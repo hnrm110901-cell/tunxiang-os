@@ -34,6 +34,10 @@ from .compliance import ComplianceLicense, LicenseType, LicenseStatus
 from .quality import QualityInspection, InspectionStatus
 from .neural_event_log import NeuralEventLog, EventProcessingStatus
 from .dish import DishCategory, Dish, DishIngredient
+from .bom import BOMTemplate, BOMItem
+from .dish_master import DishMaster, BrandMenu, StoreMenu
+from .channel_config import SalesChannelConfig
+from .dish_channel import DishChannelConfig
 from .ai_model import AIModel, ModelPurchaseRecord, DataContributionRecord, ModelType, ModelLevel, ModelStatus, PurchaseStatus
 from .federated_learning import FLTrainingRound, FLModelUpload, RoundStatus
 from .marketing_campaign import MarketingCampaign
@@ -105,6 +109,13 @@ __all__ = [
     "DishCategory",
     "Dish",
     "DishIngredient",
+    "BOMTemplate",
+    "BOMItem",
+    "DishMaster",
+    "BrandMenu",
+    "StoreMenu",
+    "SalesChannelConfig",
+    "DishChannelConfig",
     "AIModel",
     "ModelPurchaseRecord",
     "DataContributionRecord",

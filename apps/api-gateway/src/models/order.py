@@ -47,6 +47,9 @@ class Order(Base, TimestampMixin):
     # Staff tracking
     waiter_id = Column(String(50), index=True)   # 服务员ID（用于员工绩效基线计算）
 
+    # 销售渠道（Task2 P0 字段）
+    sales_channel = Column(String(30), nullable=True, index=True)
+
     # Metadata
     notes = Column(String(500))
     order_metadata = Column(JSON, default=dict)  # Renamed from metadata to avoid SQLAlchemy conflict
