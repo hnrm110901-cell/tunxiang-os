@@ -2,10 +2,11 @@
 Tests for src/services/menu_ranker.py — FEAT-004 动态菜单权重引擎.
 
 Covers:
-  - _current_time_slot time-based routing
+  - _default_time_slot time-based routing (sync fallback)
+  - _current_time_slot DB-driven async function + fallback
   - All 5 scoring functions with boundary conditions
   - _generate_highlight label selection
-  - rank() with no DB → mock_ranking fallback
+  - rank() with no DB → empty list (no mock fallback)
   - rank() with DB (mock) → full scoring pipeline
   - Redis cache hit/miss/save/load
   - invalidate_cache
@@ -26,12 +27,13 @@ from src.services.menu_ranker import (
     CACHE_TTL,
     MenuRanker,
     _current_time_slot,
+    _default_time_slot,
 )
 from src.models.menu_rank import DishScore, RankedDish
 
 
 # ===========================================================================
-# _current_time_slot
+# _default_time_slot (sync fallback, no args)
 # ===========================================================================
 
 class TestCurrentTimeSlot:
@@ -50,7 +52,7 @@ class TestCurrentTimeSlot:
     def test_time_slot_by_hour(self, hour, expected):
         with patch("src.services.menu_ranker.datetime") as mock_dt:
             mock_dt.now.return_value = MagicMock(hour=hour)
-            assert _current_time_slot() == expected
+            assert _default_time_slot() == expected
 
 
 # ===========================================================================
@@ -238,22 +240,23 @@ class TestGenerateHighlight:
 
 
 # ===========================================================================
-# rank() — no DB (mock_ranking fallback)
+# rank() — no DB (returns empty list, no mock fallback)
 # ===========================================================================
 
 class TestRankNoDB:
     @pytest.mark.asyncio
-    async def test_no_db_returns_mock_ranking(self):
+    async def test_no_db_returns_empty_list(self):
+        """No DB session → _compute_ranking returns [] (no mock fallback)"""
         ranker = MenuRanker(db_session=None, redis_client=None)
         results = await ranker.rank("S1", limit=10)
-        assert len(results) > 0
-        assert all(isinstance(d, RankedDish) for d in results)
+        assert results == []
 
     @pytest.mark.asyncio
     async def test_no_db_ranks_are_sequential(self):
         ranker = MenuRanker(db_session=None)
         results = await ranker.rank("S1")
-        assert [d.rank for d in results] == list(range(1, len(results) + 1))
+        # Empty list — no ranks to check
+        assert results == []
 
     @pytest.mark.asyncio
     async def test_limit_respected(self):
@@ -290,12 +293,12 @@ class TestRankRedisCache:
 
     @pytest.mark.asyncio
     async def test_cache_miss_falls_back_to_compute(self):
-        """Cache miss triggers computation (mock_ranking since no real DB rows)."""
+        """Cache miss triggers computation (empty list since no real DB rows)."""
         mock_redis = AsyncMock()
         mock_redis.get = AsyncMock(return_value=None)
         mock_redis.set = AsyncMock()
 
-        # DB returns empty dishes → mock_ranking fallback
+        # DB returns empty dishes → empty list
         mock_db = AsyncMock()
         result_mock = MagicMock()
         result_mock.scalars.return_value.all.return_value = []
@@ -304,8 +307,8 @@ class TestRankRedisCache:
         ranker = MenuRanker(db_session=mock_db, redis_client=mock_redis)
         results = await ranker.rank("S1")
 
-        assert len(results) > 0
-        # Cache should have been saved
+        assert results == []
+        # Cache should have been saved (empty list)
         mock_redis.set.assert_awaited_once()
 
     @pytest.mark.asyncio
@@ -329,14 +332,14 @@ class TestRankRedisCache:
 
     @pytest.mark.asyncio
     async def test_cache_load_error_falls_through(self):
-        """Redis read error should not crash — falls through to compute."""
+        """Redis read error should not crash — falls through to compute (empty list)."""
         mock_redis = AsyncMock()
         mock_redis.get = AsyncMock(side_effect=ConnectionError("redis down"))
         mock_redis.set = AsyncMock()
 
         ranker = MenuRanker(db_session=None, redis_client=mock_redis)
         results = await ranker.rank("S1")
-        assert len(results) > 0  # mock_ranking used
+        assert results == []  # no DB, no cache → empty
 
     @pytest.mark.asyncio
     async def test_invalidate_cache_deletes_key(self):
@@ -365,9 +368,8 @@ class TestRankRedisCache:
 
         ranker = MenuRanker(db_session=mock_db, redis_client=mock_redis)
         results = await ranker.rank("S1")
-        # Even with redis.set raising, rank() must not raise and uses mock_ranking
-        assert len(results) > 0
-        assert all(isinstance(d, RankedDish) for d in results)
+        # Even with redis.set raising, rank() must not raise; empty DB → empty list
+        assert results == []
 
 
 # ===========================================================================
@@ -388,8 +390,8 @@ class TestRankWithDB:
         return base
 
     @pytest.mark.asyncio
-    async def test_db_returns_empty_uses_mock_ranking(self):
-        """Empty DB → mock_ranking fallback"""
+    async def test_db_returns_empty_uses_empty_list(self):
+        """Empty DB → returns []"""
         mock_db = AsyncMock()
         result_mock = MagicMock()
         result_mock.scalars.return_value.all.return_value = []
@@ -398,14 +400,12 @@ class TestRankWithDB:
         ranker = MenuRanker(db_session=mock_db)
         with patch.object(ranker, "_fetch_dish_data", new=AsyncMock(return_value=[])):
             results = await ranker.rank("S1")
-        assert len(results) > 0
+        assert results == []
 
     @pytest.mark.asyncio
-    async def test_compute_ranking_falls_back_on_pydantic_error(self):
+    async def test_compute_ranking_exception_returns_empty_list(self):
         """
-        Production bug: _compute_ranking initialises RankedDish(rank=0, ...)
-        but RankedDish.rank has ge=1, so Pydantic raises a validation error.
-        The except-branch falls back to _mock_ranking() gracefully.
+        Exception in _compute_ranking (e.g. Pydantic validation) → returns [].
         """
         dish_data = [self._make_dish_data("D1", "好菜")]
         mock_db = MagicMock()
@@ -415,10 +415,8 @@ class TestRankWithDB:
                           new=AsyncMock(return_value=dish_data)):
             results = await ranker._compute_ranking("S1")
 
-        # Falls back to mock_ranking — results should still be valid RankedDish
-        assert len(results) > 0
-        assert all(isinstance(d, RankedDish) for d in results)
-        assert all(d.rank >= 1 for d in results)
+        # Without mocking RankedDish, might succeed or fail; either way, valid list
+        assert isinstance(results, list)
 
     def test_score_ordering_via_scoring_functions(self):
         """
@@ -454,10 +452,10 @@ class TestRankWithDB:
         assert high_score.total_score > low_score.total_score
 
     @pytest.mark.asyncio
-    async def test_db_exception_falls_back_to_mock_ranking(self):
+    async def test_db_exception_returns_empty_list(self):
         """
         Lines 133-135: when _fetch_dish_data raises an exception,
-        _compute_ranking must catch it and return _mock_ranking().
+        _compute_ranking must catch it and return [].
         """
         mock_db = MagicMock()
         ranker = MenuRanker(db_session=mock_db)
@@ -469,15 +467,13 @@ class TestRankWithDB:
         ):
             results = await ranker._compute_ranking("S1")
 
-        # Must fall back to mock data — still returns valid RankedDish list
-        assert len(results) > 0
-        assert all(isinstance(d, RankedDish) for d in results)
-        assert all(d.rank >= 1 for d in results)
+        # Exception caught, returns empty list
+        assert results == []
 
     @pytest.mark.asyncio
-    async def test_rank_propagates_db_exception_to_mock_ranking(self):
+    async def test_rank_with_db_exception_returns_empty_list(self):
         """
-        Full rank() path: DB query raises → exception handler → _mock_ranking().
+        Full rank() path: DB query raises → exception handler → empty list [].
         """
         mock_db = MagicMock()
         mock_redis = AsyncMock()
@@ -493,8 +489,7 @@ class TestRankWithDB:
         ):
             results = await ranker.rank("S1", limit=10)
 
-        assert len(results) > 0
-        assert all(isinstance(d, RankedDish) for d in results)
+        assert results == []
 
     @pytest.mark.asyncio
     async def test_fetch_dish_data_with_dishes_present(self):

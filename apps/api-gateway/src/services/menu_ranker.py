@@ -24,9 +24,16 @@ logger = structlog.get_logger()
 CACHE_TTL = 5 * 60  # 5分钟
 CACHE_KEY_PREFIX = "menu_rank:"
 
+# 默认时段配置（MealPeriod 表为空时 fallback）
+_DEFAULT_SLOTS = [
+    ("breakfast", 6, 10),
+    ("lunch",    10, 14),
+    ("dinner",   17, 21),
+]
 
-def _current_time_slot() -> str:
-    """返回当前时段：breakfast/lunch/dinner/off_peak"""
+
+def _default_time_slot() -> str:
+    """默认时段判断（fallback，无 DB 时使用）"""
     hour = datetime.now().hour
     if 6 <= hour < 10:
         return "breakfast"
@@ -35,6 +42,42 @@ def _current_time_slot() -> str:
     elif 17 <= hour < 21:
         return "dinner"
     return "off_peak"
+
+
+async def _current_time_slot(session, store_id: str) -> str:
+    """
+    从 meal_periods 表查询当前时段。
+    无记录/匹配失败时 fallback 到默认分段。
+    """
+    try:
+        from sqlalchemy import select
+        from ..models.meal_period import MealPeriod
+
+        stmt = select(MealPeriod).where(
+            MealPeriod.store_id == store_id,
+            MealPeriod.is_active.is_(True),
+        )
+        result = await session.execute(stmt)
+        periods = result.scalars().all()
+
+        if not periods:
+            return _default_time_slot()
+
+        hour = datetime.now().hour
+        for period in periods:
+            if period.start_hour <= period.end_hour:
+                # 普通时段（不跨午夜）
+                if period.start_hour <= hour < period.end_hour:
+                    return period.name
+            else:
+                # 跨午夜时段（如深夜 22-2）
+                if hour >= period.start_hour or hour < period.end_hour:
+                    return period.name
+
+        return "off_peak"
+    except Exception as e:
+        logger.warning("meal_period.query_failed", store_id=store_id, error=str(e))
+        return _default_time_slot()
 
 
 class MenuRanker:
@@ -88,14 +131,14 @@ class MenuRanker:
     async def _compute_ranking(self, store_id: str) -> List[RankedDish]:
         """核心评分计算"""
         if not self._db:
-            return self._mock_ranking()
+            return []
 
         try:
             dish_data = await self._fetch_dish_data(store_id)
             if not dish_data:
-                return self._mock_ranking()
+                return []
 
-            time_slot = _current_time_slot()
+            time_slot = await _current_time_slot(self._db, store_id)
             scored_dishes = []
 
             for dish in dish_data:
@@ -132,7 +175,7 @@ class MenuRanker:
 
         except Exception as e:
             logger.error("menu_ranker.compute_failed", store_id=store_id, error=str(e))
-            return self._mock_ranking()
+            return []
 
     async def _fetch_dish_data(self, store_id: str) -> List[Dict[str, Any]]:
         """从数据库批量获取菜品及销售统计数据
@@ -333,23 +376,6 @@ class MenuRanker:
         elif score.low_refund_score >= 0.9:
             return "顾客满意度高"
         return None
-
-    def _mock_ranking(self) -> List[RankedDish]:
-        """无 DB 时返回示例排名（降级）"""
-        mock_dishes = [
-            ("D001", "招牌红烧肉", 0.85, 0.80, 0.90, 0.75, 0.95),
-            ("D002", "清蒸鲈鱼", 0.75, 0.85, 0.70, 0.80, 0.90),
-            ("D003", "麻婆豆腐", 0.65, 0.75, 0.95, 0.85, 0.85),
-        ]
-        result = []
-        for i, (dish_id, name, t, m, s, ts, lr) in enumerate(mock_dishes, start=1):
-            score = DishScore(
-                dish_id=dish_id, dish_name=name,
-                trend_score=t, margin_score=m, stock_score=s,
-                time_slot_score=ts, low_refund_score=lr,
-            ).compute_total()
-            result.append(RankedDish(rank=i, dish_id=dish_id, dish_name=name, score=score))
-        return result
 
     async def _load_cache(self, store_id: str) -> Optional[List[RankedDish]]:
         if not self._redis:

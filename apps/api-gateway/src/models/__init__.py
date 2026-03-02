@@ -49,6 +49,7 @@ from .fct import FCTTaxRecord, FCTCashFlowItem, TaxType, TaxpayerType, CashFlowD
 from .banquet_lifecycle import BanquetStage, BanquetStageHistory
 from .banquet_event_order import BanquetEventOrder, BEOStatus
 from .waste_event import WasteEvent, WasteEventType, WasteEventStatus
+from .meal_period import MealPeriod
 
 __all__ = [
     "Base",
@@ -150,4 +151,5 @@ __all__ = [
     "WasteEvent",
     "WasteEventType",
     "WasteEventStatus",
+    "MealPeriod",
 ]
