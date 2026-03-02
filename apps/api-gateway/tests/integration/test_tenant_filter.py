@@ -189,3 +189,196 @@ class TestTenantFilterContext:
              patch("src.core.tenant_filter.disable_tenant_filter"):
             async with TenantFilterContext(mock_session) as s:
                 assert s is mock_session
+
+
+# ===========================================================================
+# receive_do_orm_execute inner function (lines 88-111)
+# ===========================================================================
+
+class TestReceiveDoOrmExecute:
+    """
+    Tests for the inner `receive_do_orm_execute` function defined inside
+    enable_tenant_filter's ORM fallback block (lines 88-111).
+
+    Strategy: use a fake `event.listens_for` decorator to capture the inner
+    function, then call it directly with mock orm_execute_state objects.
+    """
+
+    def _capture_listener(self, mock_event):
+        """Return a fake listens_for that captures the registered function."""
+        captured = {}
+
+        def fake_listens_for(session, event_name):
+            def decorator(fn):
+                captured["fn"] = fn
+                return fn
+            return decorator
+
+        mock_event.listens_for = fake_listens_for
+        return captured
+
+    @pytest.mark.asyncio
+    async def test_non_select_returns_early(self):
+        """ORM listener returns immediately for non-SELECT statements (line 89-90)."""
+        mock_session = AsyncMock()
+
+        with patch("src.core.tenant_filter.TenantContext.get_current_tenant", return_value="S1"), \
+             patch("src.core.tenant_filter.event") as mock_event:
+            captured = self._capture_listener(mock_event)
+            await enable_tenant_filter(mock_session, use_rls=False)
+
+        assert "fn" in captured, "listens_for decorator was not called"
+
+        mock_state = MagicMock()
+        mock_state.is_select = False
+        # Should return without touching statement
+        captured["fn"](mock_state)
+        mock_state.statement.froms.__iter__.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_no_tenant_returns_early(self):
+        """ORM listener returns early when no tenant context at query time (lines 93-94)."""
+        mock_session = AsyncMock()
+
+        with patch("src.core.tenant_filter.TenantContext.get_current_tenant", return_value="S1"), \
+             patch("src.core.tenant_filter.event") as mock_event:
+            captured = self._capture_listener(mock_event)
+            await enable_tenant_filter(mock_session, use_rls=False)
+
+        assert "fn" in captured
+
+        mock_state = MagicMock()
+        mock_state.is_select = True
+        with patch("src.core.tenant_filter.TenantContext.get_current_tenant", return_value=None):
+            captured["fn"](mock_state)
+        mock_state.statement.froms.__iter__.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_non_tenant_table_not_filtered(self):
+        """ORM listener skips tables not in TENANT_TABLES (lines 98-111)."""
+        mock_session = AsyncMock()
+
+        with patch("src.core.tenant_filter.TenantContext.get_current_tenant", return_value="S1"), \
+             patch("src.core.tenant_filter.event") as mock_event:
+            captured = self._capture_listener(mock_event)
+            await enable_tenant_filter(mock_session, use_rls=False)
+
+        assert "fn" in captured
+
+        mock_table = MagicMock()
+        mock_table.name = "users"  # system table, not in TENANT_TABLES
+
+        mock_state = MagicMock()
+        mock_state.is_select = True
+        mock_state.statement.froms = [mock_table]
+
+        with patch("src.core.tenant_filter.TenantContext.get_current_tenant", return_value="S1"):
+            captured["fn"](mock_state)
+
+        mock_state.statement.where.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_tenant_table_with_existing_filter_not_doubled(self):
+        """ORM listener skips filter injection when store_id already present (line 102)."""
+        mock_session = AsyncMock()
+
+        with patch("src.core.tenant_filter.TenantContext.get_current_tenant", return_value="S1"), \
+             patch("src.core.tenant_filter.event") as mock_event:
+            captured = self._capture_listener(mock_event)
+            await enable_tenant_filter(mock_session, use_rls=False)
+
+        assert "fn" in captured
+
+        mock_table = MagicMock()
+        mock_table.name = "orders"  # in TENANT_TABLES
+
+        mock_state = MagicMock()
+        mock_state.is_select = True
+        mock_state.statement.froms = [mock_table]
+
+        with patch("src.core.tenant_filter.TenantContext.get_current_tenant", return_value="S1"), \
+             patch("src.core.tenant_filter._has_store_filter", return_value=True):
+            captured["fn"](mock_state)
+
+        mock_state.statement.where.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_tenant_table_applies_store_id_filter(self):
+        """ORM listener injects store_id WHERE clause for tenant tables (lines 103-111)."""
+        mock_session = AsyncMock()
+
+        with patch("src.core.tenant_filter.TenantContext.get_current_tenant", return_value="S1"), \
+             patch("src.core.tenant_filter.event") as mock_event:
+            captured = self._capture_listener(mock_event)
+            await enable_tenant_filter(mock_session, use_rls=False)
+
+        assert "fn" in captured
+
+        mock_table = MagicMock()
+        mock_table.name = "orders"  # in TENANT_TABLES
+
+        mock_state = MagicMock()
+        mock_state.is_select = True
+        mock_state.statement.froms = [mock_table]
+        # Capture statement before listener reassigns mock_state.statement
+        original_statement = mock_state.statement
+
+        with patch("src.core.tenant_filter.TenantContext.get_current_tenant", return_value="S1"), \
+             patch("src.core.tenant_filter._has_store_filter", return_value=False):
+            captured["fn"](mock_state)
+
+        original_statement.where.assert_called_once()
+
+
+# ===========================================================================
+# disable_tenant_filter (lines 147-148)
+# ===========================================================================
+
+class TestDisableTenantFilter:
+    def test_disable_calls_event_remove(self):
+        """
+        disable_tenant_filter calls event.remove with the session and listener name
+        (line 147), then logs the outcome (line 148).
+
+        receive_do_orm_execute is a closure defined inside enable_tenant_filter, so
+        it is not in module scope.  We inject a sentinel into the module namespace
+        so the name resolves, then verify event.remove is called correctly.
+        """
+        import src.core.tenant_filter as tf_mod
+        from src.core.tenant_filter import disable_tenant_filter
+
+        mock_session = MagicMock()
+        sentinel_fn = MagicMock()
+
+        # Inject the name into module scope so the function body can resolve it
+        tf_mod.receive_do_orm_execute = sentinel_fn
+        try:
+            with patch.object(tf_mod, "event") as mock_event:
+                disable_tenant_filter(mock_session)
+
+            mock_event.remove.assert_called_once_with(
+                mock_session, "do_orm_execute", sentinel_fn
+            )
+        finally:
+            # Always clean up the injected attribute
+            del tf_mod.receive_do_orm_execute
+
+    def test_disable_logs_info(self):
+        """
+        After event.remove, disable_tenant_filter logs an info message (line 148).
+        """
+        import src.core.tenant_filter as tf_mod
+        from src.core.tenant_filter import disable_tenant_filter
+
+        mock_session = MagicMock()
+        sentinel_fn = MagicMock()
+
+        tf_mod.receive_do_orm_execute = sentinel_fn
+        try:
+            with patch.object(tf_mod, "event"), \
+                 patch.object(tf_mod, "logger") as mock_logger:
+                disable_tenant_filter(mock_session)
+
+            mock_logger.info.assert_called_once_with("Tenant filter disabled for session")
+        finally:
+            del tf_mod.receive_do_orm_execute

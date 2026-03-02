@@ -459,3 +459,140 @@ class TestGlobalInstance:
     def test_global_guardrails_is_initialized(self):
         assert isinstance(guardrails, NeuralSymbolicGuardrails)
         assert len(guardrails.rules) > 0
+
+
+# ===========================================================================
+# validate_proposal: exception handler (lines 309-311)
+# ===========================================================================
+
+class TestValidateProposalExceptionHandler:
+    def test_bad_rule_check_is_caught_and_skipped(self, ng):
+        """Inject a rule whose check() raises → caught, logged, continue."""
+        # Temporarily add a bad rule that always raises
+        ng.rules["BAD_TEST"] = {
+            "name": "bad rule for testing",
+            "category": RuleCategory.FINANCIAL,
+            "severity": ViolationSeverity.LOW,
+            "check": lambda proposal, context: 1 / 0,  # always raises
+            "threshold_key": "budget",
+        }
+        try:
+            # Should NOT raise; the exception is caught inside validate_proposal
+            result = ng.validate_proposal(
+                _proposal({"supplier_certified": True}),
+                _ctx(),
+            )
+            # The bad rule is skipped; other rules may still produce violations
+            assert isinstance(result, GuardrailResult)
+        finally:
+            del ng.rules["BAD_TEST"]
+
+
+# ===========================================================================
+# validate_proposal: HIGH-only escalation reason (line 332)
+# ===========================================================================
+
+class TestHighOnlyEscalationReason:
+    def test_two_high_violations_no_critical_sets_high_risk_reason(self, ng):
+        """
+        2+ HIGH violations (no CRITICAL) → requires_human_approval=True,
+        escalation_reason contains '高风险' (line 332 branch).
+        """
+        # FIN_002 (HIGH): quantity > historical_peak * 1.2
+        # SAFE_002 (HIGH): requires_cold_chain=True but no temperature_log
+        proposal = _proposal({
+            "quantity": 9999,             # triggers FIN_002 (HIGH)
+            "requires_cold_chain": True,  # triggers SAFE_002 (HIGH)
+            "has_temperature_log": False,
+            "supplier_certified": True,   # avoid COMP_001 CRITICAL
+            "staff_count": 3,             # avoid OPS_001 CRITICAL (minimum_staff=3)
+            "shelf_life_days": 3,         # avoid SAFE_001 CRITICAL
+            "discounted_price": 50,       # avoid BIZ_001 HIGH (equals cost_price)
+        })
+        ctx = _ctx(historical_peak=100)  # 100*1.2=120, so 9999 > 120 → FIN_002
+
+        result = ng.validate_proposal(proposal, ctx)
+
+        high_violations = [v for v in result.violations if v.severity == ViolationSeverity.HIGH]
+        critical_violations = [v for v in result.violations if v.severity == ViolationSeverity.CRITICAL]
+
+        assert len(high_violations) >= 2
+        assert len(critical_violations) == 0
+        assert result.requires_human_approval is True
+        assert result.escalation_reason is not None
+        assert "高风险" in result.escalation_reason
+
+
+# ===========================================================================
+# auto_fix_proposal: FIN_002, BIZ_001, REF_001 fix branches (lines 430, 435, 438)
+# ===========================================================================
+
+class TestAutoFixSpecificRules:
+    def test_fin002_medium_violation_adjusts_quantity(self, ng):
+        """
+        Manual FIN_002 violation with MEDIUM severity (fixable) →
+        auto_fix sets quantity = historical_peak * 1.2 (line 430).
+        """
+        proposal = _proposal({"quantity": 100})
+        violations = [
+            RuleViolation(
+                rule_id="FIN_002",
+                rule_name="采购量不可超过历史峰值120%",
+                category=RuleCategory.FINANCIAL,
+                severity=ViolationSeverity.MEDIUM,  # MEDIUM is fixable
+                description="test",
+                actual_value=100,
+                threshold_value=None,
+                recommendation="",
+            )
+        ]
+        ctx = {"historical_peak": 1000}
+        fixed = ng.auto_fix_proposal(proposal, violations, ctx)
+        assert fixed is not None
+        assert fixed["quantity"] == int(1000 * 1.2)  # 1200
+
+    def test_biz001_medium_violation_sets_discounted_price(self, ng):
+        """
+        Manual BIZ_001 violation with MEDIUM severity →
+        auto_fix sets discounted_price = cost_price (line 435).
+        """
+        proposal = _proposal({"discounted_price": 10})
+        violations = [
+            RuleViolation(
+                rule_id="BIZ_001",
+                rule_name="促销折扣不可低于成本价",
+                category=RuleCategory.BUSINESS,
+                severity=ViolationSeverity.MEDIUM,
+                description="test",
+                actual_value=10,
+                threshold_value=None,
+                recommendation="",
+            )
+        ]
+        ctx = {"cost_price": 50}
+        fixed = ng.auto_fix_proposal(proposal, violations, ctx)
+        assert fixed is not None
+        assert fixed["discounted_price"] == 50
+
+    def test_ref001_medium_violation_caps_refund_amount(self, ng):
+        """
+        Manual REF_001 violation with MEDIUM severity →
+        auto_fix sets refund_amount = original_order_amount (line 438).
+        """
+        proposal = _proposal({"refund_amount": 99999})
+        violations = [
+            RuleViolation(
+                rule_id="REF_001",
+                rule_name="退款金额不可超过原订单金额",
+                category=RuleCategory.FINANCIAL,
+                severity=ViolationSeverity.MEDIUM,
+                description="test",
+                actual_value=99999,
+                threshold_value=None,
+                recommendation="",
+            )
+        ]
+        ctx = {"original_order_amount": 10000}
+        fixed = ng.auto_fix_proposal(proposal, violations, ctx)
+        assert fixed is not None
+        assert fixed["refund_amount"] == 10000

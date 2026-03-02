@@ -314,3 +314,14 @@ class TestCircuitBreakerDecorator:
             await no_fallback()
         with pytest.raises(CircuitBreakerOpenError):
             await no_fallback()
+
+    def test_decorator_sync_no_fallback_reraises(self):
+        @circuit_breaker(failure_threshold=1, success_threshold=2, timeout=60)
+        def sync_no_fallback():
+            raise RuntimeError("sync error")
+
+        with pytest.raises(RuntimeError):
+            sync_no_fallback()
+        # Now circuit is open; no fallback → re-raises CircuitBreakerOpenError
+        with pytest.raises(CircuitBreakerOpenError):
+            sync_no_fallback()
