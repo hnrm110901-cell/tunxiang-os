@@ -368,6 +368,21 @@ class TestBaiduSTTInternal:
 
 class TestBaiduTTSInternal:
     @pytest.mark.asyncio
+    async def test_baidu_tts_no_token_returns_empty(self):
+        """Baidu TTS: token response has no access_token → raises inside try → caught → b''."""
+        svc = VoiceService(VoiceProvider.BAIDU)
+        mock_token_resp = MagicMock()
+        mock_token_resp.json = MagicMock(return_value={})  # no access_token
+        mock_client = AsyncMock()
+        mock_client.post = AsyncMock(return_value=mock_token_resp)
+        import httpx
+        with patch.object(httpx, "AsyncClient") as mock_cls:
+            mock_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_cls.return_value.__aexit__ = AsyncMock(return_value=None)
+            audio = await svc._baidu_tts("你好", "zh-CN", "female", 1.0)
+        assert audio == b""
+
+    @pytest.mark.asyncio
     async def test_baidu_tts_audio_response(self):
         svc = VoiceService(VoiceProvider.BAIDU)
         mock_token_resp = MagicMock()

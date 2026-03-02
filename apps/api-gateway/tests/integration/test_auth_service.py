@@ -209,6 +209,15 @@ class TestRefreshAccessToken:
         with pytest.raises(Exception):
             await svc.refresh_access_token(tokens["access_token"])
 
+    @pytest.mark.asyncio
+    async def test_missing_sub_in_payload_raises_value_error(self):
+        """Payload without 'sub' field triggers line 86 ValueError."""
+        svc = AuthService()
+        with patch("src.services.auth_service.decode_refresh_token",
+                   return_value={"type": "refresh"}):  # no 'sub'
+            with pytest.raises(ValueError, match="无效的刷新令牌"):
+                await svc.refresh_access_token("any-token")
+
 
 # ===========================================================================
 # authenticate_user (mock DB)
@@ -287,6 +296,56 @@ class TestRegisterUser:
                     role=UserRole.WAITER,
                 )
 
+    @pytest.mark.asyncio
+    async def test_duplicate_email_raises(self):
+        """Second query (email check) returns existing user → ValueError."""
+        existing = _make_user()
+        svc = AuthService()
+        session = AsyncMock()
+        none_result = MagicMock()
+        none_result.scalar_one_or_none = MagicMock(return_value=None)
+        dup_result = MagicMock()
+        dup_result.scalar_one_or_none = MagicMock(return_value=existing)
+        session.execute = AsyncMock(side_effect=[none_result, dup_result])
+
+        @asynccontextmanager
+        async def _ctx():
+            yield session
+
+        with patch("src.services.auth_service.get_db_session", _ctx):
+            with pytest.raises(ValueError, match="邮箱已存在"):
+                await svc.register_user(
+                    username="newuser", email="taken@test.com",
+                    password="pw", full_name="Test",
+                    role=UserRole.WAITER,
+                )
+
+    @pytest.mark.asyncio
+    async def test_register_success_returns_user(self):
+        """Both duplicate checks pass → User created and returned."""
+        svc = AuthService()
+        session = AsyncMock()
+        none_result = MagicMock()
+        none_result.scalar_one_or_none = MagicMock(return_value=None)
+        session.execute = AsyncMock(return_value=none_result)
+        session.add = MagicMock()
+        session.commit = AsyncMock()
+        session.refresh = AsyncMock()
+
+        @asynccontextmanager
+        async def _ctx():
+            yield session
+
+        with patch("src.services.auth_service.get_db_session", _ctx):
+            result = await svc.register_user(
+                username="brand_new", email="new@test.com",
+                password="pw", full_name="Test",
+                role=UserRole.WAITER,
+            )
+        assert result.username == "brand_new"
+        assert result.email == "new@test.com"
+        assert result.is_active is True
+
 
 # ===========================================================================
 # change_password (mock DB)
@@ -315,3 +374,82 @@ class TestChangePassword:
         with patch("src.services.auth_service.get_db_session", _mock_db_session(None)):
             result = await svc.change_password("ghost-id", "pw", "new-pw")
         assert result is False
+
+
+# ===========================================================================
+# get_user_by_username (mock DB)
+# ===========================================================================
+
+class TestGetUserByUsername:
+    @pytest.mark.asyncio
+    async def test_found_returns_user(self):
+        user = _make_user()
+        svc = AuthService()
+        with patch("src.services.auth_service.get_db_session", _mock_db_session(user)):
+            result = await svc.get_user_by_username("testuser")
+        assert result is user
+
+    @pytest.mark.asyncio
+    async def test_not_found_returns_none(self):
+        svc = AuthService()
+        with patch("src.services.auth_service.get_db_session", _mock_db_session(None)):
+            result = await svc.get_user_by_username("ghost")
+        assert result is None
+
+
+# ===========================================================================
+# update_user (mock DB)
+# ===========================================================================
+
+class TestUpdateUser:
+    @pytest.mark.asyncio
+    async def test_not_found_returns_none(self):
+        svc = AuthService()
+        with patch("src.services.auth_service.get_db_session", _mock_db_session(None)):
+            result = await svc.update_user("nonexistent-id")
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_updates_full_name(self):
+        user = _make_user()
+        svc = AuthService()
+        with patch("src.services.auth_service.get_db_session", _mock_db_session(user)):
+            result = await svc.update_user(str(user.id), full_name="New Name")
+        assert user.full_name == "New Name"
+        assert result is user
+
+    @pytest.mark.asyncio
+    async def test_updates_email(self):
+        user = _make_user()
+        svc = AuthService()
+        with patch("src.services.auth_service.get_db_session", _mock_db_session(user)):
+            result = await svc.update_user(str(user.id), email="updated@test.com")
+        assert user.email == "updated@test.com"
+        assert result is user
+
+    @pytest.mark.asyncio
+    async def test_updates_role(self):
+        user = _make_user()
+        svc = AuthService()
+        with patch("src.services.auth_service.get_db_session", _mock_db_session(user)):
+            result = await svc.update_user(str(user.id), role=UserRole.STORE_MANAGER)
+        assert user.role == UserRole.STORE_MANAGER
+        assert result is user
+
+    @pytest.mark.asyncio
+    async def test_updates_store_id(self):
+        user = _make_user()
+        svc = AuthService()
+        with patch("src.services.auth_service.get_db_session", _mock_db_session(user)):
+            result = await svc.update_user(str(user.id), store_id="S999")
+        assert user.store_id == "S999"
+        assert result is user
+
+    @pytest.mark.asyncio
+    async def test_updates_is_active(self):
+        user = _make_user()
+        svc = AuthService()
+        with patch("src.services.auth_service.get_db_session", _mock_db_session(user)):
+            result = await svc.update_user(str(user.id), is_active=False)
+        assert user.is_active is False
+        assert result is user
