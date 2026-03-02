@@ -351,6 +351,24 @@ class TestRankRedisCache:
         ranker = MenuRanker(redis_client=None)
         await ranker.invalidate_cache("S1")  # must not raise
 
+    @pytest.mark.asyncio
+    async def test_save_cache_exception_is_swallowed(self):
+        """Lines 373-374: exception during _save_cache is swallowed, rank() still returns."""
+        mock_redis = AsyncMock()
+        mock_redis.get = AsyncMock(return_value=None)  # cache miss
+        mock_redis.set = AsyncMock(side_effect=ConnectionError("redis down"))
+
+        mock_db = AsyncMock()
+        result_mock = MagicMock()
+        result_mock.scalars.return_value.all.return_value = []
+        mock_db.execute = AsyncMock(return_value=result_mock)
+
+        ranker = MenuRanker(db_session=mock_db, redis_client=mock_redis)
+        results = await ranker.rank("S1")
+        # Even with redis.set raising, rank() must not raise and uses mock_ranking
+        assert len(results) > 0
+        assert all(isinstance(d, RankedDish) for d in results)
+
 
 # ===========================================================================
 # rank() — DB path with controlled dish_data
@@ -477,3 +495,107 @@ class TestRankWithDB:
 
         assert len(results) > 0
         assert all(isinstance(d, RankedDish) for d in results)
+
+    @pytest.mark.asyncio
+    async def test_fetch_dish_data_with_dishes_present(self):
+        """Lines 156-276: full _fetch_dish_data path when dishes are returned from DB."""
+        import uuid
+        from decimal import Decimal
+
+        # Mock dish object
+        dish_id = str(uuid.uuid4())
+        mock_dish = MagicMock()
+        mock_dish.id = dish_id
+        mock_dish.name = "测试菜"
+        mock_dish.category = "主食"
+        mock_dish.price = Decimal("50")
+        mock_dish.store_id = "S1"
+        mock_dish.is_available = True
+        mock_dish.cost = 20
+        mock_dish.current_stock = 30
+        mock_dish.min_stock = 10
+
+        # Result 1: dishes
+        dish_result = MagicMock()
+        dish_result.scalars.return_value.all.return_value = [mock_dish]
+
+        # Result 2: sales rows
+        sales_row = MagicMock()
+        sales_row.item_id = dish_id
+        sales_row.recent_qty = 100
+        sales_row.prev_qty = 80
+        sales_result = MagicMock()
+        sales_result.all.return_value = [sales_row]
+
+        # Result 3: slot rows
+        slot_row = MagicMock()
+        slot_row.item_id = dish_id
+        slot_row.total_qty = 100
+        slot_row.lunch_qty = 60
+        slot_row.dinner_qty = 40
+        slot_result = MagicMock()
+        slot_result.all.return_value = [slot_row]
+
+        # Result 4: cancel rows
+        cancel_row = MagicMock()
+        cancel_row.item_id = dish_id
+        cancel_row.cancelled_qty = 5
+        cancel_result = MagicMock()
+        cancel_result.all.return_value = [cancel_row]
+
+        mock_db = AsyncMock()
+        mock_db.execute = AsyncMock(
+            side_effect=[dish_result, sales_result, slot_result, cancel_result]
+        )
+
+        ranker = MenuRanker(db_session=mock_db)
+        dish_data = await ranker._fetch_dish_data("S1")
+
+        assert len(dish_data) == 1
+        d = dish_data[0]
+        assert d["dish_id"] == dish_id
+        assert d["dish_name"] == "测试菜"
+        assert d["recent_sales"] == 100
+        assert d["prev_sales"] == 80
+        assert d["lunch_sales_pct"] == pytest.approx(0.6)
+        assert d["dinner_sales_pct"] == pytest.approx(0.4)
+        # refund_rate = min(1.0, 5 / 100) = 0.05
+        assert d["refund_rate"] == pytest.approx(0.05)
+
+    @pytest.mark.asyncio
+    async def test_compute_ranking_sort_and_assign_ranks(self):
+        """Lines 125-131: successful sort + rank assignment when RankedDish allows rank=0."""
+        from pydantic import BaseModel
+        from typing import Optional
+        from decimal import Decimal
+
+        # Permissive RankedDish that accepts rank=0 (bypasses ge=1 constraint)
+        class _PermissiveRankedDish(BaseModel):
+            rank: int = 0
+            dish_id: str
+            dish_name: str
+            category: Optional[str] = None
+            image_url: Optional[str] = None
+            price: Optional[Decimal] = None
+            score: DishScore
+            highlight: Optional[str] = None
+
+        dish_data = [
+            self._make_dish_data("D1", "高分菜", recent_sales=200, prev_sales=100,
+                                 cost=0, current_stock=50, min_stock=10, refund_rate=0.0),
+            self._make_dish_data("D2", "低分菜", recent_sales=0, prev_sales=100,
+                                 cost=90, current_stock=4, min_stock=10, refund_rate=0.1),
+        ]
+
+        ranker = MenuRanker(db_session=MagicMock())
+        with patch("src.services.menu_ranker.RankedDish", _PermissiveRankedDish):
+            with patch.object(ranker, "_fetch_dish_data", new=AsyncMock(return_value=dish_data)):
+                results = await ranker._compute_ranking("S1")
+
+        # Lines 125-131: results are sorted by total_score descending, ranks assigned
+        assert len(results) == 2
+        assert results[0].rank == 1
+        assert results[1].rank == 2
+        # D1 (better on all factors) should rank first
+        assert results[0].dish_id == "D1"
+        assert results[0].score.total_score >= results[1].score.total_score

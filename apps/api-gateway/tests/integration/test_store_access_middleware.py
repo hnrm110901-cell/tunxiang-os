@@ -567,4 +567,37 @@ class TestDispatchException:
         await m.dispatch(req, call_next)
         # Context must be cleared even after an exception
         assert TenantContext.get_current_tenant() is None
+
+
+# ===========================================================================
+# dispatch: brand context set (lines 102-107)
+# ===========================================================================
+class TestDispatchBrandContextSet:
+    @pytest.mark.asyncio
+    async def test_brand_id_in_user_calls_set_current_brand(self):
+        """Lines 102-105: user has brand_id, no cross-brand request → set_current_brand called."""
+        from src.core.tenant_context import TenantContext
+        m = _middleware()
+        req = _request(
+            path="/api/v1/orders",
+            user={"role": "waiter", "store_id": "S1", "brand_id": "B1"},
+        )
+        call_next = AsyncMock(return_value=MagicMock())
+        with patch.object(TenantContext, "set_current_brand") as mock_set:
+            await m.dispatch(req, call_next)
+        mock_set.assert_called_once_with("B1")
+
+    @pytest.mark.asyncio
+    async def test_set_current_brand_value_error_is_swallowed(self):
+        """Lines 106-107: ValueError from set_current_brand is swallowed → call_next still called."""
+        from src.core.tenant_context import TenantContext
+        m = _middleware()
+        req = _request(
+            path="/api/v1/orders",
+            user={"role": "waiter", "store_id": "S1", "brand_id": "B1"},
+        )
+        call_next = AsyncMock(return_value=MagicMock())
+        with patch.object(TenantContext, "set_current_brand", side_effect=ValueError("invalid brand")):
+            await m.dispatch(req, call_next)
+        call_next.assert_awaited_once()
         assert TenantContext.get_current_brand() is None

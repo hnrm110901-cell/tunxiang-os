@@ -315,6 +315,19 @@ class TestAuditLogs:
         assert resp.status_code == 500
         assert resp.json()["detail"]["error_code"] == "QUERY_ERROR"
 
+    def test_all_filter_params_accepted(self):
+        """Lines 180-189: all 5 filter conditions are built when all params are provided."""
+        with self._sys_modules_patch(self._mock_db([])):
+            resp = client.get(
+                "/api/v1/execution/audit-logs"
+                "?store_id=S1&brand_id=B1&command_type=discount_apply"
+                "&actor_id=U1&status_filter=completed"
+            )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["records"] == []
+        assert body["total"] == 0
+
 
 # ---------------------------------------------------------------------------
 # get_current_user — no user in request.state (lines 51-54)

@@ -123,6 +123,12 @@ class TestEncryptSecret:
         assert "rotation_due" in meta
         assert meta["access_count"] == 0
 
+    def test_encrypt_raises_kms_exception_on_fernet_error(self, kms):
+        """Lines 143-145: exception in fernet.encrypt wraps to KMSException."""
+        with patch.object(kms.fernet, "encrypt", side_effect=RuntimeError("fernet error")):
+            with pytest.raises(KMSException, match="加密失败"):
+                kms.encrypt_secret("k_err", "plaintext")
+
 
 # ===========================================================================
 # decrypt_secret
@@ -309,3 +315,41 @@ class TestModuleFunctions:
         ct_old = encrypt_api_key("wechat-k3", "old-key", provider="wechat")
         ct_new = rotate_api_key("wechat-k3", ct_old, "new-key")
         assert decrypt_api_key("wechat-k3", ct_new) == "new-key"
+
+
+# ===========================================================================
+# _audit_log exception handling
+# ===========================================================================
+
+class TestAuditLog:
+    def test_audit_log_exception_is_swallowed(self, kms):
+        """Lines 335-337: exception inside _audit_log try-block is caught and logged, never raised."""
+        import asyncio
+        with patch.object(asyncio, "get_event_loop", side_effect=RuntimeError("no loop available")):
+            # _audit_log() is called by encrypt_secret; it must swallow the error
+            ct = kms.encrypt_secret("k_audit_err", "plaintext")
+        assert ct is not None  # did not raise
+
+    @pytest.mark.asyncio
+    async def test_audit_log_save_coroutine_in_async_context(self, kms):
+        """Lines 320-331: _save() coroutine runs when event loop is already running."""
+        import asyncio
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        mock_session = MagicMock()
+        mock_session.add = MagicMock()
+        mock_session.commit = AsyncMock()
+        mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session.__aexit__ = AsyncMock(return_value=False)
+
+        mock_db_module = MagicMock()
+        mock_db_module.get_db_session = MagicMock(return_value=mock_session)
+
+        # Patch sys.modules so that _save()'s lazy import of src.core.database
+        # does not trigger Settings() which needs env vars.
+        with patch.dict("sys.modules", {"src.core.database": mock_db_module}):
+            ct = kms.encrypt_secret("k_async_audit", "value")
+            # Yield to the event loop so ensure_future(_save()) can execute
+            await asyncio.sleep(0.05)
+
+        assert ct is not None
