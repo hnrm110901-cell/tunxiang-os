@@ -72,6 +72,28 @@ class TestKMSInit:
     def test_rotation_days_default(self, kms):
         assert kms.rotation_days == int(os.getenv("KMS_ROTATION_DAYS", "90"))
 
+    def test_kms_salt_not_set_uses_ephemeral_salt(self, monkeypatch):
+        """
+        Lines 82-86: when KMS_SALT is not set, _generate_fernet_key must log a
+        warning and fall back to a randomly generated ephemeral salt so that the
+        service still initialises successfully.
+        """
+        monkeypatch.delenv("KMS_SALT", raising=False)
+        import logging
+        import warnings
+        # KMSService.__init__ calls _generate_fernet_key which hits the fallback
+        # path.  It should NOT raise — it should produce a working Fernet instance.
+        svc = KMSService(master_key=_MASTER_KEY)
+        assert svc.fernet is not None
+
+        # The ephemeral salt means each instantiation produces a different key.
+        svc2 = KMSService(master_key=_MASTER_KEY)
+        # Cross-decryption should fail because salts differ
+        ct = svc.encrypt_secret("k_ephemeral", "test-value")
+        with pytest.raises(Exception):
+            # Different ephemeral salt → different Fernet key → decryption fails
+            svc2.decrypt_secret("k_ephemeral", ct)
+
 
 # ===========================================================================
 # encrypt_secret

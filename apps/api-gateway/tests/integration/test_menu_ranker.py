@@ -434,3 +434,46 @@ class TestRankWithDB:
         ).compute_total()
 
         assert high_score.total_score > low_score.total_score
+
+    @pytest.mark.asyncio
+    async def test_db_exception_falls_back_to_mock_ranking(self):
+        """
+        Lines 133-135: when _fetch_dish_data raises an exception,
+        _compute_ranking must catch it and return _mock_ranking().
+        """
+        mock_db = MagicMock()
+        ranker = MenuRanker(db_session=mock_db)
+
+        with patch.object(
+            ranker,
+            "_fetch_dish_data",
+            new=AsyncMock(side_effect=RuntimeError("DB connection lost")),
+        ):
+            results = await ranker._compute_ranking("S1")
+
+        # Must fall back to mock data — still returns valid RankedDish list
+        assert len(results) > 0
+        assert all(isinstance(d, RankedDish) for d in results)
+        assert all(d.rank >= 1 for d in results)
+
+    @pytest.mark.asyncio
+    async def test_rank_propagates_db_exception_to_mock_ranking(self):
+        """
+        Full rank() path: DB query raises → exception handler → _mock_ranking().
+        """
+        mock_db = MagicMock()
+        mock_redis = AsyncMock()
+        mock_redis.get = AsyncMock(return_value=None)   # cache miss
+        mock_redis.set = AsyncMock()
+
+        ranker = MenuRanker(db_session=mock_db, redis_client=mock_redis)
+
+        with patch.object(
+            ranker,
+            "_fetch_dish_data",
+            new=AsyncMock(side_effect=Exception("unexpected DB error")),
+        ):
+            results = await ranker.rank("S1", limit=10)
+
+        assert len(results) > 0
+        assert all(isinstance(d, RankedDish) for d in results)
