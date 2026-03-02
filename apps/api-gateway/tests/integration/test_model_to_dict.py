@@ -1147,3 +1147,676 @@ class TestReservationSync:
         assert result["status"] == "confirmed"
         assert result["sync_status"] == "success"
         assert result["arrival_time"] is None
+
+
+# ---------------------------------------------------------------------------
+# action_plan.py — ActionPlan.__repr__
+# ---------------------------------------------------------------------------
+
+class TestActionPlan:
+    def _make(self):
+        from src.models.action_plan import ActionPlan, DispatchStatus, ActionOutcome
+        from datetime import date
+        return ActionPlan(
+            store_id="STORE001",
+            reasoning_report_id=uuid.uuid4(),
+            report_date=date(2026, 3, 1),
+            dimension="waste",
+            severity="P1",
+            root_cause="staff_error",
+            confidence=0.85,
+            dispatch_status=DispatchStatus.DISPATCHED.value,
+            outcome=ActionOutcome.RESOLVED.value,
+        )
+
+    def test_repr_returns_string(self):
+        obj = self._make()
+        result = repr(obj)
+        assert isinstance(result, str)
+        assert "STORE001" in result
+        assert "waste" in result
+
+    def test_enum_values(self):
+        from src.models.action_plan import DispatchStatus, ActionOutcome
+        assert DispatchStatus.PENDING.value == "pending"
+        assert ActionOutcome.RESOLVED.value == "resolved"
+
+
+# ---------------------------------------------------------------------------
+# cross_store.py — CrossStoreMetric, StoreSimilarityCache, StorePeerGroup
+# ---------------------------------------------------------------------------
+
+class TestCrossStoreMetric:
+    def _make(self):
+        from src.models.cross_store import CrossStoreMetric
+        from datetime import date
+        return CrossStoreMetric(
+            store_id="STORE001",
+            metric_date=date(2026, 3, 1),
+            metric_name="waste_rate",
+            value=0.12,
+            peer_group="standard_华东",
+            peer_count=10,
+            peer_p25=0.05,
+            peer_p50=0.08,
+            peer_p75=0.14,
+            peer_p90=0.20,
+            percentile_in_peer=75.0,
+        )
+
+    def test_instantiation(self):
+        obj = self._make()
+        assert obj.store_id == "STORE001"
+        assert obj.metric_name == "waste_rate"
+        assert obj.value == 0.12
+
+
+class TestStoreSimilarityCache:
+    def _make(self):
+        from src.models.cross_store import StoreSimilarityCache
+        return StoreSimilarityCache(
+            store_a_id="STORE001",
+            store_b_id="STORE002",
+            similarity_score=0.75,
+            menu_overlap=0.60,
+            region_match=True,
+            tier_match=True,
+            capacity_ratio=0.9,
+        )
+
+    def test_instantiation(self):
+        obj = self._make()
+        assert obj.store_a_id == "STORE001"
+        assert obj.similarity_score == 0.75
+
+
+class TestStorePeerGroup:
+    def _make(self):
+        from src.models.cross_store import StorePeerGroup
+        return StorePeerGroup(
+            group_key="standard_华东",
+            tier="standard",
+            region="华东",
+            store_ids=["STORE001", "STORE002"],
+            store_count=2,
+        )
+
+    def test_instantiation(self):
+        obj = self._make()
+        assert obj.group_key == "standard_华东"
+        assert obj.store_count == 2
+
+
+# ---------------------------------------------------------------------------
+# customer_key.py — CustomerKey.__repr__, EncryptedField
+# ---------------------------------------------------------------------------
+
+class TestCustomerKey:
+    def _make(self):
+        from src.models.customer_key import CustomerKey, KeyStatus, KeyAlgorithm
+        return CustomerKey(
+            store_id="STORE001",
+            key_version=1,
+            key_alias="v1-2026-03",
+            algorithm=KeyAlgorithm.AES_256_GCM,
+            encrypted_dek="base64encodeddek==",
+            status=KeyStatus.ACTIVE,
+            is_active=True,
+            purpose="data_encryption",
+        )
+
+    def test_repr_returns_string(self):
+        obj = self._make()
+        result = repr(obj)
+        assert isinstance(result, str)
+        assert "STORE001" in result
+
+    def test_enum_values(self):
+        from src.models.customer_key import KeyStatus, KeyAlgorithm
+        assert KeyStatus.ACTIVE.value == "active"
+        assert KeyAlgorithm.AES_256_GCM.value == "AES-256-GCM"
+
+
+class TestEncryptedField:
+    def _make(self):
+        from src.models.customer_key import EncryptedField
+        return EncryptedField(
+            store_id="STORE001",
+            key_id=uuid.uuid4(),
+            table_name="waste_events",
+            field_name="evidence",
+            record_id="REC-001",
+            algorithm="AES-256-GCM",
+        )
+
+    def test_instantiation(self):
+        obj = self._make()
+        assert obj.store_id == "STORE001"
+        assert obj.table_name == "waste_events"
+
+
+# ---------------------------------------------------------------------------
+# forecast.py — ForecastResult.__repr__
+# ---------------------------------------------------------------------------
+
+class TestForecastResult:
+    def _make(self):
+        from src.models.forecast import ForecastResult
+        from datetime import date
+        return ForecastResult(
+            store_id="STORE001",
+            brand_id="BRAND001",
+            target_date=date(2026, 3, 2),
+            metric="revenue",
+            predicted_value=15000.0,
+            confidence="high",
+            basis="statistical",
+            estimated_revenue=15000.0,
+        )
+
+    def test_repr_returns_string(self):
+        obj = self._make()
+        result = repr(obj)
+        assert isinstance(result, str)
+        assert "STORE001" in result
+        assert "high" in result
+
+    def test_repr_contains_basis(self):
+        obj = self._make()
+        result = repr(obj)
+        assert "statistical" in result
+
+
+# ---------------------------------------------------------------------------
+# ingredient_mapping.py — IngredientMapping, FusionAuditLog
+# ---------------------------------------------------------------------------
+
+class TestIngredientMapping:
+    def _make(self):
+        from src.models.ingredient_mapping import IngredientMapping, FusionMethod
+        return IngredientMapping(
+            canonical_id="ING-SEAFOOD-CAOY-001",
+            canonical_name="草鱼片",
+            aliases=["草鱼", "Grass Carp Slice"],
+            category="seafood",
+            unit="kg",
+            external_ids={"pinzhi": "12345"},
+            source_costs={"supplier_invoice": {"cost_fen": 3800}},
+            canonical_cost_fen=3800,
+            fusion_confidence=0.92,
+            fusion_method=FusionMethod.EXACT_NAME.value,
+            conflict_flag=False,
+            merge_of=[],
+            is_active=True,
+        )
+
+    def test_instantiation(self):
+        obj = self._make()
+        assert obj.canonical_id == "ING-SEAFOOD-CAOY-001"
+        assert obj.canonical_name == "草鱼片"
+        assert obj.fusion_confidence == 0.92
+
+    def test_fusion_method_enum(self):
+        from src.models.ingredient_mapping import FusionMethod
+        assert FusionMethod.EXACT_ID.value == "exact_id"
+        assert FusionMethod.MANUAL.value == "manual_merge"
+
+
+class TestFusionAuditLog:
+    def _make(self):
+        from src.models.ingredient_mapping import FusionAuditLog
+        return FusionAuditLog(
+            entity_type="ingredient",
+            canonical_id="ING-SEAFOOD-CAOY-001",
+            action="create_canonical",
+            source_system="pinzhi",
+            raw_external_id="12345",
+            raw_name="草鱼",
+            confidence=0.90,
+            fusion_method="exact_name",
+            created_by="system",
+        )
+
+    def test_instantiation(self):
+        obj = self._make()
+        assert obj.entity_type == "ingredient"
+        assert obj.action == "create_canonical"
+
+
+# ---------------------------------------------------------------------------
+# knowledge_rule.py — KnowledgeRule.__repr__, IndustryBenchmark.__repr__
+# ---------------------------------------------------------------------------
+
+class TestKnowledgeRule:
+    def _make(self):
+        from src.models.knowledge_rule import KnowledgeRule, RuleCategory, RuleType, RuleStatus
+        return KnowledgeRule(
+            rule_code="WASTE-001",
+            name="损耗率超标规则",
+            description="当损耗率连续3天超过15%时触发",
+            category=RuleCategory.WASTE,
+            rule_type=RuleType.THRESHOLD,
+            condition={"metric": "waste_rate", "operator": ">", "threshold": 0.15},
+            conclusion={"root_cause": "staff_error", "confidence": 0.72},
+            base_confidence=0.72,
+            weight=1.0,
+            status=RuleStatus.ACTIVE,
+            source="expert",
+            is_public=False,
+        )
+
+    def test_repr_returns_string(self):
+        obj = self._make()
+        result = repr(obj)
+        assert isinstance(result, str)
+        assert "WASTE-001" in result
+
+    def test_enum_values(self):
+        from src.models.knowledge_rule import RuleCategory, RuleType, RuleStatus
+        assert RuleCategory.WASTE.value == "waste"
+        assert RuleType.THRESHOLD.value == "threshold"
+        assert RuleStatus.ACTIVE.value == "active"
+
+
+class TestRuleExecution:
+    def _make(self):
+        from src.models.knowledge_rule import RuleExecution
+        return RuleExecution(
+            rule_id=uuid.uuid4(),
+            rule_code="WASTE-001",
+            store_id="STORE001",
+            event_id="EVT-001",
+            condition_values={"waste_rate": 0.18},
+            conclusion_output={"root_cause": "staff_error"},
+            confidence_score=0.72,
+            is_verified=False,
+        )
+
+    def test_instantiation(self):
+        obj = self._make()
+        assert obj.rule_code == "WASTE-001"
+        assert obj.store_id == "STORE001"
+
+
+class TestIndustryBenchmark:
+    def _make(self):
+        from src.models.knowledge_rule import IndustryBenchmark, RuleCategory
+        return IndustryBenchmark(
+            industry_type="seafood",
+            metric_name="waste_rate",
+            metric_category=RuleCategory.WASTE,
+            p25_value=0.05,
+            p50_value=0.08,
+            p75_value=0.14,
+            p90_value=0.20,
+            unit="%",
+            direction="lower_better",
+            data_source="2025中国餐饮白皮书",
+            sample_size=500,
+        )
+
+    def test_repr_returns_string(self):
+        obj = self._make()
+        result = repr(obj)
+        assert isinstance(result, str)
+        assert "seafood" in result
+        assert "waste_rate" in result
+        assert "0.08" in result
+
+
+# ---------------------------------------------------------------------------
+# ontology_action.py — OntologyAction (no repr)
+# ---------------------------------------------------------------------------
+
+class TestOntologyAction:
+    def _make(self):
+        from src.models.ontology_action import OntologyAction, ActionStatus, ActionPriority
+        return OntologyAction(
+            tenant_id="TENANT001",
+            store_id="STORE001",
+            action_type="waste_follow_up",
+            assignee_staff_id="STAFF001",
+            assignee_wechat_id="wx_staff001",
+            status=ActionStatus.CREATED.value,
+            priority=ActionPriority.P1.value,
+            title="跟进损耗问题",
+            body="请核查今日食材损耗情况",
+            extra={},
+        )
+
+    def test_instantiation(self):
+        obj = self._make()
+        assert obj.tenant_id == "TENANT001"
+        assert obj.store_id == "STORE001"
+        assert obj.action_type == "waste_follow_up"
+
+    def test_escalation_minutes_constant(self):
+        from src.models.ontology_action import ESCALATION_MINUTES, ActionPriority
+        assert ESCALATION_MINUTES[ActionPriority.P0.value] == 30
+        assert ESCALATION_MINUTES[ActionPriority.P1.value] == 120
+
+
+# ---------------------------------------------------------------------------
+# ops.py — OpsEvent, OpsAsset, OpsMaintenancePlan (no repr)
+# ---------------------------------------------------------------------------
+
+class TestOpsEvent:
+    def _make(self):
+        from src.models.ops import OpsEvent, OpsEventSeverity, OpsEventStatus
+        return OpsEvent(
+            store_id="STORE001",
+            event_type="health_check",
+            severity=OpsEventSeverity.MEDIUM.value,
+            component="pos",
+            description="POS 心跳检测超时",
+            raw_data={"latency_ms": 5000},
+            status=OpsEventStatus.OPEN.value,
+        )
+
+    def test_instantiation(self):
+        obj = self._make()
+        assert obj.store_id == "STORE001"
+        assert obj.event_type == "health_check"
+        assert obj.severity == "medium"
+
+    def test_enum_values(self):
+        from src.models.ops import OpsEventSeverity, OpsEventStatus, OpsAssetType, OpsMaintenancePriority
+        assert OpsEventSeverity.CRITICAL.value == "critical"
+        assert OpsEventStatus.RESOLVED.value == "resolved"
+        assert OpsAssetType.POS.value == "pos"
+        assert OpsMaintenancePriority.URGENT.value == "urgent"
+
+
+class TestOpsAsset:
+    def _make(self):
+        from src.models.ops import OpsAsset, OpsAssetType
+        return OpsAsset(
+            store_id="STORE001",
+            asset_type=OpsAssetType.POS.value,
+            name="收银台POS-01",
+            ip_address="192.168.1.10",
+            mac_address="AA:BB:CC:DD:EE:FF",
+            firmware_version="v2.3.1",
+            serial_number="SN-12345",
+            status="online",
+        )
+
+    def test_instantiation(self):
+        obj = self._make()
+        assert obj.store_id == "STORE001"
+        assert obj.asset_type == "pos"
+        assert obj.status == "online"
+
+
+class TestOpsMaintenancePlan:
+    def _make(self):
+        from src.models.ops import OpsMaintenancePlan, OpsMaintenancePriority
+        return OpsMaintenancePlan(
+            store_id="STORE001",
+            asset_id=uuid.uuid4(),
+            plan_type="preventive",
+            description="定期检查打印机墨盒",
+            priority=OpsMaintenancePriority.MEDIUM.value,
+            status="pending",
+        )
+
+    def test_instantiation(self):
+        obj = self._make()
+        assert obj.plan_type == "preventive"
+        assert obj.priority == "medium"
+        assert obj.status == "pending"
+
+
+# ---------------------------------------------------------------------------
+# private_domain.py — PrivateDomainMember, PrivateDomainSignal,
+#                      PrivateDomainJourney, StoreQuadrantRecord (no repr)
+# ---------------------------------------------------------------------------
+
+class TestPrivateDomainMember:
+    def _make(self):
+        from src.models.private_domain import PrivateDomainMember, RFMLevel, StoreQuadrant
+        return PrivateDomainMember(
+            store_id="STORE001",
+            customer_id="CUST-001",
+            rfm_level=RFMLevel.S2.value,
+            store_quadrant=StoreQuadrant.BENCHMARK.value,
+            dynamic_tags=["vip", "seafood_lover"],
+            recency_days=5,
+            frequency=12,
+            monetary=150000,
+            risk_score=0.1,
+            channel_source="wechat",
+            wechat_openid="oXXXXXXXXX",
+            is_active=True,
+        )
+
+    def test_instantiation(self):
+        obj = self._make()
+        assert obj.store_id == "STORE001"
+        assert obj.customer_id == "CUST-001"
+        assert obj.rfm_level == "S2"
+
+    def test_enum_values(self):
+        from src.models.private_domain import RFMLevel, StoreQuadrant, SignalType, JourneyType, JourneyStatus
+        assert RFMLevel.S1.value == "S1"
+        assert StoreQuadrant.BENCHMARK.value == "benchmark"
+        assert SignalType.CHURN_RISK.value == "churn_risk"
+        assert JourneyType.VIP_RETENTION.value == "vip_retention"
+        assert JourneyStatus.RUNNING.value == "running"
+
+
+class TestPrivateDomainSignal:
+    def _make(self):
+        from src.models.private_domain import PrivateDomainSignal, SignalType
+        return PrivateDomainSignal(
+            signal_id="SIG-20260301-001",
+            store_id="STORE001",
+            customer_id="CUST-001",
+            signal_type=SignalType.CHURN_RISK.value,
+            description="客户30天未访问，存在流失风险",
+            severity="high",
+            action_taken="发送召回优惠券",
+        )
+
+    def test_instantiation(self):
+        obj = self._make()
+        assert obj.signal_id == "SIG-20260301-001"
+        assert obj.signal_type == "churn_risk"
+
+
+class TestPrivateDomainJourney:
+    def _make(self):
+        from src.models.private_domain import PrivateDomainJourney, JourneyType, JourneyStatus
+        return PrivateDomainJourney(
+            journey_id="JRNY-20260301-001",
+            store_id="STORE001",
+            customer_id="CUST-001",
+            journey_type=JourneyType.REACTIVATION.value,
+            status=JourneyStatus.RUNNING.value,
+            current_step=2,
+            total_steps=5,
+            step_history=[{"step": 1, "action": "send_coupon", "done": True}],
+        )
+
+    def test_instantiation(self):
+        obj = self._make()
+        assert obj.journey_id == "JRNY-20260301-001"
+        assert obj.total_steps == 5
+        assert obj.status == "running"
+
+
+class TestStoreQuadrantRecord:
+    def _make(self):
+        from src.models.private_domain import StoreQuadrantRecord, StoreQuadrant
+        return StoreQuadrantRecord(
+            store_id="STORE001",
+            quadrant=StoreQuadrant.POTENTIAL.value,
+            competition_density=0.65,
+            member_penetration=0.30,
+            untapped_potential=500,
+            strategy="加强私域运营，提升会员渗透率",
+        )
+
+    def test_instantiation(self):
+        obj = self._make()
+        assert obj.store_id == "STORE001"
+        assert obj.quadrant == "potential"
+        assert obj.competition_density == 0.65
+
+
+# ---------------------------------------------------------------------------
+# reasoning.py — ReasoningReport.__repr__
+# ---------------------------------------------------------------------------
+
+class TestReasoningReport:
+    def _make(self):
+        from src.models.reasoning import ReasoningReport, SeverityLevel, ReasoningDimension
+        from datetime import date
+        return ReasoningReport(
+            store_id="STORE001",
+            report_date=date(2026, 3, 1),
+            dimension=ReasoningDimension.WASTE.value,
+            severity=SeverityLevel.P2.value,
+            root_cause="staff_error",
+            confidence=0.73,
+            evidence_chain=["waste_rate > 0.15 for 3 days"],
+            triggered_rule_codes=["WASTE-001"],
+            recommended_actions=["联系门店长复核操作流程"],
+            peer_group="standard_华东",
+            peer_percentile=82.0,
+            kpi_snapshot={"waste_rate": 0.15},
+            is_actioned=False,
+        )
+
+    def test_repr_returns_string(self):
+        obj = self._make()
+        result = repr(obj)
+        assert isinstance(result, str)
+        assert "STORE001" in result
+        assert "P2" in result
+
+    def test_repr_contains_dimension(self):
+        obj = self._make()
+        result = repr(obj)
+        assert "waste" in result
+
+    def test_enum_values(self):
+        from src.models.reasoning import SeverityLevel, ReasoningDimension
+        assert SeverityLevel.P1.value == "P1"
+        assert ReasoningDimension.WASTE.value == "waste"
+        assert ReasoningDimension.CROSS_STORE.value == "cross_store"
+
+
+# ---------------------------------------------------------------------------
+# workflow.py — DailyWorkflow.__repr__, WorkflowPhase.__repr__,
+#               DecisionVersion.__repr__
+# ---------------------------------------------------------------------------
+
+class TestDailyWorkflow:
+    def _make(self):
+        from src.models.workflow import DailyWorkflow, WorkflowStatus
+        from datetime import date
+        return DailyWorkflow(
+            store_id="STORE001",
+            plan_date=date(2026, 3, 2),
+            trigger_date=date(2026, 3, 1),
+            status=WorkflowStatus.PARTIAL_LOCKED.value,
+            current_phase="scheduling",
+        )
+
+    def test_repr_returns_string(self):
+        obj = self._make()
+        result = repr(obj)
+        assert isinstance(result, str)
+        assert "STORE001" in result
+        assert "partial_locked" in result
+
+    def test_repr_contains_phase(self):
+        obj = self._make()
+        result = repr(obj)
+        assert "scheduling" in result
+
+    def test_enum_and_constants(self):
+        from src.models.workflow import WorkflowStatus, PhaseStatus, GenerationMode
+        from src.models.workflow import ALL_PHASES, PHASE_CONFIG, PHASE_INITIAL_PLAN
+        assert WorkflowStatus.COMPLETED.value == "completed"
+        assert PhaseStatus.LOCKED.value == "locked"
+        assert GenerationMode.FAST.value == "fast"
+        assert PHASE_INITIAL_PLAN in ALL_PHASES
+        assert len(ALL_PHASES) == 6
+        assert "deadline_offset" in PHASE_CONFIG[PHASE_INITIAL_PLAN]
+
+
+class TestWorkflowPhase:
+    def _make(self):
+        from src.models.workflow import WorkflowPhase, PhaseStatus
+        return WorkflowPhase(
+            workflow_id=uuid.uuid4(),
+            phase_name="procurement",
+            phase_order=2,
+            deadline=datetime(2026, 3, 1, 18, 0, 0),
+            status=PhaseStatus.LOCKED.value,
+            locked_by="auto",
+        )
+
+    def test_repr_returns_string(self):
+        obj = self._make()
+        result = repr(obj)
+        assert isinstance(result, str)
+        assert "procurement" in result
+        assert "locked" in result
+
+    def test_repr_contains_deadline_time(self):
+        obj = self._make()
+        result = repr(obj)
+        assert "18:00" in result
+
+    def test_repr_no_deadline(self):
+        from src.models.workflow import WorkflowPhase, PhaseStatus
+        obj = WorkflowPhase(
+            workflow_id=uuid.uuid4(),
+            phase_name="menu",
+            phase_order=4,
+            deadline=None,
+            status=PhaseStatus.PENDING.value,
+        )
+        result = repr(obj)
+        assert "N/A" in result
+
+
+class TestDecisionVersion:
+    def _make(self, is_final=False):
+        from src.models.workflow import DecisionVersion, GenerationMode
+        from datetime import date
+        return DecisionVersion(
+            phase_id=uuid.uuid4(),
+            store_id="STORE001",
+            phase_name="procurement",
+            plan_date=date(2026, 3, 2),
+            version_number=1,
+            content={"items": [], "total_cost": 5000},
+            generation_mode=GenerationMode.FAST.value,
+            generation_seconds=12.5,
+            data_completeness=0.95,
+            confidence=0.88,
+            submitted_by="system",
+            is_final=is_final,
+        )
+
+    def test_repr_returns_string(self):
+        obj = self._make()
+        result = repr(obj)
+        assert isinstance(result, str)
+        assert "procurement" in result
+        assert "fast" in result
+
+    def test_repr_final_marker(self):
+        obj = self._make(is_final=True)
+        result = repr(obj)
+        assert "FINAL" in result
+
+    def test_repr_not_final(self):
+        obj = self._make(is_final=False)
+        result = repr(obj)
+        # is_final=False means the FINAL marker should not appear
+        assert "FINAL" not in result
