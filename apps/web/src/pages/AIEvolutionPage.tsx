@@ -54,6 +54,12 @@ interface HitlEscalation {
   rejected: number;
 }
 
+interface StoreOption {
+  id?: string;
+  store_id?: string;
+  name?: string;
+}
+
 const AIEvolutionPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [summary, setSummary] = useState<EvolutionSummary | null>(null);
@@ -62,7 +68,7 @@ const AIEvolutionPage: React.FC = () => {
   const [agentPerformance, setAgentPerformance] = useState<AgentPerformance[]>([]);
   const [hitlEscalations, setHitlEscalations] = useState<HitlEscalation[]>([]);
   const [storeId, setStoreId] = useState('STORE001');
-  const [stores, setStores] = useState<any[]>([]);
+  const [stores, setStores] = useState<StoreOption[]>([]);
 
   const loadStores = useCallback(async () => {
     try {
@@ -174,7 +180,7 @@ const AIEvolutionPage: React.FC = () => {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Title level={4} style={{ margin: 0 }}>AI进化看板</Title>
           <Select value={storeId} onChange={setStoreId} style={{ width: 160 }}>
-            {stores.length > 0 ? stores.map((s: any) => (
+            {stores.length > 0 ? stores.map((s) => (
               <Option key={s.store_id || s.id} value={s.store_id || s.id}>{s.name || s.store_id || s.id}</Option>
             )) : <Option value="STORE001">门店 001</Option>}
           </Select>

@@ -5,13 +5,19 @@ import { apiClient } from '../services/api';
 import { handleApiError, showSuccess } from '../utils/message';
 
 const { Option } = Select;
-const { TextArea } = Input;
 
 const SYSTEMS = ['tiancai', 'meituan', 'aoqiwei', 'pinzhi', 'yiding'];
 const systemLabel: Record<string, string> = { tiancai: '天财商龙', meituan: '美团', aoqiwei: '奥琦玮', pinzhi: '品智', yiding: '易订' };
 
+interface AdapterItem {
+  adapter_name: string;
+  status?: string;
+  registered_at?: string;
+  last_sync?: string;
+}
+
 const AdaptersPage: React.FC = () => {
-  const [adapters, setAdapters] = useState<any[]>([]);
+  const [adapters, setAdapters] = useState<AdapterItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [registerVisible, setRegisterVisible] = useState(false);
   const [, setSyncLoading] = useState<Record<string, boolean>>({});
@@ -28,7 +34,7 @@ const AdaptersPage: React.FC = () => {
     try {
       const res = await apiClient.get('/adapters/adapters');
       setAdapters(res.data?.adapters || res.data || []);
-    } catch (err: any) {
+    } catch (err) {
       handleApiError(err, '加载适配器列表失败');
     } finally {
       setLoading(false);
@@ -37,10 +43,10 @@ const AdaptersPage: React.FC = () => {
 
   useEffect(() => { loadAdapters(); }, [loadAdapters]);
 
-  const registerAdapter = async (values: any) => {
+  const registerAdapter = async (values: Record<string, unknown>) => {
     setSubmitting(true);
     try {
-      let config: any = {};
+      let config: Record<string, unknown> = {};
       if (values.adapter_name === 'pinzhi') {
         config = {
           base_url: values.base_url,
@@ -93,7 +99,7 @@ const AdaptersPage: React.FC = () => {
       registerForm.resetFields();
       setSelectedAdapter('');
       loadAdapters();
-    } catch (err: any) {
+    } catch (err) {
       handleApiError(err, '注册失败');
     } finally {
       setSubmitting(false);
@@ -106,7 +112,7 @@ const AdaptersPage: React.FC = () => {
     setSyncVisible(true);
   };
 
-  const submitSync = async (values: any) => {
+  const submitSync = async (values: Record<string, unknown>) => {
     const key = `${syncType}-${values.source_system}`;
     setSyncLoading(prev => ({ ...prev, [key]: true }));
     setSyncSubmitting(true);
@@ -118,11 +124,11 @@ const AdaptersPage: React.FC = () => {
       } else if (syncType === 'order') {
         await apiClient.post('/adapters/sync/order', { order_id: values.order_id, store_id: values.store_id, source_system: values.source_system });
       } else {
-        await apiClient.post('/adapters/sync/inventory', { item_id: values.item_id, quantity: parseFloat(values.quantity), target_system: values.source_system });
+        await apiClient.post('/adapters/sync/inventory', { item_id: values.item_id, quantity: parseFloat(String(values.quantity)), target_system: values.source_system });
       }
       showSuccess('同步成功');
       setSyncVisible(false);
-    } catch (err: any) {
+    } catch (err) {
       handleApiError(err, '同步失败');
     } finally {
       setSyncLoading(prev => ({ ...prev, [key]: false }));
