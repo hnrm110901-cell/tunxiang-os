@@ -91,7 +91,7 @@ const AdaptersPage: React.FC = () => {
           ...(values.cache_ttl ? { cache_ttl: values.cache_ttl } : {}),
         };
       } else {
-        try { config = JSON.parse(values.config || '{}'); } catch { config = {}; }
+        try { config = JSON.parse(String(values.config ?? '{}')); } catch { config = {}; }
       }
       await apiClient.post('/adapters/register', { adapter_name: values.adapter_name, config });
       showSuccess('适配器注册成功');

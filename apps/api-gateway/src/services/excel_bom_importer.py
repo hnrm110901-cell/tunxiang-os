@@ -28,6 +28,7 @@ Excel BOM 导入器（徐记海鲜 POC 配方批量录入）
 """
 
 import io
+from decimal import Decimal
 from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple

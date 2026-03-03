@@ -208,6 +208,7 @@ class RaaSPricingService:
         current_energy_cost = float(os.getenv("RAAS_CURRENT_ENERGY_COST", "7500.0"))
         current_inventory_turnover = float(os.getenv("RAAS_CURRENT_INVENTORY_TURNOVER", "15.0"))
         current_repeat_rate = float(os.getenv("RAAS_CURRENT_REPEAT_RATE", "32.0"))
+        days_in_period = (current_period_end - current_period_start).days
 
         try:
             from sqlalchemy import and_

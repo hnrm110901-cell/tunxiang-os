@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useEffect, useState, useCallback } from 'react';
 import { Card, Col, Row, Table, Select, Spin, Tag, Tabs, Alert } from 'antd';
 import {

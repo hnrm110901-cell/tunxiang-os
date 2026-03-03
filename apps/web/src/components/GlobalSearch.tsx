@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Modal, Input, List, Tag, Space, Empty } from 'antd';
+import { Modal, Input, InputRef, List, Tag, Space, Empty } from 'antd';
 import {
   SearchOutlined,
   DashboardOutlined,
@@ -141,7 +141,7 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ visible, onClose }) 
   const [searchQuery, setSearchQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [activeIndex, setActiveIndex] = useState(-1);
-  const inputRef = useRef<{ focus: () => void } | null>(null);
+  const inputRef = useRef<InputRef>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 

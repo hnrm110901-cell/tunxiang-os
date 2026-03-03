@@ -4,6 +4,7 @@ Feishu Message Service
 
 提供飞书消息推送功能，支持文本、卡片、富文本等多种消息类型
 """
+import os
 import httpx
 import structlog
 from typing import Dict, Any, Optional, List
