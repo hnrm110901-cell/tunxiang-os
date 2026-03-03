@@ -447,7 +447,7 @@ class PrivateDomainAgent(BaseAgent):
         )
 
     async def trigger_journey(self, journey_type: str, customer_id: str) -> JourneyRecord:
-        """触发用户旅程"""
+        """触发用户旅程（持久化到 private_domain_journeys 表）"""
         self.logger.info("triggering_journey", journey_type=journey_type, customer_id=customer_id)
         journey_steps = {
             JourneyType.NEW_CUSTOMER.value: 4,      # Day0/2/5/7
@@ -457,8 +457,42 @@ class PrivateDomainAgent(BaseAgent):
         }
         total_steps = journey_steps.get(journey_type, 3)
         now = datetime.utcnow()
+        journey_id = f"JRN_{journey_type.upper()}_{customer_id}_{now.strftime('%Y%m%d%H%M%S')}"
+        next_action_at = now + timedelta(days=2)
+
+        # 持久化到 DB
+        engine = self._get_db_engine()
+        if engine:
+            try:
+                from sqlalchemy import text
+                with engine.connect() as conn:
+                    conn.execute(text("""
+                        INSERT INTO private_domain_journeys
+                            (id, journey_id, store_id, customer_id, journey_type, status,
+                             current_step, total_steps, step_history, started_at, next_action_at,
+                             completed_at, created_at, updated_at)
+                        VALUES
+                            (gen_random_uuid(), :journey_id, :store_id, :customer_id, :journey_type,
+                             :status, 1, :total_steps, '[]'::jsonb, :started_at, :next_action_at,
+                             NULL, NOW(), NOW())
+                        ON CONFLICT (journey_id) DO NOTHING
+                    """), {
+                        "journey_id": journey_id,
+                        "store_id": self.store_id,
+                        "customer_id": customer_id,
+                        "journey_type": journey_type,
+                        "status": JourneyStatus.RUNNING.value,
+                        "total_steps": total_steps,
+                        "started_at": now,
+                        "next_action_at": next_action_at,
+                    })
+                    conn.commit()
+                self.logger.info("journey_persisted", journey_id=journey_id)
+            except Exception as e:
+                self.logger.warning("journey_persist_failed", error=str(e))
+
         return JourneyRecord(
-            journey_id=f"JRN_{journey_type.upper()}_{customer_id}_{now.strftime('%Y%m%d%H%M%S')}",
+            journey_id=journey_id,
             journey_type=journey_type,
             customer_id=customer_id,
             store_id=self.store_id,
@@ -466,7 +500,7 @@ class PrivateDomainAgent(BaseAgent):
             current_step=1,
             total_steps=total_steps,
             started_at=now.isoformat(),
-            next_action_at=(now + timedelta(days=2)).isoformat(),
+            next_action_at=next_action_at.isoformat(),
             completed_at=None,
         )
 

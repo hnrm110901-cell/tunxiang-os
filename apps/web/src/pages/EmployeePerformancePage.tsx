@@ -3,7 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   Card, Row, Col, Select, Statistic, Table, Tag, Button,
   Typography, Space, Spin, Modal, Form, InputNumber, Input,
-  DatePicker, Progress, Badge, Tabs,
+  DatePicker, Progress, Badge, Tabs, Alert,
 } from 'antd';
 import { TrophyOutlined, ReloadOutlined, PlusOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import type { Dayjs } from 'dayjs';
@@ -253,6 +253,21 @@ const EmployeePerformancePage: React.FC = () => {
       </div>
 
       <Spin spinning={loading}>
+        {/* 未计算提示 */}
+        {!loading && summary.length === 0 && metrics.length === 0 && (
+          <Alert
+            type="info"
+            showIcon
+            style={{ marginBottom: 16 }}
+            message="绩效指标尚未生成"
+            description={
+              <>
+                当前月份暂无绩效数据。请点击右上角 <strong>「触发计算」</strong> 按钮，
+                系统将基于本月订单和损耗数据自动计算各岗位绩效指标（预计耗时 &lt; 10 秒）。
+              </>
+            }
+          />
+        )}
         {/* 概览卡片 */}
         <Row gutter={16} style={{ marginBottom: 16 }}>
           <Col span={6}>
