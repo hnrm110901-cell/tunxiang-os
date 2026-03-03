@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Card, Select, Upload, Button, Table, Alert, Space, Typography, Tabs, Tag,
 } from 'antd';
@@ -19,11 +19,23 @@ const ENTITY_LABELS: Record<Entity, string> = {
 };
 
 const BulkImportPage: React.FC = () => {
-  const [storeId, setStoreId] = useState('STORE001');
+  const [storeId, setStoreId] = useState('');
+  const [stores, setStores] = useState<any[]>([]);
   const [entity, setEntity] = useState<Entity>('inventory');
   const [fileList, setFileList] = useState<UploadFile[]>([]);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<{ success: number; failed: number; errors: string[] } | null>(null);
+
+  const loadStores = useCallback(async () => {
+    try {
+      const res = await apiClient.get('/api/v1/stores');
+      const list: any[] = res.data?.stores || res.data || [];
+      setStores(list);
+      if (list.length > 0) setStoreId(list[0].store_id || list[0].id || '');
+    } catch { /* ignore */ }
+  }, []);
+
+  useEffect(() => { loadStores(); }, [loadStores]);
 
   const handleDownloadTemplate = async () => {
     try {
@@ -76,8 +88,14 @@ const BulkImportPage: React.FC = () => {
     <div>
       <Card title="数据批量导入" style={{ marginBottom: 16 }}>
         <Space wrap style={{ marginBottom: 16 }}>
-          <Select value={storeId} onChange={setStoreId} style={{ width: 160 }} placeholder="选择门店">
-            <Option value="STORE001">STORE001</Option>
+          <Select value={storeId || undefined} onChange={setStoreId} style={{ width: 200 }} placeholder="选择门店">
+            {stores.length > 0
+              ? stores.map((s: any) => (
+                  <Option key={s.store_id || s.id} value={s.store_id || s.id}>
+                    {s.name || s.store_id || s.id}
+                  </Option>
+                ))
+              : <Option value="STORE001">智链餐厅-朝阳店</Option>}
           </Select>
           <Tabs
             activeKey={entity}

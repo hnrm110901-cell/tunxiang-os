@@ -7,6 +7,8 @@ import {
   RiseOutlined, FallOutlined, StarOutlined, ReloadOutlined, TrophyOutlined
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
+import { apiClient } from '../services/api';
+import { handleApiError } from '../utils/message';
 
 const { Title, Text } = Typography;
 
@@ -64,24 +66,35 @@ function RankBadge({ rank }: { rank: number }) {
 
 const MenuRecommendationPage: React.FC = () => {
   const [storeId, setStoreId] = useState<string>('');
+  const [stores, setStores] = useState<any[]>([]);
   const [limit, setLimit] = useState<number>(10);
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<RecommendationResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const loadStores = useCallback(async () => {
+    try {
+      const res = await apiClient.get('/api/v1/stores');
+      const list: any[] = res.data?.stores || res.data || [];
+      setStores(list);
+      if (list.length > 0) setStoreId(list[0].store_id || list[0].id || '');
+    } catch { /* ignore */ }
+  }, []);
+
+  useEffect(() => { loadStores(); }, [loadStores]);
 
   const fetchRecommendations = useCallback(async () => {
     if (!storeId) return;
     setLoading(true);
     setError(null);
     try {
-      const resp = await fetch(
-        `/api/v1/menu/recommendations?store_id=${encodeURIComponent(storeId)}&limit=${limit}`
-      );
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      const json: RecommendationResponse = await resp.json();
-      setData(json);
+      const res = await apiClient.get('/api/v1/menu/recommendations', {
+        params: { store_id: storeId, limit },
+      });
+      setData(res.data);
     } catch (e: any) {
-      setError(e.message || '获取推荐失败');
+      handleApiError(e, '获取推荐失败');
+      setError(e?.response?.data?.detail || e.message || '获取推荐失败');
     } finally {
       setLoading(false);
     }
@@ -173,10 +186,12 @@ const MenuRecommendationPage: React.FC = () => {
                 style={{ width: 200 }}
                 value={storeId || undefined}
                 onChange={setStoreId}
-                options={[
-                  { value: 'STORE_A1', label: '门店A1（示例）' },
-                  { value: 'STORE_A2', label: '门店A2（示例）' },
-                ]}
+                options={stores.length > 0
+                  ? stores.map((s: any) => ({
+                      value: s.store_id || s.id,
+                      label: s.name || s.store_id || s.id,
+                    }))
+                  : [{ value: 'STORE001', label: '智链餐厅-朝阳店' }]}
                 allowClear
               />
             </Space>
