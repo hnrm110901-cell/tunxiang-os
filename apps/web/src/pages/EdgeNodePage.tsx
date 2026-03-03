@@ -37,7 +37,7 @@ const EdgeNodePage: React.FC = () => {
   const loadStores = useCallback(async () => {
     try {
       const res = await apiClient.get('/api/v1/stores');
-      setStores(res.data?.stores || res.data || []);
+      setStores(res.stores || res || []);
     } catch { /* ignore */ }
   }, []);
 
@@ -48,8 +48,8 @@ const EdgeNodePage: React.FC = () => {
         apiClient.get(`/api/v1/edge/mode/${storeId}`),
         apiClient.get(`/api/v1/edge/cache/${storeId}`),
       ]);
-      if (modeRes.status === 'fulfilled') setEdgeMode(modeRes.value.data);
-      if (cacheRes.status === 'fulfilled') setCacheInfo(cacheRes.value.data);
+      if (modeRes.status === 'fulfilled') setEdgeMode(modeRes.value);
+      if (cacheRes.status === 'fulfilled') setCacheInfo(cacheRes.value);
     } catch (err) { handleApiError(err); }
     finally { setLoading(false); }
   }, [storeId]);
@@ -69,7 +69,7 @@ const EdgeNodePage: React.FC = () => {
       const res = await apiClient.post('/api/v1/edge/network/status', {
         store_id: storeId, is_connected: isConnected, latency_ms: isConnected ? 50 : null,
       });
-      setNetworkStatus(res.data);
+      setNetworkStatus(res);
       showSuccess('网络状态已更新');
     } catch (err) { handleApiError(err); }
   };
@@ -78,7 +78,7 @@ const EdgeNodePage: React.FC = () => {
     setSyncLoading(true);
     try {
       const res = await apiClient.post('/api/v1/edge/sync', { store_id: storeId });
-      showSuccess(`同步完成，共同步 ${res.data.synced_operations} 条操作`);
+      showSuccess(`同步完成，共同步 ${res.synced_operations} 条操作`);
       loadData();
     } catch (err) { handleApiError(err); }
     finally { setSyncLoading(false); }
@@ -89,7 +89,7 @@ const EdgeNodePage: React.FC = () => {
       const res = await apiClient.post('/api/v1/edge/offline/execute', {
         store_id: storeId, ...values,
       });
-      setOfflineResult(res.data.result);
+      setOfflineResult(res.result);
       showSuccess('离线操作执行成功');
     } catch (err) { handleApiError(err); }
   };

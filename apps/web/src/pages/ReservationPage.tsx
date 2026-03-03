@@ -50,7 +50,7 @@ const ReservationPage: React.FC = () => {
   const loadStores = useCallback(async () => {
     try {
       const res = await apiClient.get('/api/v1/stores');
-      const list: any[] = res.data?.stores || res.data || [];
+      const list: any[] = res.stores || res || [];
       setStores(list);
       if (list.length > 0) setStoreId(list[0].store_id || list[0].id || 'STORE001');
     } catch { /* ignore */ }
@@ -64,7 +64,7 @@ const ReservationPage: React.FC = () => {
       if (filterStatus) params.status = filterStatus;
       if (filterType) params.reservation_type = filterType;
       const res = await apiClient.get('/api/v1/reservations', { params });
-      setReservations(res.data || []);
+      setReservations(res || []);
     } catch (err: any) {
       handleApiError(err, '加载预约列表失败');
     } finally {
@@ -77,7 +77,7 @@ const ReservationPage: React.FC = () => {
       const res = await apiClient.get('/api/v1/reservations/today-overview', {
         params: { store_id: storeId },
       });
-      setOverview(res.data);
+      setOverview(res);
     } catch { /* 静默失败 */ }
   }, [storeId]);
 
@@ -86,7 +86,7 @@ const ReservationPage: React.FC = () => {
       const res = await apiClient.get('/api/v1/reservations/statistics', {
         params: { store_id: storeId },
       });
-      setStats(res.data);
+      setStats(res);
     } catch { /* 静默失败 */ }
   }, [storeId]);
 

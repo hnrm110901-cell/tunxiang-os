@@ -41,7 +41,7 @@ const DecisionValidatorPage: React.FC = () => {
     setLoading(true);
     try {
       const res = await apiClient.get('/api/v1/validator/rules');
-      setRules(res.data.rules || []);
+      setRules(res.rules || []);
     } catch (err) { handleApiError(err); }
     finally { setLoading(false); }
   }, []);
@@ -49,7 +49,7 @@ const DecisionValidatorPage: React.FC = () => {
   const loadStores = useCallback(async () => {
     try {
       const res = await apiClient.get('/api/v1/stores');
-      const list: any[] = res.data?.stores || res.data || [];
+      const list: any[] = res.stores || res || [];
       setStores(list);
     } catch { /* ignore */ }
   }, []);
@@ -66,7 +66,7 @@ const DecisionValidatorPage: React.FC = () => {
         decision_type: values.decision_type,
         ai_suggestion: suggestion,
       });
-      setSingleResult(res.data.validation);
+      setSingleResult(res.validation);
     } catch (err) { handleApiError(err); }
     finally { setLoading(false); }
   };
@@ -80,8 +80,8 @@ const DecisionValidatorPage: React.FC = () => {
         { store_id: 'STORE002', decision_type: 'inventory', ai_suggestion: { reorder_qty: 500 } },
       ];
       const res = await apiClient.post('/api/v1/validator/validate/batch', payload);
-      setBatchSummary(res.data.summary);
-      setBatchResults(res.data.results || []);
+      setBatchSummary(res.summary);
+      setBatchResults(res.results || []);
     } catch (err) { handleApiError(err); }
     finally { setLoading(false); }
   };
@@ -90,7 +90,7 @@ const DecisionValidatorPage: React.FC = () => {
     setLoading(true);
     try {
       const res = await apiClient.post('/api/v1/validator/anomaly/detect', values);
-      setAnomalyResult(res.data);
+      setAnomalyResult(res);
     } catch (err) { handleApiError(err); }
     finally { setLoading(false); }
   };

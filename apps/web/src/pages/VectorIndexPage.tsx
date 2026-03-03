@@ -26,7 +26,7 @@ const VectorIndexPage: React.FC = () => {
     setLoading(true);
     try {
       const res = await apiClient.get(`/api/v1/vector/collections/${selectedStore}`);
-      setCollections(res.data?.collections || res.data || []);
+      setCollections(res.collections || []);
     } catch (err: any) {
       handleApiError(err, '加载集合失败');
     } finally {
@@ -38,7 +38,7 @@ const VectorIndexPage: React.FC = () => {
     const loadStores = async () => {
       try {
         const res = await apiClient.get('/api/v1/stores');
-        const list: any[] = res.data?.stores || res.data || [];
+        const list: any[] = res.stores || res || [];
         setStores(list);
         if (list.length > 0) setSelectedStore(list[0].store_id || list[0].id || 'STORE001');
       } catch { /* ignore */ }

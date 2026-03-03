@@ -161,7 +161,7 @@ const FunnelStats: React.FC<{ storeId: string }> = ({ storeId }) => {
         `/api/v1/banquet-lifecycle/${storeId}/funnel`,
         { params: { days_back: daysBack } },
       );
-      setStats(res.data);
+      setStats(res);
     } catch (err: any) {
       handleApiError(err, '加载漏斗统计失败');
     } finally {
@@ -431,7 +431,7 @@ const BanquetLifecyclePage: React.FC = () => {
         `/api/v1/banquet-lifecycle/${storeId}/pipeline`, { params },
       );
       // Normalize: API returns {stages: [...]} or [{stage, items, ...}]
-      const raw: any = res.data;
+      const raw: any = res;
       const stages: PipelineStage[] = Array.isArray(raw)
         ? raw
         : (raw?.stages ?? []);
@@ -447,7 +447,7 @@ const BanquetLifecyclePage: React.FC = () => {
     const loadStores = async () => {
       try {
         const res = await apiClient.get('/api/v1/stores');
-        const list: any[] = res.data?.stores || res.data || [];
+        const list: any[] = res.stores || res || [];
         setStores(list);
         if (list.length > 0) setStoreId(list[0].store_id || list[0].id || 'STORE001');
       } catch { /* ignore */ }

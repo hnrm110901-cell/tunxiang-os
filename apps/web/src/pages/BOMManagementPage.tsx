@@ -216,7 +216,7 @@ const BOMManagementPage: React.FC = () => {
     setLoading(true);
     try {
       const res = await apiClient.get(`/api/v1/bom/store/${storeId}`);
-      setBoms(res.data || []);
+      setBoms(res || []);
     } catch (err: any) {
       handleApiError(err, '加载 BOM 列表失败');
     } finally {
@@ -227,7 +227,7 @@ const BOMManagementPage: React.FC = () => {
   const loadStores = useCallback(async () => {
     try {
       const res = await apiClient.get('/api/v1/stores');
-      const list: any[] = res.data?.stores || res.data || [];
+      const list: any[] = res.stores || res || [];
       setStores(list);
       if (list.length > 0 && !list.find((s: any) => (s.store_id || s.id) === storeId)) {
         setStoreId(list[0].store_id || list[0].id || 'STORE001');
@@ -242,7 +242,7 @@ const BOMManagementPage: React.FC = () => {
   const viewDetail = useCallback(async (bom: BOMTemplate) => {
     try {
       const res = await apiClient.get(`/api/v1/bom/${bom.id}`);
-      setSelectedBom(res.data);
+      setSelectedBom(res);
       setDetailVisible(true);
     } catch (err: any) {
       handleApiError(err, '加载 BOM 详情失败');
@@ -255,7 +255,7 @@ const BOMManagementPage: React.FC = () => {
     setHistoryDishId(dishId);
     try {
       const res = await apiClient.get(`/api/v1/bom/dish/${dishId}/history`);
-      setHistoryBoms(res.data || []);
+      setHistoryBoms(res || []);
       setHistoryVisible(true);
     } catch (err: any) {
       handleApiError(err, '加载版本历史失败');
@@ -270,8 +270,8 @@ const BOMManagementPage: React.FC = () => {
       showSuccess('版本已激活');
       loadBoms();
       if (historyDishId) {
-        const res = await apiClient.get(`/api/v1/bom/history/${historyDishId}`);
-        setHistoryBoms(res.data || []);
+        const res = await apiClient.get(`/api/v1/bom/dish/${historyDishId}/history`);
+        setHistoryBoms(res || []);
       }
     } catch (err: any) {
       handleApiError(err, '激活失败');
@@ -343,7 +343,7 @@ const BOMManagementPage: React.FC = () => {
       showSuccess('食材行已添加');
       setItemVisible(false);
       const res = await apiClient.get(`/api/v1/bom/${targetBomId}`);
-      setSelectedBom(res.data);
+      setSelectedBom(res);
       loadBoms();
     } catch (err: any) {
       handleApiError(err, '添加食材行失败');
