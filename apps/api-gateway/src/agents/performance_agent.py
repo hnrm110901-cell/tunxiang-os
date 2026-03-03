@@ -749,38 +749,136 @@ class PerformanceAgent(LLMEnhancedAgent):
         }
 
     async def _get_performance_report(self, params: Dict[str, Any]) -> Dict[str, Any]:
-        """绩效报表（门店/岗位/个人）。"""
-        store_id = params.get("store_id", "")
-        period = params.get("period", "month")
-        role_id = params.get("role_id")
-        report_format = params.get("format", "summary")  # summary | detail | trend
+        """绩效报表（门店/岗位/个人）。
 
-        roles = list(DEFAULT_ROLE_CONFIG.values()) if not role_id else [
-            DEFAULT_ROLE_CONFIG[r] for r in [role_id] if r in DEFAULT_ROLE_CONFIG
-        ]
-        if role_id and not roles:
+        通过并发调用 _calculate_performance + _calculate_commission 聚合各岗位数据。
+        支持三种格式：
+          summary — 各岗位 avg_score + total_commission（默认）
+          detail  — summary + 逐指标明细 + 逐规则提成明细
+          trend   — summary + 本期 vs 上期对比（需两次计算）
+        """
+        import asyncio
+
+        store_id      = params.get("store_id", "")
+        period        = params.get("period", "month")
+        role_id       = params.get("role_id")
+        report_format = params.get("format", "summary")   # summary | detail | trend
+        staff_ids     = params.get("staff_ids")
+
+        if role_id and role_id not in DEFAULT_ROLE_CONFIG:
             return {"success": False, "error": f"未知岗位: {role_id}", "data": None}
 
-        summary = []
-        for r in roles:
-            summary.append({
-                "role_id": r["id"],
-                "role_name": r["name"],
-                "period": period,
-                "avg_score": None,
-                "total_commission": None,
-            })
+        target_roles = (
+            [DEFAULT_ROLE_CONFIG[role_id]]
+            if role_id
+            else list(DEFAULT_ROLE_CONFIG.values())
+        )
+
+        year, month = _parse_period_to_ym(period)
+
+        # ── 并发拉取每个岗位的绩效 + 提成数据 ──────────────────────────────
+        async def _fetch_role(role: Dict[str, Any]) -> Dict[str, Any]:
+            base = {"store_id": store_id, "role_id": role["id"],
+                    "period": period, "staff_ids": staff_ids}
+            perf_res, comm_res = await asyncio.gather(
+                self._calculate_performance(base),
+                self._calculate_commission(base),
+            )
+            perf_data = perf_res.get("data", {}) or {}
+            comm_data = comm_res.get("data", {}) or {}
+
+            row: Dict[str, Any] = {
+                "role_id":         role["id"],
+                "role_name":       role["name"],
+                "period":          period,
+                "avg_score":       perf_data.get("total_score"),
+                "total_commission": comm_data.get("total_commission"),
+            }
+            if report_format in ("detail", "trend"):
+                row["metrics"]          = perf_data.get("metrics", [])
+                row["commission_detail"] = comm_data.get("details", [])
+
+            return row
+
+        rows = await asyncio.gather(*[_fetch_role(r) for r in target_roles])
+        summary = list(rows)
+
+        # ── trend：额外计算上期数据做对比 ───────────────────────────────────
+        prev_summary: Optional[List[Dict[str, Any]]] = None
+        if report_format == "trend":
+            # 推算上一个月
+            if year and month:
+                first_this = date(year, month, 1)
+                last_prev  = first_this - timedelta(days=1)
+                prev_period = f"{last_prev.year}-{last_prev.month:02d}"
+            else:
+                prev_period = "last_month"
+
+            prev_rows = await asyncio.gather(*[
+                _fetch_role(r) for r in target_roles
+            ])
+
+            # 用上期数据单独构建（复用 _fetch_role 但传 prev_period）
+            async def _fetch_role_prev(role: Dict[str, Any]) -> Dict[str, Any]:
+                base = {"store_id": store_id, "role_id": role["id"],
+                        "period": prev_period, "staff_ids": staff_ids}
+                perf_res, comm_res = await asyncio.gather(
+                    self._calculate_performance(base),
+                    self._calculate_commission(base),
+                )
+                perf_data = perf_res.get("data", {}) or {}
+                comm_data = comm_res.get("data", {}) or {}
+                return {
+                    "role_id":          role["id"],
+                    "avg_score":        perf_data.get("total_score"),
+                    "total_commission": comm_data.get("total_commission"),
+                }
+
+            prev_rows_data = await asyncio.gather(*[_fetch_role_prev(r) for r in target_roles])
+            prev_map = {r["role_id"]: r for r in prev_rows_data}
+
+            # 在 summary 中追加环比字段
+            for row in summary:
+                prev = prev_map.get(row["role_id"], {})
+                prev_score = prev.get("avg_score")
+                prev_comm  = prev.get("total_commission")
+                row["prev_period"]           = prev_period
+                row["prev_avg_score"]        = prev_score
+                row["prev_total_commission"] = prev_comm
+                row["score_delta"]           = (
+                    round(row["avg_score"] - prev_score, 4)
+                    if row["avg_score"] is not None and prev_score is not None else None
+                )
+                row["commission_delta"]      = (
+                    round(row["total_commission"] - prev_comm, 2)
+                    if row["total_commission"] is not None and prev_comm is not None else None
+                )
+
+        # ── 门店合计行 ───────────────────────────────────────────────────────
+        scored_rows  = [r for r in summary if r["avg_score"] is not None]
+        comm_rows    = [r for r in summary if r["total_commission"] is not None]
+        store_totals = {
+            "avg_score":        round(sum(r["avg_score"] for r in scored_rows) / len(scored_rows), 4)
+                                if scored_rows else None,
+            "total_commission": round(sum(r["total_commission"] for r in comm_rows), 2)
+                                if comm_rows else None,
+        }
 
         return {
             "success": True,
             "data": {
-                "store_id": store_id,
-                "period": period,
-                "format": report_format,
-                "summary": summary,
-                "data_source_note": "当前为占位结构，接入数据后可产出真实报表",
+                "store_id":     store_id,
+                "period":       period,
+                "year":         year,
+                "month":        month,
+                "format":       report_format,
+                "summary":      summary,
+                "store_totals": store_totals,
             },
-            "metadata": {"source": "report"},
+            "metadata": {
+                "source":       "performance_report",
+                "roles_count":  len(summary),
+            },
         }
 
     async def _explain_rule(self, params: Dict[str, Any]) -> Dict[str, Any]:
