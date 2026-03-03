@@ -11,7 +11,7 @@ import time
 
 from src.core.config import settings
 # 核心模块
-from src.api import health, agents, auth, notifications, stores, mobile, integrations, monitoring, llm, enterprise, voice, neural, adapters, tasks, reconciliation, approval, embedding, raas, model_marketplace, human_in_the_loop, hardware_integration, pos, dishes, benchmark
+from src.api import health, agents, auth, notifications, stores, mobile, integrations, monitoring, llm, enterprise, voice, neural, adapters, tasks, reconciliation, approval, embedding, raas, model_marketplace, human_in_the_loop, hardware_integration, pos, dishes, benchmark, dish_master
 from src.api.phase5_apis import platform_router, industry_router, supply_chain_router, i18n_router
 # 逐步启用的模块
 from src.api import dashboard, analytics, audit, multi_store, finance, customer360, wechat_triggers, queue, meituan_queue
@@ -437,6 +437,7 @@ app.include_router(adapters.router, tags=["adapters"])
 app.include_router(tasks.router, prefix="/api/v1", tags=["tasks"])
 app.include_router(reconciliation.router, prefix="/api/v1", tags=["reconciliation"])
 app.include_router(dishes.router, prefix="/api/v1", tags=["dishes"])
+app.include_router(dish_master.router, tags=["dish-master"])
 app.include_router(benchmark.router, prefix="/api/v1", tags=["benchmark"])
 
 # 逐步启用的模块
