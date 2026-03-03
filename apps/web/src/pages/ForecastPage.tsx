@@ -17,7 +17,7 @@ const ForecastPage: React.FC = () => {
 
   const loadStores = useCallback(async () => {
     try {
-      const res = await apiClient.get('/stores');
+      const res = await apiClient.get('/api/v1/stores');
       setStores(res.data?.stores || res.data || []);
     } catch (err: any) {
       handleApiError(err, '加载门店列表失败');
@@ -27,7 +27,7 @@ const ForecastPage: React.FC = () => {
   const loadForecast = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await apiClient.get(`/forecast/prophet/${selectedStore}`, {
+      const res = await apiClient.get(`/api/v1/forecast/prophet/${selectedStore}`, {
         params: { horizon_days: horizonDays, metric },
       });
       setForecastData(res.data);
@@ -49,7 +49,7 @@ const ForecastPage: React.FC = () => {
   const clearCache = async () => {
     const hide = showLoading('清除缓存中...');
     try {
-      await apiClient.delete(`/forecast/prophet/${selectedStore}/cache`, {
+      await apiClient.delete(`/api/v1/forecast/prophet/${selectedStore}/cache`, {
         params: { metric },
       });
       showSuccess('缓存已清除');

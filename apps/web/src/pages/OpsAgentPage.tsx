@@ -38,7 +38,7 @@ const OpsAgentPage: React.FC = () => {
   const loadHealth = useCallback(async () => {
     setHealthLoading(true);
     try {
-      const res = await apiClient.get(`/ops/health/${selectedStore}`);
+      const res = await apiClient.get(`/api/v1/ops/health/${selectedStore}`);
       setHealthResult(res.data?.data?.check_advice || '');
     } catch (err: any) { handleApiError(err, '健康检查失败'); }
     finally { setHealthLoading(false); }
@@ -46,7 +46,7 @@ const OpsAgentPage: React.FC = () => {
 
   const loadAssets = useCallback(async () => {
     try {
-      const res = await apiClient.get(`/ops/assets/${selectedStore}`);
+      const res = await apiClient.get(`/api/v1/ops/assets/${selectedStore}`);
       setAssetAdvice(res.data?.data?.asset_advice || '');
     } catch { /* silent */ }
   }, [selectedStore]);
@@ -59,7 +59,7 @@ const OpsAgentPage: React.FC = () => {
   const handleDiagnose = async (values: any) => {
     setDiagnoseLoading(true);
     try {
-      const res = await apiClient.post('/ops/diagnose', { store_id: selectedStore, ...values });
+      const res = await apiClient.post('/api/v1/ops/diagnose', { store_id: selectedStore, ...values });
       setDiagnoseResult(res.data?.data?.diagnosis || '');
     } catch (err: any) { handleApiError(err, '故障诊断失败'); }
     finally { setDiagnoseLoading(false); }
@@ -68,7 +68,7 @@ const OpsAgentPage: React.FC = () => {
   const handleRunbook = async (values: any) => {
     setRunbookLoading(true);
     try {
-      const res = await apiClient.post('/ops/runbook', { store_id: selectedStore, ...values });
+      const res = await apiClient.post('/api/v1/ops/runbook', { store_id: selectedStore, ...values });
       setRunbookResult(res.data?.data?.runbook || '');
     } catch (err: any) { handleApiError(err, 'Runbook生成失败'); }
     finally { setRunbookLoading(false); }
@@ -77,7 +77,7 @@ const OpsAgentPage: React.FC = () => {
   const handleMaintenance = async () => {
     setMaintenanceLoading(true);
     try {
-      const res = await apiClient.get(`/ops/maintenance/${selectedStore}`, { params: { device_type: deviceType } });
+      const res = await apiClient.get(`/api/v1/ops/maintenance/${selectedStore}`, { params: { device_type: deviceType } });
       setMaintenanceResult(res.data?.data?.maintenance_advice || '');
     } catch (err: any) { handleApiError(err, '预测维护查询失败'); }
     finally { setMaintenanceLoading(false); }
@@ -86,7 +86,7 @@ const OpsAgentPage: React.FC = () => {
   const handleSecurity = async () => {
     setSecurityLoading(true);
     try {
-      const res = await apiClient.get(`/ops/security/${selectedStore}`, { params: { focus: securityFocus } });
+      const res = await apiClient.get(`/api/v1/ops/security/${selectedStore}`, { params: { focus: securityFocus } });
       setSecurityResult(res.data?.data?.security_advice || '');
     } catch (err: any) { handleApiError(err, '安全建议获取失败'); }
     finally { setSecurityLoading(false); }
@@ -96,7 +96,7 @@ const OpsAgentPage: React.FC = () => {
     if (!queryInput.trim()) return;
     setQueryLoading(true);
     try {
-      const res = await apiClient.post('/ops/query', { store_id: selectedStore, question: queryInput });
+      const res = await apiClient.post('/api/v1/ops/query', { store_id: selectedStore, question: queryInput });
       const answer = res.data?.data?.answer || '';
       setQueryHistory(prev => [{ question: queryInput, answer }, ...prev].slice(0, 5));
       setQueryInput('');

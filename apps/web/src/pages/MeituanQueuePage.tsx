@@ -13,7 +13,7 @@ const MeituanQueuePage: React.FC = () => {
   const loadConfig = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await apiClient.get('/meituan/queue/config');
+      const res = await apiClient.get('/api/v1/meituan/queue/config');
       setConfig(res.data);
     } catch (err: any) {
       handleApiError(err, '加载美团配置失败');
@@ -31,7 +31,7 @@ const MeituanQueuePage: React.FC = () => {
         const [id, name, capacity] = line.split(',');
         return { id: id?.trim(), name: name?.trim(), capacity: parseInt(capacity?.trim() || '4') };
       });
-      await apiClient.post('/meituan/queue/sync/table-types', {
+      await apiClient.post('/api/v1/meituan/queue/sync/table-types', {
         store_id: values.store_id,
         app_auth_token: values.app_auth_token,
         table_types: tableTypes,
@@ -47,7 +47,7 @@ const MeituanQueuePage: React.FC = () => {
   const syncWaitingInfo = async () => {
     setSyncLoading(prev => ({ ...prev, waiting: true }));
     try {
-      await apiClient.post('/meituan/queue/sync/waiting-info', {
+      await apiClient.post('/api/v1/meituan/queue/sync/waiting-info', {
         store_id: config?.store_id || 'STORE001',
         app_auth_token: config?.app_auth_token || '',
       });

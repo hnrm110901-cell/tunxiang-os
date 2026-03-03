@@ -25,7 +25,7 @@ const VoiceDevicePage: React.FC = () => {
   const loadDevices = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await apiClient.get('/voice/devices');
+      const res = await apiClient.get('/api/v1/voice/devices');
       setDevices(res.data?.devices || res.data || []);
     } catch (err: any) {
       handleApiError(err, '加载设备列表失败');
@@ -39,7 +39,7 @@ const VoiceDevicePage: React.FC = () => {
   const registerDevice = async (values: any) => {
     setRegisterSubmitting(true);
     try {
-      await apiClient.post('/voice/devices/register', values);
+      await apiClient.post('/api/v1/voice/devices/register', values);
       showSuccess('设备注册成功');
       setRegisterVisible(false);
       registerForm.resetFields();
@@ -55,7 +55,7 @@ const VoiceDevicePage: React.FC = () => {
     const key = `connect-${record.device_id}`;
     setActionLoading(prev => ({ ...prev, [key]: true }));
     try {
-      await apiClient.post(`/voice/devices/${record.device_id}/connect`);
+      await apiClient.post(`/api/v1/voice/devices/${record.device_id}/connect`);
       showSuccess('已连接');
       loadDevices();
     } catch (err: any) {
@@ -69,7 +69,7 @@ const VoiceDevicePage: React.FC = () => {
     const key = `disconnect-${record.device_id}`;
     setActionLoading(prev => ({ ...prev, [key]: true }));
     try {
-      await apiClient.post(`/voice/devices/${record.device_id}/disconnect`);
+      await apiClient.post(`/api/v1/voice/devices/${record.device_id}/disconnect`);
       showSuccess('已断开');
       loadDevices();
     } catch (err: any) {
@@ -82,7 +82,7 @@ const VoiceDevicePage: React.FC = () => {
   const broadcastNotify = async (values: any) => {
     setNotifySubmitting(true);
     try {
-      await apiClient.post('/voice/voice/notification/broadcast', {
+      await apiClient.post('/api/v1/voice/voice/notification/broadcast', {
         message: values.message,
         role: values.role || undefined,
         priority: values.priority || 'normal',

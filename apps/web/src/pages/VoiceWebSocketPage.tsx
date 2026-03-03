@@ -29,7 +29,7 @@ const VoiceWebSocketPage: React.FC = () => {
 
   const loadStores = useCallback(async () => {
     try {
-      const res = await apiClient.get('/stores');
+      const res = await apiClient.get('/api/v1/stores');
       setStores(res.data?.stores || res.data || []);
     } catch (err) {
       handleApiError(err, '加载门店列表失败');
@@ -99,7 +99,7 @@ const VoiceWebSocketPage: React.FC = () => {
         setTtsText('');
       } else {
         // fallback: REST
-        await apiClient.post(`/voice-ws/tts/${storeId}`, { text: ttsText });
+        await apiClient.post(`/api/v1/voice-ws/tts/${storeId}`, { text: ttsText });
         showSuccess('TTS 请求已发送');
         setTtsText('');
       }

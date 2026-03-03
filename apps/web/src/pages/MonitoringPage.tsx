@@ -55,8 +55,8 @@ const MonitoringPage: React.FC = () => {
       setError(null);
 
       const [errors, performance] = await Promise.all([
-        apiClient.get(`/monitoring/errors/summary?time_window=${timeWindow}`),
-        apiClient.get(`/monitoring/performance/summary?time_window=${timeWindow}`),
+        apiClient.get(`/api/v1/monitoring/errors/summary?time_window=${timeWindow}`),
+        apiClient.get(`/api/v1/monitoring/performance/summary?time_window=${timeWindow}`),
       ]);
 
       setErrorSummary(errors);

@@ -16,7 +16,7 @@ const BenchmarkPage: React.FC = () => {
 
   const loadStores = useCallback(async () => {
     try {
-      const res = await apiClient.get('/stores');
+      const res = await apiClient.get('/api/v1/stores');
       setStores(res.data?.stores || res.data || []);
     } catch { /* ignore */ }
   }, []);
@@ -25,9 +25,9 @@ const BenchmarkPage: React.FC = () => {
     setLoading(true);
     try {
       const [reportRes, dimRes, sumRes] = await Promise.allSettled([
-        apiClient.get(`/benchmark/report?store_id=${storeId}`),
-        apiClient.get('/benchmark/dimensions'),
-        apiClient.get(`/benchmark/summary?store_id=${storeId}`),
+        apiClient.get(`/api/v1/benchmark/report?store_id=${storeId}`),
+        apiClient.get('/api/v1/benchmark/dimensions'),
+        apiClient.get(`/api/v1/benchmark/summary?store_id=${storeId}`),
       ]);
       if (reportRes.status === 'fulfilled') setReport(reportRes.value.data);
       if (dimRes.status === 'fulfilled') setDimensions(dimRes.value.data?.dimensions || dimRes.value.data || []);

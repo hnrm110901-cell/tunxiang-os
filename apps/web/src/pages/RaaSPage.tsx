@@ -20,7 +20,7 @@ const RaaSPage: React.FC = () => {
 
   const loadStores = useCallback(async () => {
     try {
-      const res = await apiClient.get('/stores');
+      const res = await apiClient.get('/api/v1/stores');
       setStores(res.data?.stores || res.data || []);
     } catch { /* ignore */ }
   }, []);
@@ -29,11 +29,11 @@ const RaaSPage: React.FC = () => {
     setLoading(true);
     try {
       const [tierRes, baseRes, effectRes, billRes, valueRes] = await Promise.allSettled([
-        apiClient.get(`/raas/pricing-tier/${storeId}`),
-        apiClient.get(`/raas/baseline/${storeId}`),
-        apiClient.get(`/raas/effect-metrics/${storeId}`),
-        apiClient.get(`/raas/monthly-bill/${storeId}`),
-        apiClient.get(`/raas/value-proposition/${storeId}`),
+        apiClient.get(`/api/v1/raas/pricing-tier/${storeId}`),
+        apiClient.get(`/api/v1/raas/baseline/${storeId}`),
+        apiClient.get(`/api/v1/raas/effect-metrics/${storeId}`),
+        apiClient.get(`/api/v1/raas/monthly-bill/${storeId}`),
+        apiClient.get(`/api/v1/raas/value-proposition/${storeId}`),
       ]);
       if (tierRes.status === 'fulfilled') setTier(tierRes.value.data);
       if (baseRes.status === 'fulfilled') setBaseline(baseRes.value.data);

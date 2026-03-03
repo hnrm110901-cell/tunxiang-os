@@ -45,14 +45,14 @@ const KPIDashboardPage: React.FC = () => {
 
   const loadStores = useCallback(async () => {
     try {
-      const res = await apiClient.get('/stores');
+      const res = await apiClient.get('/api/v1/stores');
       setStores(res.data?.stores || res.data || []);
     } catch (err: any) { handleApiError(err, '加载门店失败'); }
   }, []);
 
   const loadKpis = useCallback(async () => {
     try {
-      const res = await apiClient.get('/kpis');
+      const res = await apiClient.get('/api/v1/kpis');
       setKpis(res.data || []);
       if (!selectedKpi && res.data?.length > 0) setSelectedKpi(res.data[0].id);
     } catch (err: any) { handleApiError(err, '加载KPI定义失败'); }
@@ -61,7 +61,7 @@ const KPIDashboardPage: React.FC = () => {
   const loadRecords = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await apiClient.get('/kpis/records/store', {
+      const res = await apiClient.get('/api/v1/kpis/records/store', {
         params: { store_id: selectedStore, start_date: dateRange[0], end_date: dateRange[1] },
       });
       setRecords(res.data || []);
@@ -74,7 +74,7 @@ const KPIDashboardPage: React.FC = () => {
 
   const addRecord = async (values: any) => {
     try {
-      await apiClient.post('/kpis/records', {
+      await apiClient.post('/api/v1/kpis/records', {
         ...values,
         store_id: selectedStore,
         record_date: values.record_date?.format('YYYY-MM-DD') || dayjs().format('YYYY-MM-DD'),
@@ -98,7 +98,7 @@ const KPIDashboardPage: React.FC = () => {
 
   const saveThresholds = async (values: any) => {
     try {
-      await apiClient.patch(`/kpis/${editingKpi.id}/thresholds`, values);
+      await apiClient.patch(`/api/v1/kpis/${editingKpi.id}/thresholds`, values);
       showSuccess('阈值已更新');
       setEditThresholdModal(false);
       loadKpis();

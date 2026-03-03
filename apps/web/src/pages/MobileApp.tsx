@@ -25,7 +25,7 @@ const MobileApp: React.FC = () => {
   const loadDashboardData = useCallback(async () => {
     try {
       setRefreshing(true);
-      const response = await apiClient.get('/mobile/dashboard');
+      const response = await apiClient.get('/api/v1/mobile/dashboard');
       setDashboard(response.data);
     } catch (err: any) {
       handleApiError(err, '加载仪表盘失败');
@@ -37,7 +37,7 @@ const MobileApp: React.FC = () => {
 
   const loadTodayOrders = useCallback(async () => {
     try {
-      const response = await apiClient.get('/mobile/orders/today');
+      const response = await apiClient.get('/api/v1/mobile/orders/today');
       setTodayOrders(response.data);
     } catch (err: any) {
       handleApiError(err, '加载今日订单失败');

@@ -24,7 +24,7 @@ const ModelMarketplacePage: React.FC = () => {
 
   const loadStores = useCallback(async () => {
     try {
-      const res = await apiClient.get('/stores');
+      const res = await apiClient.get('/api/v1/stores');
       setStores(res.data?.stores || res.data || []);
     } catch {
       // 静默失败，保留默认门店
@@ -35,9 +35,9 @@ const ModelMarketplacePage: React.FC = () => {
     setLoading(true);
     try {
       const [modelsRes, myRes, netRes] = await Promise.allSettled([
-        apiClient.get('/model-marketplace/models'),
-        apiClient.get(`/model-marketplace/my-models/${storeId}`),
-        apiClient.get('/model-marketplace/network-effect'),
+        apiClient.get('/api/v1/model-marketplace/models'),
+        apiClient.get(`/api/v1/model-marketplace/my-models/${storeId}`),
+        apiClient.get('/api/v1/model-marketplace/network-effect'),
       ]);
       if (modelsRes.status === 'fulfilled') setModels(modelsRes.value.data?.models || modelsRes.value.data || []);
       if (myRes.status === 'fulfilled') setMyModels(myRes.value.data?.models || myRes.value.data || []);
@@ -54,7 +54,7 @@ const ModelMarketplacePage: React.FC = () => {
   const purchaseModel = async () => {
     setPurchaseSubmitting(true);
     try {
-      await apiClient.post('/model-marketplace/purchase', { store_id: storeId, model_id: selectedModel?.model_id || selectedModel?.id });
+      await apiClient.post('/api/v1/model-marketplace/purchase', { store_id: storeId, model_id: selectedModel?.model_id || selectedModel?.id });
       showSuccess('购买成功');
       setPurchaseVisible(false);
       loadData();
@@ -68,7 +68,7 @@ const ModelMarketplacePage: React.FC = () => {
   const contributeData = async (values: any) => {
     setContributeSubmitting(true);
     try {
-      await apiClient.post('/model-marketplace/contribute-data', { store_id: storeId, ...values });
+      await apiClient.post('/api/v1/model-marketplace/contribute-data', { store_id: storeId, ...values });
       showSuccess('数据贡献成功');
       setContributeVisible(false);
       contributeForm.resetFields();

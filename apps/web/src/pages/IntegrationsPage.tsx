@@ -23,8 +23,8 @@ const IntegrationsPage: React.FC = () => {
     setLoading(true);
     try {
       const [sysRes, logRes] = await Promise.allSettled([
-        apiClient.get('/integrations/systems'),
-        apiClient.get('/integrations/sync-logs'),
+        apiClient.get('/api/v1/integrations/systems'),
+        apiClient.get('/api/v1/integrations/sync-logs'),
       ]);
       if (sysRes.status === 'fulfilled') setSystems(sysRes.value.data?.systems || sysRes.value.data || []);
       if (logRes.status === 'fulfilled') setSyncLogs(logRes.value.data?.logs || logRes.value.data || []);
@@ -40,7 +40,7 @@ const IntegrationsPage: React.FC = () => {
   const registerSystem = async (values: any) => {
     setSubmitting(true);
     try {
-      await apiClient.post('/integrations/systems', values);
+      await apiClient.post('/api/v1/integrations/systems', values);
       showSuccess('系统注册成功');
       setRegisterVisible(false);
       form.resetFields();
@@ -54,7 +54,7 @@ const IntegrationsPage: React.FC = () => {
 
   const testConnection = async (system: any) => {
     try {
-      await apiClient.post(`/integrations/systems/${system.system_id || system.id}/test`);
+      await apiClient.post(`/api/v1/integrations/systems/${system.system_id || system.id}/test`);
       showSuccess('连接测试成功');
     } catch (err: any) {
       handleApiError(err, '连接测试失败');
@@ -63,7 +63,7 @@ const IntegrationsPage: React.FC = () => {
 
   const deleteSystem = async (system: any) => {
     try {
-      await apiClient.delete(`/integrations/systems/${system.system_id || system.id}`);
+      await apiClient.delete(`/api/v1/integrations/systems/${system.system_id || system.id}`);
       showSuccess('已删除');
       loadData();
     } catch (err: any) {

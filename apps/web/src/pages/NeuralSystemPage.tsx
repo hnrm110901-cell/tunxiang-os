@@ -18,7 +18,7 @@ const NeuralSystemPage: React.FC = () => {
   const loadStatus = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await apiClient.get('/neural/status');
+      const res = await apiClient.get('/api/v1/neural/status');
       setStatus(res.data);
     } catch (err: any) {
       handleApiError(err, '加载神经系统状态失败');
@@ -33,7 +33,7 @@ const NeuralSystemPage: React.FC = () => {
     setSearching(true);
     setSearchResults([]);
     try {
-      const res = await apiClient.post(`/neural/search/${searchType}`, {
+      const res = await apiClient.post(`/api/v1/neural/search/${searchType}`, {
         query: values.query,
         top_k: values.top_k || 5,
       });

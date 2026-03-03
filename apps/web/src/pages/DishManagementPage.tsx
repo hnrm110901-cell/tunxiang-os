@@ -25,8 +25,8 @@ const DishManagementPage: React.FC = () => {
     setLoading(true);
     try {
       const [dishRes, catRes] = await Promise.allSettled([
-        apiClient.get('/dishes'),
-        apiClient.get('/dishes/categories'),
+        apiClient.get('/api/v1/dishes'),
+        apiClient.get('/api/v1/dishes/categories'),
       ]);
       if (dishRes.status === 'fulfilled') setDishes(dishRes.value.data?.dishes || dishRes.value.data || []);
       if (catRes.status === 'fulfilled') setCategories(catRes.value.data?.categories || catRes.value.data || []);
@@ -49,10 +49,10 @@ const DishManagementPage: React.FC = () => {
     setSubmitting(true);
     try {
       if (editingDish) {
-        await apiClient.put(`/dishes/${editingDish.dish_id || editingDish.id}`, values);
+        await apiClient.put(`/api/v1/dishes/${editingDish.dish_id || editingDish.id}`, values);
         showSuccess('菜品更新成功');
       } else {
-        await apiClient.post('/dishes', values);
+        await apiClient.post('/api/v1/dishes', values);
         showSuccess('菜品创建成功');
       }
       setDishModal(false);
@@ -67,7 +67,7 @@ const DishManagementPage: React.FC = () => {
 
   const deleteDish = async (dish: any) => {
     try {
-      await apiClient.delete(`/dishes/${dish.dish_id || dish.id}`);
+      await apiClient.delete(`/api/v1/dishes/${dish.dish_id || dish.id}`);
       showSuccess('菜品已删除');
       loadData();
     } catch (err: any) {
@@ -77,7 +77,7 @@ const DishManagementPage: React.FC = () => {
 
   const viewCost = async (dish: any) => {
     try {
-      const res = await apiClient.get(`/dishes/${dish.dish_id || dish.id}/cost-breakdown`);
+      const res = await apiClient.get(`/api/v1/dishes/${dish.dish_id || dish.id}/cost-breakdown`);
       setCostDetail(res.data);
       setCostVisible(true);
     } catch (err: any) {
@@ -88,7 +88,7 @@ const DishManagementPage: React.FC = () => {
   const createCategory = async (values: any) => {
     setSubmitting(true);
     try {
-      await apiClient.post('/dishes/categories', values);
+      await apiClient.post('/api/v1/dishes/categories', values);
       showSuccess('分类创建成功');
       setCatModal(false);
       catForm.resetFields();

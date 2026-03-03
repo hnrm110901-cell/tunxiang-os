@@ -29,7 +29,7 @@ const HumanInTheLoop: React.FC = () => {
 
   const loadStores = useCallback(async () => {
     try {
-      const res = await apiClient.get('/stores');
+      const res = await apiClient.get('/api/v1/stores');
       setStores(res.data?.stores || res.data || []);
     } catch {
       // 静默失败，保留默认门店
@@ -38,7 +38,7 @@ const HumanInTheLoop: React.FC = () => {
 
   const loadPending = useCallback(async () => {
     try {
-      const res = await apiClient.get(`/human-in-the-loop/pending-approvals/${selectedStore}`);
+      const res = await apiClient.get(`/api/v1/human-in-the-loop/pending-approvals/${selectedStore}`);
       setPending(res.data?.approvals || res.data || []);
     } catch (err: any) {
       handleApiError(err, '加载待审批列表失败');
@@ -49,9 +49,9 @@ const HumanInTheLoop: React.FC = () => {
     setLoading(true);
     try {
       const [phase, metrics, rules] = await Promise.allSettled([
-        apiClient.get(`/human-in-the-loop/trust-phase/${selectedStore}`),
-        apiClient.get(`/human-in-the-loop/trust-metrics/${selectedStore}`),
-        apiClient.get('/human-in-the-loop/risk-classification'),
+        apiClient.get(`/api/v1/human-in-the-loop/trust-phase/${selectedStore}`),
+        apiClient.get(`/api/v1/human-in-the-loop/trust-metrics/${selectedStore}`),
+        apiClient.get('/api/v1/human-in-the-loop/risk-classification'),
       ]);
       if (phase.status === 'fulfilled') setTrustPhase(phase.value.data);
       if (metrics.status === 'fulfilled') setTrustMetrics(metrics.value.data);
@@ -81,7 +81,7 @@ const HumanInTheLoop: React.FC = () => {
   const submitApproval = async () => {
     setSubmitting(true);
     try {
-      await apiClient.post('/human-in-the-loop/approve', {
+      await apiClient.post('/api/v1/human-in-the-loop/approve', {
         request_id: currentRequest?.request_id || currentRequest?.id,
         approved: approving,
         comment,

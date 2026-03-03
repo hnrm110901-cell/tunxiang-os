@@ -24,7 +24,7 @@ const EventSourcingPage: React.FC = () => {
 
   const loadStores = useCallback(async () => {
     try {
-      const res = await apiClient.get('/stores');
+      const res = await apiClient.get('/api/v1/stores');
       setStores(res.data?.stores || res.data || []);
     } catch { /* ignore */ }
   }, []);
@@ -36,8 +36,8 @@ const EventSourcingPage: React.FC = () => {
       if (eventType) params.event_type = eventType;
       if (statusFilter) params.status = statusFilter;
       const [eventsRes, statsRes] = await Promise.allSettled([
-        apiClient.get(`/event-sourcing/events/${selectedStore}`, { params }),
-        apiClient.get(`/event-sourcing/stats/${selectedStore}`, { params: { hours } }),
+        apiClient.get(`/api/v1/event-sourcing/events/${selectedStore}`, { params }),
+        apiClient.get(`/api/v1/event-sourcing/stats/${selectedStore}`, { params: { hours } }),
       ]);
       if (eventsRes.status === 'fulfilled') setEvents(eventsRes.value.data?.events || eventsRes.value.data || []);
       if (statsRes.status === 'fulfilled') setStats(statsRes.value.data);
@@ -54,7 +54,7 @@ const EventSourcingPage: React.FC = () => {
     setChainLoading(true);
     setChainVisible(true);
     try {
-      const res = await apiClient.get(`/event-sourcing/events/${selectedStore}/${record.event_id || record.id}`);
+      const res = await apiClient.get(`/api/v1/event-sourcing/events/${selectedStore}/${record.event_id || record.id}`);
       setChainData(res.data);
     } catch (err: any) {
       handleApiError(err, '加载处理链失败');

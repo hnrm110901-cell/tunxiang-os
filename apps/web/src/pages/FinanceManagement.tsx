@@ -37,14 +37,14 @@ const FinanceManagement: React.FC = () => {
 
   const loadStores = useCallback(async () => {
     try {
-      const res = await apiClient.get('/stores');
+      const res = await apiClient.get('/api/v1/stores');
       setStores(res.data?.stores || res.data || []);
     } catch { /* ignore */ }
   }, []);
 
   const loadTransactions = useCallback(async () => {
     try {
-      const response = await apiClient.get('/finance/transactions', {
+      const response = await apiClient.get('/api/v1/finance/transactions', {
         params: {
           start_date: dateRange[0].format('YYYY-MM-DD'),
           end_date: dateRange[1].format('YYYY-MM-DD'),
@@ -58,7 +58,7 @@ const FinanceManagement: React.FC = () => {
 
   const loadIncomeStatement = useCallback(async () => {
     try {
-      const response = await apiClient.get('/finance/reports/income-statement', {
+      const response = await apiClient.get('/api/v1/finance/reports/income-statement', {
         params: {
           store_id: storeId,
           start_date: dateRange[0].format('YYYY-MM-DD'),
@@ -73,7 +73,7 @@ const FinanceManagement: React.FC = () => {
 
   const loadCashFlow = useCallback(async () => {
     try {
-      const response = await apiClient.get('/finance/reports/cash-flow', {
+      const response = await apiClient.get('/api/v1/finance/reports/cash-flow', {
         params: {
           store_id: storeId,
           start_date: dateRange[0].format('YYYY-MM-DD'),
@@ -89,7 +89,7 @@ const FinanceManagement: React.FC = () => {
   const loadBudgetAnalysis = useCallback(async () => {
     try {
       const now = dayjs();
-      const response = await apiClient.get('/finance/budgets/analysis', {
+      const response = await apiClient.get('/api/v1/finance/budgets/analysis', {
         params: {
           store_id: storeId,
           year: now.year(),
@@ -104,7 +104,7 @@ const FinanceManagement: React.FC = () => {
 
   const loadFinancialMetrics = useCallback(async () => {
     try {
-      const response = await apiClient.get('/finance/metrics', {
+      const response = await apiClient.get('/api/v1/finance/metrics', {
         params: {
           store_id: storeId,
           start_date: dateRange[0].format('YYYY-MM-DD'),
@@ -135,7 +135,7 @@ const FinanceManagement: React.FC = () => {
 
   const handleCreateTransaction = async (values: any) => {
     try {
-      await apiClient.post('/finance/transactions', {
+      await apiClient.post('/api/v1/finance/transactions', {
         ...values,
         amount: values.amount * 100, // 转换为分
       });
@@ -153,7 +153,7 @@ const FinanceManagement: React.FC = () => {
 
   const handleCreateBudget = async (values: any) => {
     try {
-      await apiClient.post('/finance/budgets', {
+      await apiClient.post('/api/v1/finance/budgets', {
         ...values,
         budgeted_amount: values.budgeted_amount * 100, // 转换为分
       });
@@ -177,7 +177,7 @@ const FinanceManagement: React.FC = () => {
         end_date: dateRange[1].format('YYYY-MM-DD'),
       });
 
-      const response = await apiClient.get(`/finance/reports/export?${params.toString()}`, {
+      const response = await apiClient.get(`/api/v1/finance/reports/export?${params.toString()}`, {
         responseType: 'blob',
       });
 

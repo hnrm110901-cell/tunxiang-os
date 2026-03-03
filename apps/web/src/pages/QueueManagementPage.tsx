@@ -26,8 +26,8 @@ const QueueManagementPage: React.FC = () => {
     setLoading(true);
     try {
       const [queueRes, statsRes] = await Promise.allSettled([
-        apiClient.get('/queue/list', { params: { status: statusFilter || undefined, limit: 100 } }),
-        apiClient.get('/queue/stats'),
+        apiClient.get('/api/v1/queue/list', { params: { status: statusFilter || undefined, limit: 100 } }),
+        apiClient.get('/api/v1/queue/stats'),
       ]);
       if (queueRes.status === 'fulfilled') setQueue(queueRes.value.data?.queue || queueRes.value.data || []);
       if (statsRes.status === 'fulfilled') setStats(statsRes.value.data);
@@ -43,7 +43,7 @@ const QueueManagementPage: React.FC = () => {
   const addToQueue = async (values: any) => {
     setAddSubmitting(true);
     try {
-      await apiClient.post('/queue/add', values);
+      await apiClient.post('/api/v1/queue/add', values);
       showSuccess('已加入排队');
       setAddVisible(false);
       form.resetFields();
@@ -58,7 +58,7 @@ const QueueManagementPage: React.FC = () => {
   const callNext = async () => {
     setCallLoading(true);
     try {
-      const res = await apiClient.post('/queue/call-next');
+      const res = await apiClient.post('/api/v1/queue/call-next');
       showSuccess(`已叫号：${res.data?.customer_name || '下一位'}`);
       loadQueue();
     } catch (err: any) {
@@ -72,7 +72,7 @@ const QueueManagementPage: React.FC = () => {
     const key = `seat-${record.queue_id}`;
     setActionLoading(prev => ({ ...prev, [key]: true }));
     try {
-      await apiClient.put(`/queue/${record.queue_id}/seated`, { table_number: '待分配' });
+      await apiClient.put(`/api/v1/queue/${record.queue_id}/seated`, { table_number: '待分配' });
       showSuccess('已标记入座');
       loadQueue();
     } catch (err: any) {
@@ -86,7 +86,7 @@ const QueueManagementPage: React.FC = () => {
     const key = `cancel-${record.queue_id}`;
     setActionLoading(prev => ({ ...prev, [key]: true }));
     try {
-      await apiClient.delete(`/queue/${record.queue_id}`);
+      await apiClient.delete(`/api/v1/queue/${record.queue_id}`);
       showSuccess('已取消');
       loadQueue();
     } catch (err: any) {

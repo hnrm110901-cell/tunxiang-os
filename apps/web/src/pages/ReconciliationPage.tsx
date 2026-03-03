@@ -24,7 +24,7 @@ const ReconciliationPage: React.FC = () => {
 
   const loadStores = useCallback(async () => {
     try {
-      const res = await apiClient.get('/stores');
+      const res = await apiClient.get('/api/v1/stores');
       setStores(res.data?.stores || res.data || []);
     } catch { /* ignore */ }
   }, []);
@@ -33,8 +33,8 @@ const ReconciliationPage: React.FC = () => {
     setLoading(true);
     try {
       const [recRes, sumRes] = await Promise.allSettled([
-        apiClient.get('/reconciliation/records'),
-        apiClient.get('/reconciliation/summary'),
+        apiClient.get('/api/v1/reconciliation/records'),
+        apiClient.get('/api/v1/reconciliation/summary'),
       ]);
       if (recRes.status === 'fulfilled') setRecords(recRes.value.data?.records || recRes.value.data || []);
       if (sumRes.status === 'fulfilled') setSummary(sumRes.value.data);
@@ -50,7 +50,7 @@ const ReconciliationPage: React.FC = () => {
   const performReconciliation = async () => {
     setPerforming(true);
     try {
-      await apiClient.post('/reconciliation/perform', { store_id: storeId, reconciliation_date: selectedDate });
+      await apiClient.post('/api/v1/reconciliation/perform', { store_id: storeId, reconciliation_date: selectedDate });
       showSuccess('对账执行成功');
       loadData();
     } catch (err: any) {
@@ -62,7 +62,7 @@ const ReconciliationPage: React.FC = () => {
 
   const confirmRecord = async (record: any) => {
     try {
-      await apiClient.put(`/reconciliation/records/${record.record_id || record.id}/confirm`);
+      await apiClient.put(`/api/v1/reconciliation/records/${record.record_id || record.id}/confirm`);
       showSuccess('已确认');
       loadData();
     } catch (err: any) {

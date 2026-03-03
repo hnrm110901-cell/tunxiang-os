@@ -19,7 +19,7 @@ const LLMConfigPage: React.FC = () => {
   const loadConfig = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await apiClient.get('/llm/config');
+      const res = await apiClient.get('/api/v1/llm/config');
       setConfig(res.data);
       form.setFieldsValue(res.data);
     } catch (err: any) {
@@ -34,7 +34,7 @@ const LLMConfigPage: React.FC = () => {
   const saveConfig = async (values: any) => {
     setSaving(true);
     try {
-      await apiClient.put('/llm/config', values);
+      await apiClient.put('/api/v1/llm/config', values);
       showSuccess('配置保存成功');
       loadConfig();
     } catch (err: any) {
@@ -48,7 +48,7 @@ const LLMConfigPage: React.FC = () => {
     setTesting(true);
     setTestResult(null);
     try {
-      const res = await apiClient.post('/llm/test', values);
+      const res = await apiClient.post('/api/v1/llm/test', values);
       setTestResult(res.data);
     } catch (err: any) {
       handleApiError(err, '测试失败');

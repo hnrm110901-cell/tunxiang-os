@@ -27,7 +27,7 @@ const TaskManagementPage: React.FC = () => {
   const loadTasks = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await apiClient.get('/tasks');
+      const res = await apiClient.get('/api/v1/tasks');
       setTasks(res.data?.tasks || res.data || []);
     } catch (err: any) {
       handleApiError(err, '加载任务列表失败');
@@ -41,7 +41,7 @@ const TaskManagementPage: React.FC = () => {
   const createTask = async (values: any) => {
     setSubmitting(true);
     try {
-      await apiClient.post('/tasks', values);
+      await apiClient.post('/api/v1/tasks', values);
       showSuccess('任务创建成功');
       setCreateVisible(false);
       form.resetFields();
@@ -56,7 +56,7 @@ const TaskManagementPage: React.FC = () => {
   const assignTask = async () => {
     setAssignSubmitting(true);
     try {
-      await apiClient.put(`/tasks/${currentTask.task_id || currentTask.id}/assign`, { assignee });
+      await apiClient.put(`/api/v1/tasks/${currentTask.task_id || currentTask.id}/assign`, { assignee });
       showSuccess('任务分配成功');
       setAssignVisible(false);
       loadTasks();
@@ -71,7 +71,7 @@ const TaskManagementPage: React.FC = () => {
     const key = `complete-${task.task_id || task.id}`;
     setActionLoading(prev => ({ ...prev, [key]: true }));
     try {
-      await apiClient.put(`/tasks/${task.task_id || task.id}/complete`);
+      await apiClient.put(`/api/v1/tasks/${task.task_id || task.id}/complete`);
       showSuccess('任务已完成');
       loadTasks();
     } catch (err: any) {
@@ -85,7 +85,7 @@ const TaskManagementPage: React.FC = () => {
     const key = `delete-${task.task_id || task.id}`;
     setActionLoading(prev => ({ ...prev, [key]: true }));
     try {
-      await apiClient.delete(`/tasks/${task.task_id || task.id}`);
+      await apiClient.delete(`/api/v1/tasks/${task.task_id || task.id}`);
       showSuccess('任务已删除');
       loadTasks();
     } catch (err: any) {

@@ -49,7 +49,7 @@ const SupplyChainManagement: React.FC = () => {
 
   const loadReplenishmentSuggestions = useCallback(async () => {
     try {
-      const response = await apiClient.get('/inventory/replenishment-suggestions');
+      const response = await apiClient.get('/api/v1/inventory/replenishment-suggestions');
       setReplenishmentSuggestions(response.data.suggestions || []);
     } catch (err: any) {
       handleApiError(err, '加载补货建议失败');

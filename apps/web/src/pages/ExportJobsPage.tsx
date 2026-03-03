@@ -22,7 +22,7 @@ const ExportJobsPage: React.FC = () => {
   const loadJobs = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await apiClient.get('/export-jobs');
+      const res = await apiClient.get('/api/v1/export-jobs');
       setJobs(res.data?.jobs || res.data || []);
     } catch (err: any) {
       handleApiError(err, '加载导出任务失败');
@@ -33,7 +33,7 @@ const ExportJobsPage: React.FC = () => {
 
   const loadTypes = useCallback(async () => {
     try {
-      const res = await apiClient.get('/export-jobs/types');
+      const res = await apiClient.get('/api/v1/export-jobs/types');
       setExportTypes(res.data?.types || res.data || []);
     } catch {
       setExportTypes(['transactions', 'audit_logs', 'orders']);
@@ -52,7 +52,7 @@ const ExportJobsPage: React.FC = () => {
         payload.start_date = values.date_range[0].format('YYYY-MM-DD');
         payload.end_date = values.date_range[1].format('YYYY-MM-DD');
       }
-      await apiClient.post('/export-jobs', payload);
+      await apiClient.post('/api/v1/export-jobs', payload);
       showSuccess('导出任务已提交');
       setCreateVisible(false);
       form.resetFields();
@@ -66,7 +66,7 @@ const ExportJobsPage: React.FC = () => {
     const key = `dl-${record.job_id || record.id}`;
     setActionLoading(prev => ({ ...prev, [key]: true }));
     try {
-      const res = await apiClient.get(`/export-jobs/${record.job_id || record.id}/download`, { responseType: 'blob' });
+      const res = await apiClient.get(`/api/v1/export-jobs/${record.job_id || record.id}/download`, { responseType: 'blob' });
       const url = window.URL.createObjectURL(new Blob([res.data]));
       const a = document.createElement('a');
       a.href = url;
@@ -84,7 +84,7 @@ const ExportJobsPage: React.FC = () => {
     const key = `del-${record.job_id || record.id}`;
     setActionLoading(prev => ({ ...prev, [key]: true }));
     try {
-      await apiClient.delete(`/export-jobs/${record.job_id || record.id}`);
+      await apiClient.delete(`/api/v1/export-jobs/${record.job_id || record.id}`);
       showSuccess('已删除');
       loadJobs();
     } catch (err: any) {

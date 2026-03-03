@@ -34,7 +34,7 @@ const POSPage: React.FC = () => {
 
   const loadStores = useCallback(async () => {
     try {
-      const res = await apiClient.get('/stores');
+      const res = await apiClient.get('/api/v1/stores');
       setStores(res.data?.stores || res.data || []);
     } catch (err: any) { handleApiError(err, '加载门店失败'); }
   }, []);
@@ -43,12 +43,12 @@ const POSPage: React.FC = () => {
     setLoading(true);
     try {
       const [ord, inv, sales, status, queue, h] = await Promise.allSettled([
-        apiClient.get('/pos/orders', { params: { store_id: selectedStore, start_date: dateRange[0], end_date: dateRange[1], limit: 100 } }),
-        apiClient.get('/pos/inventory', { params: { store_id: selectedStore } }),
-        apiClient.get('/pos/sales/summary', { params: { store_id: selectedStore, start_date: dateRange[0], end_date: dateRange[1] } }),
-        apiClient.get(`/pos/stores/${selectedStore}/status`),
-        apiClient.get('/pos/queue/current', { params: { store_id: selectedStore } }),
-        apiClient.get('/pos/health', { params: { store_id: selectedStore } }),
+        apiClient.get('/api/v1/pos/orders', { params: { store_id: selectedStore, start_date: dateRange[0], end_date: dateRange[1], limit: 100 } }),
+        apiClient.get('/api/v1/pos/inventory', { params: { store_id: selectedStore } }),
+        apiClient.get('/api/v1/pos/sales/summary', { params: { store_id: selectedStore, start_date: dateRange[0], end_date: dateRange[1] } }),
+        apiClient.get(`/api/v1/pos/stores/${selectedStore}/status`),
+        apiClient.get('/api/v1/pos/queue/current', { params: { store_id: selectedStore } }),
+        apiClient.get('/api/v1/pos/health', { params: { store_id: selectedStore } }),
       ]);
       if (ord.status === 'fulfilled') setOrders(ord.value.data?.data || []);
       if (inv.status === 'fulfilled') setInventory(inv.value.data?.data || []);
@@ -63,7 +63,7 @@ const POSPage: React.FC = () => {
   const syncPOS = async (syncType = 'all') => {
     setSyncing(true);
     try {
-      await apiClient.post('/pos/sync', null, { params: { store_id: selectedStore, sync_type: syncType } });
+      await apiClient.post('/api/v1/pos/sync', null, { params: { store_id: selectedStore, sync_type: syncType } });
       showSuccess('同步完成');
       loadAll();
     } catch (err: any) { handleApiError(err, '同步失败'); }

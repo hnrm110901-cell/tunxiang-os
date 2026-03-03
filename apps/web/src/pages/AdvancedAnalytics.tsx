@@ -27,14 +27,14 @@ const AdvancedAnalytics: React.FC = () => {
 
   const loadStores = useCallback(async () => {
     try {
-      const res = await apiClient.get('/stores');
+      const res = await apiClient.get('/api/v1/stores');
       setStores(res.data?.stores || res.data || []);
     } catch { /* ignore */ }
   }, []);
 
   const loadSalesPrediction = useCallback(async () => {
     try {
-      const response = await apiClient.get('/analytics/predict/sales', {
+      const response = await apiClient.get('/api/v1/analytics/predict-sales', {
         params: {
           store_id: selectedStore,
           days_ahead: 7,
@@ -48,7 +48,7 @@ const AdvancedAnalytics: React.FC = () => {
 
   const loadAnomalies = useCallback(async () => {
     try {
-      const response = await apiClient.get('/analytics/anomalies', {
+      const response = await apiClient.get('/api/v1/analytics/anomalies', {
         params: {
           store_id: selectedStore,
           metric: 'revenue',
@@ -63,7 +63,7 @@ const AdvancedAnalytics: React.FC = () => {
 
   const loadAssociations = useCallback(async () => {
     try {
-      const response = await apiClient.get('/analytics/associations', {
+      const response = await apiClient.get('/api/v1/analytics/associations', {
         params: {
           store_id: selectedStore,
           min_support: 0.1,
@@ -77,7 +77,7 @@ const AdvancedAnalytics: React.FC = () => {
 
   const loadTimePatterns = useCallback(async () => {
     try {
-      const response = await apiClient.get('/analytics/time-patterns', {
+      const response = await apiClient.get('/api/v1/analytics/time-patterns', {
         params: {
           store_id: selectedStore,
           days: 30,

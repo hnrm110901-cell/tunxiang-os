@@ -72,7 +72,7 @@ const AuditLogPage: React.FC = () => {
       if (filters.start_date) params.start_date = filters.start_date.format('YYYY-MM-DD');
       if (filters.end_date) params.end_date = filters.end_date.format('YYYY-MM-DD');
 
-      const response = await apiClient.get('/audit/logs', { params });
+      const response = await apiClient.get('/api/v1/audit/logs', { params });
       setLogs(response.data.logs || []);
       setTotal(response.data.total || 0);
     } catch (err: any) {
@@ -84,7 +84,7 @@ const AuditLogPage: React.FC = () => {
 
   const loadSystemStats = async () => {
     try {
-      const response = await apiClient.get('/audit/logs/system/stats', {
+      const response = await apiClient.get('/api/v1/audit/logs/system/stats', {
         params: { days: 7 },
       });
       setSystemStats(response.data);
@@ -95,7 +95,7 @@ const AuditLogPage: React.FC = () => {
 
   const loadActions = async () => {
     try {
-      const response = await apiClient.get('/audit/logs/actions');
+      const response = await apiClient.get('/api/v1/audit/logs/actions');
       setActions(response.data.actions || []);
     } catch (err: any) {
       handleApiError(err, '加载操作类型失败');
@@ -104,7 +104,7 @@ const AuditLogPage: React.FC = () => {
 
   const loadResourceTypes = async () => {
     try {
-      const response = await apiClient.get('/audit/logs/resource-types');
+      const response = await apiClient.get('/api/v1/audit/logs/resource-types');
       setResourceTypes(response.data.resource_types || []);
     } catch (err: any) {
       handleApiError(err, '加载资源类型失败');
@@ -113,7 +113,7 @@ const AuditLogPage: React.FC = () => {
 
   const handleCleanup = async () => {
     try {
-      const response = await apiClient.delete('/audit/logs/cleanup', {
+      const response = await apiClient.delete('/api/v1/audit/logs/cleanup', {
         params: { days: 90 },
       });
       showSuccess(`已删除 ${response.data.deleted_count} 条旧日志`);

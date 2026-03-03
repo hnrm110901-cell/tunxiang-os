@@ -20,7 +20,7 @@ const AgentMemoryPage: React.FC = () => {
 
   const loadStores = useCallback(async () => {
     try {
-      const res = await apiClient.get('/stores');
+      const res = await apiClient.get('/api/v1/stores');
       setStores(res.data?.stores || res.data || []);
     } catch { /* ignore */ }
   }, []);
@@ -30,7 +30,7 @@ const AgentMemoryPage: React.FC = () => {
     try {
       const params: any = { last_n: lastN };
       if (agentFilter) params.agent = agentFilter;
-      const res = await apiClient.get(`/agent-memory/${selectedStore}`, { params });
+      const res = await apiClient.get(`/api/v1/agent-memory/${selectedStore}`, { params });
       setMemories(res.data?.memories || res.data || []);
     } catch (err: any) {
       handleApiError(err, '加载智能体记忆失败');
@@ -49,7 +49,7 @@ const AgentMemoryPage: React.FC = () => {
       onOk: async () => {
         setClearing(true);
         try {
-          await apiClient.delete(`/agent-memory/${selectedStore}`);
+          await apiClient.delete(`/api/v1/agent-memory/${selectedStore}`);
           showSuccess('记忆已清除');
           loadMemories();
         } catch (err: any) {

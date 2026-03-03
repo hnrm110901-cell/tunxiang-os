@@ -24,7 +24,7 @@ const VectorIndexPage: React.FC = () => {
   const loadCollections = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await apiClient.get(`/vector/collections/${selectedStore}`);
+      const res = await apiClient.get(`/api/v1/vector/collections/${selectedStore}`);
       setCollections(res.data?.collections || res.data || []);
     } catch (err: any) {
       handleApiError(err, '加载集合失败');
@@ -38,7 +38,7 @@ const VectorIndexPage: React.FC = () => {
   const singleSearch = async (values: any) => {
     setSearchLoading(true);
     try {
-      const res = await apiClient.get(`/vector/search/${selectedStore}`, {
+      const res = await apiClient.get(`/api/v1/vector/search/${selectedStore}`, {
         params: { query: values.query, domain: values.domain, top_k: values.top_k || 5, score_threshold: values.score_threshold || 0 },
       });
       setSearchResults(res.data?.results || res.data || []);
@@ -52,7 +52,7 @@ const VectorIndexPage: React.FC = () => {
   const multiSearch = async (values: any) => {
     setSearchLoading(true);
     try {
-      const res = await apiClient.get(`/vector/search-multi/${selectedStore}`, {
+      const res = await apiClient.get(`/api/v1/vector/search-multi/${selectedStore}`, {
         params: { query: values.query, domains: values.domains?.join(',') || DOMAINS.join(','), top_k_per_domain: values.top_k_per_domain || 3 },
       });
       const flat: any[] = [];
@@ -71,7 +71,7 @@ const VectorIndexPage: React.FC = () => {
   const indexDocument = async (values: any) => {
     setIndexLoading(true);
     try {
-      await apiClient.post('/vector/index', { ...values, store_id: selectedStore, payload: {} });
+      await apiClient.post('/api/v1/vector/index', { ...values, store_id: selectedStore, payload: {} });
       showSuccess('文档已索引');
       indexForm.resetFields();
       loadCollections();

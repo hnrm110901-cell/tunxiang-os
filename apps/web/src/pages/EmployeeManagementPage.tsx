@@ -20,7 +20,7 @@ const EmployeeManagementPage: React.FC = () => {
 
   const loadStores = useCallback(async () => {
     try {
-      const res = await apiClient.get('/stores');
+      const res = await apiClient.get('/api/v1/stores');
       setStores(res.data?.stores || res.data || []);
     } catch { /* ignore */ }
   }, []);
@@ -28,7 +28,7 @@ const EmployeeManagementPage: React.FC = () => {
   const loadEmployees = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await apiClient.get('/employees');
+      const res = await apiClient.get('/api/v1/employees');
       setEmployees(res.data?.employees || res.data || []);
     } catch (err: any) {
       handleApiError(err, '加载员工列表失败');
@@ -48,10 +48,10 @@ const EmployeeManagementPage: React.FC = () => {
   const saveEmployee = async (values: any) => {
     try {
       if (editingEmployee) {
-        await apiClient.patch(`/employees/${editingEmployee.employee_id || editingEmployee.id}`, values);
+        await apiClient.patch(`/api/v1/employees/${editingEmployee.employee_id || editingEmployee.id}`, values);
         showSuccess('员工信息更新成功');
       } else {
-        await apiClient.post('/employees', values);
+        await apiClient.post('/api/v1/employees', values);
         showSuccess('员工创建成功');
       }
       setModalVisible(false);
@@ -64,7 +64,7 @@ const EmployeeManagementPage: React.FC = () => {
 
   const deleteEmployee = async (employee: any) => {
     try {
-      await apiClient.delete(`/employees/${employee.employee_id || employee.id}`);
+      await apiClient.delete(`/api/v1/employees/${employee.employee_id || employee.id}`);
       showSuccess('员工已删除');
       loadEmployees();
     } catch (err: any) {

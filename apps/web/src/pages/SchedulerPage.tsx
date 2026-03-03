@@ -18,7 +18,7 @@ const SchedulerPage: React.FC = () => {
   const loadSchedule = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await apiClient.get('/scheduler/schedule');
+      const res = await apiClient.get('/api/v1/scheduler/schedule');
       setSchedule(res.data?.tasks || res.data || []);
     } catch (err: any) {
       handleApiError(err, '加载调度计划失败');
@@ -32,7 +32,7 @@ const SchedulerPage: React.FC = () => {
   const triggerTask = async (values: any) => {
     setTriggering(true);
     try {
-      const res = await apiClient.post(`/scheduler/trigger/${values.task_name}`);
+      const res = await apiClient.post(`/api/v1/scheduler/trigger/${values.task_name}`);
       showSuccess(`任务 ${values.task_name} 已触发`);
       setTaskStatus(res.data);
       setStatusVisible(true);
@@ -46,7 +46,7 @@ const SchedulerPage: React.FC = () => {
 
   const checkStatus = async (taskId: string) => {
     try {
-      const res = await apiClient.get(`/scheduler/status/${taskId}`);
+      const res = await apiClient.get(`/api/v1/scheduler/status/${taskId}`);
       setTaskStatus(res.data);
       setStatusVisible(true);
     } catch (err: any) {

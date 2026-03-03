@@ -17,7 +17,7 @@ const HardwarePage: React.FC = () => {
 
   const loadStores = useCallback(async () => {
     try {
-      const res = await apiClient.get('/stores');
+      const res = await apiClient.get('/api/v1/stores');
       setStores(res.data?.stores || res.data || []);
     } catch { /* ignore */ }
   }, []);
@@ -26,9 +26,9 @@ const HardwarePage: React.FC = () => {
     setLoading(true);
     try {
       const [nodesRes, devicesRes, costRes] = await Promise.allSettled([
-        apiClient.get(`/hardware/edge-node/store/${storeId}`),
-        apiClient.get(`/hardware/shokz/store/${storeId}`),
-        apiClient.get('/hardware/deployment/total-cost'),
+        apiClient.get(`/api/v1/hardware/edge-node/store/${storeId}`),
+        apiClient.get(`/api/v1/hardware/shokz/store/${storeId}`),
+        apiClient.get('/api/v1/hardware/deployment/total-cost'),
       ]);
       if (nodesRes.status === 'fulfilled') setEdgeNodes(nodesRes.value.data?.nodes || nodesRes.value.data || []);
       if (devicesRes.status === 'fulfilled') setShokzDevices(devicesRes.value.data?.devices || devicesRes.value.data || []);
@@ -44,7 +44,7 @@ const HardwarePage: React.FC = () => {
 
   const syncNode = async (node: any) => {
     try {
-      await apiClient.post(`/hardware/edge-node/${node.node_id || node.id}/sync`);
+      await apiClient.post(`/api/v1/hardware/edge-node/${node.node_id || node.id}/sync`);
       showSuccess('同步成功');
       loadData();
     } catch (err: any) {

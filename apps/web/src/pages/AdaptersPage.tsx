@@ -32,7 +32,7 @@ const AdaptersPage: React.FC = () => {
   const loadAdapters = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await apiClient.get('/adapters/adapters');
+      const res = await apiClient.get('/api/adapters/adapters');
       setAdapters(res.data?.adapters || res.data || []);
     } catch (err) {
       handleApiError(err, '加载适配器列表失败');
@@ -93,7 +93,7 @@ const AdaptersPage: React.FC = () => {
       } else {
         try { config = JSON.parse(String(values.config ?? '{}')); } catch { config = {}; }
       }
-      await apiClient.post('/adapters/register', { adapter_name: values.adapter_name, config });
+      await apiClient.post('/api/adapters/register', { adapter_name: values.adapter_name, config });
       showSuccess('适配器注册成功');
       setRegisterVisible(false);
       registerForm.resetFields();
@@ -118,13 +118,13 @@ const AdaptersPage: React.FC = () => {
     setSyncSubmitting(true);
     try {
       if (syncType === 'all') {
-        await apiClient.post(`/adapters/sync/all/${values.source_system}/${values.store_id}`);
+        await apiClient.post(`/api/adapters/sync/all/${values.source_system}/${values.store_id}`);
       } else if (syncType === 'dishes') {
-        await apiClient.post('/adapters/sync/dishes', { store_id: values.store_id, source_system: values.source_system });
+        await apiClient.post('/api/adapters/sync/dishes', { store_id: values.store_id, source_system: values.source_system });
       } else if (syncType === 'order') {
-        await apiClient.post('/adapters/sync/order', { order_id: values.order_id, store_id: values.store_id, source_system: values.source_system });
+        await apiClient.post('/api/adapters/sync/order', { order_id: values.order_id, store_id: values.store_id, source_system: values.source_system });
       } else {
-        await apiClient.post('/adapters/sync/inventory', { item_id: values.item_id, quantity: parseFloat(String(values.quantity)), target_system: values.source_system });
+        await apiClient.post('/api/adapters/sync/inventory', { item_id: values.item_id, quantity: parseFloat(String(values.quantity)), target_system: values.source_system });
       }
       showSuccess('同步成功');
       setSyncVisible(false);

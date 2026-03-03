@@ -27,7 +27,7 @@ const DishCostPage: React.FC = () => {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await apiClient.get('/dishes/cost-analysis', {
+      const res = await apiClient.get('/api/v1/dishes/cost-analysis', {
         params: { store_id: storeId, limit: 50 },
       });
       setData(res.data);

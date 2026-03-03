@@ -31,7 +31,7 @@ const UserProfilePage: React.FC = () => {
   const loadProfile = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await apiClient.get('/auth/me');
+      const res = await apiClient.get('/api/v1/auth/me');
       setProfile(res.data);
       profileForm.setFieldsValue({
         full_name: res.data.full_name,
@@ -49,7 +49,7 @@ const UserProfilePage: React.FC = () => {
   const handleSaveProfile = async (values: { full_name?: string; email?: string }) => {
     setSaving(true);
     try {
-      await apiClient.put('/auth/me', values);
+      await apiClient.put('/api/v1/auth/me', values);
       showSuccess('个人信息已更新');
       loadProfile();
     } catch (err) {
@@ -62,7 +62,7 @@ const UserProfilePage: React.FC = () => {
   const handleChangePassword = async (values: { old_password: string; new_password: string; confirm: string }) => {
     setChangingPwd(true);
     try {
-      await apiClient.post('/auth/change-password', {
+      await apiClient.post('/api/v1/auth/change-password', {
         old_password: values.old_password,
         new_password: values.new_password,
       });

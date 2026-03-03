@@ -74,8 +74,8 @@ const EmployeePerformancePage: React.FC = () => {
     setLoading(true);
     try {
       const [empRes, lbRes, sumRes, metRes] = await Promise.all([
-        apiClient.get('/employees', { params: { store_id: storeId } }),
-        apiClient.get('/employees/performance/leaderboard', { params: { store_id: storeId } }),
+        apiClient.get('/api/v1/employees', { params: { store_id: storeId } }),
+        apiClient.get('/api/v1/employees/performance/leaderboard', { params: { store_id: storeId } }),
         apiClient.get(`/api/v1/performance/${storeId}/summary`, { params: { year, month } }),
         apiClient.get(`/api/v1/performance/${storeId}/metrics`, { params: { year, month } }),
       ]);
@@ -114,7 +114,7 @@ const EmployeePerformancePage: React.FC = () => {
 
   const submitPerformance = async (values: any) => {
     try {
-      await apiClient.post(`/employees/${selectedEmp}/performance`, {
+      await apiClient.post(`/api/v1/employees/${selectedEmp}/performance`, {
         ...values,
         period: values.period?.format('YYYY-MM') || '',
       });

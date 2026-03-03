@@ -64,11 +64,11 @@ const SystemHealthPage: React.FC = () => {
     setLoading(true);
     try {
       const [healthRes, agentsRes, externalRes, readyRes, liveRes] = await Promise.allSettled([
-        apiClient.get('/health'),
-        apiClient.get('/agents'),
-        apiClient.get('/external-systems'),
-        apiClient.get('/ready'),
-        apiClient.get('/live'),
+        apiClient.get('/api/v1/health'),
+        apiClient.get('/api/v1/agents'),
+        apiClient.get('/api/v1/external-systems'),
+        apiClient.get('/api/v1/ready'),
+        apiClient.get('/api/v1/live'),
       ]);
       if (healthRes.status === 'fulfilled') setHealth(healthRes.value.data);
       if (agentsRes.status === 'fulfilled') setAgents(agentsRes.value.data?.agents || agentsRes.value.data || []);

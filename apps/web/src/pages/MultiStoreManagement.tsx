@@ -21,7 +21,7 @@ const MultiStoreManagement: React.FC = () => {
 
   const loadStores = useCallback(async () => {
     try {
-      const response = await apiClient.get('/multi-store/stores');
+      const response = await apiClient.get('/api/v1/multi-store/stores');
       setStores(response.data.stores || []);
 
       // 默认选择前两个门店进行对比
@@ -40,7 +40,7 @@ const MultiStoreManagement: React.FC = () => {
     if (selectedStores.length < 2) return;
 
     try {
-      const response = await apiClient.post('/multi-store/compare', {
+      const response = await apiClient.post('/api/v1/multi-store/compare', {
         store_ids: selectedStores,
         start_date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
         end_date: new Date().toISOString().split('T')[0],
@@ -53,7 +53,7 @@ const MultiStoreManagement: React.FC = () => {
 
   const loadRegionalSummary = useCallback(async () => {
     try {
-      const response = await apiClient.get('/multi-store/regional-summary');
+      const response = await apiClient.get('/api/v1/multi-store/regional-summary');
       setRegionalSummary(response.data.regions || []);
     } catch (err: any) {
       handleApiError(err, '加载区域汇总失败');
@@ -62,7 +62,7 @@ const MultiStoreManagement: React.FC = () => {
 
   const loadPerformanceRanking = useCallback(async () => {
     try {
-      const response = await apiClient.get('/multi-store/performance-ranking?metric=revenue&limit=10');
+      const response = await apiClient.get('/api/v1/multi-store/performance-ranking?metric=revenue&limit=10');
       setPerformanceRanking(response.data.ranking || []);
     } catch (err: any) {
       handleApiError(err, '加载绩效排名失败');

@@ -173,7 +173,7 @@ const DataImportExportPage: React.FC = () => {
     try {
       message.loading({ content: '正在导出用户数据...', key: 'export' });
 
-      const response = await apiClient.get('/data/export/users', {
+      const response = await apiClient.get('/api/v1/data/export/users', {
         responseType: 'blob',
       });
 
@@ -198,7 +198,7 @@ const DataImportExportPage: React.FC = () => {
     try {
       message.loading({ content: '正在导出库存数据...', key: 'export' });
 
-      const response = await apiClient.get('/data/export/inventory', {
+      const response = await apiClient.get('/api/v1/data/export/inventory', {
         responseType: 'blob',
       });
 
@@ -221,7 +221,7 @@ const DataImportExportPage: React.FC = () => {
 
   const handleDownloadUserTemplate = async () => {
     try {
-      const response = await apiClient.get('/data/templates/users', {
+      const response = await apiClient.get('/api/v1/data/templates/users', {
         responseType: 'blob',
       });
 
@@ -242,7 +242,7 @@ const DataImportExportPage: React.FC = () => {
 
   const handleDownloadInventoryTemplate = async () => {
     try {
-      const response = await apiClient.get('/data/templates/inventory', {
+      const response = await apiClient.get('/api/v1/data/templates/inventory', {
         responseType: 'blob',
       });
 
@@ -280,7 +280,7 @@ const DataImportExportPage: React.FC = () => {
         const formData = new FormData();
         formData.append('file', file);
 
-        const response = await apiClient.post('/data/import/users', formData, {
+        const response = await apiClient.post('/api/v1/data/import/users', formData, {
           headers: {
             'Content-Type': 'multipart/form-data',
           },
@@ -323,7 +323,7 @@ const DataImportExportPage: React.FC = () => {
         const formData = new FormData();
         formData.append('file', file);
 
-        const response = await apiClient.post('/data/import/inventory', formData, {
+        const response = await apiClient.post('/api/v1/data/import/inventory', formData, {
           headers: {
             'Content-Type': 'multipart/form-data',
           },

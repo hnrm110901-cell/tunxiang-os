@@ -22,7 +22,7 @@ const EmbeddingPage: React.FC = () => {
 
   const loadStores = useCallback(async () => {
     try {
-      const res = await apiClient.get('/stores');
+      const res = await apiClient.get('/api/v1/stores');
       setStores(res.data?.stores || res.data || []);
     } catch { /* ignore */ }
   }, []);
@@ -30,7 +30,7 @@ const EmbeddingPage: React.FC = () => {
   const loadStatus = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await apiClient.get('/embedding/model/status');
+      const res = await apiClient.get('/api/v1/embedding/model/status');
       setModelStatus(res.data);
     } catch (err: any) {
       handleApiError(err, '加载模型状态失败');
@@ -44,7 +44,7 @@ const EmbeddingPage: React.FC = () => {
   const trainModel = async (values: any) => {
     setTraining(true);
     try {
-      await apiClient.post('/embedding/train', values);
+      await apiClient.post('/api/v1/embedding/train', values);
       showSuccess('模型训练已启动');
       trainForm.resetFields();
       loadStatus();
@@ -57,7 +57,7 @@ const EmbeddingPage: React.FC = () => {
 
   const calcSimilarity = async (values: any) => {
     try {
-      const res = await apiClient.post('/embedding/similarity', values);
+      const res = await apiClient.post('/api/v1/embedding/similarity', values);
       setSimilarityResult(res.data?.similarity ?? res.data);
     } catch (err: any) {
       handleApiError(err, '计算相似度失败');
@@ -66,7 +66,7 @@ const EmbeddingPage: React.FC = () => {
 
   const findSimilarDishes = async (values: any) => {
     try {
-      const res = await apiClient.post('/embedding/similar-dishes', values);
+      const res = await apiClient.post('/api/v1/embedding/similar-dishes', values);
       setSimilarDishes(res.data?.dishes || res.data || []);
     } catch (err: any) {
       handleApiError(err, '查找相似菜品失败');
@@ -75,7 +75,7 @@ const EmbeddingPage: React.FC = () => {
 
   const getRecommendations = async (values: any) => {
     try {
-      const res = await apiClient.post('/embedding/recommend', values);
+      const res = await apiClient.post('/api/v1/embedding/recommend', values);
       setRecommendations(res.data?.recommendations || res.data || []);
     } catch (err: any) {
       handleApiError(err, '获取推荐失败');

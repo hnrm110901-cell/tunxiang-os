@@ -24,10 +24,10 @@ const DataVisualizationScreen: React.FC = () => {
       setLoading(true);
 
       const [overview, trend, members, realtime] = await Promise.all([
-        apiClient.get('/dashboard/overview'),
-        apiClient.get('/dashboard/sales-trend?days=7'),
-        apiClient.get('/dashboard/member-stats'),
-        apiClient.get('/dashboard/realtime-metrics'),
+        apiClient.get('/api/v1/dashboard/overview'),
+        apiClient.get('/api/v1/dashboard/sales-trend?days=7'),
+        apiClient.get('/api/v1/dashboard/member-stats'),
+        apiClient.get('/api/v1/dashboard/realtime-metrics'),
       ]);
 
       setOverviewStats(overview.data);
