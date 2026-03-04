@@ -12,14 +12,14 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import {
   Card, Table, Button, Modal, Form, Input, Select, InputNumber,
-  Tag, Space, Tabs, Descriptions, Upload, message, Badge,
+  Tag, Space, Descriptions, Upload, message, Badge,
   Row, Col, Statistic, Popconfirm, Drawer, Divider, Tooltip,
-  Alert,
+  Alert, Progress,
 } from 'antd';
 import {
   PlusOutlined, UploadOutlined, CheckCircleOutlined,
   HistoryOutlined, EyeOutlined, ThunderboltOutlined,
-  ReloadOutlined, BookOutlined, EditOutlined,
+  ReloadOutlined, BookOutlined, DollarOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import type { UploadProps } from 'antd';
@@ -61,6 +61,27 @@ interface BOMTemplate {
   items: BOMItem[];
 }
 
+interface CostReportItem {
+  ingredient_id: string;
+  standard_qty: number;
+  unit: string;
+  unit_cost_fen: number;
+  item_cost_fen: number;
+  item_cost_yuan: number;
+  cost_pct: number;
+}
+
+interface CostReport {
+  bom_id: string;
+  dish_id: string;
+  version: string;
+  total_cost_fen: number;
+  total_cost_yuan: number;
+  price_yuan: number;
+  food_cost_pct: number;
+  items: CostReportItem[];
+}
+
 // ── 主组件 ────────────────────────────────────────────────────────────────────
 
 const BOMManagementPage: React.FC = () => {
@@ -71,6 +92,10 @@ const BOMManagementPage: React.FC = () => {
   const [selectedBom, setSelectedBom] = useState<BOMTemplate | null>(null);
   const [historyBoms, setHistoryBoms] = useState<BOMTemplate[]>([]);
   const [historyDishId, setHistoryDishId] = useState<string | null>(null);
+  // 成本分析
+  const [costReport, setCostReport] = useState<CostReport | null>(null);
+  const [costReportVisible, setCostReportVisible] = useState(false);
+  const [costReportLoading, setCostReportLoading] = useState(false);
 
   // 创建 BOM modal
   const [createVisible, setCreateVisible] = useState(false);
@@ -168,6 +193,22 @@ const BOMManagementPage: React.FC = () => {
       handleApiError(err, '审核失败');
     }
   }, [loadBoms]);
+
+  // ── 成本分析 ────────────────────────────────────────────────────────────────
+
+  const loadCostReport = useCallback(async (bomId: string) => {
+    setCostReportLoading(true);
+    setCostReportVisible(true);
+    try {
+      const res = await apiClient.get(`/api/v1/bom/${bomId}/cost-report`);
+      setCostReport(res.data);
+    } catch (err: any) {
+      handleApiError(err, '加载成本分析失败');
+      setCostReportVisible(false);
+    } finally {
+      setCostReportLoading(false);
+    }
+  }, []);
 
   // ── 新建 BOM ────────────────────────────────────────────────────────────────
 
@@ -302,12 +343,20 @@ const BOMManagementPage: React.FC = () => {
     },
     {
       title: '操作',
-      width: 200,
+      width: 230,
       fixed: 'right',
       render: (_, rec) => (
         <Space size={4}>
           <Tooltip title="查看详情">
             <Button size="small" icon={<EyeOutlined />} onClick={() => viewDetail(rec)} />
+          </Tooltip>
+          <Tooltip title="成本分析">
+            <Button
+              size="small"
+              icon={<DollarOutlined />}
+              style={{ color: '#52c41a', borderColor: '#52c41a' }}
+              onClick={() => loadCostReport(rec.id)}
+            />
           </Tooltip>
           <Tooltip title="版本历史">
             <Button
@@ -671,6 +720,119 @@ const BOMManagementPage: React.FC = () => {
           })}
         />
       </Drawer>
+
+      {/* ── 成本分析 Modal ────────────────────────────────────────────────────── */}
+      <Modal
+        title={
+          <Space>
+            <DollarOutlined style={{ color: '#52c41a' }} />
+            BOM 成本分析
+            {costReport && <Tag color="default">v{costReport.version}</Tag>}
+          </Space>
+        }
+        open={costReportVisible}
+        onCancel={() => { setCostReportVisible(false); setCostReport(null); }}
+        footer={null}
+        width={640}
+      >
+        {costReportLoading ? (
+          <div style={{ textAlign: 'center', padding: 40 }}>
+            <Alert type="info" message="成本分析计算中…" showIcon />
+          </div>
+        ) : costReport ? (
+          <>
+            <Row gutter={16} style={{ marginBottom: 16 }}>
+              <Col span={8}>
+                <Card size="small">
+                  <Statistic
+                    title="标准总成本"
+                    value={costReport.total_cost_yuan}
+                    prefix="¥"
+                    precision={2}
+                  />
+                </Card>
+              </Col>
+              <Col span={8}>
+                <Card size="small">
+                  <Statistic
+                    title="菜品售价"
+                    value={costReport.price_yuan}
+                    prefix="¥"
+                    precision={2}
+                    valueStyle={{ color: '#1677ff' }}
+                  />
+                </Card>
+              </Col>
+              <Col span={8}>
+                <Card size="small">
+                  <Statistic
+                    title="食材成本率"
+                    value={costReport.food_cost_pct}
+                    suffix="%"
+                    precision={1}
+                    valueStyle={{
+                      color: costReport.food_cost_pct >= 35 ? '#ff4d4f'
+                           : costReport.food_cost_pct >= 30 ? '#fa8c16'
+                           : '#3f8600',
+                    }}
+                  />
+                </Card>
+              </Col>
+            </Row>
+
+            <Divider orientation="left" style={{ margin: '8px 0 12px' }}>
+              食材成本明细（按贡献降序）
+            </Divider>
+
+            <Table
+              rowKey="ingredient_id"
+              dataSource={costReport.items}
+              pagination={false}
+              size="small"
+              columns={[
+                {
+                  title: '食材',
+                  dataIndex: 'ingredient_id',
+                  ellipsis: true,
+                  render: (v) => <code style={{ fontSize: 11 }}>{v}</code>,
+                },
+                {
+                  title: '标准用量',
+                  width: 100,
+                  render: (_, r) => `${r.standard_qty} ${r.unit}`,
+                },
+                {
+                  title: '单价',
+                  dataIndex: 'unit_cost_fen',
+                  width: 80,
+                  render: (v) => v ? `¥${(v / 100).toFixed(2)}` : '—',
+                },
+                {
+                  title: '成本',
+                  dataIndex: 'item_cost_yuan',
+                  width: 80,
+                  render: (v) => `¥${Number(v).toFixed(2)}`,
+                  sorter: (a, b) => b.item_cost_yuan - a.item_cost_yuan,
+                  defaultSortOrder: 'ascend',
+                },
+                {
+                  title: '占比',
+                  dataIndex: 'cost_pct',
+                  width: 130,
+                  render: (v) => (
+                    <Progress
+                      percent={Number(v)}
+                      size="small"
+                      strokeColor={v >= 40 ? '#ff4d4f' : v >= 25 ? '#fa8c16' : '#52c41a'}
+                      format={(p) => `${p}%`}
+                    />
+                  ),
+                },
+              ]}
+            />
+          </>
+        )}
+      </Modal>
 
       {/* ── 新建 BOM Modal ───────────────────────────────────────────────────── */}
       <Modal

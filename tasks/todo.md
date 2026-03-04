@@ -258,3 +258,7 @@
 - **`GET /api/v1/approvals` 端点增强**（MVP #5 一键审批）：
   - 新增 `status`/`decision_type`/`start_date`/`end_date` 查询参数支持多状态过滤
   - 不传 status 默认返回全部（而非仅 pending），与前端"全部"筛选对齐
+- **BOMManagementPage 成本分析按钮**（MVP #6）：接入 `/api/v1/bom/{bom_id}/cost-report`
+  - 新增「成本分析」按钮（¥图标）在每条 BOM 操作列
+  - 弹出 Modal：标准总成本¥ / 菜品售价¥ / 食材成本率%（红/橙/绿色标）
+  - 食材明细表：按成本贡献降序 + Progress 占比可视化
