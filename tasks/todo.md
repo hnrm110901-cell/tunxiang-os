@@ -286,3 +286,17 @@
   - 后端 `review.food_cost` 已有数据（`actual_pct`/`theoretical_pct`/`variance_pct`/`variance_status`/`top_ingredients`），但前端未展示
   - 新增：实际成本率%（绿/橙/红分级）+ 状态 Tag + 理论值 + 差异%
   - warning/critical 时展示 Top2 问题食材名称 + 用料成本¥
+
+### 2026-03-05（MVP #9 月度经营报告前端页面）
+- 新建 `apps/web/src/pages/MonthlyReportPage.tsx`：MVP #9 月度经营报告完整前端
+  - 门店选择器 + 月份选择器（DatePicker picker="month"，默认上月）
+  - 6个 KPI 卡片：月度营业额¥ / 食材成本率%（颜色分级）/ 损耗金额¥ / 决策采纳率% / 决策节省¥ / 审批决策
+  - 经营叙事文字区块（绿色背景）
+  - ECharts 双轴折线图：周成本率趋势 + 营业额柱状图，含33%警戒线
+  - Top3 节省决策表格（rank badge + 动作 + 预期节省¥ + 实际结果）
+  - 「打印 / 导出 PDF」按钮 → 新标签打开 `/api/v1/reports/monthly/{store_id}/html` HTML报告
+- `apps/web/src/App.tsx`：新增 `monthly-report` 路由（admin）+ lazy import
+- `apps/web/src/layouts/MainLayout.tsx`：
+  - ROUTE_TO_GROUP 新增 `/monthly-report` → `admin-analytics`
+  - 面包屑映射新增 `/monthly-report` → `月度经营报告`
+  - 「智能分析」菜单组新增「月度经营报告」入口

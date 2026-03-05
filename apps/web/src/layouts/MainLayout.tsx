@@ -90,6 +90,7 @@ const ROUTE_TO_GROUP: Record<string, string> = {
   '/scheduler': 'admin-system', '/benchmark': 'admin-analytics',
   '/approval': 'admin-system', '/approval-list': 'admin-system', '/decision-stats': 'admin-analytics',
   '/profit-dashboard': 'admin-analytics',
+  '/monthly-report': 'admin-analytics',
   '/stores': 'admin-system', '/export-jobs': 'admin-system',
   '/queue': 'admin-store', '/agent-memory': 'admin-ai', '/wechat-triggers': 'admin-system',
   '/event-sourcing': 'admin-ai', '/meituan-queue': 'admin-store', '/vector-index': 'admin-ai',
@@ -235,6 +236,7 @@ const MainLayout: React.FC = () => {
     '/approval': '审批管理',
     '/approval-list': '审批列表',
     '/profit-dashboard': '成本率分析',
+    '/monthly-report': '月度经营报告',
     '/decision-stats': '决策统计',
     '/stores': '门店管理',
     '/export-jobs': '导出任务',
@@ -481,6 +483,7 @@ const MainLayout: React.FC = () => {
           { key: '/benchmark', icon: <BarChartOutlined />, label: '基准测试' },
           { key: '/decision-stats', icon: <PieChartOutlined />, label: '决策统计' },
           { key: '/profit-dashboard', icon: <LineChartOutlined />, label: '成本率分析' },
+          { key: '/monthly-report', icon: <FileTextOutlined />, label: '月度经营报告' },
         ],
       },
       {

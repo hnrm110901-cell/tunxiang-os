@@ -114,6 +114,7 @@ const ApprovalListPage = lazy(() => import('./pages/ApprovalListPage'));
 const DecisionStatisticsDashboard = lazy(() => import('./pages/DecisionStatisticsDashboard'));
 const ProfitDashboard = lazy(() => import('./pages/ProfitDashboard'));
 const AlertThresholdsPage = lazy(() => import('./pages/AlertThresholdsPage'));
+const MonthlyReportPage = lazy(() => import('./pages/MonthlyReportPage'));
 
 const PageLoader = (
   <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 300 }}>
@@ -419,6 +420,9 @@ const AppContent: React.FC = () => {
                   } />
                   <Route path="alert-thresholds" element={
                     <ProtectedRoute requiredRole="store_manager"><AlertThresholdsPage /></ProtectedRoute>
+                  } />
+                  <Route path="monthly-report" element={
+                    <ProtectedRoute requiredRole="admin"><MonthlyReportPage /></ProtectedRoute>
                   } />
                 </Route>
                 <Route path="*" element={<NotFoundPage />} />
