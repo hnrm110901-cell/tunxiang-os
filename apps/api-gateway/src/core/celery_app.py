@@ -130,6 +130,18 @@ celery_app.conf.update(
             "queue": "default",
             "routing_key": "default",
         },
+        "src.core.celery_tasks.scan_lifecycle_transitions": {
+            "queue": "default",
+            "routing_key": "default",
+        },
+        "src.core.celery_tasks.refresh_private_domain_rfm": {
+            "queue": "low_priority",
+            "routing_key": "low_priority",
+        },
+        "src.core.celery_tasks.trigger_new_member_journeys": {
+            "queue": "default",
+            "routing_key": "default",
+        },
     },
 
     # Celery Beat定时任务调度
@@ -361,6 +373,20 @@ celery_app.conf.update(
             ),
             "args": (),
             "options": {"queue": "default", "priority": 6},
+        },
+        # 每日凌晨 3:30 刷新私域会员 RFM 指标（3:00 对账完成后执行）
+        "refresh-private-domain-rfm": {
+            "task": "src.core.celery_tasks.refresh_private_domain_rfm",
+            "schedule": crontab(hour=3, minute=30),
+            "args": (),
+            "options": {"queue": "low_priority", "priority": 3},
+        },
+        # 每小时触发新会员激活旅程
+        "trigger-new-member-journeys": {
+            "task": "src.core.celery_tasks.trigger_new_member_journeys",
+            "schedule": crontab(minute=5),   # 每小时第 5 分钟执行，错开整点高峰
+            "args": (),
+            "options": {"queue": "default", "priority": 5},
         },
     },
 )

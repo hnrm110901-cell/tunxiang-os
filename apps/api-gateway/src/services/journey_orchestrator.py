@@ -319,6 +319,7 @@ class JourneyOrchestrator:
         wechat_user_id: Optional[str] = None,
         wechat_service=None,
         freq_cap_engine=None,
+        narrator=None,
     ) -> Dict[str, Any]:
         """
         执行旅程的第 step_index 步。
@@ -329,8 +330,9 @@ class JourneyOrchestrator:
           3. 获取旅程定义和当前步骤配置
           4. 查询条件：旅程开始后是否已有订单
           5. 频控检查
-          6. 发送企微消息
-          7. 更新 step_history / current_step / status
+          6. 查询会员画像（用于个性化消息生成）
+          7. 发送企微消息（通过 JourneyNarrator 生成个性化文本）
+          8. 更新 step_history / current_step / status
 
         Returns:
             {
@@ -395,10 +397,15 @@ class JourneyOrchestrator:
                     "skipped_reason": "频控限制",
                 }
             else:
-                # 6. 发送消息
+                # 6. 查询会员画像（供 JourneyNarrator 个性化生成）
+                member_profile = await self._get_member_profile(
+                    journey.customer_id, journey.store_id, db
+                )
+                # 7. 发送消息
                 msg_result = await self._send_message(
                     step, journey.customer_id, journey.store_id,
                     wechat_user_id, wechat_service,
+                    profile=member_profile, narrator=narrator,
                 )
                 if freq_cap_engine and msg_result.get("sent"):
                     await freq_cap_engine.record_send(
@@ -412,7 +419,7 @@ class JourneyOrchestrator:
                     "action":   step.action,
                 }
 
-        # 7. 更新 DB
+        # 8. 更新 DB
         existing_history: List = list(journey.step_history or [])
         existing_history.append({
             "step_index":  step_index,
@@ -485,8 +492,16 @@ class JourneyOrchestrator:
         store_id: str,
         wechat_user_id: Optional[str],
         wechat_service,
+        *,
+        profile=None,
+        narrator=None,
     ) -> Dict[str, Any]:
-        """通过企微发送旅程消息。无服务/无 user_id 时静默跳过。"""
+        """通过企微发送旅程消息。无服务/无 user_id 时静默跳过。
+
+        Args:
+            profile:  MemberProfile（由 _get_member_profile 获取）
+            narrator: JourneyNarrator 实例（None 时降级为静态模板）
+        """
         if not wechat_service or not wechat_user_id:
             logger.debug(
                 "journey.send_skipped_no_wechat",
@@ -495,7 +510,17 @@ class JourneyOrchestrator:
             )
             return {"sent": False, "reason": "无企微服务或接收者ID"}
 
-        content = format_journey_message(step.template_id, store_id, customer_id)
+        # 优先使用 JourneyNarrator 生成个性化文本，降级为静态模板
+        if narrator is not None:
+            content = await narrator.generate(
+                template_id=step.template_id,
+                store_id=store_id,
+                customer_id=customer_id,
+                profile=profile,
+            )
+        else:
+            content = format_journey_message(step.template_id, store_id, customer_id)
+
         try:
             await wechat_service.send_text_message(
                 content=content, touser=wechat_user_id
@@ -509,3 +534,40 @@ class JourneyOrchestrator:
                 error=str(exc),
             )
             return {"sent": False, "error": str(exc)}
+
+    async def _get_member_profile(
+        self,
+        customer_id: str,
+        store_id: str,
+        db: AsyncSession,
+    ):
+        """
+        查询会员基础画像（用于 JourneyNarrator 个性化生成）。
+
+        查询失败或无记录时返回 None，上层降级为静态模板。
+        """
+        try:
+            from src.services.journey_narrator import MemberProfile
+            row = (await db.execute(
+                text("""
+                    SELECT frequency, monetary, recency_days, lifecycle_state
+                    FROM private_domain_members
+                    WHERE customer_id = :cid AND store_id = :sid
+                    LIMIT 1
+                """),
+                {"cid": customer_id, "sid": store_id},
+            )).fetchone()
+            if row:
+                return MemberProfile(
+                    frequency=row[0] or 0,
+                    monetary=row[1] or 0,
+                    recency_days=row[2],
+                    lifecycle_state=row[3],
+                )
+        except Exception as exc:
+            logger.debug(
+                "journey.get_member_profile_failed",
+                customer_id=customer_id,
+                error=str(exc),
+            )
+        return None

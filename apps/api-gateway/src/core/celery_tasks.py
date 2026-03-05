@@ -3049,16 +3049,6 @@ def check_food_cost_kpi_alert(self):
         raise self.retry(exc=exc)
 
 
-# ============================================================
-# 私域增长：旅程步骤延迟执行
-# ============================================================
-
-    try:
-        asyncio.run(_run())
-    except Exception as exc:
-        raise self.retry(exc=exc)
-
-
 @celery_app.task(bind=True, max_retries=1, default_retry_delay=300)
 def scan_lifecycle_transitions(self):
     """
@@ -3158,6 +3148,14 @@ def scan_lifecycle_transitions(self):
     except Exception as exc:
         raise self.retry(exc=exc)
 
+
+# ============================================================
+# 私域增长：旅程步骤延迟执行
+# ============================================================
+
+
+@celery_app.task(bind=True, max_retries=3, default_retry_delay=60)
+def execute_journey_step(
     self,
     journey_db_id: str,
     step_index: int,
@@ -3195,5 +3193,123 @@ def scan_lifecycle_transitions(self):
 
     try:
         asyncio.run(_run())
+    except Exception as exc:
+        raise self.retry(exc=exc)
+
+
+# ============================================================
+# 私域增长：RFM 数据刷新（每日凌晨 03:00）
+# ============================================================
+
+
+@celery_app.task(bind=True, max_retries=2, default_retry_delay=120)
+def refresh_private_domain_rfm(self):
+    """
+    每日刷新私域会员 RFM 三指标：
+      - recency_days  : 距最近一次订单的天数
+      - frequency     : 历史订单总笔数
+      - monetary      : 历史消费总金额（分）
+
+    使用单条 UPDATE...FROM 语句批量更新，避免逐行查询。
+    仅更新有历史订单的会员；新增会员若尚无订单则 recency_days 保持 NULL。
+    """
+    import asyncio
+
+    async def _run():
+        from sqlalchemy import text as _text
+        from src.core.database import get_db_session
+
+        sql = _text("""
+            UPDATE private_domain_members AS m
+            SET
+                recency_days = EXTRACT(
+                    DAY FROM (NOW() - agg.last_order_at)
+                )::int,
+                frequency    = agg.order_count,
+                monetary     = agg.total_amount
+            FROM (
+                SELECT
+                    customer_id,
+                    store_id,
+                    MAX(created_at)                AS last_order_at,
+                    COUNT(*)                       AS order_count,
+                    COALESCE(SUM(total_amount), 0) AS total_amount
+                FROM orders
+                WHERE customer_id IS NOT NULL
+                GROUP BY customer_id, store_id
+            ) AS agg
+            WHERE m.customer_id = agg.customer_id
+              AND m.store_id    = agg.store_id
+        """)
+
+        async with get_db_session() as db:
+            result = await db.execute(sql)
+            await db.commit()
+            updated = result.rowcount
+            logger.info("rfm.refresh_done", updated_rows=updated)
+            return {"updated": updated}
+
+    try:
+        return asyncio.run(_run())
+    except Exception as exc:
+        raise self.retry(exc=exc)
+
+
+# ============================================================
+# 私域增长：新会员旅程自动触发（每小时）
+# ============================================================
+
+
+@celery_app.task(bind=True, max_retries=2, default_retry_delay=60)
+def trigger_new_member_journeys(self):
+    """
+    每小时扫描过去 70 分钟内新加入的私域会员（留 10 分钟缓冲防漏），
+    对尚未有 member_activation 旅程的成员自动触发激活旅程。
+
+    每批最多 100 人，避免大量并发写入。
+    """
+    import asyncio
+
+    async def _run():
+        from sqlalchemy import text as _text
+        from src.core.database import get_db_session
+        from src.services.journey_orchestrator import JourneyOrchestrator
+
+        orch = JourneyOrchestrator()
+        stats = {"scanned": 0, "triggered": 0, "skipped": 0}
+
+        sql = _text("""
+            SELECT m.customer_id, m.store_id, m.wechat_openid
+            FROM private_domain_members m
+            WHERE m.created_at >= NOW() - (70 * INTERVAL '1 minute')
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM private_domain_journeys j
+                  WHERE j.customer_id  = m.customer_id
+                    AND j.store_id     = m.store_id
+                    AND j.journey_type = 'member_activation'
+              )
+            LIMIT 100
+        """)
+
+        async with get_db_session() as db:
+            rows = (await db.execute(sql)).fetchall()
+            for row in rows:
+                customer_id, store_id, wechat_openid = row[0], row[1], row[2]
+                stats["scanned"] += 1
+                result = await orch.trigger(
+                    customer_id, store_id, "member_activation", db,
+                    wechat_user_id=wechat_openid,
+                )
+                if "error" in result:
+                    stats["skipped"] += 1
+                else:
+                    stats["triggered"] += 1
+
+        logger.info("new_member_journey.done", **stats)
+        return stats
+
+    try:
+        return asyncio.run(_run())
     except Exception as exc:
         raise self.retry(exc=exc)
