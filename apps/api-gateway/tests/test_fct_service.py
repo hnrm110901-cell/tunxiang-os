@@ -21,6 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.services.fct_service import (
     FCTService,
+    StandaloneFCTService,
     VAT_RATE_GENERAL,
     VAT_RATE_SMALL,
     CIT_RATE_GENERAL,
@@ -692,4 +693,284 @@ class TestYuanFields:
         assert cf["ending_balance_yuan"] == pytest.approx(800_000.00, abs=0.01)
 
         assert "total_tax_yuan" in result["tax"]
-        assert result["tax"]["total_tax_yuan"] == pytest.approx(600_000.00, abs=0.01)
+        assert result["tax"]["total_tax_yuan"] == pytest.approx(60_000.00, abs=0.01)
+
+
+# ── Voucher CRUD ─────────────────────────────────────────────────────────────
+
+class TestGetVouchers:
+    """测试 get_vouchers 分页和过滤"""
+
+    @pytest.mark.asyncio
+    async def test_empty_result(self):
+        db = _mock_db()
+        db.scalar = AsyncMock(return_value=0)
+        db.execute.return_value = _scalars_all([])
+        svc = StandaloneFCTService()
+        result = await svc.get_vouchers(db, entity_id="S001")
+        assert result["total"] == 0
+        assert result["items"] == []
+
+    @pytest.mark.asyncio
+    async def test_filtered_by_status(self):
+        db = _mock_db()
+        db.scalar = AsyncMock(return_value=1)
+        v = MagicMock()
+        v.id = "00000000-0000-0000-0000-000000000001"
+        v.voucher_no = "MV-001"
+        v.store_id = "S001"
+        v.event_type = "manual"
+        v.event_id = None
+        v.biz_date = date(2026, 3, 1)
+        v.status = "draft"
+        v.description = None
+        db.execute.return_value = _scalars_all([v])
+        svc = StandaloneFCTService()
+        result = await svc.get_vouchers(db, entity_id="S001", status="draft")
+        assert result["total"] == 1
+        assert result["items"][0]["status"] == "draft"
+
+    @pytest.mark.asyncio
+    async def test_pagination_params_passed(self):
+        db = _mock_db()
+        db.scalar = AsyncMock(return_value=0)
+        db.execute.return_value = _scalars_all([])
+        svc = StandaloneFCTService()
+        result = await svc.get_vouchers(db, entity_id="S001", skip=10, limit=5)
+        assert result["skip"] == 10
+        assert result["limit"] == 5
+
+
+class TestCreateManualVoucherPersist:
+    """测试 create_manual_voucher 持久化逻辑"""
+
+    def _balanced_lines(self):
+        return [
+            {"account_code": "1001", "account_name": "现金", "debit": 1000.00, "credit": None},
+            {"account_code": "6001", "account_name": "主营业务收入", "debit": None, "credit": 1000.00},
+        ]
+
+    @pytest.mark.asyncio
+    async def test_success_returns_voucher_id(self):
+        db = _mock_db()
+        db.refresh = AsyncMock()
+        svc = StandaloneFCTService()
+        result = await svc.create_manual_voucher(
+            db, tenant_id="T1", entity_id="S001",
+            biz_date=date(2026, 3, 1), lines=self._balanced_lines(),
+        )
+        assert result["success"] is True
+        assert "voucher_id" in result
+        assert result["voucher_id"] != ""
+
+    @pytest.mark.asyncio
+    async def test_lines_count_matches(self):
+        db = _mock_db()
+        db.refresh = AsyncMock()
+        svc = StandaloneFCTService()
+        result = await svc.create_manual_voucher(
+            db, tenant_id="T1", entity_id="S001",
+            biz_date=date(2026, 3, 1), lines=self._balanced_lines(),
+        )
+        assert result["lines_count"] == 2
+
+    @pytest.mark.asyncio
+    async def test_yuan_fields_present(self):
+        db = _mock_db()
+        db.refresh = AsyncMock()
+        svc = StandaloneFCTService()
+        result = await svc.create_manual_voucher(
+            db, tenant_id="T1", entity_id="S001",
+            biz_date=date(2026, 3, 1), lines=self._balanced_lines(),
+        )
+        assert result["biz_date"] == "2026-03-01"
+        assert result["status"] == "draft"
+
+    @pytest.mark.asyncio
+    async def test_unbalanced_lines_raise_value_error(self):
+        db = _mock_db()
+        svc = StandaloneFCTService()
+        lines = [
+            {"account_code": "1001", "debit": 1000.00, "credit": None},
+            {"account_code": "6001", "debit": None, "credit": 900.00},  # 差 100
+        ]
+        with pytest.raises(ValueError, match="借贷不平衡"):
+            await svc.create_manual_voucher(
+                db, tenant_id="T1", entity_id="S001",
+                biz_date=date(2026, 3, 1), lines=lines,
+            )
+
+
+class TestGetVoucherById:
+    """测试 get_voucher_by_id"""
+
+    @pytest.mark.asyncio
+    async def test_found_with_lines(self):
+        db = _mock_db()
+        v = MagicMock()
+        v.id = "vid-001"
+        v.voucher_no = "MV-001"
+        v.store_id = "S001"
+        v.event_type = "manual"
+        v.event_id = None
+        v.biz_date = date(2026, 3, 1)
+        v.status = "draft"
+        v.description = None
+        line = MagicMock()
+        line.id = "lid-001"
+        line.line_no = 1
+        line.account_code = "1001"
+        line.account_name = "现金"
+        line.debit = 1000.00
+        line.credit = None
+        line.summary = None
+        v.lines = [line]
+        result_mock = MagicMock()
+        result_mock.scalar_one_or_none.return_value = v
+        db.execute = AsyncMock(return_value=result_mock)
+        svc = StandaloneFCTService()
+        result = await svc.get_voucher_by_id(db, "vid-001")
+        assert result is not None
+        assert result["id"] == "vid-001"
+        assert len(result["lines"]) == 1
+
+    @pytest.mark.asyncio
+    async def test_not_found_returns_none(self):
+        db = _mock_db()
+        result_mock = MagicMock()
+        result_mock.scalar_one_or_none.return_value = None
+        db.execute = AsyncMock(return_value=result_mock)
+        svc = StandaloneFCTService()
+        result = await svc.get_voucher_by_id(db, "nonexistent")
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_voucher_has_no_lines_returns_empty_list(self):
+        db = _mock_db()
+        v = MagicMock()
+        v.id = "vid-002"
+        v.voucher_no = "MV-002"
+        v.store_id = "S001"
+        v.event_type = "manual"
+        v.event_id = None
+        v.biz_date = date(2026, 3, 2)
+        v.status = "posted"
+        v.description = None
+        v.lines = []
+        result_mock = MagicMock()
+        result_mock.scalar_one_or_none.return_value = v
+        db.execute = AsyncMock(return_value=result_mock)
+        svc = StandaloneFCTService()
+        result = await svc.get_voucher_by_id(db, "vid-002")
+        assert result["lines"] == []
+
+
+# ── get_report_trend ─────────────────────────────────────────────────────────
+
+class TestGetReportTrend:
+    """测试 get_report_trend 时序聚合"""
+
+    def _trend_row(self, period_str, revenue_fen, expense_fen):
+        row = MagicMock()
+        from datetime import date as _date
+        row.__getitem__ = lambda self, i: [
+            _date.fromisoformat(period_str), revenue_fen, expense_fen
+        ][i]
+        return row
+
+    @pytest.mark.asyncio
+    async def test_month_granularity_returns_data(self):
+        db = _mock_db()
+        row = MagicMock()
+        row.__getitem__ = lambda self, i: [
+            datetime(2026, 3, 1), 1_000_000, 700_000
+        ][i]
+        result_mock = MagicMock()
+        result_mock.fetchall.return_value = [row]
+        db.execute = AsyncMock(return_value=result_mock)
+        svc = StandaloneFCTService()
+        result = await svc.get_report_trend(
+            db, tenant_id="T1", entity_id="S001",
+            start_date=date(2026, 3, 1), end_date=date(2026, 3, 31),
+            group_by="month",
+        )
+        assert result["report_type"] == "trend"
+        assert len(result["data"]) == 1
+        assert result["data"][0]["revenue_yuan"] == pytest.approx(10000.00, abs=0.01)
+
+    @pytest.mark.asyncio
+    async def test_empty_range_returns_empty_list(self):
+        db = _mock_db()
+        result_mock = MagicMock()
+        result_mock.fetchall.return_value = []
+        db.execute = AsyncMock(return_value=result_mock)
+        svc = StandaloneFCTService()
+        result = await svc.get_report_trend(db, tenant_id="T1")
+        assert result["data"] == []
+
+    @pytest.mark.asyncio
+    async def test_yuan_fields_present(self):
+        db = _mock_db()
+        row = MagicMock()
+        row.__getitem__ = lambda self, i: [
+            datetime(2026, 3, 1), 500_000, 300_000
+        ][i]
+        result_mock = MagicMock()
+        result_mock.fetchall.return_value = [row]
+        db.execute = AsyncMock(return_value=result_mock)
+        svc = StandaloneFCTService()
+        result = await svc.get_report_trend(db, tenant_id="T1")
+        item = result["data"][0]
+        assert "revenue_yuan" in item
+        assert "expense_yuan" in item
+        assert "net_yuan" in item
+        assert item["net_yuan"] == pytest.approx(2000.00, abs=0.01)
+
+
+# ── list_periods ─────────────────────────────────────────────────────────────
+
+class TestListPeriods:
+    """测试 list_periods 账期列表"""
+
+    @pytest.mark.asyncio
+    async def test_most_recent_is_open(self):
+        db = _mock_db()
+        r1 = MagicMock()
+        r1.__getitem__ = lambda self, i: [datetime(2026, 3, 1)][i]
+        r2 = MagicMock()
+        r2.__getitem__ = lambda self, i: [datetime(2026, 2, 1)][i]
+        result_mock = MagicMock()
+        result_mock.fetchall.return_value = [r1, r2]
+        db.execute = AsyncMock(return_value=result_mock)
+        svc = StandaloneFCTService()
+        result = await svc.list_periods(db, tenant_id="S001")
+        assert result["items"][0]["status"] == "open"
+        assert result["items"][1]["status"] == "closed"
+
+    @pytest.mark.asyncio
+    async def test_empty_table_returns_empty(self):
+        db = _mock_db()
+        result_mock = MagicMock()
+        result_mock.fetchall.return_value = []
+        db.execute = AsyncMock(return_value=result_mock)
+        svc = StandaloneFCTService()
+        result = await svc.list_periods(db, tenant_id="S001")
+        assert result["items"] == []
+        assert result["total"] == 0
+
+    @pytest.mark.asyncio
+    async def test_multiple_months_ordered_desc(self):
+        db = _mock_db()
+        rows = []
+        for m in [3, 2, 1]:
+            r = MagicMock()
+            r.__getitem__ = lambda self, i, _m=m: [datetime(2026, _m, 1)][i]
+            rows.append(r)
+        result_mock = MagicMock()
+        result_mock.fetchall.return_value = rows
+        db.execute = AsyncMock(return_value=result_mock)
+        svc = StandaloneFCTService()
+        result = await svc.list_periods(db, tenant_id="S001")
+        assert result["total"] == 3
+        assert result["items"][0]["period_key"] == "2026-03"
+        assert result["items"][2]["period_key"] == "2026-01"

@@ -1,5 +1,6 @@
 import sys
 from pathlib import Path
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -77,3 +78,15 @@ def patch_reservation_db(monkeypatch):
         return copy.deepcopy(_SAMPLE_RESERVATIONS[reservation_id])
 
     monkeypatch.setattr(ReservationAgent, "_get_reservation", _fake_get_reservation)
+
+
+@pytest.fixture
+def mock_db():
+    """AsyncSession mock with sensible defaults (no real DB needed)."""
+    db = AsyncMock()
+    result = MagicMock()
+    result.fetchone.return_value = None
+    result.fetchall.return_value = []
+    db.execute = AsyncMock(return_value=result)
+    db.commit = AsyncMock()
+    return db

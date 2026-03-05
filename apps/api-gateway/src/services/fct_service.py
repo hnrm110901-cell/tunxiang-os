@@ -22,14 +22,16 @@ import os
 from calendar import monthrange
 from datetime import date, datetime, timedelta
 from typing import Any, Dict, List, Optional
+from uuid import uuid4
 
 import structlog
-from sqlalchemy import and_, func, select
+from sqlalchemy import and_, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from src.models.finance import FinancialTransaction, Budget
 from src.models.reconciliation import ReconciliationRecord, ReconciliationStatus
-from src.models.fct import FCTTaxRecord, FCTCashFlowItem, TaxpayerType
+from src.models.fct import FCTTaxRecord, FCTCashFlowItem, TaxpayerType, Voucher, VoucherLine
 
 logger = structlog.get_logger()
 
@@ -648,6 +650,36 @@ class FCTService:
         """将分（fen）转换为元（yuan），保留2位小数。"""
         return round((fen or 0) / 100, 2)
 
+    @staticmethod
+    def _voucher_to_dict(v: "Voucher") -> Dict[str, Any]:
+        return {
+            "id": str(v.id),
+            "voucher_no": v.voucher_no,
+            "store_id": v.store_id,
+            "event_type": v.event_type,
+            "event_id": v.event_id,
+            "biz_date": v.biz_date.isoformat() if v.biz_date else None,
+            "status": v.status,
+            "description": v.description,
+        }
+
+    @staticmethod
+    def _line_to_dict(l: "VoucherLine") -> Dict[str, Any]:
+        return {
+            "id": str(l.id),
+            "line_no": l.line_no,
+            "account_code": l.account_code,
+            "account_name": l.account_name,
+            "debit": float(l.debit) if l.debit is not None else None,
+            "credit": float(l.credit) if l.credit is not None else None,
+            "summary": l.summary,
+        }
+
+    @staticmethod
+    def _gen_voucher_no(biz_date: date) -> str:
+        import random
+        return f"MV-{biz_date.strftime('%Y%m%d')}-{random.randint(100000, 999999)}"
+
     async def _save_tax_record(
         self,
         store_id, year, month, tp,
@@ -1073,6 +1105,40 @@ class StandaloneFCTService:
 
     # ── 凭证管理（待专用 Voucher 模型上线后替换） ──────────────────────────────
 
+    @staticmethod
+    def _y(fen: int) -> float:
+        return round((fen or 0) / 100, 2)
+
+    @staticmethod
+    def _voucher_to_dict(v) -> Dict[str, Any]:
+        return {
+            "id": str(v.id),
+            "voucher_no": v.voucher_no,
+            "store_id": v.store_id,
+            "event_type": v.event_type,
+            "event_id": v.event_id,
+            "biz_date": v.biz_date.isoformat() if v.biz_date else None,
+            "status": v.status,
+            "description": v.description,
+        }
+
+    @staticmethod
+    def _line_to_dict(l) -> Dict[str, Any]:
+        return {
+            "id": str(l.id),
+            "line_no": l.line_no,
+            "account_code": l.account_code,
+            "account_name": l.account_name,
+            "debit": float(l.debit) if l.debit is not None else None,
+            "credit": float(l.credit) if l.credit is not None else None,
+            "summary": l.summary,
+        }
+
+    @staticmethod
+    def _gen_voucher_no(biz_date: date) -> str:
+        import random
+        return f"MV-{biz_date.strftime('%Y%m%d')}-{random.randint(100000, 999999)}"
+
     async def get_vouchers(
         self,
         session: AsyncSession,
@@ -1084,12 +1150,36 @@ class StandaloneFCTService:
         skip: int = 0,
         limit: int = 50,
     ) -> Dict[str, Any]:
-        return {"items": [], "total": 0, "skip": skip, "limit": limit}
+        stmt = select(Voucher)
+        if entity_id:
+            stmt = stmt.where(Voucher.store_id == entity_id)
+        if status:
+            stmt = stmt.where(Voucher.status == status)
+        if start_date:
+            stmt = stmt.where(Voucher.biz_date >= start_date)
+        if end_date:
+            stmt = stmt.where(Voucher.biz_date <= end_date)
+        total = await session.scalar(select(func.count()).select_from(stmt.subquery()))
+        rows = (await session.execute(stmt.offset(skip).limit(limit))).scalars().all()
+        return {
+            "items": [self._voucher_to_dict(v) for v in rows],
+            "total": total or 0,
+            "skip": skip,
+            "limit": limit,
+        }
 
     async def get_voucher_by_id(
         self, session: AsyncSession, voucher_id: str
     ) -> Optional[Any]:
-        return None  # 404 会由 API 层处理
+        stmt = (
+            select(Voucher)
+            .options(selectinload(Voucher.lines))
+            .where(Voucher.id == voucher_id)
+        )
+        v = (await session.execute(stmt)).scalar_one_or_none()
+        if not v:
+            return None
+        return {**self._voucher_to_dict(v), "lines": [self._line_to_dict(l) for l in v.lines]}
 
     async def create_manual_voucher(
         self,
@@ -1108,16 +1198,40 @@ class StandaloneFCTService:
         credit_total = sum(float(l.get("credit") or 0) for l in lines)
         if abs(debit_total - credit_total) > 0.01:
             raise ValueError(f"借贷不平衡：借方 {debit_total} ≠ 贷方 {credit_total}")
-        voucher_no = f"MV-{(biz_date or date.today()).strftime('%Y%m%d')}-{str(id(lines))[-6:]}"
+        effective_date = biz_date or date.today()
+        voucher_no = self._gen_voucher_no(effective_date)
+        voucher = Voucher(
+            id=uuid4(),
+            store_id=entity_id,
+            voucher_no=voucher_no,
+            event_type="manual",
+            biz_date=effective_date,
+            status="draft",
+            description=description,
+        )
+        session.add(voucher)
+        for i, line_data in enumerate(lines, 1):
+            session.add(VoucherLine(
+                id=uuid4(),
+                voucher_id=voucher.id,
+                line_no=i,
+                account_code=line_data.get("account_code", ""),
+                account_name=line_data.get("account_name"),
+                debit=line_data.get("debit"),
+                credit=line_data.get("credit"),
+                summary=line_data.get("summary"),
+            ))
+        await session.flush()
+        await session.refresh(voucher)
         return {
             "success": True,
-            "voucher_no": voucher_no,
+            "voucher_id": str(voucher.id),
+            "voucher_no": voucher.voucher_no,
             "tenant_id": tenant_id,
             "entity_id": entity_id,
-            "biz_date": (biz_date or date.today()).isoformat(),
+            "biz_date": effective_date.isoformat(),
             "status": "draft",
-            "lines": lines,
-            "note": "凭证已创建（待专用账务模型上线后持久化）",
+            "lines_count": len(lines),
         }
 
     async def update_voucher_status(
@@ -1158,7 +1272,24 @@ class StandaloneFCTService:
         start_key: Optional[str] = None,
         end_key: Optional[str] = None,
     ) -> Dict[str, Any]:
-        return {"items": [], "total": 0}
+        stmt = text("""
+            SELECT DISTINCT DATE_TRUNC('month', transaction_date) AS month
+            FROM financial_transactions
+            WHERE store_id = :sid
+            ORDER BY 1 DESC
+        """)
+        rows = (await session.execute(stmt, {"sid": tenant_id})).fetchall()
+        if not rows:
+            return {"items": [], "total": 0}
+        items = []
+        for i, row in enumerate(rows):
+            period_dt = row[0]
+            period_key = period_dt.strftime("%Y-%m") if hasattr(period_dt, "strftime") else str(period_dt)[:7]
+            items.append({
+                "period_key": period_key,
+                "status": "open" if i == 0 else "closed",
+            })
+        return {"items": items, "total": len(items)}
 
     async def close_period(
         self, session: AsyncSession, tenant_id: str, period_key: str
@@ -1804,13 +1935,42 @@ class StandaloneFCTService:
         end_date: Optional[date] = None,
         group_by: str = "day",
     ) -> Dict[str, Any]:
+        gran = "day" if group_by == "day" else "month"
+        filters = "WHERE store_id = :sid"
+        params: Dict[str, Any] = {"sid": entity_id or tenant_id, "gran": gran}
+        if start_date:
+            filters += " AND transaction_date >= :df"
+            params["df"] = start_date
+        if end_date:
+            filters += " AND transaction_date <= :dt"
+            params["dt"] = end_date
+        stmt = text(f"""
+            SELECT DATE_TRUNC(:gran, transaction_date) AS period,
+                   SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END) AS revenue,
+                   SUM(CASE WHEN amount < 0 THEN ABS(amount) ELSE 0 END) AS expense
+            FROM financial_transactions
+            {filters}
+            GROUP BY 1 ORDER BY 1
+        """)
+        rows = (await session.execute(stmt, params)).fetchall()
+        data = []
+        for row in rows:
+            period_dt = row[0]
+            period_str = period_dt.strftime("%Y-%m-%d") if gran == "day" else period_dt.strftime("%Y-%m")
+            rev = int(row[1] or 0)
+            exp = int(row[2] or 0)
+            data.append({
+                "period": period_str,
+                "revenue_yuan": self._y(rev),
+                "expense_yuan": self._y(exp),
+                "net_yuan": self._y(rev - exp),
+            })
         return {
             "report_type": "trend",
             "tenant_id": tenant_id,
             "entity_id": entity_id,
             "group_by": group_by,
-            "data": [],
-            "note": "trend 报表待账务凭证引擎上线后提供完整时序数据",
+            "data": data,
         }
 
     async def get_report_by_entity(
@@ -1820,7 +1980,34 @@ class StandaloneFCTService:
         start_date: Optional[date] = None,
         end_date: Optional[date] = None,
     ) -> Dict[str, Any]:
-        return {"report_type": "by_entity", "tenant_id": tenant_id, "data": []}
+        filters = ""
+        params: Dict[str, Any] = {}
+        if start_date:
+            filters += " AND transaction_date >= :df"
+            params["df"] = start_date
+        if end_date:
+            filters += " AND transaction_date <= :dt"
+            params["dt"] = end_date
+        stmt = text(f"""
+            SELECT store_id,
+                   SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END) AS revenue,
+                   SUM(CASE WHEN amount < 0 THEN ABS(amount) ELSE 0 END) AS expense
+            FROM financial_transactions
+            WHERE 1=1 {filters}
+            GROUP BY store_id ORDER BY store_id
+        """)
+        rows = (await session.execute(stmt, params)).fetchall()
+        data = []
+        for row in rows:
+            rev = int(row[1] or 0)
+            exp = int(row[2] or 0)
+            data.append({
+                "entity_id": row[0],
+                "revenue_yuan": self._y(rev),
+                "expense_yuan": self._y(exp),
+                "net_yuan": self._y(rev - exp),
+            })
+        return {"report_type": "by_entity", "tenant_id": tenant_id, "data": data}
 
     async def get_report_by_region(
         self,

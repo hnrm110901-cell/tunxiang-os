@@ -12,6 +12,8 @@
 
 import os
 import asyncio
+import json
+import uuid
 import structlog
 from datetime import datetime, timedelta
 from enum import Enum
@@ -181,7 +183,9 @@ class ReservationAgent(BaseAgent):
         self,
         store_id: str,
         order_agent: Optional[Any] = None,
-        config: Optional[Dict[str, Any]] = None
+        config: Optional[Dict[str, Any]] = None,
+        db=None,
+        **kwargs,
     ):
         """
         初始化预定宴会Agent
@@ -190,39 +194,28 @@ class ReservationAgent(BaseAgent):
             store_id: 门店ID
             order_agent: 订单Agent
             config: 配置参数
+            db: AsyncSession（可选，传入时使用真实 DB 查询）
         """
         super().__init__()
         self.store_id = store_id
         self.order_agent = order_agent
+        self.db = db
         self.config = config or {
-            "advance_booking_days": int(os.getenv("RESERVATION_ADVANCE_BOOKING_DAYS", "30")),  # 提前预定天数
-            "min_party_size": 1,  # 最小人数
-            "max_party_size": int(os.getenv("RESERVATION_MAX_PARTY_SIZE", "50")),  # 最大人数
-            "deposit_rate": float(os.getenv("RESERVATION_DEPOSIT_RATE", "0.3")),  # 定金比例
-            "cancellation_hours": int(os.getenv("RESERVATION_CANCELLATION_HOURS", "24")),  # 取消提前时间(小时)
-            "reminder_hours": int(os.getenv("RESERVATION_REMINDER_HOURS", "2")),  # 提醒提前时间(小时)
+            "advance_booking_days": int(os.getenv("RESERVATION_ADVANCE_BOOKING_DAYS", "30")),
+            "min_party_size": 1,
+            "max_party_size": int(os.getenv("RESERVATION_MAX_PARTY_SIZE", "50")),
+            "deposit_rate": float(os.getenv("RESERVATION_DEPOSIT_RATE", "0.3")),
+            "cancellation_hours": int(os.getenv("RESERVATION_CANCELLATION_HOURS", "24")),
+            "reminder_hours": int(os.getenv("RESERVATION_REMINDER_HOURS", "2")),
         }
         self.logger = logger.bind(agent="reservation", store_id=store_id)
-        self._db_engine = None
-
-    def _get_db_engine(self):
-        """获取数据库引擎（懒加载）"""
-        if self._db_engine is None:
-            db_url = os.getenv("DATABASE_URL")
-            if db_url:
-                try:
-                    from sqlalchemy import create_engine
-                    self._db_engine = create_engine(db_url, pool_pre_ping=True)
-                except Exception as e:
-                    self.logger.debug("db_engine_init_failed", error=str(e))
-        return self._db_engine
 
     def get_supported_actions(self) -> List[str]:
         """获取支持的操作列表"""
         return [
             "create_reservation", "confirm_reservation", "cancel_reservation",
             "create_banquet", "allocate_seating", "send_reminder",
-            "analyze_reservations"
+            "analyze_reservations", "generate_beo", "advance_stage",
         ]
 
     async def execute(self, action: str, params: Dict[str, Any]) -> AgentResponse:
@@ -291,6 +284,19 @@ class ReservationAgent(BaseAgent):
                 result = await self.analyze_reservations(
                     start_date=params.get("start_date"),
                     end_date=params.get("end_date")
+                )
+                return AgentResponse(success=True, data=result)
+            elif action == "generate_beo":
+                result = await self.generate_beo(
+                    reservation_id=params["reservation_id"],
+                    content=params.get("content", {}),
+                )
+                return AgentResponse(success=True, data=result)
+            elif action == "advance_stage":
+                result = await self.advance_stage(
+                    reservation_id=params["reservation_id"],
+                    new_stage=params["new_stage"],
+                    notes=params.get("notes"),
                 )
                 return AgentResponse(success=True, data=result)
             else:
@@ -968,51 +974,46 @@ class ReservationAgent(BaseAgent):
 
     async def _get_reservation(self, reservation_id: str) -> "Reservation":
         """从 reservations 表查询预定信息"""
-        engine = self._get_db_engine()
-        if engine:
-            try:
-                from sqlalchemy import text
-                with engine.connect() as conn:
-                    row = conn.execute(text("""
-                        SELECT id, customer_name, customer_phone, store_id,
-                               reservation_type, reservation_date, reservation_time,
-                               party_size, table_number, status, special_requests,
-                               estimated_budget, created_at, updated_at
-                        FROM reservations
-                        WHERE id = :reservation_id AND store_id = :store_id
-                    """), {
-                        "reservation_id": reservation_id,
-                        "store_id": self.store_id,
-                    }).fetchone()
-                if row:
-                    return {
-                        "reservation_id": str(row[0]),
-                        "customer_id": None,
-                        "customer_name": str(row[1]),
-                        "customer_phone": str(row[2]),
-                        "store_id": str(row[3]),
-                        "reservation_type": row[4] or ReservationType.REGULAR,
-                        "reservation_date": str(row[5]),
-                        "reservation_time": str(row[6]),
-                        "party_size": int(row[7]),
-                        "table_type": TableType.MEDIUM,
-                        "table_number": str(row[8]) if row[8] else None,
-                        "special_requests": row[10],
-                        "status": row[9] or ReservationStatus.PENDING,
-                        "deposit_amount": int(row[11]) if row[11] else 0,
-                        "estimated_amount": int(row[11]) if row[11] else 0,
-                        "created_at": str(row[12]) if row[12] else datetime.now().isoformat(),
-                        "updated_at": str(row[13]) if row[13] else datetime.now().isoformat(),
-                        "confirmed_at": None,
-                        "seated_at": None,
-                        "completed_at": None,
-                    }
-            except Exception as e:
-                self.logger.warning(
-                    "get_reservation_db_failed",
-                    reservation_id=reservation_id,
-                    error=str(e),
-                )
+        if not self.db:
+            raise ValueError(f"预定不存在: {reservation_id}")
+        from sqlalchemy import text
+        result = await self.db.execute(
+            text("""
+                SELECT id, customer_name, customer_phone, store_id,
+                       reservation_type, reservation_date, reservation_time,
+                       party_size, table_number, status, special_requests,
+                       estimated_budget, created_at, updated_at,
+                       banquet_stage
+                FROM reservations
+                WHERE id = :reservation_id AND store_id = :store_id
+            """),
+            {"reservation_id": reservation_id, "store_id": self.store_id},
+        )
+        row = result.fetchone()
+        if row:
+            return {
+                "reservation_id": str(row[0]),
+                "customer_id": None,
+                "customer_name": str(row[1]),
+                "customer_phone": str(row[2]),
+                "store_id": str(row[3]),
+                "reservation_type": row[4] or ReservationType.REGULAR,
+                "reservation_date": str(row[5]),
+                "reservation_time": str(row[6]),
+                "party_size": int(row[7]),
+                "table_type": TableType.MEDIUM,
+                "table_number": str(row[8]) if row[8] else None,
+                "special_requests": row[10],
+                "status": row[9] or ReservationStatus.PENDING,
+                "deposit_amount": int(row[11] or 0),
+                "estimated_amount": int(row[11] or 0),
+                "created_at": str(row[12]) if row[12] else datetime.now().isoformat(),
+                "updated_at": str(row[13]) if row[13] else datetime.now().isoformat(),
+                "confirmed_at": None,
+                "seated_at": None,
+                "completed_at": None,
+                "banquet_stage": row[14] if len(row) > 14 else None,
+            }
         raise ValueError(f"预定不存在: {reservation_id}")
 
     async def _get_reservations_by_time(
@@ -1021,84 +1022,70 @@ class ReservationAgent(BaseAgent):
         time_slot: str
     ) -> List[Reservation]:
         """获取指定时段的预定"""
-        engine = self._get_db_engine()
-        if engine:
-            try:
-                from sqlalchemy import text
-                with engine.connect() as conn:
-                    rows = conn.execute(text("""
-                        SELECT id, customer_name, customer_phone, store_id,
-                               reservation_type, reservation_date, reservation_time,
-                               party_size, table_number, status, special_requests,
-                               estimated_budget, created_at, updated_at
-                        FROM reservations
-                        WHERE store_id = :s
-                          AND reservation_date = :d
-                          AND reservation_time = :t
-                        ORDER BY created_at DESC
-                    """), {"s": self.store_id, "d": date, "t": time_slot}).fetchall()
-                return [
-                    {
-                        "reservation_id": r[0], "customer_id": r[2],
-                        "customer_name": r[1], "customer_phone": r[2],
-                        "store_id": r[3], "reservation_type": r[4],
-                        "reservation_date": str(r[5]), "reservation_time": str(r[6]),
-                        "party_size": r[7], "table_type": None, "table_number": r[8],
-                        "special_requests": r[10], "status": r[9],
-                        "deposit_amount": 0, "estimated_amount": int(r[11] or 0),
-                        "created_at": r[12].isoformat() if r[12] else None,
-                        "updated_at": r[13].isoformat() if r[13] else None,
-                        "confirmed_at": None, "seated_at": None, "completed_at": None,
-                    }
-                    for r in rows
-                ]
-            except Exception as e:
-                self.logger.warning("get_reservations_by_time_db_failed", error=str(e))
-        return []
+        if not self.db:
+            return []
+        from sqlalchemy import text
+        result = await self.db.execute(
+            text("""
+                SELECT id, customer_name, customer_phone, store_id,
+                       reservation_type, reservation_date, reservation_time,
+                       party_size, table_number, status, special_requests,
+                       estimated_budget, created_at, updated_at
+                FROM reservations
+                WHERE store_id = :s
+                  AND reservation_date = :d
+                  AND reservation_time = :t
+                ORDER BY created_at DESC
+            """),
+            {"s": self.store_id, "d": date, "t": time_slot},
+        )
+        rows = result.fetchall()
+        return [
+            {
+                "reservation_id": r[0], "customer_id": r[2],
+                "customer_name": r[1], "customer_phone": r[2],
+                "store_id": r[3], "reservation_type": r[4],
+                "reservation_date": str(r[5]), "reservation_time": str(r[6]),
+                "party_size": r[7], "table_type": None, "table_number": r[8],
+                "special_requests": r[10], "status": r[9],
+                "deposit_amount": 0, "estimated_amount": int(r[11] or 0),
+                "created_at": r[12].isoformat() if r[12] else None,
+                "updated_at": r[13].isoformat() if r[13] else None,
+                "confirmed_at": None, "seated_at": None, "completed_at": None,
+            }
+            for r in rows
+        ]
 
     async def _get_available_tables(
         self,
         date: str,
         time_slot: str
     ) -> List[Dict[str, Any]]:
-        """获取可用桌位"""
-        engine = self._get_db_engine()
-        if engine:
-            try:
-                from sqlalchemy import text
-                with engine.connect() as conn:
-                    # Get all tables for this store
-                    all_tables = conn.execute(text("""
-                        SELECT table_number, table_type, capacity
-                        FROM tables
-                        WHERE store_id = :s AND is_active = true
-                    """), {"s": self.store_id}).fetchall()
-                    # Get reserved table numbers for this slot
-                    reserved = conn.execute(text("""
-                        SELECT table_number FROM reservations
-                        WHERE store_id = :s
-                          AND reservation_date = :d
-                          AND reservation_time = :t
-                          AND status IN ('confirmed', 'seated')
-                    """), {"s": self.store_id, "d": date, "t": time_slot}).fetchall()
-                reserved_nums = {r[0] for r in reserved}
-                available = [
-                    {"table_number": t[0], "table_type": t[1], "capacity": t[2]}
-                    for t in all_tables if t[0] not in reserved_nums
-                ]
-                if available:
-                    return available
-            except Exception as e:
-                self.logger.warning("get_available_tables_db_failed", error=str(e))
-        # Fallback: default table layout
-        return [
-            {"table_number": "S001", "table_type": "small", "capacity": 2},
-            {"table_number": "M001", "table_type": "medium", "capacity": 4},
-            {"table_number": "L001", "table_type": "large", "capacity": 6},
-            {"table_number": "R001", "table_type": "round", "capacity": 10},
+        """获取可用桌位（基于默认布局减去已预定桌位）"""
+        # Default table layout (no dedicated tables table in DB)
+        default_layout = [
+            {"table_number": "S001", "table_type": "small",   "capacity": 2},
+            {"table_number": "M001", "table_type": "medium",  "capacity": 4},
+            {"table_number": "L001", "table_type": "large",   "capacity": 6},
+            {"table_number": "R001", "table_type": "round",   "capacity": 10},
             {"table_number": "B001", "table_type": "banquet", "capacity": 50},
             {"table_number": "B002", "table_type": "banquet", "capacity": 200},
         ]
+        if not self.db:
+            return default_layout
+        from sqlalchemy import text
+        result = await self.db.execute(
+            text("""
+                SELECT table_number FROM reservations
+                WHERE store_id = :s
+                  AND reservation_date = :d
+                  AND reservation_time = :t
+                  AND status IN ('confirmed', 'seated')
+            """),
+            {"s": self.store_id, "d": date, "t": time_slot},
+        )
+        booked = {r[0] for r in result.fetchall() if r[0]}
+        return [t for t in default_layout if t["table_number"] not in booked]
 
     async def _get_reservations_by_period(
         self,
@@ -1106,47 +1093,154 @@ class ReservationAgent(BaseAgent):
         end_date: Optional[str]
     ) -> List[Reservation]:
         """获取时段内的预定"""
-        engine = self._get_db_engine()
-        if engine:
+        if not self.db:
+            return []
+        from sqlalchemy import text
+        start = start_date or (datetime.now() - timedelta(days=30)).date().isoformat()
+        end = end_date or datetime.now().date().isoformat()
+        result = await self.db.execute(
+            text(
+                "SELECT id, customer_name, customer_phone, store_id, "
+                "reservation_type, reservation_date, reservation_time, "
+                "party_size, table_number, status, special_requests, "
+                "estimated_budget, created_at, updated_at "
+                "FROM reservations "
+                "WHERE store_id=:s AND reservation_date>=:a AND reservation_date<=:b "
+                "ORDER BY reservation_date DESC LIMIT 200"
+            ),
+            {"s": self.store_id, "a": start, "b": end},
+        )
+        rows = result.fetchall()
+        return [
+            {
+                "reservation_id": row[0],
+                "customer_id": row[2],
+                "customer_name": row[1],
+                "customer_phone": row[2],
+                "store_id": row[3],
+                "reservation_type": row[4],
+                "reservation_date": str(row[5]),
+                "reservation_time": str(row[6]),
+                "party_size": row[7],
+                "table_type": None,
+                "table_number": row[8],
+                "special_requests": row[10],
+                "status": row[9],
+                "deposit_amount": int((row[11] or 0) * 0.3),
+                "estimated_amount": row[11] or 0,
+                "created_at": str(row[12]),
+                "updated_at": str(row[13]),
+                "confirmed_at": None,
+                "seated_at": None,
+                "completed_at": None,
+            }
+            for row in rows
+        ]
+
+    # ── 宴会事件订单 & 阶段管理 ────────────────────────────────────────────────
+
+    _STAGE_SEQUENCE = [
+        "lead", "intent", "room_lock", "signed",
+        "preparation", "service", "completed",
+    ]
+
+    async def generate_beo(
+        self,
+        reservation_id: str,
+        content: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """
+        生成宴会活动订单 (Banquet Event Order)。
+
+        要求预定状态为 confirmed 或 reservation_type 为 banquet。
+        写入 banquet_event_orders 表，ON CONFLICT 时更新 content。
+        """
+        if not self.db:
+            raise ValueError("需要数据库连接才能生成 BEO")
+        from sqlalchemy import text
+        reservation = await self._get_reservation(reservation_id)
+        if (reservation.get("status") != ReservationStatus.CONFIRMED
+                and reservation.get("reservation_type") != ReservationType.BANQUET):
+            raise ValueError(
+                f"预定 {reservation_id} 状态为 {reservation.get('status')}，"
+                "仅已确认或宴会类预定可生成 BEO"
+            )
+        beo_id = str(uuid.uuid4())
+        await self.db.execute(
+            text("""
+                INSERT INTO banquet_event_orders
+                  (id, reservation_id, version, is_latest, status, content, created_at, updated_at)
+                VALUES
+                  (:id, :rid, 1, true, 'draft', :content, now(), now())
+                ON CONFLICT (reservation_id, version) DO UPDATE
+                  SET content = EXCLUDED.content, updated_at = now()
+            """),
+            {"id": beo_id, "rid": reservation_id, "content": json.dumps(content)},
+        )
+        await self.db.commit()
+        return {"beo_id": beo_id, "version": 1, "status": "draft"}
+
+    async def advance_stage(
+        self,
+        reservation_id: str,
+        new_stage: str,
+        notes: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        推进宴会阶段。
+
+        阶段顺序: lead → intent → room_lock → signed → preparation → service → completed
+        """
+        if not self.db:
+            raise ValueError("需要数据库连接才能推进阶段")
+        if new_stage not in self._STAGE_SEQUENCE:
+            raise ValueError(f"无效阶段: {new_stage}，有效阶段: {self._STAGE_SEQUENCE}")
+        from sqlalchemy import text
+        # Fetch current stage
+        result = await self.db.execute(
+            text("SELECT banquet_stage FROM reservations WHERE id = :rid AND store_id = :sid"),
+            {"rid": reservation_id, "sid": self.store_id},
+        )
+        row = result.fetchone()
+        if not row:
+            raise ValueError(f"预定不存在: {reservation_id}")
+        current_stage = row[0]
+        # Validate stage progression
+        if current_stage:
             try:
-                from sqlalchemy import text
-                start = start_date or (datetime.now() - timedelta(days=30)).date().isoformat()
-                end = end_date or datetime.now().date().isoformat()
-                with engine.connect() as conn:
-                    rows = conn.execute(text(
-                        "SELECT id, customer_name, customer_phone, store_id, "
-                        "reservation_type, reservation_date, reservation_time, "
-                        "party_size, table_number, status, special_requests, "
-                        "estimated_budget, created_at, updated_at "
-                        "FROM reservations "
-                        "WHERE store_id=:s AND reservation_date>=:a AND reservation_date<=:b "
-                        "ORDER BY reservation_date DESC LIMIT 200"
-                    ), {"s": self.store_id, "a": start, "b": end}).fetchall()
-                reservations = []
-                for row in rows:
-                    reservations.append({
-                        "reservation_id": row[0],
-                        "customer_id": row[2],  # use phone as customer_id
-                        "customer_name": row[1],
-                        "customer_phone": row[2],
-                        "store_id": row[3],
-                        "reservation_type": row[4],
-                        "reservation_date": str(row[5]),
-                        "reservation_time": str(row[6]),
-                        "party_size": row[7],
-                        "table_type": None,
-                        "table_number": row[8],
-                        "special_requests": row[10],
-                        "status": row[9],
-                        "deposit_amount": int((row[11] or 0) * 0.3),
-                        "estimated_amount": row[11] or 0,
-                        "created_at": str(row[12]),
-                        "updated_at": str(row[13]),
-                        "confirmed_at": None,
-                        "seated_at": None,
-                        "completed_at": None,
-                    })
-                return reservations
-            except Exception as e:
-                self.logger.warning("get_reservations_by_period_db_failed", error=str(e))
-        return []
+                current_idx = self._STAGE_SEQUENCE.index(current_stage)
+                new_idx = self._STAGE_SEQUENCE.index(new_stage)
+            except ValueError:
+                raise ValueError(f"无效阶段转换: {current_stage} → {new_stage}")
+            if new_idx <= current_idx:
+                raise ValueError(
+                    f"阶段只能向前推进，当前: {current_stage}，目标: {new_stage}"
+                )
+        # Build the UPDATE SQL with optional timestamp fields
+        extra_sets = ""
+        if new_stage == "room_lock":
+            extra_sets = ", room_locked_at = now()"
+        elif new_stage == "signed":
+            extra_sets = ", signed_at = now()"
+        await self.db.execute(
+            text(
+                f"UPDATE reservations "
+                f"SET banquet_stage = :stage, banquet_stage_updated_at = now(){extra_sets} "
+                f"WHERE id = :rid AND store_id = :sid"
+            ),
+            {"stage": new_stage, "rid": reservation_id, "sid": self.store_id},
+        )
+        await self.db.execute(
+            text("""
+                INSERT INTO banquet_stage_history
+                  (reservation_id, stage, transitioned_at, notes)
+                VALUES (:rid, :stage, now(), :notes)
+            """),
+            {"rid": reservation_id, "stage": new_stage, "notes": notes},
+        )
+        await self.db.commit()
+        return {
+            "reservation_id": reservation_id,
+            "stage": new_stage,
+            "previous_stage": current_stage,
+        }

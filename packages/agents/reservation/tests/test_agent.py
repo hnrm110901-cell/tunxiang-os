@@ -11,6 +11,7 @@
 
 import pytest
 from datetime import datetime, timedelta
+from unittest.mock import AsyncMock, MagicMock, patch
 from src.agent import (
     ReservationAgent,
     ReservationType,
@@ -151,11 +152,35 @@ class TestReservationConfirmation:
         assert reservation["confirmed_at"] is not None
 
     @pytest.mark.asyncio
-    async def test_confirm_already_confirmed_reservation(self, agent):
-        """测试确认已确认的预定"""
-        # 这个测试需要mock _get_reservation返回已确认的预定
-        # 实际实现中需要使用mock
-        pass
+    async def test_confirm_already_confirmed_reservation(self, agent, monkeypatch):
+        """测试确认已确认的预定应抛出 ValueError"""
+        async def _fake_confirmed(self, reservation_id):
+            return {
+                "reservation_id": reservation_id,
+                "customer_id": "CUST001",
+                "customer_name": "张三",
+                "customer_phone": "13800138000",
+                "store_id": "STORE001",
+                "reservation_type": "regular",
+                "reservation_date": "2099-12-31",
+                "reservation_time": "18:00",
+                "party_size": 4,
+                "table_type": "medium",
+                "table_number": "M001",
+                "special_requests": None,
+                "status": ReservationStatus.CONFIRMED,
+                "deposit_amount": 10000,
+                "estimated_amount": 32000,
+                "created_at": "2026-02-28T10:00:00",
+                "updated_at": "2026-02-28T10:00:00",
+                "confirmed_at": "2026-02-28T10:05:00",
+                "seated_at": None,
+                "completed_at": None,
+            }
+
+        monkeypatch.setattr(ReservationAgent, "_get_reservation", _fake_confirmed)
+        with pytest.raises(ValueError):
+            await agent.confirm_reservation("RES001")
 
 
 class TestReservationCancellation:
@@ -394,10 +419,23 @@ class TestAnalytics:
         assert analytics["revenue_from_reservations"] >= 0
 
     @pytest.mark.asyncio
-    async def test_analytics_with_no_data(self, agent):
-        """测试无数据时的分析"""
-        # 这个测试需要mock _get_reservations_by_period返回空列表
-        pass
+    async def test_analytics_with_no_data(self, agent, monkeypatch):
+        """测试无数据时分析返回空结构 / 零计数"""
+        async def _empty_period(self, start_date, end_date):
+            return []
+
+        monkeypatch.setattr(ReservationAgent, "_get_reservations_by_period", _empty_period)
+
+        start_date = (datetime.now() - timedelta(days=30)).date().isoformat()
+        end_date = datetime.now().date().isoformat()
+        analytics = await agent.analyze_reservations(
+            start_date=start_date,
+            end_date=end_date,
+        )
+        assert analytics["total_reservations"] == 0
+        assert analytics["confirmation_rate"] == 0
+        assert analytics["cancellation_rate"] == 0
+        assert analytics["peak_hours"] == []
 
 
 class TestTableTypeRecommendation:
@@ -477,4 +515,212 @@ class TestConfiguration:
 
         assert agent.config["advance_booking_days"] == 60
         assert agent.config["deposit_rate"] == 0.5
+
+
+# ── DB query tests ──────────────────────────────────────────────────────────
+
+class TestDbQueries:
+    """测试 DB 查询方法在不同条件下的行为"""
+
+    @pytest.mark.asyncio
+    async def test_get_reservation_returns_none_when_no_db(self, monkeypatch):
+        """无 db 时 _get_reservation 应抛出 ValueError"""
+        # Override autouse patch so we get the real method
+        monkeypatch.setattr(
+            ReservationAgent,
+            "_get_reservation",
+            ReservationAgent._get_reservation,
+        )
+        agent = ReservationAgent(store_id="STORE001")  # db=None
+        with pytest.raises(ValueError, match="预定不存在"):
+            await agent._get_reservation("RES_MISSING")
+
+    @pytest.mark.asyncio
+    async def test_get_reservation_returns_row_when_db_present(self, mock_db, monkeypatch):
+        """有 db 时 _get_reservation 应返回行数据"""
+        monkeypatch.setattr(
+            ReservationAgent,
+            "_get_reservation",
+            ReservationAgent._get_reservation,
+        )
+        # Simulate a DB row: 15-column tuple
+        row = (
+            "RES001", "张三", "13800138000", "STORE001",
+            "regular", "2099-12-31", "18:00",
+            4, "T1", "pending", None,
+            32000, None, None, None,
+        )
+        mock_db.execute.return_value.fetchone.return_value = row
+        agent = ReservationAgent(store_id="STORE001", db=mock_db)
+        result = await agent._get_reservation("RES001")
+        assert result["reservation_id"] == "RES001"
+        assert result["customer_name"] == "张三"
+        assert result["party_size"] == 4
+
+    @pytest.mark.asyncio
+    async def test_get_available_tables_subtracts_booked(self, mock_db, monkeypatch):
+        """_get_available_tables 应从默认布局中减去已预定桌位"""
+        monkeypatch.setattr(
+            ReservationAgent,
+            "_get_available_tables",
+            ReservationAgent._get_available_tables,
+        )
+        # S001 and M001 are booked
+        mock_db.execute.return_value.fetchall.return_value = [("S001",), ("M001",)]
+        agent = ReservationAgent(store_id="STORE001", db=mock_db)
+        tables = await agent._get_available_tables("2099-12-31", "18:00")
+        table_numbers = [t["table_number"] for t in tables]
+        assert "S001" not in table_numbers
+        assert "M001" not in table_numbers
+        assert len(tables) == 4  # 6 default - 2 booked
+
+
+# ── Availability check tests ─────────────────────────────────────────────────
+
+class TestCheckAvailability:
+    """测试座位可用性检查"""
+
+    @pytest.mark.asyncio
+    async def test_returns_false_when_no_db(self, monkeypatch):
+        """无 db 时应返回 False（默认布局最大容量200，测试201人无法入座）"""
+        monkeypatch.setattr(
+            ReservationAgent, "_check_availability", ReservationAgent._check_availability
+        )
+        monkeypatch.setattr(
+            ReservationAgent,
+            "_get_reservations_by_time",
+            ReservationAgent._get_reservations_by_time,
+        )
+        monkeypatch.setattr(
+            ReservationAgent,
+            "_get_available_tables",
+            ReservationAgent._get_available_tables,
+        )
+        agent = ReservationAgent(store_id="STORE001")  # db=None
+        available = await agent._check_availability("2099-12-31", "18:00", 201)
+        assert available is False
+
+    @pytest.mark.asyncio
+    async def test_returns_true_when_table_with_enough_capacity(self, mock_db, monkeypatch):
+        """有足够容量的桌位时应返回 True"""
+        monkeypatch.setattr(
+            ReservationAgent, "_check_availability", ReservationAgent._check_availability
+        )
+
+        async def _fake_by_time(self, d, t):
+            return []
+
+        async def _fake_tables(self, d, t):
+            return [{"table_number": "T5", "capacity": 6}]
+
+        monkeypatch.setattr(ReservationAgent, "_get_reservations_by_time", _fake_by_time)
+        monkeypatch.setattr(ReservationAgent, "_get_available_tables", _fake_tables)
+        agent = ReservationAgent(store_id="STORE001", db=mock_db)
+        available = await agent._check_availability("2099-12-31", "18:00", 4)
+        assert available is True
+
+    @pytest.mark.asyncio
+    async def test_returns_false_when_all_tables_too_small(self, mock_db, monkeypatch):
+        """所有桌位容量不足时应返回 False"""
+        monkeypatch.setattr(
+            ReservationAgent, "_check_availability", ReservationAgent._check_availability
+        )
+
+        async def _fake_by_time(self, d, t):
+            return []
+
+        async def _fake_tables(self, d, t):
+            return [{"table_number": "T1", "capacity": 2}]
+
+        monkeypatch.setattr(ReservationAgent, "_get_reservations_by_time", _fake_by_time)
+        monkeypatch.setattr(ReservationAgent, "_get_available_tables", _fake_tables)
+        agent = ReservationAgent(store_id="STORE001", db=mock_db)
+        available = await agent._check_availability("2099-12-31", "18:00", 6)
+        assert available is False
+
+
+# ── generate_beo tests ───────────────────────────────────────────────────────
+
+class TestGenerateBeo:
+    """测试 BEO 生成"""
+
+    @pytest.mark.asyncio
+    async def test_success_inserts_and_returns_beo_id(self, mock_db, monkeypatch):
+        """成功时应插入记录并返回 beo_id"""
+        async def _fake_get(self, rid):
+            return {"reservation_id": rid, "status": ReservationStatus.CONFIRMED, "reservation_type": "regular"}
+
+        monkeypatch.setattr(ReservationAgent, "_get_reservation", _fake_get)
+        agent = ReservationAgent(store_id="STORE001", db=mock_db)
+        result = await agent.generate_beo("RES001", {"menu": ["鱼香肉丝"]})
+        assert "beo_id" in result
+        assert result["version"] == 1
+        assert result["status"] == "draft"
+        mock_db.commit.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_fails_when_reservation_not_found(self, mock_db, monkeypatch):
+        """预定不存在时应抛出 ValueError"""
+        monkeypatch.setattr(
+            ReservationAgent, "_get_reservation",
+            ReservationAgent._get_reservation,
+        )
+        mock_db.execute.return_value.fetchone.return_value = None
+        agent = ReservationAgent(store_id="STORE001", db=mock_db)
+        with pytest.raises(ValueError):
+            await agent.generate_beo("NOT_EXIST", {})
+
+    @pytest.mark.asyncio
+    async def test_fails_for_unconfirmed_non_banquet(self, mock_db, monkeypatch):
+        """非确认且非宴会类预定应拒绝生成 BEO"""
+        async def _fake_get(self, rid):
+            return {"reservation_id": rid, "status": ReservationStatus.PENDING, "reservation_type": "regular"}
+
+        monkeypatch.setattr(ReservationAgent, "_get_reservation", _fake_get)
+        agent = ReservationAgent(store_id="STORE001", db=mock_db)
+        with pytest.raises(ValueError, match="仅已确认或宴会类预定"):
+            await agent.generate_beo("RES001", {})
+
+
+# ── advance_stage tests ──────────────────────────────────────────────────────
+
+class TestAdvanceStage:
+    """测试宴会阶段推进"""
+
+    @pytest.mark.asyncio
+    async def test_success_advances_stage_and_writes_history(self, mock_db, monkeypatch):
+        """成功推进阶段并写入历史记录"""
+        mock_db.execute.return_value.fetchone.return_value = ("lead",)
+        agent = ReservationAgent(store_id="STORE001", db=mock_db)
+        result = await agent.advance_stage("RES001", "intent")
+        assert result["stage"] == "intent"
+        assert result["previous_stage"] == "lead"
+        assert mock_db.commit.await_count == 1
+
+    @pytest.mark.asyncio
+    async def test_rejects_invalid_stage_name(self, mock_db):
+        """无效阶段名称应抛出 ValueError"""
+        agent = ReservationAgent(store_id="STORE001", db=mock_db)
+        with pytest.raises(ValueError, match="无效阶段"):
+            await agent.advance_stage("RES001", "invalid_stage")
+
+    @pytest.mark.asyncio
+    async def test_sets_room_locked_at_on_room_lock_stage(self, mock_db, monkeypatch):
+        """推进到 room_lock 时 SQL 应包含 room_locked_at"""
+        mock_db.execute.return_value.fetchone.return_value = ("intent",)
+        executed_sqls = []
+
+        async def _capture_execute(stmt, params=None):
+            executed_sqls.append(str(stmt))
+            result = MagicMock()
+            result.fetchone.return_value = ("intent",)
+            result.fetchall.return_value = []
+            return result
+
+        mock_db.execute = _capture_execute
+        agent = ReservationAgent(store_id="STORE001", db=mock_db)
+        result = await agent.advance_stage("RES001", "room_lock")
+        assert result["stage"] == "room_lock"
+        update_sql = next(s for s in executed_sqls if "UPDATE reservations" in s)
+        assert "room_locked_at" in update_sql
 
