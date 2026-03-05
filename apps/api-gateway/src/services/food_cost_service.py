@@ -180,7 +180,7 @@ class FoodCostService:
             "actual_cost_yuan": round(actual_cost_fen / 100, 2),
             "revenue_fen": revenue_fen,
             "revenue_yuan": round(revenue_fen / 100, 2),
-            "actual_pct": actual_pct,
+            "actual_cost_pct": actual_pct,
             "theoretical_pct": theoretical_pct,
             "variance_pct": variance_pct,
             "variance_status": variance_status,
@@ -219,7 +219,7 @@ class FoodCostService:
         total_stores = len(store_results)
         over_budget = sum(1 for s in store_results if s["variance_status"] in ("warning", "critical"))
         avg_actual_pct = (
-            round(sum(s["actual_pct"] for s in store_results) / total_stores, 2)
+            round(sum(s["actual_cost_pct"] for s in store_results) / total_stores, 2)
             if total_stores > 0
             else 0.0
         )
@@ -228,9 +228,9 @@ class FoodCostService:
             "start_date": start_date.isoformat(),
             "end_date": end_date.isoformat(),
             "summary": {
-                "total_stores": total_stores,
-                "avg_actual_food_cost_pct": avg_actual_pct,
-                "over_budget_stores": over_budget,
+                "store_count": total_stores,
+                "avg_actual_cost_pct": avg_actual_pct,
+                "over_budget_count": over_budget,
             },
             "stores": store_results,
         }
