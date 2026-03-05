@@ -82,6 +82,19 @@ interface TrendPoint {
   revenue: number;
 }
 
+interface MaslowLevel {
+  level: number;
+  label: string;
+  count: number;
+  pct: number;
+}
+
+interface MaslowDistribution {
+  store_id: string;
+  total: number;
+  distribution: MaslowLevel[];
+}
+
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const LIFECYCLE_LABELS: Record<string, string> = {
@@ -106,6 +119,15 @@ const LIFECYCLE_COLORS: Record<string, string> = {
   at_risk:             '#fa8c16',
   dormant:             '#ff7875',
   lost:                '#434343',
+};
+
+const MASLOW_COLORS = ['#bfbfbf', '#91d5ff', '#52c41a', '#1890ff', '#722ed1'];
+const MASLOW_STRATEGIES: Record<number, string> = {
+  1: '品质口碑、安全感，不发折扣',
+  2: '性价比、便利，小额优惠降门槛',
+  3: '场合适配，圈子认同，聚餐套餐',
+  4: '专属感，被记住，优先席位礼遇',
+  5: '探索体验，主厨故事，意义 > 价格',
 };
 
 const STORE_OPTIONS = ['S001', 'S002', 'S003'];
@@ -138,8 +160,10 @@ const PrivateDomainPage: React.FC = () => {
   const [storeId, setStoreId] = useState('S001');
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [trend, setTrend] = useState<TrendPoint[]>([]);
+  const [maslow, setMaslow] = useState<MaslowDistribution | null>(null);
   const [loading, setLoading] = useState(false);
   const [trendLoading, setTrendLoading] = useState(false);
+  const [maslowLoading, setMaslowLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const fetchMetrics = useCallback(async (sid: string) => {
@@ -171,10 +195,25 @@ const PrivateDomainPage: React.FC = () => {
     }
   }, []);
 
+  const fetchMaslow = useCallback(async (sid: string) => {
+    setMaslowLoading(true);
+    try {
+      const data = await apiClient.get<MaslowDistribution>(
+        `/api/v1/private-domain/lifecycle/${sid}/maslow-distribution`
+      );
+      setMaslow(data);
+    } catch {
+      setMaslow(null);
+    } finally {
+      setMaslowLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     fetchMetrics(storeId);
     fetchTrend(storeId);
-  }, [storeId, fetchMetrics, fetchTrend]);
+    fetchMaslow(storeId);
+  }, [storeId, fetchMetrics, fetchTrend, fetchMaslow]);
 
   // ── ECharts Options ──────────────────────────────────────────────────────
 
@@ -210,6 +249,35 @@ const PrivateDomainPage: React.FC = () => {
       }],
     };
   }, [metrics]);
+
+  const maslowOption = React.useMemo(() => {
+    if (!maslow || !maslow.distribution.length) return {};
+    return {
+      tooltip: {
+        trigger: 'item',
+        formatter: (p: any) =>
+          `${p.name}<br/>人数: ${p.data.count}<br/>占比: ${(p.percent).toFixed(1)}%`,
+      },
+      legend: { show: false },
+      series: [{
+        type: 'pie',
+        radius: ['40%', '70%'],
+        label: {
+          show: true,
+          formatter: (p: any) => `L${p.data.level}\n${(p.percent).toFixed(0)}%`,
+          fontSize: 12,
+          fontWeight: 'bold',
+        },
+        data: maslow.distribution.map((d, i) => ({
+          name: d.label,
+          value: d.count,
+          count: d.count,
+          level: d.level,
+          itemStyle: { color: MASLOW_COLORS[i] },
+        })),
+      }],
+    };
+  }, [maslow]);
 
   const trendOption = React.useMemo(() => {
     if (!trend.length) return {};
@@ -279,7 +347,7 @@ const PrivateDomainPage: React.FC = () => {
             <Tooltip title="刷新">
               <ReloadOutlined
                 style={{ cursor: 'pointer', fontSize: 16 }}
-                onClick={() => { fetchMetrics(storeId); fetchTrend(storeId); }}
+                onClick={() => { fetchMetrics(storeId); fetchTrend(storeId); fetchMaslow(storeId); }}
               />
             </Tooltip>
           </Space>
@@ -486,6 +554,94 @@ const PrivateDomainPage: React.FC = () => {
             ) : (
               <div style={{ height: 420, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 {trendLoading ? <Spin /> : <Text type="secondary">暂无趋势数据</Text>}
+              </div>
+            )}
+          </Card>
+        </Col>
+      </Row>
+
+      {/* ── 马斯洛需求层级分布 ── */}
+      <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
+        <Col xs={24} lg={10}>
+          <Card
+            title={
+              <Space>
+                马斯洛需求层级分布
+                <Tooltip title="基于消费频次和金额推断，与旅程个性化策略一一对应">
+                  <InfoCircleOutlined style={{ color: '#8c8c8c' }} />
+                </Tooltip>
+              </Space>
+            }
+            bordered={false}
+            loading={maslowLoading}
+          >
+            {maslow ? (
+              <ReactECharts option={maslowOption} style={{ height: 280 }} />
+            ) : (
+              <div style={{ height: 280, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {maslowLoading ? <Spin /> : <Text type="secondary">暂无数据</Text>}
+              </div>
+            )}
+          </Card>
+        </Col>
+
+        <Col xs={24} lg={14}>
+          <Card
+            title="各层级运营策略"
+            bordered={false}
+            loading={maslowLoading}
+          >
+            {maslow?.distribution ? (
+              <div style={{ padding: '4px 0' }}>
+                {maslow.distribution.map((d, i) => (
+                  <div
+                    key={d.level}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      padding: '10px 0',
+                      borderBottom: i < 4 ? '1px solid #f0f0f0' : undefined,
+                    }}
+                  >
+                    <span
+                      style={{
+                        display: 'inline-block',
+                        width: 28, height: 28,
+                        borderRadius: '50%',
+                        background: MASLOW_COLORS[i],
+                        color: '#fff',
+                        textAlign: 'center',
+                        lineHeight: '28px',
+                        fontWeight: 'bold',
+                        fontSize: 13,
+                        flexShrink: 0,
+                        marginRight: 12,
+                      }}
+                    >
+                      L{d.level}
+                    </span>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <Text strong style={{ fontSize: 13 }}>{d.label}</Text>
+                        <Text style={{ fontSize: 13, color: MASLOW_COLORS[i] }}>
+                          {d.count} 人 ({(d.pct * 100).toFixed(1)}%)
+                        </Text>
+                      </div>
+                      <Text type="secondary" style={{ fontSize: 12 }}>
+                        {MASLOW_STRATEGIES[d.level]}
+                      </Text>
+                    </div>
+                  </div>
+                ))}
+                <div style={{ marginTop: 10 }}>
+                  <Text type="secondary" style={{ fontSize: 11 }}>
+                    总会员 {maslow.total} 人 · 层级基于消费频次 & 累计金额自动计算
+                  </Text>
+                </div>
+              </div>
+            ) : (
+              <div style={{ height: 280, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Text type="secondary">暂无数据</Text>
               </div>
             )}
           </Card>

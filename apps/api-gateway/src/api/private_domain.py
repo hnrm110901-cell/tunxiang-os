@@ -399,6 +399,77 @@ async def get_private_domain_metrics(
     return await get_full_metrics(store_id, db)
 
 
+@router.get("/lifecycle/{store_id}/maslow-distribution", summary="马斯洛需求层级分布")
+async def get_maslow_distribution(
+    store_id: str,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    统计门店会员的马斯洛需求层级分布（L1-L5）。
+
+    层级规则（与 journey_narrator.classify_maslow_level 完全一致）：
+      L1: frequency = 0
+      L2: frequency = 1
+      L3: frequency 2-5
+      L4: frequency ≥ 6 且 monetary < 50000 分（< ¥500）
+      L5: frequency ≥ 6 且 monetary ≥ 50000 分（≥ ¥500）
+    """
+    sql = text("""
+        SELECT
+            COUNT(CASE WHEN frequency = 0 THEN 1 END)::int                          AS l1,
+            COUNT(CASE WHEN frequency = 1 THEN 1 END)::int                          AS l2,
+            COUNT(CASE WHEN frequency BETWEEN 2 AND 5 THEN 1 END)::int              AS l3,
+            COUNT(CASE WHEN frequency >= 6 AND monetary < 50000 THEN 1 END)::int    AS l4,
+            COUNT(CASE WHEN frequency >= 6 AND monetary >= 50000 THEN 1 END)::int   AS l5,
+            COUNT(*)::int                                                            AS total
+        FROM private_domain_members
+        WHERE store_id = :store_id
+    """)
+    try:
+        row = (await db.execute(sql, {"store_id": store_id})).fetchone()
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+    if row is None:
+        return {"store_id": store_id, "total": 0, "distribution": []}
+
+    total = row[5] or 1  # 避免除零
+    distribution = [
+        {"level": 1, "label": "初次接触（未消费）",     "count": row[0], "pct": round(row[0] / total, 3)},
+        {"level": 2, "label": "初步信任（消费1次）",     "count": row[1], "pct": round(row[1] / total, 3)},
+        {"level": 3, "label": "社交习惯（消费2-5次）",   "count": row[2], "pct": round(row[2] / total, 3)},
+        {"level": 4, "label": "高频忠实（≥6次<¥500）",  "count": row[3], "pct": round(row[3] / total, 3)},
+        {"level": 5, "label": "深度忠诚（≥6次≥¥500）",  "count": row[4], "pct": round(row[4] / total, 3)},
+    ]
+    return {"store_id": store_id, "total": row[5], "distribution": distribution}
+
+
+@router.get("/dynamic-pricing/{store_id}", summary="Agent-14 会员个性化定价策略")
+async def get_dynamic_pricing(
+    store_id: str,
+    customer_id: str = Query(..., description="会员 ID"),
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    基于会员马斯洛层级 + 当前时段，返回个性化定价策略推荐。
+
+    - L1: 品质故事，无折扣
+    - L2: 88折回头客券
+    - L3: 78折聚餐套餐
+    - L4: 专属礼遇，无折扣
+    - L5: 主厨体验，无折扣
+    - 平峰（非 11-13h / 17-20h）L2/L3 额外让利 1 折
+    """
+    from ..services.dynamic_pricing_service import DynamicPricingService
+    from dataclasses import asdict
+
+    svc = DynamicPricingService()
+    offer = await svc.recommend(store_id, customer_id, db)
+    return asdict(offer)
+
+
 @router.get("/stats/trend/{store_id}")
 async def get_trend_stats(
     store_id: str,
