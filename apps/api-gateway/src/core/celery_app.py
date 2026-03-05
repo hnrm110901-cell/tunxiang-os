@@ -352,6 +352,16 @@ celery_app.conf.update(
             "args": (),
             "options": {"queue": "default", "priority": 8},
         },
+        # 06:00 私域生命周期扫描（churn_warning / inactivity_long → 自动触发旅程）
+        "scan-lifecycle-transitions": {
+            "task": "src.core.celery_tasks.scan_lifecycle_transitions",
+            "schedule": crontab(
+                hour=int(os.getenv("LIFECYCLE_SCAN_HOUR", "6")),
+                minute=int(os.getenv("LIFECYCLE_SCAN_MINUTE", "0")),
+            ),
+            "args": (),
+            "options": {"queue": "default", "priority": 6},
+        },
     },
 )
 

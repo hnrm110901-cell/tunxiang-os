@@ -64,6 +64,18 @@ class MarkSignalRequest(BaseModel):
     action: str = "handled"
 
 
+class TriggerLifecycleRequest(BaseModel):
+    trigger: str                          # StateTransitionTrigger value
+    changed_by: str = "api"
+    reason: Optional[str] = None
+
+
+class TriggerJourneyV2Request(BaseModel):
+    customer_id: str
+    journey_type: str
+    wechat_user_id: Optional[str] = None
+
+
 class ExecuteRequest(BaseModel):
     """统一执行请求：action + params（兼容 input_data 包裹格式由调用方展平后传入）"""
     action: str
@@ -287,6 +299,87 @@ async def mark_signal_handled(
         raise HTTPException(status_code=404, detail=f"信号 {signal_id} 不存在")
     await db.commit()
     return {"signal_id": signal_id, "action": body.action, "handled_at": handled_at.isoformat()}
+
+
+@router.get("/lifecycle/{store_id}/{customer_id}", summary="检测会员生命周期状态")
+async def get_lifecycle_state(
+    store_id: str,
+    customer_id: str,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """返回该会员当前生命周期状态（优先读已保存值，无则按 RFM 实时判断）。"""
+    from ..services.lifecycle_state_machine import LifecycleStateMachine
+    sm = LifecycleStateMachine()
+    state = await sm.detect_state(customer_id, store_id, db)
+    return {"customer_id": customer_id, "store_id": store_id, "state": state.value}
+
+
+@router.post("/lifecycle/{store_id}/{customer_id}/trigger", summary="触发生命周期转移")
+async def apply_lifecycle_trigger(
+    store_id: str,
+    customer_id: str,
+    body: TriggerLifecycleRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    对指定会员应用生命周期触发器。合法的 trigger 值：
+    register / first_order / repeat_order / high_frequency_milestone /
+    vip_upgrade / churn_warning / inactivity_long
+    """
+    from ..services.lifecycle_state_machine import LifecycleStateMachine
+    from ..models.member_lifecycle import StateTransitionTrigger
+    try:
+        trigger = StateTransitionTrigger(body.trigger)
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail=f"无效 trigger: {body.trigger}，合法值: {[t.value for t in StateTransitionTrigger]}",
+        )
+    sm = LifecycleStateMachine()
+    result = await sm.apply_trigger(
+        customer_id, store_id, trigger, db,
+        changed_by=body.changed_by, reason=body.reason,
+    )
+    return result
+
+
+@router.get("/lifecycle/{store_id}/{customer_id}/history", summary="查看生命周期转移历史")
+async def get_lifecycle_history(
+    store_id: str,
+    customer_id: str,
+    limit: int = Query(20, ge=1, le=100),
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """返回会员状态转移历史（倒序，最近优先）。"""
+    from ..services.lifecycle_state_machine import LifecycleStateMachine
+    sm = LifecycleStateMachine()
+    history = await sm.get_history(customer_id, store_id, db, limit=limit)
+    return {"history": history, "total": len(history)}
+
+
+@router.post("/journeys/{store_id}/trigger-v2", summary="触发多步骤旅程（新编排引擎）")
+async def trigger_journey_v2(
+    store_id: str,
+    body: TriggerJourneyV2Request,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    使用新 JourneyOrchestrator 触发多步骤旅程，自动调度 Celery 延迟任务。
+    journey_type: member_activation / first_order_conversion / dormant_wakeup
+    """
+    from ..services.journey_orchestrator import JourneyOrchestrator
+    orch = JourneyOrchestrator()
+    result = await orch.trigger(
+        body.customer_id, store_id, body.journey_type, db,
+        wechat_user_id=body.wechat_user_id,
+    )
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
 
 
 @router.get("/metrics/{store_id}", summary="私域三角 KPI 驾驶舱")

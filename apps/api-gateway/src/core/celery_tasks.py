@@ -3053,8 +3053,111 @@ def check_food_cost_kpi_alert(self):
 # 私域增长：旅程步骤延迟执行
 # ============================================================
 
-@celery_app.task(bind=True, max_retries=3, default_retry_delay=60)
-def execute_journey_step(
+    try:
+        asyncio.run(_run())
+    except Exception as exc:
+        raise self.retry(exc=exc)
+
+
+@celery_app.task(bind=True, max_retries=1, default_retry_delay=300)
+def scan_lifecycle_transitions(self):
+    """
+    每日 06:00 扫描私域会员生命周期变更。
+
+    逻辑：
+      1. 查询 recency_days > 45 且状态非终态的会员 → 尝试 CHURN_WARNING 触发
+      2. 查询 recency_days > 90 且状态为 at_risk 的会员  → 尝试 INACTIVITY_LONG 触发
+      3. 成功转移到 at_risk 或 dormant 的会员，自动触发 dormant_wakeup 旅程
+
+    每次每店最多处理 50 人，避免长时间锁表。
+    """
+    import asyncio
+
+    async def _run():
+        from sqlalchemy import text as _text
+        from src.core.database import get_db_session
+        from src.services.lifecycle_state_machine import LifecycleStateMachine
+        from src.services.journey_orchestrator import JourneyOrchestrator
+        from src.models.member_lifecycle import StateTransitionTrigger
+
+        sm   = LifecycleStateMachine()
+        orch = JourneyOrchestrator()
+        stats = {"scanned": 0, "transitioned": 0, "journeys_triggered": 0}
+
+        async with get_db_session() as db:
+            # 获取近30天有交易的活跃门店
+            stores_sql = _text("""
+                SELECT DISTINCT store_id FROM orders
+                WHERE created_at >= NOW() - (30 * INTERVAL '1 day')
+            """)
+            store_rows = (await db.execute(stores_sql)).fetchall()
+            store_ids  = [r[0] for r in store_rows]
+
+            for store_id in store_ids:
+                # ── 批次1：churn_warning 候选（recency > 45，非终态）──────────
+                churn_sql = _text("""
+                    SELECT customer_id, wechat_openid
+                    FROM private_domain_members
+                    WHERE store_id = :store_id
+                      AND recency_days > 45
+                      AND COALESCE(lifecycle_state, 'repeat')
+                          NOT IN ('at_risk', 'dormant', 'lost',
+                                  'lead', 'registered', 'first_order_pending')
+                    LIMIT 50
+                """)
+                churn_rows = (await db.execute(churn_sql, {"store_id": store_id})).fetchall()
+
+                for row in churn_rows:
+                    stats["scanned"] += 1
+                    result = await sm.apply_trigger(
+                        row[0], store_id,
+                        StateTransitionTrigger.CHURN_WARNING,
+                        db, changed_by="scan_lifecycle",
+                    )
+                    if result.get("transitioned"):
+                        stats["transitioned"] += 1
+                        jr = await orch.trigger(
+                            row[0], store_id, "dormant_wakeup", db,
+                            wechat_user_id=row[1],
+                        )
+                        if "error" not in jr:
+                            stats["journeys_triggered"] += 1
+
+                # ── 批次2：inactivity_long 候选（recency > 90，at_risk）────────
+                dormant_sql = _text("""
+                    SELECT customer_id, wechat_openid
+                    FROM private_domain_members
+                    WHERE store_id = :store_id
+                      AND recency_days > 90
+                      AND lifecycle_state = 'at_risk'
+                    LIMIT 50
+                """)
+                dormant_rows = (await db.execute(dormant_sql, {"store_id": store_id})).fetchall()
+
+                for row in dormant_rows:
+                    stats["scanned"] += 1
+                    result = await sm.apply_trigger(
+                        row[0], store_id,
+                        StateTransitionTrigger.INACTIVITY_LONG,
+                        db, changed_by="scan_lifecycle",
+                    )
+                    if result.get("transitioned"):
+                        stats["transitioned"] += 1
+                        jr = await orch.trigger(
+                            row[0], store_id, "dormant_wakeup", db,
+                            wechat_user_id=row[1],
+                        )
+                        if "error" not in jr:
+                            stats["journeys_triggered"] += 1
+
+        logger.info("lifecycle.scan_done", **stats)
+        return stats
+
+    try:
+        return asyncio.run(_run())
+    except Exception as exc:
+        raise self.retry(exc=exc)
+
     self,
     journey_db_id: str,
     step_index: int,
