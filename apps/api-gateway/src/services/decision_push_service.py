@@ -367,11 +367,15 @@ class DecisionPushService:
         monthly_revenue_yuan: float = 0.0,
     ) -> Dict[str, Any]:
         """
-        20:30晚推：当日回顾+待批决策提醒。
+        20:30晚推：当日经营故事简报 + 待批决策提醒。
 
-        获取待批数量；仅在有待批或高优先级决策时推送。
+        描述文本由 NarrativeEngine 生成（≤200字，固定格式）：
+          今日概况（1句话）+ 异常预警（TOP3）+ 明日建议（1个行动）
+
+        仅在有待批或高优先级决策时推送（纯信息不推）。
         """
         from src.services.wechat_service import wechat_service
+        from src.services.narrative_engine import NarrativeEngine
 
         # 查询该门店待审批决策数
         pending_count = await _count_pending_approvals(store_id, db)
@@ -390,8 +394,22 @@ class DecisionPushService:
             logger.info("decision_push.evening.nothing_to_push", store_id=store_id)
             return {"sent": False, "decision_count": 0, "message_id": None}
 
-        title = f"【20:30晚推】{store_name or store_id}"
-        description = _format_evening_description(decisions, pending_count)
+        title = f"【20:30晚推·经营简报】{store_name or store_id}"
+
+        # NarrativeEngine 生成故事简报；失败时降级为原有格式
+        try:
+            description = await NarrativeEngine.generate_store_brief(
+                store_id=store_id,
+                target_date=date.today(),
+                db=db,
+                store_label=store_name or store_id,
+                top_decisions=decisions,
+                pending_count=pending_count,
+            )
+        except Exception as exc:
+            logger.warning("decision_push.evening.narrative_failed", store_id=store_id, error=str(exc))
+            description = _format_evening_description(decisions, pending_count)
+
         action_url = f"{_APPROVAL_BASE_URL}?store_id={store_id}&window=evening"
 
         result = await wechat_service.send_decision_card(

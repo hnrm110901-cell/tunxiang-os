@@ -300,3 +300,13 @@
   - ROUTE_TO_GROUP 新增 `/monthly-report` → `admin-analytics`
   - 面包屑映射新增 `/monthly-report` → `月度经营报告`
   - 「智能分析」菜单组新增「月度经营报告」入口
+
+### 2026-03-05（NarrativeEngine 经营故事叙述器）
+- 新建 `src/services/narrative_engine.py`：架构升级 v2.1，将结构化数据转为 ≤200字 自然语言简报
+  - 纯函数：`_build_overview`（今日概况1句话）/ `_detect_anomalies`（TOP3异常，按严重度排序）/ `_build_action`（明日1个行动）/ `compose_brief`（组装+硬截断）
+  - `NarrativeEngine.generate_store_brief`：调用 CaseStoryGenerator + WasteGuardService，任何子查询失败均静默降级
+  - 固定格式：概况 + 异常（0-3条）+ 建议，严格 ≤200字
+- 修改 `src/services/decision_push_service.py`：`push_evening_recap` 调用 NarrativeEngine 替代原有简单文本
+  - 标题升级为「20:30晚推·经营简报」
+  - NarrativeEngine 失败时自动降级回 `_format_evening_description`
+- 新建 `tests/test_narrative_engine.py`：13个测试（纯函数11 + 集成3）
