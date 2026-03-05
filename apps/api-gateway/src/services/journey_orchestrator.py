@@ -137,6 +137,20 @@ BUILTIN_JOURNEYS: Dict[str, JourneyDefinition] = {
         ],
         success_metrics=["order_pay"],
     ),
+    "proactive_remind": JourneyDefinition(
+        journey_id="proactive_remind",
+        name="主动提醒（需求预测触发）",
+        trigger_events=["demand_prediction"],
+        steps=[
+            JourneyStep(
+                step_id="visit_reminder",
+                delay_minutes=0,
+                channel="wxwork",
+                template_id="journey_proactive_remind",
+            ),
+        ],
+        success_metrics=["order_pay"],
+    ),
 }
 
 

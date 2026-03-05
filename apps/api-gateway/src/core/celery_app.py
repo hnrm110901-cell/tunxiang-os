@@ -142,6 +142,10 @@ celery_app.conf.update(
             "queue": "default",
             "routing_key": "default",
         },
+        "src.core.celery_tasks.trigger_demand_predictions": {
+            "queue": "default",
+            "routing_key": "default",
+        },
     },
 
     # Celery Beat定时任务调度
@@ -387,6 +391,13 @@ celery_app.conf.update(
             "schedule": crontab(minute=5),   # 每小时第 5 分钟执行，错开整点高峰
             "args": (),
             "options": {"queue": "default", "priority": 5},
+        },
+        # Agent-13: 每日 09:15 主动触达即将到店的高频会员
+        "trigger-demand-predictions": {
+            "task": "src.core.celery_tasks.trigger_demand_predictions",
+            "schedule": crontab(hour=9, minute=15),
+            "args": (),
+            "options": {"queue": "default", "priority": 6},
         },
     },
 )

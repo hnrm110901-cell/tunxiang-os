@@ -103,6 +103,8 @@ _TEMPLATE_PURPOSE: dict[str, str] = {
         "沉睡唤醒第一步：用内容而非折扣重建连接，唤起美好记忆",
     "journey_comeback_coupon":
         "沉睡唤醒第二步：发放回归优惠券，给顾客到店的具体理由",
+    "journey_proactive_remind":
+        "需求预测主动提醒：顾客即将进入消费周期，在他想来之前先打招呼，提升选择我们的概率",
 }
 
 # 静态降级模板（API 不可用时兜底）

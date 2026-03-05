@@ -3333,3 +3333,74 @@ def trigger_new_member_journeys(self):
         return asyncio.run(_run())
     except Exception as exc:
         raise self.retry(exc=exc)
+
+
+# ── Agent-13: 需求预测主动触达 ──────────────────────────────────────────────────
+
+
+@celery_app.task(bind=True, max_retries=2, default_retry_delay=120)
+def trigger_demand_predictions(self):
+    """
+    每日 09:15 扫描所有门店，找出 72h 内即将到店的高频会员，
+    触发 proactive_remind 旅程（发企微提醒，提升选择率）。
+
+    设计：
+    - DemandPredictor.scan_upcoming_visitors(horizon_days=3)
+    - 每门店最多处理 100 人（SQL LIMIT 保证）
+    - 已有进行中 proactive_remind 旅程的会员自动跳过（SQL WHERE NOT EXISTS 保证）
+    - 任意门店失败不影响其他门店
+    """
+    import asyncio
+
+    async def _run():
+        from sqlalchemy import text as _text
+        from src.core.database import get_db_session
+        from src.services.demand_predictor import DemandPredictor
+        from src.services.journey_orchestrator import JourneyOrchestrator
+
+        predictor = DemandPredictor()
+        orch = JourneyOrchestrator()
+        stats: dict = {"stores": 0, "candidates": 0, "triggered": 0, "skipped": 0}
+
+        # 取所有有会员的门店
+        store_sql = _text(
+            "SELECT DISTINCT store_id FROM private_domain_members "
+            "WHERE lifecycle_state NOT IN ('lost', 'lead') LIMIT 200"
+        )
+
+        async with get_db_session() as db:
+            stores = (await db.execute(store_sql)).fetchall()
+            stats["stores"] = len(stores)
+
+            for (store_id,) in stores:
+                try:
+                    candidates = await predictor.scan_upcoming_visitors(
+                        store_id, db, horizon_days=3
+                    )
+                    for c in candidates:
+                        stats["candidates"] += 1
+                        result = await orch.trigger(
+                            c.customer_id,
+                            c.store_id,
+                            "proactive_remind",
+                            db,
+                            wechat_user_id=c.wechat_openid,
+                        )
+                        if "error" in result:
+                            stats["skipped"] += 1
+                        else:
+                            stats["triggered"] += 1
+                except Exception as exc:
+                    logger.warning(
+                        "demand_predictions.store_failed",
+                        store_id=store_id,
+                        error=str(exc),
+                    )
+
+        logger.info("demand_predictions.done", **stats)
+        return stats
+
+    try:
+        return asyncio.run(_run())
+    except Exception as exc:
+        raise self.retry(exc=exc)
