@@ -355,12 +355,10 @@
   - 汇总 Tag：危险/需关注/良好/优秀门店数
 - 新建 `tests/test_store_health_service.py`：28个测试（纯函数17 + 集成5）
 
-### 2026-03-05（BehaviorScoreEngine AI建议采纳率跟踪）
-- 新建 `src/services/behavior_score_engine.py`：AI建议生命周期追踪
-  - 纯函数：compute_adoption_rate / compute_execution_accuracy / compute_total_saving
-  - BehaviorScoreEngine.get_store_report（门店维度：采纳率/执行准确率/累计节省¥）
-  - BehaviorScoreEngine.get_system_roi_summary（品牌级ROI：total_saving/monthly_cost/roi_multiple）
-  - _MONTHLY_SYSTEM_COST_YUAN 环境变量可覆盖（默认¥2000/店/月）
-- `src/api/decision_hub.py` 新增 GET /api/v1/decisions/behavior-report 端点
-- `src/services/monthly_report_service.py` 接入 BehaviorScoreEngine，覆盖 decision_summary 采纳率字段
-- 新建 `tests/test_behavior_score_engine.py`：22个测试（纯函数14 + 集成4）
+### 2026-03-05（会员档案管理 + 生日提醒闭环）
+- FrequencyCapEngine wiring into execute_journey_step（lazy-init Redis client，pass freq_cap_engine=）
+- MainLayout.tsx: 新增 /dynamic-pricing 导航入口（admin-crm 分组，DollarOutlined）
+- EventScheduler P0 gap 补全：birthday_reminder_service.py + birthday_greeting/anniversary_greeting BUILTIN_JOURNEYS + trigger_birthday_reminders Celery task（10:00 daily）+ Alembic d01 migration + 13个测试
+- 会员档案管理 API: GET /members/{store_id}/list（分页+搜索+多维过滤）+ PATCH /members/{store_id}/{customer_id}（更新 birth_date/wechat_openid/channel_source）
+- MemberSystemPage.tsx: 从 null stub 重建为完整会员档案表格（RFM tag、生命周期 tag、内联生日编辑、旅程触发）
+- test_member_profile_api.py: 13个测试（GET×7 + PATCH×6）

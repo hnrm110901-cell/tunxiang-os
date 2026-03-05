@@ -7,6 +7,7 @@ Private Domain Operations API
 见 POST /execute 与 GET /actions。
 """
 from typing import List, Optional, Any, Dict
+from datetime import date
 from fastapi import APIRouter, Depends, Query, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -555,3 +556,141 @@ async def get_trend_stats(
             "revenue": revenue_by_day.get(d_str, 0),
         })
     return {"trend": trend, "days": days}
+
+
+# ── 会员档案管理 ────────────────────────────────────────────────────────────────
+
+class MemberProfilePatch(BaseModel):
+    birth_date: Optional[date] = None
+    wechat_openid: Optional[str] = None
+    channel_source: Optional[str] = None
+
+
+@router.get("/members/{store_id}/list", summary="会员档案列表（分页+搜索）")
+async def list_members(
+    store_id: str,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    search: Optional[str] = Query(None, description="customer_id 模糊搜索"),
+    lifecycle_state: Optional[str] = Query(None, description="生命周期状态过滤"),
+    rfm_level: Optional[str] = Query(None, description="RFM等级过滤"),
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    返回门店私域会员档案列表，支持按 customer_id 搜索、生命周期状态和 RFM 等级过滤。
+    """
+    conditions = ["m.store_id = :store_id"]
+    params: Dict = {"store_id": store_id}
+
+    if search:
+        conditions.append("m.customer_id ILIKE :search")
+        params["search"] = f"%{search}%"
+    if lifecycle_state:
+        conditions.append("m.lifecycle_state = :lifecycle_state")
+        params["lifecycle_state"] = lifecycle_state
+    if rfm_level:
+        conditions.append("m.rfm_level = :rfm_level")
+        params["rfm_level"] = rfm_level
+
+    where = " AND ".join(conditions)
+
+    count_sql = text(f"SELECT COUNT(*) FROM private_domain_members m WHERE {where}")
+    list_sql = text(f"""
+        SELECT
+            m.customer_id,
+            m.rfm_level,
+            m.lifecycle_state,
+            m.birth_date,
+            m.wechat_openid,
+            m.channel_source,
+            m.recency_days,
+            m.frequency,
+            m.monetary,
+            m.last_visit,
+            m.is_active,
+            m.created_at
+        FROM private_domain_members m
+        WHERE {where}
+        ORDER BY m.created_at DESC
+        LIMIT :limit OFFSET :offset
+    """)
+    params["limit"] = page_size
+    params["offset"] = (page - 1) * page_size
+
+    try:
+        total = (await db.execute(count_sql, params)).scalar() or 0
+        rows = (await db.execute(list_sql, params)).fetchall()
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+    members = [
+        {
+            "customer_id":     row[0],
+            "rfm_level":       row[1],
+            "lifecycle_state": row[2],
+            "birth_date":      str(row[3]) if row[3] else None,
+            "wechat_openid":   row[4],
+            "channel_source":  row[5],
+            "recency_days":    row[6],
+            "frequency":       row[7],
+            "monetary":        row[8],
+            "monetary_yuan":   round(row[8] / 100, 2) if row[8] else 0.0,
+            "last_visit":      str(row[9]) if row[9] else None,
+            "is_active":       row[10],
+            "joined_at":       str(row[11]) if row[11] else None,
+        }
+        for row in rows
+    ]
+    return {
+        "store_id":  store_id,
+        "total":     total,
+        "page":      page,
+        "page_size": page_size,
+        "members":   members,
+    }
+
+
+@router.patch("/members/{store_id}/{customer_id}", summary="更新会员档案（生日/企微/渠道）")
+async def patch_member_profile(
+    store_id: str,
+    customer_id: str,
+    body: MemberProfilePatch,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    更新会员档案字段（仅允许修改 birth_date / wechat_openid / channel_source）。
+    只更新请求体中非 None 的字段，其余字段保持不变。
+    """
+    updates: Dict[str, Any] = {}
+    if body.birth_date is not None:
+        updates["birth_date"] = body.birth_date
+    if body.wechat_openid is not None:
+        updates["wechat_openid"] = body.wechat_openid
+    if body.channel_source is not None:
+        updates["channel_source"] = body.channel_source
+
+    if not updates:
+        raise HTTPException(status_code=422, detail="没有可更新的字段")
+
+    set_clause = ", ".join(f"{k} = :{k}" for k in updates)
+    sql = text(f"""
+        UPDATE private_domain_members
+        SET {set_clause}
+        WHERE store_id = :store_id AND customer_id = :customer_id
+        RETURNING customer_id
+    """)
+    params = {**updates, "store_id": store_id, "customer_id": customer_id}
+
+    try:
+        result = (await db.execute(sql, params)).fetchone()
+        await db.commit()
+    except Exception as exc:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=str(exc))
+
+    if result is None:
+        raise HTTPException(status_code=404, detail="会员不存在")
+
+    return {"updated": True, "customer_id": customer_id, "fields": list(updates.keys())}
