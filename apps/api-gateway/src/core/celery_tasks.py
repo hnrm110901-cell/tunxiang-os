@@ -3178,6 +3178,18 @@ def execute_journey_step(
     async def _run():
         from src.core.database import get_db_session
         from src.services.journey_orchestrator import JourneyOrchestrator
+        from src.services.journey_narrator import JourneyNarrator
+
+        # 懒初始化企微服务（WECHAT_CORP_ID 未配置时降级为 None）
+        wechat_svc = None
+        try:
+            from src.services.wechat_service import wechat_service as _ws
+            if _ws.corp_id and _ws.corp_secret:
+                wechat_svc = _ws
+        except Exception:
+            pass  # 企微未配置，静默跳过
+
+        narrator = JourneyNarrator()  # 内部懒初始化 LLM，无 API KEY 自动降级
 
         async with get_db_session() as db:
             orchestrator = JourneyOrchestrator()
@@ -3186,11 +3198,14 @@ def execute_journey_step(
                 step_index,
                 db,
                 wechat_user_id=wechat_user_id,
+                wechat_service=wechat_svc,
+                narrator=narrator,
             )
             logger.info(
                 "journey.celery_step_done",
                 journey_db_id=journey_db_id,
                 step_index=step_index,
+                wechat_wired=wechat_svc is not None,
                 result=result,
             )
             return result
