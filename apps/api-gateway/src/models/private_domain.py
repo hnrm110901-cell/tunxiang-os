@@ -5,7 +5,7 @@ Private Domain Operations Models
 import uuid
 import enum
 from datetime import datetime
-from sqlalchemy import Column, String, Integer, Float, Boolean, JSON, DateTime, Index, Text, ForeignKey
+from sqlalchemy import Column, String, Integer, Float, Boolean, JSON, DateTime, Date, Index, Text, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
 
 from .base import Base, TimestampMixin
@@ -68,6 +68,7 @@ class PrivateDomainMember(Base, TimestampMixin):
     wechat_openid = Column(String(100), nullable=True)
     is_active = Column(Boolean, default=True)
     rfm_updated_at = Column(DateTime, default=datetime.utcnow)
+    birth_date = Column(Date, nullable=True, comment="生日（年月日）")
 
     __table_args__ = (
         Index("ix_pdm_store_rfm", "store_id", "rfm_level"),

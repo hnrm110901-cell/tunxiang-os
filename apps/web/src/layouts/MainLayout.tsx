@@ -72,6 +72,7 @@ const ROUTE_TO_GROUP: Record<string, string> = {
   '/recommendations': 'admin-analytics', '/competitive-analysis': 'admin-analytics',
   '/report-templates': 'admin-analytics', '/kpi-dashboard': 'admin-analytics',
   '/private-domain': 'admin-crm', '/members': 'admin-crm', '/customer360': 'admin-crm',
+  '/dynamic-pricing': 'admin-crm',
   '/pos': 'admin-store', '/quality': 'admin-store', '/compliance': 'admin-store',
   '/human-in-the-loop': 'admin-store',
   '/ai-evolution': 'admin-ai', '/edge-node': 'admin-ai', '/decision-validator': 'admin-ai',
@@ -196,6 +197,7 @@ const MainLayout: React.FC = () => {
     '/members': '会员系统',
     '/kpi-dashboard': 'KPI看板',
     '/customer360': '客户360',
+    '/dynamic-pricing': '动态定价策略',
     '/pos': 'POS系统',
     '/quality': '质量管理',
     '/compliance': '合规管理',
@@ -494,6 +496,7 @@ const MainLayout: React.FC = () => {
           { key: '/private-domain', icon: <TeamOutlined />, label: '私域运营' },
           { key: '/members', icon: <UserOutlined />, label: '会员系统' },
           { key: '/customer360', icon: <UserOutlined />, label: '客户360' },
+          { key: '/dynamic-pricing', icon: <DollarOutlined />, label: '动态定价策略' },
         ],
       },
       {

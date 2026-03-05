@@ -151,6 +151,36 @@ BUILTIN_JOURNEYS: Dict[str, JourneyDefinition] = {
         ],
         success_metrics=["order_pay"],
     ),
+    "birthday_greeting": JourneyDefinition(
+        journey_id="birthday_greeting",
+        name="生日祝福",
+        trigger_events=["birthday_upcoming"],
+        steps=[
+            JourneyStep(
+                step_id="birthday_wish",
+                delay_minutes=0,
+                channel="wxwork",
+                template_id="birthday_wish",
+                action={"issue_coupon": "birthday_coupon"},
+            ),
+        ],
+        success_metrics=["order_pay"],
+    ),
+    "anniversary_greeting": JourneyDefinition(
+        journey_id="anniversary_greeting",
+        name="入会周年纪念",
+        trigger_events=["member_anniversary"],
+        steps=[
+            JourneyStep(
+                step_id="anniversary_wish",
+                delay_minutes=0,
+                channel="wxwork",
+                template_id="anniversary_wish",
+                action={"issue_coupon": "anniversary_coupon"},
+            ),
+        ],
+        success_metrics=["order_pay"],
+    ),
 }
 
 

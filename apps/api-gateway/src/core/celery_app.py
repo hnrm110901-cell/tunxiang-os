@@ -146,6 +146,10 @@ celery_app.conf.update(
             "queue": "default",
             "routing_key": "default",
         },
+        "src.core.celery_tasks.trigger_birthday_reminders": {
+            "queue": "default",
+            "routing_key": "default",
+        },
     },
 
     # Celery Beat定时任务调度
@@ -396,6 +400,13 @@ celery_app.conf.update(
         "trigger-demand-predictions": {
             "task": "src.core.celery_tasks.trigger_demand_predictions",
             "schedule": crontab(hour=9, minute=15),
+            "args": (),
+            "options": {"queue": "default", "priority": 6},
+        },
+        # EventScheduler: 每日 10:00 触发生日/入会周年祝福
+        "trigger-birthday-reminders": {
+            "task": "src.core.celery_tasks.trigger_birthday_reminders",
+            "schedule": crontab(hour=10, minute=0),
             "args": (),
             "options": {"queue": "default", "priority": 6},
         },

@@ -3191,6 +3191,19 @@ def execute_journey_step(
 
         narrator = JourneyNarrator()  # 内部懒初始化 LLM，无 API KEY 自动降级
 
+        # 懒初始化频控引擎（REDIS_URL 未配置时降级为 None）
+        freq_cap = None
+        try:
+            import redis.asyncio as aioredis
+            from src.services.frequency_cap_engine import FrequencyCapEngine
+            _redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
+            _redis_client = await aioredis.from_url(
+                _redis_url, encoding="utf-8", decode_responses=True
+            )
+            freq_cap = FrequencyCapEngine(_redis_client)
+        except Exception:
+            pass  # Redis 未配置，频控静默禁用
+
         async with get_db_session() as db:
             orchestrator = JourneyOrchestrator()
             result = await orchestrator.execute_step(
@@ -3199,6 +3212,7 @@ def execute_journey_step(
                 db,
                 wechat_user_id=wechat_user_id,
                 wechat_service=wechat_svc,
+                freq_cap_engine=freq_cap,
                 narrator=narrator,
             )
             logger.info(
@@ -3206,6 +3220,7 @@ def execute_journey_step(
                 journey_db_id=journey_db_id,
                 step_index=step_index,
                 wechat_wired=wechat_svc is not None,
+                freq_cap_wired=freq_cap is not None,
                 result=result,
             )
             return result
@@ -3413,6 +3428,85 @@ def trigger_demand_predictions(self):
                     )
 
         logger.info("demand_predictions.done", **stats)
+        return stats
+
+    try:
+        return asyncio.run(_run())
+    except Exception as exc:
+        raise self.retry(exc=exc)
+
+
+# ── EventScheduler: 生日/入会周年触达 ─────────────────────────────────────────
+
+
+@celery_app.task(bind=True, max_retries=2, default_retry_delay=120)
+def trigger_birthday_reminders(self):
+    """
+    每日 10:00 扫描所有门店，找出 3 天内生日或入会周年的会员，
+    分别触发 birthday_greeting / anniversary_greeting 旅程。
+
+    设计：
+    - BirthdayReminderService.scan_upcoming_events(horizon_days=3)
+    - 30 天内已有进行中旅程的会员自动跳过（SQL WHERE NOT EXISTS 保证）
+    - 任意门店失败不影响其他门店
+    """
+    import asyncio
+
+    async def _run():
+        from sqlalchemy import text as _text
+        from src.core.database import get_db_session
+        from src.services.birthday_reminder_service import BirthdayReminderService
+        from src.services.journey_orchestrator import JourneyOrchestrator
+
+        svc = BirthdayReminderService()
+        orch = JourneyOrchestrator()
+        stats: dict = {
+            "stores": 0,
+            "birthday_triggered": 0,
+            "anniversary_triggered": 0,
+            "skipped": 0,
+        }
+
+        store_sql = _text(
+            "SELECT DISTINCT store_id FROM private_domain_members "
+            "WHERE is_active = true LIMIT 200"
+        )
+
+        _EVENT_TO_JOURNEY = {
+            "birthday":    "birthday_greeting",
+            "anniversary": "anniversary_greeting",
+        }
+
+        async with get_db_session() as db:
+            stores = (await db.execute(store_sql)).fetchall()
+            stats["stores"] = len(stores)
+
+            for (store_id,) in stores:
+                try:
+                    events = await svc.scan_upcoming_events(
+                        store_id, db, horizon_days=3
+                    )
+                    for ev in events:
+                        journey_id = _EVENT_TO_JOURNEY[ev.event_type]
+                        result = await orch.trigger(
+                            ev.customer_id,
+                            ev.store_id,
+                            journey_id,
+                            db,
+                            wechat_user_id=ev.wechat_openid,
+                        )
+                        if "error" in result:
+                            stats["skipped"] += 1
+                        else:
+                            stats[f"{ev.event_type}_triggered"] += 1
+                except Exception as exc:
+                    logger.warning(
+                        "birthday_reminders.store_failed",
+                        store_id=store_id,
+                        error=str(exc),
+                    )
+
+        logger.info("birthday_reminders.done", **stats)
         return stats
 
     try:
