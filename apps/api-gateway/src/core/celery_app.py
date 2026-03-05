@@ -150,6 +150,10 @@ celery_app.conf.update(
             "queue": "default",
             "routing_key": "default",
         },
+        "src.core.celery_tasks.pull_tiancai_daily_orders": {
+            "queue": "default",
+            "routing_key": "default",
+        },
     },
 
     # Celery Beat定时任务调度
@@ -409,6 +413,16 @@ celery_app.conf.update(
             "schedule": crontab(hour=10, minute=0),
             "args": (),
             "options": {"queue": "default", "priority": 6},
+        },
+        # 每日凌晨 02:00 拉取天财商龙昨日订单（在 03:00 POS 对账前完成入库）
+        "pull-tiancai-daily-orders": {
+            "task": "src.core.celery_tasks.pull_tiancai_daily_orders",
+            "schedule": crontab(
+                hour=int(os.getenv("TIANCAI_PULL_HOUR", "2")),
+                minute=int(os.getenv("TIANCAI_PULL_MINUTE", "0")),
+            ),
+            "args": (),
+            "options": {"queue": "default", "priority": 7},
         },
     },
 )

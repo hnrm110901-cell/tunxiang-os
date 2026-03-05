@@ -118,6 +118,11 @@ const MonthlyReportPage = lazy(() => import('./pages/MonthlyReportPage'));
 const DynamicPricingPage = lazy(() => import('./pages/DynamicPricingPage'));
 const OpsMonitoringPage = lazy(() => import('./pages/OpsMonitoringPage'));
 
+// Role-based views (Phase 1 — Store Manager /sm)
+const StoreManagerLayout = lazy(() => import('./layouts/StoreManagerLayout'));
+const SmHome = lazy(() => import('./pages/sm/Home'));
+const SmBusiness = lazy(() => import('./pages/sm/Business'));
+
 const PageLoader = (
   <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 300 }}>
     <Spin size="large" />
@@ -434,6 +439,16 @@ const AppContent: React.FC = () => {
                   } />
                 </Route>
                 <Route path="*" element={<NotFoundPage />} />
+
+                {/* Role-based views — Store Manager (手机) */}
+                <Route path="/sm" element={
+                  <ProtectedRoute>
+                    <StoreManagerLayout />
+                  </ProtectedRoute>
+                }>
+                  <Route index element={<SmHome />} />
+                  <Route path="business" element={<SmBusiness />} />
+                </Route>
               </Routes>
             </Suspense>
           </ErrorBoundary>

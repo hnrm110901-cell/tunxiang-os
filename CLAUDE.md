@@ -115,3 +115,56 @@ packages/agents/CONTEXT.md   ← Level 2 Agent层上下文
 tasks/todo.md                ← 当前任务清单
 tasks/lessons.md             ← 经验教训（每次开始先读！）
 ```
+
+---
+
+## 🎨 前端重构规范（v3.0 角色驱动架构）
+
+> 对应规范文档：`智链OS_前后端重构_产品研发开发规范_V1.0`
+
+### 角色路由约定
+
+| 角色 | 路由前缀 | 设备 | 说明 |
+|------|----------|------|------|
+| 店长 | `/sm`    | 手机 | 移动优先，底部Tab导航 |
+| 厨师长 | `/chef` | 手机 | 食材/损耗/采购视图 |
+| 楼面经理 | `/floor` | 平板 | 排队/预订/服务质量 |
+| 总部 | `/hq`   | 桌面 | 多店监控/财务/决策 |
+
+**原有 `/` 路由保留**，新角色路由并行运行，迁移完成后再切换默认。
+
+### 设计系统规则
+
+- **Design Token**：所有颜色/间距/圆角 → `src/design-system/tokens/index.ts` CSS 变量
+- **品牌色**：`#FF6B2C`（`var(--accent)`）
+- **字体栈**：`'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'SF Pro Display'`（禁止 Inter/Roboto）
+- **Z组件**：基础 UI 使用 `src/design-system/components/` 内的 Z 前缀组件（ZCard/ZKpi/ZBadge/ZButton/ZInput/ZEmpty/ZSkeleton/ZAvatar）
+- **业务组件**：复合业务组件在同目录（HealthRing/UrgencyList/ChartTrend）
+- **CSS Modules**：每个组件必须配套 `.module.css`，禁止内联样式（仅动态值除外）
+- **图表**：仍使用 `ReactECharts`（大图表）；小卡片趋势用 `ChartTrend`（原生 Canvas）
+
+### BFF 聚合规则
+
+- BFF 端点：`GET /api/v1/bff/{role}/{store_id}`
+- 每个角色首屏只发 **1个 BFF 请求**（30s Redis 缓存 + `?refresh=true` 强制刷新）
+- 子调用失败 → 降级返回 `null`，前端用 `ZEmpty` 占位，不阻塞整屏
+
+### 前端数据获取规范
+
+```typescript
+// ✅ 正确：apiClient + useState（当前项目约定）
+const resp = await apiClient.get('/api/v1/bff/sm/...');
+
+// ❌ 禁止：直接 fetch/axios；不要引入 TanStack Query（尚未安装）
+```
+
+### 命名规范（前端）
+
+| 类型 | 规范 | 示例 |
+|------|------|------|
+| React 组件 | PascalCase | `SmHome`, `ZCard` |
+| CSS Module 类 | camelCase | `.healthRow`, `.tabBar` |
+| BFF 端点角色前缀 | 小写2字母 | `sm`, `chef`, `floor`, `hq` |
+| 页面路径 | 角色前缀/页面 | `pages/sm/Home.tsx` |
+| Layout 文件 | `{Role}Layout.tsx` | `StoreManagerLayout.tsx` |
+

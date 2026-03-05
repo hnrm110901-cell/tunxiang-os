@@ -1,0 +1,47 @@
+.kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.valueRow {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.value {
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1;
+}
+
+.value.sm { font-size: 24px; }
+.value.md { font-size: 32px; }
+.value.lg { font-size: 48px; }
+
+.unit {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.change {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 12px;
+  font-weight: 500;
+  margin-top: 2px;
+}
+
+.change.up   { color: var(--green); }
+.change.down { color: var(--red); }
+.change.flat { color: var(--text-secondary); }

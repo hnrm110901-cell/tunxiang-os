@@ -570,6 +570,10 @@ app.include_router(channel_profit.router)
 # Phase 2 — 绩效计算引擎
 app.include_router(performance_compute.router)
 
+# BFF 聚合路由（角色驱动前端，4种角色各一个聚合端点）
+from src.api import bff
+app.include_router(bff.router, tags=["bff"])
+
 # v2.0 MVP — 决策中枢（Top3 + 手动推送 + 场景识别）
 from src.api import decision_hub, monthly_report
 app.include_router(decision_hub.router, tags=["decision_hub"])

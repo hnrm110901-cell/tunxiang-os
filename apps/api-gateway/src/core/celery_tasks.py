@@ -3513,3 +3513,157 @@ def trigger_birthday_reminders(self):
         return asyncio.run(_run())
     except Exception as exc:
         raise self.retry(exc=exc)
+
+
+# ── 天财商龙 POS 日单拉取（凌晨 02:00）──────────────────────────────────────
+
+@celery_app.task(
+    base=CallbackTask,
+    bind=True,
+    max_retries=int(os.getenv("CELERY_MAX_RETRIES", "3")),
+    default_retry_delay=int(os.getenv("CELERY_RETRY_DELAY_LONG", "300")),
+)
+def pull_tiancai_daily_orders(self) -> Dict[str, Any]:
+    """
+    拉取天财商龙昨日全量已支付订单并写入 orders 表（每日凌晨 02:00 执行，
+    在 03:00 POS 对账任务之前完成数据入库）。
+
+    环境变量：
+      TIANCAI_BASE_URL            — API 基础地址（必填；缺失则整体跳过）
+      TIANCAI_BRAND_ID            — 品牌 ID（用于 to_order 映射）
+      TIANCAI_APP_ID              — 全局默认 app_id
+      TIANCAI_APP_SECRET          — 全局默认 app_secret
+      TIANCAI_APP_ID_{store_id}   — 门店级 app_id（优先于全局）
+      TIANCAI_APP_SECRET_{store_id} — 门店级 app_secret（优先于全局）
+
+    Returns:
+        {success, date, stores_processed, orders_upserted, errors}
+    """
+    async def _run():
+        from datetime import date, timedelta
+        from sqlalchemy import text as _text, select
+        from ..core.database import get_db_session
+        from ..models.store import Store
+
+        base_url = os.getenv("TIANCAI_BASE_URL", "")
+        if not base_url:
+            logger.warning("tiancai_pull.skipped", reason="TIANCAI_BASE_URL not configured")
+            return {
+                "success": True,
+                "skipped": True,
+                "stores_processed": 0,
+                "orders_upserted": 0,
+                "errors": [],
+            }
+
+        brand_id = os.getenv("TIANCAI_BRAND_ID", "")
+        yesterday = (date.today() - timedelta(days=1)).strftime("%Y-%m-%d")
+
+        from packages.api_adapters.tiancai_shanglong.src.adapter import TiancaiShanglongAdapter
+
+        stores_processed = 0
+        orders_upserted = 0
+        errors = []
+
+        async with get_db_session() as session:
+            result = await session.execute(select(Store).where(Store.is_active == True))
+            stores = result.scalars().all()
+
+            for store in stores:
+                sid = str(store.id)
+                app_id = (
+                    os.getenv(f"TIANCAI_APP_ID_{sid}")
+                    or os.getenv("TIANCAI_APP_ID", "")
+                )
+                app_secret = (
+                    os.getenv(f"TIANCAI_APP_SECRET_{sid}")
+                    or os.getenv("TIANCAI_APP_SECRET", "")
+                )
+
+                if not app_id or not app_secret:
+                    logger.debug(
+                        "tiancai_pull.store_skipped",
+                        store_id=sid, reason="credentials not configured",
+                    )
+                    continue
+
+                try:
+                    adapter = TiancaiShanglongAdapter({
+                        "base_url": base_url,
+                        "app_id": app_id,
+                        "app_secret": app_secret,
+                        "store_id": sid,
+                        "timeout": 30,
+                        "retry_times": 2,
+                    })
+                    order_list = await adapter.pull_daily_orders(yesterday, brand_id)
+
+                    for schema in order_list:
+                        total_cents = int(schema.total * 100)
+                        discount_cents = int(schema.discount * 100)
+                        await session.execute(
+                            _text("""
+                                INSERT INTO orders
+                                    (id, store_id, table_number, status,
+                                     total_amount, discount_amount, final_amount,
+                                     order_time, waiter_id, sales_channel, notes,
+                                     order_metadata, created_at, updated_at)
+                                VALUES
+                                    (:id, :store_id, :table_number, :status,
+                                     :total_amount, :discount_amount, :final_amount,
+                                     :order_time, :waiter_id, 'tiancai', :notes,
+                                     '{}', NOW(), NOW())
+                                ON CONFLICT (id) DO UPDATE SET
+                                    status          = EXCLUDED.status,
+                                    total_amount    = EXCLUDED.total_amount,
+                                    discount_amount = EXCLUDED.discount_amount,
+                                    final_amount    = EXCLUDED.final_amount,
+                                    updated_at      = NOW()
+                            """),
+                            {
+                                "id": schema.order_id,
+                                "store_id": sid,
+                                "table_number": schema.table_number,
+                                "status": schema.order_status.value,
+                                "total_amount": total_cents,
+                                "discount_amount": discount_cents,
+                                "final_amount": total_cents,
+                                "order_time": schema.created_at,
+                                "waiter_id": schema.waiter_id,
+                                "notes": schema.notes,
+                            },
+                        )
+                        orders_upserted += 1
+
+                    await session.commit()
+                    stores_processed += 1
+                    logger.info(
+                        "tiancai_pull.store_done",
+                        store_id=sid, date=yesterday, orders=len(order_list),
+                    )
+
+                except Exception as e:
+                    await session.rollback()
+                    errors.append({"store_id": sid, "error": str(e)})
+                    logger.error("tiancai_pull.store_failed", store_id=sid, error=str(e))
+
+        logger.info(
+            "tiancai_pull_daily_orders.done",
+            date=yesterday,
+            stores_processed=stores_processed,
+            orders_upserted=orders_upserted,
+            errors=len(errors),
+        )
+        return {
+            "success": True,
+            "date": yesterday,
+            "stores_processed": stores_processed,
+            "orders_upserted": orders_upserted,
+            "errors": errors,
+        }
+
+    try:
+        return asyncio.run(_run())
+    except Exception as e:
+        logger.error("tiancai_pull_daily_orders.failed", error=str(e))
+        raise self.retry(exc=e)
