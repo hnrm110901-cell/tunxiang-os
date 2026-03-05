@@ -104,7 +104,7 @@ const MemberSystemPage: React.FC = () => {
       if (rfmFilter) params.rfm_level = rfmFilter;
 
       const res = await apiClient.get(
-        `/private-domain/members/${selectedStore}/list`,
+        `/api/v1/private-domain/members/${selectedStore}/list`,
         { params },
       );
       setData(res.data);
@@ -122,7 +122,7 @@ const MemberSystemPage: React.FC = () => {
   const saveBirthDate = async (customerId: string) => {
     try {
       await apiClient.patch(
-        `/private-domain/members/${selectedStore}/${customerId}`,
+        `/api/v1/private-domain/members/${selectedStore}/${customerId}`,
         { birth_date: editBirthDate ? editBirthDate.format('YYYY-MM-DD') : null },
       );
       message.success('生日已更新');
@@ -135,7 +135,7 @@ const MemberSystemPage: React.FC = () => {
 
   const triggerJourney = async (customerId: string, wechatOpenid: string | null) => {
     try {
-      await apiClient.post(`/private-domain/journeys/${selectedStore}/trigger-v2`, {
+      await apiClient.post(`/api/v1/private-domain/journeys/${selectedStore}/trigger-v2`, {
         customer_id:    customerId,
         journey_id:     selectedJourney,
         wechat_user_id: wechatOpenid ?? undefined,

@@ -694,3 +694,127 @@ async def patch_member_profile(
         raise HTTPException(status_code=404, detail="会员不存在")
 
     return {"updated": True, "customer_id": customer_id, "fields": list(updates.keys())}
+
+
+# ── 客户360画像（私域视角） ──────────────────────────────────────────────────────
+
+@router.get("/customer360/{store_id}/{customer_id}", summary="客户360画像（私域视角）")
+async def get_customer360(
+    store_id: str,
+    customer_id: str,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    聚合单个会员的私域视角360画像：
+      - 会员基础档案（RFM等级、生命周期、消费摘要、马斯洛层级）
+      - 近期旅程历史（最近10条，含状态+完成时间）
+      - 近期订单记录（最近5笔，含¥金额）
+      - 个性化定价策略推荐（DynamicPricingService）
+
+    会员不存在返回 404；订单/旅程查询失败静默降级为空列表。
+    """
+    # 1. 会员档案
+    member_sql = text("""
+        SELECT
+            customer_id, rfm_level, lifecycle_state, birth_date,
+            wechat_openid, channel_source, recency_days, frequency,
+            monetary, last_visit, is_active, created_at
+        FROM private_domain_members
+        WHERE store_id = :store_id AND customer_id = :customer_id
+        LIMIT 1
+    """)
+    try:
+        member_row = (await db.execute(
+            member_sql, {"store_id": store_id, "customer_id": customer_id}
+        )).fetchone()
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+    if member_row is None:
+        raise HTTPException(status_code=404, detail="会员不存在")
+
+    member = {
+        "customer_id":     member_row[0],
+        "rfm_level":       member_row[1],
+        "lifecycle_state": member_row[2],
+        "birth_date":      str(member_row[3]) if member_row[3] else None,
+        "wechat_openid":   member_row[4],
+        "channel_source":  member_row[5],
+        "recency_days":    member_row[6],
+        "frequency":       member_row[7],
+        "monetary":        member_row[8],
+        "monetary_yuan":   round(member_row[8] / 100, 2) if member_row[8] else 0.0,
+        "last_visit":      str(member_row[9]) if member_row[9] else None,
+        "is_active":       member_row[10],
+        "joined_at":       str(member_row[11]) if member_row[11] else None,
+    }
+
+    # 2. 旅程历史（最近10条）
+    journeys_sql = text("""
+        SELECT journey_type, status, started_at, completed_at
+        FROM private_domain_journeys
+        WHERE store_id = :store_id AND customer_id = :customer_id
+        ORDER BY started_at DESC
+        LIMIT 10
+    """)
+    try:
+        journey_rows = (await db.execute(
+            journeys_sql, {"store_id": store_id, "customer_id": customer_id}
+        )).fetchall()
+    except Exception:
+        journey_rows = []
+
+    recent_journeys = [
+        {
+            "journey_type": r[0],
+            "status":       r[1],
+            "started_at":   str(r[2]) if r[2] else None,
+            "completed_at": str(r[3]) if r[3] else None,
+        }
+        for r in journey_rows
+    ]
+
+    # 3. 近期订单（最近5笔）
+    orders_sql = text("""
+        SELECT order_id, total_amount, created_at, status
+        FROM orders
+        WHERE store_id = :store_id AND customer_id = :customer_id
+        ORDER BY created_at DESC
+        LIMIT 5
+    """)
+    try:
+        order_rows = (await db.execute(
+            orders_sql, {"store_id": store_id, "customer_id": customer_id}
+        )).fetchall()
+    except Exception:
+        order_rows = []
+
+    recent_orders = [
+        {
+            "order_id":          str(r[0]),
+            "total_amount":      int(r[1]) if r[1] is not None else 0,
+            "total_amount_yuan": round(int(r[1]) / 100, 2) if r[1] is not None else 0.0,
+            "created_at":        str(r[2]) if r[2] else None,
+            "status":            r[3],
+        }
+        for r in order_rows
+    ]
+
+    # 4. 个性化定价策略（DynamicPricingService，失败时静默返回 None）
+    from ..services.dynamic_pricing_service import DynamicPricingService
+    from dataclasses import asdict as _asdict
+    pricing_offer = None
+    try:
+        pricing_offer = _asdict(await DynamicPricingService().recommend(store_id, customer_id, db))
+    except Exception:
+        pass
+
+    return {
+        "store_id":        store_id,
+        "customer_id":     customer_id,
+        "member":          member,
+        "recent_journeys": recent_journeys,
+        "recent_orders":   recent_orders,
+        "pricing_offer":   pricing_offer,
+    }
