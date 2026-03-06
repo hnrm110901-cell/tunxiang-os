@@ -24,7 +24,6 @@ from src.models.user import User
 from src.services.fct_service import FCTService
 
 router = APIRouter(
-    prefix="/api/v1/fct",
     tags=["fct"],
 )
 
