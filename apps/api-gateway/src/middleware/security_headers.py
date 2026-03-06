@@ -58,7 +58,9 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             )
 
         # 移除 server 信息泄露
-        response.headers.pop("server", None)
-        response.headers.pop("Server", None)
+        if "server" in response.headers:
+            del response.headers["server"]
+        if "Server" in response.headers:
+            del response.headers["Server"]
 
         return response
