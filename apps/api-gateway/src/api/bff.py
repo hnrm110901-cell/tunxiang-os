@@ -322,24 +322,61 @@ async def _fetch_top3_decisions(
 
 
 async def _fetch_queue_status(store_id: str, db: AsyncSession) -> Optional[Dict]:
-    from sqlalchemy import select, text
-    result = await db.execute(
+    from sqlalchemy import text
+
+    summary = await db.execute(
         text("""
-            SELECT COUNT(*) AS waiting_groups,
-                   COALESCE(AVG(estimated_wait_minutes), 0) AS avg_wait_minutes
+            SELECT COUNT(*) AS waiting_count,
+                   COALESCE(AVG(estimated_wait_minutes), 0) AS avg_wait_min
             FROM queue_entries
             WHERE store_id = :sid
               AND status = 'waiting'
-              AND created_at >= NOW() - INTERVAL '3 hours'
+              AND created_at >= NOW() - (:n * INTERVAL '1 hour')
+        """),
+        {"sid": store_id, "n": 3},
+    )
+    row = summary.fetchone()
+    if not row:
+        return None
+
+    served = await db.execute(
+        text("""
+            SELECT COUNT(*) FROM queue_entries
+            WHERE store_id = :sid AND status = 'seated'
+              AND DATE(created_at) = CURRENT_DATE
         """),
         {"sid": store_id},
     )
-    row = result.fetchone()
-    if not row:
-        return None
+    served_today = int((served.fetchone() or [0])[0])
+
+    items_res = await db.execute(
+        text("""
+            SELECT ticket_no, party_size,
+                   EXTRACT(EPOCH FROM (NOW() - created_at)) / 60 AS wait_min,
+                   status
+            FROM queue_entries
+            WHERE store_id = :sid
+              AND status IN ('waiting', 'called')
+            ORDER BY created_at ASC
+            LIMIT 20
+        """),
+        {"sid": store_id},
+    )
+    queue_items = [
+        {
+            "ticket_no":  r[0],
+            "party_size": r[1],
+            "wait_min":   round(float(r[2]), 0),
+            "status":     r[3],
+        }
+        for r in items_res.fetchall()
+    ]
+
     return {
-        "waiting_groups":    int(row[0]),
-        "avg_wait_minutes":  round(float(row[1]), 1),
+        "waiting_count":   int(row[0]),
+        "avg_wait_min":    round(float(row[1]), 1),
+        "served_today":    served_today,
+        "queue_items":     queue_items,
     }
 
 
@@ -373,7 +410,12 @@ async def _fetch_inventory_alerts(store_id: str, db: AsyncSession) -> List[Dict]
     from sqlalchemy import text
     result = await db.execute(
         text("""
-            SELECT ingredient_name, current_stock, reorder_point, unit
+            SELECT ingredient_name, current_stock, reorder_point, unit,
+                   CASE
+                     WHEN current_stock = 0 THEN 'critical'
+                     WHEN current_stock::float / NULLIF(reorder_point, 0) < 0.5 THEN 'critical'
+                     ELSE 'warning'
+                   END AS severity
             FROM inventory_items
             WHERE store_id = :sid
               AND current_stock <= reorder_point
@@ -386,10 +428,13 @@ async def _fetch_inventory_alerts(store_id: str, db: AsyncSession) -> List[Dict]
     rows = result.fetchall()
     return [
         {
-            "ingredient_name": r[0],
-            "current_stock":   r[1],
-            "reorder_point":   r[2],
-            "unit":            r[3],
+            "ingredient_name":  r[0],
+            "current_stock":    float(r[1]),
+            "reorder_point":    float(r[2]),
+            "unit":             r[3],
+            "alert_type":       "low",
+            "severity":         r[4],
+            "suggested_action": f"补货 {r[0]}，当前库存 {r[1]} {r[3]}",
         }
         for r in rows
     ]
@@ -416,12 +461,13 @@ async def _fetch_today_reservations(
     rows = result.fetchall()
     return [
         {
-            "id":               str(r[0]),
-            "guest_name":       r[1],
-            "party_size":       r[2],
-            "reservation_time": r[3].isoformat() if hasattr(r[3], "isoformat") else str(r[3]),
-            "table_number":     r[4],
-            "status":           r[5],
+            "id":            str(r[0]),
+            "guest_name":    r[1],
+            "party_size":    r[2],
+            "reserved_time": r[3].isoformat() if hasattr(r[3], "isoformat") else str(r[3]),
+            "table_number":  r[4],
+            "status":        r[5],
+            "notes":         None,
         }
         for r in rows
     ]

@@ -33,7 +33,18 @@ export default function HQDecisions() {
     setError(null);
     try {
       const resp = await apiClient.get('/api/v1/approvals', { params: { status: 'pending' } });
-      setItems(resp.data.items ?? resp.data ?? []);
+      // DecisionLogResponse uses ai_suggestion / ai_confidence — map to our interface
+      const raw: any[] = resp.data.items ?? resp.data ?? [];
+      setItems(raw.map(d => ({
+        id:                   d.id,
+        store_id:             d.store_id,
+        store_name:           d.store_name ?? d.store_id,
+        title:                d.title ?? d.ai_suggestion?.action ?? d.ai_suggestion?.title ?? '待审批决策',
+        type:                 d.type ?? d.decision_type ?? '',
+        expected_saving_yuan: d.expected_saving_yuan ?? d.ai_suggestion?.expected_saving_yuan ?? 0,
+        confidence_pct:       d.confidence_pct ?? (d.ai_confidence != null ? d.ai_confidence * 100 : 0),
+        created_at:           d.created_at ?? null,
+      })));
     } catch (e: any) {
       setError(e?.response?.data?.detail || '数据加载失败');
     } finally {
