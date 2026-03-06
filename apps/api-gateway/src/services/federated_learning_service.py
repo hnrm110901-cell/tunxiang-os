@@ -642,3 +642,50 @@ class FederatedLearningCoordinator:
         )
 
         return result
+
+
+class DataIsolationManager:
+    """数据隔离管理器：确保门店数据边界安全，防止跨店数据泄露。"""
+
+    _SENSITIVE_FIELDS = {"customer_id", "phone", "email", "address", "staff_id", "name"}
+
+    def __init__(self):
+        self.store_data_boundaries: dict = {}
+
+    def register_store_boundary(self, store_id: str, data_policy: dict) -> bool:
+        """注册门店数据边界策略。"""
+        self.store_data_boundaries[store_id] = {
+            "store_id": store_id,
+            "data_policy": data_policy,
+            "registered_at": datetime.now().isoformat(),
+        }
+        return True
+
+    def validate_data_access(
+        self, accessor_store_id: str, target_store_id: str, data_type: str
+    ) -> bool:
+        """验证数据访问权限：仅允许同一门店内访问。"""
+        return accessor_store_id == target_store_id
+
+    def anonymize_data(self, data: dict, level: str = "medium") -> dict:
+        """对敏感字段进行哈希匿名化。
+
+        所有级别（low/medium/high）均使用 16 位哈希截断，保持一致性。
+        """
+        result = {}
+        for key, value in data.items():
+            if key in self._SENSITIVE_FIELDS:
+                result[key] = self._hash_value(str(value))
+            else:
+                result[key] = value
+        return result
+
+    def _hash_value(self, value: str) -> str:
+        """返回 16 位哈希字符串（SHA-256 截断）。"""
+        import hashlib
+        return hashlib.sha256(value.encode()).hexdigest()[:16]
+
+
+# 全局单例
+federated_learning_service = FederatedLearningService()
+data_isolation_manager = DataIsolationManager()

@@ -2,6 +2,17 @@
 Mobile API Tests
 测试移动端API接口
 """
+import os
+for _k, _v in {
+    "DATABASE_URL":          "postgresql+asyncpg://test:test@localhost/test",
+    "REDIS_URL":             "redis://localhost:6379/0",
+    "CELERY_BROKER_URL":     "redis://localhost:6379/0",
+    "CELERY_RESULT_BACKEND": "redis://localhost:6379/0",
+    "SECRET_KEY":            "test-secret-key",
+    "JWT_SECRET":            "test-jwt-secret",
+}.items():
+    os.environ.setdefault(_k, _v)
+
 import pytest
 from fastapi.testclient import TestClient
 from datetime import datetime

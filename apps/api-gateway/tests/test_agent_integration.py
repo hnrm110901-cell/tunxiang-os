@@ -2,14 +2,25 @@
 测试Agent服务集成
 """
 import asyncio
+import os
 import sys
 from pathlib import Path
+
+for _k, _v in {
+    "DATABASE_URL":          "postgresql+asyncpg://test:test@localhost/test",
+    "REDIS_URL":             "redis://localhost:6379/0",
+    "CELERY_BROKER_URL":     "redis://localhost:6379/0",
+    "CELERY_RESULT_BACKEND": "redis://localhost:6379/0",
+    "SECRET_KEY":            "test-secret-key",
+    "JWT_SECRET":            "test-jwt-secret",
+}.items():
+    os.environ.setdefault(_k, _v)
 
 # 添加项目路径
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root / "src"))
 
-from services.agent_service import AgentService
+from src.services.agent_service import AgentService
 
 
 async def test_schedule_agent():

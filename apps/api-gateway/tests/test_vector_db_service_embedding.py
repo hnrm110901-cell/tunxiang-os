@@ -11,10 +11,20 @@ VectorDbServiceEnhanced 嵌入向量生成单元测试
 - _embed_via_api: 无 API key → 返回 None（不发网络请求）
 """
 import os
+for _k, _v in {
+    "DATABASE_URL":          "postgresql+asyncpg://test:test@localhost/test",
+    "REDIS_URL":             "redis://localhost:6379/0",
+    "CELERY_BROKER_URL":     "redis://localhost:6379/0",
+    "CELERY_RESULT_BACKEND": "redis://localhost:6379/0",
+    "SECRET_KEY":            "test-secret-key",
+    "JWT_SECRET":            "test-jwt-secret",
+}.items():
+    os.environ.setdefault(_k, _v)
+
 import pytest
 from unittest.mock import MagicMock, patch
 
-from src.services.vector_db_service_enhanced import VectorDbServiceEnhanced
+from src.services.vector_db_service_enhanced import VectorDatabaseServiceEnhanced as VectorDbServiceEnhanced
 
 
 # ---------------------------------------------------------------------------

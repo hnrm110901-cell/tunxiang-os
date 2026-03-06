@@ -7,12 +7,19 @@
 """
 
 import os
-os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://test:test@localhost/test")
-os.environ.setdefault("SECRET_KEY", "test-secret")
-os.environ.setdefault("APP_ENV", "test")
+for _k, _v in {
+    "DATABASE_URL":          "postgresql+asyncpg://test:test@localhost/test",
+    "REDIS_URL":             "redis://localhost:6379/0",
+    "CELERY_BROKER_URL":     "redis://localhost:6379/0",
+    "CELERY_RESULT_BACKEND": "redis://localhost:6379/0",
+    "APP_ENV":               "test",
+    "SECRET_KEY":            "test-secret-key",
+    "JWT_SECRET":            "test-jwt-secret",
+}.items():
+    os.environ.setdefault(_k, _v)
 
-from unittest.mock import AsyncMock, MagicMock, patch, AsyncContextManager
-from contextlib import asynccontextmanager
+from unittest.mock import AsyncMock, MagicMock, patch
+from contextlib import asynccontextmanager, AbstractAsyncContextManager as AsyncContextManager
 
 import pytest
 
