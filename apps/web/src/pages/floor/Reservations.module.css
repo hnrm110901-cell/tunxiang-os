@@ -1,0 +1,37 @@
+.page { display: flex; flex-direction: column; min-height: 100%; background: var(--bg); }
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 20px 12px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.title { font-size: 20px; font-weight: 700; color: var(--text-primary); }
+
+.body {
+  flex: 1;
+  padding: 16px 20px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+.row:last-child { border-bottom: none; }
+
+.time { font-size: 13px; font-weight: 700; color: var(--accent); width: 50px; flex-shrink: 0; }
+
+.info  { flex: 1; min-width: 0; }
+.name  { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+.sub   { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+
+.right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }

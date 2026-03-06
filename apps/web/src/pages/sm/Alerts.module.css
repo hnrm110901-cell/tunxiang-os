@@ -1,0 +1,31 @@
+.page { display: flex; flex-direction: column; min-height: 100%; background: var(--bg); }
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 16px 12px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.title { font-size: 20px; font-weight: 700; color: var(--text-primary); }
+
+.body {
+  flex: 1;
+  padding: 12px 12px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.scoreRow   { display: flex; align-items: center; gap: 16px; padding: 4px 0; }
+.scoreInfo  { display: flex; flex-direction: column; gap: 8px; }
+
+.dimRow { display: flex; align-items: center; gap: 8px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.dimRow:last-child { border-bottom: none; }
+
+.dimLabel  { font-size: 13px; color: var(--text-secondary); width: 80px; flex-shrink: 0; }
+.dimBar    { flex: 1; height: 6px; background: var(--surface-hover); border-radius: 3px; overflow: hidden; }
+.dimFill   { height: 100%; border-radius: 3px; transition: width 500ms ease; }
+.dimScore  { font-size: 13px; font-weight: 600; color: var(--text-primary); width: 28px; text-align: right; flex-shrink: 0; }

@@ -1,0 +1,42 @@
+.page { display: flex; flex-direction: column; min-height: 100%; background: var(--bg); }
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px 24px 16px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.title { font-size: 20px; font-weight: 700; color: var(--text-primary); }
+
+.body {
+  flex: 1;
+  padding: 16px 24px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 800px;
+}
+
+.storeBar { display: flex; align-items: center; gap: 10px; }
+.storeLabel { font-size: 13px; color: var(--text-secondary); }
+
+.kpiGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.metaRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.metaRow:last-child { border-bottom: none; }
+.metaLabel { font-size: 13px; color: var(--text-secondary); }
+.metaValue { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+.metaAccent { font-size: 14px; font-weight: 700; color: var(--green); }

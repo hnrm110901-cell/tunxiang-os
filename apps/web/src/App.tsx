@@ -123,15 +123,22 @@ const StoreManagerLayout = lazy(() => import('./layouts/StoreManagerLayout'));
 const SmHome      = lazy(() => import('./pages/sm/Home'));
 const SmBusiness  = lazy(() => import('./pages/sm/Business'));
 const SmDecisions = lazy(() => import('./pages/sm/Decisions'));
+const SmAlerts    = lazy(() => import('./pages/sm/Alerts'));
 
 // Role-based views (Phase 2 — Chef /chef, Floor /floor, HQ /hq)
-const ChefLayout  = lazy(() => import('./layouts/ChefLayout'));
-const ChefHome    = lazy(() => import('./pages/chef/Home'));
-const FloorLayout = lazy(() => import('./layouts/FloorLayout'));
-const FloorHome   = lazy(() => import('./pages/floor/Home'));
-const HQLayout    = lazy(() => import('./layouts/HQLayout'));
-const HQHome      = lazy(() => import('./pages/hq/Home'));
-const HQStores    = lazy(() => import('./pages/hq/Stores'));
+const ChefLayout      = lazy(() => import('./layouts/ChefLayout'));
+const ChefHome        = lazy(() => import('./pages/chef/Home'));
+const ChefWaste       = lazy(() => import('./pages/chef/Waste'));
+const ChefInventory   = lazy(() => import('./pages/chef/Inventory'));
+const FloorLayout     = lazy(() => import('./layouts/FloorLayout'));
+const FloorHome       = lazy(() => import('./pages/floor/Home'));
+const FloorQueue      = lazy(() => import('./pages/floor/Queue'));
+const FloorReservations = lazy(() => import('./pages/floor/Reservations'));
+const HQLayout        = lazy(() => import('./layouts/HQLayout'));
+const HQHome          = lazy(() => import('./pages/hq/Home'));
+const HQStores        = lazy(() => import('./pages/hq/Stores'));
+const HQDecisions     = lazy(() => import('./pages/hq/Decisions'));
+const HQFinance       = lazy(() => import('./pages/hq/Finance'));
 
 const PageLoader = (
   <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 300 }}>
@@ -459,6 +466,7 @@ const AppContent: React.FC = () => {
                   <Route index element={<SmHome />} />
                   <Route path="business"  element={<SmBusiness />} />
                   <Route path="decisions" element={<SmDecisions />} />
+                  <Route path="alerts"    element={<SmAlerts />} />
                 </Route>
 
                 {/* Role-based views — Chef (手机) */}
@@ -468,6 +476,8 @@ const AppContent: React.FC = () => {
                   </ProtectedRoute>
                 }>
                   <Route index element={<ChefHome />} />
+                  <Route path="waste"     element={<ChefWaste />} />
+                  <Route path="inventory" element={<ChefInventory />} />
                 </Route>
 
                 {/* Role-based views — Floor Manager (平板) */}
@@ -477,6 +487,8 @@ const AppContent: React.FC = () => {
                   </ProtectedRoute>
                 }>
                   <Route index element={<FloorHome />} />
+                  <Route path="queue"        element={<FloorQueue />} />
+                  <Route path="reservations" element={<FloorReservations />} />
                 </Route>
 
                 {/* Role-based views — HQ (桌面) */}
@@ -486,7 +498,9 @@ const AppContent: React.FC = () => {
                   </ProtectedRoute>
                 }>
                   <Route index element={<HQHome />} />
-                  <Route path="stores" element={<HQStores />} />
+                  <Route path="stores"    element={<HQStores />} />
+                  <Route path="decisions" element={<HQDecisions />} />
+                  <Route path="finance"   element={<HQFinance />} />
                 </Route>
               </Routes>
             </Suspense>
