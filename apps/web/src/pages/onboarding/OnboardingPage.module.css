@@ -1,0 +1,392 @@
+.page {
+  min-height: 100vh;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Header & progress bar ── */
+.header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 0 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 64px;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.logo {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--accent);
+  letter-spacing: -0.5px;
+}
+
+.progressBar {
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+
+.progressStep {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  position: relative;
+}
+
+.progressStep:not(:last-child)::after {
+  content: '';
+  display: block;
+  width: 48px;
+  height: 2px;
+  background: var(--border);
+  margin: 0 4px;
+}
+
+.progressStep:not(:last-child).done::after {
+  background: var(--accent);
+}
+
+.stepDot {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  border: 2px solid var(--border);
+  background: var(--bg);
+  color: var(--text-secondary);
+  transition: all 0.2s;
+}
+
+.progressStep.active .stepDot {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: white;
+}
+
+.progressStep.done .stepDot {
+  border-color: var(--green);
+  background: var(--green);
+  color: white;
+}
+
+.stepName {
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.progressStep.active .stepName { color: var(--accent); font-weight: 600; }
+.progressStep.done .stepName   { color: var(--green); }
+
+/* ── Content area ── */
+.content {
+  flex: 1;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 48px 24px 80px;
+}
+
+.inner {
+  width: 100%;
+  max-width: 760px;
+}
+
+.stepTitle {
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin-bottom: 6px;
+}
+
+.stepSub {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin-bottom: 32px;
+}
+
+/* ── POS system grid ── */
+.posGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.posCard {
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  padding: 20px 16px;
+  cursor: pointer;
+  text-align: center;
+  background: var(--surface);
+  transition: all 0.15s;
+}
+
+.posCard:hover   { border-color: var(--accent); }
+.posCardSelected { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+
+.posIcon   { font-size: 28px; margin-bottom: 8px; }
+.posName   { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+.posStatus { font-size: 11px; color: var(--text-secondary); margin-top: 4px; }
+.posStatus.connected { color: var(--green); }
+
+/* ── Import checklist ── */
+.importGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-bottom: 24px;
+}
+
+.importCard {
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  background: var(--surface);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.importCardRequired { border-color: color-mix(in srgb, var(--accent) 40%, transparent); }
+.importCardDone     { border-color: var(--green); background: color-mix(in srgb, var(--green) 5%, transparent); }
+
+.importMeta { flex: 1; min-width: 0; }
+.importName { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+
+.importInfo {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+.importActions { display: flex; flex-direction: column; gap: 4px; align-items: flex-end; }
+
+.requiredBadge {
+  font-size: 10px;
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  color: var(--accent);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+.doneBadge {
+  font-size: 10px;
+  background: color-mix(in srgb, var(--green) 15%, transparent);
+  color: var(--green);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+/* ── Build pipeline ── */
+.stageList {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin: 32px 0;
+}
+
+.stageItem {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
+  border-left: 3px solid var(--border);
+  margin-left: 14px;
+  position: relative;
+  transition: all 0.3s;
+}
+
+.stageDot {
+  position: absolute;
+  left: -8px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  background: var(--bg);
+  top: 50%;
+  transform: translateY(-50%);
+  transition: all 0.3s;
+}
+
+.stageItem.active { border-color: var(--accent); }
+.stageItem.active .stageDot { border-color: var(--accent); background: var(--accent); animation: pulse 1.2s infinite; }
+.stageItem.done   { border-color: var(--green); }
+.stageItem.done   .stageDot { border-color: var(--green); background: var(--green); }
+
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 40%, transparent); }
+  50%       { box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 0%, transparent); }
+}
+
+.stageName { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+.stageDesc { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+.stageItem.active .stageName { color: var(--accent); }
+.stageItem.done .stageName   { color: var(--green); }
+
+/* ── Diagnostic report ── */
+.reportHero {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  padding: 28px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  margin-bottom: 24px;
+}
+
+.scoreCircle {
+  width: 110px;
+  height: 110px;
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 6px solid;
+  flex-shrink: 0;
+}
+
+.scoreNumber { font-size: 36px; font-weight: 900; line-height: 1; }
+.scoreUnit   { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+.scoreMeta   { flex: 1; }
+.scoreLabel  { font-size: 22px; font-weight: 700; color: var(--text-primary); margin-bottom: 6px; }
+.scoreDesc   { font-size: 13px; color: var(--text-secondary); line-height: 1.5; }
+
+.moduleGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-bottom: 24px;
+}
+
+.moduleCard {
+  padding: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  border-left: 4px solid;
+  cursor: pointer;
+  transition: box-shadow 0.15s;
+}
+
+.moduleCard:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
+
+.moduleHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.moduleName  { font-size: 13px; font-weight: 700; color: var(--text-primary); }
+.moduleScore { font-size: 20px; font-weight: 900; }
+.moduleInsight { font-size: 12px; color: var(--text-secondary); line-height: 1.4; }
+.moduleSuggestion { font-size: 11px; color: var(--text-secondary); margin-top: 6px; font-style: italic; }
+
+/* ── Preview table ── */
+.previewWrap {
+  margin: 16px 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: auto;
+  max-height: 260px;
+}
+
+.previewTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.previewTable th {
+  background: var(--bg);
+  padding: 8px 12px;
+  text-align: left;
+  font-weight: 600;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+  position: sticky;
+  top: 0;
+}
+
+.previewTable td {
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-primary);
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Mapping pills ── */
+.mappingRow { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0; }
+.mappingPill {
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
+}
+
+.mappingPillMissing {
+  background: color-mix(in srgb, var(--red, #ff4d4f) 12%, transparent);
+  color: var(--red, #ff4d4f);
+}
+
+/* ── Actions ── */
+.actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 24px;
+  border-top: 1px solid var(--border);
+  margin-top: 24px;
+}
+
+.actionRight { display: flex; gap: 10px; align-items: center; }
+
+/* ── Credential form ── */
+.credForm {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 20px;
+  margin-top: 16px;
+}
+
+.credTitle { font-size: 13px; font-weight: 700; color: var(--text-primary); margin-bottom: 12px; }
+.credRow   { display: flex; gap: 12px; margin-bottom: 10px; }
+.credLabel { font-size: 12px; color: var(--text-secondary); margin-bottom: 4px; }
+
+.connectedBanner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: color-mix(in srgb, var(--green) 10%, transparent);
+  border: 1px solid var(--green);
+  border-radius: 8px;
+  margin-top: 16px;
+  font-size: 13px;
+  color: var(--green);
+  font-weight: 600;
+}
