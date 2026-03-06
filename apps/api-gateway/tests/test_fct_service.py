@@ -974,3 +974,58 @@ class TestListPeriods:
         assert result["total"] == 3
         assert result["items"][0]["period_key"] == "2026-03"
         assert result["items"][2]["period_key"] == "2026-01"
+
+
+# ── get_report_by_entity ──────────────────────────────────────────────────────
+
+class TestGetReportByEntity:
+    """测试 get_report_by_entity 按实体聚合"""
+
+    def _entity_row(self, entity_id: str, revenue_fen: int, expense_fen: int):
+        row = MagicMock()
+        row.__getitem__ = lambda self, i: [entity_id, revenue_fen, expense_fen][i]
+        return row
+
+    @pytest.mark.asyncio
+    async def test_multiple_entities_returned(self):
+        db = _mock_db()
+        rows = [
+            self._entity_row("S001", 1_000_000, 700_000),
+            self._entity_row("S002", 800_000, 500_000),
+        ]
+        result_mock = MagicMock()
+        result_mock.fetchall.return_value = rows
+        db.execute = AsyncMock(return_value=result_mock)
+        svc = StandaloneFCTService()
+        result = await svc.get_report_by_entity(db, tenant_id="T1")
+        assert result["report_type"] == "by_entity"
+        assert len(result["data"]) == 2
+        assert result["data"][0]["entity_id"] == "S001"
+        assert result["data"][1]["entity_id"] == "S002"
+
+    @pytest.mark.asyncio
+    async def test_empty_result_returns_empty_list(self):
+        db = _mock_db()
+        result_mock = MagicMock()
+        result_mock.fetchall.return_value = []
+        db.execute = AsyncMock(return_value=result_mock)
+        svc = StandaloneFCTService()
+        result = await svc.get_report_by_entity(db, tenant_id="T1")
+        assert result["data"] == []
+
+    @pytest.mark.asyncio
+    async def test_yuan_fields_present_and_correct(self):
+        db = _mock_db()
+        rows = [self._entity_row("S001", 500_000, 300_000)]
+        result_mock = MagicMock()
+        result_mock.fetchall.return_value = rows
+        db.execute = AsyncMock(return_value=result_mock)
+        svc = StandaloneFCTService()
+        result = await svc.get_report_by_entity(db, tenant_id="T1")
+        item = result["data"][0]
+        assert "revenue_yuan" in item
+        assert "expense_yuan" in item
+        assert "net_yuan" in item
+        assert item["revenue_yuan"] == pytest.approx(5000.00, abs=0.01)
+        assert item["expense_yuan"] == pytest.approx(3000.00, abs=0.01)
+        assert item["net_yuan"] == pytest.approx(2000.00, abs=0.01)
