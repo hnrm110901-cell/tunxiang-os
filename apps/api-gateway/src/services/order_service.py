@@ -419,15 +419,15 @@ class OrderService:
             订单字典
         """
         order_dict = {
-            "order_id": order.id,
+            "order_id": str(order.id),
             "store_id": order.store_id,
             "table_number": order.table_number,
             "customer_name": order.customer_name,
             "customer_phone": order.customer_phone,
-            "status": order.status.value,
-            "total_amount": order.total_amount / 100,  # Convert cents to yuan
-            "discount_amount": order.discount_amount / 100,
-            "final_amount": order.final_amount / 100,
+            "status": order.status.value if hasattr(order.status, "value") else order.status,
+            "total_amount": float(order.total_amount) if order.total_amount is not None else 0,
+            "discount_amount": (order.discount_amount or 0) / 100,
+            "final_amount": float(order.final_amount) / 100 if order.final_amount is not None else float(order.total_amount or 0),
             "order_time": order.order_time.isoformat() if order.order_time else None,
             "confirmed_at": order.confirmed_at.isoformat() if order.confirmed_at else None,
             "completed_at": order.completed_at.isoformat() if order.completed_at else None,
@@ -444,8 +444,8 @@ class OrderService:
                     "item_id": item.item_id,
                     "item_name": item.item_name,
                     "quantity": item.quantity,
-                    "unit_price": item.unit_price / 100,
-                    "subtotal": item.subtotal / 100,
+                    "unit_price": float(item.unit_price) if item.unit_price is not None else 0,
+                    "subtotal": float(item.subtotal) if item.subtotal is not None else 0,
                     "notes": item.notes,
                     "customizations": item.customizations
                 }
