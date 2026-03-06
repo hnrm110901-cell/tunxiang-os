@@ -154,6 +154,10 @@ celery_app.conf.update(
             "queue": "default",
             "routing_key": "default",
         },
+        "src.core.celery_tasks.pull_historical_backfill": {
+            "queue": "low_priority",
+            "routing_key": "low_priority",
+        },
     },
 
     # Celery Beat定时任务调度

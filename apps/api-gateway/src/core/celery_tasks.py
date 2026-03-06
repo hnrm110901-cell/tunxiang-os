@@ -3689,3 +3689,204 @@ def run_onboarding_pipeline(self, store_id: str, task_id: str = "") -> Dict[str,
     except Exception as e:
         logger.error("onboarding_pipeline.failed", store_id=store_id, error=str(e))
         raise self.retry(exc=e)
+
+
+# ── Onboarding Historical Backfill Task ───────────────────────────────────────
+
+@celery_app.task(bind=True, max_retries=2, default_retry_delay=120)
+def pull_historical_backfill(
+    self,
+    store_id: str,
+    adapter: str,
+    credentials: Dict[str, Any],
+) -> Dict[str, Any]:
+    """
+    历史数据回灌任务（Onboarding Phase 2）。
+    由 POST /api/v1/onboarding/connect/{adapter} 触发。
+
+    目前支持的适配器：
+      tiancai — 天财商龙（直接复用 TiancaiShanglongAdapter）
+    其他适配器返回 skipped=True，待后续集成。
+
+    执行结果写回 OnboardingTask.step="connect" 的进度字段。
+
+    Returns:
+        {success, store_id, adapter, records_imported, skipped, errors}
+    """
+    async def _run() -> Dict[str, Any]:
+        from sqlalchemy import select, text as _text
+        from ..core.database import get_db_session
+        from ..models.onboarding import OnboardingTask
+
+        async def _update_progress(
+            session,
+            total: int,
+            imported: int,
+            failed: int,
+            status: str,
+            extra: Dict[str, Any],
+        ) -> None:
+            result = await session.execute(
+                select(OnboardingTask).where(
+                    OnboardingTask.store_id == store_id,
+                    OnboardingTask.step == "connect",
+                )
+            )
+            task = result.scalar_one_or_none()
+            if task:
+                task.total_records = total
+                task.imported_records = imported
+                task.failed_records = failed
+                task.status = status
+                task.extra = extra
+                await session.commit()
+
+        # ── 天财商龙适配器 ─────────────────────────────────────────────────────
+        if adapter == "tiancai":
+            from datetime import date, timedelta
+            from packages.api_adapters.tiancai_shanglong.src.adapter import (
+                TiancaiShanglongAdapter,
+            )
+
+            base_url = credentials.get("base_url") or os.getenv("TIANCAI_BASE_URL", "")
+            if not base_url:
+                logger.warning(
+                    "backfill.tiancai.skipped",
+                    store_id=store_id,
+                    reason="TIANCAI_BASE_URL not configured",
+                )
+                async with get_db_session() as session:
+                    await _update_progress(session, 0, 0, 0, "skipped",
+                                           {"reason": "TIANCAI_BASE_URL 未配置"})
+                return {"success": True, "store_id": store_id, "adapter": adapter,
+                        "records_imported": 0, "skipped": True, "errors": []}
+
+            app_id = (
+                credentials.get("app_id")
+                or os.getenv(f"TIANCAI_APP_ID_{store_id}")
+                or os.getenv("TIANCAI_APP_ID", "")
+            )
+            app_secret = (
+                credentials.get("app_secret")
+                or os.getenv(f"TIANCAI_APP_SECRET_{store_id}")
+                or os.getenv("TIANCAI_APP_SECRET", "")
+            )
+            brand_id = credentials.get("brand_id") or os.getenv("TIANCAI_BRAND_ID", "")
+
+            adapter_instance = TiancaiShanglongAdapter(
+                base_url=base_url,
+                app_id=app_id,
+                app_secret=app_secret,
+                brand_id=brand_id,
+            )
+
+            # 默认回灌最近 30 天
+            backfill_days = int(os.getenv("ONBOARDING_BACKFILL_DAYS", "30"))
+            today = date.today()
+            records_imported = 0
+            errors: list = []
+
+            async with get_db_session() as session:
+                await _update_progress(session, backfill_days, 0, 0, "in_progress",
+                                       {"adapter": adapter, "phase": "pulling"})
+
+            for i in range(backfill_days):
+                target_date = (today - timedelta(days=i + 1)).strftime("%Y-%m-%d")
+                try:
+                    orders = await adapter_instance.pull_daily_orders(
+                        store_id=store_id,
+                        target_date=target_date,
+                    )
+                    if orders:
+                        async with get_db_session() as session:
+                            for order in orders:
+                                await session.execute(
+                                    _text("""
+                                        INSERT INTO orders
+                                            (id, store_id, table_number, status,
+                                             total_amount, discount_amount, final_amount,
+                                             order_time, source_system, order_metadata,
+                                             created_at, updated_at)
+                                        VALUES
+                                            (:id, :store_id, :table_number, :status,
+                                             :total_amount, :discount_amount, :final_amount,
+                                             :order_time, 'tiancai', '{}', NOW(), NOW())
+                                        ON CONFLICT (id) DO NOTHING
+                                    """),
+                                    {
+                                        "id": order.order_id,
+                                        "store_id": store_id,
+                                        "table_number": order.table_no or "",
+                                        "status": order.status or "completed",
+                                        "total_amount": int(float(order.total_amount or 0) * 100),
+                                        "discount_amount": int(float(order.discount_amount or 0) * 100),
+                                        "final_amount": int(float(order.paid_amount or 0) * 100),
+                                        "order_time": order.order_time,
+                                    },
+                                )
+                                records_imported += 1
+                            await session.commit()
+                except Exception as e:
+                    logger.warning(
+                        "backfill.tiancai.day_failed",
+                        store_id=store_id,
+                        date=target_date,
+                        error=str(e),
+                    )
+                    errors.append({"date": target_date, "error": str(e)})
+
+            async with get_db_session() as session:
+                await _update_progress(
+                    session,
+                    total=backfill_days,
+                    imported=records_imported,
+                    failed=len(errors),
+                    status="completed",
+                    extra={
+                        "adapter": adapter,
+                        "days_pulled": backfill_days,
+                        "records_imported": records_imported,
+                        "errors": errors[:10],  # 最多记录前10条错误
+                    },
+                )
+
+            logger.info(
+                "backfill.tiancai.done",
+                store_id=store_id,
+                records_imported=records_imported,
+                errors=len(errors),
+            )
+            return {
+                "success": True,
+                "store_id": store_id,
+                "adapter": adapter,
+                "records_imported": records_imported,
+                "skipped": False,
+                "errors": errors[:10],
+            }
+
+        # ── 其他适配器：暂未集成，记录 skipped ────────────────────────────────
+        logger.warning(
+            "backfill.adapter_not_implemented",
+            store_id=store_id,
+            adapter=adapter,
+        )
+        async with get_db_session() as session:
+            await _update_progress(
+                session, 0, 0, 0, "skipped",
+                {"adapter": adapter, "reason": f"{adapter} 历史回灌尚未集成"},
+            )
+        return {
+            "success": True,
+            "store_id": store_id,
+            "adapter": adapter,
+            "records_imported": 0,
+            "skipped": True,
+            "errors": [],
+        }
+
+    try:
+        return asyncio.run(_run())
+    except Exception as e:
+        logger.error("backfill.failed", store_id=store_id, adapter=adapter, error=str(e))
+        raise self.retry(exc=e)

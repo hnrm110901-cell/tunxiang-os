@@ -318,19 +318,33 @@ async def connect_adapter(
         raise HTTPException(status_code=400, detail=f"不支持的适配器: {adapter}。可选: {', '.join(_VALID_ADAPTERS)}")
 
     # Upsert onboarding_tasks for 'connect' step
-    task = await _upsert_task(db, store_id, "connect", "in_progress", extra={"adapter": adapter})
-
-    # TODO Phase 2: call adapter.pull_historical_data() as background Celery task
-    # For now: mark as completed (connection test placeholder)
-    task.status = "completed"
-    task.extra = {"adapter": adapter, "note": "历史回灌将在Phase 2实现"}
+    await _upsert_task(db, store_id, "connect", "in_progress", extra={"adapter": adapter})
     await db.commit()
+
+    # 触发历史数据回灌 Celery 任务（low_priority 队列，不阻塞当前请求）
+    from ..core.celery_tasks import pull_historical_backfill
+    celery_task = pull_historical_backfill.apply_async(
+        kwargs={
+            "store_id": store_id,
+            "adapter": adapter,
+            "credentials": credentials or {},
+        },
+        queue="low_priority",
+        priority=2,
+    )
+    logger.info(
+        "onboarding.backfill_enqueued",
+        store_id=store_id,
+        adapter=adapter,
+        task_id=celery_task.id,
+    )
 
     return {
         "store_id": store_id,
         "adapter":  adapter,
-        "status":   "connected",
-        "message":  f"{adapter} 连接成功。历史数据回灌（Phase 2）将在后台运行。",
+        "status":   "backfill_started",
+        "task_id":  celery_task.id,
+        "message":  f"{adapter} 连接成功。历史数据回灌已在后台启动，可通过 /backfill/progress 查询进度。",
     }
 
 
@@ -852,7 +866,31 @@ async def complete_onboarding(
                        extra={"completed_at": datetime.utcnow().isoformat()})
     await db.commit()
 
-    # TODO Phase 2: distribute diagnostic params to Agents via agent_memory
+    # 将诊断报告关键参数分发给各 Agent（通过 AgentMemoryBus）
+    # 发布到 Redis stream，各 Agent 订阅后自动初始化
+    try:
+        diagnostic_task = await _get_task(db, store_id, "diagnostic")
+        diagnostic_summary = (diagnostic_task.extra or {}) if diagnostic_task else {}
+
+        from ..services.agent_memory_bus import AgentMemoryBus
+        bus = AgentMemoryBus()
+        await bus.publish(
+            store_id=store_id,
+            agent_id="onboarding",
+            action="onboarding_complete",
+            summary=f"门店 {store_id} Onboarding 完成，各 Agent 可基于历史数据初始化",
+            confidence=1.0,
+            data={
+                "store_id": store_id,
+                "completed_at": datetime.utcnow().isoformat(),
+                "diagnostic": diagnostic_summary,
+            },
+        )
+        logger.info("onboarding_completed.agent_memory_published", store_id=store_id)
+    except Exception as _e:
+        # 分发失败不阻断主流程，Agent 会在首次调用时自行初始化
+        logger.warning("onboarding_completed.agent_memory_failed", store_id=store_id, error=str(_e))
+
     logger.info("onboarding_completed", store_id=store_id)
     return {
         "store_id": store_id,

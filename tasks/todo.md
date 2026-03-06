@@ -98,6 +98,9 @@
 
 ## 已完成
 
+- [x] **VoiceCommandWhitelist** — `src/core/voice_command_whitelist.py`：语音高危操作白名单（财务/批量删除/权限），3级风险分级（SAFE/CONFIRM/HIGH_RISK），高危操作推送手机端二次确认；25个测试全通过
+- [x] **Onboarding Phase 2** — `connect_adapter` 真正触发 `pull_historical_backfill` Celery 任务（low_priority 队列），回灌最近30天历史订单；`complete_onboarding` 通过 AgentMemoryBus 发布 `onboarding_complete` 事件，各 Agent 自动初始化
+
 - [x] 私域 Agent get_journeys 接入真实 DB（_fetch_journeys_from_db + _persist_journey_to_db）
 - [x] 用户培训文档（docs/user-training-guide.md）
 
