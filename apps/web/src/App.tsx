@@ -115,6 +115,7 @@ const DecisionStatisticsDashboard = lazy(() => import('./pages/DecisionStatistic
 const ProfitDashboard = lazy(() => import('./pages/ProfitDashboard'));
 const AlertThresholdsPage = lazy(() => import('./pages/AlertThresholdsPage'));
 const MonthlyReportPage = lazy(() => import('./pages/MonthlyReportPage'));
+const OnboardingPage = lazy(() => import('./pages/onboarding/OnboardingPage'));
 const DynamicPricingPage = lazy(() => import('./pages/DynamicPricingPage'));
 const OpsMonitoringPage = lazy(() => import('./pages/OpsMonitoringPage'));
 
@@ -158,6 +159,7 @@ const AppContent: React.FC = () => {
               <Routes>
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/unauthorized" element={<UnauthorizedPage />} />
+                <Route path="/onboarding" element={<OnboardingPage />} />
                 <Route path="/mobile" element={
                   <ProtectedRoute>
                     <MobileApp />

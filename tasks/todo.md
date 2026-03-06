@@ -98,6 +98,15 @@
 
 ## 已完成
 
+- [x] **测试基础设施修复（2026-03-06）** — 修复12个测试收集错误，0收集错误，3303测试可收集，2910通过
+  - `src/ontology/__init__.py`：添加 `get_ontology_repository()` + 重新导出 `NodeLabel/RelType`，懒加载 neo4j 连接
+  - `src/services/backup_service.py`：新建 BackupService（pg_dump+gzip）+ backup_service 单例
+  - `src/services/data_import_export_service.py`：新建 DataImportExportService CSV导入导出
+  - `src/services/supply_chain_service.py`：新建 SupplyChainService CRUD
+  - `src/services/federated_learning_service.py`：添加 DataIsolationManager + 2个全局单例
+  - 测试修复：patch路径纠正（lazy-import → 源模块）、AsyncContextManager兼容、相对导入修复
+  - `tests/conftest.py`：添加全局env vars（CELERY_BROKER_URL等），消除120+个文件的重复设置需求
+
 - [x] **VoiceCommandWhitelist** — `src/core/voice_command_whitelist.py`：语音高危操作白名单（财务/批量删除/权限），3级风险分级（SAFE/CONFIRM/HIGH_RISK），高危操作推送手机端二次确认；25个测试全通过
 - [x] **Onboarding Phase 2** — `connect_adapter` 真正触发 `pull_historical_backfill` Celery 任务（low_priority 队列），回灌最近30天历史订单；`complete_onboarding` 通过 AgentMemoryBus 发布 `onboarding_complete` 事件，各 Agent 自动初始化
 

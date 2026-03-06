@@ -102,7 +102,7 @@ async def list_inventory(
         id=i.id, store_id=i.store_id, name=i.name, category=i.category,
         unit=i.unit, current_quantity=i.current_quantity, min_quantity=i.min_quantity,
         max_quantity=i.max_quantity, unit_cost=i.unit_cost,
-        status=i.status.value if i.status else None
+        status=i.status.value if hasattr(i.status, "value") else i.status
     ) for i in items]
 
 
@@ -121,7 +121,7 @@ async def get_inventory_item(
         id=item.id, store_id=item.store_id, name=item.name, category=item.category,
         unit=item.unit, current_quantity=item.current_quantity, min_quantity=item.min_quantity,
         max_quantity=item.max_quantity, unit_cost=item.unit_cost,
-        status=item.status.value if item.status else None
+        status=item.status.value if hasattr(item.status, "value") else item.status
     )
 
 
@@ -145,7 +145,7 @@ async def create_inventory_item(
         id=item.id, store_id=item.store_id, name=item.name, category=item.category,
         unit=item.unit, current_quantity=item.current_quantity, min_quantity=item.min_quantity,
         max_quantity=item.max_quantity, unit_cost=item.unit_cost,
-        status=item.status.value if item.status else None
+        status=item.status.value if hasattr(item.status, "value") else item.status
     )
 
 
@@ -169,7 +169,7 @@ async def update_inventory_item(
         id=item.id, store_id=item.store_id, name=item.name, category=item.category,
         unit=item.unit, current_quantity=item.current_quantity, min_quantity=item.min_quantity,
         max_quantity=item.max_quantity, unit_cost=item.unit_cost,
-        status=item.status.value if item.status else None
+        status=item.status.value if hasattr(item.status, "value") else item.status
     )
 
 
@@ -288,7 +288,7 @@ async def get_inventory_stats(
     for i in items:
         cat = i.category or "其他"
         category_dist[cat] = category_dist.get(cat, 0) + 1
-        s = i.status.value if i.status else "normal"
+        s = i.status.value if hasattr(i.status, "value") else (i.status or "normal")
         status_dist[s] = status_dist.get(s, 0) + 1
     return {
         "total_items": len(items),
@@ -296,9 +296,10 @@ async def get_inventory_stats(
         "category_distribution": category_dist,
         "status_distribution": status_dist,
         "alert_items": [
-            {"id": i.id, "name": i.name, "status": i.status.value if i.status else "normal",
+            {"id": i.id, "name": i.name,
+             "status": i.status.value if hasattr(i.status, "value") else (i.status or "normal"),
              "current_quantity": i.current_quantity, "min_quantity": i.min_quantity, "unit": i.unit}
-            for i in items if i.status and i.status.value != "normal"
+            for i in items if i.status and (i.status.value if hasattr(i.status, "value") else i.status) != "normal"
         ],
     }
 
