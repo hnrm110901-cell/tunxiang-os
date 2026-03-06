@@ -3667,3 +3667,25 @@ def pull_tiancai_daily_orders(self) -> Dict[str, Any]:
     except Exception as e:
         logger.error("tiancai_pull_daily_orders.failed", error=str(e))
         raise self.retry(exc=e)
+
+
+# ── Onboarding Pipeline Task ───────────────────────────────────────────────────
+
+@celery_app.task(bind=True, max_retries=1, default_retry_delay=60)
+def run_onboarding_pipeline(self, store_id: str, task_id: str = "") -> Dict[str, Any]:
+    """
+    5-stage Onboarding Pipeline (async wrapped for Celery):
+      1. data_cleaning → 2. kpi_calculation → 3. baseline_compare
+      4. vector_embedding → 5. knowledge_summary
+    """
+    async def _run():
+        from ..core.database import get_db_session
+        from ..services.onboarding_pipeline_service import OnboardingPipelineService
+        async with get_db_session() as session:
+            return await OnboardingPipelineService.run(store_id=store_id, db=session)
+
+    try:
+        return asyncio.run(_run())
+    except Exception as e:
+        logger.error("onboarding_pipeline.failed", store_id=store_id, error=str(e))
+        raise self.retry(exc=e)

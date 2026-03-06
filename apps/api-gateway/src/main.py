@@ -67,6 +67,8 @@ from src.api import execution, menu, store_memory, ontology_api, fct_public
 # Phase 1 — 运营智能层：渠道毛利 API
 from src.api import channel_profit
 from src.api import performance_compute
+# Onboarding Engine — 企业诊断与数据入库
+from src.api import onboarding
 from src.middleware.monitoring import MonitoringMiddleware
 from src.middleware.rate_limit import RateLimitMiddleware
 from src.middleware.audit_log import AuditLogMiddleware
@@ -569,6 +571,7 @@ app.include_router(fct_public.router, prefix="/api/v1/fct-public", tags=["fct_pu
 app.include_router(channel_profit.router)
 # Phase 2 — 绩效计算引擎
 app.include_router(performance_compute.router)
+app.include_router(onboarding.router)
 
 # BFF 聚合路由（角色驱动前端，4种角色各一个聚合端点）
 from src.api import bff
