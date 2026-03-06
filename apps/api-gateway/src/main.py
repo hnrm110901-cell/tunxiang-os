@@ -435,6 +435,9 @@ app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
 app.include_router(agents.router, prefix="/api/v1/agents", tags=["agents"])
 app.include_router(approval.router, prefix="/api/v1", tags=["approval"])
 app.include_router(notifications.router, prefix="/api/v1", tags=["notifications"])
+# store_health 须在 stores 之前注册，避免 /stores/{store_id} 把 "health" 当成 store_id 拦截
+from src.api import store_health
+app.include_router(store_health.router, prefix="/api/v1", tags=["store_health"])
 app.include_router(stores.router, prefix="/api/v1", tags=["stores"])
 app.include_router(mobile.router, prefix="/api/v1", tags=["mobile"])
 app.include_router(integrations.router, prefix="/api/v1", tags=["integrations"])
@@ -585,10 +588,6 @@ app.include_router(monthly_report.router, tags=["monthly_report"])
 # v2.0 MVP #3 — 损耗Top5排名（含¥归因）
 from src.api import waste_guard
 app.include_router(waste_guard.router, tags=["waste_guard"])
-
-# v2.1 StoreHealthScore — 门店健康指数（5维度加权综合指数）
-from src.api import store_health
-app.include_router(store_health.router, prefix="/api/v1", tags=["store_health"])
 
 # 业财税资金一体化（FCT）
 if getattr(settings, "FCT_ENABLED", False):
