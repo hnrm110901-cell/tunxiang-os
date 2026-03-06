@@ -1,9 +1,21 @@
 """
 测试配置和fixtures
 """
+import os
+
+# ── 测试环境变量（必须在所有 src.* 导入前设置）────────────────────────────────
+for _k, _v in {
+    "DATABASE_URL":          "postgresql+asyncpg://test:test@localhost/test",
+    "REDIS_URL":             "redis://localhost:6379/0",
+    "CELERY_BROKER_URL":     "redis://localhost:6379/0",
+    "CELERY_RESULT_BACKEND": "redis://localhost:6379/0",
+    "SECRET_KEY":            "test-secret-key",
+    "JWT_SECRET":            "test-jwt-secret",
+}.items():
+    os.environ.setdefault(_k, _v)
+
 import pytest
 import asyncio
-import os
 from typing import AsyncGenerator, Generator
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.pool import NullPool
