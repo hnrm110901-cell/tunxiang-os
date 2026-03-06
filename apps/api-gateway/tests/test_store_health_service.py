@@ -11,9 +11,15 @@ StoreHealthService 单元测试
 """
 
 import os
-os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://test:test@localhost/test")
-os.environ.setdefault("SECRET_KEY", "test-secret")
-os.environ.setdefault("APP_ENV", "test")
+for _k, _v in {
+    "DATABASE_URL":          "postgresql+asyncpg://test:test@localhost/test",
+    "REDIS_URL":             "redis://localhost:6379/0",
+    "CELERY_BROKER_URL":     "redis://localhost:6379/0",
+    "CELERY_RESULT_BACKEND": "redis://localhost:6379/0",
+    "SECRET_KEY":            "test-secret-key",
+    "JWT_SECRET":            "test-jwt-secret",
+}.items():
+    os.environ.setdefault(_k, _v)
 
 from datetime import date
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -107,22 +113,22 @@ class TestClassifyHealth:
 class TestScoreRevenuCompletion:
     def test_on_target(self):
         # monthly_target=30000 yuan, month with 30 days → daily_target=1000 yuan = 100000 fen
-        s = _score_revenue_completion(100_000.0, 30_000.0, date(2026, 3, 15))
+        s = _score_revenue_completion(100_000.0, 30_000.0, date(2026, 4, 15))
         assert s is not None
         assert abs(s - 100.0) < 0.1
 
     def test_half_target(self):
-        s = _score_revenue_completion(50_000.0, 30_000.0, date(2026, 3, 15))
+        s = _score_revenue_completion(50_000.0, 30_000.0, date(2026, 4, 15))
         assert s is not None
         assert abs(s - 50.0) < 1.0
 
     def test_over_target_capped_at_100(self):
-        s = _score_revenue_completion(999_999.0, 30_000.0, date(2026, 3, 15))
+        s = _score_revenue_completion(999_999.0, 30_000.0, date(2026, 4, 15))
         assert s == 100.0
 
     def test_no_target_returns_none(self):
-        assert _score_revenue_completion(10_000.0, None, date(2026, 3, 15)) is None
-        assert _score_revenue_completion(10_000.0, 0.0, date(2026, 3, 15)) is None
+        assert _score_revenue_completion(10_000.0, None, date(2026, 4, 15)) is None
+        assert _score_revenue_completion(10_000.0, 0.0, date(2026, 4, 15)) is None
 
 
 class TestScoreTableTurnover:
@@ -249,7 +255,7 @@ async def test_get_store_score_returns_valid_structure():
     db, fc_status = _make_db_mock(store)
 
     with patch(
-        "src.services.store_health_service.FoodCostService.get_store_food_cost_variance",
+        "src.services.food_cost_service.FoodCostService.get_store_food_cost_variance",
         new_callable=AsyncMock,
         return_value={"variance_status": "ok"},
     ):
@@ -283,7 +289,7 @@ async def test_get_store_score_cost_failure_degrades_gracefully():
     db, _ = _make_db_mock(store)
 
     with patch(
-        "src.services.store_health_service.FoodCostService.get_store_food_cost_variance",
+        "src.services.food_cost_service.FoodCostService.get_store_food_cost_variance",
         new_callable=AsyncMock,
         side_effect=RuntimeError("DB 超时"),
     ):

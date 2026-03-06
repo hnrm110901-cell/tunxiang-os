@@ -5,6 +5,16 @@ NarrativeEngine 单元测试
   - 纯函数：_build_overview / _detect_anomalies / _build_action / compose_brief
   - 集成：NarrativeEngine.generate_store_brief（mock DB）
 """
+import os
+for _k, _v in {
+    "DATABASE_URL":          "postgresql+asyncpg://test:test@localhost/test",
+    "REDIS_URL":             "redis://localhost:6379/0",
+    "CELERY_BROKER_URL":     "redis://localhost:6379/0",
+    "CELERY_RESULT_BACKEND": "redis://localhost:6379/0",
+    "SECRET_KEY":            "test-secret-key",
+    "JWT_SECRET":            "test-jwt-secret",
+}.items():
+    os.environ.setdefault(_k, _v)
 
 from datetime import date
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -226,11 +236,11 @@ async def test_generate_store_brief_returns_string():
     mock_waste = {"top5": _waste_top5("羊肉", 420.0)}
 
     with patch(
-        "src.services.narrative_engine.CaseStoryGenerator.generate_daily_story",
+        "src.services.case_story_generator.CaseStoryGenerator.generate_daily_story",
         new_callable=AsyncMock,
         return_value=mock_story,
     ), patch(
-        "src.services.narrative_engine.WasteGuardService.get_top5_waste",
+        "src.services.waste_guard_service.WasteGuardService.get_top5_waste",
         new_callable=AsyncMock,
         return_value=mock_waste,
     ):
@@ -255,11 +265,11 @@ async def test_generate_store_brief_degrades_on_story_failure():
     db = AsyncMock()
 
     with patch(
-        "src.services.narrative_engine.CaseStoryGenerator.generate_daily_story",
+        "src.services.case_story_generator.CaseStoryGenerator.generate_daily_story",
         new_callable=AsyncMock,
         side_effect=RuntimeError("DB 超时"),
     ), patch(
-        "src.services.narrative_engine.WasteGuardService.get_top5_waste",
+        "src.services.waste_guard_service.WasteGuardService.get_top5_waste",
         new_callable=AsyncMock,
         return_value={"top5": []},
     ):
@@ -284,11 +294,11 @@ async def test_generate_store_brief_degrades_on_waste_failure():
     }
 
     with patch(
-        "src.services.narrative_engine.CaseStoryGenerator.generate_daily_story",
+        "src.services.case_story_generator.CaseStoryGenerator.generate_daily_story",
         new_callable=AsyncMock,
         return_value=mock_story,
     ), patch(
-        "src.services.narrative_engine.WasteGuardService.get_top5_waste",
+        "src.services.waste_guard_service.WasteGuardService.get_top5_waste",
         new_callable=AsyncMock,
         side_effect=RuntimeError("损耗查询失败"),
     ):
