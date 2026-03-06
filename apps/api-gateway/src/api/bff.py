@@ -327,8 +327,8 @@ async def _fetch_queue_status(store_id: str, db: AsyncSession) -> Optional[Dict]
     summary = await db.execute(
         text("""
             SELECT COUNT(*) AS waiting_count,
-                   COALESCE(AVG(estimated_wait_minutes), 0) AS avg_wait_min
-            FROM queue_entries
+                   COALESCE(AVG(estimated_wait_time), 0) AS avg_wait_min
+            FROM queues
             WHERE store_id = :sid
               AND status = 'waiting'
               AND created_at >= NOW() - (:n * INTERVAL '1 hour')
@@ -341,7 +341,7 @@ async def _fetch_queue_status(store_id: str, db: AsyncSession) -> Optional[Dict]
 
     served = await db.execute(
         text("""
-            SELECT COUNT(*) FROM queue_entries
+            SELECT COUNT(*) FROM queues
             WHERE store_id = :sid AND status = 'seated'
               AND DATE(created_at) = CURRENT_DATE
         """),
@@ -351,10 +351,10 @@ async def _fetch_queue_status(store_id: str, db: AsyncSession) -> Optional[Dict]
 
     items_res = await db.execute(
         text("""
-            SELECT ticket_no, party_size,
+            SELECT queue_number, party_size,
                    EXTRACT(EPOCH FROM (NOW() - created_at)) / 60 AS wait_min,
                    status
-            FROM queue_entries
+            FROM queues
             WHERE store_id = :sid
               AND status IN ('waiting', 'called')
             ORDER BY created_at ASC
@@ -410,17 +410,17 @@ async def _fetch_inventory_alerts(store_id: str, db: AsyncSession) -> List[Dict]
     from sqlalchemy import text
     result = await db.execute(
         text("""
-            SELECT ingredient_name, current_stock, reorder_point, unit,
+            SELECT name, current_quantity, min_quantity, unit,
                    CASE
-                     WHEN current_stock = 0 THEN 'critical'
-                     WHEN current_stock::float / NULLIF(reorder_point, 0) < 0.5 THEN 'critical'
+                     WHEN current_quantity = 0 THEN 'critical'
+                     WHEN current_quantity::float / NULLIF(min_quantity, 0) < 0.5 THEN 'critical'
                      ELSE 'warning'
                    END AS severity
             FROM inventory_items
             WHERE store_id = :sid
-              AND current_stock <= reorder_point
-              AND is_active = true
-            ORDER BY (current_stock::float / NULLIF(reorder_point, 0)) ASC
+              AND current_quantity <= min_quantity
+              AND status != 'out_of_stock'
+            ORDER BY (current_quantity::float / NULLIF(min_quantity, 0)) ASC
             LIMIT 10
         """),
         {"sid": store_id},
@@ -447,13 +447,13 @@ async def _fetch_today_reservations(
     tdate = target_date or date.today()
     result = await db.execute(
         text("""
-            SELECT id, guest_name, party_size, reservation_time,
-                   table_number, status
+            SELECT id, customer_name, party_size, reservation_date,
+                   reservation_time, table_number, status, notes
             FROM reservations
             WHERE store_id = :sid
-              AND DATE(reservation_time) = :tdate
+              AND reservation_date = :tdate
               AND status NOT IN ('cancelled', 'no_show')
-            ORDER BY reservation_time ASC
+            ORDER BY reservation_time ASC NULLS LAST
             LIMIT 10
         """),
         {"sid": store_id, "tdate": tdate.isoformat()},
@@ -464,10 +464,12 @@ async def _fetch_today_reservations(
             "id":            str(r[0]),
             "guest_name":    r[1],
             "party_size":    r[2],
-            "reserved_time": r[3].isoformat() if hasattr(r[3], "isoformat") else str(r[3]),
-            "table_number":  r[4],
-            "status":        r[5],
-            "notes":         None,
+            "reserved_time": (
+                f"{r[3]}T{r[4]}" if r[4] else str(r[3])
+            ),
+            "table_number":  r[5],
+            "status":        r[6],
+            "notes":         r[7],
         }
         for r in rows
     ]
@@ -477,10 +479,10 @@ async def _fetch_service_alerts(store_id: str, db: AsyncSession) -> List[Dict]:
     from sqlalchemy import text
     result = await db.execute(
         text("""
-            SELECT alert_type, severity, description, created_at
-            FROM service_alerts
+            SELECT event_type, severity, description, created_at
+            FROM ops_events
             WHERE store_id = :sid
-              AND resolved_at IS NULL
+              AND status = 'open'
               AND created_at >= NOW() - INTERVAL '8 hours'
             ORDER BY severity DESC, created_at DESC
             LIMIT 10
