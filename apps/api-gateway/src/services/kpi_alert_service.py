@@ -126,14 +126,13 @@ class KPIAlertService:
 
     @staticmethod
     async def _get_active_store_ids(db: AsyncSession) -> List[str]:
-        """从 orders 表中取过去 30 天有交易记录的门店 ID（无 Store 模型依赖）。"""
+        """从 stores 表获取所有激活门店 ID。"""
         result = await db.execute(
             text(
-                "SELECT DISTINCT store_id FROM orders "
-                "WHERE created_at >= NOW() - (:days * INTERVAL '1 day') "
-                "  AND store_id IS NOT NULL "
-                "ORDER BY store_id"
-            ).bindparams(days=30)
+                "SELECT id FROM stores "
+                "WHERE is_active = TRUE "
+                "ORDER BY id"
+            )
         )
         return [row[0] for row in result.fetchall()]
 
