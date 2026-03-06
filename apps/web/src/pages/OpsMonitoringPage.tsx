@@ -21,7 +21,8 @@ import {
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
-import apiClient, { handleApiError } from '../services/api';
+import apiClient from '../services/api';
+import { handleApiError } from '../utils/message';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -44,8 +45,8 @@ interface StoreDashboard {
   generated_at: string;
   layers: {
     l1_device: LayerStatus & { total_readings: number };
-    l2_network: LayerStatus & { availability_pct: number };
-    l3_system: LayerStatus & { uptime_pct: number; down_list: string[] };
+    l2_network: LayerStatus & { availability_pct: number; unavailable: number };
+    l3_system: LayerStatus & { uptime_pct: number; down_list: string[]; total_systems: number; down_systems: number; p0_down: number };
   };
   food_safety: {
     total_checks: number;

@@ -96,7 +96,7 @@ export default function HQFinance() {
           <span className={styles.storeLabel}>门店：</span>
           <ZSelect
             value={storeId}
-            onChange={setStoreId}
+            onChange={(v) => setStoreId(String(v))}
             options={stores.length > 0 ? stores : [{ value: 'S001', label: 'S001' }]}
           />
         </div>
