@@ -481,7 +481,7 @@ def _pick_dishes(store_id: str, n: int) -> list:
 
 
 def _dish_name(dish_code: str) -> str:
-    base = "_".join(dish_code.split("_")[:2])
+    base = dish_code.split("_")[0]  # "DISH030_XT001" → "DISH030"
     for d in DISHES:
         if d["code"] == base:
             return d["name"]

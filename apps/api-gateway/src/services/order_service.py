@@ -427,7 +427,7 @@ class OrderService:
             "status": order.status.value if hasattr(order.status, "value") else order.status,
             "total_amount": float(order.total_amount) if order.total_amount is not None else 0,
             "discount_amount": (order.discount_amount or 0) / 100,
-            "final_amount": float(order.final_amount) / 100 if order.final_amount is not None else float(order.total_amount or 0),
+            "final_amount": float(order.final_amount) if order.final_amount is not None else float(order.total_amount or 0),
             "order_time": order.order_time.isoformat() if order.order_time else None,
             "confirmed_at": order.confirmed_at.isoformat() if order.confirmed_at else None,
             "completed_at": order.completed_at.isoformat() if order.completed_at else None,
