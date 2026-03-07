@@ -657,6 +657,10 @@ app.include_router(dish_cost_alert.router)
 from src.api import dish_benchmark
 app.include_router(dish_benchmark.router)
 
+# Phase 6 Month 5: 菜品智能定价引擎
+from src.api import dish_pricing
+app.include_router(dish_pricing.router)
+
 # ARCH-004 可信执行层（折扣申请 / 审批 / 审计日志 / 回滚）
 app.include_router(execution.router)
 # FEAT-004 动态菜单权重引擎（Top-N 推荐 + 5因子评分）

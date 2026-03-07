@@ -1,0 +1,62 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+/* 建议卡片 */
+.recCard {
+  border-radius: 8px;
+  border: 1px solid #f0f0f0;
+  transition: box-shadow 0.2s;
+}
+
+.recCard:hover {
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+}
+
+.recCardIncrease {
+  border-left: 4px solid #52c41a;
+}
+
+.recCardDecrease {
+  border-left: 4px solid #1677ff;
+}
+
+.recCardMaintain {
+  border-left: 4px solid #d9d9d9;
+}
+
+/* 行着色 */
+.rowIncrease {
+  background: #f6ffed !important;
+}
+
+.rowDecrease {
+  background: #e6f4ff !important;
+}
+
+/* 价格变化数字 */
+.priceUp {
+  color: #52c41a;
+  font-weight: 600;
+}
+
+.priceDown {
+  color: #1677ff;
+  font-weight: 600;
+}
+
+/* 采纳率仪表 */
+.gaugeWrap {
+  display: flex;
+  justify-content: center;
+}

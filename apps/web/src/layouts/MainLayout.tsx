@@ -190,6 +190,7 @@ const ROUTE_TO_GROUP: Record<string, string> = {
   '/menu-optimization': 'nav-overview',
   '/dish-cost-alert': 'nav-overview',
   '/dish-benchmark': 'nav-overview',
+  '/dish-pricing': 'nav-overview',
   '/industry-solutions': 'nav-platform',
   '/i18n': 'nav-platform',
   '/raas': 'nav-platform',
@@ -318,6 +319,7 @@ const BREADCRUMB_LABELS: Record<string, string> = {
   '/menu-optimization': '菜单优化建议',
   '/dish-cost-alert': '菜品成本预警',
   '/dish-benchmark': '跨店菜品对标',
+  '/dish-pricing': '菜品智能定价',
   '/industry-solutions': '行业解决方案',
   '/i18n': '国际化',
   '/raas': 'RaaS定价',
@@ -428,6 +430,7 @@ const MainLayout: React.FC = () => {
         { key: '/menu-optimization',       icon: <BulbOutlined />,    label: '菜单优化建议' },
         { key: '/dish-cost-alert',         icon: <WarningOutlined />, label: '菜品成本预警' },
         { key: '/dish-benchmark',           icon: <TrophyOutlined />, label: '跨店菜品对标' },
+        { key: '/dish-pricing',             icon: <DollarOutlined />, label: '菜品智能定价' },
       ],
     },
 
