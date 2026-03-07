@@ -57,6 +57,8 @@ const FederatedLearningPage = lazy(() => import('./pages/FederatedLearningPage')
 const AgentCollaborationPage = lazy(() => import('./pages/AgentCollaborationPage'));
 const OpenPlatformPage = lazy(() => import('./pages/OpenPlatformPage'));
 const DeveloperDocsPage = lazy(() => import('./pages/DeveloperDocsPage'));
+const ISVEcosystemPage = lazy(() => import('./pages/ISVEcosystemPage'));
+const ISVManagementPage = lazy(() => import('./pages/ISVManagementPage'));
 const IndustrySolutionsPage = lazy(() => import('./pages/IndustrySolutionsPage'));
 const I18nPage = lazy(() => import('./pages/I18nPage'));
 const TaskManagementPage = lazy(() => import('./pages/TaskManagementPage'));
@@ -285,6 +287,12 @@ const AppContent: React.FC = () => {
                   } />
                   <Route path="developer-docs" element={
                     <ProtectedRoute requiredRole="admin"><DeveloperDocsPage /></ProtectedRoute>
+                  } />
+                  <Route path="isv-ecosystem" element={
+                    <ProtectedRoute requiredRole="admin"><ISVEcosystemPage /></ProtectedRoute>
+                  } />
+                  <Route path="isv-management" element={
+                    <ProtectedRoute requiredRole="admin"><ISVManagementPage /></ProtectedRoute>
                   } />
                   <Route path="industry-solutions" element={
                     <ProtectedRoute requiredRole="admin"><IndustrySolutionsPage /></ProtectedRoute>

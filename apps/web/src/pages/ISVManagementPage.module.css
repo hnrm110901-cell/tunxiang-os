@@ -1,0 +1,110 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.pageHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.pageTitle {
+  font-size: 20px;
+  font-weight: 700;
+  margin: 0 0 4px;
+  color: var(--text-primary);
+}
+
+.pageSub {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.headerActions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.kpiGrid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
+}
+
+@media (max-width: 1100px) {
+  .kpiGrid { grid-template-columns: repeat(3, 1fr); }
+}
+
+@media (max-width: 700px) {
+  .kpiGrid { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* Tier breakdown inside last KPI card */
+.tierBreakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tierBreakdownTitle {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+
+.tierBreakdownRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.tierBreakdownCount {
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+/* Review modal */
+.reviewInfo {
+  padding: 12px 0;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--border-color, #f0f0f0);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.reviewRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.reviewLabel {
+  width: 80px;
+  flex-shrink: 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.nativeSelect {
+  width: 100%;
+  height: 32px;
+  border: 1px solid #d9d9d9;
+  border-radius: 6px;
+  padding: 0 8px;
+  font-size: 14px;
+  background: #fff;
+  color: inherit;
+  cursor: pointer;
+  outline: none;
+}
+
+.nativeSelect:hover { border-color: #4096ff; }
+.nativeSelect:focus { border-color: #4096ff; box-shadow: 0 0 0 2px rgba(5,145,255,0.1); }

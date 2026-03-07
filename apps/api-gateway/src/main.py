@@ -571,6 +571,10 @@ from src.api.docs_api import docs_router, sandbox_router
 app.include_router(docs_router, tags=["developer_docs"])
 app.include_router(sandbox_router, tags=["developer_docs"])
 
+# aPaaS ISV 生命周期管理 — Phase 2 Month 3
+from src.api import isv_management
+app.include_router(isv_management.router, tags=["isv_management"])
+
 # ARCH-004 可信执行层（折扣申请 / 审批 / 审计日志 / 回滚）
 app.include_router(execution.router)
 # FEAT-004 动态菜单权重引擎（Top-N 推荐 + 5因子评分）
