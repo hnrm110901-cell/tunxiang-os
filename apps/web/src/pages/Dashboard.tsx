@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
-import { Card, Col, Row, Alert, Tag, Button, Switch, Space } from 'antd';
+import { Switch } from 'antd';
 import {
   InboxOutlined,
   CheckCircleOutlined,
@@ -11,7 +11,8 @@ import ReactECharts from 'echarts-for-react';
 import { apiClient } from '../services/api';
 import { handleApiError } from '../utils/message';
 import { decisionAgentService, type DecisionReport } from '../services/decisionAgent';
-import { PageHeader, DataCard, LoadingSkeleton } from '../components';
+import { ZCard, ZKpi, ZBadge, ZButton, ZSkeleton } from '../design-system/components';
+import styles from './Dashboard.module.css';
 
 const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
@@ -27,7 +28,6 @@ const Dashboard: React.FC = () => {
       setLoading(true);
       setError(null);
 
-      // 并发加载健康检查和决策报告
       const [health, report] = await Promise.all([
         apiClient.healthCheck(),
         decisionAgentService.getDecisionReport(),
@@ -47,7 +47,6 @@ const Dashboard: React.FC = () => {
   useEffect(() => {
     loadDashboardData();
 
-    // 设置自动刷新
     let intervalId: number | undefined;
     if (autoRefresh) {
       intervalId = window.setInterval(() => {
@@ -56,70 +55,39 @@ const Dashboard: React.FC = () => {
     }
 
     return () => {
-      if (intervalId) {
-        clearInterval(intervalId);
-      }
+      if (intervalId) clearInterval(intervalId);
     };
   }, [autoRefresh, refreshInterval, loadDashboardData]);
 
-  // 手动刷新
   const handleManualRefresh = useCallback(() => {
     loadDashboardData();
   }, [loadDashboardData]);
 
-  // 从决策报告中提取KPI数据用于图表 - 使用 useMemo 缓存计算结果
   const kpiChartData = useMemo(() => {
     if (!decisionReport) return null;
-
     const kpis = decisionReport.kpi_summary.key_kpis;
-
-    // 营收类KPI趋势
-    const revenueKPIs = kpis.filter(k => k.category === 'revenue');
-
+    const revenueKPIs = kpis.filter((k: any) => k.category === 'revenue');
     return {
-      categories: revenueKPIs.map(k => k.metric_name),
-      currentValues: revenueKPIs.map(k => k.current_value),
-      targetValues: revenueKPIs.map(k => k.target_value),
-      achievementRates: revenueKPIs.map(k => k.achievement_rate * 100),
+      categories: revenueKPIs.map((k: any) => k.metric_name),
+      achievementRates: revenueKPIs.map((k: any) => k.achievement_rate * 100),
     };
   }, [decisionReport]);
 
-  // KPI达成率图表配置 - 使用 useMemo 缓存配置对象
   const kpiAchievementOption = useMemo(() => {
     if (!kpiChartData) return {};
-
     return {
-      title: {
-        text: 'KPI达成率',
-        left: 'center',
-      },
+      title: { text: 'KPI达成率', left: 'center' },
       tooltip: {
         trigger: 'axis',
         formatter: (params: any) => {
-          let result = params[0].name + '<br/>';
-          params.forEach((item: any) => {
-            result += `${item.marker}${item.seriesName}: ${item.value.toFixed(1)}%<br/>`;
-          });
-          return result;
+          let r = params[0].name + '<br/>';
+          params.forEach((p: any) => { r += `${p.marker}${p.seriesName}: ${p.value.toFixed(1)}%<br/>`; });
+          return r;
         },
       },
-      legend: {
-        data: ['达成率', '目标线'],
-        bottom: 10,
-      },
-      xAxis: {
-        type: 'category',
-        data: kpiChartData.categories,
-        axisLabel: {
-          interval: 0,
-          rotate: 30,
-        },
-      },
-      yAxis: {
-        type: 'value',
-        name: '达成率(%)',
-        max: 120,
-      },
+      legend: { data: ['达成率', '目标线'], bottom: 10 },
+      xAxis: { type: 'category', data: kpiChartData.categories, axisLabel: { interval: 0, rotate: 30 } },
+      yAxis: { type: 'value', name: '达成率(%)', max: 120 },
       series: [
         {
           name: '达成率',
@@ -127,9 +95,9 @@ const Dashboard: React.FC = () => {
           type: 'bar',
           itemStyle: {
             color: (params: any) => {
-              const value = params.value;
-              if (value >= 95) return '#52c41a';
-              if (value >= 85) return '#faad14';
+              const v = params.value;
+              if (v >= 95) return '#52c41a';
+              if (v >= 85) return '#faad14';
               return '#f5222d';
             },
           },
@@ -138,328 +106,217 @@ const Dashboard: React.FC = () => {
           name: '目标线',
           data: kpiChartData.categories.map(() => 100),
           type: 'line',
-          itemStyle: {
-            color: '#1890ff',
-          },
-          lineStyle: {
-            type: 'dashed',
-          },
+          itemStyle: { color: '#1890ff' },
+          lineStyle: { type: 'dashed' },
         },
       ],
     };
   }, [kpiChartData]);
 
-  // KPI状态分布饼图 - 使用 useMemo 缓存配置对象
   const kpiStatusOption = useMemo(() => {
     if (!decisionReport) return {};
-
-    const statusDist = decisionReport.kpi_summary.status_distribution;
-
+    const dist = decisionReport.kpi_summary.status_distribution;
     return {
-      title: {
-        text: 'KPI状态分布',
-        left: 'center',
-      },
-      tooltip: {
-        trigger: 'item',
-        formatter: '{a} <br/>{b}: {c} ({d}%)',
-      },
-      legend: {
-        orient: 'vertical',
-        left: 'left',
-        top: 'middle',
-      },
-      series: [
-        {
-          name: 'KPI数量',
-          type: 'pie',
-          radius: '50%',
-          data: [
-            { value: statusDist.on_track || 0, name: '正常', itemStyle: { color: '#52c41a' } },
-            { value: statusDist.at_risk || 0, name: '风险', itemStyle: { color: '#faad14' } },
-            { value: statusDist.off_track || 0, name: '异常', itemStyle: { color: '#f5222d' } },
-          ],
-          emphasis: {
-            itemStyle: {
-              shadowBlur: 10,
-              shadowOffsetX: 0,
-              shadowColor: 'rgba(0, 0, 0, 0.5)',
-            },
-          },
-        },
-      ],
+      title: { text: 'KPI状态分布', left: 'center' },
+      tooltip: { trigger: 'item', formatter: '{a} <br/>{b}: {c} ({d}%)' },
+      legend: { orient: 'vertical', left: 'left', top: 'middle' },
+      series: [{
+        name: 'KPI数量',
+        type: 'pie',
+        radius: '50%',
+        data: [
+          { value: dist.on_track  || 0, name: '正常', itemStyle: { color: '#52c41a' } },
+          { value: dist.at_risk   || 0, name: '风险', itemStyle: { color: '#faad14' } },
+          { value: dist.off_track || 0, name: '异常', itemStyle: { color: '#f5222d' } },
+        ],
+        emphasis: { itemStyle: { shadowBlur: 10, shadowOffsetX: 0, shadowColor: 'rgba(0,0,0,0.5)' } },
+      }],
     };
   }, [decisionReport]);
 
-  if (loading) {
-    return <LoadingSkeleton type="card" rows={4} />;
-  }
+  if (loading) return <ZSkeleton rows={4} block />;
 
   return (
-    <div>
-      <PageHeader
-        title="控制台"
-        subtitle={`最后更新: ${lastRefreshTime.toLocaleTimeString('zh-CN')}`}
-        extra={
-          <Space>
-            <Button
-              icon={<ReloadOutlined spin={loading} />}
-              onClick={handleManualRefresh}
-              loading={loading}
-            >
-              刷新
-            </Button>
-            <span style={{ fontSize: 14 }}>自动刷新:</span>
-            <Switch
-              checked={autoRefresh}
-              onChange={setAutoRefresh}
-              checkedChildren="开"
-              unCheckedChildren="关"
-            />
-          </Space>
-        }
-      />
+    <div className={styles.page}>
+      {/* 页头 */}
+      <div className={styles.pageHeader}>
+        <div>
+          <h2 className={styles.pageTitle}>控制台</h2>
+          <p className={styles.pageSub}>最后更新：{lastRefreshTime.toLocaleTimeString('zh-CN')}</p>
+        </div>
+        <div className={styles.headerActions}>
+          <ZButton icon={<ReloadOutlined />} onClick={handleManualRefresh} disabled={loading}>
+            刷新
+          </ZButton>
+          <span className={styles.toggleLabel}>自动刷新</span>
+          <Switch
+            checked={autoRefresh}
+            onChange={setAutoRefresh}
+            checkedChildren="开"
+            unCheckedChildren="关"
+          />
+        </div>
+      </div>
 
+      {/* 错误 / 成功 Banner */}
       {error && (
-        <Alert
-          message="数据加载失败"
-          description={
-            <div>
-              <p>{error}</p>
-              <Button size="small" onClick={handleManualRefresh}>
-                重试
-              </Button>
-            </div>
-          }
-          type="error"
-          showIcon
-          closable
-          onClose={() => setError(null)}
-          style={{ marginBottom: 24 }}
-        />
+        <div className={`${styles.alertBar} ${styles.alertError}`} style={{ marginBottom: 16 }}>
+          <strong>数据加载失败：</strong>{error}
+          <ZButton
+            style={{ marginLeft: 12 }}
+            onClick={() => { setError(null); handleManualRefresh(); }}
+          >
+            重试
+          </ZButton>
+        </div>
       )}
-
       {healthStatus && !error && (
-        <Alert
-          message="系统状态"
-          description={`后端服务运行正常 - ${healthStatus.status}`}
-          type="success"
-          showIcon
-          style={{ marginBottom: 24 }}
-        />
+        <div className={`${styles.alertBar} ${styles.alertSuccess}`} style={{ marginBottom: 16 }}>
+          系统状态正常 — {healthStatus.status}
+        </div>
       )}
 
-      {/* 健康分数卡片 */}
+      {/* 健康分数大卡 */}
       {decisionReport && (
-        <Card
-          style={{
-            marginBottom: 16,
-            background: 'var(--primary-gradient)',
-            border: 'none',
-          }}
-          bodyStyle={{ padding: '32px' }}
-        >
-          <Row align="middle" gutter={24}>
-            <Col xs={24} sm={18}>
-              <div style={{ color: 'white' }}>
-                <h2 style={{ color: 'white', marginBottom: 8, fontSize: 20 }}>
-                  <DashboardOutlined /> 系统健康分数
-                </h2>
-                <p style={{ fontSize: 56, fontWeight: 'bold', margin: '16px 0', lineHeight: 1 }}>
-                  {decisionReport.overall_health_score.toFixed(1)}
-                </p>
-                <p style={{ opacity: 0.9, marginTop: 8, fontSize: 15 }}>
-                  {decisionReport.kpi_summary.total_kpis} 个KPI指标 |{' '}
-                  {decisionReport.action_required} 项需要关注
-                </p>
+        <ZCard style={{ marginBottom: 14, background: 'var(--primary-gradient)', border: 'none' }}>
+          <div className={styles.heroRow}>
+            <div className={styles.heroLeft}>
+              <div className={styles.heroTitle}>
+                <DashboardOutlined /> 系统健康分数
               </div>
-            </Col>
-            <Col xs={24} sm={6} style={{ textAlign: 'right' }}>
-              <Space direction="vertical" size={12} style={{ width: '100%' }}>
-                <Tag color="success" style={{ fontSize: 14, padding: '4px 12px' }}>
-                  {decisionReport.kpi_summary.status_distribution.on_track || 0} 正常
-                </Tag>
-                <Tag color="warning" style={{ fontSize: 14, padding: '4px 12px' }}>
-                  {decisionReport.kpi_summary.status_distribution.at_risk || 0} 风险
-                </Tag>
-                <Tag color="error" style={{ fontSize: 14, padding: '4px 12px' }}>
-                  {decisionReport.kpi_summary.status_distribution.off_track || 0} 异常
-                </Tag>
-              </Space>
-            </Col>
-          </Row>
-        </Card>
+              <div className={styles.heroScore}>
+                {decisionReport.overall_health_score.toFixed(1)}
+              </div>
+              <div className={styles.heroSub}>
+                {decisionReport.kpi_summary.total_kpis} 个KPI指标 &nbsp;|&nbsp;
+                {decisionReport.action_required} 项需要关注
+              </div>
+            </div>
+            <div className={styles.heroBadges}>
+              <ZBadge type="success" text={`${decisionReport.kpi_summary.status_distribution.on_track  || 0} 正常`} />
+              <ZBadge type="warning" text={`${decisionReport.kpi_summary.status_distribution.at_risk   || 0} 风险`} />
+              <ZBadge type="critical" text={`${decisionReport.kpi_summary.status_distribution.off_track || 0} 异常`} />
+            </div>
+          </div>
+        </ZCard>
       )}
 
-      <Row gutter={[16, 16]}>
-        <Col xs={24} sm={12} lg={6}>
-          <DataCard
-            title="KPI总数"
+      {/* KPI 概览 */}
+      <div className={styles.kpiGrid}>
+        <ZCard>
+          <ZKpi
             value={decisionReport?.kpi_summary.total_kpis || 0}
-            prefix={<DashboardOutlined />}
-            style={{ height: '100%' }}
+            label="KPI总数"
           />
-        </Col>
-        <Col xs={24} sm={12} lg={6}>
-          <DataCard
-            title="业务洞察"
+        </ZCard>
+        <ZCard>
+          <ZKpi
             value={decisionReport?.insights_summary.total_insights || 0}
-            suffix={`/ ${decisionReport?.insights_summary.high_impact || 0} 高影响`}
-            prefix={<RiseOutlined />}
-            style={{ height: '100%' }}
+            unit={`/ ${decisionReport?.insights_summary.high_impact || 0} 高影响`}
+            label="业务洞察"
           />
-        </Col>
-        <Col xs={24} sm={12} lg={6}>
-          <DataCard
-            title="待处理建议"
+        </ZCard>
+        <ZCard>
+          <ZKpi
             value={decisionReport?.action_required || 0}
-            prefix={<InboxOutlined />}
-            style={{ height: '100%' }}
+            label="待处理建议"
           />
-        </Col>
-        <Col xs={24} sm={12} lg={6}>
-          <DataCard
-            title="KPI达标率"
-            value={
-              decisionReport
-                ? (decisionReport.kpi_summary.on_track_rate * 100).toFixed(1)
-                : 0
-            }
-            suffix="%"
-            prefix={<CheckCircleOutlined />}
-            trend={{
-              value: 5.2,
-              isPositive: decisionReport ? decisionReport.kpi_summary.on_track_rate >= 0.8 : false,
-            }}
-            style={{ height: '100%' }}
+        </ZCard>
+        <ZCard>
+          <ZKpi
+            value={decisionReport ? (decisionReport.kpi_summary.on_track_rate * 100).toFixed(1) : '0.0'}
+            unit="%"
+            label="KPI达标率"
+            change={decisionReport ? (decisionReport.kpi_summary.on_track_rate >= 0.8 ? 5.2 : -5.2) : undefined}
+            changeLabel="较上期"
           />
-        </Col>
-      </Row>
+        </ZCard>
+      </div>
 
-      {/* 数据可视化图表 */}
-      <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
-        <Col xs={24} lg={12}>
-          <Card>
-            {decisionReport ? (
-              <ReactECharts option={kpiAchievementOption} style={{ height: 320 }} />
-            ) : (
-              <LoadingSkeleton type="card" rows={1} />
-            )}
-          </Card>
-        </Col>
-        <Col xs={24} lg={12}>
-          <Card>
-            {decisionReport ? (
-              <ReactECharts option={kpiStatusOption} style={{ height: 320 }} />
-            ) : (
-              <LoadingSkeleton type="card" rows={1} />
-            )}
-          </Card>
-        </Col>
-      </Row>
+      {/* 图表行 */}
+      <div className={styles.twoColGrid} style={{ marginBottom: 14 }}>
+        <ZCard>
+          {decisionReport
+            ? <ReactECharts option={kpiAchievementOption} style={{ height: 320 }} />
+            : <ZSkeleton rows={3} block />}
+        </ZCard>
+        <ZCard>
+          {decisionReport
+            ? <ReactECharts option={kpiStatusOption} style={{ height: 320 }} />
+            : <ZSkeleton rows={3} block />}
+        </ZCard>
+      </div>
 
-      <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
-        <Col xs={24} lg={12}>
-          <Card title="关键业务洞察" bordered={false}>
-            {decisionReport?.insights_summary.key_insights.slice(0, 3).map((insight, index) => (
-              <div
-                key={insight.insight_id}
-                style={{
-                  marginBottom: 16,
-                  paddingBottom: 16,
-                  borderBottom: index < 2 ? '1px solid var(--divider-color)' : 'none',
-                }}
-              >
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    marginBottom: 8,
-                  }}
-                >
-                  <strong style={{ fontSize: 15 }}>{insight.title}</strong>
-                  <Tag
-                    color={
-                      insight.impact_level === 'high'
-                        ? 'red'
-                        : insight.impact_level === 'medium'
-                        ? 'orange'
-                        : 'blue'
-                    }
-                  >
-                    {insight.impact_level === 'high'
-                      ? '高影响'
-                      : insight.impact_level === 'medium'
-                      ? '中影响'
-                      : '低影响'}
-                  </Tag>
-                </div>
-                <p style={{ color: 'var(--text-secondary)', fontSize: 13, margin: 0 }}>
-                  {insight.description}
-                </p>
+      {/* 洞察 + 系统信息 */}
+      <div className={styles.twoColGrid}>
+        <ZCard title="关键业务洞察">
+          {decisionReport?.insights_summary.key_insights.slice(0, 3).map((insight: any, index: number) => (
+            <div
+              key={insight.insight_id}
+              style={{
+                marginBottom: 16,
+                paddingBottom: 16,
+                borderBottom: index < 2 ? '1px solid var(--border)' : 'none',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <strong style={{ fontSize: 15 }}>{insight.title}</strong>
+                <ZBadge
+                  type={insight.impact_level === 'high' ? 'critical' : insight.impact_level === 'medium' ? 'warning' : 'info'}
+                  text={insight.impact_level === 'high' ? '高影响' : insight.impact_level === 'medium' ? '中影响' : '低影响'}
+                />
               </div>
-            )) || (
-              <p style={{ color: 'var(--text-tertiary)', textAlign: 'center', padding: '32px 0' }}>
-                暂无洞察数据
+              <p style={{ color: 'var(--text-secondary)', fontSize: 13, margin: 0 }}>
+                {insight.description}
               </p>
+            </div>
+          )) || (
+            <p style={{ color: 'var(--text-secondary)', textAlign: 'center', padding: '32px 0' }}>
+              暂无洞察数据
+            </p>
+          )}
+        </ZCard>
+
+        <ZCard title="系统信息">
+          <div className={styles.infoList}>
+            <div className={styles.infoRow}>
+              <span className={styles.infoLabel}>版本</span>
+              <span className={styles.infoValue}>0.1.0</span>
+            </div>
+            <div className={styles.infoRow}>
+              <span className={styles.infoLabel}>Agent数量</span>
+              <span className={styles.infoValue}>7个</span>
+            </div>
+            <div className={styles.infoRow}>
+              <span className={styles.infoLabel}>API状态</span>
+              <ZBadge type={healthStatus ? 'success' : 'critical'} text={healthStatus ? '正常' : '异常'} />
+            </div>
+            <div className={styles.infoRow}>
+              <span className={styles.infoLabel}>最后更新</span>
+              <span className={styles.infoValue}>{new Date().toLocaleString('zh-CN')}</span>
+            </div>
+            {decisionReport && (
+              <>
+                <div className={styles.infoDivider} />
+                <div className={styles.infoRow}>
+                  <span className={styles.infoLabel}>报告时间</span>
+                  <span className={styles.infoValue}>{new Date(decisionReport.report_date).toLocaleString('zh-CN')}</span>
+                </div>
+                <div className={styles.infoRow}>
+                  <span className={styles.infoLabel}>门店ID</span>
+                  <span className={styles.infoValue}>{decisionReport.store_id}</span>
+                </div>
+                <div className={styles.infoRow}>
+                  <span className={styles.infoLabel}>健康分数</span>
+                  <span style={{ fontWeight: 600, fontSize: 16, color: 'var(--accent)' }}>
+                    {decisionReport.overall_health_score.toFixed(1)}/100
+                  </span>
+                </div>
+              </>
             )}
-          </Card>
-        </Col>
-        <Col xs={24} lg={12}>
-          <Card title="系统信息" bordered={false}>
-            <Space direction="vertical" size={8} style={{ width: '100%' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--text-secondary)' }}>版本</span>
-                <span style={{ fontWeight: 500 }}>0.1.0</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--text-secondary)' }}>Agent数量</span>
-                <span style={{ fontWeight: 500 }}>7个</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--text-secondary)' }}>API状态</span>
-                <Tag color={healthStatus ? 'success' : 'error'}>
-                  {healthStatus ? '正常' : '异常'}
-                </Tag>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--text-secondary)' }}>最后更新</span>
-                <span style={{ fontWeight: 500 }}>
-                  {new Date().toLocaleString('zh-CN')}
-                </span>
-              </div>
-              {decisionReport && (
-                <>
-                  <div
-                    style={{
-                      height: 1,
-                      background: 'var(--divider-color)',
-                      margin: '12px 0',
-                    }}
-                  />
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: 'var(--text-secondary)' }}>报告时间</span>
-                    <span style={{ fontWeight: 500 }}>
-                      {new Date(decisionReport.report_date).toLocaleString('zh-CN')}
-                    </span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: 'var(--text-secondary)' }}>门店ID</span>
-                    <span style={{ fontWeight: 500 }}>{decisionReport.store_id}</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: 'var(--text-secondary)' }}>健康分数</span>
-                    <span style={{ fontWeight: 500, fontSize: 16, color: 'var(--primary-color)' }}>
-                      {decisionReport.overall_health_score.toFixed(1)}/100
-                    </span>
-                  </div>
-                </>
-              )}
-            </Space>
-          </Card>
-        </Col>
-      </Row>
+          </div>
+        </ZCard>
+      </div>
     </div>
   );
 };

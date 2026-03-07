@@ -1,0 +1,163 @@
+/* ── Page ──────────────────────────────────────────────────────────────────── */
+
+.page {
+  padding: 0;
+}
+
+/* ── Page header ─────────────────────────────────────────────────────────────*/
+
+.pageHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.pageTitle {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.pageSub {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: 4px 0 0;
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.toggleLabel {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+/* ── Alert banners ───────────────────────────────────────────────────────────*/
+
+.alertBar {
+  display: flex;
+  align-items: center;
+  padding: 10px 14px;
+  border-radius: var(--radius-md, 8px);
+  font-size: 13px;
+  border: 1px solid;
+  line-height: 1.5;
+}
+
+.alertSuccess {
+  background: #f6ffed;
+  border-color: #b7eb8f;
+  color: #389e0d;
+}
+
+.alertError {
+  background: #fff2f0;
+  border-color: #ffccc7;
+  color: #cf1322;
+}
+
+/* ── Hero card ───────────────────────────────────────────────────────────────*/
+
+.heroRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.heroLeft {
+  color: white;
+}
+
+.heroTitle {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.heroScore {
+  font-size: 56px;
+  font-weight: 700;
+  line-height: 1;
+  margin: 12px 0;
+}
+
+.heroSub {
+  font-size: 14px;
+  opacity: 0.88;
+}
+
+.heroBadges {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+/* ── KPI grid ────────────────────────────────────────────────────────────────*/
+
+.kpiGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+@media (max-width: 1100px) { .kpiGrid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 640px)  { .kpiGrid { grid-template-columns: 1fr; } }
+
+/* ── Two-column layout ───────────────────────────────────────────────────────*/
+
+.twoColGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+@media (max-width: 900px) { .twoColGrid { grid-template-columns: 1fr; } }
+
+/* ── System info list ────────────────────────────────────────────────────────*/
+
+.infoList {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.infoRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.infoRow:last-child {
+  border-bottom: none;
+}
+
+.infoLabel {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.infoValue {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.infoDivider {
+  height: 1px;
+  background: var(--border);
+  margin: 8px 0;
+}
