@@ -1,0 +1,164 @@
+/* ── Page ──────────────────────────────────────────────────────────────────── */
+
+.page {
+  padding: 0;
+}
+
+/* ── Page header ─────────────────────────────────────────────────────────────*/
+
+.pageHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.pageTitle {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.pageSub {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: 4px 0 0;
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ── KPI grids ───────────────────────────────────────────────────────────────*/
+
+.kpiGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.kpiGrid3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+@media (max-width: 1100px) {
+  .kpiGrid  { grid-template-columns: repeat(2, 1fr); }
+  .kpiGrid3 { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 640px) {
+  .kpiGrid, .kpiGrid3 { grid-template-columns: 1fr; }
+}
+
+/* ── Section title ───────────────────────────────────────────────────────────*/
+
+.sectionTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 12px;
+}
+
+/* ── Hint text ───────────────────────────────────────────────────────────────*/
+
+.hintText {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin: 6px 0 0;
+}
+
+/* ── Description list ────────────────────────────────────────────────────────*/
+
+.descList {
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 6px);
+  overflow: hidden;
+}
+
+.descRow {
+  display: grid;
+  grid-template-columns: 100px 1fr;
+  border-bottom: 1px solid var(--border);
+}
+
+.descRow:last-child {
+  border-bottom: none;
+}
+
+.descRow dt {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: #fafafa;
+  padding: 8px 12px;
+  border-right: 1px solid var(--border);
+}
+
+.descRow dd {
+  font-size: 13px;
+  color: var(--text-primary);
+  padding: 8px 12px;
+  margin: 0;
+}
+
+/* Full-width row (label spans entire row, value below) */
+.descRow2 {
+  border-bottom: 1px solid var(--border);
+  padding: 8px 12px;
+}
+
+.descRow2:last-child {
+  border-bottom: none;
+}
+
+.descRow2 dt {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+
+.descRow2 dd {
+  font-size: 13px;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+/* 2-column grid of description rows */
+.descRowGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+}
+
+@media (max-width: 640px) {
+  .descRowGrid { grid-template-columns: 1fr; }
+}
+
+/* ── 2-column form row ────────────────────────────────────────────────────────*/
+
+.formRow2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 16px;
+}
+
+@media (max-width: 560px) {
+  .formRow2 { grid-template-columns: 1fr; }
+}

@@ -11,20 +11,22 @@
  */
 import React, { useState, useCallback, useEffect } from 'react';
 import {
-  Card, Table, Button, Modal, Form, Input, Select, InputNumber,
-  Tag, Space, Descriptions, Upload, message, Badge,
-  Row, Col, Statistic, Popconfirm, Drawer, Divider, Tooltip,
-  Alert, Progress,
+  Form, Input, InputNumber, Select, Upload, Drawer, message,
 } from 'antd';
+import type { UploadProps } from 'antd';
 import {
   PlusOutlined, UploadOutlined, CheckCircleOutlined,
   HistoryOutlined, EyeOutlined, ThunderboltOutlined,
   ReloadOutlined, BookOutlined, DollarOutlined,
 } from '@ant-design/icons';
-import type { ColumnsType } from 'antd/es/table';
-import type { UploadProps } from 'antd';
+import {
+  ZCard, ZKpi, ZBadge, ZButton, ZSkeleton, ZSelect,
+  ZTable, ZModal, ZEmpty,
+} from '../design-system/components';
+import type { ZTableColumn } from '../design-system/components/ZTable';
 import { apiClient } from '../services/api';
 import { handleApiError, showSuccess } from '../utils/message';
+import styles from './BOMManagementPage.module.css';
 
 const { Option } = Select;
 
@@ -82,36 +84,130 @@ interface CostReport {
   items: CostReportItem[];
 }
 
+// ── 列定义（放组件外避免每次渲染重新创建） ────────────────────────────────────
+
+const itemColumns: ZTableColumn<BOMItem>[] = [
+  {
+    key: 'ingredient_id',
+    title: '食材 ID',
+    render: (v: string) => <code style={{ fontSize: 12 }}>{v}</code>,
+  },
+  {
+    key: 'standard_qty',
+    title: '标准用量',
+    width: 90,
+    render: (v: number, row: BOMItem) => `${v} ${row.unit}`,
+  },
+  {
+    key: 'raw_qty',
+    title: '毛料用量',
+    width: 90,
+    render: (v: number | null, row: BOMItem) => v != null ? `${v} ${row.unit}` : '—',
+  },
+  {
+    key: 'waste_factor',
+    title: '损耗系数',
+    width: 90,
+    render: (v: number) => `${(v * 100).toFixed(1)}%`,
+  },
+  {
+    key: 'unit_cost',
+    title: '单价(分)',
+    width: 90,
+    align: 'right',
+    render: (v: number | null) => v != null ? `¥${(v / 100).toFixed(2)}` : '—',
+  },
+  {
+    key: 'is_key_ingredient',
+    title: '标签',
+    width: 120,
+    render: (_: any, row: BOMItem) => (
+      <div style={{ display: 'flex', gap: 4 }}>
+        {row.is_key_ingredient && <ZBadge type="critical" text="核心" />}
+        {row.is_optional && <ZBadge type="default" text="可选" />}
+      </div>
+    ),
+  },
+  {
+    key: 'prep_notes',
+    title: '加工说明',
+    render: (v: string | null) => v || '—',
+  },
+];
+
+const costItemColumns: ZTableColumn<CostReportItem>[] = [
+  {
+    key: 'ingredient_id',
+    title: '食材',
+    render: (v: string) => <code style={{ fontSize: 11 }}>{v}</code>,
+  },
+  {
+    key: 'standard_qty',
+    title: '标准用量',
+    width: 100,
+    render: (v: number, row: CostReportItem) => `${v} ${row.unit}`,
+  },
+  {
+    key: 'unit_cost_fen',
+    title: '单价',
+    width: 80,
+    align: 'right',
+    render: (v: number) => v ? `¥${(v / 100).toFixed(2)}` : '—',
+  },
+  {
+    key: 'item_cost_yuan',
+    title: '成本',
+    width: 80,
+    align: 'right',
+    render: (v: number) => `¥${Number(v).toFixed(2)}`,
+  },
+  {
+    key: 'cost_pct',
+    title: '占比',
+    width: 140,
+    render: (v: number) => {
+      const barColor = v >= 40 ? 'var(--red)' : v >= 25 ? 'var(--yellow)' : 'var(--green)';
+      return (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{ width: 80, height: 5, background: '#f0f0f0', borderRadius: 3, overflow: 'hidden' }}>
+            <div style={{ width: `${Math.min(v, 100)}%`, height: '100%', background: barColor, borderRadius: 3 }} />
+          </div>
+          <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{v}%</span>
+        </div>
+      );
+    },
+  },
+];
+
 // ── 主组件 ────────────────────────────────────────────────────────────────────
 
 const BOMManagementPage: React.FC = () => {
-  const [storeId, setStoreId] = useState(localStorage.getItem('store_id') || 'STORE001');
-  const [stores, setStores] = useState<any[]>([]);
-  const [boms, setBoms] = useState<BOMTemplate[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [storeId, setStoreId]       = useState(localStorage.getItem('store_id') || 'STORE001');
+  const [stores, setStores]         = useState<any[]>([]);
+  const [boms, setBoms]             = useState<BOMTemplate[]>([]);
+  const [loading, setLoading]       = useState(false);
   const [selectedBom, setSelectedBom] = useState<BOMTemplate | null>(null);
   const [historyBoms, setHistoryBoms] = useState<BOMTemplate[]>([]);
   const [historyDishId, setHistoryDishId] = useState<string | null>(null);
+
   // 成本分析
-  const [costReport, setCostReport] = useState<CostReport | null>(null);
+  const [costReport, setCostReport]             = useState<CostReport | null>(null);
   const [costReportVisible, setCostReportVisible] = useState(false);
   const [costReportLoading, setCostReportLoading] = useState(false);
 
-  // 创建 BOM modal
+  // 新建 BOM modal
   const [createVisible, setCreateVisible] = useState(false);
   const [createLoading, setCreateLoading] = useState(false);
   const [createForm] = Form.useForm();
 
   // 添加食材行 modal
-  const [itemVisible, setItemVisible] = useState(false);
-  const [itemLoading, setItemLoading] = useState(false);
+  const [itemVisible, setItemVisible]   = useState(false);
+  const [itemLoading, setItemLoading]   = useState(false);
   const [itemForm] = Form.useForm();
-  const [targetBomId, setTargetBomId] = useState<string | null>(null);
+  const [targetBomId, setTargetBomId]   = useState<string | null>(null);
 
-  // BOM 详情 drawer
-  const [detailVisible, setDetailVisible] = useState(false);
-
-  // 版本历史 drawer
+  // 抽屉
+  const [detailVisible, setDetailVisible]   = useState(false);
   const [historyVisible, setHistoryVisible] = useState(false);
 
   // ── 数据加载 ────────────────────────────────────────────────────────────────
@@ -246,7 +342,6 @@ const BOMManagementPage: React.FC = () => {
       await apiClient.post(`/api/v1/bom/${targetBomId}/items`, values);
       showSuccess('食材行已添加');
       setItemVisible(false);
-      // 刷新详情
       const res = await apiClient.get(`/api/v1/bom/${targetBomId}`);
       setSelectedBom(res.data);
       loadBoms();
@@ -278,351 +373,261 @@ const BOMManagementPage: React.FC = () => {
     },
   };
 
-  // ── 统计数据 ────────────────────────────────────────────────────────────────
+  // ── 统计 ────────────────────────────────────────────────────────────────────
 
-  const totalBoms = boms.length;
-  const activeBoms = boms.filter(b => b.is_active).length;
+  const totalBoms    = boms.length;
+  const activeBoms   = boms.filter(b => b.is_active).length;
   const approvedBoms = boms.filter(b => b.is_approved).length;
-  const avgYieldRate =
-    boms.length > 0
-      ? (boms.reduce((s, b) => s + b.yield_rate, 0) / boms.length * 100).toFixed(1)
-      : '0.0';
+  const avgYieldRate = boms.length > 0
+    ? (boms.reduce((s, b) => s + b.yield_rate, 0) / boms.length * 100).toFixed(1)
+    : '0.0';
+
+  const storeOptions = stores.length > 0
+    ? stores.map((s: any) => ({ value: s.store_id || s.id, label: s.name || s.store_id || s.id }))
+    : [
+        { value: 'STORE001', label: '北京旗舰店' },
+        { value: 'STORE002', label: '上海直营店' },
+        { value: 'STORE003', label: '广州加盟店' },
+      ];
 
   // ── BOM 列表列定义 ──────────────────────────────────────────────────────────
 
-  const bomColumns: ColumnsType<BOMTemplate> = [
+  const bomColumns: ZTableColumn<BOMTemplate>[] = [
     {
+      key: 'dish_id',
       title: '菜品 ID',
-      dataIndex: 'dish_id',
       width: 200,
-      ellipsis: true,
-      render: (v) => <code style={{ fontSize: 12 }}>{v}</code>,
+      render: (v: string) => <code style={{ fontSize: 12 }}>{v}</code>,
     },
     {
+      key: 'version',
       title: '版本',
-      dataIndex: 'version',
       width: 90,
-      render: (v, rec) => (
-        <Space>
-          <Tag color={rec.is_active ? 'green' : 'default'}>{v}</Tag>
-          {rec.is_active && <Badge status="processing" />}
-        </Space>
+      render: (v: string, rec: BOMTemplate) => (
+        <ZBadge type={rec.is_active ? 'success' : 'default'} text={v} />
       ),
     },
     {
+      key: 'yield_rate',
       title: '出成率',
-      dataIndex: 'yield_rate',
       width: 90,
-      render: (v) => <Tag color="blue">{(v * 100).toFixed(1)}%</Tag>,
+      align: 'center',
+      render: (v: number) => <ZBadge type="info" text={`${(v * 100).toFixed(1)}%`} />,
     },
     {
+      key: 'items',
       title: '食材数',
-      dataIndex: 'items',
       width: 80,
+      align: 'center',
       render: (items: BOMItem[]) => items?.length ?? 0,
     },
     {
+      key: 'effective_date',
       title: '生效日期',
-      dataIndex: 'effective_date',
       width: 120,
-      render: (v) => v?.slice(0, 10),
+      render: (v: string) => v?.slice(0, 10),
     },
     {
+      key: 'is_active',
       title: '状态',
-      width: 120,
-      render: (_, rec) => (
-        <Space size={4}>
-          {rec.is_active && <Tag color="success" icon={<CheckCircleOutlined />}>当前</Tag>}
-          {rec.is_approved ? (
-            <Tag color="processing">已审核</Tag>
-          ) : (
-            <Tag color="warning">待审核</Tag>
+      width: 140,
+      render: (_: any, rec: BOMTemplate) => (
+        <div style={{ display: 'flex', gap: 4 }}>
+          {rec.is_active && (
+            <ZBadge type="success" text="当前" />
           )}
-        </Space>
+          <ZBadge
+            type={rec.is_approved ? 'info' : 'warning'}
+            text={rec.is_approved ? '已审核' : '待审核'}
+          />
+        </div>
       ),
     },
     {
+      key: 'id',
       title: '操作',
-      width: 230,
-      fixed: 'right',
-      render: (_, rec) => (
-        <Space size={4}>
-          <Tooltip title="查看详情">
-            <Button size="small" icon={<EyeOutlined />} onClick={() => viewDetail(rec)} />
-          </Tooltip>
-          <Tooltip title="成本分析">
-            <Button
-              size="small"
-              icon={<DollarOutlined />}
-              style={{ color: '#52c41a', borderColor: '#52c41a' }}
-              onClick={() => loadCostReport(rec.id)}
-            />
-          </Tooltip>
-          <Tooltip title="版本历史">
-            <Button
-              size="small"
-              icon={<HistoryOutlined />}
-              onClick={() => viewHistory(rec.dish_id)}
-            />
-          </Tooltip>
+      width: 220,
+      render: (_: any, rec: BOMTemplate) => (
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+          <ZButton size="sm" icon={<EyeOutlined />} onClick={() => viewDetail(rec)} title="查看详情" />
+          <ZButton
+            size="sm"
+            icon={<DollarOutlined />}
+            onClick={() => loadCostReport(rec.id)}
+            title="成本分析"
+            style={{ color: '#52c41a', borderColor: '#52c41a' }}
+          />
+          <ZButton size="sm" icon={<HistoryOutlined />} onClick={() => viewHistory(rec.dish_id)} title="版本历史" />
           {!rec.is_active && (
-            <Popconfirm
-              title="激活此版本将停用同菜品的当前版本，确认？"
-              onConfirm={() => activateBom(rec.id)}
-            >
-              <Tooltip title="激活版本">
-                <Button size="small" type="primary" icon={<ThunderboltOutlined />} />
-              </Tooltip>
-            </Popconfirm>
+            <ZButton
+              size="sm"
+              variant="primary"
+              icon={<ThunderboltOutlined />}
+              title="激活版本"
+              onClick={() => {
+                if (window.confirm('激活此版本将停用同菜品的当前版本，确认？')) {
+                  activateBom(rec.id);
+                }
+              }}
+            />
           )}
           {!rec.is_approved && (
-            <Popconfirm title="审核通过此 BOM？" onConfirm={() => approveBom(rec.id)}>
-              <Button size="small" type="dashed">审核</Button>
-            </Popconfirm>
+            <ZButton
+              size="sm"
+              onClick={() => {
+                if (window.confirm('审核通过此 BOM？')) approveBom(rec.id);
+              }}
+            >
+              审核
+            </ZButton>
           )}
-          <Tooltip title="添加食材行">
-            <Button
-              size="small"
-              icon={<PlusOutlined />}
-              onClick={() => openAddItem(rec.id)}
-            />
-          </Tooltip>
-        </Space>
+          <ZButton size="sm" icon={<PlusOutlined />} onClick={() => openAddItem(rec.id)} title="添加食材行" />
+        </div>
       ),
-    },
-  ];
-
-  // ── BOM 明细列定义 ──────────────────────────────────────────────────────────
-
-  const itemColumns: ColumnsType<BOMItem> = [
-    {
-      title: '食材 ID',
-      dataIndex: 'ingredient_id',
-      ellipsis: true,
-      render: (v) => <code style={{ fontSize: 12 }}>{v}</code>,
-    },
-    {
-      title: '标准用量',
-      dataIndex: 'standard_qty',
-      width: 90,
-      render: (v, rec) => `${v} ${rec.unit}`,
-    },
-    {
-      title: '毛料用量',
-      dataIndex: 'raw_qty',
-      width: 90,
-      render: (v, rec) => v != null ? `${v} ${rec.unit}` : '—',
-    },
-    {
-      title: '损耗系数',
-      dataIndex: 'waste_factor',
-      width: 90,
-      render: (v) => `${(v * 100).toFixed(1)}%`,
-    },
-    {
-      title: '单价(分)',
-      dataIndex: 'unit_cost',
-      width: 90,
-      render: (v) => v != null ? `¥${(v / 100).toFixed(2)}` : '—',
-    },
-    {
-      title: '标签',
-      width: 120,
-      render: (_, rec) => (
-        <Space size={4}>
-          {rec.is_key_ingredient && <Tag color="red">核心</Tag>}
-          {rec.is_optional && <Tag color="default">可选</Tag>}
-        </Space>
-      ),
-    },
-    {
-      title: '加工说明',
-      dataIndex: 'prep_notes',
-      ellipsis: true,
-      render: (v) => v || '—',
     },
   ];
 
   // ── 版本历史列定义 ──────────────────────────────────────────────────────────
 
-  const historyColumns: ColumnsType<BOMTemplate> = [
-    { title: '版本', dataIndex: 'version', width: 80 },
+  const historyColumns: ZTableColumn<BOMTemplate>[] = [
+    { key: 'version', title: '版本', width: 80 },
     {
+      key: 'effective_date',
       title: '生效日期',
-      dataIndex: 'effective_date',
       width: 110,
-      render: (v) => v?.slice(0, 10),
+      render: (v: string) => v?.slice(0, 10),
     },
     {
+      key: 'expiry_date',
       title: '失效日期',
-      dataIndex: 'expiry_date',
       width: 110,
-      render: (v) => v ? v.slice(0, 10) : <Tag color="green">当前</Tag>,
+      render: (v: string | null) => v ? v.slice(0, 10) : <ZBadge type="success" text="当前" />,
     },
     {
+      key: 'yield_rate',
       title: '出成率',
-      dataIndex: 'yield_rate',
       width: 80,
-      render: (v) => `${(v * 100).toFixed(1)}%`,
+      align: 'center',
+      render: (v: number) => `${(v * 100).toFixed(1)}%`,
     },
     {
+      key: 'items',
       title: '食材数',
-      dataIndex: 'items',
       width: 70,
-      render: (items) => items?.length ?? 0,
+      align: 'center',
+      render: (items: BOMItem[]) => items?.length ?? 0,
     },
     {
+      key: 'is_approved',
       title: '状态',
-      width: 100,
-      render: (_, rec) => (
-        <Space size={4}>
-          {rec.is_active ? (
-            <Tag color="success" icon={<CheckCircleOutlined />}>激活</Tag>
-          ) : (
-            <Tag>历史</Tag>
-          )}
-          {rec.is_approved && <Tag color="blue">已审核</Tag>}
-        </Space>
+      width: 120,
+      render: (_: any, rec: BOMTemplate) => (
+        <div style={{ display: 'flex', gap: 4 }}>
+          <ZBadge
+            type={rec.is_active ? 'success' : 'default'}
+            text={rec.is_active ? '激活' : '历史'}
+          />
+          {rec.is_approved && <ZBadge type="info" text="已审核" />}
+        </div>
       ),
     },
     {
+      key: 'id',
       title: '操作',
       width: 100,
-      render: (_, rec) =>
-        !rec.is_active ? (
-          <Popconfirm
-            title="激活此版本将停用当前版本，确认？"
-            onConfirm={() => activateBom(rec.id)}
-          >
-            <Button size="small" type="primary" icon={<ThunderboltOutlined />}>
-              激活
-            </Button>
-          </Popconfirm>
-        ) : null,
+      render: (_: any, rec: BOMTemplate) => !rec.is_active ? (
+        <ZButton
+          size="sm"
+          variant="primary"
+          icon={<ThunderboltOutlined />}
+          onClick={() => {
+            if (window.confirm('激活此版本将停用当前版本，确认？')) activateBom(rec.id);
+          }}
+        >
+          激活
+        </ZButton>
+      ) : null,
     },
   ];
 
   // ── 渲染 ────────────────────────────────────────────────────────────────────
 
   return (
-    <div style={{ padding: 24 }}>
+    <div className={styles.page}>
       {/* 页头 */}
-      <Row gutter={16} align="middle" style={{ marginBottom: 16 }}>
-        <Col flex="1">
-          <h2 style={{ margin: 0 }}>
+      <div className={styles.pageHeader}>
+        <div>
+          <h2 className={styles.pageTitle}>
             <BookOutlined style={{ marginRight: 8 }} />
             BOM 配方管理
           </h2>
-          <p style={{ color: '#888', margin: 0, fontSize: 13 }}>
-            管理门店菜品的标准配方版本、食材用量及出成率
-          </p>
-        </Col>
-        <Col>
-          <Space>
-            <Select
-              value={storeId}
-              onChange={setStoreId}
-              style={{ width: 160 }}
-              placeholder="选择门店"
-            >
-              {stores.length > 0
-                ? stores.map((s: any) => (
-                    <Option key={s.store_id || s.id} value={s.store_id || s.id}>
-                      {s.name || s.store_id || s.id}
-                    </Option>
-                  ))
-                : <>
-                    <Option value="STORE001">北京旗舰店</Option>
-                    <Option value="STORE002">上海直营店</Option>
-                    <Option value="STORE003">广州加盟店</Option>
-                  </>}
-            </Select>
-            <Upload {...uploadProps}>
-              <Button icon={<UploadOutlined />}>Excel 导入</Button>
-            </Upload>
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              onClick={() => setCreateVisible(true)}
-            >
-              新建 BOM
-            </Button>
-            <Button icon={<ReloadOutlined />} onClick={loadBoms} loading={loading} />
-          </Space>
-        </Col>
-      </Row>
+          <p className={styles.pageSub}>管理门店菜品的标准配方版本、食材用量及出成率</p>
+        </div>
+        <div className={styles.headerActions}>
+          <ZSelect
+            value={storeId}
+            options={storeOptions}
+            onChange={(v) => setStoreId(v as string)}
+            style={{ width: 160 }}
+          />
+          <Upload {...uploadProps}>
+            <ZButton icon={<UploadOutlined />}>Excel 导入</ZButton>
+          </Upload>
+          <ZButton variant="primary" icon={<PlusOutlined />} onClick={() => setCreateVisible(true)}>
+            新建 BOM
+          </ZButton>
+          <ZButton icon={<ReloadOutlined />} onClick={loadBoms} disabled={loading} />
+        </div>
+      </div>
 
       {/* 统计卡片 */}
-      <Row gutter={16} style={{ marginBottom: 16 }}>
-        <Col span={6}>
-          <Card size="small">
-            <Statistic title="BOM 总数" value={totalBoms} suffix="个" />
-          </Card>
-        </Col>
-        <Col span={6}>
-          <Card size="small">
-            <Statistic
-              title="激活版本"
-              value={activeBoms}
-              suffix="个"
-              valueStyle={{ color: '#3f8600' }}
-            />
-          </Card>
-        </Col>
-        <Col span={6}>
-          <Card size="small">
-            <Statistic
-              title="已审核"
-              value={approvedBoms}
-              suffix={`/ ${totalBoms}`}
-            />
-          </Card>
-        </Col>
-        <Col span={6}>
-          <Card size="small">
-            <Statistic title="平均出成率" value={avgYieldRate} suffix="%" />
-          </Card>
-        </Col>
-      </Row>
+      <div className={styles.kpiGrid}>
+        <ZCard><ZKpi value={totalBoms}    unit="个" label="BOM 总数" /></ZCard>
+        <ZCard><ZKpi value={activeBoms}   unit="个" label="激活版本" /></ZCard>
+        <ZCard><ZKpi value={`${approvedBoms} / ${totalBoms}`} label="已审核" /></ZCard>
+        <ZCard><ZKpi value={avgYieldRate} unit="%"  label="平均出成率" /></ZCard>
+      </div>
 
       {/* BOM 列表 */}
-      <Card
+      <ZCard
         title="配方版本列表"
         extra={
-          <Alert
-            type="info"
-            message="绿色 = 当前激活版本"
-            showIcon
-            style={{ padding: '2px 8px', marginBottom: 0 }}
-            banner
-          />
+          <span className={styles.hintText}>
+            <CheckCircleOutlined style={{ color: '#52c41a', marginRight: 4 }} />
+            绿色徽标 = 当前激活版本
+          </span>
         }
       >
-        <Table
-          rowKey="id"
-          columns={bomColumns}
-          dataSource={boms}
-          loading={loading}
-          scroll={{ x: 900 }}
-          pagination={{ pageSize: 20, showTotal: (t) => `共 ${t} 条` }}
-          rowClassName={(rec) => rec.is_active ? 'ant-table-row-selected' : ''}
-          onRow={(rec) => ({
-            style: rec.is_active ? { background: '#f6ffed' } : {},
-          })}
-        />
-      </Card>
+        {loading ? (
+          <ZSkeleton rows={6} block />
+        ) : boms.length === 0 ? (
+          <ZEmpty description="暂无 BOM 数据" />
+        ) : (
+          <ZTable<BOMTemplate>
+            columns={bomColumns}
+            data={boms}
+            rowKey="id"
+            emptyText="暂无 BOM 数据"
+          />
+        )}
+      </ZCard>
 
       {/* ── BOM 详情 Drawer ──────────────────────────────────────────────────── */}
       <Drawer
         title={
           selectedBom ? (
-            <Space>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <BookOutlined />
               BOM 详情
-              <Tag color={selectedBom.is_active ? 'green' : 'default'}>
+              <span style={{
+                fontSize: 12, padding: '1px 8px', borderRadius: 12,
+                background: selectedBom.is_active ? '#f6ffed' : '#f5f5f5',
+                color: selectedBom.is_active ? '#52c41a' : '#595959',
+                border: `1px solid ${selectedBom.is_active ? '#b7eb8f' : '#d9d9d9'}`,
+              }}>
                 {selectedBom.version}
-              </Tag>
-            </Space>
+              </span>
+            </div>
           ) : 'BOM 详情'
         }
         open={detailVisible}
@@ -630,67 +635,54 @@ const BOMManagementPage: React.FC = () => {
         width={720}
         extra={
           selectedBom && (
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              onClick={() => openAddItem(selectedBom.id)}
-            >
+            <ZButton variant="primary" icon={<PlusOutlined />} onClick={() => openAddItem(selectedBom.id)}>
               添加食材行
-            </Button>
+            </ZButton>
           )
         }
       >
         {selectedBom && (
           <>
-            <Descriptions bordered size="small" column={2}>
-              <Descriptions.Item label="菜品 ID" span={2}>
-                <code>{selectedBom.dish_id}</code>
-              </Descriptions.Item>
-              <Descriptions.Item label="版本">{selectedBom.version}</Descriptions.Item>
-              <Descriptions.Item label="出成率">
-                {(selectedBom.yield_rate * 100).toFixed(2)}%
-              </Descriptions.Item>
-              <Descriptions.Item label="生效日期">
-                {selectedBom.effective_date?.slice(0, 10)}
-              </Descriptions.Item>
-              <Descriptions.Item label="失效日期">
-                {selectedBom.expiry_date?.slice(0, 10) ?? '—'}
-              </Descriptions.Item>
+            <dl className={styles.descList}>
+              <div className={styles.descRow2}><dt>菜品 ID</dt><dd><code>{selectedBom.dish_id}</code></dd></div>
+              <div className={styles.descRowGrid}>
+                <div className={styles.descRow}><dt>版本</dt><dd>{selectedBom.version}</dd></div>
+                <div className={styles.descRow}><dt>出成率</dt><dd>{(selectedBom.yield_rate * 100).toFixed(2)}%</dd></div>
+              </div>
+              <div className={styles.descRowGrid}>
+                <div className={styles.descRow}><dt>生效日期</dt><dd>{selectedBom.effective_date?.slice(0, 10)}</dd></div>
+                <div className={styles.descRow}><dt>失效日期</dt><dd>{selectedBom.expiry_date?.slice(0, 10) ?? '—'}</dd></div>
+              </div>
               {selectedBom.standard_portion != null && (
-                <Descriptions.Item label="标准份重">
-                  {selectedBom.standard_portion} g
-                </Descriptions.Item>
+                <div className={styles.descRow}><dt>标准份重</dt><dd>{selectedBom.standard_portion} g</dd></div>
               )}
               {selectedBom.prep_time_minutes != null && (
-                <Descriptions.Item label="制作工时">
-                  {selectedBom.prep_time_minutes} min
-                </Descriptions.Item>
+                <div className={styles.descRow}><dt>制作工时</dt><dd>{selectedBom.prep_time_minutes} min</dd></div>
               )}
-              <Descriptions.Item label="审核状态" span={2}>
-                <Space>
+              <div className={styles.descRow2}>
+                <dt>审核状态</dt>
+                <dd>
                   {selectedBom.is_approved ? (
-                    <Tag color="processing">已审核（{selectedBom.approved_by}）</Tag>
+                    <ZBadge type="info" text={`已审核${selectedBom.approved_by ? `（${selectedBom.approved_by}）` : ''}`} />
                   ) : (
-                    <Tag color="warning">待审核</Tag>
+                    <ZBadge type="warning" text="待审核" />
                   )}
-                </Space>
-              </Descriptions.Item>
+                </dd>
+              </div>
               {selectedBom.notes && (
-                <Descriptions.Item label="备注" span={2}>
-                  {selectedBom.notes}
-                </Descriptions.Item>
+                <div className={styles.descRow2}><dt>备注</dt><dd>{selectedBom.notes}</dd></div>
               )}
-            </Descriptions>
+            </dl>
 
-            <Divider orientation="left">食材明细（{selectedBom.items?.length ?? 0} 行）</Divider>
+            <div className={styles.sectionTitle}>
+              食材明细（{selectedBom.items?.length ?? 0} 行）
+            </div>
 
-            <Table
-              rowKey="id"
+            <ZTable<BOMItem>
               columns={itemColumns}
-              dataSource={selectedBom.items || []}
-              pagination={false}
-              size="small"
-              scroll={{ x: 600 }}
+              data={selectedBom.items || []}
+              rowKey="id"
+              emptyText="暂无食材行"
             />
           </>
         )}
@@ -699,149 +691,78 @@ const BOMManagementPage: React.FC = () => {
       {/* ── 版本历史 Drawer ──────────────────────────────────────────────────── */}
       <Drawer
         title={
-          <Space>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <HistoryOutlined />
             版本历史
-          </Space>
+          </div>
         }
         open={historyVisible}
         onClose={() => setHistoryVisible(false)}
         width={760}
       >
-        <Table
-          rowKey="id"
+        <ZTable<BOMTemplate>
           columns={historyColumns}
-          dataSource={historyBoms}
-          pagination={false}
-          size="small"
-          rowClassName={(rec) => (rec.is_active ? 'ant-table-row-selected' : '')}
-          onRow={(rec) => ({
-            style: rec.is_active ? { background: '#f6ffed' } : {},
-          })}
+          data={historyBoms}
+          rowKey="id"
+          emptyText="暂无历史版本"
         />
       </Drawer>
 
       {/* ── 成本分析 Modal ────────────────────────────────────────────────────── */}
-      <Modal
-        title={
-          <Space>
-            <DollarOutlined style={{ color: '#52c41a' }} />
-            BOM 成本分析
-            {costReport && <Tag color="default">v{costReport.version}</Tag>}
-          </Space>
-        }
+      <ZModal
         open={costReportVisible}
-        onCancel={() => { setCostReportVisible(false); setCostReport(null); }}
-        footer={null}
+        title={
+          costReport
+            ? `BOM 成本分析  v${costReport.version}`
+            : 'BOM 成本分析'
+        }
+        onClose={() => { setCostReportVisible(false); setCostReport(null); }}
         width={640}
       >
         {costReportLoading ? (
-          <div style={{ textAlign: 'center', padding: 40 }}>
-            <Alert type="info" message="成本分析计算中…" showIcon />
-          </div>
+          <ZSkeleton rows={5} block />
         ) : costReport ? (
           <>
-            <Row gutter={16} style={{ marginBottom: 16 }}>
-              <Col span={8}>
-                <Card size="small">
-                  <Statistic
-                    title="标准总成本"
-                    value={costReport.total_cost_yuan}
-                    prefix="¥"
-                    precision={2}
-                  />
-                </Card>
-              </Col>
-              <Col span={8}>
-                <Card size="small">
-                  <Statistic
-                    title="菜品售价"
-                    value={costReport.price_yuan}
-                    prefix="¥"
-                    precision={2}
-                    valueStyle={{ color: '#1677ff' }}
-                  />
-                </Card>
-              </Col>
-              <Col span={8}>
-                <Card size="small">
-                  <Statistic
-                    title="食材成本率"
-                    value={costReport.food_cost_pct}
-                    suffix="%"
-                    precision={1}
-                    valueStyle={{
-                      color: costReport.food_cost_pct >= 35 ? '#ff4d4f'
-                           : costReport.food_cost_pct >= 30 ? '#fa8c16'
-                           : '#3f8600',
-                    }}
-                  />
-                </Card>
-              </Col>
-            </Row>
+            <div className={styles.kpiGrid3}>
+              <ZCard>
+                <ZKpi value={`¥${costReport.total_cost_yuan.toFixed(2)}`} label="标准总成本" />
+              </ZCard>
+              <ZCard>
+                <ZKpi value={`¥${costReport.price_yuan.toFixed(2)}`} label="菜品售价" />
+              </ZCard>
+              <ZCard>
+                <ZKpi value={costReport.food_cost_pct.toFixed(1)} unit="%" label="食材成本率" />
+              </ZCard>
+            </div>
 
-            <Divider orientation="left" style={{ margin: '8px 0 12px' }}>
+            <div className={styles.sectionTitle} style={{ marginTop: 16 }}>
               食材成本明细（按贡献降序）
-            </Divider>
+            </div>
 
-            <Table
+            <ZTable<CostReportItem>
+              columns={costItemColumns}
+              data={costReport.items}
               rowKey="ingredient_id"
-              dataSource={costReport.items}
-              pagination={false}
-              size="small"
-              columns={[
-                {
-                  title: '食材',
-                  dataIndex: 'ingredient_id',
-                  ellipsis: true,
-                  render: (v) => <code style={{ fontSize: 11 }}>{v}</code>,
-                },
-                {
-                  title: '标准用量',
-                  width: 100,
-                  render: (_, r) => `${r.standard_qty} ${r.unit}`,
-                },
-                {
-                  title: '单价',
-                  dataIndex: 'unit_cost_fen',
-                  width: 80,
-                  render: (v) => v ? `¥${(v / 100).toFixed(2)}` : '—',
-                },
-                {
-                  title: '成本',
-                  dataIndex: 'item_cost_yuan',
-                  width: 80,
-                  render: (v) => `¥${Number(v).toFixed(2)}`,
-                  sorter: (a, b) => b.item_cost_yuan - a.item_cost_yuan,
-                  defaultSortOrder: 'ascend',
-                },
-                {
-                  title: '占比',
-                  dataIndex: 'cost_pct',
-                  width: 130,
-                  render: (v) => (
-                    <Progress
-                      percent={Number(v)}
-                      size="small"
-                      strokeColor={v >= 40 ? '#ff4d4f' : v >= 25 ? '#fa8c16' : '#52c41a'}
-                      format={(p) => `${p}%`}
-                    />
-                  ),
-                },
-              ]}
+              emptyText="暂无明细数据"
             />
           </>
         ) : null}
-      </Modal>
+      </ZModal>
 
       {/* ── 新建 BOM Modal ───────────────────────────────────────────────────── */}
-      <Modal
-        title="新建 BOM 版本"
+      <ZModal
         open={createVisible}
-        onCancel={() => setCreateVisible(false)}
-        onOk={() => createForm.submit()}
-        confirmLoading={createLoading}
+        title="新建 BOM 版本"
+        onClose={() => setCreateVisible(false)}
         width={560}
+        footer={
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <ZButton onClick={() => setCreateVisible(false)}>取消</ZButton>
+            <ZButton variant="primary" disabled={createLoading} onClick={() => createForm.submit()}>
+              {createLoading ? '创建中…' : '确定'}
+            </ZButton>
+          </div>
+        }
       >
         <Form
           form={createForm}
@@ -849,62 +770,53 @@ const BOMManagementPage: React.FC = () => {
           onFinish={handleCreateBom}
           initialValues={{ activate: true, yield_rate: 1.0 }}
         >
-          <Form.Item
-            name="dish_id"
-            label="菜品 ID"
-            rules={[{ required: true, message: '请输入菜品 ID' }]}
-          >
+          <Form.Item name="dish_id" label="菜品 ID" rules={[{ required: true, message: '请输入菜品 ID' }]}>
             <Input placeholder="例：DISH-001" />
           </Form.Item>
-          <Form.Item
-            name="version"
-            label="版本号"
-            rules={[{ required: true, message: '请输入版本号' }]}
-          >
+          <Form.Item name="version" label="版本号" rules={[{ required: true, message: '请输入版本号' }]}>
             <Input placeholder="例：v1 / v2 / 2026-03" />
           </Form.Item>
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item name="yield_rate" label="出成率">
-                <InputNumber
-                  min={0.01}
-                  max={1.0}
-                  step={0.01}
-                  style={{ width: '100%' }}
-                  formatter={(v) => `${((v as number) * 100).toFixed(0)}%`}
-                  parser={(v) => parseFloat((v || '100').replace('%', '')) / 100 as unknown as 1}
-                />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item name="standard_portion" label="标准份重（g）">
-                <InputNumber min={1} style={{ width: '100%' }} />
-              </Form.Item>
-            </Col>
-          </Row>
+          <div className={styles.formRow2}>
+            <Form.Item name="yield_rate" label="出成率">
+              <InputNumber
+                min={0.01} max={1.0} step={0.01} style={{ width: '100%' }}
+                formatter={(v) => `${((v as number) * 100).toFixed(0)}%`}
+                parser={(v) => parseFloat((v || '100').replace('%', '')) / 100 as unknown as 1}
+              />
+            </Form.Item>
+            <Form.Item name="standard_portion" label="标准份重（g）">
+              <InputNumber min={1} style={{ width: '100%' }} />
+            </Form.Item>
+          </div>
           <Form.Item name="prep_time_minutes" label="制作工时（分钟）">
             <InputNumber min={1} style={{ width: '100%' }} />
           </Form.Item>
           <Form.Item name="notes" label="备注">
             <Input.TextArea rows={2} />
           </Form.Item>
-          <Form.Item name="activate" label="创建后立即激活" valuePropName="checked">
-            <Select style={{ width: 120 }}>
+          <Form.Item name="activate" label="创建后立即激活">
+            <Select style={{ width: 160 }}>
               <Option value={true}>是</Option>
               <Option value={false}>否（保存为草稿）</Option>
             </Select>
           </Form.Item>
         </Form>
-      </Modal>
+      </ZModal>
 
       {/* ── 添加食材行 Modal ─────────────────────────────────────────────────── */}
-      <Modal
-        title="添加食材行"
+      <ZModal
         open={itemVisible}
-        onCancel={() => setItemVisible(false)}
-        onOk={() => itemForm.submit()}
-        confirmLoading={itemLoading}
+        title="添加食材行"
+        onClose={() => setItemVisible(false)}
         width={560}
+        footer={
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <ZButton onClick={() => setItemVisible(false)}>取消</ZButton>
+            <ZButton variant="primary" disabled={itemLoading} onClick={() => itemForm.submit()}>
+              {itemLoading ? '添加中…' : '确定'}
+            </ZButton>
+          </div>
+        }
       >
         <Form
           form={itemForm}
@@ -912,69 +824,45 @@ const BOMManagementPage: React.FC = () => {
           onFinish={handleAddItem}
           initialValues={{ waste_factor: 0, is_key_ingredient: false, is_optional: false }}
         >
-          <Form.Item
-            name="ingredient_id"
-            label="食材 ID"
-            rules={[{ required: true, message: '请输入食材 ID' }]}
-          >
+          <Form.Item name="ingredient_id" label="食材 ID" rules={[{ required: true, message: '请输入食材 ID' }]}>
             <Input placeholder="对应 InventoryItem.id，例：ING-PORK-001" />
           </Form.Item>
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item
-                name="standard_qty"
-                label="标准用量"
-                rules={[{ required: true, message: '请输入用量' }]}
-              >
-                <InputNumber min={0.001} step={0.5} style={{ width: '100%' }} />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item
-                name="unit"
-                label="单位"
-                rules={[{ required: true, message: '请选择单位' }]}
-              >
-                <Select>
-                  {['g', 'kg', 'ml', 'L', '个', '份', '片', '条'].map((u) => (
-                    <Option key={u} value={u}>{u}</Option>
-                  ))}
-                </Select>
-              </Form.Item>
-            </Col>
-          </Row>
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item name="raw_qty" label="毛料用量（可选）">
-                <InputNumber min={0} step={0.5} style={{ width: '100%' }} />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item name="unit_cost" label="单价（分，可选）">
-                <InputNumber min={0} style={{ width: '100%' }} />
-              </Form.Item>
-            </Col>
-          </Row>
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item name="waste_factor" label="损耗系数（0~1）">
-                <InputNumber min={0} max={1} step={0.01} style={{ width: '100%' }} />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item name="is_key_ingredient" label="核心食材">
-                <Select>
-                  <Option value={false}>否</Option>
-                  <Option value={true}>是（重点监控）</Option>
-                </Select>
-              </Form.Item>
-            </Col>
-          </Row>
+          <div className={styles.formRow2}>
+            <Form.Item name="standard_qty" label="标准用量" rules={[{ required: true, message: '请输入用量' }]}>
+              <InputNumber min={0.001} step={0.5} style={{ width: '100%' }} />
+            </Form.Item>
+            <Form.Item name="unit" label="单位" rules={[{ required: true, message: '请选择单位' }]}>
+              <Select>
+                {['g', 'kg', 'ml', 'L', '个', '份', '片', '条'].map((u) => (
+                  <Option key={u} value={u}>{u}</Option>
+                ))}
+              </Select>
+            </Form.Item>
+          </div>
+          <div className={styles.formRow2}>
+            <Form.Item name="raw_qty" label="毛料用量（可选）">
+              <InputNumber min={0} step={0.5} style={{ width: '100%' }} />
+            </Form.Item>
+            <Form.Item name="unit_cost" label="单价（分，可选）">
+              <InputNumber min={0} style={{ width: '100%' }} />
+            </Form.Item>
+          </div>
+          <div className={styles.formRow2}>
+            <Form.Item name="waste_factor" label="损耗系数（0~1）">
+              <InputNumber min={0} max={1} step={0.01} style={{ width: '100%' }} />
+            </Form.Item>
+            <Form.Item name="is_key_ingredient" label="核心食材">
+              <Select>
+                <Option value={false}>否</Option>
+                <Option value={true}>是（重点监控）</Option>
+              </Select>
+            </Form.Item>
+          </div>
           <Form.Item name="prep_notes" label="加工说明">
             <Input placeholder="例：去骨、切丁、腌制20分钟" />
           </Form.Item>
         </Form>
-      </Modal>
+      </ZModal>
     </div>
   );
 };
