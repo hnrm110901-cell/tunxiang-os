@@ -1,23 +1,22 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import {
-  Row, Col, Card, Select, Button, Alert, Tag, Table, Statistic,
-  Space, Spin, Typography, DatePicker,
-} from 'antd';
+import { DatePicker } from 'antd';
 import { FilePdfOutlined, ReloadOutlined } from '@ant-design/icons';
 import ReactECharts from 'echarts-for-react';
 import dayjs from 'dayjs';
+import {
+  ZCard, ZKpi, ZBadge, ZButton, ZSkeleton, ZSelect, ZTable,
+} from '../design-system/components';
+import type { ZTableColumn } from '../design-system/components/ZTable';
 import { apiClient } from '../services/api';
 import { handleApiError } from '../utils/message';
-
-const { Option } = Select;
-const { Text } = Typography;
+import styles from './MonthlyReportPage.module.css';
 
 const MonthlyReportPage: React.FC = () => {
-  const [loading, setLoading] = useState(false);
-  const [stores, setStores] = useState<any[]>([]);
+  const [loading, setLoading]             = useState(false);
+  const [stores, setStores]               = useState<any[]>([]);
   const [selectedStore, setSelectedStore] = useState(localStorage.getItem('store_id') || 'STORE001');
   const [selectedMonth, setSelectedMonth] = useState(dayjs().subtract(1, 'month'));
-  const [report, setReport] = useState<any>(null);
+  const [report, setReport]               = useState<any>(null);
 
   const loadStores = useCallback(async () => {
     try {
@@ -60,6 +59,19 @@ const MonthlyReportPage: React.FC = () => {
   const chart   = report?.weekly_trend_chart;
   const top3    = report?.top3_decisions || [];
 
+  const storeOptions = stores.length > 0
+    ? stores.map((s: any) => ({ value: s.store_id || s.id, label: s.name || s.store_id || s.id }))
+    : [{ value: 'STORE001', label: 'STORE001' }];
+
+  const statusBadgeType = (s: string): 'critical' | 'warning' | 'success' =>
+    s === 'critical' ? 'critical' : s === 'warning' ? 'warning' : 'success';
+
+  const statusLabel = (s: string) =>
+    s === 'critical' ? '超标' : s === 'warning' ? '偏高' : '正常';
+
+  const statusColor = (s: string) =>
+    s === 'critical' ? '#cf1322' : s === 'warning' ? '#d46b08' : '#389e0d';
+
   const chartOption = chart ? {
     tooltip: { trigger: 'axis' },
     legend: { data: ['成本率%', '营业额¥'], bottom: 0 },
@@ -90,52 +102,47 @@ const MonthlyReportPage: React.FC = () => {
     ],
   } : null;
 
-  const top3Columns = [
+  const top3Columns: ZTableColumn<any>[] = [
     {
-      title: '#', key: 'rank', width: 36,
+      key:    'rank',
+      title:  '#',
+      width:  48,
+      align:  'center',
       render: (_: any, __: any, i: number) => (
-        <Tag color={i === 0 ? 'red' : i === 1 ? 'orange' : 'blue'}>#{i + 1}</Tag>
+        <ZBadge
+          type={i === 0 ? 'critical' : i === 1 ? 'warning' : 'info'}
+          text={`#${i + 1}`}
+        />
       ),
     },
-    { title: '执行动作', dataIndex: 'action', key: 'action' },
+    { key: 'action', title: '执行动作' },
     {
-      title: '预期节省¥', dataIndex: 'expected_saving_yuan', key: 'saving',
+      key:    'expected_saving_yuan',
+      title:  '预期节省¥',
+      align:  'right',
       render: (v: number) => (
-        <Text style={{ color: '#52c41a', fontWeight: 600 }}>
+        <strong style={{ color: '#389e0d' }}>
           ¥{(v || 0).toLocaleString('zh-CN', { minimumFractionDigits: 0 })}
-        </Text>
+        </strong>
       ),
     },
     {
-      title: '实际结果', dataIndex: 'outcome', key: 'outcome',
-      render: (v: string) => v || <Text type="secondary">待统计</Text>,
+      key:    'outcome',
+      title:  '实际结果',
+      render: (v: string) => v || <span style={{ color: 'var(--text-secondary)' }}>待统计</span>,
     },
   ];
 
-  const statusColor = (s: string) =>
-    s === 'critical' ? '#f5222d' : s === 'warning' ? '#faad14' : '#52c41a';
-  const statusLabel = (s: string) =>
-    s === 'critical' ? '超标' : s === 'warning' ? '偏高' : '正常';
-  const alertType = (s: string): 'error' | 'warning' | 'success' =>
-    s === 'critical' ? 'error' : s === 'warning' ? 'warning' : 'success';
-
   return (
-    <div>
-      <Space wrap style={{ marginBottom: 16 }}>
-        <Select
+    <div className={styles.page}>
+      {/* 控制栏 */}
+      <div className={styles.toolbar}>
+        <ZSelect
           value={selectedStore}
-          onChange={setSelectedStore}
+          options={storeOptions}
+          onChange={(v) => setSelectedStore(v as string)}
           style={{ width: 160 }}
-          placeholder="选择门店"
-        >
-          {stores.length > 0
-            ? stores.map((s: any) => (
-                <Option key={s.store_id || s.id} value={s.store_id || s.id}>
-                  {s.name || s.store_id || s.id}
-                </Option>
-              ))
-            : <Option value="STORE001">STORE001</Option>}
-        </Select>
+        />
         <DatePicker
           picker="month"
           value={selectedMonth}
@@ -143,121 +150,111 @@ const MonthlyReportPage: React.FC = () => {
           disabledDate={(d) => d && d.isAfter(dayjs())}
           style={{ width: 120 }}
         />
-        <Button icon={<ReloadOutlined />} onClick={loadReport} loading={loading}>刷新</Button>
-        <Button
-          type="primary"
+        <ZButton icon={<ReloadOutlined />} onClick={loadReport} disabled={loading}>刷新</ZButton>
+        <ZButton
+          variant="primary"
           icon={<FilePdfOutlined />}
           onClick={handlePrintPdf}
           disabled={!report}
         >
           打印 / 导出 PDF
-        </Button>
-      </Space>
+        </ZButton>
+      </div>
 
-      <Spin spinning={loading}>
-        {!report && !loading && (
-          <Alert message="暂无报告数据，请选择门店和月份后加载" type="info" showIcon />
-        )}
+      {/* 主体 */}
+      {loading ? (
+        <ZSkeleton rows={10} block />
+      ) : !report ? (
+        <div className={styles.alertInfo}>暂无报告数据，请选择门店和月份后加载</div>
+      ) : (
+        <>
+          {/* 状态横幅 */}
+          {summary && (
+            <div className={`${styles.alertBanner} ${styles[`alert_${summary.cost_rate_status}`]}`}>
+              <strong>{summary.headline}</strong>
+              <span style={{ marginLeft: 8, opacity: 0.8 }}>报告周期：{summary.period}</span>
+            </div>
+          )}
 
-        {summary && (
-          <>
-            <Alert
-              message={summary.headline}
-              description={`报告周期：${summary.period}`}
-              type={alertType(summary.cost_rate_status)}
-              showIcon
-              style={{ marginBottom: 16 }}
-            />
-
-            <Row gutter={16} style={{ marginBottom: 16 }}>
-              <Col xs={12} md={4}>
-                <Card size="small">
-                  <Statistic title="月度营业额" value={summary.revenue_yuan} prefix="¥" precision={0} />
-                </Card>
-              </Col>
-              <Col xs={12} md={4}>
-                <Card size="small">
-                  <Statistic
-                    title="食材成本率"
-                    value={summary.actual_cost_pct ?? 0}
-                    suffix="%"
-                    precision={1}
-                    valueStyle={{ color: statusColor(summary.cost_rate_status) }}
+          {/* KPI 卡片 */}
+          {summary && (
+            <div className={styles.kpiGrid}>
+              <ZCard>
+                <ZKpi
+                  value={`¥${(summary.revenue_yuan || 0).toLocaleString('zh-CN', { minimumFractionDigits: 0 })}`}
+                  label="月度营业额"
+                />
+              </ZCard>
+              <ZCard>
+                <ZKpi
+                  value={(summary.actual_cost_pct ?? 0).toFixed(1)}
+                  unit="%"
+                  label="食材成本率"
+                />
+                <div style={{ marginTop: 6 }}>
+                  <ZBadge
+                    type={statusBadgeType(summary.cost_rate_status)}
+                    text={statusLabel(summary.cost_rate_status)}
                   />
-                  <Tag
-                    color={summary.cost_rate_status === 'critical' ? 'error'
-                      : summary.cost_rate_status === 'warning' ? 'warning' : 'success'}
-                    style={{ fontSize: 11, marginTop: 4 }}
-                  >
-                    {statusLabel(summary.cost_rate_status)}
-                  </Tag>
-                </Card>
-              </Col>
-              <Col xs={12} md={4}>
-                <Card size="small">
-                  <Statistic title="损耗金额" value={summary.waste_cost_yuan ?? 0} prefix="¥" precision={0} />
-                </Card>
-              </Col>
-              <Col xs={12} md={4}>
-                <Card size="small">
-                  <Statistic
-                    title="决策采纳率"
-                    value={summary.decision_adoption_pct ?? 0}
-                    suffix="%"
-                    precision={1}
-                  />
-                </Card>
-              </Col>
-              <Col xs={12} md={4}>
-                <Card size="small">
-                  <Statistic
-                    title="决策节省¥"
-                    value={summary.total_saving_yuan ?? 0}
-                    prefix="¥"
-                    precision={0}
-                    valueStyle={{ color: '#52c41a' }}
-                  />
-                </Card>
-              </Col>
-              <Col xs={12} md={4}>
-                <Card size="small">
-                  <Statistic
-                    title="审批决策"
-                    value={`${summary.decisions_approved ?? 0}/${summary.decisions_total ?? 0}`}
-                  />
-                </Card>
-              </Col>
-            </Row>
+                </div>
+              </ZCard>
+              <ZCard>
+                <ZKpi
+                  value={`¥${(summary.waste_cost_yuan ?? 0).toLocaleString('zh-CN', { minimumFractionDigits: 0 })}`}
+                  label="损耗金额"
+                />
+              </ZCard>
+              <ZCard>
+                <ZKpi
+                  value={(summary.decision_adoption_pct ?? 0).toFixed(1)}
+                  unit="%"
+                  label="决策采纳率"
+                />
+              </ZCard>
+              <ZCard>
+                <ZKpi
+                  value={`¥${(summary.total_saving_yuan ?? 0).toLocaleString('zh-CN', { minimumFractionDigits: 0 })}`}
+                  label="决策节省¥"
+                />
+              </ZCard>
+              <ZCard>
+                <ZKpi
+                  value={`${summary.decisions_approved ?? 0}/${summary.decisions_total ?? 0}`}
+                  label="审批决策"
+                />
+              </ZCard>
+            </div>
+          )}
 
-            {summary.narrative && (
-              <Card
-                size="small"
-                style={{ marginBottom: 16, background: '#f6ffed', borderColor: '#b7eb8f' }}
-              >
-                <Text style={{ fontSize: 13, lineHeight: 1.8 }}>{summary.narrative}</Text>
-              </Card>
-            )}
-          </>
-        )}
+          {/* 经营叙事 */}
+          {summary?.narrative && (
+            <ZCard style={{ marginBottom: 14, background: '#f6ffed', borderColor: '#b7eb8f' }}>
+              <p style={{ fontSize: 13, lineHeight: 1.8, margin: 0, color: '#389e0d' }}>
+                {summary.narrative}
+              </p>
+            </ZCard>
+          )}
 
-        {chartOption && (
-          <Card title="周成本率趋势" size="small" style={{ marginBottom: 16 }}>
-            <ReactECharts option={chartOption} style={{ height: 260 }} />
-          </Card>
-        )}
+          {/* 趋势图 */}
+          {chartOption && (
+            <ZCard title="周成本率趋势" style={{ marginBottom: 14 }}>
+              <ReactECharts option={chartOption} style={{ height: 260 }} />
+            </ZCard>
+          )}
 
-        {top3.length > 0 && (
-          <Card title="本月 Top3 节省决策" size="small">
-            <Table
-              dataSource={top3}
-              columns={top3Columns}
-              rowKey={(_: any, i: any) => i}
-              size="small"
-              pagination={false}
-            />
-          </Card>
-        )}
-      </Spin>
+          {/* Top3 决策 */}
+          {top3.length > 0 && (
+            <ZCard title="本月 Top3 节省决策">
+              <ZTable
+                columns={top3Columns}
+                data={top3}
+                rowKey={(_: any, i: number) => String(i)}
+                emptyText="暂无决策数据"
+              />
+            </ZCard>
+          )}
+        </>
+      )}
     </div>
   );
 };
