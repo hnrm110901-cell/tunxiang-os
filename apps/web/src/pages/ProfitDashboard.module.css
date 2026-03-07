@@ -1,0 +1,124 @@
+/* ── Page ──────────────────────────────────────────────────────────────────── */
+
+.page {
+  padding: 0;
+}
+
+.pageTitle {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 20px;
+}
+
+/* ── Toolbar ─────────────────────────────────────────────────────────────────*/
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.toolbarLabel {
+  font-size: 13px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+/* ── KPI grids ───────────────────────────────────────────────────────────────*/
+
+.kpiGrid3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+
+.kpiGrid4 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+}
+
+@media (max-width: 1100px) {
+  .kpiGrid3 { grid-template-columns: repeat(2, 1fr); }
+  .kpiGrid4 { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 640px) {
+  .kpiGrid3, .kpiGrid4 { grid-template-columns: 1fr; }
+}
+
+/* ── Alert banners ───────────────────────────────────────────────────────────*/
+
+.alertBar {
+  display: flex;
+  align-items: center;
+  padding: 10px 14px;
+  border-radius: var(--radius-md, 8px);
+  font-size: 13px;
+  border: 1px solid;
+  line-height: 1.5;
+  font-weight: 500;
+}
+
+.alert_ok {
+  background: #f6ffed;
+  border-color: #b7eb8f;
+  color: #389e0d;
+}
+
+.alert_warning {
+  background: #fffbe6;
+  border-color: #ffe58f;
+  color: #d46b08;
+}
+
+.alert_critical {
+  background: #fff2f0;
+  border-color: #ffccc7;
+  color: #cf1322;
+}
+
+/* ── Store link button ───────────────────────────────────────────────────────*/
+
+.storeLink {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: var(--accent);
+  font-size: 13px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.storeLink:hover { opacity: 0.75; }
+
+.storeLinkActive {
+  font-weight: 700;
+}
+
+/* ── PDF link ────────────────────────────────────────────────────────────────*/
+
+.pdfLink {
+  font-size: 13px;
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  white-space: nowrap;
+}
+
+/* ── Chart hint ──────────────────────────────────────────────────────────────*/
+
+.chartHint {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin: 8px 0 0;
+}
+
+/* ── Date range label ────────────────────────────────────────────────────────*/
+
+.dateRange {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
