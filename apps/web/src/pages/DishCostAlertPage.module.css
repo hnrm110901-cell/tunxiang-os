@@ -1,0 +1,36 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+/* 告警行着色 */
+.rowCritical {
+  background: #fff2f0 !important;
+}
+
+.rowWarning {
+  background: #fff7e6 !important;
+}
+
+/* 趋势侧栏统计 */
+.trendStats {
+  margin-top: 16px;
+  border: 1px solid #f0f0f0;
+  border-radius: 6px;
+  padding: 12px;
+}
+
+.trendStatItem {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
