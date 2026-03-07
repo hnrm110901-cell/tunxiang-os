@@ -1,0 +1,134 @@
+/* ── Page ──────────────────────────────────────────────────────────────────── */
+
+.page {
+  padding: 0;
+}
+
+.pageHeader {
+  margin-bottom: 20px;
+}
+
+.pageTitle {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.pageSub {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: 4px 0 0;
+}
+
+/* ── Toolbar ────────────────────────────────────────────────────────────────── */
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+/* ── KPI grids ──────────────────────────────────────────────────────────────── */
+
+.kpiGrid4 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.kpiGrid3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+
+@media (max-width: 1100px) {
+  .kpiGrid4 { grid-template-columns: repeat(2, 1fr); }
+  .kpiGrid3 { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 640px) {
+  .kpiGrid4, .kpiGrid3 { grid-template-columns: 1fr; }
+}
+
+/* ── Two-column grid ────────────────────────────────────────────────────────── */
+
+.twoColGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+@media (max-width: 900px) { .twoColGrid { grid-template-columns: 1fr; } }
+
+/* ── Alert banners ──────────────────────────────────────────────────────────── */
+
+.alertBar {
+  display: flex;
+  align-items: center;
+  padding: 10px 14px;
+  border-radius: var(--radius-md, 8px);
+  font-size: 13px;
+  border: 1px solid;
+  line-height: 1.5;
+}
+
+.alertInfo {
+  background: #e6f4ff;
+  border-color: #91caff;
+  color: #0958d9;
+}
+
+.alertWarning {
+  background: #fffbe6;
+  border-color: #ffe58f;
+  color: #d46b08;
+}
+
+.alertError {
+  background: #fff2f0;
+  border-color: #ffccc7;
+  color: #cf1322;
+}
+
+/* ── Description list (used in TaxTab) ─────────────────────────────────────── */
+
+.descList {
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 6px);
+  overflow: hidden;
+}
+
+.descRow {
+  display: grid;
+  grid-template-columns: 100px 1fr;
+  border-bottom: 1px solid var(--border);
+}
+
+.descRow:last-child {
+  border-bottom: none;
+}
+
+.descRow dt {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: #fafafa;
+  padding: 8px 12px;
+  border-right: 1px solid var(--border);
+}
+
+.descRow dd {
+  font-size: 13px;
+  color: var(--text-primary);
+  padding: 8px 12px;
+  margin: 0;
+}
