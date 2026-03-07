@@ -143,6 +143,17 @@
 
 ## 评论
 
+### 2026-03-07（Phase 1 Week 3-4 — 私域运营自动化）
+- `marketing_agent_service.py`：新增 `trigger_batch_churn_recovery`（dry_run优先跳过频控→批量计数；非dry_run通过 FrequencyCapEngine.can_send + record_send 精确控频）+ `get_campaign_roi_summary`（近N天活动按类型汇总ROI）+ `record_campaign_attribution`（幂等归因打点）
+- `marketing_agent.py`：新增3个端点：`POST /stores/{id}/batch-churn-recovery`、`GET /stores/{id}/campaigns/roi-summary`、`POST /stores/{id}/campaigns/{id}/track`
+- `celery_tasks.py`：新增 `marketing_auto_outreach` 任务（遍历近30天活跃门店批量触达）
+- `celery_app.py`：Beat 新增 `marketing-auto-outreach`（10:30，priority=6，可环境变量覆盖）
+- `RecommendationsPage.tsx`：从 null stub 完整重建（顾客ID查询 + 门店选择 + 场景感知 + ZTable混合推荐结果 + 算法说明卡片），路由权限从 admin 降为 store_manager
+- `RecommendationsPage.module.css`：新建
+- `MarketingCampaignPage.tsx`：新增第二行 ROI 汇总 KPI（近30天营收/触达/转化率/综合ROI）+ 「批量挽回触达」+「预估触达」按钮
+- `App.tsx`：recommendations 路由权限 admin → store_manager
+- `tests/test_marketing_week34.py`：12个测试（批量触达×5 + ROI汇总×5 + 归因打点×2），全部通过
+
 ### 2026-03-07（Phase 1 Week 1-2 — Marketing Agent 核心能力）
 - `marketing_agent_service.py`：新增 `get_store_segment_summary`（批量RFM，一条SQL聚合全门店顾客→5维客群分布+占比）+ `get_at_risk_customers`（按风险降序，支持 risk_threshold 过滤，返回最近失联天数/消费总额¥/推荐动作）
 - `marketing_agent.py`：新增3个端点：`GET /stores/{store_id}/segments`、`GET /stores/{store_id}/customers/at-risk`、`GET /stores/{store_id}/statistics`

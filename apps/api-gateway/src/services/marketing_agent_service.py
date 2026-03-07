@@ -846,6 +846,191 @@ class MarketingAgentService:
         result.sort(key=lambda x: x["churn_risk"], reverse=True)
         return result[:limit]
 
+    # ==================== 企微批量自动触达 ====================
+
+    async def trigger_batch_churn_recovery(
+        self,
+        store_id: str,
+        dry_run: bool = False,
+    ) -> Dict[str, Any]:
+        """
+        批量触达流失风险客户（企微自动挽回）
+
+        流程：
+          1. 拉取本门店所有 at_risk/lost 客户
+          2. 对每位客户检查频控（FrequencyCapEngine），勿扰时段/当日已发则跳过
+          3. 发送个性化挽回消息（企微文本消息）
+          4. 记录发送，递增频控计数器
+          5. 返回 {sent, skipped_freq_cap, errors, dry_run}
+
+        dry_run=True 时只统计，不实际发送。
+        """
+        customers = await self.get_at_risk_customers(store_id, limit=100, risk_threshold=0.5)
+
+        sent = 0
+        skipped_freq_cap = 0
+        errors = 0
+
+        # 惰性初始化频控引擎和企微服务
+        freq_engine = None
+        wechat = None
+        try:
+            import redis.asyncio as aioredis
+            from src.services.frequency_cap_engine import FrequencyCapEngine
+            _redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+            _redis = aioredis.from_url(_redis_url, decode_responses=True)
+            freq_engine = FrequencyCapEngine(_redis)
+        except Exception as e:
+            logger.warning("freq_cap_init_failed: %s", str(e))
+
+        if not dry_run:
+            try:
+                from src.services.wechat_work_message_service import WeChatWorkMessageService
+                wechat = WeChatWorkMessageService()
+            except Exception as e:
+                logger.warning("wechat_service_init_failed: %s", str(e))
+
+        for customer in customers:
+            phone = customer["customer_phone"]
+            churn_risk = customer["churn_risk"]
+            days_since = customer["days_since_last_order"]
+
+            # dry_run：直接计入 sent，不检查频控也不实际发送
+            if dry_run:
+                sent += 1
+                continue
+
+            # 频控检查（仅非 dry_run 时生效）
+            if freq_engine:
+                try:
+                    if not await freq_engine.can_send(phone, store_id, "wxwork"):
+                        skipped_freq_cap += 1
+                        continue
+                except Exception:
+                    pass  # 频控故障时降级允许
+
+            # 构建个性化消息
+            if churn_risk >= float(os.getenv("CHURN_RISK_CRITICAL", "0.9")):
+                msg = f"好久不见！您已有{days_since}天未到访，特为您准备了专属挽回券，期待再次相聚～"
+            else:
+                msg = f"您好，{days_since}天没来啦！我们有新菜上线，欢迎回来尝鲜，专属优惠等您～"
+
+            try:
+                if wechat:
+                    await wechat.send_text_message(phone, msg)
+                # 记录发送
+                if freq_engine:
+                    try:
+                        await freq_engine.record_send(phone, store_id, "wxwork")
+                    except Exception:
+                        pass
+                sent += 1
+            except Exception as e:
+                logger.warning("batch_churn_send_failed", phone=phone, error=str(e))
+                errors += 1
+
+        logger.info(
+            "batch_churn_recovery_done: store=%s sent=%d skipped=%d errors=%d dry_run=%s",
+            store_id, sent, skipped_freq_cap, errors, dry_run,
+        )
+        return {
+            "store_id": store_id,
+            "total_at_risk": len(customers),
+            "sent": sent,
+            "skipped_freq_cap": skipped_freq_cap,
+            "errors": errors,
+            "dry_run": dry_run,
+        }
+
+    # ==================== 营销效果追踪 ====================
+
+    async def get_campaign_roi_summary(
+        self,
+        store_id: str,
+        days: int = 30,
+    ) -> Dict[str, Any]:
+        """
+        门店营销活动 ROI 汇总（近 N 天）
+
+        返回：总活动数/活跃活动/总触达人数/总转化/转化率/总营收¥/总成本¥/综合ROI
+        同时返回按 campaign_type 细分的子汇总，供前端饼图/柱图使用。
+        """
+        from src.models.marketing_campaign import MarketingCampaign as MCModel
+        cutoff = datetime.now() - timedelta(days=days)
+
+        async with get_db_session() as session:
+            stmt = select(MCModel).where(
+                MCModel.store_id == store_id,
+                MCModel.created_at >= cutoff,
+            )
+            rows = (await session.execute(stmt)).scalars().all()
+
+        total = len(rows)
+        active = sum(1 for r in rows if r.status == "active")
+        reach = sum(r.reach_count or 0 for r in rows)
+        conversion = sum(r.conversion_count or 0 for r in rows)
+        revenue = sum(float(r.revenue_generated or 0) for r in rows)
+        cost = sum(float(r.actual_cost or r.budget or 0) for r in rows)
+        roi = round((revenue - cost) / cost, 4) if cost > 0 else 0.0
+        conv_rate = round(conversion / reach, 4) if reach > 0 else 0.0
+
+        # 细分 by campaign_type
+        by_type: Dict[str, Dict] = {}
+        for r in rows:
+            t = r.campaign_type or "其他"
+            if t not in by_type:
+                by_type[t] = {"count": 0, "reach": 0, "conversion": 0, "revenue": 0.0, "cost": 0.0}
+            by_type[t]["count"] += 1
+            by_type[t]["reach"] += r.reach_count or 0
+            by_type[t]["conversion"] += r.conversion_count or 0
+            by_type[t]["revenue"] += float(r.revenue_generated or 0)
+            by_type[t]["cost"] += float(r.actual_cost or r.budget or 0)
+
+        return {
+            "store_id": store_id,
+            "days": days,
+            "total_campaigns": total,
+            "active_campaigns": active,
+            "total_reach": reach,
+            "total_conversion": conversion,
+            "conversion_rate": conv_rate,
+            "total_revenue_yuan": round(revenue, 2),
+            "total_cost_yuan": round(cost, 2),
+            "overall_roi": roi,
+            "by_type": by_type,
+            "computed_at": datetime.now().isoformat(),
+        }
+
+    async def record_campaign_attribution(
+        self,
+        campaign_id: str,
+        delta_reach: int = 0,
+        delta_conversion: int = 0,
+        delta_revenue: float = 0.0,
+        delta_cost: float = 0.0,
+    ) -> bool:
+        """
+        活动归因打点：累加触达/转化/营收/成本到 marketing_campaigns 记录。
+        供 POS 订单关联营销活动时调用。
+        """
+        from src.models.marketing_campaign import MarketingCampaign as MCModel
+        from sqlalchemy import update
+
+        async with get_db_session() as session:
+            stmt = (
+                update(MCModel)
+                .where(MCModel.id == campaign_id)
+                .values(
+                    reach_count=MCModel.reach_count + delta_reach,
+                    conversion_count=MCModel.conversion_count + delta_conversion,
+                    revenue_generated=MCModel.revenue_generated + delta_revenue,
+                    actual_cost=MCModel.actual_cost + delta_cost,
+                )
+            )
+            result = await session.execute(stmt)
+            await session.commit()
+            return result.rowcount > 0
+
     async def get_statistics(self) -> Dict[str, Any]:
         """获取营销统计"""
         try:

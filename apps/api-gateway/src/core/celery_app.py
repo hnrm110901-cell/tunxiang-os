@@ -388,6 +388,16 @@ celery_app.conf.update(
             "args": (),
             "options": {"queue": "default", "priority": 8},
         },
+        # 10:30 营销自动触达：批量企微挽回流失风险客户（FrequencyCapEngine 频控保护）
+        "marketing-auto-outreach": {
+            "task": "src.core.celery_tasks.marketing_auto_outreach",
+            "schedule": crontab(
+                hour=int(os.getenv("MARKETING_OUTREACH_HOUR", "10")),
+                minute=int(os.getenv("MARKETING_OUTREACH_MINUTE", "30")),
+            ),
+            "args": (),
+            "options": {"queue": "default", "priority": 6},
+        },
         # 06:00 私域生命周期扫描（churn_warning / inactivity_long → 自动触发旅程）
         "scan-lifecycle-transitions": {
             "task": "src.core.celery_tasks.scan_lifecycle_transitions",

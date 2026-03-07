@@ -4065,3 +4065,55 @@ def dispatch_agent_message(
         logger.error("dispatch_agent_message.failed",
                      to_agent=to_agent, action=action, error=str(exc))
         raise self.retry(exc=exc)
+
+
+# ── Marketing: 每日批量挽回流失客户 ──────────────────────────────────────────────
+
+@celery_app.task(
+    base=CallbackTask,
+    bind=True,
+    max_retries=2,
+    default_retry_delay=120,
+)
+def marketing_auto_outreach(self, store_id: str = None) -> Dict[str, Any]:
+    """
+    每日批量企微挽回（10:30 自动执行）。
+    遍历所有活跃门店（或指定门店），对 at_risk/lost 客户发送个性化挽回消息。
+    通过 FrequencyCapEngine 控制发送频次，避免骚扰。
+    """
+    async def _run():
+        from ..services.marketing_agent_service import MarketingAgentService
+        from ..models.store import Store
+
+        results = []
+        async with get_db_session() as session:
+            if store_id:
+                store_ids = [store_id]
+            else:
+                # 取最近30天有订单的门店
+                from ..models.order import Order
+                from sqlalchemy import select, distinct, func
+                from datetime import timedelta
+                cutoff = datetime.utcnow() - timedelta(days=30)
+                rows = (await session.execute(
+                    select(distinct(Order.store_id)).where(Order.created_at >= cutoff)
+                )).all()
+                store_ids = [r[0] for r in rows if r[0]]
+
+        svc = MarketingAgentService(db=None)
+        for sid in store_ids:
+            try:
+                result = await svc.trigger_batch_churn_recovery(sid, dry_run=False)
+                results.append(result)
+                logger.info("marketing_auto_outreach.store_done", store_id=sid, sent=result["sent"])
+            except Exception as e:
+                logger.warning("marketing_auto_outreach.store_failed", store_id=sid, error=str(e))
+                results.append({"store_id": sid, "error": str(e)})
+
+        return {"stores_processed": len(results), "results": results}
+
+    try:
+        return asyncio.run(_run())
+    except Exception as exc:
+        logger.error("marketing_auto_outreach.failed", error=str(exc))
+        raise self.retry(exc=exc)

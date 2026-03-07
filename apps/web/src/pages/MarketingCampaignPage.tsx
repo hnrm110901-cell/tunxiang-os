@@ -50,6 +50,17 @@ interface StoreStats {
   avg_roi: number;
 }
 
+interface RoiSummary {
+  total_campaigns: number;
+  active_campaigns: number;
+  total_reach: number;
+  total_conversion: number;
+  conversion_rate: number;
+  total_revenue_yuan: number;
+  total_cost_yuan: number;
+  overall_roi: number;
+}
+
 // ── Segment labels ─────────────────────────────────────────────────────────────
 
 const SEG_LABEL: Record<string, string> = {
@@ -187,6 +198,7 @@ const MarketingCampaignPage: React.FC = () => {
   const [atRisk, setAtRisk] = useState<AtRiskCustomer[]>([]);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [stats, setStats] = useState<StoreStats | null>(null);
+  const [roiSummary, setRoiSummary] = useState<RoiSummary | null>(null);
   const [loading, setLoading] = useState(false);
 
   const [couponModal, setCouponModal] = useState(false);
@@ -201,17 +213,19 @@ const MarketingCampaignPage: React.FC = () => {
   const loadAll = useCallback(async (sid: string) => {
     setLoading(true);
     try {
-      const [segRes, atRiskRes, campaignRes, statsRes] = await Promise.allSettled([
+      const [segRes, atRiskRes, campaignRes, statsRes, roiRes] = await Promise.allSettled([
         apiClient.get(`/api/v1/marketing/stores/${sid}/segments`),
         apiClient.get(`/api/v1/marketing/stores/${sid}/customers/at-risk?risk_threshold=0.5&limit=30`),
         apiClient.get(`/api/v1/marketing/stores/${sid}/campaigns?limit=20`),
         apiClient.get(`/api/v1/marketing/stores/${sid}/statistics`),
+        apiClient.get(`/api/v1/marketing/stores/${sid}/campaigns/roi-summary?days=30`),
       ]);
 
       if (segRes.status === 'fulfilled') setSegData(segRes.value.data);
       if (atRiskRes.status === 'fulfilled') setAtRisk(atRiskRes.value.data.customers || []);
       if (campaignRes.status === 'fulfilled') setCampaigns(campaignRes.value.data.campaigns || []);
       if (statsRes.status === 'fulfilled') setStats(statsRes.value.data);
+      if (roiRes.status === 'fulfilled') setRoiSummary(roiRes.value.data);
     } catch (e) {
       handleApiError(e);
     } finally {
@@ -220,6 +234,25 @@ const MarketingCampaignPage: React.FC = () => {
   }, []);
 
   useEffect(() => { loadAll(storeId); }, [storeId, loadAll]);
+
+  const [outreachLoading, setOutreachLoading] = useState(false);
+
+  const handleBatchOutreach = async (dryRun: boolean) => {
+    setOutreachLoading(true);
+    try {
+      const res = await apiClient.post(`/api/v1/marketing/stores/${storeId}/batch-churn-recovery`, { dry_run: dryRun });
+      const d = res.data;
+      if (dryRun) {
+        message.info(`预估发送：${d.total_at_risk} 位流失风险客户，实际可发 ${d.sent} 位（频控过滤 ${d.skipped_freq_cap} 位）`);
+      } else {
+        message.success(`已发送 ${d.sent} 条企微挽回消息，跳过 ${d.skipped_freq_cap} 位（今日频控），失败 ${d.errors} 条`);
+      }
+    } catch (e) {
+      handleApiError(e);
+    } finally {
+      setOutreachLoading(false);
+    }
+  };
 
   const handleCouponSubmit = async (values: { scenario: string }) => {
     setCouponLoading(true);
@@ -314,6 +347,10 @@ const MarketingCampaignPage: React.FC = () => {
             onChange={(v) => { setStoreId(v); localStorage.setItem('store_id', v); }}
           />
           <ZButton onClick={() => loadAll(storeId)}>刷新</ZButton>
+          <ZButton onClick={() => handleBatchOutreach(true)} disabled={outreachLoading}>预估触达</ZButton>
+          <ZButton variant="primary" onClick={() => handleBatchOutreach(false)} disabled={outreachLoading}>
+            {outreachLoading ? '发送中…' : '批量挽回触达'}
+          </ZButton>
           <ZButton variant="primary" onClick={() => setCouponModal(true)}>生成发券策略</ZButton>
           <ZButton variant="primary" onClick={() => setCampaignModal(true)}>新建营销活动</ZButton>
         </div>
@@ -325,12 +362,22 @@ const MarketingCampaignPage: React.FC = () => {
           {[...Array(4)].map((_, i) => <ZSkeleton key={i} height={88} />)}
         </div>
       ) : (
-        <div className={styles.kpiGrid}>
-          <ZCard><ZKpi label="总顾客数" value={segData?.total_customers ?? '-'} unit="人" /></ZCard>
-          <ZCard><ZKpi label="高价值客户" value={segs['high_value'] ?? 0} unit="人" /></ZCard>
-          <ZCard><ZKpi label="流失风险客户" value={atRiskCount} unit="人" /></ZCard>
-          <ZCard><ZKpi label="活跃活动" value={stats?.active_campaigns ?? 0} unit="个" /></ZCard>
-        </div>
+        <>
+          <div className={styles.kpiGrid}>
+            <ZCard><ZKpi label="总顾客数" value={segData?.total_customers ?? '-'} unit="人" /></ZCard>
+            <ZCard><ZKpi label="高价值客户" value={segs['high_value'] ?? 0} unit="人" /></ZCard>
+            <ZCard><ZKpi label="流失风险客户" value={atRiskCount} unit="人" /></ZCard>
+            <ZCard><ZKpi label="活跃活动" value={stats?.active_campaigns ?? 0} unit="个" /></ZCard>
+          </div>
+          {roiSummary && (
+            <div className={styles.kpiGrid}>
+              <ZCard><ZKpi label="近30天营收" value={`¥${roiSummary.total_revenue_yuan?.toLocaleString('zh-CN')}`} /></ZCard>
+              <ZCard><ZKpi label="触达人次" value={(roiSummary.total_reach || 0).toLocaleString()} /></ZCard>
+              <ZCard><ZKpi label="转化率" value={`${((roiSummary.conversion_rate || 0) * 100).toFixed(1)}%`} /></ZCard>
+              <ZCard><ZKpi label="综合 ROI" value={`${(roiSummary.overall_roi || 0).toFixed(2)}x`} /></ZCard>
+            </div>
+          )}
+        </>
       )}
 
       {/* Segment chart + Campaign table */}

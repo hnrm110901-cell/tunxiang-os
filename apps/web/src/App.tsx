@@ -241,7 +241,7 @@ const AppContent: React.FC = () => {
                     <ProtectedRoute requiredRole="admin"><HumanInTheLoop /></ProtectedRoute>
                   } />
                   <Route path="recommendations" element={
-                    <ProtectedRoute requiredRole="admin"><RecommendationsPage /></ProtectedRoute>
+                    <ProtectedRoute requiredRole="store_manager"><RecommendationsPage /></ProtectedRoute>
                   } />
                   <Route path="private-domain" element={
                     <ProtectedRoute requiredRole="admin"><PrivateDomainPage /></ProtectedRoute>

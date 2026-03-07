@@ -260,6 +260,94 @@ async def get_campaign(
 
 # ── Store-level segment & risk analytics ───────────────────────────────────────
 
+class BatchChurnRecoveryRequest(BaseModel):
+    dry_run: bool = False   # True=仅统计，不实际发送
+
+
+class CampaignAttributionRequest(BaseModel):
+    delta_reach:      int   = 0
+    delta_conversion: int   = 0
+    delta_revenue:    float = 0.0
+    delta_cost:       float = 0.0
+
+
+# ── Batch churn recovery ────────────────────────────────────────────────────────
+
+@router.post("/stores/{store_id}/batch-churn-recovery")
+async def batch_churn_recovery(
+    store_id: str,
+    body:     BatchChurnRecoveryRequest,
+    db:       AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> Dict[str, Any]:
+    """
+    批量企微触达流失风险客户（频控保护）
+
+    - 拉取 at_risk + lost 客户（risk_threshold=0.5）
+    - 通过 FrequencyCapEngine 过滤今日/本周已达上限的客户
+    - 发送个性化挽回文本消息
+    - dry_run=true 仅返回统计，不实际发送
+    """
+    try:
+        svc = _get_service(db)
+        return await svc.trigger_batch_churn_recovery(store_id, dry_run=body.dry_run)
+    except Exception as e:
+        logger.error("batch_churn_recovery_failed", error=str(e), store_id=store_id)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ── Campaign ROI summary ────────────────────────────────────────────────────────
+
+@router.get("/stores/{store_id}/campaigns/roi-summary")
+async def get_campaign_roi_summary(
+    store_id: str,
+    days:     int = Query(30, ge=1, le=365, description="近N天"),
+    db:       AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> Dict[str, Any]:
+    """营销活动 ROI 汇总：转化率/总营收¥/综合ROI + 按活动类型细分"""
+    try:
+        svc = _get_service(db)
+        return await svc.get_campaign_roi_summary(store_id, days=days)
+    except Exception as e:
+        logger.error("get_campaign_roi_summary_failed", error=str(e), store_id=store_id)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ── Campaign attribution tracking ──────────────────────────────────────────────
+
+@router.post("/stores/{store_id}/campaigns/{campaign_id}/track")
+async def track_campaign_attribution(
+    store_id:    str,
+    campaign_id: str,
+    body:        CampaignAttributionRequest,
+    db:          AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> Dict[str, Any]:
+    """
+    活动归因打点：POS 订单关联营销活动时调用，累加触达/转化/营收/成本。
+    幂等操作，允许多次调用。
+    """
+    # Verify campaign belongs to store
+    c = await db.get(MarketingCampaignModel, campaign_id)
+    if not c or c.store_id != store_id:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+
+    try:
+        svc = _get_service(db)
+        updated = await svc.record_campaign_attribution(
+            campaign_id,
+            delta_reach=body.delta_reach,
+            delta_conversion=body.delta_conversion,
+            delta_revenue=body.delta_revenue,
+            delta_cost=body.delta_cost,
+        )
+        return {"campaign_id": campaign_id, "updated": updated}
+    except Exception as e:
+        logger.error("track_campaign_attribution_failed", error=str(e))
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/stores/{store_id}/segments")
 async def get_store_segment_summary(
     store_id: str,
