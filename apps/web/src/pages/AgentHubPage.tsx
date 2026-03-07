@@ -11,10 +11,6 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Card, Select, Button, Tag, Spin, Typography, Space,
-  Divider, Empty, Tooltip,
-} from 'antd';
-import {
   ReloadOutlined, RobotOutlined, CheckCircleOutlined,
   ClockCircleOutlined, ThunderboltOutlined, RiseOutlined,
   BarChartOutlined, SafetyOutlined, SyncOutlined,
@@ -22,10 +18,8 @@ import {
 } from '@ant-design/icons';
 import ReactECharts from 'echarts-for-react';
 import { apiClient } from '../services/api';
+import { ZCard, ZBadge, ZButton, ZSkeleton, ZSelect, ZEmpty } from '../design-system/components';
 import styles from './AgentHubPage.module.css';
-
-const { Text, Title } = Typography;
-const { Option } = Select;
 
 // ── Agent metadata ─────────────────────────────────────────────────────────────
 
@@ -167,15 +161,15 @@ interface GovData {
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 function statusForAgent(stat: AgentStat | undefined): {
-  label: string; color: string; tagColor: string;
+  label: string; color: string; badgeType: 'success' | 'warning' | 'default';
 } {
   if (!stat || stat.total === 0) {
-    return { label: '待机', color: '#8c8c8c', tagColor: 'default' };
+    return { label: '待机', color: '#8c8c8c', badgeType: 'default' };
   }
   if (stat.adoption_rate < 30) {
-    return { label: '需关注', color: '#fa8c16', tagColor: 'warning' };
+    return { label: '需关注', color: '#fa8c16', badgeType: 'warning' };
   }
-  return { label: '运行中', color: '#52c41a', tagColor: 'success' };
+  return { label: '运行中', color: '#52c41a', badgeType: 'success' };
 }
 
 function adoptionColor(rate: number): string {
@@ -193,6 +187,17 @@ function statusColor(status: string | null): string {
     default:                            return '#8c8c8c';
   }
 }
+
+function statusBadgeType(status: string | null): 'success' | 'critical' | 'warning' | 'info' | 'default' {
+  switch (status) {
+    case 'approved': case 'executed': return 'success';
+    case 'rejected':                  return 'critical';
+    case 'modified':                  return 'warning';
+    case 'pending':                   return 'info';
+    default:                          return 'default';
+  }
+}
+
 function statusLabel(status: string | null): string {
   const map: Record<string, string> = {
     approved: '已采纳', executed: '已执行', rejected: '已否决',
@@ -330,6 +335,17 @@ const AgentHubPage: React.FC = () => {
     }],
   };
 
+  const storeOptions = [
+    { value: '', label: '全部门店' },
+    ...stores.map((s: any) => ({ value: s.store_id || s.id, label: s.name || s.store_id || s.id })),
+  ];
+
+  const daysOptions = [
+    { value: 7,  label: '近 7 天' },
+    { value: 30, label: '近 30 天' },
+    { value: 90, label: '近 90 天' },
+  ];
+
   // ── Render ────────────────────────────────────────────────────────────────────
 
   return (
@@ -338,299 +354,263 @@ const AgentHubPage: React.FC = () => {
       {/* ── Page header ─────────────────────────────────────────────────────── */}
       <div className={styles.pageHeader}>
         <div className={styles.pageHeaderLeft}>
-          <Title level={4} style={{ margin: 0 }}>智能体中心</Title>
-          <Text type="secondary" style={{ fontSize: 13 }}>
-            {AGENT_ORDER.length} 个 Agent 运行中
-          </Text>
+          <h4 className={styles.pageTitle}>智能体中心</h4>
+          <span className={styles.pageSub}>{AGENT_ORDER.length} 个 Agent 运行中</span>
         </div>
-        <Space wrap>
-          <Select
-            value={selectedStore || undefined}
-            onChange={v => setSelectedStore(v ?? '')}
-            allowClear
-            placeholder="全部门店"
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+          <ZSelect
+            value={selectedStore}
+            onChange={(v) => setSelectedStore(v as string)}
             style={{ width: 160 }}
-          >
-            {stores.map((s: any) => (
-              <Option key={s.store_id || s.id} value={s.store_id || s.id}>
-                {s.name || s.store_id || s.id}
-              </Option>
-            ))}
-          </Select>
-          <Select value={days} onChange={setDays} style={{ width: 100 }}>
-            <Option value={7}>近 7 天</Option>
-            <Option value={30}>近 30 天</Option>
-            <Option value={90}>近 90 天</Option>
-          </Select>
-          <Button icon={<ReloadOutlined />} onClick={loadGov}>刷新</Button>
-        </Space>
+            options={storeOptions}
+          />
+          <ZSelect
+            value={days}
+            onChange={(v) => setDays(Number(v))}
+            style={{ width: 100 }}
+            options={daysOptions}
+          />
+          <ZButton icon={<ReloadOutlined />} onClick={loadGov} loading={loading}>刷新</ZButton>
+        </div>
       </div>
 
-      <Spin spinning={loading}>
-
-        {/* ── Stats bar ──────────────────────────────────────────────────────── */}
-        <div className={styles.statsBar}>
-          {statsItems.map((item, idx) => (
-            <div key={idx} className={styles.statsBarItem}>
-              <div
-                className={styles.statsBarIconWrap}
-                style={{ background: item.iconBg, color: item.iconColor }}
-              >
-                {item.icon}
-              </div>
-              <div className={styles.statsBarBody}>
-                <div className={styles.statsBarLabel}>{item.label}</div>
-                <div className={styles.statsBarValue} style={{ color: item.iconColor }}>
-                  {item.value}
-                  <span className={styles.statsBarUnit}>{item.unit}</span>
+      {loading ? (
+        <ZSkeleton rows={10} block />
+      ) : (
+        <>
+          {/* ── Stats bar ──────────────────────────────────────────────────────── */}
+          <div className={styles.statsBar}>
+            {statsItems.map((item, idx) => (
+              <div key={idx} className={styles.statsBarItem}>
+                <div
+                  className={styles.statsBarIconWrap}
+                  style={{ background: item.iconBg, color: item.iconColor }}
+                >
+                  {item.icon}
+                </div>
+                <div className={styles.statsBarBody}>
+                  <div className={styles.statsBarLabel}>{item.label}</div>
+                  <div className={styles.statsBarValue} style={{ color: item.iconColor }}>
+                    {item.value}
+                    <span className={styles.statsBarUnit}>{item.unit}</span>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
 
-        {/* ── Agent cards ────────────────────────────────────────────────────── */}
-        <div className={styles.agentGrid}>
-          {AGENT_ORDER.map(agentType => {
-            const meta  = AGENT_META[agentType];
-            const stat  = statsByType[agentType];
-            const st    = statusForAgent(stat);
-            const rate  = stat?.adoption_rate ?? 0;
+          {/* ── Agent cards ────────────────────────────────────────────────────── */}
+          <div className={styles.agentGrid}>
+            {AGENT_ORDER.map(agentType => {
+              const meta  = AGENT_META[agentType];
+              const stat  = statsByType[agentType];
+              const st    = statusForAgent(stat);
+              const rate  = stat?.adoption_rate ?? 0;
 
-            return (
-              <div key={agentType} className={styles.agentCard}>
+              return (
+                <div key={agentType} className={styles.agentCard}>
 
-                {/* Header */}
-                <div className={styles.agentCardTop}>
-                  <div
-                    className={styles.agentIconWrap}
-                    style={{ background: meta.color, fontSize: 22 }}
-                  >
-                    {meta.icon}
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
-                      <span className={styles.agentCardName}>{meta.label} Agent</span>
-                      <Tag color={st.tagColor} style={{ fontSize: 11, padding: '0 5px', lineHeight: '18px' }}>
-                        {st.label}
-                      </Tag>
-                    </div>
-                    <div className={styles.agentCardDesc}>{meta.description}</div>
-                  </div>
-                </div>
-
-                {/* Capability tags */}
-                <div className={styles.agentCardCapabilities}>
-                  {meta.capabilities.map(cap => (
-                    <Tag key={cap} color="default" style={{ fontSize: 11, padding: '0 5px' }}>
-                      {cap}
-                    </Tag>
-                  ))}
-                </div>
-
-                {/* Metrics strip */}
-                <div className={styles.agentMetrics}>
-                  <div className={styles.agentMetricItem}>
-                    <span className={styles.agentMetricValue}>{stat?.total ?? 0}</span>
-                    <span className={styles.agentMetricLabel}>决策总量</span>
-                  </div>
-                  <div className={styles.agentMetricItem}>
-                    <span
-                      className={styles.agentMetricValue}
-                      style={{ color: adoptionColor(rate) }}
-                    >
-                      {stat ? `${rate.toFixed(0)}%` : '—'}
-                    </span>
-                    <span className={styles.agentMetricLabel}>采纳率</span>
-                  </div>
-                  <div className={styles.agentMetricItem}>
-                    <span
-                      className={styles.agentMetricValue}
-                      style={{ color: (stat?.pending ?? 0) > 0 ? '#f5222d' : '#8c8c8c' }}
-                    >
-                      {stat?.pending ?? 0}
-                    </span>
-                    <span className={styles.agentMetricLabel}>待处理</span>
-                  </div>
-                </div>
-
-                {/* Adoption bar */}
-                <div className={styles.agentAdoptionRow}>
-                  <div className={styles.agentAdoptionHeader}>
-                    <span className={styles.agentAdoptionLabel}>采纳率</span>
-                    <span
-                      className={styles.agentAdoptionPct}
-                      style={{ color: adoptionColor(rate) }}
-                    >
-                      {stat ? `${rate.toFixed(1)}%` : '暂无数据'}
-                    </span>
-                  </div>
-                  <div className={styles.agentAdoptionBar}>
+                  {/* Header */}
+                  <div className={styles.agentCardTop}>
                     <div
-                      className={styles.agentAdoptionFill}
-                      style={{
-                        width: `${stat ? Math.min(rate, 100) : 0}%`,
-                        background: adoptionColor(rate),
-                      }}
-                    />
-                  </div>
-                </div>
-
-                {/* Footer: enter workspace */}
-                <div className={styles.agentCardFooter}>
-                  <Button
-                    type="primary"
-                    ghost
-                    block
-                    size="small"
-                    icon={<ArrowRightOutlined />}
-                    style={{ borderColor: meta.accentHex, color: meta.accentHex }}
-                    onClick={() => navigate(meta.route)}
-                  >
-                    进入工作台
-                  </Button>
-                </div>
-
-              </div>
-            );
-          })}
-        </div>
-
-        {/* ── Bottom: activity + trend ────────────────────────────────────────── */}
-        <div className={styles.bottomSection}>
-
-          {/* Activity feed */}
-          <Card
-            title={
-              <Space>
-                <RobotOutlined style={{ color: '#1890ff' }} />
-                <span>最近决策活动</span>
-              </Space>
-            }
-            extra={
-              <Button
-                type="link"
-                size="small"
-                icon={<SafetyOutlined />}
-                onClick={() => navigate('/governance')}
-              >
-                查看治理看板 →
-              </Button>
-            }
-            bodyStyle={{ padding: '4px 0' }}
-          >
-            {(govData?.recent_logs ?? []).length === 0 ? (
-              <Empty
-                image={Empty.PRESENTED_IMAGE_SIMPLE}
-                description="暂无决策记录"
-                style={{ padding: '24px 0' }}
-              />
-            ) : (
-              (govData?.recent_logs ?? []).slice(0, 10).map(log => {
-                const meta = AGENT_META[log.agent_type ?? ''];
-                const netImpact = (log.revenue_impact_yuan || 0) - (log.cost_impact_yuan || 0);
-                return (
-                  <div key={log.id} className={styles.activityItem}>
-                    <div
-                      className={styles.activityDot}
-                      style={{ background: statusColor(log.decision_status) }}
-                    />
-                    <div className={styles.activityBody}>
-                      <div className={styles.activityTitle}>
-                        {log.ai_suggestion || '（无建议摘要）'}
-                      </div>
-                      <div className={styles.activityMeta}>
-                        <span>{log.created_at}</span>
-                        {meta && (
-                          <Tag color="default" style={{ fontSize: 10, padding: '0 4px', lineHeight: '16px' }}>
-                            {meta.icon} {meta.label}
-                          </Tag>
-                        )}
-                        <Tag
-                          color={
-                            log.decision_status === 'approved'  || log.decision_status === 'executed' ? 'success' :
-                            log.decision_status === 'rejected' ? 'error' :
-                            log.decision_status === 'modified' ? 'warning' : 'processing'
-                          }
-                          style={{ fontSize: 10, padding: '0 4px', lineHeight: '16px' }}
-                        >
-                          {statusLabel(log.decision_status)}
-                        </Tag>
-                        <Tooltip title="置信度">
-                          <span>{log.ai_confidence.toFixed(0)}%</span>
-                        </Tooltip>
-                      </div>
+                      className={styles.agentIconWrap}
+                      style={{ background: meta.color, fontSize: 22 }}
+                    >
+                      {meta.icon}
                     </div>
-                    {netImpact !== 0 && (
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                        <span className={styles.agentCardName}>{meta.label} Agent</span>
+                        <ZBadge type={st.badgeType} text={st.label} />
+                      </div>
+                      <div className={styles.agentCardDesc}>{meta.description}</div>
+                    </div>
+                  </div>
+
+                  {/* Capability tags */}
+                  <div className={styles.agentCardCapabilities}>
+                    {meta.capabilities.map(cap => (
+                      <ZBadge key={cap} type="default" text={cap} />
+                    ))}
+                  </div>
+
+                  {/* Metrics strip */}
+                  <div className={styles.agentMetrics}>
+                    <div className={styles.agentMetricItem}>
+                      <span className={styles.agentMetricValue}>{stat?.total ?? 0}</span>
+                      <span className={styles.agentMetricLabel}>决策总量</span>
+                    </div>
+                    <div className={styles.agentMetricItem}>
                       <span
-                        className={styles.activityAmount}
-                        style={{ color: netImpact >= 0 ? '#52c41a' : '#f5222d' }}
+                        className={styles.agentMetricValue}
+                        style={{ color: adoptionColor(rate) }}
                       >
-                        {netImpact >= 0 ? '+' : ''}¥{Math.abs(netImpact).toLocaleString()}
+                        {stat ? `${rate.toFixed(0)}%` : '—'}
                       </span>
-                    )}
-                  </div>
-                );
-              })
-            )}
-          </Card>
-
-          {/* Weekly trend chart */}
-          <Card
-            title={
-              <Space>
-                <RiseOutlined style={{ color: '#52c41a' }} />
-                <span>采纳率趋势</span>
-              </Space>
-            }
-            bodyStyle={{ padding: '12px 16px' }}
-          >
-            {trend.length === 0 ? (
-              <Empty
-                image={Empty.PRESENTED_IMAGE_SIMPLE}
-                description="暂无趋势数据"
-                style={{ padding: '24px 0' }}
-              />
-            ) : (
-              <ReactECharts option={trendChartOption} style={{ height: 180 }} />
-            )}
-
-            <Divider style={{ margin: '12px 0' }} />
-
-            {/* Per-agent adoption quick list */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {AGENT_ORDER.filter(k => statsByType[k]).slice(0, 6).map(agentType => {
-                const meta = AGENT_META[agentType];
-                const stat = statsByType[agentType];
-                return (
-                  <div key={agentType} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 14 }}>{meta.icon}</span>
-                    <span style={{ fontSize: 12, color: '#595959', flex: 1, whiteSpace: 'nowrap' }}>
-                      {meta.label}
-                    </span>
-                    <div style={{ width: 80, height: 4, background: '#f0f0f0', borderRadius: 2, overflow: 'hidden' }}>
-                      <div style={{
-                        height: '100%',
-                        width: `${Math.min(stat.adoption_rate, 100)}%`,
-                        background: adoptionColor(stat.adoption_rate),
-                        borderRadius: 2,
-                        transition: 'width 0.5s ease',
-                      }} />
+                      <span className={styles.agentMetricLabel}>采纳率</span>
                     </div>
-                    <span style={{
-                      fontSize: 12, fontWeight: 600, width: 38, textAlign: 'right',
-                      color: adoptionColor(stat.adoption_rate),
-                    }}>
-                      {stat.adoption_rate.toFixed(0)}%
-                    </span>
+                    <div className={styles.agentMetricItem}>
+                      <span
+                        className={styles.agentMetricValue}
+                        style={{ color: (stat?.pending ?? 0) > 0 ? '#f5222d' : '#8c8c8c' }}
+                      >
+                        {stat?.pending ?? 0}
+                      </span>
+                      <span className={styles.agentMetricLabel}>待处理</span>
+                    </div>
                   </div>
-                );
-              })}
-            </div>
-          </Card>
 
-        </div>
-      </Spin>
+                  {/* Adoption bar */}
+                  <div className={styles.agentAdoptionRow}>
+                    <div className={styles.agentAdoptionHeader}>
+                      <span className={styles.agentAdoptionLabel}>采纳率</span>
+                      <span
+                        className={styles.agentAdoptionPct}
+                        style={{ color: adoptionColor(rate) }}
+                      >
+                        {stat ? `${rate.toFixed(1)}%` : '暂无数据'}
+                      </span>
+                    </div>
+                    <div className={styles.agentAdoptionBar}>
+                      <div
+                        className={styles.agentAdoptionFill}
+                        style={{
+                          width: `${stat ? Math.min(rate, 100) : 0}%`,
+                          background: adoptionColor(rate),
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Footer: enter workspace */}
+                  <div className={styles.agentCardFooter}>
+                    <button
+                      className={styles.agentEnterBtn}
+                      style={{ borderColor: meta.accentHex, color: meta.accentHex }}
+                      onClick={() => navigate(meta.route)}
+                    >
+                      <ArrowRightOutlined style={{ fontSize: 12 }} />
+                      进入工作台
+                    </button>
+                  </div>
+
+                </div>
+              );
+            })}
+          </div>
+
+          {/* ── Bottom: activity + trend ────────────────────────────────────────── */}
+          <div className={styles.bottomSection}>
+
+            {/* Activity feed */}
+            <ZCard
+              title={
+                <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                  <RobotOutlined style={{ color: '#1890ff' }} />
+                  <span>最近决策活动</span>
+                </div>
+              }
+              extra={
+                <ZButton variant="ghost" size="sm" icon={<SafetyOutlined />} onClick={() => navigate('/governance')}>
+                  查看治理看板 →
+                </ZButton>
+              }
+              noPadding
+            >
+              {(govData?.recent_logs ?? []).length === 0 ? (
+                <ZEmpty description="暂无决策记录" />
+              ) : (
+                (govData?.recent_logs ?? []).slice(0, 10).map(log => {
+                  const meta = AGENT_META[log.agent_type ?? ''];
+                  const netImpact = (log.revenue_impact_yuan || 0) - (log.cost_impact_yuan || 0);
+                  return (
+                    <div key={log.id} className={styles.activityItem}>
+                      <div
+                        className={styles.activityDot}
+                        style={{ background: statusColor(log.decision_status) }}
+                      />
+                      <div className={styles.activityBody}>
+                        <div className={styles.activityTitle}>
+                          {log.ai_suggestion || '（无建议摘要）'}
+                        </div>
+                        <div className={styles.activityMeta}>
+                          <span>{log.created_at}</span>
+                          {meta && (
+                            <ZBadge type="default" text={`${meta.icon} ${meta.label}`} />
+                          )}
+                          <ZBadge
+                            type={statusBadgeType(log.decision_status)}
+                            text={statusLabel(log.decision_status)}
+                          />
+                          <span title="置信度">{log.ai_confidence.toFixed(0)}%</span>
+                        </div>
+                      </div>
+                      {netImpact !== 0 && (
+                        <span
+                          className={styles.activityAmount}
+                          style={{ color: netImpact >= 0 ? '#52c41a' : '#f5222d' }}
+                        >
+                          {netImpact >= 0 ? '+' : ''}¥{Math.abs(netImpact).toLocaleString()}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </ZCard>
+
+            {/* Weekly trend chart */}
+            <ZCard
+              title={
+                <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                  <RiseOutlined style={{ color: '#52c41a' }} />
+                  <span>采纳率趋势</span>
+                </div>
+              }
+            >
+              {trend.length === 0 ? (
+                <ZEmpty description="暂无趋势数据" />
+              ) : (
+                <ReactECharts option={trendChartOption} style={{ height: 180 }} />
+              )}
+
+              <div style={{ borderTop: '1px solid var(--border)', margin: '12px 0' }} />
+
+              {/* Per-agent adoption quick list */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {AGENT_ORDER.filter(k => statsByType[k]).slice(0, 6).map(agentType => {
+                  const meta = AGENT_META[agentType];
+                  const stat = statsByType[agentType];
+                  return (
+                    <div key={agentType} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: 14 }}>{meta.icon}</span>
+                      <span style={{ fontSize: 12, color: 'var(--text-secondary)', flex: 1, whiteSpace: 'nowrap' }}>
+                        {meta.label}
+                      </span>
+                      <div style={{ width: 80, height: 4, background: '#f0f0f0', borderRadius: 2, overflow: 'hidden' }}>
+                        <div style={{
+                          height: '100%',
+                          width: `${Math.min(stat.adoption_rate, 100)}%`,
+                          background: adoptionColor(stat.adoption_rate),
+                          borderRadius: 2,
+                          transition: 'width 0.5s ease',
+                        }} />
+                      </div>
+                      <span style={{
+                        fontSize: 12, fontWeight: 600, width: 38, textAlign: 'right',
+                        color: adoptionColor(stat.adoption_rate),
+                      }}>
+                        {stat.adoption_rate.toFixed(0)}%
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </ZCard>
+
+          </div>
+        </>
+      )}
     </div>
   );
 };

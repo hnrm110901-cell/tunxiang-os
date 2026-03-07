@@ -11,9 +11,6 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Card, Select, Button, Tag, Spin, Typography, Space, Divider, Tooltip,
-} from 'antd';
-import {
   ReloadOutlined, TeamOutlined, ClockCircleOutlined, HeartOutlined,
   StarOutlined, CheckCircleOutlined, WarningOutlined, CalendarOutlined,
   ShopOutlined, ScheduleOutlined, CustomerServiceOutlined, SafetyOutlined,
@@ -22,10 +19,8 @@ import {
   ShoppingCartOutlined, TrophyOutlined, SyncOutlined,
 } from '@ant-design/icons';
 import { apiClient } from '../services/api';
+import { ZCard, ZBadge, ZButton, ZSkeleton, ZSelect } from '../design-system/components';
 import styles from './OpsHubPage.module.css';
-
-const { Text, Title } = Typography;
-const { Option } = Select;
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -125,6 +120,12 @@ const PRIORITY_COLOR: Record<Priority, string> = {
 
 const PRIORITY_LABEL: Record<Priority, string> = {
   critical: '紧急', high: '重要', normal: '普通',
+};
+
+const PRIORITY_BADGE_TYPE: Record<Priority, 'critical' | 'warning' | 'info'> = {
+  critical: 'critical',
+  high:     'warning',
+  normal:   'info',
 };
 
 // ── Component ──────────────────────────────────────────────────────────────────
@@ -283,6 +284,10 @@ const OpsHubPage: React.FC = () => {
 
   const loading = bffLoading || boardLoading;
 
+  const storeOptions = stores.length > 0
+    ? stores.map((s: any) => ({ value: s.store_id || s.id, label: s.name || s.store_id || s.id }))
+    : [{ value: 'S001', label: 'S001 示例门店' }];
+
   // ── Render ────────────────────────────────────────────────────────────────────
 
   return (
@@ -291,323 +296,301 @@ const OpsHubPage: React.FC = () => {
       {/* ── Page header ─────────────────────────────────────────────────────── */}
       <div className={styles.pageHeader}>
         <div className={styles.pageHeaderLeft}>
-          <Title level={4} style={{ margin: 0 }}>门店运营中心</Title>
-          <Text type="secondary" style={{ fontSize: 13 }}>
+          <h4 className={styles.pageTitle}>门店运营中心</h4>
+          <span className={styles.pageSub}>
             {new Date().toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'short' })}
-          </Text>
+          </span>
         </div>
-        <Space>
-          <Select
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <ZSelect
             value={selectedStore}
-            onChange={v => setSelectedStore(v)}
+            onChange={(v) => setSelectedStore(v as string)}
             style={{ width: 160 }}
-            placeholder="选择门店"
-          >
-            {stores.length > 0
-              ? stores.map((s: any) => (
-                  <Option key={s.store_id || s.id} value={s.store_id || s.id}>
-                    {s.name || s.store_id || s.id}
-                  </Option>
-                ))
-              : <Option value="S001">S001 示例门店</Option>}
-          </Select>
-          <Button icon={<ReloadOutlined />} onClick={refresh}>刷新</Button>
-        </Space>
+            options={storeOptions}
+          />
+          <ZButton icon={<ReloadOutlined />} onClick={refresh} loading={loading}>刷新</ZButton>
+        </div>
       </div>
 
-      <Spin spinning={loading}>
-
-        {/* ── KPI strip ──────────────────────────────────────────────────────── */}
-        <div className={styles.kpiStrip}>
-          {kpiItems.map((item, idx) => (
-            <div key={idx} className={styles.kpiItem}>
-              <div className={styles.kpiIconWrap} style={{ background: item.iconBg, color: item.iconColor }}>
-                {item.icon}
-              </div>
-              <div className={styles.kpiBody}>
-                <div className={styles.kpiLabel}>{item.label}</div>
-                <div className={styles.kpiValue} style={{ color: item.iconColor }}>
-                  {item.value}
-                  <span className={styles.kpiUnit}>{item.unit}</span>
+      {loading ? (
+        <ZSkeleton rows={8} block />
+      ) : (
+        <>
+          {/* ── KPI strip ──────────────────────────────────────────────────────── */}
+          <div className={styles.kpiStrip}>
+            {kpiItems.map((item, idx) => (
+              <div key={idx} className={styles.kpiItem}>
+                <div className={styles.kpiIconWrap} style={{ background: item.iconBg, color: item.iconColor }}>
+                  {item.icon}
+                </div>
+                <div className={styles.kpiBody}>
+                  <div className={styles.kpiLabel}>{item.label}</div>
+                  <div className={styles.kpiValue} style={{ color: item.iconColor }}>
+                    {item.value}
+                    <span className={styles.kpiUnit}>{item.unit}</span>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
 
-        {/* ── 3-col main ─────────────────────────────────────────────────────── */}
-        <div className={styles.mainGrid}>
+          {/* ── 3-col main ─────────────────────────────────────────────────────── */}
+          <div className={styles.mainGrid}>
 
-          {/* ── 排班状态 ────────────────────────────────────────────────────── */}
-          <Card
-            title={<Space><ScheduleOutlined style={{ color: '#fa8c16' }} /><span>今日排班状态</span></Space>}
-            extra={
-              <Space size={6}>
-                {totalStaff != null && (
-                  <Text strong style={{ color: '#fa8c16', fontSize: 15 }}>
-                    {totalStaff} 人
-                  </Text>
-                )}
-                <Button type="link" size="small" style={{ padding: 0 }} onClick={() => navigate('/schedule')}>
-                  排班管理 <ArrowRightOutlined />
-                </Button>
-              </Space>
-            }
-            bodyStyle={{ padding: '14px 16px' }}
-          >
-            {/* Shift groups */}
-            {shiftDefs.length > 0 ? (
-              <div className={styles.shiftRows}>
-                {shiftDefs.map(def => (
-                  <div key={def.key} className={styles.shiftRow}>
-                    <div className={styles.shiftColor} style={{ background: def.color }} />
-                    <div className={styles.shiftInfo}>
-                      <div className={styles.shiftName}>{def.label}</div>
-                      <div className={styles.shiftTime}>{def.time}</div>
-                    </div>
-                    <span className={styles.shiftCount}>
-                      {shiftGroups[def.key]?.length ?? 0}
-                      <span className={styles.shiftUnit}>人</span>
-                    </span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className={styles.shiftRows}>
-                {[
-                  { label: '早班', time: '07:00–14:00', color: '#fa8c16', count: Math.round((totalStaff ?? 8) * 0.3) },
-                  { label: '午班', time: '10:00–17:00', color: '#1890ff', count: Math.round((totalStaff ?? 8) * 0.4) },
-                  { label: '晚班', time: '16:00–22:00', color: '#722ed1', count: Math.round((totalStaff ?? 8) * 0.3) },
-                ].map(def => (
-                  <div key={def.label} className={styles.shiftRow}>
-                    <div className={styles.shiftColor} style={{ background: def.color }} />
-                    <div className={styles.shiftInfo}>
-                      <div className={styles.shiftName}>{def.label}</div>
-                      <div className={styles.shiftTime}>{def.time}</div>
-                    </div>
-                    <span className={styles.shiftCount}>
-                      {def.count}<span className={styles.shiftUnit}>人</span>
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Staff list */}
-            {allShifts.length > 0 && (
-              <>
-                <Divider style={{ margin: '8px 0' }} />
-                <div className={styles.staffList}>
-                  {allShifts.slice(0, 8).map((s: any, i: number) => (
-                    <div key={i} className={styles.staffRow}>
-                      <div className={styles.staffDot} style={{ background: '#52c41a' }} />
-                      <span className={styles.staffName}>{s.employee_id || `员工${i + 1}`}</span>
-                      <span className={styles.staffPosition}>{s.position || s.shift_type}</span>
-                    </div>
-                  ))}
+            {/* ── 排班状态 ────────────────────────────────────────────────────── */}
+            <ZCard
+              title={<div style={{ display:'flex', alignItems:'center', gap:6 }}><ScheduleOutlined style={{ color: '#fa8c16' }} /><span>今日排班状态</span></div>}
+              extra={
+                <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                  {totalStaff != null && (
+                    <strong style={{ color: '#fa8c16', fontSize: 15 }}>{totalStaff} 人</strong>
+                  )}
+                  <ZButton variant="ghost" size="sm" onClick={() => navigate('/schedule')}>
+                    排班管理 <ArrowRightOutlined />
+                  </ZButton>
                 </div>
-              </>
-            )}
-          </Card>
-
-          {/* ── 排队实况 ────────────────────────────────────────────────────── */}
-          <Card
-            title={<Space><UnorderedListOutlined style={{ color: '#1890ff' }} /><span>排队实况</span></Space>}
-            extra={
-              <Button type="link" size="small" style={{ padding: 0 }} onClick={() => navigate('/queue')}>
-                排队管理 <ArrowRightOutlined />
-              </Button>
-            }
-            bodyStyle={{ padding: 0 }}
-          >
-            <div className={styles.queueCenter}>
-              <div
-                className={styles.queueCircle}
-                style={{ borderColor: queueStatus.color, color: queueStatus.color }}
-              >
-                <span className={styles.queueCircleNum}>{waitCount}</span>
-                <span className={styles.queueCircleUnit}>桌等候</span>
-              </div>
-              <Tag color={waitCount > 10 ? 'error' : waitCount > 5 ? 'warning' : 'success'}>
-                {queueStatus.label}
-              </Tag>
-            </div>
-
-            <div className={styles.queueStats}>
-              <div className={styles.queueStatItem}>
-                <span className={styles.queueStatValue}>{kpi?.avg_wait_min ?? '—'}</span>
-                <span className={styles.queueStatLabel}>均等候(分)</span>
-              </div>
-              <div className={styles.queueStatItem}>
-                <span className={styles.queueStatValue} style={{ color: '#52c41a' }}>
-                  {kpi?.served_today ?? '—'}
-                </span>
-                <span className={styles.queueStatLabel}>今日接待</span>
-              </div>
-              <div className={styles.queueStatItem}>
-                <Tooltip title="翻台率（参考值）">
-                  <span className={styles.queueStatValue} style={{ color: '#1890ff' }}>
-                    {kpi?.served_today
-                      ? (Math.min(kpi.served_today / 40, 4.0)).toFixed(1)
-                      : '—'}
-                  </span>
-                </Tooltip>
-                <span className={styles.queueStatLabel}>翻台率</span>
-              </div>
-            </div>
-          </Card>
-
-          {/* ── 服务质量 ────────────────────────────────────────────────────── */}
-          <Card
-            title={<Space><StarOutlined style={{ color: '#faad14' }} /><span>今日服务质量</span></Space>}
-            extra={
-              <Button type="link" size="small" style={{ padding: 0 }} onClick={() => navigate('/service')}>
-                服务详情 <ArrowRightOutlined />
-              </Button>
-            }
-            bodyStyle={{ padding: '14px 16px' }}
-          >
-            {/* Rating header */}
-            <div className={styles.ratingHeader}>
-              <span className={styles.ratingBig} style={{
-                color: svc.avg >= 4.5 ? '#52c41a' : svc.avg >= 4.0 ? '#faad14' : '#f5222d',
-              }}>
-                {svc.avg.toFixed(1)}
-              </span>
-              <div>
-                <div className={styles.ratingStars}>{renderStars(svc.avg)}</div>
-                <div className={styles.ratingReviews}>{svc.count} 条评价</div>
-              </div>
-            </div>
-
-            {/* Rating distribution */}
-            <div className={styles.ratingBars}>
-              {([5, 4, 3, 2, 1] as const).map(star => {
-                const count = svc.dist[star];
-                const pct   = svc.count > 0 ? (count / svc.count) * 100 : 0;
-                return (
-                  <div key={star} className={styles.ratingBarRow}>
-                    <span className={styles.ratingBarLabel}>{star}★</span>
-                    <div className={styles.ratingBarTrack}>
-                      <div
-                        className={styles.ratingBarFill}
-                        style={{
-                          width: `${pct}%`,
-                          background: star >= 4 ? '#52c41a' : star === 3 ? '#faad14' : '#f5222d',
-                        }}
-                      />
-                    </div>
-                    <span className={styles.ratingBarCount}>{count}</span>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Issues */}
-            {svc.issues.length > 0 && (
-              <>
-                <Divider style={{ margin: '8px 0' }} />
-                <div style={{ fontSize: 11, color: '#8c8c8c', marginBottom: 6 }}>顾客反馈问题</div>
-                <div className={styles.issueList}>
-                  {svc.issues.map((issue, i) => (
-                    <div key={i} className={styles.issueRow} style={{ background: issue.bg }}>
-                      <span className={styles.issueLabel}>{issue.label}</span>
-                      <span className={styles.issueCount} style={{ color: issue.color }}>
-                        {issue.count} 次
+              }
+            >
+              {/* Shift groups */}
+              {shiftDefs.length > 0 ? (
+                <div className={styles.shiftRows}>
+                  {shiftDefs.map(def => (
+                    <div key={def.key} className={styles.shiftRow}>
+                      <div className={styles.shiftColor} style={{ background: def.color }} />
+                      <div className={styles.shiftInfo}>
+                        <div className={styles.shiftName}>{def.label}</div>
+                        <div className={styles.shiftTime}>{def.time}</div>
+                      </div>
+                      <span className={styles.shiftCount}>
+                        {shiftGroups[def.key]?.length ?? 0}
+                        <span className={styles.shiftUnit}>人</span>
                       </span>
                     </div>
                   ))}
                 </div>
-              </>
-            )}
-          </Card>
-
-        </div>
-
-        {/* ── 今日任务清单 ────────────────────────────────────────────────────── */}
-        <Card
-          title={
-            <Space>
-              <FileTextOutlined style={{ color: '#1890ff' }} />
-              <span>今日任务清单</span>
-              {tasks.filter(t => t.priority === 'critical').length > 0 && (
-                <Tag color="error">{tasks.filter(t => t.priority === 'critical').length} 项紧急</Tag>
-              )}
-            </Space>
-          }
-          extra={
-            <Button type="link" size="small" style={{ padding: 0 }} onClick={() => navigate('/tasks')}>
-              全部任务 <ArrowRightOutlined />
-            </Button>
-          }
-          bodyStyle={{ padding: '4px 0' }}
-        >
-          <div className={styles.taskItems}>
-            {tasks.map(task => (
-              <div key={task.id} className={styles.taskRow}>
-                <div
-                  className={styles.taskPriorityDot}
-                  style={{ background: PRIORITY_COLOR[task.priority] }}
-                />
-                <div className={styles.taskBody}>
-                  <div className={styles.taskTitle}>{task.title}</div>
-                  <div className={styles.taskMeta}>
-                    <Tag color="default" style={{ fontSize: 10, padding: '0 4px', lineHeight: '16px' }}>
-                      {task.type}
-                    </Tag>
-                    <span><ClockCircleOutlined style={{ marginRight: 3 }} />{task.time}</span>
-                  </div>
+              ) : (
+                <div className={styles.shiftRows}>
+                  {[
+                    { label: '早班', time: '07:00–14:00', color: '#fa8c16', count: Math.round((totalStaff ?? 8) * 0.3) },
+                    { label: '午班', time: '10:00–17:00', color: '#1890ff', count: Math.round((totalStaff ?? 8) * 0.4) },
+                    { label: '晚班', time: '16:00–22:00', color: '#722ed1', count: Math.round((totalStaff ?? 8) * 0.3) },
+                  ].map(def => (
+                    <div key={def.label} className={styles.shiftRow}>
+                      <div className={styles.shiftColor} style={{ background: def.color }} />
+                      <div className={styles.shiftInfo}>
+                        <div className={styles.shiftName}>{def.label}</div>
+                        <div className={styles.shiftTime}>{def.time}</div>
+                      </div>
+                      <span className={styles.shiftCount}>
+                        {def.count}<span className={styles.shiftUnit}>人</span>
+                      </span>
+                    </div>
+                  ))}
                 </div>
-                <Tag
-                  color={task.priority === 'critical' ? 'error' : task.priority === 'high' ? 'warning' : 'processing'}
-                  className={styles.taskAction}
+              )}
+
+              {/* Staff list */}
+              {allShifts.length > 0 && (
+                <>
+                  <div style={{ borderTop: '1px solid var(--border)', margin: '8px 0' }} />
+                  <div className={styles.staffList}>
+                    {allShifts.slice(0, 8).map((s: any, i: number) => (
+                      <div key={i} className={styles.staffRow}>
+                        <div className={styles.staffDot} style={{ background: '#52c41a' }} />
+                        <span className={styles.staffName}>{s.employee_id || `员工${i + 1}`}</span>
+                        <span className={styles.staffPosition}>{s.position || s.shift_type}</span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </ZCard>
+
+            {/* ── 排队实况 ────────────────────────────────────────────────────── */}
+            <ZCard
+              title={<div style={{ display:'flex', alignItems:'center', gap:6 }}><UnorderedListOutlined style={{ color: '#1890ff' }} /><span>排队实况</span></div>}
+              extra={
+                <ZButton variant="ghost" size="sm" onClick={() => navigate('/queue')}>
+                  排队管理 <ArrowRightOutlined />
+                </ZButton>
+              }
+              noPadding
+            >
+              <div className={styles.queueCenter}>
+                <div
+                  className={styles.queueCircle}
+                  style={{ borderColor: queueStatus.color, color: queueStatus.color }}
                 >
-                  {PRIORITY_LABEL[task.priority]}
-                </Tag>
-                <Button
-                  type="link"
-                  size="small"
-                  style={{ padding: '0 4px', flexShrink: 0 }}
-                  onClick={() => navigate(task.route)}
-                >
-                  处理
-                </Button>
+                  <span className={styles.queueCircleNum}>{waitCount}</span>
+                  <span className={styles.queueCircleUnit}>桌等候</span>
+                </div>
+                <ZBadge
+                  type={waitCount > 10 ? 'critical' : waitCount > 5 ? 'warning' : 'success'}
+                  text={queueStatus.label}
+                />
               </div>
-            ))}
-          </div>
-        </Card>
 
-        {/* ── 快捷导航 ────────────────────────────────────────────────────────── */}
-        <Card
-          title={
-            <Space>
-              <ShopOutlined style={{ color: '#8c8c8c' }} />
-              <span>门店运营功能导航</span>
-            </Space>
-          }
-          bodyStyle={{ padding: '12px 16px' }}
-          style={{ marginTop: 14 }}
-        >
-          <div className={styles.quickNav}>
-            {quickNavItems.map(item => (
-              <button
-                key={item.route}
-                className={styles.quickNavItem}
-                onClick={() => navigate(item.route)}
-              >
-                <span className={styles.quickNavIcon} style={{ color: '#1890ff' }}>
-                  {item.icon}
+              <div className={styles.queueStats}>
+                <div className={styles.queueStatItem}>
+                  <span className={styles.queueStatValue}>{kpi?.avg_wait_min ?? '—'}</span>
+                  <span className={styles.queueStatLabel}>均等候(分)</span>
+                </div>
+                <div className={styles.queueStatItem}>
+                  <span className={styles.queueStatValue} style={{ color: '#52c41a' }}>
+                    {kpi?.served_today ?? '—'}
+                  </span>
+                  <span className={styles.queueStatLabel}>今日接待</span>
+                </div>
+                <div className={styles.queueStatItem}>
+                  <span className={styles.queueStatValue} style={{ color: '#1890ff' }} title="翻台率（参考值）">
+                    {kpi?.served_today
+                      ? (Math.min(kpi.served_today / 40, 4.0)).toFixed(1)
+                      : '—'}
+                  </span>
+                  <span className={styles.queueStatLabel}>翻台率</span>
+                </div>
+              </div>
+            </ZCard>
+
+            {/* ── 服务质量 ────────────────────────────────────────────────────── */}
+            <ZCard
+              title={<div style={{ display:'flex', alignItems:'center', gap:6 }}><StarOutlined style={{ color: '#faad14' }} /><span>今日服务质量</span></div>}
+              extra={
+                <ZButton variant="ghost" size="sm" onClick={() => navigate('/service')}>
+                  服务详情 <ArrowRightOutlined />
+                </ZButton>
+              }
+            >
+              {/* Rating header */}
+              <div className={styles.ratingHeader}>
+                <span className={styles.ratingBig} style={{
+                  color: svc.avg >= 4.5 ? '#52c41a' : svc.avg >= 4.0 ? '#faad14' : '#f5222d',
+                }}>
+                  {svc.avg.toFixed(1)}
                 </span>
-                <span className={styles.quickNavLabel}>{item.label}</span>
-                {item.badge != null && item.badge > 0 && (
-                  <span className={styles.quickNavBadge}>{item.badge}</span>
-                )}
-              </button>
-            ))}
-          </div>
-        </Card>
+                <div>
+                  <div className={styles.ratingStars}>{renderStars(svc.avg)}</div>
+                  <div className={styles.ratingReviews}>{svc.count} 条评价</div>
+                </div>
+              </div>
 
-      </Spin>
+              {/* Rating distribution */}
+              <div className={styles.ratingBars}>
+                {([5, 4, 3, 2, 1] as const).map(star => {
+                  const count = svc.dist[star];
+                  const pct   = svc.count > 0 ? (count / svc.count) * 100 : 0;
+                  return (
+                    <div key={star} className={styles.ratingBarRow}>
+                      <span className={styles.ratingBarLabel}>{star}★</span>
+                      <div className={styles.ratingBarTrack}>
+                        <div
+                          className={styles.ratingBarFill}
+                          style={{
+                            width: `${pct}%`,
+                            background: star >= 4 ? '#52c41a' : star === 3 ? '#faad14' : '#f5222d',
+                          }}
+                        />
+                      </div>
+                      <span className={styles.ratingBarCount}>{count}</span>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Issues */}
+              {svc.issues.length > 0 && (
+                <>
+                  <div style={{ borderTop: '1px solid var(--border)', margin: '8px 0' }} />
+                  <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 6 }}>顾客反馈问题</div>
+                  <div className={styles.issueList}>
+                    {svc.issues.map((issue, i) => (
+                      <div key={i} className={styles.issueRow} style={{ background: issue.bg }}>
+                        <span className={styles.issueLabel}>{issue.label}</span>
+                        <span className={styles.issueCount} style={{ color: issue.color }}>
+                          {issue.count} 次
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </ZCard>
+
+          </div>
+
+          {/* ── 今日任务清单 ────────────────────────────────────────────────────── */}
+          <ZCard
+            title={
+              <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                <FileTextOutlined style={{ color: '#1890ff' }} />
+                <span>今日任务清单</span>
+                {tasks.filter(t => t.priority === 'critical').length > 0 && (
+                  <ZBadge type="critical" text={`${tasks.filter(t => t.priority === 'critical').length} 项紧急`} />
+                )}
+              </div>
+            }
+            extra={
+              <ZButton variant="ghost" size="sm" onClick={() => navigate('/tasks')}>
+                全部任务 <ArrowRightOutlined />
+              </ZButton>
+            }
+            noPadding
+          >
+            <div className={styles.taskItems}>
+              {tasks.map(task => (
+                <div key={task.id} className={styles.taskRow}>
+                  <div
+                    className={styles.taskPriorityDot}
+                    style={{ background: PRIORITY_COLOR[task.priority] }}
+                  />
+                  <div className={styles.taskBody}>
+                    <div className={styles.taskTitle}>{task.title}</div>
+                    <div className={styles.taskMeta}>
+                      <ZBadge type="default" text={task.type} />
+                      <span><ClockCircleOutlined style={{ marginRight: 3 }} />{task.time}</span>
+                    </div>
+                  </div>
+                  <ZBadge
+                    type={PRIORITY_BADGE_TYPE[task.priority]}
+                    text={PRIORITY_LABEL[task.priority]}
+                  />
+                  <ZButton
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => navigate(task.route)}
+                  >
+                    处理
+                  </ZButton>
+                </div>
+              ))}
+            </div>
+          </ZCard>
+
+          {/* ── 快捷导航 ────────────────────────────────────────────────────────── */}
+          <ZCard
+            title={<div style={{ display:'flex', alignItems:'center', gap:6 }}><ShopOutlined style={{ color: '#8c8c8c' }} /><span>门店运营功能导航</span></div>}
+            style={{ marginTop: 14 }}
+          >
+            <div className={styles.quickNav}>
+              {quickNavItems.map(item => (
+                <button
+                  key={item.route}
+                  className={styles.quickNavItem}
+                  onClick={() => navigate(item.route)}
+                >
+                  <span className={styles.quickNavIcon} style={{ color: '#1890ff' }}>
+                    {item.icon}
+                  </span>
+                  <span className={styles.quickNavLabel}>{item.label}</span>
+                  {item.badge != null && item.badge > 0 && (
+                    <span className={styles.quickNavBadge}>{item.badge}</span>
+                  )}
+                </button>
+              ))}
+            </div>
+          </ZCard>
+        </>
+      )}
     </div>
   );
 };

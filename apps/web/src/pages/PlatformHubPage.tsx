@@ -1,19 +1,16 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Card, Tag, Spin, Typography, Button, Tooltip, Badge } from 'antd';
 import {
   ControlOutlined,
   ReloadOutlined,
   CheckCircleOutlined,
-  WarningOutlined,
   BugOutlined,
   DatabaseOutlined,
   ApiOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../services/api';
+import { ZCard, ZBadge, ZButton, ZSkeleton } from '../design-system/components';
 import css from './PlatformHubPage.module.css';
-
-const { Title, Text } = Typography;
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -190,6 +187,12 @@ function usageColor(pct: number): string {
   return '#52c41a';
 }
 
+function statusBadgeType(s: string): 'success' | 'warning' | 'critical' {
+  if (s === 'ok' || s === 'healthy') return 'success';
+  if (s === 'warn' || s === 'degraded') return 'warning';
+  return 'critical';
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function PlatformHubPage() {
@@ -302,16 +305,18 @@ export default function PlatformHubPage() {
       {/* Header */}
       <div className={css.pageHeader}>
         <div className={css.pageHeaderLeft}>
-          <Title level={4} style={{ margin: 0 }}>平台与治理中心</Title>
-          <Text type="secondary" style={{ fontSize: 13 }}>系统健康 · 审批审计 · 集成管理</Text>
+          <h4 className={css.pageTitle}>平台与治理中心</h4>
+          <span className={css.pageSub}>系统健康 · 审批审计 · 集成管理</span>
         </div>
-        <Tooltip title="刷新数据">
-          <Button size="small" icon={<ReloadOutlined />} onClick={refresh} loading={loading} />
-        </Tooltip>
+        <span title="刷新数据">
+          <ZButton size="sm" icon={<ReloadOutlined />} onClick={refresh} loading={loading} />
+        </span>
       </div>
 
       {/* KPI Strip */}
-      <Spin spinning={loading} size="small">
+      {loading ? (
+        <ZSkeleton rows={2} block style={{ marginBottom: 16 }} />
+      ) : (
         <div className={css.kpiStrip}>
           {KPI_ITEMS.map(k => (
             <div key={k.label} className={css.kpiItem}>
@@ -327,14 +332,13 @@ export default function PlatformHubPage() {
             </div>
           ))}
         </div>
-      </Spin>
+      )}
 
       {/* 3-col main */}
       <div className={css.mainGrid}>
         {/* Col 1: 系统状态 */}
-        <Card
-          size="small"
-          title={<><BugOutlined style={{ marginRight: 6, color: '#1890ff' }} />系统状态</>}
+        <ZCard
+          title={<div style={{ display:'flex', alignItems:'center', gap:6 }}><BugOutlined style={{ color: '#1890ff' }} /><span>系统状态</span></div>}
           extra={<a onClick={() => navigate('/monitoring')} style={{ fontSize: 12 }}>监控详情</a>}
         >
           <div className={css.healthList}>
@@ -348,15 +352,15 @@ export default function PlatformHubPage() {
               <div key={row.name} className={css.healthRow}>
                 <div className={css.healthDot} style={{ background: statusColor(row.status) }} />
                 <span className={css.healthName}>{row.name}</span>
-                <Tag color={row.status === 'ok' || row.status === 'healthy' ? 'success' : row.status === 'warn' || row.status === 'degraded' ? 'warning' : 'error'}
-                     style={{ fontSize: 10, margin: 0 }}>
-                  {statusLabel(row.status)}
-                </Tag>
+                <ZBadge
+                  type={statusBadgeType(row.status)}
+                  text={statusLabel(row.status)}
+                />
                 <span className={css.healthMeta}>{row.value}</span>
               </div>
             ))}
           </div>
-          <div style={{ marginTop: 12, borderTop: '1px solid #f5f5f5', paddingTop: 10 }}>
+          <div style={{ marginTop: 12, borderTop: '1px solid var(--border)', paddingTop: 10 }}>
             {[
               { label: 'CPU 使用率',    value: `${p.cpu_usage_pct}%`,    color: usageColor(p.cpu_usage_pct) },
               { label: '内存使用率',    value: `${p.memory_usage_pct}%`, color: usageColor(p.memory_usage_pct) },
@@ -368,12 +372,11 @@ export default function PlatformHubPage() {
               </div>
             ))}
           </div>
-        </Card>
+        </ZCard>
 
         {/* Col 2: 审批与审计 */}
-        <Card
-          size="small"
-          title={<><CheckCircleOutlined style={{ marginRight: 6, color: '#fa8c16' }} />审批与审计</>}
+        <ZCard
+          title={<div style={{ display:'flex', alignItems:'center', gap:6 }}><CheckCircleOutlined style={{ color: '#fa8c16' }} /><span>审批与审计</span></div>}
           extra={<a onClick={() => navigate('/approval-list')} style={{ fontSize: 12 }}>全部审批</a>}
         >
           <div className={css.approvalSummary}>
@@ -381,21 +384,21 @@ export default function PlatformHubPage() {
               <div className={css.approvalNum}>{ap.length}</div>
               <div className={css.approvalDesc}>项待审批</div>
             </div>
-            <Button
-              size="small"
-              type="primary"
+            <ZButton
+              variant="primary"
+              size="sm"
               onClick={() => navigate('/approval-list')}
               disabled={ap.length === 0}
             >
               立即处理
-            </Button>
+            </ZButton>
           </div>
 
           {ap.length > 0 && (
             <div className={css.approvalList}>
               {ap.slice(0, 3).map(item => (
                 <div key={item.id} className={css.approvalRow} onClick={() => navigate('/approval-list')}>
-                  <Tag color="warning" style={{ fontSize: 10, margin: 0 }}>{item.decision_type}</Tag>
+                  <ZBadge type="warning" text={item.decision_type} />
                   <span className={css.approvalTitle}>{item.store_id}</span>
                   <span className={css.approvalMeta}>{relativeTime(item.created_at)}</span>
                 </div>
@@ -403,8 +406,8 @@ export default function PlatformHubPage() {
             </div>
           )}
 
-          <div style={{ marginTop: 10, borderTop: '1px solid #f5f5f5', paddingTop: 6 }}>
-            <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 6 }}>近期操作日志</div>
+          <div style={{ marginTop: 10, borderTop: '1px solid var(--border)', paddingTop: 6 }}>
+            <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 6 }}>近期操作日志</div>
             <div className={css.auditList}>
               {DEMO_AUDIT.slice(0, 4).map((a, i) => (
                 <div key={i} className={css.auditRow}>
@@ -415,12 +418,11 @@ export default function PlatformHubPage() {
               ))}
             </div>
           </div>
-        </Card>
+        </ZCard>
 
         {/* Col 3: 集成与备份 */}
-        <Card
-          size="small"
-          title={<><ApiOutlined style={{ marginRight: 6, color: '#722ed1' }} />集成与数据</>}
+        <ZCard
+          title={<div style={{ display:'flex', alignItems:'center', gap:6 }}><ApiOutlined style={{ color: '#722ed1' }} /><span>集成与数据</span></div>}
           extra={<a onClick={() => navigate('/integrations')} style={{ fontSize: 12 }}>集成管理</a>}
         >
           <div className={css.integrationList}>
@@ -430,12 +432,10 @@ export default function PlatformHubPage() {
                   {intg.icon}
                 </div>
                 <span className={css.integrationName}>{intg.name}</span>
-                <Tag
-                  color={intg.status === 'ok' ? 'success' : 'warning'}
-                  style={{ fontSize: 10, margin: 0 }}
-                >
-                  {intg.status === 'ok' ? '正常' : '告警'}
-                </Tag>
+                <ZBadge
+                  type={intg.status === 'ok' ? 'success' : 'warning'}
+                  text={intg.status === 'ok' ? '正常' : '告警'}
+                />
                 <span className={css.integrationMeta}>{intg.meta}</span>
               </div>
             ))}
@@ -453,17 +453,18 @@ export default function PlatformHubPage() {
               </div>
             </div>
             <div style={{ textAlign: 'right' }}>
-              <Tag color={bk.status === 'completed' ? 'success' : 'warning'} style={{ margin: 0 }}>
-                {statusLabel(bk.status)}
-              </Tag>
+              <ZBadge
+                type={bk.status === 'completed' ? 'success' : 'warning'}
+                text={statusLabel(bk.status)}
+              />
               <div className={css.backupSummaryTime}>{relativeTime(bk.created_at)}</div>
             </div>
           </div>
-        </Card>
+        </ZCard>
       </div>
 
       {/* Quick Nav — grouped */}
-      <Card size="small" title="管理入口">
+      <ZCard title="管理入口">
         <div className={css.navGroups}>
           {NAV_GROUPS.map(group => (
             <div key={group.title} className={css.navGroup}>
@@ -483,7 +484,7 @@ export default function PlatformHubPage() {
             </div>
           ))}
         </div>
-      </Card>
+      </ZCard>
     </div>
   );
 }

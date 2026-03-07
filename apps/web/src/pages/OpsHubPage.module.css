@@ -19,6 +19,18 @@
   gap: 10px;
 }
 
+.pageTitle {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.pageSub {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
 /* ── KPI Strip ─────────────────────────────────────────────────────────────── */
 
 .kpiStrip {

@@ -13,20 +13,14 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Card, Select, Button, Tag, Spin, Typography, Space, Divider, Tooltip,
-  Progress,
-} from 'antd';
-import {
   ReloadOutlined, WarningOutlined, ShoppingOutlined, FireOutlined,
   InboxOutlined, DollarOutlined, ArrowRightOutlined, BulbOutlined,
   CheckCircleOutlined, ShoppingCartOutlined, ExperimentOutlined,
   FileExcelOutlined, BarChartOutlined,
 } from '@ant-design/icons';
 import { apiClient } from '../services/api';
+import { ZCard, ZBadge, ZButton, ZSkeleton, ZSelect } from '../design-system/components';
 import styles from './ProductsHubPage.module.css';
-
-const { Text, Title } = Typography;
-const { Option } = Select;
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -86,6 +80,12 @@ function invStatusColor(status: string): string {
 
 function invStatusLabel(status: string): string {
   return { out_of_stock: '已断货', critical: '即将断货', low: '库存偏低', normal: '正常' }[status] ?? status;
+}
+
+function invStatusBadgeType(status: string): 'critical' | 'warning' | 'default' {
+  if (status === 'out_of_stock' || status === 'critical') return 'critical';
+  if (status === 'low') return 'warning';
+  return 'default';
 }
 
 function wasteRankColor(i: number): string {
@@ -248,6 +248,10 @@ const ProductsHubPage: React.FC = () => {
 
   const loading = bffLoading || invLoading || wasteLoading || boardLoading;
 
+  const storeOptions = stores.length > 0
+    ? stores.map((s: any) => ({ value: s.store_id || s.id, label: s.name || s.store_id || s.id }))
+    : [{ value: 'S001', label: 'S001 示例门店' }];
+
   // ── Render ────────────────────────────────────────────────────────────────────
 
   return (
@@ -256,217 +260,210 @@ const ProductsHubPage: React.FC = () => {
       {/* ── Header ──────────────────────────────────────────────────────────── */}
       <div className={styles.pageHeader}>
         <div className={styles.pageHeaderLeft}>
-          <Title level={4} style={{ margin: 0 }}>商品与供应链中心</Title>
-          <Text type="secondary" style={{ fontSize: 13 }}>
+          <h4 className={styles.pageTitle}>商品与供应链中心</h4>
+          <span className={styles.pageSub}>
             {new Date().toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'short' })}
-          </Text>
+          </span>
         </div>
-        <Space>
-          <Select value={selectedStore} onChange={setSelectedStore} style={{ width: 160 }}>
-            {stores.length > 0
-              ? stores.map((s: any) => (
-                  <Option key={s.store_id || s.id} value={s.store_id || s.id}>
-                    {s.name || s.store_id || s.id}
-                  </Option>
-                ))
-              : <Option value="S001">S001 示例门店</Option>}
-          </Select>
-          <Button icon={<ReloadOutlined />} onClick={refresh}>刷新</Button>
-        </Space>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <ZSelect
+            value={selectedStore}
+            onChange={(v) => setSelectedStore(v as string)}
+            style={{ width: 160 }}
+            options={storeOptions}
+          />
+          <ZButton icon={<ReloadOutlined />} onClick={refresh} loading={loading}>刷新</ZButton>
+        </div>
       </div>
 
-      <Spin spinning={loading}>
-
-        {/* ── KPI strip ──────────────────────────────────────────────────────── */}
-        <div className={styles.kpiStrip}>
-          {kpiItems.map((item, idx) => (
-            <div key={idx} className={styles.kpiItem}>
-              <div className={styles.kpiIconWrap} style={{ background: item.iconBg, color: item.iconColor }}>
-                {item.icon}
-              </div>
-              <div className={styles.kpiBody}>
-                <div className={styles.kpiLabel}>{item.label}</div>
-                <div className={styles.kpiValue} style={{ color: item.iconColor }}>
-                  {item.value}<span className={styles.kpiUnit}>{item.unit}</span>
+      {loading ? (
+        <ZSkeleton rows={8} block />
+      ) : (
+        <>
+          {/* ── KPI strip ──────────────────────────────────────────────────────── */}
+          <div className={styles.kpiStrip}>
+            {kpiItems.map((item, idx) => (
+              <div key={idx} className={styles.kpiItem}>
+                <div className={styles.kpiIconWrap} style={{ background: item.iconBg, color: item.iconColor }}>
+                  {item.icon}
                 </div>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* ── 3-col main ─────────────────────────────────────────────────────── */}
-        <div className={styles.mainGrid}>
-
-          {/* ── 库存状态 ────────────────────────────────────────────────────── */}
-          <Card
-            title={<Space><InboxOutlined style={{ color: '#1890ff' }} /><span>库存状态</span></Space>}
-            extra={
-              <Space size={6}>
-                {totalValueYuan > 0 && (
-                  <Text type="secondary" style={{ fontSize: 12 }}>
-                    总值 ¥{totalValueYuan.toLocaleString('zh-CN', { maximumFractionDigits: 0 })}
-                  </Text>
-                )}
-                <Button type="link" size="small" style={{ padding: 0 }} onClick={() => navigate('/inventory')}>
-                  库存管理 <ArrowRightOutlined />
-                </Button>
-              </Space>
-            }
-            bodyStyle={{ padding: '12px 16px' }}
-          >
-            {/* Status distribution */}
-            <div style={{ marginBottom: 10 }}>
-              {[
-                { key: 'out_of_stock', label: '已断货', count: statusDist.out_of_stock, color: '#f5222d', bg: '#fff1f0' },
-                { key: 'critical',     label: '即将断货', count: statusDist.critical,   color: '#fa8c16', bg: '#fff7e6' },
-                { key: 'low',          label: '库存偏低', count: statusDist.low,         color: '#faad14', bg: '#fffbe6' },
-                { key: 'normal',       label: '正常',    count: statusDist.normal,       color: '#52c41a', bg: '#f6ffed' },
-              ].map(row => (
-                <div key={row.key} className={styles.statusRow}>
-                  <div className={styles.statusDot} style={{ background: row.color }} />
-                  <span className={styles.statusLabel}>{row.label}</span>
-                  <span className={styles.statusCount} style={{ color: row.count > 0 && row.key !== 'normal' ? row.color : '#262626' }}>
-                    {row.count}
-                  </span>
-                  <Tag color={row.key !== 'normal' && row.count > 0 ? 'error' : 'default'}
-                    style={{ marginLeft: 8, fontSize: 10, padding: '0 4px', lineHeight: '16px' }}>
-                    {row.count > 0 ? '项' : '—'}
-                  </Tag>
-                </div>
-              ))}
-            </div>
-
-            {/* Top alert items */}
-            {invStats?.alert_items && invStats.alert_items.length > 0 && (
-              <>
-                <Divider style={{ margin: '8px 0' }} />
-                <div style={{ fontSize: 11, color: '#8c8c8c', marginBottom: 6 }}>预警品项（Top 5）</div>
-                <div className={styles.alertItems}>
-                  {invStats.alert_items.slice(0, 5).map(item => {
-                    const color = invStatusColor(item.status);
-                    const bg    = item.status === 'out_of_stock' ? '#fff1f0'
-                                : item.status === 'critical'     ? '#fff7e6'
-                                : '#fffbe6';
-                    return (
-                      <div key={item.id} className={styles.alertRow}
-                        style={{ background: bg, borderLeftColor: color }}>
-                        <span className={styles.alertItemName}>{item.name}</span>
-                        <Tag color={item.status === 'out_of_stock' ? 'error' : item.status === 'critical' ? 'warning' : 'gold'}
-                          style={{ fontSize: 10, padding: '0 4px', lineHeight: '16px', flexShrink: 0 }}>
-                          {invStatusLabel(item.status)}
-                        </Tag>
-                        <span className={styles.alertItemQty}>
-                          {item.current_quantity}{item.unit}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </>
-            )}
-
-            {(!invStats || invStats.alert_items?.length === 0) && (
-              <div style={{ textAlign: 'center', padding: '12px 0', color: '#8c8c8c', fontSize: 13 }}>
-                <CheckCircleOutlined style={{ color: '#52c41a', marginRight: 6 }} />
-                库存状态正常
-              </div>
-            )}
-          </Card>
-
-          {/* ── 损耗 Top5 ───────────────────────────────────────────────────── */}
-          <Card
-            title={<Space><FireOutlined style={{ color: '#fa8c16' }} /><span>本周损耗 Top5</span></Space>}
-            extra={
-              <Button type="link" size="small" style={{ padding: 0 }} onClick={() => navigate('/waste-reasoning')}>
-                损耗分析 <ArrowRightOutlined />
-              </Button>
-            }
-            bodyStyle={{ padding: '12px 16px' }}
-          >
-            {/* Summary row */}
-            {wasteSummary && (
-              <>
-                <div className={styles.wasteSummaryRow}>
-                  <Text type="secondary" style={{ fontSize: 12 }}>本周总损耗</Text>
-                  <Text strong style={{ fontSize: 15, color: '#fa8c16' }}>
-                    ¥{totalWasteYuan > 0 ? Math.round(totalWasteYuan / 100).toLocaleString() : '—'}
-                  </Text>
-                </div>
-                {wasteSummary.waste_rate_pct != null && (
-                  <div className={styles.wasteSummaryRow}>
-                    <Text type="secondary" style={{ fontSize: 12 }}>损耗率</Text>
-                    <Space size={6}>
-                      <Text strong style={{ fontSize: 13, color: (wasteSummary.waste_rate_pct ?? 0) > 5 ? '#f5222d' : '#52c41a' }}>
-                        {wasteSummary.waste_rate_pct.toFixed(1)}%
-                      </Text>
-                      {wasteSummary.mom_change_pct != null && (
-                        <Tag color={(wasteSummary.mom_change_pct ?? 0) > 0 ? 'error' : 'success'} style={{ fontSize: 10, padding: '0 4px' }}>
-                          {wasteSummary.mom_change_pct > 0 ? '+' : ''}{wasteSummary.mom_change_pct.toFixed(1)}%
-                        </Tag>
-                      )}
-                    </Space>
+                <div className={styles.kpiBody}>
+                  <div className={styles.kpiLabel}>{item.label}</div>
+                  <div className={styles.kpiValue} style={{ color: item.iconColor }}>
+                    {item.value}<span className={styles.kpiUnit}>{item.unit}</span>
                   </div>
-                )}
-                <Divider style={{ margin: '8px 0' }} />
-              </>
-            )}
-
-            {/* Top 5 waste items */}
-            {wasteTop5.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '20px 0', color: '#8c8c8c', fontSize: 13 }}>
-                <CheckCircleOutlined style={{ color: '#52c41a', marginRight: 6 }} />
-                本周暂无损耗记录
+                </div>
               </div>
-            ) : (
-              <div className={styles.wasteItems}>
-                {wasteTop5.map((item, i) => (
-                  <div key={i} className={styles.wasteRow}>
-                    <div className={styles.wasteRank} style={{ background: wasteRankColor(i) }}>
-                      {i + 1}
-                    </div>
-                    <Tooltip title={item.cause || item.ingredient_name}>
-                      <span className={styles.wasteName}>{item.ingredient_name}</span>
-                    </Tooltip>
-                    <div className={styles.wasteBarTrack}>
-                      <div
-                        className={styles.wasteBarFill}
-                        style={{
-                          width: `${(item.total_waste_yuan / maxWasteYuan) * 100}%`,
-                          background: wasteRankColor(i),
-                        }}
-                      />
-                    </div>
-                    <span className={styles.wasteAmount} style={{ color: wasteRankColor(i) }}>
-                      ¥{(item.total_waste_yuan / 100).toLocaleString('zh-CN', { maximumFractionDigits: 0 })}
+            ))}
+          </div>
+
+          {/* ── 3-col main ─────────────────────────────────────────────────────── */}
+          <div className={styles.mainGrid}>
+
+            {/* ── 库存状态 ────────────────────────────────────────────────────── */}
+            <ZCard
+              title={<div style={{ display:'flex', alignItems:'center', gap:6 }}><InboxOutlined style={{ color: '#1890ff' }} /><span>库存状态</span></div>}
+              extra={
+                <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                  {totalValueYuan > 0 && (
+                    <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                      总值 ¥{totalValueYuan.toLocaleString('zh-CN', { maximumFractionDigits: 0 })}
                     </span>
+                  )}
+                  <ZButton variant="ghost" size="sm" onClick={() => navigate('/inventory')}>
+                    库存管理 <ArrowRightOutlined />
+                  </ZButton>
+                </div>
+              }
+            >
+              {/* Status distribution */}
+              <div style={{ marginBottom: 10 }}>
+                {[
+                  { key: 'out_of_stock', label: '已断货', count: statusDist.out_of_stock, color: '#f5222d' },
+                  { key: 'critical',     label: '即将断货', count: statusDist.critical,   color: '#fa8c16' },
+                  { key: 'low',          label: '库存偏低', count: statusDist.low,         color: '#faad14' },
+                  { key: 'normal',       label: '正常',    count: statusDist.normal,       color: '#52c41a' },
+                ].map(row => (
+                  <div key={row.key} className={styles.statusRow}>
+                    <div className={styles.statusDot} style={{ background: row.color }} />
+                    <span className={styles.statusLabel}>{row.label}</span>
+                    <span className={styles.statusCount} style={{ color: row.count > 0 && row.key !== 'normal' ? row.color : 'var(--text-primary)' }}>
+                      {row.count}
+                    </span>
+                    <ZBadge
+                      type={row.key !== 'normal' && row.count > 0 ? 'critical' : 'default'}
+                      text={row.count > 0 ? '项' : '—'}
+                    />
                   </div>
                 ))}
               </div>
-            )}
-          </Card>
 
-          {/* ── 采购建议 ────────────────────────────────────────────────────── */}
-          <Card
-            title={<Space><ShoppingCartOutlined style={{ color: '#52c41a' }} /><span>待采购清单</span></Space>}
-            extra={
-              <Button type="link" size="small" style={{ padding: 0 }} onClick={() => navigate('/inventory')}>
-                采购管理 <ArrowRightOutlined />
-              </Button>
-            }
-            bodyStyle={{ padding: '12px 16px' }}
-          >
-            {purchaseList.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '20px 0', color: '#8c8c8c', fontSize: 13 }}>
-                <CheckCircleOutlined style={{ color: '#52c41a', marginRight: 6 }} />
-                暂无待采购项目
-              </div>
-            ) : (
-              <div className={styles.purchaseItems}>
-                {purchaseList.slice(0, 6).map((item, i) => {
-                  const levelColor = item.alert_level === 'critical' ? '#f5222d'
-                                   : item.alert_level === 'urgent'   ? '#fa8c16'
-                                   : '#faad14';
-                  return (
+              {/* Top alert items */}
+              {invStats?.alert_items && invStats.alert_items.length > 0 && (
+                <>
+                  <div style={{ borderTop: '1px solid var(--border)', margin: '8px 0' }} />
+                  <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 6 }}>预警品项（Top 5）</div>
+                  <div className={styles.alertItems}>
+                    {invStats.alert_items.slice(0, 5).map(item => {
+                      const color = invStatusColor(item.status);
+                      const bg    = item.status === 'out_of_stock' ? '#fff1f0'
+                                  : item.status === 'critical'     ? '#fff7e6'
+                                  : '#fffbe6';
+                      return (
+                        <div key={item.id} className={styles.alertRow}
+                          style={{ background: bg, borderLeftColor: color }}>
+                          <span className={styles.alertItemName}>{item.name}</span>
+                          <ZBadge
+                            type={invStatusBadgeType(item.status)}
+                            text={invStatusLabel(item.status)}
+                          />
+                          <span className={styles.alertItemQty}>
+                            {item.current_quantity}{item.unit}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+
+              {(!invStats || invStats.alert_items?.length === 0) && (
+                <div style={{ textAlign: 'center', padding: '12px 0', color: 'var(--text-secondary)', fontSize: 13 }}>
+                  <CheckCircleOutlined style={{ color: '#52c41a', marginRight: 6 }} />
+                  库存状态正常
+                </div>
+              )}
+            </ZCard>
+
+            {/* ── 损耗 Top5 ───────────────────────────────────────────────────── */}
+            <ZCard
+              title={<div style={{ display:'flex', alignItems:'center', gap:6 }}><FireOutlined style={{ color: '#fa8c16' }} /><span>本周损耗 Top5</span></div>}
+              extra={
+                <ZButton variant="ghost" size="sm" onClick={() => navigate('/waste-reasoning')}>
+                  损耗分析 <ArrowRightOutlined />
+                </ZButton>
+              }
+            >
+              {/* Summary row */}
+              {wasteSummary && (
+                <>
+                  <div className={styles.wasteSummaryRow}>
+                    <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>本周总损耗</span>
+                    <strong style={{ fontSize: 15, color: '#fa8c16' }}>
+                      ¥{totalWasteYuan > 0 ? Math.round(totalWasteYuan / 100).toLocaleString() : '—'}
+                    </strong>
+                  </div>
+                  {wasteSummary.waste_rate_pct != null && (
+                    <div className={styles.wasteSummaryRow}>
+                      <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>损耗率</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <strong style={{ fontSize: 13, color: (wasteSummary.waste_rate_pct ?? 0) > 5 ? '#f5222d' : '#52c41a' }}>
+                          {wasteSummary.waste_rate_pct.toFixed(1)}%
+                        </strong>
+                        {wasteSummary.mom_change_pct != null && (
+                          <ZBadge
+                            type={(wasteSummary.mom_change_pct ?? 0) > 0 ? 'critical' : 'success'}
+                            text={`${wasteSummary.mom_change_pct > 0 ? '+' : ''}${wasteSummary.mom_change_pct.toFixed(1)}%`}
+                          />
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  <div style={{ borderTop: '1px solid var(--border)', margin: '8px 0' }} />
+                </>
+              )}
+
+              {/* Top 5 waste items */}
+              {wasteTop5.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--text-secondary)', fontSize: 13 }}>
+                  <CheckCircleOutlined style={{ color: '#52c41a', marginRight: 6 }} />
+                  本周暂无损耗记录
+                </div>
+              ) : (
+                <div className={styles.wasteItems}>
+                  {wasteTop5.map((item, i) => (
+                    <div key={i} className={styles.wasteRow}>
+                      <div className={styles.wasteRank} style={{ background: wasteRankColor(i) }}>
+                        {i + 1}
+                      </div>
+                      <span className={styles.wasteName} title={item.cause || item.ingredient_name}>
+                        {item.ingredient_name}
+                      </span>
+                      <div className={styles.wasteBarTrack}>
+                        <div
+                          className={styles.wasteBarFill}
+                          style={{
+                            width: `${(item.total_waste_yuan / maxWasteYuan) * 100}%`,
+                            background: wasteRankColor(i),
+                          }}
+                        />
+                      </div>
+                      <span className={styles.wasteAmount} style={{ color: wasteRankColor(i) }}>
+                        ¥{(item.total_waste_yuan / 100).toLocaleString('zh-CN', { maximumFractionDigits: 0 })}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </ZCard>
+
+            {/* ── 采购建议 ────────────────────────────────────────────────────── */}
+            <ZCard
+              title={<div style={{ display:'flex', alignItems:'center', gap:6 }}><ShoppingCartOutlined style={{ color: '#52c41a' }} /><span>待采购清单</span></div>}
+              extra={
+                <ZButton variant="ghost" size="sm" onClick={() => navigate('/inventory')}>
+                  采购管理 <ArrowRightOutlined />
+                </ZButton>
+              }
+            >
+              {purchaseList.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--text-secondary)', fontSize: 13 }}>
+                  <CheckCircleOutlined style={{ color: '#52c41a', marginRight: 6 }} />
+                  暂无待采购项目
+                </div>
+              ) : (
+                <div className={styles.purchaseItems}>
+                  {purchaseList.slice(0, 6).map((item, i) => (
                     <div key={i} className={styles.purchaseRow}>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div className={styles.purchaseName}>{item.item_name}</div>
@@ -479,139 +476,133 @@ const ProductsHubPage: React.FC = () => {
                       </div>
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 3 }}>
                         {item.recommended_quantity != null && (
-                          <Text strong style={{ fontSize: 13, color: '#262626' }}>
+                          <strong style={{ fontSize: 13, color: 'var(--text-primary)' }}>
                             +{item.recommended_quantity}{item.unit}
-                          </Text>
+                          </strong>
                         )}
                         {item.alert_level && (
-                          <Tag color={item.alert_level === 'critical' ? 'error' : 'warning'}
-                            style={{ fontSize: 10, padding: '0 4px', lineHeight: '16px', margin: 0 }}>
-                            {item.alert_level === 'critical' ? '紧急' : item.alert_level === 'urgent' ? '较急' : '建议'}
-                          </Tag>
+                          <ZBadge
+                            type={item.alert_level === 'critical' ? 'critical' : 'warning'}
+                            text={item.alert_level === 'critical' ? '紧急' : item.alert_level === 'urgent' ? '较急' : '建议'}
+                          />
                         )}
                       </div>
                     </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {purchaseList.length > 6 && (
-              <Button
-                type="dashed"
-                block
-                size="small"
-                style={{ marginTop: 8 }}
-                onClick={() => navigate('/inventory')}
-              >
-                查看全部 {purchaseList.length} 项
-              </Button>
-            )}
-          </Card>
-
-        </div>
-
-        {/* ── 食材成本率详情 ──────────────────────────────────────────────────── */}
-        <Card
-          title={<Space><DollarOutlined style={{ color: '#722ed1' }} /><span>食材成本率分析</span></Space>}
-          extra={
-            <Button type="link" size="small" style={{ padding: 0 }} onClick={() => navigate('/profit-dashboard')}>
-              成本看板 <ArrowRightOutlined />
-            </Button>
-          }
-          bodyStyle={{ padding: '16px 20px' }}
-          style={{ marginBottom: 14 }}
-        >
-          {foodCost ? (
-            <>
-              <div className={styles.costRow}>
-                <div className={styles.costCell}>
-                  <span className={styles.costCellValue} style={{ color: costColor(foodCost.variance_status) }}>
-                    {foodCost.actual_cost_pct.toFixed(1)}%
-                  </span>
-                  <span className={styles.costCellLabel}>实际成本率</span>
-                </div>
-                <div className={styles.costCell}>
-                  <span className={styles.costCellValue} style={{ color: '#1890ff' }}>
-                    {foodCost.target_pct.toFixed(1)}%
-                  </span>
-                  <span className={styles.costCellLabel}>目标成本率</span>
-                </div>
-                <div className={styles.costCell}>
-                  <span className={styles.costCellValue}
-                    style={{ color: foodCost.variance_pct > 0 ? '#f5222d' : '#52c41a' }}>
-                    {foodCost.variance_pct > 0 ? '+' : ''}{foodCost.variance_pct.toFixed(1)}%
-                  </span>
-                  <span className={styles.costCellLabel}>较目标偏差</span>
-                </div>
-              </div>
-
-              <div style={{ marginTop: 16, display: 'flex', alignItems: 'center', gap: 12 }}>
-                <Text type="secondary" style={{ fontSize: 12, whiteSpace: 'nowrap' }}>
-                  目标 {foodCost.target_pct.toFixed(1)}%
-                </Text>
-                <div style={{ flex: 1 }}>
-                  <Progress
-                    percent={Math.min(foodCost.actual_cost_pct, 60)}
-                    success={{ percent: Math.min(foodCost.target_pct, 60) }}
-                    strokeColor={costColor(foodCost.variance_status)}
-                    showInfo={false}
-                    size="small"
-                  />
-                </div>
-                <Tag
-                  color={foodCost.variance_status === 'critical' ? 'error'
-                       : foodCost.variance_status === 'warning'  ? 'warning' : 'success'}
-                >
-                  {foodCost.variance_status === 'critical' ? '超标'
-                 : foodCost.variance_status === 'warning'  ? '偏高' : '正常'}
-                </Tag>
-              </div>
-
-              {foodCost.variance_status !== 'ok' && (
-                <div style={{
-                  marginTop: 10,
-                  padding: '8px 12px',
-                  background: foodCost.variance_status === 'critical' ? '#fff1f0' : '#fff7e6',
-                  border: `1px solid ${foodCost.variance_status === 'critical' ? '#ffccc7' : '#ffd591'}`,
-                  borderRadius: 6,
-                  fontSize: 12,
-                  color: costColor(foodCost.variance_status),
-                }}>
-                  <BulbOutlined style={{ marginRight: 6 }} />
-                  建议核查损耗原因并优化采购量，
-                  {foodCost.variance_pct > 0 && `超标 ${foodCost.variance_pct.toFixed(1)}%，`}
-                  点击"损耗分析"了解明细。
+                  ))}
                 </div>
               )}
-            </>
-          ) : (
-            <div style={{ textAlign: 'center', padding: '20px 0', color: '#8c8c8c', fontSize: 13 }}>
-              暂无食材成本数据
-            </div>
-          )}
-        </Card>
 
-        {/* ── 快捷导航 ────────────────────────────────────────────────────────── */}
-        <Card
-          title={<Space><ShoppingOutlined style={{ color: '#8c8c8c' }} /><span>商品与供应链功能导航</span></Space>}
-          bodyStyle={{ padding: '12px 16px' }}
-        >
-          <div className={styles.quickNav}>
-            {quickNavItems.map(item => (
-              <button
-                key={item.route}
-                className={styles.quickNavItem}
-                onClick={() => navigate(item.route)}
-              >
-                <span className={styles.quickNavIcon}>{item.icon}</span>
-                <span className={styles.quickNavLabel}>{item.label}</span>
-              </button>
-            ))}
+              {purchaseList.length > 6 && (
+                <ZButton
+                  variant="secondary"
+                  onClick={() => navigate('/inventory')}
+                  style={{ marginTop: 8, width: '100%' }}
+                >
+                  查看全部 {purchaseList.length} 项
+                </ZButton>
+              )}
+            </ZCard>
+
           </div>
-        </Card>
 
-      </Spin>
+          {/* ── 食材成本率详情 ──────────────────────────────────────────────────── */}
+          <ZCard
+            title={<div style={{ display:'flex', alignItems:'center', gap:6 }}><DollarOutlined style={{ color: '#722ed1' }} /><span>食材成本率分析</span></div>}
+            extra={
+              <ZButton variant="ghost" size="sm" onClick={() => navigate('/profit-dashboard')}>
+                成本看板 <ArrowRightOutlined />
+              </ZButton>
+            }
+            style={{ marginBottom: 14 }}
+          >
+            {foodCost ? (
+              <>
+                <div className={styles.costRow}>
+                  <div className={styles.costCell}>
+                    <span className={styles.costCellValue} style={{ color: costColor(foodCost.variance_status) }}>
+                      {foodCost.actual_cost_pct.toFixed(1)}%
+                    </span>
+                    <span className={styles.costCellLabel}>实际成本率</span>
+                  </div>
+                  <div className={styles.costCell}>
+                    <span className={styles.costCellValue} style={{ color: '#1890ff' }}>
+                      {foodCost.target_pct.toFixed(1)}%
+                    </span>
+                    <span className={styles.costCellLabel}>目标成本率</span>
+                  </div>
+                  <div className={styles.costCell}>
+                    <span className={styles.costCellValue}
+                      style={{ color: foodCost.variance_pct > 0 ? '#f5222d' : '#52c41a' }}>
+                      {foodCost.variance_pct > 0 ? '+' : ''}{foodCost.variance_pct.toFixed(1)}%
+                    </span>
+                    <span className={styles.costCellLabel}>较目标偏差</span>
+                  </div>
+                </div>
+
+                <div style={{ marginTop: 16, display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <span style={{ fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
+                    目标 {foodCost.target_pct.toFixed(1)}%
+                  </span>
+                  <div style={{ flex: 1 }}>
+                    <div className={styles.costBar}>
+                      <div
+                        className={styles.costBarFill}
+                        style={{
+                          width: `${Math.min(foodCost.actual_cost_pct, 60) / 60 * 100}%`,
+                          background: costColor(foodCost.variance_status),
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <ZBadge
+                    type={foodCost.variance_status === 'critical' ? 'critical' : foodCost.variance_status === 'warning' ? 'warning' : 'success'}
+                    text={foodCost.variance_status === 'critical' ? '超标' : foodCost.variance_status === 'warning' ? '偏高' : '正常'}
+                  />
+                </div>
+
+                {foodCost.variance_status !== 'ok' && (
+                  <div style={{
+                    marginTop: 10,
+                    padding: '8px 12px',
+                    background: foodCost.variance_status === 'critical' ? '#fff1f0' : '#fff7e6',
+                    border: `1px solid ${foodCost.variance_status === 'critical' ? '#ffccc7' : '#ffd591'}`,
+                    borderRadius: 6,
+                    fontSize: 12,
+                    color: costColor(foodCost.variance_status),
+                  }}>
+                    <BulbOutlined style={{ marginRight: 6 }} />
+                    建议核查损耗原因并优化采购量，
+                    {foodCost.variance_pct > 0 && `超标 ${foodCost.variance_pct.toFixed(1)}%，`}
+                    点击"损耗分析"了解明细。
+                  </div>
+                )}
+              </>
+            ) : (
+              <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--text-secondary)', fontSize: 13 }}>
+                暂无食材成本数据
+              </div>
+            )}
+          </ZCard>
+
+          {/* ── 快捷导航 ────────────────────────────────────────────────────────── */}
+          <ZCard
+            title={<div style={{ display:'flex', alignItems:'center', gap:6 }}><ShoppingOutlined style={{ color: '#8c8c8c' }} /><span>商品与供应链功能导航</span></div>}
+          >
+            <div className={styles.quickNav}>
+              {quickNavItems.map(item => (
+                <button
+                  key={item.route}
+                  className={styles.quickNavItem}
+                  onClick={() => navigate(item.route)}
+                >
+                  <span className={styles.quickNavIcon}>{item.icon}</span>
+                  <span className={styles.quickNavLabel}>{item.label}</span>
+                </button>
+              ))}
+            </div>
+          </ZCard>
+        </>
+      )}
     </div>
   );
 };

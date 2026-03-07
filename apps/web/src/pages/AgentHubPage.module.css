@@ -19,6 +19,18 @@
   gap: 10px;
 }
 
+.pageTitle {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.pageSub {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
 /* ── Stats bar ─────────────────────────────────────────────────────────────── */
 
 .statsBar {
@@ -256,6 +268,27 @@
 .agentCardFooter {
   padding: 10px 16px 12px;
   margin-top: auto;
+}
+
+.agentEnterBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  width: 100%;
+  padding: 5px 12px;
+  border: 1px solid currentColor;
+  border-radius: var(--radius-sm, 6px);
+  background: transparent;
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: opacity 0.15s;
+  font-weight: 500;
+}
+
+.agentEnterBtn:hover {
+  opacity: 0.75;
 }
 
 /* ── Bottom section ────────────────────────────────────────────────────────── */

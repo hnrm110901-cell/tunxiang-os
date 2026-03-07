@@ -15,10 +15,7 @@
  */
 import React, { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  Row, Col, Card, Select, Button, Tag, Spin, Typography,
-  Space, Divider, Drawer, Badge,
-} from 'antd';
+import { Drawer } from 'antd';
 import {
   ReloadOutlined, WarningOutlined, BulbOutlined, RobotOutlined,
   ClockCircleOutlined, DollarOutlined, TeamOutlined, ShoppingOutlined,
@@ -26,10 +23,8 @@ import {
   RiseOutlined, FireOutlined, StarOutlined,
 } from '@ant-design/icons';
 import { apiClient } from '../services/api';
+import { ZCard, ZBadge, ZButton, ZSkeleton, ZSelect } from '../design-system/components';
 import styles from './DailyHubPage.module.css';
-
-const { Text, Title } = Typography;
-const { Option } = Select;
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -315,8 +310,8 @@ const DailyHubPage: React.FC = () => {
     ({ critical: '#f5222d', warning: '#fa8c16', info: '#1890ff' }[s]);
   const severityBg = (s: Severity) =>
     ({ critical: '#fff1f0', warning: '#fff7e6', info: '#e6f7ff' }[s]);
-  const severityTagColor = (s: Severity) =>
-    ({ critical: 'error', warning: 'warning', info: 'processing' }[s] as any);
+  const severityBadgeType = (s: Severity): 'critical' | 'warning' | 'info' =>
+    ({ critical: 'critical', warning: 'warning', info: 'info' }[s]);
   const severityLabel = (s: Severity) =>
     ({ critical: '紧急', warning: '关注', info: '提示' }[s]);
 
@@ -332,7 +327,7 @@ const DailyHubPage: React.FC = () => {
       unit:  fmtRevenueUnit(kpi?.today_revenue_yuan ?? null),
       icon:  <DollarOutlined />,
       color: '#1890ff',
-      badge: null,
+      badge: null as { text: string; type: 'critical' | 'warning' } | null,
     },
     {
       label: '食材成本率',
@@ -342,7 +337,7 @@ const DailyHubPage: React.FC = () => {
       color: kpi?.food_cost_status === 'critical' ? '#f5222d'
            : kpi?.food_cost_status === 'warning'  ? '#fa8c16'
            : '#52c41a',
-      badge: kpi?.food_cost_status === 'critical' ? { text: '超标', type: 'error' as const }
+      badge: kpi?.food_cost_status === 'critical' ? { text: '超标', type: 'critical' as const }
            : kpi?.food_cost_status === 'warning'  ? { text: '偏高', type: 'warning' as const }
            : null,
     },
@@ -352,7 +347,7 @@ const DailyHubPage: React.FC = () => {
       unit:  '桌',
       icon:  <TeamOutlined />,
       color: '#13c2c2',
-      badge: null,
+      badge: null as { text: string; type: 'critical' | 'warning' } | null,
     },
     {
       label: '当前排队',
@@ -360,7 +355,7 @@ const DailyHubPage: React.FC = () => {
       unit:  '桌',
       icon:  <ClockCircleOutlined />,
       color: (kpi?.waiting_count ?? 0) > 8 ? '#fa8c16' : '#52c41a',
-      badge: null,
+      badge: null as { text: string; type: 'critical' | 'warning' } | null,
     },
     {
       label: '健康指数',
@@ -369,7 +364,7 @@ const DailyHubPage: React.FC = () => {
       icon:  <HeartOutlined />,
       color: (kpi?.health_score ?? 100) >= 80 ? '#52c41a'
            : (kpi?.health_score ?? 100) >= 60 ? '#faad14' : '#f5222d',
-      badge: null,
+      badge: null as { text: string; type: 'critical' | 'warning' } | null,
     },
     {
       label: '待处理事项',
@@ -378,7 +373,7 @@ const DailyHubPage: React.FC = () => {
       icon:  <BellOutlined />,
       color: ((kpi?.pending_approvals ?? 0) + (kpi?.unread_alerts ?? 0)) > 0 ? '#f5222d' : '#52c41a',
       badge: ((kpi?.pending_approvals ?? 0) + (kpi?.unread_alerts ?? 0)) > 0
-             ? { text: '需处理', type: 'error' as const } : null,
+             ? { text: '需处理', type: 'critical' as const } : null,
     },
   ];
 
@@ -399,6 +394,10 @@ const DailyHubPage: React.FC = () => {
   const forecast   = board?.tomorrow_forecast;
   const isLoading  = kpiLoading || boardLoading;
 
+  const storeOptions = stores.length > 0
+    ? stores.map((s: any) => ({ value: s.store_id || s.id, label: s.name || s.store_id || s.id }))
+    : [{ value: 'S001', label: 'S001 示例门店' }];
+
   // ── Render ────────────────────────────────────────────────────────────────────
 
   return (
@@ -407,39 +406,29 @@ const DailyHubPage: React.FC = () => {
       {/* ── Page header ─────────────────────────────────────────────────────── */}
       <div className={styles.pageHeader}>
         <div className={styles.pageHeaderLeft}>
-          <Title level={4} style={{ margin: 0 }}>经营作战台</Title>
-          <Text type="secondary" style={{ fontSize: 13 }}>
+          <h4 className={styles.pageTitle}>经营作战台</h4>
+          <span className={styles.pageSub}>
             {new Date().toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'short' })}
-          </Text>
+          </span>
         </div>
-        <Space>
-          <Select
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <ZSelect
             value={selectedStore}
-            onChange={v => setSelectedStore(v)}
+            onChange={(v) => setSelectedStore(v as string)}
             style={{ width: 160 }}
-            placeholder="选择门店"
-          >
-            {stores.length > 0
-              ? stores.map((s: any) => (
-                  <Option key={s.store_id || s.id} value={s.store_id || s.id}>
-                    {s.name || s.store_id || s.id}
-                  </Option>
-                ))
-              : <Option value="S001">S001 示例门店</Option>}
-          </Select>
-          <Button icon={<ReloadOutlined />} onClick={refresh}>刷新</Button>
-          <Button
-            type="primary"
-            icon={<RobotOutlined />}
-            onClick={() => setAiOpen(true)}
-          >
+            options={storeOptions}
+          />
+          <ZButton icon={<ReloadOutlined />} onClick={refresh} loading={isLoading}>刷新</ZButton>
+          <ZButton variant="primary" icon={<RobotOutlined />} onClick={() => setAiOpen(true)}>
             AI 协作
-          </Button>
-        </Space>
+          </ZButton>
+        </div>
       </div>
 
       {/* ── KPI strip ───────────────────────────────────────────────────────── */}
-      <Spin spinning={kpiLoading} size="small">
+      {kpiLoading ? (
+        <ZSkeleton rows={2} block style={{ marginBottom: 0 }} />
+      ) : (
         <div className={styles.kpiStrip}>
           {kpiItems.map((item, idx) => (
             <div key={idx} className={styles.kpiStripItem}>
@@ -454,32 +443,26 @@ const DailyHubPage: React.FC = () => {
                 </div>
               </div>
               {item.badge && (
-                <Tag color={item.badge.type} className={styles.kpiStripBadge}>
-                  {item.badge.text}
-                </Tag>
+                <ZBadge type={item.badge.type} text={item.badge.text} />
               )}
             </div>
           ))}
         </div>
-      </Spin>
+      )}
 
       {/* ── Main content ────────────────────────────────────────────────────── */}
-      <Row gutter={16} style={{ marginTop: 16 }}>
+      <div className={styles.mainLayout}>
 
         {/* ── 经营节奏 timeline ─────────────────────────────────────────────── */}
-        <Col xs={24} lg={7}>
-          <Card
+        <div>
+          <ZCard
             title={
-              <Space>
+              <div style={{ display:'flex', alignItems:'center', gap:6 }}>
                 <ClockCircleOutlined style={{ color: '#1890ff' }} />
                 <span>今日经营节奏</span>
-                <Tag color="blue">
-                  {OPS_PHASES.find(p => p.key === currentPhaseKey)?.label}
-                </Tag>
-              </Space>
+                <ZBadge type="info" text={OPS_PHASES.find(p => p.key === currentPhaseKey)?.label ?? ''} />
+              </div>
             }
-            className={styles.card}
-            bodyStyle={{ padding: '14px 16px' }}
           >
             {/* Phase selector */}
             <div className={styles.phaseNav}>
@@ -541,50 +524,47 @@ const DailyHubPage: React.FC = () => {
             {/* Tomorrow preview (if board loaded) */}
             {forecast && (
               <>
-                <Divider style={{ margin: '14px 0 10px' }} />
-                <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 6 }}>明日预测</div>
+                <div style={{ borderTop: '1px solid var(--border)', margin: '14px 0 10px' }} />
+                <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 6 }}>明日预测</div>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
-                  <span style={{ fontSize: 18, fontWeight: 700, color: '#262626' }}>
+                  <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-primary)' }}>
                     ¥{((forecast.total_predicted_revenue ?? 0) / 100).toFixed(0)}
                   </span>
-                  <span style={{ fontSize: 12, color: '#8c8c8c' }}>预计营收</span>
+                  <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>预计营收</span>
                 </div>
                 {forecast.weather && (
-                  <Tag color="blue" style={{ marginTop: 6 }}>
-                    {forecast.weather.condition} {forecast.weather.temperature}°C
-                  </Tag>
+                  <ZBadge type="info" text={`${forecast.weather.condition} ${forecast.weather.temperature}°C`} />
                 )}
                 {forecast.holiday && (
-                  <Tag color="red" style={{ marginTop: 6 }}>{forecast.holiday.name}</Tag>
+                  <ZBadge type="critical" text={forecast.holiday.name} />
                 )}
               </>
             )}
-          </Card>
-        </Col>
+          </ZCard>
+        </div>
 
         {/* ── Right column ──────────────────────────────────────────────────── */}
-        <Col xs={24} lg={17}>
-          <Spin spinning={isLoading}>
-
-            {/* ── 异常事件 + 经营机会 ─────────────────────────────────────── */}
-            <Row gutter={16}>
-              {/* Anomaly events */}
-              <Col xs={24} md={12}>
-                <Card
+        <div>
+          {isLoading ? (
+            <ZSkeleton rows={6} block />
+          ) : (
+            <>
+              {/* ── 异常事件 + 经营机会 ─────────────────────────────────────── */}
+              <div className={styles.eventsRow}>
+                {/* Anomaly events */}
+                <ZCard
                   title={
-                    <Space>
+                    <div style={{ display:'flex', alignItems:'center', gap:6 }}>
                       <WarningOutlined style={{ color: '#f5222d' }} />
                       <span>异常事件</span>
                       {anomalies.length > 0 && (
-                        <Badge
-                          count={anomalies.length}
-                          style={{ backgroundColor: '#f5222d' }}
-                        />
+                        <span style={{ background:'#f5222d', color:'#fff', borderRadius:10, fontSize:11, padding:'0 6px', lineHeight:'18px', minWidth:18, display:'inline-block', textAlign:'center' }}>
+                          {anomalies.length}
+                        </span>
                       )}
-                    </Space>
+                    </div>
                   }
-                  className={styles.card}
-                  bodyStyle={{ padding: '4px 0' }}
+                  noPadding
                 >
                   {anomalies.length === 0 ? (
                     <div className={styles.emptyState}>
@@ -602,40 +582,33 @@ const DailyHubPage: React.FC = () => {
                         }}
                       >
                         <div className={styles.eventCardHeader}>
-                          <Text strong style={{ fontSize: 13, color: severityColor(a.severity), flex: 1 }}>
+                          <strong style={{ fontSize: 13, color: severityColor(a.severity), flex: 1 }}>
                             {a.title}
-                          </Text>
-                          <Tag color={severityTagColor(a.severity)}>
-                            {severityLabel(a.severity)}
-                          </Tag>
+                          </strong>
+                          <ZBadge type={severityBadgeType(a.severity)} text={severityLabel(a.severity)} />
                         </div>
-                        <Text type="secondary" style={{ fontSize: 12 }}>{a.detail}</Text>
-                        <Button
-                          type="link"
-                          size="small"
+                        <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{a.detail}</span>
+                        <button
                           className={styles.eventCardAction}
                           style={{ color: severityColor(a.severity) }}
                           onClick={() => navigate(a.action_to)}
                         >
                           {a.action_label} →
-                        </Button>
+                        </button>
                       </div>
                     ))
                   )}
-                </Card>
-              </Col>
+                </ZCard>
 
-              {/* Business opportunities */}
-              <Col xs={24} md={12}>
-                <Card
+                {/* Business opportunities */}
+                <ZCard
                   title={
-                    <Space>
+                    <div style={{ display:'flex', alignItems:'center', gap:6 }}>
                       <BulbOutlined style={{ color: '#52c41a' }} />
                       <span>经营机会</span>
-                    </Space>
+                    </div>
                   }
-                  className={styles.card}
-                  bodyStyle={{ padding: '4px 0' }}
+                  noPadding
                 >
                   {opportunities.length === 0 ? (
                     <div className={styles.emptyState}>
@@ -650,51 +623,47 @@ const DailyHubPage: React.FC = () => {
                         style={{ borderLeftColor: opportunityColor(o.type) }}
                       >
                         <div className={styles.eventCardHeader}>
-                          <Text strong style={{ fontSize: 13, flex: 1 }}>{o.title}</Text>
-                          <Tag color="purple">{o.expected_gain}</Tag>
+                          <strong style={{ fontSize: 13, flex: 1 }}>{o.title}</strong>
+                          <ZBadge type="accent" text={o.expected_gain} />
                         </div>
-                        <Text type="secondary" style={{ fontSize: 12 }}>{o.detail}</Text>
-                        <Button
-                          type="link"
-                          size="small"
+                        <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{o.detail}</span>
+                        <button
                           className={styles.eventCardAction}
                           style={{ color: opportunityColor(o.type) }}
                           onClick={() => navigate(o.action_to)}
                         >
                           {o.action_label} →
-                        </Button>
+                        </button>
                       </div>
                     ))
                   )}
-                </Card>
-              </Col>
-            </Row>
+                </ZCard>
+              </div>
 
-            {/* ── AI Top3 决策推荐 ──────────────────────────────────────────── */}
-            <Card
-              title={
-                <Space>
-                  <ThunderboltOutlined style={{ color: '#faad14' }} />
-                  <span>今日 AI 决策推荐</span>
-                  <Tag color="gold">Top 3</Tag>
-                </Space>
-              }
-              extra={
-                <Button
-                  size="small"
-                  icon={<ReloadOutlined />}
-                  onClick={loadDecisions}
-                  loading={decisionsLoading}
-                >
-                  刷新
-                </Button>
-              }
-              style={{ marginTop: 16 }}
-              className={styles.card}
-              bodyStyle={{ padding: 16 }}
-            >
-              <Spin spinning={decisionsLoading}>
-                {decisions.length === 0 && !decisionsLoading ? (
+              {/* ── AI Top3 决策推荐 ──────────────────────────────────────────── */}
+              <ZCard
+                title={
+                  <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                    <ThunderboltOutlined style={{ color: '#faad14' }} />
+                    <span>今日 AI 决策推荐</span>
+                    <ZBadge type="warning" text="Top 3" />
+                  </div>
+                }
+                extra={
+                  <ZButton
+                    size="sm"
+                    icon={<ReloadOutlined />}
+                    onClick={loadDecisions}
+                    loading={decisionsLoading}
+                  >
+                    刷新
+                  </ZButton>
+                }
+                style={{ marginTop: 16 }}
+              >
+                {decisionsLoading ? (
+                  <ZSkeleton rows={3} block />
+                ) : decisions.length === 0 ? (
                   <div className={styles.emptyState} style={{ padding: '24px 0' }}>
                     <ThunderboltOutlined style={{ color: '#faad14', fontSize: 28 }} />
                     <div>AI 正在分析中，暂无决策推荐</div>
@@ -710,117 +679,108 @@ const DailyHubPage: React.FC = () => {
                           style={{ borderTop: `3px solid ${rankColor}` }}
                         >
                           <div className={styles.decisionCardHeader}>
-                            <Tag color={d.rank === 1 ? 'red' : d.rank === 2 ? 'orange' : 'blue'}>
-                              #{d.rank}
-                            </Tag>
-                            <Tag color={
-                              d.source === 'inventory' ? 'orange'
-                              : d.source === 'food_cost' ? 'blue' : 'purple'
-                            }>
-                              {d.source === 'inventory' ? '库存'
-                              : d.source === 'food_cost' ? '成本' : '综合'}
-                            </Tag>
-                            <Tag color={
-                              d.execution_difficulty === 'low'    ? 'success'
-                              : d.execution_difficulty === 'high' ? 'error' : 'warning'
-                            }>
-                              {d.execution_difficulty === 'low'   ? '易执行'
-                              : d.execution_difficulty === 'high' ? '较复杂' : '中等'}
-                            </Tag>
+                            <ZBadge
+                              type={d.rank === 1 ? 'critical' : d.rank === 2 ? 'warning' : 'info'}
+                              text={`#${d.rank}`}
+                            />
+                            <ZBadge
+                              type={d.source === 'inventory' ? 'warning' : d.source === 'food_cost' ? 'info' : 'default'}
+                              text={d.source === 'inventory' ? '库存' : d.source === 'food_cost' ? '成本' : '综合'}
+                            />
+                            <ZBadge
+                              type={d.execution_difficulty === 'low' ? 'success' : d.execution_difficulty === 'high' ? 'critical' : 'warning'}
+                              text={d.execution_difficulty === 'low' ? '易执行' : d.execution_difficulty === 'high' ? '较复杂' : '中等'}
+                            />
                           </div>
 
                           <div className={styles.decisionCardTitle}>{d.title}</div>
-                          <Text type="secondary" style={{ fontSize: 12, lineHeight: 1.5 }}>
+                          <span style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
                             {d.action}
-                          </Text>
+                          </span>
 
                           <div className={styles.decisionCardMeta}>
                             <span style={{ color: '#52c41a', fontWeight: 700, fontSize: 14 }}>
                               ¥{d.net_benefit_yuan?.toLocaleString() ?? '—'}
                             </span>
-                            <span style={{ color: '#8c8c8c', fontSize: 12 }}>
+                            <span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>
                               置信度 {d.confidence_pct?.toFixed(0)}%
                             </span>
                           </div>
 
-                          <Button
-                            type={d.rank === 1 ? 'primary' : 'default'}
-                            size="small"
+                          <ZButton
+                            variant={d.rank === 1 ? 'primary' : 'secondary'}
+                            size="sm"
                             icon={<RiseOutlined />}
-                            block
                             onClick={() => navigate('/decision')}
+                            style={{ width: '100%' }}
                           >
                             去审批
-                          </Button>
+                          </ZButton>
                         </div>
                       );
                     })}
                   </div>
                 )}
-              </Spin>
-            </Card>
+              </ZCard>
 
-            {/* ── Board quick-stat strip ────────────────────────────────────── */}
-            {board && (
-              <div className={styles.boardStrip}>
-                <div className={styles.boardStripItem}>
-                  <span className={styles.boardStripIcon}>📋</span>
-                  <div className={styles.boardStripBody}>
-                    <div className={styles.boardStripLabel}>采购待处理</div>
-                    <div className={styles.boardStripValue}>
-                      {board.purchase_order?.length ?? 0}
-                      <span style={{ fontSize: 13, fontWeight: 400, color: '#8c8c8c' }}> 项</span>
+              {/* ── Board quick-stat strip ────────────────────────────────────── */}
+              {board && (
+                <div className={styles.boardStrip}>
+                  <div className={styles.boardStripItem}>
+                    <span className={styles.boardStripIcon}>📋</span>
+                    <div className={styles.boardStripBody}>
+                      <div className={styles.boardStripLabel}>采购待处理</div>
+                      <div className={styles.boardStripValue}>
+                        {board.purchase_order?.length ?? 0}
+                        <span style={{ fontSize: 13, fontWeight: 400, color: 'var(--text-secondary)' }}> 项</span>
+                      </div>
+                      <div className={styles.boardStripSub}>
+                        <button className={styles.linkBtn} onClick={() => navigate('/inventory')}>查看采购清单 →</button>
+                      </div>
                     </div>
-                    <div className={styles.boardStripSub}>
-                      <Button type="link" size="small" style={{ padding: 0, height: 'auto', fontSize: 12 }}
-                        onClick={() => navigate('/inventory')}>查看采购清单 →</Button>
+                  </div>
+
+                  <div className={styles.boardStripItem}>
+                    <span className={styles.boardStripIcon}>👥</span>
+                    <div className={styles.boardStripBody}>
+                      <div className={styles.boardStripLabel}>今日排班</div>
+                      <div className={styles.boardStripValue}>
+                        {board.staffing_plan?.total_staff ?? 0}
+                        <span style={{ fontSize: 13, fontWeight: 400, color: 'var(--text-secondary)' }}> 人</span>
+                      </div>
+                      <div className={styles.boardStripSub}>
+                        <button className={styles.linkBtn} onClick={() => navigate('/schedule')}>查看排班 →</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className={styles.boardStripItem}>
+                    <span className={styles.boardStripIcon}>📊</span>
+                    <div className={styles.boardStripBody}>
+                      <div className={styles.boardStripLabel}>昨日健康指数</div>
+                      <div className={styles.boardStripValue}>
+                        {board.yesterday_review?.health_score ?? '—'}
+                        <span style={{ fontSize: 13, fontWeight: 400, color: 'var(--text-secondary)' }}> 分</span>
+                      </div>
+                      <div className={styles.boardStripSub}>
+                        <button className={styles.linkBtn} onClick={() => navigate('/kpi-dashboard')}>查看详情 →</button>
+                      </div>
                     </div>
                   </div>
                 </div>
-
-                <div className={styles.boardStripItem}>
-                  <span className={styles.boardStripIcon}>👥</span>
-                  <div className={styles.boardStripBody}>
-                    <div className={styles.boardStripLabel}>今日排班</div>
-                    <div className={styles.boardStripValue}>
-                      {board.staffing_plan?.total_staff ?? 0}
-                      <span style={{ fontSize: 13, fontWeight: 400, color: '#8c8c8c' }}> 人</span>
-                    </div>
-                    <div className={styles.boardStripSub}>
-                      <Button type="link" size="small" style={{ padding: 0, height: 'auto', fontSize: 12 }}
-                        onClick={() => navigate('/schedule')}>查看排班 →</Button>
-                    </div>
-                  </div>
-                </div>
-
-                <div className={styles.boardStripItem}>
-                  <span className={styles.boardStripIcon}>📊</span>
-                  <div className={styles.boardStripBody}>
-                    <div className={styles.boardStripLabel}>昨日健康指数</div>
-                    <div className={styles.boardStripValue}>
-                      {board.yesterday_review?.health_score ?? '—'}
-                      <span style={{ fontSize: 13, fontWeight: 400, color: '#8c8c8c' }}> 分</span>
-                    </div>
-                    <div className={styles.boardStripSub}>
-                      <Button type="link" size="small" style={{ padding: 0, height: 'auto', fontSize: 12 }}
-                        onClick={() => navigate('/kpi-dashboard')}>查看详情 →</Button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-          </Spin>
-        </Col>
-      </Row>
+              )}
+            </>
+          )}
+        </div>
+      </div>
 
       {/* ── AI 协作抽屉 ──────────────────────────────────────────────────────── */}
       <Drawer
         title={
-          <Space>
+          <div style={{ display:'flex', alignItems:'center', gap:8 }}>
             <RobotOutlined style={{ color: '#722ed1' }} />
             <span>AI 协作助手</span>
-          </Space>
+          </div>
         }
         placement="right"
         width={380}
@@ -843,7 +803,7 @@ const DailyHubPage: React.FC = () => {
             ))}
           </div>
 
-          <Divider />
+          <div style={{ borderTop: '1px solid var(--border)', margin: '16px 0' }} />
 
           <div className={styles.aiActionsTitle}>快捷动作</div>
           {[
@@ -853,16 +813,14 @@ const DailyHubPage: React.FC = () => {
             { icon: <TeamOutlined />,    label: '派发晚市备战任务给店长',    to: '/tasks'        },
             { icon: <RiseOutlined />,    label: '查看跨店可复制经营动作',    to: '/cross-store-insights' },
           ].map((item, i) => (
-            <Button
+            <ZButton
               key={i}
-              block
               icon={item.icon}
               className={styles.aiActionBtn}
-              style={{ textAlign: 'left', marginBottom: 8, height: 40 }}
               onClick={() => { setAiOpen(false); navigate(item.to); }}
             >
               {item.label}
-            </Button>
+            </ZButton>
           ))}
         </div>
       </Drawer>

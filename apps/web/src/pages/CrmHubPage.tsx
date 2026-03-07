@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Card, Tag, Spin, Typography, Select, Button, Tooltip } from 'antd';
 import {
   UserAddOutlined,
   ReloadOutlined,
@@ -9,10 +8,8 @@ import {
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../services/api';
-import { handleApiError } from '../utils/errorHandler';
+import { ZCard, ZBadge, ZButton, ZSkeleton, ZSelect } from '../design-system/components';
 import css from './CrmHubPage.module.css';
-
-const { Title, Text } = Typography;
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -68,8 +65,8 @@ const SIGNAL_TYPE_LABEL: Record<string, string> = {
   churn_prevention:     '流失挽回',
 };
 
-const SIGNAL_URGENCY_COLOR: Record<string, string> = {
-  high:   'error',
+const SIGNAL_URGENCY_TYPE: Record<string, 'critical' | 'warning' | 'default'> = {
+  high:   'critical',
   medium: 'warning',
   low:    'default',
 };
@@ -246,14 +243,13 @@ export default function CrmHubPage() {
       {/* Header */}
       <div className={css.pageHeader}>
         <div className={css.pageHeaderLeft}>
-          <Title level={4} style={{ margin: 0 }}>会员与增长中心</Title>
-          <Text type="secondary" style={{ fontSize: 13 }}>会员数据 → 触达动作闭环</Text>
+          <h4 className={css.pageTitle}>会员与增长中心</h4>
+          <span className={css.pageSub}>会员数据 → 触达动作闭环</span>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <Select
+          <ZSelect
             value={storeId}
-            onChange={setStoreId}
-            size="small"
+            onChange={(v) => setStoreId(v as string)}
             style={{ width: 110 }}
             options={[
               { value: 'S001', label: '旗舰店' },
@@ -261,14 +257,16 @@ export default function CrmHubPage() {
               { value: 'S003', label: '中关村店' },
             ]}
           />
-          <Tooltip title="刷新数据">
-            <Button size="small" icon={<ReloadOutlined />} onClick={refresh} loading={loading} />
-          </Tooltip>
+          <span title="刷新数据">
+            <ZButton size="sm" icon={<ReloadOutlined />} onClick={refresh} loading={loading} />
+          </span>
         </div>
       </div>
 
       {/* KPI Strip */}
-      <Spin spinning={loading} size="small">
+      {loading ? (
+        <ZSkeleton rows={2} block style={{ marginBottom: 16 }} />
+      ) : (
         <div className={css.kpiStrip}>
           {KPI_ITEMS.map(k => (
             <div key={k.label} className={css.kpiItem}>
@@ -285,14 +283,13 @@ export default function CrmHubPage() {
             </div>
           ))}
         </div>
-      </Spin>
+      )}
 
       {/* 3-col main */}
       <div className={css.mainGrid}>
         {/* Col 1: 人群分层 */}
-        <Card
-          size="small"
-          title={<><TeamOutlined style={{ marginRight: 6, color: '#1890ff' }} />人群分层</>}
+        <ZCard
+          title={<div style={{ display:'flex', alignItems:'center', gap:6 }}><TeamOutlined style={{ color: '#1890ff' }} /><span>人群分层</span></div>}
           extra={<a onClick={() => navigate('/members')} style={{ fontSize: 12 }}>会员中心</a>}
         >
           <div className={css.segmentList}>
@@ -316,12 +313,11 @@ export default function CrmHubPage() {
             <span className={css.segmentTotalLabel}>会员总量</span>
             <span className={css.segmentTotalValue}>{fmtNum(d.total_members)} 人</span>
           </div>
-        </Card>
+        </ZCard>
 
         {/* Col 2: 增长信号 */}
-        <Card
-          size="small"
-          title={<><RiseOutlined style={{ marginRight: 6, color: '#52c41a' }} />AI 增长信号</>}
+        <ZCard
+          title={<div style={{ display:'flex', alignItems:'center', gap:6 }}><RiseOutlined style={{ color: '#52c41a' }} /><span>AI 增长信号</span></div>}
           extra={<a onClick={() => navigate('/private-domain')} style={{ fontSize: 12 }}>私域运营</a>}
         >
           <div className={css.signalList}>
@@ -336,9 +332,10 @@ export default function CrmHubPage() {
                   )}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                  <Tag color={SIGNAL_URGENCY_COLOR[sig.urgency] ?? 'default'} style={{ fontSize: 10, margin: 0 }}>
-                    {sig.urgency === 'high' ? '紧急' : sig.urgency === 'medium' ? '建议' : '参考'}
-                  </Tag>
+                  <ZBadge
+                    type={SIGNAL_URGENCY_TYPE[sig.urgency] ?? 'default'}
+                    text={sig.urgency === 'high' ? '紧急' : sig.urgency === 'medium' ? '建议' : '参考'}
+                  />
                   <span style={{ fontSize: 10, color: '#8c8c8c' }}>
                     {SIGNAL_TYPE_LABEL[sig.signal_type] ?? sig.signal_type}
                   </span>
@@ -347,12 +344,11 @@ export default function CrmHubPage() {
               </div>
             ))}
           </div>
-        </Card>
+        </ZCard>
 
         {/* Col 3: 流失预警 */}
-        <Card
-          size="small"
-          title={<><WarningOutlined style={{ marginRight: 6, color: '#f5222d' }} />流失预警</>}
+        <ZCard
+          title={<div style={{ display:'flex', alignItems:'center', gap:6 }}><WarningOutlined style={{ color: '#f5222d' }} /><span>流失预警</span></div>}
           extra={<a onClick={() => navigate('/customer360')} style={{ fontSize: 12 }}>客户360</a>}
         >
           <div className={css.churnSummaryRow}>
@@ -360,33 +356,33 @@ export default function CrmHubPage() {
               <div className={css.churnSummaryNum}>{fmtNum(churnTotal)}</div>
               <div className={css.churnSummaryDesc}>人有流失风险</div>
             </div>
-            <Button
-              size="small"
-              type="primary"
-              danger
+            <ZButton
+              variant="danger"
+              size="sm"
               icon={<UserAddOutlined />}
               onClick={() => navigate('/private-domain')}
             >
               批量挽回
-            </Button>
+            </ZButton>
           </div>
           <div className={css.churnList}>
             {churnList.map(u => (
               <div key={u.customer_id} className={css.churnRow}>
                 <div className={css.churnAvatar}>{u.name.charAt(0)}</div>
                 <span className={css.churnName}>{u.name}</span>
-                <Tag color={u.risk_level === 'high' ? 'error' : 'warning'} style={{ fontSize: 10, margin: 0 }}>
-                  {u.risk_level === 'high' ? '高风险' : '中风险'}
-                </Tag>
+                <ZBadge
+                  type={u.risk_level === 'high' ? 'critical' : 'warning'}
+                  text={u.risk_level === 'high' ? '高风险' : '中风险'}
+                />
                 <span className={css.churnDays}>{u.days_since_visit}天未到</span>
               </div>
             ))}
           </div>
-        </Card>
+        </ZCard>
       </div>
 
       {/* Quick Nav */}
-      <Card size="small" title="快捷导航">
+      <ZCard title="快捷导航">
         <div className={css.quickNav}>
           {QUICK_NAV.map(n => (
             <button
@@ -399,7 +395,7 @@ export default function CrmHubPage() {
             </button>
           ))}
         </div>
-      </Card>
+      </ZCard>
     </div>
   );
 }
