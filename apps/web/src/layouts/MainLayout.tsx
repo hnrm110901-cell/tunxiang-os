@@ -175,6 +175,7 @@ const ROUTE_TO_GROUP: Record<string, string> = {
   '/webhook-management': 'nav-platform',
   '/api-billing':        'nav-platform',
   '/developer-console':  'nav-platform',
+  '/business-events':    'nav-overview',
   '/industry-solutions': 'nav-platform',
   '/i18n': 'nav-platform',
   '/raas': 'nav-platform',
@@ -288,6 +289,7 @@ const BREADCRUMB_LABELS: Record<string, string> = {
   '/webhook-management': 'Webhook 事件订阅',
   '/api-billing':        'API 计量计费',
   '/developer-console':  'ISV 开发者控制台',
+  '/business-events':    '经营事件中心',
   '/industry-solutions': '行业解决方案',
   '/i18n': '国际化',
   '/raas': 'RaaS定价',
@@ -383,6 +385,7 @@ const MainLayout: React.FC = () => {
         { key: '/hq-dashboard',        icon: <ShopOutlined />,       label: '总部看板' },
         { key: '/data-visualization',  icon: <MonitorOutlined />,    label: '数据大屏' },
         { key: '/finance',             icon: <DollarOutlined />,     label: '财务管理' },
+        { key: '/business-events',     icon: <NodeIndexOutlined />,  label: '经营事件中心' },
       ],
     },
 

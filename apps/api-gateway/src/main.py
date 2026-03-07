@@ -599,6 +599,10 @@ app.include_router(api_billing.router, tags=["api_billing"])
 from src.api import developer_console
 app.include_router(developer_console.router, tags=["developer_console"])
 
+# 业财税资金 Agent — Phase 5 Month 1: 经营事件中心 + 利润归因基础
+from src.api import business_events
+app.include_router(business_events.router, tags=["business_events"])
+
 # ARCH-004 可信执行层（折扣申请 / 审批 / 审计日志 / 回滚）
 app.include_router(execution.router)
 # FEAT-004 动态菜单权重引擎（Top-N 推荐 + 5因子评分）
