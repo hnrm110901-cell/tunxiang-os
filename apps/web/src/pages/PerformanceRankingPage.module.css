@@ -1,0 +1,99 @@
+.page {
+  padding: 24px;
+  max-width: 1400px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.computeBtn {
+  padding: 4px 16px;
+  border: 1px solid #1677ff;
+  border-radius: 6px;
+  background: #1677ff;
+  color: #fff;
+  cursor: pointer;
+  font-size: 14px;
+  height: 32px;
+}
+
+.computeBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.kpiRow {
+  margin-bottom: 16px;
+}
+
+.kpiCard {
+  height: 100%;
+}
+
+.kpiLabel {
+  font-size: 12px;
+  color: #8c8c8c;
+  margin-bottom: 4px;
+}
+
+.kpiRank {
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: #1d1d1f;
+}
+
+.kpiTotal {
+  font-size: 14px;
+  font-weight: 400;
+  color: #8c8c8c;
+}
+
+.kpiMeta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 4px 0;
+}
+
+.kpiPct {
+  font-size: 12px;
+  color: #595959;
+}
+
+.kpiEmpty {
+  color: #bfbfbf;
+  font-size: 13px;
+  padding: 8px 0;
+}
+
+.overallCard {
+  margin-bottom: 16px;
+}
+
+.highlightRow {
+  background-color: #e6f4ff;
+}
+
+.highlightGap {
+  background-color: #fff1f0;
+}
