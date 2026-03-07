@@ -1,0 +1,88 @@
+.page { display: flex; flex-direction: column; gap: 16px; }
+
+.pageHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.pageTitle { font-size: 20px; font-weight: 700; margin: 0 0 4px; color: var(--text-primary); }
+.pageSub   { font-size: 13px; color: var(--text-secondary); margin: 0; }
+
+.headerActions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+.monthInput {
+  padding: 6px 10px;
+  border: 1px solid var(--border-color, #d9d9d9);
+  border-radius: 6px;
+  font-size: 13px;
+  outline: none;
+  background: var(--bg-primary, #fff);
+  color: var(--text-primary);
+}
+
+.kpiGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+@media (max-width: 960px) { .kpiGrid { grid-template-columns: repeat(2, 1fr); } }
+
+.mono {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+}
+
+.amountCell {
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--accent, #FF6B2C);
+}
+
+.invNo {
+  font-size: 12px;
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--text-primary);
+}
+
+/* Invoice detail */
+.invDetail { display: flex; flex-direction: column; gap: 12px; }
+
+.invMetaRow {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  font-size: 13px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-color, #f0f0f0);
+}
+
+.lineItems { display: flex; flex-direction: column; gap: 8px; }
+
+.lineItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 8px 12px;
+  background: var(--bg-secondary, #fafafa);
+  border-radius: 6px;
+  gap: 12px;
+}
+
+.lineDesc { font-size: 12px; color: var(--text-secondary); flex: 1; }
+
+.lineRight { display: flex; gap: 12px; align-items: center; flex-shrink: 0; }
+
+.lineQty { font-size: 12px; color: var(--text-secondary); }
+
+.invTotal {
+  text-align: right;
+  font-size: 14px;
+  font-weight: 600;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-color, #f0f0f0);
+}

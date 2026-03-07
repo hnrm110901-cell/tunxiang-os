@@ -64,6 +64,8 @@ const RevenueSharePage = lazy(() => import('./pages/RevenueSharePage'));
 const ISVDashboardPage = lazy(() => import('./pages/ISVDashboardPage'));
 const PlatformAnalyticsPage = lazy(() => import('./pages/PlatformAnalyticsPage'));
 const WebhookManagementPage = lazy(() => import('./pages/WebhookManagementPage'));
+const ApiBillingPage = lazy(() => import('./pages/ApiBillingPage'));
+const DeveloperConsolePage = lazy(() => import('./pages/DeveloperConsolePage'));
 const IndustrySolutionsPage = lazy(() => import('./pages/IndustrySolutionsPage'));
 const I18nPage = lazy(() => import('./pages/I18nPage'));
 const TaskManagementPage = lazy(() => import('./pages/TaskManagementPage'));
@@ -313,6 +315,12 @@ const AppContent: React.FC = () => {
                   } />
                   <Route path="webhook-management" element={
                     <ProtectedRoute requiredRole="admin"><WebhookManagementPage /></ProtectedRoute>
+                  } />
+                  <Route path="api-billing" element={
+                    <ProtectedRoute requiredRole="admin"><ApiBillingPage /></ProtectedRoute>
+                  } />
+                  <Route path="developer-console" element={
+                    <ProtectedRoute requiredRole="admin"><DeveloperConsolePage /></ProtectedRoute>
                   } />
                   <Route path="industry-solutions" element={
                     <ProtectedRoute requiredRole="admin"><IndustrySolutionsPage /></ProtectedRoute>

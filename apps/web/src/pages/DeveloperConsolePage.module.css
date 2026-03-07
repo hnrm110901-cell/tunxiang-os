@@ -1,0 +1,86 @@
+.page { display: flex; flex-direction: column; gap: 16px; }
+
+.pageHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.pageTitle { font-size: 20px; font-weight: 700; margin: 0 0 4px; color: var(--text-primary); }
+.pageSub   { font-size: 13px; color: var(--text-secondary); margin: 0; display: flex; align-items: center; gap: 8px; }
+
+.headerActions { display: flex; gap: 8px; align-items: center; }
+
+.kpiGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+@media (max-width: 960px) { .kpiGrid { grid-template-columns: repeat(2, 1fr); } }
+
+.kpiSub { font-size: 11px; color: var(--text-secondary); margin-top: 4px; }
+.kpiSubWarn { font-size: 11px; color: #f5222d; margin-top: 4px; font-weight: 600; }
+
+.chart { height: 220px; }
+
+/* Tab bar */
+.tabBar {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--border-color, #f0f0f0);
+  margin-bottom: 16px;
+}
+
+.tab {
+  padding: 8px 20px;
+  font-size: 13px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: color 0.2s, border-color 0.2s;
+}
+
+.tab:hover { color: var(--text-primary); }
+
+.tabActive {
+  color: var(--accent, #FF6B2C);
+  border-bottom-color: var(--accent, #FF6B2C);
+  font-weight: 600;
+}
+
+/* Plugin cell */
+.pluginName { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+.emoji { font-size: 16px; }
+
+.rating {
+  color: #faad14;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+/* Amount cells */
+.amount {
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--accent, #FF6B2C);
+}
+
+.amountGreen {
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: #52c41a;
+}
+
+/* Leaderboard top ranks */
+.topRank {
+  font-weight: 800;
+  font-size: 15px;
+  color: #fa8c16;
+}
