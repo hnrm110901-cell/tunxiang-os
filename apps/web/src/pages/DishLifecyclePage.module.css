@@ -1,0 +1,49 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+/* 阶段标签色 */
+.phaseLaunch  { color: #1677ff; }
+.phaseGrowth  { color: #52c41a; font-weight: 600; }
+.phasePeak    { color: #389e0d; font-weight: 600; }
+.phaseDecline { color: #fa8c16; }
+.phaseExit    { color: #ff4d4f; font-weight: 600; }
+
+/* 行着色 */
+.rowExit    { background: #fff2f0 !important; }
+.rowDecline { background: #fff7e6 !important; }
+.rowLaunch  { background: #e6f4ff !important; }
+
+/* 跃迁卡片 */
+.transCard {
+  border-radius: 8px;
+  border-left: 4px solid #fa8c16;
+  margin-bottom: 8px;
+}
+
+.transCardUp {
+  border-left-color: #52c41a;
+}
+
+.transCardDown {
+  border-left-color: #ff4d4f;
+}
+
+/* 生命线节点 */
+.timelinePhase {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
