@@ -1,0 +1,123 @@
+/* ── Page ──────────────────────────────────────────────────────────────────── */
+
+.page {
+  padding: 0;
+}
+
+/* ── Page header ─────────────────────────────────────────────────────────────*/
+
+.pageHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.pageTitle {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ── Status card grid ────────────────────────────────────────────────────────*/
+
+.statusGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-bottom: 0;
+}
+
+@media (max-width: 900px)  { .statusGrid { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 600px)  { .statusGrid { grid-template-columns: 1fr; } }
+
+/* ── Mode buttons ────────────────────────────────────────────────────────────*/
+
+.modeButtons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ── Network status ──────────────────────────────────────────────────────────*/
+
+.networkRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.latency {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.networkButtons {
+  display: flex;
+  gap: 8px;
+}
+
+/* ── Description list ────────────────────────────────────────────────────────*/
+
+.descList {
+  margin: 0 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 6px);
+  overflow: hidden;
+}
+
+.descRow {
+  display: grid;
+  grid-template-columns: 80px 1fr;
+  border-bottom: 1px solid var(--border);
+}
+
+.descRow:last-child { border-bottom: none; }
+
+.descRow dt {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: #fafafa;
+  padding: 6px 10px;
+  border-right: 1px solid var(--border);
+}
+
+.descRow dd {
+  font-size: 13px;
+  color: var(--text-primary);
+  padding: 6px 10px;
+  margin: 0;
+}
+
+/* ── Offline operation form ──────────────────────────────────────────────────*/
+
+.offlineGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+@media (max-width: 800px) { .offlineGrid { grid-template-columns: 1fr; } }
+
+/* ── Result pre ──────────────────────────────────────────────────────────────*/
+
+.resultPre {
+  font-size: 12px;
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-all;
+}

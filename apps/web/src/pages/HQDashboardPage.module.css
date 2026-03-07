@@ -1,0 +1,80 @@
+/* ── Page ──────────────────────────────────────────────────────────────────── */
+
+.page {
+  padding: 0;
+}
+
+/* ── Page header ─────────────────────────────────────────────────────────────*/
+
+.pageHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.pageTitle {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ── Alert banner ────────────────────────────────────────────────────────────*/
+
+.alertBar {
+  display: flex;
+  align-items: center;
+  padding: 10px 14px;
+  border-radius: var(--radius-md, 8px);
+  font-size: 13px;
+  border: 1px solid;
+  line-height: 1.5;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.alertWarning {
+  background: #fffbe6;
+  border-color: #ffe58f;
+  color: #d46b08;
+}
+
+/* ── KPI grid ────────────────────────────────────────────────────────────────*/
+
+.kpiGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+}
+
+@media (max-width: 1100px) { .kpiGrid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 640px)  { .kpiGrid { grid-template-columns: 1fr; } }
+
+/* ── Chart + table row ───────────────────────────────────────────────────────*/
+
+.chartRow {
+  display: grid;
+  grid-template-columns: 3fr 2fr;
+  gap: 14px;
+}
+
+@media (max-width: 1000px) { .chartRow { grid-template-columns: 1fr; } }
+
+/* ── Health summary tags ─────────────────────────────────────────────────────*/
+
+.healthSummaryTags {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}

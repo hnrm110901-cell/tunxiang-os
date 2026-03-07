@@ -1,18 +1,16 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import {
-  Card, Row, Col, Statistic, Table, Tag, Badge, Button, DatePicker,
-  Typography, Space, Alert, Spin, Progress, Tooltip,
-} from 'antd';
+import { DatePicker } from 'antd';
 import {
   ShopOutlined, ReloadOutlined, WarningOutlined,
-  RiseOutlined, FallOutlined, CheckCircleOutlined, HeartOutlined,
+  CheckCircleOutlined, HeartOutlined,
 } from '@ant-design/icons';
 import dayjs, { Dayjs } from 'dayjs';
 import ReactECharts from 'echarts-for-react';
 import { apiClient } from '../services/api';
 import { handleApiError } from '../utils/message';
-
-const { Title, Text } = Typography;
+import { ZCard, ZKpi, ZBadge, ZButton, ZSkeleton, ZTable, ZEmpty } from '../design-system/components';
+import type { ZTableColumn } from '../design-system/components/ZTable';
+import styles from './HQDashboardPage.module.css';
 
 const DIM_LABEL: Record<string, string> = {
   revenue_completion: '营收完成率',
@@ -22,12 +20,130 @@ const DIM_LABEL: Record<string, string> = {
   staff_efficiency:   '人效',
 };
 
+// ── Column definitions ────────────────────────────────────────────────────────
+
+const storeColumns: ZTableColumn<any>[] = [
+  {
+    key: '_rank',
+    title: '#',
+    width: 48,
+    render: (_: any, __: any, idx: number) => idx + 1,
+  },
+  { key: 'store_name', title: '门店' },
+  {
+    key: 'revenue',
+    title: '昨日营收',
+    align: 'right',
+    render: (v: number) => `¥${(v / 100).toFixed(0)}`,
+  },
+  { key: 'orders', title: '订单数', align: 'right' },
+  {
+    key: 'health_score',
+    title: '健康分',
+    width: 120,
+    render: (v: number) => {
+      const pct = Math.min(100, Math.round(v || 0));
+      const color = pct >= 80 ? 'var(--green)' : pct >= 60 ? '#faad14' : 'var(--red)';
+      return (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{ flex: 1, height: 5, background: '#f0f0f0', borderRadius: 3, overflow: 'hidden' }}>
+            <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: 3 }} />
+          </div>
+          <span style={{ fontSize: 11, color: 'var(--text-secondary)', minWidth: 24 }}>{pct}</span>
+        </div>
+      );
+    },
+  },
+  {
+    key: 'pending_approvals',
+    title: '待审批',
+    align: 'center',
+    width: 72,
+    render: (v: number) => v > 0
+      ? <ZBadge type="warning" text={String(v)} />
+      : <CheckCircleOutlined style={{ color: '#52c41a' }} />,
+  },
+  {
+    key: 'has_alert',
+    title: '状态',
+    width: 80,
+    align: 'center',
+    render: (v: boolean) => v
+      ? <ZBadge type="critical" text="需关注" />
+      : <ZBadge type="success" text="正常" />,
+  },
+];
+
+const healthColumns: ZTableColumn<any>[] = [
+  {
+    key: 'rank',
+    title: '#',
+    width: 48,
+    render: (v: number) => (
+      <span style={{
+        fontWeight: 700,
+        color: v === 1 ? '#f5a623' : v === 2 ? '#9b9b9b' : v === 3 ? '#cd7f32' : 'var(--text-secondary)',
+      }}>{v}</span>
+    ),
+  },
+  { key: 'store_name', title: '门店' },
+  {
+    key: 'score',
+    title: '综合健康分',
+    width: 140,
+    render: (v: number, row: any) => {
+      const pct = Math.min(100, Math.round(v || 0));
+      const color = row.level === 'excellent' ? '#52c41a'
+        : row.level === 'good'    ? '#1890ff'
+        : row.level === 'warning' ? '#faad14'
+        : '#ff4d4f';
+      return (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{ width: 80, height: 5, background: '#f0f0f0', borderRadius: 3, overflow: 'hidden' }}>
+            <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: 3 }} />
+          </div>
+          <strong style={{ fontSize: 13 }}>{pct}</strong>
+        </div>
+      );
+    },
+  },
+  {
+    key: 'level_label',
+    title: '状态',
+    width: 80,
+    align: 'center',
+    render: (v: string, row: any) => {
+      const type =
+        row.level === 'excellent' ? 'success'
+        : row.level === 'good'    ? 'info'
+        : row.level === 'warning' ? 'warning'
+        : 'critical';
+      return <ZBadge type={type as any} text={v} />;
+    },
+  },
+  {
+    key: 'weakest_label',
+    title: '最弱维度',
+    render: (v: string | null) => v
+      ? <ZBadge type="warning" text={v} />
+      : <CheckCircleOutlined style={{ color: '#52c41a' }} />,
+  },
+  {
+    key: 'revenue_yuan',
+    title: '营收',
+    align: 'right',
+    render: (v: number) => `¥${(v || 0).toLocaleString('zh-CN', { maximumFractionDigits: 0 })}`,
+  },
+];
+
+// ── Component ─────────────────────────────────────────────────────────────────
+
 const HQDashboardPage: React.FC = () => {
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading]           = useState(false);
   const [healthLoading, setHealthLoading] = useState(false);
-  const [targetDate, setTargetDate] = useState<Dayjs>(dayjs().subtract(1, 'day'));
-  const [data, setData] = useState<any>(null);
-  const [healthData, setHealthData] = useState<any>(null);
+  const [targetDate, setTargetDate]     = useState<Dayjs>(dayjs().subtract(1, 'day'));
+  const [data, setData]                 = useState<any>(null);
+  const [healthData, setHealthData]     = useState<any>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -50,7 +166,7 @@ const HQDashboardPage: React.FC = () => {
         params: { target_date: targetDate.format('YYYY-MM-DD') },
       });
       setHealthData(res.data);
-    } catch (err: any) {
+    } catch {
       // 健康评分非核心，静默降级
     } finally {
       setHealthLoading(false);
@@ -62,11 +178,12 @@ const HQDashboardPage: React.FC = () => {
     loadHealth();
   }, [load, loadHealth]);
 
-  const summary = data?.summary || {};
-  const storeMetrics: any[] = data?.store_metrics || [];
-  const alertStores: any[] = data?.alert_stores || [];
+  const summary      = data?.summary      || {};
+  const storeMetrics = data?.store_metrics || [];
+  const alertStores  = data?.alert_stores  || [];
+  const healthStores = healthData?.stores  || [];
+  const healthSummary = healthData?.summary || {};
 
-  // 营收排名柱状图
   const top10 = storeMetrics.slice(0, 10);
   const barOption = {
     tooltip: { trigger: 'axis' },
@@ -75,218 +192,104 @@ const HQDashboardPage: React.FC = () => {
     series: [{
       type: 'bar',
       data: top10.map((s: any) => s.revenue),
-      itemStyle: { color: '#1890ff' },
-      label: { show: false },
+      itemStyle: { color: 'var(--accent)' },
     }],
   };
 
-  const columns = [
-    { title: '排名', render: (_: any, __: any, idx: number) => idx + 1, width: 60 },
-    { title: '门店', dataIndex: 'store_name' },
-    {
-      title: '昨日营收',
-      dataIndex: 'revenue',
-      render: (v: number) => `¥${(v / 100).toFixed(0)}`,
-      sorter: (a: any, b: any) => a.revenue - b.revenue,
-    },
-    { title: '订单数', dataIndex: 'orders' },
-    {
-      title: '健康分',
-      dataIndex: 'health_score',
-      render: (v: number) => (
-        <Progress percent={v} size="small" status={v >= 80 ? 'success' : v >= 60 ? 'normal' : 'exception'} />
-      ),
-    },
-    {
-      title: '待审批',
-      dataIndex: 'pending_approvals',
-      render: (v: number) => v > 0 ? <Badge count={v} /> : <CheckCircleOutlined style={{ color: '#52c41a' }} />,
-    },
-    {
-      title: '状态',
-      dataIndex: 'has_alert',
-      render: (v: boolean) => v
-        ? <Tag color="red" icon={<WarningOutlined />}>需关注</Tag>
-        : <Tag color="green">正常</Tag>,
-    },
-  ];
-
-  // 健康评分表格列
-  const healthStores: any[] = healthData?.stores || [];
-  const healthSummary = healthData?.summary || {};
-
-  const healthColumns = [
-    {
-      title: '排名',
-      dataIndex: 'rank',
-      width: 50,
-      render: (v: number) => (
-        <span style={{
-          fontWeight: 'bold',
-          color: v === 1 ? '#f5a623' : v === 2 ? '#9b9b9b' : v === 3 ? '#cd7f32' : '#666',
-        }}>{v}</span>
-      ),
-    },
-    { title: '门店', dataIndex: 'store_name' },
-    {
-      title: '综合健康分',
-      dataIndex: 'score',
-      render: (v: number, row: any) => (
-        <Space>
-          <Progress
-            percent={v}
-            size="small"
-            strokeColor={
-              row.level === 'excellent' ? '#52c41a'
-              : row.level === 'good' ? '#1890ff'
-              : row.level === 'warning' ? '#faad14'
-              : '#ff4d4f'
-            }
-            style={{ width: 80 }}
-          />
-          <span style={{ fontWeight: 600 }}>{v}</span>
-        </Space>
-      ),
-      sorter: (a: any, b: any) => a.score - b.score,
-    },
-    {
-      title: '状态',
-      dataIndex: 'level_label',
-      render: (v: string, row: any) => (
-        <Tag color={row.level_color}>{v}</Tag>
-      ),
-    },
-    {
-      title: '最弱维度',
-      dataIndex: 'weakest_label',
-      render: (v: string | null) => v
-        ? <Tag color="orange">{v}</Tag>
-        : <CheckCircleOutlined style={{ color: '#52c41a' }} />,
-    },
-    {
-      title: '营收',
-      dataIndex: 'revenue_yuan',
-      render: (v: number) => `¥${(v || 0).toLocaleString('zh-CN', { maximumFractionDigits: 0 })}`,
-    },
-  ];
-
   return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <Title level={4} style={{ margin: 0 }}><ShopOutlined /> 总部跨店看板</Title>
-        <Space>
+    <div className={styles.page}>
+      {/* 页头 */}
+      <div className={styles.pageHeader}>
+        <h2 className={styles.pageTitle}><ShopOutlined /> 总部跨店看板</h2>
+        <div className={styles.headerActions}>
           <DatePicker
             value={targetDate}
             onChange={(v) => v && setTargetDate(v)}
             allowClear={false}
             disabledDate={(d) => d.isAfter(dayjs())}
           />
-          <Button icon={<ReloadOutlined />} onClick={() => { load(); loadHealth(); }}>刷新</Button>
-        </Space>
+          <ZButton icon={<ReloadOutlined />} onClick={() => { load(); loadHealth(); }}>刷新</ZButton>
+        </div>
       </div>
 
-      <Spin spinning={loading}>
-        {alertStores.length > 0 && (
-          <Alert
-            type="warning"
-            showIcon
-            style={{ marginBottom: 16 }}
-            message={`${alertStores.length} 家门店需要关注`}
-            description={alertStores.map((s: any) => `${s.store_name}（待审批 ${s.pending_approvals} 项）`).join('、')}
+      {/* 预警 Banner */}
+      {alertStores.length > 0 && (
+        <div className={`${styles.alertBar} ${styles.alertWarning}`} style={{ marginBottom: 16 }}>
+          <WarningOutlined style={{ marginRight: 8 }} />
+          <strong>{alertStores.length} 家门店需要关注：</strong>
+          {alertStores.map((s: any) => `${s.store_name}（待审批 ${s.pending_approvals} 项）`).join('、')}
+        </div>
+      )}
+
+      {/* KPI 概览 */}
+      {loading ? (
+        <ZSkeleton rows={2} block style={{ marginBottom: 14 }} />
+      ) : (
+        <div className={styles.kpiGrid} style={{ marginBottom: 14 }}>
+          <ZCard>
+            <ZKpi value={summary.total_stores || 0} unit="家" label="门店总数" />
+          </ZCard>
+          <ZCard>
+            <ZKpi
+              value={`¥${((summary.total_revenue || 0) / 100).toFixed(0)}`}
+              label="昨日总营收"
+            />
+          </ZCard>
+          <ZCard>
+            <ZKpi value={summary.total_orders || 0} unit="单" label="昨日总订单" />
+          </ZCard>
+          <ZCard>
+            <ZKpi
+              value={summary.total_pending_approvals || 0}
+              unit="项"
+              label="待审批决策"
+            />
+          </ZCard>
+        </div>
+      )}
+
+      {/* 营收柱状图 + 门店列表 */}
+      {loading ? (
+        <ZSkeleton rows={6} block style={{ marginBottom: 14 }} />
+      ) : (
+        <div className={styles.chartRow} style={{ marginBottom: 14 }}>
+          <ZCard title="营收排名 TOP10">
+            <ReactECharts option={barOption} style={{ height: 280 }} />
+          </ZCard>
+          <ZCard title={`门店列表（${storeMetrics.length} 家）`}>
+            <ZTable
+              columns={storeColumns}
+              data={storeMetrics}
+              rowKey="store_id"
+              emptyText="暂无门店数据"
+            />
+          </ZCard>
+        </div>
+      )}
+
+      {/* 门店健康度排名 */}
+      <ZCard title={
+        <span><HeartOutlined style={{ color: '#52c41a', marginRight: 6 }} />门店健康度排名</span>
+      }>
+        <div className={styles.healthSummaryTags} style={{ marginBottom: 12 }}>
+          {healthSummary.critical  > 0 && <ZBadge type="critical" text={`危险 ${healthSummary.critical} 家`} />}
+          {healthSummary.warning   > 0 && <ZBadge type="warning"  text={`需关注 ${healthSummary.warning} 家`} />}
+          {healthSummary.good      > 0 && <ZBadge type="info"     text={`良好 ${healthSummary.good} 家`} />}
+          {healthSummary.excellent > 0 && <ZBadge type="success"  text={`优秀 ${healthSummary.excellent} 家`} />}
+        </div>
+        {healthLoading ? (
+          <ZSkeleton rows={4} block />
+        ) : healthStores.length === 0 ? (
+          <ZEmpty description="暂无健康评分数据" />
+        ) : (
+          <ZTable
+            columns={healthColumns}
+            data={healthStores}
+            rowKey="store_id"
+            emptyText="暂无数据"
           />
         )}
-
-        <Row gutter={16} style={{ marginBottom: 16 }}>
-          <Col span={6}>
-            <Card>
-              <Statistic title="门店总数" value={summary.total_stores || 0} suffix="家" />
-            </Card>
-          </Col>
-          <Col span={6}>
-            <Card>
-              <Statistic
-                title="昨日总营收"
-                value={((summary.total_revenue || 0) / 100).toFixed(0)}
-                prefix="¥"
-              />
-            </Card>
-          </Col>
-          <Col span={6}>
-            <Card>
-              <Statistic title="昨日总订单" value={summary.total_orders || 0} suffix="单" />
-            </Card>
-          </Col>
-          <Col span={6}>
-            <Card>
-              <Statistic
-                title="待审批决策"
-                value={summary.total_pending_approvals || 0}
-                valueStyle={{ color: summary.total_pending_approvals > 0 ? '#faad14' : '#52c41a' }}
-                suffix="项"
-              />
-            </Card>
-          </Col>
-        </Row>
-
-        <Row gutter={16} style={{ marginBottom: 16 }}>
-          <Col span={14}>
-            <Card title="营收排名 TOP10">
-              <ReactECharts option={barOption} style={{ height: 280 }} />
-            </Card>
-          </Col>
-          <Col span={10}>
-            <Card title="门店列表" extra={<Text type="secondary">{storeMetrics.length} 家</Text>}>
-              <Table
-                dataSource={storeMetrics}
-                columns={columns}
-                rowKey="store_id"
-                size="small"
-                pagination={{ pageSize: 8, size: 'small' }}
-                scroll={{ y: 280 }}
-              />
-            </Card>
-          </Col>
-        </Row>
-
-        {/* 门店健康度排名卡片（v2.1 StoreHealthScore） */}
-        <Spin spinning={healthLoading}>
-          <Card
-            title={<span><HeartOutlined style={{ color: '#52c41a', marginRight: 6 }} />门店健康度排名</span>}
-            extra={
-              <Space>
-                {healthSummary.critical > 0 && (
-                  <Tag color="red">🔴 危险 {healthSummary.critical} 家</Tag>
-                )}
-                {healthSummary.warning > 0 && (
-                  <Tag color="orange">⚠️ 需关注 {healthSummary.warning} 家</Tag>
-                )}
-                {healthSummary.good > 0 && (
-                  <Tag color="blue">良好 {healthSummary.good} 家</Tag>
-                )}
-                {healthSummary.excellent > 0 && (
-                  <Tag color="green">优秀 {healthSummary.excellent} 家</Tag>
-                )}
-              </Space>
-            }
-          >
-            <Table
-              dataSource={healthStores}
-              columns={healthColumns}
-              rowKey="store_id"
-              size="small"
-              pagination={false}
-              rowClassName={(row: any) =>
-                row.level === 'critical' ? 'ant-table-row-danger' : ''
-              }
-            />
-            {healthStores.length === 0 && !healthLoading && (
-              <Text type="secondary" style={{ display: 'block', textAlign: 'center', padding: 16 }}>
-                暂无健康评分数据
-              </Text>
-            )}
-          </Card>
-        </Spin>
-      </Spin>
+      </ZCard>
     </div>
   );
 };
