@@ -705,6 +705,147 @@ class MarketingAgentService:
 
         return performance
 
+    # ==================== 批量客群分析 ====================
+
+    async def get_store_segment_summary(self, store_id: str) -> Dict[str, Any]:
+        """
+        获取门店客群分布摘要（批量 RFM 计算）
+
+        一条 SQL 聚合门店所有顾客的消费指标，然后逐行计算 RFM 分群，
+        返回各客群人数 + 占比，供前端饼图和 KPI 卡片使用。
+        """
+        async with get_db_session() as session:
+            now = datetime.now()
+            stmt = select(
+                Order.customer_phone,
+                func.count(Order.id).label("order_count"),
+                func.coalesce(func.sum(Order.final_amount), 0).label("total_amount"),
+                func.max(Order.order_time).label("last_order_time"),
+            ).where(
+                Order.store_id == store_id,
+                Order.customer_phone.isnot(None),
+                Order.status.in_([OrderStatus.COMPLETED, OrderStatus.SERVED]),
+            ).group_by(Order.customer_phone)
+
+            rows = (await session.execute(stmt)).all()
+
+        _r_mult = float(os.getenv("RFM_RECENCY_MULTIPLIER", "2"))
+        _f_mult = float(os.getenv("RFM_FREQUENCY_MULTIPLIER", "4"))
+        _m_div = float(os.getenv("RFM_MONETARY_DIVISOR", "100"))
+        _r_w = float(os.getenv("RFM_RECENCY_WEIGHT", "0.3"))
+        _f_w = float(os.getenv("RFM_FREQUENCY_WEIGHT", "0.3"))
+        _m_w = float(os.getenv("RFM_MONETARY_WEIGHT", "0.4"))
+        _churn_low = int(os.getenv("CHURN_LOW_RISK_DAYS", "7"))
+        _churn_mid = int(os.getenv("CHURN_MID_RISK_DAYS", "30"))
+        _churn_high = int(os.getenv("CHURN_HIGH_RISK_DAYS", "60"))
+
+        segments: Dict[str, int] = {s.value: 0 for s in CustomerSegment}
+        for row in rows:
+            days_since = (now - row.last_order_time).days if row.last_order_time else 999
+            total_amount = float(row.total_amount or 0) / 100
+            total_orders = int(row.order_count or 0)
+
+            r_score = 100 - min(days_since * _r_mult, 100)
+            f_score = min(total_orders * _f_mult, 100)
+            m_score = min(total_amount / _m_div, 100) if _m_div > 0 else 0.0
+            value_score = r_score * _r_w + f_score * _f_w + m_score * _m_w
+
+            if days_since < _churn_low:
+                churn_risk = float(os.getenv("CHURN_RISK_LOW", "0.1"))
+            elif days_since < _churn_mid:
+                churn_risk = float(os.getenv("CHURN_RISK_MID", "0.3"))
+            elif days_since < _churn_high:
+                churn_risk = float(os.getenv("CHURN_RISK_HIGH", "0.6"))
+            else:
+                churn_risk = float(os.getenv("CHURN_RISK_CRITICAL", "0.9"))
+
+            seg = self._determine_segment(value_score, churn_risk)
+            segments[seg.value] += 1
+
+        total = len(rows)
+        return {
+            "store_id": store_id,
+            "total_customers": total,
+            "segments": segments,
+            "segments_pct": {
+                k: round(v / total * 100, 1) if total > 0 else 0.0
+                for k, v in segments.items()
+            },
+            "computed_at": now.isoformat(),
+        }
+
+    async def get_at_risk_customers(
+        self,
+        store_id: str,
+        limit: int = 50,
+        risk_threshold: float = 0.5,
+    ) -> List[Dict[str, Any]]:
+        """
+        获取流失风险客户列表
+
+        查询最近一次消费距今超过 CHURN_MID_RISK_DAYS 天的客户，
+        按流失风险从高到低排序，返回前 limit 条。
+        """
+        _churn_mid = int(os.getenv("CHURN_MID_RISK_DAYS", "30"))
+        _churn_high = int(os.getenv("CHURN_HIGH_RISK_DAYS", "60"))
+        _churn_risk_mid = float(os.getenv("CHURN_RISK_MID", "0.3"))
+        _churn_risk_high = float(os.getenv("CHURN_RISK_HIGH", "0.6"))
+        _churn_risk_critical = float(os.getenv("CHURN_RISK_CRITICAL", "0.9"))
+
+        async with get_db_session() as session:
+            now = datetime.now()
+            cutoff = now - timedelta(days=_churn_mid)
+
+            stmt = (
+                select(
+                    Order.customer_phone,
+                    Order.customer_name,
+                    func.count(Order.id).label("order_count"),
+                    func.coalesce(func.sum(Order.final_amount), 0).label("total_amount"),
+                    func.max(Order.order_time).label("last_order_time"),
+                )
+                .where(
+                    Order.store_id == store_id,
+                    Order.customer_phone.isnot(None),
+                    Order.status.in_([OrderStatus.COMPLETED, OrderStatus.SERVED]),
+                )
+                .group_by(Order.customer_phone, Order.customer_name)
+                .having(func.max(Order.order_time) < cutoff)
+                .order_by(func.max(Order.order_time).asc())
+                .limit(limit * 2)  # fetch extra to apply risk_threshold filter
+            )
+            rows = (await session.execute(stmt)).all()
+
+        result = []
+        for row in rows:
+            days_since = (now - row.last_order_time).days if row.last_order_time else 999
+            total_amount_yuan = round(float(row.total_amount or 0) / 100, 2)
+
+            if days_since < _churn_mid:
+                churn_risk = _churn_risk_mid
+            elif days_since < _churn_high:
+                churn_risk = _churn_risk_high
+            else:
+                churn_risk = _churn_risk_critical
+
+            if churn_risk < risk_threshold:
+                continue
+
+            result.append({
+                "customer_phone": row.customer_phone,
+                "customer_name": row.customer_name or "未知",
+                "order_count": int(row.order_count or 0),
+                "total_amount_yuan": total_amount_yuan,
+                "last_order_date": row.last_order_time.strftime("%Y-%m-%d") if row.last_order_time else None,
+                "days_since_last_order": days_since,
+                "churn_risk": churn_risk,
+                "segment": CustomerSegment.LOST.value if churn_risk >= _churn_risk_critical else CustomerSegment.AT_RISK.value,
+                "recommended_action": "重新激活营销" if churn_risk >= _churn_risk_critical else "发送挽回优惠券",
+            })
+
+        result.sort(key=lambda x: x["churn_risk"], reverse=True)
+        return result[:limit]
+
     async def get_statistics(self) -> Dict[str, Any]:
         """获取营销统计"""
         try:

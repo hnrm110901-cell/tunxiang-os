@@ -7,7 +7,6 @@
 
 ## 进行中
 
-
 ---
 
 ## 待办（v2.0 战略重置，按优先级排序）
@@ -143,6 +142,14 @@
 ---
 
 ## 评论
+
+### 2026-03-07（Phase 1 Week 1-2 — Marketing Agent 核心能力）
+- `marketing_agent_service.py`：新增 `get_store_segment_summary`（批量RFM，一条SQL聚合全门店顾客→5维客群分布+占比）+ `get_at_risk_customers`（按风险降序，支持 risk_threshold 过滤，返回最近失联天数/消费总额¥/推荐动作）
+- `marketing_agent.py`：新增3个端点：`GET /stores/{store_id}/segments`、`GET /stores/{store_id}/customers/at-risk`、`GET /stores/{store_id}/statistics`
+- 新建 `tests/test_marketing_agent_service.py`：24个测试（_determine_segment×6 + 向量化×2 + 发券策略×5 + 批量分群×4 + 流失客户列表×7），全部通过
+- 重建 `apps/web/src/pages/MarketingCampaignPage.tsx`：Z设计系统，ECharts 客群饼图 + ZTable 流失客户风险条 + ZTable 活动列表 + ZModal 发券策略生成器 + ZModal 新建活动
+- 新建 `apps/web/src/pages/MarketingCampaignPage.module.css`
+- `apps/web/src/layouts/MainLayout.tsx`：新增「营销智能体」导航入口（RocketOutlined，会员与增长分组），补充路由映射 + 面包屑标题
 
 ### 2026-03-02
 - P2 绩效计算引擎上线：从订单/损耗事件聚合各岗位核心指标（store_manager/waiter/kitchen）

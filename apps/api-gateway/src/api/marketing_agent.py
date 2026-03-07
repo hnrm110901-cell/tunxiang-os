@@ -258,6 +258,77 @@ async def get_campaign(
     }
 
 
+# ── Store-level segment & risk analytics ───────────────────────────────────────
+
+@router.get("/stores/{store_id}/segments")
+async def get_store_segment_summary(
+    store_id: str,
+    db:       AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> Dict[str, Any]:
+    """门店客群分布摘要：批量 RFM 计算，返回各客群人数+占比（高价值/潜力/流失风险/已流失/新客）"""
+    try:
+        svc = _get_service(db)
+        return await svc.get_store_segment_summary(store_id)
+    except Exception as e:
+        logger.error("get_store_segment_summary_failed", error=str(e), store_id=store_id)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/stores/{store_id}/customers/at-risk")
+async def list_at_risk_customers(
+    store_id:       str,
+    limit:          int   = Query(50, ge=1, le=200, description="返回条数上限"),
+    risk_threshold: float = Query(0.5, ge=0.0, le=1.0, description="流失风险阈值（0-1）"),
+    db:             AsyncSession = Depends(get_db),
+    current_user:   User = Depends(get_current_active_user),
+) -> Dict[str, Any]:
+    """流失风险客户列表：按风险评分降序，含最近下单日期/消费总额/推荐营销动作"""
+    try:
+        svc = _get_service(db)
+        customers = await svc.get_at_risk_customers(store_id, limit=limit, risk_threshold=risk_threshold)
+        return {"store_id": store_id, "total": len(customers), "customers": customers}
+    except Exception as e:
+        logger.error("list_at_risk_customers_failed", error=str(e), store_id=store_id)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/stores/{store_id}/statistics")
+async def get_store_marketing_statistics(
+    store_id: str,
+    db:       AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> Dict[str, Any]:
+    """门店营销统计：活动数/活跃活动/总触达/总转化/平均ROI（基于 marketing_campaigns 表）"""
+    try:
+        from sqlalchemy import and_, func as sqlfunc
+        stmt = select(
+            sqlfunc.count(MarketingCampaignModel.id),
+            sqlfunc.sum(
+                sqlfunc.cast(MarketingCampaignModel.status == "active", sqlfunc.Integer)
+            ),
+            sqlfunc.coalesce(sqlfunc.sum(MarketingCampaignModel.reach_count), 0),
+            sqlfunc.coalesce(sqlfunc.sum(MarketingCampaignModel.conversion_count), 0),
+            sqlfunc.coalesce(sqlfunc.avg(
+                (MarketingCampaignModel.revenue_generated - MarketingCampaignModel.actual_cost)
+                / sqlfunc.nullif(MarketingCampaignModel.actual_cost, 0)
+            ), 0.0),
+        ).where(MarketingCampaignModel.store_id == store_id)
+
+        row = (await db.execute(stmt)).one()
+        return {
+            "store_id": store_id,
+            "total_campaigns":   int(row[0] or 0),
+            "active_campaigns":  int(row[1] or 0),
+            "total_reach":       int(row[2] or 0),
+            "total_conversion":  int(row[3] or 0),
+            "avg_roi":           round(float(row[4] or 0.0), 4),
+        }
+    except Exception as e:
+        logger.error("get_store_marketing_statistics_failed", error=str(e), store_id=store_id)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.patch("/stores/{store_id}/campaigns/{campaign_id}/status")
 async def update_campaign_status(
     store_id:    str,

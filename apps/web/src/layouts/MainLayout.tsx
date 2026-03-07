@@ -53,6 +53,7 @@ import {
   ControlOutlined,
   UsergroupAddOutlined,
   NodeIndexOutlined,
+  RocketOutlined,
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -113,6 +114,7 @@ const ROUTE_TO_GROUP: Record<string, string> = {
   '/dynamic-pricing': 'nav-products',
 
   // 04 会员与增长
+  '/marketing':       'nav-crm',
   '/crm-hub': 'nav-crm',
   '/members': 'nav-crm',
   '/customer360': 'nav-crm',
@@ -221,6 +223,7 @@ const BREADCRUMB_LABELS: Record<string, string> = {
   '/dynamic-pricing': '动态定价',
   '/members': '会员中心',
   '/crm-hub': '会员与增长中心',
+  '/marketing': '营销智能体',
   '/customer360': '客户360',
   '/private-domain': '私域运营',
   '/channel-profit': '渠道毛利',
@@ -418,6 +421,7 @@ const MainLayout: React.FC = () => {
         { key: '/crm-hub',          icon: <AppstoreOutlined />,  label: '会员增长中心' },
         { key: '/members',          icon: <UserOutlined />,      label: '会员中心' },
         { key: '/customer360',      icon: <UserOutlined />,      label: '客户360' },
+        { key: '/marketing',        icon: <RocketOutlined />,    label: '营销智能体' },
         { key: '/private-domain',   icon: <TeamOutlined />,      label: '私域运营' },
         { key: '/channel-profit',   icon: <ShopOutlined />,      label: '渠道毛利' },
         { key: '/recommendations',  icon: <BulbOutlined />,      label: '推荐引擎' },
