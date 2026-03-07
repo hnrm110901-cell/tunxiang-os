@@ -62,6 +62,7 @@ const ISVManagementPage = lazy(() => import('./pages/ISVManagementPage'));
 const PluginMarketplacePage = lazy(() => import('./pages/PluginMarketplacePage'));
 const RevenueSharePage = lazy(() => import('./pages/RevenueSharePage'));
 const ISVDashboardPage = lazy(() => import('./pages/ISVDashboardPage'));
+const PlatformAnalyticsPage = lazy(() => import('./pages/PlatformAnalyticsPage'));
 const IndustrySolutionsPage = lazy(() => import('./pages/IndustrySolutionsPage'));
 const I18nPage = lazy(() => import('./pages/I18nPage'));
 const TaskManagementPage = lazy(() => import('./pages/TaskManagementPage'));
@@ -305,6 +306,9 @@ const AppContent: React.FC = () => {
                   } />
                   <Route path="isv-dashboard" element={
                     <ProtectedRoute requiredRole="admin"><ISVDashboardPage /></ProtectedRoute>
+                  } />
+                  <Route path="platform-analytics" element={
+                    <ProtectedRoute requiredRole="admin"><PlatformAnalyticsPage /></ProtectedRoute>
                   } />
                   <Route path="industry-solutions" element={
                     <ProtectedRoute requiredRole="admin"><IndustrySolutionsPage /></ProtectedRoute>

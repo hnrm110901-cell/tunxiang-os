@@ -1,0 +1,185 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.pageHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.pageTitle {
+  font-size: 20px;
+  font-weight: 700;
+  margin: 0 0 4px;
+  color: var(--text-primary);
+}
+
+.pageSub {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.headerActions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+/* KPI row */
+.kpiGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+@media (max-width: 960px) {
+  .kpiGrid { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* KPI card inner detail */
+.kpiDetail {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+  line-height: 1.5;
+}
+
+/* Revenue trend chart */
+.chartContainer {
+  height: 300px;
+}
+
+/* Two-column content row */
+.twoCol {
+  display: grid;
+  grid-template-columns: 3fr 2fr;
+  gap: 16px;
+}
+
+@media (max-width: 1000px) {
+  .twoCol { grid-template-columns: 1fr; }
+}
+
+/* Tier breakdown inside card */
+.tierList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.tierRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.tierCount {
+  font-weight: 700;
+  font-size: 16px;
+  color: var(--text-primary);
+}
+
+.tierBar {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--bg-secondary, #f0f0f0);
+  margin-top: 4px;
+  overflow: hidden;
+}
+
+.tierBarFill {
+  height: 100%;
+  border-radius: 3px;
+  background: var(--accent, #FF6B2C);
+  transition: width 0.4s ease;
+}
+
+/* Top plugins table extras */
+.pluginNameCell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pluginEmoji {
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.pluginMeta {
+  min-width: 0;
+}
+
+.pluginName {
+  font-weight: 600;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pluginDev {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.ratingDisplay {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #faad14;
+}
+
+/* Platform health summary */
+.healthGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+@media (max-width: 700px) {
+  .healthGrid { grid-template-columns: 1fr; }
+}
+
+.healthItem {
+  padding: 12px 16px;
+  background: var(--bg-secondary, #fafafa);
+  border-radius: 8px;
+  border: 1px solid var(--border-color, #f0f0f0);
+}
+
+.healthLabel {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+
+.healthValue {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.healthValueAccent {
+  color: var(--accent, #FF6B2C);
+}
+
+.healthValueGreen {
+  color: #52c41a;
+}
+
+.amountCell {
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--accent, #FF6B2C);
+}

@@ -583,6 +583,10 @@ app.include_router(plugin_marketplace.router, tags=["plugin_marketplace"])
 from src.api import revenue_sharing
 app.include_router(revenue_sharing.router, tags=["revenue_sharing"])
 
+# aPaaS 平台分析 + 评分 — Phase 3 Month 6
+from src.api import platform_analytics
+app.include_router(platform_analytics.router, tags=["platform_analytics"])
+
 # ARCH-004 可信执行层（折扣申请 / 审批 / 审计日志 / 回滚）
 app.include_router(execution.router)
 # FEAT-004 动态菜单权重引擎（Top-N 推荐 + 5因子评分）
