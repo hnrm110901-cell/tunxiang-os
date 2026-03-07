@@ -470,6 +470,7 @@ const AppContent: React.FC = () => {
                   </ProtectedRoute>
                 }>
                   <Route index element={<SmHome />} />
+                  <Route path="home"      element={<SmHome />} />
                   <Route path="business"  element={<SmBusiness />} />
                   <Route path="decisions" element={<SmDecisions />} />
                   <Route path="alerts"    element={<SmAlerts />} />

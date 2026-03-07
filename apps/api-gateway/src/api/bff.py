@@ -92,25 +92,34 @@ async def sm_home(
             return {**cached, "_from_cache": True}
 
     # 并行拉取所有子数据
-    health_task    = _fetch_health_score(store_id, db)
-    top3_task      = _fetch_top3_decisions(store_id, monthly_revenue_yuan, db)
-    queue_task     = _fetch_queue_status(store_id, db)
-    pending_task   = _fetch_pending_count(store_id, db)
+    health_task   = _fetch_health_score(store_id, db)
+    top3_task     = _fetch_top3_decisions(store_id, monthly_revenue_yuan, db)
+    queue_task    = _fetch_queue_status(store_id, db)
+    pending_task  = _fetch_pending_count(store_id, db)
+    revenue_task  = _fetch_today_revenue(store_id, db)
+    fc_task       = _fetch_food_cost_quick(store_id, db)
+    alerts_task   = _fetch_unread_alerts_count(store_id, db)
 
-    health, top3, queue, pending = await asyncio.gather(
-        _safe(health_task, default=None),
-        _safe(top3_task,   default=[]),
-        _safe(queue_task,  default=None),
+    health, top3, queue, pending, revenue, fc, alerts_count = await asyncio.gather(
+        _safe(health_task,  default=None),
+        _safe(top3_task,    default=[]),
+        _safe(queue_task,   default=None),
         _safe(pending_task, default=0),
+        _safe(revenue_task, default=None),
+        _safe(fc_task,      default=None),
+        _safe(alerts_task,  default=0),
     )
 
     payload = {
-        "store_id":               store_id,
-        "as_of":                  datetime.utcnow().isoformat(),
-        "health_score":           health,
-        "top3_decisions":         top3,
-        "queue_status":           queue,
+        "store_id":                store_id,
+        "as_of":                   datetime.utcnow().isoformat(),
+        "health_score":            health,
+        "top3_decisions":          top3,
+        "queue_status":            queue,
         "pending_approvals_count": pending,
+        "today_revenue_yuan":      revenue,
+        "food_cost_summary":       fc,
+        "unread_alerts_count":     alerts_count,
     }
 
     await _cache_set(cache_key, payload)
@@ -633,6 +642,70 @@ async def _fetch_revenue_trend(db: AsyncSession) -> Dict:
         })
 
     return {"dates": dates, "stores": stores}
+
+
+async def _fetch_today_revenue(store_id: str, db: AsyncSession) -> Optional[Dict]:
+    """优先读今日 KPI_REVENUE，无记录则从 orders 实时汇总。"""
+    from sqlalchemy import text
+
+    row = await db.execute(
+        text("""
+            SELECT value FROM kpi_records
+            WHERE store_id = :sid AND kpi_id = 'KPI_REVENUE'
+              AND record_date = CURRENT_DATE
+            LIMIT 1
+        """),
+        {"sid": store_id},
+    )
+    r = row.fetchone()
+    if r and r[0]:
+        return {"revenue_yuan": round(float(r[0]), 2), "source": "kpi"}
+
+    row2 = await db.execute(
+        text("""
+            SELECT COALESCE(SUM(total_amount), 0) FROM orders
+            WHERE store_id = :sid
+              AND DATE(created_at AT TIME ZONE 'UTC') = CURRENT_DATE
+        """),
+        {"sid": store_id},
+    )
+    r2 = row2.fetchone()
+    return {"revenue_yuan": round(float(r2[0]), 2) if r2 else 0.0, "source": "orders"}
+
+
+async def _fetch_food_cost_quick(store_id: str, db: AsyncSession) -> Optional[Dict]:
+    """获取近7天食材成本率概要。"""
+    from src.services.food_cost_service import FoodCostService
+
+    end   = date.today()
+    start = end - timedelta(days=6)
+    result = await FoodCostService.get_store_food_cost_variance(
+        store_id=store_id, start_date=start, end_date=end, db=db
+    )
+    if not result:
+        return None
+    return {
+        "actual_cost_pct": round(float(result.get("actual_cost_pct") or 0), 1),
+        "target_pct":      round(float(result.get("theoretical_pct") or 33.0), 1),
+        "variance_pct":    round(float(result.get("variance_pct") or 0), 1),
+        "variance_status": result.get("variance_status", "ok"),
+    }
+
+
+async def _fetch_unread_alerts_count(store_id: str, db: AsyncSession) -> int:
+    """近24小时 open 状态的运营事件数。"""
+    from sqlalchemy import text
+
+    row = await db.execute(
+        text("""
+            SELECT COUNT(*) FROM ops_events
+            WHERE store_id = :sid
+              AND status = 'open'
+              AND created_at >= NOW() - INTERVAL '24 hours'
+        """),
+        {"sid": store_id},
+    )
+    return int((row.fetchone() or [0])[0])
 
 
 async def _fetch_cross_store_decisions(db: AsyncSession) -> List[Dict]:

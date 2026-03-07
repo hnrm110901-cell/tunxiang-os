@@ -5,37 +5,104 @@
   background: var(--bg);
 }
 
+/* ── Header ───────────────────────────────────────────────────────────────── */
+
 .header {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
-  padding: 20px 16px 12px;
+  padding: 20px 16px 14px;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 10;
 }
 
 .greeting {
-  font-size: 22px;
+  font-size: 20px;
   font-weight: 700;
   color: var(--text-primary);
-  line-height: 1.2;
+  line-height: 1.3;
+  font-family: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
 }
 
 .date {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--text-secondary);
-  margin-top: 2px;
+  margin-top: 3px;
+  letter-spacing: 0.2px;
 }
+
+/* ── Body ────────────────────────────────────────────────────────────────── */
 
 .body {
   flex: 1;
-  padding: 12px 12px 24px;
+  padding: 12px 12px 32px;
   display: flex;
   flex-direction: column;
   gap: 12px;
+  /* safe area on iOS */
+  padding-bottom: calc(32px + env(safe-area-inset-bottom, 0px));
 }
 
-/* health card internals */
+/* ── Alert banner ─────────────────────────────────────────────────────────── */
+
+.alertBanner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 11px 14px;
+  background: #fff1f0;
+  border: 1px solid #ffccc7;
+  border-radius: 10px;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+}
+
+.alertIcon {
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.alertText {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 500;
+  color: #cf1322;
+  line-height: 1.4;
+}
+
+.alertArrow {
+  font-size: 18px;
+  color: #cf1322;
+  flex-shrink: 0;
+}
+
+/* ── KPI grid ─────────────────────────────────────────────────────────────── */
+
+.kpiGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.kpiCell {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 14px 12px;
+}
+
+.kpiCellAlert {
+  background: #fff7e6;
+  border-color: #ffa940;
+}
+
+/* ── Health card internals ────────────────────────────────────────────────── */
+
 .healthRow {
   display: flex;
   align-items: center;
@@ -46,29 +113,117 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
 }
 
 .weakDim {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
 }
 
 .weakLabel {
   font-size: 11px;
   color: var(--text-tertiary);
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.6px;
 }
 
 .weakValue {
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 15px;
+  font-weight: 700;
   color: var(--accent);
 }
 
-.kpiRow {
+.healthStats {
   display: flex;
-  gap: 16px;
+  align-items: center;
+  gap: 8px;
+}
+
+.statItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  flex: 1;
+}
+
+.statValue {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1;
+}
+
+.statLabel {
+  font-size: 10px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.statDivider {
+  width: 1px;
+  height: 24px;
+  background: var(--border);
+  flex-shrink: 0;
+}
+
+/* ── Quick actions ────────────────────────────────────────────────────────── */
+
+.quickGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.quickBtn {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 14px 4px 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s, border-color 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.quickBtn:active {
+  background: var(--surface-hover);
+  border-color: var(--accent);
+}
+
+.quickIcon {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.quickLabel {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.quickBadge {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  min-width: 16px;
+  height: 16px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+  line-height: 1;
 }
