@@ -566,6 +566,11 @@ app.include_router(marketing_agent.router, tags=["marketing_agent"])
 from src.api import open_platform
 app.include_router(open_platform.router, tags=["open_platform"])
 
+# aPaaS 开发者文档 + 沙箱 — Phase 2 Month 2
+from src.api.docs_api import docs_router, sandbox_router
+app.include_router(docs_router, tags=["developer_docs"])
+app.include_router(sandbox_router, tags=["developer_docs"])
+
 # ARCH-004 可信执行层（折扣申请 / 审批 / 审计日志 / 回滚）
 app.include_router(execution.router)
 # FEAT-004 动态菜单权重引擎（Top-N 推荐 + 5因子评分）

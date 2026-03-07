@@ -56,6 +56,7 @@ const DecisionValidatorPage = lazy(() => import('./pages/DecisionValidatorPage')
 const FederatedLearningPage = lazy(() => import('./pages/FederatedLearningPage'));
 const AgentCollaborationPage = lazy(() => import('./pages/AgentCollaborationPage'));
 const OpenPlatformPage = lazy(() => import('./pages/OpenPlatformPage'));
+const DeveloperDocsPage = lazy(() => import('./pages/DeveloperDocsPage'));
 const IndustrySolutionsPage = lazy(() => import('./pages/IndustrySolutionsPage'));
 const I18nPage = lazy(() => import('./pages/I18nPage'));
 const TaskManagementPage = lazy(() => import('./pages/TaskManagementPage'));
@@ -281,6 +282,9 @@ const AppContent: React.FC = () => {
                   } />
                   <Route path="open-platform" element={
                     <ProtectedRoute requiredRole="admin"><OpenPlatformPage /></ProtectedRoute>
+                  } />
+                  <Route path="developer-docs" element={
+                    <ProtectedRoute requiredRole="admin"><DeveloperDocsPage /></ProtectedRoute>
                   } />
                   <Route path="industry-solutions" element={
                     <ProtectedRoute requiredRole="admin"><IndustrySolutionsPage /></ProtectedRoute>

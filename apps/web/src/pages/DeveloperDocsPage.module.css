@@ -1,0 +1,463 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.pageHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.pageTitle {
+  font-size: 20px;
+  font-weight: 700;
+  margin: 0 0 4px;
+  color: var(--text-primary);
+}
+
+.pageSub {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.headerActions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+/* ── Tab bar ─────────────────────────────────────────────────────────────── */
+
+.tabBar {
+  display: flex;
+  gap: 4px;
+  border-bottom: 2px solid var(--border-color, #f0f0f0);
+  padding-bottom: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.tabBar::-webkit-scrollbar { display: none; }
+
+.tab {
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: none;
+  border: none;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  white-space: nowrap;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.tab:hover { color: var(--accent, #FF6B2C); }
+
+.tabActive {
+  color: var(--accent, #FF6B2C);
+  border-bottom-color: var(--accent, #FF6B2C);
+}
+
+.tabContent {
+  min-height: 400px;
+}
+
+/* ── Quick Start ─────────────────────────────────────────────────────────── */
+
+.quickStartGrid {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+@media (max-width: 960px) {
+  .quickStartGrid { grid-template-columns: 1fr; }
+}
+
+/* Auth steps */
+.authSteps {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.authStep {
+  display: flex;
+  gap: 16px;
+}
+
+.authStepNum {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--accent, #FF6B2C);
+  color: white;
+  font-size: 13px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.authStepContent { flex: 1; }
+
+.authStepTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.authStepDesc {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+/* Sandbox */
+.sandboxGuide {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.sandboxBanner {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 14px;
+  background: linear-gradient(135deg, #e6f7ff 0%, #f0f5ff 100%);
+  border-radius: 8px;
+}
+
+.sandboxIcon { font-size: 32px; }
+
+.sandboxTitle {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.sandboxDesc {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.sandboxFeatures {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sandboxFeatureItem {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.sandboxFeatureIcon { font-size: 18px; margin-top: 2px; }
+
+.sandboxFeatureLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.sandboxFeatureDesc {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+/* ── Endpoint List ───────────────────────────────────────────────────────── */
+
+.levelHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 0 10px 12px;
+  border-left: 3px solid var(--accent, #FF6B2C);
+  margin-bottom: 12px;
+  font-size: 14px;
+}
+
+.levelCount {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.endpointList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.endpointCard {
+  border: 1px solid var(--border-color, #f0f0f0);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.endpointHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: var(--bg-secondary, #fafafa);
+  gap: 12px;
+}
+
+.endpointHeader:hover { background: #f5f5f5; }
+
+.endpointLeft {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.endpointRight {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.methodBadge {
+  font-size: 11px;
+  font-weight: 700;
+  color: white;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-family: monospace;
+  flex-shrink: 0;
+}
+
+.endpointPath {
+  font-size: 13px;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  color: var(--text-primary);
+}
+
+.endpointName {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.chevron {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.endpointBody {
+  padding: 16px;
+  border-top: 1px solid var(--border-color, #f0f0f0);
+}
+
+.endpointDesc {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin: 0 0 16px;
+}
+
+/* ── Shared: section, params table ──────────────────────────────────────── */
+
+.section { margin-bottom: 16px; }
+
+.sectionTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+}
+
+.paramsTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.paramsTable th {
+  text-align: left;
+  padding: 6px 10px;
+  background: var(--bg-secondary, #fafafa);
+  border-bottom: 1px solid var(--border-color, #f0f0f0);
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.paramsTable td {
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--border-color, #f0f0f0);
+  vertical-align: top;
+}
+
+.paramName {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: #1677ff;
+  background: #e6f4ff;
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+.paramType {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: #722ed1;
+}
+
+/* ── Code blocks ─────────────────────────────────────────────────────────── */
+
+.langTabs {
+  display: flex;
+  gap: 2px;
+  margin-bottom: 0;
+}
+
+.langTab {
+  padding: 5px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: var(--bg-secondary, #f5f5f5);
+  border: 1px solid var(--border-color, #e8e8e8);
+  border-bottom: none;
+  cursor: pointer;
+  border-radius: 4px 4px 0 0;
+  transition: color 0.15s, background 0.15s;
+}
+
+.langTab:hover { color: var(--accent, #FF6B2C); }
+
+.langTabActive {
+  color: var(--accent, #FF6B2C);
+  background: #1e1e2e;
+  border-color: #1e1e2e;
+}
+
+.codeBlock {
+  margin: 0;
+  padding: 14px 16px;
+  background: #1e1e2e;
+  color: #cdd6f4;
+  font-size: 12.5px;
+  font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+  line-height: 1.6;
+  border-radius: 0 4px 4px 4px;
+  overflow-x: auto;
+  white-space: pre;
+}
+
+/* ── SDK page ─────────────────────────────────────────────────────────────── */
+
+.sdkHeader {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 0;
+}
+
+.sdkBtns { display: flex; gap: 2px; }
+
+.sdkNote {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.sdkRoadmap {
+  margin-top: 24px;
+  padding: 16px;
+  background: var(--bg-secondary, #fafafa);
+  border-radius: 8px;
+}
+
+.sdkRoadmapGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+@media (max-width: 900px) {
+  .sdkRoadmapGrid { grid-template-columns: repeat(2, 1fr); }
+}
+
+.sdkItem {
+  padding: 12px;
+  background: white;
+  border: 1px solid var(--border-color, #f0f0f0);
+  border-radius: 6px;
+}
+
+.sdkItemLang {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.sdkItemNote {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+
+/* ── Credential result ────────────────────────────────────────────────────── */
+
+.credResultBox {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.resultAlert {
+  padding: 10px 14px;
+  background: #fff7e6;
+  border: 1px solid #ffd591;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #873800;
+  line-height: 1.5;
+}
+
+.credRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--border-color, #f0f0f0);
+}
+
+.credRow:last-child { border-bottom: none; }
+
+.credLabel {
+  width: 90px;
+  flex-shrink: 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+  padding-top: 2px;
+}
+
+.credValue {
+  flex: 1;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 11px;
+  color: var(--text-primary);
+  word-break: break-all;
+  background: var(--bg-secondary, #f5f5f5);
+  padding: 4px 8px;
+  border-radius: 4px;
+}
