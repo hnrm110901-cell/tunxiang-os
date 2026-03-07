@@ -1,0 +1,100 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.pageHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.pageTitle {
+  font-size: 20px;
+  font-weight: 700;
+  margin: 0 0 4px;
+  color: var(--text-primary);
+}
+
+.pageSub {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.headerActions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.kpiGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+@media (max-width: 900px) {
+  .kpiGrid { grid-template-columns: repeat(2, 1fr); }
+}
+
+.amountLarge {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--accent, #FF6B2C);
+}
+
+.profitLarge {
+  font-size: 22px;
+  font-weight: 800;
+  color: #52c41a;
+}
+
+.filterBar {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.periodInput {
+  height: 32px;
+  border: 1px solid var(--border-color, #d9d9d9);
+  border-radius: 6px;
+  padding: 0 10px;
+  font-size: 14px;
+  outline: none;
+  background: var(--bg-primary, #fff);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.periodInput:focus { border-color: #4096ff; }
+
+.nativeSelect {
+  width: 100%;
+  height: 32px;
+  border: 1px solid #d9d9d9;
+  border-radius: 6px;
+  padding: 0 8px;
+  font-size: 14px;
+  background: #fff;
+  color: inherit;
+  cursor: pointer;
+  outline: none;
+}
+
+.nativeSelect:hover { border-color: #4096ff; }
+.nativeSelect:focus { border-color: #4096ff; box-shadow: 0 0 0 2px rgba(5,145,255,0.1); }
+
+.amountCell {
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+}
+
+.amountCellAccent { color: var(--accent, #FF6B2C); }
+.amountCellGreen  { color: #52c41a; }

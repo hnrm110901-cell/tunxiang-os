@@ -579,6 +579,10 @@ app.include_router(isv_management.router, tags=["isv_management"])
 from src.api import plugin_marketplace
 app.include_router(plugin_marketplace.router, tags=["plugin_marketplace"])
 
+# aPaaS 收入分成 — Phase 3 Month 5
+from src.api import revenue_sharing
+app.include_router(revenue_sharing.router, tags=["revenue_sharing"])
+
 # ARCH-004 可信执行层（折扣申请 / 审批 / 审计日志 / 回滚）
 app.include_router(execution.router)
 # FEAT-004 动态菜单权重引擎（Top-N 推荐 + 5因子评分）
