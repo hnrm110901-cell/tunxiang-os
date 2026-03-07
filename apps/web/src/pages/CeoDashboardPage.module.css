@@ -1,0 +1,152 @@
+.page { display: flex; flex-direction: column; gap: 16px; }
+
+.pageHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.pageTitle { font-size: 20px; font-weight: 700; margin: 0 0 4px; color: var(--text-primary); }
+.pageSub   { font-size: 13px; color: var(--text-secondary); margin: 0; }
+.headerActions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+/* KPI grid — 5 cols for CEO summary */
+.kpiGrid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
+}
+@media (max-width: 1100px) { .kpiGrid { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 720px)  { .kpiGrid { grid-template-columns: repeat(2, 1fr); } }
+
+.kpiSub     { font-size: 11px; color: var(--text-secondary); margin-top: 4px; }
+.kpiSubWarn { font-size: 11px; color: #f5222d; margin-top: 4px; font-weight: 600; }
+
+/* Tab */
+.tabBar {
+  display: flex;
+  border-bottom: 1px solid var(--border-color, #f0f0f0);
+  margin-bottom: 16px;
+}
+.tab {
+  padding: 8px 20px;
+  font-size: 13px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: color 0.2s, border-color 0.2s;
+}
+.tab:hover { color: var(--text-primary); }
+.tabActive {
+  color: var(--accent, #FF6B2C);
+  border-bottom-color: var(--accent, #FF6B2C);
+  font-weight: 600;
+}
+
+/* Profit rank layout */
+.rankLayout {
+  display: grid;
+  grid-template-columns: 340px 1fr;
+  gap: 16px;
+  align-items: start;
+}
+@media (max-width: 900px) { .rankLayout { grid-template-columns: 1fr; } }
+
+.rankChart { height: 280px; }
+
+/* Risk heat scatter */
+.chartMed { height: 260px; margin-bottom: 16px; }
+
+/* Risk heat bar list */
+.heatTable { display: flex; flex-direction: column; gap: 6px; }
+.heatRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+}
+.heatStore {
+  width: 120px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text-primary);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+}
+.heatBar {
+  flex: 1;
+  height: 8px;
+  background: var(--bg-secondary, #f5f5f5);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.heatFill {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.4s ease;
+}
+.heatCount {
+  width: 100px;
+  text-align: right;
+  color: var(--text-secondary);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+/* Alert / gap lists */
+.alertList { display: flex; flex-direction: column; gap: 8px; }
+.alertRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border: 1px solid var(--border-color, #f0f0f0);
+  border-radius: 6px;
+  background: var(--bg-primary, #fff);
+  font-size: 13px;
+}
+.alertStore {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text-primary);
+  font-weight: 600;
+}
+.alertName {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+/* Money */
+.mono {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+}
+.amount {
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: #f5222d;
+}
+.devWarn {
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: #fa8c16;
+}
+
+/* Cash gap days badge */
+.gapDays {
+  display: inline-block;
+  padding: 2px 8px;
+  background: rgba(245, 34, 45, 0.1);
+  color: #cf1322;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
