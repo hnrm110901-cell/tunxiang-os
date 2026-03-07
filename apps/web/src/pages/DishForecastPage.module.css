@@ -1,0 +1,42 @@
+.page {
+  padding: 16px 24px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.point {
+  font-variant-numeric: tabular-nums;
+  cursor: help;
+  border-bottom: 1px dashed #1677ff;
+}
+
+.revenue {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  cursor: help;
+  border-bottom: 1px dashed #52c41a;
+}
+
+/* Row highlights */
+.rowLaunch :global(td) {
+  background-color: #f6ffed !important;
+}
+
+.rowDecline :global(td) {
+  background-color: #fff7e6 !important;
+}
+
+.rowExit :global(td) {
+  background-color: #fff1f0 !important;
+}
+
+.rowHighError :global(td) {
+  background-color: #fff1f0 !important;
+}

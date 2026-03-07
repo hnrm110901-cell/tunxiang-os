@@ -193,6 +193,7 @@ const ROUTE_TO_GROUP: Record<string, string> = {
   '/dish-benchmark': 'nav-overview',
   '/dish-pricing': 'nav-overview',
   '/dish-lifecycle': 'nav-overview',
+  '/dish-forecast': 'nav-overview',
   '/industry-solutions': 'nav-platform',
   '/i18n': 'nav-platform',
   '/raas': 'nav-platform',
@@ -323,6 +324,7 @@ const BREADCRUMB_LABELS: Record<string, string> = {
   '/dish-benchmark': '跨店菜品对标',
   '/dish-pricing': '菜品智能定价',
   '/dish-lifecycle': '菜品生命周期',
+  '/dish-forecast': '菜品销售预测',
   '/industry-solutions': '行业解决方案',
   '/i18n': '国际化',
   '/raas': 'RaaS定价',
@@ -435,6 +437,7 @@ const MainLayout: React.FC = () => {
         { key: '/dish-benchmark',           icon: <TrophyOutlined />, label: '跨店菜品对标' },
         { key: '/dish-pricing',             icon: <DollarOutlined />, label: '菜品智能定价' },
         { key: '/dish-lifecycle',           icon: <HistoryOutlined />, label: '菜品生命周期' },
+        { key: '/dish-forecast',            icon: <LineChartOutlined />, label: '菜品销售预测' },
       ],
     },
 

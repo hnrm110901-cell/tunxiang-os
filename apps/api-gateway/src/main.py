@@ -665,6 +665,10 @@ app.include_router(dish_pricing.router)
 from src.api import dish_lifecycle
 app.include_router(dish_lifecycle.router)
 
+# Phase 6 Month 7: 菜品销售预测引擎
+from src.api import dish_forecast
+app.include_router(dish_forecast.router)
+
 # ARCH-004 可信执行层（折扣申请 / 审批 / 审计日志 / 回滚）
 app.include_router(execution.router)
 # FEAT-004 动态菜单权重引擎（Top-N 推荐 + 5因子评分）
