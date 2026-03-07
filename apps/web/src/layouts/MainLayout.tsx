@@ -141,6 +141,7 @@ const ROUTE_TO_GROUP: Record<string, string> = {
   '/voice-ws': 'nav-agents',
 
   // 06 平台与治理 (admin only)
+  '/platform-hub': 'nav-platform',
   '/users': 'nav-platform',
   '/stores': 'nav-platform',
   '/multi-store': 'nav-platform',
@@ -243,6 +244,7 @@ const BREADCRUMB_LABELS: Record<string, string> = {
   '/event-sourcing': '事件溯源',
   '/voice-ws': '语音WebSocket',
   '/users': '用户管理',
+  '/platform-hub': '平台与治理中心',
   '/stores': '门店管理',
   '/multi-store': '多门店管理',
   '/approval': '审批管理',
@@ -459,6 +461,7 @@ const MainLayout: React.FC = () => {
       icon: <ControlOutlined />,
       label: '平台与治理',
       children: [
+        { key: '/platform-hub',     icon: <AppstoreOutlined />,   label: '治理中心' },
         // 组织与权限
         { key: '/users',            icon: <TeamOutlined />,       label: '用户管理' },
         { key: '/stores',           icon: <ShopOutlined />,       label: '门店管理' },
