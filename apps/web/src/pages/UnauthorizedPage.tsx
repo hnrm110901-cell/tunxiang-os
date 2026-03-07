@@ -1,27 +1,15 @@
 import React from 'react';
-import { Result, Button } from 'antd';
 import { useNavigate } from 'react-router-dom';
+import { ZButton } from '../design-system/components';
+import styles from './NotFoundPage.module.css';
 
 const UnauthorizedPage: React.FC = () => {
   const navigate = useNavigate();
-
   return (
-    <div style={{
-      display: 'flex',
-      justifyContent: 'center',
-      alignItems: 'center',
-      minHeight: '100vh'
-    }}>
-      <Result
-        status="403"
-        title="403"
-        subTitle="抱歉，您没有权限访问此页面。"
-        extra={
-          <Button type="primary" onClick={() => navigate('/')}>
-            返回首页
-          </Button>
-        }
-      />
+    <div className={styles.wrap}>
+      <div className={styles.code}>403</div>
+      <div className={styles.title}>抱歉，您没有权限访问此页面。</div>
+      <ZButton variant="primary" onClick={() => navigate('/')}>返回首页</ZButton>
     </div>
   );
 };
