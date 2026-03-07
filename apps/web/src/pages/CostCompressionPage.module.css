@@ -1,0 +1,73 @@
+.pageHeader { margin-bottom: 16px; }
+
+.controlBar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+/* ── 行动类型配色 ────────────────────────────────────────── */
+.rowRenegotiate   { background: #fff2f0 !important; }
+.rowReformulate   { background: #fff7e6 !important; }
+.rowAdjustPortion { background: #e6f4ff !important; }
+.rowMonitor       { background: #f9f9f9 !important; }
+
+/* ── 趋势指示 ───────────────────────────────────────────── */
+.trendImproving { color: #52c41a; font-weight: 600; }
+.trendWorsening { color: #ff4d4f; font-weight: 600; }
+.trendStable    { color: #8c8c8c; }
+
+/* ── 优先级 ─────────────────────────────────────────────── */
+.prioHigh   { color: #ff4d4f; font-weight: 700; }
+.prioMedium { color: #fa8c16; font-weight: 600; }
+.prioLow    { color: #8c8c8c; }
+
+/* ── KPI 总览条 ─────────────────────────────────────────── */
+.kpiRow {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.kpiCard {
+  background: #fff;
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
+  padding: 14px 18px;
+  text-align: center;
+}
+.kpiLabel { font-size: 12px; color: #8c8c8c; }
+.kpiValue { font-size: 22px; font-weight: 800; margin-top: 4px; }
+
+/* ── 汇总图表 ───────────────────────────────────────────── */
+.summaryCharts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+/* ── Top 机会榜 ─────────────────────────────────────────── */
+.topBar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+/* ── 历史 ───────────────────────────────────────────────── */
+.historySearch {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+  align-items: center;
+}
+.historyHint {
+  color: #8c8c8c;
+  font-size: 13px;
+  padding: 40px;
+  text-align: center;
+}

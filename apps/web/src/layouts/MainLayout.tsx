@@ -198,6 +198,7 @@ const ROUTE_TO_GROUP: Record<string, string> = {
   '/dish-health': 'nav-overview',
   '/dish-attribution': 'nav-overview',
   '/menu-matrix': 'nav-overview',
+  '/cost-compression': 'nav-overview',
   '/industry-solutions': 'nav-platform',
   '/i18n': 'nav-platform',
   '/raas': 'nav-platform',
@@ -332,6 +333,7 @@ const BREADCRUMB_LABELS: Record<string, string> = {
   '/dish-health': '菜品健康评分',
   '/dish-attribution': '菜品营收归因',
   '/menu-matrix': '菜品组合矩阵',
+  '/cost-compression': '成本压缩机会',
   '/industry-solutions': '行业解决方案',
   '/i18n': '国际化',
   '/raas': 'RaaS定价',
@@ -448,6 +450,7 @@ const MainLayout: React.FC = () => {
         { key: '/dish-health',              icon: <HeartOutlined />, label: '菜品健康评分' },
         { key: '/dish-attribution',          icon: <FundOutlined />, label: '菜品营收归因' },
         { key: '/menu-matrix',               icon: <PieChartOutlined />, label: '菜品组合矩阵' },
+        { key: '/cost-compression',          icon: <DollarOutlined />,  label: '成本压缩机会' },
       ],
     },
 
