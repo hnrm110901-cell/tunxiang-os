@@ -1,0 +1,254 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.pageHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.pageTitle {
+  font-size: 20px;
+  font-weight: 700;
+  margin: 0 0 4px;
+  color: var(--text-primary);
+}
+
+.pageSub {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.headerActions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+/* Stats bar */
+.statsRow {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.statItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px 24px;
+  background: var(--bg-secondary, #fafafa);
+  border-radius: 8px;
+  border: 1px solid var(--border-color, #f0f0f0);
+  min-width: 80px;
+}
+
+.statNum {
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--text-primary);
+  line-height: 1;
+}
+
+.statGreen  { color: #52c41a; }
+.statOrange { color: #fa8c16; }
+.statRed    { color: #f5222d; }
+
+.statLabel {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+
+/* Subscription list */
+.subList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.subHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.subLeft {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.subUrl {
+  font-size: 13px;
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--accent, #FF6B2C);
+  word-break: break-all;
+}
+
+.subActions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.subDesc {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin: 8px 0 4px;
+}
+
+.eventTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.eventTag {
+  background: var(--bg-secondary, #f5f5f5);
+  border: 1px solid var(--border-color, #e8e8e8);
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--text-primary);
+}
+
+.subMeta {
+  display: flex;
+  gap: 16px;
+  margin-top: 10px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  flex-wrap: wrap;
+}
+
+.failCount {
+  color: #f5222d;
+  font-weight: 600;
+}
+
+/* Events reference */
+.eventsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.eventRefItem {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 6px 10px;
+  background: var(--bg-secondary, #fafafa);
+  border-radius: 6px;
+}
+
+.eventCode {
+  font-size: 11px;
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--accent, #FF6B2C);
+  flex-shrink: 0;
+}
+
+.eventRefDesc {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+/* Form */
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 16px;
+}
+
+.formLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.required {
+  color: #f5222d;
+}
+
+.formInput {
+  padding: 8px 12px;
+  border: 1px solid var(--border-color, #d9d9d9);
+  border-radius: 6px;
+  font-size: 13px;
+  outline: none;
+  background: var(--bg-primary, #fff);
+  color: var(--text-primary);
+  transition: border-color 0.2s;
+}
+
+.formInput:focus {
+  border-color: var(--accent, #FF6B2C);
+}
+
+.formHint {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.checkboxGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 0;
+}
+
+.checkboxItem {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.checkboxDesc {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+/* Delivery summary */
+.deliSummary {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-color, #f0f0f0);
+}
+
+.deliStat {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.deliCnt {
+  font-weight: 700;
+  font-size: 16px;
+  color: var(--text-primary);
+}
+
+.mono {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+}

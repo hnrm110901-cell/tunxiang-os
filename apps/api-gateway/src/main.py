@@ -587,6 +587,10 @@ app.include_router(revenue_sharing.router, tags=["revenue_sharing"])
 from src.api import platform_analytics
 app.include_router(platform_analytics.router, tags=["platform_analytics"])
 
+# aPaaS Webhook 事件订阅 — Phase 4 Month 10
+from src.api import webhooks
+app.include_router(webhooks.router, tags=["webhooks"])
+
 # ARCH-004 可信执行层（折扣申请 / 审批 / 审计日志 / 回滚）
 app.include_router(execution.router)
 # FEAT-004 动态菜单权重引擎（Top-N 推荐 + 5因子评分）

@@ -63,6 +63,7 @@ const PluginMarketplacePage = lazy(() => import('./pages/PluginMarketplacePage')
 const RevenueSharePage = lazy(() => import('./pages/RevenueSharePage'));
 const ISVDashboardPage = lazy(() => import('./pages/ISVDashboardPage'));
 const PlatformAnalyticsPage = lazy(() => import('./pages/PlatformAnalyticsPage'));
+const WebhookManagementPage = lazy(() => import('./pages/WebhookManagementPage'));
 const IndustrySolutionsPage = lazy(() => import('./pages/IndustrySolutionsPage'));
 const I18nPage = lazy(() => import('./pages/I18nPage'));
 const TaskManagementPage = lazy(() => import('./pages/TaskManagementPage'));
@@ -309,6 +310,9 @@ const AppContent: React.FC = () => {
                   } />
                   <Route path="platform-analytics" element={
                     <ProtectedRoute requiredRole="admin"><PlatformAnalyticsPage /></ProtectedRoute>
+                  } />
+                  <Route path="webhook-management" element={
+                    <ProtectedRoute requiredRole="admin"><WebhookManagementPage /></ProtectedRoute>
                   } />
                   <Route path="industry-solutions" element={
                     <ProtectedRoute requiredRole="admin"><IndustrySolutionsPage /></ProtectedRoute>
