@@ -73,6 +73,7 @@ const CeoDashboardPage = lazy(() => import('./pages/CeoDashboardPage'));
 const BudgetManagementPage = lazy(() => import('./pages/BudgetManagementPage'));
 const FinancialAlertsPage = lazy(() => import('./pages/FinancialAlertsPage'));
 const FinanceHealthPage = lazy(() => import('./pages/FinanceHealthPage'));
+const CFODashboardPage  = lazy(() => import('./pages/CFODashboardPage'));
 const IndustrySolutionsPage = lazy(() => import('./pages/IndustrySolutionsPage'));
 const I18nPage = lazy(() => import('./pages/I18nPage'));
 const TaskManagementPage = lazy(() => import('./pages/TaskManagementPage'));
@@ -333,7 +334,7 @@ const AppContent: React.FC = () => {
                     <ProtectedRoute requiredRole="admin"><BusinessEventsPage /></ProtectedRoute>
                   } />
                   <Route path="cfo-dashboard" element={
-                    <ProtectedRoute requiredRole="admin"><TaxCashflowPage /></ProtectedRoute>
+                    <ProtectedRoute requiredRole="admin"><CFODashboardPage /></ProtectedRoute>
                   } />
                   <Route path="settlement-risk" element={
                     <ProtectedRoute requiredRole="admin"><SettlementRiskPage /></ProtectedRoute>

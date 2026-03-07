@@ -621,6 +621,10 @@ app.include_router(alerts_router)
 from src.api import finance_health
 app.include_router(finance_health.router)
 
+# 业财税资金 Agent — Phase 5 Month 6: CFO工作台·多店财务综合驾驶舱
+from src.api import cfo_dashboard
+app.include_router(cfo_dashboard.router)
+
 # ARCH-004 可信执行层（折扣申请 / 审批 / 审计日志 / 回滚）
 app.include_router(execution.router)
 # FEAT-004 动态菜单权重引擎（Top-N 推荐 + 5因子评分）
