@@ -625,6 +625,10 @@ app.include_router(finance_health.router)
 from src.api import cfo_dashboard
 app.include_router(cfo_dashboard.router)
 
+# 业财税资金 Agent — Phase 5 Month 7: 智能财务预测引擎
+from src.api import financial_forecast
+app.include_router(financial_forecast.router)
+
 # ARCH-004 可信执行层（折扣申请 / 审批 / 审计日志 / 回滚）
 app.include_router(execution.router)
 # FEAT-004 动态菜单权重引擎（Top-N 推荐 + 5因子评分）

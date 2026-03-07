@@ -182,6 +182,7 @@ const ROUTE_TO_GROUP: Record<string, string> = {
   '/budget-management':  'nav-overview',
   '/financial-alerts':   'nav-overview',
   '/finance-health':     'nav-overview',
+  '/financial-forecast': 'nav-overview',
   '/industry-solutions': 'nav-platform',
   '/i18n': 'nav-platform',
   '/raas': 'nav-platform',
@@ -302,6 +303,7 @@ const BREADCRUMB_LABELS: Record<string, string> = {
   '/budget-management':  '预算管理',
   '/financial-alerts':   '财务预警',
   '/finance-health':     '财务健康评分',
+  '/financial-forecast': '财务预测',
   '/industry-solutions': '行业解决方案',
   '/i18n': '国际化',
   '/raas': 'RaaS定价',
@@ -404,6 +406,7 @@ const MainLayout: React.FC = () => {
         { key: '/budget-management',    icon: <DollarOutlined />,     label: '预算管理' },
         { key: '/financial-alerts',     icon: <BellOutlined />,       label: '财务预警' },
         { key: '/finance-health',        icon: <FundOutlined />,       label: '财务健康评分' },
+        { key: '/financial-forecast',    icon: <LineChartOutlined />,  label: '财务预测' },
       ],
     },
 
