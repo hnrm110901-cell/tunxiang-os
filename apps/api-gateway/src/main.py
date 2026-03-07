@@ -645,6 +645,10 @@ app.include_router(financial_recommendation.router)
 from src.api import dish_profitability
 app.include_router(dish_profitability.router)
 
+# Phase 6 Month 2: 菜单优化建议引擎
+from src.api import menu_optimization
+app.include_router(menu_optimization.router)
+
 # ARCH-004 可信执行层（折扣申请 / 审批 / 审计日志 / 回滚）
 app.include_router(execution.router)
 # FEAT-004 动态菜单权重引擎（Top-N 推荐 + 5因子评分）

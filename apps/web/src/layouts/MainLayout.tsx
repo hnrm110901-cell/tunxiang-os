@@ -187,6 +187,7 @@ const ROUTE_TO_GROUP: Record<string, string> = {
   '/performance-ranking':      'nav-overview',
   '/financial-recommendation': 'nav-overview',
   '/dish-profitability': 'nav-overview',
+  '/menu-optimization': 'nav-overview',
   '/industry-solutions': 'nav-platform',
   '/i18n': 'nav-platform',
   '/raas': 'nav-platform',
@@ -312,6 +313,7 @@ const BREADCRUMB_LABELS: Record<string, string> = {
   '/performance-ranking':      '财务对标排名',
   '/financial-recommendation': '财务智能建议',
   '/dish-profitability': '菜品盈利分析',
+  '/menu-optimization': '菜单优化建议',
   '/industry-solutions': '行业解决方案',
   '/i18n': '国际化',
   '/raas': 'RaaS定价',
@@ -419,6 +421,7 @@ const MainLayout: React.FC = () => {
         { key: '/performance-ranking',   icon: <TrophyOutlined />,     label: '财务对标排名' },
         { key: '/financial-recommendation', icon: <BulbOutlined />,    label: '财务智能建议' },
         { key: '/dish-profitability',      icon: <PieChartOutlined />, label: '菜品盈利分析' },
+        { key: '/menu-optimization',       icon: <BulbOutlined />,    label: '菜单优化建议' },
       ],
     },
 
