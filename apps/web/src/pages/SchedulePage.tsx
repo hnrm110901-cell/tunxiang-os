@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   Card, Form, Input, Button, DatePicker, Table, Space, Tag, Tabs,
   Modal, Select, Row, Col, Statistic, Popconfirm, Alert, Badge,
-  Tooltip, Drawer, InputNumber,
+  Tooltip, Drawer, InputNumber, Timeline, Empty,
 } from 'antd';
 import {
   PlusOutlined, UserOutlined, CalendarOutlined, ReloadOutlined,
@@ -55,6 +55,10 @@ const SchedulePage: React.FC = () => {
 
   const [manualDrawer, setManualDrawer] = useState(false);
   const [manualForm] = Form.useForm();
+  const [historyDrawer, setHistoryDrawer] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historySchedule, setHistorySchedule] = useState<any>(null);
+  const [historyItems, setHistoryItems] = useState<any[]>([]);
 
   const [weekDate, setWeekDate] = useState<Dayjs>(dayjs().startOf('isoWeek'));
   const [statsRange, setStatsRange] = useState<[Dayjs, Dayjs]>([dayjs().subtract(7, 'day'), dayjs()]);
@@ -200,6 +204,21 @@ const SchedulePage: React.FC = () => {
     } catch (err: any) { handleApiError(err, '确认失败'); }
   };
 
+  // ── History ──
+  const handleOpenHistory = async (schedule: any) => {
+    try {
+      setHistorySchedule(schedule);
+      setHistoryDrawer(true);
+      setHistoryLoading(true);
+      const res = await apiClient.get(`/api/v1/schedules/${schedule.id}/history?limit=100`);
+      setHistoryItems(res || []);
+    } catch (err: any) {
+      handleApiError(err, '加载历史记录失败');
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
   // ── Columns ──
   const empColumns: ColumnsType<any> = [
     { title: '员工ID', dataIndex: 'id', key: 'id', width: 130, ellipsis: true },
@@ -234,11 +253,16 @@ const SchedulePage: React.FC = () => {
     { title: '班次数', key: 'shifts_count', width: 80, render: (_: any, r: any) => r.shifts?.length || 0 },
     { title: '状态', dataIndex: 'is_published', key: 'is_published', width: 90, render: (v: boolean) => <Tag color={v ? 'green' : 'orange'}>{v ? '已发布' : '草稿'}</Tag> },
     {
-      title: '操作', key: 'action', width: 120,
-      render: (_: any, record: any) => !record.is_published && (
-        <Popconfirm title="发布后员工可见，确认发布？" onConfirm={() => handlePublish(record.id)} okText="发布" cancelText="取消">
-          <Button size="small" type="primary" icon={<SendOutlined />}>发布</Button>
-        </Popconfirm>
+      title: '操作', key: 'action', width: 180,
+      render: (_: any, record: any) => (
+        <Space>
+          <Button size="small" onClick={() => handleOpenHistory(record)}>历史</Button>
+          {!record.is_published && (
+            <Popconfirm title="发布后员工可见，确认发布？" onConfirm={() => handlePublish(record.id)} okText="发布" cancelText="取消">
+              <Button size="small" type="primary" icon={<SendOutlined />}>发布</Button>
+            </Popconfirm>
+          )}
+        </Space>
       ),
     },
   ];
@@ -513,6 +537,49 @@ const SchedulePage: React.FC = () => {
             <Button type="primary" htmlType="submit" block>创建排班</Button>
           </Form.Item>
         </Form>
+      </Drawer>
+
+      {/* 排班历史 Drawer */}
+      <Drawer
+        title={`排班历史${historySchedule?.schedule_date ? ` · ${historySchedule.schedule_date}` : ''}`}
+        open={historyDrawer}
+        onClose={() => setHistoryDrawer(false)}
+        width={520}
+      >
+        {historyLoading ? (
+          <div style={{ textAlign: 'center', padding: 40 }}>加载中...</div>
+        ) : historyItems.length === 0 ? (
+          <Empty description="暂无历史记录" />
+        ) : (
+          <Timeline
+            items={historyItems.map((item: any) => ({
+              color: item.action === 'create' ? 'green' : 'blue',
+              children: (
+                <div>
+                  <div style={{ fontWeight: 600 }}>{item.description || item.action}</div>
+                  <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>
+                    操作人：{item.username || item.user_id} · {item.created_at ? dayjs(item.created_at).format('YYYY-MM-DD HH:mm:ss') : '-'}
+                  </div>
+                  {(item.changes || item.new_value) && (
+                    <pre
+                      style={{
+                        marginTop: 8,
+                        fontSize: 12,
+                        whiteSpace: 'pre-wrap',
+                        background: '#fafafa',
+                        border: '1px solid #f0f0f0',
+                        borderRadius: 6,
+                        padding: 8,
+                      }}
+                    >
+{JSON.stringify({ changes: item.changes || {}, new_value: item.new_value || {} }, null, 2)}
+                    </pre>
+                  )}
+                </div>
+              ),
+            }))}
+          />
+        )}
       </Drawer>
     </div>
   );
