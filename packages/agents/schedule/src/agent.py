@@ -44,6 +44,7 @@ class ScheduleState(TypedDict):
     employees: List[Dict[str, Any]]
     requirements: Dict[str, int]
     schedule: List[Dict[str, Any]]
+    labor_cost_summary: Dict[str, Any]
     optimization_suggestions: List[str]
     errors: List[str]
 
@@ -347,6 +348,21 @@ class ScheduleAgent(BaseAgent):
             if hours > self.max_shift_hours:
                 suggestions.append(f"员工{emp_id}工作时长超过{self.max_shift_hours}小时")
 
+        labor_cost_summary = self._estimate_labor_cost(schedule)
+        target_labor_cost = float(
+            self.config.get("target_daily_labor_cost", os.getenv("SCHEDULE_TARGET_DAILY_LABOR_COST", "0"))
+        )
+        if target_labor_cost > 0 and labor_cost_summary["estimated_total_cost"] > target_labor_cost:
+            overrun = round(labor_cost_summary["estimated_total_cost"] - target_labor_cost, 2)
+            suggestions.append(
+                f"预计人工成本超目标¥{overrun}，建议优先压降非高峰班次或采用低成本技能替补"
+            )
+        labor_cost_summary["target_daily_labor_cost"] = round(target_labor_cost, 2)
+        labor_cost_summary["overrun_amount"] = round(
+            max(0.0, labor_cost_summary["estimated_total_cost"] - target_labor_cost), 2
+        )
+
+        state["labor_cost_summary"] = labor_cost_summary
         state["optimization_suggestions"] = suggestions
         logger.info("排班优化完成", suggestions_count=len(suggestions))
         return state
@@ -363,6 +379,31 @@ class ScheduleAgent(BaseAgent):
         if end_hour < start_hour:  # 跨天
             return 24 - start_hour + end_hour
         return float(end_hour - start_hour)
+
+    def _estimate_labor_cost(self, schedule: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """估算人工成本，用于成本优化目标。"""
+        hourly_cost = {
+            "manager": float(self.config.get("hourly_cost_manager", os.getenv("SCHEDULE_HOURLY_COST_MANAGER", "40"))),
+            "chef": float(self.config.get("hourly_cost_chef", os.getenv("SCHEDULE_HOURLY_COST_CHEF", "32"))),
+            "waiter": float(self.config.get("hourly_cost_waiter", os.getenv("SCHEDULE_HOURLY_COST_WAITER", "24"))),
+            "cashier": float(self.config.get("hourly_cost_cashier", os.getenv("SCHEDULE_HOURLY_COST_CASHIER", "26"))),
+            "cleaner": float(self.config.get("hourly_cost_cleaner", os.getenv("SCHEDULE_HOURLY_COST_CLEANER", "20"))),
+        }
+
+        breakdown: Dict[str, float] = {}
+        total = 0.0
+        for shift in schedule:
+            skill = shift.get("skill", "waiter")
+            hours = self._calculate_shift_hours(shift["start_time"], shift["end_time"])
+            cost = round(hours * hourly_cost.get(skill, hourly_cost["waiter"]), 2)
+            total += cost
+            breakdown[skill] = round(breakdown.get(skill, 0.0) + cost, 2)
+
+        return {
+            "estimated_total_cost": round(total, 2),
+            "cost_breakdown_by_skill": breakdown,
+            "hourly_cost_config": hourly_cost,
+        }
 
     async def run(
         self,
@@ -387,6 +428,7 @@ class ScheduleAgent(BaseAgent):
             "employees": employees,
             "requirements": {},
             "schedule": [],
+            "labor_cost_summary": {},
             "optimization_suggestions": [],
             "errors": [],
         }
@@ -407,6 +449,7 @@ class ScheduleAgent(BaseAgent):
                 "schedule": state["schedule"],
                 "traffic_prediction": state["traffic_data"],
                 "requirements": state["requirements"],
+                "labor_cost_summary": state["labor_cost_summary"],
                 "suggestions": state["optimization_suggestions"],
             }
         except Exception as e:

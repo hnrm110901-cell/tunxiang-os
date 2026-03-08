@@ -64,6 +64,7 @@ def initial_state(sample_employees):
         employees=sample_employees,
         requirements={},
         schedule=[],
+        labor_cost_summary={},
         optimization_suggestions=[],
         errors=[],
     )
@@ -178,6 +179,7 @@ class TestScheduleAgent:
         result = await agent.optimize_schedule(state)
 
         assert "optimization_suggestions" in result
+        assert "labor_cost_summary" in result
         assert isinstance(result["optimization_suggestions"], list)
 
     @pytest.mark.asyncio
@@ -193,7 +195,24 @@ class TestScheduleAgent:
         assert "schedule" in result
         assert "traffic_prediction" in result
         assert "requirements" in result
+        assert "labor_cost_summary" in result
         assert "suggestions" in result
+
+    @pytest.mark.asyncio
+    async def test_cost_target_generates_optimization_suggestion(self, sample_employees):
+        """测试超预算时生成成本优化建议"""
+        agent = ScheduleAgent(
+            {
+                "min_shift_hours": 4,
+                "max_shift_hours": 8,
+                "max_weekly_hours": 40,
+                "target_daily_labor_cost": 10,
+            }
+        )
+        result = await agent.run(store_id="STORE001", date="2024-01-15", employees=sample_employees)
+        assert result["success"] is True
+        assert result["labor_cost_summary"]["estimated_total_cost"] > 10
+        assert any("预计人工成本超目标" in s for s in result["suggestions"])
 
     @pytest.mark.asyncio
     async def test_run_with_empty_employees(self, agent):
