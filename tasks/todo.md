@@ -9,7 +9,213 @@
 
 ---
 
-## 待办（v2.0 战略重置，按优先级排序）
+## Phase 7 Month 1 — L5 行动层补全（2026-03-08）
+
+- [x] `celery_app.py` 注册 `nightly-action-dispatch` Beat（04:30，环境变量 L5_DISPATCH_HOUR/MINUTE 可覆盖）
+- [x] `wechat_action_fsm.py` 修复 `_upgrade_priority` 方向 bug（P3→P2→P1→P0）
+- [x] 新建 `tests/test_action_dispatch_service.py`：13个测试（P1/P2/P3/OK 四路 + 幂等 + 降级 + outcome + stats）
+- [x] 新建 `tests/test_wechat_action_fsm.py`：24个测试（生命周期 + 升级 + 超时判断 + webhook验签 + 优先级链）
+- [x] 新建 `apps/web/src/pages/ActionPlansPage.tsx`：L5 行动计划管理页面（KPI卡 + 过滤 + 详情Drawer + 结果登记Modal）
+- [x] `App.tsx`：新增 `/action-plans` 路由（store_manager 权限）
+- [x] `MainLayout.tsx`：新增「L5 行动计划」导航入口
+
+---
+
+## Phase 8 — 人力管理 Agent（Workforce Intelligence）
+
+> 来源：智链OS_人力管理Agent_产品设计方案.txt + 智链OS人力管理Agent架构.md（2026-03-08）
+> 北极星：「乐才告诉你昨天用了多少人工成本；智链OS告诉你明天少排1个人能多赚多少钱。」
+> 差异化定位：不做第二个乐才（合规管理工具），做连锁餐饮的**人力经营决策系统**
+
+---
+
+### 设计原则（来自产品文档）
+
+1. **经营决策 > 合规管理**：每个输出必须连接到¥影响（Rule 6）
+2. **主动推送 > 被动报表**：每日07:00企微推送「今日人力建议」，店长一键确认
+3. **需求拉动排班**：客流预测 → 人力需求 → 排班建议（Legion 理念）
+4. **可解释性**：每个建议附3条推理链节点（置信度 + 依据 + 预期¥影响）
+5. **渐进式自动化**：Phase 1建议+手动执行 → Phase 2建议+一键确认 → Phase 3自动排班
+
+---
+
+### 架构决策
+
+- **不新建 package agent**：直接在 `api-gateway/src/services/` 中扩展，复用现有 DB/Redis/Celery 基础设施
+- **与现有 schedule agent 的关系**：`packages/agents/schedule/` 继续负责班次生成逻辑；新服务在其之上添加「经营决策层」（客流预测→人力需求→成本优化）
+- **新数据模型**：独立文件 `src/models/workforce.py`（LaborBudget / StaffingPattern / EmployeePreference / TurnoverEvent / ShiftFairnessScore）
+- **前端角色分离**：店长工作台（今日建议+确认）/ 运营负责人（跨店对标）/ CEO驾驶舱（人力成本趋势）
+
+---
+
+### Phase 8 Month 1 — MVP 人力建议闭环
+
+> 目标：用数据驱动排班决策，替代店长拍脑袋。可用徐记海鲜1-2家门店验证。
+> 验证指标：排班建议采纳率>60% / 人工成本率降低2-3pp / 店长满意度NPS>7
+
+#### Step 1：数据模型 + Alembic Migration
+
+- [ ] 新建 `src/models/workforce.py`：
+  - `LaborBudget`（门店月度人工预算，含 budget_yuan / actual_yuan / variance_pct）
+  - `StaffingPattern`（历史最优排班模板，按星期×节假日类型建立模式库）
+  - `EmployeePreference`（员工偏好班次 + 不可用时段，驱动排班满意度）
+  - `TurnoverEvent`（离职事件标注，含离职原因/时间/替换成本，训练留存模型）
+  - `ShiftFairnessScore`（每员工每月差班分配比例，异常时触发预警）
+  - `LaborDemandForecast`（客流预测结果持久化，action_date / predicted_customers / predicted_revenue / confidence）
+- [ ] 新建 Alembic migration `w01_workforce_models.py`（5张新表）
+- [ ] 在 `src/models/__init__.py` 注册新模型
+
+#### Step 2：客流预测 Service（Agent 1 + 2 核心）
+
+- [ ] 新建 `src/services/labor_demand_service.py`：`LaborDemandService`
+  - 纯函数：`_compute_weekday_factor(date) → float`（星期系数，周五=1.3，周一=0.85）
+  - 纯函数：`_compute_holiday_factor(date) → float`（节假日系数，含湖南本地节日权重）
+  - 纯函数：`_compute_weather_factor(weather_code) → float`（雨天客流-15%，晴天+5%）
+  - `forecast_customer_flow(store_id, target_date, db) → LaborDemandForecast`：
+    - 读取近30天历史日销售均值作为基线
+    - 叠加星期/节假日/天气三个因子
+    - 精度目标：±15%（Phase 1），存入 `labor_demand_forecasts` 表
+  - `compute_staffing_needs(forecast, store_id, db) → dict`：
+    - 基于该店历史人效比（元/人/天）计算岗位人数
+    - 输出：`{kitchen: 3, waiter: 5, cashier: 1, total: 9}`
+    - 与上周同日对比，标注增减量
+  - `get_labor_efficiency(store_id, date_range, db) → dict`：
+    - 人效 = 当日营收 / 实际出勤人数
+    - 返回趋势数据 + 对标建议
+
+#### Step 3：人工成本监控 Service（Agent 5）
+
+- [ ] 新建 `src/services/labor_cost_service.py`：`LaborCostService`
+  - 纯函数：`compute_labor_cost_rate(labor_cost, revenue) → float`（人工成本率）
+  - 纯函数：`classify_labor_cost_status(rate, budget_rate) → str`（ok/warning/critical）
+  - 纯函数：`compute_daily_saving(actual_count, recommended_count, avg_wage_per_day) → float`（节省¥）
+  - `get_store_labor_summary(store_id, date, db) → dict`：
+    - 实际人工成本¥ / 建议人工成本¥ / 节省或超支¥
+    - 人工成本率% + 状态（含预算对比）
+    - 与建议人数差距（+N人/-N人）
+  - `get_multi_store_labor_ranking(store_ids, month, db) → list`：
+    - 跨店人工成本率排名（供运营负责人横向对标）
+
+#### Step 4：今日人力建议推送（Rippling 主动推送理念）
+
+- [ ] 新建 `src/services/workforce_push_service.py`：`WorkforcePushService`
+  - 纯函数：`_format_staffing_recommendation(forecast, staffing, cost_summary) → str`：
+    - 格式：明日客流预测N人 / 建议排班X人（厨房N/前厅N/收银N）/ 较昨日同比±N / 预计节省¥
+    - 附 3条推理链（如：「预计客流+20%，历史周六均值N人，节假日系数×1.2」）
+    - 含一键确认按钮文案
+  - `push_daily_staffing_advice(store_id, db)`：组装建议 + 调用 WeChatService 推送 → 记录推送日志
+  - `push_labor_cost_alert(store_id, db)`：人工成本率超 warning 阈值时触发（Rule 7 合规）
+
+- [ ] `src/core/celery_tasks.py`：新增 `push_daily_workforce_advice` 任务（遍历活跃门店）
+- [ ] `src/core/celery_app.py`：Beat 新增 `daily-workforce-advice`（07:00，L8_WORKFORCE_HOUR/MINUTE 可覆盖，priority=9）
+
+#### Step 5：API 端点
+
+- [x] 新建 `src/api/workforce.py`：Router `/api/v1/workforce`
+  - `GET /stores/{store_id}/labor-forecast?date=` → 明日客流预测 + 建议人数
+  - `GET /stores/{store_id}/labor-cost?date=` → 人工成本日报（实际/建议/节省¥）
+  - `GET /stores/{store_id}/labor-efficiency?start_date=&end_date=` → 人效趋势
+  - `POST /stores/{store_id}/staffing-advice/confirm` → 店长确认排班建议（记录采纳行为）
+  - `GET /multi-store/labor-ranking?month=` → 跨店人工成本率排名
+  - `GET /stores/{store_id}/labor-budget` → 读取月度人工预算
+  - `PUT /stores/{store_id}/labor-budget` → 更新月度人工预算（store_manager 权限）
+- [x] `src/main.py`：注册 workforce router
+
+#### Step 6：前端页面（店长工作台）
+
+- [x] 新建 `apps/web/src/pages/WorkforcePage.tsx`：人力管理主页面
+  - **KPI 卡片行**（4个）：今日建议人数 / 当前实际出勤 / 本月人工成本率% / 本月节省¥
+  - **今日人力建议卡片**（核心 UX）：
+    - 客流预测数字 + 置信度 Badge
+    - 岗位建议表：厨房/前厅/收银各岗位建议人数 + 与昨日对比
+    - 3条推理链展示（可折叠）
+    - 「确认排班建议」按钮（一键确认，发POST记录采纳）
+    - 「修改并确认」按钮（内联编辑人数后确认）
+  - **人工成本趋势图**：近30天人工成本率折线 + 目标线 + 周均值柱状图（ReactECharts）
+  - **本月与建议对比**：实际出勤人数 vs 建议人数折线对比（高出建议时标红）
+- [x] 新建 `apps/web/src/pages/WorkforcePage.module.css`
+- [x] `apps/web/src/App.tsx`：新增 `/workforce` 路由（store_manager 权限）
+- [x] `apps/web/src/layouts/MainLayout.tsx`：新增「人力管理」导航入口（TeamOutlined，运营管理分组）
+
+#### Step 7：测试
+
+- [ ] 新建 `tests/test_labor_demand_service.py`：≥16个测试
+  - 纯函数：星期系数×3 / 节假日系数×3 / 天气系数×2
+  - forecast_customer_flow：正常/无历史数据/节假日
+  - compute_staffing_needs：正常/人效比缺失降级
+  - get_labor_efficiency：单店/多日
+- [ ] 新建 `tests/test_labor_cost_service.py`：≥12个测试
+  - 纯函数：cost_rate×3 / classify_status×3 / compute_saving×2
+  - get_store_labor_summary：正常/无预算数据
+  - get_multi_store_labor_ranking：多店排序
+- [ ] 新建 `tests/test_workforce_push_service.py`：≥10个测试
+  - _format_staffing_recommendation：格式合规（含¥/置信度/推理链）
+  - push_daily_staffing_advice：正常/企微失败降级
+  - push_labor_cost_alert：超阈值触发/未超阈值不推送
+- [ ] 新建 `tests/integration/test_workforce_pipeline.py`：≥15个测试
+  - 客流预测→人力需求→推送全链路
+  - 采纳行为记录闭环
+  - 跨店排名结构验证
+
+---
+
+### Phase 8 Month 2 — 双向闭环（员工侧 + 流失预测）
+
+> 核心目标：将员工纳入系统闭环，形成「系统-店长-员工」三方协同
+
+- [ ] 员工偏好管理 API（CRUD EmployeePreference）
+- [ ] 换班申请流（申请→技能检查→店长审批→企微通知）
+- [ ] `src/services/shift_fairness_service.py`：班次公平性评分
+  - 统计每员工月均差班（深夜/早班）分配比例
+  - 公平性指数计算（基尼系数思路）
+  - 异常员工自动预警（连续3周分配最差班次）
+- [ ] `src/services/turnover_prediction_service.py`：员工流失风险预测
+  - 特征：考勤异常次数 + 班次公平性得分 + 连续工作天数 + 工资波动率
+  - 输出：90天内离职风险分（0-1）+ 主要风险因子
+  - 高风险（>0.7）触发企微提醒店长介入
+  - 离职成本估算（Rule 6：月薪×50% = 替换成本¥）
+- [ ] 前端：WorkforcePage 新增「员工健康」Tab（流失风险排名 + 班次公平性分布）
+- [ ] 测试：≥20个
+
+---
+
+### Phase 8 Month 3 — 行业基准 + AI 排班
+
+> 核心目标：用多客户数据积累行业基准，形成数据网络效应壁垒
+
+- [ ] `src/services/labor_benchmark_service.py`：行业基准数据库
+  - 湖南中式餐饮人效基准（按门店面积/座位数分档）
+  - 同类型门店人工成本率基准区间
+  - 跨客户数据脱敏聚合（联邦学习模式）
+- [ ] 客流预测精度迭代：从±15% → ±8%（积累历史数据后加入门店级微事件特征）
+- [ ] 自动排班 Agent：从「建议+手动确认」→「自动生成+异常提醒」
+  - 集成 packages/agents/schedule/ 的班次生成能力
+  - 增加人工成本约束：排班方案在 LaborBudget 硬约束内
+- [ ] `StaffingPattern` 模板库：从历史最优排班中学习，快速应用到相似日期
+
+---
+
+### 新增数据对象与关系（产品文档第七章补充）
+
+```
+新增对象
+LaborBudget     门店月度人工预算（排班决策的硬约束）
+StaffingPattern 历史最优排班模式模板库
+EmployeePreference 员工期望班次/不可用时段
+TurnoverEvent   离职事件标注（训练留存预测模型）
+ShiftFairnessScore 员工月度班次公平性量化分
+LaborDemandForecast 客流预测结果（持久化供回测）
+
+新增关系语义
+CustomerFlow → LaborDemand   （需求拉动供给，Legion 理念）
+TurnoverEvent → PredictionModel  （每次真实离职更新模型权重）
+Store → LaborBudget          （预算作为排班的硬约束）
+Employee → ShiftFairnessScore （员工级公平性追踪）
+```
+
+---
+
+
 
 > 来源：智链OS产品开发计划明细v2（融合Toast建议）2026-03-04
 > North Star：续费率≥95% | 客户成本率降低2个点 | 客户ROI≥10x

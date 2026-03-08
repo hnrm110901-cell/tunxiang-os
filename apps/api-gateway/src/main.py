@@ -63,6 +63,7 @@ from src.api import hq_dashboard
 from src.api import ai_accuracy
 from src.api import dashboard_preferences
 from src.api import governance
+from src.api import workforce
 # ARCH-004 可信执行层 / FEAT-004 动态菜单 / ARCH-003 门店记忆层 / 本体论 L2 API / FCT 公开接口
 from src.api import execution, menu, store_memory, ontology_api, fct_public
 # Phase 1 — 运营智能层：渠道毛利 API
@@ -545,6 +546,7 @@ app.include_router(backups.router)
 app.include_router(private_domain.router, tags=["private_domain"])
 app.include_router(ops.router, prefix="/api/v1/ops", tags=["ops"])
 app.include_router(daily_hub.router, tags=["daily_hub"])
+app.include_router(workforce.router, tags=["workforce"])
 # Phase 9 — 宴会熔断引擎（吉日感知 + BEO 单 + 采购/排班加成 + 资源冲突检测）
 app.include_router(banquet.router, tags=["banquet"])
 # Banquet Lifecycle — 7 阶段销售漏斗 + 锁台冲突 + 销控日历

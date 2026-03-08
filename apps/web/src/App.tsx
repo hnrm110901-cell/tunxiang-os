@@ -152,6 +152,7 @@ const MarketingCampaignPage = lazy(() => import('./pages/MarketingCampaignPage')
 const FctPage = lazy(() => import('./pages/FctPage'));
 const ApprovalListPage = lazy(() => import('./pages/ApprovalListPage'));
 const ActionPlansPage = lazy(() => import('./pages/ActionPlansPage'));
+const WorkforcePage = lazy(() => import('./pages/WorkforcePage'));
 const DecisionStatisticsDashboard = lazy(() => import('./pages/DecisionStatisticsDashboard'));
 const ProfitDashboard = lazy(() => import('./pages/ProfitDashboard'));
 const AlertThresholdsPage = lazy(() => import('./pages/AlertThresholdsPage'));
@@ -598,6 +599,9 @@ const AppContent: React.FC = () => {
                   } />
                   <Route path="action-plans" element={
                     <ProtectedRoute requiredRole="store_manager"><ActionPlansPage /></ProtectedRoute>
+                  } />
+                  <Route path="workforce" element={
+                    <ProtectedRoute requiredRole="store_manager"><WorkforcePage /></ProtectedRoute>
                   } />
                   <Route path="decision-stats" element={
                     <ProtectedRoute requiredRole="admin"><DecisionStatisticsDashboard /></ProtectedRoute>

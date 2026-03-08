@@ -100,6 +100,7 @@ const ROUTE_TO_GROUP: Record<string, string> = {
   '/ops-agent': 'nav-operations',
   '/voice-devices': 'nav-operations',
   '/employee-performance': 'nav-operations',
+  '/workforce': 'nav-operations',
 
   // 03 商品与供应链
   '/products-hub': 'nav-products',
@@ -246,6 +247,7 @@ const BREADCRUMB_LABELS: Record<string, string> = {
   '/ops-agent': 'IT运维Agent',
   '/voice-devices': '语音设备',
   '/employee-performance': '员工绩效',
+  '/workforce': '人力管理',
   '/dishes': '菜品管理',
   '/bom-management': 'BOM配方',
   '/inventory': '库存管理',
@@ -470,6 +472,7 @@ const MainLayout: React.FC = () => {
         { key: '/employees',         icon: <TeamOutlined />,          label: '员工管理' },
         { key: '/my-schedule',       icon: <CalendarOutlined />,      label: '我的班表' },
         { key: '/employee-performance', icon: <TrophyOutlined />,     label: '员工绩效' },
+        { key: '/workforce',         icon: <TeamOutlined />,          label: '人力管理' },
         { key: '/queue',             icon: <TeamOutlined />,          label: '排队管理' },
         { key: '/meituan-queue',     icon: <SyncOutlined />,          label: '美团排队' },
         { key: '/reservation',       icon: <CalendarOutlined />,      label: '预订宴会' },
@@ -553,7 +556,7 @@ const MainLayout: React.FC = () => {
     },
 
     // 06 平台与治理（admin only）
-    ...(isAdmin ? [{
+    ...(isAdmin ? ([{
       key: 'nav-platform',
       icon: <ControlOutlined />,
       label: '平台与治理',
@@ -602,7 +605,7 @@ const MainLayout: React.FC = () => {
         { key: '/industry-solutions',icon: <GlobalOutlined />,    label: '行业解决方案' },
         { key: '/i18n',             icon: <TranslationOutlined />,label: '国际化' },
       ],
-    } as MenuProps['items'][number]] : []),
+    }] as NonNullable<MenuProps['items']>) : []),
   ];
 
   const handleMenuClick = ({ key }: { key: string }) => {
