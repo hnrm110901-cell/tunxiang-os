@@ -287,6 +287,55 @@ async def create_lead(
     return {"id": lead.id, "current_stage": lead.current_stage.value}
 
 
+@router.patch("/stores/{store_id}/leads/{lead_id}/stage")
+async def update_lead_stage(
+    store_id: str,
+    lead_id: str,
+    body: LeadStageUpdateReq,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """推进线索阶段 + 记录跟进内容（LeadFollowupRecord）"""
+    result = await db.execute(
+        select(BanquetLead).where(
+            and_(BanquetLead.id == lead_id, BanquetLead.store_id == store_id)
+        )
+    )
+    lead = result.scalars().first()
+    if not lead:
+        raise HTTPException(status_code=404, detail="线索不存在")
+
+    stage_before = lead.current_stage   # 变更前阶段，在 mutation 前保存
+    lead.current_stage = body.stage
+    lead.last_followup_at = datetime.utcnow()
+
+    next_followup_at = None
+    if body.next_followup_days:
+        from datetime import timedelta
+        next_followup_at = datetime.utcnow() + timedelta(days=body.next_followup_days)
+
+    from src.models.banquet import LeadFollowupRecord
+    record = LeadFollowupRecord(
+        id=str(uuid.uuid4()),
+        lead_id=lead_id,
+        followup_type="wechat",          # 默认类型；后续可在 body 中扩展
+        content=body.followup_content,
+        stage_before=stage_before,
+        stage_after=body.stage,
+        next_followup_at=next_followup_at,
+        created_by=str(current_user.id),
+    )
+    db.add(record)
+    await db.commit()
+    return {
+        "lead_id": lead_id,
+        "stage_before": stage_before.value,
+        "new_stage": lead.current_stage.value,
+        "last_followup_at": lead.last_followup_at.isoformat(),
+        "next_followup_at": next_followup_at.isoformat() if next_followup_at else None,
+    }
+
+
 # ────────── 宴会订单 ──────────────────────────────────────────────────────────
 
 @router.get("/stores/{store_id}/orders")

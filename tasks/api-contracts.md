@@ -324,10 +324,54 @@ interface SmBffResponse {
 
 ## 待补充接口（Claude 正在开发）
 
-> 以下接口尚未实现，Codex 先用 mock 数据占位，等Claude更新此文件
+> 以下接口已全部实现，Codex 可直接对接
 
-- `GET /api/v1/workforce/stores/{store_id}/shift-fairness-detail` — 班次公平性详细分布图数据
-- `POST /api/v1/workforce/employees/{employee_id}/preference` — 员工班次偏好更新
+- ~~`GET /api/v1/workforce/stores/{store_id}/shift-fairness-detail` — 已实现（见下方）~~
+- `POST /api/v1/workforce/employees/{employee_id}/preference` — 已存在于 `PUT /api/v1/employees/{employee_id}/preferences`（employees router）
+
+### GET `/api/v1/workforce/stores/{store_id}/shift-fairness-detail`
+
+```typescript
+// Query: year?, month?
+interface ShiftFairnessDetail {
+  store_id: string;
+  year: number;
+  month: number;
+  fairness_index: number;          // 0-100，越高越公平
+  total_employees: number;
+  distribution: {
+    high_unfairness_count: number;   // unfavorable_ratio >= 0.5
+    medium_unfairness_count: number; // 0.25 <= ratio < 0.5
+    low_unfairness_count: number;    // ratio < 0.25
+  };
+  employee_stats: Array<{
+    employee_id: string;
+    total_shifts: number;
+    unfavorable_shifts: number;
+    unfavorable_ratio: number;      // 0-1，差班占比
+  }>;
+  consecutive_alerts: string[];    // 连续被分配差班的员工ID列表
+}
+```
+
+### PATCH `/api/v1/banquet-agent/stores/{store_id}/leads/{lead_id}/stage`
+
+```typescript
+// Body:
+interface LeadStageUpdateReq {
+  stage: LeadStage;
+  followup_content: string;
+  next_followup_days?: number;    // 1-30，下次跟进天数
+}
+// Response:
+interface LeadStageUpdateResp {
+  lead_id: string;
+  stage_before: LeadStage;
+  new_stage: LeadStage;
+  last_followup_at: string;
+  next_followup_at: string | null;
+}
+```
 
 ---
 

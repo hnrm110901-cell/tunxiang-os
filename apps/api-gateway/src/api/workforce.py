@@ -508,3 +508,51 @@ async def get_best_staffing_pattern(
     if not pattern:
         return {"store_id": store_id, "date": target_date.isoformat(), "exists": False}
     return {"store_id": store_id, "date": target_date.isoformat(), "exists": True, **pattern}
+
+
+@router.get("/stores/{store_id}/shift-fairness-detail")
+async def get_shift_fairness_detail(
+    store_id: str,
+    year: Optional[int] = Query(None, ge=2020, le=2100),
+    month: Optional[int] = Query(None, ge=1, le=12),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """班次公平性详细分布 — 供员工健康Tab的分布柱状图使用"""
+    target = date.today()
+    y = year or target.year
+    m = month or target.month
+
+    fairness_service = ShiftFairnessService()
+    data = await fairness_service.get_monthly_shift_fairness(
+        store_id=store_id, year=y, month=m, db=db
+    )
+
+    # 按 unfavorable_ratio 分三档，供前端柱状图渲染
+    stats = data.get("employee_stats", [])
+    buckets = {
+        "high":   [s for s in stats if s["unfavorable_ratio"] >= 0.5],
+        "medium": [s for s in stats if 0.25 <= s["unfavorable_ratio"] < 0.5],
+        "low":    [s for s in stats if s["unfavorable_ratio"] < 0.25],
+    }
+
+    alerts = await fairness_service.detect_unfair_assignment_alerts(
+        store_id=store_id, end_date=date(y, m, 1).replace(day=1), db=db
+    )
+
+    return {
+        "store_id": store_id,
+        "year": y,
+        "month": m,
+        "fairness_index": data.get("fairness_index", 100.0),
+        "total_employees": data.get("total_employees", 0),
+        "distribution": {
+            "high_unfairness_count":   len(buckets["high"]),
+            "medium_unfairness_count": len(buckets["medium"]),
+            "low_unfairness_count":    len(buckets["low"]),
+        },
+        # 所有员工按 unfavorable_ratio 降序，供前端绘制水平条形图
+        "employee_stats": stats,
+        # 连续被分配差班的预警员工列表
+        "consecutive_alerts": alerts.get("at_risk_employees", []),
+    }
