@@ -24,6 +24,11 @@ import {
 } from '@ant-design/icons';
 import ReactECharts from 'echarts-for-react';
 import { apiClient } from '../services/api';
+import {
+  inventoryDataService,
+  type InventoryItem,
+  type TransferRequestRecord,
+} from '../services/inventoryData';
 import { handleApiError } from '../utils/message';
 
 interface StoreItem {
@@ -66,28 +71,6 @@ interface PerformanceRankingItem {
   growth_rate: number;
 }
 
-interface InventoryItem {
-  id: string;
-  name: string;
-  unit?: string;
-  current_quantity: number;
-}
-
-interface TransferRequestItem {
-  decision_id: string;
-  status: string;
-  source_store_id: string;
-  target_store_id: string;
-  source_item_id: string;
-  target_item_id: string;
-  item_name: string;
-  quantity: number;
-  unit?: string;
-  reason?: string;
-  manager_feedback?: string;
-  created_at?: string;
-}
-
 type TransferActionType = 'approve' | 'reject';
 
 const MultiStoreManagement: React.FC = () => {
@@ -100,7 +83,7 @@ const MultiStoreManagement: React.FC = () => {
   const [performanceRanking, setPerformanceRanking] = useState<PerformanceRankingItem[]>([]);
   const [sourceInventoryItems, setSourceInventoryItems] = useState<InventoryItem[]>([]);
   const [targetInventoryItems, setTargetInventoryItems] = useState<InventoryItem[]>([]);
-  const [transferRequests, setTransferRequests] = useState<TransferRequestItem[]>([]);
+  const [transferRequests, setTransferRequests] = useState<TransferRequestRecord[]>([]);
   const [transferSubmitting, setTransferSubmitting] = useState(false);
   const [transferActionLoadingId, setTransferActionLoadingId] = useState<string | null>(null);
   const [transferFilterStoreId, setTransferFilterStoreId] = useState<string | undefined>(undefined);
@@ -154,8 +137,8 @@ const MultiStoreManagement: React.FC = () => {
       return;
     }
     try {
-      const response = await apiClient.get(`/api/v1/inventory?store_id=${encodeURIComponent(storeId)}`) as InventoryItem[];
-      setter(response || []);
+      const response = await inventoryDataService.getAll(storeId);
+      setter(response);
     } catch (err: unknown) {
       setter([]);
       handleApiError(err, `加载门店 ${storeId} 库存失败`);
@@ -164,16 +147,11 @@ const MultiStoreManagement: React.FC = () => {
 
   const loadTransferRequests = useCallback(async () => {
     try {
-      const params = new URLSearchParams({ limit: '30' });
-      if (transferFilterStoreId) {
-        params.set('store_id', transferFilterStoreId);
-      }
-      if (transferFilterStatus) {
-        params.set('status', transferFilterStatus);
-      }
-      const response = await apiClient.get(`/api/v1/inventory/transfer-requests?${params.toString()}`) as {
-        items?: TransferRequestItem[];
-      };
+      const response = await inventoryDataService.listTransferRequests({
+        storeId: transferFilterStoreId,
+        status: transferFilterStatus,
+        limit: 30,
+      });
       setTransferRequests(response.items || []);
     } catch (err: unknown) {
       handleApiError(err, '加载调货申请失败');
@@ -187,10 +165,10 @@ const MultiStoreManagement: React.FC = () => {
     target_item_id?: string;
     quantity: number;
     reason?: string;
-  }) => {
+    }) => {
     try {
       setTransferSubmitting(true);
-      await apiClient.post(`/api/v1/inventory/transfer-request?store_id=${encodeURIComponent(values.source_store_id)}`, {
+      await inventoryDataService.createTransferRequest(values.source_store_id, {
         source_item_id: values.source_item_id,
         target_store_id: values.target_store_id,
         target_item_id: values.target_item_id || undefined,
@@ -209,9 +187,7 @@ const MultiStoreManagement: React.FC = () => {
   const handleApproveTransfer = useCallback(async (decisionId: string, managerFeedback?: string) => {
     try {
       setTransferActionLoadingId(decisionId);
-      await apiClient.post(`/api/v1/inventory/transfer-requests/${decisionId}/approve`, {
-        manager_feedback: managerFeedback || '同意调货',
-      });
+      await inventoryDataService.approveTransferRequest(decisionId, managerFeedback || '同意调货');
       message.success('已批准并执行调货');
       await loadTransferRequests();
     } catch (err: unknown) {
@@ -224,9 +200,7 @@ const MultiStoreManagement: React.FC = () => {
   const handleRejectTransfer = useCallback(async (decisionId: string, managerFeedback: string) => {
     try {
       setTransferActionLoadingId(decisionId);
-      await apiClient.post(`/api/v1/inventory/transfer-requests/${decisionId}/reject`, {
-        manager_feedback: managerFeedback,
-      });
+      await inventoryDataService.rejectTransferRequest(decisionId, managerFeedback);
       message.success('已驳回调货申请');
       await loadTransferRequests();
     } catch (err: unknown) {
@@ -471,17 +445,22 @@ const MultiStoreManagement: React.FC = () => {
       title: '调货项',
       dataIndex: 'item_name',
       key: 'item_name',
-      render: (_: unknown, row: TransferRequestItem) => `${row.item_name} ${row.quantity}${row.unit || ''}`,
+      render: (_: unknown, row: TransferRequestRecord) => {
+        if (!row.item_name || row.quantity === null) return '-';
+        return `${row.item_name} ${row.quantity}${row.unit || ''}`;
+      },
     },
     {
       title: '来源门店',
       dataIndex: 'source_store_id',
       key: 'source_store_id',
+      render: (value: string | null) => value || '-',
     },
     {
       title: '目标门店',
       dataIndex: 'target_store_id',
       key: 'target_store_id',
+      render: (value: string | null) => value || '-',
     },
     {
       title: '备注',
@@ -500,7 +479,7 @@ const MultiStoreManagement: React.FC = () => {
       title: '操作',
       key: 'actions',
       width: 140,
-      render: (_: unknown, row: TransferRequestItem) => {
+      render: (_: unknown, row: TransferRequestRecord) => {
         const disabled = row.status !== 'pending';
         return (
           <Space>

@@ -440,7 +440,56 @@ class TransferRejectBody(BaseModel):
     manager_feedback: str
 
 
-@router.post("/inventory/transfer-request", status_code=201)
+class TransferSuggestionResponse(BaseModel):
+    workflow: str
+    source_store_id: str
+    target_store_id: str
+    source_item_id: str
+    target_item_id: str
+    item_name: str
+    unit: Optional[str] = None
+    quantity: float
+    reason: str
+    requested_by: str
+
+
+class TransferRequestCreateResponse(BaseModel):
+    decision_id: str
+    status: str
+    transfer: TransferSuggestionResponse
+
+
+class TransferRequestListItemResponse(BaseModel):
+    decision_id: str
+    status: str
+    source_store_id: Optional[str] = None
+    target_store_id: Optional[str] = None
+    source_item_id: Optional[str] = None
+    target_item_id: Optional[str] = None
+    item_name: Optional[str] = None
+    quantity: Optional[float] = None
+    unit: Optional[str] = None
+    reason: Optional[str] = None
+    manager_feedback: Optional[str] = None
+    created_at: Optional[str] = None
+    approved_at: Optional[str] = None
+    executed_at: Optional[str] = None
+
+
+class TransferRequestListResponse(BaseModel):
+    total: int
+    items: List[TransferRequestListItemResponse]
+
+
+class TransferActionResponse(BaseModel):
+    success: bool
+    decision_id: str
+    status: str
+    source_new_quantity: Optional[float] = None
+    target_new_quantity: Optional[float] = None
+
+
+@router.post("/inventory/transfer-request", status_code=201, response_model=TransferRequestCreateResponse)
 async def create_transfer_request(
     req: TransferRequestBody,
     store_id: str = Query(..., description="来源门店ID"),
@@ -518,7 +567,7 @@ async def create_transfer_request(
     }
 
 
-@router.get("/inventory/transfer-requests")
+@router.get("/inventory/transfer-requests", response_model=TransferRequestListResponse)
 async def list_transfer_requests(
     store_id: Optional[str] = Query(None, description="筛选门店（来源或目标）"),
     status: Optional[str] = Query(None, description="pending/approved/rejected/executed"),
@@ -567,7 +616,7 @@ async def list_transfer_requests(
     return {"total": len(items), "items": items}
 
 
-@router.post("/inventory/transfer-requests/{decision_id}/approve")
+@router.post("/inventory/transfer-requests/{decision_id}/approve", response_model=TransferActionResponse)
 async def approve_transfer_request(
     decision_id: str,
     req: TransferApprovalBody,
@@ -658,7 +707,7 @@ async def approve_transfer_request(
     }
 
 
-@router.post("/inventory/transfer-requests/{decision_id}/reject")
+@router.post("/inventory/transfer-requests/{decision_id}/reject", response_model=TransferActionResponse)
 async def reject_transfer_request(
     decision_id: str,
     req: TransferRejectBody,

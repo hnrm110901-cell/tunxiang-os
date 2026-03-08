@@ -79,6 +79,44 @@ export interface BatchRestockResult {
   }>;
 }
 
+export interface TransferRequestPayload {
+  source_item_id: string;
+  target_store_id: string;
+  quantity: number;
+  target_item_id?: string;
+  reason?: string;
+}
+
+export interface TransferRequestRecord {
+  decision_id: string;
+  status: 'pending' | 'approved' | 'rejected' | 'executed' | string;
+  source_store_id: string | null;
+  target_store_id: string | null;
+  source_item_id: string | null;
+  target_item_id: string | null;
+  item_name: string | null;
+  quantity: number | null;
+  unit: string | null;
+  reason: string | null;
+  manager_feedback: string | null;
+  created_at: string | null;
+  approved_at: string | null;
+  executed_at: string | null;
+}
+
+export interface TransferRequestListResult {
+  total: number;
+  items: TransferRequestRecord[];
+}
+
+export interface TransferActionResult {
+  success: boolean;
+  decision_id: string;
+  status: string;
+  source_new_quantity?: number;
+  target_new_quantity?: number;
+}
+
 class InventoryDataService {
   private readonly basePath = '/api/v1/inventory';
 
@@ -160,6 +198,41 @@ class InventoryDataService {
   async getAlertsByStore(storeId: string): Promise<InventoryItem[]> {
     const items = await this.getAll(storeId);
     return items.filter((item) => item.status && item.status !== 'normal');
+  }
+
+  async createTransferRequest(storeId: string, payload: TransferRequestPayload): Promise<{
+    decision_id: string;
+    status: string;
+  }> {
+    return apiClient.post<{ decision_id: string; status: string }>(
+      `/api/v1/inventory/transfer-request?store_id=${encodeURIComponent(storeId)}`,
+      payload
+    );
+  }
+
+  async listTransferRequests(params?: {
+    storeId?: string;
+    status?: string;
+    limit?: number;
+  }): Promise<TransferRequestListResult> {
+    const query = new URLSearchParams({ limit: String(params?.limit ?? 30) });
+    if (params?.storeId) query.set('store_id', params.storeId);
+    if (params?.status) query.set('status', params.status);
+    return apiClient.get<TransferRequestListResult>(`/api/v1/inventory/transfer-requests?${query.toString()}`);
+  }
+
+  async approveTransferRequest(decisionId: string, managerFeedback?: string): Promise<TransferActionResult> {
+    return apiClient.post<TransferActionResult>(
+      `/api/v1/inventory/transfer-requests/${decisionId}/approve`,
+      { manager_feedback: managerFeedback }
+    );
+  }
+
+  async rejectTransferRequest(decisionId: string, managerFeedback: string): Promise<TransferActionResult> {
+    return apiClient.post<TransferActionResult>(
+      `/api/v1/inventory/transfer-requests/${decisionId}/reject`,
+      { manager_feedback: managerFeedback }
+    );
   }
 }
 
