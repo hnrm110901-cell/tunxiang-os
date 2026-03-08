@@ -104,7 +104,7 @@ class OrderAgent(BaseAgent):
             "create_reservation", "join_queue", "get_queue_status",
             "create_order", "add_dish", "recommend_dishes",
             "calculate_bill", "process_payment", "get_order",
-            "update_order_status", "cancel_order",
+            "modify_order", "update_order_status", "cancel_order",
         ]
 
     def get_valid_next_statuses(self, current_status: str) -> List[str]:
@@ -131,6 +131,8 @@ class OrderAgent(BaseAgent):
                 result = await self.process_payment(**params)
             elif action == "get_order":
                 result = await self.get_order(**params)
+            elif action == "modify_order":
+                result = await self.modify_order(**params)
             elif action == "update_order_status":
                 result = await self.update_order_status(**params)
             elif action == "cancel_order":
@@ -357,6 +359,71 @@ class OrderAgent(BaseAgent):
             "subtotal": price * quantity,
         }
         return {"success": True, "message": f"已添加{quantity}份{dish_name}", "dish_item": dish_item}
+
+    async def modify_order(
+        self,
+        order_id: str,
+        order: Dict[str, Any],
+        modifications: List[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        """
+        修改订单（由调用方传入当前 order，返回 updated_order）
+
+        modifications 支持:
+          - {"action":"update_quantity","dish_id":"D001","quantity":2}
+          - {"action":"remove_dish","dish_id":"D001"}
+          - {"action":"update_instructions","dish_id":"D001","special_instructions":"少辣"}
+        """
+        logger.info("修改订单", order_id=order_id, modifications_count=len(modifications))
+
+        dishes = [dict(d) for d in order.get("dishes", [])]
+        applied: List[str] = []
+
+        for mod in modifications:
+            action = mod.get("action")
+            dish_id = mod.get("dish_id")
+            target = next((d for d in dishes if d.get("dish_id") == dish_id), None)
+
+            if action == "remove_dish":
+                before = len(dishes)
+                dishes = [d for d in dishes if d.get("dish_id") != dish_id]
+                if len(dishes) < before:
+                    applied.append(f"移除菜品 {dish_id}")
+                else:
+                    applied.append(f"移除失败，菜品不存在 {dish_id}")
+                continue
+
+            if not target:
+                applied.append(f"修改失败，菜品不存在 {dish_id}")
+                continue
+
+            if action == "update_quantity":
+                quantity = int(mod.get("quantity", 0))
+                if quantity <= 0:
+                    applied.append(f"数量非法，菜品 {dish_id}")
+                    continue
+                target["quantity"] = quantity
+                target["subtotal"] = round(float(target.get("price", 0)) * quantity, 2)
+                applied.append(f"更新菜品 {dish_id} 数量为 {quantity}")
+            elif action == "update_instructions":
+                target["special_instructions"] = mod.get("special_instructions")
+                applied.append(f"更新菜品 {dish_id} 备注")
+            else:
+                applied.append(f"未知修改动作 {action}")
+
+        total_amount = round(sum(float(d.get("subtotal", 0)) for d in dishes), 2)
+        updated_order = dict(order)
+        updated_order["dishes"] = dishes
+        updated_order["total_amount"] = total_amount
+        updated_order["updated_at"] = datetime.now().isoformat()
+
+        return {
+            "success": True,
+            "order_id": order_id,
+            "updated_order": updated_order,
+            "applied_modifications": applied,
+            "message": f"订单修改完成，共处理 {len(modifications)} 项",
+        }
 
     async def recommend_dishes(
         self,

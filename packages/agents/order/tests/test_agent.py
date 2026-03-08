@@ -158,6 +158,82 @@ class TestOrdering:
         assert "price" in dish
         assert "reason" in dish
 
+    @pytest.mark.asyncio
+    async def test_modify_order_update_quantity_and_total(self, agent):
+        """测试订单改数量后金额重算"""
+        order = {
+            "order_id": "ORD001",
+            "dishes": [
+                {"dish_id": "D001", "dish_name": "宫保鸡丁", "price": 48.0, "quantity": 1, "subtotal": 48.0},
+                {"dish_id": "D002", "dish_name": "米饭", "price": 3.0, "quantity": 2, "subtotal": 6.0},
+            ],
+            "total_amount": 54.0,
+            "status": OrderStatus.ORDERING.value,
+        }
+        result = await agent.modify_order(
+            order_id="ORD001",
+            order=order,
+            modifications=[{"action": "update_quantity", "dish_id": "D001", "quantity": 2}],
+        )
+        assert result["success"] is True
+        updated = result["updated_order"]
+        assert updated["total_amount"] == 102.0
+        dish = next(d for d in updated["dishes"] if d["dish_id"] == "D001")
+        assert dish["quantity"] == 2
+
+    @pytest.mark.asyncio
+    async def test_modify_order_remove_dish(self, agent):
+        """测试订单删菜"""
+        order = {
+            "order_id": "ORD002",
+            "dishes": [
+                {"dish_id": "D001", "dish_name": "宫保鸡丁", "price": 48.0, "quantity": 1, "subtotal": 48.0},
+                {"dish_id": "D002", "dish_name": "米饭", "price": 3.0, "quantity": 2, "subtotal": 6.0},
+            ],
+            "total_amount": 54.0,
+            "status": OrderStatus.ORDERING.value,
+        }
+        result = await agent.modify_order(
+            order_id="ORD002",
+            order=order,
+            modifications=[{"action": "remove_dish", "dish_id": "D002"}],
+        )
+        assert result["success"] is True
+        updated = result["updated_order"]
+        assert len(updated["dishes"]) == 1
+        assert updated["total_amount"] == 48.0
+
+    @pytest.mark.asyncio
+    async def test_modify_order_update_instructions_and_invalid_quantity(self, agent):
+        """测试改备注和非法数量输入"""
+        order = {
+            "order_id": "ORD003",
+            "dishes": [
+                {
+                    "dish_id": "D003",
+                    "dish_name": "鱼香肉丝",
+                    "price": 38.0,
+                    "quantity": 1,
+                    "subtotal": 38.0,
+                    "special_instructions": None,
+                }
+            ],
+            "total_amount": 38.0,
+            "status": OrderStatus.ORDERING.value,
+        }
+        result = await agent.modify_order(
+            order_id="ORD003",
+            order=order,
+            modifications=[
+                {"action": "update_instructions", "dish_id": "D003", "special_instructions": "少盐"},
+                {"action": "update_quantity", "dish_id": "D003", "quantity": 0},
+            ],
+        )
+        assert result["success"] is True
+        updated = result["updated_order"]
+        assert updated["dishes"][0]["special_instructions"] == "少盐"
+        assert any("数量非法" in msg for msg in result["applied_modifications"])
+
 
 class TestPayment:
     """结账管理测试"""
