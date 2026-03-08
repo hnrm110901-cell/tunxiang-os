@@ -547,6 +547,28 @@ class TestMultiStoreSchedule:
         assert any(s["to_store_id"] == "STORE_B" for s in result["transfer_suggestions"])
 
 
+class TestPredictiveAdjustments:
+    """预测性排班调整测试"""
+
+    @pytest.mark.asyncio
+    async def test_predict_schedule_adjustments_increase_and_decrease(self, agent):
+        result = await agent.predict_schedule_adjustments(
+            store_id="STORE001",
+            date="2024-01-15",
+            current_requirements={
+                "morning": {"waiter": 2, "chef": 1},
+                "afternoon": {"waiter": 3, "chef": 1},
+                "evening": {"waiter": 4, "chef": 2},
+            },
+            baseline_customers={"morning": 60, "afternoon": 80, "evening": 120},
+            predicted_customers={"morning": 90, "afternoon": 64, "evening": 120},
+        )
+        assert result["success"] is True
+        assert len(result["predictive_adjustments"]) >= 2
+        assert any(a["type"] == "increase_staff" for a in result["predictive_adjustments"])
+        assert any(a["type"] == "decrease_staff" for a in result["predictive_adjustments"])
+
+
 class TestEnums:
     """枚举类型测试"""
 

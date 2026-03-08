@@ -175,7 +175,7 @@ class ScheduleAgent(BaseAgent):
         }
 
     def get_supported_actions(self) -> List[str]:
-        return ["run", "plan_multi_store_schedule", "adjust_schedule", "get_schedule"]
+        return ["run", "plan_multi_store_schedule", "predict_schedule_adjustments", "adjust_schedule", "get_schedule"]
 
     async def execute(self, action: str, params: Dict[str, Any]) -> AgentResponse:
         try:
@@ -189,6 +189,14 @@ class ScheduleAgent(BaseAgent):
                 result = await self.plan_multi_store_schedule(
                     date=params["date"],
                     stores=params["stores"],
+                )
+            elif action == "predict_schedule_adjustments":
+                result = await self.predict_schedule_adjustments(
+                    store_id=params["store_id"],
+                    date=params["date"],
+                    current_requirements=params.get("current_requirements", {}),
+                    predicted_customers=params["predicted_customers"],
+                    baseline_customers=params.get("baseline_customers", {}),
                 )
             elif action == "adjust_schedule":
                 result = await self.adjust_schedule(
@@ -631,6 +639,63 @@ class ScheduleAgent(BaseAgent):
             "date": date,
             "store_results": per_store_results,
             "transfer_suggestions": transfer_suggestions,
+        }
+
+    async def predict_schedule_adjustments(
+        self,
+        store_id: str,
+        date: str,
+        current_requirements: Dict[str, Any],
+        predicted_customers: Dict[str, int],
+        baseline_customers: Optional[Dict[str, int]] = None,
+    ) -> Dict[str, Any]:
+        """
+        预测性排班调整：
+        对比 baseline 与 predicted 客流，提前给出增减员建议。
+        """
+        baseline = baseline_customers or {}
+        adjustments: List[Dict[str, Any]] = []
+
+        for shift in ("morning", "afternoon", "evening"):
+            base = max(1, int(baseline.get(shift, predicted_customers.get(shift, 1))))
+            pred = max(1, int(predicted_customers.get(shift, base)))
+            change_ratio = (pred - base) / base
+
+            req = current_requirements.get(shift, {})
+            current_waiter = int(req.get("waiter", 0))
+            current_chef = int(req.get("chef", 0))
+
+            if change_ratio >= 0.2:
+                delta_waiter = max(1, int(round(current_waiter * min(change_ratio, 0.5)))) if current_waiter > 0 else 1
+                delta_chef = max(1, int(round(current_chef * min(change_ratio, 0.4)))) if current_chef > 0 else 1
+                adjustments.append(
+                    {
+                        "shift": shift,
+                        "type": "increase_staff",
+                        "change_ratio": round(change_ratio, 3),
+                        "recommendation": {"waiter": delta_waiter, "chef": delta_chef},
+                        "reason": f"预测客流较基线提升{round(change_ratio * 100, 1)}%",
+                    }
+                )
+            elif change_ratio <= -0.15:
+                delta_waiter = max(1, int(round(max(1, current_waiter) * min(abs(change_ratio), 0.4)))) if current_waiter > 0 else 0
+                delta_chef = max(1, int(round(max(1, current_chef) * min(abs(change_ratio), 0.3)))) if current_chef > 0 else 0
+                adjustments.append(
+                    {
+                        "shift": shift,
+                        "type": "decrease_staff",
+                        "change_ratio": round(change_ratio, 3),
+                        "recommendation": {"waiter": delta_waiter, "chef": delta_chef},
+                        "reason": f"预测客流较基线下降{round(abs(change_ratio) * 100, 1)}%",
+                    }
+                )
+
+        return {
+            "success": True,
+            "store_id": store_id,
+            "date": date,
+            "predictive_adjustments": adjustments,
+            "message": f"生成{len(adjustments)}条预测性排班调整建议",
         }
 
     async def adjust_schedule(
