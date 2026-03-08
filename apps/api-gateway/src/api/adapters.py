@@ -115,6 +115,8 @@ async def register_adapter(request: AdapterRegisterRequest):
             data={"adapter_name": adapter_name},
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("适配器注册失败", error=str(e))
         raise HTTPException(status_code=500, detail=str(e))

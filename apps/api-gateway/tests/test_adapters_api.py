@@ -3,9 +3,11 @@ import pytest
 from fastapi import HTTPException
 
 from src.api.adapters import (
+    AdapterRegisterRequest,
     DishSyncRequest,
     OrderSyncRequest,
     integration_service,
+    register_adapter,
     sync_all,
     sync_dishes,
     sync_order,
@@ -61,3 +63,19 @@ async def test_sync_all_supports_pinzhi(monkeypatch):
 
     assert result.status == "success"
     assert result.data["results"]["dishes"]["synced_count"] == 2
+
+
+@pytest.mark.asyncio
+async def test_register_adapter_unsupported_returns_400():
+    with pytest.raises(HTTPException) as exc:
+        await register_adapter(
+            AdapterRegisterRequest(adapter_name="unknown", config={})
+        )
+    assert exc.value.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_sync_dishes_unsupported_source_returns_400():
+    with pytest.raises(HTTPException) as exc:
+        await sync_dishes(DishSyncRequest(store_id="STORE001", source_system="unknown"))
+    assert exc.value.status_code == 400
