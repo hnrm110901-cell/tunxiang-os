@@ -1142,13 +1142,14 @@ class TestPettyCashPlaceholders:
         assert result["limit"] == 20
 
 
-class TestBudgetPlaceholderCompatibility:
-    """测试预算占位接口参数兼容（public API 与 legacy 参数）"""
+class TestBudgetCompatibility:
+    """测试预算接口参数兼容与核心校验逻辑"""
 
     @pytest.mark.asyncio
     async def test_check_budget_accepts_public_api_params(self):
         svc = StandaloneFCTService()
         db = _mock_db()
+        db.execute = AsyncMock(side_effect=[_single_scalar(5000), _single_scalar(1000)])
         result = await svc.check_budget(
             db,
             tenant_id="T1",
@@ -1162,11 +1163,15 @@ class TestBudgetPlaceholderCompatibility:
         assert result["budget_type"] == "monthly"
         assert result["category"] == "food_cost"
         assert result["requested"] == 1888.5
+        assert result["planned"] == 5000.0
+        assert result["actual"] == 1000.0
+        assert result["within_budget"] is True
 
     @pytest.mark.asyncio
     async def test_occupy_budget_accepts_public_api_params(self):
         svc = StandaloneFCTService()
         db = _mock_db()
+        db.execute = AsyncMock(side_effect=[_single_scalar(1000), _single_scalar(950)])
         result = await svc.occupy_budget(
             db,
             tenant_id="T1",
@@ -1177,10 +1182,33 @@ class TestBudgetPlaceholderCompatibility:
             amount=200.0,
             ref_id="PAY-1",
         )
-        assert result["success"] is True
+        assert result["success"] is False
         assert result["budget_type"] == "monthly"
         assert result["category"] == "food_cost"
         assert result["occupied"] == 200.0
+        assert result["reason"] == "budget_exceeded"
+
+    @pytest.mark.asyncio
+    async def test_occupy_budget_writes_transaction_when_within_budget(self):
+        svc = StandaloneFCTService()
+        db = _mock_db()
+        db.execute = AsyncMock(side_effect=[_single_scalar(1000), _single_scalar(200)])
+        result = await svc.occupy_budget(
+            db,
+            tenant_id="T1",
+            entity_id="S001",
+            budget_type="monthly",
+            period="202603",
+            category="food_cost",
+            amount=200.0,
+            ref_id="PAY-2",
+        )
+        assert result["success"] is True
+        assert db.add.call_count == 1
+        txn = db.add.call_args[0][0]
+        assert txn.category == "food_cost"
+        assert txn.transaction_type == "expense"
+        assert txn.reference_id == "PAY-2"
 
     @pytest.mark.asyncio
     async def test_list_budget_controls_accepts_budget_type_filter(self):
@@ -1199,6 +1227,51 @@ class TestBudgetPlaceholderCompatibility:
         assert result["budget_type"] == "monthly"
         assert result["skip"] == 2
         assert result["limit"] == 8
+
+    @pytest.mark.asyncio
+    async def test_upsert_budget_inserts_when_missing(self):
+        svc = StandaloneFCTService()
+        db = _mock_db()
+        empty_result = MagicMock()
+        empty_result.scalars.return_value.first.return_value = None
+        db.execute = AsyncMock(return_value=empty_result)
+        result = await svc.upsert_budget(
+            db,
+            tenant_id="T1",
+            entity_id="S001",
+            budget_type="monthly",
+            period="202603",
+            category="food_cost",
+            amount=3000,
+        )
+        assert result["success"] is True
+        assert result["year"] == 2026
+        assert result["month"] == 3
+        assert db.add.call_count == 1
+
+    @pytest.mark.asyncio
+    async def test_upsert_budget_updates_existing(self):
+        svc = StandaloneFCTService()
+        db = _mock_db()
+        existing = MagicMock()
+        existing.id = "BUD-1"
+        existing.budgeted_amount = 1000
+        found_result = MagicMock()
+        found_result.scalars.return_value.first.return_value = existing
+        db.execute = AsyncMock(return_value=found_result)
+        result = await svc.upsert_budget(
+            db,
+            tenant_id="T1",
+            entity_id="S001",
+            budget_type="monthly",
+            period="202603",
+            category="food_cost",
+            amount=4500,
+        )
+        assert result["success"] is True
+        assert result["budget_id"] == "BUD-1"
+        assert existing.budgeted_amount == 4500
+        db.add.assert_not_called()
 
 
 # ── get_report_trend ─────────────────────────────────────────────────────────

@@ -1940,7 +1940,46 @@ class StandaloneFCTService:
     async def upsert_budget(
         self, session: AsyncSession, **kwargs
     ) -> Dict[str, Any]:
-        return {"success": True, **kwargs}
+        tenant_id = kwargs.get("tenant_id")
+        entity_id = kwargs.get("entity_id") or ""
+        period = str(kwargs.get("period") or "")
+        category = str(kwargs.get("category") or "")
+        amount = int(float(kwargs.get("amount") or 0))
+        if len(period) != 6 or (not period.isdigit()):
+            raise ValueError("period 格式应为 YYYYMM")
+        year, month = int(period[:4]), int(period[4:6])
+        store_id = entity_id or tenant_id
+
+        stmt = select(Budget).where(
+            and_(
+                Budget.store_id == store_id,
+                Budget.year == year,
+                Budget.month == month,
+                Budget.category == category,
+            )
+        )
+        existing = (await session.execute(stmt)).scalars().first()
+        if existing:
+            existing.budgeted_amount = amount
+            budget_id = str(existing.id)
+        else:
+            row = Budget(
+                store_id=store_id,
+                year=year,
+                month=month,
+                category=category,
+                budgeted_amount=amount,
+            )
+            session.add(row)
+            budget_id = str(row.id) if getattr(row, "id", None) else ""
+        await session.flush()
+        return {
+            "success": True,
+            **kwargs,
+            "budget_id": budget_id,
+            "year": year,
+            "month": month,
+        }
 
     async def upsert_budget_control(
         self, session: AsyncSession, **kwargs
@@ -1980,16 +2019,46 @@ class StandaloneFCTService:
     ) -> Dict[str, Any]:
         normalized_account = account_code or category or ""
         requested_amount = float(amount_to_use if amount_to_use is not None else (amount or 0))
+        target_entity = entity_id or tenant_id
+        target_category = category or normalized_account
+        y, m = date.today().year, date.today().month
+        if period and len(period) == 6 and period.isdigit():
+            y, m = int(period[:4]), int(period[4:6])
+        month_start = date(y, m, 1)
+        month_end = date(y, m, monthrange(y, m)[1])
+
+        budget_stmt = select(func.sum(Budget.budgeted_amount)).where(
+            and_(
+                Budget.store_id == target_entity,
+                Budget.year == y,
+                Budget.month == m,
+                Budget.category == target_category,
+            )
+        )
+        actual_stmt = select(func.sum(FinancialTransaction.amount)).where(
+            and_(
+                FinancialTransaction.store_id == target_entity,
+                FinancialTransaction.transaction_type == "expense",
+                FinancialTransaction.category == target_category,
+                FinancialTransaction.transaction_date >= month_start,
+                FinancialTransaction.transaction_date <= month_end,
+            )
+        )
+        planned = float((await session.execute(budget_stmt)).scalar() or 0)
+        actual = float((await session.execute(actual_stmt)).scalar() or 0)
+        available = planned - actual
         return {
             "tenant_id": tenant_id,
-            "entity_id": entity_id,
+            "entity_id": target_entity,
             "budget_type": budget_type or "period",
             "account_code": normalized_account,
-            "category": category or normalized_account,
+            "category": target_category,
             "requested": requested_amount,
-            "available": None,
-            "within_budget": True,
-            "note": "预算控制模型待上线",
+            "planned": planned,
+            "actual": actual,
+            "available": available,
+            "within_budget": requested_amount <= available,
+            "period": f"{y:04d}{m:02d}",
         }
 
     async def occupy_budget(
@@ -2005,16 +2074,59 @@ class StandaloneFCTService:
         period: Optional[str] = None,
     ) -> Dict[str, Any]:
         normalized_account = account_code or category or ""
+        target_category = category or normalized_account
+        check = await self.check_budget(
+            session,
+            tenant_id=tenant_id,
+            entity_id=entity_id,
+            account_code=account_code,
+            amount=amount,
+            budget_type=budget_type,
+            category=target_category,
+            period=period,
+        )
+        if not check["within_budget"]:
+            return {
+                "success": False,
+                "tenant_id": tenant_id,
+                "entity_id": entity_id or tenant_id,
+                "budget_type": budget_type or "period",
+                "account_code": normalized_account,
+                "category": target_category,
+                "period": check.get("period") or period,
+                "occupied": float(amount),
+                "ref_id": ref_id,
+                "reason": "budget_exceeded",
+                "available": check.get("available"),
+            }
+
+        txn_date = date.today()
+        if check.get("period") and len(str(check["period"])) == 6 and str(check["period"]).isdigit():
+            py, pm = int(str(check["period"])[:4]), int(str(check["period"])[4:6])
+            txn_date = date(py, pm, 1)
+        row = FinancialTransaction(
+            store_id=entity_id or tenant_id,
+            transaction_date=txn_date,
+            transaction_type="expense",
+            category=target_category,
+            amount=int(float(amount)),
+            description=f"budget occupy {ref_id or ''}".strip(),
+            reference_id=ref_id,
+            created_by="budget_control",
+        )
+        session.add(row)
+        await session.flush()
         return {
             "success": True,
             "tenant_id": tenant_id,
-            "entity_id": entity_id,
+            "entity_id": entity_id or tenant_id,
             "budget_type": budget_type or "period",
             "account_code": normalized_account,
-            "category": category or normalized_account,
-            "period": period,
+            "category": target_category,
+            "period": check.get("period") or period,
             "occupied": float(amount),
             "ref_id": ref_id,
+            "available_after": float(check.get("available") or 0) - float(amount or 0),
         }
 
     # ── 年度计划 ──────────────────────────────────────────────────────────────
