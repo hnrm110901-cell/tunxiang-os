@@ -1,27 +1,31 @@
 """
-Ontology layer (Palantir L2) — 本体层初始化
+Ontology 包公共导出
 """
 import os
+from functools import lru_cache
+from typing import TYPE_CHECKING
 
-from .schema import NodeLabel, RelType  # no neo4j dependency
+from .schema import NodeLabel, RelType, ExtensionNodeLabel
 
-_repository = None
+if TYPE_CHECKING:
+    from .repository import OntologyRepository
+
+__all__ = [
+    "NodeLabel",
+    "RelType",
+    "ExtensionNodeLabel",
+    "get_ontology_repository",
+]
 
 
-def get_ontology_repository():
-    """返回 OntologyRepository 单例（懒初始化，首次调用时才连接 Neo4j）。
-
-    依赖环境变量：
-      NEO4J_URI      (默认 bolt://localhost:7687)
-      NEO4J_USER     (默认 neo4j)
-      NEO4J_PASSWORD (默认 neo4j)
+@lru_cache(maxsize=1)
+def get_ontology_repository() -> "OntologyRepository":
+    """返回全局单例 OntologyRepository（从环境变量读取连接信息）。
+    Neo4j 不可用时返回未连接实例，调用方按需处理连接异常。
     """
-    global _repository
-    if _repository is None:
-        from .repository import OntologyRepository  # lazy import (requires neo4j pkg)
-        _repository = OntologyRepository(
-            uri=os.getenv("NEO4J_URI", "bolt://localhost:7687"),
-            user=os.getenv("NEO4J_USER", "neo4j"),
-            password=os.getenv("NEO4J_PASSWORD", "neo4j"),
-        )
-    return _repository
+    from .repository import OntologyRepository  # 懒加载，避免 neo4j 未安装时影响整体启动
+
+    uri = os.getenv("NEO4J_URI", "bolt://localhost:7687")
+    user = os.getenv("NEO4J_USER", "neo4j")
+    password = os.getenv("NEO4J_PASSWORD", "password")
+    return OntologyRepository(uri=uri, user=user, password=password)

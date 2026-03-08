@@ -47,7 +47,7 @@ const NotificationCenter: React.FC = () => {
     try {
       setLoading(true);
       const response = await apiClient.get('/api/v1/notifications');
-      setNotifications(response.data || []);
+      setNotifications(response || []);
     } catch (err: any) {
       handleApiError(err, '加载通知列表失败');
     } finally {
@@ -58,7 +58,7 @@ const NotificationCenter: React.FC = () => {
   const loadTemplates = async () => {
     try {
       const response = await apiClient.get('/api/v1/notifications/templates');
-      setTemplates(response.data.templates || {});
+      setTemplates(response.templates || {});
     } catch (err: any) {
       handleApiError(err, '加载通知模板失败');
     }
@@ -67,7 +67,7 @@ const NotificationCenter: React.FC = () => {
   const loadUnreadCount = async () => {
     try {
       const response = await apiClient.get('/api/v1/notifications/unread-count');
-      setUnreadCount(response.data.unread_count || 0);
+      setUnreadCount(response.unread_count || 0);
     } catch (err: any) {
       handleApiError(err, '加载未读数量失败');
     }

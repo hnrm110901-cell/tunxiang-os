@@ -1,267 +1,182 @@
-import React, { useState, useCallback } from 'react';
-import { Form, Input, message } from 'antd';
-import { SearchOutlined } from '@ant-design/icons';
-import { ZCard, ZKpi, ZBadge, ZButton, ZSkeleton, ZEmpty, ZSelect, ZTable } from '../design-system/components';
-import type { ZTableColumn } from '../design-system/components';
-import { apiClient, handleApiError } from '../services/api';
-import styles from './RecommendationsPage.module.css';
+import React, { useState, useCallback, useEffect } from 'react';
+import { Card, Col, Row, Select, Form, InputNumber, Button, Tabs, Statistic, Table, DatePicker, Input, Space } from 'antd';
+import type { ColumnsType } from 'antd/es/table';
+import { apiClient } from '../services/api';
+import { handleApiError } from '../utils/message';
 
-// ── Types ──────────────────────────────────────────────────────────────────────
-
-interface DishRecommendation {
-  dish_id: string;
-  dish_name: string;
-  score: number;
-  reason: string;
-  price: number;
-  estimated_profit: number;
-  confidence: number;
-  recommendation_type?: string;
-}
-
-interface RecommendResult {
-  customer_id: string;
-  store_id: string;
-  recommendations: DishRecommendation[];
-  generated_at?: string;
-}
-
-// ── Table columns ──────────────────────────────────────────────────────────────
-
-const dishColumns: ZTableColumn<DishRecommendation>[] = [
-  {
-    key: 'dish_name',
-    title: '菜品',
-    render: (name) => <strong>{name}</strong>,
-  },
-  {
-    key: 'score',
-    title: '匹配度',
-    width: 130,
-    render: (score) => {
-      const pct = Math.round((score || 0) * 100);
-      const color = pct >= 80 ? 'var(--green)' : pct >= 60 ? '#fa8c16' : 'var(--text-secondary)';
-      return (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <div style={{ flex: 1, height: 5, background: '#f0f0f0', borderRadius: 3, overflow: 'hidden' }}>
-            <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: 3 }} />
-          </div>
-          <span style={{ fontSize: 12, color, minWidth: 30 }}>{pct}%</span>
-        </div>
-      );
-    },
-  },
-  {
-    key: 'price',
-    title: '定价',
-    align: 'right',
-    render: (v) => v != null ? `¥${Number(v).toFixed(2)}` : '-',
-  },
-  {
-    key: 'estimated_profit',
-    title: '预估毛利',
-    align: 'right',
-    render: (v) => v != null
-      ? <span style={{ color: 'var(--green)', fontWeight: 600 }}>¥{Number(v).toFixed(2)}</span>
-      : '-',
-  },
-  {
-    key: 'confidence',
-    title: '置信度',
-    align: 'center',
-    render: (v) => {
-      const pct = Math.round((v || 0) * 100);
-      return <ZBadge type={pct >= 80 ? 'success' : pct >= 60 ? 'warning' : 'neutral'} text={`${pct}%`} />;
-    },
-  },
-  {
-    key: 'reason',
-    title: '推荐理由',
-    render: (r) => <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>{r}</span>,
-  },
-];
-
-// ── Store options ──────────────────────────────────────────────────────────────
-
-const STORE_OPTIONS = [
-  { value: 'STORE001', label: '门店 001' },
-  { value: 'STORE002', label: '门店 002' },
-  { value: 'STORE003', label: '门店 003' },
-];
-
-const TOPK_OPTIONS = [
-  { value: '3', label: '推荐 3 道' },
-  { value: '5', label: '推荐 5 道' },
-  { value: '8', label: '推荐 8 道' },
-  { value: '10', label: '推荐 10 道' },
-];
-
-const CONTEXT_OPTIONS = [
-  { value: '', label: '无特定场景' },
-  { value: 'lunch', label: '午餐时段' },
-  { value: 'dinner', label: '晚餐时段' },
-  { value: 'weekend', label: '周末聚餐' },
-  { value: 'birthday', label: '生日场合' },
-];
-
-// ── Component ──────────────────────────────────────────────────────────────────
+const { Option } = Select;
+const { RangePicker } = DatePicker;
 
 const RecommendationsPage: React.FC = () => {
-  const [storeId, setStoreId] = useState(localStorage.getItem('store_id') || 'STORE001');
-  const [customerId, setCustomerId] = useState('');
-  const [topK, setTopK] = useState('5');
-  const [context, setContext] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<RecommendResult | null>(null);
-  const [lastQueried, setLastQueried] = useState<string | null>(null);
+  const [stores, setStores] = useState<any[]>([]);
+  const [selectedStore, setSelectedStore] = useState('STORE001');
+  const [dishResult, setDishResult] = useState<any[]>([]);
+  const [pricingResult, setPricingResult] = useState<any>(null);
+  const [campaignResult, setCampaignResult] = useState<any>(null);
+  const [perfResult, setPerfResult] = useState<any>(null);
+  const [loadingDish, setLoadingDish] = useState(false);
+  const [loadingPrice, setLoadingPrice] = useState(false);
+  const [loadingCampaign, setLoadingCampaign] = useState(false);
+  const [loadingPerf, setLoadingPerf] = useState(false);
 
-  const handleSearch = useCallback(async () => {
-    if (!customerId.trim()) {
-      message.warning('请输入顾客手机号或会员ID');
-      return;
-    }
-    setLoading(true);
-    setResult(null);
+  const loadStores = useCallback(async () => {
     try {
-      const payload: Record<string, unknown> = {
-        customer_id: customerId.trim(),
-        store_id: storeId,
-        top_k: parseInt(topK),
-      };
-      if (context) {
-        payload.context = { occasion: context };
-      }
-      const res = await apiClient.post('/api/v1/recommendations/dishes', payload);
-      const data = res.data;
-      setResult({
-        customer_id: customerId.trim(),
-        store_id: storeId,
-        recommendations: Array.isArray(data.recommendations) ? data.recommendations : (Array.isArray(data) ? data : []),
-        generated_at: new Date().toLocaleTimeString('zh-CN'),
-      });
-      setLastQueried(customerId.trim());
-    } catch (e) {
-      handleApiError(e);
-    } finally {
-      setLoading(false);
+      const res = await apiClient.get('/api/v1/stores');
+      setStores(res.stores || res || []);
+    } catch (err: any) {
+      handleApiError(err, '加载门店列表失败');
     }
-  }, [customerId, storeId, topK, context]);
+  }, []);
 
-  const recs = result?.recommendations || [];
-  const avgScore = recs.length > 0
-    ? Math.round(recs.reduce((s, r) => s + (r.score || 0), 0) / recs.length * 100)
-    : 0;
-  const totalProfit = recs.reduce((s, r) => s + (r.estimated_profit || 0), 0);
+  useEffect(() => { loadStores(); }, [loadStores]);
+
+  const submitDish = async (values: any) => {
+    setLoadingDish(true);
+    try {
+      const res = await apiClient.post('/api/v1/recommendations/dishes', { ...values, store_id: selectedStore });
+      setDishResult(res?.recommendations || res || []);
+    } catch (err: any) {
+      handleApiError(err, '获取菜品推荐失败');
+    } finally {
+      setLoadingDish(false);
+    }
+  };
+
+  const submitPricing = async (values: any) => {
+    setLoadingPrice(true);
+    try {
+      const res = await apiClient.post('/api/v1/recommendations/pricing/optimize', { ...values, store_id: selectedStore });
+      setPricingResult(res);
+    } catch (err: any) {
+      handleApiError(err, '获取定价建议失败');
+    } finally {
+      setLoadingPrice(false);
+    }
+  };
+
+  const submitCampaign = async (values: any) => {
+    setLoadingCampaign(true);
+    try {
+      const res = await apiClient.post('/api/v1/recommendations/marketing/campaign', { ...values, store_id: selectedStore });
+      setCampaignResult(res);
+    } catch (err: any) {
+      handleApiError(err, '获取营销方案失败');
+    } finally {
+      setLoadingCampaign(false);
+    }
+  };
+
+  const submitPerf = async (values: any) => {
+    setLoadingPerf(true);
+    try {
+      const [start, end] = values.date_range || [];
+      const res = await apiClient.post('/api/v1/recommendations/performance', {
+        store_id: selectedStore,
+        start_date: start?.format('YYYY-MM-DD'),
+        end_date: end?.format('YYYY-MM-DD'),
+      });
+      setPerfResult(res);
+    } catch (err: any) {
+      handleApiError(err, '获取推荐效果失败');
+    } finally {
+      setLoadingPerf(false);
+    }
+  };
+
+  const dishColumns: ColumnsType<any> = [
+    { title: '菜品', dataIndex: 'dish_name', key: 'dish_name' },
+    { title: '评分', dataIndex: 'score', key: 'score', render: (v: number) => v?.toFixed(2) },
+    { title: '原因', dataIndex: 'reason', key: 'reason', ellipsis: true },
+    { title: '价格', dataIndex: 'price', key: 'price', render: (v: number) => `¥${v}` },
+    { title: '利润', dataIndex: 'profit', key: 'profit', render: (v: number) => `¥${v}` },
+    { title: '置信度', dataIndex: 'confidence', key: 'confidence', render: (v: number) => `${((v || 0) * 100).toFixed(0)}%` },
+  ];
+
+  const tabItems = [
+    {
+      key: 'dish', label: '菜品推荐',
+      children: (
+        <div>
+          <Form layout="inline" onFinish={submitDish} style={{ marginBottom: 16 }}>
+            <Form.Item name="customer_id" label="顾客ID"><Input placeholder="顾客ID" /></Form.Item>
+            <Form.Item name="top_k" label="推荐数量" initialValue={5}><InputNumber min={1} max={20} /></Form.Item>
+            <Form.Item><Button type="primary" htmlType="submit" loading={loadingDish}>获取推荐</Button></Form.Item>
+          </Form>
+          <Table columns={dishColumns} dataSource={dishResult} rowKey={(r, i) => `${r.dish_name}-${i}`} />
+        </div>
+      ),
+    },
+    {
+      key: 'pricing', label: '动态定价',
+      children: (
+        <div>
+          <Form layout="inline" onFinish={submitPricing} style={{ marginBottom: 16 }}>
+            <Form.Item name="dish_id" label="菜品ID" rules={[{ required: true }]}><Input placeholder="菜品ID" /></Form.Item>
+            <Form.Item><Button type="primary" htmlType="submit" loading={loadingPrice}>获取定价</Button></Form.Item>
+          </Form>
+          {pricingResult && (
+            <Row gutter={16}>
+              <Col span={6}><Card><Statistic title="当前价格" value={pricingResult.current_price} prefix="¥" /></Card></Col>
+              <Col span={6}><Card><Statistic title="推荐价格" value={pricingResult.recommended_price} prefix="¥" /></Card></Col>
+              <Col span={6}><Card><Statistic title="变化率" value={pricingResult.change_rate} suffix="%" /></Card></Col>
+              <Col span={6}><Card><Statistic title="预期收益" value={pricingResult.expected_revenue} prefix="¥" /></Card></Col>
+            </Row>
+          )}
+          {pricingResult?.strategy && <Card style={{ marginTop: 16 }} title="策略说明"><p>{pricingResult.strategy}</p><p>{pricingResult.reason}</p></Card>}
+        </div>
+      ),
+    },
+    {
+      key: 'campaign', label: '营销活动',
+      children: (
+        <div>
+          <Form layout="inline" onFinish={submitCampaign} style={{ marginBottom: 16 }}>
+            <Form.Item name="objective" label="目标"><Input placeholder="如：提升客流" /></Form.Item>
+            <Form.Item name="budget" label="预算"><InputNumber min={0} placeholder="预算" /></Form.Item>
+            <Form.Item name="target_audience" label="目标客群"><Input placeholder="目标客群" /></Form.Item>
+            <Form.Item><Button type="primary" htmlType="submit" loading={loadingCampaign}>生成方案</Button></Form.Item>
+          </Form>
+          {campaignResult && (
+            <Card title="营销方案">
+              <p><b>活动名称：</b>{campaignResult.campaign_name}</p>
+              <p><b>活动描述：</b>{campaignResult.description}</p>
+              <p><b>预期效果：</b>{campaignResult.expected_outcome}</p>
+            </Card>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: 'performance', label: '推荐效果',
+      children: (
+        <div>
+          <Form layout="inline" onFinish={submitPerf} style={{ marginBottom: 16 }}>
+            <Form.Item name="date_range" label="日期范围"><RangePicker /></Form.Item>
+            <Form.Item><Button type="primary" htmlType="submit" loading={loadingPerf}>查询效果</Button></Form.Item>
+          </Form>
+          {perfResult && (
+            <Row gutter={16}>
+              <Col span={8}><Card><Statistic title="接受率" value={((perfResult.acceptance_rate || 0) * 100).toFixed(1)} suffix="%" /></Card></Col>
+              <Col span={8}><Card><Statistic title="营收影响" value={perfResult.revenue_impact} prefix="¥" /></Card></Col>
+              <Col span={8}><Card><Statistic title="满意度" value={((perfResult.satisfaction_score || 0) * 100).toFixed(1)} suffix="%" /></Card></Col>
+            </Row>
+          )}
+        </div>
+      ),
+    },
+  ];
 
   return (
-    <div className={styles.page}>
-      {/* Header */}
-      <div className={styles.pageHeader}>
-        <div>
-          <h1 className={styles.pageTitle}>个性化推荐引擎</h1>
-          <p className={styles.pageSub}>基于协同过滤 + 菜品内容 + 场景感知的混合推荐</p>
-        </div>
-      </div>
-
-      {/* Query bar */}
-      <ZCard>
-        <div className={styles.queryBar}>
-          <div className={styles.queryField}>
-            <label className={styles.queryLabel}>门店</label>
-            <ZSelect
-              value={storeId}
-              options={STORE_OPTIONS}
-              onChange={(v) => { setStoreId(v); localStorage.setItem('store_id', v); }}
-            />
-          </div>
-          <div className={styles.queryFieldGrow}>
-            <label className={styles.queryLabel}>顾客手机号 / 会员ID</label>
-            <Input
-              placeholder="输入顾客手机号或会员ID后按 Enter 查询"
-              prefix={<SearchOutlined style={{ color: 'var(--text-secondary)' }} />}
-              value={customerId}
-              onChange={(e) => setCustomerId(e.target.value)}
-              onPressEnter={handleSearch}
-              style={{ borderRadius: 8 }}
-            />
-          </div>
-          <div className={styles.queryField}>
-            <label className={styles.queryLabel}>推荐数量</label>
-            <ZSelect value={topK} options={TOPK_OPTIONS} onChange={setTopK} />
-          </div>
-          <div className={styles.queryField}>
-            <label className={styles.queryLabel}>就餐场景</label>
-            <ZSelect value={context} options={CONTEXT_OPTIONS} onChange={setContext} />
-          </div>
-          <ZButton
-            variant="primary"
-            disabled={loading}
-            onClick={handleSearch}
-          >
-            {loading ? '推荐中…' : '获取推荐'}
-          </ZButton>
-        </div>
-      </ZCard>
-
-      {/* KPI cards — only when results exist */}
-      {result && (
-        <div className={styles.kpiGrid}>
-          <ZCard>
-            <ZKpi label="推荐菜品数" value={recs.length} unit="道" />
-          </ZCard>
-          <ZCard>
-            <ZKpi label="平均匹配度" value={avgScore} unit="%" />
-          </ZCard>
-          <ZCard>
-            <ZKpi label="预估总毛利" value={`¥${totalProfit.toFixed(2)}`} />
-          </ZCard>
-          <ZCard>
-            <ZKpi label="查询顾客" value={lastQueried || '-'} />
-          </ZCard>
-        </div>
-      )}
-
-      {/* Results */}
-      <ZCard
-        title={result ? `推荐结果 — ${result.customer_id}` : '推荐结果'}
-        extra={result?.generated_at && (
-          <span className={styles.genTime}>生成于 {result.generated_at}</span>
-        )}
-      >
-        {loading ? (
-          <ZSkeleton height={240} />
-        ) : recs.length > 0 ? (
-          <ZTable
-            columns={dishColumns}
-            data={recs}
-            rowKey="dish_id"
-          />
-        ) : (
-          <ZEmpty text={result ? '该顾客暂无推荐菜品（订单历史不足）' : '请输入顾客信息并点击「获取推荐」'} />
-        )}
-      </ZCard>
-
-      {/* Algorithm explainer */}
-      <ZCard title="推荐算法说明">
-        <div className={styles.algoGrid}>
-          <div className={styles.algoItem}>
-            <div className={styles.algoTitle}>协同过滤</div>
-            <div className={styles.algoDesc}>找到消费行为相似的顾客群体，推荐他们喜爱但该顾客未点过的菜品</div>
-          </div>
-          <div className={styles.algoItem}>
-            <div className={styles.algoTitle}>内容匹配</div>
-            <div className={styles.algoDesc}>基于顾客口味偏好向量（辣度/素食/海鲜/肉类/甜品）与菜品特征进行余弦相似度匹配</div>
-          </div>
-          <div className={styles.algoItem}>
-            <div className={styles.algoTitle}>场景感知</div>
-            <div className={styles.algoDesc}>结合就餐时段（午/晚/周末）、节假日、天气等上下文动态调整推荐权重</div>
-          </div>
-          <div className={styles.algoItem}>
-            <div className={styles.algoTitle}>商业规则</div>
-            <div className={styles.algoDesc}>兼顾高毛利菜品、库存充足食材、门店主推商品，在个性化与商业目标间平衡</div>
-          </div>
-        </div>
-      </ZCard>
+    <div>
+      <Space style={{ marginBottom: 16 }}>
+        <span>门店：</span>
+        <Select value={selectedStore} onChange={setSelectedStore} style={{ width: 160 }}>
+          {stores.length > 0 ? stores.map((s: any) => (
+            <Option key={s.store_id || s.id} value={s.store_id || s.id}>{s.name || s.store_id || s.id}</Option>
+          )) : <Option value="STORE001">STORE001</Option>}
+        </Select>
+      </Space>
+      <Card><Tabs items={tabItems} /></Card>
     </div>
   );
 };

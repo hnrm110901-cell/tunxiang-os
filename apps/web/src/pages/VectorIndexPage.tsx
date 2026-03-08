@@ -54,7 +54,7 @@ const VectorIndexPage: React.FC = () => {
       const res = await apiClient.get(`/api/v1/vector/search/${selectedStore}`, {
         params: { query: values.query, domain: values.domain, top_k: values.top_k || 5, score_threshold: values.score_threshold || 0 },
       });
-      setSearchResults(res.data?.results || res.data || []);
+      setSearchResults(res?.results || res || []);
     } catch (err: any) {
       handleApiError(err, '搜索失败');
     } finally {
@@ -69,7 +69,7 @@ const VectorIndexPage: React.FC = () => {
         params: { query: values.query, domains: values.domains?.join(',') || DOMAINS.join(','), top_k_per_domain: values.top_k_per_domain || 3 },
       });
       const flat: any[] = [];
-      const data = res.data?.results || res.data || {};
+      const data = res?.results || res || {};
       Object.entries(data).forEach(([domain, items]: [string, any]) => {
         (items || []).forEach((item: any) => flat.push({ ...item, domain }));
       });

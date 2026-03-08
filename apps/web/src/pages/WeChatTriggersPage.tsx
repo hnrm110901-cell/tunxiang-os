@@ -27,8 +27,8 @@ const WeChatTriggersPage: React.FC = () => {
         apiClient.get('/api/v1/wechat/triggers/rules'),
         apiClient.get('/api/v1/wechat/triggers/stats'),
       ]);
-      if (rulesRes.status === 'fulfilled') setRules(rulesRes.value.data?.rules || rulesRes.value.data || []);
-      if (statsRes.status === 'fulfilled') setStats(statsRes.value.data);
+      if (rulesRes.status === 'fulfilled') setRules(rulesRes.value?.rules || rulesRes.value || []);
+      if (statsRes.status === 'fulfilled') setStats(statsRes.value);
     } catch (err: any) {
       handleApiError(err, '加载触发规则失败');
     } finally {

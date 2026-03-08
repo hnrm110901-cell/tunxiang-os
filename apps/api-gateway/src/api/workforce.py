@@ -21,6 +21,7 @@ from src.services.labor_cost_service import LaborCostService
 from src.services.labor_demand_service import LaborDemandService
 from src.services.shift_fairness_service import ShiftFairnessService
 from src.services.turnover_prediction_service import TurnoverPredictionService
+from src.services.workforce_auto_schedule_service import WorkforceAutoScheduleService
 
 router = APIRouter(prefix="/api/v1/workforce", tags=["workforce"])
 
@@ -40,6 +41,13 @@ class LaborBudgetUpsertRequest(BaseModel):
     daily_budget_yuan: Optional[float] = Field(None, ge=0)
     alert_threshold_pct: float = Field(90.0, ge=0, le=100)
     is_active: bool = True
+
+
+class AutoScheduleRequest(BaseModel):
+    schedule_date: Optional[str] = Field(None, description="排班日期 YYYY-MM-DD，默认今天")
+    auto_publish: bool = Field(True, description="是否自动发布排班")
+    notify_on_anomaly: bool = Field(True, description="发现异常时是否发送企微提醒")
+    recipient_user_id: Optional[str] = Field(None, description="企微接收人，默认 store_{store_id}")
 
 
 def _risk_level(score: float) -> str:
@@ -432,3 +440,28 @@ async def upsert_labor_budget(
     )
     await db.commit()
     return {"ok": True, "store_id": store_id, "budget_period": body.month}
+
+
+@router.post("/stores/{store_id}/auto-schedule")
+async def auto_generate_schedule_with_constraints(
+    store_id: str,
+    body: AutoScheduleRequest,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_role(UserRole.STORE_MANAGER)),
+):
+    target_date = _parse_iso_date(body.schedule_date, "schedule_date") if body.schedule_date else date.today()
+    try:
+        result = await WorkforceAutoScheduleService.generate_schedule_with_constraints(
+            store_id=store_id,
+            schedule_date=target_date,
+            db=db,
+            auto_publish=body.auto_publish,
+            notify_on_anomaly=body.notify_on_anomaly,
+            recipient_user_id=body.recipient_user_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    if not result.get("created"):
+        raise HTTPException(status_code=409, detail="该日期排班已存在，请勿重复生成")
+    return result

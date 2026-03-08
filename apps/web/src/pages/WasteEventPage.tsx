@@ -122,7 +122,7 @@ const WasteEventPage: React.FC = () => {
       if (filterStatus) params.status = filterStatus;
       if (filterType) params.event_type = filterType;
       const res = await apiClient.get(`/api/v1/waste-events/store/${storeId}`, { params });
-      setEvents(res.data || []);
+      setEvents(res || []);
     } catch (err: any) {
       handleApiError(err, '加载损耗事件失败');
     } finally {
@@ -136,8 +136,8 @@ const WasteEventPage: React.FC = () => {
         apiClient.get(`/api/v1/waste-events/store/${storeId}/summary`, { params: { days } }),
         apiClient.get(`/api/v1/waste-events/store/${storeId}/root-causes`, { params: { days } }),
       ]);
-      if (sumRes.status === 'fulfilled') setSummary(sumRes.value.data);
-      if (rcRes.status === 'fulfilled') setRootCauses(rcRes.value.data || []);
+      if (sumRes.status === 'fulfilled') setSummary(sumRes.value);
+      if (rcRes.status === 'fulfilled') setRootCauses(rcRes.value || []);
     } catch (err: any) {
       handleApiError(err, '加载汇总数据失败');
     }
@@ -146,7 +146,7 @@ const WasteEventPage: React.FC = () => {
   const loadStores = useCallback(async () => {
     try {
       const res = await apiClient.get('/api/v1/stores');
-      const list: any[] = res.data?.stores || res.data || [];
+      const list: any[] = res.stores || res || [];
       setStores(list);
       if (list.length > 0) setStoreId(list[0].store_id || list[0].id || 'STORE001');
     } catch { /* ignore */ }
@@ -163,7 +163,7 @@ const WasteEventPage: React.FC = () => {
   const viewDetail = useCallback(async (ev: WasteEvent) => {
     try {
       const res = await apiClient.get(`/api/v1/waste-events/${ev.event_id}`);
-      setSelectedEvent(res.data);
+      setSelectedEvent(res);
       setDetailVisible(true);
     } catch {
       setSelectedEvent(ev);
@@ -180,7 +180,7 @@ const WasteEventPage: React.FC = () => {
       showSuccess('推理完成');
       loadEvents();
       if (selectedEvent?.event_id === eventId) {
-        setSelectedEvent(res.data?.event || null);
+        setSelectedEvent(res?.event || null);
       }
     } catch (err: any) {
       handleApiError(err, '推理失败');

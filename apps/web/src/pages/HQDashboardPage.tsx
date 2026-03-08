@@ -151,7 +151,7 @@ const HQDashboardPage: React.FC = () => {
       const res = await apiClient.get('/api/v1/hq/dashboard', {
         params: { target_date: targetDate.format('YYYY-MM-DD') },
       });
-      setData(res.data);
+      setData(res);
     } catch (err: any) {
       handleApiError(err, '加载总部看板失败');
     } finally {

@@ -162,7 +162,7 @@ const InventoryPage: React.FC = () => {
   const handleBatchRestock = async () => {
     try {
       const res = await apiClient.post(`/api/v1/inventory/batch-restock?store_id=${storeId}`, { item_ids: null });
-      showSuccess(`批量补货完成，共补货 ${res.data?.restocked} 个物品`);
+      showSuccess(`批量补货完成，共补货 ${res?.restocked} 个物品`);
       loadInventory();
       loadStats();
     } catch (err: any) { handleApiError(err, '批量补货失败'); }

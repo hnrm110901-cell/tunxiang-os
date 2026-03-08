@@ -17,7 +17,7 @@ from src.api.phase5_apis import platform_router, industry_router, supply_chain_r
 # 逐步启用的模块
 from src.api import dashboard, analytics, audit, multi_store, finance, customer360, wechat_triggers, queue, meituan_queue
 # 需要外部适配器的模块 (会在适配器不可用时返回错误)
-from src.api import members
+from src.api import members, blindbox
 from src.api import edge_node, decision_validator, recommendations, agent_collaboration
 # Phase 1: CRUD API
 from src.api import employees, inventory, schedules, reservations, kpis, orders
@@ -49,6 +49,7 @@ from src.api import forecast
 from src.api import cross_store_insights
 from src.api import report_templates
 from src.api import competitive_analysis
+from src.api import federated
 from src.api import export_jobs
 from src.api import backups
 from src.api import private_domain
@@ -462,6 +463,7 @@ app.include_router(audit.router, prefix="/api/v1/audit", tags=["audit"])
 app.include_router(multi_store.router, prefix="/api/v1/multi-store", tags=["multi_store"])
 app.include_router(finance.router, prefix="/api/v1/finance", tags=["finance"])
 app.include_router(members.router, prefix="/api/v1/members", tags=["members"])
+app.include_router(blindbox.router, prefix="/api/v1", tags=["blindbox"])
 app.include_router(customer360.router, tags=["customer360"])
 app.include_router(wechat_triggers.router, tags=["wechat_triggers"])
 app.include_router(queue.router, tags=["queue"])
@@ -472,8 +474,7 @@ app.include_router(edge_node.router, tags=["edge_node"])
 app.include_router(decision_validator.router, tags=["decision_validator"])
 
 # Phase 4: 智能优化期 (Intelligence Optimization Period)
-# ⚠️ 联邦学习已冻结（战略 Phase 0 决策）：暂不对外暴露路由，待 Neo4j 本体层稳定后重新评估
-# app.include_router(federated_learning.router, tags=["federated_learning"])
+app.include_router(federated.router)
 app.include_router(recommendations.router, tags=["recommendations"])
 app.include_router(agent_collaboration.router, tags=["agent_collaboration"])
 

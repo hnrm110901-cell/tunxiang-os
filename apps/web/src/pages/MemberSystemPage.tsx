@@ -1,375 +1,245 @@
-/**
- * MemberSystemPage — 会员档案管理
- *
- * 功能：
- *   - 分页浏览私域会员（按 customer_id 搜索，按生命周期状态/RFM等级过滤）
- *   - 内联编辑生日（birth_date），使 birthday_reminder Celery 任务生效
- *   - 显示 RFM 等级、生命周期状态（彩色 Badge）、企微 openid、消费金额
- *   - 一键触发指定旅程（birthday_greeting / anniversary_greeting / dormant_wakeup）
- */
-import React, { useEffect, useState, useCallback } from 'react';
-import { Input, Select, DatePicker, message } from 'antd';
+import React, { useState, useCallback } from 'react';
 import {
-  SearchOutlined, ReloadOutlined, EditOutlined, CheckOutlined,
-  CloseOutlined, SendOutlined,
-} from '@ant-design/icons';
-import dayjs from 'dayjs';
-import apiClient from '../services/api';
-import { ZCard, ZBadge, ZButton, ZSkeleton, ZSelect, ZTable } from '../design-system/components';
-import type { ZTableColumn } from '../design-system/components/ZTable';
-import styles from './MemberSystemPage.module.css';
+  Card, Tabs, Form, Input, Select, Button, Table, Tag,
+  Space, Modal, Descriptions, Statistic, Row, Col, InputNumber, message,
+} from 'antd';
+import { SearchOutlined, PlusOutlined, GiftOutlined } from '@ant-design/icons';
+import type { ColumnsType } from 'antd/es/table';
+import { apiClient } from '../services/api';
+import { handleApiError, showSuccess } from '../utils/message';
 
 const { Option } = Select;
 
-// ── Types ─────────────────────────────────────────────────────────────────────
-
-interface Member {
-  customer_id:    string;
-  rfm_level:      string;
-  lifecycle_state: string | null;
-  birth_date:     string | null;
-  wechat_openid:  string | null;
-  channel_source: string | null;
-  recency_days:   number;
-  frequency:      number;
-  monetary_yuan:  number;
-  last_visit:     string | null;
-  is_active:      boolean;
-  joined_at:      string | null;
-}
-
-interface ListResponse {
-  total:     number;
-  page:      number;
-  page_size: number;
-  members:   Member[];
-}
-
-// ── Constants ─────────────────────────────────────────────────────────────────
-
-const STORE_OPTIONS = ['S001', 'S002', 'S003'];
-
-const LIFECYCLE_BADGE_TYPE: Record<string, 'default' | 'info' | 'warning' | 'success' | 'critical' | 'accent'> = {
-  lead:                 'default',
-  registered:           'info',
-  first_order_pending:  'warning',
-  repeat:               'success',
-  high_frequency:       'accent',
-  vip:                  'accent',
-  at_risk:              'warning',
-  dormant:              'critical',
-  lost:                 'default',
-};
-const LIFECYCLE_LABEL: Record<string, string> = {
-  lead: '潜客', registered: '已注册', first_order_pending: '待首单',
-  repeat: '复购', high_frequency: '高频', vip: 'VIP',
-  at_risk: '风险', dormant: '沉睡', lost: '流失',
-};
-const RFM_BADGE_TYPE: Record<string, 'warning' | 'info' | 'success' | 'default'> = {
-  S1: 'warning', S2: 'info', S3: 'success', S4: 'warning', S5: 'default',
-};
-
-const JOURNEY_OPTIONS = [
-  { value: 'birthday_greeting',    label: '生日祝福' },
-  { value: 'anniversary_greeting', label: '入会周年' },
-  { value: 'dormant_wakeup',       label: '沉睡唤醒' },
-  { value: 'member_activation',    label: '入会激活' },
-];
-
-const lcSelectOptions = Object.entries(LIFECYCLE_LABEL).map(([k, v]) => ({ value: k, label: v }));
-const rfmSelectOptions = ['S1', 'S2', 'S3', 'S4', 'S5'].map(r => ({ value: r, label: r }));
-const storeSelectOptions = STORE_OPTIONS.map(s => ({ value: s, label: s }));
-
-// ── Main Component ────────────────────────────────────────────────────────────
+const sexLabel: Record<number, string> = { 1: '男', 2: '女' };
 
 const MemberSystemPage: React.FC = () => {
-  const storeId = localStorage.getItem('store_id') || 'S001';
+  const [queryForm] = Form.useForm();
+  const [addForm] = Form.useForm();
+  const [rechargeForm] = Form.useForm();
+  const [couponForm] = Form.useForm();
 
-  const [selectedStore, setSelectedStore] = useState(storeId);
-  const [search, setSearch]       = useState('');
-  const [lcFilter, setLcFilter]   = useState<string | undefined>();
-  const [rfmFilter, setRfmFilter] = useState<string | undefined>();
-  const [page, setPage]           = useState(1);
-  const [data, setData]           = useState<ListResponse | null>(null);
-  const [loading, setLoading]     = useState(false);
+  const [member, setMember] = useState<any>(null);
+  const [trades, setTrades] = useState<any[]>([]);
+  const [recharges, setRecharges] = useState<any[]>([]);
+  const [coupons, setCoupons] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [addModal, setAddModal] = useState(false);
+  const [editModal, setEditModal] = useState(false);
+  const [editForm] = Form.useForm();
+  const [connectionStatus, setConnectionStatus] = useState<any>(null);
 
-  const [editingKey, setEditingKey]       = useState<string | null>(null);
-  const [editBirthDate, setEditBirthDate] = useState<dayjs.Dayjs | null>(null);
-  const [triggerKey, setTriggerKey]           = useState<string | null>(null);
-  const [selectedJourney, setSelectedJourney] = useState<string>('birthday_greeting');
+  const testConnection = async () => {
+    try {
+      const res = await apiClient.get('/api/v1/members/test-connection');
+      setConnectionStatus(res);
+      if (res.success) showSuccess('连接正常');
+      else message.error(res.error || '连接失败');
+    } catch (err: any) { handleApiError(err, '连接测试失败'); }
+  };
 
-  const fetchMembers = useCallback(async (p = page) => {
+  const queryMember = useCallback(async (values: any) => {
     setLoading(true);
+    setMember(null);
+    setTrades([]);
+    setRecharges([]);
+    setCoupons([]);
     try {
-      const params: Record<string, string | number> = { page: p, page_size: 20 };
-      if (search)   params.search          = search;
-      if (lcFilter) params.lifecycle_state = lcFilter;
-      if (rfmFilter) params.rfm_level      = rfmFilter;
+      const res = await apiClient.get('/api/v1/members/query', { params: values });
+      setMember(res);
+      // 同时加载交易/充值/优惠券
+      const cardNo = res.cardNo;
+      const [t, r, c] = await Promise.allSettled([
+        apiClient.get('/api/v1/members/trade/query', { params: { card_no: cardNo } }),
+        apiClient.get('/api/v1/members/recharge/query', { params: { card_no: cardNo } }),
+        apiClient.get('/api/v1/members/coupon/list', { params: { card_no: cardNo } }),
+      ]);
+      if (t.status === 'fulfilled') setTrades(t.value?.trades || t.value || []);
+      if (r.status === 'fulfilled') setRecharges(r.value?.records || r.value || []);
+      if (c.status === 'fulfilled') setCoupons(c.value?.coupons || c.value || []);
+    } catch (err: any) { handleApiError(err, '查询会员失败'); }
+    finally { setLoading(false); }
+  }, []);
 
-      const res = await apiClient.get(
-        `/api/v1/private-domain/members/${selectedStore}/list`,
-        { params },
-      );
-      setData(res.data);
-    } catch {
-      message.error('加载会员列表失败');
-    } finally {
-      setLoading(false);
-    }
-  }, [selectedStore, search, lcFilter, rfmFilter, page]);
-
-  useEffect(() => { fetchMembers(1); setPage(1); }, [selectedStore, lcFilter, rfmFilter]);
-
-  const handleSearch = () => { fetchMembers(1); setPage(1); };
-
-  const saveBirthDate = async (customerId: string) => {
+  const addMember = async (values: any) => {
     try {
-      await apiClient.patch(
-        `/api/v1/private-domain/members/${selectedStore}/${customerId}`,
-        { birth_date: editBirthDate ? editBirthDate.format('YYYY-MM-DD') : null },
-      );
-      message.success('生日已更新');
-      setEditingKey(null);
-      fetchMembers(page);
-    } catch {
-      message.error('更新失败');
-    }
+      await apiClient.post('/api/v1/members/add', values);
+      showSuccess('会员添加成功');
+      setAddModal(false);
+      addForm.resetFields();
+    } catch (err: any) { handleApiError(err, '添加会员失败'); }
   };
 
-  const triggerJourney = async (customerId: string, wechatOpenid: string | null) => {
-    const journeyLabel = JOURNEY_OPTIONS.find(o => o.value === selectedJourney)?.label;
-    if (!window.confirm(`触发「${journeyLabel}」旅程？`)) return;
+  const updateMember = async (values: any) => {
+    if (!member?.cardNo) return;
     try {
-      await apiClient.post(`/api/v1/private-domain/journeys/${selectedStore}/trigger-v2`, {
-        customer_id:    customerId,
-        journey_id:     selectedJourney,
-        wechat_user_id: wechatOpenid ?? undefined,
+      await apiClient.put(`/api/v1/members/${member.cardNo}`, values);
+      showSuccess('会员信息已更新');
+      setEditModal(false);
+      queryMember({ card_no: member.cardNo });
+    } catch (err: any) { handleApiError(err, '更新会员失败'); }
+  };
+
+  const submitRecharge = async (values: any) => {
+    if (!member?.cardNo) return;
+    try {
+      await apiClient.post('/api/v1/members/recharge/submit', {
+        ...values,
+        card_no: member.cardNo,
+        amount: Math.round(values.amount * 100),
       });
-      message.success('旅程已触发');
-      setTriggerKey(null);
-    } catch {
-      message.error('触发失败');
-    }
+      showSuccess('充值成功');
+      rechargeForm.resetFields();
+      queryMember({ card_no: member.cardNo });
+    } catch (err: any) { handleApiError(err, '充值失败'); }
   };
 
-  const columns: ZTableColumn<Member>[] = [
-    {
-      key: 'customer_id',
-      title: '客户ID',
-      width: 120,
-      render: (v: string) => <span className={styles.codeCell}>{v}</span>,
-    },
-    {
-      key: 'rfm_level',
-      title: 'RFM',
-      width: 70,
-      align: 'center',
-      render: (v: string) => v
-        ? <ZBadge type={RFM_BADGE_TYPE[v] || 'default'} text={v} />
-        : <span className={styles.muted}>—</span>,
-    },
-    {
-      key: 'lifecycle_state',
-      title: '生命周期',
-      width: 90,
-      align: 'center',
-      render: (v: string | null) => v
-        ? <ZBadge type={LIFECYCLE_BADGE_TYPE[v] || 'default'} text={LIFECYCLE_LABEL[v] || v} />
-        : <span className={styles.muted}>—</span>,
-    },
-    {
-      key: 'birth_date',
-      title: '生日',
-      width: 180,
-      render: (_: string | null, record: Member) => {
-        const isEditing = editingKey === record.customer_id;
-        if (isEditing) {
-          return (
-            <div className={styles.inlineEdit}>
-              <DatePicker
-                size="small"
-                value={editBirthDate}
-                onChange={setEditBirthDate}
-                format="YYYY-MM-DD"
-                placeholder="选择生日"
-                allowClear
-              />
-              <button className={styles.iconBtn} onClick={() => saveBirthDate(record.customer_id)}>
-                <CheckOutlined style={{ color: '#52c41a' }} />
-              </button>
-              <button className={styles.iconBtn} onClick={() => setEditingKey(null)}>
-                <CloseOutlined style={{ color: '#cf1322' }} />
-              </button>
-            </div>
-          );
-        }
-        return (
-          <div className={styles.inlineEdit}>
-            <span className={record.birth_date ? undefined : styles.muted}>
-              {record.birth_date || '未设置'}
-            </span>
-            <button
-              className={styles.iconBtn}
-              title="设置生日（用于生日提醒）"
-              onClick={() => {
-                setEditingKey(record.customer_id);
-                setEditBirthDate(record.birth_date ? dayjs(record.birth_date) : null);
-              }}
-            >
-              <EditOutlined style={{ color: 'var(--text-secondary)' }} />
-            </button>
-          </div>
-        );
-      },
-    },
-    {
-      key: 'wechat_openid',
-      title: '企微ID',
-      width: 130,
-      render: (v: string | null) => v
-        ? <span className={`${styles.muted} ${styles.ellipsis}`} title={v}>{v}</span>
-        : <span className={styles.muted}>—</span>,
-    },
-    {
-      key: 'frequency',
-      title: '消费次数',
-      width: 80,
-      align: 'right',
-    },
-    {
-      key: 'monetary_yuan',
-      title: '消费金额',
-      width: 100,
-      align: 'right',
-      render: (v: number) => `¥${v.toFixed(2)}`,
-    },
-    {
-      key: 'recency_days',
-      title: '最近到访',
-      width: 90,
-      align: 'right',
-      render: (v: number) => v != null ? `${v}天前` : '—',
-    },
-    {
-      key: 'customer_id' as any,
-      title: '触发旅程',
-      width: 190,
-      render: (_: unknown, record: Member) => {
-        const isTriggering = triggerKey === record.customer_id;
-        if (isTriggering) {
-          return (
-            <div className={styles.inlineEdit}>
-              <Select
-                size="small"
-                style={{ width: 110 }}
-                value={selectedJourney}
-                onChange={setSelectedJourney}
-              >
-                {JOURNEY_OPTIONS.map(o => (
-                  <Option key={o.value} value={o.value}>{o.label}</Option>
-                ))}
-              </Select>
-              <ZButton
-                variant="primary"
-                icon={<SendOutlined />}
-                onClick={() => triggerJourney(record.customer_id, record.wechat_openid)}
-              >
-                发送
-              </ZButton>
-              <ZButton onClick={() => setTriggerKey(null)}>取消</ZButton>
-            </div>
-          );
-        }
-        return (
-          <ZButton
-            icon={<SendOutlined />}
-            onClick={() => { setTriggerKey(record.customer_id); setSelectedJourney('birthday_greeting'); }}
-          >
-            触发旅程
-          </ZButton>
-        );
-      },
-    },
+  const useCoupon = async (values: any) => {
+    try {
+      await apiClient.post('/api/v1/members/coupon/use', {
+        ...values,
+        amount: Math.round(values.amount * 100),
+      });
+      showSuccess('优惠券核销成功');
+      couponForm.resetFields();
+    } catch (err: any) { handleApiError(err, '核销失败'); }
+  };
+
+  const tradeColumns: ColumnsType<any> = [
+    { title: '交易ID', dataIndex: 'trade_id', key: 'trade_id', ellipsis: true },
+    { title: '金额', dataIndex: 'amount', key: 'amount', render: (v: number) => `¥${(v / 100).toFixed(2)}` },
+    { title: '支付方式', dataIndex: 'pay_type', key: 'pay_type' },
+    { title: '状态', dataIndex: 'status', key: 'status', render: (v: string) => <Tag color={v === 'success' ? 'green' : 'red'}>{v}</Tag> },
+    { title: '时间', dataIndex: 'created_at', key: 'created_at', render: (v: string) => v?.slice(0, 16) },
   ];
 
-  const totalPages = Math.ceil((data?.total || 0) / 20);
+  const rechargeColumns: ColumnsType<any> = [
+    { title: '充值ID', dataIndex: 'recharge_id', key: 'recharge_id', ellipsis: true },
+    { title: '充值金额', dataIndex: 'amount', key: 'amount', render: (v: number) => `¥${(v / 100).toFixed(2)}` },
+    { title: '支付方式', dataIndex: 'pay_type', key: 'pay_type' },
+    { title: '时间', dataIndex: 'created_at', key: 'created_at', render: (v: string) => v?.slice(0, 16) },
+  ];
+
+  const couponColumns: ColumnsType<any> = [
+    { title: '优惠券名称', dataIndex: 'coupon_name', key: 'coupon_name' },
+    { title: '面值', dataIndex: 'value', key: 'value', render: (v: number) => `¥${(v / 100).toFixed(0)}` },
+    { title: '有效期', dataIndex: 'expire_date', key: 'expire_date' },
+    { title: '状态', dataIndex: 'status', key: 'status', render: (v: string) => <Tag color={v === 'valid' ? 'green' : 'default'}>{v === 'valid' ? '可用' : '已用'}</Tag> },
+  ];
+
+  const memberTabItems = member ? [
+    {
+      key: 'info', label: '会员信息',
+      children: (
+        <div>
+          <Descriptions bordered column={2} size="small">
+            <Descriptions.Item label="卡号">{member.cardNo}</Descriptions.Item>
+            <Descriptions.Item label="姓名">{member.name}</Descriptions.Item>
+            <Descriptions.Item label="手机">{member.mobile}</Descriptions.Item>
+            <Descriptions.Item label="性别">{sexLabel[member.sex] || '-'}</Descriptions.Item>
+            <Descriptions.Item label="生日">{member.birthday || '-'}</Descriptions.Item>
+            <Descriptions.Item label="等级">Lv.{member.level}</Descriptions.Item>
+            <Descriptions.Item label="积分">{member.points}</Descriptions.Item>
+            <Descriptions.Item label="余额">¥{(member.balance / 100).toFixed(2)}</Descriptions.Item>
+            <Descriptions.Item label="注册门店">{member.regStore || '-'}</Descriptions.Item>
+            <Descriptions.Item label="注册时间">{member.regTime || '-'}</Descriptions.Item>
+          </Descriptions>
+          <Space style={{ marginTop: 12 }}>
+            <Button onClick={() => { editForm.setFieldsValue({ name: member.name, sex: member.sex, birthday: member.birthday }); setEditModal(true); }}>编辑信息</Button>
+          </Space>
+        </div>
+      ),
+    },
+    {
+      key: 'trades', label: `交易记录 (${trades.length})`,
+      children: <Table columns={tradeColumns} dataSource={trades} rowKey={(r, i) => `${r.trade_id || i}`} size="small" />,
+    },
+    {
+      key: 'recharge', label: `充值记录 (${recharges.length})`,
+      children: (
+        <div>
+          <Card size="small" title="快速充值" style={{ marginBottom: 12 }}>
+            <Form form={rechargeForm} layout="inline" onFinish={submitRecharge}>
+              <Form.Item name="amount" label="充值金额(元)" rules={[{ required: true }]}><InputNumber min={1} /></Form.Item>
+              <Form.Item name="pay_type" label="支付方式" initialValue={1}><Select style={{ width: 100 }}><Option value={1}>微信</Option><Option value={2}>支付宝</Option><Option value={3}>现金</Option></Select></Form.Item>
+              <Form.Item name="cashier" label="收银员" rules={[{ required: true }]}><Input placeholder="收银员ID" /></Form.Item>
+              <Form.Item name="store_id" label="门店" rules={[{ required: true }]}><Input placeholder="门店ID" /></Form.Item>
+              <Form.Item name="trade_no" label="流水号" rules={[{ required: true }]}><Input placeholder="第三方流水号" /></Form.Item>
+              <Form.Item><Button type="primary" htmlType="submit">充值</Button></Form.Item>
+            </Form>
+          </Card>
+          <Table columns={rechargeColumns} dataSource={recharges} rowKey={(r, i) => `${r.recharge_id || i}`} size="small" />
+        </div>
+      ),
+    },
+    {
+      key: 'coupons', label: `优惠券 (${coupons.length})`,
+      children: (
+        <div>
+          <Card size="small" title="核销优惠券" style={{ marginBottom: 12 }}>
+            <Form form={couponForm} layout="inline" onFinish={useCoupon}>
+              <Form.Item name="code" label="券码" rules={[{ required: true }]}><Input placeholder="优惠券码" /></Form.Item>
+              <Form.Item name="store_id" label="门店" rules={[{ required: true }]}><Input placeholder="门店ID" /></Form.Item>
+              <Form.Item name="cashier" label="收银员" rules={[{ required: true }]}><Input placeholder="收银员ID" /></Form.Item>
+              <Form.Item name="amount" label="消费金额(元)" rules={[{ required: true }]}><InputNumber min={0} /></Form.Item>
+              <Form.Item><Button type="primary" icon={<GiftOutlined />} htmlType="submit">核销</Button></Form.Item>
+            </Form>
+          </Card>
+          <Table columns={couponColumns} dataSource={coupons} rowKey={(r, i) => `${r.coupon_id || i}`} size="small" />
+        </div>
+      ),
+    },
+  ] : [];
 
   return (
-    <ZCard
-      title="会员档案管理"
-      extra={
-        <ZButton icon={<ReloadOutlined />} onClick={() => fetchMembers(page)}>
-          刷新
-        </ZButton>
-      }
-    >
-      {/* Filter Bar */}
-      <div className={styles.filterBar}>
-        <ZSelect
-          value={selectedStore}
-          options={storeSelectOptions}
-          onChange={v => { setSelectedStore(v as string); setPage(1); }}
-          style={{ width: 100 }}
-        />
-        <Input
-          placeholder="搜索客户ID"
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          onPressEnter={handleSearch}
-          suffix={<SearchOutlined style={{ cursor: 'pointer' }} onClick={handleSearch} />}
-          style={{ width: 200 }}
-          allowClear
-        />
-        <ZSelect
-          value={lcFilter}
-          options={[{ value: '', label: '全部状态' }, ...lcSelectOptions]}
-          onChange={v => setLcFilter((v as string) || undefined)}
-          style={{ width: 130 }}
-        />
-        <ZSelect
-          value={rfmFilter}
-          options={[{ value: '', label: 'RFM等级' }, ...rfmSelectOptions]}
-          onChange={v => setRfmFilter((v as string) || undefined)}
-          style={{ width: 100 }}
-        />
-      </div>
+    <div>
+      <Space style={{ marginBottom: 16 }}>
+        <Button onClick={testConnection}>
+          测试连接 {connectionStatus && (connectionStatus.success ? '✅' : '❌')}
+        </Button>
+        <Button type="primary" icon={<PlusOutlined />} onClick={() => setAddModal(true)}>新增会员</Button>
+      </Space>
 
-      {/* Table */}
-      {loading ? (
-        <ZSkeleton rows={6} block />
-      ) : (
-        <>
-          <ZTable
-            columns={columns}
-            data={data?.members || []}
-            rowKey="customer_id"
-            emptyText="暂无会员数据"
-          />
+      <Card title="会员查询" style={{ marginBottom: 16 }}>
+        <Form form={queryForm} layout="inline" onFinish={queryMember}>
+          <Form.Item name="card_no" label="卡号"><Input placeholder="会员卡号" /></Form.Item>
+          <Form.Item name="mobile" label="手机号"><Input placeholder="手机号" /></Form.Item>
+          <Form.Item><Button type="primary" icon={<SearchOutlined />} htmlType="submit" loading={loading}>查询</Button></Form.Item>
+        </Form>
+      </Card>
 
-          {/* 分页 */}
-          <div className={styles.pagination}>
-            <span className={styles.paginationInfo}>
-              共 {data?.total || 0} 位会员
-            </span>
-            <div className={styles.paginationBtns}>
-              <ZButton
-                disabled={page <= 1}
-                onClick={() => { const p = page - 1; setPage(p); fetchMembers(p); }}
-              >
-                上一页
-              </ZButton>
-              <span className={styles.pageLabel}>第 {page} / {totalPages || 1} 页</span>
-              <ZButton
-                disabled={page >= totalPages}
-                onClick={() => { const p = page + 1; setPage(p); fetchMembers(p); }}
-              >
-                下一页
-              </ZButton>
-            </div>
-          </div>
-        </>
+      {member && (
+        <Row gutter={16} style={{ marginBottom: 16 }}>
+          <Col span={6}><Card size="small"><Statistic title="积分" value={member.points} /></Card></Col>
+          <Col span={6}><Card size="small"><Statistic title="余额" value={(member.balance / 100).toFixed(2)} prefix="¥" /></Card></Col>
+          <Col span={6}><Card size="small"><Statistic title="等级" value={`Lv.${member.level}`} /></Card></Col>
+          <Col span={6}><Card size="small"><Statistic title="优惠券" value={coupons.filter((c: any) => c.status === 'valid').length} suffix="张可用" /></Card></Col>
+        </Row>
       )}
-    </ZCard>
+
+      {member && <Card><Tabs items={memberTabItems} /></Card>}
+
+      {/* 新增会员 Modal */}
+      <Modal title="新增会员" open={addModal} onCancel={() => setAddModal(false)} footer={null}>
+        <Form form={addForm} layout="vertical" onFinish={addMember}>
+          <Form.Item name="mobile" label="手机号" rules={[{ required: true }]}><Input /></Form.Item>
+          <Form.Item name="name" label="姓名" rules={[{ required: true }]}><Input /></Form.Item>
+          <Form.Item name="sex" label="性别" initialValue={1}><Select><Option value={1}>男</Option><Option value={2}>女</Option></Select></Form.Item>
+          <Form.Item name="birthday" label="生日"><Input placeholder="YYYY-MM-DD" /></Form.Item>
+          <Form.Item name="store_id" label="注册门店"><Input /></Form.Item>
+          <Form.Item><Button type="primary" htmlType="submit" block>添加</Button></Form.Item>
+        </Form>
+      </Modal>
+
+      {/* 编辑会员 Modal */}
+      <Modal title="编辑会员信息" open={editModal} onCancel={() => setEditModal(false)} footer={null}>
+        <Form form={editForm} layout="vertical" onFinish={updateMember}>
+          <Form.Item name="name" label="姓名"><Input /></Form.Item>
+          <Form.Item name="sex" label="性别"><Select><Option value={1}>男</Option><Option value={2}>女</Option></Select></Form.Item>
+          <Form.Item name="birthday" label="生日"><Input placeholder="YYYY-MM-DD" /></Form.Item>
+          <Form.Item><Button type="primary" htmlType="submit" block>保存</Button></Form.Item>
+        </Form>
+      </Modal>
+    </div>
   );
 };
 

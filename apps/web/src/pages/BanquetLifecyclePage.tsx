@@ -306,7 +306,7 @@ const AvailabilityCalendar: React.FC<{ storeId: string }> = ({ storeId }) => {
         { params: { max_capacity: capacity } },
       );
       const map: Record<string, CalDay> = {};
-      (res.data?.days ?? []).forEach((d: CalDay) => { map[d.date] = d; });
+      (res?.days ?? []).forEach((d: CalDay) => { map[d.date] = d; });
       setCalData(map);
     } catch (err: any) {
       handleApiError(err, '加载销控日历失败');

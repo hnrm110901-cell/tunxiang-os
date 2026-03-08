@@ -24,11 +24,13 @@ os.environ.setdefault("WECHAT_AGENT_ID", "1")
 os.environ.setdefault("SECRET_KEY", "test-secret-key-for-workforce-pipeline-32!!")
 
 from src.api.workforce import (  # noqa: E402
+    AutoScheduleRequest,
     LaborBudgetUpsertRequest,
     StaffingAdviceConfirmRequest,
     _parse_iso_date,
     _parse_yyyymm,
     _risk_level,
+    auto_generate_schedule_with_constraints,
     confirm_staffing_advice,
     get_employee_health,
     get_labor_budget,
@@ -261,6 +263,44 @@ class TestWorkforceConfirmLoop:
                 user=_mock_user(),
             )
         assert exc.value.status_code == 400
+
+
+class TestWorkforceAutoScheduleAPI:
+    @pytest.mark.asyncio
+    async def test_auto_schedule_api_success(self):
+        db = AsyncMock()
+        body = AutoScheduleRequest(schedule_date="2026-03-09", auto_publish=True)
+        with patch(
+            "src.api.workforce.WorkforceAutoScheduleService.generate_schedule_with_constraints",
+            new_callable=AsyncMock,
+            return_value={"created": True, "schedule_id": "sc1", "anomaly_count": 0},
+        ):
+            resp = await auto_generate_schedule_with_constraints(
+                store_id="S001",
+                body=body,
+                db=db,
+                _=_mock_user(),
+            )
+        assert resp["created"] is True
+        assert resp["schedule_id"] == "sc1"
+
+    @pytest.mark.asyncio
+    async def test_auto_schedule_api_conflict(self):
+        db = AsyncMock()
+        body = AutoScheduleRequest(schedule_date="2026-03-09")
+        with patch(
+            "src.api.workforce.WorkforceAutoScheduleService.generate_schedule_with_constraints",
+            new_callable=AsyncMock,
+            return_value={"created": False, "reason": "exists"},
+        ):
+            with pytest.raises(HTTPException) as exc:
+                await auto_generate_schedule_with_constraints(
+                    store_id="S001",
+                    body=body,
+                    db=db,
+                    _=_mock_user(),
+                )
+        assert exc.value.status_code == 409
 
     @pytest.mark.asyncio
     async def test_confirm_staffing_advice_invalid_meal_period(self):

@@ -304,6 +304,19 @@ celery_app.conf.update(
                 "priority": 9,
             },
         },
+        # L8: 每日 07:00 自动排班（预算硬约束 + 异常提醒）
+        "daily-auto-workforce-schedule": {
+            "task": "tasks.auto_generate_workforce_schedule",
+            "schedule": crontab(
+                hour=int(os.getenv("L8_AUTO_SCHEDULE_HOUR", "7")),
+                minute=int(os.getenv("L8_AUTO_SCHEDULE_MINUTE", "0")),
+            ),
+            "args": (),
+            "options": {
+                "queue": "default",
+                "priority": 9,
+            },
+        },
         # 每日 17:00 启动晚间多阶段规划工作流（为所有门店规划 Day N+1）
         "start-evening-planning": {
             "task": "tasks.start_evening_planning_all_stores",

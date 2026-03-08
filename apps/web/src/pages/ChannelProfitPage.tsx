@@ -54,7 +54,7 @@ const ChannelProfitPage: React.FC = () => {
   const loadStores = useCallback(async () => {
     try {
       const res = await apiClient.get('/api/v1/stores');
-      setStores(res.data?.stores || res.data || []);
+      setStores(res.stores || res || []);
     } catch { /* ignore */ }
   }, []);
 

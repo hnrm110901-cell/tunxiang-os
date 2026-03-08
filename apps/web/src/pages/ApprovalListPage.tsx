@@ -74,7 +74,7 @@ const ApprovalListPage: React.FC = () => {
         params.end_date   = dateRange[1]?.format('YYYY-MM-DD');
       }
       const res = await apiClient.get('/api/v1/approvals', { params });
-      setApprovals(res.data?.approvals || res.data || []);
+      setApprovals(res?.approvals || res || []);
     } catch (err: any) {
       handleApiError(err, '加载审批列表失败');
     } finally {

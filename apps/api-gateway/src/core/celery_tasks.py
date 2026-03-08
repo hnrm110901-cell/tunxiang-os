@@ -2833,6 +2833,68 @@ def push_daily_workforce_advice(self, store_id: str = None):
 
 
 # ============================================================
+# L8: 自动排班（预算硬约束 + 异常提醒）
+# ============================================================
+
+@celery_app.task(
+    bind=True,
+    max_retries=3,
+    default_retry_delay=300,
+    name="tasks.auto_generate_workforce_schedule",
+)
+def auto_generate_workforce_schedule(self, store_id: str = None):
+    """每日自动生成当日排班，并在异常时提醒门店负责人。"""
+    import asyncio
+    from datetime import date as _date
+
+    async def _run():
+        from sqlalchemy import select
+        from src.core.database import get_db_session
+        from src.models.store import Store, StoreStatus
+        from src.services.workforce_auto_schedule_service import WorkforceAutoScheduleService
+
+        async with get_db_session() as db:
+            if store_id:
+                stores = [str(store_id)]
+            else:
+                active_rows = (
+                    await db.execute(
+                        select(Store.id).where(
+                            Store.is_active.is_(True),
+                            Store.status == StoreStatus.ACTIVE.value,
+                        )
+                    )
+                ).all()
+                stores = [str(r.id) for r in active_rows] if active_rows else []
+                if not stores:
+                    rows = (await db.execute(select(Store.id))).all()
+                    stores = [str(r.id) for r in rows]
+
+            target_date = _date.today()
+            for sid in stores:
+                try:
+                    await WorkforceAutoScheduleService.generate_schedule_with_constraints(
+                        store_id=sid,
+                        schedule_date=target_date,
+                        db=db,
+                        auto_publish=True,
+                        notify_on_anomaly=True,
+                        recipient_user_id=_get_store_recipient(sid),
+                    )
+                except Exception as exc:
+                    logger.warning(
+                        "auto_generate_workforce_schedule.store_failed",
+                        store_id=sid,
+                        error=str(exc),
+                    )
+
+    try:
+        asyncio.run(_run())
+    except Exception as exc:
+        raise self.retry(exc=exc)
+
+
+# ============================================================
 # INFRA-002: 企微消息重试任务
 # ============================================================
 

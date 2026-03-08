@@ -83,7 +83,7 @@ const DataSecurityPage: React.FC = () => {
   const loadStores = useCallback(async () => {
     try {
       const res = await apiClient.get('/api/v1/stores');
-      const list: any[] = res.data?.stores || res.data || [];
+      const list: any[] = res.stores || res || [];
       setStores(list);
       if (list.length > 0) setStoreId(list[0].store_id || list[0].id || 'STORE001');
     } catch { /* ignore */ }
@@ -93,7 +93,7 @@ const DataSecurityPage: React.FC = () => {
     setLoading(true);
     try {
       const res = await apiClient.get(`/api/v1/security/keys/${storeId}`);
-      setKeys(res.data || []);
+      setKeys(res || []);
     } catch (err: any) {
       handleApiError(err, '加载密钥列表失败');
     } finally {
@@ -105,7 +105,7 @@ const DataSecurityPage: React.FC = () => {
     setCoverageLoading(true);
     try {
       const res = await apiClient.get(`/api/v1/security/keys/${storeId}/coverage`);
-      setCoverage(res.data);
+      setCoverage(res);
     } catch (err: any) {
       handleApiError(err, '加载覆盖率失败');
     } finally {

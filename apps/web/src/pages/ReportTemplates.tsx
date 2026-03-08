@@ -45,7 +45,7 @@ const ReportTemplates: React.FC = () => {
     try {
       setLoadingTemplates(true);
       const res = await apiClient.get('/api/v1/report-templates/');
-      setTemplates(res.data?.data || res.data || []);
+      setTemplates(res?.data || res || []);
     } catch (err: any) {
       handleApiError(err, '加载模板列表失败');
     } finally {
@@ -57,7 +57,7 @@ const ReportTemplates: React.FC = () => {
     try {
       setLoadingScheduled(true);
       const res = await apiClient.get('/api/v1/report-templates/scheduled-reports');
-      setScheduled(res.data?.data || res.data || []);
+      setScheduled(res?.data || res || []);
     } catch (err: any) {
       handleApiError(err, '加载订阅列表失败');
     } finally {
@@ -75,7 +75,7 @@ const ReportTemplates: React.FC = () => {
     try {
       const res = await apiClient.get(`/api/v1/report-templates/${id}/generate`, { responseType: 'blob' });
       hide();
-      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const url = window.URL.createObjectURL(res as any);
       const link = document.createElement('a');
       link.href = url;
       link.setAttribute('download', `${name}_report.xlsx`);
