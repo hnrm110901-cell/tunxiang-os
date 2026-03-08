@@ -76,6 +76,9 @@ test-decision:
 test-banquet:
 	python3 -m pytest packages/agents/banquet/tests/test_agent.py -q
 
+test-dish-rd:
+	python3 -m pytest packages/agents/dish_rd/tests/test_agent.py -q
+
 # 代码检查
 lint:
 	ruff check packages/ apps/

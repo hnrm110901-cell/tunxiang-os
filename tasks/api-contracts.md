@@ -486,3 +486,89 @@ interface OrderItem {
 type BanquetType = 'wedding'|'birthday'|'business'|'full_moon'|'graduation'|'anniversary'|'other'
 type BanquetHallType = 'main_hall'|'vip_room'|'garden'|'outdoor'
 ```
+
+---
+
+## Dish R&D Agent（菜品研发 Phase 10）接口
+
+> 路由前缀：`/api/v1/dish-rd`
+
+### 菜品主档
+
+**GET `/api/v1/dish-rd/brands/{brand_id}/dishes`**
+```typescript
+// Query: status?, dish_type?, keyword?, page?, page_size?
+interface DishListResponse {
+  total: number; page: number; page_size: number;
+  items: DishSummary[];
+}
+interface DishSummary {
+  dish_id: string; dish_code: string; dish_name: string;
+  dish_type: DishType; status: DishStatus; lifecycle_stage: string;
+  positioning_type: string | null;
+  target_price_yuan: number | null;
+  flavor_tags: string[];
+  created_at: string;
+}
+type DishStatus = 'draft'|'ideation'|'in_dev'|'sampling'|'pilot_pending'|'piloting'|'launch_ready'|'launched'|'optimizing'|'discontinued'|'archived'
+type DishType = 'new'|'upgrade'|'seasonal'|'regional'|'banquet'|'delivery'
+```
+
+**POST `/api/v1/dish-rd/brands/{brand_id}/dishes`** — 创建菜品
+
+**GET `/api/v1/dish-rd/brands/{brand_id}/dishes/{dish_id}`** — 菜品详情（含成本摘要+试点摘要）
+
+**PATCH `/api/v1/dish-rd/brands/{brand_id}/dishes/{dish_id}`** — 更新菜品
+
+### 配方与 BOM
+
+**POST `.../dishes/{dish_id}/recipe-versions`** — 创建配方版本
+
+**POST `.../recipe-versions/{version_id}/items`** — 批量添加 BOM 行
+
+**GET `.../recipe-versions/{version_id}/items`** — 查询 BOM 明细
+
+### 试点管理
+
+**POST `.../dishes/{dish_id}/pilot-tests`** — 创建试点
+
+**POST `.../pilot-tests/{pilot_id}/decision`** — 记录试点决策（go/revise/stop）
+
+**GET `.../dishes/{dish_id}/pilot-tests`** — 查询试点列表
+
+### 上市管理
+
+**POST `.../dishes/{dish_id}/launch-projects`** — 创建上市项目（自动把菜品状态推进到 launch_ready）
+
+### 反馈 & 复盘
+
+**POST `.../dishes/{dish_id}/feedbacks`** — 录入反馈
+
+**GET `.../dishes/{dish_id}/feedbacks`** — 查询反馈列表
+
+**GET `.../dishes/{dish_id}/retrospective-reports`** — 查询复盘报告
+
+### Agent 接口
+
+**POST `.../dishes/{dish_id}/agent/cost-sim?recipe_version_id=`** — 成本仿真
+```typescript
+interface CostSimResult {
+  total_cost: number;               // ¥总成本
+  suggested_price_yuan: number;     // ¥建议售价
+  margin_rate: number;              // 毛利率
+  margin_amount_yuan: number;       // ¥毛利额
+  price_scenarios: Array<{ target_margin_rate: number; suggested_price_yuan: number; margin_amount_yuan: number }>;
+  stress_tests: Array<{ price_change_pct: number; stressed_margin_rate: number; margin_delta: number }>;
+  item_details: BomItemCost[];
+}
+```
+
+**GET `.../dishes/{dish_id}/agent/pilot-recommend?top_n=5`** — 试点门店推荐
+
+**POST `.../dishes/{dish_id}/agent/review?period=30d`** — 复盘优化（lifecycle_assessment + optimization_suggestions）
+
+**GET `.../dishes/{dish_id}/agent/launch-readiness`** — 发布就绪检查（checklist + missing_items）
+
+**GET `/api/v1/dish-rd/brands/{brand_id}/agent/risk-scan`** — 风险全扫描（risk_count + high_risks + medium_risks）
+
+**GET `/api/v1/dish-rd/brands/{brand_id}/dashboard`** — 菜品研发驾驶舱

@@ -6,8 +6,16 @@
 
 ## [Claude] 当前状态
 
-**更新时间**: 2026-03-08 接口补全
-**状态**: ✅ Phase 9 + 接口补全全部完成
+**更新时间**: 2026-03-08 Phase 10 菜品研发 Agent
+**状态**: ✅ Phase 10 菜品研发 Agent 全部完成
+
+**已完成（Phase 10 菜品研发 Agent）**:
+- ✅ 数据模型 `apps/api-gateway/src/models/dish_rd.py`：20张表，22个枚举，5层架构（L1主数据→L5智能）
+- ✅ Alembic迁移 `z36_dish_rd_agent_tables.py`（`alembic upgrade head` 可执行）
+- ✅ 5个 Agent：CostSimAgent/PilotRecAgent/DishReviewAgent/LaunchAssistAgent/RiskAlertAgent
+- ✅ API端点 `/api/v1/dish-rd`：菜品CRUD+配方版本+BOM+试点+上市+反馈+复盘+5个Agent接口+驾驶舱
+- ✅ **22个单元测试全部通过** (`make test-dish-rd` → 22 passed)
+- ✅ 接口契约发布至 `tasks/api-contracts.md` → "Dish R&D Agent Phase 10" 节
 
 **已完成（Phase 9 总结）**:
 - ✅ 握手测试通过，发现并修复 WorkforcePage `risk_level` 缺 critical 级别 BUG
