@@ -65,6 +65,7 @@ def initial_state(sample_employees):
         requirements={},
         schedule=[],
         labor_cost_summary={},
+        auto_scheduling_actions=[],
         optimization_suggestions=[],
         errors=[],
     )
@@ -180,6 +181,7 @@ class TestScheduleAgent:
 
         assert "optimization_suggestions" in result
         assert "labor_cost_summary" in result
+        assert "auto_scheduling_actions" in result
         assert isinstance(result["optimization_suggestions"], list)
 
     @pytest.mark.asyncio
@@ -196,6 +198,7 @@ class TestScheduleAgent:
         assert "traffic_prediction" in result
         assert "requirements" in result
         assert "labor_cost_summary" in result
+        assert "auto_scheduling_actions" in result
         assert "suggestions" in result
 
     @pytest.mark.asyncio
@@ -213,6 +216,26 @@ class TestScheduleAgent:
         assert result["success"] is True
         assert result["labor_cost_summary"]["estimated_total_cost"] > 10
         assert any("预计人工成本超目标" in s for s in result["suggestions"])
+        assert any(a["type"] == "cost_control" for a in result["auto_scheduling_actions"])
+
+    @pytest.mark.asyncio
+    async def test_auto_scheduling_actions_contains_gap_filling(self, sample_employees):
+        """测试自动排班建议包含补员动作"""
+        agent = ScheduleAgent(
+            {
+                "min_shift_hours": 4,
+                "max_shift_hours": 8,
+                "max_weekly_hours": 40,
+            }
+        )
+        # 仅1名员工，必然出现缺口
+        result = await agent.run(
+            store_id="STORE001",
+            date="2024-01-15",
+            employees=[sample_employees[0]],
+        )
+        assert result["success"] is True
+        assert any(a["type"] == "fill_gap" for a in result["auto_scheduling_actions"])
 
     @pytest.mark.asyncio
     async def test_run_with_empty_employees(self, agent):

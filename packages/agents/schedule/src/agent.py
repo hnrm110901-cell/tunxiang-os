@@ -45,6 +45,7 @@ class ScheduleState(TypedDict):
     requirements: Dict[str, int]
     schedule: List[Dict[str, Any]]
     labor_cost_summary: Dict[str, Any]
+    auto_scheduling_actions: List[Dict[str, Any]]
     optimization_suggestions: List[str]
     errors: List[str]
 
@@ -363,6 +364,12 @@ class ScheduleAgent(BaseAgent):
         )
 
         state["labor_cost_summary"] = labor_cost_summary
+        state["auto_scheduling_actions"] = self._build_auto_scheduling_actions(
+            requirements=requirements,
+            schedule=schedule,
+            labor_cost_summary=labor_cost_summary,
+            traffic_data=state.get("traffic_data", {}),
+        )
         state["optimization_suggestions"] = suggestions
         logger.info("排班优化完成", suggestions_count=len(suggestions))
         return state
@@ -405,6 +412,62 @@ class ScheduleAgent(BaseAgent):
             "hourly_cost_config": hourly_cost,
         }
 
+    def _build_auto_scheduling_actions(
+        self,
+        requirements: Dict[str, Any],
+        schedule: List[Dict[str, Any]],
+        labor_cost_summary: Dict[str, Any],
+        traffic_data: Dict[str, Any],
+    ) -> List[Dict[str, Any]]:
+        """输出结构化自动排班建议，供前端/编排器直接消费。"""
+        actions: List[Dict[str, Any]] = []
+
+        for shift_name, shift_requirements in requirements.items():
+            for skill, required_count in shift_requirements.items():
+                actual_count = len([s for s in schedule if s.get("shift") == shift_name and s.get("skill") == skill])
+                gap = required_count - actual_count
+                if gap > 0:
+                    actions.append(
+                        {
+                            "priority": "high",
+                            "type": "fill_gap",
+                            "title": f"{shift_name}班次补员",
+                            "action": "add_employee",
+                            "payload": {"shift": shift_name, "skill": skill, "count": gap},
+                        }
+                    )
+
+        if labor_cost_summary.get("overrun_amount", 0) > 0:
+            actions.append(
+                {
+                    "priority": "medium",
+                    "type": "cost_control",
+                    "title": "人工成本超预算压降",
+                    "action": "reduce_non_peak",
+                    "payload": {
+                        "overrun_amount": labor_cost_summary["overrun_amount"],
+                        "target_daily_labor_cost": labor_cost_summary.get("target_daily_labor_cost", 0),
+                    },
+                }
+            )
+
+        predicted_customers = traffic_data.get("predicted_customers", {})
+        if isinstance(predicted_customers, dict):
+            evening = int(predicted_customers.get("evening", 0))
+            morning = int(predicted_customers.get("morning", 0))
+            if evening >= morning * 2 and evening > 0:
+                actions.append(
+                    {
+                        "priority": "medium",
+                        "type": "peak_preparation",
+                        "title": "晚高峰预排班",
+                        "action": "pre_allocate_evening",
+                        "payload": {"expected_evening_customers": evening},
+                    }
+                )
+
+        return actions
+
     async def run(
         self,
         store_id: str,
@@ -429,6 +492,7 @@ class ScheduleAgent(BaseAgent):
             "requirements": {},
             "schedule": [],
             "labor_cost_summary": {},
+            "auto_scheduling_actions": [],
             "optimization_suggestions": [],
             "errors": [],
         }
@@ -450,6 +514,7 @@ class ScheduleAgent(BaseAgent):
                 "traffic_prediction": state["traffic_data"],
                 "requirements": state["requirements"],
                 "labor_cost_summary": state["labor_cost_summary"],
+                "auto_scheduling_actions": state["auto_scheduling_actions"],
                 "suggestions": state["optimization_suggestions"],
             }
         except Exception as e:
