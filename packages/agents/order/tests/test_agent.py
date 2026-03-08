@@ -257,6 +257,41 @@ class TestOrderManagement:
         assert result["status"] == OrderStatus.COOKING.value
 
     @pytest.mark.asyncio
+    async def test_update_order_status_invalid_transition(self, agent):
+        """测试非法状态转换被拒绝"""
+        mock_order = {"order_id": "ORD001", "status": OrderStatus.ORDERING.value}
+        result = await agent.update_order_status(
+            order_id="ORD001",
+            new_status=OrderStatus.PAID.value,
+            order=mock_order,
+        )
+        assert result["success"] is False
+        assert "不允许从 ordering 转换到 paid" in result["message"]
+
+    @pytest.mark.asyncio
+    async def test_update_order_status_unknown_status(self, agent):
+        """测试未知状态输入被校验拒绝"""
+        mock_order = {"order_id": "ORD001", "status": "unknown_status"}
+        result = await agent.update_order_status(
+            order_id="ORD001",
+            new_status=OrderStatus.ORDERED.value,
+            order=mock_order,
+        )
+        assert result["success"] is False
+        assert "未知订单状态" in result["message"]
+
+    def test_get_valid_next_statuses(self, agent):
+        """测试获取状态机下一跳"""
+        assert agent.get_valid_next_statuses(OrderStatus.RESERVED.value) == [
+            OrderStatus.WAITING.value,
+            OrderStatus.SEATED.value,
+            OrderStatus.CANCELLED.value,
+        ]
+        assert agent.get_valid_next_statuses(OrderStatus.PAID.value) == [
+            OrderStatus.COMPLETED.value
+        ]
+
+    @pytest.mark.asyncio
     async def test_cancel_order(self, agent):
         """测试取消订单"""
         mock_order = {"order_id": "ORD001", "status": OrderStatus.ORDERING.value}

@@ -39,6 +39,9 @@ class OrderStatus(Enum):
 
 # 合法状态转换表（含取消规则，统一来源）
 _VALID_TRANSITIONS: Dict[str, List[str]] = {
+    OrderStatus.RESERVED.value: [OrderStatus.WAITING.value, OrderStatus.SEATED.value, OrderStatus.CANCELLED.value],
+    OrderStatus.WAITING.value: [OrderStatus.SEATED.value, OrderStatus.CANCELLED.value],
+    OrderStatus.SEATED.value: [OrderStatus.ORDERING.value, OrderStatus.CANCELLED.value],
     OrderStatus.ORDERING.value: [OrderStatus.ORDERED.value, OrderStatus.CANCELLED.value],
     OrderStatus.ORDERED.value: [OrderStatus.COOKING.value, OrderStatus.CANCELLED.value],
     OrderStatus.COOKING.value: [OrderStatus.SERVED.value, OrderStatus.CANCELLED.value],
@@ -51,6 +54,7 @@ _VALID_TRANSITIONS: Dict[str, List[str]] = {
 
 # 不可取消的终态（与 _VALID_TRANSITIONS 保持一致）
 _NON_CANCELLABLE = {OrderStatus.PAID.value, OrderStatus.COMPLETED.value, OrderStatus.CANCELLED.value}
+_ALL_ORDER_STATUSES = {status.value for status in OrderStatus}
 
 
 class ReservationType(Enum):
@@ -102,6 +106,10 @@ class OrderAgent(BaseAgent):
             "calculate_bill", "process_payment", "get_order",
             "update_order_status", "cancel_order",
         ]
+
+    def get_valid_next_statuses(self, current_status: str) -> List[str]:
+        """返回当前状态可转换的下一状态集合。"""
+        return list(_VALID_TRANSITIONS.get(current_status, []))
 
     async def execute(self, action: str, params: Dict[str, Any]) -> AgentResponse:
         try:
@@ -482,6 +490,11 @@ class OrderAgent(BaseAgent):
         logger.info("更新订单状态", order_id=order_id, new_status=new_status)
 
         current = order.get("status", "")
+        if current not in _ALL_ORDER_STATUSES:
+            return {"success": False, "message": f"未知订单状态: {current}"}
+        if new_status not in _ALL_ORDER_STATUSES:
+            return {"success": False, "message": f"目标订单状态非法: {new_status}"}
+
         allowed = _VALID_TRANSITIONS.get(current, [])
         if new_status not in allowed:
             return {"success": False, "message": f"不允许从 {current} 转换到 {new_status}"}
