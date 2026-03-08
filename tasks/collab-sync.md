@@ -26,6 +26,10 @@
   - 表格开启横向滚动
   - 抽屉宽度改为 `92vw`（移动端）
   - 工具栏与操作按钮优化换行
+- [x] 多门店管理页稳定性修复（`MultiStoreManagement.tsx`）
+  - 去除 `any`，补齐接口类型（门店列表/区域汇总/绩效排名/对比响应）
+  - 对比查询改为选择事件驱动，避免 effect 中级联 setState
+  - Select 选项改为 `options` 模式，修复标签渲染与可维护性问题
 
 ## P2
 - [x] 角色权限管理体验优化（页面入口可见性与无权限提示一致性）
@@ -53,6 +57,7 @@
 - status: completed
 - owner: Codex
 - task: FCT 账期持久化收尾（`fct_periods` 落库 + 兼容修复）
+- task: 多门店管理页类型化与交互稳定性修复
 - files:
   - `apps/api-gateway/src/api/blindbox.py`
   - `apps/api-gateway/src/api/federated.py`
@@ -87,4 +92,5 @@
   - `python3 -m pytest -q apps/api-gateway/tests/test_fct_service.py -k "CreateManualVoucherPersist or UpdateVoucherStatus or VoucherReverseAndVoid"`（16 passed）
   - `python3 -m pytest -q apps/api-gateway/tests/test_fct_public_voucher_api.py apps/api-gateway/tests/test_fct_public_periods_api.py`（6 passed）
   - `python3 -m pytest -q apps/api-gateway/tests/test_fct_service.py -k "PeriodCloseReopen or CreateManualVoucherPersist or UpdateVoucherStatus or VoucherReverseAndVoid"`（21 passed）
+  - `pnpm --filter @zhilian-os/web exec eslint src/pages/MultiStoreManagement.tsx`（通过）
 - note: 已消除 `src.main` 的 blindbox/federated 缺失模块阻断；mobile 上传接口已返回 `file_url`

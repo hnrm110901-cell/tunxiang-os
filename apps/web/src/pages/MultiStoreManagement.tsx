@@ -9,62 +9,104 @@ import ReactECharts from 'echarts-for-react';
 import { apiClient } from '../services/api';
 import { handleApiError } from '../utils/message';
 
-const { Option } = Select;
+interface StoreItem {
+  id: string;
+  name: string;
+  region: string;
+}
+
+interface ComparisonMetrics {
+  revenue: number;
+  orders: number;
+  customers: number;
+  avg_order_value: number;
+}
+
+interface ComparisonStore {
+  id: string;
+  name: string;
+  metrics: ComparisonMetrics;
+}
+
+interface ComparisonResponse {
+  stores: ComparisonStore[];
+}
+
+interface RegionalSummaryItem {
+  region: string;
+  total_revenue: number;
+  store_count: number;
+  total_orders: number;
+  total_customers: number;
+}
+
+interface PerformanceRankingItem {
+  rank: number;
+  store_id: string;
+  store_name: string;
+  region: string;
+  value: number;
+  growth_rate: number;
+}
 
 const MultiStoreManagement: React.FC = () => {
   const [loading, setLoading] = useState(true);
-  const [stores, setStores] = useState<any[]>([]);
+  const [stores, setStores] = useState<StoreItem[]>([]);
   const [selectedStores, setSelectedStores] = useState<string[]>([]);
-  const [comparisonData, setComparisonData] = useState<any>(null);
-  const [regionalSummary, setRegionalSummary] = useState<any[]>([]);
-  const [performanceRanking, setPerformanceRanking] = useState<any[]>([]);
+  const [comparisonData, setComparisonData] = useState<ComparisonResponse | null>(null);
+  const [regionalSummary, setRegionalSummary] = useState<RegionalSummaryItem[]>([]);
+  const [performanceRanking, setPerformanceRanking] = useState<PerformanceRankingItem[]>([]);
 
-  const loadStores = useCallback(async () => {
-    try {
-      const response = await apiClient.get('/api/v1/multi-store/stores');
-      setStores(response.stores || []);
-
-      // 默认选择前两个门店进行对比
-      if (response.stores && response.stores.length >= 2) {
-        setSelectedStores([
-          response.stores[0].id,
-          response.stores[1].id,
-        ]);
-      }
-    } catch (err: any) {
-      handleApiError(err, '加载门店列表失败');
+  const loadComparisonData = useCallback(async (storeIds: string[]) => {
+    if (storeIds.length < 2) {
+      setComparisonData(null);
+      return;
     }
-  }, []);
-
-  const loadComparisonData = useCallback(async () => {
-    if (selectedStores.length < 2) return;
 
     try {
       const response = await apiClient.post('/api/v1/multi-store/compare', {
-        store_ids: selectedStores,
+        store_ids: storeIds,
         start_date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
         end_date: new Date().toISOString().split('T')[0],
-      });
+      }) as ComparisonResponse;
       setComparisonData(response);
-    } catch (err: any) {
+    } catch (err: unknown) {
       handleApiError(err, '加载对比数据失败');
     }
-  }, [selectedStores]);
+  }, []);
+
+  const loadStores = useCallback(async () => {
+    try {
+      const response = await apiClient.get('/api/v1/multi-store/stores') as { stores?: StoreItem[] };
+      const storeList = response.stores || [];
+      setStores(storeList);
+
+      if (storeList.length >= 2) {
+        const defaults = [storeList[0].id, storeList[1].id];
+        setSelectedStores(defaults);
+        await loadComparisonData(defaults);
+      }
+    } catch (err: unknown) {
+      handleApiError(err, '加载门店列表失败');
+    }
+  }, [loadComparisonData]);
 
   const loadRegionalSummary = useCallback(async () => {
     try {
-      const response = await apiClient.get('/api/v1/multi-store/regional-summary');
+      const response = await apiClient.get('/api/v1/multi-store/regional-summary') as { regions?: RegionalSummaryItem[] };
       setRegionalSummary(response.regions || []);
-    } catch (err: any) {
+    } catch (err: unknown) {
       handleApiError(err, '加载区域汇总失败');
     }
   }, []);
 
   const loadPerformanceRanking = useCallback(async () => {
     try {
-      const response = await apiClient.get('/api/v1/multi-store/performance-ranking?metric=revenue&limit=10');
+      const response = await apiClient.get('/api/v1/multi-store/performance-ranking?metric=revenue&limit=10') as {
+        ranking?: PerformanceRankingItem[];
+      };
       setPerformanceRanking(response.ranking || []);
-    } catch (err: any) {
+    } catch (err: unknown) {
       handleApiError(err, '加载绩效排名失败');
     }
   }, []);
@@ -79,29 +121,23 @@ const MultiStoreManagement: React.FC = () => {
       ]);
       setLoading(false);
     };
+
     loadData();
   }, [loadStores, loadRegionalSummary, loadPerformanceRanking]);
 
-  useEffect(() => {
-    if (selectedStores.length >= 2) {
-      loadComparisonData();
-    }
-  }, [selectedStores, loadComparisonData]);
+  const handleStoreSelectionChange = async (values: string[]) => {
+    setSelectedStores(values);
+    await loadComparisonData(values);
+  };
 
-  // 门店对比图表配置
   const comparisonChartOption = {
-    title: {
-      text: '门店对比分析',
-      left: 'center',
-    },
+    title: { text: '门店对比分析', left: 'center' },
     tooltip: {
       trigger: 'axis',
-      axisPointer: {
-        type: 'shadow',
-      },
+      axisPointer: { type: 'shadow' },
     },
     legend: {
-      data: comparisonData?.stores?.map((s: any) => s.name) || [],
+      data: comparisonData?.stores?.map((s) => s.name) || [],
       bottom: 10,
     },
     grid: {
@@ -114,10 +150,8 @@ const MultiStoreManagement: React.FC = () => {
       type: 'category',
       data: ['营收', '订单数', '客流量', '客单价'],
     },
-    yAxis: {
-      type: 'value',
-    },
-    series: comparisonData?.stores?.map((store: any) => ({
+    yAxis: { type: 'value' },
+    series: comparisonData?.stores?.map((store) => ({
       name: store.name,
       type: 'bar',
       data: [
@@ -129,7 +163,6 @@ const MultiStoreManagement: React.FC = () => {
     })) || [],
   };
 
-  // 区域汇总图表配置
   const regionalChartOption = {
     title: {
       text: '区域营收分布',
@@ -148,7 +181,7 @@ const MultiStoreManagement: React.FC = () => {
         name: '区域营收',
         type: 'pie',
         radius: '50%',
-        data: regionalSummary.map((region: any) => ({
+        data: regionalSummary.map((region) => ({
           value: region.total_revenue / 100,
           name: region.region,
         })),
@@ -163,7 +196,6 @@ const MultiStoreManagement: React.FC = () => {
     ],
   };
 
-  // 绩效排名表格列
   const rankingColumns = [
     {
       title: '排名',
@@ -222,9 +254,8 @@ const MultiStoreManagement: React.FC = () => {
         <ShopOutlined /> 多门店管理
       </h1>
 
-      {/* 区域汇总统计 */}
       <Row gutter={[16, 16]} style={{ marginBottom: '24px' }}>
-        {regionalSummary.map((region: any) => (
+        {regionalSummary.map((region) => (
           <Col xs={24} sm={12} md={6} key={region.region}>
             <Card>
               <Statistic
@@ -242,7 +273,6 @@ const MultiStoreManagement: React.FC = () => {
         ))}
       </Row>
 
-      {/* 门店对比 */}
       <Card title="门店对比分析" style={{ marginBottom: '24px' }}>
         <Space style={{ marginBottom: '16px' }}>
           <span>选择门店:</span>
@@ -251,15 +281,13 @@ const MultiStoreManagement: React.FC = () => {
             style={{ width: 400 }}
             placeholder="请选择要对比的门店"
             value={selectedStores}
-            onChange={setSelectedStores}
+            onChange={handleStoreSelectionChange}
             maxTagCount={2}
-          >
-            {stores.map((store: any) => (
-              <Option key={store.id} value={store.id}>
-                {store.name} ({store.region})
-              </Option>
-            ))}
-          </Select>
+            options={stores.map((store) => ({
+              label: `${store.name} (${store.region})`,
+              value: store.id,
+            }))}
+          />
         </Space>
         {selectedStores.length < 2 ? (
           <Empty description="请至少选择两个门店进行对比" image={Empty.PRESENTED_IMAGE_SIMPLE} />
@@ -271,14 +299,12 @@ const MultiStoreManagement: React.FC = () => {
       </Card>
 
       <Row gutter={[16, 16]}>
-        {/* 区域营收分布 */}
         <Col xs={24} lg={12}>
           <Card title="区域营收分布">
             <ReactECharts option={regionalChartOption} style={{ height: '400px' }} />
           </Card>
         </Col>
 
-        {/* 绩效排名 */}
         <Col xs={24} lg={12}>
           <Card title="门店绩效排名（按营收）">
             <Table
