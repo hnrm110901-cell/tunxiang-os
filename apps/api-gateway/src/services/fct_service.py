@@ -1826,7 +1826,54 @@ class StandaloneFCTService:
         skip: int = 0,
         limit: int = 100,
     ) -> Dict[str, Any]:
-        return {"items": [], "total": 0, "skip": skip, "limit": limit}
+        target_entity = entity_id or tenant_id
+        filters = [FCTTaxRecord.store_id == target_entity]
+
+        if period and len(period) == 6 and period.isdigit():
+            filters.append(FCTTaxRecord.year == int(period[:4]))
+            filters.append(FCTTaxRecord.month == int(period[4:6]))
+
+        stmt = (
+            select(FCTTaxRecord)
+            .where(and_(*filters))
+            .order_by(FCTTaxRecord.year.desc(), FCTTaxRecord.month.desc(), FCTTaxRecord.id.desc())
+        )
+        rows = (await session.execute(stmt)).scalars().all()
+        wanted = (tax_type or "total").lower()
+        allowed_types = {"vat", "cit", "surcharge", "total", "all"}
+        if wanted not in allowed_types:
+            wanted = "total"
+
+        expanded: List[Dict[str, Any]] = []
+        for r in rows:
+            period_key = f"{int(r.year):04d}{int(r.month):02d}"
+            taxpayer = r.taxpayer_type.value if hasattr(r.taxpayer_type, "value") else str(r.taxpayer_type)
+            per_type_rows = [
+                ("vat", int(r.net_vat or r.vat_amount or 0)),
+                ("cit", int(r.cit_amount or 0)),
+                ("surcharge", int(r.vat_surcharge or 0)),
+                ("total", int(r.total_tax or 0)),
+            ]
+            for t, amount in per_type_rows:
+                if wanted != "all" and t != wanted:
+                    continue
+                expanded.append(
+                    {
+                        "id": str(r.id),
+                        "entity_id": r.store_id,
+                        "period": period_key,
+                        "tax_type": t,
+                        "taxpayer_type": taxpayer,
+                        "amount": amount,
+                        "amount_yuan": self._y(amount),
+                        "is_finalized": bool(r.is_finalized),
+                        "generated_by": r.generated_by,
+                    }
+                )
+
+        total = len(expanded)
+        items = expanded[skip: skip + limit]
+        return {"items": items, "total": total, "skip": skip, "limit": limit}
 
     async def get_tax_declaration_draft(
         self,

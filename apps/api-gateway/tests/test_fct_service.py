@@ -999,6 +999,58 @@ class TestVoucherReverseAndVoid:
         assert db.add.call_count >= 3  # 1 红冲凭证 + 2 红冲分录
 
 
+class TestListTaxDeclarations:
+    """测试税务申报列表（由 FCTTaxRecord 展开）"""
+
+    @staticmethod
+    def _tax_record(store_id: str = "S001", year: int = 2026, month: int = 3):
+        r = MagicMock()
+        r.id = "tax-001"
+        r.store_id = store_id
+        r.year = year
+        r.month = month
+        r.taxpayer_type = "general"
+        r.net_vat = 12000
+        r.vat_amount = 13000
+        r.cit_amount = 8000
+        r.vat_surcharge = 1400
+        r.total_tax = 21400
+        r.is_finalized = True
+        r.generated_by = "system"
+        return r
+
+    @pytest.mark.asyncio
+    async def test_default_returns_total_type(self):
+        db = _mock_db()
+        db.execute = AsyncMock(return_value=_scalars_all([self._tax_record()]))
+        svc = StandaloneFCTService()
+
+        result = await svc.list_tax_declarations(db, tenant_id="S001")
+        assert result["total"] == 1
+        assert result["items"][0]["tax_type"] == "total"
+        assert result["items"][0]["amount"] == 21400
+
+    @pytest.mark.asyncio
+    async def test_all_expands_to_four_types(self):
+        db = _mock_db()
+        db.execute = AsyncMock(return_value=_scalars_all([self._tax_record()]))
+        svc = StandaloneFCTService()
+
+        result = await svc.list_tax_declarations(db, tenant_id="S001", tax_type="all")
+        assert result["total"] == 4
+        assert {i["tax_type"] for i in result["items"]} == {"vat", "cit", "surcharge", "total"}
+
+    @pytest.mark.asyncio
+    async def test_pagination_on_expanded_items(self):
+        db = _mock_db()
+        db.execute = AsyncMock(return_value=_scalars_all([self._tax_record()]))
+        svc = StandaloneFCTService()
+
+        result = await svc.list_tax_declarations(db, tenant_id="S001", tax_type="all", skip=1, limit=2)
+        assert result["total"] == 4
+        assert len(result["items"]) == 2
+
+
 class TestApprovalVoucherSync:
     """测试审批与凭证状态联动"""
 
