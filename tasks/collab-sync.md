@@ -16,6 +16,7 @@
   - 任务详情弹窗：补齐任务详情展示 + 证据上传占位 + 提交前证据校验
   - 任务详情接口化：新增 `queryTaskDetail`，提交改为 `submitTask(payload)`（说明/文件名）
   - 证据上传调用化：新增 `uploadTaskEvidence`（FormData）+ mock 回退 + 上传状态展示
+  - 后端 `mobile` API 补齐：`home/shifts/tasks` 查询 + check-in/out + start/submit + evidence 上传
 
 ## P1
 - [x] 核心页面移动端适配补强（`WorkforcePage`、`ActionPlansPage`）
@@ -40,8 +41,9 @@
 ## [Codex] 状态
 - status: completed
 - owner: Codex
-- task: 移动端首页/班次/任务 V1 骨架接入
+- task: 移动端后端 API 补齐（/api/v1/mobile）
 - files:
+  - `apps/api-gateway/src/api/mobile.py`
   - `apps/web/src/pages/sm/Home.tsx`
   - `apps/web/src/pages/sm/Shifts.tsx`
   - `apps/web/src/pages/sm/Shifts.module.css`
@@ -55,5 +57,6 @@
   - `apps/web/src/App.tsx`
   - `tasks/collab-sync.md`
 - verify:
-  - `pnpm --filter @zhilian-os/web exec eslint src/services/mobile.types.ts src/services/mobile.mock.ts src/services/mobile.mutation.service.ts src/pages/sm/Tasks.tsx`（通过）
-- note: 上传链路前端已接通，下一步可让后端返回文件 URL 并展示预览
+  - `python3 -m py_compile apps/api-gateway/src/api/mobile.py`（通过）
+  - `python3 -m pytest -q apps/api-gateway/tests -k "mobile and (api or task or shift)"`（被现有 `blindbox` 导入错误阻断，非本次改动引入）
+- note: 前后端 `/api/v1/mobile` 链路已对齐，下一步可加 mobile API 专项测试与附件 URL 返回

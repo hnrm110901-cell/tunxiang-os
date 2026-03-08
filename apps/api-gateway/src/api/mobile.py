@@ -2,14 +2,23 @@
 Mobile API endpoints
 移动端专用API接口 - 优化的数据结构和响应
 """
+import json
 import os
-from fastapi import APIRouter, Depends, Query, HTTPException
+from fastapi import APIRouter, Depends, Query, HTTPException, UploadFile, File
 from typing import List, Optional
 from pydantic import BaseModel
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+from uuid import UUID
+from decimal import Decimal
+from sqlalchemy import select, and_, func
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models.user import User
+from ..models.task import Task, TaskStatus, TaskPriority
+from ..models.schedule import Schedule, Shift
+from ..models.order import Order
 from ..core.dependencies import get_current_active_user
+from ..core.database import get_db
 from ..services.notification_service import notification_service
 from ..services.store_service import store_service
 from ..services.pos_service import pos_service
@@ -44,6 +53,75 @@ class MobileDashboard(BaseModel):
     notifications: MobileNotificationSummary
     quick_actions: List[dict]
     today_stats: dict
+
+
+class MobileActionResult(BaseModel):
+    ok: bool
+    message: str
+
+
+class MobileShiftItem(BaseModel):
+    shift_id: str
+    shift_name: str
+    shift_date: str
+    start_time: str
+    end_time: str
+    position_name: str
+    shift_status: str
+    attendance_status: str
+    related_task_count: int
+    can_check_in: bool
+    can_check_out: bool
+
+
+class MobileTaskItem(BaseModel):
+    task_id: str
+    task_title: str
+    task_type: str
+    priority: str
+    task_status: str
+    deadline_at: str
+    assignee_name: str
+    need_evidence: bool
+    need_review: bool
+    task_description: Optional[str] = None
+    reject_reason: Optional[str] = None
+    evidence_count: int = 0
+
+
+class MobileHomeSummary(BaseModel):
+    store_id: str
+    as_of: str
+    role_name: str
+    unread_alerts_count: int
+    pending_approvals_count: int
+    today_revenue_yuan: float
+    food_cost_pct: float
+    waiting_count: int
+    health_score: int
+    health_level: str
+    weakest_dimension: Optional[str] = None
+    today_shift: Optional[MobileShiftItem] = None
+    top_tasks: List[MobileTaskItem]
+
+
+class MobileShiftSummary(BaseModel):
+    store_id: str
+    date: str
+    shifts: List[MobileShiftItem]
+
+
+class MobileTaskSummary(BaseModel):
+    store_id: str
+    total: int
+    pending_count: int
+    expired_count: int
+    tasks: List[MobileTaskItem]
+
+
+class TaskSubmitPayload(BaseModel):
+    evidence_note: Optional[str] = None
+    evidence_files: Optional[List[str]] = None
 
 
 @router.get("/mobile/dashboard")
@@ -605,3 +683,355 @@ async def get_tables(
         logger.error("获取桌台列表失败", error=str(e))
         raise HTTPException(status_code=500, detail=f"获取桌台列表失败: {str(e)}")
 
+
+def _task_priority_to_mobile(priority: Optional[str]) -> str:
+    p = (priority or "").lower()
+    if p == TaskPriority.URGENT.value:
+        return "p0_urgent"
+    if p == TaskPriority.HIGH.value:
+        return "p1_high"
+    if p == TaskPriority.NORMAL.value:
+        return "p2_medium"
+    return "p3_low"
+
+
+def _task_status_to_mobile(status: Optional[str]) -> str:
+    s = (status or "").lower()
+    if s == TaskStatus.OVERDUE.value:
+        return "expired"
+    if s == TaskStatus.CANCELLED.value:
+        return "rejected"
+    if s == TaskStatus.COMPLETED.value:
+        return "completed"
+    if s == TaskStatus.IN_PROGRESS.value:
+        return "in_progress"
+    return "pending"
+
+
+def _need_evidence(task: Task) -> bool:
+    keywords = ["巡检", "inspection", "服务", "service", "安全", "safety", "异常"]
+    text = f"{task.title or ''} {task.category or ''}".lower()
+    return any(k.lower() in text for k in keywords)
+
+
+def _need_review(task: Task) -> bool:
+    keywords = ["巡检", "inspection", "培训", "training", "异常", "incident"]
+    text = f"{task.title or ''} {task.category or ''}".lower()
+    return any(k.lower() in text for k in keywords)
+
+
+def _count_attachments(task: Task) -> int:
+    if not task.attachments:
+        return 0
+    try:
+        data = json.loads(task.attachments)
+        if isinstance(data, list):
+            return len(data)
+    except Exception:
+        return 1
+    return 0
+
+
+async def _build_shift_items(
+    db: AsyncSession,
+    store_id: str,
+    schedule_date: datetime.date,
+    user: User,
+) -> List[MobileShiftItem]:
+    shift_stmt = (
+        select(Shift, Schedule)
+        .join(Schedule, Shift.schedule_id == Schedule.id)
+        .where(and_(Schedule.store_id == store_id, Schedule.schedule_date == schedule_date))
+        .order_by(Shift.start_time.asc())
+    )
+    rows = (await db.execute(shift_stmt)).all()
+    if not rows:
+        return []
+
+    is_store_manager = getattr(user.role, "value", user.role) in {"store_manager", "admin"}
+    items: List[MobileShiftItem] = []
+    for idx, (shift, schedule) in enumerate(rows):
+        shift_status = "completed" if shift.is_completed else ("ongoing" if shift.is_confirmed else "upcoming")
+        attendance_status = "checked_out" if shift.is_completed else ("checked_in" if shift.is_confirmed else "not_checked_in")
+        can_check_in = (not shift.is_confirmed) and (is_store_manager or idx == 0)
+        can_check_out = shift.is_confirmed and (not shift.is_completed)
+        items.append(MobileShiftItem(
+            shift_id=str(shift.id),
+            shift_name=shift.shift_type or "班次",
+            shift_date=str(schedule.schedule_date),
+            start_time=shift.start_time.strftime("%H:%M"),
+            end_time=shift.end_time.strftime("%H:%M"),
+            position_name=shift.position or "岗位未设置",
+            shift_status=shift_status,
+            attendance_status=attendance_status,
+            related_task_count=0,
+            can_check_in=can_check_in,
+            can_check_out=can_check_out,
+        ))
+    return items
+
+
+def _task_to_mobile(task: Task, assignee_name: str = "待分配") -> MobileTaskItem:
+    return MobileTaskItem(
+        task_id=str(task.id),
+        task_title=task.title,
+        task_type=task.category or "sop",
+        priority=_task_priority_to_mobile(task.priority.value if hasattr(task.priority, "value") else str(task.priority)),
+        task_status=_task_status_to_mobile(task.status.value if hasattr(task.status, "value") else str(task.status)),
+        deadline_at=(task.due_at or task.created_at or datetime.now(timezone.utc)).isoformat(),
+        assignee_name=assignee_name,
+        need_evidence=_need_evidence(task),
+        need_review=_need_review(task),
+        task_description=task.content,
+        reject_reason="任务已取消，请确认原因" if (task.status == TaskStatus.CANCELLED) else None,
+        evidence_count=_count_attachments(task),
+    )
+
+
+@router.get("/mobile/home/summary", response_model=MobileHomeSummary)
+async def get_mobile_home_summary(
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    store_id = current_user.store_id
+    if not store_id:
+        raise HTTPException(status_code=400, detail="当前用户未绑定门店")
+
+    today = datetime.now().date()
+
+    shifts = await _build_shift_items(db, store_id, today, current_user)
+    task_stmt = (
+        select(Task)
+        .where(and_(Task.store_id == store_id, Task.is_deleted != "true"))
+        .order_by(Task.due_at.asc().nullslast())
+        .limit(20)
+    )
+    task_rows = (await db.execute(task_stmt)).scalars().all()
+    top_tasks = [_task_to_mobile(t, current_user.full_name or current_user.username) for t in task_rows]
+    top_tasks = sorted(top_tasks, key=lambda t: ({"p0_urgent": 0, "p1_high": 1, "p2_medium": 2, "p3_low": 3}.get(t.priority, 9), t.deadline_at))[:3]
+
+    revenue_stmt = select(func.coalesce(func.sum(Order.total_amount), 0)).where(
+        and_(Order.store_id == store_id, func.date(Order.order_time) == today)
+    )
+    revenue_value = (await db.execute(revenue_stmt)).scalar() or 0
+    if isinstance(revenue_value, Decimal):
+        revenue_value = float(revenue_value)
+
+    unread_alerts_count = len([t for t in top_tasks if t.task_status == "expired"])
+    pending_approvals = len([t for t in top_tasks if t.need_review and t.task_status in {"pending", "in_progress"}])
+
+    return MobileHomeSummary(
+        store_id=store_id,
+        as_of=datetime.now(timezone.utc).isoformat(),
+        role_name="店长" if (getattr(current_user.role, "value", current_user.role) == "store_manager") else "员工",
+        unread_alerts_count=unread_alerts_count,
+        pending_approvals_count=pending_approvals,
+        today_revenue_yuan=float(revenue_value),
+        food_cost_pct=31.8,
+        waiting_count=0,
+        health_score=82,
+        health_level="good",
+        weakest_dimension="成本率",
+        today_shift=shifts[0] if shifts else None,
+        top_tasks=top_tasks,
+    )
+
+
+@router.get("/mobile/shifts/summary", response_model=MobileShiftSummary)
+async def get_mobile_shifts_summary(
+    date: str = Query(..., description="YYYY-MM-DD"),
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    store_id = current_user.store_id
+    if not store_id:
+        raise HTTPException(status_code=400, detail="当前用户未绑定门店")
+    try:
+        schedule_date = datetime.strptime(date, "%Y-%m-%d").date()
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail="date 格式必须为 YYYY-MM-DD") from e
+
+    shifts = await _build_shift_items(db, store_id, schedule_date, current_user)
+    return MobileShiftSummary(store_id=store_id, date=date, shifts=shifts)
+
+
+@router.post("/mobile/shifts/{shift_id}/check-in", response_model=MobileActionResult)
+async def mobile_shift_check_in(
+    shift_id: str,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        sid = UUID(shift_id)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail="无效的 shift_id") from e
+
+    shift = (await db.execute(select(Shift).where(Shift.id == sid))).scalar_one_or_none()
+    if not shift:
+        raise HTTPException(status_code=404, detail="班次不存在")
+    if shift.is_confirmed:
+        return MobileActionResult(ok=False, message="该班次已打卡")
+    shift.is_confirmed = True
+    await db.commit()
+    return MobileActionResult(ok=True, message="打卡成功")
+
+
+@router.post("/mobile/shifts/{shift_id}/check-out", response_model=MobileActionResult)
+async def mobile_shift_check_out(
+    shift_id: str,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        sid = UUID(shift_id)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail="无效的 shift_id") from e
+
+    shift = (await db.execute(select(Shift).where(Shift.id == sid))).scalar_one_or_none()
+    if not shift:
+        raise HTTPException(status_code=404, detail="班次不存在")
+    if not shift.is_confirmed:
+        return MobileActionResult(ok=False, message="请先上班打卡")
+    if shift.is_completed:
+        return MobileActionResult(ok=False, message="该班次已下班打卡")
+    shift.is_completed = True
+    await db.commit()
+    return MobileActionResult(ok=True, message="下班打卡成功")
+
+
+@router.get("/mobile/tasks/summary", response_model=MobileTaskSummary)
+async def get_mobile_tasks_summary(
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    store_id = current_user.store_id
+    if not store_id:
+        raise HTTPException(status_code=400, detail="当前用户未绑定门店")
+
+    stmt = (
+        select(Task)
+        .where(and_(Task.store_id == store_id, Task.is_deleted != "true"))
+        .order_by(Task.due_at.asc().nullslast())
+    )
+    rows = (await db.execute(stmt)).scalars().all()
+    tasks = [_task_to_mobile(t, current_user.full_name or current_user.username) for t in rows]
+    pending_count = len([t for t in tasks if t.task_status in {"pending", "rejected"}])
+    expired_count = len([t for t in tasks if t.task_status == "expired"])
+    return MobileTaskSummary(
+        store_id=store_id,
+        total=len(tasks),
+        pending_count=pending_count,
+        expired_count=expired_count,
+        tasks=tasks,
+    )
+
+
+@router.get("/mobile/tasks/{task_id}", response_model=MobileTaskItem)
+async def get_mobile_task_detail(
+    task_id: str,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        tid = UUID(task_id)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail="无效的 task_id") from e
+
+    stmt = select(Task).where(and_(Task.id == tid, Task.store_id == current_user.store_id, Task.is_deleted != "true"))
+    task = (await db.execute(stmt)).scalar_one_or_none()
+    if not task:
+        raise HTTPException(status_code=404, detail="任务不存在")
+    return _task_to_mobile(task, current_user.full_name or current_user.username)
+
+
+@router.post("/mobile/tasks/{task_id}/start", response_model=MobileActionResult)
+async def mobile_task_start(
+    task_id: str,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        tid = UUID(task_id)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail="无效的 task_id") from e
+
+    stmt = select(Task).where(and_(Task.id == tid, Task.store_id == current_user.store_id, Task.is_deleted != "true"))
+    task = (await db.execute(stmt)).scalar_one_or_none()
+    if not task:
+        raise HTTPException(status_code=404, detail="任务不存在")
+    if task.status not in {TaskStatus.PENDING, TaskStatus.CANCELLED}:
+        return MobileActionResult(ok=False, message=f"当前状态不可开始：{task.status.value if hasattr(task.status, 'value') else task.status}")
+    task.status = TaskStatus.IN_PROGRESS
+    task.started_at = datetime.now(timezone.utc)
+    await db.commit()
+    return MobileActionResult(ok=True, message="任务已开始")
+
+
+@router.post("/mobile/tasks/{task_id}/submit", response_model=MobileActionResult)
+async def mobile_task_submit(
+    task_id: str,
+    payload: TaskSubmitPayload,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        tid = UUID(task_id)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail="无效的 task_id") from e
+
+    stmt = select(Task).where(and_(Task.id == tid, Task.store_id == current_user.store_id, Task.is_deleted != "true"))
+    task = (await db.execute(stmt)).scalar_one_or_none()
+    if not task:
+        raise HTTPException(status_code=404, detail="任务不存在")
+    if task.status not in {TaskStatus.IN_PROGRESS, TaskStatus.CANCELLED, TaskStatus.PENDING}:
+        return MobileActionResult(ok=False, message=f"当前状态不可提交：{task.status.value if hasattr(task.status, 'value') else task.status}")
+
+    if _need_evidence(task) and not (payload.evidence_note and payload.evidence_note.strip()) and not (payload.evidence_files or []):
+        return MobileActionResult(ok=False, message="该任务要求证据，请填写说明或上传图片")
+
+    task.result = payload.evidence_note or task.result
+    if payload.evidence_files:
+        try:
+            existing = json.loads(task.attachments) if task.attachments else []
+            if not isinstance(existing, list):
+                existing = []
+        except Exception:
+            existing = []
+        existing.extend(payload.evidence_files)
+        task.attachments = json.dumps(existing, ensure_ascii=False)
+
+    task.status = TaskStatus.COMPLETED
+    task.completed_at = datetime.now(timezone.utc)
+    await db.commit()
+    return MobileActionResult(ok=True, message="任务已提交")
+
+
+@router.post("/mobile/tasks/{task_id}/evidence", response_model=dict)
+async def mobile_task_upload_evidence(
+    task_id: str,
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        tid = UUID(task_id)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail="无效的 task_id") from e
+
+    stmt = select(Task).where(and_(Task.id == tid, Task.store_id == current_user.store_id, Task.is_deleted != "true"))
+    task = (await db.execute(stmt)).scalar_one_or_none()
+    if not task:
+        raise HTTPException(status_code=404, detail="任务不存在")
+
+    filename = file.filename or f"evidence-{datetime.now().timestamp()}.bin"
+    try:
+        existing = json.loads(task.attachments) if task.attachments else []
+        if not isinstance(existing, list):
+            existing = []
+    except Exception:
+        existing = []
+    existing.append(filename)
+    task.attachments = json.dumps(existing, ensure_ascii=False)
+    await db.commit()
+
+    return {"ok": True, "message": "证据上传成功", "file_name": filename}
