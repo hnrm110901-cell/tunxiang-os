@@ -166,6 +166,10 @@ const MultiStoreManagement: React.FC = () => {
     quantity: number;
     reason?: string;
     }) => {
+    if (values.source_store_id === values.target_store_id) {
+      message.warning('目标门店不能与来源门店相同');
+      return;
+    }
     try {
       setTransferSubmitting(true);
       await inventoryDataService.createTransferRequest(values.source_store_id, {
@@ -303,6 +307,14 @@ const MultiStoreManagement: React.FC = () => {
       setTargetInventoryItems([]);
     }
   }, [targetStoreId, loadStoreInventory]);
+
+  useEffect(() => {
+    if (!sourceStoreId || !targetStoreId) return;
+    if (sourceStoreId !== targetStoreId) return;
+    transferForm.setFieldValue('target_store_id', undefined);
+    setTargetInventoryItems([]);
+    message.warning('目标门店不能与来源门店相同，请重新选择');
+  }, [sourceStoreId, targetStoreId, transferForm]);
 
   const handleStoreSelectionChange = async (values: string[]) => {
     setSelectedStores(values);
@@ -630,12 +642,24 @@ const MultiStoreManagement: React.FC = () => {
           </Form.Item>
           <Form.Item
             name="target_store_id"
-            rules={[{ required: true, message: '请选择目标门店' }]}
+            rules={[
+              { required: true, message: '请选择目标门店' },
+              () => ({
+                validator(_, value) {
+                  if (!value || value !== sourceStoreId) {
+                    return Promise.resolve();
+                  }
+                  return Promise.reject(new Error('目标门店不能与来源门店相同'));
+                },
+              }),
+            ]}
           >
             <Select
               style={{ width: 180 }}
               placeholder="目标门店"
-              options={stores.map((store) => ({ label: `${store.name} (${store.region})`, value: store.id }))}
+              options={stores
+                .filter((store) => store.id !== sourceStoreId)
+                .map((store) => ({ label: `${store.name} (${store.region})`, value: store.id }))}
             />
           </Form.Item>
           <Form.Item
