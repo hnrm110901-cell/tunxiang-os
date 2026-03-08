@@ -12,7 +12,7 @@ KitchenVisionInterface Protocol — 为 2027Q3 厨房视觉系统预留标准接
 接口设计原则：
 - 数据类定义完整，满足业务需求
 - Protocol 约束实现方必须满足的方法签名
-- TODO 注释标明 2027Q3 实现计划
+- Roadmap(2027Q3) 注释标明后续实现计划
 """
 from __future__ import annotations
 
@@ -68,7 +68,7 @@ class KitchenVisionInterface(Protocol):
     """
     厨房视觉系统接口
 
-    TODO(2027Q3): 实现此接口，接入厨房摄像头和计算机视觉模型。
+    Roadmap(2027Q3): 实现此接口，接入厨房摄像头和计算机视觉模型。
 
     实现建议：
     - 使用 YOLOv8 或 RT-DETR 进行菜品识别
@@ -98,7 +98,7 @@ class KitchenVisionInterface(Protocol):
         Returns:
             List[DishOutputRecord]: 出品记录列表
         """
-        ...  # TODO: 2027Q3 实现
+        ...  # Roadmap(2027Q3): 待实现
 
     async def get_cook_time_stats(
         self,
@@ -117,7 +117,7 @@ class KitchenVisionInterface(Protocol):
         Returns:
             List[CookTimeStats]: 各菜品/档口的烹饪时间统计
         """
-        ...  # TODO: 2027Q3 实现
+        ...  # Roadmap(2027Q3): 待实现
 
     async def get_realtime_station_status(
         self,
@@ -133,7 +133,7 @@ class KitchenVisionInterface(Protocol):
             - estimated_done_time: 预计完成时间
             - chef_id: 当前厨师
         """
-        ...  # TODO: 2027Q3 实现
+        ...  # Roadmap(2027Q3): 待实现
 
 
 # ==================== 占位实现（返回空数据）====================
@@ -154,7 +154,7 @@ class KitchenVisionStub:
         station_id: Optional[str] = None,
         dish_id: Optional[str] = None,
     ) -> List[DishOutputRecord]:
-        # TODO(2027Q3): 接入摄像头系统
+        # Roadmap(2027Q3): 接入摄像头系统
         return []
 
     async def get_cook_time_stats(
@@ -163,14 +163,14 @@ class KitchenVisionStub:
         sku_ids: Optional[List[str]] = None,
         period_days: int = 7,
     ) -> List[CookTimeStats]:
-        # TODO(2027Q3): 接入摄像头系统
+        # Roadmap(2027Q3): 接入摄像头系统
         return []
 
     async def get_realtime_station_status(
         self,
         store_id: str,
     ) -> dict:
-        # TODO(2027Q3): 接入摄像头系统
+        # Roadmap(2027Q3): 接入摄像头系统
         return {}
 
 
