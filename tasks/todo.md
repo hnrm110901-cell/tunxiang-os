@@ -154,7 +154,7 @@
 
 > 核心目标：用多客户数据积累行业基准，形成数据网络效应壁垒
 
-- [ ] `src/services/labor_benchmark_service.py`：行业基准数据库
+- [x] `src/services/labor_benchmark_service.py`：行业基准数据库
   - 湖南中式餐饮人效基准（按门店面积/座位数分档）
   - 同类型门店人工成本率基准区间
   - 跨客户数据脱敏聚合（联邦学习模式）
