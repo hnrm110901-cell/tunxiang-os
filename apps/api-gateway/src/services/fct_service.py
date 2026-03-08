@@ -1204,6 +1204,18 @@ class StandaloneFCTService:
         return date(target_year, dt.month, day)
 
     @staticmethod
+    def _period_key(dt: date) -> str:
+        return dt.strftime("%Y-%m")
+
+    def _is_period_explicitly_closed(self, tenant_id: str, period_key: str) -> bool:
+        return self._period_status_overrides.get((tenant_id, period_key)) == "closed"
+
+    def _ensure_period_open_for_voucher(self, tenant_id: str, effective_date: date) -> None:
+        period_key = self._period_key(effective_date)
+        if self._is_period_explicitly_closed(tenant_id, period_key):
+            raise ValueError(f"会计期间 {period_key} 已结账，禁止新增或过账凭证")
+
+    @staticmethod
     def _voucher_to_dict(v) -> Dict[str, Any]:
         return {
             "id": str(v.id),
@@ -1293,6 +1305,7 @@ class StandaloneFCTService:
         if abs(debit_total - credit_total) > 0.01:
             raise ValueError(f"借贷不平衡：借方 {debit_total} ≠ 贷方 {credit_total}")
         effective_date = biz_date or date.today()
+        self._ensure_period_open_for_voucher(tenant_id, effective_date)
         period = effective_date.strftime("%Y%m")
         policy = {"enforce_check": False, "auto_occupy": False}
         if budget_check is None or budget_occupy is None:
@@ -1403,6 +1416,7 @@ class StandaloneFCTService:
         voucher_amount = 0.0
         period = (voucher.biz_date or date.today()).strftime("%Y%m")
         if status == "posted" and current != "posted":
+            self._ensure_period_open_for_voucher(voucher.store_id, voucher.biz_date or date.today())
             policy = {"enforce_check": False, "auto_occupy": False}
             if budget_check is None or budget_occupy is None:
                 policy = await self._resolve_budget_policy(
@@ -1512,13 +1526,16 @@ class StandaloneFCTService:
         if original_status != "posted":
             raise ValueError("仅已过账凭证支持红冲")
 
-        red_no = f"RF-{(biz_date or date.today()).strftime('%Y%m%d')}-{str(uuid4())[:8].upper()}"
+        red_biz_date = biz_date or date.today()
+        self._ensure_period_open_for_voucher(original.store_id, red_biz_date)
+
+        red_no = f"RF-{red_biz_date.strftime('%Y%m%d')}-{str(uuid4())[:8].upper()}"
         red_voucher = Voucher(
             voucher_no=red_no,
             store_id=original.store_id,
             event_type="red_flush",
             event_id=str(original.id),
-            biz_date=biz_date or date.today(),
+            biz_date=red_biz_date,
             status="posted",
             description=f"红冲凭证，冲销原凭证 {original.voucher_no}",
         )
@@ -1547,7 +1564,7 @@ class StandaloneFCTService:
             "original_voucher_no": original.voucher_no,
             "red_voucher_id": str(red_voucher.id),
             "red_voucher_no": red_no,
-            "biz_date": (biz_date or date.today()).isoformat(),
+            "biz_date": red_biz_date.isoformat(),
             "success": True,
         }
 

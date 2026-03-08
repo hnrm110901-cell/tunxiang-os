@@ -843,6 +843,20 @@ class TestCreateManualVoucherPersist:
                     lines=self._balanced_lines(),
                 )
 
+    @pytest.mark.asyncio
+    async def test_closed_period_blocks_manual_voucher_creation(self):
+        db = _mock_db()
+        svc = StandaloneFCTService()
+        svc._period_status_overrides[("T1", "2026-03")] = "closed"
+        with pytest.raises(ValueError, match="已结账"):
+            await svc.create_manual_voucher(
+                db,
+                tenant_id="T1",
+                entity_id="S001",
+                biz_date=date(2026, 3, 1),
+                lines=self._balanced_lines(),
+            )
+
 
 class TestGetVoucherById:
     """测试 get_voucher_by_id"""
@@ -993,6 +1007,32 @@ class TestUpdateVoucherStatus:
         assert result["status"] == "posted"
         occupy_mock.assert_awaited_once()
 
+    @pytest.mark.asyncio
+    async def test_closed_period_blocks_posting(self):
+        db = _mock_db()
+        db.refresh = AsyncMock()
+        v = MagicMock()
+        v.id = "vid-201"
+        v.voucher_no = "MV-201"
+        v.store_id = "S001"
+        v.biz_date = date(2026, 3, 1)
+        v.status = "approved"
+
+        voucher_result = MagicMock()
+        voucher_result.scalar_one_or_none.return_value = v
+        db.execute = AsyncMock(return_value=voucher_result)
+
+        svc = StandaloneFCTService()
+        svc._period_status_overrides[("S001", "2026-03")] = "closed"
+        with pytest.raises(ValueError, match="已结账"):
+            await svc.update_voucher_status(
+                db,
+                voucher_id="vid-201",
+                target_status="posted",
+                budget_check=False,
+                budget_occupy=False,
+            )
+
 
 class TestVoucherReverseAndVoid:
     """测试凭证作废与红冲"""
@@ -1075,6 +1115,24 @@ class TestVoucherReverseAndVoid:
         assert result["red_voucher_no"].startswith("RF-20260308-")
         assert original.status == "reversed"
         assert db.add.call_count >= 3  # 1 红冲凭证 + 2 红冲分录
+
+    @pytest.mark.asyncio
+    async def test_red_flush_blocked_when_period_closed(self):
+        db = _mock_db()
+        original = MagicMock()
+        original.id = "vid-304"
+        original.voucher_no = "MV-304"
+        original.store_id = "S001"
+        original.status = "posted"
+        original.lines = []
+        result_mock = MagicMock()
+        result_mock.scalar_one_or_none.return_value = original
+        db.execute = AsyncMock(return_value=result_mock)
+
+        svc = StandaloneFCTService()
+        svc._period_status_overrides[("S001", "2026-03")] = "closed"
+        with pytest.raises(ValueError, match="已结账"):
+            await svc.red_flush_voucher(db, voucher_id="vid-304", biz_date=date(2026, 3, 8))
 
 
 class TestCreateCashTransaction:

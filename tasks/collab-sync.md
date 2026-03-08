@@ -37,6 +37,8 @@
   - `close_period/reopen_period`：补齐不存在/重复状态校验
   - 单 open 约束：反结账后目标期间为 open，其余 closed（运行时状态覆盖）
   - 补齐单测：service 与 API 层期间端点
+  - 关闭期间保护：禁止新增凭证、凭证过账、红冲过账（返回明确错误）
+  - 补齐 API 映射测试：关闭期间错误统一映射为 400
 
 ---
 
@@ -55,6 +57,7 @@
   - `apps/api-gateway/src/api/mobile.py`
   - `apps/api-gateway/tests/test_mobile_api_v1_routes.py`
   - `apps/api-gateway/tests/test_fct_public_periods_api.py`
+  - `apps/api-gateway/tests/test_fct_public_voucher_api.py`
   - `apps/api-gateway/tests/test_fct_service.py`
   - `apps/api-gateway/src/services/fct_service.py`
   - `apps/web/src/pages/sm/Home.tsx`
@@ -79,4 +82,6 @@
   - `pnpm --filter @zhilian-os/web exec eslint src/services/mobile.types.ts src/services/mobile.mutation.service.ts src/pages/sm/Tasks.tsx`（通过）
   - `python3 -m pytest -q apps/api-gateway/tests/test_fct_service.py -k "ListPeriods or PeriodCloseReopen"`（6 passed）
   - `python3 -m pytest -q apps/api-gateway/tests/test_fct_public_periods_api.py`（3 passed）
+  - `python3 -m pytest -q apps/api-gateway/tests/test_fct_service.py -k "CreateManualVoucherPersist or UpdateVoucherStatus or VoucherReverseAndVoid"`（16 passed）
+  - `python3 -m pytest -q apps/api-gateway/tests/test_fct_public_voucher_api.py apps/api-gateway/tests/test_fct_public_periods_api.py`（6 passed）
 - note: 已消除 `src.main` 的 blindbox/federated 缺失模块阻断；mobile 上传接口已返回 `file_url`
