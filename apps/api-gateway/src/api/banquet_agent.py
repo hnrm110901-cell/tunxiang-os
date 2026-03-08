@@ -22,18 +22,29 @@ from src.models.banquet import (
     LeadStageEnum, OrderStatusEnum, BanquetTypeEnum,
     BanquetHallType, PaymentTypeEnum, DepositStatusEnum,
 )
-from packages.agents.banquet.src.agent import (
-    FollowupAgent, QuotationAgent, SchedulingAgent,
-    ExecutionAgent, ReviewAgent,
-)
+import sys
+from pathlib import Path as _Path
+
+def _load_banquet_agents():
+    """懒加载 Banquet Agent（与 workforce_auto_schedule_service 同一模式）"""
+    repo_root = _Path(__file__).resolve().parents[4]
+    if str(repo_root) not in sys.path:
+        sys.path.insert(0, str(repo_root))
+    from packages.agents.banquet.src.agent import (
+        FollowupAgent, QuotationAgent, SchedulingAgent,
+        ExecutionAgent, ReviewAgent,
+    )
+    return FollowupAgent, QuotationAgent, SchedulingAgent, ExecutionAgent, ReviewAgent
+
+_FollowupAgent, _QuotationAgent, _SchedulingAgent, _ExecutionAgent, _ReviewAgent = _load_banquet_agents()
 
 router = APIRouter(prefix="/api/v1/banquet-agent", tags=["banquet-agent"])
 
-_followup   = FollowupAgent()
-_quotation  = QuotationAgent()
-_scheduling = SchedulingAgent()
-_execution  = ExecutionAgent()
-_review     = ReviewAgent()
+_followup   = _FollowupAgent()
+_quotation  = _QuotationAgent()
+_scheduling = _SchedulingAgent()
+_execution  = _ExecutionAgent()
+_review     = _ReviewAgent()
 
 
 # ────────── Schemas ──────────────────────────────────────────────────────────

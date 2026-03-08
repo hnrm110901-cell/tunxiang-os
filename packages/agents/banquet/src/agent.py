@@ -22,7 +22,7 @@ from src.models.banquet import (
     MenuPackage, ExecutionTask, ExecutionTemplate,
     BanquetProfitSnapshot, BanquetAgentActionLog,
     LeadStageEnum, OrderStatusEnum, TaskStatusEnum, TaskOwnerRoleEnum,
-    BanquetAgentTypeEnum,
+    BanquetAgentTypeEnum, BanquetHallType, BanquetTypeEnum,
 )
 
 logger = logging.getLogger(__name__)
