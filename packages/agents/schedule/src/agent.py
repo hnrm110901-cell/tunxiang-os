@@ -3,13 +3,14 @@
 基于客流预测和员工技能的自动排班系统
 无状态设计：状态由调用方从DB查询后传入，Agent不持有任何内存状态
 """
-from typing import Dict, Any, List, Optional, TypedDict
+from typing import Dict, Any, List, Optional, TypedDict, Callable
 from datetime import datetime, timedelta
 import structlog
 from enum import Enum
 import uuid
 import sys
 import os
+import inspect
 from pathlib import Path
 
 # Add core module to path
@@ -113,6 +114,64 @@ class ScheduleAgent(BaseAgent):
             logger.warning("schedule_traffic_db_failed", error=str(e))
         return None
 
+    def _normalize_predicted_customers(self, data: Any) -> Optional[Dict[str, int]]:
+        """规范化模型输出，确保包含 morning/afternoon/evening 三段且为正整数。"""
+        if not isinstance(data, dict):
+            return None
+        required_keys = ("morning", "afternoon", "evening")
+        if not all(k in data for k in required_keys):
+            return None
+        try:
+            normalized = {k: max(1, int(data[k])) for k in required_keys}
+            return normalized
+        except (TypeError, ValueError):
+            return None
+
+    async def _fetch_model_traffic(
+        self, store_id: str, date: str, is_weekend: bool
+    ) -> Optional[Dict[str, Any]]:
+        """
+        调用可注入的真实客流预测模型。
+        config["traffic_predictor"] 支持同步/异步函数，返回:
+          {"predicted_customers": {...}, "confidence": 0.xx, "peak_hours": [...]} 或直接 {...}
+        """
+        predictor: Optional[Callable[..., Any]] = self.config.get("traffic_predictor")
+        if not callable(predictor):
+            return None
+
+        try:
+            raw = predictor(store_id=store_id, date=date, is_weekend=is_weekend)
+            if inspect.isawaitable(raw):
+                raw = await raw
+        except Exception as e:
+            logger.warning("schedule_traffic_model_failed", error=str(e))
+            return None
+
+        predicted = None
+        confidence = 0.90 if not is_weekend else 0.86
+        peak_hours = ["12:00-13:00", "18:00-20:00"]
+        model_name = "custom_predictor"
+
+        if isinstance(raw, dict):
+            if "predicted_customers" in raw:
+                predicted = self._normalize_predicted_customers(raw.get("predicted_customers"))
+                confidence = float(raw.get("confidence", confidence))
+                if isinstance(raw.get("peak_hours"), list):
+                    peak_hours = raw["peak_hours"]
+                model_name = str(raw.get("model_name", model_name))
+            else:
+                predicted = self._normalize_predicted_customers(raw)
+
+        if not predicted:
+            return None
+
+        return {
+            "predicted_customers": predicted,
+            "confidence": max(0.0, min(1.0, confidence)),
+            "peak_hours": peak_hours,
+            "model_name": model_name,
+        }
+
     def get_supported_actions(self) -> List[str]:
         return ["run", "adjust_schedule", "get_schedule"]
 
@@ -149,7 +208,7 @@ class ScheduleAgent(BaseAgent):
             return AgentResponse(success=False, data=None, error=str(e))
 
     async def analyze_traffic(self, state: ScheduleState) -> ScheduleState:
-        """分析客流数据（优先使用历史订单均值，无 DB 时回退到固定系数）"""
+        """分析客流数据（真实模型优先，历史订单均值次级，无 DB 时回退固定系数）"""
         store_id = state["store_id"]
         date = state["date"]
         logger.info("分析客流", store_id=store_id, date=date)
@@ -160,33 +219,49 @@ class ScheduleAgent(BaseAgent):
             weekday = 0
         is_weekend = weekday >= 5
 
-        # 优先从历史订单数据预测
-        historical = await self._fetch_historical_traffic(store_id, date)
-        if historical:
-            predicted = historical
-            confidence = 0.85 if not is_weekend else 0.80
-            source = "historical_orders"
+        # 优先：真实模型预测
+        model_result = await self._fetch_model_traffic(store_id, date, is_weekend)
+        if model_result:
+            predicted = model_result["predicted_customers"]
+            confidence = model_result["confidence"]
+            source = "traffic_model"
+            peak_hours = model_result.get("peak_hours", ["12:00-13:00", "18:00-20:00"])
+            model_name = model_result.get("model_name", "custom_predictor")
         else:
-            # Fallback：固定系数
-            weekend_factor = float(os.getenv("SCHEDULE_WEEKEND_TRAFFIC_FACTOR", "1.4")) if is_weekend else 1.0
-            base_morning = int(os.getenv("SCHEDULE_BASE_MORNING_CUSTOMERS", "50"))
-            base_afternoon = int(os.getenv("SCHEDULE_BASE_AFTERNOON_CUSTOMERS", "80"))
-            base_evening = int(os.getenv("SCHEDULE_BASE_EVENING_CUSTOMERS", "120"))
-            predicted = {
-                "morning": int(base_morning * weekend_factor),
-                "afternoon": int(base_afternoon * weekend_factor),
-                "evening": int(base_evening * weekend_factor),
-            }
-            confidence = 0.75 if not is_weekend else 0.65
-            source = "default_coefficients"
+            # 次级：历史订单均值
+            historical = await self._fetch_historical_traffic(store_id, date)
+            if historical:
+                predicted = historical
+                confidence = 0.85 if not is_weekend else 0.80
+                source = "historical_orders"
+                peak_hours = ["12:00-13:00", "18:00-20:00"]
+                model_name = None
+            else:
+                # 兜底：固定系数
+                weekend_factor = float(os.getenv("SCHEDULE_WEEKEND_TRAFFIC_FACTOR", "1.4")) if is_weekend else 1.0
+                base_morning = int(os.getenv("SCHEDULE_BASE_MORNING_CUSTOMERS", "50"))
+                base_afternoon = int(os.getenv("SCHEDULE_BASE_AFTERNOON_CUSTOMERS", "80"))
+                base_evening = int(os.getenv("SCHEDULE_BASE_EVENING_CUSTOMERS", "120"))
+                predicted = {
+                    "morning": int(base_morning * weekend_factor),
+                    "afternoon": int(base_afternoon * weekend_factor),
+                    "evening": int(base_evening * weekend_factor),
+                }
+                confidence = 0.75 if not is_weekend else 0.65
+                source = "default_coefficients"
+                peak_hours = ["12:00-13:00", "18:00-20:00"]
+                model_name = None
 
         state["traffic_data"] = {
             "predicted_customers": predicted,
-            "peak_hours": ["12:00-13:00", "18:00-20:00"],
+            "peak_hours": peak_hours,
             "confidence": confidence,
             "weekend": is_weekend,
             "source": source,
         }
+        if model_name:
+            state["traffic_data"]["model_name"] = model_name
+
         logger.info("客流分析完成", traffic_data=state["traffic_data"])
         return state
 

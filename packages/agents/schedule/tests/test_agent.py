@@ -91,6 +91,41 @@ class TestScheduleAgent:
         assert "confidence" in result["traffic_data"]
 
     @pytest.mark.asyncio
+    async def test_analyze_traffic_uses_model_predictor_first(self, initial_state):
+        """测试优先使用真实模型预测"""
+        async def predictor(**kwargs):
+            return {
+                "predicted_customers": {"morning": 66, "afternoon": 88, "evening": 123},
+                "confidence": 0.93,
+                "peak_hours": ["11:30-13:00", "18:00-20:30"],
+                "model_name": "test_model_v1",
+            }
+
+        agent = ScheduleAgent(
+            {"min_shift_hours": 4, "max_shift_hours": 8, "max_weekly_hours": 40, "traffic_predictor": predictor}
+        )
+        result = await agent.analyze_traffic(initial_state)
+        assert result["traffic_data"]["source"] == "traffic_model"
+        assert result["traffic_data"]["predicted_customers"]["morning"] == 66
+        assert result["traffic_data"]["model_name"] == "test_model_v1"
+
+    @pytest.mark.asyncio
+    async def test_analyze_traffic_fallback_to_historical(self, agent, initial_state, monkeypatch):
+        """测试模型不可用时回退历史订单均值"""
+        async def broken_predictor(**kwargs):
+            raise RuntimeError("model unavailable")
+
+        async def fake_historical(*args, **kwargs):
+            return {"morning": 70, "afternoon": 90, "evening": 140}
+
+        agent.config["traffic_predictor"] = broken_predictor
+        monkeypatch.setattr(agent, "_fetch_historical_traffic", fake_historical)
+
+        result = await agent.analyze_traffic(initial_state)
+        assert result["traffic_data"]["source"] == "historical_orders"
+        assert result["traffic_data"]["predicted_customers"]["evening"] == 140
+
+    @pytest.mark.asyncio
     async def test_calculate_requirements(self, agent, initial_state):
         """测试人力需求计算"""
         # 先分析客流
