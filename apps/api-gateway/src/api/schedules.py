@@ -4,8 +4,8 @@ Schedule Management API
 """
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from typing import Optional, List
-from datetime import date, time
+from typing import Optional, List, Literal
+from datetime import date, time, datetime
 import uuid
 import structlog
 
@@ -16,7 +16,7 @@ from ..models.audit_log import AuditLog, ResourceType, AuditAction
 from ..models.user import User, UserRole
 from ..repositories import ScheduleRepository
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, desc
+from sqlalchemy import select, and_
 from sqlalchemy.orm import selectinload
 
 from ..services.schedule_conflict_service import detect_schedule_conflicts
@@ -387,19 +387,41 @@ async def confirm_shift(
 async def get_schedule_history(
     schedule_id: str,
     limit: int = Query(50, ge=1, le=200),
+    action: Optional[Literal["create", "update"]] = Query(None, description="按动作筛选"),
+    keyword: Optional[str] = Query(None, description="关键词（操作人/描述）"),
+    order: Literal["desc", "asc"] = Query("desc", description="时间排序"),
     session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
     """获取排班历史记录（审计日志）"""
+    # FastAPI direct function calls in tests can pass Query() objects as defaults.
+    action_value = action if isinstance(action, str) else None
+    keyword_value = keyword if isinstance(keyword, str) else None
+    order_value = order if order in ("desc", "asc") else "desc"
+    limit_value = limit if isinstance(limit, int) else 50
+
     result = await session.execute(
         select(AuditLog).where(
             and_(
                 AuditLog.resource_type == ResourceType.SCHEDULE,
                 AuditLog.resource_id == schedule_id,
             )
-        ).order_by(desc(AuditLog.created_at)).limit(limit)
+        ).limit(200)
     )
     rows = result.scalars().all()
+    if action_value:
+        rows = [item for item in rows if item.action == action_value]
+    if keyword_value:
+        kw = keyword_value.strip().lower()
+        rows = [
+            item for item in rows
+            if kw in f"{item.description or ''} {item.username or ''} {item.user_id or ''} {item.action or ''}".lower()
+        ]
+    rows.sort(
+        key=lambda item: item.created_at.timestamp() if item.created_at else float("-inf"),
+        reverse=(order_value == "desc"),
+    )
+    rows = rows[:limit_value]
     return [
         ScheduleHistoryItem(
             id=str(item.id),
