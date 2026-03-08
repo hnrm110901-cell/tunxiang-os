@@ -9,8 +9,7 @@ import {
 } from '@ant-design/icons';
 import ReactECharts from 'echarts-for-react';
 import dayjs from 'dayjs';
-import { apiClient } from '../services/api';
-import { handleApiError } from '../utils/message';
+import { apiClient, handleApiError } from '../services/api';
 
 const { Title, Text } = Typography;
 const { Option } = Select;

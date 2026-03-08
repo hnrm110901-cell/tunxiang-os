@@ -1,7 +1,7 @@
 import React from 'react';
 import styles from './ZButton.module.css';
 
-type Variant = 'primary' | 'secondary' | 'ghost' | 'danger';
+type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'default';
 type Size = 'sm' | 'md' | 'lg';
 
 interface ZButtonProps {
@@ -10,23 +10,27 @@ interface ZButtonProps {
   loading?: boolean;
   icon?: React.ReactNode;
   disabled?: boolean;
-  onClick?: () => void;
+  onClick?: React.MouseEventHandler<HTMLButtonElement>;
   children?: React.ReactNode;
   style?: React.CSSProperties;
+  className?: string;
   type?: 'button' | 'submit' | 'reset';
+  title?: string;
 }
 
 export default function ZButton({
   variant = 'primary', size = 'md', loading, icon, disabled,
-  onClick, children, style, type = 'button',
+  onClick, children, style, className, type = 'button', title,
 }: ZButtonProps) {
+  const normalizedVariant = variant === 'default' ? 'secondary' : variant;
   return (
     <button
       type={type}
-      className={`${styles.btn} ${styles[variant]} ${styles[size]}`}
+      className={`${styles.btn} ${styles[normalizedVariant]} ${styles[size]} ${className ?? ''}`}
       disabled={disabled || loading}
       onClick={onClick}
       style={style}
+      title={title}
     >
       {loading ? <span>⟳</span> : icon}
       {children}

@@ -10,7 +10,7 @@ export interface SelectOption {
 interface ZSelectProps {
   options:      SelectOption[];
   value?:       string | number | null;
-  onChange?:    (value: string | number) => void;
+  onChange?:    (value: any) => void;
   placeholder?: string;
   style?:       React.CSSProperties;
 }

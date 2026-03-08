@@ -2,28 +2,34 @@ import React from 'react';
 import styles from './ZTable.module.css';
 
 export interface ZTableColumn<T = any> {
-  key:       string;
+  key?:      string;
+  dataIndex?: keyof T | string;
   title:     string;
   align?:    'left' | 'right' | 'center';
   render?:   (value: any, row: T, index: number) => React.ReactNode;
   width?:    number | string;
 }
 
-interface ZTableProps<T = any> {
+export interface ZTableProps<T = any> {
   columns:    ZTableColumn<T>[];
-  data:       T[];
+  data?:      T[];
+  dataSource?: T[];
   rowKey?:    keyof T | ((row: T, i: number) => string);
   emptyText?: string;
   style?:     React.CSSProperties;
+  size?: 'small' | 'middle' | 'large' | 'sm' | 'md' | 'lg';
+  pagination?: any;
 }
 
 export default function ZTable<T = any>({
   columns,
   data,
+  dataSource,
   rowKey,
   emptyText = '暂无数据',
   style,
 }: ZTableProps<T>) {
+  const rows = dataSource ?? data ?? [];
   const getKey = (row: T, i: number): string => {
     if (!rowKey) return String(i);
     if (typeof rowKey === 'function') return rowKey(row, i);
@@ -47,18 +53,20 @@ export default function ZTable<T = any>({
           </tr>
         </thead>
         <tbody>
-          {data.length === 0 ? (
+          {rows.length === 0 ? (
             <tr>
               <td colSpan={columns.length} className={styles.empty}>{emptyText}</td>
             </tr>
           ) : (
-            data.map((row, i) => (
+            rows.map((row, i) => (
               <tr key={getKey(row, i)} className={styles.row}>
-                {columns.map(col => {
-                  const value = (row as any)[col.key];
+                {columns.map((col, colIdx) => {
+                  const lookupKey = (col.dataIndex ?? col.key) as string | undefined;
+                  const value = lookupKey ? (row as any)[lookupKey] : undefined;
+                  const cellKey = col.key ?? lookupKey ?? String(colIdx);
                   return (
                     <td
-                      key={col.key}
+                      key={cellKey}
                       className={col.align === 'right' ? styles.right : col.align === 'center' ? styles.center : ''}
                     >
                       {col.render ? col.render(value, row, i) : value ?? '—'}

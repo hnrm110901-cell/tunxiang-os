@@ -12,10 +12,15 @@ interface ZSkeletonProps {
   avatarSize?: number;
   /** 重复 rows 次（列表场景） */
   rows?: number;
+  /** 兼容旧调用：直接指定占位高度 */
+  height?: number;
   style?: React.CSSProperties;
 }
 
-function SkeletonUnit({ lines, block, avatar, avatarSize }: Omit<ZSkeletonProps, 'rows' | 'style'>) {
+function SkeletonUnit({ lines, block, avatar, avatarSize, height }: Omit<ZSkeletonProps, 'rows' | 'style'>) {
+  if (height != null) {
+    return <div className={`${styles.base} ${styles.block}`} style={{ height }} />;
+  }
   if (block) {
     return <div className={`${styles.base} ${styles.block}`} />;
   }

@@ -174,7 +174,7 @@ const CFODashboardPage: React.FC = () => {
     },
     {
       label:    '门店数量',
-      value:    ho ? `${ho.store_count}`,
+      value:    ho ? `${ho.store_count}` : '—',
       sub:      ho
         ? `优秀 ${ho.grade_distribution.A} / 良好 ${ho.grade_distribution.B}`
         : '—',

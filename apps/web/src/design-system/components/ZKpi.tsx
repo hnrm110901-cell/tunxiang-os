@@ -5,13 +5,15 @@ interface ZKpiProps {
   value: string | number;
   label: string;
   unit?: string;
+  prefix?: string;
   change?: number;       // 正数=上升，负数=下降，0=持平
   changeLabel?: string;  // 如 "较昨日"
   size?: 'sm' | 'md' | 'lg';
+  status?: 'good' | 'warning' | 'critical' | string;
 }
 
 export default function ZKpi({
-  value, label, unit, change, changeLabel, size = 'md',
+  value, label, unit, prefix, change, changeLabel, size = 'md',
 }: ZKpiProps) {
   const changeDir = change == null ? null : change > 0 ? 'up' : change < 0 ? 'down' : 'flat';
   const changeSymbol = change == null ? '' : change > 0 ? '↑' : change < 0 ? '↓' : '—';
@@ -20,7 +22,7 @@ export default function ZKpi({
     <div className={styles.kpi}>
       <div className={styles.label}>{label}</div>
       <div className={styles.valueRow}>
-        <span className={`${styles.value} ${styles[size]}`}>{value}</span>
+        <span className={`${styles.value} ${styles[size]}`}>{prefix ?? ''}{value}</span>
         {unit && <span className={styles.unit}>{unit}</span>}
       </div>
       {change != null && (

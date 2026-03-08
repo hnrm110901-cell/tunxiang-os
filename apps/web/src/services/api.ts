@@ -110,3 +110,16 @@ class ApiClient {
 
 export const apiClient = new ApiClient();
 export default apiClient;
+
+// 兼容旧页面：部分页面从 services/api 导入 handleApiError
+export const handleApiError = (error: any, defaultMessage: string = '操作失败'): string => {
+  if (error?.response?.data) {
+    return (
+      error.response.data.message ||
+      error.response.data.detail ||
+      defaultMessage
+    );
+  }
+  if (error?.message) return error.message;
+  return defaultMessage;
+};

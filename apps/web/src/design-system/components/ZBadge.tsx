@@ -1,19 +1,29 @@
 import React from 'react';
 import styles from './ZBadge.module.css';
 
-type BadgeType = 'critical' | 'warning' | 'success' | 'info' | 'default' | 'accent';
+type BadgeType =
+  | 'critical'
+  | 'warning'
+  | 'success'
+  | 'info'
+  | 'default'
+  | 'accent'
+  | 'error'
+  | 'neutral';
 
-interface ZBadgeProps {
+export interface ZBadgeProps {
   type?: BadgeType;
-  text: string;
+  text?: string;
+  label?: string;
   icon?: React.ReactNode;
 }
 
-export default function ZBadge({ type = 'default', text, icon }: ZBadgeProps) {
+export default function ZBadge({ type = 'default', text, label, icon }: ZBadgeProps) {
+  const shown = text ?? label ?? '';
   return (
     <span className={`${styles.badge} ${styles[type]}`}>
       {icon && icon}
-      {text}
+      {shown}
     </span>
   );
 }

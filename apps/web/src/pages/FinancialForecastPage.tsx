@@ -390,7 +390,7 @@ const FinancialForecastPage: React.FC = () => {
                 const color = TYPE_COLORS[ft];
                 if (!item) {
                   return (
-                    <Card key={ft} size="small" title={item?.label ?? ft} className={styles.chartCard}>
+                    <Card key={ft} size="small" title={ft} className={styles.chartCard}>
                       <Empty description="历史数据不足（需≥2期）" />
                     </Card>
                   );

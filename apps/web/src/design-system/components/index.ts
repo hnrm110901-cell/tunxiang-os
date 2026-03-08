@@ -8,6 +8,7 @@ export { default as ZSkeleton } from './ZSkeleton';
 export { default as ZAvatar } from './ZAvatar';
 export { default as ZTabs } from './ZTabs';
 export { default as ZTable } from './ZTable';
+export type { ZTableColumn, ZTableProps } from './ZTable';
 export { default as ZModal } from './ZModal';
 export { default as ZSelect } from './ZSelect';
 // Business components

@@ -311,7 +311,7 @@ const DailyHubPage: React.FC = () => {
   const severityBg = (s: Severity) =>
     ({ critical: '#fff1f0', warning: '#fff7e6', info: '#e6f7ff' }[s]);
   const severityBadgeType = (s: Severity): 'critical' | 'warning' | 'info' =>
-    ({ critical: 'critical', warning: 'warning', info: 'info' }[s]);
+    ({ critical: 'critical', warning: 'warning', info: 'info' } as const)[s];
   const severityLabel = (s: Severity) =>
     ({ critical: '紧急', warning: '关注', info: '提示' }[s]);
 

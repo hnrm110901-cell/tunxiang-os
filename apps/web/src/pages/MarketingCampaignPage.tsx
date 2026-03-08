@@ -438,7 +438,7 @@ const MarketingCampaignPage: React.FC = () => {
               <span className={styles.couponLabel}>面额</span>
               <strong style={{ color: 'var(--accent)' }}>¥{String(couponResult.amount)}</strong>
             </div>
-            {couponResult.threshold && (
+            {Boolean(couponResult.threshold) && (
               <div className={styles.couponRow}>
                 <span className={styles.couponLabel}>使用门槛</span>
                 <span>满 ¥{String(couponResult.threshold)} 可用</span>
