@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from src.api.schedules import get_schedule_history
+from src.api.schedules import get_schedule_history, router
 
 
 @pytest.mark.asyncio
@@ -38,3 +38,8 @@ async def test_get_schedule_history_returns_items():
     assert rows[0].id == "log-1"
     assert rows[0].action == "create"
     assert rows[0].changes["shift_count"] == 6
+
+
+def test_week_view_route_is_registered():
+    paths = {route.path for route in router.routes}
+    assert "/schedules/week-view" in paths

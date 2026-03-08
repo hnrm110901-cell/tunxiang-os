@@ -462,6 +462,7 @@ async def get_my_schedule(
 
 
 
+@router.get("/schedules/week-view")
 async def get_week_view(
     store_id: str = Query(...),
     week_start: date = Query(..., description="周一日期"),
