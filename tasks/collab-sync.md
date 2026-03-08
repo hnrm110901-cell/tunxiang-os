@@ -45,6 +45,7 @@
   - 审批执行补齐：来源/目标库存变更 + 双向 `TRANSFER` 流水 + 审批链落库
   - 前端新增：`MultiStoreManagement` 调货申请表单 + 待审批列表 + 批准/驳回动作
   - 新增后端测试：`test_inventory_transfer_workflow_api.py`（创建/列表/批准/驳回）
+  - 体验增强：列表按门店/状态筛选、手动刷新、审批意见弹窗（驳回必填）与意见回显
 
 ## P2
 - [x] 角色权限管理体验优化（页面入口可见性与无权限提示一致性）
@@ -101,6 +102,9 @@
   - `apps/web/src/App.tsx`
   - `tasks/collab-sync.md`
 - verify:
+  - `npx eslint apps/web/src/pages/MultiStoreManagement.tsx`（通过）
+  - `npm run build --workspace @zhilian-os/web`（通过）
+  - `python3 -m pytest -q apps/api-gateway/tests/test_inventory_transfer_workflow_api.py`（5 passed）
   - `npm run build --workspace @zhilian-os/web`（通过）
   - `python3 -m py_compile apps/api-gateway/src/api/inventory.py`（通过）
   - `python3 -m pytest -q apps/api-gateway/tests/test_inventory_transfer_workflow_api.py`（5 passed）

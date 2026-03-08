@@ -14,7 +14,7 @@ import {
   Input,
   InputNumber,
   Button,
-  Popconfirm,
+  Modal,
   message,
 } from 'antd';
 import {
@@ -88,6 +88,8 @@ interface TransferRequestItem {
   created_at?: string;
 }
 
+type TransferActionType = 'approve' | 'reject';
+
 const MultiStoreManagement: React.FC = () => {
   const [transferForm] = Form.useForm();
   const [loading, setLoading] = useState(true);
@@ -101,6 +103,12 @@ const MultiStoreManagement: React.FC = () => {
   const [transferRequests, setTransferRequests] = useState<TransferRequestItem[]>([]);
   const [transferSubmitting, setTransferSubmitting] = useState(false);
   const [transferActionLoadingId, setTransferActionLoadingId] = useState<string | null>(null);
+  const [transferFilterStoreId, setTransferFilterStoreId] = useState<string | undefined>(undefined);
+  const [transferFilterStatus, setTransferFilterStatus] = useState<string | undefined>(undefined);
+  const [transferActionModalVisible, setTransferActionModalVisible] = useState(false);
+  const [pendingActionDecisionId, setPendingActionDecisionId] = useState<string | null>(null);
+  const [pendingActionType, setPendingActionType] = useState<TransferActionType>('approve');
+  const [transferFeedbackInput, setTransferFeedbackInput] = useState('');
 
   const loadComparisonData = useCallback(async (storeIds: string[]) => {
     if (storeIds.length < 2) {
@@ -156,14 +164,21 @@ const MultiStoreManagement: React.FC = () => {
 
   const loadTransferRequests = useCallback(async () => {
     try {
-      const response = await apiClient.get('/api/v1/inventory/transfer-requests?limit=30') as {
+      const params = new URLSearchParams({ limit: '30' });
+      if (transferFilterStoreId) {
+        params.set('store_id', transferFilterStoreId);
+      }
+      if (transferFilterStatus) {
+        params.set('status', transferFilterStatus);
+      }
+      const response = await apiClient.get(`/api/v1/inventory/transfer-requests?${params.toString()}`) as {
         items?: TransferRequestItem[];
       };
       setTransferRequests(response.items || []);
     } catch (err: unknown) {
       handleApiError(err, '加载调货申请失败');
     }
-  }, []);
+  }, [transferFilterStatus, transferFilterStoreId]);
 
   const handleCreateTransferRequest = useCallback(async (values: {
     source_store_id: string;
@@ -191,11 +206,11 @@ const MultiStoreManagement: React.FC = () => {
     }
   }, [loadTransferRequests]);
 
-  const handleApproveTransfer = useCallback(async (decisionId: string) => {
+  const handleApproveTransfer = useCallback(async (decisionId: string, managerFeedback?: string) => {
     try {
       setTransferActionLoadingId(decisionId);
       await apiClient.post(`/api/v1/inventory/transfer-requests/${decisionId}/approve`, {
-        manager_feedback: '同意调货',
+        manager_feedback: managerFeedback || '同意调货',
       });
       message.success('已批准并执行调货');
       await loadTransferRequests();
@@ -206,11 +221,11 @@ const MultiStoreManagement: React.FC = () => {
     }
   }, [loadTransferRequests]);
 
-  const handleRejectTransfer = useCallback(async (decisionId: string) => {
+  const handleRejectTransfer = useCallback(async (decisionId: string, managerFeedback: string) => {
     try {
       setTransferActionLoadingId(decisionId);
       await apiClient.post(`/api/v1/inventory/transfer-requests/${decisionId}/reject`, {
-        manager_feedback: '当前不满足调货条件',
+        manager_feedback: managerFeedback,
       });
       message.success('已驳回调货申请');
       await loadTransferRequests();
@@ -220,6 +235,43 @@ const MultiStoreManagement: React.FC = () => {
       setTransferActionLoadingId(null);
     }
   }, [loadTransferRequests]);
+
+  const openTransferActionModal = useCallback((decisionId: string, action: TransferActionType) => {
+    setPendingActionDecisionId(decisionId);
+    setPendingActionType(action);
+    setTransferFeedbackInput(action === 'approve' ? '同意调货' : '');
+    setTransferActionModalVisible(true);
+  }, []);
+
+  const closeTransferActionModal = useCallback(() => {
+    setTransferActionModalVisible(false);
+    setPendingActionDecisionId(null);
+    setTransferFeedbackInput('');
+  }, []);
+
+  const confirmTransferAction = useCallback(async () => {
+    if (!pendingActionDecisionId) return;
+
+    const feedback = transferFeedbackInput.trim();
+    if (pendingActionType === 'reject' && !feedback) {
+      message.warning('驳回时请填写审批意见');
+      return;
+    }
+
+    if (pendingActionType === 'approve') {
+      await handleApproveTransfer(pendingActionDecisionId, feedback);
+    } else {
+      await handleRejectTransfer(pendingActionDecisionId, feedback);
+    }
+    closeTransferActionModal();
+  }, [
+    closeTransferActionModal,
+    handleApproveTransfer,
+    handleRejectTransfer,
+    pendingActionDecisionId,
+    pendingActionType,
+    transferFeedbackInput,
+  ]);
 
   const loadRegionalSummary = useCallback(async () => {
     try {
@@ -248,13 +300,16 @@ const MultiStoreManagement: React.FC = () => {
         loadStores(),
         loadRegionalSummary(),
         loadPerformanceRanking(),
-        loadTransferRequests(),
       ]);
       setLoading(false);
     };
 
     loadData();
-  }, [loadStores, loadRegionalSummary, loadPerformanceRanking, loadTransferRequests]);
+  }, [loadStores, loadRegionalSummary, loadPerformanceRanking]);
+
+  useEffect(() => {
+    loadTransferRequests();
+  }, [loadTransferRequests]);
 
   const sourceStoreId = Form.useWatch('source_store_id', transferForm);
   const targetStoreId = Form.useWatch('target_store_id', transferForm);
@@ -435,9 +490,16 @@ const MultiStoreManagement: React.FC = () => {
       ellipsis: true,
     },
     {
+      title: '审批意见',
+      dataIndex: 'manager_feedback',
+      key: 'manager_feedback',
+      ellipsis: true,
+      render: (feedback?: string) => feedback || '-',
+    },
+    {
       title: '操作',
       key: 'actions',
-      width: 190,
+      width: 140,
       render: (_: unknown, row: TransferRequestItem) => {
         const disabled = row.status !== 'pending';
         return (
@@ -447,27 +509,20 @@ const MultiStoreManagement: React.FC = () => {
               size="small"
               loading={transferActionLoadingId === row.decision_id}
               disabled={disabled}
-              onClick={() => handleApproveTransfer(row.decision_id)}
+              onClick={() => openTransferActionModal(row.decision_id, 'approve')}
             >
               批准
             </Button>
-            <Popconfirm
-              title="确认驳回该调货申请？"
-              okText="确认"
-              cancelText="取消"
-              onConfirm={() => handleRejectTransfer(row.decision_id)}
+            <Button
+              type="link"
+              size="small"
+              danger
+              loading={transferActionLoadingId === row.decision_id}
               disabled={disabled}
+              onClick={() => openTransferActionModal(row.decision_id, 'reject')}
             >
-              <Button
-                type="link"
-                size="small"
-                danger
-                loading={transferActionLoadingId === row.decision_id}
-                disabled={disabled}
-              >
-                驳回
-              </Button>
-            </Popconfirm>
+              驳回
+            </Button>
           </Space>
         );
       },
@@ -553,6 +608,31 @@ const MultiStoreManagement: React.FC = () => {
       </Row>
 
       <Card title="跨店调货审批" style={{ marginTop: '24px' }}>
+        <Space style={{ marginBottom: '12px', flexWrap: 'wrap' }}>
+          <span>列表筛选:</span>
+          <Select
+            allowClear
+            style={{ width: 180 }}
+            placeholder="按门店筛选"
+            value={transferFilterStoreId}
+            onChange={(value) => setTransferFilterStoreId(value)}
+            options={stores.map((store) => ({ label: `${store.name} (${store.region})`, value: store.id }))}
+          />
+          <Select
+            allowClear
+            style={{ width: 160 }}
+            placeholder="按状态筛选"
+            value={transferFilterStatus}
+            onChange={(value) => setTransferFilterStatus(value)}
+            options={[
+              { label: '待审批', value: 'pending' },
+              { label: '已执行', value: 'executed' },
+              { label: '已驳回', value: 'rejected' },
+            ]}
+          />
+          <Button onClick={loadTransferRequests}>刷新列表</Button>
+        </Space>
+
         <Form
           form={transferForm}
           layout="inline"
@@ -629,6 +709,25 @@ const MultiStoreManagement: React.FC = () => {
           size="small"
           locale={{ emptyText: '暂无调货申请' }}
         />
+
+        <Modal
+          open={transferActionModalVisible}
+          title={pendingActionType === 'approve' ? '批准调货申请' : '驳回调货申请'}
+          okText={pendingActionType === 'approve' ? '确认批准' : '确认驳回'}
+          cancelText="取消"
+          onCancel={closeTransferActionModal}
+          onOk={confirmTransferAction}
+          confirmLoading={!!transferActionLoadingId}
+          destroyOnClose
+        >
+          <Input.TextArea
+            rows={4}
+            maxLength={200}
+            value={transferFeedbackInput}
+            placeholder={pendingActionType === 'approve' ? '可填写审批意见（选填）' : '请填写驳回原因（必填）'}
+            onChange={(e) => setTransferFeedbackInput(e.target.value)}
+          />
+        </Modal>
       </Card>
     </div>
   );

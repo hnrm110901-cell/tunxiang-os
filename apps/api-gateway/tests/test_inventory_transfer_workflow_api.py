@@ -227,6 +227,7 @@ async def test_approve_transfer_request_executes_stock_move_and_transactions():
     assert source_item.current_quantity == 12.0
     assert target_item.current_quantity == 11.0
     assert decision.decision_status == DecisionStatus.EXECUTED
+    assert decision.manager_feedback == "同意"
     assert len(decision.approval_chain) == 1
 
     add_calls = session.add.call_args_list
@@ -259,4 +260,5 @@ async def test_reject_transfer_request_marks_rejected():
     assert out["success"] is True
     assert out["status"] == "rejected"
     assert decision.decision_status == DecisionStatus.REJECTED
+    assert decision.manager_feedback == "本店库存也紧张"
     assert len(decision.approval_chain) == 1
