@@ -1122,6 +1122,117 @@ class TestCreateCashTransaction:
         occupy_mock.assert_awaited_once()
 
 
+class TestTaxInvoiceFlow:
+    @pytest.mark.asyncio
+    async def test_create_tax_invoice_persists(self):
+        db = _mock_db()
+        svc = StandaloneFCTService()
+        result = await svc.create_tax_invoice(
+            db,
+            tenant_id="T1",
+            entity_id="S001",
+            invoice_type="purchase",
+            invoice_no="INV-NEW",
+            amount=1200,
+            tax_amount=120,
+            invoice_date=date(2026, 3, 1),
+            status="draft",
+            extra={"source": "manual"},
+        )
+        assert result["success"] is True
+        assert result["invoice_no"] == "INV-NEW"
+        assert db.add.call_count == 1
+
+    @pytest.mark.asyncio
+    async def test_update_tax_invoice_updates_fields(self):
+        db = _mock_db()
+        invoice = MagicMock()
+        invoice.id = "inv-3"
+        invoice.invoice_number = "INV-003"
+        invoice.total_amount = 1000
+        invoice.tax_amount = 100
+        invoice.net_amount = 900
+        invoice.status = "draft"
+        result_one = MagicMock()
+        result_one.scalar_one_or_none.return_value = invoice
+        db.execute = AsyncMock(return_value=result_one)
+        svc = StandaloneFCTService()
+        result = await svc.update_tax_invoice(
+            db,
+            invoice_id="inv-3",
+            invoice_no="INV-003A",
+            amount=1500,
+            tax_amount=150,
+            status="issued",
+            extra={"k": "v"},
+        )
+        assert result["success"] is True
+        assert invoice.invoice_number == "INV-003A"
+        assert invoice.net_amount == 1350
+        assert invoice.status == "issued"
+
+    @pytest.mark.asyncio
+    async def test_create_and_list_tax_invoices(self):
+        db = _mock_db()
+        created = MagicMock()
+        created.id = "inv-1"
+        created.store_id = "S001"
+        created.invoice_type = "purchase"
+        created.invoice_number = "INV-001"
+        created.total_amount = 1000
+        created.tax_amount = 100
+        created.net_amount = 900
+        created.invoice_date = date(2026, 3, 1)
+        created.status = "draft"
+        created.created_at = datetime(2026, 3, 1)
+        count_result = MagicMock()
+        count_result.scalar.return_value = 1
+        list_result = MagicMock()
+        list_result.scalars.return_value.all.return_value = [created]
+        db.execute = AsyncMock(side_effect=[count_result, list_result])
+        svc = StandaloneFCTService()
+        result = await svc.list_tax_invoices(
+            db,
+            tenant_id="T1",
+            entity_id="S001",
+            invoice_type="purchase",
+            skip=0,
+            limit=20,
+        )
+        assert result["total"] == 1
+        assert result["items"][0]["invoice_no"] == "INV-001"
+        assert result["items"][0]["net_amount"] == 900
+
+    @pytest.mark.asyncio
+    async def test_link_and_query_invoices_by_voucher(self):
+        db = _mock_db()
+        invoice = MagicMock()
+        invoice.id = "inv-2"
+        invoice.items = {}
+        invoice.invoice_date = date(2026, 3, 2)
+        invoice.created_at = datetime(2026, 3, 2)
+        invoice.invoice_number = "INV-002"
+        invoice.invoice_type = "purchase"
+        invoice.total_amount = 500
+        invoice.tax_amount = 50
+        invoice.status = "draft"
+
+        get_one = MagicMock()
+        get_one.scalar_one_or_none.return_value = invoice
+        list_result = MagicMock()
+        list_result.scalars.return_value.all.return_value = [invoice]
+        db.execute = AsyncMock(side_effect=[get_one, list_result])
+        svc = StandaloneFCTService()
+
+        link = await svc.link_invoice_to_voucher(db, invoice_id="inv-2", voucher_id="vid-1", line_no=1)
+        assert link["success"] is True
+        assert invoice.items["linked_vouchers"][0]["voucher_id"] == "vid-1"
+
+        out = await svc.list_invoices_by_voucher(db, voucher_id="vid-1")
+        assert len(out["invoices"]) == 1
+        assert out["invoices"][0]["invoice_no"] == "INV-002"
+
+
 class TestListTaxDeclarations:
     """测试税务申报列表（由 FCTTaxRecord 展开）"""
 

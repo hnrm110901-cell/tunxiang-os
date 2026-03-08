@@ -30,7 +30,7 @@ from sqlalchemy import and_, case, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from src.models.finance import FinancialTransaction, Budget
+from src.models.finance import FinancialTransaction, Budget, Invoice
 from src.models.reconciliation import ReconciliationRecord, ReconciliationStatus
 from src.models.fct import (
     FCTTaxRecord,
@@ -1924,7 +1924,41 @@ class StandaloneFCTService:
         skip: int = 0,
         limit: int = 100,
     ) -> Dict[str, Any]:
-        return {"items": [], "total": 0, "skip": skip, "limit": limit}
+        target_entity = entity_id or tenant_id
+        filters = [Invoice.store_id == target_entity]
+        if invoice_type:
+            filters.append(Invoice.invoice_type == invoice_type)
+        if start_date:
+            filters.append(Invoice.invoice_date >= start_date)
+        if end_date:
+            filters.append(Invoice.invoice_date <= end_date)
+
+        total_stmt = select(func.count(Invoice.id)).where(and_(*filters))
+        total = int((await session.execute(total_stmt)).scalar() or 0)
+        stmt = (
+            select(Invoice)
+            .where(and_(*filters))
+            .order_by(Invoice.invoice_date.desc(), Invoice.created_at.desc())
+            .offset(skip)
+            .limit(limit)
+        )
+        rows = (await session.execute(stmt)).scalars().all()
+        items: List[Dict[str, Any]] = []
+        for r in rows:
+            items.append(
+                {
+                    "id": str(r.id),
+                    "entity_id": r.store_id,
+                    "invoice_type": r.invoice_type,
+                    "invoice_no": r.invoice_number,
+                    "amount": int(r.total_amount or 0),
+                    "tax_amount": int(r.tax_amount or 0),
+                    "net_amount": int(r.net_amount or 0),
+                    "invoice_date": r.invoice_date.isoformat() if r.invoice_date else None,
+                    "status": r.status,
+                }
+            )
+        return {"items": items, "total": total, "skip": skip, "limit": limit}
 
     async def create_tax_invoice(
         self,
@@ -1939,14 +1973,33 @@ class StandaloneFCTService:
         status: str = "draft",
         extra: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
+        inv_date = invoice_date or date.today()
+        total_amt = int(amount or 0)
+        tax_amt = int(tax_amount or 0)
+        if not invoice_no:
+            invoice_no = f"INV-{inv_date.strftime('%Y%m%d')}-{str(uuid4())[:8].upper()}"
+        row = Invoice(
+            store_id=entity_id,
+            invoice_type=invoice_type,
+            invoice_number=invoice_no,
+            invoice_date=inv_date,
+            total_amount=total_amt,
+            tax_amount=tax_amt,
+            net_amount=max(0, total_amt - tax_amt),
+            status=status,
+            items=extra or {},
+        )
+        session.add(row)
+        await session.flush()
         return {
+            "id": str(row.id),
             "tenant_id": tenant_id,
             "entity_id": entity_id,
             "invoice_type": invoice_type,
             "invoice_no": invoice_no,
-            "amount": amount,
-            "tax_amount": tax_amount,
-            "invoice_date": (invoice_date or date.today()).isoformat(),
+            "amount": total_amt,
+            "tax_amount": tax_amt,
+            "invoice_date": inv_date.isoformat(),
             "status": status,
             "success": True,
         }
@@ -1962,7 +2015,33 @@ class StandaloneFCTService:
         status: Optional[str] = None,
         extra: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
-        return {"invoice_id": invoice_id, "status": status, "success": True}
+        stmt = select(Invoice).where(Invoice.id == invoice_id)
+        row = (await session.execute(stmt)).scalar_one_or_none()
+        if not row:
+            raise ValueError("发票不存在")
+
+        if invoice_no is not None:
+            row.invoice_number = invoice_no
+        if amount is not None:
+            row.total_amount = int(amount)
+        if tax_amount is not None:
+            row.tax_amount = int(tax_amount)
+        if amount is not None or tax_amount is not None:
+            row.net_amount = max(0, int(row.total_amount or 0) - int(row.tax_amount or 0))
+        if invoice_date is not None:
+            row.invoice_date = invoice_date
+        if status is not None:
+            row.status = status
+        if extra is not None:
+            row.items = extra
+
+        await session.flush()
+        return {
+            "invoice_id": str(row.id),
+            "invoice_no": row.invoice_number,
+            "status": row.status,
+            "success": True,
+        }
 
     async def link_invoice_to_voucher(
         self,
@@ -1971,12 +2050,50 @@ class StandaloneFCTService:
         voucher_id: str,
         line_no: Optional[int] = None,
     ) -> Dict[str, Any]:
+        stmt = select(Invoice).where(Invoice.id == invoice_id)
+        row = (await session.execute(stmt)).scalar_one_or_none()
+        if not row:
+            raise ValueError("发票不存在")
+
+        payload: Dict[str, Any] = {}
+        if isinstance(row.items, dict):
+            payload = dict(row.items)
+        elif isinstance(row.items, list):
+            payload = {"lines": row.items}
+
+        links = payload.get("linked_vouchers")
+        if not isinstance(links, list):
+            links = []
+        exists = any(str(i.get("voucher_id")) == str(voucher_id) for i in links if isinstance(i, dict))
+        if not exists:
+            links.append({"voucher_id": str(voucher_id), "line_no": line_no})
+        payload["linked_vouchers"] = links
+        row.items = payload
+        await session.flush()
         return {"invoice_id": invoice_id, "voucher_id": voucher_id, "success": True}
 
     async def list_invoices_by_voucher(
         self, session: AsyncSession, voucher_id: str
     ) -> Dict[str, Any]:
-        return {"voucher_id": voucher_id, "invoices": []}
+        stmt = select(Invoice).order_by(Invoice.invoice_date.desc(), Invoice.created_at.desc())
+        rows = (await session.execute(stmt)).scalars().all()
+        invoices: List[Dict[str, Any]] = []
+        for r in rows:
+            links = []
+            if isinstance(r.items, dict) and isinstance(r.items.get("linked_vouchers"), list):
+                links = r.items.get("linked_vouchers") or []
+            if any(str(i.get("voucher_id")) == str(voucher_id) for i in links if isinstance(i, dict)):
+                invoices.append(
+                    {
+                        "invoice_id": str(r.id),
+                        "invoice_no": r.invoice_number,
+                        "invoice_type": r.invoice_type,
+                        "amount": int(r.total_amount or 0),
+                        "tax_amount": int(r.tax_amount or 0),
+                        "status": r.status,
+                    }
+                )
+        return {"voucher_id": voucher_id, "invoices": invoices}
 
     async def verify_invoice_stub(
         self, session: AsyncSession, invoice_id: str
