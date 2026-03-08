@@ -115,7 +115,7 @@
   - forecast_customer_flow：正常/无历史数据/节假日
   - compute_staffing_needs：正常/人效比缺失降级
   - get_labor_efficiency：单店/多日
-- [ ] 新建 `tests/test_labor_cost_service.py`：≥12个测试
+- [x] 新建 `tests/test_labor_cost_service.py`：≥12个测试
   - 纯函数：cost_rate×3 / classify_status×3 / compute_saving×2
   - get_store_labor_summary：正常/无预算数据
   - get_multi_store_labor_ranking：多店排序
