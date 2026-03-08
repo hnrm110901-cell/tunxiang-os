@@ -109,6 +109,7 @@
 - verify:
   - `python3 -m py_compile apps/api-gateway/src/api/inventory.py`（通过）
   - `python3 -m pytest -q apps/api-gateway/tests/test_inventory_transfer_routes_http.py`（4 passed）
+  - `python3 -m pytest -q apps/api-gateway/tests/test_inventory_transfer_routes_http.py`（5 passed，新增静态路由声明顺序断言）
   - `python3 -m pytest -q apps/api-gateway/tests/test_inventory_transfer_workflow_api.py apps/api-gateway/tests/test_multi_store_api_routes.py`（14 passed）
   - 文档校对：`docs/跨店调货API契约V1.md`（已添加接口、状态机、规则、错误语义）
   - `python3 -m pytest -q apps/api-gateway/tests/test_multi_store_api_routes.py`（9 passed，含动态路由顺序防吞断言）

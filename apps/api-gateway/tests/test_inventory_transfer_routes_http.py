@@ -187,3 +187,17 @@ def test_reject_transfer_request_route_marks_rejected():
     data = response.json()
     assert data["success"] is True
     assert data["status"] == "rejected"
+
+
+def test_transfer_static_routes_declared_before_inventory_dynamic_item_route():
+    get_paths = []
+    for route in router.routes:
+        methods = getattr(route, "methods", set()) or set()
+        if "GET" not in methods:
+            continue
+        get_paths.append(route.path)
+
+    assert "/inventory/{item_id}" in get_paths
+    dynamic_index = get_paths.index("/inventory/{item_id}")
+    assert "/inventory/transfer-requests" in get_paths
+    assert get_paths.index("/inventory/transfer-requests") < dynamic_index
