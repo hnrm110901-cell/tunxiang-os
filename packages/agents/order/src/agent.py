@@ -242,28 +242,49 @@ class OrderAgent(BaseAgent):
     def _check_time_availability(
         self, store_id: str, time: str, existing_reservations: List[Dict[str, Any]]
     ) -> bool:
-        same_time = [
+        same_time = self._count_confirmed_reservations(store_id, time, existing_reservations)
+        max_concurrent = int(os.getenv("ORDER_MAX_CONCURRENT_RESERVATIONS", "10"))
+        return same_time < max_concurrent
+
+    def _count_confirmed_reservations(
+        self, store_id: str, reservation_time: str, existing_reservations: List[Dict[str, Any]]
+    ) -> int:
+        return len([
             r for r in existing_reservations
             if r["store_id"] == store_id
-            and r["reservation_time"] == time
+            and r["reservation_time"] == reservation_time
             and r["status"] == "confirmed"
-        ]
-        max_concurrent = int(os.getenv("ORDER_MAX_CONCURRENT_RESERVATIONS", "10"))
-        return len(same_time) < max_concurrent
+        ])
 
     def _suggest_alternative_times(
         self, store_id: str, requested_time: str, existing_reservations: List[Dict[str, Any]]
     ) -> List[str]:
+        """
+        预定冲突智能解决：
+        - 在请求时间前后按30分钟粒度扫描候选
+        - 按当前时段负载（confirmed数量）升序，再按与请求时间距离升序排序
+        """
         base_time = datetime.fromisoformat(requested_time)
-        candidates = [base_time + timedelta(hours=i) for i in [1, 2, -1, 3]]
-        alternatives = []
-        for t in candidates:
+        max_concurrent = int(os.getenv("ORDER_MAX_CONCURRENT_RESERVATIONS", "10"))
+        offsets_minutes = [30, -30, 60, -60, 90, -90, 120, -120]
+
+        ranked: List[Dict[str, Any]] = []
+        for offset in offsets_minutes:
+            t = base_time + timedelta(minutes=offset)
             t_str = t.strftime("%Y-%m-%d %H:%M")
-            if self._check_time_availability(store_id, t_str, existing_reservations):
-                alternatives.append(t_str)
-            if len(alternatives) >= 3:
-                break
-        return alternatives
+            load = self._count_confirmed_reservations(store_id, t_str, existing_reservations)
+            if load >= max_concurrent:
+                continue
+            ranked.append(
+                {
+                    "time": t_str,
+                    "load": load,
+                    "distance": abs(offset),
+                }
+            )
+
+        ranked.sort(key=lambda x: (x["load"], x["distance"]))
+        return [item["time"] for item in ranked[:3]]
 
     # ==================== 排位/等位管理 ====================
 

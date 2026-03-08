@@ -57,6 +57,33 @@ class TestReservation:
         assert result["success"] is True
         assert result["reservation"]["special_requests"] == "需要儿童座椅"
 
+    @pytest.mark.asyncio
+    async def test_create_reservation_conflict_returns_ranked_alternatives(self, agent, monkeypatch):
+        """测试预定冲突时返回智能排序的备选时段"""
+        monkeypatch.setenv("ORDER_MAX_CONCURRENT_RESERVATIONS", "2")
+        existing_reservations = [
+            # 请求时段已满
+            {"store_id": "STORE001", "reservation_time": "2024-01-20 18:00", "status": "confirmed"},
+            {"store_id": "STORE001", "reservation_time": "2024-01-20 18:00", "status": "confirmed"},
+            # 18:30 负载较高(1)
+            {"store_id": "STORE001", "reservation_time": "2024-01-20 18:30", "status": "confirmed"},
+            # 17:30 负载较低(0) -> 应优先于18:30
+        ]
+
+        result = await agent.create_reservation(
+            store_id="STORE001",
+            customer_name="冲突用户",
+            customer_mobile="13800138001",
+            party_size=4,
+            reservation_time="2024-01-20 18:00",
+            existing_reservations=existing_reservations,
+        )
+        assert result["success"] is False
+        assert "alternative_times" in result
+        assert len(result["alternative_times"]) > 0
+        # 智能排序：更低负载 + 时间更近
+        assert result["alternative_times"][0] == "2024-01-20 17:30"
+
 
 class TestQueue:
     """排队管理测试"""
