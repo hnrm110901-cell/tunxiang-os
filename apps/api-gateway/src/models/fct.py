@@ -163,6 +163,51 @@ class FCTBudgetControl(Base, TimestampMixin):
     )
 
 
+class FCTPettyCash(Base, TimestampMixin):
+    """备用金主档。"""
+
+    __tablename__ = "fct_petty_cash"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id = Column(String(64), nullable=False, index=True)
+    entity_id = Column(String(64), nullable=False, index=True)
+    cash_type = Column(String(16), nullable=False, index=True)
+    amount_limit = Column(Numeric(18, 2), nullable=False, default=0)
+    current_balance = Column(Numeric(18, 2), nullable=False, default=0)
+    status = Column(String(20), nullable=False, default="active")
+    extra = Column(JSON)
+
+    records = relationship(
+        "FCTPettyCashRecord",
+        back_populates="petty_cash",
+        cascade="all, delete-orphan",
+        lazy="select",
+    )
+
+
+class FCTPettyCashRecord(Base, TimestampMixin):
+    """备用金收支明细。"""
+
+    __tablename__ = "fct_petty_cash_records"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    petty_cash_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("fct_petty_cash.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    record_type = Column(String(16), nullable=False, index=True)
+    amount = Column(Numeric(18, 2), nullable=False)
+    biz_date = Column(Date, nullable=False, index=True)
+    ref_type = Column(String(32))
+    ref_id = Column(String(64))
+    description = Column(Text)
+    extra = Column(JSON)
+
+    petty_cash = relationship("FCTPettyCash", back_populates="records")
+
+
 # ── 会计凭证（双分录）───────────────────────────────────────────────────────
 
 class Voucher(Base, TimestampMixin):

@@ -23,7 +23,7 @@ import inspect
 from calendar import monthrange
 from datetime import date, datetime, timedelta
 from typing import Any, Dict, List, Optional
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import structlog
 from sqlalchemy import and_, case, func, select, text
@@ -36,6 +36,8 @@ from src.models.fct import (
     FCTTaxRecord,
     FCTCashFlowItem,
     FCTBudgetControl,
+    FCTPettyCash,
+    FCTPettyCashRecord,
     TaxpayerType,
     Voucher,
     VoucherLine,
@@ -1125,6 +1127,15 @@ class StandaloneFCTService:
     @staticmethod
     def _flag_to_bool(value: Any) -> bool:
         return str(value).strip().lower() in {"1", "true", "yes", "on"}
+
+    @staticmethod
+    def _parse_uuid_or_none(value: Optional[str]) -> Optional[UUID]:
+        if not value:
+            return None
+        try:
+            return UUID(str(value))
+        except Exception:
+            return None
 
     async def _resolve_budget_policy(
         self,
@@ -2708,7 +2719,7 @@ class StandaloneFCTService:
         self,
         session: AsyncSession,
         tenant_id: str,
-        petty_cash_id: str,
+        petty_cash_id: Optional[str] = None,
         entity_id: Optional[str] = None,
         cash_type: str = "general",
         amount_limit: float = 0,
@@ -2717,17 +2728,69 @@ class StandaloneFCTService:
         status: str = "active",
         extra: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
+        target_entity = entity_id or tenant_id
+        parsed_id = self._parse_uuid_or_none(petty_cash_id)
+        row = None
+        if parsed_id:
+            row = (
+                await session.execute(
+                    select(FCTPettyCash).where(
+                        and_(
+                            FCTPettyCash.id == parsed_id,
+                            FCTPettyCash.tenant_id == tenant_id,
+                        )
+                    )
+                )
+            ).scalar_one_or_none()
+        if row is None:
+            row = (
+                await session.execute(
+                    select(FCTPettyCash).where(
+                        and_(
+                            FCTPettyCash.tenant_id == tenant_id,
+                            FCTPettyCash.entity_id == target_entity,
+                            FCTPettyCash.cash_type == cash_type,
+                        )
+                    )
+                )
+            ).scalar_one_or_none()
+
+        payload = dict(extra or {})
+        payload["currency"] = currency
+        if owner is not None:
+            payload["owner"] = owner
+
+        if row:
+            row.entity_id = target_entity
+            row.cash_type = cash_type
+            row.amount_limit = float(amount_limit)
+            row.status = status
+            row.extra = payload
+        else:
+            row = FCTPettyCash(
+                id=parsed_id or uuid4(),
+                tenant_id=tenant_id,
+                entity_id=target_entity,
+                cash_type=cash_type,
+                amount_limit=float(amount_limit),
+                current_balance=float(amount_limit),
+                status=status,
+                extra=payload,
+            )
+            session.add(row)
+        await session.flush()
         return {
             "success": True,
             "tenant_id": tenant_id,
-            "petty_cash_id": petty_cash_id,
-            "entity_id": entity_id,
-            "cash_type": cash_type,
-            "amount_limit": float(amount_limit),
-            "currency": currency,
-            "owner": owner,
-            "status": status,
-            "extra": extra or {},
+            "petty_cash_id": str(row.id),
+            "entity_id": row.entity_id,
+            "cash_type": row.cash_type,
+            "amount_limit": float(row.amount_limit or 0),
+            "current_balance": float(row.current_balance or 0),
+            "currency": payload.get("currency"),
+            "owner": payload.get("owner"),
+            "status": row.status,
+            "extra": row.extra or {},
         }
 
     async def list_petty_cash(
@@ -2739,7 +2802,36 @@ class StandaloneFCTService:
         skip: int = 0,
         limit: int = 100,
     ) -> Dict[str, Any]:
-        return {"items": [], "total": 0, "skip": skip, "limit": limit}
+        filters = [FCTPettyCash.tenant_id == tenant_id]
+        if entity_id:
+            filters.append(FCTPettyCash.entity_id == entity_id)
+        if cash_type:
+            filters.append(FCTPettyCash.cash_type == cash_type)
+
+        total_stmt = select(func.count(FCTPettyCash.id)).where(and_(*filters))
+        total = int((await session.execute(total_stmt)).scalar() or 0)
+        stmt = (
+            select(FCTPettyCash)
+            .where(and_(*filters))
+            .order_by(FCTPettyCash.updated_at.desc())
+            .offset(skip)
+            .limit(limit)
+        )
+        rows = (await session.execute(stmt)).scalars().all()
+        items = [
+            {
+                "petty_cash_id": str(r.id),
+                "tenant_id": r.tenant_id,
+                "entity_id": r.entity_id,
+                "cash_type": r.cash_type,
+                "amount_limit": float(r.amount_limit or 0),
+                "current_balance": float(r.current_balance or 0),
+                "status": r.status,
+                "extra": r.extra or {},
+            }
+            for r in rows
+        ]
+        return {"items": items, "total": total, "skip": skip, "limit": limit}
 
     async def add_petty_cash_record(
         self,
@@ -2752,15 +2844,46 @@ class StandaloneFCTService:
         ref_id: Optional[str] = None,
         description: Optional[str] = None,
     ) -> Dict[str, Any]:
+        parsed_id = self._parse_uuid_or_none(petty_cash_id)
+        if not parsed_id:
+            raise ValueError("petty_cash_id 无效")
+        petty_cash = (
+            await session.execute(select(FCTPettyCash).where(FCTPettyCash.id == parsed_id))
+        ).scalar_one_or_none()
+        if not petty_cash:
+            raise ValueError("备用金主档不存在")
+
+        normalized_type = (record_type or "").strip().lower()
+        delta = float(amount)
+        if normalized_type in {"expense", "out", "payment"}:
+            delta = -abs(delta)
+        else:
+            delta = abs(delta)
+
+        petty_cash.current_balance = float(petty_cash.current_balance or 0) + delta
+        row = FCTPettyCashRecord(
+            petty_cash_id=petty_cash.id,
+            record_type=normalized_type or "expense",
+            amount=float(amount),
+            biz_date=biz_date or date.today(),
+            ref_type=ref_type,
+            ref_id=ref_id,
+            description=description,
+            extra=None,
+        )
+        session.add(row)
+        await session.flush()
         return {
             "success": True,
-            "petty_cash_id": petty_cash_id,
-            "record_type": record_type,
-            "amount": float(amount),
-            "biz_date": biz_date.isoformat() if isinstance(biz_date, date) else None,
-            "ref_type": ref_type,
-            "ref_id": ref_id,
-            "description": description,
+            "record_id": str(row.id),
+            "petty_cash_id": str(petty_cash.id),
+            "record_type": row.record_type,
+            "amount": float(row.amount or 0),
+            "biz_date": row.biz_date.isoformat() if row.biz_date else None,
+            "ref_type": row.ref_type,
+            "ref_id": row.ref_id,
+            "description": row.description,
+            "balance_after": float(petty_cash.current_balance or 0),
         }
 
     async def list_petty_cash_records(
@@ -2775,9 +2898,58 @@ class StandaloneFCTService:
         limit: int = 100,
     ) -> Dict[str, Any]:
         normalized_cash_id = petty_cash_id or cash_id
+        filters = []
+        parsed_id = self._parse_uuid_or_none(normalized_cash_id)
+        if parsed_id:
+            filters.append(FCTPettyCashRecord.petty_cash_id == parsed_id)
+        if start_date:
+            filters.append(FCTPettyCashRecord.biz_date >= start_date)
+        if end_date:
+            filters.append(FCTPettyCashRecord.biz_date <= end_date)
+
+        stmt = (
+            select(FCTPettyCashRecord, FCTPettyCash)
+            .join(FCTPettyCash, FCTPettyCash.id == FCTPettyCashRecord.petty_cash_id)
+            .where(and_(*filters) if filters else text("1=1"))
+        )
+        if tenant_id:
+            stmt = stmt.where(FCTPettyCash.tenant_id == tenant_id)
+
+        count_stmt = (
+            select(func.count(FCTPettyCashRecord.id))
+            .select_from(FCTPettyCashRecord)
+            .join(FCTPettyCash, FCTPettyCash.id == FCTPettyCashRecord.petty_cash_id)
+            .where(and_(*filters) if filters else text("1=1"))
+        )
+        if tenant_id:
+            count_stmt = count_stmt.where(FCTPettyCash.tenant_id == tenant_id)
+        total = int((await session.execute(count_stmt)).scalar() or 0)
+
+        rows = (
+            await session.execute(
+                stmt.order_by(FCTPettyCashRecord.biz_date.desc(), FCTPettyCashRecord.created_at.desc())
+                .offset(skip)
+                .limit(limit)
+            )
+        ).all()
+        items = [
+            {
+                "record_id": str(r.id),
+                "petty_cash_id": str(pc.id),
+                "tenant_id": pc.tenant_id,
+                "entity_id": pc.entity_id,
+                "record_type": r.record_type,
+                "amount": float(r.amount or 0),
+                "biz_date": r.biz_date.isoformat() if r.biz_date else None,
+                "ref_type": r.ref_type,
+                "ref_id": r.ref_id,
+                "description": r.description,
+            }
+            for r, pc in rows
+        ]
         return {
-            "items": [],
-            "total": 0,
+            "items": items,
+            "total": total,
             "skip": skip,
             "limit": limit,
             "petty_cash_id": normalized_cash_id,

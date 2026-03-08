@@ -17,6 +17,7 @@ for _k, _v in {
 import pytest
 from datetime import date, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
+from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.services.fct_service import (
@@ -1316,16 +1317,21 @@ class TestApprovalVoucherSync:
 
 
 class TestPettyCashPlaceholders:
-    """测试备用金占位接口参数兼容与返回结构"""
+    """测试备用金接口参数兼容与持久化查询结构"""
 
     @pytest.mark.asyncio
     async def test_upsert_petty_cash_accepts_public_api_params(self):
         svc = StandaloneFCTService()
         db = _mock_db()
+        miss1 = MagicMock()
+        miss1.scalar_one_or_none.return_value = None
+        miss2 = MagicMock()
+        miss2.scalar_one_or_none.return_value = None
+        db.execute = AsyncMock(side_effect=[miss1, miss2])
         result = await svc.upsert_petty_cash(
             db,
             tenant_id="T1",
-            petty_cash_id="PC-001",
+            petty_cash_id=None,
             entity_id="S001",
             cash_type="store",
             amount_limit=5000,
@@ -1335,7 +1341,7 @@ class TestPettyCashPlaceholders:
             extra={"note": "seed"},
         )
         assert result["success"] is True
-        assert result["petty_cash_id"] == "PC-001"
+        assert result["entity_id"] == "S001"
         assert result["amount_limit"] == 5000.0
         assert result["extra"]["note"] == "seed"
 
@@ -1343,9 +1349,15 @@ class TestPettyCashPlaceholders:
     async def test_add_petty_cash_record_accepts_public_api_params(self):
         svc = StandaloneFCTService()
         db = _mock_db()
+        pc = MagicMock()
+        pc.id = UUID("00000000-0000-0000-0000-000000000123")
+        pc.current_balance = 5000.0
+        found = MagicMock()
+        found.scalar_one_or_none.return_value = pc
+        db.execute = AsyncMock(return_value=found)
         result = await svc.add_petty_cash_record(
             db,
-            petty_cash_id="PC-001",
+            petty_cash_id="00000000-0000-0000-0000-000000000123",
             record_type="expense",
             amount=128.5,
             biz_date=date(2026, 3, 8),
@@ -1354,26 +1366,44 @@ class TestPettyCashPlaceholders:
             description="snacks",
         )
         assert result["success"] is True
-        assert result["petty_cash_id"] == "PC-001"
+        assert result["petty_cash_id"] == "00000000-0000-0000-0000-000000000123"
         assert result["biz_date"] == "2026-03-08"
 
     @pytest.mark.asyncio
     async def test_list_petty_cash_records_supports_petty_cash_id_and_dates(self):
         svc = StandaloneFCTService()
         db = _mock_db()
+        pc = MagicMock()
+        pc.id = UUID("00000000-0000-0000-0000-000000000123")
+        pc.tenant_id = "T1"
+        pc.entity_id = "S001"
+        rec = MagicMock()
+        rec.id = "rec-1"
+        rec.record_type = "expense"
+        rec.amount = 100
+        rec.biz_date = date(2026, 3, 10)
+        rec.ref_type = "manual"
+        rec.ref_id = "R-2"
+        rec.description = "x"
+        count_result = MagicMock()
+        count_result.scalar.return_value = 1
+        list_result = MagicMock()
+        list_result.all.return_value = [(rec, pc)]
+        db.execute = AsyncMock(side_effect=[count_result, list_result])
         result = await svc.list_petty_cash_records(
             db,
-            petty_cash_id="PC-001",
+            petty_cash_id="00000000-0000-0000-0000-000000000123",
             start_date=date(2026, 3, 1),
             end_date=date(2026, 3, 31),
             skip=5,
             limit=20,
         )
-        assert result["petty_cash_id"] == "PC-001"
+        assert result["petty_cash_id"] == "00000000-0000-0000-0000-000000000123"
         assert result["start_date"] == "2026-03-01"
         assert result["end_date"] == "2026-03-31"
         assert result["skip"] == 5
         assert result["limit"] == 20
+        assert result["total"] == 1
 
 
 class TestBudgetCompatibility:
