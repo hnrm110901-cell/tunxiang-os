@@ -110,7 +110,7 @@
 
 #### Step 7：测试
 
-- [ ] 新建 `tests/test_labor_demand_service.py`：≥16个测试
+- [x] 新建 `tests/test_labor_demand_service.py`：≥16个测试
   - 纯函数：星期系数×3 / 节假日系数×3 / 天气系数×2
   - forecast_customer_flow：正常/无历史数据/节假日
   - compute_staffing_needs：正常/人效比缺失降级
