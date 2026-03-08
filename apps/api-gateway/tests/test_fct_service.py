@@ -1312,8 +1312,36 @@ class TestApprovalVoucherSync:
 
         assert result["success"] is True
         assert result["status"] == "approved"
+        assert "approval_id" in result
         assert result["voucher_sync"]["status"] == "approved"
         assert v.status == "approved"
+
+    @pytest.mark.asyncio
+    async def test_get_approval_by_ref_reads_persisted_records(self):
+        db = _mock_db()
+        rec = MagicMock()
+        rec.id = "apr-1"
+        rec.step = 1
+        rec.status = "approved"
+        rec.approved_at = "2026-03-08T10:00:00"
+        rec.approved_by = "U001"
+        rec.comment = "ok"
+        rec.extra = {"channel": "manual"}
+        result_mock = MagicMock()
+        result_mock.scalars.return_value.all.return_value = [rec]
+        db.execute = AsyncMock(return_value=result_mock)
+
+        svc = StandaloneFCTService()
+        out = await svc.get_approval_by_ref(
+            db,
+            tenant_id="T1",
+            ref_type="voucher",
+            ref_id="vid-201",
+        )
+
+        assert len(out["records"]) == 1
+        assert out["records"][0]["status"] == "approved"
+        assert out["records"][0]["approved_by"] == "U001"
 
 
 class TestPettyCashPlaceholders:

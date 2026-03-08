@@ -208,6 +208,23 @@ class FCTPettyCashRecord(Base, TimestampMixin):
     petty_cash = relationship("FCTPettyCash", back_populates="records")
 
 
+class FCTApprovalRecord(Base, TimestampMixin):
+    """审批流记录。"""
+
+    __tablename__ = "fct_approval_records"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id = Column(String(64), nullable=False, index=True)
+    ref_type = Column(String(32), nullable=False, index=True)
+    ref_id = Column(String(64), nullable=False, index=True)
+    step = Column(Integer, nullable=False, default=1)
+    status = Column(String(20), nullable=False, default="pending")
+    approved_at = Column(String(32))
+    approved_by = Column(String(64))
+    comment = Column(Text)
+    extra = Column(JSON)
+
+
 # ── 会计凭证（双分录）───────────────────────────────────────────────────────
 
 class Voucher(Base, TimestampMixin):

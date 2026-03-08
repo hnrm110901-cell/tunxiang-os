@@ -38,6 +38,7 @@ from src.models.fct import (
     FCTBudgetControl,
     FCTPettyCash,
     FCTPettyCashRecord,
+    FCTApprovalRecord,
     TaxpayerType,
     Voucher,
     VoucherLine,
@@ -2971,11 +2972,28 @@ class StandaloneFCTService:
         extra: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         status_l = (status or "pending").strip().lower()
+        approved_at = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S") if status_l == "approved" else None
+        approved_by = (extra or {}).get("approved_by") if isinstance(extra, dict) else None
+        comment = (extra or {}).get("comment") if isinstance(extra, dict) else None
+        row = FCTApprovalRecord(
+            tenant_id=tenant_id,
+            ref_type=ref_type,
+            ref_id=ref_id,
+            step=int(step or 1),
+            status=status_l,
+            approved_at=approved_at,
+            approved_by=approved_by,
+            comment=comment,
+            extra=extra or {},
+        )
+        session.add(row)
+        await session.flush()
         result: Dict[str, Any] = {
+            "approval_id": str(row.id),
             "tenant_id": tenant_id,
             "ref_type": ref_type,
             "ref_id": ref_id,
-            "step": step,
+            "step": int(step or 1),
             "status": status_l,
             "success": True,
         }
@@ -2997,7 +3015,35 @@ class StandaloneFCTService:
         ref_type: str,
         ref_id: str,
     ) -> Dict[str, Any]:
-        records: List[Dict[str, Any]] = []
+        stmt = (
+            select(FCTApprovalRecord)
+            .where(
+                and_(
+                    FCTApprovalRecord.tenant_id == tenant_id,
+                    FCTApprovalRecord.ref_type == ref_type,
+                    FCTApprovalRecord.ref_id == ref_id,
+                )
+            )
+            .order_by(FCTApprovalRecord.step.asc(), FCTApprovalRecord.created_at.asc())
+        )
+        rows = (await session.execute(stmt)).scalars().all()
+        records: List[Dict[str, Any]] = [
+            {
+                "approval_id": str(r.id),
+                "step": int(r.step or 1),
+                "status": (r.status or "").lower(),
+                "approved_at": r.approved_at,
+                "approved_by": r.approved_by,
+                "comment": r.comment,
+                "extra": r.extra or {},
+            }
+            for r in rows
+        ]
+
+        if records:
+            return {"tenant_id": tenant_id, "ref_type": ref_type, "ref_id": ref_id, "records": records}
+
+        # 兼容兜底：历史数据可能尚未落审批表，回退凭证状态映射。
         if ref_type in {"voucher", "fct_voucher"}:
             stmt = select(Voucher).where(Voucher.id == ref_id)
             voucher = (await session.execute(stmt)).scalar_one_or_none()
