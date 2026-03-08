@@ -251,3 +251,165 @@ class TestUpgradePriority:
 
     def test_p0_stays_p0(self):
         assert WeChatActionFSM._upgrade_priority(ActionPriority.P0) == ActionPriority.P0
+
+
+# ── 8. Redis 持久化 ───────────────────────────────────────────────────────────
+
+class TestRedisPersistence:
+    """Redis 写穿/读恢复逻辑验证（注入 mock redis_cache，不依赖真实 Redis）"""
+
+    def _make_mock_redis(self):
+        """构造最小 redis_cache mock：set/expire/zadd/zrange/get/initialize 均可追踪。"""
+        from unittest.mock import AsyncMock, MagicMock
+        rc = MagicMock()
+        rc._initialized = True
+        rc.set = AsyncMock(return_value=True)
+        rc.get = AsyncMock(return_value=None)
+        rc.expire = AsyncMock(return_value=True)
+        rc._redis = MagicMock()
+        rc._redis.zadd = AsyncMock()
+        rc._redis.zrange = AsyncMock(return_value=[])
+        return rc
+
+    @pytest.mark.asyncio
+    async def test_create_action_writes_to_redis(self):
+        """create_action 成功后应调用 redis set + zadd"""
+        rc = self._make_mock_redis()
+        fsm = WeChatActionFSM(redis_cache=rc)
+        with patch.object(fsm, "_send_wechat_message", new_callable=AsyncMock, return_value=True):
+            action = await fsm.create_action(
+                store_id="S001", category=ActionCategory.WASTE_ALERT,
+                priority=ActionPriority.P1, title="测试", content="内容",
+                receiver_user_id="u1",
+            )
+        rc.set.assert_awaited_once()
+        key_used = rc.set.call_args[0][0]
+        assert action.action_id in key_used
+        rc._redis.zadd.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_state_transition_persists_to_redis(self):
+        """push_to_wechat 状态变更后应再次调用 redis set"""
+        rc = self._make_mock_redis()
+        fsm = WeChatActionFSM(redis_cache=rc)
+        with patch.object(fsm, "_send_wechat_message", new_callable=AsyncMock, return_value=True):
+            action = await fsm.create_action(
+                store_id="S001", category=ActionCategory.WASTE_ALERT,
+                priority=ActionPriority.P2, title="t", content="c",
+                receiver_user_id="u1",
+            )
+            rc.set.reset_mock()
+            rc._redis.zadd.reset_mock()
+            await fsm.push_to_wechat(action.action_id)
+        # push_to_wechat 应再次持久化（状态变为 PUSHED）
+        rc.set.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_redis_failure_degrades_to_memory(self):
+        """Redis 写入失败时：Action 仍在内存中，不抛异常"""
+        from unittest.mock import AsyncMock, MagicMock
+        rc = MagicMock()
+        rc._initialized = True
+        rc.set = AsyncMock(side_effect=ConnectionError("Redis 不可用"))
+        rc.expire = AsyncMock()
+        rc._redis = MagicMock()
+        rc._redis.zadd = AsyncMock()
+        fsm = WeChatActionFSM(redis_cache=rc)
+        action = await fsm.create_action(
+            store_id="S001", category=ActionCategory.ANOMALY,
+            priority=ActionPriority.P3, title="t", content="c",
+            receiver_user_id="u1",
+        )
+        # 内存中仍存在
+        assert action.action_id in fsm._actions
+        assert fsm._actions[action.action_id].state == ActionState.CREATED
+
+    @pytest.mark.asyncio
+    async def test_restore_from_redis_loads_actions(self):
+        """restore_from_redis：从 Redis zrange + get 重建内存状态"""
+        from unittest.mock import AsyncMock, MagicMock
+        import json
+        from datetime import datetime
+
+        action_id = "ACT-TESTREDIS01"
+        payload = {
+            "action_id": action_id,
+            "store_id": "S001",
+            "category": "waste_alert",
+            "priority": "P1",
+            "title": "恢复测试",
+            "content": "内容",
+            "state": "pushed",
+            "created_at": datetime.utcnow().isoformat(),
+            "pushed_at": datetime.utcnow().isoformat(),
+            "acknowledged_at": None,
+            "resolved_at": None,
+            "escalated_at": None,
+            "escalation_count": 0,
+            "receiver_user_id": "u1",
+            "escalation_user_id": "",
+            "source_event_id": None,
+            "evidence": {},
+            "wechat_msgid": None,
+        }
+        rc = MagicMock()
+        rc._initialized = True
+        rc.set = AsyncMock(return_value=True)
+        rc.expire = AsyncMock(return_value=True)
+        rc.get = AsyncMock(return_value=payload)  # rc.get 自动 json.loads，返回 dict
+        rc._redis = MagicMock()
+        rc._redis.zadd = AsyncMock()
+        rc._redis.zrange = AsyncMock(return_value=[action_id])
+
+        fsm = WeChatActionFSM(redis_cache=rc)
+        count = await fsm.restore_from_redis()
+
+        assert count == 1
+        assert action_id in fsm._actions
+        assert fsm._actions[action_id].state == ActionState.PUSHED
+        assert fsm._actions[action_id].priority == ActionPriority.P1
+
+    @pytest.mark.asyncio
+    async def test_restore_from_redis_skips_missing_keys(self):
+        """restore_from_redis：index 中有 ID 但 key 已过期 → 跳过，不报错"""
+        from unittest.mock import AsyncMock, MagicMock
+        rc = MagicMock()
+        rc._initialized = True
+        rc.get = AsyncMock(return_value=None)  # key 已过期
+        rc._redis = MagicMock()
+        rc._redis.zrange = AsyncMock(return_value=["ACT-EXPIRED001"])
+
+        fsm = WeChatActionFSM(redis_cache=rc)
+        count = await fsm.restore_from_redis()
+        assert count == 0
+        assert len(fsm._actions) == 0
+
+    def test_action_serialization_roundtrip(self):
+        """_action_to_json / _action_from_json 往返序列化正确"""
+        from datetime import datetime
+        original = ActionRecord(
+            action_id="ACT-SERIAL001",
+            store_id="S002",
+            category=ActionCategory.KPI_ALERT,
+            priority=ActionPriority.P2,
+            title="序列化测试",
+            content="测试内容",
+            state=ActionState.PROCESSING,
+            created_at=datetime(2026, 3, 8, 4, 30, 0),
+            receiver_user_id="mgr_001",
+            escalation_user_id="hq_001",
+            escalation_count=1,
+            evidence={"key": "value"},
+        )
+        raw = WeChatActionFSM._action_to_json(original)
+        restored = WeChatActionFSM._action_from_json(raw)
+
+        assert restored.action_id == original.action_id
+        assert restored.store_id == original.store_id
+        assert restored.category == original.category
+        assert restored.priority == original.priority
+        assert restored.state == original.state
+        assert restored.created_at == original.created_at
+        assert restored.escalation_count == original.escalation_count
+        assert restored.evidence == original.evidence
+

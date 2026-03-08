@@ -73,6 +73,19 @@ from .member_lifecycle import (
     StateTransitionTrigger,
     MemberLifecycleHistory,
 )
+from .workforce import (
+    LaborDemandForecast,
+    LaborCostSnapshot,
+    StaffingAdvice,
+    StaffingAdviceConfirmation,
+    StoreLaborBudget,
+    LaborCostRanking,
+    MealPeriodType,
+    StaffingAdviceStatus,
+    ConfirmationAction,
+    BudgetPeriodType,
+    RankingPeriodType,
+)
 
 __all__ = [
     "Base",
@@ -231,4 +244,16 @@ __all__ = [
     "LifecycleState",
     "StateTransitionTrigger",
     "MemberLifecycleHistory",
+    # Phase 8 — Workforce
+    "LaborDemandForecast",
+    "LaborCostSnapshot",
+    "StaffingAdvice",
+    "StaffingAdviceConfirmation",
+    "StoreLaborBudget",
+    "LaborCostRanking",
+    "MealPeriodType",
+    "StaffingAdviceStatus",
+    "ConfirmationAction",
+    "BudgetPeriodType",
+    "RankingPeriodType",
 ]

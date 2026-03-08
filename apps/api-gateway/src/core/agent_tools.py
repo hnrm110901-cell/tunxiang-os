@@ -549,6 +549,108 @@ OPS_TOOLS: List[Dict[str, Any]] = [
             "required": ["store_id", "device_type", "issue_description", "priority"],
         },
     },
+    {
+        "name": "query_device_readings",
+        "description": "查询IoT设备读数历史（温度/功率/在线状态），用于趋势分析和告警回溯",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "store_id": {"type": "string", "description": "门店ID"},
+                "device_name": {"type": "string", "description": "设备名称（可选，不传则返回全部）"},
+                "metric_type": {
+                    "type": "string",
+                    "enum": ["temperature", "power", "online_status", "tpm", "clean_days", "all"],
+                    "default": "all",
+                    "description": "指标类型",
+                },
+                "minutes_back": {"type": "integer", "default": 60, "description": "往前查询分钟数"},
+                "limit": {"type": "integer", "default": 50},
+            },
+            "required": ["store_id"],
+        },
+    },
+    {
+        "name": "query_network_health",
+        "description": "查询网络探针历史结果（ICMP/HTTP/DNS/带宽），用于网络质量分析和故障定位",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "store_id": {"type": "string", "description": "门店ID"},
+                "probe_type": {
+                    "type": "string",
+                    "enum": ["icmp", "http", "dns", "bandwidth", "wifi", "vpn", "all"],
+                    "default": "all",
+                },
+                "vlan": {"type": "string", "description": "VLAN区段过滤（vlan10/vlan20/wan等）"},
+                "minutes_back": {"type": "integer", "default": 30},
+                "alerts_only": {"type": "boolean", "default": False, "description": "仅返回告警记录"},
+            },
+            "required": ["store_id"],
+        },
+    },
+    {
+        "name": "query_food_safety",
+        "description": "查询食安合规记录（冷链温度/油质/清洁周期/安全设备），支持违规明细查询",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "store_id": {"type": "string", "description": "门店ID"},
+                "record_type": {
+                    "type": "string",
+                    "enum": ["cold_chain", "fridge_power", "ice_machine_clean", "oil_quality", "safety_device", "all"],
+                    "default": "all",
+                },
+                "days_back": {"type": "integer", "default": 7},
+                "violations_only": {"type": "boolean", "default": False},
+            },
+            "required": ["store_id"],
+        },
+    },
+    {
+        "name": "get_asset_inventory",
+        "description": "获取门店IT资产台账（POS/打印机/路由器/AP/摄像头等），含在线状态和最后活跃时间",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "store_id": {"type": "string", "description": "门店ID"},
+                "asset_type": {
+                    "type": "string",
+                    "enum": ["pos", "erp", "member", "printer", "kds", "door_access", "camera",
+                             "server", "router", "switch", "ap", "vpn", "all"],
+                    "default": "all",
+                },
+                "status": {
+                    "type": "string",
+                    "enum": ["online", "offline", "degraded", "all"],
+                    "default": "all",
+                },
+            },
+            "required": ["store_id"],
+        },
+    },
+    {
+        "name": "get_alert_history",
+        "description": "获取门店历史告警列表（OpsEvent），支持按严重程度/状态/时间过滤",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "store_id": {"type": "string", "description": "门店ID"},
+                "severity": {
+                    "type": "string",
+                    "enum": ["low", "medium", "high", "critical", "all"],
+                    "default": "all",
+                },
+                "status": {
+                    "type": "string",
+                    "enum": ["open", "in_progress", "resolved", "all"],
+                    "default": "open",
+                },
+                "hours_back": {"type": "integer", "default": 24},
+                "limit": {"type": "integer", "default": 20},
+            },
+            "required": ["store_id"],
+        },
+    },
 ]
 
 # ── PerformanceAgent 工具集 ───────────────────────────────────────────────────
@@ -752,6 +854,11 @@ class ToolExecutor:
             "get_system_health": self._get_system_health,
             "get_error_logs": self._get_error_logs,
             "create_maintenance_ticket": self._create_maintenance_ticket,
+            "query_device_readings": self._query_device_readings,
+            "query_network_health": self._query_network_health,
+            "query_food_safety": self._query_food_safety,
+            "get_asset_inventory": self._get_asset_inventory,
+            "get_alert_history": self._get_alert_history,
             # ── PerformanceAgent ───────────────────────────────────────────
             "get_employee_performance": self._get_employee_performance,
             "calculate_commission": self._calculate_commission,
@@ -938,6 +1045,163 @@ class ToolExecutor:
                                         issue_description=p["issue_description"],
                                         priority=p["priority"],
                                         suggested_action=p.get("suggested_action", ""))
+
+    async def _query_device_readings(self, p: Dict) -> Any:
+        """查询IoT设备读数历史，直接查 ops_device_readings 表。"""
+        session = self.services.get("db_session")
+        if not session:
+            return {"status": "service_unavailable", "service": "ops", "method": "query_device_readings"}
+        from sqlalchemy import select, and_
+        from datetime import datetime, timedelta, timezone
+        from ..models.ops import OpsDeviceReading
+        since = datetime.now(timezone.utc) - timedelta(minutes=p.get("minutes_back", 60))
+        stmt = (
+            select(OpsDeviceReading)
+            .where(OpsDeviceReading.store_id == p["store_id"],
+                   OpsDeviceReading.recorded_at >= since)
+        )
+        if p.get("device_name"):
+            stmt = stmt.where(OpsDeviceReading.device_name == p["device_name"])
+        if p.get("metric_type") and p["metric_type"] != "all":
+            stmt = stmt.where(OpsDeviceReading.metric_type == p["metric_type"])
+        stmt = stmt.order_by(OpsDeviceReading.recorded_at.desc()).limit(p.get("limit", 50))
+        rows = (await session.execute(stmt)).scalars().all()
+        return {
+            "total": len(rows),
+            "readings": [
+                {"device_name": r.device_name, "metric_type": r.metric_type,
+                 "value_float": r.value_float, "value_bool": r.value_bool,
+                 "unit": r.unit, "is_alert": r.is_alert,
+                 "alert_message": r.alert_message,
+                 "recorded_at": r.recorded_at.isoformat()}
+                for r in rows
+            ],
+        }
+
+    async def _query_network_health(self, p: Dict) -> Any:
+        """查询网络探针历史结果，直接查 ops_network_health 表。"""
+        session = self.services.get("db_session")
+        if not session:
+            return {"status": "service_unavailable", "service": "ops", "method": "query_network_health"}
+        from sqlalchemy import select
+        from datetime import datetime, timedelta, timezone
+        from ..models.ops import OpsNetworkHealth
+        since = datetime.now(timezone.utc) - timedelta(minutes=p.get("minutes_back", 30))
+        stmt = (
+            select(OpsNetworkHealth)
+            .where(OpsNetworkHealth.store_id == p["store_id"],
+                   OpsNetworkHealth.recorded_at >= since)
+        )
+        if p.get("probe_type") and p["probe_type"] != "all":
+            stmt = stmt.where(OpsNetworkHealth.probe_type == p["probe_type"])
+        if p.get("vlan"):
+            stmt = stmt.where(OpsNetworkHealth.vlan == p["vlan"])
+        if p.get("alerts_only"):
+            stmt = stmt.where(OpsNetworkHealth.is_alert.is_(True))
+        stmt = stmt.order_by(OpsNetworkHealth.recorded_at.desc()).limit(50)
+        rows = (await session.execute(stmt)).scalars().all()
+        return {
+            "total": len(rows),
+            "probes": [
+                {"probe_type": r.probe_type, "target": r.target, "vlan": r.vlan,
+                 "is_available": r.is_available, "latency_ms": r.latency_ms,
+                 "packet_loss_pct": r.packet_loss_pct, "bandwidth_mbps": r.bandwidth_mbps,
+                 "is_alert": r.is_alert, "alert_message": r.alert_message,
+                 "recorded_at": r.recorded_at.isoformat()}
+                for r in rows
+            ],
+        }
+
+    async def _query_food_safety(self, p: Dict) -> Any:
+        """查询食安合规记录，直接查 ops_food_safety_records 表。"""
+        session = self.services.get("db_session")
+        if not session:
+            return {"status": "service_unavailable", "service": "ops", "method": "query_food_safety"}
+        from sqlalchemy import select
+        from datetime import datetime, timedelta, timezone
+        from ..models.ops import OpsFoodSafetyRecord
+        since = datetime.now(timezone.utc) - timedelta(days=p.get("days_back", 7))
+        stmt = (
+            select(OpsFoodSafetyRecord)
+            .where(OpsFoodSafetyRecord.store_id == p["store_id"],
+                   OpsFoodSafetyRecord.recorded_at >= since)
+        )
+        if p.get("record_type") and p["record_type"] != "all":
+            stmt = stmt.where(OpsFoodSafetyRecord.record_type == p["record_type"])
+        if p.get("violations_only"):
+            stmt = stmt.where(OpsFoodSafetyRecord.is_compliant.is_(False))
+        stmt = stmt.order_by(OpsFoodSafetyRecord.recorded_at.desc()).limit(50)
+        rows = (await session.execute(stmt)).scalars().all()
+        return {
+            "total": len(rows),
+            "violations": sum(1 for r in rows if not r.is_compliant),
+            "records": [
+                {"record_type": r.record_type, "device_name": r.device_name,
+                 "is_compliant": r.is_compliant, "value_float": r.value_float,
+                 "unit": r.unit, "notes": r.notes,
+                 "requires_action": r.requires_action,
+                 "recorded_at": r.recorded_at.isoformat()}
+                for r in rows
+            ],
+        }
+
+    async def _get_asset_inventory(self, p: Dict) -> Any:
+        """获取门店IT资产台账，直接查 ops_assets 表。"""
+        session = self.services.get("db_session")
+        if not session:
+            return {"status": "service_unavailable", "service": "ops", "method": "get_asset_inventory"}
+        from sqlalchemy import select
+        from ..models.ops import OpsAsset
+        stmt = select(OpsAsset).where(OpsAsset.store_id == p["store_id"])
+        if p.get("asset_type") and p["asset_type"] != "all":
+            stmt = stmt.where(OpsAsset.asset_type == p["asset_type"])
+        if p.get("status") and p["status"] != "all":
+            stmt = stmt.where(OpsAsset.status == p["status"])
+        stmt = stmt.order_by(OpsAsset.asset_type, OpsAsset.name)
+        rows = (await session.execute(stmt)).scalars().all()
+        return {
+            "total": len(rows),
+            "online": sum(1 for r in rows if r.status == "online"),
+            "offline": sum(1 for r in rows if r.status == "offline"),
+            "assets": [
+                {"id": str(r.id), "asset_type": r.asset_type, "name": r.name,
+                 "ip_address": r.ip_address, "status": r.status,
+                 "last_seen": r.last_seen.isoformat() if r.last_seen else None,
+                 "firmware_version": r.firmware_version}
+                for r in rows
+            ],
+        }
+
+    async def _get_alert_history(self, p: Dict) -> Any:
+        """获取门店历史告警，直接查 ops_events 表。"""
+        session = self.services.get("db_session")
+        if not session:
+            return {"status": "service_unavailable", "service": "ops", "method": "get_alert_history"}
+        from sqlalchemy import select
+        from datetime import datetime, timedelta, timezone
+        from ..models.ops import OpsEvent
+        since = datetime.now(timezone.utc) - timedelta(hours=p.get("hours_back", 24))
+        stmt = (
+            select(OpsEvent)
+            .where(OpsEvent.store_id == p["store_id"],
+                   OpsEvent.created_at >= since)
+        )
+        if p.get("severity") and p["severity"] != "all":
+            stmt = stmt.where(OpsEvent.severity == p["severity"])
+        if p.get("status") and p["status"] != "all":
+            stmt = stmt.where(OpsEvent.status == p["status"])
+        stmt = stmt.order_by(OpsEvent.created_at.desc()).limit(p.get("limit", 20))
+        rows = (await session.execute(stmt)).scalars().all()
+        return {
+            "total": len(rows),
+            "alerts": [
+                {"id": str(r.id), "event_type": r.event_type, "severity": r.severity,
+                 "component": r.component, "description": r.description,
+                 "status": r.status, "created_at": r.created_at.isoformat(),
+                 "resolved_at": r.resolved_at.isoformat() if r.resolved_at else None}
+                for r in rows
+            ],
+        }
 
     # PerformanceAgent handlers
     async def _get_employee_performance(self, p: Dict) -> Any:

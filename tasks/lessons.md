@@ -78,6 +78,10 @@
 **问题**：`return {"items": rows, "total": len(rows)}` 在分页时 `total` 返回的是当前页行数，而非数据库总行数，前端无法计算总页数。
 **规则**：分页接口必须单独执行 `SELECT COUNT(*) ...`（去掉 LIMIT/OFFSET），用其结果作为 `total`。
 
-### L016 — 勿在 `os.getenv()` 默认值里硬编码凭证
+### L017 — _upgrade_priority 方向 bug（WeChatActionFSM）
+**问题**：`_upgrade_priority` 用 `order[max(0, idx - 1)]` 向左移动，但 `order = [P3, P2, P1, P0]` 中 P0 在右侧（最高优先级）。导致 P2→P3（降级！）而非 P2→P1（升级）。
+**规则**："优先级升级"应向列表中更高优先级的方向移动。`_upgrade_priority` 正确写法：`order[min(len(order)-1, idx+1)]`（向 P0 方向移动）。
+
+
 **问题**：`os.getenv("DATABASE_URL", "postgresql+asyncpg://postgres:postgres@localhost/zhilian")` 在未配置环境变量时会静默使用弱默认密码，若意外部署至生产环境将造成数据泄露。
 **规则**：必须配置的环境变量用 `os.environ["DATABASE_URL"]`（无默认值），启动时即刻崩溃并提示缺失配置，优于运行时出现意外行为。

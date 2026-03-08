@@ -20,8 +20,8 @@ Webhook 验证：
 
 import asyncio
 import hashlib
+import json
 import os
-import time
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
@@ -31,6 +31,11 @@ from typing import Callable, Dict, List, Optional
 import structlog
 
 logger = structlog.get_logger()
+
+# Redis 键规范（CLAUDE.md: namespace:entity_id）
+_ACTION_KEY_PREFIX = "wechat_action"
+_ACTION_INDEX_KEY = "wechat_action:ids"
+_ACTION_TTL_SECONDS = 7 * 24 * 3600  # 7 天，覆盖最长升级周期（P3=3天）
 
 
 # ── 枚举 ──────────────────────────────────────────────────────────────────────
@@ -152,10 +157,12 @@ class WeChatActionFSM:
         await fsm.push_to_wechat(action.action_id)
     """
 
-    def __init__(self):
-        # 内存存储（生产环境应持久化到 Redis/PostgreSQL）
+    def __init__(self, redis_cache=None):
+        # 内存 dict 作为本地缓存；Redis 作为持久化层（多 worker 共享状态）
         self._actions: Dict[str, ActionRecord] = {}
         self._escalation_task: Optional[asyncio.Task] = None
+        # 延迟导入避免循环依赖；允许测试注入 mock
+        self._redis = redis_cache  # None → 首次 IO 时懒加载全局实例
 
     # ── 生命周期方法 ──────────────────────────────────────────────────────────
 
@@ -192,6 +199,7 @@ class WeChatActionFSM:
             priority=priority.value,
             category=category.value,
         )
+        await self._persist_action(action)
         return action
 
     async def push_to_wechat(self, action_id: str) -> bool:
@@ -219,6 +227,7 @@ class WeChatActionFSM:
             action.state = ActionState.FAILED
             logger.warning("Action 企微推送失败", action_id=action_id)
 
+        await self._persist_action(action)
         return success
 
     async def acknowledge(self, action_id: str, user_id: str) -> bool:
@@ -229,6 +238,7 @@ class WeChatActionFSM:
         action.state = ActionState.ACKNOWLEDGED
         action.acknowledged_at = datetime.utcnow()
         logger.info("Action 已确认", action_id=action_id, user_id=user_id)
+        await self._persist_action(action)
         return True
 
     async def start_processing(self, action_id: str) -> bool:
@@ -237,6 +247,7 @@ class WeChatActionFSM:
         if action.state != ActionState.ACKNOWLEDGED:
             return False
         action.state = ActionState.PROCESSING
+        await self._persist_action(action)
         return True
 
     async def resolve(self, action_id: str, resolution_notes: str = "") -> bool:
@@ -254,6 +265,7 @@ class WeChatActionFSM:
                 (action.resolved_at - action.created_at).total_seconds() / 60, 1
             ),
         )
+        await self._persist_action(action)
         return True
 
     async def escalate(self, action_id: str) -> bool:
@@ -273,6 +285,7 @@ class WeChatActionFSM:
         action.state = ActionState.ESCALATED
         action.escalated_at = datetime.utcnow()
         action.escalation_count += 1
+        await self._persist_action(action)
 
         # 升级优先级
         new_priority = self._upgrade_priority(action.priority)
@@ -430,6 +443,121 @@ class WeChatActionFSM:
         if not action:
             raise ValueError(f"Action {action_id} 不存在")
         return action
+
+    # ── Redis 持久化 ───────────────────────────────────────────────────────────
+
+    def _redis_client(self):
+        """懒加载全局 redis_cache 单例（可被测试覆盖）。"""
+        if self._redis is None:
+            from src.services.redis_cache_service import redis_cache
+            self._redis = redis_cache
+        return self._redis
+
+    @staticmethod
+    def _action_key(action_id: str) -> str:
+        return f"{_ACTION_KEY_PREFIX}:{action_id}"
+
+    @staticmethod
+    def _action_to_json(action: ActionRecord) -> str:
+        """序列化 ActionRecord → JSON（datetime → ISO 字符串；enum → value）。"""
+        d = {
+            "action_id":          action.action_id,
+            "store_id":           action.store_id,
+            "category":           action.category.value,
+            "priority":           action.priority.value,
+            "title":              action.title,
+            "content":            action.content,
+            "state":              action.state.value,
+            "created_at":         action.created_at.isoformat(),
+            "pushed_at":          action.pushed_at.isoformat() if action.pushed_at else None,
+            "acknowledged_at":    action.acknowledged_at.isoformat() if action.acknowledged_at else None,
+            "resolved_at":        action.resolved_at.isoformat() if action.resolved_at else None,
+            "escalated_at":       action.escalated_at.isoformat() if action.escalated_at else None,
+            "escalation_count":   action.escalation_count,
+            "receiver_user_id":   action.receiver_user_id,
+            "escalation_user_id": action.escalation_user_id,
+            "source_event_id":    action.source_event_id,
+            "evidence":           action.evidence,
+            "wechat_msgid":       action.wechat_msgid,
+        }
+        return json.dumps(d, ensure_ascii=False)
+
+    @staticmethod
+    def _action_from_json(raw: str) -> ActionRecord:
+        """反序列化 JSON → ActionRecord。"""
+        d = json.loads(raw)
+
+        def _dt(v):
+            return datetime.fromisoformat(v) if v else None
+
+        return ActionRecord(
+            action_id=d["action_id"],
+            store_id=d["store_id"],
+            category=ActionCategory(d["category"]),
+            priority=ActionPriority(d["priority"]),
+            title=d["title"],
+            content=d["content"],
+            state=ActionState(d["state"]),
+            created_at=datetime.fromisoformat(d["created_at"]),
+            pushed_at=_dt(d.get("pushed_at")),
+            acknowledged_at=_dt(d.get("acknowledged_at")),
+            resolved_at=_dt(d.get("resolved_at")),
+            escalated_at=_dt(d.get("escalated_at")),
+            escalation_count=d.get("escalation_count", 0),
+            receiver_user_id=d.get("receiver_user_id", ""),
+            escalation_user_id=d.get("escalation_user_id", ""),
+            source_event_id=d.get("source_event_id"),
+            evidence=d.get("evidence", {}),
+            wechat_msgid=d.get("wechat_msgid"),
+        )
+
+    async def _persist_action(self, action: ActionRecord) -> None:
+        """将 ActionRecord 写入 Redis（含 TTL）。失败时降级为纯内存。"""
+        try:
+            rc = self._redis_client()
+            if not rc._initialized:
+                await rc.initialize()
+            key = self._action_key(action.action_id)
+            raw = self._action_to_json(action)
+            await rc.set(key, raw, expire=_ACTION_TTL_SECONDS)
+            # 有序集合记录 action_id（score = 创建时间戳），便于 restore_from_redis 按时间顺序恢复
+            score = action.created_at.timestamp()
+            await rc._redis.zadd(_ACTION_INDEX_KEY, {action.action_id: score})
+            await rc.expire(_ACTION_INDEX_KEY, _ACTION_TTL_SECONDS)
+        except Exception as e:
+            logger.warning("Action Redis 持久化失败（降级内存）", action_id=action.action_id, error=str(e))
+
+    async def restore_from_redis(self) -> int:
+        """
+        从 Redis 恢复所有 Action 到内存（进程重启 / 新 worker 上线时调用）。
+
+        Returns:
+            恢复的 Action 数量
+        """
+        try:
+            rc = self._redis_client()
+            if not rc._initialized:
+                await rc.initialize()
+            action_ids = await rc._redis.zrange(_ACTION_INDEX_KEY, 0, -1)
+            count = 0
+            for action_id in action_ids:
+                raw = await rc.get(self._action_key(action_id))
+                if raw:
+                    try:
+                        # rc.get 自动 json.loads；但我们需要原始字符串
+                        # 如果已被自动解析为 dict，重新 dumps
+                        if isinstance(raw, dict):
+                            raw = json.dumps(raw, ensure_ascii=False)
+                        action = self._action_from_json(raw)
+                        self._actions[action.action_id] = action
+                        count += 1
+                    except Exception as e:
+                        logger.warning("恢复 Action 失败，跳过", action_id=action_id, error=str(e))
+            logger.info("从 Redis 恢复 Action", count=count)
+            return count
+        except Exception as e:
+            logger.warning("Redis Action 恢复失败（降级内存）", error=str(e))
+            return 0
 
     def _build_markdown_message(self, action: ActionRecord) -> str:
         """构建企微 Markdown 卡片消息"""

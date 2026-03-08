@@ -11,7 +11,7 @@ Covers:
   - resolve: any non-terminal → RESOLVED; re-resolve → False; notes stored
   - escalate: marks ESCALATED, creates escalated action with upgraded priority
   - escalate: terminal states (RESOLVED/CLOSED/ESCALATED) → False
-  - _upgrade_priority: production bug — actually downgrades (P0→P1→P2→P3) due to reversed index arithmetic
+  - _upgrade_priority: P3→P2→P1→P0，P0 不再升级（Phase 7 Month 1 已修复方向 bug）
   - verify_webhook_signature: SHA1(sorted([token, timestamp, nonce]))
   - handle_webhook_callback: "确认/收到" → acknowledge; "解决/完成" → resolve
   - list_actions: store_id / state / priority / limit filters
@@ -428,17 +428,14 @@ class TestEscalate:
     @pytest.mark.asyncio
     async def test_escalate_upgrades_priority(self):
         """
-        Production bug: _upgrade_priority(P2) returns P3 (downgrade) instead of P1
-        due to reversed index arithmetic in the order list.
-        The escalated action uses the (broken) _upgrade_priority result.
+        P2 行动升级后：新行动优先级应为 P1（已修复 _upgrade_priority bug）
         """
         fsm = _fsm()
         action = await _action(fsm, priority=ActionPriority.P2, escalation_user="mgr_001")
         await fsm.push_to_wechat(action.action_id)
         await fsm.escalate(action.action_id)
         new_actions = [a for a in fsm._actions.values() if a.action_id != action.action_id]
-        # Bug: actual result is P3 (downgrade), not P1 (upgrade)
-        assert new_actions[0].priority == ActionPriority.P3
+        assert new_actions[0].priority == ActionPriority.P1
 
     @pytest.mark.asyncio
     async def test_escalate_resolved_returns_false(self):
@@ -471,26 +468,21 @@ class TestEscalate:
 
 class TestUpgradePriority:
     """
-    Production bug: _upgrade_priority uses order=[P3,P2,P1,P0] and idx-1,
-    which DOWNGRADES priority (moves toward P3) instead of upgrading toward P0.
-    The docstring says "P3→P2→P1→P0" but the implementation does the reverse.
-    Tests below document the actual (broken) behavior.
+    _upgrade_priority 正确实现（已修复 Phase 7 Month 1）：
+    P3→P2→P1→P0，P0 不再升级。
+    docstring "P3→P2→P1→P0" 与实现一致。
     """
-    def test_p3_stays_p3(self):
-        # Bug: P3 should upgrade to P2 but stays P3 (max(0, 0-1)=0 → P3)
-        assert WeChatActionFSM._upgrade_priority(ActionPriority.P3) == ActionPriority.P3
+    def test_p3_upgrades_to_p2(self):
+        assert WeChatActionFSM._upgrade_priority(ActionPriority.P3) == ActionPriority.P2
 
-    def test_p2_downgrades_to_p3(self):
-        # Bug: P2 should upgrade to P1 but downgrades to P3 (max(0, 1-1)=0 → P3)
-        assert WeChatActionFSM._upgrade_priority(ActionPriority.P2) == ActionPriority.P3
+    def test_p2_upgrades_to_p1(self):
+        assert WeChatActionFSM._upgrade_priority(ActionPriority.P2) == ActionPriority.P1
 
-    def test_p1_downgrades_to_p2(self):
-        # Bug: P1 should upgrade to P0 but downgrades to P2 (max(0, 2-1)=1 → P2)
-        assert WeChatActionFSM._upgrade_priority(ActionPriority.P1) == ActionPriority.P2
+    def test_p1_upgrades_to_p0(self):
+        assert WeChatActionFSM._upgrade_priority(ActionPriority.P1) == ActionPriority.P0
 
-    def test_p0_downgrades_to_p1(self):
-        # Bug: P0 should stay P0 but downgrades to P1 (max(0, 3-1)=2 → P1)
-        assert WeChatActionFSM._upgrade_priority(ActionPriority.P0) == ActionPriority.P1
+    def test_p0_stays_p0(self):
+        assert WeChatActionFSM._upgrade_priority(ActionPriority.P0) == ActionPriority.P0
 
 
 # ===========================================================================
