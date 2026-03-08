@@ -145,3 +145,72 @@ def test_static_count_route_not_captured_by_dynamic_store_id_route():
 
     assert response.status_code == 200
     assert response.json()["count"] == 7
+
+
+def test_static_stores_route_not_captured_by_dynamic_store_id_route():
+    app = FastAPI()
+    app.include_router(router, prefix="/api/v1/multi-store")
+    app.dependency_overrides[get_current_active_user] = lambda: SimpleNamespace(id="u1", role="admin")
+
+    store = SimpleNamespace(
+        id="S001",
+        name="岳麓店",
+        code="YL01",
+        address="长沙市岳麓区",
+        city="长沙",
+        district="岳麓",
+        region="华中",
+        status="active",
+        is_active=True,
+        manager_id="U001",
+        area=300,
+        seats=120,
+        phone="123456",
+        created_at=None,
+    )
+
+    with patch("src.api.multi_store.store_service.get_stores", new=AsyncMock(return_value=[store])), patch(
+        "src.api.multi_store.store_service.get_store", new=AsyncMock(return_value=None)
+    ):
+        client = TestClient(app)
+        response = client.get("/api/v1/multi-store/stores")
+
+    assert response.status_code == 200
+    assert response.json()["stores"][0]["id"] == "S001"
+
+
+def test_static_performance_ranking_route_not_captured_by_dynamic_store_id_route():
+    app = FastAPI()
+    app.include_router(router, prefix="/api/v1/multi-store")
+    app.dependency_overrides[get_current_active_user] = lambda: SimpleNamespace(id="u1", role="admin")
+
+    with patch(
+        "src.api.multi_store.store_service.get_performance_ranking",
+        new=AsyncMock(return_value=[{"store_id": "S001", "store_name": "岳麓店", "region": "华中", "value": 100000, "rank": 1}]),
+    ), patch("src.api.multi_store.store_service.get_store", new=AsyncMock(return_value=None)):
+        client = TestClient(app)
+        response = client.get("/api/v1/multi-store/performance-ranking?metric=revenue&limit=10")
+
+    assert response.status_code == 200
+    assert response.json()["ranking"][0]["store_id"] == "S001"
+    assert response.json()["ranking"][0]["growth_rate"] == 0.0
+
+
+def test_static_regional_summary_route_not_captured_by_dynamic_store_id_route():
+    app = FastAPI()
+    app.include_router(router, prefix="/api/v1/multi-store")
+    app.dependency_overrides[get_current_active_user] = lambda: SimpleNamespace(id="u1", role="admin")
+
+    s1 = SimpleNamespace(id="S001")
+    with patch(
+        "src.api.multi_store.store_service.get_stores_by_region",
+        new=AsyncMock(return_value={"华中": [s1]}),
+    ), patch(
+        "src.api.multi_store.store_service.get_store_stats",
+        new=AsyncMock(return_value={"today_revenue": 100000, "today_orders": 100, "today_customers": 150}),
+    ), patch("src.api.multi_store.store_service.get_store", new=AsyncMock(return_value=None)):
+        client = TestClient(app)
+        response = client.get("/api/v1/multi-store/regional-summary")
+
+    assert response.status_code == 200
+    assert response.json()["regions"][0]["region"] == "华中"
