@@ -1846,6 +1846,58 @@ class TestListPeriods:
         assert result["items"][2]["period_key"] == "2026-01"
 
 
+class TestPeriodCloseReopen:
+    """测试期间结账/反结账状态机"""
+
+    @staticmethod
+    def _month_rows(*months):
+        rows = []
+        for m in months:
+            r = MagicMock()
+            r.__getitem__ = lambda self, i, _m=m: [datetime(2026, _m, 1)][i]
+            rows.append(r)
+        result_mock = MagicMock()
+        result_mock.fetchall.return_value = rows
+        return result_mock
+
+    @pytest.mark.asyncio
+    async def test_close_period_invalid_format(self):
+        db = _mock_db()
+        svc = StandaloneFCTService()
+        with pytest.raises(ValueError, match="YYYY-MM"):
+            await svc.close_period(db, tenant_id="S001", period_key="202603")
+
+    @pytest.mark.asyncio
+    async def test_close_period_not_exists(self):
+        db = _mock_db()
+        db.execute = AsyncMock(return_value=self._month_rows(3, 2))
+        svc = StandaloneFCTService()
+        with pytest.raises(ValueError, match="不存在"):
+            await svc.close_period(db, tenant_id="S001", period_key="2025-12")
+
+    @pytest.mark.asyncio
+    async def test_close_then_reopen_changes_status(self):
+        db = _mock_db()
+        db.execute = AsyncMock(return_value=self._month_rows(3, 2, 1))
+        svc = StandaloneFCTService()
+
+        closed = await svc.close_period(db, tenant_id="S001", period_key="2026-03")
+        assert closed["status"] == "closed"
+
+        periods_after_close = await svc.list_periods(db, tenant_id="S001")
+        p_closed = next(i for i in periods_after_close["items"] if i["period_key"] == "2026-03")
+        assert p_closed["status"] == "closed"
+
+        reopened = await svc.reopen_period(db, tenant_id="S001", period_key="2026-02")
+        assert reopened["status"] == "open"
+
+        periods_after_reopen = await svc.list_periods(db, tenant_id="S001")
+        p_reopen = {i["period_key"]: i["status"] for i in periods_after_reopen["items"]}
+        assert p_reopen["2026-02"] == "open"
+        assert p_reopen["2026-03"] == "closed"
+        assert p_reopen["2026-01"] == "closed"
+
+
 class TestLedgerQueries:
     """测试总账明细与余额查询"""
 

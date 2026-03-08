@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import os
 import inspect
+import re
 from calendar import monthrange
 from datetime import date, datetime, timedelta
 from typing import Any, Dict, List, Optional
@@ -1066,6 +1067,12 @@ class StandaloneFCTService:
     与 fct_public.py 的调用契约一致。
     """
 
+    PERIOD_KEY_RE = re.compile(r"^\d{4}-\d{2}$")
+
+    def __init__(self):
+        # 账期状态覆盖（运行时）：默认“最新 open，其余 closed”
+        self._period_status_overrides: Dict[tuple[str, str], str] = {}
+
     # ── 业财事件接入 ────────────────────────────────────────────────────────────
 
     async def ingest_event(
@@ -1566,20 +1573,43 @@ class StandaloneFCTService:
         for i, row in enumerate(rows):
             period_dt = row[0]
             period_key = period_dt.strftime("%Y-%m") if hasattr(period_dt, "strftime") else str(period_dt)[:7]
+            override = self._period_status_overrides.get((tenant_id, period_key))
             items.append({
                 "period_key": period_key,
-                "status": "open" if i == 0 else "closed",
+                "status": override or ("open" if i == 0 else "closed"),
             })
         return {"items": items, "total": len(items)}
 
     async def close_period(
         self, session: AsyncSession, tenant_id: str, period_key: str
     ) -> Dict[str, Any]:
+        if not self.PERIOD_KEY_RE.match(period_key):
+            raise ValueError("period_key 格式应为 YYYY-MM")
+        periods = await self.list_periods(session, tenant_id=tenant_id)
+        target = next((p for p in periods["items"] if p["period_key"] == period_key), None)
+        if not target:
+            raise ValueError("period_key 不存在")
+        if target["status"] == "closed":
+            raise ValueError("该期间已结账")
+
+        self._period_status_overrides[(tenant_id, period_key)] = "closed"
         return {"tenant_id": tenant_id, "period_key": period_key, "status": "closed"}
 
     async def reopen_period(
         self, session: AsyncSession, tenant_id: str, period_key: str
     ) -> Dict[str, Any]:
+        if not self.PERIOD_KEY_RE.match(period_key):
+            raise ValueError("period_key 格式应为 YYYY-MM")
+        periods = await self.list_periods(session, tenant_id=tenant_id)
+        keys = [p["period_key"] for p in periods["items"]]
+        if period_key not in keys:
+            raise ValueError("period_key 不存在")
+        target = next((p for p in periods["items"] if p["period_key"] == period_key), None)
+        if target and target["status"] == "open":
+            raise ValueError("该期间已是打开状态")
+
+        for key in keys:
+            self._period_status_overrides[(tenant_id, key)] = "open" if key == period_key else "closed"
         return {"tenant_id": tenant_id, "period_key": period_key, "status": "open"}
 
     # ── 主数据（科目档案） ────────────────────────────────────────────────────
