@@ -91,6 +91,7 @@ interface EmployeeHealthResp {
 }
 
 const defaultStoreId = localStorage.getItem('store_id') || 'STORE001';
+const MOBILE_BREAKPOINT = 768;
 
 const WorkforcePage: React.FC = () => {
   const [storeId] = useState(defaultStoreId);
@@ -106,6 +107,9 @@ const WorkforcePage: React.FC = () => {
   const [employeeHealthLoading, setEmployeeHealthLoading] = useState(false);
   const [employeeHealth, setEmployeeHealth] = useState<EmployeeHealthResp | null>(null);
   const [activeTab, setActiveTab] = useState<'operations' | 'employee'>('operations');
+  const [isMobile, setIsMobile] = useState(
+    typeof window !== 'undefined' ? window.innerWidth <= MOBILE_BREAKPOINT : false
+  );
 
   const [confirmModal, setConfirmModal] = useState(false);
   const [confirmForm] = Form.useForm();
@@ -191,6 +195,12 @@ const WorkforcePage: React.FC = () => {
   useEffect(() => {
     loadEmployeeHealth();
   }, [loadEmployeeHealth]);
+
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth <= MOBILE_BREAKPOINT);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   const activeForecast = useMemo(() => forecast?.periods?.[selectedPeriod], [forecast, selectedPeriod]);
 
@@ -311,8 +321,8 @@ const WorkforcePage: React.FC = () => {
   return (
     <div className={styles.page}>
       <div className={styles.toolbar}>
-        <Title level={4} style={{ margin: 0 }}>人力管理工作台</Title>
-        <Space>
+        <Title level={4} className={styles.toolbarTitle}>人力管理工作台</Title>
+        <Space className={styles.toolbarControls}>
           <Text type="secondary">建议日期</Text>
           <DatePicker value={date} onChange={d => d && setDate(d)} />
           <ZButton icon={<ReloadOutlined />} onClick={loadCore}>刷新</ZButton>
@@ -341,9 +351,9 @@ const WorkforcePage: React.FC = () => {
 
           <div className={styles.sectionGrid}>
             <ZCard title="今日人力建议">
-              <Space style={{ marginBottom: 10 }}>
+              <Space className={styles.periodControls}>
                 <Text>餐段</Text>
-                <Select<PeriodKey> value={selectedPeriod} onChange={setSelectedPeriod} style={{ width: 130 }}>
+                <Select<PeriodKey> value={selectedPeriod} onChange={setSelectedPeriod} style={{ width: isMobile ? 110 : 130 }}>
                   <Select.Option value="morning">早餐</Select.Option>
                   <Select.Option value="lunch">午餐</Select.Option>
                   <Select.Option value="dinner">晚餐</Select.Option>
@@ -362,6 +372,7 @@ const WorkforcePage: React.FC = () => {
                 size="small"
                 pagination={false}
                 rowKey="key"
+                scroll={{ x: 'max-content' }}
                 dataSource={positionRows}
                 columns={[
                   { title: '岗位', dataIndex: 'position' },
@@ -404,7 +415,7 @@ const WorkforcePage: React.FC = () => {
             </ZCard>
 
             <ZCard title="预算与告警">
-              <Space direction="vertical" style={{ width: '100%' }} size={10}>
+              <Space direction="vertical" className={styles.budgetStack} size={10}>
                 <Text>预算月份：{budget?.budget_period || date.format('YYYY-MM')}</Text>
                 <Text>目标成本率：<b>{budget?.target_labor_cost_rate ?? 0}%</b></Text>
                 <Text>月度上限：<b>¥{Number(budget?.max_labor_cost_yuan || 0).toLocaleString()}</b></Text>
@@ -456,6 +467,7 @@ const WorkforcePage: React.FC = () => {
                 size="small"
                 rowKey="employee_id"
                 pagination={false}
+                scroll={{ x: 'max-content' }}
                 dataSource={employeeHealth?.items || []}
                 columns={[
                   { title: '员工', dataIndex: 'name' },

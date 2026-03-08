@@ -47,6 +47,11 @@
   text-overflow: ellipsis;
 }
 
+.actionCell {
+  display: flex;
+  gap: 6px;
+}
+
 /* ── Drawer content ─────────────────────────────────────────────────────────── */
 
 .drawerContent {
@@ -131,3 +136,15 @@
 
 .kpiDeltaImprove { color: #52c41a; font-weight: 600; }
 .kpiDeltaWorsen  { color: #d9363e; font-weight: 600; }
+
+@media (max-width: 720px) {
+  .filterLabel {
+    width: 100%;
+  }
+  .ellipsis {
+    max-width: 160px;
+  }
+  .descRow {
+    grid-template-columns: 90px 1fr;
+  }
+}

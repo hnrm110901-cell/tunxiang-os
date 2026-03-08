@@ -1,10 +1,10 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { Drawer, Modal, Form, Input, Select as AntSelect, message } from 'antd';
 import {
-  ReloadOutlined, EyeOutlined, CheckCircleOutlined, ArrowUpOutlined,
+  ReloadOutlined, EyeOutlined, CheckCircleOutlined,
 } from '@ant-design/icons';
 import {
-  ZCard, ZKpi, ZBadge, ZButton, ZSkeleton, ZSelect, ZTable, ZInput, ZEmpty,
+  ZCard, ZKpi, ZBadge, ZButton, ZSkeleton, ZSelect, ZTable, ZEmpty,
 } from '../design-system/components';
 import type { ZTableColumn } from '../design-system/components/ZTable';
 import { apiClient } from '../services/api';
@@ -84,6 +84,9 @@ const DIMENSION_LABEL: Record<string, string> = {
 
 const ActionPlansPage: React.FC = () => {
   const storeId = localStorage.getItem('store_id') || 'STORE001';
+  const [isMobile, setIsMobile] = useState(
+    typeof window !== 'undefined' ? window.innerWidth <= 768 : false
+  );
 
   // 列表状态
   const [plans, setPlans]       = useState<ActionPlan[]>([]);
@@ -111,7 +114,7 @@ const ActionPlansPage: React.FC = () => {
   const loadPlans = useCallback(async () => {
     setLoading(true);
     try {
-      const params: Record<string, any> = { days };
+      const params: Record<string, string | number> = { days };
       if (severity) params.severity = severity;
       if (outcome)  params.outcome  = outcome;
       const resp = await apiClient.get(`/api/v1/l5/stores/${storeId}/action-plans`, { params });
@@ -128,7 +131,7 @@ const ActionPlansPage: React.FC = () => {
     try {
       const resp = await apiClient.get('/api/v1/l5/reports/platform-stats', { params: { days: 7 } });
       setStats(resp.data);
-    } catch (e) {
+    } catch {
       // 统计加载失败静默处理
     } finally {
       setStatsLoading(false);
@@ -136,6 +139,11 @@ const ActionPlansPage: React.FC = () => {
   }, []);
 
   useEffect(() => { loadPlans(); loadStats(); }, [loadPlans, loadStats]);
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   // ── 详情 ───────────────────────────────────────────────────────────────────
 
@@ -227,7 +235,7 @@ const ActionPlansPage: React.FC = () => {
       dataIndex: 'plan_id',
       width: 120,
       render: (_: string, row: ActionPlan) => (
-        <div style={{ display: 'flex', gap: 6 }}>
+        <div className={styles.actionCell}>
           <ZButton
             size="sm"
             variant="ghost"
@@ -256,7 +264,6 @@ const ActionPlansPage: React.FC = () => {
   const totalP1   = stats?.severity_dist?.P1 ?? 0;
   const totalP2   = stats?.severity_dist?.P2 ?? 0;
   const resolved  = stats?.outcome_dist?.resolved ?? 0;
-  const pending   = stats?.outcome_dist?.pending ?? 0;
   const resRate   = stats?.resolution_rate ?? 0;
 
   // ── 渲染 ───────────────────────────────────────────────────────────────────
@@ -286,7 +293,7 @@ const ActionPlansPage: React.FC = () => {
           <ZSelect
             value={severity}
             onChange={v => setSeverity(v as string)}
-            style={{ width: 120 }}
+            style={{ width: isMobile ? '100%' : 120 }}
             options={[
               { label: '全部', value: '' },
               { label: 'P1 高危', value: 'P1' },
@@ -298,7 +305,7 @@ const ActionPlansPage: React.FC = () => {
           <ZSelect
             value={outcome}
             onChange={v => setOutcome(v as string)}
-            style={{ width: 130 }}
+            style={{ width: isMobile ? '100%' : 130 }}
             options={[
               { label: '全部', value: '' },
               { label: '待处理', value: 'pending' },
@@ -311,7 +318,7 @@ const ActionPlansPage: React.FC = () => {
           <ZSelect
             value={days}
             onChange={v => setDays(v as number)}
-            style={{ width: 100 }}
+            style={{ width: isMobile ? '100%' : 100 }}
             options={[
               { label: '7天', value: 7 },
               { label: '30天', value: 30 },
@@ -347,7 +354,7 @@ const ActionPlansPage: React.FC = () => {
       {/* 详情 Drawer */}
       <Drawer
         title="行动计划详情"
-        width={520}
+        width={isMobile ? '92vw' : 520}
         open={!!detail}
         onClose={() => setDetail(null)}
         destroyOnClose
