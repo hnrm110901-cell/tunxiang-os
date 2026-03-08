@@ -607,6 +607,33 @@ class TestPredictiveAdjustments:
         assert any(a["type"] == "decrease_staff" for a in result["predictive_adjustments"])
 
 
+class TestReinforcementScheduling:
+    """强化学习动态排班测试"""
+
+    @pytest.mark.asyncio
+    async def test_reinforcement_optimize_schedule_selects_best_q_action(self, agent):
+        result = await agent.reinforcement_optimize_schedule(
+            store_id="STORE001",
+            date="2024-01-15",
+            current_requirements={
+                "morning": {"waiter": 2, "chef": 1, "cashier": 1},
+                "evening": {"waiter": 3, "chef": 2, "cashier": 1},
+            },
+            predicted_customers={"morning": 70, "evening": 150},
+            previous_q_values={
+                "increase_evening_waiter": 0.8,
+                "increase_evening_chef": 0.3,
+                "decrease_morning_waiter": 0.1,
+                "keep_current": 0.2,
+            },
+            reward=0.6,
+        )
+        assert result["success"] is True
+        assert result["chosen_action"] == "increase_evening_waiter"
+        assert result["adjusted_requirements"]["evening"]["waiter"] == 4
+        assert result["q_values"]["increase_evening_waiter"] > 0.8
+
+
 class TestEmployeeSatisfaction:
     """员工满意度优化测试"""
 

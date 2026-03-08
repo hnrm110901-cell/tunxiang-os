@@ -181,6 +181,7 @@ class ScheduleAgent(BaseAgent):
             "plan_multi_store_schedule",
             "plan_cross_region_allocation",
             "predict_schedule_adjustments",
+            "reinforcement_optimize_schedule",
             "evaluate_employee_satisfaction",
             "adjust_schedule",
             "get_schedule",
@@ -211,6 +212,16 @@ class ScheduleAgent(BaseAgent):
                     current_requirements=params.get("current_requirements", {}),
                     predicted_customers=params["predicted_customers"],
                     baseline_customers=params.get("baseline_customers", {}),
+                )
+            elif action == "reinforcement_optimize_schedule":
+                result = await self.reinforcement_optimize_schedule(
+                    store_id=params["store_id"],
+                    date=params["date"],
+                    current_requirements=params.get("current_requirements", {}),
+                    predicted_customers=params.get("predicted_customers", {}),
+                    previous_q_values=params.get("previous_q_values", {}),
+                    reward=params.get("reward"),
+                    candidate_actions=params.get("candidate_actions"),
                 )
             elif action == "evaluate_employee_satisfaction":
                 result = await self.evaluate_employee_satisfaction(
@@ -829,6 +840,67 @@ class ScheduleAgent(BaseAgent):
             "date": date,
             "predictive_adjustments": adjustments,
             "message": f"生成{len(adjustments)}条预测性排班调整建议",
+        }
+
+    async def reinforcement_optimize_schedule(
+        self,
+        store_id: str,
+        date: str,
+        current_requirements: Dict[str, Any],
+        predicted_customers: Dict[str, int],
+        previous_q_values: Dict[str, float],
+        reward: Optional[float] = None,
+        candidate_actions: Optional[List[str]] = None,
+    ) -> Dict[str, Any]:
+        """
+        基于强化学习的动态排班（Q-learning简化版）：
+        - 输入上次Q值与可选动作
+        - 选择当前最优动作（贪心）
+        - 若提供reward，更新该动作Q值并返回新Q表
+        """
+        actions = candidate_actions or [
+            "increase_evening_waiter",
+            "increase_evening_chef",
+            "decrease_morning_waiter",
+            "keep_current",
+        ]
+        q_values = {a: float(previous_q_values.get(a, 0.0)) for a in actions}
+        chosen_action = max(actions, key=lambda a: q_values.get(a, 0.0))
+
+        # Apply selected action to generate adjusted requirements
+        adjusted = {
+            shift: {k: int(v) for k, v in req.items()}
+            for shift, req in (current_requirements or {}).items()
+        }
+        if "evening" not in adjusted:
+            adjusted["evening"] = {"waiter": 0, "chef": 0, "cashier": 0}
+        if "morning" not in adjusted:
+            adjusted["morning"] = {"waiter": 0, "chef": 0, "cashier": 0}
+
+        if chosen_action == "increase_evening_waiter":
+            adjusted["evening"]["waiter"] = int(adjusted["evening"].get("waiter", 0)) + 1
+        elif chosen_action == "increase_evening_chef":
+            adjusted["evening"]["chef"] = int(adjusted["evening"].get("chef", 0)) + 1
+        elif chosen_action == "decrease_morning_waiter":
+            adjusted["morning"]["waiter"] = max(0, int(adjusted["morning"].get("waiter", 0)) - 1)
+
+        # Q-learning one-step update
+        alpha = float(self.config.get("rl_alpha", 0.3))
+        gamma = float(self.config.get("rl_gamma", 0.8))
+        if reward is not None:
+            best_next = max(q_values.values()) if q_values else 0.0
+            old_q = q_values.get(chosen_action, 0.0)
+            q_values[chosen_action] = round(old_q + alpha * (float(reward) + gamma * best_next - old_q), 6)
+
+        return {
+            "success": True,
+            "store_id": store_id,
+            "date": date,
+            "chosen_action": chosen_action,
+            "adjusted_requirements": adjusted,
+            "q_values": q_values,
+            "predicted_customers": predicted_customers,
+            "message": "强化学习动态排班建议已生成",
         }
 
     async def adjust_schedule(
