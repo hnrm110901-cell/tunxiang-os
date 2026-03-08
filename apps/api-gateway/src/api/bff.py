@@ -738,3 +738,131 @@ async def _fetch_cross_store_decisions(db: AsyncSession) -> List[Dict]:
 
     merged.sort(key=lambda x: x.get("priority_score", 0), reverse=True)
     return merged[:5]
+
+
+# ── GET /api/v1/bff/banquet/{store_id} ────────────────────────────────────────
+
+@router.get("/banquet/{store_id}", summary="宴会管理首屏聚合数据")
+async def banquet_home(
+    store_id: str,
+    refresh: bool = Query(default=False, description="强制刷新缓存"),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_active_user),
+):
+    """
+    宴会管理首屏一次性聚合（30s 缓存）：
+    - dashboard: 本月宴会 KPI（收入/毛利/转化率/档期利用率）
+    - stale_leads: FollowupAgent 扫描的停滞线索（dry_run）
+    - upcoming_orders: 未来 7 天宴会订单
+    - hall_summary: 活跃厅房数量
+    """
+    cache_key = f"bff:banquet:{store_id}"
+    if not refresh:
+        cached = await _cache_get(cache_key)
+        if cached:
+            return {**cached, "_from_cache": True}
+
+    from datetime import date, timedelta
+    from sqlalchemy import select, and_, func
+    from src.models.banquet import (
+        BanquetOrder, BanquetHall, BanquetLead,
+        OrderStatusEnum,
+    )
+
+    async def _fetch_banquet_dashboard():
+        from src.models.banquet import BanquetKpiDaily
+        today = date.today()
+        kpi_result = await db.execute(
+            select(
+                func.sum(BanquetKpiDaily.revenue_fen).label("revenue_fen"),
+                func.sum(BanquetKpiDaily.gross_profit_fen).label("profit_fen"),
+                func.sum(BanquetKpiDaily.order_count).label("order_count"),
+                func.sum(BanquetKpiDaily.lead_count).label("lead_count"),
+                func.avg(BanquetKpiDaily.hall_utilization_pct).label("utilization"),
+            ).where(
+                and_(
+                    BanquetKpiDaily.store_id == store_id,
+                    func.extract("year", BanquetKpiDaily.stat_date) == today.year,
+                    func.extract("month", BanquetKpiDaily.stat_date) == today.month,
+                )
+            )
+        )
+        row = kpi_result.first()
+        if not row:
+            return None
+        revenue_yuan = (row.revenue_fen or 0) / 100
+        profit_yuan  = (row.profit_fen  or 0) / 100
+        order_count  = row.order_count or 0
+        lead_count   = row.lead_count  or 0
+        utilization  = round(row.utilization or 0, 1)
+        conversion   = round(order_count / lead_count * 100, 1) if lead_count > 0 else 0
+        return {
+            "year": today.year, "month": today.month,
+            "revenue_yuan": revenue_yuan,
+            "gross_profit_yuan": profit_yuan,
+            "order_count": order_count,
+            "lead_count": lead_count,
+            "conversion_rate_pct": conversion,
+            "hall_utilization_pct": utilization,
+        }
+
+    async def _fetch_stale_leads():
+        """FollowupAgent dry_run 扫描"""
+        from packages.agents.banquet.src.agent import FollowupAgent
+        agent = FollowupAgent()
+        return await agent.scan_stale_leads(store_id=store_id, db=db, dry_run=True)
+
+    async def _fetch_upcoming_orders():
+        today = date.today()
+        result = await db.execute(
+            select(BanquetOrder).where(
+                and_(
+                    BanquetOrder.store_id == store_id,
+                    BanquetOrder.banquet_date >= today,
+                    BanquetOrder.banquet_date <= today + timedelta(days=7),
+                    BanquetOrder.order_status.notin_([
+                        OrderStatusEnum.CANCELLED, OrderStatusEnum.CLOSED
+                    ]),
+                )
+            ).order_by(BanquetOrder.banquet_date)
+        )
+        orders = result.scalars().all()
+        return [
+            {
+                "id": o.id,
+                "banquet_date": str(o.banquet_date),
+                "banquet_type": o.banquet_type.value,
+                "people_count": o.people_count,
+                "order_status": o.order_status.value,
+                "total_amount_yuan": o.total_amount_fen / 100,
+            }
+            for o in orders
+        ]
+
+    async def _fetch_hall_summary():
+        result = await db.execute(
+            select(func.count()).where(
+                and_(BanquetHall.store_id == store_id, BanquetHall.is_active == True)
+            )
+        )
+        return {"active_hall_count": result.scalar() or 0}
+
+    dashboard, stale_leads, upcoming_orders, hall_summary = await asyncio.gather(
+        _safe(_fetch_banquet_dashboard(), default=None),
+        _safe(_fetch_stale_leads(), default=[]),
+        _safe(_fetch_upcoming_orders(), default=[]),
+        _safe(_fetch_hall_summary(), default={"active_hall_count": 0}),
+    )
+
+    payload = {
+        "store_id": store_id,
+        "as_of": datetime.utcnow().isoformat(),
+        "dashboard": dashboard,
+        "stale_lead_count": len(stale_leads),
+        "stale_leads": stale_leads[:5],          # 最多展示5条提醒
+        "upcoming_orders": upcoming_orders,
+        "hall_summary": hall_summary,
+    }
+    await _cache_set(cache_key, payload)
+    return {**payload, "_from_cache": False}
+

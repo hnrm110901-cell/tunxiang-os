@@ -320,6 +320,43 @@ interface SmBffResponse {
 }
 ```
 
+### GET `/api/v1/bff/banquet/{store_id}` — 宴会管理首屏聚合
+
+**用途**: 宴会管理首屏一次性加载（30s Redis缓存，`?refresh=true` 强制刷新）
+
+```typescript
+interface BanquetBffResponse {
+  store_id: string;
+  as_of: string;                   // ISO timestamp
+  dashboard: {
+    year: number; month: number;
+    revenue_yuan: number;          // 本月宴会收入¥
+    gross_profit_yuan: number;     // 毛利¥
+    order_count: number;
+    lead_count: number;
+    conversion_rate_pct: number;
+    hall_utilization_pct: number;
+  } | null;
+  stale_lead_count: number;        // 停滞线索总数
+  stale_leads: Array<{             // 最多5条提醒
+    lead_id: string;
+    days_stale: number;
+    stage: string;
+    suggestion: string;            // 包含¥预算的提醒文本
+  }>;
+  upcoming_orders: Array<{         // 未来7天宴会
+    id: string;
+    banquet_date: string;
+    banquet_type: string;
+    people_count: number;
+    order_status: string;
+    total_amount_yuan: number;
+  }>;
+  hall_summary: { active_hall_count: number };
+  _from_cache: boolean;
+}
+```
+
 ---
 
 ## 待补充接口（Claude 正在开发）
