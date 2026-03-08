@@ -323,9 +323,14 @@ const SchedulePage: React.FC = () => {
                     ))
                   }
                   {day.schedule_id && !day.is_published && (
-                    <Popconfirm title="发布后员工可见，确认？" onConfirm={() => handlePublish(day.schedule_id)} okText="发布" cancelText="取消">
-                      <Button size="small" block icon={<SendOutlined />} style={{ marginTop: 4, fontSize: 11 }}>发布</Button>
-                    </Popconfirm>
+                    <Space direction="vertical" style={{ width: '100%', marginTop: 4 }} size={4}>
+                      <Button size="small" block onClick={() => handleOpenHistory({ id: day.schedule_id, schedule_date: day.date })}>
+                        历史
+                      </Button>
+                      <Popconfirm title="发布后员工可见，确认？" onConfirm={() => handlePublish(day.schedule_id)} okText="发布" cancelText="取消">
+                        <Button size="small" block icon={<SendOutlined />} style={{ fontSize: 11 }}>发布</Button>
+                      </Popconfirm>
+                    </Space>
                   )}
                 </td>
               ))}
