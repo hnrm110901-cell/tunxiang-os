@@ -1853,12 +1853,106 @@ class StandaloneFCTService:
         end_date: Optional[date] = None,
         granularity: str = "month",
     ) -> Dict[str, Any]:
+        # 当前仅支持月粒度，其他粒度降级为 month。
+        if granularity != "month":
+            granularity = "month"
+
+        store_key = entity_id or tenant_id
+        filters = "WHERE store_id = :sid"
+        params: Dict[str, Any] = {"sid": store_key}
+        if start_date:
+            filters += " AND transaction_date >= :df"
+            params["df"] = start_date
+        if end_date:
+            filters += " AND transaction_date <= :dt"
+            params["dt"] = end_date
+
+        actual_stmt = text(f"""
+            SELECT DATE_TRUNC('month', transaction_date) AS period,
+                   SUM(CASE WHEN transaction_type = 'income' THEN amount ELSE 0 END) AS income,
+                   SUM(CASE WHEN transaction_type = 'expense' THEN amount ELSE 0 END) AS expense
+            FROM financial_transactions
+            {filters}
+            GROUP BY 1
+            ORDER BY 1
+        """)
+        actual_rows = (await session.execute(actual_stmt, params)).fetchall()
+        actual_map: Dict[str, int] = {}
+        for row in actual_rows:
+            period_dt = row[0]
+            period_key = period_dt.strftime("%Y-%m")
+            income = int(row[1] or 0)
+            expense = int(row[2] or 0)
+            actual_map[period_key] = income - expense
+
+        budget_stmt = select(Budget).where(
+            and_(
+                Budget.store_id == store_key,
+                Budget.month >= 1,
+                Budget.month <= 12,
+            )
+        )
+        budget_rows = (await session.execute(budget_stmt)).scalars().all()
+
+        start_month = date(start_date.year, start_date.month, 1) if start_date else None
+        end_month = date(end_date.year, end_date.month, 1) if end_date else None
+
+        budget_map: Dict[str, int] = {}
+        for b in budget_rows:
+            if not b.year or not b.month:
+                continue
+            try:
+                month_dt = date(int(b.year), int(b.month), 1)
+            except ValueError:
+                continue
+            if start_month and month_dt < start_month:
+                continue
+            if end_month and month_dt > end_month:
+                continue
+            period_key = month_dt.strftime("%Y-%m")
+            budget_map[period_key] = budget_map.get(period_key, 0) + int(b.budgeted_amount or 0)
+
+        periods = sorted(set(actual_map.keys()) | set(budget_map.keys()))
+        items: List[Dict[str, Any]] = []
+        for p in periods:
+            plan_cents = int(budget_map.get(p, 0))
+            actual_cents = int(actual_map.get(p, 0))
+            variance_cents = actual_cents - plan_cents
+            variance_pct = round((variance_cents / plan_cents) * 100, 2) if plan_cents else None
+            items.append(
+                {
+                    "period": p,
+                    "planned_amount": plan_cents,
+                    "planned_amount_yuan": self._y(plan_cents),
+                    "actual_amount": actual_cents,
+                    "actual_amount_yuan": self._y(actual_cents),
+                    "variance": variance_cents,
+                    "variance_yuan": self._y(variance_cents),
+                    "variance_pct": variance_pct,
+                }
+            )
+
+        planned_total = sum(x["planned_amount"] for x in items)
+        actual_total = sum(x["actual_amount"] for x in items)
+        total_variance = actual_total - planned_total
+
         return {
+            "report_type": "plan_vs_actual",
             "tenant_id": tenant_id,
             "entity_id": entity_id,
             "granularity": granularity,
-            "items": [],
-            "note": "plan_vs_actual 待专用账务模型上线后完整实现",
+            "start_date": start_date.isoformat() if start_date else None,
+            "end_date": end_date.isoformat() if end_date else None,
+            "items": items,
+            "summary": {
+                "planned_total": planned_total,
+                "planned_total_yuan": self._y(planned_total),
+                "actual_total": actual_total,
+                "actual_total_yuan": self._y(actual_total),
+                "variance_total": total_variance,
+                "variance_total_yuan": self._y(total_variance),
+                "variance_total_pct": round((total_variance / planned_total) * 100, 2) if planned_total else None,
+            },
         }
 
     # ── 备用金 ────────────────────────────────────────────────────────────────

@@ -1128,6 +1128,92 @@ class TestGetReportTrend:
         assert item["net_yuan"] == pytest.approx(2000.00, abs=0.01)
 
 
+class TestGetPlanVsActual:
+    """测试 plan_vs_actual 报表（月维度预算对比实际）"""
+
+    @staticmethod
+    def _actual_row(period_dt: datetime, income_fen: int, expense_fen: int):
+        row = MagicMock()
+        row.__getitem__ = lambda self, i: [period_dt, income_fen, expense_fen][i]
+        return row
+
+    @staticmethod
+    def _budget_row(year: int, month: int, amount: int):
+        b = MagicMock()
+        b.year = year
+        b.month = month
+        b.budgeted_amount = amount
+        return b
+
+    @pytest.mark.asyncio
+    async def test_merge_budget_and_actual_by_month(self):
+        db = _mock_db()
+        actual_result = MagicMock()
+        actual_result.fetchall.return_value = [
+            self._actual_row(datetime(2026, 3, 1), 1_000_000, 700_000),
+            self._actual_row(datetime(2026, 4, 1), 1_200_000, 900_000),
+        ]
+        budget_result = MagicMock()
+        budget_result.scalars.return_value.all.return_value = [
+            self._budget_row(2026, 3, 350_000),
+            self._budget_row(2026, 4, 280_000),
+        ]
+        db.execute = AsyncMock(side_effect=[actual_result, budget_result])
+
+        svc = StandaloneFCTService()
+        result = await svc.get_plan_vs_actual(
+            db,
+            tenant_id="T1",
+            entity_id="S001",
+            start_date=date(2026, 3, 1),
+            end_date=date(2026, 4, 30),
+        )
+
+        assert result["report_type"] == "plan_vs_actual"
+        assert result["granularity"] == "month"
+        assert len(result["items"]) == 2
+        assert result["items"][0]["period"] == "2026-03"
+        assert result["items"][0]["planned_amount"] == 350_000
+        assert result["items"][0]["actual_amount"] == 300_000
+        assert result["summary"]["planned_total"] == 630_000
+        assert result["summary"]["actual_total"] == 600_000
+
+    @pytest.mark.asyncio
+    async def test_no_budget_returns_none_pct(self):
+        db = _mock_db()
+        actual_result = MagicMock()
+        actual_result.fetchall.return_value = [
+            self._actual_row(datetime(2026, 3, 1), 200_000, 150_000),
+        ]
+        budget_result = MagicMock()
+        budget_result.scalars.return_value.all.return_value = []
+        db.execute = AsyncMock(side_effect=[actual_result, budget_result])
+
+        svc = StandaloneFCTService()
+        result = await svc.get_plan_vs_actual(db, tenant_id="T1")
+        item = result["items"][0]
+
+        assert item["planned_amount"] == 0
+        assert item["actual_amount"] == 50_000
+        assert item["variance_pct"] is None
+        assert result["summary"]["variance_total_pct"] is None
+
+    @pytest.mark.asyncio
+    async def test_non_month_granularity_degrades_to_month(self):
+        db = _mock_db()
+        actual_result = MagicMock()
+        actual_result.fetchall.return_value = []
+        budget_result = MagicMock()
+        budget_result.scalars.return_value.all.return_value = []
+        db.execute = AsyncMock(side_effect=[actual_result, budget_result])
+
+        svc = StandaloneFCTService()
+        result = await svc.get_plan_vs_actual(db, tenant_id="T1", granularity="day")
+
+        assert result["granularity"] == "month"
+        assert result["items"] == []
+
+
 # ── list_periods ─────────────────────────────────────────────────────────────
 
 class TestListPeriods:
