@@ -121,6 +121,42 @@ class TestOrdering:
         assert result["order"]["status"] == OrderStatus.ORDERING.value
 
     @pytest.mark.asyncio
+    async def test_create_order_reject_when_table_unavailable(self):
+        """测试桌台不可用时拒绝下单"""
+        async def checker(**kwargs):
+            return {"available": False, "reason": "已被占用", "source": "mock_table_manager"}
+
+        agent = OrderAgent({"average_wait_time": 30, "average_dining_time": 90, "table_availability_checker": checker})
+        result = await agent.create_order(store_id="STORE001", table_id="T009", customer_id="C001")
+        assert result["success"] is False
+        assert "桌台 T009 当前不可下单" in result["message"]
+
+    @pytest.mark.asyncio
+    async def test_create_order_calls_table_occupy_callback(self):
+        """测试下单成功后调用桌台占用回调"""
+        called = {"count": 0, "order_id": None}
+
+        def checker(**kwargs):
+            return True
+
+        async def occupy_callback(**kwargs):
+            called["count"] += 1
+            called["order_id"] = kwargs.get("order_id")
+
+        agent = OrderAgent(
+            {
+                "average_wait_time": 30,
+                "average_dining_time": 90,
+                "table_availability_checker": checker,
+                "table_occupy_callback": occupy_callback,
+            }
+        )
+        result = await agent.create_order(store_id="STORE001", table_id="T010", customer_id="C002")
+        assert result["success"] is True
+        assert called["count"] == 1
+        assert called["order_id"] == result["order"]["order_id"]
+
+    @pytest.mark.asyncio
     async def test_add_dish(self, agent):
         """测试添加菜品"""
         result = await agent.add_dish(

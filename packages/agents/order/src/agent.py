@@ -10,6 +10,7 @@ import structlog
 import uuid
 import os
 import sys
+import inspect
 from pathlib import Path
 
 # Add core module to path
@@ -110,6 +111,48 @@ class OrderAgent(BaseAgent):
     def get_valid_next_statuses(self, current_status: str) -> List[str]:
         """返回当前状态可转换的下一状态集合。"""
         return list(_VALID_TRANSITIONS.get(current_status, []))
+
+    async def _check_table_available(self, store_id: str, table_id: str) -> Dict[str, Any]:
+        """
+        可插拔桌台可用性检查。
+        config["table_availability_checker"] 支持同步/异步函数，返回 bool 或 dict。
+        """
+        checker = self.config.get("table_availability_checker")
+        if not callable(checker):
+            return {"ok": True, "source": "default_open"}
+
+        try:
+            raw = checker(store_id=store_id, table_id=table_id)
+            if inspect.isawaitable(raw):
+                raw = await raw
+        except Exception as e:
+            logger.warning("table_check_failed", error=str(e), table_id=table_id)
+            return {"ok": True, "source": "checker_error_fallback_open"}
+
+        if isinstance(raw, bool):
+            return {"ok": raw, "source": "table_manager"}
+        if isinstance(raw, dict):
+            return {
+                "ok": bool(raw.get("available", False)),
+                "source": str(raw.get("source", "table_manager")),
+                "reason": raw.get("reason"),
+            }
+        return {"ok": True, "source": "checker_invalid_fallback_open"}
+
+    async def _mark_table_occupied(self, store_id: str, table_id: str, order_id: str) -> None:
+        """
+        可插拔桌台占用回调。
+        config["table_occupy_callback"] 支持同步/异步函数，异常时仅记录日志不阻塞下单。
+        """
+        callback = self.config.get("table_occupy_callback")
+        if not callable(callback):
+            return
+        try:
+            raw = callback(store_id=store_id, table_id=table_id, order_id=order_id)
+            if inspect.isawaitable(raw):
+                await raw
+        except Exception as e:
+            logger.warning("table_occupy_callback_failed", error=str(e), table_id=table_id, order_id=order_id)
 
     async def execute(self, action: str, params: Dict[str, Any]) -> AgentResponse:
         try:
@@ -324,6 +367,15 @@ class OrderAgent(BaseAgent):
         """创建订单（返回新订单数据，由调用方持久化到DB）"""
         logger.info("创建订单", store_id=store_id, table_id=table_id)
 
+        table_check = await self._check_table_available(store_id=store_id, table_id=table_id)
+        if not table_check.get("ok", False):
+            reason = table_check.get("reason") or "桌台不可用"
+            return {
+                "success": False,
+                "message": f"桌台 {table_id} 当前不可下单：{reason}",
+                "table_check": table_check,
+            }
+
         order_id = f"ORD{uuid.uuid4().hex[:12].upper()}"
         order = {
             "order_id": order_id,
@@ -335,8 +387,9 @@ class OrderAgent(BaseAgent):
             "status": OrderStatus.ORDERING.value,
             "created_at": datetime.now().isoformat(),
         }
+        await self._mark_table_occupied(store_id=store_id, table_id=table_id, order_id=order_id)
         logger.info("订单创建成功", order_id=order_id)
-        return {"success": True, "order": order}
+        return {"success": True, "order": order, "table_check": table_check}
 
     async def add_dish(
         self,
