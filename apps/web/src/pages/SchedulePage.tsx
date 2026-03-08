@@ -59,6 +59,7 @@ const SchedulePage: React.FC = () => {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historySchedule, setHistorySchedule] = useState<any>(null);
   const [historyItems, setHistoryItems] = useState<any[]>([]);
+  const [historyActionFilter, setHistoryActionFilter] = useState<string>('all');
 
   const [weekDate, setWeekDate] = useState<Dayjs>(dayjs().startOf('isoWeek'));
   const [statsRange, setStatsRange] = useState<[Dayjs, Dayjs]>([dayjs().subtract(7, 'day'), dayjs()]);
@@ -209,6 +210,7 @@ const SchedulePage: React.FC = () => {
     try {
       setHistorySchedule(schedule);
       setHistoryDrawer(true);
+      setHistoryActionFilter('all');
       setHistoryLoading(true);
       const res = await apiClient.get(`/api/v1/schedules/${schedule.id}/history?limit=100`);
       setHistoryItems(res || []);
@@ -344,6 +346,9 @@ const SchedulePage: React.FC = () => {
   const activeCount = employees.filter(e => e.is_active).length;
   const skillCount = new Set(employees.flatMap(e => e.skills || [])).size;
   const publishedCount = schedules.filter(s => s.is_published).length;
+  const filteredHistoryItems = historyActionFilter === 'all'
+    ? historyItems
+    : historyItems.filter((item: any) => item.action === historyActionFilter);
 
   return (
     <div>
@@ -551,13 +556,23 @@ const SchedulePage: React.FC = () => {
         onClose={() => setHistoryDrawer(false)}
         width={520}
       >
+        <div style={{ marginBottom: 12 }}>
+          <Space>
+            <span style={{ color: '#666', fontSize: 12 }}>操作类型</span>
+            <Select size="small" value={historyActionFilter} onChange={setHistoryActionFilter} style={{ width: 140 }}>
+              <Option value="all">全部</Option>
+              <Option value="create">创建</Option>
+              <Option value="update">更新</Option>
+            </Select>
+          </Space>
+        </div>
         {historyLoading ? (
           <div style={{ textAlign: 'center', padding: 40 }}>加载中...</div>
-        ) : historyItems.length === 0 ? (
+        ) : filteredHistoryItems.length === 0 ? (
           <Empty description="暂无历史记录" />
         ) : (
           <Timeline
-            items={historyItems.map((item: any) => ({
+            items={filteredHistoryItems.map((item: any) => ({
               color: item.action === 'create' ? 'green' : 'blue',
               children: (
                 <div>
