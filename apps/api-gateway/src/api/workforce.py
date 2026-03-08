@@ -15,9 +15,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.database import get_db
 from src.core.dependencies import get_current_user, require_role
+from src.repositories import EmployeeRepository
 from src.models.user import User, UserRole
 from src.services.labor_cost_service import LaborCostService
 from src.services.labor_demand_service import LaborDemandService
+from src.services.shift_fairness_service import ShiftFairnessService
+from src.services.turnover_prediction_service import TurnoverPredictionService
 
 router = APIRouter(prefix="/api/v1/workforce", tags=["workforce"])
 
@@ -37,6 +40,14 @@ class LaborBudgetUpsertRequest(BaseModel):
     daily_budget_yuan: Optional[float] = Field(None, ge=0)
     alert_threshold_pct: float = Field(90.0, ge=0, le=100)
     is_active: bool = True
+
+
+def _risk_level(score: float) -> str:
+    if score >= 0.7:
+        return "high"
+    if score >= 0.4:
+        return "medium"
+    return "low"
 
 
 def _parse_iso_date(s: str, name: str) -> date:
@@ -150,6 +161,78 @@ async def get_labor_efficiency(
         "end_date": ed.isoformat(),
         "avg_labor_efficiency_yuan_per_person": avg_efficiency,
         "days": days,
+    }
+
+
+@router.get("/stores/{store_id}/employee-health")
+async def get_employee_health(
+    store_id: str,
+    year: Optional[int] = Query(None, ge=2020, le=2100),
+    month: Optional[int] = Query(None, ge=1, le=12),
+    top_n: int = Query(20, ge=1, le=200),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    target = date.today()
+    y = year or target.year
+    m = month or target.month
+
+    fairness_service = ShiftFairnessService()
+    turnover_service = TurnoverPredictionService()
+
+    employees = await EmployeeRepository.get_by_store(db, store_id)
+    fairness_data = await fairness_service.get_monthly_shift_fairness(
+        store_id=store_id,
+        year=y,
+        month=m,
+        db=db,
+    )
+    fairness_map = {
+        item["employee_id"]: item
+        for item in fairness_data.get("employee_stats", [])
+    }
+
+    items = []
+    for employee in employees:
+        pred = await turnover_service.predict_employee_turnover(
+            employee_id=employee.id,
+            db=db,
+            send_alert=False,
+        )
+        stat = fairness_map.get(employee.id, {})
+        risk_score = float(pred["risk_score_90d"])
+        items.append(
+            {
+                "employee_id": employee.id,
+                "name": employee.name,
+                "position": employee.position,
+                "risk_score_90d": risk_score,
+                "risk_level": _risk_level(risk_score),
+                "replacement_cost_yuan": float(pred["replacement_cost_yuan"]),
+                "major_risk_factors": pred["major_risk_factors"],
+                "unfavorable_ratio": float(stat.get("unfavorable_ratio", 0.0)),
+                "unfavorable_shifts": int(stat.get("unfavorable_shifts", 0)),
+                "total_shifts": int(stat.get("total_shifts", 0)),
+            }
+        )
+
+    items.sort(key=lambda item: item["risk_score_90d"], reverse=True)
+    sliced = items[:top_n]
+
+    fairness_distribution = {
+        "high_unfairness": sum(1 for item in sliced if item["unfavorable_ratio"] >= 0.5),
+        "medium_unfairness": sum(1 for item in sliced if 0.25 <= item["unfavorable_ratio"] < 0.5),
+        "low_unfairness": sum(1 for item in sliced if item["unfavorable_ratio"] < 0.25),
+    }
+
+    return {
+        "store_id": store_id,
+        "year": y,
+        "month": m,
+        "total": len(items),
+        "fairness_index": float(fairness_data.get("fairness_index", 100.0)),
+        "fairness_distribution": fairness_distribution,
+        "items": sliced,
     }
 
 

@@ -7,6 +7,7 @@ import {
   Modal,
   Select,
   Space,
+  Tabs,
   Table,
   Tag,
   Typography,
@@ -62,6 +63,33 @@ interface SeriesPoint {
   recommendedHeadcount: number;
 }
 
+interface EmployeeHealthItem {
+  employee_id: string;
+  name: string;
+  position?: string;
+  risk_score_90d: number;
+  risk_level: 'high' | 'medium' | 'low';
+  replacement_cost_yuan: number;
+  major_risk_factors: Array<{ name: string; score: number }>;
+  unfavorable_ratio: number;
+  unfavorable_shifts: number;
+  total_shifts: number;
+}
+
+interface EmployeeHealthResp {
+  store_id: string;
+  year: number;
+  month: number;
+  total: number;
+  fairness_index: number;
+  fairness_distribution: {
+    high_unfairness: number;
+    medium_unfairness: number;
+    low_unfairness: number;
+  };
+  items: EmployeeHealthItem[];
+}
+
 const defaultStoreId = localStorage.getItem('store_id') || 'STORE001';
 
 const WorkforcePage: React.FC = () => {
@@ -75,6 +103,9 @@ const WorkforcePage: React.FC = () => {
   const [cost, setCost] = useState<LaborCostResp | null>(null);
   const [budget, setBudget] = useState<LaborBudgetResp | null>(null);
   const [series, setSeries] = useState<SeriesPoint[]>([]);
+  const [employeeHealthLoading, setEmployeeHealthLoading] = useState(false);
+  const [employeeHealth, setEmployeeHealth] = useState<EmployeeHealthResp | null>(null);
+  const [activeTab, setActiveTab] = useState<'operations' | 'employee'>('operations');
 
   const [confirmModal, setConfirmModal] = useState(false);
   const [confirmForm] = Form.useForm();
@@ -131,6 +162,24 @@ const WorkforcePage: React.FC = () => {
     }
   }, [storeId]);
 
+  const loadEmployeeHealth = useCallback(async () => {
+    setEmployeeHealthLoading(true);
+    try {
+      const res = await apiClient.get<EmployeeHealthResp>(`/api/v1/workforce/stores/${storeId}/employee-health`, {
+        params: {
+          year: date.year(),
+          month: date.month() + 1,
+          top_n: 20,
+        },
+      });
+      setEmployeeHealth(res);
+    } catch (err) {
+      handleApiError(err, '加载员工健康数据失败');
+    } finally {
+      setEmployeeHealthLoading(false);
+    }
+  }, [date, storeId]);
+
   useEffect(() => {
     loadCore();
   }, [loadCore]);
@@ -138,6 +187,10 @@ const WorkforcePage: React.FC = () => {
   useEffect(() => {
     loadSeries();
   }, [loadSeries]);
+
+  useEffect(() => {
+    loadEmployeeHealth();
+  }, [loadEmployeeHealth]);
 
   const activeForecast = useMemo(() => forecast?.periods?.[selectedPeriod], [forecast, selectedPeriod]);
 
@@ -187,6 +240,30 @@ const WorkforcePage: React.FC = () => {
       ],
     };
   }, [series]);
+
+  const fairnessPieOption = useMemo(() => {
+    const dist = employeeHealth?.fairness_distribution || {
+      high_unfairness: 0,
+      medium_unfairness: 0,
+      low_unfairness: 0,
+    };
+    return {
+      tooltip: { trigger: 'item' },
+      legend: { bottom: 0 },
+      series: [
+        {
+          name: '班次公平性分布',
+          type: 'pie',
+          radius: '65%',
+          data: [
+            { value: dist.high_unfairness, name: '高不公平(>=50%)' },
+            { value: dist.medium_unfairness, name: '中不公平(25-50%)' },
+            { value: dist.low_unfairness, name: '低不公平(<25%)' },
+          ],
+        },
+      ],
+    };
+  }, [employeeHealth]);
 
   const submitConfirm = useCallback(async () => {
     try {
@@ -242,7 +319,16 @@ const WorkforcePage: React.FC = () => {
         </Space>
       </div>
 
-      {loading ? (
+      <Tabs
+        activeKey={activeTab}
+        onChange={key => setActiveTab(key as 'operations' | 'employee')}
+        items={[
+          { key: 'operations', label: '经营人力' },
+          { key: 'employee', label: '员工健康' },
+        ]}
+      />
+
+      {activeTab === 'operations' && (loading ? (
         <ZSkeleton rows={8} />
       ) : (
         <>
@@ -351,7 +437,62 @@ const WorkforcePage: React.FC = () => {
             </div>
           </ZCard>
         </>
-      )}
+      ))}
+
+      {activeTab === 'employee' && (employeeHealthLoading ? (
+        <ZSkeleton rows={6} />
+      ) : (
+        <>
+          <div className={styles.kpiGrid}>
+            <ZCard><ZKpi label="员工总数" value={employeeHealth?.total ?? 0} unit="人" /></ZCard>
+            <ZCard><ZKpi label="高风险流失" value={employeeHealth?.items.filter(x => x.risk_level === 'high').length ?? 0} unit="人" /></ZCard>
+            <ZCard><ZKpi label="门店公平性指数" value={employeeHealth?.fairness_index ?? 100} unit="" /></ZCard>
+            <ZCard><ZKpi label="潜在替换成本" value={employeeHealth?.items.reduce((s, x) => s + (x.replacement_cost_yuan || 0), 0) ?? 0} unit="¥" /></ZCard>
+          </div>
+
+          <div className={styles.sectionGrid}>
+            <ZCard title="流失风险排名（Top 20）">
+              <Table
+                size="small"
+                rowKey="employee_id"
+                pagination={false}
+                dataSource={employeeHealth?.items || []}
+                columns={[
+                  { title: '员工', dataIndex: 'name' },
+                  { title: '岗位', dataIndex: 'position', render: (v?: string) => v || '-' },
+                  {
+                    title: '风险分(90天)',
+                    dataIndex: 'risk_score_90d',
+                    render: (v: number) => v.toFixed(2),
+                  },
+                  {
+                    title: '风险等级',
+                    dataIndex: 'risk_level',
+                    render: (v: 'high' | 'medium' | 'low') =>
+                      v === 'high' ? <Tag color="red">高</Tag> : v === 'medium' ? <Tag color="orange">中</Tag> : <Tag color="green">低</Tag>,
+                  },
+                  {
+                    title: '班次不公平占比',
+                    dataIndex: 'unfavorable_ratio',
+                    render: (v: number) => `${(v * 100).toFixed(1)}%`,
+                  },
+                  {
+                    title: '替换成本',
+                    dataIndex: 'replacement_cost_yuan',
+                    render: (v: number) => `¥${Number(v || 0).toLocaleString()}`,
+                  },
+                ]}
+              />
+            </ZCard>
+
+            <ZCard title="班次公平性分布">
+              <div className={styles.chartBox}>
+                <ReactECharts option={fairnessPieOption} style={{ height: 340 }} />
+              </div>
+            </ZCard>
+          </div>
+        </>
+      ))}
 
       <Modal
         title="确认排班建议"

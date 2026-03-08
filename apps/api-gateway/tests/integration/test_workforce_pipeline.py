@@ -28,7 +28,9 @@ from src.api.workforce import (  # noqa: E402
     StaffingAdviceConfirmRequest,
     _parse_iso_date,
     _parse_yyyymm,
+    _risk_level,
     confirm_staffing_advice,
+    get_employee_health,
     get_labor_budget,
     upsert_labor_budget,
 )
@@ -390,3 +392,103 @@ class TestWorkforceValidationHelpers:
             _parse_yyyymm("2026-00")
         assert exc.value.status_code == 400
 
+    def test_risk_level(self):
+        assert _risk_level(0.2) == "low"
+        assert _risk_level(0.5) == "medium"
+        assert _risk_level(0.8) == "high"
+
+
+class TestEmployeeHealthApi:
+    @pytest.mark.asyncio
+    async def test_get_employee_health_aggregates(self):
+        db = AsyncMock()
+        employees = [
+            MagicMock(id="E1", name="张三", position="waiter"),
+            MagicMock(id="E2", name="李四", position="chef"),
+        ]
+        fairness_payload = {
+            "fairness_index": 85.5,
+            "employee_stats": [
+                {"employee_id": "E1", "unfavorable_ratio": 0.5, "unfavorable_shifts": 5, "total_shifts": 10},
+                {"employee_id": "E2", "unfavorable_ratio": 0.2, "unfavorable_shifts": 2, "total_shifts": 10},
+            ],
+        }
+        pred_map = {
+            "E1": {
+                "risk_score_90d": 0.82,
+                "replacement_cost_yuan": 4200,
+                "major_risk_factors": [{"name": "attendance", "score": 0.9}],
+            },
+            "E2": {
+                "risk_score_90d": 0.35,
+                "replacement_cost_yuan": 3200,
+                "major_risk_factors": [{"name": "fairness", "score": 0.5}],
+            },
+        }
+
+        async def _predict(employee_id, db, send_alert=False):
+            return {
+                "employee_id": employee_id,
+                "store_id": "S001",
+                "alert_sent": False,
+                **pred_map[employee_id],
+            }
+
+        with (
+            patch("src.api.workforce.EmployeeRepository.get_by_store", new=AsyncMock(return_value=employees)),
+            patch("src.api.workforce.ShiftFairnessService.get_monthly_shift_fairness", new=AsyncMock(return_value=fairness_payload)),
+            patch("src.api.workforce.TurnoverPredictionService.predict_employee_turnover", new=AsyncMock(side_effect=_predict)),
+        ):
+            resp = await get_employee_health(
+                store_id="S001",
+                year=2026,
+                month=3,
+                top_n=20,
+                db=db,
+                _=_mock_user(),
+            )
+
+        assert resp["store_id"] == "S001"
+        assert resp["fairness_index"] == 85.5
+        assert resp["total"] == 2
+        assert resp["items"][0]["employee_id"] == "E1"
+        assert resp["items"][0]["risk_level"] == "high"
+        assert resp["fairness_distribution"]["high_unfairness"] == 1
+
+    @pytest.mark.asyncio
+    async def test_get_employee_health_top_n(self):
+        db = AsyncMock()
+        employees = [
+            MagicMock(id="E1", name="张三", position="waiter"),
+            MagicMock(id="E2", name="李四", position="chef"),
+            MagicMock(id="E3", name="王五", position="cashier"),
+        ]
+        fairness_payload = {"fairness_index": 90.0, "employee_stats": []}
+
+        async def _predict(employee_id, db, send_alert=False):
+            score = {"E1": 0.9, "E2": 0.8, "E3": 0.1}[employee_id]
+            return {
+                "employee_id": employee_id,
+                "store_id": "S001",
+                "risk_score_90d": score,
+                "replacement_cost_yuan": 1000,
+                "major_risk_factors": [],
+                "alert_sent": False,
+            }
+
+        with (
+            patch("src.api.workforce.EmployeeRepository.get_by_store", new=AsyncMock(return_value=employees)),
+            patch("src.api.workforce.ShiftFairnessService.get_monthly_shift_fairness", new=AsyncMock(return_value=fairness_payload)),
+            patch("src.api.workforce.TurnoverPredictionService.predict_employee_turnover", new=AsyncMock(side_effect=_predict)),
+        ):
+            resp = await get_employee_health(
+                store_id="S001",
+                year=2026,
+                month=3,
+                top_n=2,
+                db=db,
+                _=_mock_user(),
+            )
+
+        assert len(resp["items"]) == 2
+        assert [item["employee_id"] for item in resp["items"]] == ["E1", "E2"]

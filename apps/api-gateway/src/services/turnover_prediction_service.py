@@ -66,6 +66,7 @@ class TurnoverPredictionService:
         employee_id: str,
         db: AsyncSession,
         monthly_salary: Optional[float] = None,
+        send_alert: bool = True,
     ) -> Dict[str, Any]:
         """预测 90 天内流失风险，并在高风险时通知店长。"""
         employee = await EmployeeRepository.get_by_id(db, employee_id)
@@ -92,7 +93,7 @@ class TurnoverPredictionService:
         replacement_cost = estimate_replacement_cost(salary)
 
         alert_sent = False
-        if risk_score > 0.7:
+        if send_alert and risk_score > 0.7:
             store = await db.get(Store, employee.store_id)
             if store and store.manager_id:
                 message = (
