@@ -157,4 +157,5 @@ class ResourceType:
     SUPPLIER = "supplier"
     PURCHASE_ORDER = "purchase_order"
     MEMBER = "member"
+    SCHEDULE = "schedule"
     SYSTEM = "system"

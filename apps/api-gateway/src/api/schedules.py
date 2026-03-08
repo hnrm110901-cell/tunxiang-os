@@ -12,10 +12,11 @@ import structlog
 from ..core.database import get_db
 from ..core.dependencies import get_current_active_user, require_role
 from ..models.schedule import Schedule, Shift
+from ..models.audit_log import AuditLog, ResourceType, AuditAction
 from ..models.user import User, UserRole
 from ..repositories import ScheduleRepository
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, desc
 from sqlalchemy.orm import selectinload
 
 from ..services.schedule_conflict_service import detect_schedule_conflicts
@@ -56,6 +57,46 @@ class ScheduleResponse(BaseModel):
     total_hours: Optional[str]
     is_published: bool
     shifts: List[ShiftResponse]
+
+
+class ScheduleHistoryItem(BaseModel):
+    id: str
+    action: str
+    description: Optional[str]
+    user_id: str
+    username: Optional[str]
+    user_role: Optional[str]
+    created_at: Optional[str]
+    changes: Optional[dict] = None
+    new_value: Optional[dict] = None
+
+
+def _add_schedule_audit_log(
+    *,
+    session: AsyncSession,
+    action: str,
+    schedule_id: str,
+    store_id: str,
+    current_user: User,
+    description: str,
+    changes: Optional[dict] = None,
+    new_value: Optional[dict] = None,
+) -> None:
+    session.add(
+        AuditLog(
+            action=action,
+            resource_type=ResourceType.SCHEDULE,
+            resource_id=schedule_id,
+            user_id=str(current_user.id),
+            username=getattr(current_user, "username", None),
+            user_role=getattr(current_user, "role", None),
+            description=description,
+            changes=changes or {},
+            new_value=new_value,
+            store_id=store_id,
+            status="success",
+        )
+    )
 
 
 @router.get("/schedules", response_model=List[ScheduleResponse])
@@ -141,6 +182,17 @@ async def create_schedule(
         )
         session.add(shift)
 
+    _add_schedule_audit_log(
+        session=session,
+        action=AuditAction.CREATE,
+        schedule_id=str(schedule.id),
+        store_id=req.store_id,
+        current_user=current_user,
+        description="创建排班",
+        changes={"shift_count": len(req.shifts)},
+        new_value={"schedule_date": req.schedule_date.isoformat()},
+    )
+
     await session.commit()
     result2 = await session.execute(
         select(Schedule).options(selectinload(Schedule.shifts)).where(Schedule.id == schedule.id)
@@ -165,6 +217,16 @@ async def publish_schedule(
         raise HTTPException(status_code=404, detail="排班不存在")
     schedule.is_published = True
     schedule.published_by = str(current_user.id)
+    _add_schedule_audit_log(
+        session=session,
+        action=AuditAction.UPDATE,
+        schedule_id=str(schedule.id),
+        store_id=schedule.store_id,
+        current_user=current_user,
+        description="发布排班",
+        changes={"is_published": True},
+        new_value={"published_by": str(current_user.id)},
+    )
     await session.commit()
     return _to_schedule_response(schedule)
 
@@ -260,6 +322,17 @@ async def auto_generate_schedule(
         )
         session.add(shift)
 
+    _add_schedule_audit_log(
+        session=session,
+        action=AuditAction.CREATE,
+        schedule_id=str(schedule.id),
+        store_id=req.store_id,
+        current_user=current_user,
+        description="自动生成排班",
+        changes={"mode": "auto", "shift_count": len(shifts_data)},
+        new_value={"schedule_date": req.schedule_date.isoformat()},
+    )
+
     await session.commit()
     result2 = await session.execute(
         select(Schedule).options(selectinload(Schedule.shifts)).where(Schedule.id == schedule.id)
@@ -284,9 +357,23 @@ async def confirm_shift(
     shift = result.scalar_one_or_none()
     if not shift:
         raise HTTPException(status_code=404, detail="班次不存在")
+    schedule_store_result = await session.execute(
+        select(Schedule.store_id).where(Schedule.id == schedule_id)
+    )
+    schedule_store_id = schedule_store_result.scalar_one_or_none() or ""
     shift.is_confirmed = True
     if req.notes:
         shift.notes = req.notes
+    _add_schedule_audit_log(
+        session=session,
+        action=AuditAction.UPDATE,
+        schedule_id=schedule_id,
+        store_id=schedule_store_id,
+        current_user=current_user,
+        description="确认班次",
+        changes={"shift_id": str(shift.id), "is_confirmed": True},
+        new_value={"notes": req.notes} if req.notes else {"is_confirmed": True},
+    )
     await session.commit()
     await session.refresh(shift)
     return ShiftResponse(
@@ -294,6 +381,39 @@ async def confirm_shift(
         start_time=shift.start_time, end_time=shift.end_time,
         position=shift.position, is_confirmed=shift.is_confirmed,
     )
+
+
+@router.get("/schedules/{schedule_id}/history", response_model=List[ScheduleHistoryItem])
+async def get_schedule_history(
+    schedule_id: str,
+    limit: int = Query(50, ge=1, le=200),
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """获取排班历史记录（审计日志）"""
+    result = await session.execute(
+        select(AuditLog).where(
+            and_(
+                AuditLog.resource_type == ResourceType.SCHEDULE,
+                AuditLog.resource_id == schedule_id,
+            )
+        ).order_by(desc(AuditLog.created_at)).limit(limit)
+    )
+    rows = result.scalars().all()
+    return [
+        ScheduleHistoryItem(
+            id=str(item.id),
+            action=item.action,
+            description=item.description,
+            user_id=item.user_id,
+            username=item.username,
+            user_role=item.user_role,
+            created_at=item.created_at.isoformat() if item.created_at else None,
+            changes=item.changes,
+            new_value=item.new_value,
+        )
+        for item in rows
+    ]
 
 
 @router.get("/schedules/my-schedule")
