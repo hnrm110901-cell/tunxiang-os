@@ -1316,3 +1316,101 @@ class TestGetReportByEntity:
         assert item["revenue_yuan"] == pytest.approx(5000.00, abs=0.01)
         assert item["expense_yuan"] == pytest.approx(3000.00, abs=0.01)
         assert item["net_yuan"] == pytest.approx(2000.00, abs=0.01)
+
+
+class TestGetReportComparison:
+    """测试 comparison 报表（同比/环比）"""
+
+    @pytest.mark.asyncio
+    async def test_yoy_comparison_with_change_pct(self):
+        svc = StandaloneFCTService()
+        db = _mock_db()
+        svc._aggregate_transactions = AsyncMock(side_effect=[
+            {"income": 1_200_000, "expense": 700_000, "net": 500_000},
+            {"income": 1_000_000, "expense": 650_000, "net": 350_000},
+        ])
+        result = await svc.get_report_comparison(
+            db,
+            tenant_id="T1",
+            entity_id="S001",
+            start_date=date(2026, 3, 1),
+            end_date=date(2026, 3, 31),
+            compare_type="yoy",
+        )
+        assert result["compare_type"] == "yoy"
+        assert result["previous"]["net"] == 350_000
+        assert result["changes"]["income_pct"] == 20.0
+        assert result["changes"]["net_pct"] == pytest.approx(42.86, abs=0.01)
+
+    @pytest.mark.asyncio
+    async def test_mom_comparison(self):
+        svc = StandaloneFCTService()
+        db = _mock_db()
+        svc._aggregate_transactions = AsyncMock(side_effect=[
+            {"income": 800_000, "expense": 500_000, "net": 300_000},
+            {"income": 750_000, "expense": 520_000, "net": 230_000},
+        ])
+        result = await svc.get_report_comparison(
+            db,
+            tenant_id="T1",
+            start_date=date(2026, 3, 1),
+            end_date=date(2026, 3, 31),
+            compare_type="mom",
+        )
+        assert result["compare_type"] == "mom"
+        assert result["changes"]["net_pct"] == pytest.approx(30.43, abs=0.01)
+
+    @pytest.mark.asyncio
+    async def test_missing_date_returns_zero_previous(self):
+        svc = StandaloneFCTService()
+        db = _mock_db()
+        svc._aggregate_transactions = AsyncMock(return_value={"income": 100, "expense": 20, "net": 80})
+        result = await svc.get_report_comparison(db, tenant_id="T1")
+        assert result["previous"] == {"income": 0, "expense": 0, "net": 0}
+        assert result["changes"]["income_pct"] is None
+
+
+class TestGetReportConsolidated:
+    """测试 consolidated 报表（按主体与汇总）"""
+
+    @staticmethod
+    def _row(entity_id: str, income_fen: int, expense_fen: int):
+        row = MagicMock()
+        row.__getitem__ = lambda self, i: [entity_id, income_fen, expense_fen][i]
+        return row
+
+    @pytest.mark.asyncio
+    async def test_group_by_entity_returns_by_entity_and_balances(self):
+        db = _mock_db()
+        result_mock = MagicMock()
+        result_mock.fetchall.return_value = [
+            self._row("S001", 1_000_000, 700_000),
+            self._row("S002", 800_000, 500_000),
+        ]
+        db.execute = AsyncMock(return_value=result_mock)
+        svc = StandaloneFCTService()
+
+        result = await svc.get_report_consolidated(db, tenant_id="T1", period="202603", group_by="entity")
+        assert result["report_type"] == "consolidated"
+        assert len(result["by_entity"]) == 2
+        assert result["balances"]["income"] == 1_800_000
+        assert result["balances"]["net"] == 600_000
+
+    @pytest.mark.asyncio
+    async def test_group_by_all_only_returns_balances(self):
+        db = _mock_db()
+        result_mock = MagicMock()
+        result_mock.fetchall.return_value = [self._row("S001", 500_000, 300_000)]
+        db.execute = AsyncMock(return_value=result_mock)
+        svc = StandaloneFCTService()
+
+        result = await svc.get_report_consolidated(db, tenant_id="T1", period="202603", group_by="all")
+        assert "by_entity" not in result
+        assert result["balances"]["net_yuan"] == pytest.approx(2000.00, abs=0.01)
+
+    @pytest.mark.asyncio
+    async def test_invalid_period_raises(self):
+        svc = StandaloneFCTService()
+        db = _mock_db()
+        with pytest.raises(ValueError, match="YYYYMM"):
+            await svc.get_report_consolidated(db, tenant_id="T1", period="2026-03")

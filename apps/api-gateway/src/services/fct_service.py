@@ -1110,6 +1110,20 @@ class StandaloneFCTService:
         return round((fen or 0) / 100, 2)
 
     @staticmethod
+    def _shift_month(dt: date, months: int) -> date:
+        total = (dt.year * 12 + (dt.month - 1)) + months
+        year = total // 12
+        month = total % 12 + 1
+        day = min(dt.day, monthrange(year, month)[1])
+        return date(year, month, day)
+
+    @staticmethod
+    def _shift_year(dt: date, years: int) -> date:
+        target_year = dt.year + years
+        day = min(dt.day, monthrange(target_year, dt.month)[1])
+        return date(target_year, dt.month, day)
+
+    @staticmethod
     def _voucher_to_dict(v) -> Dict[str, Any]:
         return {
             "id": str(v.id),
@@ -2263,13 +2277,36 @@ class StandaloneFCTService:
         compare_type: str = "yoy",
     ) -> Dict[str, Any]:
         current = await self._aggregate_transactions(session, entity_id, start_date, end_date)
+        previous = {"income": 0, "expense": 0, "net": 0}
+
+        if start_date and end_date:
+            compare_t = (compare_type or "yoy").lower()
+            if compare_t == "mom":
+                prev_start = self._shift_month(start_date, -1)
+                prev_end = self._shift_month(end_date, -1)
+            else:
+                compare_t = "yoy"
+                prev_start = self._shift_year(start_date, -1)
+                prev_end = self._shift_year(end_date, -1)
+            previous = await self._aggregate_transactions(session, entity_id, prev_start, prev_end)
+            compare_type = compare_t
+
+        def _pct(curr: int, prev: int) -> Optional[float]:
+            if prev == 0:
+                return None
+            return round((curr - prev) / prev * 100, 2)
+
         return {
             "report_type": "comparison",
             "tenant_id": tenant_id,
             "compare_type": compare_type,
             "current": current,
-            "previous": {"income": 0, "expense": 0, "net": 0},
-            "note": "同比环比对比待账务期间模型上线后精准计算",
+            "previous": previous,
+            "changes": {
+                "income_pct": _pct(int(current.get("income") or 0), int(previous.get("income") or 0)),
+                "expense_pct": _pct(int(current.get("expense") or 0), int(previous.get("expense") or 0)),
+                "net_pct": _pct(int(current.get("net") or 0), int(previous.get("net") or 0)),
+            },
         }
 
     async def get_report_consolidated(
@@ -2279,14 +2316,61 @@ class StandaloneFCTService:
         period: str,
         group_by: Optional[str] = "entity",
     ) -> Dict[str, Any]:
-        return {
+        if not period or len(period) != 6 or not period.isdigit():
+            raise ValueError("period 格式应为 YYYYMM")
+
+        year, month = int(period[:4]), int(period[4:6])
+        start_d = date(year, month, 1)
+        end_d = date(year, month, monthrange(year, month)[1])
+
+        stmt = text("""
+            SELECT store_id,
+                   SUM(CASE WHEN transaction_type = 'income' THEN amount ELSE 0 END) AS income,
+                   SUM(CASE WHEN transaction_type = 'expense' THEN amount ELSE 0 END) AS expense
+            FROM financial_transactions
+            WHERE transaction_date >= :df AND transaction_date <= :dt
+            GROUP BY store_id
+            ORDER BY store_id
+        """)
+        rows = (await session.execute(stmt, {"df": start_d, "dt": end_d})).fetchall()
+
+        by_entity: List[Dict[str, Any]] = []
+        total_income = 0
+        total_expense = 0
+        for row in rows:
+            income = int(row[1] or 0)
+            expense = int(row[2] or 0)
+            net = income - expense
+            total_income += income
+            total_expense += expense
+            by_entity.append({
+                "entity_id": row[0],
+                "income": income,
+                "income_yuan": self._y(income),
+                "expense": expense,
+                "expense_yuan": self._y(expense),
+                "net": net,
+                "net_yuan": self._y(net),
+            })
+
+        total_net = total_income - total_expense
+        result: Dict[str, Any] = {
             "report_type": "consolidated",
             "tenant_id": tenant_id,
             "period": period,
-            "group_by": group_by,
-            "data": [],
-            "note": "合并报表待多主体账务模型上线后实现",
+            "group_by": group_by or "entity",
+            "balances": {
+                "income": total_income,
+                "income_yuan": self._y(total_income),
+                "expense": total_expense,
+                "expense_yuan": self._y(total_expense),
+                "net": total_net,
+                "net_yuan": self._y(total_net),
+            },
         }
+        if (group_by or "entity") == "entity":
+            result["by_entity"] = by_entity
+        return result
 
     async def get_reports_stub(
         self,
