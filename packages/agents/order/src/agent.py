@@ -11,6 +11,7 @@ import uuid
 import os
 import sys
 import inspect
+import re
 from pathlib import Path
 
 # Add core module to path
@@ -105,6 +106,7 @@ class OrderAgent(BaseAgent):
             "create_reservation", "join_queue", "get_queue_status",
             "create_order", "add_dish", "calculate_dynamic_price", "recommend_dishes", "personalize_dining_suggestions",
             "suggest_cross_store_reservation",
+            "get_ar_menu_preview", "parse_voice_order",
             "calculate_bill", "process_payment", "get_order",
             "modify_order", "merge_table_orders", "update_order_status", "cancel_order",
         ]
@@ -175,6 +177,10 @@ class OrderAgent(BaseAgent):
                 result = await self.personalize_dining_suggestions(**params)
             elif action == "suggest_cross_store_reservation":
                 result = await self.suggest_cross_store_reservation(**params)
+            elif action == "get_ar_menu_preview":
+                result = await self.get_ar_menu_preview(**params)
+            elif action == "parse_voice_order":
+                result = await self.parse_voice_order(**params)
             elif action == "calculate_bill":
                 result = await self.calculate_bill(**params)
             elif action == "process_payment":
@@ -867,6 +873,97 @@ class OrderAgent(BaseAgent):
             "cross_store_options": top,
             "redirect_reservation_payload": redirect_payload,
             "message": "已生成跨门店预定建议" if top else "暂无可用门店可供预定",
+        }
+
+    async def get_ar_menu_preview(
+        self,
+        store_id: str,
+        menu_items: List[Dict[str, Any]],
+        locale: str = "zh-CN",
+    ) -> Dict[str, Any]:
+        """
+        AR菜单展示数据：
+        输出每个菜品的 AR 资产地址、锚点信息与交互提示。
+        """
+        ar_items = []
+        for item in menu_items:
+            dish_id = str(item.get("dish_id", "unknown"))
+            dish_name = str(item.get("dish_name", "未知菜品"))
+            ar_items.append(
+                {
+                    "dish_id": dish_id,
+                    "dish_name": dish_name,
+                    "price": float(item.get("price", 0)),
+                    "ar_asset_url": item.get("ar_asset_url", f"/ar-assets/{dish_id}.glb"),
+                    "anchor_type": item.get("anchor_type", "tabletop"),
+                    "scale_hint": item.get("scale_hint", 1.0),
+                    "interaction_hint": "双指缩放，单指旋转" if locale != "en-US" else "Pinch to zoom, drag to rotate",
+                }
+            )
+        return {
+            "success": True,
+            "store_id": store_id,
+            "locale": locale,
+            "ar_menu_items": ar_items,
+            "message": "AR菜单预览已生成" if locale != "en-US" else "AR menu preview generated",
+        }
+
+    async def parse_voice_order(
+        self,
+        transcript: str,
+        menu_catalog: List[Dict[str, Any]],
+        locale: str = "zh-CN",
+    ) -> Dict[str, Any]:
+        """
+        语音点单解析：
+        从语音文本中匹配菜品和数量，返回订单草稿。
+        """
+        text = transcript.strip()
+        if not text:
+            return {"success": False, "message": "语音内容为空"}
+
+        parsed_items: List[Dict[str, Any]] = []
+        total_amount = 0.0
+        remaining_text = text
+        cn_num = {"一": 1, "二": 2, "两": 2, "三": 3, "四": 4, "五": 5}
+
+        for dish in menu_catalog:
+            dish_name = str(dish.get("dish_name", ""))
+            if not dish_name or dish_name not in text:
+                continue
+
+            quantity = 1
+            m_digit = re.search(rf"(\d+)\s*份?\s*{re.escape(dish_name)}", text)
+            if m_digit:
+                quantity = int(m_digit.group(1))
+            else:
+                m_cn = re.search(rf"([一二两三四五])\s*份?\s*{re.escape(dish_name)}", text)
+                if m_cn:
+                    quantity = cn_num.get(m_cn.group(1), 1)
+
+            price = float(dish.get("price", 0))
+            subtotal = round(price * quantity, 2)
+            parsed_items.append(
+                {
+                    "dish_id": dish.get("dish_id"),
+                    "dish_name": dish_name,
+                    "price": price,
+                    "quantity": quantity,
+                    "subtotal": subtotal,
+                }
+            )
+            total_amount += subtotal
+            remaining_text = remaining_text.replace(dish_name, "")
+
+        return {
+            "success": True,
+            "locale": locale,
+            "order_draft": {
+                "items": parsed_items,
+                "total_amount": round(total_amount, 2),
+            },
+            "unparsed_text": remaining_text.strip(),
+            "message": "语音点单解析完成" if locale != "en-US" else "Voice order parsed",
         }
 
     # ==================== 结账管理 ====================

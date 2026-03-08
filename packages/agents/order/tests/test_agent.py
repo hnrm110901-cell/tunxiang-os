@@ -377,6 +377,31 @@ class TestOrdering:
         assert result["redirect_reservation_payload"]["redirected_from"] == "STORE001"
 
     @pytest.mark.asyncio
+    async def test_get_ar_menu_preview(self, agent):
+        """测试AR菜单预览"""
+        result = await agent.get_ar_menu_preview(
+            store_id="STORE001",
+            menu_items=[{"dish_id": "D001", "dish_name": "宫保鸡丁", "price": 48.0}],
+        )
+        assert result["success"] is True
+        assert len(result["ar_menu_items"]) == 1
+        assert result["ar_menu_items"][0]["ar_asset_url"].endswith(".glb")
+
+    @pytest.mark.asyncio
+    async def test_parse_voice_order(self, agent):
+        """测试语音点单解析"""
+        result = await agent.parse_voice_order(
+            transcript="来2份宫保鸡丁和1份米饭",
+            menu_catalog=[
+                {"dish_id": "D001", "dish_name": "宫保鸡丁", "price": 48.0},
+                {"dish_id": "D002", "dish_name": "米饭", "price": 3.0},
+            ],
+        )
+        assert result["success"] is True
+        assert len(result["order_draft"]["items"]) == 2
+        assert result["order_draft"]["total_amount"] == 99.0
+
+    @pytest.mark.asyncio
     async def test_modify_order_update_quantity_and_total(self, agent):
         """测试订单改数量后金额重算"""
         order = {

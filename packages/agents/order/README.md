@@ -384,8 +384,8 @@ pytest tests/ -v --cov=src --cov-report=html
 - [x] 多语言菜单支持
 
 ### 长期
-- [ ] AR菜单展示
-- [ ] 语音点单
+- [x] AR菜单展示
+- [x] 语音点单
 - [x] 个性化用餐建议
 - [x] 跨门店预定
 
