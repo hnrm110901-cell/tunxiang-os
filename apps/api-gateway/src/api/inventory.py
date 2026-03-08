@@ -456,6 +456,10 @@ async def list_transfer_requests(
     current_user: User = Depends(get_current_active_user),
 ):
     """查询跨店调货审批请求。"""
+    status_filter = status
+    if status_filter == "pending_approval":
+        status_filter = DecisionStatus.PENDING.value
+
     stmt = (
         select(DecisionLog)
         .where(
@@ -474,7 +478,7 @@ async def list_transfer_requests(
         if store_id and not (row.store_id == store_id or suggestion.get("target_store_id") == store_id):
             continue
         status_value = row.decision_status.value if hasattr(row.decision_status, "value") else str(row.decision_status)
-        if status and status_value != status:
+        if status_filter and status_value != status_filter:
             continue
         items.append({
             "decision_id": row.id,

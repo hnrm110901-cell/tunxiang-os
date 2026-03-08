@@ -182,6 +182,54 @@ async def test_list_transfer_requests_filters_status_and_store():
 
 
 @pytest.mark.asyncio
+async def test_list_transfer_requests_accepts_pending_approval_alias():
+    row1 = SimpleNamespace(
+        id="dec-1",
+        store_id="S001",
+        ai_suggestion={
+            "source_store_id": "S001",
+            "target_store_id": "S002",
+            "source_item_id": "inv-src-1",
+            "target_item_id": "inv-tgt-1",
+            "item_name": "鸡腿",
+            "quantity": 8.0,
+            "unit": "kg",
+            "reason": "调货",
+        },
+        decision_status=DecisionStatus.PENDING,
+        manager_feedback=None,
+        created_at=datetime(2026, 3, 8, 9, 0, 0),
+        approved_at=None,
+        executed_at=None,
+    )
+    row2 = SimpleNamespace(
+        id="dec-2",
+        store_id="S001",
+        ai_suggestion={"source_store_id": "S001", "target_store_id": "S003"},
+        decision_status=DecisionStatus.REJECTED,
+        manager_feedback="不通过",
+        created_at=datetime(2026, 3, 8, 10, 0, 0),
+        approved_at=datetime(2026, 3, 8, 10, 5, 0),
+        executed_at=None,
+    )
+
+    session = AsyncMock()
+    session.execute = AsyncMock(return_value=_ScalarsAllResult([row1, row2]))
+
+    out = await list_transfer_requests(
+        store_id="S001",
+        status="pending_approval",
+        limit=50,
+        session=session,
+        current_user=SimpleNamespace(id="u-1"),
+    )
+
+    assert out["total"] == 1
+    assert out["items"][0]["decision_id"] == "dec-1"
+    assert out["items"][0]["status"] == "pending"
+
+
+@pytest.mark.asyncio
 async def test_approve_transfer_request_executes_stock_move_and_transactions():
     decision = SimpleNamespace(
         id="dec-1",
