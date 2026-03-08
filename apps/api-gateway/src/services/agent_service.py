@@ -339,7 +339,9 @@ class AgentService:
 
             # Special handling for service agent - use database service
             if agent_type == "service":
-                from src.services.service_service import service_quality_service
+                from src.services.service_service import ServiceQualityService
+                service_store_id = params.get("store_id") or "STORE001"
+                service_quality_service = ServiceQualityService(store_id=service_store_id)
 
                 if action == "monitor_service_quality" or action == "get_service_quality_metrics":
                     result_data = await service_quality_service.get_service_quality_metrics(
@@ -514,7 +516,9 @@ class AgentService:
 
             # Special handling for training agent - use database service
             if agent_type == "training":
-                from src.services.training_service import training_service
+                from src.services.training_service import TrainingService
+                training_store_id = params.get("store_id") or "STORE001"
+                training_service = TrainingService(store_id=training_store_id)
 
                 if action == "assess_training_needs":
                     result_data = await training_service.assess_training_needs(

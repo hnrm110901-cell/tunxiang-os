@@ -13,6 +13,7 @@ for _k, _v in {
     os.environ.setdefault(_k, _v)
 
 import pytest
+from unittest.mock import AsyncMock, patch
 from src.services.agent_service import AgentService
 
 
@@ -184,3 +185,45 @@ class TestAgentService:
 
         assert result is not None
         assert "execution_time" in result
+
+    @pytest.mark.unit
+    async def test_service_agent_uses_store_id_in_params(self):
+        """service agent 应按 params.store_id 构造服务实例"""
+        with patch.object(AgentService, "_initialize_agents", return_value=None):
+            svc = AgentService()
+            svc._agents = {"service": object()}
+
+        mock_instance = AsyncMock()
+        mock_instance.get_service_quality_metrics.return_value = {"quality_score": 92}
+
+        with patch("src.services.service_service.ServiceQualityService", return_value=mock_instance) as mock_cls:
+            result = await svc.execute_agent("service", {
+                "action": "get_service_quality_metrics",
+                "params": {"store_id": "S999", "start_date": "2026-03-01", "end_date": "2026-03-08"},
+            })
+
+        mock_cls.assert_called_once_with(store_id="S999")
+        mock_instance.get_service_quality_metrics.assert_awaited_once()
+        assert result["success"] is True
+        assert result["data"]["quality_score"] == 92
+
+    @pytest.mark.unit
+    async def test_training_agent_uses_store_id_in_params(self):
+        """training agent 应按 params.store_id 构造服务实例"""
+        with patch.object(AgentService, "_initialize_agents", return_value=None):
+            svc = AgentService()
+            svc._agents = {"training": object()}
+
+        mock_instance = AsyncMock()
+        mock_instance.get_training_statistics.return_value = {"total_trainings": 12}
+
+        with patch("src.services.training_service.TrainingService", return_value=mock_instance) as mock_cls:
+            result = await svc.execute_agent("training", {
+                "action": "get_training_statistics",
+                "params": {"store_id": "S888", "start_date": "2026-03-01", "end_date": "2026-03-08"},
+            })
+
+        mock_cls.assert_called_once_with(store_id="S888")
+        mock_instance.get_training_statistics.assert_awaited_once()
+        assert result["success"] is True
+        assert result["data"]["total_trainings"] == 12
