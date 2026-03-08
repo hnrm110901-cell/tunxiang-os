@@ -60,6 +60,7 @@ const SchedulePage: React.FC = () => {
   const [historySchedule, setHistorySchedule] = useState<any>(null);
   const [historyItems, setHistoryItems] = useState<any[]>([]);
   const [historyActionFilter, setHistoryActionFilter] = useState<string>('all');
+  const [historyKeyword, setHistoryKeyword] = useState<string>('');
 
   const [weekDate, setWeekDate] = useState<Dayjs>(dayjs().startOf('isoWeek'));
   const [statsRange, setStatsRange] = useState<[Dayjs, Dayjs]>([dayjs().subtract(7, 'day'), dayjs()]);
@@ -211,6 +212,7 @@ const SchedulePage: React.FC = () => {
       setHistorySchedule(schedule);
       setHistoryDrawer(true);
       setHistoryActionFilter('all');
+      setHistoryKeyword('');
       setHistoryLoading(true);
       const res = await apiClient.get(`/api/v1/schedules/${schedule.id}/history?limit=100`);
       setHistoryItems(res || []);
@@ -346,9 +348,16 @@ const SchedulePage: React.FC = () => {
   const activeCount = employees.filter(e => e.is_active).length;
   const skillCount = new Set(employees.flatMap(e => e.skills || [])).size;
   const publishedCount = schedules.filter(s => s.is_published).length;
-  const filteredHistoryItems = historyActionFilter === 'all'
+  const actionFilteredHistoryItems = historyActionFilter === 'all'
     ? historyItems
     : historyItems.filter((item: any) => item.action === historyActionFilter);
+  const keyword = historyKeyword.trim().toLowerCase();
+  const filteredHistoryItems = keyword
+    ? actionFilteredHistoryItems.filter((item: any) => {
+        const haystack = `${item.description || ''} ${item.username || ''} ${item.user_id || ''} ${item.action || ''}`.toLowerCase();
+        return haystack.includes(keyword);
+      })
+    : actionFilteredHistoryItems;
 
   const handleExportHistory = () => {
     const payload = {
@@ -588,13 +597,21 @@ const SchedulePage: React.FC = () => {
         }
       >
         <div style={{ marginBottom: 12 }}>
-          <Space>
+          <Space wrap>
             <span style={{ color: '#666', fontSize: 12 }}>操作类型</span>
             <Select size="small" value={historyActionFilter} onChange={setHistoryActionFilter} style={{ width: 140 }}>
               <Option value="all">全部</Option>
               <Option value="create">创建</Option>
               <Option value="update">更新</Option>
             </Select>
+            <Input
+              size="small"
+              allowClear
+              placeholder="搜索操作人/描述"
+              value={historyKeyword}
+              onChange={(e) => setHistoryKeyword(e.target.value)}
+              style={{ width: 180 }}
+            />
           </Space>
         </div>
         {historyLoading ? (
