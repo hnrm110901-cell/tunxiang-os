@@ -1,5 +1,22 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Card, Col, Row, Table, Statistic, Spin, Select, Tag, Space, Empty } from 'antd';
+import {
+  Card,
+  Col,
+  Row,
+  Table,
+  Statistic,
+  Spin,
+  Select,
+  Tag,
+  Space,
+  Empty,
+  Form,
+  Input,
+  InputNumber,
+  Button,
+  Popconfirm,
+  message,
+} from 'antd';
 import {
   ShopOutlined,
   RiseOutlined,
@@ -49,13 +66,41 @@ interface PerformanceRankingItem {
   growth_rate: number;
 }
 
+interface InventoryItem {
+  id: string;
+  name: string;
+  unit?: string;
+  current_quantity: number;
+}
+
+interface TransferRequestItem {
+  decision_id: string;
+  status: string;
+  source_store_id: string;
+  target_store_id: string;
+  source_item_id: string;
+  target_item_id: string;
+  item_name: string;
+  quantity: number;
+  unit?: string;
+  reason?: string;
+  manager_feedback?: string;
+  created_at?: string;
+}
+
 const MultiStoreManagement: React.FC = () => {
+  const [transferForm] = Form.useForm();
   const [loading, setLoading] = useState(true);
   const [stores, setStores] = useState<StoreItem[]>([]);
   const [selectedStores, setSelectedStores] = useState<string[]>([]);
   const [comparisonData, setComparisonData] = useState<ComparisonResponse | null>(null);
   const [regionalSummary, setRegionalSummary] = useState<RegionalSummaryItem[]>([]);
   const [performanceRanking, setPerformanceRanking] = useState<PerformanceRankingItem[]>([]);
+  const [sourceInventoryItems, setSourceInventoryItems] = useState<InventoryItem[]>([]);
+  const [targetInventoryItems, setTargetInventoryItems] = useState<InventoryItem[]>([]);
+  const [transferRequests, setTransferRequests] = useState<TransferRequestItem[]>([]);
+  const [transferSubmitting, setTransferSubmitting] = useState(false);
+  const [transferActionLoadingId, setTransferActionLoadingId] = useState<string | null>(null);
 
   const loadComparisonData = useCallback(async (storeIds: string[]) => {
     if (storeIds.length < 2) {
@@ -85,11 +130,96 @@ const MultiStoreManagement: React.FC = () => {
         const defaults = [storeList[0].id, storeList[1].id];
         setSelectedStores(defaults);
         await loadComparisonData(defaults);
+        transferForm.setFieldsValue({
+          source_store_id: storeList[0].id,
+          target_store_id: storeList[1].id,
+        });
       }
     } catch (err: unknown) {
       handleApiError(err, '加载门店列表失败');
     }
-  }, [loadComparisonData]);
+  }, [loadComparisonData, transferForm]);
+
+  const loadStoreInventory = useCallback(async (storeId: string, setter: (items: InventoryItem[]) => void) => {
+    if (!storeId) {
+      setter([]);
+      return;
+    }
+    try {
+      const response = await apiClient.get(`/api/v1/inventory?store_id=${encodeURIComponent(storeId)}`) as InventoryItem[];
+      setter(response || []);
+    } catch (err: unknown) {
+      setter([]);
+      handleApiError(err, `加载门店 ${storeId} 库存失败`);
+    }
+  }, []);
+
+  const loadTransferRequests = useCallback(async () => {
+    try {
+      const response = await apiClient.get('/api/v1/inventory/transfer-requests?limit=30') as {
+        items?: TransferRequestItem[];
+      };
+      setTransferRequests(response.items || []);
+    } catch (err: unknown) {
+      handleApiError(err, '加载调货申请失败');
+    }
+  }, []);
+
+  const handleCreateTransferRequest = useCallback(async (values: {
+    source_store_id: string;
+    target_store_id: string;
+    source_item_id: string;
+    target_item_id?: string;
+    quantity: number;
+    reason?: string;
+  }) => {
+    try {
+      setTransferSubmitting(true);
+      await apiClient.post(`/api/v1/inventory/transfer-request?store_id=${encodeURIComponent(values.source_store_id)}`, {
+        source_item_id: values.source_item_id,
+        target_store_id: values.target_store_id,
+        target_item_id: values.target_item_id || undefined,
+        quantity: values.quantity,
+        reason: values.reason,
+      });
+      message.success('调货申请已提交，等待审批');
+      await loadTransferRequests();
+    } catch (err: unknown) {
+      handleApiError(err, '提交调货申请失败');
+    } finally {
+      setTransferSubmitting(false);
+    }
+  }, [loadTransferRequests]);
+
+  const handleApproveTransfer = useCallback(async (decisionId: string) => {
+    try {
+      setTransferActionLoadingId(decisionId);
+      await apiClient.post(`/api/v1/inventory/transfer-requests/${decisionId}/approve`, {
+        manager_feedback: '同意调货',
+      });
+      message.success('已批准并执行调货');
+      await loadTransferRequests();
+    } catch (err: unknown) {
+      handleApiError(err, '批准调货失败');
+    } finally {
+      setTransferActionLoadingId(null);
+    }
+  }, [loadTransferRequests]);
+
+  const handleRejectTransfer = useCallback(async (decisionId: string) => {
+    try {
+      setTransferActionLoadingId(decisionId);
+      await apiClient.post(`/api/v1/inventory/transfer-requests/${decisionId}/reject`, {
+        manager_feedback: '当前不满足调货条件',
+      });
+      message.success('已驳回调货申请');
+      await loadTransferRequests();
+    } catch (err: unknown) {
+      handleApiError(err, '驳回调货失败');
+    } finally {
+      setTransferActionLoadingId(null);
+    }
+  }, [loadTransferRequests]);
 
   const loadRegionalSummary = useCallback(async () => {
     try {
@@ -118,12 +248,32 @@ const MultiStoreManagement: React.FC = () => {
         loadStores(),
         loadRegionalSummary(),
         loadPerformanceRanking(),
+        loadTransferRequests(),
       ]);
       setLoading(false);
     };
 
     loadData();
-  }, [loadStores, loadRegionalSummary, loadPerformanceRanking]);
+  }, [loadStores, loadRegionalSummary, loadPerformanceRanking, loadTransferRequests]);
+
+  const sourceStoreId = Form.useWatch('source_store_id', transferForm);
+  const targetStoreId = Form.useWatch('target_store_id', transferForm);
+
+  useEffect(() => {
+    if (sourceStoreId) {
+      loadStoreInventory(sourceStoreId, setSourceInventoryItems);
+    } else {
+      setSourceInventoryItems([]);
+    }
+  }, [sourceStoreId, loadStoreInventory]);
+
+  useEffect(() => {
+    if (targetStoreId) {
+      loadStoreInventory(targetStoreId, setTargetInventoryItems);
+    } else {
+      setTargetInventoryItems([]);
+    }
+  }, [targetStoreId, loadStoreInventory]);
 
   const handleStoreSelectionChange = async (values: string[]) => {
     setSelectedStores(values);
@@ -240,6 +390,90 @@ const MultiStoreManagement: React.FC = () => {
     },
   ];
 
+  const transferStatusTag = (status: string) => {
+    if (status === 'pending') return <Tag color="processing">待审批</Tag>;
+    if (status === 'executed') return <Tag color="success">已执行</Tag>;
+    if (status === 'rejected') return <Tag color="error">已驳回</Tag>;
+    return <Tag>{status}</Tag>;
+  };
+
+  const transferColumns = [
+    {
+      title: '申请单',
+      dataIndex: 'decision_id',
+      key: 'decision_id',
+      width: 220,
+      ellipsis: true,
+    },
+    {
+      title: '状态',
+      dataIndex: 'status',
+      key: 'status',
+      width: 100,
+      render: (status: string) => transferStatusTag(status),
+    },
+    {
+      title: '调货项',
+      dataIndex: 'item_name',
+      key: 'item_name',
+      render: (_: unknown, row: TransferRequestItem) => `${row.item_name} ${row.quantity}${row.unit || ''}`,
+    },
+    {
+      title: '来源门店',
+      dataIndex: 'source_store_id',
+      key: 'source_store_id',
+    },
+    {
+      title: '目标门店',
+      dataIndex: 'target_store_id',
+      key: 'target_store_id',
+    },
+    {
+      title: '备注',
+      dataIndex: 'reason',
+      key: 'reason',
+      ellipsis: true,
+    },
+    {
+      title: '操作',
+      key: 'actions',
+      width: 190,
+      render: (_: unknown, row: TransferRequestItem) => {
+        const disabled = row.status !== 'pending';
+        return (
+          <Space>
+            <Button
+              type="link"
+              size="small"
+              loading={transferActionLoadingId === row.decision_id}
+              disabled={disabled}
+              onClick={() => handleApproveTransfer(row.decision_id)}
+            >
+              批准
+            </Button>
+            <Popconfirm
+              title="确认驳回该调货申请？"
+              okText="确认"
+              cancelText="取消"
+              onConfirm={() => handleRejectTransfer(row.decision_id)}
+              disabled={disabled}
+            >
+              <Button
+                type="link"
+                size="small"
+                danger
+                loading={transferActionLoadingId === row.decision_id}
+                disabled={disabled}
+              >
+                驳回
+              </Button>
+            </Popconfirm>
+          </Space>
+        );
+      },
+    },
+  ];
+
   if (loading) {
     return (
       <div style={{ textAlign: 'center', padding: '100px 0' }}>
@@ -317,6 +551,85 @@ const MultiStoreManagement: React.FC = () => {
           </Card>
         </Col>
       </Row>
+
+      <Card title="跨店调货审批" style={{ marginTop: '24px' }}>
+        <Form
+          form={transferForm}
+          layout="inline"
+          onFinish={handleCreateTransferRequest}
+          style={{ marginBottom: '16px', rowGap: 12 }}
+        >
+          <Form.Item
+            name="source_store_id"
+            rules={[{ required: true, message: '请选择来源门店' }]}
+          >
+            <Select
+              style={{ width: 180 }}
+              placeholder="来源门店"
+              options={stores.map((store) => ({ label: `${store.name} (${store.region})`, value: store.id }))}
+            />
+          </Form.Item>
+          <Form.Item
+            name="target_store_id"
+            rules={[{ required: true, message: '请选择目标门店' }]}
+          >
+            <Select
+              style={{ width: 180 }}
+              placeholder="目标门店"
+              options={stores.map((store) => ({ label: `${store.name} (${store.region})`, value: store.id }))}
+            />
+          </Form.Item>
+          <Form.Item
+            name="source_item_id"
+            rules={[{ required: true, message: '请选择来源库存项' }]}
+          >
+            <Select
+              showSearch
+              style={{ width: 220 }}
+              placeholder="来源库存项"
+              options={sourceInventoryItems.map((item) => ({
+                label: `${item.name}（可用 ${item.current_quantity}${item.unit || ''}）`,
+                value: item.id,
+              }))}
+            />
+          </Form.Item>
+          <Form.Item name="target_item_id">
+            <Select
+              allowClear
+              showSearch
+              style={{ width: 220 }}
+              placeholder="目标库存项（可选）"
+              options={targetInventoryItems.map((item) => ({
+                label: `${item.name}（现有 ${item.current_quantity}${item.unit || ''}）`,
+                value: item.id,
+              }))}
+            />
+          </Form.Item>
+          <Form.Item
+            name="quantity"
+            rules={[{ required: true, message: '请输入调货数量' }]}
+          >
+            <InputNumber min={0.01} precision={2} placeholder="数量" />
+          </Form.Item>
+          <Form.Item name="reason">
+            <Input style={{ width: 220 }} placeholder="调货原因（可选）" maxLength={120} />
+          </Form.Item>
+          <Form.Item>
+            <Button type="primary" htmlType="submit" loading={transferSubmitting}>
+              提交申请
+            </Button>
+          </Form.Item>
+        </Form>
+
+        <Table
+          columns={transferColumns}
+          dataSource={transferRequests}
+          rowKey="decision_id"
+          pagination={{ pageSize: 8, showSizeChanger: false }}
+          size="small"
+          locale={{ emptyText: '暂无调货申请' }}
+        />
+      </Card>
     </div>
   );
 };

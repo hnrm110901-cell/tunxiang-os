@@ -37,6 +37,11 @@
   - `avg_order_value` 指标补齐映射，避免前端图表空值
   - 路由稳定性修复：将 `/{store_id}` 动态路由后置，避免吞掉 `/count` 等静态路由
   - 路由回归补强：新增 `/stores`、`/regional-summary`、`/performance-ranking` 静态路由防吞用例
+- [x] 跨店调货申请/审批最小闭环（API + 页面 + 回归测试）
+  - 后端新增：`/inventory/transfer-request`、`/inventory/transfer-requests`、`/inventory/transfer-requests/{decision_id}/approve|reject`
+  - 审批执行补齐：来源/目标库存变更 + 双向 `TRANSFER` 流水 + 审批链落库
+  - 前端新增：`MultiStoreManagement` 调货申请表单 + 待审批列表 + 批准/驳回动作
+  - 新增后端测试：`test_inventory_transfer_workflow_api.py`（创建/列表/批准/驳回）
 
 ## P2
 - [x] 角色权限管理体验优化（页面入口可见性与无权限提示一致性）
@@ -63,11 +68,12 @@
 ## [Codex] 状态
 - status: completed
 - owner: Codex
-- task: FCT 账期持久化收尾（`fct_periods` 落库 + 兼容修复）
-- task: 多门店 API 兼容层补齐（路径 + 响应结构）
-- task: 多门店路由稳定性修复（静态路由优先）
-- task: 多门店路由回归测试补强（8个用例）
+- task: 跨店调货申请/审批最小闭环（API + 页面 + 回归测试）
 - files:
+  - `apps/api-gateway/src/api/inventory.py`
+  - `apps/api-gateway/tests/test_inventory_transfer_workflow_api.py`
+  - `apps/web/src/pages/MultiStoreManagement.tsx`
+  - `tasks/collab-sync.md`
   - `apps/api-gateway/src/api/blindbox.py`
   - `apps/api-gateway/src/api/federated.py`
   - `apps/api-gateway/src/api/mobile.py`
@@ -92,6 +98,9 @@
   - `apps/web/src/App.tsx`
   - `tasks/collab-sync.md`
 - verify:
+  - `python3 -m py_compile apps/api-gateway/src/api/inventory.py`（通过）
+  - `python3 -m pytest -q apps/api-gateway/tests/test_inventory_transfer_workflow_api.py`（5 passed）
+  - `npm run build --workspace @zhilian-os/web`（失败：`MainLayout.tsx` 既有类型错误，非本次改动引入）
   - `python3 -m py_compile apps/api-gateway/src/api/mobile.py`（通过）
   - `python3 -m py_compile apps/api-gateway/src/api/blindbox.py apps/api-gateway/src/api/federated.py`（通过）
   - `python3 -m pytest -q apps/api-gateway/tests/test_mobile_api_v1_routes.py`（3 passed）

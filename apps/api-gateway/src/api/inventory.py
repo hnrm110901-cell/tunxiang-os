@@ -11,10 +11,13 @@ from ..core.database import get_db
 from ..core.dependencies import get_current_active_user, require_role
 from ..models.inventory import InventoryItem, InventoryStatus, TransactionType, InventoryTransaction
 from ..models.user import User, UserRole
+from ..models.decision_log import DecisionLog, DecisionType, DecisionStatus
 from ..repositories import InventoryRepository
 from ..services.redis_cache_service import RedisCacheService
+from ..services.approval_service import approval_service
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, desc
+from ..core.clock import now_utc, utcnow_naive
 
 logger = structlog.get_logger()
 router = APIRouter()
@@ -419,3 +422,278 @@ async def batch_restock(
     await session.commit()
     logger.info("batch_restock_completed", store_id=store_id, count=len(restocked))
     return {"restocked": len(restocked), "items": restocked}
+
+
+class TransferRequestBody(BaseModel):
+    source_item_id: str
+    target_store_id: str
+    quantity: float
+    target_item_id: Optional[str] = None
+    reason: Optional[str] = None
+
+
+class TransferApprovalBody(BaseModel):
+    manager_feedback: Optional[str] = None
+
+
+class TransferRejectBody(BaseModel):
+    manager_feedback: str
+
+
+@router.post("/inventory/transfer-request", status_code=201)
+async def create_transfer_request(
+    req: TransferRequestBody,
+    store_id: str = Query(..., description="来源门店ID"),
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """创建跨店调货审批请求。"""
+    if req.quantity <= 0:
+        raise HTTPException(status_code=400, detail="调货数量必须大于0")
+    if req.target_store_id == store_id:
+        raise HTTPException(status_code=400, detail="目标门店不能与来源门店相同")
+
+    source_result = await session.execute(
+        select(InventoryItem).where(
+            InventoryItem.id == req.source_item_id,
+            InventoryItem.store_id == store_id,
+        )
+    )
+    source_item = source_result.scalar_one_or_none()
+    if not source_item:
+        raise HTTPException(status_code=404, detail="来源库存项不存在")
+    if source_item.current_quantity < req.quantity:
+        raise HTTPException(status_code=400, detail="来源门店库存不足")
+
+    target_item = None
+    if req.target_item_id:
+        target_result = await session.execute(
+            select(InventoryItem).where(
+                InventoryItem.id == req.target_item_id,
+                InventoryItem.store_id == req.target_store_id,
+            )
+        )
+        target_item = target_result.scalar_one_or_none()
+    else:
+        target_result = await session.execute(
+            select(InventoryItem).where(
+                InventoryItem.store_id == req.target_store_id,
+                InventoryItem.name == source_item.name,
+            )
+        )
+        target_item = target_result.scalar_one_or_none()
+
+    if not target_item:
+        raise HTTPException(status_code=404, detail="目标门店匹配库存项不存在")
+
+    transfer_payload = {
+        "workflow": "inventory_transfer",
+        "source_store_id": store_id,
+        "target_store_id": req.target_store_id,
+        "source_item_id": source_item.id,
+        "target_item_id": target_item.id,
+        "item_name": source_item.name,
+        "unit": source_item.unit,
+        "quantity": req.quantity,
+        "reason": req.reason or "跨店调货",
+        "requested_by": str(current_user.id),
+    }
+
+    decision = await approval_service.create_approval_request(
+        decision_type=DecisionType.PURCHASE_SUGGESTION,
+        agent_type="inventory_agent",
+        agent_method="create_transfer_request",
+        store_id=store_id,
+        ai_suggestion=transfer_payload,
+        ai_confidence=0.82,
+        ai_reasoning=f"来源门店库存充足，建议向 {req.target_store_id} 调拨 {req.quantity} {source_item.unit or ''}",
+        context_data={"workflow": "inventory_transfer"},
+        db=session,
+    )
+
+    return {
+        "decision_id": decision.id,
+        "status": "pending_approval",
+        "transfer": transfer_payload,
+    }
+
+
+@router.get("/inventory/transfer-requests")
+async def list_transfer_requests(
+    store_id: Optional[str] = Query(None, description="筛选门店（来源或目标）"),
+    status: Optional[str] = Query(None, description="pending/approved/rejected/executed"),
+    limit: int = Query(50, ge=1, le=200),
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """查询跨店调货审批请求。"""
+    stmt = (
+        select(DecisionLog)
+        .where(
+            DecisionLog.decision_type == DecisionType.PURCHASE_SUGGESTION,
+            DecisionLog.agent_type == "inventory_agent",
+            DecisionLog.agent_method == "create_transfer_request",
+        )
+        .order_by(desc(DecisionLog.created_at))
+        .limit(limit)
+    )
+    rows = (await session.execute(stmt)).scalars().all()
+
+    items = []
+    for row in rows:
+        suggestion = row.ai_suggestion or {}
+        if store_id and not (row.store_id == store_id or suggestion.get("target_store_id") == store_id):
+            continue
+        status_value = row.decision_status.value if hasattr(row.decision_status, "value") else str(row.decision_status)
+        if status and status_value != status:
+            continue
+        items.append({
+            "decision_id": row.id,
+            "status": status_value,
+            "source_store_id": suggestion.get("source_store_id", row.store_id),
+            "target_store_id": suggestion.get("target_store_id"),
+            "source_item_id": suggestion.get("source_item_id"),
+            "target_item_id": suggestion.get("target_item_id"),
+            "item_name": suggestion.get("item_name"),
+            "quantity": suggestion.get("quantity"),
+            "unit": suggestion.get("unit"),
+            "reason": suggestion.get("reason"),
+            "manager_feedback": row.manager_feedback,
+            "created_at": row.created_at.isoformat() if row.created_at else None,
+            "approved_at": row.approved_at.isoformat() if row.approved_at else None,
+            "executed_at": row.executed_at.isoformat() if row.executed_at else None,
+        })
+
+    return {"total": len(items), "items": items}
+
+
+@router.post("/inventory/transfer-requests/{decision_id}/approve")
+async def approve_transfer_request(
+    decision_id: str,
+    req: TransferApprovalBody,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """批准并执行跨店调货。"""
+    result = await session.execute(
+        select(DecisionLog).where(
+            DecisionLog.id == decision_id,
+            DecisionLog.decision_type == DecisionType.PURCHASE_SUGGESTION,
+            DecisionLog.agent_type == "inventory_agent",
+            DecisionLog.agent_method == "create_transfer_request",
+        )
+    )
+    decision = result.scalar_one_or_none()
+    if not decision:
+        raise HTTPException(status_code=404, detail="调货申请不存在")
+
+    status_value = decision.decision_status.value if hasattr(decision.decision_status, "value") else str(decision.decision_status)
+    if status_value not in {DecisionStatus.PENDING.value, "pending"}:
+        raise HTTPException(status_code=400, detail="仅待审批的调货申请可批准")
+
+    suggestion = decision.ai_suggestion or {}
+    source_item_id = suggestion.get("source_item_id")
+    target_item_id = suggestion.get("target_item_id")
+    quantity = float(suggestion.get("quantity") or 0)
+    if not source_item_id or not target_item_id or quantity <= 0:
+        raise HTTPException(status_code=400, detail="调货申请数据不完整")
+
+    source_item = (await session.execute(select(InventoryItem).where(InventoryItem.id == source_item_id))).scalar_one_or_none()
+    target_item = (await session.execute(select(InventoryItem).where(InventoryItem.id == target_item_id))).scalar_one_or_none()
+    if not source_item or not target_item:
+        raise HTTPException(status_code=404, detail="调货库存项不存在")
+    if source_item.current_quantity < quantity:
+        raise HTTPException(status_code=400, detail="来源门店库存不足，无法执行调货")
+
+    source_before = source_item.current_quantity
+    target_before = target_item.current_quantity
+    source_item.current_quantity = source_before - quantity
+    target_item.current_quantity = target_before + quantity
+
+    source_txn = InventoryTransaction(
+        item_id=source_item.id,
+        store_id=source_item.store_id,
+        transaction_type=TransactionType.TRANSFER,
+        quantity=-quantity,
+        quantity_before=source_before,
+        quantity_after=source_item.current_quantity,
+        notes=f"跨店调出，审批单 {decision_id}",
+        performed_by=str(current_user.id),
+    )
+    target_txn = InventoryTransaction(
+        item_id=target_item.id,
+        store_id=target_item.store_id,
+        transaction_type=TransactionType.TRANSFER,
+        quantity=quantity,
+        quantity_before=target_before,
+        quantity_after=target_item.current_quantity,
+        notes=f"跨店调入，审批单 {decision_id}",
+        performed_by=str(current_user.id),
+    )
+    session.add(source_txn)
+    session.add(target_txn)
+
+    decision.decision_status = DecisionStatus.EXECUTED
+    decision.manager_id = str(current_user.id)
+    decision.manager_feedback = req.manager_feedback
+    decision.manager_decision = {"action": "approve_transfer", "quantity": quantity}
+    decision.approved_at = utcnow_naive()
+    decision.executed_at = utcnow_naive()
+    chain = decision.approval_chain or []
+    chain.append({
+        "action": "approved_transfer",
+        "manager_id": str(current_user.id),
+        "timestamp": now_utc().isoformat(),
+        "feedback": req.manager_feedback,
+    })
+    decision.approval_chain = chain
+
+    await session.commit()
+    return {
+        "success": True,
+        "decision_id": decision_id,
+        "status": DecisionStatus.EXECUTED.value,
+        "source_new_quantity": source_item.current_quantity,
+        "target_new_quantity": target_item.current_quantity,
+    }
+
+
+@router.post("/inventory/transfer-requests/{decision_id}/reject")
+async def reject_transfer_request(
+    decision_id: str,
+    req: TransferRejectBody,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """拒绝跨店调货申请。"""
+    result = await session.execute(
+        select(DecisionLog).where(
+            DecisionLog.id == decision_id,
+            DecisionLog.decision_type == DecisionType.PURCHASE_SUGGESTION,
+            DecisionLog.agent_type == "inventory_agent",
+            DecisionLog.agent_method == "create_transfer_request",
+        )
+    )
+    decision = result.scalar_one_or_none()
+    if not decision:
+        raise HTTPException(status_code=404, detail="调货申请不存在")
+
+    status_value = decision.decision_status.value if hasattr(decision.decision_status, "value") else str(decision.decision_status)
+    if status_value not in {DecisionStatus.PENDING.value, "pending"}:
+        raise HTTPException(status_code=400, detail="仅待审批的调货申请可拒绝")
+
+    decision.decision_status = DecisionStatus.REJECTED
+    decision.manager_id = str(current_user.id)
+    decision.manager_feedback = req.manager_feedback
+    decision.approved_at = utcnow_naive()
+    chain = decision.approval_chain or []
+    chain.append({
+        "action": "rejected_transfer",
+        "manager_id": str(current_user.id),
+        "timestamp": now_utc().isoformat(),
+        "feedback": req.manager_feedback,
+    })
+    decision.approval_chain = chain
+
+    await session.commit()
+    return {"success": True, "decision_id": decision_id, "status": DecisionStatus.REJECTED.value}
