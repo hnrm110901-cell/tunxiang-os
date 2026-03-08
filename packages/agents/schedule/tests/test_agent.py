@@ -65,6 +65,7 @@ def initial_state(sample_employees):
         requirements={},
         schedule=[],
         labor_cost_summary={},
+        satisfaction_summary={},
         auto_scheduling_actions=[],
         optimization_suggestions=[],
         errors=[],
@@ -208,6 +209,7 @@ class TestScheduleAgent:
             requirements={"morning": {"waiter": 1}},
             schedule=[],
             labor_cost_summary={},
+            satisfaction_summary={},
             auto_scheduling_actions=[],
             optimization_suggestions=[],
             errors=[],
@@ -243,6 +245,7 @@ class TestScheduleAgent:
         assert "traffic_prediction" in result
         assert "requirements" in result
         assert "labor_cost_summary" in result
+        assert "satisfaction_summary" in result
         assert "auto_scheduling_actions" in result
         assert "suggestions" in result
 
@@ -567,6 +570,54 @@ class TestPredictiveAdjustments:
         assert len(result["predictive_adjustments"]) >= 2
         assert any(a["type"] == "increase_staff" for a in result["predictive_adjustments"])
         assert any(a["type"] == "decrease_staff" for a in result["predictive_adjustments"])
+
+
+class TestEmployeeSatisfaction:
+    """员工满意度优化测试"""
+
+    @pytest.mark.asyncio
+    async def test_evaluate_employee_satisfaction(self, agent):
+        employees = [
+            {"id": "E1", "name": "张三", "skills": ["waiter"], "preferences": {"preferred_shifts": ["morning"]}},
+            {"id": "E2", "name": "李四", "skills": ["chef"], "preferences": {"preferred_shifts": ["evening"]}},
+        ]
+        schedule = [
+            {
+                "employee_id": "E1",
+                "employee_name": "张三",
+                "skill": "waiter",
+                "shift": "morning",
+                "date": "2024-01-15",
+                "start_time": "06:00",
+                "end_time": "14:00",
+            },
+            {
+                "employee_id": "E2",
+                "employee_name": "李四",
+                "skill": "chef",
+                "shift": "morning",
+                "date": "2024-01-15",
+                "start_time": "06:00",
+                "end_time": "14:00",
+            },
+        ]
+        result = await agent.evaluate_employee_satisfaction(schedule=schedule, employees=employees)
+        assert "average_score" in result
+        assert len(result["employee_scores"]) == 2
+
+    @pytest.mark.asyncio
+    async def test_low_satisfaction_triggers_action(self, agent):
+        employees = [
+            {
+                "id": "E1",
+                "name": "张三",
+                "skills": ["waiter"],
+                "preferences": {"preferred_shifts": ["evening"]},
+            }
+        ]
+        result = await agent.run(store_id="STORE001", date="2024-01-15", employees=employees)
+        assert result["success"] is True
+        assert any(a["type"] == "satisfaction_improvement" for a in result["auto_scheduling_actions"])
 
 
 class TestEnums:

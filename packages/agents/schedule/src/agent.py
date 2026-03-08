@@ -45,6 +45,7 @@ class ScheduleState(TypedDict):
     requirements: Dict[str, int]
     schedule: List[Dict[str, Any]]
     labor_cost_summary: Dict[str, Any]
+    satisfaction_summary: Dict[str, Any]
     auto_scheduling_actions: List[Dict[str, Any]]
     optimization_suggestions: List[str]
     errors: List[str]
@@ -175,7 +176,14 @@ class ScheduleAgent(BaseAgent):
         }
 
     def get_supported_actions(self) -> List[str]:
-        return ["run", "plan_multi_store_schedule", "predict_schedule_adjustments", "adjust_schedule", "get_schedule"]
+        return [
+            "run",
+            "plan_multi_store_schedule",
+            "predict_schedule_adjustments",
+            "evaluate_employee_satisfaction",
+            "adjust_schedule",
+            "get_schedule",
+        ]
 
     async def execute(self, action: str, params: Dict[str, Any]) -> AgentResponse:
         try:
@@ -197,6 +205,11 @@ class ScheduleAgent(BaseAgent):
                     current_requirements=params.get("current_requirements", {}),
                     predicted_customers=params["predicted_customers"],
                     baseline_customers=params.get("baseline_customers", {}),
+                )
+            elif action == "evaluate_employee_satisfaction":
+                result = await self.evaluate_employee_satisfaction(
+                    schedule=params["schedule"],
+                    employees=params["employees"],
                 )
             elif action == "adjust_schedule":
                 result = await self.adjust_schedule(
@@ -382,13 +395,21 @@ class ScheduleAgent(BaseAgent):
         labor_cost_summary["overrun_amount"] = round(
             max(0.0, labor_cost_summary["estimated_total_cost"] - target_labor_cost), 2
         )
+        satisfaction_summary = await self.evaluate_employee_satisfaction(
+            schedule=schedule,
+            employees=state.get("employees", []),
+        )
+        if satisfaction_summary.get("average_score", 1.0) < 0.6:
+            suggestions.append("员工满意度偏低，建议优先分配偏好班次并平衡高工时员工")
 
         state["labor_cost_summary"] = labor_cost_summary
+        state["satisfaction_summary"] = satisfaction_summary
         state["auto_scheduling_actions"] = self._build_auto_scheduling_actions(
             requirements=requirements,
             schedule=schedule,
             labor_cost_summary=labor_cost_summary,
             traffic_data=state.get("traffic_data", {}),
+            satisfaction_summary=satisfaction_summary,
         )
         state["optimization_suggestions"] = suggestions
         logger.info("排班优化完成", suggestions_count=len(suggestions))
@@ -462,6 +483,7 @@ class ScheduleAgent(BaseAgent):
         schedule: List[Dict[str, Any]],
         labor_cost_summary: Dict[str, Any],
         traffic_data: Dict[str, Any],
+        satisfaction_summary: Optional[Dict[str, Any]] = None,
     ) -> List[Dict[str, Any]]:
         """输出结构化自动排班建议，供前端/编排器直接消费。"""
         actions: List[Dict[str, Any]] = []
@@ -495,6 +517,23 @@ class ScheduleAgent(BaseAgent):
                 }
             )
 
+        if satisfaction_summary and satisfaction_summary.get("average_score", 1.0) < 0.6:
+            actions.append(
+                {
+                    "priority": "medium",
+                    "type": "satisfaction_improvement",
+                    "title": "员工满意度优化",
+                    "action": "rebalance_shift_preferences",
+                    "payload": {
+                        "average_score": satisfaction_summary.get("average_score"),
+                        "low_score_employee_ids": [
+                            item.get("employee_id")
+                            for item in satisfaction_summary.get("low_score_employees", [])
+                        ],
+                    },
+                }
+            )
+
         predicted_customers = traffic_data.get("predicted_customers", {})
         if isinstance(predicted_customers, dict):
             evening = int(predicted_customers.get("evening", 0))
@@ -511,6 +550,42 @@ class ScheduleAgent(BaseAgent):
                 )
 
         return actions
+
+    async def evaluate_employee_satisfaction(
+        self,
+        schedule: List[Dict[str, Any]],
+        employees: List[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        """
+        员工满意度评分（0-1）：
+        - 偏好班次命中率
+        - 工时疲劳惩罚（>8h）
+        """
+        employee_map = {e.get("id"): e for e in employees}
+        details: List[Dict[str, Any]] = []
+        for emp_id, emp in employee_map.items():
+            shifts = [s for s in schedule if s.get("employee_id") == emp_id]
+            if not shifts:
+                details.append({"employee_id": emp_id, "score": 0.7, "reason": "未排班"})
+                continue
+
+            preferred = set((emp.get("preferences") or {}).get("preferred_shifts", []))
+            preferred_hits = sum(1 for s in shifts if s.get("shift") in preferred) if preferred else len(shifts)
+            preference_score = preferred_hits / max(1, len(shifts))
+
+            total_hours = sum(self._calculate_shift_hours(s["start_time"], s["end_time"]) for s in shifts)
+            fatigue_penalty = min(0.4, max(0.0, total_hours - 8.0) / 20.0)
+
+            score = max(0.0, min(1.0, preference_score - fatigue_penalty))
+            details.append({"employee_id": emp_id, "score": round(score, 3), "total_hours": total_hours})
+
+        average = round(sum(d["score"] for d in details) / max(1, len(details)), 3)
+        low_score = [d for d in details if d["score"] < 0.5]
+        return {
+            "average_score": average,
+            "employee_scores": details,
+            "low_score_employees": low_score,
+        }
 
     async def run(
         self,
@@ -536,6 +611,7 @@ class ScheduleAgent(BaseAgent):
             "requirements": {},
             "schedule": [],
             "labor_cost_summary": {},
+            "satisfaction_summary": {},
             "auto_scheduling_actions": [],
             "optimization_suggestions": [],
             "errors": [],
@@ -558,6 +634,7 @@ class ScheduleAgent(BaseAgent):
                 "traffic_prediction": state["traffic_data"],
                 "requirements": state["requirements"],
                 "labor_cost_summary": state["labor_cost_summary"],
+                "satisfaction_summary": state["satisfaction_summary"],
                 "auto_scheduling_actions": state["auto_scheduling_actions"],
                 "suggestions": state["optimization_suggestions"],
             }
