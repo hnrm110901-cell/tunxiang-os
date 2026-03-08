@@ -137,6 +137,32 @@ class FCTCashFlowItem(Base, TimestampMixin):
     )
 
 
+class FCTBudgetControl(Base, TimestampMixin):
+    """预算控制配置（enforce_check / auto_occupy）。"""
+
+    __tablename__ = "fct_budget_control"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id = Column(String(64), nullable=False, index=True)
+    entity_id = Column(String(64), nullable=False, default="", index=True)
+    budget_type = Column(String(16), nullable=False, index=True)
+    category = Column(String(64), nullable=False, default="", index=True)
+    enforce_check = Column(String(8), nullable=False, default="false")
+    auto_occupy = Column(String(8), nullable=False, default="false")
+    extra = Column(JSON)
+
+    __table_args__ = (
+        Index(
+            "ix_fct_budget_control_tenant_entity_type_cat",
+            "tenant_id",
+            "entity_id",
+            "budget_type",
+            "category",
+            unique=True,
+        ),
+    )
+
+
 # ── 会计凭证（双分录）───────────────────────────────────────────────────────
 
 class Voucher(Base, TimestampMixin):

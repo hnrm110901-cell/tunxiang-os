@@ -1214,6 +1214,20 @@ class TestBudgetCompatibility:
     async def test_list_budget_controls_accepts_budget_type_filter(self):
         svc = StandaloneFCTService()
         db = _mock_db()
+        count_result = MagicMock()
+        count_result.scalar.return_value = 1
+        row = MagicMock()
+        row.id = "CTL-1"
+        row.tenant_id = "T1"
+        row.entity_id = "S001"
+        row.budget_type = "monthly"
+        row.category = "food_cost"
+        row.enforce_check = "true"
+        row.auto_occupy = "false"
+        row.extra = {"source": "test"}
+        list_result = MagicMock()
+        list_result.scalars.return_value.all.return_value = [row]
+        db.execute = AsyncMock(side_effect=[count_result, list_result])
         result = await svc.list_budget_controls(
             db,
             tenant_id="T1",
@@ -1227,6 +1241,9 @@ class TestBudgetCompatibility:
         assert result["budget_type"] == "monthly"
         assert result["skip"] == 2
         assert result["limit"] == 8
+        assert result["total"] == 1
+        assert result["items"][0]["enforce_check"] is True
+        assert result["items"][0]["auto_occupy"] is False
 
     @pytest.mark.asyncio
     async def test_upsert_budget_inserts_when_missing(self):
@@ -1272,6 +1289,28 @@ class TestBudgetCompatibility:
         assert result["budget_id"] == "BUD-1"
         assert existing.budgeted_amount == 4500
         db.add.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_upsert_budget_control_insert_and_bool_normalization(self):
+        svc = StandaloneFCTService()
+        db = _mock_db()
+        empty_result = MagicMock()
+        empty_result.scalars.return_value.first.return_value = None
+        db.execute = AsyncMock(return_value=empty_result)
+        result = await svc.upsert_budget_control(
+            db,
+            tenant_id="T1",
+            entity_id="S001",
+            budget_type="monthly",
+            category="food_cost",
+            enforce_check=True,
+            auto_occupy="yes",
+            extra={"policy": "strict"},
+        )
+        assert result["success"] is True
+        assert result["enforce_check"] is True
+        assert result["auto_occupy"] is True
+        assert db.add.call_count == 1
 
 
 # ── get_report_trend ─────────────────────────────────────────────────────────

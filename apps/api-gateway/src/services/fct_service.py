@@ -31,7 +31,14 @@ from sqlalchemy.orm import selectinload
 
 from src.models.finance import FinancialTransaction, Budget
 from src.models.reconciliation import ReconciliationRecord, ReconciliationStatus
-from src.models.fct import FCTTaxRecord, FCTCashFlowItem, TaxpayerType, Voucher, VoucherLine
+from src.models.fct import (
+    FCTTaxRecord,
+    FCTCashFlowItem,
+    FCTBudgetControl,
+    TaxpayerType,
+    Voucher,
+    VoucherLine,
+)
 from src.models.store import Store
 
 logger = structlog.get_logger()
@@ -1111,6 +1118,14 @@ class StandaloneFCTService:
         return round((fen or 0) / 100, 2)
 
     @staticmethod
+    def _as_flag(value: Any) -> str:
+        return "true" if str(value).strip().lower() in {"1", "true", "yes", "on"} else "false"
+
+    @staticmethod
+    def _flag_to_bool(value: Any) -> bool:
+        return str(value).strip().lower() in {"1", "true", "yes", "on"}
+
+    @staticmethod
     def _shift_month(dt: date, months: int) -> date:
         total = (dt.year * 12 + (dt.month - 1)) + months
         year = total // 12
@@ -1984,7 +1999,53 @@ class StandaloneFCTService:
     async def upsert_budget_control(
         self, session: AsyncSession, **kwargs
     ) -> Dict[str, Any]:
-        return {"success": True, **kwargs}
+        tenant_id = str(kwargs.get("tenant_id") or "")
+        entity_id = str(kwargs.get("entity_id") or "")
+        budget_type = str(kwargs.get("budget_type") or "period")
+        category = str(kwargs.get("category") or "")
+        enforce_flag = self._as_flag(kwargs.get("enforce_check", False))
+        auto_flag = self._as_flag(kwargs.get("auto_occupy", False))
+        extra = kwargs.get("extra")
+
+        stmt = select(FCTBudgetControl).where(
+            and_(
+                FCTBudgetControl.tenant_id == tenant_id,
+                FCTBudgetControl.entity_id == entity_id,
+                FCTBudgetControl.budget_type == budget_type,
+                FCTBudgetControl.category == category,
+            )
+        )
+        existing = (await session.execute(stmt)).scalars().first()
+        if existing:
+            existing.enforce_check = enforce_flag
+            existing.auto_occupy = auto_flag
+            existing.extra = extra
+            control_id = str(existing.id)
+        else:
+            row = FCTBudgetControl(
+                tenant_id=tenant_id,
+                entity_id=entity_id,
+                budget_type=budget_type,
+                category=category,
+                enforce_check=enforce_flag,
+                auto_occupy=auto_flag,
+                extra=extra,
+            )
+            session.add(row)
+            control_id = str(row.id) if getattr(row, "id", None) else ""
+        await session.flush()
+
+        return {
+            "success": True,
+            "id": control_id,
+            "tenant_id": tenant_id,
+            "entity_id": entity_id,
+            "budget_type": budget_type,
+            "category": category,
+            "enforce_check": self._flag_to_bool(enforce_flag),
+            "auto_occupy": self._flag_to_bool(auto_flag),
+            "extra": extra,
+        }
 
     async def list_budget_controls(
         self,
@@ -1995,9 +2056,39 @@ class StandaloneFCTService:
         skip: int = 0,
         limit: int = 100,
     ) -> Dict[str, Any]:
+        filters = [FCTBudgetControl.tenant_id == tenant_id]
+        if entity_id is not None:
+            filters.append(FCTBudgetControl.entity_id == entity_id)
+        if budget_type:
+            filters.append(FCTBudgetControl.budget_type == budget_type)
+
+        total_stmt = select(func.count(FCTBudgetControl.id)).where(and_(*filters))
+        total = int((await session.execute(total_stmt)).scalar() or 0)
+
+        list_stmt = (
+            select(FCTBudgetControl)
+            .where(and_(*filters))
+            .order_by(FCTBudgetControl.updated_at.desc())
+            .offset(skip)
+            .limit(limit)
+        )
+        rows = (await session.execute(list_stmt)).scalars().all()
+        items = [
+            {
+                "id": str(r.id),
+                "tenant_id": r.tenant_id,
+                "entity_id": r.entity_id,
+                "budget_type": r.budget_type,
+                "category": r.category,
+                "enforce_check": self._flag_to_bool(r.enforce_check),
+                "auto_occupy": self._flag_to_bool(r.auto_occupy),
+                "extra": r.extra,
+            }
+            for r in rows
+        ]
         return {
-            "items": [],
-            "total": 0,
+            "items": items,
+            "total": total,
             "skip": skip,
             "limit": limit,
             "tenant_id": tenant_id,
