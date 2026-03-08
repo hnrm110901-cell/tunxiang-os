@@ -103,7 +103,7 @@ class OrderAgent(BaseAgent):
     def get_supported_actions(self) -> List[str]:
         return [
             "create_reservation", "join_queue", "get_queue_status",
-            "create_order", "add_dish", "recommend_dishes",
+            "create_order", "add_dish", "calculate_dynamic_price", "recommend_dishes",
             "calculate_bill", "process_payment", "get_order",
             "modify_order", "merge_table_orders", "update_order_status", "cancel_order",
         ]
@@ -166,6 +166,8 @@ class OrderAgent(BaseAgent):
                 result = await self.create_order(**params)
             elif action == "add_dish":
                 result = await self.add_dish(**params)
+            elif action == "calculate_dynamic_price":
+                result = await self.calculate_dynamic_price(**params)
             elif action == "recommend_dishes":
                 result = await self.recommend_dishes(**params)
             elif action == "calculate_bill":
@@ -435,6 +437,65 @@ class OrderAgent(BaseAgent):
             "subtotal": price * quantity,
         }
         return {"success": True, "message": f"已添加{quantity}份{dish_name}", "dish_item": dish_item}
+
+    async def calculate_dynamic_price(
+        self,
+        dish_id: str,
+        base_price: float,
+        demand_level: str = "normal",
+        party_size: int = 2,
+        request_time: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        动态定价策略（MVP）：
+        - 需求等级：low / normal / high
+        - 大客群：>=6人小幅上浮
+        - 高峰时段：11:30-13:30、18:00-20:30 小幅上浮
+        """
+        if base_price <= 0:
+            return {"success": False, "message": "基础价格必须大于0"}
+
+        demand_factor_map = {
+            "low": float(os.getenv("ORDER_PRICING_FACTOR_LOW", "0.95")),
+            "normal": float(os.getenv("ORDER_PRICING_FACTOR_NORMAL", "1.00")),
+            "high": float(os.getenv("ORDER_PRICING_FACTOR_HIGH", "1.08")),
+        }
+        demand_factor = demand_factor_map.get(demand_level, demand_factor_map["normal"])
+
+        group_factor = float(os.getenv("ORDER_PRICING_GROUP_FACTOR", "1.03")) if party_size >= 6 else 1.0
+
+        peak_factor = 1.0
+        peak_hit = False
+        if request_time:
+            try:
+                dt = datetime.fromisoformat(request_time)
+                hhmm = dt.hour * 60 + dt.minute
+                lunch_peak = 11 * 60 + 30 <= hhmm <= 13 * 60 + 30
+                dinner_peak = 18 * 60 <= hhmm <= 20 * 60 + 30
+                if lunch_peak or dinner_peak:
+                    peak_factor = float(os.getenv("ORDER_PRICING_PEAK_FACTOR", "1.05"))
+                    peak_hit = True
+            except ValueError:
+                peak_factor = 1.0
+
+        total_factor = demand_factor * group_factor * peak_factor
+        suggested_price = round(base_price * total_factor, 2)
+
+        return {
+            "success": True,
+            "dish_id": dish_id,
+            "base_price": round(base_price, 2),
+            "suggested_price": suggested_price,
+            "adjustment_rate": round(total_factor - 1.0, 4),
+            "factors": {
+                "demand_level": demand_level,
+                "demand_factor": demand_factor,
+                "group_factor": group_factor,
+                "peak_factor": peak_factor,
+                "peak_hit": peak_hit,
+            },
+            "message": "动态定价计算完成",
+        }
 
     async def modify_order(
         self,

@@ -202,6 +202,31 @@ class TestOrdering:
         assert result["dish_item"]["special_instructions"] == "少辣"
 
     @pytest.mark.asyncio
+    async def test_calculate_dynamic_price_peak_high_demand(self, agent):
+        """测试动态定价：高需求+高峰+大客群"""
+        result = await agent.calculate_dynamic_price(
+            dish_id="D001",
+            base_price=100.0,
+            demand_level="high",
+            party_size=8,
+            request_time="2024-01-20 18:30",
+        )
+        assert result["success"] is True
+        assert result["suggested_price"] > 100.0
+        assert result["factors"]["peak_hit"] is True
+
+    @pytest.mark.asyncio
+    async def test_calculate_dynamic_price_invalid_base_price(self, agent):
+        """测试动态定价：非法基础价格"""
+        result = await agent.calculate_dynamic_price(
+            dish_id="D001",
+            base_price=0,
+            demand_level="normal",
+        )
+        assert result["success"] is False
+        assert "基础价格必须大于0" in result["message"]
+
+    @pytest.mark.asyncio
     async def test_recommend_dishes(self, agent):
         """测试推荐菜品"""
         result = await agent.recommend_dishes(
