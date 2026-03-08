@@ -3,7 +3,7 @@ import dayjs from 'dayjs';
 import { ClockCircleOutlined } from '@ant-design/icons';
 import { ZBadge, ZButton, ZCard, ZEmpty, ZModal, ZSkeleton } from '../../design-system/components';
 import { startTask, submitTask } from '../../services/mobile.mutation.service';
-import { queryTaskSummary } from '../../services/mobile.query.service';
+import { queryTaskDetail, queryTaskSummary } from '../../services/mobile.query.service';
 import type { MobileTask, TaskSummaryResponse } from '../../services/mobile.types';
 import { showError, showSuccess, handleApiError } from '../../utils/message';
 import styles from './Tasks.module.css';
@@ -33,6 +33,7 @@ export default function SmTasks() {
   const [filter, setFilter] = useState<TaskFilter>('todo');
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const [selectedTask, setSelectedTask] = useState<MobileTask | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
   const [evidenceNote, setEvidenceNote] = useState('');
   const [evidenceFileName, setEvidenceFileName] = useState('');
 
@@ -70,11 +71,11 @@ export default function SmTasks() {
   };
 
   const doSubmit = async (item: MobileTask) => {
-    if (item.need_evidence && !evidenceNote.trim() && !evidenceFileName) {
-      return showError('该任务要求证据，请填写说明或上传图片');
-    }
     setActionLoadingId(item.task_id);
-    const result = await submitTask(item.task_id);
+    const result = await submitTask(item.task_id, {
+      evidence_note: evidenceNote,
+      evidence_files: evidenceFileName ? [evidenceFileName] : [],
+    });
     setActionLoadingId(null);
     if (!result.ok) return showError(result.message);
     showSuccess(result.message);
@@ -85,7 +86,11 @@ export default function SmTasks() {
   };
 
   const openDetail = (item: MobileTask) => {
-    setSelectedTask(item);
+    setDetailLoading(true);
+    queryTaskDetail(item.task_id)
+      .then((detail) => setSelectedTask(detail))
+      .catch((err) => handleApiError(err, '加载任务详情失败'))
+      .finally(() => setDetailLoading(false));
     setEvidenceNote('');
     setEvidenceFileName('');
   };
@@ -159,13 +164,21 @@ export default function SmTasks() {
           ) : null
         }
       >
-        {selectedTask && (
+        {detailLoading ? (
+          <ZSkeleton rows={4} />
+        ) : selectedTask && (
           <div className={styles.modalBody}>
             <div className={styles.detailRow}><span>任务</span><b>{selectedTask.task_title}</b></div>
             <div className={styles.detailRow}><span>状态</span><b>{STATUS_TEXT[selectedTask.task_status] || selectedTask.task_status}</b></div>
             <div className={styles.detailRow}><span>截止</span><b>{dayjs(selectedTask.deadline_at).format('MM-DD HH:mm')}</b></div>
             <div className={styles.detailRow}><span>类型</span><b>{selectedTask.task_type}</b></div>
             <div className={styles.detailRow}><span>证据要求</span><b>{selectedTask.need_evidence ? '必须' : '可选'}</b></div>
+            {selectedTask.task_description && (
+              <div className={styles.detailDesc}>{selectedTask.task_description}</div>
+            )}
+            {selectedTask.reject_reason && (
+              <div className={styles.rejectReason}>驳回原因：{selectedTask.reject_reason}</div>
+            )}
             <div className={styles.evidenceBlock}>
               <div className={styles.evidenceTitle}>证据上传占位</div>
               <textarea

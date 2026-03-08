@@ -1,6 +1,6 @@
 import { apiClient } from './api';
-import { getMockHomeSummary, getMockShiftSummary, getMockTaskSummary } from './mobile.mock';
-import type { MobileHomeSummaryResponse, ShiftSummaryResponse, TaskSummaryResponse } from './mobile.types';
+import { getMockHomeSummary, getMockShiftSummary, getMockTaskDetail, getMockTaskSummary } from './mobile.mock';
+import type { MobileHomeSummaryResponse, MobileTask, ShiftSummaryResponse, TaskSummaryResponse } from './mobile.types';
 
 const STORE_ID = localStorage.getItem('store_id') || 'STORE001';
 
@@ -34,5 +34,16 @@ export async function queryTaskSummary(): Promise<TaskSummaryResponse> {
     return resp;
   } catch {
     return getMockTaskSummary();
+  }
+}
+
+export async function queryTaskDetail(taskId: string): Promise<MobileTask> {
+  try {
+    const resp = await apiClient.get<MobileTask>(`/api/v1/mobile/tasks/${taskId}`);
+    return resp;
+  } catch {
+    const task = getMockTaskDetail(taskId);
+    if (!task) throw new Error('任务不存在');
+    return task;
   }
 }

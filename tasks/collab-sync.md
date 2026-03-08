@@ -14,6 +14,7 @@
   - 底部导航切换为 首页/班次/任务/告警，保留原 `business/decisions` 路由兼容
   - 状态机补齐：打卡/下班打卡、任务开始/提交均有状态转移校验与错误提示
   - 任务详情弹窗：补齐任务详情展示 + 证据上传占位 + 提交前证据校验
+  - 任务详情接口化：新增 `queryTaskDetail`，提交改为 `submitTask(payload)`（说明/文件名）
 
 ## P1
 - [x] 核心页面移动端适配补强（`WorkforcePage`、`ActionPlansPage`）
@@ -53,5 +54,5 @@
   - `apps/web/src/App.tsx`
   - `tasks/collab-sync.md`
 - verify:
-  - `pnpm --filter @zhilian-os/web exec eslint src/pages/sm/Tasks.tsx`（通过）
-- note: 已补任务详情与证据占位，下一步可对接真实上传接口
+  - `pnpm --filter @zhilian-os/web exec eslint src/services/mobile.types.ts src/services/mobile.mock.ts src/services/mobile.query.service.ts src/services/mobile.mutation.service.ts src/pages/sm/Tasks.tsx`（通过）
+- note: 已实现详情查询与 payload 提交，下一步可接真实附件上传 API

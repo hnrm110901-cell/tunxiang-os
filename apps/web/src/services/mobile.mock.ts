@@ -51,6 +51,8 @@ const initialTasks: MobileTask[] = [
     assignee_name: '李平',
     need_evidence: true,
     need_review: true,
+    task_description: '开市前完成前厅、包厢、洗手间、收银区巡检并确认设备状态。',
+    evidence_count: 0,
   },
   {
     task_id: 'task_002',
@@ -62,6 +64,8 @@ const initialTasks: MobileTask[] = [
     assignee_name: '李平',
     need_evidence: false,
     need_review: false,
+    task_description: '核对重点菜品、酱料、酒水库存是否满足午市需求。',
+    evidence_count: 0,
   },
   {
     task_id: 'task_003',
@@ -73,6 +77,9 @@ const initialTasks: MobileTask[] = [
     assignee_name: '李平',
     need_evidence: true,
     need_review: true,
+    task_description: '因上一版照片不清晰，需要补拍包厢全景与台面细节。',
+    reject_reason: '照片不清晰，请补拍包厢全景与台面细节。',
+    evidence_count: 1,
   },
   {
     task_id: 'task_004',
@@ -84,6 +91,8 @@ const initialTasks: MobileTask[] = [
     assignee_name: '李平',
     need_evidence: false,
     need_review: false,
+    task_description: '联系后厨确认催菜原因并回填处理结果。',
+    evidence_count: 0,
   },
 ];
 
@@ -184,5 +193,29 @@ export function mockSubmitTask(taskId: string): MobileActionResult {
     return { ok: false, message: `当前状态不可提交：${task.task_status}` };
   }
   task.task_status = task.need_review ? 'submitted' : 'completed';
+  return { ok: true, message: task.need_review ? '任务已提交，等待审核' : '任务已完成' };
+}
+
+export function getMockTaskDetail(taskId: string): MobileTask | null {
+  const task = mockState.tasks.find((t) => t.task_id === taskId);
+  return task ? clone(task) : null;
+}
+
+export function mockSubmitTaskWithPayload(
+  taskId: string,
+  payload?: { evidence_note?: string; evidence_files?: string[] }
+): MobileActionResult {
+  const task = mockState.tasks.find((t) => t.task_id === taskId);
+  if (!task) return { ok: false, message: '任务不存在' };
+  if (!['in_progress', 'rejected'].includes(task.task_status)) {
+    return { ok: false, message: `当前状态不可提交：${task.task_status}` };
+  }
+  const files = payload?.evidence_files || [];
+  if (task.need_evidence && !payload?.evidence_note?.trim() && files.length === 0) {
+    return { ok: false, message: '该任务要求证据，请填写说明或上传图片' };
+  }
+  task.evidence_count = (task.evidence_count || 0) + files.length;
+  task.task_status = task.need_review ? 'submitted' : 'completed';
+  task.reject_reason = undefined;
   return { ok: true, message: task.need_review ? '任务已提交，等待审核' : '任务已完成' };
 }

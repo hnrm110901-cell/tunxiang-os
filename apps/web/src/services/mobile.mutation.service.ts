@@ -1,6 +1,6 @@
 import { apiClient } from './api';
-import { mockCheckInShift, mockCheckOutShift, mockStartTask, mockSubmitTask } from './mobile.mock';
-import type { MobileActionResult } from './mobile.types';
+import { mockCheckInShift, mockCheckOutShift, mockStartTask, mockSubmitTaskWithPayload } from './mobile.mock';
+import type { MobileActionResult, TaskSubmitPayload } from './mobile.types';
 
 export async function checkInShift(shiftId: string): Promise<MobileActionResult> {
   try {
@@ -29,11 +29,11 @@ export async function startTask(taskId: string): Promise<MobileActionResult> {
   }
 }
 
-export async function submitTask(taskId: string): Promise<MobileActionResult> {
+export async function submitTask(taskId: string, payload?: TaskSubmitPayload): Promise<MobileActionResult> {
   try {
-    await apiClient.post(`/api/v1/mobile/tasks/${taskId}/submit`, {});
+    await apiClient.post(`/api/v1/mobile/tasks/${taskId}/submit`, payload || {});
     return { ok: true, message: '任务已提交' };
   } catch {
-    return mockSubmitTask(taskId);
+    return mockSubmitTaskWithPayload(taskId, payload);
   }
 }

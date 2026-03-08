@@ -27,6 +27,9 @@ export interface MobileTask {
   assignee_name: string;
   need_evidence: boolean;
   need_review: boolean;
+  task_description?: string;
+  reject_reason?: string;
+  evidence_count?: number;
 }
 
 export interface ShiftSummaryResponse {
@@ -62,4 +65,9 @@ export interface MobileHomeSummaryResponse {
 export interface MobileActionResult {
   ok: boolean;
   message: string;
+}
+
+export interface TaskSubmitPayload {
+  evidence_note?: string;
+  evidence_files?: string[];
 }
