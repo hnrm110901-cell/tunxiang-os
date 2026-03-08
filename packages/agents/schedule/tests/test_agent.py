@@ -549,6 +549,41 @@ class TestMultiStoreSchedule:
         assert len(result["store_results"]) == 2
         assert any(s["to_store_id"] == "STORE_B" for s in result["transfer_suggestions"])
 
+    @pytest.mark.asyncio
+    async def test_plan_cross_region_allocation(self, agent):
+        stores = [
+            {
+                "store_id": "STORE_A",
+                "region_id": "REGION_1",
+                "employees": [
+                    {
+                        "id": "A_E1",
+                        "name": "跨区厨师",
+                        "skills": ["chef"],
+                        "multi_store_available": True,
+                        "cross_region_available": True,
+                        "allowed_stores": ["STORE_B"],
+                        "allowed_regions": ["REGION_2"],
+                    }
+                ],
+            },
+            {
+                "store_id": "STORE_B",
+                "region_id": "REGION_2",
+                "employees": [
+                    {
+                        "id": "B_E1",
+                        "name": "收银",
+                        "skills": ["cashier"],
+                        "multi_store_available": False,
+                    }
+                ],
+            },
+        ]
+        result = await agent.plan_cross_region_allocation(date="2024-01-15", stores=stores)
+        assert result["success"] is True
+        assert any(s["to_region"] == "REGION_2" for s in result["cross_region_transfer_suggestions"])
+
 
 class TestPredictiveAdjustments:
     """预测性排班调整测试"""

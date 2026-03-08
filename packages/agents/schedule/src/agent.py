@@ -179,6 +179,7 @@ class ScheduleAgent(BaseAgent):
         return [
             "run",
             "plan_multi_store_schedule",
+            "plan_cross_region_allocation",
             "predict_schedule_adjustments",
             "evaluate_employee_satisfaction",
             "adjust_schedule",
@@ -195,6 +196,11 @@ class ScheduleAgent(BaseAgent):
                 )
             elif action == "plan_multi_store_schedule":
                 result = await self.plan_multi_store_schedule(
+                    date=params["date"],
+                    stores=params["stores"],
+                )
+            elif action == "plan_cross_region_allocation":
+                result = await self.plan_cross_region_allocation(
                     date=params["date"],
                     stores=params["stores"],
                 )
@@ -716,6 +722,56 @@ class ScheduleAgent(BaseAgent):
             "date": date,
             "store_results": per_store_results,
             "transfer_suggestions": transfer_suggestions,
+        }
+
+    async def plan_cross_region_allocation(
+        self,
+        date: str,
+        stores: List[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        """
+        跨区域人力调配：
+        - 基于多门店排班缺口
+        - 仅匹配 cross_region_available 的员工
+        - 可选受 allowed_regions 限制
+        """
+        base_plan = await self.plan_multi_store_schedule(date=date, stores=stores)
+        store_region_map = {s["store_id"]: s.get("region_id", "UNKNOWN") for s in stores}
+        cross_region_suggestions: List[Dict[str, Any]] = []
+
+        for suggestion in base_plan.get("transfer_suggestions", []):
+            from_store_id = suggestion.get("from_store_id")
+            to_store_id = suggestion.get("to_store_id")
+            from_region = store_region_map.get(from_store_id, "UNKNOWN")
+            to_region = store_region_map.get(to_store_id, "UNKNOWN")
+            if from_region == to_region:
+                continue
+
+            from_store = next((s for s in stores if s["store_id"] == from_store_id), None)
+            employee = None
+            if from_store:
+                employee = next((e for e in from_store.get("employees", []) if e.get("id") == suggestion.get("employee_id")), None)
+            if not employee or not employee.get("cross_region_available", False):
+                continue
+
+            allowed_regions = employee.get("allowed_regions")
+            if isinstance(allowed_regions, list) and to_region not in allowed_regions:
+                continue
+
+            cross_region_suggestions.append(
+                {
+                    **suggestion,
+                    "from_region": from_region,
+                    "to_region": to_region,
+                    "reason": "目标区域存在班次缺口，员工具备跨区支援条件",
+                }
+            )
+
+        return {
+            "success": True,
+            "date": date,
+            "store_results": base_plan.get("store_results", []),
+            "cross_region_transfer_suggestions": cross_region_suggestions,
         }
 
     async def predict_schedule_adjustments(
