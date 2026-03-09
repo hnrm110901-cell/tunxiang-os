@@ -5,6 +5,7 @@
  *      GET /api/v1/banquet-agent/stores/{id}/agent/followup-scan
  */
 import React, { useCallback, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import {
   ZCard, ZKpi, ZBadge, ZButton, ZSkeleton, ZEmpty,
@@ -37,6 +38,7 @@ interface LeadItem {
 }
 
 export default function SmBanquet() {
+  const navigate = useNavigate();
   const [todayCheck,      setTodayCheck]      = useState<TodayCheck | null>(null);
   const [leads,           setLeads]           = useState<LeadItem[]>([]);
   const [loadingToday,    setLoadingToday]    = useState(true);
@@ -164,13 +166,13 @@ export default function SmBanquet() {
           <div className={styles.actionRow}>
             <ZButton
               variant="ghost"
-              onClick={() => alert('查看全部线索 — 敬请期待（Phase 2）')}
+              onClick={() => navigate('/sm/banquet-leads')}
             >
               查看全部线索
             </ZButton>
             <ZButton
               variant="ghost"
-              onClick={() => alert('查看全部订单 — 敬请期待（Phase 2）')}
+              onClick={() => navigate('/sm/banquet-orders')}
             >
               查看全部订单
             </ZButton>

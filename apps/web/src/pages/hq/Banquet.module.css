@@ -125,3 +125,183 @@
   font-weight: 600;
   color: var(--text-primary);
 }
+
+/* ─── Tab 内容区 ─── */
+.tabContent {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px 0 0;
+}
+
+.tabHeader {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.calHeader {
+  display: flex;
+  justify-content: flex-start;
+  margin-bottom: 8px;
+}
+
+/* ─── 销售管道 ─── */
+.pipelineTitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.expandBtn {
+  background: none;
+  border: none;
+  font-size: 12px;
+  color: var(--accent);
+  cursor: pointer;
+  padding: 2px 0;
+}
+
+.pipelineList {
+  display: flex;
+  flex-direction: column;
+  padding-top: 8px;
+}
+
+.pipelineRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.pipelineRow:last-child { border-bottom: none; }
+
+.pipelineInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.pipelineType {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pipelineMeta {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+.pipelineAmount {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  flex-shrink: 0;
+}
+
+/* ─── 销控日历 ─── */
+.calGrid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.calWeekday {
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-secondary);
+  padding: 4px 0 8px;
+  font-weight: 500;
+}
+
+.calEmpty {
+  background: transparent;
+}
+
+.calCell {
+  min-height: 52px;
+  padding: 6px 4px 4px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  cursor: default;
+}
+
+.calAuspicious {
+  border-color: var(--yellow, #f5a623);
+  border-width: 2px;
+}
+
+.calFull {
+  background: rgba(220, 53, 69, 0.08);
+}
+
+.calDay {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.calDots {
+  display: flex;
+  gap: 3px;
+  align-items: center;
+}
+
+.dotConfirmed {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.dotLocked {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--yellow, #f5a623);
+}
+
+/* 图例 */
+.calLegend {
+  display: flex;
+  gap: 16px;
+  padding: 12px 0 4px;
+  flex-wrap: wrap;
+}
+
+.legendItem {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.legendAuspicious {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  border: 2px solid var(--yellow, #f5a623);
+}
+
+.legendFull {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  background: rgba(220, 53, 69, 0.15);
+  border: 1px solid rgba(220, 53, 69, 0.3);
+}
