@@ -84,6 +84,8 @@ interface HallRecommendResp {
   [key: string]: unknown;
 }
 
+type BanquetType = 'birthday' | 'wedding' | 'business' | 'family' | 'other';
+
 const STAGE_LABEL: Record<LeadStage, string> = {
   new: '新建',
   contacted: '已联系',
@@ -104,6 +106,14 @@ const STAGE_COLOR: Record<LeadStage, string> = {
   deposit_pending: 'magenta',
   won: 'green',
   lost: 'red',
+};
+
+const BANQUET_TYPE_LABEL: Record<BanquetType, string> = {
+  birthday: '生日宴',
+  wedding: '婚宴',
+  business: '商务宴',
+  family: '家庭聚会',
+  other: '其他',
 };
 
 const BanquetAgentPage: React.FC = () => {
@@ -130,6 +140,12 @@ const BanquetAgentPage: React.FC = () => {
   const [advanceTarget, setAdvanceTarget] = useState<LeadItem | null>(null);
   const [advanceSubmitting, setAdvanceSubmitting] = useState(false);
   const [advanceForm] = Form.useForm();
+  const [leadCreateModal, setLeadCreateModal] = useState(false);
+  const [leadCreateSubmitting, setLeadCreateSubmitting] = useState(false);
+  const [leadCreateForm] = Form.useForm();
+  const [orderCreateModal, setOrderCreateModal] = useState(false);
+  const [orderCreateSubmitting, setOrderCreateSubmitting] = useState(false);
+  const [orderCreateForm] = Form.useForm();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -232,6 +248,54 @@ const BanquetAgentPage: React.FC = () => {
     }
   }, [advanceForm, advanceTarget, load]);
 
+  const submitCreateLead = useCallback(async () => {
+    try {
+      const values = await leadCreateForm.validateFields();
+      setLeadCreateSubmitting(true);
+      await apiClient.post(`/api/v1/banquet-agent/stores/${STORE_ID}/leads`, {
+        customer_id: values.customer_id,
+        banquet_type: values.banquet_type,
+        expected_date: values.expected_date ? values.expected_date.format('YYYY-MM-DD') : undefined,
+        expected_people_count: values.expected_people_count,
+        expected_budget_yuan: values.expected_budget_yuan,
+      });
+      showSuccess('线索已创建');
+      setLeadCreateModal(false);
+      leadCreateForm.resetFields();
+      load();
+    } catch (err) {
+      handleApiError(err, '创建线索失败');
+    } finally {
+      setLeadCreateSubmitting(false);
+    }
+  }, [leadCreateForm, load]);
+
+  const submitCreateOrder = useCallback(async () => {
+    try {
+      const values = await orderCreateForm.validateFields();
+      setOrderCreateSubmitting(true);
+      await apiClient.post(`/api/v1/banquet-agent/stores/${STORE_ID}/orders`, {
+        customer_id: values.customer_id,
+        banquet_type: values.banquet_type,
+        banquet_date: values.banquet_date.format('YYYY-MM-DD'),
+        people_count: values.people_count,
+        table_count: values.table_count,
+        total_amount_yuan: values.total_amount_yuan,
+        deposit_yuan: values.deposit_yuan || 0,
+        contact_name: values.contact_name || undefined,
+        contact_phone: values.contact_phone || undefined,
+      });
+      showSuccess('订单已创建');
+      setOrderCreateModal(false);
+      orderCreateForm.resetFields();
+      load();
+    } catch (err) {
+      handleApiError(err, '创建订单失败');
+    } finally {
+      setOrderCreateSubmitting(false);
+    }
+  }, [load, orderCreateForm]);
+
   const kpis = useMemo(() => [
     { label: '本月宴会收入', value: dashboard ? `¥${Math.round(dashboard.revenue_yuan).toLocaleString()}` : '—' },
     { label: '本月毛利', value: dashboard ? `¥${Math.round(dashboard.gross_profit_yuan).toLocaleString()}` : '—' },
@@ -307,6 +371,14 @@ const BanquetAgentPage: React.FC = () => {
                   <Select.Option key={s} value={s}>{STAGE_LABEL[s]}</Select.Option>
                 ))}
               </Select>
+              <ZButton variant="primary" onClick={() => {
+                leadCreateForm.setFieldsValue({
+                  banquet_type: 'business',
+                  expected_people_count: 10,
+                  expected_budget_yuan: 10000,
+                });
+                setLeadCreateModal(true);
+              }}>新建线索</ZButton>
               <ZButton icon={<ReloadOutlined />} onClick={load}>刷新</ZButton>
             </Space>
           }
@@ -411,7 +483,24 @@ const BanquetAgentPage: React.FC = () => {
         </div>
       </div>
 
-      <ZCard title="宴会订单列表" subtitle={`共 ${orders.length} 条`}>
+      <ZCard
+        title="宴会订单列表"
+        subtitle={`共 ${orders.length} 条`}
+        extra={
+          <ZButton variant="primary" onClick={() => {
+            orderCreateForm.setFieldsValue({
+              banquet_type: 'business',
+              people_count: 10,
+              table_count: 2,
+              total_amount_yuan: 12000,
+              deposit_yuan: 2000,
+            });
+            setOrderCreateModal(true);
+          }}>
+            新建订单
+          </ZButton>
+        }
+      >
         {orders.length === 0 ? (
           <ZEmpty title="暂无订单" />
         ) : (
@@ -467,6 +556,78 @@ const BanquetAgentPage: React.FC = () => {
           </Form.Item>
           <Form.Item label="下次跟进（天）" name="next_followup_days">
             <InputNumber min={1} max={30} style={{ width: '100%' }} />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal
+        title="新建宴会线索"
+        open={leadCreateModal}
+        onCancel={() => setLeadCreateModal(false)}
+        onOk={submitCreateLead}
+        confirmLoading={leadCreateSubmitting}
+      >
+        <Form form={leadCreateForm} layout="vertical">
+          <Form.Item label="客户ID" name="customer_id" rules={[{ required: true, message: '请输入客户ID' }]}>
+            <Input placeholder="例如：customer-001" />
+          </Form.Item>
+          <Form.Item label="宴会类型" name="banquet_type" rules={[{ required: true }]}>
+            <Select>
+              {(Object.keys(BANQUET_TYPE_LABEL) as BanquetType[]).map((t) => (
+                <Select.Option key={t} value={t}>{BANQUET_TYPE_LABEL[t]}</Select.Option>
+              ))}
+            </Select>
+          </Form.Item>
+          <Form.Item label="预计日期" name="expected_date">
+            <DatePicker style={{ width: '100%' }} />
+          </Form.Item>
+          <Form.Item label="预计人数" name="expected_people_count">
+            <InputNumber min={1} style={{ width: '100%' }} />
+          </Form.Item>
+          <Form.Item label="预计预算（¥）" name="expected_budget_yuan">
+            <InputNumber min={0} style={{ width: '100%' }} />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal
+        title="新建宴会订单"
+        open={orderCreateModal}
+        onCancel={() => setOrderCreateModal(false)}
+        onOk={submitCreateOrder}
+        confirmLoading={orderCreateSubmitting}
+      >
+        <Form form={orderCreateForm} layout="vertical">
+          <Form.Item label="客户ID" name="customer_id" rules={[{ required: true, message: '请输入客户ID' }]}>
+            <Input placeholder="例如：customer-001" />
+          </Form.Item>
+          <Form.Item label="宴会类型" name="banquet_type" rules={[{ required: true }]}>
+            <Select>
+              {(Object.keys(BANQUET_TYPE_LABEL) as BanquetType[]).map((t) => (
+                <Select.Option key={t} value={t}>{BANQUET_TYPE_LABEL[t]}</Select.Option>
+              ))}
+            </Select>
+          </Form.Item>
+          <Form.Item label="宴会日期" name="banquet_date" rules={[{ required: true, message: '请选择日期' }]}>
+            <DatePicker style={{ width: '100%' }} />
+          </Form.Item>
+          <Form.Item label="人数" name="people_count" rules={[{ required: true }]}>
+            <InputNumber min={1} style={{ width: '100%' }} />
+          </Form.Item>
+          <Form.Item label="桌数" name="table_count" rules={[{ required: true }]}>
+            <InputNumber min={1} style={{ width: '100%' }} />
+          </Form.Item>
+          <Form.Item label="订单金额（¥）" name="total_amount_yuan" rules={[{ required: true }]}>
+            <InputNumber min={0} style={{ width: '100%' }} />
+          </Form.Item>
+          <Form.Item label="定金（¥）" name="deposit_yuan">
+            <InputNumber min={0} style={{ width: '100%' }} />
+          </Form.Item>
+          <Form.Item label="联系人" name="contact_name">
+            <Input />
+          </Form.Item>
+          <Form.Item label="联系电话" name="contact_phone">
+            <Input />
           </Form.Item>
         </Form>
       </Modal>
