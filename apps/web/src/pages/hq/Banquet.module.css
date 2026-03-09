@@ -1,0 +1,127 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 24px;
+  background: var(--bg);
+  min-height: 100%;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.title {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.kpiRow {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+@media (max-width: 960px) {
+  .kpiRow { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* 漏斗 */
+.funnel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.funnelRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.funnelLabel {
+  width: 80px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+  text-align: right;
+}
+
+.funnelBarWrap {
+  flex: 1;
+  height: 20px;
+  background: var(--surface-hover);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.funnelBar {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 10px;
+  min-width: 4px;
+  transition: width 0.4s ease;
+}
+
+.funnelCount {
+  width: 36px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-align: right;
+  flex-shrink: 0;
+}
+
+/* 订单表 */
+.table {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.thead {
+  display: grid;
+  grid-template-columns: 1fr 60px 50px 90px 70px;
+  gap: 8px;
+  padding: 6px 0 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border);
+}
+
+.trow {
+  display: grid;
+  grid-template-columns: 1fr 60px 50px 90px 70px;
+  gap: 8px;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+
+.trow:last-child { border-bottom: none; }
+
+.tdType {
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tdDate {
+  color: var(--text-secondary);
+}
+
+.tdTable {
+  color: var(--text-primary);
+}
+
+.tdAmount {
+  font-weight: 600;
+  color: var(--text-primary);
+}

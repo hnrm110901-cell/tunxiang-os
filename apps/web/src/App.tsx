@@ -186,6 +186,8 @@ const HQStores        = lazy(() => import('./pages/hq/Stores'));
 const HQDecisions     = lazy(() => import('./pages/hq/Decisions'));
 const HQFinance       = lazy(() => import('./pages/hq/Finance'));
 const HQWorkforce     = lazy(() => import('./pages/hq/Workforce'));
+const HQBanquet       = lazy(() => import('./pages/hq/Banquet'));
+const SmBanquet       = lazy(() => import('./pages/sm/Banquet'));
 
 const PageLoader = (
   <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 300 }}>
@@ -642,6 +644,7 @@ const AppContent: React.FC = () => {
                   <Route path="decisions" element={<SmDecisions />} />
                   <Route path="alerts"    element={<SmAlerts />} />
                   <Route path="workforce" element={<SmWorkforce />} />
+                  <Route path="banquet"   element={<SmBanquet />} />
                 </Route>
 
                 {/* Role-based views — Chef (手机) */}
@@ -677,6 +680,7 @@ const AppContent: React.FC = () => {
                   <Route path="decisions" element={<HQDecisions />} />
                   <Route path="finance"   element={<HQFinance />} />
                   <Route path="workforce" element={<HQWorkforce />} />
+                  <Route path="banquet"   element={<HQBanquet />} />
                 </Route>
               </Routes>
             </Suspense>

@@ -8,6 +8,7 @@ const NAV_ITEMS = [
   { to: '/hq/decisions',   label: '决策',   icon: '🎯' },
   { to: '/hq/finance',     label: '财务',   icon: '💰' },
   { to: '/hq/workforce',   label: '人力',   icon: '👥' },
+  { to: '/hq/banquet',     label: '宴会',   icon: '🎊' },
 ];
 
 export default function HQLayout() {

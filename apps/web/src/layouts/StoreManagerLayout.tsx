@@ -8,6 +8,7 @@ const NAV_ITEMS = [
   { to: '/sm/tasks',       label: '任务',   icon: '✅' },
   { to: '/sm/workforce',   label: '人力',   icon: '👥' },
   { to: '/sm/alerts',      label: '告警',   icon: '🔔' },
+  { to: '/sm/banquet',     label: '宴会',   icon: '🎊' },
 ];
 
 export default function StoreManagerLayout() {
