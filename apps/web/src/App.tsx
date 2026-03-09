@@ -147,7 +147,7 @@ const BOMManagementPage = lazy(() => import('./pages/BOMManagementPage'));
 const WasteEventPage = lazy(() => import('./pages/WasteEventPage'));
 
 const DataSecurityPage = lazy(() => import('./pages/DataSecurityPage'));
-const BanquetLifecyclePage = lazy(() => import('./pages/BanquetLifecyclePage'));
+const BanquetLifecyclePage = lazy(() => import('./pages/BanquetAgentPage'));
 const MarketingCampaignPage = lazy(() => import('./pages/MarketingCampaignPage'));
 const FctPage = lazy(() => import('./pages/FctPage'));
 const ApprovalListPage = lazy(() => import('./pages/ApprovalListPage'));
