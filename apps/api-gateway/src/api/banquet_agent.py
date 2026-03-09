@@ -438,6 +438,318 @@ async def update_lead_stage(
     }
 
 
+class LostReq(BaseModel):
+    lost_reason:    str
+    followup_note:  Optional[str] = None
+
+
+@router.patch("/stores/{store_id}/leads/{lead_id}/lost")
+async def mark_lead_lost(
+    store_id: str,
+    lead_id: str,
+    body: LostReq,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """将线索标记为流失，记录流失原因"""
+    result = await db.execute(
+        select(BanquetLead).where(
+            and_(BanquetLead.id == lead_id, BanquetLead.store_id == store_id)
+        )
+    )
+    lead = result.scalars().first()
+    if not lead:
+        raise HTTPException(status_code=404, detail="线索不存在")
+    if lead.current_stage == LeadStageEnum.LOST:
+        raise HTTPException(status_code=400, detail="线索已标记为流失")
+
+    stage_before = lead.current_stage
+    lead.current_stage = LeadStageEnum.LOST
+    lead.lost_reason = body.lost_reason
+    lead.last_followup_at = datetime.utcnow()
+
+    record = LeadFollowupRecord(
+        id=str(uuid.uuid4()),
+        lead_id=lead_id,
+        followup_type="other",
+        content=body.followup_note or f"流失原因：{body.lost_reason}",
+        stage_before=stage_before,
+        stage_after=LeadStageEnum.LOST,
+        created_by=str(current_user.id),
+    )
+    db.add(record)
+    await db.commit()
+    return {
+        "lead_id": lead_id,
+        "current_stage": "lost",
+        "lost_reason": body.lost_reason,
+    }
+
+
+@router.get("/stores/{store_id}/leads/followup-due")
+async def list_followup_due(
+    store_id: str,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """返回今日到期 + 已逾期的跟进线索（排除 won/lost）"""
+    from datetime import timedelta
+    now = datetime.utcnow()
+    tomorrow = now + timedelta(hours=24)
+    stale_cutoff = now - timedelta(days=7)
+    excluded = [LeadStageEnum.WON, LeadStageEnum.LOST]
+
+    # due_today: next_followup_at is set and <= tomorrow
+    result_due = await db.execute(
+        select(BanquetLead).where(
+            and_(
+                BanquetLead.store_id == store_id,
+                BanquetLead.current_stage.not_in(excluded),
+                BanquetLead.next_followup_at.isnot(None),
+                BanquetLead.next_followup_at <= tomorrow,
+            )
+        ).order_by(BanquetLead.next_followup_at)
+    )
+    due_leads = result_due.scalars().all()
+
+    # stale: no recent followup and next_followup_at not set or already past stale_cutoff
+    result_stale = await db.execute(
+        select(BanquetLead).where(
+            and_(
+                BanquetLead.store_id == store_id,
+                BanquetLead.current_stage.not_in(excluded),
+                BanquetLead.last_followup_at < stale_cutoff,
+                BanquetLead.next_followup_at.is_(None),
+            )
+        ).order_by(BanquetLead.last_followup_at)
+    )
+    stale_leads = result_stale.scalars().all()
+
+    # merge, dedup by id
+    seen = set()
+    all_leads = []
+    for lead in list(due_leads) + list(stale_leads):
+        if lead.id not in seen:
+            seen.add(lead.id)
+            all_leads.append(lead)
+
+    def _serialize(lead: BanquetLead, is_overdue: bool):
+        return {
+            "lead_id":           lead.id,
+            "banquet_type":      lead.banquet_type.value if hasattr(lead.banquet_type, "value") else str(lead.banquet_type),
+            "current_stage":     lead.current_stage.value,
+            "expected_date":     lead.expected_date.isoformat() if lead.expected_date else None,
+            "last_followup_at":  lead.last_followup_at.isoformat() if lead.last_followup_at else None,
+            "next_followup_at":  lead.next_followup_at.isoformat() if lead.next_followup_at else None,
+            "is_overdue":        is_overdue,
+            "customer_id":       lead.customer_id,
+        }
+
+    due_ids = {l.id for l in due_leads}
+    return {
+        "due_today":  [_serialize(l, l.next_followup_at is not None and l.next_followup_at < now) for l in due_leads],
+        "overdue":    [_serialize(l, True) for l in stale_leads if l.id not in due_ids],
+        "total":      len(seen),
+    }
+
+
+# ────────── 分析看板 ──────────────────────────────────────────────────────────
+
+_STAGE_LABELS = {
+    "new":              "初步询价",
+    "contacted":        "已联系",
+    "visit_scheduled":  "预约看厅",
+    "quoted":           "已报价",
+    "waiting_decision": "等待决策",
+    "deposit_pending":  "待付定金",
+    "won":              "成交",
+    "lost":             "流失",
+}
+_FUNNEL_STAGES = [
+    "new", "contacted", "visit_scheduled", "quoted",
+    "waiting_decision", "deposit_pending", "won",
+]
+
+
+@router.get("/stores/{store_id}/analytics/funnel")
+async def get_conversion_funnel(
+    store_id: str,
+    month: Optional[str] = Query(None, description="YYYY-MM，默认当月"),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """阶段转化漏斗：各阶段线索数 + 逐级转化率"""
+    from datetime import timedelta
+    if month:
+        try:
+            period_start = datetime.strptime(month, "%Y-%m").replace(day=1)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="month 格式应为 YYYY-MM")
+    else:
+        today = datetime.utcnow()
+        period_start = today.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+    # next month start
+    if period_start.month == 12:
+        period_end = period_start.replace(year=period_start.year + 1, month=1)
+    else:
+        period_end = period_start.replace(month=period_start.month + 1)
+
+    # count leads created in period, grouped by stage (including LOST)
+    result = await db.execute(
+        select(BanquetLead.current_stage, func.count(BanquetLead.id)).where(
+            and_(
+                BanquetLead.store_id == store_id,
+                BanquetLead.created_at >= period_start,
+                BanquetLead.created_at < period_end,
+            )
+        ).group_by(BanquetLead.current_stage)
+    )
+    counts_raw = {row[0].value if hasattr(row[0], "value") else str(row[0]): row[1]
+                  for row in result.all()}
+
+    total_leads = sum(counts_raw.values())
+    won_count   = counts_raw.get("won", 0)
+    lost_count  = counts_raw.get("lost", 0)
+
+    # build funnel with conversion rates relative to previous stage
+    stages = []
+    prev_count = None
+    for stage in _FUNNEL_STAGES:
+        count = counts_raw.get(stage, 0)
+        conversion_rate = round(count / prev_count, 4) if prev_count and prev_count > 0 else None
+        stages.append({
+            "stage":           stage,
+            "label":           _STAGE_LABELS.get(stage, stage),
+            "count":           count,
+            "conversion_rate": conversion_rate,
+        })
+        prev_count = count
+
+    return {
+        "period":                   period_start.strftime("%Y-%m"),
+        "stages":                   stages,
+        "total_leads":              total_leads,
+        "won_count":                won_count,
+        "lost_count":               lost_count,
+        "overall_conversion_rate":  round(won_count / total_leads, 4) if total_leads > 0 else 0.0,
+    }
+
+
+@router.get("/stores/{store_id}/analytics/revenue-forecast")
+async def get_revenue_forecast(
+    store_id: str,
+    months: int = Query(3, ge=1, le=12, description="预测月数"),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """未来 N 个月已确认订单的营收预测（按宴会日期归属月份）"""
+    from datetime import timedelta
+    today = datetime.utcnow().date()
+    # start from current month
+    start = today.replace(day=1)
+
+    # end: start + months
+    year, mo = start.year, start.month
+    for _ in range(months):
+        mo += 1
+        if mo > 12:
+            mo = 1
+            year += 1
+    end = date_type(year, mo, 1)
+
+    result = await db.execute(
+        select(BanquetOrder).where(
+            and_(
+                BanquetOrder.store_id == store_id,
+                BanquetOrder.order_status.in_([
+                    OrderStatusEnum.CONFIRMED,
+                    OrderStatusEnum.PREPARING,
+                    OrderStatusEnum.IN_PROGRESS,
+                ]),
+                BanquetOrder.banquet_date >= start,
+                BanquetOrder.banquet_date < end,
+            )
+        )
+    )
+    orders = result.scalars().all()
+
+    # bucket by month
+    buckets: dict = {}
+    for order in orders:
+        key = order.banquet_date.strftime("%Y-%m")
+        if key not in buckets:
+            buckets[key] = {"month": key, "confirmed_revenue_yuan": 0.0, "order_count": 0}
+        buckets[key]["confirmed_revenue_yuan"] += round(order.total_amount_fen / 100, 2)
+        buckets[key]["order_count"] += 1
+
+    # fill missing months with zeros
+    forecast = []
+    y, m = start.year, start.month
+    for _ in range(months):
+        key = f"{y:04d}-{m:02d}"
+        forecast.append(buckets.get(key, {"month": key, "confirmed_revenue_yuan": 0.0, "order_count": 0}))
+        m += 1
+        if m > 12:
+            m = 1
+            y += 1
+
+    return {"forecast": forecast}
+
+
+@router.get("/stores/{store_id}/analytics/lost-analysis")
+async def get_lost_analysis(
+    store_id: str,
+    month: Optional[str] = Query(None, description="YYYY-MM，默认当月"),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """流失原因分析：按 lost_reason 分组统计"""
+    if month:
+        try:
+            period_start = datetime.strptime(month, "%Y-%m").replace(day=1)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="month 格式应为 YYYY-MM")
+    else:
+        today = datetime.utcnow()
+        period_start = today.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+    if period_start.month == 12:
+        period_end = period_start.replace(year=period_start.year + 1, month=1)
+    else:
+        period_end = period_start.replace(month=period_start.month + 1)
+
+    result = await db.execute(
+        select(BanquetLead.lost_reason, func.count(BanquetLead.id)).where(
+            and_(
+                BanquetLead.store_id == store_id,
+                BanquetLead.current_stage == LeadStageEnum.LOST,
+                BanquetLead.created_at >= period_start,
+                BanquetLead.created_at < period_end,
+            )
+        ).group_by(BanquetLead.lost_reason)
+    )
+    rows = result.all()
+    total = sum(r[1] for r in rows)
+
+    reasons = sorted(
+        [
+            {
+                "reason":  r[0] or "未说明",
+                "count":   r[1],
+                "pct":     round(r[1] / total * 100, 1) if total > 0 else 0.0,
+            }
+            for r in rows
+        ],
+        key=lambda x: -x["count"],
+    )
+    return {
+        "period":      period_start.strftime("%Y-%m"),
+        "total_lost":  total,
+        "reasons":     reasons,
+    }
+
+
 # ────────── 宴会订单 ──────────────────────────────────────────────────────────
 
 @router.get("/stores/{store_id}/orders")

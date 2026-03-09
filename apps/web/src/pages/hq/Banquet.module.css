@@ -652,3 +652,88 @@
 
 .detailLeadRow:last-child, .detailOrderRow:last-child { border-bottom: none; }
 
+
+/* ── Tab8: 转化分析 ── */
+.analyticsTab {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 4px 0;
+}
+
+.analyticsPicker {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.funnelKpis {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.funnelKpi {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.funnelKpiValue {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--accent, #ff6b2c);
+}
+
+.funnelKpiLabel {
+  font-size: 12px;
+  color: var(--text-secondary, #888);
+}
+
+/* 流失归因 */
+.lostList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.lostRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.lostReason {
+  width: 100px;
+  flex-shrink: 0;
+  font-size: 13px;
+  color: var(--text-primary, #333);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lostBarWrap {
+  flex: 1;
+  height: 10px;
+  background: var(--surface-hover, #f3f3f3);
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.lostBar {
+  height: 100%;
+  background: #ef4444;
+  border-radius: 5px;
+  transition: width 0.3s ease;
+  min-width: 4px;
+}
+
+.lostCount {
+  width: 80px;
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--text-secondary, #888);
+  text-align: right;
+}

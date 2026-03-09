@@ -14,7 +14,6 @@ import {
 import apiClient from '../../services/api';
 import { handleApiError } from '../../utils/message';
 import styles from './BanquetLeadDetail.module.css';
-
 const STORE_ID = localStorage.getItem('store_id') || 'S001';
 
 const STAGE_BADGE_TYPE: Record<string, 'info' | 'warning' | 'success' | 'default'> = {
@@ -96,6 +95,12 @@ export default function SmBanquetLeadDetail() {
   const [cvRemark,       setCvRemark]       = useState('');
   const [converting,     setConverting]     = useState(false);
 
+  // 标记流失 Modal state
+  const [lostOpen,    setLostOpen]    = useState(false);
+  const [lostReason,  setLostReason]  = useState('');
+  const [lostNote,    setLostNote]    = useState('');
+  const [marking,     setMarking]     = useState(false);
+
   const loadLead = useCallback(async () => {
     if (!leadId) return;
     setLoading(true);
@@ -165,6 +170,23 @@ export default function SmBanquetLeadDetail() {
       handleApiError(e, '转化订单失败');
     } finally {
       setConverting(false);
+    }
+  };
+
+  const handleMarkLost = async () => {
+    if (!lostReason.trim()) return;
+    setMarking(true);
+    try {
+      await apiClient.patch(
+        `/api/v1/banquet-agent/stores/${STORE_ID}/leads/${leadId}/lost`,
+        { lost_reason: lostReason.trim(), followup_note: lostNote || null },
+      );
+      setLostOpen(false);
+      await loadLead();
+    } catch (e) {
+      handleApiError(e, '标记流失失败');
+    } finally {
+      setMarking(false);
     }
   };
 
@@ -269,6 +291,17 @@ export default function SmBanquetLeadDetail() {
             <div className={styles.convertRow}>
               <ZButton variant="primary" size="sm" onClick={openConvertModal}>
                 转为订单
+              </ZButton>
+            </div>
+          )}
+          {lead.current_stage !== 'won' && lead.current_stage !== 'lost' && (
+            <div className={styles.convertRow}>
+              <ZButton
+                variant="ghost"
+                size="sm"
+                onClick={() => { setLostReason(''); setLostNote(''); setLostOpen(true); }}
+              >
+                标记流失
               </ZButton>
             </div>
           )}
@@ -433,6 +466,43 @@ export default function SmBanquetLeadDetail() {
               value={cvRemark}
               onChange={e => setCvRemark(e.target.value)}
               placeholder="特殊要求…"
+            />
+          </div>
+        </div>
+      </ZModal>
+      {/* 标记流失 Modal */}
+      <ZModal
+        open={lostOpen}
+        title="标记线索流失"
+        onClose={() => setLostOpen(false)}
+        footer={
+          <div className={styles.modalFooter}>
+            <ZButton variant="ghost" onClick={() => setLostOpen(false)}>取消</ZButton>
+            <ZButton
+              variant="primary"
+              onClick={handleMarkLost}
+              disabled={!lostReason.trim() || marking}
+            >
+              {marking ? '提交中…' : '确认流失'}
+            </ZButton>
+          </div>
+        }
+      >
+        <div className={styles.modalBody}>
+          <div className={styles.field}>
+            <label className={styles.label}>流失原因</label>
+            <ZInput
+              value={lostReason}
+              onChange={e => setLostReason(e.target.value)}
+              placeholder="如：价格太高、竞品抢单、日期冲突…"
+            />
+          </div>
+          <div className={styles.field}>
+            <label className={styles.label}>备注（选填）</label>
+            <ZInput
+              value={lostNote}
+              onChange={e => setLostNote(e.target.value)}
+              placeholder="补充说明…"
             />
           </div>
         </div>

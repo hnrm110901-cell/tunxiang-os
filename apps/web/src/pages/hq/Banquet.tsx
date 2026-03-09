@@ -1269,6 +1269,190 @@ function ResourceTab() {
   );
 }
 
+/* ─── Tab8: 转化分析 ─── */
+
+interface FunnelStage {
+  stage:           string;
+  label:           string;
+  count:           number;
+  conversion_rate: number | null;
+}
+
+interface FunnelResp {
+  period:                   string;
+  stages:                   FunnelStage[];
+  total_leads:              number;
+  won_count:                number;
+  lost_count:               number;
+  overall_conversion_rate:  number;
+}
+
+interface ForecastBucket {
+  month:                   string;
+  confirmed_revenue_yuan:  number;
+  order_count:             number;
+}
+
+interface LostReason {
+  reason: string;
+  count:  number;
+  pct:    number;
+}
+
+function AnalyticsTab() {
+  const [month,    setMonth]    = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  });
+  const [funnel,    setFunnel]    = useState<FunnelResp | null>(null);
+  const [forecast,  setForecast]  = useState<ForecastBucket[]>([]);
+  const [lostData,  setLostData]  = useState<LostReason[]>([]);
+  const [loading,   setLoading]   = useState(false);
+
+  const load = useCallback(async (m: string) => {
+    setLoading(true);
+    try {
+      const STORE = localStorage.getItem('store_id') || 'S001';
+      const [funnelR, forecastR, lostR] = await Promise.allSettled([
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/analytics/funnel`, { params: { month: m } }),
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/analytics/revenue-forecast`, { params: { months: 3 } }),
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/analytics/lost-analysis`, { params: { month: m } }),
+      ]);
+      if (funnelR.status === 'fulfilled')   setFunnel(funnelR.value.data);
+      if (forecastR.status === 'fulfilled') setForecast(forecastR.value.data?.forecast ?? []);
+      if (lostR.status === 'fulfilled')     setLostData(lostR.value.data?.reasons ?? []);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { load(month); }, [load, month]);
+
+  /* funnel bar chart */
+  const funnelOption = funnel ? {
+    tooltip: { trigger: 'axis' as const },
+    grid: { left: 100, right: 20, top: 20, bottom: 30 },
+    xAxis: { type: 'value' as const, minInterval: 1 },
+    yAxis: {
+      type: 'category' as const,
+      data: [...funnel.stages].reverse().map(s => s.label),
+      axisLabel: { fontSize: 12 },
+    },
+    series: [{
+      type: 'bar' as const,
+      data: [...funnel.stages].reverse().map(s => s.count),
+      itemStyle: { color: 'var(--accent, #ff6b2c)' },
+      label: {
+        show: true,
+        position: 'right' as const,
+        formatter: (p: { value: number; dataIndex: number }) => {
+          const stage = funnel.stages[funnel.stages.length - 1 - p.dataIndex];
+          return stage.conversion_rate != null
+            ? `${p.value} (${(stage.conversion_rate * 100).toFixed(0)}%)`
+            : `${p.value}`;
+        },
+      },
+    }],
+  } : null;
+
+  /* forecast bar chart */
+  const forecastOption = forecast.length > 0 ? {
+    tooltip: { trigger: 'axis' as const },
+    grid: { left: 60, right: 20, top: 20, bottom: 30 },
+    xAxis: { type: 'category' as const, data: forecast.map(b => b.month) },
+    yAxis: { type: 'value' as const, axisLabel: { formatter: (v: number) => `${(v / 10000).toFixed(0)}万` } },
+    series: [{
+      type: 'bar' as const,
+      data: forecast.map(b => b.confirmed_revenue_yuan),
+      itemStyle: { color: '#3b82f6' },
+      label: { show: true, position: 'top' as const, formatter: (p: { value: number }) => p.value > 0 ? `${(p.value / 10000).toFixed(1)}万` : '' },
+    }],
+  } : null;
+
+  const maxLost = lostData.length > 0 ? Math.max(...lostData.map(r => r.count)) : 1;
+
+  return (
+    <div className={styles.analyticsTab}>
+      {/* 月份选择 */}
+      <div className={styles.analyticsPicker}>
+        <ZInput
+          type="month"
+          value={month}
+          onChange={e => setMonth(e.target.value)}
+        />
+      </div>
+
+      {loading ? <ZSkeleton rows={8} /> : (
+        <>
+          {/* 转化漏斗 */}
+          <ZCard title="转化漏斗">
+            {!funnel || funnel.total_leads === 0 ? (
+              <ZEmpty title="暂无数据" description="当月尚无线索记录" />
+            ) : (
+              <>
+                <div className={styles.funnelKpis}>
+                  <div className={styles.funnelKpi}>
+                    <span className={styles.funnelKpiValue}>{funnel.total_leads}</span>
+                    <span className={styles.funnelKpiLabel}>总线索</span>
+                  </div>
+                  <div className={styles.funnelKpi}>
+                    <span className={styles.funnelKpiValue}>{funnel.won_count}</span>
+                    <span className={styles.funnelKpiLabel}>成交</span>
+                  </div>
+                  <div className={styles.funnelKpi}>
+                    <span className={styles.funnelKpiValue}>{funnel.lost_count}</span>
+                    <span className={styles.funnelKpiLabel}>流失</span>
+                  </div>
+                  <div className={styles.funnelKpi}>
+                    <span className={styles.funnelKpiValue}>
+                      {(funnel.overall_conversion_rate * 100).toFixed(1)}%
+                    </span>
+                    <span className={styles.funnelKpiLabel}>整体转化</span>
+                  </div>
+                </div>
+                {funnelOption && (
+                  <ReactECharts option={funnelOption} style={{ height: 240 }} />
+                )}
+              </>
+            )}
+          </ZCard>
+
+          {/* 营收预测 */}
+          <ZCard title="近 3 个月营收预测（已确认订单）">
+            {forecast.every(b => b.order_count === 0) ? (
+              <ZEmpty title="暂无确认订单" description="确认订单后自动显示" />
+            ) : forecastOption ? (
+              <ReactECharts option={forecastOption} style={{ height: 180 }} />
+            ) : null}
+          </ZCard>
+
+          {/* 流失归因 */}
+          <ZCard title={`流失归因（${month}）`}>
+            {lostData.length === 0 ? (
+              <ZEmpty title="本月暂无流失线索" description="" />
+            ) : (
+              <div className={styles.lostList}>
+                {lostData.map(r => (
+                  <div key={r.reason} className={styles.lostRow}>
+                    <span className={styles.lostReason}>{r.reason}</span>
+                    <div className={styles.lostBarWrap}>
+                      <div
+                        className={styles.lostBar}
+                        style={{ width: `${(r.count / maxLost) * 100}%` }}
+                      />
+                    </div>
+                    <span className={styles.lostCount}>{r.count} ({r.pct}%)</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </ZCard>
+        </>
+      )}
+    </div>
+  );
+}
+
 /* ─── Tab7: 客户档案 ─── */
 
 interface CustomerItem {
@@ -1476,6 +1660,7 @@ export default function HQBanquet() {
           { key: 'profit',    label: '利润复盘', children: <ProfitTab /> },
           { key: 'resource',  label: '资源配置', children: <ResourceTab /> },
           { key: 'customers', label: '客户档案', children: <CustomerTab /> },
+          { key: 'analytics', label: '转化分析', children: <AnalyticsTab /> },
         ]}
       />
     </div>
