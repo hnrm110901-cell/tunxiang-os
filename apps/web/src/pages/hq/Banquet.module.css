@@ -1138,3 +1138,56 @@
 .hallChip       { padding: 4px 12px; border-radius: 20px; border: 1px solid var(--border, #eee); background: #fff; font-size: 13px; cursor: pointer; }
 .hallChipActive { background: var(--accent, #FF6B2C); border-color: var(--accent, #FF6B2C); color: #fff; }
 .hallBooked     { background: rgba(255, 107, 44, 0.12); border: 1px solid rgba(255, 107, 44, 0.4); }
+
+/* ── Phase 15: 服务品质 ── */
+.svcQualityBody { display: flex; flex-direction: column; gap: 12px; }
+.svcKpiRow      { display: flex; gap: 20px; flex-wrap: wrap; }
+.svcKpi         { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 70px; }
+.svcKpiVal      { font-size: 22px; font-weight: 700; line-height: 1; }
+.svcKpiLabel    { font-size: 11px; color: var(--text-secondary, #888); }
+.svcTypeList    { display: flex; flex-direction: column; gap: 0; }
+.svcTypeRow     { display: flex; align-items: center; gap: 12px; padding: 6px 0; border-bottom: 1px solid var(--border, #eee); font-size: 13px; }
+.svcTypeRow:last-child { border-bottom: none; }
+.svcTypeName    { flex: 1; font-weight: 600; }
+.svcTypeCount   { color: var(--text-secondary, #888); width: 56px; }
+.svcTypePct     { color: #22c55e; width: 72px; }
+.svcTypeExc     { color: #f97316; width: 56px; }
+
+/* ── Phase 15: 预订提前量 ── */
+.leadTimeBody     { display: flex; flex-direction: column; gap: 12px; }
+.leadTimeAvg      { font-size: 13px; color: var(--text-secondary, #888); }
+.leadTimeBuckets  { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; }
+.leadTimeBucket   { background: var(--surface-2, #f8f9fa); border-radius: 8px; padding: 10px 12px; border: 1px solid var(--border, #eee); }
+.leadTimeBucketLabel { font-size: 11px; color: var(--text-secondary, #888); margin-bottom: 4px; }
+.leadTimeBucketCount { font-size: 20px; font-weight: 700; line-height: 1; margin-bottom: 6px; }
+.leadTimeBar      { height: 4px; background: var(--border, #eee); border-radius: 2px; overflow: hidden; }
+.leadTimeBarFill  { height: 100%; background: var(--accent, #FF6B2C); border-radius: 2px; transition: width 0.4s; }
+
+/* ── Phase 15: 客户保留 ── */
+.retentionBody     { display: flex; flex-direction: column; gap: 12px; }
+.retentionSummary  { display: flex; gap: 16px; flex-wrap: wrap; }
+.retentionKpi      { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 64px; }
+.retentionKpiVal   { font-size: 20px; font-weight: 700; line-height: 1; }
+.retentionKpiLabel { font-size: 11px; color: var(--text-secondary, #888); }
+.retentionTopList  { display: flex; flex-direction: column; gap: 0; }
+.retentionTopTitle { font-size: 12px; font-weight: 600; color: var(--text-secondary, #888); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+.retentionTopRow   { display: flex; align-items: center; gap: 12px; padding: 6px 0; border-bottom: 1px solid var(--border, #eee); font-size: 13px; }
+.retentionTopRow:last-child { border-bottom: none; }
+.retentionTopName   { flex: 1; font-weight: 600; }
+.retentionTopOrders { color: var(--text-secondary, #888); width: 48px; }
+.retentionTopAmount { font-weight: 600; color: var(--accent, #FF6B2C); }
+
+/* ── Phase 15: 取消分析 ── */
+.cancelBody     { display: flex; flex-direction: column; gap: 12px; }
+.cancelSummary  { display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap; }
+.cancelTotal    { font-size: 18px; font-weight: 700; color: #dc2626; }
+.cancelLost     { font-size: 13px; color: var(--text-secondary, #888); }
+.cancelByType   { display: flex; flex-direction: column; gap: 0; }
+.cancelTypeRow  { display: flex; align-items: center; gap: 12px; padding: 5px 0; border-bottom: 1px solid var(--border, #eee); font-size: 13px; }
+.cancelTypeRow:last-child { border-bottom: none; }
+.cancelTypeName  { flex: 1; font-weight: 600; }
+.cancelTypeCount { color: #dc2626; }
+.cancelLeadTime  { display: flex; gap: 16px; padding: 8px 0; border-top: 1px solid var(--border, #eee); }
+.cancelLtItem   { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.cancelLtLabel  { font-size: 11px; color: var(--text-secondary, #888); }
+.cancelLtCount  { font-size: 18px; font-weight: 700; line-height: 1; }

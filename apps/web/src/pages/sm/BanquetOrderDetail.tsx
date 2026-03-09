@@ -180,6 +180,20 @@ export default function SmBanquetOrderDetail() {
   const [excSeverity,   setExcSeverity]   = useState('medium');
   const [reporting,     setReporting]     = useState(false);
 
+  // Phase 15: 排班建议 state
+  interface StaffingPlan {
+    order_id:     string;
+    banquet_type: string;
+    table_count:  number;
+    staffing: {
+      kitchen: number; service: number; decor: number; manager: number; total: number;
+    };
+    generated_at: string | null;
+  }
+  const [staffing,          setStaffing]          = useState<StaffingPlan | null>(null);
+  const [staffingLoading,   setStaffingLoading]   = useState(false);
+  const [generatingStaffing, setGeneratingStaffing] = useState(false);
+
   // AI 复盘 state
   interface ReviewData {
     review_id: string;
@@ -298,6 +312,38 @@ export default function SmBanquetOrderDetail() {
   }, [orderId]);
 
   useEffect(() => { loadExceptions(); }, [loadExceptions]);
+
+  const loadStaffing = useCallback(async () => {
+    if (!orderId) return;
+    setStaffingLoading(true);
+    try {
+      const resp = await apiClient.get(
+        `/api/v1/banquet-agent/stores/${STORE_ID}/orders/${orderId}/staffing-plan`,
+      );
+      setStaffing(resp.data);
+    } catch {
+      setStaffing(null);
+    } finally {
+      setStaffingLoading(false);
+    }
+  }, [orderId]);
+
+  useEffect(() => { loadStaffing(); }, [loadStaffing]);
+
+  const handleGenerateStaffing = async () => {
+    if (!orderId) return;
+    setGeneratingStaffing(true);
+    try {
+      const resp = await apiClient.post(
+        `/api/v1/banquet-agent/stores/${STORE_ID}/orders/${orderId}/staffing-plan`,
+      );
+      setStaffing(resp.data);
+    } catch (e) {
+      handleApiError(e, '生成排班建议失败');
+    } finally {
+      setGeneratingStaffing(false);
+    }
+  };
 
   const loadContract = useCallback(async () => {
     if (!orderId) return;
@@ -682,6 +728,48 @@ export default function SmBanquetOrderDetail() {
             </div>
           )}
         </ZCard>
+
+        {/* Phase 15: 排班建议 */}
+        {['confirmed', 'preparing', 'in_progress'].includes(order.status) && (
+          <ZCard>
+            <div className={styles.sectionHeader}>
+              <div className={styles.sectionTitle}>排班建议</div>
+              <ZButton
+                variant="ghost"
+                size="sm"
+                onClick={handleGenerateStaffing}
+                disabled={generatingStaffing}
+              >
+                {generatingStaffing ? '生成中…' : staffing ? '重新生成' : '生成建议'}
+              </ZButton>
+            </div>
+            {staffingLoading ? (
+              <ZSkeleton rows={2} />
+            ) : !staffing ? (
+              <ZEmpty title="暂无排班建议" description="点击「生成建议」获取 AI 推荐人员配置" />
+            ) : (
+              <div className={styles.staffingBody}>
+                <div className={styles.staffingSummary}>
+                  共需 <strong>{staffing.staffing.total}</strong> 人
+                  （{order.table_count} 桌 · {order.banquet_type}）
+                </div>
+                <div className={styles.staffingRoles}>
+                  {([
+                    { key: 'kitchen' as const, label: '厨房' },
+                    { key: 'service' as const, label: '服务' },
+                    { key: 'decor'   as const, label: '布置' },
+                    { key: 'manager' as const, label: '管理' },
+                  ]).map(r => (
+                    <div key={r.key} className={styles.staffingRole}>
+                      <span className={styles.staffingRoleLabel}>{r.label}</span>
+                      <span className={styles.staffingRoleCount}>{staffing.staffing[r.key]}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </ZCard>
+        )}
 
         {/* 付款记录 */}
         <ZCard>

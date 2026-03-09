@@ -1808,6 +1808,26 @@ interface QuoteStats {
   total_quotes: number; accepted_quotes: number; acceptance_pct: number;
   type_distribution: QuoteStatItem[];
 }
+/* Phase 15 */
+interface ServiceQualityType { banquet_type: string; task_count: number; completion_pct: number; exception_count: number }
+interface ServiceQualityData {
+  order_count: number; task_completion_pct: number;
+  avg_delay_hours: number; exception_rate_pct: number;
+  by_banquet_type: ServiceQualityType[];
+}
+interface LeadTimeBuckets { under_30: number; d30_60: number; d60_90: number; over_90: number }
+interface LeadTimeData { total: number; avg_lead_time_days: number; buckets: LeadTimeBuckets; bucket_pcts: LeadTimeBuckets }
+interface RetentionCustomer { customer_id: string; name: string; order_count: number; total_yuan: number }
+interface RetentionData {
+  total_customers: number; repeat_customers: number; repeat_rate_pct: number;
+  avg_ltv_yuan: number; top_customers: RetentionCustomer[];
+}
+interface CancellationType { banquet_type: string; count: number }
+interface CancellationData {
+  total: number; revenue_lost_yuan: number;
+  by_banquet_type: CancellationType[];
+  by_lead_time: { urgent_7d: number; d7_30: number; over_30d: number };
+}
 
 function AnalyticsTab() {
   const [month,    setMonth]    = useState(() => {
@@ -1827,6 +1847,11 @@ function AnalyticsTab() {
   } | null>(null);
   const [agingData,    setAgingData]    = useState<AgingData | null>(null);
   const [quoteStats,   setQuoteStats]   = useState<QuoteStats | null>(null);
+  /* Phase 15 */
+  const [svcQuality,   setSvcQuality]   = useState<ServiceQualityData | null>(null);
+  const [leadTime,     setLeadTime]     = useState<LeadTimeData | null>(null);
+  const [retention,    setRetention]    = useState<RetentionData | null>(null);
+  const [cancellation, setCancellation] = useState<CancellationData | null>(null);
   const [loading,      setLoading]      = useState(false);
 
   const load = useCallback(async (m: string) => {
@@ -1834,7 +1859,10 @@ function AnalyticsTab() {
     try {
       const STORE = localStorage.getItem('store_id') || 'S001';
       const [y, mo] = m.split('-');
-      const [funnelR, forecastR, lostR, arR, excR, excStatsR, agingR, quoteStatsR] = await Promise.allSettled([
+      const [
+        funnelR, forecastR, lostR, arR, excR, excStatsR,
+        agingR, quoteStatsR, svcR, ltR, retR, cancelR,
+      ] = await Promise.allSettled([
         apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/analytics/funnel`, { params: { month: m } }),
         apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/analytics/revenue-forecast`, { params: { months: 3 } }),
         apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/analytics/lost-analysis`, { params: { month: m } }),
@@ -1843,6 +1871,10 @@ function AnalyticsTab() {
         apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/analytics/exception-stats`, { params: { month: m } }),
         apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/analytics/receivables-aging`),
         apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/analytics/quote-stats`, { params: { year: Number(y), month: Number(mo) } }),
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/analytics/service-quality`, { params: { month: m } }),
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/analytics/booking-lead-time`),
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/analytics/customer-retention`),
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/analytics/cancellation-analysis`),
       ]);
       if (funnelR.status === 'fulfilled')     setFunnel(funnelR.value.data);
       if (forecastR.status === 'fulfilled')   setForecast(forecastR.value.data?.forecast ?? []);
@@ -1852,6 +1884,10 @@ function AnalyticsTab() {
       if (excStatsR.status === 'fulfilled')   setExcStats(excStatsR.value.data);
       if (agingR.status === 'fulfilled')      setAgingData(agingR.value.data);
       if (quoteStatsR.status === 'fulfilled') setQuoteStats(quoteStatsR.value.data);
+      if (svcR.status === 'fulfilled')        setSvcQuality(svcR.value.data);
+      if (ltR.status === 'fulfilled')         setLeadTime(ltR.value.data);
+      if (retR.status === 'fulfilled')        setRetention(retR.value.data);
+      if (cancelR.status === 'fulfilled')     setCancellation(cancelR.value.data);
     } finally {
       setLoading(false);
     }
@@ -2139,6 +2175,167 @@ function AnalyticsTab() {
                       <span className={styles.quoteTypeAmount}>¥{t.total_amount_yuan.toLocaleString()}</span>
                     </div>
                   ))}
+                </div>
+              </div>
+            )}
+          </ZCard>
+
+          {/* Phase 15: 服务品质 */}
+          <ZCard title={`服务品质（${month}）`}>
+            {!svcQuality || svcQuality.order_count === 0 ? (
+              <ZEmpty title="本月暂无宴会订单" description="" />
+            ) : (
+              <div className={styles.svcQualityBody}>
+                <div className={styles.svcKpiRow}>
+                  <div className={styles.svcKpi}>
+                    <span className={styles.svcKpiVal}>{svcQuality.task_completion_pct}%</span>
+                    <span className={styles.svcKpiLabel}>任务完成率</span>
+                  </div>
+                  <div className={styles.svcKpi}>
+                    <span className={styles.svcKpiVal} style={{ color: svcQuality.avg_delay_hours > 1 ? '#f97316' : '#22c55e' }}>
+                      {svcQuality.avg_delay_hours.toFixed(1)}h
+                    </span>
+                    <span className={styles.svcKpiLabel}>平均延误</span>
+                  </div>
+                  <div className={styles.svcKpi}>
+                    <span className={styles.svcKpiVal} style={{ color: svcQuality.exception_rate_pct > 10 ? '#dc2626' : '#22c55e' }}>
+                      {svcQuality.exception_rate_pct}%
+                    </span>
+                    <span className={styles.svcKpiLabel}>异常率</span>
+                  </div>
+                </div>
+                {svcQuality.by_banquet_type.length > 0 && (
+                  <div className={styles.svcTypeList}>
+                    {svcQuality.by_banquet_type.map(t => (
+                      <div key={t.banquet_type} className={styles.svcTypeRow}>
+                        <span className={styles.svcTypeName}>{t.banquet_type}</span>
+                        <span className={styles.svcTypeCount}>{t.task_count} 任务</span>
+                        <span className={styles.svcTypePct}>{t.completion_pct}% 完成</span>
+                        <span className={styles.svcTypeExc}>{t.exception_count} 异常</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </ZCard>
+
+          {/* Phase 15: 预订提前量 */}
+          <ZCard title="预订提前量分布">
+            {!leadTime || leadTime.total === 0 ? (
+              <ZEmpty title="暂无数据" description="" />
+            ) : (
+              <div className={styles.leadTimeBody}>
+                <div className={styles.leadTimeAvg}>
+                  平均提前 <strong>{leadTime.avg_lead_time_days} 天</strong>（共 {leadTime.total} 单）
+                </div>
+                <div className={styles.leadTimeBuckets}>
+                  {([
+                    { key: 'under_30', label: '<30天' },
+                    { key: 'd30_60',   label: '30–60天' },
+                    { key: 'd60_90',   label: '60–90天' },
+                    { key: 'over_90',  label: '>90天' },
+                  ] as { key: keyof LeadTimeBuckets; label: string }[]).map(b => (
+                    <div key={b.key} className={styles.leadTimeBucket}>
+                      <div className={styles.leadTimeBucketLabel}>{b.label}</div>
+                      <div className={styles.leadTimeBucketCount}>{leadTime.buckets[b.key]}</div>
+                      <div className={styles.leadTimeBar}>
+                        <div
+                          className={styles.leadTimeBarFill}
+                          style={{ width: `${leadTime.bucket_pcts[b.key]}%` }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </ZCard>
+
+          {/* Phase 15: 客户保留 */}
+          <ZCard title="客户保留分析">
+            {!retention || retention.total_customers === 0 ? (
+              <ZEmpty title="暂无客户数据" description="" />
+            ) : (
+              <div className={styles.retentionBody}>
+                <div className={styles.retentionSummary}>
+                  <div className={styles.retentionKpi}>
+                    <span className={styles.retentionKpiVal}>{retention.total_customers}</span>
+                    <span className={styles.retentionKpiLabel}>总客户数</span>
+                  </div>
+                  <div className={styles.retentionKpi}>
+                    <span className={styles.retentionKpiVal}>{retention.repeat_customers}</span>
+                    <span className={styles.retentionKpiLabel}>复购客户</span>
+                  </div>
+                  <div className={styles.retentionKpi}>
+                    <span
+                      className={styles.retentionKpiVal}
+                      style={{ color: retention.repeat_rate_pct >= 30 ? '#22c55e' : '#f97316' }}
+                    >
+                      {retention.repeat_rate_pct}%
+                    </span>
+                    <span className={styles.retentionKpiLabel}>复购率</span>
+                  </div>
+                  <div className={styles.retentionKpi}>
+                    <span className={styles.retentionKpiVal}>¥{retention.avg_ltv_yuan.toLocaleString()}</span>
+                    <span className={styles.retentionKpiLabel}>客均LTV</span>
+                  </div>
+                </div>
+                {retention.top_customers.length > 0 && (
+                  <div className={styles.retentionTopList}>
+                    <div className={styles.retentionTopTitle}>Top 客户</div>
+                    {retention.top_customers.map(c => (
+                      <div key={c.customer_id} className={styles.retentionTopRow}>
+                        <span className={styles.retentionTopName}>{c.name}</span>
+                        <span className={styles.retentionTopOrders}>{c.order_count} 单</span>
+                        <span className={styles.retentionTopAmount}>¥{c.total_yuan.toLocaleString()}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </ZCard>
+
+          {/* Phase 15: 取消分析 */}
+          <ZCard title="取消订单分析">
+            {!cancellation || cancellation.total === 0 ? (
+              <ZEmpty title="近期无取消订单" description="很好！继续保持" />
+            ) : (
+              <div className={styles.cancelBody}>
+                <div className={styles.cancelSummary}>
+                  <span className={styles.cancelTotal}>{cancellation.total} 单取消</span>
+                  <span className={styles.cancelLost}>
+                    损失收入 <strong>¥{cancellation.revenue_lost_yuan.toLocaleString()}</strong>
+                  </span>
+                </div>
+                {cancellation.by_banquet_type.length > 0 && (
+                  <div className={styles.cancelByType}>
+                    {cancellation.by_banquet_type.map(t => (
+                      <div key={t.banquet_type} className={styles.cancelTypeRow}>
+                        <span className={styles.cancelTypeName}>{t.banquet_type}</span>
+                        <span className={styles.cancelTypeCount}>{t.count} 单</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className={styles.cancelLeadTime}>
+                  <div className={styles.cancelLtItem}>
+                    <span className={styles.cancelLtLabel}>7天内取消</span>
+                    <span className={styles.cancelLtCount} style={{ color: '#dc2626' }}>
+                      {cancellation.by_lead_time.urgent_7d}
+                    </span>
+                  </div>
+                  <div className={styles.cancelLtItem}>
+                    <span className={styles.cancelLtLabel}>7–30天</span>
+                    <span className={styles.cancelLtCount} style={{ color: '#f97316' }}>
+                      {cancellation.by_lead_time.d7_30}
+                    </span>
+                  </div>
+                  <div className={styles.cancelLtItem}>
+                    <span className={styles.cancelLtLabel}>30天以前</span>
+                    <span className={styles.cancelLtCount}>{cancellation.by_lead_time.over_30d}</span>
+                  </div>
                 </div>
               </div>
             )}
