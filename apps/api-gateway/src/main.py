@@ -12,7 +12,7 @@ import time
 
 from src.core.config import settings
 # 核心模块
-from src.api import health, agents, auth, notifications, stores, mobile, integrations, monitoring, llm, enterprise, voice, neural, adapters, tasks, reconciliation, approval, embedding, raas, model_marketplace, human_in_the_loop, hardware_integration, pos, dishes, benchmark, dish_master
+from src.api import health, agents, auth, notifications, stores, mobile, integrations, monitoring, llm, enterprise, voice, neural, adapters, tasks, reconciliation, approval, embedding, raas, model_marketplace, human_in_the_loop, hardware_integration, pos, dishes, benchmark, dish_master, alerts_webhook
 from src.api.phase5_apis import platform_router, industry_router, supply_chain_router, i18n_router
 # 逐步启用的模块
 from src.api import dashboard, analytics, audit, multi_store, finance, customer360, wechat_triggers, queue, meituan_queue
@@ -447,6 +447,7 @@ app.include_router(stores.router, prefix="/api/v1", tags=["stores"])
 app.include_router(mobile.router, prefix="/api/v1", tags=["mobile"])
 app.include_router(integrations.router, prefix="/api/v1", tags=["integrations"])
 app.include_router(monitoring.router, prefix="/api/v1", tags=["monitoring"])
+app.include_router(alerts_webhook.router, tags=["alerts"])
 app.include_router(llm.router, prefix="/api/v1", tags=["llm"])
 app.include_router(enterprise.router, prefix="/api/v1/enterprise", tags=["enterprise"])
 app.include_router(voice.router, prefix="/api/v1/voice", tags=["voice"])

@@ -1,7 +1,7 @@
 # Makefile for Zhilian OS
 # 智链OS开发辅助命令
 
-.PHONY: help install dev test lint format clean run docker staging-up staging-down staging-logs staging-migrate staging-health prod-env-check prod-deploy prod-health prod-scheduler-patrol prod-monitor-up prod-monitor-down prod-monitor-status prod-monitor-lint prod-alert-test prod-ops-report prod-install-ops-timer
+.PHONY: help install dev test lint format clean run docker staging-up staging-down staging-logs staging-migrate staging-health prod-env-check prod-deploy prod-health prod-scheduler-patrol prod-monitor-up prod-monitor-down prod-monitor-status prod-monitor-lint prod-alert-test prod-alert-webhook-smoke prod-ops-report prod-install-ops-timer
 
 # 默认目标
 help:
@@ -39,6 +39,7 @@ help:
 	@echo "  make prod-monitor-status     - 查看监控栈状态"
 	@echo "  make prod-monitor-lint       - 校验 Prometheus/Alertmanager 配置"
 	@echo "  make prod-alert-test         - 注入一条测试告警到 Alertmanager"
+	@echo "  make prod-alert-webhook-smoke - 直测 API 告警 webhook 接收端点"
 	@echo "  make prod-ops-report         - 生成每日巡检报告（logs/ops）"
 	@echo "  make prod-install-ops-timer  - 安装 systemd 定时巡检（需 root）"
 
@@ -225,6 +226,9 @@ prod-monitor-lint:
 
 prod-alert-test:
 	bash scripts/ops/alertmanager_test.sh
+
+prod-alert-webhook-smoke:
+	bash scripts/ops/alert_webhook_smoke.sh
 
 prod-ops-report:
 	bash scripts/ops/daily_ops_report.sh

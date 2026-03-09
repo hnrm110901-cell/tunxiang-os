@@ -117,6 +117,12 @@ make prod-monitor-lint
 make prod-alert-test
 ```
 
+直测 API 告警 webhook（不经 Prometheus）：
+
+```bash
+ALERT_WEBHOOK_TOKEN=<token> make prod-alert-webhook-smoke
+```
+
 停止监控栈：
 
 ```bash
