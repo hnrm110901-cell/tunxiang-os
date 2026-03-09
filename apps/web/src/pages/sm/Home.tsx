@@ -265,6 +265,24 @@ export default function SmHome() {
     rejected: 'critical',
   };
   const canSubmitAdvice = !!selectedAdvice && selectedAdvice.source === 'advice' && selectedAdvice.status === 'pending';
+  const rejectionBreakdown = (() => {
+    const list = (adviceHistory?.items || [])
+      .filter((x) => x.action === 'rejected')
+      .map((x) => x.rejection_reason_text || x.rejection_reason)
+      .filter((x): x is string => !!x);
+    if (!list.length) return [];
+    const total = list.length;
+    const map: Record<string, number> = {};
+    list.forEach((x) => { map[x] = (map[x] || 0) + 1; });
+    return Object.entries(map)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 4)
+      .map(([reason, count]) => ({
+        reason,
+        count,
+        pct: Math.round((count / total) * 100),
+      }));
+  })();
 
   return (
     <div className={styles.page}>
@@ -429,6 +447,21 @@ export default function SmHome() {
                 {adviceHistory.rejection_reasons_top.length > 0 && (
                   <div className={styles.historyReasons}>
                     高频拒绝原因：{adviceHistory.rejection_reasons_top.join('；')}
+                  </div>
+                )}
+                {rejectionBreakdown.length > 0 && (
+                  <div className={styles.reasonBars}>
+                    {rejectionBreakdown.map((x) => (
+                      <div key={x.reason} className={styles.reasonBarItem}>
+                        <div className={styles.reasonBarHead}>
+                          <span>{x.reason}</span>
+                          <span>{x.pct}%</span>
+                        </div>
+                        <div className={styles.reasonBarTrack}>
+                          <div className={styles.reasonBarFill} style={{ width: `${x.pct}%` }} />
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
                 <div className={styles.historyList}>
