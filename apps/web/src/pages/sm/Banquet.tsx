@@ -176,6 +176,12 @@ export default function SmBanquet() {
             >
               查看全部订单
             </ZButton>
+            <ZButton
+              variant="ghost"
+              onClick={() => navigate('/sm/banquet-tasks')}
+            >
+              执行任务
+            </ZButton>
           </div>
         </ZCard>
       </div>

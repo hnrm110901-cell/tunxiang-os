@@ -152,6 +152,9 @@ export default function SmBanquetOrders() {
                     <div className={styles.right}>
                       <span className={styles.amount}>¥{order.amount_yuan.toLocaleString()}</span>
                       <ZBadge type={s.type} text={s.text} />
+                      <ZButton variant="ghost" size="sm" onClick={() => navigate(`/sm/banquet-orders/${order.banquet_id}`)}>
+                        详情
+                      </ZButton>
                       {order.status === 'confirmed' && (
                         <ZButton variant="ghost" size="sm" onClick={() => openPayModal(order)}>
                           登记付款

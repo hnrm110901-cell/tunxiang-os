@@ -10,7 +10,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import dayjs from 'dayjs';
 import {
-  ZCard, ZKpi, ZBadge, ZSkeleton, ZEmpty, ZSelect, ZTabs,
+  ZCard, ZKpi, ZBadge, ZSkeleton, ZEmpty, ZSelect, ZTabs, ZButton, ZInput,
 } from '../../design-system/components';
 import apiClient from '../../services/api';
 import { handleApiError } from '../../utils/message';
@@ -420,6 +420,184 @@ function AvailabilityTab() {
   );
 }
 
+/* ─── Tab4：AI 建议 ─── */
+interface FollowupItem {
+  lead_id:    string;
+  days_stale: number;
+  stage:      string;
+  suggestion: string;
+}
+
+interface PackageRec {
+  package_id:                     string;
+  package_name:                   string;
+  suggested_price_per_person_yuan: number;
+  total_price_yuan:               number;
+  estimated_gross_profit_yuan:    number;
+  gross_margin_pct:               number;
+  banquet_type:                   string;
+}
+
+function AITab() {
+  const [scanning,      setScanning]      = useState(false);
+  const [followups,     setFollowups]     = useState<FollowupItem[] | null>(null);
+
+  const [recPeople,     setRecPeople]     = useState('');
+  const [recBudget,     setRecBudget]     = useState('');
+  const [recType,       setRecType]       = useState('');
+  const [recommending,  setRecommending]  = useState(false);
+  const [packages,      setPackages]      = useState<PackageRec[] | null>(null);
+
+  const BANQUET_TYPE_OPTIONS = [
+    { value: '',         label: '不限类型' },
+    { value: 'wedding',  label: '婚宴' },
+    { value: 'birthday', label: '寿宴' },
+    { value: 'business', label: '商务宴' },
+    { value: 'other',    label: '其他' },
+  ];
+
+  const runFollowupScan = useCallback(async () => {
+    setScanning(true);
+    setFollowups(null);
+    try {
+      const resp = await apiClient.get(
+        `/api/v1/banquet-agent/stores/${STORE_ID}/agent/followup-scan`,
+        { params: { dry_run: true } },
+      );
+      setFollowups(resp.data?.items ?? []);
+    } catch {
+      setFollowups([]);
+    } finally {
+      setScanning(false);
+    }
+  }, []);
+
+  const runQuoteRecommend = useCallback(async () => {
+    const pc = parseInt(recPeople, 10);
+    const budget = parseFloat(recBudget);
+    if (!pc || !budget) return;
+    setRecommending(true);
+    setPackages(null);
+    try {
+      const params: Record<string, string | number> = { people_count: pc, budget_yuan: budget };
+      if (recType) params.banquet_type = recType;
+      const resp = await apiClient.get(
+        `/api/v1/banquet-agent/stores/${STORE_ID}/agent/quote-recommend`,
+        { params },
+      );
+      setPackages(resp.data?.recommendations ?? resp.data ?? []);
+    } catch {
+      setPackages([]);
+    } finally {
+      setRecommending(false);
+    }
+  }, [recPeople, recBudget, recType]);
+
+  return (
+    <div className={styles.tabContent}>
+      {/* 跟进扫描 */}
+      <ZCard>
+        <div className={styles.aiSectionHeader}>
+          <div className={styles.aiSectionTitle}>跟进扫描</div>
+          <ZButton variant="primary" size="sm" onClick={runFollowupScan} disabled={scanning}>
+            {scanning ? '扫描中…' : '扫描停滞线索'}
+          </ZButton>
+        </div>
+        {followups === null && !scanning && (
+          <div className={styles.aiHint}>点击「扫描停滞线索」获取跟进建议</div>
+        )}
+        {scanning && <ZSkeleton rows={3} />}
+        {followups !== null && !scanning && followups.length === 0 && (
+          <ZEmpty title="暂无停滞线索" description="所有线索均在正常跟进中" />
+        )}
+        {followups !== null && followups.length > 0 && (
+          <div className={styles.followupList}>
+            {followups.map(item => (
+              <div key={item.lead_id} className={styles.followupRow}>
+                <div className={styles.followupMeta}>
+                  <ZBadge type="warning" text={`${item.days_stale}天未跟进`} />
+                  <span className={styles.followupStage}>{item.stage}</span>
+                </div>
+                <div className={styles.followupText}>{item.suggestion}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </ZCard>
+
+      {/* 报价推荐 */}
+      <ZCard>
+        <div className={styles.aiSectionTitle}>报价推荐</div>
+        <div className={styles.aiForm}>
+          <div className={styles.aiFormRow}>
+            <div className={styles.aiField}>
+              <label className={styles.aiLabel}>用餐人数</label>
+              <ZInput
+                type="number"
+                value={recPeople}
+                onChange={e => setRecPeople(e.target.value)}
+                placeholder="如：200"
+              />
+            </div>
+            <div className={styles.aiField}>
+              <label className={styles.aiLabel}>预算上限（元）</label>
+              <ZInput
+                type="number"
+                value={recBudget}
+                onChange={e => setRecBudget(e.target.value)}
+                placeholder="如：60000"
+              />
+            </div>
+          </div>
+          <div className={styles.aiFormRow}>
+            <div className={styles.aiField}>
+              <label className={styles.aiLabel}>宴会类型（选填）</label>
+              <ZSelect
+                value={recType}
+                options={BANQUET_TYPE_OPTIONS}
+                onChange={v => setRecType(v as string)}
+              />
+            </div>
+            <div className={styles.aiFieldAction}>
+              <ZButton
+                variant="primary"
+                onClick={runQuoteRecommend}
+                disabled={recommending || !recPeople || !recBudget}
+              >
+                {recommending ? '推荐中…' : '推荐套餐'}
+              </ZButton>
+            </div>
+          </div>
+        </div>
+        {recommending && <ZSkeleton rows={3} />}
+        {packages !== null && !recommending && packages.length === 0 && (
+          <ZEmpty title="暂无匹配套餐" description="请调整人数或预算后重试" />
+        )}
+        {packages !== null && packages.length > 0 && (
+          <div className={styles.packageList}>
+            {packages.map(pkg => (
+              <div key={pkg.package_id} className={styles.packageCard}>
+                <div className={styles.packageName}>{pkg.package_name}</div>
+                <div className={styles.packageMeta}>
+                  <span>{pkg.banquet_type}</span>
+                  <span>·</span>
+                  <span>¥{pkg.suggested_price_per_person_yuan}/人</span>
+                </div>
+                <div className={styles.packageStats}>
+                  <span className={styles.packageTotal}>总价¥{pkg.total_price_yuan.toLocaleString()}</span>
+                  <span className={styles.packageProfit}>
+                    毛利¥{pkg.estimated_gross_profit_yuan.toLocaleString()} · {pkg.gross_margin_pct}%
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </ZCard>
+    </div>
+  );
+}
+
 /* ─── 主组件 ─── */
 export default function HQBanquet() {
   return (
@@ -432,6 +610,7 @@ export default function HQBanquet() {
           { key: 'dashboard', label: '仪表盘',  children: <DashboardTab /> },
           { key: 'pipeline',  label: '销售管道', children: <PipelineTab /> },
           { key: 'calendar',  label: '销控日历', children: <AvailabilityTab /> },
+          { key: 'ai',        label: 'AI 建议',  children: <AITab /> },
         ]}
       />
     </div>

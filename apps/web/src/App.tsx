@@ -188,8 +188,10 @@ const HQFinance       = lazy(() => import('./pages/hq/Finance'));
 const HQWorkforce     = lazy(() => import('./pages/hq/Workforce'));
 const HQBanquet       = lazy(() => import('./pages/hq/Banquet'));
 const SmBanquet       = lazy(() => import('./pages/sm/Banquet'));
-const SmBanquetLeads  = lazy(() => import('./pages/sm/BanquetLeads'));
-const SmBanquetOrders = lazy(() => import('./pages/sm/BanquetOrders'));
+const SmBanquetLeads       = lazy(() => import('./pages/sm/BanquetLeads'));
+const SmBanquetOrders      = lazy(() => import('./pages/sm/BanquetOrders'));
+const SmBanquetOrderDetail = lazy(() => import('./pages/sm/BanquetOrderDetail'));
+const SmBanquetTasks       = lazy(() => import('./pages/sm/BanquetTasks'));
 
 const PageLoader = (
   <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 300 }}>
@@ -646,9 +648,11 @@ const AppContent: React.FC = () => {
                   <Route path="decisions" element={<SmDecisions />} />
                   <Route path="alerts"    element={<SmAlerts />} />
                   <Route path="workforce" element={<SmWorkforce />} />
-                  <Route path="banquet"        element={<SmBanquet />} />
-                  <Route path="banquet-leads"  element={<SmBanquetLeads />} />
-                  <Route path="banquet-orders" element={<SmBanquetOrders />} />
+                  <Route path="banquet"              element={<SmBanquet />} />
+                  <Route path="banquet-leads"        element={<SmBanquetLeads />} />
+                  <Route path="banquet-orders"       element={<SmBanquetOrders />} />
+                  <Route path="banquet-orders/:orderId" element={<SmBanquetOrderDetail />} />
+                  <Route path="banquet-tasks"        element={<SmBanquetTasks />} />
                 </Route>
 
                 {/* Role-based views — Chef (手机) */}

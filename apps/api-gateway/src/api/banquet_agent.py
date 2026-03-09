@@ -19,9 +19,10 @@ from src.models.user import User
 from src.models.banquet import (
     BanquetHall, BanquetCustomer, BanquetLead, BanquetOrder,
     MenuPackage, ExecutionTask, BanquetPaymentRecord,
-    BanquetHallBooking, BanquetKpiDaily,
+    BanquetHallBooking, BanquetKpiDaily, BanquetQuote,
     LeadStageEnum, OrderStatusEnum, BanquetTypeEnum,
     BanquetHallType, PaymentTypeEnum, DepositStatusEnum,
+    TaskStatusEnum,
 )
 import sys
 from pathlib import Path as _Path
@@ -513,6 +514,332 @@ async def add_payment(
         "paid_yuan": order.paid_fen / 100,
         "balance_yuan": (order.total_amount_fen - order.paid_fen) / 100,
         "deposit_status": order.deposit_status.value,
+    }
+
+
+# ────────── 订单详情 ──────────────────────────────────────────────────────────
+
+@router.get("/stores/{store_id}/orders/{order_id}")
+async def get_order_detail(
+    store_id: str,
+    order_id: str,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """订单详情：基本信息 + 执行任务 + 付款记录"""
+    result = await db.execute(
+        select(BanquetOrder)
+        .options(
+            selectinload(BanquetOrder.tasks),
+            selectinload(BanquetOrder.payments),
+            selectinload(BanquetOrder.bookings).selectinload(BanquetHallBooking.hall),
+            selectinload(BanquetOrder.customer),
+        )
+        .where(and_(BanquetOrder.id == order_id, BanquetOrder.store_id == store_id))
+    )
+    order = result.scalars().first()
+    if not order:
+        raise HTTPException(status_code=404, detail="订单不存在")
+
+    tasks_data = [
+        {
+            "task_id":    t.id,
+            "task_name":  t.task_name,
+            "task_type":  t.task_type,
+            "owner_role": t.owner_role.value,
+            "due_time":   t.due_time.isoformat() if t.due_time else None,
+            "status":     t.task_status.value,
+            "completed_at": t.completed_at.isoformat() if t.completed_at else None,
+            "remark":     t.remark,
+        }
+        for t in sorted(order.tasks, key=lambda x: x.due_time)
+    ]
+    payments_data = [
+        {
+            "payment_id":     p.id,
+            "payment_type":   p.payment_type.value,
+            "amount_yuan":    p.amount_fen / 100,
+            "payment_method": p.payment_method,
+            "paid_at":        p.paid_at.isoformat() if p.paid_at else None,
+            "receipt_no":     p.receipt_no,
+        }
+        for p in sorted(order.payments, key=lambda x: x.paid_at)
+    ]
+    booking = order.bookings[0] if order.bookings else None
+
+    tasks_done  = sum(1 for t in order.tasks if t.task_status == TaskStatusEnum.DONE)
+    tasks_total = len(order.tasks)
+
+    return {
+        "order_id":          order.id,
+        "store_id":          order.store_id,
+        "banquet_type":      order.banquet_type.value,
+        "banquet_date":      order.banquet_date.isoformat(),
+        "people_count":      order.people_count,
+        "table_count":       order.table_count,
+        "contact_name":      order.contact_name or (order.customer.name if order.customer else None),
+        "contact_phone":     order.contact_phone or (order.customer.phone if order.customer else None),
+        "status":            order.order_status.value,
+        "deposit_status":    order.deposit_status.value,
+        "total_amount_yuan": order.total_amount_fen / 100,
+        "paid_yuan":         order.paid_fen / 100,
+        "balance_yuan":      (order.total_amount_fen - order.paid_fen) / 100,
+        "hall_name":         booking.hall.name if booking and booking.hall else None,
+        "slot_name":         booking.slot_name if booking else None,
+        "remark":            order.remark,
+        "tasks":             tasks_data,
+        "tasks_done":        tasks_done,
+        "tasks_total":       tasks_total,
+        "payments":          payments_data,
+    }
+
+
+# ────────── 执行任务 ──────────────────────────────────────────────────────────
+
+class TaskUpdateReq(BaseModel):
+    status: TaskStatusEnum
+    remark: Optional[str] = None
+
+
+@router.get("/stores/{store_id}/orders/{order_id}/tasks")
+async def list_order_tasks(
+    store_id: str,
+    order_id: str,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """订单执行任务列表"""
+    # verify order belongs to store
+    order_result = await db.execute(
+        select(BanquetOrder.id).where(
+            and_(BanquetOrder.id == order_id, BanquetOrder.store_id == store_id)
+        )
+    )
+    if not order_result.first():
+        raise HTTPException(status_code=404, detail="订单不存在")
+
+    result = await db.execute(
+        select(ExecutionTask)
+        .where(ExecutionTask.banquet_order_id == order_id)
+        .order_by(ExecutionTask.due_time)
+    )
+    tasks = result.scalars().all()
+    return [
+        {
+            "task_id":    t.id,
+            "task_name":  t.task_name,
+            "task_type":  t.task_type,
+            "owner_role": t.owner_role.value,
+            "due_time":   t.due_time.isoformat() if t.due_time else None,
+            "status":     t.task_status.value,
+            "completed_at": t.completed_at.isoformat() if t.completed_at else None,
+            "remark":     t.remark,
+        }
+        for t in tasks
+    ]
+
+
+@router.patch("/stores/{store_id}/orders/{order_id}/tasks/{task_id}")
+async def update_task_status(
+    store_id: str,
+    order_id: str,
+    task_id: str,
+    body: TaskUpdateReq,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """更新任务状态（完成/重开等）"""
+    # join-verify task belongs to this store's order
+    result = await db.execute(
+        select(ExecutionTask)
+        .join(BanquetOrder, ExecutionTask.banquet_order_id == BanquetOrder.id)
+        .where(
+            and_(
+                ExecutionTask.id == task_id,
+                BanquetOrder.id == order_id,
+                BanquetOrder.store_id == store_id,
+            )
+        )
+    )
+    task = result.scalars().first()
+    if not task:
+        raise HTTPException(status_code=404, detail="任务不存在")
+
+    task.task_status = body.status
+    if body.status == TaskStatusEnum.DONE and not task.completed_at:
+        task.completed_at = datetime.utcnow()
+    elif body.status != TaskStatusEnum.DONE:
+        task.completed_at = None
+    if body.remark is not None:
+        task.remark = body.remark
+    await db.commit()
+    return {"task_id": task_id, "status": task.task_status.value}
+
+
+@router.post("/stores/{store_id}/orders/{order_id}/tasks/generate", status_code=201)
+async def generate_order_tasks(
+    store_id: str,
+    order_id: str,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """从模板为订单批量生成执行任务（ExecutionAgent）"""
+    result = await db.execute(
+        select(BanquetOrder).where(
+            and_(BanquetOrder.id == order_id, BanquetOrder.store_id == store_id)
+        )
+    )
+    order = result.scalars().first()
+    if not order:
+        raise HTTPException(status_code=404, detail="订单不存在")
+
+    tasks = await _execution.generate_tasks_for_order(order=order, db=db)
+    return {"order_id": order_id, "tasks_generated": len(tasks)}
+
+
+@router.get("/stores/{store_id}/tasks")
+async def list_store_tasks(
+    store_id: str,
+    status: Optional[str] = Query(None, description="pending/in_progress/done/overdue"),
+    owner_role: Optional[str] = Query(None, description="kitchen/service/decor/purchase/manager"),
+    due_date: Optional[str] = Query(None, description="YYYY-MM-DD，筛选截止日当天"),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """跨订单执行任务视图（SM 任务清单）"""
+    stmt = (
+        select(ExecutionTask, BanquetOrder.banquet_date, BanquetOrder.banquet_type)
+        .join(BanquetOrder, ExecutionTask.banquet_order_id == BanquetOrder.id)
+        .where(BanquetOrder.store_id == store_id)
+    )
+    if status:
+        try:
+            stmt = stmt.where(ExecutionTask.task_status == TaskStatusEnum(status))
+        except ValueError:
+            pass
+    if owner_role:
+        from src.models.banquet import TaskOwnerRoleEnum
+        try:
+            stmt = stmt.where(ExecutionTask.owner_role == TaskOwnerRoleEnum(owner_role))
+        except ValueError:
+            pass
+    if due_date:
+        from datetime import date as _date
+        try:
+            d = _date.fromisoformat(due_date)
+            stmt = stmt.where(func.date(ExecutionTask.due_time) == d)
+        except ValueError:
+            pass
+
+    stmt = stmt.order_by(ExecutionTask.due_time)
+    result = await db.execute(stmt)
+    rows = result.all()
+
+    return [
+        {
+            "task_id":       t.id,
+            "task_name":     t.task_name,
+            "task_type":     t.task_type,
+            "owner_role":    t.owner_role.value,
+            "due_time":      t.due_time.isoformat() if t.due_time else None,
+            "status":        t.task_status.value,
+            "completed_at":  t.completed_at.isoformat() if t.completed_at else None,
+            "order_id":      t.banquet_order_id,
+            "banquet_date":  banquet_date.isoformat() if banquet_date else None,
+            "banquet_type":  banquet_type.value if banquet_type else None,
+        }
+        for t, banquet_date, banquet_type in rows
+    ]
+
+
+# ────────── 报价单 ────────────────────────────────────────────────────────────
+
+class QuoteCreateReq(BaseModel):
+    people_count: int = Field(ge=1)
+    table_count: int = Field(ge=1)
+    quoted_amount_yuan: float = Field(gt=0)
+    package_id: Optional[str] = None
+    valid_days: int = Field(default=7, ge=1, le=90)
+    menu_snapshot: Optional[dict] = None
+
+
+@router.get("/stores/{store_id}/leads/{lead_id}/quotes")
+async def list_lead_quotes(
+    store_id: str,
+    lead_id: str,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """线索报价单列表"""
+    # verify lead belongs to store
+    lead_result = await db.execute(
+        select(BanquetLead.id).where(
+            and_(BanquetLead.id == lead_id, BanquetLead.store_id == store_id)
+        )
+    )
+    if not lead_result.first():
+        raise HTTPException(status_code=404, detail="线索不存在")
+
+    result = await db.execute(
+        select(BanquetQuote)
+        .where(BanquetQuote.lead_id == lead_id)
+        .order_by(BanquetQuote.created_at.desc())
+    )
+    quotes = result.scalars().all()
+    return [
+        {
+            "quote_id":           q.id,
+            "people_count":       q.people_count,
+            "table_count":        q.table_count,
+            "quoted_amount_yuan": q.quoted_amount_fen / 100,
+            "valid_until":        q.valid_until.isoformat() if q.valid_until else None,
+            "is_accepted":        q.is_accepted,
+            "package_id":         q.package_id,
+            "created_at":         q.created_at.isoformat() if q.created_at else None,
+        }
+        for q in quotes
+    ]
+
+
+@router.post("/stores/{store_id}/leads/{lead_id}/quotes", status_code=201)
+async def create_lead_quote(
+    store_id: str,
+    lead_id: str,
+    body: QuoteCreateReq,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """创建报价单"""
+    lead_result = await db.execute(
+        select(BanquetLead.id).where(
+            and_(BanquetLead.id == lead_id, BanquetLead.store_id == store_id)
+        )
+    )
+    if not lead_result.first():
+        raise HTTPException(status_code=404, detail="线索不存在")
+
+    from datetime import date as _date, timedelta
+    valid_until = _date.today() + timedelta(days=body.valid_days)
+
+    quote = BanquetQuote(
+        id=str(uuid.uuid4()),
+        lead_id=lead_id,
+        store_id=store_id,
+        package_id=body.package_id,
+        people_count=body.people_count,
+        table_count=body.table_count,
+        quoted_amount_fen=int(body.quoted_amount_yuan * 100),
+        menu_snapshot=body.menu_snapshot,
+        valid_until=valid_until,
+        is_accepted=False,
+        created_by=str(current_user.id),
+    )
+    db.add(quote)
+    await db.commit()
+    return {
+        "quote_id":           quote.id,
+        "quoted_amount_yuan": body.quoted_amount_yuan,
+        "valid_until":        valid_until.isoformat(),
     }
 
 
