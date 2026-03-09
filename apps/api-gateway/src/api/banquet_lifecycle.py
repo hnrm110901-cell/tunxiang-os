@@ -34,6 +34,18 @@ router = APIRouter(
     tags=["banquet_lifecycle"],
 )
 
+# 7 阶段中文标签（用于 Phase 2 前端 PipelineTab）
+_PIPELINE_STAGE_LABELS: dict[str, str] = {
+    "lead":        "商机",
+    "intent":      "意向",
+    "room_lock":   "锁台",
+    "signed":      "已签约",
+    "preparation": "准备中",
+    "service":     "服务中",
+    "completed":   "已完成",
+    "cancelled":   "已取消",
+}
+
 
 # ── Pydantic Schemas ──────────────────────────────────────────────────────────
 
@@ -76,7 +88,35 @@ async def get_pipeline(
     lte = _date.fromisoformat(event_date_lte) if event_date_lte else None
 
     svc = BanquetLifecycleService(db)
-    return await svc.get_pipeline(store_id, event_date_gte=gte, event_date_lte=lte)
+    raw = await svc.get_pipeline(store_id, event_date_gte=gte, event_date_lte=lte)
+
+    # Phase 2: convert dict-of-lists → array of PipelineStage objects
+    stages_dict: dict = raw.get("stages", {})
+    pipeline_array = [
+        {
+            "stage":       stage_key,
+            "stage_label": _PIPELINE_STAGE_LABELS.get(stage_key, stage_key),
+            "count":       len(leads),
+            "leads": [
+                {
+                    "banquet_id":    item.get("reservation_id"),
+                    "banquet_type":  item.get("banquet_details_type", "宴会"),
+                    "expected_date": item.get("reservation_date"),
+                    "contact_name":  item.get("customer_name"),
+                    "amount_yuan":   item.get("estimated_budget"),
+                }
+                for item in leads
+            ],
+        }
+        for stage_key, leads in stages_dict.items()
+        if stage_key != "cancelled"   # 已取消不在管道中展示
+    ]
+
+    return {
+        **raw,
+        # Phase 2 frontend reads raw?.stages or Array.isArray(raw)
+        "stages": pipeline_array,
+    }
 
 
 @router.get(
@@ -110,12 +150,22 @@ async def get_availability_calendar(
         )
 
     svc = BanquetLifecycleService(db)
-    return await svc.get_availability_calendar(
+    result = await svc.get_availability_calendar(
         store_id=store_id,
         year=year,
         month=month,
         max_capacity=max_capacity,
     )
+
+    # Phase 2: add `days` alias for calendar array, and `capacity` per day
+    calendar = result.get("calendar", [])
+    for day in calendar:
+        day["capacity"] = max_capacity   # frontend uses cell.capacity for full check
+
+    return {
+        **result,
+        "days": calendar,   # frontend reads raw?.days
+    }
 
 
 @router.get(

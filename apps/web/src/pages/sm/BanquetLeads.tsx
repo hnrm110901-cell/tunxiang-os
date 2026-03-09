@@ -17,20 +17,32 @@ import styles from './BanquetLeads.module.css';
 const STORE_ID = localStorage.getItem('store_id') || 'S001';
 
 const STAGE_FILTERS = [
-  { value: '',          label: '全部' },
-  { value: 'inquiry',   label: '初步询价' },
-  { value: 'intent',    label: '意向确认' },
-  { value: 'locked',    label: '锁台' },
-  { value: 'signed',    label: '已签约' },
+  { value: '',                label: '全部' },
+  { value: 'new',             label: '初步询价' },
+  { value: 'quoted',          label: '意向确认' },
+  { value: 'deposit_pending', label: '锁台' },
+  { value: 'won',             label: '已签约' },
 ];
 
-const STAGE_OPTIONS = STAGE_FILTERS.filter(s => s.value !== '');
+const STAGE_OPTIONS = [
+  { value: 'contacted',        label: '已联系' },
+  { value: 'visit_scheduled',  label: '预约看厅' },
+  { value: 'quoted',           label: '已报价' },
+  { value: 'waiting_decision', label: '等待决策' },
+  { value: 'deposit_pending',  label: '待付定金' },
+  { value: 'won',              label: '成交' },
+  { value: 'lost',             label: '流失' },
+];
 
 const STAGE_BADGE_TYPE: Record<string, 'info' | 'warning' | 'success' | 'default'> = {
-  inquiry: 'info',
-  intent:  'warning',
-  locked:  'warning',
-  signed:  'success',
+  new:              'info',
+  contacted:        'info',
+  visit_scheduled:  'info',
+  quoted:           'warning',
+  waiting_decision: 'warning',
+  deposit_pending:  'warning',
+  won:              'success',
+  lost:             'default',
 };
 
 interface LeadItem {

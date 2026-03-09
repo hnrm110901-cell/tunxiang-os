@@ -18,24 +18,28 @@ const STORE_ID = localStorage.getItem('store_id') || 'S001';
 
 const STATUS_FILTERS = [
   { value: '',           label: '全部' },
-  { value: 'pending',    label: '待确认' },
+  { value: 'draft',      label: '待确认' },
   { value: 'confirmed',  label: '已确认' },
   { value: 'completed',  label: '已完成' },
   { value: 'cancelled',  label: '已取消' },
 ];
 
 const PAYMENT_METHODS = [
-  { value: 'cash',    label: '现金' },
+  { value: 'cash',     label: '现金' },
   { value: 'transfer', label: '转账' },
-  { value: 'wechat',  label: '微信' },
-  { value: 'alipay',  label: '支付宝' },
+  { value: 'wechat',   label: '微信' },
+  { value: 'alipay',   label: '支付宝' },
 ];
 
 const STATUS_BADGE: Record<string, { text: string; type: 'success' | 'info' | 'warning' | 'default' }> = {
-  pending:   { text: '待确认', type: 'warning' },
-  confirmed: { text: '已确认', type: 'success' },
-  completed: { text: '已完成', type: 'info'    },
-  cancelled: { text: '已取消', type: 'default' },
+  draft:       { text: '待确认', type: 'warning' },
+  confirmed:   { text: '已确认', type: 'success' },
+  preparing:   { text: '准备中', type: 'info'    },
+  in_progress: { text: '进行中', type: 'info'    },
+  completed:   { text: '已完成', type: 'info'    },
+  settled:     { text: '已结算', type: 'success' },
+  closed:      { text: '已关闭', type: 'default' },
+  cancelled:   { text: '已取消', type: 'default' },
 };
 
 interface OrderItem {

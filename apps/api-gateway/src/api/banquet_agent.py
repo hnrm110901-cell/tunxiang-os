@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, Query, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, func
+from sqlalchemy.orm import selectinload
 
 from src.core.database import get_db
 from src.core.security import get_current_user
@@ -39,6 +40,17 @@ def _load_banquet_agents():
 _FollowupAgent, _QuotationAgent, _SchedulingAgent, _ExecutionAgent, _ReviewAgent = _load_banquet_agents()
 
 router = APIRouter(prefix="/api/v1/banquet-agent", tags=["banquet-agent"])
+
+_LEAD_STAGE_LABELS: dict[str, str] = {
+    "new":              "初步询价",
+    "contacted":        "已联系",
+    "visit_scheduled":  "预约看厅",
+    "quoted":           "意向确认",
+    "waiting_decision": "等待决策",
+    "deposit_pending":  "锁台",
+    "won":              "已签约",
+    "lost":             "已流失",
+}
 
 _followup   = _FollowupAgent()
 _quotation  = _QuotationAgent()
@@ -82,7 +94,8 @@ class LeadCreateReq(BaseModel):
 
 class LeadStageUpdateReq(BaseModel):
     stage: LeadStageEnum
-    followup_content: str
+    followup_content: Optional[str] = None   # legacy field name
+    followup_note:    Optional[str] = None   # Phase 2 frontend field name
     next_followup_days: Optional[int] = Field(None, ge=1, le=30)
 
 
@@ -104,7 +117,7 @@ class OrderCreateReq(BaseModel):
 
 
 class PaymentReq(BaseModel):
-    payment_type: PaymentTypeEnum
+    payment_type: PaymentTypeEnum = PaymentTypeEnum.BALANCE   # default: 尾款
     amount_yuan: float = Field(gt=0)
     payment_method: Optional[str] = None
     receipt_no: Optional[str] = None
@@ -237,9 +250,16 @@ async def list_leads(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(get_current_user),
 ):
-    stmt = select(BanquetLead).where(BanquetLead.store_id == store_id)
+    stmt = (
+        select(BanquetLead)
+        .options(selectinload(BanquetLead.customer))
+        .where(BanquetLead.store_id == store_id)
+    )
     if stage:
-        stmt = stmt.where(BanquetLead.current_stage == LeadStageEnum(stage))
+        try:
+            stmt = stmt.where(BanquetLead.current_stage == LeadStageEnum(stage))
+        except ValueError:
+            pass  # 无效阶段值 → 忽略过滤，返回全部
     if owner_user_id:
         stmt = stmt.where(BanquetLead.owner_user_id == owner_user_id)
     result = await db.execute(stmt.order_by(BanquetLead.created_at.desc()))
@@ -248,14 +268,21 @@ async def list_leads(
         "total": len(leads),
         "items": [
             {
-                "id": l.id,
-                "banquet_type": l.banquet_type.value,
+                # Phase 2 frontend fields
+                "banquet_id":    l.id,
+                "banquet_type":  l.banquet_type.value,
                 "expected_date": str(l.expected_date) if l.expected_date else None,
+                "contact_name":  l.customer.name if l.customer else None,
+                "budget_yuan":   (l.expected_budget_fen or 0) / 100,
+                "stage":         l.current_stage.value,
+                "stage_label":   _LEAD_STAGE_LABELS.get(l.current_stage.value, l.current_stage.value),
+                # Legacy fields (backward compat)
+                "id":                   l.id,
                 "expected_people_count": l.expected_people_count,
-                "expected_budget_yuan": (l.expected_budget_fen or 0) / 100,
-                "current_stage": l.current_stage.value,
-                "owner_user_id": l.owner_user_id,
-                "last_followup_at": l.last_followup_at.isoformat() if l.last_followup_at else None,
+                "expected_budget_yuan":  (l.expected_budget_fen or 0) / 100,
+                "current_stage":         l.current_stage.value,
+                "owner_user_id":         l.owner_user_id,
+                "last_followup_at":      l.last_followup_at.isoformat() if l.last_followup_at else None,
             }
             for l in leads
         ],
@@ -314,12 +341,14 @@ async def update_lead_stage(
         from datetime import timedelta
         next_followup_at = datetime.utcnow() + timedelta(days=body.next_followup_days)
 
+    note_content = body.followup_content or body.followup_note or "（无跟进内容）"
+
     from src.models.banquet import LeadFollowupRecord
     record = LeadFollowupRecord(
         id=str(uuid.uuid4()),
         lead_id=lead_id,
         followup_type="wechat",          # 默认类型；后续可在 body 中扩展
-        content=body.followup_content,
+        content=note_content,
         stage_before=stage_before,
         stage_after=body.stage,
         next_followup_at=next_followup_at,
@@ -341,15 +370,20 @@ async def update_lead_stage(
 @router.get("/stores/{store_id}/orders")
 async def list_orders(
     store_id: str,
-    order_status: Optional[str] = Query(None),
+    status: Optional[str] = Query(None, description="订单状态（Phase 2 前端参数名）"),
+    order_status: Optional[str] = Query(None, description="订单状态（旧参数名，兼容保留）"),
     date_from: Optional[str] = Query(None, description="YYYY-MM-DD"),
     date_to: Optional[str] = Query(None, description="YYYY-MM-DD"),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(get_current_user),
 ):
     stmt = select(BanquetOrder).where(BanquetOrder.store_id == store_id)
-    if order_status:
-        stmt = stmt.where(BanquetOrder.order_status == OrderStatusEnum(order_status))
+    effective_status = status or order_status
+    if effective_status:
+        try:
+            stmt = stmt.where(BanquetOrder.order_status == OrderStatusEnum(effective_status))
+        except ValueError:
+            pass  # 无效状态值 → 忽略过滤，返回全部
     if date_from:
         stmt = stmt.where(BanquetOrder.banquet_date >= date_from)
     if date_to:
@@ -360,16 +394,21 @@ async def list_orders(
         "total": len(orders),
         "items": [
             {
-                "id": o.id,
+                # Phase 2 frontend fields
+                "banquet_id":   o.id,
                 "banquet_type": o.banquet_type.value,
                 "banquet_date": str(o.banquet_date),
-                "people_count": o.people_count,
-                "table_count": o.table_count,
-                "order_status": o.order_status.value,
-                "deposit_status": o.deposit_status.value,
-                "total_amount_yuan": o.total_amount_fen / 100,
-                "paid_yuan": o.paid_fen / 100,
-                "balance_yuan": (o.total_amount_fen - o.paid_fen) / 100,
+                "table_count":  o.table_count,
+                "amount_yuan":  o.total_amount_fen / 100,
+                "status":       o.order_status.value,
+                # Legacy fields (backward compat)
+                "id":                 o.id,
+                "people_count":       o.people_count,
+                "order_status":       o.order_status.value,
+                "deposit_status":     o.deposit_status.value,
+                "total_amount_yuan":  o.total_amount_fen / 100,
+                "paid_yuan":          o.paid_fen / 100,
+                "balance_yuan":       (o.total_amount_fen - o.paid_fen) / 100,
             }
             for o in orders
         ],
@@ -553,16 +592,23 @@ async def agent_generate_review(
 @router.get("/stores/{store_id}/dashboard")
 async def banquet_dashboard(
     store_id: str,
-    month: Optional[str] = Query(None, description="YYYY-MM，默认当月"),
+    year:  Optional[int] = Query(None, description="年份（整数，与 month 整数配合使用）"),
+    month: Optional[str] = Query(None, description="月份：可为整数 '3' 或 YYYY-MM 字符串 '2026-03'"),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(get_current_user),
 ):
     """宴会经营驾驶舱：本月收入/订单数/转化率/档期利用率"""
-    from datetime import date
-    if month:
+    from datetime import date as _date
+    # 解析年月：支持 ?year=2026&month=3 和 ?month=2026-03 两种形式
+    if month and "-" in str(month):
         y, m = map(int, month.split("-"))
+    elif year and month:
+        y, m = year, int(month)
+    elif month:
+        today = _date.today()
+        y, m = today.year, int(month)
     else:
-        today = date.today()
+        today = _date.today()
         y, m = today.year, today.month
 
     # KPI 日报聚合
@@ -593,10 +639,15 @@ async def banquet_dashboard(
         "store_id": store_id,
         "year": y,
         "month": m,
-        "revenue_yuan": revenue_yuan,            # Rule 6: ¥字段
-        "gross_profit_yuan": profit_yuan,
-        "order_count": order_count,
-        "lead_count": lead_count,
+        # Phase 2 frontend fields (DashboardData interface)
+        "revenue_yuan":     revenue_yuan,
+        "gross_margin_pct": round(profit_yuan / revenue_yuan * 100, 1) if revenue_yuan > 0 else 0,
+        "order_count":      order_count,
+        "conversion_rate":  conversion,       # alias: conversion_rate_pct
+        "room_utilization": utilization,      # alias: hall_utilization_pct
+        # Legacy / additional fields
+        "gross_profit_yuan":   profit_yuan,
+        "lead_count":          lead_count,
         "conversion_rate_pct": conversion,
         "hall_utilization_pct": utilization,
         "summary": (
