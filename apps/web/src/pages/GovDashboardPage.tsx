@@ -1,17 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
-  Card, Row, Col, Statistic, Table, Tag, Select, Spin,
-  Alert, Typography, Space,
+  Table, Tag, Select, Space, Typography, Alert,
 } from 'antd';
 import {
-  CheckCircleOutlined, CloseCircleOutlined,
-  EditOutlined, SyncOutlined, RobotOutlined,
+  CheckCircleOutlined, EditOutlined, SyncOutlined, RobotOutlined,
 } from '@ant-design/icons';
 import ReactECharts from 'echarts-for-react';
-import dayjs from 'dayjs';
 import { apiClient, handleApiError } from '../services/api';
+import AgentWorkspaceTemplate from '../components/AgentWorkspaceTemplate';
+import { ZCard, ZEmpty } from '../design-system/components';
 
-const { Title, Text } = Typography;
+const { Text } = Typography;
 const { Option } = Select;
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -113,7 +112,9 @@ const GovDashboardPage: React.FC = () => {
   const [days, setDays] = useState(30);
   const [storeId, setStoreId] = useState<string | undefined>(undefined);
 
-  const fetchData = async () => {
+  const s = data?.summary;
+
+  const fetchData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -126,9 +127,9 @@ const GovDashboardPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [days, storeId]);
 
-  useEffect(() => { fetchData(); }, [days, storeId]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { fetchData(); }, [fetchData]);
 
   // ── 决策状态饼图 ────────────────────────────────────────────────────────────
   const pieOption = data ? {
@@ -212,182 +213,116 @@ const GovDashboardPage: React.FC = () => {
     },
   ];
 
-  return (
-    <div style={{ padding: 24 }}>
-      <Row justify="space-between" align="middle" style={{ marginBottom: 16 }}>
-        <Col>
-          <Title level={4} style={{ margin: 0 }}>
-            <RobotOutlined style={{ marginRight: 8 }} />AI 治理看板
-          </Title>
-          <Text type="secondary">决策采纳率 · 人工干预率 · Agent 健康度 · 信任分</Text>
-        </Col>
-        <Col>
-          <Space>
-            <Select value={days} onChange={setDays} style={{ width: 110 }}>
-              <Option value={7}>近 7 天</Option>
-              <Option value={30}>近 30 天</Option>
-              <Option value={90}>近 90 天</Option>
-            </Select>
-            <Select
-              placeholder="全部门店"
-              allowClear
-              style={{ width: 130 }}
-              onChange={(v) => setStoreId(v)}
-            >
-              {/* populated from stores API if needed */}
-            </Select>
-          </Space>
-        </Col>
-      </Row>
-
+  const overviewContent = (
+    <>
       {error && <Alert type="error" message={error} style={{ marginBottom: 16 }} />}
 
-      <Spin spinning={loading}>
-        {/* ── KPI 卡片 ────────────────────────────────────────────────────── */}
-        <Row gutter={[16, 16]}>
-          <Col xs={12} sm={6}>
-            <Card size="small">
-              <Statistic
-                title="决策总数"
-                value={data?.summary.total_decisions ?? 0}
-                suffix={<Text type="secondary" style={{ fontSize: 12 }}>条</Text>}
-              />
-            </Card>
-          </Col>
-          <Col xs={12} sm={6}>
-            <Card size="small">
-              <Statistic
-                title="AI决策采纳率"
-                value={data?.summary.adoption_rate ?? 0}
-                precision={1}
-                suffix="%"
-                valueStyle={{ color: (data?.summary.adoption_rate ?? 0) >= 70 ? '#52c41a' : '#faad14' }}
-                prefix={<CheckCircleOutlined />}
-              />
-            </Card>
-          </Col>
-          <Col xs={12} sm={6}>
-            <Card size="small">
-              <Statistic
-                title="人工干预率"
-                value={data?.summary.override_rate ?? 0}
-                precision={1}
-                suffix="%"
-                valueStyle={{ color: (data?.summary.override_rate ?? 0) <= 20 ? '#52c41a' : '#ff4d4f' }}
-                prefix={<EditOutlined />}
-              />
-            </Card>
-          </Col>
-          <Col xs={12} sm={6}>
-            <Card size="small">
-              <Statistic
-                title="平均置信度"
-                value={data?.summary.avg_confidence ?? 0}
-                precision={1}
-                suffix="%"
-                prefix={<RobotOutlined />}
-              />
-            </Card>
-          </Col>
-        </Row>
+      {/* 图表行：饼 + 折线 */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 12, marginBottom: 12 }}>
+        <ZCard title="决策状态分布" size="small">
+          {data && data.status_dist.length > 0
+            ? <ReactECharts option={pieOption} style={{ height: 220 }} />
+            : <ZEmpty style={{ height: 220 }} />}
+        </ZCard>
+        <ZCard title="周度 AI 决策采纳率趋势" size="small">
+          {data && data.weekly_trend.length > 0
+            ? <ReactECharts option={lineOption} style={{ height: 220 }} />
+            : <ZEmpty style={{ height: 220 }} />}
+        </ZCard>
+      </div>
 
-        <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
-          <Col xs={12} sm={6}>
-            <Card size="small">
-              <Statistic
-                title="平均信任分"
-                value={data?.summary.avg_trust_score ?? 0}
-                precision={1}
-                suffix="%"
-              />
-            </Card>
-          </Col>
-          <Col xs={12} sm={6}>
-            <Card size="small">
-              <Statistic
-                title="待人工审批"
-                value={data?.summary.pending_count ?? 0}
-                suffix="条"
-                valueStyle={{ color: (data?.summary.pending_count ?? 0) > 0 ? '#faad14' : undefined }}
-                prefix={<SyncOutlined />}
-              />
-            </Card>
-          </Col>
-          <Col xs={12} sm={6}>
-            <Card size="small">
-              <Statistic
-                title="已决策"
-                value={data?.summary.decided_count ?? 0}
-                suffix="条"
-                prefix={<CheckCircleOutlined style={{ color: '#52c41a' }} />}
-              />
-            </Card>
-          </Col>
-          <Col xs={12} sm={6}>
-            <Card size="small">
-              <Statistic
-                title="统计周期"
-                value={days}
-                suffix="天"
-              />
-            </Card>
-          </Col>
-        </Row>
+      {/* 柱状图 */}
+      <ZCard title="各 Agent 决策分布" size="small" style={{ marginBottom: 12 }}>
+        {data && data.agent_stats.length > 0
+          ? <ReactECharts option={barOption} style={{ height: 240 }} />
+          : <ZEmpty style={{ height: 240 }} />}
+      </ZCard>
 
-        {/* ── 图表区 ────────────────────────────────────────────────────────── */}
-        <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
-          <Col xs={24} md={8}>
-            <Card title="决策状态分布" size="small">
-              {data && data.status_dist.length > 0 ? (
-                <ReactECharts option={pieOption} style={{ height: 220 }} />
-              ) : (
-                <div style={{ height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Text type="secondary">暂无数据</Text>
-                </div>
-              )}
-            </Card>
-          </Col>
-          <Col xs={24} md={16}>
-            <Card title="周度 AI 决策采纳率趋势" size="small">
-              {data && data.weekly_trend.length > 0 ? (
-                <ReactECharts option={lineOption} style={{ height: 220 }} />
-              ) : (
-                <div style={{ height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Text type="secondary">暂无数据</Text>
-                </div>
-              )}
-            </Card>
-          </Col>
-        </Row>
+      {/* 日志表 */}
+      <ZCard title="最近决策日志" size="small">
+        <Table
+          dataSource={data?.recent_logs ?? []}
+          columns={columns}
+          rowKey="id"
+          size="small"
+          pagination={false}
+          scroll={{ x: 700 }}
+          locale={{ emptyText: '暂无决策记录' }}
+        />
+      </ZCard>
+    </>
+  );
 
-        <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
-          <Col xs={24}>
-            <Card title="各 Agent 决策分布" size="small">
-              {data && data.agent_stats.length > 0 ? (
-                <ReactECharts option={barOption} style={{ height: 240 }} />
-              ) : (
-                <div style={{ height: 240, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Text type="secondary">暂无 Agent 决策数据</Text>
-                </div>
-              )}
-            </Card>
-          </Col>
-        </Row>
-
-        {/* ── 决策日志表格 ──────────────────────────────────────────────────── */}
-        <Card title="最近决策日志" size="small" style={{ marginTop: 16 }}>
-          <Table
-            dataSource={data?.recent_logs ?? []}
-            columns={columns}
-            rowKey="id"
+  return (
+    <AgentWorkspaceTemplate
+      agentName="AI 治理看板"
+      agentIcon="🤖"
+      agentColor="#1677ff"
+      description="决策采纳率 · 人工干预率 · Agent 健康度 · 信任分"
+      status={(s?.pending_count ?? 0) > 10 ? 'warning' : loading ? 'idle' : 'running'}
+      loading={loading}
+      onRefresh={fetchData}
+      headerExtra={
+        <Space>
+          <Select value={days} onChange={setDays} style={{ width: 110 }} size="small">
+            <Option value={7}>近 7 天</Option>
+            <Option value={30}>近 30 天</Option>
+            <Option value={90}>近 90 天</Option>
+          </Select>
+          <Select
+            placeholder="全部门店"
+            allowClear
+            style={{ width: 130 }}
             size="small"
-            pagination={false}
-            scroll={{ x: 700 }}
-            locale={{ emptyText: '暂无决策记录' }}
+            onChange={(v) => setStoreId(v)}
           />
-        </Card>
-      </Spin>
-    </div>
+        </Space>
+      }
+      kpis={[
+        {
+          label: '决策总数',
+          value: s?.total_decisions ?? '—',
+          unit: '条',
+          icon: <RobotOutlined />,
+        },
+        {
+          label: 'AI采纳率',
+          value: s != null ? s.adoption_rate.toFixed(1) : '—',
+          unit: '%',
+          valueColor: (s?.adoption_rate ?? 0) >= 70 ? '#52c41a' : '#faad14',
+          icon: <CheckCircleOutlined />,
+        },
+        {
+          label: '人工干预率',
+          value: s != null ? s.override_rate.toFixed(1) : '—',
+          unit: '%',
+          valueColor: (s?.override_rate ?? 0) <= 20 ? '#52c41a' : '#ff4d4f',
+          icon: <EditOutlined />,
+        },
+        {
+          label: '平均置信度',
+          value: s != null ? s.avg_confidence.toFixed(1) : '—',
+          unit: '%',
+          icon: <RobotOutlined />,
+        },
+        {
+          label: '平均信任分',
+          value: s != null ? s.avg_trust_score.toFixed(1) : '—',
+          unit: '%',
+        },
+        {
+          label: '待人工审批',
+          value: s?.pending_count ?? '—',
+          unit: '条',
+          valueColor: (s?.pending_count ?? 0) > 0 ? '#faad14' : undefined,
+          icon: <SyncOutlined />,
+        },
+      ]}
+      tabs={[
+        { key: 'overview', label: '总览', children: overviewContent },
+      ]}
+      defaultTab="overview"
+    />
   );
 };
 
