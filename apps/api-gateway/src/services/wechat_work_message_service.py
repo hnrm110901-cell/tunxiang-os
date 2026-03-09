@@ -7,6 +7,7 @@ import httpx
 import structlog
 from typing import Dict, Any, Optional
 from ..core.config import settings
+from ..utils.retry_helper import WECHAT_RETRY_CONFIG, async_retry
 
 logger = structlog.get_logger()
 
@@ -17,6 +18,7 @@ class WeChatWorkMessageService:
     def __init__(self):
         self._cache_key = "wechat_work:access_token"
 
+    @async_retry(WECHAT_RETRY_CONFIG)
     async def get_access_token(self) -> str:
         """获取企业微信access_token（使用Redis缓存）"""
         from .redis_cache_service import redis_cache

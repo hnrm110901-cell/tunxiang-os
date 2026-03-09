@@ -17,6 +17,8 @@ from typing import Any, AsyncIterator, Callable, Dict, List, Optional
 
 import structlog
 
+from ..utils.retry_helper import LLM_RETRY_CONFIG, async_retry
+
 logger = structlog.get_logger()
 
 
@@ -171,6 +173,7 @@ class OpenAIClient(BaseLLMClient):
         messages.append({"role": "user", "content": prompt})
         return await self.generate_with_context(messages, temperature, max_tokens, **kwargs)
 
+    @async_retry(LLM_RETRY_CONFIG)
     async def generate_with_context(
         self,
         messages: List[Dict[str, Any]],
@@ -253,6 +256,7 @@ class AnthropicClient(BaseLLMClient):
             **kwargs,
         )
 
+    @async_retry(LLM_RETRY_CONFIG)
     async def generate_with_context(
         self,
         messages: List[Dict[str, Any]],
