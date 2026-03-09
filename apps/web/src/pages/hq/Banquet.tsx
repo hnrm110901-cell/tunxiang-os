@@ -101,6 +101,12 @@ function DashboardTab() {
   const [syncing,       setSyncing]       = useState(false);
   const [trend,         setTrend]         = useState<{ month: string; revenue_yuan: number; order_count: number; gross_profit_yuan: number }[]>([]);
 
+  // 月度目标
+  const [targetYuan,    setTargetYuan]    = useState<number | null>(null);
+  const [targetOpen,    setTargetOpen]    = useState(false);
+  const [targetInput,   setTargetInput]   = useState('');
+  const [savingTarget,  setSavingTarget]  = useState(false);
+
   const loadDashboard = useCallback(async (m: string) => {
     setLoadingKpi(true);
     const [year, mon] = m.split('-').map(Number);
@@ -154,6 +160,13 @@ function DashboardTab() {
       .catch(() => setTrend([]));
   }, [loadFunnel, loadOrders]);
 
+  useEffect(() => {
+    const [y, m] = month.split('-').map(Number);
+    apiClient.get(`/api/v1/banquet-agent/stores/${STORE_ID}/revenue-targets/${y}/${m}`)
+      .then(r => setTargetYuan(r.data?.target_yuan ?? null))
+      .catch(() => setTargetYuan(null));
+  }, [month]);
+
   const syncKpi = async () => {
     setSyncing(true);
     try {
@@ -167,6 +180,25 @@ function DashboardTab() {
       handleApiError(e, 'KPI 同步失败');
     } finally {
       setSyncing(false);
+    }
+  };
+
+  const saveTarget = async () => {
+    const v = parseFloat(targetInput);
+    if (!v || v <= 0) return;
+    setSavingTarget(true);
+    try {
+      const [y, m] = month.split('-').map(Number);
+      await apiClient.put(
+        `/api/v1/banquet-agent/stores/${STORE_ID}/revenue-targets/${y}/${m}`,
+        { target_yuan: v },
+      );
+      setTargetYuan(v);
+      setTargetOpen(false);
+    } catch (e) {
+      handleApiError(e, '保存目标失败');
+    } finally {
+      setSavingTarget(false);
     }
   };
 
@@ -308,6 +340,59 @@ function DashboardTab() {
           </ZCard>
         );
       })()}
+
+      {/* 本月营收目标 */}
+      <ZCard>
+        <div className={styles.targetHeader}>
+          <div className={styles.sectionTitle}>本月目标</div>
+          <ZButton variant="ghost" size="sm" onClick={() => { setTargetInput(String(targetYuan ?? '')); setTargetOpen(true); }}>
+            {targetYuan !== null ? '编辑目标' : '设置目标'}
+          </ZButton>
+        </div>
+        {targetYuan === null ? (
+          <div className={styles.targetEmpty}>未设置本月营收目标</div>
+        ) : (() => {
+          const actual = dashboard?.revenue_yuan ?? 0;
+          const pct = Math.min(100, targetYuan > 0 ? (actual / targetYuan) * 100 : 0);
+          return (
+            <div className={styles.targetBody}>
+              <div className={styles.targetMeta}>
+                <span>目标：¥{(targetYuan / 10000).toFixed(1)}万</span>
+                <span>实际：¥{(actual / 10000).toFixed(1)}万</span>
+                <span className={pct >= 100 ? styles.targetDone : styles.targetPct}>{pct.toFixed(1)}%</span>
+              </div>
+              <div className={styles.targetBarBg}>
+                <div className={`${styles.targetBarFill} ${pct >= 100 ? styles.targetBarDone : ''}`} style={{ width: `${pct}%` }} />
+              </div>
+            </div>
+          );
+        })()}
+      </ZCard>
+
+      {/* 月度目标设置 Modal */}
+      <ZModal
+        open={targetOpen}
+        title="设置月度营收目标"
+        onClose={() => setTargetOpen(false)}
+        footer={
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <ZButton variant="ghost" onClick={() => setTargetOpen(false)}>取消</ZButton>
+            <ZButton variant="primary" onClick={saveTarget} disabled={savingTarget || !targetInput}>
+              {savingTarget ? '保存中…' : '确认'}
+            </ZButton>
+          </div>
+        }
+      >
+        <div style={{ padding: '8px 0' }}>
+          <label style={{ fontSize: 13, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>目标营收（元）</label>
+          <ZInput
+            type="number"
+            value={targetInput}
+            onChange={e => setTargetInput(e.target.value)}
+            placeholder="如：500000"
+          />
+        </div>
+      </ZModal>
     </div>
   );
 }

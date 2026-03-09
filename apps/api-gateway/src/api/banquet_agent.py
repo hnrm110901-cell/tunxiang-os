@@ -23,7 +23,7 @@ from src.models.banquet import (
     BanquetContract, BanquetProfitSnapshot, LeadFollowupRecord,
     LeadStageEnum, OrderStatusEnum, BanquetTypeEnum,
     BanquetHallType, PaymentTypeEnum, DepositStatusEnum,
-    TaskStatusEnum,
+    TaskStatusEnum, TaskOwnerRoleEnum, BanquetAgentActionLog, BanquetRevenueTarget,
 )
 import sys
 from pathlib import Path as _Path
@@ -2531,6 +2531,264 @@ async def get_upcoming_tasks(
         "total_pending": total_pending,
         "total_done":    total_done,
     }
+
+
+# ────────── Phase 10：搜索 · 月度目标 · 自定义任务 · 时间轴 ─────────────────────
+
+@router.get("/stores/{store_id}/search")
+async def search_banquet(
+    store_id: str,
+    q: str = Query(..., min_length=2, description="搜索关键词（客户姓名/电话/订单号）"),
+    type: str = Query("all", description="all|lead|order"),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """跨实体全文搜索：线索（客户姓名/电话）+ 订单（订单号/客户姓名/电话）"""
+    leads_out = []
+    orders_out = []
+    like = f"%{q}%"
+
+    if type in ("all", "lead"):
+        stmt = (
+            select(BanquetLead, BanquetCustomer)
+            .join(BanquetCustomer, BanquetLead.customer_id == BanquetCustomer.id)
+            .where(
+                and_(
+                    BanquetLead.store_id == store_id,
+                    (BanquetCustomer.name.ilike(like)) |
+                    (BanquetCustomer.phone.ilike(like)),
+                )
+            )
+            .order_by(BanquetLead.created_at.desc())
+            .limit(20)
+        )
+        rows = (await db.execute(stmt)).all()
+        for lead, customer in rows:
+            leads_out.append({
+                "id":           lead.id,
+                "type":         "lead",
+                "customer_name": customer.name,
+                "phone":        customer.phone,
+                "banquet_type": lead.banquet_type.value if lead.banquet_type else None,
+                "expected_date": lead.expected_date.isoformat() if lead.expected_date else None,
+                "stage":        lead.stage.value,
+            })
+
+    if type in ("all", "order"):
+        stmt = (
+            select(BanquetOrder, BanquetCustomer)
+            .join(BanquetCustomer, BanquetOrder.customer_id == BanquetCustomer.id)
+            .where(
+                and_(
+                    BanquetOrder.store_id == store_id,
+                    (BanquetCustomer.name.ilike(like)) |
+                    (BanquetCustomer.phone.ilike(like)) |
+                    (BanquetOrder.contact_name.ilike(like)) |
+                    (BanquetOrder.contact_phone.ilike(like)),
+                )
+            )
+            .order_by(BanquetOrder.created_at.desc())
+            .limit(20)
+        )
+        rows = (await db.execute(stmt)).all()
+        for order, customer in rows:
+            orders_out.append({
+                "id":            order.id,
+                "type":          "order",
+                "customer_name": customer.name,
+                "banquet_type":  order.banquet_type.value if order.banquet_type else None,
+                "banquet_date":  order.banquet_date.isoformat() if order.banquet_date else None,
+                "total_amount_yuan": round(order.total_amount_fen / 100, 2),
+                "status":        order.order_status.value,
+            })
+
+    return {"leads": leads_out, "orders": orders_out}
+
+
+class _TargetBody(BaseModel):
+    target_yuan: float = Field(..., gt=0, description="目标营收（元）")
+
+
+@router.get("/stores/{store_id}/revenue-targets/{year}/{month}")
+async def get_revenue_target(
+    store_id: str,
+    year: int,
+    month: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """读取月度营收目标"""
+    stmt = select(BanquetRevenueTarget).where(
+        and_(
+            BanquetRevenueTarget.store_id == store_id,
+            BanquetRevenueTarget.year == year,
+            BanquetRevenueTarget.month == month,
+        )
+    )
+    row = (await db.execute(stmt)).scalars().first()
+    if row is None:
+        return {"year": year, "month": month, "target_yuan": None, "target_fen": None}
+    return {
+        "year":         row.year,
+        "month":        row.month,
+        "target_yuan":  round(row.target_fen / 100, 2),
+        "target_fen":   row.target_fen,
+    }
+
+
+@router.put("/stores/{store_id}/revenue-targets/{year}/{month}", status_code=200)
+async def set_revenue_target(
+    store_id: str,
+    year: int,
+    month: int,
+    body: _TargetBody,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """设置/更新月度营收目标（upsert）"""
+    from sqlalchemy.dialects.postgresql import insert as pg_insert
+    target_fen = int(body.target_yuan * 100)
+    now = datetime.utcnow()
+    stmt = (
+        pg_insert(BanquetRevenueTarget)
+        .values(
+            id=str(uuid.uuid4()),
+            store_id=store_id,
+            year=year,
+            month=month,
+            target_fen=target_fen,
+            created_at=now,
+            updated_at=now,
+        )
+        .on_conflict_do_update(
+            constraint="uq_revenue_target_store_ym",
+            set_={"target_fen": target_fen, "updated_at": now},
+        )
+    )
+    await db.execute(stmt)
+    await db.commit()
+    return {"year": year, "month": month, "target_yuan": body.target_yuan}
+
+
+class _CustomTaskBody(BaseModel):
+    task_name:  str = Field(..., min_length=1, max_length=200)
+    owner_role: str = Field(..., description="kitchen/service/decor/purchase/manager")
+    due_time:   str = Field(..., description="ISO datetime，如 2026-03-15T18:00:00")
+
+
+@router.post("/stores/{store_id}/orders/{order_id}/tasks", status_code=201)
+async def create_custom_task(
+    store_id: str,
+    order_id: str,
+    body: _CustomTaskBody,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """在订单下创建自定义执行任务"""
+    # Verify order belongs to store
+    order_stmt = select(BanquetOrder).where(
+        and_(BanquetOrder.id == order_id, BanquetOrder.store_id == store_id)
+    )
+    order = (await db.execute(order_stmt)).scalars().first()
+    if order is None:
+        raise HTTPException(status_code=404, detail="订单不存在")
+
+    try:
+        role_enum = TaskOwnerRoleEnum(body.owner_role)
+    except ValueError:
+        raise HTTPException(status_code=422, detail=f"无效角色: {body.owner_role}")
+
+    try:
+        due_dt = datetime.fromisoformat(body.due_time.replace("Z", "+00:00"))
+        if due_dt.tzinfo is not None:
+            due_dt = due_dt.replace(tzinfo=None)
+    except ValueError:
+        raise HTTPException(status_code=422, detail="due_time 格式错误，请用 ISO 格式")
+
+    task = ExecutionTask(
+        id=str(uuid.uuid4()),
+        banquet_order_id=order_id,
+        task_name=body.task_name,
+        task_type="custom",
+        owner_role=role_enum,
+        task_status=TaskStatusEnum.PENDING,
+        due_time=due_dt,
+    )
+    db.add(task)
+    await db.commit()
+    await db.refresh(task)
+    return {
+        "task_id":    task.id,
+        "task_name":  task.task_name,
+        "owner_role": task.owner_role.value,
+        "status":     task.task_status.value,
+        "due_time":   task.due_time.isoformat() if task.due_time else None,
+    }
+
+
+@router.get("/stores/{store_id}/orders/{order_id}/timeline")
+async def get_order_timeline(
+    store_id: str,
+    order_id: str,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """订单事件时间轴：付款记录 + 已完成任务 + Agent 日志，按时间升序"""
+    # Verify order
+    order_stmt = select(BanquetOrder).where(
+        and_(BanquetOrder.id == order_id, BanquetOrder.store_id == store_id)
+    )
+    if (await db.execute(order_stmt)).scalars().first() is None:
+        raise HTTPException(status_code=404, detail="订单不存在")
+
+    events = []
+
+    # 1. Payment records
+    pay_stmt = select(BanquetPaymentRecord).where(
+        BanquetPaymentRecord.banquet_order_id == order_id
+    ).order_by(BanquetPaymentRecord.created_at)
+    for pay in (await db.execute(pay_stmt)).scalars().all():
+        events.append({
+            "time":       pay.created_at.isoformat(),
+            "event_type": "payment",
+            "title":      f"登记收款 ¥{round(pay.amount_fen / 100, 2):,.0f}",
+            "detail":     pay.payment_method,
+        })
+
+    # 2. Completed tasks
+    task_stmt = select(ExecutionTask).where(
+        and_(
+            ExecutionTask.banquet_order_id == order_id,
+            ExecutionTask.task_status.in_([
+                TaskStatusEnum.DONE, TaskStatusEnum.VERIFIED,
+            ]),
+        )
+    ).order_by(ExecutionTask.updated_at)
+    for task in (await db.execute(task_stmt)).scalars().all():
+        events.append({
+            "time":       (task.updated_at or task.created_at).isoformat(),
+            "event_type": "task_done",
+            "title":      f"任务完成：{task.task_name}",
+            "detail":     task.owner_role.value if task.owner_role else None,
+        })
+
+    # 3. Agent action logs
+    log_stmt = select(BanquetAgentActionLog).where(
+        and_(
+            BanquetAgentActionLog.related_object_type == "order",
+            BanquetAgentActionLog.related_object_id == order_id,
+        )
+    ).order_by(BanquetAgentActionLog.created_at)
+    for log in (await db.execute(log_stmt)).scalars().all():
+        events.append({
+            "time":       log.created_at.isoformat(),
+            "event_type": "agent",
+            "title":      log.action_type,
+            "detail":     log.suggestion_text,
+        })
+
+    events.sort(key=lambda e: e["time"])
+    return {"order_id": order_id, "events": events}
 
 
 # ────────── Agent 接口 ────────────────────────────────────────────────────────

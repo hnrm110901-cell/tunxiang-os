@@ -9,6 +9,19 @@
   padding: 20px 16px 12px;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.searchBtn {
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  padding: 4px;
+  margin-top: 2px;
+  line-height: 1;
 }
 
 .title {

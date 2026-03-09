@@ -146,6 +146,23 @@ export default function SmBanquetOrderDetail() {
   const [payMethod,  setPayMethod]  = useState('');
   const [paying,     setPaying]     = useState(false);
 
+  // 添加自定义任务 Modal state
+  const [addTaskOpen,    setAddTaskOpen]    = useState(false);
+  const [newTaskName,    setNewTaskName]    = useState('');
+  const [newTaskRole,    setNewTaskRole]    = useState('kitchen');
+  const [newTaskDueTime, setNewTaskDueTime] = useState('');
+  const [addingTask,     setAddingTask]     = useState(false);
+
+  // 订单时间轴 state
+  interface TimelineEvent {
+    time:       string;
+    event_type: string;
+    title:      string;
+    detail:     string | null;
+  }
+  const [timeline,        setTimeline]        = useState<TimelineEvent[]>([]);
+  const [timelineLoading, setTimelineLoading] = useState(false);
+
   const loadOrder = useCallback(async () => {
     if (!orderId) return;
     setLoading(true);
@@ -162,6 +179,23 @@ export default function SmBanquetOrderDetail() {
   }, [orderId]);
 
   useEffect(() => { loadOrder(); }, [loadOrder]);
+
+  const loadTimeline = useCallback(async () => {
+    if (!orderId) return;
+    setTimelineLoading(true);
+    try {
+      const resp = await apiClient.get(
+        `/api/v1/banquet-agent/stores/${STORE_ID}/orders/${orderId}/timeline`,
+      );
+      setTimeline(resp.data?.events ?? []);
+    } catch {
+      setTimeline([]);
+    } finally {
+      setTimelineLoading(false);
+    }
+  }, [orderId]);
+
+  useEffect(() => { loadTimeline(); }, [loadTimeline]);
 
   const loadContract = useCallback(async () => {
     if (!orderId) return;
@@ -327,6 +361,27 @@ export default function SmBanquetOrderDetail() {
     }
   };
 
+  const handleAddTask = async () => {
+    if (!newTaskName || !newTaskDueTime) return;
+    setAddingTask(true);
+    try {
+      await apiClient.post(
+        `/api/v1/banquet-agent/stores/${STORE_ID}/orders/${orderId}/tasks`,
+        { task_name: newTaskName, owner_role: newTaskRole, due_time: newTaskDueTime },
+      );
+      setAddTaskOpen(false);
+      setNewTaskName('');
+      setNewTaskDueTime('');
+      setNewTaskRole('kitchen');
+      await loadOrder();
+      await loadTimeline();
+    } catch (e) {
+      handleApiError(e, '添加任务失败');
+    } finally {
+      setAddingTask(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className={styles.page}>
@@ -448,7 +503,12 @@ export default function SmBanquetOrderDetail() {
         <ZCard>
           <div className={styles.sectionHeader}>
             <div className={styles.sectionTitle}>执行任务</div>
-            <span className={styles.taskProgress}>{order.tasks_done}/{order.tasks_total}</span>
+            <div className={styles.sectionHeaderRight}>
+              <span className={styles.taskProgress}>{order.tasks_done}/{order.tasks_total}</span>
+              {['confirmed', 'preparing', 'in_progress'].includes(order.status) && (
+                <ZButton variant="ghost" size="sm" onClick={() => setAddTaskOpen(true)}>＋ 添加任务</ZButton>
+              )}
+            </div>
           </div>
           {order.tasks_total > 0 && (
             <div className={styles.progressBar}>
@@ -564,6 +624,32 @@ export default function SmBanquetOrderDetail() {
               )}
             </div>
           ) : null}
+        </ZCard>
+
+        {/* 订单时间轴 */}
+        <ZCard>
+          <div className={styles.sectionTitle}>操作日志</div>
+          {timelineLoading ? (
+            <ZSkeleton rows={3} />
+          ) : timeline.length === 0 ? (
+            <ZEmpty title="暂无操作记录" description="收款或任务完成后显示" />
+          ) : (
+            <div className={styles.timeline}>
+              {timeline.map((ev, i) => (
+                <div key={i} className={styles.tlRow}>
+                  <div className={styles.tlIcon}>
+                    {ev.event_type === 'payment'   ? '💰' :
+                     ev.event_type === 'task_done' ? '✅' : '🤖'}
+                  </div>
+                  <div className={styles.tlContent}>
+                    <div className={styles.tlTitle}>{ev.title}</div>
+                    {ev.detail && <div className={styles.tlDetail}>{ev.detail}</div>}
+                    <div className={styles.tlTime}>{dayjs(ev.time).format('MM-DD HH:mm')}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </ZCard>
       </div>
 
@@ -740,6 +826,58 @@ export default function SmBanquetOrderDetail() {
               value={payMethod}
               options={PAYMENT_METHOD_OPTIONS}
               onChange={v => setPayMethod(v as string)}
+            />
+          </div>
+        </div>
+      </ZModal>
+
+      {/* 添加自定义任务 Modal */}
+      <ZModal
+        open={addTaskOpen}
+        title="添加任务"
+        onClose={() => setAddTaskOpen(false)}
+        footer={
+          <div className={styles.settleFooter}>
+            <ZButton variant="ghost" onClick={() => setAddTaskOpen(false)}>取消</ZButton>
+            <ZButton
+              variant="primary"
+              onClick={handleAddTask}
+              disabled={addingTask || !newTaskName || !newTaskDueTime}
+            >
+              {addingTask ? '添加中…' : '确认添加'}
+            </ZButton>
+          </div>
+        }
+      >
+        <div className={styles.settleForm}>
+          <div className={styles.settleField}>
+            <label className={styles.settleLabel}>任务名称</label>
+            <ZInput
+              value={newTaskName}
+              onChange={e => setNewTaskName(e.target.value)}
+              placeholder="如：额外备餐"
+            />
+          </div>
+          <div className={styles.settleField}>
+            <label className={styles.settleLabel}>负责角色</label>
+            <ZSelect
+              value={newTaskRole}
+              options={[
+                { value: 'kitchen',  label: '厨房' },
+                { value: 'service',  label: '服务' },
+                { value: 'decor',    label: '布置' },
+                { value: 'purchase', label: '采购' },
+                { value: 'manager',  label: '店长' },
+              ]}
+              onChange={v => setNewTaskRole(v as string)}
+            />
+          </div>
+          <div className={styles.settleField}>
+            <label className={styles.settleLabel}>截止时间</label>
+            <ZInput
+              type="datetime-local"
+              value={newTaskDueTime}
+              onChange={e => setNewTaskDueTime(e.target.value)}
             />
           </div>
         </div>

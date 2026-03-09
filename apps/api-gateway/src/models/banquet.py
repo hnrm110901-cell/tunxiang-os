@@ -1,6 +1,6 @@
 """
 宴会管理 Agent — 数据模型
-Phase 9（Banquet Intelligence System）
+Phase 10（Banquet Intelligence System）
 
 5层架构对应模型：
   L1 基础主数据：BanquetHall, BanquetHallType, BanquetType, SourceChannel
@@ -9,7 +9,8 @@ Phase 9（Banquet Intelligence System）
   L4 执行收款层：ExecutionTemplate, ExecutionTask, ExecutionException,
                  BanquetPaymentRecord, BanquetContract
   L5 分析智能层：BanquetProfitSnapshot, BanquetKpiDaily,
-                 BanquetAgentRule, BanquetAgentActionLog
+                 BanquetAgentRule, BanquetAgentActionLog,
+                 BanquetRevenueTarget
 """
 import enum
 from datetime import datetime, date
@@ -474,4 +475,19 @@ class BanquetAgentActionLog(Base, TimestampMixin):
 
     __table_args__ = (
         Index("ix_banquet_agent_log_obj", "related_object_type", "related_object_id"),
+    )
+
+
+class BanquetRevenueTarget(Base, TimestampMixin):
+    """宴会月度营收目标"""
+    __tablename__ = "banquet_revenue_targets"
+
+    id         = Column(String(36), primary_key=True)
+    store_id   = Column(String(36), nullable=False, index=True)
+    year       = Column(Integer, nullable=False)
+    month      = Column(Integer, nullable=False)   # 1–12
+    target_fen = Column(Integer, nullable=False)   # 目标营收（分）
+
+    __table_args__ = (
+        UniqueConstraint("store_id", "year", "month", name="uq_revenue_target_store_ym"),
     )

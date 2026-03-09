@@ -858,3 +858,65 @@
   border: 1px solid var(--border, #ddd);
   border-radius: 12px;
 }
+
+/* ── Phase 10: monthly target card ────────────────────────────────────────── */
+
+.targetHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.sectionTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary, #111);
+}
+
+.targetEmpty {
+  font-size: 13px;
+  color: var(--text-secondary, #888);
+  padding: 4px 0;
+}
+
+.targetBody {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.targetMeta {
+  display: flex;
+  gap: 16px;
+  font-size: 13px;
+  color: var(--text-secondary, #555);
+}
+
+.targetPct {
+  font-weight: 600;
+  color: var(--accent, #ff6b2c);
+}
+
+.targetDone {
+  font-weight: 600;
+  color: #16a34a;
+}
+
+.targetBarBg {
+  height: 8px;
+  background: var(--border, #eee);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.targetBarFill {
+  height: 100%;
+  background: var(--accent, #ff6b2c);
+  border-radius: 4px;
+  transition: width 0.4s;
+}
+
+.targetBarDone {
+  background: #16a34a;
+}

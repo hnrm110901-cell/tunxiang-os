@@ -82,8 +82,13 @@ export default function SmBanquet() {
   return (
     <div className={styles.page}>
       <div className={styles.header}>
-        <div className={styles.title}>今日宴会</div>
-        <div className={styles.subtitle}>{TODAY}</div>
+        <div>
+          <div className={styles.title}>今日宴会</div>
+          <div className={styles.subtitle}>{TODAY}</div>
+        </div>
+        <button className={styles.searchBtn} onClick={() => navigate('/sm/banquet-search')} aria-label="搜索">
+          🔍
+        </button>
       </div>
 
       <div className={styles.body}>

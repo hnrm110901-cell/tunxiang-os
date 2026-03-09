@@ -195,6 +195,7 @@ const SmBanquetOrderDetail = lazy(() => import('./pages/sm/BanquetOrderDetail'))
 const SmBanquetTasks       = lazy(() => import('./pages/sm/BanquetTasks'));
 const SmBanquetPush        = lazy(() => import('./pages/sm/BanquetPush'));
 const SmBanquetFollowups   = lazy(() => import('./pages/sm/BanquetFollowups'));
+const SmBanquetSearch      = lazy(() => import('./pages/sm/BanquetSearch'));
 
 const PageLoader = (
   <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 300 }}>
@@ -659,6 +660,7 @@ const AppContent: React.FC = () => {
                   <Route path="banquet-tasks"        element={<SmBanquetTasks />} />
                   <Route path="banquet-push"         element={<SmBanquetPush />} />
                   <Route path="banquet-followups"    element={<SmBanquetFollowups />} />
+                  <Route path="banquet-search"       element={<SmBanquetSearch />} />
                 </Route>
 
                 {/* Role-based views — Chef (手机) */}
