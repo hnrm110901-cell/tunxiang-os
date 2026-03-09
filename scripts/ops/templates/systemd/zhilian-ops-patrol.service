@@ -1,0 +1,17 @@
+[Unit]
+Description=Zhilian OS Daily Ops Patrol Report
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/zhilian-os
+EnvironmentFile=/opt/zhilian-os/.env.prod
+Environment=BASE_URL=http://127.0.0.1
+# Put admin token in /opt/zhilian-os/.env.prod as TOKEN=...
+ExecStart=/usr/bin/env bash /opt/zhilian-os/scripts/ops/daily_ops_report.sh
+User=root
+Group=root
+
+[Install]
+WantedBy=multi-user.target

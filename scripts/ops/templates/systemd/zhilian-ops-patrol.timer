@@ -1,0 +1,10 @@
+[Unit]
+Description=Run Zhilian OS Daily Ops Patrol Report
+
+[Timer]
+OnCalendar=*-*-* 08:05:00
+Persistent=true
+Unit=zhilian-ops-patrol.service
+
+[Install]
+WantedBy=timers.target

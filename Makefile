@@ -1,7 +1,7 @@
 # Makefile for Zhilian OS
 # 智链OS开发辅助命令
 
-.PHONY: help install dev test lint format clean run docker staging-up staging-down staging-logs staging-migrate staging-health
+.PHONY: help install dev test lint format clean run docker staging-up staging-down staging-logs staging-migrate staging-health prod-env-check prod-deploy prod-health prod-scheduler-patrol prod-monitor-up prod-monitor-down prod-monitor-status prod-monitor-lint prod-alert-test prod-ops-report prod-install-ops-timer
 
 # 默认目标
 help:
@@ -28,6 +28,19 @@ help:
 	@echo "  make staging-logs            - 查看 staging 日志"
 	@echo "  make staging-migrate         - 对 staging DB 执行 Alembic 迁移"
 	@echo "  make staging-health          - 检查 staging API 健康状态"
+	@echo ""
+	@echo "Production 运维:"
+	@echo "  make prod-env-check          - 校验生产环境变量与 compose 配置"
+	@echo "  make prod-deploy             - 执行生产部署（compose + worker + beat）"
+	@echo "  make prod-health             - 生产健康巡检（health/live/ready）"
+	@echo "  make prod-scheduler-patrol   - 07:00/夜间任务巡检（需 TOKEN）"
+	@echo "  make prod-monitor-up         - 启动 Prometheus/Grafana/Alertmanager"
+	@echo "  make prod-monitor-down       - 停止监控栈"
+	@echo "  make prod-monitor-status     - 查看监控栈状态"
+	@echo "  make prod-monitor-lint       - 校验 Prometheus/Alertmanager 配置"
+	@echo "  make prod-alert-test         - 注入一条测试告警到 Alertmanager"
+	@echo "  make prod-ops-report         - 生成每日巡检报告（logs/ops）"
+	@echo "  make prod-install-ops-timer  - 安装 systemd 定时巡检（需 root）"
 
 # 安装生产依赖
 install:
@@ -175,3 +188,40 @@ staging-migrate:
 
 staging-health:
 	@curl -sf http://localhost:8001/api/v1/health && echo "✅ API healthy" || echo "❌ API unhealthy"
+
+# ============================================================
+# Production 运维脚本
+# 默认读取 .env.prod + apps/api-gateway/.env.production
+# ============================================================
+prod-env-check:
+	bash scripts/ops/prod_env_check.sh
+
+prod-deploy:
+	bash scripts/ops/deploy_prod.sh
+
+prod-health:
+	bash scripts/ops/health_check_prod.sh
+
+prod-scheduler-patrol:
+	bash scripts/ops/scheduler_patrol.sh
+
+prod-monitor-up:
+	ACTION=up bash scripts/ops/monitoring_stack.sh
+
+prod-monitor-down:
+	ACTION=down bash scripts/ops/monitoring_stack.sh
+
+prod-monitor-status:
+	ACTION=status bash scripts/ops/monitoring_stack.sh
+
+prod-monitor-lint:
+	bash scripts/ops/monitoring_lint.sh
+
+prod-alert-test:
+	bash scripts/ops/alertmanager_test.sh
+
+prod-ops-report:
+	bash scripts/ops/daily_ops_report.sh
+
+prod-install-ops-timer:
+	sudo bash scripts/ops/install_systemd_timer.sh

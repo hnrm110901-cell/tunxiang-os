@@ -27,7 +27,8 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
       - GF_USERS_ALLOW_SIGN_UP=false
     volumes:
       - ./grafana/dashboards:/etc/grafana/provisioning/dashboards
@@ -71,7 +72,7 @@ services:
     ports:
       - "9121:9121"
     environment:
-      - REDIS_ADDR=redis:6379
+      - REDIS_ADDR=${REDIS_EXPORTER_ADDR:-redis://redis:6379}
     networks:
       - zhilian-network
     restart: unless-stopped
@@ -83,7 +84,7 @@ services:
     ports:
       - "9187:9187"
     environment:
-      - DATA_SOURCE_NAME=postgresql://zhilian:zhilian@db:5432/zhilian_os?sslmode=disable
+      - DATA_SOURCE_NAME=${POSTGRES_EXPORTER_DSN:-postgresql://zhilian:zhilian@postgres:5432/zhilian_os?sslmode=disable}
     networks:
       - zhilian-network
     restart: unless-stopped

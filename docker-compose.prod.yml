@@ -29,13 +29,17 @@ services:
     environment:
       - APP_ENV=production
       - DEBUG=False
-      - DATABASE_URL=postgresql+asyncpg://zhilian:zhilian@postgres:5432/zhilian_os
-      - REDIS_URL=redis://:${REDIS_PASSWORD:-zhilian}@redis:6379/0
+      - DATABASE_URL=${API_DATABASE_URL:?API_DATABASE_URL is required}
+      - REDIS_URL=redis://:${REDIS_PASSWORD:?REDIS_PASSWORD is required}@redis:6379/0
+      - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD:?REDIS_PASSWORD is required}@redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:?REDIS_PASSWORD is required}@redis:6379/2
       - REDIS_SENTINEL_HOSTS=redis-sentinel-1:26379,redis-sentinel-2:26379,redis-sentinel-3:26379
       - REDIS_SENTINEL_MASTER=mymaster
-      - REDIS_SENTINEL_PASSWORD=${REDIS_PASSWORD:-zhilian}
+      - REDIS_SENTINEL_PASSWORD=${REDIS_PASSWORD:?REDIS_PASSWORD is required}
       - QDRANT_HOST=qdrant
       - QDRANT_PORT=6333
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:?JWT_SECRET_KEY is required}
+      - SECRET_KEY=${SECRET_KEY:?SECRET_KEY is required}
       - PYTHONPATH=/app:/app/packages
     env_file:
       - ./apps/api-gateway/.env.production
@@ -51,11 +55,99 @@ services:
       qdrant:
         condition: service_started
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      test: ["CMD-SHELL", "python - <<'PY'\nimport sys, urllib.request\nurllib.request.urlopen('http://127.0.0.1:8000/api/v1/health', timeout=3)\nprint('ok')\nPY"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
+
+  celery-worker:
+    build:
+      context: .
+      dockerfile: ./apps/api-gateway/Dockerfile.prod
+    container_name: zhilian-celery-worker
+    restart: always
+    command:
+      - celery
+      - -A
+      - src.core.celery_app
+      - worker
+      - --loglevel=info
+      - --concurrency=4
+      - --queues=high_priority,default,low_priority
+    environment:
+      - APP_ENV=production
+      - DEBUG=False
+      - DATABASE_URL=${API_DATABASE_URL:?API_DATABASE_URL is required}
+      - REDIS_URL=redis://:${REDIS_PASSWORD:?REDIS_PASSWORD is required}@redis:6379/0
+      - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD:?REDIS_PASSWORD is required}@redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:?REDIS_PASSWORD is required}@redis:6379/2
+      - REDIS_SENTINEL_HOSTS=redis-sentinel-1:26379,redis-sentinel-2:26379,redis-sentinel-3:26379
+      - REDIS_SENTINEL_MASTER=mymaster
+      - REDIS_SENTINEL_PASSWORD=${REDIS_PASSWORD:?REDIS_PASSWORD is required}
+      - QDRANT_HOST=qdrant
+      - QDRANT_PORT=6333
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:?JWT_SECRET_KEY is required}
+      - SECRET_KEY=${SECRET_KEY:?SECRET_KEY is required}
+      - PYTHONPATH=/app:/app/packages
+    env_file:
+      - ./apps/api-gateway/.env.production
+    volumes:
+      - ./logs:/var/log/zhilian-os
+    networks:
+      - zhilian-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      qdrant:
+        condition: service_started
+      api-gateway:
+        condition: service_healthy
+
+  celery-beat:
+    build:
+      context: .
+      dockerfile: ./apps/api-gateway/Dockerfile.prod
+    container_name: zhilian-celery-beat
+    restart: always
+    command:
+      - celery
+      - -A
+      - src.core.celery_app
+      - beat
+      - --loglevel=info
+    environment:
+      - APP_ENV=production
+      - DEBUG=False
+      - DATABASE_URL=${API_DATABASE_URL:?API_DATABASE_URL is required}
+      - REDIS_URL=redis://:${REDIS_PASSWORD:?REDIS_PASSWORD is required}@redis:6379/0
+      - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD:?REDIS_PASSWORD is required}@redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:?REDIS_PASSWORD is required}@redis:6379/2
+      - REDIS_SENTINEL_HOSTS=redis-sentinel-1:26379,redis-sentinel-2:26379,redis-sentinel-3:26379
+      - REDIS_SENTINEL_MASTER=mymaster
+      - REDIS_SENTINEL_PASSWORD=${REDIS_PASSWORD:?REDIS_PASSWORD is required}
+      - QDRANT_HOST=qdrant
+      - QDRANT_PORT=6333
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:?JWT_SECRET_KEY is required}
+      - SECRET_KEY=${SECRET_KEY:?SECRET_KEY is required}
+      - PYTHONPATH=/app:/app/packages
+    env_file:
+      - ./apps/api-gateway/.env.production
+    volumes:
+      - ./logs:/var/log/zhilian-os
+    networks:
+      - zhilian-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      qdrant:
+        condition: service_started
+      api-gateway:
+        condition: service_healthy
 
   # Nginx反向代理
   nginx:
@@ -87,9 +179,9 @@ services:
       - redis-data:/data
     networks:
       - zhilian-network
-    command: redis-server --appendonly yes --requirepass "${REDIS_PASSWORD:-zhilian}"
+    command: redis-server --appendonly yes --requirepass "${REDIS_PASSWORD:?REDIS_PASSWORD is required}"
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-zhilian}", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:?REDIS_PASSWORD is required}", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -102,9 +194,9 @@ services:
       - zhilian-network
     command: >
       redis-server --appendonly yes
-      --requirepass "${REDIS_PASSWORD:-zhilian}"
+      --requirepass "${REDIS_PASSWORD:?REDIS_PASSWORD is required}"
       --replicaof redis 6379
-      --masterauth "${REDIS_PASSWORD:-zhilian}"
+      --masterauth "${REDIS_PASSWORD:?REDIS_PASSWORD is required}"
     volumes:
       - redis-replica-data:/data
     depends_on:
@@ -120,7 +212,7 @@ services:
     ports:
       - "26379:26379"
     command: >
-      sh -c "printf 'port 26379\nsentinel monitor mymaster redis 6379 2\nsentinel auth-pass mymaster ${REDIS_PASSWORD:-zhilian}\nsentinel down-after-milliseconds mymaster 5000\nsentinel failover-timeout mymaster 10000\nsentinel parallel-syncs mymaster 1\n' > /tmp/sentinel.conf && redis-sentinel /tmp/sentinel.conf"
+      sh -c "printf 'port 26379\nsentinel monitor mymaster redis 6379 2\nsentinel auth-pass mymaster ${REDIS_PASSWORD:?REDIS_PASSWORD is required}\nsentinel down-after-milliseconds mymaster 5000\nsentinel failover-timeout mymaster 10000\nsentinel parallel-syncs mymaster 1\n' > /tmp/sentinel.conf && redis-sentinel /tmp/sentinel.conf"
     depends_on:
       - redis
       - redis-replica
@@ -134,7 +226,7 @@ services:
     ports:
       - "26380:26379"
     command: >
-      sh -c "printf 'port 26379\nsentinel monitor mymaster redis 6379 2\nsentinel auth-pass mymaster ${REDIS_PASSWORD:-zhilian}\nsentinel down-after-milliseconds mymaster 5000\nsentinel failover-timeout mymaster 10000\nsentinel parallel-syncs mymaster 1\n' > /tmp/sentinel.conf && redis-sentinel /tmp/sentinel.conf"
+      sh -c "printf 'port 26379\nsentinel monitor mymaster redis 6379 2\nsentinel auth-pass mymaster ${REDIS_PASSWORD:?REDIS_PASSWORD is required}\nsentinel down-after-milliseconds mymaster 5000\nsentinel failover-timeout mymaster 10000\nsentinel parallel-syncs mymaster 1\n' > /tmp/sentinel.conf && redis-sentinel /tmp/sentinel.conf"
     depends_on:
       - redis
       - redis-replica
@@ -148,7 +240,7 @@ services:
     ports:
       - "26381:26379"
     command: >
-      sh -c "printf 'port 26379\nsentinel monitor mymaster redis 6379 2\nsentinel auth-pass mymaster ${REDIS_PASSWORD:-zhilian}\nsentinel down-after-milliseconds mymaster 5000\nsentinel failover-timeout mymaster 10000\nsentinel parallel-syncs mymaster 1\n' > /tmp/sentinel.conf && redis-sentinel /tmp/sentinel.conf"
+      sh -c "printf 'port 26379\nsentinel monitor mymaster redis 6379 2\nsentinel auth-pass mymaster ${REDIS_PASSWORD:?REDIS_PASSWORD is required}\nsentinel down-after-milliseconds mymaster 5000\nsentinel failover-timeout mymaster 10000\nsentinel parallel-syncs mymaster 1\n' > /tmp/sentinel.conf && redis-sentinel /tmp/sentinel.conf"
     depends_on:
       - redis
       - redis-replica
@@ -177,7 +269,7 @@ services:
       - "5433:5432"
     environment:
       - POSTGRES_USER=zhilian
-      - POSTGRES_PASSWORD=zhilian
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
       - POSTGRES_DB=zhilian_os
     volumes:
       - postgres-data:/var/lib/postgresql/data
