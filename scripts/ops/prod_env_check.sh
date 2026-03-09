@@ -29,6 +29,34 @@ check_required_var() {
   return 0
 }
 
+validate_alert_dedupe_config() {
+  local backend ttl
+  backend="$(printf '%s' "${ALERT_DEDUPE_BACKEND:-memory}" | tr '[:upper:]' '[:lower:]')"
+  ttl="${ALERT_DEDUPE_TTL_SECONDS:-300}"
+
+  case "$backend" in
+    memory|redis|hybrid) ;;
+    *)
+      err "ALERT_DEDUPE_BACKEND must be one of: memory|redis|hybrid (got: ${backend})"
+      return 1
+      ;;
+  esac
+
+  if ! [[ "$ttl" =~ ^[0-9]+$ ]] || [[ "$ttl" -le 0 ]]; then
+    err "ALERT_DEDUPE_TTL_SECONDS must be a positive integer (got: ${ttl})"
+    return 1
+  fi
+
+  if [[ "$backend" == "redis" || "$backend" == "hybrid" ]]; then
+    if [[ -z "${REDIS_URL:-}" && -z "${REDIS_SENTINEL_HOSTS:-}" ]]; then
+      err "ALERT_DEDUPE_BACKEND=${backend} requires REDIS_URL or REDIS_SENTINEL_HOSTS"
+      return 1
+    fi
+  fi
+
+  return 0
+}
+
 log "root=$ROOT_DIR"
 require_cmd docker
 
@@ -58,6 +86,10 @@ for key in POSTGRES_PASSWORD REDIS_PASSWORD SECRET_KEY JWT_SECRET_KEY API_DATABA
     FAILED=1
   fi
 done
+
+if ! validate_alert_dedupe_config; then
+  FAILED=1
+fi
 
 if ! "${COMPOSE_BIN[@]}" --env-file "$ENV_FILE" -f "$ROOT_DIR/docker-compose.prod.yml" config >/dev/null; then
   err "compose config validation failed"

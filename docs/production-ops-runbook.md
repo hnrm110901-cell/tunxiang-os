@@ -133,6 +133,7 @@ ALERT_WEBHOOK_TOKEN=<token> make prod-alert-e2e
 - `ALERT_DEDUPE_BACKEND=memory`：单进程内存去重（默认）
 - `ALERT_DEDUPE_BACKEND=redis`：跨实例 Redis 去重
 - `ALERT_DEDUPE_BACKEND=hybrid`：内存 + Redis 双重去重
+- 当 `ALERT_DEDUPE_BACKEND=redis|hybrid` 时，需确保已配置 `REDIS_URL` 或 `REDIS_SENTINEL_HOSTS`。
 
 停止监控栈：
 
