@@ -299,3 +299,39 @@
   color: var(--text-secondary);
   font-size: 12px;
 }
+
+.historyWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.historyKpis {
+  display: flex;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.historyReasons {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.historyList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.historyItem {
+  display: grid;
+  grid-template-columns: 88px 80px 1fr;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.historyReasonTag {
+  color: var(--text-primary);
+}

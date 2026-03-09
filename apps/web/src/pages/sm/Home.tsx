@@ -54,6 +54,21 @@ interface AdviceCardData {
   source: 'advice' | 'forecast';
 }
 
+interface AdviceHistoryItem {
+  advice_date: string;
+  action?: 'confirmed' | 'modified' | 'rejected';
+  rejection_reason?: string;
+}
+
+interface AdviceHistoryResp {
+  total: number;
+  confirmed_count: number;
+  modified_count: number;
+  rejected_count: number;
+  rejection_reasons_top: string[];
+  items: AdviceHistoryItem[];
+}
+
 export default function SmHome() {
   const navigate = useNavigate();
   const [data, setData] = useState<MobileHomeSummaryResponse | null>(null);
@@ -67,6 +82,7 @@ export default function SmHome() {
     today: null,
     tomorrow: null,
   });
+  const [adviceHistory, setAdviceHistory] = useState<AdviceHistoryResp | null>(null);
   const [adviceKey, setAdviceKey] = useState<'today' | 'tomorrow'>('tomorrow');
 
   const normalizePositionRequirements = (raw: Record<string, any> | undefined): Record<string, number> => {
@@ -143,12 +159,17 @@ export default function SmHome() {
         queryAdviceByDate(today),
         queryAdviceByDate(tomorrow),
       ]);
+      const history = await apiClient.get<AdviceHistoryResp>(`/api/v1/workforce/stores/${STORE_ID}/staffing-advice/history`, {
+        params: { days: 7 },
+      });
       setAdviceMap({
         today: todayAdvice,
         tomorrow: tomorrowAdvice,
       });
+      setAdviceHistory(history);
     } catch {
       setAdviceMap({ today: null, tomorrow: null });
+      setAdviceHistory(null);
     } finally {
       setAdviceLoading(false);
     }
@@ -374,6 +395,36 @@ export default function SmHome() {
                     adviceForm.setFieldsValue({ action: 'rejected' });
                     setAdviceModal(true);
                   }}>❌ 拒绝</ZButton>
+                </div>
+              </div>
+            )}
+          </ZCard>
+
+          <ZCard title="近7天建议处理概览" subtitle={adviceHistory ? `${adviceHistory.total} 条记录` : '暂无记录'}>
+            {adviceLoading ? (
+              <ZSkeleton rows={2} />
+            ) : !adviceHistory ? (
+              <ZEmpty title="暂无处理记录" />
+            ) : (
+              <div className={styles.historyWrap}>
+                <div className={styles.historyKpis}>
+                  <span>确认 {adviceHistory.confirmed_count}</span>
+                  <span>修改 {adviceHistory.modified_count}</span>
+                  <span>拒绝 {adviceHistory.rejected_count}</span>
+                </div>
+                {adviceHistory.rejection_reasons_top.length > 0 && (
+                  <div className={styles.historyReasons}>
+                    高频拒绝原因：{adviceHistory.rejection_reasons_top.join('；')}
+                  </div>
+                )}
+                <div className={styles.historyList}>
+                  {adviceHistory.items.slice(0, 3).map((x, i) => (
+                    <div key={`${x.advice_date}-${i}`} className={styles.historyItem}>
+                      <span>{x.advice_date}</span>
+                      <span>{x.action === 'confirmed' ? '已确认' : x.action === 'modified' ? '已修改确认' : x.action === 'rejected' ? '已拒绝' : '待处理'}</span>
+                      {x.action === 'rejected' && x.rejection_reason ? <span className={styles.historyReasonTag}>{x.rejection_reason}</span> : <span>-</span>}
+                    </div>
+                  ))}
                 </div>
               </div>
             )}

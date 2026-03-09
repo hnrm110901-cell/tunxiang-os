@@ -37,6 +37,7 @@ from src.api.workforce import (  # noqa: E402
     get_employee_health,
     get_labor_budget,
     get_staffing_advice,
+    get_staffing_advice_history,
     learn_staffing_patterns,
     upsert_labor_budget,
 )
@@ -301,6 +302,60 @@ class TestWorkforceConfirmLoop:
         )
         assert resp.exists is False
         assert resp.store_id == "S001"
+
+    @pytest.mark.asyncio
+    async def test_get_staffing_advice_history_with_rows(self):
+        db = AsyncMock()
+        row1 = MagicMock()
+        row1.advice_date = datetime(2026, 3, 9).date()
+        row1.meal_period = "all_day"
+        row1.status = "confirmed"
+        row1.recommended_headcount = 10
+        row1.action = "modified"
+        row1.modified_headcount = 12
+        row1.rejection_reason = None
+        row1.confirmed_at = datetime(2026, 3, 9, 8, 30)
+
+        row2 = MagicMock()
+        row2.advice_date = datetime(2026, 3, 8).date()
+        row2.meal_period = "all_day"
+        row2.status = "rejected"
+        row2.recommended_headcount = 9
+        row2.action = "rejected"
+        row2.modified_headcount = None
+        row2.rejection_reason = "临时闭店检修"
+        row2.confirmed_at = datetime(2026, 3, 8, 8, 20)
+
+        result = MagicMock()
+        result.fetchall.return_value = [row1, row2]
+        db.execute = AsyncMock(return_value=result)
+
+        resp = await get_staffing_advice_history(
+            store_id="S001",
+            days=7,
+            db=db,
+            _=_mock_user(),
+        )
+        assert resp.total == 2
+        assert resp.modified_count == 1
+        assert resp.rejected_count == 1
+        assert "临时闭店检修" in resp.rejection_reasons_top
+
+    @pytest.mark.asyncio
+    async def test_get_staffing_advice_history_empty(self):
+        db = AsyncMock()
+        result = MagicMock()
+        result.fetchall.return_value = []
+        db.execute = AsyncMock(return_value=result)
+
+        resp = await get_staffing_advice_history(
+            store_id="S001",
+            days=7,
+            db=db,
+            _=_mock_user(),
+        )
+        assert resp.total == 0
+        assert resp.items == []
 
     @pytest.mark.asyncio
     async def test_confirm_staffing_advice_modified_requires_count(self):

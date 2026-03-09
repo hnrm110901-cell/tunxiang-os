@@ -57,6 +57,29 @@ class StaffingAdviceQueryResponse(BaseModel):
     confirmed_by: Optional[str] = None
 
 
+class StaffingAdviceHistoryItem(BaseModel):
+    advice_date: str
+    meal_period: str
+    status: str
+    action: Optional[str] = None
+    recommended_headcount: Optional[int] = None
+    modified_headcount: Optional[int] = None
+    rejection_reason: Optional[str] = None
+    cost_impact_yuan: Optional[float] = None
+    confirmed_at: Optional[str] = None
+
+
+class StaffingAdviceHistoryResponse(BaseModel):
+    store_id: str
+    days: int
+    total: int
+    confirmed_count: int
+    modified_count: int
+    rejected_count: int
+    rejection_reasons_top: list[str]
+    items: list[StaffingAdviceHistoryItem]
+
+
 class LaborBudgetUpsertRequest(BaseModel):
     month: str = Field(..., description="预算月份 YYYY-MM")
     target_labor_cost_rate: float = Field(..., ge=0, le=100)
@@ -173,6 +196,102 @@ async def get_staffing_advice(
         confirmed_action=row.confirmed_action,
         confirmed_at=row.confirmed_at.isoformat() if hasattr(row.confirmed_at, "isoformat") and row.confirmed_at else None,
         confirmed_by=row.confirmed_by,
+    )
+
+
+@router.get("/stores/{store_id}/staffing-advice/history", response_model=StaffingAdviceHistoryResponse)
+async def get_staffing_advice_history(
+    store_id: str,
+    days: int = Query(7, ge=1, le=30, description="查询最近 N 天建议处理记录"),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    start_date = date.today() - timedelta(days=days - 1)
+
+    result = await db.execute(
+        text(
+            """
+            SELECT
+                sa.advice_date,
+                sa.meal_period,
+                sa.status,
+                sa.recommended_headcount,
+                sac.action,
+                sac.modified_headcount,
+                sac.rejection_reason,
+                sac.confirmed_at
+            FROM staffing_advice sa
+            LEFT JOIN LATERAL (
+                SELECT action, modified_headcount, rejection_reason, confirmed_at
+                FROM staffing_advice_confirmations
+                WHERE advice_id = sa.id
+                ORDER BY confirmed_at DESC
+                LIMIT 1
+            ) sac ON TRUE
+            WHERE sa.store_id = :sid
+              AND sa.advice_date >= :start_date
+            ORDER BY sa.advice_date DESC, sa.created_at DESC
+            """
+        ),
+        {"sid": store_id, "start_date": start_date},
+    )
+    rows = result.fetchall()
+
+    avg_wage_per_day = float(os.getenv("L8_AVG_WAGE_PER_DAY", "200"))
+    items: list[StaffingAdviceHistoryItem] = []
+    reasons: list[str] = []
+    confirmed_count = 0
+    modified_count = 0
+    rejected_count = 0
+
+    for row in rows:
+        action = row.action or None
+        recommended = int(row.recommended_headcount) if row.recommended_headcount is not None else None
+        modified = int(row.modified_headcount) if row.modified_headcount is not None else None
+        if action == "confirmed":
+            confirmed_count += 1
+        elif action == "modified":
+            modified_count += 1
+        elif action == "rejected":
+            rejected_count += 1
+            if row.rejection_reason:
+                reasons.append(str(row.rejection_reason))
+
+        effective = modified if action == "modified" and modified is not None else recommended
+        cost_impact = None
+        if effective is not None and recommended is not None:
+            cost_impact = float((effective - recommended) * avg_wage_per_day)
+
+        items.append(
+            StaffingAdviceHistoryItem(
+                advice_date=row.advice_date.isoformat() if hasattr(row.advice_date, "isoformat") else str(row.advice_date),
+                meal_period=row.meal_period,
+                status=row.status,
+                action=action,
+                recommended_headcount=recommended,
+                modified_headcount=modified,
+                rejection_reason=row.rejection_reason,
+                cost_impact_yuan=round(cost_impact, 2) if cost_impact is not None else None,
+                confirmed_at=row.confirmed_at.isoformat() if hasattr(row.confirmed_at, "isoformat") and row.confirmed_at else None,
+            )
+        )
+
+    top_reasons: list[str] = []
+    if reasons:
+        counts: dict[str, int] = {}
+        for r in reasons:
+            counts[r] = counts.get(r, 0) + 1
+        top_reasons = [k for k, _ in sorted(counts.items(), key=lambda x: x[1], reverse=True)[:3]]
+
+    return StaffingAdviceHistoryResponse(
+        store_id=store_id,
+        days=days,
+        total=len(items),
+        confirmed_count=confirmed_count,
+        modified_count=modified_count,
+        rejected_count=rejected_count,
+        rejection_reasons_top=top_reasons,
+        items=items,
     )
 
 
