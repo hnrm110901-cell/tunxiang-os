@@ -1,8 +1,8 @@
 /**
- * SM 任务看板页（7天日历视图）
+ * SM 任务看板页（移动端）
  * 路由：/sm/banquet-tasks
- * 数据：GET /api/v1/banquet-agent/stores/{id}/tasks/upcoming?days=7&owner_role=
- *      PATCH /api/v1/banquet-agent/stores/{id}/orders/{order_id}/tasks/{task_id}
+ * 数据：GET /api/v1/banquet-agent/stores/{id}/tasks
+ *      PATCH /api/v1/banquet-agent/stores/{id}/tasks/{task_id}/complete
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -51,8 +51,10 @@ interface TaskItem {
   owner_role:   string;
   order_id:     string;
   banquet_type: string | null;
+  banquet_date: string;
   due_time:     string | null;
   status:       string;
+  is_overdue:   boolean;
 }
 
 interface DayGroup {
@@ -72,16 +74,27 @@ export default function SmBanquetTasks() {
   const load = useCallback(async (r: string) => {
     setLoading(true);
     try {
-      const params: Record<string, string | number> = { days: 7 };
+      const params: Record<string, string | number> = { days_ahead: 7 };
       if (r) params.owner_role = r;
       const resp = await apiClient.get(
-        `/api/v1/banquet-agent/stores/${STORE_ID}/tasks/upcoming`,
+        `/api/v1/banquet-agent/stores/${STORE_ID}/tasks`,
         { params },
       );
-      setDays(resp.data?.days ?? []);
+      // Flatten task list into day groups
+      const tasks: TaskItem[] = resp.data?.tasks ?? [];
+      const groupMap: Record<string, TaskItem[]> = {};
+      for (const t of tasks) {
+        const key = t.banquet_date ?? 'unknown';
+        if (!groupMap[key]) groupMap[key] = [];
+        groupMap[key].push(t);
+      }
+      const grouped = Object.entries(groupMap)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([date, dayTasks]) => ({ date, tasks: dayTasks }));
+      setDays(grouped);
       setSummary({
-        total_pending: resp.data?.total_pending ?? 0,
-        total_done:    resp.data?.total_done    ?? 0,
+        total_pending: resp.data?.pending_count ?? 0,
+        total_done:    tasks.filter(t => t.status === 'done' || t.status === 'verified').length,
       });
     } catch {
       setDays([]);
@@ -93,12 +106,13 @@ export default function SmBanquetTasks() {
   useEffect(() => { load(role); }, [load, role]);
 
   const toggleTask = async (task: TaskItem) => {
-    const newStatus = (task.status === 'done' || task.status === 'verified') ? 'pending' : 'done';
+    const isDone = task.status === 'done' || task.status === 'verified';
+    if (isDone) return;   // Phase 20 complete endpoint is one-way
     setCompleting(task.task_id);
     try {
       await apiClient.patch(
-        `/api/v1/banquet-agent/stores/${STORE_ID}/orders/${task.order_id}/tasks/${task.task_id}`,
-        { status: newStatus },
+        `/api/v1/banquet-agent/stores/${STORE_ID}/tasks/${task.task_id}/complete`,
+        { remark: '' },
       );
       await load(role);
     } catch (e) {

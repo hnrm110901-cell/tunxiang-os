@@ -1,8 +1,8 @@
 /**
  * SM 推送通知页
  * 路由：/sm/banquet-push
- * 数据：POST /api/v1/banquet-agent/stores/{id}/push/scan
- *      GET  /api/v1/banquet-agent/stores/{id}/push/records
+ * 数据：GET  /api/v1/banquet-agent/stores/{id}/push/history
+ *      POST /api/v1/banquet-agent/stores/{id}/push/batch
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -49,9 +49,9 @@ export default function SmBanquetPush() {
     setLoading(true);
     try {
       const resp = await apiClient.get(
-        `/api/v1/banquet-agent/stores/${STORE_ID}/push/records`,
+        `/api/v1/banquet-agent/stores/${STORE_ID}/push/history`,
       );
-      setRecords(resp.data?.records ?? []);
+      setRecords(resp.data?.items ?? []);
     } catch {
       setRecords([]);
     } finally {
@@ -66,7 +66,8 @@ export default function SmBanquetPush() {
     setLastScan(null);
     try {
       const resp = await apiClient.post(
-        `/api/v1/banquet-agent/stores/${STORE_ID}/push/scan`,
+        `/api/v1/banquet-agent/stores/${STORE_ID}/push/batch`,
+        { push_type: 'reminder', message: '宴会准备提醒', target_ids: [] },
       );
       setLastScan(resp.data);
       await loadRecords();

@@ -7687,3 +7687,431 @@ async def get_monthly_benchmark(
         "months":   months,
         "data":     data,
     }
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Phase 20 — SM 移动端完善：执行任务 · 跟进看板 · 批量推送
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# ── 1. 执行任务列表 ─────────────────────────────────────────────────────────
+
+@router.get("/stores/{store_id}/tasks")
+async def get_task_list(
+    store_id:    str,
+    status:      str = "",        # pending|in_progress|done|overdue|all
+    order_id:    str = "",
+    owner_role:  str = "",
+    days_ahead:  int = 30,
+    db:          AsyncSession = Depends(get_db),
+    _:           User = Depends(get_current_user),
+):
+    """执行任务列表（支持状态/订单/角色过滤）"""
+    from datetime import timedelta
+    from src.models.banquet import ExecutionTask, BanquetOrder, TaskStatusEnum
+
+    q = (
+        select(ExecutionTask, BanquetOrder.banquet_date, BanquetOrder.banquet_type, BanquetOrder.contact_name)
+        .join(BanquetOrder, ExecutionTask.banquet_order_id == BanquetOrder.id)
+        .where(BanquetOrder.store_id == store_id)
+        .where(BanquetOrder.banquet_date <= date_type.today() + timedelta(days=days_ahead))
+        .order_by(ExecutionTask.due_time)
+    )
+    if order_id:
+        q = q.where(ExecutionTask.banquet_order_id == order_id)
+    if owner_role:
+        q = q.where(ExecutionTask.owner_role == owner_role)
+    if status and status != "all":
+        try:
+            q = q.where(ExecutionTask.task_status == TaskStatusEnum(status))
+        except ValueError:
+            pass
+
+    rows = (await db.execute(q)).all()
+
+    tasks = []
+    for task, bdate, btype, contact in rows:
+        is_overdue = (
+            task.task_status not in (TaskStatusEnum.DONE, TaskStatusEnum.VERIFIED, TaskStatusEnum.CLOSED)
+            and task.due_time
+            and task.due_time.date() < date_type.today()
+        )
+        tasks.append({
+            "task_id":       task.id,
+            "order_id":      task.banquet_order_id,
+            "task_name":     task.task_name,
+            "task_type":     task.task_type,
+            "owner_role":    task.owner_role.value if hasattr(task.owner_role, "value") else str(task.owner_role),
+            "status":        task.task_status.value if hasattr(task.task_status, "value") else str(task.task_status),
+            "due_time":      task.due_time.isoformat() if task.due_time else None,
+            "is_overdue":    is_overdue,
+            "banquet_date":  str(bdate),
+            "banquet_type":  btype.value if hasattr(btype, "value") else str(btype),
+            "contact_name":  contact,
+            "remark":        task.remark,
+        })
+
+    pending_count  = sum(1 for t in tasks if t["status"] in ("pending", "in_progress"))
+    overdue_count  = sum(1 for t in tasks if t["is_overdue"])
+    return {
+        "store_id":      store_id,
+        "total":         len(tasks),
+        "pending_count": pending_count,
+        "overdue_count": overdue_count,
+        "tasks":         tasks,
+    }
+
+
+# ── 2. 完成任务 ──────────────────────────────────────────────────────────────
+
+@router.patch("/stores/{store_id}/tasks/{task_id}/complete")
+async def complete_task(
+    store_id:  str,
+    task_id:   str,
+    remark:    str = Body("", embed=True),
+    db:        AsyncSession = Depends(get_db),
+    _:         User = Depends(get_current_user),
+):
+    """标记任务为已完成"""
+    from datetime import datetime as _dt
+    from src.models.banquet import ExecutionTask, BanquetOrder, TaskStatusEnum
+
+    res = await db.execute(
+        select(ExecutionTask)
+        .join(BanquetOrder, ExecutionTask.banquet_order_id == BanquetOrder.id)
+        .where(ExecutionTask.id == task_id)
+        .where(BanquetOrder.store_id == store_id)
+    )
+    task = res.scalars().first()
+    if not task:
+        raise HTTPException(status_code=404, detail="task not found")
+
+    task.task_status  = TaskStatusEnum.DONE
+    task.completed_at = _dt.utcnow()
+    if remark:
+        task.remark = remark
+    await db.commit()
+
+    return {"task_id": task_id, "status": "done", "completed_at": task.completed_at.isoformat()}
+
+
+# ── 3. 线索跟进列表 ─────────────────────────────────────────────────────────
+
+@router.get("/stores/{store_id}/followups")
+async def get_followup_schedule(
+    store_id:  str,
+    days:      int = 7,
+    overdue:   bool = False,
+    db:        AsyncSession = Depends(get_db),
+    _:         User = Depends(get_current_user),
+):
+    """待跟进线索列表（按 next_followup_at 排序）"""
+    from datetime import timedelta
+    from src.models.banquet import BanquetLead, BanquetCustomer, LeadStageEnum
+
+    today = date_type.today()
+    if overdue:
+        # Overdue: next_followup_at in the past and not WON/LOST
+        q = (
+            select(BanquetLead, BanquetCustomer.name, BanquetCustomer.phone)
+            .join(BanquetCustomer, BanquetLead.customer_id == BanquetCustomer.id)
+            .where(BanquetLead.store_id == store_id)
+            .where(BanquetLead.next_followup_at < today)
+            .where(BanquetLead.current_stage.not_in([LeadStageEnum.WON, LeadStageEnum.LOST]))
+            .order_by(BanquetLead.next_followup_at)
+        )
+    else:
+        cutoff = today + timedelta(days=days)
+        q = (
+            select(BanquetLead, BanquetCustomer.name, BanquetCustomer.phone)
+            .join(BanquetCustomer, BanquetLead.customer_id == BanquetCustomer.id)
+            .where(BanquetLead.store_id == store_id)
+            .where(BanquetLead.next_followup_at <= cutoff)
+            .where(BanquetLead.next_followup_at >= today)
+            .where(BanquetLead.current_stage.not_in([LeadStageEnum.WON, LeadStageEnum.LOST]))
+            .order_by(BanquetLead.next_followup_at)
+        )
+
+    rows = (await db.execute(q)).all()
+
+    items = []
+    for lead, cname, cphone in rows:
+        items.append({
+            "lead_id":          lead.id,
+            "customer_name":    cname,
+            "customer_phone":   cphone,
+            "banquet_type":     lead.banquet_type.value if hasattr(lead.banquet_type, "value") else str(lead.banquet_type),
+            "expected_date":    str(lead.expected_date) if lead.expected_date else None,
+            "stage":            lead.current_stage.value if hasattr(lead.current_stage, "value") else str(lead.current_stage),
+            "next_followup_at": lead.next_followup_at.isoformat() if lead.next_followup_at else None,
+            "last_followup_at": lead.last_followup_at.isoformat() if lead.last_followup_at else None,
+            "budget_yuan":      round((lead.expected_budget_fen or 0) / 100, 2) if lead.expected_budget_fen else None,
+            "source_channel":   lead.source_channel,
+        })
+
+    return {
+        "store_id":      store_id,
+        "total":         len(items),
+        "overdue_mode":  overdue,
+        "items":         items,
+    }
+
+
+# ── 4. 记录跟进活动 ─────────────────────────────────────────────────────────
+
+@router.post("/stores/{store_id}/followups/{lead_id}/log")
+async def log_followup_activity(
+    store_id:        str,
+    lead_id:         str,
+    followup_type:   str = Body("call", embed=True),   # call/visit/wechat/email
+    content:         str = Body(..., embed=True),
+    next_followup_at: str = Body("", embed=True),      # ISO datetime, optional
+    db:              AsyncSession = Depends(get_db),
+    _:               User = Depends(get_current_user),
+):
+    """记录一次跟进活动，更新线索 last/next_followup_at"""
+    from datetime import datetime as _dt
+    from src.models.banquet import BanquetLead, LeadFollowupRecord
+
+    res = await db.execute(
+        select(BanquetLead)
+        .where(BanquetLead.id == lead_id)
+        .where(BanquetLead.store_id == store_id)
+    )
+    lead = res.scalars().first()
+    if not lead:
+        raise HTTPException(status_code=404, detail="lead not found")
+
+    now = _dt.utcnow()
+    record = LeadFollowupRecord(
+        id=str(__import__("uuid").uuid4()),
+        lead_id=lead_id,
+        followup_type=followup_type,
+        content=content,
+        stage_before=lead.current_stage,
+        stage_after=lead.current_stage,
+    )
+    if next_followup_at:
+        try:
+            nxt = _dt.fromisoformat(next_followup_at)
+            record.next_followup_at = nxt
+            lead.next_followup_at   = nxt
+        except ValueError:
+            pass
+
+    lead.last_followup_at = now
+    db.add(record)
+    await db.commit()
+
+    return {
+        "lead_id":          lead_id,
+        "record_id":        record.id,
+        "followup_type":    followup_type,
+        "logged_at":        now.isoformat(),
+        "next_followup_at": record.next_followup_at.isoformat() if record.next_followup_at else None,
+    }
+
+
+# ── 5. 推送通知历史 ─────────────────────────────────────────────────────────
+
+@router.get("/stores/{store_id}/push/history")
+async def get_push_history(
+    store_id:   str,
+    page:       int = 1,
+    page_size:  int = 20,
+    db:         AsyncSession = Depends(get_db),
+    _:          User = Depends(get_current_user),
+):
+    """推送通知历史（从 ActionLog 读取）"""
+    from src.models.banquet import BanquetAgentActionLog, BanquetAgentTypeEnum
+
+    offset = (page - 1) * page_size
+    q = (
+        select(BanquetAgentActionLog)
+        .where(BanquetAgentActionLog.action_type.in_(
+            ["daily_brief", "collection_message", "anniversary_message",
+             "win_back_message", "batch_push"]
+        ))
+        .order_by(BanquetAgentActionLog.created_at.desc())
+        .offset(offset)
+        .limit(page_size)
+    )
+
+    total_res = await db.execute(
+        select(func.count(BanquetAgentActionLog.id))
+        .where(BanquetAgentActionLog.action_type.in_(
+            ["daily_brief", "collection_message", "anniversary_message",
+             "win_back_message", "batch_push"]
+        ))
+    )
+    total = total_res.scalar() or 0
+
+    logs = (await db.execute(q)).scalars().all()
+
+    items = []
+    for log in logs:
+        items.append({
+            "log_id":      log.id,
+            "action_type": log.action_type,
+            "object_type": log.related_object_type,
+            "object_id":   log.related_object_id,
+            "summary":     (log.suggestion_text or "")[:80],
+            "approved":    log.is_human_approved,
+            "created_at":  log.created_at.isoformat() if log.created_at else None,
+        })
+
+    return {
+        "store_id":  store_id,
+        "total":     total,
+        "page":      page,
+        "page_size": page_size,
+        "items":     items,
+    }
+
+
+# ── 6. 批量推送 ──────────────────────────────────────────────────────────────
+
+@router.post("/stores/{store_id}/push/batch")
+async def batch_push(
+    store_id:    str,
+    push_type:   str = Body(..., embed=True),    # reminder/promotion/greeting
+    message:     str = Body(..., embed=True),
+    target_ids:  list = Body(..., embed=True),   # list of customer_id or lead_id
+    db:          AsyncSession = Depends(get_db),
+    _:           User = Depends(get_current_user),
+):
+    """批量推送消息（写入 ActionLog，实际发送由外部服务处理）"""
+    if not target_ids:
+        raise HTTPException(status_code=400, detail="target_ids cannot be empty")
+
+    logs_added = 0
+    for tid in target_ids[:50]:   # 最多50条/次
+        log = BanquetAgentActionLog(
+            id=str(__import__("uuid").uuid4()),
+            agent_type="followup",
+            related_object_type="customer",
+            related_object_id=str(tid),
+            action_type="batch_push",
+            action_result={"push_type": push_type, "status": "queued"},
+            suggestion_text=message[:200],
+            is_human_approved=True,
+        )
+        db.add(log)
+        logs_added += 1
+
+    await db.commit()
+
+    return {
+        "store_id":    store_id,
+        "push_type":   push_type,
+        "queued":      logs_added,
+        "message_preview": message[:80],
+    }
+
+
+# ── 7. 员工作业分配列表 ─────────────────────────────────────────────────────
+
+@router.get("/stores/{store_id}/staff/assignments")
+async def get_staff_assignments(
+    store_id:   str,
+    days_ahead: int = 14,
+    role:       str = "",
+    db:         AsyncSession = Depends(get_db),
+    _:          User = Depends(get_current_user),
+):
+    """按员工角色汇总未来宴会执行任务分配"""
+    from datetime import timedelta
+    from sqlalchemy import Integer
+    from src.models.banquet import ExecutionTask, BanquetOrder, TaskStatusEnum
+
+    cutoff = date_type.today() + timedelta(days=days_ahead)
+    q = (
+        select(
+            ExecutionTask.owner_role,
+            ExecutionTask.owner_user_id,
+            func.count(ExecutionTask.id).label("task_count"),
+            func.sum(
+                func.cast(ExecutionTask.task_status == TaskStatusEnum.DONE, Integer)
+            ).label("done_count"),
+        )
+        .join(BanquetOrder, ExecutionTask.banquet_order_id == BanquetOrder.id)
+        .where(BanquetOrder.store_id == store_id)
+        .where(BanquetOrder.banquet_date <= cutoff)
+        .where(BanquetOrder.banquet_date >= date_type.today())
+        .group_by(ExecutionTask.owner_role, ExecutionTask.owner_user_id)
+        .order_by(ExecutionTask.owner_role)
+    )
+    if role:
+        q = q.where(ExecutionTask.owner_role == role)
+
+    rows = (await db.execute(q)).all()
+
+    assignments = []
+    for r in rows:
+        task_count = r.task_count or 0
+        done_count = r.done_count or 0
+        assignments.append({
+            "owner_role":    r.owner_role.value if hasattr(r.owner_role, "value") else str(r.owner_role),
+            "owner_user_id": r.owner_user_id,
+            "task_count":    task_count,
+            "done_count":    done_count,
+            "pending_count": task_count - done_count,
+            "completion_pct": round(done_count / task_count * 100, 1) if task_count > 0 else None,
+        })
+
+    return {
+        "store_id":    store_id,
+        "days_ahead":  days_ahead,
+        "assignments": assignments,
+    }
+
+
+# ── 8. 订单指派员工 ─────────────────────────────────────────────────────────
+
+@router.post("/stores/{store_id}/orders/{order_id}/assign-staff")
+async def assign_staff_to_order(
+    store_id:      str,
+    order_id:      str,
+    owner_user_id: str = Body(..., embed=True),
+    owner_role:    str = Body("manager", embed=True),
+    db:            AsyncSession = Depends(get_db),
+    _:             User = Depends(get_current_user),
+):
+    """将员工指派到订单下的所有 pending 任务"""
+    from src.models.banquet import ExecutionTask, BanquetOrder, TaskStatusEnum, TaskOwnerRoleEnum
+
+    res = await db.execute(
+        select(BanquetOrder)
+        .where(BanquetOrder.id == order_id)
+        .where(BanquetOrder.store_id == store_id)
+    )
+    order = res.scalars().first()
+    if not order:
+        raise HTTPException(status_code=404, detail="order not found")
+
+    try:
+        role_enum = TaskOwnerRoleEnum(owner_role)
+    except ValueError:
+        role_enum = TaskOwnerRoleEnum.MANAGER
+
+    task_res = await db.execute(
+        select(ExecutionTask)
+        .where(ExecutionTask.banquet_order_id == order_id)
+        .where(ExecutionTask.task_status == TaskStatusEnum.PENDING)
+    )
+    tasks = task_res.scalars().all()
+
+    updated = 0
+    for task in tasks:
+        task.owner_user_id = owner_user_id
+        task.owner_role    = role_enum
+        updated += 1
+
+    order.owner_user_id = owner_user_id
+    await db.commit()
+
+    return {
+        "order_id":      order_id,
+        "owner_user_id": owner_user_id,
+        "owner_role":    owner_role,
+        "tasks_updated": updated,
+    }

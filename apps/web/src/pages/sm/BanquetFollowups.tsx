@@ -1,9 +1,8 @@
 /**
  * SM 跟进提醒页
  * 路由：/sm/banquet-followups
- * 数据：GET /api/v1/banquet-agent/stores/{id}/leads/followup-due
- *      PATCH /api/v1/banquet-agent/stores/{id}/leads/{lead_id}/stage   (已联系 / 推进)
- *      PATCH /api/v1/banquet-agent/stores/{id}/leads/{lead_id}/lost    (标记流失)
+ * 数据：GET  /api/v1/banquet-agent/stores/{id}/followups
+ *      POST /api/v1/banquet-agent/stores/{id}/followups/{lead_id}/log
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -76,9 +75,19 @@ export default function SmBanquetFollowups() {
     setLoading(true);
     try {
       const resp = await apiClient.get(
-        `/api/v1/banquet-agent/stores/${STORE_ID}/leads/followup-due`,
+        `/api/v1/banquet-agent/stores/${STORE_ID}/followups`,
+        { params: { days: 7 } },
       );
-      setData(resp.data);
+      // Adapt phase-20 shape to existing component structure
+      const items = resp.data?.items ?? [];
+      setData({
+        due_today: items.filter((i: { next_followup_at: string }) => {
+          const d = i.next_followup_at?.slice(0, 10);
+          return d === new Date().toISOString().slice(0, 10);
+        }),
+        overdue:   [],
+        total:     resp.data?.total ?? 0,
+      });
     } catch {
       setData({ due_today: [], overdue: [], total: 0 });
     } finally {
