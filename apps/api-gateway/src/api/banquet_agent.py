@@ -8613,3 +8613,490 @@ async def get_upsell_opportunities(
         "total":             len(opportunities),
         "opportunities":     opportunities[:top_n],
     }
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Phase 22 — 营收预测 · 套餐洞察 · 智能报价
+# ═══════════════════════════════════════════════════════════════════════════
+
+# ── 1. 营收趋势预测 ──────────────────────────────────────────────────────────
+
+@router.get("/stores/{store_id}/analytics/revenue-forecast")
+async def get_revenue_forecast(
+    store_id: str,
+    months:   int = 3,   # 预测未来 N 个月
+    db:       AsyncSession = Depends(get_db),
+    _:        User = Depends(get_current_user),
+):
+    """基于历史 KPI 月度均值做简单移动平均预测"""
+    from datetime import timedelta
+    from src.models.banquet import BanquetKpiDaily
+
+    # 取最近 12 个月历史
+    cutoff = date_type.today() - timedelta(days=365)
+    res = await db.execute(
+        select(BanquetKpiDaily)
+        .where(BanquetKpiDaily.store_id == store_id)
+        .where(BanquetKpiDaily.stat_date >= cutoff)
+        .order_by(BanquetKpiDaily.stat_date)
+    )
+    kpis = res.scalars().all()
+
+    # 按月聚合
+    monthly: dict = {}
+    for k in kpis:
+        key = str(k.stat_date)[:7]   # YYYY-MM
+        if key not in monthly:
+            monthly[key] = {"revenue_fen": 0, "order_count": 0, "days": 0}
+        monthly[key]["revenue_fen"]  += k.revenue_fen
+        monthly[key]["order_count"]  += k.order_count
+        monthly[key]["days"]         += 1
+
+    history = []
+    for ym, v in sorted(monthly.items()):
+        history.append({
+            "month":         ym,
+            "revenue_yuan":  round(v["revenue_fen"] / 100, 2),
+            "order_count":   v["order_count"],
+        })
+
+    # 移动平均（取最近3个月均值作为基线）
+    forecast = []
+    if history:
+        window = history[-3:] if len(history) >= 3 else history
+        avg_revenue = sum(h["revenue_yuan"] for h in window) / len(window)
+        avg_orders  = sum(h["order_count"] for h in window) / len(window)
+        today = date_type.today()
+        # 生成未来 months 个月的预测
+        for i in range(1, months + 1):
+            m_val = today.month + i
+            y_val = today.year + (m_val - 1) // 12
+            m_val = (m_val - 1) % 12 + 1
+            forecast.append({
+                "month":             f"{y_val:04d}-{m_val:02d}",
+                "forecast_revenue_yuan": round(avg_revenue, 2),
+                "forecast_orders":   round(avg_orders),
+                "confidence":        "medium",
+            })
+
+    return {
+        "store_id":    store_id,
+        "history":     history,
+        "forecast":    forecast,
+        "method":      "moving_average_3m",
+    }
+
+
+# ── 2. 订单星期热力图 ────────────────────────────────────────────────────────
+
+@router.get("/stores/{store_id}/analytics/booking-heatmap")
+async def get_booking_heatmap(
+    store_id: str,
+    months:   int = 12,
+    db:       AsyncSession = Depends(get_db),
+    _:        User = Depends(get_current_user),
+):
+    """过去 N 个月宴会订单热力图（星期 × 月份矩阵）"""
+    from datetime import timedelta
+    from src.models.banquet import BanquetOrder, OrderStatusEnum
+
+    cutoff = date_type.today() - timedelta(days=months * 30)
+    res = await db.execute(
+        select(BanquetOrder)
+        .where(BanquetOrder.store_id == store_id)
+        .where(BanquetOrder.banquet_date >= cutoff)
+        .where(BanquetOrder.order_status.in_([OrderStatusEnum.CONFIRMED, OrderStatusEnum.COMPLETED]))
+    )
+    orders = res.scalars().all()
+
+    # weekday(0=Mon…6=Sun) × month counts
+    WEEKDAY_NAMES = ["一", "二", "三", "四", "五", "六", "日"]
+    matrix: dict = {w: {} for w in range(7)}
+    for o in orders:
+        wd  = o.banquet_date.weekday()
+        mon = str(o.banquet_date)[:7]
+        matrix[wd][mon] = matrix[wd].get(mon, 0) + 1
+
+    months_list = sorted({str(o.banquet_date)[:7] for o in orders})
+    rows = []
+    for wd in range(7):
+        cells = [{"month": m, "count": matrix[wd].get(m, 0)} for m in months_list]
+        rows.append({
+            "weekday":      wd,
+            "weekday_label": f"周{WEEKDAY_NAMES[wd]}",
+            "total":        sum(c["count"] for c in cells),
+            "cells":        cells,
+        })
+
+    busiest = max(rows, key=lambda r: r["total"]) if rows else None
+    return {
+        "store_id":     store_id,
+        "months":       months_list,
+        "matrix":       rows,
+        "busiest_weekday": busiest["weekday_label"] if busiest else None,
+        "total_orders": sum(r["total"] for r in rows),
+    }
+
+
+# ── 3. 套餐销售分析 ─────────────────────────────────────────────────────────
+
+@router.get("/stores/{store_id}/analytics/menu-performance")
+async def get_menu_performance(
+    store_id: str,
+    db:       AsyncSession = Depends(get_db),
+    _:        User = Depends(get_current_user),
+):
+    """各套餐使用次数、收入贡献、毛利率"""
+    from src.models.banquet import MenuPackage, BanquetOrder, OrderStatusEnum
+
+    pkg_res = await db.execute(
+        select(MenuPackage)
+        .where(MenuPackage.store_id == store_id)
+        .where(MenuPackage.is_active == True)
+    )
+    packages = pkg_res.scalars().all()
+    if not packages:
+        return {"store_id": store_id, "packages": []}
+
+    pkg_ids = [p.id for p in packages]
+    ord_res = await db.execute(
+        select(BanquetOrder)
+        .where(BanquetOrder.store_id == store_id)
+        .where(BanquetOrder.package_id.in_(pkg_ids))
+        .where(BanquetOrder.order_status.in_([OrderStatusEnum.CONFIRMED, OrderStatusEnum.COMPLETED]))
+    )
+    orders = ord_res.scalars().all()
+
+    # 按 package_id 统计
+    stats: dict = {p.id: {"count": 0, "revenue_fen": 0} for p in packages}
+    for o in orders:
+        if o.package_id in stats:
+            stats[o.package_id]["count"]       += 1
+            stats[o.package_id]["revenue_fen"] += o.total_amount_fen or 0
+
+    result = []
+    pkg_map = {p.id: p for p in packages}
+    for pid, st in sorted(stats.items(), key=lambda x: x[1]["revenue_fen"], reverse=True):
+        p = pkg_map[pid]
+        cost  = p.cost_fen or 0
+        price = p.suggested_price_fen or 1
+        gpm   = round((price - cost) / price * 100, 1) if price > 0 else 0.0
+        result.append({
+            "package_id":     pid,
+            "name":           p.name,
+            "banquet_type":   p.banquet_type.value if p.banquet_type else None,
+            "price_yuan":     round(price / 100, 2),
+            "cost_yuan":      round(cost / 100, 2),
+            "gross_margin_pct": gpm,
+            "order_count":    st["count"],
+            "revenue_yuan":   round(st["revenue_fen"] / 100, 2),
+        })
+
+    return {
+        "store_id": store_id,
+        "total_packages": len(packages),
+        "packages": result,
+    }
+
+
+# ── 4. 智能套餐推荐 ─────────────────────────────────────────────────────────
+
+@router.post("/stores/{store_id}/quotes/smart-recommend")
+async def smart_recommend_package(
+    store_id:     str,
+    budget_yuan:  float = Body(..., embed=True),
+    people_count: int   = Body(..., embed=True),
+    banquet_type: str   = Body("wedding", embed=True),
+    db:           AsyncSession = Depends(get_db),
+    _:            User = Depends(get_current_user),
+):
+    """根据预算/人数/类型推荐最匹配套餐，附升级建议"""
+    from src.models.banquet import MenuPackage, BanquetTypeEnum
+
+    budget_fen   = int(budget_yuan * 100)
+    per_table    = budget_fen // max(people_count // 10, 1)   # 估算桌单价
+
+    try:
+        bt = BanquetTypeEnum(banquet_type)
+    except ValueError:
+        bt = None
+
+    res = await db.execute(
+        select(MenuPackage)
+        .where(MenuPackage.store_id == store_id)
+        .where(MenuPackage.is_active == True)
+        .where(MenuPackage.target_people_min <= people_count)
+        .where(MenuPackage.target_people_max >= people_count)
+        .order_by(MenuPackage.suggested_price_fen)
+    )
+    packages = res.scalars().all()
+
+    if bt is not None:
+        typed = [p for p in packages if p.banquet_type == bt or p.banquet_type is None]
+    else:
+        typed = packages
+
+    # 推荐：最接近 per_table 预算的套餐（预算内优先）
+    within_budget  = [p for p in typed if p.suggested_price_fen <= per_table]
+    above_budget   = [p for p in typed if p.suggested_price_fen > per_table]
+
+    recommended = within_budget[-1] if within_budget else (typed[0] if typed else None)
+    upgrade     = above_budget[0]   if above_budget  else None
+
+    def _pkg_dict(p):
+        return {
+            "package_id":    p.id,
+            "name":          p.name,
+            "price_yuan":    round(p.suggested_price_fen / 100, 2),
+            "banquet_type":  p.banquet_type.value if p.banquet_type else None,
+            "description":   p.description,
+            "per_table_yuan": round(p.suggested_price_fen / 100, 2),
+            "total_est_yuan": round(p.suggested_price_fen * (people_count // 10) / 100, 2),
+        }
+
+    return {
+        "store_id":         store_id,
+        "budget_yuan":      budget_yuan,
+        "people_count":     people_count,
+        "banquet_type":     banquet_type,
+        "recommended":      _pkg_dict(recommended) if recommended else None,
+        "upgrade_option":   _pkg_dict(upgrade)     if upgrade     else None,
+        "total_matches":    len(typed),
+    }
+
+
+# ── 5. 客户忠诚度指标 ────────────────────────────────────────────────────────
+
+@router.get("/stores/{store_id}/analytics/loyalty-metrics")
+async def get_loyalty_metrics(
+    store_id: str,
+    db:       AsyncSession = Depends(get_db),
+    _:        User = Depends(get_current_user),
+):
+    """复购率 · 客均LTV · 留存趋势"""
+    from src.models.banquet import BanquetCustomer, BanquetOrder, OrderStatusEnum
+
+    cust_res = await db.execute(
+        select(BanquetCustomer)
+        .where(BanquetCustomer.store_id == store_id)
+    )
+    customers = cust_res.scalars().all()
+    total_customers = len(customers)
+    if total_customers == 0:
+        return {"store_id": store_id, "repeat_rate_pct": 0.0, "avg_ltv_yuan": 0.0,
+                "total_customers": 0, "repeat_customers": 0}
+
+    repeat = sum(1 for c in customers if (c.total_banquet_count or 0) >= 2)
+    avg_ltv = sum((c.total_banquet_amount_fen or 0) for c in customers) / total_customers
+
+    # 新客 vs 回头客月度趋势（最近6个月）
+    from datetime import timedelta
+    cutoff = date_type.today() - timedelta(days=180)
+    ord_res = await db.execute(
+        select(BanquetOrder)
+        .where(BanquetOrder.store_id == store_id)
+        .where(BanquetOrder.banquet_date >= cutoff)
+        .where(BanquetOrder.order_status.in_([OrderStatusEnum.CONFIRMED, OrderStatusEnum.COMPLETED]))
+    )
+    orders = ord_res.scalars().all()
+
+    # group by month
+    new_monthly: dict = {}
+    repeat_monthly: dict = {}
+    customer_first: dict = {}    # customer_id → first order month
+    for o in sorted(orders, key=lambda x: x.banquet_date):
+        mon = str(o.banquet_date)[:7]
+        if o.customer_id not in customer_first:
+            customer_first[o.customer_id] = mon
+            new_monthly[mon] = new_monthly.get(mon, 0) + 1
+        else:
+            repeat_monthly[mon] = repeat_monthly.get(mon, 0) + 1
+
+    all_months = sorted({str(o.banquet_date)[:7] for o in orders})
+    trend = [
+        {
+            "month":         m,
+            "new_orders":    new_monthly.get(m, 0),
+            "repeat_orders": repeat_monthly.get(m, 0),
+        }
+        for m in all_months
+    ]
+
+    return {
+        "store_id":          store_id,
+        "total_customers":   total_customers,
+        "repeat_customers":  repeat,
+        "repeat_rate_pct":   round(repeat / total_customers * 100, 1),
+        "avg_ltv_yuan":      round(avg_ltv / 100, 2),
+        "monthly_trend":     trend,
+    }
+
+
+# ── 6. 旺季峰值分析 ─────────────────────────────────────────────────────────
+
+@router.get("/stores/{store_id}/analytics/peak-analysis")
+async def get_peak_analysis(
+    store_id: str,
+    db:       AsyncSession = Depends(get_db),
+    _:        User = Depends(get_current_user),
+):
+    """历史订单月份分布 + 星期分布 + 宴会类型占比"""
+    from src.models.banquet import BanquetOrder, OrderStatusEnum
+
+    res = await db.execute(
+        select(BanquetOrder)
+        .where(BanquetOrder.store_id == store_id)
+        .where(BanquetOrder.order_status.in_([OrderStatusEnum.CONFIRMED, OrderStatusEnum.COMPLETED]))
+    )
+    orders = res.scalars().all()
+    if not orders:
+        return {"store_id": store_id, "by_month": [], "by_weekday": [], "by_type": []}
+
+    # 月份分布（1–12）
+    month_cnt: dict = {}
+    weekday_cnt: dict = {}
+    type_cnt: dict = {}
+    for o in orders:
+        m = o.banquet_date.month
+        w = o.banquet_date.weekday()
+        t = o.banquet_type.value if hasattr(o.banquet_type, "value") else str(o.banquet_type)
+        month_cnt[m]   = month_cnt.get(m, 0) + 1
+        weekday_cnt[w] = weekday_cnt.get(w, 0) + 1
+        type_cnt[t]    = type_cnt.get(t, 0) + 1
+
+    total = len(orders)
+    MONTH_NAMES = ["一","二","三","四","五","六","七","八","九","十","十一","十二"]
+    WEEK_NAMES  = ["一","二","三","四","五","六","日"]
+
+    by_month = [
+        {"month": m, "label": f"{MONTH_NAMES[m-1]}月", "count": month_cnt.get(m, 0),
+         "pct": round(month_cnt.get(m, 0) / total * 100, 1)}
+        for m in range(1, 13)
+    ]
+    by_weekday = [
+        {"weekday": w, "label": f"周{WEEK_NAMES[w]}", "count": weekday_cnt.get(w, 0),
+         "pct": round(weekday_cnt.get(w, 0) / total * 100, 1)}
+        for w in range(7)
+    ]
+    by_type = sorted(
+        [{"type": t, "count": c, "pct": round(c / total * 100, 1)}
+         for t, c in type_cnt.items()],
+        key=lambda x: x["count"], reverse=True
+    )
+
+    peak_month   = max(by_month,   key=lambda x: x["count"])
+    peak_weekday = max(by_weekday, key=lambda x: x["count"])
+
+    return {
+        "store_id":     store_id,
+        "total_orders": total,
+        "by_month":     by_month,
+        "by_weekday":   by_weekday,
+        "by_type":      by_type,
+        "peak_month":   peak_month["label"],
+        "peak_weekday": peak_weekday["label"],
+    }
+
+
+# ── 7. 收款效率分析 ─────────────────────────────────────────────────────────
+
+@router.get("/stores/{store_id}/analytics/payment-efficiency")
+async def get_payment_efficiency(
+    store_id: str,
+    db:       AsyncSession = Depends(get_db),
+    _:        User = Depends(get_current_user),
+):
+    """首付率 · 尾款回收率 · 逾期应收分布"""
+    from src.models.banquet import BanquetOrder, OrderStatusEnum
+
+    res = await db.execute(
+        select(BanquetOrder)
+        .where(BanquetOrder.store_id == store_id)
+        .where(BanquetOrder.order_status.in_([OrderStatusEnum.CONFIRMED, OrderStatusEnum.COMPLETED]))
+        .where(BanquetOrder.total_amount_fen > 0)
+    )
+    orders = res.scalars().all()
+    if not orders:
+        return {"store_id": store_id, "total_orders": 0, "deposit_rate_pct": 0.0,
+                "full_payment_rate_pct": 0.0, "overdue_yuan": 0.0}
+
+    total      = len(orders)
+    deposited  = sum(1 for o in orders if (o.deposit_fen or 0) > 0)
+    fully_paid = sum(1 for o in orders if (o.paid_fen or 0) >= (o.total_amount_fen or 0))
+
+    total_receivable_fen = sum(o.total_amount_fen or 0 for o in orders)
+    total_received_fen   = sum(o.paid_fen or 0 for o in orders)
+    overdue_fen = sum(
+        (o.total_amount_fen or 0) - (o.paid_fen or 0)
+        for o in orders
+        if (o.total_amount_fen or 0) > (o.paid_fen or 0) and o.banquet_date < date_type.today()
+    )
+
+    return {
+        "store_id":              store_id,
+        "total_orders":          total,
+        "deposit_rate_pct":      round(deposited  / total * 100, 1),
+        "full_payment_rate_pct": round(fully_paid / total * 100, 1),
+        "total_receivable_yuan": round(total_receivable_fen / 100, 2),
+        "total_received_yuan":   round(total_received_fen   / 100, 2),
+        "collection_rate_pct":   round(total_received_fen / total_receivable_fen * 100, 1) if total_receivable_fen else 0.0,
+        "overdue_yuan":          round(overdue_fen / 100, 2),
+    }
+
+
+# ── 8. 线索流转速度 ─────────────────────────────────────────────────────────
+
+@router.get("/stores/{store_id}/analytics/lead-velocity")
+async def get_lead_velocity(
+    store_id: str,
+    db:       AsyncSession = Depends(get_db),
+    _:        User = Depends(get_current_user),
+):
+    """已成交线索从创建到成交的平均天数及各阶段停留时间"""
+    from src.models.banquet import BanquetLead, LeadStageEnum, LeadFollowupRecord
+
+    # 取已成交线索
+    res = await db.execute(
+        select(BanquetLead)
+        .where(BanquetLead.store_id == store_id)
+        .where(BanquetLead.current_stage == LeadStageEnum.WON)
+        .where(BanquetLead.converted_order_id != None)
+    )
+    won_leads = res.scalars().all()
+
+    if not won_leads:
+        return {"store_id": store_id, "avg_days_to_close": None,
+                "won_count": 0, "sample_leads": []}
+
+    velocity_list = []
+    for lead in won_leads:
+        if lead.last_followup_at and lead.next_followup_at:
+            days = (lead.last_followup_at.date() - date_type.today()).days
+        else:
+            days = None
+
+        # 取跟进记录数
+        log_res = await db.execute(
+            select(func.count(LeadFollowupRecord.id))
+            .where(LeadFollowupRecord.lead_id == lead.id)
+        )
+        followup_count = log_res.scalar() or 0
+
+        velocity_list.append({
+            "lead_id":        lead.id,
+            "banquet_type":   lead.banquet_type.value if hasattr(lead.banquet_type, "value") else str(lead.banquet_type),
+            "followup_count": followup_count,
+            "days_to_close":  days,
+        })
+
+    valid_days  = [v["days_to_close"] for v in velocity_list if v["days_to_close"] is not None]
+    avg_days    = round(sum(valid_days) / len(valid_days), 1) if valid_days else None
+    avg_touches = round(sum(v["followup_count"] for v in velocity_list) / len(velocity_list), 1)
+
+    return {
+        "store_id":           store_id,
+        "won_count":          len(won_leads),
+        "avg_days_to_close":  avg_days,
+        "avg_followup_count": avg_touches,
+        "sample_leads":       velocity_list[:10],
+    }

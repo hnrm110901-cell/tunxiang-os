@@ -1426,3 +1426,50 @@
 .upsellDate         { font-size: 13px; font-weight: 500; color: #111827; }
 .upsellMeta         { font-size: 11px; color: #6b7280; margin-top: 2px; }
 .upsellAmt          { font-size: 13px; font-weight: 700; color: #16a34a; flex-shrink: 0; padding-left: 8px; }
+
+/* ── Phase 22: 套餐洞察 & 营收预测 ── */
+.menuInsightTab     { display: flex; flex-direction: column; gap: 16px; }
+
+/* 套餐表 */
+.pkgList            { display: flex; flex-direction: column; gap: 0; }
+.pkgHeader          { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr; gap: 8px; padding: 6px 4px; font-size: 11px; color: #6b7280; font-weight: 600; border-bottom: 2px solid #e5e7eb; }
+.pkgRow             { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr; gap: 8px; align-items: center; padding: 8px 4px; border-bottom: 1px solid #f9fafb; }
+.pkgName            { font-size: 13px; font-weight: 500; color: #111827; }
+.pkgType            { margin-left: 6px; font-size: 10px; color: #6b7280; background: #f3f4f6; padding: 1px 5px; border-radius: 4px; }
+.pkgCell            { font-size: 12px; color: #374151; }
+
+/* 旺季分析 */
+.peakGrid           { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 12px; }
+.peakSubTitle       { font-size: 12px; font-weight: 600; color: #374151; margin-bottom: 8px; }
+.peakBars           { display: flex; align-items: flex-end; gap: 3px; height: 80px; }
+.peakBarItem        { display: flex; flex-direction: column; align-items: center; gap: 2px; flex: 1; }
+.peakBar            { width: 100%; background: #3b82f6; border-radius: 2px 2px 0 0; min-height: 2px; transition: height .3s; }
+.peakBarLabel       { font-size: 9px; color: #6b7280; }
+.peakBarCount       { font-size: 9px; color: #374151; font-weight: 600; }
+.typeList           { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.typeRow            { display: grid; grid-template-columns: 80px 1fr 40px; align-items: center; gap: 8px; }
+.typeLabel          { font-size: 12px; color: #374151; }
+.typeBarWrap        { background: #f3f4f6; border-radius: 3px; height: 12px; overflow: hidden; }
+.typeBar            { height: 100%; background: var(--accent, #FF6B2C); border-radius: 3px; transition: width .3s; }
+.typePct            { font-size: 11px; color: #6b7280; text-align: right; }
+
+/* 营收预测 Tab */
+.revenueForecastTab { display: flex; flex-direction: column; gap: 16px; }
+.forecastChart      { display: flex; align-items: flex-end; gap: 4px; height: 110px; overflow-x: auto; padding-bottom: 20px; }
+.fcBarItem          { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 28px; flex: 1; }
+.fcBarActual        { width: 100%; background: var(--accent, #FF6B2C); border-radius: 2px 2px 0 0; min-height: 2px; transition: height .3s; }
+.fcBarForecast      { width: 100%; background: #94a3b8; border-radius: 2px 2px 0 0; min-height: 2px; border: 1px dashed #64748b; transition: height .3s; }
+.fcLabel            { font-size: 9px; color: #6b7280; white-space: nowrap; }
+
+/* 忠诚度指标 */
+.loyaltyGrid        { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.loyaltyKpi         { text-align: center; padding: 12px 8px; background: #f9fafb; border-radius: 8px; }
+.loyaltyValue       { font-size: 18px; font-weight: 700; color: #111827; }
+.loyaltyLabel       { font-size: 11px; color: #6b7280; margin-top: 4px; }
+
+/* 收款效率 */
+.paymentGrid        { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.paymentItem        { text-align: center; padding: 12px 8px; background: #f9fafb; border-radius: 8px; }
+.paymentLabel       { font-size: 11px; color: #6b7280; margin-bottom: 4px; }
+.paymentValue       { font-size: 16px; font-weight: 700; color: #111827; }
+.paymentOverdue     { color: #dc2626; }

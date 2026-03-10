@@ -3817,6 +3817,8 @@ export default function HQBanquet() {
           { key: 'healthscore',  label: '运营健康',  children: <HealthScoreTab /> },
           { key: 'custinsight',  label: '客户洞察',  children: <CustomerInsightTab /> },
           { key: 'funnel',       label: '获客漏斗',  children: <FunnelAnalyticsTab /> },
+          { key: 'menuinsight',  label: '套餐洞察',  children: <MenuInsightTab /> },
+          { key: 'revforecast',  label: '营收预测',  children: <RevenueForecastTab /> },
         ]}
       />
     </div>
@@ -4070,6 +4072,270 @@ function FunnelAnalyticsTab() {
           </div>
         )}
       </ZCard>
+    </div>
+  );
+}
+
+/* ─── Phase 22: 套餐洞察 Tab ─── */
+function MenuInsightTab() {
+  const STORE = localStorage.getItem('store_id') || 'S001';
+
+  interface PkgPerfItem {
+    package_id: string;
+    name: string;
+    banquet_type: string | null;
+    price_yuan: number;
+    cost_yuan: number;
+    gross_margin_pct: number;
+    order_count: number;
+    revenue_yuan: number;
+  }
+  interface PeakMonth { month: number; label: string; count: number; pct: number; }
+  interface PeakWeekday { weekday: number; label: string; count: number; pct: number; }
+  interface PeakType { type: string; count: number; pct: number; }
+
+  const [pkgs,    setPkgs]    = useState<PkgPerfItem[]>([]);
+  const [byMonth, setByMonth] = useState<PeakMonth[]>([]);
+  const [byWeek,  setByWeek]  = useState<PeakWeekday[]>([]);
+  const [byType,  setByType]  = useState<PeakType[]>([]);
+  const [peakInfo, setPeakInfo] = useState<{ peak_month: string; peak_weekday: string } | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    Promise.allSettled([
+      apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/analytics/menu-performance`),
+      apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/analytics/peak-analysis`),
+    ]).then(([mp, pa]) => {
+      if (mp.status === 'fulfilled') setPkgs(mp.value.data?.packages ?? []);
+      if (pa.status === 'fulfilled') {
+        setByMonth(pa.value.data?.by_month ?? []);
+        setByWeek(pa.value.data?.by_weekday ?? []);
+        setByType(pa.value.data?.by_type ?? []);
+        setPeakInfo({ peak_month: pa.value.data?.peak_month, peak_weekday: pa.value.data?.peak_weekday });
+      }
+    }).finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return <ZSkeleton rows={6} />;
+
+  const maxMonth = Math.max(...byMonth.map(m => m.count), 1);
+  const maxWeek  = Math.max(...byWeek.map(w => w.count), 1);
+
+  return (
+    <div className={styles.menuInsightTab}>
+      {/* 套餐销售分析 */}
+      <ZCard title="套餐销售分析">
+        {pkgs.length === 0 ? (
+          <ZEmpty title="暂无套餐数据" description="请先创建宴会套餐" />
+        ) : (
+          <div className={styles.pkgList}>
+            <div className={styles.pkgHeader}>
+              <span>套餐名称</span>
+              <span>单价</span>
+              <span>毛利率</span>
+              <span>使用次数</span>
+              <span>收入贡献</span>
+            </div>
+            {pkgs.map(p => (
+              <div key={p.package_id} className={styles.pkgRow}>
+                <div className={styles.pkgName}>
+                  {p.name}
+                  {p.banquet_type && <span className={styles.pkgType}>{p.banquet_type}</span>}
+                </div>
+                <div className={styles.pkgCell}>¥{p.price_yuan.toLocaleString()}</div>
+                <div className={styles.pkgCell}>
+                  <ZBadge
+                    type={p.gross_margin_pct >= 40 ? 'success' : p.gross_margin_pct >= 25 ? 'info' : 'warning'}
+                    text={`${p.gross_margin_pct}%`}
+                  />
+                </div>
+                <div className={styles.pkgCell}>{p.order_count} 场</div>
+                <div className={styles.pkgCell}>¥{p.revenue_yuan.toLocaleString()}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </ZCard>
+
+      {/* 旺季分析 */}
+      {peakInfo && (
+        <ZCard title={`旺季分析 · 峰值月份：${peakInfo.peak_month} · 峰值星期：${peakInfo.peak_weekday}`}>
+          <div className={styles.peakGrid}>
+            <div>
+              <div className={styles.peakSubTitle}>月份分布</div>
+              <div className={styles.peakBars}>
+                {byMonth.map(m => (
+                  <div key={m.month} className={styles.peakBarItem}>
+                    <div className={styles.peakBar} style={{ height: `${Math.round(m.count / maxMonth * 60)}px` }} />
+                    <div className={styles.peakBarLabel}>{m.label.replace('月', '')}</div>
+                    <div className={styles.peakBarCount}>{m.count}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div>
+              <div className={styles.peakSubTitle}>星期分布</div>
+              <div className={styles.peakBars}>
+                {byWeek.map(w => (
+                  <div key={w.weekday} className={styles.peakBarItem}>
+                    <div className={styles.peakBar} style={{ height: `${Math.round(w.count / maxWeek * 60)}px`, background: 'var(--accent)' }} />
+                    <div className={styles.peakBarLabel}>{w.label.replace('周', '')}</div>
+                    <div className={styles.peakBarCount}>{w.count}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+          {byType.length > 0 && (
+            <div className={styles.typeList}>
+              {byType.map(t => (
+                <div key={t.type} className={styles.typeRow}>
+                  <span className={styles.typeLabel}>{t.type}</span>
+                  <div className={styles.typeBarWrap}>
+                    <div className={styles.typeBar} style={{ width: `${t.pct}%` }} />
+                  </div>
+                  <span className={styles.typePct}>{t.pct}%</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </ZCard>
+      )}
+    </div>
+  );
+}
+
+/* ─── Phase 22: 营收预测 Tab ─── */
+function RevenueForecastTab() {
+  const STORE = localStorage.getItem('store_id') || 'S001';
+
+  interface HistoryItem { month: string; revenue_yuan: number; order_count: number; }
+  interface ForecastItem { month: string; forecast_revenue_yuan: number; forecast_orders: number; confidence: string; }
+  interface LoyaltyData {
+    total_customers: number;
+    repeat_customers: number;
+    repeat_rate_pct: number;
+    avg_ltv_yuan: number;
+    monthly_trend: Array<{ month: string; new_orders: number; repeat_orders: number }>;
+  }
+  interface PaymentData {
+    total_orders: number;
+    deposit_rate_pct: number;
+    full_payment_rate_pct: number;
+    collection_rate_pct: number;
+    overdue_yuan: number;
+    total_receivable_yuan: number;
+    total_received_yuan: number;
+  }
+
+  const [history,  setHistory]  = useState<HistoryItem[]>([]);
+  const [forecast, setForecast] = useState<ForecastItem[]>([]);
+  const [loyalty,  setLoyalty]  = useState<LoyaltyData | null>(null);
+  const [payment,  setPayment]  = useState<PaymentData | null>(null);
+  const [loading,  setLoading]  = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    Promise.allSettled([
+      apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/analytics/revenue-forecast`, { params: { months: 3 } }),
+      apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/analytics/loyalty-metrics`),
+      apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/analytics/payment-efficiency`),
+    ]).then(([rf, lm, pe]) => {
+      if (rf.status === 'fulfilled') {
+        setHistory(rf.value.data?.history ?? []);
+        setForecast(rf.value.data?.forecast ?? []);
+      }
+      if (lm.status === 'fulfilled') setLoyalty(lm.value.data);
+      if (pe.status === 'fulfilled') setPayment(pe.value.data);
+    }).finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return <ZSkeleton rows={6} />;
+
+  const maxRevenue = Math.max(...history.map(h => h.revenue_yuan), ...forecast.map(f => f.forecast_revenue_yuan), 1);
+
+  return (
+    <div className={styles.revenueForecastTab}>
+      {/* 营收趋势 + 预测 */}
+      <ZCard title="营收趋势预测（移动平均3个月）">
+        {history.length === 0 && forecast.length === 0 ? (
+          <ZEmpty title="暂无历史数据" description="营收数据积累后自动生成预测" />
+        ) : (
+          <div className={styles.forecastChart}>
+            {history.map(h => (
+              <div key={h.month} className={styles.fcBarItem}>
+                <div
+                  className={styles.fcBarActual}
+                  style={{ height: `${Math.round(h.revenue_yuan / maxRevenue * 80)}px` }}
+                  title={`¥${h.revenue_yuan.toLocaleString()}`}
+                />
+                <div className={styles.fcLabel}>{h.month.slice(5)}</div>
+              </div>
+            ))}
+            {forecast.map(f => (
+              <div key={f.month} className={styles.fcBarItem}>
+                <div
+                  className={styles.fcBarForecast}
+                  style={{ height: `${Math.round(f.forecast_revenue_yuan / maxRevenue * 80)}px` }}
+                  title={`预测 ¥${f.forecast_revenue_yuan.toLocaleString()}`}
+                />
+                <div className={styles.fcLabel} style={{ color: '#94a3b8' }}>{f.month.slice(5)}~</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </ZCard>
+
+      {/* 忠诚度指标 */}
+      {loyalty && (
+        <ZCard title="客户忠诚度指标">
+          <div className={styles.loyaltyGrid}>
+            <div className={styles.loyaltyKpi}>
+              <div className={styles.loyaltyValue}>{loyalty.repeat_rate_pct}%</div>
+              <div className={styles.loyaltyLabel}>复购率</div>
+            </div>
+            <div className={styles.loyaltyKpi}>
+              <div className={styles.loyaltyValue}>¥{loyalty.avg_ltv_yuan.toLocaleString()}</div>
+              <div className={styles.loyaltyLabel}>客均LTV</div>
+            </div>
+            <div className={styles.loyaltyKpi}>
+              <div className={styles.loyaltyValue}>{loyalty.repeat_customers}</div>
+              <div className={styles.loyaltyLabel}>复购客户数</div>
+            </div>
+            <div className={styles.loyaltyKpi}>
+              <div className={styles.loyaltyValue}>{loyalty.total_customers}</div>
+              <div className={styles.loyaltyLabel}>总客户数</div>
+            </div>
+          </div>
+        </ZCard>
+      )}
+
+      {/* 收款效率 */}
+      {payment && (
+        <ZCard title="收款效率">
+          <div className={styles.paymentGrid}>
+            <div className={styles.paymentItem}>
+              <div className={styles.paymentLabel}>首付率</div>
+              <div className={styles.paymentValue}>{payment.deposit_rate_pct}%</div>
+            </div>
+            <div className={styles.paymentItem}>
+              <div className={styles.paymentLabel}>全额付款率</div>
+              <div className={styles.paymentValue}>{payment.full_payment_rate_pct}%</div>
+            </div>
+            <div className={styles.paymentItem}>
+              <div className={styles.paymentLabel}>回收率</div>
+              <div className={styles.paymentValue}>{payment.collection_rate_pct}%</div>
+            </div>
+            <div className={styles.paymentItem}>
+              <div className={styles.paymentLabel}>逾期应收</div>
+              <div className={`${styles.paymentValue} ${payment.overdue_yuan > 0 ? styles.paymentOverdue : ''}`}>
+                ¥{payment.overdue_yuan.toLocaleString()}
+              </div>
+            </div>
+          </div>
+        </ZCard>
+      )}
     </div>
   );
 }
