@@ -1275,3 +1275,58 @@
 .briefAlertType   { font-size: 13px; color: var(--text-secondary, #888); }
 .briefAlertIssues { display: flex; flex-wrap: wrap; gap: 8px; font-size: 13px; color: #64748b; }
 .briefAlertOk     { color: #22c55e; }
+
+/* ─── Phase 18: AnalyticsTab — 线索来源ROI + 价格段 ─── */
+.srcRoiList       { display: flex; flex-direction: column; gap: 10px; }
+.srcRoiRow        { display: grid; grid-template-columns: 80px 1fr 100px; align-items: center; gap: 12px; }
+.srcName          { font-size: 13px; font-weight: 600; color: var(--text-primary, #111); }
+.srcBar           { position: relative; height: 8px; background: #f1f5f9; border-radius: 4px; overflow: hidden; }
+.srcBarFill       { height: 100%; background: var(--accent, #FF6B2C); border-radius: 4px; transition: width 0.4s; }
+.srcConv          { font-size: 12px; color: #64748b; text-align: right; }
+.srcRevenue       { font-size: 12px; color: var(--text-primary, #111); text-align: right; font-weight: 600; }
+
+.priceGrid        { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+.priceBucket      { background: #f8fafc; border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 4px; }
+.priceBucketRange { font-size: 12px; font-weight: 700; color: var(--accent, #FF6B2C); }
+.priceBucketLabel { font-size: 11px; color: #94a3b8; }
+.priceBucketConv  { font-size: 15px; font-weight: 700; color: var(--text-primary, #111); }
+.priceBucketAvg   { font-size: 12px; color: #64748b; }
+.priceBucketCount { font-size: 11px; color: #94a3b8; }
+
+/* ─── Phase 18: ContractTab ─── */
+.contractTab       { display: flex; flex-direction: column; gap: 16px; }
+.contractKpiRow    { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 4px; }
+.contractKpi       { background: #f8fafc; border-radius: 8px; padding: 12px; text-align: center; }
+.contractKpiVal    { font-size: 22px; font-weight: 700; color: var(--text-primary, #111); }
+.contractKpiLabel  { font-size: 12px; color: #64748b; margin-top: 2px; }
+.contractAlertList { display: flex; flex-direction: column; gap: 10px; }
+.contractAlertRow  { display: flex; align-items: flex-start; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #f1f5f9; }
+.contractAlertRow:last-child { border-bottom: none; }
+.contractAlertDate { font-size: 13px; font-weight: 600; color: var(--text-primary, #111); }
+.contractAlertMeta { font-size: 12px; color: #64748b; margin-top: 2px; }
+.contractAlertAmount { font-size: 14px; font-weight: 700; color: var(--accent, #FF6B2C); }
+.contractPhone     { font-size: 12px; color: #94a3b8; }
+
+/* ─── Phase 18: ReviewsTab ─── */
+.reviewTab         { display: flex; flex-direction: column; gap: 16px; }
+.reviewKpiRow      { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 4px; }
+.reviewKpi         { background: #f8fafc; border-radius: 8px; padding: 12px; text-align: center; }
+.reviewKpiVal      { font-size: 22px; font-weight: 700; color: var(--text-primary, #111); }
+.reviewKpiLabel    { font-size: 12px; color: #64748b; margin-top: 2px; }
+.reviewScoreDist   { display: flex; flex-direction: column; gap: 6px; }
+.reviewScoreRow    { display: grid; grid-template-columns: 32px 1fr 32px; align-items: center; gap: 8px; }
+.reviewScoreBar    { height: 8px; background: #f1f5f9; border-radius: 4px; overflow: hidden; }
+.reviewScoreBarFill { height: 100%; background: #f59e0b; border-radius: 4px; transition: width 0.4s; }
+.reviewStarLabel   { font-size: 12px; color: #64748b; text-align: right; }
+.reviewStarCount   { font-size: 12px; color: var(--text-primary, #111); font-weight: 600; text-align: right; }
+.reviewTrendRow    { display: flex; align-items: flex-end; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
+.reviewTrendItem   { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 40px; }
+.reviewTrendBar    { width: 28px; background: var(--accent, #FF6B2C); border-radius: 3px 3px 0 0; min-height: 2px; }
+.reviewTrendLabel  { font-size: 10px; color: #94a3b8; white-space: nowrap; }
+.reviewLowList     { display: flex; flex-direction: column; gap: 12px; }
+.reviewLowRow      { padding: 10px; background: #fff5f5; border-radius: 8px; border-left: 3px solid #ef4444; }
+.reviewLowScore    { font-size: 13px; font-weight: 700; color: #ef4444; }
+.reviewLowBody     { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.reviewLowMeta     { font-size: 12px; color: #64748b; margin-top: 2px; }
+.reviewLowText     { font-size: 13px; color: var(--text-primary, #111); margin-top: 4px; }
+.reviewLowTags     { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }

@@ -1846,6 +1846,15 @@ interface BriefAlert {
   pending_tasks: number; unpaid_yuan: number; open_exceptions: number;
 }
 interface DailyBriefData { today_banquets: number; next_n_banquets: number; days: number; alerts: BriefAlert[] }
+/* Phase 18 */
+interface LeadSourceRow {
+  source: string; lead_count: number; converted: number;
+  conversion_rate_pct: number; revenue_yuan: number; revenue_per_lead_yuan: number;
+}
+interface PricingBucket {
+  range: string; lead_count: number; order_count: number;
+  conversion_rate_pct: number | null; avg_revenue_yuan: number | null;
+}
 
 function AnalyticsTab() {
   const [month,    setMonth]    = useState(() => {
@@ -1875,6 +1884,9 @@ function AnalyticsTab() {
   const [pkgProfit,    setPkgProfit]    = useState<PkgProfitRow[]>([]);
   const [seasonal,     setSeasonal]     = useState<SeasonalData | null>(null);
   const [revForecast,  setRevForecast]  = useState<RevForecast | null>(null);
+  /* Phase 18 */
+  const [leadSourceRoi,  setLeadSourceRoi]  = useState<LeadSourceRow[]>([]);
+  const [pricingBuckets, setPricingBuckets] = useState<PricingBucket[]>([]);
   const [loading,      setLoading]      = useState(false);
 
   const load = useCallback(async (m: string) => {
@@ -1886,6 +1898,7 @@ function AnalyticsTab() {
         funnelR, forecastR, lostR, arR, excR, excStatsR,
         agingR, quoteStatsR, svcR, ltR, retR, cancelR, execR,
         pkgProfitR, seasonalR, revForecastR,
+        leadSrcR, pricingR,
       ] = await Promise.allSettled([
         apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/analytics/funnel`, { params: { month: m } }),
         apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/analytics/revenue-forecast`, { params: { months: 3 } }),
@@ -1904,6 +1917,9 @@ function AnalyticsTab() {
         apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/menu-packages/profitability`, { params: { year: Number(y), month: Number(mo) } }),
         apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/analytics/seasonal-patterns`),
         apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/analytics/revenue-forecast`),
+        /* Phase 18 */
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/analytics/lead-source-roi`),
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/analytics/pricing-analysis`),
       ]);
       if (funnelR.status === 'fulfilled')     setFunnel(funnelR.value.data);
       if (forecastR.status === 'fulfilled')   setForecast(forecastR.value.data?.forecast ?? []);
@@ -1921,6 +1937,8 @@ function AnalyticsTab() {
       if (pkgProfitR.status === 'fulfilled')  setPkgProfit(pkgProfitR.value.data?.packages ?? []);
       if (seasonalR.status === 'fulfilled')   setSeasonal(seasonalR.value.data);
       if (revForecastR.status === 'fulfilled') setRevForecast(revForecastR.value.data);
+      if (leadSrcR.status === 'fulfilled')    setLeadSourceRoi(leadSrcR.value.data?.sources ?? []);
+      if (pricingR.status === 'fulfilled')    setPricingBuckets(pricingR.value.data?.buckets ?? []);
     } finally {
       setLoading(false);
     }
@@ -2518,6 +2536,49 @@ function AnalyticsTab() {
               </div>
             )}
           </ZCard>
+
+          {/* Phase 18: 线索来源 ROI */}
+          {leadSourceRoi.length > 0 && (
+            <ZCard title="线索来源 ROI">
+              <div className={styles.srcRoiList}>
+                {leadSourceRoi.map(s => {
+                  const maxRev = Math.max(...leadSourceRoi.map(x => x.revenue_yuan), 1);
+                  return (
+                    <div key={s.source} className={styles.srcRoiRow}>
+                      <span className={styles.srcName}>{s.source}</span>
+                      <div className={styles.srcBar}>
+                        <div className={styles.srcBarFill} style={{ width: `${(s.revenue_yuan / maxRev * 100).toFixed(0)}%` }} />
+                      </div>
+                      <span className={styles.srcConv}>{s.conversion_rate_pct}%</span>
+                      <span className={styles.srcRevenue}>¥{s.revenue_yuan.toLocaleString()}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </ZCard>
+          )}
+
+          {/* Phase 18: 价格段成交率分析 */}
+          {pricingBuckets.length > 0 && (
+            <ZCard title="价格段成交率">
+              <div className={styles.priceGrid}>
+                {pricingBuckets.map(b => (
+                  <div key={b.range} className={styles.priceBucket}>
+                    <div className={styles.priceBucketRange}>{b.range}</div>
+                    <div className={styles.priceBucketConv}>
+                      {b.conversion_rate_pct != null ? `${b.conversion_rate_pct}%` : '—'}
+                    </div>
+                    <div className={styles.priceBucketLabel}>转化率</div>
+                    <div className={styles.priceBucketAvg}>
+                      {b.avg_revenue_yuan != null ? `¥${b.avg_revenue_yuan.toLocaleString()}` : '—'}
+                    </div>
+                    <div className={styles.priceBucketLabel}>件均</div>
+                    <div className={styles.priceBucketCount}>{b.lead_count} 线索</div>
+                  </div>
+                ))}
+              </div>
+            </ZCard>
+          )}
         </>
       )}
     </div>
@@ -3086,6 +3147,237 @@ function CrossStoreTab() {
   );
 }
 
+/* ─── Phase 18: 合同履约 Tab ─── */
+interface ComplianceOrder { order_id: string; banquet_date: string; banquet_type: string; contact_name: string | null; days_until?: number; deposit_yuan?: number; days_overdue?: number; overdue_yuan?: number; contact_phone?: string | null; has_contract?: boolean }
+interface ComplianceData {
+  total_orders: number;
+  unsigned:    { count: number; orders: ComplianceOrder[] };
+  deposit_due: { count: number; total_overdue_yuan: number; orders: ComplianceOrder[] };
+  final_due:   { count: number; total_overdue_yuan: number; orders: ComplianceOrder[] };
+}
+
+function ContractTab() {
+  const STORE = localStorage.getItem('store_id') || 'S001';
+  const [data,    setData]    = useState<ComplianceData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/contracts/compliance`)
+      .then(r => setData(r.data))
+      .catch(() => setData(null))
+      .finally(() => setLoading(false));
+  }, [STORE]);
+
+  if (loading) return <ZSkeleton rows={5} />;
+  if (!data)   return <ZEmpty title="合同数据加载失败" description="请稍后重试" />;
+
+  const BT_LABEL: Record<string, string> = { wedding: '婚宴', birthday: '寿宴', business: '商务宴', full_month: '满月宴', graduation: '升学宴', other: '其他' };
+
+  return (
+    <div className={styles.contractTab}>
+      <div className={styles.contractKpiRow}>
+        <div className={styles.contractKpi}>
+          <span className={styles.contractKpiVal} style={{ color: data.unsigned.count > 0 ? '#ef4444' : '#22c55e' }}>{data.unsigned.count}</span>
+          <span className={styles.contractKpiLabel}>未签合同</span>
+        </div>
+        <div className={styles.contractKpi}>
+          <span className={styles.contractKpiVal} style={{ color: data.deposit_due.count > 0 ? '#ef4444' : '#22c55e' }}>{data.deposit_due.count}</span>
+          <span className={styles.contractKpiLabel}>定金未付</span>
+        </div>
+        <div className={styles.contractKpi}>
+          <span className={styles.contractKpiVal} style={{ color: data.final_due.count > 0 ? '#f97316' : '#22c55e' }}>{data.final_due.count}</span>
+          <span className={styles.contractKpiLabel}>尾款逾期</span>
+        </div>
+        <div className={styles.contractKpi}>
+          <span className={styles.contractKpiVal}>{data.total_orders}</span>
+          <span className={styles.contractKpiLabel}>总订单</span>
+        </div>
+      </div>
+
+      {data.unsigned.count > 0 && (
+        <ZCard title={`未签合同（${data.unsigned.count}）`}>
+          <div className={styles.contractAlertList}>
+            {data.unsigned.orders.map(o => (
+              <div key={o.order_id} className={styles.contractAlertRow}>
+                <div className={styles.contractAlertDate}>{o.banquet_date} · {BT_LABEL[o.banquet_type] ?? o.banquet_type}</div>
+                <div className={styles.contractAlertMeta}>
+                  <span>{o.contact_name ?? '—'}</span>
+                  {o.days_until != null && <ZBadge type={o.days_until <= 7 ? 'warning' : 'info'} text={`${o.days_until} 天后`} />}
+                  <ZBadge type="default" text={o.has_contract ? '草稿' : '无合同'} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </ZCard>
+      )}
+
+      {data.deposit_due.count > 0 && (
+        <ZCard title={`定金未付（${data.deposit_due.count}单 · 共¥${data.deposit_due.total_overdue_yuan.toLocaleString()}）`}>
+          <div className={styles.contractAlertList}>
+            {data.deposit_due.orders.map(o => (
+              <div key={o.order_id} className={styles.contractAlertRow}>
+                <div className={styles.contractAlertDate}>{o.banquet_date} · {BT_LABEL[o.banquet_type] ?? o.banquet_type}</div>
+                <div className={styles.contractAlertMeta}>
+                  <span>{o.contact_name ?? '—'}</span>
+                  {o.contact_phone && <span className={styles.contractPhone}>{o.contact_phone}</span>}
+                  <span className={styles.contractAlertAmount}>定金¥{(o.deposit_yuan ?? 0).toLocaleString()}</span>
+                  <ZBadge type="warning" text={`${o.days_until} 天后宴会`} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </ZCard>
+      )}
+
+      {data.final_due.count > 0 && (
+        <ZCard title={`尾款逾期（${data.final_due.count}单 · 共¥${data.final_due.total_overdue_yuan.toLocaleString()}）`}>
+          <div className={styles.contractAlertList}>
+            {data.final_due.orders.map(o => (
+              <div key={o.order_id} className={styles.contractAlertRow}>
+                <div className={styles.contractAlertDate}>{o.banquet_date} · {BT_LABEL[o.banquet_type] ?? o.banquet_type}</div>
+                <div className={styles.contractAlertMeta}>
+                  <span>{o.contact_name ?? '—'}</span>
+                  {o.contact_phone && <span className={styles.contractPhone}>{o.contact_phone}</span>}
+                  <span className={styles.contractAlertAmount}>逾期¥{(o.overdue_yuan ?? 0).toLocaleString()}</span>
+                  <ZBadge type="default" text={`已过 ${o.days_overdue} 天`} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </ZCard>
+      )}
+
+      {data.unsigned.count === 0 && data.deposit_due.count === 0 && data.final_due.count === 0 && (
+        <ZEmpty title="合同履约全部正常" description="无待处理事项" />
+      )}
+    </div>
+  );
+}
+
+/* ─── Phase 18: 客户评价 Tab ─── */
+interface ReviewSummaryData {
+  total: number; avg_score: number | null;
+  score_distribution: Record<string, number>;
+  monthly_trend: { month: string; avg_score: number; count: number }[];
+  by_banquet_type: { banquet_type: string; avg_score: number; count: number }[];
+}
+interface LowScoreItem { review_id: string; order_id: string; score: number; banquet_date: string; banquet_type: string; contact_name: string | null; ai_summary: string | null; tags: string[]; created_at: string | null }
+
+function ReviewsTab() {
+  const STORE = localStorage.getItem('store_id') || 'S001';
+  const [summary,    setSummary]    = useState<ReviewSummaryData | null>(null);
+  const [lowScores,  setLowScores]  = useState<LowScoreItem[]>([]);
+  const [loading,    setLoading]    = useState(true);
+
+  useEffect(() => {
+    Promise.allSettled([
+      apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/reviews/summary`, { params: { months: 6 } }),
+      apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/reviews/low-score-alerts`, { params: { threshold: 3 } }),
+    ]).then(([sumR, lowR]) => {
+      if (sumR.status === 'fulfilled')  setSummary(sumR.value.data);
+      if (lowR.status === 'fulfilled')  setLowScores(lowR.value.data?.items ?? []);
+    }).finally(() => setLoading(false));
+  }, [STORE]);
+
+  const STARS = ['1', '2', '3', '4', '5'];
+  const maxDist = summary ? Math.max(...STARS.map(s => summary.score_distribution[s] ?? 0), 1) : 1;
+
+  if (loading) return <ZSkeleton rows={6} />;
+
+  return (
+    <div className={styles.reviewTab}>
+      {/* KPI 行 */}
+      <div className={styles.reviewKpiRow}>
+        <div className={styles.reviewKpi}>
+          <span className={styles.reviewKpiVal}>{summary?.total ?? 0}</span>
+          <span className={styles.reviewKpiLabel}>总评价</span>
+        </div>
+        <div className={styles.reviewKpi}>
+          <span className={styles.reviewKpiVal}>{summary?.avg_score?.toFixed(1) ?? '—'}</span>
+          <span className={styles.reviewKpiLabel}>均分</span>
+        </div>
+        <div className={styles.reviewKpi}>
+          <span className={styles.reviewKpiVal} style={{ color: lowScores.length > 0 ? '#ef4444' : '#22c55e' }}>{lowScores.length}</span>
+          <span className={styles.reviewKpiLabel}>低分预警</span>
+        </div>
+      </div>
+
+      {/* 评分分布 */}
+      {summary && summary.total > 0 && (
+        <ZCard title="评分分布">
+          <div className={styles.reviewScoreDist}>
+            {STARS.map(s => (
+              <div key={s} className={styles.reviewScoreRow}>
+                <span className={styles.reviewStarLabel}>{s}★</span>
+                <div className={styles.reviewScoreBar}>
+                  <div
+                    className={styles.reviewScoreBarFill}
+                    style={{
+                      width: `${((summary.score_distribution[s] ?? 0) / maxDist * 100).toFixed(0)}%`,
+                      background: Number(s) >= 4 ? '#22c55e' : Number(s) === 3 ? '#f97316' : '#ef4444',
+                    }}
+                  />
+                </div>
+                <span className={styles.reviewStarCount}>{summary.score_distribution[s] ?? 0}</span>
+              </div>
+            ))}
+          </div>
+        </ZCard>
+      )}
+
+      {/* 月度趋势 */}
+      {summary && summary.monthly_trend.length > 0 && (
+        <ZCard title="月度均分趋势">
+          <div className={styles.reviewTrendRow}>
+            {summary.monthly_trend.map(m => (
+              <div key={m.month} className={styles.reviewTrendItem}>
+                <div
+                  className={styles.reviewTrendBar}
+                  style={{ height: `${(m.avg_score / 5 * 60).toFixed(0)}px`, background: m.avg_score >= 4 ? '#22c55e' : m.avg_score >= 3 ? '#f97316' : '#ef4444' }}
+                  title={`${m.avg_score.toFixed(1)} (${m.count}条)`}
+                />
+                <span className={styles.reviewTrendLabel}>{m.month.slice(5)}</span>
+              </div>
+            ))}
+          </div>
+        </ZCard>
+      )}
+
+      {/* 低分预警 */}
+      {lowScores.length > 0 && (
+        <ZCard title={`低分预警（≤3分，近90天）`}>
+          <div className={styles.reviewLowList}>
+            {lowScores.map(r => (
+              <div key={r.review_id} className={styles.reviewLowRow}>
+                <div className={styles.reviewLowScore} style={{ color: r.score <= 2 ? '#ef4444' : '#f97316' }}>
+                  {r.score}★
+                </div>
+                <div className={styles.reviewLowBody}>
+                  <div className={styles.reviewLowMeta}>
+                    <span>{r.banquet_date}</span>
+                    <span>{r.banquet_type}</span>
+                    {r.contact_name && <span>{r.contact_name}</span>}
+                  </div>
+                  {r.ai_summary && <div className={styles.reviewLowText}>{r.ai_summary}</div>}
+                  {r.tags.length > 0 && (
+                    <div className={styles.reviewLowTags}>
+                      {r.tags.map((t, i) => <ZBadge key={i} type="warning" text={t} />)}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </ZCard>
+      )}
+
+      {(!summary || summary.total === 0) && lowScores.length === 0 && (
+        <ZEmpty title="暂无评价数据" description="宴会完成后可在订单详情生成评价" />
+      )}
+    </div>
+  );
+}
+
 /* ─── Phase 17: 运营简报 Tab ─── */
 function DailyBriefTab() {
   const STORE = localStorage.getItem('store_id') || 'S001';
@@ -3208,6 +3500,8 @@ export default function HQBanquet() {
           { key: 'hallsched', label: '厅房月历',  children: <HallScheduleTab /> },
           { key: 'crossstore',   label: '跨店对比',  children: <CrossStoreTab /> },
           { key: 'dailybrief',   label: '运营简报',  children: <DailyBriefTab /> },
+          { key: 'contract',     label: '合同履约',  children: <ContractTab /> },
+          { key: 'reviews',      label: '客户评价',  children: <ReviewsTab /> },
         ]}
       />
     </div>

@@ -6465,3 +6465,618 @@ async def get_revenue_forecast(
         "confirmed_revenue_yuan": round(confirmed_fen / 100, 2),
         "forecast_yuan":         round(forecast_fen  / 100, 2),
     }
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# Phase 18 — 合同履约追踪 · 智能定价 · 评价闭环
+# ════════════════════════════════════════════════════════════════════════════
+
+# ── 1. 合同履约状态总览 ────────────────────────────────────────────────────
+
+@router.get("/stores/{store_id}/contracts/compliance")
+async def get_contract_compliance(
+    store_id: str,
+    db:       AsyncSession = Depends(get_db),
+    _:        User         = Depends(get_current_user),
+):
+    """合同履约状态总览：未签 / 定金逾期 / 尾款逾期"""
+    from datetime import timedelta
+
+    today = date_type.today()
+    warn_horizon = today + timedelta(days=30)  # 30天内宴会未签 → 警告
+
+    orders_res = await db.execute(
+        select(BanquetOrder).where(
+            BanquetOrder.store_id == store_id,
+            BanquetOrder.order_status.in_([OrderStatusEnum.CONFIRMED, OrderStatusEnum.COMPLETED]),
+        )
+    )
+    orders = orders_res.scalars().all()
+
+    # 批量拉合同
+    oids = [o.id for o in orders]
+    contracts_by_oid: dict = {}
+    if oids:
+        ct_res = await db.execute(
+            select(BanquetContract).where(BanquetContract.banquet_order_id.in_(oids))
+        )
+        for c in ct_res.scalars().all():
+            contracts_by_oid[c.banquet_order_id] = c
+
+    unsigned    = []
+    deposit_due = []
+    final_due   = []
+
+    for o in orders:
+        ct = contracts_by_oid.get(o.id)
+        bt = o.banquet_type.value if hasattr(o.banquet_type, "value") else str(o.banquet_type)
+        row = {
+            "order_id":    str(o.id),
+            "banquet_date": str(o.banquet_date),
+            "banquet_type": bt,
+            "contact_name": o.contact_name,
+        }
+
+        # 1) 未签合同：30天内宴会且合同不存在或未签
+        if o.banquet_date <= warn_horizon:
+            if ct is None or ct.contract_status != "signed":
+                days_until = (o.banquet_date - today).days
+                unsigned.append({**row, "days_until": days_until, "has_contract": ct is not None})
+
+        # 2) 定金逾期：已确认但 deposit_status 仍 UNPAID 且距宴会 <= 14 天
+        deposit_st = getattr(o, "deposit_status", None)
+        ds_val = deposit_st.value if hasattr(deposit_st, "value") else str(deposit_st)
+        total_fen = o.total_amount_fen or 0
+        paid_fen  = o.paid_fen or 0
+        deposit_fen = getattr(o, "deposit_fen", 0) or 0
+        days_until = (o.banquet_date - today).days
+        if ds_val == "unpaid" and 0 <= days_until <= 14:
+            deposit_due.append({
+                **row,
+                "days_until":       days_until,
+                "deposit_yuan":     round(deposit_fen / 100, 2),
+                "contact_phone":    o.contact_phone,
+            })
+
+        # 3) 尾款逾期：宴会已过 且 paid_fen < total_amount_fen
+        if o.banquet_date < today and paid_fen < total_fen:
+            overdue_yuan = round((total_fen - paid_fen) / 100, 2)
+            days_overdue = (today - o.banquet_date).days
+            final_due.append({
+                **row,
+                "days_overdue":  days_overdue,
+                "overdue_yuan":  overdue_yuan,
+                "contact_phone": o.contact_phone,
+            })
+
+    unsigned.sort(key=lambda x: x["days_until"])
+    deposit_due.sort(key=lambda x: x["days_until"])
+    final_due.sort(key=lambda x: x["days_overdue"], reverse=True)
+
+    return {
+        "store_id":     store_id,
+        "total_orders": len(orders),
+        "unsigned": {
+            "count": len(unsigned),
+            "orders": unsigned[:20],
+        },
+        "deposit_due": {
+            "count": len(deposit_due),
+            "total_overdue_yuan": sum(r["deposit_yuan"] for r in deposit_due),
+            "orders": deposit_due[:20],
+        },
+        "final_due": {
+            "count": len(final_due),
+            "total_overdue_yuan": sum(r["overdue_yuan"] for r in final_due),
+            "orders": final_due[:20],
+        },
+    }
+
+
+# ── 2. 逾期定金预警列表 ────────────────────────────────────────────────────
+
+@router.get("/stores/{store_id}/contracts/overdue-deposits")
+async def get_overdue_deposits(
+    store_id:     str,
+    days_overdue: int = Query(default=0),
+    db:           AsyncSession = Depends(get_db),
+    _:            User         = Depends(get_current_user),
+):
+    """定金逾期预警：deposit_status=unpaid 且 banquet_date 即将到来"""
+    from datetime import timedelta
+
+    today     = date_type.today()
+    threshold = today + timedelta(days=max(0, 30 - days_overdue))
+
+    orders_res = await db.execute(
+        select(BanquetOrder).where(
+            BanquetOrder.store_id == store_id,
+            BanquetOrder.order_status == OrderStatusEnum.CONFIRMED,
+            BanquetOrder.deposit_status == DepositStatusEnum.UNPAID,
+            BanquetOrder.banquet_date <= threshold,
+        )
+    )
+    orders = orders_res.scalars().all()
+
+    items = []
+    for o in orders:
+        deposit_fen = getattr(o, "deposit_fen", 0) or 0
+        days_until = (o.banquet_date - today).days
+        bt = o.banquet_type.value if hasattr(o.banquet_type, "value") else str(o.banquet_type)
+        items.append({
+            "order_id":          str(o.id),
+            "banquet_date":      str(o.banquet_date),
+            "banquet_type":      bt,
+            "contact_name":      o.contact_name,
+            "contact_phone":     o.contact_phone,
+            "days_until":        days_until,
+            "deposit_yuan":      round(deposit_fen / 100, 2),
+        })
+
+    items.sort(key=lambda x: x["days_until"])
+    return {"store_id": store_id, "total": len(items), "items": items}
+
+
+# ── 3. 智能定价建议 ────────────────────────────────────────────────────────
+
+@router.post("/stores/{store_id}/orders/{order_id}/pricing-recommendation")
+async def get_pricing_recommendation(
+    store_id: str,
+    order_id: str,
+    db:       AsyncSession = Depends(get_db),
+    _:        User         = Depends(get_current_user),
+):
+    """基于历史同类订单的分位数定价建议（纯规则，不调 LLM）"""
+    from datetime import timedelta
+
+    order_res = await db.execute(
+        select(BanquetOrder).where(
+            BanquetOrder.id == order_id,
+            BanquetOrder.store_id == store_id,
+        )
+    )
+    order = order_res.scalars().first()
+    if not order:
+        raise HTTPException(status_code=404, detail="订单不存在")
+
+    banquet_date  = order.banquet_date
+    banquet_type  = order.banquet_type
+    table_count   = order.table_count or 1
+
+    # 查历史同类确认/完成订单（近2年，±30天内日期）
+    two_years_ago = banquet_date - timedelta(days=730)
+    hist_res = await db.execute(
+        select(BanquetOrder).where(
+            BanquetOrder.store_id == store_id,
+            BanquetOrder.banquet_type == banquet_type,
+            BanquetOrder.order_status.in_([OrderStatusEnum.CONFIRMED, OrderStatusEnum.COMPLETED]),
+            BanquetOrder.banquet_date >= two_years_ago,
+            BanquetOrder.id != order_id,
+            BanquetOrder.table_count > 0,
+            BanquetOrder.total_amount_fen > 0,
+        )
+    )
+    hist = hist_res.scalars().all()
+
+    # 吉日加成（查 BanquetKpiDaily 的 is_auspicious 标记）
+    auspicious_res = await db.execute(
+        select(BanquetKpiDaily).where(
+            BanquetKpiDaily.store_id == store_id,
+            BanquetKpiDaily.stat_date == banquet_date,
+        )
+    )
+    kpi_day = auspicious_res.scalars().first()
+    # BanquetKpiDaily 没有 is_auspicious 字段，用月份判断粗代理（3/5/6/9/10 为旺季）
+    peak_months = {3, 5, 6, 9, 10}
+    is_peak = banquet_date.month in peak_months
+    # 周末溢价
+    is_weekend = banquet_date.weekday() >= 5
+
+    premium_mult = 1.0
+    if is_peak:    premium_mult += 0.03
+    if is_weekend: premium_mult += 0.05
+
+    bt_label = banquet_type.value if hasattr(banquet_type, "value") else str(banquet_type)
+
+    if len(hist) < 5:
+        # 样本不足 → 用 MenuPackage 理论定价
+        pkg_res = await db.execute(
+            select(MenuPackage).where(
+                MenuPackage.store_id == store_id,
+                MenuPackage.banquet_type == banquet_type,
+                MenuPackage.is_active.is_(True),
+            )
+        )
+        pkgs = pkg_res.scalars().all()
+        if pkgs:
+            avg_price = sum((p.suggested_price_fen or 0) for p in pkgs) / len(pkgs)
+        else:
+            avg_price = 80000  # 默认 800元/桌 × 100
+
+        base_per_table = avg_price
+        tiers = [
+            {"tier": "economy",  "price_per_table_yuan": round(base_per_table * 0.85 / 100, 0), "total_yuan": round(base_per_table * 0.85 / 100 * table_count, 0), "conversion_rate_pct": None},
+            {"tier": "standard", "price_per_table_yuan": round(base_per_table / 100, 0),          "total_yuan": round(base_per_table / 100 * table_count, 0),          "conversion_rate_pct": None},
+            {"tier": "premium",  "price_per_table_yuan": round(base_per_table * 1.2 / 100, 0),  "total_yuan": round(base_per_table * 1.2 / 100 * table_count, 0),  "conversion_rate_pct": None},
+        ]
+        return {
+            "order_id": order_id, "banquet_type": bt_label,
+            "table_count": table_count, "banquet_date": str(banquet_date),
+            "is_peak": is_peak, "is_weekend": is_weekend,
+            "sample_count": len(hist),
+            "tiers": tiers,
+            "recommendation": "standard",
+            "reason": f"历史样本不足（{len(hist)} 条），基于套餐定价估算",
+        }
+
+    # 计算每桌单价分位数
+    prices_per_table = sorted((o.total_amount_fen / o.table_count) for o in hist if o.table_count > 0)
+    n = len(prices_per_table)
+    p25 = prices_per_table[max(0, int(n * 0.25) - 1)]
+    p50 = prices_per_table[max(0, int(n * 0.50) - 1)]
+    p75 = prices_per_table[max(0, int(n * 0.75) - 1)]
+
+    p25 *= premium_mult
+    p50 *= premium_mult
+    p75 *= premium_mult
+
+    def _conv_rate(threshold_fen: float) -> float:
+        above = sum(1 for o in hist if (o.total_amount_fen / o.table_count) >= threshold_fen)
+        return round(above / len(hist) * 100, 1)
+
+    tiers = [
+        {"tier": "economy",  "price_per_table_yuan": round(p25 / 100, 0), "total_yuan": round(p25 / 100 * table_count, 0), "conversion_rate_pct": _conv_rate(p25)},
+        {"tier": "standard", "price_per_table_yuan": round(p50 / 100, 0), "total_yuan": round(p50 / 100 * table_count, 0), "conversion_rate_pct": _conv_rate(p50)},
+        {"tier": "premium",  "price_per_table_yuan": round(p75 / 100, 0), "total_yuan": round(p75 / 100 * table_count, 0), "conversion_rate_pct": _conv_rate(p75)},
+    ]
+
+    recommendation = "standard"
+    reason = f"基于 {len(hist)} 条历史同类订单"
+    if is_peak:    reason += "，旺季月份（+3%）"
+    if is_weekend: reason += "，周末（+5%）"
+
+    return {
+        "order_id": order_id, "banquet_type": bt_label,
+        "table_count": table_count, "banquet_date": str(banquet_date),
+        "is_peak": is_peak, "is_weekend": is_weekend,
+        "sample_count": len(hist),
+        "tiers": tiers,
+        "recommendation": recommendation,
+        "reason": reason,
+    }
+
+
+# ── 4. 价格段成交率分析 ────────────────────────────────────────────────────
+
+@router.get("/stores/{store_id}/analytics/pricing-analysis")
+async def get_pricing_analysis(
+    store_id:     str,
+    banquet_type: Optional[str] = Query(default=None),
+    db:           AsyncSession  = Depends(get_db),
+    _:            User          = Depends(get_current_user),
+):
+    """价格段（元/桌）成交率分析"""
+    # 线索（预算）
+    lead_q = select(BanquetLead).where(
+        BanquetLead.store_id == store_id,
+        BanquetLead.expected_budget_fen > 0,
+    )
+    if banquet_type:
+        try:
+            lead_q = lead_q.where(BanquetLead.banquet_type == BanquetTypeEnum(banquet_type))
+        except ValueError:
+            pass
+    leads_res = await db.execute(lead_q)
+    leads = leads_res.scalars().all()
+
+    # 已转化订单
+    order_q = select(BanquetOrder).where(
+        BanquetOrder.store_id == store_id,
+        BanquetOrder.order_status.in_([OrderStatusEnum.CONFIRMED, OrderStatusEnum.COMPLETED]),
+        BanquetOrder.total_amount_fen > 0,
+        BanquetOrder.table_count > 0,
+    )
+    if banquet_type:
+        try:
+            order_q = order_q.where(BanquetOrder.banquet_type == BanquetTypeEnum(banquet_type))
+        except ValueError:
+            pass
+    orders_res = await db.execute(order_q)
+    orders = orders_res.scalars().all()
+
+    # 价格段：按线索预算/桌分桶（estimated_people / 10 as proxy tables）
+    buckets = [
+        {"range": "<500元/桌",    "min": 0,    "max": 50000},
+        {"range": "500-800元/桌", "min": 50000, "max": 80000},
+        {"range": "800-1200元/桌","min": 80000, "max": 120000},
+        {"range": ">1200元/桌",   "min": 120000,"max": 9999999},
+    ]
+
+    # 以线索预算÷预计桌数（人数/10）作为每桌预算
+    def _lead_per_table(lead) -> float:
+        people = (lead.expected_people_count or 100)
+        tables = max(people // 10, 1)
+        return (lead.expected_budget_fen or 0) / tables
+
+    def _order_per_table(order) -> float:
+        return order.total_amount_fen / (order.table_count or 1)
+
+    result = []
+    for b in buckets:
+        lc = sum(1 for l in leads  if b["min"] <= _lead_per_table(l)  < b["max"])
+        oc = sum(1 for o in orders if b["min"] <= _order_per_table(o) < b["max"])
+        rev = sum(o.total_amount_fen for o in orders if b["min"] <= _order_per_table(o) < b["max"])
+        conv = round(oc / lc * 100, 1) if lc > 0 else None
+        avg_rev = round(rev / oc / 100, 0) if oc > 0 else None
+        result.append({
+            "range":               b["range"],
+            "lead_count":          lc,
+            "order_count":         oc,
+            "conversion_rate_pct": conv,
+            "avg_revenue_yuan":    avg_rev,
+        })
+
+    return {"store_id": store_id, "buckets": result}
+
+
+# ── 5. 评价汇总 ────────────────────────────────────────────────────────────
+
+@router.get("/stores/{store_id}/reviews/summary")
+async def get_reviews_summary(
+    store_id: str,
+    months:   int = Query(default=3),
+    db:       AsyncSession = Depends(get_db),
+    _:        User         = Depends(get_current_user),
+):
+    """宴后评价汇总：均分、评分分布、月度趋势、类型分布"""
+    from datetime import timedelta
+
+    cutoff = date_type.today() - timedelta(days=months * 30)
+
+    reviews_res = await db.execute(
+        select(BanquetOrderReview, BanquetOrder.banquet_date, BanquetOrder.banquet_type)
+        .join(BanquetOrder, BanquetOrderReview.banquet_order_id == BanquetOrder.id)
+        .where(
+            BanquetOrder.store_id == store_id,
+            BanquetOrderReview.customer_rating.isnot(None),
+            BanquetOrder.banquet_date >= cutoff,
+        )
+    )
+    rows = reviews_res.all()
+
+    if not rows:
+        return {
+            "store_id": store_id, "total": 0, "avg_score": None,
+            "score_distribution": {str(i): 0 for i in range(1, 6)},
+            "monthly_trend": [], "by_banquet_type": [],
+        }
+
+    dist: dict[str, int] = {str(i): 0 for i in range(1, 6)}
+    monthly: dict[str, list] = {}
+    by_type: dict[str, list] = {}
+
+    for rev, bd, bt in rows:
+        score = rev.customer_rating
+        dist[str(score)] = dist.get(str(score), 0) + 1
+        m_key = f"{bd.year:04d}-{bd.month:02d}"
+        monthly.setdefault(m_key, []).append(score)
+        bt_key = bt.value if hasattr(bt, "value") else str(bt)
+        by_type.setdefault(bt_key, []).append(score)
+
+    all_scores = [r[0].customer_rating for r in rows]
+    avg = round(sum(all_scores) / len(all_scores), 2)
+
+    trend = sorted([
+        {"month": m, "avg_score": round(sum(v) / len(v), 2), "count": len(v)}
+        for m, v in monthly.items()
+    ], key=lambda x: x["month"])
+
+    by_type_list = [
+        {"banquet_type": t, "avg_score": round(sum(v) / len(v), 2), "count": len(v)}
+        for t, v in by_type.items()
+    ]
+
+    return {
+        "store_id":           store_id,
+        "total":              len(rows),
+        "avg_score":          avg,
+        "score_distribution": dist,
+        "monthly_trend":      trend,
+        "by_banquet_type":    by_type_list,
+    }
+
+
+# ── 6. 低分预警 ────────────────────────────────────────────────────────────
+
+@router.get("/stores/{store_id}/reviews/low-score-alerts")
+async def get_low_score_alerts(
+    store_id:  str,
+    threshold: int = Query(default=3),
+    db:        AsyncSession = Depends(get_db),
+    _:         User         = Depends(get_current_user),
+):
+    """低分评价预警列表（customer_rating <= threshold，近90天）"""
+    from datetime import timedelta
+
+    cutoff = date_type.today() - timedelta(days=90)
+
+    res = await db.execute(
+        select(BanquetOrderReview, BanquetOrder)
+        .join(BanquetOrder, BanquetOrderReview.banquet_order_id == BanquetOrder.id)
+        .where(
+            BanquetOrder.store_id == store_id,
+            BanquetOrderReview.customer_rating.isnot(None),
+            BanquetOrderReview.customer_rating <= threshold,
+            BanquetOrder.banquet_date >= cutoff,
+        )
+        .order_by(BanquetOrderReview.created_at.desc())
+    )
+    rows = res.all()
+
+    items = []
+    for rev, order in rows:
+        bt = order.banquet_type.value if hasattr(order.banquet_type, "value") else str(order.banquet_type)
+        items.append({
+            "review_id":    str(rev.id),
+            "order_id":     str(order.id),
+            "score":        rev.customer_rating,
+            "banquet_date": str(order.banquet_date),
+            "banquet_type": bt,
+            "contact_name": order.contact_name,
+            "ai_summary":   rev.ai_summary,
+            "tags":         rev.improvement_tags or [],
+            "created_at":   rev.created_at.isoformat() if rev.created_at else None,
+        })
+
+    return {"store_id": store_id, "total": len(items), "threshold": threshold, "items": items}
+
+
+# ── 7. 线索来源 ROI ────────────────────────────────────────────────────────
+
+@router.get("/stores/{store_id}/analytics/lead-source-roi")
+async def get_lead_source_roi(
+    store_id: str,
+    db:       AsyncSession = Depends(get_db),
+    _:        User         = Depends(get_current_user),
+):
+    """线索来源（source_channel）转化率与营收归因"""
+    leads_res = await db.execute(
+        select(BanquetLead).where(BanquetLead.store_id == store_id)
+    )
+    leads = leads_res.scalars().all()
+
+    if not leads:
+        return {"store_id": store_id, "sources": []}
+
+    # 已转化线索 → 查对应订单金额
+    converted = [l for l in leads if l.converted_order_id]
+    conv_oids  = [l.converted_order_id for l in converted]
+    orders_by_id: dict = {}
+    if conv_oids:
+        ord_res = await db.execute(
+            select(BanquetOrder).where(BanquetOrder.id.in_(conv_oids))
+        )
+        for o in ord_res.scalars().all():
+            orders_by_id[str(o.id)] = o
+
+    # 按 source_channel 聚合（None → "其他"）
+    by_source: dict = {}
+    for lead in leads:
+        src = lead.source_channel or "其他"
+        if src not in by_source:
+            by_source[src] = {"leads": [], "revenue_fen": 0, "converted": 0}
+        by_source[src]["leads"].append(lead)
+
+    for lead in converted:
+        src = lead.source_channel or "其他"
+        ord = orders_by_id.get(str(lead.converted_order_id))
+        by_source[src]["converted"]   += 1
+        by_source[src]["revenue_fen"] += (ord.total_amount_fen if ord else 0)
+
+    sources = []
+    for src, data in sorted(by_source.items(), key=lambda x: -x[1]["revenue_fen"]):
+        lc  = len(data["leads"])
+        conv = data["converted"]
+        rev_fen = data["revenue_fen"]
+        sources.append({
+            "source":                src,
+            "lead_count":            lc,
+            "converted":             conv,
+            "conversion_rate_pct":   round(conv / lc * 100, 1) if lc else 0.0,
+            "revenue_yuan":          round(rev_fen / 100, 2),
+            "revenue_per_lead_yuan": round(rev_fen / lc / 100, 2) if lc else 0.0,
+        })
+
+    return {"store_id": store_id, "sources": sources}
+
+
+# ── 8. 厅房利用率预测 ────────────────────────────────────────────────────
+
+@router.get("/stores/{store_id}/analytics/hall-utilization-forecast")
+async def get_hall_utilization_forecast(
+    store_id: str,
+    days:     int = Query(default=30),
+    db:       AsyncSession = Depends(get_db),
+    _:        User         = Depends(get_current_user),
+):
+    """未来 N 天厅房利用率预测（每日）"""
+    from datetime import timedelta
+
+    today = date_type.today()
+    end   = today + timedelta(days=days)
+
+    # 查有效厅房数量（作为每日可用 slot 基准）
+    halls_res = await db.execute(
+        select(BanquetHall).where(
+            BanquetHall.store_id == store_id,
+            BanquetHall.is_active.is_(True),
+        )
+    )
+    halls = halls_res.scalars().all()
+    hall_count = max(len(halls), 1)
+    slots_per_day = hall_count * 2  # 每个厅每天2个时段（午/晚）
+
+    # 未来预订
+    future_res = await db.execute(
+        select(BanquetHallBooking).where(
+            BanquetHallBooking.slot_date >= today,
+            BanquetHallBooking.slot_date <= end,
+            BanquetHallBooking.hall_id.in_([h.id for h in halls]),
+        )
+    )
+    future_bookings = future_res.scalars().all()
+
+    # 历史同期（去年同期 ±15天）
+    last_year_start = today - timedelta(days=365 - 15)
+    last_year_end   = end   - timedelta(days=365 - 15)
+    hist_res = await db.execute(
+        select(BanquetHallBooking).where(
+            BanquetHallBooking.slot_date >= last_year_start,
+            BanquetHallBooking.slot_date <= last_year_end,
+            BanquetHallBooking.hall_id.in_([h.id for h in halls]),
+        )
+    )
+    hist_bookings = hist_res.scalars().all()
+
+    # 按日期分组
+    future_by_date: dict[str, int] = {}
+    for bk in future_bookings:
+        k = str(bk.slot_date)
+        future_by_date[k] = future_by_date.get(k, 0) + 1
+
+    hist_by_offset: dict[int, int] = {}
+    for bk in hist_bookings:
+        # offset = days from today
+        offset = (bk.slot_date - (today - timedelta(days=365 - 15))).days
+        hist_by_offset[offset] = hist_by_offset.get(offset, 0) + 1
+
+    daily = []
+    for i in range(days):
+        d = today + timedelta(days=i)
+        d_str = str(d)
+        booked   = future_by_date.get(d_str, 0)
+        hist_bk  = hist_by_offset.get(i, 0)
+        util_pct  = round(booked  / slots_per_day * 100, 1)
+        hist_pct  = round(hist_bk / slots_per_day * 100, 1)
+        status = "overbooked" if util_pct >= 100 else ("underbooked" if util_pct < 30 else "normal")
+        daily.append({
+            "date":           d_str,
+            "booked":         booked,
+            "capacity":       slots_per_day,
+            "utilization_pct": util_pct,
+            "hist_avg_pct":   hist_pct,
+            "status":         status,
+        })
+
+    avg_util = round(sum(d["utilization_pct"] for d in daily) / days, 1) if daily else 0.0
+    return {
+        "store_id":   store_id,
+        "halls":      hall_count,
+        "days":       days,
+        "daily":      daily,
+        "summary": {
+            "avg_utilization_pct": avg_util,
+            "overbooked_days":     sum(1 for d in daily if d["status"] == "overbooked"),
+            "underbooked_days":    sum(1 for d in daily if d["status"] == "underbooked"),
+        },
+    }
