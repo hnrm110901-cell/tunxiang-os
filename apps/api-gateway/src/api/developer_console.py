@@ -93,8 +93,8 @@ async def get_console_overview(
             "total_calls":    r.total or 0,
             "billable_calls": r.billable or 0,
         }
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning("console_api_usage_failed", dev_id=dev_id, error=str(exc))
 
     # ── Plugin summary ────────────────────────────────────────────────────────
     plugin_summary: Optional[Dict] = None
@@ -116,8 +116,8 @@ async def get_console_overview(
             "total_installs": r.installs or 0,
             "avg_rating":   round(_float(r.avg_rating), 2) if r.avg_rating else None,
         }
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning("console_plugin_summary_failed", dev_id=dev_id, error=str(exc))
 
     # ── Revenue (pending settlement) ──────────────────────────────────────────
     revenue_summary: Optional[Dict] = None
@@ -138,8 +138,8 @@ async def get_console_overview(
             "pending_yuan":  round(pending_fen / 100, 2),
             "paid_yuan":     round(paid_fen / 100, 2),
         }
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning("console_revenue_summary_failed", dev_id=dev_id, error=str(exc))
 
     # ── Webhook health ────────────────────────────────────────────────────────
     webhook_health: Optional[Dict] = None
@@ -157,8 +157,8 @@ async def get_console_overview(
             "active_count":  r.total or 0,
             "failing_count": r.failing or 0,
         }
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning("console_webhook_health_failed", dev_id=dev_id, error=str(exc))
 
     # ── Latest snapshot ───────────────────────────────────────────────────────
     snapshot: Optional[Dict] = None
@@ -177,8 +177,8 @@ async def get_console_overview(
             for k in ("pending_settlement_yuan", "last_paid_yuan", "avg_rating", "api_quota_used_pct"):
                 if snapshot.get(k) is not None:
                     snapshot[k] = _float(snapshot[k])
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning("console_latest_snapshot_failed", dev_id=dev_id, error=str(exc))
 
     return {
         "developer": {
@@ -224,8 +224,8 @@ async def compute_snapshot(
         res = r.fetchone()
         api_today = res.today_cnt or 0
         api_month = res.month_cnt or 0
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning("snapshot_api_usage_failed", dev_id=dev_id, error=str(exc))
 
     published = 0
     installs = 0
@@ -245,8 +245,8 @@ async def compute_snapshot(
         published  = res.pub or 0
         installs   = res.inst or 0
         avg_rating = round(_float(res.avgr), 2) if res.avgr else None
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning("snapshot_plugin_failed", dev_id=dev_id, error=str(exc))
 
     pending_yuan = 0.0
     last_paid_yuan = 0.0
@@ -263,8 +263,8 @@ async def compute_snapshot(
         res = r.fetchone()
         pending_yuan   = round((res.pend or 0) / 100, 2)
         last_paid_yuan = round((res.paid or 0) / 100, 2)
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning("snapshot_revenue_failed", dev_id=dev_id, error=str(exc))
 
     webhook_count   = 0
     webhook_failing = 0
@@ -280,8 +280,8 @@ async def compute_snapshot(
         res = r.fetchone()
         webhook_count   = res.cnt or 0
         webhook_failing = res.fail or 0
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning("snapshot_webhook_failed", dev_id=dev_id, error=str(exc))
 
     # Quota %: look up billing cycle
     quota_pct = 0.0
@@ -296,8 +296,8 @@ async def compute_snapshot(
         res = r.fetchone()
         if res and res.free_quota and res.free_quota > 0:
             quota_pct = round(min(res.billable_calls / res.free_quota * 100, 999.99), 2)
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning("snapshot_quota_failed", dev_id=dev_id, error=str(exc))
 
     snap_id = str(uuid.uuid4())
     await db.execute(

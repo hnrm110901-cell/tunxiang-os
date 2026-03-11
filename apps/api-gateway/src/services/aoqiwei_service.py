@@ -95,12 +95,59 @@ class AoqiweiService:
         depot_code: Optional[str] = None,
         shop_code: Optional[str] = None,
         good_code: Optional[str] = None,
+        db=None,
     ) -> List[Dict[str, Any]]:
-        """查询库存"""
+        """查询库存。未配置时降级查询本地 inventory_items 表。"""
         if not self.is_configured():
+            if db is not None:
+                return await self._get_stock_local(shop_code=shop_code, good_code=good_code, db=db)
             logger.warning("奥琦玮未配置，返回空库存")
             return []
         return await self._get_adapter().query_stock(depot_code, shop_code, good_code)
+
+    @staticmethod
+    async def _get_stock_local(
+        shop_code: Optional[str],
+        good_code: Optional[str],
+        db,
+    ) -> List[Dict[str, Any]]:
+        """从本地 inventory_items 表读取库存作为降级数据源。"""
+        from sqlalchemy import select
+        from src.models.inventory import InventoryItem
+
+        stmt = select(
+            InventoryItem.id,
+            InventoryItem.name,
+            InventoryItem.category,
+            InventoryItem.unit,
+            InventoryItem.current_quantity,
+            InventoryItem.min_quantity,
+            InventoryItem.unit_cost,
+            InventoryItem.status,
+            InventoryItem.store_id,
+        )
+        if shop_code:
+            stmt = stmt.where(InventoryItem.store_id == shop_code)
+        if good_code:
+            stmt = stmt.where(InventoryItem.id == good_code)
+
+        rows = (await db.execute(stmt)).all()
+        logger.info("aoqiwei_stock_local_fallback", shop_code=shop_code, count=len(rows))
+        return [
+            {
+                "good_code":    r.id,
+                "good_name":    r.name,
+                "category":     r.category,
+                "unit":         r.unit,
+                "stock_qty":    r.current_quantity,
+                "min_qty":      r.min_quantity,
+                "unit_cost_fen": r.unit_cost,
+                "status":       r.status,
+                "shop_code":    r.store_id,
+                "data_source":  "local_inventory",
+            }
+            for r in rows
+        ]
 
     async def get_stock_estimate(self, shop_code: str, start_date: str, end_date: str) -> Dict[str, Any]:
         """获取库存预估"""
@@ -187,9 +234,13 @@ class AoqiweiService:
         end_date: str,
         shop_code: Optional[str] = None,
         good_code: Optional[str] = None,
+        db=None,
     ) -> Dict[str, Any]:
-        """查询进销存报表"""
+        """查询进销存报表。未配置时降级返回本地库存快照。"""
         if not self.is_configured():
+            if db is not None:
+                items = await self._get_stock_local(shop_code=shop_code, good_code=good_code, db=db)
+                return {"list": items, "total": len(items), "data_source": "local_inventory"}
             return {"list": [], "total": 0}
         return await self._get_adapter().query_inventory_report(start_date, end_date, shop_code, good_code)
 

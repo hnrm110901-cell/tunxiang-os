@@ -447,6 +447,18 @@ class BanquetPlanningEngine:
                 }
             ],
 
+            # ── 执行检查清单
+            "checklist": [
+                {"category": "采购", "item": "食材已按采购清单备货", "status": "pending", "responsible": "采购员"},
+                {"category": "采购", "item": "特殊食材供应商已确认", "status": "pending", "responsible": "采购员"},
+                {"category": "厨房", "item": "宴会菜单已与厨师长确认", "status": "pending", "responsible": "厨师长"},
+                {"category": "厨房", "item": "菜品出餐时间节点已规划", "status": "pending", "responsible": "厨师长"},
+                {"category": "前厅", "item": "场地布置已按要求完成", "status": "pending", "responsible": "楼面经理"},
+                {"category": "前厅", "item": "服务员排班已确认到岗", "status": "pending", "responsible": "楼面经理"},
+                {"category": "财务", "item": "定金已收取并录入系统", "status": "pending" if deposit == 0 else "completed", "responsible": "收银"},
+                {"category": "协调", "item": "客户特殊要求已传达各部门", "status": "pending", "responsible": "协调员"},
+            ],
+
             # ── 熔断元信息
             "circuit_breaker": {
                 "triggered":    True,
