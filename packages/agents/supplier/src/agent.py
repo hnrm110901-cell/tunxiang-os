@@ -9,6 +9,9 @@
 """
 from __future__ import annotations
 
+import json
+import logging
+import os
 import uuid
 from datetime import datetime, date, timedelta
 from decimal import Decimal
@@ -25,6 +28,34 @@ from src.models.supplier_agent import (
     SupplierTierEnum, QuoteStatusEnum, ContractStatusEnum,
     DeliveryStatusEnum, RiskLevelEnum, AlertTypeEnum, SupplierAgentTypeEnum,
 )
+
+logger = logging.getLogger(__name__)
+
+_LLM_ENABLED = os.getenv("LLM_ENABLED", "true").lower() == "true"
+_LLM_PROVIDER = os.getenv("LLM_PROVIDER", "anthropic")
+
+
+async def _ai_insight(system: str, user_data: dict) -> Optional[str]:
+    """
+    调用 Claude API 生成 AI 洞察。
+    - LLM_ENABLED=false 或 API_KEY 未配置时，静默返回 None（使用模板 reason）
+    - 使用 claude-opus-4-6 + adaptive thinking（复杂决策场景）
+    """
+    if not _LLM_ENABLED:
+        return None
+    try:
+        from src.core.llm import get_llm_client
+        client = get_llm_client()
+        prompt = json.dumps(user_data, ensure_ascii=False, default=str)
+        insight = await client.generate(
+            prompt=prompt,
+            system_prompt=system,
+            max_tokens=512,
+        )
+        return insight.strip() or None
+    except Exception as exc:
+        logger.warning("supplier_agent_llm_insight_failed: %s", str(exc))
+        return None
 
 
 # ─────────────────────────────────────────────
@@ -255,6 +286,24 @@ class PriceComparisonAgent:
             await db.flush()
 
         duration_ms = int((datetime.utcnow() - t0).total_seconds() * 1000)
+
+        ai_insight = await _ai_insight(
+            system=(
+                "你是智链OS供应链决策AI，专注餐饮连锁供应商管理。"
+                "根据比价数据，用2-3句话给出采购建议，必须包含：建议动作、¥预期节省金额、置信度。"
+                "回复语言：中文，简洁。"
+            ),
+            user_data={
+                "material_id": material_id,
+                "recommended_supplier": best["supplier_id"],
+                "recommended_price_yuan": best["unit_price_yuan"],
+                "price_delta_pct": best["price_delta_pct"],
+                "estimated_saving_yuan": saving,
+                "quote_count": len(quotes),
+                "price_spread_pct": compute_price_spread_pct(prices),
+            },
+        )
+
         return {
             "comparison_id": comparison_id,
             "material_id": material_id,
@@ -264,6 +313,7 @@ class PriceComparisonAgent:
             "price_spread_pct": compute_price_spread_pct(prices),
             "estimated_saving_yuan": saving,
             "recommendation_reason": reason,
+            "ai_insight": ai_insight,
             "confidence": 0.85,
             "ranked_quotes": ranked,
             "duration_ms": duration_ms,
@@ -438,6 +488,22 @@ class SupplierRatingAgent:
             await db.flush()
             result["eval_id"] = eval_id
 
+        result["ai_insight"] = await _ai_insight(
+            system=(
+                "你是智链OS供应商评级AI。根据评级数据，用2-3句话给出管理建议，"
+                "必须包含：建议动作（升级/降级/约谈/保持）、关键风险点、置信度。"
+                "回复语言：中文，简洁。"
+            ),
+            user_data={
+                "supplier_id": supplier_id,
+                "composite_score": composite,
+                "tier_suggestion": tier_suggestion.value,
+                "reject_rate_pct": round(reject_rate * 100, 2),
+                "delivery_score": delivery_score,
+                "price_score": price_score,
+                "action_required": action_required,
+            },
+        )
         return result
 
     def _build_action_text(
@@ -604,6 +670,22 @@ class AutoSourcingAgent:
             "split_plan": split_plan,
             "alternative_supplier_ids": alt_ids,
             "reasoning": reasoning,
+            "ai_insight": await _ai_insight(
+                system=(
+                    "你是智链OS采购寻源AI。根据寻源结果，用2-3句话给出采购决策建议，"
+                    "必须包含：建议动作（立即下单/询价/备货）、预期¥总采购金额、置信度。"
+                    "回复语言：中文，简洁。"
+                ),
+                user_data={
+                    "material_name": material.material_name,
+                    "required_qty": required_qty,
+                    "needed_by_date": str(needed_by_date),
+                    "sourcing_strategy": strategy,
+                    "estimated_total_yuan": total,
+                    "estimated_saving_yuan": saving,
+                    "candidate_count": len(candidates),
+                },
+            ),
             "confidence": 0.80,
         }
 
@@ -730,10 +812,28 @@ class ContractRiskAgent:
             await db.flush()
 
         duration_ms = int((datetime.utcnow() - t0).total_seconds() * 1000)
+
+        total_financial_risk = sum(
+            s.get("financial_impact_yuan", 0) for s in alert_summaries
+        )
         return {
             "scanned_count": len(contracts),
             "alerts_created": alerts_created,
             "alert_summaries": alert_summaries,
+            "ai_insight": await _ai_insight(
+                system=(
+                    "你是智链OS合同风险AI。根据合同预警数据，用2-3句话给出处置建议，"
+                    "必须包含：优先处置哪个合同、¥预计风险金额、置信度。"
+                    "回复语言：中文，简洁。"
+                ),
+                user_data={
+                    "scanned_count": len(contracts),
+                    "alerts_created": alerts_created,
+                    "critical_count": sum(1 for s in alert_summaries if s["risk_level"] == "critical"),
+                    "total_financial_risk_yuan": round(total_financial_risk, 2),
+                    "top_alerts": alert_summaries[:3],
+                },
+            ) if alert_summaries else None,
             "duration_ms": duration_ms,
         }
 
@@ -828,6 +928,23 @@ class SupplyChainRiskAgent:
             "risk_count": len(risks),
             "events_created": events_created,
             "risks": risks,
+            "ai_insight": await _ai_insight(
+                system=(
+                    "你是智链OS供应链风险AI。根据供应链风险扫描结果，用2-3句话给出应急建议，"
+                    "必须包含：最高优先级风险、建议行动、¥预计影响金额、置信度。"
+                    "回复语言：中文，简洁。"
+                ),
+                user_data={
+                    "risk_count": len(risks),
+                    "single_source_risks": len([r for r in risks if r["alert_type"] == AlertTypeEnum.SINGLE_SOURCE_RISK]),
+                    "delay_risks": len([r for r in risks if r["alert_type"] == AlertTypeEnum.DELIVERY_DELAY]),
+                    "price_spike_risks": len([r for r in risks if r["alert_type"] == AlertTypeEnum.PRICE_SPIKE]),
+                    "top_risks": [
+                        {"title": r["title"], "risk_level": r["risk_level"].value if hasattr(r["risk_level"], "value") else r["risk_level"]}
+                        for r in risks[:3]
+                    ],
+                },
+            ) if risks else None,
             "duration_ms": duration_ms,
         }
 
