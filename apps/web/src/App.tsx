@@ -152,6 +152,7 @@ const DataSecurityPage = lazy(() => import('./pages/DataSecurityPage'));
 const BanquetLifecyclePage = lazy(() => import('./pages/BanquetAgentPage'));
 const DishRdPage = lazy(() => import('./pages/DishRdPage'));
 const DishRdDetailPage = lazy(() => import('./pages/DishRdDetailPage'));
+const SupplierAgentPage = lazy(() => import('./pages/SupplierAgentPage'));
 const MarketingCampaignPage = lazy(() => import('./pages/MarketingCampaignPage'));
 const FctPage = lazy(() => import('./pages/FctPage'));
 const ApprovalListPage = lazy(() => import('./pages/ApprovalListPage'));
@@ -650,6 +651,9 @@ const AppContent: React.FC = () => {
                   } />
                   <Route path="dish-rd/:dishId" element={
                     <ProtectedRoute requiredRole="admin"><DishRdDetailPage /></ProtectedRoute>
+                  } />
+                  <Route path="supplier-agent" element={
+                    <ProtectedRoute requiredRole="admin"><SupplierAgentPage /></ProtectedRoute>
                   } />
                 </Route>
                 <Route path="*" element={<NotFoundPage />} />

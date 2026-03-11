@@ -117,6 +117,7 @@ const ROUTE_TO_GROUP: Record<string, string> = {
   '/reconciliation': 'nav-products',
   '/dynamic-pricing': 'nav-products',
   '/dish-rd': 'nav-products',
+  '/supplier-agent': 'nav-products',
 
   // 04 会员与增长
   '/marketing':       'nav-crm',
@@ -261,6 +262,7 @@ const BREADCRUMB_LABELS: Record<string, string> = {
   '/alert-thresholds': '告警阈值',
   '/reconciliation': '对账管理',
   '/dish-rd': '菜品研发',
+  '/supplier-agent': '供应商管理',
   '/dynamic-pricing': '动态定价',
   '/members': '会员中心',
   '/crm-hub': '会员与增长中心',
@@ -576,6 +578,7 @@ const MainLayout: React.FC = () => {
         { key: '/reconciliation',  icon: <FileExcelOutlined />, label: '对账管理' },
         { key: '/dynamic-pricing', icon: <DollarOutlined />,    label: '动态定价' },
         { key: '/dish-rd',         icon: <ExperimentOutlined />, label: '菜品研发' },
+        { key: '/supplier-agent',  icon: <ShoppingOutlined />,  label: '供应商管理' },
       ],
     },
 

@@ -100,6 +100,27 @@ from .workforce import (
     BudgetPeriodType,
     RankingPeriodType,
 )
+# Phase 11 — Supplier Agent
+from .supplier_agent import (
+    SupplierProfile,
+    MaterialCatalog,
+    SupplierQuote,
+    SupplierContract,
+    SupplierDelivery,
+    PriceComparison,
+    SupplierEvaluation,
+    SourcingRecommendation,
+    ContractAlert,
+    SupplyRiskEvent,
+    SupplierAgentLog,
+    SupplierTierEnum,
+    QuoteStatusEnum,
+    ContractStatusEnum,
+    DeliveryStatusEnum,
+    RiskLevelEnum,
+    AlertTypeEnum,
+    SupplierAgentTypeEnum,
+)
 # Phase 9 — Banquet Agent
 from .banquet import (
     BanquetHall,
@@ -306,4 +327,29 @@ __all__ = [
     "ConfirmationAction",
     "BudgetPeriodType",
     "RankingPeriodType",
+    # Phase 9 — Banquet Agent
+    "BanquetHall",
+    "BanquetCustomer",
+    "BanquetLead",
+    "BanquetOrder",
+    "BanquetAgentTypeEnum",
+    # Phase 11 — Supplier Agent
+    "SupplierProfile",
+    "MaterialCatalog",
+    "SupplierQuote",
+    "SupplierContract",
+    "SupplierDelivery",
+    "PriceComparison",
+    "SupplierEvaluation",
+    "SourcingRecommendation",
+    "ContractAlert",
+    "SupplyRiskEvent",
+    "SupplierAgentLog",
+    "SupplierTierEnum",
+    "QuoteStatusEnum",
+    "ContractStatusEnum",
+    "DeliveryStatusEnum",
+    "RiskLevelEnum",
+    "AlertTypeEnum",
+    "SupplierAgentTypeEnum",
 ]
