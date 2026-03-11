@@ -70,6 +70,65 @@ class JourneyStatus(str, Enum):
     RUNNING = "running"
     COMPLETED = "completed"
     FAILED = "failed"
+    AGENT_EXIT = "agent_exit"   # 三触无响应，停止自动化，转人工
+
+
+# ── 沉睡唤醒旅程步骤定义 ────────────────────────────────────────────────────────
+# 理论来源：《思考，快与慢》损失厌恶 + 《助推》框架效应 + 《怪诞行为学》所有权效应
+
+REACTIVATION_STEPS = [
+    {
+        "step": 1,
+        "timing_days": 3,               # 沉睡信号触发后第3天
+        "framework": "ownership_effect",
+        "label": "所有权效应（您已经拥有）",
+        "message_principle": (
+            "强调顾客「已拥有」的权益将失效，而非发放新优惠。"
+            "禁止使用「想念您」「优惠来啦」等主动营销语气。"
+        ),
+        "template": (
+            "【权益到期提醒】您的{store_name}会员专属特权"
+            "「{benefit_name}」将于{expire_days}天后自动清空，"
+            "您上次使用是在{last_visit_date}"
+        ),
+        "psychology": "所有权效应激活，损失厌恶 2× 收益渴望",
+        "expected_open_rate_lift": "40%",
+    },
+    {
+        "step": 2,
+        "timing_days": 10,              # 第1步发出后7天无响应
+        "framework": "social_proof",
+        "label": "社会证明 + 具体场景",
+        "message_principle": (
+            "用可量化的社会证明降低心理距离。"
+            "禁止「再给您一个机会」「最后一次」等施压语气。"
+        ),
+        "template": (
+            "您认识的{store_name}老顾客，最近都在推荐「{new_dish}」。"
+            "上次{cohort_size}位顾客和您同一天加入，其中{adoption_pct}%已经来体验过了"
+        ),
+        "psychology": "《乌合之众》从众心理 + 具体场景降低心理距离",
+        "expected_open_rate_lift": "25%",
+    },
+    {
+        "step": 3,
+        "timing_days": 24,              # 第2步发出后14天无响应
+        "framework": "minimum_action",
+        "label": "极低门槛的最小行动",
+        "message_principle": (
+            "不是让他来，是让他说一个字。禁止大额折扣（破坏价格锚点）。"
+        ),
+        "template": (
+            "只需回复「好」，我们帮您保留下周{preferred_slot}的位置"
+        ),
+        "psychology": "《助推》默认选项——极低行动成本触发系统一决策",
+        "no_response_action": "agent_exit",  # 无响应则停止所有自动触达
+        "expected_open_rate_lift": "15%",
+    },
+]
+
+# 旅程步骤间隔天数（REACTIVATION 专用）
+_REACTIVATION_STEP_DELAYS = {1: 3, 2: 10, 3: 24}
 
 
 # ─────────────────────────── TypedDicts ───────────────────────────
@@ -97,7 +156,7 @@ class SignalEvent(TypedDict):
     action_taken: Optional[str]
 
 
-class JourneyRecord(TypedDict):
+class JourneyRecord(TypedDict, total=False):
     journey_id: str
     journey_type: str
     customer_id: str
@@ -108,6 +167,7 @@ class JourneyRecord(TypedDict):
     started_at: str
     next_action_at: Optional[str]
     completed_at: Optional[str]
+    step_actions: Optional[list]   # Hook步骤详情（NEW_CUSTOMER旅程）
 
 
 class StoreQuadrantData(TypedDict):
@@ -132,6 +192,209 @@ class PrivateDomainDashboard(TypedDict):
     bad_review_count: int        # 近7天差评数
     store_quadrant: str
     roi_estimate: float
+
+
+# ── Hook化新客激活旅程步骤（B2·方向二）────────────────────────────────────────
+# 理论来源：《上瘾》Hook模型 + 《助推》默认选项 + 《影响力》承诺一致性
+# 核心洞见：习惯养成需要 触发→行动→多变奖励→投入 四步循环，当前旅程缺少"投入"环节。
+
+NEW_CUSTOMER_JOURNEY_STEPS = [
+    {
+        "step": 1,
+        "timing": "消费后2小时内",
+        "mechanism": "触发层：即时身份确认",
+        "channel": "wechat",
+        "action": "welcome_identity_anchor",
+        "message_principle": (
+            "欢迎加入！您今天的[具体菜品]选择很有品味，"
+            "我们把您标注为「会品菜的老饕」。"
+            "请问您下次来通常是几人用餐？(2人/3-4人/6人以上)"
+        ),
+        "psychology": "身份标签（承诺一致性锚点）+ 问小问题（投入感）",
+    },
+    {
+        "step": 2,
+        "timing": "Day 2 午餐前1小时",
+        "mechanism": "行动层：最小可行行动",
+        "channel": "wechat_card",
+        "action": "micro_commitment_card",
+        "message_principle": (
+            "基于Step1答案：「您好像喜欢X人聚餐，本周五有一桌靠窗的位置，"
+            "是否帮您预留？（只需回复'预留'两个字）」"
+        ),
+        "psychology": "默认选项 + 极低行动成本 + 稀缺性",
+    },
+    {
+        "step": 3,
+        "timing": "Day 5（个性化时间窗口）",
+        "mechanism": "多变奖励：不可预测的惊喜",
+        "channel": "wechat_template",
+        "action": "variable_reward_dispatch",
+        "message_principle": (
+            "从3种奖励中随机选1种：A) 专属菜品提前尝鲜资格（稀缺性）"
+            "B) 厨师长亲笔推荐的今日时令菜  C) 积分翻倍日通知"
+        ),
+        "psychology": "变比率强化（老虎机效应），比固定奖励更强",
+    },
+    {
+        "step": 4,
+        "timing": "Day 7",
+        "mechanism": "投入层：参与感沉淀",
+        "channel": "wechat",
+        "action": "investment_deepening",
+        "message_principle": (
+            "「您上次提到喜欢XX口味，我们的厨师团队为您收录了这个偏好。"
+            "下次来可以直接说'按我的口味来'，我们会记得。」"
+        ),
+        "psychology": "让用户意识到自己已经「投入」了信息，离开有成本",
+    },
+]
+
+# ── 差评修复协议 ────────────────────────────────────────────────────────────────
+# 理论来源：《影响力》互惠原则 + 《乌合之众》群体心理 + 《消费者行为学》认知失调
+# 核心洞见：差评的本质是认知失调，补偿目标不是"买回评分"，
+#           而是帮助顾客重建正确的自我叙事。
+
+BAD_REVIEW_REPAIR_PROTOCOL = {
+    "rating_1": {
+        "severity": "critical",
+        "response_window_minutes": 15,    # 必须15分钟内响应（在群体情绪形成前）
+        "steps": [
+            {
+                "step": 1,
+                "timing": "0-15min",
+                "channel": "store_manager_personal_wechat",
+                "principle": "不解释，不辩解，只承认情感",
+                "message_principle": (
+                    "情绪先行：「您今天的体验让我很难过，这不是我们应有的标准」"
+                ),
+                "psychology": "《消费者行为学》：先处理情绪再处理问题",
+            },
+            {
+                "step": 2,
+                "timing": "15-60min",
+                "channel": "wechat",
+                "principle": "主动超预期补偿（不等顾客索取）",
+                "message_principle": (
+                    "提供3选1给顾客控制感：A) 退款  B) 下次全额抵扣  C) 今晚外送补救菜品"
+                ),
+                "psychology": "控制感本身就是修复认知失调的方式",
+            },
+            {
+                "step": 3,
+                "timing": "48h后",
+                "channel": "wechat",
+                "principle": "用新场景覆盖负面记忆（完全不提上次差评）",
+                "message_principle": (
+                    "「{name}，上次您提到喜欢{favorite_dish}，"
+                    "我们本周新到了一批，想请您来试试」"
+                ),
+                "psychology": "用正面情境覆盖负面记忆，行为改变认知",
+            },
+            {
+                "step": 4,
+                "timing": "顾客回店时",
+                "channel": "edge_hub_shokz",
+                "principle": "到店时触发服务员给予超预期现场体验",
+                "message_principle": (
+                    "Edge Hub → 服务员耳机：「桌位XXX是上次有差评的顾客，"
+                    "今日全程关注，主动询问并做记录」"
+                ),
+                "psychology": "顾客来了就会重新评价那次差评（行为改变认知）",
+            },
+        ],
+    },
+    "rating_2_3": {
+        "severity": "warning",
+        "response_window_minutes": 30,
+        "steps": [
+            {
+                "step": 1,
+                "timing": "0-30min",
+                "channel": "wechat_template",
+                "principle": "模板消息+真实具名（激活公平感而非报复感）",
+                "message_principle": (
+                    "具体承认问题（「您提到的等待时间确实超过了我们标准」），"
+                    "来自具名服务经理（不是系统）"
+                ),
+                "psychology": "具体>抽象，具名>系统",
+            },
+            {
+                "step": 2,
+                "timing": "1-4h",
+                "channel": "wechat",
+                "principle": "意外个性化互惠（从历史数据提取最爱菜品）",
+                "message_principle": (
+                    "不是50元券，是「特别为您准备了您上次点的{favorite_dish}免费一份」"
+                ),
+                "psychology": "《影响力》互惠：意外性+个性化 >> 通用折扣",
+            },
+        ],
+    },
+}
+
+
+def _infer_compensation_type(customer_history: Optional[Dict[str, Any]]) -> str:
+    """
+    从顾客历史数据推断最合适的个性化补偿类型。
+    返回：dish_voucher（最爱菜品）/ credit（消费抵扣）/ refund（退款）
+    """
+    if not customer_history:
+        return "credit"
+    favorite = customer_history.get("favorite_dish")
+    if favorite:
+        return "dish_voucher"
+    monetary = customer_history.get("monetary", 0)
+    if monetary >= 5000:  # 高消费顾客更在意体验而非钱
+        return "dish_voucher"
+    return "credit"
+
+
+# ── 竞品防御剧本（B4·方向九）────────────────────────────────────────────────────
+# 理论来源：《定位》里斯/特劳特 + 《黑客增长》留存护城河
+# 核心洞见：防守≠折扣战；正确应对是强化「被记录的个性化」和「社交网络」两大护城河
+
+COMPETITOR_DEFENSE_PLAYBOOK: Dict[str, Any] = {
+    "竞品新开业": {
+        "wrong_action": "立即发高折扣（价格战，双输）",
+        "right_actions": [
+            {
+                "target": "近30天消费过的所有顾客",
+                "timing": "7天内",
+                "message_principle": (
+                    "「感谢您{X}年来的陪伴，您在{门店名}的{菜品偏好}记录，"
+                    "是我们每次出菜前都会参考的标准」"
+                ),
+                "psychology": "强化「被记录的个性化」护城河——新竞品无法复制",
+            },
+            {
+                "target": "S1/S2 高价值用户",
+                "timing": "3天内",
+                "message_principle": (
+                    "「您认识的{门店名}朋友们都在期待本月新品，"
+                    "作为老朋友，您是第一批可以预约试菜的」"
+                ),
+                "psychology": "强化「社交网络」护城河——你的朋友也在这里",
+            },
+        ],
+        "forbidden": "不要主动提及竞争对手（《定位》：提及竞品等于帮对方打广告）",
+    },
+    "竞品评分上升": {
+        "wrong_action": "跟风模仿竞品活动",
+        "right_actions": [
+            {
+                "target": "近60天未消费的S3/S4用户",
+                "timing": "立即",
+                "message_principle": (
+                    "「{上次消费的具体菜品}本周出了新做法，"
+                    "只有老顾客才知道这个消息」"
+                ),
+                "psychology": "用具体记忆重建心理距离，降低对新竞品的好奇心",
+            },
+        ],
+        "forbidden": "不要用「我们比XX更好」的比较语气",
+    },
+}
 
 
 # ─────────────────────────── Agent ───────────────────────────
@@ -495,6 +758,61 @@ class PrivateDomainAgent(BaseAgent):
                 ))
         return signals[:20]  # 返回最新20条
 
+    async def detect_competitor_signals(
+        self,
+        revenue_drop_pct: float = 0.0,
+        drop_days: int = 7,
+        is_holiday: bool = False,
+    ) -> List[SignalEvent]:
+        """
+        竞品信号检测（B4·方向九）。
+
+        采用「代理检测」策略：用自身数据反推竞品存在。
+        当门店近期营收/频次突然下降且非节假日，推断周边可能有竞品开业。
+
+        实际生产中可额外接入：
+          - 大众点评 API（新店开业/评分变化）
+          - 美团后台数据（周边同品类订单分流）
+
+        Args:
+            revenue_drop_pct: 近 drop_days 天营收下降百分比（正数表示下降）
+            drop_days:        统计窗口天数（默认7天）
+            is_holiday:       是否节假日（节假日下降不算竞品信号）
+
+        Returns:
+            触发的竞品信号列表（无信号时返回空列表）
+        """
+        self.logger.info(
+            "detecting_competitor_signals",
+            store_id=self.store_id,
+            revenue_drop_pct=revenue_drop_pct,
+            is_holiday=is_holiday,
+        )
+        signals = []
+
+        # 竞品代理信号：营收骤降 ≥ 15% 且非节假日
+        if not is_holiday and revenue_drop_pct >= 15:
+            severity = "high" if revenue_drop_pct >= 30 else "medium"
+            now = datetime.utcnow().isoformat()
+            signals.append(
+                SignalEvent(
+                    signal_id=(
+                        f"SIG_COMPETITOR_{self.store_id}_{date.today().isoformat()}"
+                    ),
+                    signal_type=SignalType.COMPETITOR.value,
+                    customer_id="",
+                    store_id=self.store_id,
+                    description=(
+                        f"周边可能有竞品开业——{self.store_id}近{drop_days}天"
+                        f"营收下降 {revenue_drop_pct:.1f}%，非节假日异常"
+                    ),
+                    severity=severity,
+                    triggered_at=now,
+                    action_taken=None,
+                )
+            )
+        return signals
+
     async def calculate_store_quadrant(
         self,
         competition_density: float,
@@ -538,14 +856,24 @@ class PrivateDomainAgent(BaseAgent):
         """触发用户旅程（持久化到 private_domain_journeys 表）"""
         self.logger.info("triggering_journey", journey_type=journey_type, customer_id=customer_id)
         journey_steps = {
-            JourneyType.NEW_CUSTOMER.value: 4,      # Day0/2/5/7
+            JourneyType.NEW_CUSTOMER.value: len(NEW_CUSTOMER_JOURNEY_STEPS),  # Hook四步
             JourneyType.VIP_RETENTION.value: 4,     # 月/季/生日/年
-            JourneyType.REACTIVATION.value: 3,      # 第1/2/3触
+            JourneyType.REACTIVATION.value: 3,      # 第1/2/3触（损失厌恶分级）
             JourneyType.REVIEW_REPAIR.value: 4,     # 30min/4h/补偿/追踪
         }
         total_steps = journey_steps.get(journey_type, 3)
         now = datetime.utcnow()
-        next_action_at = now + timedelta(days=2)
+
+        # REACTIVATION：按步骤定义的精确延迟天数设置首次 next_action_at
+        # NEW_CUSTOMER Step1：消费后2小时内，delay=0天
+        if journey_type == JourneyType.REACTIVATION.value:
+            delay_days = _REACTIVATION_STEP_DELAYS.get(1, 3)
+        elif journey_type == JourneyType.NEW_CUSTOMER.value:
+            delay_days = 0
+        else:
+            delay_days = 2
+        next_action_at = now + timedelta(days=delay_days)
+
         record = JourneyRecord(
             journey_id=f"JRN_{journey_type.upper()}_{customer_id}_{now.strftime('%Y%m%d%H%M%S')}",
             journey_type=journey_type,
@@ -557,9 +885,50 @@ class PrivateDomainAgent(BaseAgent):
             started_at=now.isoformat(),
             next_action_at=next_action_at.isoformat(),
             completed_at=None,
+            step_actions=(
+                NEW_CUSTOMER_JOURNEY_STEPS
+                if journey_type == JourneyType.NEW_CUSTOMER.value
+                else None
+            ),
         )
         self._persist_journey_to_db(record)
         return record
+
+    async def advance_reactivation_journey(
+        self,
+        journey: JourneyRecord,
+        responded: bool,
+    ) -> JourneyRecord:
+        """
+        推进沉睡唤醒旅程到下一步。
+
+        responded=True  → 前进到下一步
+        responded=False → 检查是否已到第3步无响应：是则进入 agent_exit 状态
+        """
+        current_step = journey["current_step"]
+        total_steps = journey["total_steps"]
+        now = datetime.utcnow()
+
+        if not responded and current_step >= total_steps:
+            # 第3触无响应：停止自动化，边际效益为负
+            journey["status"] = JourneyStatus.AGENT_EXIT.value
+            journey["completed_at"] = now.isoformat()
+            self.logger.info(
+                "reactivation_agent_exit",
+                customer_id=journey["customer_id"],
+                reason="no_response_after_step_3",
+            )
+        elif responded or current_step < total_steps:
+            next_step = current_step + 1
+            delay_days = _REACTIVATION_STEP_DELAYS.get(next_step, 7)
+            journey["current_step"] = next_step
+            journey["next_action_at"] = (now + timedelta(days=delay_days)).isoformat()
+            if next_step > total_steps:
+                journey["status"] = JourneyStatus.COMPLETED.value
+                journey["completed_at"] = now.isoformat()
+
+        self._persist_journey_to_db(journey)
+        return journey
 
     async def get_journeys(self, status: Optional[str] = None) -> List[JourneyRecord]:
         """获取旅程列表（DB-first，无 DB 时返回空列表）"""
@@ -588,16 +957,44 @@ class PrivateDomainAgent(BaseAgent):
         customer_id: Optional[str],
         rating: int,
         content: str,
+        customer_history: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
-        """处理差评（差评修复旅程）"""
+        """
+        差评四阶心理修复协议。
+
+        rating 1   → 15分钟响应窗口，4步修复，店长真人介入
+        rating 2-3 → 30分钟响应窗口，2步修复，具名模板+个性化互惠
+
+        customer_history 传入时用于推断个性化补偿类型（最爱菜品优先）。
+        """
         self.logger.info("processing_bad_review", review_id=review_id, rating=rating)
+
+        # 选择协议
+        if rating <= 1:
+            protocol = BAD_REVIEW_REPAIR_PROTOCOL["rating_1"]
+        else:
+            protocol = BAD_REVIEW_REPAIR_PROTOCOL["rating_2_3"]
+
+        response_window = protocol["response_window_minutes"]
+        step_sequence = [
+            {"step": s["step"], "timing": s["timing"], "channel": s["channel"],
+             "principle": s["principle"]}
+            for s in protocol["steps"]
+        ]
+        compensation_type = _infer_compensation_type(customer_history)
+
         journey = None
         if customer_id:
             journey = await self.trigger_journey(JourneyType.REVIEW_REPAIR.value, customer_id)
+
         return {
             "review_id": review_id,
             "handled": True,
-            "response_time_minutes": 28,
+            "severity": protocol["severity"],
+            "response_window_minutes": response_window,
+            "total_repair_steps": len(protocol["steps"]),
+            "step_sequence": step_sequence,
+            "compensation_type": compensation_type,
             "compensation_issued": rating <= 2,
             "journey_triggered": journey is not None,
             "journey_id": journey["journey_id"] if journey else None,

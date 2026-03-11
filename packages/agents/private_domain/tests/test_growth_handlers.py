@@ -9,6 +9,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 import pytest
 from growth_handlers import (
     GROWTH_ACTIONS,
+    COGNITIVE_FRIENDLY_TEMPLATES,
+    _render_template,
     run_growth_action,
 )
 
@@ -135,3 +137,163 @@ async def test_food_safety_alert_returns_alerts():
     assert "alerts" in out
     assert len(out["alerts"]) >= 1
     assert out.get("store_id") == "S1"
+
+
+# ── A1 认知友好模板系统测试 ────────────────────────────────────────────────────
+
+class TestCognitiveFriendlyTemplates:
+    """方向十二：认知友好模板系统——行为科学原则验证。"""
+
+    def test_all_four_themes_defined(self):
+        assert set(COGNITIVE_FRIENDLY_TEMPLATES.keys()) == {
+            "新品上市", "节假日促销", "复购唤醒", "口碑引导"
+        }
+
+    def test_each_template_has_required_fields(self):
+        for theme, tpl in COGNITIVE_FRIENDLY_TEMPLATES.items():
+            assert "draft_template" in tpl, f"{theme} 缺少 draft_template"
+            assert "draft_fallback" in tpl, f"{theme} 缺少 draft_fallback"
+            assert "principle" in tpl, f"{theme} 缺少 principle"
+            assert "publish_tip" in tpl, f"{theme} 缺少 publish_tip"
+            assert "forbidden" in tpl, f"{theme} 缺少 forbidden"
+
+    def test_render_template_with_full_vars(self):
+        tpl = COGNITIVE_FRIENDLY_TEMPLATES["新品上市"]
+        result = _render_template(tpl, {
+            "taster_count": 5,
+            "dish_name": "清蒸鲈鱼",
+            "chef_name": "张师傅",
+            "texture_word": "嫩",
+        })
+        assert "5" in result
+        assert "清蒸鲈鱼" in result
+        assert "张师傅" in result
+
+    def test_render_template_falls_back_on_missing_vars(self):
+        tpl = COGNITIVE_FRIENDLY_TEMPLATES["新品上市"]
+        result = _render_template(tpl, {})  # 缺少所有变量
+        assert result == tpl["draft_fallback"]
+        assert len(result) > 0
+
+    def test_render_holiday_template(self):
+        tpl = COGNITIVE_FRIENDLY_TEMPLATES["节假日促销"]
+        result = _render_template(tpl, {
+            "holiday": "五一",
+            "store_name": "徐记海鲜",
+            "seat_count": 2,
+        })
+        assert "五一" in result
+        assert "徐记海鲜" in result
+        assert "2" in result
+
+    def test_render_reactivation_template(self):
+        tpl = COGNITIVE_FRIENDLY_TEMPLATES["复购唤醒"]
+        result = _render_template(tpl, {
+            "last_visit_season": "夏天",
+            "current_ingredient": "秋蟹",
+        })
+        assert "夏天" in result
+        assert "秋蟹" in result
+
+    def test_render_reputation_template(self):
+        tpl = COGNITIVE_FRIENDLY_TEMPLATES["口碑引导"]
+        result = _render_template(tpl, {"visit_count": 8})
+        assert "8" in result
+
+    # ── action 接口测试 ──────────────────────────────────────────────────────
+
+    @pytest.mark.asyncio
+    async def test_social_content_draft_returns_principle_and_forbidden(self):
+        """返回值必须包含行为科学原理字段。"""
+        out = await run_growth_action(
+            "social_content_draft",
+            {"theme": "新品上市"},
+            "S001",
+        )
+        assert "draft" in out
+        assert "principle" in out
+        assert "forbidden" in out
+        assert "publish_tip" in out
+        assert len(out["draft"]) > 0
+
+    @pytest.mark.asyncio
+    async def test_social_content_draft_new_product_with_vars(self):
+        """变量填充后文案包含具体的人和菜品名。"""
+        out = await run_growth_action(
+            "social_content_draft",
+            {
+                "theme": "新品上市",
+                "vars": {
+                    "taster_count": 4,
+                    "dish_name": "口水鸡",
+                    "chef_name": "李大厨",
+                    "texture_word": "香",
+                },
+            },
+            "S001",
+        )
+        assert "口水鸡" in out["draft"]
+        assert "李大厨" in out["draft"]
+        # 验证不是广告感文案（不含「上市！」等）
+        assert "上市！" not in out["draft"]
+
+    @pytest.mark.asyncio
+    async def test_social_content_draft_holiday_no_discount_word(self):
+        """节假日模板不应包含折扣百分比。"""
+        out = await run_growth_action(
+            "social_content_draft",
+            {
+                "theme": "节假日促销",
+                "vars": {
+                    "holiday": "国庆",
+                    "store_name": "徐记",
+                    "seat_count": 4,
+                },
+            },
+            "S001",
+        )
+        assert "折" not in out["draft"]
+        assert "%" not in out["draft"]
+        assert "forbidden" in out
+
+    @pytest.mark.asyncio
+    async def test_social_content_draft_reactivation_no_absence_pressure(self):
+        """复购唤醒模板不应包含「没来」「想念」等施压词。"""
+        out = await run_growth_action(
+            "social_content_draft",
+            {"theme": "复购唤醒"},
+            "S001",
+        )
+        assert "没来" not in out["draft"]
+        assert "想念" not in out["draft"]
+
+    @pytest.mark.asyncio
+    async def test_social_content_draft_reputation_uses_altruism_framing(self):
+        """口碑引导文案要包含利他视角（帮助还没来过的人）。"""
+        out = await run_growth_action(
+            "social_content_draft",
+            {"theme": "口碑引导"},
+            "S001",
+        )
+        assert "还没来过" in out["draft"] or "还没" in out["draft"]
+
+    @pytest.mark.asyncio
+    async def test_social_content_draft_unknown_theme_falls_back(self):
+        """未知主题降级到新品上市，不报错。"""
+        out = await run_growth_action(
+            "social_content_draft",
+            {"theme": "随便一个不存在的主题"},
+            "S001",
+        )
+        assert "draft" in out
+        assert out.get("theme") == "新品上市"
+
+    @pytest.mark.asyncio
+    async def test_social_content_draft_store_id_propagated(self):
+        """store_id 正确传播到返回值。"""
+        out = await run_growth_action(
+            "social_content_draft",
+            {"theme": "口碑引导"},
+            "S999",
+        )
+        assert out.get("store_id") == "S999"

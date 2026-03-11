@@ -333,15 +333,102 @@ async def _personalized_recommend(params: Dict[str, Any]) -> Dict[str, Any]:
     return _with_store_id(data, params)
 
 
+# ── 认知友好模板系统 ────────────────────────────────────────────────────────────
+# 理论来源：《助推》信息架构 + 《思考，快与慢》认知易得性 + 《影响力》社会证明
+# 原则：具体的人+具体的感受 > 形容词堆砌；稀缺性+家庭账户 > 价格折扣
+
+COGNITIVE_FRIENDLY_TEMPLATES: Dict[str, Dict[str, Any]] = {
+    "新品上市": {
+        "draft_template": (
+            "今天有{taster_count}位老顾客试了新的{dish_name}，"
+            "{chef_name}说「比以前的更{texture_word}」"
+        ),
+        "draft_fallback": (
+            "今天有3位老顾客试了新品，厨师长说「比以前的更鲜滑」"
+        ),
+        "principle": "具体的人+具体的感受，激活系统一，远比形容词堆砌有效",
+        "publish_tip": "建议午间 11:00 或晚间 18:00 发布，避开推送高峰",
+        "forbidden": "禁止使用「新品上市！XX菜品全新升级，等您来品尝！」等广告感语气",
+    },
+    "节假日促销": {
+        "draft_template": (
+            "{holiday}假期，{store_name}留给您和家人的最后{seat_count}个位置"
+        ),
+        "draft_fallback": (
+            "五一假期，我们留给您和家人的最后3个位置"
+        ),
+        "principle": "稀缺性（最后N个）+ 家庭账户（和家人）优于价格折扣",
+        "publish_tip": "节前3天发布效果最佳，节当天不发（已决策）",
+        "forbidden": "禁止直接写「全场8折」等折扣语——会把价格设为锚点",
+    },
+    "复购唤醒": {
+        "draft_template": (
+            "上次您来的时候，{last_visit_season}刚开始。"
+            "现在{current_ingredient}又到了"
+        ),
+        "draft_fallback": (
+            "上次您来的时候，夏天刚开始。现在秋季时令食材又到了"
+        ),
+        "principle": "时间具体化，激活顾客「上次来时」的情境记忆，唤醒比提醒更有效",
+        "publish_tip": "个人私信效果远优于群发，建议结合顾客上次消费时间段发送",
+        "forbidden": "禁止使用「您已经X天没来了，我们想念您」——施压感触发逆反",
+    },
+    "口碑引导": {
+        "draft_template": (
+            "您来了{visit_count}次，比我们大部分的顾客都更了解我们。"
+            "如果您愿意，您的真实感受对还没来过的人很有价值"
+        ),
+        "draft_fallback": (
+            "您是我们的老顾客了，比大部分人更了解我们。"
+            "如果您愿意，您的真实感受对还没来过的人很有价值"
+        ),
+        "principle": "《影响力》专家权威 + 利他动机（帮助陌生人而非商家），打开率高3倍",
+        "publish_tip": "在顾客刚完成愉快体验后的20分钟内发送，效果最佳",
+        "forbidden": "禁止写「如果您满意，请给我们5星好评」——利益感太强，降低真实性",
+    },
+}
+
+
+def _render_template(tpl: Dict[str, Any], vars_: Dict[str, Any]) -> str:
+    """用 vars_ 填充 draft_template；缺字段时降级到 draft_fallback。"""
+    try:
+        return tpl["draft_template"].format(**vars_)
+    except KeyError:
+        return tpl["draft_fallback"]
+
+
 async def _social_content_draft(params: Dict[str, Any]) -> Dict[str, Any]:
-    """社媒文案草稿。可选: platform, theme, tone。"""
+    """
+    认知友好社媒文案草稿。
+
+    参数：
+      platform    发布渠道（wechat / douyin / dianping），默认 wechat
+      theme       文案主题，支持：新品上市 / 节假日促销 / 复购唤醒 / 口碑引导
+      vars        填充模板变量的字典，缺少时自动降级至默认文案
+
+    返回额外字段：
+      principle   本条文案背后的行为科学原理
+      forbidden   本主题的禁忌写法
+    """
     platform = params.get("platform") or "wechat"
     theme = params.get("theme") or "新品上市"
+    vars_ = params.get("vars") or {}
+
+    tpl = COGNITIVE_FRIENDLY_TEMPLATES.get(theme)
+    if tpl is None:
+        # 未知主题：降级到新品上市模板并标注
+        tpl = COGNITIVE_FRIENDLY_TEMPLATES["新品上市"]
+        theme = "新品上市"
+
+    draft = _render_template(tpl, vars_)
+
     data = {
-        "draft": "新品上市！分享你的试吃体验，赢取免费券。",
+        "draft": draft,
         "platform": platform,
         "theme": theme,
-        "publish_tip": "建议午间 11:00 或晚间 18:00 发布。",
+        "principle": tpl["principle"],
+        "publish_tip": tpl["publish_tip"],
+        "forbidden": tpl["forbidden"],
     }
     return _with_store_id(data, params)
 

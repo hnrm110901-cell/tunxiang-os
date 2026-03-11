@@ -4275,3 +4275,151 @@ def marketing_auto_outreach(self, store_id: str = None) -> Dict[str, Any]:
     except Exception as exc:
         logger.error("marketing_auto_outreach.failed", error=str(exc))
         raise self.retry(exc=exc)
+
+
+@celery_app.task(
+    base=CallbackTask,
+    bind=True,
+    name="tasks.check_edge_hub_heartbeats",
+    max_retries=2,
+    default_retry_delay=60,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+)
+def check_edge_hub_heartbeats(self) -> Dict[str, Any]:
+    """
+    每 3 分钟扫描全平台边缘主机心跳。
+
+    离线逻辑（last_heartbeat 超过阈值）：
+      - 将主机 status 设为 offline
+      - 若无同类 open EdgeAlert(hub_offline)，则创建 P1 告警
+
+    恢复逻辑（last_heartbeat 在阈值内，但 status 为 offline）：
+      - 将主机 status 设为 online
+      - 自动 RESOLVE 该主机全部 open hub_offline 告警
+
+    返回：{offline_marked, recovered, alerts_created, alerts_resolved}
+
+    调度建议：beat_schedule 中设置 crontab(minute="*/3")
+    """
+    import uuid as _uuid
+    from datetime import timedelta
+
+    OFFLINE_THRESHOLD_MINUTES = int(os.getenv("EDGE_HUB_OFFLINE_THRESHOLD_MIN", "5"))
+
+    async def _run():
+        from src.core.database import AsyncSessionLocal
+        from src.models.edge_hub import EdgeHub, EdgeAlert, AlertStatus, AlertLevel, HubStatus
+        from src.models.user import User, UserRole
+        from src.services.wechat_alert_service import wechat_alert_service
+        from sqlalchemy import select, and_, update
+
+        offline_marked   = 0
+        recovered        = 0
+        alerts_created   = 0
+        alerts_resolved  = 0
+        now              = __import__("datetime").datetime.utcnow()
+        stale_cutoff     = now - timedelta(minutes=OFFLINE_THRESHOLD_MINUTES)
+
+        async with AsyncSessionLocal() as db:
+            hubs = (await db.execute(select(EdgeHub))).scalars().all()
+
+            for hub in hubs:
+                heartbeat_stale = (hub.last_heartbeat is None or hub.last_heartbeat < stale_cutoff)
+
+                if heartbeat_stale and hub.status != HubStatus.OFFLINE:
+                    # ── 心跳超时 → 标记离线 + 创建 P1 告警 ─────────────────
+                    hub.status = HubStatus.OFFLINE
+                    offline_marked += 1
+
+                    existing = (await db.execute(
+                        select(EdgeAlert).where(and_(
+                            EdgeAlert.hub_id   == hub.id,
+                            EdgeAlert.alert_type == "hub_offline",
+                            EdgeAlert.status   == AlertStatus.OPEN,
+                        ))
+                    )).scalar_one_or_none()
+
+                    if not existing:
+                        db.add(EdgeAlert(
+                            id         = str(_uuid.uuid4()),
+                            hub_id     = hub.id,
+                            store_id   = hub.store_id,
+                            level      = AlertLevel.P1,
+                            alert_type = "hub_offline",
+                            message    = f"边缘主机 {hub.hub_code} 心跳超时（>{OFFLINE_THRESHOLD_MINUTES}min）",
+                            status     = AlertStatus.OPEN,
+                        ))
+                        alerts_created += 1
+                        logger.warning(
+                            "edge_hub.heartbeat_lost",
+                            hub_id=hub.id, hub_code=hub.hub_code, store_id=hub.store_id,
+                        )
+
+                        # ── 推送企微通知给对应门店店长 ───────────────────────
+                        try:
+                            managers = (await db.execute(
+                                select(User).where(
+                                    User.store_id == hub.store_id,
+                                    User.is_active == True,
+                                    User.role.in_([UserRole.STORE_MANAGER, UserRole.ADMIN]),
+                                    User.wechat_user_id.isnot(None),
+                                )
+                            )).scalars().all()
+                            recipient_ids = [m.wechat_user_id for m in managers]
+                            if recipient_ids:
+                                await wechat_alert_service.send_hardware_alert(
+                                    hub_id=hub.id,
+                                    hub_code=hub.hub_code,
+                                    store_id=hub.store_id,
+                                    alert_type="hub_offline",
+                                    recipient_ids=recipient_ids,
+                                    extra={"last_heartbeat": hub.last_heartbeat},
+                                )
+                        except Exception as _wechat_exc:
+                            logger.error(
+                                "edge_hub.wechat_push_failed",
+                                hub_id=hub.id,
+                                error=str(_wechat_exc),
+                            )
+
+                elif not heartbeat_stale and hub.status == HubStatus.OFFLINE:
+                    # ── 心跳恢复 → 标记在线 + 自动 resolve 告警 ──────────────
+                    hub.status = HubStatus.ONLINE
+                    recovered += 1
+
+                    open_alerts = (await db.execute(
+                        select(EdgeAlert).where(and_(
+                            EdgeAlert.hub_id     == hub.id,
+                            EdgeAlert.alert_type == "hub_offline",
+                            EdgeAlert.status     == AlertStatus.OPEN,
+                        ))
+                    )).scalars().all()
+
+                    for alert in open_alerts:
+                        alert.status      = AlertStatus.RESOLVED
+                        alert.resolved_at = now
+                        alert.resolved_by = "system"
+                        alerts_resolved  += 1
+
+                    if recovered:
+                        logger.info(
+                            "edge_hub.heartbeat_recovered",
+                            hub_id=hub.id, hub_code=hub.hub_code, store_id=hub.store_id,
+                        )
+
+            await db.commit()
+
+        return {
+            "success":         True,
+            "offline_marked":  offline_marked,
+            "recovered":       recovered,
+            "alerts_created":  alerts_created,
+            "alerts_resolved": alerts_resolved,
+        }
+
+    try:
+        return asyncio.run(_run())
+    except Exception as exc:
+        logger.error("check_edge_hub_heartbeats.failed", error=str(exc))
+        raise self.retry(exc=exc)

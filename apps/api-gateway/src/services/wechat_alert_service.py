@@ -22,6 +22,7 @@ class WeChatAlertService:
     - 库存预警
     - 订单异常告警
     - 系统错误告警
+    - 硬件离线 P1 告警
     """
 
     def __init__(self):
@@ -492,6 +493,100 @@ class WeChatAlertService:
                 "success": False,
                 "error": str(e)
             }
+
+    async def send_hardware_alert(
+        self,
+        hub_id: str,
+        hub_code: str,
+        store_id: str,
+        alert_type: str,
+        recipient_ids: List[str],
+        extra: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """
+        发送硬件离线 P1 告警到企业微信
+
+        Args:
+            hub_id: 边缘主机 ID
+            hub_code: 边缘主机编码（展示用）
+            store_id: 门店 ID
+            alert_type: 告警类型（如 hub_offline）
+            recipient_ids: 接收人企微ID列表（通常为对应门店店长）
+            extra: 附加信息（如最后心跳时间）
+
+        Returns:
+            发送结果
+        """
+        try:
+            last_hb = (extra or {}).get("last_heartbeat")
+            last_hb_str = (
+                last_hb.strftime("%Y-%m-%d %H:%M:%S") if last_hb else "从未上报"
+            )
+
+            full_message = f"""🚨 硬件离线告警（P1）
+
+主机编码: {hub_code}
+门店编号: {store_id}
+告警类型: {alert_type}
+最后心跳: {last_hb_str}
+发现时间: {datetime.now().strftime('%Y-%m-%d %H:%M')}
+
+请尽快登录智链后台或前往现场检查设备连接状态。
+
+---
+智链OS 系统监控"""
+
+            logger.info(
+                "Sending hardware alert",
+                hub_id=hub_id,
+                hub_code=hub_code,
+                alert_type=alert_type,
+                recipient_count=len(recipient_ids),
+            )
+
+            sent_count = 0
+            failed_count = 0
+
+            for recipient_id in recipient_ids:
+                try:
+                    result = await self.message_service.send_text_message(
+                        user_id=recipient_id,
+                        content=full_message,
+                    )
+                    if result.get("success"):
+                        sent_count += 1
+                    else:
+                        failed_count += 1
+                except Exception as e:
+                    failed_count += 1
+                    logger.error(
+                        "Error sending hardware alert",
+                        recipient_id=recipient_id,
+                        error=str(e),
+                    )
+
+            logger.info(
+                "Hardware alert sent",
+                hub_id=hub_id,
+                sent_count=sent_count,
+                failed_count=failed_count,
+            )
+
+            return {
+                "success": True,
+                "sent_count": sent_count,
+                "failed_count": failed_count,
+                "total_recipients": len(recipient_ids),
+            }
+
+        except Exception as e:
+            logger.error(
+                "Hardware alert sending failed",
+                hub_id=hub_id,
+                error=str(e),
+                exc_info=e,
+            )
+            return {"success": False, "error": str(e)}
 
 
 # 全局实例
