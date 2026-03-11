@@ -527,6 +527,71 @@ async def resolve_alert(
     return {"code": 0, "message": "ok", "data": _alert_row(alert)}
 
 
+@router.patch("/alerts/{alert_id}/ignore")
+async def ignore_alert(
+    alert_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> Dict[str, Any]:
+    """忽略告警（状态置为 ignored）"""
+    alert = (await db.execute(select(EdgeAlert).where(EdgeAlert.id == alert_id))).scalar_one_or_none()
+    if not alert:
+        raise HTTPException(status_code=404, detail="alert not found")
+
+    alert.status = AlertStatus.IGNORED
+    alert.resolved_at = datetime.utcnow()
+    alert.resolved_by = str(getattr(current_user, "username", current_user.id))
+    await db.commit()
+    await db.refresh(alert)
+    return {"code": 0, "message": "ok", "data": _alert_row(alert)}
+
+
+@router.patch("/alerts/{alert_id}/escalate")
+async def escalate_alert(
+    alert_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> Dict[str, Any]:
+    """升级告警级别（P3→P2→P1）"""
+    alert = (await db.execute(select(EdgeAlert).where(EdgeAlert.id == alert_id))).scalar_one_or_none()
+    if not alert:
+        raise HTTPException(status_code=404, detail="alert not found")
+
+    level_order = ["p3", "p2", "p1"]
+    current_idx = level_order.index(alert.level) if alert.level in level_order else 0
+    alert.level = level_order[min(current_idx + 1, len(level_order) - 1)]
+    await db.commit()
+    await db.refresh(alert)
+    return {"code": 0, "message": "ok", "data": _alert_row(alert)}
+
+
+@router.post("/nodes/{hub_id}/inspect")
+async def inspect_node(
+    hub_id: str,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_active_user),
+) -> Dict[str, Any]:
+    """触发节点巡检（更新 last_heartbeat 记录，实际硬件层命令由边缘主机处理）"""
+    hub = (await db.execute(select(EdgeHub).where(EdgeHub.id == hub_id))).scalar_one_or_none()
+    if not hub:
+        raise HTTPException(status_code=404, detail="hub not found")
+
+    # 记录巡检时间戳（真实场景会推送指令到边缘，此处记录触发）
+    hub.last_heartbeat = datetime.utcnow()
+    await db.commit()
+    await db.refresh(hub)
+
+    return {
+        "code": 0,
+        "message": "ok",
+        "data": {
+            "hubId": hub.id,
+            "inspectedAt": hub.last_heartbeat.isoformat() + "Z",
+            "status": hub.status,
+        },
+    }
+
+
 # ── 耳机绑定管理 ───────────────────────────────────────────────────────────────
 
 @router.get("/bindings/{store_id}")

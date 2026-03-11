@@ -54,7 +54,8 @@ const EdgeHubAlertsPage: React.FC = () => {
   const [resolving, setResolving] = useState<string | null>(null);
 
   // 详情抽屉
-  const [drawerAlert, setDrawerAlert] = useState<AlertItem | null>(null);
+  const [drawerAlert, setDrawerAlert]   = useState<AlertItem | null>(null);
+  const [actioning,   setActioning]     = useState<string | null>(null);
 
   // 筛选状态
   const [keyword,   setKeyword]   = useState('');
@@ -104,10 +105,26 @@ const EdgeHubAlertsPage: React.FC = () => {
       await apiClient.patch(`/api/v1/edge-hub/alerts/${alertId}/resolve`, {});
       message.success('告警已标记为已解决');
       await fetchAlerts(page);
+      if (drawerAlert?.id === alertId) setDrawerAlert(prev => prev ? { ...prev, status: 'resolved' } : null);
     } catch (err) {
       handleApiError(err);
     } finally {
       setResolving(null);
+    }
+  };
+
+  const handleAlertAction = async (alertId: string, action: 'ignore' | 'escalate') => {
+    setActioning(action);
+    try {
+      const resp = await apiClient.patch(`/api/v1/edge-hub/alerts/${alertId}/${action}`, {});
+      const updated = (resp as any).data as AlertItem;
+      message.success(action === 'ignore' ? '告警已忽略' : '告警已升级');
+      setDrawerAlert(updated);
+      await fetchAlerts(page);
+    } catch (err) {
+      handleApiError(err);
+    } finally {
+      setActioning(null);
     }
   };
 
@@ -297,6 +314,33 @@ const EdgeHubAlertsPage: React.FC = () => {
         onClose={() => setDrawerAlert(null)}
         width={480}
         destroyOnClose
+        extra={
+          drawerAlert?.status === 'open' && (
+            <Space>
+              <Button
+                size="small"
+                loading={actioning === 'ignore'}
+                onClick={() => handleAlertAction(drawerAlert!.id, 'ignore')}
+              >
+                忽略
+              </Button>
+              <Button
+                size="small" danger
+                loading={actioning === 'escalate'}
+                onClick={() => handleAlertAction(drawerAlert!.id, 'escalate')}
+              >
+                升级
+              </Button>
+              <Button
+                type="primary" size="small"
+                loading={resolving === drawerAlert!.id}
+                onClick={() => handleResolve(drawerAlert!.id)}
+              >
+                标记已解决
+              </Button>
+            </Space>
+          )
+        }
       >
         {drawerAlert && (
           <Descriptions size="small" column={1} bordered>

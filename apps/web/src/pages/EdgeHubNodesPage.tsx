@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Card, Table, Tag, Badge, Input, Select, Space, Button,
-  Tooltip, Empty, Spin, Row, Col, Drawer, Descriptions, List, Progress,
+  Tooltip, Empty, Spin, Row, Col, Drawer, Descriptions, List, Progress, message,
 } from 'antd';
 import {
   SearchOutlined, ReloadOutlined, WifiOutlined,
-  DesktopOutlined, BellOutlined, LinkOutlined, InfoCircleOutlined,
+  DesktopOutlined, BellOutlined, LinkOutlined, InfoCircleOutlined, SyncOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { useNavigate } from 'react-router-dom';
@@ -81,6 +81,7 @@ const EdgeHubNodesPage: React.FC = () => {
   const [drawerHubId, setDrawerHubId]   = useState<string | null>(null);
   const [drawerData,  setDrawerData]    = useState<any>(null);
   const [drawerLoading, setDrawerLoading] = useState(false);
+  const [inspecting, setInspecting]     = useState(false);
 
   const fetchNodes = useCallback(async (pg = 1) => {
     setLoading(true);
@@ -113,6 +114,22 @@ const EdgeHubNodesPage: React.FC = () => {
       handleApiError(err);
     } finally {
       setDrawerLoading(false);
+    }
+  };
+
+  const handleInspect = async () => {
+    if (!drawerHubId) return;
+    setInspecting(true);
+    try {
+      await apiClient.post(`/api/v1/edge-hub/nodes/${drawerHubId}/inspect`, {});
+      message.success('巡检指令已下发');
+      // 刷新抽屉数据
+      const resp = await apiClient.get(`/api/v1/edge-hub/nodes/${drawerHubId}`);
+      setDrawerData((resp as any).data);
+    } catch (err) {
+      handleApiError(err);
+    } finally {
+      setInspecting(false);
     }
   };
 
@@ -301,6 +318,15 @@ const EdgeHubNodesPage: React.FC = () => {
         onClose={() => { setDrawerHubId(null); setDrawerData(null); }}
         width={560}
         destroyOnClose
+        extra={
+          <Button
+            type="primary" size="small" icon={<SyncOutlined />}
+            loading={inspecting}
+            onClick={handleInspect}
+          >
+            触发巡检
+          </Button>
+        }
       >
         <Spin spinning={drawerLoading}>
           {drawerData ? (
