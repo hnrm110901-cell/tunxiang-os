@@ -352,4 +352,25 @@ __all__ = [
     "RiskLevelEnum",
     "AlertTypeEnum",
     "SupplierAgentTypeEnum",
+    # Phase 12 — BusinessIntel Agent
+    "BizMetricSnapshot",
+    "RevenueAlert",
+    "KpiScorecard",
+    "OrderForecast",
+    "BizDecision",
+    "ScenarioRecord",
+    "BizIntelLog",
+    "AnomalyLevelEnum",
+    "KpiStatusEnum",
+    "DecisionPriorityEnum",
+    "ScenarioTypeEnum",
+    "BizIntelAgentTypeEnum",
+    "DecisionStatusEnum",
 ]
+
+from .business_intel import (
+    BizMetricSnapshot, RevenueAlert, KpiScorecard, OrderForecast,
+    BizDecision, ScenarioRecord, BizIntelLog,
+    AnomalyLevelEnum, KpiStatusEnum, DecisionPriorityEnum,
+    ScenarioTypeEnum, BizIntelAgentTypeEnum, DecisionStatusEnum,
+)

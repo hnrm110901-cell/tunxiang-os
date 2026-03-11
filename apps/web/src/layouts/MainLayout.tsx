@@ -118,6 +118,7 @@ const ROUTE_TO_GROUP: Record<string, string> = {
   '/dynamic-pricing': 'nav-products',
   '/dish-rd': 'nav-products',
   '/supplier-agent': 'nav-products',
+  '/business-intel': 'nav-agents',
 
   // 04 会员与增长
   '/marketing':       'nav-crm',
@@ -263,6 +264,7 @@ const BREADCRUMB_LABELS: Record<string, string> = {
   '/reconciliation': '对账管理',
   '/dish-rd': '菜品研发',
   '/supplier-agent': '供应商管理',
+  '/business-intel': '经营智能体',
   '/dynamic-pricing': '动态定价',
   '/members': '会员中心',
   '/crm-hub': '会员与增长中心',
@@ -609,6 +611,7 @@ const MainLayout: React.FC = () => {
         { key: '/agent-hub',         icon: <AppstoreOutlined />,    label: 'Agent 总览' },
         // Agent 工作台
         { key: '/decision',          icon: <BarChartOutlined />,    label: '经营决策 Agent' },
+        { key: '/business-intel',    icon: <RobotOutlined />,       label: '经营智能体' },
         { key: '/training',          icon: <ReadOutlined />,        label: '培训管理 Agent' },
         // 配置与治理
         { key: '/agent-collaboration',icon: <ApartmentOutlined />,  label: '协作编排' },

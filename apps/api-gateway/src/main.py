@@ -567,6 +567,9 @@ app.include_router(bulk_import.router, tags=["bulk_import"])
 app.include_router(hq_dashboard.router, prefix="/api/v1", tags=["hq_dashboard"])
 app.include_router(dish_rd_agent.router, tags=["dish-rd"])
 app.include_router(supplier_agent.router, tags=["supplier-agent"])
+# Phase 12 — 经营智能体（营收异常 / KPI健康度 / 订单预测 / Top3决策 / 场景识别）
+from src.api import business_intel
+app.include_router(business_intel.router, tags=["business-intel"])
 app.include_router(ai_accuracy.router, prefix="/api/v1", tags=["ai_accuracy"])
 app.include_router(governance.router, prefix="/api/v1", tags=["governance"])
 app.include_router(dashboard_preferences.router, prefix="/api/v1", tags=["dashboard_preferences"])
