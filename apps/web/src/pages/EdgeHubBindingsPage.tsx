@@ -5,6 +5,7 @@ import {
 } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
+import { useSearchParams } from 'react-router-dom';
 import { apiClient, handleApiError } from '../services/api';
 import styles from './EdgeHubBindingsPage.module.css';
 
@@ -27,6 +28,12 @@ interface BindingItem {
   unboundAt:    string | null;
 }
 
+interface StoreOption {
+  id: string;
+  name: string;
+  code: string;
+}
+
 // ── 常量 ──────────────────────────────────────────────────────────────────────
 
 const POSITION_OPTIONS = [
@@ -45,14 +52,39 @@ const POSITION_LABEL: Record<string, string> = Object.fromEntries(
 // ── 主组件 ────────────────────────────────────────────────────────────────────
 
 const EdgeHubBindingsPage: React.FC = () => {
-  const [storeId, setStoreId] = useState('S001');
-  const [bindings, setBindings] = useState<BindingItem[]>([]);
-  const [loading, setLoading]   = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const [storeId,   setStoreId]   = useState(() => searchParams.get('store') ?? '');
+  const [stores,    setStores]    = useState<StoreOption[]>([]);
+  const [bindings,  setBindings]  = useState<BindingItem[]>([]);
+  const [loading,   setLoading]   = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editTarget, setEditTarget] = useState<BindingItem | null>(null);
+  const [modalOpen,   setModalOpen]   = useState(false);
+  const [editTarget,  setEditTarget]  = useState<BindingItem | null>(null);
   const [form] = Form.useForm();
+
+  // 加载门店列表
+  useEffect(() => {
+    apiClient.get('/api/v1/stores?is_active=true')
+      .then(resp => {
+        const list: StoreOption[] = ((resp as any) ?? []).map((s: any) => ({
+          id:   s.id,
+          name: s.name,
+          code: s.code,
+        }));
+        setStores(list);
+        // 若 URL 中无 store 参数，默认选第一个
+        if (!storeId && list.length > 0) setStoreId(list[0].id);
+      })
+      .catch(() => {/* silent — bindings page still usable without store list */});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // 门店切换 → 同步 URL
+  useEffect(() => {
+    if (storeId) setSearchParams({ store: storeId }, { replace: true });
+  }, [storeId, setSearchParams]);
 
   const fetchBindings = async () => {
     setLoading(true);
@@ -185,11 +217,18 @@ const EdgeHubBindingsPage: React.FC = () => {
       <div className={styles.header}>
         <h2 className={styles.title}>岗位与耳机绑定管理</h2>
         <Space>
-          <Select value={storeId} onChange={setStoreId} style={{ width: 110 }}>
-            <Option value="S001">S001</Option>
-            <Option value="S002">S002</Option>
-            <Option value="S003">S003</Option>
-          </Select>
+          <Select
+            value={storeId || undefined}
+            onChange={setStoreId}
+            style={{ width: 160 }}
+            placeholder="选择门店"
+            showSearch
+            optionFilterProp="label"
+            options={stores.map(s => ({
+              value: s.id,
+              label: `${s.code} ${s.name}`,
+            }))}
+          />
           <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
             新建绑定
           </Button>

@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
-  Card, Row, Col, Table, Tag, Tabs, Badge, Empty, Spin, Descriptions, Tooltip,
+  Card, Row, Col, Table, Tag, Tabs, Badge, Empty, Spin, Descriptions, Button,
 } from 'antd';
 import {
   WifiOutlined, DesktopOutlined, BellOutlined, ReloadOutlined,
@@ -78,7 +78,7 @@ const EdgeHubStorePage: React.FC = () => {
   const [alerts, setAlerts]   = useState<AlertItem[]>([]);
   const [loading, setLoading] = useState(false);
 
-  const fetchAll = async () => {
+  const fetchAll = useCallback(async () => {
     if (!storeId) return;
     setLoading(true);
     try {
@@ -95,9 +95,9 @@ const EdgeHubStorePage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [storeId]);
 
-  useEffect(() => { fetchAll(); }, [storeId]);
+  useEffect(() => { fetchAll(); }, [fetchAll]);
 
   const hub = hubs[0] ?? null;
 
@@ -162,9 +162,9 @@ const EdgeHubStorePage: React.FC = () => {
     <div className={styles.page}>
       <div className={styles.header}>
         <h2 className={styles.title}>门店边缘详情 — {storeId}</h2>
-        <span className={styles.refreshBtn} onClick={fetchAll}>
-          <ReloadOutlined /> 刷新
-        </span>
+        <Button icon={<ReloadOutlined />} size="small" onClick={fetchAll} loading={loading}>
+          刷新
+        </Button>
       </div>
 
       <Spin spinning={loading}>
