@@ -143,6 +143,13 @@ class WorkforceAutoScheduleService:
         if not active_employees:
             raise ValueError("该门店暂无在职员工，无法自动排班")
 
+        # 提前获取预算，作为排班生成的硬约束传入 Agent
+        daily_budget = await WorkforceAutoScheduleService._fetch_daily_budget_yuan(
+            store_id=store_id,
+            schedule_date=schedule_date,
+            db=db,
+        )
+
         shifts_payload = await StaffingPatternService.build_shifts_from_best_pattern(
             store_id=store_id,
             target_date=schedule_date,
@@ -154,6 +161,7 @@ class WorkforceAutoScheduleService:
                 store_id=store_id,
                 schedule_date=schedule_date,
                 employees=active_employees,
+                daily_budget_yuan=daily_budget,
             )
             source = "schedule_agent"
         if not shifts_payload:
@@ -163,11 +171,6 @@ class WorkforceAutoScheduleService:
         if conflicts:
             raise ValueError(f"自动排班冲突: {conflicts[0]['message']}")
 
-        daily_budget = await WorkforceAutoScheduleService._fetch_daily_budget_yuan(
-            store_id=store_id,
-            schedule_date=schedule_date,
-            db=db,
-        )
         estimated_cost = estimate_labor_cost_yuan(shifts_payload)
         anomalies = build_schedule_anomalies(
             shifts=shifts_payload,
@@ -230,6 +233,7 @@ class WorkforceAutoScheduleService:
         store_id: str,
         schedule_date: date,
         employees: List[Any],
+        daily_budget_yuan: Optional[float] = None,
     ) -> List[Dict[str, Any]]:
         employee_payload = []
         for e in employees:
@@ -249,7 +253,10 @@ class WorkforceAutoScheduleService:
             if schedule_agent_cls is None:
                 raise RuntimeError("schedule agent unavailable")
 
-            agent = schedule_agent_cls({"store_id": store_id})
+            agent_config: Dict[str, Any] = {"store_id": store_id}
+            if daily_budget_yuan is not None:
+                agent_config["target_daily_labor_cost"] = daily_budget_yuan
+            agent = schedule_agent_cls(agent_config)
             result = await agent.run(
                 store_id=store_id,
                 date=schedule_date.isoformat(),

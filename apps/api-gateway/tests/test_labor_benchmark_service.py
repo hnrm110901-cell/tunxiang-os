@@ -28,6 +28,30 @@ def test_classify_store_size_large_by_seats():
     assert classify_store_size(200, 260) == "large"
 
 
+def test_classify_store_size_large_by_area():
+    assert classify_store_size(600, 50) == "large"
+
+
+def test_classify_store_size_medium_by_seats():
+    assert classify_store_size(100, 130) == "medium"
+
+
+def test_classify_store_size_none_values():
+    assert classify_store_size(None, None) == "small"
+
+
+def test_get_hunan_benchmark_small():
+    bm = get_hunan_benchmark("small")
+    assert bm["labor_cost_rate_target"] == 24.0
+    assert bm["labor_efficiency_target"] == 1100.0
+
+
+def test_get_hunan_benchmark_large():
+    bm = get_hunan_benchmark("large")
+    assert bm["labor_cost_rate_target"] == 20.0
+    assert bm["labor_efficiency_target"] == 1500.0
+
+
 def test_get_hunan_benchmark_fallback():
     bm = get_hunan_benchmark("unknown")
     assert bm["labor_cost_rate_target"] == 22.0
@@ -49,6 +73,34 @@ def test_evaluate_against_benchmark_critical():
         benchmark={"labor_cost_rate_target": 22, "labor_efficiency_target": 1300},
     )
     assert out["health_level"] == "critical"
+
+
+def test_evaluate_against_benchmark_good():
+    out = evaluate_against_benchmark(
+        labor_cost_rate=23,
+        labor_efficiency=1210,
+        benchmark={"labor_cost_rate_target": 22, "labor_efficiency_target": 1300},
+    )
+    assert out["health_level"] == "good"
+
+
+def test_evaluate_against_benchmark_warning():
+    out = evaluate_against_benchmark(
+        labor_cost_rate=25,
+        labor_efficiency=1100,
+        benchmark={"labor_cost_rate_target": 22, "labor_efficiency_target": 1300},
+    )
+    assert out["health_level"] == "warning"
+
+
+def test_evaluate_against_benchmark_gap_values():
+    out = evaluate_against_benchmark(
+        labor_cost_rate=25.0,
+        labor_efficiency=1200.0,
+        benchmark={"labor_cost_rate_target": 22.0, "labor_efficiency_target": 1300.0},
+    )
+    assert out["rate_gap_pct"] == 3.0
+    assert out["efficiency_gap"] == -100.0
 
 
 @pytest.mark.asyncio
@@ -107,6 +159,28 @@ async def test_get_store_monthly_benchmark_no_snapshot_data():
 
 
 @pytest.mark.asyncio
+async def test_get_store_monthly_benchmark_december_boundary():
+    """12月边界：end_date 应跨年到下一年1月。"""
+    db = AsyncMock()
+
+    store_row = MagicMock()
+    store_row.id = "S001"
+    store_row.name = "门店"
+    store_row.area = 200
+    store_row.seats = 90
+
+    snap_row = MagicMock()
+    snap_row.avg_rate = 21.5
+    snap_row.avg_efficiency = 1350.0
+
+    db.execute = AsyncMock(side_effect=[_result(store_row), _result(snap_row)])
+
+    data = await LaborBenchmarkService.get_store_monthly_benchmark("S001", "2025-12", db)
+    assert data["month"] == "2025-12"
+    assert data["actual"]["labor_cost_rate"] == 21.5
+
+
+@pytest.mark.asyncio
 async def test_get_peer_group_baseline_medium():
     db = AsyncMock()
 
@@ -139,3 +213,21 @@ async def test_get_peer_group_baseline_empty():
 
     assert data["store_count"] == 0
     assert data["avg_labor_cost_rate"] == 0.0
+
+
+@pytest.mark.asyncio
+async def test_get_peer_group_baseline_large():
+    db = AsyncMock()
+
+    row = MagicMock()
+    row.store_count = 3
+    row.avg_rate = 19.5
+    row.avg_efficiency = 1620.0
+
+    db.execute = AsyncMock(return_value=_result(row))
+
+    data = await LaborBenchmarkService.get_peer_group_baseline("2026-03", "large", db)
+
+    assert data["size_tier"] == "large"
+    assert data["avg_labor_efficiency"] == 1620.0
+
