@@ -43,7 +43,8 @@ async def _cache_get(key: str) -> Optional[Dict]:
         from src.services.redis_cache_service import RedisCacheService
         svc = RedisCacheService()
         return await svc.get(key)
-    except Exception:
+    except Exception as exc:
+        logger.debug("bff_cache_get_failed", key=key, error=str(exc))
         return None
 
 
@@ -52,8 +53,8 @@ async def _cache_set(key: str, value: Dict) -> None:
         from src.services.redis_cache_service import RedisCacheService
         svc = RedisCacheService()
         await svc.set(key, value, expire=_BFF_CACHE_TTL)
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug("bff_cache_set_failed", key=key, error=str(exc))
 
 
 # ── 子调用降级包装 ─────────────────────────────────────────────────────────────
@@ -427,7 +428,9 @@ async def _fetch_waste_top5(store_id: str, db: AsyncSession) -> List[Dict]:
     result = await WasteGuardService.get_top5_waste(
         store_id=store_id, start_date=start, end_date=end, db=db
     )
-    return result.get("top5", []) if isinstance(result, dict) else []
+    if not isinstance(result, dict):
+        return []
+    return result.get("top5") or result.get("items") or []
 
 
 async def _fetch_inventory_alerts(store_id: str, db: AsyncSession) -> List[Dict]:
@@ -489,20 +492,34 @@ async def _fetch_today_reservations(
         params,
     )
     rows = result.fetchall()
-    return [
-        {
-            "id":            str(r[0]),
-            "guest_name":    r[1],
-            "party_size":    r[2],
-            "reserved_time": (
-                f"{r[3]}T{r[4]}" if r[4] else str(r[3])
-            ),
-            "table_number":  r[5],
-            "status":        r[6],
-            "notes":         r[7],
-        }
-        for r in rows
-    ]
+    mapped = []
+    for r in rows:
+        # 兼容两种行结构：
+        # 1) (id, guest, party, date_or_dt, table, status)
+        # 2) (id, guest, party, reservation_date, reservation_time, table, status, notes)
+        if len(r) >= 8:
+            reserved_time = f"{r[3]}T{r[4]}" if r[4] else str(r[3])
+            table_number = r[5]
+            status = r[6]
+            notes = r[7]
+        else:
+            reserved_time = str(r[3])
+            table_number = r[4] if len(r) > 4 else None
+            status = r[5] if len(r) > 5 else None
+            notes = r[6] if len(r) > 6 else None
+
+        mapped.append(
+            {
+                "id": str(r[0]),
+                "guest_name": r[1],
+                "party_size": r[2],
+                "reserved_time": reserved_time,
+                "table_number": table_number,
+                "status": status,
+                "notes": notes,
+            }
+        )
+    return mapped
 
 
 async def _fetch_service_alerts(store_id: str, db: AsyncSession) -> List[Dict]:
@@ -865,4 +882,3 @@ async def banquet_home(
     }
     await _cache_set(cache_key, payload)
     return {**payload, "_from_cache": False}
-

@@ -23,8 +23,11 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any, Dict, List, Optional, Tuple
 
+import structlog
 from sqlalchemy import bindparam, text
 from sqlalchemy.ext.asyncio import AsyncSession
+
+logger = structlog.get_logger()
 
 # ── 常量 ─────────────────────────────────────────────────────────────────────
 
@@ -470,8 +473,8 @@ async def detect_store_anomalies(
             try:
                 r = await detect_metric_anomaly(db, store_id, period, metric, value, revenue)
                 results.append(r)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("anomaly_detect_failed", store_id=store_id, metric=metric, error=str(exc))
 
     if health_row:
         try:
@@ -480,8 +483,8 @@ async def detect_store_anomalies(
                 _to_float(health_row[0]), revenue,
             )
             results.append(r)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("anomaly_detect_failed", store_id=store_id, metric="health_score", error=str(exc))
 
     await db.commit()
 

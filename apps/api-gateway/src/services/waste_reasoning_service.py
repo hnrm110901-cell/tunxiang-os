@@ -76,8 +76,8 @@ async def _step2_bom_deviation(
     try:
         dt_start = datetime.fromisoformat(date_start + "T00:00:00")
         dt_end = datetime.fromisoformat(date_end + "T23:59:59")
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning("waste_reasoning_date_parse_failed", date_start=date_start, date_end=date_end, error=str(exc))
 
     # 取门店所有 active dishes（用于 resolver 路径）
     active_dishes: List[Any] = []

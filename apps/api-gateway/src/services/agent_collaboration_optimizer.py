@@ -800,6 +800,8 @@ class AgentDependencyGraph:
                 report["execution_order"] = [
                     a.value for a in self.topological_order()
                 ]
-            except ValueError:
-                pass
+            except ValueError as exc:
+                logger.warning("dag_topological_sort_failed", error=str(exc))
+                report["execution_order"] = None
+                report["cycle_detected"] = True
         return report
