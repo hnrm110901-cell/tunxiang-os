@@ -2,9 +2,10 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   Card, Table, Tag, Input, Select, Space, Button,
   Tooltip, Empty, Spin, Popconfirm, message, Row, Col,
+  Drawer, Descriptions, Badge,
 } from 'antd';
 import {
-  SearchOutlined, ReloadOutlined, CheckCircleOutlined,
+  SearchOutlined, ReloadOutlined, CheckCircleOutlined, InfoCircleOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { apiClient, handleApiError } from '../services/api';
@@ -51,6 +52,9 @@ const EdgeHubAlertsPage: React.FC = () => {
   const [meta, setMeta]           = useState<PageMeta>({ page: 1, pageSize: 20, total: 0, hasMore: false });
   const [loading, setLoading]     = useState(false);
   const [resolving, setResolving] = useState<string | null>(null);
+
+  // 详情抽屉
+  const [drawerAlert, setDrawerAlert] = useState<AlertItem | null>(null);
 
   // 筛选状态
   const [keyword,   setKeyword]   = useState('');
@@ -154,24 +158,31 @@ const EdgeHubAlertsPage: React.FC = () => {
       render: (v: string | null) => v ? dayjs(v).format('MM-DD HH:mm') : '—',
     },
     {
-      title: '操作', key: 'actions', width: 90, fixed: 'right' as const,
-      render: (_: unknown, r: AlertItem) =>
-        r.status === 'open' ? (
-          <Popconfirm
-            title="确认标记此告警为已解决？"
-            onConfirm={() => handleResolve(r.id)}
-            okText="确认" cancelText="取消"
+      title: '操作', key: 'actions', width: 130, fixed: 'right' as const,
+      render: (_: unknown, r: AlertItem) => (
+        <Space size={4}>
+          <Button
+            type="link" size="small" icon={<InfoCircleOutlined />}
+            onClick={() => setDrawerAlert(r)}
           >
-            <Button
-              type="link" size="small" icon={<CheckCircleOutlined />}
-              loading={resolving === r.id}
+            详情
+          </Button>
+          {r.status === 'open' && (
+            <Popconfirm
+              title="确认标记此告警为已解决？"
+              onConfirm={() => handleResolve(r.id)}
+              okText="确认" cancelText="取消"
             >
-              解决
-            </Button>
-          </Popconfirm>
-        ) : (
-          <span className={styles.resolved}>已处理</span>
-        ),
+              <Button
+                type="link" size="small" icon={<CheckCircleOutlined />}
+                loading={resolving === r.id}
+              >
+                解决
+              </Button>
+            </Popconfirm>
+          )}
+        </Space>
+      ),
     },
   ];
 
@@ -278,6 +289,43 @@ const EdgeHubAlertsPage: React.FC = () => {
           )}
         </Card>
       </Spin>
+
+      {/* 告警详情抽屉 */}
+      <Drawer
+        title={drawerAlert ? `告警详情 — ${drawerAlert.id.slice(0, 8)}…` : '告警详情'}
+        open={!!drawerAlert}
+        onClose={() => setDrawerAlert(null)}
+        width={480}
+        destroyOnClose
+      >
+        {drawerAlert && (
+          <Descriptions size="small" column={1} bordered>
+            <Descriptions.Item label="级别">
+              <Tag color={LEVEL_COLOR[drawerAlert.level] ?? 'default'}>
+                {LEVEL_LABEL[drawerAlert.level] ?? drawerAlert.level.toUpperCase()}
+              </Tag>
+            </Descriptions.Item>
+            <Descriptions.Item label="状态">
+              <Tag color={drawerAlert.status === 'open' ? 'red' : 'green'}>
+                {drawerAlert.status === 'open' ? '未解决' : '已解决'}
+              </Tag>
+            </Descriptions.Item>
+            <Descriptions.Item label="门店">{drawerAlert.storeId}</Descriptions.Item>
+            <Descriptions.Item label="告警类型">
+              <code>{drawerAlert.alertType.replace(/_/g, ' ')}</code>
+            </Descriptions.Item>
+            <Descriptions.Item label="描述">{drawerAlert.message ?? '—'}</Descriptions.Item>
+            <Descriptions.Item label="Hub ID">{drawerAlert.hubId ?? '—'}</Descriptions.Item>
+            <Descriptions.Item label="设备 ID">{drawerAlert.deviceId ?? '—'}</Descriptions.Item>
+            <Descriptions.Item label="发生时间">
+              {drawerAlert.createdAt ? dayjs(drawerAlert.createdAt).format('YYYY-MM-DD HH:mm:ss') : '—'}
+            </Descriptions.Item>
+            <Descriptions.Item label="解决时间">
+              {drawerAlert.resolvedAt ? dayjs(drawerAlert.resolvedAt).format('YYYY-MM-DD HH:mm:ss') : '—'}
+            </Descriptions.Item>
+          </Descriptions>
+        )}
+      </Drawer>
     </div>
   );
 };

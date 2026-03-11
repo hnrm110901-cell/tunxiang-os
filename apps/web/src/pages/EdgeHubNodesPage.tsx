@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Card, Table, Tag, Badge, Input, Select, Space, Button,
-  Tooltip, Empty, Spin, Row, Col,
+  Tooltip, Empty, Spin, Row, Col, Drawer, Descriptions, List, Progress,
 } from 'antd';
 import {
   SearchOutlined, ReloadOutlined, WifiOutlined,
-  DesktopOutlined, BellOutlined, LinkOutlined,
+  DesktopOutlined, BellOutlined, LinkOutlined, InfoCircleOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { useNavigate } from 'react-router-dom';
@@ -52,6 +52,8 @@ const STATUS_LABEL: Record<string, string> = {
   online: '在线', offline: '离线', degraded: '降级', upgrading: '升级中',
 };
 
+const LEVEL_COLOR: Record<string, string> = { p1: 'red', p2: 'orange', p3: 'blue' };
+
 function resourceBar(pct: number | null) {
   if (pct === null) return '—';
   const color = pct >= 90 ? '#ff4d4f' : pct >= 70 ? '#fa8c16' : '#52c41a';
@@ -75,6 +77,11 @@ const EdgeHubNodesPage: React.FC = () => {
   const [page, setPage]         = useState(1);
   const pageSize = 20;
 
+  // 详情抽屉
+  const [drawerHubId, setDrawerHubId]   = useState<string | null>(null);
+  const [drawerData,  setDrawerData]    = useState<any>(null);
+  const [drawerLoading, setDrawerLoading] = useState(false);
+
   const fetchNodes = useCallback(async (pg = 1) => {
     setLoading(true);
     try {
@@ -94,6 +101,20 @@ const EdgeHubNodesPage: React.FC = () => {
   }, [keyword, status]);
 
   useEffect(() => { fetchNodes(1); }, [keyword, status]);
+
+  const openNodeDrawer = async (hubId: string) => {
+    setDrawerHubId(hubId);
+    setDrawerData(null);
+    setDrawerLoading(true);
+    try {
+      const resp = await apiClient.get(`/api/v1/edge-hub/nodes/${hubId}`);
+      setDrawerData((resp as any).data);
+    } catch (err) {
+      handleApiError(err);
+    } finally {
+      setDrawerLoading(false);
+    }
+  };
 
   // ── 统计行 ───────────────────────────────────────────────────────────────────
   const onlineCount   = nodes.filter(n => n.status === 'online').length;
@@ -171,14 +192,22 @@ const EdgeHubNodesPage: React.FC = () => {
         new Date(a.lastHeartbeat ?? 0).getTime() - new Date(b.lastHeartbeat ?? 0).getTime(),
     },
     {
-      title: '操作', key: 'actions', width: 80, fixed: 'right' as const,
+      title: '操作', key: 'actions', width: 120, fixed: 'right' as const,
       render: (_: unknown, r: NodeItem) => (
-        <Button
-          type="link" size="small"
-          onClick={() => navigate(`/edge-hub/stores/${r.storeId}`)}
-        >
-          详情
-        </Button>
+        <Space size={4}>
+          <Button
+            type="link" size="small" icon={<InfoCircleOutlined />}
+            onClick={() => openNodeDrawer(r.id)}
+          >
+            详情
+          </Button>
+          <Button
+            type="link" size="small"
+            onClick={() => navigate(`/edge-hub/stores/${r.storeId}`)}
+          >
+            门店
+          </Button>
+        </Space>
       ),
     },
   ];
@@ -264,6 +293,83 @@ const EdgeHubNodesPage: React.FC = () => {
           )}
         </Card>
       </Spin>
+
+      {/* 节点详情抽屉 */}
+      <Drawer
+        title={drawerData ? `节点详情 — ${drawerData.hubCode}` : '节点详情'}
+        open={!!drawerHubId}
+        onClose={() => { setDrawerHubId(null); setDrawerData(null); }}
+        width={560}
+        destroyOnClose
+      >
+        <Spin spinning={drawerLoading}>
+          {drawerData ? (
+            <>
+              <Descriptions size="small" column={2} bordered style={{ marginBottom: 16 }}>
+                <Descriptions.Item label="状态" span={2}>
+                  <Badge
+                    color={STATUS_COLOR[drawerData.status] ?? '#d9d9d9'}
+                    text={STATUS_LABEL[drawerData.status] ?? drawerData.status}
+                  />
+                </Descriptions.Item>
+                <Descriptions.Item label="IP 地址">{drawerData.ipAddress ?? '—'}</Descriptions.Item>
+                <Descriptions.Item label="版本">{drawerData.runtimeVersion ?? '—'}</Descriptions.Item>
+                <Descriptions.Item label="最后心跳" span={2}>
+                  {drawerData.lastHeartbeat ? dayjs(drawerData.lastHeartbeat).format('YYYY-MM-DD HH:mm:ss') : '—'}
+                </Descriptions.Item>
+                {drawerData.cpuPct !== null && (
+                  <Descriptions.Item label="CPU">
+                    <Progress percent={Math.round(drawerData.cpuPct)} size="small" status={drawerData.cpuPct >= 90 ? 'exception' : 'normal'} />
+                  </Descriptions.Item>
+                )}
+                {drawerData.memPct !== null && (
+                  <Descriptions.Item label="内存">
+                    <Progress percent={Math.round(drawerData.memPct)} size="small" status={drawerData.memPct >= 90 ? 'exception' : 'normal'} />
+                  </Descriptions.Item>
+                )}
+                {drawerData.diskPct !== null && (
+                  <Descriptions.Item label="磁盘">
+                    <Progress percent={Math.round(drawerData.diskPct)} size="small" status={drawerData.diskPct >= 90 ? 'exception' : 'normal'} />
+                  </Descriptions.Item>
+                )}
+              </Descriptions>
+
+              <h4 style={{ marginBottom: 8 }}>设备列表（{drawerData.devices?.length ?? 0} 台）</h4>
+              <List
+                size="small"
+                dataSource={drawerData.devices ?? []}
+                renderItem={(d: any) => (
+                  <List.Item>
+                    <Space>
+                      <Badge color={STATUS_COLOR[d.status] ?? '#d9d9d9'} />
+                      <code>{d.deviceCode}</code>
+                      <Tag>{d.deviceType}</Tag>
+                      <span style={{ color: '#8c8c8c', fontSize: 12 }}>{d.name ?? ''}</span>
+                    </Space>
+                  </List.Item>
+                )}
+                style={{ marginBottom: 16 }}
+              />
+
+              <h4 style={{ marginBottom: 8 }}>近期告警（最多10条）</h4>
+              <List
+                size="small"
+                dataSource={drawerData.recentAlerts ?? []}
+                locale={{ emptyText: '暂无告警' }}
+                renderItem={(a: any) => (
+                  <List.Item>
+                    <Space>
+                      <Tag color={LEVEL_COLOR[a.level] ?? 'default'}>{a.level?.toUpperCase()}</Tag>
+                      <span style={{ fontSize: 12 }}>{a.alertType?.replace(/_/g, ' ')}</span>
+                      <Tag color={a.status === 'open' ? 'red' : 'green'}>{a.status === 'open' ? '未解决' : '已解决'}</Tag>
+                    </Space>
+                  </List.Item>
+                )}
+              />
+            </>
+          ) : !drawerLoading && <Empty description="无数据" />}
+        </Spin>
+      </Drawer>
     </div>
   );
 };

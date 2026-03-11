@@ -364,6 +364,40 @@ async def store_alerts(
 
 # ── 全局节点列表 ───────────────────────────────────────────────────────────────
 
+# ── 全局节点列表 ───────────────────────────────────────────────────────────────
+
+@router.get("/nodes/{hub_id}")
+async def get_node_detail(
+    hub_id: str,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_active_user),
+) -> Dict[str, Any]:
+    """单个边缘节点详情（含设备列表 + 最近10条告警）"""
+    hub = (await db.execute(select(EdgeHub).where(EdgeHub.id == hub_id))).scalar_one_or_none()
+    if not hub:
+        raise HTTPException(status_code=404, detail="hub not found")
+
+    devices = (
+        await db.execute(
+            select(EdgeDevice).where(EdgeDevice.hub_id == hub_id).order_by(EdgeDevice.device_type)
+        )
+    ).scalars().all()
+
+    recent_alerts = (
+        await db.execute(
+            select(EdgeAlert)
+            .where(EdgeAlert.hub_id == hub_id)
+            .order_by(EdgeAlert.created_at.desc())
+            .limit(10)
+        )
+    ).scalars().all()
+
+    row = _hub_row(hub)
+    row["devices"]      = [_device_row(d) for d in devices]
+    row["recentAlerts"] = [_alert_row(a) for a in recent_alerts]
+    return {"code": 0, "message": "ok", "data": row}
+
+
 @router.get("/nodes")
 async def list_nodes(
     status: Optional[str] = Query(None),
