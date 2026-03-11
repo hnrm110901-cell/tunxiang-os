@@ -80,8 +80,18 @@ function fmtVal(metric: string, val: number | null): string {
 // ── 主组件 ────────────────────────────────────────────────────────────────
 
 const FinancialAnomalyPage: React.FC = () => {
-  const storeId = 'S001';
+  const [storeId,      setStoreId]      = useState('S001');
+  const [storeOptions, setStoreOptions] = useState<string[]>(['S001']);
   const [period, setPeriod] = useState(dayjs().subtract(1, 'month').format('YYYY-MM'));
+
+  useEffect(() => {
+    apiClient.get<{ items: Array<{ id: string }> }>('/api/v1/stores?limit=50')
+      .then(data => {
+        const ids = (data.items ?? []).map((s: { id: string }) => s.id).filter(Boolean);
+        if (ids.length > 0) setStoreOptions(ids);
+      })
+      .catch(() => { /* 保持默认 */ });
+  }, []);
   const [detectResult, setDetectResult] = useState<DetectResult | null>(null);
   const [records, setRecords] = useState<AnomalyRecord[]>([]);
   const [trend, setTrend] = useState<TrendItem[]>([]);
@@ -293,6 +303,9 @@ const FinancialAnomalyPage: React.FC = () => {
       <div className={styles.header}>
         <h2 className={styles.title}>财务异常检测引擎</h2>
         <div className={styles.controls}>
+          <Select value={storeId} onChange={setStoreId} style={{ width: 110 }}>
+            {storeOptions.map(s => <Option key={s} value={s}>{s}</Option>)}
+          </Select>
           <Select
             value={period}
             onChange={setPeriod}

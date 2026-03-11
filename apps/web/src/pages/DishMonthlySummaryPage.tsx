@@ -3,7 +3,7 @@
  * 3 Tabs: 月报总览 / 趋势对比 / 行动清单
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   Tabs, Card, Button, Select, Spin, Alert, Row, Col,
   Typography, Tag, Table, Badge, Statistic, Divider,
@@ -324,8 +324,18 @@ function ActionTab({ data }: { data: Record<string, any> | null }) {
 // ── 主组件 ────────────────────────────────────────────────────────────────────
 
 const DishMonthlySummaryPage: React.FC = () => {
-  const [storeId, setStoreId]   = useState(DEFAULT_STORE);
+  const [storeId,      setStoreId]      = useState(DEFAULT_STORE);
+  const [storeOptions, setStoreOptions] = useState<string[]>([DEFAULT_STORE]);
   const [period,  setPeriod]    = useState(DEFAULT_PERIOD);
+
+  useEffect(() => {
+    apiClient.get<{ items: Array<{ id: string }> }>('/api/v1/stores?limit=50')
+      .then(data => {
+        const ids = (data.items ?? []).map((s: { id: string }) => s.id).filter(Boolean);
+        if (ids.length > 0) setStoreOptions(ids);
+      })
+      .catch(() => { /* 保持默认 */ });
+  }, []);
   const [data,    setData]      = useState<Record<string, any> | null>(null);
   const [history, setHistory]   = useState<Record<string, any>[]>([]);
   const [loading, setLoading]   = useState(false);
@@ -383,8 +393,7 @@ const DishMonthlySummaryPage: React.FC = () => {
         </Title>
         <Space wrap>
           <Select value={storeId} onChange={setStoreId} style={{ width: 120 }}>
-            <Option value="S001">S001门店</Option>
-            <Option value="S002">S002门店</Option>
+            {storeOptions.map(s => <Option key={s} value={s}>{s}</Option>)}
           </Select>
           <Select value={period} onChange={setPeriod} style={{ width: 120 }}>
             {periods.map(p => <Option key={p} value={p}>{p}</Option>)}

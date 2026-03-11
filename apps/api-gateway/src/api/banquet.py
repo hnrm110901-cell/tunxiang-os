@@ -19,6 +19,7 @@ from __future__ import annotations
 from datetime import date, timedelta
 from typing import Any, Dict, List, Optional
 
+import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -30,6 +31,7 @@ from src.services.auspicious_date_service import AuspiciousDateService
 from src.services.banquet_planning_engine import banquet_planning_engine
 
 router = APIRouter(prefix="/api/v1/banquet", tags=["banquet"])
+logger = structlog.get_logger()
 
 
 # ── Pydantic Schemas ──────────────────────────────────────────────────────────
@@ -180,8 +182,7 @@ async def today_banquet_check(
             if r.get("reservation_type") == ReservationType.BANQUET.value
         ]
     except Exception as e:
-        # 非致命，返回空列表 + 警告
-        pass
+        logger.warning("banquet.today_check.reservations_failed", store_id=store_id, error=str(e))
 
     # 3. 熔断检查
     circuit_results = []

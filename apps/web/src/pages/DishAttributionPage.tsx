@@ -3,7 +3,7 @@
  * 4 Tabs: 归因看板 / 汇总分析 / 增降幅榜 / 菜品归因历史
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   Tabs, Table, Tag, Select, Button, Input, Spin, Alert, Tooltip,
   Card, Space, Typography, Row, Col, Statistic,
@@ -544,8 +544,18 @@ function DishHistory({ storeId, period }: { storeId: string; period: string }) {
 // ── 主页面 ────────────────────────────────────────────────────────────────────
 
 const DishAttributionPage: React.FC = () => {
-  const [storeId] = useState(DEFAULT_STORE);
+  const [storeId,      setStoreId]      = useState(DEFAULT_STORE);
+  const [storeOptions, setStoreOptions] = useState<string[]>([DEFAULT_STORE]);
   const [period, setPeriod] = useState(DEFAULT_PERIOD);
+
+  useEffect(() => {
+    apiClient.get<{ items: Array<{ id: string }> }>('/api/v1/stores?limit=50')
+      .then(data => {
+        const ids = (data.items ?? []).map((s: { id: string }) => s.id).filter(Boolean);
+        if (ids.length > 0) setStoreOptions(ids);
+      })
+      .catch(() => { /* 保持默认 */ });
+  }, []);
   const [computing, setComputing] = useState(false);
   const [computeMsg, setComputeMsg] = useState('');
 
@@ -585,6 +595,9 @@ const DishAttributionPage: React.FC = () => {
           </Col>
           <Col>
             <Space>
+              <Select value={storeId} onChange={setStoreId} style={{ width: 110 }}>
+                {storeOptions.map(s => <Option key={s} value={s}>{s}</Option>)}
+              </Select>
               <Select
                 value={period}
                 onChange={setPeriod}
