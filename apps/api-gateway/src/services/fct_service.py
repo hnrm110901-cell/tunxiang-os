@@ -3312,7 +3312,60 @@ class StandaloneFCTService:
         if records:
             return {"tenant_id": tenant_id, "ref_type": ref_type, "ref_id": ref_id, "records": records}
 
-        # 兼容兜底：历史数据可能尚未落审批表，回退凭证状态映射。
+    async def update_approval_status(
+        self,
+        session: AsyncSession,
+        approval_id: str,
+        new_status: str,
+        approved_by: Optional[str] = None,
+        comment: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        更新审批记录状态（pending → approved / rejected）。
+
+        审批通过时：
+          - 若 ref_type=voucher，联动凭证状态 draft → approved
+          - 记录 approved_at / approved_by / comment
+        """
+        from src.models.fct import FCTApprovalRecord
+
+        stmt = select(FCTApprovalRecord).where(FCTApprovalRecord.id == approval_id)
+        row = (await session.execute(stmt)).scalar_one_or_none()
+        if not row:
+            raise ValueError(f"审批记录 {approval_id} 不存在")
+
+        allowed_statuses = {"pending", "approved", "rejected", "withdrawn"}
+        new_status_l = new_status.strip().lower()
+        if new_status_l not in allowed_statuses:
+            raise ValueError(f"无效状态 '{new_status}'，允许值：{', '.join(sorted(allowed_statuses))}")
+
+        row.status = new_status_l
+        if new_status_l == "approved":
+            row.approved_at = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S")
+            if approved_by:
+                row.approved_by = approved_by
+        if comment:
+            row.comment = comment
+
+        await session.flush()
+
+        result: Dict[str, Any] = {
+            "approval_id": str(row.id),
+            "ref_type":    row.ref_type,
+            "ref_id":      row.ref_id,
+            "step":        int(row.step or 1),
+            "status":      new_status_l,
+            "approved_at": row.approved_at,
+            "approved_by": row.approved_by,
+            "success":     True,
+        }
+
+        # 凭证联动：approved → voucher draft→approved
+        if row.ref_type in {"voucher", "fct_voucher"} and new_status_l == "approved":
+            sync = await self.update_voucher_status(session, voucher_id=row.ref_id, target_status="approved")
+            result["voucher_sync"] = sync
+
+        return result
         if ref_type in {"voucher", "fct_voucher"}:
             stmt = select(Voucher).where(Voucher.id == ref_id)
             voucher = (await session.execute(stmt)).scalar_one_or_none()

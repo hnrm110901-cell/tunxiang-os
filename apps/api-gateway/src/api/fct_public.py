@@ -718,16 +718,67 @@ async def verify_invoice(
     return await fct_service.verify_invoice(session, invoice_id=invoice_id)
 
 
-# ---------- Phase 4：审批流占位 ----------
-@router.post("/approvals", summary="审批记录占位")
+# ---------- 审批流 ----------
+@router.post("/approvals", summary="创建审批记录")
 async def create_approval(
     body: Dict[str, Any],
     session: AsyncSession = Depends(get_db_fct),
     _: None = Depends(verify_fct_api_key),
 ) -> Dict[str, Any]:
-    return await fct_service.create_approval_record(
-        session, tenant_id=body["tenant_id"], ref_type=body["ref_type"], ref_id=body["ref_id"], step=body.get("step", 1), status=body.get("status") or "pending", extra=body.get("extra")
-    )
+    """
+    创建审批记录。
+
+    body: { tenant_id, ref_type, ref_id, step?, status?, extra? }
+      - ref_type: voucher | purchase_order | expense_claim | ...
+      - status: pending（默认）| approved | rejected
+      - extra: { approved_by, comment, ... }
+    """
+    tenant_id = body.get("tenant_id")
+    ref_type  = body.get("ref_type")
+    ref_id    = body.get("ref_id")
+    if not tenant_id or not ref_type or not ref_id:
+        raise HTTPException(status_code=400, detail="tenant_id / ref_type / ref_id 为必填字段")
+    try:
+        return await fct_service.create_approval_record(
+            session,
+            tenant_id=tenant_id,
+            ref_type=ref_type,
+            ref_id=ref_id,
+            step=int(body.get("step") or 1),
+            status=body.get("status") or "pending",
+            extra=body.get("extra"),
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.patch("/approvals/{approval_id}", summary="审批操作（通过/驳回）")
+async def update_approval(
+    approval_id: str,
+    body: Dict[str, Any],
+    session: AsyncSession = Depends(get_db_fct),
+    _: None = Depends(verify_fct_api_key),
+) -> Dict[str, Any]:
+    """
+    更新审批记录状态。
+
+    body: { status, approved_by?, comment? }
+      - status: approved | rejected | withdrawn
+    审批通过时自动联动凭证状态（draft → approved）。
+    """
+    new_status = body.get("status")
+    if not new_status:
+        raise HTTPException(status_code=400, detail="status 为必填字段")
+    try:
+        return await fct_service.update_approval_status(
+            session,
+            approval_id=approval_id,
+            new_status=new_status,
+            approved_by=body.get("approved_by"),
+            comment=body.get("comment"),
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.get("/approvals/by-ref", summary="按业务单查审批记录")

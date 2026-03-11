@@ -820,9 +820,9 @@ class PerformanceAgent(LLMEnhancedAgent):
                         },
                     }
             except Exception as e:
-                logger.warning("绩效 DB 查询失败，降级占位", error=str(e))
+                logger.warning("绩效 DB 查询失败，返回空指标结构", error=str(e), store_id=store_id)
 
-        # ── 降级：占位结构（维持向后兼容） ───────────────────────────────────
+        # ── 降级：空指标结构（DB 不可用或缺少 store_id） ─────────────────────
         items = []
         for m in role["metrics"]:
             items.append({
@@ -844,7 +844,7 @@ class PerformanceAgent(LLMEnhancedAgent):
                 "staff_ids": staff_ids,
                 "metrics": items,
                 "total_score": None,
-                "data_source_note": "当前为占位结构，接入指标表后可计算真实得分",
+                "data_source_note": "指标数据暂不可用（需提供 store_id 且数据库可连接）",
             },
             "metadata": {"source": "performance_engine"},
         }
