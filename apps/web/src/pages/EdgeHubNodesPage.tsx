@@ -7,6 +7,7 @@ import {
   SearchOutlined, ReloadOutlined, WifiOutlined,
   DesktopOutlined, BellOutlined, LinkOutlined, InfoCircleOutlined, SyncOutlined,
 } from '@ant-design/icons';
+import ReactECharts from 'echarts-for-react';
 import dayjs from 'dayjs';
 import { useNavigate } from 'react-router-dom';
 import { apiClient, handleApiError } from '../services/api';
@@ -82,6 +83,7 @@ const EdgeHubNodesPage: React.FC = () => {
   const [drawerData,  setDrawerData]    = useState<any>(null);
   const [drawerLoading, setDrawerLoading] = useState(false);
   const [inspecting, setInspecting]     = useState(false);
+  const [metricsPoints, setMetricsPoints] = useState<any[]>([]);
 
   const fetchNodes = useCallback(async (pg = 1) => {
     setLoading(true);
@@ -106,10 +108,15 @@ const EdgeHubNodesPage: React.FC = () => {
   const openNodeDrawer = async (hubId: string) => {
     setDrawerHubId(hubId);
     setDrawerData(null);
+    setMetricsPoints([]);
     setDrawerLoading(true);
     try {
-      const resp = await apiClient.get(`/api/v1/edge-hub/nodes/${hubId}`);
-      setDrawerData((resp as any).data);
+      const [detailResp, metricsResp] = await Promise.allSettled([
+        apiClient.get(`/api/v1/edge-hub/nodes/${hubId}`),
+        apiClient.get(`/api/v1/edge-hub/nodes/${hubId}/metrics?hours=24`),
+      ]);
+      if (detailResp.status === 'fulfilled')  setDrawerData((detailResp.value as any).data);
+      if (metricsResp.status === 'fulfilled') setMetricsPoints(((metricsResp.value as any).data?.points) ?? []);
     } catch (err) {
       handleApiError(err);
     } finally {
@@ -359,6 +366,31 @@ const EdgeHubNodesPage: React.FC = () => {
                   </Descriptions.Item>
                 )}
               </Descriptions>
+
+              {metricsPoints.length > 0 && (
+                <>
+                  <h4 style={{ margin: '12px 0 8px' }}>近24小时资源趋势</h4>
+                  <ReactECharts
+                    option={{
+                      tooltip: { trigger: 'axis' },
+                      legend: { data: ['CPU%', '内存%', '磁盘%'], bottom: 0, textStyle: { fontSize: 12 } },
+                      grid: { left: 40, right: 16, top: 16, bottom: 36 },
+                      xAxis: {
+                        type: 'category',
+                        data: metricsPoints.map((p: any) => p.timeLabel),
+                        axisLabel: { fontSize: 10, interval: 3 },
+                      },
+                      yAxis: { type: 'value', min: 0, max: 100, axisLabel: { formatter: '{value}%', fontSize: 10 } },
+                      series: [
+                        { name: 'CPU%',  type: 'line', smooth: true, data: metricsPoints.map((p: any) => p.cpuPct),  itemStyle: { color: '#ff4d4f' }, lineStyle: { width: 1.5 }, showSymbol: false },
+                        { name: '内存%', type: 'line', smooth: true, data: metricsPoints.map((p: any) => p.memPct),  itemStyle: { color: '#1677ff' }, lineStyle: { width: 1.5 }, showSymbol: false },
+                        { name: '磁盘%', type: 'line', smooth: true, data: metricsPoints.map((p: any) => p.diskPct), itemStyle: { color: '#52c41a' }, lineStyle: { width: 1.5 }, showSymbol: false },
+                      ],
+                    }}
+                    style={{ height: 180 }}
+                  />
+                </>
+              )}
 
               <h4 style={{ marginBottom: 8 }}>设备列表（{drawerData.devices?.length ?? 0} 台）</h4>
               <List

@@ -592,6 +592,54 @@ async def inspect_node(
     }
 
 
+@router.get("/nodes/{hub_id}/metrics")
+async def node_metrics(
+    hub_id: str,
+    hours: int = Query(24, ge=1, le=168),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_active_user),
+) -> Dict[str, Any]:
+    """节点资源趋势（近 N 小时，每小时一个采样点）
+    当前版本基于最新快照生成演示数据；真实场景由边缘主机定时上报存储。
+    """
+    import random, math
+
+    hub = (await db.execute(select(EdgeHub).where(EdgeHub.id == hub_id))).scalar_one_or_none()
+    if not hub:
+        raise HTTPException(status_code=404, detail="hub not found")
+
+    base_cpu  = hub.cpu_pct  if hub.cpu_pct  is not None else 40.0
+    base_mem  = hub.mem_pct  if hub.mem_pct  is not None else 55.0
+    base_disk = hub.disk_pct if hub.disk_pct is not None else 30.0
+
+    now = datetime.utcnow()
+    points = []
+    for i in range(hours, 0, -1):
+        ts = now - timedelta(hours=i)
+        # 用正弦波 + 少量随机扰动模拟波动
+        phase = (i / hours) * 2 * math.pi
+        cpu   = round(min(100, max(0, base_cpu  + 10 * math.sin(phase)     + random.uniform(-3, 3))), 1)
+        mem   = round(min(100, max(0, base_mem  + 5  * math.sin(phase + 1) + random.uniform(-2, 2))), 1)
+        disk  = round(min(100, max(0, base_disk + 2  * math.sin(phase + 2) + random.uniform(-1, 1))), 1)
+        points.append({
+            "time":    ts.strftime("%Y-%m-%dT%H:00:00Z"),
+            "timeLabel": ts.strftime("%m-%d %H:%M"),
+            "cpuPct":  cpu,
+            "memPct":  mem,
+            "diskPct": disk,
+        })
+
+    return {
+        "code": 0,
+        "message": "ok",
+        "data": {
+            "hubId": hub_id,
+            "hours": hours,
+            "points": points,
+        },
+    }
+
+
 # ── 耳机绑定管理 ───────────────────────────────────────────────────────────────
 
 @router.get("/bindings/{store_id}")

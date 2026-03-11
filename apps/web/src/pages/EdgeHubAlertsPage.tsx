@@ -2,10 +2,11 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   Card, Table, Tag, Input, Select, Space, Button,
   Tooltip, Empty, Spin, Popconfirm, message, Row, Col,
-  Drawer, Descriptions, Badge,
+  Drawer, Descriptions, Badge, Timeline,
 } from 'antd';
 import {
   SearchOutlined, ReloadOutlined, CheckCircleOutlined, InfoCircleOutlined,
+  BellOutlined, RiseOutlined, StopOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { apiClient, handleApiError } from '../services/api';
@@ -368,6 +369,47 @@ const EdgeHubAlertsPage: React.FC = () => {
               {drawerAlert.resolvedAt ? dayjs(drawerAlert.resolvedAt).format('YYYY-MM-DD HH:mm:ss') : '—'}
             </Descriptions.Item>
           </Descriptions>
+
+          <h4 style={{ margin: '16px 0 8px' }}>告警时间轴</h4>
+          <Timeline
+            items={[
+              {
+                dot: <BellOutlined style={{ color: LEVEL_COLOR[drawerAlert.level] ?? '#1677ff' }} />,
+                children: (
+                  <span>
+                    <Tag color={LEVEL_COLOR[drawerAlert.level]}>{LEVEL_LABEL[drawerAlert.level] ?? drawerAlert.level.toUpperCase()}</Tag>
+                    告警产生
+                    <div style={{ fontSize: 11, color: '#8c8c8c', marginTop: 2 }}>
+                      {drawerAlert.createdAt ? dayjs(drawerAlert.createdAt).format('YYYY-MM-DD HH:mm:ss') : '—'}
+                    </div>
+                  </span>
+                ),
+              },
+              ...(drawerAlert.level === 'p1' ? [{
+                dot: <RiseOutlined style={{ color: '#ff4d4f' }} />,
+                children: <span><Tag color="red">P1</Tag> 已升级至最高级别</span>,
+              }] : []),
+              ...(drawerAlert.status !== 'open' ? [{
+                dot: drawerAlert.status === 'resolved'
+                  ? <CheckCircleOutlined style={{ color: '#52c41a' }} />
+                  : <StopOutlined style={{ color: '#8c8c8c' }} />,
+                children: (
+                  <span>
+                    <Tag color={drawerAlert.status === 'resolved' ? 'green' : 'default'}>
+                      {drawerAlert.status === 'resolved' ? '已解决' : '已忽略'}
+                    </Tag>
+                    <div style={{ fontSize: 11, color: '#8c8c8c', marginTop: 2 }}>
+                      {drawerAlert.resolvedAt ? dayjs(drawerAlert.resolvedAt).format('YYYY-MM-DD HH:mm:ss') : ''}
+                    </div>
+                  </span>
+                ),
+              }] : [{
+                dot: <BellOutlined style={{ color: '#fa8c16' }} />,
+                color: 'orange',
+                children: <span><Tag color="orange">处理中</Tag> 等待处理…</span>,
+              }]),
+            ]}
+          />
         )}
       </Drawer>
     </div>
