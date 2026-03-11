@@ -16,8 +16,11 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any, Dict, List, Optional, Tuple
 
+import structlog
 from sqlalchemy import bindparam, text
 from sqlalchemy.ext.asyncio import AsyncSession
+
+logger = structlog.get_logger()
 
 # ── 常量 ─────────────────────────────────────────────────────────────────────
 
@@ -394,7 +397,8 @@ async def compute_all_forecasts(
     ]:
         try:
             results[key] = await fn(db, store_id, target_period)
-        except Exception:
+        except Exception as exc:
+            logger.warning("forecast_compute_failed", store_id=store_id, forecast_type=key, error=str(exc))
             results[key] = None
 
     await db.commit()
