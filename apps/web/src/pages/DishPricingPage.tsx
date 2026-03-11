@@ -92,6 +92,7 @@ const fmtPct   = (n: number) => `${Number(n).toFixed(1)}%`;
 // ── 主页面 ────────────────────────────────────────────────────────────────────
 const DishPricingPage: React.FC = () => {
   const [storeId,     setStoreId]     = useState('S001');
+  const [storeOptions, setStoreOptions] = useState<string[]>(['S001']);
   const [period,      setPeriod]      = useState(dayjs().subtract(1, 'month').format('YYYY-MM'));
   const [generating,  setGenerating]  = useState(false);
   const [loading,     setLoading]     = useState(false);
@@ -106,6 +107,15 @@ const DishPricingPage: React.FC = () => {
     open: false, rec: null,
   });
   const [adoptedPrice, setAdoptedPrice] = useState<number | null>(null);
+
+  useEffect(() => {
+    apiClient.get<{ items: Array<{ id: string }> }>('/api/v1/stores?limit=50')
+      .then(data => {
+        const ids = (data.items ?? []).map((s: { id: string }) => s.id).filter(Boolean);
+        if (ids.length > 0) setStoreOptions(ids);
+      })
+      .catch(() => { /* 保持默认门店列表 */ });
+  }, []);
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
@@ -373,8 +383,7 @@ const DishPricingPage: React.FC = () => {
         </Title>
         <Space>
           <Select value={storeId} onChange={setStoreId} style={{ width: 120 }}>
-            <Option value="S001">S001门店</Option>
-            <Option value="S002">S002门店</Option>
+            {storeOptions.map(s => <Option key={s} value={s}>{s}</Option>)}
           </Select>
           <Select value={period} onChange={setPeriod} style={{ width: 120 }}>
             {periodOptions.map(p => <Option key={p} value={p}>{p}</Option>)}

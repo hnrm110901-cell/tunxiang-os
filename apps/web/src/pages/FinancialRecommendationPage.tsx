@@ -84,9 +84,19 @@ const STATUS_COLOR: Record<string, string> = {
 // ── 主组件 ────────────────────────────────────────────────────────────────
 
 const FinancialRecommendationPage: React.FC = () => {
-  const storeId = 'S001';
+  const [storeId, setStoreId] = useState('S001');
+  const [storeOptions, setStoreOptions] = useState<string[]>(['S001']);
   const [period, setPeriod] = useState(dayjs().subtract(1, 'month').format('YYYY-MM'));
   const [statusFilter, setStatusFilter] = useState<string>('');
+
+  useEffect(() => {
+    apiClient.get<{ items: Array<{ id: string }> }>('/api/v1/stores?limit=50')
+      .then(data => {
+        const ids = (data.items ?? []).map((s: { id: string }) => s.id).filter(Boolean);
+        if (ids.length > 0) setStoreOptions(ids);
+      })
+      .catch(() => { /* 保持默认门店列表 */ });
+  }, []);
 
   const [recs, setRecs] = useState<Recommendation[]>([]);
   const [stats, setStats] = useState<StatItem[]>([]);
@@ -296,6 +306,9 @@ const FinancialRecommendationPage: React.FC = () => {
       <div className={styles.header}>
         <h2 className={styles.title}>财务智能建议</h2>
         <div className={styles.controls}>
+          <Select value={storeId} onChange={setStoreId} style={{ width: 110 }}>
+            {storeOptions.map(s => <Option key={s} value={s}>{s}</Option>)}
+          </Select>
           <Select value={period} onChange={setPeriod} style={{ width: 120 }}>
             {periodOptions.map((p) => <Option key={p} value={p}>{p}</Option>)}
           </Select>

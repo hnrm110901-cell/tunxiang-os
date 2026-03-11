@@ -161,7 +161,19 @@ export default function CrmHubPage() {
   const [churn,    setChurn]    = useState<ChurnUser[] | null>(null);
   const [loading,  setLoading]  = useState(true);
   const [storeId,  setStoreId]  = useState('S001');
+  const [storeOptions, setStoreOptions] = useState<Array<{ value: string; label: string }>>([{ value: 'S001', label: 'S001' }]);
   const [selectedSignal, setSelectedSignal] = useState<GrowthSignal | null>(null);
+
+  useEffect(() => {
+    apiClient.get<{ items: Array<{ id: string; name?: string }> }>('/api/v1/stores?limit=50')
+      .then(data => {
+        const opts = (data.items ?? [])
+          .filter(s => s.id)
+          .map(s => ({ value: s.id, label: s.name ? `${s.name}(${s.id})` : s.id }));
+        if (opts.length > 0) setStoreOptions(opts);
+      })
+      .catch(() => { /* 保持默认门店列表 */ });
+  }, []);
 
   const loadStats = useCallback(async () => {
     try {
@@ -252,11 +264,7 @@ export default function CrmHubPage() {
             value={storeId}
             onChange={(v) => setStoreId(v as string)}
             style={{ width: 110 }}
-            options={[
-              { value: 'S001', label: '旗舰店' },
-              { value: 'S002', label: '万达店' },
-              { value: 'S003', label: '中关村店' },
-            ]}
+            options={storeOptions}
           />
           <span title="刷新数据">
             <ZButton size="sm" icon={<ReloadOutlined />} onClick={refresh} loading={loading} />
