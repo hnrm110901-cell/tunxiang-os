@@ -200,6 +200,8 @@ const SmBanquetSearch      = lazy(() => import('./pages/sm/BanquetSearch'));
 const EdgeHubDashboardPage = lazy(() => import('./pages/EdgeHubDashboardPage'));
 const EdgeHubStorePage     = lazy(() => import('./pages/EdgeHubStorePage'));
 const EdgeHubBindingsPage  = lazy(() => import('./pages/EdgeHubBindingsPage'));
+const EdgeHubNodesPage     = lazy(() => import('./pages/EdgeHubNodesPage'));
+const EdgeHubAlertsPage    = lazy(() => import('./pages/EdgeHubAlertsPage'));
 
 const PageLoader = (
   <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 300 }}>
@@ -398,6 +400,12 @@ const AppContent: React.FC = () => {
                   } />
                   <Route path="edge-hub" element={
                     <ProtectedRoute requiredRole="admin"><EdgeHubDashboardPage /></ProtectedRoute>
+                  } />
+                  <Route path="edge-hub/nodes" element={
+                    <ProtectedRoute requiredRole="admin"><EdgeHubNodesPage /></ProtectedRoute>
+                  } />
+                  <Route path="edge-hub/alerts" element={
+                    <ProtectedRoute requiredRole="admin"><EdgeHubAlertsPage /></ProtectedRoute>
                   } />
                   <Route path="edge-hub/stores/:storeId" element={
                     <ProtectedRoute requiredRole="admin"><EdgeHubStorePage /></ProtectedRoute>

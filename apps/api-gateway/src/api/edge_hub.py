@@ -8,9 +8,14 @@ Edge Hub API
   GET  /api/v1/edge-hub/dashboard/todos         — 待处理事项
   GET  /api/v1/edge-hub/dashboard/recent-alerts — 今日告警列表
 
+  GET  /api/v1/edge-hub/nodes                  — 全局边缘节点列表（支持状态/关键词筛选）
+
   GET  /api/v1/edge-hub/stores/{store_id}       — 门店边缘详情
   GET  /api/v1/edge-hub/stores/{store_id}/devices — 门店设备列表
   GET  /api/v1/edge-hub/stores/{store_id}/alerts  — 门店告警列表
+
+  GET    /api/v1/edge-hub/alerts               — 全局告警列表（支持多维筛选）
+  PATCH  /api/v1/edge-hub/alerts/{alert_id}/resolve — 标记告警已解决
 
   GET  /api/v1/edge-hub/bindings/{store_id}     — 门店耳机绑定列表
   POST /api/v1/edge-hub/bindings/{store_id}     — 创建绑定
@@ -355,6 +360,137 @@ async def store_alerts(
             "hasMore": offset + pageSize < total,
         },
     }
+
+
+# ── 全局节点列表 ───────────────────────────────────────────────────────────────
+
+@router.get("/nodes")
+async def list_nodes(
+    status: Optional[str] = Query(None),
+    keyword: Optional[str] = Query(None),
+    page: int = Query(1, ge=1),
+    pageSize: int = Query(20, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_active_user),
+) -> Dict[str, Any]:
+    """全局边缘节点列表（支持状态/关键词筛选）"""
+    q = select(EdgeHub).where(EdgeHub.is_active == True)
+    if status:
+        q = q.where(EdgeHub.status == status)
+    if keyword:
+        like = f"%{keyword}%"
+        q = q.where(
+            (EdgeHub.hub_code.ilike(like)) | (EdgeHub.name.ilike(like)) | (EdgeHub.store_id.ilike(like))
+        )
+
+    total = (await db.execute(select(func.count()).select_from(q.subquery()))).scalar_one()
+    offset = (page - 1) * pageSize
+    hubs = (
+        await db.execute(q.order_by(EdgeHub.last_heartbeat.desc().nullslast()).offset(offset).limit(pageSize))
+    ).scalars().all()
+
+    # 按节点批量查询设备数和未解决告警数
+    hub_ids = [h.id for h in hubs]
+    device_counts: Dict[str, int] = {}
+    alert_counts: Dict[str, int] = {}
+    if hub_ids:
+        dev_rows = (
+            await db.execute(
+                select(EdgeDevice.hub_id, func.count(EdgeDevice.id).label("cnt"))
+                .where(EdgeDevice.hub_id.in_(hub_ids))
+                .group_by(EdgeDevice.hub_id)
+            )
+        ).all()
+        device_counts = {r.hub_id: r.cnt for r in dev_rows}
+
+        alert_rows = (
+            await db.execute(
+                select(EdgeAlert.hub_id, func.count(EdgeAlert.id).label("cnt"))
+                .where(EdgeAlert.hub_id.in_(hub_ids), EdgeAlert.status == AlertStatus.OPEN)
+                .group_by(EdgeAlert.hub_id)
+            )
+        ).all()
+        alert_counts = {r.hub_id: r.cnt for r in alert_rows}
+
+    items = []
+    for h in hubs:
+        row = _hub_row(h)
+        row["deviceCount"]  = device_counts.get(h.id, 0)
+        row["openAlertCount"] = alert_counts.get(h.id, 0)
+        items.append(row)
+
+    return {
+        "code": 0,
+        "message": "ok",
+        "data": {"nodes": items},
+        "meta": {
+            "page": page, "pageSize": pageSize, "total": total,
+            "hasMore": offset + pageSize < total,
+        },
+    }
+
+
+# ── 全局告警管理 ───────────────────────────────────────────────────────────────
+
+@router.get("/alerts")
+async def list_all_alerts(
+    status: Optional[str] = Query(None),
+    level: Optional[str] = Query(None),
+    store_id: Optional[str] = Query(None),
+    alert_type: Optional[str] = Query(None),
+    page: int = Query(1, ge=1),
+    pageSize: int = Query(20, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_active_user),
+) -> Dict[str, Any]:
+    """全局告警列表（支持多维筛选）"""
+    q = select(EdgeAlert)
+    if status:
+        q = q.where(EdgeAlert.status == status)
+    if level:
+        q = q.where(EdgeAlert.level == level)
+    if store_id:
+        q = q.where(EdgeAlert.store_id == store_id)
+    if alert_type:
+        q = q.where(EdgeAlert.alert_type == alert_type)
+
+    total = (await db.execute(select(func.count()).select_from(q.subquery()))).scalar_one()
+    offset = (page - 1) * pageSize
+    alerts = (
+        await db.execute(q.order_by(EdgeAlert.created_at.desc()).offset(offset).limit(pageSize))
+    ).scalars().all()
+
+    return {
+        "code": 0,
+        "message": "ok",
+        "data": {"list": [_alert_row(a) for a in alerts]},
+        "meta": {
+            "page": page, "pageSize": pageSize, "total": total,
+            "hasMore": offset + pageSize < total,
+        },
+    }
+
+
+@router.patch("/alerts/{alert_id}/resolve")
+async def resolve_alert(
+    alert_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> Dict[str, Any]:
+    """标记告警已解决"""
+    alert = (await db.execute(select(EdgeAlert).where(EdgeAlert.id == alert_id))).scalar_one_or_none()
+    if not alert:
+        raise HTTPException(status_code=404, detail="alert not found")
+    if alert.status == AlertStatus.RESOLVED:
+        return {"code": 0, "message": "already resolved", "data": _alert_row(alert)}
+
+    alert.status = AlertStatus.RESOLVED
+    alert.resolved_at = datetime.utcnow()
+    alert.resolved_by = str(getattr(current_user, "username", current_user.id))
+    await db.commit()
+    await db.refresh(alert)
+
+    return {"code": 0, "message": "ok", "data": _alert_row(alert)}
 
 
 # ── 耳机绑定管理 ───────────────────────────────────────────────────────────────

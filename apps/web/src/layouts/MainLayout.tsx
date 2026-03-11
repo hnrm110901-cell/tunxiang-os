@@ -56,6 +56,8 @@ import {
   NodeIndexOutlined,
   RocketOutlined,
   HeartOutlined,
+  WifiOutlined,
+  DesktopOutlined,
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -161,6 +163,10 @@ const ROUTE_TO_GROUP: Record<string, string> = {
   '/llm-config': 'nav-platform',
   '/model-marketplace': 'nav-platform',
   '/hardware': 'nav-platform',
+  '/edge-hub': 'nav-platform',
+  '/edge-hub/nodes': 'nav-platform',
+  '/edge-hub/alerts': 'nav-platform',
+  '/edge-hub/bindings': 'nav-platform',
   '/monitoring': 'nav-platform',
   '/system-health': 'nav-platform',
   '/scheduler': 'nav-platform',
@@ -299,6 +305,10 @@ const BREADCRUMB_LABELS: Record<string, string> = {
   '/llm-config': 'LLM配置',
   '/model-marketplace': '模型市场',
   '/hardware': '硬件管理',
+  '/edge-hub': 'Edge Hub 总览',
+  '/edge-hub/nodes': 'Edge 节点列表',
+  '/edge-hub/alerts': 'Edge 告警管理',
+  '/edge-hub/bindings': '耳机绑定管理',
   '/monitoring': '系统监控',
   '/system-health': '系统健康',
   '/scheduler': '调度管理',
@@ -643,6 +653,10 @@ const MainLayout: React.FC = () => {
         { key: '/llm-config',       icon: <SettingOutlined />,    label: 'LLM配置' },
         { key: '/model-marketplace',icon: <AppstoreOutlined />,   label: '模型市场' },
         { key: '/hardware',         icon: <CloudOutlined />,      label: '硬件管理' },
+        { key: '/edge-hub',         icon: <WifiOutlined />,       label: 'Edge Hub 总览' },
+        { key: '/edge-hub/nodes',   icon: <DesktopOutlined />,    label: 'Edge 节点列表' },
+        { key: '/edge-hub/alerts',  icon: <BellOutlined />,       label: 'Edge 告警管理' },
+        { key: '/edge-hub/bindings',icon: <ApiOutlined />,        label: '耳机绑定管理' },
         // 系统监控
         { key: '/monitoring',       icon: <MonitorOutlined />,    label: '系统监控' },
         { key: '/system-health',    icon: <MonitorOutlined />,    label: '系统健康' },
