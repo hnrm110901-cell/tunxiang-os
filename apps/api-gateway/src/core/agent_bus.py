@@ -184,10 +184,10 @@ def _default_agent_factories() -> Dict[str, Callable]:
         "schedule":    _make(f"{_base}.schedule_agent",    "ScheduleAgent"),
         "order":       _make(f"{_base}.order_agent",       "OrderAgent"),
         "inventory":   _make(f"{_base}.inventory_agent",   "InventoryAgent"),
-        "service":     _make(f"{_base}.schedule_agent",    "ScheduleAgent"),  # 兼容占位
-        "training":    _make(f"{_base}.schedule_agent",    "ScheduleAgent"),  # 兼容占位
+        "service":     _make(f"{_base}.service_agent",     "ServiceAgent"),
+        "training":    _make(f"{_base}.training_agent",    "TrainingAgent"),
         "decision":    _make(f"{_base}.decision_agent",    "DecisionAgent"),
-        "reservation": _make(f"{_base}.schedule_agent",    "ScheduleAgent"),  # 兼容占位
+        "reservation": _make(f"{_base}.reservation_agent", "ReservationAgent"),
         "ops":         _make(f"{_base}.ops_agent",         "OpsAgent"),
         "performance": _make(f"{_base}.performance_agent", "PerformanceAgent"),
         "quality":     _make(f"{_base}.quality_agent",     "QualityAgent"),
