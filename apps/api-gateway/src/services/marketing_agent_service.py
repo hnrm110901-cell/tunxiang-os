@@ -922,8 +922,8 @@ class MarketingAgentService:
                 if freq_engine:
                     try:
                         await freq_engine.record_send(phone, store_id, "wxwork")
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        logger.debug("marketing.freq_record_failed", phone=phone, store_id=store_id, error=str(exc))
                 sent += 1
             except Exception as e:
                 logger.warning("batch_churn_send_failed", phone=phone, error=str(e))

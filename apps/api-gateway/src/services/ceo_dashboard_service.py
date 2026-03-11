@@ -189,8 +189,8 @@ async def get_ceo_dashboard(
             SELECT COUNT(*) FROM agent_action_log
             WHERE action_level IN ('L2','L3') AND status = 'pending'
         """), {})).scalar() or 0
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning("ceo_dashboard.pending_l2_query_failed", error=str(exc))
 
     return {
         "period":             period,

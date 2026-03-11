@@ -564,23 +564,23 @@ async def get_finance_dashboard(
 
     try:
         score = await get_health_score(db, store_id, period)
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning("finance_dashboard.health_score_failed", store_id=store_id, period=period, error=str(exc))
 
     try:
         insights = await get_finance_insights(db, store_id, period)
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning("finance_dashboard.insights_failed", store_id=store_id, period=period, error=str(exc))
 
     try:
         profit_trend = await get_profit_trend(db, store_id, periods=6)
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning("finance_dashboard.profit_trend_failed", store_id=store_id, error=str(exc))
 
     try:
         health_trend = await get_health_trend(db, store_id, periods=6)
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning("finance_dashboard.health_trend_failed", store_id=store_id, error=str(exc))
 
     return {
         "store_id":     store_id,

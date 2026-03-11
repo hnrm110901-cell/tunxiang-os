@@ -341,11 +341,10 @@ class OnboardingPipelineService:
                     texts=[summary],
                     category="knowledge_summary",
                 )
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("onboarding.vector_upsert_failed", store_id=self.store_id, error=str(exc))
 
             return {"summary": summary, "word_count": len(summary)}
-
         except Exception as exc:
             logger.warning("knowledge_summary_skipped", error=str(exc))
             return {"summary": None, "note": "知识摘要跳过（LLM不可用）"}

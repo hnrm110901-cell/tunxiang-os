@@ -10,6 +10,7 @@ from typing import List, Optional, Any, Dict
 from datetime import date
 from fastapi import APIRouter, Depends, Query, HTTPException
 from pydantic import BaseModel
+import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 
@@ -30,6 +31,7 @@ from agent import PrivateDomainAgent
 from growth_handlers import GROWTH_ACTIONS
 
 router = APIRouter(prefix="/api/v1/private-domain", tags=["private_domain"])
+logger = structlog.get_logger()
 
 
 def _get_agent(store_id: str) -> PrivateDomainAgent:
@@ -807,8 +809,8 @@ async def get_customer360(
     pricing_offer = None
     try:
         pricing_offer = _asdict(await DynamicPricingService().recommend(store_id, customer_id, db))
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning("private_domain.dynamic_pricing_failed", store_id=store_id, customer_id=customer_id, error=str(exc))
 
     return {
         "store_id":        store_id,

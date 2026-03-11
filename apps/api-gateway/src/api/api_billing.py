@@ -462,8 +462,8 @@ async def list_invoices(
         if inv.get("line_items") and isinstance(inv["line_items"], str):
             try:
                 inv["line_items"] = json.loads(inv["line_items"])
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("billing.line_items_json_parse_failed", invoice_id=inv.get("id"), error=str(exc))
         inv["amount_yuan"] = float(inv["amount_yuan"])
         invoices.append(inv)
     return {"invoices": invoices, "total": len(invoices)}

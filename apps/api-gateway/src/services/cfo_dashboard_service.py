@@ -13,8 +13,11 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
+import structlog
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
+
+logger = structlog.get_logger()
 
 # ── 常量 ─────────────────────────────────────────────────────────────────────
 
@@ -471,23 +474,23 @@ async def get_cfo_dashboard(
 
     try:
         health_overview = await get_brand_health_overview(db, brand_id, period)
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning("cfo_dashboard.health_overview_failed", brand_id=brand_id, period=period, error=str(exc))
 
     try:
         alert_summary = await get_brand_alert_summary(db, brand_id)
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning("cfo_dashboard.alert_summary_failed", brand_id=brand_id, error=str(exc))
 
     try:
         budget_summary = await get_brand_budget_summary(db, brand_id, period)
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning("cfo_dashboard.budget_summary_failed", brand_id=brand_id, period=period, error=str(exc))
 
     try:
         actions = await get_brand_actions(db, brand_id, period)
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning("cfo_dashboard.actions_failed", brand_id=brand_id, period=period, error=str(exc))
 
     # 告警事件列表（供 prioritize_brand_actions 使用）
     alert_events = []

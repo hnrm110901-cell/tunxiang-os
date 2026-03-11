@@ -25,6 +25,7 @@ Journey Orchestrator
 from __future__ import annotations
 
 import json
+import inspect
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -35,6 +36,13 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = structlog.get_logger()
+
+
+async def _maybe_await(value: Any) -> Any:
+    """Support both real async DB results and AsyncMock coroutine returns."""
+    if inspect.isawaitable(value):
+        return await value
+    return value
 
 
 # ── 数据类 ────────────────────────────────────────────────────────────────────
@@ -243,6 +251,12 @@ def format_journey_message(
             "时隔许久，我们想念您了！近期新品上线，欢迎回来品鉴 🍜",
         "journey_comeback_coupon":
             "专属回归礼遇券已送达，凭此券到店享受85折优惠，期待再见",
+        "journey_proactive_remind":
+            "根据您的消费节奏，这两天可能会想吃点好的。今日有新鲜食材到店，欢迎来尝鲜",
+        "birthday_wish":
+            "生日快乐！感谢一路陪伴，您的专属生日礼包已准备好，到店出示即可兑换",
+        "anniversary_wish":
+            "感谢一年来的陪伴！您已是我们的老朋友，专属周年礼已送达，欢迎到店领取",
     }
     return _TEMPLATES.get(template_id, f"您有一条来自门店的消息，欢迎到店")
 
@@ -396,7 +410,7 @@ class JourneyOrchestrator:
             """),
             {"id": journey_db_id},
         )
-        journey = row.fetchone()
+        journey = await _maybe_await(row.fetchone())
         if not journey:
             return {"error": "旅程记录不存在", "journey_db_id": journey_db_id}
 
@@ -523,7 +537,7 @@ class JourneyOrchestrator:
                 """),
                 {"store_id": store_id, "cid": customer_id, "since": since},
             )
-            result = row.fetchone()
+            result = await _maybe_await(row.fetchone())
             return int(result.cnt) if result else 0
         except Exception as exc:
             logger.warning("journey.count_orders_failed", error=str(exc))
@@ -613,7 +627,7 @@ class JourneyOrchestrator:
 
         # 2. 查 DB
         try:
-            row = (await db.execute(
+            execute_result = await db.execute(
                 text("""
                     SELECT frequency, monetary, recency_days, lifecycle_state
                     FROM private_domain_members
@@ -621,7 +635,8 @@ class JourneyOrchestrator:
                     LIMIT 1
                 """),
                 {"cid": customer_id, "sid": store_id},
-            )).fetchone()
+            )
+            row = await _maybe_await(execute_result.fetchone())
             if not row:
                 return None
 
@@ -645,11 +660,10 @@ class JourneyOrchestrator:
                         "lifecycle_state": profile.lifecycle_state,
                         "maslow_level":    classify_maslow_level(profile),
                     })
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("journey.ctx_cache_write_failed", store_id=store_id, customer_id=customer_id, error=str(exc))
 
             return profile
-
         except Exception as exc:
             logger.debug(
                 "journey.get_member_profile_failed",

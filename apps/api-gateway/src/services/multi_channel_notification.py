@@ -652,8 +652,8 @@ class AppPushNotificationHandler(NotificationChannelHandler):
                         channel="app_push_via_wechat_work",
                     )
                 return ok
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("notification.wechat_fallback_failed", recipient=recipient, error=str(exc))
 
             logger.warning(
                 "App推送服务未配置且企业微信不可用，通知跳过",
