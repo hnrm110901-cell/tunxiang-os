@@ -1,0 +1,44 @@
+.page {
+  padding: 24px;
+  background: #f5f5f5;
+  min-height: 100vh;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: #141414;
+}
+
+.refreshTime {
+  font-size: 12px;
+  color: #8c8c8c;
+}
+
+.kpiRow {
+  margin-bottom: 16px;
+}
+
+.kpiCard {
+  border-radius: 8px;
+}
+
+.kpiSub {
+  font-size: 12px;
+  color: #8c8c8c;
+  margin-top: 4px;
+}
+
+.tableCard,
+.chartCard {
+  border-radius: 8px;
+  height: 100%;
+}

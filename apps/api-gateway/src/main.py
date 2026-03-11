@@ -7,7 +7,17 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse, Response
 import structlog
-from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST, CollectorRegistry
+from prometheus_client import (
+    CONTENT_TYPE_LATEST,
+    GCCollector,
+    Gauge,
+    Histogram,
+    PlatformCollector,
+    ProcessCollector,
+    Counter,
+    CollectorRegistry,
+    generate_latest,
+)
 import time
 
 from src.core.config import settings
@@ -361,22 +371,31 @@ app.add_middleware(AuditLogMiddleware)
 app.add_middleware(MonitoringMiddleware)
 
 # ==================== Prometheus指标 ====================
+# 使用独立Registry，避免测试进程中重复导入导致默认Registry重复注册
+METRICS_REGISTRY = CollectorRegistry()
+ProcessCollector(registry=METRICS_REGISTRY)
+PlatformCollector(registry=METRICS_REGISTRY)
+GCCollector(registry=METRICS_REGISTRY)
+
 # 创建Prometheus指标
 REQUEST_COUNT = Counter(
     'http_requests_total',
     'Total HTTP requests',
-    ['method', 'endpoint', 'status']
+    ['method', 'endpoint', 'status'],
+    registry=METRICS_REGISTRY,
 )
 
 REQUEST_DURATION = Histogram(
     'http_request_duration_seconds',
     'HTTP request duration in seconds',
-    ['method', 'endpoint']
+    ['method', 'endpoint'],
+    registry=METRICS_REGISTRY,
 )
 
 ACTIVE_REQUESTS = Gauge(
     'http_requests_active',
-    'Number of active HTTP requests'
+    'Number of active HTTP requests',
+    registry=METRICS_REGISTRY,
 )
 
 # Prometheus metrics端点
@@ -388,7 +407,7 @@ async def metrics():
     Exposes application metrics in Prometheus format for scraping.
     """
     return Response(
-        content=generate_latest(),
+        content=generate_latest(METRICS_REGISTRY),
         media_type=CONTENT_TYPE_LATEST
     )
 
@@ -722,6 +741,10 @@ app.include_router(bff.router, tags=["bff"])
 from src.api import decision_hub, monthly_report
 app.include_router(decision_hub.router, tags=["decision_hub"])
 app.include_router(monthly_report.router, tags=["monthly_report"])
+
+# Phase 9 — Edge Hub（门店边缘硬件层：主机/设备/耳机绑定/告警）
+from src.api import edge_hub
+app.include_router(edge_hub.router, tags=["edge_hub"])
 
 # v2.0 MVP #3 — 损耗Top5排名（含¥归因）
 from src.api import waste_guard

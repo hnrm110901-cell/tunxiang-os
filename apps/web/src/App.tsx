@@ -197,6 +197,10 @@ const SmBanquetPush        = lazy(() => import('./pages/sm/BanquetPush'));
 const SmBanquetFollowups   = lazy(() => import('./pages/sm/BanquetFollowups'));
 const SmBanquetSearch      = lazy(() => import('./pages/sm/BanquetSearch'));
 
+const EdgeHubDashboardPage = lazy(() => import('./pages/EdgeHubDashboardPage'));
+const EdgeHubStorePage     = lazy(() => import('./pages/EdgeHubStorePage'));
+const EdgeHubBindingsPage  = lazy(() => import('./pages/EdgeHubBindingsPage'));
+
 const PageLoader = (
   <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 300 }}>
     <Spin size="large" />
@@ -391,6 +395,15 @@ const AppContent: React.FC = () => {
                   } />
                   <Route path="performance-ranking" element={
                     <ProtectedRoute requiredRole="admin"><PerformanceRankingPage /></ProtectedRoute>
+                  } />
+                  <Route path="edge-hub" element={
+                    <ProtectedRoute requiredRole="admin"><EdgeHubDashboardPage /></ProtectedRoute>
+                  } />
+                  <Route path="edge-hub/stores/:storeId" element={
+                    <ProtectedRoute requiredRole="admin"><EdgeHubStorePage /></ProtectedRoute>
+                  } />
+                  <Route path="edge-hub/bindings" element={
+                    <ProtectedRoute requiredRole="admin"><EdgeHubBindingsPage /></ProtectedRoute>
                   } />
                   <Route path="financial-recommendation" element={
                     <ProtectedRoute requiredRole="admin"><FinancialRecommendationPage /></ProtectedRoute>
