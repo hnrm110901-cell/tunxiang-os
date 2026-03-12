@@ -14,7 +14,7 @@ from sqlalchemy import (
     ForeignKey, Enum as SAEnum, JSON, UniqueConstraint, Index,
 )
 from sqlalchemy.dialects.postgresql import UUID
-from src.core.database import Base
+from src.models.base import Base
 
 
 class VarianceSeverity(str, enum.Enum):

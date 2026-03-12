@@ -20,7 +20,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import relationship
 
-from src.core.database import Base
+from src.models.base import Base
 from src.models.base import TimestampMixin
 
 

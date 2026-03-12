@@ -9,7 +9,7 @@ from sqlalchemy import (
     DateTime, Enum as SAEnum, Index,
 )
 from sqlalchemy.dialects.postgresql import JSONB
-from src.core.database import Base
+from src.models.base import Base
 
 
 # ──────────────────────────────────────────────
