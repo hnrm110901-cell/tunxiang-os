@@ -149,11 +149,11 @@ const LoginPage: React.FC = () => {
           <button
             className={styles.quickCard}
             style={{ background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)' }}
-            onClick={() => quickLogin('manager', 'manager123')}
+            onClick={() => quickLogin('manager001', 'manager123')}
           >
             <div>
               <div className={styles.quickName}>💼 店长</div>
-              <div className={styles.quickCred}>manager / manager123</div>
+              <div className={styles.quickCred}>manager001 / manager123</div>
             </div>
             <LoginOutlined style={{ fontSize: 20 }} />
           </button>
@@ -161,11 +161,11 @@ const LoginPage: React.FC = () => {
           <button
             className={styles.quickCard}
             style={{ background: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)' }}
-            onClick={() => quickLogin('staff', 'staff123')}
+            onClick={() => quickLogin('waiter001', 'waiter123')}
           >
             <div>
-              <div className={styles.quickName}>👤 员工</div>
-              <div className={styles.quickCred}>staff / staff123</div>
+              <div className={styles.quickName}>👤 服务员</div>
+              <div className={styles.quickCred}>waiter001 / waiter123</div>
             </div>
             <LoginOutlined style={{ fontSize: 20 }} />
           </button>
