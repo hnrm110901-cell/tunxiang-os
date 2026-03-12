@@ -4423,3 +4423,147 @@ def check_edge_hub_heartbeats(self) -> Dict[str, Any]:
     except Exception as exc:
         logger.error("check_edge_hub_heartbeats.failed", error=str(exc))
         raise self.retry(exc=exc)
+
+
+# ── SignalBus 周期扫描任务 ─────────────────────────────────────────────────────
+
+@celery_app.task(
+    bind=True,
+    max_retries=2,
+    default_retry_delay=60,
+)
+def run_signal_bus_scan(self) -> Dict[str, Any]:
+    """
+    SignalBus 周期扫描：每2小时遍历全部门店，执行3条核心路由规则
+      ① 差评 → 私域修复旅程
+      ② 临期/低库存 → 废料预警推送
+      ③ 大桌预订(≥6人) → 裂变场景识别
+    """
+    async def _run():
+        from ..core.database import AsyncSessionLocal
+        from ..services.signal_bus import run_periodic_scan
+        from sqlalchemy import text
+
+        results = []
+        async with AsyncSessionLocal() as db:
+            try:
+                rows = (await db.execute(
+                    text("SELECT id FROM stores WHERE is_active = true")
+                )).fetchall()
+                store_ids = [r[0] for r in rows]
+            except Exception:
+                store_ids = ["store_001"]  # 降级到默认门店
+
+            for sid in store_ids:
+                try:
+                    r = await run_periodic_scan(sid, db)
+                    results.append(r)
+                except Exception as exc:
+                    logger.warning("signal_bus.task.store_failed",
+                                   store_id=sid, error=str(exc))
+
+        total = sum(r.get("total_routed", 0) for r in results)
+        logger.info("signal_bus.task.done",
+                    stores=len(results), total_routed=total)
+        return {"stores": len(results), "total_routed": total, "details": results}
+
+    try:
+        return asyncio.run(_run())
+    except Exception as exc:
+        logger.error("signal_bus.task.failed", error=str(exc))
+        raise self.retry(exc=exc)
+
+
+# ── 店长版每日简报任务 ────────────────────────────────────────────────────────
+
+@celery_app.task(
+    bind=True,
+    max_retries=2,
+    default_retry_delay=60,
+)
+def push_sm_daily_briefing(self) -> Dict[str, Any]:
+    """
+    店长版每日简报：08:00 推送
+      - 私域健康分（今日综合得分）
+      - Top3 决策（¥预期影响 + 置信度）
+      - 昨日经营快照（营收/成本率/损耗）
+      - 流失预警（高风险会员数）
+      - 今日1条核心行动建议
+    """
+    async def _run():
+        from ..core.database import AsyncSessionLocal
+        from ..services.store_manager_briefing_service import push_briefing
+        from sqlalchemy import text
+
+        results = []
+        async with AsyncSessionLocal() as db:
+            try:
+                rows = (await db.execute(
+                    text("SELECT id FROM stores WHERE is_active = true")
+                )).fetchall()
+                store_ids = [r[0] for r in rows]
+            except Exception:
+                store_ids = ["store_001"]
+
+            for sid in store_ids:
+                try:
+                    r = await push_briefing(sid, db)
+                    results.append({
+                        "store_id": sid,
+                        "pushed": r["pushed"],
+                        "score":  r["briefing"]["health"]["total_score"],
+                    })
+                except Exception as exc:
+                    logger.warning("push_sm_briefing.store_failed",
+                                   store_id=sid, error=str(exc))
+
+        total_pushed = sum(1 for r in results if r.get("pushed"))
+        logger.info("push_sm_briefing.done",
+                    stores=len(results), pushed=total_pushed)
+        return {"stores": len(results), "pushed": total_pushed, "details": results}
+
+    try:
+        return asyncio.run(_run())
+    except Exception as exc:
+        logger.error("push_sm_briefing.failed", error=str(exc))
+        raise self.retry(exc=exc)
+
+
+# ── 老板多店版简报任务 ────────────────────────────────────────────────────────
+
+@celery_app.task(
+    bind=True,
+    max_retries=2,
+    default_retry_delay=60,
+)
+def push_hq_daily_briefing(self) -> Dict[str, Any]:
+    """
+    老板多店版每日简报：08:10 推送（晚于店长版 5 分钟）
+      - 各门店健康分排名（红绿灯）
+      - 预警门店（< 50 分）
+      - 全局 Top3 决策
+      - 昨日全店合并营收/均成本率
+    """
+    async def _run():
+        from ..core.database import AsyncSessionLocal
+        from ..services.hq_briefing_service import push_hq_briefing
+
+        async with AsyncSessionLocal() as db:
+            result = await push_hq_briefing(db, dry_run=False)
+
+        logger.info(
+            "push_hq_briefing.done",
+            stores=result["briefing"].get("store_count", 0),
+            alerts=len(result["briefing"].get("alerts", [])),
+            pushed=result["pushed"],
+        )
+        return {
+            "store_count": result["briefing"].get("store_count", 0),
+            "pushed":      result["pushed"],
+        }
+
+    try:
+        return asyncio.run(_run())
+    except Exception as exc:
+        logger.error("push_hq_briefing.failed", error=str(exc))
+        raise self.retry(exc=exc)

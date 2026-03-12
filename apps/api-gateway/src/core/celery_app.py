@@ -203,6 +203,18 @@ celery_app.conf.update(
             "queue": "low_priority",
             "routing_key": "low_priority",
         },
+        "src.core.celery_tasks.push_sm_daily_briefing": {
+            "queue": "default",
+            "routing_key": "default",
+        },
+        "src.core.celery_tasks.push_hq_daily_briefing": {
+            "queue": "default",
+            "routing_key": "default",
+        },
+        "src.core.celery_tasks.run_signal_bus_scan": {
+            "queue": "default",
+            "routing_key": "default",
+        },
         "src.core.celery_tasks.ops_patrol": {
             "queue": "high_priority",
             "routing_key": "high_priority",
@@ -548,6 +560,43 @@ celery_app.conf.update(
                 hour=int(os.getenv("L5_DISPATCH_HOUR", "4")),
                 minute=int(os.getenv("L5_DISPATCH_MINUTE", "30")),
             ),
+            "args": (),
+            "options": {
+                "queue": "default",
+                "priority": 8,
+            },
+        },
+        # P2 — 店长版每日简报（08:00 推送）
+        "push-sm-daily-briefing": {
+            "task": "src.core.celery_tasks.push_sm_daily_briefing",
+            "schedule": crontab(
+                hour=int(os.getenv("SM_BRIEFING_HOUR", "8")),
+                minute=int(os.getenv("SM_BRIEFING_MINUTE", "5")),
+            ),
+            "args": (),
+            "options": {"queue": "default", "priority": 9},
+        },
+        # P3 — 老板多店版简报（08:10 推送，晚于店长版）
+        "push-hq-daily-briefing": {
+            "task": "src.core.celery_tasks.push_hq_daily_briefing",
+            "schedule": crontab(
+                hour=int(os.getenv("HQ_BRIEFING_HOUR", "8")),
+                minute=int(os.getenv("HQ_BRIEFING_MINUTE", "10")),
+            ),
+            "args": (),
+            "options": {"queue": "default", "priority": 8},
+        },
+        # SignalBus — 每2小时扫描（差评/临期库存/大桌预订 → 自动路由）
+        "signal-bus-scan": {
+            "task": "src.core.celery_tasks.run_signal_bus_scan",
+            "schedule": crontab(minute=0, hour="*/2"),
+            "args": (),
+            "options": {"queue": "default", "priority": 7},
+        },
+        # Phase 9 — 每3分钟检测边缘主机心跳，离线自动创建 P1 告警
+        "check-edge-hub-heartbeats": {
+            "task": "tasks.check_edge_hub_heartbeats",
+            "schedule": crontab(minute=f"*/{os.getenv('EDGE_HUB_HEARTBEAT_CHECK_INTERVAL', '3')}"),
             "args": (),
             "options": {
                 "queue": "default",

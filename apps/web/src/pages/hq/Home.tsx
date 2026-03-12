@@ -5,6 +5,7 @@
  */
 import React, { useEffect, useState, useCallback } from 'react';
 import ReactECharts from 'echarts-for-react';
+import { useNavigate } from 'react-router-dom';
 import {
   ZCard, ZKpi, ZBadge, ZButton, ZSkeleton, ZEmpty,
   HealthRing,
@@ -35,6 +36,14 @@ interface Decision {
   expected_saving_yuan: number;
   urgency_hours:        number;
 }
+interface EdgeHubSummary {
+  total_hubs:         number;
+  online_hubs:        number;
+  offline_hubs:       number;
+  open_alert_count:   number;
+  p1_alert_count:     number;
+}
+
 interface HQData {
   as_of:                   string;
   stores_health_ranking:   StoreHealth[];
@@ -42,6 +51,7 @@ interface HQData {
   cross_store_decisions:   Decision[];
   revenue_trend:           { dates: string[]; stores: { store_id: string; store_name: string; values: number[] }[] };
   pending_approvals_count: number;
+  edge_hub_summary:        EdgeHubSummary | null;
   hq_summary: {
     store_count:          number;
     avg_health_score:     number;
@@ -85,6 +95,7 @@ const PALETTE = [
 ];
 
 export default function HQHome() {
+  const navigate = useNavigate();
   const [data,    setData]    = useState<HQData | null>(null);
   const [laborRanking, setLaborRanking] = useState<LaborRankingItem[]>([]);
   const [laborAvgRate, setLaborAvgRate] = useState<number>(0);
@@ -195,7 +206,31 @@ export default function HQHome() {
             <ZCard><ZKpi value={s?.avg_health_score?.toFixed(1) ?? '—'} label="平均门店健康分" size="lg" /></ZCard>
             <ZCard><ZKpi value={(s?.critical_store_count ?? 0) + (s?.warning_store_count ?? 0)} label="告警门店" unit="家" size="lg" /></ZCard>
             <ZCard><ZKpi value={data?.pending_approvals_count ?? 0} label="待审批决策" size="lg" /></ZCard>
+            <ZCard>
+              <div style={(data?.edge_hub_summary?.offline_hubs ?? 0) > 0 ? { color: '#f97316' } : undefined}>
+                <ZKpi
+                  value={data?.edge_hub_summary?.offline_hubs ?? '—'}
+                  label="离线主机"
+                  unit="台"
+                  size="lg"
+                />
+              </div>
+            </ZCard>
           </div>
+
+          {/* 硬件告警横幅 */}
+          {data?.edge_hub_summary && (data.edge_hub_summary.offline_hubs > 0 || data.edge_hub_summary.p1_alert_count > 0) && (
+            <button className={styles.hwBanner} onClick={() => navigate('/edge-hub/dashboard')}>
+              <span>📡</span>
+              <span>
+                <strong>硬件异常：</strong>
+                {data.edge_hub_summary.offline_hubs > 0 && `${data.edge_hub_summary.offline_hubs} 台主机离线`}
+                {data.edge_hub_summary.offline_hubs > 0 && data.edge_hub_summary.p1_alert_count > 0 && ' · '}
+                {data.edge_hub_summary.p1_alert_count > 0 && `${data.edge_hub_summary.p1_alert_count} 条P1告警未解决`}
+              </span>
+              <span className={styles.hwBannerLink}>查看详情 ›</span>
+            </button>
+          )}
 
           {/* 危险门店横幅 */}
           {criticalStores.length > 0 && (

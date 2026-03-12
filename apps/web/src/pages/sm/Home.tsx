@@ -321,6 +321,18 @@ export default function SmHome() {
             </button>
           )}
 
+          {(data?.edge_hub_status && (!data.edge_hub_status.hub_online || data.edge_hub_status.p1_alert_count > 0)) && (
+            <button className={styles.alertBanner} onClick={() => navigate('/edge-hub/dashboard')}>
+              <span className={styles.alertIcon}>📡</span>
+              <span className={styles.alertText}>
+                {!data.edge_hub_status.hub_online
+                  ? '边缘主机离线，请检查硬件状态'
+                  : `${data.edge_hub_status.p1_alert_count} 条P1硬件告警待处理`}
+              </span>
+              <span className={styles.alertArrow}>›</span>
+            </button>
+          )}
+
           {todayAdvicePending && (
             <button
               className={styles.adviceBannerPending}
@@ -523,6 +535,15 @@ export default function SmHome() {
                 <span className={styles.quickIcon}>🔔</span>
                 <span className={styles.quickLabel}>告警管理</span>
                 {(data?.unread_alerts_count || 0) > 0 && <span className={styles.quickBadge}>{data?.unread_alerts_count}</span>}
+              </button>
+              <button className={styles.quickBtn} onClick={() => navigate('/edge-hub/dashboard')}>
+                <span className={styles.quickIcon}>📡</span>
+                <span className={styles.quickLabel}>硬件状态</span>
+                {(data?.edge_hub_status?.p1_alert_count || 0) > 0 && (
+                  <span className={`${styles.quickBadge} ${styles.quickBadgeWarn}`}>
+                    {data!.edge_hub_status!.p1_alert_count}
+                  </span>
+                )}
               </button>
             </div>
           </ZCard>

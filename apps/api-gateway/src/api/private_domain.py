@@ -402,6 +402,33 @@ async def get_private_domain_metrics(
     return await get_full_metrics(store_id, db)
 
 
+@router.get("/health/{store_id}", summary="私域健康分（5维度综合评分）")
+async def get_health_score(
+    store_id: str,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    私域健康综合评分（0-100）：
+
+    | 维度       | 权重 | 说明                        |
+    |------------|------|-----------------------------|
+    | 会员质量   | 30分 | S4/S5 高价值会员占比        |
+    | 留存控制   | 25分 | 低风险会员比例              |
+    | 信号响应   | 20分 | 近30天信号已处理率          |
+    | 旅程完成   | 15分 | 近30天旅程完成率            |
+    | 增长势能   | 10分 | 近7天新客激活率             |
+
+    等级：优秀(85+) / 良好(70-84) / 待改善(50-69) / 预警(<50)
+    """
+    from ..services.private_domain_health_service import calculate_health_score
+    try:
+        return await calculate_health_score(store_id, db)
+    except Exception as exc:
+        logger.error("private_domain.health_failed", store_id=store_id, error=str(exc))
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
 @router.get("/lifecycle/{store_id}/maslow-distribution", summary="马斯洛需求层级分布")
 async def get_maslow_distribution(
     store_id: str,

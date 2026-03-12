@@ -203,6 +203,7 @@ const SmBanquetTasks       = lazy(() => import('./pages/sm/BanquetTasks'));
 const SmBanquetPush        = lazy(() => import('./pages/sm/BanquetPush'));
 const SmBanquetFollowups   = lazy(() => import('./pages/sm/BanquetFollowups'));
 const SmBanquetSearch      = lazy(() => import('./pages/sm/BanquetSearch'));
+const SmPrivateDomainHealth = lazy(() => import('./pages/sm/PrivateDomainHealthPage'));
 
 const EdgeHubDashboardPage = lazy(() => import('./pages/EdgeHubDashboardPage'));
 const EdgeHubStorePage     = lazy(() => import('./pages/EdgeHubStorePage'));
@@ -710,6 +711,7 @@ const AppContent: React.FC = () => {
                   <Route path="banquet-push"         element={<SmBanquetPush />} />
                   <Route path="banquet-followups"    element={<SmBanquetFollowups />} />
                   <Route path="banquet-search"       element={<SmBanquetSearch />} />
+                  <Route path="private-domain-health" element={<SmPrivateDomainHealth />} />
                 </Route>
 
                 {/* Role-based views — Chef (手机) */}

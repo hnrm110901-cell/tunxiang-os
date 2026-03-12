@@ -1,0 +1,185 @@
+/* ── 页面容器 ──────────────────────────────────────────────────────────────── */
+
+.page {
+  padding: 0;
+  max-width: 800px;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 2px;
+}
+
+.asOf {
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ── 综合评分卡 ─────────────────────────────────────────────────────────────── */
+
+.scoreCard {
+  /* 继承 ZCard 基础样式 */
+}
+
+.scoreInner {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 8px 0;
+}
+
+.scoreInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+}
+
+.gradeBadge {
+  align-self: flex-start;
+  font-size: 14px;
+  padding: 3px 10px;
+}
+
+.gradeDesc {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin: 0;
+}
+
+.totalScore {
+  font-size: 13px;
+  color: var(--text-tertiary);
+}
+
+.totalScore strong {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 2px;
+}
+
+/* ── 维度明细 ───────────────────────────────────────────────────────────────── */
+
+.dimCard {
+  /* 继承 ZCard */
+}
+
+.dimRow {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border-subtle, #f0f0f0);
+}
+
+.dimRow:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.dimHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.dimLabel {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.dimScore {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.dimMax {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-tertiary);
+}
+
+.barTrack {
+  height: 6px;
+  background: var(--surface-hover, #f5f5f5);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.barFill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 600ms ease;
+}
+
+.dimDetail {
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+/* ── 行动建议 ───────────────────────────────────────────────────────────────── */
+
+.actionsCard {
+  /* 继承 ZCard */
+}
+
+.actionList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.actionItem {
+  padding: 12px;
+  background: var(--surface-hover, #fafafa);
+  border-radius: var(--radius-md, 8px);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.actionHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.actionDim {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.actionPct {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  margin-left: auto;
+}
+
+.actionText {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin: 0;
+}

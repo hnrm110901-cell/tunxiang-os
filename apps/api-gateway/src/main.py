@@ -570,6 +570,12 @@ app.include_router(competitive_analysis.router)
 app.include_router(export_jobs.router)
 app.include_router(backups.router)
 app.include_router(private_domain.router, tags=["private_domain"])
+from src.api import signal_bus_api
+app.include_router(signal_bus_api.router, tags=["signal_bus"])
+from src.api import briefing_api
+app.include_router(briefing_api.router, tags=["briefing"])
+from src.api import hq_briefing_api
+app.include_router(hq_briefing_api.router, tags=["hq_briefing"])
 app.include_router(ops.router, prefix="/api/v1/ops", tags=["ops"])
 app.include_router(daily_hub.router, tags=["daily_hub"])
 app.include_router(workforce.router, tags=["workforce"])

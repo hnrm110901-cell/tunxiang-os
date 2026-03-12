@@ -3823,8 +3823,424 @@ export default function HQBanquet() {
           { key: 'satisfaction', label: '满意度',    children: <SatisfactionTab /> },
           { key: 'yoy',          label: '年度对比',  children: <YearOverYearTab /> },
           { key: 'alertcenter',  label: '预警中心',  children: <AlertCenterTab /> },
+          { key: 'periodcmp',    label: '期间对比',  children: <PeriodComparisonTab /> },
+          { key: 'oprisk',       label: '运营风险',  children: <OperationRiskTab /> },
+          { key: 'cancelanal',   label: '取消分析',  children: <CancellationAnalysisTab /> },
+          { key: 'leadhealth',   label: '线索健康',  children: <LeadPipelineHealthTab /> },
+          { key: 'refundrisk',   label: '退款风险',  children: <RefundRiskTab /> },
+          { key: 'targetgap',    label: '目标达成',  children: <MonthlyTargetGapTab /> },
+          { key: 'seasonal',     label: '季节规律',  children: <SeasonalPatternTab /> },
+          { key: 'custltv',      label: '客户LTV',   children: <CustomerLTVTab /> },
+          { key: 'repeatcust',   label: '回头客',    children: <RepeatCustomerTab /> },
+          { key: 'leadtime',     label: '提前天数',  children: <BookingLeadTimeTab /> },
+          { key: 'tableutil',    label: '桌位利用',  children: <TableUtilizationTab /> },
+          { key: 'satref',       label: '满意&转介', children: <SatisfactionReferralTab /> },
+          { key: 'qturnaround',  label: '报价周转',  children: <QuoteTurnaroundTab /> },
+          { key: 'newrepeat',    label: '新客对比',  children: <NewVsRepeatMonthlyTab /> },
+          { key: 'amendment',    label: '订单修改',  children: <OrderAmendmentTab /> },
+          { key: 'profitab',     label: '盈利分析',  children: <ProfitabilityTab /> },
+          { key: 'crosssell',    label: '交叉销售',  children: <CrossSellTab /> },
+          { key: 'vipspend',     label: 'VIP消费',   children: <VipSpendingTab /> },
+          { key: 'loyalty',      label: '积分兑换',  children: <LoyaltyRedemptionTab /> },
+          { key: 'forecast',     label: '预测准确',  children: <ForecastAccuracyTab /> },
+          { key: 'deposit35',    label: '定金退款',  children: <DepositRefundTab /> },
+          { key: 'seasonal35',   label: '季节指数',  children: <SeasonalRevenueTab /> },
+          { key: 'canceltype',   label: '取消分析',  children: <CancellationReasonsTab /> },
+          { key: 'weekdaypat',   label: '星期分布',  children: <WeekdayPatternTab /> },
+          { key: 'revtable',    label: '桌均收入',  children: <RevenuePerTableTab /> },
+          { key: 'sentiment',   label: '评价情感',  children: <ReviewSentimentTab /> },
+          { key: 'upsell38',    label: '加购分析',  children: <UpsellAnalysisTab /> },
+          { key: 'revtrend38',  label: '收入趋势',  children: <RevenueTrendTab /> },
+          { key: 'profitmargin', label: '利润率',   children: <ProfitMarginTab /> },
+          { key: 'typetrendp39', label: '类型趋势', children: <TypeTrendTab /> },
+          { key: 'reorderp40',   label: '复购分析', children: <ReorderAnalysisTab /> },
+          { key: 'depositp40',   label: '定金分析', children: <DepositAnalysisTab /> },
+          { key: 'noshowp41',    label: '爽约分析', children: <NoShowAnalysisTab /> },
+          { key: 'pkgpopularp41', label: '套餐热度', children: <PackagePopularityTab /> },
+          { key: 'guestrevp42',   label: '人均消费', children: <GuestRevenueTab /> },
+          { key: 'vipanalyp42',   label: 'VIP分析',  children: <VipAnalysisTab /> },
+          { key: 'pertablep43',   label: '每桌收入', children: <PerTableRevenueTab /> },
+          { key: 'ltvp43',        label: '客户价值', children: <CustomerLtvTab /> },
+          { key: 'funnelp44',     label: '转化漏斗', children: <LeadFunnelTab /> },
+          { key: 'refundp44',     label: '退款分析', children: <RefundAnalysisTab /> },
+          { key: 'peakdayp45',    label: '高峰日',   children: <PeakDayTab /> },
+          { key: 'warningp45',    label: '风险预警', children: <EarlyWarningTab /> },
+          { key: 'advancep46',    label: '提前预订', children: <AdvanceBookingTab /> },
+          { key: 'canceltypp46',  label: '类型取消', children: <CancellationTypeTab /> },
+          { key: 'monthrevp47',   label: '月度收入', children: <MonthlyRevenueTrendTab /> },
+          { key: 'vippremiump47', label: 'VIP溢价',  children: <VipPremiumTab /> },
+          { key: 'hvthreshp48',   label: '高价值单', children: <HighValueThresholdTab /> },
+          { key: 'referralp48',   label: '转介绍',   children: <ReferralLeadTab /> },
+          { key: 'sattrndp49',    label: '满意度',   children: <SatisfactionTrendTab /> },
+          { key: 'scoredistp49',  label: '评分分布', children: <ReviewScoreDistTab /> },
+          { key: 'wkndvswkdp50',  label: '周末分析', children: <WeekendVsWeekdayTab /> },
+          { key: 'quarterlyp50',  label: '季度收入', children: <QuarterlyRevenueTab /> },
+          { key: 'typerevp51',    label: '类型占比', children: <TypeRevenueShareTab /> },
+          { key: 'leadconvp51',   label: '转化趋势', children: <MonthlyLeadConversionTab /> },
+          { key: 'canceltypp52',  label: '取消率',   children: <TypeCancellationRateTab /> },
+          { key: 'peakhrp52',     label: '高峰时段', children: <PeakBookingHourTab /> },
+          { key: 'clvp53',        label: '客户CLV',  children: <CustomerLifetimeValueTab /> },
+          { key: 'datepopup53',   label: '日期热度', children: <BanquetDatePopularityTab /> },
+          { key: 'paymentprefp54', label: '支付偏好', children: <PaymentMethodPreferenceTab /> },
+          { key: 'seasonp54',      label: '季节分析', children: <BanquetSeasonAnalysisTab /> },
+          { key: 'winlossp55',    label: '赢输比率', children: <LeadWinLossRatioTab /> },
+          { key: 'newcustp55',    label: '新客增长', children: <MonthlyNewCustomersTab /> },
+          { key: 'funnelp56',     label: '转化漏斗', children: <LeadStageFunnelTab /> },
+          { key: 'ordervtrndp56', label: '客单价',   children: <OrderValueTrendTab /> },
+          { key: 'srcp57',        label: '渠道收入', children: <CustomerSourceRevenueTab /> },
+          { key: 'canceltimp57',  label: '取消时机', children: <OrderCancellationTimingTab /> },
+          { key: 'complrp58',     label: '完成率',   children: <OrderCompletionRateTab /> },
+          { key: 'exctypp58',     label: '异常分布', children: <ExceptionTypeDistributionTab /> },
+          { key: 'wkdayp59',      label: '星期分布', children: <BanquetWeekdayDistributionTab /> },
+          { key: 'partialp59',    label: '尾款未清', children: <PaymentPartialRateTab /> },
         ]}
       />
+    </div>
+  );
+}
+
+/* ─── Phase 57: 渠道收入 Tab ─── */
+function CustomerSourceRevenueTab() {
+  const STORE = localStorage.getItem('store_id') || 'S001';
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const r = await apiClient.get(
+        `/api/v1/banquet-agent/stores/${STORE}/customer-source-revenue?months=12`
+      );
+      setData(r.data);
+    } catch (e) { handleApiError(e); }
+    finally { setLoading(false); }
+  }, [STORE]);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (loading) return <ZSkeleton />;
+  if (!data || data.total_won === 0) return <ZEmpty text="暂无渠道收入数据" />;
+
+  const maxRev = Math.max(...(data.by_channel || []).map((c: any) => c.revenue_yuan), 1);
+
+  return (
+    <div className={styles.p57Wrap}>
+      <ZCard>
+        <div className={styles.p57KpiRow}>
+          <div className={styles.p57Kpi}>
+            <span className={styles.p57KpiVal}>{data.total_won}</span>
+            <span className={styles.p57KpiLabel}>赢单线索</span>
+          </div>
+          <div className={styles.p57Kpi}>
+            <span className={styles.p57KpiVal}>{data.top_channel || '—'}</span>
+            <span className={styles.p57KpiLabel}>最高收入渠道</span>
+          </div>
+        </div>
+        <div className={styles.p57ChannelList}>
+          {(data.by_channel || []).map((c: any) => (
+            <div key={c.channel} className={styles.p57ChannelRow}>
+              <span className={styles.p57ChannelName}>{c.channel}</span>
+              <div className={styles.p57Track}>
+                <div
+                  className={styles.p57Fill}
+                  style={{ width: `${Math.round(c.revenue_yuan / maxRev * 100)}%` }}
+                />
+              </div>
+              <span className={styles.p57Rev}>¥{c.revenue_yuan}</span>
+              <span className={styles.p57SmCount}>{c.won_leads}单</span>
+            </div>
+          ))}
+        </div>
+      </ZCard>
+    </div>
+  );
+}
+
+/* ─── Phase 57: 取消时机 Tab ─── */
+function OrderCancellationTimingTab() {
+  const STORE = localStorage.getItem('store_id') || 'S001';
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const r = await apiClient.get(
+        `/api/v1/banquet-agent/stores/${STORE}/order-cancellation-timing?months=12`
+      );
+      setData(r.data);
+    } catch (e) { handleApiError(e); }
+    finally { setLoading(false); }
+  }, [STORE]);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (loading) return <ZSkeleton />;
+  if (!data || data.total_cancelled === 0) return <ZEmpty text="暂无取消订单数据" />;
+
+  const maxCount = Math.max(...(data.distribution || []).map((d: any) => d.count), 1);
+
+  return (
+    <div className={styles.p57Wrap}>
+      <ZCard>
+        <div className={styles.p57KpiRow}>
+          <div className={styles.p57Kpi}>
+            <span className={styles.p57KpiVal}>{data.total_cancelled}</span>
+            <span className={styles.p57KpiLabel}>取消总单数</span>
+          </div>
+          <div className={styles.p57Kpi}>
+            <span className={styles.p57KpiVal}>
+              {data.avg_days_before != null ? `${data.avg_days_before}天` : '—'}
+            </span>
+            <span className={styles.p57KpiLabel}>平均提前天数</span>
+          </div>
+        </div>
+        <div className={styles.p57BucketList}>
+          {(data.distribution || []).map((d: any) => (
+            <div key={d.bucket} className={styles.p57BucketRow}>
+              <span className={styles.p57BucketName}>{d.bucket}</span>
+              <div className={styles.p57Track}>
+                <div
+                  className={styles.p57CancelFill}
+                  style={{ width: `${Math.round(d.count / maxCount * 100)}%` }}
+                />
+              </div>
+              <span className={styles.p57BucketCount}>{d.count}单</span>
+              <span className={styles.p57BucketPct}>{d.pct}%</span>
+            </div>
+          ))}
+        </div>
+      </ZCard>
+    </div>
+  );
+}
+
+/* ─── Phase 58: 订单完成率 Tab ─── */
+function OrderCompletionRateTab() {
+  const STORE = localStorage.getItem('store_id') || 'S001';
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const r = await apiClient.get(
+        `/api/v1/banquet-agent/stores/${STORE}/order-completion-rate?months=12`
+      );
+      setData(r.data);
+    } catch (e) { handleApiError(e); }
+    finally { setLoading(false); }
+  }, [STORE]);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (loading) return <ZSkeleton />;
+  if (!data || data.total_orders === 0) return <ZEmpty text="暂无订单数据" />;
+
+  const completedPct = data.completion_rate_pct ?? 0;
+  const inProgressPct = 100 - completedPct;
+
+  return (
+    <div className={styles.p58Wrap}>
+      <ZCard>
+        <div className={styles.p58KpiRow}>
+          <div className={styles.p58Kpi}>
+            <span className={styles.p58KpiVal}>{data.total_orders}</span>
+            <span className={styles.p58KpiLabel}>总订单数</span>
+          </div>
+          <div className={styles.p58Kpi}>
+            <span className={styles.p58KpiVal}>{data.completed_count}</span>
+            <span className={styles.p58KpiLabel}>已完成</span>
+          </div>
+          <div className={styles.p58Kpi}>
+            <span className={styles.p58KpiVal}>{completedPct}%</span>
+            <span className={styles.p58KpiLabel}>完成率</span>
+          </div>
+        </div>
+        <div className={styles.p58BarWrap}>
+          <div className={styles.p58BarLabel}>
+            <span>已完成</span><span>进行中</span>
+          </div>
+          <div className={styles.p58Track}>
+            <div className={styles.p58CompletedFill} style={{ width: `${completedPct}%` }} />
+            <div className={styles.p58InProgressFill} style={{ width: `${inProgressPct}%` }} />
+          </div>
+          <div className={styles.p58BarLabel}>
+            <span>{completedPct}%</span><span>{inProgressPct.toFixed(1)}%</span>
+          </div>
+        </div>
+      </ZCard>
+    </div>
+  );
+}
+
+/* ─── Phase 58: 异常类型分布 Tab ─── */
+function ExceptionTypeDistributionTab() {
+  const STORE = localStorage.getItem('store_id') || 'S001';
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const r = await apiClient.get(
+        `/api/v1/banquet-agent/stores/${STORE}/exception-type-distribution?months=6`
+      );
+      setData(r.data);
+    } catch (e) { handleApiError(e); }
+    finally { setLoading(false); }
+  }, [STORE]);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (loading) return <ZSkeleton />;
+  if (!data || data.total_exceptions === 0) return <ZEmpty text="暂无异常事件数据" />;
+
+  const maxCount = Math.max(...(data.by_type || []).map((t: any) => t.count), 1);
+
+  return (
+    <div className={styles.p58Wrap}>
+      <ZCard>
+        <div className={styles.p58KpiRow}>
+          <div className={styles.p58Kpi}>
+            <span className={styles.p58KpiVal}>{data.total_exceptions}</span>
+            <span className={styles.p58KpiLabel}>异常总数</span>
+          </div>
+          <div className={styles.p58Kpi}>
+            <span className={styles.p58KpiVal}>{data.most_common_type || '—'}</span>
+            <span className={styles.p58KpiLabel}>最多异常类型</span>
+          </div>
+        </div>
+        <div className={styles.p58TypeList}>
+          {(data.by_type || []).map((t: any) => (
+            <div key={t.type} className={styles.p58TypeRow}>
+              <span className={styles.p58TypeName}>{t.type}</span>
+              <div className={styles.p58Track}>
+                <div
+                  className={styles.p58ExcFill}
+                  style={{ width: `${Math.round(t.count / maxCount * 100)}%` }}
+                />
+              </div>
+              <span className={styles.p58TypeCount}>{t.count}次</span>
+              <span className={styles.p58TypePct}>{t.pct}%</span>
+            </div>
+          ))}
+        </div>
+      </ZCard>
+    </div>
+  );
+}
+
+/* ─── Phase 59: 星期分布 Tab ─── */
+function BanquetWeekdayDistributionTab() {
+  const STORE = localStorage.getItem('store_id') || 'S001';
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const r = await apiClient.get(
+        `/api/v1/banquet-agent/stores/${STORE}/banquet-weekday-distribution?months=12`
+      );
+      setData(r.data);
+    } catch (e) { handleApiError(e); }
+    finally { setLoading(false); }
+  }, [STORE]);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (loading) return <ZSkeleton />;
+  if (!data || data.total_orders === 0) return <ZEmpty text="暂无宴会日期数据" />;
+
+  const maxCount = Math.max(...(data.by_weekday || []).map((d: any) => d.count), 1);
+
+  return (
+    <div className={styles.p59Wrap}>
+      <ZCard>
+        <div className={styles.p59KpiRow}>
+          <div className={styles.p59Kpi}>
+            <span className={styles.p59KpiVal}>{data.total_orders}</span>
+            <span className={styles.p59KpiLabel}>总订单数</span>
+          </div>
+          <div className={styles.p59Kpi}>
+            <span className={styles.p59KpiVal}>{data.peak_weekday || '—'}</span>
+            <span className={styles.p59KpiLabel}>最热星期</span>
+          </div>
+        </div>
+        <div className={styles.p59DayList}>
+          {(data.by_weekday || []).map((d: any) => (
+            <div key={d.weekday} className={styles.p59DayRow}>
+              <span className={styles.p59DayName}>{d.weekday}</span>
+              <div className={styles.p59Track}>
+                <div
+                  className={`${styles.p59DayFill} ${d.weekday === data.peak_weekday ? styles.p59Peak : ''}`}
+                  style={{ width: `${Math.round(d.count / maxCount * 100)}%` }}
+                />
+              </div>
+              <span className={styles.p59DayCount}>{d.count}</span>
+              <span className={styles.p59DayPct}>{d.pct}%</span>
+            </div>
+          ))}
+        </div>
+      </ZCard>
+    </div>
+  );
+}
+
+/* ─── Phase 59: 尾款未清 Tab ─── */
+function PaymentPartialRateTab() {
+  const STORE = localStorage.getItem('store_id') || 'S001';
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const r = await apiClient.get(
+        `/api/v1/banquet-agent/stores/${STORE}/payment-partial-rate?months=6`
+      );
+      setData(r.data);
+    } catch (e) { handleApiError(e); }
+    finally { setLoading(false); }
+  }, [STORE]);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (loading) return <ZSkeleton />;
+  if (!data || data.total_orders === 0) return <ZEmpty text="暂无订单数据" />;
+
+  const partialPct  = data.partial_rate_pct ?? 0;
+  const clearedPct  = 100 - partialPct;
+
+  return (
+    <div className={styles.p59Wrap}>
+      <ZCard>
+        <div className={styles.p59KpiRow}>
+          <div className={styles.p59Kpi}>
+            <span className={styles.p59KpiVal}>{data.total_orders}</span>
+            <span className={styles.p59KpiLabel}>合计订单</span>
+          </div>
+          <div className={styles.p59Kpi}>
+            <span className={styles.p59KpiVal}>{data.partial_count}</span>
+            <span className={styles.p59KpiLabel}>尾款未清</span>
+          </div>
+          <div className={styles.p59Kpi}>
+            <span className={styles.p59KpiVal}>¥{data.outstanding_yuan}</span>
+            <span className={styles.p59KpiLabel}>待收金额</span>
+          </div>
+        </div>
+        <div className={styles.p59BarWrap}>
+          <div className={styles.p59BarLabel}>
+            <span>已结清 {clearedPct.toFixed(1)}%</span>
+            <span>未结清 {partialPct}%</span>
+          </div>
+          <div className={styles.p59BarTrack}>
+            <div className={styles.p59ClearedFill}  style={{ width: `${clearedPct}%` }} />
+            <div className={styles.p59PartialFill}   style={{ width: `${partialPct}%` }} />
+          </div>
+        </div>
+      </ZCard>
     </div>
   );
 }
@@ -4865,6 +5281,6008 @@ function AlertCenterTab() {
             ))}
           </div>
         )}
+      </ZCard>
+    </div>
+  );
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 25 Tab 1 — PeriodComparisonTab「期间对比」
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface PeriodMetric {
+  metric: string;
+  label: string;
+  period_a: number | null;
+  period_b: number | null;
+  delta_pct: number | null;
+}
+interface PeriodComparisonData {
+  period_a: { start: string; end: string };
+  period_b: { start: string; end: string };
+  metrics: PeriodMetric[];
+}
+interface TopSpender {
+  customer_id: string;
+  name: string;
+  phone: string;
+  order_count: number;
+  total_yuan: number;
+  avg_yuan: number;
+  vip_level: number;
+}
+
+function PeriodComparisonTab() {
+  const { storeId } = useStore();
+  const today = new Date();
+  const fmt = (d: Date) => d.toISOString().slice(0, 10);
+  const offset = (d: Date, days: number) => { const n = new Date(d); n.setDate(n.getDate() + days); return n; };
+
+  const [paStart, setPaStart] = React.useState(fmt(offset(today, -60)));
+  const [paEnd,   setPaEnd]   = React.useState(fmt(offset(today, -31)));
+  const [pbStart, setPbStart] = React.useState(fmt(offset(today, -120)));
+  const [pbEnd,   setPbEnd]   = React.useState(fmt(offset(today, -91)));
+
+  const [cmp,       setCmp]       = React.useState<PeriodComparisonData | null>(null);
+  const [spenders,  setSpenders]  = React.useState<TopSpender[]>([]);
+  const [loading,   setLoading]   = React.useState(false);
+
+  const load = useCallback(async () => {
+    if (!storeId) return;
+    setLoading(true);
+    try {
+      const [r1, r2] = await Promise.allSettled([
+        apiClient.get(`/api/v1/banquet-agent/stores/${storeId}/analytics/period-comparison?period_a_start=${paStart}&period_a_end=${paEnd}&period_b_start=${pbStart}&period_b_end=${pbEnd}`),
+        apiClient.get(`/api/v1/banquet-agent/stores/${storeId}/analytics/top-spenders?months=12&top_n=10`),
+      ]);
+      if (r1.status === 'fulfilled') setCmp(r1.value.data);
+      if (r2.status === 'fulfilled') setSpenders(r2.value.data.ranking ?? []);
+    } catch (e) { handleApiError(e); }
+    finally { setLoading(false); }
+  }, [storeId, paStart, paEnd, pbStart, pbEnd]);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (loading) return <ZSkeleton rows={6} />;
+
+  return (
+    <div className={styles.periodCmpTab}>
+      {/* Date range selectors */}
+      <ZCard title="期间对比">
+        <div className={styles.periodInputRow}>
+          <span className={styles.periodLabel}>期间A</span>
+          <input type="date" value={paStart} onChange={e => setPaStart(e.target.value)} className={styles.dateInput} />
+          <span>~</span>
+          <input type="date" value={paEnd}   onChange={e => setPaEnd(e.target.value)}   className={styles.dateInput} />
+          <span className={styles.periodLabel}>期间B</span>
+          <input type="date" value={pbStart} onChange={e => setPbStart(e.target.value)} className={styles.dateInput} />
+          <span>~</span>
+          <input type="date" value={pbEnd}   onChange={e => setPbEnd(e.target.value)}   className={styles.dateInput} />
+          <ZButton size="sm" onClick={load}>对比</ZButton>
+        </div>
+        {cmp == null ? (
+          <ZEmpty title="暂无数据" />
+        ) : (
+          <div className={styles.cmpTable}>
+            <div className={styles.cmpHeader}>
+              <span>指标</span>
+              <span>期间A</span>
+              <span>期间B</span>
+              <span>变化</span>
+            </div>
+            {cmp.metrics.map(m => (
+              <div key={m.metric} className={styles.cmpRow}>
+                <div className={styles.cmpLabel}>{m.label}</div>
+                <div className={styles.cmpVal}>{m.period_a != null ? m.period_a.toLocaleString() : '—'}</div>
+                <div className={styles.cmpVal}>{m.period_b != null ? m.period_b.toLocaleString() : '—'}</div>
+                <div className={`${styles.cmpDelta} ${m.delta_pct == null ? '' : m.delta_pct >= 0 ? styles.cmpUp : styles.cmpDown}`}>
+                  {m.delta_pct == null ? '—' : `${m.delta_pct >= 0 ? '▲' : '▼'} ${Math.abs(m.delta_pct)}%`}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </ZCard>
+
+      {/* Top spenders */}
+      <ZCard title="高价值客户 Top 10（近12个月）">
+        {spenders.length === 0 ? <ZEmpty title="暂无数据" /> : (
+          <div className={styles.spenderList}>
+            <div className={styles.spenderHeader}>
+              <span>排名</span><span>客户</span><span>订单数</span><span>总消费</span><span>客单价</span>
+            </div>
+            {spenders.map((s, i) => (
+              <div key={s.customer_id} className={styles.spenderRow}>
+                <div className={styles.spenderRank}>{i + 1}</div>
+                <div className={styles.spenderName}>{s.name || '—'}</div>
+                <div className={styles.spenderCell}>{s.order_count} 单</div>
+                <div className={styles.spenderCell}>¥{s.total_yuan.toLocaleString()}</div>
+                <div className={styles.spenderCell}>¥{s.avg_yuan.toLocaleString()}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </ZCard>
+    </div>
+  );
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 25 Tab 2 — OperationRiskTab「运营风险」
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface DepositRiskItem {
+  order_id: string;
+  banquet_date: string;
+  days_until_event: number;
+  total_yuan: number;
+  deposit_yuan: number;
+  deposit_ratio_pct: number;
+  contact_name: string;
+}
+interface TaskTrendPoint {
+  week: string;
+  total: number;
+  completed: number;
+  completion_rate_pct: number;
+}
+
+function OperationRiskTab() {
+  const { storeId } = useStore();
+  const [riskItems,  setRiskItems]  = React.useState<DepositRiskItem[]>([]);
+  const [taskSeries, setTaskSeries] = React.useState<TaskTrendPoint[]>([]);
+  const [avgRate,    setAvgRate]    = React.useState<number>(0);
+  const [totalExp,   setTotalExp]   = React.useState<number>(0);
+  const [loading,    setLoading]    = React.useState(false);
+
+  useEffect(() => {
+    if (!storeId) return;
+    setLoading(true);
+    Promise.allSettled([
+      apiClient.get(`/api/v1/banquet-agent/stores/${storeId}/analytics/deposit-risk?min_risk_pct=30`),
+      apiClient.get(`/api/v1/banquet-agent/stores/${storeId}/analytics/task-completion-trend?weeks=8`),
+    ]).then(([r1, r2]) => {
+      if (r1.status === 'fulfilled') {
+        setRiskItems(r1.value.data.items ?? []);
+        setTotalExp(r1.value.data.total_exposed_yuan ?? 0);
+      }
+      if (r2.status === 'fulfilled') {
+        setTaskSeries(r2.value.data.series ?? []);
+        setAvgRate(r2.value.data.avg_completion_rate_pct ?? 0);
+      }
+    }).catch(handleApiError).finally(() => setLoading(false));
+  }, [storeId]);
+
+  if (loading) return <ZSkeleton rows={6} />;
+
+  return (
+    <div className={styles.opRiskTab}>
+      {/* Deposit Risk */}
+      <ZCard title={`定金风险预警（风险敞口 ¥${totalExp.toLocaleString()}）`}>
+        {riskItems.length === 0 ? (
+          <ZEmpty title="暂无定金风险订单" />
+        ) : (
+          <div className={styles.riskList}>
+            <div className={styles.riskHeader}>
+              <span>宴会日期</span><span>距今</span><span>联系人</span>
+              <span>总金额</span><span>已付定金</span><span>定金比例</span>
+            </div>
+            {riskItems.map(r => (
+              <div key={r.order_id} className={`${styles.riskRow} ${r.deposit_ratio_pct < 10 ? styles.riskHigh : styles.riskMed}`}>
+                <div>{r.banquet_date}</div>
+                <div>{r.days_until_event}天</div>
+                <div>{r.contact_name || '—'}</div>
+                <div>¥{r.total_yuan.toLocaleString()}</div>
+                <div>¥{r.deposit_yuan.toLocaleString()}</div>
+                <div className={styles.riskRatio}>{r.deposit_ratio_pct}%</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </ZCard>
+
+      {/* Task Completion Trend */}
+      <ZCard title={`任务完成趋势（8周均完成率 ${avgRate}%）`}>
+        {taskSeries.length === 0 ? (
+          <ZEmpty title="暂无任务数据" />
+        ) : (
+          <div className={styles.taskTrendList}>
+            <div className={styles.taskTrendHeader}>
+              <span>周次</span><span>总任务</span><span>已完成</span><span>完成率</span>
+            </div>
+            {taskSeries.map(w => (
+              <div key={w.week} className={styles.taskTrendRow}>
+                <div className={styles.taskWeek}>{w.week}</div>
+                <div className={styles.taskCell}>{w.total}</div>
+                <div className={styles.taskCell}>{w.completed}</div>
+                <div className={styles.taskBarWrap}>
+                  <div className={styles.taskBar}
+                    style={{ width: `${Math.min(w.completion_rate_pct, 100)}%`,
+                             background: w.completion_rate_pct >= 80 ? 'var(--green)' : w.completion_rate_pct >= 50 ? 'var(--yellow)' : 'var(--red)' }} />
+                  <span className={styles.taskBarLabel}>{w.completion_rate_pct}%</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </ZCard>
+    </div>
+  );
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 26 Tab 1 — CancellationAnalysisTab「取消分析」
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface CancelTypeRow { banquet_type: string; count: number; pct: number; }
+interface CancelMonthRow { month: string; count: number; lost_yuan: number; }
+interface CancellationData {
+  total_cancelled: number;
+  cancel_rate_pct: number | null;
+  total_lost_yuan: number;
+  by_type: CancelTypeRow[];
+  by_month: CancelMonthRow[];
+}
+
+interface RevenuePerTableTypeRow { banquet_type: string; order_count: number; avg_per_table_yuan: number | null; }
+interface RevenuePerTableMonthRow { month: string; avg_per_table_yuan: number | null; }
+interface RevenuePerTableData {
+  overall_avg_yuan: number | null;
+  by_type: RevenuePerTableTypeRow[];
+  by_month: RevenuePerTableMonthRow[];
+}
+
+function CancellationAnalysisTab() {
+  const { storeId } = useStore();
+  const [cancel, setCancel]   = React.useState<CancellationData | null>(null);
+  const [rpt,    setRpt]      = React.useState<RevenuePerTableData | null>(null);
+  const [loading, setLoading] = React.useState(false);
+
+  useEffect(() => {
+    if (!storeId) return;
+    setLoading(true);
+    Promise.allSettled([
+      apiClient.get(`/api/v1/banquet-agent/stores/${storeId}/analytics/cancellation-analysis?months=12`),
+      apiClient.get(`/api/v1/banquet-agent/stores/${storeId}/analytics/revenue-per-table?months=6`),
+    ]).then(([r1, r2]) => {
+      if (r1.status === 'fulfilled') setCancel(r1.value.data);
+      if (r2.status === 'fulfilled') setRpt(r2.value.data);
+    }).catch(handleApiError).finally(() => setLoading(false));
+  }, [storeId]);
+
+  if (loading) return <ZSkeleton rows={6} />;
+
+  const TYPE_LABEL: Record<string, string> = {
+    wedding: '婚宴', birthday: '寿宴', corporate: '商务', anniversary: '周年',
+    other: '其他',
+  };
+
+  return (
+    <div className={styles.cancelTab}>
+      {/* Cancellation summary */}
+      <ZCard title="取消订单分析（近12个月）">
+        {!cancel || cancel.total_cancelled === 0 ? (
+          <ZEmpty title="近12个月无取消订单" />
+        ) : (
+          <>
+            <div className={styles.cancelKpiRow}>
+              <div className={styles.cancelKpi}>
+                <div className={styles.cancelKpiVal}>{cancel.total_cancelled}</div>
+                <div className={styles.cancelKpiLabel}>取消订单数</div>
+              </div>
+              <div className={styles.cancelKpi}>
+                <div className={`${styles.cancelKpiVal} ${styles.cancelRed}`}>
+                  {cancel.cancel_rate_pct != null ? `${cancel.cancel_rate_pct}%` : '—'}
+                </div>
+                <div className={styles.cancelKpiLabel}>取消率</div>
+              </div>
+              <div className={styles.cancelKpi}>
+                <div className={`${styles.cancelKpiVal} ${styles.cancelRed}`}>
+                  ¥{cancel.total_lost_yuan.toLocaleString()}
+                </div>
+                <div className={styles.cancelKpiLabel}>损失金额</div>
+              </div>
+            </div>
+            <div className={styles.cancelTypeRow}>
+              {cancel.by_type.map(t => (
+                <div key={t.banquet_type} className={styles.cancelTypeChip}>
+                  <span>{TYPE_LABEL[t.banquet_type] ?? t.banquet_type}</span>
+                  <strong>{t.count}次</strong>
+                  <span className={styles.cancelTypePct}>{t.pct}%</span>
+                </div>
+              ))}
+            </div>
+            <div className={styles.cancelMonthList}>
+              {cancel.by_month.map(m => (
+                <div key={m.month} className={styles.cancelMonthRow}>
+                  <span className={styles.cancelMonth}>{m.month}</span>
+                  <span>{m.count}单</span>
+                  <span className={styles.cancelLost}>损失 ¥{m.lost_yuan.toLocaleString()}</span>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </ZCard>
+
+      {/* Revenue per table */}
+      <ZCard title={`桌均收入分析${rpt?.overall_avg_yuan != null ? `（均值 ¥${rpt.overall_avg_yuan.toLocaleString()}/桌）` : ''}`}>
+        {!rpt || rpt.by_type.length === 0 ? (
+          <ZEmpty title="暂无数据" />
+        ) : (
+          <>
+            <div className={styles.rptTypeList}>
+              <div className={styles.rptTypeHeader}>
+                <span>类型</span><span>订单数</span><span>桌均价</span>
+              </div>
+              {rpt.by_type.map(t => (
+                <div key={t.banquet_type} className={styles.rptTypeRow}>
+                  <div>{TYPE_LABEL[t.banquet_type] ?? t.banquet_type}</div>
+                  <div>{t.order_count}</div>
+                  <div className={styles.rptAvg}>
+                    {t.avg_per_table_yuan != null ? `¥${t.avg_per_table_yuan.toLocaleString()}` : '—'}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className={styles.rptMonthBars}>
+              {rpt.by_month.map(m => {
+                const maxVal = Math.max(...rpt.by_month.map(x => x.avg_per_table_yuan ?? 0));
+                const pct = maxVal > 0 && m.avg_per_table_yuan != null
+                  ? Math.round(m.avg_per_table_yuan / maxVal * 100)
+                  : 0;
+                return (
+                  <div key={m.month} className={styles.rptMonthBar}>
+                    <div className={styles.rptMonthLabel}>{m.month.slice(5)}</div>
+                    <div className={styles.rptBarTrack}>
+                      <div className={styles.rptBarFill} style={{ width: `${pct}%` }} />
+                    </div>
+                    <div className={styles.rptMonthVal}>
+                      {m.avg_per_table_yuan != null ? `¥${m.avg_per_table_yuan}` : '—'}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
+      </ZCard>
+    </div>
+  );
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 26 Tab 2 — LeadPipelineHealthTab「线索健康」
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface LeadAgingBucket { label: string; count: number; pct: number; }
+interface StaleLeadItem { lead_id: string; days_idle: number; stage: string; contact_name: string; }
+interface WaitlistData {
+  total_leads: number;
+  waitlisted_count: number;
+  converted_count: number;
+  conversion_rate_pct: number | null;
+  avg_wait_days: number | null;
+}
+
+function LeadPipelineHealthTab() {
+  const { storeId } = useStore();
+  const [agingBuckets, setAgingBuckets] = React.useState<LeadAgingBucket[]>([]);
+  const [staleLeads,   setStaleLeads]   = React.useState<StaleLeadItem[]>([]);
+  const [waitlist,     setWaitlist]     = React.useState<WaitlistData | null>(null);
+  const [loading,      setLoading]      = React.useState(false);
+
+  useEffect(() => {
+    if (!storeId) return;
+    setLoading(true);
+    Promise.allSettled([
+      apiClient.get(`/api/v1/banquet-agent/stores/${storeId}/analytics/lead-aging`),
+      apiClient.get(`/api/v1/banquet-agent/stores/${storeId}/analytics/waitlist-conversion?months=6`),
+    ]).then(([r1, r2]) => {
+      if (r1.status === 'fulfilled') {
+        setAgingBuckets(r1.value.data.buckets ?? []);
+        setStaleLeads(r1.value.data.stale_leads ?? []);
+      }
+      if (r2.status === 'fulfilled') setWaitlist(r2.value.data);
+    }).catch(handleApiError).finally(() => setLoading(false));
+  }, [storeId]);
+
+  if (loading) return <ZSkeleton rows={6} />;
+
+  const STAGE_LABEL: Record<string, string> = {
+    new: '新线索', contacted: '已联系', visit_scheduled: '预约看厅',
+    quoted: '已报价', waiting_decision: '等待决策', deposit_pending: '待付定金',
+  };
+
+  return (
+    <div className={styles.leadHealthTab}>
+      {/* Lead aging buckets */}
+      <ZCard title="线索停滞分析">
+        {agingBuckets.length === 0 ? (
+          <ZEmpty title="暂无活跃线索" />
+        ) : (
+          <div className={styles.agingBuckets}>
+            {agingBuckets.map(b => (
+              <div key={b.label} className={styles.agingBucket}>
+                <div className={styles.agingLabel}>{b.label}</div>
+                <div className={styles.agingBarTrack}>
+                  <div className={styles.agingBarFill}
+                    style={{ width: `${b.pct}%`,
+                             background: b.label.includes('60') ? 'var(--red)' :
+                                         b.label.includes('31') ? 'var(--yellow)' : 'var(--accent)' }} />
+                </div>
+                <div className={styles.agingCount}>{b.count} 条</div>
+                <div className={styles.agingPct}>{b.pct}%</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </ZCard>
+
+      {/* Stale leads */}
+      {staleLeads.length > 0 && (
+        <ZCard title={`超期未跟进线索（${staleLeads.length} 条）`}>
+          <div className={styles.staleList}>
+            <div className={styles.staleHeader}>
+              <span>联系人</span><span>当前阶段</span><span>停滞天数</span>
+            </div>
+            {staleLeads.map(l => (
+              <div key={l.lead_id} className={styles.staleRow}>
+                <div>{l.contact_name || '—'}</div>
+                <div>{STAGE_LABEL[l.stage] ?? l.stage}</div>
+                <div className={`${styles.staleDays} ${l.days_idle > 60 ? styles.staleDanger : styles.staleWarn}`}>
+                  {l.days_idle}天
+                </div>
+              </div>
+            ))}
+          </div>
+        </ZCard>
+      )}
+
+      {/* Waitlist conversion */}
+      <ZCard title="候补转化（等待决策→签约）">
+        {!waitlist || waitlist.waitlisted_count === 0 ? (
+          <ZEmpty title="暂无候补数据" />
+        ) : (
+          <div className={styles.waitlistGrid}>
+            <div className={styles.waitlistKpi}>
+              <div className={styles.waitlistVal}>{waitlist.waitlisted_count}</div>
+              <div className={styles.waitlistLabel}>候补线索</div>
+            </div>
+            <div className={styles.waitlistKpi}>
+              <div className={styles.waitlistVal}>{waitlist.converted_count}</div>
+              <div className={styles.waitlistLabel}>已转化</div>
+            </div>
+            <div className={styles.waitlistKpi}>
+              <div className={`${styles.waitlistVal} ${styles.waitlistAccent}`}>
+                {waitlist.conversion_rate_pct != null ? `${waitlist.conversion_rate_pct}%` : '—'}
+              </div>
+              <div className={styles.waitlistLabel}>转化率</div>
+            </div>
+            <div className={styles.waitlistKpi}>
+              <div className={styles.waitlistVal}>
+                {waitlist.avg_wait_days != null ? `${waitlist.avg_wait_days}天` : '—'}
+              </div>
+              <div className={styles.waitlistLabel}>平均等待</div>
+            </div>
+          </div>
+        )}
+      </ZCard>
+    </div>
+  );
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 27 Tab 1 — RefundRiskTab「退款风险」
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface RefundData {
+  refund_orders: number;
+  total_orders: number;
+  refund_rate_pct: number | null;
+  total_refund_yuan: number;
+  avg_refund_yuan: number | null;
+  by_type: { banquet_type: string; count: number; pct: number }[];
+}
+interface BundlePkg {
+  package_id: string;
+  package_name: string;
+  order_count: number;
+  total_revenue_yuan: number;
+  avg_per_table_yuan: number | null;
+  gross_margin_pct: number | null;
+}
+
+function RefundRiskTab() {
+  const { storeId } = useStore();
+  const [refund,   setRefund]  = React.useState<RefundData | null>(null);
+  const [bundles,  setBundles] = React.useState<BundlePkg[]>([]);
+  const [loading,  setLoading] = React.useState(false);
+
+  useEffect(() => {
+    if (!storeId) return;
+    setLoading(true);
+    Promise.allSettled([
+      apiClient.get(`/api/v1/banquet-agent/stores/${storeId}/analytics/refund-rate?months=6`),
+      apiClient.get(`/api/v1/banquet-agent/stores/${storeId}/analytics/bundle-performance?months=6`),
+    ]).then(([r1, r2]) => {
+      if (r1.status === 'fulfilled') setRefund(r1.value.data);
+      if (r2.status === 'fulfilled') setBundles(r2.value.data.packages ?? []);
+    }).catch(handleApiError).finally(() => setLoading(false));
+  }, [storeId]);
+
+  if (loading) return <ZSkeleton rows={6} />;
+
+  const TYPE_LABEL: Record<string, string> = {
+    wedding: '婚宴', birthday: '寿宴', corporate: '商务', anniversary: '周年', other: '其他',
+  };
+
+  return (
+    <div className={styles.refundTab}>
+      {/* Refund summary */}
+      <ZCard title="退款风险分析（近6个月）">
+        {!refund || refund.refund_orders === 0 ? (
+          <ZEmpty title="近6个月无退款记录" />
+        ) : (
+          <>
+            <div className={styles.refundKpiRow}>
+              <div className={styles.refundKpi}>
+                <div className={`${styles.refundKpiVal} ${styles.refundRed}`}>{refund.refund_orders}</div>
+                <div className={styles.refundKpiLabel}>退款订单</div>
+              </div>
+              <div className={styles.refundKpi}>
+                <div className={`${styles.refundKpiVal} ${styles.refundRed}`}>
+                  {refund.refund_rate_pct != null ? `${refund.refund_rate_pct}%` : '—'}
+                </div>
+                <div className={styles.refundKpiLabel}>退款率</div>
+              </div>
+              <div className={styles.refundKpi}>
+                <div className={styles.refundKpiVal}>¥{refund.total_refund_yuan.toLocaleString()}</div>
+                <div className={styles.refundKpiLabel}>总退款额</div>
+              </div>
+              <div className={styles.refundKpi}>
+                <div className={styles.refundKpiVal}>
+                  {refund.avg_refund_yuan != null ? `¥${refund.avg_refund_yuan.toLocaleString()}` : '—'}
+                </div>
+                <div className={styles.refundKpiLabel}>均退款额</div>
+              </div>
+            </div>
+            <div className={styles.refundTypeRow}>
+              {refund.by_type.map(t => (
+                <div key={t.banquet_type} className={styles.refundTypeChip}>
+                  <span>{TYPE_LABEL[t.banquet_type] ?? t.banquet_type}</span>
+                  <strong>{t.count}次</strong>
+                  <span className={styles.refundTypePct}>{t.pct}%</span>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </ZCard>
+
+      {/* Bundle performance */}
+      <ZCard title="套餐销售效果（近6个月）">
+        {bundles.length === 0 ? <ZEmpty title="暂无套餐数据" /> : (
+          <div className={styles.bundleList}>
+            <div className={styles.bundleHeader}>
+              <span>套餐名称</span><span>订单数</span><span>总收入</span>
+              <span>桌均价</span><span>毛利率</span>
+            </div>
+            {bundles.map(p => (
+              <div key={p.package_id} className={styles.bundleRow}>
+                <div className={styles.bundleName}>{p.package_name}</div>
+                <div>{p.order_count}</div>
+                <div>¥{p.total_revenue_yuan.toLocaleString()}</div>
+                <div>{p.avg_per_table_yuan != null ? `¥${p.avg_per_table_yuan}` : '—'}</div>
+                <div>
+                  {p.gross_margin_pct != null ? (
+                    <ZBadge type={p.gross_margin_pct >= 40 ? 'success' : p.gross_margin_pct >= 25 ? 'info' : 'default'}
+                      text={`${p.gross_margin_pct}%`} />
+                  ) : '—'}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </ZCard>
+    </div>
+  );
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 27 Tab 2 — MonthlyTargetGapTab「目标达成」
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface TargetRow {
+  month: number;
+  actual_yuan: number;
+  target_yuan: number;
+  gap_yuan: number | null;
+  achievement_pct: number | null;
+}
+interface SentimentSummary { positive: number; neutral: number; negative: number; }
+interface SentimentTrendPoint {
+  month: string;
+  positive: number;
+  neutral: number;
+  negative: number;
+  avg_ai_score: number | null;
+}
+
+const MONTH_NAMES = ['','1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
+
+function MonthlyTargetGapTab() {
+  const { storeId } = useStore();
+  const [rows,       setRows]      = React.useState<TargetRow[]>([]);
+  const [ytd,        setYtd]       = React.useState<number | null>(null);
+  const [sentiment,  setSentiment] = React.useState<SentimentSummary | null>(null);
+  const [sentTrend,  setSentTrend] = React.useState<SentimentTrendPoint[]>([]);
+  const [loading,    setLoading]   = React.useState(false);
+
+  useEffect(() => {
+    if (!storeId) return;
+    setLoading(true);
+    Promise.allSettled([
+      apiClient.get(`/api/v1/banquet-agent/stores/${storeId}/analytics/monthly-target-gap?year=0`),
+      apiClient.get(`/api/v1/banquet-agent/stores/${storeId}/analytics/review-sentiment-trend?months=6`),
+    ]).then(([r1, r2]) => {
+      if (r1.status === 'fulfilled') {
+        setRows(r1.value.data.monthly_rows ?? []);
+        setYtd(r1.value.data.ytd_achievement_pct ?? null);
+      }
+      if (r2.status === 'fulfilled') {
+        setSentiment(r2.value.data.sentiment_summary ?? null);
+        setSentTrend(r2.value.data.monthly_trend ?? []);
+      }
+    }).catch(handleApiError).finally(() => setLoading(false));
+  }, [storeId]);
+
+  if (loading) return <ZSkeleton rows={6} />;
+
+  return (
+    <div className={styles.targetGapTab}>
+      {/* Monthly target vs actual */}
+      <ZCard title={`月度目标达成${ytd != null ? `（YTD ${ytd}%）` : ''}`}>
+        {rows.length === 0 ? <ZEmpty title="暂无目标数据" /> : (
+          <div className={styles.targetTable}>
+            <div className={styles.targetHeader}>
+              <span>月份</span><span>实际</span><span>目标</span>
+              <span>缺口</span><span>达成率</span>
+            </div>
+            {rows.map(r => (
+              <div key={r.month} className={styles.targetRow}>
+                <div className={styles.targetMonth}>{MONTH_NAMES[r.month]}</div>
+                <div>¥{r.actual_yuan.toLocaleString()}</div>
+                <div className={styles.targetGoal}>
+                  {r.target_yuan > 0 ? `¥${r.target_yuan.toLocaleString()}` : '—'}
+                </div>
+                <div className={`${styles.targetGap} ${r.gap_yuan != null && r.gap_yuan >= 0 ? styles.gapPos : styles.gapNeg}`}>
+                  {r.gap_yuan != null ? `${r.gap_yuan >= 0 ? '+' : ''}¥${r.gap_yuan.toLocaleString()}` : '—'}
+                </div>
+                <div>
+                  {r.achievement_pct != null ? (
+                    <ZBadge
+                      type={r.achievement_pct >= 100 ? 'success' : r.achievement_pct >= 80 ? 'info' : 'warning'}
+                      text={`${r.achievement_pct}%`} />
+                  ) : '—'}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </ZCard>
+
+      {/* Sentiment summary */}
+      <ZCard title="评价情绪分布（近6个月）">
+        {!sentiment ? <ZEmpty title="暂无评价数据" /> : (
+          <>
+            <div className={styles.sentGrid}>
+              <div className={`${styles.sentKpi} ${styles.sentPos}`}>
+                <div className={styles.sentVal}>{sentiment.positive}</div>
+                <div className={styles.sentLabel}>正面</div>
+              </div>
+              <div className={`${styles.sentKpi} ${styles.sentNeu}`}>
+                <div className={styles.sentVal}>{sentiment.neutral}</div>
+                <div className={styles.sentLabel}>中性</div>
+              </div>
+              <div className={`${styles.sentKpi} ${styles.sentNeg}`}>
+                <div className={styles.sentVal}>{sentiment.negative}</div>
+                <div className={styles.sentLabel}>负面</div>
+              </div>
+            </div>
+            {sentTrend.length > 0 && (
+              <div className={styles.sentTrendList}>
+                {sentTrend.map(t => {
+                  const total = t.positive + t.neutral + t.negative || 1;
+                  return (
+                    <div key={t.month} className={styles.sentTrendRow}>
+                      <span className={styles.sentMonth}>{t.month}</span>
+                      <div className={styles.sentBar}>
+                        <div style={{ width: `${t.positive/total*100}%`, background: 'var(--green)', height: '100%' }} />
+                        <div style={{ width: `${t.neutral/total*100}%`,  background: 'var(--yellow)', height: '100%' }} />
+                        <div style={{ width: `${t.negative/total*100}%`, background: 'var(--red)',    height: '100%' }} />
+                      </div>
+                      {t.avg_ai_score != null && (
+                        <span className={styles.sentAi}>AI {t.avg_ai_score}</span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </>
+        )}
+      </ZCard>
+    </div>
+  );
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 28 Tab 1 — SeasonalPatternTab「季节规律」
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface SeasonalRow {
+  month: number;
+  month_name: string;
+  avg_revenue_yuan: number;
+  is_peak: boolean;
+  is_trough: boolean;
+}
+interface SizeGroup {
+  label: string;
+  order_count: number;
+  avg_per_table_yuan: number | null;
+  total_revenue_yuan: number;
+}
+
+function SeasonalPatternTab() {
+  const { storeId } = useStore();
+  const [pattern,    setPattern]   = React.useState<SeasonalRow[]>([]);
+  const [peakMonth,  setPeakMonth] = React.useState<number | null>(null);
+  const [sizeGroups, setSizeGroups] = React.useState<SizeGroup[]>([]);
+  const [inflection, setInflection] = React.useState<string | null>(null);
+  const [loading,    setLoading]   = React.useState(false);
+
+  useEffect(() => {
+    if (!storeId) return;
+    setLoading(true);
+    Promise.allSettled([
+      apiClient.get(`/api/v1/banquet-agent/stores/${storeId}/analytics/seasonal-revenue-pattern?years=2`),
+      apiClient.get(`/api/v1/banquet-agent/stores/${storeId}/analytics/banquet-size-revenue-correlation?months=12`),
+    ]).then(([r1, r2]) => {
+      if (r1.status === 'fulfilled') {
+        setPattern(r1.value.data.monthly_pattern ?? []);
+        setPeakMonth(r1.value.data.peak_month ?? null);
+      }
+      if (r2.status === 'fulfilled') {
+        setSizeGroups(r2.value.data.size_groups ?? []);
+        setInflection(r2.value.data.inflection_point ?? null);
+      }
+    }).catch(handleApiError).finally(() => setLoading(false));
+  }, [storeId]);
+
+  if (loading) return <ZSkeleton rows={6} />;
+
+  const maxRev = Math.max(...pattern.map(r => r.avg_revenue_yuan), 1);
+
+  return (
+    <div className={styles.seasonalTab}>
+      {/* Seasonal revenue */}
+      <ZCard title={`季节性营收规律${peakMonth ? `（旺季：${peakMonth}月）` : ''}`}>
+        {pattern.length === 0 ? <ZEmpty title="暂无历史数据" /> : (
+          <div className={styles.seasonalBars}>
+            {pattern.map(r => (
+              <div key={r.month} className={`${styles.seasonBar} ${r.is_peak ? styles.seasonPeak : r.is_trough ? styles.seasonTrough : ''}`}>
+                <div className={styles.seasonBarInner}>
+                  <div className={styles.seasonBarFill}
+                    style={{ height: `${Math.round(r.avg_revenue_yuan / maxRev * 100)}%` }} />
+                </div>
+                <div className={styles.seasonMonthLabel}>{r.month_name}</div>
+                <div className={styles.seasonRevLabel}>¥{(r.avg_revenue_yuan / 1000).toFixed(1)}k</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </ZCard>
+
+      {/* Size-revenue correlation */}
+      <ZCard title={`规模收益分析${inflection ? `（最优规模：${inflection}）` : ''}`}>
+        {sizeGroups.length === 0 ? <ZEmpty title="暂无数据" /> : (
+          <div className={styles.sizeCorrelList}>
+            <div className={styles.sizeCorrelHeader}>
+              <span>规模</span><span>订单数</span><span>桌均价</span><span>总收入</span>
+            </div>
+            {sizeGroups.map(g => (
+              <div key={g.label} className={`${styles.sizeCorrelRow} ${g.label === inflection ? styles.sizeOptimal : ''}`}>
+                <div className={styles.sizeLabel}>{g.label}</div>
+                <div>{g.order_count}</div>
+                <div className={styles.sizeAvg}>
+                  {g.avg_per_table_yuan != null ? `¥${g.avg_per_table_yuan.toLocaleString()}` : '—'}
+                </div>
+                <div>¥{g.total_revenue_yuan.toLocaleString()}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </ZCard>
+    </div>
+  );
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 28 Tab 2 — CustomerLTVTab「客户LTV」
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface LTVBucket { label: string; count: number; pct: number; }
+interface LTVTop { customer_id: string; ltv_yuan: number; banquet_count: number; }
+interface FollowUpRow {
+  followup_bucket: string;
+  total_leads: number;
+  won_leads: number;
+  win_rate_pct: number;
+}
+
+function CustomerLTVTab() {
+  const { storeId } = useStore();
+  const [buckets,  setBuckets]  = React.useState<LTVBucket[]>([]);
+  const [top,      setTop]      = React.useState<LTVTop[]>([]);
+  const [avgLtv,   setAvgLtv]   = React.useState<number | null>(null);
+  const [fuRows,   setFuRows]   = React.useState<FollowUpRow[]>([]);
+  const [optimal,  setOptimal]  = React.useState<string | null>(null);
+  const [loading,  setLoading]  = React.useState(false);
+
+  useEffect(() => {
+    if (!storeId) return;
+    setLoading(true);
+    Promise.allSettled([
+      apiClient.get(`/api/v1/banquet-agent/stores/${storeId}/analytics/customer-lifetime-value?top_n=10`),
+      apiClient.get(`/api/v1/banquet-agent/stores/${storeId}/analytics/follow-up-effectiveness?months=6`),
+    ]).then(([r1, r2]) => {
+      if (r1.status === 'fulfilled') {
+        setBuckets(r1.value.data.ltv_buckets ?? []);
+        setTop(r1.value.data.top ?? []);
+        setAvgLtv(r1.value.data.avg_ltv_yuan ?? null);
+      }
+      if (r2.status === 'fulfilled') {
+        setFuRows(r2.value.data.rows ?? []);
+        setOptimal(r2.value.data.optimal_followup_bucket ?? null);
+      }
+    }).catch(handleApiError).finally(() => setLoading(false));
+  }, [storeId]);
+
+  if (loading) return <ZSkeleton rows={6} />;
+
+  return (
+    <div className={styles.ltvTab}>
+      {/* LTV distribution */}
+      <ZCard title={`客户LTV分布${avgLtv != null ? `（均值 ¥${avgLtv.toLocaleString()}）` : ''}`}>
+        {buckets.length === 0 ? <ZEmpty title="暂无客户数据" /> : (
+          <div className={styles.ltvBuckets}>
+            {buckets.map(b => (
+              <div key={b.label} className={styles.ltvBucket}>
+                <div className={styles.ltvBucketLabel}>{b.label}</div>
+                <div className={styles.ltvBucketBarTrack}>
+                  <div className={styles.ltvBucketBarFill} style={{ width: `${b.pct}%` }} />
+                </div>
+                <div className={styles.ltvBucketStats}>
+                  <span>{b.count}人</span>
+                  <span className={styles.ltvBucketPct}>{b.pct}%</span>
+                </div>
+              </div>
+            ))}
+            <div className={styles.ltvTopList}>
+              {top.slice(0, 5).map((c, i) => (
+                <div key={c.customer_id} className={styles.ltvTopRow}>
+                  <span className={styles.ltvTopRank}>{i + 1}</span>
+                  <span className={styles.ltvTopId}>{c.customer_id}</span>
+                  <span>{c.banquet_count}次</span>
+                  <span className={styles.ltvTopAmt}>¥{c.ltv_yuan.toLocaleString()}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </ZCard>
+
+      {/* Follow-up effectiveness */}
+      <ZCard title={`跟进次数与转化率${optimal ? `（最优：${optimal}）` : ''}`}>
+        {fuRows.length === 0 ? <ZEmpty title="暂无跟进数据" /> : (
+          <div className={styles.fuList}>
+            <div className={styles.fuHeader}>
+              <span>跟进次数</span><span>线索数</span><span>成交数</span><span>成交率</span>
+            </div>
+            {fuRows.map(r => (
+              <div key={r.followup_bucket}
+                className={`${styles.fuRow} ${r.followup_bucket === optimal ? styles.fuOptimal : ''}`}>
+                <div className={styles.fuBucket}>{r.followup_bucket}</div>
+                <div>{r.total_leads}</div>
+                <div>{r.won_leads}</div>
+                <div>
+                  <ZBadge
+                    type={r.win_rate_pct >= 50 ? 'success' : r.win_rate_pct >= 25 ? 'info' : 'default'}
+                    text={`${r.win_rate_pct}%`} />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </ZCard>
+    </div>
+  );
+}
+
+// Phase 29 Tab 1 — RepeatCustomerTab「回头客」
+function RepeatCustomerTab() {
+  const { storeId } = useStore();
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const load = useCallback(async () => {
+    if (!storeId) return;
+    setLoading(true);
+    try {
+      const r = await apiClient.get(`/api/v1/banquet-agent/stores/${storeId}/analytics/repeat-customer-rate`);
+      setData(r.data);
+    } catch (e) { handleApiError(e); }
+    finally { setLoading(false); }
+  }, [storeId]);
+  useEffect(() => { load(); }, [load]);
+
+  const [srcData, setSrcData] = useState<any>(null);
+  const [srcLoading, setSrcLoading] = useState(false);
+  const loadSrc = useCallback(async () => {
+    if (!storeId) return;
+    setSrcLoading(true);
+    try {
+      const r = await apiClient.get(`/api/v1/banquet-agent/stores/${storeId}/analytics/lead-source-roi`);
+      setSrcData(r.data);
+    } catch (e) { handleApiError(e); }
+    finally { setSrcLoading(false); }
+  }, [storeId]);
+  useEffect(() => { loadSrc(); }, [loadSrc]);
+
+  return (
+    <div className={styles.repeatTab}>
+      <ZCard title="回头客分析">
+        {loading ? <ZSkeleton /> : !data ? <ZEmpty message="暂无数据" /> : (
+          <div className={styles.repeatKpiRow}>
+            <div className={styles.repeatKpi}>
+              <div className={styles.repeatKpiVal}>{data.total_customers ?? '-'}</div>
+              <div className={styles.repeatKpiLabel}>总客户数</div>
+            </div>
+            <div className={styles.repeatKpi}>
+              <div className={styles.repeatKpiVal}>{data.repeat_customers ?? '-'}</div>
+              <div className={styles.repeatKpiLabel}>回头客数</div>
+            </div>
+            <div className={`${styles.repeatKpi} ${styles.repeatAccent}`}>
+              <div className={styles.repeatKpiVal}>{data.repeat_rate_pct != null ? `${data.repeat_rate_pct}%` : '-'}</div>
+              <div className={styles.repeatKpiLabel}>回头客率</div>
+            </div>
+            <div className={styles.repeatKpi}>
+              <div className={styles.repeatKpiVal}>¥{data.repeat_customer_revenue_yuan?.toLocaleString() ?? '-'}</div>
+              <div className={styles.repeatKpiLabel}>回头客贡献</div>
+            </div>
+            <div className={styles.repeatKpi}>
+              <div className={styles.repeatKpiVal}>¥{data.new_customer_revenue_yuan?.toLocaleString() ?? '-'}</div>
+              <div className={styles.repeatKpiLabel}>新客贡献</div>
+            </div>
+          </div>
+        )}
+      </ZCard>
+      <ZCard title="线索来源 ROI">
+        {srcLoading ? <ZSkeleton /> : !srcData || srcData.sources.length === 0 ? <ZEmpty message="暂无数据" /> : (
+          <div className={styles.srcRoiList}>
+            <div className={styles.srcRoiHeader}>
+              <span>来源渠道</span><span>线索数</span><span>签约数</span><span>转化率</span><span>平均预算</span>
+            </div>
+            {srcData.sources.map((s: any) => (
+              <div key={s.source} className={`${styles.srcRoiRow} ${s.source === srcData.best_source ? styles.srcBest : ''}`}>
+                <span className={styles.srcName}>{s.source}</span>
+                <span>{s.lead_count}</span>
+                <span>{s.won_count}</span>
+                <span className={styles.srcRate}>{s.conversion_rate_pct}%</span>
+                <span>¥{s.avg_budget_yuan?.toLocaleString()}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </ZCard>
+    </div>
+  );
+}
+
+// Phase 29 Tab 2 — BookingLeadTimeTab「提前天数」
+function BookingLeadTimeTab() {
+  const { storeId } = useStore();
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const load = useCallback(async () => {
+    if (!storeId) return;
+    setLoading(true);
+    try {
+      const r = await apiClient.get(`/api/v1/banquet-agent/stores/${storeId}/analytics/advance-booking-lead-time`);
+      setData(r.data);
+    } catch (e) { handleApiError(e); }
+    finally { setLoading(false); }
+  }, [storeId]);
+  useEffect(() => { load(); }, [load]);
+
+  const [collData, setCollData] = useState<any>(null);
+  const [collLoading, setCollLoading] = useState(false);
+  const loadColl = useCallback(async () => {
+    if (!storeId) return;
+    setCollLoading(true);
+    try {
+      const r = await apiClient.get(`/api/v1/banquet-agent/stores/${storeId}/analytics/payment-collection-rate`);
+      setCollData(r.data);
+    } catch (e) { handleApiError(e); }
+    finally { setCollLoading(false); }
+  }, [storeId]);
+  useEffect(() => { loadColl(); }, [loadColl]);
+
+  const maxCount = data?.buckets ? Math.max(...data.buckets.map((b: any) => b.count), 1) : 1;
+
+  return (
+    <div className={styles.leadTimeTab}>
+      <ZCard title="提前预订天数分布">
+        {loading ? <ZSkeleton /> : !data ? <ZEmpty message="暂无数据" /> : (
+          <>
+            <div className={styles.leadTimeKpiRow}>
+              <div className={styles.leadTimeKpi}>
+                <div className={styles.leadTimeVal}>{data.avg_lead_days ?? '-'}</div>
+                <div className={styles.leadTimeLabel}>平均提前天数</div>
+              </div>
+              <div className={styles.leadTimeKpi}>
+                <div className={styles.leadTimeVal}>{data.median_lead_days ?? '-'}</div>
+                <div className={styles.leadTimeLabel}>中位数</div>
+              </div>
+              <div className={styles.leadTimeKpi}>
+                <div className={styles.leadTimeVal}>{data.total_orders}</div>
+                <div className={styles.leadTimeLabel}>订单总数</div>
+              </div>
+            </div>
+            <div className={styles.leadTimeBuckets}>
+              {data.buckets.map((b: any) => (
+                <div key={b.bucket} className={styles.leadTimeBucket}>
+                  <div className={styles.leadTimeBucketLabel}>{b.bucket}</div>
+                  <div className={styles.leadTimeBucketTrack}>
+                    <div className={styles.leadTimeBucketFill} style={{ width: `${b.count / maxCount * 100}%` }} />
+                  </div>
+                  <div className={styles.leadTimeBucketCount}>{b.count} ({b.pct}%)</div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </ZCard>
+      <ZCard title="回款率 & 欠款订单">
+        {collLoading ? <ZSkeleton /> : !collData ? <ZEmpty message="暂无数据" /> : (
+          <>
+            <div className={styles.collKpiRow}>
+              <div className={styles.collKpi}>
+                <div className={styles.collKpiVal}>¥{collData.total_receivable_yuan?.toLocaleString() ?? '-'}</div>
+                <div className={styles.collKpiLabel}>应收总额</div>
+              </div>
+              <div className={styles.collKpi}>
+                <div className={styles.collKpiVal}>¥{collData.total_collected_yuan?.toLocaleString() ?? '-'}</div>
+                <div className={styles.collKpiLabel}>已收总额</div>
+              </div>
+              <div className={`${styles.collKpi} ${(collData.collection_rate_pct ?? 100) < 80 ? styles.collRed : ''}`}>
+                <div className={styles.collKpiVal}>{collData.collection_rate_pct != null ? `${collData.collection_rate_pct}%` : '-'}</div>
+                <div className={styles.collKpiLabel}>回款率</div>
+              </div>
+              <div className={styles.collKpi}>
+                <div className={styles.collKpiVal}>{collData.overdue_count}</div>
+                <div className={styles.collKpiLabel}>欠款订单</div>
+              </div>
+            </div>
+            {collData.overdue_orders.length > 0 && (
+              <div className={styles.overdueList}>
+                <div className={styles.overdueHeader}>
+                  <span>订单</span><span>宴会日期</span><span>应收¥</span><span>已收¥</span><span>欠款¥</span>
+                </div>
+                {collData.overdue_orders.slice(0, 10).map((row: any) => (
+                  <div key={row.order_id} className={styles.overdueRow}>
+                    <span className={styles.overdueId}>{row.order_id.slice(-6)}</span>
+                    <span>{row.banquet_date}</span>
+                    <span>¥{row.total_yuan?.toLocaleString()}</span>
+                    <span>¥{row.paid_yuan?.toLocaleString()}</span>
+                    <span className={styles.overdueAmt}>¥{row.outstanding_yuan?.toLocaleString()}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </ZCard>
+    </div>
+  );
+}
+
+// Phase 30 Tab 1 — TableUtilizationTab「桌位利用率」
+function TableUtilizationTab() {
+  const { storeId } = useStore();
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const load = useCallback(async () => {
+    if (!storeId) return;
+    setLoading(true);
+    try {
+      const r = await apiClient.get(`/api/v1/banquet-agent/stores/${storeId}/analytics/table-utilization-rate`);
+      setData(r.data);
+    } catch (e) { handleApiError(e); }
+    finally { setLoading(false); }
+  }, [storeId]);
+  useEffect(() => { load(); }, [load]);
+
+  const [peakData, setPeakData] = useState<any>(null);
+  const [peakLoading, setPeakLoading] = useState(false);
+  const loadPeak = useCallback(async () => {
+    if (!storeId) return;
+    setPeakLoading(true);
+    try {
+      const r = await apiClient.get(`/api/v1/banquet-agent/stores/${storeId}/analytics/peak-day-revenue`);
+      setPeakData(r.data);
+    } catch (e) { handleApiError(e); }
+    finally { setPeakLoading(false); }
+  }, [storeId]);
+  useEffect(() => { loadPeak(); }, [loadPeak]);
+
+  const maxRev = peakData?.by_weekday ? Math.max(...peakData.by_weekday.map((w: any) => w.total_revenue_yuan), 1) : 1;
+
+  return (
+    <div className={styles.tableUtilTab}>
+      <ZCard title="桌位利用率">
+        {loading ? <ZSkeleton /> : !data || data.halls.length === 0 ? <ZEmpty message="暂无数据" /> : (
+          <>
+            <div className={styles.tableUtilKpi}>
+              <span>整体利用率</span>
+              <span className={styles.tableUtilPct}>
+                {data.overall_utilization_pct != null ? `${data.overall_utilization_pct}%` : '-'}
+              </span>
+            </div>
+            <div className={styles.tableUtilList}>
+              <div className={styles.tableUtilHeader}>
+                <span>厅房</span><span>预订场次</span><span>实用桌数</span><span>利用率</span>
+              </div>
+              {data.halls.map((h: any) => (
+                <div key={h.hall_id} className={styles.tableUtilRow}>
+                  <span>{h.hall_name}</span>
+                  <span>{h.booking_count}</span>
+                  <span>{h.total_used_tables}</span>
+                  <span className={styles.tableUtilPct}>{h.utilization_pct != null ? `${h.utilization_pct}%` : '-'}</span>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </ZCard>
+      <ZCard title="峰值收入日">
+        {peakLoading ? <ZSkeleton /> : !peakData ? <ZEmpty message="暂无数据" /> : (
+          <>
+            {peakData.peak_weekday && (
+              <div className={styles.peakBadge}>峰值：{peakData.peak_weekday}</div>
+            )}
+            <div className={styles.peakBars}>
+              {peakData.by_weekday.map((w: any) => (
+                <div key={w.weekday} className={`${styles.peakBar} ${w.weekday === peakData.peak_weekday ? styles.peakBarTop : ''}`}>
+                  <div className={styles.peakBarInner}>
+                    <div
+                      className={styles.peakBarFill}
+                      style={{ height: `${w.total_revenue_yuan / maxRev * 100}%` }}
+                    />
+                  </div>
+                  <div className={styles.peakBarLabel}>{w.weekday}</div>
+                  <div className={styles.peakBarVal}>¥{(w.total_revenue_yuan / 1000).toFixed(1)}k</div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </ZCard>
+    </div>
+  );
+}
+
+// Phase 30 Tab 2 — SatisfactionReferralTab「满意度&转介绍」
+function SatisfactionReferralTab() {
+  const { storeId } = useStore();
+  const [satData, setSatData] = useState<any>(null);
+  const [satLoading, setSatLoading] = useState(false);
+  const [refData, setRefData] = useState<any>(null);
+  const [refLoading, setRefLoading] = useState(false);
+
+  const loadSat = useCallback(async () => {
+    if (!storeId) return;
+    setSatLoading(true);
+    try {
+      const r = await apiClient.get(`/api/v1/banquet-agent/stores/${storeId}/analytics/customer-satisfaction-score`);
+      setSatData(r.data);
+    } catch (e) { handleApiError(e); }
+    finally { setSatLoading(false); }
+  }, [storeId]);
+
+  const loadRef = useCallback(async () => {
+    if (!storeId) return;
+    setRefLoading(true);
+    try {
+      const r = await apiClient.get(`/api/v1/banquet-agent/stores/${storeId}/analytics/referral-rate`);
+      setRefData(r.data);
+    } catch (e) { handleApiError(e); }
+    finally { setRefLoading(false); }
+  }, [storeId]);
+
+  useEffect(() => { loadSat(); loadRef(); }, [loadSat, loadRef]);
+
+  return (
+    <div className={styles.satRefTab}>
+      <ZCard title="客户满意度">
+        {satLoading ? <ZSkeleton /> : !satData ? <ZEmpty message="暂无数据" /> : (
+          <>
+            <div className={styles.satKpiRow}>
+              <div className={styles.satKpi}>
+                <div className={styles.satKpiVal}>{satData.avg_rating ?? '-'}</div>
+                <div className={styles.satKpiLabel}>平均评分</div>
+              </div>
+              <div className={styles.satKpi}>
+                <div className={styles.satKpiVal}>{satData.avg_ai_score ?? '-'}</div>
+                <div className={styles.satKpiLabel}>AI评分</div>
+              </div>
+              <div className={styles.satKpi}>
+                <div className={`${styles.satKpiVal} ${(satData.nps_estimate ?? 0) >= 50 ? styles.satGreen : ''}`}>
+                  {satData.nps_estimate ?? '-'}
+                </div>
+                <div className={styles.satKpiLabel}>NPS估算</div>
+              </div>
+              <div className={styles.satKpi}>
+                <div className={styles.satKpiVal}>{satData.total_reviews}</div>
+                <div className={styles.satKpiLabel}>总评价数</div>
+              </div>
+            </div>
+            {satData.by_month.length > 0 && (
+              <div className={styles.satMonthList}>
+                {satData.by_month.map((m: any) => (
+                  <div key={m.month} className={styles.satMonthRow}>
+                    <span className={styles.satMonth}>{m.month}</span>
+                    <span>{m.review_count} 条</span>
+                    <span>均分 {m.avg_rating ?? '-'}</span>
+                    <span>AI {m.avg_ai_score ?? '-'}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </ZCard>
+      <ZCard title="转介绍率">
+        {refLoading ? <ZSkeleton /> : !refData ? <ZEmpty message="暂无数据" /> : (
+          <div className={styles.refKpiRow}>
+            <div className={styles.refKpi}>
+              <div className={styles.refKpiVal}>{refData.total_leads}</div>
+              <div className={styles.refKpiLabel}>总线索</div>
+            </div>
+            <div className={styles.refKpi}>
+              <div className={styles.refKpiVal}>{refData.referral_count}</div>
+              <div className={styles.refKpiLabel}>转介绍线索</div>
+            </div>
+            <div className={`${styles.refKpi} ${styles.refAccent}`}>
+              <div className={styles.refKpiVal}>{refData.referral_rate_pct != null ? `${refData.referral_rate_pct}%` : '-'}</div>
+              <div className={styles.refKpiLabel}>转介绍率</div>
+            </div>
+            <div className={styles.refKpi}>
+              <div className={styles.refKpiVal}>{refData.referral_win_rate_pct != null ? `${refData.referral_win_rate_pct}%` : '-'}</div>
+              <div className={styles.refKpiLabel}>转介绍签约率</div>
+            </div>
+            <div className={styles.refKpi}>
+              <div className={styles.refKpiVal}>{refData.non_referral_win_rate_pct != null ? `${refData.non_referral_win_rate_pct}%` : '-'}</div>
+              <div className={styles.refKpiLabel}>其他渠道签约率</div>
+            </div>
+          </div>
+        )}
+      </ZCard>
+    </div>
+  );
+}
+
+// Phase 31 Tab 1 — QuoteTurnaroundTab「报价周转」
+function QuoteTurnaroundTab() {
+  const { storeId } = useStore();
+  const [qtData, setQtData] = useState<any>(null);
+  const [qtLoading, setQtLoading] = useState(false);
+  const [contractData, setContractData] = useState<any>(null);
+  const [contractLoading, setContractLoading] = useState(false);
+
+  const loadQt = useCallback(async () => {
+    if (!storeId) return;
+    setQtLoading(true);
+    try {
+      const r = await apiClient.get(`/api/v1/banquet-agent/stores/${storeId}/analytics/quote-turnaround-time`);
+      setQtData(r.data);
+    } catch (e) { handleApiError(e); }
+    finally { setQtLoading(false); }
+  }, [storeId]);
+
+  const loadContract = useCallback(async () => {
+    if (!storeId) return;
+    setContractLoading(true);
+    try {
+      const r = await apiClient.get(`/api/v1/banquet-agent/stores/${storeId}/analytics/contract-signed-rate`);
+      setContractData(r.data);
+    } catch (e) { handleApiError(e); }
+    finally { setContractLoading(false); }
+  }, [storeId]);
+
+  useEffect(() => { loadQt(); loadContract(); }, [loadQt, loadContract]);
+
+  const maxQtCount = qtData?.buckets ? Math.max(...qtData.buckets.map((b: any) => b.count), 1) : 1;
+
+  return (
+    <div className={styles.qtTab}>
+      <ZCard title="报价周转时间">
+        {qtLoading ? <ZSkeleton /> : !qtData ? <ZEmpty message="暂无数据" /> : (
+          <>
+            <div className={styles.qtKpiRow}>
+              <div className={styles.qtKpi}>
+                <div className={styles.qtKpiVal}>{qtData.avg_days ?? '-'} 天</div>
+                <div className={styles.qtKpiLabel}>平均周转</div>
+              </div>
+              <div className={styles.qtKpi}>
+                <div className={styles.qtKpiVal}>{qtData.median_days ?? '-'} 天</div>
+                <div className={styles.qtKpiLabel}>中位数</div>
+              </div>
+              <div className={styles.qtKpi}>
+                <div className={styles.qtKpiVal}>{qtData.quoted_leads} / {qtData.total_leads}</div>
+                <div className={styles.qtKpiLabel}>已报价/总线索</div>
+              </div>
+            </div>
+            {qtData.buckets.length > 0 && (
+              <div className={styles.qtBuckets}>
+                {qtData.buckets.map((b: any) => (
+                  <div key={b.bucket} className={styles.qtBucket}>
+                    <div className={styles.qtBucketLabel}>{b.bucket}</div>
+                    <div className={styles.qtBucketTrack}>
+                      <div className={styles.qtBucketFill} style={{ width: `${b.count / maxQtCount * 100}%` }} />
+                    </div>
+                    <div className={styles.qtBucketCount}>{b.count} ({b.pct}%)</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </ZCard>
+      <ZCard title="合同签约率">
+        {contractLoading ? <ZSkeleton /> : !contractData ? <ZEmpty message="暂无数据" /> : (
+          <div className={styles.contractKpiRow}>
+            <div className={styles.contractKpi}>
+              <div className={styles.contractKpiVal}>{contractData.total_orders}</div>
+              <div className={styles.contractKpiLabel}>总订单</div>
+            </div>
+            <div className={styles.contractKpi}>
+              <div className={styles.contractKpiVal}>{contractData.with_contract}</div>
+              <div className={styles.contractKpiLabel}>有合同</div>
+            </div>
+            <div className={`${styles.contractKpi} ${styles.contractAccent}`}>
+              <div className={styles.contractKpiVal}>
+                {contractData.contract_rate_pct != null ? `${contractData.contract_rate_pct}%` : '-'}
+              </div>
+              <div className={styles.contractKpiLabel}>签约率</div>
+            </div>
+          </div>
+        )}
+      </ZCard>
+    </div>
+  );
+}
+
+// Phase 31 Tab 2 — NewVsRepeatMonthlyTab「新客vs回头客」
+function NewVsRepeatMonthlyTab() {
+  const { storeId } = useStore();
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const [overdueData, setOverdueData] = useState<any>(null);
+  const [overdueLoading, setOverdueLoading] = useState(false);
+
+  const load = useCallback(async () => {
+    if (!storeId) return;
+    setLoading(true);
+    try {
+      const r = await apiClient.get(`/api/v1/banquet-agent/stores/${storeId}/analytics/monthly-new-vs-repeat`);
+      setData(r.data);
+    } catch (e) { handleApiError(e); }
+    finally { setLoading(false); }
+  }, [storeId]);
+
+  const loadOverdue = useCallback(async () => {
+    if (!storeId) return;
+    setOverdueLoading(true);
+    try {
+      const r = await apiClient.get(`/api/v1/banquet-agent/stores/${storeId}/analytics/staff-task-overdue-rate`);
+      setOverdueData(r.data);
+    } catch (e) { handleApiError(e); }
+    finally { setOverdueLoading(false); }
+  }, [storeId]);
+
+  useEffect(() => { load(); loadOverdue(); }, [load, loadOverdue]);
+
+  return (
+    <div className={styles.newRepeatTab}>
+      <ZCard title="月度新客 vs 回头客">
+        {loading ? <ZSkeleton /> : !data || data.monthly.length === 0 ? <ZEmpty message="暂无数据" /> : (
+          <div className={styles.nrTable}>
+            <div className={styles.nrHeader}>
+              <span>月份</span><span>新客单数</span><span>新客收入¥</span><span>回头客单数</span><span>回头客收入¥</span>
+            </div>
+            {data.monthly.map((m: any) => (
+              <div key={m.month} className={styles.nrRow}>
+                <span className={styles.nrMonth}>{m.month}</span>
+                <span>{m.new_orders}</span>
+                <span>¥{m.new_revenue_yuan?.toLocaleString()}</span>
+                <span className={styles.nrRepeat}>{m.repeat_orders}</span>
+                <span>¥{m.repeat_revenue_yuan?.toLocaleString()}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </ZCard>
+      <ZCard title="员工任务逾期率">
+        {overdueLoading ? <ZSkeleton /> : !overdueData ? <ZEmpty message="暂无数据" /> : (
+          <>
+            <div className={styles.overdueKpiRow}>
+              <div className={styles.overdueKpi}>
+                <div className={styles.overdueKpiVal}>{overdueData.total_tasks}</div>
+                <div className={styles.overdueKpiLabel}>总任务</div>
+              </div>
+              <div className={styles.overdueKpi}>
+                <div className={`${styles.overdueKpiVal} ${overdueData.overdue_tasks > 0 ? styles.overdueRed : ''}`}>
+                  {overdueData.overdue_tasks}
+                </div>
+                <div className={styles.overdueKpiLabel}>逾期任务</div>
+              </div>
+              <div className={styles.overdueKpi}>
+                <div className={styles.overdueKpiVal}>
+                  {overdueData.overall_overdue_rate_pct != null ? `${overdueData.overall_overdue_rate_pct}%` : '-'}
+                </div>
+                <div className={styles.overdueKpiLabel}>整体逾期率</div>
+              </div>
+            </div>
+            {overdueData.by_staff.length > 0 && (
+              <div className={styles.overdueStaffList}>
+                <div className={styles.overdueStaffHeader}>
+                  <span>员工</span><span>总任务</span><span>逾期数</span><span>逾期率</span>
+                </div>
+                {overdueData.by_staff.map((s: any) => (
+                  <div key={s.user_id} className={`${styles.overdueStaffRow} ${s.overdue_rate_pct > 20 ? styles.overdueHighRow : ''}`}>
+                    <span className={styles.overdueStaffId}>{s.user_id.slice(-6)}</span>
+                    <span>{s.total_tasks}</span>
+                    <span>{s.overdue_tasks}</span>
+                    <span className={s.overdue_rate_pct > 20 ? styles.overdueRed : ''}>{s.overdue_rate_pct}%</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </ZCard>
+    </div>
+  );
+}
+
+// Phase 32 Tab 1 — OrderAmendmentTab「订单修改&套餐附加」
+function OrderAmendmentTab() {
+  const { storeId } = useStore();
+  const [amendData, setAmendData] = useState<any>(null);
+  const [amendLoading, setAmendLoading] = useState(false);
+  const [attachData, setAttachData] = useState<any>(null);
+  const [attachLoading, setAttachLoading] = useState(false);
+
+  const loadAmend = useCallback(async () => {
+    if (!storeId) return;
+    setAmendLoading(true);
+    try {
+      const r = await apiClient.get(`/api/v1/banquet-agent/stores/${storeId}/analytics/order-amendment-rate`);
+      setAmendData(r.data);
+    } catch (e) { handleApiError(e); }
+    finally { setAmendLoading(false); }
+  }, [storeId]);
+
+  const loadAttach = useCallback(async () => {
+    if (!storeId) return;
+    setAttachLoading(true);
+    try {
+      const r = await apiClient.get(`/api/v1/banquet-agent/stores/${storeId}/analytics/package-attach-rate`);
+      setAttachData(r.data);
+    } catch (e) { handleApiError(e); }
+    finally { setAttachLoading(false); }
+  }, [storeId]);
+
+  useEffect(() => { loadAmend(); loadAttach(); }, [loadAmend, loadAttach]);
+
+  return (
+    <div className={styles.amendTab}>
+      <ZCard title="订单修改率">
+        {amendLoading ? <ZSkeleton /> : !amendData ? <ZEmpty message="暂无数据" /> : (
+          <div className={styles.amendKpiRow}>
+            <div className={styles.amendKpi}>
+              <div className={styles.amendKpiVal}>{amendData.total_orders}</div>
+              <div className={styles.amendKpiLabel}>总订单</div>
+            </div>
+            <div className={styles.amendKpi}>
+              <div className={styles.amendKpiVal}>{amendData.amended_orders}</div>
+              <div className={styles.amendKpiLabel}>修改订单</div>
+            </div>
+            <div className={`${styles.amendKpi} ${styles.amendAccent}`}>
+              <div className={styles.amendKpiVal}>
+                {amendData.amendment_rate_pct != null ? `${amendData.amendment_rate_pct}%` : '-'}
+              </div>
+              <div className={styles.amendKpiLabel}>修改率</div>
+            </div>
+          </div>
+        )}
+      </ZCard>
+      <ZCard title="套餐附加率">
+        {attachLoading ? <ZSkeleton /> : !attachData ? <ZEmpty message="暂无数据" /> : (
+          <>
+            <div className={styles.attachKpiRow}>
+              <div className={styles.attachKpi}>
+                <div className={styles.attachKpiVal}>{attachData.total_orders}</div>
+                <div className={styles.attachKpiLabel}>总订单</div>
+              </div>
+              <div className={styles.attachKpi}>
+                <div className={styles.attachKpiVal}>{attachData.with_package}</div>
+                <div className={styles.attachKpiLabel}>含套餐</div>
+              </div>
+              <div className={`${styles.attachKpi} ${styles.attachAccent}`}>
+                <div className={styles.attachKpiVal}>
+                  {attachData.attach_rate_pct != null ? `${attachData.attach_rate_pct}%` : '-'}
+                </div>
+                <div className={styles.attachKpiLabel}>附加率</div>
+              </div>
+            </div>
+            {attachData.top_packages.length > 0 && (
+              <div className={styles.topPkgList}>
+                {attachData.top_packages.map((p: any, i: number) => (
+                  <div key={p.package_id} className={styles.topPkgRow}>
+                    <span className={styles.topPkgRank}>#{i + 1}</span>
+                    <span className={styles.topPkgId}>{p.package_id.slice(-8)}</span>
+                    <span>{p.order_count} 单</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </ZCard>
+    </div>
+  );
+}
+
+// Phase 32 Tab 2 — ProfitabilityTab「盈利能力&执行评分」
+function ProfitabilityTab() {
+  const { storeId } = useStore();
+  const [profData, setProfData] = useState<any>(null);
+  const [profLoading, setProfLoading] = useState(false);
+  const [execData, setExecData] = useState<any>(null);
+  const [execLoading, setExecLoading] = useState(false);
+
+  const loadProf = useCallback(async () => {
+    if (!storeId) return;
+    setProfLoading(true);
+    try {
+      const r = await apiClient.get(`/api/v1/banquet-agent/stores/${storeId}/analytics/banquet-type-profitability`);
+      setProfData(r.data);
+    } catch (e) { handleApiError(e); }
+    finally { setProfLoading(false); }
+  }, [storeId]);
+
+  const loadExec = useCallback(async () => {
+    if (!storeId) return;
+    setExecLoading(true);
+    try {
+      const r = await apiClient.get(`/api/v1/banquet-agent/stores/${storeId}/analytics/event-execution-score`);
+      setExecData(r.data);
+    } catch (e) { handleApiError(e); }
+    finally { setExecLoading(false); }
+  }, [storeId]);
+
+  useEffect(() => { loadProf(); loadExec(); }, [loadProf, loadExec]);
+
+  return (
+    <div className={styles.profTab}>
+      <ZCard title="宴会类型盈利能力">
+        {profLoading ? <ZSkeleton /> : !profData || profData.types.length === 0 ? <ZEmpty message="暂无数据" /> : (
+          <div className={styles.profList}>
+            <div className={styles.profHeader}>
+              <span>类型</span><span>单数</span><span>收入¥</span><span>成本¥</span><span>毛利率</span>
+            </div>
+            {profData.types.map((t: any) => (
+              <div key={t.banquet_type} className={`${styles.profRow} ${t.banquet_type === profData.most_profitable_type ? styles.profTop : ''}`}>
+                <span className={styles.profType}>{t.banquet_type}</span>
+                <span>{t.order_count}</span>
+                <span>¥{t.total_revenue_yuan?.toLocaleString()}</span>
+                <span>¥{t.total_cost_yuan?.toLocaleString()}</span>
+                <span className={styles.profMargin}>{t.gross_margin_pct != null ? `${t.gross_margin_pct}%` : '-'}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </ZCard>
+      <ZCard title="宴会执行综合评分">
+        {execLoading ? <ZSkeleton /> : !execData ? <ZEmpty message="暂无数据" /> : (
+          <>
+            <div className={styles.execKpiRow}>
+              <div className={styles.execKpi}>
+                <div className={styles.execKpiVal}>{execData.total_events}</div>
+                <div className={styles.execKpiLabel}>已完成场次</div>
+              </div>
+              <div className={`${styles.execKpi} ${styles.execAccent}`}>
+                <div className={styles.execKpiVal}>{execData.avg_execution_score ?? '-'}</div>
+                <div className={styles.execKpiLabel}>平均执行评分</div>
+              </div>
+            </div>
+            {execData.events.length > 0 && (
+              <div className={styles.execList}>
+                <div className={styles.execHeader}>
+                  <span>宴会日期</span><span>任务完成率</span><span>异常数</span><span>评分</span>
+                </div>
+                {execData.events.slice(0, 8).map((e: any) => (
+                  <div key={e.order_id} className={styles.execRow}>
+                    <span>{e.banquet_date}</span>
+                    <span>{e.task_completion_rate}%</span>
+                    <span>{e.exception_count}</span>
+                    <span className={e.execution_score >= 80 ? styles.execGood : styles.execWarn}>
+                      {e.execution_score}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </ZCard>
+    </div>
+  );
+}
+
+// Phase 33 Tab 1 — CrossSellTab「交叉销售&规模趋势」
+function CrossSellTab() {
+  const { storeId } = useStore();
+  const [crossData, setCrossData] = useState<any>(null);
+  const [crossLoading, setCrossLoading] = useState(false);
+  const [sizeData, setSizeData] = useState<any>(null);
+  const [sizeLoading, setSizeLoading] = useState(false);
+
+  const loadCross = useCallback(async () => {
+    if (!storeId) return;
+    setCrossLoading(true);
+    try {
+      const r = await apiClient.get(`/api/v1/banquet-agent/stores/${storeId}/analytics/cross-sell-rate`);
+      setCrossData(r.data);
+    } catch (e) { handleApiError(e); }
+    finally { setCrossLoading(false); }
+  }, [storeId]);
+
+  const loadSize = useCallback(async () => {
+    if (!storeId) return;
+    setSizeLoading(true);
+    try {
+      const r = await apiClient.get(`/api/v1/banquet-agent/stores/${storeId}/analytics/banquet-size-trend`);
+      setSizeData(r.data);
+    } catch (e) { handleApiError(e); }
+    finally { setSizeLoading(false); }
+  }, [storeId]);
+
+  useEffect(() => { loadCross(); loadSize(); }, [loadCross, loadSize]);
+
+  return (
+    <div className={styles.crossTab}>
+      <ZCard title="交叉销售率">
+        {crossLoading ? <ZSkeleton /> : !crossData ? <ZEmpty message="暂无数据" /> : (
+          <div className={styles.crossKpiRow}>
+            <div className={styles.crossKpi}>
+              <div className={styles.crossKpiVal}>{crossData.total_customers}</div>
+              <div className={styles.crossKpiLabel}>总客户数</div>
+            </div>
+            <div className={styles.crossKpi}>
+              <div className={styles.crossKpiVal}>{crossData.cross_sell_customers}</div>
+              <div className={styles.crossKpiLabel}>跨类型客户</div>
+            </div>
+            <div className={`${styles.crossKpi} ${styles.crossAccent}`}>
+              <div className={styles.crossKpiVal}>
+                {crossData.cross_sell_rate_pct != null ? `${crossData.cross_sell_rate_pct}%` : '-'}
+              </div>
+              <div className={styles.crossKpiLabel}>交叉销售率</div>
+            </div>
+          </div>
+        )}
+      </ZCard>
+      <ZCard title="宴会规模趋势（平均桌数）">
+        {sizeLoading ? <ZSkeleton /> : !sizeData || sizeData.monthly.length === 0 ? <ZEmpty message="暂无数据" /> : (
+          <>
+            <div className={styles.sizeOverallKpi}>
+              整体均值 <span className={styles.sizeOverallVal}>{sizeData.overall_avg_tables ?? '-'} 桌</span>
+            </div>
+            <div className={styles.sizeTrendList}>
+              {sizeData.monthly.map((m: any) => (
+                <div key={m.month} className={styles.sizeTrendRow}>
+                  <span className={styles.sizeTrendMonth}>{m.month}</span>
+                  <span>{m.order_count} 单</span>
+                  <span className={styles.sizeTrendAvg}>{m.avg_tables ?? '-'} 桌</span>
+                  <span>¥{m.total_revenue_yuan?.toLocaleString()}</span>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </ZCard>
+    </div>
+  );
+}
+
+// Phase 33 Tab 2 — VipSpendingTab「VIP消费&账龄」
+function VipSpendingTab() {
+  const { storeId } = useStore();
+  const [vipData, setVipData] = useState<any>(null);
+  const [vipLoading, setVipLoading] = useState(false);
+  const [agingData, setAgingData] = useState<any>(null);
+  const [agingLoading, setAgingLoading] = useState(false);
+
+  const loadVip = useCallback(async () => {
+    if (!storeId) return;
+    setVipLoading(true);
+    try {
+      const r = await apiClient.get(`/api/v1/banquet-agent/stores/${storeId}/analytics/vip-spending-trend`);
+      setVipData(r.data);
+    } catch (e) { handleApiError(e); }
+    finally { setVipLoading(false); }
+  }, [storeId]);
+
+  const loadAging = useCallback(async () => {
+    if (!storeId) return;
+    setAgingLoading(true);
+    try {
+      const r = await apiClient.get(`/api/v1/banquet-agent/stores/${storeId}/analytics/payment-overdue-aging`);
+      setAgingData(r.data);
+    } catch (e) { handleApiError(e); }
+    finally { setAgingLoading(false); }
+  }, [storeId]);
+
+  useEffect(() => { loadVip(); loadAging(); }, [loadVip, loadAging]);
+
+  return (
+    <div className={styles.vipSpendTab}>
+      <ZCard title="VIP 消费趋势">
+        {vipLoading ? <ZSkeleton /> : !vipData || vipData.by_level.length === 0 ? <ZEmpty message="暂无VIP数据" /> : (
+          <>
+            <div className={styles.vipSpendKpi}>
+              VIP 总数 <span className={styles.vipSpendVal}>{vipData.total_vip}</span>
+            </div>
+            <div className={styles.vipLevelList}>
+              <div className={styles.vipLevelHeader}>
+                <span>VIP等级</span><span>订单数</span><span>总收入¥</span><span>均单¥</span>
+              </div>
+              {vipData.by_level.map((v: any) => (
+                <div key={v.vip_level} className={styles.vipLevelRow}>
+                  <span className={styles.vipLevelBadge}>Lv.{v.vip_level}</span>
+                  <span>{v.order_count}</span>
+                  <span>¥{v.total_revenue_yuan?.toLocaleString()}</span>
+                  <span className={styles.vipAvgOrder}>¥{v.avg_order_yuan?.toLocaleString()}</span>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </ZCard>
+      <ZCard title="欠款账龄分析">
+        {agingLoading ? <ZSkeleton /> : !agingData ? <ZEmpty message="暂无数据" /> : agingData.total_overdue === 0 ? (
+          <div className={styles.agingAllPaid}>✓ 无欠款订单</div>
+        ) : (
+          <>
+            <div className={styles.agingKpiRow}>
+              <div className={styles.agingKpi}>
+                <div className={styles.agingKpiVal}>{agingData.total_overdue}</div>
+                <div className={styles.agingKpiLabel}>欠款订单</div>
+              </div>
+              <div className={`${styles.agingKpi} ${styles.agingRed}`}>
+                <div className={styles.agingKpiVal}>¥{agingData.total_overdue_yuan?.toLocaleString()}</div>
+                <div className={styles.agingKpiLabel}>欠款总额</div>
+              </div>
+            </div>
+            <div className={styles.agingBucketList}>
+              {agingData.buckets.map((b: any) => (
+                <div key={b.bucket} className={styles.agingBucketRow}>
+                  <span className={styles.agingBucketLabel}>{b.bucket}</span>
+                  <div className={styles.agingBucketTrack}>
+                    <div className={styles.agingBucketFill} style={{ width: `${b.pct}%` }} />
+                  </div>
+                  <span className={styles.agingBucketStat}>{b.count} 单 ¥{b.amount_yuan?.toLocaleString()}</span>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </ZCard>
+    </div>
+  );
+}
+
+// Phase 34 Tab 1 — LoyaltyRedemptionTab「积分兑换&菜单升级」
+function LoyaltyRedemptionTab() {
+  const { storeId } = useStore();
+  const [loyaltyData, setLoyaltyData] = useState<any>(null);
+  const [upgradeData, setUpgradeData] = useState<any>(null);
+  const [channelData, setChannelData] = useState<any>(null);
+  const [lLoading, setLLoading] = useState(false);
+  const [uLoading, setULoading] = useState(false);
+  const [cLoading, setCLoading] = useState(false);
+
+  const loadLoyalty = useCallback(async () => {
+    if (!storeId) return;
+    setLLoading(true);
+    try {
+      const r = await apiClient.get(`/api/v1/banquet-agent/stores/${storeId}/analytics/loyalty-points-redemption-rate`);
+      setLoyaltyData(r.data);
+    } catch (e) { handleApiError(e); }
+    finally { setLLoading(false); }
+  }, [storeId]);
+
+  const loadUpgrade = useCallback(async () => {
+    if (!storeId) return;
+    setULoading(true);
+    try {
+      const r = await apiClient.get(`/api/v1/banquet-agent/stores/${storeId}/analytics/menu-upgrade-rate`);
+      setUpgradeData(r.data);
+    } catch (e) { handleApiError(e); }
+    finally { setULoading(false); }
+  }, [storeId]);
+
+  const loadChannel = useCallback(async () => {
+    if (!storeId) return;
+    setCLoading(true);
+    try {
+      const r = await apiClient.get(`/api/v1/banquet-agent/stores/${storeId}/analytics/channel-conversion-funnel`);
+      setChannelData(r.data);
+    } catch (e) { handleApiError(e); }
+    finally { setCLoading(false); }
+  }, [storeId]);
+
+  useEffect(() => { loadLoyalty(); loadUpgrade(); loadChannel(); }, [loadLoyalty, loadUpgrade, loadChannel]);
+
+  return (
+    <div className={styles.loyaltyTab}>
+      <ZCard title="积分兑换率">
+        {lLoading ? <ZSkeleton /> : !loyaltyData ? <ZEmpty message="暂无数据" /> : (
+          <div className={styles.loyaltyKpiRow}>
+            <div className={styles.loyaltyKpi}>
+              <div className={styles.loyaltyKpiVal}>{loyaltyData.total_customers}</div>
+              <div className={styles.loyaltyKpiLabel}>客户总数</div>
+            </div>
+            <div className={`${styles.loyaltyKpi} ${styles.loyaltyAccent}`}>
+              <div className={styles.loyaltyKpiVal}>{loyaltyData.redemption_rate_pct ?? '—'}%</div>
+              <div className={styles.loyaltyKpiLabel}>兑换率</div>
+            </div>
+            <div className={styles.loyaltyKpi}>
+              <div className={styles.loyaltyKpiVal}>{loyaltyData.avg_points_redeemed ?? '—'}</div>
+              <div className={styles.loyaltyKpiLabel}>均兑积分</div>
+            </div>
+          </div>
+        )}
+      </ZCard>
+      <ZCard title="菜单升级率">
+        {uLoading ? <ZSkeleton /> : !upgradeData ? <ZEmpty message="暂无数据" /> : (
+          <div className={styles.upgradeKpiRow}>
+            <div className={styles.upgradeKpi}>
+              <div className={styles.upgradeKpiVal}>{upgradeData.total_pkg_orders}</div>
+              <div className={styles.upgradeKpiLabel}>套餐订单数</div>
+            </div>
+            <div className={`${styles.upgradeKpi} ${styles.upgradeAccent}`}>
+              <div className={styles.upgradeKpiVal}>{upgradeData.upgrade_rate_pct ?? '—'}%</div>
+              <div className={styles.upgradeKpiLabel}>升级率</div>
+            </div>
+            <div className={styles.upgradeKpi}>
+              <div className={styles.upgradeKpiVal}>¥{upgradeData.avg_upgrade_yuan ?? '—'}</div>
+              <div className={styles.upgradeKpiLabel}>均升级金额</div>
+            </div>
+          </div>
+        )}
+      </ZCard>
+      <ZCard title="渠道转化漏斗">
+        {cLoading ? <ZSkeleton /> : !channelData || channelData.channels?.length === 0 ? <ZEmpty message="暂无渠道数据" /> : (
+          <>
+            <div className={styles.channelBest}>
+              最佳渠道 <ZBadge label={channelData.best_channel} variant="success" />
+            </div>
+            <div className={styles.channelList}>
+              <div className={styles.channelHeader}>
+                <span>渠道</span><span>总线索</span><span>成交</span><span>转化率</span>
+              </div>
+              {channelData.channels.map((c: any) => (
+                <div key={c.channel} className={styles.channelRow}>
+                  <span>{c.channel}</span>
+                  <span>{c.total}</span>
+                  <span>{c.signed}</span>
+                  <span className={styles.channelRate}>{c.conversion_rate_pct ?? '—'}%</span>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </ZCard>
+    </div>
+  );
+}
+
+// Phase 34 Tab 2 — ForecastAccuracyTab「预测准确率&员工热力图」
+function ForecastAccuracyTab() {
+  const { storeId } = useStore();
+  const [forecastData, setForecastData] = useState<any>(null);
+  const [heatmapData, setHeatmapData] = useState<any>(null);
+  const [ltData, setLtData] = useState<any>(null);
+  const [fLoading, setFLoading] = useState(false);
+  const [hLoading, setHLoading] = useState(false);
+  const [ltLoading, setLtLoading] = useState(false);
+
+  const loadForecast = useCallback(async () => {
+    if (!storeId) return;
+    setFLoading(true);
+    try {
+      const r = await apiClient.get(`/api/v1/banquet-agent/stores/${storeId}/analytics/banquet-forecast-accuracy`);
+      setForecastData(r.data);
+    } catch (e) { handleApiError(e); }
+    finally { setFLoading(false); }
+  }, [storeId]);
+
+  const loadHeatmap = useCallback(async () => {
+    if (!storeId) return;
+    setHLoading(true);
+    try {
+      const r = await apiClient.get(`/api/v1/banquet-agent/stores/${storeId}/analytics/staff-utilization-heatmap`);
+      setHeatmapData(r.data);
+    } catch (e) { handleApiError(e); }
+    finally { setHLoading(false); }
+  }, [storeId]);
+
+  const loadLt = useCallback(async () => {
+    if (!storeId) return;
+    setLtLoading(true);
+    try {
+      const r = await apiClient.get(`/api/v1/banquet-agent/stores/${storeId}/analytics/customer-lifetime-event-count`);
+      setLtData(r.data);
+    } catch (e) { handleApiError(e); }
+    finally { setLtLoading(false); }
+  }, [storeId]);
+
+  useEffect(() => { loadForecast(); loadHeatmap(); loadLt(); }, [loadForecast, loadHeatmap, loadLt]);
+
+  return (
+    <div className={styles.forecastTab}>
+      <ZCard title="收入预测准确率">
+        {fLoading ? <ZSkeleton /> : !forecastData || forecastData.monthly?.length === 0 ? <ZEmpty message="暂无目标数据" /> : (
+          <>
+            <div className={styles.forecastKpiRow}>
+              <div className={`${styles.forecastKpi} ${styles.forecastAccent}`}>
+                <div className={styles.forecastKpiVal}>{forecastData.avg_accuracy_pct ?? '—'}%</div>
+                <div className={styles.forecastKpiLabel}>平均准确率</div>
+              </div>
+              <div className={styles.forecastKpi}>
+                <div className={styles.forecastKpiVal}>{forecastData.avg_deviation_pct != null ? (forecastData.avg_deviation_pct > 0 ? '+' : '') + forecastData.avg_deviation_pct + '%' : '—'}</div>
+                <div className={styles.forecastKpiLabel}>平均偏差</div>
+              </div>
+            </div>
+            <div className={styles.forecastList}>
+              <div className={styles.forecastHeader}>
+                <span>月份</span><span>目标¥</span><span>实际¥</span><span>准确率</span>
+              </div>
+              {forecastData.monthly.map((m: any) => (
+                <div key={`${m.year}-${m.month}`} className={`${styles.forecastRow} ${m.accuracy_pct && m.accuracy_pct >= 95 ? styles.forecastGood : ''}`}>
+                  <span>{m.year}/{String(m.month).padStart(2, '0')}</span>
+                  <span>¥{m.target_yuan?.toLocaleString()}</span>
+                  <span>¥{m.actual_yuan?.toLocaleString()}</span>
+                  <span className={styles.forecastAcc}>{m.accuracy_pct ?? '—'}%</span>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </ZCard>
+      <ZCard title="员工任务热力图（峰值星期）">
+        {hLoading ? <ZSkeleton /> : !heatmapData || heatmapData.staff?.length === 0 ? <ZEmpty message="暂无员工任务数据" /> : (
+          <div className={styles.heatmapList}>
+            <div className={styles.heatmapHeader}>
+              <span>员工</span><span>总任务</span><span>峰值日</span>
+            </div>
+            {heatmapData.staff.map((s: any) => (
+              <div key={s.user_id} className={styles.heatmapRow}>
+                <span className={styles.heatmapId}>{s.user_id}</span>
+                <span>{s.total_tasks}</span>
+                <span className={styles.heatmapPeak}>{s.peak_weekday}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </ZCard>
+      <ZCard title="客户全生命周期宴会次数">
+        {ltLoading ? <ZSkeleton /> : !ltData ? <ZEmpty message="暂无数据" /> : (
+          <>
+            <div className={styles.ltKpiRow}>
+              <div className={styles.ltKpi}>
+                <div className={styles.ltKpiVal}>{ltData.avg_events ?? '—'}</div>
+                <div className={styles.ltKpiLabel}>平均次数</div>
+              </div>
+              <div className={styles.ltKpi}>
+                <div className={styles.ltKpiVal}>{ltData.median_events ?? '—'}</div>
+                <div className={styles.ltKpiLabel}>中位数</div>
+              </div>
+              <div className={styles.ltKpi}>
+                <div className={styles.ltKpiVal}>{ltData.total_customers}</div>
+                <div className={styles.ltKpiLabel}>客户数</div>
+              </div>
+            </div>
+            <div className={styles.ltDistList}>
+              {(ltData.distribution || []).map((b: any) => (
+                <div key={b.bucket} className={styles.ltDistRow}>
+                  <span className={styles.ltDistLabel}>{b.bucket}</span>
+                  <div className={styles.ltDistTrack}>
+                    <div className={styles.ltDistFill} style={{ width: `${b.pct}%` }} />
+                  </div>
+                  <span className={styles.ltDistStat}>{b.count}人 ({b.pct}%)</span>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </ZCard>
+    </div>
+  );
+}
+
+// Phase 35 Tab 1 — DepositRefundTab「定金退款&赢单比&VIP留存」
+function DepositRefundTab() {
+  const { storeId } = useStore();
+  const [refundData, setRefundData] = useState<any>(null);
+  const [ratioData, setRatioData] = useState<any>(null);
+  const [retData, setRetData] = useState<any>(null);
+  const [rLoading, setRLoading] = useState(false);
+  const [wLoading, setWLoading] = useState(false);
+  const [vLoading, setVLoading] = useState(false);
+
+  const loadRefund = useCallback(async () => {
+    if (!storeId) return;
+    setRLoading(true);
+    try {
+      const r = await apiClient.get(`/api/v1/banquet-agent/stores/${storeId}/analytics/deposit-refund-rate`);
+      setRefundData(r.data);
+    } catch (e) { handleApiError(e); }
+    finally { setRLoading(false); }
+  }, [storeId]);
+
+  const loadRatio = useCallback(async () => {
+    if (!storeId) return;
+    setWLoading(true);
+    try {
+      const r = await apiClient.get(`/api/v1/banquet-agent/stores/${storeId}/analytics/lead-win-loss-ratio`);
+      setRatioData(r.data);
+    } catch (e) { handleApiError(e); }
+    finally { setWLoading(false); }
+  }, [storeId]);
+
+  const loadRet = useCallback(async () => {
+    if (!storeId) return;
+    setVLoading(true);
+    try {
+      const r = await apiClient.get(`/api/v1/banquet-agent/stores/${storeId}/analytics/vip-retention-rate`);
+      setRetData(r.data);
+    } catch (e) { handleApiError(e); }
+    finally { setVLoading(false); }
+  }, [storeId]);
+
+  useEffect(() => { loadRefund(); loadRatio(); loadRet(); }, [loadRefund, loadRatio, loadRet]);
+
+  return (
+    <div className={styles.depositTab}>
+      <ZCard title="定金退款率">
+        {rLoading ? <ZSkeleton /> : !refundData ? <ZEmpty message="暂无数据" /> : (
+          <div className={styles.depositKpiRow}>
+            <div className={styles.depositKpi}>
+              <div className={styles.depositKpiVal}>{refundData.total_cancelled}</div>
+              <div className={styles.depositKpiLabel}>取消订单</div>
+            </div>
+            <div className={`${styles.depositKpi} ${styles.depositRed}`}>
+              <div className={styles.depositKpiVal}>{refundData.refund_rate_pct ?? '—'}%</div>
+              <div className={styles.depositKpiLabel}>定金退款率</div>
+            </div>
+            <div className={styles.depositKpi}>
+              <div className={styles.depositKpiVal}>¥{refundData.avg_deposit_yuan ?? '—'}</div>
+              <div className={styles.depositKpiLabel}>均退定金</div>
+            </div>
+          </div>
+        )}
+      </ZCard>
+      <ZCard title="线索赢单/输单比">
+        {wLoading ? <ZSkeleton /> : !ratioData ? <ZEmpty message="暂无数据" /> : (
+          <div className={styles.winlossKpiRow}>
+            <div className={`${styles.winlossKpi} ${styles.winGreen}`}>
+              <div className={styles.winlossKpiVal}>{ratioData.won}</div>
+              <div className={styles.winlossKpiLabel}>赢单</div>
+            </div>
+            <div className={`${styles.winlossKpi} ${styles.winRed}`}>
+              <div className={styles.winlossKpiVal}>{ratioData.lost}</div>
+              <div className={styles.winlossKpiLabel}>输单</div>
+            </div>
+            <div className={`${styles.winlossKpi} ${styles.winAccent}`}>
+              <div className={styles.winlossKpiVal}>{ratioData.win_loss_ratio ?? '—'}</div>
+              <div className={styles.winlossKpiLabel}>赢/输比</div>
+            </div>
+            <div className={styles.winlossKpi}>
+              <div className={styles.winlossKpiVal}>{ratioData.win_rate_pct ?? '—'}%</div>
+              <div className={styles.winlossKpiLabel}>赢单率</div>
+            </div>
+          </div>
+        )}
+      </ZCard>
+      <ZCard title="VIP 客户留存率">
+        {vLoading ? <ZSkeleton /> : !retData ? <ZEmpty message="暂无VIP数据" /> : (
+          <>
+            <div className={styles.retKpiRow}>
+              <div className={styles.retKpi}>
+                <div className={styles.retKpiVal}>{retData.total_vip}</div>
+                <div className={styles.retKpiLabel}>VIP总数</div>
+              </div>
+              <div className={`${styles.retKpi} ${styles.retAccent}`}>
+                <div className={styles.retKpiVal}>{retData.retention_rate_pct ?? '—'}%</div>
+                <div className={styles.retKpiLabel}>留存率</div>
+              </div>
+            </div>
+            {(retData.by_level || []).length > 0 && (
+              <div className={styles.retLevelList}>
+                <div className={styles.retLevelHeader}>
+                  <span>VIP等级</span><span>总数</span><span>留存</span><span>留存率</span>
+                </div>
+                {retData.by_level.map((l: any) => (
+                  <div key={l.vip_level} className={styles.retLevelRow}>
+                    <span className={styles.retLevelBadge}>Lv.{l.vip_level}</span>
+                    <span>{l.total}</span>
+                    <span>{l.retained}</span>
+                    <span className={styles.retRate}>{l.retention_rate_pct}%</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </ZCard>
+    </div>
+  );
+}
+
+// Phase 35 Tab 2 — SeasonalRevenueTab「季节收入指数&复购间隔&停用率」
+function SeasonalRevenueTab() {
+  const { storeId } = useStore();
+  const [seasonData, setSeasonData] = useState<any>(null);
+  const [intervalData, setIntervalData] = useState<any>(null);
+  const [downtimeData, setDowntimeData] = useState<any>(null);
+  const [sLoading, setSLoading] = useState(false);
+  const [iLoading, setILoading] = useState(false);
+  const [dLoading, setDLoading] = useState(false);
+
+  const loadSeason = useCallback(async () => {
+    if (!storeId) return;
+    setSLoading(true);
+    try {
+      const r = await apiClient.get(`/api/v1/banquet-agent/stores/${storeId}/analytics/seasonal-revenue-index`);
+      setSeasonData(r.data);
+    } catch (e) { handleApiError(e); }
+    finally { setSLoading(false); }
+  }, [storeId]);
+
+  const loadInterval = useCallback(async () => {
+    if (!storeId) return;
+    setILoading(true);
+    try {
+      const r = await apiClient.get(`/api/v1/banquet-agent/stores/${storeId}/analytics/banquet-repeat-interval`);
+      setIntervalData(r.data);
+    } catch (e) { handleApiError(e); }
+    finally { setILoading(false); }
+  }, [storeId]);
+
+  const loadDowntime = useCallback(async () => {
+    if (!storeId) return;
+    setDLoading(true);
+    try {
+      const r = await apiClient.get(`/api/v1/banquet-agent/stores/${storeId}/analytics/hall-maintenance-downtime`);
+      setDowntimeData(r.data);
+    } catch (e) { handleApiError(e); }
+    finally { setDLoading(false); }
+  }, [storeId]);
+
+  useEffect(() => { loadSeason(); loadInterval(); loadDowntime(); }, [loadSeason, loadInterval, loadDowntime]);
+
+  const MONTH_NAMES = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
+
+  return (
+    <div className={styles.seasonalRevTab}>
+      <ZCard title="季节收入指数">
+        {sLoading ? <ZSkeleton /> : !seasonData || seasonData.monthly?.length === 0 ? <ZEmpty message="暂无数据" /> : (
+          <>
+            <div className={styles.seasonRevKpi}>
+              峰值月 <strong>{seasonData.peak_month ? MONTH_NAMES[seasonData.peak_month - 1] : '—'}</strong>
+              &nbsp;&nbsp;低谷月 <strong>{seasonData.trough_month ? MONTH_NAMES[seasonData.trough_month - 1] : '—'}</strong>
+            </div>
+            <div className={styles.seasonRevBars}>
+              {seasonData.monthly.filter((m: any) => m.order_count > 0).map((m: any) => (
+                <div key={m.month} className={`${styles.seasonRevBar} ${m.month === seasonData.peak_month ? styles.seasonRevPeak : ''}`}>
+                  <div className={styles.seasonRevBarTrack}>
+                    <div className={styles.seasonRevBarFill} style={{ height: `${Math.min((m.seasonal_index || 0) * 50, 100)}%` }} />
+                  </div>
+                  <div className={styles.seasonRevBarLabel}>{MONTH_NAMES[m.month - 1]}</div>
+                  <div className={styles.seasonRevBarIdx}>{m.seasonal_index ?? '—'}</div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </ZCard>
+      <ZCard title="宴会复购间隔">
+        {iLoading ? <ZSkeleton /> : !intervalData ? <ZEmpty message="暂无数据" /> : (
+          <div className={styles.intervalKpiRow}>
+            <div className={styles.intervalKpi}>
+              <div className={styles.intervalKpiVal}>{intervalData.total_repeat_customers}</div>
+              <div className={styles.intervalKpiLabel}>复购客户数</div>
+            </div>
+            <div className={`${styles.intervalKpi} ${styles.intervalAccent}`}>
+              <div className={styles.intervalKpiVal}>{intervalData.avg_interval_days ?? '—'}</div>
+              <div className={styles.intervalKpiLabel}>均间隔(天)</div>
+            </div>
+            <div className={styles.intervalKpi}>
+              <div className={styles.intervalKpiVal}>{intervalData.median_interval_days ?? '—'}</div>
+              <div className={styles.intervalKpiLabel}>中位间隔(天)</div>
+            </div>
+          </div>
+        )}
+      </ZCard>
+      <ZCard title="厅房停用率">
+        {dLoading ? <ZSkeleton /> : !downtimeData ? <ZEmpty message="暂无数据" /> : (
+          <>
+            <div className={styles.downtimeKpiRow}>
+              <div className={styles.downtimeKpi}>
+                <div className={styles.downtimeKpiVal}>{downtimeData.total_halls}</div>
+                <div className={styles.downtimeKpiLabel}>厅房总数</div>
+              </div>
+              <div className={`${styles.downtimeKpi} ${styles.downtimeRed}`}>
+                <div className={styles.downtimeKpiVal}>{downtimeData.downtime_rate_pct ?? '—'}%</div>
+                <div className={styles.downtimeKpiLabel}>停用率</div>
+              </div>
+            </div>
+            <div className={styles.downtimeHallList}>
+              {(downtimeData.halls || []).map((h: any) => (
+                <div key={h.hall_id} className={`${styles.downtimeHallRow} ${!h.is_active ? styles.downtimeInactive : ''}`}>
+                  <span>{h.name}</span>
+                  <ZBadge label={h.is_active ? '运营中' : '停用'} variant={h.is_active ? 'success' : 'error'} />
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </ZCard>
+    </div>
+  );
+}
+
+// Phase 36 Tab 1 — CancellationReasonsTab「取消分析&报价接受率&客户流失」
+function CancellationReasonsTab() {
+  const { storeId } = useStore();
+  const [cancelData, setCancelData] = useState<any>(null);
+  const [acceptData, setAcceptData] = useState<any>(null);
+  const [churnData, setChurnData] = useState<any>(null);
+  const [c1Loading, setC1Loading] = useState(false);
+  const [c2Loading, setC2Loading] = useState(false);
+  const [c3Loading, setC3Loading] = useState(false);
+
+  const loadCancel = useCallback(async () => {
+    if (!storeId) return;
+    setC1Loading(true);
+    try {
+      const r = await apiClient.get(`/api/v1/banquet-agent/stores/${storeId}/analytics/banquet-cancellation-reasons`);
+      setCancelData(r.data);
+    } catch (e) { handleApiError(e); }
+    finally { setC1Loading(false); }
+  }, [storeId]);
+
+  const loadAccept = useCallback(async () => {
+    if (!storeId) return;
+    setC2Loading(true);
+    try {
+      const r = await apiClient.get(`/api/v1/banquet-agent/stores/${storeId}/analytics/quote-acceptance-rate`);
+      setAcceptData(r.data);
+    } catch (e) { handleApiError(e); }
+    finally { setC2Loading(false); }
+  }, [storeId]);
+
+  const loadChurn = useCallback(async () => {
+    if (!storeId) return;
+    setC3Loading(true);
+    try {
+      const r = await apiClient.get(`/api/v1/banquet-agent/stores/${storeId}/analytics/customer-churn-risk`);
+      setChurnData(r.data);
+    } catch (e) { handleApiError(e); }
+    finally { setC3Loading(false); }
+  }, [storeId]);
+
+  useEffect(() => { loadCancel(); loadAccept(); loadChurn(); }, [loadCancel, loadAccept, loadChurn]);
+
+  return (
+    <div className={styles.cancelTab}>
+      <ZCard title="取消订单分析">
+        {c1Loading ? <ZSkeleton /> : !cancelData || cancelData.total_cancelled === 0 ? <ZEmpty message="暂无取消订单" /> : (
+          <>
+            <div className={styles.cancelKpiRow}>
+              <div className={`${styles.cancelKpi} ${styles.cancelRed}`}>
+                <div className={styles.cancelKpiVal}>{cancelData.total_cancelled}</div>
+                <div className={styles.cancelKpiLabel}>取消总数</div>
+              </div>
+              <div className={styles.cancelKpi}>
+                <div className={styles.cancelKpiVal}>¥{cancelData.total_deposit_lost_yuan?.toLocaleString()}</div>
+                <div className={styles.cancelKpiLabel}>定金损失</div>
+              </div>
+            </div>
+            <div className={styles.cancelTypeList}>
+              {cancelData.by_type.map((t: any) => (
+                <div key={t.banquet_type} className={`${styles.cancelTypeRow} ${t.banquet_type === cancelData.top_cancel_type ? styles.cancelTopRow : ''}`}>
+                  <span className={styles.cancelTypeName}>{t.banquet_type}</span>
+                  <div className={styles.cancelTypeTrack}>
+                    <div className={styles.cancelTypeFill} style={{ width: `${t.pct}%` }} />
+                  </div>
+                  <span className={styles.cancelTypeStat}>{t.count}单 ({t.pct}%)</span>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </ZCard>
+      <ZCard title="报价接受率">
+        {c2Loading ? <ZSkeleton /> : !acceptData ? <ZEmpty message="暂无数据" /> : (
+          <div className={styles.acceptKpiRow}>
+            <div className={styles.acceptKpi}>
+              <div className={styles.acceptKpiVal}>{acceptData.total_quoted}</div>
+              <div className={styles.acceptKpiLabel}>进入报价漏斗</div>
+            </div>
+            <div className={`${styles.acceptKpi} ${styles.acceptAccent}`}>
+              <div className={styles.acceptKpiVal}>{acceptData.acceptance_rate_pct ?? '—'}%</div>
+              <div className={styles.acceptKpiLabel}>接受率</div>
+            </div>
+            <div className={styles.acceptKpi}>
+              <div className={styles.acceptKpiVal}>{acceptData.won_count}</div>
+              <div className={styles.acceptKpiLabel}>成交</div>
+            </div>
+          </div>
+        )}
+      </ZCard>
+      <ZCard title="客户流失风险">
+        {c3Loading ? <ZSkeleton /> : !churnData ? <ZEmpty message="暂无数据" /> : (
+          <div className={styles.churnKpiRow}>
+            <div className={styles.churnKpi}>
+              <div className={styles.churnKpiVal}>{churnData.total_customers}</div>
+              <div className={styles.churnKpiLabel}>客户总数</div>
+            </div>
+            <div className={`${styles.churnKpi} ${styles.churnRed}`}>
+              <div className={styles.churnKpiVal}>{churnData.at_risk_count}</div>
+              <div className={styles.churnKpiLabel}>高风险客户</div>
+            </div>
+            <div className={styles.churnKpi}>
+              <div className={styles.churnKpiVal}>{churnData.churn_risk_pct ?? '—'}%</div>
+              <div className={styles.churnKpiLabel}>流失风险率</div>
+            </div>
+          </div>
+        )}
+      </ZCard>
+    </div>
+  );
+}
+
+// Phase 36 Tab 2 — WeekdayPatternTab「星期分布&套餐贡献&员工超时」
+function WeekdayPatternTab() {
+  const { storeId } = useStore();
+  const [wdData, setWdData] = useState<any>(null);
+  const [pkgData, setPkgData] = useState<any>(null);
+  const [otData, setOtData] = useState<any>(null);
+  const [w1Loading, setW1Loading] = useState(false);
+  const [w2Loading, setW2Loading] = useState(false);
+  const [w3Loading, setW3Loading] = useState(false);
+
+  const loadWd = useCallback(async () => {
+    if (!storeId) return;
+    setW1Loading(true);
+    try {
+      const r = await apiClient.get(`/api/v1/banquet-agent/stores/${storeId}/analytics/banquet-day-of-week-pattern`);
+      setWdData(r.data);
+    } catch (e) { handleApiError(e); }
+    finally { setW1Loading(false); }
+  }, [storeId]);
+
+  const loadPkg = useCallback(async () => {
+    if (!storeId) return;
+    setW2Loading(true);
+    try {
+      const r = await apiClient.get(`/api/v1/banquet-agent/stores/${storeId}/analytics/package-revenue-contribution`);
+      setPkgData(r.data);
+    } catch (e) { handleApiError(e); }
+    finally { setW2Loading(false); }
+  }, [storeId]);
+
+  const loadOt = useCallback(async () => {
+    if (!storeId) return;
+    setW3Loading(true);
+    try {
+      const r = await apiClient.get(`/api/v1/banquet-agent/stores/${storeId}/analytics/staff-overtime-rate`);
+      setOtData(r.data);
+    } catch (e) { handleApiError(e); }
+    finally { setW3Loading(false); }
+  }, [storeId]);
+
+  useEffect(() => { loadWd(); loadPkg(); loadOt(); }, [loadWd, loadPkg, loadOt]);
+
+  return (
+    <div className={styles.weekdayTab}>
+      <ZCard title="宴会星期分布">
+        {w1Loading ? <ZSkeleton /> : !wdData || wdData.by_weekday?.length === 0 ? <ZEmpty message="暂无数据" /> : (
+          <>
+            <div className={styles.wdPeak}>峰值 <strong>{wdData.peak_weekday}</strong> &nbsp; 总计 {wdData.total_orders} 单</div>
+            <div className={styles.wdBars}>
+              {(wdData.by_weekday || []).map((d: any) => {
+                const maxCount = Math.max(...(wdData.by_weekday || []).map((x: any) => x.order_count));
+                const pct = maxCount > 0 ? (d.order_count / maxCount) * 100 : 0;
+                return (
+                  <div key={d.weekday} className={`${styles.wdBar} ${d.weekday === wdData.peak_weekday ? styles.wdPeakBar : ''}`}>
+                    <div className={styles.wdBarTrack}>
+                      <div className={styles.wdBarFill} style={{ height: `${pct}%` }} />
+                    </div>
+                    <div className={styles.wdBarLabel}>{d.weekday.replace('周', '')}</div>
+                    <div className={styles.wdBarCount}>{d.order_count}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
+      </ZCard>
+      <ZCard title="套餐收入贡献率">
+        {w2Loading ? <ZSkeleton /> : !pkgData ? <ZEmpty message="暂无数据" /> : (
+          <div className={styles.pkgContribRow}>
+            <div className={styles.pkgContribKpi}>
+              <div className={styles.pkgContribVal}>{pkgData.total_orders}</div>
+              <div className={styles.pkgContribLabel}>总订单</div>
+            </div>
+            <div className={`${styles.pkgContribKpi} ${styles.pkgContribAccent}`}>
+              <div className={styles.pkgContribVal}>{pkgData.pkg_revenue_pct ?? '—'}%</div>
+              <div className={styles.pkgContribLabel}>套餐收入占比</div>
+            </div>
+            <div className={styles.pkgContribKpi}>
+              <div className={styles.pkgContribVal}>¥{pkgData.pkg_revenue_yuan?.toLocaleString()}</div>
+              <div className={styles.pkgContribLabel}>套餐收入</div>
+            </div>
+          </div>
+        )}
+      </ZCard>
+      <ZCard title="员工任务超时率">
+        {w3Loading ? <ZSkeleton /> : !otData ? <ZEmpty message="暂无数据" /> : (
+          <div className={styles.otKpiRow}>
+            <div className={styles.otKpi}>
+              <div className={styles.otKpiVal}>{otData.total_completed}</div>
+              <div className={styles.otKpiLabel}>已完成任务</div>
+            </div>
+            <div className={`${styles.otKpi} ${styles.otRed}`}>
+              <div className={styles.otKpiVal}>{otData.overtime_rate_pct ?? '—'}%</div>
+              <div className={styles.otKpiLabel}>超时率</div>
+            </div>
+            <div className={styles.otKpi}>
+              <div className={styles.otKpiVal}>{otData.overtime_count}</div>
+              <div className={styles.otKpiLabel}>超时次数</div>
+            </div>
+          </div>
+        )}
+      </ZCard>
+    </div>
+  );
+}
+
+// Phase 37 Tab 1 — RevenuePerTableTab「桌均收入&来源量&人均消费」
+function RevenuePerTableTab() {
+  const { storeId } = useStore();
+  const [rptData, setRptData] = useState<any>(null);
+  const [srcData, setSrcData] = useState<any>(null);
+  const [spendData, setSpendData] = useState<any>(null);
+  const [r1L, setR1L] = useState(false);
+  const [r2L, setR2L] = useState(false);
+  const [r3L, setR3L] = useState(false);
+
+  const loadRpt = useCallback(async () => {
+    if (!storeId) return; setR1L(true);
+    try { const r = await apiClient.get(`/api/v1/banquet-agent/stores/${storeId}/analytics/banquet-revenue-per-table`); setRptData(r.data); }
+    catch (e) { handleApiError(e); } finally { setR1L(false); }
+  }, [storeId]);
+
+  const loadSrc = useCallback(async () => {
+    if (!storeId) return; setR2L(true);
+    try { const r = await apiClient.get(`/api/v1/banquet-agent/stores/${storeId}/analytics/lead-source-volume`); setSrcData(r.data); }
+    catch (e) { handleApiError(e); } finally { setR2L(false); }
+  }, [storeId]);
+
+  const loadSpend = useCallback(async () => {
+    if (!storeId) return; setR3L(true);
+    try { const r = await apiClient.get(`/api/v1/banquet-agent/stores/${storeId}/analytics/customer-average-spend`); setSpendData(r.data); }
+    catch (e) { handleApiError(e); } finally { setR3L(false); }
+  }, [storeId]);
+
+  useEffect(() => { loadRpt(); loadSrc(); loadSpend(); }, [loadRpt, loadSrc, loadSpend]);
+
+  return (
+    <div className={styles.rptTab}>
+      <ZCard title="各宴会类型桌均收入">
+        {r1L ? <ZSkeleton /> : !rptData ? <ZEmpty message="暂无数据" /> : (
+          <>
+            <div className={styles.rptOverall}>
+              总体桌均 <span className={styles.rptOverallVal}>¥{rptData.overall_rev_per_table ?? '—'}</span>
+            </div>
+            <div className={styles.rptList}>
+              <div className={styles.rptHeader}><span>类型</span><span>桌数</span><span>总收入</span><span>桌均¥</span></div>
+              {(rptData.by_type || []).map((t: any) => (
+                <div key={t.banquet_type} className={styles.rptRow}>
+                  <span>{t.banquet_type}</span>
+                  <span>{t.total_tables}</span>
+                  <span>¥{t.total_revenue_yuan?.toLocaleString()}</span>
+                  <span className={styles.rptVal}>¥{t.rev_per_table_yuan}</span>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </ZCard>
+      <ZCard title="线索来源量">
+        {r2L ? <ZSkeleton /> : !srcData || srcData.total_leads === 0 ? <ZEmpty message="暂无线索数据" /> : (
+          <>
+            <div className={styles.srcVolKpi}>
+              总线索 <span className={styles.srcVolVal}>{srcData.total_leads}</span>
+              &nbsp;最多来源 <strong>{srcData.top_source}</strong>
+            </div>
+            <div className={styles.srcVolList}>
+              {(srcData.sources || []).map((s: any) => (
+                <div key={s.channel} className={styles.srcVolRow}>
+                  <span className={styles.srcVolCh}>{s.channel}</span>
+                  <div className={styles.srcVolTrack}>
+                    <div className={styles.srcVolFill} style={{ width: `${s.pct}%` }} />
+                  </div>
+                  <span className={styles.srcVolStat}>{s.count}条 ({s.pct}%)</span>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </ZCard>
+      <ZCard title="客户人均/桌均消费">
+        {r3L ? <ZSkeleton /> : !spendData ? <ZEmpty message="暂无数据" /> : (
+          <div className={styles.spendKpiRow}>
+            <div className={styles.spendKpi}>
+              <div className={styles.spendKpiVal}>¥{spendData.avg_spend_per_person_yuan ?? '—'}</div>
+              <div className={styles.spendKpiLabel}>人均消费</div>
+            </div>
+            <div className={`${styles.spendKpi} ${styles.spendAccent}`}>
+              <div className={styles.spendKpiVal}>¥{spendData.avg_spend_per_table_yuan ?? '—'}</div>
+              <div className={styles.spendKpiLabel}>桌均消费</div>
+            </div>
+            <div className={styles.spendKpi}>
+              <div className={styles.spendKpiVal}>{spendData.total_people?.toLocaleString()}</div>
+              <div className={styles.spendKpiLabel}>总客数</div>
+            </div>
+          </div>
+        )}
+      </ZCard>
+    </div>
+  );
+}
+
+// Phase 37 Tab 2 — ReviewSentimentTab「评价情感&任务速度&月度增长」
+function ReviewSentimentTab() {
+  const { storeId } = useStore();
+  const [sentData, setSentData] = useState<any>(null);
+  const [speedData, setSpeedData] = useState<any>(null);
+  const [growthData, setGrowthData] = useState<any>(null);
+  const [s1L, setS1L] = useState(false);
+  const [s2L, setS2L] = useState(false);
+  const [s3L, setS3L] = useState(false);
+
+  const loadSent = useCallback(async () => {
+    if (!storeId) return; setS1L(true);
+    try { const r = await apiClient.get(`/api/v1/banquet-agent/stores/${storeId}/analytics/review-sentiment-breakdown`); setSentData(r.data); }
+    catch (e) { handleApiError(e); } finally { setS1L(false); }
+  }, [storeId]);
+
+  const loadSpeed = useCallback(async () => {
+    if (!storeId) return; setS2L(true);
+    try { const r = await apiClient.get(`/api/v1/banquet-agent/stores/${storeId}/analytics/task-completion-speed`); setSpeedData(r.data); }
+    catch (e) { handleApiError(e); } finally { setS2L(false); }
+  }, [storeId]);
+
+  const loadGrowth = useCallback(async () => {
+    if (!storeId) return; setS3L(true);
+    try { const r = await apiClient.get(`/api/v1/banquet-agent/stores/${storeId}/analytics/monthly-order-growth`); setGrowthData(r.data); }
+    catch (e) { handleApiError(e); } finally { setS3L(false); }
+  }, [storeId]);
+
+  useEffect(() => { loadSent(); loadSpeed(); loadGrowth(); }, [loadSent, loadSpeed, loadGrowth]);
+
+  return (
+    <div className={styles.sentimentTab}>
+      <ZCard title="评价情感分布">
+        {s1L ? <ZSkeleton /> : !sentData || sentData.total_reviews === 0 ? <ZEmpty message="暂无评价数据" /> : (
+          <>
+            <div className={styles.sentKpiRow}>
+              <div className={`${styles.sentKpi} ${styles.sentGreen}`}>
+                <div className={styles.sentKpiVal}>{sentData.positive_pct ?? '—'}%</div>
+                <div className={styles.sentKpiLabel}>好评 ({sentData.positive_count})</div>
+              </div>
+              <div className={styles.sentKpi}>
+                <div className={styles.sentKpiVal}>{sentData.neutral_pct ?? '—'}%</div>
+                <div className={styles.sentKpiLabel}>中评 ({sentData.neutral_count})</div>
+              </div>
+              <div className={`${styles.sentKpi} ${styles.sentRed}`}>
+                <div className={styles.sentKpiVal}>{sentData.negative_pct ?? '—'}%</div>
+                <div className={styles.sentKpiLabel}>差评 ({sentData.negative_count})</div>
+              </div>
+            </div>
+            {sentData.top_improvement_tags?.length > 0 && (
+              <div className={styles.sentTagList}>
+                <div className={styles.sentTagTitle}>高频改进标签</div>
+                {sentData.top_improvement_tags.map((t: any) => (
+                  <span key={t.tag} className={styles.sentTag}>{t.tag} ({t.count})</span>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </ZCard>
+      <ZCard title="任务完成速度">
+        {s2L ? <ZSkeleton /> : !speedData ? <ZEmpty message="暂无数据" /> : (
+          <div className={styles.speedKpiRow}>
+            <div className={styles.speedKpi}>
+              <div className={styles.speedKpiVal}>{speedData.avg_hours ?? '—'}h</div>
+              <div className={styles.speedKpiLabel}>平均耗时</div>
+            </div>
+            <div className={styles.speedKpi}>
+              <div className={styles.speedKpiVal}>{speedData.median_hours ?? '—'}h</div>
+              <div className={styles.speedKpiLabel}>中位耗时</div>
+            </div>
+            <div className={`${styles.speedKpi} ${styles.speedAccent}`}>
+              <div className={styles.speedKpiVal}>{speedData.fast_pct ?? '—'}%</div>
+              <div className={styles.speedKpiLabel}>24h内完成</div>
+            </div>
+          </div>
+        )}
+      </ZCard>
+      <ZCard title="月度订单增长率">
+        {s3L ? <ZSkeleton /> : !growthData || growthData.monthly?.length === 0 ? <ZEmpty message="暂无数据" /> : (
+          <>
+            <div className={styles.growthAvg}>
+              均环比 <span className={styles.growthAvgVal}>{growthData.avg_growth_pct != null ? (growthData.avg_growth_pct > 0 ? '+' : '') + growthData.avg_growth_pct + '%' : '—'}</span>
+            </div>
+            <div className={styles.growthList}>
+              <div className={styles.growthHeader}><span>月份</span><span>订单数</span><span>环比</span></div>
+              {growthData.monthly.slice(-6).map((m: any) => (
+                <div key={`${m.year}-${m.month}`} className={styles.growthRow}>
+                  <span>{m.year}/{String(m.month).padStart(2,'0')}</span>
+                  <span>{m.order_count}</span>
+                  <span className={m.mom_growth_pct != null && m.mom_growth_pct > 0 ? styles.growthPos : styles.growthNeg}>
+                    {m.mom_growth_pct != null ? (m.mom_growth_pct > 0 ? '+' : '') + m.mom_growth_pct + '%' : '—'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </ZCard>
+    </div>
+  );
+}
+
+/* ─── Phase 38: 加购分析 Tab ─── */
+function UpsellAnalysisTab() {
+  const STORE = localStorage.getItem('store_id') || 'S001';
+  const [upsellData, setUpsellData]   = useState<any>(null);
+  const [capData,    setCapData]      = useState<any>(null);
+  const [refData,    setRefData]      = useState<any>(null);
+  const [signData,   setSignData]     = useState<any>(null);
+  const [loading,    setLoading]      = useState(true);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [u, c, r, s] = await Promise.all([
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/upsell-success-rate?months=6`),
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/capacity-utilization?months=6`),
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/referral-conversion-rate?months=6`),
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/contract-signing-speed?months=6`),
+      ]);
+      setUpsellData((u as any).data);
+      setCapData((c as any).data);
+      setRefData((r as any).data);
+      setSignData((s as any).data);
+    } catch (e) { handleApiError(e); }
+    finally { setLoading(false); }
+  }, [STORE]);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (loading) return <ZSkeleton rows={5} />;
+
+  return (
+    <div className={styles.upsell38Tab}>
+      <ZCard title="加购成功率">
+        {!upsellData || upsellData.upsell_rate_pct == null ? <ZEmpty /> : (
+          <div className={styles.upsell38KpiRow}>
+            <div className={`${styles.upsell38Kpi} ${styles.upsell38Accent}`}>
+              <span className={styles.upsell38KpiVal}>{upsellData.upsell_rate_pct}%</span>
+              <span className={styles.upsell38KpiLabel}>加购率</span>
+            </div>
+            <div className={styles.upsell38Kpi}>
+              <span className={styles.upsell38KpiVal}>¥{upsellData.avg_upsell_yuan ?? '-'}</span>
+              <span className={styles.upsell38KpiLabel}>平均加购额</span>
+            </div>
+            <div className={styles.upsell38Kpi}>
+              <span className={styles.upsell38KpiVal}>{upsellData.upsell_count ?? 0}</span>
+              <span className={styles.upsell38KpiLabel}>加购订单数</span>
+            </div>
+          </div>
+        )}
+      </ZCard>
+
+      <ZCard title="容量利用率">
+        {!capData || capData.overall_utilization_pct == null ? <ZEmpty /> : (
+          <div className={styles.cap38Tab}>
+            <div className={styles.cap38Overall}>
+              <span className={styles.cap38OverallVal}>{capData.overall_utilization_pct}%</span>
+              <span>综合利用率</span>
+            </div>
+            <div className={styles.cap38List}>
+              <div className={styles.cap38Header}>
+                <span style={{flex:2}}>厅房</span>
+                <span style={{flex:1}}>预订场次</span>
+                <span style={{flex:1}}>利用率</span>
+              </div>
+              {(capData.halls || []).map((h: any) => (
+                <div key={h.hall_id} className={styles.cap38Row}>
+                  <span style={{flex:2}}>{h.hall_name}</span>
+                  <span style={{flex:1}}>{h.booking_count}</span>
+                  <span style={{flex:1, fontWeight:600}}>{h.utilization_pct ?? '-'}%</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </ZCard>
+
+      <ZCard title="转介绍转化率">
+        {!refData || refData.conversion_rate_pct == null ? <ZEmpty /> : (
+          <div className={styles.ref38KpiRow}>
+            <div className={`${styles.ref38Kpi} ${styles.ref38Accent}`}>
+              <span className={styles.ref38KpiVal}>{refData.conversion_rate_pct}%</span>
+              <span className={styles.ref38KpiLabel}>转化率</span>
+            </div>
+            <div className={styles.ref38Kpi}>
+              <span className={styles.ref38KpiVal}>{refData.total_referrals}</span>
+              <span className={styles.ref38KpiLabel}>转介绍线索</span>
+            </div>
+            <div className={styles.ref38Kpi}>
+              <span className={styles.ref38KpiVal}>{refData.won_count}</span>
+              <span className={styles.ref38KpiLabel}>成单数</span>
+            </div>
+          </div>
+        )}
+      </ZCard>
+
+      <ZCard title="签约速度">
+        {!signData || signData.avg_days_to_sign == null ? <ZEmpty /> : (
+          <div className={styles.sign38KpiRow}>
+            <div className={`${styles.sign38Kpi} ${styles.sign38Accent}`}>
+              <span className={styles.sign38KpiVal}>{signData.avg_days_to_sign}天</span>
+              <span className={styles.sign38KpiLabel}>平均签约周期</span>
+            </div>
+            <div className={styles.sign38Kpi}>
+              <span className={styles.sign38KpiVal}>{signData.fast_sign_pct}%</span>
+              <span className={styles.sign38KpiLabel}>快速签约率(≤14天)</span>
+            </div>
+          </div>
+        )}
+      </ZCard>
+    </div>
+  );
+}
+
+/* ─── Phase 38: 收入趋势 Tab ─── */
+function RevenueTrendTab() {
+  const STORE = localStorage.getItem('store_id') || 'S001';
+  const [trendData, setTrendData]     = useState<any>(null);
+  const [reviewRate, setReviewRate]   = useState<any>(null);
+  const [coordData,  setCoordData]    = useState<any>(null);
+  const [leadData,   setLeadData]     = useState<any>(null);
+  const [loading,    setLoading]      = useState(true);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [t, r, c, l] = await Promise.all([
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/revenue-trend?months=12`),
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/post-event-review-rate?months=6`),
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/coordinator-performance?months=3`),
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/booking-lead-time?months=6`),
+      ]);
+      setTrendData((t as any).data);
+      setReviewRate((r as any).data);
+      setCoordData((c as any).data);
+      setLeadData((l as any).data);
+    } catch (e) { handleApiError(e); }
+    finally { setLoading(false); }
+  }, [STORE]);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (loading) return <ZSkeleton rows={5} />;
+
+  return (
+    <div className={styles.revTrend38Tab}>
+      <ZCard title="月度收入趋势">
+        {!trendData || !trendData.monthly?.length ? <ZEmpty /> : (
+          <>
+            <div className={styles.revTrend38KpiRow}>
+              <div className={`${styles.revTrend38Kpi} ${styles.revTrend38Accent}`}>
+                <span className={styles.revTrend38KpiVal}>¥{trendData.total_revenue_yuan?.toLocaleString()}</span>
+                <span className={styles.revTrend38KpiLabel}>累计收入</span>
+              </div>
+              <div className={styles.revTrend38Kpi}>
+                <span className={styles.revTrend38KpiVal}>¥{trendData.avg_monthly_yuan?.toLocaleString()}</span>
+                <span className={styles.revTrend38KpiLabel}>月均收入</span>
+              </div>
+            </div>
+            <div className={styles.revTrend38List}>
+              <div className={styles.revTrend38Header}>
+                <span style={{flex:2}}>月份</span>
+                <span style={{flex:2}}>收入(元)</span>
+                <span style={{flex:1}}>环比</span>
+              </div>
+              {(trendData.monthly || []).slice(-6).map((m: any) => (
+                <div key={m.month} className={styles.revTrend38Row}>
+                  <span style={{flex:2}}>{m.month}</span>
+                  <span style={{flex:2}}>¥{m.revenue_yuan?.toLocaleString()}</span>
+                  <span style={{flex:1}} className={
+                    m.mom_growth_pct == null ? '' :
+                    m.mom_growth_pct >= 0 ? styles.revTrend38Pos : styles.revTrend38Neg
+                  }>
+                    {m.mom_growth_pct == null ? '-' : `${m.mom_growth_pct > 0 ? '+' : ''}${m.mom_growth_pct}%`}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </ZCard>
+
+      <ZCard title="活动后评价率">
+        {!reviewRate || reviewRate.review_rate_pct == null ? <ZEmpty /> : (
+          <div className={styles.revRate38KpiRow}>
+            <div className={`${styles.revRate38Kpi} ${styles.revRate38Accent}`}>
+              <span className={styles.revRate38KpiVal}>{reviewRate.review_rate_pct}%</span>
+              <span className={styles.revRate38KpiLabel}>评价率</span>
+            </div>
+            <div className={styles.revRate38Kpi}>
+              <span className={styles.revRate38KpiVal}>{reviewRate.reviewed_count}</span>
+              <span className={styles.revRate38KpiLabel}>已评价</span>
+            </div>
+            <div className={styles.revRate38Kpi}>
+              <span className={styles.revRate38KpiVal}>{reviewRate.total_completed}</span>
+              <span className={styles.revRate38KpiLabel}>总完成单</span>
+            </div>
+          </div>
+        )}
+      </ZCard>
+
+      <ZCard title="协调员绩效">
+        {!coordData || !coordData.coordinators?.length ? <ZEmpty /> : (
+          <div className={styles.coord38Tab}>
+            {coordData.top_coordinator && (
+              <div className={styles.coord38Top}>TOP: {coordData.top_coordinator}</div>
+            )}
+            <div className={styles.coord38List}>
+              <div className={styles.coord38Header}>
+                <span style={{flex:2}}>协调员</span>
+                <span style={{flex:1}}>完成单数</span>
+                <span style={{flex:1}}>平均评分</span>
+              </div>
+              {(coordData.coordinators || []).map((c: any, i: number) => (
+                <div key={i} className={styles.coord38Row}>
+                  <span style={{flex:2}}>{c.coordinator}</span>
+                  <span style={{flex:1}}>{c.completed_orders}</span>
+                  <span style={{flex:1, fontWeight:600}}>{c.avg_rating ?? '-'}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </ZCard>
+
+      <ZCard title="预订提前期">
+        {!leadData || leadData.avg_lead_days == null ? <ZEmpty /> : (
+          <div className={styles.leadTime38Tab}>
+            <div className={styles.leadTime38Overall}>
+              <span className={styles.leadTime38OverallVal}>{leadData.avg_lead_days}天</span>
+              <span>平均提前天数</span>
+            </div>
+            <div className={styles.leadTime38DistList}>
+              {(leadData.distribution || []).map((b: any) => (
+                <div key={b.bucket} className={styles.leadTime38DistRow}>
+                  <span className={styles.leadTime38DistLabel}>{b.bucket}</span>
+                  <div className={styles.leadTime38DistTrack}>
+                    <div className={styles.leadTime38DistFill} style={{width:`${b.pct}%`}} />
+                  </div>
+                  <span className={styles.leadTime38DistStat}>{b.count}单 ({b.pct}%)</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </ZCard>
+    </div>
+  );
+}
+
+/* ─── Phase 39: 利润率 Tab ─── */
+function ProfitMarginTab() {
+  const STORE = localStorage.getItem('store_id') || 'S001';
+  const [marginData,  setMarginData]  = useState<any>(null);
+  const [turnData,    setTurnData]    = useState<any>(null);
+  const [payData,     setPayData]     = useState<any>(null);
+  const [sizeData,    setSizeData]    = useState<any>(null);
+  const [loading,     setLoading]     = useState(true);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [m, t, p, s] = await Promise.all([
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/profit-margin?months=6`),
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/hall-turnover-rate?months=6`),
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/payment-method-breakdown?months=6`),
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/order-size-distribution?months=12`),
+      ]);
+      setMarginData((m as any).data);
+      setTurnData((t as any).data);
+      setPayData((p as any).data);
+      setSizeData((s as any).data);
+    } catch (e) { handleApiError(e); }
+    finally { setLoading(false); }
+  }, [STORE]);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (loading) return <ZSkeleton rows={5} />;
+
+  return (
+    <div className={styles.profitMarginTab}>
+      <ZCard title="宴会利润率">
+        {!marginData || marginData.profit_margin_pct == null ? <ZEmpty /> : (
+          <div className={styles.pmKpiRow}>
+            <div className={`${styles.pmKpi} ${styles.pmAccent}`}>
+              <span className={styles.pmKpiVal}>{marginData.profit_margin_pct}%</span>
+              <span className={styles.pmKpiLabel}>利润率</span>
+            </div>
+            <div className={styles.pmKpi}>
+              <span className={styles.pmKpiVal}>¥{marginData.total_revenue_yuan?.toLocaleString()}</span>
+              <span className={styles.pmKpiLabel}>总收入</span>
+            </div>
+            <div className={styles.pmKpi}>
+              <span className={styles.pmKpiVal}>¥{marginData.total_cost_yuan?.toLocaleString()}</span>
+              <span className={styles.pmKpiLabel}>总成本</span>
+            </div>
+          </div>
+        )}
+      </ZCard>
+
+      <ZCard title="厅房翻台率">
+        {!turnData || !turnData.halls?.length ? <ZEmpty /> : (
+          <div className={styles.turnTab}>
+            <div className={styles.turnOverall}>
+              综合翻台率 <strong>{turnData.overall_turnover_rate}</strong> 次/天
+            </div>
+            <div className={styles.turnList}>
+              <div className={styles.turnHeader}>
+                <span style={{flex:2}}>厅房</span>
+                <span style={{flex:1}}>预订场次</span>
+                <span style={{flex:1}}>翻台率</span>
+              </div>
+              {(turnData.halls || []).map((h: any) => (
+                <div key={h.hall_id} className={styles.turnRow}>
+                  <span style={{flex:2}}>{h.hall_name}</span>
+                  <span style={{flex:1}}>{h.booking_count}</span>
+                  <span style={{flex:1, fontWeight:600}}>{h.turnover_rate}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </ZCard>
+
+      <ZCard title="支付方式分析">
+        {!payData || !payData.methods?.length ? <ZEmpty /> : (
+          <div className={styles.payMethodTab}>
+            {payData.top_method && (
+              <div className={styles.payMethodTop}>主要支付：{payData.top_method}</div>
+            )}
+            <div className={styles.payMethodList}>
+              {(payData.methods || []).map((m: any) => (
+                <div key={m.method} className={styles.payMethodRow}>
+                  <span className={styles.payMethodName}>{m.method}</span>
+                  <div className={styles.payMethodTrack}>
+                    <div className={styles.payMethodFill} style={{width:`${m.pct}%`}} />
+                  </div>
+                  <span className={styles.payMethodStat}>{m.count}次 ({m.pct}%)</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </ZCard>
+
+      <ZCard title="订单规模分布">
+        {!sizeData || !sizeData.distribution?.length ? <ZEmpty /> : (
+          <div className={styles.sizeDistTab}>
+            <div className={styles.sizeDistAvg}>
+              平均桌数：<strong>{sizeData.avg_tables}</strong> 桌
+            </div>
+            <div className={styles.sizeDistList}>
+              {(sizeData.distribution || []).map((b: any) => (
+                <div key={b.bucket} className={styles.sizeDistRow}>
+                  <span className={styles.sizeDistLabel}>{b.bucket}</span>
+                  <div className={styles.sizeDistTrack}>
+                    <div className={styles.sizeDistFill}
+                      style={{width:`${Math.round(b.count / sizeData.total_orders * 100)}%`}} />
+                  </div>
+                  <span className={styles.sizeDistStat}>{b.count}单</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </ZCard>
+    </div>
+  );
+}
+
+/* ─── Phase 39: 类型趋势 Tab ─── */
+function TypeTrendTab() {
+  const STORE = localStorage.getItem('store_id') || 'S001';
+  const [typeData,   setTypeData]   = useState<any>(null);
+  const [respData,   setRespData]   = useState<any>(null);
+  const [satData,    setSatData]    = useState<any>(null);
+  const [staffData,  setStaffData]  = useState<any>(null);
+  const [loading,    setLoading]    = useState(true);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [ty, r, s, st] = await Promise.all([
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/banquet-type-trend?months=12`),
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/lead-response-time?months=3`),
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/customer-satisfaction-score?months=6`),
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/staff-task-distribution?months=3`),
+      ]);
+      setTypeData((ty as any).data);
+      setRespData((r as any).data);
+      setSatData((s as any).data);
+      setStaffData((st as any).data);
+    } catch (e) { handleApiError(e); }
+    finally { setLoading(false); }
+  }, [STORE]);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (loading) return <ZSkeleton rows={5} />;
+
+  return (
+    <div className={styles.typeTrend39Tab}>
+      <ZCard title="宴会类型趋势">
+        {!typeData || !typeData.by_type?.length ? <ZEmpty /> : (
+          <div className={styles.tt39List}>
+            {typeData.top_type && (
+              <div className={styles.tt39Top}>最热类型：{typeData.top_type}</div>
+            )}
+            <div className={styles.tt39TypeList}>
+              <div className={styles.tt39Header}>
+                <span style={{flex:2}}>类型</span>
+                <span style={{flex:1}}>总单数</span>
+              </div>
+              {(typeData.by_type || []).map((t: any) => (
+                <div key={t.banquet_type} className={styles.tt39Row}>
+                  <span style={{flex:2}}>{t.banquet_type}</span>
+                  <span style={{flex:1, fontWeight:600}}>{t.total}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </ZCard>
+
+      <ZCard title="线索响应时间">
+        {!respData || respData.avg_response_hours == null ? <ZEmpty /> : (
+          <div className={styles.resp39KpiRow}>
+            <div className={`${styles.resp39Kpi} ${styles.resp39Accent}`}>
+              <span className={styles.resp39KpiVal}>{respData.avg_response_hours}h</span>
+              <span className={styles.resp39KpiLabel}>平均响应</span>
+            </div>
+            <div className={styles.resp39Kpi}>
+              <span className={styles.resp39KpiVal}>{respData.fast_response_pct}%</span>
+              <span className={styles.resp39KpiLabel}>2h内响应率</span>
+            </div>
+            <div className={styles.resp39Kpi}>
+              <span className={styles.resp39KpiVal}>{respData.responded_leads ?? 0}</span>
+              <span className={styles.resp39KpiLabel}>已响应线索</span>
+            </div>
+          </div>
+        )}
+      </ZCard>
+
+      <ZCard title="客户满意度趋势">
+        {!satData || satData.overall_score == null ? <ZEmpty /> : (
+          <div className={styles.sat39Tab}>
+            <div className={styles.sat39Overall}>
+              <span className={styles.sat39OverallVal}>{satData.overall_score}</span>
+              <span>综合满意度（满分100）</span>
+            </div>
+            <div className={styles.sat39List}>
+              <div className={styles.sat39Header}>
+                <span style={{flex:2}}>月份</span>
+                <span style={{flex:1}}>评价数</span>
+                <span style={{flex:1}}>平均分</span>
+              </div>
+              {(satData.monthly || []).slice(-4).map((m: any) => (
+                <div key={m.month} className={styles.sat39Row}>
+                  <span style={{flex:2}}>{m.month}</span>
+                  <span style={{flex:1}}>{m.count}</span>
+                  <span style={{flex:1, fontWeight:600}}>{m.avg_score}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </ZCard>
+
+      <ZCard title="员工任务分布">
+        {!staffData || !staffData.staff?.length ? <ZEmpty /> : (
+          <div className={styles.staff39Tab}>
+            {staffData.busiest_staff && (
+              <div className={styles.staff39Top}>最忙：{staffData.busiest_staff}</div>
+            )}
+            <div className={styles.staff39List}>
+              <div className={styles.staff39Header}>
+                <span style={{flex:2}}>员工ID</span>
+                <span style={{flex:1}}>任务数</span>
+                <span style={{flex:1}}>完成率</span>
+              </div>
+              {(staffData.staff || []).map((s: any) => (
+                <div key={s.user_id} className={styles.staff39Row}>
+                  <span style={{flex:2, fontSize:12}}>{s.user_id}</span>
+                  <span style={{flex:1}}>{s.total_tasks}</span>
+                  <span style={{flex:1, fontWeight:600}}>{s.completion_pct ?? '-'}%</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </ZCard>
+    </div>
+  );
+}
+
+/* ─── Phase 40: 复购分析 Tab ─── */
+function ReorderAnalysisTab() {
+  const STORE = localStorage.getItem('store_id') || 'S001';
+  const [convData,   setConvData]   = useState<any>(null);
+  const [reordData,  setReordData]  = useState<any>(null);
+  const [ageData,    setAgeData]    = useState<any>(null);
+  const [cancelData, setCancelData] = useState<any>(null);
+  const [loading,    setLoading]    = useState(true);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [c, r, a, cl] = await Promise.all([
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/booking-conversion-rate?months=6`),
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/customer-reorder-rate?months=12`),
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/lead-age-distribution?months=6`),
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/cancellation-lead-time?months=6`),
+      ]);
+      setConvData((c as any).data);
+      setReordData((r as any).data);
+      setAgeData((a as any).data);
+      setCancelData((cl as any).data);
+    } catch (e) { handleApiError(e); }
+    finally { setLoading(false); }
+  }, [STORE]);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (loading) return <ZSkeleton rows={5} />;
+
+  return (
+    <div className={styles.reorder40Tab}>
+      <ZCard title="线索转订单转化率">
+        {!convData || convData.conversion_rate_pct == null ? <ZEmpty /> : (
+          <div className={styles.conv40KpiRow}>
+            <div className={`${styles.conv40Kpi} ${styles.conv40Accent}`}>
+              <span className={styles.conv40KpiVal}>{convData.conversion_rate_pct}%</span>
+              <span className={styles.conv40KpiLabel}>转化率</span>
+            </div>
+            <div className={styles.conv40Kpi}>
+              <span className={styles.conv40KpiVal}>{convData.converted_count}</span>
+              <span className={styles.conv40KpiLabel}>成单数</span>
+            </div>
+            <div className={styles.conv40Kpi}>
+              <span className={styles.conv40KpiVal}>{convData.total_leads}</span>
+              <span className={styles.conv40KpiLabel}>总线索</span>
+            </div>
+          </div>
+        )}
+      </ZCard>
+
+      <ZCard title="客户复购率">
+        {!reordData || reordData.reorder_rate_pct == null ? <ZEmpty /> : (
+          <div className={styles.conv40KpiRow}>
+            <div className={`${styles.conv40Kpi} ${styles.conv40Accent}`}>
+              <span className={styles.conv40KpiVal}>{reordData.reorder_rate_pct}%</span>
+              <span className={styles.conv40KpiLabel}>复购率</span>
+            </div>
+            <div className={styles.conv40Kpi}>
+              <span className={styles.conv40KpiVal}>{reordData.reorder_customers}</span>
+              <span className={styles.conv40KpiLabel}>复购客户</span>
+            </div>
+            <div className={styles.conv40Kpi}>
+              <span className={styles.conv40KpiVal}>{reordData.total_customers}</span>
+              <span className={styles.conv40KpiLabel}>总客户</span>
+            </div>
+          </div>
+        )}
+      </ZCard>
+
+      <ZCard title="线索年龄分布">
+        {!ageData || ageData.avg_age_days == null ? <ZEmpty /> : (
+          <div className={styles.age40Tab}>
+            <div className={styles.age40Avg}>
+              平均年龄：<strong>{ageData.avg_age_days}</strong> 天
+            </div>
+            <div className={styles.age40DistList}>
+              {(ageData.distribution || []).map((b: any) => (
+                <div key={b.bucket} className={styles.age40DistRow}>
+                  <span className={styles.age40DistLabel}>{b.bucket}</span>
+                  <div className={styles.age40DistTrack}>
+                    <div className={styles.age40DistFill} style={{width:`${b.pct}%`}} />
+                  </div>
+                  <span className={styles.age40DistStat}>{b.count}条 ({b.pct}%)</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </ZCard>
+
+      <ZCard title="取消提前期分布">
+        {!cancelData || cancelData.avg_days_before_event == null ? <ZEmpty /> : (
+          <div className={styles.cancelLt40Tab}>
+            <div className={styles.cancelLt40Avg}>
+              平均提前：<strong>{cancelData.avg_days_before_event}</strong> 天
+            </div>
+            <div className={styles.cancelLt40DistList}>
+              {(cancelData.distribution || []).map((b: any) => (
+                <div key={b.bucket} className={styles.cancelLt40DistRow}>
+                  <span className={styles.cancelLt40DistLabel}>{b.bucket}</span>
+                  <div className={styles.cancelLt40DistTrack}>
+                    <div className={styles.cancelLt40DistFill} style={{width:`${b.pct}%`}} />
+                  </div>
+                  <span className={styles.cancelLt40DistStat}>{b.count}单 ({b.pct}%)</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </ZCard>
+    </div>
+  );
+}
+
+/* ─── Phase 40: 定金分析 Tab ─── */
+function DepositAnalysisTab() {
+  const STORE = localStorage.getItem('store_id') || 'S001';
+  const [depositData,  setDepositData]  = useState<any>(null);
+  const [customData,   setCustomData]   = useState<any>(null);
+  const [perfData,     setPerfData]     = useState<any>(null);
+  const [seasonData,   setSeasonData]   = useState<any>(null);
+  const [loading,      setLoading]      = useState(true);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [d, c, p, s] = await Promise.all([
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/deposit-ratio-analysis?months=6`),
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/menu-customization-rate?months=6`),
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/staff-performance-score?months=3`),
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/hall-revenue-seasonality?months=24`),
+      ]);
+      setDepositData((d as any).data);
+      setCustomData((c as any).data);
+      setPerfData((p as any).data);
+      setSeasonData((s as any).data);
+    } catch (e) { handleApiError(e); }
+    finally { setLoading(false); }
+  }, [STORE]);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (loading) return <ZSkeleton rows={5} />;
+
+  return (
+    <div className={styles.deposit40Tab}>
+      <ZCard title="定金比例分析">
+        {!depositData || depositData.avg_deposit_ratio_pct == null ? <ZEmpty /> : (
+          <div className={styles.dep40Tab}>
+            <div className={styles.dep40Avg}>
+              平均定金比例：<strong>{depositData.avg_deposit_ratio_pct}%</strong>
+            </div>
+            <div className={styles.dep40DistList}>
+              {(depositData.distribution || []).map((b: any) => (
+                <div key={b.bucket} className={styles.dep40DistRow}>
+                  <span className={styles.dep40DistLabel}>{b.bucket}</span>
+                  <div className={styles.dep40DistTrack}>
+                    <div className={styles.dep40DistFill} style={{width:`${b.pct}%`}} />
+                  </div>
+                  <span className={styles.dep40DistStat}>{b.count}单 ({b.pct}%)</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </ZCard>
+
+      <ZCard title="菜单定制率">
+        {!customData || customData.customization_rate_pct == null ? <ZEmpty /> : (
+          <div className={styles.conv40KpiRow}>
+            <div className={`${styles.conv40Kpi} ${styles.conv40Accent}`}>
+              <span className={styles.conv40KpiVal}>{customData.customization_rate_pct}%</span>
+              <span className={styles.conv40KpiLabel}>定制率</span>
+            </div>
+            <div className={styles.conv40Kpi}>
+              <span className={styles.conv40KpiVal}>{customData.customized_count}</span>
+              <span className={styles.conv40KpiLabel}>定制单数</span>
+            </div>
+          </div>
+        )}
+      </ZCard>
+
+      <ZCard title="员工绩效评分">
+        {!perfData || !perfData.staff?.length ? <ZEmpty /> : (
+          <div className={styles.perf40Tab}>
+            {perfData.top_performer && (
+              <div className={styles.perf40Top}>TOP绩效：{perfData.top_performer}</div>
+            )}
+            <div className={styles.perf40List}>
+              <div className={styles.perf40Header}>
+                <span style={{flex:2}}>员工ID</span>
+                <span style={{flex:1}}>任务数</span>
+                <span style={{flex:1}}>绩效分</span>
+              </div>
+              {(perfData.staff || []).map((s: any) => (
+                <div key={s.user_id} className={styles.perf40Row}>
+                  <span style={{flex:2, fontSize:12}}>{s.user_id}</span>
+                  <span style={{flex:1}}>{s.total_tasks}</span>
+                  <span style={{flex:1, fontWeight:600}}>{s.performance_score}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </ZCard>
+
+      <ZCard title="厅房收入季节性">
+        {!seasonData || !seasonData.monthly?.length ? <ZEmpty /> : (
+          <div className={styles.season40Tab}>
+            <div className={styles.season40KpiRow}>
+              <span>旺季：<strong>{seasonData.peak_month}月</strong></span>
+              <span>淡季：<strong>{seasonData.trough_month}月</strong></span>
+            </div>
+            <div className={styles.season40Bars}>
+              {(seasonData.monthly || []).map((m: any) => {
+                const maxIdx = Math.max(...(seasonData.monthly || []).map((x: any) => x.seasonal_index || 0));
+                const pct = maxIdx > 0 ? Math.round((m.seasonal_index || 0) / maxIdx * 100) : 0;
+                return (
+                  <div key={m.month} className={`${styles.season40Bar} ${m.month === seasonData.peak_month ? styles.season40PeakBar : ''}`}>
+                    <div className={styles.season40BarTrack}>
+                      <div className={styles.season40BarFill} style={{height:`${pct}%`}} />
+                    </div>
+                    <span className={styles.season40BarLabel}>{m.month}月</span>
+                    <span className={styles.season40BarIdx}>{m.seasonal_index}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </ZCard>
+    </div>
+  );
+}
+
+/* ─── Phase 41: 爽约分析 Tab ─── */
+function NoShowAnalysisTab() {
+  const STORE = localStorage.getItem('store_id') || 'S001';
+  const [noShowData,  setNoShowData]  = useState<any>(null);
+  const [quoteData,   setQuoteData]   = useState<any>(null);
+  const [slotData,    setSlotData]    = useState<any>(null);
+  const [amendData,   setAmendData]   = useState<any>(null);
+  const [loading,     setLoading]     = useState(true);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [n, q, s, a] = await Promise.all([
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/no-show-rate?months=6`),
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/quote-revision-count?months=6`),
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/peak-booking-slots?months=6`),
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/order-amendment-frequency?months=6`),
+      ]);
+      setNoShowData((n as any).data);
+      setQuoteData((q as any).data);
+      setSlotData((s as any).data);
+      setAmendData((a as any).data);
+    } catch (e) { handleApiError(e); }
+    finally { setLoading(false); }
+  }, [STORE]);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (loading) return <ZSkeleton rows={5} />;
+
+  return (
+    <div className={styles.noShow41Tab}>
+      <ZCard title="宴会爽约率">
+        {!noShowData || noShowData.no_show_rate_pct == null ? <ZEmpty /> : (
+          <div className={styles.ns41KpiRow}>
+            <div className={`${styles.ns41Kpi} ${styles.ns41Red}`}>
+              <span className={styles.ns41KpiVal}>{noShowData.no_show_rate_pct}%</span>
+              <span className={styles.ns41KpiLabel}>爽约率</span>
+            </div>
+            <div className={styles.ns41Kpi}>
+              <span className={styles.ns41KpiVal}>{noShowData.no_show_count}</span>
+              <span className={styles.ns41KpiLabel}>爽约单数</span>
+            </div>
+            <div className={styles.ns41Kpi}>
+              <span className={styles.ns41KpiVal}>{noShowData.total_past_orders}</span>
+              <span className={styles.ns41KpiLabel}>历史订单</span>
+            </div>
+          </div>
+        )}
+      </ZCard>
+
+      <ZCard title="报价修改次数">
+        {!quoteData || quoteData.avg_revisions_per_lead == null ? <ZEmpty /> : (
+          <div className={styles.ns41KpiRow}>
+            <div className={`${styles.ns41Kpi} ${styles.ns41Accent}`}>
+              <span className={styles.ns41KpiVal}>{quoteData.avg_revisions_per_lead}</span>
+              <span className={styles.ns41KpiLabel}>平均修改次数</span>
+            </div>
+            <div className={styles.ns41Kpi}>
+              <span className={styles.ns41KpiVal}>{quoteData.multi_revision_pct}%</span>
+              <span className={styles.ns41KpiLabel}>多次修改率</span>
+            </div>
+            <div className={styles.ns41Kpi}>
+              <span className={styles.ns41KpiVal}>{quoteData.total_quotes}</span>
+              <span className={styles.ns41KpiLabel}>总报价数</span>
+            </div>
+          </div>
+        )}
+      </ZCard>
+
+      <ZCard title="高峰预订时段">
+        {!slotData || !slotData.slots?.length ? <ZEmpty /> : (
+          <div className={styles.slot41Tab}>
+            {slotData.peak_slot && (
+              <div className={styles.slot41Peak}>高峰时段：{slotData.peak_slot}</div>
+            )}
+            <div className={styles.slot41List}>
+              {(slotData.slots || []).map((s: any) => (
+                <div key={s.slot} className={styles.slot41Row}>
+                  <span className={styles.slot41Name}>{s.slot}</span>
+                  <div className={styles.slot41Track}>
+                    <div className={styles.slot41Fill} style={{width:`${s.pct}%`}} />
+                  </div>
+                  <span className={styles.slot41Stat}>{s.count}场 ({s.pct}%)</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </ZCard>
+
+      <ZCard title="订单修改频率">
+        {!amendData || amendData.amendment_rate_pct == null ? <ZEmpty /> : (
+          <div className={styles.ns41KpiRow}>
+            <div className={`${styles.ns41Kpi} ${styles.ns41Red}`}>
+              <span className={styles.ns41KpiVal}>{amendData.amendment_rate_pct}%</span>
+              <span className={styles.ns41KpiLabel}>修改率</span>
+            </div>
+            <div className={styles.ns41Kpi}>
+              <span className={styles.ns41KpiVal}>{amendData.amended_count}</span>
+              <span className={styles.ns41KpiLabel}>修改单数</span>
+            </div>
+          </div>
+        )}
+      </ZCard>
+    </div>
+  );
+}
+
+/* ─── Phase 41: 套餐热度 Tab ─── */
+function PackagePopularityTab() {
+  const STORE = localStorage.getItem('store_id') || 'S001';
+  const [pkgData,    setPkgData]    = useState<any>(null);
+  const [acqData,    setAcqData]    = useState<any>(null);
+  const [tpData,     setTpData]     = useState<any>(null);
+  const [specData,   setSpecData]   = useState<any>(null);
+  const [loading,    setLoading]    = useState(true);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [p, a, t, s] = await Promise.all([
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/package-popularity?months=6`),
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/customer-acquisition-cost?months=6`),
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/lead-touchpoint-count?months=6`),
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/staff-specialization-index?months=6`),
+      ]);
+      setPkgData((p as any).data);
+      setAcqData((a as any).data);
+      setTpData((t as any).data);
+      setSpecData((s as any).data);
+    } catch (e) { handleApiError(e); }
+    finally { setLoading(false); }
+  }, [STORE]);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (loading) return <ZSkeleton rows={5} />;
+
+  return (
+    <div className={styles.pkgPop41Tab}>
+      <ZCard title="套餐受欢迎度">
+        {!pkgData || !pkgData.packages?.length ? <ZEmpty /> : (
+          <div className={styles.pkgPop41List}>
+            {pkgData.top_package_id && (
+              <div className={styles.pkgPop41Top}>最热套餐：{pkgData.top_package_id}</div>
+            )}
+            <div className={styles.pkgPop41Rows}>
+              <div className={styles.pkgPop41Header}>
+                <span style={{flex:2}}>套餐ID</span>
+                <span style={{flex:1}}>选用次数</span>
+                <span style={{flex:1}}>占比</span>
+              </div>
+              {(pkgData.packages || []).map((p: any) => (
+                <div key={p.package_id} className={styles.pkgPop41Row}>
+                  <span style={{flex:2, fontSize:12}}>{p.package_id}</span>
+                  <span style={{flex:1}}>{p.order_count}</span>
+                  <span style={{flex:1, fontWeight:600}}>{p.pct}%</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </ZCard>
+
+      <ZCard title="获客渠道价值">
+        {!acqData || acqData.avg_budget_yuan == null ? <ZEmpty /> : (
+          <div className={styles.acq41Tab}>
+            <div className={styles.acq41Avg}>
+              平均预算：<strong>¥{acqData.avg_budget_yuan?.toLocaleString()}</strong>
+            </div>
+            <div className={styles.acq41List}>
+              {(acqData.channels || []).map((c: any) => (
+                <div key={c.channel} className={styles.acq41Row}>
+                  <span className={styles.acq41Ch}>{c.channel}</span>
+                  <span>{c.won_count}单</span>
+                  <span className={styles.acq41Budget}>¥{c.avg_budget_yuan?.toLocaleString()}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </ZCard>
+
+      <ZCard title="线索接触次数对比">
+        {!tpData || tpData.avg_touchpoints == null ? <ZEmpty /> : (
+          <div className={styles.ns41KpiRow}>
+            <div className={`${styles.ns41Kpi} ${styles.ns41Accent}`}>
+              <span className={styles.ns41KpiVal}>{tpData.avg_touchpoints}</span>
+              <span className={styles.ns41KpiLabel}>平均接触次数</span>
+            </div>
+            <div className={styles.ns41Kpi}>
+              <span className={styles.ns41KpiVal}>{tpData.won_avg ?? '-'}</span>
+              <span className={styles.ns41KpiLabel}>成单均值</span>
+            </div>
+            <div className={styles.ns41Kpi}>
+              <span className={styles.ns41KpiVal}>{tpData.lost_avg ?? '-'}</span>
+              <span className={styles.ns41KpiLabel}>未成单均值</span>
+            </div>
+          </div>
+        )}
+      </ZCard>
+
+      <ZCard title="员工专业化指数">
+        {!specData || !specData.staff?.length ? <ZEmpty /> : (
+          <div className={styles.spec41Tab}>
+            {specData.most_specialized && (
+              <div className={styles.spec41Top}>最专业：{specData.most_specialized}</div>
+            )}
+            <div className={styles.spec41List}>
+              <div className={styles.spec41Header}>
+                <span style={{flex:2}}>员工ID</span>
+                <span style={{flex:1}}>主要类型</span>
+                <span style={{flex:1}}>专业指数</span>
+              </div>
+              {(specData.staff || []).map((s: any) => (
+                <div key={s.user_id} className={styles.spec41Row}>
+                  <span style={{flex:2, fontSize:12}}>{s.user_id}</span>
+                  <span style={{flex:1}}>{s.top_banquet_type}</span>
+                  <span style={{flex:1, fontWeight:600}}>{s.specialization_idx}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </ZCard>
+    </div>
+  );
+}
+
+/* ─── Phase 42: 人均消费 Tab ─── */
+function GuestRevenueTab() {
+  const STORE = localStorage.getItem('store_id') || 'S001';
+  const [rpgData,    setRpgData]    = useState<any>(null);
+  const [densData,   setDensData]   = useState<any>(null);
+  const [fbData,     setFbData]     = useState<any>(null);
+  const [overdueData,setOverdueData]= useState<any>(null);
+  const [loading,    setLoading]    = useState(true);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [r1, r2, r3, r4] = await Promise.all([
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/revenue-per-guest?months=6`),
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/hall-booking-density?months=3`),
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/feedback-response-rate?months=6`),
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/task-overdue-rate?months=3`),
+      ]);
+      setRpgData(r1.data);
+      setDensData(r2.data);
+      setFbData(r3.data);
+      setOverdueData(r4.data);
+    } catch (e) { handleApiError(e); }
+    finally { setLoading(false); }
+  }, [STORE]);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (loading) return <ZSkeleton />;
+
+  return (
+    <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
+
+      {/* 人均消费 */}
+      <ZCard title="人均消费分析">
+        {!rpgData || rpgData.overall_per_guest_yuan == null ? <ZEmpty /> : (
+          <div className={styles.guestRev42Tab}>
+            <div className={styles.gr42KpiRow}>
+              <div className={`${styles.gr42Kpi} ${styles.gr42Accent}`}>
+                <span className={styles.gr42KpiVal}>¥{rpgData.overall_per_guest_yuan?.toFixed(1)}</span>
+                <span className={styles.gr42KpiLabel}>总体人均消费</span>
+              </div>
+              <div className={styles.gr42Kpi}>
+                <span className={styles.gr42KpiVal}>{rpgData.total_orders}</span>
+                <span className={styles.gr42KpiLabel}>订单数</span>
+              </div>
+            </div>
+            {(rpgData.by_type || []).length > 0 && (
+              <div className={styles.gr42TypeList}>
+                <div className={styles.gr42TypeHeader}>
+                  <span style={{flex:2}}>宴会类型</span>
+                  <span style={{flex:1}}>订单</span>
+                  <span style={{flex:1}}>人均¥</span>
+                </div>
+                {(rpgData.by_type || []).map((t: any) => (
+                  <div key={t.banquet_type} className={styles.gr42TypeRow}>
+                    <span style={{flex:2}}>{t.banquet_type}</span>
+                    <span style={{flex:1}}>{t.order_count}</span>
+                    <span style={{flex:1, color:'var(--accent)', fontWeight:600}}>
+                      {t.per_guest_yuan?.toFixed(1)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </ZCard>
+
+      {/* 厅房预订密度 */}
+      <ZCard title="厅房预订密度">
+        {!densData || !densData.halls?.length ? <ZEmpty /> : (
+          <div className={styles.density42Tab}>
+            {densData.overall_weekly_density != null && (
+              <div className={styles.dens42Overall}>
+                总体周均预订：<strong>{densData.overall_weekly_density?.toFixed(2)} 次/周</strong>
+              </div>
+            )}
+            <div className={styles.dens42List}>
+              <div className={styles.dens42Header}>
+                <span style={{flex:2}}>厅房</span>
+                <span style={{flex:1}}>预订数</span>
+                <span style={{flex:1}}>周均</span>
+              </div>
+              {(densData.halls || []).map((h: any) => (
+                <div key={h.hall_id} className={styles.dens42Row}>
+                  <span style={{flex:2}}>{h.hall_name}</span>
+                  <span style={{flex:1}}>{h.booking_count}</span>
+                  <span style={{flex:1, fontWeight:600}}>{h.weekly_density?.toFixed(2)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </ZCard>
+
+      {/* 客户反馈响应率 */}
+      <ZCard title="客户反馈响应率">
+        {!fbData || fbData.response_rate_pct == null ? <ZEmpty /> : (
+          <div className={styles.fbResp42KpiRow}>
+            <div className={`${styles.fbResp42Kpi} ${styles.gr42Accent}`}>
+              <span className={styles.gr42KpiVal}>{fbData.response_rate_pct?.toFixed(1)}%</span>
+              <span className={styles.gr42KpiLabel}>投诉响应率</span>
+            </div>
+            <div className={styles.fbResp42Kpi}>
+              <span className={styles.gr42KpiVal}>{fbData.resolved_count}</span>
+              <span className={styles.gr42KpiLabel}>已处理</span>
+            </div>
+            <div className={styles.fbResp42Kpi}>
+              <span className={styles.gr42KpiVal}>{fbData.total_complaints}</span>
+              <span className={styles.gr42KpiLabel}>总投诉</span>
+            </div>
+          </div>
+        )}
+      </ZCard>
+
+      {/* 任务逾期率 */}
+      <ZCard title="员工任务逾期率">
+        {!overdueData || overdueData.overdue_rate_pct == null ? <ZEmpty /> : (
+          <div className={styles.overdueTab42}>
+            <div className={styles.gr42KpiRow}>
+              <div className={`${styles.gr42Kpi} ${overdueData.overdue_rate_pct > 20 ? styles.gr42Accent : ''}`}>
+                <span className={styles.gr42KpiVal}>{overdueData.overdue_rate_pct?.toFixed(1)}%</span>
+                <span className={styles.gr42KpiLabel}>逾期率</span>
+              </div>
+              <div className={styles.gr42Kpi}>
+                <span className={styles.gr42KpiVal}>{overdueData.overdue_count}</span>
+                <span className={styles.gr42KpiLabel}>逾期任务</span>
+              </div>
+              <div className={styles.gr42Kpi}>
+                <span className={styles.gr42KpiVal}>{overdueData.total_completed}</span>
+                <span className={styles.gr42KpiLabel}>已完成</span>
+              </div>
+            </div>
+          </div>
+        )}
+      </ZCard>
+    </div>
+  );
+}
+
+/* ─── Phase 42: VIP分析 Tab ─── */
+function VipAnalysisTab() {
+  const STORE = localStorage.getItem('store_id') || 'S001';
+  const [vipData,   setVipData]   = useState<any>(null);
+  const [budgData,  setBudgData]  = useState<any>(null);
+  const [addonData, setAddonData] = useState<any>(null);
+  const [gapData,   setGapData]   = useState<any>(null);
+  const [loading,   setLoading]   = useState(true);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [r1, r2, r3, r4] = await Promise.all([
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/vip-upgrade-rate?months=12`),
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/lead-budget-accuracy?months=6`),
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/addon-revenue?months=6`),
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/deposit-to-final-payment-gap?months=6`),
+      ]);
+      setVipData(r1.data);
+      setBudgData(r2.data);
+      setAddonData(r3.data);
+      setGapData(r4.data);
+    } catch (e) { handleApiError(e); }
+    finally { setLoading(false); }
+  }, [STORE]);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (loading) return <ZSkeleton />;
+
+  return (
+    <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
+
+      {/* VIP升级率 */}
+      <ZCard title="VIP客户分析">
+        {!vipData || vipData.vip_rate_pct == null ? <ZEmpty /> : (
+          <div className={styles.vipAnal42Tab}>
+            <div className={styles.vip42KpiRow}>
+              <div className={`${styles.vip42Kpi} ${styles.vip42Accent}`}>
+                <span className={styles.vip42KpiVal}>{vipData.vip_rate_pct?.toFixed(1)}%</span>
+                <span className={styles.vip42KpiLabel}>VIP占比</span>
+              </div>
+              <div className={styles.vip42Kpi}>
+                <span className={styles.vip42KpiVal}>{vipData.vip_count}</span>
+                <span className={styles.vip42KpiLabel}>VIP客户</span>
+              </div>
+              <div className={styles.vip42Kpi}>
+                <span className={styles.vip42KpiVal}>{vipData.total_customers}</span>
+                <span className={styles.vip42KpiLabel}>总客户</span>
+              </div>
+            </div>
+            {(vipData.by_level || []).length > 0 && (
+              <div className={styles.vip42LevelList}>
+                {(vipData.by_level || []).map((lv: any) => (
+                  <div key={lv.vip_level} style={{
+                    display:'flex', justifyContent:'space-between',
+                    padding:'6px 0', borderBottom:'1px solid var(--border)', fontSize:13
+                  }}>
+                    <span>Lv{lv.vip_level}</span>
+                    <span style={{fontWeight:600}}>{lv.count} 人</span>
+                    <span style={{color:'var(--accent)'}}>{lv.pct?.toFixed(1)}%</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </ZCard>
+
+      {/* 线索预算准确率 */}
+      <ZCard title="线索预算准确率">
+        {!budgData || budgData.avg_deviation_pct == null ? <ZEmpty /> : (
+          <div className={styles.budgetAcc42}>
+            <div className={styles.vip42KpiRow}>
+              <div className={`${styles.vip42Kpi} ${styles.vip42Accent}`}>
+                <span className={styles.vip42KpiVal}>{budgData.accurate_pct?.toFixed(1)}%</span>
+                <span className={styles.vip42KpiLabel}>预算准确率</span>
+              </div>
+              <div className={styles.vip42Kpi}>
+                <span className={styles.vip42KpiVal}>{budgData.avg_deviation_pct?.toFixed(1)}%</span>
+                <span className={styles.vip42KpiLabel}>平均偏差</span>
+              </div>
+              <div className={styles.vip42Kpi}>
+                <span className={styles.vip42KpiVal}>{budgData.total_won}</span>
+                <span className={styles.vip42KpiLabel}>成单线索</span>
+              </div>
+            </div>
+          </div>
+        )}
+      </ZCard>
+
+      {/* 加购收入 */}
+      <ZCard title="套餐加购分析">
+        {!addonData || addonData.total_addon_yuan == null ? <ZEmpty /> : (
+          <div className={styles.addon42KpiRow}>
+            <div className={`${styles.vip42Kpi} ${styles.vip42Accent}`}>
+              <span className={styles.vip42KpiVal}>¥{addonData.total_addon_yuan?.toFixed(0)}</span>
+              <span className={styles.vip42KpiLabel}>总加购金额</span>
+            </div>
+            <div className={styles.vip42Kpi}>
+              <span className={styles.vip42KpiVal}>¥{addonData.avg_addon_yuan?.toFixed(0)}</span>
+              <span className={styles.vip42KpiLabel}>均单加购</span>
+            </div>
+            <div className={styles.vip42Kpi}>
+              <span className={styles.vip42KpiVal}>{addonData.addon_orders}</span>
+              <span className={styles.vip42KpiLabel}>有加购订单</span>
+            </div>
+          </div>
+        )}
+      </ZCard>
+
+      {/* 定金到尾款时长 */}
+      <ZCard title="定金到尾款间隔">
+        {!gapData || gapData.avg_gap_days == null ? <ZEmpty /> : (
+          <div className={styles.payGap42KpiRow}>
+            <div className={`${styles.vip42Kpi} ${styles.vip42Accent}`}>
+              <span className={styles.vip42KpiVal}>{gapData.avg_gap_days?.toFixed(1)}</span>
+              <span className={styles.vip42KpiLabel}>平均间隔(天)</span>
+            </div>
+            <div className={styles.vip42Kpi}>
+              <span className={styles.vip42KpiVal}>{gapData.quick_payment_pct?.toFixed(1)}%</span>
+              <span className={styles.vip42KpiLabel}>快速结清率</span>
+            </div>
+            <div className={styles.vip42Kpi}>
+              <span className={styles.vip42KpiVal}>{gapData.total_orders}</span>
+              <span className={styles.vip42KpiLabel}>已完成订单</span>
+            </div>
+          </div>
+        )}
+      </ZCard>
+    </div>
+  );
+}
+
+/* ─── Phase 43: 每桌收入 Tab ─── */
+function PerTableRevenueTab() {
+  const STORE = localStorage.getItem('store_id') || 'S001';
+  const [rptData,  setRptData]  = useState<any>(null);
+  const [roiData,  setRoiData]  = useState<any>(null);
+  const [payData,  setPayData]  = useState<any>(null);
+  const [riskData, setRiskData] = useState<any>(null);
+  const [loading,  setLoading]  = useState(true);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [r1, r2, r3, r4] = await Promise.all([
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/revenue-per-table?months=6`),
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/lead-source-roi?months=6`),
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/payment-completion-rate?months=6`),
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/double-booking-risk?months=3`),
+      ]);
+      setRptData(r1.data);
+      setRoiData(r2.data);
+      setPayData(r3.data);
+      setRiskData(r4.data);
+    } catch (e) { handleApiError(e); }
+    finally { setLoading(false); }
+  }, [STORE]);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (loading) return <ZSkeleton />;
+
+  return (
+    <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
+
+      {/* 每桌收入 */}
+      <ZCard title="每桌收入分析">
+        {!rptData || rptData.overall_per_table_yuan == null ? <ZEmpty /> : (
+          <div className={styles.perTable43Tab}>
+            <div className={styles.pt43KpiRow}>
+              <div className={`${styles.pt43Kpi} ${styles.pt43Accent}`}>
+                <span className={styles.pt43KpiVal}>¥{rptData.overall_per_table_yuan?.toFixed(0)}</span>
+                <span className={styles.pt43KpiLabel}>总体每桌收入</span>
+              </div>
+              <div className={styles.pt43Kpi}>
+                <span className={styles.pt43KpiVal}>{rptData.total_orders}</span>
+                <span className={styles.pt43KpiLabel}>订单数</span>
+              </div>
+            </div>
+            {(rptData.by_type || []).length > 0 && (
+              <div className={styles.pt43TypeList}>
+                <div className={styles.pt43TypeHeader}>
+                  <span style={{flex:2}}>宴会类型</span>
+                  <span style={{flex:1}}>订单</span>
+                  <span style={{flex:1}}>每桌¥</span>
+                </div>
+                {(rptData.by_type || []).map((t: any) => (
+                  <div key={t.banquet_type} className={styles.pt43TypeRow}>
+                    <span style={{flex:2}}>{t.banquet_type}</span>
+                    <span style={{flex:1}}>{t.order_count}</span>
+                    <span style={{flex:1, color:'var(--accent)', fontWeight:600}}>
+                      {t.per_table_yuan?.toFixed(0)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </ZCard>
+
+      {/* 线索渠道ROI */}
+      <ZCard title="线索渠道ROI">
+        {!roiData || !roiData.channels?.length ? <ZEmpty /> : (
+          <div className={styles.roi43Tab}>
+            {roiData.best_channel && (
+              <div className={styles.roi43Best}>最优渠道：<strong>{roiData.best_channel}</strong></div>
+            )}
+            <div className={styles.roi43List}>
+              <div className={styles.roi43Header}>
+                <span style={{flex:2}}>渠道</span>
+                <span style={{flex:1}}>成单</span>
+                <span style={{flex:1}}>转化率</span>
+              </div>
+              {(roiData.channels || []).map((c: any) => (
+                <div key={c.channel} className={styles.roi43Row}>
+                  <span style={{flex:2}}>{c.channel}</span>
+                  <span style={{flex:1}}>{c.won}/{c.total}</span>
+                  <span style={{flex:1, color:'var(--accent)', fontWeight:600}}>
+                    {c.win_rate_pct?.toFixed(1)}%
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </ZCard>
+
+      {/* 付款完成率 */}
+      <ZCard title="付款完成率">
+        {!payData || payData.completion_rate_pct == null ? <ZEmpty /> : (
+          <div className={styles.pay43KpiRow}>
+            <div className={`${styles.pt43Kpi} ${styles.pt43Accent}`}>
+              <span className={styles.pt43KpiVal}>{payData.completion_rate_pct?.toFixed(1)}%</span>
+              <span className={styles.pt43KpiLabel}>全额付清率</span>
+            </div>
+            <div className={styles.pt43Kpi}>
+              <span className={styles.pt43KpiVal}>{payData.fully_paid_count}</span>
+              <span className={styles.pt43KpiLabel}>已全额付清</span>
+            </div>
+            <div className={styles.pt43Kpi}>
+              <span className={styles.pt43KpiVal}>{payData.total_orders}</span>
+              <span className={styles.pt43KpiLabel}>总订单</span>
+            </div>
+          </div>
+        )}
+      </ZCard>
+
+      {/* 重复预订风险 */}
+      <ZCard title="厅房重复预订风险">
+        {!riskData || riskData.conflict_rate_pct == null ? <ZEmpty /> : (
+          <div className={styles.risk43Tab}>
+            <div className={styles.pt43KpiRow}>
+              <div className={`${styles.pt43Kpi} ${riskData.conflict_days > 0 ? styles.pt43Accent : ''}`}>
+                <span className={styles.pt43KpiVal}>{riskData.conflict_days}</span>
+                <span className={styles.pt43KpiLabel}>冲突档期</span>
+              </div>
+              <div className={styles.pt43Kpi}>
+                <span className={styles.pt43KpiVal}>{riskData.conflict_rate_pct?.toFixed(1)}%</span>
+                <span className={styles.pt43KpiLabel}>冲突率</span>
+              </div>
+            </div>
+          </div>
+        )}
+      </ZCard>
+    </div>
+  );
+}
+
+/* ─── Phase 43: 客户价值 Tab ─── */
+function CustomerLtvTab() {
+  const STORE = localStorage.getItem('store_id') || 'S001';
+  const [ltvData,    setLtvData]    = useState<any>(null);
+  const [seasonData, setSeasonData] = useState<any>(null);
+  const [loadData,   setLoadData]   = useState<any>(null);
+  const [venueData,  setVenueData]  = useState<any>(null);
+  const [loading,    setLoading]    = useState(true);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [r1, r2, r3, r4] = await Promise.all([
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/customer-lifetime-value?months=24`),
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/seasonal-revenue-index?months=24`),
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/staff-order-load?months=3`),
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/repeat-venue-rate?months=12`),
+      ]);
+      setLtvData(r1.data);
+      setSeasonData(r2.data);
+      setLoadData(r3.data);
+      setVenueData(r4.data);
+    } catch (e) { handleApiError(e); }
+    finally { setLoading(false); }
+  }, [STORE]);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (loading) return <ZSkeleton />;
+
+  return (
+    <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
+
+      {/* 客户终身价值 */}
+      <ZCard title="客户终身价值 (LTV)">
+        {!ltvData || ltvData.avg_ltv_yuan == null ? <ZEmpty /> : (
+          <div className={styles.ltv43Tab}>
+            <div className={styles.ltv43KpiRow}>
+              <div className={`${styles.ltv43Kpi} ${styles.ltv43Accent}`}>
+                <span className={styles.ltv43KpiVal}>¥{ltvData.avg_ltv_yuan?.toFixed(0)}</span>
+                <span className={styles.ltv43KpiLabel}>平均LTV</span>
+              </div>
+              <div className={styles.ltv43Kpi}>
+                <span className={styles.ltv43KpiVal}>{ltvData.total_customers}</span>
+                <span className={styles.ltv43KpiLabel}>活跃客户</span>
+              </div>
+            </div>
+            {(ltvData.top_customers || []).length > 0 && (
+              <div className={styles.ltv43TopList}>
+                <div className={styles.ltv43TopHeader}>
+                  <span style={{flex:2}}>客户ID</span>
+                  <span style={{flex:1}}>LTV¥</span>
+                </div>
+                {(ltvData.top_customers || []).slice(0, 5).map((c: any) => (
+                  <div key={c.customer_id} className={styles.ltv43TopRow}>
+                    <span style={{flex:2, fontSize:12}}>{c.customer_id}</span>
+                    <span style={{flex:1, color:'var(--accent)', fontWeight:600}}>
+                      {c.ltv_yuan?.toFixed(0)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </ZCard>
+
+      {/* 季度收入指数 */}
+      <ZCard title="季度收入指数">
+        {!seasonData || !seasonData.quarterly?.length ? <ZEmpty /> : (
+          <div className={styles.season43Tab}>
+            {seasonData.peak_quarter != null && (
+              <div className={styles.season43Peak}>
+                旺季：<strong>Q{seasonData.peak_quarter}</strong>
+              </div>
+            )}
+            <div className={styles.season43List}>
+              {(seasonData.quarterly || []).map((q: any) => (
+                <div key={q.quarter} className={styles.season43Row}>
+                  <span className={styles.season43Q}>Q{q.quarter}</span>
+                  <span className={styles.season43Cnt}>{q.order_count} 单</span>
+                  <span style={{
+                    flex:1, textAlign:'right', fontWeight:600,
+                    color: q.quarter === seasonData.peak_quarter ? 'var(--accent)' : 'var(--text-primary)'
+                  }}>
+                    ¥{q.revenue_yuan?.toFixed(0)}
+                  </span>
+                  <span className={styles.season43Idx}>×{q.seasonal_index}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </ZCard>
+
+      {/* 员工订单负荷 */}
+      <ZCard title="员工订单负荷">
+        {!loadData || !loadData.staff?.length ? <ZEmpty /> : (
+          <div className={styles.load43Tab}>
+            {loadData.busiest_staff && (
+              <div className={styles.load43Top}>最忙员工：<strong>{loadData.busiest_staff}</strong></div>
+            )}
+            <div className={styles.load43List}>
+              <div className={styles.load43Header}>
+                <span style={{flex:2}}>员工ID</span>
+                <span style={{flex:1}}>任务数</span>
+                <span style={{flex:1}}>订单数</span>
+              </div>
+              {(loadData.staff || []).slice(0, 8).map((s: any) => (
+                <div key={s.user_id} className={styles.load43Row}>
+                  <span style={{flex:2, fontSize:12}}>{s.user_id}</span>
+                  <span style={{flex:1, fontWeight:600}}>{s.task_count}</span>
+                  <span style={{flex:1}}>{s.order_count}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </ZCard>
+
+      {/* 同场地重复预订率 */}
+      <ZCard title="同场地重复预订率">
+        {!venueData || venueData.repeat_rate_pct == null ? <ZEmpty /> : (
+          <div className={styles.venue43Tab}>
+            <div className={styles.ltv43KpiRow}>
+              <div className={`${styles.ltv43Kpi} ${styles.ltv43Accent}`}>
+                <span className={styles.ltv43KpiVal}>{venueData.repeat_rate_pct?.toFixed(1)}%</span>
+                <span className={styles.ltv43KpiLabel}>重复预订率</span>
+              </div>
+              <div className={styles.ltv43Kpi}>
+                <span className={styles.ltv43KpiVal}>{venueData.repeat_hall_count}</span>
+                <span className={styles.ltv43KpiLabel}>高频厅房</span>
+              </div>
+            </div>
+            {(venueData.repeat_halls || []).length > 0 && (
+              <div style={{ marginTop: 8 }}>
+                {(venueData.repeat_halls || []).slice(0, 5).map((h: any) => (
+                  <div key={h.hall_id} style={{
+                    display:'flex', justifyContent:'space-between',
+                    padding:'6px 0', borderBottom:'1px solid var(--border)', fontSize:13
+                  }}>
+                    <span>{h.hall_id}</span>
+                    <span style={{fontWeight:600, color:'var(--accent)'}}>
+                      {h.booking_count} 次预订
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </ZCard>
+    </div>
+  );
+}
+
+/* ─── Phase 44: 转化漏斗 Tab ─── */
+function LeadFunnelTab() {
+  const STORE = localStorage.getItem('store_id') || 'S001';
+  const [funnelData, setFunnelData] = useState<any>(null);
+  const [winLossData,setWinLossData]= useState<any>(null);
+  const [concData,   setConcData]   = useState<any>(null);
+  const [growthData, setGrowthData] = useState<any>(null);
+  const [loading,    setLoading]    = useState(true);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [r1, r2, r3, r4] = await Promise.all([
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/lead-conversion-funnel?months=6`),
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/lead-win-loss-ratio?months=6`),
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/order-value-concentration?months=12`),
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/customer-spend-growth?months=12`),
+      ]);
+      setFunnelData(r1.data);
+      setWinLossData(r2.data);
+      setConcData(r3.data);
+      setGrowthData(r4.data);
+    } catch (e) { handleApiError(e); }
+    finally { setLoading(false); }
+  }, [STORE]);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (loading) return <ZSkeleton />;
+
+  return (
+    <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
+
+      {/* 线索转化漏斗 */}
+      <ZCard title="线索转化漏斗">
+        {!funnelData || funnelData.win_rate_pct == null ? <ZEmpty /> : (
+          <div className={styles.funnel44Tab}>
+            <div className={styles.funnel44KpiRow}>
+              <div className={`${styles.funnel44Kpi} ${styles.funnel44Accent}`}>
+                <span className={styles.funnel44KpiVal}>{funnelData.win_rate_pct?.toFixed(1)}%</span>
+                <span className={styles.funnel44KpiLabel}>整体转化率</span>
+              </div>
+              <div className={styles.funnel44Kpi}>
+                <span className={styles.funnel44KpiVal}>{funnelData.total_leads}</span>
+                <span className={styles.funnel44KpiLabel}>总线索数</span>
+              </div>
+            </div>
+            <div className={styles.funnel44Stages}>
+              {(funnelData.stages || []).filter((s: any) => s.count > 0).map((s: any) => (
+                <div key={s.stage} className={styles.funnel44Stage}>
+                  <span className={styles.funnel44StageName}>{s.stage}</span>
+                  <div className={styles.funnel44Bar}>
+                    <div className={styles.funnel44Fill} style={{width:`${s.pct}%`}} />
+                  </div>
+                  <span className={styles.funnel44Stat}>{s.count}({s.pct}%)</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </ZCard>
+
+      {/* 赢单/输单比 */}
+      <ZCard title="赢单/输单比">
+        {!winLossData || winLossData.win_loss_ratio == null ? <ZEmpty /> : (
+          <div className={styles.winLoss44Tab}>
+            <div className={styles.funnel44KpiRow}>
+              <div className={`${styles.funnel44Kpi} ${styles.funnel44Accent}`}>
+                <span className={styles.funnel44KpiVal}>{winLossData.win_loss_ratio}</span>
+                <span className={styles.funnel44KpiLabel}>赢/输比</span>
+              </div>
+              <div className={styles.funnel44Kpi}>
+                <span className={styles.funnel44KpiVal}>{winLossData.won}</span>
+                <span className={styles.funnel44KpiLabel}>赢单</span>
+              </div>
+              <div className={styles.funnel44Kpi}>
+                <span className={styles.funnel44KpiVal}>{winLossData.lost}</span>
+                <span className={styles.funnel44KpiLabel}>输单</span>
+              </div>
+            </div>
+          </div>
+        )}
+      </ZCard>
+
+      {/* 订单金额集中度 */}
+      <ZCard title="订单金额集中度">
+        {!concData || concData.top20_pct_revenue == null ? <ZEmpty /> : (
+          <div className={styles.conc44Tab}>
+            <div className={styles.funnel44KpiRow}>
+              <div className={`${styles.funnel44Kpi} ${styles.funnel44Accent}`}>
+                <span className={styles.funnel44KpiVal}>{concData.top20_pct_revenue?.toFixed(1)}%</span>
+                <span className={styles.funnel44KpiLabel}>Top20%收入占比</span>
+              </div>
+              <div className={styles.funnel44Kpi}>
+                <span className={styles.funnel44KpiVal}>{concData.gini?.toFixed(3)}</span>
+                <span className={styles.funnel44KpiLabel}>基尼系数</span>
+              </div>
+            </div>
+          </div>
+        )}
+      </ZCard>
+
+      {/* 客户消费增长 */}
+      <ZCard title="客户消费增长率">
+        {!growthData || growthData.avg_growth_pct == null ? <ZEmpty /> : (
+          <div className={styles.funnel44KpiRow}>
+            <div className={`${styles.funnel44Kpi} ${styles.funnel44Accent}`}>
+              <span className={styles.funnel44KpiVal}>{growthData.avg_growth_pct?.toFixed(1)}%</span>
+              <span className={styles.funnel44KpiLabel}>平均增长率</span>
+            </div>
+            <div className={styles.funnel44Kpi}>
+              <span className={styles.funnel44KpiVal}>{growthData.growing_customers}</span>
+              <span className={styles.funnel44KpiLabel}>增长客户数</span>
+            </div>
+          </div>
+        )}
+      </ZCard>
+    </div>
+  );
+}
+
+/* ─── Phase 44: 退款分析 Tab ─── */
+function RefundAnalysisTab() {
+  const STORE = localStorage.getItem('store_id') || 'S001';
+  const [refundData,  setRefundData]  = useState<any>(null);
+  const [upgradeData, setUpgradeData] = useState<any>(null);
+  const [speedData,   setSpeedData]   = useState<any>(null);
+  const [availData,   setAvailData]   = useState<any>(null);
+  const [loading,     setLoading]     = useState(true);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [r1, r2, r3, r4] = await Promise.all([
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/banquet-refund-rate?months=6`),
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/menu-upgrade-rate?months=6`),
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/task-completion-speed?months=3`),
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/hall-slot-availability?months=3`),
+      ]);
+      setRefundData(r1.data);
+      setUpgradeData(r2.data);
+      setSpeedData(r3.data);
+      setAvailData(r4.data);
+    } catch (e) { handleApiError(e); }
+    finally { setLoading(false); }
+  }, [STORE]);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (loading) return <ZSkeleton />;
+
+  return (
+    <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
+
+      {/* 退款率 */}
+      <ZCard title="宴会退款分析">
+        {!refundData || refundData.refund_rate_pct == null ? <ZEmpty /> : (
+          <div className={styles.refund44Tab}>
+            <div className={styles.ref44KpiRow}>
+              <div className={`${styles.ref44Kpi} ${refundData.refund_rate_pct > 20 ? styles.ref44Accent : ''}`}>
+                <span className={styles.ref44KpiVal}>{refundData.refund_rate_pct?.toFixed(1)}%</span>
+                <span className={styles.ref44KpiLabel}>需退款率</span>
+              </div>
+              <div className={styles.ref44Kpi}>
+                <span className={styles.ref44KpiVal}>¥{refundData.total_refund_yuan?.toFixed(0)}</span>
+                <span className={styles.ref44KpiLabel}>退款总额</span>
+              </div>
+              <div className={styles.ref44Kpi}>
+                <span className={styles.ref44KpiVal}>{refundData.total_cancelled}</span>
+                <span className={styles.ref44KpiLabel}>取消总数</span>
+              </div>
+            </div>
+          </div>
+        )}
+      </ZCard>
+
+      {/* 菜单升档率 */}
+      <ZCard title="菜单升档率">
+        {!upgradeData || upgradeData.upgrade_rate_pct == null ? <ZEmpty /> : (
+          <div className={styles.ref44KpiRow}>
+            <div className={`${styles.ref44Kpi} ${styles.ref44Accent}`}>
+              <span className={styles.ref44KpiVal}>{upgradeData.upgrade_rate_pct?.toFixed(1)}%</span>
+              <span className={styles.ref44KpiLabel}>升档率</span>
+            </div>
+            <div className={styles.ref44Kpi}>
+              <span className={styles.ref44KpiVal}>{upgradeData.upgraded_count}</span>
+              <span className={styles.ref44KpiLabel}>升档订单</span>
+            </div>
+            <div className={styles.ref44Kpi}>
+              <span className={styles.ref44KpiVal}>{upgradeData.total_pkg_orders}</span>
+              <span className={styles.ref44KpiLabel}>套餐订单</span>
+            </div>
+          </div>
+        )}
+      </ZCard>
+
+      {/* 任务完成速度 */}
+      <ZCard title="任务完成速度">
+        {!speedData || speedData.avg_hours == null ? <ZEmpty /> : (
+          <div className={styles.ref44KpiRow}>
+            <div className={`${styles.ref44Kpi} ${styles.ref44Accent}`}>
+              <span className={styles.ref44KpiVal}>{speedData.avg_hours?.toFixed(1)}h</span>
+              <span className={styles.ref44KpiLabel}>平均完成时长</span>
+            </div>
+            <div className={styles.ref44Kpi}>
+              <span className={styles.ref44KpiVal}>{speedData.fast_pct?.toFixed(1)}%</span>
+              <span className={styles.ref44KpiLabel}>24h内完成率</span>
+            </div>
+          </div>
+        )}
+      </ZCard>
+
+      {/* 厅房档期可用率 */}
+      <ZCard title="厅房档期可用率">
+        {!availData || !availData.halls?.length ? <ZEmpty /> : (
+          <div className={styles.avail44Tab}>
+            {availData.overall_occupancy_pct != null && (
+              <div className={styles.avail44Overall}>
+                整体入住率：<strong>{availData.overall_occupancy_pct?.toFixed(1)}%</strong>
+              </div>
+            )}
+            <div className={styles.avail44List}>
+              {(availData.halls || []).map((h: any) => (
+                <div key={h.hall_id} className={styles.avail44Row}>
+                  <span className={styles.avail44Name}>{h.hall_name}</span>
+                  <div className={styles.avail44Track}>
+                    <div className={styles.avail44Fill} style={{width:`${Math.min(h.occupancy_pct, 100)}%`}} />
+                  </div>
+                  <span className={styles.avail44Stat}>{h.occupancy_pct?.toFixed(1)}%</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </ZCard>
+    </div>
+  );
+}
+
+/* ─── Phase 45: 高峰日 Tab ─── */
+function PeakDayTab() {
+  const STORE = localStorage.getItem('store_id') || 'S001';
+  const [peakData,   setPeakData]   = useState<any>(null);
+  const [sqmData,    setSqmData]    = useState<any>(null);
+  const [nurData,    setNurData]    = useState<any>(null);
+  const [tableData,  setTableData]  = useState<any>(null);
+  const [loading,    setLoading]    = useState(true);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [r1, r2, r3, r4] = await Promise.all([
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/peak-day-analysis?months=12`),
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/hall-revenue-per-sqm?months=6`),
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/lead-nurturing-effectiveness?months=6`),
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/table-utilization?months=6`),
+      ]);
+      setPeakData(r1.data);
+      setSqmData(r2.data);
+      setNurData(r3.data);
+      setTableData(r4.data);
+    } catch (e) { handleApiError(e); }
+    finally { setLoading(false); }
+  }, [STORE]);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (loading) return <ZSkeleton />;
+
+  return (
+    <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
+
+      {/* 高峰日分析 */}
+      <ZCard title="宴会高峰日分析">
+        {!peakData || !peakData.by_weekday?.length ? <ZEmpty /> : (
+          <div className={styles.peak45Tab}>
+            {peakData.peak_weekday && (
+              <div className={styles.peak45Top}>最热宴会日：<strong>{peakData.peak_weekday}</strong></div>
+            )}
+            <div className={styles.peak45List}>
+              {(peakData.by_weekday || []).filter((d: any) => d.order_count > 0).map((d: any) => {
+                const maxCnt = Math.max(...(peakData.by_weekday || []).map((x: any) => x.order_count));
+                return (
+                  <div key={d.weekday} className={styles.peak45Row}>
+                    <span className={styles.peak45Name}>{d.name}</span>
+                    <div className={styles.peak45Bar}>
+                      <div className={styles.peak45Fill}
+                        style={{width:`${maxCnt > 0 ? d.order_count/maxCnt*100 : 0}%`}} />
+                    </div>
+                    <span className={styles.peak45Stat}>{d.order_count}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </ZCard>
+
+      {/* 厅房坪效 */}
+      <ZCard title="厅房坪效 (元/㎡)">
+        {!sqmData || !sqmData.halls?.length ? <ZEmpty /> : (
+          <div className={styles.sqm45Tab}>
+            {sqmData.overall_per_sqm != null && (
+              <div className={styles.sqm45Overall}>
+                整体坪效：<strong>¥{sqmData.overall_per_sqm?.toFixed(1)}/㎡</strong>
+              </div>
+            )}
+            <div className={styles.sqm45List}>
+              <div className={styles.sqm45Header}>
+                <span style={{flex:2}}>厅房</span>
+                <span style={{flex:1}}>面积㎡</span>
+                <span style={{flex:1}}>坪效¥</span>
+              </div>
+              {(sqmData.halls || []).map((h: any) => (
+                <div key={h.hall_id} className={styles.sqm45Row}>
+                  <span style={{flex:2}}>{h.hall_name}</span>
+                  <span style={{flex:1}}>{h.area_m2}</span>
+                  <span style={{flex:1, color:'var(--accent)', fontWeight:600}}>
+                    {h.per_sqm_yuan?.toFixed(1) ?? '-'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </ZCard>
+
+      {/* 线索培育效果 */}
+      <ZCard title="线索培育效果">
+        {!nurData || nurData.won_avg_followups == null ? <ZEmpty /> : (
+          <div className={styles.nur45KpiRow}>
+            <div className={`${styles.nur45Kpi} ${styles.nur45Accent}`}>
+              <span className={styles.nur45KpiVal}>{nurData.won_avg_followups}</span>
+              <span className={styles.nur45KpiLabel}>成单平均跟进</span>
+            </div>
+            <div className={styles.nur45Kpi}>
+              <span className={styles.nur45KpiVal}>{nurData.lost_avg_followups ?? '-'}</span>
+              <span className={styles.nur45KpiLabel}>未成单平均跟进</span>
+            </div>
+            <div className={styles.nur45Kpi}>
+              <span className={styles.nur45KpiVal}>{nurData.total_leads}</span>
+              <span className={styles.nur45KpiLabel}>总线索</span>
+            </div>
+          </div>
+        )}
+      </ZCard>
+
+      {/* 桌位利用率 */}
+      <ZCard title="桌位利用率">
+        {!tableData || tableData.avg_utilization_pct == null ? <ZEmpty /> : (
+          <div className={styles.table45Tab}>
+            <div className={styles.nur45KpiRow}>
+              <div className={`${styles.nur45Kpi} ${styles.nur45Accent}`}>
+                <span className={styles.nur45KpiVal}>{tableData.avg_utilization_pct?.toFixed(1)}%</span>
+                <span className={styles.nur45KpiLabel}>平均桌位利用率</span>
+              </div>
+              <div className={styles.nur45Kpi}>
+                <span className={styles.nur45KpiVal}>{tableData.total_orders}</span>
+                <span className={styles.nur45KpiLabel}>订单数</span>
+              </div>
+            </div>
+            {(tableData.by_type || []).length > 0 && (
+              <div className={styles.table45List}>
+                {(tableData.by_type || []).map((t: any) => (
+                  <div key={t.banquet_type} className={styles.table45Row}>
+                    <span style={{flex:2}}>{t.banquet_type}</span>
+                    <span style={{flex:1}}>{t.avg_tables} 桌</span>
+                    <span style={{flex:1, color:'var(--accent)', fontWeight:600}}>
+                      {t.utilization_pct?.toFixed(1) ?? '-'}%
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </ZCard>
+    </div>
+  );
+}
+
+/* ─── Phase 45: 风险预警 Tab ─── */
+function EarlyWarningTab() {
+  const STORE = localStorage.getItem('store_id') || 'S001';
+  const [warnData,    setWarnData]    = useState<any>(null);
+  const [staffData,   setStaffData]   = useState<any>(null);
+  const [cmpData,     setCmpData]     = useState<any>(null);
+  const [payChanData, setPayChanData] = useState<any>(null);
+  const [loading,     setLoading]     = useState(true);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [r1, r2, r3, r4] = await Promise.all([
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/order-early-warning?days_ahead=14`),
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/staff-rating-by-order?months=6`),
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/customer-complaint-rate?months=6`),
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/payment-channel-trend?months=6`),
+      ]);
+      setWarnData(r1.data);
+      setStaffData(r2.data);
+      setCmpData(r3.data);
+      setPayChanData(r4.data);
+    } catch (e) { handleApiError(e); }
+    finally { setLoading(false); }
+  }, [STORE]);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (loading) return <ZSkeleton />;
+
+  return (
+    <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
+
+      {/* 订单风险预警 */}
+      <ZCard title="订单付款风险预警">
+        {!warnData ? <ZEmpty /> : (
+          <div className={styles.warn45Tab}>
+            <div className={styles.warn45KpiRow}>
+              <div className={`${styles.warn45Kpi} ${warnData.at_risk_count > 0 ? styles.warn45Danger : ''}`}>
+                <span className={styles.warn45KpiVal}>{warnData.at_risk_count}</span>
+                <span className={styles.warn45KpiLabel}>高风险订单</span>
+              </div>
+              <div className={styles.warn45Kpi}>
+                <span className={styles.warn45KpiVal}>{warnData.total_confirmed}</span>
+                <span className={styles.warn45KpiLabel}>14天内宴会</span>
+              </div>
+            </div>
+            {(warnData.warnings || []).length > 0 && (
+              <div className={styles.warn45List}>
+                <div className={styles.warn45Header}>
+                  <span style={{flex:2}}>订单ID</span>
+                  <span style={{flex:1}}>距今</span>
+                  <span style={{flex:1}}>未付¥</span>
+                </div>
+                {(warnData.warnings || []).map((w: any) => (
+                  <div key={w.order_id} className={styles.warn45Row}>
+                    <span style={{flex:2, fontSize:11}}>{w.order_id}</span>
+                    <span style={{flex:1, color:'var(--accent)'}}>{w.days_until}天</span>
+                    <span style={{flex:1, fontWeight:600, color:'#e53e3e'}}>
+                      {w.unpaid_yuan?.toFixed(0)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </ZCard>
+
+      {/* 员工评分 */}
+      <ZCard title="员工评分排行">
+        {!staffData || !staffData.staff?.length ? <ZEmpty /> : (
+          <div className={styles.staff45Tab}>
+            {staffData.top_rated && (
+              <div className={styles.staff45Top}>评分最高：<strong>{staffData.top_rated}</strong></div>
+            )}
+            <div className={styles.staff45List}>
+              <div className={styles.staff45Header}>
+                <span style={{flex:2}}>员工</span>
+                <span style={{flex:1}}>订单数</span>
+                <span style={{flex:1}}>评分</span>
+              </div>
+              {(staffData.staff || []).slice(0, 8).map((s: any) => (
+                <div key={s.name} className={styles.staff45Row}>
+                  <span style={{flex:2}}>{s.name}</span>
+                  <span style={{flex:1}}>{s.order_count}</span>
+                  <span style={{flex:1, color:'var(--accent)', fontWeight:600}}>
+                    {s.avg_rating?.toFixed(1) ?? '-'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </ZCard>
+
+      {/* 客户投诉率 */}
+      <ZCard title="客户投诉率">
+        {!cmpData || cmpData.complaint_rate_pct == null ? <ZEmpty /> : (
+          <div className={styles.warn45KpiRow}>
+            <div className={`${styles.warn45Kpi} ${cmpData.complaint_rate_pct > 5 ? styles.warn45Danger : ''}`}>
+              <span className={styles.warn45KpiVal}>{cmpData.complaint_rate_pct?.toFixed(1)}%</span>
+              <span className={styles.warn45KpiLabel}>投诉率</span>
+            </div>
+            <div className={styles.warn45Kpi}>
+              <span className={styles.warn45KpiVal}>{cmpData.complaint_count}</span>
+              <span className={styles.warn45KpiLabel}>投诉单数</span>
+            </div>
+            <div className={styles.warn45Kpi}>
+              <span className={styles.warn45KpiVal}>{cmpData.total_completed}</span>
+              <span className={styles.warn45KpiLabel}>完成订单</span>
+            </div>
+          </div>
+        )}
+      </ZCard>
+
+      {/* 支付渠道 */}
+      <ZCard title="支付渠道分布">
+        {!payChanData || !payChanData.channels?.length ? <ZEmpty /> : (
+          <div className={styles.payChan45Tab}>
+            {payChanData.dominant_channel && (
+              <div className={styles.payChan45Top}>主要渠道：<strong>{payChanData.dominant_channel}</strong></div>
+            )}
+            {(payChanData.channels || []).map((c: any) => (
+              <div key={c.channel} className={styles.payChan45Row}>
+                <span className={styles.payChan45Name}>{c.channel}</span>
+                <div className={styles.payChan45Track}>
+                  <div className={styles.payChan45Fill} style={{width:`${c.pct}%`}} />
+                </div>
+                <span className={styles.payChan45Stat}>{c.pct?.toFixed(1)}%</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </ZCard>
+    </div>
+  );
+}
+
+// ── Phase 46: AdvanceBookingTab ──────────────────────────────────────────────
+
+function AdvanceBookingTab() {
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const storeId = localStorage.getItem('store_id') || '';
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const r = await apiClient.get(`/api/v1/banquet-agent/stores/${storeId}/advance-booking-rate?months=12`);
+      setData(r.data);
+    } catch (e) { handleApiError(e); }
+    finally { setLoading(false); }
+  }, [storeId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (loading) return <ZSkeleton />;
+
+  return (
+    <div className={styles.p46Wrap}>
+      <ZCard title="提前预订天数分布">
+        {!data || data.total_orders === 0 ? <ZEmpty /> : (
+          <div>
+            <div className={styles.p46KpiRow}>
+              <div className={styles.p46Kpi}>
+                <span className={styles.p46KpiVal}>{data.avg_advance_days ?? '—'}</span>
+                <span className={styles.p46KpiLabel}>平均提前天数</span>
+              </div>
+              <div className={styles.p46Kpi}>
+                <span className={styles.p46KpiVal}>{data.total_orders}</span>
+                <span className={styles.p46KpiLabel}>统计订单</span>
+              </div>
+            </div>
+            <div className={styles.p46BucketList}>
+              {(data.distribution || []).map((b: any) => (
+                <div key={b.bucket} className={styles.p46BucketRow}>
+                  <span className={styles.p46BucketLabel}>{b.bucket}</span>
+                  <div className={styles.p46BucketTrack}>
+                    <div className={styles.p46BucketFill}
+                      style={{ width: `${b.count / data.total_orders * 100}%` }} />
+                  </div>
+                  <span className={styles.p46BucketStat}>{b.count} 单</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </ZCard>
+    </div>
+  );
+}
+
+// ── Phase 46: CancellationTypeTab ────────────────────────────────────────────
+
+function CancellationTypeTab() {
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const storeId = localStorage.getItem('store_id') || '';
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const r = await apiClient.get(`/api/v1/banquet-agent/stores/${storeId}/cancellation-by-type?months=12`);
+      setData(r.data);
+    } catch (e) { handleApiError(e); }
+    finally { setLoading(false); }
+  }, [storeId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (loading) return <ZSkeleton />;
+
+  return (
+    <div className={styles.p46Wrap}>
+      <ZCard title="按宴会类型取消率">
+        {!data || data.total_orders === 0 ? <ZEmpty /> : (
+          <div>
+            {data.overall_cancel_rate_pct != null && (
+              <div className={styles.p46OverallRow}>
+                综合取消率：<strong>{data.overall_cancel_rate_pct?.toFixed(1)}%</strong>
+              </div>
+            )}
+            <div className={styles.p46TypeList}>
+              {(data.by_type || []).map((t: any) => (
+                <div key={t.banquet_type} className={styles.p46TypeRow}>
+                  <span className={styles.p46TypeName}>{t.banquet_type}</span>
+                  <div className={styles.p46TypeTrack}>
+                    <div className={styles.p46TypeFill}
+                      style={{ width: `${t.cancel_rate_pct}%` }} />
+                  </div>
+                  <span className={styles.p46TypeStat}>{t.cancel_rate_pct?.toFixed(1)}%</span>
+                  <span className={styles.p46TypeCount}>({t.cancelled}/{t.total})</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </ZCard>
+    </div>
+  );
+}
+
+// ── Phase 47: MonthlyRevenueTrendTab ─────────────────────────────────────────
+
+function MonthlyRevenueTrendTab() {
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const storeId = localStorage.getItem('store_id') || '';
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const r = await apiClient.get(`/api/v1/banquet-agent/stores/${storeId}/monthly-revenue-trend?months=12`);
+      setData(r.data);
+    } catch (e) { handleApiError(e); }
+    finally { setLoading(false); }
+  }, [storeId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (loading) return <ZSkeleton />;
+
+  const maxRev = data?.monthly?.length
+    ? Math.max(...data.monthly.map((m: any) => m.revenue_yuan))
+    : 1;
+
+  return (
+    <div className={styles.p47Wrap}>
+      <ZCard title="月度宴会收入趋势">
+        {!data || data.total_orders === 0 ? <ZEmpty /> : (
+          <div>
+            <div className={styles.p47KpiRow}>
+              <div className={styles.p47Kpi}>
+                <span className={styles.p47KpiVal}>¥{data.total_revenue_yuan?.toLocaleString()}</span>
+                <span className={styles.p47KpiLabel}>周期总收入</span>
+              </div>
+              <div className={styles.p47Kpi}>
+                <span className={styles.p47KpiVal}>{data.peak_month ?? '—'}</span>
+                <span className={styles.p47KpiLabel}>收入峰值月</span>
+              </div>
+            </div>
+            <div className={styles.p47BarChart}>
+              {(data.monthly || []).map((m: any) => (
+                <div key={m.month} className={styles.p47BarCol}>
+                  <div className={styles.p47BarTrack}>
+                    <div
+                      className={styles.p47BarFill}
+                      style={{ height: `${(m.revenue_yuan / maxRev) * 100}%` }}
+                    />
+                  </div>
+                  <span className={styles.p47BarLabel}>{m.month.slice(5)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </ZCard>
+    </div>
+  );
+}
+
+// ── Phase 47: VipPremiumTab ───────────────────────────────────────────────────
+
+function VipPremiumTab() {
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const storeId = localStorage.getItem('store_id') || '';
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const r = await apiClient.get(`/api/v1/banquet-agent/stores/${storeId}/vip-order-value-premium?months=12`);
+      setData(r.data);
+    } catch (e) { handleApiError(e); }
+    finally { setLoading(false); }
+  }, [storeId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (loading) return <ZSkeleton />;
+
+  return (
+    <div className={styles.p47Wrap}>
+      <ZCard title="VIP客户订单溢价">
+        {!data || data.total_orders === 0 ? <ZEmpty /> : (
+          <div className={styles.p47PremiumGrid}>
+            <div className={styles.p47PremiumCard}>
+              <span className={styles.p47PremiumVal}>
+                {data.vip_avg_yuan != null ? `¥${data.vip_avg_yuan.toLocaleString()}` : '—'}
+              </span>
+              <span className={styles.p47PremiumLabel}>VIP 均单</span>
+            </div>
+            <div className={styles.p47PremiumCard}>
+              <span className={styles.p47PremiumVal}>
+                {data.normal_avg_yuan != null ? `¥${data.normal_avg_yuan.toLocaleString()}` : '—'}
+              </span>
+              <span className={styles.p47PremiumLabel}>普通均单</span>
+            </div>
+            <div className={styles.p47PremiumCard + ' ' + styles.p47PremiumHighlight}>
+              <span className={styles.p47PremiumVal}>
+                {data.premium_pct != null ? `+${data.premium_pct.toFixed(1)}%` : '—'}
+              </span>
+              <span className={styles.p47PremiumLabel}>溢价幅度</span>
+            </div>
+          </div>
+        )}
+      </ZCard>
+    </div>
+  );
+}
+
+// ── Phase 48: HighValueThresholdTab ──────────────────────────────────────────
+
+function HighValueThresholdTab() {
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const storeId = localStorage.getItem('store_id') || '';
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const r = await apiClient.get(`/api/v1/banquet-agent/stores/${storeId}/high-value-order-threshold?months=12`);
+      setData(r.data);
+    } catch (e) { handleApiError(e); }
+    finally { setLoading(false); }
+  }, [storeId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (loading) return <ZSkeleton />;
+
+  return (
+    <div className={styles.p48Wrap}>
+      <ZCard title="高价值订单阈值">
+        {!data || data.total_orders === 0 ? <ZEmpty /> : (
+          <div className={styles.p48ThresholdGrid}>
+            <div className={styles.p48ThreshCard}>
+              <span className={styles.p48ThreshVal}>
+                {data.top20_threshold_yuan != null
+                  ? `¥${data.top20_threshold_yuan.toLocaleString()}`
+                  : '—'}
+              </span>
+              <span className={styles.p48ThreshLabel}>Top 20% 起点</span>
+            </div>
+            <div className={styles.p48ThreshCard}>
+              <span className={styles.p48ThreshVal}>{data.top20_count ?? '—'}</span>
+              <span className={styles.p48ThreshLabel}>高价值订单数</span>
+            </div>
+            <div className={styles.p48ThreshCard + ' ' + styles.p48ThreshHighlight}>
+              <span className={styles.p48ThreshVal}>
+                {data.top20_revenue_pct != null
+                  ? `${data.top20_revenue_pct.toFixed(1)}%`
+                  : '—'}
+              </span>
+              <span className={styles.p48ThreshLabel}>收入贡献</span>
+            </div>
+          </div>
+        )}
+      </ZCard>
+    </div>
+  );
+}
+
+// ── Phase 48: ReferralLeadTab ─────────────────────────────────────────────────
+
+function ReferralLeadTab() {
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const storeId = localStorage.getItem('store_id') || '';
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const r = await apiClient.get(`/api/v1/banquet-agent/stores/${storeId}/referral-lead-rate?months=12`);
+      setData(r.data);
+    } catch (e) { handleApiError(e); }
+    finally { setLoading(false); }
+  }, [storeId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (loading) return <ZSkeleton />;
+
+  return (
+    <div className={styles.p48Wrap}>
+      <ZCard title="转介绍线索分析">
+        {!data || data.total_leads === 0 ? <ZEmpty /> : (
+          <div>
+            <div className={styles.p48RefKpiRow}>
+              <div className={styles.p48RefKpi}>
+                <span className={styles.p48RefKpiVal}>{data.referral_count ?? 0}</span>
+                <span className={styles.p48RefKpiLabel}>转介绍线索</span>
+              </div>
+              <div className={styles.p48RefKpi}>
+                <span className={styles.p48RefKpiVal}>
+                  {data.referral_rate_pct != null ? `${data.referral_rate_pct.toFixed(1)}%` : '—'}
+                </span>
+                <span className={styles.p48RefKpiLabel}>占总线索比</span>
+              </div>
+              <div className={styles.p48RefKpi + ' ' + styles.p48RefHighlight}>
+                <span className={styles.p48RefKpiVal}>
+                  {data.referral_win_rate_pct != null ? `${data.referral_win_rate_pct.toFixed(1)}%` : '—'}
+                </span>
+                <span className={styles.p48RefKpiLabel}>转化率</span>
+              </div>
+            </div>
+            <div className={styles.p48RefTotal}>
+              共 {data.total_leads} 条线索，其中转介绍 {data.referral_count} 条
+            </div>
+          </div>
+        )}
+      </ZCard>
+    </div>
+  );
+}
+
+// ── Phase 49: SatisfactionTrendTab ───────────────────────────────────────────
+
+function SatisfactionTrendTab() {
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const storeId = localStorage.getItem('store_id') || '';
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const r = await apiClient.get(`/api/v1/banquet-agent/stores/${storeId}/satisfaction-trend?months=12`);
+      setData(r.data);
+    } catch (e) { handleApiError(e); }
+    finally { setLoading(false); }
+  }, [storeId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (loading) return <ZSkeleton />;
+
+  const maxCount = data?.monthly?.length
+    ? Math.max(...data.monthly.map((m: any) => m.count), 1)
+    : 1;
+
+  return (
+    <div className={styles.p49Wrap}>
+      <ZCard title="客户满意度月度趋势">
+        {!data || data.total_reviews === 0 ? <ZEmpty /> : (
+          <div>
+            <div className={styles.p49KpiRow}>
+              <div className={styles.p49Kpi}>
+                <span className={styles.p49KpiVal}>{data.overall_avg?.toFixed(2) ?? '—'}</span>
+                <span className={styles.p49KpiLabel}>综合评分</span>
+              </div>
+              <div className={styles.p49Kpi}>
+                <span className={styles.p49KpiVal}>{data.total_reviews}</span>
+                <span className={styles.p49KpiLabel}>总评价数</span>
+              </div>
+            </div>
+            <div className={styles.p49MonthList}>
+              {(data.monthly || []).map((m: any) => (
+                <div key={m.month} className={styles.p49MonthRow}>
+                  <span className={styles.p49MonthLabel}>{m.month.slice(5)}</span>
+                  <div className={styles.p49MonthTrack}>
+                    <div
+                      className={styles.p49MonthFill}
+                      style={{ width: `${(m.avg_rating / 5) * 100}%` }}
+                    />
+                  </div>
+                  <span className={styles.p49MonthStat}>{m.avg_rating?.toFixed(1)} ★</span>
+                  <span className={styles.p49MonthCount}>({m.count})</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </ZCard>
+    </div>
+  );
+}
+
+// ── Phase 49: ReviewScoreDistTab ──────────────────────────────────────────────
+
+function ReviewScoreDistTab() {
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const storeId = localStorage.getItem('store_id') || '';
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const r = await apiClient.get(`/api/v1/banquet-agent/stores/${storeId}/review-score-distribution?months=12`);
+      setData(r.data);
+    } catch (e) { handleApiError(e); }
+    finally { setLoading(false); }
+  }, [storeId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (loading) return <ZSkeleton />;
+
+  const STARS = ['★★★★★','★★★★☆','★★★☆☆','★★☆☆☆','★☆☆☆☆'];
+
+  return (
+    <div className={styles.p49Wrap}>
+      <ZCard title="评分分布">
+        {!data || data.total_reviews === 0 ? <ZEmpty /> : (
+          <div>
+            <div className={styles.p49ScoreHeader}>
+              <span className={styles.p49ScoreAvg}>{data.avg_score?.toFixed(2)}</span>
+              <span className={styles.p49ScoreStars}>/ 5.0</span>
+              <ZBadge label={`五星 ${data.five_star_pct?.toFixed(1)}%`} color="green" />
+            </div>
+            <div className={styles.p49ScoreList}>
+              {(data.distribution || []).map((d: any, i: number) => (
+                <div key={d.score} className={styles.p49ScoreRow}>
+                  <span className={styles.p49ScoreLabel}>{STARS[5 - d.score] ?? d.score + '星'}</span>
+                  <div className={styles.p49ScoreTrack}>
+                    <div className={styles.p49ScoreFill} style={{ width: `${d.pct}%` }} />
+                  </div>
+                  <span className={styles.p49ScoreStat}>{d.count}条</span>
+                  <span className={styles.p49ScorePct}>{d.pct}%</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </ZCard>
+    </div>
+  );
+}
+
+// ── Phase 50: WeekendVsWeekdayTab ─────────────────────────────────────────────
+
+function WeekendVsWeekdayTab() {
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const storeId = localStorage.getItem('store_id') || '';
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const r = await apiClient.get(`/api/v1/banquet-agent/stores/${storeId}/weekend-vs-weekday?months=12`);
+      setData(r.data);
+    } catch (e) { handleApiError(e); }
+    finally { setLoading(false); }
+  }, [storeId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (loading) return <ZSkeleton />;
+
+  return (
+    <div className={styles.p50Wrap}>
+      <ZCard title="周末 vs 工作日对比">
+        {!data || data.total_orders === 0 ? <ZEmpty /> : (
+          <div>
+            <div className={styles.p50RatioBar}>
+              <div
+                className={styles.p50RatioWeekend}
+                style={{ width: `${data.weekend_ratio_pct ?? 0}%` }}
+              />
+            </div>
+            <div className={styles.p50RatioLabels}>
+              <span>周末 {data.weekend_ratio_pct?.toFixed(1)}%</span>
+              <span>工作日 {(100 - (data.weekend_ratio_pct ?? 0)).toFixed(1)}%</span>
+            </div>
+            <div className={styles.p50CompareGrid}>
+              <div className={styles.p50CompareCard}>
+                <span className={styles.p50CompareTitle}>周末</span>
+                <span className={styles.p50CompareVal}>{data.weekend?.count ?? 0} 单</span>
+                <span className={styles.p50CompareSub}>
+                  ¥{data.weekend?.avg_yuan?.toLocaleString() ?? '—'} / 单
+                </span>
+              </div>
+              <div className={styles.p50CompareCard}>
+                <span className={styles.p50CompareTitle}>工作日</span>
+                <span className={styles.p50CompareVal}>{data.weekday?.count ?? 0} 单</span>
+                <span className={styles.p50CompareSub}>
+                  ¥{data.weekday?.avg_yuan?.toLocaleString() ?? '—'} / 单
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+      </ZCard>
+    </div>
+  );
+}
+
+// ── Phase 50: QuarterlyRevenueTab ─────────────────────────────────────────────
+
+function QuarterlyRevenueTab() {
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const storeId = localStorage.getItem('store_id') || '';
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const r = await apiClient.get(`/api/v1/banquet-agent/stores/${storeId}/quarterly-revenue?months=12`);
+      setData(r.data);
+    } catch (e) { handleApiError(e); }
+    finally { setLoading(false); }
+  }, [storeId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (loading) return <ZSkeleton />;
+
+  const maxRev = data?.quarters?.length
+    ? Math.max(...data.quarters.map((q: any) => q.revenue_yuan), 1)
+    : 1;
+
+  return (
+    <div className={styles.p50Wrap}>
+      <ZCard title="季度收入分析">
+        {!data || data.total_orders === 0 ? <ZEmpty /> : (
+          <div>
+            {data.best_quarter && (
+              <div className={styles.p50BestQ}>
+                最优季度：<strong>{data.best_quarter}</strong>
+              </div>
+            )}
+            <div className={styles.p50QBarChart}>
+              {(data.quarters || []).map((q: any) => (
+                <div key={q.quarter} className={styles.p50QBarCol}>
+                  <div className={styles.p50QBarTrack}>
+                    <div
+                      className={styles.p50QBarFill + (q.quarter === data.best_quarter ? ' ' + styles.p50QBarBest : '')}
+                      style={{ height: `${(q.revenue_yuan / maxRev) * 100}%` }}
+                    />
+                  </div>
+                  <span className={styles.p50QBarLabel}>{q.quarter.slice(-2)}</span>
+                  <span className={styles.p50QBarRev}>¥{(q.revenue_yuan / 10000).toFixed(1)}万</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </ZCard>
+    </div>
+  );
+}
+
+// ── Phase 51: TypeRevenueShareTab ─────────────────────────────────────────────
+
+function TypeRevenueShareTab() {
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const storeId = localStorage.getItem('store_id') || '';
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const r = await apiClient.get(`/api/v1/banquet-agent/stores/${storeId}/type-revenue-share?months=12`);
+      setData(r.data);
+    } catch (e) { handleApiError(e); }
+    finally { setLoading(false); }
+  }, [storeId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (loading) return <ZSkeleton />;
+
+  return (
+    <div className={styles.p51Wrap}>
+      <ZCard title="各宴会类型收入占比">
+        {!data || data.total_orders === 0 ? <ZEmpty /> : (
+          <div>
+            <div className={styles.p51TotalRow}>
+              总收入：<strong>¥{data.total_revenue_yuan?.toLocaleString()}</strong>
+              {data.top_type && <span className={styles.p51TopBadge}>主力：{data.top_type}</span>}
+            </div>
+            <div className={styles.p51TypeList}>
+              {(data.by_type || []).map((t: any) => (
+                <div key={t.banquet_type} className={styles.p51TypeRow}>
+                  <span className={styles.p51TypeName}>{t.banquet_type}</span>
+                  <div className={styles.p51TypeTrack}>
+                    <div className={styles.p51TypeFill}
+                      style={{ width: `${t.revenue_share_pct}%` }} />
+                  </div>
+                  <span className={styles.p51TypePct}>{t.revenue_share_pct}%</span>
+                  <span className={styles.p51TypeRev}>¥{(t.revenue_yuan / 10000).toFixed(1)}万</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </ZCard>
+    </div>
+  );
+}
+
+// ── Phase 51: MonthlyLeadConversionTab ────────────────────────────────────────
+
+function MonthlyLeadConversionTab() {
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const storeId = localStorage.getItem('store_id') || '';
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const r = await apiClient.get(`/api/v1/banquet-agent/stores/${storeId}/monthly-lead-conversion?months=6`);
+      setData(r.data);
+    } catch (e) { handleApiError(e); }
+    finally { setLoading(false); }
+  }, [storeId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (loading) return <ZSkeleton />;
+
+  return (
+    <div className={styles.p51Wrap}>
+      <ZCard title="月度线索转化率">
+        {!data || data.total_leads === 0 ? <ZEmpty /> : (
+          <div>
+            <div className={styles.p51ConvKpiRow}>
+              <div className={styles.p51ConvKpi}>
+                <span className={styles.p51ConvKpiVal}>{data.total_leads}</span>
+                <span className={styles.p51ConvKpiLabel}>总线索</span>
+              </div>
+              <div className={styles.p51ConvKpi}>
+                <span className={styles.p51ConvKpiVal}>
+                  {data.avg_conversion_pct != null ? `${data.avg_conversion_pct.toFixed(1)}%` : '—'}
+                </span>
+                <span className={styles.p51ConvKpiLabel}>平均转化率</span>
+              </div>
+            </div>
+            <div className={styles.p51ConvMonthList}>
+              {(data.monthly || []).map((m: any) => (
+                <div key={m.month} className={styles.p51ConvMonthRow}>
+                  <span className={styles.p51ConvMonthLabel}>{m.month.slice(5)}</span>
+                  <div className={styles.p51ConvTrack}>
+                    <div className={styles.p51ConvFill}
+                      style={{ width: `${m.conversion_pct}%` }} />
+                  </div>
+                  <span className={styles.p51ConvStat}>{m.conversion_pct?.toFixed(1)}%</span>
+                  <span className={styles.p51ConvCount}>({m.won}/{m.total})</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </ZCard>
+    </div>
+  );
+}
+
+// ── Phase 52: TypeCancellationRateTab ─────────────────────────────────────────
+function TypeCancellationRateTab() {
+  const storeId = localStorage.getItem('store_id') || '';
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const [months, setMonths] = useState(12);
+
+  const load = useCallback(async () => {
+    if (!storeId) return;
+    setLoading(true);
+    try {
+      const r = await apiClient.get(
+        `/api/v1/banquet-agent/stores/${storeId}/banquet-type-cancellation-rate?months=${months}`
+      );
+      setData(r.data);
+    } catch (e) { handleApiError(e); }
+    finally { setLoading(false); }
+  }, [storeId, months]);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (loading) return <ZSkeleton rows={5} />;
+  if (!data || data.total_orders === 0) return <ZEmpty message="暂无订单数据" />;
+
+  return (
+    <div className={styles.p52Wrap}>
+      <ZCard title="宴会类型取消率分析">
+        <div className={styles.p52KpiRow}>
+          <div className={styles.p52Kpi}>
+            <span className={styles.p52KpiVal}>{data.total_orders}</span>
+            <span className={styles.p52KpiLabel}>总订单数</span>
+          </div>
+          <div className={styles.p52Kpi}>
+            <span className={styles.p52KpiVal}>{data.overall_cancellation_pct ?? '—'}%</span>
+            <span className={styles.p52KpiLabel}>整体取消率</span>
+          </div>
+        </div>
+        <div className={styles.p52TypeList}>
+          {(data.by_type || []).map((t: any) => (
+            <div key={t.banquet_type} className={styles.p52TypeRow}>
+              <span className={styles.p52TypeName}>{t.banquet_type}</span>
+              <div className={styles.p52Track}>
+                <div className={styles.p52Fill} style={{ width: `${t.cancellation_pct}%` }} />
+              </div>
+              <span className={styles.p52Pct}>{t.cancellation_pct}%</span>
+              <span className={styles.p52Count}>({t.cancelled}/{t.total})</span>
+            </div>
+          ))}
+        </div>
+      </ZCard>
+    </div>
+  );
+}
+
+// ── Phase 52: PeakBookingHourTab ──────────────────────────────────────────────
+function PeakBookingHourTab() {
+  const storeId = localStorage.getItem('store_id') || '';
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const [months, setMonths] = useState(3);
+
+  const load = useCallback(async () => {
+    if (!storeId) return;
+    setLoading(true);
+    try {
+      const r = await apiClient.get(
+        `/api/v1/banquet-agent/stores/${storeId}/peak-booking-hour?months=${months}`
+      );
+      setData(r.data);
+    } catch (e) { handleApiError(e); }
+    finally { setLoading(false); }
+  }, [storeId, months]);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (loading) return <ZSkeleton rows={5} />;
+  if (!data || data.total_orders === 0) return <ZEmpty message="暂无预订数据" />;
+
+  const maxCount = Math.max(...(data.by_hour || []).map((h: any) => h.count), 1);
+
+  return (
+    <div className={styles.p52Wrap}>
+      <ZCard title="预订高峰小时分析">
+        <div className={styles.p52KpiRow}>
+          <div className={styles.p52Kpi}>
+            <span className={styles.p52KpiVal}>{data.total_orders}</span>
+            <span className={styles.p52KpiLabel}>总订单数</span>
+          </div>
+          <div className={styles.p52Kpi}>
+            <span className={styles.p52KpiVal}>{data.peak_hour ?? '—'}:00</span>
+            <span className={styles.p52KpiLabel}>高峰时段</span>
+          </div>
+        </div>
+        <div className={styles.p52HourChart}>
+          {(data.by_hour || []).map((h: any) => (
+            <div key={h.hour} className={styles.p52HourCol}>
+              <div className={styles.p52HourBar}>
+                <div
+                  className={styles.p52HourFill}
+                  style={{
+                    height: `${Math.round(h.count / maxCount * 100)}%`,
+                    background: h.hour === data.peak_hour ? 'var(--accent)' : 'var(--accent-muted)',
+                  }}
+                />
+              </div>
+              <span className={styles.p52HourLabel}>{h.hour}</span>
+            </div>
+          ))}
+        </div>
+      </ZCard>
+    </div>
+  );
+}
+
+// ── Phase 53: CustomerLifetimeValueTab ───────────────────────────────────────
+function CustomerLifetimeValueTab() {
+  const storeId = localStorage.getItem('store_id') || '';
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const [months, setMonths] = useState(24);
+
+  const load = useCallback(async () => {
+    if (!storeId) return;
+    setLoading(true);
+    try {
+      const r = await apiClient.get(
+        `/api/v1/banquet-agent/stores/${storeId}/customer-lifetime-value?months=${months}`
+      );
+      setData(r.data);
+    } catch (e) { handleApiError(e); }
+    finally { setLoading(false); }
+  }, [storeId, months]);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (loading) return <ZSkeleton rows={4} />;
+  if (!data || data.total_customers === 0) return <ZEmpty message="暂无客户数据" />;
+
+  return (
+    <div className={styles.p53Wrap}>
+      <ZCard title="客户生命周期价值 (CLV)">
+        <div className={styles.p53KpiRow}>
+          <div className={styles.p53Kpi}>
+            <span className={styles.p53KpiVal}>{data.total_customers}</span>
+            <span className={styles.p53KpiLabel}>客户总数</span>
+          </div>
+          <div className={styles.p53Kpi}>
+            <span className={styles.p53KpiVal}>¥{data.avg_clv_yuan ?? '—'}</span>
+            <span className={styles.p53KpiLabel}>平均 CLV</span>
+          </div>
+          <div className={styles.p53Kpi}>
+            <span className={styles.p53KpiVal}>{data.top10_count ?? '—'}</span>
+            <span className={styles.p53KpiLabel}>Top 10% 客户</span>
+          </div>
+        </div>
+        {data.top_customer && (
+          <div className={styles.p53TopRow}>
+            <span className={styles.p53TopLabel}>最高价值客户</span>
+            <ZBadge color="accent">{data.top_customer}</ZBadge>
+          </div>
+        )}
+      </ZCard>
+    </div>
+  );
+}
+
+// ── Phase 53: BanquetDatePopularityTab ────────────────────────────────────────
+function BanquetDatePopularityTab() {
+  const storeId = localStorage.getItem('store_id') || '';
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const [months, setMonths] = useState(12);
+
+  const load = useCallback(async () => {
+    if (!storeId) return;
+    setLoading(true);
+    try {
+      const r = await apiClient.get(
+        `/api/v1/banquet-agent/stores/${storeId}/banquet-date-popularity?months=${months}`
+      );
+      setData(r.data);
+    } catch (e) { handleApiError(e); }
+    finally { setLoading(false); }
+  }, [storeId, months]);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (loading) return <ZSkeleton rows={5} />;
+  if (!data || data.total_orders === 0) return <ZEmpty message="暂无预订数据" />;
+
+  const maxCount = Math.max(...(data.by_month || []).map((m: any) => m.count), 1);
+
+  return (
+    <div className={styles.p53Wrap}>
+      <ZCard title="宴会日期受欢迎程度">
+        <div className={styles.p53KpiRow}>
+          <div className={styles.p53Kpi}>
+            <span className={styles.p53KpiVal}>{data.total_orders}</span>
+            <span className={styles.p53KpiLabel}>总预订数</span>
+          </div>
+          <div className={styles.p53Kpi}>
+            <span className={styles.p53KpiVal}>{data.peak_month ?? '—'}</span>
+            <span className={styles.p53KpiLabel}>最热月份</span>
+          </div>
+        </div>
+        <div className={styles.p53MonthList}>
+          {(data.by_month || []).map((m: any) => (
+            <div key={m.month} className={styles.p53MonthRow}>
+              <span className={styles.p53MonthLabel}>{m.month}</span>
+              <div className={styles.p53Track}>
+                <div
+                  className={styles.p53Fill}
+                  style={{
+                    width: `${Math.round(m.count / maxCount * 100)}%`,
+                    background: m.month === data.peak_month ? 'var(--accent)' : 'var(--accent-muted)',
+                  }}
+                />
+              </div>
+              <span className={styles.p53Count}>{m.count}</span>
+            </div>
+          ))}
+        </div>
+      </ZCard>
+    </div>
+  );
+}
+
+// ── Phase 54: PaymentMethodPreferenceTab ─────────────────────────────────────
+function PaymentMethodPreferenceTab() {
+  const storeId = localStorage.getItem('store_id') || '';
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const [months, setMonths] = useState(6);
+
+  const load = useCallback(async () => {
+    if (!storeId) return;
+    setLoading(true);
+    try {
+      const r = await apiClient.get(
+        `/api/v1/banquet-agent/stores/${storeId}/payment-method-preference?months=${months}`
+      );
+      setData(r.data);
+    } catch (e) { handleApiError(e); }
+    finally { setLoading(false); }
+  }, [storeId, months]);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (loading) return <ZSkeleton rows={4} />;
+  if (!data || data.total_payments === 0) return <ZEmpty message="暂无支付数据" />;
+
+  return (
+    <div className={styles.p54Wrap}>
+      <ZCard title="支付方式偏好分析">
+        <div className={styles.p54KpiRow}>
+          <div className={styles.p54Kpi}>
+            <span className={styles.p54KpiVal}>{data.total_payments}</span>
+            <span className={styles.p54KpiLabel}>总支付笔数</span>
+          </div>
+          <div className={styles.p54Kpi}>
+            <span className={styles.p54KpiVal}>{data.preferred_method ?? '—'}</span>
+            <span className={styles.p54KpiLabel}>最常用方式</span>
+          </div>
+        </div>
+        <div className={styles.p54MethodList}>
+          {(data.by_method || []).map((m: any) => (
+            <div key={m.method} className={styles.p54MethodRow}>
+              <span className={styles.p54MethodName}>{m.method}</span>
+              <div className={styles.p54Track}>
+                <div className={styles.p54Fill} style={{ width: `${m.count_pct}%` }} />
+              </div>
+              <span className={styles.p54Pct}>{m.count_pct}%</span>
+              <span className={styles.p54Count}>{m.count}笔</span>
+            </div>
+          ))}
+        </div>
+      </ZCard>
+    </div>
+  );
+}
+
+// ── Phase 54: BanquetSeasonAnalysisTab ────────────────────────────────────────
+function BanquetSeasonAnalysisTab() {
+  const storeId = localStorage.getItem('store_id') || '';
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const [months, setMonths] = useState(12);
+
+  const load = useCallback(async () => {
+    if (!storeId) return;
+    setLoading(true);
+    try {
+      const r = await apiClient.get(
+        `/api/v1/banquet-agent/stores/${storeId}/banquet-season-analysis?months=${months}`
+      );
+      setData(r.data);
+    } catch (e) { handleApiError(e); }
+    finally { setLoading(false); }
+  }, [storeId, months]);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (loading) return <ZSkeleton rows={4} />;
+  if (!data || data.total_orders === 0) return <ZEmpty message="暂无订单数据" />;
+
+  const seasonColors: Record<string, string> = {
+    春季: '#4ade80', 夏季: '#f59e0b', 秋季: '#f97316', 冬季: '#60a5fa',
+  };
+  const maxCount = Math.max(...(data.by_season || []).map((s: any) => s.count), 1);
+
+  return (
+    <div className={styles.p54Wrap}>
+      <ZCard title="宴会季节性分析">
+        <div className={styles.p54KpiRow}>
+          <div className={styles.p54Kpi}>
+            <span className={styles.p54KpiVal}>{data.total_orders}</span>
+            <span className={styles.p54KpiLabel}>总订单数</span>
+          </div>
+          <div className={styles.p54Kpi}>
+            <span className={styles.p54KpiVal}>{data.peak_season ?? '—'}</span>
+            <span className={styles.p54KpiLabel}>旺季</span>
+          </div>
+        </div>
+        <div className={styles.p54SeasonList}>
+          {(data.by_season || []).map((s: any) => (
+            <div key={s.season} className={styles.p54SeasonRow}>
+              <span className={styles.p54SeasonName}>{s.season}</span>
+              <div className={styles.p54Track}>
+                <div
+                  className={styles.p54Fill}
+                  style={{
+                    width: `${Math.round(s.count / maxCount * 100)}%`,
+                    background: seasonColors[s.season] || 'var(--accent)',
+                  }}
+                />
+              </div>
+              <span className={styles.p54Count}>{s.count}单</span>
+              <span className={styles.p54Rev}>¥{s.revenue_yuan}</span>
+            </div>
+          ))}
+        </div>
+      </ZCard>
+    </div>
+  );
+}
+
+// ── Phase 55: LeadWinLossRatioTab ─────────────────────────────────────────────
+function LeadWinLossRatioTab() {
+  const storeId = localStorage.getItem('store_id') || '';
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const [months, setMonths] = useState(6);
+
+  const load = useCallback(async () => {
+    if (!storeId) return;
+    setLoading(true);
+    try {
+      const r = await apiClient.get(
+        `/api/v1/banquet-agent/stores/${storeId}/lead-win-loss-ratio?months=${months}`
+      );
+      setData(r.data);
+    } catch (e) { handleApiError(e); }
+    finally { setLoading(false); }
+  }, [storeId, months]);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (loading) return <ZSkeleton rows={4} />;
+  if (!data || data.total_leads === 0) return <ZEmpty message="暂无线索数据" />;
+
+  return (
+    <div className={styles.p55Wrap}>
+      <ZCard title="线索赢单/输单比率">
+        <div className={styles.p55KpiRow}>
+          <div className={styles.p55Kpi}>
+            <span className={styles.p55KpiVal}>{data.total_leads}</span>
+            <span className={styles.p55KpiLabel}>总线索数</span>
+          </div>
+          <div className={styles.p55Kpi}>
+            <span className={styles.p55KpiVal} style={{ color: 'var(--green,#22c55e)' }}>{data.won}</span>
+            <span className={styles.p55KpiLabel}>赢单</span>
+          </div>
+          <div className={styles.p55Kpi}>
+            <span className={styles.p55KpiVal} style={{ color: 'var(--red,#ef4444)' }}>{data.lost}</span>
+            <span className={styles.p55KpiLabel}>输单</span>
+          </div>
+          <div className={styles.p55Kpi}>
+            <span className={styles.p55KpiVal}>{data.win_loss_ratio ?? '—'}</span>
+            <span className={styles.p55KpiLabel}>赢/输比</span>
+          </div>
+        </div>
+        <div className={styles.p55RatioBar}>
+          <div
+            className={styles.p55WinFill}
+            style={{ width: `${data.win_pct ?? 0}%` }}
+            title={`赢单 ${data.win_pct}%`}
+          />
+          <div
+            className={styles.p55LossFill}
+            style={{ width: `${data.loss_pct ?? 0}%` }}
+            title={`输单 ${data.loss_pct}%`}
+          />
+        </div>
+        <div className={styles.p55RatioLegend}>
+          <span className={styles.p55LegendWin}>赢单 {data.win_pct}%</span>
+          <span className={styles.p55LegendLoss}>输单 {data.loss_pct}%</span>
+        </div>
+      </ZCard>
+    </div>
+  );
+}
+
+// ── Phase 55: MonthlyNewCustomersTab ──────────────────────────────────────────
+function MonthlyNewCustomersTab() {
+  const storeId = localStorage.getItem('store_id') || '';
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const [months, setMonths] = useState(12);
+
+  const load = useCallback(async () => {
+    if (!storeId) return;
+    setLoading(true);
+    try {
+      const r = await apiClient.get(
+        `/api/v1/banquet-agent/stores/${storeId}/monthly-new-customers?months=${months}`
+      );
+      setData(r.data);
+    } catch (e) { handleApiError(e); }
+    finally { setLoading(false); }
+  }, [storeId, months]);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (loading) return <ZSkeleton rows={5} />;
+  if (!data || data.total_new_customers === 0) return <ZEmpty message="暂无客户数据" />;
+
+  const maxCount = Math.max(...(data.monthly || []).map((m: any) => m.new_customers), 1);
+
+  return (
+    <div className={styles.p55Wrap}>
+      <ZCard title="月度新客户增长">
+        <div className={styles.p55KpiRow}>
+          <div className={styles.p55Kpi}>
+            <span className={styles.p55KpiVal}>{data.total_new_customers}</span>
+            <span className={styles.p55KpiLabel}>新客户总数</span>
+          </div>
+          <div className={styles.p55Kpi}>
+            <span className={styles.p55KpiVal}>{data.peak_month ?? '—'}</span>
+            <span className={styles.p55KpiLabel}>新客高峰月</span>
+          </div>
+        </div>
+        <div className={styles.p55MonthList}>
+          {(data.monthly || []).map((m: any) => (
+            <div key={m.month} className={styles.p55MonthRow}>
+              <span className={styles.p55MonthLabel}>{m.month}</span>
+              <div className={styles.p55Track}>
+                <div
+                  className={styles.p55Fill}
+                  style={{
+                    width: `${Math.round(m.new_customers / maxCount * 100)}%`,
+                    background: m.month === data.peak_month ? 'var(--accent)' : 'var(--accent-muted)',
+                  }}
+                />
+              </div>
+              <span className={styles.p55Count}>{m.new_customers}</span>
+            </div>
+          ))}
+        </div>
+      </ZCard>
+    </div>
+  );
+}
+
+// ── Phase 56: LeadStageFunnelTab ──────────────────────────────────────────────
+function LeadStageFunnelTab() {
+  const storeId = localStorage.getItem('store_id') || '';
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const [months, setMonths] = useState(6);
+
+  const load = useCallback(async () => {
+    if (!storeId) return;
+    setLoading(true);
+    try {
+      const r = await apiClient.get(
+        `/api/v1/banquet-agent/stores/${storeId}/lead-stage-conversion-funnel?months=${months}`
+      );
+      setData(r.data);
+    } catch (e) { handleApiError(e); }
+    finally { setLoading(false); }
+  }, [storeId, months]);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (loading) return <ZSkeleton rows={5} />;
+  if (!data || data.total_leads === 0) return <ZEmpty message="暂无线索数据" />;
+
+  const stageLabels: Record<string, string> = {
+    new: '初步询价', contacted: '已接触', quoted: '已报价',
+    deposit_pending: '待定金', won: '已赢单',
+  };
+  const maxCount = Math.max(...(data.funnel || []).map((f: any) => f.count), 1);
+
+  return (
+    <div className={styles.p56Wrap}>
+      <ZCard title="线索阶段转化漏斗">
+        <div className={styles.p56KpiRow}>
+          <div className={styles.p56Kpi}>
+            <span className={styles.p56KpiVal}>{data.total_leads}</span>
+            <span className={styles.p56KpiLabel}>总线索数</span>
+          </div>
+          <div className={styles.p56Kpi}>
+            <span className={styles.p56KpiVal}>{data.overall_conversion_pct ?? '—'}%</span>
+            <span className={styles.p56KpiLabel}>整体转化率</span>
+          </div>
+        </div>
+        <div className={styles.p56FunnelList}>
+          {(data.funnel || []).map((f: any) => (
+            <div key={f.stage} className={styles.p56FunnelRow}>
+              <span className={styles.p56StageName}>{stageLabels[f.stage] ?? f.stage}</span>
+              <div className={styles.p56Track}>
+                <div
+                  className={styles.p56Fill}
+                  style={{
+                    width: `${maxCount > 0 ? Math.round(f.count / maxCount * 100) : 0}%`,
+                    background: f.stage === 'won' ? 'var(--accent)' : 'var(--accent-muted)',
+                  }}
+                />
+              </div>
+              <span className={styles.p56Count}>{f.count}</span>
+              <span className={styles.p56Pct}>{f.pct}%</span>
+            </div>
+          ))}
+        </div>
+      </ZCard>
+    </div>
+  );
+}
+
+// ── Phase 56: OrderValueTrendTab ──────────────────────────────────────────────
+function OrderValueTrendTab() {
+  const storeId = localStorage.getItem('store_id') || '';
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const [months, setMonths] = useState(12);
+
+  const load = useCallback(async () => {
+    if (!storeId) return;
+    setLoading(true);
+    try {
+      const r = await apiClient.get(
+        `/api/v1/banquet-agent/stores/${storeId}/order-value-trend?months=${months}`
+      );
+      setData(r.data);
+    } catch (e) { handleApiError(e); }
+    finally { setLoading(false); }
+  }, [storeId, months]);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (loading) return <ZSkeleton rows={5} />;
+  if (!data || data.total_orders === 0) return <ZEmpty message="暂无订单数据" />;
+
+  const maxAvg = Math.max(...(data.monthly || []).map((m: any) => m.avg_yuan), 1);
+
+  return (
+    <div className={styles.p56Wrap}>
+      <ZCard title="订单客单价月度趋势">
+        <div className={styles.p56KpiRow}>
+          <div className={styles.p56Kpi}>
+            <span className={styles.p56KpiVal}>{data.total_orders}</span>
+            <span className={styles.p56KpiLabel}>总订单数</span>
+          </div>
+          <div className={styles.p56Kpi}>
+            <span className={styles.p56KpiVal}>
+              {data.trend_direction === 'up' ? '↑ 上升' : data.trend_direction === 'down' ? '↓ 下降' : '—'}
+            </span>
+            <span className={styles.p56KpiLabel}>趋势</span>
+          </div>
+        </div>
+        <div className={styles.p56MonthList}>
+          {(data.monthly || []).map((m: any) => (
+            <div key={m.month} className={styles.p56MonthRow}>
+              <span className={styles.p56MonthLabel}>{m.month}</span>
+              <div className={styles.p56Track}>
+                <div
+                  className={styles.p56Fill}
+                  style={{ width: `${Math.round(m.avg_yuan / maxAvg * 100)}%` }}
+                />
+              </div>
+              <span className={styles.p56Rev}>¥{m.avg_yuan}</span>
+              <span className={styles.p56SmCount}>{m.count}单</span>
+            </div>
+          ))}
+        </div>
       </ZCard>
     </div>
   );
