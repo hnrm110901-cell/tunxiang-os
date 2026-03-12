@@ -171,6 +171,7 @@ const MonthlyReportPage = lazy(() => import('./pages/MonthlyReportPage'));
 const OnboardingPage = lazy(() => import('./pages/onboarding/OnboardingPage'));
 const DynamicPricingPage = lazy(() => import('./pages/DynamicPricingPage'));
 const OpsMonitoringPage = lazy(() => import('./pages/OpsMonitoringPage'));
+const MerchantManagementPage = lazy(() => import('./pages/MerchantManagementPage'));
 
 // Role-based views (Phase 1 — Store Manager /sm)
 const StoreManagerLayout = lazy(() => import('./layouts/StoreManagerLayout'));
@@ -577,6 +578,9 @@ const AppContent: React.FC = () => {
                   } />
                   <Route path="governance" element={
                     <ProtectedRoute requiredRole="admin"><GovDashboardPage /></ProtectedRoute>
+                  } />
+                  <Route path="merchants" element={
+                    <ProtectedRoute requiredRole="admin"><MerchantManagementPage /></ProtectedRoute>
                   } />
                   <Route path="agent-hub" element={
                     <ProtectedRoute requiredRole="admin"><AgentHubPage /></ProtectedRoute>

@@ -24,6 +24,7 @@ from src.core.config import settings
 # 核心模块
 from src.api import health, agents, auth, notifications, stores, mobile, integrations, monitoring, llm, enterprise, voice, neural, adapters, tasks, reconciliation, approval, embedding, raas, model_marketplace, human_in_the_loop, hardware_integration, pos, dishes, benchmark, dish_master, alerts_webhook
 from src.api import roles as roles_api
+from src.api import merchants
 from src.api.phase5_apis import platform_router, industry_router, supply_chain_router, i18n_router
 # 逐步启用的模块
 from src.api import dashboard, analytics, audit, multi_store, finance, customer360, wechat_triggers, queue, meituan_queue
@@ -419,6 +420,7 @@ async def prometheus_middleware(request, call_next):
 app.include_router(health.router, prefix="/api/v1", tags=["health"])
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
 app.include_router(roles_api.router, prefix="/api/v1", tags=["roles"])
+app.include_router(merchants.router, prefix="/api/v1", tags=["merchants"])
 app.include_router(agents.router, prefix="/api/v1/agents", tags=["agents"])
 app.include_router(approval.router, prefix="/api/v1", tags=["approval"])
 app.include_router(notifications.router, prefix="/api/v1", tags=["notifications"])

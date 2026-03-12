@@ -158,6 +158,7 @@ const ROUTE_TO_GROUP: Record<string, string> = {
 
   // 06 平台与治理 (admin only)
   '/platform-hub': 'nav-platform',
+  '/merchants': 'nav-platform',
   '/users': 'nav-platform',
   '/stores': 'nav-platform',
   '/multi-store': 'nav-platform',
@@ -307,6 +308,7 @@ const BREADCRUMB_LABELS: Record<string, string> = {
   '/event-sourcing': '事件溯源',
   '/voice-ws': '语音WebSocket',
   '/users': '用户管理',
+  '/merchants': '商户管理',
   '/platform-hub': '平台与治理中心',
   '/stores': '门店管理',
   '/multi-store': '多门店管理',
@@ -665,6 +667,7 @@ const MainLayout: React.FC = () => {
       children: [
         { key: '/platform-hub',     icon: <AppstoreOutlined />,   label: '治理中心' },
         // 组织与权限
+        { key: '/merchants',        icon: <BankOutlined />,       label: '商户管理' },
         { key: '/users',            icon: <TeamOutlined />,       label: '用户管理' },
         { key: '/stores',           icon: <ShopOutlined />,       label: '门店管理' },
         { key: '/multi-store',      icon: <ShopOutlined />,       label: '多门店管理' },
