@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { apiClient } from '@/utils/apiClient'
+import { apiClient } from '../services/api'
 import css from './OpsFlowAgentPage.module.css'
 
 interface DashboardData {
@@ -180,7 +180,7 @@ export default function OpsFlowAgentPage() {
                 <div className={css.kpiValue}>{dashboard.inventory_layer.unresolved_alerts}</div>
                 <div className={css.kpiSub}>需立即补货</div>
               </div>
-              <div className={`${css.kpiCard} ${dashboard.quality_layer.avg_score < 75 ? css.kpiCritical : css.quality_layer?.avg_score < 85 ? css.kpiWarn : css.kpiOk}`}>
+              <div className={`${css.kpiCard} ${dashboard.quality_layer.avg_score < 75 ? css.kpiCritical : dashboard.quality_layer?.avg_score < 85 ? css.kpiWarn : css.kpiOk}`}>
                 <div className={css.kpiLabel}>今日质检均分</div>
                 <div className={css.kpiValue}>{dashboard.quality_layer.avg_score || '—'}</div>
                 <div className={css.kpiSub}>检测 {dashboard.quality_layer.inspections_24h} 次</div>
@@ -375,7 +375,7 @@ function ChainEventsTab({ storeId }: { storeId: string }) {
 
   useEffect(() => {
     apiClient.get<{ events: typeof events }>(`/api/v1/ops-flow/stores/${storeId}/chain-events?limit=30`)
-      .then(d => setEvents(d.events))
+      .then((d: { events: typeof events }) => setEvents(d.events))
       .catch(console.error)
       .finally(() => setLoading(false))
   }, [storeId])

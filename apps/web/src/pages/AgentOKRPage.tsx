@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { apiClient } from '@/utils/apiClient'
+import { apiClient } from '../services/api'
 
 interface AgentOKRSummary {
   overall: {
