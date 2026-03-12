@@ -219,37 +219,125 @@ async def get_recommendation_performance(
 
 # ==================== P1-3：门店级经营推荐 ====================
 
+import datetime
+import structlog
+from sqlalchemy import text
+
 from ..services.recommendation_service import generate_store_recommendations
 from ..core.dependencies import get_current_active_user
 from ..models.user import User
+
+_rec_logger = structlog.get_logger()
+
+
+async def _fetch_sales_data(store_id: str, db: AsyncSession) -> List[dict]:
+    """查询近7天门店销售数据（按菜品汇总）。"""
+    since = (datetime.date.today() - datetime.timedelta(days=7)).isoformat()
+    try:
+        rows = (await db.execute(
+            text("""
+                SELECT
+                    oi.item_name                          AS dish_name,
+                    COALESCE(oi.item_id, oi.item_name)   AS dish_id,
+                    SUM(oi.quantity)::int                  AS qty_sold_7d,
+                    SUM(oi.subtotal)                      AS revenue_7d,
+                    SUM(oi.quantity) / 7.0                AS avg_daily_qty
+                FROM order_items oi
+                JOIN orders o ON oi.order_id = o.id
+                WHERE oi.store_id = :store_id
+                  AND o.created_at >= :since
+                GROUP BY oi.item_name, oi.item_id
+                ORDER BY revenue_7d DESC
+                LIMIT 20
+            """),
+            {"store_id": store_id, "since": since},
+        )).fetchall()
+    except Exception as exc:
+        _rec_logger.warning("recommendations.sales_query_failed", store_id=store_id, error=str(exc))
+        return []
+
+    return [
+        {
+            "dish_id":       str(r[1] or r[0]),
+            "dish_name":     r[0],
+            "qty_sold_7d":   int(r[2] or 0),
+            "revenue_7d":    float(r[3] or 0),
+            "avg_daily_qty": float(r[4] or 0),
+        }
+        for r in rows
+        if r[0]
+    ]
+
+
+async def _fetch_inventory_data(store_id: str, db: AsyncSession) -> List[dict]:
+    """
+    查询库存中消耗速度快/数量偏低的食材，并计算预计耗尽天数。
+    days_until_expiry = current_quantity / avg_daily_usage（来自近7天 usage 交易）
+    """
+    since = (datetime.date.today() - datetime.timedelta(days=7)).isoformat()
+    try:
+        rows = (await db.execute(
+            text("""
+                SELECT
+                    ii.name                          AS dish_name,
+                    ii.name                          AS dish_id,
+                    COALESCE(ii.current_quantity, 0) AS stock_qty,
+                    COALESCE(ii.unit_price, 0)       AS cost_per_unit,
+                    CASE
+                        WHEN COALESCE(usage.daily_usage, 0) > 0
+                        THEN FLOOR(ii.current_quantity / usage.daily_usage)::int
+                        ELSE 99
+                    END                              AS days_until_expiry
+                FROM inventory_items ii
+                LEFT JOIN (
+                    SELECT
+                        item_id,
+                        ABS(SUM(quantity)) / 7.0 AS daily_usage
+                    FROM inventory_transactions
+                    WHERE store_id = :store_id
+                      AND transaction_type = 'usage'
+                      AND created_at >= :since
+                    GROUP BY item_id
+                ) usage ON ii.id = usage.item_id
+                WHERE ii.store_id = :store_id
+                  AND ii.current_quantity IS NOT NULL
+                  AND ii.current_quantity > 0
+                ORDER BY days_until_expiry ASC
+                LIMIT 20
+            """),
+            {"store_id": store_id, "since": since},
+        )).fetchall()
+    except Exception as exc:
+        _rec_logger.warning("recommendations.inventory_query_failed", store_id=store_id, error=str(exc))
+        return []
+
+    return [
+        {
+            "dish_id":          r[1],
+            "dish_name":        r[0],
+            "stock_qty":        float(r[2]),
+            "cost_per_unit":    float(r[3]),
+            "days_until_expiry": int(r[4]),
+        }
+        for r in rows
+        if r[0]
+    ]
 
 
 @router.get("/{store_id}", summary="获取门店经营推荐（推广/下架/限时折扣）")
 async def get_store_recommendations(
     store_id: str,
     _current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
 ):
     """
     基于销售历史 + 库存状态，返回门店级推荐列表。
     每条推荐包含：建议动作、预期¥影响、置信度、优先级。
     """
     try:
-        # TODO: 接入真实 sales/inventory DB 查询
-        # 当前使用模拟数据用于演示
-        mock_sales = [
-            {"dish_id": "D001", "dish_name": "招牌红烧肉", "qty_sold_7d": 84, "revenue_7d": 2520.0, "avg_daily_qty": 12.0},
-            {"dish_id": "D002", "dish_name": "夫妻肺片", "qty_sold_7d": 63, "revenue_7d": 1890.0, "avg_daily_qty": 9.0},
-            {"dish_id": "D003", "dish_name": "麻婆豆腐", "qty_sold_7d": 42, "revenue_7d": 840.0, "avg_daily_qty": 6.0},
-            {"dish_id": "D004", "dish_name": "冬瓜汤", "qty_sold_7d": 7, "revenue_7d": 140.0, "avg_daily_qty": 1.0},
-            {"dish_id": "D005", "dish_name": "酸豆角", "qty_sold_7d": 5, "revenue_7d": 75.0, "avg_daily_qty": 0.7},
-        ]
-        mock_inventory = [
-            {"dish_id": "D004", "dish_name": "冬瓜汤", "stock_qty": 30, "days_until_expiry": 3, "cost_per_unit": 4.5},
-            {"dish_id": "D006", "dish_name": "卤猪蹄", "stock_qty": 15, "days_until_expiry": 1, "cost_per_unit": 28.0},
-            {"dish_id": "D005", "dish_name": "酸豆角", "stock_qty": 20, "days_until_expiry": 5, "cost_per_unit": 2.0},
-        ]
-
-        recs = generate_store_recommendations(store_id, mock_sales, mock_inventory)
+        sales_data = await _fetch_sales_data(store_id, db)
+        inventory_data = await _fetch_inventory_data(store_id, db)
+        recs = generate_store_recommendations(store_id, sales_data, inventory_data)
         return {
             "store_id": store_id,
             "total": len(recs),
