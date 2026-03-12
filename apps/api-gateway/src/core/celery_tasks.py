@@ -4023,7 +4023,254 @@ def pull_historical_backfill(
                 "errors": errors[:10],
             }
 
-        # ── 其他适配器：暂未集成，记录 skipped ────────────────────────────────
+        # ── 客如云适配器 ───────────────────────────────────────────────────────
+        elif adapter == "keruyun":
+            from datetime import date, timedelta
+            from packages.api_adapters.keruyun.src.adapter import KeruyunAdapter
+
+            client_id = (
+                credentials.get("client_id")
+                or os.getenv(f"KERUYUN_CLIENT_ID_{store_id}")
+                or os.getenv("KERUYUN_CLIENT_ID", "")
+            )
+            client_secret = (
+                credentials.get("client_secret")
+                or os.getenv(f"KERUYUN_CLIENT_SECRET_{store_id}")
+                or os.getenv("KERUYUN_CLIENT_SECRET", "")
+            )
+            if not client_id or not client_secret:
+                logger.warning("backfill.keruyun.skipped", store_id=store_id,
+                               reason="KERUYUN credentials not configured")
+                async with get_db_session() as session:
+                    await _update_progress(session, 0, 0, 0, "skipped",
+                                           {"reason": "KERUYUN_CLIENT_ID/SECRET 未配置"})
+                return {"success": True, "store_id": store_id, "adapter": adapter,
+                        "records_imported": 0, "skipped": True, "errors": []}
+
+            adapter_instance = KeruyunAdapter(config={
+                "base_url": credentials.get("base_url") or os.getenv("KERUYUN_BASE_URL", "https://api.keruyun.com"),
+                "client_id": client_id,
+                "client_secret": client_secret,
+                "store_id": store_id,
+            })
+
+            backfill_days = int(os.getenv("ONBOARDING_BACKFILL_DAYS", "30"))
+            today = date.today()
+            records_imported = 0
+            errors: list = []
+
+            async with get_db_session() as session:
+                await _update_progress(session, backfill_days, 0, 0, "in_progress",
+                                       {"adapter": adapter, "phase": "pulling"})
+
+            for i in range(backfill_days):
+                target_date = today - timedelta(days=i + 1)
+                start_time = target_date.strftime("%Y-%m-%d 00:00:00")
+                end_time = target_date.strftime("%Y-%m-%d 23:59:59")
+                try:
+                    result = await adapter_instance.query_order(
+                        start_time=start_time, end_time=end_time
+                    )
+                    orders = (
+                        result if isinstance(result, list)
+                        else result.get("orders", result.get("list", []))
+                    )
+                    if orders and isinstance(orders, list):
+                        async with get_db_session() as session:
+                            for order in orders:
+                                oid = (
+                                    order.get("order_id")
+                                    or order.get("orderId")
+                                    or order.get("id")
+                                )
+                                if not oid:
+                                    continue
+                                await session.execute(
+                                    _text("""
+                                        INSERT INTO orders
+                                            (id, store_id, table_number, status,
+                                             total_amount, discount_amount, final_amount,
+                                             order_time, source_system, order_metadata,
+                                             created_at, updated_at)
+                                        VALUES
+                                            (:id, :store_id, :table_number, :status,
+                                             :total_amount, :discount_amount, :final_amount,
+                                             :order_time, 'keruyun', '{}', NOW(), NOW())
+                                        ON CONFLICT (id) DO NOTHING
+                                    """),
+                                    {
+                                        "id": str(oid),
+                                        "store_id": store_id,
+                                        "table_number": order.get("tableId") or order.get("table_id") or "",
+                                        "status": str(order.get("status") or "completed"),
+                                        "total_amount": int(float(order.get("totalAmount") or order.get("total_amount") or 0) * 100),
+                                        "discount_amount": int(float(order.get("discountAmount") or order.get("discount_amount") or 0) * 100),
+                                        "final_amount": int(float(order.get("paidAmount") or order.get("paid_amount") or order.get("finalAmount") or 0) * 100),
+                                        "order_time": order.get("orderTime") or order.get("order_time") or start_time,
+                                    },
+                                )
+                                records_imported += 1
+                            await session.commit()
+                except Exception as e:
+                    logger.warning("backfill.keruyun.day_failed", store_id=store_id,
+                                   date=target_date.isoformat(), error=str(e))
+                    errors.append({"date": target_date.isoformat(), "error": str(e)})
+
+            async with get_db_session() as session:
+                await _update_progress(
+                    session, total=backfill_days, imported=records_imported,
+                    failed=len(errors), status="completed",
+                    extra={"adapter": adapter, "days_pulled": backfill_days,
+                           "records_imported": records_imported, "errors": errors[:10]},
+                )
+            logger.info("backfill.keruyun.done", store_id=store_id,
+                        records_imported=records_imported, errors=len(errors))
+            return {"success": True, "store_id": store_id, "adapter": adapter,
+                    "records_imported": records_imported, "skipped": False, "errors": errors[:10]}
+
+        # ── 品智适配器 ─────────────────────────────────────────────────────────
+        elif adapter == "pinzhi":
+            from datetime import date, timedelta
+            from packages.api_adapters.pinzhi.src.adapter import PinzhiAdapter
+
+            base_url = credentials.get("base_url") or os.getenv("PINZHI_BASE_URL", "")
+            token = (
+                credentials.get("token")
+                or os.getenv(f"PINZHI_TOKEN_{store_id}")
+                or os.getenv("PINZHI_TOKEN", "")
+            )
+            if not base_url or not token:
+                logger.warning("backfill.pinzhi.skipped", store_id=store_id,
+                               reason="PINZHI_BASE_URL/TOKEN not configured")
+                async with get_db_session() as session:
+                    await _update_progress(session, 0, 0, 0, "skipped",
+                                           {"reason": "PINZHI_BASE_URL/TOKEN 未配置"})
+                return {"success": True, "store_id": store_id, "adapter": adapter,
+                        "records_imported": 0, "skipped": True, "errors": []}
+
+            ognid = (
+                credentials.get("ognid")
+                or os.getenv(f"PINZHI_OGNID_{store_id}")
+                or os.getenv("PINZHI_OGNID", store_id)
+            )
+            adapter_instance = PinzhiAdapter(config={"base_url": base_url, "token": token})
+
+            backfill_days = int(os.getenv("ONBOARDING_BACKFILL_DAYS", "30"))
+            today = date.today()
+            records_imported = 0
+            errors: list = []
+            page_size = 50
+
+            async with get_db_session() as session:
+                await _update_progress(session, backfill_days, 0, 0, "in_progress",
+                                       {"adapter": adapter, "phase": "pulling"})
+
+            for i in range(backfill_days):
+                target_date = today - timedelta(days=i + 1)
+                date_str = target_date.strftime("%Y-%m-%d")
+                try:
+                    page = 1
+                    while True:
+                        orders = await adapter_instance.query_orders(
+                            ognid=ognid,
+                            begin_date=date_str,
+                            end_date=date_str,
+                            page_index=page,
+                            page_size=page_size,
+                        )
+                        if not orders:
+                            break
+                        async with get_db_session() as session:
+                            for order in orders:
+                                oid = (
+                                    order.get("orderId")
+                                    or order.get("order_id")
+                                    or order.get("id")
+                                )
+                                if not oid:
+                                    continue
+                                await session.execute(
+                                    _text("""
+                                        INSERT INTO orders
+                                            (id, store_id, table_number, status,
+                                             total_amount, discount_amount, final_amount,
+                                             order_time, source_system, order_metadata,
+                                             created_at, updated_at)
+                                        VALUES
+                                            (:id, :store_id, :table_number, :status,
+                                             :total_amount, :discount_amount, :final_amount,
+                                             :order_time, 'pinzhi', '{}', NOW(), NOW())
+                                        ON CONFLICT (id) DO NOTHING
+                                    """),
+                                    {
+                                        "id": str(oid),
+                                        "store_id": store_id,
+                                        "table_number": order.get("tableId") or order.get("table_id") or "",
+                                        "status": str(order.get("orderStatus") or order.get("status") or "completed"),
+                                        "total_amount": int(float(order.get("totalAmount") or order.get("total_amount") or 0) * 100),
+                                        "discount_amount": int(float(order.get("discountAmount") or order.get("discount_amount") or 0) * 100),
+                                        "final_amount": int(float(order.get("actualAmount") or order.get("paidAmount") or order.get("final_amount") or 0) * 100),
+                                        "order_time": order.get("orderTime") or order.get("order_time") or date_str,
+                                    },
+                                )
+                                records_imported += 1
+                            await session.commit()
+                        if len(orders) < page_size:
+                            break
+                        page += 1
+                except Exception as e:
+                    logger.warning("backfill.pinzhi.day_failed", store_id=store_id,
+                                   date=date_str, error=str(e))
+                    errors.append({"date": date_str, "error": str(e)})
+
+            async with get_db_session() as session:
+                await _update_progress(
+                    session, total=backfill_days, imported=records_imported,
+                    failed=len(errors), status="completed",
+                    extra={"adapter": adapter, "days_pulled": backfill_days,
+                           "records_imported": records_imported, "errors": errors[:10]},
+                )
+            logger.info("backfill.pinzhi.done", store_id=store_id,
+                        records_imported=records_imported, errors=len(errors))
+            return {"success": True, "store_id": store_id, "adapter": adapter,
+                    "records_imported": records_imported, "skipped": False, "errors": errors[:10]}
+
+        # ── 美团SAAS / 奥琦玮 / 一订 — 不支持历史批量回灌 ──────────────────────
+        elif adapter in ("meituan", "meituan-saas"):
+            # 美团SAAS只提供单单查询接口（query_order by order_id/day_seq），
+            # 无法按日期批量拉取历史订单，标记 skipped。
+            logger.warning("backfill.meituan.skipped", store_id=store_id,
+                           reason="meituan-saas adapter has no batch historical pull API")
+            async with get_db_session() as session:
+                await _update_progress(session, 0, 0, 0, "skipped",
+                                       {"adapter": adapter,
+                                        "reason": "美团SAAS仅支持单单查询，不支持历史批量回灌"})
+            return {"success": True, "store_id": store_id, "adapter": adapter,
+                    "records_imported": 0, "skipped": True, "errors": []}
+
+        elif adapter == "aoqiwei":
+            # 奥琦玮为上传推送模型（POS→奥琦玮），无历史订单拉取接口，标记 skipped。
+            logger.warning("backfill.aoqiwei.skipped", store_id=store_id,
+                           reason="aoqiwei is an upload-push model with no historical pull API")
+            async with get_db_session() as session:
+                await _update_progress(session, 0, 0, 0, "skipped",
+                                       {"adapter": adapter,
+                                        "reason": "奥琦玮为上传推送模型，无历史数据拉取接口"})
+            return {"success": True, "store_id": store_id, "adapter": adapter,
+                    "records_imported": 0, "skipped": True, "errors": []}
+
+        elif adapter == "yiding":
+            # 一订为预订管理系统，非POS订单系统，orders表回灌不适用，标记 skipped。
+            logger.warning("backfill.yiding.skipped", store_id=store_id,
+                           reason="yiding is a reservation system, not a POS order system")
+            async with get_db_session() as session:
+                await _update_progress(session, 0, 0, 0, "skipped",
+                                       {"adapter": adapter,
+                                        "reason": "一订为预订系统，不适用于orders表历史回灌"})
+            return {"success": True, "store_id": store_id, "adapter": adapter,
+                    "records_imported": 0, "skipped": True, "errors": []}
+
+        # ── 未知适配器 ─────────────────────────────────────────────────────────
         logger.warning(
             "backfill.adapter_not_implemented",
             store_id=store_id,
