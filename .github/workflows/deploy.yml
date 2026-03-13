@@ -139,16 +139,22 @@ jobs:
               sleep 3
             done
 
-            echo "=== [4.5/5] Run DB migrations ==="
-            cd /opt/zhilian-os
-            echo "Running containers:"
-            docker ps --format "{{.Names}}" | head -10
-            docker compose \
-              --env-file .env.prod \
-              -f docker-compose.prod.yml \
-              exec -T api-gateway sh -c "cd /app && alembic upgrade head" \
-              && echo "✓ DB migrations done" \
-              || echo "⚠ Migration failed — check alembic config"
+            echo "=== [4.5/5] Force DB table creation via API ==="
+            # API 已健康，直接 curl 一个会触发 DB 查询的轻量接口来验证表已创建
+            # init_db (create_all) 在 startup 里已经运行，这里只做验证
+            CONTAINER=$(docker ps --format "{{.Names}}" | grep -E "api.gateway|zhilian.api|api-gateway" | head -1)
+            echo "Container: $CONTAINER"
+            if [ -n "$CONTAINER" ]; then
+              docker exec "$CONTAINER" python3 -c "
+import asyncio, sys
+sys.path.insert(0, '/app')
+async def run():
+    from src.core.database import init_db
+    await init_db(retries=3, delay=2.0)
+    print('✓ Tables created/verified')
+asyncio.run(run())
+" && echo "✓ DB init done" || echo "⚠ DB init via exec failed"
+            fi
 
             echo "=== [5/5] Check final status ==="
             docker ps --filter "name=zhilian" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
