@@ -210,7 +210,7 @@ async def init_db(retries: int = 5, delay: float = 3.0):
     import asyncio
     from src.models import Base
 
-    last_exc: Exception | None = None
+    last_exc = None
     for attempt in range(1, retries + 1):
         try:
             async with engine.begin() as conn:
