@@ -127,7 +127,7 @@ jobs:
             docker compose \
               --env-file .env.prod \
               -f docker-compose.prod.yml \
-              up -d --no-deps --build zhilian-api
+              up -d --no-deps --build api-gateway
 
             echo "=== [4/5] Wait for API health ==="
             for i in $(seq 1 20); do
@@ -140,7 +140,7 @@ jobs:
             done
 
             echo "=== [5/5] Check final status ==="
-            docker ps --filter "name=zhilian-api" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+            docker ps --filter "name=zhilian" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
             curl -sf http://127.0.0.1:8000/api/v1/health && echo "" || echo "⚠ Health check failed"
           ENDSSH
 

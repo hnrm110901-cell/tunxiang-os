@@ -99,14 +99,14 @@ cd /opt/zhilian-os
 docker compose \
   --env-file .env.prod \
   -f docker-compose.prod.yml \
-  stop zhilian-api 2>/dev/null || true
+  stop api-gateway 2>/dev/null || true
 
 docker compose \
   --env-file .env.prod \
   -f docker-compose.prod.yml \
-  up -d --no-deps zhilian-api
+  up -d --no-deps api-gateway
 
-log "zhilian-api 容器已启动"
+log "api-gateway 容器已启动"
 
 # ── Step 5: 等待 API 健康 ────────────────────────────────────────
 step 5 "等待 API 就绪"
@@ -124,7 +124,7 @@ done
 
 if [ "$READY" = "0" ]; then
   warn "API 30 次健康检查未通过，查看日志:"
-  docker logs --tail=30 zhilian-api
+  docker logs --tail=30 api-gateway 2>/dev/null || docker logs --tail=30 zhilian-api 2>/dev/null || true
 fi
 
 # ── Step 6: 更新同步脚本 ────────────────────────────────────────
@@ -146,7 +146,7 @@ supervisorctl stop tunxiang-os >> $LOG 2>&1 || true
 
 # 重启 Docker API
 docker compose --env-file .env.prod -f docker-compose.prod.yml \
-  up -d --no-deps zhilian-api >> $LOG 2>&1
+  up -d --no-deps api-gateway >> $LOG 2>&1
 
 echo "同步完成" >> $LOG
 SYNC
@@ -181,6 +181,6 @@ echo ""
 log "修复完成！"
 echo ""
 echo "常用命令:"
-echo "  查看 API 日志:  docker logs -f zhilian-api"
+echo "  查看 API 日志:  docker logs -f zhilian-api  (或 api-gateway)"
 echo "  手动同步:       bash /usr/local/bin/zhilian-os-sync.sh"
 echo "  查看同步日志:   tail -f /var/log/zhilian-os-sync.log"
