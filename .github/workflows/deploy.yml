@@ -150,7 +150,7 @@ jobs:
           rsync -avz --delete \
             --exclude='.git' \
             apps/web/dist/ \
-            root@42.194.229.21:/var/www/html/zhilian-os/
+            root@42.194.229.21:/var/www/tunxiang/
 
           # 通知 nginx reload（不重启，零停机）
           ssh root@42.194.229.21 "nginx -t && nginx -s reload"
