@@ -1,223 +1,361 @@
 /* ── Page ────────────────────────────────────────────────────────────────────*/
 
 .page {
-  max-width: 1100px;
+  max-width: 1280px;
   margin: 0 auto;
-}
-
-/* ── Welcome ─────────────────────────────────────────────────────────────────*/
-
-.welcome {
-  margin-bottom: 20px;
-}
-
-.title {
-  font-size: 22px;
-  font-weight: 700;
-  color: #1D1D1F;
-  margin: 0 0 4px;
-}
-
-.subtitle {
-  font-size: 14px;
-  color: #6E6E73;
-  margin: 0;
-}
-
-/* ── Status bar ──────────────────────────────────────────────────────────────*/
-
-.statusBar {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 20px;
-  background: #fff;
-  border: 1px solid #E8E8E8;
-  border-radius: 10px;
-  padding: 10px 16px;
-  margin-bottom: 20px;
-  font-size: 13px;
 }
 
-.statusLabel {
-  font-weight: 600;
-  color: #1D1D1F;
-  margin-right: 4px;
-}
+/* ── 1. Hero KPI Bar ─────────────────────────────────────────────────────────*/
 
-.refreshBtn {
-  margin-left: auto;
-  border: 1px solid #0AAF9A;
-  background: transparent;
-  color: #0AAF9A;
-  font-size: 12px;
-  padding: 3px 12px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-family: inherit;
-  transition: all 0.15s;
-}
-
-.refreshBtn:hover {
-  background: rgba(10, 175, 154, 0.06);
-}
-
-/* ── Stats grid ──────────────────────────────────────────────────────────────*/
-
-.statsGrid {
+.heroBar {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 14px;
-  margin-bottom: 24px;
-}
-
-@media (max-width: 900px) {
-  .statsGrid { grid-template-columns: repeat(2, 1fr); }
-}
-
-.statCard {
+  gap: 0;
   background: #fff;
   border: 1px solid #E8E8E8;
   border-radius: 12px;
-  padding: 16px;
+  overflow: hidden;
+}
+
+.heroBar > * {
+  padding: 20px 24px;
+  border-right: 1px solid #F0F0F0;
+}
+
+.heroBar > *:last-child {
+  border-right: none;
+}
+
+@media (max-width: 1100px) {
+  .heroBar {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .heroBar > *:nth-child(2) {
+    border-right: none;
+  }
+}
+
+/* ── 2. Mid Row ──────────────────────────────────────────────────────────────*/
+
+.midRow {
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  gap: 16px;
+  align-items: start;
+}
+
+@media (max-width: 1100px) {
+  .midRow {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Agent Table ─────────────────────────────────────────────────────────────*/
+
+.agentName {
+  font-weight: 500;
+  color: #1D1D1F;
+  font-size: 13px;
+}
+
+.responseMs {
+  font-size: 12px;
+  color: #6E6E73;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── System Health Card ──────────────────────────────────────────────────────*/
+
+.healthCenter {
   display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  cursor: pointer;
-  text-align: left;
-  font-family: inherit;
-  transition: all 0.15s;
-  position: relative;
+  justify-content: center;
+  padding: 8px 0 12px;
 }
 
-.statCard:hover {
-  border-color: #0AAF9A;
-  box-shadow: 0 2px 12px rgba(10, 175, 154, 0.1);
-  transform: translateY(-1px);
+.statusList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
 }
 
-.statIcon {
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
+.statusRow {
   display: flex;
   align-items: center;
-  justify-content: center;
-  font-size: 18px;
-  flex-shrink: 0;
+  gap: 8px;
 }
 
-.statBody {
+.statusRowLabel {
   flex: 1;
-  min-width: 0;
-}
-
-.statValue {
-  font-size: 24px;
-  font-weight: 700;
-  color: #1D1D1F;
-  line-height: 1.2;
-}
-
-.statLabel {
   font-size: 13px;
-  font-weight: 500;
-  color: #6E6E73;
-  margin-top: 2px;
+  color: #3D3D3D;
 }
 
-.statSub {
-  font-size: 11px;
-  color: #AEAEB2;
-  margin-top: 4px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.statArrow {
+.statusRowVal {
   font-size: 12px;
   color: #AEAEB2;
-  flex-shrink: 0;
-  margin-top: 4px;
 }
 
-/* ── Section ─────────────────────────────────────────────────────────────────*/
+.trendLabel {
+  font-size: 11px;
+  color: #AEAEB2;
+  margin-bottom: 4px;
+}
 
-.section {
-  margin-bottom: 24px;
+.refreshIconBtn {
+  border: none;
+  background: transparent;
+  color: #AEAEB2;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  font-family: inherit;
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+}
+
+.refreshIconBtn:hover {
+  color: #0AAF9A;
+  background: rgba(10, 175, 154, 0.08);
+}
+
+/* ── 3. Merchant Grid ────────────────────────────────────────────────────────*/
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: -8px;
 }
 
 .sectionTitle {
   font-size: 15px;
   font-weight: 600;
   color: #1D1D1F;
-  margin: 0 0 12px;
+  margin: 0;
 }
 
-/* ── Quick Actions ───────────────────────────────────────────────────────────*/
-
-.quickGrid {
+.merchantGrid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
 }
 
-@media (max-width: 900px) {
-  .quickGrid { grid-template-columns: repeat(2, 1fr); }
+@media (max-width: 1100px) {
+  .merchantGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 
-.quickCard {
+@media (max-width: 700px) {
+  .merchantGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.merchantCard {
   background: #fff;
   border: 1px solid #E8E8E8;
-  border-radius: 10px;
-  padding: 14px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
+  border-radius: 12px;
+  padding: 16px;
   cursor: pointer;
-  font-family: inherit;
-  text-align: left;
   transition: all 0.15s;
 }
 
-.quickCard:hover {
+.merchantCard:hover {
   border-color: #0AAF9A;
-  box-shadow: 0 2px 8px rgba(10, 175, 154, 0.08);
+  box-shadow: 0 2px 12px rgba(10, 175, 154, 0.1);
+  transform: translateY(-1px);
 }
 
-.quickDot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex-shrink: 0;
+.merchantCardHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 14px;
 }
 
-.quickLabel {
-  font-size: 14px;
+.merchantCardName {
+  font-size: 15px;
   font-weight: 600;
   color: #1D1D1F;
 }
 
-.quickDesc {
+.merchantCardMeta {
   font-size: 12px;
   color: #AEAEB2;
   margin-top: 2px;
 }
 
-.quickArrow {
-  font-size: 12px;
-  color: #AEAEB2;
-  margin-left: auto;
-  flex-shrink: 0;
+.merchantCardBody {
+  display: flex;
+  align-items: center;
+  gap: 20px;
 }
 
-/* ── Merchant table ──────────────────────────────────────────────────────────*/
+.merchantCardStats {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
 
-.merchantTable {
-  background: #fff;
-  border: 1px solid #E8E8E8;
-  border-radius: 10px;
-  overflow: hidden;
+.merchantStatItem {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.merchantStatVal {
+  font-size: 20px;
+  font-weight: 700;
+  color: #1D1D1F;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+
+.merchantStatLabel {
+  font-size: 11px;
+  color: #AEAEB2;
+}
+
+/* ── 4. Bottom Row ───────────────────────────────────────────────────────────*/
+
+.bottomRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .bottomRow {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Event Timeline ──────────────────────────────────────────────────────────*/
+
+.timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.eventItem {
+  display: flex;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid #F5F5F7;
+  align-items: flex-start;
+}
+
+.eventItem:last-child {
+  border-bottom: none;
+}
+
+.eventDot {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #F5F5F7;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.eventMeta {
+  flex: 1;
+  min-width: 0;
+}
+
+.eventTime {
+  font-size: 11px;
+  color: #AEAEB2;
+  margin-right: 8px;
+  font-variant-numeric: tabular-nums;
+}
+
+.eventContent {
+  font-size: 13px;
+  color: #3D3D3D;
+}
+
+/* ── AI Suggestion List ──────────────────────────────────────────────────────*/
+
+.suggestionList {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.suggestionItem {
+  padding: 10px 0;
+  border-bottom: 1px solid #F5F5F7;
+}
+
+.suggestionItem:last-child {
+  border-bottom: none;
+}
+
+.suggestionTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.suggestionMerchant {
+  font-size: 12px;
+  color: #AEAEB2;
+  font-weight: 500;
+}
+
+.suggestionAction {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1D1D1F;
+  margin-bottom: 2px;
+}
+
+.suggestionImpact {
+  font-size: 12px;
+  color: #0AAF9A;
+  font-weight: 500;
+}
+
+/* ── Common: Link Button ─────────────────────────────────────────────────────*/
+
+.linkBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: #0AAF9A;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  padding: 3px 6px;
+  border-radius: 4px;
+  transition: all 0.15s;
+}
+
+.linkBtn:hover {
+  background: rgba(10, 175, 154, 0.08);
+}
+
+/* ── Legacy compatibility (keep for MerchantRow used by other pages) ─────────*/
+
+.section {
+  margin-bottom: 0;
 }
 
 .merchantRow {

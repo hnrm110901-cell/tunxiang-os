@@ -66,7 +66,7 @@
 .nav {
   flex: 1;
   overflow-y: auto;
-  padding: 12px 0;
+  padding: 8px 0;
   scrollbar-width: none;
 }
 
@@ -75,27 +75,81 @@
 }
 
 .navGroup {
-  margin-bottom: 4px;
+  margin-bottom: 2px;
+}
+
+/* ── Group Header (Accordion trigger) ───────────────────────────────────────*/
+
+.groupHeader {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px 9px 14px;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 13px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.15s;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.groupHeader:hover {
+  color: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.groupHeaderActive {
+  color: #0AAF9A !important;
 }
 
 .groupTitle {
-  font-size: 11px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.3);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  padding: 8px 16px 4px;
+  flex: 1;
+  font-size: 13px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
+
+.groupArrow {
+  font-size: 11px;
+  flex-shrink: 0;
+  color: rgba(255, 255, 255, 0.25);
+  transition: transform 0.2s ease;
+}
+
+.groupArrowOpen {
+  transform: rotate(180deg);
+  color: rgba(255, 255, 255, 0.5);
+}
+
+/* ── Sub Menu (Accordion panel) ─────────────────────────────────────────────*/
+
+.subMenu {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.25s ease;
+}
+
+.subMenuOpen {
+  max-height: 480px;
+}
+
+/* ── Nav Items ───────────────────────────────────────────────────────────────*/
 
 .navItem {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 9px 16px;
-  color: rgba(255, 255, 255, 0.6);
+  padding: 8px 12px 8px 20px;
+  color: rgba(255, 255, 255, 0.55);
   text-decoration: none;
-  font-size: 13.5px;
-  border-radius: 0;
+  font-size: 13px;
   transition: all 0.15s;
   position: relative;
   white-space: nowrap;
@@ -104,7 +158,7 @@
 
 .navItem:hover {
   color: #fff;
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.07);
 }
 
 .navItemActive {
@@ -124,10 +178,28 @@
   border-radius: 0 3px 3px 0;
 }
 
+/* ── Collapsed: icon-only group ─────────────────────────────────────────────*/
+
+.groupIconOnly {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 0;
+  color: rgba(255, 255, 255, 0.45);
+  cursor: default;
+  transition: all 0.15s;
+}
+
+.groupIconActive {
+  color: #0AAF9A;
+}
+
+/* ── Nav Icon & Label ────────────────────────────────────────────────────────*/
+
 .navIcon {
-  font-size: 16px;
+  font-size: 15px;
   flex-shrink: 0;
-  width: 20px;
+  width: 18px;
   display: flex;
   align-items: center;
   justify-content: center;

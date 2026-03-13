@@ -4,13 +4,17 @@
  * 访问入口: www.admin.zlsjos.cn / admin.zlsjos.cn
  * 权限要求: admin 角色
  * 功能定位: 系统迭代 / 测试 / 灰度 / 商户配置 / 屯象工具管理
+ *
+ * 导航结构: 二级 Accordion 折叠菜单
+ *   - 点击一级分组 → 展开/收起子菜单
+ *   - 折叠侧边栏 → 只显示分组图标（native tooltip）
+ *   - 当前路由命中的分组自动展开
  */
 import React, { useState } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
   DashboardOutlined,
   ShopOutlined,
-  ToolOutlined,
   BarChartOutlined,
   ApiOutlined,
   SettingOutlined,
@@ -25,82 +29,126 @@ import {
   AuditOutlined,
   RobotOutlined,
   GlobalOutlined,
+  HomeOutlined,
+  DownOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../contexts/AuthContext';
 import styles from './PlatformAdminLayout.module.css';
 
-// ── 侧栏导航结构 ───────────────────────────────────────────────
+// ── 导航类型 ───────────────────────────────────────────────
 interface NavItem {
   key: string;
   path: string;
   label: string;
   icon: React.ReactNode;
-  badge?: string; // 'new' | 'beta'
+  badge?: string;
 }
 
 interface NavGroup {
   groupKey: string;
   title: string;
+  groupIcon: React.ReactNode;
   items: NavItem[];
 }
 
+// ── 导航结构（5 分组 13 项，路由 path 不变） ───────────────
 const NAV_GROUPS: NavGroup[] = [
   {
     groupKey: 'overview',
-    title: '概览',
+    title: '平台概览',
+    groupIcon: <HomeOutlined />,
     items: [
-      { key: 'home', path: '/platform', label: '控制台', icon: <DashboardOutlined /> },
-      { key: 'analytics', path: '/platform/analytics', label: '平台分析', icon: <BarChartOutlined /> },
+      { key: 'home',      path: '/platform',           label: '实时控制台', icon: <DashboardOutlined /> },
+      { key: 'analytics', path: '/platform/analytics', label: '效能分析',   icon: <BarChartOutlined /> },
     ],
   },
   {
     groupKey: 'merchants',
-    title: '商户管理',
+    title: '商户运营',
+    groupIcon: <ShopOutlined />,
     items: [
-      { key: 'merchants', path: '/platform/merchants', label: '商户列表', icon: <ShopOutlined /> },
-      { key: 'integrations', path: '/platform/integrations', label: 'API 集成配置', icon: <ApiOutlined /> },
+      { key: 'merchants',     path: '/platform/merchants',     label: '商户列表', icon: <ShopOutlined /> },
+      { key: 'integrations',  path: '/platform/integrations',  label: '接入配置', icon: <ApiOutlined /> },
       { key: 'open-platform', path: '/platform/open-platform', label: '开放平台', icon: <GlobalOutlined /> },
     ],
   },
   {
-    groupKey: 'system',
-    title: '系统运维',
+    groupKey: 'ai',
+    title: 'AI 引擎',
+    groupIcon: <RobotOutlined />,
     items: [
-      { key: 'monitoring', path: '/platform/monitoring', label: '系统监控', icon: <CloudServerOutlined /> },
-      { key: 'feature-flags', path: '/platform/feature-flags', label: '灰度 & 特性开关', icon: <BranchesOutlined />, badge: 'new' },
-      { key: 'audit-log', path: '/platform/audit-log', label: '审计日志', icon: <AuditOutlined /> },
-      { key: 'backup', path: '/platform/backup', label: '备份管理', icon: <DatabaseOutlined /> },
+      { key: 'agents',           path: '/platform/agents',           label: 'Agent 配置与监控', icon: <RobotOutlined /> },
+      { key: 'ontology',         path: '/platform/ontology',         label: '本体图管理',       icon: <ExperimentOutlined /> },
+      { key: 'data-sovereignty', path: '/platform/data-sovereignty', label: '数据主权',         icon: <SafetyOutlined /> },
     ],
   },
   {
-    groupKey: 'tools',
-    title: '屯象工具管理',
+    groupKey: 'system',
+    title: '平台运维',
+    groupIcon: <CloudServerOutlined />,
     items: [
-      { key: 'agents', path: '/platform/agents', label: 'Agent 配置', icon: <RobotOutlined /> },
-      { key: 'ontology', path: '/platform/ontology', label: '本体图管理', icon: <ExperimentOutlined /> },
-      { key: 'data-sovereignty', path: '/platform/data-sovereignty', label: '数据主权', icon: <SafetyOutlined /> },
+      { key: 'monitoring',    path: '/platform/monitoring',    label: '系统监控', icon: <CloudServerOutlined /> },
+      { key: 'feature-flags', path: '/platform/feature-flags', label: '灰度发布', icon: <BranchesOutlined />, badge: 'new' },
+      { key: 'audit-log',     path: '/platform/audit-log',     label: '审计日志', icon: <AuditOutlined /> },
+      { key: 'backup',        path: '/platform/backup',        label: '备份管理', icon: <DatabaseOutlined /> },
     ],
   },
   {
     groupKey: 'config',
-    title: '平台配置',
+    title: '配置',
+    groupIcon: <SettingOutlined />,
     items: [
       { key: 'settings', path: '/platform/settings', label: '系统设置', icon: <SettingOutlined /> },
     ],
   },
 ];
 
-// ── Layout 组件 ────────────────────────────────────────────────
+// ── 根据路由初始化展开分组 ─────────────────────────────────
+function getInitialOpenGroups(pathname: string): Set<string> {
+  const open = new Set<string>(['overview']);
+  NAV_GROUPS.forEach((group) => {
+    if (
+      group.items.some((item) =>
+        item.path === '/platform'
+          ? pathname === '/platform'
+          : pathname.startsWith(item.path),
+      )
+    ) {
+      open.add(group.groupKey);
+    }
+  });
+  return open;
+}
+
+// ── Layout 组件 ────────────────────────────────────────────
 const PlatformAdminLayout: React.FC = () => {
+  const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
+  const [openGroups, setOpenGroups] = useState<Set<string>>(
+    () => getInitialOpenGroups(location.pathname),
+  );
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
 
   const handleLogout = async () => {
     await logout();
     navigate('/login');
   };
+
+  const toggleGroup = (groupKey: string) => {
+    setOpenGroups((prev) => {
+      const next = new Set(prev);
+      next.has(groupKey) ? next.delete(groupKey) : next.add(groupKey);
+      return next;
+    });
+  };
+
+  const groupHasActive = (group: NavGroup): boolean =>
+    group.items.some((item) =>
+      item.path === '/platform'
+        ? location.pathname === '/platform'
+        : location.pathname.startsWith(item.path),
+    );
 
   return (
     <div className={styles.shell}>
@@ -117,39 +165,69 @@ const PlatformAdminLayout: React.FC = () => {
           )}
         </div>
 
-        {/* 导航 */}
+        {/* 二级 Accordion 导航 */}
         <nav className={styles.nav}>
-          {NAV_GROUPS.map((group) => (
-            <div key={group.groupKey} className={styles.navGroup}>
-              {!collapsed && (
-                <div className={styles.groupTitle}>{group.title}</div>
-              )}
-              {group.items.map((item) => (
-                <NavLink
-                  key={item.key}
-                  to={item.path}
-                  end={item.path === '/platform'}
-                  className={({ isActive }) =>
-                    `${styles.navItem} ${isActive ? styles.navItemActive : ''}`
-                  }
-                  title={collapsed ? item.label : undefined}
-                >
-                  <span className={styles.navIcon}>{item.icon}</span>
-                  {!collapsed && (
-                    <span className={styles.navLabel}>{item.label}</span>
-                  )}
-                  {!collapsed && item.badge && (
-                    <span className={`${styles.badge} ${styles[`badge_${item.badge}`]}`}>
-                      {item.badge}
-                    </span>
-                  )}
-                </NavLink>
-              ))}
-            </div>
-          ))}
+          {NAV_GROUPS.map((group) => {
+            const isOpen = !collapsed && openGroups.has(group.groupKey);
+            const hasActive = groupHasActive(group);
+
+            return (
+              <div key={group.groupKey} className={styles.navGroup}>
+                {collapsed ? (
+                  /* 折叠态：仅显示图标 + native tooltip */
+                  <div
+                    className={`${styles.groupIconOnly} ${hasActive ? styles.groupIconActive : ''}`}
+                    title={group.title}
+                  >
+                    <span className={styles.navIcon}>{group.groupIcon}</span>
+                  </div>
+                ) : (
+                  /* 展开态：可点击的分组标题 */
+                  <button
+                    className={`${styles.groupHeader} ${
+                      hasActive && !isOpen ? styles.groupHeaderActive : ''
+                    }`}
+                    onClick={() => toggleGroup(group.groupKey)}
+                  >
+                    <span className={styles.navIcon}>{group.groupIcon}</span>
+                    <span className={styles.groupTitle}>{group.title}</span>
+                    <DownOutlined
+                      className={`${styles.groupArrow} ${isOpen ? styles.groupArrowOpen : ''}`}
+                    />
+                  </button>
+                )}
+
+                {/* 子菜单（CSS max-height 动画） */}
+                <div className={`${styles.subMenu} ${isOpen ? styles.subMenuOpen : ''}`}>
+                  {group.items.map((item) => (
+                    <NavLink
+                      key={item.key}
+                      to={item.path}
+                      end={item.path === '/platform'}
+                      className={({ isActive }) =>
+                        `${styles.navItem} ${isActive ? styles.navItemActive : ''}`
+                      }
+                    >
+                      <span className={styles.navIcon}>{item.icon}</span>
+                      <span className={styles.navLabel}>{item.label}</span>
+                      {item.badge && (
+                        <span
+                          className={`${styles.badge} ${
+                            item.badge === 'new' ? styles.badge_new : styles.badge_beta
+                          }`}
+                        >
+                          {item.badge}
+                        </span>
+                      )}
+                    </NavLink>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
         </nav>
 
-        {/* 用户信息 */}
+        {/* 用户信息区 */}
         <div className={styles.userArea}>
           {!collapsed && (
             <div className={styles.userInfo}>
@@ -171,7 +249,6 @@ const PlatformAdminLayout: React.FC = () => {
 
       {/* ── 主内容区 ── */}
       <div className={styles.main}>
-        {/* 顶栏 */}
         <header className={styles.topbar}>
           <button
             className={styles.collapseBtn}
@@ -179,18 +256,15 @@ const PlatformAdminLayout: React.FC = () => {
           >
             {collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
           </button>
-
           <div className={styles.breadcrumb}>
             {getBreadcrumb(location.pathname)}
           </div>
-
           <div className={styles.topbarRight}>
             <span className={styles.envBadge}>PROD</span>
             <span className={styles.version}>v0.1.0</span>
           </div>
         </header>
 
-        {/* 页面内容 */}
         <main className={styles.content}>
           <Outlet />
         </main>
@@ -199,24 +273,23 @@ const PlatformAdminLayout: React.FC = () => {
   );
 };
 
-// ── 面包屑生成 ─────────────────────────────────────────────────
+// ── 面包屑 ─────────────────────────────────────────────────
 function getBreadcrumb(pathname: string): React.ReactNode {
   const map: Record<string, string> = {
-    '/platform': '控制台',
-    '/platform/analytics': '平台分析',
-    '/platform/merchants': '商户列表',
-    '/platform/integrations': 'API 集成配置',
-    '/platform/open-platform': '开放平台',
-    '/platform/monitoring': '系统监控',
-    '/platform/feature-flags': '灰度 & 特性开关',
-    '/platform/audit-log': '审计日志',
-    '/platform/backup': '备份管理',
-    '/platform/agents': 'Agent 配置',
-    '/platform/ontology': '本体图管理',
+    '/platform':                  '实时控制台',
+    '/platform/analytics':        '效能分析',
+    '/platform/merchants':        '商户列表',
+    '/platform/integrations':     '接入配置',
+    '/platform/open-platform':    '开放平台',
+    '/platform/monitoring':       '系统监控',
+    '/platform/feature-flags':    '灰度发布',
+    '/platform/audit-log':        '审计日志',
+    '/platform/backup':           '备份管理',
+    '/platform/agents':           'Agent 配置与监控',
+    '/platform/ontology':         '本体图管理',
     '/platform/data-sovereignty': '数据主权',
-    '/platform/settings': '系统设置',
+    '/platform/settings':         '系统设置',
   };
-
   const label = map[pathname] || '屯象OS';
   return (
     <span className={styles.breadcrumbText}>
