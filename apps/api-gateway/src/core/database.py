@@ -7,6 +7,7 @@ from sqlalchemy.pool import NullPool
 from sqlalchemy.exc import OperationalError, IntegrityError
 from sqlalchemy import text
 from contextlib import asynccontextmanager
+from typing import Optional
 import asyncio
 import structlog
 import os
@@ -32,7 +33,7 @@ _TENANT_SCHEMA_MAP: dict[str, str] = {
 }
 
 
-def resolve_schema(brand_or_tenant_id: str) -> str | None:
+def resolve_schema(brand_or_tenant_id: str) -> Optional[str]:
     """将 brand_id 或 tenant_id 解析为 PostgreSQL schema 名"""
     return _TENANT_SCHEMA_MAP.get(brand_or_tenant_id)
 
