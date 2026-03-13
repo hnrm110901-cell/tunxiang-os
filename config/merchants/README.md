@@ -4,9 +4,9 @@
 
 | 商户 | brand_id | 门店数 | 品智域名 | 奥琦玮商户号 |
 |------|----------|--------|----------|-------------|
-| 尝在一起 | BRD_CZYZ0001 | 3家 | czyq.pinzhikeji.net | ⚠️ 待填写 |
+| 尝在一起 | BRD_CZYZ0001 | 3家 | czyq.pinzhikeji.net | ✅ 1275413383 |
 | 最黔线 | BRD_ZQX0001 | 6家 | ljcg.pinzhikeji.net | ✅ 1827518239 |
-| 尚宫厨 | BRD_SGC0001 | 5家 | xcsgc.pinzhikeji.net | ⚠️ 待填写 |
+| 尚宫厨 | BRD_SGC0001 | 5家 | xcsgc.pinzhikeji.net | ✅ 1549254243 |
 
 ## 快速开通步骤
 

@@ -87,8 +87,7 @@ MERCHANTS = [
             "base_url": "https://api.acewill.net",
             "app_id": "dp25MLoc2gnXE7A223ZiVv",
             "app_key": "3d2eaa5f9b9a6a6746a18d28e770b501",
-            # ⚠️ 待填写：请登录奥琦玮后台获取商户号ID后更新此字段
-            "merchant_id": "",
+            "merchant_id": "1275413383",  # ✅ 已配置
         },
         "stores": [
             {
@@ -270,8 +269,7 @@ MERCHANTS = [
             "base_url": "https://api.acewill.net",
             "app_id": "dp0X0jl45wauwdGgkRETITz",
             "app_key": "649738234c7426bfa0dbfa431c92a750",
-            # ⚠️ 待填写：请登录奥琦玮后台获取商户号ID后更新此字段
-            "merchant_id": "",
+            "merchant_id": "1549254243",  # ✅ 已配置（心传尚宫厨）
         },
         # 卡券中心（尚宫厨独有）
         "aoqiwei_coupon": {
@@ -565,19 +563,14 @@ def _print_summary():
 ├──────────────┬──────────┬────────────┬───────────────────┤
 │ 商户         │ 门店数   │ 登录账号   │ 奥琦玮商户号       │
 ├──────────────┼──────────┼────────────┼───────────────────┤
-│ 尝在一起     │ 3家      │ czyz_admin │ ⚠️  待填写         │
+│ 尝在一起     │ 3家      │ czyz_admin │ ✅ 1275413383      │
 │ 最黔线       │ 6家      │ zqx_admin  │ ✅ 1827518239      │
-│ 尚宫厨       │ 5家      │ sgc_admin  │ ⚠️  待填写         │
+│ 尚宫厨       │ 5家      │ sgc_admin  │ ✅ 1549254243      │
 └──────────────┴──────────┴────────────┴───────────────────┘
 
-⚠️  待办事项：
-  1. 尝在一起：登录奥琦玮后台，将商户号ID填入以下字段：
-     ExternalSystem.config['aoqiwei_merchant_id'] (provider=aoqiwei, brand_id=BRD_CZYZ0001)
-     或更新 .env.merchants 文件后重新运行本脚本
+✅ 所有商户号已配置完毕！
 
-  2. 尚宫厨：同上，填入 BRD_SGC0001 对应的商户号ID
-
-  3. 品智数据同步（Celery 定时任务）默认每5分钟拉取一次订单数据
+  品智数据同步（Celery 定时任务）默认每5分钟拉取一次订单数据
      启动命令: celery -A src.core.celery_tasks worker --beat -l info
 """)
 
