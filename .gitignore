@@ -79,3 +79,6 @@ ssl/*.p12
 # Claude Code 本地配置
 CLAUDE.local.md
 .claude/settings.local.json
+
+# 商户 API 凭证配置（含敏感 Token，禁止提交）
+config/merchants/.env.*
