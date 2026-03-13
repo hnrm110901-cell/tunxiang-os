@@ -191,6 +191,10 @@ class IntegrationService:
             return {"success": False, "error": "未配置API端点"}
 
         try:
+            # 品智POS使用token签名鉴权，单独处理
+            if system.provider == "pinzhi":
+                return await self._test_pinzhi_connection(system)
+
             async with httpx.AsyncClient(timeout=float(os.getenv("INTEGRATION_HTTP_TIMEOUT", "10.0"))) as client:
                 response = await client.get(
                     f"{system.api_endpoint}/health",
@@ -203,6 +207,36 @@ class IntegrationService:
                         "success": False,
                         "error": f"HTTP {response.status_code}",
                     }
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    async def _test_pinzhi_connection(self, system: ExternalSystem) -> Dict[str, Any]:
+        """测试品智POS连接（Token鉴权）"""
+        cfg = system.config or {}
+        token = cfg.get("token") or system.api_key
+        if not token:
+            return {"success": False, "error": "未配置品智Token"}
+        try:
+            import hashlib, time
+            timestamp = str(int(time.time()))
+            sign_str = f"token={token}&timestamp={timestamp}"
+            sign = hashlib.md5(sign_str.encode()).hexdigest().upper()
+            params = {"token": token, "timestamp": timestamp, "sign": sign, "pageIndex": 1, "pageSize": 1}
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                for path in ["/category/query.do", "/bill/query.do"]:
+                    try:
+                        resp = await client.get(f"{system.api_endpoint}{path}", params=params)
+                        body = resp.json()
+                        # 品智返回 code 0 或 1 均代表接口可达
+                        if resp.status_code < 500:
+                            code = body.get("code", body.get("returnCode", -1))
+                            if code in (0, 1, "0", "1", 200, "200"):
+                                return {"success": True, "message": f"品智POS连接成功（{path}）"}
+                            else:
+                                return {"success": True, "message": f"品智接口可达，认证码={code}"}
+                    except Exception:
+                        continue
+            return {"success": False, "error": "品智API端点无法访问"}
         except Exception as e:
             return {"success": False, "error": str(e)}
 
