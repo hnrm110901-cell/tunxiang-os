@@ -214,7 +214,8 @@ async def init_db(retries: int = 5, delay: float = 3.0):
     for attempt in range(1, retries + 1):
         try:
             async with engine.begin() as conn:
-                await conn.run_sync(Base.metadata.create_all)
+                # checkfirst=True: 跳过已存在的表和 ENUM 类型，幂等安全
+                await conn.run_sync(Base.metadata.create_all, checkfirst=True)
             logger.info("Database initialized successfully", attempt=attempt)
             return
         except Exception as exc:
