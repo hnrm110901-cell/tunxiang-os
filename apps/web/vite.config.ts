@@ -24,6 +24,7 @@ export default defineConfig({
   build: {
     // Code splitting configuration
     rollupOptions: {
+      external: ['qrcode'],
       output: {
         manualChunks: {
           // Vendor chunks
