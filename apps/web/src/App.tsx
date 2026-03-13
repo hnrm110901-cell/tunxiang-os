@@ -172,6 +172,9 @@ const OnboardingPage = lazy(() => import('./pages/onboarding/OnboardingPage'));
 const DynamicPricingPage = lazy(() => import('./pages/DynamicPricingPage'));
 const OpsMonitoringPage = lazy(() => import('./pages/OpsMonitoringPage'));
 const MerchantManagementPage = lazy(() => import('./pages/MerchantManagementPage'));
+// Phase P1 — 预订Agent: 渠道中台 + 客户风控
+const ChannelAnalyticsPage = lazy(() => import('./pages/ChannelAnalyticsPage'));
+const CustomerRiskPage = lazy(() => import('./pages/CustomerRiskPage'));
 
 // Role-based views (Phase 1 — Store Manager /sm)
 const StoreManagerLayout = lazy(() => import('./layouts/StoreManagerLayout'));
@@ -611,6 +614,8 @@ const AppContent: React.FC = () => {
                   <Route path="merchants" element={
                     <ProtectedRoute requiredRole="admin"><MerchantManagementPage /></ProtectedRoute>
                   } />
+                  <Route path="channel-analytics" element={<ChannelAnalyticsPage />} />
+                  <Route path="customer-risk" element={<CustomerRiskPage />} />
                   <Route path="agent-hub" element={
                     <ProtectedRoute requiredRole="admin"><AgentHubPage /></ProtectedRoute>
                   } />

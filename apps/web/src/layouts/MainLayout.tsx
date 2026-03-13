@@ -63,6 +63,7 @@ import {
   MenuFoldOutlined,
   MenuUnfoldOutlined,
   EnvironmentOutlined,
+  ShareAltOutlined,
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -198,6 +199,13 @@ const DOMAIN_SIDEBAR: DomainSidebar = {
       items: [
         { key: '/marketing',           icon: <RocketOutlined />,    label: '营销智能体' },
         { key: '/channel-profit',      icon: <ShopOutlined />,      label: '渠道毛利' },
+        { key: '/channel-analytics',   icon: <ShareAltOutlined />,  label: '渠道分析' },
+      ],
+    },
+    {
+      groupLabel: '客户风控',
+      items: [
+        { key: '/customer-risk',       icon: <SafetyOutlined />,    label: '客户风控' },
       ],
     },
   ],
@@ -349,6 +357,8 @@ const BREADCRUMB_LABELS: Record<string, string> = {
   '/customer360': '客户360',
   '/private-domain': '私域运营',
   '/channel-profit': '渠道毛利',
+  '/channel-analytics': '渠道分析',
+  '/customer-risk': '客户风控',
   '/recommendations': '推荐引擎',
   '/wechat-triggers': '企微触发器',
   '/agent-hub': 'Agent 总览',

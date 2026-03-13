@@ -86,6 +86,8 @@ from src.api import execution, menu, store_memory, ontology_api, fct_public
 # Phase 1 — 运营智能层：渠道毛利 API
 from src.api import channel_profit
 from src.api import performance_compute
+# Phase P1 — 预订Agent: 渠道中台 + 客户风控
+from src.api import channel_analytics, customer_risk
 # Onboarding Engine — 企业诊断与数据入库
 from src.api import onboarding
 from src.middleware.monitoring import MonitoringMiddleware
@@ -730,6 +732,9 @@ app.include_router(channel_profit.router)
 # Phase 2 — 绩效计算引擎
 app.include_router(performance_compute.router)
 app.include_router(onboarding.router)
+# Phase P1 — 预订Agent: 渠道中台 + 客户风控
+app.include_router(channel_analytics.router, prefix="/api/v1", tags=["channel-analytics"])
+app.include_router(customer_risk.router, prefix="/api/v1", tags=["customer-risk"])
 
 # P0 — 食材成本真相引擎
 from src.api import cost_truth

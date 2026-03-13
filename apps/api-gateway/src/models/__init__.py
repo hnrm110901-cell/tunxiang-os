@@ -412,3 +412,9 @@ from .attendance import AttendanceLog
 from .member_rfm import MemberRfmSnapshot
 from .price_benchmark import PriceBenchmarkPool, PriceBenchmarkReport
 from .decision_lifecycle import DecisionLifecycle
+# Phase P1 — 预订Agent: 渠道中台 + 客户风控
+from .reservation_channel import ReservationChannel, ChannelType
+from .customer_ownership import (
+    CustomerOwnership, TransferReason,
+    CustomerRiskAlert, RiskLevel, RiskType,
+)
