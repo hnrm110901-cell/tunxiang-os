@@ -31,6 +31,7 @@ import src.models.execution_audit  # noqa: F401
 import src.models.customer_key  # noqa: F401
 import src.models.workflow  # noqa: F401
 import src.models.forecast  # noqa: F401
+import src.models.agent_config  # noqa: F401
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -66,14 +67,31 @@ def run_migrations_offline() -> None:
         context.run_migrations()
 
 
+def _get_tenant_schemas(connection) -> list[str]:
+    """从 tenant_schema_map 表获取所有活跃租户 Schema"""
+    try:
+        result = connection.execute(
+            __import__("sqlalchemy").text(
+                "SELECT schema_name FROM public.tenant_schema_map WHERE is_active = TRUE"
+            )
+        )
+        return [row[0] for row in result.fetchall()]
+    except Exception:
+        return []
+
+
 def run_migrations_online() -> None:
-    """Run migrations in 'online' mode (connects to DB)."""
+    """
+    Run migrations in 'online' mode.
+    先迁移 public schema，再循环迁移所有租户 schema。
+    """
     connectable = create_engine(
         database_url,
         poolclass=pool.NullPool,
     )
 
     with connectable.connect() as connection:
+        # 1. 迁移 public schema（系统表 + 共享表）
         context.configure(
             connection=connection,
             target_metadata=target_metadata,
@@ -82,6 +100,31 @@ def run_migrations_online() -> None:
         )
         with context.begin_transaction():
             context.run_migrations()
+
+        # 2. 迁移所有租户 schema（DDL 结构保持一致）
+        tenant_schemas = _get_tenant_schemas(connection)
+        for schema in tenant_schemas:
+            try:
+                connection.execute(
+                    __import__("sqlalchemy").text(f"SET search_path TO {schema}, public")
+                )
+                context.configure(
+                    connection=connection,
+                    target_metadata=target_metadata,
+                    compare_type=True,
+                    compare_server_default=True,
+                    version_table_schema=schema,
+                    include_schemas=[schema],
+                )
+                with context.begin_transaction():
+                    context.run_migrations()
+                print(f"  ✅ Schema '{schema}' migrated")
+            except Exception as e:
+                print(f"  ⚠️ Schema '{schema}' migration skipped: {e}")
+            finally:
+                connection.execute(
+                    __import__("sqlalchemy").text("SET search_path TO public")
+                )
 
 
 if context.is_offline_mode():

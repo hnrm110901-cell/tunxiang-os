@@ -199,6 +199,10 @@ celery_app.conf.update(
             "queue": "default",
             "routing_key": "default",
         },
+        "src.core.celery_tasks.pull_pinzhi_daily_data": {
+            "queue": "default",
+            "routing_key": "default",
+        },
         "src.core.celery_tasks.pull_historical_backfill": {
             "queue": "low_priority",
             "routing_key": "low_priority",
@@ -532,6 +536,16 @@ celery_app.conf.update(
             "schedule": crontab(hour=10, minute=0),
             "args": (),
             "options": {"queue": "default", "priority": 6},
+        },
+        # 每日凌晨 01:30 拉取品智 POS 昨日数据（订单+汇总）
+        "pull-pinzhi-daily-data": {
+            "task": "src.core.celery_tasks.pull_pinzhi_daily_data",
+            "schedule": crontab(
+                hour=int(os.getenv("PINZHI_PULL_HOUR", "1")),
+                minute=int(os.getenv("PINZHI_PULL_MINUTE", "30")),
+            ),
+            "args": (),
+            "options": {"queue": "default", "priority": 7},
         },
         # 每日凌晨 02:00 拉取天财商龙昨日订单（在 03:00 POS 对账前完成入库）
         "pull-tiancai-daily-orders": {

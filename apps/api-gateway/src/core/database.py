@@ -1,9 +1,11 @@
 """
 Database Configuration and Connection
+支持多租户 Schema 隔离: 根据 TenantContext.brand_id 动态切换 search_path
 """
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.pool import NullPool
 from sqlalchemy.exc import OperationalError, IntegrityError
+from sqlalchemy import text
 from contextlib import asynccontextmanager
 import asyncio
 import structlog
@@ -14,6 +16,48 @@ from src.core.tenant_context import TenantContext
 from src.core.tenant_filter import enable_tenant_filter
 
 logger = structlog.get_logger()
+
+# ---- 多租户 Schema 映射（静态 + 运行时从 DB 加载） ----
+# tenant_id（Nginx X-Tenant-ID） → schema_name
+# brand_id → schema_name
+_TENANT_SCHEMA_MAP: dict[str, str] = {
+    # tenant_id → schema
+    "brand_czq": "czq",
+    "brand_zqx": "zqx",
+    "brand_sgc": "sgc",
+    # brand_id → schema
+    "BRD_CZYZ0001": "czq",
+    "BRD_ZQX00001": "zqx",
+    "BRD_SGC00001": "sgc",
+}
+
+
+def resolve_schema(brand_or_tenant_id: str) -> str | None:
+    """将 brand_id 或 tenant_id 解析为 PostgreSQL schema 名"""
+    return _TENANT_SCHEMA_MAP.get(brand_or_tenant_id)
+
+
+async def reload_schema_map_from_db():
+    """从 tenant_schema_map 表热加载映射（服务启动或定时刷新时调用）"""
+    try:
+        async with engine.begin() as conn:
+            result = await conn.execute(text(
+                "SELECT schema_name, brand_id, tenant_id FROM public.tenant_schema_map WHERE is_active = TRUE"
+            ))
+            rows = result.fetchall()
+            for row in rows:
+                _TENANT_SCHEMA_MAP[row[1]] = row[0]  # brand_id → schema
+                if row[2]:
+                    _TENANT_SCHEMA_MAP[row[2]] = row[0]  # tenant_id → schema
+            logger.info("Schema map reloaded from DB", count=len(rows))
+    except Exception as e:
+        logger.warning("Failed to reload schema map from DB (table may not exist yet)", error=str(e))
+
+
+async def _set_search_path(session: AsyncSession, schema_name: str):
+    """动态设置当前会话的 search_path"""
+    await session.execute(text(f"SET search_path TO {schema_name}, public"))
+    logger.debug("search_path set", schema=schema_name)
 
 # Import Base for models
 from src.models.base import Base
@@ -91,17 +135,19 @@ async def get_db_session(enable_tenant_isolation: bool = True):
     """
     async with AsyncSessionLocal() as session:
         try:
-            # 启用租户过滤器
+            # Schema 级隔离: 根据 brand_id 切换 search_path
+            brand_id = TenantContext.get_current_brand()
+            if brand_id:
+                schema = resolve_schema(brand_id)
+                if schema:
+                    await _set_search_path(session, schema)
+
+            # 启用租户过滤器（ORM 级 store_id 行过滤）
             if enable_tenant_isolation:
                 tenant_id = TenantContext.get_current_tenant()
                 if tenant_id:
                     enable_tenant_filter(session)
                     logger.debug("Tenant isolation enabled", tenant_id=tenant_id)
-                else:
-                    logger.warning(
-                        "Tenant isolation requested but no tenant context set. "
-                        "Session will not be filtered."
-                    )
 
             yield session
             await session.commit()
@@ -139,7 +185,14 @@ async def get_db(enable_tenant_isolation: bool = True):
     """
     async with AsyncSessionLocal() as session:
         try:
-            # 启用租户过滤器
+            # Schema 级隔离: 根据 brand_id 切换 search_path
+            brand_id = TenantContext.get_current_brand()
+            if brand_id:
+                schema = resolve_schema(brand_id)
+                if schema:
+                    await _set_search_path(session, schema)
+
+            # 启用租户过滤器（ORM 级 store_id 行过滤）
             if enable_tenant_isolation:
                 tenant_id = TenantContext.get_current_tenant()
                 if tenant_id:

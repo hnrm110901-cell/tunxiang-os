@@ -134,10 +134,8 @@ const PrivateDomainHealthPage: React.FC = () => {
               <div className={styles.scoreInfo}>
                 <ZBadge
                   type={gradeColor(data.grade.color) as any}
-                  className={styles.gradeBadge}
-                >
-                  {data.grade.level}
-                </ZBadge>
+                  text={data.grade.level}
+                />
                 <p className={styles.gradeDesc}>{data.grade.desc}</p>
                 <div className={styles.totalScore}>
                   综合得分 <strong>{data.total_score}</strong> / 100
@@ -161,9 +159,7 @@ const PrivateDomainHealthPage: React.FC = () => {
                   <li key={i} className={styles.actionItem}>
                     <div className={styles.actionHeader}>
                       <span className={styles.actionDim}>{a.dimension}</span>
-                      <ZBadge type={urgencyBadge(a.urgency) as any}>
-                        {a.urgency === 'high' ? '紧急' : '建议'}
-                      </ZBadge>
+                      <ZBadge type={urgencyBadge(a.urgency) as any} text={a.urgency === 'high' ? '紧急' : '建议'} />
                       <span className={styles.actionPct}>{a.score_pct}</span>
                     </div>
                     <p className={styles.actionText}>{a.action}</p>

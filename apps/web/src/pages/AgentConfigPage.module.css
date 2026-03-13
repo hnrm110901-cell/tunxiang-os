@@ -1,0 +1,64 @@
+.container {
+  padding: 0;
+}
+
+.cardTitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.cardTitleIcon {
+  color: var(--accent, #0AAF9A);
+  font-size: 18px;
+}
+
+.statsBar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+/* Agent cell */
+.agentCell {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.agentIcon {
+  flex-shrink: 0;
+  font-size: 20px;
+  margin-top: 2px;
+}
+
+.agentLabel {
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.agentDesc {
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.45);
+  line-height: 1.4;
+  max-width: 280px;
+}
+
+/* Config summary */
+.configSummary {
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.65);
+}
+
+/* Edit modal */
+.editDesc {
+  margin-bottom: 16px;
+  padding: 10px 12px;
+  background: rgba(10, 175, 154, 0.06);
+  border-radius: 8px;
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.65);
+}

@@ -1,0 +1,138 @@
+.page {
+  padding: 16px;
+  padding-bottom: 100px;
+  min-height: 100vh;
+  background: var(--bg, #f5f5f5);
+}
+
+.header { margin-bottom: 12px; }
+.title {
+  font-size: 22px;
+  font-weight: 700;
+  margin: 0;
+  color: var(--t1, #1a1a1a);
+}
+.subtitle {
+  font-size: 13px;
+  color: var(--t3, #999);
+  margin: 4px 0 0;
+}
+
+/* Stats */
+.statsRow {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.statCard {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--bg-raised, #fff);
+}
+.statValue {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--t1, #1a1a1a);
+}
+.statLabel {
+  font-size: 12px;
+  color: var(--t3, #999);
+}
+
+/* Tabs */
+.tabBar {
+  display: flex;
+  margin-bottom: 12px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--bg-raised, #e8e8e8);
+}
+.tab {
+  flex: 1;
+  padding: 10px 0;
+  border: none;
+  background: none;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--t2, #666);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.tabActive {
+  background: #ff4d4f;
+  color: #fff;
+  border-radius: 10px;
+}
+
+/* Search */
+.searchBar {
+  margin-bottom: 12px;
+}
+.searchInput {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid var(--t4, #d9d9d9);
+  border-radius: 10px;
+  font-size: 14px;
+  outline: none;
+  background: var(--bg-raised, #fff);
+  box-sizing: border-box;
+}
+.searchInput:focus {
+  border-color: var(--accent, #0AAF9A);
+}
+
+/* List */
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.dishCard {
+  padding: 10px 12px !important;
+}
+.dishRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.dishInfo {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+.dishName {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--t1, #1a1a1a);
+}
+.dishMeta {
+  font-size: 12px;
+  color: var(--t3, #999);
+  margin-top: 2px;
+}
+
+/* Soldout button */
+.soldoutBtn {
+  padding: 6px 16px;
+  border: none;
+  border-radius: 8px;
+  background: #ff4d4f;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+  flex-shrink: 0;
+}
+.soldoutBtn:hover {
+  opacity: 0.85;
+}
+.soldoutBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

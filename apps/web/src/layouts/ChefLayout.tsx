@@ -3,9 +3,10 @@ import { Outlet, NavLink } from 'react-router-dom';
 import styles from './ChefLayout.module.css';
 
 const NAV_ITEMS = [
-  { to: '/chef',         label: '首页',   icon: '🍳' },
-  { to: '/chef/waste',   label: '损耗',   icon: '📉' },
-  { to: '/chef/inventory', label: '库存', icon: '📦' },
+  { to: '/chef',           label: '首页',   icon: '🍳' },
+  { to: '/chef/soldout',   label: '沽清',   icon: '🚫' },
+  { to: '/chef/waste',     label: '损耗',   icon: '📉' },
+  { to: '/chef/inventory', label: '库存',   icon: '📦' },
 ];
 
 export default function ChefLayout() {

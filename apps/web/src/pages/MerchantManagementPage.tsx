@@ -12,6 +12,7 @@ import {
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { apiClient } from '../utils/apiClient';
+import AgentConfigPage from './AgentConfigPage';
 import styles from './MerchantManagementPage.module.css';
 
 const { Text } = Typography;
@@ -928,6 +929,13 @@ const MerchantManagementPage: React.FC = () => {
                         locale={{ emptyText: '暂无用户，点击上方按钮添加' }}
                       />
                     </div>
+                  ),
+                },
+                {
+                  key: 'agents',
+                  label: 'Agent 配置',
+                  children: (
+                    <AgentConfigPage brandId={detail.brand_id} brandName={detail.brand_name} />
                   ),
                 },
               ]}

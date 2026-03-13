@@ -1,6 +1,7 @@
 """
 Store ID Validation Middleware
 门店ID归属校验中间件 - 防止跨店铺/跨品牌数据访问
+支持 X-Tenant-ID Header（Nginx 注入）+ JWT brand_id 双层隔离
 """
 from fastapi import Request, HTTPException, status
 from fastapi.responses import JSONResponse
@@ -13,12 +14,35 @@ from src.core.tenant_context import TenantContext
 logger = structlog.get_logger()
 
 
+def _decode_user_from_request(request: Request) -> Optional[dict]:
+    """从 Authorization header 解码 JWT，提取用户信息"""
+    auth_header = request.headers.get("authorization", "")
+    if not auth_header.startswith("Bearer "):
+        return None
+    token = auth_header[7:]
+    try:
+        from src.core.security import decode_access_token
+        payload = decode_access_token(token)
+        return {
+            "sub": payload.get("sub"),
+            "username": payload.get("username"),
+            "role": payload.get("role", ""),
+            "store_id": payload.get("store_id", ""),
+            "brand_id": payload.get("brand_id", ""),
+            "stores": payload.get("stores", []),
+        }
+    except Exception:
+        return None
+
+
 class StoreAccessMiddleware(BaseHTTPMiddleware):
     """
     门店访问权限校验中间件（双层隔离：store_id + brand_id）
 
     验证用户是否有权访问指定的 store_id，同时检查 brand_id 跨品牌访问。
     防止跨店铺、跨品牌数据泄露。
+
+    支持 Nginx 注入的 X-Tenant-ID Header 自动设置品牌上下文。
     """
 
     # 不需要校验的路径
@@ -30,10 +54,11 @@ class StoreAccessMiddleware(BaseHTTPMiddleware):
         "/metrics",
         "/auth/login",
         "/auth/register",
+        "/api/v1/auth",
     ]
 
     # 超级管理员角色（可以访问所有门店/品牌）
-    SUPER_ADMIN_ROLES = ["super_admin", "system_admin"]
+    SUPER_ADMIN_ROLES = ["super_admin", "system_admin", "admin"]
 
     async def dispatch(self, request: Request, call_next):
         """处理请求"""
@@ -42,12 +67,25 @@ class StoreAccessMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         try:
+            # 从 JWT 解码用户信息并注入 request.state
+            user = getattr(request.state, "user", None)
+            if user is None:
+                user = _decode_user_from_request(request)
+                if user:
+                    request.state.user = user
+
+            # 从 Nginx X-Tenant-ID Header 设置品牌上下文（最高优先级）
+            x_tenant_id = request.headers.get("x-tenant-id", "")
+            if x_tenant_id and x_tenant_id != "platform_admin":
+                # x_tenant_id 格式: brand_czq / brand_zqx / brand_sgc
+                TenantContext.set_current_brand(x_tenant_id)
+                logger.debug("Brand context set from X-Tenant-ID", tenant_id=x_tenant_id)
+
             # 从请求中提取 store_id
             store_id = await self._extract_store_id(request)
 
             # 如果没有提取到 store_id，尝试从用户信息获取
             if not store_id:
-                user = getattr(request.state, "user", None)
                 if user:
                     store_id = user.get("store_id")
 

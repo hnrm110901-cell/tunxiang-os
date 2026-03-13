@@ -19,6 +19,11 @@ import ReactECharts from 'echarts-for-react';
 
 const STORE_ID = localStorage.getItem('store_id') || 'S001';
 
+// 兼容后续 Tab 使用的 useStore hook（内部统一用 STORE_ID）
+function useStore() {
+  return { storeId: STORE_ID };
+}
+
 /* ─── 类型 ─── */
 interface DashboardData {
   store_id:         string;
@@ -6251,7 +6256,7 @@ function RepeatCustomerTab() {
   return (
     <div className={styles.repeatTab}>
       <ZCard title="回头客分析">
-        {loading ? <ZSkeleton /> : !data ? <ZEmpty message="暂无数据" /> : (
+        {loading ? <ZSkeleton /> : !data ? <ZEmpty description="暂无数据" /> : (
           <div className={styles.repeatKpiRow}>
             <div className={styles.repeatKpi}>
               <div className={styles.repeatKpiVal}>{data.total_customers ?? '-'}</div>
@@ -6277,7 +6282,7 @@ function RepeatCustomerTab() {
         )}
       </ZCard>
       <ZCard title="线索来源 ROI">
-        {srcLoading ? <ZSkeleton /> : !srcData || srcData.sources.length === 0 ? <ZEmpty message="暂无数据" /> : (
+        {srcLoading ? <ZSkeleton /> : !srcData || srcData.sources.length === 0 ? <ZEmpty description="暂无数据" /> : (
           <div className={styles.srcRoiList}>
             <div className={styles.srcRoiHeader}>
               <span>来源渠道</span><span>线索数</span><span>签约数</span><span>转化率</span><span>平均预算</span>
@@ -6332,7 +6337,7 @@ function BookingLeadTimeTab() {
   return (
     <div className={styles.leadTimeTab}>
       <ZCard title="提前预订天数分布">
-        {loading ? <ZSkeleton /> : !data ? <ZEmpty message="暂无数据" /> : (
+        {loading ? <ZSkeleton /> : !data ? <ZEmpty description="暂无数据" /> : (
           <>
             <div className={styles.leadTimeKpiRow}>
               <div className={styles.leadTimeKpi}>
@@ -6363,7 +6368,7 @@ function BookingLeadTimeTab() {
         )}
       </ZCard>
       <ZCard title="回款率 & 欠款订单">
-        {collLoading ? <ZSkeleton /> : !collData ? <ZEmpty message="暂无数据" /> : (
+        {collLoading ? <ZSkeleton /> : !collData ? <ZEmpty description="暂无数据" /> : (
           <>
             <div className={styles.collKpiRow}>
               <div className={styles.collKpi}>
@@ -6440,7 +6445,7 @@ function TableUtilizationTab() {
   return (
     <div className={styles.tableUtilTab}>
       <ZCard title="桌位利用率">
-        {loading ? <ZSkeleton /> : !data || data.halls.length === 0 ? <ZEmpty message="暂无数据" /> : (
+        {loading ? <ZSkeleton /> : !data || data.halls.length === 0 ? <ZEmpty description="暂无数据" /> : (
           <>
             <div className={styles.tableUtilKpi}>
               <span>整体利用率</span>
@@ -6465,7 +6470,7 @@ function TableUtilizationTab() {
         )}
       </ZCard>
       <ZCard title="峰值收入日">
-        {peakLoading ? <ZSkeleton /> : !peakData ? <ZEmpty message="暂无数据" /> : (
+        {peakLoading ? <ZSkeleton /> : !peakData ? <ZEmpty description="暂无数据" /> : (
           <>
             {peakData.peak_weekday && (
               <div className={styles.peakBadge}>峰值：{peakData.peak_weekday}</div>
@@ -6524,7 +6529,7 @@ function SatisfactionReferralTab() {
   return (
     <div className={styles.satRefTab}>
       <ZCard title="客户满意度">
-        {satLoading ? <ZSkeleton /> : !satData ? <ZEmpty message="暂无数据" /> : (
+        {satLoading ? <ZSkeleton /> : !satData ? <ZEmpty description="暂无数据" /> : (
           <>
             <div className={styles.satKpiRow}>
               <div className={styles.satKpi}>
@@ -6562,7 +6567,7 @@ function SatisfactionReferralTab() {
         )}
       </ZCard>
       <ZCard title="转介绍率">
-        {refLoading ? <ZSkeleton /> : !refData ? <ZEmpty message="暂无数据" /> : (
+        {refLoading ? <ZSkeleton /> : !refData ? <ZEmpty description="暂无数据" /> : (
           <div className={styles.refKpiRow}>
             <div className={styles.refKpi}>
               <div className={styles.refKpiVal}>{refData.total_leads}</div>
@@ -6626,7 +6631,7 @@ function QuoteTurnaroundTab() {
   return (
     <div className={styles.qtTab}>
       <ZCard title="报价周转时间">
-        {qtLoading ? <ZSkeleton /> : !qtData ? <ZEmpty message="暂无数据" /> : (
+        {qtLoading ? <ZSkeleton /> : !qtData ? <ZEmpty description="暂无数据" /> : (
           <>
             <div className={styles.qtKpiRow}>
               <div className={styles.qtKpi}>
@@ -6659,7 +6664,7 @@ function QuoteTurnaroundTab() {
         )}
       </ZCard>
       <ZCard title="合同签约率">
-        {contractLoading ? <ZSkeleton /> : !contractData ? <ZEmpty message="暂无数据" /> : (
+        {contractLoading ? <ZSkeleton /> : !contractData ? <ZEmpty description="暂无数据" /> : (
           <div className={styles.contractKpiRow}>
             <div className={styles.contractKpi}>
               <div className={styles.contractKpiVal}>{contractData.total_orders}</div>
@@ -6715,7 +6720,7 @@ function NewVsRepeatMonthlyTab() {
   return (
     <div className={styles.newRepeatTab}>
       <ZCard title="月度新客 vs 回头客">
-        {loading ? <ZSkeleton /> : !data || data.monthly.length === 0 ? <ZEmpty message="暂无数据" /> : (
+        {loading ? <ZSkeleton /> : !data || data.monthly.length === 0 ? <ZEmpty description="暂无数据" /> : (
           <div className={styles.nrTable}>
             <div className={styles.nrHeader}>
               <span>月份</span><span>新客单数</span><span>新客收入¥</span><span>回头客单数</span><span>回头客收入¥</span>
@@ -6733,7 +6738,7 @@ function NewVsRepeatMonthlyTab() {
         )}
       </ZCard>
       <ZCard title="员工任务逾期率">
-        {overdueLoading ? <ZSkeleton /> : !overdueData ? <ZEmpty message="暂无数据" /> : (
+        {overdueLoading ? <ZSkeleton /> : !overdueData ? <ZEmpty description="暂无数据" /> : (
           <>
             <div className={styles.overdueKpiRow}>
               <div className={styles.overdueKpi}>
@@ -6808,7 +6813,7 @@ function OrderAmendmentTab() {
   return (
     <div className={styles.amendTab}>
       <ZCard title="订单修改率">
-        {amendLoading ? <ZSkeleton /> : !amendData ? <ZEmpty message="暂无数据" /> : (
+        {amendLoading ? <ZSkeleton /> : !amendData ? <ZEmpty description="暂无数据" /> : (
           <div className={styles.amendKpiRow}>
             <div className={styles.amendKpi}>
               <div className={styles.amendKpiVal}>{amendData.total_orders}</div>
@@ -6828,7 +6833,7 @@ function OrderAmendmentTab() {
         )}
       </ZCard>
       <ZCard title="套餐附加率">
-        {attachLoading ? <ZSkeleton /> : !attachData ? <ZEmpty message="暂无数据" /> : (
+        {attachLoading ? <ZSkeleton /> : !attachData ? <ZEmpty description="暂无数据" /> : (
           <>
             <div className={styles.attachKpiRow}>
               <div className={styles.attachKpi}>
@@ -6897,7 +6902,7 @@ function ProfitabilityTab() {
   return (
     <div className={styles.profTab}>
       <ZCard title="宴会类型盈利能力">
-        {profLoading ? <ZSkeleton /> : !profData || profData.types.length === 0 ? <ZEmpty message="暂无数据" /> : (
+        {profLoading ? <ZSkeleton /> : !profData || profData.types.length === 0 ? <ZEmpty description="暂无数据" /> : (
           <div className={styles.profList}>
             <div className={styles.profHeader}>
               <span>类型</span><span>单数</span><span>收入¥</span><span>成本¥</span><span>毛利率</span>
@@ -6915,7 +6920,7 @@ function ProfitabilityTab() {
         )}
       </ZCard>
       <ZCard title="宴会执行综合评分">
-        {execLoading ? <ZSkeleton /> : !execData ? <ZEmpty message="暂无数据" /> : (
+        {execLoading ? <ZSkeleton /> : !execData ? <ZEmpty description="暂无数据" /> : (
           <>
             <div className={styles.execKpiRow}>
               <div className={styles.execKpi}>
@@ -6984,7 +6989,7 @@ function CrossSellTab() {
   return (
     <div className={styles.crossTab}>
       <ZCard title="交叉销售率">
-        {crossLoading ? <ZSkeleton /> : !crossData ? <ZEmpty message="暂无数据" /> : (
+        {crossLoading ? <ZSkeleton /> : !crossData ? <ZEmpty description="暂无数据" /> : (
           <div className={styles.crossKpiRow}>
             <div className={styles.crossKpi}>
               <div className={styles.crossKpiVal}>{crossData.total_customers}</div>
@@ -7004,7 +7009,7 @@ function CrossSellTab() {
         )}
       </ZCard>
       <ZCard title="宴会规模趋势（平均桌数）">
-        {sizeLoading ? <ZSkeleton /> : !sizeData || sizeData.monthly.length === 0 ? <ZEmpty message="暂无数据" /> : (
+        {sizeLoading ? <ZSkeleton /> : !sizeData || sizeData.monthly.length === 0 ? <ZEmpty description="暂无数据" /> : (
           <>
             <div className={styles.sizeOverallKpi}>
               整体均值 <span className={styles.sizeOverallVal}>{sizeData.overall_avg_tables ?? '-'} 桌</span>
@@ -7059,7 +7064,7 @@ function VipSpendingTab() {
   return (
     <div className={styles.vipSpendTab}>
       <ZCard title="VIP 消费趋势">
-        {vipLoading ? <ZSkeleton /> : !vipData || vipData.by_level.length === 0 ? <ZEmpty message="暂无VIP数据" /> : (
+        {vipLoading ? <ZSkeleton /> : !vipData || vipData.by_level.length === 0 ? <ZEmpty description="暂无VIP数据" /> : (
           <>
             <div className={styles.vipSpendKpi}>
               VIP 总数 <span className={styles.vipSpendVal}>{vipData.total_vip}</span>
@@ -7081,7 +7086,7 @@ function VipSpendingTab() {
         )}
       </ZCard>
       <ZCard title="欠款账龄分析">
-        {agingLoading ? <ZSkeleton /> : !agingData ? <ZEmpty message="暂无数据" /> : agingData.total_overdue === 0 ? (
+        {agingLoading ? <ZSkeleton /> : !agingData ? <ZEmpty description="暂无数据" /> : agingData.total_overdue === 0 ? (
           <div className={styles.agingAllPaid}>✓ 无欠款订单</div>
         ) : (
           <>
@@ -7158,7 +7163,7 @@ function LoyaltyRedemptionTab() {
   return (
     <div className={styles.loyaltyTab}>
       <ZCard title="积分兑换率">
-        {lLoading ? <ZSkeleton /> : !loyaltyData ? <ZEmpty message="暂无数据" /> : (
+        {lLoading ? <ZSkeleton /> : !loyaltyData ? <ZEmpty description="暂无数据" /> : (
           <div className={styles.loyaltyKpiRow}>
             <div className={styles.loyaltyKpi}>
               <div className={styles.loyaltyKpiVal}>{loyaltyData.total_customers}</div>
@@ -7176,7 +7181,7 @@ function LoyaltyRedemptionTab() {
         )}
       </ZCard>
       <ZCard title="菜单升级率">
-        {uLoading ? <ZSkeleton /> : !upgradeData ? <ZEmpty message="暂无数据" /> : (
+        {uLoading ? <ZSkeleton /> : !upgradeData ? <ZEmpty description="暂无数据" /> : (
           <div className={styles.upgradeKpiRow}>
             <div className={styles.upgradeKpi}>
               <div className={styles.upgradeKpiVal}>{upgradeData.total_pkg_orders}</div>
@@ -7194,10 +7199,10 @@ function LoyaltyRedemptionTab() {
         )}
       </ZCard>
       <ZCard title="渠道转化漏斗">
-        {cLoading ? <ZSkeleton /> : !channelData || channelData.channels?.length === 0 ? <ZEmpty message="暂无渠道数据" /> : (
+        {cLoading ? <ZSkeleton /> : !channelData || channelData.channels?.length === 0 ? <ZEmpty description="暂无渠道数据" /> : (
           <>
             <div className={styles.channelBest}>
-              最佳渠道 <ZBadge label={channelData.best_channel} variant="success" />
+              最佳渠道 <ZBadge label={channelData.best_channel} type="success" />
             </div>
             <div className={styles.channelList}>
               <div className={styles.channelHeader}>
@@ -7264,7 +7269,7 @@ function ForecastAccuracyTab() {
   return (
     <div className={styles.forecastTab}>
       <ZCard title="收入预测准确率">
-        {fLoading ? <ZSkeleton /> : !forecastData || forecastData.monthly?.length === 0 ? <ZEmpty message="暂无目标数据" /> : (
+        {fLoading ? <ZSkeleton /> : !forecastData || forecastData.monthly?.length === 0 ? <ZEmpty description="暂无目标数据" /> : (
           <>
             <div className={styles.forecastKpiRow}>
               <div className={`${styles.forecastKpi} ${styles.forecastAccent}`}>
@@ -7293,7 +7298,7 @@ function ForecastAccuracyTab() {
         )}
       </ZCard>
       <ZCard title="员工任务热力图（峰值星期）">
-        {hLoading ? <ZSkeleton /> : !heatmapData || heatmapData.staff?.length === 0 ? <ZEmpty message="暂无员工任务数据" /> : (
+        {hLoading ? <ZSkeleton /> : !heatmapData || heatmapData.staff?.length === 0 ? <ZEmpty description="暂无员工任务数据" /> : (
           <div className={styles.heatmapList}>
             <div className={styles.heatmapHeader}>
               <span>员工</span><span>总任务</span><span>峰值日</span>
@@ -7309,7 +7314,7 @@ function ForecastAccuracyTab() {
         )}
       </ZCard>
       <ZCard title="客户全生命周期宴会次数">
-        {ltLoading ? <ZSkeleton /> : !ltData ? <ZEmpty message="暂无数据" /> : (
+        {ltLoading ? <ZSkeleton /> : !ltData ? <ZEmpty description="暂无数据" /> : (
           <>
             <div className={styles.ltKpiRow}>
               <div className={styles.ltKpi}>
@@ -7388,7 +7393,7 @@ function DepositRefundTab() {
   return (
     <div className={styles.depositTab}>
       <ZCard title="定金退款率">
-        {rLoading ? <ZSkeleton /> : !refundData ? <ZEmpty message="暂无数据" /> : (
+        {rLoading ? <ZSkeleton /> : !refundData ? <ZEmpty description="暂无数据" /> : (
           <div className={styles.depositKpiRow}>
             <div className={styles.depositKpi}>
               <div className={styles.depositKpiVal}>{refundData.total_cancelled}</div>
@@ -7406,7 +7411,7 @@ function DepositRefundTab() {
         )}
       </ZCard>
       <ZCard title="线索赢单/输单比">
-        {wLoading ? <ZSkeleton /> : !ratioData ? <ZEmpty message="暂无数据" /> : (
+        {wLoading ? <ZSkeleton /> : !ratioData ? <ZEmpty description="暂无数据" /> : (
           <div className={styles.winlossKpiRow}>
             <div className={`${styles.winlossKpi} ${styles.winGreen}`}>
               <div className={styles.winlossKpiVal}>{ratioData.won}</div>
@@ -7428,7 +7433,7 @@ function DepositRefundTab() {
         )}
       </ZCard>
       <ZCard title="VIP 客户留存率">
-        {vLoading ? <ZSkeleton /> : !retData ? <ZEmpty message="暂无VIP数据" /> : (
+        {vLoading ? <ZSkeleton /> : !retData ? <ZEmpty description="暂无VIP数据" /> : (
           <>
             <div className={styles.retKpiRow}>
               <div className={styles.retKpi}>
@@ -7509,7 +7514,7 @@ function SeasonalRevenueTab() {
   return (
     <div className={styles.seasonalRevTab}>
       <ZCard title="季节收入指数">
-        {sLoading ? <ZSkeleton /> : !seasonData || seasonData.monthly?.length === 0 ? <ZEmpty message="暂无数据" /> : (
+        {sLoading ? <ZSkeleton /> : !seasonData || seasonData.monthly?.length === 0 ? <ZEmpty description="暂无数据" /> : (
           <>
             <div className={styles.seasonRevKpi}>
               峰值月 <strong>{seasonData.peak_month ? MONTH_NAMES[seasonData.peak_month - 1] : '—'}</strong>
@@ -7530,7 +7535,7 @@ function SeasonalRevenueTab() {
         )}
       </ZCard>
       <ZCard title="宴会复购间隔">
-        {iLoading ? <ZSkeleton /> : !intervalData ? <ZEmpty message="暂无数据" /> : (
+        {iLoading ? <ZSkeleton /> : !intervalData ? <ZEmpty description="暂无数据" /> : (
           <div className={styles.intervalKpiRow}>
             <div className={styles.intervalKpi}>
               <div className={styles.intervalKpiVal}>{intervalData.total_repeat_customers}</div>
@@ -7548,7 +7553,7 @@ function SeasonalRevenueTab() {
         )}
       </ZCard>
       <ZCard title="厅房停用率">
-        {dLoading ? <ZSkeleton /> : !downtimeData ? <ZEmpty message="暂无数据" /> : (
+        {dLoading ? <ZSkeleton /> : !downtimeData ? <ZEmpty description="暂无数据" /> : (
           <>
             <div className={styles.downtimeKpiRow}>
               <div className={styles.downtimeKpi}>
@@ -7564,7 +7569,7 @@ function SeasonalRevenueTab() {
               {(downtimeData.halls || []).map((h: any) => (
                 <div key={h.hall_id} className={`${styles.downtimeHallRow} ${!h.is_active ? styles.downtimeInactive : ''}`}>
                   <span>{h.name}</span>
-                  <ZBadge label={h.is_active ? '运营中' : '停用'} variant={h.is_active ? 'success' : 'error'} />
+                  <ZBadge label={h.is_active ? '运营中' : '停用'} type={h.is_active ? 'success' : 'error'} />
                 </div>
               ))}
             </div>
@@ -7620,7 +7625,7 @@ function CancellationReasonsTab() {
   return (
     <div className={styles.cancelTab}>
       <ZCard title="取消订单分析">
-        {c1Loading ? <ZSkeleton /> : !cancelData || cancelData.total_cancelled === 0 ? <ZEmpty message="暂无取消订单" /> : (
+        {c1Loading ? <ZSkeleton /> : !cancelData || cancelData.total_cancelled === 0 ? <ZEmpty description="暂无取消订单" /> : (
           <>
             <div className={styles.cancelKpiRow}>
               <div className={`${styles.cancelKpi} ${styles.cancelRed}`}>
@@ -7647,7 +7652,7 @@ function CancellationReasonsTab() {
         )}
       </ZCard>
       <ZCard title="报价接受率">
-        {c2Loading ? <ZSkeleton /> : !acceptData ? <ZEmpty message="暂无数据" /> : (
+        {c2Loading ? <ZSkeleton /> : !acceptData ? <ZEmpty description="暂无数据" /> : (
           <div className={styles.acceptKpiRow}>
             <div className={styles.acceptKpi}>
               <div className={styles.acceptKpiVal}>{acceptData.total_quoted}</div>
@@ -7665,7 +7670,7 @@ function CancellationReasonsTab() {
         )}
       </ZCard>
       <ZCard title="客户流失风险">
-        {c3Loading ? <ZSkeleton /> : !churnData ? <ZEmpty message="暂无数据" /> : (
+        {c3Loading ? <ZSkeleton /> : !churnData ? <ZEmpty description="暂无数据" /> : (
           <div className={styles.churnKpiRow}>
             <div className={styles.churnKpi}>
               <div className={styles.churnKpiVal}>{churnData.total_customers}</div>
@@ -7731,7 +7736,7 @@ function WeekdayPatternTab() {
   return (
     <div className={styles.weekdayTab}>
       <ZCard title="宴会星期分布">
-        {w1Loading ? <ZSkeleton /> : !wdData || wdData.by_weekday?.length === 0 ? <ZEmpty message="暂无数据" /> : (
+        {w1Loading ? <ZSkeleton /> : !wdData || wdData.by_weekday?.length === 0 ? <ZEmpty description="暂无数据" /> : (
           <>
             <div className={styles.wdPeak}>峰值 <strong>{wdData.peak_weekday}</strong> &nbsp; 总计 {wdData.total_orders} 单</div>
             <div className={styles.wdBars}>
@@ -7753,7 +7758,7 @@ function WeekdayPatternTab() {
         )}
       </ZCard>
       <ZCard title="套餐收入贡献率">
-        {w2Loading ? <ZSkeleton /> : !pkgData ? <ZEmpty message="暂无数据" /> : (
+        {w2Loading ? <ZSkeleton /> : !pkgData ? <ZEmpty description="暂无数据" /> : (
           <div className={styles.pkgContribRow}>
             <div className={styles.pkgContribKpi}>
               <div className={styles.pkgContribVal}>{pkgData.total_orders}</div>
@@ -7771,7 +7776,7 @@ function WeekdayPatternTab() {
         )}
       </ZCard>
       <ZCard title="员工任务超时率">
-        {w3Loading ? <ZSkeleton /> : !otData ? <ZEmpty message="暂无数据" /> : (
+        {w3Loading ? <ZSkeleton /> : !otData ? <ZEmpty description="暂无数据" /> : (
           <div className={styles.otKpiRow}>
             <div className={styles.otKpi}>
               <div className={styles.otKpiVal}>{otData.total_completed}</div>
@@ -7825,7 +7830,7 @@ function RevenuePerTableTab() {
   return (
     <div className={styles.rptTab}>
       <ZCard title="各宴会类型桌均收入">
-        {r1L ? <ZSkeleton /> : !rptData ? <ZEmpty message="暂无数据" /> : (
+        {r1L ? <ZSkeleton /> : !rptData ? <ZEmpty description="暂无数据" /> : (
           <>
             <div className={styles.rptOverall}>
               总体桌均 <span className={styles.rptOverallVal}>¥{rptData.overall_rev_per_table ?? '—'}</span>
@@ -7845,7 +7850,7 @@ function RevenuePerTableTab() {
         )}
       </ZCard>
       <ZCard title="线索来源量">
-        {r2L ? <ZSkeleton /> : !srcData || srcData.total_leads === 0 ? <ZEmpty message="暂无线索数据" /> : (
+        {r2L ? <ZSkeleton /> : !srcData || srcData.total_leads === 0 ? <ZEmpty description="暂无线索数据" /> : (
           <>
             <div className={styles.srcVolKpi}>
               总线索 <span className={styles.srcVolVal}>{srcData.total_leads}</span>
@@ -7866,7 +7871,7 @@ function RevenuePerTableTab() {
         )}
       </ZCard>
       <ZCard title="客户人均/桌均消费">
-        {r3L ? <ZSkeleton /> : !spendData ? <ZEmpty message="暂无数据" /> : (
+        {r3L ? <ZSkeleton /> : !spendData ? <ZEmpty description="暂无数据" /> : (
           <div className={styles.spendKpiRow}>
             <div className={styles.spendKpi}>
               <div className={styles.spendKpiVal}>¥{spendData.avg_spend_per_person_yuan ?? '—'}</div>
@@ -7920,7 +7925,7 @@ function ReviewSentimentTab() {
   return (
     <div className={styles.sentimentTab}>
       <ZCard title="评价情感分布">
-        {s1L ? <ZSkeleton /> : !sentData || sentData.total_reviews === 0 ? <ZEmpty message="暂无评价数据" /> : (
+        {s1L ? <ZSkeleton /> : !sentData || sentData.total_reviews === 0 ? <ZEmpty description="暂无评价数据" /> : (
           <>
             <div className={styles.sentKpiRow}>
               <div className={`${styles.sentKpi} ${styles.sentGreen}`}>
@@ -7948,7 +7953,7 @@ function ReviewSentimentTab() {
         )}
       </ZCard>
       <ZCard title="任务完成速度">
-        {s2L ? <ZSkeleton /> : !speedData ? <ZEmpty message="暂无数据" /> : (
+        {s2L ? <ZSkeleton /> : !speedData ? <ZEmpty description="暂无数据" /> : (
           <div className={styles.speedKpiRow}>
             <div className={styles.speedKpi}>
               <div className={styles.speedKpiVal}>{speedData.avg_hours ?? '—'}h</div>
@@ -7966,7 +7971,7 @@ function ReviewSentimentTab() {
         )}
       </ZCard>
       <ZCard title="月度订单增长率">
-        {s3L ? <ZSkeleton /> : !growthData || growthData.monthly?.length === 0 ? <ZEmpty message="暂无数据" /> : (
+        {s3L ? <ZSkeleton /> : !growthData || growthData.monthly?.length === 0 ? <ZEmpty description="暂无数据" /> : (
           <>
             <div className={styles.growthAvg}>
               均环比 <span className={styles.growthAvgVal}>{growthData.avg_growth_pct != null ? (growthData.avg_growth_pct > 0 ? '+' : '') + growthData.avg_growth_pct + '%' : '—'}</span>
@@ -10448,7 +10453,7 @@ function ReviewScoreDistTab() {
             <div className={styles.p49ScoreHeader}>
               <span className={styles.p49ScoreAvg}>{data.avg_score?.toFixed(2)}</span>
               <span className={styles.p49ScoreStars}>/ 5.0</span>
-              <ZBadge label={`五星 ${data.five_star_pct?.toFixed(1)}%`} color="green" />
+              <ZBadge label={`五星 ${data.five_star_pct?.toFixed(1)}%`} type="success" />
             </div>
             <div className={styles.p49ScoreList}>
               {(data.distribution || []).map((d: any, i: number) => (
@@ -10710,7 +10715,7 @@ function TypeCancellationRateTab() {
   useEffect(() => { load(); }, [load]);
 
   if (loading) return <ZSkeleton rows={5} />;
-  if (!data || data.total_orders === 0) return <ZEmpty message="暂无订单数据" />;
+  if (!data || data.total_orders === 0) return <ZEmpty description="暂无订单数据" />;
 
   return (
     <div className={styles.p52Wrap}>
@@ -10764,7 +10769,7 @@ function PeakBookingHourTab() {
   useEffect(() => { load(); }, [load]);
 
   if (loading) return <ZSkeleton rows={5} />;
-  if (!data || data.total_orders === 0) return <ZEmpty message="暂无预订数据" />;
+  if (!data || data.total_orders === 0) return <ZEmpty description="暂无预订数据" />;
 
   const maxCount = Math.max(...(data.by_hour || []).map((h: any) => h.count), 1);
 
@@ -10824,7 +10829,7 @@ function CustomerLifetimeValueTab() {
   useEffect(() => { load(); }, [load]);
 
   if (loading) return <ZSkeleton rows={4} />;
-  if (!data || data.total_customers === 0) return <ZEmpty message="暂无客户数据" />;
+  if (!data || data.total_customers === 0) return <ZEmpty description="暂无客户数据" />;
 
   return (
     <div className={styles.p53Wrap}>
@@ -10846,7 +10851,7 @@ function CustomerLifetimeValueTab() {
         {data.top_customer && (
           <div className={styles.p53TopRow}>
             <span className={styles.p53TopLabel}>最高价值客户</span>
-            <ZBadge color="accent">{data.top_customer}</ZBadge>
+            <ZBadge type="accent" text={data.top_customer} />
           </div>
         )}
       </ZCard>
@@ -10876,7 +10881,7 @@ function BanquetDatePopularityTab() {
   useEffect(() => { load(); }, [load]);
 
   if (loading) return <ZSkeleton rows={5} />;
-  if (!data || data.total_orders === 0) return <ZEmpty message="暂无预订数据" />;
+  if (!data || data.total_orders === 0) return <ZEmpty description="暂无预订数据" />;
 
   const maxCount = Math.max(...(data.by_month || []).map((m: any) => m.count), 1);
 
@@ -10937,7 +10942,7 @@ function PaymentMethodPreferenceTab() {
   useEffect(() => { load(); }, [load]);
 
   if (loading) return <ZSkeleton rows={4} />;
-  if (!data || data.total_payments === 0) return <ZEmpty message="暂无支付数据" />;
+  if (!data || data.total_payments === 0) return <ZEmpty description="暂无支付数据" />;
 
   return (
     <div className={styles.p54Wrap}>
@@ -10991,7 +10996,7 @@ function BanquetSeasonAnalysisTab() {
   useEffect(() => { load(); }, [load]);
 
   if (loading) return <ZSkeleton rows={4} />;
-  if (!data || data.total_orders === 0) return <ZEmpty message="暂无订单数据" />;
+  if (!data || data.total_orders === 0) return <ZEmpty description="暂无订单数据" />;
 
   const seasonColors: Record<string, string> = {
     春季: '#4ade80', 夏季: '#f59e0b', 秋季: '#f97316', 冬季: '#60a5fa',
@@ -11056,7 +11061,7 @@ function LeadWinLossRatioTab() {
   useEffect(() => { load(); }, [load]);
 
   if (loading) return <ZSkeleton rows={4} />;
-  if (!data || data.total_leads === 0) return <ZEmpty message="暂无线索数据" />;
+  if (!data || data.total_leads === 0) return <ZEmpty description="暂无线索数据" />;
 
   return (
     <div className={styles.p55Wrap}>
@@ -11122,7 +11127,7 @@ function MonthlyNewCustomersTab() {
   useEffect(() => { load(); }, [load]);
 
   if (loading) return <ZSkeleton rows={5} />;
-  if (!data || data.total_new_customers === 0) return <ZEmpty message="暂无客户数据" />;
+  if (!data || data.total_new_customers === 0) return <ZEmpty description="暂无客户数据" />;
 
   const maxCount = Math.max(...(data.monthly || []).map((m: any) => m.new_customers), 1);
 
@@ -11183,7 +11188,7 @@ function LeadStageFunnelTab() {
   useEffect(() => { load(); }, [load]);
 
   if (loading) return <ZSkeleton rows={5} />;
-  if (!data || data.total_leads === 0) return <ZEmpty message="暂无线索数据" />;
+  if (!data || data.total_leads === 0) return <ZEmpty description="暂无线索数据" />;
 
   const stageLabels: Record<string, string> = {
     new: '初步询价', contacted: '已接触', quoted: '已报价',
@@ -11249,7 +11254,7 @@ function OrderValueTrendTab() {
   useEffect(() => { load(); }, [load]);
 
   if (loading) return <ZSkeleton rows={5} />;
-  if (!data || data.total_orders === 0) return <ZEmpty message="暂无订单数据" />;
+  if (!data || data.total_orders === 0) return <ZEmpty description="暂无订单数据" />;
 
   const maxAvg = Math.max(...(data.monthly || []).map((m: any) => m.avg_yuan), 1);
 

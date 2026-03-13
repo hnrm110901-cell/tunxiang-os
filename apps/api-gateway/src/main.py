@@ -25,6 +25,7 @@ from src.core.config import settings
 from src.api import health, agents, auth, notifications, stores, mobile, integrations, monitoring, llm, enterprise, voice, neural, adapters, tasks, reconciliation, approval, embedding, raas, model_marketplace, human_in_the_loop, hardware_integration, pos, dishes, benchmark, dish_master, alerts_webhook
 from src.api import roles as roles_api
 from src.api import merchants
+from src.api import prep_suggestion, soldout, agent_configs
 from src.api.phase5_apis import platform_router, industry_router, supply_chain_router, i18n_router
 # 逐步启用的模块
 from src.api import dashboard, analytics, audit, multi_store, finance, customer360, wechat_triggers, queue, meituan_queue
@@ -91,6 +92,7 @@ from src.middleware.monitoring import MonitoringMiddleware
 from src.middleware.rate_limit import RateLimitMiddleware
 from src.middleware.audit_log import AuditLogMiddleware
 from src.middleware.security_headers import SecurityHeadersMiddleware
+from src.middleware.store_access import StoreAccessMiddleware
 
 # 配置结构化日志
 logger = structlog.get_logger()
@@ -330,6 +332,9 @@ app.add_middleware(RateLimitMiddleware)
 # 添加审计日志中间件
 app.add_middleware(AuditLogMiddleware)
 
+# 门店/品牌访问隔离中间件（支持 X-Tenant-ID Header）
+app.add_middleware(StoreAccessMiddleware)
+
 # 添加监控中间件
 app.add_middleware(MonitoringMiddleware)
 
@@ -421,6 +426,9 @@ app.include_router(health.router, prefix="/api/v1", tags=["health"])
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
 app.include_router(roles_api.router, prefix="/api/v1", tags=["roles"])
 app.include_router(merchants.router, prefix="/api/v1", tags=["merchants"])
+app.include_router(agent_configs.router, prefix="/api/v1", tags=["agent-configs"])
+app.include_router(prep_suggestion.router, tags=["prep-suggestion"])
+app.include_router(soldout.router, tags=["soldout"])
 app.include_router(agents.router, prefix="/api/v1/agents", tags=["agents"])
 app.include_router(approval.router, prefix="/api/v1", tags=["approval"])
 app.include_router(notifications.router, prefix="/api/v1", tags=["notifications"])
@@ -780,6 +788,10 @@ async def startup_event():
         from src.core.database import init_db
         await init_db()
         logger.info("数据库初始化成功")
+
+        # 加载多租户 Schema 映射
+        from src.core.database import reload_schema_map_from_db
+        await reload_schema_map_from_db()
     except Exception as e:
         logger.error("数据库初始化失败", error=str(e))
         # Don't fail startup if database is not available

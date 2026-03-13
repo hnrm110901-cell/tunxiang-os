@@ -182,10 +182,12 @@ const SmBusiness  = lazy(() => import('./pages/sm/Business'));
 const SmDecisions = lazy(() => import('./pages/sm/Decisions'));
 const SmAlerts    = lazy(() => import('./pages/sm/Alerts'));
 const SmWorkforce = lazy(() => import('./pages/sm/Workforce'));
+const SmPrepSuggestion = lazy(() => import('./pages/sm/PrepSuggestion'));
 
 // Role-based views (Phase 2 — Chef /chef, Floor /floor, HQ /hq)
 const ChefLayout      = lazy(() => import('./layouts/ChefLayout'));
 const ChefHome        = lazy(() => import('./pages/chef/Home'));
+const ChefSoldout     = lazy(() => import('./pages/chef/Soldout'));
 const ChefWaste       = lazy(() => import('./pages/chef/Waste'));
 const ChefInventory   = lazy(() => import('./pages/chef/Inventory'));
 const FloorLayout     = lazy(() => import('./layouts/FloorLayout'));
@@ -732,6 +734,7 @@ const AppContent: React.FC = () => {
                   <Route path="banquet-followups"    element={<SmBanquetFollowups />} />
                   <Route path="banquet-search"       element={<SmBanquetSearch />} />
                   <Route path="private-domain-health" element={<SmPrivateDomainHealth />} />
+                  <Route path="prep" element={<SmPrepSuggestion />} />
                 </Route>
 
                 {/* Role-based views — Chef (手机) */}
@@ -741,6 +744,7 @@ const AppContent: React.FC = () => {
                   </ProtectedRoute>
                 }>
                   <Route index element={<ChefHome />} />
+                  <Route path="soldout"   element={<ChefSoldout />} />
                   <Route path="waste"     element={<ChefWaste />} />
                   <Route path="inventory" element={<ChefInventory />} />
                 </Route>

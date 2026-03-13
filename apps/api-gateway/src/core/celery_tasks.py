@@ -3827,6 +3827,210 @@ def pull_tiancai_daily_orders(self) -> Dict[str, Any]:
         raise self.retry(exc=e)
 
 
+# ── 品智日营业数据同步（每日 01:30 执行，早于天财 02:00 及对账 03:00）────────────
+
+@celery_app.task(
+    bind=True,
+    max_retries=int(os.getenv("CELERY_MAX_RETRIES", "3")),
+    default_retry_delay=int(os.getenv("CELERY_RETRY_DELAY_LONG", "300")),
+)
+def pull_pinzhi_daily_data(self) -> Dict[str, Any]:
+    """
+    拉取品智 POS 昨日营业数据（订单 + 营业汇总 + 出品明细）并写入 orders 表。
+
+    环境变量：
+      PINZHI_BASE_URL   — API 基础地址（必填；缺失则跳过）
+      PINZHI_TOKEN      — API Token（必填）
+      PINZHI_BRAND_ID   — 品牌 ID（映射标准 schema 用）
+
+    Returns:
+        {success, date, stores_processed, orders_upserted, summaries_saved, errors}
+    """
+    async def _run():
+        from datetime import date, timedelta
+        from sqlalchemy import text as _text, select
+        from ..core.database import get_db_session
+        from ..models.store import Store
+
+        base_url = os.getenv("PINZHI_BASE_URL", "")
+        token = os.getenv("PINZHI_TOKEN", "")
+        if not base_url or not token:
+            logger.warning("pinzhi_pull.skipped", reason="PINZHI_BASE_URL or PINZHI_TOKEN not configured")
+            return {
+                "success": True,
+                "skipped": True,
+                "stores_processed": 0,
+                "orders_upserted": 0,
+                "summaries_saved": 0,
+                "errors": [],
+            }
+
+        brand_id = os.getenv("PINZHI_BRAND_ID", "")
+        yesterday = (date.today() - timedelta(days=1)).strftime("%Y-%m-%d")
+
+        from packages.api_adapters.pinzhi.src.adapter import PinzhiAdapter
+
+        adapter = PinzhiAdapter({
+            "base_url": base_url,
+            "token": token,
+            "timeout": int(os.getenv("PINZHI_TIMEOUT", "30")),
+            "retry_times": int(os.getenv("PINZHI_RETRY_TIMES", "3")),
+        })
+
+        stores_processed = 0
+        orders_upserted = 0
+        summaries_saved = 0
+        errors = []
+
+        try:
+            async with get_db_session() as session:
+                # 获取所有活跃门店
+                result = await session.execute(
+                    select(Store).where(Store.is_active.is_(True))
+                )
+                stores = result.scalars().all()
+
+                for store in stores:
+                    sid = str(store.id)
+                    # 品智用 ognid（门店 omsID），通常存在 store.config 或用 store.code
+                    ognid = ""
+                    if store.config and isinstance(store.config, dict):
+                        ognid = store.config.get("pinzhi_ognid", "")
+                    if not ognid:
+                        ognid = store.code or sid
+
+                    try:
+                        # 1) 拉取订单明细
+                        page = 1
+                        store_orders = 0
+                        while True:
+                            raw_orders = await adapter.query_orders(
+                                ognid=ognid,
+                                begin_date=yesterday,
+                                end_date=yesterday,
+                                page_index=page,
+                                page_size=100,
+                            )
+                            if not raw_orders:
+                                break
+
+                            for raw in raw_orders:
+                                order_schema = adapter.to_order(raw, sid, brand_id)
+                                total_cents = int(order_schema.total * 100)
+                                discount_cents = int(order_schema.discount * 100)
+                                await session.execute(
+                                    _text("""
+                                        INSERT INTO orders
+                                            (id, store_id, table_number, status,
+                                             total_amount, discount_amount, final_amount,
+                                             order_time, waiter_id, sales_channel, notes,
+                                             order_metadata, created_at, updated_at)
+                                        VALUES
+                                            (:id, :store_id, :table_number, :status,
+                                             :total_amount, :discount_amount, :final_amount,
+                                             :order_time, :waiter_id, 'pinzhi', :notes,
+                                             '{}', NOW(), NOW())
+                                        ON CONFLICT (id) DO UPDATE SET
+                                            status          = EXCLUDED.status,
+                                            total_amount    = EXCLUDED.total_amount,
+                                            discount_amount = EXCLUDED.discount_amount,
+                                            final_amount    = EXCLUDED.final_amount,
+                                            updated_at      = NOW()
+                                    """),
+                                    {
+                                        "id": order_schema.order_id,
+                                        "store_id": sid,
+                                        "table_number": order_schema.table_number,
+                                        "status": order_schema.order_status.value,
+                                        "total_amount": total_cents,
+                                        "discount_amount": discount_cents,
+                                        "final_amount": total_cents - discount_cents,
+                                        "order_time": order_schema.created_at,
+                                        "waiter_id": order_schema.waiter_id,
+                                        "notes": order_schema.notes,
+                                    },
+                                )
+                                store_orders += 1
+
+                            if len(raw_orders) < 100:
+                                break
+                            page += 1
+
+                        orders_upserted += store_orders
+
+                        # 2) 拉取营业汇总（日报用）
+                        summary = await adapter.query_order_summary(ognid, yesterday)
+                        if summary:
+                            await session.execute(
+                                _text("""
+                                    INSERT INTO daily_summaries
+                                        (store_id, business_date, revenue_cents,
+                                         order_count, customer_count, avg_ticket_cents,
+                                         source, raw_data, created_at)
+                                    VALUES
+                                        (:store_id, :biz_date, :revenue,
+                                         :order_count, :customer_count, :avg_ticket,
+                                         'pinzhi', :raw_data, NOW())
+                                    ON CONFLICT (store_id, business_date, source) DO UPDATE SET
+                                        revenue_cents   = EXCLUDED.revenue_cents,
+                                        order_count     = EXCLUDED.order_count,
+                                        customer_count  = EXCLUDED.customer_count,
+                                        avg_ticket_cents = EXCLUDED.avg_ticket_cents,
+                                        raw_data        = EXCLUDED.raw_data,
+                                        created_at      = NOW()
+                                """),
+                                {
+                                    "store_id": sid,
+                                    "biz_date": yesterday,
+                                    "revenue": int(float(summary.get("realPrice", 0))),
+                                    "order_count": int(summary.get("orderCount", 0)),
+                                    "customer_count": int(summary.get("customerCount", 0)),
+                                    "avg_ticket": int(float(summary.get("avgPrice", 0))),
+                                    "raw_data": __import__("json").dumps(summary, ensure_ascii=False, default=str),
+                                },
+                            )
+                            summaries_saved += 1
+
+                        await session.commit()
+                        stores_processed += 1
+                        logger.info(
+                            "pinzhi_pull.store_done",
+                            store_id=sid, date=yesterday,
+                            orders=store_orders,
+                        )
+
+                    except Exception as e:
+                        await session.rollback()
+                        errors.append({"store_id": sid, "error": str(e)})
+                        logger.error("pinzhi_pull.store_failed", store_id=sid, error=str(e))
+
+        finally:
+            await adapter.close()
+
+        logger.info(
+            "pinzhi_pull_daily_data.done",
+            date=yesterday,
+            stores_processed=stores_processed,
+            orders_upserted=orders_upserted,
+            summaries_saved=summaries_saved,
+            errors=len(errors),
+        )
+        return {
+            "success": True,
+            "date": yesterday,
+            "stores_processed": stores_processed,
+            "orders_upserted": orders_upserted,
+            "summaries_saved": summaries_saved,
+            "errors": errors,
+        }
+
+    try:
+        return asyncio.run(_run())
+    except Exception as e:
+        logger.error("pinzhi_pull_daily_data.failed", error=str(e))
+        raise self.retry(exc=e)
+
+
 # ── Onboarding Pipeline Task ───────────────────────────────────────────────────
 
 @celery_app.task(bind=True, max_retries=1, default_retry_delay=60)
