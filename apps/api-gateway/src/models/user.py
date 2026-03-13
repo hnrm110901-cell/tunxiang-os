@@ -49,6 +49,7 @@ class User(Base, TimestampMixin):
     is_active = Column(Boolean, default=True, nullable=False)
     store_id = Column(String(50), index=True)  # Associated store
     brand_id = Column(String(50), index=True)  # Associated brand (multi-brand isolation)
+    phone = Column(String(20), unique=True, nullable=True, index=True)  # 手机号，用于短信验证码登录
     wechat_user_id = Column(String(100), index=True)  # WeChat Work user ID for push notifications
 
     def __repr__(self):

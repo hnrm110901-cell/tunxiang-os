@@ -8,8 +8,11 @@ from typing import Optional, List
 from ..models.user import User, UserRole
 from ..services.auth_service import AuthService
 from ..services.enterprise_oauth_service import EnterpriseOAuthService
+from ..services.sms_service import sms_service
+from ..services.qr_login_service import qr_login_service
 from ..core.dependencies import get_current_active_user, require_role
 from ..core.permissions import get_user_permissions
+from ..core.database import get_db_session
 
 router = APIRouter()
 auth_service = AuthService()
@@ -58,6 +61,15 @@ class ChangePasswordRequest(BaseModel):
 
 class RefreshTokenRequest(BaseModel):
     refresh_token: str
+
+
+class SMSSendRequest(BaseModel):
+    phone: str
+
+
+class SMSLoginRequest(BaseModel):
+    phone: str
+    code: str
 
 
 @router.post("/login")
@@ -537,6 +549,161 @@ async def dingtalk_oauth_callback(request: OAuthCallbackRequest):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"钉钉OAuth登录失败: {str(e)}",
+        )
+
+
+# ══════════════════════════════════════════════════════════════
+#  SMS 短信验证码登录
+# ══════════════════════════════════════════════════════════════
+
+@router.post("/sms/send")
+async def sms_send_code(request: SMSSendRequest):
+    """
+    发送短信验证码
+
+    向指定手机号发送6位数字验证码，有效期5分钟。
+    同一手机号60秒内只能发送一次。
+
+    **认证要求**: 无需认证
+
+    **开发环境**: 未配置 SMS 服务时，验证码会打印到后端日志。
+    """
+    try:
+        result = await sms_service.send_code(request.phone)
+        return result
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=str(e),
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"验证码发送失败: {str(e)}",
+        )
+
+
+@router.post("/sms/login")
+async def sms_login(request: SMSLoginRequest):
+    """
+    手机验证码登录
+
+    使用手机号和验证码进行身份验证。
+    手机号必须已关联到系统用户。
+
+    **认证要求**: 无需认证
+
+    **返回**: 与 /login 相同的 JWT 响应
+    """
+    from sqlalchemy import select
+
+    # 1. 校验验证码
+    valid = await sms_service.verify_code(request.phone, request.code)
+    if not valid:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="验证码错误或已过期",
+        )
+
+    # 2. 根据手机号查找用户
+    async with get_db_session() as session:
+        stmt = select(User).where(User.phone == request.phone)
+        result = await session.execute(stmt)
+        user = result.scalar_one_or_none()
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="该手机号未绑定任何用户，请联系管理员",
+        )
+
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="用户已被禁用",
+        )
+
+    # 3. 生成令牌
+    token_data = await auth_service.create_tokens_for_user(user)
+    return token_data
+
+
+# ══════════════════════════════════════════════════════════════
+#  QR 扫码登录
+# ══════════════════════════════════════════════════════════════
+
+@router.post("/qr/generate")
+async def qr_generate():
+    """
+    生成 QR 登录会话
+
+    桌面端调用此接口生成 QR 码内容，前端展示为二维码图片。
+    QR 会话有效期5分钟。
+
+    **认证要求**: 无需认证
+
+    **返回**:
+    - qr_id: 会话ID（轮询用）
+    - qr_url: 二维码内容 URL
+    - expires_in: 有效期（秒）
+    """
+    try:
+        result = await qr_login_service.generate_qr()
+        return result
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"QR 生成失败: {str(e)}",
+        )
+
+
+@router.get("/qr/status/{qr_id}")
+async def qr_status(qr_id: str):
+    """
+    查询 QR 登录状态
+
+    桌面端每2秒轮询此接口，检查扫码进度。
+
+    **认证要求**: 无需认证
+
+    **状态说明**:
+    - pending: 等待扫码
+    - scanned: 已扫码，等待确认
+    - confirmed: 已确认，返回令牌
+    - expired: 已过期
+    """
+    result = await qr_login_service.get_status(qr_id)
+    return result
+
+
+@router.post("/qr/confirm/{qr_id}")
+async def qr_confirm(
+    qr_id: str,
+    current_user: User = Depends(get_current_active_user),
+):
+    """
+    确认 QR 登录
+
+    已登录用户（手机端）扫码后调用此接口确认登录。
+    确认后桌面端轮询会获取到令牌。
+
+    **认证要求**: 需要有效的访问令牌（已登录用户）
+    """
+    try:
+        # 先标记为已扫描
+        await qr_login_service.mark_scanned(qr_id)
+        # 然后确认
+        result = await qr_login_service.confirm(qr_id, current_user, auth_service)
+        return result
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"QR 确认失败: {str(e)}",
         )
 
 

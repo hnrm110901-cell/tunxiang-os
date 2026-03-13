@@ -83,12 +83,11 @@ interface DomainTab {
 }
 
 const DOMAIN_TABS: DomainTab[] = [
-  { key: 'overview',    label: '经营总览' },
-  { key: 'operations',  label: '运营中心' },
-  { key: 'growth',      label: '增长引擎' },
+  { key: 'overview',    label: '经营看板' },
+  { key: 'operations',  label: '门店运营' },
+  { key: 'growth',      label: '客户增长' },
   { key: 'supply',      label: '供应链' },
-  { key: 'agents',      label: '智能体' },
-  { key: 'platform',    label: '平台治理', adminOnly: true },
+  { key: 'settings',    label: '设置', adminOnly: true },
 ];
 
 // ══════════════════════════════════════════════════════════════
@@ -109,277 +108,167 @@ interface SidebarGroup {
 type DomainSidebar = Record<string, SidebarGroup[]>;
 
 const DOMAIN_SIDEBAR: DomainSidebar = {
+  // ═══════════════════════════════════════════════════════════
+  // 经营看板（原36项 → 15项）— Toast 风格：聚焦核心 KPI
+  // ═══════════════════════════════════════════════════════════
   overview: [
     {
-      groupLabel: '经营看板',
+      groupLabel: '核心指标',
       items: [
         { key: '/',                     icon: <DashboardOutlined />,  label: '经营作战台' },
-        { key: '/daily-hub',            icon: <RiseOutlined />,       label: '明日备战板' },
         { key: '/kpi-dashboard',        icon: <BarChartOutlined />,   label: 'KPI仪表盘' },
         { key: '/profit-dashboard',     icon: <LineChartOutlined />,  label: '利润分析' },
-        { key: '/monthly-report',       icon: <FileTextOutlined />,   label: '月度报告' },
-        { key: '/decision-stats',       icon: <PieChartOutlined />,   label: '决策统计' },
         { key: '/forecast',             icon: <LineChartOutlined />,  label: '需求预测' },
       ],
     },
     {
-      groupLabel: '跨门店',
-      items: [
-        { key: '/cross-store-insights', icon: <GlobalOutlined />,     label: '跨店洞察' },
-        { key: '/competitive-analysis', icon: <RiseOutlined />,       label: '竞争分析' },
-        { key: '/hq-dashboard',         icon: <ShopOutlined />,       label: '总部看板' },
-        { key: '/data-visualization',   icon: <MonitorOutlined />,    label: '数据大屏' },
-      ],
-    },
-    {
-      groupLabel: '财务',
+      groupLabel: '财务概览',
       items: [
         { key: '/finance',              icon: <DollarOutlined />,     label: '财务管理' },
-        { key: '/cfo-dashboard',        icon: <DollarOutlined />,     label: 'CFO 工作台' },
-        { key: '/ceo-dashboard',        icon: <FundOutlined />,       label: 'CEO 驾驶舱' },
         { key: '/budget-management',    icon: <DollarOutlined />,     label: '预算管理' },
         { key: '/settlement-risk',      icon: <SafetyOutlined />,     label: '结算风控' },
         { key: '/financial-alerts',     icon: <BellOutlined />,       label: '财务预警' },
-        { key: '/finance-health',       icon: <FundOutlined />,       label: '财务健康' },
-        { key: '/financial-forecast',   icon: <LineChartOutlined />,  label: '财务预测' },
-        { key: '/financial-anomaly',    icon: <WarningOutlined />,    label: '财务异常' },
-        { key: '/performance-ranking',  icon: <TrophyOutlined />,     label: '对标排名' },
-        { key: '/financial-recommendation', icon: <BulbOutlined />,   label: '智能建议' },
-        { key: '/business-events',      icon: <NodeIndexOutlined />,  label: '事件中心' },
       ],
     },
     {
-      groupLabel: '菜品分析',
+      groupLabel: '菜品智能',
       items: [
-        { key: '/dish-profitability',   icon: <PieChartOutlined />,   label: '盈利分析' },
+        { key: '/dish-profitability',   icon: <PieChartOutlined />,   label: '菜品盈利分析' },
         { key: '/menu-optimization',    icon: <BulbOutlined />,       label: '菜单优化' },
         { key: '/dish-cost-alert',      icon: <WarningOutlined />,    label: '成本预警' },
-        { key: '/dish-benchmark',       icon: <TrophyOutlined />,     label: '跨店对标' },
         { key: '/dish-pricing',         icon: <DollarOutlined />,     label: '智能定价' },
-        { key: '/dish-lifecycle',       icon: <HistoryOutlined />,    label: '生命周期' },
-        { key: '/dish-forecast',        icon: <LineChartOutlined />,  label: '销售预测' },
-        { key: '/dish-health',          icon: <HeartOutlined />,      label: '健康评分' },
-        { key: '/dish-attribution',     icon: <FundOutlined />,       label: '营收归因' },
-        { key: '/menu-matrix',          icon: <PieChartOutlined />,   label: '组合矩阵' },
-        { key: '/cost-compression',     icon: <DollarOutlined />,     label: '成本压缩' },
         { key: '/dish-monthly-summary', icon: <FileTextOutlined />,   label: '菜品月报' },
-        { key: '/fct-advanced',         icon: <BankOutlined />,       label: 'FCT 高级' },
+      ],
+    },
+    {
+      groupLabel: '跨店对比',
+      items: [
+        { key: '/cross-store-insights', icon: <GlobalOutlined />,     label: '跨店洞察' },
+        { key: '/hq-dashboard',         icon: <ShopOutlined />,       label: '总部看板' },
       ],
     },
   ],
 
+  // ═══════════════════════════════════════════════════════════
+  // 门店运营（原18项 → 10项）— 合并冗余，术语统一
+  // ═══════════════════════════════════════════════════════════
   operations: [
     {
-      groupLabel: '日常运营',
+      groupLabel: '日常管理',
       items: [
-        { key: '/ops-hub',             icon: <AppstoreOutlined />,        label: '运营中心' },
-        { key: '/schedule',            icon: <ScheduleOutlined />,        label: '智能排班' },
-        { key: '/employees',           icon: <TeamOutlined />,            label: '员工管理' },
-        { key: '/my-schedule',         icon: <CalendarOutlined />,        label: '我的班表' },
-        { key: '/employee-performance',icon: <TrophyOutlined />,          label: '员工绩效' },
-        { key: '/workforce',           icon: <TeamOutlined />,            label: '人力管理' },
+        { key: '/ops-hub',              icon: <AppstoreOutlined />,        label: '运营中心' },
+        { key: '/schedule',             icon: <ScheduleOutlined />,        label: '智能排班' },
+        { key: '/employees',            icon: <TeamOutlined />,            label: '员工管理' },
+        { key: '/tasks',                icon: <FileTextOutlined />,        label: '任务管理' },
       ],
     },
     {
       groupLabel: '门店服务',
       items: [
-        { key: '/queue',               icon: <TeamOutlined />,            label: '排队管理' },
-        { key: '/meituan-queue',       icon: <SyncOutlined />,            label: '美团排队' },
-        { key: '/reservation',         icon: <CalendarOutlined />,        label: '预订宴会' },
-        { key: '/pos',                 icon: <ShoppingCartOutlined />,    label: 'POS系统' },
-        { key: '/service',             icon: <CustomerServiceOutlined />, label: '服务质量' },
+        { key: '/queue',                icon: <TeamOutlined />,            label: '排队管理' },
+        { key: '/reservation',          icon: <CalendarOutlined />,        label: '预订宴会' },
+        { key: '/service',              icon: <CustomerServiceOutlined />, label: '服务质量' },
       ],
     },
     {
-      groupLabel: '合规与任务',
+      groupLabel: '质量合规',
       items: [
-        { key: '/quality',             icon: <CheckCircleOutlined />,     label: '质量管理' },
-        { key: '/compliance',          icon: <SafetyOutlined />,          label: '合规管理' },
-        { key: '/human-in-the-loop',   icon: <CheckCircleOutlined />,     label: '人工审批' },
-        { key: '/tasks',               icon: <FileTextOutlined />,        label: '任务管理' },
-        { key: '/action-plans',        icon: <CheckCircleOutlined />,     label: 'L5 行动计划' },
-        { key: '/ops-agent',           icon: <ToolOutlined />,            label: 'IT运维Agent' },
-        { key: '/voice-devices',       icon: <SoundOutlined />,           label: '语音设备' },
+        { key: '/quality',              icon: <CheckCircleOutlined />,     label: '质量管理' },
+        { key: '/compliance',           icon: <SafetyOutlined />,          label: '合规管理' },
+        { key: '/human-in-the-loop',    icon: <CheckCircleOutlined />,     label: '人工审批' },
       ],
     },
   ],
 
+  // ═══════════════════════════════════════════════════════════
+  // 客户增长（原8项 → 6项）— 保持简洁
+  // ═══════════════════════════════════════════════════════════
   growth: [
     {
-      groupLabel: '会员',
+      groupLabel: '会员运营',
       items: [
-        { key: '/crm-hub',            icon: <AppstoreOutlined />,  label: '增长中心' },
-        { key: '/members',            icon: <UserOutlined />,      label: '会员中心' },
-        { key: '/customer360',        icon: <UserOutlined />,      label: '客户360' },
-        { key: '/private-domain',     icon: <TeamOutlined />,      label: '私域运营' },
+        { key: '/crm-hub',             icon: <AppstoreOutlined />,  label: '增长中心' },
+        { key: '/members',             icon: <UserOutlined />,      label: '会员中心' },
+        { key: '/customer360',         icon: <UserOutlined />,      label: '客户360' },
+        { key: '/private-domain',      icon: <TeamOutlined />,      label: '私域运营' },
       ],
     },
     {
-      groupLabel: '营销',
+      groupLabel: '营销工具',
       items: [
-        { key: '/marketing',          icon: <RocketOutlined />,    label: '营销智能体' },
-        { key: '/recommendations',    icon: <BulbOutlined />,      label: '推荐引擎' },
-        { key: '/wechat-triggers',    icon: <BellOutlined />,      label: '企微触发器' },
-        { key: '/channel-profit',     icon: <ShopOutlined />,      label: '渠道毛利' },
+        { key: '/marketing',           icon: <RocketOutlined />,    label: '营销智能体' },
+        { key: '/channel-profit',      icon: <ShopOutlined />,      label: '渠道毛利' },
       ],
     },
   ],
 
+  // ═══════════════════════════════════════════════════════════
+  // 供应链（原14项 → 10项）— 合并重复的供应链管理
+  // ═══════════════════════════════════════════════════════════
   supply: [
     {
-      groupLabel: '商品管理',
+      groupLabel: '菜品管理',
       items: [
-        { key: '/products-hub',       icon: <AppstoreOutlined />,     label: '供应链中心' },
-        { key: '/dishes',             icon: <ShoppingOutlined />,     label: '菜品管理' },
-        { key: '/bom-management',     icon: <ReadOutlined />,         label: 'BOM配方' },
-        { key: '/dish-cost',          icon: <DollarOutlined />,       label: '菜品成本' },
-        { key: '/dish-rd',            icon: <ExperimentOutlined />,   label: '菜品研发' },
-        { key: '/dynamic-pricing',    icon: <DollarOutlined />,       label: '动态定价' },
+        { key: '/dishes',              icon: <ShoppingOutlined />,     label: '菜品管理' },
+        { key: '/bom-management',      icon: <ReadOutlined />,         label: 'BOM配方' },
+        { key: '/dish-cost',           icon: <DollarOutlined />,       label: '菜品成本' },
+        { key: '/dish-rd',             icon: <ExperimentOutlined />,   label: '菜品研发' },
       ],
     },
     {
-      groupLabel: '库存与采购',
+      groupLabel: '库存采购',
       items: [
-        { key: '/inventory',          icon: <InboxOutlined />,        label: '库存管理' },
-        { key: '/order',              icon: <ShoppingCartOutlined />, label: '订单协同' },
-        { key: '/supply-chain',       icon: <ShoppingOutlined />,     label: '供应链管理' },
-        { key: '/supplier-agent',     icon: <ShoppingOutlined />,     label: '供应商管理' },
-        { key: '/reconciliation',     icon: <FileExcelOutlined />,    label: '对账管理' },
+        { key: '/inventory',           icon: <InboxOutlined />,        label: '库存管理' },
+        { key: '/order',               icon: <ShoppingCartOutlined />, label: '订单协同' },
+        { key: '/supplier-agent',      icon: <ShoppingOutlined />,     label: '供应商管理' },
+        { key: '/reconciliation',      icon: <FileExcelOutlined />,    label: '对账管理' },
       ],
     },
     {
       groupLabel: '损耗管控',
       items: [
-        { key: '/waste-reasoning',    icon: <FireOutlined />,         label: '损耗分析' },
-        { key: '/waste-events',       icon: <WarningOutlined />,      label: '损耗事件' },
-        { key: '/alert-thresholds',   icon: <BellOutlined />,         label: '告警阈值' },
+        { key: '/waste-reasoning',     icon: <FireOutlined />,         label: '损耗分析' },
+        { key: '/waste-events',        icon: <WarningOutlined />,      label: '损耗事件' },
       ],
     },
   ],
 
-  agents: [
+  // ═══════════════════════════════════════════════════════════
+  // 设置（合并原"智能体"64项+平台治理 → 14项）— admin only
+  // ═══════════════════════════════════════════════════════════
+  settings: [
     {
-      groupLabel: '总览',
+      groupLabel: '组织管理',
       items: [
-        { key: '/agent-hub',          icon: <AppstoreOutlined />,     label: 'Agent 总览' },
-        { key: '/decision',           icon: <BarChartOutlined />,     label: '经营决策' },
-        { key: '/training',           icon: <ReadOutlined />,         label: '培训管理' },
+        { key: '/stores',              icon: <ShopOutlined />,         label: '门店管理' },
+        { key: '/users',               icon: <TeamOutlined />,         label: '用户管理' },
+        { key: '/roles',               icon: <SafetyOutlined />,       label: '角色权限' },
       ],
     },
     {
-      groupLabel: 'Agent 工作台',
+      groupLabel: '系统集成',
       items: [
-        { key: '/business-intel',     icon: <RobotOutlined />,        label: '经营智能体' },
-        { key: '/people-agent',       icon: <TeamOutlined />,         label: '人员智能体' },
-        { key: '/ops-flow-agent',     icon: <ApiOutlined />,          label: '运营流程体' },
-        { key: '/agent-okr',          icon: <BarChartOutlined />,     label: 'Agent OKR' },
-        { key: '/agent-collab',       icon: <ApiOutlined />,          label: '协同总线' },
+        { key: '/integrations',        icon: <ApiOutlined />,          label: 'POS集成' },
+        { key: '/llm-config',          icon: <SettingOutlined />,      label: 'LLM配置' },
+        { key: '/edge-hub',            icon: <WifiOutlined />,         label: 'Edge Hub' },
       ],
     },
     {
-      groupLabel: '配置与治理',
+      groupLabel: 'AI 管理',
       items: [
-        { key: '/agent-collaboration',icon: <ApartmentOutlined />,    label: '协作编排' },
-        { key: '/agent-memory',       icon: <DatabaseOutlined />,     label: 'Agent 记忆' },
-        { key: '/knowledge-rules',    icon: <DatabaseOutlined />,     label: '知识规则库' },
-        { key: '/governance',         icon: <SafetyOutlined />,       label: 'AI 治理' },
-        { key: '/decision-validator', icon: <CheckCircleOutlined />,  label: '决策验证' },
-        { key: '/ai-accuracy',       icon: <BarChartOutlined />,      label: 'AI 准确率' },
-        { key: '/ai-evolution',      icon: <RobotOutlined />,         label: 'AI 进化' },
+        { key: '/agent-hub',           icon: <RobotOutlined />,        label: 'Agent 总览' },
+        { key: '/decision',            icon: <BarChartOutlined />,     label: '经营决策' },
+        { key: '/knowledge-rules',     icon: <DatabaseOutlined />,     label: '知识规则库' },
+        { key: '/governance',          icon: <SafetyOutlined />,       label: 'AI 治理' },
       ],
     },
     {
-      groupLabel: '底层技术',
+      groupLabel: '数据管理',
       items: [
-        { key: '/edge-node',          icon: <CloudOutlined />,        label: '边缘节点' },
-        { key: '/federated-learning', icon: <ExperimentOutlined />,   label: '联邦学习' },
-        { key: '/neural',             icon: <ApartmentOutlined />,    label: '神经系统' },
-        { key: '/embedding',          icon: <ExperimentOutlined />,   label: '嵌入模型' },
-        { key: '/vector-index',       icon: <SearchOutlined />,       label: '向量知识库' },
-        { key: '/event-sourcing',     icon: <FileTextOutlined />,     label: '事件溯源' },
-        { key: '/voice-ws',           icon: <SoundOutlined />,        label: '语音 WS' },
-      ],
-    },
-  ],
-
-  platform: [
-    {
-      groupLabel: '组织与权限',
-      items: [
-        { key: '/platform-hub',       icon: <AppstoreOutlined />,     label: '治理中心' },
-        { key: '/merchants',          icon: <BankOutlined />,         label: '商户管理' },
-        { key: '/users',              icon: <TeamOutlined />,         label: '用户管理' },
-        { key: '/stores',             icon: <ShopOutlined />,         label: '门店管理' },
-        { key: '/multi-store',        icon: <ShopOutlined />,         label: '多门店管理' },
-        { key: '/cross-store-config', icon: <ShopOutlined />,         label: '跨店协调' },
-        { key: '/roles',              icon: <SafetyOutlined />,       label: '角色权限' },
-      ],
-    },
-    {
-      groupLabel: '审批与审计',
-      items: [
-        { key: '/approval',           icon: <CheckCircleOutlined />,  label: '审批管理' },
-        { key: '/approval-list',      icon: <UnorderedListOutlined />,label: '审批列表' },
-        { key: '/audit',              icon: <FileTextOutlined />,     label: '审计日志' },
-        { key: '/data-security',      icon: <SafetyOutlined />,       label: '数据安全' },
-      ],
-    },
-    {
-      groupLabel: '集成与适配',
-      items: [
-        { key: '/integrations',       icon: <ApiOutlined />,          label: '外部集成' },
-        { key: '/adapters',           icon: <ApiOutlined />,          label: '适配器管理' },
-        { key: '/enterprise',         icon: <ApiOutlined />,          label: '企业集成' },
-        { key: '/llm-config',         icon: <SettingOutlined />,      label: 'LLM配置' },
-        { key: '/model-marketplace',  icon: <AppstoreOutlined />,     label: '模型市场' },
-      ],
-    },
-    {
-      groupLabel: '硬件与边缘',
-      items: [
-        { key: '/hardware',           icon: <CloudOutlined />,        label: '硬件管理' },
-        { key: '/edge-hub',           icon: <WifiOutlined />,         label: 'Edge Hub' },
-        { key: '/edge-hub/nodes',     icon: <DesktopOutlined />,      label: 'Edge 节点' },
-        { key: '/edge-hub/alerts',    icon: <BellOutlined />,         label: 'Edge 告警' },
-        { key: '/edge-hub/bindings',  icon: <ApiOutlined />,          label: '耳机绑定' },
-      ],
-    },
-    {
-      groupLabel: '系统监控',
-      items: [
-        { key: '/monitoring',         icon: <MonitorOutlined />,      label: '系统监控' },
-        { key: '/system-health',      icon: <MonitorOutlined />,      label: '系统健康' },
-        { key: '/scheduler',          icon: <CalendarOutlined />,     label: '调度管理' },
-        { key: '/benchmark',          icon: <BarChartOutlined />,     label: '基准测试' },
-      ],
-    },
-    {
-      groupLabel: '数据与配置',
-      items: [
-        { key: '/backup',             icon: <DatabaseOutlined />,     label: '数据备份' },
-        { key: '/export-jobs',        icon: <ExportOutlined />,       label: '导出任务' },
-        { key: '/data-import-export', icon: <FileExcelOutlined />,    label: '导入导出' },
-        { key: '/bulk-import',        icon: <UploadOutlined />,       label: '批量导入' },
-        { key: '/report-templates',   icon: <FileTextOutlined />,     label: '报表模板' },
-      ],
-    },
-    {
-      groupLabel: '开放平台',
-      items: [
-        { key: '/open-platform',      icon: <AppstoreOutlined />,     label: '开放平台' },
-        { key: '/developer-docs',     icon: <FileTextOutlined />,     label: '开发者文档' },
-        { key: '/developer-console',  icon: <FundOutlined />,         label: '开发者控制台' },
-        { key: '/isv-ecosystem',      icon: <RocketOutlined />,       label: 'ISV 生态' },
-        { key: '/isv-management',     icon: <TeamOutlined />,         label: 'ISV 管理' },
-        { key: '/plugin-marketplace', icon: <AppstoreOutlined />,     label: '插件市场' },
-        { key: '/revenue-share',      icon: <DollarOutlined />,       label: '分成管理' },
-        { key: '/isv-dashboard',      icon: <FundOutlined />,         label: 'ISV 看板' },
-        { key: '/platform-analytics', icon: <RiseOutlined />,         label: '商业化总览' },
-        { key: '/webhook-management', icon: <ApiOutlined />,          label: 'Webhook' },
-        { key: '/api-billing',        icon: <DollarOutlined />,       label: 'API 计费' },
-        { key: '/raas',               icon: <DollarOutlined />,       label: 'RaaS定价' },
-        { key: '/industry-solutions', icon: <GlobalOutlined />,       label: '行业方案' },
-        { key: '/i18n',               icon: <TranslationOutlined />,  label: '国际化' },
+        { key: '/audit',               icon: <FileTextOutlined />,     label: '审计日志' },
+        { key: '/data-import-export',  icon: <FileExcelOutlined />,    label: '数据导入导出' },
+        { key: '/monitoring',          icon: <MonitorOutlined />,      label: '系统监控' },
+        { key: '/open-platform',       icon: <AppstoreOutlined />,     label: '开放平台' },
       ],
     },
   ],
@@ -575,6 +464,35 @@ const STORE_MANAGER_EXTRA_ROUTES = new Set<string>([
 // Component
 // ══════════════════════════════════════════════════════════════
 
+// ── 最近访问页面（localStorage 持久化）──
+const RECENT_PAGES_KEY = 'tx_recent_pages';
+const MAX_RECENT = 5;
+
+interface RecentPage {
+  key: string;
+  label: string;
+}
+
+function getRecentPages(): RecentPage[] {
+  try {
+    return JSON.parse(localStorage.getItem(RECENT_PAGES_KEY) || '[]');
+  } catch { return []; }
+}
+
+function addRecentPage(page: RecentPage) {
+  const pages = getRecentPages().filter(p => p.key !== page.key);
+  pages.unshift(page);
+  localStorage.setItem(RECENT_PAGES_KEY, JSON.stringify(pages.slice(0, MAX_RECENT)));
+}
+
+// ── 所有菜单项的扁平列表（用于搜索过滤）──
+const ALL_SIDEBAR_ITEMS: (SidebarItem & { domain: string; group: string })[] = [];
+Object.entries(DOMAIN_SIDEBAR).forEach(([domain, groups]) => {
+  groups.forEach(g => g.items.forEach(item => {
+    ALL_SIDEBAR_ITEMS.push({ ...item, domain, group: g.groupLabel });
+  }));
+});
+
 const MainLayout: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -593,12 +511,23 @@ const MainLayout: React.FC = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
   const [searchVisible, setSearchVisible] = useState(false);
+  const [sidebarFilter, setSidebarFilter] = useState('');
+  const [recentPages, setRecentPages] = useState<RecentPage[]>(getRecentPages);
 
-  // 路由变化时同步 domain
+  // 路由变化时同步 domain + 记录最近访问
   const effectiveDomain = ROUTE_TO_DOMAIN[location.pathname] || activeDomain;
   if (effectiveDomain && effectiveDomain !== activeDomain) {
     setActiveDomain(effectiveDomain);
   }
+
+  // 记录最近访问页面
+  React.useEffect(() => {
+    const label = BREADCRUMB_LABELS[location.pathname];
+    if (label && location.pathname !== '/') {
+      addRecentPage({ key: location.pathname, label });
+      setRecentPages(getRecentPages());
+    }
+  }, [location.pathname]);
 
   // ── RBAC ──
   const allowedRoutes = useMemo(() => {
@@ -669,8 +598,31 @@ const MainLayout: React.FC = () => {
   };
 
   const isGroupExpanded = (groupLabel: string) => {
-    return expandedGroups[groupLabel] !== false; // default expanded
+    // 默认折叠，除非用户手动展开，或当前路由在该组内
+    if (expandedGroups[groupLabel] !== undefined) return expandedGroups[groupLabel];
+    // 自动展开包含当前路由的组
+    const groups = DOMAIN_SIDEBAR[activeDomain] || [];
+    const group = groups.find(g => g.groupLabel === groupLabel);
+    if (group) {
+      return group.items.some(item => item.key === location.pathname);
+    }
+    return false;
   };
+
+  // 侧边栏搜索过滤后的菜单项
+  const filteredSidebarGroups = useMemo(() => {
+    if (!sidebarFilter.trim()) return sidebarGroups;
+    const keyword = sidebarFilter.toLowerCase();
+    return sidebarGroups
+      .map(group => ({
+        ...group,
+        items: group.items.filter(item =>
+          item.label.toLowerCase().includes(keyword) ||
+          item.key.toLowerCase().includes(keyword)
+        ),
+      }))
+      .filter(group => group.items.length > 0);
+  }, [sidebarGroups, sidebarFilter]);
 
   // ── Current sidebar groups ──
   const sidebarGroups = DOMAIN_SIDEBAR[activeDomain] || [];
@@ -698,7 +650,7 @@ const MainLayout: React.FC = () => {
           {/* Logo */}
           <div className={styles.logo} onClick={() => navigate('/')}>
             <img src="/logo-mark-v3.svg" alt="屯象" style={{ width: 26, height: 32 }} />
-            <span className={styles.logoText}>{brandName || '智链OS'}</span>
+            <span className={styles.logoText}>{brandName || '屯象OS'}</span>
           </div>
 
           <div className={styles.divider} />
@@ -759,8 +711,41 @@ const MainLayout: React.FC = () => {
 
         {/* ════════════════ L2 · 侧边栏 ════════════════ */}
         <aside className={`${styles.sidebar} ${sidebarCollapsed ? styles.sidebarCollapsed : ''}`}>
-          {sidebarGroups.map((group) => {
-            const expanded = isGroupExpanded(group.groupLabel);
+          {/* ── 快捷访问区 ── */}
+          {!sidebarCollapsed && recentPages.length > 0 && !sidebarFilter && (
+            <div className={styles.quickAccess}>
+              <div className={styles.quickAccessTitle}>最近访问</div>
+              {recentPages.map(page => (
+                <button
+                  key={page.key}
+                  className={`${styles.sidebarItem} ${location.pathname === page.key ? styles.sidebarItemActive : ''}`}
+                  onClick={() => navigate(page.key)}
+                >
+                  <span className={styles.sidebarItemIcon}><HistoryOutlined /></span>
+                  {page.label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* ── 侧边栏搜索 ── */}
+          {!sidebarCollapsed && (
+            <div className={styles.sidebarSearch}>
+              <SearchOutlined style={{ color: 'var(--text-tertiary)', fontSize: 12 }} />
+              <input
+                className={styles.sidebarSearchInput}
+                placeholder="搜索菜单..."
+                value={sidebarFilter}
+                onChange={e => setSidebarFilter(e.target.value)}
+              />
+              {sidebarFilter && (
+                <button className={styles.sidebarSearchClear} onClick={() => setSidebarFilter('')}>✕</button>
+              )}
+            </div>
+          )}
+
+          {filteredSidebarGroups.map((group) => {
+            const expanded = sidebarFilter ? true : isGroupExpanded(group.groupLabel);
             // 过滤权限
             const visibleItems = group.items.filter(item => isRouteAllowed(item.key));
             if (visibleItems.length === 0) return null;

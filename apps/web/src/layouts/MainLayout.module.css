@@ -232,6 +232,70 @@
   padding: 8px 4px;
 }
 
+/* ── Quick Access Area ── */
+.quickAccess {
+  padding-bottom: 8px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--border, rgba(0,0,0,0.06));
+}
+
+.quickAccessTitle {
+  padding: 4px 10px 4px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-tertiary, #AEAEB2);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* ── Sidebar Search ── */
+.sidebarSearch {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  margin: 2px 0 6px;
+  border-radius: 8px;
+  background: var(--surface, #fff);
+  border: 1px solid var(--border, rgba(0,0,0,0.06));
+  transition: border-color 0.2s;
+}
+
+.sidebarSearch:focus-within {
+  border-color: var(--accent, #0AAF9A);
+}
+
+.sidebarSearchInput {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font-size: 12px;
+  color: var(--text-primary, #1D1D1F);
+  outline: none;
+  padding: 3px 0;
+  font-family: inherit;
+}
+
+.sidebarSearchInput::placeholder {
+  color: var(--text-tertiary, #AEAEB2);
+}
+
+.sidebarSearchClear {
+  border: none;
+  background: transparent;
+  color: var(--text-tertiary, #AEAEB2);
+  cursor: pointer;
+  font-size: 10px;
+  padding: 2px 4px;
+  border-radius: 4px;
+  line-height: 1;
+}
+
+.sidebarSearchClear:hover {
+  color: var(--text-primary, #1D1D1F);
+  background: var(--surface-hover, rgba(0,0,0,0.04));
+}
+
 /* ── Sidebar Group Header ── */
 .sidebarGroup {
   padding: 6px 10px;

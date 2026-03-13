@@ -55,7 +55,7 @@
 
 .header {
   text-align: center;
-  margin-bottom: 28px;
+  margin-bottom: 24px;
 }
 
 .emoji {
@@ -76,6 +76,53 @@
   font-size: 15px;
   color: var(--text-secondary, #888);
   margin: 0;
+}
+
+/* ── Tab Bar ─────────────────────────────────────────────────────────────────*/
+
+.tabBar {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 20px;
+  background: #F5F5F7;
+  border-radius: 10px;
+  padding: 3px;
+}
+
+.tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary, #888);
+  font-size: 13px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.tab:hover {
+  color: var(--text-primary, #1D1D1F);
+}
+
+.tabActive {
+  background: #fff;
+  color: #0AAF9A;
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+/* ── Tab Content ─────────────────────────────────────────────────────────────*/
+
+.tabContent {
+  min-height: 150px;
 }
 
 /* ── Submit button ───────────────────────────────────────────────────────────*/
@@ -118,6 +165,170 @@
   flex: 1;
   height: 1px;
   background: #e8e8e8;
+}
+
+/* ── Phone Form ──────────────────────────────────────────────────────────────*/
+
+.phoneForm {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.phoneInputRow {
+  display: flex;
+  align-items: center;
+  border: 1px solid #d9d9d9;
+  border-radius: 8px;
+  overflow: hidden;
+  transition: border-color 0.2s;
+}
+
+.phoneInputRow:focus-within {
+  border-color: #0AAF9A;
+}
+
+.phonePrefix {
+  padding: 0 12px;
+  font-size: 14px;
+  color: var(--text-secondary, #666);
+  background: #FAFAFA;
+  border-right: 1px solid #d9d9d9;
+  line-height: 44px;
+  flex-shrink: 0;
+}
+
+.phoneInput {
+  flex: 1;
+  border: none;
+  outline: none;
+  padding: 0 12px;
+  font-size: 15px;
+  font-family: inherit;
+  height: 44px;
+  background: transparent;
+}
+
+.phoneInput::placeholder {
+  color: #AEAEB2;
+}
+
+.codeInputRow {
+  display: flex;
+  gap: 10px;
+}
+
+.codeInput {
+  flex: 1;
+  height: 44px;
+  border: 1px solid #d9d9d9;
+  border-radius: 8px;
+  padding: 0 12px;
+  font-size: 15px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.2s;
+  letter-spacing: 4px;
+  text-align: center;
+}
+
+.codeInput:focus {
+  border-color: #0AAF9A;
+}
+
+.codeInput::placeholder {
+  color: #AEAEB2;
+  letter-spacing: 0;
+}
+
+.sendCodeBtn {
+  flex-shrink: 0;
+  width: 120px;
+  height: 44px;
+  border: 1px solid #0AAF9A;
+  border-radius: 8px;
+  background: transparent;
+  color: #0AAF9A;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.sendCodeBtn:hover:not(:disabled) {
+  background: rgba(10, 175, 154, 0.06);
+}
+
+.sendCodeBtn:disabled {
+  border-color: #d9d9d9;
+  color: #AEAEB2;
+  cursor: not-allowed;
+}
+
+/* ── QR Code ─────────────────────────────────────────────────────────────────*/
+
+.qrContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 16px 0;
+}
+
+.qrBox {
+  width: 220px;
+  height: 220px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #e8e8e8;
+  border-radius: 12px;
+  background: #fff;
+  margin-bottom: 16px;
+}
+
+.qrCanvas {
+  border-radius: 8px;
+}
+
+.qrPlaceholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--text-secondary, #888);
+  font-size: 14px;
+  text-align: center;
+}
+
+.qrPlaceholder p {
+  margin: 0;
+}
+
+.refreshQrBtn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 20px;
+  border: 1px solid #0AAF9A;
+  border-radius: 8px;
+  background: transparent;
+  color: #0AAF9A;
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.refreshQrBtn:hover {
+  background: rgba(10, 175, 154, 0.06);
+}
+
+.qrTip {
+  font-size: 13px;
+  color: var(--text-secondary, #888);
+  text-align: center;
 }
 
 /* ── Quick login cards ───────────────────────────────────────────────────────*/
