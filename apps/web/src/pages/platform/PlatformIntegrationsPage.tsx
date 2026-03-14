@@ -7,9 +7,10 @@
  */
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  ZCard, ZBadge, ZButton, ZTable, ZEmpty, ZAlert, ZDrawer, ZSelect,
+  ZCard, ZBadge, ZButton, ZTable, ZAlert, ZDrawer, ZSelect, ZSkeleton,
 } from '../../design-system/components';
-import type { ZTableColumn, SelectOption } from '../../design-system/components';
+import type { ZTableColumn } from '../../design-system/components';
+import type { SelectOption } from '../../design-system/components/ZSelect';
 import { apiClient } from '../../services/api';
 import styles from './PlatformIntegrationsPage.module.css';
 
@@ -166,8 +167,8 @@ const TYPE_BADGE: Record<string, 'info' | 'success' | 'warning' | 'default'> = {
 const STATUS_LABEL: Record<string, string> = {
   active: '活跃', inactive: '未激活', error: '错误', testing: '测试中',
 };
-const STATUS_BADGE: Record<string, 'success' | 'default' | 'danger' | 'warning'> = {
-  active: 'success', inactive: 'default', error: 'danger', testing: 'warning',
+const STATUS_BADGE: Record<string, 'success' | 'default' | 'error' | 'warning'> = {
+  active: 'success', inactive: 'default', error: 'error', testing: 'warning',
 };
 
 function relativeTime(ts: string | null | undefined): string {
@@ -541,14 +542,15 @@ export default function PlatformIntegrationsPage() {
 
       {/* ── 主表格 ── */}
       <ZCard>
-        <ZTable
-          columns={columns}
-          data={filtered}
-          loading={loading}
-          emptyText={
-            <ZEmpty text={activeTab === 'all' ? '暂无接入配置，点击右上角新增' : `暂无${TYPE_LABEL[activeTab]}接入配置`} />
-          }
-        />
+        {loading ? (
+          <ZSkeleton rows={4} />
+        ) : (
+          <ZTable
+            columns={columns}
+            data={filtered}
+            emptyText={activeTab === 'all' ? '暂无接入配置，点击右上角新增' : `暂无${TYPE_LABEL[activeTab]}接入配置`}
+          />
+        )}
       </ZCard>
 
       {/* ── 新增/编辑 Drawer ── */}
@@ -649,7 +651,7 @@ export default function PlatformIntegrationsPage() {
           {/* 新建提示 */}
           {!isEditing && currentSchema && (
             <div className={styles.schemaTip}>
-              <ZAlert variant="warning" title="保存后默认为"未激活"状态">
+              <ZAlert variant="warning" title='保存后默认为「未激活」状态'>
                 请保存后点击"测试"验证连通性，确认无误后手动"启用"。
               </ZAlert>
             </div>

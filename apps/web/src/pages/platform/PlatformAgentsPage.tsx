@@ -307,7 +307,7 @@ export default function PlatformAgentsPage() {
       <div className={styles.brandBar}>
         <span className={styles.brandBarLabel}>选择品牌：</span>
         {loadingBrands ? (
-          <ZSkeleton width={200} height={32} />
+          <ZSkeleton height={32} />
         ) : brands.length === 0 ? (
           <span className={styles.noData}>暂无商户数据</span>
         ) : (
@@ -327,7 +327,7 @@ export default function PlatformAgentsPage() {
         {selectedBrand && (
           <div className={styles.brandActions}>
             {totalCount === 0 && !loadingAgents && (
-              <ZButton size="sm" variant="outline" onClick={handleInit}>
+              <ZButton size="sm" variant="secondary" onClick={handleInit}>
                 {initializing ? '初始化中…' : '初始化默认配置'}
               </ZButton>
             )}
@@ -344,7 +344,7 @@ export default function PlatformAgentsPage() {
       {loadingAgents ? (
         <div className={styles.skeletonGrid}>
           {[...Array(6)].map((_, i) => (
-            <ZSkeleton key={i} height={160} borderRadius={12} />
+            <ZSkeleton key={i} height={160} style={{ borderRadius: 12 }} />
           ))}
         </div>
       ) : agents.length === 0 ? (

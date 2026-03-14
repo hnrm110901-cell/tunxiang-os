@@ -11,7 +11,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   ZCard, ZBadge, ZButton, ZAlert, ZEmpty, ZSkeleton, ZTabs, ZInput,
 } from '../../design-system/components';
-import apiClient from '../../services/apiClient';
+import { apiClient } from '../../services/api';
 import styles from './EdgeNodeManagementPage.module.css';
 
 // ─── 类型 ────────────────────────────────────────────────────────────────────
@@ -64,7 +64,7 @@ const NodeStatusBadge: React.FC<{ status: string }> = ({ status }) => {
   const label: Record<string, string> = {
     online: '在线', offline: '离线', unknown: '未知',
   };
-  return <ZBadge variant={map[status] ?? 'default'}>{label[status] ?? status}</ZBadge>;
+  return <ZBadge type={map[status] ?? 'default'} text={label[status] ?? status} />;
 };
 
 // ─── Tab 1：节点列表 ─────────────────────────────────────────────────────────
@@ -137,8 +137,8 @@ const NodeListTab: React.FC = () => {
                 <span className={styles.metricLabel}>密钥状态</span>
                 <span className={styles.metricValue}>
                   {node.credential_ok
-                    ? <ZBadge variant="success">有效</ZBadge>
-                    : <ZBadge variant="warning">待配置</ZBadge>}
+                    ? <ZBadge type="success" text="有效" />
+                    : <ZBadge type="warning" text="待配置" />}
                 </span>
               </div>
             </div>
@@ -185,8 +185,8 @@ const OnboardingWizardTab: React.FC = () => {
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pollCountRef = useRef(0);
 
-  const updateForm = (field: keyof WizardForm) => (e: React.ChangeEvent<HTMLInputElement>) =>
-    setForm(f => ({ ...f, [field]: e.target.value }));
+  const updateForm = (field: keyof WizardForm) => (v: string) =>
+    setForm(f => ({ ...f, [field]: v }));
 
   // 步骤1 → 步骤2
   const step1Valid = form.storeId.trim() && form.piIp.trim() && form.piUser.trim();
@@ -307,7 +307,7 @@ sudo EDGE_API_BASE_URL=https://admin.zlsjos.cn \\
           <p className={styles.stepDesc}>Token 用于 Pi5 首次注册到云端，有效期 7 天，明文仅显示一次。</p>
           <div className={styles.tokenNoteRow}>
             <label style={{ flex: 1 }}>Token 备注（可选）
-              <ZInput value={tokenNote} onChange={e => setTokenNote(e.target.value)}
+              <ZInput value={tokenNote} onChange={v => setTokenNote(v)}
                 placeholder={`${form.storeName || form.storeId} ${new Date().toLocaleDateString('zh-CN')}`} />
             </label>
             <ZButton onClick={issueToken} loading={tokenLoading} disabled={tokenLoading} style={{ alignSelf: 'flex-end' }}>
@@ -428,9 +428,7 @@ sudo EDGE_API_BASE_URL=https://admin.zlsjos.cn \\
               <div className={styles.summaryRow}><span>IP 地址</span><code>{foundNode.ip_address}</code></div>
               <div className={styles.summaryRow}><span>MAC 地址</span><code>{foundNode.mac_address}</code></div>
               <div className={styles.summaryRow}><span>设备密钥</span>
-                <ZBadge variant={foundNode.credential_ok ? 'success' : 'warning'}>
-                  {foundNode.credential_ok ? '有效' : '待激活'}
-                </ZBadge>
+                <ZBadge type={foundNode.credential_ok ? 'success' : 'warning'} text={foundNode.credential_ok ? '有效' : '待激活'} />
               </div>
             </div>
           ) : (
@@ -571,10 +569,10 @@ const BootstrapTokenTab: React.FC = () => {
         <div className={styles.issueTitle}>发放新 Bootstrap Token</div>
         <div className={styles.issueRow}>
           <label style={{ flex: 2 }}>备注
-            <ZInput value={newTokenNote} onChange={e => setNewTokenNote(e.target.value)} placeholder="如：尝在一起文化城店 2026-03-14" />
+            <ZInput value={newTokenNote} onChange={v => setNewTokenNote(v)} placeholder="如：尝在一起文化城店 2026-03-14" />
           </label>
           <label style={{ flex: 1 }}>限定门店（可选）
-            <ZInput value={newTokenStoreId} onChange={e => setNewTokenStoreId(e.target.value)} placeholder="如 CZYZ-2461" />
+            <ZInput value={newTokenStoreId} onChange={v => setNewTokenStoreId(v)} placeholder="如 CZYZ-2461" />
           </label>
           <ZButton onClick={issue} loading={issuing} style={{ alignSelf: 'flex-end' }}>发放</ZButton>
         </div>
@@ -608,8 +606,8 @@ const BootstrapTokenTab: React.FC = () => {
                 <span className={styles.tokenExpiry}>{fmtTs(t.expires_at)}</span>
                 <span>
                   {t.active
-                    ? <ZBadge variant="success">有效</ZBadge>
-                    : <ZBadge variant="default">已吊销</ZBadge>}
+                    ? <ZBadge type="success" text="有效" />
+                    : <ZBadge type="default" text="已吊销" />}
                 </span>
                 <span>
                   {t.active && (
