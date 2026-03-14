@@ -797,6 +797,8 @@ const AppContent: React.FC = () => {
                   <Route path="analytics" element={<PlatformAnalyticsPage />} />
                   {/* 商户管理 → 复用现有页面 */}
                   <Route path="merchants" element={<MerchantManagementPage />} />
+                  {/* 门店管理 → 复用现有页面 */}
+                  <Route path="stores" element={<StoreManagementPage />} />
                   {/* API 集成配置 → 专用接入配置管理页 */}
                   <Route path="integrations" element={<PlatformIntegrationsPage />} />
                   {/* 边缘节点管理 → Pi5 注册 / 监控 / Bootstrap Token */}
@@ -811,6 +813,10 @@ const AppContent: React.FC = () => {
                   <Route path="audit-log" element={<AuditLogPage />} />
                   {/* 备份管理 → 复用现有页面 */}
                   <Route path="backup" element={<BackupManagement />} />
+                  {/* 用户管理 → 复用现有页面 */}
+                  <Route path="users" element={<UserManagementPage />} />
+                  {/* 角色权限 → 复用现有页面 */}
+                  <Route path="roles" element={<RoleManagementPage />} />
                   {/* Agent 配置与监控 → 专用 Agent 管理页 */}
                   <Route path="agents" element={<PlatformAgentsPage />} />
                   {/* 本体图管理 → 复用现有页面 */}

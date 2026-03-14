@@ -8,6 +8,48 @@
   gap: 20px;
 }
 
+/* ── 0. Quick Actions ────────────────────────────────────────────────────────*/
+
+.quickActions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.quickBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border: 1px solid #E8E8E8;
+  border-radius: 8px;
+  background: #fff;
+  color: #3D3D3D;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.quickBtn:hover {
+  border-color: #0AAF9A;
+  color: #0AAF9A;
+  background: rgba(10, 175, 154, 0.04);
+}
+
+.quickBtnAccent {
+  background: #0AAF9A;
+  color: #fff;
+  border-color: #0AAF9A;
+}
+
+.quickBtnAccent:hover {
+  background: #09997F;
+  color: #fff;
+  border-color: #09997F;
+}
+
 /* ── 1. Hero KPI Bar ─────────────────────────────────────────────────────────*/
 
 .heroBar {

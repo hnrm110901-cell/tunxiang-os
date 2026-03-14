@@ -33,6 +33,10 @@ import {
   DownOutlined,
   HddOutlined,
   WifiOutlined,
+  UserOutlined,
+  TeamOutlined,
+  AppstoreOutlined,
+  KeyOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../contexts/AuthContext';
 import styles from './PlatformAdminLayout.module.css';
@@ -53,7 +57,7 @@ interface NavGroup {
   items: NavItem[];
 }
 
-// ── 导航结构（5 分组 13 项，路由 path 不变） ───────────────
+// ── 导航结构（6 分组 18 项） ───────────────────────────────
 const NAV_GROUPS: NavGroup[] = [
   {
     groupKey: 'overview',
@@ -69,10 +73,20 @@ const NAV_GROUPS: NavGroup[] = [
     title: '商户运营',
     groupIcon: <ShopOutlined />,
     items: [
-      { key: 'merchants',     path: '/platform/merchants',     label: '商户列表', icon: <ShopOutlined /> },
-      { key: 'integrations',  path: '/platform/integrations',  label: '接入配置',  icon: <ApiOutlined /> },
-      { key: 'edge-nodes',    path: '/platform/edge-nodes',    label: '边缘节点',  icon: <HddOutlined />, badge: 'new' },
-      { key: 'open-platform', path: '/platform/open-platform', label: '开放平台',  icon: <GlobalOutlined /> },
+      { key: 'merchants',     path: '/platform/merchants',     label: '商户管理', icon: <ShopOutlined /> },
+      { key: 'stores',        path: '/platform/stores',        label: '门店管理', icon: <AppstoreOutlined /> },
+      { key: 'integrations',  path: '/platform/integrations',  label: '接入配置', icon: <ApiOutlined /> },
+      { key: 'edge-nodes',    path: '/platform/edge-nodes',    label: '边缘节点', icon: <HddOutlined />, badge: 'new' },
+      { key: 'open-platform', path: '/platform/open-platform', label: '开放平台', icon: <GlobalOutlined /> },
+    ],
+  },
+  {
+    groupKey: 'users',
+    title: '用户权限',
+    groupIcon: <TeamOutlined />,
+    items: [
+      { key: 'users', path: '/platform/users', label: '用户管理', icon: <UserOutlined /> },
+      { key: 'roles', path: '/platform/roles', label: '角色权限', icon: <KeyOutlined /> },
     ],
   },
   {
@@ -80,9 +94,9 @@ const NAV_GROUPS: NavGroup[] = [
     title: 'AI 引擎',
     groupIcon: <RobotOutlined />,
     items: [
-      { key: 'agents',           path: '/platform/agents',           label: 'Agent 配置与监控', icon: <RobotOutlined /> },
-      { key: 'ontology',         path: '/platform/ontology',         label: '本体图管理',       icon: <ExperimentOutlined /> },
-      { key: 'data-sovereignty', path: '/platform/data-sovereignty', label: '数据主权',         icon: <SafetyOutlined /> },
+      { key: 'agents',           path: '/platform/agents',           label: 'Agent 监控', icon: <RobotOutlined /> },
+      { key: 'ontology',         path: '/platform/ontology',         label: '本体图管理', icon: <ExperimentOutlined /> },
+      { key: 'data-sovereignty', path: '/platform/data-sovereignty', label: '数据主权',   icon: <SafetyOutlined /> },
     ],
   },
   {
@@ -98,7 +112,7 @@ const NAV_GROUPS: NavGroup[] = [
   },
   {
     groupKey: 'config',
-    title: '配置',
+    title: '系统配置',
     groupIcon: <SettingOutlined />,
     items: [
       { key: 'settings', path: '/platform/settings', label: '系统设置', icon: <SettingOutlined /> },
@@ -281,15 +295,18 @@ function getBreadcrumb(pathname: string): React.ReactNode {
   const map: Record<string, string> = {
     '/platform':                  '实时控制台',
     '/platform/analytics':        '效能分析',
-    '/platform/merchants':        '商户列表',
+    '/platform/merchants':        '商户管理',
+    '/platform/stores':           '门店管理',
     '/platform/integrations':     '接入配置',
     '/platform/edge-nodes':       '边缘节点管理',
     '/platform/open-platform':    '开放平台',
+    '/platform/users':            '用户管理',
+    '/platform/roles':            '角色权限',
     '/platform/monitoring':       '系统监控',
     '/platform/feature-flags':    '灰度发布',
     '/platform/audit-log':        '审计日志',
     '/platform/backup':           '备份管理',
-    '/platform/agents':           'Agent 配置与监控',
+    '/platform/agents':           'Agent 监控',
     '/platform/ontology':         '本体图管理',
     '/platform/data-sovereignty': '数据主权',
     '/platform/settings':         '系统设置',
