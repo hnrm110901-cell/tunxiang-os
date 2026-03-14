@@ -211,8 +211,18 @@ services:
       - zhilian-network
     ports:
       - "26379:26379"
-    command: >
-      sh -c "printf 'port 26379\nsentinel monitor mymaster redis 6379 2\nsentinel auth-pass mymaster ${REDIS_PASSWORD:?REDIS_PASSWORD is required}\nsentinel down-after-milliseconds mymaster 5000\nsentinel failover-timeout mymaster 10000\nsentinel parallel-syncs mymaster 1\n' > /tmp/sentinel.conf && redis-sentinel /tmp/sentinel.conf"
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        cat > /tmp/sentinel.conf <<CONF
+        port 26379
+        sentinel monitor mymaster redis 6379 2
+        sentinel auth-pass mymaster ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
+        sentinel down-after-milliseconds mymaster 5000
+        sentinel failover-timeout mymaster 10000
+        sentinel parallel-syncs mymaster 1
+        CONF
+        redis-sentinel /tmp/sentinel.conf
     depends_on:
       - redis
       - redis-replica
@@ -225,8 +235,18 @@ services:
       - zhilian-network
     ports:
       - "26380:26379"
-    command: >
-      sh -c "printf 'port 26379\nsentinel monitor mymaster redis 6379 2\nsentinel auth-pass mymaster ${REDIS_PASSWORD:?REDIS_PASSWORD is required}\nsentinel down-after-milliseconds mymaster 5000\nsentinel failover-timeout mymaster 10000\nsentinel parallel-syncs mymaster 1\n' > /tmp/sentinel.conf && redis-sentinel /tmp/sentinel.conf"
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        cat > /tmp/sentinel.conf <<CONF
+        port 26379
+        sentinel monitor mymaster redis 6379 2
+        sentinel auth-pass mymaster ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
+        sentinel down-after-milliseconds mymaster 5000
+        sentinel failover-timeout mymaster 10000
+        sentinel parallel-syncs mymaster 1
+        CONF
+        redis-sentinel /tmp/sentinel.conf
     depends_on:
       - redis
       - redis-replica
@@ -239,8 +259,18 @@ services:
       - zhilian-network
     ports:
       - "26381:26379"
-    command: >
-      sh -c "printf 'port 26379\nsentinel monitor mymaster redis 6379 2\nsentinel auth-pass mymaster ${REDIS_PASSWORD:?REDIS_PASSWORD is required}\nsentinel down-after-milliseconds mymaster 5000\nsentinel failover-timeout mymaster 10000\nsentinel parallel-syncs mymaster 1\n' > /tmp/sentinel.conf && redis-sentinel /tmp/sentinel.conf"
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        cat > /tmp/sentinel.conf <<CONF
+        port 26379
+        sentinel monitor mymaster redis 6379 2
+        sentinel auth-pass mymaster ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
+        sentinel down-after-milliseconds mymaster 5000
+        sentinel failover-timeout mymaster 10000
+        sentinel parallel-syncs mymaster 1
+        CONF
+        redis-sentinel /tmp/sentinel.conf
     depends_on:
       - redis
       - redis-replica
