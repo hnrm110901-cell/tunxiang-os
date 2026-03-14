@@ -560,6 +560,21 @@ class BanquetLifecycleService:
             await banquet_planning_engine.save_beo(
                 beo=beo, banquet=banquet_dict, db=self.db, operator=operator
             )
+
+            # Bridge 2: BEO采购清单→自动采购建议（含企微通知厨房）
+            try:
+                from src.services.lifecycle_bridge import trigger_procurement_from_beo
+                await trigger_procurement_from_beo(
+                    session=self.db,
+                    reservation_id=str(reservation.id),
+                    beo_data=beo,
+                )
+            except Exception as bridge_err:
+                logger.warning(
+                    "BEO采购桥接失败（非致命）",
+                    reservation_id=reservation.id,
+                    error=str(bridge_err),
+                )
         except Exception as e:
             logger.warning(
                 "签约触发 BEO 生成失败（非致命）",

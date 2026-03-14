@@ -107,3 +107,59 @@ async def get_cancellation_analysis(
         start_date=start_date,
         end_date=end_date,
     )
+
+
+# ── P0 补齐：渠道统计聚合看板 ────────────────────────────────────
+
+@router.get("/channel-analytics/summary")
+async def get_channel_summary(
+    store_id: str = Query(..., description="门店ID"),
+    start_date: date = Query(..., description="开始日期"),
+    end_date: date = Query(..., description="结束日期"),
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """
+    渠道综合看板 — 一次性返回所有渠道维度数据（P0 渠道统计聚合）
+
+    合并：渠道分布 + 转化率 + 退订率 + 佣金成本 + 趋势
+    管理层看板一屏展示所需全部数据。
+    """
+    stats = await channel_analytics_service.get_channel_stats(
+        session=session, store_id=store_id,
+        start_date=start_date, end_date=end_date,
+    )
+    conversion = await channel_analytics_service.get_channel_conversion(
+        session=session, store_id=store_id,
+        start_date=start_date, end_date=end_date,
+    )
+    cancellation = await channel_analytics_service.get_cancellation_analysis(
+        session=session, store_id=store_id,
+        start_date=start_date, end_date=end_date,
+    )
+
+    # 合并转化率到渠道数据
+    conv_map = {c["channel"]: c for c in conversion}
+    enriched_channels = []
+    for ch in stats.get("channels", []):
+        ch_name = ch["channel"]
+        conv_data = conv_map.get(ch_name, {})
+        enriched_channels.append({
+            **ch,
+            "completed": conv_data.get("completed", 0),
+            "conversion_rate": conv_data.get("conversion_rate", 0),
+        })
+
+    total_commission = sum(ch.get("total_commission", 0) for ch in enriched_channels)
+
+    return {
+        "store_id": store_id,
+        "period": f"{start_date} ~ {end_date}",
+        "total_reservations": stats.get("total_reservations", 0),
+        "cancellation_rate": cancellation.get("cancellation_rate", 0),
+        "no_show_rate": cancellation.get("no_show_rate", 0),
+        "effective_rate": cancellation.get("effective_rate", 0),
+        "total_commission_yuan": round(total_commission, 2),
+        "channels": enriched_channels,
+        "top_channel": enriched_channels[0]["channel"] if enriched_channels else None,
+    }

@@ -32,6 +32,8 @@ import src.models.customer_key  # noqa: F401
 import src.models.workflow  # noqa: F401
 import src.models.forecast  # noqa: F401
 import src.models.agent_config  # noqa: F401
+import src.models.consumer_identity  # noqa: F401 — Sprint 1 CDP
+import src.models.consumer_id_mapping  # noqa: F401 — Sprint 1 CDP
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

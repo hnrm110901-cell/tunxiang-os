@@ -72,11 +72,13 @@ def _format_card_description(decisions: List[Dict[str, Any]]) -> str:
         rank   = d.get("rank", 1)
         title  = d.get("title", "未知决策")
         action = d.get("action", "")
+        trust  = d.get("trust_score", 0.0)
 
+        trust_label = f" | 信任分{trust:.0f}" if trust > 0 else ""
         lines.append(
             f"{rank}. 【{title}】\n"
             f"   {action}\n"
-            f"   💰¥{saving:.0f} | 置信度{conf:.0f}% | 难度:{diff}"
+            f"   💰¥{saving:.0f} | 置信度{conf:.0f}%{trust_label} | 难度:{diff}"
         )
 
     desc = "\n\n".join(lines) if lines else "今日无高优先级决策"

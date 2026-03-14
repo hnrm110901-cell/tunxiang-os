@@ -1,0 +1,8 @@
+.container { padding: 20px; }
+.title { font-size: 20px; font-weight: 600; color: var(--text-primary); margin: 0 0 12px; }
+.summary { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 12px; }
+.tableCard { border-radius: 10px; text-align: center; min-height: 80px; display: flex; align-items: center; justify-content: center; }
+.tableNo { font-size: 18px; font-weight: 700; color: var(--text-primary); }
+.seats { font-size: 12px; color: var(--text-secondary); margin-top: 4px; }
+.duration { font-size: 11px; color: var(--text-tertiary); margin-top: 2px; }

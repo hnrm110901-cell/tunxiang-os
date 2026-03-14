@@ -98,7 +98,7 @@ class DecisionAcceptIn(BaseModel):
 @router.get("/stores/{store_id}/chain-events")
 async def list_chain_events(
     store_id: str,
-    severity: Optional[str] = Query(None, regex="^(info|warning|critical)$"),
+    severity: Optional[str] = Query(None, pattern="^(info|warning|critical)$"),
     limit: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
 ):
@@ -297,7 +297,7 @@ async def get_quality_summary(
 @router.get("/stores/{store_id}/quality-records")
 async def list_quality_records(
     store_id: str,
-    status: Optional[str] = Query(None, regex="^(pass|warning|fail)$"),
+    status: Optional[str] = Query(None, pattern="^(pass|warning|fail)$"),
     limit: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
 ):

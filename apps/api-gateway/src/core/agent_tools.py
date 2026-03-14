@@ -746,6 +746,20 @@ def get_all_tool_names(agent_type: str) -> List[str]:
     return [t["name"] for t in get_tools_for_agent(agent_type)]
 
 
+def get_skill_for_tool(agent_type: str, tool_name: str):
+    """
+    获取指定 Tool 的 SkillDescriptor（便捷函数）。
+
+    Returns:
+        SkillDescriptor 或 None
+    """
+    try:
+        from src.core.skill_registry import SkillRegistry
+        return SkillRegistry.get().get_skill(f"{agent_type}.{tool_name}")
+    except Exception:
+        return None
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # 工具执行路由器
 # ─────────────────────────────────────────────────────────────────────────────

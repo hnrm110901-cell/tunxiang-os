@@ -4,11 +4,10 @@ import { useSwipe } from '../hooks/useSwipe';
 import styles from './StoreManagerLayout.module.css';
 
 const NAV_ITEMS = [
-  { to: '/sm',             label: '首页',   icon: '🏠' },
-  { to: '/sm/shifts',      label: '班次',   icon: '🕒' },
-  { to: '/sm/tasks',       label: '任务',   icon: '✅' },
-  { to: '/sm/alerts',      label: '告警',   icon: '🔔' },
-  { to: '/sm/business',    label: '业务',   icon: '📊' },
+  { to: '/sm',             label: '简报',   icon: '📋' },
+  { to: '/sm/patrol',      label: '巡店',   icon: '🔍' },
+  { to: '/sm/decisions',   label: 'AI决策', icon: '🤖' },
+  { to: '/sm/profile',     label: '我的',   icon: '👤' },
 ];
 
 export default function StoreManagerLayout() {
@@ -42,6 +41,10 @@ export default function StoreManagerLayout() {
       >
         <Outlet />
       </main>
+      {/* Voice FAB — AI语音助手 */}
+      <button className={styles.voiceFab} title="AI语音助手">
+        🎙️
+      </button>
       <nav className={styles.tabBar}>
         {NAV_ITEMS.map(({ to, label, icon }) => (
           <NavLink

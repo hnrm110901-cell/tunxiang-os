@@ -3,6 +3,7 @@
 Queue/Waiting List Models
 """
 from sqlalchemy import Column, String, Integer, DateTime, Boolean, Text, Enum as SQLEnum
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
 from datetime import datetime
 import enum
@@ -32,6 +33,9 @@ class Queue(Base):
     customer_name = Column(String(100), nullable=False, comment="客户姓名")
     customer_phone = Column(String(20), nullable=False, index=True, comment="客户电话")
     party_size = Column(Integer, nullable=False, comment="就餐人数")
+
+    # CDP 统一消费者ID（Sprint 1 地基层）
+    consumer_id = Column(UUID(as_uuid=True), nullable=True, index=True, comment="CDP消费者ID")
 
     # 状态信息
     status = Column(

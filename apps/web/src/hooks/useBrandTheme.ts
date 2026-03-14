@@ -22,14 +22,14 @@ const BRAND_COLORS: Record<string, string> = {
   sichuan: '#CF1322',   // 川菜 — 正红
   cantonese: '#D4B106', // 粤菜 — 金色
   hunan: '#FA541C',     // 湘菜 — 橙红
-  default: '#0AAF9A',   // 默认 — 屯象绿
+  default: '#FF6B35',   // 默认 — 屯象橙
 };
 
 const DEFAULT_THEME: BrandTheme = {
   brandId: '',
   brandName: '屯象OS',
-  logoUrl: '',
-  accentColor: '#0AAF9A',
+  logoUrl: '/logo-icon.svg',
+  accentColor: '#FF6B35',
   cuisineType: '',
   loading: false,
 };
@@ -81,7 +81,7 @@ export function useBrandTheme(): BrandTheme {
         setTheme({
           brandId,
           brandName: data.brand_name || '屯象OS',
-          logoUrl: data.logo_url || '',
+          logoUrl: data.logo_url || '/logo-icon.svg',
           accentColor,
           cuisineType,
           loading: false,

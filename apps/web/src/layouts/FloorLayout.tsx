@@ -3,9 +3,12 @@ import { Outlet, NavLink } from 'react-router-dom';
 import styles from './FloorLayout.module.css';
 
 const NAV_ITEMS = [
-  { to: '/floor',           label: '看板',   icon: '🏪' },
-  { to: '/floor/queue',     label: '排队',   icon: '🔢' },
-  { to: '/floor/reservations', label: '预订', icon: '📅' },
+  { to: '/floor',              label: '看板',   icon: '🏪' },
+  { to: '/floor/tables',       label: '桌台',   icon: '🪑' },
+  { to: '/floor/queue',        label: '排队',   icon: '🔢' },
+  { to: '/floor/reservations', label: '预订',   icon: '📅' },
+  { to: '/floor/checkout',     label: '收银',   icon: '💳' },
+  { to: '/floor/kitchen',      label: '出品',   icon: '🍽️' },
 ];
 
 export default function FloorLayout() {

@@ -1,8 +1,9 @@
 /**
  * 屯象OS · Dark Theme Token Map
- * 深色主题：绿调暗色 (#0B1A20)，非纯黑
+ * 基于 TunxiangOS UI Design Spec v1.0
+ * 深色主题：Navy调暗色 (#0F1419)
  */
-import { mint, dark as darkColors, semantic } from '../tokens/colors';
+import { brand, dark as darkColors, semantic } from '../tokens/colors';
 
 export const darkTheme = {
   // Backgrounds
@@ -23,17 +24,18 @@ export const darkTheme = {
   '--tx-border-light':    darkColors.border,
   '--tx-divider':         darkColors.border,
 
-  // Accent (same in dark)
-  '--tx-accent':          mint[500],
-  '--tx-accent-hover':    mint[400],
-  '--tx-accent-active':   mint[300],
-  '--tx-accent-soft':     'rgba(10,175,154,0.15)',
+  // Accent (Brand Orange, brighter in dark)
+  '--tx-accent':          brand[500],     // #FF6B35
+  '--tx-accent-hover':    brand[400],     // #FF7E4A
+  '--tx-accent-active':   brand[300],     // #FF9A6E
+  '--tx-accent-soft':     'rgba(255,107,53,0.15)',
+  '--tx-accent-bg':       'rgba(255,107,53,0.10)',
 
   // Semantic (brighter in dark for contrast)
   '--tx-success':         '#34D399',
-  '--tx-warning':         '#FFC244',
+  '--tx-warning':         '#FBBF24',
   '--tx-danger':          '#F87171',
-  '--tx-info':            mint[500],
+  '--tx-info':            '#60A5FA',
 
   // Warm
   '--tx-sun':             '#FFC244',
@@ -42,7 +44,7 @@ export const darkTheme = {
 
   // Surface
   '--tx-surface':         darkColors.raised,
-  '--tx-surface-hover':   '#112830',
+  '--tx-surface-hover':   '#243447',
 
   // Shadows (darker in dark mode)
   '--tx-shadow-sm':       '0 1px 2px rgba(0,0,0,0.2)',

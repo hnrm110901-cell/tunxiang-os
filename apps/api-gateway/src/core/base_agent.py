@@ -101,6 +101,20 @@ class BaseAgent(ABC):
             "supported_actions": self.get_supported_actions(),
         }
 
+    def get_supported_skills(self) -> list:
+        """
+        返回此 Agent 支持的 SkillDescriptor 列表。
+
+        默认实现代理到 SkillRegistry.query(agent_type=...)。
+        子类可重写以自定义。
+        """
+        agent_type = getattr(self, "agent_type", self.__class__.__name__.lower().replace("agent", ""))
+        try:
+            from src.core.skill_registry import SkillRegistry
+            return SkillRegistry.get().query(agent_type=agent_type)
+        except Exception:
+            return []
+
     async def _execute_with_timing(self, action: str, params: Dict[str, Any]) -> AgentResponse:
         """
         执行操作并记录时间（内部方法）

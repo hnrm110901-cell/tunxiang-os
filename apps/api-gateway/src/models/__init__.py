@@ -427,3 +427,11 @@ from .banquet_sales import (
 # Phase P3 — EO执行引擎
 from .event_staff import EventStaff, StaffRole, StaffConfirmStatus
 from .hall_showcase import HallShowcase
+# 替换易订 — R3 桌台平面图 + R4 AI邀请函
+from .floor_plan import TableDefinition, TableShape, TableStatus
+from .invitation import Invitation, InvitationRSVP, InvitationTemplate, RSVPStatus
+# P0 补齐 — 预排菜模型
+from .reservation_pre_order import ReservationPreOrder, PreOrderStatus
+# Sprint 1 — CDP 地基层
+from .consumer_identity import ConsumerIdentity
+from .consumer_id_mapping import ConsumerIdMapping, IdType

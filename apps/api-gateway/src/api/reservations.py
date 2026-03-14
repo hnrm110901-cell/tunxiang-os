@@ -1,6 +1,12 @@
 """
 Reservation Management API
 预约管理API
+
+替代易订PRO核心：
+1. 严格7状态机（合法转移守卫）
+2. 状态变更自动触发企微通知
+3. 订金管理（录入/确认）
+4. 桌位冲突检测（同桌同时段不可重复预订）
 """
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
@@ -21,6 +27,119 @@ logger = structlog.get_logger()
 router = APIRouter()
 
 
+# ══════════════════════════════════════════════════════════════════
+# 状态机定义 — 严格转移守卫（替代易订核心）
+# ══════════════════════════════════════════════════════════════════
+VALID_TRANSITIONS: Dict[ReservationStatus, List[ReservationStatus]] = {
+    ReservationStatus.PENDING: [
+        ReservationStatus.CONFIRMED,
+        ReservationStatus.ARRIVED,    # 直接到店（walk-in确认）
+        ReservationStatus.CANCELLED,
+    ],
+    ReservationStatus.CONFIRMED: [
+        ReservationStatus.ARRIVED,
+        ReservationStatus.CANCELLED,
+        ReservationStatus.NO_SHOW,
+    ],
+    ReservationStatus.ARRIVED: [
+        ReservationStatus.SEATED,
+        ReservationStatus.CANCELLED,  # 到店后离开
+    ],
+    ReservationStatus.SEATED: [
+        ReservationStatus.COMPLETED,
+    ],
+    ReservationStatus.COMPLETED: [],   # 终态
+    ReservationStatus.CANCELLED: [],   # 终态
+    ReservationStatus.NO_SHOW: [],     # 终态
+}
+
+
+def _check_transition(current: ReservationStatus, target: ReservationStatus):
+    """校验状态转移合法性"""
+    allowed = VALID_TRANSITIONS.get(current, [])
+    if target not in allowed:
+        allowed_str = ", ".join(s.value for s in allowed) if allowed else "无（终态）"
+        raise HTTPException(
+            status_code=400,
+            detail=f"状态 {current.value} 不可转移到 {target.value}。允许的目标状态: {allowed_str}",
+        )
+
+
+async def _notify_reservation_change(
+    reservation: Reservation,
+    old_status: str,
+    new_status: str,
+):
+    """状态变更后异步触发企微通知（fire-and-forget，失败不阻塞）"""
+    try:
+        from ..services.wechat_trigger_service import wechat_trigger_service
+        event_map = {
+            "confirmed": "reservation.confirmed",
+            "cancelled": "reservation.cancelled",
+            "arrived": "reservation.arrived",
+        }
+        event_key = event_map.get(new_status)
+        if event_key and hasattr(wechat_trigger_service, "trigger"):
+            await wechat_trigger_service.trigger(
+                event_key,
+                {
+                    "store_id": reservation.store_id,
+                    "reservation_id": str(reservation.id),
+                    "customer_name": reservation.customer_name,
+                    "customer_phone": reservation.customer_phone,
+                    "party_size": reservation.party_size,
+                    "reservation_date": reservation.reservation_date.isoformat() if reservation.reservation_date else "",
+                    "reservation_time": reservation.reservation_time.strftime("%H:%M") if reservation.reservation_time else "",
+                    "table_number": reservation.table_number or "",
+                },
+            )
+            logger.info("reservation_notification_sent",
+                        reservation_id=str(reservation.id), event=event_key)
+    except Exception as e:
+        logger.warning("reservation_notification_failed",
+                       reservation_id=str(reservation.id), error=str(e))
+
+
+async def _check_table_conflict(
+    session: AsyncSession,
+    store_id: str,
+    table_number: str,
+    reservation_date: date,
+    reservation_time: time,
+    exclude_id: Optional[str] = None,
+):
+    """桌位冲突检测：同门店同桌号同日期±1小时内不可重复预订"""
+    time_start = (datetime.combine(reservation_date, reservation_time) - timedelta(hours=1)).time()
+    time_end = (datetime.combine(reservation_date, reservation_time) + timedelta(hours=1)).time()
+
+    query = select(Reservation).where(
+        and_(
+            Reservation.store_id == store_id,
+            Reservation.table_number == table_number,
+            Reservation.reservation_date == reservation_date,
+            Reservation.reservation_time >= time_start,
+            Reservation.reservation_time <= time_end,
+            Reservation.status.in_([
+                ReservationStatus.PENDING,
+                ReservationStatus.CONFIRMED,
+                ReservationStatus.ARRIVED,
+                ReservationStatus.SEATED,
+            ]),
+        )
+    )
+    if exclude_id:
+        query = query.where(Reservation.id != exclude_id)
+
+    result = await session.execute(query)
+    conflict = result.scalar_one_or_none()
+    if conflict:
+        raise HTTPException(
+            status_code=409,
+            detail=f"桌位冲突：桌号 {table_number} 在 {reservation_date} {reservation_time.strftime('%H:%M')} "
+                   f"附近已有预订（{conflict.customer_name}，{conflict.reservation_time.strftime('%H:%M')}）",
+        )
+
+
 class CreateReservationRequest(BaseModel):
     store_id: str
     customer_name: str
@@ -35,6 +154,7 @@ class CreateReservationRequest(BaseModel):
     dietary_restrictions: Optional[str] = None
     customer_email: Optional[str] = None
     estimated_budget: Optional[int] = None   # 分
+    deposit_amount: Optional[int] = None     # 订金金额（分）
     banquet_details: Optional[Dict[str, Any]] = None
     notes: Optional[str] = None
 
@@ -47,6 +167,8 @@ class UpdateReservationRequest(BaseModel):
     arrival_time: Optional[datetime] = None
     notes: Optional[str] = None
     banquet_details: Optional[Dict[str, Any]] = None
+    deposit_amount: Optional[int] = None     # 订金金额（分）
+    deposit_paid: Optional[int] = None       # 已付订金（分）
 
 
 class AssignTableRequest(BaseModel):
@@ -69,6 +191,8 @@ class ReservationResponse(BaseModel):
     special_requests: Optional[str]
     dietary_restrictions: Optional[str]
     estimated_budget: Optional[int]
+    deposit_amount: Optional[int] = None
+    deposit_paid: Optional[int] = None
     banquet_details: Optional[Dict[str, Any]]
     notes: Optional[str]
     arrival_time: Optional[datetime]
@@ -93,6 +217,8 @@ def _to_response(r: Reservation) -> ReservationResponse:
         special_requests=r.special_requests,
         dietary_restrictions=r.dietary_restrictions,
         estimated_budget=r.estimated_budget,
+        deposit_amount=getattr(r, "deposit_amount", None),
+        deposit_paid=getattr(r, "deposit_paid", None),
         banquet_details=r.banquet_details,
         notes=r.notes,
         arrival_time=r.arrival_time,
@@ -251,6 +377,13 @@ async def create_reservation(
     current_user: User = Depends(get_current_active_user),
 ):
     """创建预约"""
+    # 桌位冲突检测
+    if req.table_number:
+        await _check_table_conflict(
+            session, req.store_id, req.table_number,
+            req.reservation_date, req.reservation_time,
+        )
+
     reservation_id = f"RES_{req.reservation_date.strftime('%Y%m%d')}_{str(uuid.uuid4())[:8].upper()}"
     r = Reservation(
         id=reservation_id,
@@ -271,11 +404,39 @@ async def create_reservation(
         notes=req.notes,
         status=ReservationStatus.PENDING,
     )
+    # 订金
+    if req.deposit_amount is not None:
+        r.deposit_paid = req.deposit_amount
     session.add(r)
     await session.commit()
     await session.refresh(r)
+
+    # CDP 自动关联消费者ID（异步，不阻塞）
+    try:
+        from ..services.dining_journey_service import link_consumer_to_reservation
+        await link_consumer_to_reservation(session, r)
+        await session.commit()
+    except Exception:
+        pass  # fire-and-forget
+
+    # Bridge 4: 检查客户活跃旅程（优惠券/回归礼遇）
+    journey_hint = None
+    try:
+        from ..services.lifecycle_bridge import check_active_journeys_on_reservation
+        journey_info = await check_active_journeys_on_reservation(
+            session, req.customer_phone, req.store_id,
+        )
+        if journey_info.get("has_active_journey"):
+            journey_hint = journey_info
+            await session.commit()
+    except Exception:
+        pass  # fire-and-forget
+
     logger.info("reservation_created", reservation_id=str(r.id), type=req.reservation_type)
-    return _to_response(r)
+    resp = _to_response(r)
+    if journey_hint:
+        return {**resp.model_dump(), "journey_hint": journey_hint}
+    return resp
 
 
 @router.patch("/reservations/{reservation_id}", response_model=ReservationResponse)
@@ -290,6 +451,22 @@ async def update_reservation(
     r = result.scalar_one_or_none()
     if not r:
         raise HTTPException(status_code=404, detail="预约不存在")
+
+    old_status = r.status
+
+    # 状态转移守卫
+    if req.status is not None and req.status != r.status:
+        _check_transition(r.status, req.status)
+
+    # 桌位变更时检测冲突
+    if req.table_number and req.table_number != r.table_number:
+        res_date = r.reservation_date
+        res_time = r.reservation_time
+        await _check_table_conflict(
+            session, r.store_id, req.table_number,
+            res_date, res_time, exclude_id=str(r.id),
+        )
+
     for field, value in req.model_dump(exclude_none=True).items():
         setattr(r, field, value)
     if req.status == ReservationStatus.CANCELLED:
@@ -298,6 +475,12 @@ async def update_reservation(
         r.arrival_time = datetime.utcnow()
     await session.commit()
     await session.refresh(r)
+
+    # 状态变更通知
+    if req.status is not None and req.status != old_status:
+        new_status_val = req.status.value if hasattr(req.status, "value") else str(req.status)
+        await _notify_reservation_change(r, old_status.value, new_status_val)
+
     logger.info("reservation_updated", reservation_id=reservation_id, status=req.status)
     return _to_response(r)
 
@@ -313,12 +496,24 @@ async def checkin_reservation(
     r = result.scalar_one_or_none()
     if not r:
         raise HTTPException(status_code=404, detail="预约不存在")
-    if r.status not in (ReservationStatus.PENDING, ReservationStatus.CONFIRMED):
-        raise HTTPException(status_code=400, detail=f"当前状态 {r.status.value} 不可签到")
+    _check_transition(r.status, ReservationStatus.ARRIVED)
+    old_status = r.status.value
     r.status = ReservationStatus.ARRIVED
     r.arrival_time = datetime.utcnow()
     await session.commit()
     await session.refresh(r)
+    await _notify_reservation_change(r, old_status, "arrived")
+
+    # Bridge 1: 预订到店→自动准备订单（含预排菜转入）
+    try:
+        from ..services.lifecycle_bridge import prepare_order_from_reservation
+        order_result = await prepare_order_from_reservation(session, reservation_id)
+        await session.commit()
+        logger.info("reservation_auto_order", reservation_id=reservation_id,
+                     order_id=order_result.get("order_id"))
+    except Exception as e:
+        logger.warning("reservation_auto_order_failed", error=str(e))
+
     logger.info("reservation_checkin", reservation_id=reservation_id)
     return _to_response(r)
 
@@ -335,6 +530,15 @@ async def seat_reservation(
     r = result.scalar_one_or_none()
     if not r:
         raise HTTPException(status_code=404, detail="预约不存在")
+    _check_transition(r.status, ReservationStatus.SEATED)
+
+    # 桌位冲突检测
+    await _check_table_conflict(
+        session, r.store_id, req.table_number,
+        r.reservation_date, r.reservation_time,
+        exclude_id=str(r.id),
+    )
+
     r.table_number = req.table_number
     r.status = ReservationStatus.SEATED
     await session.commit()
@@ -354,6 +558,7 @@ async def mark_no_show(
     r = result.scalar_one_or_none()
     if not r:
         raise HTTPException(status_code=404, detail="预约不存在")
+    _check_transition(r.status, ReservationStatus.NO_SHOW)
     r.status = ReservationStatus.NO_SHOW
     await session.commit()
     await session.refresh(r)
@@ -371,7 +576,16 @@ async def complete_reservation(
     r = result.scalar_one_or_none()
     if not r:
         raise HTTPException(status_code=404, detail="预约不存在")
+    _check_transition(r.status, ReservationStatus.COMPLETED)
     r.status = ReservationStatus.COMPLETED
     await session.commit()
     await session.refresh(r)
+
+    # 离店满意度调查（异步，不阻塞）
+    try:
+        from ..services.dining_journey_service import trigger_satisfaction_survey
+        await trigger_satisfaction_survey(session, reservation_id)
+    except Exception:
+        pass  # fire-and-forget
+
     return _to_response(r)

@@ -3,6 +3,7 @@
  * 路由：/sm/decisions
  * 数据：GET /api/v1/bff/sm/{store_id}/notifications
  * 操作：POST /api/v1/approvals/{decision_id}/approve
+ *       POST /api/v1/approvals/{decision_id}/reject
  */
 import React, { useEffect, useState, useCallback } from 'react';
 import {
@@ -16,9 +17,12 @@ const STORE_ID = localStorage.getItem('store_id') || 'S001';
 interface DecisionItem {
   id:                    string;
   type:                  string;
+  decision_type:         string;
   title:                 string;
   expected_saving_yuan:  number;
   confidence_pct:        number;
+  trust_score:           number;
+  ai_reasoning:          string;
   created_at:            string | null;
 }
 
@@ -27,7 +31,9 @@ export default function SmDecisions() {
   const [loading,   setLoading]   = useState(true);
   const [error,     setError]     = useState<string | null>(null);
   const [selected,  setSelected]  = useState<DecisionItem | null>(null);
-  const [approving, setApproving] = useState<string | null>(null);  // decision id being approved
+  const [approving, setApproving] = useState<string | null>(null);
+  const [rejecting, setRejecting] = useState<string | null>(null);
+  const [feedback,  setFeedback]  = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -56,6 +62,23 @@ export default function SmDecisions() {
       setApproving(null);
     }
   };
+
+  const handleReject = async (id: string) => {
+    setRejecting(id);
+    try {
+      await apiClient.post(`/api/v1/approvals/${id}/reject`, { feedback });
+      setItems(prev => prev.filter(i => i.id !== id));
+      setSelected(null);
+      setFeedback('');
+    } catch (e: any) {
+      alert(e?.response?.data?.detail || '驳回失败，请重试');
+    } finally {
+      setRejecting(null);
+    }
+  };
+
+  const trustColor = (score: number) =>
+    score >= 70 ? 'var(--green)' : score >= 40 ? 'var(--accent)' : 'var(--red, #e74c3c)';
 
   return (
     <div className={styles.page}>
@@ -86,11 +109,18 @@ export default function SmDecisions() {
                   />
                   <div className={styles.rowMeta}>
                     <div className={styles.rowTitle}>{item.title}</div>
-                    {item.created_at && (
-                      <div className={styles.rowTime}>
-                        {new Date(item.created_at).toLocaleString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                      </div>
-                    )}
+                    <div className={styles.rowTime}>
+                      {item.trust_score > 0 && (
+                        <span className={styles.trustBadge} style={{ color: trustColor(item.trust_score) }}>
+                          信任{item.trust_score.toFixed(0)}
+                        </span>
+                      )}
+                      {item.created_at && (
+                        <span>
+                          {new Date(item.created_at).toLocaleString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
                 <div className={styles.rowRight}>
@@ -109,10 +139,17 @@ export default function SmDecisions() {
       <ZModal
         open={!!selected}
         title="决策详情"
-        onClose={() => setSelected(null)}
+        onClose={() => { setSelected(null); setFeedback(''); }}
         footer={
           <>
-            <ZButton variant="ghost" onClick={() => setSelected(null)}>暂不处理</ZButton>
+            <ZButton
+              variant="ghost"
+              loading={rejecting === selected?.id}
+              onClick={() => selected && handleReject(selected.id)}
+              style={{ color: 'var(--red, #e74c3c)' }}
+            >
+              驳回
+            </ZButton>
             <ZButton
               loading={approving === selected?.id}
               onClick={() => selected && handleApprove(selected.id)}
@@ -137,8 +174,30 @@ export default function SmDecisions() {
               <span className={styles.detailValue}>{selected.confidence_pct.toFixed(1)}%</span>
             </div>
             <div className={styles.detailRow}>
-              <span className={styles.detailLabel}>类型</span>
-              <span className={styles.detailValue}>{selected.type}</span>
+              <span className={styles.detailLabel}>AI信任分</span>
+              <span className={styles.detailValue} style={{ color: trustColor(selected.trust_score) }}>
+                {selected.trust_score.toFixed(1)}
+              </span>
+            </div>
+            <div className={styles.detailRow}>
+              <span className={styles.detailLabel}>决策类型</span>
+              <span className={styles.detailValue}>{selected.decision_type || selected.type}</span>
+            </div>
+            {selected.ai_reasoning && (
+              <div className={styles.reasoningSection}>
+                <span className={styles.detailLabel}>AI推理依据</span>
+                <div className={styles.reasoningText}>{selected.ai_reasoning}</div>
+              </div>
+            )}
+            <div className={styles.feedbackSection}>
+              <span className={styles.detailLabel}>驳回反馈（可选）</span>
+              <textarea
+                className={styles.feedbackInput}
+                placeholder="请输入驳回理由，帮助AI改进..."
+                value={feedback}
+                onChange={(e) => setFeedback(e.target.value)}
+                rows={2}
+              />
             </div>
           </div>
         )}

@@ -66,7 +66,16 @@ class PrivateDomainMember(Base, TimestampMixin):
     risk_score = Column(Float, default=0.0)
     channel_source = Column(String(50), nullable=True)  # 来源渠道
     wechat_openid = Column(String(100), nullable=True)
+
+    # CDP 统一消费者ID（Sprint 2 打通 CDP 地基）
+    consumer_id = Column(UUID(as_uuid=True), nullable=True, index=True)
+
     is_active = Column(Boolean, default=True)
+    # RFM 1-5 标准化评分（Sprint 2 CDP RFM 重算）
+    r_score = Column(Integer, nullable=True, comment="R评分1-5")
+    f_score = Column(Integer, nullable=True, comment="F评分1-5")
+    m_score = Column(Integer, nullable=True, comment="M评分1-5")
+
     rfm_updated_at = Column(DateTime, default=datetime.utcnow)
     birth_date = Column(Date, nullable=True, comment="生日（年月日）")
 

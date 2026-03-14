@@ -16,8 +16,12 @@ interface PendingDecision {
   store_name?:          string;
   title:                string;
   type:                 string;
+  decision_type:        string;
   expected_saving_yuan: number;
   confidence_pct:       number;
+  trust_score:          number;
+  ai_reasoning:         string;
+  outcome:              string | null;
   created_at:           string | null;
 }
 
@@ -27,13 +31,14 @@ export default function HQDecisions() {
   const [error,     setError]     = useState<string | null>(null);
   const [selected,  setSelected]  = useState<PendingDecision | null>(null);
   const [approving, setApproving] = useState<string | null>(null);
+  const [rejecting, setRejecting] = useState<string | null>(null);
+  const [feedback,  setFeedback]  = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const resp = await apiClient.get('/api/v1/approvals', { params: { status: 'pending' } });
-      // DecisionLogResponse uses ai_suggestion / ai_confidence — map to our interface
       const raw: any[] = resp.items ?? resp ?? [];
       setItems(raw.map(d => ({
         id:                   d.id,
@@ -41,8 +46,12 @@ export default function HQDecisions() {
         store_name:           d.store_name ?? d.store_id,
         title:                d.title ?? d.ai_suggestion?.action ?? d.ai_suggestion?.title ?? '待审批决策',
         type:                 d.type ?? d.decision_type ?? '',
+        decision_type:        d.decision_type ?? d.type ?? '',
         expected_saving_yuan: d.expected_saving_yuan ?? d.ai_suggestion?.expected_saving_yuan ?? 0,
         confidence_pct:       d.confidence_pct ?? (d.ai_confidence != null ? d.ai_confidence * 100 : 0),
+        trust_score:          d.trust_score ?? 0,
+        ai_reasoning:         d.ai_suggestion?.reasoning ?? '',
+        outcome:              d.outcome ?? null,
         created_at:           d.created_at ?? null,
       })));
     } catch (e: any) {
@@ -65,6 +74,33 @@ export default function HQDecisions() {
     } finally {
       setApproving(null);
     }
+  };
+
+  const handleReject = async (id: string) => {
+    setRejecting(id);
+    try {
+      await apiClient.post(`/api/v1/approvals/${id}/reject`, { feedback });
+      setItems(prev => prev.filter(i => i.id !== id));
+      setSelected(null);
+      setFeedback('');
+    } catch (e: any) {
+      alert(e?.response?.data?.detail || '驳回失败，请重试');
+    } finally {
+      setRejecting(null);
+    }
+  };
+
+  const trustColor = (score: number) =>
+    score >= 70 ? 'var(--green)' : score >= 40 ? 'var(--accent)' : 'var(--red, #e74c3c)';
+
+  const outcomeLabel = (outcome: string | null) => {
+    if (!outcome) return null;
+    const map: Record<string, { text: string; type: 'success' | 'warning' | 'error' }> = {
+      success: { text: '已验证成功', type: 'success' },
+      partial: { text: '部分成功', type: 'warning' },
+      failure: { text: '效果不佳', type: 'error' },
+    };
+    return map[outcome] ?? null;
   };
 
   return (
@@ -98,6 +134,15 @@ export default function HQDecisions() {
                     <div className={styles.rowTitle}>{item.title}</div>
                     <div className={styles.rowSub}>
                       {item.store_name || item.store_id}
+                      {item.trust_score > 0 && (
+                        <span className={styles.trustBadge} style={{ color: trustColor(item.trust_score) }}>
+                          {' '}信任{item.trust_score.toFixed(0)}
+                        </span>
+                      )}
+                      {item.outcome && (() => {
+                        const info = outcomeLabel(item.outcome);
+                        return info ? <span className={styles.outcomeBadge} data-type={info.type}>{' '}{info.text}</span> : null;
+                      })()}
                       {item.created_at && ` · ${new Date(item.created_at).toLocaleString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`}
                     </div>
                   </div>
@@ -117,10 +162,17 @@ export default function HQDecisions() {
       <ZModal
         open={!!selected}
         title="决策详情"
-        onClose={() => setSelected(null)}
+        onClose={() => { setSelected(null); setFeedback(''); }}
         footer={
           <>
-            <ZButton variant="ghost" onClick={() => setSelected(null)}>暂不处理</ZButton>
+            <ZButton
+              variant="ghost"
+              loading={rejecting === selected?.id}
+              onClick={() => selected && handleReject(selected.id)}
+              style={{ color: 'var(--red, #e74c3c)' }}
+            >
+              驳回
+            </ZButton>
             <ZButton
               loading={approving === selected?.id}
               onClick={() => selected && handleApprove(selected.id)}
@@ -149,8 +201,39 @@ export default function HQDecisions() {
               <span className={styles.detailValue}>{selected.confidence_pct.toFixed(1)}%</span>
             </div>
             <div className={styles.detailRow}>
-              <span className={styles.detailLabel}>类型</span>
-              <span className={styles.detailValue}>{selected.type}</span>
+              <span className={styles.detailLabel}>AI信任分</span>
+              <span className={styles.detailValue} style={{ color: trustColor(selected.trust_score) }}>
+                {selected.trust_score.toFixed(1)}
+              </span>
+            </div>
+            <div className={styles.detailRow}>
+              <span className={styles.detailLabel}>决策类型</span>
+              <span className={styles.detailValue}>{selected.decision_type || selected.type}</span>
+            </div>
+            {selected.outcome && (() => {
+              const info = outcomeLabel(selected.outcome);
+              return info ? (
+                <div className={styles.detailRow}>
+                  <span className={styles.detailLabel}>效果评估</span>
+                  <span className={styles.outcomeBadge} data-type={info.type}>{info.text}</span>
+                </div>
+              ) : null;
+            })()}
+            {selected.ai_reasoning && (
+              <div className={styles.reasoningSection}>
+                <span className={styles.detailLabel}>AI推理依据</span>
+                <div className={styles.reasoningText}>{selected.ai_reasoning}</div>
+              </div>
+            )}
+            <div className={styles.feedbackSection}>
+              <span className={styles.detailLabel}>驳回反馈（可选）</span>
+              <textarea
+                className={styles.feedbackInput}
+                placeholder="请输入驳回理由，帮助AI改进..."
+                value={feedback}
+                onChange={(e) => setFeedback(e.target.value)}
+                rows={2}
+              />
             </div>
           </div>
         )}

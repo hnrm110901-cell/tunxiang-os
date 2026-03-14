@@ -150,7 +150,7 @@ async def get_peer_group(
 async def get_best_practice_stores(
     metric_name:    str   = Query(..., description="指标名: waste_rate/cost_ratio/bom_compliance/..."),
     top_n:          int   = Query(5, ge=1, le=20),
-    direction:      str   = Query("lower_better", regex="^(lower_better|higher_better)$"),
+    direction:      str   = Query("lower_better", pattern="^(lower_better|higher_better)$"),
     peer_group_key: Optional[str] = Query(None, description="同伴组 key，如 standard_华东"),
     metric_date:    Optional[date] = Query(None, description="查询日期，默认昨日"),
     db:             AsyncSession = Depends(get_db),

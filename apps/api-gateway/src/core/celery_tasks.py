@@ -3918,23 +3918,30 @@ def pull_pinzhi_daily_data(self) -> Dict[str, Any]:
                                 order_schema = adapter.to_order(raw, sid, brand_id)
                                 total_cents = int(order_schema.total * 100)
                                 discount_cents = int(order_schema.discount * 100)
+                                # CDP: 从原始数据提取会员手机号（供 consumer_id 回填）
+                                vip_phone = raw.get("vipMobile") or raw.get("mobile") or ""
+                                vip_name = raw.get("vipName") or ""
                                 await session.execute(
                                     _text("""
                                         INSERT INTO orders
                                             (id, store_id, table_number, status,
                                              total_amount, discount_amount, final_amount,
                                              order_time, waiter_id, sales_channel, notes,
+                                             customer_phone, customer_name,
                                              order_metadata, created_at, updated_at)
                                         VALUES
                                             (:id, :store_id, :table_number, :status,
                                              :total_amount, :discount_amount, :final_amount,
                                              :order_time, :waiter_id, 'pinzhi', :notes,
+                                             :customer_phone, :customer_name,
                                              '{}', NOW(), NOW())
                                         ON CONFLICT (id) DO UPDATE SET
                                             status          = EXCLUDED.status,
                                             total_amount    = EXCLUDED.total_amount,
                                             discount_amount = EXCLUDED.discount_amount,
                                             final_amount    = EXCLUDED.final_amount,
+                                            customer_phone  = COALESCE(NULLIF(EXCLUDED.customer_phone, ''), orders.customer_phone),
+                                            customer_name   = COALESCE(NULLIF(EXCLUDED.customer_name, ''), orders.customer_name),
                                             updated_at      = NOW()
                                     """),
                                     {
@@ -3948,6 +3955,8 @@ def pull_pinzhi_daily_data(self) -> Dict[str, Any]:
                                         "order_time": order_schema.created_at,
                                         "waiter_id": order_schema.waiter_id,
                                         "notes": order_schema.notes,
+                                        "customer_phone": vip_phone,
+                                        "customer_name": vip_name,
                                     },
                                 )
                                 store_orders += 1
@@ -5017,4 +5026,289 @@ def push_hq_daily_briefing(self) -> Dict[str, Any]:
         return asyncio.run(_run())
     except Exception as exc:
         logger.error("push_hq_briefing.failed", error=str(exc))
+        raise self.retry(exc=exc)
+
+
+# ============================================================
+# Sprint 1 CDP: POS拉取后回填 consumer_id
+# ============================================================
+@celery_app.task(bind=True, max_retries=2, default_retry_delay=120)
+def cdp_sync_consumer_ids(self) -> Dict[str, Any]:
+    """
+    POS数据拉取后，为所有未解析的订单/预订回填 consumer_id。
+    每日 02:30 执行（紧跟 01:30 品智 + 02:00 天财拉取之后）。
+
+    Sprint 1 KPI: consumer_id 填充率 ≥ 80%
+    """
+    async def _run():
+        from src.core.database import get_db_session
+        from src.services.cdp_sync_service import cdp_sync_service
+
+        async with get_db_session() as session:
+            result = await cdp_sync_service.sync_all_stores(session, batch_size=500)
+            await session.commit()
+
+        logger.info("cdp_sync_consumer_ids.done", **result)
+        return result
+
+    try:
+        return asyncio.run(_run())
+    except Exception as exc:
+        logger.error("cdp_sync_consumer_ids.failed", error=str(exc))
+        raise self.retry(exc=exc)
+
+
+# ============================================================
+# Sprint 2 CDP: consumer_id 驱动的 RFM 重算
+# ============================================================
+@celery_app.task(bind=True, max_retries=2, default_retry_delay=120)
+def cdp_rfm_recalculate(self) -> Dict[str, Any]:
+    """
+    基于 consumer_id 重算全量 RFM。
+    每日 03:00 执行（02:30 consumer_id 回填完成后）。
+
+    步骤：
+    1. 先回填 PrivateDomainMember → ConsumerIdentity 链接
+    2. 再基于 consumer_id 重算 RFM
+    3. 计算偏差率，验证 < 5%
+
+    Sprint 2 KPI: RFM 偏差 < 5%
+    """
+    async def _run():
+        from src.core.database import get_db_session
+        from src.services.cdp_rfm_service import cdp_rfm_service
+
+        async with get_db_session() as session:
+            # Step 1: 回填 member → consumer link
+            link_result = await cdp_rfm_service.backfill_members(session)
+            # Step 2: 重算 RFM
+            rfm_result = await cdp_rfm_service.recalculate_all(session)
+            # Step 3: 偏差校验
+            deviation = await cdp_rfm_service.compute_deviation(session)
+            await session.commit()
+
+        result = {
+            "link": link_result,
+            "rfm": rfm_result,
+            "deviation": deviation,
+        }
+        logger.info("cdp_rfm_recalculate.done", **result)
+        return result
+
+    try:
+        return asyncio.run(_run())
+    except Exception as exc:
+        logger.error("cdp_rfm_recalculate.failed", error=str(exc))
+        raise self.retry(exc=exc)
+
+
+# ============================================================
+# Sprint 3 MemberAgent: 沉睡会员自动唤醒扫描
+# ============================================================
+@celery_app.task(bind=True, max_retries=2, default_retry_delay=120)
+def member_agent_dormant_sweep(self) -> Dict[str, Any]:
+    """
+    自动扫描所有门店的沉睡会员并触发唤醒旅程。
+    每日 06:30 执行（RFM 重算 03:00 完成后，开店前触发）。
+
+    流程：
+    1. 查询所有有沉睡会员的门店
+    2. 每店批量触发 dormant_wakeup 旅程（每店最多 10 条/天）
+    3. 汇总结果，追踪 Sprint 3 KPI: ≥50条/周
+
+    每店每天限 10 条，避免集中骚扰；7天累计 ≥50 达标。
+    """
+    async def _run():
+        from src.core.database import get_db_session
+        from src.services.member_agent_service import member_agent_service
+        from src.models.private_domain import PrivateDomainMember
+        from sqlalchemy import select, func
+
+        async with get_db_session() as session:
+            # Step 1: 找到有沉睡会员的门店
+            stmt = (
+                select(PrivateDomainMember.store_id)
+                .where(
+                    PrivateDomainMember.is_active.is_(True),
+                    PrivateDomainMember.consumer_id.isnot(None),
+                    PrivateDomainMember.recency_days >= 30,
+                )
+                .group_by(PrivateDomainMember.store_id)
+            )
+            result = await session.execute(stmt)
+            store_ids = [row[0] for row in result.all()]
+
+            # Step 2: 每店触发唤醒（每店每天最多 10 条）
+            total = {"stores": 0, "scanned": 0, "eligible": 0, "triggered": 0}
+            for sid in store_ids:
+                try:
+                    r = await member_agent_service.batch_trigger_wakeup(
+                        session, sid,
+                        min_recency_days=30,
+                        max_count=10,
+                        dry_run=False,
+                    )
+                    total["stores"] += 1
+                    total["scanned"] += r.get("scanned", 0)
+                    total["eligible"] += r.get("eligible", 0)
+                    total["triggered"] += r.get("triggered", 0)
+                except Exception as e:
+                    logger.warning(
+                        "member_agent_dormant_sweep.store_failed",
+                        store_id=sid, error=str(e),
+                    )
+
+            await session.commit()
+
+        logger.info("member_agent_dormant_sweep.done", **total)
+        return total
+
+    try:
+        return asyncio.run(_run())
+    except Exception as exc:
+        logger.error("member_agent_dormant_sweep.failed", error=str(exc))
+        raise self.retry(exc=exc)
+
+
+# ============================================================
+# Sprint 4: 增收月报自动生成（每月1日）
+# ============================================================
+@celery_app.task(bind=True, max_retries=2, default_retry_delay=300)
+def revenue_growth_monthly_report(self) -> Dict[str, Any]:
+    """
+    每月1日 08:00 自动生成上月增收月报。
+
+    遍历所有门店，生成各 Agent ¥贡献汇总。
+    """
+    async def _run():
+        from src.core.database import get_db_session
+        from src.services.revenue_growth_service import revenue_growth_service
+        from src.models.order import Order
+        from sqlalchemy import select, func
+
+        async with get_db_session() as session:
+            # 查询所有有订单的门店
+            stmt = (
+                select(Order.store_id)
+                .group_by(Order.store_id)
+            )
+            result = await session.execute(stmt)
+            store_ids = [row[0] for row in result.all()]
+
+            reports = []
+            for sid in store_ids:
+                try:
+                    report = await revenue_growth_service.generate_monthly_report(
+                        session, sid, month_offset=-1,
+                    )
+                    reports.append(report)
+                    logger.info(
+                        "revenue_growth_report.store_done",
+                        store_id=sid,
+                        delta_yuan=report["revenue"]["delta_yuan"],
+                        agent_total=report["agent_contribution"]["agent_total_yuan"],
+                    )
+                except Exception as e:
+                    logger.warning(
+                        "revenue_growth_report.store_failed",
+                        store_id=sid, error=str(e),
+                    )
+
+        total = {
+            "stores": len(reports),
+            "total_delta_yuan": sum(r["revenue"]["delta_yuan"] for r in reports),
+            "total_agent_contribution_yuan": sum(
+                r["agent_contribution"]["agent_total_yuan"] for r in reports
+            ),
+        }
+        logger.info("revenue_growth_monthly_report.done", **total)
+        return total
+
+    try:
+        return asyncio.run(_run())
+    except Exception as exc:
+        logger.error("revenue_growth_monthly_report.failed", error=str(exc))
+        raise self.retry(exc=exc)
+
+
+# ── CDP 全量回填管道 ────────────────────────────────────────────
+
+@celery_app.task(bind=True, max_retries=1, default_retry_delay=300)
+def cdp_full_backfill(self, store_id=None, batch_size=500) -> Dict[str, Any]:
+    """
+    CDP 全量回填管道（异步版）
+
+    步骤：订单回填 → 会员回填 → RFM重算 → 偏差校验
+    """
+    async def _run():
+        from src.core.database import get_db_session
+        from src.services.cdp_monitor_service import cdp_monitor_service
+
+        async with get_db_session() as db:
+            result = await cdp_monitor_service.run_full_backfill(
+                db, store_id=store_id, batch_size=batch_size,
+            )
+            logger.info(
+                "cdp_full_backfill.done",
+                store_id=store_id,
+                kpi_all_met=result["kpi_summary"]["all_met"],
+            )
+            return result
+
+    try:
+        return asyncio.run(_run())
+    except Exception as exc:
+        logger.error("cdp_full_backfill.failed", error=str(exc))
+        raise self.retry(exc=exc)
+
+
+# ── P2: 决策效果闭环评估 ──────────────────────────────────────────────────
+
+@celery_app.task(
+    base=CallbackTask,
+    bind=True,
+    max_retries=2,
+    default_retry_delay=300,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_jitter=True,
+)
+def evaluate_decision_effects(self) -> Dict[str, Any]:
+    """
+    每日 03:30 扫描已执行但未评估的 DecisionLog，
+    根据 decision_type 匹配评估策略，计算偏差，更新 outcome/trust_score。
+    """
+    async def _run():
+        from src.core.database import get_db_session
+        from src.services.effect_evaluator import EffectEvaluator
+
+        async with get_db_session() as db:
+            evaluator = EffectEvaluator(db)
+            result = await evaluator.run_evaluation_sweep()
+            logger.info("evaluate_decision_effects.done", **result)
+
+            # 评估完成后推送企微通知（仅在有评估结果时）
+            evaluated = result.get("evaluated", 0)
+            if evaluated > 0:
+                try:
+                    from src.services.wechat_service import wechat_service
+                    if wechat_service:
+                        success = result.get("success", 0)
+                        failure = result.get("failure", 0)
+                        msg = (
+                            f"【AI效果评估完成】\n"
+                            f"评估决策 {evaluated} 条\n"
+                            f"成功 {success} | 失败 {failure}\n"
+                            f"查看详情：/sm/decisions"
+                        )
+                        await wechat_service.send_text(msg)
+                except Exception as push_exc:
+                    logger.warning("evaluate_decision_effects.push_failed", error=str(push_exc))
+
+            return result
+
+    try:
+        return asyncio.run(_run())
+    except Exception as exc:
+        logger.error("evaluate_decision_effects.failed", error=str(exc))
         raise self.retry(exc=exc)

@@ -47,3 +47,31 @@
 .detailLabel  { font-size: 13px; color: var(--text-tertiary); flex-shrink: 0; padding-top: 1px; }
 .detailValue  { font-size: 14px; color: var(--text-primary); text-align: right; font-weight: 500; }
 .detailAccent { font-size: 16px; font-weight: 700; color: var(--green); }
+
+/* Trust badge */
+.trustBadge { font-size: 11px; font-weight: 600; }
+
+/* Outcome badge */
+.outcomeBadge { font-size: 11px; font-weight: 600; }
+.outcomeBadge[data-type="success"] { color: var(--green); }
+.outcomeBadge[data-type="warning"] { color: var(--accent); }
+.outcomeBadge[data-type="error"]   { color: var(--red, #e74c3c); }
+
+/* AI reasoning */
+.reasoningSection { display: flex; flex-direction: column; gap: 6px; padding: 10px 0; border-top: 1px solid var(--border); }
+.reasoningText { font-size: 13px; color: var(--text-secondary); line-height: 1.5; background: var(--bg); border-radius: 8px; padding: 8px 10px; }
+
+/* Feedback */
+.feedbackSection { display: flex; flex-direction: column; gap: 6px; padding-top: 10px; border-top: 1px solid var(--border); }
+.feedbackInput {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 13px;
+  color: var(--text-primary);
+  background: var(--bg);
+  resize: none;
+  font-family: inherit;
+}
+.feedbackInput:focus { outline: none; border-color: var(--accent); }

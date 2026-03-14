@@ -1,18 +1,19 @@
 /**
  * 屯象OS Design Tokens
  * 品牌: 屯象 TUN XIANG · 餐饮人的好伙伴
+ * 基于 TunxiangOS UI Design Spec v1.0
  *
  * 使用方式:
  *   import { colors, typography, spacing } from '@/design-system/tokens';
- *   // CSS中用 var(--tx-mint-500) 等变量
+ *   // CSS中用 var(--tx-brand-500) 等变量
  */
 
-export { mint, warm, neutral, semantic, dark, colors } from './colors';
+export { brand, mint, warm, neutral, semantic, dark, navy, colors } from './colors';
 export { fontFamily, fontSize, lineHeight, letterSpacing, typography } from './typography';
 export { spacing, breakpoint, layout } from './spacing';
 export { radius, shadow, zIndex, motion } from './elevation';
 
-import { mint, warm, neutral, semantic, dark } from './colors';
+import { brand, warm, neutral, semantic, dark, navy } from './colors';
 import { fontFamily, fontSize } from './typography';
 import { spacing } from './spacing';
 import { radius, shadow, zIndex, motion } from './elevation';
@@ -29,7 +30,7 @@ export function injectTokens() {
     // 背景
     '--bg':              dark.bg,
     '--surface':         dark.raised,
-    '--surface-hover':   '#112830',
+    '--surface-hover':   '#243447',
     // 文字
     '--text-primary':    dark.t1,
     '--text-secondary':  dark.t2,
@@ -37,11 +38,14 @@ export function injectTokens() {
     // 边框
     '--border':          dark.border,
     // 语义色
-    '--accent':          mint[500],
-    '--accent-soft':     `rgba(10,175,154,0.15)`,
+    '--accent':          brand[500],
+    '--accent-soft':     'rgba(255,107,53,0.15)',
+    '--accent-hover':    brand[400],
+    '--accent-active':   brand[300],
+    '--accent-bg':       'rgba(255,107,53,0.10)',
     '--green':           '#34D399',
     '--red':             '#F87171',
-    '--yellow':          warm.sun,
+    '--yellow':          '#FBBF24',
     '--blue':            '#60A5FA',
     // Ant Design 兼容
     '--bg-primary':      dark.bg,
@@ -58,18 +62,21 @@ export function injectTokens() {
     '--surface':         neutral[0],
     '--surface-hover':   neutral[100],
     // 文字
-    '--text-primary':    neutral[900],
+    '--text-primary':    navy[700],     // #1E2A3A — Design Spec navy-900
     '--text-secondary':  neutral[600],
     '--text-tertiary':   neutral[400],
     // 边框
     '--border':          neutral[200],
-    // 语义色
-    '--accent':          mint[500],
-    '--accent-soft':     `rgba(10,175,154,0.08)`,
-    '--green':           semantic.success,
-    '--red':             semantic.danger,
-    '--yellow':          warm.amber,
-    '--blue':            '#0A84FF',
+    // 语义色（Design Spec v1.0）
+    '--accent':          brand[500],    // #FF6B35
+    '--accent-soft':     'rgba(255,107,53,0.08)',
+    '--accent-hover':    brand[600],    // #E85A24
+    '--accent-active':   brand[700],    // #C44A1B
+    '--accent-bg':       brand[50],     // #FFF0E8
+    '--green':           semantic.success,  // #27AE60
+    '--red':             semantic.danger,   // #EB5757
+    '--yellow':          warm.amber,        // #F2994A
+    '--blue':            semantic.info,     // #2D9CDB
     // Ant Design 兼容
     '--bg-primary':      neutral[0],
     '--bg-secondary':    neutral[50],
@@ -83,11 +90,18 @@ export function injectTokens() {
 
   // ── 静态变量（不随主题变化）──
   const staticVars: Record<string, string> = {
-    // Mint色阶
-    '--tx-mint-50':  mint[50],  '--tx-mint-100': mint[100], '--tx-mint-200': mint[200],
-    '--tx-mint-300': mint[300], '--tx-mint-400': mint[400], '--tx-mint-500': mint[500],
-    '--tx-mint-600': mint[600], '--tx-mint-700': mint[700], '--tx-mint-800': mint[800],
-    '--tx-mint-900': mint[900],
+    // Brand色阶（替代旧mint，保持--tx-mint-*兼容）
+    '--tx-mint-50':  brand[50],  '--tx-mint-100': brand[100], '--tx-mint-200': brand[200],
+    '--tx-mint-300': brand[300], '--tx-mint-400': brand[400], '--tx-mint-500': brand[500],
+    '--tx-mint-600': brand[600], '--tx-mint-700': brand[700], '--tx-mint-800': brand[800],
+    '--tx-mint-900': brand[900],
+    // Brand色阶（新命名）
+    '--tx-brand-50':  brand[50],  '--tx-brand-100': brand[100], '--tx-brand-200': brand[200],
+    '--tx-brand-300': brand[300], '--tx-brand-400': brand[400], '--tx-brand-500': brand[500],
+    '--tx-brand-600': brand[600], '--tx-brand-700': brand[700], '--tx-brand-800': brand[800],
+    '--tx-brand-900': brand[900],
+    // Navy
+    '--tx-navy-700': navy[700], '--tx-navy-900': navy[900],
     // Warm
     '--tx-warm-sun':   warm.sun,   '--tx-warm-fire': warm.fire,
     '--tx-warm-blush': warm.blush, '--tx-warm-amber': warm.amber,

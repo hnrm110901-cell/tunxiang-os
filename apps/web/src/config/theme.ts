@@ -1,24 +1,25 @@
 /**
  * 屯象OS · Ant Design 主题覆盖
+ * 基于 TunxiangOS UI Design Spec v1.0
  */
 import { theme as antdTheme } from 'antd';
 import type { ThemeConfig } from 'antd';
 
-const fontFamily = "'Noto Sans SC', 'PingFang SC', -apple-system, BlinkMacSystemFont, sans-serif";
+const fontFamily = "'PingFang SC', 'HarmonyOS Sans SC', 'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif";
 
 // 亮色主题
 export const lightTheme: ThemeConfig = {
   token: {
-    colorPrimary:      '#0AAF9A',  // mint-500
-    colorSuccess:      '#1A7A52',  // tx-success
-    colorWarning:      '#C8923A',  // tx-warning
-    colorError:        '#C53030',  // tx-danger
-    colorInfo:         '#0AAF9A',  // mint-500
+    colorPrimary:      '#FF6B35',  // brand-500
+    colorSuccess:      '#27AE60',  // success
+    colorWarning:      '#F2994A',  // warning
+    colorError:        '#EB5757',  // danger
+    colorInfo:         '#2D9CDB',  // info
     colorBgContainer:  '#FFFFFF',
-    colorBgLayout:     '#F7FAFA',  // n-50
-    colorText:         '#0D1E1E',  // n-900
-    colorTextSecondary:'#4A6B6B',  // n-600
-    colorBorder:       '#D8E4E4',  // n-200
+    colorBgLayout:     '#FAFAFA',
+    colorText:         '#1E2A3A',  // navy-700
+    colorTextSecondary:'#595959',
+    colorBorder:       '#E8E8E8',
     borderRadius: 8,
     fontSize: 14,
     fontFamily,
@@ -26,12 +27,12 @@ export const lightTheme: ThemeConfig = {
   components: {
     Layout: {
       headerBg: '#FFFFFF',
-      bodyBg: '#F7FAFA',
-      siderBg: '#032E27',          // mint-900 (深绿侧边栏)
+      bodyBg: '#FAFAFA',
+      siderBg: '#1A1A2E',
     },
     Menu: {
-      darkItemBg: '#032E27',
-      darkItemSelectedBg: '#0AAF9A',
+      darkItemBg: '#1A1A2E',
+      darkItemSelectedBg: '#FF6B35',
     },
     Card: { borderRadiusLG: 12 },
     Button: { borderRadius: 8, controlHeight: 36 },
@@ -43,31 +44,31 @@ export const lightTheme: ThemeConfig = {
 // 暗色主题
 export const darkTheme: ThemeConfig = {
   token: {
-    colorPrimary:      '#0AAF9A',
+    colorPrimary:      '#FF6B35',
     colorSuccess:      '#34D399',
-    colorWarning:      '#FFC244',
+    colorWarning:      '#FBBF24',
     colorError:        '#F87171',
-    colorInfo:         '#0AAF9A',
-    colorBgContainer:  '#0D2029',  // dark-raised
-    colorBgLayout:     '#0B1A20',  // dark-bg
+    colorInfo:         '#60A5FA',
+    colorBgContainer:  '#1A2332',  // dark-raised
+    colorBgLayout:     '#0F1419',  // dark-bg
     colorText:         'rgba(255,255,255,0.92)',
     colorTextSecondary:'rgba(255,255,255,0.50)',
     colorBorder:       'rgba(255,255,255,0.10)',
     borderRadius: 8,
     fontSize: 14,
     fontFamily,
-    colorBgBase: '#0B1A20',
+    colorBgBase: '#0F1419',
     colorTextBase: 'rgba(255,255,255,0.92)',
   },
   components: {
     Layout: {
-      headerBg: '#08141A',
-      bodyBg: '#0B1A20',
-      siderBg: '#08131A',
+      headerBg: '#0F1419',
+      bodyBg: '#0F1419',
+      siderBg: '#0F1419',
     },
     Menu: {
-      darkItemBg: '#08131A',
-      darkItemSelectedBg: '#0AAF9A',
+      darkItemBg: '#0F1419',
+      darkItemSelectedBg: '#FF6B35',
     },
     Card: { borderRadiusLG: 12 },
     Button: { borderRadius: 8, controlHeight: 36 },

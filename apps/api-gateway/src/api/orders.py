@@ -147,6 +147,19 @@ async def update_status(
     svc = OrderService()
     try:
         order = await svc.update_order_status(order_id, body.status, body.notes)
+
+        # Bridge 3: 订单完成→CDP闭环（消费者关联+RFM+旅程评估+预订同步）
+        if body.status == "completed":
+            try:
+                from src.core.database import get_db as _get_db
+                from src.services.lifecycle_bridge import on_order_completed
+                async for db in _get_db():
+                    result = await on_order_completed(db, order_id)
+                    await db.commit()
+                    break
+            except Exception:
+                pass  # fire-and-forget
+
         return order
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))

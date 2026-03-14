@@ -96,7 +96,7 @@ def _get_ops_agent():
 @router.get("/health/{store_id}")
 async def health_check(
     store_id: str,
-    scope: str = Query("store", regex="^(store|all)$"),
+    scope: str = Query("store", pattern="^(store|all)$"),
     current_user: User = Depends(require_permission(Permission.AGENT_OPS_READ)),
 ):
     """门店 IT 健康检查（软件/硬件/网络三域）"""
@@ -160,7 +160,7 @@ async def predict_maintenance(
 @router.get("/security/{store_id}")
 async def security_advice(
     store_id: str,
-    focus: Optional[str] = Query(None, regex="^(password|unauthorized_device|firmware|vpn)?$"),
+    focus: Optional[str] = Query(None, pattern="^(password|unauthorized_device|firmware|vpn)?$"),
     current_user: User = Depends(require_permission(Permission.AGENT_OPS_READ)),
 ):
     """安全加固建议（弱密码/非授权设备/固件漏洞/VPN）"""

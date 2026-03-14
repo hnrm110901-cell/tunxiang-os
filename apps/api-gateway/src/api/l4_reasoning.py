@@ -197,7 +197,7 @@ async def list_reports(
     store_id:   str,
     days:       int          = Query(30, ge=1, le=365),
     dimension:  Optional[str] = Query(None),
-    severity:   Optional[str] = Query(None, regex="^(P1|P2|P3|OK)$"),
+    severity:   Optional[str] = Query(None, pattern="^(P1|P2|P3|OK)$"),
     limit:      int          = Query(50, ge=1, le=200),
     db:         AsyncSession = Depends(get_db),
     _:          User         = Depends(get_current_user),
@@ -333,7 +333,7 @@ async def get_improvement_plan(
     response_model=List[dict],
 )
 async def get_platform_alerts(
-    severity:  str          = Query("P1", regex="^(P1|P2)$"),
+    severity:  str          = Query("P1", pattern="^(P1|P2)$"),
     days:      int          = Query(7, ge=1, le=30),
     dimension: Optional[str] = Query(None),
     limit:     int          = Query(100, ge=1, le=500),

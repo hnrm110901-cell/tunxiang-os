@@ -120,23 +120,48 @@ async def _update_decision_log(
 ) -> None:
     now = datetime.datetime.utcnow()
     try:
+        # 读取当前 trust_score 用于贝叶斯更新
+        current_row = (await db.execute(
+            text("SELECT trust_score, expected_result FROM decision_logs WHERE id = :did"),
+            {"did": decision_id},
+        )).fetchone()
+
+        current_trust = float(current_row[0]) if current_row and current_row[0] else 50.0
+        expected_result = current_row[1] if current_row else None
+
+        # 计算偏差（如果有预期值）
+        deviation = 0.0
+        if expected_result and isinstance(expected_result, dict):
+            expected_fen = expected_result.get("impact_fen", 0)
+            if expected_fen:
+                deviation = abs(actual_impact_fen - expected_fen) / max(abs(expected_fen), 1) * 100
+
+        # 贝叶斯信任分更新
+        from src.services.effect_evaluator import _compute_trust_delta
+        trust_delta = _compute_trust_delta(outcome, deviation, current_trust)
+        new_trust = max(0.0, min(100.0, current_trust + trust_delta))
+
         await db.execute(
             text("""
                 UPDATE decision_logs
                 SET outcome       = :outcome,
                     actual_result = :actual,
+                    result_deviation = :deviation,
+                    trust_score   = :trust,
                     executed_at   = :now,
                     manager_id    = COALESCE(manager_id, :executor),
                     manager_feedback = COALESCE(manager_feedback || ' | ', '') || :note
                 WHERE id = :did
             """),
             {
-                "outcome":  outcome,
-                "actual":   {"impact_fen": actual_impact_fen},
-                "now":      now,
-                "executor": executor_id,
-                "note":     note or "",
-                "did":      decision_id,
+                "outcome":   outcome,
+                "actual":    {"impact_fen": actual_impact_fen},
+                "deviation": round(deviation, 2),
+                "trust":     round(new_trust, 2),
+                "now":       now,
+                "executor":  executor_id,
+                "note":      note or "",
+                "did":       decision_id,
             },
         )
         await db.commit()

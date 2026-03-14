@@ -1,0 +1,7 @@
+.container { padding: 20px; }
+.title { font-size: 20px; font-weight: 600; color: var(--text-primary); margin: 0 0 12px; }
+.summary { display: flex; gap: 8px; margin-bottom: 12px; }
+.itemCard { margin-bottom: 8px; border-radius: 10px; }
+.itemRow { display: flex; justify-content: space-between; align-items: center; }
+.tableBadge { font-size: 12px; font-weight: 600; color: var(--text-secondary); margin: 0 8px; }
+.dishName { font-size: 14px; color: var(--text-primary); }

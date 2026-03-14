@@ -16,7 +16,7 @@ export default function HQLayout() {
     <div className={styles.shell}>
       <aside className={styles.sidebar}>
         <div className={styles.logo}>
-          <img src="/logo-mark-v3.svg" alt="屯象" style={{ width: 24, height: 30 }} />
+          <img src="/logo-icon.svg" alt="屯象" style={{ width: 28, height: 28 }} />
           <span className={styles.logoText}>屯象OS</span>
         </div>
         <nav className={styles.nav}>

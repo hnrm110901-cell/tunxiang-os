@@ -421,7 +421,7 @@ async def get_store_marketing_statistics(
 async def update_campaign_status(
     store_id:    str,
     campaign_id: str,
-    status:      str = Query(..., regex="^(active|completed|cancelled)$"),
+    status:      str = Query(..., pattern="^(active|completed|cancelled)$"),
     db:          AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ) -> Dict[str, Any]:

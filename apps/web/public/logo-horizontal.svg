@@ -1,17 +1,1 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<!--
-  屯象 Logo Horizontal · 芽象 + 文字
-  用于 Topbar / Login / Loading 等场景
--->
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 48" width="200" height="48">
-  <!-- Logo Mark (scaled down) -->
-  <g transform="translate(4,2) scale(0.44)">
-    <circle cx="40" cy="26" r="22" fill="#0AAF9A"/>
-    <rect x="36.5" y="46" width="7" height="28" rx="3.5" fill="#0AAF9A"/>
-    <rect x="10" y="75" width="60" height="8" rx="4" fill="#0AAF9A"/>
-  </g>
-  <!-- 屯象OS Text -->
-  <text x="52" y="32" font-family="'Noto Serif SC', serif" font-weight="700" font-size="20" fill="#0D1E1E" letter-spacing="2">
-    屯象OS
-  </text>
-</svg>
+<svg id="logo-horizontal" viewBox="0 0 320 80" xmlns="http://www.w3.org/2000/svg"><g transform="translate(0, 0)"><rect width="80" height="80" fill="#FF6B35" rx="18"/><path d="M25,45 C25,25 45,20 60,25 C75,30 85,50 75,70 C65,90 40,85 30,75 C20,65 25,55 35,50 C45,45 60,55 55,70" transform="scale(0.8) translate(12, 12)" fill="none" stroke="white" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/><circle cx="40" cy="50.4" r="3" fill="white"/></g><text x="100" y="55" font-family="PingFang SC, SF Pro Display, sans-serif" font-weight="bold" font-size="38" fill="#1D1D1F">屯象OS</text></svg>

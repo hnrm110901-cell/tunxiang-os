@@ -28,7 +28,7 @@ from src.api import merchants
 from src.api import prep_suggestion, soldout, agent_configs
 from src.api.phase5_apis import platform_router, industry_router, supply_chain_router, i18n_router
 # 逐步启用的模块
-from src.api import dashboard, analytics, audit, multi_store, finance, customer360, wechat_triggers, queue, meituan_queue
+from src.api import dashboard, analytics, audit, multi_store, finance, customer360, wechat_triggers, queue, meituan_queue, meituan_reservation
 # 需要外部适配器的模块 (会在适配器不可用时返回错误)
 from src.api import members, blindbox
 from src.api import edge_node, decision_validator, recommendations, agent_collaboration
@@ -77,6 +77,7 @@ from src.api import bulk_import
 from src.api import hq_dashboard
 from src.api import dish_rd_agent
 from src.api import supplier_agent
+from src.api import ai_pillars
 from src.api import ai_accuracy
 from src.api import dashboard_preferences
 from src.api import governance
@@ -471,6 +472,7 @@ app.include_router(customer360.router, tags=["customer360"])
 app.include_router(wechat_triggers.router, tags=["wechat_triggers"])
 app.include_router(queue.router, tags=["queue"])
 app.include_router(meituan_queue.router, tags=["meituan_queue"])
+app.include_router(meituan_reservation.router, tags=["meituan_reservation"])
 
 # Phase 3: 稳定性加固期 (Stability Reinforcement Period)
 app.include_router(edge_node.router, tags=["edge_node"])
@@ -502,6 +504,9 @@ app.include_router(human_in_the_loop.router, tags=["human_in_the_loop"])
 
 # Hardware Integration (硬件集成 - 树莓派5 + Shokz)
 app.include_router(hardware_integration.router, tags=["hardware_integration"])
+
+# AI三支柱 — Skill Registry + Effect Loop + BusinessContext
+app.include_router(ai_pillars.router, tags=["ai-pillars"])
 
 # POS模块
 app.include_router(pos.router, prefix="/api/v1/pos", tags=["pos"])
@@ -747,6 +752,59 @@ app.include_router(banquet_sales_api.router, prefix="/api/v1", tags=["banquet-sa
 app.include_router(event_orders.router, prefix="/api/v1", tags=["event-orders"])
 # Phase P4 — 预订AI助手
 app.include_router(reservation_ai.router, prefix="/api/v1", tags=["reservation-ai"])
+
+# 替换易订 — R1 客户自助预订H5 / R3 桌台平面图 / R4 AI邀请函
+from src.api import public_reservation, floor_plan, invitation
+# 预订数据分析引擎 — 8维度深度分析
+from src.api import reservation_analytics
+app.include_router(public_reservation.router, tags=["public_reservation"])
+app.include_router(floor_plan.router, tags=["floor_plan"])
+app.include_router(invitation.router, tags=["invitation"])
+app.include_router(reservation_analytics.router, tags=["reservation_analytics"])
+
+# 全链路用餐旅程（预订→到店→用餐→离店→售后）
+from src.api import dining_journey
+app.include_router(dining_journey.router, tags=["dining_journey"])
+
+# P0 补齐 — 餐段配置 + 预排菜（替代易订PRO缺口）
+from src.api import meal_period_config, pre_order
+app.include_router(meal_period_config.router, tags=["meal_period_config"])
+app.include_router(pre_order.router, tags=["pre_order"])
+
+# P1 补齐 — 预订单/锁位单 + 销售业绩 + 营销触达 + RFM配置
+from src.api import reservation_receipt, sales_performance, marketing_touchpoint, rfm_config
+app.include_router(reservation_receipt.router, tags=["reservation_receipt"])
+app.include_router(sales_performance.router, tags=["sales_performance"])
+app.include_router(marketing_touchpoint.router, tags=["marketing_touchpoint"])
+app.include_router(rfm_config.router, tags=["rfm_config"])
+
+# P2 补齐 — 客户资源分配 + 来电记录/路线发送
+from src.api import customer_allocation, call_record
+app.include_router(customer_allocation.router, tags=["customer_allocation"])
+app.include_router(call_record.router, tags=["call_record"])
+
+# 全链路闭环桥接
+from src.api import lifecycle
+app.include_router(lifecycle.router, tags=["lifecycle"])
+
+# Sprint 1 — CDP 统一消费者身份
+from src.api import cdp
+app.include_router(cdp.router, tags=["cdp"])
+# Sprint 3 — MemberAgent + BossAgent
+from src.api import member_agent
+app.include_router(member_agent.router, tags=["cdp-agent"])
+# Sprint 4 — 裂变引擎 + FloorAgent + MenuAgent + 增收月报
+from src.api import growth_agent
+app.include_router(growth_agent.router, tags=["cdp-growth"])
+# Sprint 5 — CostAgent + KitchenAgent + StoreAgent
+from src.api import ops_intelligence
+app.include_router(ops_intelligence.router, tags=["cdp-ops"])
+# Sprint 6 — PeopleAgent + OntologyAgent + TenantReplicator
+from src.api import platform_agent
+app.include_router(platform_agent.router, tags=["cdp-platform"])
+# CDP 监控仪表盘
+from src.api import cdp_monitor
+app.include_router(cdp_monitor.router, tags=["cdp-monitor"])
 
 # P0 — 食材成本真相引擎
 from src.api import cost_truth

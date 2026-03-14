@@ -33,6 +33,9 @@ class Order(Base, TimestampMixin):
     customer_name = Column(String(100))
     customer_phone = Column(String(20))
 
+    # CDP 统一消费者ID（Sprint 1 地基层）
+    consumer_id = Column(UUID(as_uuid=True), nullable=True, index=True)
+
     # Order details
     status = Column(String(20), default=OrderStatus.PENDING.value, nullable=False, index=True)
     total_amount = Column(Numeric(10, 2), nullable=False)  # stored as yuan in DB

@@ -171,6 +171,9 @@ const DOMAIN_SIDEBAR: DomainSidebar = {
         { key: '/banquet-sales',        icon: <FundOutlined />,            label: '宴会销控' },
         { key: '/event-orders',         icon: <FileTextOutlined />,        label: 'EO执行' },
         { key: '/reservation-ai',      icon: <RobotOutlined />,           label: '预订AI' },
+        { key: '/reservation-analytics', icon: <PieChartOutlined />,     label: '预订分析' },
+        { key: '/floor-plan',          icon: <EnvironmentOutlined />,     label: '桌台平面图' },
+        { key: '/invitation-manager',  icon: <ShareAltOutlined />,        label: 'AI邀请函' },
         { key: '/service',              icon: <CustomerServiceOutlined />, label: '服务质量' },
       ],
     },
@@ -195,6 +198,7 @@ const DOMAIN_SIDEBAR: DomainSidebar = {
         { key: '/members',             icon: <UserOutlined />,      label: '会员中心' },
         { key: '/customer360',         icon: <UserOutlined />,      label: '客户360' },
         { key: '/private-domain',      icon: <TeamOutlined />,      label: '私域运营' },
+        { key: '/cdp-monitor',         icon: <DatabaseOutlined />,  label: 'CDP监控' },
       ],
     },
     {
@@ -359,6 +363,7 @@ const BREADCRUMB_LABELS: Record<string, string> = {
   '/marketing': '营销智能体',
   '/customer360': '客户360',
   '/private-domain': '私域运营',
+  '/cdp-monitor': 'CDP监控',
   '/channel-profit': '渠道毛利',
   '/channel-analytics': '渠道分析',
   '/customer-risk': '客户风控',
@@ -665,7 +670,9 @@ const MainLayout: React.FC = () => {
         <div className={styles.topNavLeft}>
           {/* Logo */}
           <div className={styles.logo} onClick={() => navigate('/')}>
-            <img src="/logo-mark-v3.svg" alt="屯象" style={{ width: 26, height: 32 }} />
+            <div className={styles.logoMark}>
+              <img src="/logo-icon.svg" alt="屯象" style={{ width: 32, height: 32 }} />
+            </div>
             <span className={styles.logoText}>{brandName || '屯象OS'}</span>
           </div>
 

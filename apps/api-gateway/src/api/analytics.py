@@ -68,7 +68,7 @@ async def analyze_associations(
 async def revenue_trend(
     store_id:    str = Query(..., description="门店ID"),
     days:        int = Query(30, ge=7, le=365, description="统计天数"),
-    granularity: str = Query("daily", regex="^(daily|weekly)$", description="颗粒度: daily / weekly"),
+    granularity: str = Query("daily", pattern="^(daily|weekly)$", description="颗粒度: daily / weekly"),
     db:          AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):

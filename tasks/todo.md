@@ -110,6 +110,56 @@
 
 ## 进行中
 
+### Sprint 1 — CDP地基 + 品智POS打通（90天计划 W1-2）
+
+> CDP宪法：1.任何消费者记录必须经resolve()获取consumer_id 2.consumer_id不可修改只能merge() 3.所有渠道消费行为必须归因到consumer_id
+
+#### S1.1-S1.7: CDP 核心模型+服务+POS改造
+
+- [x] `src/models/consumer_identity.py` — ConsumerIdentity 统一消费者身份（primary_phone业务键，聚合profile，RFM快照，merge支持）
+- [x] `src/models/consumer_id_mapping.py` — ConsumerIdMapping 11种外部ID映射（PHONE/WECHAT_OPENID/POS_MEMBER_ID/MEITUAN_UID等）
+- [x] `src/services/identity_resolution_service.py` — IdentityResolutionService: resolve()/merge()/backfill_orders()/refresh_profile()/get_stats()
+- [x] `src/services/cdp_sync_service.py` — CDPSyncService: sync_store_orders()/sync_all_stores()/get_fill_rate()
+- [x] `src/api/cdp.py` — 8个API端点: resolve/consumer/{id}/lookup/merge/backfill/refresh/stats/fill-rate
+- [x] Order/Reservation/Queue 三表加 consumer_id 字段（UUID, nullable, indexed）
+- [x] Alembic迁移 `z47_cdp_consumer_identity.py`（2表+3字段+索引）
+- [x] `models/__init__.py` 注册 ConsumerIdentity + ConsumerIdMapping + IdType
+- [x] `main.py` 注册 CDP router
+- [x] `alembic/env.py` 注册新模型
+- [x] 品智POS celery_tasks INSERT 增加 customer_phone/customer_name（从 vipMobile/vipName 提取）
+- [x] adapter_integration_service _convert_pinzhi_order 增加 customer_phone/pos_member_id
+- [x] Celery Beat `cdp-sync-consumer-ids`（02:30，紧跟POS拉取后自动回填）
+- [x] 19个单元测试全部通过（`tests/test_identity_resolution_service.py`）
+
+#### S1 待完成
+
+- [x] 品智订单全量同步回填 — `cdp_monitor_service.run_full_backfill()` 4步管道 + Celery异步任务
+- [x] consumer_id 填充率验证（KPI: ≥80%）— `compute_kpi_summary()` + `classify_fill_rate_health()`
+
+#### S2.1-S2.6: CDP 打通私域 + 企微通道 + RFM 重算
+
+- [x] PrivateDomainMember 加 consumer_id + r_score/f_score/m_score 字段
+- [x] `src/services/cdp_rfm_service.py` — CDPRFMService: recalculate_all()/compute_deviation()/backfill_members()
+  - 纯函数：score_recency/score_frequency/score_monetary/classify_rfm_level/compute_risk_score
+  - R评分：≤7天=5, ≤14天=4, ≤30天=3, ≤60天=2, >60天=1
+  - RFM→S1-S5：sum≥13=S1, ≥10=S2, ≥7=S3, ≥4=S4, <4=S5
+  - 风险分：R权重60% + F/M各20%
+- [x] `src/services/cdp_wechat_channel.py` — CDPWeChatChannel: send_to_consumer()/batch_send_by_rfm()/batch_send_by_tags()/get_channel_stats()
+- [x] CDP API 扩展（6个新端点）：rfm/recalculate, rfm/deviation, backfill/members, wechat/batch-send, wechat/tag-send, wechat/channel-stats
+- [x] Alembic迁移 `z48_cdp_private_domain_link.py`（consumer_id + r/f/m_score 4字段）
+- [x] Celery Beat `cdp-rfm-recalculate`（03:00，02:30 consumer_id 回填后）
+- [x] celery_tasks 新增 `cdp_rfm_recalculate` 任务（回填member→重算RFM→偏差校验）
+- [x] 49个单元测试全部通过（Sprint 1: 19 + Sprint 2: 30）
+
+#### S2 待完成
+
+- [x] 生产环境执行回填 — `POST /api/v1/cdp/monitor/full-backfill` + Celery `cdp_full_backfill` 异步任务
+- [x] RFM 偏差验证（KPI: < 5%）— `compute_kpi_summary()` deviation_kpi 校验
+- [x] 前端 CDP 监控面板 — `CDPMonitorPage.tsx`（KPI横幅+填充率表+RFM柱状图+偏差卡+全量回填按钮）
+- [x] `src/services/cdp_monitor_service.py` — 纯函数 + Dashboard聚合 + 4步回填管道
+- [x] `src/api/cdp_monitor.py` — 4个端点 + Celery异步回填
+- [x] `tests/test_cdp_monitor_service.py` — 27个测试全部通过
+
 ---
 
 ## Phase 7 Month 1 — L5 行动层补全（2026-03-08）

@@ -227,6 +227,14 @@ celery_app.conf.update(
             "queue": "high_priority",   # P0/P1 走高优先队列；fire_and_forget 本身按 priority 选队列
             "routing_key": "high_priority",
         },
+        "src.core.celery_tasks.member_agent_dormant_sweep": {
+            "queue": "default",
+            "routing_key": "default",
+        },
+        "src.core.celery_tasks.revenue_growth_monthly_report": {
+            "queue": "default",
+            "routing_key": "default",
+        },
         "tasks.push_daily_workforce_advice": {
             "queue": "default",
             "routing_key": "default",
@@ -557,6 +565,47 @@ celery_app.conf.update(
             "args": (),
             "options": {"queue": "default", "priority": 7},
         },
+        # Sprint 1 CDP: POS拉取后回填 consumer_id（02:30 紧跟 POS 拉取）
+        "cdp-sync-consumer-ids": {
+            "task": "src.core.celery_tasks.cdp_sync_consumer_ids",
+            "schedule": crontab(
+                hour=int(os.getenv("CDP_SYNC_HOUR", "2")),
+                minute=int(os.getenv("CDP_SYNC_MINUTE", "30")),
+            ),
+            "args": (),
+            "options": {"queue": "default", "priority": 8},
+        },
+        # Sprint 2 CDP: consumer_id 驱动的 RFM 重算（03:00，旧 RFM 刷新在 03:30）
+        "cdp-rfm-recalculate": {
+            "task": "src.core.celery_tasks.cdp_rfm_recalculate",
+            "schedule": crontab(
+                hour=int(os.getenv("CDP_RFM_HOUR", "3")),
+                minute=int(os.getenv("CDP_RFM_MINUTE", "0")),
+            ),
+            "args": (),
+            "options": {"queue": "default", "priority": 7},
+        },
+        # Sprint 4: 每月1日 08:00 生成上月增收月报
+        "revenue-growth-monthly-report": {
+            "task": "src.core.celery_tasks.revenue_growth_monthly_report",
+            "schedule": crontab(
+                hour=int(os.getenv("REVENUE_REPORT_HOUR", "8")),
+                minute=int(os.getenv("REVENUE_REPORT_MINUTE", "0")),
+                day_of_month=1,
+            ),
+            "args": (),
+            "options": {"queue": "default", "priority": 5},
+        },
+        # Sprint 3 MemberAgent: 每日 06:30 自动扫描沉睡会员并触发唤醒旅程（KPI: ≥50条/周）
+        "member-agent-dormant-sweep": {
+            "task": "src.core.celery_tasks.member_agent_dormant_sweep",
+            "schedule": crontab(
+                hour=int(os.getenv("MEMBER_AGENT_SWEEP_HOUR", "6")),
+                minute=int(os.getenv("MEMBER_AGENT_SWEEP_MINUTE", "30")),
+            ),
+            "args": (),
+            "options": {"queue": "default", "priority": 6},
+        },
         # P3: 每N分钟 OpsAgent 巡检 + P0 级别自动推送企微告警
         "ops-patrol": {
             "task": "src.core.celery_tasks.ops_patrol",
@@ -606,6 +655,13 @@ celery_app.conf.update(
             "schedule": crontab(minute=0, hour="*/2"),
             "args": (),
             "options": {"queue": "default", "priority": 7},
+        },
+        # P2 — 每日03:30 决策效果闭环评估（扫描已执行未评估的 DecisionLog）
+        "evaluate-decision-effects": {
+            "task": "src.core.celery_tasks.evaluate_decision_effects",
+            "schedule": crontab(hour=3, minute=30),
+            "args": (),
+            "options": {"queue": "default", "priority": 5},
         },
         # Phase 9 — 每3分钟检测边缘主机心跳，离线自动创建 P1 告警
         "check-edge-hub-heartbeats": {

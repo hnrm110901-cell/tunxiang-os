@@ -71,6 +71,33 @@ async def _get_yesterday_story(store_id: str, db: AsyncSession) -> Dict[str, Any
         return {"cost_metrics": {}, "decision_summary": {}, "narrative": "-", "date": str(yesterday)}
 
 
+async def _get_ai_trust_summary(store_id: str, db: AsyncSession) -> Dict[str, Any]:
+    try:
+        row = (await db.execute(
+            text("""
+                SELECT
+                    ROUND(AVG(trust_score)::numeric, 1) AS avg_trust,
+                    COUNT(CASE WHEN outcome = 'success' THEN 1 END) AS success,
+                    COUNT(CASE WHEN outcome IS NOT NULL THEN 1 END) AS evaluated,
+                    COALESCE(SUM(CASE WHEN outcome = 'success' THEN cost_impact ELSE 0 END), 0) AS saved
+                FROM decision_logs
+                WHERE store_id = :s AND created_at >= NOW() - INTERVAL '30 days'
+            """),
+            {"s": store_id},
+        )).fetchone()
+        if not row or row[0] is None:
+            return {"avg_trust": 0, "success_count": 0, "evaluated_count": 0, "saved_yuan": 0}
+        return {
+            "avg_trust":       float(row[0]),
+            "success_count":   int(row[1]),
+            "evaluated_count": int(row[2]),
+            "saved_yuan":      round(float(row[3]), 2),
+        }
+    except Exception as exc:
+        logger.warning("briefing.trust_failed", error=str(exc))
+        return {"avg_trust": 0, "success_count": 0, "evaluated_count": 0, "saved_yuan": 0}
+
+
 async def _get_churn_risk_count(store_id: str, db: AsyncSession) -> int:
     try:
         row = (await db.execute(
@@ -109,11 +136,12 @@ async def generate_briefing(
     today     = datetime.date.today()
     yesterday = today - datetime.timedelta(days=1)
 
-    health, decisions, story, churn = (
+    health, decisions, story, churn, trust = (
         await _get_health(store_id, db),
         await _get_top3_decisions(store_id, db),
         await _get_yesterday_story(store_id, db),
         await _get_churn_risk_count(store_id, db),
+        await _get_ai_trust_summary(store_id, db),
     )
 
     # 今日核心行动（取健康分最薄弱维度的第1条建议）
@@ -148,6 +176,15 @@ async def generate_briefing(
                 f" | ¥{impact:,.0f} | 置信度{confidence:.0%}"
             )
 
+    if trust.get("avg_trust", 0) > 0:
+        push_lines.append("━━ AI信任分 ━━")
+        push_lines.append(
+            f"信任分 {trust['avg_trust']:.0f} | "
+            f"已评估 {trust['evaluated_count']}条 | "
+            f"成功 {trust['success_count']}条 | "
+            f"累计节省 ¥{trust['saved_yuan']:,.2f}"
+        )
+
     if churn > 0:
         push_lines.append(f"━━ 流失预警 ━━")
         push_lines.append(f"⚠️ 高风险会员 {churn} 人，建议立即启动唤醒旅程")
@@ -175,9 +212,10 @@ async def generate_briefing(
             "waste_yuan":       waste_y,
             "narrative":        story.get("narrative", "-"),
         },
-        "churn_risk":   churn,
-        "top_action":   top_action,
-        "push_text":    push_text,
+        "churn_risk":       churn,
+        "ai_trust_summary": trust,
+        "top_action":       top_action,
+        "push_text":        push_text,
     }
 
 

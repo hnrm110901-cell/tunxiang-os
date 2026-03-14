@@ -513,6 +513,10 @@ class AdapterIntegrationService:
             "discount_amount": (order_data.get("specialOfferPrice", 0) or 0) / 100,
             "real_amount": (order_data.get("realPrice", 0) or 0) / 100,
             "status": status_map.get(bill_status, "pending"),
+            # CDP: 品智会员手机号/会员卡号（供 consumer_id 回填）
+            "customer_phone": order_data.get("vipMobile") or order_data.get("mobile"),
+            "customer_name": order_data.get("vipName"),
+            "pos_member_id": order_data.get("vipCard"),
             "dishes": [
                 {
                     "dish_id": item.get("dishId"),

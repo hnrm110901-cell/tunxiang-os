@@ -156,7 +156,7 @@ const PlatformAdminLayout: React.FC = () => {
       <aside className={`${styles.sidebar} ${collapsed ? styles.sidebarCollapsed : ''}`}>
         {/* Logo */}
         <div className={styles.logo}>
-          <span className={styles.logoIcon}>🐘</span>
+          <img src="/logo-icon.svg" alt="屯象" style={{ width: 28, height: 28 }} />
           {!collapsed && (
             <div className={styles.logoText}>
               <span className={styles.logoName}>屯象OS</span>

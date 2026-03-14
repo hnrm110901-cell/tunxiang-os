@@ -93,6 +93,7 @@ class AgentMessage:
     created_at: str = field(
         default_factory=lambda: datetime.now(timezone.utc).isoformat()
     )
+    context: Optional[Dict[str, Any]] = None  # BusinessContext 序列化数据
 
     def enrich_payload(self) -> Dict[str, Any]:
         """返回注入了 store_id 的参数字典（不修改原 payload）。"""
@@ -275,6 +276,17 @@ class AgentBus:
         agent = self._make_agent(msg.to_agent)
         params = msg.enrich_payload()
 
+        # 传递 BusinessContext：追加 breadcrumb 并透传到目标 Agent
+        if msg.context:
+            try:
+                from src.core.business_context import BusinessContext
+                ctx = BusinessContext.from_dict(msg.context)
+                ctx.add_breadcrumb(f"agent_bus:{msg.from_agent}->{msg.to_agent}:{msg.action}")
+                msg.context = ctx.to_dict()
+                params["_business_context"] = msg.context
+            except Exception:
+                pass
+
         try:
             response = await asyncio.wait_for(
                 agent.execute(msg.action, params),
@@ -358,6 +370,14 @@ class AgentBus:
         )
         return list(replies)
 
+    def discover_skills(self, intent: str) -> list:
+        """基于 SkillRegistry 按业务意图发现跨 Agent 的技能。"""
+        try:
+            from src.core.skill_registry import SkillRegistry
+            return SkillRegistry.get().query(intent=intent)
+        except Exception:
+            return []
+
     async def fire_and_forget(self, msg: AgentMessage) -> str:
         """
         即发即忘：将消息投递到 Celery 异步任务队列，立即返回 msg_id。
@@ -378,6 +398,7 @@ class AgentBus:
                     "priority": msg.priority,
                     "trace_id": msg.trace_id,
                     "msg_id": msg.msg_id,
+                    "context": msg.context,
                 },
                 queue=queue,
                 priority=msg.priority,

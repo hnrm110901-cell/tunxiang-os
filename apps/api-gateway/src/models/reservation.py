@@ -40,6 +40,9 @@ class Reservation(Base, TimestampMixin):
     customer_phone = Column(String(20), nullable=False, index=True)
     customer_email = Column(String(100))
 
+    # CDP 统一消费者ID（Sprint 1 地基层）
+    consumer_id = Column(UUID(as_uuid=True), nullable=True, index=True)
+
     # Reservation details
     reservation_type = Column(Enum(ReservationType), default=ReservationType.REGULAR, nullable=False)
     reservation_date = Column(Date, nullable=False, index=True)

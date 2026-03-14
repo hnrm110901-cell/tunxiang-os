@@ -179,6 +179,18 @@ const BanquetSalesPage = lazy(() => import('./pages/BanquetSalesPage'));
 const EventOrderPage = lazy(() => import('./pages/EventOrderPage'));
 const ReservationAIPage = lazy(() => import('./pages/ReservationAIPage'));
 
+// CDP 监控面板
+const CDPMonitorPage = lazy(() => import('./pages/CDPMonitorPage'));
+
+// 替换易订 — R1 客户自助预订H5 / R3 桌台平面图 / R4 AI邀请函
+const BookingH5 = lazy(() => import('./pages/public/BookingH5'));
+const BookingLookup = lazy(() => import('./pages/public/BookingLookup'));
+const FloorPlanPage = lazy(() => import('./pages/FloorPlanPage'));
+const InvitationView = lazy(() => import('./pages/public/InvitationView'));
+const InvitationManagerPage = lazy(() => import('./pages/InvitationManagerPage'));
+// 预订数据分析仪表板
+const ReservationAnalyticsPage = lazy(() => import('./pages/ReservationAnalyticsPage'));
+
 // Role-based views (Phase 1 — Store Manager /sm)
 const StoreManagerLayout = lazy(() => import('./layouts/StoreManagerLayout'));
 const SmHome      = lazy(() => import('./pages/sm/Home'));
@@ -189,6 +201,8 @@ const SmDecisions = lazy(() => import('./pages/sm/Decisions'));
 const SmAlerts    = lazy(() => import('./pages/sm/Alerts'));
 const SmWorkforce = lazy(() => import('./pages/sm/Workforce'));
 const SmPrepSuggestion = lazy(() => import('./pages/sm/PrepSuggestion'));
+const SmPatrol    = lazy(() => import('./pages/sm/Patrol'));
+const SmProfile   = lazy(() => import('./pages/sm/Profile'));
 
 // Platform Admin layout + pages (admin.zlsjos.cn / www.admin.zlsjos.cn)
 const PlatformAdminLayout = lazy(() => import('./layouts/PlatformAdminLayout'));
@@ -204,6 +218,9 @@ const FloorLayout     = lazy(() => import('./layouts/FloorLayout'));
 const FloorHome       = lazy(() => import('./pages/floor/Home'));
 const FloorQueue      = lazy(() => import('./pages/floor/Queue'));
 const FloorReservations = lazy(() => import('./pages/floor/Reservations'));
+const FloorTables    = lazy(() => import('./pages/floor/Tables'));
+const FloorCheckout  = lazy(() => import('./pages/floor/Checkout'));
+const FloorKitchen   = lazy(() => import('./pages/floor/Kitchen'));
 const HQLayout        = lazy(() => import('./layouts/HQLayout'));
 const HQHome          = lazy(() => import('./pages/hq/Home'));
 const HQStores        = lazy(() => import('./pages/hq/Stores'));
@@ -270,6 +287,10 @@ const AppContent: React.FC = () => {
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/unauthorized" element={<UnauthorizedPage />} />
                 <Route path="/onboarding" element={<OnboardingPage />} />
+                {/* 替换易订 — 公开路由（无需登录） */}
+                <Route path="/book" element={<BookingH5 />} />
+                <Route path="/my-booking" element={<BookingLookup />} />
+                <Route path="/invitation/:token" element={<InvitationView />} />
                 <Route path="/mobile" element={
                   <ProtectedRoute>
                     <MobileApp />
@@ -355,6 +376,9 @@ const AppContent: React.FC = () => {
                   } />
                   <Route path="members" element={
                     <ProtectedRoute requiredRole="admin"><MemberSystemPage /></ProtectedRoute>
+                  } />
+                  <Route path="cdp-monitor" element={
+                    <ProtectedRoute requiredRole="admin"><CDPMonitorPage /></ProtectedRoute>
                   } />
                   <Route path="kpi-dashboard" element={
                     <ProtectedRoute requiredRole="admin"><KPIDashboardPage /></ProtectedRoute>
@@ -745,6 +769,16 @@ const AppContent: React.FC = () => {
                   <Route path="fct-advanced" element={
                     <ProtectedRoute requiredRole="admin"><FctAdvancedPage /></ProtectedRoute>
                   } />
+                  {/* 替换易订 — R3 桌台平面图 / R4 AI邀请函 */}
+                  <Route path="floor-plan" element={
+                    <ProtectedRoute><FloorPlanPage /></ProtectedRoute>
+                  } />
+                  <Route path="invitation-manager" element={
+                    <ProtectedRoute><InvitationManagerPage /></ProtectedRoute>
+                  } />
+                  <Route path="reservation-analytics" element={
+                    <ProtectedRoute><ReservationAnalyticsPage /></ProtectedRoute>
+                  } />
                 </Route>
                 <Route path="*" element={<NotFoundPage />} />
 
@@ -807,6 +841,8 @@ const AppContent: React.FC = () => {
                   <Route path="banquet-search"       element={<SmBanquetSearch />} />
                   <Route path="private-domain-health" element={<SmPrivateDomainHealth />} />
                   <Route path="prep" element={<SmPrepSuggestion />} />
+                  <Route path="patrol"   element={<SmPatrol />} />
+                  <Route path="profile"  element={<SmProfile />} />
                 </Route>
 
                 {/* Role-based views — Chef (手机) */}
@@ -828,8 +864,11 @@ const AppContent: React.FC = () => {
                   </ProtectedRoute>
                 }>
                   <Route index element={<FloorHome />} />
+                  <Route path="tables"       element={<FloorTables />} />
                   <Route path="queue"        element={<FloorQueue />} />
                   <Route path="reservations" element={<FloorReservations />} />
+                  <Route path="checkout"     element={<FloorCheckout />} />
+                  <Route path="kitchen"      element={<FloorKitchen />} />
                 </Route>
 
                 {/* Role-based views — HQ (桌面) */}

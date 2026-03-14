@@ -1,15 +1,16 @@
 /**
  * 屯象OS · 阴影/圆角/z-index Token
+ * 基于 TunxiangOS UI Design Spec v1.0
  */
 
-// ── Border Radius ──
+// ── Border Radius (Design Spec v1.0) ──
 export const radius = {
   '2xs':  3,
-  xs:     4,
+  xs:     4,     // --radius-sm: badge, small tag
   sm:     6,
-  md:     8,
-  lg:     12,
-  xl:     16,
+  md:     8,     // --radius-md: button, input, table row hover
+  lg:     12,    // --radius-lg: card, modal, dropdown
+  xl:     16,    // --radius-xl: bottom sheet (mobile), floating panel
   '2xl':  24,
   full:   9999,
 } as const;

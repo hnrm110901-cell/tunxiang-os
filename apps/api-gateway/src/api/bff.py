@@ -101,8 +101,9 @@ async def sm_home(
     fc_task        = _fetch_food_cost_quick(store_id, db)
     alerts_task    = _fetch_unread_alerts_count(store_id, db)
     hub_task       = _fetch_edge_hub_status(store_id, db)
+    trust_task     = _fetch_ai_trust_summary(store_id, db)
 
-    health, top3, queue, pending, revenue, fc, alerts_count, hub_status = await asyncio.gather(
+    health, top3, queue, pending, revenue, fc, alerts_count, hub_status, trust = await asyncio.gather(
         _safe(health_task,  default=None),
         _safe(top3_task,    default=[]),
         _safe(queue_task,   default=None),
@@ -111,6 +112,7 @@ async def sm_home(
         _safe(fc_task,      default=None),
         _safe(alerts_task,  default=0),
         _safe(hub_task,     default=None),
+        _safe(trust_task,   default=None),
     )
 
     payload = {
@@ -124,6 +126,7 @@ async def sm_home(
         "food_cost_summary":       fc,
         "unread_alerts_count":     alerts_count,
         "edge_hub_status":         hub_status,
+        "ai_trust_summary":        trust,
     }
 
     await _cache_set(cache_key, payload)
@@ -244,14 +247,16 @@ async def hq_overview(
     trend_task        = _fetch_revenue_trend(db)
     decisions_task    = _fetch_cross_store_decisions(db)
     hub_summary_task  = _fetch_hq_edge_hub_summary(db)
+    trust_task        = _fetch_hq_ai_trust_overview(db)
 
-    health_ranking, fc_ranking, pending, revenue_trend, cross_decisions, hub_summary = await asyncio.gather(
+    health_ranking, fc_ranking, pending, revenue_trend, cross_decisions, hub_summary, trust_overview = await asyncio.gather(
         _safe(health_task,       default=[]),
         _safe(fc_rank_task,      default=[]),
         _safe(pending_task,      default=0),
         _safe(trend_task,        default={}),
         _safe(decisions_task,    default=[]),
         _safe(hub_summary_task,  default=None),
+        _safe(trust_task,        default=None),
     )
 
     # 计算汇总指标
@@ -278,6 +283,7 @@ async def hq_overview(
             "warning_store_count":  warning_count,
         },
         "edge_hub_summary": hub_summary,
+        "ai_trust_overview": trust_overview,
     }
 
     await _cache_set(cache_key, payload)
@@ -319,9 +325,12 @@ async def sm_notifications(
         notifications.append({
             "id":                   r.id,
             "type":                 "pending_decision",
+            "decision_type":        r.decision_type or "",
             "title":                suggestion.get("action", "待审批决策"),
             "expected_saving_yuan": suggestion.get("expected_saving_yuan", 0.0),
             "confidence_pct":       round(float(r.ai_confidence or 0) * 100, 1),
+            "trust_score":          round(float(r.trust_score or 0), 1),
+            "ai_reasoning":         suggestion.get("reasoning", ""),
             "created_at":           r.created_at.isoformat() if r.created_at else None,
         })
 
@@ -790,6 +799,82 @@ async def _fetch_unread_alerts_count(store_id: str, db: AsyncSession) -> int:
         {"sid": store_id},
     )
     return int((row.fetchone() or [0])[0])
+
+
+async def _fetch_ai_trust_summary(store_id: str, db: AsyncSession) -> Optional[Dict]:
+    """门店AI信任分摘要：平均信任分 + 近30天评估成功率 + 累计¥节省。"""
+    from sqlalchemy import text
+    row = (await db.execute(
+        text("""
+            SELECT
+                ROUND(AVG(trust_score)::numeric, 1) AS avg_trust,
+                COUNT(CASE WHEN outcome IS NOT NULL THEN 1 END) AS evaluated,
+                COUNT(CASE WHEN outcome = 'success' THEN 1 END) AS success,
+                COALESCE(SUM(CASE WHEN outcome = 'success' THEN cost_impact ELSE 0 END), 0) AS saved_yuan
+            FROM decision_logs
+            WHERE store_id = :sid
+              AND created_at >= NOW() - INTERVAL '30 days'
+        """),
+        {"sid": store_id},
+    )).fetchone()
+    if not row or row[0] is None:
+        return None
+    evaluated = int(row[1])
+    success = int(row[2])
+    return {
+        "avg_trust_score":    float(row[0]),
+        "evaluated_count":    evaluated,
+        "success_count":      success,
+        "success_rate_pct":   round(success / evaluated * 100, 1) if evaluated else 0.0,
+        "total_saved_yuan":   round(float(row[3]), 2),
+    }
+
+
+async def _fetch_hq_ai_trust_overview(db: AsyncSession) -> Optional[Dict]:
+    """全平台AI信任分概览：各门店平均信任分 + 全局评估统计。"""
+    from sqlalchemy import text
+    rows = (await db.execute(
+        text("""
+            SELECT
+                dl.store_id,
+                s.name AS store_name,
+                ROUND(AVG(dl.trust_score)::numeric, 1) AS avg_trust,
+                COUNT(CASE WHEN dl.outcome IS NOT NULL THEN 1 END) AS evaluated,
+                COUNT(CASE WHEN dl.outcome = 'success' THEN 1 END) AS success
+            FROM decision_logs dl
+            LEFT JOIN stores s ON s.id = dl.store_id
+            WHERE dl.created_at >= NOW() - INTERVAL '30 days'
+              AND dl.trust_score IS NOT NULL
+            GROUP BY dl.store_id, s.name
+            ORDER BY avg_trust DESC
+        """),
+    )).fetchall()
+    if not rows:
+        return None
+
+    stores = []
+    total_evaluated = 0
+    total_success = 0
+    for r in rows:
+        evaluated = int(r[3])
+        success = int(r[4])
+        total_evaluated += evaluated
+        total_success += success
+        stores.append({
+            "store_id":    r[0],
+            "store_name":  r[1] or r[0],
+            "avg_trust":   float(r[2]),
+            "evaluated":   evaluated,
+            "success":     success,
+        })
+
+    return {
+        "store_trust_ranking": stores,
+        "platform_avg_trust":  round(sum(s["avg_trust"] for s in stores) / len(stores), 1) if stores else 0.0,
+        "total_evaluated":     total_evaluated,
+        "total_success":       total_success,
+        "platform_success_rate_pct": round(total_success / total_evaluated * 100, 1) if total_evaluated else 0.0,
+    }
 
 
 async def _fetch_cross_store_decisions(db: AsyncSession) -> List[Dict]:

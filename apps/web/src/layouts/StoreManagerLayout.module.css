@@ -35,6 +35,31 @@
   padding-bottom: env(safe-area-inset-bottom);
 }
 
+/* Voice FAB */
+.voiceFab {
+  position: fixed;
+  bottom: calc(56px + env(safe-area-inset-bottom, 0px) + 16px);
+  right: 16px;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #FF8E53, #FF6B35);
+  border: none;
+  box-shadow: 0 4px 16px rgba(255,107,53,0.35);
+  font-size: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 50;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.voiceFab:active {
+  transform: scale(0.92);
+  box-shadow: 0 2px 8px rgba(255,107,53,0.25);
+}
+
 /* Bottom tab bar */
 .tabBar {
   display: flex;

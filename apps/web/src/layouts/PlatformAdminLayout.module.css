@@ -5,7 +5,7 @@
   height: 100vh;
   overflow: hidden;
   background: #F5F5F7;
-  font-family: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
+  font-family: 'PingFang SC', 'HarmonyOS Sans SC', 'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
 }
 
 /* ── Sidebar ─────────────────────────────────────────────────────────────────*/
@@ -105,7 +105,7 @@
 }
 
 .groupHeaderActive {
-  color: #0AAF9A !important;
+  color: #FF6B35 !important;
 }
 
 .groupTitle {
@@ -162,7 +162,7 @@
 }
 
 .navItemActive {
-  color: #0AAF9A !important;
+  color: #FF6B35 !important;
   background: rgba(10, 175, 154, 0.12) !important;
 }
 
@@ -174,7 +174,7 @@
   transform: translateY(-50%);
   width: 3px;
   height: 60%;
-  background: #0AAF9A;
+  background: #FF6B35;
   border-radius: 0 3px 3px 0;
 }
 
@@ -222,8 +222,8 @@
 }
 
 .badge_new {
-  background: rgba(10, 175, 154, 0.2);
-  color: #0AAF9A;
+  background: rgba(255, 107, 53, 0.2);
+  color: #FF6B35;
 }
 
 .badge_beta {
@@ -251,7 +251,7 @@
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #0AAF9A, #066E5D);
+  background: linear-gradient(135deg, #FF8E53, #FF6B35);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -314,7 +314,7 @@
 /* ── Topbar ──────────────────────────────────────────────────────────────────*/
 
 .topbar {
-  height: 52px;
+  height: 56px;
   background: #fff;
   border-bottom: 1px solid #E8E8E8;
   display: flex;
@@ -373,8 +373,8 @@
   font-weight: 700;
   padding: 2px 8px;
   border-radius: 4px;
-  background: rgba(10, 175, 154, 0.12);
-  color: #0AAF9A;
+  background: rgba(255, 107, 53, 0.12);
+  color: #FF6B35;
   letter-spacing: 0.05em;
 }
 
