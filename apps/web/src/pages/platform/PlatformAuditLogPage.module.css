@@ -1,0 +1,228 @@
+/* PlatformAuditLogPage.module.css */
+
+/* ── 页面容器 ─────────────────────────────────────────────────────────────── */
+.page {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 24px 28px;
+}
+
+/* ── 页头 ──────────────────────────────────────────────────────────────────── */
+.pageHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  gap: 16px;
+}
+
+.pageTitle {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary, #111827);
+  margin: 0 0 4px;
+  letter-spacing: -0.3px;
+}
+
+.pageSubtitle {
+  font-size: 13px;
+  color: var(--text-tertiary, #9ca3af);
+  margin: 0;
+}
+
+.headerActions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+/* ── 提示行 ──────────────────────────────────────────────────────────────── */
+.alertRow {
+  margin-bottom: 14px;
+}
+
+/* ── 统计行 ────────────────────────────────────────────────────────────────── */
+.statsRow {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.statCard {
+  padding: 16px 20px !important;
+  text-align: center;
+}
+
+.statNum {
+  font-size: 30px;
+  font-weight: 800;
+  color: var(--text-primary, #111827);
+  line-height: 1.1;
+  margin-bottom: 4px;
+  letter-spacing: -1px;
+}
+
+.statNumGreen { color: #22c55e; }
+.statNumRed   { color: #ef4444; }
+
+.statLabel {
+  font-size: 12px;
+  color: var(--text-tertiary, #9ca3af);
+  font-weight: 500;
+}
+
+/* ── 过滤栏 ────────────────────────────────────────────────────────────────── */
+.filterCard {
+  padding: 16px 20px !important;
+  margin-bottom: 14px;
+}
+
+.filterRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.searchInput {
+  flex: 1;
+  min-width: 180px;
+}
+
+/* ── 日期范围 ─────────────────────────────────────────────────────────────── */
+.dateRange {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dateInput {
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--text-primary, #111827);
+  background: var(--surface, #fff);
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s;
+  cursor: pointer;
+}
+
+.dateInput:focus {
+  border-color: var(--accent, #FF6B2C);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent, #FF6B2C) 12%, transparent);
+}
+
+.dateSep {
+  font-size: 12px;
+  color: var(--text-tertiary, #9ca3af);
+}
+
+.filterBtns {
+  display: flex;
+  gap: 6px;
+}
+
+/* ── 表头信息 & 分页 ─────────────────────────────────────────────────────── */
+.tableHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.totalLabel {
+  font-size: 13px;
+  color: var(--text-secondary, #6b7280);
+}
+
+.totalLabel strong {
+  color: var(--text-primary, #111827);
+  font-weight: 700;
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pageInfo {
+  font-size: 13px;
+  color: var(--text-secondary, #6b7280);
+  white-space: nowrap;
+}
+
+/* ── 表格卡片 ─────────────────────────────────────────────────────────────── */
+.tableCard {
+  padding: 0 !important;
+  overflow: hidden;
+}
+
+/* ── 单元格样式 ─────────────────────────────────────────────────────────────── */
+.timeCell {
+  font-size: 12px;
+  color: var(--text-secondary, #6b7280);
+  font-family: 'SF Mono', 'Fira Mono', monospace;
+  white-space: nowrap;
+}
+
+.userCell {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.userName {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary, #111827);
+}
+
+.resourceTag {
+  display: inline-block;
+  font-size: 12px;
+  color: var(--text-secondary, #6b7280);
+  background: var(--surface-elevated, #f3f4f6);
+  padding: 2px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.descCell {
+  font-size: 13px;
+  color: var(--text-secondary, #6b7280);
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.ipCell {
+  font-size: 12px;
+  color: var(--text-tertiary, #9ca3af);
+  font-family: 'SF Mono', 'Fira Mono', monospace;
+}
+
+/* ── 响应式 ──────────────────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .statsRow {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .filterRow {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .dateRange {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .dateInput {
+    width: 100%;
+  }
+}

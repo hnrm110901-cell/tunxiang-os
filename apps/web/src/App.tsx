@@ -212,6 +212,7 @@ const EdgeNodeManagementPage     = lazy(() => import('./pages/platform/EdgeNodeM
 const PlatformAgentsPage         = lazy(() => import('./pages/platform/PlatformAgentsPage'));
 const PlatformFeatureFlagsPage   = lazy(() => import('./pages/platform/PlatformFeatureFlagsPage'));
 const PlatformOntologyPage       = lazy(() => import('./pages/platform/PlatformOntologyPage'));
+const PlatformAuditLogPage       = lazy(() => import('./pages/platform/PlatformAuditLogPage'));
 
 // Role-based views (Phase 2 — Chef /chef, Floor /floor, HQ /hq)
 const ChefLayout      = lazy(() => import('./layouts/ChefLayout'));
@@ -811,8 +812,8 @@ const AppContent: React.FC = () => {
                   <Route path="monitoring" element={<MonitoringPage />} />
                   {/* 灰度 & 特性开关 → 专用灰度发布管理页 */}
                   <Route path="feature-flags" element={<PlatformFeatureFlagsPage />} />
-                  {/* 审计日志 → 复用现有页面 */}
-                  <Route path="audit-log" element={<AuditLogPage />} />
+                  {/* 审计日志 → 专用审计日志管理页 */}
+                  <Route path="audit-log" element={<PlatformAuditLogPage />} />
                   {/* 备份管理 → 复用现有页面 */}
                   <Route path="backup" element={<BackupManagement />} />
                   {/* 用户管理 → 复用现有页面 */}
