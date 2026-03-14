@@ -1,8 +1,134 @@
-.container { padding: 20px; }
-.title { font-size: 20px; font-weight: 600; color: var(--text-primary); margin: 0 0 12px; }
-.summary { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
-.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 12px; }
-.tableCard { border-radius: 10px; text-align: center; min-height: 80px; display: flex; align-items: center; justify-content: center; }
-.tableNo { font-size: 18px; font-weight: 700; color: var(--text-primary); }
-.seats { font-size: 12px; color: var(--text-secondary); margin-top: 4px; }
-.duration { font-size: 11px; color: var(--text-tertiary); margin-top: 2px; }
+/* Tables.module.css — 桌台管理（楼面经理平板端） */
+
+.container {
+  padding: 20px 24px;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+/* ── 页头 ─────────────────────────────────────────────────────────────────── */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary, #111827);
+  margin: 0;
+}
+
+/* ── 状态摘要 Pill ─────────────────────────────────────────────────────────── */
+.summary {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.pill {
+  font-size: 13px;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+
+.pillIdle {
+  background: rgba(34, 197, 94, 0.12);
+  color: #16a34a;
+}
+
+.pillOccupied {
+  background: rgba(10, 175, 154, 0.12);
+  color: #0AAF9A;
+}
+
+.pillReserved {
+  background: rgba(59, 130, 246, 0.12);
+  color: #2563eb;
+}
+
+.pillCleaning {
+  background: rgba(249, 115, 22, 0.12);
+  color: #ea580c;
+}
+
+/* ── 桌台网格 ─────────────────────────────────────────────────────────────── */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+/* ── 桌台卡 ─────────────────────────────────────────────────────────────────── */
+.tableCard {
+  padding: 14px 12px !important;
+  border-radius: 12px !important;
+  border-left: 4px solid transparent !important;
+  cursor: pointer;
+  transition: transform 0.1s, box-shadow 0.1s;
+  min-height: 110px;
+}
+
+.tableCard:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* 状态色条 */
+.cardIdle     { border-left-color: #22c55e !important; }
+.cardOccupied { border-left-color: #0AAF9A !important; }
+.cardReserved { border-left-color: #3b82f6 !important; }
+.cardCleaning { border-left-color: #f97316 !important; }
+
+.tableInner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  text-align: center;
+}
+
+.tableNo {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--text-primary, #111827);
+  letter-spacing: -0.5px;
+}
+
+.seats {
+  font-size: 12px;
+  color: var(--text-secondary, #6b7280);
+}
+
+.badgeWrap {
+  margin-top: 4px;
+}
+
+.guestCount {
+  font-size: 12px;
+  color: var(--text-secondary, #6b7280);
+  margin-top: 2px;
+}
+
+.duration {
+  font-size: 11px;
+  color: var(--text-tertiary, #9ca3af);
+}
+
+/* ── 响应式 ─────────────────────────────────────────────────────────────── */
+@media (max-width: 600px) {
+  .grid {
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    gap: 8px;
+  }
+
+  .container {
+    padding: 16px;
+  }
+}

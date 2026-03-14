@@ -7,15 +7,17 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import dayjs from 'dayjs';
 import {
-  ZCard, ZKpi, ZBadge, ZButton, ZSkeleton, ZEmpty, ZModal,
+  ZCard, ZKpi, ZBadge, ZButton, ZSkeleton, ZEmpty, ZModal, ZSelect,
 } from '../../design-system/components';
-import { Form, InputNumber, Select, Input } from 'antd';
+import type { SelectOption } from '../../design-system/components/ZSelect';
 import apiClient from '../../services/api';
 import { handleApiError, showSuccess, showError } from '../../utils/message';
 import styles from './Workforce.module.css';
 
 const STORE_ID = localStorage.getItem('store_id') || 'S001';
 const TOMORROW  = dayjs().add(1, 'day').format('YYYY-MM-DD');
+
+type ActionType = 'confirmed' | 'modified' | 'rejected';
 
 interface PositionBreakdown {
   [position: string]: number;
@@ -42,24 +44,36 @@ interface Advice {
 }
 
 const ACTION_LABELS: Record<string, { text: string; type: 'success' | 'info' | 'warning' }> = {
-  confirmed: { text: '已确认',    type: 'success' },
-  modified:  { text: '修改确认',  type: 'info'    },
-  rejected:  { text: '已拒绝',    type: 'warning' },
+  confirmed: { text: '已确认',   type: 'success' },
+  modified:  { text: '修改确认', type: 'info'    },
+  rejected:  { text: '已拒绝',   type: 'warning' },
 };
 
-const STATUS_LABELS: Record<string, string> = {
-  pending:   '待处理',
-  confirmed: '已确认',
-  rejected:  '已拒绝',
-  expired:   '已过期',
-};
+const ACTION_OPTIONS: SelectOption[] = [
+  { value: 'confirmed', label: '直接确认' },
+  { value: 'modified',  label: '修改后确认' },
+  { value: 'rejected',  label: '拒绝'     },
+];
 
 export default function SmWorkforce() {
-  const [advice,     setAdvice]     = useState<Advice | null>(null);
-  const [loading,    setLoading]    = useState(true);
-  const [modal,      setModal]      = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [form]                      = Form.useForm();
+  const [advice,      setAdvice]      = useState<Advice | null>(null);
+  const [loading,     setLoading]     = useState(true);
+  const [modal,       setModal]       = useState(false);
+  const [submitting,  setSubmitting]  = useState(false);
+
+  // 表单状态（替代 Ant Design Form）
+  const [formAction,   setFormAction]   = useState<ActionType>('confirmed');
+  const [formHeadcount, setFormHeadcount] = useState<string>('');
+  const [formReason,    setFormReason]    = useState('');
+  const [formError,     setFormError]     = useState('');
+
+  const openModal = () => {
+    setFormAction('confirmed');
+    setFormHeadcount('');
+    setFormReason('');
+    setFormError('');
+    setModal(true);
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -79,27 +93,35 @@ export default function SmWorkforce() {
   useEffect(() => { load(); }, [load]);
 
   const handleSubmit = async () => {
-    let values: Record<string, any>;
-    try { values = await form.validateFields(); }
-    catch { return; }
-
+    // 手动校验
+    if (formAction === 'modified') {
+      const n = parseInt(formHeadcount, 10);
+      if (!formHeadcount || isNaN(n) || n < 1) {
+        setFormError('请输入有效的人数（≥ 1）');
+        return;
+      }
+    }
+    if (formAction === 'rejected' && !formReason.trim()) {
+      setFormError('请输入拒绝原因');
+      return;
+    }
+    setFormError('');
     setSubmitting(true);
     try {
       await apiClient.post(
         `/api/v1/workforce/stores/${STORE_ID}/staffing-advice/confirm`,
         {
-          advice_date:           TOMORROW,
-          meal_period:           'all_day',
-          action:                values.action,
-          modified_headcount:    values.action === 'modified' ? values.modified_headcount : undefined,
-          rejection_reason:      values.action === 'rejected'  ? values.rejection_reason  : undefined,
+          advice_date:        TOMORROW,
+          meal_period:        'all_day',
+          action:             formAction,
+          modified_headcount: formAction === 'modified' ? parseInt(formHeadcount, 10) : undefined,
+          rejection_reason:   formAction === 'rejected'  ? formReason.trim()          : undefined,
         }
       );
       showSuccess('处理成功');
       setModal(false);
-      form.resetFields();
       load();
-    } catch (e) {
+    } catch {
       showError('提交失败，请重试');
     } finally {
       setSubmitting(false);
@@ -107,10 +129,10 @@ export default function SmWorkforce() {
   };
 
   const a = advice;
-  const savingYuan = a?.estimated_saving_yuan ?? 0;
+  const savingYuan    = a?.estimated_saving_yuan ?? 0;
   const confidencePct = a?.confidence_score != null ? Math.round(a.confidence_score * 100) : null;
-  const reasons = [a?.reason_1, a?.reason_2, a?.reason_3].filter(Boolean);
-  const isHandled = !!a?.confirmed_action;
+  const reasons       = [a?.reason_1, a?.reason_2, a?.reason_3].filter(Boolean);
+  const isHandled     = !!a?.confirmed_action;
 
   return (
     <div className={styles.page}>
@@ -171,7 +193,10 @@ export default function SmWorkforce() {
             <ZCard
               title="AI 推理依据"
               extra={confidencePct != null
-                ? <ZBadge type={confidencePct >= 75 ? 'success' : confidencePct >= 55 ? 'info' : 'warning'} text={`置信度 ${confidencePct}%`} />
+                ? <ZBadge
+                    type={confidencePct >= 75 ? 'success' : confidencePct >= 55 ? 'info' : 'warning'}
+                    text={`置信度 ${confidencePct}%`}
+                  />
                 : null
               }
             >
@@ -201,14 +226,13 @@ export default function SmWorkforce() {
                 )}
               </div>
             ) : (
-              <ZButton onClick={() => { form.resetFields(); setModal(true); }}>
-                处理建议
-              </ZButton>
+              <ZButton onClick={openModal}>处理建议</ZButton>
             )}
           </ZCard>
         </div>
       )}
 
+      {/* 处理弹窗 */}
       <ZModal
         open={modal}
         title="处理人力建议"
@@ -220,31 +244,52 @@ export default function SmWorkforce() {
           </>
         }
       >
-        <Form form={form} layout="vertical" initialValues={{ action: 'confirmed' }}>
-          <Form.Item label="处理动作" name="action" rules={[{ required: true }]}>
-            <Select>
-              <Select.Option value="confirmed">直接确认</Select.Option>
-              <Select.Option value="modified">修改后确认</Select.Option>
-              <Select.Option value="rejected">拒绝</Select.Option>
-            </Select>
-          </Form.Item>
-          <Form.Item noStyle shouldUpdate>
-            {({ getFieldValue }) => (
-              <>
-                {getFieldValue('action') === 'modified' && (
-                  <Form.Item label="修改后人数" name="modified_headcount" rules={[{ required: true, message: '请输入人数' }]}>
-                    <InputNumber min={1} style={{ width: '100%' }} />
-                  </Form.Item>
-                )}
-                {getFieldValue('action') === 'rejected' && (
-                  <Form.Item label="拒绝原因" name="rejection_reason" rules={[{ required: true, message: '请输入原因' }]}>
-                    <Input placeholder="请输入拒绝原因" />
-                  </Form.Item>
-                )}
-              </>
-            )}
-          </Form.Item>
-        </Form>
+        <div className={styles.formBody}>
+          {/* 处理动作 */}
+          <div className={styles.fieldRow}>
+            <label className={styles.fieldLabel}>处理动作 *</label>
+            <ZSelect
+              options={ACTION_OPTIONS}
+              value={formAction}
+              onChange={(v) => {
+                setFormAction(v as ActionType);
+                setFormError('');
+              }}
+            />
+          </div>
+
+          {/* 修改后人数 */}
+          {formAction === 'modified' && (
+            <div className={styles.fieldRow}>
+              <label className={styles.fieldLabel}>修改后人数 *</label>
+              <input
+                type="number"
+                min={1}
+                value={formHeadcount}
+                onChange={(e) => { setFormHeadcount(e.target.value); setFormError(''); }}
+                placeholder="请输入人数"
+                className={styles.numInput}
+              />
+            </div>
+          )}
+
+          {/* 拒绝原因 */}
+          {formAction === 'rejected' && (
+            <div className={styles.fieldRow}>
+              <label className={styles.fieldLabel}>拒绝原因 *</label>
+              <textarea
+                value={formReason}
+                onChange={(e) => { setFormReason(e.target.value); setFormError(''); }}
+                placeholder="请输入拒绝原因"
+                rows={3}
+                className={styles.textArea}
+              />
+            </div>
+          )}
+
+          {/* 错误提示 */}
+          {formError && <div className={styles.formError}>{formError}</div>}
+        </div>
       </ZModal>
     </div>
   );

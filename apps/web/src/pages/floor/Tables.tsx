@@ -3,7 +3,7 @@
  * 桌台状态实时看板、翻台管理
  */
 import React, { useState, useEffect } from 'react';
-import { Card, Tag, Empty, Spin, Badge } from 'antd';
+import { ZCard, ZBadge, ZEmpty, ZSkeleton } from '../../design-system/components';
 import { apiClient } from '../../services/api';
 import styles from './Tables.module.css';
 
@@ -17,11 +17,17 @@ interface TableInfo {
   duration_min?: number;
 }
 
-const STATUS_CONFIG: Record<string, { color: string; label: string; badge: string }> = {
-  idle:     { color: '#27AE60', label: '空闲', badge: 'success' },
-  occupied: { color: '#0AAF9A', label: '用餐中', badge: 'processing' },
-  reserved: { color: '#2D9CDB', label: '已预订', badge: 'warning' },
-  cleaning: { color: '#F2994A', label: '清理中', badge: 'default' },
+type StatusKey = 'idle' | 'occupied' | 'reserved' | 'cleaning';
+
+const STATUS_CONFIG: Record<StatusKey, {
+  label: string;
+  badgeType: 'success' | 'info' | 'warning' | 'default';
+  cardClass: string;
+}> = {
+  idle:     { label: '空闲',  badgeType: 'success', cardClass: styles.cardIdle },
+  occupied: { label: '用餐中', badgeType: 'info',    cardClass: styles.cardOccupied },
+  reserved: { label: '已预订', badgeType: 'warning',  cardClass: styles.cardReserved },
+  cleaning: { label: '清理中', badgeType: 'default',  cardClass: styles.cardCleaning },
 };
 
 export default function Tables() {
@@ -36,34 +42,55 @@ export default function Tables() {
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <Spin style={{ display: 'flex', justifyContent: 'center', padding: 40 }} />;
-  if (!tables.length) return <Empty description="暂无桌台数据" style={{ padding: 40 }} />;
+  const idleCount    = tables.filter(t => t.status === 'idle').length;
+  const occupiedCount = tables.filter(t => t.status === 'occupied').length;
+  const reservedCount = tables.filter(t => t.status === 'reserved').length;
+  const cleaningCount = tables.filter(t => t.status === 'cleaning').length;
 
   return (
     <div className={styles.container}>
-      <h2 className={styles.title}>桌台管理</h2>
-      <div className={styles.summary}>
-        {Object.entries(STATUS_CONFIG).map(([key, cfg]) => {
-          const count = tables.filter(t => t.status === key).length;
-          return <Tag key={key} color={cfg.color}>{cfg.label} {count}</Tag>;
-        })}
+      {/* 页头 */}
+      <div className={styles.header}>
+        <h2 className={styles.title}>桌台管理</h2>
+        <div className={styles.summary}>
+          <span className={`${styles.pill} ${styles.pillIdle}`}>空闲 {idleCount}</span>
+          <span className={`${styles.pill} ${styles.pillOccupied}`}>用餐中 {occupiedCount}</span>
+          <span className={`${styles.pill} ${styles.pillReserved}`}>已预订 {reservedCount}</span>
+          {cleaningCount > 0 && (
+            <span className={`${styles.pill} ${styles.pillCleaning}`}>清理中 {cleaningCount}</span>
+          )}
+        </div>
       </div>
-      <div className={styles.grid}>
-        {tables.map((t) => {
-          const cfg = STATUS_CONFIG[t.status] || STATUS_CONFIG.idle;
-          return (
-            <Badge.Ribbon key={t.table_id} text={cfg.label} color={cfg.color}>
-              <Card className={styles.tableCard} size="small">
-                <div className={styles.tableNo}>{t.table_no}</div>
-                <div className={styles.seats}>{t.seats}座</div>
-                {t.duration_min != null && (
-                  <div className={styles.duration}>{t.duration_min}分钟</div>
-                )}
-              </Card>
-            </Badge.Ribbon>
-          );
-        })}
-      </div>
+
+      {/* 桌台网格 */}
+      {loading ? (
+        <ZSkeleton rows={6} />
+      ) : tables.length === 0 ? (
+        <ZEmpty text="暂无桌台数据" />
+      ) : (
+        <div className={styles.grid}>
+          {tables.map((t) => {
+            const cfg = STATUS_CONFIG[t.status] || STATUS_CONFIG.idle;
+            return (
+              <ZCard key={t.table_id} className={`${styles.tableCard} ${cfg.cardClass}`}>
+                <div className={styles.tableInner}>
+                  <div className={styles.tableNo}>{t.table_no}</div>
+                  <div className={styles.seats}>{t.seats} 座</div>
+                  <div className={styles.badgeWrap}>
+                    <ZBadge type={cfg.badgeType} text={cfg.label} />
+                  </div>
+                  {t.guest_count != null && (
+                    <div className={styles.guestCount}>👥 {t.guest_count} 人</div>
+                  )}
+                  {t.duration_min != null && (
+                    <div className={styles.duration}>⏱ {t.duration_min} 分钟</div>
+                  )}
+                </div>
+              </ZCard>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

@@ -114,3 +114,69 @@
   font-size: 12px;
   color: var(--text-secondary);
 }
+
+/* ── 弹窗表单 ─────────────────────────────────────────────────────────────── */
+.formBody {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.fieldRow {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.fieldLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.numInput {
+  width: 100%;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 8px;
+  font-size: 14px;
+  color: var(--text-primary, #111827);
+  background: var(--surface, #fff);
+  font-family: inherit;
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.15s;
+}
+
+.numInput:focus {
+  border-color: var(--accent, #FF6B2C);
+  box-shadow: 0 0 0 3px rgba(255, 107, 44, 0.12);
+}
+
+.textArea {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 8px;
+  font-size: 14px;
+  color: var(--text-primary, #111827);
+  background: var(--surface, #fff);
+  font-family: inherit;
+  outline: none;
+  resize: vertical;
+  box-sizing: border-box;
+  transition: border-color 0.15s;
+  line-height: 1.5;
+}
+
+.textArea:focus {
+  border-color: var(--accent, #FF6B2C);
+  box-shadow: 0 0 0 3px rgba(255, 107, 44, 0.12);
+}
+
+.formError {
+  font-size: 13px;
+  color: #ef4444;
+  padding: 6px 0 0;
+}
