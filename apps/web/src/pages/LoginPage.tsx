@@ -123,7 +123,22 @@ const LoginPage: React.FC = () => {
     try {
       const success = await login(values.username, values.password);
       if (success) {
-        const redirect = searchParams.get('redirect') || '/platform';
+        const explicit = searchParams.get('redirect');
+        const fallback = (() => {
+          const stored = localStorage.getItem('token');
+          if (stored) {
+            try {
+              const payload = JSON.parse(atob(stored.split('.')[1]));
+              if (payload.role === 'admin') return '/platform';
+              if (payload.role === 'store_manager') return '/sm';
+              if (payload.role === 'chef') return '/chef';
+              if (payload.role === 'floor_manager') return '/floor';
+              if (payload.role === 'headquarters') return '/hq';
+            } catch { /* fallthrough */ }
+          }
+          return '/sm';
+        })();
+        const redirect = explicit && explicit !== '/' ? explicit : fallback;
         setTimeout(() => navigate(redirect, { replace: true }), 400);
       }
     } catch {
