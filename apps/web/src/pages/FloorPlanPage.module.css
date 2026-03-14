@@ -1,0 +1,17 @@
+.container {
+  padding: 16px;
+}
+
+.floorSvg {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  background: #fafafa;
+  border-radius: 8px;
+  user-select: none;
+}
+
+.floorSvg g:hover rect,
+.floorSvg g:hover circle {
+  opacity: 1 !important;
+  filter: brightness(1.1);
+}

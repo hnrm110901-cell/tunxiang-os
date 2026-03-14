@@ -1,0 +1,404 @@
+/* 客户自助预订H5 — 移动优先 */
+.container {
+  max-width: 480px;
+  margin: 0 auto;
+  min-height: 100vh;
+  background: #f5f5f5;
+  font-family: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
+  color: #333;
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+.header {
+  background: #FF6B2C;
+  color: #fff;
+  padding: 16px 20px;
+  text-align: center;
+}
+
+.header h1 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.header p {
+  margin: 4px 0 0;
+  font-size: 13px;
+  opacity: 0.85;
+}
+
+/* Progress bar */
+.progress {
+  display: flex;
+  padding: 12px 20px;
+  background: #fff;
+  gap: 8px;
+}
+
+.progressStep {
+  flex: 1;
+  height: 3px;
+  background: #e0e0e0;
+  border-radius: 2px;
+  transition: background 0.3s;
+}
+
+.progressStepActive {
+  background: #FF6B2C;
+}
+
+/* Step container */
+.step {
+  padding: 20px;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.stepTitle {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 16px;
+  color: #1a1a1a;
+}
+
+/* Store list */
+.storeList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.storeCard {
+  background: #fff;
+  border-radius: 10px;
+  padding: 16px;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.storeCard:active {
+  transform: scale(0.98);
+}
+
+.storeCardSelected {
+  border-color: #FF6B2C;
+  box-shadow: 0 2px 8px rgba(255, 107, 44, 0.15);
+}
+
+.storeName {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0 0 4px;
+}
+
+.storeAddress {
+  font-size: 13px;
+  color: #999;
+  margin: 0;
+}
+
+/* Date/Time picker */
+.dateGrid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.dateCell {
+  text-align: center;
+  padding: 8px 4px;
+  border-radius: 8px;
+  font-size: 13px;
+  cursor: pointer;
+  background: #fff;
+  border: 1px solid #eee;
+  transition: all 0.2s;
+}
+
+.dateCellSelected {
+  background: #FF6B2C;
+  color: #fff;
+  border-color: #FF6B2C;
+}
+
+.dateCellToday {
+  border-color: #FF6B2C;
+  color: #FF6B2C;
+}
+
+.timeSlots {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.timeSlot {
+  background: #fff;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  padding: 10px 8px;
+  text-align: center;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.timeSlotSelected {
+  background: #FF6B2C;
+  color: #fff;
+  border-color: #FF6B2C;
+}
+
+.timeSlotDisabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.mealLabel {
+  font-size: 14px;
+  font-weight: 600;
+  color: #666;
+  margin: 12px 0 8px;
+}
+
+/* Form fields */
+.formGroup {
+  margin-bottom: 16px;
+}
+
+.label {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  color: #666;
+  margin-bottom: 6px;
+}
+
+.input {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 15px;
+  outline: none;
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+  font-family: inherit;
+}
+
+.input:focus {
+  border-color: #FF6B2C;
+}
+
+.textarea {
+  composes: input;
+  resize: vertical;
+  min-height: 80px;
+}
+
+/* Party size selector */
+.partySizeRow {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.partySizeBtn {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  border: 1px solid #eee;
+  background: #fff;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.partySizeBtnSelected {
+  background: #FF6B2C;
+  color: #fff;
+  border-color: #FF6B2C;
+}
+
+/* SMS Verification */
+.phoneRow {
+  display: flex;
+  gap: 10px;
+}
+
+.phoneInput {
+  composes: input;
+  flex: 1;
+}
+
+.sendCodeBtn {
+  padding: 12px 16px;
+  background: #FF6B2C;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  white-space: nowrap;
+  cursor: pointer;
+  min-width: 100px;
+}
+
+.sendCodeBtn:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+.codeInput {
+  composes: input;
+  letter-spacing: 8px;
+  text-align: center;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+/* Action buttons */
+.actions {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 12px 20px;
+  padding-bottom: calc(12px + env(safe-area-inset-bottom, 0));
+  background: #fff;
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.06);
+  display: flex;
+  gap: 12px;
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+.btnPrimary {
+  flex: 1;
+  padding: 14px;
+  background: #FF6B2C;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.btnPrimary:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+.btnSecondary {
+  padding: 14px 20px;
+  background: #f5f5f5;
+  color: #666;
+  border: none;
+  border-radius: 10px;
+  font-size: 16px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+/* Confirm step */
+.confirmCard {
+  background: #fff;
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 16px;
+}
+
+.confirmRow {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid #f0f0f0;
+  font-size: 14px;
+}
+
+.confirmRow:last-child {
+  border-bottom: none;
+}
+
+.confirmLabel {
+  color: #999;
+}
+
+.confirmValue {
+  font-weight: 500;
+  color: #333;
+}
+
+/* Success state */
+.successContainer {
+  text-align: center;
+  padding: 40px 20px;
+}
+
+.successIcon {
+  width: 64px;
+  height: 64px;
+  background: #4CAF50;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 16px;
+  color: #fff;
+  font-size: 32px;
+}
+
+.successTitle {
+  font-size: 20px;
+  font-weight: 600;
+  margin: 0 0 8px;
+}
+
+.successSubtitle {
+  font-size: 14px;
+  color: #999;
+  margin: 0 0 24px;
+}
+
+/* Loading */
+.loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 40px;
+}
+
+.spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid #eee;
+  border-top-color: #FF6B2C;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Error */
+.error {
+  background: #fff5f5;
+  color: #d32f2f;
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  margin-bottom: 16px;
+}

@@ -1,0 +1,243 @@
+/* AI邀请函 — 5套主题 via CSS变量 */
+.invitation {
+  min-height: 100vh;
+  font-family: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, serif;
+  color: var(--inv-text, #333);
+  background: var(--inv-bg, #1a1a2e);
+  overflow-x: hidden;
+}
+
+/* Theme: Wedding Red */
+.themeWeddingRed {
+  --inv-bg: linear-gradient(135deg, #8B0000, #C41E3A);
+  --inv-text: #FFF8DC;
+  --inv-accent: #FFD700;
+  --inv-card-bg: rgba(255,255,255,0.08);
+}
+
+/* Theme: Birthday Gold */
+.themeBirthdayGold {
+  --inv-bg: linear-gradient(135deg, #2C1810, #5C3D2E);
+  --inv-text: #FFF8DC;
+  --inv-accent: #FFD700;
+  --inv-card-bg: rgba(255,215,0,0.08);
+}
+
+/* Theme: Corporate Blue */
+.themeCorporateBlue {
+  --inv-bg: linear-gradient(135deg, #0a1628, #1a3a5c);
+  --inv-text: #E8ECF0;
+  --inv-accent: #4DA8DA;
+  --inv-card-bg: rgba(77,168,218,0.08);
+}
+
+/* Theme: Full Moon Pink */
+.themeFullMoonPink {
+  --inv-bg: linear-gradient(135deg, #FFF0F5, #FFE4E1);
+  --inv-text: #5C3D4C;
+  --inv-accent: #FF69B4;
+  --inv-card-bg: rgba(255,105,180,0.08);
+}
+
+/* Theme: Graduation Green */
+.themeGraduationGreen {
+  --inv-bg: linear-gradient(135deg, #0D2818, #1A5032);
+  --inv-text: #E8F5E9;
+  --inv-accent: #81C784;
+  --inv-card-bg: rgba(129,199,132,0.08);
+}
+
+.container {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 40px 24px;
+  min-height: 100vh;
+  background: var(--inv-bg);
+}
+
+.header {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.eventTitle {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--inv-accent, #FFD700);
+  margin: 0 0 8px;
+  letter-spacing: 2px;
+}
+
+.eventType {
+  font-size: 14px;
+  color: var(--inv-text);
+  opacity: 0.7;
+  text-transform: uppercase;
+  letter-spacing: 4px;
+}
+
+.divider {
+  width: 60px;
+  height: 1px;
+  background: var(--inv-accent);
+  margin: 24px auto;
+  opacity: 0.5;
+}
+
+.messageBox {
+  background: var(--inv-card-bg);
+  border-radius: 12px;
+  padding: 24px 20px;
+  margin-bottom: 24px;
+  font-size: 16px;
+  line-height: 1.8;
+  white-space: pre-wrap;
+  text-align: center;
+  color: var(--inv-text);
+}
+
+.infoSection {
+  margin-bottom: 24px;
+}
+
+.infoRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  color: var(--inv-text);
+}
+
+.infoIcon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--inv-card-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  color: var(--inv-accent);
+}
+
+.infoLabel {
+  font-size: 12px;
+  opacity: 0.6;
+}
+
+.infoValue {
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.navBtn {
+  display: inline-block;
+  padding: 10px 24px;
+  background: var(--inv-accent);
+  color: #000;
+  border-radius: 8px;
+  font-weight: 600;
+  text-decoration: none;
+  margin-top: 8px;
+  font-size: 14px;
+  cursor: pointer;
+  border: none;
+}
+
+/* RSVP Form */
+.rsvpSection {
+  background: var(--inv-card-bg);
+  border-radius: 12px;
+  padding: 24px 20px;
+  margin-top: 32px;
+}
+
+.rsvpTitle {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--inv-accent);
+  margin: 0 0 16px;
+  text-align: center;
+}
+
+.rsvpField {
+  margin-bottom: 14px;
+}
+
+.rsvpLabel {
+  display: block;
+  font-size: 13px;
+  color: var(--inv-text);
+  opacity: 0.7;
+  margin-bottom: 4px;
+}
+
+.rsvpInput {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--inv-text);
+  font-size: 15px;
+  outline: none;
+  box-sizing: border-box;
+  font-family: inherit;
+}
+
+.rsvpInput:focus {
+  border-color: var(--inv-accent);
+}
+
+.rsvpTextarea {
+  composes: rsvpInput;
+  min-height: 80px;
+  resize: vertical;
+}
+
+.rsvpSubmit {
+  composes: navBtn;
+  width: 100%;
+  text-align: center;
+  margin-top: 16px;
+  padding: 12px;
+  font-size: 16px;
+}
+
+.partySizeRow {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.partySizeBtn {
+  padding: 6px 16px;
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--inv-text);
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.partySizeBtnActive {
+  background: var(--inv-accent);
+  color: #000;
+  border-color: var(--inv-accent);
+}
+
+.stats {
+  text-align: center;
+  margin-top: 24px;
+  font-size: 13px;
+  opacity: 0.5;
+  color: var(--inv-text);
+}
+
+.success {
+  text-align: center;
+  padding: 20px;
+  color: var(--inv-accent);
+  font-size: 16px;
+}

@@ -1,0 +1,191 @@
+.container {
+  padding: 24px;
+  min-height: 100vh;
+  background: #f5f5f5;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.title {
+  font-size: 24px;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.controls {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+/* KPI Cards Row */
+.kpiRow {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.kpiCard {
+  background: #fff;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.kpiLabel {
+  font-size: 13px;
+  color: #999;
+  margin-bottom: 8px;
+}
+
+.kpiValue {
+  font-size: 28px;
+  font-weight: 700;
+  color: #1a1a1a;
+}
+
+.kpiSub {
+  font-size: 12px;
+  color: #999;
+  margin-top: 4px;
+}
+
+.kpiUp {
+  color: #52c41a;
+}
+
+.kpiDown {
+  color: #ff4d4f;
+}
+
+/* Charts Grid */
+.chartsGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.chartCard {
+  background: #fff;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.chartTitle {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.chartFull {
+  grid-column: 1 / -1;
+}
+
+/* Risk Table */
+.riskHigh {
+  color: #ff4d4f;
+  font-weight: 600;
+}
+
+.riskMedium {
+  color: #faad14;
+  font-weight: 600;
+}
+
+.riskLow {
+  color: #52c41a;
+}
+
+/* Insights */
+.insightsList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.insightsList li {
+  padding: 8px 0;
+  border-bottom: 1px solid #f0f0f0;
+  font-size: 13px;
+  color: #333;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.insightsList li:last-child {
+  border-bottom: none;
+}
+
+/* Channel Bar */
+.channelBar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid #f5f5f5;
+}
+
+.channelName {
+  width: 80px;
+  font-size: 13px;
+  color: #666;
+}
+
+.channelBarInner {
+  flex: 1;
+  height: 24px;
+  background: #f5f5f5;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.channelBarFill {
+  height: 100%;
+  border-radius: 4px;
+  background: #FF6B2C;
+  transition: width 0.6s ease;
+  display: flex;
+  align-items: center;
+  padding-left: 8px;
+  font-size: 11px;
+  color: #fff;
+  white-space: nowrap;
+}
+
+.channelStats {
+  width: 120px;
+  text-align: right;
+  font-size: 12px;
+  color: #999;
+}
+
+@media (max-width: 1200px) {
+  .kpiRow {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .chartsGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .kpiRow {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .container {
+    padding: 12px;
+  }
+}

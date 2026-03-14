@@ -1,0 +1,1365 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>智链OS — 产品架构及功能明细思维导图</title>
+<style>
+  :root {
+    --bg: #0B1120;
+    --bg2: #111827;
+    --bg3: #1F2937;
+    --border: #374151;
+    --t1: rgba(255,255,255,.92);
+    --t2: rgba(255,255,255,.68);
+    --t3: rgba(255,255,255,.45);
+    --accent: #0AAF9A;
+    --accent2: #06D6A0;
+    --orange: #FF6B2C;
+    --blue: #3B82F6;
+    --purple: #8B5CF6;
+    --pink: #EC4899;
+    --yellow: #F59E0B;
+    --red: #EF4444;
+    --cyan: #06B6D4;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
+    background: var(--bg);
+    color: var(--t1);
+    overflow: hidden;
+    height: 100vh;
+  }
+
+  /* ── Header ── */
+  .header {
+    position: fixed; top:0; left:0; right:0; z-index:100;
+    background: rgba(11,17,32,.85);
+    backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 24px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .header h1 {
+    font-size: 18px; font-weight: 700;
+    background: linear-gradient(135deg, var(--accent2), var(--blue));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .header .subtitle { font-size: 12px; color: var(--t3); margin-left: 12px; }
+  .header .stats { display:flex; gap:16px; }
+  .header .stat {
+    font-size: 11px; color: var(--t3);
+    display: flex; align-items: center; gap: 4px;
+  }
+  .header .stat b { color: var(--accent); font-size: 14px; }
+
+  /* ── Controls ── */
+  .controls {
+    position: fixed; top: 56px; left: 0; right: 0; z-index: 99;
+    background: rgba(17,24,39,.9);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    padding: 8px 24px;
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  }
+  .controls button {
+    padding: 5px 14px; border-radius: 6px; border: 1px solid var(--border);
+    background: var(--bg3); color: var(--t2); font-size: 12px; cursor: pointer;
+    transition: all .15s;
+  }
+  .controls button:hover { border-color: var(--accent); color: var(--accent); }
+  .controls button.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .controls .search-box {
+    flex:1; max-width: 280px; padding: 5px 12px; border-radius: 6px;
+    border: 1px solid var(--border); background: var(--bg); color: var(--t1);
+    font-size: 12px; outline: none;
+  }
+  .controls .search-box:focus { border-color: var(--accent); }
+  .controls .search-box::placeholder { color: var(--t3); }
+  .legend { display:flex; gap: 10px; margin-left: auto; }
+  .legend span {
+    display:flex; align-items:center; gap:4px; font-size:11px; color:var(--t3);
+  }
+  .legend span i {
+    display:inline-block; width:10px; height:10px; border-radius:50%;
+  }
+
+  /* ── Mind Map Container ── */
+  #mindmap {
+    position: fixed;
+    top: 100px; left: 0; right: 0; bottom: 0;
+    overflow: hidden;
+    cursor: grab;
+  }
+  #mindmap:active { cursor: grabbing; }
+
+  svg { width: 100%; height: 100%; }
+
+  /* ── Node styles ── */
+  .node { cursor: pointer; }
+  .node text {
+    font-family: 'Noto Sans SC', sans-serif;
+    fill: var(--t1);
+    font-size: 12px;
+  }
+  .node .label-bg {
+    fill: var(--bg2);
+    stroke: var(--border);
+    stroke-width: 1;
+    rx: 6; ry: 6;
+  }
+  .node:hover .label-bg { stroke: var(--accent); stroke-width: 1.5; }
+  .node .badge {
+    font-size: 9px; fill: var(--t3);
+  }
+  .node .desc {
+    font-size: 10px; fill: var(--t3);
+  }
+  .node .toggle-circle {
+    fill: var(--bg3); stroke: var(--accent); stroke-width: 1.5;
+    cursor: pointer;
+  }
+  .node .toggle-text {
+    fill: var(--accent); font-size: 10px; font-weight: 700;
+    text-anchor: middle; dominant-baseline: central;
+    pointer-events: none;
+  }
+
+  .link {
+    fill: none;
+    stroke: var(--border);
+    stroke-width: 1.2;
+    stroke-opacity: 0.5;
+  }
+
+  /* ── Tooltip ── */
+  .tooltip {
+    position: fixed; z-index: 200;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 16px;
+    max-width: 380px;
+    box-shadow: 0 8px 32px rgba(0,0,0,.5);
+    pointer-events: none;
+    display: none;
+    font-size: 12px;
+    line-height: 1.6;
+  }
+  .tooltip .tt-title { font-weight:700; color:var(--accent); margin-bottom:4px; }
+  .tooltip .tt-desc { color:var(--t2); }
+  .tooltip .tt-meta { color:var(--t3); font-size:11px; margin-top:6px; border-top:1px solid var(--border); padding-top:6px; }
+
+  /* ── Detail Panel ── */
+  .detail-panel {
+    position: fixed; top:100px; right:0; bottom:0; width:380px;
+    background: var(--bg2);
+    border-left: 1px solid var(--border);
+    z-index: 50;
+    transform: translateX(100%);
+    transition: transform .3s ease;
+    overflow-y: auto;
+    padding: 20px;
+  }
+  .detail-panel.open { transform: translateX(0); }
+  .detail-panel .dp-close {
+    position:absolute; top:12px; right:12px;
+    background:none; border:none; color:var(--t3); font-size:18px; cursor:pointer;
+  }
+  .detail-panel h3 { font-size:16px; color:var(--accent); margin-bottom:8px; }
+  .detail-panel .dp-path { font-size:11px; color:var(--t3); margin-bottom:12px; font-family:monospace; }
+  .detail-panel .dp-desc { font-size:13px; color:var(--t2); line-height:1.7; margin-bottom:16px; }
+  .detail-panel .dp-children { list-style:none; }
+  .detail-panel .dp-children li {
+    padding:6px 0; border-bottom:1px solid rgba(55,65,81,.5);
+    font-size:12px; color:var(--t2);
+    display:flex; align-items:flex-start; gap:8px;
+  }
+  .detail-panel .dp-children li .dot {
+    width:6px; height:6px; border-radius:50%; margin-top:5px; flex-shrink:0;
+  }
+  .detail-panel .dp-tag {
+    display:inline-block; padding:2px 8px; border-radius:4px;
+    font-size:10px; margin-right:4px; margin-bottom:4px;
+  }
+
+  /* ── Mini-map ── */
+  .minimap {
+    position:fixed; bottom:16px; right:16px; z-index:80;
+    width:180px; height:120px;
+    background:var(--bg2); border:1px solid var(--border); border-radius:8px;
+    overflow:hidden; opacity:.7;
+  }
+  .minimap:hover { opacity:1; }
+  .minimap svg { width:100%; height:100%; }
+  .minimap .viewport {
+    fill:rgba(10,175,154,.15); stroke:var(--accent); stroke-width:1;
+  }
+
+  /* ── Breadcrumb ── */
+  .breadcrumb {
+    position:fixed; bottom:16px; left:16px; z-index:80;
+    display:flex; gap:4px; align-items:center;
+    font-size:11px; color:var(--t3);
+  }
+  .breadcrumb span { cursor:pointer; }
+  .breadcrumb span:hover { color:var(--accent); }
+  .breadcrumb .sep { color:var(--border); margin:0 2px; }
+
+  @keyframes fadeIn { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:translateY(0)} }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div style="display:flex;align-items:baseline;">
+    <h1>智链OS 产品架构及功能明细</h1>
+    <span class="subtitle">v2.5.0 · 2026-03-12 · 交互式思维导图</span>
+  </div>
+  <div class="stats">
+    <div class="stat">服务 <b id="stat-svc">0</b></div>
+    <div class="stat">模型 <b id="stat-model">0</b></div>
+    <div class="stat">API <b id="stat-api">0</b></div>
+    <div class="stat">Agent <b id="stat-agent">0</b></div>
+    <div class="stat">页面 <b id="stat-page">0</b></div>
+    <div class="stat">定时任务 <b id="stat-task">0</b></div>
+  </div>
+</div>
+
+<div class="controls">
+  <button onclick="expandAll()">全部展开</button>
+  <button onclick="collapseAll()">全部收起</button>
+  <button onclick="expandLevel(2)">展开2层</button>
+  <button onclick="expandLevel(3)">展开3层</button>
+  <button onclick="resetView()">重置视图</button>
+  <input class="search-box" type="text" placeholder="搜索节点（输入关键词）..." oninput="searchNodes(this.value)">
+  <div class="legend">
+    <span><i style="background:var(--accent)"></i>平台</span>
+    <span><i style="background:var(--blue)"></i>后端</span>
+    <span><i style="background:var(--purple)"></i>Agent</span>
+    <span><i style="background:var(--orange)"></i>前端</span>
+    <span><i style="background:var(--pink)"></i>基础设施</span>
+    <span><i style="background:var(--yellow)"></i>数据</span>
+  </div>
+</div>
+
+<div id="mindmap"></div>
+<div class="tooltip" id="tooltip"></div>
+<div class="detail-panel" id="detailPanel">
+  <button class="dp-close" onclick="closeDetail()">&times;</button>
+  <div id="detailContent"></div>
+</div>
+<div class="breadcrumb" id="breadcrumb"></div>
+
+<script>
+// ══════════════════════════════════════════════════════════════════════════════
+// DATA — 智链OS 完整产品架构树
+// ══════════════════════════════════════════════════════════════════════════════
+const DATA = {
+  name: "智链OS",
+  desc: "AI驱动的餐饮连锁经营决策系统",
+  color: "#0AAF9A",
+  meta: "North Star: 续费率≥95% · 客户成本率降低2pp · ROI≥10x",
+  children: [
+    // ═══════════════════════ 1. 核心AI决策引擎 ═══════════════════════
+    {
+      name: "核心AI决策引擎",
+      desc: "五层智能架构（L1感知→L5行动），AI从数据到决策到执行的完整链路",
+      color: "#0AAF9A",
+      children: [
+        {
+          name: "L1 感知层",
+          desc: "实时数据采集与事件感知，对接POS/IoT/企微等数据源",
+          children: [
+            { name: "神经事件系统", desc: "neural_system.py — 实时事件处理引擎，POS订单/库存变动/客诉等事件流", meta: "Celery高优队列, 实时触发" },
+            { name: "信号总线", desc: "signal_bus.py — 低评分评价/临时库存/异常订单等信号路由分发", meta: "每2小时扫描" },
+            { name: "POS适配器", desc: "4套POS系统适配器：天财商龙/品智/翼订/奥琦玮", meta: "packages/api-adapters/, webhook自动接收" },
+            { name: "天气/节假日", desc: "weather_adapter.py + external_factors_adapter.py", meta: "外部因子自动注入预测模型" },
+            { name: "边缘计算节点", desc: "edge_node_service.py + raspberry_pi_edge_service.py — 门店本地设备，离线可用", meta: "心跳检测每3分钟" },
+          ]
+        },
+        {
+          name: "L2 融合层",
+          desc: "多源数据标准化融合，食材/渠道/BOM统一映射",
+          children: [
+            { name: "食材融合", desc: "ingredient_fusion_service.py — 多POS系统食材名称标准化映射", meta: "支持别名/同义词" },
+            { name: "BOM解析器", desc: "bom_resolver.py — 多层级BOM配方继承与解析", meta: "品牌→区域→门店三级继承" },
+            { name: "渠道配置", desc: "channel_config — 堂食/外卖/团购渠道差异化定价与成本核算" },
+            { name: "向量嵌入", desc: "vector_db_service.py + embedding_model_service.py — Qdrant向量库，MiniLM-L12模型", meta: "384维, 本地推理" },
+            { name: "本体知识图谱", desc: "ontology_* 系列 — Neo4j知识图谱，PG↔Neo4j双向同步", meta: "每日02:00同步" },
+          ]
+        },
+        {
+          name: "L3 知识层",
+          desc: "跨门店知识沉淀与传播，构建行业基准数据壁垒",
+          children: [
+            { name: "跨店洞察", desc: "cross_store_insights_service.py — 同类门店经验萃取", meta: "物化视图, 日级更新" },
+            { name: "门店记忆", desc: "store_memory_service.py — 门店级长期记忆（峰谷模式/客群特征）", meta: "每日02:00更新" },
+            { name: "联邦学习", desc: "federated_learning_service.py — 跨客户数据脱敏训练", meta: "FedAvg/加权聚合, 差分隐私" },
+            { name: "行业基准", desc: "benchmark_service.py + labor_benchmark_service.py — 人效/成本率/翻台率基准", meta: "按面积/座位数分档" },
+            { name: "案例生成器", desc: "case_story_generator.py — 日/周/月维度自动聚合客户成功案例", meta: "含¥节省金额" },
+          ]
+        },
+        {
+          name: "L4 推理层",
+          desc: "基于规则+因果图+LLM的多模态推理引擎",
+          children: [
+            { name: "推理引擎", desc: "reasoning_engine.py — 规则推理+因果分析+LLM辅助推断", meta: "推理链可追溯" },
+            { name: "因果图谱", desc: "causal_graph_service.py — 构建食材成本↔客流↔损耗等因果关系图" },
+            { name: "场景识别器", desc: "scenario_matcher.py — 7种经营场景自动分类", meta: "high_cost/high_waste/holiday_peak等" },
+            { name: "异常检测", desc: "anomaly_detection_service.py — 统计异常检测，15分钟一次收入异常扫描" },
+            { name: "知识规则", desc: "knowledge_rule_service.py — 业务规则引擎（条件→动作）" },
+            { name: "LLM-Cypher", desc: "llm_cypher_service.py — 自然语言→Neo4j Cypher查询转换" },
+          ]
+        },
+        {
+          name: "L5 行动层",
+          desc: "决策→审批→执行→反馈的完整行动闭环",
+          children: [
+            { name: "决策优先级引擎", desc: "decision_priority_engine.py — 多Agent建议聚合Top3，含¥影响评分", meta: "inventory/food_cost/reasoning三源" },
+            { name: "财务影响计算器", desc: "financial_impact_calculator.py — 每条建议附¥预期收益和¥成本", meta: "6个静态方法" },
+            { name: "行动派发", desc: "action_dispatch_service.py — 04:30批量派发，L4推理→L5执行", meta: "P0/P1/P2/P3四级" },
+            { name: "企微FSM", desc: "wechat_action_fsm.py — 行动状态机（待执行→已发送→已确认→已完成）", meta: "优先级升级链" },
+            { name: "Human-in-the-Loop", desc: "human_in_the_loop_service.py — P1/P2/P3风险分级审批流" },
+            { name: "48h效果反馈", desc: "execution_feedback_service.py — 审批通过后自动追踪执行效果" },
+          ]
+        },
+      ]
+    },
+
+    // ═══════════════════════ 2. 九大智能体 ═══════════════════════
+    {
+      name: "9-Agent 智能体生态",
+      desc: "三层九Agent架构：增长层(3) + 运营层(3) + 底座层(3) + 协同总线",
+      color: "#8B5CF6",
+      children: [
+        {
+          name: "增长层",
+          desc: "驱动营收增长的三大Agent",
+          color: "#8B5CF6",
+          children: [
+            {
+              name: "BusinessIntelAgent",
+              desc: "经营智能分析Agent — 收入异常/KPI记分卡/订单预测/场景匹配",
+              meta: "5个子Agent: RevenueAnomaly/KpiScorecard/OrderForecast/BizInsight/ScenarioMatch",
+              children: [
+                { name: "收入异常检测", desc: "RevenueAnomalyAgent — 15分钟粒度异常扫描" },
+                { name: "KPI记分卡", desc: "KpiScorecardAgent — 多维度经营指标评分" },
+                { name: "订单预测", desc: "OrderForecastAgent — 基于Prophet+历史的需求预测" },
+                { name: "场景洞察", desc: "BizInsightAgent — 经营场景自动识别与建议" },
+              ]
+            },
+            {
+              name: "MarketingAgent",
+              desc: "营销自动化Agent — RFM分群/流失挽回/发券策略/ROI追踪",
+              meta: "每日10:30自动触达, 频控引擎限流",
+              children: [
+                { name: "RFM客群分析", desc: "一条SQL聚合全门店顾客→5维客群分布" },
+                { name: "流失客户挽回", desc: "批量干预 + dry_run预估模式" },
+                { name: "智能发券策略", desc: "基于消费频次/客单价/偏好的个性化券" },
+                { name: "活动ROI追踪", desc: "归因打点 + 近N天汇总" },
+              ]
+            },
+            {
+              name: "BanquetAgent",
+              desc: "宴会全生命周期Agent — 7阶段漏斗（初步询价→签约→执行→复盘）",
+              meta: "5个子Agent: Followup/Quotation/Scheduling/Execution/Review",
+              children: [
+                { name: "销售管道", desc: "7阶段手风琴视图，线索→意向→锁台→签约→执行" },
+                { name: "销控日历", desc: "吉日金边/满负荷红底，月度CSS Grid" },
+                { name: "BEO协调", desc: "BanquetEventOrder — 宴会执行单管理" },
+                { name: "付款与回款", desc: "定金/尾款/退款全流程" },
+              ]
+            },
+          ]
+        },
+        {
+          name: "运营层",
+          desc: "优化日常运营效率的三大Agent",
+          color: "#8B5CF6",
+          children: [
+            {
+              name: "OpsFlowAgent",
+              desc: "出品链联动Agent — 1事件→3层级联响应（三体合并：订单+库存+质检）",
+              meta: "65个单元测试, 15个API端点",
+              children: [
+                { name: "ChainAlertAgent", desc: "事件链联动告警（1个采购异常→库存/出品/排菜三级响应）" },
+                { name: "OrderAnomalyAgent", desc: "订单异常检测（退菜率/出品超时/金额偏差）" },
+                { name: "InventoryIntelAgent", desc: "库存智能预警（安全库存/效期/呆滞物料）" },
+                { name: "QualityInspectionAgent", desc: "菜品质检（视觉AI/温度/色泽/摆盘）" },
+                { name: "OpsOptimizeAgent", desc: "运营优化建议（流程瓶颈/人效提升/成本压缩）" },
+              ]
+            },
+            {
+              name: "PeopleAgent",
+              desc: "人力经营决策Agent — 需求拉动排班，每个输出连接¥影响",
+              meta: "每日07:00推送人力建议, 排班建议采纳率>60%",
+              children: [
+                { name: "客流→人力预测", desc: "labor_demand_service.py — 三档降级(rule/statistical/weighted), 含CN节假日表" },
+                { name: "智能排班建议", desc: "workforce_push_service.py — 推理链3条 + 一键确认" },
+                { name: "人工成本监控", desc: "labor_cost_service.py — 成本率/趋势/跨店排名 + ¥文案" },
+                { name: "班次公平性", desc: "shift_fairness_service.py — 基尼系数思路，连续差班预警" },
+                { name: "流失风险预测", desc: "turnover_prediction_service.py — 90天离职风险 + 替换成本¥" },
+                { name: "自动排班", desc: "workforce_auto_schedule_service.py — LaborBudget硬约束 + StaffingPattern模板" },
+              ]
+            },
+            {
+              name: "DishRdAgent",
+              desc: "菜品研发全周期Agent — 从概念→试制→上市→退市",
+              meta: "5个子Agent: CostSim/PilotRec/Review/LaunchAssist/RiskAlert",
+              children: [
+                { name: "成本模拟", desc: "CostSimAgent — BOM成本预估与对标" },
+                { name: "试菜推荐", desc: "PilotRecAgent — 试菜门店/时段推荐" },
+                { name: "上市助手", desc: "LaunchAssistAgent — 定价/渠道/推广策略" },
+                { name: "菜品生命周期", desc: "dish_lifecycle_service.py — 引入→成长→成熟→衰退四阶段" },
+              ]
+            },
+          ]
+        },
+        {
+          name: "底座层",
+          desc: "保障合规与财务准确的三大Agent",
+          color: "#8B5CF6",
+          children: [
+            {
+              name: "ComplianceAgent",
+              desc: "合规监控Agent — 证照到期/食品安全/消防/卫生许可",
+              children: [
+                { name: "证照管理", desc: "compliance_service.py — 到期自动预警" },
+                { name: "语音高危白名单", desc: "voice_command_whitelist.py — 财务/批量删除/权限3级风险" },
+              ]
+            },
+            {
+              name: "OpsAgent",
+              desc: "IT运维Agent — L1感知→L3执行，设备/网络/系统监控",
+              meta: "每15分钟巡检, P0告警直推企微",
+              children: [
+                { name: "系统巡检", desc: "ops_monitor_service.py — CPU/内存/磁盘/进程监控" },
+                { name: "边缘Hub管理", desc: "edge_hub — 门店IoT设备注册/心跳/告警" },
+                { name: "Shokz耳机", desc: "shokz_service.py — 骨传导耳机语音指令" },
+              ]
+            },
+            {
+              name: "FctAgent",
+              desc: "Finance-Controlling-Tax Agent — 财务管控税务一体化",
+              meta: "8端点 + 驾驶舱BFF",
+              children: [
+                { name: "基础FCT", desc: "fct_service.py — 税务估算/现金流预测/预算执行, 全¥化输出" },
+                { name: "银企直连", desc: "fct_advanced — 银行流水自动匹配（LIKE→正则转换）" },
+                { name: "多实体合并", desc: "consolidate_entities — 关联交易抵消 + 合并报表" },
+                { name: "税务自动提取", desc: "extract_tax_fields — VAT/CIT/附加税自动计算" },
+              ]
+            },
+          ]
+        },
+        {
+          name: "协同基础设施",
+          desc: "多Agent协调与度量体系",
+          color: "#8B5CF6",
+          children: [
+            {
+              name: "AgentCollabOptimizer",
+              desc: "多Agent协同总线 — 冲突检测/优先级仲裁/字符2-gram去重/低影响抑制",
+              meta: "40个单元测试, compliance优先级最高",
+              children: [
+                { name: "冲突检测", desc: "同一entity不同Agent建议冲突时自动识别" },
+                { name: "优先级仲裁", desc: "compliance > safety > revenue > cost_saving" },
+                { name: "去重抑制", desc: "Jaccard相似度 > 0.6 自动合并，低影响(<¥50)自动抑制" },
+              ]
+            },
+            {
+              name: "Agent OKR 看板",
+              desc: "agent_okr_service.py — PPT Slide 8 OKR目标追踪",
+              meta: "34个单元测试",
+              children: [
+                { name: "采纳率追踪", desc: "每Agent建议发出数 → 采纳数 → 采纳率%" },
+                { name: "预测误差", desc: "预测值vs实际值偏差监控" },
+                { name: "响应时效", desc: "从事件触发到建议生成的延迟P50/P99" },
+              ]
+            },
+            {
+              name: "Agent记忆总线",
+              desc: "agent_memory_bus.py — Agent间共享上下文与事件发布/订阅" },
+          ]
+        },
+        {
+          name: "SupplierAgent",
+          desc: "供应商智能管理Agent — 比价/评级/寻源/合同风险/供应链风险",
+          color: "#8B5CF6",
+          meta: "51个单元测试, 25个端点",
+          children: [
+            { name: "比价分析", desc: "PriceComparisonAgent — 同品不同供应商价格对比" },
+            { name: "供应商评级", desc: "SupplierRatingAgent — 交付/质量/价格/服务多维评分" },
+            { name: "自动寻源", desc: "AutoSourcingAgent — 基于BOM自动推荐最优供应商组合" },
+            { name: "合同风险", desc: "ContractRiskAgent — 合同到期/条款异常预警" },
+            { name: "供应链风险", desc: "SupplyChainRiskAgent — 集中度/区域/品类风险评估" },
+          ]
+        },
+      ]
+    },
+
+    // ═══════════════════════ 3. 核心业务服务 ═══════════════════════
+    {
+      name: "核心业务服务",
+      desc: "211个服务文件覆盖餐饮连锁全业务域",
+      color: "#3B82F6",
+      children: [
+        {
+          name: "菜品与菜单",
+          desc: "菜品全生命周期管理 + 菜单智能优化",
+          children: [
+            { name: "菜品CRUD", desc: "dish_service.py — 菜品档案/变体/图片管理" },
+            { name: "菜品定价", desc: "dish_pricing_service.py — AI动态定价（需求/库存/时段/竞争）" },
+            { name: "菜品利润", desc: "dish_profitability_service.py — 单品利润分析" },
+            { name: "菜品健康度", desc: "dish_health_service.py — KPI健康评分(0-100)" },
+            { name: "菜品成本预警", desc: "dish_cost_alert_service.py — 成本超标自动告警" },
+            { name: "菜品跨店对标", desc: "dish_benchmark_service.py — 同品同菜跨店表现比较" },
+            { name: "菜品归因", desc: "dish_attribution_service.py — 营收贡献归因分析" },
+            { name: "菜单矩阵", desc: "menu_matrix_service.py — BCG矩阵(明星/金牛/问号/瘦狗)" },
+            { name: "菜单优化", desc: "menu_optimization_service.py — 利润最大化菜单组合推荐" },
+            { name: "菜单排名", desc: "menu_ranker.py — 按销量/利润/评价综合排名" },
+            { name: "成本压缩", desc: "cost_compression_analyzer.py — 食材替换/用量优化节省机会" },
+          ]
+        },
+        {
+          name: "BOM与库存",
+          desc: "配方管理 + 实时库存 + 损耗追踪",
+          children: [
+            { name: "BOM管理", desc: "bom_service.py — 配方CRUD/版本控制/Excel导入" },
+            { name: "BOM继承", desc: "bom_resolver.py — 品牌→区域→门店三级BOM继承解析" },
+            { name: "库存服务", desc: "inventory_service.py — 实时库存跟踪/预警/安全库存" },
+            { name: "损耗追踪", desc: "waste_event_service.py — 损耗事件记录与归因" },
+            { name: "损耗卫士", desc: "waste_guard_service.py — Top5按¥金额排序 + BOM偏差" },
+          ]
+        },
+        {
+          name: "财务管控",
+          desc: "从成本率到现金流的全链路财务服务",
+          children: [
+            { name: "食材成本", desc: "food_cost_service.py — BOM成本分析/理论vs实际/跨店排名" },
+            { name: "利润归因", desc: "profit_attribution_service.py — 渠道/品类利润分解" },
+            { name: "预算管理", desc: "budget_service.py — 月度预算编制与执行率跟踪" },
+            { name: "现金流预测", desc: "cashflow_forecast_service.py — 未来N天现金流预测" },
+            { name: "财务健康", desc: "finance_health_service.py — 财务健康综合评分" },
+            { name: "财务异常", desc: "financial_anomaly_service.py — 异常交易/支出自动检测" },
+            { name: "结算风险", desc: "settlement_risk_service.py — 供应商/平台结算风险评估" },
+            { name: "KPI告警", desc: "kpi_alert_service.py — 09:30食材成本率阈值告警", meta: "warning 32% / critical 35%" },
+          ]
+        },
+        {
+          name: "会员与私域",
+          desc: "RFM分群 + 旅程自动化 + 360°客户画像",
+          children: [
+            { name: "会员生命周期", desc: "member_service.py — RFM评分/客群分级/生命周期管理" },
+            { name: "客户360°", desc: "customer360_service.py — 全维度客户画像" },
+            { name: "旅程编排器", desc: "journey_orchestrator.py — 自动化营销旅程（新客激活/沉睡唤醒/生日关怀）" },
+            { name: "频控引擎", desc: "frequency_cap_engine.py — 消息发送频率限制，防骚扰" },
+            { name: "生日提醒", desc: "birthday_reminder_service.py — 每日10:00自动触发" },
+            { name: "私域指标", desc: "private_domain_metrics.py — 私域健康度/活跃度/转化率" },
+          ]
+        },
+        {
+          name: "报告与分析",
+          desc: "从日报到月报的全维度报告体系",
+          children: [
+            { name: "经营叙述器", desc: "narrative_engine.py — 数据→≤200字自然语言简报" },
+            { name: "每日Hub", desc: "daily_hub_service.py — T+1明日备战板数据聚合" },
+            { name: "门店健康度", desc: "store_health_service.py — 5维度加权(营收30%+翻台20%+成本25%+客诉15%+人效10%)" },
+            { name: "月度报告", desc: "monthly_report_service.py — JSON+HTML双格式，浏览器打印PDF" },
+            { name: "行为评分", desc: "behavior_score_engine.py — AI建议采纳率追踪+系统ROI证明" },
+            { name: "竞品分析", desc: "competitive_analysis_service.py — 竞争对手价格/服务对标" },
+          ]
+        },
+        {
+          name: "推荐与个性化",
+          desc: "菜品推荐 + A/B测试 + 动态定价",
+          children: [
+            { name: "推荐引擎", desc: "recommendation_engine.py — CF+CB+CTX+BIZ四维评分(0.3+0.3+0.2+0.2)" },
+            { name: "推荐服务", desc: "recommendation_service.py — 推荐→定价→活动pipeline" },
+            { name: "A/B测试", desc: "decision_ab_test_service.py — 哈希确定分流+Z检验显著性" },
+            { name: "动态定价", desc: "dynamic_pricing_service.py — 需求/库存/时段/天气多因子定价" },
+          ]
+        },
+      ]
+    },
+
+    // ═══════════════════════ 4. 企微推送体系 ═══════════════════════
+    {
+      name: "企微决策推送",
+      desc: "4时间点主动推送 + 一键审批 + 效果反馈闭环",
+      color: "#06D6A0",
+      children: [
+        { name: "08:00 晨推", desc: "push_morning_decisions — Top3决策卡片（¥+置信度+一键操作）" },
+        { name: "12:00 午推", desc: "push_noon_anomaly — 上午异常汇总（仅warning/critical触发）" },
+        { name: "17:30 战前推", desc: "push_prebattle_decisions — 库存/人力备战提醒（有决策才推）" },
+        { name: "20:30 晚推", desc: "push_evening_recap — 经营简报（NarrativeEngine生成自然语言）" },
+        { name: "审批回调", desc: "approval_service.py — 企微审批→状态更新→48h效果反馈" },
+        { name: "推送合规", desc: "Rule 7: 建议动作+预期¥+置信度+一键操作; 纯信息不推送" },
+      ]
+    },
+
+    // ═══════════════════════ 5. 前端应用 ═══════════════════════
+    {
+      name: "前端应用",
+      desc: "React 19 + Vite + Ant Design 5 · 166个页面 · 4套角色布局",
+      color: "#FF6B2C",
+      children: [
+        {
+          name: "角色驱动架构",
+          desc: "4个角色 × 4种设备 × 独立Layout",
+          children: [
+            {
+              name: "店长工作台 /sm",
+              desc: "StoreManagerLayout — 移动优先, 底部Tab导航",
+              meta: "18+页面: Home/Shifts/Tasks/Business/Decisions/Alerts/Workforce/Banquet系列",
+              children: [
+                { name: "SM首页", desc: "KPI卡片 + AI建议卡 + 今日待办" },
+                { name: "排班管理", desc: "排班表 + 换班申请 + 一键确认建议" },
+                { name: "宴会线索", desc: "阶段Chip过滤 + 推进阶段Modal" },
+                { name: "宴会订单", desc: "状态过滤 + 登记付款Modal" },
+                { name: "私域健康", desc: "会员活跃度/转化率分析" },
+              ]
+            },
+            {
+              name: "厨师长工作台 /chef",
+              desc: "ChefLayout — 移动端, 厨房聚焦视图",
+              meta: "3页面: Home/Waste/Inventory",
+              children: [
+                { name: "厨房Dashboard", desc: "今日出品量/退菜率/备菜计划" },
+                { name: "损耗登记", desc: "快速录入损耗事件" },
+                { name: "厨房库存", desc: "当前可用食材/缺料预警" },
+              ]
+            },
+            {
+              name: "楼面经理 /floor",
+              desc: "FloorLayout — 平板端, 横屏优化",
+              meta: "3页面: Home/Queue/Reservations",
+              children: [
+                { name: "楼面Dashboard", desc: "排队/翻台/服务质量概览" },
+                { name: "排队管理", desc: "叫号/美团排队集成" },
+                { name: "预订管理", desc: "预订列表/冲突检测" },
+              ]
+            },
+            {
+              name: "总部驾驶舱 /hq",
+              desc: "HQLayout — 桌面端, 多店监控面板",
+              meta: "6页面: Home/Stores/Decisions/Finance/Workforce/Banquet",
+              children: [
+                { name: "HQ首页", desc: "门店健康度排名 + 收入概览 + 异常门店" },
+                { name: "门店对标", desc: "多维度跨店比较" },
+                { name: "决策中心", desc: "全品牌决策汇总与下发" },
+                { name: "财务总览", desc: "合并报表/成本率趋势/预算执行" },
+                { name: "人力分析", desc: "跨店人工成本排名+品牌均值对比" },
+              ]
+            },
+          ]
+        },
+        {
+          name: "核心功能页面",
+          desc: "10个MVP功能 + 扩展功能页面",
+          children: [
+            {
+              name: "经营总览 (34项)",
+              desc: "从日报到月报, 从单店到全局",
+              children: [
+                { name: "明日备战板", desc: "DailyHubPage — 昨日复盘+Top3 AI决策+食材成本率" },
+                { name: "KPI仪表盘", desc: "KPIDashboardPage — 多维KPI监控" },
+                { name: "利润分析", desc: "ProfitDashboard — 跨店成本率排名+单店周趋势+食材明细钻取(3Tab)" },
+                { name: "月度报告", desc: "MonthlyReportPage — 6KPI卡+经营叙事+周趋势图+Top3节省决策+打印PDF" },
+                { name: "预测中心", desc: "ForecastPage — 需求/营收预测" },
+                { name: "竞品分析", desc: "CompetitiveAnalysis — 市场竞争对标" },
+              ]
+            },
+            {
+              name: "门店运营 (18项)",
+              desc: "排班/排队/服务/质检/合规",
+              children: [
+                { name: "智能排班", desc: "SchedulePage — AI建议+一键确认+公平性" },
+                { name: "员工绩效", desc: "EmployeePerformancePage — 岗位KPI追踪" },
+                { name: "人力管理", desc: "WorkforcePage — 4KPI+建议卡+成本趋势+员工健康Tab" },
+                { name: "行动计划", desc: "ActionPlansPage — L5行动管理+结果登记" },
+                { name: "审批管理", desc: "ApprovalListPage — 待审批/已通过/已拒绝" },
+              ]
+            },
+            {
+              name: "商品供应链 (14项)",
+              desc: "BOM/库存/损耗/供应商",
+              children: [
+                { name: "BOM管理", desc: "BOMManagementPage — 配方CRUD+成本分析Modal" },
+                { name: "损耗Top5", desc: "WasteReasoningPage — ¥排名+归因Tag+建议行动+BOM偏差" },
+                { name: "供应商智能", desc: "SupplierAgentPage — 驾驶舱/档案/合同/预警/寻源5Tab" },
+                { name: "告警阈值", desc: "AlertThresholdsPage — 阈值配置(warning/critical)" },
+              ]
+            },
+            {
+              name: "会员增长 (8项)",
+              desc: "CRM/营销/推荐/私域",
+              children: [
+                { name: "会员档案", desc: "MemberSystemPage — RFM标签/生命周期/生日编辑/旅程触发" },
+                { name: "营销活动", desc: "MarketingCampaignPage — 客群饼图+流失风险+ROI汇总+批量挽回" },
+                { name: "推荐引擎", desc: "RecommendationsPage — 场景感知+混合推荐+算法说明" },
+                { name: "渠道利润", desc: "ChannelProfitPage — 堂食/外卖/团购利润对比" },
+              ]
+            },
+          ]
+        },
+        {
+          name: "智能体中心 (19项)",
+          desc: "Agent管理/监控/协同/训练",
+          children: [
+            { name: "Agent Hub", desc: "AgentHubPage — 全部Agent状态总览" },
+            { name: "经营智能", desc: "BusinessIntelPage — BI Agent驾驶舱" },
+            { name: "出品链联动", desc: "OpsFlowAgentPage — 驾驶舱/联动/库存/质检/优化5Tab" },
+            { name: "Agent OKR", desc: "AgentOKRPage — 采纳率进度条+目标线+OKR Badge" },
+            { name: "协同总线", desc: "AgentCollabPage — 冲突统计KPI+协同原理+近期冲突" },
+            { name: "AI演进", desc: "AIEvolutionPage — AI模型迭代追踪" },
+          ]
+        },
+        {
+          name: "设计系统",
+          desc: "Z前缀组件库 + Design Token + 主题切换",
+          children: [
+            { name: "Design Token", desc: "CSS变量系统: 颜色/间距/圆角/阴影/动效", meta: "品牌色 #FF6B2C, 暗色模式" },
+            { name: "Z组件库", desc: "ZCard/ZButton/ZInput/ZBadge/ZAvatar/ZEmpty/ZSkeleton (12+组件)" },
+            { name: "业务组件", desc: "HealthRing/UrgencyList/ChartTrend/AISuggestionCard" },
+            { name: "主题系统", desc: "ThemeContext — light/dark/auto, localStorage持久化, 系统主题跟随" },
+          ]
+        },
+      ]
+    },
+
+    // ═══════════════════════ 6. 数据架构 ═══════════════════════
+    {
+      name: "数据架构",
+      desc: "73个SQLAlchemy模型 + 104个Alembic迁移 + 4种存储引擎",
+      color: "#F59E0B",
+      children: [
+        {
+          name: "PostgreSQL (主库)",
+          desc: "核心业务数据, RLS行级安全, brand_id+store_id双重隔离",
+          children: [
+            { name: "核心实体 (9表)", desc: "User/Store/Employee/Order/Dish/Inventory/BOM/Ingredient/StoreConfig" },
+            { name: "经营分析 (6表)", desc: "KPI/Forecast/DailyReport/DecisionLog/FinancialReport/BizMetricSnapshot" },
+            { name: "宴会体系 (6表)", desc: "BanquetHall/BanquetType/BanquetOrder/BanquetLead/BanquetStage/BanquetEventOrder" },
+            { name: "会员体系 (4表)", desc: "Member/MemberLifecycle/MemberJourney/JourneyStep" },
+            { name: "Agent追踪 (7表)", desc: "AgentOKR/AgentConflict/AgentCollab/PeopleDecision/OpsFlowAlert/SupplierRec/DishRdMaster" },
+            { name: "FCT高级 (8表)", desc: "BankAccount/BankTransaction/BankMatchRule/Entity/ConsolidationRun/IntercompanyItem/TaxDeclaration/TaxExtractRule" },
+            { name: "人力管理 (6表)", desc: "LaborDemandForecast/LaborCostSnapshot/StaffingAdvice/StoreLaborBudget/ShiftFairnessScore/TurnoverEvent" },
+            { name: "安全审计 (4表)", desc: "AuditLog/CustomerKey/BackupJob/ExportJob" },
+            { name: "RLS隔离", desc: "rls_001/002 — 租户级+品牌级行级安全策略" },
+          ]
+        },
+        {
+          name: "Neo4j (图数据库)",
+          desc: "业务本体知识图谱, Cypher查询",
+          children: [
+            { name: "节点类型", desc: "Store/Dish/Ingredient/Employee/Customer/Supplier/Equipment" },
+            { name: "关系类型", desc: "HAS_MENU/USES_INGREDIENT/WORKS_AT/ORDERS/SUPPLIES" },
+            { name: "同步机制", desc: "每日02:00 PG→Neo4j全量同步 + 增量事件驱动" },
+          ]
+        },
+        {
+          name: "Qdrant (向量库)",
+          desc: "v1.7.4, 384维MiniLM-L12嵌入, 语义搜索与RAG",
+          children: [
+            { name: "订单索引", desc: "orders+revenue domain, 支持语义查询" },
+            { name: "菜品索引", desc: "dishes+menu domain" },
+            { name: "知识索引", desc: "SOP/规则/案例向量化检索" },
+            { name: "降级监控", desc: "embedding_monitor_service.py — 相似度/空结果率/延迟P99/健康分" },
+          ]
+        },
+        {
+          name: "Redis (缓存/消息)",
+          desc: "Redis 7 + Sentinel HA, Celery Broker",
+          children: [
+            { name: "BFF缓存", desc: "角色首屏BFF 30s缓存 + ?refresh=true强制刷新" },
+            { name: "推送去重", desc: "企微消息Redis去重，防重复发送" },
+            { name: "频控存储", desc: "营销消息频率限制计数器" },
+            { name: "离线缓存", desc: "edge_node离线查询: 营业额/库存快照" },
+            { name: "Celery Broker", desc: "3优先级队列: high/default/low" },
+          ]
+        },
+      ]
+    },
+
+    // ═══════════════════════ 7. 定时任务体系 ═══════════════════════
+    {
+      name: "定时任务体系",
+      desc: "Celery Beat 45+定时任务, Asia/Shanghai时区, 环境变量可配置",
+      color: "#06B6D4",
+      children: [
+        {
+          name: "凌晨批处理 (00-06)",
+          desc: "数据同步/清理/训练等重型任务",
+          children: [
+            { name: "01:00 释放过期房锁", desc: "release_expired_room_locks" },
+            { name: "02:00 天财数据拉取", desc: "pull_tiancai_daily_orders" },
+            { name: "02:00 本体图谱同步", desc: "sync_ontology_graph (PG→Neo4j)" },
+            { name: "02:00 门店记忆更新", desc: "update_store_memory" },
+            { name: "03:00 POS对账", desc: "perform_daily_reconciliation" },
+            { name: "03:30 RFM刷新", desc: "refresh_private_domain_rfm" },
+            { name: "04:30 行动批量派发", desc: "nightly_action_dispatch (L5)" },
+            { name: "06:00 RAG日报", desc: "generate_daily_report_with_rag" },
+            { name: "06:00 生命周期扫描", desc: "scan_lifecycle_transitions" },
+          ]
+        },
+        {
+          name: "早间运营 (07-12)",
+          desc: "人力建议/决策推送/告警巡检",
+          children: [
+            { name: "07:00 人力建议推送", desc: "push_daily_workforce_advice + auto_schedule" },
+            { name: "08:00 晨推Top3", desc: "push_morning_decisions" },
+            { name: "08:05 店长日报", desc: "push_sm_daily_briefing" },
+            { name: "08:10 总部简报", desc: "push_hq_daily_briefing" },
+            { name: "09:00 需求预测推送", desc: "push_daily_forecast" },
+            { name: "09:15 高频会员推送", desc: "trigger_demand_predictions" },
+            { name: "09:30 成本率告警", desc: "check_food_cost_kpi_alert" },
+            { name: "09:45 成本趋势告警", desc: "check_food_cost_trend_alert" },
+            { name: "10:00 库存检查", desc: "check_inventory_alert (午市备料)" },
+            { name: "10:00 生日提醒", desc: "trigger_birthday_reminders" },
+            { name: "10:30 营销自动触达", desc: "marketing_auto_outreach" },
+            { name: "12:00 午推异常", desc: "push_noon_anomaly" },
+          ]
+        },
+        {
+          name: "下午/晚间 (17-22)",
+          desc: "备战推送/日报生成",
+          children: [
+            { name: "17:00 多阶段规划", desc: "start_evening_planning (N+1日)" },
+            { name: "17:30 战前推送", desc: "push_prebattle_decisions" },
+            { name: "20:30 经营简报", desc: "push_evening_recap (NarrativeEngine)" },
+            { name: "22:30 日报生成", desc: "generate_and_send_daily_report + daily_hub" },
+          ]
+        },
+        {
+          name: "高频巡检",
+          desc: "分钟级巡检任务",
+          children: [
+            { name: "每3分钟", desc: "check_edge_hub_heartbeats — 边缘设备心跳" },
+            { name: "每5分钟", desc: "retry_failed_wechat + check_workflow_deadlines" },
+            { name: "每10分钟", desc: "escalate_ontology_actions — L5超时升级" },
+            { name: "每15分钟", desc: "detect_revenue_anomaly + ops_patrol" },
+            { name: "每1小时", desc: "trigger_new_member_journeys" },
+            { name: "每2小时", desc: "run_signal_bus_scan" },
+            { name: "每周一03:00", desc: "propagate_training_knowledge — 跨店知识传播" },
+          ]
+        },
+      ]
+    },
+
+    // ═══════════════════════ 8. 开放平台 ═══════════════════════
+    {
+      name: "开放平台与生态",
+      desc: "ISV生态 + 模型市场 + 插件市场 + API计费",
+      color: "#EC4899",
+      children: [
+        { name: "Open API", desc: "open_api_platform.py — ISV API访问管理", meta: "API Key + Rate Limit" },
+        { name: "ISV管理", desc: "isv_management — ISV招募/审核/上架/分成" },
+        { name: "模型市场", desc: "model_marketplace — AI模型浏览/购买/部署" },
+        { name: "插件市场", desc: "plugin_marketplace — 功能插件发现/安装" },
+        { name: "API计费", desc: "api_billing — 按调用量计费(RaaS模式)" },
+        { name: "收入分成", desc: "revenue_sharing — ISV/平台收入分配" },
+        { name: "行业方案", desc: "industry_solutions — 火锅/烧烤/快餐/正餐模板" },
+        { name: "国际化", desc: "internationalization.py — 多语言支持(i18n)" },
+        { name: "开发者控制台", desc: "developer_console — API Key管理/调试/文档" },
+      ]
+    },
+
+    // ═══════════════════════ 9. 基础设施 ═══════════════════════
+    {
+      name: "基础设施",
+      desc: "K8s + Docker + Nginx + CI/CD + 监控",
+      color: "#EC4899",
+      children: [
+        {
+          name: "Kubernetes部署",
+          desc: "11个YAML清单, HPA自动扩缩",
+          children: [
+            { name: "API Gateway", desc: "3副本, Rolling Update, 250m~1000m CPU, 512Mi~1Gi RAM" },
+            { name: "Web Nginx", desc: "1-5副本HPA, SPA路由, Gzip, 1年静态缓存" },
+            { name: "PostgreSQL", desc: "StatefulSet, 20Gi PVC, 512Mi~2Gi RAM" },
+            { name: "Redis", desc: "StatefulSet, 5Gi PVC, 256Mi~1Gi RAM" },
+            { name: "Ingress", desc: "cert-manager TLS, WebSocket 3600s, HSTS/CSP安全头" },
+            { name: "HPA", desc: "API 2-10副本(CPU 70%), Web 1-5副本(CPU 70%)" },
+          ]
+        },
+        {
+          name: "Docker环境",
+          desc: "开发6服务 + 生产3服务(API+Worker+Beat)",
+          children: [
+            { name: "开发环境", desc: "docker-compose: PG15 + Redis7 + Neo4j5.17 + Qdrant1.7.4 + Prometheus + Grafana" },
+            { name: "API镜像", desc: "Python 3.9-slim多阶段构建, 健康检查 /health" },
+            { name: "Celery Worker", desc: "4并发, high/default/low三队列" },
+            { name: "Celery Beat", desc: "07:00 Asia/Shanghai调度器" },
+          ]
+        },
+        {
+          name: "安全加固",
+          desc: "多层安全防护",
+          children: [
+            { name: "SecurityHeaders", desc: "防XSS/点击劫持/MIME嗅探/HSTS中间件" },
+            { name: "CORS", desc: "环境感知配置, 明确methods/headers" },
+            { name: "数据加密", desc: "AES-256-GCM, 每客户独立密钥" },
+            { name: "RLS", desc: "PostgreSQL行级安全(tenant+brand双层)" },
+            { name: "JWT认证", desc: "python-jose + passlib/bcrypt" },
+            { name: "RBAC", desc: "permission_matrix.py — 角色权限矩阵" },
+          ]
+        },
+        {
+          name: "CI/CD流水线",
+          desc: "GitHub Actions 6个Job",
+          children: [
+            { name: "lint-backend", desc: "flake8 + black + isort" },
+            { name: "test-backend", desc: "pytest + PG15 + Redis7 + Codecov" },
+            { name: "test-agents", desc: "9个Agent并行矩阵测试" },
+            { name: "lint-frontend", desc: "ESLint" },
+            { name: "test-frontend", desc: "Vitest + pnpm build + Codecov" },
+            { name: "build", desc: "Docker Buildx多阶段构建(仅main分支)" },
+          ]
+        },
+        {
+          name: "监控告警",
+          desc: "Prometheus + Grafana + 自定义告警规则",
+          children: [
+            { name: "Prometheus", desc: "/metrics端点, 15s采集间隔" },
+            { name: "Grafana", desc: "可视化面板, 默认admin/admin" },
+            { name: "告警规则", desc: "Redis宕机/DB连接池耗尽/磁盘/Agent错误率" },
+            { name: "Flower", desc: "Celery任务监控UI" },
+          ]
+        },
+      ]
+    },
+
+    // ═══════════════════════ 10. 通信集成 ═══════════════════════
+    {
+      name: "外部集成",
+      desc: "企微/飞书/语音/POS/供应链等多渠道集成",
+      color: "#06B6D4",
+      children: [
+        {
+          name: "企业微信",
+          desc: "决策推送/审批回调/会员触达",
+          children: [
+            { name: "消息推送", desc: "wechat_service.py — textcard格式+Redis去重+失败入队" },
+            { name: "审批流", desc: "企微审批→状态更新→48h效果反馈" },
+            { name: "Webhook", desc: "企微事件接收(客户消息/审批回调)" },
+          ]
+        },
+        {
+          name: "飞书",
+          desc: "feishu_service.py — 飞书消息/通知集成" },
+        {
+          name: "语音交互",
+          desc: "Shokz骨传导耳机 + 讯飞WebSocket",
+          children: [
+            { name: "语音指令", desc: "voice_service.py — 语音命令处理" },
+            { name: "讯飞ASR", desc: "iflytek_websocket_service.py — 实时语音识别" },
+            { name: "高危白名单", desc: "3级风险(SAFE/CONFIRM/HIGH_RISK)" },
+          ]
+        },
+        {
+          name: "POS系统",
+          desc: "4套POS适配器 + Webhook自动接收",
+          children: [
+            { name: "天财商龙", desc: "tiancai-shanglong — 每日02:00拉取订单/菜品/库存" },
+            { name: "品智", desc: "pinzhi — 实时订单同步" },
+            { name: "翼订", desc: "yiding — 订单/菜品/门店对接" },
+            { name: "奥琦玮", desc: "aoqiwei — 供应链平台集成" },
+          ]
+        },
+        {
+          name: "美团",
+          desc: "meituan_queue_integration — 美团排队系统对接" },
+      ]
+    },
+  ]
+};
+
+// ══════════════════════════════════════════════════════════════════════════════
+// D3-like Tree Layout (Pure JS, no dependency)
+// ══════════════════════════════════════════════════════════════════════════════
+
+const COLORS = {
+  "#0AAF9A": "var(--accent)", "#3B82F6": "var(--blue)", "#8B5CF6": "var(--purple)",
+  "#FF6B2C": "var(--orange)", "#EC4899": "var(--pink)", "#F59E0B": "var(--yellow)",
+  "#06D6A0": "var(--accent2)", "#06B6D4": "var(--cyan)", "#EF4444": "var(--red)",
+};
+
+let svg, g, zoom;
+let root;
+let nodeId = 0;
+let duration = 400;
+const nodeH = 32, nodeGapV = 6, nodeGapH = 260;
+let searchTerm = '';
+
+// Count stats
+function countNodes(node, stats) {
+  if (!stats) stats = { svc:0, model:0, api:0, agent:0, page:0, task:0 };
+  const n = (node.name || '').toLowerCase();
+  const d = (node.desc || '').toLowerCase();
+  if (d.includes('service') || d.includes('_service')) stats.svc++;
+  if (d.includes('模型') || d.includes('表)') || d.includes('张表')) stats.model++;
+  if (d.includes('端点') || d.includes('api')) stats.api++;
+  if (n.includes('agent') || d.includes('agent')) stats.agent++;
+  if (n.includes('page') || d.includes('page') || d.includes('页面') || d.includes('页')) stats.page++;
+  if (d.includes('celery') || d.includes('beat') || d.includes('每') || n.includes('定时')) stats.task++;
+  if (node.children) node.children.forEach(c => countNodes(c, stats));
+  return stats;
+}
+
+function init() {
+  const container = document.getElementById('mindmap');
+  const w = container.clientWidth, h = container.clientHeight;
+
+  const svgEl = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svgEl.setAttribute('width', w);
+  svgEl.setAttribute('height', h);
+  container.appendChild(svgEl);
+  svg = svgEl;
+
+  const gEl = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  gEl.setAttribute('id', 'tree-group');
+  svg.appendChild(gEl);
+  g = gEl;
+
+  // Pan & Zoom
+  let viewX = 80, viewY = h/2, scale = 0.85;
+  function applyTransform() {
+    g.setAttribute('transform', `translate(${viewX},${viewY}) scale(${scale})`);
+  }
+  applyTransform();
+
+  let dragging = false, lastX, lastY;
+  container.addEventListener('mousedown', e => { dragging=true; lastX=e.clientX; lastY=e.clientY; });
+  container.addEventListener('mousemove', e => {
+    if(!dragging) return;
+    viewX += e.clientX - lastX;
+    viewY += e.clientY - lastY;
+    lastX = e.clientX; lastY = e.clientY;
+    applyTransform();
+  });
+  container.addEventListener('mouseup', () => dragging=false);
+  container.addEventListener('mouseleave', () => dragging=false);
+  container.addEventListener('wheel', e => {
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? 0.92 : 1.08;
+    scale = Math.max(0.15, Math.min(3, scale * delta));
+    applyTransform();
+  }, {passive:false});
+
+  window._resetView = () => { viewX=80; viewY=h/2; scale=0.85; applyTransform(); };
+
+  // Build tree
+  root = buildTree(DATA, null, 0);
+  // collapse level > 2
+  collapseBelow(root, 2);
+  render();
+
+  // Stats
+  const stats = countNodes(DATA);
+  document.getElementById('stat-svc').textContent = '211';
+  document.getElementById('stat-model').textContent = '73';
+  document.getElementById('stat-api').textContent = '155';
+  document.getElementById('stat-agent').textContent = '17';
+  document.getElementById('stat-page').textContent = '166';
+  document.getElementById('stat-task').textContent = '45';
+}
+
+function buildTree(data, parent, depth) {
+  const node = {
+    id: nodeId++,
+    name: data.name,
+    desc: data.desc || '',
+    meta: data.meta || '',
+    color: data.color || (parent ? parent.color : '#0AAF9A'),
+    depth: depth,
+    parent: parent,
+    _children: null,
+    children: null,
+    x: 0, y: 0,
+  };
+  if (data.children && data.children.length > 0) {
+    node.children = data.children.map(c => buildTree(c, node, depth+1));
+    node._allChildren = node.children;
+  }
+  return node;
+}
+
+function collapseBelow(node, maxDepth) {
+  if (!node.children) return;
+  if (node.depth >= maxDepth) {
+    node._children = node.children;
+    node.children = null;
+  } else {
+    node.children.forEach(c => collapseBelow(c, maxDepth));
+  }
+}
+
+function expandBelow(node, maxDepth) {
+  if (node._children) {
+    if (node.depth < maxDepth) {
+      node.children = node._children;
+      node._children = null;
+    }
+  }
+  if (node.children) {
+    node.children.forEach(c => expandBelow(c, maxDepth));
+  }
+}
+
+function expandAllNode(node) {
+  if (node._children) { node.children = node._children; node._children = null; }
+  if (node.children) node.children.forEach(expandAllNode);
+}
+function collapseAllNode(node) {
+  if (node.children && node.depth > 0) {
+    node._children = node.children;
+    node.children = null;
+  }
+  if (node._children) node._children.forEach(collapseAllNode);
+}
+
+function toggleNode(node) {
+  if (node.children) {
+    node._children = node.children;
+    node.children = null;
+  } else if (node._children) {
+    node.children = node._children;
+    node._children = null;
+  }
+  render();
+}
+
+// Layout: compute x,y for each node
+function layoutTree(node) {
+  let allNodes = [];
+  let y = 0;
+
+  function walk(n, depth) {
+    n.depth = depth;
+    n.x = depth * nodeGapH;
+    if (!n.children || n.children.length === 0) {
+      n.y = y;
+      y += nodeH + nodeGapV;
+      allNodes.push(n);
+      return;
+    }
+    let firstY, lastY;
+    n.children.forEach((c, i) => {
+      walk(c, depth + 1);
+      if (i === 0) firstY = c.y;
+      lastY = c.y;
+    });
+    n.y = (firstY + lastY) / 2;
+    allNodes.push(n);
+  }
+  walk(node, 0);
+  return allNodes;
+}
+
+function render() {
+  const allNodes = layoutTree(root);
+
+  // Clear
+  while (g.firstChild) g.removeChild(g.firstChild);
+
+  // Links
+  allNodes.forEach(n => {
+    if (n.children) {
+      n.children.forEach(c => {
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        const textW = getTextWidth(n.name, n.depth) + 24;
+        const sx = n.x + textW;
+        const sy = n.y + nodeH/2;
+        const tx = c.x;
+        const ty = c.y + nodeH/2;
+        const mx = (sx + tx) / 2;
+        path.setAttribute('d', `M${sx},${sy} C${mx},${sy} ${mx},${ty} ${tx},${ty}`);
+        path.setAttribute('class', 'link');
+        path.setAttribute('stroke', n.color || '#374151');
+        path.setAttribute('stroke-opacity', '0.3');
+        g.appendChild(path);
+      });
+    }
+  });
+
+  // Nodes
+  allNodes.forEach(n => {
+    const gNode = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    gNode.setAttribute('class', 'node');
+    gNode.setAttribute('transform', `translate(${n.x},${n.y})`);
+
+    const isMatch = searchTerm && (n.name.toLowerCase().includes(searchTerm) || n.desc.toLowerCase().includes(searchTerm));
+    const textW = getTextWidth(n.name, n.depth) + 24;
+    const h = nodeH;
+
+    // Background rect
+    const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    rect.setAttribute('class', 'label-bg');
+    rect.setAttribute('width', textW);
+    rect.setAttribute('height', h);
+    rect.setAttribute('rx', 6);
+    if (isMatch) {
+      rect.setAttribute('stroke', '#F59E0B');
+      rect.setAttribute('stroke-width', 2);
+      rect.setAttribute('fill', 'rgba(245,158,11,.1)');
+    } else {
+      rect.setAttribute('fill', n.depth === 0 ? 'rgba(10,175,154,.12)' : 'var(--bg2)');
+    }
+    gNode.appendChild(rect);
+
+    // Color bar
+    const bar = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    bar.setAttribute('x', 0); bar.setAttribute('y', 0);
+    bar.setAttribute('width', 3); bar.setAttribute('height', h);
+    bar.setAttribute('rx', 1.5);
+    bar.setAttribute('fill', n.color || '#374151');
+    gNode.appendChild(bar);
+
+    // Text
+    const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    text.setAttribute('x', 14);
+    text.setAttribute('y', h/2 + 1);
+    text.setAttribute('dominant-baseline', 'central');
+    text.setAttribute('font-size', n.depth === 0 ? 15 : n.depth === 1 ? 13 : 12);
+    text.setAttribute('font-weight', n.depth <= 1 ? '700' : '400');
+    text.setAttribute('fill', n.depth === 0 ? '#0AAF9A' : 'var(--t1)');
+    text.textContent = n.name;
+    gNode.appendChild(text);
+
+    // Child count badge
+    const childCount = (n.children ? n.children.length : 0) + (n._children ? n._children.length : 0);
+    if (childCount > 0) {
+      const badge = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      badge.setAttribute('x', textW - 8);
+      badge.setAttribute('y', h/2 + 1);
+      badge.setAttribute('dominant-baseline', 'central');
+      badge.setAttribute('text-anchor', 'end');
+      badge.setAttribute('class', 'badge');
+      badge.setAttribute('fill', n.color || 'var(--t3)');
+      badge.textContent = childCount;
+      gNode.appendChild(badge);
+    }
+
+    // Toggle button
+    if (n._children || n.children) {
+      const hasHidden = !!n._children;
+      const cx = textW + 14;
+      const cy = h / 2;
+      const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      circle.setAttribute('cx', cx);
+      circle.setAttribute('cy', cy);
+      circle.setAttribute('r', 8);
+      circle.setAttribute('class', 'toggle-circle');
+      circle.setAttribute('fill', hasHidden ? 'rgba(10,175,154,.15)' : 'var(--bg3)');
+      gNode.appendChild(circle);
+
+      const tText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      tText.setAttribute('x', cx);
+      tText.setAttribute('y', cy);
+      tText.setAttribute('class', 'toggle-text');
+      tText.textContent = hasHidden ? '+' : '−';
+      gNode.appendChild(tText);
+
+      circle.addEventListener('click', e => { e.stopPropagation(); toggleNode(n); });
+    }
+
+    // Hover → tooltip
+    gNode.addEventListener('mouseenter', e => showTooltip(e, n));
+    gNode.addEventListener('mouseleave', hideTooltip);
+    // Click → detail
+    gNode.addEventListener('click', () => showDetail(n));
+
+    g.appendChild(gNode);
+  });
+}
+
+function getTextWidth(text, depth) {
+  const fontSize = depth === 0 ? 15 : depth === 1 ? 13 : 12;
+  // rough CJK char width estimation
+  let w = 0;
+  for (let i = 0; i < text.length; i++) {
+    const c = text.charCodeAt(i);
+    w += c > 127 ? fontSize * 1.05 : fontSize * 0.62;
+  }
+  return Math.max(w + 16, 60);
+}
+
+function showTooltip(e, node) {
+  if (!node.desc && !node.meta) return;
+  const tt = document.getElementById('tooltip');
+  let html = `<div class="tt-title">${node.name}</div>`;
+  if (node.desc) html += `<div class="tt-desc">${node.desc}</div>`;
+  if (node.meta) html += `<div class="tt-meta">${node.meta}</div>`;
+  tt.innerHTML = html;
+  tt.style.display = 'block';
+  tt.style.left = Math.min(e.clientX + 16, window.innerWidth - 400) + 'px';
+  tt.style.top = Math.min(e.clientY - 10, window.innerHeight - 200) + 'px';
+}
+function hideTooltip() {
+  document.getElementById('tooltip').style.display = 'none';
+}
+
+function showDetail(node) {
+  const panel = document.getElementById('detailPanel');
+  const content = document.getElementById('detailContent');
+
+  // Build breadcrumb path
+  let path = [];
+  let p = node;
+  while(p) { path.unshift(p.name); p = p.parent; }
+
+  let html = `<h3>${node.name}</h3>`;
+  html += `<div class="dp-path">${path.join(' → ')}</div>`;
+  if (node.desc) html += `<div class="dp-desc">${node.desc}</div>`;
+  if (node.meta) html += `<div class="dp-desc" style="color:var(--accent);font-size:12px;margin-bottom:12px">${node.meta}</div>`;
+
+  const kids = node.children || node._children;
+  if (kids && kids.length > 0) {
+    html += `<h4 style="font-size:13px;color:var(--t2);margin:12px 0 8px">子节点 (${kids.length})</h4>`;
+    html += '<ul class="dp-children">';
+    kids.forEach(c => {
+      html += `<li><span class="dot" style="background:${c.color || node.color}"></span><div><b style="color:var(--t1)">${c.name}</b>`;
+      if (c.desc) html += `<br><span style="color:var(--t3);font-size:11px">${c.desc}</span>`;
+      const gc = (c.children || c._children);
+      if (gc && gc.length > 0) html += `<br><span style="color:${c.color || node.color};font-size:10px">${gc.length} 个子项</span>`;
+      html += '</div></li>';
+    });
+    html += '</ul>';
+  }
+
+  content.innerHTML = html;
+  panel.classList.add('open');
+
+  // Breadcrumb
+  const bc = document.getElementById('breadcrumb');
+  bc.innerHTML = path.map((p,i) => `<span>${p}</span>${i < path.length-1 ? '<span class="sep">›</span>' : ''}`).join('');
+}
+function closeDetail() {
+  document.getElementById('detailPanel').classList.remove('open');
+}
+
+// Controls
+function expandAll() { expandAllNode(root); render(); }
+function collapseAll() { collapseAllNode(root); render(); }
+function expandLevel(n) { collapseAllNode(root); expandBelow(root, n); render(); }
+function resetView() { window._resetView(); collapseAllNode(root); expandBelow(root, 2); render(); }
+function searchNodes(term) {
+  searchTerm = term.toLowerCase().trim();
+  if (searchTerm) {
+    // expand all to show matches
+    expandAllNode(root);
+  }
+  render();
+}
+
+// Init
+window.addEventListener('load', init);
+window.addEventListener('resize', () => {
+  svg.setAttribute('width', svg.parentElement.clientWidth);
+  svg.setAttribute('height', svg.parentElement.clientHeight);
+});
+</script>
+</body>
+</html>
