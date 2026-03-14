@@ -84,18 +84,31 @@ if ! id -u "${EDGE_USER}" >/dev/null 2>&1; then
 fi
 
 mkdir -p "${INSTALL_DIR}" "${CONFIG_DIR}" "${STATE_DIR}"
-cp "${EDGE_DIR}/edge_node_agent.py" "${INSTALL_DIR}/edge_node_agent.py"
-cp "${EDGE_DIR}/shokz_callback_daemon.py" "${INSTALL_DIR}/shokz_callback_daemon.py"
-cp "${SCRIPT_DIR}/install_raspberry_pi_edge.sh" "${INSTALL_DIR}/install_raspberry_pi_edge.sh"
+cp "${EDGE_DIR}/edge_node_agent.py"         "${INSTALL_DIR}/edge_node_agent.py"
+cp "${EDGE_DIR}/shokz_callback_daemon.py"   "${INSTALL_DIR}/shokz_callback_daemon.py"
+cp "${EDGE_DIR}/shokz_bluetooth_manager.py" "${INSTALL_DIR}/shokz_bluetooth_manager.py"
+cp "${EDGE_DIR}/edge_model_manager.py"      "${INSTALL_DIR}/edge_model_manager.py"
+cp "${EDGE_DIR}/edge_business_queue.py"     "${INSTALL_DIR}/edge_business_queue.py"
+cp "${EDGE_DIR}/edge_health_check.py"       "${INSTALL_DIR}/edge_health_check.py"
+cp "${SCRIPT_DIR}/install_raspberry_pi_edge.sh"          "${INSTALL_DIR}/install_raspberry_pi_edge.sh"
 cp "${SCRIPT_DIR}/enable_raspberry_pi_edge_autoprovision.sh" "${INSTALL_DIR}/enable_raspberry_pi_edge_autoprovision.sh"
 cp "${EDGE_DIR}/bootstrap_edge_firstboot.sh" "${INSTALL_DIR}/bootstrap_edge_firstboot.sh"
 cp "${EDGE_DIR}/${SERVICE_NAME}" "/etc/systemd/system/${SERVICE_NAME}"
 cp "${EDGE_DIR}/${SHOKZ_SERVICE_NAME}" "/etc/systemd/system/${SHOKZ_SERVICE_NAME}"
 chmod 755 "${INSTALL_DIR}/edge_node_agent.py"
 chmod 755 "${INSTALL_DIR}/shokz_callback_daemon.py"
+chmod 755 "${INSTALL_DIR}/shokz_bluetooth_manager.py"
+chmod 755 "${INSTALL_DIR}/edge_model_manager.py"
+chmod 755 "${INSTALL_DIR}/edge_business_queue.py"
+chmod 755 "${INSTALL_DIR}/edge_health_check.py"
 chmod 755 "${INSTALL_DIR}/install_raspberry_pi_edge.sh"
 chmod 755 "${INSTALL_DIR}/enable_raspberry_pi_edge_autoprovision.sh"
 chmod 755 "${INSTALL_DIR}/bootstrap_edge_firstboot.sh"
+
+# 安装系统级软链（方便直接调用）
+ln -sf "${INSTALL_DIR}/edge_health_check.py"  /usr/local/bin/zhilian-check
+ln -sf "${INSTALL_DIR}/edge_model_manager.py" /usr/local/bin/zhilian-models
+ln -sf "${INSTALL_DIR}/edge_business_queue.py" /usr/local/bin/zhilian-queue
 
 cat > "${CONFIG_DIR}/edge-node.env" <<EOF
 EDGE_API_BASE_URL=${API_BASE_URL}
@@ -122,10 +135,13 @@ systemctl --no-pager --full status "${SERVICE_NAME}" || true
 systemctl --no-pager --full status "${SHOKZ_SERVICE_NAME}" || true
 
 echo
-echo "Zhilian edge node installer completed."
-echo "Config file: ${CONFIG_DIR}/edge-node.env"
-echo "State file: ${STATE_DIR}/node_state.json"
-echo "Shokz state file: ${STATE_DIR}/shokz_state.json"
-echo "Service: ${SERVICE_NAME}"
-echo "Shokz callback service: ${SHOKZ_SERVICE_NAME}"
-echo "Logs: journalctl -u ${SERVICE_NAME} -f"
+echo "屯象OS 边缘节点安装完成。"
+echo "配置文件 : ${CONFIG_DIR}/edge-node.env"
+echo "状态文件 : ${STATE_DIR}/node_state.json"
+echo "Shokz状态: ${STATE_DIR}/shokz_state.json"
+echo "主服务   : ${SERVICE_NAME}"
+echo "Shokz服务: ${SHOKZ_SERVICE_NAME}"
+echo "日志查看 : journalctl -u ${SERVICE_NAME} -f"
+echo "健康检查 : zhilian-check"
+echo "模型管理 : zhilian-models list"
+echo "队列状态 : zhilian-queue stats"

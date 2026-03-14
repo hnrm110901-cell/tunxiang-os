@@ -79,6 +79,10 @@ scp -P "${REMOTE_PORT}" \
 scp -P "${REMOTE_PORT}" \
   "${EDGE_DIR}/edge_node_agent.py" \
   "${EDGE_DIR}/shokz_callback_daemon.py" \
+  "${EDGE_DIR}/shokz_bluetooth_manager.py" \
+  "${EDGE_DIR}/edge_model_manager.py" \
+  "${EDGE_DIR}/edge_business_queue.py" \
+  "${EDGE_DIR}/edge_health_check.py" \
   "${EDGE_DIR}/zhilian-edge-node.service" \
   "${EDGE_DIR}/zhilian-edge-shokz.service" \
   "${EDGE_DIR}/zhilian-edge-bootstrap.service" \

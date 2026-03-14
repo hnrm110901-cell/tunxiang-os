@@ -27,6 +27,7 @@ from src.services.shokz_device_service import (
 from src.models.user import User
 from src.models.audit_log import AuditAction, ResourceType
 from src.services.audit_log_service import audit_log_service
+from src.services.edge_bootstrap_token_service import get_edge_bootstrap_token_service
 
 router = APIRouter(prefix="/api/v1/hardware")
 edge_security = HTTPBearer(auto_error=False)
@@ -93,18 +94,35 @@ async def get_edge_bootstrap_or_user(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(edge_security),
     session: AsyncSession = Depends(get_db),
 ):
-    if credentials and settings.EDGE_BOOTSTRAP_TOKEN:
+    if credentials:
         token = credentials.credentials
-        if secrets.compare_digest(token, settings.EDGE_BOOTSTRAP_TOKEN):
+        # 1) 优先检查 Redis 动态 Token（运营人员从后台发放）
+        try:
+            token_svc = get_edge_bootstrap_token_service()
+            if await token_svc.verify_token(token):
+                return SimpleNamespace(
+                    id="edge-bootstrap",
+                    username="edge-bootstrap",
+                    role="system",
+                    is_active=True,
+                    auth_type="edge_bootstrap_dynamic",
+                )
+        except Exception:
+            pass  # Redis 不可用时降级到静态 token
+
+        # 2) 兼容旧方案：静态 EDGE_BOOTSTRAP_TOKEN（env var）
+        if settings.EDGE_BOOTSTRAP_TOKEN and secrets.compare_digest(
+            token, settings.EDGE_BOOTSTRAP_TOKEN
+        ):
             return SimpleNamespace(
                 id="edge-bootstrap",
                 username="edge-bootstrap",
                 role="system",
                 is_active=True,
-                auth_type="edge_bootstrap",
+                auth_type="edge_bootstrap_static",
             )
 
-    if credentials:
+        # 3) 普通用户 JWT
         return await get_current_user(credentials, session)
 
     raise HTTPException(
@@ -233,6 +251,14 @@ async def switch_network_mode(
     """
     service = get_raspberry_pi_edge_service()
     node = await service.switch_network_mode(node_id=node_id, mode=mode)
+    await _safe_audit_log(
+        action="edge_node_network_mode_switch",
+        resource_id=node_id,
+        description=f"切换边缘节点网络模式为 {mode}",
+        current_user=current_user,
+        store_id=node.store_id,
+        new_value={"mode": mode},
+    )
 
     return {
         "success": True,
@@ -811,3 +837,130 @@ async def get_total_deployment_cost(
             "fast_roi": True
         }
     }
+
+
+# ==================== 管理员：边缘节点总览 ====================
+
+
+@router.get("/admin/edge-nodes")
+async def list_all_edge_nodes(
+    current_user: User = Depends(get_current_user),
+):
+    """
+    列出所有已注册的边缘节点（跨门店）。
+    仅管理员可调用，用于硬件管理总览页。
+    """
+    service = get_raspberry_pi_edge_service()
+    all_nodes = list(service.edge_nodes.values())
+    enriched = []
+    for node in all_nodes:
+        credential_status = await service.get_credential_status(node.node_id)
+        enriched.append({
+            **node.model_dump(),
+            "credential_ok": credential_status.get("device_secret_active", False),
+        })
+    return {
+        "success": True,
+        "total": len(enriched),
+        "nodes": enriched,
+    }
+
+
+# ==================== Bootstrap Token 动态管理 ====================
+
+
+class IssueBootstrapTokenRequest(BaseModel):
+    note: str = ""                # 备注（如："尝在一起接入 2026-03-14"）
+    store_id: Optional[str] = None  # 限制适用门店（不填=不限制）
+    ttl_days: int = 7             # 有效天数（1~30）
+
+
+@router.post("/admin/bootstrap-token/issue")
+async def issue_bootstrap_token(
+    req: IssueBootstrapTokenRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """
+    运营人员从后台发放 Bootstrap Token。
+
+    - 每个 Token 独立吊销，互不影响
+    - Token 明文**仅在响应中返回一次**，请立即复制保存
+    - 默认有效期 7 天，最长 30 天
+    """
+    ttl_days = max(1, min(req.ttl_days, 30))
+    token_svc = get_edge_bootstrap_token_service()
+    plain_token = await token_svc.issue_token(
+        created_by=getattr(current_user, "username", str(getattr(current_user, "id", "unknown"))),
+        note=req.note,
+        store_id=req.store_id,
+        ttl_seconds=ttl_days * 24 * 3600,
+    )
+    await _safe_audit_log(
+        action="edge_bootstrap_token_issue",
+        resource_id="bootstrap_token",
+        description=f"发放 Bootstrap Token，note={req.note}，store_id={req.store_id}",
+        current_user=current_user,
+        store_id=req.store_id,
+        new_value={"note": req.note, "store_id": req.store_id, "ttl_days": ttl_days},
+    )
+    return {
+        "success": True,
+        "token": plain_token,
+        "warning": "此 Token 仅显示一次，请立即复制保存",
+        "ttl_days": ttl_days,
+        "note": req.note,
+        "store_id": req.store_id,
+    }
+
+
+@router.get("/admin/bootstrap-token/list")
+async def list_bootstrap_tokens(
+    current_user: User = Depends(get_current_user),
+):
+    """列出所有有效/已吊销的 Bootstrap Token 元数据（不含明文 Token）。"""
+    token_svc = get_edge_bootstrap_token_service()
+    tokens = await token_svc.list_tokens()
+    import dataclasses
+    return {
+        "success": True,
+        "total": len(tokens),
+        "tokens": [dataclasses.asdict(t) for t in tokens],
+        "static_token_configured": bool(settings.EDGE_BOOTSTRAP_TOKEN),
+    }
+
+
+@router.post("/admin/bootstrap-token/revoke/{token_hash}")
+async def revoke_bootstrap_token(
+    token_hash: str,
+    current_user: User = Depends(get_current_user),
+):
+    """吊销指定 token_hash 对应的 Bootstrap Token。"""
+    token_svc = get_edge_bootstrap_token_service()
+    ok = await token_svc.revoke_token(token_hash)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Token 不存在或已过期")
+    await _safe_audit_log(
+        action="edge_bootstrap_token_revoke",
+        resource_id="bootstrap_token",
+        description=f"吊销 Bootstrap Token hash={token_hash[:16]}…",
+        current_user=current_user,
+        new_value={"token_hash": token_hash},
+    )
+    return {"success": True, "message": "Token 已吊销"}
+
+
+@router.post("/admin/bootstrap-token/revoke-all")
+async def revoke_all_bootstrap_tokens(
+    current_user: User = Depends(get_current_user),
+):
+    """紧急：吊销所有动态 Bootstrap Token（安全事件响应用）。"""
+    token_svc = get_edge_bootstrap_token_service()
+    count = await token_svc.revoke_all_tokens()
+    await _safe_audit_log(
+        action="edge_bootstrap_token_revoke_all",
+        resource_id="bootstrap_token",
+        description=f"紧急吊销全部 Bootstrap Token，共 {count} 个",
+        current_user=current_user,
+        new_value={"revoked_count": count},
+    )
+    return {"success": True, "revoked_count": count, "message": "所有动态 Token 已吊销，静态 env Token 需手动更换"}

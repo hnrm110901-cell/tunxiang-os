@@ -55,6 +55,10 @@ class StoreAccessMiddleware(BaseHTTPMiddleware):
         "/auth/login",
         "/auth/register",
         "/api/v1/auth",
+        # 边缘节点注册/心跳/Bootstrap — 使用独立 edge bootstrap token 认证，不走门店访问控制
+        "/api/v1/hardware/edge-node/register",
+        "/api/v1/hardware/edge-node/heartbeat",
+        "/api/v1/hardware/admin/bootstrap-token",
     ]
 
     # 超级管理员角色（可以访问所有门店/品牌）

@@ -205,8 +205,11 @@ const SmPatrol    = lazy(() => import('./pages/sm/Patrol'));
 const SmProfile   = lazy(() => import('./pages/sm/Profile'));
 
 // Platform Admin layout + pages (admin.zlsjos.cn / www.admin.zlsjos.cn)
-const PlatformAdminLayout = lazy(() => import('./layouts/PlatformAdminLayout'));
-const PlatformAdminHome   = lazy(() => import('./pages/platform/PlatformAdminHome'));
+const PlatformAdminLayout        = lazy(() => import('./layouts/PlatformAdminLayout'));
+const PlatformAdminHome          = lazy(() => import('./pages/platform/PlatformAdminHome'));
+const PlatformIntegrationsPage   = lazy(() => import('./pages/platform/PlatformIntegrationsPage'));
+const EdgeNodeManagementPage     = lazy(() => import('./pages/platform/EdgeNodeManagementPage'));
+const PlatformAgentsPage         = lazy(() => import('./pages/platform/PlatformAgentsPage'));
 
 // Role-based views (Phase 2 — Chef /chef, Floor /floor, HQ /hq)
 const ChefLayout      = lazy(() => import('./layouts/ChefLayout'));
@@ -794,8 +797,10 @@ const AppContent: React.FC = () => {
                   <Route path="analytics" element={<PlatformAnalyticsPage />} />
                   {/* 商户管理 → 复用现有页面 */}
                   <Route path="merchants" element={<MerchantManagementPage />} />
-                  {/* API 集成配置 → 复用现有页面 */}
-                  <Route path="integrations" element={<EnterpriseIntegrationPage />} />
+                  {/* API 集成配置 → 专用接入配置管理页 */}
+                  <Route path="integrations" element={<PlatformIntegrationsPage />} />
+                  {/* 边缘节点管理 → Pi5 注册 / 监控 / Bootstrap Token */}
+                  <Route path="edge-nodes" element={<EdgeNodeManagementPage />} />
                   {/* 开放平台 → 复用现有页面 */}
                   <Route path="open-platform" element={<OpenPlatformPage />} />
                   {/* 系统监控 → 复用现有页面 */}
@@ -806,8 +811,8 @@ const AppContent: React.FC = () => {
                   <Route path="audit-log" element={<AuditLogPage />} />
                   {/* 备份管理 → 复用现有页面 */}
                   <Route path="backup" element={<BackupManagement />} />
-                  {/* Agent 配置 → 复用 HQ 决策页面占位 */}
-                  <Route path="agents" element={<HQDashboardPage />} />
+                  {/* Agent 配置与监控 → 专用 Agent 管理页 */}
+                  <Route path="agents" element={<PlatformAgentsPage />} />
                   {/* 本体图管理 → 复用现有页面 */}
                   <Route path="ontology" element={<OntologyAdminPage />} />
                   {/* 数据主权 → 复用现有页面 */}

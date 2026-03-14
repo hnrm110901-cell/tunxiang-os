@@ -1,0 +1,358 @@
+/* PlatformAgentsPage.module.css */
+
+.page {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 24px 28px;
+}
+
+/* ── 页头 ─────────────────────────────────────────────────── */
+.pageHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+
+.pageTitle {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary, #111827);
+  margin: 0 0 4px;
+  letter-spacing: -0.3px;
+}
+
+.pageSubtitle {
+  font-size: 13px;
+  color: var(--text-tertiary, #9ca3af);
+  margin: 0;
+}
+
+/* ── 品牌选择栏 ───────────────────────────────────────────── */
+.brandBar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.brandBarLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary, #6b7280);
+  white-space: nowrap;
+}
+
+.brandTabs {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.brandTab {
+  padding: 6px 16px;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 20px;
+  background: transparent;
+  font-size: 13px;
+  color: var(--text-secondary, #6b7280);
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: inherit;
+}
+
+.brandTab:hover {
+  border-color: var(--accent, #FF6B2C);
+  color: var(--accent, #FF6B2C);
+}
+
+.brandTabActive {
+  background: var(--accent, #FF6B2C);
+  border-color: var(--accent, #FF6B2C);
+  color: #fff;
+  font-weight: 600;
+}
+
+.brandActions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.summaryTag {
+  font-size: 13px;
+  color: var(--text-secondary, #6b7280);
+  background: var(--surface-elevated, #f3f4f6);
+  padding: 4px 12px;
+  border-radius: 12px;
+}
+
+.noData {
+  font-size: 13px;
+  color: var(--text-tertiary, #9ca3af);
+}
+
+/* ── 加载骨架 ─────────────────────────────────────────────── */
+.skeletonGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+}
+
+/* ── Agent 网格 ───────────────────────────────────────────── */
+.agentGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+}
+
+.agentCard {
+  padding: 18px;
+  transition: opacity 0.2s, box-shadow 0.2s;
+}
+
+.agentCardEnabled {
+  opacity: 1;
+}
+
+.agentCardDisabled {
+  opacity: 0.65;
+}
+
+/* ── 卡头 ─────────────────────────────────────────────────── */
+.agentCardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 10px;
+}
+
+.agentIconLabel {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.agentIcon {
+  font-size: 24px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.agentName {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary, #111827);
+  margin-bottom: 4px;
+}
+
+/* ── 状态指示灯 ───────────────────────────────────────────── */
+.statusDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 4px;
+}
+
+.statusDotOn {
+  background: #22c55e;
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.2);
+}
+
+.statusDotOff {
+  background: var(--border, #e5e7eb);
+}
+
+/* ── 描述文字 ─────────────────────────────────────────────── */
+.agentDesc {
+  font-size: 12px;
+  color: var(--text-secondary, #6b7280);
+  line-height: 1.5;
+  margin: 0 0 10px;
+}
+
+/* ── 参数摘要 ─────────────────────────────────────────────── */
+.configSummary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.configChip {
+  font-size: 11px;
+  background: var(--surface-elevated, #f3f4f6);
+  border-radius: 4px;
+  padding: 2px 8px;
+  color: var(--text-secondary, #6b7280);
+}
+
+.configChip strong {
+  color: var(--text-primary, #111827);
+}
+
+/* ── 操作按钮 ─────────────────────────────────────────────── */
+.agentActions {
+  display: flex;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-subtle, #f0f0f0);
+}
+
+/* ── Drawer ───────────────────────────────────────────────── */
+.drawerBody {
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  overflow-y: auto;
+}
+
+.drawerFooter {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 16px 24px;
+  border-top: 1px solid var(--border, #e5e7eb);
+}
+
+.alertRow {
+  margin-bottom: 16px;
+}
+
+.drawerAgentInfo {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 20px;
+  padding: 14px;
+  background: var(--surface-elevated, #f9fafb);
+  border-radius: 10px;
+}
+
+.drawerAgentIcon {
+  font-size: 28px;
+  flex-shrink: 0;
+}
+
+.drawerAgentName {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary, #111827);
+  margin-bottom: 4px;
+}
+
+.drawerAgentDesc {
+  font-size: 12px;
+  color: var(--text-secondary, #6b7280);
+  line-height: 1.5;
+}
+
+.sectionDivider {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-tertiary, #9ca3af);
+  margin-bottom: 14px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border, #e5e7eb);
+}
+
+/* ── ConfigEditor ─────────────────────────────────────────── */
+.configEditor {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.configRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.configLabel {
+  font-size: 13px;
+  color: var(--text-secondary, #6b7280);
+  font-weight: 500;
+  flex-shrink: 0;
+  min-width: 140px;
+  font-family: 'SF Mono', 'Fira Mono', monospace;
+  font-size: 12px;
+}
+
+.configInput {
+  flex: 1;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--text-primary, #111827);
+  background: var(--surface, #fff);
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s;
+  box-sizing: border-box;
+}
+
+.configInput:focus {
+  border-color: var(--accent, #FF6B2C);
+}
+
+.noConfig {
+  font-size: 13px;
+  color: var(--text-tertiary, #9ca3af);
+  text-align: center;
+  padding: 20px 0;
+}
+
+/* ── Toggle 开关 ──────────────────────────────────────────── */
+.toggle {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.toggle input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggleTrack {
+  width: 36px;
+  height: 20px;
+  background: var(--border, #e5e7eb);
+  border-radius: 10px;
+  transition: background 0.2s;
+  position: relative;
+}
+
+.toggleTrack::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.2s;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+.toggle input:checked + .toggleTrack {
+  background: var(--accent, #FF6B2C);
+}
+
+.toggle input:checked + .toggleTrack::after {
+  transform: translateX(16px);
+}

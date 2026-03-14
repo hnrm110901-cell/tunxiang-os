@@ -31,6 +31,8 @@ import {
   GlobalOutlined,
   HomeOutlined,
   DownOutlined,
+  HddOutlined,
+  WifiOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../contexts/AuthContext';
 import styles from './PlatformAdminLayout.module.css';
@@ -68,8 +70,9 @@ const NAV_GROUPS: NavGroup[] = [
     groupIcon: <ShopOutlined />,
     items: [
       { key: 'merchants',     path: '/platform/merchants',     label: '商户列表', icon: <ShopOutlined /> },
-      { key: 'integrations',  path: '/platform/integrations',  label: '接入配置', icon: <ApiOutlined /> },
-      { key: 'open-platform', path: '/platform/open-platform', label: '开放平台', icon: <GlobalOutlined /> },
+      { key: 'integrations',  path: '/platform/integrations',  label: '接入配置',  icon: <ApiOutlined /> },
+      { key: 'edge-nodes',    path: '/platform/edge-nodes',    label: '边缘节点',  icon: <HddOutlined />, badge: 'new' },
+      { key: 'open-platform', path: '/platform/open-platform', label: '开放平台',  icon: <GlobalOutlined /> },
     ],
   },
   {
@@ -280,6 +283,7 @@ function getBreadcrumb(pathname: string): React.ReactNode {
     '/platform/analytics':        '效能分析',
     '/platform/merchants':        '商户列表',
     '/platform/integrations':     '接入配置',
+    '/platform/edge-nodes':       '边缘节点管理',
     '/platform/open-platform':    '开放平台',
     '/platform/monitoring':       '系统监控',
     '/platform/feature-flags':    '灰度发布',

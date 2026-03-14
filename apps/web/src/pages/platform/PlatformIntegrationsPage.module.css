@@ -1,0 +1,256 @@
+/* PlatformIntegrationsPage.module.css */
+
+/* ── 页面容器 ─────────────────────────────────────────────────────────────── */
+.page {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 24px 28px;
+}
+
+/* ── 页头 ──────────────────────────────────────────────────────────────────── */
+.pageHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 24px;
+  gap: 16px;
+}
+
+.pageTitle {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary, #111827);
+  margin: 0 0 4px;
+  letter-spacing: -0.3px;
+}
+
+.pageSubtitle {
+  font-size: 13px;
+  color: var(--text-tertiary, #9ca3af);
+  margin: 0;
+}
+
+/* ── Tab 过滤栏 ─────────────────────────────────────────────────────────────── */
+.tabBar {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--border, #e5e7eb);
+  padding-bottom: 0;
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--text-secondary, #6b7280);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: color 0.15s, border-color 0.15s;
+  font-family: inherit;
+  border-radius: 0;
+}
+
+.tab:hover {
+  color: var(--accent, #FF6B2C);
+}
+
+.tabActive {
+  color: var(--accent, #FF6B2C);
+  border-bottom-color: var(--accent, #FF6B2C);
+  font-weight: 600;
+}
+
+.tabCount {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--surface-elevated, #f3f4f6);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-tertiary, #9ca3af);
+}
+
+.tabActive .tabCount {
+  background: color-mix(in srgb, var(--accent, #FF6B2C) 15%, transparent);
+  color: var(--accent, #FF6B2C);
+}
+
+/* ── 表格列样式 ──────────────────────────────────────────────────────────────── */
+.nameCell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.nameText {
+  font-weight: 500;
+  color: var(--text-primary, #111827);
+  font-size: 14px;
+}
+
+.storeTag {
+  font-size: 11px;
+  color: var(--text-tertiary, #9ca3af);
+  background: var(--surface-elevated, #f3f4f6);
+  padding: 1px 6px;
+  border-radius: 4px;
+  display: inline-block;
+  max-width: 120px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.providerTag {
+  font-size: 12px;
+  color: var(--text-secondary, #6b7280);
+  background: var(--surface-elevated, #f3f4f6);
+  padding: 2px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.endpoint {
+  font-size: 12px;
+  color: var(--text-secondary, #6b7280);
+  font-family: 'SF Mono', 'Fira Mono', monospace;
+  word-break: break-all;
+}
+
+.timeCell {
+  font-size: 12px;
+  color: var(--text-tertiary, #9ca3af);
+  white-space: nowrap;
+}
+
+.actionGroup {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: nowrap;
+}
+
+/* ── Drawer 内容 ─────────────────────────────────────────────────────────────── */
+.drawerBody {
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.drawerFooter {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 16px 24px;
+  border-top: 1px solid var(--border, #e5e7eb);
+}
+
+/* ── 表单字段 ─────────────────────────────────────────────────────────────── */
+.fieldRow {
+  margin-bottom: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.fieldLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary, #111827);
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.required {
+  color: var(--danger, #ef4444);
+  margin-left: 2px;
+}
+
+.fieldHint {
+  font-size: 11px;
+  color: var(--text-tertiary, #9ca3af);
+  line-height: 1.4;
+}
+
+.input {
+  width: 100%;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 8px;
+  font-size: 14px;
+  color: var(--text-primary, #111827);
+  background: var(--surface, #fff);
+  font-family: inherit;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  box-sizing: border-box;
+  outline: none;
+}
+
+.input:focus {
+  border-color: var(--accent, #FF6B2C);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent, #FF6B2C) 15%, transparent);
+}
+
+.input:disabled {
+  background: var(--surface-elevated, #f3f4f6);
+  color: var(--text-tertiary, #9ca3af);
+  cursor: not-allowed;
+}
+
+.textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--text-primary, #111827);
+  background: var(--surface, #fff);
+  font-family: 'SF Mono', 'Fira Mono', monospace;
+  resize: vertical;
+  transition: border-color 0.15s;
+  box-sizing: border-box;
+  outline: none;
+  min-height: 110px;
+}
+
+.textarea:focus {
+  border-color: var(--accent, #FF6B2C);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent, #FF6B2C) 15%, transparent);
+}
+
+/* ── 提示区 ──────────────────────────────────────────────────────────────────── */
+.schemaTip {
+  margin-bottom: 18px;
+}
+
+/* ── 动态字段分区 ──────────────────────────────────────────────────────────── */
+.dynamicFields {
+  display: flex;
+  flex-direction: column;
+}
+
+.sectionDivider {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-tertiary, #9ca3af);
+  margin-bottom: 14px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border, #e5e7eb);
+}
