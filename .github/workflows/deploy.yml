@@ -12,8 +12,8 @@ concurrency:
 # ── 环境变量 ──────────────────────────────────────────────
 env:
   SERVER_HOST: 42.194.229.21
-  PROD_DIR: /opt/zhilian-os
-  STAGING_DIR: /opt/zhilian-os-staging
+  PROD_DIR: /opt/zhilian-os/prod
+  STAGING_DIR: /opt/zhilian-os/staging
 
 jobs:
   # ── 1. 快速健康检查 ─────────────────────────────────────
@@ -118,7 +118,7 @@ jobs:
           ssh root@${{ env.SERVER_HOST }} << 'ENDSSH'
             set -e
             echo "=== [PROD 1/6] Pull latest code ==="
-            cd /opt/zhilian-os
+            cd /opt/zhilian-os/prod
             git fetch origin main
             git reset --hard origin/main
             echo "Git HEAD: $(git log -1 --oneline)"
@@ -130,7 +130,7 @@ jobs:
             supervisorctl update 2>/dev/null || true
 
             echo "=== [PROD 3/6] Build & start API container ==="
-            cd /opt/zhilian-os
+            cd /opt/zhilian-os/prod
             docker compose \
               --env-file .env.prod \
               -f docker-compose.prod.yml \
@@ -160,6 +160,7 @@ jobs:
               || echo "⚠ Migration warning (check logs)"
 
             echo "=== [PROD 6/6] Restart Celery workers ==="
+            cd /opt/zhilian-os/prod
             docker compose \
               --env-file .env.prod \
               -f docker-compose.prod.yml \
@@ -176,10 +177,11 @@ jobs:
         run: |
           ssh root@${{ env.SERVER_HOST }} << 'ENDSSH'
             set -e
-            STAGING_DIR="/opt/zhilian-os-staging"
+            STAGING_DIR="/opt/zhilian-os/staging"
 
             echo "=== [STAGING 1/5] Ensure staging directory ==="
             if [ ! -d "$STAGING_DIR" ]; then
+              mkdir -p /opt/zhilian-os
               git clone --branch develop https://github.com/hnrm110901-cell/zhilian-os.git "$STAGING_DIR"
             fi
 

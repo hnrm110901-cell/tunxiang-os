@@ -1,6 +1,7 @@
 # 屯象OS — 多 Agent 协同开发标准 v1.0
 
-> 本文件是三工具（Claude Code / Codex / Claude CLI）协同开发的**唯一权威标准**。
+> 本文件是三工具（Claude Code / Codex / Claude CLI）协同开发的**架构层标准**。
+> Codex 的详细规范见 [`CODEX.md`](../CODEX.md)（Codex 工作前必读）。
 > 任何工具在触碰受保护路径前，必须先 `git pull --rebase origin develop` 重读最新文件。
 
 ---

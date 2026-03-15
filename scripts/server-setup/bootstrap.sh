@@ -7,7 +7,9 @@
 set -euo pipefail
 
 REPO_URL="https://github.com/hnrm110901-cell/zhilian-os.git"
-APP_DIR="/opt/zhilian-os"
+APP_BASE="/opt/zhilian-os"
+APP_DIR="$APP_BASE/prod"
+STAGING_DIR="$APP_BASE/staging"
 NGINX_WEB_ROOT="/var/www/tunxiang"
 DEPLOY_KEY_PATH="/root/.ssh/id_ed25519_tunxiang"
 
@@ -29,6 +31,7 @@ info "Docker version: $(docker --version)"
 
 # ── 2. 克隆或更新仓库 ────────────────────────────────────────────────────────
 info "Step 2/9: Clone / update repository"
+mkdir -p "$APP_BASE"
 if [ -d "$APP_DIR/.git" ]; then
   warn "Repo already exists at $APP_DIR — pulling latest"
   git -C "$APP_DIR" fetch origin main

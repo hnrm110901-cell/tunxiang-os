@@ -38,6 +38,7 @@ Makefile                             @hnrm110901-cell
 /apps/api-gateway/tests/             @hnrm110901-cell
 /apps/web/src/__tests__/             @hnrm110901-cell
 CLAUDE.md                            @hnrm110901-cell
+CODEX.md                             @hnrm110901-cell
 ARCHITECTURE.md                      @hnrm110901-cell
 /docs/agent-collaboration-standard.md  @hnrm110901-cell
 /docs/collaboration-workflow.md        @hnrm110901-cell
