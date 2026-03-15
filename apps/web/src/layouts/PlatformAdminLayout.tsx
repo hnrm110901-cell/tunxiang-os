@@ -292,6 +292,15 @@ const PlatformAdminLayout: React.FC = () => {
 
 // ── 面包屑 ─────────────────────────────────────────────────
 function getBreadcrumb(pathname: string): React.ReactNode {
+  // 商户详情页动态路由
+  if (pathname.startsWith('/platform/merchants/') && pathname !== '/platform/merchants') {
+    return (
+      <span className={styles.breadcrumbText}>
+        企业管理后台 <span className={styles.breadcrumbSep}>/</span> 商户管理 <span className={styles.breadcrumbSep}>/</span> 商户详情
+      </span>
+    );
+  }
+
   const map: Record<string, string> = {
     '/platform':                  '实时控制台',
     '/platform/analytics':        '效能分析',

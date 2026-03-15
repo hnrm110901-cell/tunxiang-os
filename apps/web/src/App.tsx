@@ -172,6 +172,8 @@ const OnboardingPage = lazy(() => import('./pages/onboarding/OnboardingPage'));
 const DynamicPricingPage = lazy(() => import('./pages/DynamicPricingPage'));
 const OpsMonitoringPage = lazy(() => import('./pages/OpsMonitoringPage'));
 const MerchantManagementPage = lazy(() => import('./pages/MerchantManagementPage'));
+const MerchantListPage = lazy(() => import('./pages/platform/MerchantListPage'));
+const MerchantDetailPage = lazy(() => import('./pages/platform/MerchantDetailPage'));
 // Phase P1 — 预订Agent: 渠道中台 + 客户风控
 const ChannelAnalyticsPage = lazy(() => import('./pages/ChannelAnalyticsPage'));
 const CustomerRiskPage = lazy(() => import('./pages/CustomerRiskPage'));
@@ -218,6 +220,36 @@ const PlatformSystemMonitorPage    = lazy(() => import('./pages/platform/Platfor
 const PlatformBackupPage           = lazy(() => import('./pages/platform/PlatformBackupPage'));
 const SystemSettingsPage         = lazy(() => import('./pages/platform/SystemSettingsPage'));
 
+// HR 模块页面
+const PayrollPage = lazy(() => import('./pages/hr/PayrollPage'));
+const LeaveManagementPage = lazy(() => import('./pages/hr/LeaveManagementPage'));
+const RecruitmentHRPage = lazy(() => import('./pages/hr/RecruitmentPage'));
+const PerformanceReviewPage = lazy(() => import('./pages/hr/PerformanceReviewPage'));
+const ContractManagementPage = lazy(() => import('./pages/hr/ContractManagementPage'));
+const HRDashboardPage = lazy(() => import('./pages/hr/HRDashboardPage'));
+const EmployeeRosterPage = lazy(() => import('./pages/hr/EmployeeRosterPage'));
+const EmployeeLifecyclePage = lazy(() => import('./pages/hr/EmployeeLifecyclePage'));
+const AttendanceReportPage = lazy(() => import('./pages/hr/AttendanceReportPage'));
+const SmHRQuick = lazy(() => import('./pages/sm/HRQuick'));
+const CommissionPage = lazy(() => import('./pages/hr/CommissionPage'));
+const RewardPenaltyPage = lazy(() => import('./pages/hr/RewardPenaltyPage'));
+const SocialInsurancePage = lazy(() => import('./pages/hr/SocialInsurancePage'));
+const EmployeeGrowthPage = lazy(() => import('./pages/hr/EmployeeGrowthPage'));
+const IMConfigPage = lazy(() => import('./pages/hr/IMConfigPage'));
+const RosterImportPage = lazy(() => import('./pages/hr/RosterImportPage'));
+const OrgStructurePage = lazy(() => import('./pages/hr/OrgStructurePage'));
+const ComplianceDashboard = lazy(() => import('./pages/hr/ComplianceDashboard'));
+const HRTrainingPage = lazy(() => import('./pages/hr/TrainingPage'));
+const TrainingDashboard = lazy(() => import('./pages/hr/TrainingDashboard'));
+const MentorshipPage = lazy(() => import('./pages/hr/MentorshipPage'));
+const HRMonthlyReportPage = lazy(() => import('./pages/hr/MonthlyReportPage'));
+const HRApprovalManagementPage = lazy(() => import('./pages/hr/ApprovalManagementPage'));
+const SettlementPage = lazy(() => import('./pages/hr/SettlementPage'));
+const PayslipManagementPage = lazy(() => import('./pages/hr/PayslipManagementPage'));
+const BusinessRulesPage = lazy(() => import('./pages/hr/BusinessRulesPage'));
+const ShiftTemplatePage = lazy(() => import('./pages/hr/ShiftTemplatePage'));
+const AttendanceRulePage = lazy(() => import('./pages/hr/AttendanceRulePage'));
+
 // Role-based views (Phase 2 — Chef /chef, Floor /floor, HQ /hq)
 const ChefLayout      = lazy(() => import('./layouts/ChefLayout'));
 const ChefHome        = lazy(() => import('./pages/chef/Home'));
@@ -248,6 +280,14 @@ const SmBanquetPush        = lazy(() => import('./pages/sm/BanquetPush'));
 const SmBanquetFollowups   = lazy(() => import('./pages/sm/BanquetFollowups'));
 const SmBanquetSearch      = lazy(() => import('./pages/sm/BanquetSearch'));
 const SmPrivateDomainHealth = lazy(() => import('./pages/sm/PrivateDomainHealthPage'));
+
+// Role-based views — Employee H5 Self-Service (/emp)
+const EmployeeLayout    = lazy(() => import('./pages/employee/EmployeeLayout'));
+const EmployeePortal    = lazy(() => import('./pages/employee/EmployeePortal'));
+const MyPayslipPage     = lazy(() => import('./pages/employee/MyPayslipPage'));
+const MyAttendancePage  = lazy(() => import('./pages/employee/MyAttendancePage'));
+const LeaveRequestPage  = lazy(() => import('./pages/employee/LeaveRequestPage'));
+const MyTrainingPage    = lazy(() => import('./pages/employee/MyTrainingPage'));
 
 const EdgeHubDashboardPage = lazy(() => import('./pages/EdgeHubDashboardPage'));
 const EdgeHubStorePage     = lazy(() => import('./pages/EdgeHubStorePage'));
@@ -779,6 +819,88 @@ const AppContent: React.FC = () => {
                   <Route path="fct-advanced" element={
                     <ProtectedRoute requiredRole="admin"><FctAdvancedPage /></ProtectedRoute>
                   } />
+                  {/* HR模块 — 薪酬/假勤/招聘/绩效/合同/仪表盘 */}
+                  <Route path="hr-dashboard" element={
+                    <ProtectedRoute requiredRole="admin"><HRDashboardPage /></ProtectedRoute>
+                  } />
+                  <Route path="payroll" element={
+                    <ProtectedRoute requiredRole="admin"><PayrollPage /></ProtectedRoute>
+                  } />
+                  <Route path="leave-management" element={
+                    <ProtectedRoute requiredRole="store_manager"><LeaveManagementPage /></ProtectedRoute>
+                  } />
+                  <Route path="recruitment" element={
+                    <ProtectedRoute requiredRole="admin"><RecruitmentHRPage /></ProtectedRoute>
+                  } />
+                  <Route path="performance-review" element={
+                    <ProtectedRoute requiredRole="admin"><PerformanceReviewPage /></ProtectedRoute>
+                  } />
+                  <Route path="contract-management" element={
+                    <ProtectedRoute requiredRole="admin"><ContractManagementPage /></ProtectedRoute>
+                  } />
+                  <Route path="employee-roster" element={
+                    <ProtectedRoute requiredRole="store_manager"><EmployeeRosterPage /></ProtectedRoute>
+                  } />
+                  <Route path="employee-lifecycle" element={
+                    <ProtectedRoute requiredRole="store_manager"><EmployeeLifecyclePage /></ProtectedRoute>
+                  } />
+                  <Route path="attendance-report" element={
+                    <ProtectedRoute requiredRole="store_manager"><AttendanceReportPage /></ProtectedRoute>
+                  } />
+                  <Route path="commission" element={
+                    <ProtectedRoute requiredRole="admin"><CommissionPage /></ProtectedRoute>
+                  } />
+                  <Route path="reward-penalty" element={
+                    <ProtectedRoute requiredRole="admin"><RewardPenaltyPage /></ProtectedRoute>
+                  } />
+                  <Route path="social-insurance" element={
+                    <ProtectedRoute requiredRole="admin"><SocialInsurancePage /></ProtectedRoute>
+                  } />
+                  <Route path="employee-growth" element={
+                    <ProtectedRoute requiredRole="admin"><EmployeeGrowthPage /></ProtectedRoute>
+                  } />
+                  <Route path="im-config" element={
+                    <ProtectedRoute requiredRole="admin"><IMConfigPage /></ProtectedRoute>
+                  } />
+                  <Route path="roster-import" element={
+                    <ProtectedRoute requiredRole="admin"><RosterImportPage /></ProtectedRoute>
+                  } />
+                  <Route path="org-structure" element={
+                    <ProtectedRoute requiredRole="admin"><OrgStructurePage /></ProtectedRoute>
+                  } />
+                  <Route path="compliance" element={
+                    <ProtectedRoute requiredRole="admin"><ComplianceDashboard /></ProtectedRoute>
+                  } />
+                  <Route path="hr-training" element={
+                    <ProtectedRoute requiredRole="admin"><HRTrainingPage /></ProtectedRoute>
+                  } />
+                  <Route path="training-dashboard" element={
+                    <ProtectedRoute requiredRole="admin"><TrainingDashboard /></ProtectedRoute>
+                  } />
+                  <Route path="mentorship" element={
+                    <ProtectedRoute requiredRole="admin"><MentorshipPage /></ProtectedRoute>
+                  } />
+                  <Route path="hr-monthly-report" element={
+                    <ProtectedRoute requiredRole="admin"><HRMonthlyReportPage /></ProtectedRoute>
+                  } />
+                  <Route path="hr-approval" element={
+                    <ProtectedRoute requiredRole="admin"><HRApprovalManagementPage /></ProtectedRoute>
+                  } />
+                  <Route path="settlement" element={
+                    <ProtectedRoute requiredRole="admin"><SettlementPage /></ProtectedRoute>
+                  } />
+                  <Route path="payslip-management" element={
+                    <ProtectedRoute requiredRole="admin"><PayslipManagementPage /></ProtectedRoute>
+                  } />
+                  <Route path="business-rules" element={
+                    <ProtectedRoute requiredRole="admin"><BusinessRulesPage /></ProtectedRoute>
+                  } />
+                  <Route path="shift-templates" element={
+                    <ProtectedRoute requiredRole="admin"><ShiftTemplatePage /></ProtectedRoute>
+                  } />
+                  <Route path="attendance-rules" element={
+                    <ProtectedRoute requiredRole="admin"><AttendanceRulePage /></ProtectedRoute>
+                  } />
                   {/* 替换易订 — R3 桌台平面图 / R4 AI邀请函 */}
                   <Route path="floor-plan" element={
                     <ProtectedRoute><FloorPlanPage /></ProtectedRoute>
@@ -802,8 +924,9 @@ const AppContent: React.FC = () => {
                   <Route index element={<PlatformAdminHome />} />
                   {/* 平台分析 → 复用现有页面 */}
                   <Route path="analytics" element={<PlatformAnalyticsPage />} />
-                  {/* 商户管理 → 复用现有页面 */}
-                  <Route path="merchants" element={<MerchantManagementPage />} />
+                  {/* 商户管理 → 列表页 + 独立详情页 */}
+                  <Route path="merchants" element={<MerchantListPage />} />
+                  <Route path="merchants/:brandId" element={<MerchantDetailPage />} />
                   {/* 门店管理 → 复用现有页面 */}
                   <Route path="stores" element={<StoreManagementPage />} />
                   {/* API 集成配置 → 专用接入配置管理页 */}
@@ -859,6 +982,7 @@ const AppContent: React.FC = () => {
                   <Route path="banquet-search"       element={<SmBanquetSearch />} />
                   <Route path="private-domain-health" element={<SmPrivateDomainHealth />} />
                   <Route path="prep" element={<SmPrepSuggestion />} />
+                  <Route path="hr"       element={<SmHRQuick />} />
                   <Route path="patrol"   element={<SmPatrol />} />
                   <Route path="profile"  element={<SmProfile />} />
                 </Route>
@@ -901,6 +1025,16 @@ const AppContent: React.FC = () => {
                   <Route path="finance"   element={<HQFinance />} />
                   <Route path="workforce" element={<HQWorkforce />} />
                   <Route path="banquet"   element={<HQBanquet />} />
+                </Route>
+
+                {/* Role-based views — Employee H5 Self-Service (手机) */}
+                <Route path="/emp" element={<EmployeeLayout />}>
+                  <Route index element={<EmployeePortal />} />
+                  <Route path="payslip"    element={<MyPayslipPage />} />
+                  <Route path="attendance" element={<MyAttendancePage />} />
+                  <Route path="leave"      element={<LeaveRequestPage />} />
+                  <Route path="training"   element={<MyTrainingPage />} />
+                  <Route path="profile"    element={<EmployeePortal />} />
                 </Route>
               </Routes>
             </Suspense>

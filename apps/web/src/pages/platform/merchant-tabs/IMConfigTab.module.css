@@ -1,0 +1,41 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.loadingContainer {
+  display: flex;
+  justify-content: center;
+  padding: 48px 0;
+}
+
+.card {
+  border-radius: 8px;
+}
+
+.lastSync {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 14px;
+  background: rgba(0, 0, 0, 0.02);
+  border-radius: 8px;
+  margin-bottom: 12px;
+  font-size: 13px;
+}
+
+.syncStats {
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.45);
+}
+
+.callbackHint {
+  padding: 10px 14px;
+  background: rgba(10, 175, 154, 0.04);
+  border: 1px solid rgba(10, 175, 154, 0.12);
+  border-radius: 8px;
+  font-size: 12px;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  word-break: break-all;
+}

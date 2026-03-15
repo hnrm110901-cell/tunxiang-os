@@ -1,16 +1,20 @@
 """
-商户管理 API — 商户开通 / 列表 / 详情 / 更新 / 启停 / 门店 / 用户
+商户管理 API — 商户开通 / 列表 / 详情 / 更新 / 启停 / 门店 / 用户 / 配置聚合 / 渠道
 所有端点仅 ADMIN 可用
 """
-from typing import Optional
+from typing import Optional, List
+from decimal import Decimal
+import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
+from sqlalchemy import select, delete as sa_delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.database import get_db
 from src.core.dependencies import require_role
 from src.models.user import User, UserRole
+from src.models.channel_config import SalesChannelConfig
 from src.services import merchant_service
 
 router = APIRouter(prefix="/merchants", tags=["merchants"])
@@ -309,3 +313,159 @@ async def remove_user(
         raise HTTPException(status_code=404, detail="用户不存在")
     await session.commit()
     return result
+
+
+# ── 配置聚合 ─────────────────────────────────────────────────────────────────
+
+@router.get("/{brand_id}/config-summary")
+async def get_config_summary(
+    brand_id: str,
+    session: AsyncSession = Depends(get_db),
+    _admin: User = Depends(require_role(UserRole.ADMIN)),
+):
+    """聚合返回 IM/Agent/渠道/门店/用户 配置状态"""
+    from src.models.brand_im_config import BrandIMConfig
+    from src.models.agent_config import AgentConfig
+
+    detail = await merchant_service.get_merchant_detail(session, brand_id)
+    if not detail:
+        raise HTTPException(status_code=404, detail="商户不存在")
+
+    # IM config
+    im_result = await session.execute(
+        select(BrandIMConfig).where(BrandIMConfig.brand_id == brand_id)
+    )
+    im_config = im_result.scalar_one_or_none()
+    im_summary = {
+        "configured": im_config is not None,
+        "platform": im_config.im_platform if im_config else None,
+        "last_sync_status": im_config.last_sync_status if im_config else None,
+        "last_sync_at": im_config.last_sync_at.isoformat() if im_config and im_config.last_sync_at else None,
+    }
+
+    # Agent configs
+    agent_result = await session.execute(
+        select(AgentConfig).where(AgentConfig.brand_id == brand_id)
+    )
+    agents = agent_result.scalars().all()
+    agent_summary = {
+        "total": len(agents),
+        "enabled": sum(1 for a in agents if a.is_enabled),
+    }
+
+    # Channels
+    ch_result = await session.execute(
+        select(SalesChannelConfig).where(SalesChannelConfig.brand_id == brand_id)
+    )
+    channels = ch_result.scalars().all()
+
+    return {
+        "im": im_summary,
+        "agents": agent_summary,
+        "channels": {"count": len(channels)},
+        "store_count": len(detail.get("stores", [])),
+        "user_count": len(detail.get("users", [])),
+    }
+
+
+# ── 渠道配置 CRUD ────────────────────────────────────────────────────────────
+
+class ChannelConfigRequest(BaseModel):
+    channel: str
+    platform_commission_pct: float = 0.0
+    delivery_cost_fen: int = 0
+    packaging_cost_fen: int = 0
+    is_active: bool = True
+
+
+@router.get("/{brand_id}/channels")
+async def list_channels(
+    brand_id: str,
+    session: AsyncSession = Depends(get_db),
+    _admin: User = Depends(require_role(UserRole.ADMIN)),
+):
+    """品牌下 SalesChannelConfig 列表"""
+    result = await session.execute(
+        select(SalesChannelConfig).where(SalesChannelConfig.brand_id == brand_id)
+    )
+    rows = result.scalars().all()
+    return [
+        {
+            "id": str(r.id),
+            "brand_id": r.brand_id,
+            "channel": r.channel,
+            "platform_commission_pct": float(r.platform_commission_pct) if r.platform_commission_pct else 0,
+            "delivery_cost_fen": r.delivery_cost_fen or 0,
+            "packaging_cost_fen": r.packaging_cost_fen or 0,
+            "is_active": r.is_active,
+        }
+        for r in rows
+    ]
+
+
+@router.post("/{brand_id}/channels")
+async def upsert_channel(
+    brand_id: str,
+    req: ChannelConfigRequest,
+    session: AsyncSession = Depends(get_db),
+    _admin: User = Depends(require_role(UserRole.ADMIN)),
+):
+    """创建/更新渠道配置"""
+    # 检查是否已存在
+    result = await session.execute(
+        select(SalesChannelConfig).where(
+            SalesChannelConfig.brand_id == brand_id,
+            SalesChannelConfig.channel == req.channel,
+        )
+    )
+    existing = result.scalar_one_or_none()
+
+    if existing:
+        existing.platform_commission_pct = Decimal(str(req.platform_commission_pct))
+        existing.delivery_cost_fen = req.delivery_cost_fen
+        existing.packaging_cost_fen = req.packaging_cost_fen
+        existing.is_active = req.is_active
+    else:
+        existing = SalesChannelConfig(
+            id=uuid.uuid4(),
+            brand_id=brand_id,
+            channel=req.channel,
+            platform_commission_pct=Decimal(str(req.platform_commission_pct)),
+            delivery_cost_fen=req.delivery_cost_fen,
+            packaging_cost_fen=req.packaging_cost_fen,
+            is_active=req.is_active,
+        )
+        session.add(existing)
+
+    await session.commit()
+    return {
+        "id": str(existing.id),
+        "brand_id": brand_id,
+        "channel": existing.channel,
+        "platform_commission_pct": float(existing.platform_commission_pct),
+        "delivery_cost_fen": existing.delivery_cost_fen,
+        "packaging_cost_fen": existing.packaging_cost_fen,
+        "is_active": existing.is_active,
+    }
+
+
+@router.delete("/{brand_id}/channels/{channel_id}")
+async def delete_channel(
+    brand_id: str,
+    channel_id: str,
+    session: AsyncSession = Depends(get_db),
+    _admin: User = Depends(require_role(UserRole.ADMIN)),
+):
+    """删除渠道配置"""
+    result = await session.execute(
+        select(SalesChannelConfig).where(
+            SalesChannelConfig.id == uuid.UUID(channel_id),
+            SalesChannelConfig.brand_id == brand_id,
+        )
+    )
+    row = result.scalar_one_or_none()
+    if not row:
+        raise HTTPException(status_code=404, detail="渠道配置不存在")
+    await session.delete(row)
+    await session.commit()
+    return {"message": "已删除"}

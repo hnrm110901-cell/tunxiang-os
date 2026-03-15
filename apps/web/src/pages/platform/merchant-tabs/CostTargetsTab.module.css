@@ -1,0 +1,48 @@
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.title {
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.72);
+}
+
+.headerActions {
+  display: flex;
+  gap: 8px;
+}
+
+.targetGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.targetCard {
+  text-align: center;
+}
+
+.targetValue {
+  font-size: 24px;
+  font-weight: 700;
+  color: #0AAF9A;
+}
+
+.targetLabel {
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.45);
+  margin-top: 4px;
+}
+
+.hint {
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.35);
+  padding: 12px 16px;
+  background: rgba(0, 0, 0, 0.02);
+  border-radius: 8px;
+}
