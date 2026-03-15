@@ -1,0 +1,111 @@
+/* ReviewActionPage.module.css — 评论行动引擎页样式 */
+
+/* ── 页面容器 ─────────────────────────────────────────────────────── */
+.page {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 24px 28px;
+}
+
+/* ── 页头 ─────────────────────────────────────────────────────────── */
+.pageHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  gap: 16px;
+}
+
+/* ── 统计行 ───────────────────────────────────────────────────────── */
+.statsRow {
+  margin-bottom: 20px;
+}
+
+.statsCard {
+  border-radius: 8px;
+}
+
+/* ── 工具栏 ───────────────────────────────────────────────────────── */
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.filters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ── 条件标签组 ──────────────────────────────────────────────────── */
+.conditionTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+/* ── 规则卡片 ─────────────────────────────────────────────────────── */
+.ruleCard {
+  margin-bottom: 12px;
+  border-radius: 8px;
+  transition: box-shadow 0.2s;
+}
+
+.ruleCard:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.09);
+}
+
+/* ── 日志详情 ─────────────────────────────────────────────────────── */
+.logDetail {
+  padding: 12px;
+  background: #fafafa;
+  border-radius: 6px;
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+/* ── 空状态 / 加载 ───────────────────────────────────────────────── */
+.spinCenter {
+  display: flex;
+  justify-content: center;
+  padding: 60px 0;
+}
+
+/* ── 模态框表单 ──────────────────────────────────────────────────── */
+.formSection {
+  margin-bottom: 16px;
+}
+
+.formLabel {
+  font-weight: 600;
+  margin-bottom: 6px;
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.65);
+}
+
+/* ── 响应式 ───────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .page {
+    padding: 16px;
+  }
+
+  .pageHeader {
+    flex-direction: column;
+  }
+
+  .toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .filters {
+    flex-direction: column;
+  }
+}

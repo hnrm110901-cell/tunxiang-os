@@ -1,0 +1,364 @@
+/* AutoProcurementPage.module.css — 智能采购 */
+
+/* ── 页面容器 ─────────────────────────────────────────────────────────────── */
+.page {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 24px 28px;
+}
+
+/* ── 页头 ──────────────────────────────────────────────────────────────────── */
+.pageHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  gap: 16px;
+}
+
+.pageTitle {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary, #111827);
+  margin: 0 0 4px;
+  letter-spacing: -0.3px;
+}
+
+.pageSubtitle {
+  font-size: 13px;
+  color: var(--text-tertiary, #9ca3af);
+  margin: 0;
+}
+
+.headerActions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* ── 统计行 ────────────────────────────────────────────────────────────────── */
+.statsRow {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.statCard {
+  padding: 16px 20px !important;
+  text-align: center;
+}
+
+.statNum {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--text-primary, #111827);
+  line-height: 1.1;
+  margin-bottom: 4px;
+  letter-spacing: -0.5px;
+}
+
+.statGreen  { color: #22c55e; }
+.statOrange { color: var(--accent, #FF6B2C); }
+.statRed    { color: #ef4444; }
+.statBlue   { color: #3b82f6; }
+
+.statLabel {
+  font-size: 12px;
+  color: var(--text-tertiary, #9ca3af);
+  font-weight: 500;
+}
+
+/* ── Tab 栏 ────────────────────────────────────────────────────────────────── */
+.tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--border, #e5e7eb);
+  margin-bottom: 16px;
+}
+
+.tab {
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-tertiary, #9ca3af);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+  font-family: inherit;
+}
+
+.tab:hover {
+  color: var(--text-primary, #111827);
+}
+
+.tabActive {
+  composes: tab;
+  color: var(--accent, #FF6B2C);
+  border-bottom-color: var(--accent, #FF6B2C);
+}
+
+/* ── 筛选工具栏 ───────────────────────────────────────────────────────────── */
+.toolbar {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.filterSelect {
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--text-primary, #111827);
+  background: var(--surface, #fff);
+  font-family: inherit;
+  outline: none;
+  cursor: pointer;
+  min-width: 120px;
+}
+
+.filterSelect:focus {
+  border-color: var(--accent, #FF6B2C);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent, #FF6B2C) 12%, transparent);
+}
+
+.toolbarSpacer {
+  flex: 1;
+}
+
+/* ── 建议卡片 ──────────────────────────────────────────────────────────────── */
+.suggestionGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.suggestionCard {
+  padding: 16px !important;
+}
+
+.suggestionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 10px;
+}
+
+.ingredientName {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary, #111827);
+}
+
+.triggerBadge {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: #fef3c7;
+  color: #92400e;
+  font-weight: 600;
+}
+
+.suggestionMeta {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 16px;
+  margin-bottom: 12px;
+  font-size: 12px;
+}
+
+.metaLabel {
+  color: var(--text-tertiary, #9ca3af);
+}
+
+.metaValue {
+  font-weight: 600;
+  color: var(--text-primary, #111827);
+}
+
+.metaValueWarn {
+  composes: metaValue;
+  color: #ef4444;
+}
+
+.costLine {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 10px;
+  border-top: 1px solid var(--border, #e5e7eb);
+}
+
+.costAmount {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--accent, #FF6B2C);
+  font-family: 'SF Mono', 'Fira Mono', monospace;
+}
+
+.cardActions {
+  display: flex;
+  gap: 6px;
+}
+
+/* ── 表格卡片 ─────────────────────────────────────────────────────────────── */
+.tableCard {
+  padding: 0 !important;
+  overflow: hidden;
+}
+
+.actionGroup {
+  display: flex;
+  gap: 4px;
+  justify-content: flex-end;
+}
+
+.amountCell {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary, #111827);
+  font-family: 'SF Mono', 'Fira Mono', monospace;
+}
+
+.timeCell {
+  font-size: 12px;
+  color: var(--text-secondary, #6b7280);
+  white-space: nowrap;
+}
+
+/* ── 空态 ──────────────────────────────────────────────────────────────────── */
+.emptyWrap {
+  padding: 48px 0;
+}
+
+/* ── Modal 表单 ───────────────────────────────────────────────────────────── */
+.modalBody {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.modalFooter {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.modalErr {
+  margin-bottom: 12px;
+}
+
+.fieldRow {
+  margin-bottom: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.fieldLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary, #111827);
+}
+
+.fieldRequired {
+  color: #ef4444;
+  margin-left: 2px;
+}
+
+.fieldInput {
+  width: 100%;
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--text-primary, #111827);
+  background: var(--surface, #fff);
+  font-family: inherit;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.fieldInput:focus {
+  border-color: var(--accent, #FF6B2C);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent, #FF6B2C) 12%, transparent);
+}
+
+.fieldGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+/* ── 启用开关 ──────────────────────────────────────────────────────────────── */
+.switchCell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.switch {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  background: #d1d5db;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  transition: background 0.2s;
+  padding: 0;
+}
+
+.switch::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.2s;
+}
+
+.switchOn {
+  composes: switch;
+  background: var(--accent, #FF6B2C);
+}
+
+.switchOn::after {
+  transform: translateX(16px);
+}
+
+/* ── 响应式 ──────────────────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .statsRow {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .suggestionGrid {
+    grid-template-columns: 1fr;
+  }
+  .fieldGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .statsRow {
+    grid-template-columns: 1fr;
+  }
+  .toolbar {
+    flex-direction: column;
+  }
+  .tabs {
+    overflow-x: auto;
+  }
+}

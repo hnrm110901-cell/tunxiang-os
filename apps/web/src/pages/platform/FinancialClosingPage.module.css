@@ -1,0 +1,519 @@
+/* FinancialClosingPage.module.css — 日清日结 */
+
+/* ── 页面容器 ────────────────────────────────────────────────────────────── */
+.page {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 24px 28px;
+}
+
+/* ── 页头 ─────────────────────────────────────────────────────────────────── */
+.pageHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  gap: 16px;
+}
+
+.pageTitle {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary, #111827);
+  margin: 0 0 4px;
+  letter-spacing: -0.3px;
+}
+
+.pageSubtitle {
+  font-size: 13px;
+  color: var(--text-tertiary, #9ca3af);
+  margin: 0;
+}
+
+.headerActions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+  align-items: center;
+}
+
+/* ── 统计行 ───────────────────────────────────────────────────────────────── */
+.statsRow {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.statCard {
+  padding: 16px 20px !important;
+  text-align: center;
+}
+
+.statNum {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--text-primary, #111827);
+  line-height: 1.2;
+}
+
+.statNumGreen {
+  composes: statNum;
+  color: var(--color-success, #10b981);
+}
+
+.statNumWarn {
+  composes: statNum;
+  color: var(--color-warning, #f59e0b);
+}
+
+.statNumRed {
+  composes: statNum;
+  color: var(--color-error, #ef4444);
+}
+
+.statLabel {
+  font-size: 12px;
+  color: var(--text-tertiary, #9ca3af);
+  margin-top: 4px;
+}
+
+/* ── Tabs ─────────────────────────────────────────────────────────────────── */
+.tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--border-primary, #e5e7eb);
+  margin-bottom: 20px;
+}
+
+.tab {
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-tertiary, #9ca3af);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.15s;
+  background: none;
+  border-top: none;
+  border-left: none;
+  border-right: none;
+}
+
+.tab:hover {
+  color: var(--text-secondary, #4b5563);
+}
+
+.tabActive {
+  composes: tab;
+  color: var(--accent, #FF6B2C);
+  border-bottom-color: var(--accent, #FF6B2C);
+}
+
+/* ── 日历网格 ─────────────────────────────────────────────────────────────── */
+.calendarContainer {
+  margin-top: 16px;
+}
+
+.calendarNav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.calendarMonth {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary, #111827);
+  min-width: 160px;
+  text-align: center;
+}
+
+.calendarGrid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.calendarWeekday {
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-tertiary, #9ca3af);
+  padding: 8px 0;
+}
+
+.calendarDay {
+  min-height: 80px;
+  border-radius: 8px;
+  padding: 8px;
+  cursor: pointer;
+  border: 1px solid var(--border-primary, #e5e7eb);
+  transition: all 0.15s;
+  display: flex;
+  flex-direction: column;
+}
+
+.calendarDay:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.calendarDayEmpty {
+  composes: calendarDay;
+  background: var(--bg-secondary, #f9fafb);
+  cursor: default;
+  border-color: transparent;
+}
+
+.calendarDayEmpty:hover {
+  box-shadow: none;
+}
+
+.calendarDayNum {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary, #111827);
+  margin-bottom: 4px;
+}
+
+.calendarDayRevenue {
+  font-size: 11px;
+  color: var(--text-secondary, #4b5563);
+  margin-top: auto;
+}
+
+.calendarDayOrders {
+  font-size: 10px;
+  color: var(--text-tertiary, #9ca3af);
+}
+
+/* 日历日结状态色 */
+.statusCompleted {
+  border-color: #a7f3d0;
+  background: #ecfdf5;
+}
+
+.statusWarning {
+  border-color: #fde68a;
+  background: #fffbeb;
+}
+
+.statusError {
+  border-color: #fecaca;
+  background: #fef2f2;
+}
+
+.statusPending {
+  border-color: #e5e7eb;
+  background: #f9fafb;
+}
+
+.statusProcessing {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+}
+
+/* ── 状态标签 ─────────────────────────────────────────────────────────────── */
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.badgeGreen {
+  composes: badge;
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.badgeYellow {
+  composes: badge;
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.badgeRed {
+  composes: badge;
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.badgeGray {
+  composes: badge;
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.badgeBlue {
+  composes: badge;
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+/* ── 月度汇总 ─────────────────────────────────────────────────────────────── */
+.plSummary {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.plCard {
+  padding: 20px !important;
+}
+
+.plLabel {
+  font-size: 13px;
+  color: var(--text-tertiary, #9ca3af);
+  margin-bottom: 6px;
+}
+
+.plValue {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-primary, #111827);
+}
+
+.plValueGreen {
+  composes: plValue;
+  color: var(--color-success, #10b981);
+}
+
+.plValueRed {
+  composes: plValue;
+  color: var(--color-error, #ef4444);
+}
+
+/* ── 渠道表格 ─────────────────────────────────────────────────────────────── */
+.channelTable {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 16px;
+}
+
+.channelTable th,
+.channelTable td {
+  padding: 10px 16px;
+  text-align: left;
+  font-size: 13px;
+  border-bottom: 1px solid var(--border-primary, #e5e7eb);
+}
+
+.channelTable th {
+  font-weight: 600;
+  color: var(--text-secondary, #4b5563);
+  background: var(--bg-secondary, #f9fafb);
+}
+
+.channelTable td {
+  color: var(--text-primary, #111827);
+}
+
+/* ── 异常告警卡片 ─────────────────────────────────────────────────────────── */
+.anomalyList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.anomalyCard {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--border-primary, #e5e7eb);
+  transition: background 0.15s;
+}
+
+.anomalyCard:hover {
+  background: var(--bg-secondary, #f9fafb);
+}
+
+.anomalyIcon {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.iconHigh {
+  composes: anomalyIcon;
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.iconMedium {
+  composes: anomalyIcon;
+  background: #fef3c7;
+  color: #d97706;
+}
+
+.iconLow {
+  composes: anomalyIcon;
+  background: #dbeafe;
+  color: #2563eb;
+}
+
+.anomalyBody {
+  flex: 1;
+  min-width: 0;
+}
+
+.anomalyDesc {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary, #111827);
+  margin-bottom: 4px;
+}
+
+.anomalyMeta {
+  font-size: 12px;
+  color: var(--text-tertiary, #9ca3af);
+  display: flex;
+  gap: 12px;
+}
+
+.anomalyAmount {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-error, #ef4444);
+  white-space: nowrap;
+  align-self: center;
+}
+
+/* ── 详情弹层 ─────────────────────────────────────────────────────────────── */
+.detailOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.3);
+  z-index: 999;
+}
+
+.detailDrawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 520px;
+  background: #fff;
+  box-shadow: -4px 0 24px rgba(0, 0, 0, 0.12);
+  z-index: 1000;
+  overflow-y: auto;
+  padding: 24px;
+}
+
+.detailHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.detailTitle {
+  font-size: 18px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.detailSection {
+  margin-bottom: 20px;
+}
+
+.detailSectionTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary, #111827);
+  margin-bottom: 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border-primary, #e5e7eb);
+}
+
+.detailGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 16px;
+}
+
+.detailItem {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 0;
+  font-size: 13px;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.detailLabel {
+  color: var(--text-tertiary, #9ca3af);
+}
+
+.detailValue {
+  color: var(--text-primary, #111827);
+  font-weight: 500;
+}
+
+/* ── 每日明细表格 ─────────────────────────────────────────────────────────── */
+.dailyTable {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 12px;
+}
+
+.dailyTable th,
+.dailyTable td {
+  padding: 8px 12px;
+  text-align: right;
+  font-size: 13px;
+  border-bottom: 1px solid var(--border-primary, #e5e7eb);
+}
+
+.dailyTable th {
+  text-align: right;
+  font-weight: 600;
+  color: var(--text-secondary, #4b5563);
+  background: var(--bg-secondary, #f9fafb);
+}
+
+.dailyTable th:first-child,
+.dailyTable td:first-child {
+  text-align: left;
+}
+
+/* ── 响应式 ───────────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .statsRow {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .plSummary {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .calendarGrid {
+    gap: 2px;
+  }
+
+  .calendarDay {
+    min-height: 60px;
+    padding: 4px;
+  }
+
+  .detailDrawer {
+    width: 100%;
+  }
+
+  .detailGrid {
+    grid-template-columns: 1fr;
+  }
+}

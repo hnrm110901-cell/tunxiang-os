@@ -231,6 +231,18 @@ const HealthCertPage             = lazy(() => import('./pages/platform/HealthCer
 const SupplierB2BPage            = lazy(() => import('./pages/platform/SupplierB2BPage'));
 const DianpingPage               = lazy(() => import('./pages/platform/DianpingPage'));
 const BankReconciliationPage     = lazy(() => import('./pages/platform/BankReconciliationPage'));
+// Batch 1 — 数据融合层
+const IntegrationHubPage         = lazy(() => import('./pages/platform/IntegrationHubPage'));
+const OmniChannelPage            = lazy(() => import('./pages/platform/OmniChannelPage'));
+const TriReconciliationPage      = lazy(() => import('./pages/platform/TriReconciliationPage'));
+// Batch 2 — 智能决策层
+const SupplierIntelPage          = lazy(() => import('./pages/platform/SupplierIntelPage'));
+const ReviewActionPage           = lazy(() => import('./pages/platform/ReviewActionPage'));
+const ComplianceEnginePage       = lazy(() => import('./pages/platform/ComplianceEnginePage'));
+// Batch 3 — 自动化闭环层
+const AutoProcurementPage       = lazy(() => import('./pages/platform/AutoProcurementPage'));
+const FinancialClosingPage      = lazy(() => import('./pages/platform/FinancialClosingPage'));
+const CommandCenterPage         = lazy(() => import('./pages/platform/CommandCenterPage'));
 
 // HR 模块页面
 const PayrollPage = lazy(() => import('./pages/hr/PayrollPage'));
@@ -979,6 +991,18 @@ const AppContent: React.FC = () => {
                   <Route path="supplier-b2b" element={<SupplierB2BPage />} />
                   <Route path="dianping" element={<DianpingPage />} />
                   <Route path="bank-recon" element={<BankReconciliationPage />} />
+                  {/* Batch 1 — 数据融合层 */}
+                  <Route path="integration-hub" element={<IntegrationHubPage />} />
+                  <Route path="omni-channel" element={<OmniChannelPage />} />
+                  <Route path="tri-recon" element={<TriReconciliationPage />} />
+                  {/* Batch 2 — 智能决策层 */}
+                  <Route path="supplier-intel" element={<SupplierIntelPage />} />
+                  <Route path="review-actions" element={<ReviewActionPage />} />
+                  <Route path="compliance-engine" element={<ComplianceEnginePage />} />
+                  {/* Batch 3 — 自动化闭环层 */}
+                  <Route path="auto-procurement" element={<AutoProcurementPage />} />
+                  <Route path="financial-closing" element={<FinancialClosingPage />} />
+                  <Route path="command-center" element={<CommandCenterPage />} />
                 </Route>
 
                 {/* Role-based views — Store Manager (手机) */}

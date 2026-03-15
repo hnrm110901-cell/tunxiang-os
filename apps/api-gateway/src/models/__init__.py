@@ -166,6 +166,16 @@ from .health_certificate import HealthCertificate
 from .supplier_b2b import B2BPurchaseOrder, B2BPurchaseItem
 from .dianping_review import DianpingReview
 from .bank_reconciliation import BankStatement, BankReconciliationBatch
+# Batch 1 — 数据融合层
+from .integration_hub import IntegrationHubStatus
+from .tri_reconciliation import TriReconciliationRecord
+# Batch 2 — 智能决策层
+from .supplier_intelligence import SupplierScorecard
+from .review_action import ReviewActionRule, ReviewActionLog
+from .compliance_engine import ComplianceScore, ComplianceAlert
+# Batch 3 — 自动化闭环层
+from .auto_procurement import ProcurementRule, ProcurementExecution
+from .financial_closing import DailyClosingReport
 
 __all__ = [
     "Base",

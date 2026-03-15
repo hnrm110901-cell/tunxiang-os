@@ -1,0 +1,345 @@
+/* SupplierIntelPage.module.css — 供应商智能评分 */
+
+/* ── 页面容器 ─────────────────────────────────────────────────────────────── */
+.page {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 24px 28px;
+}
+
+/* ── 页头 ──────────────────────────────────────────────────────────────────── */
+.pageHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  gap: 16px;
+}
+
+.pageTitle {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary, #111827);
+  margin: 0 0 4px;
+  letter-spacing: -0.3px;
+}
+
+.pageSubtitle {
+  font-size: 13px;
+  color: var(--text-tertiary, #9ca3af);
+  margin: 0;
+}
+
+.headerActions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* ── 评级分布卡片行 ───────────────────────────────────────────────────────── */
+.tierRow {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.tierCard {
+  padding: 16px 20px !important;
+  text-align: center;
+  border-left: 4px solid transparent !important;
+  transition: transform 0.15s, box-shadow 0.15s;
+  cursor: pointer;
+}
+
+.tierCard:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.tierCardA { border-left-color: #22c55e !important; }
+.tierCardB { border-left-color: #3b82f6 !important; }
+.tierCardC { border-left-color: var(--accent, #FF6B2C) !important; }
+.tierCardD { border-left-color: #ef4444 !important; }
+
+.tierNum {
+  font-size: 32px;
+  font-weight: 800;
+  line-height: 1.1;
+  margin-bottom: 4px;
+  letter-spacing: -0.5px;
+}
+
+.tierNumA { color: #22c55e; }
+.tierNumB { color: #3b82f6; }
+.tierNumC { color: var(--accent, #FF6B2C); }
+.tierNumD { color: #ef4444; }
+
+.tierLabel {
+  font-size: 12px;
+  color: var(--text-tertiary, #9ca3af);
+  font-weight: 500;
+}
+
+/* ── 筛选工具栏 ───────────────────────────────────────────────────────────── */
+.toolbar {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.filterSelect {
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--text-primary, #111827);
+  background: var(--surface, #fff);
+  font-family: inherit;
+  outline: none;
+  cursor: pointer;
+  min-width: 120px;
+}
+
+.filterSelect:focus {
+  border-color: var(--accent, #FF6B2C);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent, #FF6B2C) 12%, transparent);
+}
+
+.searchInput {
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--text-primary, #111827);
+  background: var(--surface, #fff);
+  font-family: inherit;
+  outline: none;
+  min-width: 180px;
+}
+
+.searchInput:focus {
+  border-color: var(--accent, #FF6B2C);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent, #FF6B2C) 12%, transparent);
+}
+
+.toolbarSpacer {
+  flex: 1;
+}
+
+/* ── 排名表格 ─────────────────────────────────────────────────────────────── */
+.tableCard {
+  padding: 0 !important;
+  overflow: hidden;
+  margin-bottom: 20px;
+}
+
+.rankCell {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--text-secondary, #6b7280);
+  text-align: center;
+  min-width: 36px;
+}
+
+.rankTop { color: var(--accent, #FF6B2C); }
+
+.supplierName {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary, #111827);
+}
+
+.scoreCell {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary, #111827);
+  font-family: 'SF Mono', 'Fira Mono', monospace;
+}
+
+/* ── 进度条（维度分数可视化） ─────────────────────────────────────────────── */
+.scoreBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.scoreBarTrack {
+  flex: 1;
+  height: 6px;
+  background: var(--bg-subtle, #f3f4f6);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.scoreBarFill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.4s ease;
+}
+
+.fillGreen  { background: #22c55e; }
+.fillBlue   { background: #3b82f6; }
+.fillOrange { background: var(--accent, #FF6B2C); }
+.fillRed    { background: #ef4444; }
+
+.scoreBarValue {
+  font-size: 12px;
+  font-weight: 700;
+  min-width: 28px;
+  text-align: right;
+  font-family: 'SF Mono', 'Fira Mono', monospace;
+}
+
+/* ── 趋势箭头 ─────────────────────────────────────────────────────────────── */
+.trendUp   { color: #ef4444; font-weight: 700; }
+.trendDown { color: #22c55e; font-weight: 700; }
+.trendFlat { color: var(--text-tertiary, #9ca3af); }
+
+/* ── 风险预警面板 ─────────────────────────────────────────────────────────── */
+.riskSection {
+  margin-bottom: 20px;
+}
+
+.riskSectionTitle {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary, #111827);
+  margin-bottom: 12px;
+}
+
+.riskGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 12px;
+}
+
+.riskCard {
+  padding: 16px !important;
+  border-left: 4px solid #ef4444 !important;
+}
+
+.riskCardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.riskSupplier {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary, #111827);
+}
+
+.riskReasons {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 10px;
+}
+
+.riskReason {
+  font-size: 12px;
+  color: var(--text-secondary, #6b7280);
+  padding: 2px 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.riskReason::before {
+  content: "\26A0";
+  color: #ef4444;
+  flex-shrink: 0;
+}
+
+.riskAction {
+  font-size: 12px;
+  color: var(--accent, #FF6B2C);
+  font-weight: 600;
+  padding: 8px 12px;
+  background: color-mix(in srgb, var(--accent, #FF6B2C) 6%, transparent);
+  border-radius: 6px;
+}
+
+/* ── 价格趋势区域 ─────────────────────────────────────────────────────────── */
+.trendSection {
+  margin-bottom: 20px;
+}
+
+.trendSectionTitle {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary, #111827);
+  margin-bottom: 12px;
+}
+
+.trendControls {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 12px;
+  align-items: center;
+}
+
+.trendTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.trendTable th {
+  text-align: left;
+  padding: 8px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-tertiary, #9ca3af);
+  border-bottom: 1px solid var(--border, #e5e7eb);
+}
+
+.trendTable td {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-light, #f3f4f6);
+  color: var(--text-primary, #111827);
+}
+
+.priceValue {
+  font-family: 'SF Mono', 'Fira Mono', monospace;
+  font-weight: 600;
+}
+
+/* ── 金额 ─────────────────────────────────────────────────────────────────── */
+.amountCell {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary, #111827);
+  font-family: 'SF Mono', 'Fira Mono', monospace;
+}
+
+/* ── 空态 / 加载 ──────────────────────────────────────────────────────────── */
+.loadingWrap {
+  padding: 60px 20px;
+  text-align: center;
+}
+
+/* ── 响应式 ──────────────────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .tierRow {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .riskGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .tierRow {
+    grid-template-columns: 1fr;
+  }
+  .toolbar {
+    flex-direction: column;
+  }
+}

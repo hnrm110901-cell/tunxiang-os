@@ -110,6 +110,18 @@ from src.api import health_certificates
 from src.api import supplier_b2b
 from src.api import dianping
 from src.api import bank_reconciliation
+# Batch 1 — 数据融合层：集成中心 / 全渠道营收 / 三角对账
+from src.api import integration_hub
+from src.api import omni_channel
+from src.api import tri_reconciliation
+# Batch 2 — 智能决策层：供应商智能 / 评论行动 / 合规引擎
+from src.api import supplier_intelligence
+from src.api import review_action
+from src.api import compliance_engine
+# Batch 3 — 自动化闭环层：智能采购 / 日清日结 / 指挥中心
+from src.api import auto_procurement
+from src.api import financial_closing
+from src.api import command_center
 from src.middleware.monitoring import MonitoringMiddleware
 from src.middleware.rate_limit import RateLimitMiddleware
 from src.middleware.audit_log import AuditLogMiddleware
@@ -923,6 +935,18 @@ app.include_router(health_certificates.router, prefix="/api/v1", tags=["health-c
 app.include_router(supplier_b2b.router, prefix="/api/v1", tags=["supplier-b2b"])
 app.include_router(dianping.router, prefix="/api/v1", tags=["dianping"])
 app.include_router(bank_reconciliation.router, prefix="/api/v1", tags=["bank-reconciliation"])
+# Batch 1 — 数据融合层
+app.include_router(integration_hub.router, tags=["integration-hub"])
+app.include_router(omni_channel.router, tags=["omni-channel"])
+app.include_router(tri_reconciliation.router, prefix="/api/v1", tags=["tri-reconciliation"])
+# Batch 2 — 智能决策层
+app.include_router(supplier_intelligence.router, tags=["supplier-intelligence"])
+app.include_router(review_action.router, tags=["review-actions"])
+app.include_router(compliance_engine.router, tags=["compliance-engine"])
+# Batch 3 — 自动化闭环层
+app.include_router(auto_procurement.router, prefix="/api/v1", tags=["auto-procurement"])
+app.include_router(financial_closing.router, tags=["financial-closing"])
+app.include_router(command_center.router, tags=["command-center"])
 
 # 业财税资金一体化（FCT）
 if getattr(settings, "FCT_ENABLED", False):

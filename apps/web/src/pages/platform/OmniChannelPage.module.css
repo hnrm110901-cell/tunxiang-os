@@ -1,0 +1,247 @@
+/* OmniChannelPage.module.css — 全渠道营收分析页样式 */
+
+/* ── 页面容器 ─────────────────────────────────────────────────────── */
+.page {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 24px 28px;
+}
+
+/* ── 页头 ─────────────────────────────────────────────────────────── */
+.pageHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  gap: 16px;
+}
+
+.pageTitle {
+  font-size: 22px;
+  font-weight: 600;
+  margin: 0 0 4px;
+}
+
+.pageSubtitle {
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 13px;
+}
+
+/* ── 过滤栏 ───────────────────────────────────────────────────────── */
+.filterBar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+/* ── KPI 统计行 ──────────────────────────────────────────────────── */
+.kpiRow {
+  margin-bottom: 24px;
+}
+
+.kpiCard {
+  height: 100%;
+}
+
+.kpiValue {
+  font-size: 28px;
+  font-weight: 700;
+  color: #ff6b2c;
+}
+
+/* ── 渠道卡片网格 ────────────────────────────────────────────────── */
+.channelGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.channelCard {
+  border-radius: 8px;
+  transition: box-shadow 0.2s;
+}
+
+.channelCard:hover {
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+}
+
+.channelName {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.channelMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.55);
+}
+
+.channelRevenue {
+  font-size: 22px;
+  font-weight: 700;
+  color: #222;
+  margin: 8px 0;
+}
+
+.channelShare {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: #fff7f0;
+  color: #ff6b2c;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* ── 区块标题 ────────────────────────────────────────────────────── */
+.sectionTitle {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 24px 0 12px;
+}
+
+/* ── 趋势区域 ────────────────────────────────────────────────────── */
+.trendSection {
+  margin-bottom: 24px;
+}
+
+.periodSelector {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.trendTable {
+  overflow-x: auto;
+}
+
+/* ── 利润瀑布 ────────────────────────────────────────────────────── */
+.waterfallRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.waterfallStep {
+  flex: 1;
+  min-width: 140px;
+  text-align: center;
+  padding: 16px 12px;
+  border-radius: 8px;
+  background: #fafafa;
+}
+
+.waterfallStep.gross {
+  background: #e6f7ff;
+  border: 1px solid #91d5ff;
+}
+
+.waterfallStep.deduction {
+  background: #fff2e8;
+  border: 1px solid #ffbb96;
+}
+
+.waterfallStep.net {
+  background: #f6ffed;
+  border: 1px solid #b7eb8f;
+}
+
+.waterfallLabel {
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.45);
+  margin-bottom: 4px;
+}
+
+.waterfallValue {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.waterfallArrow {
+  font-size: 20px;
+  color: rgba(0, 0, 0, 0.25);
+  flex-shrink: 0;
+}
+
+/* ── 热力图 ──────────────────────────────────────────────────────── */
+.heatmapWrap {
+  overflow-x: auto;
+  margin-bottom: 24px;
+}
+
+.heatmapTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.heatmapTable th,
+.heatmapTable td {
+  padding: 6px 8px;
+  text-align: center;
+  border: 1px solid #f0f0f0;
+  min-width: 40px;
+}
+
+.heatmapTable th {
+  background: #fafafa;
+  font-weight: 600;
+  position: sticky;
+  top: 0;
+}
+
+.heatmapTable td.channelHeader {
+  font-weight: 600;
+  text-align: left;
+  background: #fafafa;
+  min-width: 80px;
+  position: sticky;
+  left: 0;
+}
+
+.heatCell {
+  border-radius: 3px;
+  min-width: 32px;
+  min-height: 24px;
+  display: inline-block;
+  line-height: 24px;
+}
+
+/* ── 加载/空态 ───────────────────────────────────────────────────── */
+.spinCenter {
+  display: flex;
+  justify-content: center;
+  padding: 80px 0;
+}
+
+/* ── 响应式 ──────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .page {
+    padding: 16px;
+  }
+
+  .channelGrid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .waterfallRow {
+    flex-direction: column;
+  }
+
+  .waterfallArrow {
+    transform: rotate(90deg);
+  }
+
+  .filterBar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
