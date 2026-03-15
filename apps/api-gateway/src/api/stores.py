@@ -58,6 +58,7 @@ class UpdateStoreRequest(BaseModel):
     daily_customer_target: Optional[int] = None
     cost_ratio_target: Optional[float] = None
     labor_cost_ratio_target: Optional[float] = None
+    config: Optional[dict] = None  # POS/CRM凭证及其他门店级配置（深度合并，不覆盖现有字段）
 
 
 class StoreResponse(BaseModel):

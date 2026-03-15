@@ -136,9 +136,14 @@ class StoreService:
             if not store:
                 return None
 
-            # 更新字段
+            # 更新字段（config 字段深度合并，不覆盖现有键）
             for key, value in kwargs.items():
-                if hasattr(store, key) and value is not None:
+                if not hasattr(store, key) or value is None:
+                    continue
+                if key == "config" and isinstance(value, dict):
+                    existing = store.config if isinstance(store.config, dict) else {}
+                    store.config = {**existing, **value}
+                else:
                     setattr(store, key, value)
 
             await session.commit()

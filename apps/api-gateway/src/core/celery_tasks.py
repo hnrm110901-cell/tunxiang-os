@@ -3862,32 +3862,15 @@ def pull_pinzhi_daily_data(self) -> Dict[str, Any]:
         from datetime import date, timedelta
         from sqlalchemy import text as _text, select
         from ..core.database import get_db_session
+        from ..models.integration import ExternalSystem, IntegrationType
         from ..models.store import Store
 
-        base_url = os.getenv("PINZHI_BASE_URL", "")
-        token = os.getenv("PINZHI_TOKEN", "")
-        if not base_url or not token:
-            logger.warning("pinzhi_pull.skipped", reason="PINZHI_BASE_URL or PINZHI_TOKEN not configured")
-            return {
-                "success": True,
-                "skipped": True,
-                "stores_processed": 0,
-                "orders_upserted": 0,
-                "summaries_saved": 0,
-                "errors": [],
-            }
-
-        brand_id = os.getenv("PINZHI_BRAND_ID", "")
+        global_base_url = os.getenv("PINZHI_BASE_URL", "")
+        global_token = os.getenv("PINZHI_TOKEN", "")
+        global_brand_id = os.getenv("PINZHI_BRAND_ID", "")
         yesterday = (date.today() - timedelta(days=1)).strftime("%Y-%m-%d")
 
         from packages.api_adapters.pinzhi.src.adapter import PinzhiAdapter
-
-        adapter = PinzhiAdapter({
-            "base_url": base_url,
-            "token": token,
-            "timeout": int(os.getenv("PINZHI_TIMEOUT", "30")),
-            "retry_times": int(os.getenv("PINZHI_RETRY_TIMES", "3")),
-        })
 
         stores_processed = 0
         orders_upserted = 0
@@ -3902,14 +3885,73 @@ def pull_pinzhi_daily_data(self) -> Dict[str, Any]:
                 )
                 stores = result.scalars().all()
 
+                # 预加载品智 ExternalSystem 凭证（store_id → ExternalSystem）
+                ext_result = await session.execute(
+                    select(ExternalSystem).where(
+                        ExternalSystem.provider == "pinzhi",
+                        ExternalSystem.type == IntegrationType.POS,
+                    )
+                )
+                ext_by_store: dict = {
+                    str(e.store_id): e for e in ext_result.scalars().all() if e.store_id
+                }
+
+                # 若全局凭证和 ExternalSystem 均无配置，跳过整个任务
+                if not global_base_url and not global_token and not ext_by_store:
+                    logger.warning("pinzhi_pull.skipped", reason="无全局环境变量且接入配置管理中无品智凭证")
+                    return {
+                        "success": True,
+                        "skipped": True,
+                        "stores_processed": 0,
+                        "orders_upserted": 0,
+                        "summaries_saved": 0,
+                        "errors": [],
+                    }
+
                 for store in stores:
                     sid = str(store.id)
-                    # 品智用 ognid（门店 omsID），通常存在 store.config 或用 store.code
-                    ognid = ""
-                    if store.config and isinstance(store.config, dict):
-                        ognid = store.config.get("pinzhi_ognid", "")
-                    if not ognid:
-                        ognid = store.code or sid
+                    cfg = store.config if isinstance(store.config, dict) else {}
+                    ext = ext_by_store.get(sid)
+                    ext_cfg: dict = ext.config if ext and isinstance(ext.config, dict) else {}
+
+                    # 凭证优先级：store.config > ExternalSystem > 全局环境变量
+                    base_url = (
+                        cfg.get("pinzhi_base_url")
+                        or ext_cfg.get("pinzhi_base_url")
+                        or (ext.api_endpoint if ext else None)
+                        or global_base_url
+                    )
+                    token = (
+                        cfg.get("pinzhi_token")
+                        or ext_cfg.get("pinzhi_store_token")
+                        or (ext.api_secret if ext else None)
+                        or (ext.api_key if ext else None)
+                        or global_token
+                    )
+                    brand_id = (
+                        cfg.get("pinzhi_brand_id")
+                        or ext_cfg.get("brand_id")
+                        or getattr(store, "brand_id", None)
+                        or global_brand_id
+                    )
+                    ognid = str(
+                        cfg.get("pinzhi_ognid")
+                        or ext_cfg.get("pinzhi_oms_id")
+                        or ext_cfg.get("pinzhi_store_id")
+                        or store.code
+                        or sid
+                    )
+
+                    if not base_url or not token:
+                        logger.debug("pinzhi_pull.store_skipped", store_id=sid, reason="无凭证")
+                        continue
+
+                    adapter = PinzhiAdapter({
+                        "base_url": base_url,
+                        "token": token,
+                        "timeout": int(os.getenv("PINZHI_TIMEOUT", "30")),
+                        "retry_times": int(os.getenv("PINZHI_RETRY_TIMES", "3")),
+                    })
 
                     try:
                         # 1) 拉取订单明细
@@ -4024,9 +4066,8 @@ def pull_pinzhi_daily_data(self) -> Dict[str, Any]:
                         await session.rollback()
                         errors.append({"store_id": sid, "error": str(e)})
                         logger.error("pinzhi_pull.store_failed", store_id=sid, error=str(e))
-
-        finally:
-            await adapter.close()
+                    finally:
+                        await adapter.close()
 
         logger.info(
             "pinzhi_pull_daily_data.done",

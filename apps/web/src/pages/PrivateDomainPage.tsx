@@ -256,7 +256,7 @@ const PrivateDomainPage: React.FC = () => {
             </Card>
             <Card title="本月ROI估算" size="small">
               <Statistic value={dashboard?.roi_estimate ?? '--'} suffix=":1" prefix="≈" valueStyle={{ color: '#1A7A52', fontSize: 32 }} />
-              <div style={{ color: '#999', fontSize: 12 }}>目标 ≥ 8:1，签约承诺 ≥ 8:1 否则退费</div>
+              <div style={{ color: '#999', fontSize: 12 }}>目标 ≥ 8:1（行业基准），ROI持续优化中</div>
             </Card>
           </Col>
         </Row>
