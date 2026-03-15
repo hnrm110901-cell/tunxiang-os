@@ -13,10 +13,7 @@
     <script>
       (function () {
         var stored = localStorage.getItem('tunxiang-theme') || localStorage.getItem('zhilian-theme');
-        var isDark =
-          stored === 'dark' ||
-          (stored !== 'light' &&
-            window.matchMedia('(prefers-color-scheme: dark)').matches);
+        var isDark = stored === 'dark';
         document.documentElement.setAttribute(
           'data-theme',
           isDark ? 'dark' : 'light'

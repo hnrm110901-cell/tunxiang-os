@@ -1,5 +1,5 @@
 /* ═══ 屯象OS Design System · CSS Variables ═══ */
-/* v2 设计系统 — 深色主题 + Mint #0AAF9A */
+/* v3 设计系统 — 亮色优先 + Mint #0AAF9A */
 /* 注意: 大部分变量由 injectTokens() 在运行时注入 */
 /* 此文件仅定义 CSS-only 场景的 fallback */
 
@@ -17,7 +17,92 @@
   --info-color:    #2D9CDB;
 }
 
-/* ── 深色主题（默认） ── */
+/* ── 亮色主题（默认） ── */
+[data-theme='light'] {
+  /* 背景层 */
+  --bg-primary:    #FFFFFF;
+  --bg-secondary:  #FAFAFA;
+  --bg-tertiary:   #F5F6F8;
+  --bg-elevated:   #FFFFFF;
+
+  /* 文字层 */
+  --text-primary:   #1D2939;
+  --text-secondary: #4B5563;
+  --text-tertiary:  #9CA3AF;
+  --text-disabled:  #D1D5DB;
+
+  /* 边框 & 分割线 */
+  --border-color:  #E5E7EB;
+  --border-light:  #F3F4F6;
+  --divider-color: #F3F4F6;
+
+  /* 语义别名 */
+  --bg:             #F5F6F8;
+  --surface:        #FFFFFF;
+  --surface-hover:  #F9FAFB;
+  --border:         #E5E7EB;
+  --accent:         #0AAF9A;
+  --accent-soft:    rgba(10,175,154,0.08);
+  --accent-hover:   #099987;
+  --accent-active:  #078070;
+  --accent-bg:      #E6F7F5;
+  --green:          #16A34A;
+  --red:            #DC2626;
+  --yellow:         #D97706;
+  --blue:           #2563EB;
+
+  /* 阴影 */
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+  --shadow-md: 0 2px 8px rgba(0,0,0,0.08);
+  --shadow-lg: 0 4px 16px rgba(0,0,0,0.10);
+  --shadow-xl: 0 8px 24px rgba(0,0,0,0.12);
+
+  /* ── 导航 & 侧边栏专用 token ── */
+  --nav-bg:               #FFFFFF;
+  --nav-border:           #E5E7EB;
+  --nav-shadow:           0 1px 0 #E5E7EB;
+  --sidebar-bg:           #FFFFFF;
+  --sidebar-border:       #E5E7EB;
+
+  /* 标签页 */
+  --tab-inactive:         #6B7280;
+  --tab-hover-color:      #1D2939;
+  --tab-hover-bg:         #F5F6F8;
+
+  /* 搜索框 */
+  --search-bg:            #F5F6F8;
+  --search-border:        #E5E7EB;
+  --search-text:          #9CA3AF;
+  --search-kbd-bg:        #EEF0F4;
+  --search-kbd-text:      #9CA3AF;
+
+  /* 图标按钮 */
+  --icon-btn-color:       #6B7280;
+  --icon-btn-hover-bg:    #F5F6F8;
+  --icon-btn-active-color:#1D2939;
+
+  /* 侧边栏条目 */
+  --sidebar-item-color:   #4B5563;
+  --sidebar-group-color:  #9CA3AF;
+  --sidebar-toggle-color: #C8CDD6;
+  --sidebar-item-hover-bg:#F5F6F8;
+
+  /* 面包屑 */
+  --breadcrumb-color:     #9CA3AF;
+  --breadcrumb-current:   #1D2939;
+
+  /* 内容区 */
+  --content-outer-bg:     #F5F6F8;
+  --content-inner-bg:     #FFFFFF;
+  --content-inner-border: #E5E7EB;
+  --content-inner-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+
+  /* 页脚 */
+  --footer-color:         #D1D5DB;
+  --footer-border:        #F3F4F6;
+}
+
+/* ── 深色主题 ── */
 [data-theme='dark'] {
   --bg-primary:    #0B1A20;
   --bg-secondary:  #0D2029;
@@ -51,40 +136,48 @@
   --shadow-md: 0 2px 8px rgba(0,0,0,0.4);
   --shadow-lg: 0 4px 16px rgba(0,0,0,0.5);
   --shadow-xl: 0 8px 24px rgba(0,0,0,0.6);
-}
 
-/* ── 浅色模式 fallback ── */
-[data-theme='light'] {
-  --bg-primary:    #FFFFFF;
-  --bg-secondary:  #FAFAFA;
-  --bg-tertiary:   #F5F5F5;
-  --bg-elevated:   #FFFFFF;
+  /* ── 导航 & 侧边栏专用 token ── */
+  --nav-bg:               #0B1A20;
+  --nav-border:           rgba(255,255,255,0.08);
+  --nav-shadow:           none;
+  --sidebar-bg:           #0B1A20;
+  --sidebar-border:       rgba(255,255,255,0.08);
 
-  --text-primary:   #1E2A3A;
-  --text-secondary: #595959;
-  --text-tertiary:  #BFBFBF;
-  --text-disabled:  #D9D9D9;
+  /* 标签页 */
+  --tab-inactive:         rgba(255,255,255,0.50);
+  --tab-hover-color:      rgba(255,255,255,0.92);
+  --tab-hover-bg:         rgba(255,255,255,0.06);
 
-  --border-color: #E8E8E8;
-  --border-light: #F5F5F5;
-  --divider-color: #F5F5F5;
+  /* 搜索框 */
+  --search-bg:            rgba(255,255,255,0.06);
+  --search-border:        rgba(255,255,255,0.10);
+  --search-text:          rgba(255,255,255,0.50);
+  --search-kbd-bg:        rgba(255,255,255,0.08);
+  --search-kbd-text:      rgba(255,255,255,0.38);
 
-  --bg:             #FAFAFA;
-  --surface:        #FFFFFF;
-  --surface-hover:  #F5F5F5;
-  --border:         #E8E8E8;
-  --accent:         #0AAF9A;
-  --accent-soft:    rgba(10,175,154,0.08);
-  --accent-hover:   #099987;
-  --accent-active:  #078070;
-  --accent-bg:      #E6F7F5;
-  --green:          #27AE60;
-  --red:            #EB5757;
-  --yellow:         #F2994A;
-  --blue:           #2D9CDB;
+  /* 图标按钮 */
+  --icon-btn-color:       rgba(255,255,255,0.50);
+  --icon-btn-hover-bg:    rgba(255,255,255,0.08);
+  --icon-btn-active-color:rgba(255,255,255,0.92);
 
-  --shadow-sm: 0 1px 2px rgba(0,0,0,0.06);
-  --shadow-md: 0 2px 8px rgba(0,0,0,0.08);
-  --shadow-lg: 0 4px 16px rgba(0,0,0,0.10);
-  --shadow-xl: 0 8px 24px rgba(0,0,0,0.12);
+  /* 侧边栏条目 */
+  --sidebar-item-color:   rgba(255,255,255,0.65);
+  --sidebar-group-color:  rgba(255,255,255,0.38);
+  --sidebar-toggle-color: rgba(255,255,255,0.38);
+  --sidebar-item-hover-bg:rgba(255,255,255,0.06);
+
+  /* 面包屑 */
+  --breadcrumb-color:     rgba(255,255,255,0.38);
+  --breadcrumb-current:   rgba(255,255,255,0.92);
+
+  /* 内容区 */
+  --content-outer-bg:     #091518;
+  --content-inner-bg:     #0D2029;
+  --content-inner-border: rgba(255,255,255,0.08);
+  --content-inner-shadow: 0 1px 3px rgba(0,0,0,0.2);
+
+  /* 页脚 */
+  --footer-color:         rgba(255,255,255,0.25);
+  --footer-border:        rgba(255,255,255,0.06);
 }

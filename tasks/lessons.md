@@ -133,3 +133,27 @@ def _risk_level(score: float) -> str:
 ### L025 — git rebase 冲突后必须保留双方的新增内容
 **问题**：远程新增了 6 个平台页面（PlatformFeatureFlagsPage 等），本地新增了 SystemSettingsPage。rebase 冲突时如果只保留一方，会丢失另一方的页面注册，导致路由 404。
 **规则**：`App.tsx` 的 lazy import 和 Route 注册冲突，必须合并保留双方的新增行。解决完冲突后运行 `npx tsc --noEmit` 确认无遗漏引用。
+
+### L026 — 连字符目录的适配器包不能直接 import，需用 importlib 隔离命名空间
+**问题**：`packages/api-adapters/pinzhi/` 路径含连字符，Python 无法 `import packages.api_adapters.pinzhi`。用 `sys.path.insert` 后 `from src.adapter import PinzhiAdapter` 会因 `src` 已被 `apps/api-gateway/src` 占用而导入错误模块（`ModuleNotFoundError: cannot import 'PinzhiAdapter' from 'src.adapter'`）。
+**规则**：从 `packages/api-adapters/{hyphen-name}/src/` 加载适配器时，必须用 `importlib.util.spec_from_file_location` + 唯一命名空间（如 `_pinzhi_pkg`）注册到 `sys.modules`，不能用 `sys.path` 注入再直接 import。封装成 `_load_pkg_module(pkg_key, pkg_src_dir, submodules)` 工具函数，确保多个适配器各自隔离互不干扰。
+
+### L027 — _sync_tiancai 调用了不存在的 query_orders 方法
+**问题**：`_sync_tiancai` 调用 `adapter.query_orders(start_date=..., end_date=..., page=..., page_size=50, status="paid")`，但 TiancaiShanglongAdapter（新旧两版本）的实际分页方法是 `fetch_orders_by_date(date_str, page, page_size, status)`，且 status 是整数（2=已支付）而非字符串。循环退出条件也用了错误的 `len(raw_orders) < 50`，正确应检查 `result["has_more"]`。
+**规则**：新增或修改 `_sync_xxx` 前必须阅读适配器源码确认方法签名；分页退出条件必须基于 API 返回的 `has_more` 字段，不能用返回行数与 page_size 比较（最后一页刚好满页时会多发一次请求但不会死循环，而 `has_more=False` 语义精确）。
+
+---
+
+## 前端主题与导航
+
+### L028 — index.html 内联脚本的主题 fallback 必须与 useTheme.ts 默认值一致
+**问题**：`index.html` 有内联防闪脚本在 React 启动前设置 `data-theme`，其逻辑为 `stored === 'dark' || (!stored && prefers-color-scheme: dark)`。当系统开启深色模式且 localStorage 无存储值时，脚本设置 `dark`，但 `useTheme.ts` 默认返回 `'light'`，导致两者不一致，页面始终深色。
+**规则**：`index.html` 内联脚本的 fallback 逻辑必须与 `useTheme.ts` 的默认值完全一致。如果产品默认亮色，内联脚本只判断 `stored === 'dark'`，不参考系统色彩偏好。
+
+### L029 — 开发服务器端口 3000 与 Claude-in-Chrome broker 冲突
+**问题**：`vite.config.ts` 和 `launch.json` 配置端口 3000，但该端口被 Claude Code 的 Chrome 扩展 broker 进程占用（redwood-broker）。Vite 自动移到 3001，但 `preview_start` 工具仍报告 3000，导致 preview 工具指向旧进程，验证始终看到旧界面。
+**规则**：前端开发服务器端口统一改用 5173（Vite 默认），避开 3000。已更新 `vite.config.ts` 和 `.claude/launch.json`。
+
+### L030 — 导航菜单分组不超过 6 项，否则拆分
+**问题**："门店服务"分组塞了 9 个菜单项，前厅日常操作和宴会业务混在一起，楼面经理和宴会销售都难以快速找到目标。
+**规则**：单个侧边栏分组超过 6 项必须拆分；宴会业务是独立工作流，应与日常前厅操作分组。功能名称用业务语言（"排队叫号"而非"排队管理"，"采购协同"而非"订单协同"），避免技术术语（"CDP监控"→"数据中台"）。图标语义必须与功能一致（损耗用 FallOutlined 而非 FireOutlined）。

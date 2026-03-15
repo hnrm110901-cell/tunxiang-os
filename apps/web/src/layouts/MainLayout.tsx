@@ -49,6 +49,7 @@ import {
   HistoryOutlined,
   WarningOutlined,
   FireOutlined,
+  FallOutlined,
   PieChartOutlined,
   UnorderedListOutlined,
   FundOutlined,
@@ -146,6 +147,7 @@ const DOMAIN_SIDEBAR: DomainSidebar = {
       items: [
         { key: '/cross-store-insights', icon: <GlobalOutlined />,     label: '跨店洞察' },
         { key: '/hq-dashboard',         icon: <ShopOutlined />,       label: '总部看板' },
+        { key: '/decision',             icon: <RocketOutlined />,     label: '经营决策' },
       ],
     },
   ],
@@ -164,17 +166,22 @@ const DOMAIN_SIDEBAR: DomainSidebar = {
       ],
     },
     {
-      groupLabel: '门店服务',
+      groupLabel: '前厅接待',
       items: [
-        { key: '/queue',                icon: <TeamOutlined />,            label: '排队管理' },
-        { key: '/reservation',          icon: <CalendarOutlined />,        label: '预订宴会' },
-        { key: '/banquet-sales',        icon: <FundOutlined />,            label: '宴会销控' },
-        { key: '/event-orders',         icon: <FileTextOutlined />,        label: 'EO执行' },
-        { key: '/reservation-ai',      icon: <RobotOutlined />,           label: '预订AI' },
-        { key: '/reservation-analytics', icon: <PieChartOutlined />,     label: '预订分析' },
-        { key: '/floor-plan',          icon: <EnvironmentOutlined />,     label: '桌台平面图' },
-        { key: '/invitation-manager',  icon: <ShareAltOutlined />,        label: 'AI邀请函' },
+        { key: '/queue',                icon: <TeamOutlined />,            label: '排队叫号' },
+        { key: '/floor-plan',          icon: <EnvironmentOutlined />,     label: '桌台实况' },
         { key: '/service',              icon: <CustomerServiceOutlined />, label: '服务质量' },
+      ],
+    },
+    {
+      groupLabel: '宴会业务',
+      items: [
+        { key: '/reservation',          icon: <CalendarOutlined />,        label: '预订管理' },
+        { key: '/banquet-sales',        icon: <FundOutlined />,            label: '宴会销控' },
+        { key: '/event-orders',         icon: <FileTextOutlined />,        label: 'EO执行单' },
+        { key: '/reservation-analytics', icon: <PieChartOutlined />,     label: '预订分析' },
+        { key: '/reservation-ai',      icon: <RobotOutlined />,           label: 'AI预订助手' },
+        { key: '/invitation-manager',  icon: <ShareAltOutlined />,        label: 'AI邀请函' },
       ],
     },
     {
@@ -198,7 +205,8 @@ const DOMAIN_SIDEBAR: DomainSidebar = {
         { key: '/members',             icon: <UserOutlined />,      label: '会员中心' },
         { key: '/customer360',         icon: <UserOutlined />,      label: '客户360' },
         { key: '/private-domain',      icon: <TeamOutlined />,      label: '私域运营' },
-        { key: '/cdp-monitor',         icon: <DatabaseOutlined />,  label: 'CDP监控' },
+        { key: '/cdp-monitor',         icon: <DatabaseOutlined />,  label: '数据中台' },
+        { key: '/customer-risk',       icon: <SafetyOutlined />,    label: '客户风控' },
       ],
     },
     {
@@ -207,12 +215,6 @@ const DOMAIN_SIDEBAR: DomainSidebar = {
         { key: '/marketing',           icon: <RocketOutlined />,    label: '营销智能体' },
         { key: '/channel-profit',      icon: <ShopOutlined />,      label: '渠道毛利' },
         { key: '/channel-analytics',   icon: <ShareAltOutlined />,  label: '渠道分析' },
-      ],
-    },
-    {
-      groupLabel: '客户风控',
-      items: [
-        { key: '/customer-risk',       icon: <SafetyOutlined />,    label: '客户风控' },
       ],
     },
   ],
@@ -234,7 +236,7 @@ const DOMAIN_SIDEBAR: DomainSidebar = {
       groupLabel: '库存采购',
       items: [
         { key: '/inventory',           icon: <InboxOutlined />,        label: '库存管理' },
-        { key: '/order',               icon: <ShoppingCartOutlined />, label: '订单协同' },
+        { key: '/order',               icon: <ShoppingCartOutlined />, label: '采购协同' },
         { key: '/supplier-agent',      icon: <ShoppingOutlined />,     label: '供应商管理' },
         { key: '/reconciliation',      icon: <FileExcelOutlined />,    label: '对账管理' },
       ],
@@ -242,7 +244,7 @@ const DOMAIN_SIDEBAR: DomainSidebar = {
     {
       groupLabel: '损耗管控',
       items: [
-        { key: '/waste-reasoning',     icon: <FireOutlined />,         label: '损耗分析' },
+        { key: '/waste-reasoning',     icon: <FallOutlined />,         label: '损耗分析' },
         { key: '/waste-events',        icon: <WarningOutlined />,      label: '损耗事件' },
       ],
     },
@@ -272,7 +274,6 @@ const DOMAIN_SIDEBAR: DomainSidebar = {
       groupLabel: 'AI 管理',
       items: [
         { key: '/agent-hub',           icon: <RobotOutlined />,        label: 'Agent 总览' },
-        { key: '/decision',            icon: <BarChartOutlined />,     label: '经营决策' },
         { key: '/knowledge-rules',     icon: <DatabaseOutlined />,     label: '知识规则库' },
         { key: '/governance',          icon: <SafetyOutlined />,       label: 'AI 治理' },
       ],

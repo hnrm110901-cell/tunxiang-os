@@ -18,12 +18,12 @@ body,
 }
 
 body {
-  background-color: var(--bg, #0B1A20);
-  color: var(--text-primary, rgba(255,255,255,0.92));
+  background-color: var(--bg, #F5F6F8);
+  color: var(--text-primary, #1D2939);
   transition: background-color var(--transition-base), color var(--transition-base);
 }
 
-/* ── Scrollbar (v2 dark style) ── */
+/* ── Scrollbar ── */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -34,24 +34,12 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255,255,255,0.10);
+  background: var(--border, #E5E7EB);
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255,255,255,0.20);
-}
-
-[data-theme='light'] ::-webkit-scrollbar-track {
-  background: var(--bg-secondary, #FAFAFA);
-}
-
-[data-theme='light'] ::-webkit-scrollbar-thumb {
-  background: var(--border-color, #E8E8E8);
-}
-
-[data-theme='light'] ::-webkit-scrollbar-thumb:hover {
-  background: var(--text-tertiary, #BFBFBF);
+  background: var(--text-tertiary, #9CA3AF);
 }
 
 /* ── Utilities ── */
