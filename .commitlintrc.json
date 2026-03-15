@@ -1,0 +1,51 @@
+{
+  "extends": ["@commitlint/config-conventional"],
+  "rules": {
+    "type-enum": [
+      2,
+      "always",
+      [
+        "feat",
+        "fix",
+        "refactor",
+        "docs",
+        "test",
+        "chore",
+        "perf",
+        "ci",
+        "style",
+        "revert",
+        "build"
+      ]
+    ],
+    "scope-enum": [
+      1,
+      "always",
+      [
+        "kernel",
+        "api",
+        "web",
+        "ui",
+        "agents",
+        "models",
+        "services",
+        "platform",
+        "integrations",
+        "hr",
+        "pos",
+        "ci",
+        "deploy",
+        "db",
+        "auth",
+        "bff",
+        "im",
+        "sm",
+        "hq",
+        "chef",
+        "floor"
+      ]
+    ],
+    "subject-max-length": [2, "always", 100],
+    "body-max-line-length": [1, "always", 200]
+  }
+}

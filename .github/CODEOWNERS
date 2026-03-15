@@ -1,0 +1,37 @@
+# CODEOWNERS — 屯象OS 目录职责划分
+#
+# Claude Code: 架构设计、核心模块、复杂逻辑
+# Codex:       UI 组件、模块补全、代码重构
+# CLI:         自动化脚本、批量操作、CI 辅助
+#
+# GitHub 会根据此文件在 PR 中自动请求对应方 review
+
+# ── 核心架构（Claude Code 主导）──────────────────────────
+/apps/api-gateway/src/core/          @hnrm110901-cell
+/apps/api-gateway/src/agents/        @hnrm110901-cell
+/apps/api-gateway/src/models/        @hnrm110901-cell
+/apps/api-gateway/src/services/      @hnrm110901-cell
+/apps/api-gateway/src/api/           @hnrm110901-cell
+/apps/api-gateway/src/middleware/     @hnrm110901-cell
+/packages/agents/                    @hnrm110901-cell
+/packages/api-adapters/              @hnrm110901-cell
+
+# ── 前端 UI（Codex 主导）────────────────────────────────
+/apps/web/src/pages/                 @hnrm110901-cell
+/apps/web/src/design-system/         @hnrm110901-cell
+/apps/web/src/components/            @hnrm110901-cell
+/apps/web/src/layouts/               @hnrm110901-cell
+/apps/web/src/hooks/                 @hnrm110901-cell
+
+# ── CI/CD 与脚本（CLI 主导）─────────────────────────────
+/.github/                            @hnrm110901-cell
+/scripts/                            @hnrm110901-cell
+/k8s/                                @hnrm110901-cell
+/docker-compose*.yml                 @hnrm110901-cell
+Makefile                             @hnrm110901-cell
+
+# ── 共同维护 ────────────────────────────────────────────
+/apps/api-gateway/tests/             @hnrm110901-cell
+/apps/web/src/__tests__/             @hnrm110901-cell
+CLAUDE.md                           @hnrm110901-cell
+ARCHITECTURE.md                     @hnrm110901-cell
