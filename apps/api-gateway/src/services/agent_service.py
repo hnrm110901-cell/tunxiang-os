@@ -165,14 +165,42 @@ class AgentService:
                 "execution_time": 0.0,
             }
 
+        # 将 input_data 顶层字段合并到 params（前端有时直接传 store_id/period 等）
+        merged_params = {**{k: v for k, v in input_data.items() if k != "action"}, **params}
+        params = merged_params
+
         try:
             # Special handling for decision agent - use database service
-            if agent_type == "decision" and action == "get_decision_report":
+            if agent_type == "decision" and action in (
+                "get_decision_report", "analyze_kpi", "get_recommendations", "get_insights"
+            ):
                 from src.services.decision_service import decision_service
-                result_data = await decision_service.get_decision_report(
+                report = await decision_service.get_decision_report(
                     start_date=params.get("start_date"),
                     end_date=params.get("end_date")
                 )
+                # 按 action 映射到前端期望的字段
+                if action == "analyze_kpi":
+                    result_data = {
+                        "metrics": report.get("kpi_summary", {}).get("key_kpis", []),
+                        "kpi_summary": report.get("kpi_summary", {}),
+                        "overall_health_score": report.get("overall_health_score", 0),
+                    }
+                elif action == "get_recommendations":
+                    result_data = {
+                        "recommendations": report.get("recommendations_summary", {}).get(
+                            "critical_recommendations", []
+                        ),
+                        "total": report.get("recommendations_summary", {}).get("total_recommendations", 0),
+                    }
+                elif action == "get_insights":
+                    result_data = {
+                        "performance": report.get("insights_summary", {}).get("key_insights", []),
+                        "total_insights": report.get("insights_summary", {}).get("total_insights", 0),
+                    }
+                else:
+                    result_data = report
+
                 execution_time = time.time() - start_time
 
                 logger.info(
@@ -184,7 +212,7 @@ class AgentService:
 
                 return {
                     "success": True,
-                    "data": result_data,
+                    **result_data,
                     "error": None,
                     "execution_time": execution_time,
                     "metadata": {"source": "database"},
