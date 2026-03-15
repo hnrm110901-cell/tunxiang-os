@@ -280,7 +280,7 @@ const WasteReasoningPage: React.FC = () => {
           end_date:   end.format('YYYY-MM-DD'),
         },
       });
-      setReport(res.data);
+      setReport(res);
     } catch (err: any) {
       setError('加载损耗数据失败，请检查网络或联系管理员');
       handleApiError(err, '加载损耗数据失败');

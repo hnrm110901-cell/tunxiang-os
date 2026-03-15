@@ -52,9 +52,9 @@ async function loadKpiData(storeId: string) {
     apiClient.get(`/api/v1/energy/stores/${storeId}/anomalies`, { params: { limit: 20 } }),
   ]);
 
-  const bff     = bffRes.status     === 'fulfilled' ? bffRes.value.data     : null;
-  const energy  = energyRes.status  === 'fulfilled' ? energyRes.value.data  : null;
-  const anomalies = anomalyRes.status === 'fulfilled' ? anomalyRes.value.data : [];
+  const bff     = bffRes.status     === 'fulfilled' ? bffRes.value     : null;
+  const energy  = energyRes.status  === 'fulfilled' ? energyRes.value  : null;
+  const anomalies = anomalyRes.status === 'fulfilled' ? anomalyRes.value : [];
 
   return { bff, energy, anomalies };
 }
@@ -78,7 +78,7 @@ const DailyHubPage: React.FC = () => {
         apiClient.get(`/api/v1/daily-hub/${selectedStore}`),
         loadKpiData(selectedStore),
       ]);
-      if (boardRes.status === 'fulfilled') setBoard(boardRes.value.data);
+      if (boardRes.status === 'fulfilled') setBoard(boardRes.value);
       if (kpiData.status === 'fulfilled')  setKpi(kpiData.value);
     } finally {
       setLoading(false);
