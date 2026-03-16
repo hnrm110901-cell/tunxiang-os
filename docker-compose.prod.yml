@@ -55,11 +55,11 @@ services:
       qdrant:
         condition: service_started
     healthcheck:
-      test: ["CMD-SHELL", "python - <<'PY'\nimport sys, urllib.request\nurllib.request.urlopen('http://127.0.0.1:8000/api/v1/health', timeout=3)\nprint('ok')\nPY"]
+      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:8000/api/v1/ready || exit 1"]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 40s
+      retries: 5
+      start_period: 90s
 
   celery-worker:
     build:
