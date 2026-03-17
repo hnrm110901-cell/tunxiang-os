@@ -415,6 +415,17 @@ __all__ = [
     "PayslipRecord",
     # HR — 操作审计日志
     "OperationAuditLog",
+    # HR架构重构 M1
+    "Person",
+    "Assignment",
+    "AssignmentStatus",
+    "EmploymentType",
+    "PersonContract",
+    "SkillNode",
+    "Achievement",
+    "BehaviorPattern",
+    "RetentionSignal",
+    "KnowledgeCapture",
 ]
 
 from .agent_collab import AgentCollabSnapshot, AgentConflict, GlobalOptimizationLog
@@ -559,3 +570,13 @@ from .social_insurance import EmployeeSocialInsurance, SocialInsuranceConfig
 
 # HR Phase 4 — 培训认证/师徒制
 from .training import ExamAttempt, TrainingCourse, TrainingEnrollment, TrainingExam
+
+# HR架构重构 M1 — Person-Assignment-Contract + 知识OS层
+from .person import Person
+from .assignment import Assignment, AssignmentStatus, EmploymentType
+from .person_contract import PersonContract
+from .skill_node import SkillNode
+from .achievement import Achievement
+from .behavior_pattern import BehaviorPattern
+from .retention_signal import RetentionSignal
+from .knowledge_capture import KnowledgeCapture

@@ -1,23 +1,20 @@
 /**
- * PlatformAdminLayout — 屯象OS 企业管理后台
+ * PlatformAdminLayout — 屯象智能平台（Level 1）
  *
- * TOAST-style: 扁平分区导航 + 侧栏搜索 + 清晰视觉层级
- * 访问入口: admin.zlsjos.cn
- * 权限: admin 角色
+ * 四级管理体系第一级：管产品 · 管智能 · 管商户生命周期
+ * 用户：屯象科技内部（产品/研发/测试/客户成功）
+ * 路由：/platform
  */
 import React, { useState, useMemo } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
   DashboardOutlined,
-  ShopOutlined,
   BarChartOutlined,
-  ApiOutlined,
   SettingOutlined,
   LogoutOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
   BranchesOutlined,
-  SafetyOutlined,
   DatabaseOutlined,
   CloudServerOutlined,
   ExperimentOutlined,
@@ -25,29 +22,17 @@ import {
   RobotOutlined,
   GlobalOutlined,
   HomeOutlined,
-  HddOutlined,
-  UserOutlined,
-  TeamOutlined,
-  AppstoreOutlined,
-  KeyOutlined,
   SearchOutlined,
-  FileTextOutlined,
-  TransactionOutlined,
-  BankOutlined,
-  AccountBookOutlined,
-  ReconciliationOutlined,
-  ShoppingCartOutlined,
-  StarOutlined,
+  ShopOutlined,
+  KeyOutlined,
   SolutionOutlined,
-  MedicineBoxOutlined,
-  ThunderboltOutlined,
-  FundProjectionScreenOutlined,
-  NodeIndexOutlined,
-  LinkOutlined,
-  RadarChartOutlined,
+  BookOutlined,
+  DeploymentUnitOutlined,
+  RocketOutlined,
+  FundOutlined,
+  SafetyOutlined,
   AlertOutlined,
-  CheckCircleOutlined,
-  ControlOutlined,
+  TeamOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../contexts/AuthContext';
 import styles from './PlatformAdminLayout.module.css';
@@ -68,83 +53,40 @@ interface NavSection {
   items: NavItem[];
 }
 
-// ── 菜单结构（9 分区，34 项） ─────────────────────────────────
+// ── 菜单结构（4 分区，16 项） ─────────────────────────────────
 const NAV_SECTIONS: NavSection[] = [
   {
-    sectionKey: 'workspace',
-    title: '工作台',
-    icon: <HomeOutlined />,
+    sectionKey: 'product',
+    title: '产品工程',
+    icon: <RocketOutlined />,
     items: [
-      { key: 'home',      path: '/platform',           label: '控制台',   icon: <DashboardOutlined /> },
-      { key: 'analytics', path: '/platform/analytics', label: '效能分析', icon: <BarChartOutlined /> },
+      { key: 'home',          path: '/platform',               label: '控制台',     icon: <DashboardOutlined /> },
+      { key: 'analytics',     path: '/platform/analytics',     label: '效能分析',   icon: <BarChartOutlined /> },
+      { key: 'feature-flags', path: '/platform/feature-flags', label: '灰度发布',   icon: <BranchesOutlined /> },
     ],
   },
   {
-    sectionKey: 'merchants',
-    title: '商户',
-    icon: <ShopOutlined />,
-    items: [
-      { key: 'merchants',     path: '/platform/merchants',     label: '商户管理', icon: <ShopOutlined /> },
-      { key: 'stores',        path: '/platform/stores',        label: '门店管理', icon: <AppstoreOutlined /> },
-      { key: 'integrations',  path: '/platform/integrations',  label: '接入配置', icon: <ApiOutlined /> },
-      { key: 'open-platform', path: '/platform/open-platform', label: '开放平台', icon: <GlobalOutlined /> },
-    ],
-  },
-  {
-    sectionKey: 'users',
-    title: '用户',
-    icon: <TeamOutlined />,
-    items: [
-      { key: 'users', path: '/platform/users', label: '用户管理', icon: <UserOutlined /> },
-      { key: 'roles', path: '/platform/roles', label: '角色权限', icon: <KeyOutlined /> },
-    ],
-  },
-  {
-    sectionKey: 'finance',
-    title: '财务对账',
-    icon: <AccountBookOutlined />,
-    items: [
-      { key: 'e-invoices',        path: '/platform/e-invoices',        label: '电子发票',   icon: <FileTextOutlined /> },
-      { key: 'payment-recon',     path: '/platform/payment-recon',     label: '支付对账',   icon: <TransactionOutlined /> },
-      { key: 'bank-recon',        path: '/platform/bank-recon',        label: '银行对账',   icon: <BankOutlined /> },
-      { key: 'tri-recon',         path: '/platform/tri-recon',         label: '三角对账',   icon: <ReconciliationOutlined /> },
-      { key: 'financial-closing', path: '/platform/financial-closing', label: '日清日结',   icon: <AccountBookOutlined /> },
-      { key: 'omni-channel',     path: '/platform/omni-channel',      label: '全渠道营收', icon: <FundProjectionScreenOutlined /> },
-    ],
-  },
-  {
-    sectionKey: 'channels',
-    title: '渠道运营',
-    icon: <RadarChartOutlined />,
-    items: [
-      { key: 'eleme',          path: '/platform/eleme',          label: '饿了么',   icon: <ShoppingCartOutlined /> },
-      { key: 'douyin',         path: '/platform/douyin',         label: '抖音团购', icon: <ThunderboltOutlined /> },
-      { key: 'dianping',       path: '/platform/dianping',       label: '点评监控', icon: <StarOutlined /> },
-      { key: 'review-actions', path: '/platform/review-actions', label: '评论行动', icon: <AlertOutlined /> },
-    ],
-  },
-  {
-    sectionKey: 'supply-chain',
-    title: '供应链',
-    icon: <NodeIndexOutlined />,
-    items: [
-      { key: 'supplier-b2b',      path: '/platform/supplier-b2b',      label: '供应商B2B', icon: <LinkOutlined /> },
-      { key: 'supplier-intel',     path: '/platform/supplier-intel',    label: '供应商智能', icon: <ExperimentOutlined /> },
-      { key: 'auto-procurement',   path: '/platform/auto-procurement',  label: '智能采购',   icon: <ShoppingCartOutlined /> },
-      { key: 'food-safety',       path: '/platform/food-safety',       label: '食品安全',   icon: <SafetyOutlined /> },
-      { key: 'health-certs',      path: '/platform/health-certs',      label: '健康证管理', icon: <MedicineBoxOutlined /> },
-    ],
-  },
-  {
-    sectionKey: 'ai',
-    title: 'AI 引擎',
+    sectionKey: 'intelligence',
+    title: '智能引擎',
     icon: <RobotOutlined />,
     items: [
-      { key: 'agents',            path: '/platform/agents',            label: 'Agent 监控',   icon: <RobotOutlined /> },
-      { key: 'ontology',          path: '/platform/ontology',          label: '本体图谱',     icon: <ExperimentOutlined /> },
-      { key: 'data-sovereignty',  path: '/platform/data-sovereignty',  label: '数据主权',     icon: <SafetyOutlined /> },
-      { key: 'compliance-engine', path: '/platform/compliance-engine', label: '合规引擎',     icon: <CheckCircleOutlined /> },
-      { key: 'command-center',    path: '/platform/command-center',    label: '指挥中心',     icon: <ControlOutlined />, badge: 'new' },
+      { key: 'agents',          path: '/platform/agents',          label: 'Agent 编排',   icon: <RobotOutlined /> },
+      { key: 'ontology',        path: '/platform/ontology',        label: '本体图谱',     icon: <ExperimentOutlined /> },
+      { key: 'model-versions',  path: '/platform/model-versions',  label: '模型版本',     icon: <DeploymentUnitOutlined />, badge: 'new' },
+      { key: 'prompt-warehouse',path: '/platform/prompt-warehouse',label: '提示词仓库',   icon: <BookOutlined />, badge: 'new' },
+      { key: 'cross-learning',  path: '/platform/cross-learning',  label: '全网学习',     icon: <FundOutlined />, badge: 'new' },
+    ],
+  },
+  {
+    sectionKey: 'lifecycle',
+    title: '商户生命周期',
+    icon: <ShopOutlined />,
+    items: [
+      { key: 'merchants',     path: '/platform/merchants',     label: '商户管理',   icon: <ShopOutlined /> },
+      { key: 'module-auth',   path: '/platform/module-auth',   label: '模块授权',   icon: <KeyOutlined />, badge: 'new' },
+      { key: 'key-mgmt',      path: '/platform/key-mgmt',      label: '密钥管理',   icon: <SafetyOutlined />, badge: 'new' },
+      { key: 'delivery',      path: '/platform/delivery',      label: '实施跟踪',   icon: <SolutionOutlined />, badge: 'new' },
+      { key: 'renewal-alert', path: '/platform/renewal-alert', label: '续费预警',   icon: <AlertOutlined />, badge: 'new' },
     ],
   },
   {
@@ -152,20 +94,12 @@ const NAV_SECTIONS: NavSection[] = [
     title: '平台运维',
     icon: <CloudServerOutlined />,
     items: [
-      { key: 'monitoring',      path: '/platform/monitoring',      label: '系统监控', icon: <CloudServerOutlined /> },
-      { key: 'feature-flags',   path: '/platform/feature-flags',   label: '灰度发布', icon: <BranchesOutlined />, badge: 'new' },
-      { key: 'audit-log',       path: '/platform/audit-log',       label: '审计日志', icon: <AuditOutlined /> },
-      { key: 'backup',          path: '/platform/backup',          label: '备份管理', icon: <DatabaseOutlined /> },
-      { key: 'edge-nodes',      path: '/platform/edge-nodes',      label: '边缘节点', icon: <HddOutlined />, badge: 'new' },
-      { key: 'integration-hub', path: '/platform/integration-hub', label: '集成中心', icon: <SolutionOutlined /> },
-    ],
-  },
-  {
-    sectionKey: 'settings',
-    title: '设置',
-    icon: <SettingOutlined />,
-    items: [
-      { key: 'settings', path: '/platform/settings', label: '系统设置', icon: <SettingOutlined /> },
+      { key: 'monitoring', path: '/platform/monitoring', label: '系统监控', icon: <CloudServerOutlined /> },
+      { key: 'audit-log',  path: '/platform/audit-log',  label: '审计日志', icon: <AuditOutlined /> },
+      { key: 'backup',     path: '/platform/backup',     label: '备份管理', icon: <DatabaseOutlined /> },
+      { key: 'open-platform', path: '/platform/open-platform', label: '开放平台', icon: <GlobalOutlined /> },
+      { key: 'users',      path: '/platform/users',      label: '平台用户', icon: <TeamOutlined /> },
+      { key: 'settings',   path: '/platform/settings',   label: '系统设置', icon: <SettingOutlined /> },
     ],
   },
 ];
@@ -182,7 +116,7 @@ function getBreadcrumb(pathname: string): React.ReactNode {
   if (pathname.startsWith('/platform/merchants/') && pathname !== '/platform/merchants') {
     return (
       <>
-        <span className={styles.breadcrumbItem}>商户</span>
+        <span className={styles.breadcrumbItem}>商户生命周期</span>
         <span className={styles.breadcrumbSep}>/</span>
         <span className={styles.breadcrumbItem}>商户管理</span>
         <span className={styles.breadcrumbSep}>/</span>
@@ -217,7 +151,6 @@ const PlatformAdminLayout: React.FC = () => {
     navigate('/login');
   };
 
-  // 搜索过滤菜单项
   const filteredSections = useMemo(() => {
     if (!search.trim()) return NAV_SECTIONS;
     const q = search.trim().toLowerCase();
@@ -238,22 +171,19 @@ const PlatformAdminLayout: React.FC = () => {
 
   return (
     <div className={styles.shell}>
-      {/* ── 侧栏 ── */}
       <aside className={`${styles.sidebar} ${collapsed ? styles.sidebarCollapsed : ''}`}>
-        {/* Logo */}
         <div className={styles.logoArea} onClick={() => navigate('/platform')}>
           <div className={styles.logoMark}>
             <img src="/logo-icon.svg" alt="屯象" className={styles.logoImg} />
           </div>
           {!collapsed && (
             <div className={styles.logoText}>
-              <span className={styles.logoName}>屯象OS</span>
-              <span className={styles.logoSub}>Enterprise Admin</span>
+              <span className={styles.logoName}>屯象智能平台</span>
+              <span className={styles.logoSub}>Platform Engine</span>
             </div>
           )}
         </div>
 
-        {/* 搜索 */}
         {!collapsed && (
           <div className={styles.searchWrap}>
             <SearchOutlined className={styles.searchIcon} />
@@ -266,7 +196,6 @@ const PlatformAdminLayout: React.FC = () => {
           </div>
         )}
 
-        {/* 导航 */}
         <nav className={styles.nav}>
           {filteredSections.map((sec) => (
             <div key={sec.sectionKey} className={styles.section}>
@@ -311,7 +240,6 @@ const PlatformAdminLayout: React.FC = () => {
           ))}
         </nav>
 
-        {/* 底部用户 */}
         <div className={styles.sidebarFooter}>
           {!collapsed && (
             <div className={styles.userCard}>
@@ -337,9 +265,7 @@ const PlatformAdminLayout: React.FC = () => {
         </div>
       </aside>
 
-      {/* ── 主区域 ── */}
       <div className={styles.main}>
-        {/* 顶栏 */}
         <header className={styles.topbar}>
           <button
             className={styles.collapseBtn}
@@ -348,18 +274,14 @@ const PlatformAdminLayout: React.FC = () => {
           >
             {collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
           </button>
-
           <div className={styles.breadcrumb}>
             {getBreadcrumb(location.pathname)}
           </div>
-
           <div className={styles.topbarRight}>
             <span className={styles.envBadge}>PROD</span>
             <span className={styles.versionTag}>v0.1.0</span>
           </div>
         </header>
-
-        {/* 内容 */}
         <main className={styles.content}>
           <Outlet />
         </main>

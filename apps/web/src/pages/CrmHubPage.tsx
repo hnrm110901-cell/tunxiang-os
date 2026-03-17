@@ -5,6 +5,15 @@ import {
   TeamOutlined,
   RiseOutlined,
   WarningOutlined,
+  SearchOutlined,
+  MobileOutlined,
+  BarChartOutlined,
+  BulbOutlined,
+  MessageOutlined,
+  DollarOutlined,
+  ClockCircleOutlined,
+  ThunderboltOutlined,
+  RadarChartOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../services/api';
@@ -74,12 +83,12 @@ const SIGNAL_URGENCY_TYPE: Record<string, 'critical' | 'warning' | 'default'> = 
 // ── Quick nav ─────────────────────────────────────────────────────────────────
 
 const QUICK_NAV = [
-  { icon: '👥', label: '会员中心',   route: '/members' },
-  { icon: '🔍', label: '客户360',   route: '/customer360' },
-  { icon: '📱', label: '私域运营',   route: '/private-domain' },
-  { icon: '📊', label: '渠道毛利',   route: '/channel-profit' },
-  { icon: '💡', label: '推荐引擎',   route: '/recommendations' },
-  { icon: '💬', label: '企微触发器', route: '/wechat-triggers' },
+  { icon: <TeamOutlined style={{ fontSize: 22, color: '#0AAF9A' }} />,          label: '会员中心',   route: '/members' },
+  { icon: <SearchOutlined style={{ fontSize: 22, color: '#722ed1' }} />,        label: '客户360',   route: '/customer360' },
+  { icon: <MobileOutlined style={{ fontSize: 22, color: '#1A7A52' }} />,        label: '私域运营',   route: '/private-domain' },
+  { icon: <BarChartOutlined style={{ fontSize: 22, color: '#C8923A' }} />,      label: '渠道毛利',   route: '/channel-profit' },
+  { icon: <BulbOutlined style={{ fontSize: 22, color: '#eb2f96' }} />,          label: '推荐引擎',   route: '/recommendations' },
+  { icon: <MessageOutlined style={{ fontSize: 22, color: '#1890ff' }} />,       label: '企微触发器', route: '/wechat-triggers' },
 ];
 
 // ── Demo fallback data ────────────────────────────────────────────────────────
@@ -243,12 +252,12 @@ export default function CrmHubPage() {
   const churnTotal = stats?.dormant_count ?? DEMO_STATS.dormant_count;
 
   const KPI_ITEMS = [
-    { icon: '👥', bg: '#e6f4ff', label: '会员总量',   value: fmtNum(d.total_members),        unit: '人' },
-    { icon: '🆕', bg: 'rgba(26,122,82,0.08)', label: '本月新增',   value: `+${d.new_this_month}`,         unit: '人', sub: '较上月 +8%' },
-    { icon: '🔄', bg: '#fff0f6', label: '复购率',     value: `${d.repurchase_rate.toFixed(1)}`, unit: '%' },
-    { icon: '😴', bg: 'rgba(200,146,58,0.08)', label: '沉睡会员',   value: fmtNum(d.dormant_count),        unit: '人', warn: '需唤醒' },
-    { icon: '💰', bg: '#f9f0ff', label: '储值余额',   value: `¥${fmtMoney(d.stored_value_yuan)}` },
-    { icon: '📡', bg: '#e6fffb', label: '私域触达率', value: `${d.reach_rate.toFixed(1)}`,   unit: '%' },
+    { icon: <TeamOutlined style={{ color: '#1890ff' }} />,             bg: 'rgba(24,144,255,0.06)', label: '会员总量',   value: fmtNum(d.total_members),          unit: '人' },
+    { icon: <UserAddOutlined style={{ color: '#1A7A52' }} />,          bg: 'rgba(26,122,82,0.06)',  label: '本月新增',   value: `+${d.new_this_month}`,           unit: '人', sub: '较上月 +8%' },
+    { icon: <ReloadOutlined style={{ color: '#eb2f96' }} />,           bg: 'rgba(235,47,150,0.06)', label: '复购率',     value: `${d.repurchase_rate.toFixed(1)}`, unit: '%' },
+    { icon: <ClockCircleOutlined style={{ color: '#C8923A' }} />,      bg: 'rgba(200,146,58,0.06)', label: '沉睡会员',   value: fmtNum(d.dormant_count),          unit: '人', warn: '需唤醒' },
+    { icon: <DollarOutlined style={{ color: '#722ed1' }} />,           bg: 'rgba(114,46,209,0.06)', label: '储值余额',   value: `¥${fmtMoney(d.stored_value_yuan)}` },
+    { icon: <RadarChartOutlined style={{ color: '#0AAF9A' }} />,       bg: 'rgba(10,175,154,0.06)', label: '私域触达率', value: `${d.reach_rate.toFixed(1)}`,     unit: '%' },
   ];
 
   return (
@@ -402,7 +411,7 @@ export default function CrmHubPage() {
               className={css.quickNavItem}
               onClick={() => navigate(n.route)}
             >
-              <span className={css.quickNavIcon}>{n.icon}</span>
+              <span className={css.quickNavIcon} aria-hidden>{n.icon}</span>
               <span className={css.quickNavLabel}>{n.label}</span>
             </button>
           ))}

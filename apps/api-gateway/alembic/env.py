@@ -49,6 +49,16 @@ import src.models.social_insurance  # noqa: F401
 import src.models.employee_growth  # noqa: F401
 import src.models.brand_im_config  # noqa: F401
 
+# HR架构重构 M1 — Person-Assignment-Contract + 知识OS层
+import src.models.person  # noqa: F401
+import src.models.assignment  # noqa: F401
+import src.models.person_contract  # noqa: F401
+import src.models.skill_node  # noqa: F401
+import src.models.achievement  # noqa: F401
+import src.models.behavior_pattern  # noqa: F401
+import src.models.retention_signal  # noqa: F401
+import src.models.knowledge_capture  # noqa: F401
+
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
