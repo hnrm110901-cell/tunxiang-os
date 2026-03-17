@@ -226,16 +226,14 @@ async def _fetch_source_breakdown(store_id: str, db: AsyncSession) -> Dict[str, 
         """),
         {"store_id": store_id},
     )
-    breakdown = {"weishenghuo": 0, "aoqiwei_crm": 0, "pinzhi": 0}
+    breakdown = {"aoqiwei_crm": 0, "pinzhi": 0}
     for row in result.mappings():
         src = row["source"]
         if src in breakdown:
             breakdown[src] = row["cnt"]
         else:
-            # 映射常见名称变体
-            if "weishenghuo" in src.lower() or "wsh" in src.lower():
-                breakdown["weishenghuo"] += row["cnt"]
-            elif "aoqiwei" in src.lower() or "aqw" in src.lower():
+            # 映射常见名称变体（微生活即奥琦玮CRM，统一归入 aoqiwei_crm）
+            if "aoqiwei" in src.lower() or "aqw" in src.lower() or "weishenghuo" in src.lower() or "wsh" in src.lower():
                 breakdown["aoqiwei_crm"] += row["cnt"]
             elif "pinzhi" in src.lower() or "pz" in src.lower():
                 breakdown["pinzhi"] += row["cnt"]
@@ -324,7 +322,7 @@ async def list_store_members(
     search: Optional[str] = Query(default=None, description="按手机号/姓名搜索"),
     level: Optional[str] = Query(default=None, description="按等级筛选"),
     lifecycle: Optional[str] = Query(default=None, description="按生命周期筛选: 新客/活跃/沉睡/流失"),
-    source: Optional[str] = Query(default=None, description="按来源筛选: weishenghuo/aoqiwei_crm/pinzhi"),
+    source: Optional[str] = Query(default=None, description="按来源筛选: aoqiwei_crm/pinzhi"),
     db: AsyncSession = Depends(get_db),
 ):
     """

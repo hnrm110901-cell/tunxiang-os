@@ -1,7 +1,7 @@
 """
 奥琦玮 CRM 开放平台适配器（会员 & 交易接口）
 
-Base URL: https://welcrm.com
+Base URL: https://api.acewill.net (原 welcrm.com)
 文档: https://www.yuque.com/acewillomp/odh93w（密码: cw01）
 
 签名算法（官方 PHP demo 还原，必须严格遵守）：
@@ -106,9 +106,9 @@ class AoqiweiCrmAdapter:
     """
     奥琦玮 CRM 会员 & 交易接口适配器。
 
-    对应奥琦玮系统：welcrm.com（非供应链 openapi.acescm.cn）。
+    对应奥琦玮系统：api.acewill.net（原 welcrm.com，非供应链 openapi.acescm.cn）。
     环境变量：
-        AOQIWEI_CRM_BASE_URL — 默认 https://welcrm.com
+        AOQIWEI_CRM_BASE_URL — 默认 https://api.acewill.net
         AOQIWEI_CRM_APPID    — CRM AppID
         AOQIWEI_CRM_APPKEY   — CRM AppKey（签名密钥，不发送到请求体）
         AOQIWEI_CRM_TIMEOUT  — 超时秒数，默认 30
@@ -117,7 +117,7 @@ class AoqiweiCrmAdapter:
 
     def __init__(self, config: Dict[str, Any]) -> None:
         self.base_url = config.get(
-            "base_url", os.getenv("AOQIWEI_CRM_BASE_URL", "https://welcrm.com")
+            "base_url", os.getenv("AOQIWEI_CRM_BASE_URL", "https://api.acewill.net")
         )
         self.appid = config.get("appid", os.getenv("AOQIWEI_CRM_APPID", ""))
         self.appkey = config.get("appkey", os.getenv("AOQIWEI_CRM_APPKEY", ""))
