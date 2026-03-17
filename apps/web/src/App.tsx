@@ -936,7 +936,6 @@ const AppContent: React.FC = () => {
                     <ProtectedRoute><ReservationAnalyticsPage /></ProtectedRoute>
                   } />
                 </Route>
-                <Route path="*" element={<NotFoundPage />} />
 
                 {/* ── 企业管理后台 /platform (admin.zlsjos.cn) ── */}
                 <Route path="/platform" element={
@@ -1084,6 +1083,9 @@ const AppContent: React.FC = () => {
                   <Route path="training"   element={<MyTrainingPage />} />
                   <Route path="profile"    element={<EmployeePortal />} />
                 </Route>
+
+                {/* 404 通配符必须放在所有路由最后 */}
+                <Route path="*" element={<NotFoundPage />} />
               </Routes>
             </Suspense>
           </ErrorBoundary>
