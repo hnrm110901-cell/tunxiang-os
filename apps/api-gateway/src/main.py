@@ -1051,6 +1051,11 @@ from src.api import hr_decision_flywheel
 
 app.include_router(hr_decision_flywheel.router, prefix="/api/v1", tags=["decision_flywheel"])
 
+# 知识OS层 — 技能图谱 / 知识采集 / 技能护照 / 行为模式 / 离职风险
+from src.api.knowledge import router as knowledge_router
+
+app.include_router(knowledge_router, tags=["knowledge"])
+
 # Month 1 (P0) — 外部集成
 app.include_router(e_invoice.router, prefix="/api/v1", tags=["e-invoices"])
 app.include_router(eleme.router, tags=["eleme"])
