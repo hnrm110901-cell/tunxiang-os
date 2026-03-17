@@ -5711,15 +5711,15 @@ def pull_aoqiwei_daily_supply(self) -> Dict[str, Any]:
     """
     拉取奥琦玮供应链昨日采购入库单 + 当前库存快照，写入 DB。
 
-    注意：奥琦玮 POS 订单为 push 模型（POS 向我方推送），无 pull API；
-    此任务仅处理供应链（inventory/purchase）数据。
+    当前对接客户：尝在一起（base_url: czyqss.scmacewill.cn）
 
-    环境变量：
-      AOQIWEI_BASE_URL    — API 基础地址（默认 https://openapi.acescm.cn）
-      AOQIWEI_APP_KEY     — AppKey（必填；缺失则跳过）
-      AOQIWEI_APP_SECRET  — AppSecret（必填；缺失则跳过）
-      AOQIWEI_SHOP_CODE   — 默认门店 shopCode
-      AOQIWEI_SHOP_CODE_{store_id} — 门店级 shopCode（优先）
+    凭证来源（优先级）：
+      1. external_systems 表 provider='aoqiwei_scm'（由 seed_real_merchants.py 写入）
+      2. 环境变量 AOQIWEI_BASE_URL / AOQIWEI_APP_KEY / AOQIWEI_APP_SECRET（fallback）
+
+    门店 shopCode：
+      AOQIWEI_SHOP_CODE_{store_id} — 门店级（优先）
+      AOQIWEI_SHOP_CODE            — 默认
 
     Returns:
         {success, date, stores_processed, purchase_orders_saved, stock_snapshots, errors}
@@ -5728,39 +5728,14 @@ def pull_aoqiwei_daily_supply(self) -> Dict[str, Any]:
     async def _run():
         from datetime import date, timedelta
 
-        from sqlalchemy import select
+        from sqlalchemy import select, text as _t
 
         from ..core.database import get_db_session
         from ..models.store import Store
 
-        app_key = os.getenv("AOQIWEI_APP_KEY", "")
-        app_secret = os.getenv("AOQIWEI_APP_SECRET", "")
-
-        if not app_key or not app_secret:
-            logger.warning("aoqiwei_supply_pull.skipped", reason="AOQIWEI_APP_KEY or AOQIWEI_APP_SECRET not configured")
-            return {
-                "success": True,
-                "skipped": True,
-                "stores_processed": 0,
-                "purchase_orders_saved": 0,
-                "stock_snapshots": 0,
-                "errors": [],
-            }
-
         yesterday = (date.today() - timedelta(days=1)).strftime("%Y-%m-%d")
-        base_url = os.getenv("AOQIWEI_BASE_URL", "https://openapi.acescm.cn")
 
         from packages.api_adapters.aoqiwei.src.adapter import AoqiweiAdapter
-
-        adapter = AoqiweiAdapter(
-            {
-                "base_url": base_url,
-                "app_key": app_key,
-                "app_secret": app_secret,
-                "timeout": int(os.getenv("AOQIWEI_TIMEOUT", "30")),
-                "retry_times": int(os.getenv("AOQIWEI_RETRY_TIMES", "3")),
-            }
-        )
 
         stores_processed = 0
         purchase_orders_saved = 0
@@ -5769,6 +5744,53 @@ def pull_aoqiwei_daily_supply(self) -> Dict[str, Any]:
 
         try:
             async with get_db_session() as session:
+                # 优先从 external_systems 表读取供应链凭证（provider='aoqiwei_scm'）
+                scm_rows = await session.execute(
+                    _t("""
+                        SELECT api_endpoint, api_key, api_secret, config
+                        FROM external_systems
+                        WHERE provider = 'aoqiwei_scm'
+                          AND status = 'active'
+                        LIMIT 10
+                    """)
+                )
+                scm_configs = scm_rows.mappings().all()
+
+                if scm_configs:
+                    # 从 DB 读取凭证（seed_real_merchants.py 写入）
+                    scm_cfg = scm_configs[0]
+                    base_url = scm_cfg["api_endpoint"]
+                    app_key = scm_cfg["api_key"]
+                    app_secret = scm_cfg["api_secret"]
+                    logger.info("aoqiwei_supply_pull.config_from_db", base_url=base_url)
+                else:
+                    # Fallback: 环境变量
+                    app_key = os.getenv("AOQIWEI_APP_KEY", "")
+                    app_secret = os.getenv("AOQIWEI_APP_SECRET", "")
+                    base_url = os.getenv("AOQIWEI_BASE_URL", "https://openapi.acescm.cn")
+                    logger.info("aoqiwei_supply_pull.config_from_env", base_url=base_url)
+
+                if not app_key or not app_secret:
+                    logger.warning("aoqiwei_supply_pull.skipped", reason="供应链凭证未配置（DB和环境变量均为空）")
+                    return {
+                        "success": True,
+                        "skipped": True,
+                        "stores_processed": 0,
+                        "purchase_orders_saved": 0,
+                        "stock_snapshots": 0,
+                        "errors": [],
+                    }
+
+                adapter = AoqiweiAdapter(
+                    {
+                        "base_url": base_url,
+                        "app_key": app_key,
+                        "app_secret": app_secret,
+                        "timeout": int(os.getenv("AOQIWEI_TIMEOUT", "30")),
+                        "retry_times": int(os.getenv("AOQIWEI_RETRY_TIMES", "3")),
+                    }
+                )
+
                 result = await session.execute(select(Store).where(Store.is_active.is_(True)))
                 stores = result.scalars().all()
 

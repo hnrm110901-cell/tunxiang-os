@@ -89,6 +89,12 @@ MERCHANTS = [
             "app_key": "3d2eaa5f9b9a6a6746a18d28e770b501",
             "merchant_id": "1275413383",  # ✅ 已配置
         },
+        # 奥琦玮供应链配置（尝在一起专属实例）
+        "aoqiwei_scm": {
+            "base_url": "http://czyqss.scmacewill.cn",
+            "app_key": "changzaiyiqi",
+            "app_secret": "WmRpv8OlR1UR",
+        },
         "stores": [
             {
                 "id": "CZYZ-2461",
@@ -528,7 +534,28 @@ def seed():
                 brand_id=brand_id,
             )
 
-            # 6. 卡券中心（仅尚宫厨）
+            # 6. 奥琦玮供应链集成（仅配置了 aoqiwei_scm 的商户）
+            if "aoqiwei_scm" in m:
+                scm = m["aoqiwei_scm"]
+                upsert_external_system(
+                    session=session,
+                    name=f"奥琦玮供应链 - {brand_name}",
+                    sys_type=IntegrationType.SUPPLIER,
+                    provider="aoqiwei_scm",
+                    api_endpoint=scm["base_url"],
+                    api_key=scm["app_key"],
+                    api_secret=scm["app_secret"],
+                    store_id=None,  # 品牌级别
+                    config={
+                        "aoqiwei_scm_base_url": scm["base_url"],
+                        "aoqiwei_scm_app_key": scm["app_key"],
+                        "sign_algorithm": "MD5(sorted_params+appSecret)",
+                        "brand_id": brand_id,
+                    },
+                    brand_id=brand_id,
+                )
+
+            # 7. 卡券中心（仅尚宫厨）
             if "aoqiwei_coupon" in m:
                 coupon = m["aoqiwei_coupon"]
                 upsert_external_system(
