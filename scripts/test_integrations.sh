@@ -27,20 +27,24 @@ AUTH="Authorization:Bearer $TK"
 echo ""
 echo "[2/5] 商户列表..."
 MERCHANTS=$(curl -s "$API/api/v1/merchants" -H "$AUTH")
-echo "$MERCHANTS" | python3 -c '
-import sys,json
+echo "$MERCHANTS" | python3 << 'PYEOF'
+import sys, json
 try:
-    data=json.load(sys.stdin)
+    data = json.load(sys.stdin)
     if isinstance(data, list):
         for m in data:
-            print(f"  {m.get(\"brand_name\",\"?\")} ({m.get(\"brand_id\",\"?\")}) - {m.get(\"store_count\",0)}店 - {m.get(\"status\",\"?\")}")
-    elif isinstance(data, dict) and "detail" in data:
-        print(f"  错误: {data[\"detail\"]}")
+            name = m.get('brand_name', '?')
+            bid = m.get('brand_id', '?')
+            cnt = m.get('store_count', 0)
+            st = m.get('status', '?')
+            print(f"  {name} ({bid}) - {cnt}店 - {st}")
+    elif isinstance(data, dict) and 'detail' in data:
+        print(f"  错误: {data['detail']}")
     else:
-        print(f"  响应: {json.dumps(data,ensure_ascii=False)[:300]}")
+        print(f"  响应: {json.dumps(data, ensure_ascii=False)[:300]}")
 except Exception as e:
     print(f"  解析失败: {e}")
-'
+PYEOF
 
 # 3. 查看已有订单
 echo ""
@@ -61,42 +65,51 @@ SYNC_RESULT=$(curl -s -X POST "$API/api/v1/integrations/pos-sync" \
   -H 'Content-Type:application/json' \
   -d "{\"adapter\":\"pinzhi\",\"sync_date\":\"$YESTERDAY\",\"store_ids\":[\"CZYZ-2461\"]}")
 
-echo "$SYNC_RESULT" | python3 -c '
-import sys,json
+echo "$SYNC_RESULT" | python3 << 'PYEOF'
+import sys, json
 try:
-    d=json.load(sys.stdin)
-    if "stores" in d:
-        for s in d["stores"]:
-            print(f"  门店: {s.get("store_name","?")} | DB订单: {s.get("orders_in_db",0)} | POS订单: {s.get("pos_orders",0)} | 差异: {s.get("diff_orders",0)}")
-        print(f"  同步成功: {d.get("success",False)}")
-    elif "detail" in d:
-        print(f"  错误: {d["detail"]}")
+    d = json.load(sys.stdin)
+    if 'stores' in d:
+        for s in d['stores']:
+            sn = s.get('store_name', '?')
+            db_o = s.get('orders_in_db', 0)
+            pos_o = s.get('pos_orders', 0)
+            diff = s.get('diff_orders', 0)
+            print(f"  门店: {sn} | DB订单: {db_o} | POS订单: {pos_o} | 差异: {diff}")
+        print(f"  同步成功: {d.get('success', False)}")
+    elif 'detail' in d:
+        print(f"  错误: {d['detail']}")
     else:
-        print(f"  响应: {json.dumps(d,ensure_ascii=False)[:300]}")
-except:
-    print(f"  原始响应: {sys.stdin.read()[:300] if hasattr(sys.stdin,"read") else "解析失败"}")
-' 2>/dev/null
+        print(f"  响应: {json.dumps(d, ensure_ascii=False)[:300]}")
+except Exception as e:
+    raw = str(e)
+    print(f"  解析异常: {raw}")
+PYEOF
 
-# 5. 品智健康检查
+# 5. 外部系统健康检查
 echo ""
-echo "[5/5] 适配器健康检查..."
+echo "[5/5] 外部系统健康检查..."
 HEALTH=$(curl -s "$API/api/v1/external-systems" -H "$AUTH" 2>/dev/null)
 if [ -n "$HEALTH" ]; then
-  echo "$HEALTH" | python3 -c '
-import sys,json
+  echo "$HEALTH" | python3 << 'PYEOF'
+import sys, json
 try:
-    d=json.load(sys.stdin)
-    if isinstance(d,dict):
-        for k,v in d.items():
-            st=v.get("status","?") if isinstance(v,dict) else v
-            print(f"  {k}: {st}")
+    d = json.load(sys.stdin)
+    if isinstance(d, dict):
+        for k, v in d.items():
+            if isinstance(v, dict):
+                st = v.get('status', '?')
+                msg = v.get('message', '')
+                print(f"  {k}: {st} {msg}")
+            else:
+                print(f"  {k}: {v}")
     else:
-        print(f"  {json.dumps(d,ensure_ascii=False)[:200]}")
+        print(f"  {json.dumps(d, ensure_ascii=False)[:200]}")
 except:
     pass
-' 2>/dev/null
+PYEOF
 else
-  echo "  (无健康检查端点或无响应)"
+  echo "  (无响应)"
 fi
 
 echo ""
