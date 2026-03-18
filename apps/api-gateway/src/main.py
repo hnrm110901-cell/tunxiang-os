@@ -972,6 +972,11 @@ from src.api import bff_member_profile
 
 app.include_router(bff_member_profile.router, tags=["BFF-会员画像"])
 
+# BFF 发券（P2 双轨发券：微生活券透传 + 屯象服务券）
+from src.api import bff_coupon
+
+app.include_router(bff_coupon.router, tags=["BFF-发券"])
+
 # v2.0 MVP — 决策中枢（Top3 + 手动推送 + 场景识别）
 from src.api import decision_hub, monthly_report
 
