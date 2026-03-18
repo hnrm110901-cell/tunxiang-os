@@ -678,7 +678,7 @@ const AppContent: React.FC = () => {
                     <ProtectedRoute requiredRole="admin"><ApprovalManagementPage /></ProtectedRoute>
                   } />
                   <Route path="stores" element={
-                    <ProtectedRoute requiredRole="admin"><StoreManagementPage /></ProtectedRoute>
+                    <ProtectedRoute><StoreManagementPage /></ProtectedRoute>
                   } />
                   <Route path="export-jobs" element={
                     <ProtectedRoute requiredRole="admin"><ExportJobsPage /></ProtectedRoute>

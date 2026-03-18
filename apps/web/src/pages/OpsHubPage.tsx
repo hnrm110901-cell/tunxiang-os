@@ -10,6 +10,7 @@
  */
 import React, { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useUserStores } from '../hooks/useUserStores';
 import {
   ReloadOutlined, TeamOutlined, ClockCircleOutlined, HeartOutlined,
   StarOutlined, CheckCircleOutlined, WarningOutlined, CalendarOutlined,
@@ -133,7 +134,7 @@ const PRIORITY_BADGE_TYPE: Record<Priority, 'critical' | 'warning' | 'info'> = {
 const OpsHubPage: React.FC = () => {
   const navigate = useNavigate();
 
-  const [stores,        setStores]        = useState<any[]>([]);
+  const { stores: userStores, currentStoreId, loading: storesLoading } = useUserStores();
   const [selectedStore, setSelectedStore] = useState(localStorage.getItem('store_id') || '');
 
   const [bffLoading,  setBffLoading]  = useState(true);
@@ -144,12 +145,13 @@ const OpsHubPage: React.FC = () => {
 
   // ── Loaders ──────────────────────────────────────────────────────────────────
 
-  const loadStores = useCallback(async () => {
-    try {
-      const res = await apiClient.get('/api/v1/stores');
-      setStores(res.data?.stores || res.data || []);
-    } catch { /* silent */ }
-  }, []);
+  // 当 useUserStores 加载完毕且 selectedStore 为空时，自动选中默认门店
+  useEffect(() => {
+    if (!storesLoading && currentStoreId && !selectedStore) {
+      setSelectedStore(currentStoreId);
+      localStorage.setItem('store_id', currentStoreId);
+    }
+  }, [storesLoading, currentStoreId, selectedStore]);
 
   const loadBff = useCallback(async () => {
     setBffLoading(true);
@@ -188,7 +190,7 @@ const OpsHubPage: React.FC = () => {
 
   const refresh = useCallback(() => { loadBff(); loadBoard(); }, [loadBff, loadBoard]);
 
-  useEffect(() => { loadStores(); }, [loadStores]);
+  // stores 来自 useUserStores，不再手动加载
   useEffect(() => { refresh(); }, [refresh]);
 
   // ── Derived data ──────────────────────────────────────────────────────────────
@@ -286,8 +288,8 @@ const OpsHubPage: React.FC = () => {
 
   const loading = bffLoading || boardLoading;
 
-  const storeOptions = stores.length > 0
-    ? stores.map((s: any) => ({ value: s.store_id || s.id, label: s.name || s.store_id || s.id }))
+  const storeOptions = userStores.length > 0
+    ? userStores.map((s) => ({ value: s.id, label: s.name || s.id }))
     : [];
 
   // ── Render ────────────────────────────────────────────────────────────────────
