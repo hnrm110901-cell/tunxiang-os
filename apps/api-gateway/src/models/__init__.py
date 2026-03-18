@@ -435,6 +435,12 @@ __all__ = [
     "CouponDistribution",
     "CouponRedemption",
     "CouponRoiDaily",
+    # P3 — 营销任务体系
+    "MarketingTask",
+    "MarketingTaskTarget",
+    "MarketingTaskAssignment",
+    "MarketingTaskExecution",
+    "MarketingTaskStats",
 ]
 
 from .agent_collab import AgentCollabSnapshot, AgentConflict, GlobalOptimizationLog
@@ -597,3 +603,12 @@ from .knowledge_capture import KnowledgeCapture
 # P2 — 服务券 + 发券ROI
 from .service_voucher import ServiceVoucherTemplate, ServiceVoucher
 from .coupon_distribution import CouponDistribution, CouponRedemption, CouponRoiDaily
+
+# P3 — 营销任务体系
+from .marketing_task import (
+    MarketingTask,
+    MarketingTaskTarget,
+    MarketingTaskAssignment,
+    MarketingTaskExecution,
+    MarketingTaskStats,
+)

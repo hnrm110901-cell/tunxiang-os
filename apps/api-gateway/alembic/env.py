@@ -38,6 +38,7 @@ import src.models.member_check_in       # noqa: F401 — P1 识客
 import src.models.member_dish_preference # noqa: F401 — P1 菜品偏好
 import src.models.service_voucher        # noqa: F401 — P2 服务券
 import src.models.coupon_distribution    # noqa: F401 — P2 发券+ROI
+import src.models.marketing_task          # noqa: F401 — P3 营销任务
 
 # HR 模块 — 业人一体化
 import src.models.payroll  # noqa: F401
