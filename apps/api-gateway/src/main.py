@@ -944,6 +944,13 @@ from src.api import cdp_monitor
 
 app.include_router(cdp_monitor.router, tags=["cdp-monitor"])
 
+# P3 — 营销任务（总部创建 → 店长分配 → 员工执行）
+from src.api import hq_marketing_tasks
+from src.api import sm_marketing_tasks
+
+app.include_router(hq_marketing_tasks.router, tags=["HQ-营销任务"])
+app.include_router(sm_marketing_tasks.router, tags=["SM-营销任务"])
+
 # P0 — 食材成本真相引擎
 from src.api import cost_truth
 
