@@ -2,6 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { message } from 'antd';
 import MemberSearchBar from '../../components/MemberSearchBar';
 import MemberProfileCard, { type MemberProfile as MemberProfileType } from '../../components/MemberProfileCard';
+import CouponSelector from '../../components/CouponSelector';
 import { apiClient } from '../../services/api';
 import styles from './MemberProfile.module.css';
 
@@ -9,6 +10,7 @@ export default function MemberProfile() {
   const [profile, setProfile] = useState<MemberProfileType | null>(null);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
+  const [couponTarget, setCouponTarget] = useState<string | null>(null);
 
   // TODO: 从用户上下文获取 store_id
   const storeId = 'STORE001';
@@ -29,9 +31,8 @@ export default function MemberProfile() {
     }
   }, [storeId]);
 
-  const handleIssueCoupon = useCallback((_consumerId: string) => {
-    // P2 阶段实现
-    message.info('发券功能即将上线');
+  const handleIssueCoupon = useCallback((consumerId: string) => {
+    setCouponTarget(consumerId);
   }, []);
 
   return (
@@ -49,6 +50,15 @@ export default function MemberProfile() {
           />
         )}
       </div>
+      {couponTarget && (
+        <CouponSelector
+          visible={!!couponTarget}
+          onClose={() => setCouponTarget(null)}
+          consumerId={couponTarget}
+          storeId={storeId}
+          phone={profile?.identity?.phone}
+        />
+      )}
     </div>
   );
 }
