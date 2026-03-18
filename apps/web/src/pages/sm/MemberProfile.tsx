@@ -4,6 +4,7 @@ import MemberSearchBar from '../../components/MemberSearchBar';
 import MemberProfileCard, { type MemberProfile as MemberProfileType } from '../../components/MemberProfileCard';
 import CouponSelector from '../../components/CouponSelector';
 import { apiClient } from '../../services/api';
+import { useAuthStore } from '../../stores/authStore';
 import styles from './MemberProfile.module.css';
 
 export default function MemberProfile() {
@@ -12,8 +13,8 @@ export default function MemberProfile() {
   const [searched, setSearched] = useState(false);
   const [couponTarget, setCouponTarget] = useState<string | null>(null);
 
-  // 当前使用默认门店，后续从用户登录态获取
-  const storeId = 'STORE001';
+  const user = useAuthStore((s) => s.user);
+  const storeId = user?.store_id || '';
 
   const handleSearch = useCallback(async (phone: string) => {
     setLoading(true);

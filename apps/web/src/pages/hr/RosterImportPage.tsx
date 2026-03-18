@@ -6,6 +6,7 @@ import { Card, Upload, Button, Table, message, Alert, Steps, Space, Tag, Typogra
 import { UploadOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import { hrService } from '../../services/hrService';
 import type { ImportPreviewResult, ImportConfirmResult } from '../../services/hrService';
+import { useAuthStore } from '../../stores/authStore';
 
 const { Title } = Typography;
 
@@ -15,7 +16,8 @@ const RosterImportPage: React.FC = () => {
   const [preview, setPreview] = useState<ImportPreviewResult | null>(null);
   const [result, setResult] = useState<ImportConfirmResult | null>(null);
   const [loading, setLoading] = useState(false);
-  const brandId = 'default_brand'; // TODO: 从上下文获取
+  const user = useAuthStore((s) => s.user);
+  const brandId = user?.brand_id || '';
 
   const handleUpload = async (uploadFile: File) => {
     setFile(uploadFile);

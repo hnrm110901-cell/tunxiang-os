@@ -9,7 +9,7 @@ import structlog
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..core.dependencies import get_db, get_current_user
+from ..core.dependencies import get_db, get_current_user, validate_store_brand
 from ..models.user import User
 from ..services.member_profile_aggregator import member_profile_aggregator
 
@@ -59,6 +59,8 @@ async def get_member_profile(
     每个子源独立失败，降级返回 null。
     Redis 缓存 5 分钟，?refresh=true 强制刷新。
     """
+    await validate_store_brand(store_id, current_user)
+
     cache_key = f"member_profile:{store_id}:{phone}"
     if not refresh:
         cached = await _cache_get(cache_key)

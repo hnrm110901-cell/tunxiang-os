@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
 from uuid import UUID
 
-from ..core.dependencies import get_db, get_current_user
+from ..core.dependencies import get_db, get_current_user, validate_store_brand
 from ..models.user import User
 from ..services.coupon_distribution_service import coupon_distribution_service
 
@@ -33,6 +33,7 @@ async def distribute_coupon(
     db: AsyncSession = Depends(get_db),
 ):
     """发放优惠券（微生活券透传 或 屯象服务券）"""
+    await validate_store_brand(store_id, current_user)
     distributed_by = current_user.id
     brand_id = current_user.brand_id or ""
 
@@ -63,6 +64,7 @@ async def confirm_service_voucher(
     db: AsyncSession = Depends(get_db),
 ):
     """员工确认服务券已送达"""
+    await validate_store_brand(store_id, current_user)
     confirmed_by = current_user.id
     return await coupon_distribution_service.confirm_service_voucher(
         db=db, voucher_id=UUID(voucher_id), confirmed_by=confirmed_by,

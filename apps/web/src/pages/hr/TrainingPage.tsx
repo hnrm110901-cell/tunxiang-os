@@ -6,6 +6,7 @@ import { Card, Row, Col, Tag, Progress, Tabs, Empty, Spin, Typography } from 'an
 import { BookOutlined, TrophyOutlined, ClockCircleOutlined } from '@ant-design/icons';
 import { hrService } from '../../services/hrService';
 import type { TrainingCourseItem, TrainingEnrollmentItem } from '../../services/hrService';
+import { useAuthStore } from '../../stores/authStore';
 
 const { Title, Text } = Typography;
 
@@ -20,8 +21,9 @@ const TrainingPage: React.FC = () => {
   const [courses, setCourses] = useState<TrainingCourseItem[]>([]);
   const [enrollments, setEnrollments] = useState<TrainingEnrollmentItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const brandId = 'default_brand';
-  const employeeId = 'EMP001';
+  const user = useAuthStore((s) => s.user);
+  const brandId = user?.brand_id || '';
+  const employeeId = user?.id || '';
 
   useEffect(() => { loadData(); }, []);
 

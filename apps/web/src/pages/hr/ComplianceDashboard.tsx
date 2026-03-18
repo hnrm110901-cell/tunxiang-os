@@ -6,6 +6,7 @@ import { Card, Row, Col, Table, Tag, Statistic, Button, message, Typography, Spi
 import { SafetyCertificateOutlined, AlertOutlined, BellOutlined } from '@ant-design/icons';
 import { hrService } from '../../services/hrService';
 import type { ComplianceDashboardData } from '../../services/hrService';
+import { useAuthStore } from '../../stores/authStore';
 
 const { Title } = Typography;
 
@@ -31,7 +32,8 @@ const ComplianceDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<ComplianceDashboardData | null>(null);
   const [sending, setSending] = useState(false);
-  const storeId = 'S001';
+  const user = useAuthStore((s) => s.user);
+  const storeId = user?.store_id || '';
 
   useEffect(() => { loadData(); }, []);
 

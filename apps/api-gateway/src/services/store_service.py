@@ -99,6 +99,7 @@ class StoreService:
         is_active: Optional[bool] = None,
         limit: int = 100,
         offset: int = 0,
+        brand_id: Optional[str] = None,
     ) -> List[Store]:
         """获取门店列表"""
         async with get_db_session() as session:
@@ -114,6 +115,8 @@ class StoreService:
                 conditions.append(Store.status == status.value)
             if is_active is not None:
                 conditions.append(Store.is_active == is_active)
+            if brand_id:
+                conditions.append(Store.brand_id == brand_id)
 
             if conditions:
                 stmt = stmt.where(and_(*conditions))
@@ -175,6 +178,7 @@ class StoreService:
         self,
         region: Optional[str] = None,
         status: Optional[StoreStatus] = None,
+        brand_id: Optional[str] = None,
     ) -> int:
         """获取门店数量"""
         async with get_db_session() as session:
@@ -185,6 +189,8 @@ class StoreService:
                 conditions.append(Store.region == region)
             if status:
                 conditions.append(Store.status == status.value)
+            if brand_id:
+                conditions.append(Store.brand_id == brand_id)
 
             if conditions:
                 stmt = stmt.where(and_(*conditions))
@@ -192,10 +198,13 @@ class StoreService:
             result = await session.execute(stmt)
             return result.scalar()
 
-    async def get_stores_by_region(self) -> Dict[str, List[Store]]:
+    async def get_stores_by_region(self, brand_id: Optional[str] = None) -> Dict[str, List[Store]]:
         """按区域分组获取门店"""
         async with get_db_session() as session:
-            stmt = select(Store).where(Store.is_active == True).order_by(Store.region, Store.name)
+            stmt = select(Store).where(Store.is_active == True)
+            if brand_id:
+                stmt = stmt.where(Store.brand_id == brand_id)
+            stmt = stmt.order_by(Store.region, Store.name)
             result = await session.execute(stmt)
             stores = result.scalars().all()
 

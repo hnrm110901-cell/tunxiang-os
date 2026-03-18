@@ -6,13 +6,15 @@ import { Card, Row, Col, Statistic, Progress, Typography, Spin } from 'antd';
 import { BookOutlined, TrophyOutlined, TeamOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import { hrService } from '../../services/hrService';
 import type { TrainingDashboardData } from '../../services/hrService';
+import { useAuthStore } from '../../stores/authStore';
 
 const { Title } = Typography;
 
 const TrainingDashboard: React.FC = () => {
   const [data, setData] = useState<TrainingDashboardData | null>(null);
   const [loading, setLoading] = useState(true);
-  const brandId = 'default_brand';
+  const user = useAuthStore((s) => s.user);
+  const brandId = user?.brand_id || '';
 
   useEffect(() => { loadData(); }, []);
 

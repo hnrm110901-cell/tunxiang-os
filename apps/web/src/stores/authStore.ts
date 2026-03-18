@@ -8,6 +8,7 @@ export interface User {
   full_name: string | null;
   role: string;
   store_id: string | null;
+  brand_id: string | null;
   is_active: boolean;
 }
 

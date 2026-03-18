@@ -6,6 +6,7 @@ import { Card, Tabs, Tag, Statistic, Row, Col, Select, Typography, Spin, List, A
 import { FileTextOutlined } from '@ant-design/icons';
 import { hrService } from '../../services/hrService';
 import type { MonthlyReportData } from '../../services/hrService';
+import { useAuthStore } from '../../stores/authStore';
 
 const { Title } = Typography;
 
@@ -16,8 +17,9 @@ const MonthlyReportPage: React.FC = () => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
   });
-  const storeId = 'S001';
-  const brandId = 'default_brand';
+  const user = useAuthStore((s) => s.user);
+  const storeId = user?.store_id || '';
+  const brandId = user?.brand_id || '';
 
   useEffect(() => { loadData(); }, [month]);
 

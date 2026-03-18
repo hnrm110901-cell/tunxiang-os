@@ -140,6 +140,8 @@ async def get_stores(
     """
     获取门店列表
     """
+    # ADMIN 无品牌限制（brand_id 为空），其余用户只看自己品牌的门店
+    brand_id_filter = current_user.brand_id if current_user.brand_id else None
     stores = await store_service.get_stores(
         region=region,
         city=city,
@@ -147,6 +149,7 @@ async def get_stores(
         is_active=is_active,
         limit=limit,
         offset=offset,
+        brand_id=brand_id_filter,
     )
 
     return [StoreResponse(**store.to_dict()) for store in stores]
@@ -164,6 +167,10 @@ async def get_store(
 
     if not store:
         raise HTTPException(status_code=404, detail="门店不存在")
+
+    # 品牌隔离：非 ADMIN 用户只能访问自己品牌的门店
+    if current_user.brand_id and store.brand_id != current_user.brand_id:
+        raise HTTPException(status_code=403, detail="无权访问该门店")
 
     return StoreResponse(**store.to_dict())
 
@@ -186,6 +193,10 @@ async def update_store(
 
     if not store:
         raise HTTPException(status_code=404, detail="门店不存在")
+
+    # 品牌隔离：非 ADMIN 用户只能更新自己品牌的门店
+    if current_user.brand_id and store.brand_id != current_user.brand_id:
+        raise HTTPException(status_code=403, detail="无权修改该门店")
 
     return StoreResponse(**store.to_dict())
 
@@ -214,6 +225,13 @@ async def get_store_stats(
     """
     获取门店统计信息
     """
+    # 品牌隔离：先验证门店所属品牌
+    store = await store_service.get_store(store_id)
+    if not store:
+        raise HTTPException(status_code=404, detail="门店不存在")
+    if current_user.brand_id and store.brand_id != current_user.brand_id:
+        raise HTTPException(status_code=403, detail="无权访问该门店")
+
     stats = await store_service.get_store_stats(store_id)
 
     if not stats:
@@ -229,7 +247,8 @@ async def get_stores_by_region(
     """
     按区域分组获取门店
     """
-    stores_by_region = await store_service.get_stores_by_region()
+    brand_id_filter = current_user.brand_id if current_user.brand_id else None
+    stores_by_region = await store_service.get_stores_by_region(brand_id=brand_id_filter)
 
     # 转换为响应格式
     result = {}
@@ -267,5 +286,6 @@ async def get_stores_count(
     """
     获取门店数量统计
     """
-    count = await store_service.get_store_count(region=region, status=status)
+    brand_id_filter = current_user.brand_id if current_user.brand_id else None
+    count = await store_service.get_store_count(region=region, status=status, brand_id=brand_id_filter)
     return {"count": count, "region": region, "status": status}

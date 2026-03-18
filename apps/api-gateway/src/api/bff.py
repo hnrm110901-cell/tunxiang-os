@@ -27,7 +27,7 @@ import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..core.dependencies import get_current_active_user, get_db
+from ..core.dependencies import get_current_active_user, get_db, validate_store_brand
 from ..models.user import User
 
 logger = structlog.get_logger()
@@ -91,6 +91,8 @@ async def sm_home(
     - pending_approvals_count: 待审批决策数
     - unread_alerts_count: 未读告警数
     """
+    await validate_store_brand(store_id, current_user)
+
     cache_key = f"bff:sm:{store_id}"
     if not refresh:
         cached = await _cache_get(cache_key)
@@ -154,6 +156,8 @@ async def chef_home(
     - waste_top5: 损耗Top5 排名（含 waste_cost_yuan）
     - inventory_alerts: 库存告警列表
     """
+    await validate_store_brand(store_id, current_user)
+
     cache_key = f"bff:chef:{store_id}"
     if not refresh:
         cached = await _cache_get(cache_key)
@@ -199,6 +203,8 @@ async def floor_home(
     - today_reservations: 今日预订列表（前10条）
     - service_alerts: 服务质量告警
     """
+    await validate_store_brand(store_id, current_user)
+
     cache_key = f"bff:floor:{store_id}"
     if not refresh:
         cached = await _cache_get(cache_key)

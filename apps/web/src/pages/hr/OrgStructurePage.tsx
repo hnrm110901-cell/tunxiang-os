@@ -6,6 +6,7 @@ import { Card, Tree, Spin, Empty, Tag, Typography } from 'antd';
 import { ApartmentOutlined } from '@ant-design/icons';
 import { hrService } from '../../services/hrService';
 import type { OrganizationNode } from '../../services/hrService';
+import { useAuthStore } from '../../stores/authStore';
 
 const { Title } = Typography;
 
@@ -26,7 +27,8 @@ interface TreeNode {
 const OrgStructurePage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [treeData, setTreeData] = useState<TreeNode[]>([]);
-  const brandId = 'default_brand';
+  const user = useAuthStore((s) => s.user);
+  const brandId = user?.brand_id || '';
 
   useEffect(() => {
     loadData();

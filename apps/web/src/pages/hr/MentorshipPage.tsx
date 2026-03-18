@@ -6,13 +6,15 @@ import { Card, Table, Tag, Typography, Spin } from 'antd';
 import { TeamOutlined } from '@ant-design/icons';
 import { hrService } from '../../services/hrService';
 import type { MentorshipItem } from '../../services/hrService';
+import { useAuthStore } from '../../stores/authStore';
 
 const { Title } = Typography;
 
 const MentorshipPage: React.FC = () => {
   const [data, setData] = useState<MentorshipItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const storeId = 'S001';
+  const user = useAuthStore((s) => s.user);
+  const storeId = user?.store_id || '';
 
   useEffect(() => { loadData(); }, []);
 
