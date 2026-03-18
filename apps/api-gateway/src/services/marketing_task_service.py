@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Optional
 from uuid import UUID
 
 import structlog
-from sqlalchemy import select, func, text
+from sqlalchemy import select, func, text, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models.marketing_task import (
@@ -15,20 +15,6 @@ from ..models.marketing_task import (
 )
 
 logger = structlog.get_logger(__name__)
-
-# 预设人群包 → 参数化 SQL WHERE（绝不拼接用户输入）
-_PRESET_SQL = {
-    "birthday_week": """ci.birth_date IS NOT NULL
-        AND (DATE_PART('month', ci.birth_date) * 100 + DATE_PART('day', ci.birth_date))
-        IN (SELECT DATE_PART('month', d) * 100 + DATE_PART('day', d)
-            FROM generate_series(CURRENT_DATE, CURRENT_DATE + INTERVAL '7 days', '1 day'::interval) d)""",
-    "inactive_30d": "ci.last_order_at < NOW() - INTERVAL '30 days' AND ci.total_order_count > 3",
-    "low_balance": "ci.total_order_amount_fen > 0",
-    "high_value_vip": "ci.total_order_count >= 10 AND ci.total_order_amount_fen >= 1000000",
-    "new_customer": "ci.total_order_count = 1 AND ci.first_order_at > NOW() - INTERVAL '30 days'",
-    "declining": "ci.rfm_frequency IS NOT NULL",
-    "dormant": "ci.last_order_at < NOW() - INTERVAL '90 days'",
-}
 
 
 class MarketingTaskService:
@@ -71,16 +57,22 @@ class MarketingTaskService:
         audience_config: Dict,
         store_ids: List[str],
     ) -> Dict[str, Any]:
+        """预览人群数量。
+
+        预设人群包使用 ORM 构建参数化查询（安全）。
+        AI 查询由 LLM 生成结构化过滤条件，服务端构建参数化查询（不拼接 SQL）。
+        """
         if audience_type == "preset":
             preset_id = audience_config.get("preset_id", "")
-            where_clause = self._preset_to_sql(preset_id)
-            if where_clause == "1=0":
+            filters_fn = self._preset_to_orm(preset_id)
+            if filters_fn is None:
                 return {"total_count": 0, "error": f"未知预设包: {preset_id}"}
 
-            stmt = text(f"""
-                SELECT COUNT(*) FROM consumer_identities ci
-                WHERE ci.is_merged = FALSE AND ({where_clause})
-            """)
+            from ..models.consumer_identity import ConsumerIdentity
+            stmt = select(func.count()).select_from(ConsumerIdentity).where(
+                ConsumerIdentity.is_merged.is_(False),
+                *filters_fn(ConsumerIdentity),
+            )
             result = await db.execute(stmt)
             total = result.scalar() or 0
             return {"total_count": total, "by_store": []}
@@ -136,8 +128,54 @@ class MarketingTaskService:
         total = result.scalar() or 0
         return {"total_count": total, "by_store": []}
 
-    def _preset_to_sql(self, preset_id: str) -> str:
-        return _PRESET_SQL.get(preset_id, "1=0")
+    @staticmethod
+    def _preset_to_orm(preset_id: str):
+        """返回一个函数 fn(CI) -> list[条件]，用于 ORM 构建参数化查询。
+
+        返回 None 表示未知预设包。绝不使用 text() f-string。
+        """
+        from datetime import timedelta
+
+        def _birthday_week(CI):
+            # 近一周生日：使用 raw SQL text() 但不拼接任何变量
+            return [
+                CI.birth_date.isnot(None),
+                text("""(DATE_PART('month', consumer_identities.birth_date) * 100
+                    + DATE_PART('day', consumer_identities.birth_date))
+                    IN (SELECT DATE_PART('month', d) * 100 + DATE_PART('day', d)
+                        FROM generate_series(CURRENT_DATE,
+                             CURRENT_DATE + INTERVAL '7 days',
+                             '1 day'::interval) d)"""),
+            ]
+
+        def _inactive_30d(CI):
+            return [CI.last_order_at < func.now() - text("INTERVAL '30 days'"), CI.total_order_count > 3]
+
+        def _low_balance(CI):
+            return [CI.total_order_amount_fen > 0]
+
+        def _high_value_vip(CI):
+            return [CI.total_order_count >= 10, CI.total_order_amount_fen >= 1000000]
+
+        def _new_customer(CI):
+            return [CI.total_order_count == 1, CI.first_order_at > func.now() - text("INTERVAL '30 days'")]
+
+        def _declining(CI):
+            return [CI.rfm_frequency.isnot(None)]
+
+        def _dormant(CI):
+            return [CI.last_order_at < func.now() - text("INTERVAL '90 days'")]
+
+        presets = {
+            "birthday_week": _birthday_week,
+            "inactive_30d": _inactive_30d,
+            "low_balance": _low_balance,
+            "high_value_vip": _high_value_vip,
+            "new_customer": _new_customer,
+            "declining": _declining,
+            "dormant": _dormant,
+        }
+        return presets.get(preset_id)
 
     async def publish_task(
         self,

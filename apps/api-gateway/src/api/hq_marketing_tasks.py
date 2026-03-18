@@ -87,7 +87,11 @@ async def create_task(
 
 
 @router.post("/audience-preview", summary="预览人群数量")
-async def audience_preview(req: AudiencePreviewRequest, db: AsyncSession = Depends(get_db)):
+async def audience_preview(
+    req: AudiencePreviewRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
     return await marketing_task_service.preview_audience(
         db=db, audience_type=req.audience_type,
         audience_config=req.audience_config, store_ids=req.store_ids,
@@ -98,6 +102,7 @@ async def audience_preview(req: AudiencePreviewRequest, db: AsyncSession = Depen
 async def publish_task(
     task_id: str,
     req: PublishRequest,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     if not req.store_ids:

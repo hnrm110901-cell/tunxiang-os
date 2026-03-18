@@ -9,7 +9,8 @@ import structlog
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..core.dependencies import get_db
+from ..core.dependencies import get_db, get_current_user
+from ..models.user import User
 from ..services.member_profile_aggregator import member_profile_aggregator
 
 logger = structlog.get_logger(__name__)
@@ -50,6 +51,7 @@ async def get_member_profile(
     phone: str,
     include_ai: bool = Query(default=True, description="是否生成AI话术"),
     refresh: bool = Query(default=False, description="强制刷新缓存"),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """

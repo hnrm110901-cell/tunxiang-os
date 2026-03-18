@@ -8,8 +8,9 @@ const NAV_ITEMS = [
   { to: '/sm/patrol',      label: '巡店',   icon: '🔍' },
   { to: '/sm/hr',          label: '人力',   icon: '👥' },
   { to: '/sm/decisions',   label: 'AI决策', icon: '🤖' },
-  { to: '/sm/members',     label: '识客',   icon: '👤' },
-  { to: '/sm/profile',     label: '我的',   icon: '🙍' },
+  { to: '/sm/members',           label: '识客',   icon: '👤' },
+  { to: '/sm/marketing-tasks',   label: '营销',   icon: '📣' },
+  { to: '/sm/profile',           label: '我的',   icon: '🙍' },
 ];
 
 export default function StoreManagerLayout() {

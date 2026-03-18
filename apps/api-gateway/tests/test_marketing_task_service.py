@@ -23,9 +23,14 @@ class TestMarketingTaskService:
         assert result["success"] is True
         assert "task_id" in result
 
-    @pytest.mark.asyncio
-    async def test_preset_birthday_week(self):
-        """预设人群包：近一周生日"""
-        from src.services.marketing_task_service import marketing_task_service
-        sql = marketing_task_service._preset_to_sql("birthday_week")
-        assert "birth_date" in sql
+    def test_preset_birthday_week(self):
+        """预设人群包：近一周生日返回 ORM 过滤函数"""
+        from src.services.marketing_task_service import MarketingTaskService
+        fn = MarketingTaskService._preset_to_orm("birthday_week")
+        assert fn is not None
+
+    def test_preset_unknown_returns_none(self):
+        """未知预设包返回 None"""
+        from src.services.marketing_task_service import MarketingTaskService
+        fn = MarketingTaskService._preset_to_orm("nonexistent")
+        assert fn is None

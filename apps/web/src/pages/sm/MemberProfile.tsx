@@ -12,7 +12,7 @@ export default function MemberProfile() {
   const [searched, setSearched] = useState(false);
   const [couponTarget, setCouponTarget] = useState<string | null>(null);
 
-  // TODO: 从用户上下文获取 store_id
+  // 当前使用默认门店，后续从用户登录态获取
   const storeId = 'STORE001';
 
   const handleSearch = useCallback(async (phone: string) => {
