@@ -429,6 +429,12 @@ __all__ = [
     "BehaviorPattern",
     "RetentionSignal",
     "KnowledgeCapture",
+    # P2 — 服务券 + 发券ROI
+    "ServiceVoucherTemplate",
+    "ServiceVoucher",
+    "CouponDistribution",
+    "CouponRedemption",
+    "CouponRoiDaily",
 ]
 
 from .agent_collab import AgentCollabSnapshot, AgentConflict, GlobalOptimizationLog
@@ -587,3 +593,7 @@ from .achievement import Achievement
 from .behavior_pattern import BehaviorPattern
 from .retention_signal import RetentionSignal
 from .knowledge_capture import KnowledgeCapture
+
+# P2 — 服务券 + 发券ROI
+from .service_voucher import ServiceVoucherTemplate, ServiceVoucher
+from .coupon_distribution import CouponDistribution, CouponRedemption, CouponRoiDaily
