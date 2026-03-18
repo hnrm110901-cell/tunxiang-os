@@ -111,8 +111,8 @@ export default function CrmHubPage() {
   const [signals,  setSignals]  = useState<GrowthSignal[] | null>(null);
   const [churn,    setChurn]    = useState<ChurnUser[] | null>(null);
   const [loading,  setLoading]  = useState(true);
-  const [storeId,  setStoreId]  = useState('S001');
-  const [storeOptions, setStoreOptions] = useState<Array<{ value: string; label: string }>>([{ value: 'S001', label: 'S001' }]);
+  const [storeId,  setStoreId]  = useState(localStorage.getItem('store_id') || '');
+  const [storeOptions, setStoreOptions] = useState<Array<{ value: string; label: string }>>([]);
   const [selectedSignal, setSelectedSignal] = useState<GrowthSignal | null>(null);
 
   useEffect(() => {
