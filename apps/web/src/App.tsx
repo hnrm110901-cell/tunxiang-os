@@ -329,6 +329,9 @@ const SmBanquetFollowups   = lazy(() => import('./pages/sm/BanquetFollowups'));
 const SmBanquetSearch      = lazy(() => import('./pages/sm/BanquetSearch'));
 const SmPrivateDomainHealth = lazy(() => import('./pages/sm/PrivateDomainHealthPage'));
 const SmMemberProfile = lazy(() => import('./pages/sm/MemberProfile'));
+const HqMarketingTasks = lazy(() => import('./pages/hq/MarketingTasks'));
+const HqMarketingTaskCreate = lazy(() => import('./pages/hq/MarketingTaskCreate'));
+const SmMarketingTasks = lazy(() => import('./pages/sm/MarketingTasks'));
 
 // Role-based views — Employee H5 Self-Service (/emp)
 const EmployeeLayout    = lazy(() => import('./pages/employee/EmployeeLayout'));
@@ -1066,6 +1069,7 @@ const AppContent: React.FC = () => {
                   <Route path="patrol"   element={<SmPatrol />} />
                   <Route path="members"  element={<SmMemberProfile />} />
                   <Route path="profile"  element={<SmProfile />} />
+                  <Route path="marketing-tasks" element={<SmMarketingTasks />} />
                 </Route>
 
                 {/* Role-based views — Chef (手机) */}
@@ -1130,6 +1134,9 @@ const AppContent: React.FC = () => {
                   <Route path="forecast" element={<ForecastPage />} />
                   <Route path="reports" element={<ReportTemplates />} />
                   <Route path="banquet" element={<HQBanquet />} />
+                  {/* 营销任务 */}
+                  <Route path="marketing-tasks" element={<HqMarketingTasks />} />
+                  <Route path="marketing-tasks/create" element={<HqMarketingTaskCreate />} />
                 </Route>
 
                 {/* Role-based views — Employee H5 Self-Service (手机) */}
