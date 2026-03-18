@@ -258,37 +258,42 @@ class PinzhiAdapter:
         ognid: Optional[str] = None,
         begin_date: Optional[str] = None,
         end_date: Optional[str] = None,
+        business_date: Optional[str] = None,
         page_index: int = 1,
         page_size: int = int(os.getenv("PINZHI_PAGE_SIZE", "20")),
     ) -> List[Dict[str, Any]]:
         """
-        按日期查询订单数据（V2）
+        按日期查询订单数据
+
+        品智orderNew.do实际使用businessDate参数（单日查询）。
+        为兼容pos_service等上游调用者，同时接受begin_date/end_date，
+        优先使用business_date，其次取begin_date作为businessDate。
 
         Args:
             ognid: 门店omsID
-            begin_date: 开始日期（yyyy-MM-dd）
-            end_date: 结束日期（yyyy-MM-dd）
+            begin_date: 开始日期（yyyy-MM-dd），作为businessDate使用
+            end_date: 结束日期（yyyy-MM-dd），保留兼容但不发送给API
+            business_date: 营业日（yyyy-MM-dd），优先级最高
             page_index: 页码
             page_size: 每页数量
 
         Returns:
             订单列表
         """
+        # 品智API只支持单日查询(businessDate)，取优先级：business_date > begin_date
+        biz_date = business_date or begin_date
         params = {"pageIndex": page_index, "pageSize": page_size}
 
         if ognid:
             params["ognid"] = ognid
-        if begin_date:
-            params["beginDate"] = begin_date
-        if end_date:
-            params["endDate"] = end_date
+        if biz_date:
+            params["businessDate"] = biz_date
 
         params = self._add_sign(params)
         logger.info(
             "查询订单",
             ognid=ognid,
-            begin_date=begin_date,
-            end_date=end_date,
+            business_date=biz_date,
             page=page_index,
         )
 
