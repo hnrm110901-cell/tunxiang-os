@@ -328,6 +328,7 @@ const SmBanquetPush        = lazy(() => import('./pages/sm/BanquetPush'));
 const SmBanquetFollowups   = lazy(() => import('./pages/sm/BanquetFollowups'));
 const SmBanquetSearch      = lazy(() => import('./pages/sm/BanquetSearch'));
 const SmPrivateDomainHealth = lazy(() => import('./pages/sm/PrivateDomainHealthPage'));
+const SmMemberProfile = lazy(() => import('./pages/sm/MemberProfile'));
 
 // Role-based views — Employee H5 Self-Service (/emp)
 const EmployeeLayout    = lazy(() => import('./pages/employee/EmployeeLayout'));
@@ -1063,6 +1064,7 @@ const AppContent: React.FC = () => {
                   <Route path="prep" element={<SmPrepSuggestion />} />
                   <Route path="hr"       element={<SmHRQuick />} />
                   <Route path="patrol"   element={<SmPatrol />} />
+                  <Route path="members"  element={<SmMemberProfile />} />
                   <Route path="profile"  element={<SmProfile />} />
                 </Route>
 
