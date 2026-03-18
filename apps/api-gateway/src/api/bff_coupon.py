@@ -1,14 +1,17 @@
 """BFF 发券 + ROI — P2"""
 
 import structlog
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import Optional
+from typing import List, Optional
 from uuid import UUID
 
 from ..core.dependencies import get_db, get_current_user, validate_store_brand
 from ..models.user import User
+from ..models.service_voucher import ServiceVoucherTemplate
+from ..models.consumer_identity import ConsumerIdentity
 from ..services.coupon_distribution_service import coupon_distribution_service
 
 logger = structlog.get_logger(__name__)
@@ -23,6 +26,60 @@ class DistributeCouponRequest(BaseModel):
     coupon_name: Optional[str] = ""
     coupon_value_fen: Optional[int] = 0
     phone: Optional[str] = None
+
+
+@router.get("/{store_id}/available-coupons/{consumer_id}", summary="可用券列表")
+async def available_coupons(
+    store_id: str,
+    consumer_id: str,
+    phone: Optional[str] = Query(None),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """聚合微生活券 + 屯象服务券模板，返回可选券列表"""
+    await validate_store_brand(store_id, current_user)
+    brand_id = current_user.brand_id or ""
+    coupons: List[dict] = []
+
+    # 1) 微生活券 — 需要手机号查 card_no
+    if phone:
+        try:
+            from ..services.member_service import member_service
+            member = await member_service.query_member(mobile=phone)
+            card_no = (member or {}).get("card_no", "")
+            if card_no:
+                wsh_list = await member_service.coupon_list(card_no=card_no, store_id=store_id)
+                for c in (wsh_list or []):
+                    coupons.append({
+                        "id": str(c.get("coupon_id", "")),
+                        "name": c.get("coupon_name", "未命名券"),
+                        "source": "weishenghuo",
+                        "value_display": c.get("value_display", ""),
+                        "expires": c.get("end_time", ""),
+                    })
+        except Exception as e:
+            logger.warning("微生活券查询失败", error=str(e))
+
+    # 2) 屯象服务券模板
+    try:
+        stmt = select(ServiceVoucherTemplate).where(
+            ServiceVoucherTemplate.brand_id == brand_id,
+            ServiceVoucherTemplate.is_active.is_(True),
+        )
+        result = await db.execute(stmt)
+        templates = result.scalars().all()
+        for t in templates:
+            coupons.append({
+                "id": str(t.id),
+                "name": t.name,
+                "source": "service_voucher",
+                "value_display": t.description or t.voucher_type,
+                "expires": "",
+            })
+    except Exception as e:
+        logger.warning("服务券模板查询失败", error=str(e))
+
+    return {"coupons": coupons}
 
 
 @router.post("/{store_id}/distribute-coupon", summary="发券")

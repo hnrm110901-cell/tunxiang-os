@@ -28,12 +28,21 @@ export default function CouponSelector({
   const [distributing, setDistributing] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!visible) return;
+    if (!visible || !storeId || !consumerId) return;
+    let cancelled = false;
     setLoading(true);
-    // 实际调用后端接口获取可用券列表（当前返回空列表，待后端实现后对接）
-    setCoupons([]);
-    setLoading(false);
-  }, [visible, consumerId]);
+    const params = phone ? `?phone=${encodeURIComponent(phone)}` : '';
+    apiClient.get<{ coupons: Coupon[] }>(
+      `/api/v1/bff/member-profile/${storeId}/available-coupons/${consumerId}${params}`,
+    ).then((res) => {
+      if (!cancelled) setCoupons(res.coupons || []);
+    }).catch(() => {
+      if (!cancelled) setCoupons([]);
+    }).finally(() => {
+      if (!cancelled) setLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [visible, consumerId, storeId, phone]);
 
   const handleDistribute = useCallback(async (coupon: Coupon) => {
     setDistributing(coupon.id);
