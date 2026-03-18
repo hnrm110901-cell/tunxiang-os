@@ -84,3 +84,4 @@ CLAUDE.local.md
 
 # 商户 API 凭证配置（含敏感 Token，禁止提交）
 config/merchants/.env.*
+.worktrees/
