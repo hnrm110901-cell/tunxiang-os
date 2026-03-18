@@ -9,8 +9,8 @@ POS 数据同步验证接口
 支持适配器：
   pinzhi        — 品智收银（尝在一起 / 最黔线 / 尚宫厨，每商户独立凭证）
   tiancai       — 天财商龙（MD5 签名版）
-  aoqiwei_supply — 奥琦玮供应链（采购 + 库存）
-  aoqiwei_crm   — 奥琦玮微生活会员（按手机号增强会员数据）
+  chixingyun    — 喰星云供应链（奥琦玮旗下，采购 + 库存）
+  weishenghuo   — 微生活会员（奥琦玮旗下，按手机号增强会员数据）
 """
 
 from __future__ import annotations
@@ -104,15 +104,15 @@ def _pinzhi_adapter_class():
     return mods["adapter"].PinzhiAdapter
 
 
-def _aoqiwei_supply_adapter_class():
-    """按需加载奥琦玮供应链适配器类。"""
+def _chixingyun_adapter_class():
+    """按需加载喰星云供应链适配器类（奥琦玮旗下）。"""
     _src = _resolve_adapter_src("aoqiwei")
     mods = _load_pkg_module("_aoqiwei_pkg", _src, ["adapter", "crm_adapter"])
     return mods["adapter"].AoqiweiAdapter
 
 
-def _aoqiwei_crm_adapter_class():
-    """按需加载奥琦玮 CRM 适配器类。"""
+def _weishenghuo_adapter_class():
+    """按需加载微生活会员适配器类（奥琦玮旗下）。"""
     _src = _resolve_adapter_src("aoqiwei")
     mods = _load_pkg_module("_aoqiwei_pkg", _src, ["adapter", "crm_adapter"])
     return mods["crm_adapter"].AoqiweiCrmAdapter
@@ -126,8 +126,8 @@ class PosSyncRequest(BaseModel):
 
     adapter: str = Field(
         ...,
-        description="适配器类型：pinzhi / tiancai / aoqiwei_supply / aoqiwei_crm",
-        pattern="^(pinzhi|tiancai|aoqiwei_supply|aoqiwei_crm)$",
+        description="适配器类型：pinzhi / tiancai / chixingyun / weishenghuo",
+        pattern="^(pinzhi|tiancai|chixingyun|weishenghuo)$",
     )
     sync_date: Optional[str] = Field(
         None,
@@ -578,10 +578,10 @@ async def _sync_tiancai(sync_date: str, store_ids: Optional[List[str]]) -> PosSy
     )
 
 
-# ── 奥琦玮供应链同步 ──────────────────────────────────────────────────────────
+# ── 喰星云供应链同步（奥琦玮旗下） ──────────────────────────────────────────────
 
 
-async def _sync_aoqiwei_supply(sync_date: str, store_ids: Optional[List[str]]) -> PosSyncResponse:
+async def _sync_chixingyun(sync_date: str, store_ids: Optional[List[str]]) -> PosSyncResponse:
     """按需拉取奥琦玮供应链数据（采购 + 库存）"""
     sync_date_obj = date.fromisoformat(sync_date) if isinstance(sync_date, str) else sync_date
     app_key = os.getenv("AOQIWEI_APP_KEY", "")
@@ -590,7 +590,7 @@ async def _sync_aoqiwei_supply(sync_date: str, store_ids: Optional[List[str]]) -
     if not app_key or not app_secret:
         return PosSyncResponse(
             success=False,
-            adapter="aoqiwei_supply",
+            adapter="chixingyun",
             sync_date=sync_date,
             triggered_at=datetime.now().isoformat(),
             stores=[],
@@ -598,7 +598,7 @@ async def _sync_aoqiwei_supply(sync_date: str, store_ids: Optional[List[str]]) -
             skipped_reason="AOQIWEI_APP_KEY 或 AOQIWEI_APP_SECRET 未配置，请在环境变量中设置",
         )
 
-    AoqiweiAdapter = _aoqiwei_supply_adapter_class()
+    AoqiweiAdapter = _chixingyun_adapter_class()
 
     adapter = AoqiweiAdapter(
         {
@@ -636,7 +636,7 @@ async def _sync_aoqiwei_supply(sync_date: str, store_ids: Optional[List[str]]) -
                     FROM daily_summaries
                     WHERE store_id = :sid
                       AND business_date = :dt
-                      AND source = 'aoqiwei_supply'
+                      AND source = 'chixingyun'
                     LIMIT 1
                 """),
                 {"sid": sid, "dt": sync_date_obj},
@@ -666,7 +666,7 @@ async def _sync_aoqiwei_supply(sync_date: str, store_ids: Optional[List[str]]) -
                 stock_count = len(stock_list) if stock_list else 0
             except Exception as e:
                 error_msg = str(e)
-                logger.error("pos_sync.aoqiwei_supply.store_error", store_id=sid, error=error_msg)
+                logger.error("pos_sync.chixingyun.store_error", store_id=sid, error=error_msg)
 
             match = None
             diff_orders = None
@@ -693,7 +693,7 @@ async def _sync_aoqiwei_supply(sync_date: str, store_ids: Optional[List[str]]) -
 
     return PosSyncResponse(
         success=all(s.error is None for s in store_summaries),
-        adapter="aoqiwei_supply",
+        adapter="chixingyun",
         sync_date=sync_date,
         triggered_at=datetime.now().isoformat(),
         stores=store_summaries,
@@ -708,10 +708,10 @@ async def _sync_aoqiwei_supply(sync_date: str, store_ids: Optional[List[str]]) -
     )
 
 
-# ── 奥琦玮微生活会员同步 ──────────────────────────────────────────────────────
+# ── 微生活会员同步（奥琦玮旗下） ──────────────────────────────────────────────
 
 
-async def _sync_aoqiwei_crm(sync_date: str, store_ids: Optional[List[str]]) -> PosSyncResponse:
+async def _sync_weishenghuo(sync_date: str, store_ids: Optional[List[str]]) -> PosSyncResponse:
     """
     奥琦玮微生活会员数据增强。
 
@@ -722,12 +722,12 @@ async def _sync_aoqiwei_crm(sync_date: str, store_ids: Optional[List[str]]) -> P
       4. 返回各门店增强摘要
 
     注意：奥琦玮 CRM 无批量导出 API，仅支持按手机号逐条查询。
-    凭证读取顺序：store.config.aoqiwei_crm_appid > ExternalSystem(provider=aoqiwei) > AOQIWEI_CRM_APPID（环境变量）
+    凭证读取顺序：store.config > ExternalSystem(provider=weishenghuo) > 环境变量
     """
     global_appid = os.getenv("AOQIWEI_CRM_APPID", "")
     global_appkey = os.getenv("AOQIWEI_CRM_APPKEY", "")
 
-    AoqiweiCrmAdapter = _aoqiwei_crm_adapter_class()
+    AoqiweiCrmAdapter = _weishenghuo_adapter_class()
     store_summaries: List[StoreSyncSummary] = []
     total_phones = 0
     total_enriched = 0
@@ -739,10 +739,10 @@ async def _sync_aoqiwei_crm(sync_date: str, store_ids: Optional[List[str]]) -> P
         result = await session.execute(stmt)
         stores = result.scalars().all()
 
-        # 预加载奥琦玮 CRM ExternalSystem（品牌级，store_id 可为 None）
+        # 预加载微生活会员 ExternalSystem（品牌级，store_id 可为 None）
         crm_ext_rows = await session.execute(
             select(ExternalSystem).where(
-                ExternalSystem.provider == "aoqiwei",
+                ExternalSystem.provider == "weishenghuo",
                 ExternalSystem.type == IntegrationType.MEMBER,
             )
         )
@@ -763,7 +763,7 @@ async def _sync_aoqiwei_crm(sync_date: str, store_ids: Optional[List[str]]) -> P
         if not has_any_credentials:
             return PosSyncResponse(
                 success=False,
-                adapter="aoqiwei_crm",
+                adapter="weishenghuo",
                 sync_date=sync_date,
                 triggered_at=datetime.now().isoformat(),
                 stores=[],
@@ -781,14 +781,14 @@ async def _sync_aoqiwei_crm(sync_date: str, store_ids: Optional[List[str]]) -> P
 
             # 门店级 CRM 凭证覆盖（store.config > ExternalSystem > 环境变量）
             appid = (
-                cfg.get("aoqiwei_crm_appid")
-                or ext_cfg.get("aoqiwei_app_id")
+                cfg.get("weishenghuo_appid")
+                or ext_cfg.get("weishenghuo_app_id")
                 or (crm_ext.api_key if crm_ext else None)
                 or global_appid
             )
             appkey = (
-                cfg.get("aoqiwei_crm_appkey")
-                or ext_cfg.get("aoqiwei_app_key")
+                cfg.get("weishenghuo_appkey")
+                or ext_cfg.get("weishenghuo_app_key")
                 or (crm_ext.api_secret if crm_ext else None)
                 or global_appkey
             )
@@ -798,7 +798,7 @@ async def _sync_aoqiwei_crm(sync_date: str, store_ids: Optional[List[str]]) -> P
                 or os.getenv("AOQIWEI_CRM_BASE_URL", "https://api.acewill.net")
             )
             crm_shop_id: Optional[int] = None
-            raw_shop_id = cfg.get("aoqiwei_crm_shop_id") or ext_cfg.get("aoqiwei_merchant_id")
+            raw_shop_id = cfg.get("weishenghuo_shop_id") or ext_cfg.get("weishenghuo_merchant_id")
             if raw_shop_id:
                 try:
                     crm_shop_id = int(raw_shop_id)
@@ -876,7 +876,7 @@ async def _sync_aoqiwei_crm(sync_date: str, store_ids: Optional[List[str]]) -> P
 
             except Exception as e:
                 error_msg = str(e)
-                logger.error("pos_sync.aoqiwei_crm.store_error", store_id=sid, error=error_msg)
+                logger.error("pos_sync.weishenghuo.store_error", store_id=sid, error=error_msg)
 
             await crm.aclose()
             total_enriched += enriched
@@ -900,7 +900,7 @@ async def _sync_aoqiwei_crm(sync_date: str, store_ids: Optional[List[str]]) -> P
 
     return PosSyncResponse(
         success=all(s.error is None for s in store_summaries),
-        adapter="aoqiwei_crm",
+        adapter="weishenghuo",
         sync_date=sync_date,
         triggered_at=datetime.now().isoformat(),
         stores=store_summaries,
@@ -918,8 +918,8 @@ async def _sync_aoqiwei_crm(sync_date: str, store_ids: Optional[List[str]]) -> P
 _ADAPTER_HANDLERS = {
     "pinzhi": _sync_pinzhi,
     "tiancai": _sync_tiancai,
-    "aoqiwei_supply": _sync_aoqiwei_supply,
-    "aoqiwei_crm": _sync_aoqiwei_crm,
+    "chixingyun": _sync_chixingyun,
+    "weishenghuo": _sync_weishenghuo,
 }
 
 
@@ -933,8 +933,8 @@ async def trigger_pos_sync(
 
     - **pinzhi**: 品智收银 — 尝在一起 / 最黔线 / 尚宫厨（per-store token）
     - **tiancai**: 天财商龙（MD5签名版）
-    - **aoqiwei_supply**: 奥琦玮供应链（采购入库 + 库存快照）
-    - **aoqiwei_crm**: 奥琦玮微生活会员（手机号逐一增强积分/余额/等级）
+    - **chixingyun**: 奥琦玮供应链（采购入库 + 库存快照）
+    - **weishenghuo**: 奥琦玮微生活会员（手机号逐一增强积分/余额/等级）
     - **sync_date**: 要同步的日期，默认昨天（YYYY-MM-DD）
     - **store_ids**: 指定门店 ID，为空则同步所有门店
     """
@@ -976,14 +976,14 @@ async def get_sync_status(
             "data_type": "POS 订单 + 营业汇总",
             "per_store_config": "store.config.pinzhi_base_url / pinzhi_token / pinzhi_ognid",
         },
-        "aoqiwei_crm": {
+        "weishenghuo": {
             "configured": bool(os.getenv("AOQIWEI_CRM_APPID") and os.getenv("AOQIWEI_CRM_APPKEY")),
             "base_url": os.getenv("AOQIWEI_CRM_BASE_URL", "https://welcrm.com"),
             "missing_vars": [v for v in ["AOQIWEI_CRM_APPID", "AOQIWEI_CRM_APPKEY"] if not os.getenv(v)],
             "scheduled_time": "每日 02:25（基于近30天订单手机号增强会员积分/余额/等级）",
             "merchants": "尝在一起 / 最黔线 / 尚宫厨（共用或各自门店配置）",
             "data_type": "会员积分 / 储值余额 / 等级（单条查询，无批量导出 API）",
-            "per_store_config": "store.config.aoqiwei_crm_appid / aoqiwei_crm_appkey / aoqiwei_crm_shop_id",
+            "per_store_config": "store.config.weishenghuo_appid / weishenghuo_appkey / weishenghuo_shop_id",
             "note": "奥琦玮 CRM 无批量会员列表 API，自动从 orders.customer_phone 提取近30天消费手机号逐一查询。",
         },
         "tiancai": {
@@ -995,7 +995,7 @@ async def get_sync_status(
             "data_type": "POS 订单",
             "per_store_config": "store.config.tiancai_store_id",
         },
-        "aoqiwei_supply": {
+        "chixingyun": {
             "configured": bool(os.getenv("AOQIWEI_APP_KEY") and os.getenv("AOQIWEI_APP_SECRET")),
             "base_url": os.getenv("AOQIWEI_BASE_URL", "https://openapi.acescm.cn"),
             "missing_vars": [v for v in ["AOQIWEI_APP_KEY", "AOQIWEI_APP_SECRET"] if not os.getenv(v)],
@@ -1019,15 +1019,15 @@ async def get_sync_status(
                 if provider == "pinzhi":
                     adapters_status["pinzhi"]["configured"] = True
                     adapters_status["pinzhi"]["config_source"] = "ExternalSystem"
-                elif provider in ("aoqiwei", "aoqiwei_crm"):
-                    adapters_status["aoqiwei_crm"]["configured"] = True
-                    adapters_status["aoqiwei_crm"]["config_source"] = "ExternalSystem"
+                elif provider in ("weishenghuo",):
+                    adapters_status["weishenghuo"]["configured"] = True
+                    adapters_status["weishenghuo"]["config_source"] = "ExternalSystem"
                 elif provider in ("tiancai", "tiancai-shanglong"):
                     adapters_status["tiancai"]["configured"] = True
                     adapters_status["tiancai"]["config_source"] = "ExternalSystem"
-                elif provider in ("aoqiwei_supply",):
-                    adapters_status["aoqiwei_supply"]["configured"] = True
-                    adapters_status["aoqiwei_supply"]["config_source"] = "ExternalSystem"
+                elif provider in ("chixingyun",):
+                    adapters_status["chixingyun"]["configured"] = True
+                    adapters_status["chixingyun"]["config_source"] = "ExternalSystem"
     except Exception as exc:
         logger.warning("pos_sync.status_ext_query_failed", error=str(exc))
 
@@ -1046,7 +1046,7 @@ async def get_sync_status(
                 """))
             for row in rows.fetchall():
                 src = row[0]
-                key = "aoqiwei_supply" if src == "aoqiwei_supply" else src
+                key = "chixingyun" if src == "chixingyun" else src
                 if key in adapters_status:
                     adapters_status[key]["last_sync_date"] = str(row[1]) if row[1] else None
                     adapters_status[key]["recent_7d_orders"] = int(row[2] or 0)
@@ -1062,8 +1062,8 @@ async def get_sync_status(
                 """))
             crm_data = crm_row.fetchone()
             if crm_data and crm_data[0]:
-                adapters_status["aoqiwei_crm"]["recent_7d_phones_enriched"] = int(crm_data[0])
-                adapters_status["aoqiwei_crm"]["last_crm_sync_at"] = str(crm_data[1]) if crm_data[1] else None
+                adapters_status["weishenghuo"]["recent_7d_phones_enriched"] = int(crm_data[0])
+                adapters_status["weishenghuo"]["last_crm_sync_at"] = str(crm_data[1]) if crm_data[1] else None
     except Exception as exc:
         logger.warning("pos_sync.status_query_failed", error=str(exc))
 
@@ -1112,7 +1112,7 @@ async def get_merchants_status(
         for e in ext_list:
             if e.provider == "pinzhi" and e.store_id:
                 pos_by_store[str(e.store_id)] = e
-            elif e.provider in ("aoqiwei", "aoqiwei_crm"):
+            elif e.provider in ("weishenghuo",):
                 cfg = e.config if isinstance(e.config, dict) else {}
                 bid = cfg.get("brand_id", "")
                 if bid:
@@ -1170,7 +1170,7 @@ async def get_merchants_status(
                 "brand_id": bid,
                 "city": getattr(store, "city", None),
                 "pinzhi_pos": pos_info,
-                "aoqiwei_crm": crm_info,
+                "weishenghuo": crm_info,
                 "recent_7d_orders": store_orders["order_cnt"],
                 "recent_7d_revenue_yuan": store_orders["revenue_yuan"],
                 "data_flowing": store_orders["order_cnt"] > 0,
@@ -1195,8 +1195,8 @@ async def get_merchants_status(
 class BackfillRequest(BaseModel):
     adapter: str = Field(
         ...,
-        description="适配器类型：pinzhi / aoqiwei_crm",
-        pattern="^(pinzhi|tiancai|aoqiwei_supply|aoqiwei_crm)$",
+        description="适配器类型：pinzhi / weishenghuo",
+        pattern="^(pinzhi|tiancai|chixingyun|weishenghuo)$",
     )
     start_date: str = Field(..., description="开始日期 YYYY-MM-DD（含）")
     end_date: str = Field(..., description="结束日期 YYYY-MM-DD（含）")
@@ -1238,7 +1238,7 @@ async def backfill_history(
     新商户初次接入后，批量拉取指定日期范围内的历史订单并写入 DB。
 
     - 每天单独调用一次 POS 同步（与按需触发逻辑完全一致，幂等）
-    - 支持适配器：pinzhi / aoqiwei_crm
+    - 支持适配器：pinzhi / weishenghuo
     - 最多 90 天，防止误操作
     - 单天失败不中断其他天，在 days[].error 中记录
 

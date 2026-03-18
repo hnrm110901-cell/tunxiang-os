@@ -617,8 +617,8 @@ celery_app.conf.update(
             "args": (),
             "options": {"queue": "default", "priority": 7},
         },
-        # 每日凌晨 02:25 奥琦玮CRM会员数据增强（基于近30天订单手机号逐条查询）
-        "enrich-members-aoqiwei-crm": {
+        # 每日凌晨 02:25 微生活会员数据增强（基于近30天订单手机号逐条查询）
+        "enrich-members-weishenghuo": {
             "task": "src.core.celery_tasks.enrich_members_from_aoqiwei_crm",
             "schedule": crontab(
                 hour=int(os.getenv("AOQIWEI_CRM_ENRICH_HOUR", "2")),
@@ -847,9 +847,9 @@ celery_app.conf.update(
             "args": (),
             "options": {"queue": "default", "priority": 6},
         },
-        # 每日凌晨 03:30 奥琦玮CRM会员增量同步（逐条查询 + ConsumerIdMapping 桥接）
-        "sync-aoqiwei-crm-members": {
-            "task": "sync_aoqiwei_crm_members",
+        # 每日凌晨 03:30 微生活会员增量同步（逐条查询 + ConsumerIdMapping 桥接）
+        "sync-weishenghuo-members": {
+            "task": "sync_weishenghuo_members",
             "schedule": crontab(
                 hour=int(os.getenv("AOQIWEI_CRM_SYNC_HOUR", "3")),
                 minute=int(os.getenv("AOQIWEI_CRM_SYNC_MINUTE", "30")),

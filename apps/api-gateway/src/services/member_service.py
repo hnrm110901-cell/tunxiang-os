@@ -1,6 +1,6 @@
 """
 Member Service
-奥琦韦会员系统服务层
+微生活会员系统服务层（奥琦玮旗下）
 """
 
 import os

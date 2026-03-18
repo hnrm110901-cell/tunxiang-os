@@ -5714,7 +5714,7 @@ def pull_aoqiwei_daily_supply(self) -> Dict[str, Any]:
     当前对接客户：尝在一起（base_url: czyqss.scmacewill.cn）
 
     凭证来源（优先级）：
-      1. external_systems 表 provider='aoqiwei_scm'（由 seed_real_merchants.py 写入）
+      1. external_systems 表 provider='chixingyun'（由 seed_real_merchants.py 写入）
       2. 环境变量 AOQIWEI_BASE_URL / AOQIWEI_APP_KEY / AOQIWEI_APP_SECRET（fallback）
 
     门店 shopCode：
@@ -5744,12 +5744,12 @@ def pull_aoqiwei_daily_supply(self) -> Dict[str, Any]:
 
         try:
             async with get_db_session() as session:
-                # 优先从 external_systems 表读取供应链凭证（provider='aoqiwei_scm'）
+                # 优先从 external_systems 表读取供应链凭证（provider='chixingyun'）
                 scm_rows = await session.execute(
                     _t("""
                         SELECT api_endpoint, api_key, api_secret, config
                         FROM external_systems
-                        WHERE provider = 'aoqiwei_scm'
+                        WHERE provider = 'chixingyun'
                           AND status = 'active'
                         LIMIT 10
                     """)
@@ -5941,7 +5941,7 @@ def enrich_members_from_aoqiwei_crm(self) -> Dict[str, Any]:
     从奥琦玮微生活 CRM 拉取会员积分/余额/等级，写入 MemberSync 表。
 
     执行流程：
-      1. 从 ExternalSystem 表查找 provider='aoqiwei_crm' 的已启用配置
+      1. 从 ExternalSystem 表查找 provider='weishenghuo' 的已启用配置
       2. 从 orders.customer_phone 提取近 30 天有消费记录的会员手机号
       3. 逐个调用 CRM /member/info 补全会员数据
       4. 写入 member_syncs 表（支持 upsert）
@@ -5978,7 +5978,7 @@ def enrich_members_from_aoqiwei_crm(self) -> Dict[str, Any]:
             sys_result = await session.execute(_text("""
                     SELECT api_key, api_secret, api_endpoint
                     FROM external_systems
-                    WHERE provider = 'aoqiwei_crm'
+                    WHERE provider = 'weishenghuo'
                       AND status != 'inactive'
                     ORDER BY created_at ASC
                     LIMIT 1
@@ -6067,7 +6067,7 @@ def enrich_members_from_aoqiwei_crm(self) -> Dict[str, Any]:
                             VALUES
                                 (gen_random_uuid(),
                                  (SELECT id FROM external_systems
-                                  WHERE provider='aoqiwei_crm' LIMIT 1),
+                                  WHERE provider='weishenghuo' LIMIT 1),
                                  :phone, :cno,
                                  :phone, :name, :level, :points, :balance,
                                  'success', NOW(), :raw_data::jsonb,
@@ -6430,32 +6430,31 @@ def check_approval_timeouts(self) -> Dict[str, Any]:
         return {"error": str(exc)}
 
 
-# ── 奥琦玮CRM会员：按手机号逐条查询 + ConsumerIdMapping 桥接 ─────────────────
+# ── 微生活会员：按手机号逐条查询 + ConsumerIdMapping 桥接 ─────────────────
 
 
 @celery_app.task(
     bind=True,
-    name="sync_aoqiwei_crm_members",
+    name="sync_weishenghuo_members",
     max_retries=3,
     default_retry_delay=300,
     soft_time_limit=600,
     time_limit=900,
 )
-def sync_aoqiwei_crm_members(self) -> Dict[str, Any]:
+def sync_weishenghuo_members(self) -> Dict[str, Any]:
     """
-    从奥琦玮CRM（api.acewill.net / welcrm.com）增量同步会员数据，
+    从微生活会员系统（奥琦玮旗下，api.acewill.net）增量同步会员数据，
     写入 member_syncs 表并建立 ConsumerIdMapping。
 
     执行流程：
-      1. 从 external_systems 查找 provider='aoqiwei' AND type='member' 的已启用配置
+      1. 从 external_systems 查找 provider='weishenghuo' AND type='member' 的已启用配置
       2. 初始化 AoqiweiCrmAdapter（appid + appkey 签名认证）
-      3. 从近30天订单中提取去重手机号（与 enrich_members_from_aoqiwei_crm 相同策略，
-         因为奥琦玮CRM无批量导出API，仅支持按手机号/卡号逐条查询）
+      3. 从近30天订单中提取去重手机号（微生活CRM无批量导出API，仅支持按手机号/卡号逐条查询）
       4. 逐条调用 adapter.get_member_info(mobile=phone) 获取会员数据
       5. 对每个会员：upsert member_syncs + 创建 ConsumerIdMapping（POS_MEMBER_ID + PHONE）
       6. 更新 Redis last_sync_time 供下次增量同步使用
 
-    Redis Key：aoqiwei_crm:last_sync:{brand_id} — ISO 格式时间戳
+    Redis Key：weishenghuo:last_sync:{brand_id} — ISO 格式时间戳
 
     Returns:
         {success, brands_processed, members_synced, new_mappings, errors}
@@ -6470,7 +6469,7 @@ def sync_aoqiwei_crm_members(self) -> Dict[str, Any]:
 
     db_url = os.getenv("DATABASE_URL", "")
     if not db_url:
-        logger.warning("sync_aoqiwei_crm_members.skipped", reason="DATABASE_URL 未配置")
+        logger.warning("sync_weishenghuo_members.skipped", reason="DATABASE_URL 未配置")
         return {
             "success": True,
             "skipped": True,
@@ -6491,18 +6490,18 @@ def sync_aoqiwei_crm_members(self) -> Dict[str, Any]:
 
     try:
         with engine.connect() as conn:
-            # 1. 查找所有已启用的奥琦玮CRM会员配置（provider='aoqiwei' + type='member'）
+            # 1. 查找所有已启用的微生活会员配置（provider='weishenghuo' + type='member'）
             sys_rows = conn.execute(text("""
                 SELECT id, store_id, brand_id, api_key, api_secret, api_endpoint, config
                 FROM external_systems
-                WHERE provider = 'aoqiwei'
+                WHERE provider = 'weishenghuo'
                   AND type = 'member'
                   AND status != 'inactive'
                 ORDER BY created_at ASC
             """)).fetchall()
 
             if not sys_rows:
-                logger.info("sync_aoqiwei_crm_members.no_config", reason="无已启用的奥琦玮CRM会员配置")
+                logger.info("sync_weishenghuo_members.no_config", reason="无已启用的微生活会员配置")
                 return {
                     "success": True,
                     "skipped": True,
@@ -6528,7 +6527,7 @@ def sync_aoqiwei_crm_members(self) -> Dict[str, Any]:
                 if not appid or not appkey:
                     errors.append(f"brand={brand_id}: appid 或 appkey 未配置，跳过")
                     logger.warning(
-                        "sync_aoqiwei_crm_members.brand_skip",
+                        "sync_weishenghuo_members.brand_skip",
                         brand_id=brand_id,
                         reason="缺少凭证",
                     )
@@ -6543,7 +6542,7 @@ def sync_aoqiwei_crm_members(self) -> Dict[str, Any]:
                 })
 
                 # 2. 从 Redis 获取上次同步时间（增量拉取）
-                redis_key = f"aoqiwei_crm:last_sync:{brand_id}"
+                redis_key = f"weishenghuo:last_sync:{brand_id}"
                 last_sync_str = rds.get(redis_key)
 
                 # 3. 从近期订单提取去重手机号（增量：只取 last_sync 后的新订单手机号）
@@ -6653,7 +6652,7 @@ def sync_aoqiwei_crm_members(self) -> Dict[str, Any]:
                                                 gen_random_uuid()
                                             ),
                                             'pos_member_id', :member_id,
-                                            :store_id, 'aoqiwei_crm', 80,
+                                            :store_id, 'weishenghuo', 80,
                                             false, true, NOW(), NOW()
                                         WHERE NOT EXISTS (
                                             SELECT 1 FROM consumer_id_mappings
@@ -6686,7 +6685,7 @@ def sync_aoqiwei_crm_members(self) -> Dict[str, Any]:
                                                 gen_random_uuid()
                                             ),
                                             'phone', :mobile,
-                                            :store_id, 'aoqiwei_crm', 90,
+                                            :store_id, 'weishenghuo', 90,
                                             false, true, NOW(), NOW()
                                         WHERE NOT EXISTS (
                                             SELECT 1 FROM consumer_id_mappings
@@ -6707,7 +6706,7 @@ def sync_aoqiwei_crm_members(self) -> Dict[str, Any]:
                         except Exception as member_exc:
                             errors.append(f"brand={brand_id}, phone={phone}: {str(member_exc)}")
                             logger.warning(
-                                "sync_aoqiwei_crm_members.member_error",
+                                "sync_weishenghuo_members.member_error",
                                 brand_id=brand_id,
                                 phone=phone,
                                 error=str(member_exc),
@@ -6724,7 +6723,7 @@ def sync_aoqiwei_crm_members(self) -> Dict[str, Any]:
                     new_mappings += brand_new_mappings
 
                     logger.info(
-                        "sync_aoqiwei_crm_members.brand_done",
+                        "sync_weishenghuo_members.brand_done",
                         brand_id=brand_id,
                         members_synced=brand_synced,
                         new_mappings=brand_new_mappings,
@@ -6733,7 +6732,7 @@ def sync_aoqiwei_crm_members(self) -> Dict[str, Any]:
                 except Exception as brand_exc:
                     errors.append(f"brand={brand_id}: {str(brand_exc)}")
                     logger.error(
-                        "sync_aoqiwei_crm_members.brand_error",
+                        "sync_weishenghuo_members.brand_error",
                         brand_id=brand_id,
                         error=str(brand_exc),
                     )
@@ -6746,11 +6745,11 @@ def sync_aoqiwei_crm_members(self) -> Dict[str, Any]:
                         pass
 
     except Exception as exc:
-        logger.error("sync_aoqiwei_crm_members.failed", error=str(exc))
+        logger.error("sync_weishenghuo_members.failed", error=str(exc))
         raise self.retry(exc=exc)
 
     logger.info(
-        "sync_aoqiwei_crm_members.done",
+        "sync_weishenghuo_members.done",
         brands_processed=brands_processed,
         members_synced=members_synced,
         new_mappings=new_mappings,

@@ -317,9 +317,9 @@ class IntegrationService:
         if not system.api_endpoint:
             return {"success": False, "error": "未配置API端点"}
 
-        # 奥琦玮微生活会员：使用 CRM 适配器真实 API 测试
-        if system.provider in ("aoqiwei_crm",):
-            return await self._test_aoqiwei_crm_connection(system)
+        # 微生活会员：使用 CRM 适配器真实 API 测试
+        if system.provider in ("weishenghuo",):
+            return await self._test_weishenghuo_connection(system)
 
         try:
             headers = {}
@@ -341,7 +341,7 @@ class IntegrationService:
         except Exception as e:
             return {"success": False, "error": str(e)}
 
-    async def _test_aoqiwei_crm_connection(self, system: ExternalSystem) -> Dict[str, Any]:
+    async def _test_weishenghuo_connection(self, system: ExternalSystem) -> Dict[str, Any]:
         """
         测试奥琦玮微生活会员 CRM 连接。
         通过调用 /member/info（传入不存在的测试号码）来验证签名算法和网络连通性。
