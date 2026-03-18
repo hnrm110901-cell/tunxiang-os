@@ -857,6 +857,13 @@ celery_app.conf.update(
             "args": (),
             "options": {"queue": "default", "priority": 7},
         },
+        # P2: 每日凌晨 03:00 发券 ROI 日汇总
+        "aggregate-coupon-roi-daily": {
+            "task": "src.core.celery_tasks.aggregate_coupon_roi_daily",
+            "schedule": crontab(hour=3, minute=0),
+            "args": (),
+            "options": {"queue": "default", "priority": 5},
+        },
     },
 )
 

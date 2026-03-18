@@ -7111,3 +7111,37 @@ def recalculate_rfm_daily(self):
             }
 
     return asyncio.run(_run())
+
+
+# ── 发券 ROI 日汇总 ──────────────────────────────────────────────────────────
+
+
+@celery_app.task(bind=True, max_retries=2, default_retry_delay=300)
+def aggregate_coupon_roi_daily(self, target_date_str: str = None):
+    """每日汇总发券 ROI 数据（凌晨 03:00 执行）"""
+
+    async def _run():
+        from datetime import date as _date, timedelta
+        from ..core.database import AsyncSessionLocal
+        from ..services.coupon_roi_service import coupon_roi_service
+        from sqlalchemy import select
+        from ..models.store import Store
+
+        td = _date.fromisoformat(target_date_str) if target_date_str else _date.today() - timedelta(days=1)
+        logger.info("开始发券ROI日汇总", date=str(td))
+
+        async with AsyncSessionLocal() as db:
+            stores = (await db.execute(select(Store.id, Store.brand_id))).all()
+            results = []
+            for sid, bid in stores:
+                try:
+                    r = await coupon_roi_service.aggregate_daily(db, td, sid, bid or "")
+                    results.append(r)
+                except Exception as e:
+                    logger.warning("ROI汇总单店失败", store_id=sid, error=str(e))
+            await db.commit()
+
+        logger.info("发券ROI日汇总完成", date=str(td), stores=len(results))
+        return {"success": True, "date": str(td), "stores_processed": len(results)}
+
+    return asyncio.run(_run())

@@ -13,6 +13,7 @@ from ..models.user import User
 from ..models.service_voucher import ServiceVoucherTemplate
 from ..models.consumer_identity import ConsumerIdentity
 from ..services.coupon_distribution_service import coupon_distribution_service
+from ..services.coupon_roi_service import coupon_roi_service
 
 logger = structlog.get_logger(__name__)
 
@@ -126,3 +127,45 @@ async def confirm_service_voucher(
     return await coupon_distribution_service.confirm_service_voucher(
         db=db, voucher_id=UUID(voucher_id), confirmed_by=confirmed_by,
     )
+
+
+@router.get("/{store_id}/coupon-roi", summary="发券ROI查询")
+async def query_coupon_roi(
+    store_id: str,
+    start_date: str = Query(..., description="开始日期 YYYY-MM-DD"),
+    end_date: str = Query(..., description="结束日期 YYYY-MM-DD"),
+    staff_id: Optional[str] = Query(None),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """查询发券 ROI 汇总 + 日趋势"""
+    await validate_store_brand(store_id, current_user)
+    from datetime import date as _date
+    sd = _date.fromisoformat(start_date)
+    ed = _date.fromisoformat(end_date)
+    sid = UUID(staff_id) if staff_id else None
+    return await coupon_roi_service.query_roi(
+        db=db, store_id=store_id, brand_id=current_user.brand_id or "",
+        start_date=sd, end_date=ed, staff_id=sid,
+    )
+
+
+@router.get("/{store_id}/coupon-roi/leaderboard", summary="发券员工排行榜")
+async def coupon_staff_leaderboard(
+    store_id: str,
+    start_date: str = Query(..., description="开始日期 YYYY-MM-DD"),
+    end_date: str = Query(..., description="结束日期 YYYY-MM-DD"),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """员工发券效果排行"""
+    await validate_store_brand(store_id, current_user)
+    from datetime import date as _date
+    sd = _date.fromisoformat(start_date)
+    ed = _date.fromisoformat(end_date)
+    return {
+        "leaderboard": await coupon_roi_service.staff_leaderboard(
+            db=db, store_id=store_id, brand_id=current_user.brand_id or "",
+            start_date=sd, end_date=ed,
+        )
+    }
