@@ -97,12 +97,99 @@ class IntelligentRecommendationEngine:
 
     def __init__(self, db: AsyncSession):
         self.db = db
-        # User-dish interaction matrix (simplified)
+        # User-dish interaction matrix — 从 customer_dish_interactions 表加载，持久化
         self.user_dish_matrix: Dict[str, Dict[str, float]] = {}
+        self._matrix_loaded = False
         # Dish similarity matrix
         self.dish_similarity: Dict[str, Dict[str, float]] = {}
         # Price elasticity data
         self.price_elasticity: Dict[str, float] = {}
+
+    async def _ensure_matrix_loaded(self, store_id: str) -> None:
+        """
+        惰性加载门店的 user_dish_matrix（从 customer_dish_interactions 表）。
+        每次实例化只加载一次（避免重复查询）。
+        """
+        if self._matrix_loaded:
+            return
+        try:
+            from sqlalchemy import text
+            rows = (await self.db.execute(
+                text("""
+                    SELECT customer_id, dish_id,
+                           SUM(score) AS total_score
+                    FROM customer_dish_interactions
+                    WHERE store_id = :sid
+                    GROUP BY customer_id, dish_id
+                """),
+                {"sid": store_id},
+            )).fetchall()
+            for r in rows:
+                cid, did, sc = str(r[0]), str(r[1]), float(r[2])
+                if cid not in self.user_dish_matrix:
+                    self.user_dish_matrix[cid] = {}
+                self.user_dish_matrix[cid][did] = sc
+            self._matrix_loaded = True
+        except Exception as exc:
+            import structlog as _sl
+            _sl.get_logger().warning(
+                "recommendation_engine.matrix_load_failed",
+                store_id=store_id, error=str(exc),
+            )
+
+    async def record_interaction(
+        self,
+        store_id:         str,
+        customer_id:      str,
+        dish_id:          str,
+        interaction_type: str,
+        order_id:         Optional[str] = None,
+    ) -> None:
+        """
+        记录一次用户-菜品交互，写入 customer_dish_interactions 表并更新内存矩阵。
+
+        interaction_type → score 映射：
+          order      → +1.0（点了一次）
+          reorder    → +2.0（复购，偏好更强）
+          review_pos → +3.0（好评，强偏好信号）
+          review_neg → -1.0（差评，负偏好信号）
+        """
+        _SCORE_MAP = {
+            "order":      1.0,
+            "reorder":    2.0,
+            "review_pos": 3.0,
+            "review_neg": -1.0,
+        }
+        score = _SCORE_MAP.get(interaction_type, 1.0)
+        try:
+            from sqlalchemy import text
+            from datetime import datetime
+            await self.db.execute(
+                text("""
+                    INSERT INTO customer_dish_interactions
+                        (store_id, customer_id, dish_id, score, interaction_type,
+                         order_id, recorded_at)
+                    VALUES
+                        (:sid, :cid, :did, :score, :itype, :oid, :ts)
+                """),
+                {
+                    "sid": store_id, "cid": customer_id, "did": dish_id,
+                    "score": score, "itype": interaction_type,
+                    "oid": order_id, "ts": datetime.utcnow(),
+                },
+            )
+            await self.db.commit()
+            # 同步更新内存矩阵
+            if customer_id not in self.user_dish_matrix:
+                self.user_dish_matrix[customer_id] = {}
+            self.user_dish_matrix[customer_id][dish_id] = (
+                self.user_dish_matrix[customer_id].get(dish_id, 0.0) + score
+            )
+        except Exception as exc:
+            import structlog as _sl
+            _sl.get_logger().warning(
+                "recommendation_engine.record_interaction_failed", error=str(exc)
+            )
 
     async def recommend_dishes(
         self,
@@ -131,6 +218,9 @@ class IntelligentRecommendationEngine:
             List of dish recommendations with scores and reasons
         """
         context = context or {}
+
+        # 确保 user_dish_matrix 已从 DB 加载（在线学习数据）
+        await self._ensure_matrix_loaded(store_id)
 
         # Get customer history
         customer_history = await self._get_customer_history(customer_id, store_id)

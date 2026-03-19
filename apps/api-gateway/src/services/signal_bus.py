@@ -458,3 +458,147 @@ async def run_periodic_scan(store_id: str, db: AsyncSession) -> Dict[str, Any]:
     results["total_routed"] = total_routed
     logger.info("signal_bus.scan.done", store_id=store_id, total_routed=total_routed)
     return results
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 可配置路由层 — 从 signal_routing_rules 表加载规则并派发
+# ═══════════════════════════════════════════════════════════════════════════════
+
+async def _load_active_rules(db: AsyncSession) -> List[Dict[str, Any]]:
+    """
+    从 DB 加载所有启用的路由规则，按 priority ASC 排序。
+    失败时返回空列表（回退到硬编码路由）。
+    """
+    try:
+        rows = (await db.execute(
+            text("""
+                SELECT id, condition_type, condition_params,
+                       action_type, action_params, priority
+                FROM signal_routing_rules
+                WHERE enabled = true
+                ORDER BY priority ASC
+            """),
+        )).fetchall()
+        return [
+            {
+                "id":               r[0],
+                "condition_type":   r[1],
+                "condition_params": r[2] or {},
+                "action_type":      r[3],
+                "action_params":    r[4] or {},
+                "priority":         r[5],
+            }
+            for r in rows
+        ]
+    except Exception as exc:
+        logger.warning("signal_bus.load_rules_failed", error=str(exc))
+        return []
+
+
+async def _dispatch_rule(
+    rule:     Dict[str, Any],
+    store_id: str,
+    db:       AsyncSession,
+) -> Dict[str, Any]:
+    """
+    根据单条规则的 action_type 派发到对应路由函数。
+    未知 action_type 静默跳过。
+    """
+    action_type = rule["action_type"]
+    params      = rule["action_params"]
+
+    if action_type == "repair_journey":
+        # 扫描未处理差评，批量触发
+        threshold = rule["condition_params"].get("rating_threshold", 3)
+        since = (datetime.datetime.utcnow()
+                 - datetime.timedelta(hours=_SCAN_WINDOW_HOURS)).isoformat()
+        rows = (await db.execute(
+            text("""
+                SELECT signal_id, customer_id, description
+                FROM private_domain_signals
+                WHERE store_id = :s AND signal_type = 'bad_review'
+                  AND resolved_at IS NULL AND triggered_at >= :since
+                LIMIT 20
+            """),
+            {"s": store_id, "since": since},
+        )).fetchall()
+        routed = 0
+        for r in rows:
+            rating = 1
+            if "rating:" in (r[2] or ""):
+                try:
+                    rating = int(r[2].split("rating:")[-1].split()[0])
+                except ValueError:
+                    pass
+            if rating <= threshold:
+                await route_bad_review(store_id, r[0], r[1], rating, r[2] or "", db)
+                routed += 1
+        return {"rule_id": rule["id"], "action_type": action_type, "routed": routed}
+
+    if action_type == "waste_push":
+        result = await route_near_expiry(store_id, db, push=True)
+        return {"rule_id": rule["id"], "action_type": action_type, **result}
+
+    if action_type == "referral_engine":
+        min_size = rule["condition_params"].get("min_table_size", _LARGE_TABLE_THRESHOLD)
+        since = (datetime.datetime.utcnow()
+                 - datetime.timedelta(hours=_SCAN_WINDOW_HOURS)).isoformat()
+        today = datetime.date.today().isoformat()
+        rows = (await db.execute(
+            text("""
+                SELECT id, customer_phone, customer_name, party_size, reservation_date::text
+                FROM reservations
+                WHERE store_id = :s AND reservation_date = :today
+                  AND party_size >= :threshold AND created_at >= :since
+                ORDER BY party_size DESC LIMIT 10
+            """),
+            {"s": store_id, "today": today, "threshold": min_size, "since": since},
+        )).fetchall()
+        routed = 0
+        for row in rows:
+            await route_large_table_reservation(
+                store_id=store_id, reservation_id=str(row[0]),
+                customer_phone=str(row[1]), customer_name=str(row[2]),
+                party_size=int(row[3]), reservation_date=str(row[4]), db=db,
+            )
+            routed += 1
+        return {"rule_id": rule["id"], "action_type": action_type, "routed": routed}
+
+    logger.debug("signal_bus.unknown_action_type", action_type=action_type)
+    return {"rule_id": rule["id"], "action_type": action_type, "routed": 0}
+
+
+async def run_rule_driven_scan(store_id: str, db: AsyncSession) -> Dict[str, Any]:
+    """
+    规则驱动扫描入口（替代硬编码的 run_periodic_scan）。
+
+    优先从 signal_routing_rules 表加载规则；
+    若表为空或查询失败，降级到 run_periodic_scan（硬编码路由）。
+    """
+    rules = await _load_active_rules(db)
+
+    if not rules:
+        logger.info("signal_bus.no_db_rules.fallback_to_hardcoded", store_id=store_id)
+        return await run_periodic_scan(store_id, db)
+
+    dispatch_results = []
+    for rule in rules:
+        try:
+            result = await _dispatch_rule(rule, store_id, db)
+            dispatch_results.append(result)
+        except Exception as exc:
+            logger.warning(
+                "signal_bus.rule_dispatch_failed",
+                rule_id=rule["id"], error=str(exc),
+            )
+
+    total_routed = sum(r.get("routed", 0) for r in dispatch_results)
+    logger.info("signal_bus.rule_scan_done",
+                store_id=store_id, rules_applied=len(rules), total_routed=total_routed)
+    return {
+        "store_id":     store_id,
+        "scanned_at":   datetime.datetime.utcnow().isoformat(),
+        "rules_applied": len(rules),
+        "total_routed": total_routed,
+        "details":      dispatch_results,
+    }

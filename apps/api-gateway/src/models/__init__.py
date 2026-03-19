@@ -612,3 +612,6 @@ from .marketing_task import (
     MarketingTaskExecution,
     MarketingTaskStats,
 )
+# P0-P2 智能提升（屯象OS）
+from .weight_learning import DecisionWeightConfig
+from .signal_routing_rule import SignalRoutingRule

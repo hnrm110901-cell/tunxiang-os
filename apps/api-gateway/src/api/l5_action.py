@@ -233,6 +233,32 @@ async def record_outcome(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="行动计划不存在")
 
     await db.commit()
+
+    # ── L5→L3 反馈弧：将行动结果写入 Neo4j，供跨店知识聚合使用 ──────────────
+    from src.services.action_ontology_service import ActionOntologyService
+    from src.services.decision_weight_learner import compute_accuracy_ratio
+    try:
+        ontology_svc = ActionOntologyService()
+        kpi_delta    = body.kpi_delta or {}
+        # 从 kpi_delta 估算实际影响金额（若有的话）
+        actual_impact = float(kpi_delta.get("impact_yuan", 0))
+        accuracy      = compute_accuracy_ratio(
+            outcome              = body.outcome if body.outcome in {"resolved"} else "failure",
+            actual_impact_yuan   = actual_impact,
+            expected_saving_yuan = float(kpi_delta.get("expected_yuan", max(actual_impact, 1))),
+        )
+        ontology_svc.record_outcome(
+            action_id          = plan_id,
+            store_id           = str(plan.store_id) if hasattr(plan, "store_id") else "unknown",
+            outcome            = body.outcome,
+            actual_impact_yuan = actual_impact,
+            accuracy_ratio     = accuracy,
+        )
+        ontology_svc.close()
+    except Exception as _exc:
+        import structlog as _sl
+        _sl.get_logger().warning("l5.ontology_feedback_failed", error=str(_exc))
+
     return {
         "plan_id": plan_id,
         "outcome": plan.outcome,

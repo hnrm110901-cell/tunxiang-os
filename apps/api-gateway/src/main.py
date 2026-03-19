@@ -984,6 +984,10 @@ from src.api import bff_coupon
 
 app.include_router(bff_coupon.router, tags=["BFF-发券"])
 
+# 统一门店健康指数 — Single Source of Truth（替代分散的 4 套健康分引擎）
+from src.api import store_health_index
+app.include_router(store_health_index.router, tags=["store_health_index"])
+
 # v2.0 MVP — 决策中枢（Top3 + 手动推送 + 场景识别）
 from src.api import decision_hub, monthly_report
 

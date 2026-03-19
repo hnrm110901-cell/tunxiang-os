@@ -73,7 +73,16 @@ async def submit_execution_feedback(
     # ③ 写入正向/负向信号（影响健康分的信号响应维度）
     signal_id = await _write_outcome_signal(store_id, decision_id, outcome, actual_impact_yuan, db)
 
-    # ④ 重算健康分
+    # ④ 在线权重学习：从 decision_log 取回 dim_scores，更新门店专属权重
+    await _trigger_weight_learning(
+        store_id=store_id,
+        decision_id=decision_id,
+        outcome=outcome,
+        actual_impact_yuan=actual_impact_yuan,
+        db=db,
+    )
+
+    # ⑤ 重算健康分
     health_after = await _get_current_score(store_id, db)
     delta = round(health_after - health_before, 1)
 
@@ -100,6 +109,46 @@ async def submit_execution_feedback(
 
 
 # ── 内部 helpers ──────────────────────────────────────────────────────────────
+
+async def _trigger_weight_learning(
+    store_id:           str,
+    decision_id:        str,
+    outcome:            str,
+    actual_impact_yuan: float,
+    db:                 AsyncSession,
+) -> None:
+    """
+    从 decision_log 取出 dim_scores 和 expected_saving_yuan，
+    调用 DecisionWeightLearner 更新门店专属权重。
+    失败不影响主流程。
+    """
+    try:
+        row = (await db.execute(
+            text("SELECT ai_suggestion FROM decision_logs WHERE id = :did"),
+            {"did": decision_id},
+        )).fetchone()
+        if not row:
+            return
+        suggestion = row[0] or {}
+        dim_scores = suggestion.get("dim_scores", {})
+        expected_saving_yuan = float(suggestion.get("expected_saving_yuan", 0))
+
+        if not dim_scores or expected_saving_yuan <= 0:
+            logger.debug("weight_learning.skip_no_dim_scores", decision_id=decision_id)
+            return
+
+        from src.services.decision_weight_learner import DecisionWeightLearner
+        await DecisionWeightLearner().update_from_feedback(
+            store_id=store_id,
+            dim_scores=dim_scores,
+            outcome=outcome,
+            actual_impact_yuan=actual_impact_yuan,
+            expected_saving_yuan=expected_saving_yuan,
+            db=db,
+        )
+    except Exception as exc:
+        logger.warning("weight_learning.failed", store_id=store_id, error=str(exc))
+
 
 
 async def _get_current_score(store_id: str, db: AsyncSession) -> float:

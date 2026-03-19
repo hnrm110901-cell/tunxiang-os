@@ -139,44 +139,61 @@ def _score_execution(execution_difficulty: str) -> float:
 def compute_priority_score(
     candidate: DecisionCandidate,
     monthly_revenue_yuan: float = 0.0,
-) -> float:
+    weights: Optional[Dict[str, float]] = None,
+) -> Tuple[float, Dict[str, float]]:
     """
     计算候选决策的综合优先级分（0-100）。
 
-    权重：财务40% + 紧急度30% + 置信度20% + 执行10%
+    权重默认 财务40% + 紧急度30% + 置信度20% + 执行10%，
+    可传入从 DecisionWeightLearner 加载的门店专属学习权重。
+
+    Returns:
+        (priority_score, dim_scores)  — dim_scores 供 WeightLearner 训练使用
     """
+    from src.services.decision_weight_learner import DEFAULT_WEIGHTS
+    w = weights or DEFAULT_WEIGHTS
+
     f = _score_financial(candidate.expected_saving_yuan, monthly_revenue_yuan)
     u = _score_urgency(candidate.urgency_hours)
     c = _score_confidence(candidate.confidence)
     e = _score_execution(candidate.execution_difficulty)
-    score = 0.40 * f + 0.30 * u + 0.20 * c + 0.10 * e
-    return round(score, 2)
+
+    dim_scores = {"financial": f, "urgency": u, "confidence": c, "execution": e}
+    score = (
+        w.get("financial",  0.40) * f
+        + w.get("urgency",    0.30) * u
+        + w.get("confidence", 0.20) * c
+        + w.get("execution",  0.10) * e
+    )
+    return round(score, 2), dim_scores
 
 
 def _format_decision(
     candidate: DecisionCandidate,
     priority_score: float,
     rank: int,
+    dim_scores: Optional[Dict[str, float]] = None,
 ) -> dict:
-    """将候选决策格式化为推送就绪的 dict（含 ¥ 字段）"""
+    """将候选决策格式化为推送就绪的 dict（含 ¥ 字段 + 维度分，供 WeightLearner 使用）"""
     roi = FinancialImpactCalculator.decision_roi(
         candidate.expected_saving_yuan,
         candidate.expected_cost_yuan,
     )
     return {
-        "rank": rank,
-        "title": candidate.title,
-        "action": candidate.action,
-        "source": candidate.source,
-        "expected_saving_yuan": round(candidate.expected_saving_yuan, 2),
-        "expected_cost_yuan": round(candidate.expected_cost_yuan, 2),
-        "net_benefit_yuan": roi["net_benefit_yuan"],
-        "confidence_pct": round(candidate.confidence * 100, 1),
-        "urgency_hours": candidate.urgency_hours,
-        "execution_difficulty": candidate.execution_difficulty,
-        "decision_window_label": candidate.decision_window_label,
-        "priority_score": priority_score,
-        "context": candidate.context,
+        "rank":                   rank,
+        "title":                  candidate.title,
+        "action":                 candidate.action,
+        "source":                 candidate.source,
+        "expected_saving_yuan":   round(candidate.expected_saving_yuan, 2),
+        "expected_cost_yuan":     round(candidate.expected_cost_yuan, 2),
+        "net_benefit_yuan":       roi["net_benefit_yuan"],
+        "confidence_pct":         round(candidate.confidence * 100, 1),
+        "urgency_hours":          candidate.urgency_hours,
+        "execution_difficulty":   candidate.execution_difficulty,
+        "decision_window_label":  candidate.decision_window_label,
+        "priority_score":         priority_score,
+        "dim_scores":             dim_scores or {},   # 供 WeightLearner 训练
+        "context":                candidate.context,
     }
 
 
@@ -567,12 +584,25 @@ class DecisionPriorityEngine:
             self.logger.info("no_candidates_found")
             return []
 
+        # ── 加载门店专属学习权重 ─────────────────────────────────────────────
+        from src.services.decision_weight_learner import DecisionWeightLearner
+        try:
+            learned_weights = await DecisionWeightLearner().get_weights(self.store_id, db)
+        except Exception:
+            learned_weights = None
+
         # ── 评分 & 排序 ─────────────────────────────────────────────────────
-        scored = [(candidate, compute_priority_score(candidate, monthly_revenue_yuan)) for candidate in all_candidates]
+        scored = [
+            (candidate, *compute_priority_score(candidate, monthly_revenue_yuan, learned_weights))
+            for candidate in all_candidates
+        ]
         scored.sort(key=lambda x: x[1], reverse=True)
 
         # ── 格式化 Top 3 ────────────────────────────────────────────────────
-        top3 = [_format_decision(candidate, score, rank + 1) for rank, (candidate, score) in enumerate(scored[:3])]
+        top3 = [
+            _format_decision(candidate, score, rank + 1, dim_scores)
+            for rank, (candidate, score, dim_scores) in enumerate(scored[:3])
+        ]
 
         self.logger.info(
             "get_top3_completed",
