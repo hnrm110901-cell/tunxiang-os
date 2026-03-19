@@ -1,0 +1,140 @@
+.page {
+  padding: 0;
+  max-width: 800px;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 2px;
+}
+
+.asOf {
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ── 综合评分卡 ─────────────────────────────────────────────────────────────── */
+
+.scoreCard { /* 继承 ZCard */ }
+
+.scoreInner {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 8px 0;
+}
+
+.scoreInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+}
+
+.levelBadge {
+  align-self: flex-start;
+  font-size: 14px;
+  padding: 3px 10px;
+}
+
+.scoreNum {
+  font-size: 13px;
+  color: var(--text-tertiary);
+}
+
+.scoreNum strong {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 2px;
+}
+
+.scoreHint {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  margin: 0;
+}
+
+/* ── 三支柱 ─────────────────────────────────────────────────────────────────── */
+
+.pillarRow {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border-subtle, #f0f0f0);
+}
+
+.pillarRow:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.pillarRow:first-child {
+  padding-top: 0;
+}
+
+.pillarHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.pillarLabel {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  display: block;
+}
+
+.pillarDesc {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  display: block;
+  margin-top: 2px;
+}
+
+.pillarRight {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.pillarWeight {
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+.pillarScore {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.barTrack {
+  height: 6px;
+  background: var(--surface-hover, #f5f5f5);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.barFill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 600ms ease;
+}

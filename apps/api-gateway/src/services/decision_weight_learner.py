@@ -90,18 +90,24 @@ def compute_gradient(
     accuracy_ratio: float,
 ) -> Dict[str, float]:
     """
-    计算各维度权重的梯度方向。
+    计算各维度权重的梯度方向（相对分数偏差法）。
 
     advantage = accuracy_ratio - 1.0（正：超预期，负：不达预期）
-    gradient_i = advantage × (score_i / 100)
+    gradient_i = advantage × (score_i - mean_score) / 100
 
-    含义：
-      决策表现超预期 → 高分维度权重增加（正确判断的奖励）
-      决策表现不达预期 → 高分维度权重减少（误判的惩罚）
+    使用"相对于均值的偏差"而非绝对分数，原因：
+      - 若用绝对分数，所有维度梯度同号 → normalize 后相互抵消，权重不收敛
+      - 用相对偏差，梯度之和 ≈ 0 → normalize 几乎不改变权重总量
+      - 高于均值的维度获得正梯度（成功时增权，失败时减权）
+      - 低于均值的维度获得负梯度（成功时减权，失败时增权）
+
+    结果：持续成功的决策中，最"关键"维度的权重逐步上升。
     """
     advantage = accuracy_ratio - 1.0
+    scores = [dim_scores_0_100.get(d, 0.0) for d in weights]
+    mean_score = sum(scores) / len(scores) if scores else 50.0
     return {
-        dim: advantage * (dim_scores_0_100.get(dim, 0.0) / 100.0)
+        dim: advantage * ((dim_scores_0_100.get(dim, 0.0) - mean_score) / 100.0)
         for dim in weights
     }
 
@@ -111,18 +117,26 @@ def apply_gradient(
     gradient: Dict[str, float],
     lr: float = LEARNING_RATE,
 ) -> Dict[str, float]:
-    """梯度步进 → clip → normalize，返回新权重。"""
+    """
+    梯度步进 → 迭代 clip+normalize 直到所有权重在 [WEIGHT_MIN, WEIGHT_MAX] 内。
+
+    单次 clip→normalize 可能导致归一化后某维度仍低于 WEIGHT_MIN，
+    因此最多迭代 10 次直至稳定（通常 1-2 次即收敛）。
+    """
     updated = {
         dim: weights[dim] + lr * gradient.get(dim, 0.0)
         for dim in weights
     }
-    # clip
-    clipped = {dim: max(WEIGHT_MIN, min(WEIGHT_MAX, v)) for dim, v in updated.items()}
-    # normalize（确保 sum = 1.0）
-    total = sum(clipped.values())
-    if total <= 0:
-        return DEFAULT_WEIGHTS.copy()
-    return {dim: round(v / total, 6) for dim, v in clipped.items()}
+    for _ in range(10):
+        clipped = {k: max(WEIGHT_MIN, min(WEIGHT_MAX, v)) for k, v in updated.items()}
+        total = sum(clipped.values())
+        if total <= 0:
+            return DEFAULT_WEIGHTS.copy()
+        normalized = {k: round(v / total, 6) for k, v in clipped.items()}
+        if all(WEIGHT_MIN - 1e-9 <= v <= WEIGHT_MAX + 1e-9 for v in normalized.values()):
+            return normalized
+        updated = normalized
+    return normalized
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

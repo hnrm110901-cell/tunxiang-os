@@ -988,6 +988,14 @@ app.include_router(bff_coupon.router, tags=["BFF-发券"])
 from src.api import store_health_index
 app.include_router(store_health_index.router, tags=["store_health_index"])
 
+# SignalBus 可配置路由规则管理
+from src.api import signal_routing
+app.include_router(signal_routing.router, tags=["signal_routing"])
+
+# 数据血缘追踪查询
+from src.api import data_lineage_api
+app.include_router(data_lineage_api.router, tags=["data_lineage"])
+
 # v2.0 MVP — 决策中枢（Top3 + 手动推送 + 场景识别）
 from src.api import decision_hub, monthly_report
 

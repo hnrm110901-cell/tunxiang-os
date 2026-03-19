@@ -391,6 +391,33 @@ async def get_push_ab_test(
         raise HTTPException(status_code=500, detail=f"A/B 测试分析失败: {exc}")
 
 
+# ── GET /api/v1/decisions/weight-history ─────────────────────────────────────
+
+@router.get("/weight-history", summary="门店决策权重学习历史")
+async def get_decision_weight_history(
+    store_id:     str,
+    current_user: User         = Depends(get_current_active_user),
+    db: AsyncSession           = Depends(get_db),
+):
+    """
+    查询指定门店的决策维度权重及其学习历史（供前端可视化演化曲线）。
+
+    Response:
+      - current:      当前生效的四维权重（financial / urgency / confidence / execution）
+      - history:      最近 20 次权重更新快照（含 ts 时间戳）
+      - sample_count: 累计学习样本数
+    """
+    from src.services.decision_weight_learner import DecisionWeightLearner
+    learner = DecisionWeightLearner()
+    result  = await learner.get_weight_history(store_id, db)
+    return {
+        "store_id":     store_id,
+        "current":      result["weights"],
+        "history":      result["history"],
+        "sample_count": result["sample_count"],
+    }
+
+
 @router.get("/push-ab-test/multi-store", summary="多门店推送时间点横向对比")
 async def get_push_ab_test_multi_store(
     store_ids: str = Query(..., description="逗号分隔的门店 ID 列表"),

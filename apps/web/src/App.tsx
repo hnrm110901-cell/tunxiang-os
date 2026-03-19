@@ -332,6 +332,8 @@ const SmMemberProfile = lazy(() => import('./pages/sm/MemberProfile'));
 const HqMarketingTasks = lazy(() => import('./pages/hq/MarketingTasks'));
 const HqMarketingTaskCreate = lazy(() => import('./pages/hq/MarketingTaskCreate'));
 const SmMarketingTasks = lazy(() => import('./pages/sm/MarketingTasks'));
+const SmStoreHealthIndex    = lazy(() => import('./pages/sm/StoreHealthIndexPage'));
+const HQWeightEvolution     = lazy(() => import('./pages/hq/WeightEvolutionPage'));
 
 // Role-based views — Employee H5 Self-Service (/emp)
 const EmployeeLayout    = lazy(() => import('./pages/employee/EmployeeLayout'));
@@ -1070,6 +1072,7 @@ const AppContent: React.FC = () => {
                   <Route path="members"  element={<SmMemberProfile />} />
                   <Route path="profile"  element={<SmProfile />} />
                   <Route path="marketing-tasks" element={<SmMarketingTasks />} />
+                  <Route path="health-index"          element={<SmStoreHealthIndex />} />
                 </Route>
 
                 {/* Role-based views — Chef (手机) */}
@@ -1137,6 +1140,7 @@ const AppContent: React.FC = () => {
                   {/* 营销任务 */}
                   <Route path="marketing-tasks" element={<HqMarketingTasks />} />
                   <Route path="marketing-tasks/create" element={<HqMarketingTaskCreate />} />
+                  <Route path="weight-evolution"  element={<HQWeightEvolution />} />
                 </Route>
 
                 {/* Role-based views — Employee H5 Self-Service (手机) */}
