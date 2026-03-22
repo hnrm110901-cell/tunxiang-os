@@ -79,15 +79,7 @@ new-store:
 # ─── Agent 验证 ───
 
 verify-agents:
-	@cd services/tx-agent/src && python3 -c "\
-	import sys; sys.path.insert(0, '.'); \
-	from agents.skills import ALL_SKILL_AGENTS; \
-	import asyncio; \
-	total=0; ok=0; \
-	for cls in ALL_SKILL_AGENTS: \
-	    a=cls(tenant_id='test'); \
-	    for act in a.get_supported_actions(): \
-	        r=asyncio.run(a.execute(act, {})); \
-	        total+=1; ok+=1 if r.success or 'Unsupported' not in (r.error or '') else 0; \
-	print(f'Agent actions: {ok}/{total} ({round(ok/total*100)}%)'); \
-	"
+	@python3 scripts/verify_agents.py 2>&1 | grep -v "\[info\]"
+
+smoke:
+	@bash scripts/smoke_test.sh
