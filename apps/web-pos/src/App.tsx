@@ -1,14 +1,22 @@
-import { isAndroidPOS, isIPad, isBrowser } from './bridge/TXBridge';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { CashierPage } from './pages/CashierPage';
+import { OrderPage } from './pages/OrderPage';
+import { SettlePage } from './pages/SettlePage';
+import { ShiftPage } from './pages/ShiftPage';
+import { TableMapPage } from './pages/TableMapPage';
 
 function App() {
-  const env = isAndroidPOS() ? 'Android POS' : isIPad() ? 'iPad' : 'Browser';
-
   return (
-    <div style={{ padding: 24, textAlign: 'center' }}>
-      <h1>TunxiangOS POS</h1>
-      <p>V3.0 — AI-Native Restaurant Chain Operating System</p>
-      <p>Environment: {env}</p>
-    </div>
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Navigate to="/tables" replace />} />
+        <Route path="/tables" element={<TableMapPage />} />
+        <Route path="/cashier/:tableNo" element={<CashierPage />} />
+        <Route path="/order/:orderId" element={<OrderPage />} />
+        <Route path="/settle/:orderId" element={<SettlePage />} />
+        <Route path="/shift" element={<ShiftPage />} />
+      </Routes>
+    </BrowserRouter>
   );
 }
 
