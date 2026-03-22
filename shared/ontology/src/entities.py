@@ -1,62 +1,362 @@
-"""六大核心实体 — Ontology L1 层骨架定义
+"""六大核心实体 — Ontology L1 层完整定义
 
-详细字段在各域微服务中扩展，此处仅定义核心标识字段。
+从 tunxiang V2.x 模型提取，统一添加 tenant_id + RLS 支持。
+金额统一存分（fen），展示时 /100 转元。
 """
-from sqlalchemy import String, Integer, Numeric
-from sqlalchemy.orm import Mapped, mapped_column
+import uuid
+
+from sqlalchemy import (
+    Boolean, Date, DateTime, Float, Integer, Numeric, String, Text,
+    ForeignKey, Index, UniqueConstraint, func,
+)
+from sqlalchemy.dialects.postgresql import ARRAY, JSON, UUID
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import TenantBase
+from .enums import (
+    OrderStatus, StoreStatus, InventoryStatus, TransactionType,
+    EmploymentStatus, EmploymentType, StorageType, RFMLevel,
+)
 
+
+# ─────────────────────────────────────────────
+# 1. Customer — 顾客（Golden ID 全渠道画像）
+# ─────────────────────────────────────────────
 
 class Customer(TenantBase):
-    """顾客 — Golden ID, 全渠道画像, RFM 分层, 生命周期"""
+    """CDP 统一消费者身份 — Golden ID"""
     __tablename__ = "customers"
 
-    golden_id: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
-    name: Mapped[str] = mapped_column(String(100), nullable=False)
-    phone: Mapped[str | None] = mapped_column(String(20))
+    primary_phone: Mapped[str] = mapped_column(String(20), nullable=False, unique=True, index=True)
+    display_name: Mapped[str | None] = mapped_column(String(100))
+    gender: Mapped[str | None] = mapped_column(String(10))
+    birth_date: Mapped[str | None] = mapped_column(Date)
+    anniversary: Mapped[str | None] = mapped_column(Date)
+
+    # 微信身份
+    wechat_openid: Mapped[str | None] = mapped_column(String(128), index=True)
+    wechat_unionid: Mapped[str | None] = mapped_column(String(128), index=True)
+    wechat_nickname: Mapped[str | None] = mapped_column(String(100))
+    wechat_avatar_url: Mapped[str | None] = mapped_column(String(500))
+
+    # 消费统计
+    total_order_count: Mapped[int] = mapped_column(Integer, default=0)
+    total_order_amount_fen: Mapped[int] = mapped_column(Integer, default=0, comment="累计消费(分)")
+    total_reservation_count: Mapped[int] = mapped_column(Integer, default=0)
+    first_order_at: Mapped[str | None] = mapped_column(DateTime(timezone=True))
+    last_order_at: Mapped[str | None] = mapped_column(DateTime(timezone=True), index=True)
+    first_store_id: Mapped[str | None] = mapped_column(String(50))
+
+    # RFM
+    rfm_recency_days: Mapped[int | None] = mapped_column(Integer)
+    rfm_frequency: Mapped[int | None] = mapped_column(Integer)
+    rfm_monetary_fen: Mapped[int | None] = mapped_column(Integer, comment="M值(分)")
+    rfm_level: Mapped[str | None] = mapped_column(String(5), default="S3")
+
+    # 标签与偏好
+    tags: Mapped[list | None] = mapped_column(JSON, default=list)
+    dietary_restrictions: Mapped[list | None] = mapped_column(JSON, default=list)
+
+    # 合并追踪
+    is_merged: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    merged_into: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), index=True)
+
+    # 来源
+    source: Mapped[str | None] = mapped_column(String(50), comment="pos/wechat/manual/meituan")
+    confidence_score: Mapped[float] = mapped_column(Float, default=1.0)
+    extra: Mapped[dict | None] = mapped_column(JSON, default=dict)
+
+    __table_args__ = (
+        Index("idx_customer_phone_active", "primary_phone", "is_merged"),
+        {"comment": "CDP统一消费者身份"},
+    )
 
 
-class Dish(TenantBase):
-    """菜品 — BOM 配方, 各渠道价格, 毛利模型, 四象限分类"""
-    __tablename__ = "dishes"
-
-    dish_name: Mapped[str] = mapped_column(String(200), nullable=False)
-    price_fen: Mapped[int] = mapped_column(Integer, nullable=False, comment="售价(分)")
-    category: Mapped[str | None] = mapped_column(String(100))
-
+# ─────────────────────────────────────────────
+# 2. Store — 门店
+# ─────────────────────────────────────────────
 
 class Store(TenantBase):
     """门店 — 桌台拓扑, 档口配置, 人效模型, 经营指标"""
     __tablename__ = "stores"
 
-    store_name: Mapped[str] = mapped_column(String(200), nullable=False)
-    store_code: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
-    address: Mapped[str | None] = mapped_column(String(500))
+    store_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    store_code: Mapped[str] = mapped_column(String(20), unique=True, nullable=False)
+    address: Mapped[str | None] = mapped_column(String(255))
+    city: Mapped[str | None] = mapped_column(String(50))
+    district: Mapped[str | None] = mapped_column(String(50))
+    phone: Mapped[str | None] = mapped_column(String(20))
+    latitude: Mapped[float | None] = mapped_column(Float)
+    longitude: Mapped[float | None] = mapped_column(Float)
+    brand_id: Mapped[str | None] = mapped_column(String(50), index=True)
+    region: Mapped[str | None] = mapped_column(String(50))
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default=StoreStatus.active.value)
 
+    # 门店物理属性
+    area: Mapped[float | None] = mapped_column(Float, comment="面积(平方米)")
+    seats: Mapped[int | None] = mapped_column(Integer, comment="座位数")
+    floors: Mapped[int] = mapped_column(Integer, default=1)
+    opening_date: Mapped[str | None] = mapped_column(String(20))
+    business_hours: Mapped[dict | None] = mapped_column(JSON)
+    config: Mapped[dict | None] = mapped_column(JSON, default=dict)
+
+    # 经营目标
+    monthly_revenue_target_fen: Mapped[int | None] = mapped_column(Integer, comment="月营收目标(分)")
+    daily_customer_target: Mapped[int | None] = mapped_column(Integer)
+    cost_ratio_target: Mapped[float | None] = mapped_column(Float)
+    labor_cost_ratio_target: Mapped[float | None] = mapped_column(Float)
+
+
+# ─────────────────────────────────────────────
+# 3. Dish — 菜品
+# ─────────────────────────────────────────────
+
+class DishCategory(TenantBase):
+    """菜品分类（支持多级）"""
+    __tablename__ = "dish_categories"
+
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    code: Mapped[str | None] = mapped_column(String(50))
+    parent_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("dish_categories.id"))
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+    children = relationship("DishCategory", backref="parent", remote_side="DishCategory.id")
+
+
+class Dish(TenantBase):
+    """菜品主档 — BOM 配方, 各渠道价格, 毛利模型, 四象限分类"""
+    __tablename__ = "dishes"
+
+    dish_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    dish_code: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
+    category_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("dish_categories.id"))
+    description: Mapped[str | None] = mapped_column(Text)
+    image_url: Mapped[str | None] = mapped_column(String(500))
+
+    # 价格（统一存分）
+    price_fen: Mapped[int] = mapped_column(Integer, nullable=False, comment="售价(分)")
+    original_price_fen: Mapped[int | None] = mapped_column(Integer, comment="原价(分)")
+    cost_fen: Mapped[int | None] = mapped_column(Integer, comment="成本(分)")
+    profit_margin: Mapped[float | None] = mapped_column(Numeric(5, 2), comment="毛利率(%)")
+
+    # 属性
+    unit: Mapped[str] = mapped_column(String(20), default="份")
+    serving_size: Mapped[str | None] = mapped_column(String(50))
+    spicy_level: Mapped[int] = mapped_column(Integer, default=0)
+    preparation_time: Mapped[int | None] = mapped_column(Integer, comment="制作时间(分钟)")
+    cooking_method: Mapped[str | None] = mapped_column(String(50))
+    kitchen_station: Mapped[str | None] = mapped_column(String(50), comment="档口")
+
+    # 标签
+    tags: Mapped[list | None] = mapped_column(ARRAY(String), comment="招牌/新品/特价/素食")
+    allergens: Mapped[list | None] = mapped_column(ARRAY(String))
+    dietary_info: Mapped[list | None] = mapped_column(ARRAY(String))
+
+    # 营养
+    calories: Mapped[int | None] = mapped_column(Integer)
+    protein: Mapped[float | None] = mapped_column(Numeric(5, 2))
+    fat: Mapped[float | None] = mapped_column(Numeric(5, 2))
+    carbohydrate: Mapped[float | None] = mapped_column(Numeric(5, 2))
+
+    # 状态
+    is_available: Mapped[bool] = mapped_column(Boolean, default=True)
+    is_recommended: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_seasonal: Mapped[bool] = mapped_column(Boolean, default=False)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+
+    # 统计
+    total_sales: Mapped[int] = mapped_column(Integer, default=0)
+    total_revenue_fen: Mapped[int] = mapped_column(Integer, default=0, comment="总营收(分)")
+    rating: Mapped[float | None] = mapped_column(Numeric(3, 2))
+    review_count: Mapped[int] = mapped_column(Integer, default=0)
+
+    # 关联
+    category = relationship("DishCategory", lazy="joined")
+    ingredients = relationship("DishIngredient", back_populates="dish", cascade="all, delete-orphan")
+
+
+class DishIngredient(TenantBase):
+    """菜品-食材关联（BOM 配方）"""
+    __tablename__ = "dish_ingredients"
+
+    dish_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("dishes.id"), nullable=False)
+    ingredient_id: Mapped[str] = mapped_column(String(50), nullable=False)
+    quantity: Mapped[float] = mapped_column(Numeric(10, 3), nullable=False)
+    unit: Mapped[str] = mapped_column(String(20), nullable=False)
+    cost_per_serving_fen: Mapped[int | None] = mapped_column(Integer, comment="每份成本(分)")
+    is_required: Mapped[bool] = mapped_column(Boolean, default=True)
+    is_substitutable: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    dish = relationship("Dish", back_populates="ingredients")
+
+
+# ─────────────────────────────────────────────
+# 4. Order — 订单
+# ─────────────────────────────────────────────
 
 class Order(TenantBase):
     """订单 — 全渠道统一, 折扣明细, 核销记录, 出餐状态"""
     __tablename__ = "orders"
 
     order_no: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
-    total_fen: Mapped[int] = mapped_column(Integer, nullable=False, comment="订单总额(分)")
-    status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending")
+    store_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("stores.id"), nullable=False)
+    table_number: Mapped[str | None] = mapped_column(String(20))
+    customer_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("customers.id"), index=True)
+    waiter_id: Mapped[str | None] = mapped_column(String(50), index=True)
+    sales_channel: Mapped[str | None] = mapped_column(String(30), index=True, comment="dine_in/takeout/delivery")
+
+    # 金额（统一存分）
+    total_amount_fen: Mapped[int] = mapped_column(Integer, nullable=False, comment="总金额(分)")
+    discount_amount_fen: Mapped[int] = mapped_column(Integer, default=0, comment="折扣(分)")
+    final_amount_fen: Mapped[int | None] = mapped_column(Integer, comment="实付(分)")
+
+    # 状态与时间
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default=OrderStatus.pending.value, index=True)
+    order_time: Mapped[str] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    confirmed_at: Mapped[str | None] = mapped_column(DateTime(timezone=True))
+    completed_at: Mapped[str | None] = mapped_column(DateTime(timezone=True))
+
+    notes: Mapped[str | None] = mapped_column(String(500))
+    order_metadata: Mapped[dict | None] = mapped_column(JSON, default=dict)
+
+    # 关联
+    items = relationship("OrderItem", back_populates="order", cascade="all, delete-orphan")
+
+    __table_args__ = (
+        Index("idx_order_store_status", "store_id", "status"),
+        Index("idx_order_store_time", "store_id", "order_time"),
+    )
+
+
+class OrderItem(TenantBase):
+    """订单明细"""
+    __tablename__ = "order_items"
+
+    order_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("orders.id"), nullable=False, index=True)
+    dish_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("dishes.id"))
+    item_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    quantity: Mapped[int] = mapped_column(Integer, nullable=False)
+    unit_price_fen: Mapped[int] = mapped_column(Integer, nullable=False, comment="单价(分)")
+    subtotal_fen: Mapped[int] = mapped_column(Integer, nullable=False, comment="小计(分)")
+    food_cost_fen: Mapped[int | None] = mapped_column(Integer, comment="BOM理论成本(分)")
+    gross_margin: Mapped[float | None] = mapped_column(Numeric(6, 4), comment="毛利率")
+    notes: Mapped[str | None] = mapped_column(String(255))
+    customizations: Mapped[dict | None] = mapped_column(JSON, default=dict)
+
+    order = relationship("Order", back_populates="items")
+
+
+# ─────────────────────────────────────────────
+# 5. Ingredient — 食材
+# ─────────────────────────────────────────────
+
+class IngredientMaster(TenantBase):
+    """食材主档（集团级字典表）"""
+    __tablename__ = "ingredient_masters"
+
+    canonical_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    aliases: Mapped[list | None] = mapped_column(ARRAY(String(100)))
+    category: Mapped[str] = mapped_column(String(30), nullable=False, comment="seafood/meat/vegetable/...")
+    sub_category: Mapped[str | None] = mapped_column(String(30))
+    base_unit: Mapped[str] = mapped_column(String(10), nullable=False, comment="kg/L/个")
+    spec_desc: Mapped[str | None] = mapped_column(String(100))
+
+    # 存储
+    shelf_life_days: Mapped[int | None] = mapped_column(Integer)
+    storage_type: Mapped[str] = mapped_column(String(20), nullable=False, default=StorageType.ambient.value)
+    storage_temp_min: Mapped[float | None] = mapped_column(Numeric(5, 1))
+    storage_temp_max: Mapped[float | None] = mapped_column(Numeric(5, 1))
+
+    # 属性
+    is_traceable: Mapped[bool] = mapped_column(Boolean, default=False)
+    allergen_tags: Mapped[list | None] = mapped_column(ARRAY(String(30)))
+    seasonality: Mapped[list | None] = mapped_column(ARRAY(String(2)), comment="月份如{3,4,5}")
+    typical_waste_pct: Mapped[float | None] = mapped_column(Numeric(5, 2))
+    typical_yield_rate: Mapped[float | None] = mapped_column(Numeric(5, 4))
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
 
 class Ingredient(TenantBase):
-    """食材 — 库存量, 效期, 采购价, 批次, 供应商"""
+    """门店库存台账"""
     __tablename__ = "ingredients"
 
-    ingredient_name: Mapped[str] = mapped_column(String(200), nullable=False)
+    store_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("stores.id"), nullable=False, index=True)
+    ingredient_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    category: Mapped[str | None] = mapped_column(String(50))
     unit: Mapped[str] = mapped_column(String(20), nullable=False)
-    unit_price_fen: Mapped[int] = mapped_column(Integer, comment="单价(分)")
+    current_quantity: Mapped[float] = mapped_column(Float, default=0)
+    min_quantity: Mapped[float] = mapped_column(Float, nullable=False)
+    max_quantity: Mapped[float | None] = mapped_column(Float)
+    unit_price_fen: Mapped[int | None] = mapped_column(Integer, comment="单价(分)")
+    status: Mapped[str] = mapped_column(String(20), default=InventoryStatus.normal.value, index=True)
+    supplier_name: Mapped[str | None] = mapped_column(String(100))
 
+    transactions = relationship("IngredientTransaction", back_populates="ingredient", cascade="all, delete-orphan")
+
+
+class IngredientTransaction(TenantBase):
+    """库存流水"""
+    __tablename__ = "ingredient_transactions"
+
+    ingredient_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("ingredients.id"), nullable=False, index=True)
+    transaction_type: Mapped[str] = mapped_column(String(20), nullable=False, comment="purchase/usage/waste/adjustment")
+    quantity: Mapped[float] = mapped_column(Float, nullable=False)
+    unit_cost_fen: Mapped[int | None] = mapped_column(Integer, comment="单位成本(分)")
+    reference_id: Mapped[str | None] = mapped_column(String(100), comment="关联单据号")
+    notes: Mapped[str | None] = mapped_column(String(500))
+
+    ingredient = relationship("Ingredient", back_populates="transactions")
+
+
+# ─────────────────────────────────────────────
+# 6. Employee — 员工
+# ─────────────────────────────────────────────
 
 class Employee(TenantBase):
     """员工 — 角色, 技能, 排班, 业绩提成, 效率指标"""
     __tablename__ = "employees"
 
+    store_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("stores.id"), nullable=False, index=True)
     emp_name: Mapped[str] = mapped_column(String(100), nullable=False)
-    role: Mapped[str] = mapped_column(String(50), nullable=False)
     phone: Mapped[str | None] = mapped_column(String(20))
+    email: Mapped[str | None] = mapped_column(String(100))
+    role: Mapped[str] = mapped_column(String(50), nullable=False, comment="waiter/chef/cashier/manager")
+    skills: Mapped[list | None] = mapped_column(ARRAY(String), default=list)
+
+    # 雇佣信息
+    hire_date: Mapped[str | None] = mapped_column(Date)
+    employment_status: Mapped[str] = mapped_column(String(20), default=EmploymentStatus.regular.value)
+    employment_type: Mapped[str] = mapped_column(String(30), default=EmploymentType.regular.value)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    probation_end_date: Mapped[str | None] = mapped_column(Date)
+    grade_level: Mapped[str | None] = mapped_column(String(50))
+
+    # IM 绑定
+    wechat_userid: Mapped[str | None] = mapped_column(String(100), index=True)
+    dingtalk_userid: Mapped[str | None] = mapped_column(String(100), index=True)
+
+    # 个人信息
+    gender: Mapped[str | None] = mapped_column(String(10))
+    birth_date: Mapped[str | None] = mapped_column(Date)
+    education: Mapped[str | None] = mapped_column(String(20))
+
+    # 证照
+    health_cert_expiry: Mapped[str | None] = mapped_column(Date)
+    id_card_no: Mapped[str | None] = mapped_column(String(200), comment="AES-256-GCM加密")
+
+    # 薪酬
+    daily_wage_standard_fen: Mapped[int | None] = mapped_column(Integer, comment="日薪标准(分)")
+    work_hour_type: Mapped[str | None] = mapped_column(String(30), comment="标准工时/综合工时")
+    bank_name: Mapped[str | None] = mapped_column(String(100))
+    bank_account: Mapped[str | None] = mapped_column(String(200), comment="AES-256-GCM加密")
+
+    # 紧急联系人
+    emergency_contact: Mapped[str | None] = mapped_column(String(50))
+    emergency_phone: Mapped[str | None] = mapped_column(String(20))
+
+    # 组织
+    org_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), index=True)
+    preferences: Mapped[dict | None] = mapped_column(JSON, default=dict)
+    performance_score: Mapped[str | None] = mapped_column(String(10))
+    training_completed: Mapped[list | None] = mapped_column(ARRAY(String), default=list)
