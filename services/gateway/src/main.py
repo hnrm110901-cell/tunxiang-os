@@ -37,3 +37,13 @@ async def list_domains():
     from .proxy import DOMAIN_ROUTES
     domains = {k: {"configured": bool(v), "url": v or "not configured"} for k, v in DOMAIN_ROUTES.items()}
     return ok(domains)
+
+
+@app.get("/api/v1/menu-config")
+async def get_menu_config(role: str = "admin"):
+    """决策4：菜单配置引擎 — 根据角色动态生成菜单树"""
+    from .menu_config import generate_menu_for_tenant
+    # 全域签约（demo）
+    all_domains = ["tx-trade", "tx-menu", "tx-member", "tx-supply", "tx-finance", "tx-org", "tx-analytics", "tx-agent"]
+    modules = generate_menu_for_tenant(all_domains, role)
+    return ok(modules)

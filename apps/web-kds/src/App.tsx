@@ -1,147 +1,139 @@
 /**
- * KDS 出餐屏 — 后厨核心交互
- * 大屏展示待出餐订单，点击确认出餐
+ * KDS 出餐看板 — 三列布局（蓝图 P0）
+ * 待制作 | 制作中 | 异常/超时
+ *
+ * 餐饮顾问建议：高对比配色，大字号，厨师手湿也能看清
  */
 import { useState, useEffect } from 'react';
 
-interface KDSOrder {
+interface KDSTicket {
   id: string;
   orderNo: string;
   tableNo: string;
-  items: { name: string; quantity: number; notes: string }[];
+  items: { name: string; qty: number; notes: string }[];
   createdAt: string;
-  elapsedMinutes: number;
-  status: 'pending' | 'preparing' | 'ready';
+  elapsed: number; // 分钟
+  status: 'pending' | 'preparing' | 'abnormal';
+  priority: 'normal' | 'rush' | 'vip';
 }
 
-// Mock 数据（接入 WebSocket 后替换）
-const MOCK_ORDERS: KDSOrder[] = [
-  {
-    id: '1', orderNo: 'TX001', tableNo: 'A01',
-    items: [{ name: '剁椒鱼头', quantity: 1, notes: '少辣' }, { name: '农家小炒肉', quantity: 1, notes: '' }],
-    createdAt: '14:25', elapsedMinutes: 8, status: 'preparing',
-  },
-  {
-    id: '2', orderNo: 'TX002', tableNo: 'A03',
-    items: [{ name: '口味虾', quantity: 1, notes: '中辣' }, { name: '凉拌黄瓜', quantity: 2, notes: '' }],
-    createdAt: '14:28', elapsedMinutes: 5, status: 'pending',
-  },
-  {
-    id: '3', orderNo: 'TX003', tableNo: 'B01',
-    items: [{ name: '剁椒鱼头', quantity: 2, notes: '' }, { name: '口味虾', quantity: 1, notes: '微辣' }, { name: '米饭', quantity: 6, notes: '' }],
-    createdAt: '14:30', elapsedMinutes: 3, status: 'pending',
-  },
-  {
-    id: '4', orderNo: 'TX004', tableNo: 'B02',
-    items: [{ name: '农家小炒肉', quantity: 2, notes: '多放辣椒' }],
-    createdAt: '14:32', elapsedMinutes: 1, status: 'pending',
-  },
+const MOCK: KDSTicket[] = [
+  { id: '1', orderNo: '001', tableNo: 'A01', items: [{ name: '剁椒鱼头', qty: 1, notes: '少辣' }, { name: '小炒肉', qty: 1, notes: '' }], createdAt: '14:25', elapsed: 8, status: 'pending', priority: 'normal' },
+  { id: '2', orderNo: '002', tableNo: 'A03', items: [{ name: '口味虾', qty: 1, notes: '中辣' }], createdAt: '14:22', elapsed: 11, status: 'preparing', priority: 'rush' },
+  { id: '3', orderNo: '003', tableNo: 'B01', items: [{ name: '鱼头', qty: 2, notes: '' }, { name: '米饭', qty: 6, notes: '' }], createdAt: '14:15', elapsed: 18, status: 'preparing', priority: 'vip' },
+  { id: '4', orderNo: '004', tableNo: 'B02', items: [{ name: '外婆鸡', qty: 1, notes: '多放辣' }], createdAt: '14:28', elapsed: 5, status: 'pending', priority: 'normal' },
+  { id: '5', orderNo: '005', tableNo: 'A05', items: [{ name: '凉拌黄瓜', qty: 2, notes: '' }], createdAt: '13:55', elapsed: 38, status: 'abnormal', priority: 'normal' },
 ];
 
-const statusColor = { pending: '#faad14', preparing: '#1890ff', ready: '#52c41a' };
-const statusLabel = { pending: '待制作', preparing: '制作中', ready: '可出餐' };
-
-function timeColor(minutes: number): string {
-  if (minutes >= 20) return '#ff4d4f';
-  if (minutes >= 12) return '#faad14';
-  return '#52c41a';
-}
+const COL_STYLE = { flex: 1, display: 'flex' as const, flexDirection: 'column' as const, gap: 8, overflowY: 'auto' as const, padding: 8 };
+const priorityBorder: Record<string, string> = { normal: '#333', rush: '#faad14', vip: '#722ed1' };
 
 export default function App() {
-  const [orders, setOrders] = useState(MOCK_ORDERS);
-  const [now, setNow] = useState(Date.now());
+  const [tickets, setTickets] = useState(MOCK);
 
-  // 每分钟刷新时间
-  useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), 60000);
-    return () => clearInterval(timer);
-  }, []);
-
-  const handleStatusChange = (id: string, newStatus: KDSOrder['status']) => {
-    setOrders((prev) =>
-      prev.map((o) => (o.id === id ? { ...o, status: newStatus } : o))
-        .filter((o) => !(o.id === id && newStatus === 'ready'))
+  const move = (id: string, to: KDSTicket['status']) => {
+    setTickets(prev => to === 'abnormal'
+      ? prev.map(t => t.id === id ? { ...t, status: to } : t)
+      : prev.filter(t => t.id !== id || to !== 'preparing').map(t => t.id === id ? { ...t, status: to } : t)
     );
   };
 
-  const pendingCount = orders.filter((o) => o.status === 'pending').length;
-  const preparingCount = orders.filter((o) => o.status === 'preparing').length;
+  const complete = (id: string) => setTickets(prev => prev.filter(t => t.id !== id));
+
+  const pending = tickets.filter(t => t.status === 'pending');
+  const preparing = tickets.filter(t => t.status === 'preparing');
+  const abnormal = tickets.filter(t => t.status === 'abnormal');
 
   return (
-    <div style={{ background: '#0B1A20', minHeight: '100vh', color: '#fff', padding: 16 }}>
+    <div style={{ background: '#000', color: '#fff', height: '100vh', display: 'flex', flexDirection: 'column', fontFamily: 'Noto Sans SC, sans-serif' }}>
       {/* 顶部状态栏 */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, padding: '0 8px' }}>
-        <h2 style={{ margin: 0, fontSize: 24 }}>后厨出餐屏</h2>
-        <div style={{ display: 'flex', gap: 24, fontSize: 16 }}>
-          <span>待制作 <strong style={{ color: '#faad14' }}>{pendingCount}</strong></span>
-          <span>制作中 <strong style={{ color: '#1890ff' }}>{preparingCount}</strong></span>
-          <span>总计 <strong>{orders.length}</strong></span>
+      <header style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 16px', background: '#111', fontSize: 16 }}>
+        <span style={{ fontWeight: 'bold', fontSize: 20 }}>🔥 后厨看板</span>
+        <div style={{ display: 'flex', gap: 24 }}>
+          <span>待制作 <b style={{ color: '#faad14', fontSize: 24 }}>{pending.length}</b></span>
+          <span>制作中 <b style={{ color: '#1890ff', fontSize: 24 }}>{preparing.length}</b></span>
+          <span style={{ color: abnormal.length > 0 ? '#ff4d4f' : '#666' }}>异常 <b style={{ fontSize: 24 }}>{abnormal.length}</b></span>
+        </div>
+      </header>
+
+      {/* 三列看板 */}
+      <div style={{ flex: 1, display: 'flex', gap: 2, overflow: 'hidden' }}>
+        {/* 待制作 */}
+        <div style={{ ...COL_STYLE, background: '#1a1a00' }}>
+          <div style={{ textAlign: 'center', padding: 4, fontSize: 14, fontWeight: 'bold', color: '#faad14', borderBottom: '2px solid #faad14' }}>
+            待制作 ({pending.length})
+          </div>
+          {pending.map(t => <TicketCard key={t.id} t={t} onAction={() => move(t.id, 'preparing')} actionLabel="开始制作" actionColor="#1890ff" />)}
+        </div>
+
+        {/* 制作中 */}
+        <div style={{ ...COL_STYLE, background: '#001a1a' }}>
+          <div style={{ textAlign: 'center', padding: 4, fontSize: 14, fontWeight: 'bold', color: '#1890ff', borderBottom: '2px solid #1890ff' }}>
+            制作中 ({preparing.length})
+          </div>
+          {preparing.map(t => <TicketCard key={t.id} t={t} onAction={() => complete(t.id)} actionLabel="出餐完成" actionColor="#52c41a" />)}
+        </div>
+
+        {/* 异常/超时 */}
+        <div style={{ ...COL_STYLE, background: '#1a0000' }}>
+          <div style={{ textAlign: 'center', padding: 4, fontSize: 14, fontWeight: 'bold', color: '#ff4d4f', borderBottom: '2px solid #ff4d4f' }}>
+            异常 ({abnormal.length})
+          </div>
+          {abnormal.map(t => <TicketCard key={t.id} t={t} onAction={() => complete(t.id)} actionLabel="已处理" actionColor="#52c41a" isAbnormal />)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TicketCard({ t, onAction, actionLabel, actionColor, isAbnormal }: {
+  t: KDSTicket; onAction: () => void; actionLabel: string; actionColor: string; isAbnormal?: boolean;
+}) {
+  const timeColor = t.elapsed >= 25 ? '#ff4d4f' : t.elapsed >= 15 ? '#faad14' : '#52c41a';
+
+  return (
+    <div style={{
+      background: '#111', borderRadius: 8, padding: 12,
+      borderLeft: `5px solid ${isAbnormal ? '#ff4d4f' : priorityBorder[t.priority]}`,
+      animation: t.priority === 'rush' ? 'pulse 2s infinite' : undefined,
+    }}>
+      {/* 头部：桌号 + 时间 */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+        <div>
+          <span style={{ fontSize: 22, fontWeight: 'bold' }}>{t.tableNo}</span>
+          <span style={{ fontSize: 11, color: '#666', marginLeft: 6 }}>#{t.orderNo}</span>
+          {t.priority !== 'normal' && (
+            <span style={{
+              marginLeft: 6, fontSize: 10, padding: '1px 6px', borderRadius: 4,
+              background: t.priority === 'rush' ? '#faad14' : '#722ed1', color: '#fff',
+            }}>
+              {t.priority === 'rush' ? '催' : 'VIP'}
+            </span>
+          )}
+        </div>
+        <div style={{ fontSize: 24, fontWeight: 'bold', color: timeColor, fontFamily: 'JetBrains Mono, monospace' }}>
+          {t.elapsed}′
         </div>
       </div>
 
-      {/* 订单卡片网格 */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 12 }}>
-        {orders.map((order) => (
-          <div key={order.id} style={{
-            background: '#112228',
-            borderRadius: 8,
-            borderLeft: `4px solid ${statusColor[order.status]}`,
-            padding: 16,
-            display: 'flex',
-            flexDirection: 'column',
-          }}>
-            {/* 头部 */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-              <div>
-                <span style={{ fontSize: 20, fontWeight: 'bold' }}>{order.tableNo}</span>
-                <span style={{ fontSize: 12, color: '#666', marginLeft: 8 }}>{order.orderNo}</span>
-              </div>
-              <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: 20, fontWeight: 'bold', color: timeColor(order.elapsedMinutes) }}>
-                  {order.elapsedMinutes}分
-                </div>
-                <div style={{ fontSize: 10, color: '#666' }}>{order.createdAt}</div>
-              </div>
-            </div>
+      {/* 菜品 */}
+      {t.items.map((item, i) => (
+        <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', fontSize: 18, fontWeight: 'bold' }}>
+          <span>
+            {item.name}
+            {item.notes && <span style={{ fontSize: 12, color: '#ff4d4f', marginLeft: 4 }}>({item.notes})</span>}
+          </span>
+          <span style={{ color: '#FF6B2C' }}>×{item.qty}</span>
+        </div>
+      ))}
 
-            {/* 菜品列表 */}
-            <div style={{ flex: 1, marginBottom: 12 }}>
-              {order.items.map((item, i) => (
-                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid #1a2a33' }}>
-                  <span style={{ fontSize: 16, fontWeight: 'bold' }}>
-                    {item.name}
-                    {item.notes && <span style={{ fontSize: 11, color: '#ff4d4f', marginLeft: 4 }}>({item.notes})</span>}
-                  </span>
-                  <span style={{ fontSize: 18, fontWeight: 'bold', color: '#FF6B2C' }}>×{item.quantity}</span>
-                </div>
-              ))}
-            </div>
-
-            {/* 操作按钮 */}
-            <div style={{ display: 'flex', gap: 8 }}>
-              {order.status === 'pending' && (
-                <button onClick={() => handleStatusChange(order.id, 'preparing')}
-                  style={{ flex: 1, padding: 10, background: '#1890ff', color: '#fff', border: 'none', borderRadius: 6, fontSize: 14, cursor: 'pointer' }}>
-                  开始制作
-                </button>
-              )}
-              {order.status === 'preparing' && (
-                <button onClick={() => handleStatusChange(order.id, 'ready')}
-                  style={{ flex: 1, padding: 10, background: '#52c41a', color: '#fff', border: 'none', borderRadius: 6, fontSize: 14, cursor: 'pointer' }}>
-                  出餐完成
-                </button>
-              )}
-            </div>
-          </div>
-        ))}
-
-        {orders.length === 0 && (
-          <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: 80, color: '#666' }}>
-            <div style={{ fontSize: 48, marginBottom: 16 }}>✓</div>
-            <div style={{ fontSize: 20 }}>所有订单已出餐</div>
-          </div>
-        )}
-      </div>
+      {/* 操作按钮 */}
+      <button onClick={onAction} style={{
+        width: '100%', marginTop: 8, padding: 10, border: 'none', borderRadius: 6,
+        background: actionColor, color: '#fff', fontSize: 16, fontWeight: 'bold', cursor: 'pointer',
+      }}>
+        {actionLabel}
+      </button>
     </div>
   );
 }
