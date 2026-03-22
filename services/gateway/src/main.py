@@ -1,6 +1,10 @@
 """TunxiangOS API Gateway — 统一入口，按域路由到各微服务"""
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
+from .middleware import TenantMiddleware, RequestLogMiddleware
+from .proxy import router as proxy_router
+from .response import ok
 
 app = FastAPI(
     title="TunxiangOS Gateway",
@@ -8,6 +12,9 @@ app = FastAPI(
     description="AI-Native Restaurant Chain Operating System",
 )
 
+# Middleware（执行顺序：后添加先执行）
+app.add_middleware(RequestLogMiddleware)
+app.add_middleware(TenantMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # TODO: 生产环境限制域名
@@ -15,21 +22,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
-@app.middleware("http")
-async def tenant_id_middleware(request: Request, call_next):
-    """从 X-Tenant-ID header 提取租户 ID"""
-    tenant_id = request.headers.get("X-Tenant-ID")
-    request.state.tenant_id = tenant_id
-    response = await call_next(request)
-    return response
+# 域路由代理
+app.include_router(proxy_router)
 
 
 @app.get("/health")
 async def health():
-    return {"ok": True, "data": {"service": "gateway", "version": "3.0.0"}}
+    return ok({"service": "gateway", "version": "3.0.0"})
 
 
-# 域服务路由（按域迁移后逐步添加）
-# from services.tx_trade.src.api import router as trade_router
-# app.include_router(trade_router, prefix="/api/v1/trade")
+@app.get("/api/v1/domains")
+async def list_domains():
+    """列出所有域服务及其状态"""
+    from .proxy import DOMAIN_ROUTES
+    domains = {k: {"configured": bool(v), "url": v or "not configured"} for k, v in DOMAIN_ROUTES.items()}
+    return ok(domains)
