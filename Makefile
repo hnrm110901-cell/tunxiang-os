@@ -3,7 +3,7 @@
 
 # ─── 测试 ───
 
-test: test-trade test-agent test-analytics test-supply test-integration
+test: test-trade test-agent test-analytics test-supply test-menu test-integration
 	@echo "\n✓ All tests passed"
 
 test-trade:
@@ -21,6 +21,10 @@ test-analytics:
 test-supply:
 	@echo "=== tx-supply ==="
 	@cd services/tx-supply && python3 -m pytest src/tests/ -q
+
+test-menu:
+	@echo "=== tx-menu ==="
+	@cd services/tx-menu && python3 -m pytest src/tests/ -q
 
 test-integration:
 	@echo "=== integration ==="

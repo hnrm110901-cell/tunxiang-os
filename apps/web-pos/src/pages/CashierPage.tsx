@@ -6,14 +6,15 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useOrderStore } from '../store/orderStore';
 import { createOrder, addItem as apiAddItem } from '../api/tradeApi';
+import { fetchDishes, type DishItem } from '../api/menuApi';
 
-const MOCK_DISHES = [
-  { id: 'd1', name: '剁椒鱼头', priceFen: 8800, category: '热菜', station: '热菜档' },
-  { id: 'd2', name: '农家小炒肉', priceFen: 4200, category: '热菜', station: '热菜档' },
-  { id: 'd3', name: '凉拌黄瓜', priceFen: 900, category: '凉菜', station: '凉菜档' },
-  { id: 'd4', name: '口味虾', priceFen: 12800, category: '热菜', station: '热菜档' },
-  { id: 'd5', name: '米饭', priceFen: 300, category: '主食', station: 'default' },
-  { id: 'd6', name: '酸梅汤', priceFen: 800, category: '饮品', station: 'default' },
+const FALLBACK_DISHES = [
+  { id: 'd1', name: '剁椒鱼头', priceFen: 8800, category: '热菜', kitchenStation: '热菜档', isAvailable: true },
+  { id: 'd2', name: '农家小炒肉', priceFen: 4200, category: '热菜', kitchenStation: '热菜档', isAvailable: true },
+  { id: 'd3', name: '凉拌黄瓜', priceFen: 900, category: '凉菜', kitchenStation: '凉菜档', isAvailable: true },
+  { id: 'd4', name: '口味虾', priceFen: 12800, category: '热菜', kitchenStation: '热菜档', isAvailable: true },
+  { id: 'd5', name: '米饭', priceFen: 300, category: '主食', kitchenStation: 'default', isAvailable: true },
+  { id: 'd6', name: '酸梅汤', priceFen: 800, category: '饮品', kitchenStation: 'default', isAvailable: true },
 ];
 
 const fen2yuan = (fen: number) => `¥${(fen / 100).toFixed(2)}`;
@@ -26,24 +27,27 @@ export function CashierPage() {
   const { items, totalFen, discountFen, orderId } = store;
   const finalFen = totalFen - discountFen;
   const [loading, setLoading] = useState(false);
+  const [dishes, setDishes] = useState<DishItem[]>(FALLBACK_DISHES);
 
-  // 页面加载时自动开单（调用 tx-trade API）
+  // 加载菜品（API优先，失败回退 mock）+ 自动开单
   useEffect(() => {
-    if (!orderId && tableNo) {
-      setLoading(true);
-      createOrder(STORE_ID, tableNo)
-        .then((res) => store.setOrder(res.order_id, res.order_no, tableNo))
-        .catch((e) => console.error('开单失败(离线模式):', e))
-        .finally(() => setLoading(false));
-    }
+    setLoading(true);
+    Promise.all([
+      fetchDishes(STORE_ID).then((d) => { if (d.length > 0) setDishes(d); }),
+      !orderId && tableNo
+        ? createOrder(STORE_ID, tableNo)
+            .then((res) => store.setOrder(res.order_id, res.order_no, tableNo))
+            .catch((e) => console.error('开单失败(离线模式):', e))
+        : Promise.resolve(),
+    ]).finally(() => setLoading(false));
   }, []);
 
-  const handleAddDish = async (dish: typeof MOCK_DISHES[0]) => {
+  const handleAddDish = async (dish: DishItem) => {
     const existing = items.find((i) => i.dishId === dish.id);
     if (existing) {
       store.updateQuantity(existing.id, existing.quantity + 1);
     } else {
-      store.addItem({ dishId: dish.id, name: dish.name, quantity: 1, priceFen: dish.priceFen, notes: '', kitchenStation: dish.station });
+      store.addItem({ dishId: dish.id, name: dish.name, quantity: 1, priceFen: dish.priceFen, notes: '', kitchenStation: dish.kitchenStation });
     }
 
     // 同步到后端（失败不阻断前端操作）
@@ -62,7 +66,7 @@ export function CashierPage() {
           {store.orderNo && <span style={{ color: '#52c41a', fontSize: 12 }}>{store.orderNo}</span>}
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
-          {MOCK_DISHES.map((d) => (
+          {dishes.map((d) => (
             <div key={d.id} onClick={() => handleAddDish(d)}
               style={{ padding: 12, borderRadius: 8, background: '#1a2a33', cursor: 'pointer', textAlign: 'center' }}>
               <div style={{ fontWeight: 'bold' }}>{d.name}</div>
