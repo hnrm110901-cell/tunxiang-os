@@ -1,0 +1,35 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 56px 24px;
+  gap: 10px;
+}
+
+.icon {
+  font-size: 40px;
+  line-height: 1;
+  opacity: 0.25;
+}
+
+.title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.desc {
+  font-size: 13px;
+  color: var(--text-tertiary);
+  margin: 0;
+  text-align: center;
+  max-width: 280px;
+  line-height: 1.6;
+}
+
+.action {
+  margin-top: 8px;
+}
