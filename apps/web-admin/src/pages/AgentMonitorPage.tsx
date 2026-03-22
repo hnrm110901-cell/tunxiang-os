@@ -3,15 +3,15 @@
  */
 
 const AGENTS = [
-  { id: 'discount_guard', name: '折扣守护', priority: 'P0', location: '边缘+云端', actions: 6, implemented: 2, status: 'active' },
-  { id: 'smart_menu', name: '智能排菜', priority: 'P0', location: '云端', actions: 8, implemented: 2, status: 'active' },
-  { id: 'serve_dispatch', name: '出餐调度', priority: 'P1', location: '边缘', actions: 7, implemented: 1, status: 'active' },
-  { id: 'member_insight', name: '会员洞察', priority: 'P1', location: '云端', actions: 9, implemented: 6, status: 'active' },
-  { id: 'inventory_alert', name: '库存预警', priority: 'P1', location: '边缘+云端', actions: 9, implemented: 5, status: 'active' },
-  { id: 'finance_audit', name: '财务稽核', priority: 'P1', location: '云端', actions: 7, implemented: 5, status: 'active' },
-  { id: 'store_inspect', name: '巡店质检', priority: 'P2', location: '云端', actions: 7, implemented: 0, status: 'skeleton' },
-  { id: 'smart_service', name: '智能客服', priority: 'P2', location: '云端', actions: 9, implemented: 0, status: 'skeleton' },
-  { id: 'private_ops', name: '私域运营', priority: 'P2', location: '云端', actions: 11, implemented: 5, status: 'active' },
+  { id: 'discount_guard', name: '折扣守护', priority: 'P0', location: '边缘+云端', actions: 6, implemented: 6, status: 'active' },
+  { id: 'smart_menu', name: '智能排菜', priority: 'P0', location: '云端', actions: 8, implemented: 8, status: 'active' },
+  { id: 'serve_dispatch', name: '出餐调度', priority: 'P1', location: '边缘', actions: 7, implemented: 7, status: 'active' },
+  { id: 'member_insight', name: '会员洞察', priority: 'P1', location: '云端', actions: 9, implemented: 9, status: 'active' },
+  { id: 'inventory_alert', name: '库存预警', priority: 'P1', location: '边缘+云端', actions: 9, implemented: 9, status: 'active' },
+  { id: 'finance_audit', name: '财务稽核', priority: 'P1', location: '云端', actions: 7, implemented: 7, status: 'active' },
+  { id: 'store_inspect', name: '巡店质检', priority: 'P2', location: '云端', actions: 7, implemented: 7, status: 'active' },
+  { id: 'smart_service', name: '智能客服', priority: 'P2', location: '云端', actions: 9, implemented: 9, status: 'active' },
+  { id: 'private_ops', name: '私域运营', priority: 'P2', location: '云端', actions: 11, implemented: 11, status: 'active' },
 ];
 
 const priorityColor: Record<string, string> = { P0: '#ff4d4f', P1: '#faad14', P2: '#1890ff' };
