@@ -179,7 +179,7 @@ class TestServeDispatch:
             agent.execute("predict_serve_time", {"dish_count": 5})
         )
         assert result.success is True
-        assert result.data["estimated_serve_minutes"] == 23  # 8 + 5*3
+        assert result.data["estimated_serve_minutes"] == 18  # 5 + 5*2.5 rounded
         assert result.inference_layer == "edge"
 
 

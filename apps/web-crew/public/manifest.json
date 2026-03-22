@@ -1,0 +1,14 @@
+{
+  "name": "屯象OS 服务员端",
+  "short_name": "屯象Crew",
+  "description": "服务员点餐、加菜、催菜、桌台状态",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0B1A20",
+  "theme_color": "#FF6B2C",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
