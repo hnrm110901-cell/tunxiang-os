@@ -1,0 +1,102 @@
+/* ═══════════════════════════════════════════
+   屯象OS Design Token — 全端共享基础层
+   决策1：Token 层共享，布局层分叉
+   ═══════════════════════════════════════════ */
+
+:root {
+  /* ─── 品牌色 ─── */
+  --brand: #FF6B2C;
+  --brand-light: #FF8F5E;
+  --brand-bg: rgba(255, 107, 44, 0.08);
+
+  /* ─── 语义色 ─── */
+  --green: #52c41a;
+  --amber: #faad14;
+  --red: #ff4d4f;
+  --blue: #1890ff;
+  --purple: #722ed1;
+
+  /* ─── 背景层级 ─── */
+  --bg-0: #0B1A20;     /* 最深底色 */
+  --bg-1: #112228;     /* 卡片/面板 */
+  --bg-2: #1a2a33;     /* 输入框/分割 */
+  --bg-3: #243540;     /* hover 态 */
+
+  /* ─── 文字层级 ─── */
+  --text-1: #ffffff;
+  --text-2: #cccccc;
+  --text-3: #999999;
+  --text-4: #666666;
+
+  /* ─── 间距 ─── */
+  --sp-1: 4px;  --sp-2: 8px;  --sp-3: 12px;  --sp-4: 16px;
+  --sp-5: 20px; --sp-6: 24px; --sp-8: 32px;  --sp-10: 40px;
+
+  /* ─── 圆角 ─── */
+  --r4: 4px;  --r8: 8px;  --r12: 12px;  --r16: 16px;
+
+  /* ─── 字体 ─── */
+  --font-title: 'Noto Serif SC', serif;
+  --font-body: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', monospace;
+  --font-latin: 'Inter', sans-serif;
+
+  /* ─── 布局 ─── */
+  --rail-w: 56px;
+  --sidebar-w: 220px;
+  --context-w: 340px;
+  --topbar-h: 48px;
+
+  /* ─── 动画 ─── */
+  --ease-out: cubic-bezier(.2, .9, .3, 1);
+  --duration-fast: .15s;
+  --duration-panel: .3s;
+
+  /* ─── 透明度 ─── */
+  --t1: 0.04; --t2: 0.08; --t3: 0.15; --t4: 0.30; --t5: 0.60;
+
+  /* ─── 阴影 ─── */
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.2);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.3);
+  --shadow-lg: 0 8px 24px rgba(0,0,0,0.4);
+}
+
+/* ═══════════════════════════════════════════
+   决策6：门店端"粗放模式" Token 覆盖层
+   .shell--store 切换：触控热区≥44px 正文≥14px
+   ═══════════════════════════════════════════ */
+.shell--store {
+  --min-touch: 44px;
+  --font-size-body: 14px;
+  --font-size-label: 12px;
+  --font-size-title: 18px;
+  --scrollbar-w: 8px;
+  --rail-w: 0px;        /* 门店端无 Rail */
+  --sidebar-w: 0px;     /* 门店端 Sidebar 为抽屉 */
+  --context-w: 0px;     /* 门店端无 Context Panel */
+}
+
+/* ═══════════════════════════════════════════
+   精细模式（总部桌面端）
+   ═══════════════════════════════════════════ */
+.shell--hq {
+  --min-touch: 32px;
+  --font-size-body: 13px;
+  --font-size-label: 10px;
+  --font-size-title: 14px;
+  --scrollbar-w: 4px;
+}
+
+/* ═══════════════════════════════════════════
+   服务员端（手机 PWA）
+   ═══════════════════════════════════════════ */
+.shell--crew {
+  --min-touch: 48px;
+  --font-size-body: 16px;
+  --font-size-label: 13px;
+  --font-size-title: 20px;
+  --scrollbar-w: 0px;   /* 手机端隐藏滚动条 */
+  --rail-w: 0px;
+  --sidebar-w: 0px;
+  --context-w: 0px;
+}
