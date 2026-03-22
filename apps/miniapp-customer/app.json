@@ -1,0 +1,26 @@
+{
+  "pages": [
+    "pages/index/index",
+    "pages/menu/menu",
+    "pages/order/order",
+    "pages/member/member"
+  ],
+  "window": {
+    "navigationBarTitleText": "屯象点餐",
+    "navigationBarBackgroundColor": "#0B1A20",
+    "navigationBarTextStyle": "white",
+    "backgroundColor": "#0B1A20"
+  },
+  "tabBar": {
+    "color": "#999",
+    "selectedColor": "#FF6B2C",
+    "backgroundColor": "#112228",
+    "list": [
+      { "pagePath": "pages/index/index", "text": "点餐" },
+      { "pagePath": "pages/order/order", "text": "订单" },
+      { "pagePath": "pages/member/member", "text": "我的" }
+    ]
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json"
+}

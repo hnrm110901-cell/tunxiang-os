@@ -1,0 +1,20 @@
+.container { padding: 0; background: #0B1A20; min-height: 100vh; color: #fff; }
+.header { padding: 20rpx 30rpx; display: flex; justify-content: space-between; align-items: center; }
+.store-name { font-size: 36rpx; font-weight: bold; }
+.table-info { font-size: 28rpx; color: #FF6B2C; }
+
+.categories { white-space: nowrap; padding: 20rpx 30rpx; }
+.category-item { display: inline-block; padding: 12rpx 30rpx; margin-right: 16rpx; border-radius: 30rpx; background: #1a2a33; font-size: 26rpx; }
+.category-item.active { background: #FF6B2C; color: #fff; }
+
+.dish-list { padding: 0 30rpx; height: calc(100vh - 300rpx); }
+.dish-card { display: flex; padding: 20rpx 0; border-bottom: 1rpx solid #1a2a33; }
+.dish-img { width: 160rpx; height: 120rpx; border-radius: 12rpx; margin-right: 20rpx; }
+.dish-info { flex: 1; display: flex; flex-direction: column; justify-content: center; }
+.dish-name { font-size: 30rpx; margin-bottom: 8rpx; }
+.dish-price { font-size: 32rpx; color: #FF6B2C; font-weight: bold; }
+
+.cart-bar { position: fixed; bottom: 0; left: 0; right: 0; display: flex; align-items: center; padding: 20rpx 30rpx; background: #112228; }
+.cart-count { flex: 1; font-size: 28rpx; color: #999; }
+.cart-total { font-size: 36rpx; color: #FF6B2C; font-weight: bold; margin-right: 20rpx; }
+.submit-btn { background: #FF6B2C !important; color: #fff !important; border-radius: 40rpx; font-size: 30rpx; padding: 0 40rpx; }

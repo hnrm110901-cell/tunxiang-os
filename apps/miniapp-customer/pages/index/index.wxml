@@ -1,0 +1,34 @@
+<!-- 点餐首页 — 扫码点餐入口 -->
+<view class="container">
+  <view class="header">
+    <text class="store-name">{{storeName || '屯象点餐'}}</text>
+    <text class="table-info" wx:if="{{tableNo}}">桌号: {{tableNo}}</text>
+  </view>
+
+  <!-- 菜品分类 -->
+  <scroll-view scroll-x class="categories">
+    <view class="category-item {{activeCategory === item ? 'active' : ''}}"
+          wx:for="{{categories}}" wx:key="*this"
+          bindtap="selectCategory" data-name="{{item}}">
+      {{item}}
+    </view>
+  </scroll-view>
+
+  <!-- 菜品列表 -->
+  <scroll-view scroll-y class="dish-list">
+    <view class="dish-card" wx:for="{{dishes}}" wx:key="id" bindtap="addToCart" data-dish="{{item}}">
+      <image class="dish-img" src="{{item.imageUrl || '/assets/dish-placeholder.png'}}" mode="aspectFill" />
+      <view class="dish-info">
+        <text class="dish-name">{{item.name}}</text>
+        <text class="dish-price">¥{{item.priceFen / 100}}</text>
+      </view>
+    </view>
+  </scroll-view>
+
+  <!-- 底部购物车栏 -->
+  <view class="cart-bar" wx:if="{{cartCount > 0}}">
+    <text class="cart-count">已选 {{cartCount}} 件</text>
+    <text class="cart-total">¥{{cartTotal / 100}}</text>
+    <button class="submit-btn" bindtap="submitOrder">去结算</button>
+  </view>
+</view>
