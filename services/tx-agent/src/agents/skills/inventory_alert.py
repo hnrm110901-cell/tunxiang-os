@@ -38,11 +38,15 @@ class InventoryAlertAgent(SkillAgent):
             "check_expiration": self._check_expiration,
             "optimize_stock_levels": self._optimize_levels,
             "evaluate_supplier": self._evaluate_supplier,
+            "monitor_inventory": self._monitor_inventory,
+            "compare_supplier_prices": self._compare_prices,
+            "scan_contract_risks": self._scan_contracts,
+            "analyze_waste": self._analyze_waste,
         }
         handler = dispatch.get(action)
-        if handler:
-            return await handler(params)
-        return AgentResult(success=True, action=action, data={"message": f"{action} ready"}, confidence=0.8)
+        if not handler:
+            return AgentResult(success=False, action=action, error=f"Unsupported: {action}")
+        return await handler(params)
 
     # ─── 消耗预测（4种算法） ───
 
@@ -282,3 +286,65 @@ class InventoryAlertAgent(SkillAgent):
             reasoning=f"综合评分 {total:.0f} 分，等级 {grade}",
             confidence=0.9,
         )
+
+    async def _monitor_inventory(self, params: dict) -> AgentResult:
+        """实时库存监控"""
+        items = params.get("items", [])
+        status_counts = {"normal": 0, "low": 0, "critical": 0, "out": 0}
+        for item in items:
+            qty = item.get("current_qty", 0)
+            min_qty = item.get("min_qty", 0)
+            if qty <= 0: status_counts["out"] += 1
+            elif qty < min_qty * 0.5: status_counts["critical"] += 1
+            elif qty < min_qty: status_counts["low"] += 1
+            else: status_counts["normal"] += 1
+        return AgentResult(success=True, action="monitor_inventory",
+                         data={"status_counts": status_counts, "total_items": len(items),
+                               "issues": status_counts["critical"] + status_counts["out"]},
+                         reasoning=f"{len(items)} 品项，{status_counts['critical']} 严重不足，{status_counts['out']} 缺货",
+                         confidence=0.9)
+
+    async def _compare_prices(self, params: dict) -> AgentResult:
+        """供应商比价"""
+        quotes = params.get("quotes", [])
+        if not quotes:
+            return AgentResult(success=False, action="compare_supplier_prices", error="无报价数据")
+        sorted_q = sorted(quotes, key=lambda q: q.get("price_fen", 0))
+        cheapest = sorted_q[0]
+        avg_price = sum(q["price_fen"] for q in quotes) / len(quotes)
+        saving = round((avg_price - cheapest["price_fen"]) / avg_price * 100, 1) if avg_price > 0 else 0
+        return AgentResult(success=True, action="compare_supplier_prices",
+                         data={"cheapest": cheapest, "all_quotes": sorted_q,
+                               "avg_price_fen": round(avg_price), "potential_saving_pct": saving},
+                         reasoning=f"最低价 {cheapest.get('supplier', '')} ¥{cheapest['price_fen']/100:.2f}，可节省 {saving}%",
+                         confidence=0.85)
+
+    async def _scan_contracts(self, params: dict) -> AgentResult:
+        """合同风险扫描"""
+        contracts = params.get("contracts", [])
+        risks = []
+        for c in contracts:
+            remaining_days = c.get("remaining_days", 999)
+            if remaining_days <= 0:
+                risks.append({"supplier": c.get("supplier", ""), "risk": "expired", "days": remaining_days})
+            elif remaining_days <= 30:
+                risks.append({"supplier": c.get("supplier", ""), "risk": "expiring", "days": remaining_days})
+            if c.get("single_source"):
+                risks.append({"supplier": c.get("supplier", ""), "risk": "single_source"})
+        return AgentResult(success=True, action="scan_contract_risks",
+                         data={"risks": risks, "total_contracts": len(contracts), "at_risk": len(risks)},
+                         reasoning=f"扫描 {len(contracts)} 份合同，{len(risks)} 个风险", confidence=0.85)
+
+    async def _analyze_waste(self, params: dict) -> AgentResult:
+        """损耗分析"""
+        waste_events = params.get("events", [])
+        total_fen = sum(e.get("cost_fen", 0) for e in waste_events)
+        by_cause = {}
+        for e in waste_events:
+            cause = e.get("cause", "unknown")
+            by_cause[cause] = by_cause.get(cause, 0) + e.get("cost_fen", 0)
+        top_causes = sorted(by_cause.items(), key=lambda x: -x[1])[:5]
+        return AgentResult(success=True, action="analyze_waste",
+                         data={"total_waste_yuan": round(total_fen / 100, 2), "event_count": len(waste_events),
+                               "top_causes": [{"cause": c, "cost_yuan": round(v/100, 2)} for c, v in top_causes]},
+                         reasoning=f"总损耗 ¥{total_fen/100:.0f}，{len(waste_events)} 个事件", confidence=0.8)

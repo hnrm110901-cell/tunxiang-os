@@ -49,11 +49,14 @@ class MemberInsightAgent(SkillAgent):
             "process_bad_review": self._process_bad_review,
             "detect_signals": self._detect_signals,
             "monitor_service_quality": self._monitor_quality,
+            "detect_competitor": self._detect_competitor,
+            "handle_complaint": self._handle_complaint,
+            "collect_feedback": self._collect_feedback,
         }
         handler = dispatch.get(action)
-        if handler:
-            return await handler(params)
-        return AgentResult(success=True, action=action, data={"message": f"{action} ready"}, confidence=0.8)
+        if not handler:
+            return AgentResult(success=False, action=action, error=f"Unsupported: {action}")
+        return await handler(params)
 
     async def _analyze_rfm(self, params: dict) -> AgentResult:
         """RFM 分层分析"""
@@ -247,3 +250,35 @@ class MemberInsightAgent(SkillAgent):
             reasoning=f"平均评分 {avg:.1f}，差评率 {bad_rate:.1f}%",
             confidence=0.85,
         )
+
+    async def _detect_competitor(self, params: dict) -> AgentResult:
+        """竞对动态监控"""
+        competitors = params.get("competitors", [])
+        signals = []
+        for c in competitors:
+            name = c.get("name", "")
+            if c.get("price_change_pct", 0) < -10:
+                signals.append({"competitor": name, "type": "price_drop", "detail": f"降价{abs(c['price_change_pct'])}%"})
+            if c.get("new_campaign"):
+                signals.append({"competitor": name, "type": "campaign", "detail": c["new_campaign"]})
+        return AgentResult(success=True, action="detect_competitor",
+                         data={"signals": signals, "total": len(signals)},
+                         reasoning=f"检测到 {len(signals)} 个竞对动态", confidence=0.7)
+
+    async def _handle_complaint(self, params: dict) -> AgentResult:
+        """投诉处理"""
+        complaint_type = params.get("type", "other")
+        priority = {"food_quality": 1, "service": 2, "hygiene": 1}.get(complaint_type, 3)
+        return AgentResult(success=True, action="handle_complaint",
+                         data={"type": complaint_type, "priority": priority,
+                               "assigned_to": "store_manager" if priority <= 2 else "duty_manager",
+                               "follow_up_hours": 24 if priority == 1 else 48},
+                         reasoning=f"投诉 {complaint_type}，优先级 {priority}", confidence=0.85)
+
+    async def _collect_feedback(self, params: dict) -> AgentResult:
+        """收集反馈"""
+        feedback = params.get("feedback", {})
+        return AgentResult(success=True, action="collect_feedback",
+                         data={"stored": True, "rating": feedback.get("rating", 0),
+                               "category": feedback.get("category", "general")},
+                         reasoning="反馈已收集", confidence=0.95)

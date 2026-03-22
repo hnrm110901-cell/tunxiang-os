@@ -51,11 +51,15 @@ class SmartServiceAgent(SkillAgent):
             "analyze_skill_gaps": self._analyze_skill_gaps,
             "evaluate_effectiveness": self._evaluate_effectiveness,
             "generate_improvements": self._generate_improvements,
+            "analyze_feedback": self._analyze_feedback,
+            "generate_training_plan": self._training_plan,
+            "track_training_progress": self._track_progress,
+            "manage_certificates": self._manage_certs,
         }
         handler = dispatch.get(action)
         if handler:
             return await handler(params)
-        return AgentResult(success=True, action=action, data={"message": f"{action} ready"}, confidence=0.8)
+        return AgentResult(success=False, action=action, error=f"Unsupported: {action}")
 
     async def _handle_complaint(self, params: dict) -> AgentResult:
         """投诉处理闭环"""
@@ -215,3 +219,40 @@ class SmartServiceAgent(SkillAgent):
             reasoning=f"生成 {len(improvements)} 条改进建议",
             confidence=0.8,
         )
+
+    async def _analyze_feedback(self, params: dict) -> AgentResult:
+        feedbacks = params.get("feedbacks", [])
+        if not feedbacks:
+            return AgentResult(success=True, action="analyze_feedback", data={"total": 0}, confidence=0.5)
+        positive = sum(1 for f in feedbacks if f.get("rating", 3) >= 4)
+        negative = sum(1 for f in feedbacks if f.get("rating", 3) <= 2)
+        return AgentResult(success=True, action="analyze_feedback",
+                         data={"total": len(feedbacks), "positive": positive, "negative": negative,
+                               "sentiment_score": round(positive / len(feedbacks) * 100, 1)},
+                         reasoning=f"好评 {positive}/{len(feedbacks)}", confidence=0.8)
+
+    async def _training_plan(self, params: dict) -> AgentResult:
+        role = params.get("role", "waiter")
+        gaps = params.get("skill_gaps", [])
+        plan = [{"week": i+1, "skill": g, "method": "实操+理论", "hours": 4} for i, g in enumerate(gaps[:4])]
+        return AgentResult(success=True, action="generate_training_plan",
+                         data={"role": role, "plan": plan, "total_weeks": len(plan), "total_hours": len(plan) * 4},
+                         reasoning=f"为 {role} 生成 {len(plan)} 周培训计划", confidence=0.8)
+
+    async def _track_progress(self, params: dict) -> AgentResult:
+        records = params.get("records", [])
+        completed = sum(1 for r in records if r.get("completed"))
+        total = len(records)
+        return AgentResult(success=True, action="track_training_progress",
+                         data={"completed": completed, "total": total,
+                               "completion_pct": round(completed / total * 100, 1) if total > 0 else 0},
+                         reasoning=f"完成 {completed}/{total}", confidence=0.9)
+
+    async def _manage_certs(self, params: dict) -> AgentResult:
+        certs = params.get("certificates", [])
+        expiring = [c for c in certs if c.get("remaining_days", 999) <= 30]
+        expired = [c for c in certs if c.get("remaining_days", 999) <= 0]
+        return AgentResult(success=True, action="manage_certificates",
+                         data={"total": len(certs), "expired": len(expired), "expiring": len(expiring),
+                               "needs_attention": expired + expiring},
+                         reasoning=f"{len(expired)} 过期，{len(expiring)} 即将过期", confidence=0.9)

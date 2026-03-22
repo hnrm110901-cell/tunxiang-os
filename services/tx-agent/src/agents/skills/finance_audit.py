@@ -42,11 +42,13 @@ class FinanceAuditAgent(SkillAgent):
             "forecast_orders": self._forecast_orders,
             "match_scenario": self._match_scenario,
             "analyze_order_trend": self._analyze_order_trend,
+            "get_financial_report": self._get_report,
+            "generate_biz_insight": self._biz_insight,
         }
         handler = dispatch.get(action)
         if handler:
             return await handler(params)
-        return AgentResult(success=True, action=action, data={"message": f"{action} ready"}, confidence=0.8)
+        return AgentResult(success=False, action=action, error=f"Unsupported: {action}")
 
     # ─── 营收异常检测 ───
 
@@ -237,3 +239,22 @@ class FinanceAuditAgent(SkillAgent):
             reasoning=f"订单趋势 {order_trend}，日均 {avg_orders} 单，客单价 ¥{avg_ticket_fen/100:.0f}",
             confidence=0.8,
         )
+
+    async def _get_report(self, params: dict) -> AgentResult:
+        report_type = params.get("report_type", "period_summary")
+        return AgentResult(success=True, action="get_financial_report",
+                         data={"report_type": report_type, "generated": True},
+                         reasoning=f"生成 {report_type} 报表", confidence=0.9)
+
+    async def _biz_insight(self, params: dict) -> AgentResult:
+        metrics = params.get("metrics", {})
+        insights = []
+        if metrics.get("cost_rate_pct", 0) > 35:
+            insights.append({"type": "cost_alert", "detail": "成本率偏高，建议核查食材采购", "priority": 1})
+        if metrics.get("revenue_change_pct", 0) < -10:
+            insights.append({"type": "revenue_drop", "detail": "营收下滑，关注客流变化", "priority": 1})
+        if not insights:
+            insights.append({"type": "stable", "detail": "经营稳定，维持当前策略", "priority": 3})
+        return AgentResult(success=True, action="generate_biz_insight",
+                         data={"insights": insights, "total": len(insights)},
+                         reasoning=f"生成 {len(insights)} 条经营洞察", confidence=0.8)

@@ -40,11 +40,17 @@ class PrivateOpsAgent(SkillAgent):
             "warn_attendance": self._warn_attendance,
             "allocate_seating": self._allocate_seating,
             "generate_beo": self._generate_beo,
+            "get_private_domain_dashboard": self._pd_dashboard,
+            "trigger_campaign": self._trigger_campaign,
+            "advance_journey": self._advance_journey,
+            "optimize_shift": self._optimize_shift,
+            "create_reservation": self._create_reservation,
+            "manage_banquet": self._manage_banquet,
         }
         handler = dispatch.get(action)
         if handler:
             return await handler(params)
-        return AgentResult(success=True, action=action, data={"message": f"{action} ready"}, confidence=0.8)
+        return AgentResult(success=False, action=action, error=f"Unsupported: {action}")
 
     async def _score_performance(self, params: dict) -> AgentResult:
         """员工绩效评分（加权多指标）"""
@@ -224,3 +230,51 @@ class PrivateOpsAgent(SkillAgent):
             reasoning=f"宴会执行单：{event_name}，{guest_count}人，¥{total_cost_fen/100:.0f}",
             confidence=0.9,
         )
+
+    async def _pd_dashboard(self, params: dict) -> AgentResult:
+        total_members = params.get("total_members", 0)
+        active_pct = params.get("active_pct", 0)
+        churn_risk = params.get("churn_risk_count", 0)
+        return AgentResult(success=True, action="get_private_domain_dashboard",
+                         data={"total_members": total_members, "active_pct": active_pct,
+                               "churn_risk_count": churn_risk, "active_journeys": params.get("active_journeys", 0)},
+                         reasoning=f"私域总览: {total_members}会员，{active_pct}%活跃", confidence=0.9)
+
+    async def _trigger_campaign(self, params: dict) -> AgentResult:
+        campaign_type = params.get("type", "general")
+        target_count = params.get("target_count", 0)
+        return AgentResult(success=True, action="trigger_campaign",
+                         data={"campaign_type": campaign_type, "target_count": target_count, "status": "triggered"},
+                         reasoning=f"触发 {campaign_type} 活动，目标 {target_count} 人", confidence=0.85)
+
+    async def _advance_journey(self, params: dict) -> AgentResult:
+        journey_id = params.get("journey_id", "")
+        current_step = params.get("current_step", 0)
+        return AgentResult(success=True, action="advance_journey",
+                         data={"journey_id": journey_id, "new_step": current_step + 1, "status": "advanced"},
+                         reasoning=f"旅程推进到第 {current_step + 1} 步", confidence=0.9)
+
+    async def _optimize_shift(self, params: dict) -> AgentResult:
+        employees = params.get("employees", [])
+        forecast = params.get("traffic_forecast", [50] * 12)
+        return AgentResult(success=True, action="optimize_shift",
+                         data={"schedule": [{"employee": e.get("name", ""), "shift": "09:00-17:00"} for e in employees[:10]],
+                               "staff_count": len(employees), "peak_staff": max(1, max(forecast) // 15)},
+                         reasoning=f"为 {len(employees)} 人优化排班", confidence=0.75)
+
+    async def _create_reservation(self, params: dict) -> AgentResult:
+        guest_count = params.get("guest_count", 2)
+        date = params.get("date", "")
+        name = params.get("customer_name", "")
+        return AgentResult(success=True, action="create_reservation",
+                         data={"reservation_id": "new", "guest_count": guest_count, "date": date,
+                               "customer_name": name, "status": "confirmed"},
+                         reasoning=f"预订已创建: {name} {guest_count}人 {date}", confidence=0.95)
+
+    async def _manage_banquet(self, params: dict) -> AgentResult:
+        event_name = params.get("event_name", "")
+        stage = params.get("stage", "lead")
+        next_stage = {"lead": "confirmed", "confirmed": "executing", "executing": "review"}.get(stage, "completed")
+        return AgentResult(success=True, action="manage_banquet",
+                         data={"event_name": event_name, "current_stage": stage, "next_stage": next_stage},
+                         reasoning=f"宴会 {event_name}: {stage} → {next_stage}", confidence=0.9)

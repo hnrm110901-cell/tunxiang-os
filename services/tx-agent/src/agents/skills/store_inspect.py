@@ -46,11 +46,13 @@ class StoreInspectAgent(SkillAgent):
             "suggest_runbook": self._suggest_runbook,
             "predict_maintenance": self._predict_maintenance,
             "food_safety_status": self._food_safety,
+            "security_advice": self._security,
+            "store_dashboard": self._dashboard,
         }
         handler = dispatch.get(action)
         if handler:
             return await handler(params)
-        return AgentResult(success=True, action=action, data={"message": f"{action} ready"}, confidence=0.8)
+        return AgentResult(success=False, action=action, error=f"Unsupported: {action}")
 
     async def _health_check(self, params: dict) -> AgentResult:
         """三域健康检查：软件/硬件/网络"""
@@ -211,3 +213,21 @@ class StoreInspectAgent(SkillAgent):
             reasoning=f"食安合规率 {compliance_rate:.1f}%，{violation_count} 个违规",
             confidence=0.9,
         )
+
+    async def _security(self, params: dict) -> AgentResult:
+        issues = []
+        if params.get("weak_passwords"): issues.append("弱密码需更换")
+        if params.get("unauthorized_devices"): issues.append("发现未授权设备")
+        if params.get("firmware_outdated"): issues.append("固件需更新")
+        if not params.get("vpn_enabled", True): issues.append("VPN未启用")
+        return AgentResult(success=True, action="security_advice",
+                         data={"issues": issues, "total": len(issues),
+                               "risk_level": "high" if len(issues) >= 3 else "medium" if issues else "low"},
+                         reasoning=f"{len(issues)} 个安全风险", confidence=0.85)
+
+    async def _dashboard(self, params: dict) -> AgentResult:
+        return AgentResult(success=True, action="store_dashboard",
+                         data={"software_score": params.get("sw", 100), "hardware_score": params.get("hw", 100),
+                               "network_score": params.get("net", 100),
+                               "overall": round((params.get("sw", 100) + params.get("hw", 100) + params.get("net", 100)) / 3)},
+                         reasoning="门店健康总览", confidence=0.9)
