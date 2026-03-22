@@ -1,0 +1,93 @@
+# Dependencies
+node_modules/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+pip-log.txt
+.venv/
+venv/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment
+.env
+.env.local
+.env.*.local
+.env.staging
+.env.production
+
+# Build outputs
+dist/
+build/
+*.egg-info/
+.next/
+out/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Testing
+coverage/
+.coverage
+coverage.xml
+.nyc_output/
+.pytest_cache/
+htmlcov/
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+docker-compose.override.yml
+
+# Kubernetes
+*.kubeconfig
+
+# SSL certificates
+ssl/*.pem
+ssl/*.key
+ssl/*.crt
+
+# Claude Code
+CLAUDE.local.md
+.claude/settings.local.json
+.claude/worktrees/
+.superpowers/
+
+# Android
+apps/android-shell/.gradle/
+apps/android-shell/build/
+apps/android-shell/local.properties
+
+# iOS / Swift
+apps/ios-shell/.build/
+edge/coreml-bridge/.build/
+*.xcuserdata
+DerivedData/
+
+# ML models (large files)
+*.mlmodel
+*.mlpackage
+*.onnx
+!shared/ontology/**

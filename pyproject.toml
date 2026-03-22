@@ -1,0 +1,16 @@
+[project]
+name = "tunxiang-os"
+version = "3.0.0"
+description = "TunxiangOS - AI-Native Restaurant Chain Operating System"
+requires-python = ">=3.11"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["services/*/src/tests", "edge/*/src/tests", "shared/*/tests"]

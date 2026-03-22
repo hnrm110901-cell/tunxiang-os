@@ -1,0 +1,19 @@
+{
+  "name": "tunxiang-os",
+  "version": "3.0.0",
+  "private": true,
+  "description": "TunxiangOS - AI-Native Restaurant Chain Operating System",
+  "scripts": {
+    "dev:pos": "pnpm --filter web-pos dev",
+    "dev:kds": "pnpm --filter web-kds dev",
+    "dev:crew": "pnpm --filter web-crew dev",
+    "dev:admin": "pnpm --filter web-admin dev",
+    "build": "pnpm -r build",
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r test"
+  },
+  "engines": {
+    "node": ">=18",
+    "pnpm": ">=8"
+  }
+}
