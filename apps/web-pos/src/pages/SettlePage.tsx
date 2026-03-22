@@ -1,9 +1,11 @@
 /**
- * 结算页面 — 支付方式选择 + 打印
+ * 结算页面 — 对接 tx-trade 支付 API + 打印
  */
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useOrderStore } from '../store/orderStore';
-import { printReceipt, openCashBox } from '../bridge/TXBridge';
+import { settleOrder, createPayment, printReceipt as apiPrintReceipt } from '../api/tradeApi';
+import { printReceipt as bridgePrint, openCashBox } from '../bridge/TXBridge';
 
 const fen2yuan = (fen: number) => `¥${(fen / 100).toFixed(2)}`;
 
@@ -18,27 +20,47 @@ const PAYMENT_METHODS = [
 
 export function SettlePage() {
   const navigate = useNavigate();
-  const { items, totalFen, discountFen, tableNo, clear } = useOrderStore();
+  const { items, totalFen, discountFen, tableNo, orderId, clear } = useOrderStore();
   const finalFen = totalFen - discountFen;
+  const [paying, setPaying] = useState(false);
 
   const handlePay = async (method: string) => {
-    // TODO: 调用 PaymentService API
-    alert(`支付方式: ${method}\n金额: ${fen2yuan(finalFen)}\n支付成功！`);
+    if (paying) return;
+    setPaying(true);
 
-    // 打印小票
     try {
-      await printReceipt(`[收银小票]\n桌号: ${tableNo}\n金额: ${fen2yuan(finalFen)}`);
+      // 1. 创建支付记录
+      if (orderId) {
+        await createPayment(orderId, method, finalFen);
+      }
+
+      // 2. 结算订单
+      if (orderId) {
+        await settleOrder(orderId);
+      }
+
+      // 3. 打印小票
+      if (orderId) {
+        try {
+          const { content_base64 } = await apiPrintReceipt(orderId);
+          await bridgePrint(content_base64);
+        } catch {
+          // 打印失败不阻断结算
+        }
+      }
+
+      // 4. 现金弹钱箱
+      if (method === 'cash') {
+        try { await openCashBox(); } catch { /* ignore */ }
+      }
+
+      clear();
+      navigate('/tables');
     } catch (e) {
-      console.error('打印失败', e);
+      alert(`支付失败: ${e instanceof Error ? e.message : '未知错误'}`);
+    } finally {
+      setPaying(false);
     }
-
-    // 现金支付弹钱箱
-    if (method === 'cash') {
-      try { await openCashBox(); } catch (e) { /* ignore */ }
-    }
-
-    clear();
-    navigate('/tables');
   };
 
   return (
@@ -76,13 +98,14 @@ export function SettlePage() {
           <button
             key={m.key}
             onClick={() => handlePay(m.key)}
+            disabled={paying}
             style={{
               padding: 16, border: 'none', borderRadius: 8,
-              background: m.color, color: '#fff', fontSize: 18,
-              cursor: 'pointer',
+              background: paying ? '#444' : m.color, color: '#fff', fontSize: 18,
+              cursor: paying ? 'not-allowed' : 'pointer',
             }}
           >
-            {m.label}
+            {paying ? '处理中...' : m.label}
           </button>
         ))}
         <button

@@ -1,0 +1,87 @@
+## TunxiangOS V3.0 — 开发环境全栈启动
+## 使用: docker-compose up -d
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: tunxiang
+      POSTGRES_PASSWORD: changeme_dev
+      POSTGRES_DB: tunxiang_os
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      - ./infra/docker/init-rls.sql:/docker-entrypoint-initdb.d/01-rls.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tunxiang"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  gateway:
+    build:
+      context: .
+      dockerfile: services/gateway/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://tunxiang:changeme_dev@postgres/tunxiang_os
+      REDIS_URL: redis://redis:6379/0
+      TX_TRADE_URL: http://tx-trade:8001
+      TX_MENU_URL: http://tx-menu:8002
+      TX_AGENT_URL: http://tx-agent:8008
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  tx-trade:
+    build:
+      context: .
+      dockerfile: services/tx-trade/Dockerfile
+    ports:
+      - "8001:8001"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://tunxiang:changeme_dev@postgres/tunxiang_os
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  tx-menu:
+    build:
+      context: .
+      dockerfile: services/tx-menu/Dockerfile
+    ports:
+      - "8002:8002"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://tunxiang:changeme_dev@postgres/tunxiang_os
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  tx-agent:
+    build:
+      context: .
+      dockerfile: services/tx-agent/Dockerfile
+    ports:
+      - "8008:8008"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://tunxiang:changeme_dev@postgres/tunxiang_os
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  pg_data:
