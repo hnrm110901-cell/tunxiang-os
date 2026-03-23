@@ -91,7 +91,7 @@
 | F2 | **Mac mini M4 部署** | mac-station + sync-engine + 本地 PG 配置 | 中 |
 | F3 | **Tailscale VPN 配通** | 门店 Mac mini → 云端安全隧道 | 小 |
 | F4 | **云端服务器部署** | 腾讯云 Docker Compose 生产环境 | 中 |
-| F5 | **SSL 证书 + 域名** | api.zlsjos.cn + admin.zlsjos.cn | 小 |
+| F5 | **SSL 证书 + 域名** | api.tunxiangos.com + admin.tunxiangos.com | 小 |
 | F6 | **ESC/POS 打印机联调** | 商米内置打印 + 外接佳博/芯烨 | 中 |
 | F7 | **电子秤联调** | 商米秤 SDK / 顶尖电子秤 | 小 |
 

@@ -69,7 +69,7 @@ echo ""
 echo "▶ Step 3/5: 注册门店到云端"
 echo "  POST /api/v1/org/stores"
 echo "  {\"store_name\": \"$STORE_NAME\", \"store_code\": \"$STORE_CODE\", \"brand_id\": \"$BRAND_ID\"}"
-# curl -X POST "https://api.zlsjos.cn/api/v1/org/stores" \
+# curl -X POST "https://api.tunxiangos.com/api/v1/org/stores" \
 #   -H "X-Tenant-ID: $TENANT_ID" \
 #   -H "Content-Type: application/json" \
 #   -d "{\"store_name\":\"$STORE_NAME\",\"store_code\":\"$STORE_CODE\",\"brand_id\":\"$BRAND_ID\"}"
@@ -90,7 +90,7 @@ echo "▶ Step 5/5: 系统验证"
 checks=(
   "Mac Station|http://$MAC_MINI_IP:8000/health"
   "Core ML Bridge|http://$MAC_MINI_IP:8100/health"
-  "Cloud Gateway|https://api.zlsjos.cn/health"
+  "Cloud Gateway|https://api.tunxiangos.com/health"
 )
 
 all_ok=true
@@ -114,7 +114,7 @@ if [ "$all_ok" = true ]; then
   echo " ✓ 新店上线完成！"
   echo ""
   echo " POS 访问: http://$MAC_MINI_IP:5173"
-  echo " 管理后台: https://admin.zlsjos.cn"
+  echo " 管理后台: https://admin.tunxiangos.com"
   echo " 小程序: 扫码进入"
 else
   echo " ⚠ 部分检查未通过，请排查"

@@ -262,7 +262,7 @@ class TestFullCashierFlow:
             assert isinstance(kitchen_receipt, bytes)
 
         # Step 8.2: 二维码（好评码）
-        qr = generate_qr_code_escpos("https://review.zlsjos.cn/order/BBBB", size=6)
+        qr = generate_qr_code_escpos("https://review.tunxiangos.com/order/BBBB", size=6)
         assert isinstance(qr, bytes)
         assert len(qr) > 0
 
@@ -724,7 +724,7 @@ class TestAdvancedPrinting:
         assert len(result) > 100
 
     def test_qr_code_generation(self):
-        qr = generate_qr_code_escpos("https://pay.zlsjos.cn/order/12345", size=4)
+        qr = generate_qr_code_escpos("https://pay.tunxiangos.com/order/12345", size=4)
         assert isinstance(qr, bytes)
         assert len(qr) > 20
 

@@ -1,7 +1,7 @@
 // TunxiangOS 微信小程序 — 顾客端
 App({
   globalData: {
-    apiBase: 'https://api.zlsjos.cn',  // 云端 Gateway
+    apiBase: 'https://api.tunxiangos.com',  // 云端 Gateway
     tenantId: '',
     storeId: '',
     userInfo: null,

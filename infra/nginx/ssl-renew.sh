@@ -7,10 +7,10 @@
 #   3. 手动续期
 #
 # 域名列表（按需修改）：
-DOMAINS=("api.zlsjos.cn" "admin.zlsjos.cn" "miniapp.zlsjos.cn")
+DOMAINS=("api.tunxiangos.com" "admin.tunxiangos.com" "miniapp.tunxiangos.com")
 EMAIL="devops@tunxiang.tech"
 NGINX_CONTAINER="tunxiang-nginx"
-CERT_DIR="/etc/letsencrypt/live/api.zlsjos.cn"
+CERT_DIR="/etc/letsencrypt/live/api.tunxiangos.com"
 NGINX_SSL_DIR="/etc/nginx/ssl"
 
 set -euo pipefail
