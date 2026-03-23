@@ -3,7 +3,11 @@
     "pages/index/index",
     "pages/menu/menu",
     "pages/order/order",
-    "pages/member/member"
+    "pages/member/member",
+    "pages/booking/booking",
+    "pages/queue/queue",
+    "pages/coupons/coupons",
+    "pages/corporate/corporate"
   ],
   "window": {
     "navigationBarTitleText": "屯象点餐",

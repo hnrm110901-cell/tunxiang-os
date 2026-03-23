@@ -1,0 +1,69 @@
+<!-- 排队取号页 -->
+<view class="container">
+  <!-- 未取号状态 -->
+  <view class="take-number-section" wx:if="{{!queueTicket}}">
+    <view class="section-title">排队取号</view>
+
+    <!-- 人数选择 -->
+    <view class="form-item">
+      <text class="form-label">用餐人数</text>
+      <view class="guest-options">
+        <view class="guest-item {{selectedGuests === item.value ? 'active' : ''}}"
+              wx:for="{{guestOptions}}" wx:key="value"
+              bindtap="selectGuests" data-value="{{item.value}}">
+          {{item.label}}
+        </view>
+      </view>
+    </view>
+
+    <!-- 当前排队概况 -->
+    <view class="queue-overview" wx:if="{{queueSummary.length > 0}}">
+      <view class="overview-title">当前排队情况</view>
+      <view class="overview-row" wx:for="{{queueSummary}}" wx:key="type">
+        <text class="overview-type">{{item.label}}</text>
+        <text class="overview-count">前方 {{item.waiting}} 桌</text>
+        <text class="overview-time">约 {{item.estimateMin}} 分钟</text>
+      </view>
+    </view>
+
+    <button class="submit-btn" bindtap="takeNumber" disabled="{{!selectedGuests || submitting}}">
+      {{submitting ? '取号中...' : '立即取号'}}
+    </button>
+  </view>
+
+  <!-- 已取号状态：等位进度 -->
+  <view class="ticket-section" wx:if="{{queueTicket}}">
+    <view class="ticket-card">
+      <view class="ticket-type">{{queueTicket.queueLabel}}</view>
+      <view class="ticket-number">{{queueTicket.ticketNo}}</view>
+      <view class="ticket-hint">您的排队号</view>
+    </view>
+
+    <!-- 等位进度 -->
+    <view class="progress-section">
+      <view class="progress-item">
+        <text class="progress-label">前方等待</text>
+        <text class="progress-value highlight">{{queueTicket.ahead}} 桌</text>
+      </view>
+      <view class="progress-item">
+        <text class="progress-label">预计等待</text>
+        <text class="progress-value highlight">{{queueTicket.estimateMin}} 分钟</text>
+      </view>
+      <view class="progress-item">
+        <text class="progress-label">用餐人数</text>
+        <text class="progress-value">{{queueTicket.guests}} 人</text>
+      </view>
+      <view class="progress-item">
+        <text class="progress-label">取号时间</text>
+        <text class="progress-value">{{queueTicket.createdAt}}</text>
+      </view>
+    </view>
+
+    <!-- 提示 -->
+    <view class="tip-box">
+      <text class="tip-text">请留意叫号提醒，过号需重新取号。</text>
+    </view>
+
+    <button class="cancel-btn" bindtap="cancelQueue">取消排队</button>
+  </view>
+</view>
