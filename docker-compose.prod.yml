@@ -1,4 +1,4 @@
-## TunxiangOS V3.0 — 生产环境 Docker Compose
+## TunxiangOS V3 — 生产环境 Docker Compose
 ## 使用: docker-compose -f docker-compose.prod.yml up -d
 
 x-common-env: &common-env
@@ -22,6 +22,7 @@ x-service-defaults: &service-defaults
         memory: 128M
 
 services:
+  # ── Nginx 反向代理 ──
   nginx:
     image: nginx:alpine
     ports:
@@ -30,7 +31,15 @@ services:
     volumes:
       - ./infra/nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
       - ./ssl:/etc/nginx/ssl:ro
+      # V3 全部静态文件目录
+      - web-hub-dist:/usr/share/nginx/html/web-hub:ro
       - web-admin-dist:/usr/share/nginx/html/web-admin:ro
+      - web-pos-dist:/usr/share/nginx/html/web-pos:ro
+      - web-kds-dist:/usr/share/nginx/html/web-kds:ro
+      - miniapp-dist:/usr/share/nginx/html/miniapp:ro
+      - web-forge-dist:/usr/share/nginx/html/web-forge:ro
+      - docs-dist:/usr/share/nginx/html/docs:ro
+      - www-dist:/usr/share/nginx/html/www:ro
     depends_on:
       - gateway
     restart: always
@@ -44,6 +53,69 @@ services:
         limits:
           cpus: "0.5"
           memory: 256M
+
+  # ── 前端构建服务 ──
+
+  web-hub:
+    build:
+      context: .
+      dockerfile: apps/web-hub/Dockerfile
+    volumes:
+      - web-hub-dist:/app/dist
+    environment:
+      VITE_API_BASE_URL: https://${API_DOMAIN:-api.tunxiangos.com}
+      VITE_WS_BASE_URL: wss://${WS_DOMAIN:-ws.tunxiangos.com}
+
+  web-admin:
+    build:
+      context: .
+      dockerfile: apps/web-admin/Dockerfile
+    volumes:
+      - web-admin-dist:/app/dist
+    environment:
+      VITE_API_BASE_URL: https://${API_DOMAIN:-api.tunxiangos.com}
+      VITE_WS_BASE_URL: wss://${WS_DOMAIN:-ws.tunxiangos.com}
+
+  web-pos:
+    build:
+      context: .
+      dockerfile: apps/web-pos/Dockerfile
+    volumes:
+      - web-pos-dist:/app/dist
+    environment:
+      VITE_API_BASE_URL: https://${API_DOMAIN:-api.tunxiangos.com}
+      VITE_WS_BASE_URL: wss://${WS_DOMAIN:-ws.tunxiangos.com}
+
+  web-kds:
+    build:
+      context: .
+      dockerfile: apps/web-kds/Dockerfile
+    volumes:
+      - web-kds-dist:/app/dist
+    environment:
+      VITE_API_BASE_URL: https://${API_DOMAIN:-api.tunxiangos.com}
+      VITE_WS_BASE_URL: wss://${WS_DOMAIN:-ws.tunxiangos.com}
+
+  miniapp:
+    build:
+      context: .
+      dockerfile: apps/miniapp-customer/Dockerfile
+    volumes:
+      - miniapp-dist:/app/dist
+    environment:
+      VITE_API_BASE_URL: https://${API_DOMAIN:-api.tunxiangos.com}
+
+  web-forge:
+    build:
+      context: .
+      dockerfile: apps/web-forge/Dockerfile
+    volumes:
+      - web-forge-dist:/app/dist
+    environment:
+      VITE_API_BASE_URL: https://${API_DOMAIN:-api.tunxiangos.com}
+      VITE_WS_BASE_URL: wss://${WS_DOMAIN:-ws.tunxiangos.com}
+
+  # ── 基础设施 ──
 
   postgres:
     image: postgres:16-alpine
@@ -85,6 +157,8 @@ services:
         limits:
           cpus: "0.5"
           memory: 512M
+
+  # ── 后端微服务 ──
 
   gateway:
     build:
@@ -296,4 +370,11 @@ services:
 volumes:
   pg_data:
   redis_data:
+  web-hub-dist:
   web-admin-dist:
+  web-pos-dist:
+  web-kds-dist:
+  miniapp-dist:
+  web-forge-dist:
+  docs-dist:
+  www-dist:
