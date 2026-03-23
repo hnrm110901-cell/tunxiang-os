@@ -4,7 +4,7 @@ Golden ID 全渠道画像、RFM 分层、营销活动、用户旅程、私域运
 来源：35 个 service 文件迁移自 tunxiang V2.x
 """
 from fastapi import FastAPI
-from .api.members import router as member_router
+from api.members import router as member_router
 
 app = FastAPI(title="TunxiangOS tx-member", version="3.0.0")
 app.include_router(member_router)

@@ -8,6 +8,13 @@ import { ShellHQ } from './shell/ShellHQ';
 import { DashboardPage } from './pages/DashboardPage';
 import { StoreHealthPage } from './pages/StoreHealthPage';
 import { AgentMonitorPage } from './pages/AgentMonitorPage';
+import { TradePage } from './pages/TradePage';
+import { CatalogPage } from './pages/CatalogPage';
+import { SupplyPage } from './pages/SupplyPage';
+import { OperationsPage } from './pages/OperationsPage';
+import { CrmPage } from './pages/CrmPage';
+import { OrgPage } from './pages/OrgPage';
+import { SystemPage } from './pages/SystemPage';
 
 function App() {
   return (
@@ -18,6 +25,13 @@ function App() {
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/store-health" element={<StoreHealthPage />} />
           <Route path="/agents" element={<AgentMonitorPage />} />
+          <Route path="/trade" element={<TradePage />} />
+          <Route path="/catalog" element={<CatalogPage />} />
+          <Route path="/supply" element={<SupplyPage />} />
+          <Route path="/operations" element={<OperationsPage />} />
+          <Route path="/crm" element={<CrmPage />} />
+          <Route path="/org" element={<OrgPage />} />
+          <Route path="/system" element={<SystemPage />} />
         </Routes>
       </ShellHQ>
     </BrowserRouter>

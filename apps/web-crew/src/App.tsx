@@ -5,11 +5,17 @@ import { BrowserRouter, Routes, Route, Navigate, Link, useLocation } from 'react
 import { TablesView } from './pages/TablesView';
 import { QuickOrderView } from './pages/QuickOrderView';
 import { ActiveOrdersView } from './pages/ActiveOrdersView';
+import { DailyCruisePage } from './pages/DailyCruisePage';
+import { ReviewPage } from './pages/ReviewPage';
+import { ProfilePage } from './pages/ProfilePage';
 
 const tabs = [
   { path: '/tables', label: '桌台', icon: '🪑' },
   { path: '/order', label: '点餐', icon: '📋' },
   { path: '/active', label: '进行中', icon: '🔥' },
+  { path: '/cruise', label: '巡航', icon: '🚀' },
+  { path: '/review', label: '复盘', icon: '📊' },
+  { path: '/profile', label: '我的', icon: '👤' },
 ];
 
 function BottomTab() {
@@ -41,6 +47,9 @@ export default function App() {
           <Route path="/tables" element={<TablesView />} />
           <Route path="/order" element={<QuickOrderView />} />
           <Route path="/active" element={<ActiveOrdersView />} />
+          <Route path="/cruise" element={<DailyCruisePage />} />
+          <Route path="/review" element={<ReviewPage />} />
+          <Route path="/profile" element={<ProfilePage />} />
         </Routes>
         <BottomTab />
       </div>

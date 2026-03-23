@@ -106,6 +106,14 @@ class Store(TenantBase):
     cost_ratio_target: Mapped[float | None] = mapped_column(Float)
     labor_cost_ratio_target: Mapped[float | None] = mapped_column(Float)
 
+    # 蓝图扩展字段
+    turnover_rate_target: Mapped[float | None] = mapped_column(Float, comment="翻台率目标")
+    serve_time_limit_min: Mapped[int | None] = mapped_column(Integer, default=30, comment="出餐时限(分钟)")
+    waste_rate_target: Mapped[float | None] = mapped_column(Float, comment="损耗率目标(%)")
+    rectification_close_rate: Mapped[float | None] = mapped_column(Float, comment="整改关闭率")
+    meal_periods: Mapped[dict | None] = mapped_column(JSON, comment="餐段配置[{name,start,end}]")
+    business_type: Mapped[str | None] = mapped_column(String(30), comment="pro/standard/lite")
+
 
 # ─────────────────────────────────────────────
 # 3. Dish — 菜品
@@ -220,6 +228,18 @@ class Order(TenantBase):
     notes: Mapped[str | None] = mapped_column(String(500))
     order_metadata: Mapped[dict | None] = mapped_column(JSON, default=dict)
 
+    # 蓝图扩展字段（wireframe-fields-v1）
+    guest_count: Mapped[int | None] = mapped_column(Integer, comment="就餐人数")
+    dining_duration_min: Mapped[int | None] = mapped_column(Integer, comment="就餐时长(分钟)")
+    abnormal_flag: Mapped[bool] = mapped_column(Boolean, default=False, comment="异常标记")
+    abnormal_type: Mapped[str | None] = mapped_column(String(50), comment="complaint/return/discount/timeout")
+    discount_type: Mapped[str | None] = mapped_column(String(50), comment="折扣类型:coupon/vip/manager/promotion")
+    margin_alert_flag: Mapped[bool] = mapped_column(Boolean, default=False, comment="毛利告警")
+    gross_margin_before: Mapped[float | None] = mapped_column(Numeric(6, 4), comment="折扣前毛利率")
+    gross_margin_after: Mapped[float | None] = mapped_column(Numeric(6, 4), comment="折扣后毛利率")
+    served_at: Mapped[str | None] = mapped_column(DateTime(timezone=True), comment="出餐完成时间")
+    serve_duration_min: Mapped[int | None] = mapped_column(Integer, comment="出餐耗时(分钟)")
+
     # 关联
     items = relationship("OrderItem", back_populates="order", cascade="all, delete-orphan")
 
@@ -243,6 +263,15 @@ class OrderItem(TenantBase):
     gross_margin: Mapped[float | None] = mapped_column(Numeric(6, 4), comment="毛利率")
     notes: Mapped[str | None] = mapped_column(String(255))
     customizations: Mapped[dict | None] = mapped_column(JSON, default=dict)
+
+    # 蓝图扩展字段
+    pricing_mode: Mapped[str | None] = mapped_column(String(20), comment="fixed/weight/market_price")
+    weight_value: Mapped[float | None] = mapped_column(Numeric(8, 3), comment="称重值(kg)")
+    gift_flag: Mapped[bool] = mapped_column(Boolean, default=False, comment="赠送标记")
+    sent_to_kds_flag: Mapped[bool] = mapped_column(Boolean, default=False, comment="已发送KDS")
+    kds_station: Mapped[str | None] = mapped_column(String(50), comment="目标档口")
+    return_flag: Mapped[bool] = mapped_column(Boolean, default=False, comment="退菜标记")
+    return_reason: Mapped[str | None] = mapped_column(String(200), comment="退菜原因")
 
     order = relationship("Order", back_populates="items")
 

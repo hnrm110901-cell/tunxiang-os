@@ -3,7 +3,7 @@
 
 # ─── 测试 ───
 
-test: test-trade test-agent test-analytics test-supply test-menu test-ops test-integration
+test: test-trade test-agent test-analytics test-supply test-menu test-ops test-member test-finance test-org test-integration
 	@echo "\n✓ All tests passed"
 
 test-trade:
@@ -25,6 +25,18 @@ test-supply:
 test-menu:
 	@echo "=== tx-menu ==="
 	@cd services/tx-menu && python3 -m pytest src/tests/ -q
+
+test-member:
+	@echo "=== tx-member ==="
+	@cd services/tx-member && PYTHONPATH=src python3 -m pytest src/tests/ -q
+
+test-finance:
+	@echo "=== tx-finance ==="
+	@cd services/tx-finance && PYTHONPATH=src python3 -m pytest src/tests/ -q
+
+test-org:
+	@echo "=== tx-org ==="
+	@cd services/tx-org && PYTHONPATH=src python3 -m pytest src/tests/ -q
 
 test-ops:
 	@echo "=== tx-ops ==="
