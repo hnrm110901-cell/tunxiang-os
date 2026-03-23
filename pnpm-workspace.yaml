@@ -3,3 +3,4 @@ packages:
   - "apps/web-kds"
   - "apps/web-crew"
   - "apps/web-admin"
+  - "apps/web-hub"
