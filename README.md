@@ -89,15 +89,62 @@ tunxiang-os/
 └── infra/                 Docker + Nginx + Tailscale
 ```
 
+## V3.2+ 新增功能
+
+### 品智 POS 借鉴与适配
+- **品智 Adapter** — 完整的品智 POS 数据适配器（订单/菜品/会员/库存同步）
+- **签名验证** — 品智 API 签名校验模块
+- **10 大 Adapter 体系** — 品智/奥琦玮/天财商龙/美团SaaS/易鼎/客如云/微生活/饿了么/抖音/诺诺
+
+### HR 模块（tx-org 扩展）
+- **薪资引擎** — 多薪资项库 + 五险一金 + 绩效提成自动计算
+- **请假审批** — 多级审批流 + 假期余额管理
+- **门店调动** — 跨门店人员调配 + 历史记录
+- **人效分析** — 人时营收比 + 工时利用率 + 排班优化建议
+- **角色层级** — 集团/区域/门店三级权限体系
+- **薪资项库** — 可配置薪资项模板 + 批量套用
+
+### Repository 模式
+- **tx-analytics Repository** — 健康度/叙事/KPI 数据访问层抽象
+- **tx-menu Repository** — 菜品/发布方案 Repository 封装
+- **tx-member Repository** — 会员/营销方案 Repository 封装
+- **tx-supply Repository** — 库存/采购/损耗 Repository 封装
+
+### Adapter / SDK 扩展
+- **统一适配器基类** — BaseAdapter + AdapterRegistry + 类型映射
+- **标准化数据类型** — 订单/菜品/会员/库存/桌台/供应商/预订统一类型
+- **饿了么 Webhook** — 饿了么订单实时回调适配
+- **抖音外卖适配** — 抖音来客订单同步
+
+### 运营流程
+- **日清日结 E1-E8** — 开店/巡航/异常/交班/闭店/日结/复盘/整改八节点
+- **工作流引擎** — 通用节点状态机 + 检查项管理
+- **快速开店（Clone）** — 标杆门店配置一键克隆到新店
+
+### 交易增强
+- **预订排队入座** — 预订状态机 + 排队叫号 + 最优桌台分配
+- **桌台状态机** — 休眠检测 + 超时提醒 + 自动释放
+- **ESC/POS 高级打印** — 外卖单/交班报表/预结单/二维码/厨房标签
+- **营销方案引擎** — 7种方案类型 + 互斥规则 + 优先级执行
+
+### 基础设施
+- **Nginx 完善** — WebSocket 代理/miniapp API/静态缓存/Gzip/Rate Limiting/CORS
+- **SSL 自动续期** — Let's Encrypt certbot + cron 定时续期
+
 ## 测试
 
 ```
-173 tests passing
+173+ tests passing
 ├── tx-trade:      26 (收银全流程 + ESC/POS + 支付)
 ├── tx-agent:      76 (9 Agent + 约束 + Memory Bus + Master)
 ├── tx-analytics:  40 (健康度 + 叙事引擎)
 ├── tx-supply:     21 (损耗监控)
-└── integration:   10 (跨域全链路)
+├── tx-ops:        20+ (日清日结+快速开店+工作流)
+├── tx-org:        30+ (薪资/请假/调动/人效/角色)
+├── tx-member:     20+ (营销引擎+API)
+├── adapters:      15+ (品智/奥琦玮/天财等)
+├── integration:   10 (跨域全链路)
+└── e2e:            5 (端到端场景)
 ```
 
 ## 部署
