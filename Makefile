@@ -16,23 +16,23 @@ test-agent:
 
 test-analytics:
 	@echo "=== tx-analytics ==="
-	@cd services/tx-analytics && python3 -m pytest src/tests/ -q
+	@cd services/tx-analytics && PYTHONPATH=src:../../ python3 -m pytest src/tests/ -q
 
 test-supply:
 	@echo "=== tx-supply ==="
-	@cd services/tx-supply && python3 -m pytest src/tests/ -q
+	@cd services/tx-supply && PYTHONPATH=src:../../ python3 -m pytest src/tests/ -q
 
 test-menu:
 	@echo "=== tx-menu ==="
-	@cd services/tx-menu && python3 -m pytest src/tests/ -q
+	@cd services/tx-menu && PYTHONPATH=src:../../ python3 -m pytest src/tests/ -q
 
 test-member:
 	@echo "=== tx-member ==="
-	@cd services/tx-member && PYTHONPATH=src python3 -m pytest src/tests/ -q
+	@cd services/tx-member && PYTHONPATH=src:../../ python3 -m pytest src/tests/ -q
 
 test-finance:
 	@echo "=== tx-finance ==="
-	@cd services/tx-finance && PYTHONPATH=src python3 -m pytest src/tests/ -q
+	@cd services/tx-finance && PYTHONPATH=src:../../ python3 -m pytest src/tests/ -q
 
 test-org:
 	@echo "=== tx-org ==="

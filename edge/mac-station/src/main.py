@@ -95,6 +95,53 @@ async def agent_push_ws(websocket: WebSocket):
         logger.info("ws_client_disconnected", total=len(connected_clients))
 
 
+# ─── KDS WebSocket 推送 ───
+
+from kds_pusher import KDSPusher
+import json
+
+kds_pusher = KDSPusher()
+
+
+@app.websocket("/ws/kds/{station_id}")
+async def kds_ws(websocket: WebSocket, station_id: str):
+    """KDS 终端 WebSocket 连接端点"""
+    await websocket.accept()
+    await kds_pusher.register(station_id, websocket)
+    logger.info("kds_ws_connected", station_id=station_id)
+
+    try:
+        while True:
+            raw = await websocket.receive_text()
+            if raw == "ping":
+                await websocket.send_text("pong")
+                continue
+
+            try:
+                msg = json.loads(raw)
+            except json.JSONDecodeError:
+                continue
+
+            msg_type = msg.get("type")
+
+            if msg_type == "new_order":
+                # 收到新订单 -> 按出品部门拆分推送到各档口
+                await kds_pusher.dispatch_new_order(msg.get("order", {}))
+
+            elif msg_type == "status_change":
+                await kds_pusher.push_status_change(
+                    msg.get("ticket_id", ""),
+                    msg.get("new_status", ""),
+                )
+
+            elif msg_type == "rush_order":
+                await kds_pusher.push_rush_order(msg.get("ticket_id", ""))
+
+    except WebSocketDisconnect:
+        await kds_pusher.unregister(station_id, websocket)
+        logger.info("kds_ws_disconnected", station_id=station_id)
+
+
 async def broadcast_agent_decision(decision: dict):
     """广播 Agent 决策到所有连接的 POS 终端"""
     for ws in connected_clients:
