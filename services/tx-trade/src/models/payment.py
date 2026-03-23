@@ -1,7 +1,7 @@
 """支付模型 — 多支付方式 + 退款"""
 import uuid
 
-from sqlalchemy import String, Integer, DateTime, Text, ForeignKey, func
+from sqlalchemy import String, Integer, Float, Boolean, DateTime, Text, ForeignKey, func
 from sqlalchemy.dialects.postgresql import UUID, JSON
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -23,6 +23,19 @@ class Payment(TenantBase):
     amount_fen: Mapped[int] = mapped_column(Integer, nullable=False, comment="支付金额(分)")
     status: Mapped[str] = mapped_column(
         String(20), nullable=False, default=PaymentStatus.pending.value, index=True
+    )
+
+    # 实收属性
+    is_actual_revenue: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, comment="是否计入实收"
+    )
+    actual_revenue_ratio: Mapped[float] = mapped_column(
+        Float, nullable=False, default=1.0,
+        comment="实收比例(0-1)，例如团购券按面额的0.9计入实收"
+    )
+    payment_category: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="other",
+        comment="支付类别：现金/移动支付/会员消费/团购/银联卡/银行卡/挂账/快充/免单/外卖支付/华彩会员/优惠券/其他"
     )
 
     # 第三方支付信息

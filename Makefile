@@ -36,7 +36,7 @@ test-finance:
 
 test-org:
 	@echo "=== tx-org ==="
-	@cd services/tx-org && PYTHONPATH=src python3 -m pytest src/tests/ -q
+	@cd services/tx-org && PYTHONPATH=src:../../ python3 -m pytest src/tests/ -q
 
 test-ops:
 	@echo "=== tx-ops ==="

@@ -114,6 +114,18 @@ class Store(TenantBase):
     meal_periods: Mapped[dict | None] = mapped_column(JSON, comment="餐段配置[{name,start,end}]")
     business_type: Mapped[str | None] = mapped_column(String(30), comment="pro/standard/lite")
 
+    # 品智借鉴：门店标签多维度分类
+    store_category: Mapped[str | None] = mapped_column(String(50), comment="门店类别：商场店/街边店/社区店")
+    store_tags: Mapped[dict | None] = mapped_column(JSON, default=list, comment="门店标签[{category,tags}]，最多3维度")
+    operation_mode: Mapped[str | None] = mapped_column(String(20), comment="经营模式：直营/加盟/联营")
+    store_level: Mapped[str | None] = mapped_column(String(20), comment="门店等级：A/B/C/D")
+    last_online_at: Mapped[str | None] = mapped_column(DateTime(timezone=True), comment="最近在线日期")
+    license_expiry: Mapped[str | None] = mapped_column(Date, comment="授权到期日期")
+
+    # 品智借鉴：日结/班别配置
+    settlement_mode: Mapped[str | None] = mapped_column(String(20), default="auto+manual", comment="日结方式：auto/manual/auto+manual")
+    shift_type: Mapped[str | None] = mapped_column(String(20), default="no_shift", comment="班别：no_shift/two_shift/three_shift")
+
 
 # ─────────────────────────────────────────────
 # 3. Dish — 菜品
@@ -155,6 +167,10 @@ class Dish(TenantBase):
     preparation_time: Mapped[int | None] = mapped_column(Integer, comment="制作时间(分钟)")
     cooking_method: Mapped[str | None] = mapped_column(String(50))
     kitchen_station: Mapped[str | None] = mapped_column(String(50), comment="档口")
+    production_dept_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), comment="出品部门ID")
+    sell_start_date: Mapped[str | None] = mapped_column(Date, comment="售卖开始日期")
+    sell_end_date: Mapped[str | None] = mapped_column(Date, comment="售卖结束日期")
+    sell_time_ranges: Mapped[dict | None] = mapped_column(JSON, comment="售卖时段[{start,end}]")
 
     # 标签
     tags: Mapped[list | None] = mapped_column(ARRAY(String), comment="招牌/新品/特价/素食")
