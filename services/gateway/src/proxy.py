@@ -23,6 +23,8 @@ DOMAIN_ROUTES = {
     "org": os.getenv("TX_ORG_URL", "http://localhost:8006"),
     "analytics": os.getenv("TX_ANALYTICS_URL", "http://localhost:8007"),
     "agent": os.getenv("TX_AGENT_URL", "http://localhost:8008"),
+    "growth": os.getenv("TX_GROWTH_URL", "http://localhost:8012"),
+    "intel": os.getenv("TX_INTEL_URL", "http://localhost:8013"),
 }
 
 # 旧单体回退（M4a 后可移除）

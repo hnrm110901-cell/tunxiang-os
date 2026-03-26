@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .middleware import TenantMiddleware, RequestLogMiddleware
 from .proxy import router as proxy_router
 from .hub_api import router as hub_router
+from .growth_intel_relay import router as relay_router
 from .response import ok
 
 app = FastAPI(
@@ -28,6 +29,9 @@ app.include_router(proxy_router)
 
 # Hub 运维管理 API（仅 hub.tunxiangos.com 可访问，Nginx IP白名单保护）
 app.include_router(hub_router)
+
+# 情报→增长自动接力 API
+app.include_router(relay_router)
 
 
 @app.get("/health")

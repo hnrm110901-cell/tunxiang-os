@@ -24,6 +24,14 @@ import { ROIOverviewPage } from './pages/hq/growth/ROIOverviewPage';
 import { IntelDashboardPage } from './pages/hq/market-intel/IntelDashboardPage';
 import { NewProductListPage } from './pages/hq/market-intel/NewProductListPage';
 import { NewProductOpportunityPage } from './pages/hq/market-intel/NewProductOpportunityPage';
+import { ContentCenterPage } from './pages/hq/growth/ContentCenterPage';
+import { OfferCenterPage } from './pages/hq/growth/OfferCenterPage';
+import { ChannelCenterPage } from './pages/hq/growth/ChannelCenterPage';
+import { ReferralCenterPage } from './pages/hq/growth/ReferralCenterPage';
+import { StoreExecutionPage } from './pages/hq/growth/StoreExecutionPage';
+import { CompetitorCenterPage } from './pages/hq/market-intel/CompetitorCenterPage';
+import { ReviewTopicPage } from './pages/hq/market-intel/ReviewTopicPage';
+import { TrendReportPage } from './pages/hq/market-intel/TrendReportPage';
 
 function App() {
   return (
@@ -50,6 +58,14 @@ function App() {
           <Route path="/hq/market-intel/dashboard" element={<IntelDashboardPage />} />
           <Route path="/hq/market-intel/new-products" element={<NewProductListPage />} />
           <Route path="/hq/market-intel/new-products/:id" element={<NewProductOpportunityPage />} />
+          <Route path="/hq/growth/content" element={<ContentCenterPage />} />
+          <Route path="/hq/growth/offers" element={<OfferCenterPage />} />
+          <Route path="/hq/growth/channels" element={<ChannelCenterPage />} />
+          <Route path="/hq/growth/referral" element={<ReferralCenterPage />} />
+          <Route path="/hq/growth/execution" element={<StoreExecutionPage />} />
+          <Route path="/hq/market-intel/competitors" element={<CompetitorCenterPage />} />
+          <Route path="/hq/market-intel/reviews" element={<ReviewTopicPage />} />
+          <Route path="/hq/market-intel/reports" element={<TrendReportPage />} />
         </Routes>
       </ShellHQ>
     </BrowserRouter>
