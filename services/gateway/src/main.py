@@ -24,14 +24,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 域路由代理
-app.include_router(proxy_router)
-
-# Hub 运维管理 API（仅 hub.tunxiangos.com 可访问，Nginx IP白名单保护）
+# Hub 运维管理 API（必须在 proxy 之前注册，否则被通配路由拦截）
 app.include_router(hub_router)
 
 # 情报→增长自动接力 API
 app.include_router(relay_router)
+
+# 域路由代理（通配路由 /api/v1/{domain}/{path}，放最后）
+app.include_router(proxy_router)
 
 
 @app.get("/health")
