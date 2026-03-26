@@ -1,0 +1,218 @@
+"""渠道触达引擎 — 统一渠道配置、发送能力和合规频控
+
+统一管理企微、短信、小程序、App Push 等渠道的消息发送，
+强制频率限制防止用户骚扰，记录发送日志用于归因。
+"""
+import uuid
+from datetime import datetime, timezone, date
+from typing import Any, Optional
+from collections import defaultdict
+
+
+# ---------------------------------------------------------------------------
+# 内存存储
+# ---------------------------------------------------------------------------
+
+_channel_configs: dict[str, dict] = {}
+_send_logs: list[dict] = []
+_daily_send_counts: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
+# _daily_send_counts[user_id][channel] = count_today
+
+
+# ---------------------------------------------------------------------------
+# ChannelEngine
+# ---------------------------------------------------------------------------
+
+class ChannelEngine:
+    """渠道触达引擎 — 统一渠道配置、发送能力和合规频控"""
+
+    CHANNELS = {
+        "wecom": {"name": "企业微信", "max_daily": 3},
+        "sms": {"name": "短信", "max_daily": 2},
+        "miniapp": {"name": "小程序订阅消息", "max_daily": 5},
+        "app_push": {"name": "App Push", "max_daily": 3},
+        "pos_receipt": {"name": "POS小票二维码", "max_daily": 999},
+        "reservation_page": {"name": "预订确认页", "max_daily": 1},
+        "store_task": {"name": "门店人工任务", "max_daily": 1},
+    }
+
+    def send_message(
+        self,
+        channel: str,
+        user_id: str,
+        content: str,
+        offer_id: Optional[str] = None,
+    ) -> dict:
+        """发送消息
+
+        Args:
+            channel: 渠道名称
+            user_id: 用户ID
+            content: 消息内容
+            offer_id: 关联优惠ID（可选）
+
+        Returns:
+            发送结果
+        """
+        if channel not in self.CHANNELS:
+            return {"success": False, "error": f"不支持的渠道: {channel}"}
+
+        # 频控检查
+        freq_check = self.check_frequency_limit(user_id, channel)
+        if not freq_check["allowed"]:
+            return {
+                "success": False,
+                "error": f"频率限制：{freq_check['reason']}",
+                "channel": channel,
+                "user_id": user_id,
+            }
+
+        # 模拟发送
+        message_id = str(uuid.uuid4())[:8]
+        now = datetime.now(timezone.utc).isoformat()
+        today = date.today().isoformat()
+
+        log_entry = {
+            "message_id": message_id,
+            "channel": channel,
+            "user_id": user_id,
+            "content": content[:200],  # 截断存储
+            "offer_id": offer_id,
+            "status": "sent",
+            "sent_at": now,
+            "date": today,
+        }
+        _send_logs.append(log_entry)
+
+        # 更新每日计数
+        _daily_send_counts[user_id][channel] += 1
+
+        return {
+            "success": True,
+            "message_id": message_id,
+            "channel": channel,
+            "user_id": user_id,
+            "sent_at": now,
+        }
+
+    def check_frequency_limit(self, user_id: str, channel: str) -> dict:
+        """检查频率限制
+
+        Returns:
+            {"allowed": bool, "reason": str, "current_count": int, "max_daily": int}
+        """
+        if channel not in self.CHANNELS:
+            return {"allowed": False, "reason": f"不支持的渠道: {channel}", "current_count": 0, "max_daily": 0}
+
+        max_daily = self.CHANNELS[channel]["max_daily"]
+        current_count = _daily_send_counts.get(user_id, {}).get(channel, 0)
+
+        allowed = current_count < max_daily
+        reason = "" if allowed else f"今日已发送 {current_count} 次，上限 {max_daily} 次"
+
+        return {
+            "allowed": allowed,
+            "reason": reason,
+            "current_count": current_count,
+            "max_daily": max_daily,
+            "channel": channel,
+            "channel_name": self.CHANNELS[channel]["name"],
+        }
+
+    def get_channel_stats(self, channel: str, date_range: dict) -> dict:
+        """获取渠道统计
+
+        Args:
+            channel: 渠道名称
+            date_range: {"start": "2026-03-01", "end": "2026-03-26"}
+        """
+        if channel not in self.CHANNELS:
+            return {"error": f"不支持的渠道: {channel}"}
+
+        start = date_range.get("start", "")
+        end = date_range.get("end", "")
+
+        channel_logs = [
+            log for log in _send_logs
+            if log["channel"] == channel
+            and (not start or log.get("date", "") >= start)
+            and (not end or log.get("date", "") <= end)
+        ]
+
+        total_sent = len(channel_logs)
+        unique_users = len(set(log["user_id"] for log in channel_logs))
+        with_offer = sum(1 for log in channel_logs if log.get("offer_id"))
+
+        return {
+            "channel": channel,
+            "channel_name": self.CHANNELS[channel]["name"],
+            "date_range": date_range,
+            "total_sent": total_sent,
+            "unique_users": unique_users,
+            "with_offer_count": with_offer,
+            "avg_per_user": round(total_sent / max(1, unique_users), 2),
+        }
+
+    def configure_channel(self, channel: str, settings: dict) -> dict:
+        """配置渠道参数
+
+        Args:
+            channel: 渠道名称
+            settings: 配置项
+                {"max_daily": 5, "enabled": True, "template_id": "..."}
+        """
+        if channel not in self.CHANNELS:
+            return {"error": f"不支持的渠道: {channel}"}
+
+        config = _channel_configs.get(channel, {})
+        config.update(settings)
+        config["channel"] = channel
+        config["updated_at"] = datetime.now(timezone.utc).isoformat()
+
+        # 更新全局频率限制
+        if "max_daily" in settings:
+            self.CHANNELS[channel]["max_daily"] = settings["max_daily"]
+
+        _channel_configs[channel] = config
+        return config
+
+    def get_send_log(
+        self,
+        user_id: Optional[str] = None,
+        channel: Optional[str] = None,
+        date_range: Optional[dict] = None,
+    ) -> list[dict]:
+        """查询发送日志
+
+        Args:
+            user_id: 按用户过滤（可选）
+            channel: 按渠道过滤（可选）
+            date_range: 按日期过滤（可选）
+        """
+        logs = _send_logs.copy()
+
+        if user_id:
+            logs = [l for l in logs if l["user_id"] == user_id]
+        if channel:
+            logs = [l for l in logs if l["channel"] == channel]
+        if date_range:
+            start = date_range.get("start", "")
+            end = date_range.get("end", "")
+            if start:
+                logs = [l for l in logs if l.get("date", "") >= start]
+            if end:
+                logs = [l for l in logs if l.get("date", "") <= end]
+
+        return logs
+
+
+def reset_daily_counts() -> None:
+    """重置每日发送计数（辅助函数，用于测试）"""
+    _daily_send_counts.clear()
+
+
+def clear_all_channel_data() -> None:
+    """清空所有渠道数据（仅测试用）"""
+    _channel_configs.clear()
+    _send_logs.clear()
+    _daily_send_counts.clear()
