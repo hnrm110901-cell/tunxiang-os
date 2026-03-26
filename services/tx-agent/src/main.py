@@ -6,11 +6,13 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .api.planner import router as planner_router
+from .api.observability import router as observability_router
 
 app = FastAPI(title="TunxiangOS tx-agent", version="3.0.0", description="Agent OS 微服务")
 
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 app.include_router(planner_router)
+app.include_router(observability_router)
 
 
 @app.get("/health")

@@ -1,9 +1,10 @@
 .PHONY: test test-trade test-agent test-analytics test-supply test-integration
 .PHONY: dev up down logs lint
+.PHONY: mcp-server test-mcp
 
 # ─── 测试 ───
 
-test: test-trade test-agent test-analytics test-supply test-menu test-ops test-member test-finance test-org test-integration
+test: test-trade test-agent test-analytics test-supply test-menu test-ops test-member test-finance test-org test-mcp test-integration
 	@echo "\n✓ All tests passed"
 
 test-trade:
@@ -99,3 +100,13 @@ verify-agents:
 
 smoke:
 	@bash scripts/smoke_test.sh
+
+# ─── MCP Server ───
+
+mcp-server:
+	@echo "=== Starting MCP Server ==="
+	@cd services/mcp-server && PYTHONPATH=src:../tx-agent/src python3 -m src.server
+
+test-mcp:
+	@echo "=== mcp-server ==="
+	@cd services/mcp-server && PYTHONPATH=src:../tx-agent/src python3 -m pytest src/tests/ -q

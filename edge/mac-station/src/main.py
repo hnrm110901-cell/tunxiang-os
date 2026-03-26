@@ -13,14 +13,18 @@ import structlog
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
+from vision_service import router as vision_router
+from voice_service import router as voice_router
+from federated_client import router as federated_router
+
 logger = structlog.get_logger()
 
 COREML_URL = os.getenv("COREML_BRIDGE_URL", "http://localhost:8100")
 
 app = FastAPI(
     title="TunxiangOS Mac Station",
-    version="3.0.0",
-    description="门店本地智能后台 — Mac mini M4",
+    version="4.1.0",
+    description="门店本地智能后台 — Mac mini M4 (Voice + Vision + KDS)",
 )
 
 app.add_middleware(
@@ -30,30 +34,39 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ─── Vision Service 路由 ───
+app.include_router(vision_router)
+
+# ─── Voice Service 路由 ───
+app.include_router(voice_router)
+
+# ─── Federated Learning 路由 ───
+app.include_router(federated_router)
+
 # ─── 健康检查 ───
 
 @app.get("/health")
-async def health():
+async def health() -> dict:
     return {"ok": True, "data": {"service": "mac-station", "version": "3.0.0"}}
 
 
 # ─── 离线查询 API ───
 
 @app.get("/api/v1/offline/revenue")
-async def query_revenue_offline(store_id: str, date: str = "today"):
+async def query_revenue_offline(store_id: str, date: str = "today") -> dict:
     """离线查询营业额（从本地 PG 读取）"""
     # TODO: 接入本地 PG
     return {"ok": True, "data": {"store_id": store_id, "date": date, "revenue_fen": 0, "source": "local_cache"}}
 
 
 @app.get("/api/v1/offline/inventory")
-async def query_inventory_offline(store_id: str):
+async def query_inventory_offline(store_id: str) -> dict:
     """离线查询库存（从本地 PG 读取）"""
     return {"ok": True, "data": {"store_id": store_id, "items": [], "source": "local_cache"}}
 
 
 @app.get("/api/v1/offline/orders")
-async def query_orders_offline(store_id: str, status: str = "pending"):
+async def query_orders_offline(store_id: str, status: str = "pending") -> dict:
     """离线查询订单"""
     return {"ok": True, "data": {"store_id": store_id, "orders": [], "source": "local_cache"}}
 
@@ -61,7 +74,7 @@ async def query_orders_offline(store_id: str, status: str = "pending"):
 # ─── Core ML 代理 ───
 
 @app.post("/api/v1/predict/{model_name}")
-async def predict(model_name: str, data: dict):
+async def predict(model_name: str, data: dict) -> dict:
     """代理 Core ML 桥接请求到 coreml-bridge (port 8100)"""
     try:
         async with httpx.AsyncClient(timeout=5) as client:
@@ -78,7 +91,7 @@ connected_clients: list[WebSocket] = []
 
 
 @app.websocket("/ws/agent-push")
-async def agent_push_ws(websocket: WebSocket):
+async def agent_push_ws(websocket: WebSocket) -> None:
     """WebSocket 端点 — Agent 决策实时推送到安卓 POS"""
     await websocket.accept()
     connected_clients.append(websocket)
@@ -104,7 +117,7 @@ kds_pusher = KDSPusher()
 
 
 @app.websocket("/ws/kds/{station_id}")
-async def kds_ws(websocket: WebSocket, station_id: str):
+async def kds_ws(websocket: WebSocket, station_id: str) -> None:
     """KDS 终端 WebSocket 连接端点"""
     await websocket.accept()
     await kds_pusher.register(station_id, websocket)
@@ -142,26 +155,26 @@ async def kds_ws(websocket: WebSocket, station_id: str):
         logger.info("kds_ws_disconnected", station_id=station_id)
 
 
-async def broadcast_agent_decision(decision: dict):
+async def broadcast_agent_decision(decision: dict) -> None:
     """广播 Agent 决策到所有连接的 POS 终端"""
     for ws in connected_clients:
         try:
             await ws.send_json(decision)
-        except Exception:
+        except (WebSocketDisconnect, RuntimeError, OSError):
             pass
 
 
 # ─── 安卓 POS 外设转发（iPad 用） ───
 
 @app.post("/api/print")
-async def print_receipt(data: dict):
+async def print_receipt(data: dict) -> dict:
     """接收 iPad/浏览器的打印请求，转发到安卓 POS（通过 WebSocket）"""
     await broadcast_agent_decision({"type": "print", "payload": data})
     return {"ok": True, "data": {"message": "Print command forwarded"}}
 
 
 @app.post("/api/cash-box")
-async def open_cash_box():
+async def open_cash_box() -> dict:
     """接收钱箱开启请求"""
     await broadcast_agent_decision({"type": "open_cash_box"})
     return {"ok": True, "data": {"message": "Cash box command forwarded"}}
