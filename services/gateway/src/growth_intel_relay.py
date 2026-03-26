@@ -333,40 +333,40 @@ _service = GrowthIntelRelayService()
 
 
 @router.get("/relays")
-async def list_relays():
+async def list_relays() -> dict:
     """列出所有接力记录"""
     return {"ok": True, "data": {"items": _service.get_relay_history(), "total": len(_service.get_relay_history())}}
 
 
 @router.get("/relays/active")
-async def list_active_relays():
+async def list_active_relays() -> dict:
     """列出活跃接力记录"""
     active = _service.get_active_relays()
     return {"ok": True, "data": {"items": active, "total": len(active)}}
 
 
 @router.post("/relays/create")
-async def create_relay(opportunity_id: str):
+async def create_relay(opportunity_id: str) -> dict:
     """从情报机会创建增长活动草稿"""
     relay = _service.relay_opportunity_to_campaign(opportunity_id)
     return {"ok": True, "data": relay}
 
 
 @router.post("/feedbacks/create")
-async def create_feedback(pilot_id: str, results: dict):
+async def create_feedback(pilot_id: str, results: dict) -> dict:
     """记录试点结果反馈"""
     feedback = _service.relay_pilot_result_to_intel(pilot_id, results)
     return {"ok": True, "data": feedback}
 
 
 @router.get("/feedbacks")
-async def list_feedbacks():
+async def list_feedbacks() -> dict:
     """列出所有试点反馈"""
     feedbacks = _service.get_feedbacks()
     return {"ok": True, "data": {"items": feedbacks, "total": len(feedbacks)}}
 
 
 @router.get("/stats")
-async def relay_stats():
+async def relay_stats() -> dict:
     """接力统计"""
     return {"ok": True, "data": _service.get_relay_stats()}

@@ -453,13 +453,13 @@ async def send_message(req: SendMessageRequest) -> dict:
 
 
 @app.get("/api/v1/channels/{channel}/frequency/{user_id}")
-async def check_frequency(channel: str, user_id: str):
+async def check_frequency(channel: str, user_id: str) -> dict:
     result = channel_svc.check_frequency_limit(user_id, channel)
     return ok_response(result)
 
 
 @app.get("/api/v1/channels/{channel}/stats")
-async def get_channel_stats(channel: str, start: str = "", end: str = ""):
+async def get_channel_stats(channel: str, start: str = "", end: str = "") -> dict:
     result = channel_svc.get_channel_stats(channel, {"start": start, "end": end})
     if "error" in result:
         return error_response(result["error"])
@@ -467,7 +467,7 @@ async def get_channel_stats(channel: str, start: str = "", end: str = ""):
 
 
 @app.post("/api/v1/channels/configure")
-async def configure_channel(req: ChannelConfigRequest):
+async def configure_channel(req: ChannelConfigRequest) -> dict:
     result = channel_svc.configure_channel(req.channel, req.settings)
     if "error" in result:
         return error_response(result["error"])
@@ -480,7 +480,7 @@ async def get_send_log(
     channel: Optional[str] = None,
     start: str = "",
     end: str = "",
-):
+) -> dict:
     date_range = {"start": start, "end": end} if start or end else None
     result = channel_svc.get_send_log(user_id, channel, date_range)
     return ok_response(result)
@@ -504,19 +504,19 @@ class ConversionRequest(BaseModel):
 
 
 @app.post("/api/v1/roi/touchpoint")
-async def record_touchpoint(req: TouchpointRequest):
+async def record_touchpoint(req: TouchpointRequest) -> dict:
     result = roi_svc.record_touchpoint(req.user_id, req.channel, req.campaign_id, req.touchpoint_type)
     return ok_response(result)
 
 
 @app.post("/api/v1/roi/conversion")
-async def record_conversion(req: ConversionRequest):
+async def record_conversion(req: ConversionRequest) -> dict:
     result = roi_svc.record_conversion(req.user_id, req.order_id, req.revenue_fen)
     return ok_response(result)
 
 
 @app.get("/api/v1/roi/campaign/{campaign_id}")
-async def get_campaign_attribution(campaign_id: str, model: str = "multi_touch"):
+async def get_campaign_attribution(campaign_id: str, model: str = "multi_touch") -> dict:
     result = roi_svc.compute_attribution(campaign_id, model)
     if "error" in result:
         return error_response(result["error"])
@@ -524,24 +524,24 @@ async def get_campaign_attribution(campaign_id: str, model: str = "multi_touch")
 
 
 @app.get("/api/v1/roi/channels")
-async def get_channel_roi(start: str = "", end: str = ""):
+async def get_channel_roi(start: str = "", end: str = "") -> dict:
     result = roi_svc.get_channel_roi({"start": start, "end": end})
     return ok_response(result)
 
 
 @app.get("/api/v1/roi/segments")
-async def get_segment_roi(start: str = "", end: str = ""):
+async def get_segment_roi(start: str = "", end: str = "") -> dict:
     result = roi_svc.get_segment_roi({"start": start, "end": end})
     return ok_response(result)
 
 
 @app.get("/api/v1/roi/user/{user_id}/path")
-async def get_attribution_path(user_id: str):
+async def get_attribution_path(user_id: str) -> dict:
     result = roi_svc.get_attribution_path(user_id)
     return ok_response(result)
 
 
 @app.get("/api/v1/roi/overview")
-async def get_roi_overview(start: str = "", end: str = ""):
+async def get_roi_overview(start: str = "", end: str = "") -> dict:
     result = roi_svc.get_roi_overview({"start": start, "end": end})
     return ok_response(result)
