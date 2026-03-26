@@ -568,8 +568,7 @@ def get_pilot_portfolio() -> dict:
 
 @app.get("/health")
 def health_check() -> dict:
-    return {
-        "ok": True,
+    return ok({
         "service": "tx-intel",
         "version": "1.0.0",
         "engines": [
@@ -581,4 +580,4 @@ def health_check() -> dict:
             "intel_report_engine",
             "pilot_suggestion",
         ],
-    }
+    })

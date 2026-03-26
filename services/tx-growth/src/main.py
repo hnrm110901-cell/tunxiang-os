@@ -50,7 +50,7 @@ def error_response(msg: str) -> dict:
 # ---------------------------------------------------------------------------
 
 @app.get("/health")
-async def health():
+async def health() -> dict:
     return {"ok": True, "data": {"service": "tx-growth", "version": "3.0.0"}}
 
 
@@ -86,7 +86,7 @@ class ContentValidationRequest(BaseModel):
 
 
 @app.post("/api/v1/brand-strategy")
-async def create_brand_strategy(req: BrandStrategyRequest):
+async def create_brand_strategy(req: BrandStrategyRequest) -> dict:
     result = brand_svc.create_brand_strategy(
         brand_id=req.brand_id,
         positioning=req.positioning,
@@ -102,7 +102,7 @@ async def create_brand_strategy(req: BrandStrategyRequest):
 
 
 @app.get("/api/v1/brand-strategy/{brand_id}")
-async def get_brand_strategy(brand_id: str):
+async def get_brand_strategy(brand_id: str) -> dict:
     result = brand_svc.get_brand_strategy(brand_id)
     if "error" in result:
         return error_response(result["error"])
@@ -110,7 +110,7 @@ async def get_brand_strategy(brand_id: str):
 
 
 @app.put("/api/v1/brand-strategy/{brand_id}")
-async def update_brand_strategy(brand_id: str, req: BrandStrategyUpdateRequest):
+async def update_brand_strategy(brand_id: str, req: BrandStrategyUpdateRequest) -> dict:
     result = brand_svc.update_brand_strategy(brand_id, req.updates)
     if "error" in result:
         return error_response(result["error"])
@@ -118,25 +118,25 @@ async def update_brand_strategy(brand_id: str, req: BrandStrategyUpdateRequest):
 
 
 @app.post("/api/v1/brand-strategy/city")
-async def create_city_strategy(req: CityStrategyRequest):
+async def create_city_strategy(req: CityStrategyRequest) -> dict:
     result = brand_svc.create_city_strategy(req.brand_id, req.city, req.district_strategies)
     return ok_response(result)
 
 
 @app.get("/api/v1/brand-strategy/{brand_id}/seasonal-calendar")
-async def get_seasonal_calendar(brand_id: str):
+async def get_seasonal_calendar(brand_id: str) -> dict:
     result = brand_svc.get_seasonal_calendar(brand_id)
     return ok_response(result)
 
 
 @app.post("/api/v1/brand-strategy/validate-content")
-async def validate_content_against_brand(req: ContentValidationRequest):
+async def validate_content_against_brand(req: ContentValidationRequest) -> dict:
     result = brand_svc.validate_content_against_brand(req.brand_id, req.content_text)
     return ok_response(result)
 
 
 @app.get("/api/v1/brand-strategy/{brand_id}/strategy-card")
-async def get_strategy_card(brand_id: str):
+async def get_strategy_card(brand_id: str) -> dict:
     result = brand_svc.generate_strategy_card(brand_id)
     if "error" in result:
         return error_response(result["error"])
@@ -158,19 +158,19 @@ class ClassifyUserRequest(BaseModel):
 
 
 @app.post("/api/v1/segments")
-async def create_segment(req: SegmentRequest):
+async def create_segment(req: SegmentRequest) -> dict:
     result = segment_svc.create_segment(req.name, req.rules, req.segment_type)
     return ok_response(result)
 
 
 @app.get("/api/v1/segments")
-async def list_segments():
+async def list_segments() -> dict:
     result = segment_svc.list_segments()
     return ok_response(result)
 
 
 @app.get("/api/v1/segments/{segment_id}")
-async def get_segment_detail(segment_id: str):
+async def get_segment_detail(segment_id: str) -> dict:
     result = segment_svc.get_segment_detail(segment_id)
     if "error" in result:
         return error_response(result["error"])
@@ -178,7 +178,7 @@ async def get_segment_detail(segment_id: str):
 
 
 @app.get("/api/v1/segments/{segment_id}/users")
-async def get_segment_users(segment_id: str, page: int = 1, size: int = 20):
+async def get_segment_users(segment_id: str, page: int = 1, size: int = 20) -> dict:
     result = segment_svc.get_segment_users(segment_id, page, size)
     if "error" in result:
         return error_response(result["error"])
@@ -186,7 +186,7 @@ async def get_segment_users(segment_id: str, page: int = 1, size: int = 20):
 
 
 @app.get("/api/v1/segments/{segment_id}/stats")
-async def get_segment_stats(segment_id: str):
+async def get_segment_stats(segment_id: str) -> dict:
     result = segment_svc.compute_segment_stats(segment_id)
     if "error" in result:
         return error_response(result["error"])
@@ -194,19 +194,19 @@ async def get_segment_stats(segment_id: str):
 
 
 @app.post("/api/v1/segments/classify")
-async def classify_user(req: ClassifyUserRequest):
+async def classify_user(req: ClassifyUserRequest) -> dict:
     result = segment_svc.classify_user(req.user_data)
     return ok_response({"matched_segments": result})
 
 
 @app.get("/api/v1/segments/ai-recommend/{brand_id}")
-async def ai_recommend_segments(brand_id: str):
+async def ai_recommend_segments(brand_id: str) -> dict:
     result = segment_svc.ai_recommend_segments(brand_id)
     return ok_response(result)
 
 
 @app.get("/api/v1/segments/lifecycle-distribution")
-async def get_lifecycle_distribution():
+async def get_lifecycle_distribution() -> dict:
     result = segment_svc.get_lifecycle_distribution()
     return ok_response(result)
 
@@ -234,7 +234,7 @@ class ExecuteNodeRequest(BaseModel):
 
 
 @app.post("/api/v1/journeys")
-async def create_journey(req: JourneyRequest):
+async def create_journey(req: JourneyRequest) -> dict:
     result = journey_svc.create_journey(
         req.name, req.journey_type, req.trigger, req.nodes, req.target_segment_id
     )
@@ -242,7 +242,7 @@ async def create_journey(req: JourneyRequest):
 
 
 @app.put("/api/v1/journeys/{journey_id}")
-async def update_journey(journey_id: str, req: JourneyUpdateRequest):
+async def update_journey(journey_id: str, req: JourneyUpdateRequest) -> dict:
     result = journey_svc.update_journey(journey_id, req.updates)
     if "error" in result:
         return error_response(result["error"])
@@ -250,7 +250,7 @@ async def update_journey(journey_id: str, req: JourneyUpdateRequest):
 
 
 @app.post("/api/v1/journeys/{journey_id}/publish")
-async def publish_journey(journey_id: str):
+async def publish_journey(journey_id: str) -> dict:
     result = journey_svc.publish_journey(journey_id)
     if "error" in result:
         return error_response(result["error"])
@@ -258,7 +258,7 @@ async def publish_journey(journey_id: str):
 
 
 @app.post("/api/v1/journeys/{journey_id}/pause")
-async def pause_journey(journey_id: str):
+async def pause_journey(journey_id: str) -> dict:
     result = journey_svc.pause_journey(journey_id)
     if "error" in result:
         return error_response(result["error"])
@@ -266,7 +266,7 @@ async def pause_journey(journey_id: str):
 
 
 @app.get("/api/v1/journeys/{journey_id}")
-async def get_journey_detail(journey_id: str):
+async def get_journey_detail(journey_id: str) -> dict:
     result = journey_svc.get_journey_detail(journey_id)
     if "error" in result:
         return error_response(result["error"])
@@ -274,13 +274,13 @@ async def get_journey_detail(journey_id: str):
 
 
 @app.get("/api/v1/journeys")
-async def list_journeys(status: Optional[str] = None):
+async def list_journeys(status: Optional[str] = None) -> dict:
     result = journey_svc.list_journeys(status)
     return ok_response(result)
 
 
 @app.post("/api/v1/journeys/execute-node")
-async def execute_node(req: ExecuteNodeRequest):
+async def execute_node(req: ExecuteNodeRequest) -> dict:
     result = journey_svc.execute_node(req.journey_id, req.node_id, req.user_id)
     if "error" in result:
         return error_response(result["error"])
@@ -288,7 +288,7 @@ async def execute_node(req: ExecuteNodeRequest):
 
 
 @app.get("/api/v1/journeys/{journey_id}/stats")
-async def get_journey_stats(journey_id: str):
+async def get_journey_stats(journey_id: str) -> dict:
     result = journey_svc.get_journey_stats(journey_id)
     if "error" in result:
         return error_response(result["error"])
@@ -296,7 +296,7 @@ async def get_journey_stats(journey_id: str):
 
 
 @app.get("/api/v1/journeys/{journey_id}/simulate")
-async def simulate_journey(journey_id: str):
+async def simulate_journey(journey_id: str) -> dict:
     result = journey_svc.simulate_journey(journey_id)
     if "error" in result:
         return error_response(result["error"])
@@ -324,7 +324,7 @@ class CreateTemplateRequest(BaseModel):
 
 
 @app.post("/api/v1/content/generate")
-async def generate_content(req: GenerateContentRequest):
+async def generate_content(req: GenerateContentRequest) -> dict:
     result = content_svc.generate_content(
         req.content_type, req.brand_id, req.target_segment,
         req.dish_name, req.event_name, req.tone,
@@ -335,25 +335,25 @@ async def generate_content(req: GenerateContentRequest):
 
 
 @app.get("/api/v1/content/templates")
-async def list_templates(content_type: Optional[str] = None):
+async def list_templates(content_type: Optional[str] = None) -> dict:
     result = content_svc.list_templates(content_type)
     return ok_response(result)
 
 
 @app.post("/api/v1/content/templates")
-async def create_template(req: CreateTemplateRequest):
+async def create_template(req: CreateTemplateRequest) -> dict:
     result = content_svc.create_template(req.name, req.content_type, req.body_template, req.variables)
     return ok_response(result)
 
 
 @app.post("/api/v1/content/validate")
-async def validate_content(req: ContentValidationRequest):
+async def validate_content(req: ContentValidationRequest) -> dict:
     result = content_svc.validate_content(req.brand_id, req.content_text)
     return ok_response(result)
 
 
 @app.get("/api/v1/content/{content_id}/performance")
-async def get_content_performance(content_id: str):
+async def get_content_performance(content_id: str) -> dict:
     result = content_svc.get_content_performance(content_id)
     if "error" in result:
         return error_response(result["error"])
@@ -386,7 +386,7 @@ class MarginCheckRequest(BaseModel):
 
 
 @app.post("/api/v1/offers")
-async def create_offer(req: OfferRequest):
+async def create_offer(req: OfferRequest) -> dict:
     result = offer_svc.create_offer(
         req.name, req.offer_type, req.discount_rules, req.validity_days,
         req.target_segments, req.stores, req.time_slots, req.margin_floor,
@@ -397,13 +397,13 @@ async def create_offer(req: OfferRequest):
 
 
 @app.post("/api/v1/offers/check-eligibility")
-async def check_eligibility(req: EligibilityRequest):
+async def check_eligibility(req: EligibilityRequest) -> dict:
     result = offer_svc.evaluate_offer_eligibility(req.user_id, req.offer_id)
     return ok_response(result)
 
 
 @app.get("/api/v1/offers/{offer_id}/cost")
-async def calculate_offer_cost(offer_id: str):
+async def calculate_offer_cost(offer_id: str) -> dict:
     result = offer_svc.calculate_offer_cost(offer_id)
     if "error" in result:
         return error_response(result["error"])
@@ -411,13 +411,13 @@ async def calculate_offer_cost(offer_id: str):
 
 
 @app.post("/api/v1/offers/check-margin")
-async def check_margin_compliance(req: MarginCheckRequest):
+async def check_margin_compliance(req: MarginCheckRequest) -> dict:
     result = offer_svc.check_margin_compliance(req.offer_id, req.order_data)
     return ok_response(result)
 
 
 @app.get("/api/v1/offers/{offer_id}/analytics")
-async def get_offer_analytics(offer_id: str):
+async def get_offer_analytics(offer_id: str) -> dict:
     result = offer_svc.get_offer_analytics(offer_id)
     if "error" in result:
         return error_response(result["error"])
@@ -425,7 +425,7 @@ async def get_offer_analytics(offer_id: str):
 
 
 @app.get("/api/v1/offers/recommend/{segment_id}")
-async def recommend_offer(segment_id: str):
+async def recommend_offer(segment_id: str) -> dict:
     result = offer_svc.recommend_offer_for_segment(segment_id)
     return ok_response(result)
 
@@ -447,7 +447,7 @@ class ChannelConfigRequest(BaseModel):
 
 
 @app.post("/api/v1/channels/send")
-async def send_message(req: SendMessageRequest):
+async def send_message(req: SendMessageRequest) -> dict:
     result = channel_svc.send_message(req.channel, req.user_id, req.content, req.offer_id)
     return ok_response(result)
 
