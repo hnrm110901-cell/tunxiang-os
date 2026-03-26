@@ -21,6 +21,7 @@ const MENU_CONFIGS: Record<string, MenuConfig> = {
         { id: 'hq-dashboard', label: '经营驾驶舱', icon: '📊', path: '/dashboard' },
         { id: 'store-health', label: '门店健康', icon: '🏥', path: '/store-health' },
         { id: 'agent-monitor', label: 'Agent 监控', icon: '🤖', path: '/agents' },
+        { id: 'daily-plan', label: '每日计划', icon: '📋', path: '/daily-plan' },
       ]},
     ],
   },

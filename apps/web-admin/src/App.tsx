@@ -15,6 +15,7 @@ import { OperationsPage } from './pages/OperationsPage';
 import { CrmPage } from './pages/CrmPage';
 import { OrgPage } from './pages/OrgPage';
 import { SystemPage } from './pages/SystemPage';
+import { DailyPlanPage } from './pages/DailyPlanPage';
 
 function App() {
   return (
@@ -32,6 +33,7 @@ function App() {
           <Route path="/crm" element={<CrmPage />} />
           <Route path="/org" element={<OrgPage />} />
           <Route path="/system" element={<SystemPage />} />
+          <Route path="/daily-plan" element={<DailyPlanPage />} />
         </Routes>
       </ShellHQ>
     </BrowserRouter>
