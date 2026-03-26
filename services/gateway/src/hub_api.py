@@ -19,7 +19,8 @@ async def list_merchants(status: Optional[str] = None, page: int = 1, size: int 
         {"id": "m1", "name": "尝在一起", "template": "standard", "stores": 5, "status": "active", "expires": "2027-03-22"},
         {"id": "m2", "name": "徐记海鲜", "template": "pro", "stores": 100, "status": "active", "expires": "2027-06-30"},
         {"id": "m3", "name": "最黔线", "template": "standard", "stores": 8, "status": "trial", "expires": "2026-04-22"},
-    ], "total": 3}}
+        {"id": "m4", "name": "尚宫厨", "template": "lite", "stores": 3, "status": "active", "expires": "2027-01-15"},
+    ], "total": 4}}
 
 @router.post("/merchants")
 async def create_merchant(data: dict):
