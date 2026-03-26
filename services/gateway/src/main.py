@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .middleware import TenantMiddleware, RequestLogMiddleware
 from .proxy import router as proxy_router
+from .auth import router as auth_router
 from .hub_api import router as hub_router
 from .growth_intel_relay import router as relay_router
 from .response import ok
@@ -23,6 +24,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# 认证 API（必须在 proxy 之前注册，否则被通配路由拦截）
+app.include_router(auth_router)
 
 # Hub 运维管理 API（必须在 proxy 之前注册，否则被通配路由拦截）
 app.include_router(hub_router)

@@ -14,11 +14,26 @@ import { TopbarHQ } from './TopbarHQ';
 
 interface ShellHQProps {
   children: ReactNode;
+  onLogout?: () => void;
 }
 
-export function ShellHQ({ children }: ShellHQProps) {
+export function ShellHQ({ children, onLogout }: ShellHQProps) {
   const [activeModule, setActiveModule] = useState('dashboard');
   const [agentVisible, setAgentVisible] = useState(true);
+
+  // Read current user from localStorage
+  let userName = '用户';
+  let userRole = '';
+  try {
+    const raw = localStorage.getItem('tx_user');
+    if (raw) {
+      const u = JSON.parse(raw);
+      userName = u.name || u.username || '用户';
+      userRole = u.merchant || '';
+    }
+  } catch {
+    // ignore parse errors
+  }
 
   return (
     <div className="shell--hq" style={{
@@ -34,7 +49,12 @@ export function ShellHQ({ children }: ShellHQProps) {
     }}>
       {/* Topbar — 贯穿全宽 */}
       <div style={{ gridColumn: '1 / -1' }}>
-        <TopbarHQ onToggleAgent={() => setAgentVisible(!agentVisible)} />
+        <TopbarHQ
+          onToggleAgent={() => setAgentVisible(!agentVisible)}
+          userName={userName}
+          userRole={userRole}
+          onLogout={onLogout}
+        />
       </div>
 
       {/* Icon Rail — 一级导航 */}

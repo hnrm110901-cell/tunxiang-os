@@ -2,9 +2,12 @@
  * web-admin — 总部管理后台
  * 决策1: Shell-HQ 四栏布局
  * 决策2: Agent Console 右侧面板
+ * 决策3: Auth Guard — 未登录则显示 LoginPage
  */
+import { useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ShellHQ } from './shell/ShellHQ';
+import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { StoreHealthPage } from './pages/StoreHealthPage';
 import { AgentMonitorPage } from './pages/AgentMonitorPage';
@@ -34,9 +37,29 @@ import { ReviewTopicPage } from './pages/hq/market-intel/ReviewTopicPage';
 import { TrendReportPage } from './pages/hq/market-intel/TrendReportPage';
 
 function App() {
+  const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem('tx_token'));
+
+  const handleLogout = () => {
+    const token = localStorage.getItem('tx_token');
+    // Fire-and-forget logout call
+    if (token) {
+      fetch('/api/v1/auth/logout', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      }).catch(() => {/* ignore */});
+    }
+    localStorage.removeItem('tx_token');
+    localStorage.removeItem('tx_user');
+    setIsLoggedIn(false);
+  };
+
+  if (!isLoggedIn) {
+    return <LoginPage onLogin={() => setIsLoggedIn(true)} />;
+  }
+
   return (
     <BrowserRouter>
-      <ShellHQ>
+      <ShellHQ onLogout={handleLogout}>
         <Routes>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<DashboardPage />} />
