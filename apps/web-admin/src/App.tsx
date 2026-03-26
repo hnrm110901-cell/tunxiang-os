@@ -16,6 +16,14 @@ import { CrmPage } from './pages/CrmPage';
 import { OrgPage } from './pages/OrgPage';
 import { SystemPage } from './pages/SystemPage';
 import { DailyPlanPage } from './pages/DailyPlanPage';
+import { GrowthDashboardPage } from './pages/hq/growth/GrowthDashboardPage';
+import { SegmentCenterPage } from './pages/hq/growth/SegmentCenterPage';
+import { JourneyListPage } from './pages/hq/growth/JourneyListPage';
+import { JourneyCanvasPage } from './pages/hq/growth/JourneyCanvasPage';
+import { ROIOverviewPage } from './pages/hq/growth/ROIOverviewPage';
+import { IntelDashboardPage } from './pages/hq/market-intel/IntelDashboardPage';
+import { NewProductListPage } from './pages/hq/market-intel/NewProductListPage';
+import { NewProductOpportunityPage } from './pages/hq/market-intel/NewProductOpportunityPage';
 
 function App() {
   return (
@@ -34,6 +42,14 @@ function App() {
           <Route path="/org" element={<OrgPage />} />
           <Route path="/system" element={<SystemPage />} />
           <Route path="/daily-plan" element={<DailyPlanPage />} />
+          <Route path="/hq/growth/dashboard" element={<GrowthDashboardPage />} />
+          <Route path="/hq/growth/segments" element={<SegmentCenterPage />} />
+          <Route path="/hq/growth/journeys" element={<JourneyListPage />} />
+          <Route path="/hq/growth/journeys/:journeyId/canvas" element={<JourneyCanvasPage />} />
+          <Route path="/hq/growth/roi" element={<ROIOverviewPage />} />
+          <Route path="/hq/market-intel/dashboard" element={<IntelDashboardPage />} />
+          <Route path="/hq/market-intel/new-products" element={<NewProductListPage />} />
+          <Route path="/hq/market-intel/new-products/:id" element={<NewProductOpportunityPage />} />
         </Routes>
       </ShellHQ>
     </BrowserRouter>
