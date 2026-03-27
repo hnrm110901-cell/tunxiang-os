@@ -30,6 +30,9 @@ class AgentResult:
     error: Optional[str] = None
     execution_ms: int = 0
     inference_layer: str = "cloud"  # "edge" or "cloud"
+    agent_level: int = 1  # 1=suggest, 2=auto+rollback, 3=fully_autonomous
+    rollback_window_min: int = 30  # Level 2: minutes before auto-commit
+    rollback_id: str = ""  # For Level 2 rollback tracking
 
 
 class SkillAgent(ABC):
@@ -44,15 +47,20 @@ class SkillAgent(ABC):
     description: str = ""
     priority: str = "P2"  # P0/P1/P2
     run_location: str = "cloud"  # "edge", "cloud", "edge+cloud"
+    agent_level: int = 1  # 1=suggest, 2=auto+rollback, 3=fully_autonomous
 
     def __init__(self, tenant_id: str, store_id: Optional[str] = None):
         self.tenant_id = tenant_id
         self.store_id = store_id
 
     async def run(self, action: str, params: dict[str, Any]) -> AgentResult:
-        """统一入口 — 执行 + 约束校验 + 决策留痕
+        """统一入口 — 执行 + 约束校验 + 决策留痕 + 自治等级标注
 
         子类不要覆盖此方法，实现 execute() 即可。
+        三级自治机制：
+          Level 1: 仅建议，人工决定是否执行
+          Level 2: 自动执行 + 30分钟回滚窗口
+          Level 3: 完全自主执行
         """
         start = time.perf_counter()
 
@@ -68,6 +76,12 @@ class SkillAgent(ABC):
             )
 
         result.execution_ms = int((time.perf_counter() - start) * 1000)
+
+        # 标注自治等级
+        result.agent_level = self.agent_level
+        if self.agent_level == 2:
+            result.rollback_id = str(uuid.uuid4())
+            result.rollback_window_min = 30
 
         # 三条硬约束校验
         from .constraints import ConstraintChecker
@@ -91,6 +105,8 @@ class SkillAgent(ABC):
             success=result.success,
             confidence=result.confidence,
             constraints_passed=result.constraints_passed,
+            agent_level=self.agent_level,
+            rollback_id=result.rollback_id,
             ms=result.execution_ms,
         )
 
