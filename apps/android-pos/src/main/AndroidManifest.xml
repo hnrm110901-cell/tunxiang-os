@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Network for API calls and sync -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <!-- Sunmi scale broadcast -->
+    <uses-permission android:name="com.sunmi.scale.permission.DATA" />
+
+    <!-- Sunmi scanner -->
+    <uses-permission android:name="com.sunmi.scanner.permission.SCAN" />
+
+    <!-- Keep awake for POS kiosk mode -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <application
+        android:name=".TunxiangPOSApp"
+        android:allowBackup="false"
+        android:icon="@mipmap/ic_launcher"
+        android:label="屯象POS"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.TunxiangPOS"
+        tools:targetApi="34">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:screenOrientation="landscape"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
+            android:windowSoftInputMode="adjustResize"
+            android:launchMode="singleTask">
+
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Sunmi scanner result receiver -->
+        <receiver
+            android:name=".bridge.SunmiScanner$scanReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.sunmi.scanner.ACTION_DATA_CODE_RECEIVED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- WorkManager initialization -->
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            android:exported="false"
+            tools:node="merge">
+            <!-- Disable automatic WorkManager initialization, we do it in TunxiangPOSApp -->
+            <meta-data
+                android:name="androidx.work.WorkManagerInitializer"
+                android:value="androidx.startup"
+                tools:node="remove" />
+        </provider>
+    </application>
+</manifest>
