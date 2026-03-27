@@ -77,11 +77,29 @@ class Customer(TenantBase):
 # ─────────────────────────────────────────────
 
 class Store(TenantBase):
-    """门店 — 桌台拓扑, 档口配置, 人效模型, 经营指标"""
+    """门店 — 桌台拓扑, 档口配置, 人效模型, 经营指标
+
+    修正#7: 支持虚拟门店(中央厨房/电商仓库)
+    - store_type: physical/virtual/central_kitchen/warehouse
+    - has_physical_seats: False for virtual stores
+    - address/seats: optional for virtual stores
+    """
     __tablename__ = "stores"
 
     store_name: Mapped[str] = mapped_column(String(100), nullable=False)
     store_code: Mapped[str] = mapped_column(String(20), unique=True, nullable=False)
+
+    # 修正#7: 门店类型 — 支持虚拟门店
+    store_type: Mapped[str] = mapped_column(
+        String(30), nullable=False, default="physical",
+        comment="physical/virtual/central_kitchen/warehouse",
+    )
+    has_physical_seats: Mapped[bool] = mapped_column(
+        Boolean, default=True,
+        comment="True for restaurants, False for warehouses/virtual",
+    )
+
+    # 地址现在可选 — 虚拟门店/中央厨房可能无地址
     address: Mapped[str | None] = mapped_column(String(255))
     city: Mapped[str | None] = mapped_column(String(50))
     district: Mapped[str | None] = mapped_column(String(50))
@@ -92,9 +110,9 @@ class Store(TenantBase):
     region: Mapped[str | None] = mapped_column(String(50))
     status: Mapped[str] = mapped_column(String(20), nullable=False, default=StoreStatus.active.value)
 
-    # 门店物理属性
+    # 门店物理属性 — seats 可选(虚拟门店无座位)
     area: Mapped[float | None] = mapped_column(Float, comment="面积(平方米)")
-    seats: Mapped[int | None] = mapped_column(Integer, comment="座位数")
+    seats: Mapped[int | None] = mapped_column(Integer, comment="座位数, None for virtual stores")
     floors: Mapped[int] = mapped_column(Integer, default=1)
     opening_date: Mapped[str | None] = mapped_column(String(20))
     business_hours: Mapped[dict | None] = mapped_column(JSON)
@@ -112,7 +130,7 @@ class Store(TenantBase):
     waste_rate_target: Mapped[float | None] = mapped_column(Float, comment="损耗率目标(%)")
     rectification_close_rate: Mapped[float | None] = mapped_column(Float, comment="整改关闭率")
     meal_periods: Mapped[dict | None] = mapped_column(JSON, comment="餐段配置[{name,start,end}]")
-    business_type: Mapped[str | None] = mapped_column(String(30), comment="pro/standard/lite")
+    business_type: Mapped[str | None] = mapped_column(String(30), comment="fine_dining/fast_food/retail/catering/pro/standard/lite")
 
     # 品智借鉴：门店标签多维度分类
     store_category: Mapped[str | None] = mapped_column(String(50), comment="门店类别：商场店/街边店/社区店")
@@ -125,6 +143,9 @@ class Store(TenantBase):
     # 品智借鉴：日结/班别配置
     settlement_mode: Mapped[str | None] = mapped_column(String(20), default="auto+manual", comment="日结方式：auto/manual/auto+manual")
     shift_type: Mapped[str | None] = mapped_column(String(20), default="no_shift", comment="班别：no_shift/two_shift/three_shift")
+
+    # 灵活扩展
+    metadata: Mapped[dict | None] = mapped_column(JSON, default=dict, comment="灵活扩展字段")
 
 
 # ─────────────────────────────────────────────
@@ -220,15 +241,29 @@ class DishIngredient(TenantBase):
 # ─────────────────────────────────────────────
 
 class Order(TenantBase):
-    """订单 — 全渠道统一, 折扣明细, 核销记录, 出餐状态"""
+    """订单 — 全渠道统一, 折扣明细, 核销记录, 出餐状态
+
+    修正#7:
+    - table_number 移入 metadata (预制菜零售无桌台)
+    - sales_channel → sales_channel_id 引用配置表，非硬编码枚举
+    - order_type 明确订单类型
+    """
     __tablename__ = "orders"
 
     order_no: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
     store_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("stores.id"), nullable=False)
-    table_number: Mapped[str | None] = mapped_column(String(20))
     customer_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("customers.id"), index=True)
     waiter_id: Mapped[str | None] = mapped_column(String(50), index=True)
-    sales_channel: Mapped[str | None] = mapped_column(String(30), index=True, comment="dine_in/takeout/delivery")
+
+    # 修正#7: 订单类型 + 渠道引用配置表
+    order_type: Mapped[str] = mapped_column(
+        String(30), nullable=False, default="dine_in",
+        comment="dine_in/takeaway/delivery/retail/catering/banquet",
+    )
+    sales_channel_id: Mapped[str | None] = mapped_column(
+        String(50), index=True,
+        comment="引用SalesChannel配置表, e.g. ch_meituan",
+    )
 
     # 金额（统一存分）
     total_amount_fen: Mapped[int] = mapped_column(Integer, nullable=False, comment="总金额(分)")
@@ -242,7 +277,13 @@ class Order(TenantBase):
     completed_at: Mapped[str | None] = mapped_column(DateTime(timezone=True))
 
     notes: Mapped[str | None] = mapped_column(String(500))
-    order_metadata: Mapped[dict | None] = mapped_column(JSON, default=dict)
+
+    # 修正#7: metadata 存放 table_no/guest_count 等可选上下文
+    # table_number 不再是顶层字段 — 预制菜/外卖/B2B 无桌台
+    order_metadata: Mapped[dict | None] = mapped_column(
+        JSON, default=dict,
+        comment='{"table_no": "A03", "guest_count": 4, "delivery_address": "..."}',
+    )
 
     # 蓝图扩展字段（wireframe-fields-v1）
     guest_count: Mapped[int | None] = mapped_column(Integer, comment="就餐人数")
