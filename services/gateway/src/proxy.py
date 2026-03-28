@@ -13,6 +13,13 @@ from fastapi.responses import JSONResponse
 logger = structlog.get_logger()
 router = APIRouter()
 
+# 全局连接池 — 复用 TCP 连接，避免每次请求新建连接（省 8-25ms）
+_http_pool = httpx.AsyncClient(
+    timeout=httpx.Timeout(connect=5, read=30, write=10, pool=5),
+    limits=httpx.Limits(max_connections=100, max_keepalive_connections=20, keepalive_expiry=30),
+    follow_redirects=False,
+)
+
 # 域服务注册表 — 全部指向新微服务
 DOMAIN_ROUTES = {
     "trade": os.getenv("TX_TRADE_URL", "http://localhost:8001"),
@@ -40,19 +47,18 @@ async def _proxy(request: Request, target_url: str) -> JSONResponse:
         )
 
     try:
-        async with httpx.AsyncClient(timeout=30) as client:
-            url = f"{target_url}{request.url.path}"
-            headers = {k: v for k, v in request.headers.items() if k.lower() not in ("host", "content-length")}
-            body = await request.body()
+        url = f"{target_url}{request.url.path}"
+        headers = {k: v for k, v in request.headers.items() if k.lower() not in ("host", "content-length")}
+        body = await request.body()
 
-            resp = await client.request(
-                method=request.method,
-                url=url,
-                headers=headers,
-                params=dict(request.query_params),
-                content=body if body else None,
-            )
-            return JSONResponse(status_code=resp.status_code, content=resp.json())
+        resp = await _http_pool.request(
+            method=request.method,
+            url=url,
+            headers=headers,
+            params=dict(request.query_params),
+            content=body if body else None,
+        )
+        return JSONResponse(status_code=resp.status_code, content=resp.json())
     except httpx.ConnectError:
         logger.warning("service_unreachable", target=target_url, path=request.url.path)
         # 回退到旧单体

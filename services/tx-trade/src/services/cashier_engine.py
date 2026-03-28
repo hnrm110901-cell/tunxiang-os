@@ -274,39 +274,45 @@ class CashierEngine:
     ) -> dict:
         """加菜 — 支持固定价/称重/时价三种定价模式"""
         order_uuid = uuid.UUID(order_id)
+        dish_uuid = uuid.UUID(dish_id) if dish_id else None
 
-        # 检查订单存在且可加菜
-        order = await self._get_order(order_uuid)
+        # 单次查询同时获取 Order + Dish（合并 2 次 DB 往返为 1 次）
+        if dish_uuid:
+            result = await self.db.execute(
+                select(Order, Dish)
+                .outerjoin(Dish, Dish.id == dish_uuid)
+                .where(Order.id == order_uuid, Order.tenant_id == self.tenant_id)
+            )
+            row = result.one_or_none()
+            if not row:
+                raise ValueError(f"订单不存在: {order_id}")
+            order, dish = row[0], row[1]
+        else:
+            order = await self._get_order(order_uuid)
+            dish = None
+
         if order.status in (OrderStatus.completed.value, OrderStatus.cancelled.value):
             raise ValueError(f"订单状态 {order.status}，无法加菜")
 
         # 计算小计
         if pricing_mode == "weighted" and weight_value is not None:
             subtotal_fen = round(unit_price_fen * weight_value)
-        elif pricing_mode == "market_price":
-            # 时价菜品直接用传入的单价
-            subtotal_fen = unit_price_fen * qty
         else:
             subtotal_fen = unit_price_fen * qty
 
-        # 查菜品BOM成本
+        # BOM 成本（从已加载的 dish 对象取，无额外查询）
         food_cost_fen = None
         gross_margin = None
-        if dish_id:
-            dish_result = await self.db.execute(
-                select(Dish).where(Dish.id == uuid.UUID(dish_id))
-            )
-            dish = dish_result.scalar_one_or_none()
-            if dish and dish.cost_fen:
-                food_cost_fen = dish.cost_fen * qty
-                if subtotal_fen > 0:
-                    gross_margin = round((subtotal_fen - food_cost_fen) / subtotal_fen, 4)
+        if dish and dish.cost_fen:
+            food_cost_fen = dish.cost_fen * qty
+            if subtotal_fen > 0:
+                gross_margin = round((subtotal_fen - food_cost_fen) / subtotal_fen, 4)
 
         item = OrderItem(
             id=uuid.uuid4(),
             tenant_id=self.tenant_id,
             order_id=order_uuid,
-            dish_id=uuid.UUID(dish_id) if dish_id else None,
+            dish_id=dish_uuid,
             item_name=dish_name,
             quantity=qty,
             unit_price_fen=unit_price_fen,
@@ -320,19 +326,12 @@ class CashierEngine:
         )
         self.db.add(item)
 
-        # 重新计算订单总额
+        # 重新计算订单总额（与 INSERT 合并为单次 flush）
         new_total = order.total_amount_fen + subtotal_fen
         new_final = new_total - order.discount_amount_fen
-
-        await self.db.execute(
-            update(Order)
-            .where(Order.id == order_uuid)
-            .values(
-                total_amount_fen=new_total,
-                final_amount_fen=new_final,
-                status=OrderStatus.confirmed.value,
-            )
-        )
+        order.total_amount_fen = new_total
+        order.final_amount_fen = new_final
+        order.status = OrderStatus.confirmed.value
 
         await self.db.flush()
         logger.info(
