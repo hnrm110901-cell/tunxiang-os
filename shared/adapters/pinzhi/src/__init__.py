@@ -5,6 +5,8 @@ from .order_sync import PinzhiOrderSync
 from .dish_sync import PinzhiDishSync
 from .member_sync import PinzhiMemberSync
 from .inventory_sync import PinzhiInventorySync
+from .merchants import MERCHANT_CONFIG
+from .factory import PinzhiAdapterFactory
 
 __all__ = [
     "PinzhiAdapter",
@@ -16,4 +18,6 @@ __all__ = [
     "PinzhiDishSync",
     "PinzhiMemberSync",
     "PinzhiInventorySync",
+    "MERCHANT_CONFIG",
+    "PinzhiAdapterFactory",
 ]
