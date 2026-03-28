@@ -82,7 +82,7 @@ Page({
 
   removeImage: function (e) {
     var idx = e.currentTarget.dataset.index;
-    var images = self.data.images.slice();
+    var images = this.data.images.slice();
     images.splice(idx, 1);
     this.setData({ images: images });
   },

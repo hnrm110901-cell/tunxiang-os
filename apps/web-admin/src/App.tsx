@@ -42,6 +42,7 @@ import { ApprovalCenterPage } from './pages/hq/ops/ApprovalCenterPage';
 import { ReviewCenterPage } from './pages/hq/ops/ReviewCenterPage';
 import { AlertCenterPage } from './pages/hq/ops/AlertCenterPage';
 import { SettingsPage } from './pages/hq/ops/SettingsPage';
+import { PeakMonitorPage } from './pages/hq/ops/PeakMonitorPage';
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem('tx_token'));
@@ -103,6 +104,7 @@ function App() {
           <Route path="/hq/ops/review" element={<ReviewCenterPage />} />
           <Route path="/hq/ops/alerts" element={<AlertCenterPage />} />
           <Route path="/hq/ops/settings" element={<SettingsPage />} />
+          <Route path="/hq/ops/peak-monitor" element={<PeakMonitorPage />} />
         </Routes>
       </ShellHQ>
     </BrowserRouter>
