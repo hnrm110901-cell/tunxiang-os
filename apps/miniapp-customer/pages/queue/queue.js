@@ -1,5 +1,6 @@
 // 排队取号页
-const app = getApp();
+var app = getApp();
+var api = require('../../utils/api.js');
 
 Page({
   data: {
@@ -16,147 +17,124 @@ Page({
     pollTimer: null,
   },
 
-  onLoad() {
+  onLoad: function () {
     this.loadQueueSummary();
     this.checkExistingTicket();
   },
 
-  onUnload() {
+  onUnload: function () {
     if (this.data.pollTimer) {
       clearInterval(this.data.pollTimer);
     }
   },
 
-  selectGuests(e) {
+  selectGuests: function (e) {
     this.setData({ selectedGuests: e.currentTarget.dataset.value });
   },
 
-  async loadQueueSummary() {
-    try {
-      const res = await wx.request({
-        url: `${app.globalData.apiBase}/api/v1/queue/summary`,
-        data: { store_id: app.globalData.storeId },
-        header: { 'X-Tenant-ID': app.globalData.tenantId },
+  loadQueueSummary: function () {
+    var self = this;
+    var storeId = app.globalData.storeId;
+    api.fetchQueueSummary(storeId)
+      .then(function (data) {
+        self.setData({ queueSummary: data.items || [] });
+      })
+      .catch(function (err) {
+        console.error('loadQueueSummary failed', err);
       });
-      if (res.data.ok) {
-        this.setData({ queueSummary: res.data.data.items || [] });
-      }
-    } catch (err) {
-      console.error('loadQueueSummary failed', err);
-    }
   },
 
-  async checkExistingTicket() {
-    try {
-      const res = await wx.request({
-        url: `${app.globalData.apiBase}/api/v1/queue/my-ticket`,
-        data: {
-          store_id: app.globalData.storeId,
-          customer_id: app.globalData.customerId,
-        },
-        header: { 'X-Tenant-ID': app.globalData.tenantId },
+  checkExistingTicket: function () {
+    var self = this;
+    var storeId = app.globalData.storeId;
+    api.fetchMyTicket(storeId)
+      .then(function (data) {
+        if (data) {
+          self.setData({ queueTicket: data });
+          self.startPolling();
+        }
+      })
+      .catch(function (err) {
+        console.error('checkExistingTicket failed', err);
       });
-      if (res.data.ok && res.data.data) {
-        this.setData({ queueTicket: res.data.data });
-        this.startPolling();
-      }
-    } catch (err) {
-      console.error('checkExistingTicket failed', err);
-    }
   },
 
-  async takeNumber() {
-    if (!this.data.selectedGuests) {
+  takeNumber: function () {
+    var self = this;
+    if (!self.data.selectedGuests) {
       wx.showToast({ title: '请选择用餐人数', icon: 'none' });
       return;
     }
-    this.setData({ submitting: true });
-    try {
-      const res = await wx.request({
-        url: `${app.globalData.apiBase}/api/v1/queue/take`,
-        method: 'POST',
-        header: { 'X-Tenant-ID': app.globalData.tenantId },
-        data: {
-          store_id: app.globalData.storeId,
-          customer_id: app.globalData.customerId,
-          guest_range: this.data.selectedGuests,
-        },
-      });
-      if (res.data.ok) {
+    self.setData({ submitting: true });
+
+    var storeId = app.globalData.storeId;
+    api.takeQueue(storeId, self.data.selectedGuests)
+      .then(function (data) {
         wx.showToast({ title: '取号成功', icon: 'success' });
-        this.setData({ queueTicket: res.data.data });
-        this.startPolling();
-      } else {
-        wx.showToast({ title: res.data.error?.message || '取号失败', icon: 'none' });
-      }
-    } catch (err) {
-      console.error('takeNumber failed', err);
-      wx.showToast({ title: '网络错误', icon: 'none' });
-    } finally {
-      this.setData({ submitting: false });
-    }
+        self.setData({ queueTicket: data, submitting: false });
+        self.startPolling();
+      })
+      .catch(function (err) {
+        console.error('takeNumber failed', err);
+        wx.showToast({ title: err.message || '取号失败', icon: 'none' });
+        self.setData({ submitting: false });
+      });
   },
 
-  startPolling() {
-    if (this.data.pollTimer) clearInterval(this.data.pollTimer);
-    const timer = setInterval(() => {
-      this.refreshTicketStatus();
+  startPolling: function () {
+    var self = this;
+    if (self.data.pollTimer) clearInterval(self.data.pollTimer);
+    var timer = setInterval(function () {
+      self.refreshTicketStatus();
     }, 15000);
-    this.setData({ pollTimer: timer });
+    self.setData({ pollTimer: timer });
   },
 
-  async refreshTicketStatus() {
-    try {
-      const res = await wx.request({
-        url: `${app.globalData.apiBase}/api/v1/queue/my-ticket`,
-        data: {
-          store_id: app.globalData.storeId,
-          customer_id: app.globalData.customerId,
-        },
-        header: { 'X-Tenant-ID': app.globalData.tenantId },
-      });
-      if (res.data.ok && res.data.data) {
-        const ticket = res.data.data;
-        this.setData({ queueTicket: ticket });
-        if (ticket.status === 'called') {
-          wx.showModal({
-            title: '叫号通知',
-            content: `您的号码 ${ticket.ticketNo} 已到，请前往就座！`,
-            showCancel: false,
-          });
-          clearInterval(this.data.pollTimer);
+  refreshTicketStatus: function () {
+    var self = this;
+    var storeId = app.globalData.storeId;
+    api.fetchMyTicket(storeId)
+      .then(function (data) {
+        if (data) {
+          self.setData({ queueTicket: data });
+          if (data.status === 'called') {
+            wx.showModal({
+              title: '叫号通知',
+              content: '您的号码 ' + data.ticketNo + ' 已到，请前往就座！',
+              showCancel: false,
+            });
+            clearInterval(self.data.pollTimer);
+          }
+        } else {
+          self.setData({ queueTicket: null });
+          clearInterval(self.data.pollTimer);
         }
-      } else {
-        this.setData({ queueTicket: null });
-        clearInterval(this.data.pollTimer);
-      }
-    } catch (err) {
-      console.error('refreshTicketStatus failed', err);
-    }
+      })
+      .catch(function (err) {
+        console.error('refreshTicketStatus failed', err);
+      });
   },
 
-  async cancelQueue() {
-    const confirmRes = await new Promise(resolve => {
-      wx.showModal({ title: '提示', content: '确定取消排队？', success: resolve });
+  cancelQueue: function () {
+    var self = this;
+    wx.showModal({
+      title: '提示',
+      content: '确定取消排队？',
+      success: function (res) {
+        if (!res.confirm) return;
+        var ticket = self.data.queueTicket;
+        api.cancelQueueTicket(ticket.id)
+          .then(function () {
+            wx.showToast({ title: '已取消', icon: 'success' });
+            clearInterval(self.data.pollTimer);
+            self.setData({ queueTicket: null, pollTimer: null });
+            self.loadQueueSummary();
+          })
+          .catch(function (err) {
+            console.error('cancelQueue failed', err);
+            wx.showToast({ title: '取消失败', icon: 'none' });
+          });
+      },
     });
-    if (!confirmRes.confirm) return;
-
-    try {
-      const ticket = this.data.queueTicket;
-      const res = await wx.request({
-        url: `${app.globalData.apiBase}/api/v1/queue/${ticket.id}/cancel`,
-        method: 'POST',
-        header: { 'X-Tenant-ID': app.globalData.tenantId },
-      });
-      if (res.data.ok) {
-        wx.showToast({ title: '已取消', icon: 'success' });
-        clearInterval(this.data.pollTimer);
-        this.setData({ queueTicket: null, pollTimer: null });
-        this.loadQueueSummary();
-      }
-    } catch (err) {
-      console.error('cancelQueue failed', err);
-      wx.showToast({ title: '取消失败', icon: 'none' });
-    }
   },
 });

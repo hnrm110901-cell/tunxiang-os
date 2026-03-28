@@ -8,7 +8,7 @@
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
 const TENANT_ID = import.meta.env.VITE_TENANT_ID || '';
 
-async function txFetch<T>(path: string, options?: RequestInit): Promise<T> {
+export async function txFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const resp = await fetch(`${API_BASE}${path}`, {
     ...options,
     headers: {
@@ -21,6 +21,17 @@ async function txFetch<T>(path: string, options?: RequestInit): Promise<T> {
   if (!json.ok) throw new Error(json.error?.message || 'API Error');
   return json.data;
 }
+
+// ─── 各域 API 统一导出 ───
+
+export * from './dashboardApi';
+export * from './storeAnalysisApi';
+export * from './dishAnalysisApi';
+export * from './financeAnalyticsApi';
+export * from './memberAnalyticsApi';
+export * from './reviewApi';
+export * from './regionalApi';
+export * from './dispatchApi';
 
 // ─── 门店健康 ───
 

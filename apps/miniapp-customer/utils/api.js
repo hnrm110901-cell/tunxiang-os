@@ -86,6 +86,10 @@ function fetchDishes(storeId, category) {
   return txRequest(url);
 }
 
+function fetchDishDetail(dishId) {
+  return txRequest('/api/v1/menu/dishes/' + encodeURIComponent(dishId));
+}
+
 // ─── 订单 ───
 
 function createOrder(data) {
@@ -101,6 +105,12 @@ function fetchMyOrders(page, size) {
   return txRequest('/api/v1/trade/orders?customer_id=' + encodeURIComponent(customerId) + '&page=' + (page || 1) + '&size=' + (size || 20));
 }
 
+// ─── 订单(补充) ───
+
+function cancelOrder(orderId) {
+  return txRequest('/api/v1/trade/orders/' + encodeURIComponent(orderId) + '/cancel', 'POST');
+}
+
 // ─── 支付 ───
 
 function createPayment(orderId, method, amountFen) {
@@ -108,6 +118,10 @@ function createPayment(orderId, method, amountFen) {
     method: method,
     amount_fen: amountFen,
   });
+}
+
+function queryPaymentStatus(orderId) {
+  return txRequest('/api/v1/trade/orders/' + encodeURIComponent(orderId) + '/payment-status');
 }
 
 // ─── 排队 ───
@@ -172,6 +186,14 @@ function fetchCoupons(status) {
   return txRequest('/api/v1/coupon/my-list?customer_id=' + encodeURIComponent(customerId) + '&status=' + encodeURIComponent(status || 'available'));
 }
 
+function redeemCoupon(couponCode) {
+  var customerId = wx.getStorageSync('tx_customer_id') || '';
+  return txRequest('/api/v1/coupon/redeem', 'POST', {
+    customer_id: customerId,
+    coupon_code: couponCode,
+  });
+}
+
 // ─── 评价 ───
 
 function submitFeedback(data) {
@@ -204,33 +226,55 @@ module.exports = {
   // 门店
   fetchNearbyStores: fetchNearbyStores,
   fetchStoreDetail: fetchStoreDetail,
+  getStores: fetchNearbyStores,
+  getStoreDetail: fetchStoreDetail,
   // 菜单
   fetchCategories: fetchCategories,
   fetchDishes: fetchDishes,
+  fetchDishDetail: fetchDishDetail,
+  getCategories: fetchCategories,
+  getDishes: fetchDishes,
+  getDishDetail: fetchDishDetail,
   // 订单
   createOrder: createOrder,
   fetchOrderDetail: fetchOrderDetail,
   fetchMyOrders: fetchMyOrders,
+  cancelOrder: cancelOrder,
+  getOrders: fetchMyOrders,
+  getOrderDetail: fetchOrderDetail,
   // 支付
   createPayment: createPayment,
+  queryPaymentStatus: queryPaymentStatus,
   // 排队
   fetchQueueSummary: fetchQueueSummary,
   takeQueue: takeQueue,
   fetchMyTicket: fetchMyTicket,
   cancelQueueTicket: cancelQueueTicket,
+  getQueueStatus: fetchQueueSummary,
+  takeNumber: takeQueue,
+  cancelQueue: cancelQueueTicket,
   // 预订
   createBooking: createBooking,
   fetchBookings: fetchBookings,
   cancelBooking: cancelBooking,
+  createReservation: createBooking,
+  getReservations: fetchBookings,
+  cancelReservation: cancelBooking,
   // 会员
   fetchMemberProfile: fetchMemberProfile,
   fetchPointsLog: fetchPointsLog,
   fetchBalanceLog: fetchBalanceLog,
+  getMemberInfo: fetchMemberProfile,
+  getPointsHistory: fetchPointsLog,
+  getBalanceHistory: fetchBalanceLog,
   // 优惠券
   fetchCoupons: fetchCoupons,
+  redeemCoupon: redeemCoupon,
+  getCoupons: fetchCoupons,
   // 评价
   submitFeedback: submitFeedback,
   fetchMyFeedbacks: fetchMyFeedbacks,
+  getMyFeedbacks: fetchMyFeedbacks,
   // 企业团餐
   fetchCorporateAccount: fetchCorporateAccount,
   fetchCorporateRecords: fetchCorporateRecords,

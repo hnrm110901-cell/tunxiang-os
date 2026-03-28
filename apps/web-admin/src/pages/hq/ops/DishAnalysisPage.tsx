@@ -3,6 +3,7 @@
  * 调用 GET /api/v1/analysis/dish/*
  */
 import { useState } from 'react';
+import { TxScatterChart } from '../../../components/charts';
 
 const MOCK_SALES_RANK = [
   { rank: 1, name: '剁椒鱼头', sales: 128, revenue: 12800, trend: '+15%' },
@@ -148,20 +149,33 @@ export function DishAnalysisPage() {
           </div>
         </>
       ) : (
-        /* 四象限散点图 ECharts 占位 */
-        <div style={{
-          background: '#112228', borderRadius: 8, padding: 20,
-          minHeight: 500, display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}>
-          <div style={{ textAlign: 'center', color: '#666' }}>
-            <div style={{ fontSize: 48, marginBottom: 12 }}>🎯</div>
-            <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>菜品四象限散点图 — ECharts 接入点</div>
-            <div style={{ fontSize: 12, color: '#555' }}>X轴：销量 / Y轴：毛利率</div>
-            <div style={{ fontSize: 12, color: '#555', marginTop: 4 }}>
-              明星(高销高利) | 金牛(高销低利) | 问号(低销高利) | 瘦狗(低销低利)
-            </div>
-            <div style={{ fontSize: 11, color: '#444', marginTop: 8 }}>GET /api/v1/analysis/dish/quadrant</div>
-          </div>
+        /* 四象限散点图 */
+        <div style={{ background: '#112228', borderRadius: 8, padding: 20 }}>
+          <h3 style={{ margin: '0 0 4px', fontSize: 16 }}>菜品四象限分析</h3>
+          <div style={{ fontSize: 12, color: '#666', marginBottom: 16 }}>X轴：销量 / Y轴：毛利率 / 气泡大小：营收</div>
+          <TxScatterChart
+            data={[
+              { name: '剁椒鱼头', x: 128, y: 68.2, size: 128 },
+              { name: '小炒黄牛肉', x: 96, y: 58.3, size: 96 },
+              { name: '口味虾', x: 84, y: 72.5, size: 100 },
+              { name: '辣椒炒肉', x: 76, y: 45.2, size: 38 },
+              { name: '红烧肉', x: 68, y: 65.0, size: 54 },
+              { name: '酸菜鱼', x: 52, y: 55.0, size: 46 },
+              { name: '蒜蓉虾', x: 45, y: 70.0, size: 63 },
+              { name: '干锅牛蛙', x: 38, y: 48.5, size: 30 },
+              { name: '水煮鱼', x: 32, y: 42.0, size: 25 },
+              { name: '凉拌黄瓜', x: 120, y: 35.0, size: 18 },
+              { name: '老鸭汤', x: 28, y: 62.0, size: 35 },
+              { name: '清蒸鲈鱼', x: 22, y: 75.0, size: 55 },
+            ]}
+            height={480}
+            xLabel="销量(份)"
+            yLabel="毛利率(%)"
+            xUnit="份"
+            yUnit="%"
+            showQuadrants
+            quadrantLabels={['明星(高销高利)', '问号(低销高利)', '瘦狗(低销低利)', '金牛(高销低利)']}
+          />
         </div>
       )}
     </div>

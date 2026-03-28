@@ -4,7 +4,7 @@
  * 调用 GET /api/v1/member/analytics/*
  */
 import { useState } from 'react';
-import { ChartPlaceholder } from '../../../components/ChartPlaceholder';
+import { TxLineChart, TxScatterChart } from '../../../components/charts';
 
 // ---------- 类型 ----------
 interface FunnelStep {
@@ -115,12 +115,20 @@ export function MemberAnalysisPage() {
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
         {/* 会员增长趋势 */}
-        <ChartPlaceholder
-          title="会员增长趋势"
-          chartType="Line"
-          apiEndpoint="GET /api/v1/member/analytics/growth-trend"
-          height={280}
-        />
+        <div style={{ background: '#112228', borderRadius: 8, padding: 20 }}>
+          <h3 style={{ margin: '0 0 16px', fontSize: 16 }}>会员增长趋势</h3>
+          <TxLineChart
+            data={{
+              labels: ['10月', '11月', '12月', '1月', '2月', '3月'],
+              datasets: [
+                { name: '累计会员', values: [10200, 10800, 11400, 11900, 12480, 12860], color: '#FF6B2C' },
+                { name: '新增会员', values: [280, 310, 290, 320, 300, 326], color: '#0F6E56' },
+              ],
+            }}
+            height={240}
+            showArea
+          />
+        </div>
 
         {/* 活跃度漏斗 */}
         <div style={{ background: '#112228', borderRadius: 8, padding: 20 }}>
@@ -197,11 +205,18 @@ export function MemberAnalysisPage() {
           </div>
 
           <div style={{ marginTop: 12 }}>
-            <ChartPlaceholder
-              title="复购率与客单价关联分析"
-              chartType="Scatter"
-              apiEndpoint="GET /api/v1/member/analytics/repurchase-correlation"
+            <TxScatterChart
+              data={[
+                { name: '金卡', x: 68.5, y: 72.3, size: 56 },
+                { name: '银卡', x: 58.2, y: 48.6, size: 42 },
+                { name: '普通', x: 45.0, y: 28.4, size: 28 },
+                { name: '新客', x: 52.0, y: 15.2, size: 18 },
+              ]}
               height={140}
+              xLabel="客单价(元)"
+              yLabel="复购率(%)"
+              xUnit="元"
+              yUnit="%"
             />
           </div>
         </div>

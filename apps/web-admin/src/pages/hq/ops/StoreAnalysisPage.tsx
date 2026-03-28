@@ -3,6 +3,7 @@
  * 调用 GET /api/v1/analysis/store/*
  */
 import { useState } from 'react';
+import { TxLineChart, TxHeatmap } from '../../../components/charts';
 
 const STORES = ['芙蓉路店', '岳麓店', '星沙店', '河西店', '开福店'];
 
@@ -75,41 +76,67 @@ export function StoreAnalysisPage() {
         ))}
       </div>
 
-      {/* ECharts 占位：营收趋势图 */}
-      <div style={{
-        background: '#112228', borderRadius: 8, padding: 20, marginBottom: 16,
-        minHeight: 280, display: 'flex', alignItems: 'center', justifyContent: 'center',
-      }}>
-        <div style={{ textAlign: 'center', color: '#666' }}>
-          <div style={{ fontSize: 40, marginBottom: 8 }}>📊</div>
-          <div style={{ fontSize: 13 }}>营收趋势折线图 — ECharts 接入点</div>
-          <div style={{ fontSize: 11, color: '#555', marginTop: 4 }}>GET /api/v1/analysis/store/revenue-trend?stores={selectedStores.join(',')}&period={period}</div>
-        </div>
+      {/* 营收趋势折线图 */}
+      <div style={{ background: '#112228', borderRadius: 8, padding: 20, marginBottom: 16 }}>
+        <h3 style={{ margin: '0 0 16px', fontSize: 16 }}>营收趋势</h3>
+        <TxLineChart
+          data={{
+            labels: period === 'day'
+              ? ['09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00']
+              : period === 'week'
+                ? ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
+                : ['1日', '5日', '10日', '15日', '20日', '25日', '30日'],
+            datasets: selectedStores.map((store, i) => {
+              const colors = ['#FF6B2C', '#185FA5', '#0F6E56', '#BA7517', '#A32D2D'];
+              const base = [85600, 64000, 52000, 38000, 34200][STORES.indexOf(store)] || 50000;
+              const len = period === 'day' ? 12 : 7;
+              return {
+                name: store,
+                values: Array.from({ length: len }, (_, j) => Math.round(base * (0.6 + j * 0.06 + Math.random() * 0.1))),
+                color: colors[i % colors.length],
+              };
+            }),
+          }}
+          height={280}
+          showArea={selectedStores.length === 1}
+          unit="元"
+        />
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
-        {/* ECharts 占位：翻台率/客单价 */}
-        <div style={{
-          background: '#112228', borderRadius: 8, padding: 20,
-          minHeight: 220, display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}>
-          <div style={{ textAlign: 'center', color: '#666' }}>
-            <div style={{ fontSize: 36, marginBottom: 8 }}>🔄</div>
-            <div style={{ fontSize: 13 }}>翻台率/客单价双轴图 — ECharts 接入点</div>
-            <div style={{ fontSize: 11, color: '#555', marginTop: 4 }}>GET /api/v1/analysis/store/turnover</div>
-          </div>
+        {/* 翻台率/客单价双轴图 */}
+        <div style={{ background: '#112228', borderRadius: 8, padding: 20 }}>
+          <h3 style={{ margin: '0 0 16px', fontSize: 16 }}>翻台率 / 客单价趋势</h3>
+          <TxLineChart
+            data={{
+              labels: ['周一', '周二', '周三', '周四', '周五', '周六', '周日'],
+              datasets: [
+                { name: '翻台率', values: [2.4, 2.6, 2.8, 2.5, 3.0, 3.4, 3.2], color: '#FF6B2C' },
+                { name: '客单价', values: [62, 64, 65, 63, 68, 72, 68], color: '#185FA5' },
+              ],
+            }}
+            height={220}
+          />
         </div>
 
-        {/* ECharts 占位：高峰时段热力图 */}
-        <div style={{
-          background: '#112228', borderRadius: 8, padding: 20,
-          minHeight: 220, display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}>
-          <div style={{ textAlign: 'center', color: '#666' }}>
-            <div style={{ fontSize: 36, marginBottom: 8 }}>🔥</div>
-            <div style={{ fontSize: 13 }}>高峰时段热力图 — ECharts 接入点</div>
-            <div style={{ fontSize: 11, color: '#555', marginTop: 4 }}>GET /api/v1/analysis/store/peak-hours</div>
-          </div>
+        {/* 高峰时段热力图 */}
+        <div style={{ background: '#112228', borderRadius: 8, padding: 20 }}>
+          <h3 style={{ margin: '0 0 16px', fontSize: 16 }}>高峰时段热力图</h3>
+          <TxHeatmap
+            data={{
+              xLabels: ['10:00', '11:00', '12:00', '13:00', '14:00', '17:00', '18:00', '19:00', '20:00', '21:00'],
+              yLabels: ['芙蓉路店', '岳麓店', '星沙店', '河西店', '开福店'],
+              values: [
+                [5, 12, 38, 42, 18, 8, 28, 40, 35, 15],
+                [3, 8, 32, 36, 14, 6, 22, 34, 28, 10],
+                [2, 6, 24, 28, 12, 4, 18, 26, 22, 8],
+                [1, 5, 18, 22, 8, 3, 14, 20, 16, 6],
+                [2, 7, 20, 24, 10, 5, 16, 22, 18, 7],
+              ],
+            }}
+            height={220}
+            unit="单"
+          />
         </div>
       </div>
 

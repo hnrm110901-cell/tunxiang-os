@@ -4,7 +4,7 @@
  * 调用 GET /api/v1/finance/analytics/*
  */
 import { useState } from 'react';
-import { ChartPlaceholder } from '../../../components/ChartPlaceholder';
+import { TxLineChart, TxBarChart, TxPieChart } from '../../../components/charts';
 
 // ---------- 类型 ----------
 interface RevenueChannel {
@@ -159,11 +159,18 @@ export function FinanceAnalysisPage() {
           </div>
 
           <div style={{ marginTop: 16 }}>
-            <ChartPlaceholder
-              title="收入构成趋势"
-              chartType="Area"
-              apiEndpoint="GET /api/v1/finance/analytics/revenue-composition"
+            <TxLineChart
+              data={{
+                labels: ['1月', '2月', '3月', '4月', '5月', '6月'],
+                datasets: [
+                  { name: '堂食', values: [168000, 172000, 180000, 176000, 182000, 186500], color: '#FF6B2C' },
+                  { name: '外卖', values: [62000, 65000, 70000, 72000, 75000, 78200], color: '#185FA5' },
+                  { name: '宴席', values: [28000, 30000, 32000, 30000, 33000, 34800], color: '#0F6E56' },
+                ],
+              }}
               height={160}
+              showArea
+              unit="元"
             />
           </div>
         </div>
@@ -192,11 +199,17 @@ export function FinanceAnalysisPage() {
           </div>
 
           <div style={{ marginTop: 16 }}>
-            <ChartPlaceholder
-              title="支付渠道趋势"
-              chartType="Bar"
-              apiEndpoint="GET /api/v1/finance/analytics/payment-channels"
+            <TxBarChart
+              data={{
+                labels: ['1月', '2月', '3月', '4月', '5月', '6月'],
+                datasets: [
+                  { name: '微信支付', values: [128000, 132000, 136000, 138000, 140000, 142300], color: '#0F6E56' },
+                  { name: '支付宝', values: [78000, 80000, 84000, 86000, 88000, 89600], color: '#185FA5' },
+                  { name: '其他', values: [52000, 55000, 58000, 61000, 64000, 67600], color: '#BA7517' },
+                ],
+              }}
               height={160}
+              unit="元"
             />
           </div>
         </div>
@@ -249,11 +262,16 @@ export function FinanceAnalysisPage() {
           </table>
 
           <div style={{ marginTop: 12 }}>
-            <ChartPlaceholder
-              title="折扣趋势与异常检测"
-              chartType="Line"
-              apiEndpoint="GET /api/v1/finance/analytics/discount-trend"
+            <TxLineChart
+              data={{
+                labels: ['1月', '2月', '3月', '4月', '5月', '6月'],
+                datasets: [
+                  { name: '折扣总额', values: [28000, 30000, 32000, 34000, 35000, 36000], color: '#BA7517' },
+                  { name: '异常折扣', values: [1200, 800, 2400, 600, 1800, 400], color: '#A32D2D' },
+                ],
+              }}
               height={140}
+              unit="元"
             />
           </div>
         </div>

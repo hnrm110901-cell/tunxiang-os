@@ -8,7 +8,7 @@
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
 const TENANT_ID = import.meta.env.VITE_TENANT_ID || '';
 
-async function txFetch<T>(path: string, options?: RequestInit): Promise<T> {
+export async function txFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const resp = await fetch(`${API_BASE}${path}`, {
     ...options,
     headers: {
@@ -21,6 +21,19 @@ async function txFetch<T>(path: string, options?: RequestInit): Promise<T> {
   if (!json.ok) throw new Error(json.error?.message || 'API Error');
   return json.data;
 }
+
+// ─── 各域 API 统一导出 ───
+
+export { fetchKdsTasks, rushKdsTask, fetchTableCookProgress } from './kdsApi';
+export type { KdsTask as KdsTaskDetail } from './kdsApi';
+export { fetchTables, openTable as openTableV2, clearTable as clearTableV2, transferTable as transferTableV2, mergeTables as mergeTablesV2, reserveTable } from './tablesApi';
+export { searchMember as searchMemberV2, getMemberDetail, bindMemberToOrder as bindMemberV2, fetchMemberRecommendations, deductPoints } from './memberApi';
+export { fetchDailyOpsFlow as fetchDailyOpsFlowV2, confirmCheck, advanceNode, fetchDailyOpsHistory } from './dailyOpsApi';
+export { fetchPeakStatus, fetchRushDishes, fetchDispatchSuggestions, respondDispatch } from './peakApi';
+export type { PeakLevel, PeakStatus, RushDish, DispatchRequest } from './peakApi';
+export type { CruiseNode, DailyOpsFlow as DailyOpsFlowV2 } from './dailyOpsApi';
+export type { MemberInfo as MemberInfoV2, MemberRecommendation } from './memberApi';
+export type { TableInfo as TableInfoV2 } from './tablesApi';
 
 // ─── 桌台状态 ───
 
@@ -318,5 +331,138 @@ export async function recordPatrol(
   return txFetch('/api/v1/trade/patrol', {
     method: 'POST',
     body: JSON.stringify({ store_id: storeId, table_no: tableNo }),
+  });
+}
+
+// ─── 高峰监控 ───
+
+export type PeakLevel = 'normal' | 'busy' | 'peak' | 'extreme';
+
+export interface PeakStatus {
+  store_id: string;
+  level: PeakLevel;
+  current_diners: number;
+  waiting_count: number;
+  avg_serve_time_sec: number;
+}
+
+export async function fetchPeakStatus(storeId: string): Promise<PeakStatus> {
+  return txFetch(`/api/v1/peak-monitor/crew/status?store_id=${encodeURIComponent(storeId)}`);
+}
+
+export interface RushDishItem {
+  id: string;
+  order_id: string;
+  table_no: string;
+  dish_name: string;
+  quantity: number;
+  elapsed_min: number;
+  rush_count: number;
+  is_overtime: boolean;
+}
+
+export async function fetchRushDishes(storeId: string): Promise<{ items: RushDishItem[] }> {
+  return txFetch(`/api/v1/peak-monitor/crew/rush-dishes?store_id=${encodeURIComponent(storeId)}`);
+}
+
+export interface DispatchRequest {
+  id: string;
+  area: string;
+  reason: string;
+  urgency: 'normal' | 'urgent' | 'critical';
+  accepted: boolean;
+  created_at: string;
+}
+
+export async function fetchDispatchRequests(storeId: string): Promise<{ items: DispatchRequest[] }> {
+  return txFetch(`/api/v1/peak-monitor/crew/dispatches?store_id=${encodeURIComponent(storeId)}`);
+}
+
+export async function acceptDispatch(
+  dispatchId: string,
+): Promise<{ dispatch_id: string; accepted: boolean }> {
+  return txFetch(`/api/v1/peak-monitor/dispatch/${encodeURIComponent(dispatchId)}/accept`, {
+    method: 'POST',
+  });
+}
+
+// ─── 日清日结巡航 ───
+
+export interface CruiseCheckItem {
+  id: string;
+  label: string;
+  done: boolean;
+}
+
+export interface CruiseNode {
+  code: string;
+  name: string;
+  status: 'pending' | 'in_progress' | 'completed';
+  checks: CruiseCheckItem[];
+}
+
+export async function fetchCruiseNodes(storeId: string, date?: string): Promise<{ items: CruiseNode[] }> {
+  const query = date ? `&date=${encodeURIComponent(date)}` : '';
+  return txFetch(`/api/v1/ops/cruise-nodes?store_id=${encodeURIComponent(storeId)}${query}`);
+}
+
+export async function updateCruiseCheck(
+  storeId: string,
+  nodeCode: string,
+  checkId: string,
+  done: boolean,
+): Promise<{ check_id: string; done: boolean }> {
+  return txFetch('/api/v1/ops/cruise-check', {
+    method: 'POST',
+    body: JSON.stringify({ store_id: storeId, node_code: nodeCode, check_id: checkId, done }),
+  });
+}
+
+// ─── 结账 ───
+
+export interface CheckoutResult {
+  order_id: string;
+  total_fen: number;
+  discount_fen: number;
+  pay_fen: number;
+  payment_method: string;
+}
+
+export async function checkoutOrder(
+  orderId: string,
+  paymentMethod: string,
+  memberDiscount?: { member_id: string; coupon_id?: string },
+): Promise<CheckoutResult> {
+  return txFetch(`/api/v1/trade/orders/${encodeURIComponent(orderId)}/checkout`, {
+    method: 'POST',
+    body: JSON.stringify({ payment_method: paymentMethod, member_discount: memberDiscount }),
+  });
+}
+
+// ─── 加菜 ───
+
+export async function addItemsToOrder(
+  orderId: string,
+  items: OrderItem[],
+): Promise<{ order_id: string; added_count: number; new_total_fen: number }> {
+  return txFetch(`/api/v1/trade/orders/${encodeURIComponent(orderId)}/add-items`, {
+    method: 'POST',
+    body: JSON.stringify({ items }),
+  });
+}
+
+// ─── 退菜 ───
+
+export interface ReturnItemPayload {
+  order_id: string;
+  dish_id: string;
+  quantity: number;
+  reason: string;
+}
+
+export async function returnItem(payload: ReturnItemPayload): Promise<{ order_id: string; refund_fen: number }> {
+  return txFetch(`/api/v1/trade/orders/${encodeURIComponent(payload.order_id)}/return-item`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
   });
 }

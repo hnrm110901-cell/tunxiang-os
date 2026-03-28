@@ -3,6 +3,7 @@
  * 调用 GET /api/v1/dashboard/*
  */
 import { useState } from 'react';
+import { TxLineChart } from '../../../components/charts';
 
 // ---------- Mock 数据（接 API 后替换）----------
 const MOCK_OVERVIEW = [
@@ -135,16 +136,21 @@ export function OpsDashboardPage() {
         </div>
       </div>
 
-      {/* ECharts 接入点：营收趋势折线图 */}
-      <div style={{
-        background: '#112228', borderRadius: 8, padding: 20, marginTop: 16,
-        minHeight: 240, display: 'flex', alignItems: 'center', justifyContent: 'center',
-      }}>
-        <div style={{ textAlign: 'center', color: '#666' }}>
-          <div style={{ fontSize: 40, marginBottom: 8 }}>📈</div>
-          <div style={{ fontSize: 13 }}>营收趋势图 — ECharts 接入点</div>
-          <div style={{ fontSize: 11, color: '#555', marginTop: 4 }}>GET /api/v1/dashboard/revenue-trend</div>
-        </div>
+      {/* 营收趋势折线图 */}
+      <div style={{ background: '#112228', borderRadius: 8, padding: 20, marginTop: 16 }}>
+        <h3 style={{ margin: '0 0 16px', fontSize: 16 }}>营收趋势</h3>
+        <TxLineChart
+          data={{
+            labels: ['09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00'],
+            datasets: [
+              { name: '今日', values: [1200, 2800, 5600, 12800, 18500, 19200, 20100, 21000, 23400, 26000, 27800, 28560], color: '#FF6B2C' },
+              { name: '昨日', values: [1000, 2400, 4800, 11200, 16200, 17000, 17800, 18500, 20100, 22800, 24200, 25420], color: '#185FA5' },
+            ],
+          }}
+          height={260}
+          showArea
+          unit="元"
+        />
       </div>
     </div>
   );
