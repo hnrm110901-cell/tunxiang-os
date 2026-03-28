@@ -20,6 +20,8 @@ from .api.platform_coupon_routes import router as platform_coupon_router
 from .api.service_charge_routes import router as service_charge_router
 from .api.invoice_routes import router as invoice_router
 from .api.payment_direct_routes import router as payment_direct_router
+from .api.webhook_routes import router as webhook_router
+from .api.printer_routes import router as printer_router
 
 
 @asynccontextmanager
@@ -55,6 +57,8 @@ app.include_router(platform_coupon_router)
 app.include_router(service_charge_router)
 app.include_router(invoice_router)
 app.include_router(payment_direct_router)
+app.include_router(webhook_router)
+app.include_router(printer_router)
 
 
 @app.get("/health")
