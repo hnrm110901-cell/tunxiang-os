@@ -240,20 +240,73 @@ deploy_prod() {
     fi
 }
 
+# ─── 灰度部署 ───
+deploy_gray() {
+    # 灰度不跑迁移（共用生产DB，迁移在生产部署阶段执行）
+    preflight
+    run_tests
+
+    step "灰度构建"
+    docker-compose -f docker-compose.gray.yml --env-file .env.gray build --parallel
+    log "灰度镜像构建完成"
+
+    step "灰度部署"
+    docker-compose -f docker-compose.gray.yml --env-file .env.gray up -d
+    log "灰度服务已启动"
+
+    step "灰度健康检查"
+    local max_retries=12 retry=0
+    while [[ $retry -lt $max_retries ]]; do
+        if curl -sf "https://gray-api.tunxiangos.com/health" &>/dev/null \
+           || curl -sf "http://localhost:8081/health" &>/dev/null; then
+            log "灰度 Gateway 健康检查: OK"
+            break
+        fi
+        retry=$((retry + 1))
+        log "  重试 ($retry/$max_retries)..."
+        sleep 5
+    done
+
+    if [[ $retry -ge $max_retries ]]; then
+        warn "灰度健康检查超时，请手动验证"
+    fi
+
+    echo ""
+    log "========================================="
+    log "  灰度部署完成"
+    log "  POS:   https://gray-pos.tunxiangos.com"
+    log "  Admin: https://gray-os.tunxiangos.com"
+    log "  KDS:   https://gray-kds.tunxiangos.com"
+    log "  API:   https://gray-api.tunxiangos.com"
+    log "  日志:  make logs-gray"
+    log "========================================="
+    log ""
+    log "下一步：让灰度商户切到 gray-* 域名访问"
+    log "确认无误后：./scripts/deploy.sh prod"
+
+    mkdir -p "$PROJECT_ROOT/logs"
+    echo "$TIMESTAMP | $(git rev-parse --short HEAD 2>/dev/null) | gray | success" \
+        >> "$PROJECT_ROOT/logs/deploy-history.log"
+}
+
 # ─── 入口 ───
 case "$TARGET" in
     staging) deploy_staging ;;
+    gray)    deploy_gray ;;
     prod)    deploy_prod ;;
     *)
-        echo "用法: $0 {staging|prod} [--skip-test]"
+        echo "用法: $0 {staging|gray|prod} [--skip-test]"
         echo ""
-        echo "  staging              部署到 staging 环境"
+        echo "  staging              部署到 staging 环境（独立DB）"
+        echo "  gray                 部署到灰度环境（共用生产DB）"
         echo "  prod                 部署到生产环境（需先通过 staging）"
         echo "  prod --skip-test     紧急修复：跳过 staging 验证"
         echo ""
         echo "正常发布流程："
-        echo "  1. ./scripts/deploy.sh staging   # 先部署 staging"
+        echo "  1. ./scripts/deploy.sh staging   # 先部署 staging（stg-*.tunxiangos.com）"
         echo "  2. 手动验证 staging 功能正常"
-        echo "  3. ./scripts/deploy.sh prod      # 再部署生产"
+        echo "  3. ./scripts/deploy.sh gray      # 灰度发布（gray-*.tunxiangos.com）"
+        echo "  4. 灰度商户验证 24h"
+        echo "  5. ./scripts/deploy.sh prod      # 全量发布（*.tunxiangos.com）"
         ;;
 esac

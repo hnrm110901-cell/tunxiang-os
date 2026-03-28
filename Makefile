@@ -70,6 +70,15 @@ down-staging:
 logs-staging:
 	docker-compose -f docker-compose.staging.yml logs -f
 
+up-gray:
+	docker-compose -f docker-compose.gray.yml --env-file .env.gray up -d
+
+down-gray:
+	docker-compose -f docker-compose.gray.yml down
+
+logs-gray:
+	docker-compose -f docker-compose.gray.yml logs -f
+
 # ─── 开发 ───
 
 dev-pos:
@@ -113,6 +122,9 @@ migrate-gen:
 
 deploy-staging:
 	@./scripts/deploy.sh staging
+
+deploy-gray:
+	@./scripts/deploy.sh gray
 
 deploy-prod:
 	@./scripts/deploy.sh prod
