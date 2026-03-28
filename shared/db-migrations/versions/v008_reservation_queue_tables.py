@@ -80,7 +80,20 @@ def _disable_rls(table_name: str) -> None:
 
 def upgrade() -> None:
     # =========================================================================
-    # reservations — 预订记录
+    # DROP v004 reservations/queues — schema redesigned for persistent storage
+    # v004 used Date/Time types and different column layout;
+    # v008 uses String-based dates to match in-memory dict format.
+    # Must also drop v006 RLS policies that reference the old tables.
+    # =========================================================================
+    for old_table in ("queues", "reservations"):
+        for op_suffix in ("select", "insert", "update", "delete"):
+            op.execute(f"DROP POLICY IF EXISTS {old_table}_rls_{op_suffix} ON {old_table}")
+        op.execute(f"ALTER TABLE {old_table} NO FORCE ROW LEVEL SECURITY")
+        op.execute(f"ALTER TABLE {old_table} DISABLE ROW LEVEL SECURITY")
+        op.drop_table(old_table)
+
+    # =========================================================================
+    # reservations — 预订记录 (redesigned)
     # =========================================================================
     op.create_table(
         "reservations",
@@ -223,7 +236,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    """Drop all v008 tables (reverse order)."""
+    """Drop all v008 tables and restore v004 reservations/queues."""
     for table in reversed(NEW_TABLES):
         _disable_rls(table)
 
@@ -231,3 +244,53 @@ def downgrade() -> None:
     op.drop_table("queue_entries")
     op.drop_table("no_show_records")
     op.drop_table("reservations")
+
+    # Restore v004 reservations table (original schema)
+    op.create_table(
+        "reservations",
+        sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
+        sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
+        sa.Column("store_id", sa.String(64), nullable=False),
+        sa.Column("confirmation_code", sa.String(16), nullable=False),
+        sa.Column("customer_name", sa.String(128), nullable=False),
+        sa.Column("phone", sa.String(20), nullable=False),
+        sa.Column("type", sa.String(32), nullable=False),
+        sa.Column("date", sa.Date, nullable=False),
+        sa.Column("time", sa.Time, nullable=False),
+        sa.Column("party_size", sa.Integer, nullable=False),
+        sa.Column("status", sa.String(20), nullable=False, server_default="pending"),
+        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("NOW()")),
+        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("NOW()")),
+        sa.Column("is_deleted", sa.Boolean, server_default="false"),
+    )
+
+    # Restore v004 queues table (original schema)
+    op.create_table(
+        "queues",
+        sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
+        sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
+        sa.Column("store_id", sa.String(64), nullable=False),
+        sa.Column("queue_number", sa.String(16), nullable=False),
+        sa.Column("customer_name", sa.String(128), nullable=False),
+        sa.Column("phone", sa.String(20), nullable=False),
+        sa.Column("party_size", sa.Integer, nullable=False),
+        sa.Column("status", sa.String(20), nullable=False, server_default="waiting"),
+        sa.Column("date", sa.Date, nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("NOW()")),
+        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("NOW()")),
+        sa.Column("is_deleted", sa.Boolean, server_default="false"),
+    )
+
+    # Re-apply v006-style RLS on restored tables
+    _safe = (
+        "current_setting('app.tenant_id', TRUE) IS NOT NULL "
+        "AND current_setting('app.tenant_id', TRUE) <> '' "
+        "AND tenant_id = current_setting('app.tenant_id')::UUID"
+    )
+    for tbl in ("reservations", "queues"):
+        op.execute(f"ALTER TABLE {tbl} ENABLE ROW LEVEL SECURITY")
+        op.execute(f"ALTER TABLE {tbl} FORCE ROW LEVEL SECURITY")
+        op.execute(f"CREATE POLICY {tbl}_rls_select ON {tbl} FOR SELECT USING ({_safe})")
+        op.execute(f"CREATE POLICY {tbl}_rls_insert ON {tbl} FOR INSERT WITH CHECK ({_safe})")
+        op.execute(f"CREATE POLICY {tbl}_rls_update ON {tbl} FOR UPDATE USING ({_safe}) WITH CHECK ({_safe})")
+        op.execute(f"CREATE POLICY {tbl}_rls_delete ON {tbl} FOR DELETE USING ({_safe})")

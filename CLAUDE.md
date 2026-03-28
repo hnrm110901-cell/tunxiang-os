@@ -413,7 +413,7 @@ const printReceipt = async (data: OrderData) => {
 
 ### 安全
 - 禁止在 `config/merchants/` 目录下提交任何文件
-- 数据库新表必须包含 `tenant_id` + RLS 策略（使用 `app.current_tenant`，禁止 NULL 绕过）
+- 数据库新表必须包含 `tenant_id` + RLS 策略（使用 `app.tenant_id`，禁止 NULL 绕过）
 - 所有模型调用必须通过 `ModelRouter`，不直接调用 API
 
 ### 提交前检查

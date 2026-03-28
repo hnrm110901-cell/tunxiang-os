@@ -49,8 +49,8 @@ class SyncEngine:
         while self.is_running:
             try:
                 await self._sync_cycle()
-            except Exception as e:
-                logger.error("sync_error", error=str(e))
+            except Exception as e:  # 同步主循环兜底：必须捕获所有异常以防循环退出
+                logger.error("sync_error", error=str(e), exc_info=True)
                 self.is_connected = False
 
             await asyncio.sleep(SYNC_INTERVAL)

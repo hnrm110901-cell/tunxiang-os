@@ -74,10 +74,15 @@ docker-compose.override.yml
 # Kubernetes
 *.kubeconfig
 
-# SSL certificates
+# SSL certificates & signing keys
 ssl/*.pem
 ssl/*.key
 ssl/*.crt
+*.pem
+*.key
+*.jks
+*.keystore
+*.p12
 
 # Claude Code
 CLAUDE.local.md

@@ -22,6 +22,9 @@ from .api.invoice_routes import router as invoice_router
 from .api.payment_direct_routes import router as payment_direct_router
 from .api.webhook_routes import router as webhook_router
 from .api.printer_routes import router as printer_router
+from .api.approval_routes import router as approval_router
+from .api.booking_api import router as booking_router
+from .api.kds_shortage_routes import router as kds_shortage_router
 
 
 @asynccontextmanager
@@ -59,6 +62,9 @@ app.include_router(invoice_router)
 app.include_router(payment_direct_router)
 app.include_router(webhook_router)
 app.include_router(printer_router)
+app.include_router(approval_router)
+app.include_router(booking_router)
+app.include_router(kds_shortage_router)
 
 
 @app.get("/health")

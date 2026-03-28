@@ -112,7 +112,7 @@ class EventBus:
                     agent_id=agent_id,
                     success=True,
                 )
-            except Exception as e:
+            except Exception as e:  # 事件分发兜底：单个handler异常不能阻塞其他handler执行
                 result_entry = {
                     "agent_id": agent_id,
                     "event_id": event.event_id,
@@ -125,6 +125,7 @@ class EventBus:
                     event_id=event.event_id,
                     agent_id=agent_id,
                     error=str(e),
+                    exc_info=True,
                     exc_info=True,
                 )
 

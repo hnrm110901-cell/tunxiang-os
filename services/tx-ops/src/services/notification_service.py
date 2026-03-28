@@ -20,7 +20,6 @@ from datetime import datetime, timezone
 from typing import Any, Optional
 
 import structlog
-from sqlalchemy import insert, select, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = structlog.get_logger(__name__)
@@ -324,7 +323,7 @@ class NotificationService:
         Returns:
             {items: [...], total, page, size}
         """
-        from sqlalchemy import text, func
+        from sqlalchemy import text
 
         tenant_uuid = uuid.UUID(self.tenant_id)
 
@@ -532,13 +531,14 @@ class NotificationService:
         """调用企业微信群机器人 Webhook"""
         import aiohttp
 
+        payload: dict[str, Any]
         if msg_type == "markdown":
             payload = {
                 "msgtype": "markdown",
                 "markdown": {"content": content},
             }
         else:
-            payload: dict[str, Any] = {
+            payload = {
                 "msgtype": "text",
                 "text": {
                     "content": content,

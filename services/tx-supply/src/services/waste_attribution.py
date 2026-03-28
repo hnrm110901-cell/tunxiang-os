@@ -183,8 +183,8 @@ async def analyze_waste(
                 "event_count": count,
                 "total_qty": round(qty, 4),
             }
-    except Exception:
-        log.warning("waste_events_query_failed", store_id=store_id)
+    except (OSError, ValueError, RuntimeError) as exc:
+        log.warning("waste_events_query_failed", store_id=store_id, error=str(exc))
         # 降级：无类型分布数据
         by_type = {}
 

@@ -521,15 +521,24 @@ class ApprovalService:
         )
 
         try:
-            from services.tx_ops.src.services.notification_service import NotificationService
-            notif_svc = NotificationService(self.db, self.tenant_id)
-            await notif_svc.send_wecom(
-                webhook_url=webhook_url,
-                content=content,
-                msg_type="markdown",
-                store_id=store_id,
-            )
-        except (ImportError, ConnectionError, TimeoutError, ValueError) as exc:
+            import httpx
+
+            payload = {
+                "msgtype": "markdown",
+                "markdown": {"content": content},
+            }
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resp = await client.post(webhook_url, json=payload)
+                resp.raise_for_status()
+                result = resp.json()
+                if result.get("errcode", 0) != 0:
+                    logger.warning(
+                        "wecom_approval_webhook_biz_error",
+                        approval_id=approval_id,
+                        errcode=result.get("errcode"),
+                        errmsg=result.get("errmsg"),
+                    )
+        except (httpx.HTTPError, ValueError, KeyError, OSError) as exc:
             # 通知失败不阻塞审批流程
             logger.warning(
                 "wecom_approval_notify_failed",

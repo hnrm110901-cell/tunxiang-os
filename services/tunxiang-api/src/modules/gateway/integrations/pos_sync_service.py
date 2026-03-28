@@ -467,7 +467,7 @@ class POSSyncService:
                     or store_code
                 )
                 return base_url, token, str(ognid)
-        except Exception as e:
+        except (KeyError, ValueError, OSError) as e:
             logger.warning(
                 "pos_sync.credential_lookup_failed",
                 store_id=store_id,
@@ -489,7 +489,7 @@ class POSSyncService:
             )
             row = result.fetchone()
             return str(row[0]) if row and row[0] else store_id
-        except Exception:
+        except (OSError, ValueError, RuntimeError):
             return store_id
 
     async def _get_active_store_ids(
@@ -511,7 +511,7 @@ class POSSyncService:
                 """),
             )
             return [str(row[0]) for row in result.fetchall()]
-        except Exception as e:
+        except (OSError, ValueError, RuntimeError) as e:
             logger.error("pos_sync.store_list_error", error=str(e))
             return []
 

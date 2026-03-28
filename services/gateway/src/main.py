@@ -1,4 +1,6 @@
 """TunxiangOS API Gateway — 统一入口，按域路由到各微服务"""
+import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -20,7 +22,7 @@ app.add_middleware(RequestLogMiddleware)
 app.add_middleware(TenantMiddleware)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # TODO: 生产环境限制域名
+    allow_origins=os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:5173").split(","),
     allow_methods=["*"],
     allow_headers=["*"],
 )

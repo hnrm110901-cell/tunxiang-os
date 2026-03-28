@@ -18,8 +18,9 @@ struct ContentView: View {
 
 struct POSWebView: UIViewRepresentable {
     // Mac mini 本地 API 地址（同时也是 web-pos 的服务地址）
+    /// WEB_POS_URL 必须通过 Xcode Scheme / Info.plist 注入，不硬编码 IP
     let webAppURL = ProcessInfo.processInfo.environment["WEB_POS_URL"]
-        ?? "http://192.168.1.100:5173"
+        ?? "http://localhost:5173"
 
     func makeUIView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
