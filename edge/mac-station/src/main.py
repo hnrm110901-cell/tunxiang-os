@@ -164,13 +164,125 @@ async def broadcast_agent_decision(decision: dict) -> None:
             pass
 
 
-# ─── 安卓 POS 外设转发（iPad 用） ───
+# ─── 打印机管理 ───
+
+import asyncio
+import base64
+
+# 门店打印机注册表（启动时从配置或 API 加载）
+# 格式: { "printer_id": { "name": "前台打印机", "type": "network|sunmi", "address": "192.168.1.100:9100", "paper_width": 80 } }
+_printers: dict[str, dict] = {}
+
+
+def _load_printers_from_env() -> None:
+    """从环境变量加载打印机配置（轻量方案，不依赖数据库）"""
+    # PRINTERS=receipt:network:192.168.1.100:9100,kitchen:network:192.168.1.101:9100
+    raw = os.getenv("PRINTERS", "")
+    for entry in raw.split(","):
+        entry = entry.strip()
+        if not entry:
+            continue
+        parts = entry.split(":")
+        if len(parts) >= 3:
+            name = parts[0]
+            ptype = parts[1]
+            address = ":".join(parts[2:])
+            _printers[name] = {"name": name, "type": ptype, "address": address, "paper_width": 80}
+            logger.info("printer_registered", name=name, type=ptype, address=address)
+
+
+_load_printers_from_env()
+
+
+async def _send_to_network_printer(address: str, esc_pos_bytes: bytes) -> bool:
+    """通过 TCP 发送 ESC/POS 数据到网络打印机（如佳博、芯烨等）"""
+    try:
+        host, port = address.rsplit(":", 1)
+        reader, writer = await asyncio.wait_for(
+            asyncio.open_connection(host, int(port)),
+            timeout=5,
+        )
+        writer.write(esc_pos_bytes)
+        await writer.drain()
+        writer.close()
+        await writer.wait_closed()
+        logger.info("network_print_ok", address=address, bytes=len(esc_pos_bytes))
+        return True
+    except TimeoutError:
+        logger.error("network_print_timeout", address=address)
+        return False
+    except OSError as e:
+        logger.error("network_print_error", address=address, error=str(e))
+        return False
+
+
+@app.get("/api/printers")
+async def list_printers() -> dict:
+    """列出已注册的打印机"""
+    return {"ok": True, "data": {"printers": _printers}}
+
+
+@app.post("/api/printers/{printer_id}/test")
+async def test_printer(printer_id: str) -> dict:
+    """测试打印机连通性"""
+    printer = _printers.get(printer_id)
+    if not printer:
+        return {"ok": False, "error": {"code": "PRINTER_NOT_FOUND", "message": f"打印机 {printer_id} 未注册"}}
+
+    if printer["type"] == "network":
+        # 发送一行测试文本 + 切纸
+        test_data = b'\x1b\x40'  # ESC @ 初始化
+        test_data += "---- 打印机测试 ----\n".encode("gbk", errors="replace")
+        test_data += f"打印机: {printer['name']}\n".encode("gbk", errors="replace")
+        test_data += f"地址: {printer['address']}\n".encode("gbk", errors="replace")
+        test_data += b'\x1d\x56\x00'  # GS V 0 切纸
+        ok = await _send_to_network_printer(printer["address"], test_data)
+        return {"ok": ok, "data": {"message": "测试打印已发送" if ok else "打印机连接失败"}}
+
+    return {"ok": False, "error": {"code": "UNSUPPORTED", "message": f"打印机类型 {printer['type']} 不支持测试"}}
+
 
 @app.post("/api/print")
 async def print_receipt(data: dict) -> dict:
-    """接收 iPad/浏览器的打印请求，转发到安卓 POS（通过 WebSocket）"""
+    """打印小票 — 自动选择打印通道
+
+    请求体:
+        content_base64: str — ESC/POS 字节流的 base64 编码
+        content: str — 旧格式兼容（hex 字符串）
+        printer_id: str — 指定打印机（可选，默认用第一台网络打印机）
+    """
+    # 解析打印内容
+    esc_pos_bytes = None
+    if "content_base64" in data:
+        esc_pos_bytes = base64.b64decode(data["content_base64"])
+    elif "content" in data:
+        try:
+            esc_pos_bytes = bytes.fromhex(data["content"])
+        except ValueError:
+            esc_pos_bytes = data["content"].encode("gbk", errors="replace")
+
+    if not esc_pos_bytes:
+        return {"ok": False, "error": {"code": "NO_CONTENT", "message": "缺少打印内容"}}
+
+    # 选择打印机
+    printer_id = data.get("printer_id", "")
+    printer = _printers.get(printer_id) if printer_id else None
+
+    # 没指定就用第一台网络打印机
+    if not printer:
+        for p in _printers.values():
+            if p["type"] == "network":
+                printer = p
+                break
+
+    # 有网络打印机 → 直接 TCP 发送
+    if printer and printer["type"] == "network":
+        ok = await _send_to_network_printer(printer["address"], esc_pos_bytes)
+        return {"ok": ok, "data": {"printer": printer["name"], "channel": "network_tcp"}}
+
+    # 没有网络打印机 → 转发到安卓 POS（旧路径兜底）
     await broadcast_agent_decision({"type": "print", "payload": data})
-    return {"ok": True, "data": {"message": "Print command forwarded"}}
+    return {"ok": True, "data": {"channel": "android_pos_forward"}}
 
 
 @app.post("/api/cash-box")
