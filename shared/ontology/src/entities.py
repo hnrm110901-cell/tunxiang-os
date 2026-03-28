@@ -158,7 +158,7 @@ class Store(TenantBase):
     shift_type: Mapped[str | None] = mapped_column(String(20), default="no_shift", comment="班别：no_shift/two_shift/three_shift")
 
     # 灵活扩展
-    metadata: Mapped[dict | None] = mapped_column(JSON, default=dict, comment="灵活扩展字段")
+    store_metadata: Mapped[dict | None] = mapped_column("metadata", JSON, default=dict, comment="灵活扩展字段")
 
 
 # ─────────────────────────────────────────────

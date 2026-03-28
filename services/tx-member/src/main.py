@@ -6,10 +6,12 @@ Golden ID 全渠道画像、RFM 分层、营销活动、用户旅程、私域运
 from fastapi import FastAPI
 from api.members import router as member_router
 from api.marketing import router as marketing_router
+from api.analytics_routes import router as analytics_router
 
 app = FastAPI(title="TunxiangOS tx-member", version="3.0.0")
 app.include_router(member_router)
 app.include_router(marketing_router)
+app.include_router(analytics_router)
 
 @app.get("/health")
 async def health():

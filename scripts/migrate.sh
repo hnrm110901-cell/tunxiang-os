@@ -42,22 +42,30 @@ cmd_check() {
 
     # 当前版本
     local current
-    current=$(cd "$MIGRATIONS_DIR" && alembic current 2>/dev/null | head -1 || echo "无")
-    log "当前迁移版本: $current"
+    current=$(cd "$MIGRATIONS_DIR" && PYTHONPATH="$PROJECT_ROOT" alembic current 2>/dev/null | awk '{print $1}' || true)
+    if [[ -z "$current" ]]; then
+        log "当前迁移版本: (未初始化)"
+    else
+        log "当前迁移版本: $current"
+    fi
 
     # 待执行迁移
     local pending
-    pending=$(cd "$MIGRATIONS_DIR" && alembic history --indicate-current 2>/dev/null)
+    pending=$(cd "$MIGRATIONS_DIR" && PYTHONPATH="$PROJECT_ROOT" alembic history --indicate-current 2>/dev/null || true)
     log "迁移历史:"
-    echo "$pending" | while IFS= read -r line; do
-        if echo "$line" | grep -q "(current)"; then
-            echo -e "  ${GREEN}$line${NC}"
-        elif echo "$line" | grep -q "(head)"; then
-            echo -e "  ${YELLOW}$line${NC}"
-        else
-            echo "  $line"
-        fi
-    done
+    if [[ -n "$pending" ]]; then
+        echo "$pending" | while IFS= read -r line; do
+            if echo "$line" | grep -q "(current)"; then
+                echo -e "  ${GREEN}$line${NC}"
+            elif echo "$line" | grep -q "(head)"; then
+                echo -e "  ${YELLOW}$line${NC}"
+            else
+                echo "  $line"
+            fi
+        done
+    else
+        echo "  (无历史记录)"
+    fi
 
     # 检查是否有重复 revision ID
     log "检查 revision ID 唯一性..."
@@ -73,9 +81,9 @@ cmd_check() {
 
     # 检查 down_revision 链完整性
     log "检查迁移链完整性..."
-    if cd "$MIGRATIONS_DIR" && alembic heads 2>/dev/null | grep -q ","; then
+    if cd "$MIGRATIONS_DIR" && PYTHONPATH="$PROJECT_ROOT" alembic heads 2>/dev/null | grep -q ","; then
         err "发现多个 head（迁移链分叉），需要合并"
-        cd "$MIGRATIONS_DIR" && alembic heads
+        cd "$MIGRATIONS_DIR" && PYTHONPATH="$PROJECT_ROOT" alembic heads
         return 1
     fi
     log "迁移链完整性: OK"
@@ -114,8 +122,8 @@ cmd_up() {
 
     # 检查是否有待执行的迁移
     local current head
-    current=$(cd "$MIGRATIONS_DIR" && alembic current 2>/dev/null | grep -oP '^\S+' || echo "")
-    head=$(cd "$MIGRATIONS_DIR" && alembic heads 2>/dev/null | grep -oP '^\S+' || echo "")
+    current=$(cd "$MIGRATIONS_DIR" && PYTHONPATH="$PROJECT_ROOT" alembic current 2>/dev/null | awk '{print $1}' || echo "")
+    head=$(cd "$MIGRATIONS_DIR" && PYTHONPATH="$PROJECT_ROOT" alembic heads 2>/dev/null | awk '{print $1}' || echo "")
 
     if [[ "$current" == "$head" ]]; then
         log "已在最新版本，无需迁移"
@@ -133,7 +141,7 @@ cmd_up() {
 
     # 执行迁移
     log "开始执行迁移..."
-    if cd "$MIGRATIONS_DIR" && alembic upgrade head; then
+    if cd "$MIGRATIONS_DIR" && PYTHONPATH="$PROJECT_ROOT" alembic upgrade head; then
         log "迁移执行成功"
     else
         err "迁移执行失败！"
@@ -146,7 +154,7 @@ cmd_up() {
     # 验证
     log "验证迁移结果..."
     local new_current
-    new_current=$(cd "$MIGRATIONS_DIR" && alembic current 2>/dev/null | head -1)
+    new_current=$(cd "$MIGRATIONS_DIR" && PYTHONPATH="$PROJECT_ROOT" alembic current 2>/dev/null | head -1)
     log "当前版本: $new_current"
 
     # 验证核心表存在且 RLS 启用
@@ -176,7 +184,7 @@ cmd_up() {
 # ─── 回滚 ───
 cmd_rollback() {
     local current
-    current=$(cd "$MIGRATIONS_DIR" && alembic current 2>/dev/null | grep -oP '^\S+' || echo "")
+    current=$(cd "$MIGRATIONS_DIR" && PYTHONPATH="$PROJECT_ROOT" alembic current 2>/dev/null | awk '{print $1}' || echo "")
     log "当前版本: $current"
 
     if [[ -z "$current" ]]; then
@@ -189,9 +197,9 @@ cmd_rollback() {
     backup_file=$(backup_db)
 
     log "回滚一个版本..."
-    if cd "$MIGRATIONS_DIR" && alembic downgrade -1; then
+    if cd "$MIGRATIONS_DIR" && PYTHONPATH="$PROJECT_ROOT" alembic downgrade -1; then
         local new_current
-        new_current=$(cd "$MIGRATIONS_DIR" && alembic current 2>/dev/null | head -1)
+        new_current=$(cd "$MIGRATIONS_DIR" && PYTHONPATH="$PROJECT_ROOT" alembic current 2>/dev/null | head -1)
         log "回滚成功，当前版本: $new_current"
     else
         err "回滚失败"
@@ -201,7 +209,7 @@ cmd_rollback() {
 
 # ─── 历史 ───
 cmd_history() {
-    cd "$MIGRATIONS_DIR" && alembic history --verbose
+    cd "$MIGRATIONS_DIR" && PYTHONPATH="$PROJECT_ROOT" alembic history --verbose
 }
 
 # ─── 入口 ───

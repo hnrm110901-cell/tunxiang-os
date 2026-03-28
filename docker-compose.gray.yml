@@ -1,0 +1,196 @@
+## TunxiangOS V3 — 灰度环境
+## 核心原则：共用生产数据库，跑新版本代码
+## 灰度商户通过 gray-*.tunxiangos.com 访问
+## 用法: docker-compose -f docker-compose.gray.yml --env-file .env.gray up -d
+
+x-common-env: &common-env
+  # 关键：连生产数据库，不是独立库
+  DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-tunxiang}:${POSTGRES_PASSWORD}@postgres/${POSTGRES_DB:-tunxiang_os}
+  REDIS_URL: redis://:${REDIS_PASSWORD:-changeme}@redis:6379/3
+  GRAY_MODE: "true"
+
+x-service-defaults: &service-defaults
+  restart: unless-stopped
+  network_mode: "host"
+  deploy:
+    resources:
+      limits:
+        cpus: "0.5"
+        memory: 256M
+      reservations:
+        cpus: "0.1"
+        memory: 64M
+
+services:
+  # ── Nginx 灰度入口 ──
+  gray-nginx:
+    image: nginx:alpine
+    ports:
+      - "8081:443"
+      - "8082:80"
+    volumes:
+      - ./infra/nginx/nginx-gray.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+      - gray-web-pos-dist:/usr/share/nginx/html/gray-web-pos:ro
+      - gray-web-admin-dist:/usr/share/nginx/html/gray-web-admin:ro
+      - gray-web-kds-dist:/usr/share/nginx/html/gray-web-kds:ro
+      - gray-miniapp-dist:/usr/share/nginx/html/gray-miniapp:ro
+    depends_on:
+      - gray-gateway
+    restart: unless-stopped
+
+  # ── 前端（灰度版本） ──
+  gray-web-pos:
+    build:
+      context: .
+      dockerfile: apps/web-pos/Dockerfile
+    volumes:
+      - gray-web-pos-dist:/app/dist
+    environment:
+      VITE_API_BASE_URL: https://gray-api.tunxiangos.com
+      VITE_WS_BASE_URL: wss://gray-api.tunxiangos.com/ws
+      VITE_ENV: gray
+
+  gray-web-admin:
+    build:
+      context: .
+      dockerfile: apps/web-admin/Dockerfile
+    volumes:
+      - gray-web-admin-dist:/app/dist
+    environment:
+      VITE_API_BASE_URL: https://gray-api.tunxiangos.com
+      VITE_ENV: gray
+
+  gray-web-kds:
+    build:
+      context: .
+      dockerfile: apps/web-kds/Dockerfile
+    volumes:
+      - gray-web-kds-dist:/app/dist
+    environment:
+      VITE_API_BASE_URL: https://gray-api.tunxiangos.com
+      VITE_WS_BASE_URL: wss://gray-api.tunxiangos.com/ws
+      VITE_ENV: gray
+
+  # ── 后端微服务（灰度版本，连生产 DB） ──
+  # 注意：不启动 postgres/redis 容器，复用生产环境的
+  gray-gateway:
+    build:
+      context: .
+      dockerfile: services/gateway/Dockerfile
+    environment:
+      <<: *common-env
+      TX_TRADE_URL: http://gray-tx-trade:8001
+      TX_MENU_URL: http://gray-tx-menu:8002
+      TX_MEMBER_URL: http://gray-tx-member:8003
+      TX_SUPPLY_URL: http://gray-tx-supply:8004
+      TX_FINANCE_URL: http://gray-tx-finance:8005
+      TX_ORG_URL: http://gray-tx-org:8006
+      TX_ANALYTICS_URL: http://gray-tx-analytics:8007
+      TX_AGENT_URL: http://gray-tx-agent:8008
+      TX_OPS_URL: http://gray-tx-ops:8009
+    depends_on:
+      - gray-tx-trade
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+
+  gray-tx-trade:
+    build:
+      context: .
+      dockerfile: services/tx-trade/Dockerfile
+    environment:
+      <<: *common-env
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  gray-tx-menu:
+    build:
+      context: .
+      dockerfile: services/tx-menu/Dockerfile
+    environment:
+      <<: *common-env
+    restart: unless-stopped
+
+  gray-tx-member:
+    build:
+      context: .
+      dockerfile: services/tx-member/Dockerfile
+    environment:
+      <<: *common-env
+    restart: unless-stopped
+
+  gray-tx-supply:
+    build:
+      context: .
+      dockerfile: services/tx-supply/Dockerfile
+    environment:
+      <<: *common-env
+    restart: unless-stopped
+
+  gray-tx-finance:
+    build:
+      context: .
+      dockerfile: services/tx-finance/Dockerfile
+    environment:
+      <<: *common-env
+    restart: unless-stopped
+
+  gray-tx-org:
+    build:
+      context: .
+      dockerfile: services/tx-org/Dockerfile
+    environment:
+      <<: *common-env
+    restart: unless-stopped
+
+  gray-tx-analytics:
+    build:
+      context: .
+      dockerfile: services/tx-analytics/Dockerfile
+    environment:
+      <<: *common-env
+    restart: unless-stopped
+
+  gray-tx-agent:
+    build:
+      context: .
+      dockerfile: services/tx-agent/Dockerfile
+    environment:
+      <<: *common-env
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    restart: unless-stopped
+
+  gray-tx-ops:
+    build:
+      context: .
+      dockerfile: services/tx-ops/Dockerfile
+    environment:
+      <<: *common-env
+    restart: unless-stopped
+
+# 灰度不需要自己的 PG/Redis volume，用生产的
+# 只需要前端静态文件 volume
+volumes:
+  gray-web-pos-dist:
+  gray-web-admin-dist:
+  gray-web-kds-dist:
+  gray-miniapp-dist:
+
+# 灰度服务加入生产网络，才能访问生产 DB
+networks:
+  default:
+    name: tunxiang-os_default
+    external: true

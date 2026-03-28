@@ -3,6 +3,7 @@
 # 屯象OS 安全部署脚本
 # 用法:
 #   ./scripts/deploy.sh staging          # 部署到 staging
+#   ./scripts/deploy.sh gray             # 部署到灰度（共用生产DB）
 #   ./scripts/deploy.sh prod             # 部署到生产（含确认）
 #   ./scripts/deploy.sh prod --skip-test # 跳过 staging 验证（紧急修复）
 # ─────────────────────────────────────────────────────────
