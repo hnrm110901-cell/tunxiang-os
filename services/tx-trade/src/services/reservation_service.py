@@ -6,6 +6,7 @@
 
 所有金额单位：分（fen）。
 """
+import asyncio
 import uuid
 from datetime import datetime, timezone, timedelta
 from typing import Optional
@@ -275,6 +276,9 @@ class ReservationService:
             queue_info = queue_result
 
         await self.db.flush()
+
+        # 异步发送到店确认通知
+        asyncio.create_task(self._send_arrival_notification(record))
 
         logger.info(
             "reservation_customer_arrived",
@@ -772,18 +776,64 @@ class ReservationService:
         return best
 
     def _send_confirmation(self, record: Reservation) -> bool:
-        """发送预订确认通知"""
-        logger.info(
-            "reservation_confirmation_sent",
-            phone=record.phone,
-            customer_name=record.customer_name,
-            confirmation_code=record.confirmation_code,
-            message=(
-                f"【预订确认】{record.customer_name}您好，您在{record.date} {record.time}的"
-                f"预订已确认（确认码：{record.confirmation_code}），"
-                f"{record.party_size}位。"
-                f"{'包间：' + record.room_name if record.room_name else ''}"
-                f"如需取消请提前2小时联系。"
-            ),
+        """发送预订确认通知（短信 + 微信，异步不阻塞）"""
+        asyncio.create_task(
+            self._send_confirmation_async(record)
         )
         return True
+
+    async def _send_confirmation_async(self, record: Reservation) -> None:
+        """异步发送预订确认短信和微信通知"""
+        try:
+            from services.tx_ops.src.services.notification_service import NotificationService
+            notif_svc = NotificationService(self.db, self.tenant_id)
+
+            # 发送确认短信
+            await notif_svc.send_sms(
+                phone=record.phone,
+                template_id="reservation_confirmed",
+                params={
+                    "customer_name": record.customer_name,
+                    "date": record.date,
+                    "time": record.time,
+                    "confirmation_code": record.confirmation_code,
+                    "party_size": str(record.party_size),
+                    "room": record.room_name or "",
+                },
+                store_id=str(record.store_id),
+            )
+
+            logger.info(
+                "reservation_confirmation_sent",
+                phone=record.phone,
+                customer_name=record.customer_name,
+                confirmation_code=record.confirmation_code,
+            )
+        except (ImportError, ConnectionError, TimeoutError, ValueError) as exc:
+            logger.warning(
+                "reservation_confirmation_failed",
+                phone=record.phone,
+                error=str(exc),
+            )
+
+    async def _send_arrival_notification(self, record: Reservation) -> None:
+        """异步发送到店确认通知"""
+        try:
+            from services.tx_ops.src.services.notification_service import NotificationService
+            notif_svc = NotificationService(self.db, self.tenant_id)
+
+            await notif_svc.send_sms(
+                phone=record.phone,
+                template_id="arrival_confirmed",
+                params={
+                    "customer_name": record.customer_name,
+                    "confirmation_code": record.confirmation_code,
+                },
+                store_id=str(record.store_id),
+            )
+        except (ImportError, ConnectionError, TimeoutError, ValueError) as exc:
+            logger.warning(
+                "arrival_notification_failed",
+                phone=record.phone,
+                error=str(exc),
+            )

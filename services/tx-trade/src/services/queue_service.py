@@ -5,6 +5,7 @@
 
 所有金额单位：分（fen）。
 """
+import asyncio
 import uuid
 from datetime import datetime, timezone, timedelta
 from typing import Optional
@@ -198,12 +199,15 @@ class QueueService:
         record.called_at = now
         record.notification_count = 1
 
-        # 模拟发送 SMS/微信通知
-        notification_sent = self._send_notification(
-            record.phone,
-            record.customer_name,
-            record.queue_number,
-            str(record.store_id),
+        # 发送叫号短信通知（异步不阻塞）
+        notification_sent = True
+        asyncio.create_task(
+            self._send_call_notification_async(
+                record.phone,
+                record.customer_name,
+                record.queue_number,
+                str(record.store_id),
+            )
         )
 
         await self.db.flush()
@@ -657,13 +661,38 @@ class QueueService:
             "ahead_count": ahead_count,
         }
 
+    async def _send_call_notification_async(
+        self, phone: str, customer_name: str, queue_number: str, store_id: str
+    ) -> None:
+        """异步发送叫号短信通知"""
+        try:
+            from services.tx_ops.src.services.notification_service import NotificationService
+            notif_svc = NotificationService(self.db, self.tenant_id)
+
+            await notif_svc.send_sms(
+                phone=phone,
+                template_id="queue_called",
+                params={
+                    "customer_name": customer_name,
+                    "queue_number": queue_number,
+                },
+                store_id=store_id,
+            )
+        except (ImportError, ConnectionError, TimeoutError, ValueError) as exc:
+            logger.warning(
+                "queue_call_notification_failed",
+                phone=phone,
+                queue_number=queue_number,
+                error=str(exc),
+            )
+
     def _send_notification(
         self, phone: str, customer_name: str, queue_number: str, store_id: str
     ) -> bool:
-        """发送叫号通知（SMS/微信模板消息）
+        """发送叫号通知（兼容旧调用，日志记录）
 
-        生产环境对接短信网关和微信模板消息接口。
-        当前为模拟实现。
+        实际发送已迁移到 _send_call_notification_async。
+        保留此方法用于不在 async 上下文中的场景。
         """
         logger.info(
             "queue_notification_sent",

@@ -525,22 +525,58 @@ class CashierEngine:
                 floor = 1.0 - store.cost_ratio_target
             margin_check["floor"] = floor
 
-            if margin < floor:
+            if margin < floor and not approval_id:
                 margin_check["passed"] = False
                 logger.warning(
-                    "margin_floor_rejected",
+                    "margin_floor_needs_approval",
                     order_id=order_id,
                     margin=margin,
                     floor=floor,
                     discount_fen=discount_fen,
                 )
-                return {
-                    "applied": False,
-                    "discount_fen": 0,
-                    "new_total_fen": order.final_amount_fen,
-                    "margin_check": margin_check,
-                    "error": f"折扣后毛利率 {margin:.1%} 低于底线 {floor:.1%}，需上级审批",
-                }
+
+                # 创建审批单而非直接拒绝
+                try:
+                    from .approval_service import ApprovalService
+                    approval_svc = ApprovalService(
+                        self.db, str(self.tenant_id), str(order.store_id)
+                    )
+                    approval_result = await approval_svc.create_approval(
+                        order_id=order_id,
+                        discount_info={
+                            "discount_type": discount_type,
+                            "discount_value": discount_value,
+                            "discount_fen": discount_fen,
+                            "current_margin": round(margin, 4),
+                            "margin_floor": floor,
+                            "new_final_fen": new_final,
+                        },
+                        reason=reason or f"折扣后毛利率 {margin:.1%} 低于底线 {floor:.1%}",
+                    )
+                    return {
+                        "applied": False,
+                        "needs_approval": True,
+                        "approval_id": approval_result["approval_id"],
+                        "discount_fen": 0,
+                        "new_total_fen": order.final_amount_fen,
+                        "margin_check": margin_check,
+                        "message": f"折扣后毛利率 {margin:.1%} 低于底线 {floor:.1%}，已创建审批单",
+                    }
+                except (ValueError, ImportError) as exc:
+                    logger.error(
+                        "approval_creation_failed",
+                        order_id=order_id,
+                        error=str(exc),
+                    )
+                    return {
+                        "applied": False,
+                        "needs_approval": True,
+                        "approval_id": None,
+                        "discount_fen": 0,
+                        "new_total_fen": order.final_amount_fen,
+                        "margin_check": margin_check,
+                        "error": f"折扣后毛利率 {margin:.1%} 低于底线 {floor:.1%}，审批单创建失败",
+                    }
 
         # 应用折扣
         order.discount_amount_fen = discount_fen

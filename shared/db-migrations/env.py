@@ -7,6 +7,9 @@ from sqlalchemy import engine_from_config, pool
 
 from shared.ontology.src.base import TenantBase
 
+# Import all models so TenantBase.metadata discovers them for autogenerate
+from shared.ontology.src.entities import *  # noqa: F401, F403
+
 config = context.config
 
 if config.config_file_name is not None:
