@@ -1,0 +1,224 @@
+/**
+ * TXCartPanel 样式 — 购物车面板
+ * 按钮 ≥ 48px，结算按钮 72px
+ */
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  width: var(--tx-cart-width, 360px);
+  height: 100%;
+  background: var(--tx-bg-2);
+  border-left: 1px solid var(--tx-border);
+  flex-shrink: 0;
+}
+
+/* ── 顶部 ── */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 16px 12px;
+  border-bottom: 1px solid var(--tx-border);
+}
+
+.tableInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tableNo {
+  font-size: var(--tx-font-h3);
+  font-weight: 700;
+  color: var(--tx-text-1);
+}
+
+.orderNo {
+  font-size: var(--tx-font-caption);
+  color: var(--tx-text-3);
+}
+
+.itemCount {
+  font-size: var(--tx-font-caption);
+  color: var(--tx-text-2);
+  background: var(--tx-bg-3);
+  padding: 4px 12px;
+  border-radius: 20px;
+}
+
+/* ── 订单列表 ── */
+.list {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 8px 16px;
+}
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  gap: 12px;
+}
+
+.emptyIcon {
+  font-size: 48px;
+  opacity: 0.3;
+}
+
+.emptyText {
+  font-size: var(--tx-font-caption);
+  color: var(--tx-text-3);
+}
+
+/* ── 订单行 ── */
+.cartItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--tx-border);
+  gap: 12px;
+}
+
+.cartItemInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.cartItemName {
+  font-size: var(--tx-font-body);
+  font-weight: 500;
+  color: var(--tx-text-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cartItemPrice {
+  font-size: var(--tx-font-caption);
+  color: var(--tx-text-2);
+  margin-top: 2px;
+}
+
+.cartItemActions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.qtyBtn {
+  width: var(--tx-tap-min);
+  height: var(--tx-tap-min);
+  border: 1px solid var(--tx-border);
+  border-radius: var(--tx-radius-sm);
+  background: var(--tx-bg-1);
+  color: var(--tx-text-1);
+  font-size: 20px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-family: var(--tx-font-family);
+}
+
+.qtyBtn:active {
+  background: var(--tx-bg-3);
+}
+
+.qty {
+  width: 36px;
+  text-align: center;
+  font-size: var(--tx-font-body);
+  font-weight: 700;
+  color: var(--tx-text-1);
+}
+
+/* ── 底部 ── */
+.footer {
+  border-top: 1px solid var(--tx-border);
+  padding: 12px 16px 16px;
+  background: var(--tx-bg-2);
+}
+
+.discountRow {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--tx-font-caption);
+  color: var(--tx-text-2);
+  margin-bottom: 8px;
+}
+
+.discountAmount {
+  color: var(--tx-success);
+  font-weight: 600;
+}
+
+.totalRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 16px;
+}
+
+.totalLabel {
+  font-size: var(--tx-font-h3);
+  font-weight: 600;
+  color: var(--tx-text-1);
+}
+
+.totalAmount {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--tx-primary);
+}
+
+/* ── 操作按钮 ── */
+.actions {
+  display: flex;
+  gap: var(--tx-btn-gap);
+}
+
+.btnSecondary {
+  flex: 1;
+  height: var(--tx-tap-rec);
+  border: 1px solid var(--tx-border);
+  border-radius: var(--tx-radius-md);
+  background: var(--tx-bg-1);
+  color: var(--tx-text-1);
+  font-size: var(--tx-font-body);
+  font-weight: 600;
+  cursor: pointer;
+  font-family: var(--tx-font-family);
+}
+
+.btnSecondary:active {
+  background: var(--tx-bg-3);
+}
+
+.btnPrimary {
+  flex: 2;
+  height: var(--tx-tap-lg);
+  border: none;
+  border-radius: var(--tx-radius-md);
+  background: var(--tx-primary);
+  color: #FFFFFF;
+  font-size: var(--tx-font-h3);
+  font-weight: 700;
+  cursor: pointer;
+  font-family: var(--tx-font-family);
+}
+
+.btnPrimary:disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+.btnPrimary:active:not(:disabled) {
+  background: var(--tx-primary-active);
+}

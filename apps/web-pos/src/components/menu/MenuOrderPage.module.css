@@ -1,0 +1,180 @@
+/**
+ * MenuOrderPage 布局样式
+ * 分屏比例: 分类 10% + 菜品 55% + 购物车 35%
+ * 全屏横屏布局，适配安卓POS / iPad
+ */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+  background: var(--tx-bg-1);
+}
+
+.body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* ── 菜品区域（中间） ── */
+.menuArea {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.menuHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--tx-border);
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.menuHeaderLeft {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.tableBadge {
+  font-size: var(--tx-font-body);
+  font-weight: 700;
+  color: var(--tx-primary);
+  background: var(--tx-primary-light, rgba(255, 107, 53, 0.12));
+  padding: 4px 12px;
+  border-radius: var(--tx-radius-sm);
+}
+
+.orderBadge {
+  font-size: var(--tx-font-caption);
+  color: var(--tx-success);
+  font-weight: 500;
+}
+
+.loadingHint {
+  font-size: var(--tx-font-caption);
+  color: var(--tx-warning);
+}
+
+/* ── 搜索栏 ── */
+.searchBar {
+  display: flex;
+  align-items: center;
+  background: var(--tx-bg-2);
+  border-radius: var(--tx-radius-md);
+  padding: 0 12px;
+  height: var(--tx-tap-min);
+  min-width: 200px;
+  max-width: 360px;
+  flex: 1;
+  border: 1px solid var(--tx-border);
+}
+
+.searchIcon {
+  font-size: 18px;
+  margin-right: 8px;
+  opacity: 0.5;
+}
+
+.searchInput {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font-size: var(--tx-font-caption);
+  color: var(--tx-text-1);
+  outline: none;
+  font-family: var(--tx-font-family);
+}
+
+.searchInput::placeholder {
+  color: var(--tx-text-3);
+}
+
+.searchClear {
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  color: var(--tx-text-3);
+  font-size: var(--tx-font-caption);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ── 菜品网格 ── */
+.dishGrid {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 12px 16px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+  align-content: start;
+}
+
+/* 大屏（安卓POS / iPad横屏） */
+@media (min-width: 1024px) {
+  .dishGrid {
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 16px;
+  }
+}
+
+/* 超大屏 */
+@media (min-width: 1440px) {
+  .dishGrid {
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  }
+}
+
+.noResult {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  font-size: var(--tx-font-body);
+  color: var(--tx-text-3);
+}
+
+/* ── 底部快捷栏 ── */
+.bottomBar {
+  display: flex;
+  height: var(--tx-bottom-bar-height, 64px);
+  border-top: 1px solid var(--tx-border);
+  background: var(--tx-bg-2);
+  flex-shrink: 0;
+}
+
+.quickBtn {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: var(--tx-text-2);
+  font-size: var(--tx-font-caption);
+  font-weight: 500;
+  cursor: pointer;
+  font-family: var(--tx-font-family);
+  border-right: 1px solid var(--tx-border);
+}
+
+.quickBtn:last-child {
+  border-right: none;
+}
+
+.quickBtn:active {
+  background: var(--tx-bg-3);
+  color: var(--tx-primary);
+}

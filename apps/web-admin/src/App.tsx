@@ -47,6 +47,8 @@ import { RegionalPage } from './pages/hq/ops/RegionalPage';
 import { CruiseMonitorPage } from './pages/hq/ops/CruiseMonitorPage';
 import { FinanceAnalysisPage } from './pages/hq/analytics/FinanceAnalysisPage';
 import { MemberAnalysisPage } from './pages/hq/analytics/MemberAnalysisPage';
+import { DishListPage } from './pages/menu/DishListPage';
+import { MenuTemplatePage } from './pages/menu/MenuTemplatePage';
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem('tx_token'));
@@ -79,6 +81,8 @@ function App() {
           <Route path="/agents" element={<AgentMonitorPage />} />
           <Route path="/trade" element={<TradePage />} />
           <Route path="/catalog" element={<CatalogPage />} />
+          <Route path="/menu/dishes" element={<DishListPage />} />
+          <Route path="/menu/templates" element={<MenuTemplatePage />} />
           <Route path="/supply" element={<SupplyPage />} />
           <Route path="/operations" element={<OperationsPage />} />
           <Route path="/crm" element={<CrmPage />} />

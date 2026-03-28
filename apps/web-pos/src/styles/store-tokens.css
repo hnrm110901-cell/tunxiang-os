@@ -1,0 +1,130 @@
+/**
+ * 屯象OS Store 终端 Design Tokens
+ * 品牌色: #FF6B35（与 Figma 同步）
+ * 适用: POS / KDS / Crew 三个触控终端
+ *
+ * 规则:
+ *   - 最小字体 16px
+ *   - 最小点击区域 48×48px
+ *   - 禁止 hover 作为唯一反馈
+ */
+
+:root {
+  /* ── 品牌色 ── */
+  --tx-primary: #FF6B35;
+  --tx-primary-hover: #FF8555;
+  --tx-primary-active: #E55A28;
+  --tx-primary-light: #FFF3ED;
+  --tx-navy: #1E2A3A;
+
+  /* ── 语义色 ── */
+  --tx-success: #0F6E56;
+  --tx-warning: #BA7517;
+  --tx-danger: #A32D2D;
+  --tx-info: #185FA5;
+
+  /* ── 中性色（亮色模式） ── */
+  --tx-text-1: #2C2C2A;
+  --tx-text-2: #5F5E5A;
+  --tx-text-3: #B4B2A9;
+  --tx-border: #E8E6E1;
+  --tx-bg-1: #FFFFFF;
+  --tx-bg-2: #F8F7F5;
+  --tx-bg-3: #F0EDE6;
+
+  /* ── 圆角（Store 终端更大） ── */
+  --tx-radius-sm: 8px;
+  --tx-radius-md: 12px;
+  --tx-radius-lg: 16px;
+
+  /* ── 触控安全区 ── */
+  --tx-tap-min: 48px;
+  --tx-tap-rec: 56px;
+  --tx-tap-lg: 72px;
+  --tx-btn-gap: 12px;
+
+  /* ── 字体 ── */
+  --tx-font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", "Microsoft YaHei", sans-serif;
+  --tx-font-h1: 32px;
+  --tx-font-h2: 24px;
+  --tx-font-h3: 20px;
+  --tx-font-body: 18px;
+  --tx-font-caption: 16px;
+  --tx-font-min: 16px; /* Store 终端绝对底线 */
+
+  /* ── 间距（Store 终端更宽松） ── */
+  --tx-sp-xs: 8px;
+  --tx-sp-sm: 12px;
+  --tx-sp-md: 20px;
+  --tx-sp-lg: 32px;
+  --tx-sp-xl: 48px;
+
+  /* ── 阴影 ── */
+  --tx-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --tx-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --tx-shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
+
+  /* ── 动画 ── */
+  --tx-press-scale: scale(0.97);
+  --tx-press-duration: 200ms;
+  --tx-slide-duration: 300ms;
+  --tx-pulse-duration: 1.5s;
+
+  /* ── 布局 ── */
+  --tx-category-width: 120px;
+  --tx-cart-width: 360px;
+  --tx-agent-bar-height: 48px;
+  --tx-bottom-bar-height: 64px;
+}
+
+/* ── 深色模式 ── */
+:root[data-theme="dark"] {
+  --tx-text-1: rgba(255, 255, 255, 0.92);
+  --tx-text-2: rgba(255, 255, 255, 0.65);
+  --tx-text-3: rgba(255, 255, 255, 0.38);
+  --tx-border: rgba(255, 255, 255, 0.08);
+  --tx-bg-1: #0B1A20;
+  --tx-bg-2: #0D2029;
+  --tx-bg-3: #132830;
+  --tx-success: #27AE60;
+  --tx-warning: #F2994A;
+  --tx-danger: #EB5757;
+  --tx-info: #2D9CDB;
+  --tx-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
+  --tx-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3);
+  --tx-shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+/* ── 全局触控优化 ── */
+* {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+}
+
+html, body {
+  font-family: var(--tx-font-family);
+  font-size: var(--tx-font-body);
+  color: var(--tx-text-1);
+  background: var(--tx-bg-1);
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: none;
+}
+
+/* ── 按压反馈（全局） ── */
+.tx-pressable {
+  transition: transform var(--tx-press-duration) ease;
+  cursor: pointer;
+  user-select: none;
+}
+.tx-pressable:active {
+  transform: var(--tx-press-scale);
+}
+
+/* ── Agent 预警脉冲动画 ── */
+@keyframes tx-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.8; }
+}
+.tx-pulse {
+  animation: tx-pulse var(--tx-pulse-duration) infinite;
+}
