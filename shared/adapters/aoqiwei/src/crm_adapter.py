@@ -210,9 +210,7 @@ class AoqiweiCrmAdapter:
 
                 return result.get("res", result)
 
-            except Exception as e:
-                if "微生活CRM业务错误" in str(e):
-                    raise
+            except (httpx.ConnectError, httpx.TimeoutException, httpx.DecodingError) as e:
                 last_exc = e
                 logger.warning(
                     "CRM请求失败，准备重试",
@@ -222,7 +220,7 @@ class AoqiweiCrmAdapter:
                     error=str(e),
                 )
 
-        raise Exception(f"CRM请求失败，已重试 {self.retry_times} 次: {last_exc}")
+        raise RuntimeError(f"CRM请求失败，已重试 {self.retry_times} 次: {last_exc}")
 
     async def aclose(self) -> None:
         await self._client.aclose()
@@ -283,8 +281,8 @@ class AoqiweiCrmAdapter:
                     "biz_id": biz_id,
                 },
             )
-        except Exception as e:
-            logger.warning("交易预览失败", error=str(e))
+        except (httpx.HTTPError, RuntimeError, ValueError) as e:
+            logger.warning("交易预览失败", error=str(e), exc_info=True)
             return {"success": False, "message": str(e)}
 
     async def deal_submit(
@@ -325,8 +323,8 @@ class AoqiweiCrmAdapter:
                     "biz_id": biz_id,
                 },
             )
-        except Exception as e:
-            logger.warning("交易提交失败", error=str(e))
+        except (httpx.HTTPError, RuntimeError, ValueError) as e:
+            logger.warning("交易提交失败", error=str(e), exc_info=True)
             return {"success": False, "message": str(e)}
 
     async def deal_reverse(
@@ -355,8 +353,8 @@ class AoqiweiCrmAdapter:
             params["reverse_reason"] = reverse_reason
         try:
             return await self._request("/deal/reverse", params)
-        except Exception as e:
-            logger.warning("交易冲正失败", error=str(e))
+        except (httpx.HTTPError, RuntimeError, ValueError) as e:
+            logger.warning("交易冲正失败", error=str(e), exc_info=True)
             return {"success": False, "message": str(e)}
 
     # ── 会员接口 ──────────────────────────────────────────────────────────────
@@ -389,6 +387,6 @@ class AoqiweiCrmAdapter:
         logger.info("获取会员信息", cno=cno, mobile=mobile)
         try:
             return await self._request("/user/accountBasicsInfo", params)
-        except Exception as e:
-            logger.warning("获取会员信息失败", error=str(e))
+        except (httpx.HTTPError, RuntimeError, ValueError) as e:
+            logger.warning("获取会员信息失败", error=str(e), exc_info=True)
             return {}

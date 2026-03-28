@@ -62,11 +62,23 @@ async def _proxy(request: Request, target_url: str) -> JSONResponse:
             status_code=503,
             content={"ok": False, "data": None, "error": {"code": "SERVICE_DOWN", "message": f"Service unreachable"}},
         )
-    except Exception as e:
-        logger.error("proxy_error", error=str(e))
+    except httpx.TimeoutException as e:
+        logger.warning("proxy_timeout", target=target_url, path=request.url.path, error=str(e))
+        return JSONResponse(
+            status_code=504,
+            content={"ok": False, "data": None, "error": {"code": "PROXY_TIMEOUT", "message": "Upstream service timeout"}},
+        )
+    except httpx.HTTPError as e:
+        logger.error("proxy_http_error", target=target_url, error=str(e))
         return JSONResponse(
             status_code=502,
             content={"ok": False, "data": None, "error": {"code": "PROXY_ERROR", "message": str(e)}},
+        )
+    except Exception as e:
+        logger.error("proxy_unexpected_error", error=str(e), exc_info=True)
+        return JSONResponse(
+            status_code=502,
+            content={"ok": False, "data": None, "error": {"code": "PROXY_ERROR", "message": "Internal proxy error"}},
         )
 
 

@@ -214,7 +214,7 @@ class ElemeAdapter:
                 if attempt == self.retry_times - 1:
                     raise Exception(f"饿了么HTTP请求失败: {e.response.status_code}")
 
-            except Exception as e:
+            except (httpx.ConnectError, httpx.TimeoutException, httpx.DecodingError, ValueError) as e:
                 logger.error(
                     "饿了么请求异常",
                     endpoint=endpoint,
@@ -224,7 +224,7 @@ class ElemeAdapter:
                 if attempt == self.retry_times - 1:
                     raise
 
-        raise Exception("请求失败，已达到最大重试次数")
+        raise RuntimeError("请求失败，已达到最大重试次数")
 
     def _handle_error(self, response: Dict[str, Any]) -> None:
         """

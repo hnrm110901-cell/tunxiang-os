@@ -67,7 +67,7 @@ class SkillAgent(ABC):
         try:
             result = await self.execute(action, params)
         except Exception as e:
-            logger.error("agent_error", agent=self.agent_id, action=action, error=str(e))
+            logger.error("agent_error", agent=self.agent_id, action=action, error=str(e), exc_info=True)
             result = AgentResult(
                 success=False,
                 action=action,

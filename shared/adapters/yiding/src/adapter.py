@@ -56,8 +56,8 @@ class YiDingAdapter:
         """通过获取token验证连通性"""
         try:
             return await self.client.ping()
-        except Exception as e:
-            self.logger.error("health_check_failed", error=str(e))
+        except Exception as e:  # 健康检查兜底：任何异常都视为不健康
+            self.logger.error("health_check_failed", error=str(e), exc_info=True)
             return False
 
     @property

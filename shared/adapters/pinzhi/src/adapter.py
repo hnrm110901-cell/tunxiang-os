@@ -96,7 +96,7 @@ class PinzhiAdapter:
                     raise Exception(f"HTTP请求失败: {e.response.status_code}")
                 await asyncio.sleep(0.5 * (2 ** attempt))
 
-            except Exception as e:
+            except (httpx.ConnectError, httpx.TimeoutException, httpx.DecodingError, ValueError) as e:
                 logger.error(
                     "请求异常",
                     endpoint=endpoint,
@@ -107,7 +107,7 @@ class PinzhiAdapter:
                     raise
                 await asyncio.sleep(0.5 * (2 ** attempt))
 
-        raise Exception("请求失败，已达到最大重试次数")
+        raise RuntimeError("请求失败，已达到最大重试次数")
 
     def _add_sign(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -208,7 +208,7 @@ class PinzhiAdapter:
                 else:
                     response = await self._request("POST", path, data=params)
                 return response.get("data", [])
-            except Exception as e:
+            except (httpx.HTTPError, RuntimeError, ValueError) as e:
                 logger.warning("查询菜品失败", method=method, path=path, error=str(e))
         return []
 
@@ -231,8 +231,8 @@ class PinzhiAdapter:
         try:
             response = await self._request("GET", "/pinzhi/queryPractice.do", params=params)
             return response.get("data", [])
-        except Exception as e:
-            logger.warning("查询做法配料失败", error=str(e))
+        except (httpx.HTTPError, RuntimeError, ValueError) as e:
+            logger.warning("查询做法配料失败", error=str(e), exc_info=True)
             return []
 
     async def get_tables(self, ognid: Optional[str] = None) -> List[Dict[str, Any]]:
@@ -254,8 +254,8 @@ class PinzhiAdapter:
         try:
             response = await self._request("GET", "/pinzhi/queryTable.do", params=params)
             return response.get("res", [])
-        except Exception as e:
-            logger.warning("查询桌台失败", error=str(e))
+        except (httpx.HTTPError, RuntimeError, ValueError) as e:
+            logger.warning("查询桌台失败", error=str(e), exc_info=True)
             return []
 
     async def get_employees(self, ognid: Optional[str] = None) -> List[Dict[str, Any]]:
@@ -279,7 +279,7 @@ class PinzhiAdapter:
             try:
                 response = await self._request("GET", path, params=params)
                 return response.get("data", [])
-            except Exception as e:
+            except (httpx.HTTPError, RuntimeError, ValueError) as e:
                 logger.warning("查询员工失败", path=path, error=str(e))
         return []
 
@@ -352,8 +352,8 @@ class PinzhiAdapter:
         try:
             response = await self._request("GET", "/pinzhi/queryOrderSummary.do", params=params)
             return response.get("res", {})
-        except Exception as e:
-            logger.warning("查询收入数据失败", error=str(e))
+        except (httpx.HTTPError, RuntimeError, ValueError) as e:
+            logger.warning("查询收入数据失败", error=str(e), exc_info=True)
             return {}
 
     async def query_store_summary_list(
@@ -375,8 +375,8 @@ class PinzhiAdapter:
         try:
             response = await self._request("GET", "/pinzhi/queryStoreSummaryList.do", params=params)
             return response.get("data", [])
-        except Exception as e:
-            logger.warning("查询门店营业数据失败", error=str(e))
+        except (httpx.HTTPError, RuntimeError, ValueError) as e:
+            logger.warning("查询门店营业数据失败", error=str(e), exc_info=True)
             return []
 
     async def query_cooking_detail(self, business_date: str) -> List[Dict[str, Any]]:
@@ -396,8 +396,8 @@ class PinzhiAdapter:
         try:
             response = await self._request("GET", "/pinzhi/queryCookingDetail.do", params=params)
             return response.get("data", [])
-        except Exception as e:
-            logger.warning("查询出品明细失败", error=str(e))
+        except (httpx.HTTPError, RuntimeError, ValueError) as e:
+            logger.warning("查询出品明细失败", error=str(e), exc_info=True)
             return []
 
     async def get_payment_customer(
@@ -427,8 +427,8 @@ class PinzhiAdapter:
         try:
             response = await self._request("GET", "/pinzhi/paymentCustomer.do", params=params)
             return response.get("data", [])
-        except Exception as e:
-            logger.warning("查询挂账客户失败", error=str(e))
+        except (httpx.HTTPError, RuntimeError, ValueError) as e:
+            logger.warning("查询挂账客户失败", error=str(e), exc_info=True)
             return []
 
     async def query_ogn_daily_biz_data(
@@ -457,8 +457,8 @@ class PinzhiAdapter:
                 "GET", "/pinzhi/queryOgnDailyBizData.do", params=params
             )
             return response.get("res", response.get("data", {}))
-        except Exception as e:
-            logger.warning("查询门店每日经营数据失败", error=str(e))
+        except (httpx.HTTPError, RuntimeError, ValueError) as e:
+            logger.warning("查询门店每日经营数据失败", error=str(e), exc_info=True)
             return {}
 
     async def get_organizations(self) -> List[Dict[str, Any]]:
@@ -474,8 +474,8 @@ class PinzhiAdapter:
         try:
             response = await self._request("GET", "/pinzhi/organizations.do", params=params)
             return response.get("data", response.get("res", []))
-        except Exception as e:
-            logger.warning("查询组织/机构失败", error=str(e))
+        except (httpx.HTTPError, RuntimeError, ValueError) as e:
+            logger.warning("查询组织/机构失败", error=str(e), exc_info=True)
             return []
 
     async def get_pay_types(self) -> List[Dict[str, Any]]:
@@ -492,7 +492,7 @@ class PinzhiAdapter:
             try:
                 response = await self._request("GET", path, params=params)
                 return response.get("data", response.get("res", []))
-            except Exception as e:
+            except (httpx.HTTPError, RuntimeError, ValueError) as e:
                 logger.warning("查询支付方式失败", path=path, error=str(e))
         return []
 
@@ -519,8 +519,8 @@ class PinzhiAdapter:
         try:
             response = await self._request("GET", "/pinzhi/downloadBillData.do", params=params)
             return response.get("data", "")
-        except Exception as e:
-            logger.warning("下载对账单失败", error=str(e))
+        except (httpx.HTTPError, RuntimeError, ValueError) as e:
+            logger.warning("下载对账单失败", error=str(e), exc_info=True)
             return ""
 
     async def run_all_checks(
@@ -593,7 +593,8 @@ class PinzhiAdapter:
                     "message": count or "成功",
                     "required": required,
                 })
-            except Exception as e:
+            except Exception as e:  # 诊断工具：必须捕获所有异常以报告接口状态
+                logger.debug("run_all_checks接口失败", name=name, error=str(e), exc_info=True)
                 results.append({
                     "name": name,
                     "endpoint": endpoint.split("/")[-1],

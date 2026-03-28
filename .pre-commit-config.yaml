@@ -1,0 +1,43 @@
+# 屯象OS pre-commit 安全扫描配置
+# 安装: pip install pre-commit && pre-commit install
+# 启用 commit-msg 钩子: pre-commit install --hook-type commit-msg
+# 首次运行全量检查: pre-commit run --all-files
+
+repos:
+  # 通用文件检查
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+        args: ['--maxkb=1000']
+      - id: check-json
+      - id: check-merge-conflict
+      - id: detect-private-key
+      - id: no-commit-to-branch
+        args: [--branch, main, --branch, master]
+
+  # Python代码格式化和lint（替代 black + isort + flake8）
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.4.4
+    hooks:
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+      - id: ruff-format
+
+  # Python安全漏洞扫描
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.7.8
+    hooks:
+      - id: bandit
+        args: [-r, services/, -ll, --skip, B101]
+        # B101: assert_used - 测试中使用assert是合理的
+
+  # 密钥检测
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.4.0
+    hooks:
+      - id: detect-secrets
+        args: [--baseline, .secrets.baseline]

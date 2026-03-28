@@ -152,9 +152,7 @@ class TiancaiShanglongAdapter:
 
                 return result.get("data", result)
 
-            except Exception as e:
-                if "天财商龙业务错误" in str(e):
-                    raise
+            except (httpx.ConnectError, httpx.TimeoutException, httpx.DecodingError) as e:
                 last_exc = e
                 logger.warning(
                     "天财商龙请求失败，准备重试",
@@ -163,7 +161,7 @@ class TiancaiShanglongAdapter:
                     error=str(e),
                 )
 
-        raise Exception(f"天财商龙请求失败，已重试 {self.retry_times} 次: {last_exc}")
+        raise RuntimeError(f"天财商龙请求失败，已重试 {self.retry_times} 次: {last_exc}")
 
     # ── 账单明细接口 ─────────────────────────────────────────────────────────
 
@@ -279,7 +277,7 @@ class TiancaiShanglongAdapter:
             for raw in result["items"]:
                 try:
                     all_orders.append(self.to_order(raw, self.shop_id, brand_id))
-                except Exception as exc:
+                except (KeyError, ValueError, TypeError) as exc:
                     logger.warning(
                         "tiancai_order_map_failed",
                         bs_id=raw.get("bs_id"),

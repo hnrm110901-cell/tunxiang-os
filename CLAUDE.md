@@ -399,3 +399,24 @@ const printReceipt = async (data: OrderData) => {
 8. **禁止同步阻塞业务** — sync-engine 异步运行
 9. **禁止不记录 Agent 决策** — 每个决策必须有留痕
 10. **禁止 React Web App 直接调用外设 SDK** — 必须通过 TXBridge 抽象层
+
+---
+
+## 十四、审计修复期特别约束（2026-03 至 2026-06）
+
+> 基于 v6 代码审计结果，以下约束在修复期间强制执行。详见 `docs/security-audit-report.md` 和 `docs/development-plan-v6-remediation.md`。
+
+### 异常处理
+- 新代码禁止使用 `except Exception`（最外层兜底除外，且必须加 `exc_info=True`）
+- 修改 `except Exception` 时，必须替换为具体异常类型
+- 新增 POS 适配器代码必须附带 >=3 个测试用例
+
+### 安全
+- 禁止在 `config/merchants/` 目录下提交任何文件
+- 数据库新表必须包含 `tenant_id` + RLS 策略（使用 `app.current_tenant`，禁止 NULL 绕过）
+- 所有模型调用必须通过 `ModelRouter`，不直接调用 API
+
+### 提交前检查
+- `git-secrets` 扫描通过（`scripts/setup-git-secrets.sh` 配置）
+- 涉及模块的 pytest 通过
+- 无新增 broad except（用 ruff 规则检查）

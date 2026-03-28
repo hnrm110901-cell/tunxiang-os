@@ -271,9 +271,7 @@ class AoqiweiAdapter:
 
                 return result.get("data", result)
 
-            except Exception as e:
-                if "奥琦玮API业务错误" in str(e):
-                    raise
+            except (httpx.ConnectError, httpx.TimeoutException, httpx.DecodingError) as e:
                 last_exc = e
                 logger.warning(
                     "请求失败，准备重试",
@@ -283,7 +281,7 @@ class AoqiweiAdapter:
                     error=str(e),
                 )
 
-        raise Exception(f"请求失败，已重试 {self.retry_times} 次: {last_exc}")
+        raise RuntimeError(f"请求失败，已重试 {self.retry_times} 次: {last_exc}")
 
     # ==================== 货品接口 ====================
 
@@ -309,8 +307,8 @@ class AoqiweiAdapter:
         logger.info("查询货品", params=params)
         try:
             return await self._request("/rechain/stock/api/good/getList", params)
-        except Exception as e:
-            logger.warning("查询货品失败", error=str(e))
+        except (httpx.HTTPError, RuntimeError, ValueError) as e:
+            logger.warning("查询货品失败", error=str(e), exc_info=True)
             return {"list": [], "total": 0}
 
     async def query_suppliers(
@@ -332,8 +330,8 @@ class AoqiweiAdapter:
             return await self._request(
                 "/rechain/purchase/api/supplier/getSupplierList/", params
             )
-        except Exception as e:
-            logger.warning("查询供应商失败", error=str(e))
+        except (httpx.HTTPError, RuntimeError, ValueError) as e:
+            logger.warning("查询供应商失败", error=str(e), exc_info=True)
             return {"list": [], "total": 0}
 
     # ==================== 门店/仓库接口 ====================
@@ -346,8 +344,8 @@ class AoqiweiAdapter:
                 "/rechain/api/pos/v1/basic/shop/getList"
             )
             return result if isinstance(result, list) else result.get("list", [])
-        except Exception as e:
-            logger.warning("查询门店失败", error=str(e))
+        except (httpx.HTTPError, RuntimeError, ValueError) as e:
+            logger.warning("查询门店失败", error=str(e), exc_info=True)
             return []
 
     async def query_depots(self) -> List[Dict[str, Any]]:
@@ -356,8 +354,8 @@ class AoqiweiAdapter:
         try:
             result = await self._request("/rechain/stock/api/depot/getList")
             return result if isinstance(result, list) else result.get("list", [])
-        except Exception as e:
-            logger.warning("查询仓库失败", error=str(e))
+        except (httpx.HTTPError, RuntimeError, ValueError) as e:
+            logger.warning("查询仓库失败", error=str(e), exc_info=True)
             return []
 
     # ==================== 库存接口 ====================
@@ -383,8 +381,8 @@ class AoqiweiAdapter:
                 "/rechain/stock/api/remain/getListV1", params
             )
             return result if isinstance(result, list) else result.get("list", [])
-        except Exception as e:
-            logger.warning("查询库存失败，返回空列表", error=str(e))
+        except (httpx.HTTPError, RuntimeError, ValueError) as e:
+            logger.warning("查询库存失败，返回空列表", error=str(e), exc_info=True)
             return []
 
     async def query_stock_estimate(
@@ -402,8 +400,8 @@ class AoqiweiAdapter:
                 "/rechain/stock/api/estimate/putShopEstimate/",
                 {"shopCode": shop_code, "startDate": start_date, "endDate": end_date},
             )
-        except Exception as e:
-            logger.warning("库存预估失败", error=str(e))
+        except (httpx.HTTPError, RuntimeError, ValueError) as e:
+            logger.warning("库存预估失败", error=str(e), exc_info=True)
             return {}
 
     # ==================== 配送业务接口 ====================
@@ -417,8 +415,8 @@ class AoqiweiAdapter:
                 apply_data,
                 method="POST",
             )
-        except Exception as e:
-            logger.warning("创建配送申请失败", error=str(e))
+        except (httpx.HTTPError, RuntimeError, ValueError) as e:
+            logger.warning("创建配送申请失败", error=str(e), exc_info=True)
             return {"success": False, "message": str(e)}
 
     async def query_delivery_dispatch_out(
@@ -440,8 +438,8 @@ class AoqiweiAdapter:
                 "/rechain/delivery/api/dispatchout/getOrderList", params
             )
             return result if isinstance(result, list) else result.get("list", [])
-        except Exception as e:
-            logger.warning("查询配送出库单失败", error=str(e))
+        except (httpx.HTTPError, RuntimeError, ValueError) as e:
+            logger.warning("查询配送出库单失败", error=str(e), exc_info=True)
             return []
 
     async def confirm_delivery_in(self, dispatch_in_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -453,8 +451,8 @@ class AoqiweiAdapter:
                 dispatch_in_data,
                 method="POST",
             )
-        except Exception as e:
-            logger.warning("配送入库确认失败", error=str(e))
+        except (httpx.HTTPError, RuntimeError, ValueError) as e:
+            logger.warning("配送入库确认失败", error=str(e), exc_info=True)
             return {"success": False, "message": str(e)}
 
     # ==================== 采购业务接口 ====================
@@ -487,8 +485,8 @@ class AoqiweiAdapter:
             return await self._request(
                 "/rechain/purchase/api/depotin/getOrderList", params
             )
-        except Exception as e:
-            logger.warning("查询采购入库单失败", error=str(e))
+        except (httpx.HTTPError, RuntimeError, ValueError) as e:
+            logger.warning("查询采购入库单失败", error=str(e), exc_info=True)
             return {"list": [], "total": 0}
 
     async def create_reserve_order(self, reserve_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -500,8 +498,8 @@ class AoqiweiAdapter:
                 reserve_data,
                 method="POST",
             )
-        except Exception as e:
-            logger.warning("创建采购订货单失败", error=str(e))
+        except (httpx.HTTPError, RuntimeError, ValueError) as e:
+            logger.warning("创建采购订货单失败", error=str(e), exc_info=True)
             return {"success": False, "message": str(e)}
 
     # ==================== POS订单接口 ====================
@@ -515,8 +513,8 @@ class AoqiweiAdapter:
                 order_data,
                 method="POST",
             )
-        except Exception as e:
-            logger.warning("POS订单上传失败", error=str(e))
+        except (httpx.HTTPError, RuntimeError, ValueError) as e:
+            logger.warning("POS订单上传失败", error=str(e), exc_info=True)
             return {"success": False, "message": str(e)}
 
     async def pos_check_order(self, shop_code: str, date: str) -> Dict[str, Any]:
@@ -528,8 +526,8 @@ class AoqiweiAdapter:
                 "/rechain/pos/api/ordercheck/getList",
                 {"shopCode": shop_code, "date": date},
             )
-        except Exception as e:
-            logger.warning("POS订单校验失败", error=str(e))
+        except (httpx.HTTPError, RuntimeError, ValueError) as e:
+            logger.warning("POS订单校验失败", error=str(e), exc_info=True)
             return {"checked": False, "message": str(e)}
 
     async def pos_day_done(self, shop_code: str, date: str) -> Dict[str, Any]:
@@ -542,8 +540,8 @@ class AoqiweiAdapter:
                 {"shopCode": shop_code, "date": date},
                 method="POST",
             )
-        except Exception as e:
-            logger.warning("POS日结失败", error=str(e))
+        except (httpx.HTTPError, RuntimeError, ValueError) as e:
+            logger.warning("POS日结失败", error=str(e), exc_info=True)
             return {"success": False, "message": str(e)}
 
     # ==================== 数据报表接口 ====================
@@ -569,8 +567,8 @@ class AoqiweiAdapter:
             return await self._request(
                 "/rechain/stock/api/invocingCost/getList", params
             )
-        except Exception as e:
-            logger.warning("查询进销存报表失败", error=str(e))
+        except (httpx.HTTPError, RuntimeError, ValueError) as e:
+            logger.warning("查询进销存报表失败", error=str(e), exc_info=True)
             return {"list": [], "total": 0}
 
     async def query_good_diff_analysis(
@@ -591,6 +589,6 @@ class AoqiweiAdapter:
             return await self._request(
                 "/rechain/bi/api/goodDiffAnalyse/getList", params
             )
-        except Exception as e:
-            logger.warning("货品差异分析失败", error=str(e))
+        except (httpx.HTTPError, RuntimeError, ValueError) as e:
+            logger.warning("货品差异分析失败", error=str(e), exc_info=True)
             return {"list": []}

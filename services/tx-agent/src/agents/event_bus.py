@@ -125,6 +125,7 @@ class EventBus:
                     event_id=event.event_id,
                     agent_id=agent_id,
                     error=str(e),
+                    exc_info=True,
                 )
 
         return results

@@ -29,7 +29,7 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
             # 设置 RLS tenant_id（从 request.state 注入，此处用默认值）
             yield session
             await session.commit()
-        except Exception:
+        except Exception:  # DB session 兜底回滚：必须捕获所有异常以保证回滚后再抛出
             await session.rollback()
             raise
 
@@ -44,7 +44,7 @@ async def get_db_with_tenant(tenant_id: str) -> AsyncGenerator[AsyncSession, Non
             )
             yield session
             await session.commit()
-        except Exception:
+        except Exception:  # DB session 兜底回滚：必须捕获所有异常以保证回滚后再抛出
             await session.rollback()
             raise
 

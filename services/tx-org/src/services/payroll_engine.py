@@ -561,7 +561,7 @@ def validate_formula(
                 warnings.append("表达式可能出现除零（运行时将返回0并告警）")
             except SyntaxError:
                 errors.append("表达式语法错误: 数学表达式不合法")
-            except Exception:
+            except (TypeError, NameError, ArithmeticError):
                 errors.append("表达式语法错误: 无法解析")
 
     return {
@@ -604,7 +604,7 @@ def safe_eval_expression(
         result = eval(expr)  # nosec: 已经过滤非法字符
     except ZeroDivisionError:
         return 0
-    except Exception:
+    except (SyntaxError, TypeError, NameError, ArithmeticError):
         return 0
 
     result = int(result)

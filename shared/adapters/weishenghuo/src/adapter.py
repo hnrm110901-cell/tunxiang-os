@@ -144,9 +144,7 @@ class WeishenghuoAdapter:
 
                 return result.get("data", result)
 
-            except Exception as e:
-                if "微生活业务错误" in str(e):
-                    raise
+            except (httpx.ConnectError, httpx.TimeoutException, httpx.DecodingError) as e:
                 last_exc = e
                 logger.warning(
                     "微生活请求失败，准备重试",
@@ -156,7 +154,7 @@ class WeishenghuoAdapter:
                     error=str(e),
                 )
 
-        raise Exception(
+        raise RuntimeError(
             f"微生活请求失败，已重试 {self.retry_times} 次: {last_exc}"
         )
 
@@ -201,8 +199,8 @@ class WeishenghuoAdapter:
         logger.info("获取微生活会员信息", mobile=mobile, member_id=member_id)
         try:
             return await self._request("GET", "/member/info", params)
-        except Exception as e:
-            logger.warning("获取微生活会员信息失败", error=str(e))
+        except (httpx.HTTPError, RuntimeError, ValueError) as e:
+            logger.warning("获取微生活会员信息失败", error=str(e), exc_info=True)
             return {}
 
     async def list_members(
@@ -238,8 +236,8 @@ class WeishenghuoAdapter:
         )
         try:
             return await self._request("GET", "/member/list", params)
-        except Exception as e:
-            logger.warning("拉取微生活会员列表失败", error=str(e))
+        except (httpx.HTTPError, RuntimeError, ValueError) as e:
+            logger.warning("拉取微生活会员列表失败", error=str(e), exc_info=True)
             return {"list": [], "total": 0, "page": page, "page_size": page_size}
 
     async def get_member_transactions(
@@ -276,8 +274,8 @@ class WeishenghuoAdapter:
         )
         try:
             return await self._request("GET", "/member/transactions", params)
-        except Exception as e:
-            logger.warning("查询微生活会员交易记录失败", error=str(e))
+        except (httpx.HTTPError, RuntimeError, ValueError) as e:
+            logger.warning("查询微生活会员交易记录失败", error=str(e), exc_info=True)
             return {"list": [], "total": 0, "page": page}
 
     async def get_member_points(self, member_id: str) -> Dict[str, Any]:
@@ -296,8 +294,8 @@ class WeishenghuoAdapter:
             return await self._request(
                 "GET", "/member/points", {"member_id": member_id}
             )
-        except Exception as e:
-            logger.warning("查询微生活会员积分失败", error=str(e))
+        except (httpx.HTTPError, RuntimeError, ValueError) as e:
+            logger.warning("查询微生活会员积分失败", error=str(e), exc_info=True)
             return {"balance": 0, "history": []}
 
     async def get_member_stored_value(self, member_id: str) -> Dict[str, Any]:
@@ -316,8 +314,8 @@ class WeishenghuoAdapter:
             return await self._request(
                 "GET", "/member/stored-value", {"member_id": member_id}
             )
-        except Exception as e:
-            logger.warning("查询微生活会员储值余额失败", error=str(e))
+        except (httpx.HTTPError, RuntimeError, ValueError) as e:
+            logger.warning("查询微生活会员储值余额失败", error=str(e), exc_info=True)
             return {"balance": 0}
 
     async def get_shop_list(self) -> List[Dict[str, Any]]:
@@ -334,6 +332,6 @@ class WeishenghuoAdapter:
             if isinstance(result, list):
                 return result
             return result.get("list", [])
-        except Exception as e:
-            logger.warning("获取微生活门店列表失败", error=str(e))
+        except (httpx.HTTPError, RuntimeError, ValueError) as e:
+            logger.warning("获取微生活门店列表失败", error=str(e), exc_info=True)
             return []

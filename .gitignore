@@ -19,10 +19,14 @@ ENV/
 
 # Environment
 .env
+.env.*
 .env.local
 .env.*.local
 .env.staging
 .env.production
+
+# Merchant configs (sensitive)
+config/merchants/
 
 # Build outputs
 dist/

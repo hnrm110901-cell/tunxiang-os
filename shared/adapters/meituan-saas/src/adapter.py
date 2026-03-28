@@ -139,7 +139,7 @@ class MeituanSaasAdapter:
                 if attempt == self.retry_times - 1:
                     raise Exception(f"HTTP请求失败: {e.response.status_code}")
 
-            except Exception as e:
+            except (httpx.ConnectError, httpx.TimeoutException, httpx.DecodingError, ValueError) as e:
                 logger.error(
                     "请求异常",
                     endpoint=endpoint,
@@ -149,7 +149,7 @@ class MeituanSaasAdapter:
                 if attempt == self.retry_times - 1:
                     raise
 
-        raise Exception("请求失败，已达到最大重试次数")
+        raise RuntimeError("请求失败，已达到最大重试次数")
 
     def handle_error(self, response: Dict[str, Any]) -> None:
         """
