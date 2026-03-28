@@ -7,7 +7,7 @@ Token通过环境变量加载，不在代码中出现。
 MERCHANT_CONFIG = {
     "czyz": {  # 尝在一起
         "brand_name": "尝在一起",
-        "pinzhi_base_url": "https://czyq.pinzhikeji.net/api/v1",
+        "pinzhi_base_url": "http://czyq.pinzhikeji.net:8899/pzcatering-gateway",
         "stores": {
             "2461": {"name": "文化城店", "token_env": "CZYZ_PINZHI_STORE_2461_TOKEN"},
             "7269": {"name": "浏小鲜", "token_env": "CZYZ_PINZHI_STORE_7269_TOKEN"},
@@ -17,7 +17,7 @@ MERCHANT_CONFIG = {
     },
     "zqx": {  # 最黔线
         "brand_name": "最黔线",
-        "pinzhi_base_url": "https://ljcg.pinzhikeji.net/api/v1",
+        "pinzhi_base_url": "http://ljcg.pinzhikeji.net:8899/pzcatering-gateway",
         "stores": {
             "20529": {"name": "门店1", "token_env": "ZQX_PINZHI_STORE_20529_TOKEN"},
             "32109": {"name": "门店2", "token_env": "ZQX_PINZHI_STORE_32109_TOKEN"},
@@ -30,7 +30,7 @@ MERCHANT_CONFIG = {
     },
     "sgc": {  # 尚宫厨
         "brand_name": "尚宫厨",
-        "pinzhi_base_url": "https://xcsgc.pinzhikeji.net/api/v1",
+        "pinzhi_base_url": "http://xcsgc.pinzhikeji.net:8899/pzcatering-gateway",
         "stores": {
             "2463": {"name": "门店1", "token_env": "SGC_PINZHI_STORE_2463_TOKEN"},
             "7896": {"name": "门店2", "token_env": "SGC_PINZHI_STORE_7896_TOKEN"},

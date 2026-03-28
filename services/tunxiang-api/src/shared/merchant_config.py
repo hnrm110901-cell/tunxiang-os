@@ -124,7 +124,7 @@ class MerchantConfig:
 
         base_url = os.getenv(
             f"{prefix}_PINZHI_BASE_URL",
-            "https://open.pinzhikeji.net/api/v1",
+            "http://czyq.pinzhikeji.net:8899/pzcatering-gateway",
         )
 
         # 收集所有门店 Token
