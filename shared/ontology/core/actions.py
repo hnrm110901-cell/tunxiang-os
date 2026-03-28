@@ -17,8 +17,9 @@ Ontology Actions — 对标 Palantir Actions + AIP Agent 执行层
 from __future__ import annotations
 
 import abc
+import functools
 import uuid
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from typing import Any
 
 import structlog
@@ -62,7 +63,7 @@ class AgentDecisionLog(BaseModel):
         description="三条硬约束校验结果: {margin_floor: bool, food_safety: bool, customer_experience: bool}",
     )
     confidence: float = Field(..., ge=0.0, le=1.0)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 # ─────────────────────────────────────────────
@@ -83,7 +84,7 @@ class ActionContext(BaseModel):
         default=None,
         description="如果是 Agent 触发则填写 agent_id",
     )
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -142,7 +143,7 @@ def check_margin_floor(
         constraint_type=ConstraintType.margin_floor,
         passed=passed,
         message=(
-            f"毛利率 {margin_pct:.1f}% {'>=':s} 底线 {floor:.1f}%"
+            f"毛利率 {margin_pct:.1f}% >= 底线 {floor:.1f}%"
             if passed
             else f"毛利率 {margin_pct:.1f}% 低于底线 {floor:.1f}%"
         ),
@@ -644,16 +645,19 @@ class CheckFoodSafetyAction(OntologyAction):
     ) -> list[HardConstraintResult]:
         ingredients: list[IngredientObject] = params["ingredients"]
         ref_date: date | None = params.get("reference_date")
-        # Food safety check is informational here; we don't block the action
-        # but report findings. The constraint always "passes" for the action itself
-        # since this IS the safety check action.
+        # 食安检查Action本身是巡检操作，不应被自身约束阻断。
+        # 但必须保留真实的检查结果用于决策日志和下游消费。
         result = check_food_safety(ingredients, ref_date)
-        # Override: the check action itself always proceeds, but logs the findings
+        # 标记为巡检模式：Action可继续执行，但detail中保留真实passed状态
         return [HardConstraintResult(
             constraint_type=ConstraintType.food_safety,
-            passed=True,
-            message=result.message,
-            detail=result.detail,
+            passed=True,  # 巡检Action本身不被阻断
+            message=f"[巡检] {result.message}",
+            detail={
+                **(result.detail or {}),
+                "actual_safety_passed": result.passed,  # 保留真实食安状态
+                "is_inspection": True,
+            },
         )]
 
     async def execute(
@@ -834,10 +838,12 @@ class PredictDemandAction(OntologyAction):
 
 
 def _sanitize_for_log(data: dict[str, Any]) -> dict[str, Any]:
-    """将数据中的 UUID/datetime 转为字符串以便 JSON 序列化"""
+    """将数据中的 UUID/datetime/BaseModel 转为可 JSON 序列化的类型"""
     sanitized: dict[str, Any] = {}
     for k, v in data.items():
-        if isinstance(v, uuid.UUID):
+        if isinstance(v, BaseModel):
+            sanitized[k] = _sanitize_for_log(v.model_dump())
+        elif isinstance(v, uuid.UUID):
             sanitized[k] = str(v)
         elif isinstance(v, datetime):
             sanitized[k] = v.isoformat()
@@ -847,6 +853,7 @@ def _sanitize_for_log(data: dict[str, Any]) -> dict[str, Any]:
             sanitized[k] = _sanitize_for_log(v)
         elif isinstance(v, list):
             sanitized[k] = [
+                _sanitize_for_log(item.model_dump()) if isinstance(item, BaseModel) else
                 _sanitize_for_log(item) if isinstance(item, dict) else
                 str(item) if isinstance(item, (uuid.UUID, datetime, date)) else
                 item
@@ -888,4 +895,7 @@ def _build_default_registry_with_handlers() -> OntologyRegistry:
     return registry
 
 
-default_registry: OntologyRegistry = _build_default_registry_with_handlers()
+@functools.cache
+def get_default_registry() -> OntologyRegistry:
+    """获取默认 Registry（懒初始化，首次调用时构建）"""
+    return _build_default_registry_with_handlers()

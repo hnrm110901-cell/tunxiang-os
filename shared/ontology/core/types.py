@@ -16,10 +16,10 @@ from __future__ import annotations
 
 import enum
 import uuid
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 # ─────────────────────────────────────────────
@@ -114,8 +114,8 @@ class TenantEntity(BaseModel):
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4)
     tenant_id: uuid.UUID
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     is_deleted: bool = False
 
 
@@ -291,7 +291,7 @@ class StoreObject(TenantEntity):
 
     store_name: str = Field(..., max_length=100)
     store_code: str = Field(..., max_length=20)
-    brand_id: str | None = None
+    brand_id: uuid.UUID | None = None
     region: str | None = None
 
     # 类型
@@ -420,7 +420,7 @@ class OrderObject(TenantEntity):
     status: str = "pending"
 
     # 时间
-    order_time: datetime = Field(default_factory=datetime.utcnow)
+    order_time: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     confirmed_at: datetime | None = None
     completed_at: datetime | None = None
     served_at: datetime | None = None
@@ -449,6 +449,17 @@ class OrderObject(TenantEntity):
         if v < 0:
             raise ValueError("Amount in fen cannot be negative")
         return v
+
+    @model_validator(mode="after")
+    def validate_order_amounts(self) -> "OrderObject":
+        """交叉校验: 折扣不可超过总金额，自动计算应付金额"""
+        if self.discount_amount_fen > self.total_amount_fen:
+            raise ValueError(
+                f"折扣金额 ({self.discount_amount_fen}分) 不可超过订单总额 ({self.total_amount_fen}分)"
+            )
+        if self.final_amount_fen is None:
+            self.final_amount_fen = self.total_amount_fen - self.discount_amount_fen
+        return self
 
 
 # ─────────────────────────────────────────────
@@ -505,9 +516,13 @@ class IngredientObject(TenantEntity):
     status: str = "normal"  # normal/low/critical/out_of_stock
 
     def is_expired(self, reference_date: date | None = None) -> bool:
-        """检查是否过期 — 食安合规硬约束核心判定"""
+        """检查是否过期 — 食安合规硬约束核心判定
+
+        注意: 无效期的冷藏/冷冻食材视为不合规（应录入效期）
+        """
         if self.expiry_date is None:
-            return False
+            # 需冷藏/冷冻的食材必须有效期，否则视为不安全
+            return self.storage_type in ("chilled", "frozen")
         check_date = reference_date or date.today()
         return self.expiry_date < check_date
 
@@ -563,7 +578,7 @@ class EmployeeObject(TenantEntity):
     org_id: uuid.UUID | None = None
 
     # 效率
-    performance_score: str | None = None
+    performance_score: float | None = Field(default=None, ge=0.0, le=100.0)
     training_completed: list[str] = Field(default_factory=list)
 
     def is_health_cert_valid(self, reference_date: date | None = None) -> bool:

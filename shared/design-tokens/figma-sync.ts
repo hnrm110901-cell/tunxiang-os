@@ -60,15 +60,16 @@ interface DesignToken {
 }
 
 function figmaNameToCssVar(name: string): string {
-  // "brand/primary" → "--tx-primary"
-  // "semantic/success" → "--tx-success"
-  // "neutral/text-1" → "--tx-text-1"
-  const parts = name.split('/');
-  const token = parts[parts.length - 1]
+  // "brand/primary" → "--tx-brand-primary"
+  // "semantic/success" → "--tx-semantic-success"
+  // "neutral/text-1" → "--tx-neutral-text-1"
+  // 包含完整路径以避免同名冲突 (如 brand/light vs neutral/light)
+  const cssName = name
+    .replace(/\//g, '-')
     .replace(/([A-Z])/g, '-$1')
     .toLowerCase()
     .replace(/^-/, '');
-  return `--tx-${token}`;
+  return `--tx-${cssName}`;
 }
 
 function figmaColorToHex(color: FigmaColorValue): string {
@@ -81,12 +82,14 @@ function figmaColorToHex(color: FigmaColorValue): string {
   return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`.toUpperCase();
 }
 
-function resolveValue(value: FigmaVariableValue, type: string): string {
+function resolveValue(value: FigmaVariableValue, type: string, name: string = ''): string {
   if (type === 'COLOR' && typeof value === 'object' && 'r' in value) {
     return figmaColorToHex(value);
   }
   if (type === 'FLOAT' && typeof value === 'number') {
-    return `${value}px`;
+    // 仅尺寸/间距类 Token 加 px 后缀；比率/权重等无单位值不加
+    const needsUnit = /spacing|radius|size|width|height|gap|margin|padding|tap|font-min/i.test(name);
+    return needsUnit ? `${value}px` : String(value);
   }
   return String(value);
 }
@@ -168,8 +171,8 @@ function parseVariables(data: FigmaVariablesResponse, collectionNames: string[])
         name: variable.name,
         cssVar: figmaNameToCssVar(variable.name),
         values: {
-          light: resolveValue(lightValue, variable.resolvedType),
-          dark: resolveValue(darkValue, variable.resolvedType),
+          light: resolveValue(lightValue, variable.resolvedType, variable.name),
+          dark: resolveValue(darkValue, variable.resolvedType, variable.name),
         },
         type: variable.resolvedType === 'COLOR' ? 'color'
             : variable.resolvedType === 'FLOAT' ? 'dimension'
@@ -222,8 +225,14 @@ async function main() {
     // 使用本地 tokens.json 作为 fallback
     const fallbackPath = path.join(__dirname, 'tokens.json');
     if (fs.existsSync(fallbackPath)) {
-      const raw = JSON.parse(fs.readFileSync(fallbackPath, 'utf-8'));
-      const tokens: DesignToken[] = Object.entries(raw).map(([name, val]: [string, any]) => ({
+      let raw: Record<string, { light: string; dark: string; type: string }>;
+      try {
+        raw = JSON.parse(fs.readFileSync(fallbackPath, 'utf-8'));
+      } catch (parseErr) {
+        console.error(`  tokens.json 解析失败: ${parseErr instanceof Error ? parseErr.message : parseErr}`);
+        process.exit(1);
+      }
+      const tokens: DesignToken[] = Object.entries(raw).map(([name, val]) => ({
         name,
         cssVar: figmaNameToCssVar(name),
         values: { light: val.light, dark: val.dark },
@@ -251,6 +260,6 @@ async function main() {
 }
 
 main().catch(err => {
-  console.error('❌ Figma sync failed:', err.message);
+  console.error('❌ Figma sync failed:', err instanceof Error ? err.message : String(err));
   process.exit(1);
 });

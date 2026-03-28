@@ -57,8 +57,8 @@ from .actions import (
     TransferStockAction,
     CheckFoodSafetyAction,
     PredictDemandAction,
-    # Registry instance
-    default_registry,
+    # Registry factory (lazy initialization)
+    get_default_registry,
 )
 
 __all__ = [
@@ -97,5 +97,5 @@ __all__ = [
     "TransferStockAction",
     "CheckFoodSafetyAction",
     "PredictDemandAction",
-    "default_registry",
+    "get_default_registry",
 ]
