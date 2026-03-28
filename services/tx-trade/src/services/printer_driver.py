@@ -1,9 +1,20 @@
-"""ESC/POS 网口打印机驱动 — 北洋 BTP-98NP / BTP-2002CP
+"""ESC/POS 网口打印机驱动
 
-支持所有兼容 ESC/POS 标准指令集的热敏打印机。
+支持型号:
+  - 北洋 BTP-98NP    80mm 收银小票 (TCP:9100, GBK)
+  - 北洋 BTP-2002CP  80mm 后厨打印 (TCP:9100, GBK)
+  - 佳博 C80180II    80mm 网口打印 (TCP:9100, GBK)
+  - 佳博 GP-SD80S    80mm 网口打印 (TCP:9100, GBK)
+
+所有型号均兼容 ESC/POS 标准指令集。
 连接方式: TCP/IP Socket (端口9100)
 纸宽: 80mm (48 ASCII字符 / 24 中文字符)
-编码: GBK (北洋默认)
+编码: GBK (默认)
+
+佳博特性说明:
+  - C80180II: 支持USB+网口+串口, 打印速度250mm/s, 自动切刀
+  - GP-SD80S: 支持USB+网口, 打印速度200mm/s, 自动切刀
+  - 两款均100%兼容ESC/POS, 无需额外适配
 """
 import asyncio
 from enum import Enum

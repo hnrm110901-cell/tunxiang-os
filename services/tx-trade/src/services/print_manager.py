@@ -1,5 +1,10 @@
 """打印管理器 — 门店打印机统一管理与任务分发
 
+支持打印机型号:
+  北洋: BTP-98NP (收银), BTP-2002CP (厨打)
+  佳博: C80180II (网口250mm/s), GP-SD80S (网口200mm/s)
+  其他: 任何兼容ESC/POS的80mm网口热敏打印机
+
 职责：
 1. 打印机注册/配置管理（按角色: 收银/厨打/标签）
 2. 打印任务分发（自动选择打印机 + 渲染模板 + 发送打印）
@@ -599,3 +604,86 @@ def get_print_manager() -> PrintManager:
     if _print_manager is None:
         _print_manager = PrintManager()
     return _print_manager
+
+
+# ─── 支持的打印机型号预设 ───
+
+SUPPORTED_PRINTERS = {
+    # 北洋系列
+    "beiyang_98np": {
+        "brand": "北洋",
+        "model": "BTP-98NP",
+        "paper_width": 80,
+        "port": 9100,
+        "protocol": "ESC/POS",
+        "encoding": "GBK",
+        "speed_mm_s": 230,
+        "auto_cutter": True,
+        "recommended_role": "cashier",
+        "notes": "收银主力机型，支持USB+网口+串口",
+    },
+    "beiyang_2002cp": {
+        "brand": "北洋",
+        "model": "BTP-2002CP",
+        "paper_width": 80,
+        "port": 9100,
+        "protocol": "ESC/POS",
+        "encoding": "GBK",
+        "speed_mm_s": 200,
+        "auto_cutter": True,
+        "recommended_role": "kitchen",
+        "notes": "后厨打印，耐高温防油污",
+    },
+    # 佳博系列
+    "gainscha_c80180ii": {
+        "brand": "佳博",
+        "model": "C80180II",
+        "paper_width": 80,
+        "port": 9100,
+        "protocol": "ESC/POS",
+        "encoding": "GBK",
+        "speed_mm_s": 250,
+        "auto_cutter": True,
+        "recommended_role": "cashier",
+        "notes": "高速网口打印机，支持USB+网口+串口，250mm/s",
+    },
+    "gainscha_sd80s": {
+        "brand": "佳博",
+        "model": "GP-SD80S",
+        "paper_width": 80,
+        "port": 9100,
+        "protocol": "ESC/POS",
+        "encoding": "GBK",
+        "speed_mm_s": 200,
+        "auto_cutter": True,
+        "recommended_role": "kitchen",
+        "notes": "经济型网口打印机，支持USB+网口，200mm/s",
+    },
+}
+
+
+def get_supported_printers() -> dict:
+    """获取所有支持的打印机型号及配置预设。"""
+    return SUPPORTED_PRINTERS
+
+
+def get_printer_preset(model_key: str) -> dict:
+    """根据型号key获取打印机预设配置。
+
+    Args:
+        model_key: 型号标识，如 'beiyang_98np', 'gainscha_c80180ii'
+
+    Returns:
+        打印机预设配置字典
+
+    Example:
+        >>> preset = get_printer_preset("gainscha_c80180ii")
+        >>> print(preset["speed_mm_s"])  # 250
+    """
+    preset = SUPPORTED_PRINTERS.get(model_key)
+    if preset is None:
+        raise ValueError(
+            f"不支持的打印机型号: {model_key}，"
+            f"支持的型号: {', '.join(SUPPORTED_PRINTERS.keys())}"
+        )
+    return preset
