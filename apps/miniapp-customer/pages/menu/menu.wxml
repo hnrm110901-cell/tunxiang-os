@@ -1,3 +1,78 @@
-<view class="container">
-  <text>menu 页面</text>
+<!-- 菜单浏览 + 点餐 -->
+<view class="menu-page">
+  <!-- 顶部门店 + 搜索 -->
+  <view class="menu-header">
+    <view class="header-top">
+      <text class="store-name">{{storeName}}</text>
+      <text class="table-tag" wx:if="{{tableNo}}">{{tableNo}}号桌</text>
+    </view>
+    <view class="search-bar">
+      <input class="search-input" placeholder="搜索菜品" placeholderClass="search-placeholder"
+             bindinput="onSearchInput" value="{{searchKeyword}}" />
+      <view class="search-clear" wx:if="{{searchKeyword}}" bindtap="clearSearch">✕</view>
+    </view>
+  </view>
+
+  <!-- 加载中 -->
+  <view class="loading-container" wx:if="{{loading}}">
+    <text class="loading-text">菜单加载中...</text>
+  </view>
+
+  <!-- 分类 + 菜品双栏 -->
+  <view class="menu-body" wx:if="{{!loading}}">
+    <!-- 左侧分类导航 -->
+    <scroll-view scroll-y class="category-nav">
+      <view class="category-item {{activeCategoryId === item.id ? 'active' : ''}}"
+            wx:for="{{categories}}" wx:key="id"
+            bindtap="selectCategory" data-id="{{item.id}}">
+        <text>{{item.name}}</text>
+      </view>
+    </scroll-view>
+
+    <!-- 右侧菜品列表 -->
+    <scroll-view scroll-y class="dish-list">
+      <view class="empty-state" wx:if="{{filteredDishes.length === 0}}">
+        <text>暂无菜品</text>
+      </view>
+
+      <block wx:for="{{filteredDishes}}" wx:key="id">
+        <dish-card
+          dish="{{item}}"
+          quantity="{{item._qty}}"
+          bind:add="onDishAdd"
+          bind:minus="onDishMinus"
+        />
+      </block>
+    </scroll-view>
+  </view>
+
+  <!-- 底部购物车栏 -->
+  <cart-bar
+    count="{{cartCount}}"
+    totalFen="{{cartTotalFen}}"
+    bind:showcart="onShowCart"
+    bind:checkout="goToCheckout"
+  />
+
+  <!-- 购物车弹层 -->
+  <view class="cart-popup-mask" wx:if="{{showCartPopup}}" bindtap="closeCartPopup"></view>
+  <view class="cart-popup {{showCartPopup ? 'show' : ''}}">
+    <view class="cart-popup-header">
+      <text class="cart-popup-title">已选菜品</text>
+      <view class="cart-popup-clear" bindtap="clearCart">清空</view>
+    </view>
+    <scroll-view scroll-y class="cart-popup-list">
+      <view class="cart-popup-item" wx:for="{{cartItems}}" wx:key="dish.id">
+        <text class="cart-item-name">{{item.dish.name}}</text>
+        <view class="cart-item-right">
+          <text class="cart-item-price">¥{{item.dish.priceFen ? (item.dish.priceFen / 100).toFixed(2) : '0.00'}}</text>
+          <view class="cart-item-qty">
+            <view class="qty-btn" catchtap="onDishMinus" data-dish="{{item.dish}}">-</view>
+            <text class="qty-num">{{item.quantity}}</text>
+            <view class="qty-btn plus" catchtap="onDishAdd" data-dish="{{item.dish}}">+</view>
+          </view>
+        </view>
+      </view>
+    </scroll-view>
+  </view>
 </view>

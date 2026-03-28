@@ -1,3 +1,95 @@
-<view class="container">
-  <text>order 页面</text>
+<!-- 订单页 — 确认下单 / 历史订单 -->
+<view class="page-container">
+
+  <!-- ═══ 确认下单模式 ═══ -->
+  <block wx:if="{{mode === 'confirm'}}">
+    <view class="confirm-page">
+      <!-- 桌号信息 -->
+      <view class="info-card" wx:if="{{tableNo}}">
+        <text class="info-label">用餐方式</text>
+        <text class="info-value">堂食 · {{tableNo}}号桌</text>
+      </view>
+
+      <!-- 菜品清单 -->
+      <view class="order-section">
+        <text class="section-label">已选菜品</text>
+        <view class="order-item" wx:for="{{orderItems}}" wx:key="dishId">
+          <view class="order-item-left">
+            <text class="order-item-name">{{item.dishName}}</text>
+            <text class="order-item-qty">x{{item.quantity}}</text>
+          </view>
+          <text class="order-item-price">¥{{(item.unitPriceFen * item.quantity / 100).toFixed(2)}}</text>
+        </view>
+      </view>
+
+      <!-- 备注 -->
+      <view class="remark-section">
+        <text class="section-label">备注</text>
+        <input class="remark-input" placeholder="口味偏好、忌口等" placeholderClass="remark-placeholder"
+               bindinput="onRemarkInput" value="{{remark}}" />
+      </view>
+
+      <!-- 支付方式 -->
+      <view class="pay-section">
+        <text class="section-label">支付方式</text>
+        <view class="pay-options">
+          <view class="pay-option {{payMethod === 'wechat' ? 'active' : ''}}"
+                bindtap="selectPayMethod" data-method="wechat">
+            <text class="pay-icon">💳</text>
+            <text>微信支付</text>
+          </view>
+          <view class="pay-option {{payMethod === 'balance' ? 'active' : ''}}"
+                bindtap="selectPayMethod" data-method="balance">
+            <text class="pay-icon">💰</text>
+            <text>余额支付</text>
+          </view>
+        </view>
+      </view>
+
+      <!-- 底部提交 -->
+      <view class="confirm-footer">
+        <view class="confirm-total">
+          <text class="total-label">合计</text>
+          <text class="total-amount">¥{{totalYuan}}</text>
+        </view>
+        <button class="confirm-btn" bindtap="submitOrder" disabled="{{submitting}}">
+          {{submitting ? '提交中...' : '提交订单'}}
+        </button>
+      </view>
+    </view>
+  </block>
+
+  <!-- ═══ 历史订单列表模式 ═══ -->
+  <block wx:if="{{mode === 'list'}}">
+    <!-- Tab 筛选 -->
+    <view class="order-tabs">
+      <view class="order-tab {{activeTab === item.key ? 'active' : ''}}"
+            wx:for="{{orderTabs}}" wx:key="key"
+            bindtap="switchOrderTab" data-tab="{{item.key}}">
+        {{item.label}}
+      </view>
+    </view>
+
+    <!-- 订单列表 -->
+    <view class="order-list">
+      <view class="loading-tip" wx:if="{{loadingOrders && orders.length === 0}}">加载中...</view>
+
+      <view class="empty-state" wx:if="{{!loadingOrders && orders.length === 0}}">暂无订单</view>
+
+      <view class="order-card" wx:for="{{orders}}" wx:key="id"
+            bindtap="goToOrderDetail" data-id="{{item.id}}">
+        <view class="order-card-header">
+          <text class="order-card-time">{{item.createdAt}}</text>
+          <text class="order-card-status status-{{item.status}}">{{item.statusText}}</text>
+        </view>
+        <view class="order-card-body">
+          <text class="order-card-dish">{{item.firstDishName}}{{item.itemCount > 1 ? ' 等' + item.itemCount + '件' : ''}}</text>
+        </view>
+        <view class="order-card-footer">
+          <text class="order-card-total">¥{{item.totalYuan}}</text>
+          <text class="order-card-action">查看详情 ></text>
+        </view>
+      </view>
+    </view>
+  </block>
 </view>

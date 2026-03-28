@@ -30,6 +30,10 @@ const shortcuts = [
   { label: '预订', path: '/reservations', icon: '[R]', color: '#722ed1' },
   { label: '交班', path: '/shift', icon: '[S]', color: '#faad14' },
   { label: '异常', path: '/exceptions', icon: '[!]', color: '#ff4d4f' },
+  { label: '反结账', path: '/reverse-settle', icon: '[↺]', color: '#A32D2D' },
+  { label: '排队', path: '/queue', icon: '[Q]', color: '#13c2c2' },
+  { label: '报表', path: '/reports', icon: '[G]', color: '#52c41a' },
+  { label: '设置', path: '/settings', icon: '[⚙]', color: '#8899A6' },
 ];
 
 const typeColor: Record<string, string> = {

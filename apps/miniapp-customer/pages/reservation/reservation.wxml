@@ -1,0 +1,77 @@
+<!-- 预订页 -->
+<view class="container">
+  <!-- 切换 Tab -->
+  <view class="tab-bar">
+    <view class="tab-item {{activeTab === 'new' ? 'active' : ''}}" bindtap="switchTab" data-tab="new">在线预订</view>
+    <view class="tab-item {{activeTab === 'list' ? 'active' : ''}}" bindtap="switchTab" data-tab="list">我的预订</view>
+  </view>
+
+  <!-- 新建预订 -->
+  <view class="form-section" wx:if="{{activeTab === 'new'}}">
+    <view class="form-item">
+      <text class="form-label">预订日期</text>
+      <picker mode="date" start="{{today}}" bindchange="onDateChange">
+        <view class="picker-value">{{date || '请选择日期'}}</view>
+      </picker>
+    </view>
+
+    <view class="form-item">
+      <text class="form-label">用餐时段</text>
+      <view class="slot-list">
+        <view class="slot-item {{selectedSlot === item ? 'active' : ''}}"
+              wx:for="{{timeSlots}}" wx:key="*this"
+              bindtap="selectSlot" data-slot="{{item}}">
+          {{item}}
+        </view>
+      </view>
+    </view>
+
+    <view class="form-item">
+      <text class="form-label">用餐人数</text>
+      <view class="stepper">
+        <view class="stepper-btn" bindtap="changeGuests" data-delta="{{-1}}">-</view>
+        <text class="stepper-value">{{guests}}</text>
+        <view class="stepper-btn" bindtap="changeGuests" data-delta="{{1}}">+</view>
+      </view>
+    </view>
+
+    <view class="form-item">
+      <text class="form-label">包间偏好</text>
+      <view class="room-list">
+        <view class="room-item {{selectedRoom === item.value ? 'active' : ''}}"
+              wx:for="{{roomOptions}}" wx:key="value"
+              bindtap="selectRoom" data-room="{{item.value}}">
+          {{item.label}}
+        </view>
+      </view>
+    </view>
+
+    <view class="form-item">
+      <text class="form-label">备注</text>
+      <input class="form-input" placeholder="如有特殊需求请备注" placeholderClass="placeholder"
+             bindinput="onRemarkInput" value="{{remark}}" />
+    </view>
+
+    <button class="submit-btn" bindtap="submitBooking" disabled="{{submitting}}">
+      {{submitting ? '提交中...' : '提交预订'}}
+    </button>
+  </view>
+
+  <!-- 我的预订列表 -->
+  <view class="list-section" wx:if="{{activeTab === 'list'}}">
+    <view class="empty-tip" wx:if="{{bookings.length === 0}}">暂无预订记录</view>
+    <view class="booking-card" wx:for="{{bookings}}" wx:key="id">
+      <view class="booking-header">
+        <text class="booking-date">{{item.date}} {{item.timeSlot}}</text>
+        <text class="booking-status status-{{item.status}}">{{item.statusText}}</text>
+      </view>
+      <view class="booking-body">
+        <text class="booking-detail">{{item.guests}}人 | {{item.roomLabel}}</text>
+        <text class="booking-remark" wx:if="{{item.remark}}">备注: {{item.remark}}</text>
+      </view>
+      <view class="booking-footer" wx:if="{{item.status === 'confirmed' || item.status === 'pending'}}">
+        <button class="cancel-btn" bindtap="cancelBooking" data-id="{{item.id}}">取消预订</button>
+      </view>
+    </view>
+  </view>
+</view>

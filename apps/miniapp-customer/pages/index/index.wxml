@@ -1,34 +1,67 @@
-<!-- 点餐首页 — 扫码点餐入口 -->
-<view class="container">
-  <view class="header">
-    <text class="store-name">{{storeName || '屯象点餐'}}</text>
-    <text class="table-info" wx:if="{{tableNo}}">桌号: {{tableNo}}</text>
+<!-- 首页 — 门店 + 快捷入口 + 附近门店 -->
+<view class="page-container">
+  <!-- 顶部门店信息 -->
+  <view class="store-header">
+    <view class="store-info">
+      <text class="store-name">{{storeName || '屯象点餐'}}</text>
+      <text class="store-address" wx:if="{{storeAddress}}">{{storeAddress}}</text>
+    </view>
+    <view class="table-badge" wx:if="{{tableNo}}">
+      <text class="table-label">桌号</text>
+      <text class="table-no">{{tableNo}}</text>
+    </view>
   </view>
 
-  <!-- 菜品分类 -->
-  <scroll-view scroll-x class="categories">
-    <view class="category-item {{activeCategory === item ? 'active' : ''}}"
-          wx:for="{{categories}}" wx:key="*this"
-          bindtap="selectCategory" data-name="{{item}}">
-      {{item}}
+  <!-- 快捷入口 -->
+  <view class="quick-entries">
+    <view class="entry-item" wx:for="{{quickEntries}}" wx:key="label"
+          bindtap="goToEntry" data-route="{{item.route}}">
+      <view class="entry-icon">{{item.icon}}</view>
+      <text class="entry-label">{{item.label}}</text>
     </view>
-  </scroll-view>
+  </view>
 
-  <!-- 菜品列表 -->
-  <scroll-view scroll-y class="dish-list">
-    <view class="dish-card" wx:for="{{dishes}}" wx:key="id" bindtap="addToCart" data-dish="{{item}}">
-      <image class="dish-img" src="{{item.imageUrl || '/assets/dish-placeholder.png'}}" mode="aspectFill" />
-      <view class="dish-info">
-        <text class="dish-name">{{item.name}}</text>
-        <text class="dish-price">¥{{item.priceFen / 100}}</text>
+  <!-- 当前状态卡片（排队中/预订中） -->
+  <view class="status-card" wx:if="{{currentQueue}}" bindtap="goToQueue">
+    <view class="status-left">
+      <text class="status-type">排队中</text>
+      <text class="status-detail">{{currentQueue.ticketNo}} · 前方{{currentQueue.ahead}}桌</text>
+    </view>
+    <text class="status-action">查看详情 ></text>
+  </view>
+
+  <view class="status-card" wx:if="{{currentBooking}}" bindtap="goToReservation">
+    <view class="status-left">
+      <text class="status-type">预订</text>
+      <text class="status-detail">{{currentBooking.date}} {{currentBooking.timeSlot}}</text>
+    </view>
+    <text class="status-action">查看详情 ></text>
+  </view>
+
+  <!-- 附近门店 -->
+  <view class="section">
+    <text class="section-title">附近门店</text>
+
+    <view class="loading-tip" wx:if="{{loadingStores}}">
+      <text>加载中...</text>
+    </view>
+
+    <view class="store-list" wx:if="{{!loadingStores}}">
+      <view class="empty-state" wx:if="{{nearbyStores.length === 0}}">
+        暂无附近门店，请授权定位
+      </view>
+
+      <view class="store-card" wx:for="{{nearbyStores}}" wx:key="id"
+            bindtap="goToStore" data-id="{{item.id}}">
+        <view class="store-card-main">
+          <text class="store-card-name">{{item.name}}</text>
+          <text class="store-card-address">{{item.address}}</text>
+        </view>
+        <view class="store-card-right">
+          <text class="store-card-distance" wx:if="{{item.distance}}">{{item.distance}}</text>
+          <text class="store-card-queue" wx:if="{{item.queueWaiting > 0}}">排队{{item.queueWaiting}}桌</text>
+        </view>
       </view>
     </view>
-  </scroll-view>
-
-  <!-- 底部购物车栏 -->
-  <view class="cart-bar" wx:if="{{cartCount > 0}}">
-    <text class="cart-count">已选 {{cartCount}} 件</text>
-    <text class="cart-total">¥{{cartTotal / 100}}</text>
-    <button class="submit-btn" bindtap="submitOrder">去结算</button>
   </view>
 </view>

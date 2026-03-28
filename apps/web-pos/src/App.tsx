@@ -11,6 +11,10 @@ import { POSDashboardPage } from './pages/POSDashboardPage';
 import { QueuePage } from './pages/QueuePage';
 import { POSSettingsPage } from './pages/POSSettingsPage';
 import { POSReportsPage } from './pages/POSReportsPage';
+import { CreditPayPage } from './pages/CreditPayPage';
+import { ReverseSettlePage } from './pages/ReverseSettlePage';
+import { SplitPayPage } from './pages/SplitPayPage';
+import { TaxInvoicePage } from './pages/TaxInvoicePage';
 
 function App() {
   return (
@@ -24,6 +28,10 @@ function App() {
         <Route path="/cashier/:tableNo" element={<CashierPage />} />
         <Route path="/order/:orderId" element={<OrderPage />} />
         <Route path="/settle/:orderId" element={<SettlePage />} />
+        <Route path="/credit-pay/:orderId" element={<CreditPayPage />} />
+        <Route path="/reverse-settle" element={<ReverseSettlePage />} />
+        <Route path="/split-pay/:orderId" element={<SplitPayPage />} />
+        <Route path="/tax-invoice/:orderId" element={<TaxInvoicePage />} />
         <Route path="/shift" element={<ShiftPage />} />
         <Route path="/exceptions" element={<ExceptionPage />} />
         <Route path="/queue" element={<QueuePage />} />

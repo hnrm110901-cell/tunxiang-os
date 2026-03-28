@@ -108,9 +108,30 @@ export function SettlePage() {
             {paying ? '处理中...' : m.label}
           </button>
         ))}
+        {/* 高级结算入口 */}
+        <div style={{ borderTop: '1px solid #333', paddingTop: 12, marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <button
+            onClick={() => navigate(`/credit-pay/${orderId || 'temp'}`)}
+            style={{ padding: 14, border: '1px solid #722ed1', borderRadius: 8, background: 'transparent', color: '#722ed1', cursor: 'pointer', fontSize: 16, minHeight: 48 }}
+          >
+            企业挂账
+          </button>
+          <button
+            onClick={() => navigate(`/split-pay/${orderId || 'temp'}`)}
+            style={{ padding: 14, border: '1px solid #1677FF', borderRadius: 8, background: 'transparent', color: '#1677FF', cursor: 'pointer', fontSize: 16, minHeight: 48 }}
+          >
+            拆单结账
+          </button>
+          <button
+            onClick={() => navigate(`/tax-invoice/${orderId || 'temp'}`)}
+            style={{ padding: 14, border: '1px solid #faad14', borderRadius: 8, background: 'transparent', color: '#faad14', cursor: 'pointer', fontSize: 16, minHeight: 48 }}
+          >
+            开具发票
+          </button>
+        </div>
         <button
           onClick={() => navigate(-1)}
-          style={{ padding: 12, border: '1px solid #444', borderRadius: 8, background: 'transparent', color: '#999', cursor: 'pointer', marginTop: 'auto' }}
+          style={{ padding: 12, border: '1px solid #444', borderRadius: 8, background: 'transparent', color: '#999', cursor: 'pointer', marginTop: 12 }}
         >
           返回修改
         </button>

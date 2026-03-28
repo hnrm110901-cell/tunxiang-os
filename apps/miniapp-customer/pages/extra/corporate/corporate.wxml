@@ -1,0 +1,117 @@
+<!-- 企业团餐页 -->
+<view class="container">
+  <view class="page-title">企业团餐</view>
+
+  <!-- Tab 切换 -->
+  <view class="tab-bar">
+    <view class="tab-item {{activeTab === 'overview' ? 'active' : ''}}" bindtap="switchTab" data-tab="overview">账户总览</view>
+    <view class="tab-item {{activeTab === 'records' ? 'active' : ''}}" bindtap="switchTab" data-tab="records">消费记录</view>
+    <view class="tab-item {{activeTab === 'booking' ? 'active' : ''}}" bindtap="switchTab" data-tab="booking">预订团餐</view>
+  </view>
+
+  <!-- 账户总览 -->
+  <view class="overview-section" wx:if="{{activeTab === 'overview'}}">
+    <view class="balance-card">
+      <text class="balance-label">企业账户余额</text>
+      <view class="balance-amount">
+        <text class="balance-symbol">&#165;</text>
+        <text class="balance-value">{{account.balanceYuan}}</text>
+      </view>
+      <text class="balance-company">{{account.companyName}}</text>
+    </view>
+
+    <view class="stats-row">
+      <view class="stat-item">
+        <text class="stat-value">{{account.monthSpentYuan}}</text>
+        <text class="stat-label">本月消费(元)</text>
+      </view>
+      <view class="stat-item">
+        <text class="stat-value">{{account.monthCount}}</text>
+        <text class="stat-label">本月用餐(次)</text>
+      </view>
+      <view class="stat-item">
+        <text class="stat-value">{{account.monthHeadcount}}</text>
+        <text class="stat-label">本月人次</text>
+      </view>
+    </view>
+
+    <view class="quota-section" wx:if="{{account.dailyQuotaYuan}}">
+      <view class="quota-row">
+        <text class="quota-label">每日额度</text>
+        <text class="quota-value">&#165;{{account.dailyQuotaYuan}} / 人</text>
+      </view>
+      <view class="quota-row">
+        <text class="quota-label">今日已用</text>
+        <text class="quota-value">&#165;{{account.todayUsedYuan}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 消费记录 -->
+  <view class="records-section" wx:if="{{activeTab === 'records'}}">
+    <view class="empty-tip" wx:if="{{records.length === 0}}">暂无消费记录</view>
+    <view class="record-card" wx:for="{{records}}" wx:key="id">
+      <view class="record-left">
+        <text class="record-title">{{item.description}}</text>
+        <text class="record-time">{{item.createdAt}}</text>
+      </view>
+      <view class="record-right">
+        <text class="record-amount {{item.amountFen > 0 ? 'income' : 'expense'}}">
+          {{item.amountFen > 0 ? '+' : '-'}}&#165;{{item.absAmountYuan}}
+        </text>
+        <text class="record-headcount" wx:if="{{item.headcount}}">{{item.headcount}}人</text>
+      </view>
+    </view>
+
+    <!-- 加载更多 -->
+    <view class="load-more" wx:if="{{hasMoreRecords}}" bindtap="loadMoreRecords">
+      <text>加载更多</text>
+    </view>
+  </view>
+
+  <!-- 预订团餐 -->
+  <view class="booking-section" wx:if="{{activeTab === 'booking'}}">
+    <view class="form-item">
+      <text class="form-label">用餐日期</text>
+      <picker mode="date" start="{{today}}" bindchange="onMealDateChange">
+        <view class="picker-value">{{mealDate || '请选择日期'}}</view>
+      </picker>
+    </view>
+
+    <view class="form-item">
+      <text class="form-label">用餐类型</text>
+      <view class="meal-type-list">
+        <view class="meal-type-item {{mealType === item.value ? 'active' : ''}}"
+              wx:for="{{mealTypes}}" wx:key="value"
+              bindtap="selectMealType" data-value="{{item.value}}">
+          {{item.label}}
+        </view>
+      </view>
+    </view>
+
+    <view class="form-item">
+      <text class="form-label">用餐人数</text>
+      <input class="form-input" type="number" placeholder="请输入预计人数" placeholderClass="placeholder" bindinput="onHeadcountInput" value="{{headcount}}" />
+    </view>
+
+    <view class="form-item">
+      <text class="form-label">预算(元/人)</text>
+      <view class="budget-list">
+        <view class="budget-item {{budget === item ? 'active' : ''}}"
+              wx:for="{{budgetOptions}}" wx:key="*this"
+              bindtap="selectBudget" data-budget="{{item}}">
+          &#165;{{item}}
+        </view>
+      </view>
+    </view>
+
+    <view class="form-item">
+      <text class="form-label">备注要求</text>
+      <textarea class="form-textarea" placeholder="如有忌口、菜品偏好等请备注" placeholderClass="placeholder" bindinput="onMealRemarkInput" value="{{mealRemark}}" />
+    </view>
+
+    <button class="submit-btn" bindtap="submitMealBooking" disabled="{{submitting}}">
+      {{submitting ? '提交中...' : '提交团餐预订'}}
+    </button>
+  </view>
+</view>

@@ -14,6 +14,8 @@ from .api.kds_routes import router as kds_router
 from .api.handover_routes import router as handover_router
 from .api.table_routes import router as table_router
 from .api.enterprise_routes import router as enterprise_router
+from .api.order_ext_routes import router as order_ext_router
+from .api.coupon_routes import router as coupon_router
 
 
 @asynccontextmanager
@@ -43,6 +45,8 @@ app.include_router(kds_router)
 app.include_router(handover_router)
 app.include_router(table_router)
 app.include_router(enterprise_router)
+app.include_router(order_ext_router)
+app.include_router(coupon_router)
 
 
 @app.get("/health")

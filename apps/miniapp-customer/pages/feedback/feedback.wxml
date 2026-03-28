@@ -1,0 +1,79 @@
+<!-- 评价 + 售后 -->
+<view class="container">
+  <!-- Tab 切换 -->
+  <view class="tab-bar">
+    <view class="tab-item {{activeTab === 'new' ? 'active' : ''}}" bindtap="switchTab" data-tab="new">写评价</view>
+    <view class="tab-item {{activeTab === 'list' ? 'active' : ''}}" bindtap="switchTab" data-tab="list">我的评价</view>
+  </view>
+
+  <!-- 新评价 -->
+  <view class="form-section" wx:if="{{activeTab === 'new'}}">
+    <!-- 评分 -->
+    <view class="rating-section">
+      <text class="form-label">整体评分</text>
+      <view class="rating-stars">
+        <view class="star {{rating >= item ? 'active' : ''}}"
+              wx:for="{{[1,2,3,4,5]}}" wx:key="*this"
+              bindtap="setRating" data-score="{{item}}">
+          ★
+        </view>
+      </view>
+      <text class="rating-label">{{ratingLabel}}</text>
+    </view>
+
+    <!-- 评价内容 -->
+    <view class="content-section">
+      <text class="form-label">评价内容</text>
+      <textarea class="content-input" placeholder="分享您的用餐体验..."
+                placeholderClass="placeholder"
+                maxlength="500"
+                bindinput="onContentInput"
+                value="{{content}}" />
+      <text class="char-count">{{content.length}}/500</text>
+    </view>
+
+    <!-- 拍照 -->
+    <view class="image-section">
+      <text class="form-label">上传照片 (最多{{maxImages}}张)</text>
+      <view class="image-grid">
+        <view class="image-item" wx:for="{{images}}" wx:key="*this">
+          <image class="upload-image" src="{{item}}" mode="aspectFill"
+                 bindtap="previewImage" data-url="{{item}}" />
+          <view class="image-remove" catchtap="removeImage" data-index="{{index}}">✕</view>
+        </view>
+        <view class="image-add" wx:if="{{images.length < maxImages}}" bindtap="chooseImage">
+          <text class="add-icon">+</text>
+          <text class="add-text">添加</text>
+        </view>
+      </view>
+    </view>
+
+    <button class="submit-btn" bindtap="submitFeedback" disabled="{{submitting}}">
+      {{submitting ? '提交中...' : '提交评价'}}
+    </button>
+  </view>
+
+  <!-- 我的评价列表 -->
+  <view class="list-section" wx:if="{{activeTab === 'list'}}">
+    <view class="loading-tip" wx:if="{{loadingFeedbacks}}">加载中...</view>
+    <view class="empty-tip" wx:if="{{!loadingFeedbacks && feedbacks.length === 0}}">暂无评价</view>
+
+    <view class="feedback-card" wx:for="{{feedbacks}}" wx:key="id">
+      <view class="feedback-header">
+        <view class="feedback-stars">
+          <text class="star active" wx:for="{{item.rating}}" wx:for-item="s" wx:key="*this">★</text>
+        </view>
+        <text class="feedback-date">{{item.createdAt}}</text>
+      </view>
+      <text class="feedback-content">{{item.content}}</text>
+      <view class="feedback-images" wx:if="{{item.imageUrls.length > 0}}">
+        <image class="feedback-img" wx:for="{{item.imageUrls}}" wx:for-item="img" wx:key="*this"
+               src="{{img}}" mode="aspectFill" lazy-load />
+      </view>
+      <view class="feedback-reply" wx:if="{{item.reply}}">
+        <text class="reply-label">商家回复：</text>
+        <text class="reply-text">{{item.reply}}</text>
+      </view>
+    </view>
+  </view>
+</view>

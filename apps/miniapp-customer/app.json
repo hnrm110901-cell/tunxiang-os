@@ -3,28 +3,60 @@
     "pages/index/index",
     "pages/menu/menu",
     "pages/order/order",
-    "pages/member/member",
-    "pages/booking/booking",
     "pages/queue/queue",
-    "pages/coupons/coupons",
-    "pages/corporate/corporate"
+    "pages/reservation/reservation",
+    "pages/member/member",
+    "pages/coupon/coupon",
+    "pages/feedback/feedback"
+  ],
+  "subPackages": [
+    {
+      "root": "pages/extra",
+      "pages": [
+        "corporate/corporate"
+      ]
+    }
   ],
   "window": {
     "navigationBarTitleText": "屯象点餐",
     "navigationBarBackgroundColor": "#0B1A20",
     "navigationBarTextStyle": "white",
-    "backgroundColor": "#0B1A20"
+    "backgroundColor": "#0B1A20",
+    "backgroundTextStyle": "light"
   },
   "tabBar": {
-    "color": "#999",
+    "color": "#999999",
     "selectedColor": "#FF6B2C",
     "backgroundColor": "#112228",
+    "borderStyle": "black",
     "list": [
-      { "pagePath": "pages/index/index", "text": "点餐" },
-      { "pagePath": "pages/order/order", "text": "订单" },
-      { "pagePath": "pages/member/member", "text": "我的" }
+      {
+        "pagePath": "pages/index/index",
+        "text": "首页",
+        "iconPath": "assets/tab-home.png",
+        "selectedIconPath": "assets/tab-home-active.png"
+      },
+      {
+        "pagePath": "pages/menu/menu",
+        "text": "点餐",
+        "iconPath": "assets/tab-menu.png",
+        "selectedIconPath": "assets/tab-menu-active.png"
+      },
+      {
+        "pagePath": "pages/order/order",
+        "text": "订单",
+        "iconPath": "assets/tab-order.png",
+        "selectedIconPath": "assets/tab-order-active.png"
+      },
+      {
+        "pagePath": "pages/member/member",
+        "text": "我的",
+        "iconPath": "assets/tab-member.png",
+        "selectedIconPath": "assets/tab-member-active.png"
+      }
     ]
   },
   "style": "v2",
-  "sitemapLocation": "sitemap.json"
+  "sitemapLocation": "sitemap.json",
+  "lazyCodeLoading": "requiredComponents"
 }

@@ -1,64 +1,138 @@
-// 点餐首页
-const app = getApp();
+// 首页 — 门店信息 + 快捷入口 + 附近门店
+var app = getApp();
+var api = require('../../utils/api.js');
 
 Page({
   data: {
     storeName: '',
+    storeAddress: '',
     tableNo: '',
-    categories: ['推荐', '热菜', '凉菜', '主食', '饮品'],
-    activeCategory: '推荐',
-    dishes: [],
-    cartItems: [],
-    cartCount: 0,
-    cartTotal: 0,
+    // 快捷入口
+    quickEntries: [
+      { icon: '🍽️', label: '扫码点餐', route: '/pages/menu/menu' },
+      { icon: '🎫', label: '排队取号', route: '/pages/queue/queue' },
+      { icon: '📅', label: '预订', route: '/pages/reservation/reservation' },
+      { icon: '🎁', label: '优惠券', route: '/pages/coupon/coupon' },
+    ],
+    // 附近门店列表
+    nearbyStores: [],
+    loadingStores: false,
+    // 当前排队信息
+    currentQueue: null,
+    // 当前预订
+    currentBooking: null,
   },
 
-  onLoad(options) {
-    this.setData({
-      tableNo: options.table || '',
-      storeName: options.store_name || '屯象点餐',
-    });
-    this.loadDishes();
+  onLoad: function (options) {
+    if (options.table) {
+      this.setData({ tableNo: options.table });
+    }
+    if (options.store_name) {
+      this.setData({ storeName: decodeURIComponent(options.store_name) });
+    }
+    if (options.coupon_id) {
+      // 从优惠券跳入，直接去点餐
+      wx.switchTab({ url: '/pages/menu/menu' });
+    }
   },
 
-  async loadDishes() {
-    try {
-      const res = await wx.request({
-        url: `${app.globalData.apiBase}/api/v1/menu/dishes`,
-        data: { store_id: app.globalData.storeId },
-        header: { 'X-Tenant-ID': app.globalData.tenantId },
+  onShow: function () {
+    this._loadStoreInfo();
+    this._loadNearbyStores();
+  },
+
+  onPullDownRefresh: function () {
+    var self = this;
+    Promise.all([this._loadStoreInfo(), this._loadNearbyStores()])
+      .then(function () { wx.stopPullDownRefresh(); })
+      .catch(function () { wx.stopPullDownRefresh(); });
+  },
+
+  onShareAppMessage: function () {
+    return {
+      title: this.data.storeName || '屯象点餐',
+      path: '/pages/index/index?store_id=' + app.globalData.storeId,
+    };
+  },
+
+  _loadStoreInfo: function () {
+    var self = this;
+    var storeId = app.globalData.storeId;
+    if (!storeId) return Promise.resolve();
+
+    return api.fetchStoreDetail(storeId)
+      .then(function (data) {
+        self.setData({
+          storeName: data.name || '屯象点餐',
+          storeAddress: data.address || '',
+        });
+      })
+      .catch(function (err) {
+        console.warn('加载门店信息失败', err);
       });
-      if (res.data.ok) {
-        this.setData({ dishes: res.data.data.items || [] });
+  },
+
+  _loadNearbyStores: function () {
+    var self = this;
+    self.setData({ loadingStores: true });
+
+    return new Promise(function (resolve) {
+      wx.getLocation({
+        type: 'gcj02',
+        success: function (loc) {
+          api.fetchNearbyStores(loc.latitude, loc.longitude)
+            .then(function (data) {
+              var stores = (data.items || []).map(function (s) {
+                return {
+                  id: s.id,
+                  name: s.name,
+                  address: s.address || '',
+                  distance: s.distance ? (s.distance < 1000 ? s.distance + 'm' : (s.distance / 1000).toFixed(1) + 'km') : '',
+                  queueWaiting: s.queue_waiting || 0,
+                  businessHours: s.business_hours || '',
+                };
+              });
+              self.setData({ nearbyStores: stores, loadingStores: false });
+              resolve();
+            })
+            .catch(function () {
+              self.setData({ loadingStores: false });
+              resolve();
+            });
+        },
+        fail: function () {
+          self.setData({ loadingStores: false });
+          resolve();
+        },
+      });
+    });
+  },
+
+  // ─── 事件 ───
+
+  goToEntry: function (e) {
+    var route = e.currentTarget.dataset.route;
+    if (route) {
+      // tabBar 页面用 switchTab，其他用 navigateTo
+      if (route === '/pages/menu/menu') {
+        wx.switchTab({ url: route });
+      } else {
+        wx.navigateTo({ url: route });
       }
-    } catch (e) {
-      console.error('loadDishes failed', e);
     }
   },
 
-  selectCategory(e) {
-    this.setData({ activeCategory: e.currentTarget.dataset.name });
+  goToStore: function (e) {
+    var storeId = e.currentTarget.dataset.id;
+    app.globalData.storeId = storeId;
+    wx.switchTab({ url: '/pages/menu/menu' });
   },
 
-  addToCart(e) {
-    const dish = e.currentTarget.dataset.dish;
-    const cart = [...this.data.cartItems];
-    const existing = cart.find(i => i.id === dish.id);
-    if (existing) {
-      existing.quantity += 1;
-    } else {
-      cart.push({ ...dish, quantity: 1 });
-    }
-    this.setData({
-      cartItems: cart,
-      cartCount: cart.reduce((s, i) => s + i.quantity, 0),
-      cartTotal: cart.reduce((s, i) => s + i.priceFen * i.quantity, 0),
-    });
+  goToQueue: function () {
+    wx.navigateTo({ url: '/pages/queue/queue' });
   },
 
-  submitOrder() {
-    wx.navigateTo({
-      url: `/pages/order/order?items=${encodeURIComponent(JSON.stringify(this.data.cartItems))}`,
-    });
+  goToReservation: function () {
+    wx.navigateTo({ url: '/pages/reservation/reservation' });
   },
 });

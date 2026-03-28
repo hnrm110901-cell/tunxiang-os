@@ -1,3 +1,113 @@
-<view class="container">
-  <text>member 页面</text>
+<!-- 会员中心 -->
+<view class="page-container">
+
+  <!-- 未登录状态 -->
+  <view class="login-section" wx:if="{{!isLoggedIn}}">
+    <view class="login-avatar-placeholder">👤</view>
+    <text class="login-hint">登录后查看会员权益</text>
+    <button class="login-btn" open-type="getPhoneNumber" bindgetphonenumber="onGetPhoneNumber">
+      手机号快速登录
+    </button>
+  </view>
+
+  <!-- 已登录：会员信息 -->
+  <block wx:if="{{isLoggedIn}}">
+    <!-- 会员卡 -->
+    <view class="member-card">
+      <view class="member-header">
+        <image class="member-avatar" src="{{profile.avatarUrl || '/assets/avatar-default.png'}}" mode="aspectFill" />
+        <view class="member-info">
+          <text class="member-name">{{profile.nickname}}</text>
+          <member-badge level="{{profile.level}}" />
+        </view>
+      </view>
+
+      <!-- 资产区 -->
+      <view class="assets-row">
+        <view class="asset-item" bindtap="showPointsDetail">
+          <text class="asset-value">{{profile.pointsBalance}}</text>
+          <text class="asset-label">积分</text>
+        </view>
+        <view class="asset-divider"></view>
+        <view class="asset-item" bindtap="showBalanceDetail">
+          <text class="asset-value">{{profile.balanceYuan}}</text>
+          <text class="asset-label">余额(元)</text>
+        </view>
+        <view class="asset-divider"></view>
+        <view class="asset-item">
+          <text class="asset-value">{{profile.orderCount}}</text>
+          <text class="asset-label">订单</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 功能菜单 -->
+    <view class="menu-section">
+      <view class="menu-item" wx:for="{{menuItems}}" wx:key="label"
+            bindtap="goToRoute" data-route="{{item.route}}">
+        <view class="menu-item-left">
+          <text class="menu-icon">{{item.icon}}</text>
+          <text class="menu-label">{{item.label}}</text>
+        </view>
+        <text class="menu-arrow">></text>
+      </view>
+    </view>
+
+    <!-- 消费统计 -->
+    <view class="stats-card">
+      <text class="stats-title">消费统计</text>
+      <view class="stats-row">
+        <view class="stats-item">
+          <text class="stats-value">¥{{profile.totalSpentYuan}}</text>
+          <text class="stats-label">累计消费</text>
+        </view>
+        <view class="stats-item">
+          <text class="stats-value">{{profile.orderCount}}</text>
+          <text class="stats-label">消费次数</text>
+        </view>
+      </view>
+    </view>
+  </block>
+
+  <!-- 积分明细弹层 -->
+  <view class="popup-mask" wx:if="{{showPointsLog}}" bindtap="closePointsLog"></view>
+  <view class="popup-sheet {{showPointsLog ? 'show' : ''}}">
+    <view class="popup-header">
+      <text class="popup-title">积分明细</text>
+      <view class="popup-close" bindtap="closePointsLog">✕</view>
+    </view>
+    <scroll-view scroll-y class="popup-list">
+      <view class="empty-state" wx:if="{{pointsLog.length === 0}}">暂无积分记录</view>
+      <view class="log-item" wx:for="{{pointsLog}}" wx:key="id">
+        <view class="log-left">
+          <text class="log-desc">{{item.description}}</text>
+          <text class="log-time">{{item.createdAt}}</text>
+        </view>
+        <text class="log-amount {{item.points > 0 ? 'income' : 'expense'}}">
+          {{item.points > 0 ? '+' : ''}}{{item.points}}
+        </text>
+      </view>
+    </scroll-view>
+  </view>
+
+  <!-- 余额明细弹层 -->
+  <view class="popup-mask" wx:if="{{showBalanceLog}}" bindtap="closeBalanceLog"></view>
+  <view class="popup-sheet {{showBalanceLog ? 'show' : ''}}">
+    <view class="popup-header">
+      <text class="popup-title">余额明细</text>
+      <view class="popup-close" bindtap="closeBalanceLog">✕</view>
+    </view>
+    <scroll-view scroll-y class="popup-list">
+      <view class="empty-state" wx:if="{{balanceLog.length === 0}}">暂无余额记录</view>
+      <view class="log-item" wx:for="{{balanceLog}}" wx:key="id">
+        <view class="log-left">
+          <text class="log-desc">{{item.description}}</text>
+          <text class="log-time">{{item.createdAt}}</text>
+        </view>
+        <text class="log-amount {{item.amountFen > 0 ? 'income' : 'expense'}}">
+          {{item.amountFen > 0 ? '+' : '-'}}¥{{item.amountYuan}}
+        </text>
+      </view>
+    </scroll-view>
+  </view>
 </view>
