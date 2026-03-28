@@ -43,6 +43,10 @@ import { ReviewCenterPage } from './pages/hq/ops/ReviewCenterPage';
 import { AlertCenterPage } from './pages/hq/ops/AlertCenterPage';
 import { SettingsPage } from './pages/hq/ops/SettingsPage';
 import { PeakMonitorPage } from './pages/hq/ops/PeakMonitorPage';
+import { RegionalPage } from './pages/hq/ops/RegionalPage';
+import { CruiseMonitorPage } from './pages/hq/ops/CruiseMonitorPage';
+import { FinanceAnalysisPage } from './pages/hq/analytics/FinanceAnalysisPage';
+import { MemberAnalysisPage } from './pages/hq/analytics/MemberAnalysisPage';
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem('tx_token'));
@@ -105,6 +109,10 @@ function App() {
           <Route path="/hq/ops/alerts" element={<AlertCenterPage />} />
           <Route path="/hq/ops/settings" element={<SettingsPage />} />
           <Route path="/hq/ops/peak-monitor" element={<PeakMonitorPage />} />
+          <Route path="/hq/ops/regional" element={<RegionalPage />} />
+          <Route path="/hq/ops/cruise" element={<CruiseMonitorPage />} />
+          <Route path="/hq/analytics/finance" element={<FinanceAnalysisPage />} />
+          <Route path="/hq/analytics/member" element={<MemberAnalysisPage />} />
         </Routes>
       </ShellHQ>
     </BrowserRouter>

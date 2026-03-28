@@ -57,6 +57,8 @@ const MENU_CONFIGS: Record<string, MenuConfig> = {
         { id: 'kpi', label: 'KPI 监控', icon: '🎯', path: '/analytics/kpi' },
         { id: 'cost', label: '成本分析', icon: '💰', path: '/analytics/cost' },
         { id: 'waste', label: '损耗分析', icon: '🗑️', count: 3, path: '/analytics/waste' },
+        { id: 'finance-analysis', label: '财务分析', icon: '💹', path: '/hq/analytics/finance' },
+        { id: 'member-analysis', label: '会员分析', icon: '👥', path: '/hq/analytics/member' },
       ]},
       { label: '决策', items: [
         { id: 'decisions', label: 'AI 决策', icon: '🧠', count: 5, path: '/analytics/decisions' },
@@ -71,10 +73,15 @@ const MENU_CONFIGS: Record<string, MenuConfig> = {
         { id: 'store-analysis', label: '门店分析', icon: '🏪', path: '/hq/ops/store-analysis' },
         { id: 'dish-analysis', label: '菜品分析', icon: '🍜', path: '/hq/ops/dish-analysis' },
       ]},
+      { label: '实时监控', items: [
+        { id: 'cruise-monitor', label: '营业巡航', icon: '🚢', path: '/hq/ops/cruise' },
+        { id: 'peak-monitor', label: '高峰值守', icon: '🔥', path: '/hq/ops/peak-monitor' },
+      ]},
       { label: '管控', items: [
         { id: 'approvals', label: '审批中心', icon: '✅', count: 4, path: '/hq/ops/approvals' },
         { id: 'alerts', label: '异常中心', icon: '🚨', count: 5, path: '/hq/ops/alerts' },
         { id: 'review', label: '复盘中心', icon: '📋', path: '/hq/ops/review' },
+        { id: 'regional', label: '区域追踪', icon: '🗺️', count: 3, path: '/hq/ops/regional' },
       ]},
       { label: '配置', items: [
         { id: 'settings', label: '模板配置', icon: '⚙️', path: '/hq/ops/settings' },

@@ -7,6 +7,15 @@ import structlog
 from datetime import datetime, timedelta
 from typing import Optional
 
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from .sql_queries import (
+    query_daily_revenue,
+    query_hourly_distribution,
+    query_alerts_today,
+)
+
 log = structlog.get_logger()
 
 
@@ -124,73 +133,41 @@ async def get_multi_store_overview(
     return results
 
 
-# ─── 数据库查询（桩函数，接入真实 DB 时替换） ───
+# ─── 数据库查询（通过统一SQL查询层） ───
 
-async def _query_daily_summary(db, store_id: str, tenant_id: str, date) -> dict:
-    """查询某日汇总数据"""
-    if db is None:
-        # Mock 数据用于开发/测试
-        return {
-            "revenue_fen": 856000,
-            "order_count": 128,
-            "table_turnover_rate": 1.8,
-            "health_score": 78.5,
-        }
+async def _query_daily_summary(db: AsyncSession, store_id: str, tenant_id: str, date) -> dict:
+    """查询某日汇总数据，委托给 sql_queries 统一查询层"""
+    revenue_data = await query_daily_revenue(store_id, date, tenant_id, db)
 
-    row = await db.execute(
-        """
-        SELECT COALESCE(SUM(total_fen), 0) AS revenue_fen,
-               COUNT(*) AS order_count,
-               0.0 AS table_turnover_rate
-        FROM orders
-        WHERE store_id = :store_id
-          AND tenant_id = :tenant_id
-          AND DATE(created_at) = :date
-          AND is_deleted = FALSE
-        """,
-        {"store_id": store_id, "tenant_id": tenant_id, "date": date},
-    )
-    result = row.mappings().first()
-    if result is None:
-        return {"revenue_fen": 0, "order_count": 0, "table_turnover_rate": 0.0, "health_score": 50.0}
-    return dict(result)
+    # 翻台率需额外查询桌台会话
+    from .sql_queries import query_table_sessions
+    table_data = await query_table_sessions(store_id, date, tenant_id, db)
+
+    return {
+        "revenue_fen": revenue_data["revenue_fen"],
+        "order_count": revenue_data["order_count"],
+        "table_turnover_rate": table_data["turnover_rate"],
+        "health_score": 50.0,  # TODO: 接入门店健康评分服务
+    }
 
 
-async def _query_hourly_revenue(db, store_id: str, tenant_id: str, date) -> dict[int, int]:
-    """查询小时维度营收分布"""
-    if db is None:
-        return {11: 120000, 12: 280000, 13: 156000, 17: 98000, 18: 202000}
-
-    row = await db.execute(
-        """
-        SELECT EXTRACT(HOUR FROM created_at)::int AS hour,
-               COALESCE(SUM(total_fen), 0) AS revenue_fen
-        FROM orders
-        WHERE store_id = :store_id
-          AND tenant_id = :tenant_id
-          AND DATE(created_at) = :date
-          AND is_deleted = FALSE
-        GROUP BY hour
-        """,
-        {"store_id": store_id, "tenant_id": tenant_id, "date": date},
-    )
-    return {r["hour"]: r["revenue_fen"] for r in row.mappings().all()}
+async def _query_hourly_revenue(db: AsyncSession, store_id: str, tenant_id: str, date) -> dict[int, int]:
+    """查询小时维度营收分布，委托给 sql_queries 统一查询层"""
+    hourly_data = await query_hourly_distribution(store_id, date, tenant_id, db)
+    return {item["hour"]: item["revenue_fen"] for item in hourly_data}
 
 
-async def _query_current_occupancy(db, store_id: str, tenant_id: str) -> float:
+async def _query_current_occupancy(db: AsyncSession, store_id: str, tenant_id: str) -> float:
     """查询当前上座率百分比"""
-    if db is None:
-        return 65.0
-
     row = await db.execute(
-        """
-        SELECT COUNT(*) FILTER (WHERE status = 'occupied') AS occupied,
-               COUNT(*) AS total
-        FROM tables
-        WHERE store_id = :store_id
-          AND tenant_id = :tenant_id
-          AND is_deleted = FALSE
-        """,
+        text("""
+            SELECT COUNT(*) FILTER (WHERE status = 'occupied') AS occupied,
+                   COUNT(*) AS total
+            FROM tables
+            WHERE store_id = :store_id
+              AND tenant_id = :tenant_id
+              AND is_deleted = FALSE
+        """),
         {"store_id": store_id, "tenant_id": tenant_id},
     )
     result = row.mappings().first()
@@ -199,21 +176,14 @@ async def _query_current_occupancy(db, store_id: str, tenant_id: str) -> float:
     return round(result["occupied"] / result["total"] * 100, 1)
 
 
-async def _query_tenant_stores(db, tenant_id: str) -> list[dict]:
+async def _query_tenant_stores(db: AsyncSession, tenant_id: str) -> list[dict]:
     """查询租户下所有门店"""
-    if db is None:
-        return [
-            {"store_id": "store-001", "store_name": "芙蓉路店"},
-            {"store_id": "store-002", "store_name": "五一广场店"},
-            {"store_id": "store-003", "store_name": "万达店"},
-        ]
-
     row = await db.execute(
-        """
-        SELECT store_id, store_name
-        FROM stores
-        WHERE tenant_id = :tenant_id AND is_deleted = FALSE
-        """,
+        text("""
+            SELECT store_id, store_name
+            FROM stores
+            WHERE tenant_id = :tenant_id AND is_deleted = FALSE
+        """),
         {"tenant_id": tenant_id},
     )
     return [dict(r) for r in row.mappings().all()]

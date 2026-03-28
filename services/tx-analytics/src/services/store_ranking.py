@@ -7,6 +7,9 @@
 import structlog
 from typing import Optional
 
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
+
 log = structlog.get_logger()
 
 # 支持的排行指标
@@ -173,42 +176,56 @@ async def get_store_comparison(
     }
 
 
-# ─── 数据库查询（桩函数） ───
+# ─── 数据库查询（通过统一SQL查询层） ───
 
 async def _query_ranking_data(
-    db, metric: str, date_range: str, tenant_id: str
+    db: AsyncSession, metric: str, date_range: str, tenant_id: str
 ) -> list[dict]:
-    """查询排行原始数据"""
-    if db is None:
-        # Mock 数据
-        mock = [
-            {"store_id": "store-001", "store_name": "芙蓉路店", "value": 856000, "trend": "up"},
-            {"store_id": "store-002", "store_name": "五一广场店", "value": 1023000, "trend": "up"},
-            {"store_id": "store-003", "store_name": "万达店", "value": 678000, "trend": "down"},
-            {"store_id": "store-004", "store_name": "梅溪湖店", "value": 920000, "trend": "flat"},
-        ]
-        return mock
+    """查询排行原始数据
 
-    # 根据不同 metric 构造不同 SQL
-    metric_sql = {
+    根据不同 metric 构造对应的聚合 SQL。
+    使用 sqlalchemy.text() 参数化，指标列通过预定义映射安全选择。
+    """
+    # 安全的指标 → SQL表达式映射（非用户输入拼接）
+    metric_sql_map = {
         "revenue": "COALESCE(SUM(o.total_fen), 0)",
         "margin": "COALESCE(AVG(o.margin_pct), 0)",
-        "turnover": "COALESCE(COUNT(DISTINCT o.table_id)::float / NULLIF(s.total_tables, 0), 0)",
+        "turnover": "COALESCE(COUNT(DISTINCT o.table_id)::float / NULLIF(COUNT(DISTINCT t.id), 0), 0)",
         "satisfaction": "COALESCE(AVG(o.satisfaction_score), 0)",
     }
+    metric_expr = metric_sql_map[metric]
 
-    query = f"""
-        SELECT s.store_id, s.store_name,
-               {metric_sql[metric]} AS value
-        FROM stores s
-        LEFT JOIN orders o ON o.store_id = s.store_id
-            AND o.tenant_id = :tenant_id
-            AND o.is_deleted = FALSE
-        WHERE s.tenant_id = :tenant_id
-          AND s.is_deleted = FALSE
-        GROUP BY s.store_id, s.store_name
-    """
-    row = await db.execute(query, {"tenant_id": tenant_id})
+    # turnover 需要额外 JOIN tables
+    if metric == "turnover":
+        query_str = f"""
+            SELECT s.store_id, s.store_name,
+                   {metric_expr} AS value
+            FROM stores s
+            LEFT JOIN orders o ON o.store_id = s.store_id
+                AND o.tenant_id = :tenant_id
+                AND o.is_deleted = FALSE
+            LEFT JOIN tables t ON t.store_id = s.store_id
+                AND t.tenant_id = :tenant_id
+                AND t.is_deleted = FALSE
+                AND t.is_active = TRUE
+            WHERE s.tenant_id = :tenant_id
+              AND s.is_deleted = FALSE
+            GROUP BY s.store_id, s.store_name
+        """
+    else:
+        query_str = f"""
+            SELECT s.store_id, s.store_name,
+                   {metric_expr} AS value
+            FROM stores s
+            LEFT JOIN orders o ON o.store_id = s.store_id
+                AND o.tenant_id = :tenant_id
+                AND o.is_deleted = FALSE
+            WHERE s.tenant_id = :tenant_id
+              AND s.is_deleted = FALSE
+            GROUP BY s.store_id, s.store_name
+        """
+
+    row = await db.execute(text(query_str), {"tenant_id": tenant_id})
     results = []
     for r in row.mappings().all():
         results.append({
@@ -221,29 +238,17 @@ async def _query_ranking_data(
 
 
 async def _query_stores_info(
-    db, store_ids: list[str], tenant_id: str
+    db: AsyncSession, store_ids: list[str], tenant_id: str
 ) -> list[dict]:
     """查询门店基本信息"""
-    if db is None:
-        name_map = {
-            "store-001": "芙蓉路店",
-            "store-002": "五一广场店",
-            "store-003": "万达店",
-            "store-004": "梅溪湖店",
-        }
-        return [
-            {"store_id": sid, "store_name": name_map.get(sid, sid)}
-            for sid in store_ids
-        ]
-
     row = await db.execute(
-        """
-        SELECT store_id, store_name
-        FROM stores
-        WHERE tenant_id = :tenant_id
-          AND store_id = ANY(:store_ids)
-          AND is_deleted = FALSE
-        """,
+        text("""
+            SELECT store_id, store_name
+            FROM stores
+            WHERE tenant_id = :tenant_id
+              AND store_id = ANY(:store_ids)
+              AND is_deleted = FALSE
+        """),
         {"tenant_id": tenant_id, "store_ids": store_ids},
     )
     return [dict(r) for r in row.mappings().all()]
