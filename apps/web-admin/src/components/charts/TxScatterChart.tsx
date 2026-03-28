@@ -54,6 +54,49 @@ export function TxScatterChart({
     return () => observer.disconnect();
   }, []);
 
+  // handleMove hook must be before any early returns
+  const handleMove = useCallback(
+    (e: React.MouseEvent<SVGSVGElement>) => {
+      if (!data.length) return;
+      const padL = { top: 24, right: 24, bottom: 44, left: 56 };
+      const pW = width - padL.left - padL.right;
+      const pH = height - padL.top - padL.bottom;
+      const xsL = data.map((d) => d.x);
+      const ysL = data.map((d) => d.y);
+      const xMinL = Math.min(...xsL);
+      const xMaxL = Math.max(...xsL);
+      const yMinL = Math.min(...ysL);
+      const yMaxL = Math.max(...ysL);
+      const xRangeL = xMaxL - xMinL || 1;
+      const yRangeL = yMaxL - yMinL || 1;
+      const xLoL = xMinL - xRangeL * 0.1;
+      const xHiL = xMaxL + xRangeL * 0.1;
+      const yLoL = yMinL - yRangeL * 0.1;
+      const yHiL = yMaxL + yRangeL * 0.1;
+      const xRL = xHiL - xLoL;
+      const yRL = yHiL - yLoL;
+      const toSX = (v: number) => padL.left + ((v - xLoL) / xRL) * pW;
+      const toSY = (v: number) => padL.top + pH - ((v - yLoL) / yRL) * pH;
+
+      const rect = e.currentTarget.getBoundingClientRect();
+      const mx = e.clientX - rect.left;
+      const my = e.clientY - rect.top;
+      let closest = -1;
+      let minDist = 30;
+      data.forEach((d, i) => {
+        const dx = toSX(d.x) - mx;
+        const dy = toSY(d.y) - my;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < minDist) {
+          minDist = dist;
+          closest = i;
+        }
+      });
+      setHoverIdx(closest >= 0 ? closest : null);
+    },
+    [data, width, height],
+  );
+
   if (!data.length) {
     return (
       <div ref={containerRef} style={{ width: '100%', height, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#666' }}>
@@ -75,7 +118,6 @@ export function TxScatterChart({
   const xRange = xMax - xMin || 1;
   const yRange = yMax - yMin || 1;
 
-  // 加一点padding
   const xLo = xMin - xRange * 0.1;
   const xHi = xMax + xRange * 0.1;
   const yLo = yMin - yRange * 0.1;
@@ -86,7 +128,6 @@ export function TxScatterChart({
   const toSvgX = (v: number) => pad.left + ((v - xLo) / xR) * plotW;
   const toSvgY = (v: number) => pad.top + plotH - ((v - yLo) / yR) * plotH;
 
-  // 四象限中线
   const midX = (xMin + xMax) / 2;
   const midY = (yMin + yMax) / 2;
 
@@ -94,32 +135,11 @@ export function TxScatterChart({
     if (!showQuadrants) return point.color || '#FF6B2C';
     const isRight = point.x >= midX;
     const isTop = point.y >= midY;
-    if (isRight && isTop) return QUADRANT_COLORS[0]; // 明星
-    if (!isRight && isTop) return QUADRANT_COLORS[1]; // 问号
-    if (!isRight && !isTop) return QUADRANT_COLORS[2]; // 瘦狗
-    return QUADRANT_COLORS[3]; // 金牛
+    if (isRight && isTop) return QUADRANT_COLORS[0];
+    if (!isRight && isTop) return QUADRANT_COLORS[1];
+    if (!isRight && !isTop) return QUADRANT_COLORS[2];
+    return QUADRANT_COLORS[3];
   };
-
-  const handleMove = useCallback(
-    (e: React.MouseEvent<SVGSVGElement>) => {
-      const rect = e.currentTarget.getBoundingClientRect();
-      const mx = e.clientX - rect.left;
-      const my = e.clientY - rect.top;
-      let closest = -1;
-      let minDist = 30; // 最大感知距离
-      data.forEach((d, i) => {
-        const dx = toSvgX(d.x) - mx;
-        const dy = toSvgY(d.y) - my;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist < minDist) {
-          minDist = dist;
-          closest = i;
-        }
-      });
-      setHoverIdx(closest >= 0 ? closest : null);
-    },
-    [data],
-  );
 
   return (
     <div ref={containerRef} style={{ width: '100%', position: 'relative' }}>
