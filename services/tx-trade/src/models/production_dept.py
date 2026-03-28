@@ -21,8 +21,17 @@ class ProductionDept(TenantBase):
     brand_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), nullable=False, index=True, comment="品牌ID"
     )
+    store_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), index=True, comment="门店ID（NULL表示品牌级通用）"
+    )
+    printer_address: Mapped[str | None] = mapped_column(
+        String(100), comment="档口打印机地址 host:port（如 192.168.1.101:9100）"
+    )
     fixed_fee_type: Mapped[str | None] = mapped_column(
         String(30), comment="固定费用类型：茶位费/服务费/包间费/餐位费/无"
+    )
+    default_timeout_minutes: Mapped[int] = mapped_column(
+        Integer, default=15, comment="默认出品时限(分钟)"
     )
     sort_order: Mapped[int] = mapped_column(Integer, default=0, comment="排序序号")
 
@@ -38,8 +47,11 @@ class DishDeptMapping(TenantBase):
         UUID(as_uuid=True), ForeignKey("production_depts.id"), nullable=False, index=True
     )
     printer_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), comment="关联打印机ID"
+        UUID(as_uuid=True), comment="关联打印机ID（覆盖档口默认打印机）"
     )
     kds_terminal_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), comment="关联KDS终端ID"
+    )
+    sort_order: Mapped[int] = mapped_column(
+        Integer, default=0, comment="菜品在该档口内的排序"
     )

@@ -16,6 +16,10 @@ from .api.table_routes import router as table_router
 from .api.enterprise_routes import router as enterprise_router
 from .api.order_ext_routes import router as order_ext_router
 from .api.coupon_routes import router as coupon_router
+from .api.platform_coupon_routes import router as platform_coupon_router
+from .api.service_charge_routes import router as service_charge_router
+from .api.invoice_routes import router as invoice_router
+from .api.payment_direct_routes import router as payment_direct_router
 
 
 @asynccontextmanager
@@ -47,6 +51,10 @@ app.include_router(table_router)
 app.include_router(enterprise_router)
 app.include_router(order_ext_router)
 app.include_router(coupon_router)
+app.include_router(platform_coupon_router)
+app.include_router(service_charge_router)
+app.include_router(invoice_router)
+app.include_router(payment_direct_router)
 
 
 @app.get("/health")

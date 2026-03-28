@@ -1,0 +1,158 @@
+"""屯象OS 报表定义注册表
+
+P0 每日必看报表(8个) + P2 月度报表。
+报表引擎(report_engine.py)通过 REPORT_REGISTRY 字典获取报表定义。
+每个报表包含 REPORT_ID / REPORT_NAME / CATEGORY / SQL_TEMPLATE / DIMENSIONS / METRICS / FILTERS。
+金额单位: 分(fen), int。引擎层自动转元。
+"""
+
+from services.tx_analytics.src.reports import (
+    # P0 每日必看报表
+    daily_revenue,
+    daily_revenue_by_day,
+    payment_discount,
+    daily_store_collection,
+    daily_cashflow,
+    dish_sales_stats,
+    bill_audit,
+    realtime_stats,
+    # 其他已有报表
+    area_guest_table,
+    dish_hourly,
+    finance_cashier_daily,
+    finance_cashier_variance,
+    finance_payment_summary,
+    margin_each_order,
+    margin_per_order,
+    margin_total_order,
+    revenue_structure,
+    sales_channel,
+    table_stats,
+    # P1 每周分析报表
+    combo_sales,
+    return_analysis,
+    gift_dish_analysis,
+    dept_sales_ratio,
+    dish_timeout,
+    store_anomaly,
+    discount_stats,
+)
+
+# P0 每日必看报表模块列表
+_P0_REPORTS = [
+    daily_revenue,
+    daily_revenue_by_day,
+    payment_discount,
+    daily_store_collection,
+    daily_cashflow,
+    dish_sales_stats,
+    bill_audit,
+    realtime_stats,
+]
+
+# 其他报表模块列表
+_OTHER_REPORTS = [
+    area_guest_table,
+    dish_hourly,
+    finance_cashier_daily,
+    finance_cashier_variance,
+    finance_payment_summary,
+    margin_each_order,
+    margin_per_order,
+    margin_total_order,
+    revenue_structure,
+    sales_channel,
+    table_stats,
+]
+
+# P1 每周分析报表模块列表
+_P1_REPORTS = [
+    revenue_structure,
+    sales_channel,
+    area_guest_table,
+    table_stats,
+    dish_hourly,
+    combo_sales,
+    return_analysis,
+    gift_dish_analysis,
+    dept_sales_ratio,
+    dish_timeout,
+    store_anomaly,
+    discount_stats,
+]
+
+# 全部报表
+_ALL_REPORTS = _P0_REPORTS + _OTHER_REPORTS + [
+    m for m in _P1_REPORTS if m not in _P0_REPORTS and m not in _OTHER_REPORTS
+]
+
+# 报表注册表: REPORT_ID -> 模块
+REPORT_REGISTRY: dict[str, object] = {
+    mod.REPORT_ID: mod for mod in _ALL_REPORTS
+}
+
+# 按分类索引
+REPORTS_BY_CATEGORY: dict[str, list[object]] = {}
+for _mod in _ALL_REPORTS:
+    REPORTS_BY_CATEGORY.setdefault(_mod.CATEGORY, []).append(_mod)
+
+
+def get_report(report_id: str):
+    """根据报表ID获取报表定义模块
+
+    Args:
+        report_id: 报表ID，如 'daily_revenue'
+
+    Returns:
+        报表定义模块，包含 SQL_TEMPLATE / DIMENSIONS / METRICS / FILTERS
+
+    Raises:
+        KeyError: 报表ID不存在
+    """
+    if report_id not in REPORT_REGISTRY:
+        raise KeyError(f"Report not found: {report_id}")
+    return REPORT_REGISTRY[report_id]
+
+
+def list_reports(category: str | None = None) -> list[dict]:
+    """列出所有已注册报表的摘要信息
+
+    Args:
+        category: 可选，按分类筛选 (revenue/cashflow/product/audit/realtime)
+    """
+    source = REPORTS_BY_CATEGORY.get(category, []) if category else _ALL_REPORTS
+    return [
+        {
+            "report_id": mod.REPORT_ID,
+            "report_name": mod.REPORT_NAME,
+            "category": mod.CATEGORY,
+            "dimensions": mod.DIMENSIONS,
+            "metrics": mod.METRICS,
+            "filters": mod.FILTERS,
+        }
+        for mod in source
+    ]
+
+
+def list_p0_reports() -> list[dict]:
+    """列出P0每日必看报表"""
+    return [
+        {
+            "report_id": mod.REPORT_ID,
+            "report_name": mod.REPORT_NAME,
+            "category": mod.CATEGORY,
+        }
+        for mod in _P0_REPORTS
+    ]
+
+
+def list_p1_reports() -> list[dict]:
+    """列出P1每周分析报表"""
+    return [
+        {
+            "report_id": mod.REPORT_ID,
+            "report_name": mod.REPORT_NAME,
+            "category": mod.CATEGORY,
+        }
+        for mod in _P1_REPORTS
+    ]

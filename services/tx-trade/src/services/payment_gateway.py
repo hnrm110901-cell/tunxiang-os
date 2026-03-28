@@ -15,8 +15,12 @@ from shared.ontology.src.entities import Order
 from shared.ontology.src.enums import OrderStatus
 from ..models.payment import Payment, Refund
 from ..models.enums import PaymentMethod, PaymentStatus, RefundType
+from .shouqianba_client import ShouqianbaClient, ShouqianbaError
 
 logger = structlog.get_logger()
+
+# 需要走收钱吧的支付方式
+_SQB_METHODS = {"wechat", "alipay", "unionpay"}
 
 
 def _gen_payment_no() -> str:
@@ -44,9 +48,15 @@ class PaymentGateway:
         "credit_account": {"name": "挂账", "need_trade_no": False, "fee_rate": 0},
     }
 
-    def __init__(self, db: AsyncSession, tenant_id: str):
+    def __init__(
+        self,
+        db: AsyncSession,
+        tenant_id: str,
+        sqb_client: Optional[ShouqianbaClient] = None,
+    ):
         self.db = db
         self.tenant_id = uuid.UUID(tenant_id)
+        self.sqb_client = sqb_client
 
     async def create_payment(
         self,
@@ -75,19 +85,56 @@ class PaymentGateway:
 
         payment_no = _gen_payment_no()
 
-        # 模拟收钱吧交易
         trade_no = None
-        if method_config["need_trade_no"]:
-            if auth_code:
-                # 被扫（B扫C）：收银员扫顾客付款码
-                trade_no = self._call_shouqianba_pay(payment_no, amount_fen, auth_code, method)
-            else:
-                # 主扫（C扫B）：顾客扫店铺码 — 创建预支付订单
-                trade_no = self._call_shouqianba_precreate(payment_no, amount_fen, method)
+        qr_code = None
+        sqb_response: Optional[dict] = None
+
+        if method in _SQB_METHODS and method_config["need_trade_no"]:
+            if not self.sqb_client:
+                raise RuntimeError("收钱吧客户端未配置，无法处理在线支付")
+
+            subject = f"订单{order_id[:8]}"
+            try:
+                if auth_code:
+                    # B扫C：收银员扫顾客付款码
+                    sqb_response = await self.sqb_client.pay(
+                        client_sn=payment_no,
+                        total_amount=amount_fen,
+                        dynamic_id=auth_code,
+                        subject=subject,
+                    )
+                    trade_no = sqb_response.get("sn")
+                else:
+                    # C扫B：顾客扫店铺码
+                    sqb_response = await self.sqb_client.precreate(
+                        client_sn=payment_no,
+                        total_amount=amount_fen,
+                        subject=subject,
+                    )
+                    trade_no = sqb_response.get("sn")
+                    qr_code = sqb_response.get("qr_code")
+            except ShouqianbaError as exc:
+                logger.error(
+                    "sqb_payment_failed",
+                    payment_no=payment_no,
+                    method=method,
+                    amount_fen=amount_fen,
+                    error=str(exc),
+                    result_code=exc.result_code,
+                    error_code=exc.error_code,
+                )
+                raise RuntimeError(f"收钱吧支付失败: {exc}") from exc
 
         # 计算手续费
         fee_rate = method_config["fee_rate"]
         fee_fen = round(amount_fen * fee_rate)
+
+        # C扫B 预下单时状态为 pending（等待顾客扫码支付）
+        initial_status = PaymentStatus.paid.value
+        paid_at = datetime.now(timezone.utc)
+        if method in _SQB_METHODS and not auth_code:
+            initial_status = PaymentStatus.pending.value if hasattr(PaymentStatus, "pending") else "pending"
+            paid_at = None  # type: ignore[assignment]
 
         payment = Payment(
             id=uuid.uuid4(),
@@ -96,11 +143,16 @@ class PaymentGateway:
             payment_no=payment_no,
             method=method,
             amount_fen=amount_fen,
-            status=PaymentStatus.paid.value,
+            status=initial_status,
             trade_no=trade_no,
-            paid_at=datetime.now(timezone.utc),
+            paid_at=paid_at,
             payment_category=self._method_to_category(method),
-            extra={"fee_fen": fee_fen, "fee_rate": fee_rate, "auth_code": auth_code},
+            extra={
+                "fee_fen": fee_fen,
+                "fee_rate": fee_rate,
+                "auth_code": auth_code,
+                "qr_code": qr_code,
+            },
         )
         self.db.add(payment)
         await self.db.flush()
@@ -111,13 +163,16 @@ class PaymentGateway:
             method=method,
             amount_fen=amount_fen,
             fee_fen=fee_fen,
+            trade_no=trade_no,
+            status=initial_status,
         )
 
         return {
             "payment_id": str(payment.id),
             "payment_no": payment_no,
             "trade_no": trade_no,
-            "status": PaymentStatus.paid.value,
+            "qr_code": qr_code,
+            "status": initial_status,
             "fee_fen": fee_fen,
         }
 
@@ -172,13 +227,30 @@ class PaymentGateway:
 
         refund_no = _gen_refund_no()
 
-        # 原路退款（模拟收钱吧退款API）
+        # 原路退款：在线支付走收钱吧退款API
         refund_trade_no = None
         method_config = self.PAYMENT_METHODS.get(payment.method, {})
-        if method_config.get("need_trade_no") and payment.trade_no:
-            refund_trade_no = self._call_shouqianba_refund(
-                payment.trade_no, refund_no, refund_amount_fen
-            )
+        if payment.method in _SQB_METHODS and payment.trade_no:
+            if not self.sqb_client:
+                raise RuntimeError("收钱吧客户端未配置，无法处理在线退款")
+            try:
+                sqb_refund_resp = await self.sqb_client.refund(
+                    sn=payment.trade_no,
+                    refund_request_no=refund_no,
+                    refund_amount=refund_amount_fen,
+                )
+                refund_trade_no = sqb_refund_resp.get("sn")
+            except ShouqianbaError as exc:
+                logger.error(
+                    "sqb_refund_failed",
+                    payment_no=payment.payment_no,
+                    refund_no=refund_no,
+                    amount_fen=refund_amount_fen,
+                    error=str(exc),
+                    result_code=exc.result_code,
+                    error_code=exc.error_code,
+                )
+                raise RuntimeError(f"收钱吧退款失败: {exc}") from exc
 
         # 确定退款类型
         refund_type = (
@@ -387,63 +459,6 @@ class PaymentGateway:
             "net_revenue_fen": total_revenue - total_fee - total_refund,
             "by_method": by_method,
         }
-
-    # ─────────────────────────────────────
-    # 收钱吧SDK模拟方法
-    # ─────────────────────────────────────
-
-    def _call_shouqianba_pay(
-        self, payment_no: str, amount_fen: int, auth_code: str, method: str
-    ) -> str:
-        """模拟收钱吧被扫支付（B扫C）
-
-        生产环境替换为真实HTTP调用:
-        POST https://api.shouqianba.com/upay/v2/pay
-        """
-        # 模拟返回交易号
-        trade_no = f"SQB{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}{uuid.uuid4().hex[:6].upper()}"
-        logger.info(
-            "shouqianba_pay",
-            payment_no=payment_no,
-            amount_fen=amount_fen,
-            method=method,
-            trade_no=trade_no,
-        )
-        return trade_no
-
-    def _call_shouqianba_precreate(
-        self, payment_no: str, amount_fen: int, method: str
-    ) -> str:
-        """模拟收钱吧预下单（C扫B）
-
-        POST https://api.shouqianba.com/upay/v2/precreate
-        """
-        trade_no = f"SQB{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}{uuid.uuid4().hex[:6].upper()}"
-        logger.info(
-            "shouqianba_precreate",
-            payment_no=payment_no,
-            amount_fen=amount_fen,
-            method=method,
-            trade_no=trade_no,
-        )
-        return trade_no
-
-    def _call_shouqianba_refund(
-        self, original_trade_no: str, refund_no: str, amount_fen: int
-    ) -> str:
-        """模拟收钱吧退款
-
-        POST https://api.shouqianba.com/upay/v2/refund
-        """
-        refund_trade_no = f"SQBR{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}{uuid.uuid4().hex[:6].upper()}"
-        logger.info(
-            "shouqianba_refund",
-            original_trade_no=original_trade_no,
-            refund_no=refund_no,
-            amount_fen=amount_fen,
-            refund_trade_no=refund_trade_no,
-        )
-        return refund_trade_no
 
     @staticmethod
     def _method_to_category(method: str) -> str:

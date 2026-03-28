@@ -51,3 +51,38 @@ class PrintType(str, enum.Enum):
     kitchen = "kitchen"  # 厨房单
     add_dish = "add_dish"  # 加菜单
     shift_report = "shift_report"  # 交接班报表
+
+
+class ReservationStatus(str, enum.Enum):
+    pending = "pending"
+    confirmed = "confirmed"
+    arrived = "arrived"
+    queuing = "queuing"
+    seated = "seated"
+    completed = "completed"
+    cancelled = "cancelled"
+    no_show = "no_show"
+
+
+class ReservationType(str, enum.Enum):
+    regular = "regular"
+    banquet = "banquet"
+    private_room = "private_room"
+    outdoor = "outdoor"
+    vip = "vip"
+
+
+class QueueStatus(str, enum.Enum):
+    waiting = "waiting"
+    called = "called"
+    arrived = "arrived"
+    seated = "seated"
+    skipped = "skipped"
+    cancelled = "cancelled"
+
+
+class QueueSource(str, enum.Enum):
+    walk_in = "walk_in"
+    meituan = "meituan"
+    reservation = "reservation"
+    wechat = "wechat"
