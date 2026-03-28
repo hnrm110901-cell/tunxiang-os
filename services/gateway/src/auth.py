@@ -19,9 +19,13 @@ JWT_EXPIRE_HOURS = 24
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 DEMO_USERS: dict[str, dict] = {
-    "czq_admin": {"tenant_id": "10000000-0000-0000-0000-000000000001", "merchant": "尝在一起", "name": "尝在一起管理员", "role": "merchant_admin", "password_hash": pwd_context.hash("czq2024!")},
-    "zqx_admin": {"tenant_id": "10000000-0000-0000-0000-000000000002", "merchant": "最黔线", "name": "最黔线管理员", "role": "merchant_admin", "password_hash": pwd_context.hash("zqx2024!")},
-    "sgc_admin": {"tenant_id": "10000000-0000-0000-0000-000000000003", "merchant": "尚宫厨", "name": "尚宫厨管理员", "role": "merchant_admin", "password_hash": pwd_context.hash("sgc2024!")},
+    # 尝在一起（品智czyq.pinzhikeji.net, 3家门店: 文化城/浏小鲜/永安）
+    "czyz_admin": {"tenant_id": "10000000-0000-0000-0000-000000000001", "merchant": "尝在一起", "name": "尝在一起管理员", "role": "merchant_admin", "password_hash": pwd_context.hash("czyz@2026")},
+    # 最黔线（品智ljcg.pinzhikeji.net, 6家门店: 马家湾/东欣万象/合众路/广州路/昆明路/仁怀）
+    "zqx_admin": {"tenant_id": "10000000-0000-0000-0000-000000000002", "merchant": "最黔线", "name": "最黔线管理员", "role": "merchant_admin", "password_hash": pwd_context.hash("zqx@2026")},
+    # 尚宫厨（品智xcsgc.pinzhikeji.net, 5家门店: 采霞街/湘江水岸/乐城/啫匠亲城/酃湖雅院）
+    "sgc_admin": {"tenant_id": "10000000-0000-0000-0000-000000000003", "merchant": "尚宫厨", "name": "尚宫厨管理员", "role": "merchant_admin", "password_hash": pwd_context.hash("sgc@2026")},
+    # 屯象科技超管（可切换查看任意商户）
     "tx_superadmin": {"tenant_id": "platform", "merchant": "屯象科技", "name": "屯象超级管理员", "role": "superadmin", "password_hash": pwd_context.hash("tunxiang2024!")},
 }
 
