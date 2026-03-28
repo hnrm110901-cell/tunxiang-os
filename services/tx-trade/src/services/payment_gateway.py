@@ -67,7 +67,7 @@ class PaymentGateway:
     ) -> dict:
         """创建支付 — 扫码支付时 auth_code 为顾客付款码
 
-        对于微信/支付宝/银联等在线支付，调用收钱吧SDK（此处模拟）。
+        对于微信/支付宝/银联等在线支付，调用收钱吧 Upay API。
         """
         if method not in self.PAYMENT_METHODS:
             raise ValueError(f"不支持的支付方式: {method}")

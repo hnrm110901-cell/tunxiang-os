@@ -11,6 +11,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Optional
 
 import structlog
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from .reservation_flow import (
     RESERVATION_STATES,
@@ -18,14 +19,11 @@ from .reservation_flow import (
     can_reservation_transition,
 )
 from .queue_service import QueueService
+from ..repositories.reservation_repo import ReservationRepository
+from ..repositories.queue_repo import QueueRepository
+from ..models.reservation import Reservation
 
 logger = structlog.get_logger()
-
-
-# ─── 内存存储（生产环境替换为 DB Repository） ───
-
-_reservations: dict[str, dict] = {}
-_no_show_records: dict[str, list[str]] = {}  # phone -> [reservation_ids]
 
 
 def _gen_id() -> str:
@@ -65,14 +63,17 @@ class ReservationService:
     预订全流程：创建→确认→到店→排队(可选)→入座→完成/取消/爽约
     """
 
-    def __init__(self, tenant_id: str, store_id: str):
+    def __init__(self, db: AsyncSession, tenant_id: str, store_id: str):
+        self.db = db
         self.tenant_id = tenant_id
         self.store_id = store_id
-        self._queue_service = QueueService(tenant_id=tenant_id, store_id=store_id)
+        self._repo = ReservationRepository(db, tenant_id)
+        self._queue_repo = QueueRepository(db, tenant_id)
+        self._queue_service = QueueService(db=db, tenant_id=tenant_id, store_id=store_id)
 
     # ─── 创建预订 ───
 
-    def create_reservation(
+    async def create_reservation(
         self,
         store_id: str,
         customer_name: str,
@@ -120,10 +121,10 @@ class ReservationService:
         # 包间类型：校验包间容量 + 自动分配
         assigned_room = None
         if type == "private_room":
-            assigned_room = self._assign_room(room_name, party_size, store_id, date, time)
+            assigned_room = await self._assign_room(room_name, party_size, store_id, date, time)
 
         # 检查时段冲突
-        conflicts = self.check_conflicts(
+        conflicts = await self.check_conflicts(
             store_id, date, time,
             duration_min=120,
             room_name=assigned_room["room_name"] if assigned_room else None,
@@ -146,42 +147,27 @@ class ReservationService:
         end_dt = start_dt + timedelta(hours=2)
         estimated_end_time = end_dt.strftime("%H:%M")
 
-        record = {
-            "reservation_id": reservation_id,
-            "tenant_id": self.tenant_id,
-            "store_id": store_id,
-            "confirmation_code": confirmation_code,
-            "customer_name": customer_name,
-            "phone": phone,
-            "type": type,
-            "date": date,
-            "time": time,
-            "estimated_end_time": estimated_end_time,
-            "party_size": party_size,
-            "room_name": assigned_room["room_name"] if assigned_room else None,
-            "room_info": assigned_room,
-            "table_no": None,
-            "special_requests": special_requests,
-            "deposit_required": deposit_required,
-            "deposit_amount_fen": deposit_amount_fen if deposit_required else 0,
-            "deposit_paid": False,
-            "consumer_id": consumer_id,
-            "status": "pending",
-            "queue_id": None,
-            "order_id": None,
-            "confirmed_by": None,
-            "cancel_reason": None,
-            "cancel_fee_fen": 0,
-            "no_show_recorded": False,
-            "created_at": now,
-            "updated_at": now,
-            "arrived_at": None,
-            "seated_at": None,
-            "completed_at": None,
-            "cancelled_at": None,
-        }
-
-        _reservations[reservation_id] = record
+        store_uuid = uuid.UUID(store_id)
+        record = await self._repo.create(
+            reservation_id=reservation_id,
+            store_id=store_uuid,
+            confirmation_code=confirmation_code,
+            customer_name=customer_name,
+            phone=phone,
+            type=type,
+            date=date,
+            time=time,
+            estimated_end_time=estimated_end_time,
+            party_size=party_size,
+            room_name=assigned_room["room_name"] if assigned_room else None,
+            room_info=assigned_room,
+            special_requests=special_requests,
+            deposit_required=deposit_required,
+            deposit_amount_fen=deposit_amount_fen if deposit_required else 0,
+            deposit_paid=False,
+            consumer_id=consumer_id,
+            status="pending",
+        )
 
         logger.info(
             "reservation_created",
@@ -211,7 +197,7 @@ class ReservationService:
 
     # ─── 确认预订 ───
 
-    def confirm_reservation(
+    async def confirm_reservation(
         self,
         reservation_id: str,
         confirmed_by: str = "system",
@@ -225,11 +211,11 @@ class ReservationService:
         Returns:
             {reservation_id, status, confirmed_by, notification_sent}
         """
-        record = self._get_and_validate_transition(reservation_id, "confirmed")
+        record = await self._get_and_validate_transition(reservation_id, "confirmed")
 
-        record["status"] = "confirmed"
-        record["confirmed_by"] = confirmed_by
-        record["updated_at"] = _now_iso()
+        record.status = "confirmed"
+        record.confirmed_by = confirmed_by
+        await self.db.flush()
 
         # 发送确认通知
         notification_sent = self._send_confirmation(record)
@@ -242,17 +228,17 @@ class ReservationService:
 
         return {
             "reservation_id": reservation_id,
-            "confirmation_code": record["confirmation_code"],
+            "confirmation_code": record.confirmation_code,
             "status": "confirmed",
             "confirmed_by": confirmed_by,
             "notification_sent": notification_sent,
-            "date": record["date"],
-            "time": record["time"],
+            "date": record.date,
+            "time": record.time,
         }
 
     # ─── 顾客到店 ───
 
-    def customer_arrived(self, reservation_id: str) -> dict:
+    async def customer_arrived(self, reservation_id: str) -> dict:
         """顾客到店 — 如果桌台就绪直接入座，否则自动加入优先排队
 
         Args:
@@ -261,33 +247,34 @@ class ReservationService:
         Returns:
             {reservation_id, status, action, queue_info/table_no}
         """
-        record = self._get_and_validate_transition(reservation_id, "arrived")
+        record = await self._get_and_validate_transition(reservation_id, "arrived")
 
         now = _now_iso()
-        record["status"] = "arrived"
-        record["arrived_at"] = now
-        record["updated_at"] = now
+        record.status = "arrived"
+        record.arrived_at = now
 
         # 判断是否需要排队
         # 简化逻辑：包间预订直接到座，其他看情况
-        if record["type"] == "private_room" and record["room_name"]:
+        if record.type == "private_room" and record.room_name:
             action = "direct_seat"
             queue_info = None
         else:
             # 可以进入优先排队
             action = "queue_with_priority"
-            queue_result = self._queue_service.take_number(
-                store_id=record["store_id"],
-                customer_name=record["customer_name"],
-                phone=record["phone"],
-                party_size=record["party_size"],
+            queue_result = await self._queue_service.take_number(
+                store_id=str(record.store_id),
+                customer_name=record.customer_name,
+                phone=record.phone,
+                party_size=record.party_size,
                 source="reservation",
-                vip_priority=(record["type"] == "vip"),
+                vip_priority=(record.type == "vip"),
                 reservation_id=reservation_id,
             )
-            record["queue_id"] = queue_result["queue_id"]
-            record["status"] = "queuing"
+            record.queue_id = queue_result["queue_id"]
+            record.status = "queuing"
             queue_info = queue_result
+
+        await self.db.flush()
 
         logger.info(
             "reservation_customer_arrived",
@@ -297,21 +284,21 @@ class ReservationService:
 
         result = {
             "reservation_id": reservation_id,
-            "confirmation_code": record["confirmation_code"],
-            "status": record["status"],
+            "confirmation_code": record.confirmation_code,
+            "status": record.status,
             "action": action,
             "arrived_at": now,
         }
         if queue_info:
             result["queue_info"] = queue_info
-        if record["room_name"]:
-            result["room_name"] = record["room_name"]
+        if record.room_name:
+            result["room_name"] = record.room_name
 
         return result
 
     # ─── 入座 ───
 
-    def seat_reservation(self, reservation_id: str, table_no: str) -> dict:
+    async def seat_reservation(self, reservation_id: str, table_no: str) -> dict:
         """预订入座 — 关联桌台和订单
 
         Args:
@@ -321,11 +308,11 @@ class ReservationService:
         Returns:
             {reservation_id, table_no, seated_at}
         """
-        record = _reservations.get(reservation_id)
+        record = await self._repo.get_by_reservation_id(reservation_id)
         if not record:
             raise ValueError(f"Reservation not found: {reservation_id}")
 
-        current = record["status"]
+        current = record.status
         # 允许从 arrived 或 queuing 转到 seated
         if current not in ("arrived", "queuing"):
             raise ValueError(
@@ -334,17 +321,18 @@ class ReservationService:
             )
 
         now = _now_iso()
-        record["status"] = "seated"
-        record["table_no"] = table_no
-        record["seated_at"] = now
-        record["updated_at"] = now
+        record.status = "seated"
+        record.table_no = table_no
+        record.seated_at = now
 
         # 如果有排队记录，也更新排队状态
-        if record.get("queue_id"):
+        if record.queue_id:
             try:
-                self._queue_service.seat_customer(record["queue_id"], table_no)
+                await self._queue_service.seat_customer(record.queue_id, table_no)
             except ValueError:
                 pass  # 排队记录可能已被处理
+
+        await self.db.flush()
 
         logger.info(
             "reservation_seated",
@@ -354,9 +342,9 @@ class ReservationService:
 
         return {
             "reservation_id": reservation_id,
-            "confirmation_code": record["confirmation_code"],
-            "customer_name": record["customer_name"],
-            "party_size": record["party_size"],
+            "confirmation_code": record.confirmation_code,
+            "customer_name": record.customer_name,
+            "party_size": record.party_size,
             "table_no": table_no,
             "seated_at": now,
             "status": "seated",
@@ -364,7 +352,7 @@ class ReservationService:
 
     # ─── 完成预订 ───
 
-    def complete_reservation(self, reservation_id: str) -> dict:
+    async def complete_reservation(self, reservation_id: str) -> dict:
         """完成预订 — 用餐结束
 
         Args:
@@ -373,19 +361,20 @@ class ReservationService:
         Returns:
             {reservation_id, status, completed_at, duration_min}
         """
-        record = self._get_and_validate_transition(reservation_id, "completed")
+        record = await self._get_and_validate_transition(reservation_id, "completed")
 
         now = _now_iso()
-        record["status"] = "completed"
-        record["completed_at"] = now
-        record["updated_at"] = now
+        record.status = "completed"
+        record.completed_at = now
 
         # 计算用餐时长
         duration_min = 0
-        if record.get("seated_at"):
-            seated_dt = datetime.fromisoformat(record["seated_at"])
+        if record.seated_at:
+            seated_dt = datetime.fromisoformat(record.seated_at)
             completed_dt = datetime.fromisoformat(now)
             duration_min = int((completed_dt - seated_dt).total_seconds() / 60)
+
+        await self.db.flush()
 
         logger.info(
             "reservation_completed",
@@ -402,7 +391,7 @@ class ReservationService:
 
     # ─── 取消预订 ───
 
-    def cancel_reservation(
+    async def cancel_reservation(
         self,
         reservation_id: str,
         reason: str,
@@ -418,11 +407,11 @@ class ReservationService:
         Returns:
             {reservation_id, status, reason, cancel_fee_fen, refund_fen}
         """
-        record = _reservations.get(reservation_id)
+        record = await self._repo.get_by_reservation_id(reservation_id)
         if not record:
             raise ValueError(f"Reservation not found: {reservation_id}")
 
-        current = record["status"]
+        current = record.status
         if not can_reservation_transition(current, "cancelled"):
             raise ValueError(
                 f"Cannot cancel reservation {reservation_id}: "
@@ -430,23 +419,24 @@ class ReservationService:
             )
 
         now = _now_iso()
-        record["status"] = "cancelled"
-        record["cancel_reason"] = reason
-        record["cancel_fee_fen"] = cancel_fee_fen
-        record["cancelled_at"] = now
-        record["updated_at"] = now
+        record.status = "cancelled"
+        record.cancel_reason = reason
+        record.cancel_fee_fen = cancel_fee_fen
+        record.cancelled_at = now
 
         # 计算退款金额
         refund_fen = 0
-        if record.get("deposit_paid") and record.get("deposit_amount_fen", 0) > 0:
-            refund_fen = max(0, record["deposit_amount_fen"] - cancel_fee_fen)
+        if record.deposit_paid and (record.deposit_amount_fen or 0) > 0:
+            refund_fen = max(0, record.deposit_amount_fen - cancel_fee_fen)
 
         # 如果有排队记录，也取消
-        if record.get("queue_id"):
+        if record.queue_id:
             try:
-                self._queue_service.cancel_queue(record["queue_id"], reason="reservation_cancelled")
+                await self._queue_service.cancel_queue(record.queue_id, reason="reservation_cancelled")
             except ValueError:
                 pass
+
+        await self.db.flush()
 
         logger.info(
             "reservation_cancelled",
@@ -466,7 +456,7 @@ class ReservationService:
 
     # ─── 标记爽约 ───
 
-    def mark_no_show(self, reservation_id: str) -> dict:
+    async def mark_no_show(self, reservation_id: str) -> dict:
         """标记爽约 — 记录到顾客画像
 
         Args:
@@ -475,11 +465,11 @@ class ReservationService:
         Returns:
             {reservation_id, status, no_show_count}
         """
-        record = _reservations.get(reservation_id)
+        record = await self._repo.get_by_reservation_id(reservation_id)
         if not record:
             raise ValueError(f"Reservation not found: {reservation_id}")
 
-        current = record["status"]
+        current = record.status
         if not can_reservation_transition(current, "no_show"):
             raise ValueError(
                 f"Cannot mark no_show for {reservation_id}: "
@@ -487,16 +477,15 @@ class ReservationService:
             )
 
         now = _now_iso()
-        record["status"] = "no_show"
-        record["no_show_recorded"] = True
-        record["updated_at"] = now
+        record.status = "no_show"
+        record.no_show_recorded = True
 
         # 记录到爽约历史
-        phone = record["phone"]
-        if phone not in _no_show_records:
-            _no_show_records[phone] = []
-        _no_show_records[phone].append(reservation_id)
-        no_show_count = len(_no_show_records[phone])
+        phone = record.phone
+        await self._repo.add_no_show_record(phone, reservation_id)
+        no_show_count = await self._repo.count_no_shows(phone)
+
+        await self.db.flush()
 
         logger.info(
             "reservation_no_show",
@@ -508,7 +497,7 @@ class ReservationService:
         return {
             "reservation_id": reservation_id,
             "status": "no_show",
-            "customer_name": record["customer_name"],
+            "customer_name": record.customer_name,
             "phone": phone,
             "no_show_count": no_show_count,
             "marked_at": now,
@@ -516,7 +505,7 @@ class ReservationService:
 
     # ─── 列表查询 ───
 
-    def list_reservations(
+    async def list_reservations(
         self,
         store_id: str,
         date: Optional[str] = None,
@@ -534,26 +523,12 @@ class ReservationService:
         Returns:
             预订记录列表
         """
-        results = []
-        for r in _reservations.values():
-            if r["tenant_id"] != self.tenant_id:
-                continue
-            if r["store_id"] != store_id:
-                continue
-            if date and r["date"] != date:
-                continue
-            if status and r["status"] != status:
-                continue
-            if type and r["type"] != type:
-                continue
-            results.append(r)
-
-        results.sort(key=lambda x: (x["date"], x["time"]))
-        return results
+        records = await self._repo.list_by_store(store_id, date=date, status=status, type=type)
+        return [r.to_dict() for r in records]
 
     # ─── 可用时段查询 ───
 
-    def get_time_slots(
+    async def get_time_slots(
         self,
         store_id: str,
         date: str,
@@ -583,7 +558,7 @@ class ReservationService:
                 time_str = current.strftime("%H:%M")
 
                 # 检查该时段是否有冲突
-                conflicts = self.check_conflicts(store_id, date, time_str, duration_min=120)
+                conflicts = await self.check_conflicts(store_id, date, time_str, duration_min=120)
 
                 # 检查该时段可容纳的桌数/包间
                 available = len(conflicts) == 0
@@ -606,7 +581,7 @@ class ReservationService:
 
     # ─── 预订统计 ───
 
-    def get_reservation_stats(
+    async def get_reservation_stats(
         self,
         store_id: str,
         date_range: tuple[str, str],
@@ -621,12 +596,7 @@ class ReservationService:
             {total, by_type, by_status, no_show_rate, avg_party_size, peak_hours}
         """
         start_date, end_date = date_range
-        records = [
-            r for r in _reservations.values()
-            if r["tenant_id"] == self.tenant_id
-            and r["store_id"] == store_id
-            and start_date <= r["date"] <= end_date
-        ]
+        records = await self._repo.list_by_date_range(store_id, start_date, end_date)
 
         total = len(records)
         if total == 0:
@@ -643,24 +613,24 @@ class ReservationService:
         # 按类型统计
         by_type: dict[str, int] = {}
         for r in records:
-            by_type[r["type"]] = by_type.get(r["type"], 0) + 1
+            by_type[r.type] = by_type.get(r.type, 0) + 1
 
         # 按状态统计
         by_status: dict[str, int] = {}
         for r in records:
-            by_status[r["status"]] = by_status.get(r["status"], 0) + 1
+            by_status[r.status] = by_status.get(r.status, 0) + 1
 
         # 爽约率
         no_show_count = by_status.get("no_show", 0)
         no_show_rate = no_show_count / total * 100
 
         # 平均人数
-        avg_party_size = sum(r["party_size"] for r in records) / total
+        avg_party_size = sum(r.party_size for r in records) / total
 
         # 高峰时段
         hour_counts: dict[str, int] = {}
         for r in records:
-            h = r["time"][:2] + ":00"
+            h = r.time[:2] + ":00"
             hour_counts[h] = hour_counts.get(h, 0) + 1
         peak_hours = sorted(hour_counts.items(), key=lambda x: x[1], reverse=True)[:3]
 
@@ -676,7 +646,7 @@ class ReservationService:
 
     # ─── 冲突检测 ───
 
-    def check_conflicts(
+    async def check_conflicts(
         self,
         store_id: str,
         date: str,
@@ -699,54 +669,47 @@ class ReservationService:
         target_start = datetime.strptime(f"{date} {time}", "%Y-%m-%d %H:%M")
         target_end = target_start + timedelta(minutes=duration_min)
 
-        conflicts = []
-        for r in _reservations.values():
-            if r["tenant_id"] != self.tenant_id:
-                continue
-            if r["store_id"] != store_id:
-                continue
-            if r["date"] != date:
-                continue
-            if r["status"] in ("cancelled", "no_show", "completed"):
-                continue
+        active_records = await self._repo.list_by_store_date_active(store_id, date)
 
+        conflicts = []
+        for r in active_records:
             # 包间冲突检测
-            if room_name and r.get("room_name") != room_name:
+            if room_name and r.room_name != room_name:
                 continue
 
             # 时间重叠检测
-            existing_start = datetime.strptime(f"{r['date']} {r['time']}", "%Y-%m-%d %H:%M")
-            existing_end_str = r.get("estimated_end_time", "")
+            existing_start = datetime.strptime(f"{r.date} {r.time}", "%Y-%m-%d %H:%M")
+            existing_end_str = r.estimated_end_time or ""
             if existing_end_str:
-                existing_end = datetime.strptime(f"{r['date']} {existing_end_str}", "%Y-%m-%d %H:%M")
+                existing_end = datetime.strptime(f"{r.date} {existing_end_str}", "%Y-%m-%d %H:%M")
             else:
                 existing_end = existing_start + timedelta(minutes=120)
 
             # 判断是否有重叠
             if target_start < existing_end and target_end > existing_start:
                 conflicts.append({
-                    "reservation_id": r["reservation_id"],
-                    "confirmation_code": r["confirmation_code"],
-                    "customer_name": r["customer_name"],
-                    "time": r["time"],
-                    "estimated_end_time": r.get("estimated_end_time"),
-                    "party_size": r["party_size"],
-                    "type": r["type"],
-                    "room_name": r.get("room_name"),
-                    "status": r["status"],
+                    "reservation_id": r.reservation_id,
+                    "confirmation_code": r.confirmation_code,
+                    "customer_name": r.customer_name,
+                    "time": r.time,
+                    "estimated_end_time": r.estimated_end_time,
+                    "party_size": r.party_size,
+                    "type": r.type,
+                    "room_name": r.room_name,
+                    "status": r.status,
                 })
 
         return conflicts
 
     # ─── 内部辅助方法 ───
 
-    def _get_and_validate_transition(self, reservation_id: str, target_status: str) -> dict:
+    async def _get_and_validate_transition(self, reservation_id: str, target_status: str) -> Reservation:
         """获取预订记录并验证状态转换"""
-        record = _reservations.get(reservation_id)
+        record = await self._repo.get_by_reservation_id(reservation_id)
         if not record:
             raise ValueError(f"Reservation not found: {reservation_id}")
 
-        current = record["status"]
+        current = record.status
         if not can_reservation_transition(current, target_status):
             raise ValueError(
                 f"Cannot transition reservation {reservation_id} "
@@ -755,7 +718,7 @@ class ReservationService:
             )
         return record
 
-    def _assign_room(
+    async def _assign_room(
         self,
         room_name: Optional[str],
         party_size: int,
@@ -787,7 +750,7 @@ class ReservationService:
             min_cap, max_cap = config["capacity"]
             if min_cap <= party_size <= max_cap:
                 # 检查冲突
-                conflicts = self.check_conflicts(store_id, date, time, room_name=name)
+                conflicts = await self.check_conflicts(store_id, date, time, room_name=name)
                 if not conflicts:
                     candidates.append({
                         "room_name": name,
@@ -808,18 +771,18 @@ class ReservationService:
         del best["size_diff"]
         return best
 
-    def _send_confirmation(self, record: dict) -> bool:
+    def _send_confirmation(self, record: Reservation) -> bool:
         """发送预订确认通知"""
         logger.info(
             "reservation_confirmation_sent",
-            phone=record["phone"],
-            customer_name=record["customer_name"],
-            confirmation_code=record["confirmation_code"],
+            phone=record.phone,
+            customer_name=record.customer_name,
+            confirmation_code=record.confirmation_code,
             message=(
-                f"【预订确认】{record['customer_name']}您好，您在{record['date']} {record['time']}的"
-                f"预订已确认（确认码：{record['confirmation_code']}），"
-                f"{record['party_size']}位。"
-                f"{'包间：' + record['room_name'] if record.get('room_name') else ''}"
+                f"【预订确认】{record.customer_name}您好，您在{record.date} {record.time}的"
+                f"预订已确认（确认码：{record.confirmation_code}），"
+                f"{record.party_size}位。"
+                f"{'包间：' + record.room_name if record.room_name else ''}"
                 f"如需取消请提前2小时联系。"
             ),
         )

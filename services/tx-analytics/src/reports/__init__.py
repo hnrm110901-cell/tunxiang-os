@@ -36,6 +36,44 @@ from services.tx_analytics.src.reports import (
     dish_timeout,
     store_anomaly,
     discount_stats,
+    # P2 月度毛利报表
+    margin_by_type,
+    margin_operation,
+    margin_by_channel,
+    margin_by_store,
+    # P2 月度提成报表
+    commission_summary,
+    commission_waiter,
+    commission_orderer,
+    commission_cutter,
+    commission_chef,
+    commission_runner,
+    commission_cashier,
+    dish_classification_index,
+    # P2 月度稽核报表
+    audit_log,
+    audit_bill_list,
+    audit_summary,
+    cooking_speed,
+    deposit_stats,
+    sales_transfer,
+    discount_detail,
+    # 供应链报表 (15个)
+    scm_purchase_stats,
+    scm_receiving_detail,
+    scm_supplier_summary,
+    scm_purchase_ranking,
+    scm_transfer_stats,
+    scm_waste_report,
+    scm_inventory_balance,
+    scm_inventory_status,
+    scm_receipt_balance,
+    scm_inventory_ledger,
+    scm_inventory_warning,
+    scm_cost_margin,
+    scm_yield_comparison,
+    scm_bom_cost_analysis,
+    scm_ar_ledger,
 )
 
 # P0 每日必看报表模块列表
@@ -81,10 +119,60 @@ _P1_REPORTS = [
     discount_stats,
 ]
 
+# P2 月度报表模块列表（毛利 + 提成 + 稽核）
+_P2_REPORTS = [
+    # 毛利报表 (7个)
+    margin_per_order,
+    margin_total_order,
+    margin_each_order,
+    margin_by_type,
+    margin_operation,
+    margin_by_channel,
+    margin_by_store,
+    # 提成报表 (8个)
+    commission_summary,
+    commission_waiter,
+    commission_orderer,
+    commission_cutter,
+    commission_chef,
+    commission_runner,
+    commission_cashier,
+    dish_classification_index,
+    # 稽核报表 (7个)
+    audit_log,
+    audit_bill_list,
+    audit_summary,
+    cooking_speed,
+    deposit_stats,
+    sales_transfer,
+    discount_detail,
+]
+
+# 供应链报表模块列表 (15个)
+_SCM_REPORTS = [
+    scm_purchase_stats,
+    scm_receiving_detail,
+    scm_supplier_summary,
+    scm_purchase_ranking,
+    scm_transfer_stats,
+    scm_waste_report,
+    scm_inventory_balance,
+    scm_inventory_status,
+    scm_receipt_balance,
+    scm_inventory_ledger,
+    scm_inventory_warning,
+    scm_cost_margin,
+    scm_yield_comparison,
+    scm_bom_cost_analysis,
+    scm_ar_ledger,
+]
+
 # 全部报表
 _ALL_REPORTS = _P0_REPORTS + _OTHER_REPORTS + [
     m for m in _P1_REPORTS if m not in _P0_REPORTS and m not in _OTHER_REPORTS
-]
+] + [
+    m for m in _P2_REPORTS if m not in _P0_REPORTS and m not in _OTHER_REPORTS and m not in _P1_REPORTS
+] + _SCM_REPORTS
 
 # 报表注册表: REPORT_ID -> 模块
 REPORT_REGISTRY: dict[str, object] = {
@@ -155,4 +243,28 @@ def list_p1_reports() -> list[dict]:
             "category": mod.CATEGORY,
         }
         for mod in _P1_REPORTS
+    ]
+
+
+def list_p2_reports() -> list[dict]:
+    """列出P2月度报表（毛利/提成/稽核）"""
+    return [
+        {
+            "report_id": mod.REPORT_ID,
+            "report_name": mod.REPORT_NAME,
+            "category": mod.CATEGORY,
+        }
+        for mod in _P2_REPORTS
+    ]
+
+
+def list_scm_reports() -> list[dict]:
+    """列出供应链报表(15个)"""
+    return [
+        {
+            "report_id": mod.REPORT_ID,
+            "report_name": mod.REPORT_NAME,
+            "category": mod.CATEGORY,
+        }
+        for mod in _SCM_REPORTS
     ]

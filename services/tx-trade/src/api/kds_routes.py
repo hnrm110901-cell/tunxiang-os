@@ -9,7 +9,10 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
-from ..services.kds_dispatch import dispatch_order_to_kds, get_dept_queue, get_store_kds_overview
+from ..services.kds_dispatch import (
+    dispatch_order_to_kds, get_dept_queue, get_store_kds_overview,
+    resolve_dept_for_dish,
+)
 from ..services.cooking_scheduler import calculate_cooking_order, estimate_cooking_time, get_dept_load
 from ..services.kds_actions import (
     start_cooking, finish_cooking, request_rush, request_remake,
@@ -34,10 +37,13 @@ class DispatchItem(BaseModel):
     item_name: str
     quantity: int = 1
     order_item_id: Optional[str] = None
+    notes: Optional[str] = None
 
 
 class DispatchReq(BaseModel):
     items: list[DispatchItem]
+    table_number: Optional[str] = None
+    order_no: Optional[str] = None
 
 
 class RushReq(BaseModel):
@@ -61,10 +67,23 @@ async def api_dispatch_order(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
-    """分单 — 将订单菜品分配到对应档口"""
+    """分单 — 将订单菜品自动分配到对应档口
+
+    自动完成菜品->出品部门映射，无需前端传 kitchen_station。
+    分单后自动：
+    1. 回写 OrderItem.kds_station
+    2. 为每个档口生成厨打单并发送到打印机
+    """
     tenant_id = _get_tenant_id(request)
     items = [item.model_dump() for item in body.items]
-    result = await dispatch_order_to_kds(order_id, items, tenant_id, db)
+    result = await dispatch_order_to_kds(
+        order_id,
+        items,
+        tenant_id,
+        db,
+        table_number=body.table_number or "",
+        order_no=body.order_no or "",
+    )
 
     # 智能排序
     sorted_tasks = await calculate_cooking_order(result["dept_tasks"], db)
@@ -107,6 +126,20 @@ async def api_dept_load(
     return {"ok": True, "data": load}
 
 
+@router.get("/resolve-dept/{dish_id}")
+async def api_resolve_dept(
+    dish_id: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """查询菜品对应的出品档口（供加菜场景使用）"""
+    tenant_id = _get_tenant_id(request)
+    dept = await resolve_dept_for_dish(dish_id, tenant_id, db)
+    if not dept:
+        return {"ok": True, "data": None, "message": "该菜品未配置出品档口映射"}
+    return {"ok": True, "data": dept}
+
+
 # ─── KDS 操作 ───
 
 @router.post("/task/{task_id}/start")
@@ -140,8 +173,9 @@ async def api_rush(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
-    """催菜"""
-    result = await request_rush(task_id, body.dish_id, db)
+    """催菜 — 自动推送催单到 KDS + 发送催菜厨打单到档口打印机"""
+    tenant_id = _get_tenant_id(request)
+    result = await request_rush(task_id, body.dish_id, db, tenant_id=tenant_id)
     return result
 
 
@@ -152,8 +186,9 @@ async def api_remake(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
-    """重做"""
-    result = await request_remake(task_id, body.reason, db)
+    """重做 — 自动推送重做通知到 KDS + 发送重做厨打单到档口打印机"""
+    tenant_id = _get_tenant_id(request)
+    result = await request_remake(task_id, body.reason, db, tenant_id=tenant_id)
     return result
 
 
@@ -187,7 +222,7 @@ async def api_check_timeouts(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
-    """超时检查 — 列出所有 warning/critical 级别的待出品任务"""
+    """超时检查 — 自动推送 warning/critical 到 KDS + 管理员手机"""
     tenant_id = _get_tenant_id(request)
     items = await check_timeouts(store_id, tenant_id, db)
     return {

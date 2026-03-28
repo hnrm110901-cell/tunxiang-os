@@ -148,11 +148,100 @@ async def kds_ws(websocket: WebSocket, station_id: str) -> None:
                 )
 
             elif msg_type == "rush_order":
-                await kds_pusher.push_rush_order(msg.get("ticket_id", ""))
+                await kds_pusher.push_rush_order(msg.get("ticket_id", ""), extra=msg)
+
+            elif msg_type == "remake_order":
+                await kds_pusher.push_remake_order(
+                    station_id=msg.get("station_id", station_id),
+                    task_id=msg.get("task_id", ""),
+                    dish_name=msg.get("dish_name", ""),
+                    reason=msg.get("reason", ""),
+                    table_number=msg.get("table_number", ""),
+                    remake_count=msg.get("remake_count", 1),
+                )
+
+            elif msg_type == "timeout_alert":
+                await kds_pusher.push_timeout_alert(
+                    station_id=msg.get("station_id", station_id),
+                    payload=msg.get("payload", {}),
+                )
 
     except WebSocketDisconnect:
         await kds_pusher.unregister(station_id, websocket)
         logger.info("kds_ws_disconnected", station_id=station_id)
+
+
+# ─── KDS HTTP Push 接口（供 tx-trade 服务端调用） ───
+
+
+@app.post("/api/v1/kds/push")
+async def kds_push_via_http(data: dict) -> dict:
+    """HTTP -> WebSocket 桥接：tx-trade 服务通过此接口推送消息到 KDS 终端。
+
+    请求体:
+        station_id: str — 目标档口ID
+        message: dict — 推送消息体（含 type 字段）
+    """
+    station_id = data.get("station_id", "")
+    message = data.get("message", {})
+    msg_type = message.get("type", "")
+
+    if not station_id or not msg_type:
+        return {"ok": False, "error": {"code": "INVALID_PARAMS", "message": "station_id and message.type required"}}
+
+    if msg_type == "rush_order":
+        await kds_pusher.push_rush_order(
+            message.get("ticket_id", message.get("order_id", "")),
+            extra={**message, "station_id": station_id},
+        )
+    elif msg_type == "remake_order":
+        await kds_pusher.push_remake_order(
+            station_id=station_id,
+            task_id=message.get("task_id", ""),
+            dish_name=message.get("dish_name", ""),
+            reason=message.get("reason", ""),
+            table_number=message.get("table_number", ""),
+            remake_count=message.get("remake_count", 1),
+        )
+    elif msg_type == "timeout_alert":
+        await kds_pusher.push_timeout_alert(
+            station_id=station_id,
+            payload=message.get("payload", message),
+        )
+    elif msg_type == "new_ticket":
+        await kds_pusher.push_new_ticket(station_id, message.get("payload", message))
+    elif msg_type == "status_change":
+        await kds_pusher.push_status_change(
+            message.get("ticket_id", ""),
+            message.get("new_status", ""),
+        )
+    else:
+        # 通用推送
+        await kds_pusher._send_to_station(station_id, message)
+
+    return {"ok": True, "data": {"station_id": station_id, "type": msg_type}}
+
+
+# ─── 管理员告警推送 ───
+
+
+@app.post("/api/v1/admin/alert")
+async def admin_alert(data: dict) -> dict:
+    """接收管理员告警并广播到所有连接的终端。
+
+    后续扩展：转发到企微/钉钉/短信等渠道。
+    """
+    alert_type = data.get("type", "unknown")
+    logger.warning("admin_alert_received", alert_type=alert_type, severity=data.get("severity"))
+
+    # 广播到所有 Agent 推送连接（管理员终端）
+    await broadcast_agent_decision({
+        "type": "admin_alert",
+        "payload": data,
+    })
+
+    # TODO: 转发到企微/钉钉/短信
+    return {"ok": True, "data": {"forwarded": True, "channels": ["websocket"]}}
 
 
 async def broadcast_agent_decision(decision: dict) -> None:

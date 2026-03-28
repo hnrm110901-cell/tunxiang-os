@@ -10,15 +10,11 @@ from datetime import datetime, timezone, timedelta
 from typing import Optional
 
 import structlog
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from ..repositories.queue_repo import QueueRepository
 
 logger = structlog.get_logger()
-
-
-# ─── 内存存储（生产环境替换为 DB Repository） ───
-
-_queues: dict[str, dict] = {}
-_queue_counters: dict[str, dict[str, int]] = {}  # store_id -> {prefix: last_number}
-_queue_history: dict[str, list[dict]] = {}  # store_id -> [queue records]
 
 
 def _gen_id() -> str:
@@ -75,13 +71,15 @@ class QueueService:
     支持美团排队对接+等位时间预估
     """
 
-    def __init__(self, tenant_id: str, store_id: str):
+    def __init__(self, db: AsyncSession, tenant_id: str, store_id: str):
+        self.db = db
         self.tenant_id = tenant_id
         self.store_id = store_id
+        self._repo = QueueRepository(db, tenant_id)
 
     # ─── 取号 ───
 
-    def take_number(
+    async def take_number(
         self,
         store_id: str,
         customer_name: str,
@@ -111,17 +109,15 @@ class QueueService:
             raise ValueError(f"Invalid source: {source}")
 
         prefix = _size_prefix(party_size)
+        today = _today_str()
 
-        # 获取当日计数器
-        counter_key = f"{store_id}:{_today_str()}"
-        if counter_key not in _queue_counters:
-            _queue_counters[counter_key] = {"A": 0, "B": 0, "C": 0}
-        _queue_counters[counter_key][prefix] += 1
-        seq = _queue_counters[counter_key][prefix]
+        # 获取当日计数器并递增
+        counter = await self._repo.get_or_create_counter(store_id, today, prefix)
+        seq = await self._repo.increment_counter(counter)
         queue_number = f"{prefix}{seq:03d}"
 
         # 计算前面等待人数
-        ahead_count = self._count_waiting(store_id, prefix)
+        ahead_count = await self._repo.count_waiting(store_id, today, prefix)
 
         # 估算等位时间
         est = self._calculate_wait_time(store_id, prefix, ahead_count)
@@ -133,46 +129,29 @@ class QueueService:
         priority_ts = now
         if vip_priority:
             # VIP 的优先级时间设为比最早等待者还早1秒
-            earliest = self._get_earliest_waiting_ts(store_id, prefix)
+            earliest = await self._repo.get_earliest_waiting_ts(store_id, today, prefix)
             if earliest:
                 dt = datetime.fromisoformat(earliest) - timedelta(seconds=1)
                 priority_ts = dt.isoformat()
 
-        record = {
-            "queue_id": queue_id,
-            "tenant_id": self.tenant_id,
-            "store_id": store_id,
-            "queue_number": queue_number,
-            "prefix": prefix,
-            "seq": seq,
-            "customer_name": customer_name,
-            "phone": phone,
-            "party_size": party_size,
-            "source": source,
-            "vip_priority": vip_priority,
-            "reservation_id": reservation_id,
-            "status": "waiting",
-            "priority_ts": priority_ts,
-            "taken_at": now,
-            "called_at": None,
-            "arrived_at": None,
-            "seated_at": None,
-            "skipped_at": None,
-            "cancelled_at": None,
-            "table_no": None,
-            "skip_reason": None,
-            "cancel_reason": None,
-            "notification_count": 0,
-            "date": _today_str(),
-        }
-
-        _queues[queue_id] = record
-
-        # 加入历史记录
-        history_key = f"{store_id}:{_today_str()}"
-        if history_key not in _queue_history:
-            _queue_history[history_key] = []
-        _queue_history[history_key].append(record)
+        store_uuid = uuid.UUID(store_id)
+        await self._repo.create(
+            queue_id=queue_id,
+            store_id=store_uuid,
+            queue_number=queue_number,
+            prefix=prefix,
+            seq=seq,
+            customer_name=customer_name,
+            phone=phone,
+            party_size=party_size,
+            source=source,
+            vip_priority=vip_priority,
+            reservation_id=reservation_id,
+            status="waiting",
+            priority_ts=priority_ts,
+            taken_at=now,
+            date=today,
+        )
 
         logger.info(
             "queue_number_taken",
@@ -197,7 +176,7 @@ class QueueService:
 
     # ─── 叫号 ───
 
-    def call_number(self, queue_id: str) -> dict:
+    async def call_number(self, queue_id: str) -> dict:
         """叫号 — 变更状态为called，发送通知
 
         Args:
@@ -206,39 +185,41 @@ class QueueService:
         Returns:
             {queue_id, queue_number, called_at, notification_sent}
         """
-        record = _queues.get(queue_id)
+        record = await self._repo.get_by_queue_id(queue_id)
         if not record:
             raise ValueError(f"Queue record not found: {queue_id}")
-        if record["status"] != "waiting":
+        if record.status != "waiting":
             raise ValueError(
-                f"Cannot call queue {queue_id}: current status is '{record['status']}', expected 'waiting'"
+                f"Cannot call queue {queue_id}: current status is '{record.status}', expected 'waiting'"
             )
 
         now = _now_iso()
-        record["status"] = "called"
-        record["called_at"] = now
-        record["notification_count"] = 1
+        record.status = "called"
+        record.called_at = now
+        record.notification_count = 1
 
         # 模拟发送 SMS/微信通知
         notification_sent = self._send_notification(
-            record["phone"],
-            record["customer_name"],
-            record["queue_number"],
-            record["store_id"],
+            record.phone,
+            record.customer_name,
+            record.queue_number,
+            str(record.store_id),
         )
+
+        await self.db.flush()
 
         logger.info(
             "queue_number_called",
             queue_id=queue_id,
-            queue_number=record["queue_number"],
+            queue_number=record.queue_number,
             notification_sent=notification_sent,
         )
 
         return {
             "queue_id": queue_id,
-            "queue_number": record["queue_number"],
-            "customer_name": record["customer_name"],
-            "party_size": record["party_size"],
+            "queue_number": record.queue_number,
+            "customer_name": record.customer_name,
+            "party_size": record.party_size,
             "called_at": now,
             "notification_sent": notification_sent,
             "auto_skip_at": (
@@ -248,7 +229,7 @@ class QueueService:
 
     # ─── 顾客到店 ───
 
-    def customer_arrived(self, queue_id: str) -> dict:
+    async def customer_arrived(self, queue_id: str) -> dict:
         """顾客到店确认
 
         Args:
@@ -257,43 +238,45 @@ class QueueService:
         Returns:
             {queue_id, queue_number, arrived_at, wait_duration_min}
         """
-        record = _queues.get(queue_id)
+        record = await self._repo.get_by_queue_id(queue_id)
         if not record:
             raise ValueError(f"Queue record not found: {queue_id}")
-        if record["status"] not in ("waiting", "called"):
+        if record.status not in ("waiting", "called"):
             raise ValueError(
                 f"Cannot mark arrived for queue {queue_id}: "
-                f"current status is '{record['status']}', expected 'waiting' or 'called'"
+                f"current status is '{record.status}', expected 'waiting' or 'called'"
             )
 
         now = _now_iso()
-        record["status"] = "arrived"
-        record["arrived_at"] = now
+        record.status = "arrived"
+        record.arrived_at = now
 
         # 计算实际等待时间
-        taken_dt = datetime.fromisoformat(record["taken_at"])
+        taken_dt = datetime.fromisoformat(record.taken_at)
         arrived_dt = datetime.fromisoformat(now)
         wait_duration_min = int((arrived_dt - taken_dt).total_seconds() / 60)
+
+        await self.db.flush()
 
         logger.info(
             "queue_customer_arrived",
             queue_id=queue_id,
-            queue_number=record["queue_number"],
+            queue_number=record.queue_number,
             wait_min=wait_duration_min,
         )
 
         return {
             "queue_id": queue_id,
-            "queue_number": record["queue_number"],
-            "customer_name": record["customer_name"],
-            "party_size": record["party_size"],
+            "queue_number": record.queue_number,
+            "customer_name": record.customer_name,
+            "party_size": record.party_size,
             "arrived_at": now,
             "wait_duration_min": wait_duration_min,
         }
 
     # ─── 入座 ───
 
-    def seat_customer(self, queue_id: str, table_no: str) -> dict:
+    async def seat_customer(self, queue_id: str, table_no: str) -> dict:
         """安排入座 — 关联桌台，触发开台
 
         Args:
@@ -303,47 +286,49 @@ class QueueService:
         Returns:
             {queue_id, queue_number, table_no, seated_at, total_wait_min}
         """
-        record = _queues.get(queue_id)
+        record = await self._repo.get_by_queue_id(queue_id)
         if not record:
             raise ValueError(f"Queue record not found: {queue_id}")
-        if record["status"] not in ("waiting", "called", "arrived"):
+        if record.status not in ("waiting", "called", "arrived"):
             raise ValueError(
                 f"Cannot seat queue {queue_id}: "
-                f"current status is '{record['status']}', expected 'waiting', 'called', or 'arrived'"
+                f"current status is '{record.status}', expected 'waiting', 'called', or 'arrived'"
             )
 
         now = _now_iso()
-        record["status"] = "seated"
-        record["seated_at"] = now
-        record["table_no"] = table_no
+        record.status = "seated"
+        record.seated_at = now
+        record.table_no = table_no
 
         # 计算总等待时间
-        taken_dt = datetime.fromisoformat(record["taken_at"])
+        taken_dt = datetime.fromisoformat(record.taken_at)
         seated_dt = datetime.fromisoformat(now)
         total_wait_min = int((seated_dt - taken_dt).total_seconds() / 60)
+
+        await self.db.flush()
 
         logger.info(
             "queue_customer_seated",
             queue_id=queue_id,
-            queue_number=record["queue_number"],
+            queue_number=record.queue_number,
             table_no=table_no,
             total_wait_min=total_wait_min,
         )
 
         return {
             "queue_id": queue_id,
-            "queue_number": record["queue_number"],
-            "customer_name": record["customer_name"],
-            "party_size": record["party_size"],
+            "queue_number": record.queue_number,
+            "customer_name": record.customer_name,
+            "party_size": record.party_size,
             "table_no": table_no,
             "seated_at": now,
             "total_wait_min": total_wait_min,
-            "reservation_id": record.get("reservation_id"),
+            "reservation_id": record.reservation_id,
         }
 
     # ─── 过号 ───
 
-    def skip_customer(self, queue_id: str, reason: str = "no_show") -> dict:
+    async def skip_customer(self, queue_id: str, reason: str = "no_show") -> dict:
         """过号 — 叫号后超时未到或主动跳过
 
         Args:
@@ -353,38 +338,40 @@ class QueueService:
         Returns:
             {queue_id, queue_number, skipped_at, reason}
         """
-        record = _queues.get(queue_id)
+        record = await self._repo.get_by_queue_id(queue_id)
         if not record:
             raise ValueError(f"Queue record not found: {queue_id}")
-        if record["status"] not in ("waiting", "called"):
+        if record.status not in ("waiting", "called"):
             raise ValueError(
                 f"Cannot skip queue {queue_id}: "
-                f"current status is '{record['status']}', expected 'waiting' or 'called'"
+                f"current status is '{record.status}', expected 'waiting' or 'called'"
             )
 
         now = _now_iso()
-        record["status"] = "skipped"
-        record["skipped_at"] = now
-        record["skip_reason"] = reason
+        record.status = "skipped"
+        record.skipped_at = now
+        record.skip_reason = reason
+
+        await self.db.flush()
 
         logger.info(
             "queue_customer_skipped",
             queue_id=queue_id,
-            queue_number=record["queue_number"],
+            queue_number=record.queue_number,
             reason=reason,
         )
 
         return {
             "queue_id": queue_id,
-            "queue_number": record["queue_number"],
-            "customer_name": record["customer_name"],
+            "queue_number": record.queue_number,
+            "customer_name": record.customer_name,
             "skipped_at": now,
             "reason": reason,
         }
 
     # ─── 取消排队 ───
 
-    def cancel_queue(self, queue_id: str, reason: str = "") -> dict:
+    async def cancel_queue(self, queue_id: str, reason: str = "") -> dict:
         """取消排队
 
         Args:
@@ -394,57 +381,56 @@ class QueueService:
         Returns:
             {queue_id, queue_number, cancelled_at, reason}
         """
-        record = _queues.get(queue_id)
+        record = await self._repo.get_by_queue_id(queue_id)
         if not record:
             raise ValueError(f"Queue record not found: {queue_id}")
-        if record["status"] in ("seated", "skipped", "cancelled"):
+        if record.status in ("seated", "skipped", "cancelled"):
             raise ValueError(
-                f"Cannot cancel queue {queue_id}: already in terminal status '{record['status']}'"
+                f"Cannot cancel queue {queue_id}: already in terminal status '{record.status}'"
             )
 
         now = _now_iso()
-        record["status"] = "cancelled"
-        record["cancelled_at"] = now
-        record["cancel_reason"] = reason
+        record.status = "cancelled"
+        record.cancelled_at = now
+        record.cancel_reason = reason
+
+        await self.db.flush()
 
         logger.info(
             "queue_cancelled",
             queue_id=queue_id,
-            queue_number=record["queue_number"],
+            queue_number=record.queue_number,
             reason=reason,
         )
 
         return {
             "queue_id": queue_id,
-            "queue_number": record["queue_number"],
-            "customer_name": record["customer_name"],
+            "queue_number": record.queue_number,
+            "customer_name": record.customer_name,
             "cancelled_at": now,
             "reason": reason,
         }
 
     # ─── 排队看板 ───
 
-    def get_queue_board(self, store_id: str) -> dict:
+    async def get_queue_board(self, store_id: str) -> dict:
         """获取排队看板 — 当前各桌型等待/叫号/平均等位
 
         Returns:
             {total_waiting, total_called, groups: [{size_category, prefix, count, avg_wait_min}]}
         """
         today = _today_str()
-        all_records = [
-            q for q in _queues.values()
-            if q["store_id"] == store_id and q["date"] == today
-        ]
+        all_records = await self._repo.list_by_store_date(store_id, today)
 
-        waiting = [q for q in all_records if q["status"] == "waiting"]
-        called = [q for q in all_records if q["status"] == "called"]
-        seated_today = [q for q in all_records if q["status"] == "seated"]
+        waiting = [q for q in all_records if q.status == "waiting"]
+        called = [q for q in all_records if q.status == "called"]
+        seated_today = [q for q in all_records if q.status == "seated"]
 
         # 按桌型分组
         groups = []
         for prefix in ["A", "B", "C"]:
-            prefix_waiting = [q for q in waiting if q["prefix"] == prefix]
-            prefix_called = [q for q in called if q["prefix"] == prefix]
+            prefix_waiting = [q for q in waiting if q.prefix == prefix]
+            prefix_called = [q for q in called if q.prefix == prefix]
 
             # 计算该桌型平均等位时间
             avg_wait = self._calculate_wait_time(store_id, prefix, len(prefix_waiting))
@@ -456,8 +442,8 @@ class QueueService:
                 "called_count": len(prefix_called),
                 "avg_wait_min": avg_wait["estimated_wait_min"],
                 "next_queue_numbers": [
-                    q["queue_number"] for q in sorted(
-                        prefix_waiting, key=lambda x: x["priority_ts"]
+                    q.queue_number for q in sorted(
+                        prefix_waiting, key=lambda x: x.priority_ts
                     )[:3]
                 ],
             })
@@ -475,7 +461,7 @@ class QueueService:
 
     # ─── 等位时间预估 ───
 
-    def estimate_wait_time(self, store_id: str, party_size: int) -> dict:
+    async def estimate_wait_time(self, store_id: str, party_size: int) -> dict:
         """预估等位时间
 
         基于：当前排队长度 + 可用桌数 + 平均用餐时长
@@ -491,7 +477,8 @@ class QueueService:
             raise ValueError("party_size must be positive")
 
         prefix = _size_prefix(party_size)
-        ahead_count = self._count_waiting(store_id, prefix)
+        today = _today_str()
+        ahead_count = await self._repo.count_waiting(store_id, today, prefix)
         result = self._calculate_wait_time(store_id, prefix, ahead_count)
 
         return {
@@ -507,7 +494,7 @@ class QueueService:
 
     # ─── 排队历史 ───
 
-    def get_queue_history(
+    async def get_queue_history(
         self,
         store_id: str,
         date: str,
@@ -525,29 +512,25 @@ class QueueService:
         Returns:
             {items: [...], total, page, size, stats: {...}}
         """
-        history_key = f"{store_id}:{date}"
-        records = _queue_history.get(history_key, [])
+        offset = (page - 1) * size
+        records, total = await self._repo.list_by_store_date_paged(store_id, date, offset, size)
 
-        # 统计
-        total = len(records)
-        seated = [r for r in records if r["status"] == "seated"]
-        skipped = [r for r in records if r["status"] == "skipped"]
-        cancelled = [r for r in records if r["status"] == "cancelled"]
+        # 为了统计，需要所有记录（如果量大可以用SQL聚合，但保持逻辑兼容先用内存统计）
+        all_records = await self._repo.list_by_store_date(store_id, date)
+
+        seated = [r for r in all_records if r.status == "seated"]
+        skipped = [r for r in all_records if r.status == "skipped"]
+        cancelled = [r for r in all_records if r.status == "cancelled"]
 
         # 计算平均等位时间（已入座的）
         wait_times = []
         for r in seated:
-            if r.get("seated_at") and r.get("taken_at"):
-                taken = datetime.fromisoformat(r["taken_at"])
-                seated_dt = datetime.fromisoformat(r["seated_at"])
+            if r.seated_at and r.taken_at:
+                taken = datetime.fromisoformat(r.taken_at)
+                seated_dt = datetime.fromisoformat(r.seated_at)
                 wait_times.append(int((seated_dt - taken).total_seconds() / 60))
 
         avg_wait_min = sum(wait_times) // len(wait_times) if wait_times else 0
-
-        # 分页
-        start = (page - 1) * size
-        end = start + size
-        page_items = records[start:end]
 
         stats = {
             "total": total,
@@ -561,7 +544,7 @@ class QueueService:
         }
 
         return {
-            "items": page_items,
+            "items": [r.to_dict() for r in records],
             "total": total,
             "page": page,
             "size": size,
@@ -570,7 +553,7 @@ class QueueService:
 
     # ─── 美团排队同步 ───
 
-    def sync_meituan_queue(self, store_id: str, meituan_data: list[dict]) -> dict:
+    async def sync_meituan_queue(self, store_id: str, meituan_data: list[dict]) -> dict:
         """导入美团线上排队数据
 
         Args:
@@ -586,22 +569,17 @@ class QueueService:
         skipped = 0
 
         for item in meituan_data:
+            phone = item.get("phone", "")
             # 检查是否已同步（按手机号+日期去重）
-            existing = [
-                q for q in _queues.values()
-                if q["store_id"] == store_id
-                and q["phone"] == item.get("phone", "")
-                and q["date"] == _today_str()
-                and q["source"] == "meituan"
-            ]
+            existing = await self._repo.find_existing_meituan(store_id, phone, _today_str())
             if existing:
                 skipped += 1
                 continue
 
-            result = self.take_number(
+            result = await self.take_number(
                 store_id=store_id,
                 customer_name=item.get("customer_name", "美团顾客"),
-                phone=item.get("phone", ""),
+                phone=phone,
                 party_size=item.get("party_size", 2),
                 source="meituan",
                 vip_priority=False,
@@ -624,7 +602,7 @@ class QueueService:
 
     # ─── 自动叫号（取下一位） ───
 
-    def call_next(self, store_id: str, prefix: str = "") -> Optional[dict]:
+    async def call_next(self, store_id: str, prefix: str = "") -> Optional[dict]:
         """自动叫号 — 取队列中优先级最高的等待者
 
         Args:
@@ -635,51 +613,23 @@ class QueueService:
             叫号结果 or None（无等待者）
         """
         today = _today_str()
-        waiting = [
-            q for q in _queues.values()
-            if q["store_id"] == store_id
-            and q["date"] == today
-            and q["status"] == "waiting"
-        ]
+
         if prefix:
-            waiting = [q for q in waiting if q["prefix"] == prefix]
+            waiting = await self._repo.list_waiting_by_prefix(store_id, today, prefix)
+        else:
+            # 获取所有前缀的等待者，按priority_ts排序
+            all_waiting = []
+            for p in ["A", "B", "C"]:
+                all_waiting.extend(await self._repo.list_waiting_by_prefix(store_id, today, p))
+            waiting = sorted(all_waiting, key=lambda q: q.priority_ts)
 
         if not waiting:
             return None
 
-        # 按优先级时间排序（VIP的priority_ts更早）
-        waiting.sort(key=lambda q: q["priority_ts"])
         next_item = waiting[0]
-
-        return self.call_number(next_item["queue_id"])
+        return await self.call_number(next_item.queue_id)
 
     # ─── 内部辅助方法 ───
-
-    def _count_waiting(self, store_id: str, prefix: str) -> int:
-        """统计某桌型当前等待人数"""
-        today = _today_str()
-        return len([
-            q for q in _queues.values()
-            if q["store_id"] == store_id
-            and q["date"] == today
-            and q["prefix"] == prefix
-            and q["status"] == "waiting"
-        ])
-
-    def _get_earliest_waiting_ts(self, store_id: str, prefix: str) -> Optional[str]:
-        """获取某桌型最早等待者的priority_ts"""
-        today = _today_str()
-        waiting = [
-            q for q in _queues.values()
-            if q["store_id"] == store_id
-            and q["date"] == today
-            and q["prefix"] == prefix
-            and q["status"] == "waiting"
-        ]
-        if not waiting:
-            return None
-        waiting.sort(key=lambda q: q["priority_ts"])
-        return waiting[0]["priority_ts"]
 
     def _calculate_wait_time(
         self, store_id: str, prefix: str, ahead_count: int
@@ -728,14 +678,24 @@ class QueueService:
 
 # ─── 模块级便捷函数（兼容 reservation_flow.py 的调用风格） ───
 
-def take_queue_number(store_id: str, customer_name: str, phone: str,
-                      party_size: int, tenant_id: str = "default") -> dict:
+async def take_queue_number(
+    db: AsyncSession,
+    store_id: str,
+    customer_name: str,
+    phone: str,
+    party_size: int,
+    tenant_id: str = "default",
+) -> dict:
     """便捷函数：快速取号"""
-    svc = QueueService(tenant_id=tenant_id, store_id=store_id)
-    return svc.take_number(store_id, customer_name, phone, party_size)
+    svc = QueueService(db=db, tenant_id=tenant_id, store_id=store_id)
+    return await svc.take_number(store_id, customer_name, phone, party_size)
 
 
-def get_store_queue_board(store_id: str, tenant_id: str = "default") -> dict:
+async def get_store_queue_board(
+    db: AsyncSession,
+    store_id: str,
+    tenant_id: str = "default",
+) -> dict:
     """便捷函数：获取门店排队看板"""
-    svc = QueueService(tenant_id=tenant_id, store_id=store_id)
-    return svc.get_queue_board(store_id)
+    svc = QueueService(db=db, tenant_id=tenant_id, store_id=store_id)
+    return await svc.get_queue_board(store_id)

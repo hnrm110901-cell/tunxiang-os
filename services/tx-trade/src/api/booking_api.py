@@ -7,7 +7,9 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, Request, HTTPException, Query
 from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from shared.ontology.src.database import get_db_with_tenant
 from ..services.reservation_service import ReservationService
 from ..services.queue_service import QueueService
 from ..services.banquet_lifecycle import BanquetLifecycleService
@@ -24,7 +26,15 @@ def _get_tenant_id(request: Request) -> str:
     return tid
 
 
-def _ok(data) -> dict:
+async def _get_db_session(request: Request) -> AsyncSession:
+    """获取带租户隔离的DB session"""
+    tenant_id = _get_tenant_id(request)
+    async for session in get_db_with_tenant(tenant_id):
+        return session
+    raise HTTPException(status_code=500, detail="Failed to create DB session")
+
+
+def _ok(data: object) -> dict:
     return {"ok": True, "data": data, "error": None}
 
 
@@ -66,9 +76,10 @@ class UpdateReservationStatusReq(BaseModel):
 async def create_reservation(req: CreateReservationReq, request: Request):
     """创建预订"""
     tenant_id = _get_tenant_id(request)
-    svc = ReservationService(tenant_id=tenant_id, store_id=req.store_id)
+    db = await _get_db_session(request)
+    svc = ReservationService(db=db, tenant_id=tenant_id, store_id=req.store_id)
     try:
-        result = svc.create_reservation(
+        result = await svc.create_reservation(
             store_id=req.store_id,
             customer_name=req.customer_name,
             phone=req.phone,
@@ -95,26 +106,27 @@ async def update_reservation_status(
 ):
     """更新预订状态（确认/到店/入座/完成/取消/爽约）"""
     tenant_id = _get_tenant_id(request)
-    svc = ReservationService(tenant_id=tenant_id, store_id="")
+    db = await _get_db_session(request)
+    svc = ReservationService(db=db, tenant_id=tenant_id, store_id="")
     try:
         if req.action == "confirm":
-            result = svc.confirm_reservation(reservation_id, confirmed_by=req.confirmed_by or "system")
+            result = await svc.confirm_reservation(reservation_id, confirmed_by=req.confirmed_by or "system")
         elif req.action == "arrive":
-            result = svc.customer_arrived(reservation_id)
+            result = await svc.customer_arrived(reservation_id)
         elif req.action == "seat":
             if not req.table_no:
                 _err("table_no is required for seating")
-            result = svc.seat_reservation(reservation_id, req.table_no)
+            result = await svc.seat_reservation(reservation_id, req.table_no)
         elif req.action == "complete":
-            result = svc.complete_reservation(reservation_id)
+            result = await svc.complete_reservation(reservation_id)
         elif req.action == "cancel":
-            result = svc.cancel_reservation(
+            result = await svc.cancel_reservation(
                 reservation_id,
                 reason=req.reason or "customer_request",
                 cancel_fee_fen=req.cancel_fee_fen,
             )
         elif req.action == "no_show":
-            result = svc.mark_no_show(reservation_id)
+            result = await svc.mark_no_show(reservation_id)
         else:
             _err(f"Unknown action: {req.action}")
             return
@@ -133,8 +145,9 @@ async def list_reservations(
 ):
     """查询预订列表"""
     tenant_id = _get_tenant_id(request)
-    svc = ReservationService(tenant_id=tenant_id, store_id=store_id)
-    result = svc.list_reservations(store_id=store_id, date=date, status=status, type=type)
+    db = await _get_db_session(request)
+    svc = ReservationService(db=db, tenant_id=tenant_id, store_id=store_id)
+    result = await svc.list_reservations(store_id=store_id, date=date, status=status, type=type)
     return _ok(result)
 
 
@@ -147,8 +160,9 @@ async def get_time_slots(
 ):
     """查询可用时段"""
     tenant_id = _get_tenant_id(request)
-    svc = ReservationService(tenant_id=tenant_id, store_id=store_id)
-    result = svc.get_time_slots(store_id=store_id, date=date, party_size=party_size)
+    db = await _get_db_session(request)
+    svc = ReservationService(db=db, tenant_id=tenant_id, store_id=store_id)
+    result = await svc.get_time_slots(store_id=store_id, date=date, party_size=party_size)
     return _ok(result)
 
 
@@ -161,8 +175,9 @@ async def get_reservation_stats(
 ):
     """预订统计"""
     tenant_id = _get_tenant_id(request)
-    svc = ReservationService(tenant_id=tenant_id, store_id=store_id)
-    result = svc.get_reservation_stats(store_id=store_id, date_range=(start_date, end_date))
+    db = await _get_db_session(request)
+    svc = ReservationService(db=db, tenant_id=tenant_id, store_id=store_id)
+    result = await svc.get_reservation_stats(store_id=store_id, date_range=(start_date, end_date))
     return _ok(result)
 
 
@@ -202,9 +217,10 @@ class SyncMeituanReq(BaseModel):
 async def take_queue_number(req: TakeNumberReq, request: Request):
     """取排队号"""
     tenant_id = _get_tenant_id(request)
-    svc = QueueService(tenant_id=tenant_id, store_id=req.store_id)
+    db = await _get_db_session(request)
+    svc = QueueService(db=db, tenant_id=tenant_id, store_id=req.store_id)
     try:
-        result = svc.take_number(
+        result = await svc.take_number(
             store_id=req.store_id,
             customer_name=req.customer_name,
             phone=req.phone,
@@ -221,9 +237,10 @@ async def take_queue_number(req: TakeNumberReq, request: Request):
 async def call_queue_number(req: CallNumberReq, request: Request):
     """叫号"""
     tenant_id = _get_tenant_id(request)
-    svc = QueueService(tenant_id=tenant_id, store_id="")
+    db = await _get_db_session(request)
+    svc = QueueService(db=db, tenant_id=tenant_id, store_id="")
     try:
-        result = svc.call_number(req.queue_id)
+        result = await svc.call_number(req.queue_id)
         return _ok(result)
     except ValueError as e:
         _err(str(e))
@@ -237,8 +254,9 @@ async def call_next_queue(
 ):
     """自动叫下一号"""
     tenant_id = _get_tenant_id(request)
-    svc = QueueService(tenant_id=tenant_id, store_id=store_id)
-    result = svc.call_next(store_id=store_id, prefix=prefix)
+    db = await _get_db_session(request)
+    svc = QueueService(db=db, tenant_id=tenant_id, store_id=store_id)
+    result = await svc.call_next(store_id=store_id, prefix=prefix)
     if result is None:
         return _ok({"message": "No waiting customers"})
     return _ok(result)
@@ -248,9 +266,10 @@ async def call_next_queue(
 async def seat_queue_customer(req: SeatQueueReq, request: Request):
     """排队入座"""
     tenant_id = _get_tenant_id(request)
-    svc = QueueService(tenant_id=tenant_id, store_id="")
+    db = await _get_db_session(request)
+    svc = QueueService(db=db, tenant_id=tenant_id, store_id="")
     try:
-        result = svc.seat_customer(req.queue_id, req.table_no)
+        result = await svc.seat_customer(req.queue_id, req.table_no)
         return _ok(result)
     except ValueError as e:
         _err(str(e))
@@ -260,9 +279,10 @@ async def seat_queue_customer(req: SeatQueueReq, request: Request):
 async def skip_queue_customer(req: SkipQueueReq, request: Request):
     """过号"""
     tenant_id = _get_tenant_id(request)
-    svc = QueueService(tenant_id=tenant_id, store_id="")
+    db = await _get_db_session(request)
+    svc = QueueService(db=db, tenant_id=tenant_id, store_id="")
     try:
-        result = svc.skip_customer(req.queue_id, reason=req.reason)
+        result = await svc.skip_customer(req.queue_id, reason=req.reason)
         return _ok(result)
     except ValueError as e:
         _err(str(e))
@@ -275,8 +295,9 @@ async def get_queue_board(
 ):
     """排队看板"""
     tenant_id = _get_tenant_id(request)
-    svc = QueueService(tenant_id=tenant_id, store_id=store_id)
-    result = svc.get_queue_board(store_id=store_id)
+    db = await _get_db_session(request)
+    svc = QueueService(db=db, tenant_id=tenant_id, store_id=store_id)
+    result = await svc.get_queue_board(store_id=store_id)
     return _ok(result)
 
 
@@ -288,8 +309,9 @@ async def estimate_wait_time(
 ):
     """预估等位时间"""
     tenant_id = _get_tenant_id(request)
-    svc = QueueService(tenant_id=tenant_id, store_id=store_id)
-    result = svc.estimate_wait_time(store_id=store_id, party_size=party_size)
+    db = await _get_db_session(request)
+    svc = QueueService(db=db, tenant_id=tenant_id, store_id=store_id)
+    result = await svc.estimate_wait_time(store_id=store_id, party_size=party_size)
     return _ok(result)
 
 
@@ -303,8 +325,9 @@ async def get_queue_history(
 ):
     """排队历史"""
     tenant_id = _get_tenant_id(request)
-    svc = QueueService(tenant_id=tenant_id, store_id=store_id)
-    result = svc.get_queue_history(store_id=store_id, date=date, page=page, size=size)
+    db = await _get_db_session(request)
+    svc = QueueService(db=db, tenant_id=tenant_id, store_id=store_id)
+    result = await svc.get_queue_history(store_id=store_id, date=date, page=page, size=size)
     return _ok(result)
 
 
@@ -312,8 +335,9 @@ async def get_queue_history(
 async def sync_meituan_queue(req: SyncMeituanReq, request: Request):
     """美团排队同步"""
     tenant_id = _get_tenant_id(request)
-    svc = QueueService(tenant_id=tenant_id, store_id=req.store_id)
-    result = svc.sync_meituan_queue(store_id=req.store_id, meituan_data=req.meituan_data)
+    db = await _get_db_session(request)
+    svc = QueueService(db=db, tenant_id=tenant_id, store_id=req.store_id)
+    result = await svc.sync_meituan_queue(store_id=req.store_id, meituan_data=req.meituan_data)
     return _ok(result)
 
 
