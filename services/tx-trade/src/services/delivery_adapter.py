@@ -5,9 +5,10 @@
 
 v2: 订单持久化到 PostgreSQL delivery_orders 表（RLS 隔离）。
 """
+import os
 import uuid
 from datetime import datetime, timezone, timedelta
-from typing import Optional
+from typing import Any, Optional
 
 import structlog
 from sqlalchemy import select, and_
@@ -36,29 +37,34 @@ class DeliveryPlatformAdapter:
     订单持久化到 delivery_orders 表。
     """
 
-    PLATFORMS = {
+    # 默认平台配置 — 佣金比例等应通过 override_platform_config() 从数据库/环境加载
+    # WARNING: commission_rate 是默认值，实际佣金比例因商户签约不同而异
+    PLATFORMS: dict[str, dict[str, Any]] = {
         "meituan": {
             "name": "美团外卖",
-            "commission_rate": 0.18,
+            "commission_rate": float(os.environ.get("MEITUAN_COMMISSION_RATE", "0.18")),
             "settle_days": "T+7",
             "settle_delay_days": 7,
-            "api_base": "https://api.meituan.com/",
         },
         "eleme": {
             "name": "饿了么",
-            "commission_rate": 0.20,
+            "commission_rate": float(os.environ.get("ELEME_COMMISSION_RATE", "0.20")),
             "settle_days": "T+7",
             "settle_delay_days": 7,
-            "api_base": "https://api.ele.me/",
         },
         "douyin": {
             "name": "抖音外卖",
-            "commission_rate": 0.10,
+            "commission_rate": float(os.environ.get("DOUYIN_COMMISSION_RATE", "0.10")),
             "settle_days": "T+3",
             "settle_delay_days": 3,
-            "api_base": "https://api.douyin.com/",
         },
     }
+
+    @classmethod
+    def override_platform_config(cls, platform: str, overrides: dict[str, Any]) -> None:
+        """覆盖平台配置（如从数据库加载商户实际签约佣金比例）"""
+        if platform in cls.PLATFORMS:
+            cls.PLATFORMS[platform].update(overrides)
 
     # 平台订单状态 → 内部状态映射
     STATUS_MAP = {
@@ -139,14 +145,32 @@ class DeliveryPlatformAdapter:
 
         session = await self._get_session()
         try:
-            # 检查平台订单是否已存在
+            # 幂等性检查：平台订单已存在则返回已有记录（避免重复创建）
             existing = await session.execute(
                 select(DeliveryOrder).where(
                     DeliveryOrder.platform_order_id == platform_order_id
                 )
             )
-            if existing.scalar_one_or_none() is not None:
-                raise ValueError(f"平台订单已存在: {platform_order_id}")
+            existing_order = existing.scalar_one_or_none()
+            if existing_order is not None:
+                logger.info(
+                    "delivery_order_duplicate_skip",
+                    platform_order_id=platform_order_id,
+                    existing_order_id=str(existing_order.id),
+                )
+                return {
+                    'order_id': str(existing_order.id),
+                    'order_no': existing_order.order_no,
+                    'platform_order_id': platform_order_id,
+                    'platform': existing_order.platform,
+                    'status': existing_order.status,
+                    'items_mapped': existing_order.items_json or [],
+                    'total_fen': existing_order.total_fen,
+                    'commission_fen': existing_order.commission_fen,
+                    'merchant_receive_fen': existing_order.merchant_receive_fen,
+                    'unmapped_items': existing_order.unmapped_items or [],
+                    'duplicate': True,
+                }
 
             platform_config = self.PLATFORMS[platform]
             order_id = _gen_order_id()
@@ -182,9 +206,10 @@ class DeliveryPlatformAdapter:
                 if not mapped:
                     unmapped_items.append(item.get('name', ''))
 
-            # 计算佣金
+            # 计算佣金（int 运算避免 float 精度问题）
+            # commission_rate 为近似值，佣金用 int(total * rate) 截断取整
             commission_rate = platform_config['commission_rate']
-            commission_fen = round(total_fen * commission_rate)
+            commission_fen = int(total_fen * commission_rate)
             merchant_receive_fen = total_fen - commission_fen
 
             now = datetime.now(timezone.utc)
@@ -621,11 +646,14 @@ class DeliveryPlatformAdapter:
     # ─── 内部方法 ───
 
     async def _get_order(self, session: AsyncSession, order_id: str) -> DeliveryOrder:
-        """从数据库获取订单"""
-        result = await session.execute(
-            select(DeliveryOrder).where(
-                DeliveryOrder.id == uuid.UUID(order_id)
+        """从数据库获取订单（显式 tenant_id 过滤，配合 RLS 双重保障）"""
+        conditions = [DeliveryOrder.id == uuid.UUID(order_id)]
+        if self.tenant_id:
+            conditions.append(
+                DeliveryOrder.tenant_id == uuid.UUID(self.tenant_id)
             )
+        result = await session.execute(
+            select(DeliveryOrder).where(and_(*conditions))
         )
         order = result.scalar_one_or_none()
         if order is None:

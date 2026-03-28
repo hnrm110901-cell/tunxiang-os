@@ -181,7 +181,12 @@ async def check_timeouts(
         if not item.created_at:
             continue
 
-        wait_seconds = (now - item.created_at).total_seconds()
+        created_at = item.created_at
+        # 确保 created_at 带时区信息，避免与 tz-aware now 相减时 TypeError
+        if created_at.tzinfo is None:
+            created_at = created_at.replace(tzinfo=timezone.utc)
+
+        wait_seconds = (now - created_at).total_seconds()
         wait_minutes = round(wait_seconds / 60, 1)
         status = _classify_timeout_status(wait_minutes, config)
 

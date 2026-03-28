@@ -118,7 +118,9 @@ class ApprovalService:
             },
         )
 
-        # 发送企业微信通知
+        await self.db.commit()
+
+        # 发送企业微信通知（失败不阻塞）
         await self._notify_wecom_approval(
             approval_id=approval_id,
             order_id=order_id,
@@ -175,19 +177,27 @@ class ApprovalService:
                 f"审批单 {approval_id} 当前状态为 {extra.get('status')}，无法批准"
             )
 
+        # 检查审批是否已过期
+        await self._check_and_expire(record, extra)
+        if extra.get("status") == "expired":
+            raise ValueError(
+                f"审批单 {approval_id} 已超时（{self.APPROVAL_TIMEOUT_MIN}分钟），自动过期"
+            )
+
         now = datetime.now(timezone.utc).isoformat()
         extra["status"] = "approved"
         extra["approver_id"] = approver_id
         extra["approved_at"] = now
 
         await self._update_approval_record(record["id"], extra, is_read=True)
+        await self.db.commit()
 
         # 执行折扣
         discount_applied = False
         order_id = extra.get("order_id")
         discount_info = extra.get("discount_info", {})
 
-        if order_id and discount_info:
+        if order_id and discount_info and discount_info.get("discount_value"):
             try:
                 from .cashier_engine import CashierEngine
 
@@ -200,7 +210,7 @@ class ApprovalService:
                     approval_id=approval_id,
                 )
                 discount_applied = result.get("applied", False)
-            except (ValueError, KeyError) as exc:
+            except (ValueError, KeyError, ImportError) as exc:
                 logger.error(
                     "approval_discount_exec_failed",
                     approval_id=approval_id,
@@ -253,6 +263,13 @@ class ApprovalService:
                 f"审批单 {approval_id} 当前状态为 {extra.get('status')}，无法拒绝"
             )
 
+        # 检查审批是否已过期
+        await self._check_and_expire(record, extra)
+        if extra.get("status") == "expired":
+            raise ValueError(
+                f"审批单 {approval_id} 已超时（{self.APPROVAL_TIMEOUT_MIN}分钟），自动过期"
+            )
+
         now = datetime.now(timezone.utc).isoformat()
         extra["status"] = "rejected"
         extra["approver_id"] = approver_id
@@ -260,6 +277,7 @@ class ApprovalService:
         extra["reject_reason"] = reason
 
         await self._update_approval_record(record["id"], extra, is_read=True)
+        await self.db.commit()
 
         logger.info(
             "approval_rejected",
@@ -373,6 +391,34 @@ class ApprovalService:
     # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     #  内部方法
     # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    async def _check_and_expire(
+        self, record: dict[str, Any], extra: dict[str, Any]
+    ) -> None:
+        """检查审批单是否已超时，超时则自动标记为 expired"""
+        from datetime import timedelta
+
+        created_at = record.get("created_at")
+        if not created_at:
+            return
+
+        # created_at 可能是 datetime 对象或字符串
+        if isinstance(created_at, str):
+            created_at = datetime.fromisoformat(created_at)
+
+        # 确保有时区信息
+        if created_at.tzinfo is None:
+            created_at = created_at.replace(tzinfo=timezone.utc)
+
+        deadline = created_at + timedelta(minutes=self.APPROVAL_TIMEOUT_MIN)
+        if datetime.now(timezone.utc) > deadline:
+            extra["status"] = "expired"
+            await self._update_approval_record(record["id"], extra)
+            logger.info(
+                "approval_auto_expired",
+                approval_id=extra.get("approval_id"),
+                created_at=created_at.isoformat(),
+            )
 
     async def _get_approval_record(
         self, approval_id: str

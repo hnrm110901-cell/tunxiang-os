@@ -6,6 +6,9 @@
 3. WebSocket 推送 Agent 决策到安卓 POS
 4. 代理 Core ML 桥接请求
 """
+import asyncio
+import base64
+import json
 import os
 
 import httpx
@@ -47,7 +50,7 @@ app.include_router(federated_router)
 
 @app.get("/health")
 async def health() -> dict:
-    return {"ok": True, "data": {"service": "mac-station", "version": "3.0.0"}}
+    return {"ok": True, "data": {"service": "mac-station", "version": "4.1.0"}}
 
 
 # ─── 离线查询 API ───
@@ -103,15 +106,19 @@ async def agent_push_ws(websocket: WebSocket) -> None:
             data = await websocket.receive_text()
             if data == "ping":
                 await websocket.send_text("pong")
-    except WebSocketDisconnect:
-        connected_clients.remove(websocket)
+    except (WebSocketDisconnect, RuntimeError, OSError, ConnectionError):
+        pass
+    finally:
+        try:
+            connected_clients.remove(websocket)
+        except ValueError:
+            pass
         logger.info("ws_client_disconnected", total=len(connected_clients))
 
 
 # ─── KDS WebSocket 推送 ───
 
 from kds_pusher import KDSPusher
-import json
 
 kds_pusher = KDSPusher()
 
@@ -246,17 +253,20 @@ async def admin_alert(data: dict) -> dict:
 
 async def broadcast_agent_decision(decision: dict) -> None:
     """广播 Agent 决策到所有连接的 POS 终端"""
+    dead: list[WebSocket] = []
     for ws in connected_clients:
         try:
             await ws.send_json(decision)
-        except (WebSocketDisconnect, RuntimeError, OSError):
+        except (WebSocketDisconnect, RuntimeError, OSError, ConnectionError):
+            dead.append(ws)
+    for ws in dead:
+        try:
+            connected_clients.remove(ws)
+        except ValueError:
             pass
 
 
 # ─── 打印机管理 ───
-
-import asyncio
-import base64
 
 # 门店打印机注册表（启动时从配置或 API 加载）
 # 格式: { "printer_id": { "name": "前台打印机", "type": "network|sunmi", "address": "192.168.1.100:9100", "paper_width": 80 } }
@@ -355,7 +365,13 @@ async def print_receipt(data: dict) -> dict:
 
     # 选择打印机
     printer_id = data.get("printer_id", "")
+    printer_address = data.get("printer_address", "")
     printer = _printers.get(printer_id) if printer_id else None
+
+    # 如果指定了 printer_address（如档口打印机地址 host:port），直接 TCP 发送
+    if printer_address and ":" in printer_address:
+        ok = await _send_to_network_printer(printer_address, esc_pos_bytes)
+        return {"ok": ok, "data": {"printer_address": printer_address, "channel": "network_tcp_direct"}}
 
     # 没指定就用第一台网络打印机
     if not printer:

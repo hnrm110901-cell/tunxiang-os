@@ -88,7 +88,7 @@ def format_kitchen_ticket(
 
     # 菜品列表（大字加粗）
     for item in items:
-        dish_name = item.get("dish_name", item.get("item_name", ""))
+        dish_name = item.get("dish_name", item.get("item_name", "")) or "(未命名菜品)"
         quantity = item.get("quantity", 1)
         notes = item.get("notes", "")
 
@@ -254,11 +254,17 @@ async def send_to_printer(
     }
     if printer_id:
         payload["printer_id"] = printer_id
+    if printer_address:
+        payload["printer_address"] = printer_address
 
     try:
         async with httpx.AsyncClient(timeout=PRINT_TIMEOUT_SEC) as client:
             resp = await client.post(f"{MAC_STATION_URL}/api/print", json=payload)
-            result = resp.json()
+            try:
+                result = resp.json()
+            except ValueError:
+                log.warning("kitchen_print.invalid_response", status=resp.status_code, body=resp.text[:200])
+                return False
             if result.get("ok"):
                 log.info("kitchen_print.sent")
                 return True
@@ -269,6 +275,9 @@ async def send_to_printer(
         return False
     except httpx.TimeoutException:
         log.error("kitchen_print.timeout")
+        return False
+    except httpx.HTTPError as exc:
+        log.error("kitchen_print.http_error", error=str(exc))
         return False
 
 

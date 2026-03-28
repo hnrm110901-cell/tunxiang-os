@@ -7,8 +7,10 @@
 1. 通过 WebSocket 推送提醒到对应档口的 KDS 屏幕
 2. 发送厨打单到该档口打印机
 """
+import asyncio
 import os
 import uuid
+from collections import OrderedDict
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -34,12 +36,28 @@ STATUS_CANCELLED = "cancelled"
 
 # ─── 内存中的任务时间线和状态（后续迁移到独立 kds_tasks 表） ───
 # key: task_id, value: {"status": ..., "timeline": [...], ...}
-_task_store: dict[str, dict] = {}
+# 使用 OrderedDict 以便按插入顺序淘汰旧任务
+_MAX_TASK_STORE_SIZE = 5000
+_task_store: OrderedDict[str, dict] = OrderedDict()
+_task_store_lock = asyncio.Lock()
 
 
 def _get_task(task_id: str) -> dict:
-    """获取或初始化任务记录"""
+    """获取或初始化任务记录。超过容量时淘汰最旧的已完成任务。"""
     if task_id not in _task_store:
+        # 淘汰旧的已完成/取消任务，防止内存无限增长
+        if len(_task_store) >= _MAX_TASK_STORE_SIZE:
+            to_remove: list[str] = []
+            for tid, t in _task_store.items():
+                if t["status"] in (STATUS_DONE, STATUS_CANCELLED):
+                    to_remove.append(tid)
+                if len(_task_store) - len(to_remove) < _MAX_TASK_STORE_SIZE:
+                    break
+            for tid in to_remove:
+                del _task_store[tid]
+            # 如果淘汰完成任务后仍然超限，淘汰最旧的任务
+            while len(_task_store) >= _MAX_TASK_STORE_SIZE:
+                _task_store.popitem(last=False)
         _task_store[task_id] = {
             "task_id": task_id,
             "status": STATUS_PENDING,
@@ -47,6 +65,9 @@ def _get_task(task_id: str) -> dict:
             "remake_count": 0,
             "timeline": [],
         }
+    else:
+        # 移到末尾（标记为最近访问）
+        _task_store.move_to_end(task_id)
     return _task_store[task_id]
 
 
@@ -262,7 +283,11 @@ async def request_rush(
 
     rushed_count = 0
     for tid, task in _task_store.items():
-        if task.get("status") in (STATUS_PENDING, STATUS_COOKING):
+        if (
+            task.get("order_id") == order_id
+            and task.get("dish_id") == dish_id
+            and task.get("status") in (STATUS_PENDING, STATUS_COOKING)
+        ):
             task["urgent"] = True
             _add_timeline_event(tid, "rush", detail=f"催菜: order={order_id}, dish={dish_id}")
             rushed_count += 1
@@ -345,7 +370,7 @@ async def request_remake(
     printer_address = task.get("printer_address")
 
     # 如果 task 中没有完整信息，尝试从数据库查询
-    if tenant_id and order_id and not dept_name:
+    if tenant_id and order_id and (not dept_id or dept_name == "未知档口"):
         ctx = await _resolve_task_context(order_id, dish_id, tenant_id, db)
         dept_id = dept_id or ctx["dept_id"]
         dept_name = ctx["dept_name"]

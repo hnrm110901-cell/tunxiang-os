@@ -8,7 +8,7 @@
 """
 from decimal import Decimal
 from datetime import datetime
-from typing import Dict, Any, Optional, List
+from typing import Any, Dict, List, Optional
 
 import structlog
 
@@ -279,7 +279,7 @@ class ElemeAdapter:
 
     # ==================== 标准化数据总线接口 ====================
 
-    def to_order(self, raw: Dict[str, Any], store_id: str, brand_id: str):
+    def to_order(self, raw: Dict[str, Any], store_id: str, brand_id: str) -> Any:
         """
         将饿了么原始订单字段映射到标准 OrderSchema
 

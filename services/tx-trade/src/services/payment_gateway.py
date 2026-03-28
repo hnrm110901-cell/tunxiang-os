@@ -4,17 +4,17 @@
 所有金额单位：分（fen）。
 """
 import uuid
-from datetime import datetime, timezone, date, timedelta
+from datetime import datetime, timezone
 from typing import Optional
 
 import structlog
-from sqlalchemy import select, update, func, and_, cast, Date
+from sqlalchemy import select, func, cast, Date
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.entities import Order
 from shared.ontology.src.enums import OrderStatus
 from ..models.payment import Payment, Refund
-from ..models.enums import PaymentMethod, PaymentStatus, RefundType
+from ..models.enums import PaymentStatus, RefundType
 from .shouqianba_client import ShouqianbaClient, ShouqianbaError
 
 logger = structlog.get_logger()
@@ -39,13 +39,15 @@ class PaymentGateway:
     收钱吧SDK封装：微信/支付宝/银联/云闪付统一处理。
     """
 
+    # fee_rate_permil: 手续费千分比（整数），避免 float 精度问题
+    # 例：6 表示千分之六 (0.6%)
     PAYMENT_METHODS = {
-        "cash": {"name": "现金", "need_trade_no": False, "fee_rate": 0},
-        "wechat": {"name": "微信支付", "need_trade_no": True, "fee_rate": 0.006},
-        "alipay": {"name": "支付宝", "need_trade_no": True, "fee_rate": 0.006},
-        "unionpay": {"name": "银联", "need_trade_no": True, "fee_rate": 0.005},
-        "member_balance": {"name": "会员余额", "need_trade_no": False, "fee_rate": 0},
-        "credit_account": {"name": "挂账", "need_trade_no": False, "fee_rate": 0},
+        "cash": {"name": "现金", "need_trade_no": False, "fee_rate_permil": 0},
+        "wechat": {"name": "微信支付", "need_trade_no": True, "fee_rate_permil": 6},
+        "alipay": {"name": "支付宝", "need_trade_no": True, "fee_rate_permil": 6},
+        "unionpay": {"name": "银联", "need_trade_no": True, "fee_rate_permil": 5},
+        "member_balance": {"name": "会员余额", "need_trade_no": False, "fee_rate_permil": 0},
+        "credit_account": {"name": "挂账", "need_trade_no": False, "fee_rate_permil": 0},
     }
 
     def __init__(
@@ -55,7 +57,12 @@ class PaymentGateway:
         sqb_client: Optional[ShouqianbaClient] = None,
     ):
         self.db = db
-        self.tenant_id = uuid.UUID(tenant_id)
+        if not tenant_id:
+            raise ValueError("tenant_id 不能为空")
+        try:
+            self.tenant_id = uuid.UUID(tenant_id)
+        except (ValueError, AttributeError) as exc:
+            raise ValueError(f"tenant_id 格式非法: {tenant_id}") from exc
         self.sqb_client = sqb_client
 
     async def create_payment(
@@ -71,6 +78,8 @@ class PaymentGateway:
         """
         if method not in self.PAYMENT_METHODS:
             raise ValueError(f"不支持的支付方式: {method}")
+        if not isinstance(amount_fen, int) or amount_fen <= 0:
+            raise ValueError(f"支付金额必须为正整数(分)，当前值: {amount_fen}")
 
         method_config = self.PAYMENT_METHODS[method]
 
@@ -125,9 +134,9 @@ class PaymentGateway:
                 )
                 raise RuntimeError(f"收钱吧支付失败: {exc}") from exc
 
-        # 计算手续费
-        fee_rate = method_config["fee_rate"]
-        fee_fen = round(amount_fen * fee_rate)
+        # 计算手续费（整数千分比，避免 float 精度丢失）
+        fee_rate_permil: int = method_config["fee_rate_permil"]
+        fee_fen = (amount_fen * fee_rate_permil + 999) // 1000  # 向上取整
 
         # C扫B 预下单时状态为 pending（等待顾客扫码支付）
         initial_status = PaymentStatus.paid.value
@@ -149,8 +158,7 @@ class PaymentGateway:
             payment_category=self._method_to_category(method),
             extra={
                 "fee_fen": fee_fen,
-                "fee_rate": fee_rate,
-                "auth_code": auth_code,
+                "fee_rate_permil": fee_rate_permil,
                 "qr_code": qr_code,
             },
         )
@@ -222,8 +230,24 @@ class PaymentGateway:
         if payment.status not in (PaymentStatus.paid.value, PaymentStatus.partial_refund.value):
             raise ValueError(f"支付状态 {payment.status} 不可退款")
 
-        if refund_amount_fen > payment.amount_fen:
-            raise ValueError("退款金额超过支付金额")
+        if refund_amount_fen <= 0:
+            raise ValueError(f"退款金额必须大于0，当前值: {refund_amount_fen}")
+
+        # 查询已退款总额，防止多次部分退款累计超过支付金额
+        existing_refunds_result = await self.db.execute(
+            select(func.coalesce(func.sum(Refund.amount_fen), 0)).where(
+                Refund.payment_id == pay_uuid,
+                Refund.tenant_id == self.tenant_id,
+            )
+        )
+        already_refunded_fen: int = existing_refunds_result.scalar_one()
+        refundable_fen = payment.amount_fen - already_refunded_fen
+
+        if refund_amount_fen > refundable_fen:
+            raise ValueError(
+                f"退款金额 {refund_amount_fen} 超过可退金额 {refundable_fen}"
+                f"（已退 {already_refunded_fen} / 支付 {payment.amount_fen}）"
+            )
 
         refund_no = _gen_refund_no()
 
@@ -252,10 +276,11 @@ class PaymentGateway:
                 )
                 raise RuntimeError(f"收钱吧退款失败: {exc}") from exc
 
-        # 确定退款类型
+        # 确定退款类型（基于累计退款总额判断）
+        total_refunded_after = already_refunded_fen + refund_amount_fen
         refund_type = (
             RefundType.full.value
-            if refund_amount_fen == payment.amount_fen
+            if total_refunded_after == payment.amount_fen
             else RefundType.partial.value
         )
 
@@ -273,10 +298,10 @@ class PaymentGateway:
         )
         self.db.add(refund_record)
 
-        # 更新支付状态
+        # 更新支付状态（基于累计退款总额判断）
         new_status = (
             PaymentStatus.refunded.value
-            if refund_amount_fen == payment.amount_fen
+            if total_refunded_after == payment.amount_fen
             else PaymentStatus.partial_refund.value
         )
         payment.status = new_status
@@ -319,6 +344,16 @@ class PaymentGateway:
         if not order:
             raise ValueError(f"订单不存在: {order_id}")
 
+        if not splits:
+            raise ValueError("拆单列表不能为空")
+
+        # 逐项校验
+        for idx, s in enumerate(splits):
+            if "method" not in s or "amount_fen" not in s:
+                raise ValueError(f"拆单第{idx+1}项缺少 method 或 amount_fen")
+            if not isinstance(s["amount_fen"], int) or s["amount_fen"] <= 0:
+                raise ValueError(f"拆单第{idx+1}项金额必须为正整数(分)")
+
         # 校验总额
         total_split = sum(s["amount_fen"] for s in splits)
         if total_split != order.final_amount_fen:
@@ -350,20 +385,71 @@ class PaymentGateway:
                     failed_index=i,
                     error=str(e),
                 )
-                for pid in completed_payment_ids:
+                # 回滚：已完成的在线支付需调用收钱吧退款/撤单
+                rollback_errors: list[str] = []
+                for pay_rec in payment_records:
+                    pid = pay_rec["payment_id"]
                     pay_q = await self.db.execute(
                         select(Payment).where(Payment.id == uuid.UUID(pid))
                     )
                     pay = pay_q.scalar_one_or_none()
-                    if pay:
-                        pay.status = PaymentStatus.failed.value
+                    if not pay:
+                        continue
+
+                    # 在线支付且有 trade_no，需调收钱吧撤单
+                    if (
+                        pay.method in _SQB_METHODS
+                        and pay.trade_no
+                        and self.sqb_client
+                    ):
+                        try:
+                            await self.sqb_client.cancel(pay.trade_no)
+                            logger.info(
+                                "split_rollback_cancel_ok",
+                                payment_no=pay.payment_no,
+                                trade_no=pay.trade_no,
+                            )
+                        except ShouqianbaError as cancel_err:
+                            # 撤单失败，尝试退款
+                            try:
+                                rollback_refund_no = _gen_refund_no()
+                                await self.sqb_client.refund(
+                                    sn=pay.trade_no,
+                                    refund_request_no=rollback_refund_no,
+                                    refund_amount=pay.amount_fen,
+                                )
+                                logger.info(
+                                    "split_rollback_refund_ok",
+                                    payment_no=pay.payment_no,
+                                    trade_no=pay.trade_no,
+                                )
+                            except ShouqianbaError as refund_err:
+                                rollback_errors.append(
+                                    f"{pay.payment_no}: 撤单失败({cancel_err})，"
+                                    f"退款也失败({refund_err})"
+                                )
+                                logger.error(
+                                    "split_rollback_failed",
+                                    payment_no=pay.payment_no,
+                                    trade_no=pay.trade_no,
+                                    cancel_error=str(cancel_err),
+                                    refund_error=str(refund_err),
+                                )
+
+                    pay.status = PaymentStatus.failed.value
 
                 await self.db.flush()
+
+                error_msg = f"第{i+1}笔支付失败: {str(e)}"
+                if rollback_errors:
+                    error_msg += f"; 回滚异常(需人工介入): {'; '.join(rollback_errors)}"
+
                 return {
                     "success": False,
                     "payment_records": payment_records,
                     "total_fee_fen": total_fee_fen,
-                    "error": f"第{i+1}笔支付失败: {str(e)}",
+                    "error": error_msg,
+                    "rollback_errors": rollback_errors,
                 }
 
         return {
@@ -408,18 +494,22 @@ class PaymentGateway:
                 "by_method": {},
             }
 
-        # 查所有支付记录
+        # 查所有支付记录（必须带 tenant_id 过滤）
         payments_result = await self.db.execute(
             select(Payment).where(
                 Payment.order_id.in_(order_ids),
+                Payment.tenant_id == self.tenant_id,
                 Payment.status.in_([PaymentStatus.paid.value, PaymentStatus.partial_refund.value]),
             )
         )
         payments = payments_result.scalars().all()
 
-        # 查退款
+        # 查退款（必须带 tenant_id 过滤）
         refunds_result = await self.db.execute(
-            select(Refund).where(Refund.order_id.in_(order_ids))
+            select(Refund).where(
+                Refund.order_id.in_(order_ids),
+                Refund.tenant_id == self.tenant_id,
+            )
         )
         refunds = refunds_result.scalars().all()
 

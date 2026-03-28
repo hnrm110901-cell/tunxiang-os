@@ -212,7 +212,10 @@ async def dispatch_order_to_kds(
             except (ValueError, AttributeError):
                 pass
 
-        await print_kitchen_tickets_for_dispatch(dept_tasks, _ono, _tbl)
+        try:
+            await print_kitchen_tickets_for_dispatch(dept_tasks, _ono, _tbl)
+        except Exception:
+            log.error("kds_dispatch.print_failed", exc_info=True)
 
     log.info("kds_dispatch.done", dept_count=len(dept_tasks), total_tasks=sum(len(d["items"]) for d in dept_tasks))
     return {"dept_tasks": dept_tasks}

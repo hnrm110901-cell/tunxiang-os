@@ -4,11 +4,9 @@ KDS 实时推送服务
 """
 from __future__ import annotations
 
-import json
-from typing import Any
-
 import structlog
 from fastapi import WebSocket
+from starlette.websockets import WebSocketState
 
 logger = structlog.get_logger()
 
@@ -75,9 +73,12 @@ class KDSPusher:
 
         for ws in conns:
             try:
+                if ws.client_state != WebSocketState.CONNECTED:
+                    dead.append(ws)
+                    continue
                 await ws.send_json(message)
                 sent += 1
-            except Exception as exc:
+            except (RuntimeError, OSError, ConnectionError) as exc:
                 logger.warning(
                     "kds_ws_send_failed",
                     station_id=station_id,

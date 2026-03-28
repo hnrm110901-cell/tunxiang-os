@@ -20,18 +20,37 @@ logger = structlog.get_logger()
 # 美团回调签名密钥
 MEITUAN_APP_SECRET = os.environ.get("MEITUAN_APP_SECRET", "")
 
+# 时间戳容许偏差（秒）— 美团/饿了么/抖音共用
+_TIMESTAMP_TOLERANCE = 300
+
 
 def _verify_meituan_callback_sign(params: dict[str, Any], sign: str) -> bool:
-    """验证美团回调签名：MD5(sorted_params_kv + app_secret)"""
+    """验证美团回调签名：MD5(sorted_params_kv + app_secret)
+
+    包含时间戳防重放校验（美团推送 params 中含 timestamp 字段）。
+    """
     if not MEITUAN_APP_SECRET:
         logger.error("meituan_webhook_no_secret_configured")
         return False
+
+    # 时间戳防重放
+    ts_str = str(params.get("timestamp", ""))
+    if ts_str:
+        try:
+            ts = int(ts_str)
+            if abs(int(time.time()) - ts) > _TIMESTAMP_TOLERANCE:
+                logger.warning("meituan_webhook_timestamp_expired", diff=abs(int(time.time()) - ts))
+                return False
+        except (ValueError, TypeError):
+            logger.warning("meituan_webhook_bad_timestamp", timestamp=ts_str)
+            return False
+
     filtered = {k: v for k, v in params.items() if k != "sign"}
     sorted_pairs = sorted(filtered.items(), key=lambda kv: kv[0])
     param_str = "".join(f"{k}={v}" for k, v in sorted_pairs)
     raw = param_str + MEITUAN_APP_SECRET
     expected = hashlib.md5(raw.encode("utf-8")).hexdigest().lower()
-    return expected == sign.lower()
+    return hmac_mod.compare_digest(expected, sign.lower())
 
 router = APIRouter(prefix="/api/v1/webhook", tags=["webhook"])
 
@@ -133,9 +152,13 @@ async def meituan_order_push(request: Request) -> WebhookResp:
     try:
         form_data = await request.form()
         body: dict[str, Any] = dict(form_data)
-    except ValueError:
+    except (ValueError, KeyError):
         # 也可能是 JSON
-        body = await request.json()
+        try:
+            body = await request.json()
+        except (ValueError, KeyError) as exc:
+            logger.error("meituan_webhook_bad_body", error=str(exc))
+            raise HTTPException(status_code=400, detail="请求体解析失败") from exc
 
     logger.info(
         "meituan_webhook_received",
@@ -209,9 +232,6 @@ async def meituan_order_push(request: Request) -> WebhookResp:
 
 ELEME_APP_SECRET = os.environ.get("ELEME_APP_SECRET", "")
 DOUYIN_APP_SECRET = os.environ.get("DOUYIN_APP_SECRET", "")
-
-# 时间戳容许偏差（秒）
-_TIMESTAMP_TOLERANCE = 300
 
 
 def _verify_eleme_signature(payload: str, signature: str, timestamp: str) -> bool:

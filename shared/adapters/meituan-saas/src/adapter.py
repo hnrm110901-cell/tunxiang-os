@@ -537,14 +537,14 @@ class MeituanSaasAdapter:
         response = await self._request("GET", "/api/logistics/query", data=data)
         return response.get("data", {})
 
-    async def close(self):
+    async def close(self) -> None:
         """关闭适配器，释放资源"""
         logger.info("关闭美团SAAS适配器")
         await self.api_client.close()
 
     # ==================== 标准化数据总线接口 ====================
 
-    def to_order(self, raw: Dict[str, Any], store_id: str, brand_id: str):
+    def to_order(self, raw: Dict[str, Any], store_id: str, brand_id: str) -> Any:
         """
         将美团SAAS原始订单字段映射到标准 OrderSchema
 
@@ -625,7 +625,7 @@ class MeituanSaasAdapter:
             notes=raw.get("caution"),
         )
 
-    def to_staff_action(self, raw: Dict[str, Any], store_id: str, brand_id: str):
+    def to_staff_action(self, raw: Dict[str, Any], store_id: str, brand_id: str) -> Any:
         """
         将美团SAAS原始操作数据映射为标准 StaffAction
 

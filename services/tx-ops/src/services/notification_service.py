@@ -125,11 +125,11 @@ class NotificationService:
                 params=params,
             )
 
-        # 持久化通知记录
+        # 持久化通知记录（手机号脱敏入库）
         await self._save_notification(
             notification_id=notification_id,
             channel="sms",
-            recipient=phone,
+            recipient=self._mask_phone(phone),
             template_id=template_id,
             params=params,
             status=status,
@@ -209,7 +209,7 @@ class NotificationService:
         await self._save_notification(
             notification_id=notification_id,
             channel="wechat",
-            recipient=openid,
+            recipient=self._mask_openid(openid),
             template_id=template_id,
             params=data,
             status=status,
@@ -576,42 +576,52 @@ class NotificationService:
         error_msg: Optional[str] = None,
         store_id: Optional[str] = None,
     ) -> None:
-        """写入 notifications 表记录发送历史"""
+        """写入 notifications 表记录发送历史
+
+        持久化失败仅记录日志，不阻塞主流程。
+        """
         from sqlalchemy import text
 
-        tenant_uuid = uuid.UUID(self.tenant_id)
-        store_uuid = uuid.UUID(store_id) if store_id else None
+        try:
+            tenant_uuid = uuid.UUID(self.tenant_id)
+            store_uuid = uuid.UUID(store_id) if store_id else None
+            type_map = {"sent": "success", "mock": "info", "failed": "error"}
 
-        type_map = {"sent": "success", "mock": "info", "failed": "error"}
-
-        await self.db.execute(
-            text(
-                "INSERT INTO notifications "
-                "(id, tenant_id, title, message, type, priority, store_id, "
-                "extra_data, source, created_at, updated_at, is_deleted) "
-                "VALUES (:id, :tid, :title, :msg, :typ, 'normal', :sid, "
-                ":extra, :src, NOW(), NOW(), false)"
-            ),
-            {
-                "id": str(uuid.uuid4()),
-                "tid": str(tenant_uuid),
-                "title": f"[{channel.upper()}] {template_id}",
-                "msg": f"To: {recipient} | Status: {status}"
-                       + (f" | Error: {error_msg}" if error_msg else ""),
-                "typ": type_map.get(status, "info"),
-                "sid": str(store_uuid) if store_uuid else None,
-                "extra": json.dumps({
-                    "channel": channel,
-                    "notification_id": notification_id,
-                    "recipient": recipient,
-                    "template_id": template_id,
-                    "params": params,
-                    "status": status,
-                    "error": error_msg,
-                }),
-                "src": f"notification_service/{channel}",
-            },
-        )
+            await self.db.execute(
+                text(
+                    "INSERT INTO notifications "
+                    "(id, tenant_id, title, message, type, priority, store_id, "
+                    "extra_data, source, created_at, updated_at, is_deleted) "
+                    "VALUES (:id, :tid, :title, :msg, :typ, 'normal', :sid, "
+                    ":extra, :src, NOW(), NOW(), false)"
+                ),
+                {
+                    "id": str(uuid.uuid4()),
+                    "tid": str(tenant_uuid),
+                    "title": f"[{channel.upper()}] {template_id}",
+                    "msg": f"To: {recipient} | Status: {status}"
+                           + (f" | Error: {error_msg}" if error_msg else ""),
+                    "typ": type_map.get(status, "info"),
+                    "sid": str(store_uuid) if store_uuid else None,
+                    "extra": json.dumps({
+                        "channel": channel,
+                        "notification_id": notification_id,
+                        "recipient": recipient,  # already masked by caller
+                        "template_id": template_id,
+                        "params": params,
+                        "status": status,
+                        "error": error_msg,
+                    }, ensure_ascii=False),
+                    "src": f"notification_service/{channel}",
+                },
+            )
+        except (OSError, ValueError, RuntimeError) as exc:
+            logger.error(
+                "notification_persist_failed",
+                notification_id=notification_id,
+                channel=channel,
+                error=str(exc),
+            )
 
     # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     #  工具方法
@@ -623,3 +633,10 @@ class NotificationService:
         if len(phone) >= 7:
             return phone[:3] + "****" + phone[-4:]
         return "***"
+
+    @staticmethod
+    def _mask_openid(openid: str) -> str:
+        """微信openid脱敏: oXyz1234****abcd"""
+        if len(openid) >= 12:
+            return openid[:8] + "****" + openid[-4:]
+        return openid[:4] + "***" if len(openid) >= 4 else "***"

@@ -39,7 +39,6 @@ class ShouqianbaClient:
     使用 httpx.AsyncClient 全局连接池，MD5 签名认证。
     """
 
-    BASE_URL = "https://vsi-api.shouqianba.com"
     PAY_TIMEOUT = 30.0  # 支付类接口超时(秒)
     DEFAULT_TIMEOUT = 10.0  # 普通接口超时(秒)
     POLL_INTERVAL = 2.0  # 轮询间隔(秒)
@@ -57,9 +56,12 @@ class ShouqianbaClient:
         self.terminal_key = terminal_key or os.environ["SHOUQIANBA_TERMINAL_KEY"]
         self.vendor_sn = vendor_sn or os.environ.get("SHOUQIANBA_VENDOR_SN", "")
         self.vendor_key = vendor_key or os.environ.get("SHOUQIANBA_VENDOR_KEY", "")
+        self._base_url = os.environ.get(
+            "SHOUQIANBA_BASE_URL", "https://vsi-api.shouqianba.com"
+        )
         self._external_client = http_client is not None
         self._client = http_client or httpx.AsyncClient(
-            base_url=self.BASE_URL,
+            base_url=self._base_url,
             timeout=httpx.Timeout(self.DEFAULT_TIMEOUT),
             headers={"Content-Type": "application/json"},
         )
@@ -89,12 +91,19 @@ class ShouqianbaClient:
         Returns:
             收钱吧完整 biz_response 字典
         """
+        if not client_sn:
+            raise ValueError("client_sn 不能为空")
+        if total_amount <= 0:
+            raise ValueError(f"total_amount 必须大于0，当前值: {total_amount}")
+        if not dynamic_id:
+            raise ValueError("dynamic_id（付款码）不能为空")
+
         body = {
             "terminal_sn": self.terminal_sn,
             "client_sn": client_sn,
             "total_amount": str(total_amount),
             "dynamic_id": dynamic_id,
-            "subject": subject,
+            "subject": subject or "收钱吧支付",
         }
         logger.info(
             "sqb_pay_request",
@@ -134,11 +143,16 @@ class ShouqianbaClient:
         Returns:
             收钱吧完整 biz_response 字典，包含 qr_code 字段
         """
+        if not client_sn:
+            raise ValueError("client_sn 不能为空")
+        if total_amount <= 0:
+            raise ValueError(f"total_amount 必须大于0，当前值: {total_amount}")
+
         body = {
             "terminal_sn": self.terminal_sn,
             "client_sn": client_sn,
             "total_amount": str(total_amount),
-            "subject": subject,
+            "subject": subject or "收钱吧支付",
         }
         logger.info(
             "sqb_precreate_request",
@@ -160,6 +174,8 @@ class ShouqianbaClient:
         Returns:
             收钱吧完整 biz_response 字典
         """
+        if not sn:
+            raise ValueError("sn（订单号）不能为空")
         body = {
             "terminal_sn": self.terminal_sn,
             "sn": sn,
@@ -184,6 +200,13 @@ class ShouqianbaClient:
         Returns:
             收钱吧完整 biz_response 字典
         """
+        if not sn:
+            raise ValueError("sn（原订单号）不能为空")
+        if not refund_request_no:
+            raise ValueError("refund_request_no 不能为空")
+        if refund_amount <= 0:
+            raise ValueError(f"refund_amount 必须大于0，当前值: {refund_amount}")
+
         body = {
             "terminal_sn": self.terminal_sn,
             "sn": sn,
@@ -210,6 +233,8 @@ class ShouqianbaClient:
         Returns:
             收钱吧完整 biz_response 字典
         """
+        if not sn:
+            raise ValueError("sn（订单号）不能为空")
         body = {
             "terminal_sn": self.terminal_sn,
             "sn": sn,
@@ -270,7 +295,20 @@ class ShouqianbaClient:
             )
             raise
 
-        data = response.json()
+        try:
+            data = response.json()
+        except (json.JSONDecodeError, ValueError) as exc:
+            logger.error(
+                "sqb_invalid_json_response",
+                path=path,
+                status_code=response.status_code,
+                body_preview=response.text[:200],
+            )
+            raise ShouqianbaError(
+                f"收钱吧返回非法JSON: {response.text[:100]}",
+                result_code="INVALID_RESPONSE",
+            ) from exc
+
         logger.debug(
             "sqb_response",
             path=path,

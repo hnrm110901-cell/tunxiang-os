@@ -73,7 +73,7 @@ def upgrade() -> None:
         sa.Column("tenant_id", UUID(as_uuid=True), nullable=False, index=True),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
-        sa.Column("is_deleted", sa.Boolean(), default=False),
+        sa.Column("is_deleted", sa.Boolean(), server_default=sa.text("false"), nullable=False),
 
         # ── 内部编号 ──
         sa.Column("order_no", sa.String(64), unique=True, nullable=False, index=True,

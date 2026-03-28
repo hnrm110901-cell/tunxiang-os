@@ -211,8 +211,9 @@ def upgrade() -> None:
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
         sa.Column("is_deleted", sa.Boolean, server_default="false"),
     )
+    # 修复: 唯一约束必须包含 tenant_id，否则不同租户的计数器会冲突
     op.create_index("uq_queue_counter", "queue_counters",
-                    ["store_id", "date", "prefix"], unique=True)
+                    ["tenant_id", "store_id", "date", "prefix"], unique=True)
 
     # =========================================================================
     # Enable RLS on all new tables

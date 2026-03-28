@@ -114,6 +114,7 @@ class QueueCounter(TenantBase):
     last_number: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
     __table_args__ = (
-        Index("uq_queue_counter", "store_id", "date", "prefix", unique=True),
+        # 修复: 唯一约束必须包含 tenant_id，否则不同租户的计数器会冲突
+        Index("uq_queue_counter", "tenant_id", "store_id", "date", "prefix", unique=True),
         {"comment": "排队号当日计数器"},
     )

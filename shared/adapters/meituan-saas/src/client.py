@@ -113,8 +113,9 @@ class MeituanClient:
         sorted_pairs = sorted(filtered.items(), key=lambda kv: kv[0])
         param_str = "".join(f"{k}={v}" for k, v in sorted_pairs)
         raw = param_str + app_secret
+        import hmac as _hmac
         expected = hashlib.md5(raw.encode("utf-8")).hexdigest().lower()
-        return expected == sign.lower()
+        return _hmac.compare_digest(expected, sign.lower())
 
     # ─── OAuth2 Token ───
 

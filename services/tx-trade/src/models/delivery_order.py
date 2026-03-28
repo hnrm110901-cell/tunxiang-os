@@ -4,6 +4,7 @@
 所有金额存分（fen）。
 """
 import uuid
+from datetime import datetime
 
 from sqlalchemy import (
     Boolean, DateTime, Integer, Float, String, Text,
@@ -103,13 +104,13 @@ class DeliveryOrder(TenantBase):
     )
 
     # 时间戳
-    confirmed_at: Mapped[str | None] = mapped_column(DateTime(timezone=True))
+    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     estimated_ready_min: Mapped[int | None] = mapped_column(
         Integer, comment="预计出餐分钟数",
     )
-    ready_at: Mapped[str | None] = mapped_column(DateTime(timezone=True))
-    completed_at: Mapped[str | None] = mapped_column(DateTime(timezone=True))
-    cancelled_at: Mapped[str | None] = mapped_column(DateTime(timezone=True))
+    ready_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     cancel_reason: Mapped[str | None] = mapped_column(String(500))
     cancel_responsible: Mapped[str | None] = mapped_column(
         String(20), comment="merchant/customer/platform/rider",
