@@ -61,6 +61,15 @@ logs:
 up-prod:
 	docker-compose -f docker-compose.prod.yml up -d
 
+up-staging:
+	docker-compose -f docker-compose.staging.yml --env-file .env.staging up -d
+
+down-staging:
+	docker-compose -f docker-compose.staging.yml down
+
+logs-staging:
+	docker-compose -f docker-compose.staging.yml logs -f
+
 # ─── 开发 ───
 
 dev-pos:
@@ -82,11 +91,31 @@ lint:
 
 # ─── 数据库 ───
 
+migrate-check:
+	@./scripts/migrate.sh check
+
 migrate-up:
-	cd shared/db-migrations && alembic upgrade head
+	@./scripts/migrate.sh up --no-backup
+
+migrate-up-safe:
+	@./scripts/migrate.sh up
+
+migrate-rollback:
+	@./scripts/migrate.sh rollback
+
+migrate-history:
+	@./scripts/migrate.sh history
 
 migrate-gen:
 	cd shared/db-migrations && alembic revision --autogenerate -m "$(msg)"
+
+# ─── 部署 ───
+
+deploy-staging:
+	@./scripts/deploy.sh staging
+
+deploy-prod:
+	@./scripts/deploy.sh prod
 
 # ─── 新店上线 ───
 
@@ -100,6 +129,17 @@ verify-agents:
 
 smoke:
 	@bash scripts/smoke_test.sh
+
+# ─── 监控 ───
+
+monitor:
+	@./scripts/monitor.sh check
+
+monitor-install:
+	@./scripts/monitor.sh install
+
+monitor-uninstall:
+	@./scripts/monitor.sh uninstall
 
 # ─── MCP Server ───
 
