@@ -1,0 +1,78 @@
+version: "3.8"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: tunxiang
+      POSTGRES_PASSWORD: tunxiang_demo_2024
+      POSTGRES_DB: tunxiang_os
+    ports:
+      - "5432:5432"
+    volumes:
+      - demo_pg_data:/var/lib/postgresql/data
+    networks:
+      - tunxiang-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tunxiang -d tunxiang_os"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  gateway:
+    image: python:3.12-slim
+    working_dir: /app
+    command: >
+      bash -c "pip install --no-cache-dir -q
+      fastapi>=0.104.0 uvicorn[standard]>=0.24.0 pydantic>=2.4.0
+      sqlalchemy>=2.0.0 asyncpg>=0.29.0 structlog>=23.1.0
+      passlib[bcrypt]>=1.7.4 PyJWT>=2.8.0 httpx>=0.25.0
+      && uvicorn services.gateway.src.main:app --host 0.0.0.0 --port 8000"
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://tunxiang:tunxiang_demo_2024@postgres:5432/tunxiang_os
+      JWT_SECRET: tunxiang-demo-jwt-secret-2024
+      PYTHONPATH: /app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - tunxiang-net
+    volumes:
+      - ../..:/app:ro
+
+  tx-analytics:
+    image: python:3.12-slim
+    working_dir: /app
+    command: >
+      bash -c "pip install --no-cache-dir -q
+      fastapi>=0.104.0 uvicorn[standard]>=0.24.0 pydantic>=2.4.0
+      sqlalchemy>=2.0.0 asyncpg>=0.29.0 structlog>=23.1.0 httpx>=0.25.0
+      apscheduler>=3.10.0
+      && uvicorn services.tx_analytics.src.main:app --host 0.0.0.0 --port 8007"
+    ports:
+      - "8007:8007"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://tunxiang:tunxiang_demo_2024@postgres:5432/tunxiang_os
+      PYTHONPATH: /app
+      TENANT_1_ID: "10000000-0000-0000-0000-000000000001"
+      TENANT_1_NAME: "尝在一起"
+      TENANT_2_ID: "10000000-0000-0000-0000-000000000002"
+      TENANT_2_NAME: "最黔线"
+      TENANT_3_ID: "10000000-0000-0000-0000-000000000003"
+      TENANT_3_NAME: "尚宫厨"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - tunxiang-net
+    volumes:
+      - ../..:/app:ro
+
+networks:
+  tunxiang-net:
+    driver: bridge
+
+volumes:
+  demo_pg_data:
