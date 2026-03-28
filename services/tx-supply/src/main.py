@@ -7,11 +7,13 @@ from fastapi import FastAPI
 from .api.inventory import router as inv_router
 from .api.bom_routes import router as bom_router
 from .api.deduction_routes import router as deduction_router
+from .api.receiving_routes import router as receiving_router
 
 app = FastAPI(title="TunxiangOS tx-supply", version="3.0.0")
 app.include_router(inv_router)
 app.include_router(bom_router)
 app.include_router(deduction_router)
+app.include_router(receiving_router)
 
 @app.get("/health")
 async def health():

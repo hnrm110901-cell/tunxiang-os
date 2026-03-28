@@ -64,6 +64,23 @@ const MENU_CONFIGS: Record<string, MenuConfig> = {
       ]},
     ],
   },
+  ops: {
+    moduleId: 'ops', groups: [
+      { label: '经营管理', items: [
+        { id: 'ops-dashboard', label: '经营驾驶舱', icon: '📊', path: '/hq/ops/dashboard' },
+        { id: 'store-analysis', label: '门店分析', icon: '🏪', path: '/hq/ops/store-analysis' },
+        { id: 'dish-analysis', label: '菜品分析', icon: '🍜', path: '/hq/ops/dish-analysis' },
+      ]},
+      { label: '管控', items: [
+        { id: 'approvals', label: '审批中心', icon: '✅', count: 4, path: '/hq/ops/approvals' },
+        { id: 'alerts', label: '异常中心', icon: '🚨', count: 5, path: '/hq/ops/alerts' },
+        { id: 'review', label: '复盘中心', icon: '📋', path: '/hq/ops/review' },
+      ]},
+      { label: '配置', items: [
+        { id: 'settings', label: '模板配置', icon: '⚙️', path: '/hq/ops/settings' },
+      ]},
+    ],
+  },
 };
 
 interface SidebarHQProps {

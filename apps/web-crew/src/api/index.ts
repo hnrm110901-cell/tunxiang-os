@@ -144,3 +144,179 @@ export interface ProfileData {
 export async function fetchProfile(employeeId: string): Promise<ProfileData> {
   return txFetch(`/api/v1/org/employees/${encodeURIComponent(employeeId)}/profile`);
 }
+
+// ─── 开台 ───
+
+export async function openTable(
+  storeId: string,
+  tableNo: string,
+  guestCount: number,
+): Promise<{ table_no: string; order_id: string }> {
+  return txFetch('/api/v1/trade/tables/open', {
+    method: 'POST',
+    body: JSON.stringify({ store_id: storeId, table_no: tableNo, guest_count: guestCount }),
+  });
+}
+
+export async function clearTable(
+  storeId: string,
+  tableNo: string,
+): Promise<{ table_no: string; status: string }> {
+  return txFetch('/api/v1/trade/tables/clear', {
+    method: 'POST',
+    body: JSON.stringify({ store_id: storeId, table_no: tableNo }),
+  });
+}
+
+// ─── 菜品列表 ───
+
+export interface DishCategory {
+  category_id: string;
+  category_name: string;
+}
+
+export interface DishInfo {
+  dish_id: string;
+  dish_name: string;
+  category_id: string;
+  price_fen: number;
+  image_url?: string;
+  tags?: string[];
+  sold_out: boolean;
+  is_market_price: boolean;   // 时价菜
+  is_weighed: boolean;        // 称重菜
+  specs?: DishSpec[];
+}
+
+export interface DishSpec {
+  spec_id: string;
+  spec_name: string;       // 如"做法"
+  options: string[];        // 如["红烧","清蒸","葱油"]
+}
+
+export async function fetchDishCategories(storeId: string): Promise<{ items: DishCategory[] }> {
+  return txFetch(`/api/v1/menu/categories?store_id=${encodeURIComponent(storeId)}`);
+}
+
+export async function fetchDishes(storeId: string, categoryId?: string): Promise<{ items: DishInfo[]; total: number }> {
+  const catParam = categoryId ? `&category_id=${encodeURIComponent(categoryId)}` : '';
+  return txFetch(`/api/v1/menu/dishes?store_id=${encodeURIComponent(storeId)}${catParam}`);
+}
+
+// ─── KDS 出餐任务 ───
+
+export interface KdsTask {
+  task_id: string;
+  order_id: string;
+  table_no: string;
+  dish_name: string;
+  quantity: number;
+  spec?: string;
+  status: 'pending' | 'cooking' | 'done';
+  created_at: string;
+}
+
+export async function fetchKdsTasks(storeId: string, orderId: string): Promise<{ items: KdsTask[] }> {
+  return txFetch(`/api/v1/kds/tasks?store_id=${encodeURIComponent(storeId)}&order_id=${encodeURIComponent(orderId)}`);
+}
+
+export async function rushKdsTask(taskId: string): Promise<{ task_id: string; rushed: boolean }> {
+  return txFetch(`/api/v1/kds/tasks/${encodeURIComponent(taskId)}/rush`, {
+    method: 'POST',
+  });
+}
+
+// ─── 转台/并台 ───
+
+export async function transferTable(
+  storeId: string,
+  fromTable: string,
+  toTable: string,
+): Promise<{ from_table: string; to_table: string }> {
+  return txFetch('/api/v1/trade/tables/transfer', {
+    method: 'POST',
+    body: JSON.stringify({ store_id: storeId, from_table: fromTable, to_table: toTable }),
+  });
+}
+
+export async function mergeTables(
+  storeId: string,
+  mainTable: string,
+  mergeTables: string[],
+): Promise<{ main_table: string; merged_tables: string[] }> {
+  return txFetch('/api/v1/trade/tables/merge', {
+    method: 'POST',
+    body: JSON.stringify({ store_id: storeId, main_table: mainTable, merge_tables: mergeTables }),
+  });
+}
+
+// ─── 会员 ───
+
+export interface MemberInfo {
+  member_id: string;
+  name: string;
+  phone: string;
+  level: string;
+  points: number;
+  balance_fen: number;
+  preferences: string[];
+  visit_count: number;
+  last_visit: string;
+}
+
+export async function searchMember(keyword: string): Promise<{ items: MemberInfo[] }> {
+  return txFetch(`/api/v1/member/search?keyword=${encodeURIComponent(keyword)}`);
+}
+
+export async function bindMemberToOrder(
+  orderId: string,
+  memberId: string,
+): Promise<{ order_id: string; member_id: string }> {
+  return txFetch(`/api/v1/trade/orders/${encodeURIComponent(orderId)}/bind-member`, {
+    method: 'POST',
+    body: JSON.stringify({ member_id: memberId }),
+  });
+}
+
+// ─── 客诉 ───
+
+export interface ComplaintPayload {
+  store_id: string;
+  table_no?: string;
+  order_id?: string;
+  type: 'dish' | 'service' | 'environment' | 'wait';
+  description: string;
+  image_urls?: string[];
+}
+
+export async function submitComplaint(payload: ComplaintPayload): Promise<{ complaint_id: string }> {
+  return txFetch('/api/v1/ops/complaints', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+// ─── 服务确认 ───
+
+export interface ServiceStatus {
+  table_no: string;
+  guest_count: number;
+  order_status: 'ordered' | 'all_served' | 'pending_checkout';
+  total_fen: number;
+  elapsed_min: number;
+  last_patrol: string | null;
+}
+
+export async function fetchServiceStatus(storeId: string): Promise<{ items: ServiceStatus[] }> {
+  return txFetch(`/api/v1/trade/service-status?store_id=${encodeURIComponent(storeId)}`);
+}
+
+export async function recordPatrol(
+  storeId: string,
+  tableNo: string,
+): Promise<{ table_no: string; patrol_time: string }> {
+  return txFetch('/api/v1/trade/patrol', {
+    method: 'POST',
+    body: JSON.stringify({ store_id: storeId, table_no: tableNo }),
+  });
+}

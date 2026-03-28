@@ -35,6 +35,13 @@ import { StoreExecutionPage } from './pages/hq/growth/StoreExecutionPage';
 import { CompetitorCenterPage } from './pages/hq/market-intel/CompetitorCenterPage';
 import { ReviewTopicPage } from './pages/hq/market-intel/ReviewTopicPage';
 import { TrendReportPage } from './pages/hq/market-intel/TrendReportPage';
+import { OpsDashboardPage } from './pages/hq/ops/OpsDashboardPage';
+import { StoreAnalysisPage } from './pages/hq/ops/StoreAnalysisPage';
+import { DishAnalysisPage } from './pages/hq/ops/DishAnalysisPage';
+import { ApprovalCenterPage } from './pages/hq/ops/ApprovalCenterPage';
+import { ReviewCenterPage } from './pages/hq/ops/ReviewCenterPage';
+import { AlertCenterPage } from './pages/hq/ops/AlertCenterPage';
+import { SettingsPage } from './pages/hq/ops/SettingsPage';
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem('tx_token'));
@@ -89,6 +96,13 @@ function App() {
           <Route path="/hq/market-intel/competitors" element={<CompetitorCenterPage />} />
           <Route path="/hq/market-intel/reviews" element={<ReviewTopicPage />} />
           <Route path="/hq/market-intel/reports" element={<TrendReportPage />} />
+          <Route path="/hq/ops/dashboard" element={<OpsDashboardPage />} />
+          <Route path="/hq/ops/store-analysis" element={<StoreAnalysisPage />} />
+          <Route path="/hq/ops/dish-analysis" element={<DishAnalysisPage />} />
+          <Route path="/hq/ops/approvals" element={<ApprovalCenterPage />} />
+          <Route path="/hq/ops/review" element={<ReviewCenterPage />} />
+          <Route path="/hq/ops/alerts" element={<AlertCenterPage />} />
+          <Route path="/hq/ops/settings" element={<SettingsPage />} />
         </Routes>
       </ShellHQ>
     </BrowserRouter>

@@ -13,6 +13,7 @@ from .api.cashier_api import router as cashier_router
 from .api.kds_routes import router as kds_router
 from .api.handover_routes import router as handover_router
 from .api.table_routes import router as table_router
+from .api.enterprise_routes import router as enterprise_router
 
 
 @asynccontextmanager
@@ -41,6 +42,7 @@ app.include_router(cashier_router)
 app.include_router(kds_router)
 app.include_router(handover_router)
 app.include_router(table_router)
+app.include_router(enterprise_router)
 
 
 @app.get("/health")
