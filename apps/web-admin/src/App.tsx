@@ -49,6 +49,7 @@ import { FinanceAnalysisPage } from './pages/hq/analytics/FinanceAnalysisPage';
 import { MemberAnalysisPage } from './pages/hq/analytics/MemberAnalysisPage';
 import { DishListPage } from './pages/menu/DishListPage';
 import { MenuTemplatePage } from './pages/menu/MenuTemplatePage';
+import { InventoryDashboard } from './pages/inventory/InventoryDashboard';
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem('tx_token'));
@@ -83,6 +84,7 @@ function App() {
           <Route path="/catalog" element={<CatalogPage />} />
           <Route path="/menu/dishes" element={<DishListPage />} />
           <Route path="/menu/templates" element={<MenuTemplatePage />} />
+          <Route path="/inventory" element={<InventoryDashboard />} />
           <Route path="/supply" element={<SupplyPage />} />
           <Route path="/operations" element={<OperationsPage />} />
           <Route path="/crm" element={<CrmPage />} />

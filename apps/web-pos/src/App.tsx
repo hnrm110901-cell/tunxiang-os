@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { CashierPage } from './pages/CashierPage';
 import { MenuOrderPage } from './components/menu/MenuOrderPage';
+import { ToastOpenView } from './components/menu/ToastOpenView';
 import { OrderPage } from './pages/OrderPage';
 import { SettlePage } from './pages/SettlePage';
 import { ShiftPage } from './pages/ShiftPage';
@@ -28,6 +29,7 @@ function App() {
         <Route path="/reservations" element={<ReservationPage />} />
         <Route path="/open-table/:tableNo" element={<OpenTablePage />} />
         <Route path="/menu/:tableNo" element={<MenuOrderPage />} />
+        <Route path="/toast/:tableNo" element={<ToastOpenView />} />
         <Route path="/cashier/:tableNo" element={<CashierPage />} />
         <Route path="/order/:orderId" element={<OrderPage />} />
         <Route path="/settle/:orderId" element={<SettlePage />} />

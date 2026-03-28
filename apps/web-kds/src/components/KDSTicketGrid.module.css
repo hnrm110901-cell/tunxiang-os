@@ -1,0 +1,501 @@
+/**
+ * KDSTicketGrid.module.css — Toast-style KDS Ticket Grid
+ *
+ * Store 终端规范:
+ * - 最小字体 16px
+ * - 最小触控 48x48px
+ * - CSS 变量 var(--tx-*)
+ */
+
+/* ─── CSS Variables (fallbacks if global :root not loaded) ─── */
+:root {
+  --tx-primary: #FF6B35;
+  --tx-primary-active: #E55A28;
+  --tx-primary-light: #FFF3ED;
+  --tx-success: #0F6E56;
+  --tx-warning: #BA7517;
+  --tx-danger: #A32D2D;
+  --tx-info: #185FA5;
+  --tx-text-1: #2C2C2A;
+  --tx-text-2: #5F5E5A;
+  --tx-text-3: #B4B2A9;
+  --tx-border: #E8E6E1;
+  --tx-bg-1: #FFFFFF;
+  --tx-bg-2: #F8F7F5;
+  --tx-bg-3: #F0EDE6;
+  --tx-radius-sm: 8px;
+  --tx-radius-md: 12px;
+  --tx-radius-lg: 16px;
+  --tx-tap-min: 48px;
+  --tx-tap-rec: 56px;
+  --tx-tap-lg: 72px;
+  --tx-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --tx-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+
+  /* KDS-specific colors */
+  --kds-bg: #1A1A1A;
+  --kds-card-bg: #242424;
+  --kds-sidebar-bg: #111111;
+  --kds-text: #EDEDED;
+  --kds-text-secondary: #999999;
+  --kds-green: #22C55E;
+  --kds-green-bg: #0A2E1A;
+  --kds-green-border: #16A34A;
+  --kds-yellow: #EAB308;
+  --kds-yellow-bg: #2E2A0A;
+  --kds-yellow-border: #CA8A04;
+  --kds-red: #EF4444;
+  --kds-red-bg: #2E0A0A;
+  --kds-red-border: #DC2626;
+  --kds-vip-gold: #F59E0B;
+  --kds-fulfilled-bg: #1F1F1F;
+}
+
+/* ─── Container ────────────────────────────────────────────── */
+.container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: var(--kds-bg);
+  color: var(--kds-text);
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", "Microsoft YaHei", sans-serif;
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* ─── Stats Bar ────────────────────────────────────────────── */
+.statsBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  background: var(--kds-sidebar-bg);
+  border-bottom: 2px solid var(--tx-primary);
+  flex-shrink: 0;
+}
+
+.statsTitle {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--kds-text);
+  letter-spacing: 1px;
+}
+
+.statsItems {
+  display: flex;
+  gap: 32px;
+}
+
+.statItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 72px;
+}
+
+.statLabel {
+  font-size: 16px;
+  color: var(--kds-text-secondary);
+}
+
+.statValue {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--kds-text);
+  line-height: 1.2;
+}
+
+.statDanger {
+  /* subtle background glow for overdue stat */
+}
+
+.statValueDanger {
+  color: var(--kds-red) !important;
+}
+
+/* ─── Main Layout ──────────────────────────────────────────── */
+.mainLayout {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* ─── Sidebar (Station Filter) ─────────────────────────────── */
+.sidebar {
+  width: 120px;
+  flex-shrink: 0;
+  background: var(--kds-sidebar-bg);
+  border-right: 1px solid #333;
+  display: flex;
+  flex-direction: column;
+  padding: 12px 8px;
+  gap: 8px;
+  overflow-y: auto;
+}
+
+.stationBtn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: var(--tx-tap-min);
+  padding: 10px 12px;
+  border: 1px solid #333;
+  border-radius: var(--tx-radius-sm);
+  background: transparent;
+  color: var(--kds-text-secondary);
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.stationBtn:active {
+  transform: scale(0.97);
+}
+
+.stationBtnActive {
+  background: var(--tx-primary);
+  color: #FFFFFF;
+  border-color: var(--tx-primary);
+  font-weight: 700;
+}
+
+.stationCount {
+  font-size: 16px;
+  font-weight: 700;
+  min-width: 24px;
+  text-align: center;
+}
+
+/* ─── Grid Area ────────────────────────────────────────────── */
+.gridArea {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  padding: 12px;
+}
+
+.ticketGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+  align-content: start;
+}
+
+@media (min-width: 1200px) {
+  .ticketGrid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+@media (min-width: 900px) and (max-width: 1199px) {
+  .ticketGrid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 899px) {
+  .ticketGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* ─── Empty State ──────────────────────────────────────────── */
+.emptyState {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 20px;
+  color: var(--kds-text-secondary);
+}
+
+.emptyIcon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  color: var(--kds-green);
+}
+
+.emptyText {
+  font-size: 20px;
+}
+
+/* ─── Ticket Wrapper (for swipe reveal) ────────────────────── */
+.ticketWrapper {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--tx-radius-md);
+}
+
+.swipeReveal {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 92px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--kds-green);
+  border-radius: var(--tx-radius-md);
+}
+
+.swipeRevealText {
+  color: #FFFFFF;
+  font-size: 16px;
+  font-weight: 700;
+  writing-mode: vertical-rl;
+  letter-spacing: 2px;
+}
+
+/* ─── Ticket Card Base ─────────────────────────────────────── */
+.ticketCard {
+  position: relative;
+  background: var(--kds-card-bg);
+  border-radius: var(--tx-radius-md);
+  padding: 12px 16px;
+  border-left: 6px solid transparent;
+  box-shadow: var(--tx-shadow-md);
+  transition: transform 0.3s ease, opacity 0.3s ease;
+  touch-action: pan-y;
+  z-index: 1;
+}
+
+/* ─── Age Color Coding ─────────────────────────────────────── */
+.ticketGreen {
+  border-left-color: var(--kds-green-border);
+  background: var(--kds-green-bg);
+}
+
+.ticketYellow {
+  border-left-color: var(--kds-yellow-border);
+  background: var(--kds-yellow-bg);
+}
+
+.ticketRed {
+  border-left-color: var(--kds-red-border);
+  background: var(--kds-red-bg);
+}
+
+/* ─── VIP Badge ────────────────────────────────────────────── */
+.ticketVip {
+  border: 2px solid var(--kds-vip-gold);
+  border-left-width: 6px;
+}
+
+.vipBadge {
+  display: inline-block;
+  background: var(--kds-vip-gold);
+  color: #1A1A1A;
+  font-size: 16px;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 4px;
+  margin-left: 8px;
+  letter-spacing: 1px;
+}
+
+.vipBadgeSmall {
+  display: inline-block;
+  background: var(--kds-vip-gold);
+  color: #1A1A1A;
+  font-size: 16px;
+  font-weight: 800;
+  padding: 1px 6px;
+  border-radius: 3px;
+  margin-left: 8px;
+}
+
+/* ─── Pulse Animation (overdue) ────────────────────────────── */
+.ticketPulse {
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.8; }
+}
+
+/* ─── Ticket Header ────────────────────────────────────────── */
+.ticketHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.ticketTableNo {
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--kds-text);
+  display: flex;
+  align-items: center;
+}
+
+.ticketCountdown {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--kds-green);
+  font-variant-numeric: tabular-nums;
+  min-width: 72px;
+  text-align: right;
+}
+
+.ticketYellow .ticketCountdown {
+  color: var(--kds-yellow);
+}
+
+.ticketRed .ticketCountdown,
+.countdownOverdue {
+  color: var(--kds-red) !important;
+}
+
+/* ─── Ticket Items ─────────────────────────────────────────── */
+.ticketItems {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.ticketItem {
+  padding: 4px 0;
+}
+
+.ticketItemRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ticketItemName {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--kds-text);
+  flex: 1;
+}
+
+.ticketItemQty {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--kds-text);
+  min-width: 36px;
+  text-align: right;
+}
+
+.ticketItemSpec {
+  font-size: 16px;
+  color: var(--kds-yellow);
+  margin-top: 2px;
+  padding-left: 4px;
+}
+
+.rushBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--kds-red);
+  color: #FFFFFF;
+  font-size: 16px;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+/* ─── Ticket Footer ────────────────────────────────────────── */
+.ticketFooter {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.ticketOrderId {
+  font-size: 16px;
+  color: var(--kds-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.ticketElapsed {
+  font-size: 16px;
+  color: var(--kds-text-secondary);
+}
+
+/* ─── Fulfilled Section ────────────────────────────────────── */
+.fulfilledSection {
+  margin-top: 16px;
+  border-top: 1px solid #333;
+  padding-top: 8px;
+}
+
+.fulfilledToggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: var(--tx-tap-min);
+  padding: 10px 16px;
+  background: transparent;
+  border: none;
+  color: var(--kds-text-secondary);
+  font-size: 18px;
+  font-weight: 600;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.fulfilledToggle:active {
+  opacity: 0.7;
+}
+
+.fulfilledArrow {
+  font-size: 18px;
+  transition: transform 0.2s ease;
+}
+
+.fulfilledArrowOpen {
+  transform: rotate(180deg);
+}
+
+.fulfilledList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 0;
+}
+
+.fulfilledCard {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--kds-fulfilled-bg);
+  border: 1px solid #333;
+  border-radius: var(--tx-radius-sm);
+  padding: 10px 14px;
+  min-height: var(--tx-tap-min);
+  opacity: 0.7;
+}
+
+.fulfilledTable {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--kds-green);
+}
+
+.fulfilledSummary {
+  font-size: 16px;
+  color: var(--kds-text-secondary);
+}
+
+.fulfilledDuration {
+  font-size: 16px;
+  color: var(--kds-text-secondary);
+}
