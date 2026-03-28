@@ -13,6 +13,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 from datetime import date, datetime, timedelta
 from typing import Any
@@ -546,7 +547,7 @@ class POSSyncService:
             """),
             {
                 **order_dict,
-                "order_metadata": __import__("json").dumps(
+                "order_metadata": json.dumps(
                     order_dict.get("order_metadata") or {}, ensure_ascii=False
                 ),
             },
@@ -575,7 +576,7 @@ class POSSyncService:
             """),
             {
                 **item_dict,
-                "customizations": __import__("json").dumps(
+                "customizations": json.dumps(
                     item_dict.get("customizations") or {}, ensure_ascii=False
                 ),
             },

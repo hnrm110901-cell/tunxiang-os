@@ -126,7 +126,6 @@ class EventBus:
                     agent_id=agent_id,
                     error=str(e),
                     exc_info=True,
-                    exc_info=True,
                 )
 
         return results

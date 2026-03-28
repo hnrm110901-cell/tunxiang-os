@@ -5,6 +5,7 @@
 """
 from __future__ import annotations
 
+import json
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Optional
@@ -227,7 +228,7 @@ async def create_card_type(
             "id": card_type_id,
             "tid": tenant_id,
             "name": name,
-            "rules": __import__("json").dumps(rules, ensure_ascii=False),
+            "rules": json.dumps(rules, ensure_ascii=False),
             "now": now,
         },
     )
