@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.entities import Order, OrderItem
 from ..models.production_dept import ProductionDept, DishDeptMapping
+from .dispatch_rule_engine import dispatch_rule_engine
 
 logger = structlog.get_logger()
 
@@ -37,20 +38,30 @@ async def dispatch_order_to_kds(
     table_number: str = "",
     order_no: str = "",
     auto_print: bool = True,
+    store_id: str = "",
+    channel: str = "",
+    brand_id: str = "",
+    order_time: "datetime | None" = None,
 ) -> dict:
     """将订单中的每道菜分配到对应档口，生成分单结果。
 
-    自动完成菜品->出品部门映射，无需前端传 kitchen_station。
+    自动完成菜品->出品部门映射，支持多品牌/多渠道/时段路由规则引擎。
+    规则引擎无匹配时fallback到DishDeptMapping默认映射。
 
     Args:
         order_id: 订单ID
         order_items: [{"dish_id": ..., "item_name": ..., "quantity": ...,
-                       "order_item_id": ..., "notes": ...}, ...]
-        tenant_id: 租户ID
+                       "order_item_id": ..., "notes": ...,
+                       "dish_category": ...（可选）}, ...]
+        tenant_id: 租户ID（显式传入，不从会话变量读取）
         db: 数据库会话
         table_number: 桌号（用于厨打单）
         order_no: 订单号（用于厨打单）
         auto_print: 是否自动发送厨打单到档口打印机
+        store_id: 门店ID（启用规则引擎时必须传入）
+        channel: 渠道类型 dine_in/takeaway/delivery/reservation
+        brand_id: 品牌ID（多品牌场景）
+        order_time: 下单时间（None时使用当前时间）
 
     Returns:
         {"dept_tasks": [{"dept_id": ..., "dept_name": ..., "printer_address": ...,
@@ -60,11 +71,46 @@ async def dispatch_order_to_kds(
     log = logger.bind(order_id=order_id, tenant_id=tenant_id)
     log.info("kds_dispatch.start", item_count=len(order_items))
 
+    # 如果有 store_id，使用规则引擎解析每道菜的档口
+    use_rule_engine = bool(store_id)
+    effective_order_time = order_time or datetime.now(timezone.utc)
+
     # ── 1. 批量查询所有菜品的档口映射 ──
+    # 优先使用规则引擎，规则引擎内部会fallback到DishDeptMapping
     dish_ids = [uuid.UUID(item["dish_id"]) for item in order_items if item.get("dish_id")]
     mappings: dict[uuid.UUID, uuid.UUID] = {}
+    # 规则引擎同时返回 printer_id 覆盖信息
+    printer_overrides: dict[uuid.UUID, uuid.UUID] = {}
 
-    if dish_ids:
+    if dish_ids and use_rule_engine:
+        # 使用规则引擎逐菜品解析（规则引擎内部已缓存规则列表）
+        for item in order_items:
+            raw_dish_id = item.get("dish_id")
+            if not raw_dish_id:
+                continue
+            dish_uuid = uuid.UUID(raw_dish_id)
+            try:
+                dept_id, printer_id = await dispatch_rule_engine.resolve_dept(
+                    dish_id=raw_dish_id,
+                    dish_category=item.get("dish_category"),
+                    brand_id=brand_id or None,
+                    channel=channel or None,
+                    order_time=effective_order_time,
+                    store_id=store_id,
+                    tenant_id=tenant_id,
+                    db=db,
+                )
+                if dept_id is not None:
+                    mappings[dish_uuid] = dept_id
+                    if printer_id is not None:
+                        printer_overrides[dish_uuid] = printer_id
+            except (ValueError, AttributeError) as exc:
+                log.warning(
+                    "kds_dispatch.rule_engine_failed",
+                    dish_id=raw_dish_id, error=str(exc)
+                )
+    elif dish_ids:
+        # 无规则引擎时沿用原DishDeptMapping查询
         stmt = select(DishDeptMapping.dish_id, DishDeptMapping.production_dept_id).where(
             and_(
                 DishDeptMapping.tenant_id == tid,
