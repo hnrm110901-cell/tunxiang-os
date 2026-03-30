@@ -228,6 +228,25 @@ class StoredValueService:
             recharge=plan.recharge_amount_fen,
             gift=plan.gift_amount_fen,
         )
+
+        # 发布储值充值事件（不阻塞主流程）
+        import asyncio
+        from shared.events.event_publisher import MemberEventPublisher
+        from shared.events.member_events import MemberEventType
+
+        asyncio.create_task(MemberEventPublisher.publish(
+            MemberEventType.STORED_VALUE_RECHARGED,
+            tenant_id=tenant_id,
+            customer_id=card.customer_id,
+            event_data={
+                "amount_fen": plan.recharge_amount_fen,
+                "gift_fen": plan.gift_amount_fen,
+                "card_id": str(card.id),
+                "plan_id": str(plan_id),
+            },
+            source_service="tx-member",
+        ))
+
         return _txn_to_dict(txn)
 
     # ──────────────────────────────────────────────────────────────
@@ -275,6 +294,25 @@ class StoredValueService:
         db.add(txn)
 
         logger.info("stored_value_recharge", card_no=card_no, amount=amount_fen, gift=gift_fen)
+
+        # 发布储值充值事件（不阻塞主流程）
+        import asyncio
+        from shared.events.event_publisher import MemberEventPublisher
+        from shared.events.member_events import MemberEventType
+
+        asyncio.create_task(MemberEventPublisher.publish(
+            MemberEventType.STORED_VALUE_RECHARGED,
+            tenant_id=card.tenant_id,
+            customer_id=card.customer_id,
+            event_data={
+                "amount_fen": amount_fen,
+                "gift_fen": gift_fen,
+                "card_id": str(card.id),
+                "card_no": card_no,
+            },
+            source_service="tx-member",
+        ))
+
         return {
             "card_no": card_no,
             "recharge_fen": amount_fen,

@@ -76,6 +76,12 @@ class Customer(TenantBase):
     confidence_score: Mapped[float] = mapped_column(Float, default=1.0)
     extra: Mapped[dict | None] = mapped_column(JSON, default=dict)
 
+    # 外卖平台身份
+    meituan_user_id: Mapped[str | None] = mapped_column(String(128), index=True, comment="美团用户ID")
+    meituan_openid: Mapped[str | None] = mapped_column(String(128), index=True, comment="美团小程序openid")
+    douyin_openid: Mapped[str | None] = mapped_column(String(128), index=True, comment="抖音openid")
+    eleme_user_id: Mapped[str | None] = mapped_column(String(128), index=True, comment="饿了么用户ID")
+
     # 企业微信客户联系（SCRM）
     wecom_external_userid: Mapped[str | None] = mapped_column(String(128), index=True, comment="企微客户联系外部联系人ID")
     wecom_follow_user: Mapped[str | None] = mapped_column(String(100), comment="负责跟进的导购（企微userid）")

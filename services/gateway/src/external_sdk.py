@@ -308,6 +308,171 @@ class WecomSDK:
             raise WecomAPIError(data["errcode"], data.get("errmsg", ""))
         return data.get("userlist", [])
 
+    # ── 企微群聊 API ─────────────────────────────────────────────
+
+    async def create_group_chat(
+        self,
+        name: str,
+        owner_userid: str,
+        member_userids: list[str],
+        chatid: Optional[str] = None,
+    ) -> dict:
+        """创建企微群聊
+
+        POST /appchat/create?access_token=xxx
+        {
+            "name": "群名称",
+            "owner": "企微userid",
+            "userlist": ["userid1", "userid2"],
+            "chatid": "可选，自定义群ID"
+        }
+
+        返回：{"chatid": "xxx"}
+        注意：建群可能比普通接口慢，timeout=15
+        """
+        token = await self.get_access_token()
+        url = f"{self.BASE}/appchat/create?access_token={token}"
+        payload: dict = {
+            "name": name,
+            "owner": owner_userid,
+            "userlist": member_userids,
+        }
+        if chatid:
+            payload["chatid"] = chatid
+
+        async with httpx.AsyncClient(timeout=15) as client:
+            try:
+                resp = await client.post(url, json=payload)
+                resp.raise_for_status()
+            except httpx.HTTPStatusError as exc:
+                logger.error(
+                    "wecom_create_group_chat_http_error",
+                    status=exc.response.status_code,
+                    group_name=name,
+                )
+                raise
+            except httpx.ConnectError as exc:
+                logger.error("wecom_create_group_chat_connect_error", error=str(exc))
+                raise
+            except httpx.TimeoutException as exc:
+                logger.error("wecom_create_group_chat_timeout", error=str(exc))
+                raise
+
+        data = resp.json()
+        if data.get("errcode", 0) != 0:
+            raise WecomAPIError(data["errcode"], data.get("errmsg", ""))
+
+        logger.info("wecom_create_group_chat_ok", chatid=data.get("chatid"), group_name=name)
+        return data  # 含 chatid
+
+    async def send_group_chat_message(
+        self,
+        chatid: str,
+        msgtype: str,
+        content_dict: dict,
+    ) -> dict:
+        """向企微群发消息
+
+        POST /appchat/send?access_token=xxx
+        {
+            "chatid": "群ID",
+            "msgtype": "text",
+            "text": {"content": "消息内容"}
+        }
+
+        msgtype 支持：text / image / news / miniapp
+        content_dict 为对应 msgtype 下的内容体，如 {"content": "xxx"}
+        """
+        token = await self.get_access_token()
+        url = f"{self.BASE}/appchat/send?access_token={token}"
+        payload: dict = {
+            "chatid": chatid,
+            "msgtype": msgtype,
+            msgtype: content_dict,
+        }
+
+        async with httpx.AsyncClient(timeout=15) as client:
+            try:
+                resp = await client.post(url, json=payload)
+                resp.raise_for_status()
+            except httpx.HTTPStatusError as exc:
+                logger.error(
+                    "wecom_send_group_chat_http_error",
+                    status=exc.response.status_code,
+                    chatid=chatid,
+                    msgtype=msgtype,
+                )
+                raise
+            except httpx.ConnectError as exc:
+                logger.error(
+                    "wecom_send_group_chat_connect_error",
+                    error=str(exc),
+                    chatid=chatid,
+                )
+                raise
+            except httpx.TimeoutException as exc:
+                logger.error(
+                    "wecom_send_group_chat_timeout",
+                    error=str(exc),
+                    chatid=chatid,
+                )
+                raise
+
+        data = resp.json()
+        if data.get("errcode", 0) != 0:
+            raise WecomAPIError(data["errcode"], data.get("errmsg", ""))
+
+        logger.info("wecom_send_group_chat_ok", chatid=chatid, msgtype=msgtype)
+        return data
+
+    async def get_group_chat_info(self, chatid: str) -> dict:
+        """获取企微群详情（包含成员列表）
+
+        GET /appchat/get?access_token=xxx&chatid=xxx
+
+        返回字段示例：
+          chat_info.chatid, name, owner, member_list[{userid, type, join_time}]
+        """
+        token = await self.get_access_token()
+        url = f"{self.BASE}/appchat/get?access_token={token}&chatid={chatid}"
+
+        async with httpx.AsyncClient(timeout=10) as client:
+            try:
+                resp = await client.get(url)
+                resp.raise_for_status()
+            except httpx.HTTPStatusError as exc:
+                logger.error(
+                    "wecom_get_group_chat_info_http_error",
+                    status=exc.response.status_code,
+                    chatid=chatid,
+                )
+                raise
+            except httpx.ConnectError as exc:
+                logger.error(
+                    "wecom_get_group_chat_info_connect_error",
+                    error=str(exc),
+                    chatid=chatid,
+                )
+                raise
+            except httpx.TimeoutException as exc:
+                logger.error(
+                    "wecom_get_group_chat_info_timeout",
+                    error=str(exc),
+                    chatid=chatid,
+                )
+                raise
+
+        data = resp.json()
+        if data.get("errcode", 0) != 0:
+            raise WecomAPIError(data["errcode"], data.get("errmsg", ""))
+
+        logger.info(
+            "wecom_get_group_chat_info_ok",
+            chatid=chatid,
+            member_count=len(data.get("chat_info", {}).get("member_list", [])),
+        )
+        return data.get("chat_info", {})
+
 
 # ═══════════════════════════════════════
 # D3: 支付宝

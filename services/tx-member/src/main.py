@@ -27,12 +27,16 @@ from api.rfm_routes import router as rfm_router
 from api.group_routes import router as group_router
 from api.lifecycle_routes import router as lifecycle_router
 from api.platform_routes import router as platform_router
-from workers.rfm_updater import RFMUpdater
+from workers.rfm_updater import RFMUpdater, RFMEventListener
+from shared.events.event_publisher import MemberEventPublisher
 
 logger = structlog.get_logger(__name__)
 
 # 全局 scheduler 实例（lifespan 中启动/关闭）
 _scheduler = AsyncIOScheduler(timezone="Asia/Shanghai")
+
+# 全局事件监听 Task（lifespan 中启动/取消）
+_rfm_listener_task: asyncio.Task | None = None
 
 
 async def _run_rfm_update() -> None:
@@ -50,8 +54,27 @@ async def _run_rfm_update() -> None:
             )
 
 
+async def _run_rfm_event_listener() -> None:
+    """RFM 事件监听后台任务：持续订阅 ORDER_PAID 实时刷新 RFM。
+
+    DB session 在此函数内部通过 async_session_factory 管理，
+    每条消息独立 session，避免长事务。
+    """
+    logger.info("rfm_event_listener_task_started")
+    try:
+        await RFMEventListener().listen(async_session_factory)
+    except (OSError, RuntimeError) as exc:
+        logger.error(
+            "rfm_event_listener_task_crashed",
+            error=str(exc),
+            exc_info=True,
+        )
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    global _rfm_listener_task
+
     await init_db()
 
     # 注册 RFM 每日凌晨2点定时任务（Asia/Shanghai）
@@ -66,10 +89,21 @@ async def lifespan(app: FastAPI):
     _scheduler.start()
     logger.info("rfm_scheduler_started", next_run=str(_scheduler.get_job("rfm_daily_update").next_run_time))
 
+    # 启动 RFM 事件监听后台任务（ORDER_PAID → 实时 RFM 刷新）
+    _rfm_listener_task = asyncio.create_task(_run_rfm_event_listener())
+    logger.info("rfm_event_listener_started")
+
     yield
+
+    # 关闭事件监听
+    if _rfm_listener_task and not _rfm_listener_task.done():
+        _rfm_listener_task.cancel()
+        logger.info("rfm_event_listener_stopped")
 
     _scheduler.shutdown(wait=False)
     logger.info("rfm_scheduler_stopped")
+
+    await MemberEventPublisher.close()
 
 
 app = FastAPI(

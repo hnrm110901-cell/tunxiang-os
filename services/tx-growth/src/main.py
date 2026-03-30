@@ -5,6 +5,7 @@
 七大引擎协同驱动连锁餐饮品牌的精细化增长。
 """
 import asyncio
+from contextlib import asynccontextmanager
 
 import structlog
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -12,6 +13,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import Any, Optional
 
+from shared.ontology.src.database import init_db, async_session_factory
 from services.brand_strategy import BrandStrategyService
 from services.audience_segmentation import AudienceSegmentationService
 from services.journey_orchestrator import JourneyOrchestratorService
@@ -19,21 +21,10 @@ from services.content_engine import ContentEngine
 from services.offer_engine import OfferEngine
 from services.channel_engine import ChannelEngine
 from services.roi_attribution import ROIAttributionService
-from workers.journey_executor import JourneyExecutor
+from workers.journey_executor import JourneyExecutor, JourneyEventListener
+from shared.events.event_publisher import MemberEventPublisher
 
 logger = structlog.get_logger(__name__)
-
-
-# ---------------------------------------------------------------------------
-# FastAPI App
-# ---------------------------------------------------------------------------
-
-from .api.campaign_routes import router as campaign_router
-from .api.segmentation_routes import router as segmentation_router
-
-app = FastAPI(title="TunxiangOS tx-growth", version="3.0.0")
-app.include_router(campaign_router)
-app.include_router(segmentation_router)
 
 # ---------------------------------------------------------------------------
 # APScheduler — 旅程执行引擎（每60秒 tick 一次）
@@ -42,15 +33,41 @@ app.include_router(segmentation_router)
 _scheduler = AsyncIOScheduler()
 _journey_executor = JourneyExecutor()
 
+# 全局事件监听 Task（lifespan 中启动/取消）
+_journey_listener_task: asyncio.Task | None = None
+
+
+async def _run_journey_tick() -> None:
+    """
+    定时任务入口：创建 DB session 并执行 JourneyExecutor.tick(db)。
+
+    参照 tx-member 的 _run_rfm_update() 模式：
+      - async_session_factory() 负责连接生命周期（含 commit / rollback）
+      - 具体异常类型列举，禁止 broad except
+    """
+    logger.info("journey_tick_job_started")
+    async with async_session_factory() as db:
+        try:
+            result = await _journey_executor.tick(db)
+            await db.commit()
+            logger.info("journey_tick_job_finished", **result)
+        except (OSError, RuntimeError, ValueError) as exc:
+            await db.rollback()
+            logger.error(
+                "journey_tick_job_error",
+                error=str(exc),
+                exc_info=True,
+            )
+
 
 def _schedule_tick() -> None:
     """
-    调度回调：创建一个 asyncio Task 执行 JourneyExecutor.tick()。
+    APScheduler 调度回调：在事件循环中创建 Task 执行 _run_journey_tick()。
 
     使用 asyncio.create_task 而非 await，保证 APScheduler 的调度线程不阻塞。
-    Task 内部异常通过 structlog 记录，不会静默丢失。
+    Task 内部异常通过 _on_tick_done 回调记录，不会静默丢失。
     """
-    task = asyncio.create_task(_journey_executor.tick())
+    task = asyncio.create_task(_run_journey_tick())
     task.add_done_callback(_on_tick_done)
 
 
@@ -65,28 +82,150 @@ def _on_tick_done(task: asyncio.Task) -> None:
         )
 
 
-@app.on_event("startup")
-async def start_scheduler() -> None:
-    """FastAPI 启动时启动 APScheduler，每60秒驱动旅程引擎 tick。"""
+# ---------------------------------------------------------------------------
+# FastAPI App（lifespan 管理 DB 初始化 + scheduler）
+# ---------------------------------------------------------------------------
+
+from .api.campaign_routes import router as campaign_router
+from .api.segmentation_routes import router as segmentation_router
+from .api.referral_routes import router as referral_router
+from .api.attribution_routes import router as attribution_router
+from .api.ab_test_routes import router as ab_test_router
+from .api.approval_routes import router as approval_router
+from services.approval_service import ApprovalService as _ApprovalService
+
+_approval_service = _ApprovalService()
+
+
+# ---------------------------------------------------------------------------
+# APScheduler — 审批超时检查（每小时 tick 一次）
+# ---------------------------------------------------------------------------
+
+
+async def _run_approval_expiry_check() -> None:
+    """
+    定时任务：检查所有租户超时审批单，按策略自动通过或标记 expired。
+
+    参照 _run_journey_tick() 模式：
+      - async_session_factory() 管理连接生命周期
+      - 具体异常类型列举，禁止 broad except
+    生产版应从 tenants 表查出活跃租户列表，逐一调用 check_expired_requests。
+    此处为占位实现，RLS 策略需在调用处通过 SET LOCAL app.tenant_id 激活。
+    """
+    logger.info("approval_expiry_check_started")
+    async with async_session_factory() as db:
+        try:
+            # TODO: 按活跃租户列表循环；当前仅记录启动日志
+            # 生产实现：
+            #   tenants = await fetch_active_tenant_ids(db)
+            #   for tenant_id in tenants:
+            #       await db.execute(text(f"SET LOCAL app.tenant_id='{tenant_id}'"))
+            #       result = await _approval_service.check_expired_requests(tenant_id, db)
+            #       logger.info("approval_expiry_check_tenant_done", tenant_id=str(tenant_id), **result)
+            await db.commit()
+            logger.info("approval_expiry_check_finished")
+        except (OSError, RuntimeError, ValueError) as exc:
+            await db.rollback()
+            logger.error(
+                "approval_expiry_check_error",
+                error=str(exc),
+                exc_info=True,
+            )
+
+
+def _schedule_approval_expiry() -> None:
+    """APScheduler 回调：在事件循环中创建 Task 执行超时审批检查。"""
+    task = asyncio.create_task(_run_approval_expiry_check())
+    task.add_done_callback(_on_approval_expiry_done)
+
+
+def _on_approval_expiry_done(task: asyncio.Task) -> None:
+    """超时检查 Task 完成回调：捕获并记录未处理异常。"""
+    exc = task.exception() if not task.cancelled() else None
+    if exc is not None:
+        logger.error(
+            "approval_expiry_check_unhandled_error",
+            error=str(exc),
+            exc_info=exc,
+        )
+
+
+async def _run_journey_event_listener() -> None:
+    """旅程事件监听后台任务：订阅 Redis Stream，实时触发旅程。
+
+    使用长存活的 AsyncSession，_trigger_for_customer 每次调用后 commit。
+    若 Redis 不可用，循环内自动重试（5s 间隔），不影响 APScheduler 轮询。
+    """
+    logger.info("journey_event_listener_task_started")
+    listener = JourneyEventListener()
+    try:
+        async with async_session_factory() as db:
+            await listener.listen(db)
+    except (OSError, RuntimeError) as exc:
+        logger.error(
+            "journey_event_listener_task_crashed",
+            error=str(exc),
+            exc_info=True,
+        )
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """初始化 DB 表结构，启动旅程调度器 + 审批超时检查调度器 + 事件监听。"""
+    global _journey_listener_task
+
+    await init_db()
+
     _scheduler.add_job(
         _schedule_tick,
         trigger="interval",
         seconds=60,
         id="journey_executor",
         replace_existing=True,
-        max_instances=1,          # 防止并发 tick 重叠
-        misfire_grace_time=30,    # 系统繁忙时延迟30秒内可补发
+        max_instances=1,        # 防止并发 tick 重叠
+        misfire_grace_time=30,  # 系统繁忙时延迟30秒内可补发
     )
+
+    _scheduler.add_job(
+        _schedule_approval_expiry,
+        trigger="interval",
+        hours=1,
+        id="approval_expiry_check",
+        replace_existing=True,
+        max_instances=1,
+        misfire_grace_time=300,  # 超时检查允许5分钟内补发
+    )
+
     _scheduler.start()
     logger.info("journey_executor_scheduler_started", interval_seconds=60)
+    logger.info("approval_expiry_scheduler_started", interval_hours=1)
 
+    # 启动旅程事件监听后台任务（MEMBER_REGISTERED / ORDER_PAID → 实时触发旅程）
+    _journey_listener_task = asyncio.create_task(_run_journey_event_listener())
+    logger.info("journey_event_listener_started")
 
-@app.on_event("shutdown")
-async def stop_scheduler() -> None:
-    """FastAPI 关闭时优雅停止调度器。"""
+    yield
+
+    # 关闭事件监听
+    if _journey_listener_task and not _journey_listener_task.done():
+        _journey_listener_task.cancel()
+        logger.info("journey_event_listener_stopped")
+
     if _scheduler.running:
         _scheduler.shutdown(wait=False)
         logger.info("journey_executor_scheduler_stopped")
+        logger.info("approval_expiry_scheduler_stopped")
+
+    await MemberEventPublisher.close()
+
+
+app = FastAPI(title="TunxiangOS tx-growth", version="3.0.0", lifespan=lifespan)
+app.include_router(campaign_router)
+app.include_router(segmentation_router)
+app.include_router(referral_router)
+app.include_router(attribution_router)
+app.include_router(ab_test_router)
+app.include_router(approval_router)
 
 # 服务实例
 brand_svc = BrandStrategyService()

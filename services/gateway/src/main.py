@@ -1,6 +1,9 @@
 """TunxiangOS API Gateway — 统一入口，按域路由到各微服务"""
+import asyncio
 import os
 
+import structlog
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -11,13 +14,88 @@ from .hub_api import router as hub_router
 from .growth_intel_relay import router as relay_router
 from .wecom_routes import router as wecom_router
 from .wecom_scrm_routes import router as wecom_scrm_router
+from .wecom_jssdk import router as wecom_jssdk_router
+from .wecom_internal import router as wecom_internal_router
+from .wecom_group_routes import router as wecom_group_router
 from .response import ok
+
+logger = structlog.get_logger(__name__)
 
 app = FastAPI(
     title="TunxiangOS Gateway",
     version="3.0.0",
     description="AI-Native Restaurant Chain Operating System",
 )
+
+# ── APScheduler 定时任务 ──────────────────────────────────────────
+
+_scheduler = AsyncIOScheduler(timezone="Asia/Shanghai")
+
+
+async def _run_daily_sop() -> None:
+    """每天 9:00 扫描所有租户的 active 群，执行 daily SOP
+
+    注意：此函数从数据库获取所有活跃租户列表后逐个执行。
+    实际部署时需注入数据库会话，此处为集成占位符。
+    """
+    log = logger.bind(task="wecom_group_daily_sop")
+    log.info("wecom_group_daily_sop_job_start")
+
+    try:
+        from .database import get_async_session  # type: ignore[import]
+        from .wecom_group_service import WecomGroupService
+        from .models.wecom_group import WecomGroupConfig
+        from sqlalchemy import select, distinct
+
+        service = WecomGroupService()
+
+        async for db in get_async_session():
+            # 获取所有有 active 群配置的租户
+            stmt = select(distinct(WecomGroupConfig.tenant_id)).where(
+                WecomGroupConfig.status == "active"
+            )
+            result = await db.execute(stmt)
+            tenant_ids = result.scalars().all()
+
+            for tenant_id in tenant_ids:
+                try:
+                    sop_result = await service.scan_and_execute_daily_sop(tenant_id, db)
+                    log.info(
+                        "wecom_group_daily_sop_tenant_done",
+                        tenant_id=str(tenant_id),
+                        result=sop_result,
+                    )
+                except Exception as exc:  # noqa: BLE001 — 单租户失败不阻塞其他租户
+                    log.error(
+                        "wecom_group_daily_sop_tenant_error",
+                        tenant_id=str(tenant_id),
+                        error=str(exc),
+                        exc_info=True,
+                    )
+    except ImportError:
+        log.warning("wecom_group_daily_sop_db_not_configured")
+    except Exception as exc:  # noqa: BLE001 — 最外层兜底，定时任务不能崩溃
+        log.error("wecom_group_daily_sop_job_error", error=str(exc), exc_info=True)
+
+
+@app.on_event("startup")
+async def _startup() -> None:
+    _scheduler.add_job(
+        lambda: asyncio.create_task(_run_daily_sop()),
+        "cron",
+        hour=9,
+        minute=0,
+        id="wecom_group_daily_sop",
+        replace_existing=True,
+    )
+    _scheduler.start()
+    logger.info("gateway_scheduler_started", jobs=["wecom_group_daily_sop @ 09:00 Asia/Shanghai"])
+
+
+@app.on_event("shutdown")
+async def _shutdown() -> None:
+    _scheduler.shutdown(wait=False)
+    logger.info("gateway_scheduler_stopped")
 
 # Middleware（执行顺序：后添加先执行）
 app.add_middleware(RequestLogMiddleware)
@@ -43,6 +121,15 @@ app.include_router(wecom_router)
 
 # 企业微信 SCRM 管理 API
 app.include_router(wecom_scrm_router)
+
+# 企微 JS-SDK 签名接口（供侧边栏 H5 调用）
+app.include_router(wecom_jssdk_router)
+
+# 企微内部发送端点（仅内网微服务调用，不对外暴露）
+app.include_router(wecom_internal_router)
+
+# 企微群运营 SOP API
+app.include_router(wecom_group_router)
 
 # 域路由代理（通配路由 /api/v1/{domain}/{path}，放最后）
 app.include_router(proxy_router)

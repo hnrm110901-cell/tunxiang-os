@@ -1,5 +1,6 @@
 """认证服务 — 登录/登出/会话验证（Demo 用内存 Token）"""
 
+import os
 import uuid
 from fastapi import APIRouter, Request
 from pydantic import BaseModel
@@ -10,38 +11,39 @@ router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
 # ---------------------------------------------------------------------------
 # Demo users for the 4 merchants + platform admin
+# Passwords are loaded from environment variables; dev fallback only for local
 # ---------------------------------------------------------------------------
 DEMO_USERS = {
     "admin": {
-        "password": "admin123",
+        "password": os.getenv("DEMO_ADMIN_PASSWORD", ""),
         "name": "系统管理员",
         "role": "admin",
         "tenant_id": "t-platform",
         "merchant": "屯象科技",
     },
     "changzaiyiqi": {
-        "password": "czq2026",
+        "password": os.getenv("DEMO_CZQ_PASSWORD", ""),
         "name": "尝在一起管理员",
         "role": "merchant_admin",
         "tenant_id": "t-czq",
         "merchant": "尝在一起",
     },
     "zuiqianxian": {
-        "password": "zqx2026",
+        "password": os.getenv("DEMO_ZQX_PASSWORD", ""),
         "name": "最黔线管理员",
         "role": "merchant_admin",
         "tenant_id": "t-zqx",
         "merchant": "最黔线",
     },
     "shanggongchu": {
-        "password": "sgc2026",
+        "password": os.getenv("DEMO_SGC_PASSWORD", ""),
         "name": "尚宫厨管理员",
         "role": "merchant_admin",
         "tenant_id": "t-sgc",
         "merchant": "尚宫厨",
     },
     "xuji": {
-        "password": "xj2026",
+        "password": os.getenv("DEMO_XJ_PASSWORD", ""),
         "name": "徐记海鲜管理员",
         "role": "merchant_admin",
         "tenant_id": "t-xuji",

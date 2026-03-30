@@ -1,10 +1,18 @@
 """会员管理 API — Golden ID + RFM + 旅程 + 企微 SCRM 绑定"""
+import asyncio
 from datetime import datetime
 from typing import Optional
+from uuid import UUID
 
 import structlog
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel
+from sqlalchemy.exc import IntegrityError
+
+from shared.ontology.src.database import get_db_with_tenant
+from services.repository import WecomRepository
+from shared.events.event_publisher import MemberEventPublisher
+from shared.events.member_events import MemberEventType
 
 logger = structlog.get_logger()
 
@@ -23,8 +31,28 @@ async def list_customers(store_id: str, rfm_level: Optional[str] = None, page: i
     return {"ok": True, "data": {"items": [], "total": 0}}
 
 @router.post("/customers")
-async def create_customer(req: CreateMemberReq):
-    return {"ok": True, "data": {"customer_id": "new"}}
+async def create_customer(
+    req: CreateMemberReq,
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+):
+    # TODO: 实际创建会员逻辑（当前为占位实现，customer_id 待换为真实 UUID）
+    result = {"ok": True, "data": {"customer_id": "new"}}
+
+    # 发布会员注册事件（不阻塞响应）
+    # 注意：当前 customer_id 为占位值，真实实现时替换为实际 UUID
+    try:
+        tenant_uuid = UUID(x_tenant_id)
+        # customer_uuid 在实际实现中应从 DB 插入结果中获取
+        # 此处为占位，真实 UUID 应在会员创建后发布
+        logger.info(
+            "member_registered_event_pending",
+            tenant_id=x_tenant_id,
+            hint="replace customer_id placeholder with real UUID after DB insert",
+        )
+    except ValueError:
+        logger.warning("create_customer_invalid_tenant_id", tenant_id=x_tenant_id)
+
+    return result
 
 @router.get("/customers/{customer_id}")
 async def get_customer(customer_id: str):
@@ -108,149 +136,139 @@ class BatchByExternalIdsReq(BaseModel):
 
 
 @router.get("/customers/{customer_id}/wecom")
-async def get_customer_wecom_binding(customer_id: str) -> dict:
+async def get_customer_wecom_binding(
+    customer_id: str,
+    x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+) -> dict:
     """查询某会员的企微绑定状态"""
-    # TODO: 从数据库查询 Customer.wecom_external_userid / wecom_follow_user / wecom_follow_at
-    logger.info("get_customer_wecom_binding", customer_id=customer_id)
-    return {
-        "ok": True,
-        "data": {
-            "customer_id": customer_id,
-            "wecom_external_userid": None,
-            "wecom_follow_user": None,
-            "wecom_follow_at": None,
-            "wecom_remark": None,
-        },
-    }
+    log = logger.bind(customer_id=customer_id, tenant_id=x_tenant_id)
+    log.info("get_customer_wecom_binding")
+
+    async with get_db_with_tenant(x_tenant_id) as db:
+        repo = WecomRepository(db, x_tenant_id)
+        binding = await repo.get_wecom_binding(customer_id)
+
+    if binding is None:
+        raise HTTPException(status_code=404, detail="customer_not_found")
+
+    return {"ok": True, "data": binding}
 
 
 @router.patch("/customers/{customer_id}/wecom")
 async def update_customer_wecom(
     customer_id: str,
     req: WecomBindingUpdate,
+    x_tenant_id: str = Header("", alias="X-Tenant-ID"),
 ) -> dict:
     """更新会员的企微绑定信息（支持部分更新）
 
+    只允许更新 wecom_follow_user 和 wecom_remark。
     幂等：重复调用相同参数不产生副作用。
     """
-    log = logger.bind(customer_id=customer_id, external_userid=req.wecom_external_userid)
+    log = logger.bind(customer_id=customer_id, tenant_id=x_tenant_id)
     log.info("update_customer_wecom")
 
-    # TODO: 查询 Customer by customer_id；若不存在则 raise 404
-    # TODO: UPDATE customers SET
-    #         wecom_external_userid = :wecom_external_userid,
-    #         wecom_follow_user = :wecom_follow_user,
-    #         wecom_follow_at = :wecom_follow_at,
-    #         wecom_remark = :wecom_remark,
-    #         updated_at = NOW()
-    #       WHERE id = :customer_id AND tenant_id = current_setting('app.tenant_id')::uuid
+    async with get_db_with_tenant(x_tenant_id) as db:
+        repo = WecomRepository(db, x_tenant_id)
+        updated = await repo.update_wecom_binding(
+            customer_id=customer_id,
+            follow_user=req.wecom_follow_user,
+            remark=req.wecom_remark,
+        )
+
+    if updated is None:
+        raise HTTPException(status_code=404, detail="customer_not_found")
 
     log.info("update_customer_wecom_ok")
-    return {
-        "ok": True,
-        "data": {
-            "customer_id": customer_id,
-            "wecom_external_userid": req.wecom_external_userid,
-            "wecom_follow_user": req.wecom_follow_user,
-        },
-    }
+    return {"ok": True, "data": updated}
 
 
 @router.post("/customers/wecom/bind_by_external_id")
-async def bind_customer_by_external_id(req: WecomBindByExternalIdReq) -> dict:
+async def bind_customer_by_external_id(
+    req: WecomBindByExternalIdReq,
+    x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+) -> dict:
     """通过企微 customer_add 事件绑定或创建 Customer
 
     处理逻辑（幂等）：
     1. 先查 wecom_external_userid —— 若已存在则更新 follow_at/follow_user（同一客户重加）
-    2. 若无：用 mobile 或 unionid 查找已有 Customer，找到则绑定
-    3. 若无：创建临时档案（source="wecom_only"），等待会员注册后通过手机号/unionid 合并
+    2. 若无：优先用 unionid 查找已有 Customer，找到则绑定
+    3. 若无：用 mobile 查找已有 Customer，找到则绑定
+    4. 若无：创建临时档案（source="wecom_only"）
     """
     log = logger.bind(
         external_userid=req.wecom_external_userid,
         follow_user=req.wecom_follow_user,
         mobile=req.mobile,
+        tenant_id=x_tenant_id,
     )
     log.info("bind_customer_by_external_id")
 
-    # ── Step 1: 查 wecom_external_userid 是否已存在 ──────────────
-    # TODO: SELECT id FROM customers
-    #       WHERE wecom_external_userid = :external_userid
-    #         AND tenant_id = current_setting('app.tenant_id')::uuid
-    #         AND is_deleted = false
-    existing_by_external = None  # placeholder
+    try:
+        follow_at = datetime.fromisoformat(req.wecom_follow_at)
+    except ValueError:
+        follow_at = datetime.utcnow()
 
-    if existing_by_external:
-        # 已绑定 — 更新跟进信息（幂等）
-        # TODO: UPDATE customers SET wecom_follow_user=..., wecom_follow_at=..., updated_at=NOW()
-        log.info("bind_customer_by_external_id_updated", customer_id=str(existing_by_external))
-        return {"ok": True, "data": {"customer_id": str(existing_by_external), "created": False}}
+    try:
+        async with get_db_with_tenant(x_tenant_id) as db:
+            repo = WecomRepository(db, x_tenant_id)
+            result = await repo.bind_by_external_id(
+                external_userid=req.wecom_external_userid,
+                follow_user=req.wecom_follow_user,
+                follow_at=follow_at,
+                remark=req.wecom_remark,
+                mobile=req.mobile or None,
+                unionid=req.unionid or None,
+                name=req.name or None,
+            )
+    except IntegrityError as exc:
+        log.error("bind_customer_integrity_error", error=str(exc.orig))
+        raise HTTPException(status_code=409, detail="duplicate_phone_or_constraint_violation")
 
-    # ── Step 2: 用 mobile 或 unionid 查找已有 Customer ───────────
-    existing_by_identity = None  # placeholder
-    if req.mobile:
-        # TODO: SELECT id FROM customers WHERE primary_phone = :mobile AND ...
-        pass
-    if not existing_by_identity and req.unionid:
-        # TODO: SELECT id FROM customers WHERE wechat_unionid = :unionid AND ...
-        pass
-
-    if existing_by_identity:
-        # 找到已有 Customer — 绑定企微信息
-        # TODO: UPDATE customers SET wecom_external_userid=..., wecom_follow_user=..., ...
-        log.info("bind_customer_by_external_id_linked", customer_id=str(existing_by_identity))
-        return {"ok": True, "data": {"customer_id": str(existing_by_identity), "created": False}}
-
-    # ── Step 3: 创建临时档案 ──────────────────────────────────────
-    # TODO: INSERT INTO customers (tenant_id, primary_phone, display_name, source,
-    #           wecom_external_userid, wecom_follow_user, wecom_follow_at, wecom_remark, ...)
-    #       VALUES (current_setting('app.tenant_id')::uuid, :mobile_or_placeholder, :name,
-    #           'wecom_only', :external_userid, :follow_user, :follow_at, '', ...)
-    #       RETURNING id
-    temp_customer_id = "temp_placeholder"
-    log.info("bind_customer_by_external_id_created_temp", customer_id=temp_customer_id)
-    return {"ok": True, "data": {"customer_id": temp_customer_id, "created": True}}
+    log.info("bind_customer_by_external_id_done", **result)
+    return {"ok": True, "data": result}
 
 
 @router.post("/customers/wecom/unbind_by_external_id")
-async def unbind_customer_by_external_id(req: WecomUnbindReq) -> dict:
+async def unbind_customer_by_external_id(
+    req: WecomUnbindReq,
+    x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+) -> dict:
     """处理 customer_del 事件：清空企微绑定，并打"已删除好友"标签
 
-    幂等：如已清空则无副作用。
+    幂等：如已清空则无副作用，返回 action="not_found"。
     """
-    log = logger.bind(external_userid=req.wecom_external_userid)
+    log = logger.bind(external_userid=req.wecom_external_userid, tenant_id=x_tenant_id)
     log.info("unbind_customer_by_external_id")
 
-    # TODO: UPDATE customers
-    #       SET wecom_external_userid = NULL,
-    #           wecom_follow_user = NULL,
-    #           tags = array_append(COALESCE(tags, '[]'::jsonb), '"已删除好友"'),
-    #           updated_at = NOW()
-    #       WHERE wecom_external_userid = :external_userid
-    #         AND tenant_id = current_setting('app.tenant_id')::uuid
-    #         AND is_deleted = false
+    async with get_db_with_tenant(x_tenant_id) as db:
+        repo = WecomRepository(db, x_tenant_id)
+        result = await repo.unbind_by_external_id(req.wecom_external_userid)
 
-    log.info("unbind_customer_by_external_id_ok")
-    return {"ok": True, "data": {"wecom_external_userid": req.wecom_external_userid, "unbound": True}}
+    log.info("unbind_customer_by_external_id_ok", action=result["action"])
+    return {"ok": True, "data": result}
 
 
 @router.post("/customers/wecom/batch_by_external_ids")
-async def batch_get_customers_by_external_ids(req: BatchByExternalIdsReq) -> dict:
-    """批量查询企微外部联系人 ID 对应的会员信息（用于导购客户列表）"""
-    log = logger.bind(count=len(req.external_userids))
+async def batch_get_customers_by_external_ids(
+    req: BatchByExternalIdsReq,
+    x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+) -> dict:
+    """批量查询企微外部联系人 ID 对应的会员信息（用于导购客户列表）
+
+    最多 100 个 external_userid；未找到的记录在结果中标记 found=False。
+    """
+    log = logger.bind(count=len(req.external_userids), tenant_id=x_tenant_id)
     log.info("batch_get_customers_by_external_ids")
 
-    # TODO: SELECT id, display_name, primary_phone, wechat_nickname,
-    #              rfm_level, last_order_at, total_order_amount_fen,
-    #              wecom_external_userid, wecom_follow_user, wecom_follow_at, wecom_remark
-    #       FROM customers
-    #       WHERE wecom_external_userid = ANY(:external_userids)
-    #         AND tenant_id = current_setting('app.tenant_id')::uuid
-    #         AND is_deleted = false
+    async with get_db_with_tenant(x_tenant_id) as db:
+        repo = WecomRepository(db, x_tenant_id)
+        items = await repo.batch_by_external_ids(req.external_userids)
 
     return {
         "ok": True,
         "data": {
-            "items": [],
-            "total": 0,
+            "items": items,
+            "total": len(items),
         },
     }

@@ -1,4 +1,4 @@
-"""RFM 每日批量更新 Worker
+"""RFM 每日批量更新 Worker + 事件驱动实时更新
 
 负责将全量会员的 r_score / f_score / m_score / rfm_level / risk_score
 写入 customers 表，替代即时全量查询方案。
@@ -12,6 +12,11 @@
   risk_score ：recency_days/90，R评分=1时额外乘1.3
 
 分批策略：每批 500 条 UPDATE，避免长事务。
+
+新增（事件驱动）：
+  RFMEventListener — 订阅 Redis Stream 的 member.order.paid 事件，
+                     收到后立即调用 RFMUpdater.update_single_customer()
+                     实现单客户 RFM 实时刷新，补充凌晨批量任务。
 """
 from __future__ import annotations
 
@@ -333,3 +338,228 @@ class RFMUpdater:
                 tenant_id=str(tenant_id),
                 hint="run migration to create rfm_daily_snapshots table",
             )
+
+    async def update_single_customer(
+        self,
+        customer_id: uuid.UUID,
+        tenant_id: uuid.UUID,
+        db: AsyncSession,
+    ) -> bool:
+        """实时更新单个客户的 RFM 评分（事件驱动，ORDER_PAID 后立即调用）。
+
+        与 update_tenant_rfm 算法完全一致，但只处理一位客户，
+        避免全量扫描的延迟。
+
+        Args:
+            customer_id: 客户 UUID
+            tenant_id:   租户 UUID
+            db:          数据库异步会话
+
+        Returns:
+            True = 成功更新；False = 客户不存在或已删除
+        """
+        now = datetime.now(timezone.utc)
+
+        result = await db.execute(
+            select(
+                Customer.id,
+                Customer.last_order_at,
+                Customer.total_order_count,
+                Customer.total_order_amount_fen,
+            )
+            .where(Customer.id == customer_id)
+            .where(Customer.tenant_id == tenant_id)
+            .where(Customer.is_deleted == False)   # noqa: E712
+            .where(Customer.is_merged == False)    # noqa: E712
+        )
+        row = result.one_or_none()
+        if row is None:
+            logger.debug(
+                "rfm_single_customer_not_found",
+                customer_id=str(customer_id),
+                tenant_id=str(tenant_id),
+            )
+            return False
+
+        _, last_order_at, total_count, total_amount_fen = row
+
+        if last_order_at is not None:
+            loa = last_order_at
+            if loa.tzinfo is None:
+                loa = loa.replace(tzinfo=timezone.utc)
+            recency_days = (now - loa).days
+        else:
+            recency_days = 9999
+
+        r = _calc_r_score(recency_days)
+        f = _calc_f_score(total_count or 0)
+        m = _calc_m_score(total_amount_fen or 0)
+        level = _calc_rfm_level(r, f, m)
+        risk = _calc_risk_score(recency_days, r)
+
+        await db.execute(
+            update(Customer)
+            .where(Customer.id == customer_id)
+            .where(Customer.tenant_id == tenant_id)
+            .values(
+                r_score=r,
+                f_score=f,
+                m_score=m,
+                rfm_level=level,
+                rfm_recency_days=min(recency_days, 9999),
+                risk_score=risk,
+                rfm_updated_at=now,
+                updated_at=now,
+            )
+        )
+        await db.commit()
+
+        logger.info(
+            "rfm_single_customer_updated",
+            customer_id=str(customer_id),
+            tenant_id=str(tenant_id),
+            r=r,
+            f=f,
+            m=m,
+            rfm_level=level,
+            risk_score=risk,
+        )
+        return True
+
+
+# ── RFMEventListener ──────────────────────────────────────────────────────────
+
+
+class RFMEventListener:
+    """Redis Stream 消费器 — 订阅 ORDER_PAID 事件，实时刷新单客户 RFM。
+
+    与凌晨2点批量任务并行运行（双保险）：
+      - 批量任务：保底兜底，覆盖所有租户
+      - 事件监听：下单支付后毫秒级更新，旅程引擎和风险检测立即可用最新 RFM
+
+    启动方式（tx-member/main.py lifespan 中）：
+        asyncio.create_task(RFMEventListener().listen(db_session_factory))
+    """
+
+    from shared.events.event_consumer import MemberEventConsumer
+
+    _consumer = MemberEventConsumer(
+        group_name="rfm_updater",
+        consumer_name="rfm_realtime",
+    )
+
+    async def listen(
+        self,
+        session_factory: "AsyncSessionFactory",  # type: ignore[name-defined]
+    ) -> None:
+        """持续监听 Redis Stream，收到 ORDER_PAID 后立即更新对应客户 RFM。
+
+        Args:
+            session_factory: async_session_factory（来自 shared.ontology.src.database）
+                             每次处理事件时创建独立 session，避免长事务。
+        """
+        from shared.events.member_events import MemberEvent, MemberEventType
+        from shared.events.event_publisher import MemberEventPublisher
+        from shared.events.event_consumer import STREAM_KEY
+
+        redis = await MemberEventPublisher.get_redis()
+        await self._consumer.ensure_group(redis)
+
+        logger.info(
+            "rfm_event_listener_started",
+            group=self._consumer.group_name,
+        )
+
+        import asyncio
+
+        while True:
+            try:
+                messages = await redis.xreadgroup(
+                    groupname=self._consumer.group_name,
+                    consumername=self._consumer.consumer_name,
+                    streams={STREAM_KEY: ">"},
+                    count=20,
+                    block=1000,
+                )
+            except OSError as exc:
+                logger.warning(
+                    "rfm_event_listener_redis_error",
+                    error=str(exc),
+                )
+                MemberEventPublisher._redis = None
+                await asyncio.sleep(5)
+                redis = await MemberEventPublisher.get_redis()
+                await self._consumer.ensure_group(redis)
+                continue
+
+            if not messages:
+                continue
+
+            for _stream, entries in messages:
+                for entry_id, fields in entries:
+                    await self._handle_event_entry(
+                        redis, entry_id, fields, session_factory
+                    )
+
+    async def _handle_event_entry(
+        self,
+        redis: "aioredis.Redis",  # type: ignore[name-defined]
+        entry_id: str,
+        fields: dict[str, str],
+        session_factory: "AsyncSessionFactory",  # type: ignore[name-defined]
+    ) -> None:
+        """处理单条事件，仅响应 ORDER_PAID。"""
+        from shared.events.member_events import MemberEventType
+        from shared.events.event_consumer import _deserialize_event, DLQ_STREAM_KEY
+
+        event_type_str: str = fields.get("event_type", "")
+        if event_type_str != MemberEventType.ORDER_PAID.value:
+            # 非目标事件，直接 ACK 跳过
+            await redis.xack(STREAM_KEY, self._consumer.group_name, entry_id)
+            return
+
+        try:
+            event = _deserialize_event(fields)
+        except (ValueError, KeyError) as exc:
+            logger.error(
+                "rfm_listener_deserialize_failed",
+                entry_id=entry_id,
+                error=str(exc),
+            )
+            await redis.xack(STREAM_KEY, self._consumer.group_name, entry_id)
+            return
+
+        try:
+            updater = RFMUpdater()
+            async with session_factory() as db:
+                await updater.update_single_customer(
+                    customer_id=event.customer_id,
+                    tenant_id=event.tenant_id,
+                    db=db,
+                )
+            await redis.xack(STREAM_KEY, self._consumer.group_name, entry_id)
+        except (OSError, RuntimeError, ValueError) as exc:
+            logger.error(
+                "rfm_listener_update_failed",
+                entry_id=entry_id,
+                customer_id=str(event.customer_id),
+                tenant_id=str(event.tenant_id),
+                error=str(exc),
+                exc_info=True,
+            )
+            # 写 DLQ
+            from datetime import datetime, timezone
+            await redis.xadd(
+                DLQ_STREAM_KEY,
+                {
+                    **fields,
+                    "original_entry_id": entry_id,
+                    "failure_reason": "rfm_update_failed",
+                    "error_message": str(exc),
+                    "failed_at": datetime.now(timezone.utc).isoformat(),
+                    "consumer_group": self._consumer.group_name,
+                },
+                maxlen=50_000,
+                approximate=True,
+            )
+            await redis.xack(STREAM_KEY, self._consumer.group_name, entry_id)

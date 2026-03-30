@@ -3,399 +3,960 @@
 完整的营销归因链路：
 touch → open → click → reserve → visit → order → repeat
 
-支持多种归因模型，精确计算每个渠道和活动的投资回报率。
+支持三种归因模型：
+  last_touch  — 默认。归因给归因窗口内最近一次触达（最接近下单的那次）
+  first_touch — 归因给客户在归因窗口内最早一次触达
+  linear      — 归因窗口内所有触达均分订单金额
+
+归因窗口：ATTRIBUTION_WINDOW_HOURS（默认72小时）
 
 金额单位：分(fen)
 """
 import uuid
-from datetime import datetime, timezone
-from typing import Any, Optional
 from collections import defaultdict
+from datetime import datetime, timezone, timedelta, date
+from typing import Any, Optional
 
+import structlog
+from sqlalchemy import select, update, func, and_
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from models.attribution import MarketingTouch, AttributionSummary
+
+log = structlog.get_logger(__name__)
 
 # ---------------------------------------------------------------------------
-# 内存存储
+# 全局配置
 # ---------------------------------------------------------------------------
 
-_touchpoints: list[dict] = []
-_conversions: list[dict] = []
-_campaign_costs: dict[str, int] = {}  # campaign_id -> cost_fen
+ATTRIBUTION_WINDOW_HOURS: int = 72
 
 
 # ---------------------------------------------------------------------------
 # ROIAttributionService
 # ---------------------------------------------------------------------------
 
+
 class ROIAttributionService:
-    """ROI归因引擎 — 证明增长中枢是赚钱系统"""
+    """ROI归因引擎 — 将每笔订单归因到具体营销活动/旅程/渠道
 
-    ATTRIBUTION_MODELS = ["first_touch", "last_touch", "multi_touch", "linear", "time_decay"]
+    核心逻辑：
+    1. 每次营销触达（旅程节点执行、活动推送）调用 record_touch() 写入 marketing_touches
+    2. 订单产生时调用 attribute_order() 查找最近触点并回写转化信息
+    3. 聚合查询用于仪表盘和报表
+    """
 
-    TOUCHPOINT_TYPES = ["impression", "open", "click", "reserve", "visit", "order", "repeat"]
+    # 支持的归因模型
+    ATTRIBUTION_MODELS = ["last_touch", "first_touch", "linear"]
 
-    def record_touchpoint(
+    # ------------------------------------------------------------------
+    # A. 记录营销触达
+    # ------------------------------------------------------------------
+
+    async def record_touch(
         self,
-        user_id: str,
-        channel: str,
-        campaign_id: str,
-        touchpoint_type: str,
-    ) -> dict:
-        """记录触点
+        touch_data: dict,
+        tenant_id: uuid.UUID,
+        db: AsyncSession,
+    ) -> MarketingTouch:
+        """记录一次营销触达事件。
+
+        每次旅程节点执行（send_content / send_offer）或活动推送后调用。
 
         Args:
-            user_id: 用户ID
-            channel: 渠道
-            campaign_id: 活动ID
-            touchpoint_type: 触点类型（TOUCHPOINT_TYPES 之一）
+            touch_data: {
+                customer_id: str | UUID,
+                touch_type: str,        # campaign | journey | referral | manual
+                source_id: str,         # 活动ID / 旅程ID
+                source_name: str,       # 活动/旅程名称
+                channel: str,           # wecom | sms | miniapp | pos_receipt
+                message_title: str | None,
+                offer_id: str | None,
+                touched_at: datetime | None,  # 默认 now()
+            }
+            tenant_id: 租户 UUID
+            db: AsyncSession
+
+        Returns:
+            已写入 DB 的 MarketingTouch 实例
         """
-        touchpoint_id = str(uuid.uuid4())[:8]
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(timezone.utc)
 
-        tp = {
-            "touchpoint_id": touchpoint_id,
-            "user_id": user_id,
-            "channel": channel,
-            "campaign_id": campaign_id,
-            "touchpoint_type": touchpoint_type,
-            "timestamp": now,
-        }
-        _touchpoints.append(tp)
-        return tp
+        customer_id_raw = touch_data["customer_id"]
+        customer_uuid = (
+            customer_id_raw
+            if isinstance(customer_id_raw, uuid.UUID)
+            else uuid.UUID(str(customer_id_raw))
+        )
 
-    def record_conversion(
+        touched_at_raw = touch_data.get("touched_at")
+        touched_at: datetime
+        if touched_at_raw is None:
+            touched_at = now
+        elif isinstance(touched_at_raw, datetime):
+            touched_at = touched_at_raw
+        else:
+            touched_at = datetime.fromisoformat(str(touched_at_raw))
+
+        touch = MarketingTouch(
+            tenant_id=tenant_id,
+            customer_id=customer_uuid,
+            touch_type=touch_data["touch_type"],
+            source_id=touch_data["source_id"],
+            source_name=touch_data.get("source_name", ""),
+            channel=touch_data["channel"],
+            message_title=touch_data.get("message_title"),
+            offer_id=touch_data.get("offer_id"),
+            is_converted=False,
+            touched_at=touched_at,
+        )
+        db.add(touch)
+        await db.flush()
+
+        log.info(
+            "marketing_touch_recorded",
+            touch_id=str(touch.id),
+            customer_id=str(customer_uuid),
+            source_id=touch_data["source_id"],
+            touch_type=touch_data["touch_type"],
+            channel=touch_data["channel"],
+            tenant_id=str(tenant_id),
+        )
+        return touch
+
+    # ------------------------------------------------------------------
+    # B. 订单归因
+    # ------------------------------------------------------------------
+
+    async def attribute_order(
         self,
-        user_id: str,
-        order_id: str,
-        revenue_fen: int,
-    ) -> dict:
-        """记录转化（订单）
+        order_id: uuid.UUID,
+        customer_id: uuid.UUID,
+        order_amount_fen: int,
+        order_time: datetime,
+        tenant_id: uuid.UUID,
+        db: AsyncSession,
+        model: str = "last_touch",
+        ab_test_id: Optional[uuid.UUID] = None,
+    ) -> dict[str, Any]:
+        """将一笔订单归因到营销触点。
+
+        归因逻辑（以 last_touch 为例）：
+          1. 查询该客户在 [order_time - ATTRIBUTION_WINDOW_HOURS, order_time]
+             内所有未转化的 MarketingTouch，按 touched_at DESC 排序
+          2. 取最近一条作为归因来源
+          3. 回写 is_converted=True, order_id, order_amount_fen, converted_at
+          4. 触发汇总更新 _update_summary()
 
         Args:
-            user_id: 用户ID
-            order_id: 订单ID
-            revenue_fen: 订单金额（分）
-        """
-        conversion_id = str(uuid.uuid4())[:8]
-        now = datetime.now(timezone.utc).isoformat()
+            order_id:           订单 UUID
+            customer_id:        下单客户 UUID
+            order_amount_fen:   订单金额（分）
+            order_time:         下单时间（带时区）
+            tenant_id:          租户 UUID
+            db:                 AsyncSession
+            model:              归因模型，默认 last_touch
+            ab_test_id:         若订单来源于AB测试，同时回写 ABTestAssignment 转化记录
 
-        conversion = {
-            "conversion_id": conversion_id,
-            "user_id": user_id,
-            "order_id": order_id,
-            "revenue_fen": revenue_fen,
-            "timestamp": now,
-        }
-        _conversions.append(conversion)
-        return conversion
-
-    def compute_attribution(
-        self,
-        campaign_id: str,
-        model: str = "multi_touch",
-    ) -> dict:
-        """计算活动归因
-
-        Args:
-            campaign_id: 活动ID
-            model: 归因模型（ATTRIBUTION_MODELS 之一）
+        Returns:
+            {
+              "attributed": bool,
+              "model": str,
+              "touch_id": str | None,
+              "source_id": str | None,
+              "source_name": str | None,
+              "touch_type": str | None,
+              "channel": str | None,
+            }
         """
         if model not in self.ATTRIBUTION_MODELS:
-            return {"error": f"不支持的归因模型: {model}"}
+            log.warning(
+                "unsupported_attribution_model",
+                model=model,
+                order_id=str(order_id),
+            )
+            model = "last_touch"
 
-        # 找到该活动的所有触点
-        campaign_touchpoints = [
-            tp for tp in _touchpoints if tp["campaign_id"] == campaign_id
-        ]
-        if not campaign_touchpoints:
+        window_start = order_time - timedelta(hours=ATTRIBUTION_WINDOW_HOURS)
+
+        # 查询归因窗口内该客户所有未转化触点
+        stmt = (
+            select(MarketingTouch)
+            .where(
+                and_(
+                    MarketingTouch.tenant_id == tenant_id,
+                    MarketingTouch.customer_id == customer_id,
+                    MarketingTouch.is_converted.is_(False),
+                    MarketingTouch.touched_at >= window_start,
+                    MarketingTouch.touched_at <= order_time,
+                )
+            )
+            .order_by(MarketingTouch.touched_at.asc())
+        )
+        result = await db.execute(stmt)
+        touches: list[MarketingTouch] = list(result.scalars().all())
+
+        if not touches:
+            log.info(
+                "attribution_no_touch_found",
+                order_id=str(order_id),
+                customer_id=str(customer_id),
+                window_hours=ATTRIBUTION_WINDOW_HOURS,
+            )
+            return {
+                "attributed": False,
+                "model": model,
+                "touch_id": None,
+                "source_id": None,
+                "source_name": None,
+                "touch_type": None,
+                "channel": None,
+            }
+
+        # 按归因模型选取目标触点
+        selected_touch: MarketingTouch
+
+        if model == "last_touch":
+            # 最近一次触达
+            selected_touch = touches[-1]
+            await self._mark_touch_converted(
+                db, selected_touch, order_id, order_amount_fen, order_time
+            )
+            await self._update_summary(
+                db, tenant_id, selected_touch, order_amount_fen,
+                order_time.date(), model
+            )
+
+        elif model == "first_touch":
+            # 最早一次触达
+            selected_touch = touches[0]
+            await self._mark_touch_converted(
+                db, selected_touch, order_id, order_amount_fen, order_time
+            )
+            await self._update_summary(
+                db, tenant_id, selected_touch, order_amount_fen,
+                order_time.date(), model
+            )
+
+        elif model == "linear":
+            # 所有触点均分收入
+            share_fen = order_amount_fen // len(touches)
+            remainder = order_amount_fen - share_fen * len(touches)
+
+            for i, touch in enumerate(touches):
+                # 最后一条多分余数，避免精度丢失
+                amount = share_fen + (remainder if i == len(touches) - 1 else 0)
+                await self._mark_touch_converted(
+                    db, touch, order_id, amount, order_time
+                )
+                await self._update_summary(
+                    db, tenant_id, touch, amount,
+                    order_time.date(), model
+                )
+            # 返回最后一个触点作为代表
+            selected_touch = touches[-1]
+
+        log.info(
+            "order_attributed",
+            order_id=str(order_id),
+            customer_id=str(customer_id),
+            source_id=selected_touch.source_id,
+            source_name=selected_touch.source_name,
+            touch_type=selected_touch.touch_type,
+            channel=selected_touch.channel,
+            model=model,
+            order_amount_fen=order_amount_fen,
+            tenant_id=str(tenant_id),
+        )
+
+        # ── AB测试转化回写 ────────────────────────────────────────────
+        # 若此次归因关联了 AB 测试，同步记录 ABTestAssignment 的转化
+        if ab_test_id is not None:
+            try:
+                from services.ab_test_service import ABTestService
+                ab_svc = ABTestService()
+                await ab_svc.record_conversion(
+                    test_id=ab_test_id,
+                    customer_id=customer_id,
+                    order_id=order_id,
+                    order_amount_fen=order_amount_fen,
+                    tenant_id=tenant_id,
+                    db=db,
+                )
+            except (ValueError, KeyError) as exc:
+                # AB测试回写失败不影响主归因流程
+                log.warning(
+                    "ab_test.conversion_record_failed",
+                    ab_test_id=str(ab_test_id),
+                    order_id=str(order_id),
+                    customer_id=str(customer_id),
+                    error=str(exc),
+                )
+
+        return {
+            "attributed": True,
+            "model": model,
+            "touch_id": str(selected_touch.id),
+            "source_id": selected_touch.source_id,
+            "source_name": selected_touch.source_name,
+            "touch_type": selected_touch.touch_type,
+            "channel": selected_touch.channel,
+        }
+
+    async def _mark_touch_converted(
+        self,
+        db: AsyncSession,
+        touch: MarketingTouch,
+        order_id: uuid.UUID,
+        order_amount_fen: int,
+        converted_at: datetime,
+    ) -> None:
+        """回写触点的转化字段。"""
+        await db.execute(
+            update(MarketingTouch)
+            .where(MarketingTouch.id == touch.id)
+            .values(
+                is_converted=True,
+                order_id=order_id,
+                order_amount_fen=order_amount_fen,
+                converted_at=converted_at,
+            )
+        )
+
+    async def _update_summary(
+        self,
+        db: AsyncSession,
+        tenant_id: uuid.UUID,
+        touch: MarketingTouch,
+        revenue_fen: int,
+        stat_date: date,
+        model: str,
+    ) -> None:
+        """更新（或创建）当日归因汇总行。
+
+        采用 SELECT + conditional UPDATE/INSERT 模式（不依赖 ON CONFLICT，
+        兼容无 UNIQUE 约束的情况）。
+        """
+        stmt = select(AttributionSummary).where(
+            and_(
+                AttributionSummary.tenant_id == tenant_id,
+                AttributionSummary.source_id == touch.source_id,
+                AttributionSummary.stat_date == stat_date,
+                AttributionSummary.model == model,
+            )
+        )
+        result = await db.execute(stmt)
+        summary: Optional[AttributionSummary] = result.scalar_one_or_none()
+
+        if summary is None:
+            # 首次插入该来源当日汇总
+            new_summary = AttributionSummary(
+                tenant_id=tenant_id,
+                source_type=touch.touch_type,
+                source_id=touch.source_id,
+                source_name=touch.source_name,
+                stat_date=stat_date,
+                total_touches=1,
+                unique_customers=1,
+                converted_customers=1,
+                conversion_rate=1.0,
+                attributed_revenue_fen=revenue_fen,
+                cost_fen=0,
+                roi=0.0,
+                model=model,
+            )
+            db.add(new_summary)
+            await db.flush()
+        else:
+            new_converted = summary.converted_customers + 1
+            new_revenue = summary.attributed_revenue_fen + revenue_fen
+            new_rate = (
+                round(new_converted / summary.unique_customers, 4)
+                if summary.unique_customers > 0
+                else 0.0
+            )
+            new_roi = (
+                round((new_revenue - summary.cost_fen) / summary.cost_fen, 4)
+                if summary.cost_fen > 0
+                else 0.0
+            )
+            await db.execute(
+                update(AttributionSummary)
+                .where(AttributionSummary.id == summary.id)
+                .values(
+                    converted_customers=new_converted,
+                    attributed_revenue_fen=new_revenue,
+                    conversion_rate=new_rate,
+                    roi=new_roi,
+                )
+            )
+
+        log.debug(
+            "attribution_summary_updated",
+            source_id=touch.source_id,
+            stat_date=str(stat_date),
+            revenue_fen=revenue_fen,
+            model=model,
+        )
+
+    # ------------------------------------------------------------------
+    # C. 活动 ROI 计算
+    # ------------------------------------------------------------------
+
+    async def calculate_campaign_roi(
+        self,
+        campaign_id: str,
+        start_date: date,
+        end_date: date,
+        tenant_id: uuid.UUID,
+        db: AsyncSession,
+        model: str = "last_touch",
+    ) -> dict[str, Any]:
+        """计算某活动在指定日期范围内的 ROI。
+
+        Args:
+            campaign_id:  活动 ID
+            start_date:   统计开始日期（含）
+            end_date:     统计结束日期（含）
+            tenant_id:    租户 UUID
+            db:           AsyncSession
+            model:        归因模型
+
+        Returns:
+            详细 ROI 报告 dict
+        """
+        # 查询该活动在时间范围内的所有触点
+        stmt = select(MarketingTouch).where(
+            and_(
+                MarketingTouch.tenant_id == tenant_id,
+                MarketingTouch.source_id == campaign_id,
+                MarketingTouch.touched_at >= datetime.combine(
+                    start_date, datetime.min.time(), tzinfo=timezone.utc
+                ),
+                MarketingTouch.touched_at <= datetime.combine(
+                    end_date, datetime.max.time().replace(microsecond=0), tzinfo=timezone.utc
+                ),
+            )
+        )
+        result = await db.execute(stmt)
+        touches: list[MarketingTouch] = list(result.scalars().all())
+
+        if not touches:
             return {
                 "campaign_id": campaign_id,
                 "model": model,
-                "total_cost_fen": 0,
-                "total_revenue_fen": 0,
+                "start_date": str(start_date),
+                "end_date": str(end_date),
+                "total_touches": 0,
+                "unique_customers": 0,
+                "converted_customers": 0,
+                "conversion_rate": 0.0,
+                "attributed_revenue_fen": 0,
+                "attributed_revenue_yuan": 0.0,
+                "cost_fen": 0,
+                "cost_yuan": 0.0,
                 "roi": 0.0,
-                "profit_contribution_fen": 0,
                 "cac_fen": 0,
-                "ltv_fen": 0,
+                "cac_yuan": 0.0,
             }
 
-        # 找到触达的用户
-        touched_users = set(tp["user_id"] for tp in campaign_touchpoints)
-
-        # 找到这些用户的转化
-        user_conversions = [c for c in _conversions if c["user_id"] in touched_users]
-        total_revenue_fen = sum(c["revenue_fen"] for c in user_conversions)
-
-        # 获取活动成本
-        total_cost_fen = _campaign_costs.get(campaign_id, 0)
-
-        # 根据归因模型分配收入
-        attributed_revenue_fen = self._apply_attribution_model(
-            model, campaign_id, campaign_touchpoints, user_conversions
+        total_touches = len(touches)
+        unique_customers = len({t.customer_id for t in touches})
+        converted = [t for t in touches if t.is_converted]
+        converted_customers = len({t.customer_id for t in converted})
+        attributed_revenue_fen = sum(
+            t.order_amount_fen or 0 for t in converted
         )
 
-        profit_fen = attributed_revenue_fen - total_cost_fen
-        roi = round(attributed_revenue_fen / max(1, total_cost_fen), 2) if total_cost_fen > 0 else 0.0
-        converted_users = len(set(c["user_id"] for c in user_conversions))
-        cac_fen = total_cost_fen // max(1, converted_users) if converted_users > 0 else 0
-        ltv_fen = attributed_revenue_fen // max(1, converted_users) if converted_users > 0 else 0
+        # 活动优惠成本：从汇总表取最新 cost_fen（由业务层写入）
+        cost_stmt = select(func.sum(AttributionSummary.cost_fen)).where(
+            and_(
+                AttributionSummary.tenant_id == tenant_id,
+                AttributionSummary.source_id == campaign_id,
+                AttributionSummary.stat_date >= start_date,
+                AttributionSummary.stat_date <= end_date,
+                AttributionSummary.model == model,
+            )
+        )
+        cost_result = await db.execute(cost_stmt)
+        cost_fen: int = cost_result.scalar_one_or_none() or 0
+
+        conversion_rate = round(
+            converted_customers / unique_customers, 4
+        ) if unique_customers > 0 else 0.0
+        roi = round(
+            (attributed_revenue_fen - cost_fen) / cost_fen, 4
+        ) if cost_fen > 0 else 0.0
+        cac_fen = (
+            cost_fen // converted_customers
+            if converted_customers > 0
+            else 0
+        )
+
+        # 渠道分布
+        channel_dist: dict[str, int] = defaultdict(int)
+        for t in touches:
+            channel_dist[t.channel] += 1
 
         return {
             "campaign_id": campaign_id,
             "model": model,
-            "total_cost_fen": total_cost_fen,
-            "total_cost_yuan": round(total_cost_fen / 100, 2),
-            "total_revenue_fen": attributed_revenue_fen,
-            "total_revenue_yuan": round(attributed_revenue_fen / 100, 2),
+            "start_date": str(start_date),
+            "end_date": str(end_date),
+            "total_touches": total_touches,
+            "unique_customers": unique_customers,
+            "converted_customers": converted_customers,
+            "conversion_rate": conversion_rate,
+            "attributed_revenue_fen": attributed_revenue_fen,
+            "attributed_revenue_yuan": round(attributed_revenue_fen / 100, 2),
+            "cost_fen": cost_fen,
+            "cost_yuan": round(cost_fen / 100, 2),
             "roi": roi,
-            "profit_contribution_fen": profit_fen,
-            "profit_contribution_yuan": round(profit_fen / 100, 2),
             "cac_fen": cac_fen,
             "cac_yuan": round(cac_fen / 100, 2),
-            "ltv_fen": ltv_fen,
-            "ltv_yuan": round(ltv_fen / 100, 2),
-            "touched_users": len(touched_users),
-            "converted_users": converted_users,
-            "conversion_rate": round(converted_users / max(1, len(touched_users)), 4),
+            "channel_breakdown": dict(channel_dist),
         }
 
-    def get_channel_roi(self, date_range: dict) -> list[dict]:
-        """各渠道 ROI 对比"""
-        start = date_range.get("start", "")
-        end = date_range.get("end", "")
+    # ------------------------------------------------------------------
+    # D. 旅程 ROI 计算
+    # ------------------------------------------------------------------
 
-        # 按渠道聚合触点
-        channel_data: dict[str, dict] = defaultdict(
-            lambda: {"touchpoints": 0, "users": set(), "revenue_fen": 0}
-        )
+    async def calculate_journey_roi(
+        self,
+        journey_id: str,
+        tenant_id: uuid.UUID,
+        db: AsyncSession,
+        model: str = "last_touch",
+    ) -> dict[str, Any]:
+        """计算营销旅程的 ROI，并分析各节点漏斗。
 
-        filtered_tps = [
-            tp for tp in _touchpoints
-            if (not start or tp.get("timestamp", "") >= start)
-            and (not end or tp.get("timestamp", "") <= end)
-        ]
-
-        for tp in filtered_tps:
-            ch = tp["channel"]
-            channel_data[ch]["touchpoints"] += 1
-            channel_data[ch]["users"].add(tp["user_id"])
-
-        # 关联转化
-        for ch, data in channel_data.items():
-            user_convs = [c for c in _conversions if c["user_id"] in data["users"]]
-            data["revenue_fen"] = sum(c["revenue_fen"] for c in user_convs)
-            data["conversions"] = len(user_convs)
-
-        result = []
-        for ch, data in channel_data.items():
-            cost = _campaign_costs.get(f"channel_{ch}", 0)
-            result.append({
-                "channel": ch,
-                "touchpoints": data["touchpoints"],
-                "unique_users": len(data["users"]),
-                "conversions": data.get("conversions", 0),
-                "revenue_fen": data["revenue_fen"],
-                "revenue_yuan": round(data["revenue_fen"] / 100, 2),
-                "cost_fen": cost,
-                "roi": round(data["revenue_fen"] / max(1, cost), 2) if cost > 0 else 0.0,
-            })
-
-        return sorted(result, key=lambda x: x["revenue_fen"], reverse=True)
-
-    def get_segment_roi(self, date_range: dict) -> list[dict]:
-        """各人群分层 ROI（需结合分群数据）"""
-        # 简化实现：按触点中的 campaign_id 前缀推断分群
-        segment_data: dict[str, dict] = defaultdict(
-            lambda: {"users": set(), "revenue_fen": 0, "cost_fen": 0}
-        )
-
-        for tp in _touchpoints:
-            campaign_id = tp.get("campaign_id", "")
-            # 约定 campaign_id 格式: seg_{segment_id}_{campaign_name}
-            parts = campaign_id.split("_")
-            if len(parts) >= 2 and parts[0] == "seg":
-                seg_id = parts[1]
-            else:
-                seg_id = "unknown"
-
-            segment_data[seg_id]["users"].add(tp["user_id"])
-
-        for seg_id, data in segment_data.items():
-            user_convs = [c for c in _conversions if c["user_id"] in data["users"]]
-            data["revenue_fen"] = sum(c["revenue_fen"] for c in user_convs)
-            data["conversions"] = len(user_convs)
-
-        result = []
-        for seg_id, data in segment_data.items():
-            result.append({
-                "segment_id": seg_id,
-                "unique_users": len(data["users"]),
-                "conversions": data.get("conversions", 0),
-                "revenue_fen": data["revenue_fen"],
-                "revenue_yuan": round(data["revenue_fen"] / 100, 2),
-            })
-
-        return result
-
-    def get_campaign_roi(self, campaign_id: str) -> dict:
-        """获取单个活动 ROI（快捷方法）"""
-        return self.compute_attribution(campaign_id, model="multi_touch")
-
-    def get_attribution_path(self, user_id: str) -> list[dict]:
-        """获取用户的完整归因路径
-
-        touch → open → click → reserve → visit → order → repeat
+        Returns:
+            {
+              journey_id, total_touches, converted_customers,
+              attributed_revenue_fen, roi,
+              funnel: [{channel, touches, converted, rate}],
+              bottleneck_channel: str  # 流失最多的渠道
+            }
         """
-        user_tps = [tp for tp in _touchpoints if tp["user_id"] == user_id]
-        user_convs = [c for c in _conversions if c["user_id"] == user_id]
+        stmt = select(MarketingTouch).where(
+            and_(
+                MarketingTouch.tenant_id == tenant_id,
+                MarketingTouch.source_id == journey_id,
+            )
+        )
+        result = await db.execute(stmt)
+        touches: list[MarketingTouch] = list(result.scalars().all())
 
-        # 按时间排序
-        user_tps.sort(key=lambda x: x.get("timestamp", ""))
+        if not touches:
+            return {
+                "journey_id": journey_id,
+                "model": model,
+                "total_touches": 0,
+                "unique_customers": 0,
+                "converted_customers": 0,
+                "attributed_revenue_fen": 0,
+                "attributed_revenue_yuan": 0.0,
+                "cost_fen": 0,
+                "roi": 0.0,
+                "funnel": [],
+                "bottleneck_channel": None,
+            }
 
-        path: list[dict] = []
-        for tp in user_tps:
-            path.append({
-                "step": tp["touchpoint_type"],
-                "channel": tp["channel"],
-                "campaign_id": tp["campaign_id"],
-                "timestamp": tp["timestamp"],
+        # 按渠道分组统计（旅程节点通过 channel 区分步骤）
+        channel_stats: dict[str, dict[str, Any]] = defaultdict(
+            lambda: {"touches": 0, "customers": set(), "converted": 0, "revenue_fen": 0}
+        )
+        for t in touches:
+            ch = t.channel
+            channel_stats[ch]["touches"] += 1
+            channel_stats[ch]["customers"].add(t.customer_id)
+            if t.is_converted:
+                channel_stats[ch]["converted"] += 1
+                channel_stats[ch]["revenue_fen"] += t.order_amount_fen or 0
+
+        funnel: list[dict] = []
+        min_rate: float = 1.0
+        bottleneck_channel: Optional[str] = None
+
+        for ch, stats in channel_stats.items():
+            unique = len(stats["customers"])
+            converted = stats["converted"]
+            rate = round(converted / unique, 4) if unique > 0 else 0.0
+            funnel.append({
+                "channel": ch,
+                "touches": stats["touches"],
+                "unique_customers": unique,
+                "converted": converted,
+                "conversion_rate": rate,
+                "revenue_fen": stats["revenue_fen"],
+                "revenue_yuan": round(stats["revenue_fen"] / 100, 2),
             })
+            if rate < min_rate:
+                min_rate = rate
+                bottleneck_channel = ch
 
-        for conv in user_convs:
-            path.append({
-                "step": "conversion",
-                "order_id": conv["order_id"],
-                "revenue_fen": conv["revenue_fen"],
-                "revenue_yuan": round(conv["revenue_fen"] / 100, 2),
-                "timestamp": conv["timestamp"],
-            })
+        total_converted = len({t.customer_id for t in touches if t.is_converted})
+        total_revenue = sum(t.order_amount_fen or 0 for t in touches if t.is_converted)
 
-        path.sort(key=lambda x: x.get("timestamp", ""))
-        return path
+        # 汇总成本
+        cost_stmt = select(func.sum(AttributionSummary.cost_fen)).where(
+            and_(
+                AttributionSummary.tenant_id == tenant_id,
+                AttributionSummary.source_id == journey_id,
+            )
+        )
+        cost_result = await db.execute(cost_stmt)
+        cost_fen: int = cost_result.scalar_one_or_none() or 0
 
-    def get_roi_overview(self, date_range: dict) -> dict:
-        """全局 ROI 总览"""
-        start = date_range.get("start", "")
-        end = date_range.get("end", "")
-
-        filtered_convs = [
-            c for c in _conversions
-            if (not start or c.get("timestamp", "") >= start)
-            and (not end or c.get("timestamp", "") <= end)
-        ]
-
-        total_revenue_fen = sum(c["revenue_fen"] for c in filtered_convs)
-        total_cost_fen = sum(_campaign_costs.values())
-        unique_converted = len(set(c["user_id"] for c in filtered_convs))
-
-        all_touched_users = set(tp["user_id"] for tp in _touchpoints)
-        cac_fen = total_cost_fen // max(1, unique_converted) if unique_converted > 0 else 0
-        ltv_fen = total_revenue_fen // max(1, unique_converted) if unique_converted > 0 else 0
+        roi = round(
+            (total_revenue - cost_fen) / cost_fen, 4
+        ) if cost_fen > 0 else 0.0
 
         return {
-            "date_range": date_range,
-            "total_investment_fen": total_cost_fen,
-            "total_investment_yuan": round(total_cost_fen / 100, 2),
-            "total_return_fen": total_revenue_fen,
-            "total_return_yuan": round(total_revenue_fen / 100, 2),
-            "overall_roi": round(total_revenue_fen / max(1, total_cost_fen), 2) if total_cost_fen > 0 else 0.0,
-            "profit_contribution_fen": total_revenue_fen - total_cost_fen,
-            "profit_contribution_yuan": round((total_revenue_fen - total_cost_fen) / 100, 2),
-            "cac_fen": cac_fen,
-            "cac_yuan": round(cac_fen / 100, 2),
-            "ltv_fen": ltv_fen,
-            "ltv_yuan": round(ltv_fen / 100, 2),
-            "total_touched_users": len(all_touched_users),
-            "total_converted_users": unique_converted,
-            "overall_conversion_rate": round(unique_converted / max(1, len(all_touched_users)), 4),
+            "journey_id": journey_id,
+            "model": model,
+            "total_touches": len(touches),
+            "unique_customers": len({t.customer_id for t in touches}),
+            "converted_customers": total_converted,
+            "attributed_revenue_fen": total_revenue,
+            "attributed_revenue_yuan": round(total_revenue / 100, 2),
+            "cost_fen": cost_fen,
+            "cost_yuan": round(cost_fen / 100, 2),
+            "roi": roi,
+            "funnel": funnel,
+            "bottleneck_channel": bottleneck_channel,
         }
 
-    def _apply_attribution_model(
+    # ------------------------------------------------------------------
+    # E. 营销总览仪表盘
+    # ------------------------------------------------------------------
+
+    async def get_attribution_dashboard(
         self,
-        model: str,
-        campaign_id: str,
-        touchpoints: list[dict],
-        conversions: list[dict],
-    ) -> int:
-        """根据归因模型计算归因收入"""
-        total_revenue = sum(c["revenue_fen"] for c in conversions)
+        tenant_id: uuid.UUID,
+        date_range: dict,
+        db: AsyncSession,
+    ) -> dict[str, Any]:
+        """营销总览仪表盘。
 
-        if model == "first_touch":
-            # 首次触点归因：全部收入归于首次触点的活动
-            return total_revenue
+        Args:
+            tenant_id:   租户 UUID
+            date_range:  {"start": "YYYY-MM-DD", "end": "YYYY-MM-DD"}
+            db:          AsyncSession
 
-        elif model == "last_touch":
-            # 末次触点归因：全部收入归于最后一个触点的活动
-            return total_revenue
+        Returns:
+            {
+              total_touches, total_converted, total_revenue,
+              avg_roi, top_campaigns, channel_breakdown, daily_trend
+            }
+        """
+        start_str: str = date_range.get("start", "")
+        end_str: str = date_range.get("end", "")
 
-        elif model == "multi_touch":
-            # 多触点归因：按触点数量加权
-            if not touchpoints:
-                return 0
-            # 该活动的触点占用户全部触点的比例
-            users_in_campaign = set(tp["user_id"] for tp in touchpoints)
-            weighted_revenue = 0
-            for user_id in users_in_campaign:
-                user_all_tps = [tp for tp in _touchpoints if tp["user_id"] == user_id]
-                user_campaign_tps = [tp for tp in touchpoints if tp["user_id"] == user_id]
-                user_convs = [c for c in conversions if c["user_id"] == user_id]
-                user_revenue = sum(c["revenue_fen"] for c in user_convs)
+        # 日期解析（默认近30天）
+        today = datetime.now(timezone.utc).date()
+        start_date: date = date.fromisoformat(start_str) if start_str else (
+            date(today.year, today.month, 1)
+            if today.day > 30
+            else date.fromordinal(today.toordinal() - 29)
+        )
+        end_date: date = date.fromisoformat(end_str) if end_str else today
 
-                if user_all_tps:
-                    weight = len(user_campaign_tps) / len(user_all_tps)
-                    weighted_revenue += int(user_revenue * weight)
+        start_dt = datetime.combine(start_date, datetime.min.time(), tzinfo=timezone.utc)
+        end_dt = datetime.combine(end_date, datetime.max.time().replace(microsecond=0), tzinfo=timezone.utc)
 
-            return weighted_revenue
+        # 全量触点统计
+        total_stmt = select(
+            func.count(MarketingTouch.id).label("total_touches"),
+            func.count(MarketingTouch.id).filter(
+                MarketingTouch.is_converted.is_(True)
+            ).label("total_converted"),
+            func.coalesce(
+                func.sum(MarketingTouch.order_amount_fen).filter(
+                    MarketingTouch.is_converted.is_(True)
+                ), 0
+            ).label("total_revenue"),
+        ).where(
+            and_(
+                MarketingTouch.tenant_id == tenant_id,
+                MarketingTouch.touched_at >= start_dt,
+                MarketingTouch.touched_at <= end_dt,
+            )
+        )
+        total_result = await db.execute(total_stmt)
+        row = total_result.one()
+        total_touches: int = row.total_touches or 0
+        total_converted: int = row.total_converted or 0
+        total_revenue: int = row.total_revenue or 0
 
-        elif model == "linear":
-            # 线性归因：所有活动平分收入
-            all_campaigns = set(tp["campaign_id"] for tp in _touchpoints)
-            if not all_campaigns:
-                return 0
-            return total_revenue // len(all_campaigns)
+        # 平均 ROI（来自汇总表）
+        roi_stmt = select(func.avg(AttributionSummary.roi)).where(
+            and_(
+                AttributionSummary.tenant_id == tenant_id,
+                AttributionSummary.stat_date >= start_date,
+                AttributionSummary.stat_date <= end_date,
+                AttributionSummary.roi != 0.0,
+            )
+        )
+        roi_result = await db.execute(roi_stmt)
+        avg_roi: float = round(roi_result.scalar_one_or_none() or 0.0, 4)
 
-        elif model == "time_decay":
-            # 时间衰减：越接近转化的触点权重越高
-            if not touchpoints:
-                return 0
-            # 简化：最近的触点权重 2x，较早的 1x
-            users_in_campaign = set(tp["user_id"] for tp in touchpoints)
-            weighted_revenue = 0
-            for user_id in users_in_campaign:
-                user_tps = sorted(
-                    [tp for tp in _touchpoints if tp["user_id"] == user_id],
-                    key=lambda x: x.get("timestamp", ""),
+        # 渠道转化率对比
+        channel_stmt = select(
+            MarketingTouch.channel,
+            func.count(MarketingTouch.id).label("touches"),
+            func.count(MarketingTouch.id).filter(
+                MarketingTouch.is_converted.is_(True)
+            ).label("converted"),
+        ).where(
+            and_(
+                MarketingTouch.tenant_id == tenant_id,
+                MarketingTouch.touched_at >= start_dt,
+                MarketingTouch.touched_at <= end_dt,
+            )
+        ).group_by(MarketingTouch.channel)
+        channel_result = await db.execute(channel_stmt)
+        channel_breakdown: list[dict] = []
+        for ch_row in channel_result.all():
+            ch_touches = ch_row.touches or 0
+            ch_converted = ch_row.converted or 0
+            channel_breakdown.append({
+                "channel": ch_row.channel,
+                "touches": ch_touches,
+                "converted": ch_converted,
+                "conversion_rate": round(
+                    ch_converted / ch_touches, 4
+                ) if ch_touches > 0 else 0.0,
+            })
+
+        # ROI 最高的 5 个活动（来自汇总表）
+        top_stmt = (
+            select(
+                AttributionSummary.source_id,
+                AttributionSummary.source_name,
+                AttributionSummary.source_type,
+                func.sum(AttributionSummary.attributed_revenue_fen).label("total_revenue"),
+                func.sum(AttributionSummary.cost_fen).label("total_cost"),
+                func.avg(AttributionSummary.roi).label("avg_roi"),
+            )
+            .where(
+                and_(
+                    AttributionSummary.tenant_id == tenant_id,
+                    AttributionSummary.stat_date >= start_date,
+                    AttributionSummary.stat_date <= end_date,
                 )
-                user_campaign_tps = [tp for tp in touchpoints if tp["user_id"] == user_id]
-                user_convs = [c for c in conversions if c["user_id"] == user_id]
-                user_revenue = sum(c["revenue_fen"] for c in user_convs)
+            )
+            .group_by(
+                AttributionSummary.source_id,
+                AttributionSummary.source_name,
+                AttributionSummary.source_type,
+            )
+            .order_by(func.avg(AttributionSummary.roi).desc())
+            .limit(5)
+        )
+        top_result = await db.execute(top_stmt)
+        top_campaigns: list[dict] = [
+            {
+                "source_id": r.source_id,
+                "source_name": r.source_name,
+                "source_type": r.source_type,
+                "attributed_revenue_fen": int(r.total_revenue or 0),
+                "attributed_revenue_yuan": round((r.total_revenue or 0) / 100, 2),
+                "cost_fen": int(r.total_cost or 0),
+                "roi": round(r.avg_roi or 0.0, 4),
+            }
+            for r in top_result.all()
+        ]
 
-                if not user_tps:
-                    continue
+        # 近30天每日归因收入趋势（来自汇总表）
+        daily_stmt = (
+            select(
+                AttributionSummary.stat_date,
+                func.sum(AttributionSummary.attributed_revenue_fen).label("revenue"),
+                func.sum(AttributionSummary.converted_customers).label("converted"),
+            )
+            .where(
+                and_(
+                    AttributionSummary.tenant_id == tenant_id,
+                    AttributionSummary.stat_date >= start_date,
+                    AttributionSummary.stat_date <= end_date,
+                )
+            )
+            .group_by(AttributionSummary.stat_date)
+            .order_by(AttributionSummary.stat_date.asc())
+        )
+        daily_result = await db.execute(daily_stmt)
+        daily_trend: list[dict] = [
+            {
+                "date": str(r.stat_date),
+                "attributed_revenue_fen": int(r.revenue or 0),
+                "attributed_revenue_yuan": round((r.revenue or 0) / 100, 2),
+                "converted_customers": int(r.converted or 0),
+            }
+            for r in daily_result.all()
+        ]
 
-                # 计算权重：位置越靠后权重越高
-                total_weight = 0.0
-                campaign_weight = 0.0
-                for i, tp in enumerate(user_tps):
-                    w = 1.0 + i * 0.5  # 线性递增权重
-                    total_weight += w
-                    if tp["campaign_id"] == campaign_id:
-                        campaign_weight += w
+        return {
+            "date_range": {"start": str(start_date), "end": str(end_date)},
+            "total_touches": total_touches,
+            "total_converted": total_converted,
+            "total_revenue_fen": total_revenue,
+            "total_revenue_yuan": round(total_revenue / 100, 2),
+            "overall_conversion_rate": round(
+                total_converted / total_touches, 4
+            ) if total_touches > 0 else 0.0,
+            "avg_roi": avg_roi,
+            "top_campaigns": top_campaigns,
+            "channel_breakdown": channel_breakdown,
+            "daily_trend": daily_trend,
+        }
 
-                if total_weight > 0:
-                    weighted_revenue += int(user_revenue * campaign_weight / total_weight)
+    # ------------------------------------------------------------------
+    # F. 转化漏斗
+    # ------------------------------------------------------------------
 
-            return weighted_revenue
+    async def get_conversion_funnel(
+        self,
+        source_id: str,
+        tenant_id: uuid.UUID,
+        db: AsyncSession,
+    ) -> dict[str, Any]:
+        """获取某活动/旅程的转化漏斗数据。
 
-        return total_revenue
+        漏斗步骤基于渠道序列：
+          触达 → 渠道A推送 → 渠道B推送 → ... → 下单
 
+        Returns:
+            {
+              source_id,
+              steps: ["触达", "wecom推送", "sms推送", "下单"],
+              counts: [1000, 350, 120, 85],
+              rates:  ["100%", "35.0%", "34.3%", "70.8%"]
+            }
+        """
+        stmt = select(MarketingTouch).where(
+            and_(
+                MarketingTouch.tenant_id == tenant_id,
+                MarketingTouch.source_id == source_id,
+            )
+        ).order_by(MarketingTouch.touched_at.asc())
+        result = await db.execute(stmt)
+        touches: list[MarketingTouch] = list(result.scalars().all())
 
-def set_campaign_cost(campaign_id: str, cost_fen: int) -> None:
-    """设置活动成本（辅助函数）"""
-    _campaign_costs[campaign_id] = cost_fen
+        if not touches:
+            return {
+                "source_id": source_id,
+                "steps": ["触达", "下单"],
+                "counts": [0, 0],
+                "rates": ["100%", "0%"],
+            }
 
+        total_customers = len({t.customer_id for t in touches})
 
-def clear_all_attribution_data() -> None:
-    """清空所有归因数据（仅测试用）"""
-    _touchpoints.clear()
-    _conversions.clear()
-    _campaign_costs.clear()
+        # 统计各渠道触达的去重客户数
+        channel_customers: dict[str, set] = defaultdict(set)
+        for t in touches:
+            channel_customers[t.channel].add(t.customer_id)
+
+        # 构建漏斗步骤
+        steps = ["触达"]
+        counts: list[int] = [total_customers]
+
+        for ch, customers in channel_customers.items():
+            steps.append(f"{ch}推送")
+            counts.append(len(customers))
+
+        # 最后一步：下单
+        converted_customers = len({t.customer_id for t in touches if t.is_converted})
+        steps.append("下单")
+        counts.append(converted_customers)
+
+        # 计算各步转化率（相对于第一步）
+        first = counts[0] if counts[0] > 0 else 1
+        rates: list[str] = []
+        for c in counts:
+            pct = round(c / first * 100, 1)
+            rates.append(f"{pct}%")
+
+        return {
+            "source_id": source_id,
+            "steps": steps,
+            "counts": counts,
+            "rates": rates,
+        }
+
+    # ------------------------------------------------------------------
+    # G. TOP ROI 排名
+    # ------------------------------------------------------------------
+
+    async def get_top_performers(
+        self,
+        tenant_id: uuid.UUID,
+        db: AsyncSession,
+        limit: int = 10,
+        days: int = 30,
+    ) -> list[dict[str, Any]]:
+        """获取 ROI 最高的活动/旅程排名。
+
+        Args:
+            tenant_id: 租户 UUID
+            db:        AsyncSession
+            limit:     返回条数，默认 10
+            days:      统计近多少天，默认 30
+
+        Returns:
+            按 ROI 降序排列的来源列表
+        """
+        today = datetime.now(timezone.utc).date()
+        start_date = date.fromordinal(today.toordinal() - days + 1)
+
+        stmt = (
+            select(
+                AttributionSummary.source_id,
+                AttributionSummary.source_name,
+                AttributionSummary.source_type,
+                func.sum(AttributionSummary.total_touches).label("total_touches"),
+                func.sum(AttributionSummary.unique_customers).label("unique_customers"),
+                func.sum(AttributionSummary.converted_customers).label("converted_customers"),
+                func.sum(AttributionSummary.attributed_revenue_fen).label("total_revenue"),
+                func.sum(AttributionSummary.cost_fen).label("total_cost"),
+                func.avg(AttributionSummary.roi).label("avg_roi"),
+            )
+            .where(
+                and_(
+                    AttributionSummary.tenant_id == tenant_id,
+                    AttributionSummary.stat_date >= start_date,
+                    AttributionSummary.stat_date <= today,
+                )
+            )
+            .group_by(
+                AttributionSummary.source_id,
+                AttributionSummary.source_name,
+                AttributionSummary.source_type,
+            )
+            .order_by(func.avg(AttributionSummary.roi).desc())
+            .limit(limit)
+        )
+        result = await db.execute(stmt)
+        rows = result.all()
+
+        return [
+            {
+                "rank": i + 1,
+                "source_id": r.source_id,
+                "source_name": r.source_name,
+                "source_type": r.source_type,
+                "total_touches": int(r.total_touches or 0),
+                "unique_customers": int(r.unique_customers or 0),
+                "converted_customers": int(r.converted_customers or 0),
+                "conversion_rate": round(
+                    int(r.converted_customers or 0) / int(r.unique_customers or 1), 4
+                ),
+                "attributed_revenue_fen": int(r.total_revenue or 0),
+                "attributed_revenue_yuan": round((r.total_revenue or 0) / 100, 2),
+                "cost_fen": int(r.total_cost or 0),
+                "cost_yuan": round((r.total_cost or 0) / 100, 2),
+                "roi": round(r.avg_roi or 0.0, 4),
+            }
+            for i, r in enumerate(rows)
+        ]

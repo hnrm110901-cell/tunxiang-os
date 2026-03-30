@@ -4,6 +4,9 @@
 触发引擎: 消费/注册/生日/时间/累计
 奖励引擎: 券/积分/储值/实物
 
+AB测试集成：活动若设置了 ab_test_id，在发送内容前自动通过 ABTestService
+分配变体，并使用对应变体的 content 替换默认 content。
+
 金额单位: 分(fen)
 """
 import uuid
@@ -13,6 +16,22 @@ from typing import Any, Optional
 import structlog
 
 log = structlog.get_logger()
+
+# ---------------------------------------------------------------------------
+# ApprovalService 延迟单例（避免循环导入）
+# ---------------------------------------------------------------------------
+
+_approval_service_instance = None
+
+
+def _get_approval_service():
+    """获取 ApprovalService 单例（延迟初始化，避免循环依赖）。"""
+    global _approval_service_instance
+    if _approval_service_instance is None:
+        from services.approval_service import ApprovalService  # noqa: PLC0415
+        _approval_service_instance = ApprovalService()
+    return _approval_service_instance
+
 
 # ---------------------------------------------------------------------------
 # 内存存储
@@ -138,6 +157,116 @@ class CampaignEngine:
         log.info("campaign.started", campaign_id=campaign_id, tenant_id=tenant_id)
         return campaign
 
+    async def activate_campaign(
+        self,
+        campaign_id: str,
+        operator_id: str,
+        operator_name: str,
+        tenant_id: str,
+        db: Any = None,
+    ) -> dict:
+        """激活活动 — 带审批流拦截（draft -> active 或 pending_approval）。
+
+        流程：
+            1. 检查活动是否需要审批（审批流触发条件匹配）
+            2. 若需要审批：创建审批单，活动保持 draft，返回 pending_approval
+            3. 若无需审批：直接调用 _do_activate 激活活动
+
+        Args:
+            campaign_id:   活动ID
+            operator_id:   操作人员工ID（申请人）
+            operator_name: 操作人姓名（冗余存储）
+            tenant_id:     租户ID
+            db:            数据库会话（AsyncSession，内存模式下可为 None）
+        """
+        campaign = _campaigns.get(campaign_id)
+        if not campaign:
+            return {"error": f"活动不存在: {campaign_id}"}
+        if campaign["tenant_id"] != tenant_id:
+            return {"error": "无权操作此活动"}
+
+        current = campaign["status"]
+        if "active" not in _VALID_TRANSITIONS.get(current, []):
+            return {"error": f"活动状态 {current} 不允许激活"}
+
+        if db is not None:
+            # 构造审批触发数据（字段名与审批流模板的 trigger_conditions 对齐）
+            config = campaign.get("config", {})
+            approval_object_data = {
+                "max_discount_fen": config.get("max_discount_fen", 0),
+                "target_count": config.get("target_count", 0),
+            }
+
+            approval_svc = _get_approval_service()
+            try:
+                tenant_uuid = uuid.UUID(tenant_id)
+                needs_approval, workflow_id = await approval_svc.check_needs_approval(
+                    object_type="campaign",
+                    object_data=approval_object_data,
+                    tenant_id=tenant_uuid,
+                    db=db,
+                )
+            except (ValueError, TypeError) as exc:
+                log.warning(
+                    "campaign.activate_approval_check_failed",
+                    campaign_id=campaign_id,
+                    error=str(exc),
+                )
+                needs_approval = False
+                workflow_id = None
+
+            if needs_approval and workflow_id is not None:
+                try:
+                    request = await approval_svc.create_request(
+                        workflow_id=workflow_id,
+                        object_type="campaign",
+                        object_id=campaign_id,
+                        object_summary={
+                            "name": campaign.get("name", ""),
+                            "type": campaign.get("campaign_type", ""),
+                        },
+                        requester_id=uuid.UUID(operator_id),
+                        requester_name=operator_name,
+                        tenant_id=tenant_uuid,
+                        db=db,
+                    )
+                    log.info(
+                        "campaign.activation_pending_approval",
+                        campaign_id=campaign_id,
+                        request_id=str(request.id),
+                        tenant_id=tenant_id,
+                    )
+                    return {
+                        "status": "pending_approval",
+                        "campaign_id": campaign_id,
+                        "request_id": str(request.id),
+                        "message": "活动已提交审批，等待审批通过后自动激活",
+                    }
+                except (ValueError, TypeError) as exc:
+                    log.error(
+                        "campaign.activate_create_request_failed",
+                        campaign_id=campaign_id,
+                        error=str(exc),
+                    )
+                    # 审批单创建失败时降级直接激活，保证业务连续性，并告警
+                    log.warning(
+                        "campaign.activate_fallback_direct",
+                        campaign_id=campaign_id,
+                    )
+
+        return await self._do_activate(campaign_id, tenant_id)
+
+    async def _do_activate(self, campaign_id: str, tenant_id: str) -> dict:
+        """直接激活活动（跳过审批，内部调用）。"""
+        campaign = _campaigns.get(campaign_id)
+        if not campaign:
+            return {"error": f"活动不存在: {campaign_id}"}
+
+        campaign["status"] = "active"
+        campaign["updated_at"] = datetime.now(timezone.utc).isoformat()
+        log.info("campaign.activated", campaign_id=campaign_id, tenant_id=tenant_id)
+        return campaign
+
     async def pause_campaign(
         self, campaign_id: str, tenant_id: str, db: Any = None
     ) -> dict:
@@ -221,6 +350,7 @@ class CampaignEngine:
         trigger_event: dict,
         tenant_id: str,
         db: Any = None,
+        customer_data: Optional[dict] = None,
     ) -> dict:
         """触发奖励发放
 
@@ -229,6 +359,8 @@ class CampaignEngine:
             campaign_id: 活动ID
             trigger_event: 触发事件数据
             tenant_id: 租户ID
+            db: 数据库连接（AB测试分组需要 AsyncSession；内存模式下可为 None）
+            customer_data: 客户属性（用于AB测试分流），例如 {"rfm_level": "S1", "store_id": "s1"}
         """
         eligibility = await self.check_eligibility(
             customer_id, campaign_id, tenant_id, db
@@ -238,6 +370,57 @@ class CampaignEngine:
 
         campaign = _campaigns[campaign_id]
         config = campaign.get("config", {})
+
+        # ── AB测试集成 ──────────────────────────────────────────────────
+        # 若活动关联了 AB 测试，按测试分组选择变体内容
+        ab_test_id: Optional[str] = campaign.get("ab_test_id")
+        variant_used: Optional[str] = None
+
+        if ab_test_id and db is not None:
+            try:
+                from services.ab_test_service import ABTestService
+                ab_svc = ABTestService()
+                customer_uuid = (
+                    customer_id
+                    if isinstance(customer_id, uuid.UUID)
+                    else uuid.UUID(str(customer_id))
+                )
+                tenant_uuid = (
+                    tenant_id
+                    if isinstance(tenant_id, uuid.UUID)
+                    else uuid.UUID(str(tenant_id))
+                )
+                test_uuid = uuid.UUID(str(ab_test_id))
+                variant_used = await ab_svc.assign_variant(
+                    test_id=test_uuid,
+                    customer_id=customer_uuid,
+                    customer_data=customer_data or {},
+                    tenant_id=tenant_uuid,
+                    db=db,
+                )
+                # 从变体列表中找到对应 content，覆盖活动默认 content
+                variants: list[dict] = campaign.get("variants", [])
+                for v in variants:
+                    if v.get("variant") == variant_used:
+                        config = {**config, **v.get("content", {})}
+                        break
+                log.info(
+                    "campaign.ab_test_variant_selected",
+                    campaign_id=campaign_id,
+                    ab_test_id=ab_test_id,
+                    customer_id=str(customer_id),
+                    variant=variant_used,
+                )
+            except (ValueError, KeyError) as exc:
+                # AB测试分组失败不阻断主流程，降级使用默认 content
+                log.warning(
+                    "campaign.ab_test_assign_failed",
+                    campaign_id=campaign_id,
+                    ab_test_id=ab_test_id,
+                    customer_id=str(customer_id),
+                    error=str(exc),
+                )
+
         reward_config = config.get("reward", {})
 
         # 调用奖励引擎发放
@@ -254,6 +437,7 @@ class CampaignEngine:
             "trigger_event": trigger_event,
             "reward": reward_result,
             "participated_at": now,
+            "ab_variant": variant_used,  # None 表示未参与 AB 测试
         }
         _campaign_participants[campaign_id].append(participation)
         _campaign_rewards[campaign_id].append(reward_result)
@@ -277,6 +461,7 @@ class CampaignEngine:
             "campaign_id": campaign_id,
             "customer_id": customer_id,
             "reward": reward_result,
+            "ab_variant": variant_used,
         }
 
     async def get_campaign_analytics(
