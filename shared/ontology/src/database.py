@@ -9,6 +9,7 @@
         ...
 """
 import os
+import uuid
 from typing import AsyncGenerator
 
 from sqlalchemy import text
@@ -29,8 +30,18 @@ engine = create_async_engine(
 )
 async_session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
-# 预编译 RLS 设置语句（避免每次重新解析）
 _SET_TENANT_SQL = text("SELECT set_config('app.tenant_id', :tid, true)")
+
+
+def _validate_tenant_id(tenant_id: str) -> str:
+    """校验 tenant_id 非空且为合法 UUID，防止 RLS 绕过。"""
+    if not tenant_id or not tenant_id.strip():
+        raise ValueError("tenant_id must not be empty — RLS requires a valid tenant context")
+    try:
+        uuid.UUID(tenant_id)
+    except ValueError as e:
+        raise ValueError(f"tenant_id must be a valid UUID, got: {tenant_id!r}") from e
+    return tenant_id
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
@@ -45,7 +56,11 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 
 
 async def get_db_with_tenant(tenant_id: str) -> AsyncGenerator[AsyncSession, None]:
-    """带租户隔离的 DB session — set_config 与首次业务查询在同一连接上执行"""
+    """带租户隔离的 DB session — set_config 与首次业务查询在同一连接上执行。
+
+    安全保障：拒绝 None/空/非 UUID 的 tenant_id，防止 RLS NULL 绕过。
+    """
+    _validate_tenant_id(tenant_id)
     async with async_session_factory() as session:
         try:
             await session.execute(_SET_TENANT_SQL, {"tid": tenant_id})

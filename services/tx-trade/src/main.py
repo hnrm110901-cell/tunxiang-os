@@ -32,19 +32,20 @@ from .api.dish_practice_routes import router as dish_practice_router
 from .api.table_ops_routes import router as table_ops_router
 from .api.banquet_routes import router as banquet_router
 from .api.mobile_ops_routes import router as mobile_ops_router
+from .api.takeaway_routes import router as takeaway_router
+from .api.retail_mall_routes import router as retail_mall_router
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # 启动时创建表（开发环境）
     await init_db()
     yield
 
 
 app = FastAPI(
     title="TunxiangOS tx-trade",
-    version="3.0.0",
-    description="交易履约微服务 — 收银引擎",
+    version="4.0.0",
+    description="交易履约微服务 — 收银/外卖聚合/零售商城",
     lifespan=lifespan,
 )
 
@@ -79,8 +80,10 @@ app.include_router(dish_practice_router)
 app.include_router(table_ops_router)
 app.include_router(banquet_router)
 app.include_router(mobile_ops_router)
+app.include_router(takeaway_router)
+app.include_router(retail_mall_router)
 
 
 @app.get("/health")
 async def health():
-    return {"ok": True, "data": {"service": "tx-trade", "version": "3.0.0"}}
+    return {"ok": True, "data": {"service": "tx-trade", "version": "4.0.0"}}
