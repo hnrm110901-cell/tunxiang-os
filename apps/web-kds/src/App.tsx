@@ -4,6 +4,8 @@
  * 页面清单：
  *   /board         → KitchenBoard（档口任务看板，核心）
  *   /board-legacy  → KDSBoardPage（旧版看板，保留兼容）
+ *   /zone-board    → ZoneKitchenBoard（包厢/大厅分区看板，?zone=vip|hall|all）
+ *   /booking-prep  → BookingPrepView（预订备餐视图）
  *   /dept          → DeptSelector（档口选择）
  *   /timeout       → TimeoutAlert（超时预警）
  *   /shortage      → ShortageReport（缺料上报）
@@ -28,6 +30,9 @@ import { ShortageReport } from './pages/ShortageReport';
 import { StatsPanel } from './pages/StatsPanel';
 import { RemakeModal } from './pages/RemakeModal';
 import { RunnerStation } from './pages/RunnerStation';
+import { CallingQueue } from './pages/CallingQueue';
+import { BookingPrepView } from './pages/BookingPrepView';
+import { ZoneKitchenBoard } from './pages/ZoneKitchenBoard';
 
 export default function App() {
   return (
@@ -38,12 +43,15 @@ export default function App() {
 
         {/* 新页面 */}
         <Route path="/board" element={<KitchenBoard />} />
+        <Route path="/zone-board" element={<ZoneKitchenBoard />} />
+        <Route path="/booking-prep" element={<BookingPrepView />} />
         <Route path="/dept" element={<DeptSelector />} />
         <Route path="/timeout" element={<TimeoutAlert />} />
         <Route path="/shortage" element={<ShortageReport />} />
         <Route path="/stats-panel" element={<StatsPanel />} />
         <Route path="/remake" element={<RemakeModal />} />
         <Route path="/runner" element={<RunnerStation />} />
+        <Route path="/calling" element={<CallingQueue />} />
 
         {/* 原有页面（保留兼容） */}
         <Route path="/board-legacy" element={<KDSBoardPage />} />

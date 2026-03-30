@@ -1,0 +1,101 @@
+# ═══════════════════════════════════════════════════════════════
+# 屯象OS .cursorignore — 控制 Cursor 索引和访问范围
+# 目标：让 Cursor 聚焦在业务代码、接口层、领域模型、页面层
+# ═══════════════════════════════════════════════════════════════
+
+# ─── 依赖与虚拟环境 ───
+node_modules/
+.venv/
+venv/
+ENV/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+
+# ─── 构建产物 ───
+dist/
+build/
+.next/
+out/
+apps/android-shell/build/
+apps/android-pos/build/
+apps/ios-shell/.build/
+edge/coreml-bridge/.build/
+DerivedData/
+*.xcuserdata
+
+# ─── 锁文件（无业务语义） ───
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+
+# ─── 测试与覆盖率缓存 ───
+coverage/
+.coverage
+coverage.xml
+.nyc_output/
+.pytest_cache/
+htmlcov/
+
+# ─── 日志与临时文件 ───
+logs/
+*.log
+*.tmp
+*.temp
+.cache/
+.snapshots/
+
+# ─── 数据库文件 ───
+*.db
+*.sqlite
+*.sqlite3
+backups/
+
+# ─── 密钥与证书（绝对不可索引） ───
+.env
+.env.*
+!.env.example
+!.env.*.example
+ssl/
+*.pem
+*.key
+*.crt
+*.jks
+*.keystore
+*.p12
+config/merchants/
+.secrets.baseline
+
+# ─── ML 模型二进制（太大无意义） ───
+*.mlmodel
+*.mlpackage
+*.onnx
+
+# ─── Android 构建工具链 ───
+apps/android-shell/.gradle/
+apps/android-shell/local.properties
+apps/android-pos/.gradle/
+apps/android-pos/local.properties
+
+# ─── OS 与 IDE 杂项 ───
+.DS_Store
+Thumbs.db
+.idea/
+*.swp
+*.swo
+
+# ─── Docker override（本地开发专属） ───
+docker-compose.override.yml
+
+# ─── Claude Code 工作区（避免循环索引） ───
+.claude/worktrees/
+.claude/settings.local.json
+CLAUDE.local.md
+
+# ─── 归档文档（已过时，不应影响当前决策） ───
+docs/archive/
+
+# ─── 生成物与 OpenAPI spec ───
+generated/
+.openapi/

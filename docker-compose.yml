@@ -41,10 +41,47 @@ services:
       TX_TRADE_URL: http://tx-trade:8001
       TX_MENU_URL: http://tx-menu:8002
       TX_AGENT_URL: http://tx-agent:8008
+      WECOM_CORP_ID: ${WECOM_CORP_ID}
+      WECOM_AGENT_ID: ${WECOM_AGENT_ID}
+      WECOM_SECRET: ${WECOM_SECRET}
+      WECOM_CALLBACK_TOKEN: ${WECOM_CALLBACK_TOKEN}
+      TX_MEMBER_SERVICE_URL: http://tx-member:8003
+      TX_GROWTH_SERVICE_URL: http://tx-growth:8004
     depends_on:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+
+  tx-member:
+    build:
+      context: .
+      dockerfile: services/tx-member/Dockerfile
+    ports:
+      - "8003:8003"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://tunxiang:changeme_dev@postgres/tunxiang_os
+      TX_MEMBER_SERVICE_URL: http://tx-member:8003
+      TX_GROWTH_SERVICE_URL: http://tx-growth:8004
+      TX_OPS_SERVICE_URL: http://tx-ops:8005
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  tx-growth:
+    build:
+      context: .
+      dockerfile: services/tx-growth/Dockerfile
+    ports:
+      - "8004:8004"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://tunxiang:changeme_dev@postgres/tunxiang_os
+      TX_MEMBER_SERVICE_URL: http://tx-member:8003
+      TX_GROWTH_SERVICE_URL: http://tx-growth:8004
+      TX_OPS_SERVICE_URL: http://tx-ops:8005
+      MINIAPP_BASE_URL: https://miniapp.tunxiang.com
+    depends_on:
+      postgres:
         condition: service_healthy
 
   tx-trade:
