@@ -21,7 +21,10 @@ from services.roi_attribution import ROIAttributionService
 # FastAPI App
 # ---------------------------------------------------------------------------
 
+from .api.campaign_routes import router as campaign_router
+
 app = FastAPI(title="TunxiangOS tx-growth", version="3.0.0")
+app.include_router(campaign_router)
 
 # 服务实例
 brand_svc = BrandStrategyService()
