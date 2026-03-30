@@ -26,6 +26,14 @@ export async function txFetch<T>(path: string, options?: RequestInit): Promise<T
 
 export { fetchKdsTasks, rushKdsTask, fetchTableCookProgress } from './kdsApi';
 export type { KdsTask as KdsTaskDetail } from './kdsApi';
+export {
+  updateTableInfo, verifyPlatformCoupon, copyDishesFromOrder,
+  setDishAvailability, setDishDailyLimit, updateOrderWaiter,
+  refreshDishStatus, getAIRecommendations, getOrderKdsStatus,
+} from './mobileOpsApi';
+export type {
+  DishStatusItem, AIRecommendation, OrderKdsItem, PlatformCouponResult,
+} from './mobileOpsApi';
 export { fetchTables, openTable as openTableV2, clearTable as clearTableV2, transferTable as transferTableV2, mergeTables as mergeTablesV2, reserveTable } from './tablesApi';
 export { searchMember as searchMemberV2, getMemberDetail, bindMemberToOrder as bindMemberV2, fetchMemberRecommendations, deductPoints } from './memberApi';
 export { fetchDailyOpsFlow as fetchDailyOpsFlowV2, confirmCheck, advanceNode, fetchDailyOpsHistory } from './dailyOpsApi';

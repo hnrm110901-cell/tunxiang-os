@@ -31,6 +31,7 @@ from .api.shift_routes import router as shift_router
 from .api.dish_practice_routes import router as dish_practice_router
 from .api.table_ops_routes import router as table_ops_router
 from .api.banquet_routes import router as banquet_router
+from .api.mobile_ops_routes import router as mobile_ops_router
 
 
 @asynccontextmanager
@@ -77,6 +78,7 @@ app.include_router(shift_router)
 app.include_router(dish_practice_router)
 app.include_router(table_ops_router)
 app.include_router(banquet_router)
+app.include_router(mobile_ops_router)
 
 
 @app.get("/health")

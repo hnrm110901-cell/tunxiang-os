@@ -16,6 +16,7 @@ import { MemberPage } from './pages/MemberPage';
 import { ComplaintPage } from './pages/ComplaintPage';
 import { ServiceConfirmPage } from './pages/ServiceConfirmPage';
 import { PeakAlertPage } from './pages/PeakAlertPage';
+import { OrderStatusPage } from './pages/OrderStatusPage';
 
 const tabs = [
   { path: '/tables', label: '桌台', icon: 'T' },
@@ -29,7 +30,7 @@ const tabs = [
 function BottomTab() {
   const loc = useLocation();
   // 在全屏子页面中隐藏底栏
-  const hiddenPaths = ['/open-table', '/order-full', '/rush', '/table-ops', '/member', '/complaint', '/service-confirm', '/peak-alert'];
+  const hiddenPaths = ['/open-table', '/order-full', '/rush', '/table-ops', '/member', '/complaint', '/service-confirm', '/peak-alert', '/order-status'];
   const shouldHide = hiddenPaths.some(p => loc.pathname.startsWith(p));
   if (shouldHide) return null;
 
@@ -86,6 +87,7 @@ export default function App() {
           <Route path="/complaint" element={<ComplaintPage />} />
           <Route path="/service-confirm" element={<ServiceConfirmPage />} />
           <Route path="/peak-alert" element={<PeakAlertPage />} />
+          <Route path="/order-status" element={<OrderStatusPage />} />
         </Routes>
         <BottomTab />
       </div>
