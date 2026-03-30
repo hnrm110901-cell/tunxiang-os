@@ -1,10 +1,10 @@
-# 屯象OS (TunxiangOS) V3.0
+# 屯象OS (TunxiangOS)
 
-**AI-Native 连锁餐饮经营操作系统**
+**AI-Native 连锁餐饮经营操作系统** — 连锁餐饮行业的 Palantir
 
-用一套智能系统替换连锁餐饮企业现有所有业务系统，定位"连锁餐饮行业的 Palantir"。
+用一套智能系统**替换**连锁餐饮企业现有所有业务系统。面向集团化、多品牌、多区域、多渠道的品质中餐连锁。
 
-## 架构
+## 五层架构
 
 ```
 L4  多形态前端     安卓POS / iPad / KDS / 服务员PWA / 小程序 / 总部Web
@@ -20,7 +20,7 @@ L0  设备适配       安卓POS外设(商米SDK) + Mac mini边缘AI + 旧系统
 |------|------|------|
 | 安卓 POS (商米 T2/V2) | 收银 + 打印 + 称重 + 扫码 | USB 连接 |
 | Mac mini M4 | 本地数据库 + 边缘AI + 数据同步 | **无**（不碰外设）|
-| iPad (可选) | 高端店 POS/KDS 升级 | **无**（WiFi转发到安卓）|
+| iPad (可选) | 高端店 POS/KDS 升级 | **无**（WiFi 转发到安卓）|
 
 ## 快速开始
 
@@ -40,6 +40,47 @@ cd apps/web-pos && pnpm install && pnpm dev
 make test
 ```
 
+## 项目结构
+
+```
+tunxiang-os/
+├── apps/
+│   ├── web-pos/           React POS 收银（20+ 路由）
+│   ├── web-admin/         React 总部后台（HQ + 多域子页面）
+│   ├── web-kds/           React KDS 出餐屏（6 路由）
+│   ├── web-crew/          React 服务员 PWA（6 Tab + 全屏流）
+│   ├── android-shell/     Kotlin WebView + TXBridge JS Bridge
+│   ├── ios-shell/         Swift WKWebView iPad 壳层
+│   ├── miniapp-customer/  微信小程序顾客端（8 主包 + 7 分包）
+│   ├── h5-self-order/     H5 自助点餐
+│   ├── web-hub/           品牌 Hub 门户
+│   └── web-forge/         Forge 开发者市场
+├── services/
+│   ├── gateway/           FastAPI API Gateway + 域路由代理 + 品牌管理
+│   ├── tx-trade/          交易履约（24 路由模块：收银/桌台/KDS/预订/宴席/扫码点餐/外卖...）
+│   ├── tx-menu/           菜品菜单（6 路由模块：菜品/发布/定价/套餐/做法...）
+│   ├── tx-member/         会员 CDP（8 路由模块：会员/营销/分析/优惠券/礼品卡...）
+│   ├── tx-supply/         供应链（14 路由模块：库存/BOM/采购/配送/食安/活鲜/溯源...）
+│   ├── tx-finance/        财务结算（FCT/成本率/P&L/预算/发票/月报）
+│   ├── tx-org/            组织人事（9 路由模块：员工/排班/角色/调动/绩效/薪资...）
+│   ├── tx-analytics/      经营分析（5 路由模块 + 报表引擎 + 叙事引擎）
+│   ├── tx-agent/          Agent OS（Master Agent + 9 Skill Agent + 73 Actions）
+│   └── tx-ops/            运营流程（日清日结 E1-E8 + 工作流）
+├── edge/
+│   ├── mac-station/       Mac mini 本地 API + WebSocket + 视觉/语音
+│   ├── sync-engine/       本地PG ↔ 云端PG 增量同步
+│   └── coreml-bridge/     Swift Core ML 推理服务 (Hummingbird HTTP)
+├── shared/
+│   ├── ontology/          6 大核心实体（Customer/Dish/Store/Order/Ingredient/Employee）
+│   ├── db-migrations/     Alembic 迁移（13 版本）
+│   └── adapters/          10 个旧系统适配器（品智/奥琦玮/天财/美团/饿了么/抖音...）
+└── infra/
+    ├── docker/            Docker Compose（dev/prod/staging/gray）
+    ├── nginx/             Nginx 反向代理 + SSL + WebSocket
+    ├── tailscale/         Mac mini VPN 配置
+    └── dns/               DNS 配置脚本
+```
+
 ## 9 大 AI Agent
 
 | # | Agent | 优先级 | 运行位置 | Actions |
@@ -54,97 +95,130 @@ make test
 | 8 | 智能客服 | P2 | 云端 | 9 |
 | 9 | 私域运营 | P2 | 云端 | 11 |
 
-**73/73 actions 全部实现** · 三条硬约束（毛利底线+食安合规+客户体验）无例外执行
+**73/73 actions 全部实现** · 三条硬约束（毛利底线 + 食安合规 + 客户体验）无例外执行
 
-## 项目结构
+## 业务域覆盖
+
+### 已实现（可投入使用）
+
+| 域 | 核心能力 |
+|----|---------|
+| **交易履约** | 堂食收银/桌台管理/预订排队/KDS出餐/宴席/称重菜/扫码点餐 |
+| **菜品菜单** | 菜品CRUD/BOM配方/套餐组合/四象限分析/5因子动态排名 |
+| **会员CRM** | Golden ID/RFM分层/生命周期/优惠券引擎/营销活动 |
+| **供应链** | 采购管理/库存管理/BOM成本/损耗监控/活鲜管理/溯源 |
+| **组织人事** | 员工管理/排班/考勤/绩效/门店调动/角色权限 |
+| **经营分析** | 经营驾驶舱/5维健康度/叙事引擎/跨店分析/报表引擎 |
+| **Agent OS** | 9 大 Agent/决策留痕/Memory Bus/4时间点推送 |
+| **运营流程** | 日清日结E1-E8/巡店SOP/快速开店/工作流引擎 |
+
+### 待完善（V4.0 路线图）
+
+| 域 | 待补齐 | 优先级 |
+|----|--------|--------|
+| **财务结算** | 真实营收/成本/P&L计算引擎、凭证生成 | P0 |
+| **储值卡** | 充值/消费/退款/赠送金/余额管理 | P0 |
+| **数据同步** | sync-engine 核心逻辑、断网收银 | P0 |
+| **外卖聚合** | 统一接单面板、自动接单、菜单同步 | P0 |
+| **菜单中心** | 集团模板下发、多渠道独立定价发布 | P1 |
+| **中央厨房** | 生产计划/加工/配送/门店签收 | P1 |
+| **审批流** | 通用审批引擎、可视化配置 | P1 |
+| **多品牌** | 品牌配置中心、品牌级数据隔离 | P1 |
+| **加盟管理** | 加盟商管理/分润/独立登录 | P2 |
+| **薪资引擎** | 多方案薪资计算/五险一金/个税 | P2 |
+
+## V4.0 开发路线图
+
+> 详见 `docs/development-plan-v4-showstopper.md`
 
 ```
-tunxiang-os/
-├── apps/
-│   ├── web-pos/           React POS 收银（5 页面）
-│   ├── web-admin/         React 总部后台（3 页面）
-│   ├── web-kds/           React KDS 出餐屏
-│   ├── web-crew/          React 服务员 PWA（离线可用）
-│   ├── android-shell/     Kotlin WebView + TXBridge JS Bridge
-│   ├── ios-shell/         Swift WKWebView iPad 壳层
-│   └── miniapp-customer/  微信小程序顾客端
-├── services/
-│   ├── gateway/           FastAPI API Gateway + 域路由代理
-│   ├── tx-trade/          收银引擎（开单/结算/支付/打印）
-│   ├── tx-menu/           菜品管理（BOM/四象限/定价）
-│   ├── tx-member/         会员 CDP（Golden ID/RFM/旅程）
-│   ├── tx-supply/         供应链（库存/采购/损耗）
-│   ├── tx-finance/        财务（FCT/成本率/月报）
-│   ├── tx-org/            组织（员工/排班/考勤/绩效）
-│   ├── tx-analytics/      分析（健康度/叙事/KPI/BFF）
-│   └── tx-agent/          Agent OS（Master + 9 Skill）
-├── edge/
-│   ├── mac-station/       Mac mini 本地 API + WebSocket
-│   ├── sync-engine/       本地PG ↔ 云端PG 增量同步
-│   └── coreml-bridge/     Swift Core ML 推理服务
-├── shared/
-│   ├── ontology/          6 大核心实体 + RLS 基类
-│   ├── db-migrations/     Alembic 迁移
-│   └── adapters/          10 个 POS 适配器
-└── infra/                 Docker + Nginx + Tailscale
+Phase 0  ████           Week 1-2    安全止血（RLS漏洞修复 + 凭证清除）
+Phase 1  ████████████   Week 3-14   财务引擎 + 储值卡 + 同步引擎 + 外卖聚合
+Phase 2  ████████████   Week 15-26  菜单中心 + 中央厨房 + 审批流 + 多品牌管控
+Phase 3  ████████████   Week 27-38  加盟管理 + 薪资引擎 + 营销增长工具
+Phase 4  ████████████   Week 39-52  深化打磨 + 10个E2E场景 + V4.0 发布
 ```
 
-## V3.2+ 新增功能
+### 十大致命差距修复进度
 
-### 品智 POS 借鉴与适配
-- **品智 Adapter** — 完整的品智 POS 数据适配器（订单/菜品/会员/库存同步）
-- **签名验证** — 品智 API 签名校验模块
-- **10 大 Adapter 体系** — 品智/奥琦玮/天财商龙/美团SaaS/易鼎/客如云/微生活/饿了么/抖音/诺诺
+| # | 差距 | 状态 | 目标 Phase |
+|---|------|------|-----------|
+| 1 | 财务模块空壳 → 真实计算引擎 | 🔴 待开发 | Phase 1 |
+| 2 | 中央厨房 + 配送缺失 → 全链路实现 | 🔴 待开发 | Phase 2 |
+| 3 | 加盟管理缺失 → 直营+加盟混合模式 | 🔴 待开发 | Phase 3 |
+| 4 | 储值卡缺失 → 完整预付费体系 | 🔴 待开发 | Phase 1 |
+| 5 | 菜单模板缺失 → 集团下发+门店微调 | 🔴 待开发 | Phase 2 |
+| 6 | 薪资引擎缺失 → 多方案+五险一金 | 🔴 待开发 | Phase 3 |
+| 7 | 审批流缺失 → 通用可配置审批引擎 | 🔴 待开发 | Phase 2 |
+| 8 | 同步引擎骨架 → 真实增量同步 | 🔴 待开发 | Phase 1 |
+| 9 | RLS 安全漏洞 → 修复+加固 | 🔴 待修复 | Phase 0 |
+| 10 | 外卖聚合未集成 → 统一接单管理 | 🔴 待开发 | Phase 1 |
 
-### HR 模块（tx-org 扩展）
-- **薪资引擎** — 多薪资项库 + 五险一金 + 绩效提成自动计算
-- **请假审批** — 多级审批流 + 假期余额管理
-- **门店调动** — 跨门店人员调配 + 历史记录
-- **人效分析** — 人时营收比 + 工时利用率 + 排班优化建议
-- **角色层级** — 集团/区域/门店三级权限体系
-- **薪资项库** — 可配置薪资项模板 + 批量套用
+### 目标指标
 
-### Repository 模式
-- **tx-analytics Repository** — 健康度/叙事/KPI 数据访问层抽象
-- **tx-menu Repository** — 菜品/发布方案 Repository 封装
-- **tx-member Repository** — 会员/营销方案 Repository 封装
-- **tx-supply Repository** — 库存/采购/损耗 Repository 封装
+| 指标 | 当前 | V4.0 目标 |
+|------|------|----------|
+| 测试数 | ~300 | ≥ 500 |
+| API 端点 | ~160 | ~300 |
+| 数据库表 | ~35 | ~60 |
+| 综合竞争力 | 50/100 | ≥ 75/100 |
+| AI 智能 | 95/100 | 95/100（保持领先）|
+| 财务能力 | 15/100 | 75/100 |
+| 供应链深度 | 50/100 | 80/100 |
+| 集团管控 | 35/100 | 75/100 |
 
-### Adapter / SDK 扩展
-- **统一适配器基类** — BaseAdapter + AdapterRegistry + 类型映射
-- **标准化数据类型** — 订单/菜品/会员/库存/桌台/供应商/预订统一类型
-- **饿了么 Webhook** — 饿了么订单实时回调适配
-- **抖音外卖适配** — 抖音来客订单同步
+## 竞争优势（竞品不具备）
 
-### 运营流程
-- **日清日结 E1-E8** — 开店/巡航/异常/交班/闭店/日结/复盘/整改八节点
-- **工作流引擎** — 通用节点状态机 + 检查项管理
-- **快速开店（Clone）** — 标杆门店配置一键克隆到新店
+| # | 独有能力 | 说明 |
+|---|---------|------|
+| 1 | 9 大 AI Agent + 73 Actions | 竞品最多有规则引擎，无 AI 决策 |
+| 2 | 三条硬约束自动校验 | 毛利底线 + 食安合规 + 客户体验 |
+| 3 | 经营叙事引擎 | 30 秒读懂今天生意（≤200 字自动简报）|
+| 4 | 菜品 5 因子动态排名 | 趋势+毛利+库存+时段+退单 |
+| 5 | Agent Memory Bus | 跨 Agent 协同决策 |
+| 6 | Mac mini 边缘 AI | 断网也能推理（出餐预测/折扣检测）|
+| 7 | Ontology 全链路溯源 | 一笔订单→食材→利润 完整因果链 |
+| 8 | 旧系统 Adapter 渐进替换 | 10 个适配器，不必一刀切换 |
 
-### 交易增强
-- **预订排队入座** — 预订状态机 + 排队叫号 + 最优桌台分配
-- **桌台状态机** — 休眠检测 + 超时提醒 + 自动释放
-- **ESC/POS 高级打印** — 外卖单/交班报表/预结单/二维码/厨房标签
-- **营销方案引擎** — 7种方案类型 + 互斥规则 + 优先级执行
+## 旧系统适配器
 
-### 基础设施
-- **Nginx 完善** — WebSocket 代理/miniapp API/静态缓存/Gzip/Rate Limiting/CORS
-- **SSL 自动续期** — Let's Encrypt certbot + cron 定时续期
+| 适配器 | 对接系统 | 状态 |
+|--------|---------|------|
+| pinzhi | 品智 POS | ✅ 已实现（订单/菜品/会员/库存）|
+| aoqiwei | 奥琦玮 G10 | ✅ 已实现 |
+| tiancai-shanglong | 天财商龙 | ✅ 已实现 |
+| keruyun | 客如云 | ✅ 已实现 |
+| weishenghuo | 微生活 CRM | ✅ 已实现 |
+| meituan-saas | 美团 SaaS | ✅ 已实现 |
+| eleme | 饿了么 | ✅ 已实现 |
+| douyin | 抖音来客 | ✅ 已实现 |
+| yiding | 易鼎 | ✅ 已实现 |
+| nuonuo | 诺诺发票 | ✅ 已实现 |
 
 ## 测试
 
+```bash
+# 运行全部测试
+make test
+
+# 运行单个服务测试
+cd services/tx-trade && pytest src/tests/ -v
+
+# Lint 检查
+ruff check services/ edge/ shared/
 ```
-173+ tests passing
-├── tx-trade:      26 (收银全流程 + ESC/POS + 支付)
-├── tx-agent:      76 (9 Agent + 约束 + Memory Bus + Master)
-├── tx-analytics:  40 (健康度 + 叙事引擎)
-├── tx-supply:     21 (损耗监控)
-├── tx-ops:        20+ (日清日结+快速开店+工作流)
-├── tx-org:        30+ (薪资/请假/调动/人效/角色)
-├── tx-member:     20+ (营销引擎+API)
-├── adapters:      15+ (品智/奥琦玮/天财等)
-├── integration:   10 (跨域全链路)
-└── e2e:            5 (端到端场景)
+
+```
+158 测试文件, 覆盖全部微服务
+├── tx-agent:      76 tests (9 Agent + 约束 + Memory Bus + Master)
+├── tx-analytics:  40 tests (健康度 + 叙事引擎 + 报表)
+├── tx-trade:      26 tests (收银全流程 + ESC/POS + 支付)
+├── tx-supply:     21 tests (库存 + 采购 + 损耗)
+├── tx-ops:        20+ tests (日清日结 + 快速开店 + 工作流)
+├── tx-org:        30+ tests (排班/绩效/调动/角色)
+├── tx-member:     20+ tests (营销引擎 + 会员 API)
+├── adapters:      15+ tests (品智/奥琦玮/天财等)
+└── edge:          10+ tests (mac-station + vision + voice)
 ```
 
 ## 部署
@@ -156,6 +230,9 @@ docker-compose up -d
 # 生产环境
 docker-compose -f docker-compose.prod.yml up -d
 
+# 灰度环境
+docker-compose -f docker-compose.gray.yml up -d
+
 # 新店上线（≤半天）
 ./scripts/new_store_setup.sh \
   --store-name="门店名" --store-code="CODE" \
@@ -166,15 +243,41 @@ docker-compose -f docker-compose.prod.yml up -d
 
 | 层 | 技术 |
 |---|---|
-| 前端 | React 18 + TypeScript + Ant Design + Zustand |
+| 前端 | React 18 + TypeScript + Tailwind CSS + Zustand |
 | 后端 | Python FastAPI + SQLAlchemy 2.0 + asyncpg |
-| 数据库 | PostgreSQL 16 (RLS) + Redis 7 |
+| 数据库 | PostgreSQL 16 (RLS 多租户) + Redis 7 |
 | AI | Claude API (云端) + Core ML (边缘) |
 | 安卓 | Kotlin + WebView + 商米 SDK |
 | iOS | Swift + WKWebView |
 | 边缘 | Mac mini M4 + Tailscale VPN |
-| CI/CD | GitHub Actions |
+| CI/CD | GitHub Actions (matrix: 9 服务 + 前端 + lint) |
+| 消息 | Redis Streams + PG LISTEN/NOTIFY |
+| 网络 | Tailscale + Nginx (反代/SSL/WebSocket) |
+
+## 文档索引
+
+| 文档 | 说明 |
+|------|------|
+| [CLAUDE.md](./CLAUDE.md) | 项目宪法 V3.0（架构决策 + 编码规范）|
+| [差距分析报告](./docs/gap-analysis-enterprise-benchmark-2026Q1.md) | 企业级差距分析（75+ 功能项对比）|
+| [V4.0 开发计划](./docs/development-plan-v4-showstopper.md) | 十大致命差距修复计划（52 周）|
+| [V6 审计修复](./docs/development-plan-v6-remediation.md) | 安全审计修复计划 |
+| [安全审计报告](./docs/security-audit-report.md) | RLS/Nginx/端口/租户安全审计 |
+| [徐记 23 系统替换](./docs/xuji-23-system-replacement-analysis.md) | 23 套系统替换对照表 |
+| [徐记蓝图 GAP](./docs/xuji-blueprint/GAP_ANALYSIS.md) | 蓝图差距分析 |
+| [域架构 V3](./docs/domain-architecture-v3.md) | 四平台域名与职责 |
+
+## 目标客户
+
+| 层级 | 客户类型 | 适配度 |
+|------|---------|--------|
+| **A 类** | 高复杂直营正餐集团（海鲜/酒楼/宴请/多品牌）| 核心目标 |
+| **B 类** | 标准中式正餐连锁（5-30 家门店）| 第二波复制 |
+| **C 类** | 精品小店 / 新品牌试点 | Lite 版 |
+
+**首批客户**：尝在一起（品智 POS）、最黔线、尚宫厨
+**标杆案例**：基于徐记海鲜 23 套系统替换方案设计
 
 ---
 
-屯象科技 · 未了已 · 2026
+屯象科技 · 未了已 · 长沙 · 2026

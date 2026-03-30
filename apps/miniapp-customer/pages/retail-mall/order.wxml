@@ -1,0 +1,79 @@
+<!-- 订单确认 + 支付 -->
+<view class="page-container">
+
+  <!-- 收货地址 -->
+  <view class="section address-section">
+    <view class="address-info" wx:if="{{address}}">
+      <view class="addr-top">
+        <text class="addr-name">{{address.name}}</text>
+        <text class="addr-phone">{{address.phone}}</text>
+      </view>
+      <text class="addr-detail">{{address.province}}{{address.city}}{{address.district}} {{address.detail}}</text>
+    </view>
+  </view>
+
+  <!-- 商品列表 -->
+  <view class="section">
+    <text class="section-title">商品清单</text>
+    <view class="order-item" wx:for="{{items}}" wx:key="product_id">
+      <image class="item-image" src="{{item.cover_image}}" mode="aspectFill" />
+      <view class="item-info">
+        <text class="item-name">{{item.product_name}}</text>
+        <text class="item-sku">{{item.sku_name}}</text>
+        <view class="item-bottom">
+          <text class="item-price">¥{{item.price_fen / 100}}</text>
+          <text class="item-qty">x{{item.quantity}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 会员折扣 -->
+  <view class="section" wx:if="{{hasCard}}">
+    <view class="discount-row">
+      <text class="discount-label">会员折扣</text>
+      <view class="discount-action" bindtap="applyDiscount" wx:if="{{discountFen === 0}}">
+        <text>点击使用</text>
+      </view>
+      <text class="discount-amount" wx:else>-¥{{discountFen / 100}}</text>
+    </view>
+  </view>
+
+  <!-- 备注 -->
+  <view class="section">
+    <text class="section-title">订单备注</text>
+    <textarea class="remark-input" placeholder="选填，如有特殊要求请注明" value="{{remark}}" bindinput="onRemarkInput" maxlength="200" />
+  </view>
+
+  <!-- 价格明细 -->
+  <view class="section price-summary">
+    <view class="price-row">
+      <text>商品合计</text>
+      <text>¥{{totalFen / 100}}</text>
+    </view>
+    <view class="price-row" wx:if="{{discountFen > 0}}">
+      <text>会员优惠</text>
+      <text class="discount-text">-¥{{discountFen / 100}}</text>
+    </view>
+    <view class="price-row">
+      <text>运费</text>
+      <text>免运费</text>
+    </view>
+    <view class="price-row total">
+      <text>实付金额</text>
+      <text class="final-price">¥{{finalFen / 100}}</text>
+    </view>
+  </view>
+
+  <!-- 底部提交栏 -->
+  <view class="submit-bar">
+    <view class="submit-total">
+      <text class="submit-label">需支付：</text>
+      <text class="submit-price">¥{{finalFen / 100}}</text>
+    </view>
+    <view class="submit-btn {{submitting ? 'disabled' : ''}}" bindtap="submitOrder">
+      {{submitting ? '提交中...' : '提交订单'}}
+    </view>
+  </view>
+
+</view>

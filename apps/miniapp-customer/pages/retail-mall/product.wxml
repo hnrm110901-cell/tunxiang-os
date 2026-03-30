@@ -1,0 +1,67 @@
+<!-- 商品详情 — 大图轮播+规格+评价 -->
+<view class="page-container" wx:if="{{!loading && product}}">
+
+  <!-- 图片轮播 -->
+  <swiper class="product-swiper" indicator-dots="{{true}}" bindchange="onSwiperChange">
+    <swiper-item wx:for="{{product.images}}" wx:key="*this">
+      <image class="product-big-image" src="{{item}}" mode="aspectFill" bindtap="previewImage" />
+    </swiper-item>
+  </swiper>
+
+  <!-- 价格+名称 -->
+  <view class="product-header">
+    <view class="price-row">
+      <text class="price-symbol">¥</text>
+      <text class="price-value">{{(selectedSku.price_fen || product.price_fen) / 100}}</text>
+      <text class="price-original" wx:if="{{product.original_price_fen > product.price_fen}}">¥{{product.original_price_fen / 100}}</text>
+      <view class="sales-badge">已售{{product.sales_count || 0}}</view>
+    </view>
+    <text class="product-title">{{product.name}}</text>
+    <text class="product-desc" wx:if="{{product.description}}">{{product.description}}</text>
+  </view>
+
+  <!-- 产地/保质期信息 -->
+  <view class="info-card">
+    <view class="info-row" wx:if="{{product.origin}}">
+      <text class="info-label">产地</text>
+      <text class="info-value">{{product.origin}}</text>
+    </view>
+    <view class="info-row" wx:if="{{product.shelf_life_days}}">
+      <text class="info-label">保质期</text>
+      <text class="info-value">{{product.shelf_life_days}}天</text>
+    </view>
+    <view class="info-row" wx:if="{{product.storage_method}}">
+      <text class="info-label">储存方式</text>
+      <text class="info-value">{{product.storage_method}}</text>
+    </view>
+  </view>
+
+  <!-- 规格选择 -->
+  <view class="sku-section" wx:if="{{product.skus && product.skus.length > 0}}">
+    <text class="section-title">规格</text>
+    <view class="sku-list">
+      <view class="sku-item {{selectedSku && selectedSku.id === item.id ? 'active' : ''}}"
+            wx:for="{{product.skus}}" wx:key="id"
+            bindtap="selectSku" data-sku="{{item}}">
+        <text>{{item.name}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 底部操作栏 -->
+  <view class="bottom-bar">
+    <view class="qty-control">
+      <view class="qty-btn" bindtap="decreaseQty">-</view>
+      <text class="qty-value">{{quantity}}</text>
+      <view class="qty-btn" bindtap="increaseQty">+</view>
+    </view>
+    <view class="btn-add-cart" bindtap="addToCart">加入购物车</view>
+    <view class="btn-buy-now" bindtap="buyNow">立即购买</view>
+  </view>
+
+</view>
+
+<!-- 加载中 -->
+<view class="loading-container" wx:if="{{loading}}">
+  <text class="loading-text">加载中...</text>
+</view>

@@ -1,0 +1,70 @@
+<!-- 宴席首页 — 婚宴/生日/商务/年会 -->
+<view class="page-container">
+
+  <!-- 顶部Banner -->
+  <view class="hero-banner">
+    <text class="hero-title">徐记海鲜 · 宴席定制</text>
+    <text class="hero-subtitle">专属宴会服务，让每一场宴席都值得珍藏</text>
+  </view>
+
+  <!-- 四大宴席类型 -->
+  <view class="type-grid">
+    <view class="type-card" wx:for="{{banquetTypes}}" wx:key="key"
+          bindtap="selectType" data-type="{{item}}"
+          style="border-color: {{item.color}};">
+      <view class="type-icon-wrap" style="background: {{item.color}}20;">
+        <image class="type-icon" src="{{item.icon}}" mode="aspectFit" />
+      </view>
+      <text class="type-label">{{item.label}}</text>
+      <text class="type-desc">{{item.desc}}</text>
+      <text class="type-person">{{item.minPerson}}-{{item.maxPerson}}人</text>
+    </view>
+  </view>
+
+  <!-- 预约咨询入口 -->
+  <view class="consult-bar" bindtap="callConsult">
+    <text class="consult-text">宴席专属顾问一对一服务</text>
+    <view class="consult-btn">
+      <text>立即咨询</text>
+    </view>
+  </view>
+
+  <!-- 热门宴席套餐 -->
+  <view class="section">
+    <text class="section-title">热门宴席套餐</text>
+    <scroll-view class="package-scroll" scroll-x="{{true}}">
+      <view class="package-card" wx:for="{{hotPackages}}" wx:key="id"
+            bindtap="selectPackage" data-pkg="{{item}}">
+        <image class="package-cover" src="{{item.cover_image}}" mode="aspectFill" />
+        <view class="package-body">
+          <text class="package-name">{{item.name}}</text>
+          <text class="package-price">¥{{item.price_fen / 100}}/桌</text>
+          <text class="package-capacity">适合{{item.person_count}}人</text>
+        </view>
+      </view>
+    </scroll-view>
+    <view class="empty-tip" wx:if="{{!loadingPackages && hotPackages.length === 0}}">
+      <text>暂无热门套餐</text>
+    </view>
+  </view>
+
+  <!-- 宴席案例 -->
+  <view class="section" wx:if="{{cases.length > 0}}">
+    <text class="section-title">精选案例</text>
+    <view class="case-list">
+      <view class="case-card" wx:for="{{cases}}" wx:key="id" bindtap="viewCase" data-id="{{item.id}}">
+        <image class="case-image" src="{{item.cover_image}}" mode="aspectFill" />
+        <view class="case-overlay">
+          <text class="case-title">{{item.title}}</text>
+          <text class="case-type">{{item.type_label}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 底部说明 -->
+  <view class="footer-note">
+    <text>提前7天预订可享早鸟优惠 | 支持定金锁定档期</text>
+  </view>
+
+</view>

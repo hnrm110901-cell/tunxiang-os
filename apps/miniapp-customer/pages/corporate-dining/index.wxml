@@ -1,0 +1,102 @@
+<!-- 企事业用餐首页 — 企业账户/快速点餐/预订会议餐/月度账单/多身份切换 -->
+<view class="page-container">
+
+  <!-- 企业身份切换 -->
+  <view class="enterprise-header" wx:if="{{currentEnterprise}}">
+    <view class="enterprise-selector" bindtap="toggleSwitcher">
+      <text class="enterprise-name">{{currentEnterprise.name}}</text>
+      <text class="switch-icon" wx:if="{{enterprises.length > 1}}">&#x25BC;</text>
+    </view>
+    <text class="enterprise-role">{{currentEnterprise.role || '员工'}}</text>
+  </view>
+
+  <!-- 未关联企业 -->
+  <view class="no-enterprise" wx:if="{{!currentEnterprise}}">
+    <text class="no-enterprise-text">您尚未关联任何企业账户</text>
+    <text class="no-enterprise-tip">请联系企业管理员添加您的用餐权限</text>
+  </view>
+
+  <!-- 企业账户概览卡片 -->
+  <view class="account-card" wx:if="{{currentEnterprise}}">
+    <view class="account-title">企业用餐账户</view>
+    <view class="account-grid">
+      <view class="account-item">
+        <text class="account-value">¥{{account.available_fen / 100}}</text>
+        <text class="account-label">可用额度</text>
+      </view>
+      <view class="account-item">
+        <text class="account-value">¥{{account.used_fen / 100}}</text>
+        <text class="account-label">已使用</text>
+      </view>
+      <view class="account-item">
+        <text class="account-value">¥{{account.credit_limit_fen / 100}}</text>
+        <text class="account-label">总额度</text>
+      </view>
+    </view>
+    <view class="account-cycle">
+      <text class="cycle-label">账期：{{account.billing_cycle === 'monthly' ? '月结' : account.billing_cycle === 'bi_monthly' ? '双月结' : '季结'}}</text>
+    </view>
+  </view>
+
+  <!-- 快捷入口 4宫格 -->
+  <view class="quick-grid" wx:if="{{currentEnterprise}}">
+    <view class="quick-item" wx:for="{{quickActions}}" wx:key="key" bindtap="onQuickAction" data-key="{{item.key}}">
+      <image class="quick-icon" src="{{item.icon}}" mode="aspectFit" />
+      <text class="quick-label">{{item.label}}</text>
+      <text class="quick-desc">{{item.desc}}</text>
+    </view>
+  </view>
+
+  <!-- 企业套餐推荐 -->
+  <view class="section" wx:if="{{currentEnterprise}}">
+    <text class="section-title">企业套餐</text>
+    <view class="package-list">
+      <view class="package-card" wx:for="{{packageList}}" wx:key="id" bindtap="selectPackage" data-pkg="{{item}}">
+        <image class="package-image" src="{{item.image}}" mode="aspectFill" />
+        <view class="package-info">
+          <text class="package-name">{{item.name}}</text>
+          <text class="package-desc">{{item.description}}</text>
+          <view class="package-bottom">
+            <text class="package-price">¥{{item.price_fen / 100}}/位</text>
+            <text class="package-person">{{item.min_person}}-{{item.max_person}}人</text>
+          </view>
+        </view>
+      </view>
+    </view>
+    <view class="empty-tip" wx:if="{{!loadingPackages && packageList.length === 0}}">
+      <text>暂无企业套餐</text>
+    </view>
+  </view>
+
+  <!-- 最近订单 -->
+  <view class="section" wx:if="{{currentEnterprise && recentOrders.length > 0}}">
+    <view class="section-header">
+      <text class="section-title">最近订单</text>
+      <text class="section-more" bindtap="goToAllOrders">查看全部</text>
+    </view>
+    <view class="recent-order" wx:for="{{recentOrders}}" wx:key="id">
+      <view class="order-top">
+        <text class="order-no">{{item.order_no}}</text>
+        <text class="order-status">{{item.status_text}}</text>
+      </view>
+      <text class="order-detail">{{item.summary}}</text>
+      <view class="order-bottom">
+        <text class="order-amount">¥{{item.total_fen / 100}}</text>
+        <text class="order-time">{{item.created_at}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 企业切换弹窗 -->
+  <view class="switcher-mask" wx:if="{{showSwitcher}}" bindtap="toggleSwitcher"></view>
+  <view class="switcher-popup {{showSwitcher ? 'show' : ''}}">
+    <view class="popup-title">切换企业</view>
+    <view class="switcher-item {{currentEnterprise && currentEnterprise.id === item.id ? 'active' : ''}}"
+          wx:for="{{enterprises}}" wx:key="id"
+          bindtap="switchEnterprise" data-enterprise="{{item}}">
+      <text class="switcher-name">{{item.name}}</text>
+      <text class="switcher-role">{{item.role || '员工'}}</text>
+    </view>
+  </view>
+
+</view>

@@ -1,0 +1,78 @@
+<!-- 购物车 + 收货地址 -->
+<view class="page-container">
+
+  <!-- 收货地址 -->
+  <view class="address-card" bindtap="chooseAddress">
+    <view wx:if="{{selectedAddress}}">
+      <view class="address-top">
+        <text class="address-name">{{selectedAddress.name}}</text>
+        <text class="address-phone">{{selectedAddress.phone}}</text>
+      </view>
+      <text class="address-detail">{{selectedAddress.province}}{{selectedAddress.city}}{{selectedAddress.district}} {{selectedAddress.detail}}</text>
+    </view>
+    <view wx:else class="address-empty">
+      <text>请选择收货地址</text>
+    </view>
+    <text class="address-arrow">></text>
+  </view>
+
+  <!-- 购物车商品列表 -->
+  <view class="cart-list" wx:if="{{cartItems.length > 0}}">
+    <view class="cart-item" wx:for="{{cartItems}}" wx:key="product_id">
+      <view class="cart-checkbox {{item.selected ? 'checked' : ''}}" bindtap="toggleItem" data-index="{{index}}"></view>
+      <image class="cart-image" src="{{item.cover_image}}" mode="aspectFill" />
+      <view class="cart-info">
+        <text class="cart-name">{{item.product_name}}</text>
+        <text class="cart-sku">{{item.sku_name}}</text>
+        <view class="cart-bottom">
+          <text class="cart-price">¥{{item.price_fen / 100}}</text>
+          <view class="cart-qty">
+            <view class="qty-btn" bindtap="changeQuantity" data-index="{{index}}" data-delta="{{-1}}">-</view>
+            <text class="qty-num">{{item.quantity}}</text>
+            <view class="qty-btn" bindtap="changeQuantity" data-index="{{index}}" data-delta="{{1}}">+</view>
+          </view>
+        </view>
+      </view>
+      <view class="cart-delete" bindtap="removeItem" data-index="{{index}}">
+        <text>删除</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 空购物车 -->
+  <view class="empty-cart" wx:if="{{cartItems.length === 0}}">
+    <text class="empty-text">购物车是空的</text>
+    <view class="empty-btn" bindtap="goShopping">去逛逛</view>
+  </view>
+
+  <!-- 底部结算栏 -->
+  <view class="checkout-bar" wx:if="{{cartItems.length > 0}}">
+    <view class="checkout-select-all" bindtap="toggleSelectAll">
+      <view class="cart-checkbox {{selectAll ? 'checked' : ''}}"></view>
+      <text>全选</text>
+    </view>
+    <view class="checkout-total">
+      <text class="total-label">合计：</text>
+      <text class="total-price">¥{{totalFen / 100}}</text>
+    </view>
+    <view class="checkout-btn {{selectedCount > 0 ? '' : 'disabled'}}" bindtap="goToCheckout">
+      去结算({{selectedCount}})
+    </view>
+  </view>
+
+  <!-- 地址选择弹窗 -->
+  <view class="address-mask" wx:if="{{showAddressPicker}}" bindtap="chooseAddress"></view>
+  <view class="address-popup {{showAddressPicker ? 'show' : ''}}">
+    <view class="popup-header">
+      <text class="popup-title">选择收货地址</text>
+    </view>
+    <view class="address-option" wx:for="{{addressList}}" wx:key="detail" bindtap="selectAddress" data-addr="{{item}}">
+      <text class="addr-name">{{item.name}} {{item.phone}}</text>
+      <text class="addr-detail">{{item.province}}{{item.city}}{{item.district}} {{item.detail}}</text>
+    </view>
+    <view class="address-option add-new" bindtap="useWxAddress">
+      <text>+ 使用微信地址</text>
+    </view>
+  </view>
+
+</view>
