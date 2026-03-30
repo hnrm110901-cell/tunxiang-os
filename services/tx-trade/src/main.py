@@ -34,11 +34,20 @@ from .api.banquet_routes import router as banquet_router
 from .api.mobile_ops_routes import router as mobile_ops_router
 from .api.takeaway_routes import router as takeaway_router
 from .api.retail_mall_routes import router as retail_mall_router
+from .api.runner_routes import router as runner_router
+from .api.expo_routes import router as expo_router
+from .api.cook_time_routes import router as cook_time_router
+from .api.shift_report_routes import router as shift_report_router
+from .api.dispatch_rule_routes import router as dispatch_rule_router
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    import asyncio
+    from .services.cook_time_stats import start_daily_scheduler
+    from shared.ontology.src.database import async_session_factory
     await init_db()
+    asyncio.create_task(start_daily_scheduler(async_session_factory))
     yield
 
 
@@ -82,6 +91,11 @@ app.include_router(banquet_router)
 app.include_router(mobile_ops_router)
 app.include_router(takeaway_router)
 app.include_router(retail_mall_router)
+app.include_router(runner_router,        prefix="/api/v1/runner")
+app.include_router(expo_router,          prefix="/api/v1/expo")
+app.include_router(cook_time_router,     prefix="/api/v1/cook-time")
+app.include_router(shift_report_router,  prefix="/api/v1/shifts")
+app.include_router(dispatch_rule_router, prefix="/api/v1/dispatch-rules")
 
 
 @app.get("/health")

@@ -23,8 +23,8 @@ from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import UUID
 
-revision: str = "20260330_cook_time_baselines"
-down_revision: Union[str, None] = "v016"
+revision: str = "v019"
+down_revision: Union[str, None] = "v018"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

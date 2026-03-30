@@ -12,8 +12,8 @@ import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import UUID
 
 # revision identifiers
-revision = "20260330_001"
-down_revision = None
+revision = "v021"
+down_revision = "v020"
 branch_labels = None
 depends_on = None
 

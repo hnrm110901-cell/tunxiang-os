@@ -11,8 +11,8 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision = "20260330_dispatch_rules"
-down_revision = None
+revision = "v020"
+down_revision = "v019"
 branch_labels = None
 depends_on = None
 
@@ -104,15 +104,21 @@ def upgrade() -> None:
         postgresql_where=sa.text("match_brand_id IS NOT NULL AND is_deleted = false"),
     )
 
-    # ── RLS 策略（使用 app.current_tenant，不使用 current_setting 绕过） ──
+    # ── RLS 策略（使用 app.tenant_id，与 v006/v014/v017 安全模式一致） ──
     op.execute("""
         ALTER TABLE dispatch_rules ENABLE ROW LEVEL SECURITY;
     """)
 
     op.execute("""
-        CREATE POLICY dispatch_rules_tenant_isolation
-        ON dispatch_rules
-        USING (tenant_id = current_setting('app.current_tenant')::uuid);
+        CREATE POLICY dispatch_rules_select ON dispatch_rules FOR SELECT
+            USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid);
+        CREATE POLICY dispatch_rules_insert ON dispatch_rules FOR INSERT
+            WITH CHECK (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid);
+        CREATE POLICY dispatch_rules_update ON dispatch_rules FOR UPDATE
+            USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid);
+        CREATE POLICY dispatch_rules_delete ON dispatch_rules FOR DELETE
+            USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid);
+        ALTER TABLE dispatch_rules FORCE ROW LEVEL SECURITY;
     """)
 
     op.execute("""
@@ -122,7 +128,10 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.execute("DROP POLICY IF EXISTS dispatch_rules_tenant_isolation ON dispatch_rules;")
+    op.execute("DROP POLICY IF EXISTS dispatch_rules_select ON dispatch_rules;
+    op.execute("DROP POLICY IF EXISTS dispatch_rules_insert ON dispatch_rules;")
+    op.execute("DROP POLICY IF EXISTS dispatch_rules_update ON dispatch_rules;")
+    op.execute("DROP POLICY IF EXISTS dispatch_rules_delete ON dispatch_rules;")")
     op.execute("ALTER TABLE dispatch_rules DISABLE ROW LEVEL SECURITY;")
     op.drop_index("ix_dispatch_rules_match_brand_id", table_name="dispatch_rules")
     op.drop_index("ix_dispatch_rules_match_dish_id", table_name="dispatch_rules")
