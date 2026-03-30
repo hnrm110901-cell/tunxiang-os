@@ -13,6 +13,7 @@
  *   /history       → HistoryPage（出餐历史）
  *   /config        → KDSConfigPage（档口配置）
  *   /alerts        → AlertsPage（告警页，旧版）
+ *   /runner        → RunnerStation（传菜员工作站，P2）
  */
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { KDSBoardPage } from './pages/KDSBoardPage';
@@ -26,6 +27,7 @@ import { TimeoutAlert } from './pages/TimeoutAlert';
 import { ShortageReport } from './pages/ShortageReport';
 import { StatsPanel } from './pages/StatsPanel';
 import { RemakeModal } from './pages/RemakeModal';
+import { RunnerStation } from './pages/RunnerStation';
 
 export default function App() {
   return (
@@ -41,6 +43,7 @@ export default function App() {
         <Route path="/shortage" element={<ShortageReport />} />
         <Route path="/stats-panel" element={<StatsPanel />} />
         <Route path="/remake" element={<RemakeModal />} />
+        <Route path="/runner" element={<RunnerStation />} />
 
         {/* 原有页面（保留兼容） */}
         <Route path="/board-legacy" element={<KDSBoardPage />} />

@@ -17,6 +17,7 @@ import { ComplaintPage } from './pages/ComplaintPage';
 import { ServiceConfirmPage } from './pages/ServiceConfirmPage';
 import { PeakAlertPage } from './pages/PeakAlertPage';
 import { OrderStatusPage } from './pages/OrderStatusPage';
+import { TableServedNotice } from './pages/TableServedNotice';
 
 const tabs = [
   { path: '/tables', label: '桌台', icon: 'T' },
@@ -69,6 +70,8 @@ export default function App() {
   return (
     <BrowserRouter>
       <div style={{ background: '#0B1A20', minHeight: '100vh', color: '#fff', paddingBottom: 64 }}>
+        {/* 传菜员全桌上齐通知（固定顶部横幅，WebSocket实时推送） */}
+        <TableServedNotice />
         <Routes>
           <Route path="/" element={<Navigate to="/tables" replace />} />
           {/* 主Tab页 */}
