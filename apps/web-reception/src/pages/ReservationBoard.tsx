@@ -4,6 +4,7 @@
  * 状态: 待到店/已到店/已入座/已取消
  */
 import { useState } from 'react';
+import { AIInsightsPanel } from '../components/AIInsightsPanel';
 
 type ReservationStatus = 'pending' | 'arrived' | 'seated' | 'cancelled';
 
@@ -75,6 +76,9 @@ export function ReservationBoard() {
 
   return (
     <div style={{ padding: 24 }}>
+      {/* AI 预订洞察面板 (SevenRooms + Anolla 对标) */}
+      <AIInsightsPanel />
+
       {/* 顶部标题 + 统计 */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
         <h1 style={{ fontSize: 32, fontWeight: 800 }}>今日预订台账</h1>

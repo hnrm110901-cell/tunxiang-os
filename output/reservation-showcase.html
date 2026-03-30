@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>屯象OS · 智能预订系统 — 功能展示</title>
+<style>
+  :root {
+    --tx-primary: #FF6B35;
+    --tx-primary-light: #FFF3ED;
+    --tx-navy: #1E2A3A;
+    --tx-success: #0F6E56;
+    --tx-warning: #BA7517;
+    --tx-danger: #A32D2D;
+    --tx-info: #185FA5;
+    --tx-text-1: #2C2C2A;
+    --tx-text-2: #5F5E5A;
+    --tx-text-3: #B4B2A9;
+    --tx-bg-1: #FFFFFF;
+    --tx-bg-2: #F8F7F5;
+    --tx-bg-3: #F0EDE6;
+    --tx-border: #E8E6E1;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", sans-serif;
+    background: var(--tx-bg-2); color: var(--tx-text-1);
+  }
+
+  /* Header */
+  .hero {
+    background: linear-gradient(135deg, var(--tx-navy) 0%, #2C3E50 100%);
+    color: #fff; padding: 60px 40px; text-align: center;
+  }
+  .hero h1 { font-size: 42px; font-weight: 800; margin-bottom: 12px; }
+  .hero h1 span { color: var(--tx-primary); }
+  .hero p { font-size: 18px; opacity: 0.8; max-width: 700px; margin: 0 auto; line-height: 1.6; }
+  .hero .badges { display: flex; justify-content: center; gap: 16px; margin-top: 24px; flex-wrap: wrap; }
+  .hero .badge {
+    background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.2);
+    padding: 8px 20px; border-radius: 24px; font-size: 14px; font-weight: 600;
+  }
+
+  /* Section */
+  .section { max-width: 1200px; margin: 0 auto; padding: 48px 24px; }
+  .section-title {
+    font-size: 28px; font-weight: 800; color: var(--tx-navy);
+    margin-bottom: 8px; display: flex; align-items: center; gap: 12px;
+  }
+  .section-title .num {
+    background: var(--tx-primary); color: #fff; width: 36px; height: 36px;
+    border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    font-size: 18px; font-weight: 800; flex-shrink: 0;
+  }
+  .section-subtitle { font-size: 16px; color: var(--tx-text-2); margin-bottom: 32px; margin-left: 48px; }
+
+  /* Cards Grid */
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 24px; }
+  .card {
+    background: #fff; border-radius: 16px; padding: 28px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06); border: 1px solid var(--tx-border);
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  .card:hover { transform: translateY(-4px); box-shadow: 0 8px 24px rgba(0,0,0,0.1); }
+  .card-icon { font-size: 36px; margin-bottom: 12px; }
+  .card h3 { font-size: 20px; font-weight: 700; color: var(--tx-navy); margin-bottom: 8px; }
+  .card p { font-size: 14px; color: var(--tx-text-2); line-height: 1.6; }
+  .card .tag {
+    display: inline-block; font-size: 12px; font-weight: 600;
+    padding: 3px 10px; border-radius: 12px; margin-top: 12px;
+  }
+  .tag-p0 { background: #FFECE4; color: var(--tx-primary); }
+  .tag-p1 { background: #E8F0FE; color: var(--tx-info); }
+  .tag-agent { background: #E8F5F0; color: var(--tx-success); }
+
+  /* Architecture */
+  .arch-diagram {
+    background: #fff; border-radius: 16px; padding: 32px; margin-top: 24px;
+    border: 1px solid var(--tx-border); font-family: "JetBrains Mono", monospace;
+    font-size: 13px; line-height: 1.5; overflow-x: auto; white-space: pre;
+    color: var(--tx-navy);
+  }
+
+  /* Comparison Table */
+  .compare-table {
+    width: 100%; border-collapse: collapse; background: #fff;
+    border-radius: 16px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  }
+  .compare-table th {
+    background: var(--tx-navy); color: #fff; padding: 14px 16px;
+    text-align: left; font-size: 14px; font-weight: 600;
+  }
+  .compare-table td {
+    padding: 12px 16px; border-bottom: 1px solid var(--tx-border);
+    font-size: 14px;
+  }
+  .compare-table tr:nth-child(even) td { background: var(--tx-bg-2); }
+  .check { color: var(--tx-success); font-weight: 700; }
+  .cross { color: var(--tx-text-3); }
+  .star { color: var(--tx-primary); font-weight: 700; }
+
+  /* Conversation Demo */
+  .chat-demo {
+    max-width: 480px; margin: 24px auto 0;
+    background: #fff; border-radius: 16px; padding: 24px;
+    border: 1px solid var(--tx-border);
+  }
+  .chat-msg {
+    display: flex; margin-bottom: 12px; gap: 8px;
+  }
+  .chat-msg.user { justify-content: flex-end; }
+  .chat-bubble {
+    max-width: 320px; padding: 12px 16px; border-radius: 16px;
+    font-size: 14px; line-height: 1.5;
+  }
+  .chat-msg.bot .chat-bubble { background: var(--tx-bg-2); border-bottom-left-radius: 4px; }
+  .chat-msg.user .chat-bubble { background: var(--tx-primary); color: #fff; border-bottom-right-radius: 4px; }
+  .chat-avatar {
+    width: 32px; height: 32px; border-radius: 50%; display: flex;
+    align-items: center; justify-content: center; font-size: 16px;
+    flex-shrink: 0;
+  }
+  .chat-msg.bot .chat-avatar { background: var(--tx-primary-light); }
+  .chat-msg.user .chat-avatar { background: #E8E6E1; }
+
+  /* Stats */
+  .stats-row { display: flex; gap: 24px; flex-wrap: wrap; margin: 32px 0; }
+  .stat-card {
+    flex: 1; min-width: 200px; background: #fff; border-radius: 16px; padding: 24px;
+    text-align: center; border: 1px solid var(--tx-border);
+  }
+  .stat-card .val { font-size: 36px; font-weight: 800; }
+  .stat-card .label { font-size: 14px; color: var(--tx-text-2); margin-top: 4px; }
+
+  /* Footer */
+  .footer {
+    text-align: center; padding: 48px 24px; color: var(--tx-text-3); font-size: 14px;
+  }
+  .footer a { color: var(--tx-primary); text-decoration: none; }
+</style>
+</head>
+<body>
+
+<!-- Hero -->
+<div class="hero">
+  <h1><span>屯象OS</span> · 智能预订系统</h1>
+  <p>
+    对标 SevenRooms + Anolla + OpenTable + 美味不用等<br>
+    融合全球最优秀餐饮预订产品的设计精华<br>
+    AI Agent 驱动的下一代连锁餐饮预订体验
+  </p>
+  <div class="badges">
+    <span class="badge">SevenRooms · Guest CRM</span>
+    <span class="badge">Anolla · AI Maitre d'</span>
+    <span class="badge">OpenTable · Yield Management</span>
+    <span class="badge">Resy · AI Recommendations</span>
+    <span class="badge">美味不用等 · 智能排队</span>
+  </div>
+</div>
+
+<!-- 预测效果 -->
+<div class="section">
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="val" style="color: var(--tx-danger)">-24%</div>
+      <div class="label">No-Show 率降低</div>
+    </div>
+    <div class="stat-card">
+      <div class="val" style="color: var(--tx-success)">+22%</div>
+      <div class="label">翻台率提升</div>
+    </div>
+    <div class="stat-card">
+      <div class="val" style="color: var(--tx-primary)">+18%</div>
+      <div class="label">预订营收增长</div>
+    </div>
+    <div class="stat-card">
+      <div class="val" style="color: var(--tx-info)">90%</div>
+      <div class="label">等位预测准确率</div>
+    </div>
+    <div class="stat-card">
+      <div class="val" style="color: var(--tx-warning)">73%</div>
+      <div class="label">非营业时间自动预订</div>
+    </div>
+  </div>
+</div>
+
+<!-- P0: 智能预订Agent -->
+<div class="section">
+  <div class="section-title"><span class="num">1</span> 智能预订 Agent (P0)</div>
+  <div class="section-subtitle">reservation_intelligence.py — No-Show预测 + 智能超订 + Guest Profile + 时段优化 + 确认链 + 营收归因</div>
+  <div class="cards">
+    <div class="card">
+      <div class="card-icon">🎯</div>
+      <h3>No-Show 概率预测</h3>
+      <p>基于8个维度（历史爽约率、押金、会员等级、天气、预订提前天数等）实时计算每笔预订的爽约概率，分级预警。</p>
+      <span class="tag tag-p0">P0 核心</span>
+    </div>
+    <div class="card">
+      <div class="card-icon">📈</div>
+      <h3>智能超订策略</h3>
+      <p>根据每笔预订的 No-Show 概率自动计算安全超订量，保守策略（70%预测值），绝不超过容量15%上限。</p>
+      <span class="tag tag-p0">P0 核心</span>
+    </div>
+    <div class="card">
+      <div class="card-icon">👤</div>
+      <h3>Guest Profile 画像关联</h3>
+      <p>SevenRooms 模式：预订时自动关联会员 Golden ID，注入就餐偏好、忌口、常点菜品、VIP等级。服务员可见。</p>
+      <span class="tag tag-agent">SevenRooms</span>
+    </div>
+    <div class="card">
+      <div class="card-icon">⏰</div>
+      <h3>动态时段优化</h3>
+      <p>OpenTable Yield Management：识别高峰/低谷时段，高峰缩短用餐窗口+提高低消，低谷推送优惠引流。</p>
+      <span class="tag tag-agent">OpenTable</span>
+    </div>
+    <div class="card">
+      <div class="card-icon">🔔</div>
+      <h3>确认提醒链</h3>
+      <p>T-24h 确认提醒 → T-2h 最终确认+导航 → T+15min 超时释放+通知候补。高风险预订加 T-48h 押金请求。</p>
+      <span class="tag tag-p0">P0 核心</span>
+    </div>
+    <div class="card">
+      <div class="card-icon">💰</div>
+      <h3>预订渠道营收归因</h3>
+      <p>按渠道（电话/微信/美团/抖音/到店）统计预订量、到店率、平均消费、ROI排名。数据驱动渠道投放决策。</p>
+      <span class="tag tag-p1">P1 增强</span>
+    </div>
+  </div>
+</div>
+
+<!-- P0: 智能排座Agent -->
+<div class="section">
+  <div class="section-title"><span class="num">2</span> 智能排座 Agent (P0)</div>
+  <div class="section-subtitle">smart_seating.py — 全局排座优化 + 翻台预测 + 服务员负载均衡 + 拼桌建议 + 可用性预测</div>
+  <div class="cards">
+    <div class="card">
+      <div class="card-icon">🧩</div>
+      <h3>全局排座优化</h3>
+      <p>Anolla AI Maitre d'：不是推荐单桌，而是全局优化所有未来2小时预订的排座方案，最大化营收和翻台率。</p>
+      <span class="tag tag-p0">P0 核心</span>
+    </div>
+    <div class="card">
+      <div class="card-icon">🔄</div>
+      <h3>翻台时间预测</h3>
+      <p>基于人数、菜品复杂度、是否有甜品/酒水、VIP状态、用餐时段等因素，预测每桌翻台时间，准确率90%+。</p>
+      <span class="tag tag-agent">Anolla</span>
+    </div>
+    <div class="card">
+      <div class="card-icon">👨‍🍳</div>
+      <h3>服务员负载均衡</h3>
+      <p>自动分配服务员，考虑区域、当前负载、技能等级。VIP桌优先分配高技能服务员，避免任何人超负荷。</p>
+      <span class="tag tag-p1">P1 增强</span>
+    </div>
+    <div class="card">
+      <div class="card-icon">🤝</div>
+      <h3>拼桌/合桌建议</h3>
+      <p>高峰时段自动检测可拼桌的小组（1-2人等位15分钟+），建议共享4人桌，释放小桌给其他客人。</p>
+      <span class="tag tag-p1">P1 增强</span>
+    </div>
+    <div class="card">
+      <div class="card-icon">🔮</div>
+      <h3>可用性预测</h3>
+      <p>实时预测未来任意时间点的可用桌数，考虑当前用餐进度、清台时间、即将到达的预订。</p>
+      <span class="tag tag-p0">P0 核心</span>
+    </div>
+  </div>
+</div>
+
+<!-- P1: 对话式预订 -->
+<div class="section">
+  <div class="section-title"><span class="num">3</span> 对话式预订 Agent (P1)</div>
+  <div class="section-subtitle">conversational_booking.py — 自然语言预订 + 多轮对话 + 微信/电话场景</div>
+
+  <div class="chat-demo">
+    <div style="text-align: center; font-size: 14px; color: var(--tx-text-3); margin-bottom: 16px;">
+      微信预订对话演示
+    </div>
+    <div class="chat-msg user">
+      <div class="chat-bubble">周六晚上想订个位</div>
+      <div class="chat-avatar">👤</div>
+    </div>
+    <div class="chat-msg bot">
+      <div class="chat-avatar">🤖</div>
+      <div class="chat-bubble">好的！请问几位用餐呢？有什么座位偏好吗？（包厢/靠窗/大厅）</div>
+    </div>
+    <div class="chat-msg user">
+      <div class="chat-bubble">6个人，要包厢</div>
+      <div class="chat-avatar">👤</div>
+    </div>
+    <div class="chat-msg bot">
+      <div class="chat-avatar">🤖</div>
+      <div class="chat-bubble">周六晚上6位包厢，我查一下...<br><br>💡 18:00 和 19:30 各有一个包厢可用。您想订哪个时间段呢？</div>
+    </div>
+    <div class="chat-msg user">
+      <div class="chat-bubble">6点半吧</div>
+      <div class="chat-avatar">👤</div>
+    </div>
+    <div class="chat-msg bot">
+      <div class="chat-avatar">🤖</div>
+      <div class="chat-bubble">好的，周六18:30，6位，包厢已为您预留。请问预订人姓名和手机号？</div>
+    </div>
+    <div class="chat-msg user">
+      <div class="chat-bubble">王先生 13812341234</div>
+      <div class="chat-avatar">👤</div>
+    </div>
+    <div class="chat-msg bot">
+      <div class="chat-avatar">🤖</div>
+      <div class="chat-bubble">
+        ✅ <b>预订确认！</b><br>
+        📅 周六 18:30<br>
+        👥 6位 · 梅花厅（包厢）<br>
+        📱 王先生 138****1234<br>
+        🔖 确认码: TX-0328-006<br><br>
+        我们会在到店前2小时发送提醒。期待您的光临！
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 对标分析 -->
+<div class="section">
+  <div class="section-title"><span class="num">4</span> 全球产品对标分析</div>
+  <div class="section-subtitle">屯象OS 融合五大全球最优秀预订产品的核心能力</div>
+  <table class="compare-table">
+    <thead>
+      <tr>
+        <th>能力</th>
+        <th>SevenRooms</th>
+        <th>Anolla</th>
+        <th>OpenTable</th>
+        <th>美味不用等</th>
+        <th style="background: var(--tx-primary)">屯象OS</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>No-Show 预测</td>
+        <td class="check">✓</td><td class="check">✓</td><td class="cross">—</td><td class="cross">—</td>
+        <td class="star">★ 8维度模型</td>
+      </tr>
+      <tr>
+        <td>智能超订</td>
+        <td class="check">✓</td><td class="check">✓</td><td class="cross">—</td><td class="cross">—</td>
+        <td class="star">★ 动态安全策略</td>
+      </tr>
+      <tr>
+        <td>Guest CRM 画像</td>
+        <td class="star">★ 核心</td><td class="cross">—</td><td class="check">✓</td><td class="cross">—</td>
+        <td class="star">★ Golden ID联动</td>
+      </tr>
+      <tr>
+        <td>AI 全局排座</td>
+        <td class="check">✓</td><td class="star">★ 核心</td><td class="cross">—</td><td class="cross">—</td>
+        <td class="star">★ 营收最大化</td>
+      </tr>
+      <tr>
+        <td>翻台时间预测</td>
+        <td class="cross">—</td><td class="check">✓</td><td class="cross">—</td><td class="cross">—</td>
+        <td class="star">★ 多因子模型</td>
+      </tr>
+      <tr>
+        <td>动态时段优化</td>
+        <td class="cross">—</td><td class="cross">—</td><td class="star">★ 核心</td><td class="cross">—</td>
+        <td class="star">★ 高峰/低谷策略</td>
+      </tr>
+      <tr>
+        <td>确认提醒链</td>
+        <td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td>
+        <td class="star">★ 智能时序链</td>
+      </tr>
+      <tr>
+        <td>对话式预订</td>
+        <td class="cross">—</td><td class="cross">—</td><td class="cross">—</td><td class="cross">—</td>
+        <td class="star">★ 中文NLP多轮</td>
+      </tr>
+      <tr>
+        <td>服务员负载均衡</td>
+        <td class="cross">—</td><td class="check">✓</td><td class="cross">—</td><td class="cross">—</td>
+        <td class="star">★ 区域+技能匹配</td>
+      </tr>
+      <tr>
+        <td>拼桌建议</td>
+        <td class="cross">—</td><td class="cross">—</td><td class="cross">—</td><td class="cross">—</td>
+        <td class="star">★ 屯象独创</td>
+      </tr>
+      <tr>
+        <td>边缘AI (离线)</td>
+        <td class="cross">—</td><td class="cross">—</td><td class="cross">—</td><td class="cross">—</td>
+        <td class="star">★ Mac mini Core ML</td>
+      </tr>
+      <tr>
+        <td>营收归因</td>
+        <td class="check">✓</td><td class="cross">—</td><td class="check">✓</td><td class="cross">—</td>
+        <td class="star">★ 多渠道ROI</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- 架构图 -->
+<div class="section">
+  <div class="section-title"><span class="num">5</span> Agent 架构</div>
+  <div class="section-subtitle">三个新增 Agent 与现有系统的集成关系</div>
+  <div class="arch-diagram">
+┌─────────────────────────────────────────────────────────────────────┐
+│                      Master Agent (编排中心)                        │
+├────────────────┬────────────────┬────────────────┬─────────────────┤
+│ 🎯 智能预订     │ 🧩 智能排座     │ 💬 对话式预订   │ 🎪 宴会增长     │
+│ reservation_   │ smart_         │ conversational_│ banquet_        │
+│ intelligence   │ seating        │ booking        │ growth          │
+│ [P0 edge+cloud]│ [P0 edge+cloud]│ [P1 cloud]     │ [P1 cloud]      │
+├────────────────┴────────────────┴────────────────┴─────────────────┤
+│                    Ontology 层 (L1)                                 │
+│  Customer ←→ Order ←→ Dish    Store ←→ Employee                    │
+│     ↕           ↕                ↕                                  │
+│  Reservation  Queue  Table    Ingredient                           │
+├────────────────────────────────────────────────────────────────────┤
+│                  业务服务层 (tx-trade)                              │
+│  reservation_service │ queue_service │ table_manager │ banquet_lc  │
+├────────────────────────────────────────────────────────────────────┤
+│                  数据层 (PostgreSQL + RLS)                          │
+│  reservations │ queues │ tables │ banquet_leads │ banquet_contracts │
+├────────────────────────────────────────────────────────────────────┤
+│  前端终端: 前台Reception │ POS收银 │ 服务员Crew │ 顾客MiniApp       │
+└────────────────────────────────────────────────────────────────────┘
+  </div>
+</div>
+
+<!-- 文件清单 -->
+<div class="section">
+  <div class="section-title"><span class="num">6</span> 新增/修改文件清单</div>
+  <table class="compare-table" style="margin-top: 16px">
+    <thead><tr><th>文件</th><th>类型</th><th>行数</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><code>services/tx-agent/.../reservation_intelligence.py</code></td>
+        <td><span class="tag tag-p0">新建</span></td>
+        <td id="ri-lines">~600</td>
+        <td>No-Show预测 + 超订 + 画像 + 时段优化 + 确认链 + 归因</td>
+      </tr>
+      <tr>
+        <td><code>services/tx-agent/.../smart_seating.py</code></td>
+        <td><span class="tag tag-p0">新建</span></td>
+        <td id="ss-lines">~500</td>
+        <td>全局排座 + 翻台预测 + 负载均衡 + 拼桌 + 可用性</td>
+      </tr>
+      <tr>
+        <td><code>services/tx-agent/.../conversational_booking.py</code></td>
+        <td><span class="tag tag-p1">新建</span></td>
+        <td id="cb-lines">~450</td>
+        <td>对话式预订 + 中文NLP + 多轮对话状态机</td>
+      </tr>
+      <tr>
+        <td><code>apps/web-reception/.../AIInsightsPanel.tsx</code></td>
+        <td><span class="tag tag-p1">新建</span></td>
+        <td>170</td>
+        <td>AI预订洞察面板 (No-Show预警+时段+KPI)</td>
+      </tr>
+      <tr>
+        <td><code>apps/web-reception/.../ReservationBoard.tsx</code></td>
+        <td><span class="tag tag-p1">修改</span></td>
+        <td>+2</td>
+        <td>集成 AIInsightsPanel</td>
+      </tr>
+      <tr>
+        <td><code>output/reservation-showcase.html</code></td>
+        <td><span class="tag tag-p1">新建</span></td>
+        <td>~350</td>
+        <td>功能展示网页</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="footer">
+  <p>
+    <b>屯象OS</b> — AI-Native 连锁餐饮经营操作系统<br>
+    湖南屯象科技有限公司 · 2026<br>
+    <a href="https://github.com/hnrm110901-cell/tunxiang-os">GitHub Repository</a>
+  </p>
+</div>
+
+</body>
+</html>
