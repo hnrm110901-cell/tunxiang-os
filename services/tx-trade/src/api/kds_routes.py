@@ -16,7 +16,7 @@ from ..services.kds_dispatch import (
 from ..services.cooking_scheduler import calculate_cooking_order, estimate_cooking_time, get_dept_load
 from ..services.kds_actions import (
     start_cooking, finish_cooking, request_rush, request_remake,
-    report_shortage, get_task_timeline,
+    report_shortage, get_task_timeline, confirm_rush, check_rush_overdue,
 )
 from ..services.cooking_timeout import check_timeouts, get_timeout_config
 
@@ -56,6 +56,10 @@ class RemakeReq(BaseModel):
 
 class ShortageReq(BaseModel):
     ingredient_id: str
+
+
+class RushConfirmReq(BaseModel):
+    promised_minutes: int  # 承诺在多少分钟内完成（厨师设定）
 
 
 # ─── 分单与队列 ───
@@ -211,6 +215,102 @@ async def api_task_timeline(
 ):
     """任务时间线"""
     result = await get_task_timeline(task_id, db)
+    return result
+
+
+@router.post("/task/{task_id}/rush/confirm")
+async def api_rush_confirm(
+    task_id: str,
+    body: RushConfirmReq,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """厨师确认催菜 + 设置承诺完成时间
+
+    厨师在 KDS 屏幕上确认催单并承诺分钟数后调用。
+    承诺时间将推送到 web-crew（服务员端），让服务员可以告知顾客。
+    """
+    tenant_id = _get_tenant_id(request)
+    operator_id = request.headers.get("X-Operator-ID", "unknown")
+    result = await confirm_rush(
+        task_id,
+        body.promised_minutes,
+        operator_id,
+        db,
+        tenant_id=tenant_id,
+    )
+    return result
+
+
+@router.get("/task/{task_id}/rush/status")
+async def api_rush_status(
+    task_id: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """查询催菜SLA状态
+
+    返回当前任务的催菜次数、承诺时间及是否已超时。
+    """
+    from ..models.kds_task import KDSTask
+    from sqlalchemy import select, and_
+    import uuid as _uuid
+
+    tenant_id = _get_tenant_id(request)
+
+    try:
+        tid = _uuid.UUID(tenant_id)
+        task_uuid = _uuid.UUID(task_id)
+    except ValueError:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail="无效的 task_id 或 tenant_id")
+
+    from datetime import datetime, timezone
+    stmt = select(KDSTask).where(
+        and_(
+            KDSTask.id == task_uuid,
+            KDSTask.tenant_id == tid,
+            KDSTask.is_deleted == False,  # noqa: E712
+        )
+    )
+    db_task = (await db.execute(stmt)).scalar_one_or_none()
+    if db_task is None:
+        return {"ok": False, "error": f"任务 {task_id} 不存在"}
+
+    now = datetime.now(timezone.utc)
+    promised_at = db_task.promised_at
+    is_overdue = (
+        promised_at is not None
+        and db_task.status not in ("done", "cancelled")
+        and promised_at < now
+    )
+
+    return {
+        "ok": True,
+        "data": {
+            "task_id": task_id,
+            "status": db_task.status,
+            "rush_count": db_task.rush_count,
+            "last_rush_at": db_task.last_rush_at.isoformat() if db_task.last_rush_at else None,
+            "promised_at": promised_at.isoformat() if promised_at else None,
+            "is_overdue": is_overdue,
+            "overdue_sec": int((now - promised_at).total_seconds()) if is_overdue else 0,
+        },
+    }
+
+
+@router.post("/rush/overdue-check")
+async def api_rush_overdue_check(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """催菜SLA超时批量检查（供定时任务调用）
+
+    扫描所有承诺时间已到期但任务未完成的记录，触发升级告警推送。
+    建议每分钟调用一次。
+    """
+    tenant_id = _get_tenant_id(request)
+    result = await check_rush_overdue(tenant_id, db)
     return result
 
 
