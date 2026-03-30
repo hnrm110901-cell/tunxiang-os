@@ -20,6 +20,7 @@ from .api.seafood_routes import router as seafood_router
 from .api.trace_routes import router as trace_router
 from .api.central_kitchen_routes import router as ck_router
 from .api.procurement_recommend_routes import router as procurement_recommend_router
+from .api.smart_replenishment_routes import router as smart_replenishment_router
 
 app = FastAPI(title="TunxiangOS tx-supply", version="3.0.0")
 app.include_router(inv_router)
@@ -37,7 +38,8 @@ app.include_router(food_safety_router)
 app.include_router(seafood_router)
 app.include_router(trace_router)
 app.include_router(ck_router)
-app.include_router(procurement_recommend_router, prefix="/api/v1/procurement")
+app.include_router(procurement_recommend_router,  prefix="/api/v1/procurement")
+app.include_router(smart_replenishment_router,   prefix="/api/v1/smart-replenishment")
 
 @app.get("/health")
 async def health():

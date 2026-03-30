@@ -39,6 +39,11 @@ from .api.expo_routes import router as expo_router
 from .api.cook_time_routes import router as cook_time_router
 from .api.shift_report_routes import router as shift_report_router
 from .api.dispatch_rule_routes import router as dispatch_rule_router
+from .api.dispatch_code_routes import router as dispatch_code_router
+from .api.kds_config_routes import router as kds_config_router
+from .api.kitchen_monitor_routes import router as kitchen_monitor_router
+from .api.table_monitor_routes import router as table_monitor_router
+from .api.booking_prep_routes import router as booking_prep_router
 
 
 @asynccontextmanager
@@ -95,7 +100,12 @@ app.include_router(runner_router,        prefix="/api/v1/runner")
 app.include_router(expo_router,          prefix="/api/v1/expo")
 app.include_router(cook_time_router,     prefix="/api/v1/cook-time")
 app.include_router(shift_report_router,  prefix="/api/v1/shifts")
-app.include_router(dispatch_rule_router, prefix="/api/v1/dispatch-rules")
+app.include_router(dispatch_rule_router,    prefix="/api/v1/dispatch-rules")
+app.include_router(dispatch_code_router,   prefix="/api/v1/dispatch-codes")
+app.include_router(kds_config_router,      prefix="/api/v1/kds-call")
+app.include_router(kitchen_monitor_router, prefix="/api/v1/kitchen")
+app.include_router(table_monitor_router)
+app.include_router(booking_prep_router,    prefix="/api/v1/booking-prep")
 
 
 @app.get("/health")
