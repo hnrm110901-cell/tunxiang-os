@@ -1,0 +1,113 @@
+<!-- Social Page -- group order, gift, share rewards -->
+<view class="page-container">
+  <!-- Tabs -->
+  <view class="social-tabs">
+    <view class="social-tab {{activeTab === item.key ? 'active' : ''}}"
+          wx:for="{{tabs}}" wx:key="key"
+          bindtap="switchTab" data-tab="{{item.key}}">
+      <text>{{item.label}}</text>
+    </view>
+  </view>
+
+  <!-- Group Order -->
+  <view class="tab-content" wx:if="{{activeTab === 'group'}}">
+    <view class="feature-card" wx:if="{{!groupId}}">
+      <view class="feature-hero">
+        <text class="feature-title">多人拼单</text>
+        <text class="feature-desc">各点各的，一起下单，分别付款</text>
+      </view>
+      <button class="cta-btn" bindtap="createGroup">发起拼单</button>
+    </view>
+
+    <view class="group-active" wx:if="{{groupId}}">
+      <view class="group-header">
+        <text class="group-title">拼单进行中</text>
+        <text class="group-code">邀请码: {{inviteCode}}</text>
+      </view>
+
+      <view class="group-members">
+        <text class="members-title">已加入成员</text>
+        <view class="member-row" wx:for="{{groupMembers}}" wx:key="customer_id">
+          <text class="member-name">{{item.nickname || '成员' + (index + 1)}}</text>
+          <text class="member-role">{{item.role === 'creator' ? '发起人' : ''}}</text>
+          <text class="member-items">{{item.item_count || 0}}道菜</text>
+        </view>
+        <view class="empty-state" wx:if="{{groupMembers.length === 0}}">
+          暂无其他成员，分享邀请码邀请好友
+        </view>
+      </view>
+
+      <view class="group-actions">
+        <button class="action-btn share" open-type="share" bindtap="shareGroupInvite">
+          邀请好友
+        </button>
+        <button class="action-btn primary" bindtap="goToGroupMenu">开始点菜</button>
+      </view>
+    </view>
+  </view>
+
+  <!-- Gift -->
+  <view class="tab-content" wx:if="{{activeTab === 'gift'}}">
+    <view class="feature-card">
+      <text class="feature-title">请客送礼</text>
+      <text class="feature-desc">送好友一份美食，分享快乐</text>
+    </view>
+
+    <!-- Gift type selection -->
+    <view class="gift-types">
+      <view class="gift-type-card {{selectedGiftType === item.key ? 'selected' : ''}}"
+            wx:for="{{giftTypes}}" wx:key="key"
+            bindtap="selectGiftType" data-key="{{item.key}}">
+        <text class="gift-type-label">{{item.label}}</text>
+        <text class="gift-type-desc">{{item.desc}}</text>
+      </view>
+    </view>
+
+    <!-- Gift amount (for card type) -->
+    <view class="amount-section" wx:if="{{selectedGiftType === 'card'}}">
+      <text class="section-label">选择金额</text>
+      <view class="amount-grid">
+        <view class="amount-chip {{selectedGiftAmount === item ? 'selected' : ''}}"
+              wx:for="{{giftAmounts}}" wx:key="*this"
+              bindtap="selectGiftAmount" data-amount="{{item}}">
+          <text>¥{{item / 100}}</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- Gift message -->
+    <view class="message-section">
+      <text class="section-label">留言</text>
+      <textarea class="gift-message-input" placeholder="写一句祝福..."
+                maxlength="50" bindinput="onGiftMessageInput" value="{{giftMessage}}" />
+    </view>
+
+    <button class="cta-btn" bindtap="sendGift">
+      {{selectedGiftType === 'card' ? '送出 ¥' + (selectedGiftAmount / 100) : '选择菜品送出'}}
+    </button>
+  </view>
+
+  <!-- Share Rewards -->
+  <view class="tab-content" wx:if="{{activeTab === 'share'}}">
+    <view class="feature-card share-card">
+      <text class="feature-title">分享有礼</text>
+      <text class="feature-desc">{{referralReward || '邀请好友注册，双方各获积分奖励'}}</text>
+    </view>
+
+    <view class="referral-section" wx:if="{{referralCode}}">
+      <view class="referral-code-box">
+        <text class="referral-label">你的邀请码</text>
+        <text class="referral-code">{{referralCode}}</text>
+      </view>
+
+      <view class="referral-actions">
+        <button class="action-btn share" open-type="share">分享给好友</button>
+        <button class="action-btn" bindtap="copyReferralLink">复制链接</button>
+      </view>
+    </view>
+
+    <view class="loading-tip" wx:if="{{!referralCode}}">
+      <text>生成邀请链接中...</text>
+    </view>
+  </view>
+</view>

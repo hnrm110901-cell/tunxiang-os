@@ -1,0 +1,112 @@
+<!-- Dish Customize Bottom Sheet -->
+<view class="customize-mask" wx:if="{{visible}}" bindtap="onClose">
+  <view class="customize-sheet {{visible ? 'show' : ''}}" catchtap="preventBubble">
+    <!-- Image gallery swiper -->
+    <swiper class="dish-swiper" indicator-dots="{{dish.images && dish.images.length > 1}}"
+            indicator-color="rgba(255,255,255,0.3)" indicator-active-color="#FF6B2C"
+            bindchange="onSwiperChange">
+      <swiper-item wx:for="{{dish.images || [dish.image_url]}}" wx:key="*this">
+        <image class="dish-big-img" src="{{item || '/assets/dish-placeholder.png'}}" mode="aspectFill" lazy-load />
+      </swiper-item>
+    </swiper>
+
+    <scroll-view scroll-y class="customize-content">
+      <!-- Name + Price -->
+      <view class="dish-main-info">
+        <text class="dish-detail-name">{{dish.name || dish.dish_name}}</text>
+        <text class="dish-detail-price">¥{{priceYuan}}</text>
+      </view>
+      <text class="dish-detail-desc" wx:if="{{dish.description}}">{{dish.description}}</text>
+
+      <!-- Social proof: ordered count -->
+      <view class="social-proof" wx:if="{{dish.order_count}}">
+        <text class="proof-text">{{dish.order_count}}人点过</text>
+      </view>
+
+      <!-- Nutrition + Allergen info -->
+      <view class="nutrition-row" wx:if="{{dish.calories || dish.allergens}}">
+        <text class="nutrition-item" wx:if="{{dish.calories}}">{{dish.calories}} kcal</text>
+        <text class="nutrition-item allergen" wx:if="{{dish.allergens}}">
+          过敏原: {{dish.allergens}}
+        </text>
+      </view>
+
+      <!-- Food origin traceability -->
+      <view class="origin-section" wx:if="{{dish.origin}}">
+        <text class="section-label">食材溯源</text>
+        <view class="origin-card">
+          <image class="origin-img" wx:if="{{dish.origin.image_url}}" src="{{dish.origin.image_url}}" mode="aspectFill" lazy-load />
+          <view class="origin-info">
+            <text class="origin-name">{{dish.origin.name}}</text>
+            <text class="origin-location">产地: {{dish.origin.location}}</text>
+            <text class="origin-story" wx:if="{{dish.origin.story}}">{{dish.origin.story}}</text>
+          </view>
+        </view>
+      </view>
+
+      <!-- Spice level -->
+      <view class="option-section" wx:if="{{spiceList.length > 0}}">
+        <text class="section-label">辣度</text>
+        <view class="option-row">
+          <view class="option-chip {{selectedSpice === item.id ? 'selected' : ''}}"
+                wx:for="{{spiceList}}" wx:key="id"
+                bindtap="selectSpice" data-id="{{item.id}}">
+            <text>{{item.label}}</text>
+          </view>
+        </view>
+      </view>
+
+      <!-- Portion -->
+      <view class="option-section" wx:if="{{portionList.length > 0}}">
+        <text class="section-label">份量</text>
+        <view class="option-row">
+          <view class="option-chip {{selectedPortion === item.id ? 'selected' : ''}}"
+                wx:for="{{portionList}}" wx:key="id"
+                bindtap="selectPortion" data-id="{{item.id}}">
+            <text>{{item.label}}</text>
+            <text class="option-extra" wx:if="{{item.extra_fen > 0}}">+¥{{(item.extra_fen / 100).toFixed(2)}}</text>
+          </view>
+        </view>
+      </view>
+
+      <!-- Cooking method -->
+      <view class="option-section" wx:if="{{methodList.length > 0}}">
+        <text class="section-label">做法</text>
+        <view class="option-row">
+          <view class="option-chip {{selectedMethod === item.id ? 'selected' : ''}}"
+                wx:for="{{methodList}}" wx:key="id"
+                bindtap="selectMethod" data-id="{{item.id}}">
+            <text>{{item.label}}</text>
+          </view>
+        </view>
+      </view>
+
+      <!-- Toppings / Add-ons -->
+      <view class="option-section" wx:if="{{toppingList.length > 0}}">
+        <text class="section-label">加料</text>
+        <view class="option-row">
+          <view class="option-chip {{selectedToppings.indexOf(item.id) >= 0 ? 'selected' : ''}}"
+                wx:for="{{toppingList}}" wx:key="id"
+                bindtap="toggleTopping" data-id="{{item.id}}">
+            <text>{{item.label}}</text>
+            <text class="option-extra" wx:if="{{item.price_fen > 0}}">+¥{{(item.price_fen / 100).toFixed(2)}}</text>
+          </view>
+        </view>
+      </view>
+    </scroll-view>
+
+    <!-- Bottom bar -->
+    <view class="customize-bottom">
+      <view class="qty-control">
+        <view class="qty-btn" bindtap="changeQty" data-delta="-1">-</view>
+        <text class="qty-num">{{quantity}}</text>
+        <view class="qty-btn plus" bindtap="changeQty" data-delta="1">+</view>
+      </view>
+      <view class="customize-price">
+        <text class="price-label">合计</text>
+        <text class="price-value">¥{{priceYuan}}</text>
+      </view>
+      <button class="confirm-btn" bindtap="onConfirm">加入购物车</button>
+    </view>
+  </view>
+</view>

@@ -264,6 +264,141 @@ function scanOrderCheckout(orderId) {
   });
 }
 
+// ─── 自助点餐引擎 ───
+
+function fetchRecommendations(storeId, customerId, partySize) {
+  return txRequest('/api/v1/self-order/recommend', 'POST', {
+    store_id: storeId || getApp().globalData.storeId,
+    customer_id: customerId || wx.getStorageSync('tx_customer_id') || '',
+    party_size: partySize || 1,
+    hour: new Date().getHours(),
+  });
+}
+
+function fetchAddonSuggestions(currentTotalFen, thresholdFen, candidateDishes) {
+  return txRequest('/api/v1/self-order/addon-suggest', 'POST', {
+    current_total_fen: currentTotalFen,
+    threshold_fen: thresholdFen,
+    candidate_dishes: candidateDishes,
+  });
+}
+
+function splitBillEvenly(totalFen, numPeople) {
+  return txRequest('/api/v1/self-order/aa-split-even', 'POST', {
+    total_fen: totalFen,
+    num_people: numPeople,
+  });
+}
+
+function splitBillByItems(items, assignments) {
+  return txRequest('/api/v1/self-order/aa-split-items', 'POST', {
+    items: items,
+    assignments: assignments,
+  });
+}
+
+function fetchCookingProgress(orderStatus, acceptedAt, estimatedMinutes) {
+  return txRequest('/api/v1/self-order/cooking-progress', 'POST', {
+    order_status: orderStatus,
+    accepted_at: acceptedAt || null,
+    estimated_minutes: estimatedMinutes || 15,
+  });
+}
+
+function rushOrder(orderId) {
+  return txRequest('/api/v1/self-order/rush-order', 'POST', {
+    order_id: orderId,
+    customer_id: wx.getStorageSync('tx_customer_id') || '',
+  });
+}
+
+function appendOrderItems(orderId, items) {
+  return txRequest('/api/v1/self-order/append-items', 'POST', {
+    order_id: orderId,
+    items: items,
+  });
+}
+
+// ─── 社交裂变 ───
+
+function createGroupOrder(storeId, tableNo) {
+  return txRequest('/api/v1/social/group-order/create', 'POST', {
+    store_id: storeId || getApp().globalData.storeId,
+    table_no: tableNo || '',
+  });
+}
+
+function joinGroupOrder(groupId, inviteCode) {
+  return txRequest('/api/v1/social/group-order/join', 'POST', {
+    group_id: groupId,
+    invite_code: inviteCode,
+  });
+}
+
+function getGroupOrderSummary(groupId) {
+  return txRequest('/api/v1/social/group-order/' + encodeURIComponent(groupId) + '/summary');
+}
+
+function createGift(giftType, amountFen, dishIds, message) {
+  return txRequest('/api/v1/social/gift/create', 'POST', {
+    gift_type: giftType,
+    amount_fen: amountFen || 0,
+    dish_ids: dishIds || [],
+    message: message || '',
+  });
+}
+
+function claimGift(shareCode) {
+  return txRequest('/api/v1/social/gift/claim', 'POST', {
+    share_code: shareCode,
+  });
+}
+
+function generateReferralLink() {
+  return txRequest('/api/v1/social/referral/generate', 'POST', {});
+}
+
+// ─── 积分商城 ───
+
+function fetchMallItems(category, page) {
+  var url = '/api/v1/points-mall/items?page=' + (page || 1);
+  if (category) url += '&category=' + encodeURIComponent(category);
+  return txRequest(url);
+}
+
+function redeemMallItem(itemId, quantity) {
+  return txRequest('/api/v1/points-mall/redeem', 'POST', {
+    item_id: itemId,
+    quantity: quantity || 1,
+  });
+}
+
+function fetchMyRedemptions(page) {
+  return txRequest('/api/v1/points-mall/my-redemptions?page=' + (page || 1));
+}
+
+function fetchAchievements() {
+  return txRequest('/api/v1/points-mall/achievements');
+}
+
+// ─── 虚拟排队 ───
+
+function takeVirtualQueue(storeId, guestRange, phone) {
+  return txRequest('/api/v1/queue/virtual-take', 'POST', {
+    store_id: storeId || getApp().globalData.storeId,
+    customer_id: wx.getStorageSync('tx_customer_id') || '',
+    guest_range: guestRange,
+    phone: phone || '',
+    is_virtual: true,
+  });
+}
+
+function fetchQueueEstimate(storeId, guestRange) {
+  return txRequest('/api/v1/queue/estimate?store_id=' +
+    encodeURIComponent(storeId || getApp().globalData.storeId) +
+    '&guest_range=' + encodeURIComponent(guestRange));
+}
+
 // ─── 企业团餐 ───
 
 function fetchCorporateAccount() {
@@ -348,4 +483,27 @@ module.exports = {
   fetchCorporateAccount: fetchCorporateAccount,
   fetchCorporateRecords: fetchCorporateRecords,
   submitMealBooking: submitMealBooking,
+  // 自助点餐引擎
+  fetchRecommendations: fetchRecommendations,
+  fetchAddonSuggestions: fetchAddonSuggestions,
+  splitBillEvenly: splitBillEvenly,
+  splitBillByItems: splitBillByItems,
+  fetchCookingProgress: fetchCookingProgress,
+  rushOrder: rushOrder,
+  appendOrderItems: appendOrderItems,
+  // 社交裂变
+  createGroupOrder: createGroupOrder,
+  joinGroupOrder: joinGroupOrder,
+  getGroupOrderSummary: getGroupOrderSummary,
+  createGift: createGift,
+  claimGift: claimGift,
+  generateReferralLink: generateReferralLink,
+  // 积分商城
+  fetchMallItems: fetchMallItems,
+  redeemMallItem: redeemMallItem,
+  fetchMyRedemptions: fetchMyRedemptions,
+  fetchAchievements: fetchAchievements,
+  // 虚拟排队
+  takeVirtualQueue: takeVirtualQueue,
+  fetchQueueEstimate: fetchQueueEstimate,
 };

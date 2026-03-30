@@ -1,0 +1,87 @@
+<!-- Points Mall -- redeem loyalty points -->
+<view class="page-container">
+  <!-- Points balance header -->
+  <view class="points-header">
+    <view class="points-info">
+      <text class="points-label">我的积分</text>
+      <text class="points-value">{{pointsBalance}}</text>
+    </view>
+    <view class="achievement-btn" bindtap="toggleAchievements">
+      <text class="achievement-text">成就 {{earnedCount}}/{{totalCount}}</text>
+    </view>
+  </view>
+
+  <!-- Achievements panel -->
+  <view class="achievements-panel" wx:if="{{showAchievements}}">
+    <text class="panel-title">成就徽章</text>
+    <view class="achievement-grid">
+      <view class="achievement-item {{item.earned ? 'earned' : ''}}" wx:for="{{achievements}}" wx:key="id">
+        <view class="achievement-icon">{{item.earned ? '&#9733;' : '&#9734;'}}</view>
+        <text class="achievement-name">{{item.name}}</text>
+        <text class="achievement-desc">{{item.description}}</text>
+        <text class="achievement-reward" wx:if="{{!item.earned}}">+{{item.reward_points}}积分</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- Category tabs -->
+  <view class="category-tabs">
+    <view class="category-tab {{activeCategory === item.key ? 'active' : ''}}"
+          wx:for="{{categories}}" wx:key="key"
+          bindtap="switchCategory" data-key="{{item.key}}">
+      <text>{{item.label}}</text>
+    </view>
+  </view>
+
+  <!-- Mall items grid -->
+  <view class="loading-tip" wx:if="{{loading && items.length === 0}}">
+    <text>加载中...</text>
+  </view>
+
+  <view class="mall-grid" wx:if="{{items.length > 0}}">
+    <view class="mall-item" wx:for="{{items}}" wx:key="id">
+      <image class="mall-img" src="{{item.imageUrl || '/assets/dish-placeholder.png'}}" mode="aspectFill" lazy-load />
+      <view class="mall-body">
+        <text class="mall-name">{{item.name}}</text>
+        <text class="mall-desc" wx:if="{{item.description}}">{{item.description}}</text>
+        <view class="mall-bottom">
+          <view class="mall-cost">
+            <text class="cost-value">{{item.pointsCost}}</text>
+            <text class="cost-unit">积分</text>
+          </view>
+          <view class="mall-stock" wx:if="{{item.stock <= 10}}">
+            <text>仅剩{{item.stock}}</text>
+          </view>
+          <button class="redeem-btn {{pointsBalance < item.pointsCost ? 'disabled' : ''}}"
+                  disabled="{{pointsBalance < item.pointsCost}}"
+                  bindtap="onTapRedeem" data-item="{{item}}">
+            兑换
+          </button>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <view class="empty-state" wx:if="{{!loading && items.length === 0}}">
+    暂无可兑换商品
+  </view>
+
+  <!-- Redeem confirm popup -->
+  <view class="popup-mask" wx:if="{{showRedeemConfirm}}" bindtap="closeRedeemConfirm"></view>
+  <view class="redeem-popup {{showRedeemConfirm ? 'show' : ''}}">
+    <text class="redeem-title">确认兑换</text>
+    <text class="redeem-item-name">{{redeemItem.name}}</text>
+    <view class="redeem-cost-row">
+      <text class="redeem-cost-label">需要积分</text>
+      <text class="redeem-cost-value">{{redeemItem.pointsCost}}</text>
+    </view>
+    <view class="redeem-balance-row">
+      <text class="redeem-balance-label">当前积分</text>
+      <text class="redeem-balance-value">{{pointsBalance}}</text>
+    </view>
+    <view class="redeem-actions">
+      <button class="cancel-btn" bindtap="closeRedeemConfirm">取消</button>
+      <button class="confirm-redeem-btn" bindtap="confirmRedeem">确认兑换</button>
+    </view>
+  </view>
+</view>

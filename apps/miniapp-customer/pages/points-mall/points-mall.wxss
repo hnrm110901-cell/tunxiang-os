@@ -1,0 +1,216 @@
+.page-container { min-height: 100vh; background: #0B1A20; padding-bottom: 40rpx; }
+
+/* Points header */
+.points-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 40rpx 32rpx;
+  background: linear-gradient(135deg, #FF6B2C, #FF8F5C);
+  margin: 0 32rpx;
+  margin-top: 24rpx;
+  border-radius: 24rpx;
+}
+
+.points-info { display: flex; flex-direction: column; gap: 8rpx; }
+.points-label { font-size: 26rpx; color: rgba(255,255,255,0.8); }
+.points-value { font-size: 56rpx; font-weight: bold; color: #fff; }
+
+.achievement-btn {
+  background: rgba(255,255,255,0.2);
+  border-radius: 32rpx;
+  padding: 12rpx 24rpx;
+}
+.achievement-text { font-size: 24rpx; color: #fff; }
+
+/* Achievements */
+.achievements-panel {
+  margin: 24rpx 32rpx;
+  background: #112228;
+  border-radius: 24rpx;
+  padding: 28rpx;
+}
+
+.panel-title { font-size: 30rpx; font-weight: 600; color: #fff; display: block; margin-bottom: 20rpx; }
+
+.achievement-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+}
+
+.achievement-item {
+  width: calc(33.33% - 12rpx);
+  text-align: center;
+  padding: 20rpx 12rpx;
+  background: #1a2a33;
+  border-radius: 16rpx;
+  opacity: 0.5;
+}
+
+.achievement-item.earned { opacity: 1; border: 2rpx solid #FF6B2C; }
+
+.achievement-icon { font-size: 48rpx; color: #999; display: block; margin-bottom: 8rpx; }
+.achievement-item.earned .achievement-icon { color: #FF6B2C; }
+.achievement-name { font-size: 24rpx; color: #fff; font-weight: 600; display: block; }
+.achievement-desc { font-size: 20rpx; color: #999; display: block; margin-top: 4rpx; }
+.achievement-reward { font-size: 20rpx; color: #FF6B2C; display: block; margin-top: 4rpx; }
+
+/* Category tabs */
+.category-tabs {
+  display: flex;
+  padding: 24rpx 32rpx;
+  gap: 20rpx;
+}
+
+.category-tab {
+  padding: 12rpx 32rpx;
+  border-radius: 32rpx;
+  background: #112228;
+  color: #999;
+  font-size: 26rpx;
+}
+
+.category-tab.active {
+  background: #FF6B2C;
+  color: #fff;
+  font-weight: 600;
+}
+
+/* Mall grid */
+.mall-grid {
+  display: flex;
+  flex-wrap: wrap;
+  padding: 0 32rpx;
+  gap: 20rpx;
+}
+
+.mall-item {
+  width: calc(50% - 10rpx);
+  background: #112228;
+  border-radius: 20rpx;
+  overflow: hidden;
+}
+
+.mall-img {
+  width: 100%;
+  height: 240rpx;
+}
+
+.mall-body {
+  padding: 16rpx;
+}
+
+.mall-name {
+  font-size: 26rpx;
+  font-weight: 600;
+  color: #fff;
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mall-desc {
+  font-size: 22rpx;
+  color: #999;
+  display: block;
+  margin-top: 6rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mall-bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 12rpx;
+}
+
+.mall-cost {
+  display: flex;
+  align-items: baseline;
+  gap: 4rpx;
+}
+
+.cost-value { font-size: 32rpx; font-weight: bold; color: #FF6B2C; }
+.cost-unit { font-size: 20rpx; color: #FF6B2C; }
+
+.mall-stock { font-size: 20rpx; color: #BA7517; }
+
+.redeem-btn {
+  background: #FF6B2C !important;
+  color: #fff !important;
+  font-size: 22rpx;
+  border-radius: 24rpx;
+  padding: 0 24rpx;
+  height: 52rpx;
+  line-height: 52rpx;
+  min-height: unset;
+}
+
+.redeem-btn.disabled { opacity: 0.4; }
+
+/* Empty */
+.loading-tip { text-align: center; padding: 80rpx 0; color: #999; font-size: 28rpx; }
+.empty-state { text-align: center; color: #999; font-size: 28rpx; padding: 120rpx 0; }
+
+/* Redeem confirm popup */
+.popup-mask {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 200;
+}
+
+.redeem-popup {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  background: #112228;
+  border-radius: 32rpx 32rpx 0 0;
+  padding: 40rpx 32rpx;
+  padding-bottom: calc(40rpx + env(safe-area-inset-bottom));
+  z-index: 201;
+  transform: translateY(100%);
+  transition: transform 300ms ease-out;
+}
+
+.redeem-popup.show { transform: translateY(0); }
+
+.redeem-title { font-size: 34rpx; font-weight: bold; color: #fff; display: block; text-align: center; margin-bottom: 28rpx; }
+.redeem-item-name { font-size: 30rpx; color: #ccc; display: block; text-align: center; margin-bottom: 32rpx; }
+
+.redeem-cost-row, .redeem-balance-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 16rpx 0;
+}
+
+.redeem-cost-label, .redeem-balance-label { font-size: 28rpx; color: #999; }
+.redeem-cost-value { font-size: 28rpx; color: #FF6B2C; font-weight: bold; }
+.redeem-balance-value { font-size: 28rpx; color: #fff; }
+
+.redeem-actions {
+  display: flex;
+  gap: 20rpx;
+  margin-top: 32rpx;
+}
+
+.cancel-btn {
+  flex: 1;
+  background: #1a2a33 !important;
+  color: #999 !important;
+  border-radius: 44rpx;
+  height: 88rpx;
+  line-height: 88rpx;
+}
+
+.confirm-redeem-btn {
+  flex: 1;
+  background: #FF6B2C !important;
+  color: #fff !important;
+  border-radius: 44rpx;
+  height: 88rpx;
+  line-height: 88rpx;
+}

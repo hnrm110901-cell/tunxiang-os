@@ -1,0 +1,142 @@
+.card {
+  display: flex;
+  gap: 12px;
+  padding: 12px;
+  background: var(--tx-bg-card);
+  border-radius: var(--tx-radius-md);
+  margin-bottom: 12px;
+  position: relative;
+  overflow: hidden;
+}
+
+.soldOut {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.imageWrap {
+  position: relative;
+  width: 110px;
+  height: 110px;
+  flex-shrink: 0;
+  border-radius: var(--tx-radius-sm);
+  overflow: hidden;
+}
+
+.image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.soldOutOverlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+  color: var(--tx-text-secondary);
+  font-size: var(--tx-font-sm);
+  font-weight: 600;
+}
+
+.tags {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.tag {
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  color: #fff;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.name {
+  font-size: var(--tx-font-md);
+  font-weight: 600;
+  color: var(--tx-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.desc {
+  font-size: var(--tx-font-xs);
+  color: var(--tx-text-tertiary);
+  margin-top: 4px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.allergens {
+  display: flex;
+  gap: 4px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+
+.bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: auto;
+  padding-top: 8px;
+}
+
+.priceRow {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.price {
+  font-size: var(--tx-font-lg);
+  font-weight: 700;
+  color: var(--tx-brand);
+}
+
+.memberPrice {
+  font-size: var(--tx-font-xs);
+  color: var(--tx-text-tertiary);
+  text-decoration: line-through;
+}
+
+.addBtn {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--tx-brand);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.plus {
+  font-size: 24px;
+  color: #fff;
+  line-height: 1;
+}
+
+.badge {
+  font-size: 14px;
+  color: #fff;
+  font-weight: 700;
+}

@@ -1,27 +1,55 @@
-<!-- 首页 — 门店 + 快捷入口 + 附近门店 -->
+<!-- Homepage -- 3-mode tabs + AI recommend + quick entries + GPS stores -->
 <view class="page-container">
-  <!-- 顶部门店信息 -->
+
+  <!-- Top: Store info + scan icon -->
   <view class="store-header">
     <view class="store-info">
       <text class="store-name">{{storeName || '屯象点餐'}}</text>
       <text class="store-address" wx:if="{{storeAddress}}">{{storeAddress}}</text>
     </view>
-    <view class="table-badge" wx:if="{{tableNo}}">
-      <text class="table-label">桌号</text>
-      <text class="table-no">{{tableNo}}</text>
+    <view class="header-actions">
+      <view class="table-badge" wx:if="{{tableNo}}">
+        <text class="table-label">桌号</text>
+        <text class="table-no">{{tableNo}}</text>
+      </view>
+      <view class="scan-btn" bindtap="startScan">
+        <text class="scan-icon">&#xe600;</text>
+      </view>
     </view>
   </view>
 
-  <!-- 快捷入口 -->
+  <!-- Mode tabs: Dine-in / Takeaway / Chef-at-home -->
+  <view class="mode-tabs">
+    <view class="mode-tab {{activeMode === item.key ? 'active' : ''}}"
+          wx:for="{{modes}}" wx:key="key"
+          bindtap="switchMode" data-mode="{{item.key}}">
+      <text>{{item.label}}</text>
+    </view>
+  </view>
+
+  <!-- Quick entries (4-grid) -->
   <view class="quick-entries">
     <view class="entry-item" wx:for="{{quickEntries}}" wx:key="label"
-          bindtap="goToEntry" data-route="{{item.route}}">
-      <view class="entry-icon">{{item.icon}}</view>
+          bindtap="goToEntry" data-route="{{item.route}}" data-type="{{item.type}}">
+      <view class="entry-icon-circle">
+        <image class="entry-icon-img" src="{{item.icon}}" mode="aspectFit" wx:if="{{item.icon && item.icon.indexOf('/') >= 0}}" />
+        <text class="entry-icon-emoji" wx:else>{{item.icon}}</text>
+      </view>
       <text class="entry-label">{{item.label}}</text>
     </view>
   </view>
 
-  <!-- 当前状态卡片（排队中/预订中） -->
+  <!-- Active order floating bar (like Luckin "制作中") -->
+  <view class="active-order-bar" wx:if="{{activeOrder}}" bindtap="goToActiveOrder">
+    <view class="active-order-left">
+      <view class="active-dot"></view>
+      <text class="active-text">{{activeOrder.statusText}}</text>
+      <text class="active-order-no">{{activeOrder.orderNo}}</text>
+    </view>
+    <text class="active-order-action">查看进度 ></text>
+  </view>
+
+  <!-- Current queue / booking status -->
   <view class="status-card" wx:if="{{currentQueue}}" bindtap="goToQueue">
     <view class="status-left">
       <text class="status-type">排队中</text>
@@ -38,7 +66,23 @@
     <text class="status-action">查看详情 ></text>
   </view>
 
-  <!-- 附近门店 -->
+  <!-- AI recommendations (horizontal scroll strip) -->
+  <ai-recommend
+    items="{{recommendations}}"
+    loading="{{loadingRecommendations}}"
+    title="猜你喜欢"
+    bind:add="onRecommendAdd"
+    bind:select="onRecommendSelect"
+  />
+
+  <!-- Big CTA: Start ordering -->
+  <view class="cta-section" wx:if="{{activeMode !== 'chef_home'}}">
+    <button class="cta-btn" bindtap="goToMenu">
+      {{activeMode === 'takeaway' ? '开始外卖点餐' : '开始点餐'}}
+    </button>
+  </view>
+
+  <!-- Nearby stores -->
   <view class="section">
     <text class="section-title">附近门店</text>
 
@@ -53,9 +97,12 @@
 
       <view class="store-card" wx:for="{{nearbyStores}}" wx:key="id"
             bindtap="goToStore" data-id="{{item.id}}">
+        <image class="store-card-img" wx:if="{{item.imageUrl}}"
+               src="{{item.imageUrl}}" mode="aspectFill" lazy-load />
         <view class="store-card-main">
           <text class="store-card-name">{{item.name}}</text>
           <text class="store-card-address">{{item.address}}</text>
+          <text class="store-card-hours" wx:if="{{item.businessHours}}">{{item.businessHours}}</text>
         </view>
         <view class="store-card-right">
           <text class="store-card-distance" wx:if="{{item.distance}}">{{item.distance}}</text>

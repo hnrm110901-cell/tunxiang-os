@@ -101,7 +101,16 @@ type ModalType =
   | 'daily-limit'     // 限量设置
   | 'change-waiter'   // 修改点菜员
   | 'kds-status'      // 出餐进度
-  | 'checkout';       // 快捷结账
+  | 'checkout'        // 快捷结账
+  | 'pre-bill'        // 埋单
+  | 'fire-kitchen'    // 起菜
+  | 'mark-served'     // 上菜/划菜
+  | 'price-override'  // 菜品变价
+  | 'item-transfer'   // 单品转台
+  | 'verify-receipt'  // 核对单据
+  | 'print-receipt'   // 打印客单
+  | 'kitchen-msg'     // 后厨通知
+  | 'pay-transfer';   // 转账
 
 /* ---------- 组件 ---------- */
 export function OrderPage() {
@@ -160,6 +169,32 @@ export function OrderPage() {
   // 结账
   const [checkoutProcessing, setCheckoutProcessing] = useState(false);
   const [checkoutDone, setCheckoutDone] = useState(false);
+
+  // 埋单
+  const [preBillData, setPreBillData] = useState<{
+    items: { item_name: string; quantity: number; unit_price_fen: number; subtotal_fen: number; is_gift: boolean }[];
+    subtotal_fen: number; discount_fen: number; service_charge_fen: number; total_fen: number;
+  } | null>(null);
+
+  // 上菜/划菜
+  const [servedItems, setServedItems] = useState<Record<string, boolean>>({});
+
+  // 菜品变价
+  const [priceOverrideItemId, setPriceOverrideItemId] = useState('');
+  const [priceOverrideValue, setPriceOverrideValue] = useState('');
+
+  // 单品转台
+  const [transferItemId, setTransferItemId] = useState('');
+  const [transferTargetTable, setTransferTargetTable] = useState('');
+
+  // 后厨通知
+  const [kitchenMsg, setKitchenMsg] = useState('');
+  const [kitchenMsgSent, setKitchenMsgSent] = useState(false);
+
+  // 转账
+  const [paySourceOrder, setPaySourceOrder] = useState('');
+  const [payTargetOrder, setPayTargetOrder] = useState('');
+  const [payPaymentId, setPayPaymentId] = useState('');
 
   const filteredDishes = useMemo(
     () => DISHES.filter(d => d.catId === activeCat),
@@ -249,30 +284,71 @@ export function OrderPage() {
     else addToCartSimple({ id: rec.id, name: rec.name, catId: '', priceFen: rec.priceFen, tags: [], soldOut: false, isMarketPrice: false, isWeighed: false, specs: [] });
   }, []);
 
-  /* 更多操作菜单项 */
-  const MORE_OPS = [
-    { key: 'edit-table' as ModalType, label: '修改开台', desc: '修改人数/服务员', icon: 'E' },
-    { key: 'verify-coupon' as ModalType, label: '聚合验券', desc: '美团/抖音/点评', icon: 'V' },
-    { key: 'copy-dishes' as ModalType, label: '复制菜品', desc: '从历史订单复制', icon: 'C' },
-    { key: 'transfer' as ModalType, label: '换台', desc: '当前桌转移', icon: 'T' },
-    { key: 'sold-out-mgmt' as ModalType, label: '沽清管理', desc: '标记售罄/恢复', icon: 'S' },
-    { key: 'daily-limit' as ModalType, label: '限量设置', desc: '每日限量配置', icon: 'L' },
-    { key: 'change-waiter' as ModalType, label: '修改点菜员', desc: '更换服务员', icon: 'W' },
-    { key: 'refresh' as ModalType, label: '刷新状态', desc: '同步沽清/限量', icon: 'R' },
+  /* 更多操作菜单项 — 5x5 网格，对标天财商龙 */
+  const MORE_OPS: { key: string; label: string; icon: string; color?: string }[] = [
+    // Row 1
+    { key: '_add-item', label: '加单', icon: '+' },
+    { key: 'checkout', label: '结算', icon: '$', color: C.green },
+    { key: 'pre-bill', label: '埋单', icon: 'B' },
+    { key: 'fire-kitchen', label: '起菜', icon: 'F', color: C.warning },
+    { key: 'mark-served', label: '上菜', icon: 'S', color: C.green },
+    // Row 2
+    { key: 'sold-out-mgmt', label: '停菜', icon: 'X', color: C.danger },
+    { key: 'price-override', label: '菜品变价', icon: 'P' },
+    { key: '_weigh', label: '称重', icon: 'W' },
+    { key: '_gift', label: '赠单', icon: 'G' },
+    { key: '_return', label: '退单', icon: 'R', color: C.danger },
+    // Row 3
+    { key: '_rush', label: '催单', icon: '!' , color: C.warning },
+    { key: 'edit-table', label: '修改开台', icon: 'E' },
+    { key: 'item-transfer', label: '单品转台', icon: 'T' },
+    { key: '_table-transfer', label: '换台', icon: 'H' },
+    { key: '_close-table', label: '关台', icon: 'C' },
+    // Row 4
+    { key: 'verify-receipt', label: '核对单据', icon: 'V' },
+    { key: 'print-receipt', label: '打印客单', icon: 'L' },
+    { key: 'verify-coupon', label: '验证会员', icon: 'M' },
+    { key: 'kitchen-msg', label: '后厨通知', icon: 'K', color: C.info },
+    { key: 'pay-transfer', label: '转账', icon: 'Z' },
+    // Row 5
+    { key: '_merge', label: '并账', icon: 'J' },
+    { key: 'sold-out-mgmt', label: '沽清管理', icon: 'Q' },
+    { key: 'daily-limit', label: '限量设置', icon: 'D' },
+    { key: 'change-waiter', label: '修改点菜员', icon: 'W' },
+    { key: '_refresh', label: '刷新状态', icon: 'R' },
   ];
 
-  const handleMoreOpsSelect = (key: ModalType | string) => {
-    if (key === 'transfer') {
+  const handleMoreOpsSelect = (key: string) => {
+    // 快捷跳转类(前缀 _ 表示不走弹窗)
+    if (key === '_add-item') { setActiveModal('none'); setShowCart(true); return; }
+    if (key === '_table-transfer') { setActiveModal('none'); navigate('/table-ops'); return; }
+    if (key === '_close-table') { setActiveModal('none'); navigate('/table-ops?action=close'); return; }
+    if (key === '_merge') { setActiveModal('none'); navigate('/table-ops?action=merge'); return; }
+    if (key === '_rush') { setActiveModal('none'); alert('已催单'); return; }
+    if (key === '_weigh') { setActiveModal('none'); alert('请将菜品放上电子秤'); return; }
+    if (key === '_gift') { setActiveModal('none'); alert('请在购物车中标记赠送'); return; }
+    if (key === '_return') { setActiveModal('none'); navigate(`/return?order_id=${orderId}`); return; }
+    if (key === '_refresh') {
       setActiveModal('none');
-      navigate('/table-ops');
-      return;
-    }
-    if (key === 'refresh') {
-      setActiveModal('none');
-      // TODO: 实际调用 refreshDishStatus API
+      // TODO: 调用 refreshDishStatus API
       alert('菜品状态已刷新');
       return;
     }
+    // 埋单加载数据
+    if (key === 'pre-bill') {
+      setPreBillData({
+        items: cart.map(i => ({
+          item_name: i.name, quantity: i.qty,
+          unit_price_fen: i.priceFen,
+          subtotal_fen: i.priceFen * i.qty * (i.weight || 1),
+          is_gift: false,
+        })),
+        subtotal_fen: cartTotal, discount_fen: 0,
+        service_charge_fen: 0, total_fen: cartTotal,
+      });
+    }
+    // 后厨通知重置
+    if (key === 'kitchen-msg') { setKitchenMsg(''); setKitchenMsgSent(false); }
     setActiveModal(key as ModalType);
   };
 
@@ -785,36 +861,39 @@ export function OrderPage() {
         </div>
       )}
 
-      {/* ===== A. 更多操作弹出菜单(8个快捷操作) ===== */}
+      {/* ===== A. 更多操作弹出菜单(5x5网格，对标天财) ===== */}
       {renderOverlay(activeModal === 'more-ops', () => setActiveModal('none'), (
         <>
-          <h3 style={{ fontSize: 20, fontWeight: 700, color: C.white, margin: '0 0 16px' }}>
-            更多操作
+          <h3 style={{ fontSize: 20, fontWeight: 700, color: C.white, margin: '0 0 12px' }}>
+            操作面板
           </h3>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-            {MORE_OPS.map(op => (
+          <div style={{
+            display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 8,
+          }}>
+            {MORE_OPS.map((op, idx) => (
               <button
-                key={op.key}
+                key={`${op.key}-${idx}`}
                 onClick={() => handleMoreOpsSelect(op.key)}
                 style={{
-                  minHeight: 72, padding: 14, borderRadius: 12,
+                  minHeight: 56, padding: '8px 4px', borderRadius: 10,
                   background: C.card, border: `1px solid ${C.border}`,
-                  cursor: 'pointer', textAlign: 'left',
-                  display: 'flex', alignItems: 'center', gap: 12,
+                  cursor: 'pointer',
+                  display: 'flex', flexDirection: 'column',
+                  alignItems: 'center', justifyContent: 'center', gap: 4,
                 }}
               >
                 <span style={{
-                  width: 44, height: 44, borderRadius: 10,
-                  background: `${C.accent}22`, color: C.accent,
+                  width: 32, height: 32, borderRadius: 8,
+                  background: `${op.color || C.accent}22`,
+                  color: op.color || C.accent,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 18, fontWeight: 700, flexShrink: 0,
+                  fontSize: 16, fontWeight: 700, flexShrink: 0,
                 }}>
                   {op.icon}
                 </span>
-                <div>
-                  <div style={{ fontSize: 16, fontWeight: 600, color: C.white }}>{op.label}</div>
-                  <div style={{ fontSize: 16, color: C.muted }}>{op.desc}</div>
-                </div>
+                <span style={{ fontSize: 16, fontWeight: 600, color: C.white, textAlign: 'center', lineHeight: '1.2' }}>
+                  {op.label}
+                </span>
               </button>
             ))}
           </div>

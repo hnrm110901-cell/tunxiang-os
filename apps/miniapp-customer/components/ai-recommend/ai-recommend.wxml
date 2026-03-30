@@ -1,0 +1,37 @@
+<!-- AI Recommend -- 4-grid personalized recommendations -->
+<view class="ai-recommend" wx:if="{{displayItems.length > 0 || loading}}">
+  <!-- Title row -->
+  <view class="recommend-header">
+    <view class="recommend-title-row">
+      <view class="ai-badge" wx:if="{{showAiBadge}}">AI</view>
+      <text class="recommend-title">{{title}}</text>
+    </view>
+    <text class="recommend-subtitle">基于已选菜品智能搭配</text>
+  </view>
+
+  <!-- Loading -->
+  <view class="recommend-loading" wx:if="{{loading}}">
+    <text class="loading-text">正在为你推荐...</text>
+  </view>
+
+  <!-- 4-grid layout -->
+  <view class="recommend-grid" wx:if="{{!loading && displayItems.length > 0}}">
+    <view class="recommend-card" wx:for="{{displayItems}}" wx:key="dish_id"
+          bindtap="onTapItem" data-item="{{item}}">
+      <image class="recommend-img"
+             src="{{item.image_url || '/assets/dish-placeholder.png'}}"
+             mode="aspectFill" lazy-load />
+      <view class="recommend-body">
+        <text class="recommend-name">{{item.dish_name || item.name}}</text>
+        <text class="recommend-reason" wx:if="{{item.reason}}">{{item.reason}}</text>
+        <text class="recommend-orders" wx:if="{{item.order_count}}">{{item.order_count}}人点过</text>
+        <view class="recommend-bottom">
+          <text class="recommend-price" wx:if="{{item.price_fen}}">
+            ¥{{(item.price_fen / 100).toFixed(0)}}
+          </text>
+          <view class="recommend-add-btn" catchtap="onTapAdd" data-item="{{item}}">+</view>
+        </view>
+      </view>
+    </view>
+  </view>
+</view>

@@ -144,3 +144,180 @@ export async function getOrderKdsStatus(
 ): Promise<{ items: OrderKdsItem[] }> {
   return txFetch(`/api/v1/scan-order/status/${encodeURIComponent(orderId)}`);
 }
+
+// ═══════════════════════════════════════════════
+// 以下 9 个 API：补齐天财商龙移动收银台缺失功能
+// ═══════════════════════════════════════════════
+
+// ─── 类型（新增） ───
+
+export interface PreBillItem {
+  item_name: string;
+  quantity: number;
+  unit_price_fen: number;
+  subtotal_fen: number;
+  notes: string | null;
+  is_gift: boolean;
+}
+
+export interface PreBillResult {
+  order_id: string;
+  order_no: string;
+  table_no: string | null;
+  items: PreBillItem[];
+  subtotal_fen: number;
+  discount_fen: number;
+  service_charge_fen: number;
+  total_fen: number;
+  guest_count: number | null;
+}
+
+export interface FireResult {
+  order_id: string;
+  fired_count: number;
+  items: string[];
+}
+
+export interface MarkServedResult {
+  order_id: string;
+  item_id: string;
+  item_name: string;
+  served_at: string;
+}
+
+export interface PriceOverrideResult {
+  order_id: string;
+  item_id: string;
+  item_name: string;
+  old_price_fen: number;
+  new_price_fen: number;
+  new_subtotal_fen: number;
+  new_order_total_fen: number;
+}
+
+export interface TransferItemResult {
+  order_id: string;
+  item_id: string;
+  item_name: string;
+  target_table_no: string;
+  target_order_id: string;
+}
+
+export interface PrintResult {
+  order_id: string;
+  order_no: string;
+  printed: boolean;
+  receipt_size_bytes: number;
+}
+
+export interface KitchenMessageResult {
+  message_id: string;
+  message: string;
+  table_no: string;
+  sent_at: string;
+}
+
+export interface TransferPaymentResult {
+  payment_id: string;
+  source_order_id: string;
+  target_order_id: string;
+  transferred: boolean;
+}
+
+// ─── 10. 埋单(Pre-bill) ───
+
+export async function preBill(orderId: string): Promise<PreBillResult> {
+  return txFetch(`/api/v1/mobile/orders/${encodeURIComponent(orderId)}/pre-bill`, {
+    method: 'POST',
+  });
+}
+
+// ─── 11. 起菜(Fire to Kitchen) ───
+
+export async function fireToKitchen(orderId: string): Promise<FireResult> {
+  return txFetch(`/api/v1/mobile/orders/${encodeURIComponent(orderId)}/fire`, {
+    method: 'POST',
+  });
+}
+
+// ─── 12. 上菜/划菜(Mark Served) ───
+
+export async function markItemServed(
+  orderId: string,
+  itemId: string,
+): Promise<MarkServedResult> {
+  return txFetch(
+    `/api/v1/mobile/orders/${encodeURIComponent(orderId)}/items/${encodeURIComponent(itemId)}/served`,
+    { method: 'PUT' },
+  );
+}
+
+// ─── 13. 菜品变价(Price Override) ───
+
+export async function overrideItemPrice(
+  orderId: string,
+  itemId: string,
+  newPriceFen: number,
+  reason?: string,
+): Promise<PriceOverrideResult> {
+  return txFetch(
+    `/api/v1/mobile/orders/${encodeURIComponent(orderId)}/items/${encodeURIComponent(itemId)}/price`,
+    {
+      method: 'PUT',
+      body: JSON.stringify({ new_price_fen: newPriceFen, reason: reason || '' }),
+    },
+  );
+}
+
+// ─── 14. 单品转台(Transfer Single Item) ───
+
+export async function transferSingleItem(
+  orderId: string,
+  itemId: string,
+  targetTableNo: string,
+): Promise<TransferItemResult> {
+  return txFetch(
+    `/api/v1/mobile/orders/${encodeURIComponent(orderId)}/items/${encodeURIComponent(itemId)}/transfer`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ target_table_no: targetTableNo }),
+    },
+  );
+}
+
+// ─── 15. 打印客单(Print Receipt from Mobile) ───
+
+export async function printOrderReceipt(orderId: string): Promise<PrintResult> {
+  return txFetch(`/api/v1/mobile/orders/${encodeURIComponent(orderId)}/print`, {
+    method: 'POST',
+  });
+}
+
+// ─── 16. 后厨通知(Kitchen Message) ───
+
+export async function sendKitchenMessage(
+  message: string,
+  tableNo?: string,
+): Promise<KitchenMessageResult> {
+  return txFetch('/api/v1/mobile/kds/message', {
+    method: 'POST',
+    body: JSON.stringify({ message, table_no: tableNo || '' }),
+  });
+}
+
+// ─── 17. 转账(Transfer Payment) ───
+
+export async function transferPayment(
+  sourceOrderId: string,
+  targetOrderId: string,
+  paymentId: string,
+): Promise<TransferPaymentResult> {
+  return txFetch('/api/v1/mobile/payments/transfer', {
+    method: 'POST',
+    body: JSON.stringify({
+      source_order_id: sourceOrderId,
+      target_order_id: targetOrderId,
+      payment_id: paymentId,
+    }),
+  });
+}

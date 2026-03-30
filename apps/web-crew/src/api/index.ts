@@ -30,9 +30,14 @@ export {
   updateTableInfo, verifyPlatformCoupon, copyDishesFromOrder,
   setDishAvailability, setDishDailyLimit, updateOrderWaiter,
   refreshDishStatus, getAIRecommendations, getOrderKdsStatus,
+  preBill, fireToKitchen, markItemServed, overrideItemPrice,
+  transferSingleItem, printOrderReceipt, sendKitchenMessage, transferPayment,
 } from './mobileOpsApi';
 export type {
   DishStatusItem, AIRecommendation, OrderKdsItem, PlatformCouponResult,
+  PreBillItem, PreBillResult, FireResult, MarkServedResult,
+  PriceOverrideResult, TransferItemResult, PrintResult,
+  KitchenMessageResult, TransferPaymentResult,
 } from './mobileOpsApi';
 export { fetchTables, openTable as openTableV2, clearTable as clearTableV2, transferTable as transferTableV2, mergeTables as mergeTablesV2, reserveTable } from './tablesApi';
 export { searchMember as searchMemberV2, getMemberDetail, bindMemberToOrder as bindMemberV2, fetchMemberRecommendations, deductPoints } from './memberApi';

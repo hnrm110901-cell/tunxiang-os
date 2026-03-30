@@ -34,6 +34,24 @@
         "confirm",
         "status"
       ]
+    },
+    {
+      "root": "pages/order-track",
+      "pages": [
+        "order-track"
+      ]
+    },
+    {
+      "root": "pages/points-mall",
+      "pages": [
+        "points-mall"
+      ]
+    },
+    {
+      "root": "pages/social",
+      "pages": [
+        "social"
+      ]
     }
   ],
   "window": {

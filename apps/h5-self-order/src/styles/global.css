@@ -1,0 +1,129 @@
+/* ============================================================
+   屯象 H5 自助点餐 — 全局样式
+   深色主题 #0A0A0A | 品牌色 #FF6B2C | 移动端优先 375-428px
+   ============================================================ */
+
+:root {
+  /* 品牌色 */
+  --tx-brand: #FF6B2C;
+  --tx-brand-hover: #FF8555;
+  --tx-brand-active: #E55A1E;
+  --tx-brand-light: rgba(255, 107, 44, 0.12);
+
+  /* 深色主题 */
+  --tx-bg-primary: #0A0A0A;
+  --tx-bg-secondary: #141414;
+  --tx-bg-tertiary: #1E1E1E;
+  --tx-bg-card: #1A1A1A;
+  --tx-bg-overlay: rgba(0, 0, 0, 0.7);
+
+  /* 文字 */
+  --tx-text-primary: #F5F5F5;
+  --tx-text-secondary: #A0A0A0;
+  --tx-text-tertiary: #666666;
+  --tx-text-inverse: #0A0A0A;
+
+  /* 语义色 */
+  --tx-success: #22C55E;
+  --tx-warning: #F59E0B;
+  --tx-danger: #EF4444;
+  --tx-info: #3B82F6;
+
+  /* 间距 */
+  --tx-space-xs: 4px;
+  --tx-space-sm: 8px;
+  --tx-space-md: 16px;
+  --tx-space-lg: 24px;
+  --tx-space-xl: 32px;
+
+  /* 圆角 */
+  --tx-radius-sm: 6px;
+  --tx-radius-md: 12px;
+  --tx-radius-lg: 16px;
+  --tx-radius-full: 999px;
+
+  /* 字号 */
+  --tx-font-xs: 12px;
+  --tx-font-sm: 14px;
+  --tx-font-md: 16px;
+  --tx-font-lg: 18px;
+  --tx-font-xl: 22px;
+  --tx-font-xxl: 28px;
+
+  /* 安全区 */
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+html, body {
+  overscroll-behavior: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* 触控优化：所有可点击元素最小 44x44 */
+button, a, [role="button"] {
+  min-height: 44px;
+  min-width: 44px;
+  touch-action: manipulation;
+}
+
+button {
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-family: inherit;
+  color: inherit;
+}
+
+input, textarea {
+  -webkit-appearance: none;
+  appearance: none;
+  border: none;
+  outline: none;
+  font-family: inherit;
+}
+
+img {
+  display: block;
+  max-width: 100%;
+}
+
+/* 滚动条隐藏 */
+::-webkit-scrollbar {
+  display: none;
+}
+
+/* 按压反馈动画 */
+.tx-pressable {
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+.tx-pressable:active {
+  transform: scale(0.97);
+  opacity: 0.85;
+}
+
+/* 脉冲动画 */
+@keyframes tx-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+.tx-pulse {
+  animation: tx-pulse 1.5s infinite;
+}
+
+/* 滑入动画 */
+@keyframes tx-slide-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+.tx-slide-up {
+  animation: tx-slide-up 0.3s ease-out;
+}
+
+/* 淡入动画 */
+@keyframes tx-fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.tx-fade-in {
+  animation: tx-fade-in 0.25s ease-out;
+}

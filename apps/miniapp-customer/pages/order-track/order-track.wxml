@@ -1,0 +1,61 @@
+<!-- Order Tracking -- real-time cooking progress -->
+<view class="page-container">
+  <!-- Header -->
+  <view class="track-header">
+    <view class="track-header-top">
+      <text class="track-title">订单进度</text>
+      <text class="track-order-no" wx:if="{{orderNo}}">{{orderNo}}</text>
+    </view>
+    <text class="track-store" wx:if="{{storeName}}">{{storeName}} {{tableNo ? '· ' + tableNo + '号桌' : ''}}</text>
+  </view>
+
+  <!-- Progress tracker -->
+  <order-progress
+    steps="{{steps}}"
+    currentStep="{{currentStep}}"
+    remainingSeconds="{{remainingSeconds}}"
+    estimatedReadyAt="{{estimatedReadyAt}}"
+    showRush="{{canRush}}"
+    bind:rush="onRush"
+  />
+
+  <!-- Rush cooldown notice -->
+  <view class="rush-cooldown" wx:if="{{!canRush && rushCooldown > 0}}">
+    <text class="cooldown-text">{{rushCooldown}}秒后可再次催菜</text>
+  </view>
+
+  <!-- Order items -->
+  <view class="items-section">
+    <text class="section-title">订单详情</text>
+    <view class="order-item" wx:for="{{items}}" wx:key="name">
+      <image class="item-img" wx:if="{{item.imageUrl}}" src="{{item.imageUrl}}" mode="aspectFill" lazy-load />
+      <view class="item-info">
+        <text class="item-name">{{item.name}}</text>
+        <text class="item-qty">x{{item.quantity}}</text>
+      </view>
+      <text class="item-price">¥{{item.priceYuan}}</text>
+    </view>
+
+    <view class="order-total">
+      <text class="total-label">合计</text>
+      <text class="total-value">¥{{totalYuan}}</text>
+    </view>
+  </view>
+
+  <!-- Append items button -->
+  <view class="append-section" wx:if="{{canAppend}}">
+    <button class="append-btn" bindtap="goToAppend">+ 加菜</button>
+  </view>
+
+  <!-- Order info -->
+  <view class="info-section">
+    <view class="info-row">
+      <text class="info-label">下单时间</text>
+      <text class="info-value">{{createdAt}}</text>
+    </view>
+    <view class="info-row">
+      <text class="info-label">订单编号</text>
+      <text class="info-value">{{orderNo}}</text>
+    </view>
+  </view>
+</view>
