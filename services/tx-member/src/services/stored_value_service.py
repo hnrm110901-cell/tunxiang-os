@@ -39,6 +39,10 @@ class PlanNotFoundError(Exception):
     pass
 
 
+class TransferNotAllowedError(Exception):
+    pass
+
+
 class StoredValueService:
     """储值卡核心服务"""
 
@@ -665,6 +669,306 @@ class StoredValueService:
 
         logger.info("stored_value_create_plan", plan_id=str(plan.id), name=name)
         return _plan_to_dict(plan)
+
+    # ──────────────────────────────────────────────────────────────
+    # 直接充值（按 card_id + 金额，不走套餐）
+    # ──────────────────────────────────────────────────────────────
+
+    async def recharge_direct(
+        self,
+        db: AsyncSession,
+        card_id: uuid.UUID,
+        amount_fen: int,
+        tenant_id: uuid.UUID,
+        gift_amount_fen: int = 0,
+        operator_id: uuid.UUID | None = None,
+        store_id: uuid.UUID | None = None,
+        remark: str | None = None,
+    ) -> dict:
+        """直接充值（按 card_id + 金额）— 支持满赠逻辑，不走套餐匹配。
+
+        满赠逻辑由调用方计算并通过 gift_amount_fen 传入。
+        """
+        from models.stored_value import StoredValueCard, StoredValueTransaction
+
+        if amount_fen <= 0:
+            raise ValueError("充值金额必须大于0")
+        if gift_amount_fen < 0:
+            raise ValueError("赠送金额不能为负")
+
+        card = await self._get_card_by_id_for_update(db, card_id, tenant_id)
+        _check_card_active_and_not_expired(card)
+
+        card.main_balance_fen += amount_fen
+        card.gift_balance_fen += gift_amount_fen
+        card.balance_fen = card.main_balance_fen + card.gift_balance_fen
+        card.total_recharged_fen += amount_fen
+
+        total_fen = amount_fen + gift_amount_fen
+        auto_remark = remark or (
+            f"充值{amount_fen / 100:.2f}元"
+            + (f"，赠送{gift_amount_fen / 100:.2f}元" if gift_amount_fen else "")
+        )
+
+        txn = StoredValueTransaction(
+            id=uuid.uuid4(),
+            tenant_id=tenant_id,
+            card_id=card.id,
+            customer_id=card.customer_id,
+            txn_type="recharge",
+            amount_fen=total_fen,
+            main_amount_fen=amount_fen,
+            gift_amount_fen=gift_amount_fen,
+            balance_after_fen=card.balance_fen,
+            gift_balance_after_fen=card.gift_balance_fen,
+            operator_id=operator_id,
+            store_id=store_id,
+            remark=auto_remark,
+        )
+        db.add(txn)
+
+        logger.info(
+            "stored_value_recharge_direct",
+            card_id=str(card_id),
+            amount=amount_fen,
+            gift=gift_amount_fen,
+        )
+        return _txn_to_dict(txn)
+
+    # ──────────────────────────────────────────────────────────────
+    # 直接退款（按 card_id + 金额）
+    # ──────────────────────────────────────────────────────────────
+
+    async def refund_direct(
+        self,
+        db: AsyncSession,
+        card_id: uuid.UUID,
+        amount_fen: int,
+        tenant_id: uuid.UUID,
+        order_id: uuid.UUID | None = None,
+        operator_id: uuid.UUID | None = None,
+        remark: str | None = None,
+    ) -> dict:
+        """直接退款（仅退本金）— 按 card_id，不验证原始流水。"""
+        from models.stored_value import StoredValueCard, StoredValueTransaction
+
+        if amount_fen <= 0:
+            raise ValueError("退款金额必须大于0")
+
+        card = await self._get_card_by_id_for_update(db, card_id, tenant_id)
+
+        card.main_balance_fen += amount_fen
+        card.balance_fen = card.main_balance_fen + card.gift_balance_fen
+        card.total_refunded_fen += amount_fen
+
+        txn = StoredValueTransaction(
+            id=uuid.uuid4(),
+            tenant_id=tenant_id,
+            card_id=card.id,
+            customer_id=card.customer_id,
+            txn_type="refund",
+            amount_fen=amount_fen,
+            main_amount_fen=amount_fen,
+            gift_amount_fen=0,
+            balance_after_fen=card.balance_fen,
+            gift_balance_after_fen=card.gift_balance_fen,
+            order_id=order_id,
+            operator_id=operator_id,
+            remark=remark or f"退款{amount_fen / 100:.2f}元（仅退本金）",
+        )
+        db.add(txn)
+
+        logger.info("stored_value_refund_direct", card_id=str(card_id), amount=amount_fen)
+        return _txn_to_dict(txn)
+
+    # ──────────────────────────────────────────────────────────────
+    # 余额转赠
+    # ──────────────────────────────────────────────────────────────
+
+    async def transfer(
+        self,
+        db: AsyncSession,
+        from_card_id: uuid.UUID,
+        to_card_id: uuid.UUID,
+        amount_fen: int,
+        tenant_id: uuid.UUID,
+        operator_id: uuid.UUID | None = None,
+        remark: str | None = None,
+    ) -> dict:
+        """余额转赠 — 从 from_card 转入 to_card（同一租户内，仅转本金）
+
+        并发安全：对两张卡同时加行锁（按 UUID 排序防死锁）。
+        仅转本金余额，不转赠送余额。
+        """
+        from models.stored_value import StoredValueCard, StoredValueTransaction
+
+        if amount_fen <= 0:
+            raise ValueError("转赠金额必须大于0")
+        if from_card_id == to_card_id:
+            raise ValueError("不能向自己转赠")
+
+        # 按 UUID 固定加锁顺序防死锁
+        id_a, id_b = sorted([from_card_id, to_card_id])
+
+        result_a = await db.execute(
+            select(StoredValueCard)
+            .where(
+                StoredValueCard.id == id_a,
+                StoredValueCard.tenant_id == tenant_id,
+                StoredValueCard.is_deleted.is_(False),
+            )
+            .with_for_update()
+        )
+        card_a = result_a.scalar_one_or_none()
+        if not card_a:
+            raise ValueError(f"储值卡不存在: {id_a}")
+
+        result_b = await db.execute(
+            select(StoredValueCard)
+            .where(
+                StoredValueCard.id == id_b,
+                StoredValueCard.tenant_id == tenant_id,
+                StoredValueCard.is_deleted.is_(False),
+            )
+            .with_for_update()
+        )
+        card_b = result_b.scalar_one_or_none()
+        if not card_b:
+            raise ValueError(f"储值卡不存在: {id_b}")
+
+        # 根据排序结果确定哪张是 from / to
+        from_card = card_a if card_a.id == from_card_id else card_b
+        to_card = card_b if card_b.id == to_card_id else card_a
+
+        _check_card_active_and_not_expired(from_card)
+        _check_card_active_and_not_expired(to_card)
+
+        if from_card.main_balance_fen < amount_fen:
+            raise InsufficientBalanceError(
+                f"本金余额不足以转赠：可用{from_card.main_balance_fen / 100:.2f}元"
+                f"，需{amount_fen / 100:.2f}元"
+            )
+
+        # 扣出
+        from_card.main_balance_fen -= amount_fen
+        from_card.balance_fen = from_card.main_balance_fen + from_card.gift_balance_fen
+
+        # 转入
+        to_card.main_balance_fen += amount_fen
+        to_card.balance_fen = to_card.main_balance_fen + to_card.gift_balance_fen
+
+        transfer_remark = remark or f"余额转赠 {amount_fen / 100:.2f}元"
+
+        out_txn = StoredValueTransaction(
+            id=uuid.uuid4(),
+            tenant_id=tenant_id,
+            card_id=from_card.id,
+            customer_id=from_card.customer_id,
+            txn_type="transfer_out",
+            amount_fen=-amount_fen,
+            main_amount_fen=-amount_fen,
+            gift_amount_fen=0,
+            balance_after_fen=from_card.balance_fen,
+            gift_balance_after_fen=from_card.gift_balance_fen,
+            operator_id=operator_id,
+            remark=f"{transfer_remark} → 卡{to_card_id}",
+        )
+        in_txn = StoredValueTransaction(
+            id=uuid.uuid4(),
+            tenant_id=tenant_id,
+            card_id=to_card.id,
+            customer_id=to_card.customer_id,
+            txn_type="transfer_in",
+            amount_fen=amount_fen,
+            main_amount_fen=amount_fen,
+            gift_amount_fen=0,
+            balance_after_fen=to_card.balance_fen,
+            gift_balance_after_fen=to_card.gift_balance_fen,
+            operator_id=operator_id,
+            remark=f"{transfer_remark} ← 卡{from_card_id}",
+        )
+        db.add(out_txn)
+        db.add(in_txn)
+
+        logger.info(
+            "stored_value_transfer",
+            from_card_id=str(from_card_id),
+            to_card_id=str(to_card_id),
+            amount=amount_fen,
+        )
+        return {
+            "from_card_id": str(from_card_id),
+            "to_card_id": str(to_card_id),
+            "amount_fen": amount_fen,
+            "from_balance_fen": from_card.balance_fen,
+            "to_balance_fen": to_card.balance_fen,
+            "out_txn_id": str(out_txn.id),
+            "in_txn_id": str(in_txn.id),
+        }
+
+    # ──────────────────────────────────────────────────────────────
+    # 批量过期处理
+    # ──────────────────────────────────────────────────────────────
+
+    async def process_expiry_batch(
+        self,
+        db: AsyncSession,
+        tenant_id: uuid.UUID,
+    ) -> dict:
+        """批量处理到期账户（夜批调用）
+
+        逻辑：
+        1. 查找 expiry_date <= 今天 且 status=active 的卡 → 冻结
+        2. 返回处理汇总（冻结数量）
+
+        通知（发 NOTIFY 事件到 pg_notify）由调用方或 worker 负责发送。
+        """
+        from models.stored_value import StoredValueCard, StoredValueTransaction
+
+        today = datetime.now(timezone.utc).date()
+
+        expired_result = await db.execute(
+            select(StoredValueCard)
+            .where(
+                StoredValueCard.tenant_id == tenant_id,
+                StoredValueCard.status == "active",
+                StoredValueCard.expiry_date.isnot(None),
+                StoredValueCard.expiry_date <= today,
+                StoredValueCard.is_deleted.is_(False),
+            )
+            .with_for_update(skip_locked=True)
+        )
+        expired_cards = expired_result.scalars().all()
+
+        frozen_count = 0
+        for card in expired_cards:
+            card.status = "expired"
+            txn = StoredValueTransaction(
+                id=uuid.uuid4(),
+                tenant_id=tenant_id,
+                card_id=card.id,
+                customer_id=card.customer_id,
+                txn_type="freeze",
+                amount_fen=0,
+                main_amount_fen=0,
+                gift_amount_fen=0,
+                balance_after_fen=card.balance_fen,
+                gift_balance_after_fen=card.gift_balance_fen,
+                remark=f"到期自动冻结（expiry_date={card.expiry_date}）",
+            )
+            db.add(txn)
+            frozen_count += 1
+
+        logger.info(
+            "stored_value_expiry_batch",
+            tenant_id=str(tenant_id),
+            frozen_count=frozen_count,
+        )
+        return {
+            "tenant_id": str(tenant_id),
+            "frozen_count": frozen_count,
+            "processed_at": datetime.now(timezone.utc).isoformat(),
+        }
 
     # ──────────────────────────────────────────────────────────────
     # 冻结 / 解冻

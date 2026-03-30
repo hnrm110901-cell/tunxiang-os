@@ -1,21 +1,36 @@
 """储值卡 API 路由
 
-端点列表：
+# ROUTER REGISTRATION (在 tx-member/src/main.py 中添加):
+# from .api.stored_value_routes import router as stored_value_router
+# app.include_router(stored_value_router)
+
+端点列表（v2 账户维度）：
+  POST   /api/v1/member/stored-value/accounts/{member_id}/recharge   充值（按会员ID）
+  POST   /api/v1/member/stored-value/accounts/{card_id}/consume      消费核销
+  POST   /api/v1/member/stored-value/accounts/{card_id}/refund       退款
+  POST   /api/v1/member/stored-value/accounts/{card_id}/transfer     余额转赠
+  GET    /api/v1/member/stored-value/accounts/{card_id}/balance      余额查询
+  GET    /api/v1/member/stored-value/accounts/{card_id}/transactions 流水记录
+  POST   /api/v1/member/stored-value/batch/process-expiry            触发过期批处理
+
+端点列表（v2 卡维度，已有）：
   POST   /api/v1/member/stored-value/cards                  开卡
   GET    /api/v1/member/stored-value/cards/{card_id}        卡详情
-  POST   /api/v1/member/stored-value/recharge               充值（v1 兼容：按卡号+金额）
   POST   /api/v1/member/stored-value/recharge-by-plan       充值（v2：按 card_id + plan_id）
-  POST   /api/v1/member/stored-value/consume                消费（v1 兼容）
-  POST   /api/v1/member/stored-value/refund                 退款（v1 兼容）
   POST   /api/v1/member/stored-value/refund-by-transaction  退款（v2：按原始流水）
   GET    /api/v1/member/stored-value/balance/{card_id}      余额查询（按 card_id）
   GET    /api/v1/member/stored-value/transactions/{card_id} 流水分页（按 card_id）
   GET    /api/v1/member/stored-value/plans                  套餐列表
   POST   /api/v1/member/stored-value/plans                  创建套餐
-  POST   /api/v1/member/stored-value/freeze                 冻结（v1 兼容）
-  POST   /api/v1/member/stored-value/unfreeze               解冻（v1 兼容）
-  GET    /api/v1/member/stored-value/{card_no}/balance      余额查询（v1 兼容：按卡号）
-  GET    /api/v1/member/stored-value/{card_no}/transactions 流水查询（v1 兼容：按卡号）
+
+端点列表（v1 兼容：按卡号）：
+  POST   /api/v1/member/stored-value/recharge               充值
+  POST   /api/v1/member/stored-value/consume                消费
+  POST   /api/v1/member/stored-value/refund                 退款
+  POST   /api/v1/member/stored-value/freeze                 冻结
+  POST   /api/v1/member/stored-value/unfreeze               解冻
+  GET    /api/v1/member/stored-value/{card_no}/balance      余额查询
+  GET    /api/v1/member/stored-value/{card_no}/transactions 流水查询
 """
 import uuid
 from datetime import datetime
@@ -30,6 +45,7 @@ from services.stored_value_service import (
     InsufficientBalanceError,
     CardNotActiveError,
     PlanNotFoundError,
+    TransferNotAllowedError,
 )
 
 router = APIRouter(prefix="/api/v1/member/stored-value", tags=["stored-value"])
@@ -121,6 +137,182 @@ class RefundReq(BaseModel):
 class FreezeReq(BaseModel):
     card_no: str
     operator_id: str | None = None
+
+
+# v2 账户维度请求体
+class AccountRechargeReq(BaseModel):
+    amount_fen: int = Field(..., gt=0, description="充值金额（分）")
+    gift_amount_fen: int = Field(default=0, ge=0, description="赠送金额（分）")
+    operator_id: uuid.UUID | None = None
+    store_id: uuid.UUID | None = None
+    remark: str | None = None
+
+
+class AccountConsumeReq(BaseModel):
+    amount_fen: int = Field(..., gt=0, description="消费金额（分）")
+    order_id: uuid.UUID | None = None
+    store_id: uuid.UUID | None = None
+
+
+class AccountRefundReq(BaseModel):
+    amount_fen: int = Field(..., gt=0, description="退款金额（分）")
+    order_id: uuid.UUID | None = None
+    operator_id: uuid.UUID | None = None
+    remark: str | None = None
+
+
+class AccountTransferReq(BaseModel):
+    to_card_id: uuid.UUID = Field(..., description="转入方 card_id")
+    amount_fen: int = Field(..., gt=0, description="转赠金额（分）")
+    operator_id: uuid.UUID | None = None
+    remark: str | None = None
+
+
+# ──────────────────────────────────────────────────────────────────
+# 账户维度端点（v2 新增）
+# ──────────────────────────────────────────────────────────────────
+
+@router.post("/accounts/{card_id}/recharge", summary="充值（按 card_id，直接传金额）")
+async def account_recharge(
+    card_id: uuid.UUID,
+    req: AccountRechargeReq,
+    db: AsyncSession = Depends(_get_tenant_db),
+    tenant_id: uuid.UUID = Depends(_parse_tenant_id),
+):
+    """向储值账户充值，余额正确增加，生成充值流水记录。
+    支持满赠逻辑：充 amount_fen，赠 gift_amount_fen（由调用方按业务规则计算后传入）。
+    """
+    try:
+        result = await svc.recharge_direct(
+            db=db,
+            card_id=card_id,
+            amount_fen=req.amount_fen,
+            gift_amount_fen=req.gift_amount_fen,
+            tenant_id=tenant_id,
+            operator_id=req.operator_id,
+            store_id=req.store_id,
+            remark=req.remark,
+        )
+        return {"ok": True, "data": result}
+    except (CardNotActiveError, ValueError) as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@router.post("/accounts/{card_id}/consume", summary="消费核销（按 card_id）")
+async def account_consume(
+    card_id: uuid.UUID,
+    req: AccountConsumeReq,
+    db: AsyncSession = Depends(_get_tenant_db),
+    tenant_id: uuid.UUID = Depends(_parse_tenant_id),
+):
+    """消费核销（悲观锁 SELECT FOR UPDATE 防并发超扣）。
+    先扣赠送余额，再扣本金；余额不足返回 400。
+    """
+    try:
+        result = await svc.consume_by_id(
+            db=db,
+            card_id=card_id,
+            amount_fen=req.amount_fen,
+            tenant_id=tenant_id,
+            order_id=req.order_id,
+            store_id=req.store_id,
+        )
+        return {"ok": True, "data": result}
+    except InsufficientBalanceError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except CardNotActiveError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@router.post("/accounts/{card_id}/refund", summary="退款（按 card_id）")
+async def account_refund(
+    card_id: uuid.UUID,
+    req: AccountRefundReq,
+    db: AsyncSession = Depends(_get_tenant_db),
+    tenant_id: uuid.UUID = Depends(_parse_tenant_id),
+):
+    """退款，余额恢复（仅退本金）。"""
+    try:
+        result = await svc.refund_direct(
+            db=db,
+            card_id=card_id,
+            amount_fen=req.amount_fen,
+            tenant_id=tenant_id,
+            order_id=req.order_id,
+            operator_id=req.operator_id,
+            remark=req.remark,
+        )
+        return {"ok": True, "data": result}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@router.post("/accounts/{card_id}/transfer", summary="余额转赠（按 card_id）")
+async def account_transfer(
+    card_id: uuid.UUID,
+    req: AccountTransferReq,
+    db: AsyncSession = Depends(_get_tenant_db),
+    tenant_id: uuid.UUID = Depends(_parse_tenant_id),
+):
+    """余额转赠（同一租户内），仅转本金余额。"""
+    try:
+        result = await svc.transfer(
+            db=db,
+            from_card_id=card_id,
+            to_card_id=req.to_card_id,
+            amount_fen=req.amount_fen,
+            tenant_id=tenant_id,
+            operator_id=req.operator_id,
+            remark=req.remark,
+        )
+        return {"ok": True, "data": result}
+    except InsufficientBalanceError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except (CardNotActiveError, TransferNotAllowedError) as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@router.get("/accounts/{card_id}/balance", summary="余额查询（按 card_id）")
+async def account_balance(
+    card_id: uuid.UUID,
+    db: AsyncSession = Depends(_get_tenant_db),
+    tenant_id: uuid.UUID = Depends(_parse_tenant_id),
+):
+    """查询账户余额（本金 + 赠送余额分项）。"""
+    try:
+        result = await svc.get_balance(db=db, card_id=card_id, tenant_id=tenant_id)
+        return {"ok": True, "data": result}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+
+
+@router.get("/accounts/{card_id}/transactions", summary="流水记录（按 card_id）")
+async def account_transactions(
+    card_id: uuid.UUID,
+    page: int = 1,
+    size: int = 20,
+    db: AsyncSession = Depends(_get_tenant_db),
+    tenant_id: uuid.UUID = Depends(_parse_tenant_id),
+):
+    """分页查询账户流水记录，按时间倒序。"""
+    result = await svc.get_transactions_by_id(
+        db=db, card_id=card_id, tenant_id=tenant_id, page=page, size=size,
+    )
+    return {"ok": True, "data": result}
+
+
+@router.post("/batch/process-expiry", summary="触发过期批处理")
+async def batch_process_expiry(
+    db: AsyncSession = Depends(_get_tenant_db),
+    tenant_id: uuid.UUID = Depends(_parse_tenant_id),
+):
+    """批量处理到期账户（供夜批 cron job 调用）：冻结余额，写流水。"""
+    result = await svc.process_expiry_batch(db=db, tenant_id=tenant_id)
+    return {"ok": True, "data": result}
 
 
 # ──────────────────────────────────────────────────────────────────
