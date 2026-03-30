@@ -11,8 +11,7 @@
   6. attribute_revenue    — 预订渠道营收归因
 """
 import math
-import uuid
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from typing import Any
 
 import structlog
