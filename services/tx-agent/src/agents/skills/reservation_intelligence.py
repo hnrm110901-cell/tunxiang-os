@@ -296,14 +296,24 @@ class ReservationIntelligenceAgent(SkillAgent):
         # 检查是否有近期特殊日期
         today = date.today()
         special_occasions: list[str] = []
-        if profile.get("birthday"):
-            bm, bd = profile["birthday"].split("-")
-            if abs(today.month - int(bm)) <= 1 and abs(today.day - int(bd)) <= 7:
-                special_occasions.append(f"生日将至 ({profile['birthday']})")
-        if profile.get("anniversary"):
-            am, ad = profile["anniversary"].split("-")
-            if abs(today.month - int(am)) <= 1 and abs(today.day - int(ad)) <= 7:
-                special_occasions.append(f"纪念日将至 ({profile['anniversary']})")
+
+        def _is_near_date(month_day: str) -> bool:
+            """检查月-日是否在今天前后15天内（处理跨年）"""
+            mm, dd = month_day.split("-")
+            this_year = today.year
+            for year in (this_year, this_year + 1):
+                try:
+                    target = date(year, int(mm), int(dd))
+                except ValueError:
+                    continue
+                if abs((target - today).days) <= 15:
+                    return True
+            return False
+
+        if profile.get("birthday") and _is_near_date(profile["birthday"]):
+            special_occasions.append(f"生日将至 ({profile['birthday']})")
+        if profile.get("anniversary") and _is_near_date(profile["anniversary"]):
+            special_occasions.append(f"纪念日将至 ({profile['anniversary']})")
 
         logger.info(
             "reservation.guest_profile_enriched",

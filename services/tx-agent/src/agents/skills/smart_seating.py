@@ -12,8 +12,8 @@
 与 table_dispatch 的区别：
   table_dispatch 推荐单桌最优，smart_seating 做全局多预约排座最优化。
 """
-from datetime import datetime
-from typing import Any, Optional
+from datetime import datetime, timedelta
+from typing import Any
 
 import structlog
 
@@ -97,7 +97,7 @@ class SmartSeatingAgent(SkillAgent):
         """
         reservations: list[dict] = params.get("upcoming_reservations", [])
         tables: list[dict] = params.get("tables", [])
-        current_time_str: Optional[str] = params.get("current_time")
+        current_time_str: str | None = params.get("current_time")
 
         if not reservations:
             return AgentResult(
@@ -167,7 +167,7 @@ class SmartSeatingAgent(SkillAgent):
 
             res_end = _add_minutes(res_time, duration_min)
 
-            best_table: Optional[str] = None
+            best_table: str | None = None
             best_score: float = -999.0
             best_reasoning: str = ""
 
@@ -539,7 +539,7 @@ class SmartSeatingAgent(SkillAgent):
                 combined_size = p1.get("party_size", 1) + p2.get("party_size", 1)
 
                 # 找一张能容纳的桌子
-                assigned_table: Optional[str] = None
+                assigned_table: str | None = None
                 for t in merge_tables:
                     tid = t.get("table_id", "")
                     if tid in used_tables:
@@ -683,7 +683,7 @@ class SmartSeatingAgent(SkillAgent):
         total_count = len(tables)
 
         # 如果无可用桌台，找最近可用时段（向后搜索最多 120 分钟）
-        next_available_slot: Optional[str] = None
+        next_available_slot: str | None = None
         if available_count == 0:
             for offset_min in range(5, 125, 5):
                 check_time = _add_minutes(target_time, offset_min)
@@ -765,5 +765,4 @@ def _parse_time(time_str: str) -> datetime:
 
 def _add_minutes(dt: datetime, minutes: int) -> datetime:
     """返回 dt 加上指定分钟数后的时间。"""
-    from datetime import timedelta
     return dt + timedelta(minutes=minutes)

@@ -5,7 +5,7 @@
  *
  * Store终端组件: 不使用Ant Design, 触控48px+, 字体16px+
  */
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 
 // ── AI洞察数据 ──
 interface AIInsight {
@@ -17,7 +17,7 @@ interface AIInsight {
   valleyPromotion: string;
   confirmationPending: number;     // 待确认数
   guestProfileMatched: number;     // 已匹配画像数
-  revenueForecas: number;         // 预测营收(元)
+  revenueForecast: number;         // 预测营收(元)
 }
 
 const MOCK_INSIGHT: AIInsight = {
@@ -32,7 +32,7 @@ const MOCK_INSIGHT: AIInsight = {
   valleyPromotion: '低谷时段建议推送"下午茶套餐¥68"引流',
   confirmationPending: 3,
   guestProfileMatched: 5,
-  revenueForecas: 28600,
+  revenueForecast: 28600,
 };
 
 export function AIInsightsPanel() {
@@ -116,7 +116,7 @@ export function AIInsightsPanel() {
         />
         <KPICard
           label="预测营收"
-          value={`¥${(insight.revenueForecas / 10000).toFixed(2)}万`}
+          value={`¥${(insight.revenueForecast / 10000).toFixed(2)}万`}
           color="var(--tx-primary)"
         />
       </div>
