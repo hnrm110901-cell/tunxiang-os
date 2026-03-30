@@ -6,3 +6,12 @@ from .production_dept import ProductionDept, DishDeptMapping
 from .reservation import Reservation, NoShowRecord
 from .queue import QueueEntry, QueueCounter
 from .delivery_order import DeliveryOrder
+from .banquet import (
+    BanquetLead,
+    BanquetContract,
+    BanquetProposalRecord,
+    BanquetQuotation,
+    BanquetChecklist,
+    BanquetFeedback,
+    BanquetCase,
+)
