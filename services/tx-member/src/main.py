@@ -24,6 +24,9 @@ from api.stored_value_routes import router as stored_value_router
 from api.premium_card_routes import router as premium_card_router
 from api.points_mall_routes import router as points_mall_router
 from api.rfm_routes import router as rfm_router
+from api.group_routes import router as group_router
+from api.lifecycle_routes import router as lifecycle_router
+from api.platform_routes import router as platform_router
 from workers.rfm_updater import RFMUpdater
 
 logger = structlog.get_logger(__name__)
@@ -96,6 +99,9 @@ app.include_router(stored_value_router)
 app.include_router(premium_card_router)
 app.include_router(points_mall_router)
 app.include_router(rfm_router)
+app.include_router(group_router)
+app.include_router(lifecycle_router)
+app.include_router(platform_router)
 
 
 @app.get("/health")

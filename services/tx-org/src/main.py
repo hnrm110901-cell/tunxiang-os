@@ -13,6 +13,9 @@ from api.salary_items import router as salary_items_router
 from api.payslip import router as payslip_router
 from api.employee_depth_routes import router as employee_depth_router
 from api.admin_routes import router as admin_router
+from api.payroll_routes import router as payroll_router
+from api.approval_engine_routes import router as approval_engine_router
+from api.franchise_routes import router as franchise_router
 
 app = FastAPI(title="TunxiangOS tx-org", version="3.0.0")
 app.include_router(emp_router)
@@ -24,6 +27,9 @@ app.include_router(salary_items_router)
 app.include_router(payslip_router)
 app.include_router(employee_depth_router)
 app.include_router(admin_router)
+app.include_router(payroll_router,         prefix="/api/v1/payroll")
+app.include_router(approval_engine_router, prefix="/api/v1/approval-engine")
+app.include_router(franchise_router)
 
 @app.get("/health")
 async def health():
