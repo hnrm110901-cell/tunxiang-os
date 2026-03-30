@@ -16,6 +16,15 @@
         "corporate/corporate",
         "invoice/invoice"
       ]
+    },
+    {
+      "root": "pages/chef-at-home",
+      "pages": [
+        "index",
+        "booking",
+        "chef-profile",
+        "order-tracking"
+      ]
     }
   ],
   "window": {

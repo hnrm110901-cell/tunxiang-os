@@ -1,0 +1,112 @@
+<!-- 大厨到家预约确认 -->
+<view class="container">
+  <!-- 厨师信息 -->
+  <view class="chef-summary">
+    <text class="chef-label">已选厨师</text>
+    <view class="chef-row">
+      <text class="chef-name">{{chefName}}</text>
+      <text class="chef-title">{{chefTitle}}</text>
+    </view>
+  </view>
+
+  <!-- 已选菜品 -->
+  <view class="section">
+    <text class="section-title">已选菜品</text>
+    <view class="dish-summary" wx:for="{{dishes}}" wx:key="dish_id">
+      <text class="dish-name">{{item.name}}</text>
+      <text class="dish-qty">x{{item.quantity}}</text>
+      <text class="dish-price">¥{{item.price_fen * item.quantity / 100}}</text>
+    </view>
+  </view>
+
+  <!-- 选择日期 -->
+  <view class="form-section">
+    <view class="form-item">
+      <text class="form-label">服务日期</text>
+      <picker mode="date" start="{{today}}" bindchange="onDateChange">
+        <view class="picker-value">{{date || '请选择日期'}}</view>
+      </picker>
+    </view>
+
+    <view class="form-item">
+      <text class="form-label">上门时间</text>
+      <view class="slot-list">
+        <view class="slot-item {{selectedTime === item ? 'active' : ''}}"
+              wx:for="{{timeSlots}}" wx:key="*this"
+              bindtap="selectTime" data-time="{{item}}">
+          {{item}}
+        </view>
+      </view>
+    </view>
+
+    <view class="form-item">
+      <text class="form-label">用餐人数</text>
+      <view class="stepper">
+        <view class="stepper-btn" bindtap="changeGuests" data-delta="{{-1}}">-</view>
+        <text class="stepper-value">{{guestCount}}</text>
+        <view class="stepper-btn" bindtap="changeGuests" data-delta="{{1}}">+</view>
+      </view>
+    </view>
+
+    <view class="form-item">
+      <text class="form-label">上门地址</text>
+      <view class="address-row">
+        <input class="form-input address-input" value="{{address}}" bindinput="onAddressInput"
+               placeholder="请填写详细地址" placeholder-class="placeholder" />
+        <view class="location-btn" bindtap="chooseLocation">
+          <text>定位</text>
+        </view>
+      </view>
+    </view>
+
+    <view class="form-item">
+      <text class="form-label">联系人</text>
+      <input class="form-input" value="{{contactName}}" bindinput="onContactNameInput"
+             placeholder="请填写联系人姓名" placeholder-class="placeholder" />
+    </view>
+
+    <view class="form-item">
+      <text class="form-label">联系电话</text>
+      <input class="form-input" type="number" value="{{contactPhone}}" bindinput="onContactPhoneInput"
+             placeholder="请填写联系电话" placeholder-class="placeholder" />
+    </view>
+
+    <view class="form-item">
+      <text class="form-label">备注</text>
+      <textarea class="form-textarea" value="{{remark}}" bindinput="onRemarkInput"
+                placeholder="过敏信息、忌口、特殊要求等" placeholder-class="placeholder" />
+    </view>
+  </view>
+
+  <!-- 价格明细 -->
+  <view class="price-section" wx:if="{{priceDetail}}">
+    <text class="section-title">费用明细</text>
+    <view class="price-row">
+      <text class="price-label">菜品费</text>
+      <text class="price-value">¥{{priceDetail.dish_total_fen / 100}}</text>
+    </view>
+    <view class="price-row">
+      <text class="price-label">服务费（{{guestCount}}人）</text>
+      <text class="price-value">¥{{priceDetail.service_fee_fen / 100}}</text>
+    </view>
+    <view class="price-row">
+      <text class="price-label">食材费</text>
+      <text class="price-value">¥{{priceDetail.ingredient_fee_fen / 100}}</text>
+    </view>
+    <view class="price-row">
+      <text class="price-label">交通费</text>
+      <text class="price-value">¥{{priceDetail.transport_fee_fen / 100}}</text>
+    </view>
+    <view class="price-total-row">
+      <text class="price-total-label">合计</text>
+      <text class="price-total-value">¥{{priceDetail.total_fen / 100}}</text>
+    </view>
+  </view>
+
+  <!-- 提交按钮 -->
+  <view class="submit-area">
+    <button class="submit-btn" bindtap="submitBooking" disabled="{{submitting}}">
+      {{submitting ? '提交中...' : '确认预约'}}
+    </button>
+  </view>
+</view>

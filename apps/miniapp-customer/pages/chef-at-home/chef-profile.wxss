@@ -1,0 +1,55 @@
+.container { padding: 0; background: #0B1A20; min-height: 100vh; color: #fff; }
+.loading-tip { text-align: center; color: #666; font-size: 28rpx; padding: 120rpx 0; }
+.empty-tip { text-align: center; color: #666; font-size: 28rpx; padding: 80rpx 0; }
+
+/* 厨师头部 */
+.profile-header { display: flex; padding: 40rpx 32rpx; background: #112228; }
+.profile-avatar { width: 160rpx; height: 160rpx; border-radius: 24rpx; margin-right: 28rpx; flex-shrink: 0; background: #1a2a33; }
+.profile-info { flex: 1; display: flex; flex-direction: column; justify-content: center; }
+.profile-name-row { display: flex; align-items: center; margin-bottom: 20rpx; }
+.profile-name { font-size: 36rpx; font-weight: bold; margin-right: 16rpx; }
+.profile-title { font-size: 24rpx; color: #FF6B2C; background: rgba(255,107,44,0.15); padding: 6rpx 16rpx; border-radius: 8rpx; }
+.profile-stats { display: flex; gap: 36rpx; }
+.stat-item { display: flex; flex-direction: column; align-items: center; }
+.stat-value { font-size: 32rpx; font-weight: bold; color: #FF6B2C; }
+.stat-label { font-size: 22rpx; color: #999; margin-top: 4rpx; }
+
+/* Tab */
+.tab-bar { display: flex; border-bottom: 1rpx solid #1a2a33; background: #0B1A20; }
+.tab-item { flex: 1; text-align: center; padding: 24rpx 0; font-size: 30rpx; color: #999; position: relative; }
+.tab-item.active { color: #FF6B2C; }
+.tab-item.active::after { content: ''; position: absolute; bottom: 0; left: 30%; right: 30%; height: 4rpx; background: #FF6B2C; border-radius: 2rpx; }
+
+/* Tab 内容 */
+.tab-content { padding: 32rpx; }
+
+/* 简介 */
+.info-block { margin-bottom: 36rpx; }
+.info-title { font-size: 28rpx; color: #999; display: block; margin-bottom: 16rpx; }
+.tag-list { display: flex; flex-wrap: wrap; gap: 12rpx; }
+.tag { font-size: 26rpx; color: #999; background: #1a2a33; padding: 10rpx 20rpx; border-radius: 12rpx; }
+.tag.highlight { color: #FF6B2C; background: rgba(255,107,44,0.1); }
+.status-badge { font-size: 26rpx; padding: 8rpx 20rpx; border-radius: 12rpx; display: inline-block; }
+.status-available { color: #4CAF50; background: rgba(76,175,80,0.15); }
+.status-booked { color: #FFC832; background: rgba(255,200,50,0.15); }
+.status-on_service { color: #FF6B2C; background: rgba(255,107,44,0.15); }
+.status-off_duty { color: #999; background: rgba(153,153,153,0.15); }
+
+/* 作品集 */
+.portfolio-grid { display: flex; flex-wrap: wrap; gap: 16rpx; }
+.portfolio-item { width: calc(50% - 8rpx); }
+.portfolio-image { width: 100%; height: 240rpx; border-radius: 16rpx; background: #1a2a33; }
+.portfolio-caption { font-size: 24rpx; color: #999; margin-top: 8rpx; display: block; }
+
+/* 评价 */
+.rating-card { background: #112228; border-radius: 16rpx; padding: 24rpx; margin-bottom: 20rpx; }
+.rating-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12rpx; }
+.rating-stars { color: #FFC832; font-size: 28rpx; }
+.rating-date { color: #666; font-size: 22rpx; }
+.rating-comment { font-size: 28rpx; color: #ccc; line-height: 1.6; }
+
+/* 底部按钮 */
+.bottom-spacer { height: 140rpx; }
+.bottom-action { position: fixed; bottom: 0; left: 0; right: 0; padding: 20rpx 32rpx; background: #0B1A20; border-top: 1rpx solid #1a2a33; }
+.select-btn { background: #FF6B2C !important; color: #fff !important; border-radius: 44rpx; font-size: 32rpx; height: 88rpx; line-height: 88rpx; }
+.select-btn.disabled { opacity: 0.5; }

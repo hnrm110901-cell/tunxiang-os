@@ -1,0 +1,94 @@
+<!-- 大厨到家首页 — 选菜 + 选厨师 -->
+<view class="container">
+  <!-- 顶部横幅 -->
+  <view class="hero-banner">
+    <text class="hero-title">大厨到家</text>
+    <text class="hero-subtitle">徐记海鲜 · 行政总厨上门烹饪</text>
+  </view>
+
+  <!-- 菜系筛选 -->
+  <view class="section">
+    <text class="section-title">选择厨师</text>
+    <scroll-view class="cuisine-filter" scroll-x>
+      <view class="cuisine-item {{selectedCuisine === item ? 'active' : ''}}"
+            wx:for="{{cuisineTypes}}" wx:key="*this"
+            bindtap="selectCuisine" data-type="{{item}}">
+        {{item}}
+      </view>
+    </scroll-view>
+  </view>
+
+  <!-- 厨师列表 -->
+  <view class="chef-section">
+    <view class="loading-tip" wx:if="{{loadingChefs}}">
+      <text>加载中...</text>
+    </view>
+    <view class="empty-tip" wx:elif="{{chefs.length === 0}}">
+      <text>暂无可用厨师</text>
+    </view>
+    <view wx:else>
+      <view class="chef-card {{selectedChefId === item.id ? 'selected' : ''}}"
+            wx:for="{{chefs}}" wx:key="id"
+            bindtap="selectChef" data-id="{{item.id}}">
+        <image class="chef-avatar" src="{{item.avatar}}" mode="aspectFill" lazy-load />
+        <view class="chef-info">
+          <view class="chef-name-row">
+            <text class="chef-name">{{item.name}}</text>
+            <text class="chef-title">{{item.title}}</text>
+          </view>
+          <view class="chef-tags">
+            <text class="chef-tag" wx:for="{{item.cuisine_types}}" wx:for-item="ct" wx:key="*this">{{ct}}</text>
+          </view>
+          <view class="chef-stats">
+            <text class="chef-rating">{{item.rating}}分</text>
+            <text class="chef-services">{{item.total_services}}次服务</text>
+            <text class="chef-exp">{{item.years_experience}}年经验</text>
+          </view>
+          <view class="chef-specialties">
+            <text>拿手菜: {{item.specialties[0]}}{{item.specialties[1] ? '、' + item.specialties[1] : ''}}</text>
+          </view>
+        </view>
+        <view class="chef-select-icon" wx:if="{{selectedChefId === item.id}}">
+          <text>✓</text>
+        </view>
+        <view class="chef-detail-btn" catchtap="viewChefProfile" data-id="{{item.id}}">
+          <text>详情</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 选菜区域 -->
+  <view class="section">
+    <text class="section-title">选择菜品</text>
+    <view class="dish-list">
+      <view class="dish-card" wx:for="{{dishes}}" wx:key="dish_id">
+        <image class="dish-image" src="{{item.image}}" mode="aspectFill" lazy-load />
+        <view class="dish-info">
+          <text class="dish-name">{{item.name}}</text>
+          <text class="dish-price">¥{{item.price_fen / 100}}</text>
+        </view>
+        <view class="dish-stepper">
+          <view class="stepper-btn minus {{item.quantity === 0 ? 'disabled' : ''}}"
+                catchtap="removeDish" data-index="{{index}}">-</view>
+          <text class="stepper-value" wx:if="{{item.quantity > 0}}">{{item.quantity}}</text>
+          <view class="stepper-btn plus" catchtap="addDish" data-index="{{index}}">+</view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 底部占位 -->
+  <view class="bottom-spacer"></view>
+
+  <!-- 底部下单栏 -->
+  <view class="bottom-bar" wx:if="{{selectedDishCount > 0}}">
+    <view class="bar-info">
+      <text class="bar-count">已选 {{selectedDishCount}} 道菜</text>
+      <text class="bar-price">菜品合计 ¥{{totalPriceFen / 100}}</text>
+    </view>
+    <view class="bar-btn" bindtap="goToBooking">
+      <text>去预约</text>
+    </view>
+  </view>
+</view>

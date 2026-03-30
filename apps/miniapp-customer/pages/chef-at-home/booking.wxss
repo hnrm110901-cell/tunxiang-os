@@ -1,0 +1,53 @@
+.container { padding: 0; background: #0B1A20; min-height: 100vh; color: #fff; }
+
+/* 厨师摘要 */
+.chef-summary { background: #112228; padding: 28rpx 32rpx; margin-bottom: 2rpx; }
+.chef-label { font-size: 24rpx; color: #999; display: block; margin-bottom: 12rpx; }
+.chef-row { display: flex; align-items: center; }
+.chef-name { font-size: 32rpx; font-weight: bold; margin-right: 16rpx; }
+.chef-title { font-size: 22rpx; color: #FF6B2C; background: rgba(255,107,44,0.15); padding: 4rpx 12rpx; border-radius: 8rpx; }
+
+/* 已选菜品 */
+.section { padding: 28rpx 32rpx; }
+.section-title { font-size: 30rpx; font-weight: bold; display: block; margin-bottom: 20rpx; }
+.dish-summary { display: flex; align-items: center; padding: 12rpx 0; border-bottom: 1rpx solid #1a2a33; }
+.dish-summary .dish-name { flex: 1; font-size: 28rpx; }
+.dish-summary .dish-qty { font-size: 26rpx; color: #999; margin: 0 20rpx; }
+.dish-summary .dish-price { font-size: 28rpx; color: #FF6B2C; }
+
+/* 表单 */
+.form-section { padding: 28rpx 32rpx; }
+.form-item { margin-bottom: 36rpx; }
+.form-label { font-size: 28rpx; color: #999; margin-bottom: 16rpx; display: block; }
+.form-input { background: #1a2a33; padding: 20rpx 24rpx; border-radius: 12rpx; font-size: 28rpx; color: #fff; }
+.form-textarea { background: #1a2a33; padding: 20rpx 24rpx; border-radius: 12rpx; font-size: 28rpx; color: #fff; width: 100%; height: 160rpx; box-sizing: border-box; }
+.placeholder { color: #666; }
+
+/* 地址行 */
+.address-row { display: flex; align-items: center; gap: 16rpx; }
+.address-input { flex: 1; }
+.location-btn { background: #FF6B2C; color: #fff; padding: 20rpx 28rpx; border-radius: 12rpx; font-size: 26rpx; flex-shrink: 0; }
+
+/* 时段选择 */
+.slot-list { display: flex; flex-wrap: wrap; gap: 16rpx; }
+.slot-item { padding: 16rpx 28rpx; background: #1a2a33; border-radius: 12rpx; font-size: 26rpx; color: #999; }
+.slot-item.active { background: #FF6B2C; color: #fff; }
+
+/* 人数步进器 */
+.stepper { display: flex; align-items: center; }
+.stepper-btn { width: 64rpx; height: 64rpx; background: #1a2a33; border-radius: 12rpx; display: flex; align-items: center; justify-content: center; font-size: 36rpx; color: #FF6B2C; text-align: center; line-height: 64rpx; }
+.stepper-value { font-size: 32rpx; margin: 0 30rpx; min-width: 48rpx; text-align: center; }
+
+/* 价格明细 */
+.price-section { padding: 28rpx 32rpx; background: #112228; margin-top: 16rpx; }
+.price-row { display: flex; justify-content: space-between; padding: 12rpx 0; }
+.price-label { font-size: 28rpx; color: #999; }
+.price-value { font-size: 28rpx; }
+.price-total-row { display: flex; justify-content: space-between; padding: 20rpx 0 0; margin-top: 12rpx; border-top: 1rpx solid #1a2a33; }
+.price-total-label { font-size: 30rpx; font-weight: bold; }
+.price-total-value { font-size: 36rpx; color: #FF6B2C; font-weight: bold; }
+
+/* 提交 */
+.submit-area { padding: 48rpx 32rpx; }
+.submit-btn { background: #FF6B2C !important; color: #fff !important; border-radius: 44rpx; font-size: 32rpx; height: 88rpx; line-height: 88rpx; }
+.submit-btn[disabled] { opacity: 0.6; }

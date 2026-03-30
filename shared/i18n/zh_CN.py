@@ -1,0 +1,107 @@
+"""中文（简体）— 默认语言"""
+
+LANG_CODE = "zh_CN"
+LANG_NAME = "简体中文"
+
+# ── 菜品分类 ────────────────────────────────────────────
+CATEGORIES = {
+    "hot_dish": "热菜",
+    "cold_dish": "凉菜",
+    "seafood": "海鲜",
+    "soup": "汤品",
+    "staple": "主食",
+    "drink": "酒水",
+    "dessert": "甜品",
+    "snack": "小吃",
+    "bbq": "烧烤",
+    "hotpot": "火锅",
+}
+
+# ── UI 文本 ─────────────────────────────────────────────
+UI = {
+    "checkout": "结账",
+    "order": "点菜",
+    "rush_order": "催菜",
+    "return_dish": "退菜",
+    "add_dish": "加菜",
+    "table_number": "桌号",
+    "guest_count": "人数",
+    "total": "合计",
+    "discount": "优惠",
+    "pay": "支付",
+    "cash": "现金",
+    "wechat_pay": "微信支付",
+    "alipay": "支付宝",
+    "card": "刷卡",
+    "receipt": "小票",
+    "print_receipt": "打印小票",
+    "confirm": "确认",
+    "cancel": "取消",
+    "back": "返回",
+    "search": "搜索",
+    "voice_order": "语音点餐",
+    "scan_order": "扫码点餐",
+    "member": "会员",
+    "member_price": "会员价",
+    "original_price": "原价",
+    "sold_out": "已售罄",
+    "popular": "热门",
+    "new": "新品",
+    "spicy": "辣",
+    "recommend": "推荐",
+    "quantity": "数量",
+    "remark": "备注",
+    "no_spicy": "不辣",
+    "mild_spicy": "微辣",
+    "medium_spicy": "中辣",
+    "extra_spicy": "特辣",
+    "order_success": "下单成功",
+    "order_failed": "下单失败",
+    "waiting": "等待中",
+    "preparing": "制作中",
+    "ready": "已出餐",
+    "served": "已上桌",
+}
+
+# ── 常见菜品名称 ────────────────────────────────────────
+DISH_NAMES = {
+    "steamed_fish_head_chopped_chili": "剁椒鱼头",
+    "braised_pork": "红烧肉",
+    "kung_pao_chicken": "宫保鸡丁",
+    "mapo_tofu": "麻婆豆腐",
+    "boiled_fish": "水煮鱼",
+    "steamed_bass": "清蒸鲈鱼",
+    "stir_fried_vegetables": "清炒时蔬",
+    "egg_fried_rice": "蛋炒饭",
+    "tomato_egg": "番茄炒蛋",
+    "cold_cucumber": "凉拌黄瓜",
+    "hot_and_sour_soup": "酸辣汤",
+    "wonton_soup": "馄饨汤",
+    "steamed_rice": "米饭",
+    "beer": "啤酒",
+    "cola": "可乐",
+    "plum_juice": "酸梅汤",
+    "herbal_tea": "凉茶",
+}
+
+# ── 小票模板 ────────────────────────────────────────────
+RECEIPT = {
+    "header": "消费清单",
+    "store_name": "门店名称",
+    "order_no": "订单号",
+    "table_no": "桌号",
+    "cashier": "收银员",
+    "time": "时间",
+    "item": "菜品",
+    "qty": "数量",
+    "price": "单价",
+    "subtotal": "小计",
+    "total": "合计",
+    "discount": "优惠",
+    "payable": "应付",
+    "paid": "实付",
+    "change": "找零",
+    "payment_method": "支付方式",
+    "footer": "谢谢光临，欢迎下次再来！",
+    "vat_note": "如需发票请联系前台",
+}

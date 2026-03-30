@@ -1,0 +1,107 @@
+"""English (US)"""
+
+LANG_CODE = "en_US"
+LANG_NAME = "English"
+
+# ── Categories ──────────────────────────────────────────
+CATEGORIES = {
+    "hot_dish": "Hot Dishes",
+    "cold_dish": "Cold Dishes",
+    "seafood": "Seafood",
+    "soup": "Soups",
+    "staple": "Rice & Noodles",
+    "drink": "Beverages",
+    "dessert": "Desserts",
+    "snack": "Snacks",
+    "bbq": "BBQ",
+    "hotpot": "Hot Pot",
+}
+
+# ── UI Text ─────────────────────────────────────────────
+UI = {
+    "checkout": "Checkout",
+    "order": "Order",
+    "rush_order": "Rush Order",
+    "return_dish": "Return Dish",
+    "add_dish": "Add Dish",
+    "table_number": "Table No.",
+    "guest_count": "Guests",
+    "total": "Total",
+    "discount": "Discount",
+    "pay": "Pay",
+    "cash": "Cash",
+    "wechat_pay": "WeChat Pay",
+    "alipay": "Alipay",
+    "card": "Card",
+    "receipt": "Receipt",
+    "print_receipt": "Print Receipt",
+    "confirm": "Confirm",
+    "cancel": "Cancel",
+    "back": "Back",
+    "search": "Search",
+    "voice_order": "Voice Order",
+    "scan_order": "Scan to Order",
+    "member": "Member",
+    "member_price": "Member Price",
+    "original_price": "Original Price",
+    "sold_out": "Sold Out",
+    "popular": "Popular",
+    "new": "New",
+    "spicy": "Spicy",
+    "recommend": "Recommended",
+    "quantity": "Qty",
+    "remark": "Remarks",
+    "no_spicy": "Not Spicy",
+    "mild_spicy": "Mild",
+    "medium_spicy": "Medium",
+    "extra_spicy": "Extra Spicy",
+    "order_success": "Order Placed",
+    "order_failed": "Order Failed",
+    "waiting": "Waiting",
+    "preparing": "Preparing",
+    "ready": "Ready",
+    "served": "Served",
+}
+
+# ── Dish Names ──────────────────────────────────────────
+DISH_NAMES = {
+    "steamed_fish_head_chopped_chili": "Steamed Fish Head with Chopped Chili",
+    "braised_pork": "Braised Pork Belly",
+    "kung_pao_chicken": "Kung Pao Chicken",
+    "mapo_tofu": "Mapo Tofu",
+    "boiled_fish": "Sichuan Boiled Fish",
+    "steamed_bass": "Steamed Sea Bass",
+    "stir_fried_vegetables": "Stir-fried Seasonal Vegetables",
+    "egg_fried_rice": "Egg Fried Rice",
+    "tomato_egg": "Tomato and Egg Stir-fry",
+    "cold_cucumber": "Smashed Cucumber Salad",
+    "hot_and_sour_soup": "Hot and Sour Soup",
+    "wonton_soup": "Wonton Soup",
+    "steamed_rice": "Steamed Rice",
+    "beer": "Beer",
+    "cola": "Cola",
+    "plum_juice": "Plum Juice",
+    "herbal_tea": "Herbal Tea",
+}
+
+# ── Receipt Template ────────────────────────────────────
+RECEIPT = {
+    "header": "Receipt",
+    "store_name": "Store",
+    "order_no": "Order No.",
+    "table_no": "Table No.",
+    "cashier": "Cashier",
+    "time": "Time",
+    "item": "Item",
+    "qty": "Qty",
+    "price": "Price",
+    "subtotal": "Subtotal",
+    "total": "Total",
+    "discount": "Discount",
+    "payable": "Amount Due",
+    "paid": "Paid",
+    "change": "Change",
+    "payment_method": "Payment",
+    "footer": "Thank you for dining with us!",
+    "vat_note": "For invoice, please contact the front desk",
+}

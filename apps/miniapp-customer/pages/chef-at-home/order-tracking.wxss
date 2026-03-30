@@ -1,0 +1,57 @@
+.container { padding: 0; background: #0B1A20; min-height: 100vh; color: #fff; }
+.loading-tip, .empty-tip { text-align: center; color: #666; font-size: 28rpx; padding: 120rpx 0; }
+
+/* 状态进度条 */
+.status-progress { display: flex; align-items: flex-start; padding: 48rpx 24rpx 36rpx; background: #112228; }
+.step { flex: 1; display: flex; flex-direction: column; align-items: center; position: relative; }
+.step-dot { width: 56rpx; height: 56rpx; border-radius: 50%; background: #1a2a33; display: flex; align-items: center; justify-content: center; position: relative; z-index: 1; }
+.step.done .step-dot { background: #FF6B2C; }
+.step.current .step-dot { background: #FF6B2C; box-shadow: 0 0 16rpx rgba(255,107,44,0.5); }
+.step-icon { font-size: 24rpx; }
+.step-label { font-size: 22rpx; color: #666; margin-top: 12rpx; text-align: center; }
+.step.done .step-label { color: #FF6B2C; }
+.step.current .step-label { color: #fff; font-weight: bold; }
+.step-line { position: absolute; top: 28rpx; left: calc(50% + 28rpx); right: calc(-50% + 28rpx); height: 4rpx; background: #1a2a33; z-index: 0; }
+.step.done .step-line { background: #FF6B2C; }
+
+/* 订单卡片 */
+.order-card { background: #112228; border-radius: 24rpx; padding: 28rpx; margin: 24rpx 32rpx 0; }
+.card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20rpx; }
+.card-title { font-size: 30rpx; font-weight: bold; display: block; margin-bottom: 16rpx; }
+.order-id { font-size: 22rpx; color: #666; }
+
+.info-row { display: flex; justify-content: space-between; padding: 12rpx 0; border-bottom: 1rpx solid #1a2a33; }
+.info-row:last-child { border-bottom: none; }
+.info-label { font-size: 28rpx; color: #999; }
+.info-value { font-size: 28rpx; text-align: right; max-width: 60%; }
+
+/* 菜品 */
+.dish-row { display: flex; align-items: center; padding: 12rpx 0; border-bottom: 1rpx solid #1a2a33; }
+.dish-row .dish-name { flex: 1; font-size: 28rpx; }
+.dish-row .dish-qty { font-size: 26rpx; color: #999; margin: 0 20rpx; }
+.dish-row .dish-price { font-size: 28rpx; color: #FF6B2C; }
+.total-row { display: flex; justify-content: space-between; padding: 20rpx 0 0; margin-top: 12rpx; border-top: 2rpx solid #1a2a33; }
+.total-label { font-size: 30rpx; font-weight: bold; }
+.total-value { font-size: 36rpx; color: #FF6B2C; font-weight: bold; }
+
+/* 出品照片 */
+.photo-grid { display: flex; flex-wrap: wrap; gap: 12rpx; }
+.photo-item { width: calc(33.33% - 8rpx); height: 180rpx; border-radius: 12rpx; background: #1a2a33; }
+
+/* 评价 */
+.rating-section { margin-top: 0; }
+.star-row { display: flex; gap: 16rpx; margin-bottom: 20rpx; }
+.star { font-size: 48rpx; color: #333; }
+.star.active { color: #FFC832; }
+.star-row.readonly { pointer-events: none; }
+.comment-input { background: #1a2a33; padding: 20rpx 24rpx; border-radius: 12rpx; font-size: 28rpx; color: #fff; width: 100%; height: 160rpx; box-sizing: border-box; }
+.placeholder { color: #666; }
+.rate-btn { margin-top: 24rpx; background: #FF6B2C !important; color: #fff !important; border-radius: 44rpx; font-size: 30rpx; height: 80rpx; line-height: 80rpx; }
+.rate-btn[disabled] { opacity: 0.6; }
+.rated-comment { font-size: 28rpx; color: #ccc; line-height: 1.6; display: block; }
+
+/* 操作按钮 */
+.action-area { display: flex; gap: 20rpx; padding: 48rpx 32rpx; }
+.action-btn { flex: 1; text-align: center; padding: 20rpx 0; border-radius: 44rpx; font-size: 30rpx; }
+.action-btn.outline { border: 2rpx solid #FF6B2C; color: #FF6B2C; background: transparent; }
+.action-btn.primary { background: #FF6B2C; color: #fff; }
