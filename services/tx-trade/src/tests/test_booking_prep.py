@@ -171,7 +171,7 @@ class TestTaskStatusTransition:
         BookingPrepService.mark_prep_started(task.id, TENANT_A)
         BookingPrepService.mark_prep_done(task.id, TENANT_A)
 
-        with pytest.raises(ValueError, match="started"):
+        with pytest.raises(ValueError, match="pending"):
             BookingPrepService.mark_prep_started(task.id, TENANT_A)
 
     def test_cannot_done_pending_task(self):

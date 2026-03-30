@@ -47,7 +47,10 @@ def _get_tenant_id(request: Request) -> str:
 
 async def _get_overtime_tasks(store_id: str, tenant_id: str, db: Any) -> List[dict]:
     """查询当前超时工单（warning + critical）。"""
-    from ..services.cooking_timeout import check_timeouts
+    try:
+        from ..services.cooking_timeout import check_timeouts
+    except ImportError:
+        from services.cooking_timeout import check_timeouts  # type: ignore[no-redef]  # noqa: PLC0415
 
     items = await check_timeouts(store_id, tenant_id, db)
     result = []
