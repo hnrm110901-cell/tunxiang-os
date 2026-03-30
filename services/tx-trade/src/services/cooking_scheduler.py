@@ -7,6 +7,7 @@
 - 同桌同出（Course Firing）— 多道菜协同延迟开始，保证同桌齐出
 - 基于历史数据的出餐时间预测（P50/P90 + 档口负载修正）
 - 档口负载均衡建议
+- TableFireCoordinator 集成：分单后自动创建协调计划
 """
 import statistics
 import uuid
@@ -188,6 +189,128 @@ async def coordinate_same_table(
         tasks_delayed=sum(1 for r in coordination_result if r["start_delay_seconds"] > 0),
     )
     return coordination_result
+
+
+# ─────────────────────────────────────────────
+# D. TableFire 协调引擎集成
+# ─────────────────────────────────────────────
+
+
+async def create_table_fire_plan(
+    order_id: str,
+    table_no: str,
+    store_id: str,
+    tenant_id: str,
+    dept_tasks: list[dict],
+    db: AsyncSession,
+) -> dict | None:
+    """分单后为该桌创建同出协调计划（TableFire）。
+
+    调用时机：kds_dispatch 完成分单后自动调用。
+    会为每个档口计算基于历史均值的预计完成时间，
+    然后由 TableFireCoordinator 分配延迟开始时间。
+
+    Args:
+        order_id: 订单ID
+        table_no: 桌号
+        store_id: 门店ID
+        tenant_id: 租户ID（显式隔离）
+        dept_tasks: kds_dispatch 返回的 dept_tasks 列表
+        db: 数据库会话
+
+    Returns:
+        {"plan_id": str, "dept_delays": {dept_id: seconds}, "target_completion": str}
+        或 None（创建失败时）
+    """
+    from .table_production_plan import TableFireCoordinator
+
+    log = logger.bind(
+        order_id=order_id, table_no=table_no, tenant_id=tenant_id
+    )
+
+    if not dept_tasks:
+        log.info("cooking_scheduler.table_fire.no_dept_tasks")
+        return None
+
+    # ── 1. 为每个档口预估完成时间 ──
+    items_by_dept: dict[str, dict] = {}
+    for dept in dept_tasks:
+        dept_id = dept.get("dept_id", "")
+        items = dept.get("items", [])
+        if not dept_id or not items:
+            continue
+
+        # 取该档口所有菜品的估时均值
+        est_list: list[int] = []
+        for item in items:
+            dish_id = item.get("dish_id")
+            if dish_id:
+                try:
+                    prediction = await estimate_cooking_time(dish_id, db)
+                    est_list.append(prediction["estimated_seconds"])
+                except (ValueError, AttributeError) as exc:
+                    log.warning(
+                        "cooking_scheduler.table_fire.estimate_failed",
+                        dish_id=dish_id,
+                        error=str(exc),
+                    )
+                    est_list.append(DEFAULT_COOKING_TIME_SEC)
+            else:
+                est_list.append(DEFAULT_COOKING_TIME_SEC)
+
+        # 档口完成时间 = 所有菜品估时的最大值（串行假设）
+        dept_est_seconds = max(est_list) if est_list else DEFAULT_COOKING_TIME_SEC
+
+        items_by_dept[dept_id] = {
+            "dept_name": dept.get("dept_name", ""),
+            "estimated_seconds": dept_est_seconds,
+            "items": [
+                {
+                    "task_id": item.get("task_id", ""),
+                    "dish_name": item.get("dish_name", ""),
+                    "urgent": item.get("urgent", False),
+                }
+                for item in items
+            ],
+        }
+
+    if not items_by_dept:
+        log.info("cooking_scheduler.table_fire.no_valid_depts")
+        return None
+
+    # ── 2. 调用 TableFireCoordinator 创建协调计划 ──
+    coordinator = TableFireCoordinator()
+    try:
+        plan = await coordinator.create_plan(
+            order_id=order_id,
+            table_no=table_no,
+            store_id=store_id,
+            tenant_id=tenant_id,
+            items_by_dept=items_by_dept,
+            db=db,
+        )
+    except Exception as exc:
+        log.error(
+            "cooking_scheduler.table_fire.create_plan_failed",
+            error=str(exc),
+            exc_info=True,
+        )
+        return None
+
+    if plan is None:
+        return None
+
+    log.info(
+        "cooking_scheduler.table_fire.plan_created",
+        plan_id=str(plan.id),
+        dept_count=len(items_by_dept),
+    )
+
+    return {
+        "plan_id": str(plan.id),
+        "dept_delays": plan.dept_delays,
+        "target_completion": plan.target_completion.isoformat(),
+    }
 
 
 # ─────────────────────────────────────────────
