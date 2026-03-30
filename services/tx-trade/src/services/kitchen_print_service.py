@@ -4,11 +4,13 @@
 1. 订单分单后，按档口生成厨打单并发送到对应网络打印机
 2. 催菜/重做时，生成催单/重做厨打单
 3. 通过 Mac mini 的 /api/print 接口桥接发送
+4. 打印失败时自动入队重试（PrintQueue 持久化，指数退避，死信保护）
 
 所有打印内容使用 receipt_service.py 中的 ESC/POS 工具常量。
 """
 import base64
 import os
+import sys
 from datetime import datetime, timezone
 
 import httpx
@@ -28,6 +30,35 @@ MAC_STATION_URL = os.getenv("MAC_STATION_URL", "http://localhost:8000")
 
 # 打印超时（秒）
 PRINT_TIMEOUT_SEC = 5
+
+# ─── 打印重试队列（懒加载，edge/mac-mini 不在路径时降级为纯日志）───
+
+_print_queue = None
+
+
+def _get_print_queue():
+    """懒加载 PrintQueue 实例。edge/mac-mini 未部署时返回 None（降级模式）。"""
+    global _print_queue
+    if _print_queue is not None:
+        return _print_queue
+
+    # 将 edge/mac-mini 加入 sys.path（支持独立部署和单体部署两种场景）
+    edge_mac_mini_path = os.getenv(
+        "EDGE_MAC_MINI_PATH",
+        os.path.join(os.path.dirname(__file__), "../../../../../edge/mac-mini"),
+    )
+    if edge_mac_mini_path not in sys.path:
+        sys.path.insert(0, edge_mac_mini_path)
+
+    try:
+        from print_queue import PrintQueue, PrintJob  # noqa: PLC0415
+        _print_queue = PrintQueue()
+        logger.info("kitchen_print.queue_loaded", db_path=os.getenv("PRINT_QUEUE_DB", "(default)"))
+    except ImportError:
+        logger.warning("kitchen_print.queue_unavailable", reason="edge/mac-mini 模块未找到，降级为纯日志模式")
+        _print_queue = None
+
+    return _print_queue
 
 
 # ─── 厨打单格式化 ───
@@ -235,13 +266,16 @@ async def send_to_printer(
 ) -> bool:
     """通过 Mac mini 的 /api/print 接口发送 ESC/POS 数据到网络打印机。
 
+    打印失败时自动将任务加入 PrintQueue 重试队列（对上游调用方透明）。
+    如果 PrintQueue 不可用（edge/mac-mini 未部署），降级为纯日志记录。
+
     Args:
         esc_pos_bytes: ESC/POS 字节流
         printer_address: 打印机网络地址 host:port（优先使用）
         printer_id: 打印机标识名（备选）
 
     Returns:
-        是否发送成功
+        是否发送成功（False 表示已入队等待重试，非永久失败）
     """
     log = logger.bind(
         printer_address=printer_address,
@@ -249,13 +283,15 @@ async def send_to_printer(
         bytes_len=len(esc_pos_bytes),
     )
 
-    payload: dict = {
-        "content_base64": base64.b64encode(esc_pos_bytes).decode("ascii"),
-    }
+    payload_b64 = base64.b64encode(esc_pos_bytes).decode("ascii")
+    payload: dict = {"content_base64": payload_b64}
     if printer_id:
         payload["printer_id"] = printer_id
     if printer_address:
         payload["printer_address"] = printer_address
+
+    success = False
+    error_reason: str | None = None
 
     try:
         async with httpx.AsyncClient(timeout=PRINT_TIMEOUT_SEC) as client:
@@ -264,21 +300,73 @@ async def send_to_printer(
                 result = resp.json()
             except ValueError:
                 log.warning("kitchen_print.invalid_response", status=resp.status_code, body=resp.text[:200])
-                return False
-            if result.get("ok"):
-                log.info("kitchen_print.sent")
-                return True
-            log.warning("kitchen_print.failed", response=result)
-            return False
+                error_reason = f"无效响应 HTTP {resp.status_code}"
+            else:
+                if result.get("ok"):
+                    log.info("kitchen_print.sent")
+                    success = True
+                else:
+                    log.warning("kitchen_print.failed", response=result)
+                    error_reason = str(result.get("error", "未知错误"))
     except httpx.ConnectError:
         log.error("kitchen_print.mac_station_unavailable")
-        return False
+        error_reason = "Mac Station 连接失败"
     except httpx.TimeoutException:
         log.error("kitchen_print.timeout")
-        return False
+        error_reason = "打印超时"
     except httpx.HTTPError as exc:
         log.error("kitchen_print.http_error", error=str(exc))
-        return False
+        error_reason = f"HTTP 错误: {exc}"
+
+    if not success and error_reason is not None:
+        await _enqueue_for_retry(
+            payload_b64=payload_b64,
+            printer_address=printer_address,
+            printer_id=printer_id,
+            error_reason=error_reason,
+            log=log,
+        )
+
+    return success
+
+
+async def _enqueue_for_retry(
+    payload_b64: str,
+    printer_address: str | None,
+    printer_id: str | None,
+    error_reason: str,
+    log,
+) -> None:
+    """打印失败时将任务入队 PrintQueue；PrintQueue 不可用时降级为日志记录。"""
+    queue = _get_print_queue()
+    if queue is None:
+        log.error(
+            "kitchen_print.enqueue_skipped",
+            reason="PrintQueue 不可用",
+            print_error=error_reason,
+        )
+        return
+
+    try:
+        # 懒初始化（首次使用时建表）
+        await queue.init_db()
+
+        # 动态导入（已由 _get_print_queue 确保路径可达）
+        from print_queue import PrintJob  # noqa: PLC0415
+
+        job = PrintJob(
+            payload_base64=payload_b64,
+            printer_address=printer_address,
+            printer_id=printer_id,
+        )
+        job_id = await queue.enqueue(job)
+        log.warning(
+            "kitchen_print.enqueued_for_retry",
+            job_id=job_id,
+            print_error=error_reason,
+        )
+    except Exception as exc:
+        log.error("kitchen_print.enqueue_failed", error=str(exc), exc_info=True)
 
 
 async def print_kitchen_tickets_for_dispatch(
