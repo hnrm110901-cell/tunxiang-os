@@ -25,6 +25,15 @@
         "chef-profile",
         "order-tracking"
       ]
+    },
+    {
+      "root": "pages/scan-order",
+      "pages": [
+        "index",
+        "table-menu",
+        "confirm",
+        "status"
+      ]
     }
   ],
   "window": {

@@ -234,6 +234,36 @@ function scanOrderStatus(orderId) {
   return txRequest('/api/v1/scan-order/status/' + encodeURIComponent(orderId));
 }
 
+// ─── 扫码点餐（扩展） ───
+
+function scanOrderCreate(storeId, tableId, items, customerId) {
+  return txRequest('/api/v1/scan-order/create', 'POST', {
+    store_id: storeId || getApp().globalData.storeId,
+    table_id: tableId,
+    items: items,
+    customer_id: customerId || wx.getStorageSync('tx_customer_id') || '',
+  });
+}
+
+function scanOrderAddItems(orderId, items) {
+  return txRequest('/api/v1/scan-order/add-items', 'POST', {
+    order_id: orderId,
+    items: items,
+  });
+}
+
+function scanOrderTableOrder(storeId, tableId) {
+  return txRequest('/api/v1/scan-order/table-order?store_id=' +
+    encodeURIComponent(storeId || getApp().globalData.storeId) +
+    '&table_id=' + encodeURIComponent(tableId));
+}
+
+function scanOrderCheckout(orderId) {
+  return txRequest('/api/v1/scan-order/checkout', 'POST', {
+    order_id: orderId,
+  });
+}
+
 // ─── 企业团餐 ───
 
 function fetchCorporateAccount() {
@@ -309,6 +339,11 @@ module.exports = {
   scanOrderAddItem: scanOrderAddItem,
   scanOrderSubmit: scanOrderSubmit,
   scanOrderStatus: scanOrderStatus,
+  // 扫码点餐（扩展）
+  scanOrderCreate: scanOrderCreate,
+  scanOrderAddItems: scanOrderAddItems,
+  scanOrderTableOrder: scanOrderTableOrder,
+  scanOrderCheckout: scanOrderCheckout,
   // 企业团餐
   fetchCorporateAccount: fetchCorporateAccount,
   fetchCorporateRecords: fetchCorporateRecords,

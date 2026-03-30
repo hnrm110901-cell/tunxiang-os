@@ -28,6 +28,10 @@ from .menu_advisor import MenuAdvisorAgent
 from .pilot_recommender import PilotRecommenderAgent
 from .intel_reporter import IntelReporterAgent
 
+# 语音点菜 + AI服务员
+from .voice_order import VoiceOrderAgent
+from .ai_waiter import AIWaiterAgent
+
 ALL_SKILL_AGENTS = [
     # 原有9个核心Agent
     DiscountGuardAgent,
@@ -57,4 +61,7 @@ ALL_SKILL_AGENTS = [
     MenuAdvisorAgent,
     PilotRecommenderAgent,
     IntelReporterAgent,
+    # 语音点菜 + AI服务员
+    VoiceOrderAgent,
+    AIWaiterAgent,
 ]
