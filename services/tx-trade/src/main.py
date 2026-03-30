@@ -25,6 +25,7 @@ from .api.printer_routes import router as printer_router
 from .api.approval_routes import router as approval_router
 from .api.booking_api import router as booking_router
 from .api.kds_shortage_routes import router as kds_shortage_router
+from .api.scan_order_routes import router as scan_order_router
 
 
 @asynccontextmanager
@@ -65,6 +66,7 @@ app.include_router(printer_router)
 app.include_router(approval_router)
 app.include_router(booking_router)
 app.include_router(kds_shortage_router)
+app.include_router(scan_order_router)
 
 
 @app.get("/health")

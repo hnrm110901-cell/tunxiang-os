@@ -189,4 +189,63 @@
 
 .order-card-footer { display: flex; justify-content: space-between; align-items: center; }
 .order-card-total { font-size: 32rpx; color: #FF6B2C; font-weight: bold; }
+.order-card-actions { display: flex; align-items: center; gap: 20rpx; }
 .order-card-action { font-size: 26rpx; color: #FF6B2C; }
+.order-card-invoice {
+  font-size: 24rpx;
+  color: #4CAF50;
+  padding: 6rpx 18rpx;
+  border: 1rpx solid #4CAF50;
+  border-radius: 24rpx;
+}
+
+/* ═══ 支付成功 ═══ */
+.paid-success-page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 80rpx 48rpx;
+}
+
+.success-icon-wrap {
+  width: 120rpx;
+  height: 120rpx;
+  border-radius: 50%;
+  background: #4CAF50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 32rpx;
+}
+
+.success-icon-text { font-size: 56rpx; color: #fff; }
+
+.success-title { font-size: 36rpx; color: #fff; font-weight: 600; margin-bottom: 16rpx; }
+.success-amount { font-size: 48rpx; color: #FF6B2C; font-weight: bold; margin-bottom: 12rpx; }
+.success-order-no { font-size: 24rpx; color: #999; margin-bottom: 48rpx; }
+
+.invoice-entry, .coupon-entry {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  background: #112228;
+  border-radius: 16rpx;
+  padding: 28rpx 32rpx;
+  margin-bottom: 20rpx;
+}
+
+.invoice-icon-text, .coupon-icon-text { font-size: 36rpx; margin-right: 16rpx; }
+.invoice-text, .coupon-text { flex: 1; font-size: 30rpx; color: #fff; }
+.invoice-arrow, .coupon-arrow { font-size: 28rpx; color: #999; }
+
+.back-to-orders-btn {
+  margin-top: 40rpx;
+  background: transparent !important;
+  color: #FF6B2C !important;
+  border: 2rpx solid #FF6B2C;
+  border-radius: 44rpx;
+  font-size: 30rpx;
+  width: 100%;
+  height: 84rpx;
+  line-height: 84rpx;
+}

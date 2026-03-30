@@ -12,7 +12,7 @@ import structlog
 from sqlalchemy import select, update, func, and_, cast, Date
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from shared.ontology.src.entities import Order, OrderItem, Store, Dish
+from shared.ontology.src.entities import Order, OrderItem, Store, Dish, Customer
 from shared.ontology.src.enums import OrderStatus
 from ..models.tables import Table
 from ..models.enums import TableStatus, OrderType
@@ -617,11 +617,15 @@ class CashierEngine:
         self,
         order_id: str,
         payments: list[dict],
+        auto_pay: bool = False,
+        customer_id: Optional[str] = None,
     ) -> dict:
-        """结算 — 多支付方式结账
+        """结算 — 多支付方式结账 / 无感支付
 
         Args:
             payments: [{method, amount_fen, trade_no?}]
+            auto_pay: 如果为 True 且顾客有储值卡余额 >= final_amount，自动扣款
+            customer_id: 顾客ID（auto_pay 时必传）
         """
         order_uuid = uuid.UUID(order_id)
         order = await self._get_order(order_uuid)
@@ -630,6 +634,21 @@ class CashierEngine:
             raise ValueError("订单已结算")
         if order.status == OrderStatus.cancelled.value:
             raise ValueError("订单已取消")
+
+        # ─── 无感支付：储值卡自动扣款 ───
+        auto_pay_result: Optional[dict] = None
+        if auto_pay and customer_id:
+            auto_pay_result = await self._try_auto_pay(
+                order_id=order_id,
+                customer_id=customer_id,
+                final_amount_fen=order.final_amount_fen,
+            )
+            if auto_pay_result and auto_pay_result.get("success"):
+                # 自动扣款成功，构造支付记录
+                payments = [{
+                    "method": "member_balance",
+                    "amount_fen": order.final_amount_fen,
+                }]
 
         # 验证支付总额 >= 应付金额
         total_paid = sum(p["amount_fen"] for p in payments)
@@ -700,14 +719,41 @@ class CashierEngine:
             order_no=order.order_no,
             final_fen=order.final_amount_fen,
             payments_count=len(payments),
+            auto_pay=auto_pay,
         )
 
-        return {
+        # ─── 支付后推券（异步不阻塞） ───
+        effective_customer_id = customer_id or (
+            str(order.customer_id) if order.customer_id else None
+        )
+        if effective_customer_id:
+            try:
+                from .post_payment_service import PostPaymentService
+
+                post_svc = PostPaymentService(self.db, str(self.tenant_id))
+                await post_svc.trigger_post_payment(order_id, effective_customer_id)
+            except (ImportError, ValueError, RuntimeError) as exc:
+                logger.warning(
+                    "post_payment_trigger_failed",
+                    order_id=order_id,
+                    error=str(exc),
+                )
+
+        result = {
             "settled": True,
             "payment_records": payment_records,
             "change_fen": change_fen,
             "receipt_data": receipt_data,
         }
+
+        if auto_pay_result and auto_pay_result.get("success"):
+            result["auto_pay"] = {
+                "deducted_fen": auto_pay_result["deducted_fen"],
+                "balance_fen": auto_pay_result["balance_fen"],
+                "card_id": auto_pay_result["card_id"],
+            }
+
+        return result
 
     async def cancel_order(
         self,
@@ -972,6 +1018,108 @@ class CashierEngine:
             )
             .values(status=TableStatus.free.value, current_order_id=None)
         )
+
+    async def _try_auto_pay(
+        self,
+        order_id: str,
+        customer_id: str,
+        final_amount_fen: int,
+    ) -> Optional[dict]:
+        """无感支付 — 尝试从储值卡自动扣款
+
+        查找顾客活跃储值卡，余额 >= final_amount 时自动扣款。
+        扣款成功后推送微信通知。
+        """
+        from .coupon_service import _StoredValueStore
+
+        # 遍历储值卡找到该顾客的卡（余额充足）
+        target_card: Optional[dict] = None
+        for card_data in _StoredValueStore._cards.values():
+            if (
+                card_data.get("customer_id") == customer_id
+                and card_data.get("tenant_id") == str(self.tenant_id)
+                and card_data.get("status") == "active"
+                and card_data.get("balance_fen", 0) >= final_amount_fen
+            ):
+                target_card = card_data
+                break
+
+        if not target_card:
+            logger.info(
+                "auto_pay_no_eligible_card",
+                order_id=order_id,
+                customer_id=customer_id,
+                required_fen=final_amount_fen,
+            )
+            return {"success": False, "reason": "无可用储值卡或余额不足"}
+
+        # 执行扣款
+        from .coupon_service import deduct_stored_value
+
+        deduct_result = await deduct_stored_value(
+            card_id=target_card["card_id"],
+            amount_fen=final_amount_fen,
+            order_id=order_id,
+            tenant_id=str(self.tenant_id),
+            db=self.db,
+        )
+
+        logger.info(
+            "auto_pay_success",
+            order_id=order_id,
+            customer_id=customer_id,
+            card_id=target_card["card_id"],
+            deducted_fen=final_amount_fen,
+            balance_fen=deduct_result["balance_fen"],
+        )
+
+        # 推送微信通知"已自动扣款"
+        try:
+            customer_result = await self.db.execute(
+                select(Customer).where(
+                    Customer.id == uuid.UUID(customer_id),
+                    Customer.tenant_id == self.tenant_id,
+                )
+            )
+            customer = customer_result.scalar_one_or_none()
+
+            if customer and customer.wechat_openid:
+                try:
+                    from services.tx_ops.src.services.notification_service import NotificationService  # noqa: E501
+                except ImportError:
+                    customer = None  # 跳过通知
+
+                if customer:
+                    notification_svc = NotificationService(
+                        db=self.db,
+                        tenant_id=str(self.tenant_id),
+                    )
+                    amount_yuan = final_amount_fen / 100
+                    balance_yuan = deduct_result["balance_fen"] / 100
+                    await notification_svc.send_wechat(
+                        openid=customer.wechat_openid,
+                        template_id="auto_pay_deducted",
+                        data={
+                            "first": {"value": "储值卡已自动扣款"},
+                            "keyword1": {"value": f"¥{amount_yuan:.2f}"},
+                            "keyword2": {"value": f"¥{balance_yuan:.2f}"},
+                            "remark": {"value": "如有疑问请联系门店"},
+                        },
+                    )
+        except (ConnectionError, TimeoutError, ValueError, RuntimeError) as exc:
+            # 通知失败不影响扣款结果
+            logger.warning(
+                "auto_pay_notification_failed",
+                order_id=order_id,
+                error=str(exc),
+            )
+
+        return {
+            "success": True,
+            "card_id": target_card["card_id"],
+            "deducted_fen": final_amount_fen,
+            "balance_fen": deduct_result["balance_fen"],
+        }
 
     @staticmethod
     def _method_to_category(method: str) -> str:

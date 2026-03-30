@@ -1,0 +1,57 @@
+.page-container { min-height: 100vh; background: #0B1A20; color: #fff; }
+
+.invoice-form { padding: 32rpx; }
+
+.form-section {
+  background: #112228;
+  border-radius: 16rpx;
+  padding: 28rpx;
+  margin-bottom: 20rpx;
+}
+
+.section-label { font-size: 26rpx; color: #999; display: block; margin-bottom: 16rpx; }
+
+.type-options { display: flex; gap: 20rpx; }
+
+.type-option {
+  flex: 1;
+  text-align: center;
+  padding: 20rpx;
+  background: #1a2a33;
+  border-radius: 12rpx;
+  font-size: 28rpx;
+  color: #999;
+  border: 2rpx solid transparent;
+}
+
+.type-option.active { border-color: #FF6B2C; color: #FF6B2C; }
+
+.form-input {
+  background: #1a2a33;
+  border-radius: 12rpx;
+  padding: 20rpx 24rpx;
+  font-size: 28rpx;
+  color: #fff;
+}
+
+.amount-display { font-size: 40rpx; color: #FF6B2C; font-weight: bold; }
+
+.submit-btn {
+  margin-top: 40rpx;
+  background: #FF6B2C !important;
+  color: #fff !important;
+  border-radius: 44rpx;
+  font-size: 32rpx;
+  height: 88rpx;
+  line-height: 88rpx;
+}
+
+.submit-btn[disabled] { opacity: 0.5; }
+
+.tip-text {
+  display: block;
+  text-align: center;
+  font-size: 24rpx;
+  color: #666;
+  margin-top: 24rpx;
+}

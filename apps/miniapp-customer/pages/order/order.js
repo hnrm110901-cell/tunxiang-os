@@ -14,6 +14,11 @@ Page({
     remark: '',
     payMethod: 'wechat',
     submitting: false,
+    // ─── 支付成功 ───
+    paidOrderId: '',
+    paidOrderNo: '',
+    paidAmountYuan: '0.00',
+    hasCoupons: false,
     // ─── 历史订单 ───
     activeTab: 'all',
     orderTabs: [
@@ -136,16 +141,17 @@ Page({
           return data;
         });
     }).then(function (data) {
-      wx.showToast({ title: '下单成功', icon: 'success' });
-      setTimeout(function () {
-        // 跳回订单列表
-        self.setData({
-          mode: 'list',
-          orderItems: [],
-          submitting: false,
-        });
-        self._loadOrders();
-      }, 1500);
+      wx.showToast({ title: '支付成功', icon: 'success' });
+      // 跳转到支付成功页面，展示开发票入口
+      self.setData({
+        mode: 'paid_success',
+        paidOrderId: data.order_id || '',
+        paidOrderNo: data.order_no || '',
+        paidAmountYuan: (self.data.totalFen / 100).toFixed(2),
+        hasCoupons: true,
+        orderItems: [],
+        submitting: false,
+      });
     }).catch(function (err) {
       console.error('下单失败', err);
       wx.showToast({ title: err.message || '下单失败', icon: 'none' });
@@ -220,5 +226,28 @@ Page({
   goToOrderDetail: function (e) {
     var id = e.currentTarget.dataset.id;
     wx.navigateTo({ url: '/pages/order/order?order_id=' + id });
+  },
+
+  // ─── 开发票 ───
+
+  goToInvoice: function (e) {
+    var orderId = e.currentTarget.dataset.id;
+    var amount = e.currentTarget.dataset.amount || '';
+    wx.navigateTo({
+      url: '/pages/extra/invoice/invoice?order_id=' + orderId + '&amount=' + amount,
+    });
+  },
+
+  // ─── 查看优惠券 ───
+
+  goToCoupons: function () {
+    wx.switchTab({ url: '/pages/coupon/coupon' });
+  },
+
+  // ─── 返回订单列表 ───
+
+  backToOrderList: function () {
+    this.setData({ mode: 'list' });
+    this._loadOrders();
   },
 });

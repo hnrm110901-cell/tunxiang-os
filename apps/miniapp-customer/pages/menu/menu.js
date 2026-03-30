@@ -6,6 +6,13 @@ Page({
   data: {
     storeName: '屯象点餐',
     tableNo: '',
+    // 扫码点单
+    scanOrderMode: false,
+    orderId: '',
+    orderNo: '',
+    isNewOrder: true,
+    existingItems: [],
+    recommendations: [],  // AI 智能推荐
     // 分类
     categories: [],
     activeCategoryId: '',
@@ -20,17 +27,29 @@ Page({
     showCartPopup: false,
     // 搜索
     searchKeyword: '',
+    // 出餐进度
+    showStatusPopup: false,
+    orderStatus: null,
   },
 
   onLoad: function (options) {
+    var tableNo = options.table || '';
     this.setData({
-      tableNo: options.table || '',
+      tableNo: tableNo,
       storeName: options.store_name ? decodeURIComponent(options.store_name) : '屯象点餐',
     });
+
+    // 如果有桌号，走扫码点单流程
+    if (tableNo) {
+      this.setData({ scanOrderMode: true });
+      this._initScanOrder(tableNo);
+    }
   },
 
   onShow: function () {
-    this._loadMenu();
+    if (!this.data.scanOrderMode) {
+      this._loadMenu();
+    }
   },
 
   onShareAppMessage: function () {
@@ -38,6 +57,101 @@ Page({
       title: this.data.storeName + ' - 在线点餐',
       path: '/pages/menu/menu',
     };
+  },
+
+  // ─── 扫码点单 ───
+
+  _initScanOrder: function (tableNo) {
+    var self = this;
+    self.setData({ loading: true });
+
+    api.scanOrderInit(tableNo).then(function (data) {
+      var menuItems = data.menu_items || [];
+      var recommendations = data.recommendations || [];
+
+      // 构造分类列表，首项为"推荐"
+      var catMap = {};
+      var categoryList = [{ id: 'recommend', name: '推荐' }];
+      menuItems.forEach(function (d) {
+        if (d.category_id && !catMap[d.category_id]) {
+          catMap[d.category_id] = true;
+          categoryList.push({ id: d.category_id, name: d.category_name || d.category_id });
+        }
+      });
+
+      // 给推荐菜品打上推荐标签
+      var recommendedIds = {};
+      recommendations.forEach(function (r) {
+        recommendedIds[r.dish_id] = r.reason;
+      });
+
+      // 标记菜品的推荐理由
+      menuItems.forEach(function (d) {
+        d.id = d.dish_id;
+        d.name = d.dish_name;
+        d.priceFen = d.price_fen;
+        d.imageUrl = d.image_url;
+        if (recommendedIds[d.dish_id]) {
+          d.recommendReason = recommendedIds[d.dish_id];
+        }
+      });
+
+      self.setData({
+        orderId: data.order_id || '',
+        orderNo: data.order_no || '',
+        isNewOrder: data.is_new_order,
+        existingItems: data.existing_items || [],
+        recommendations: recommendations,
+        categories: categoryList,
+        activeCategoryId: 'recommend',
+        allDishes: menuItems,
+        loading: false,
+      });
+      self._filterDishes();
+    }).catch(function (err) {
+      self.setData({ loading: false });
+      wx.showToast({ title: err.message || '加载失败', icon: 'none' });
+      // 降级到普通菜单模式
+      self.setData({ scanOrderMode: false });
+      self._loadMenu();
+    });
+  },
+
+  _submitToKitchen: function () {
+    var self = this;
+    if (!self.data.orderId) {
+      wx.showToast({ title: '请先点菜', icon: 'none' });
+      return;
+    }
+
+    wx.showLoading({ title: '提交中...' });
+    api.scanOrderSubmit(self.data.orderId).then(function (data) {
+      wx.hideLoading();
+      wx.showToast({ title: '已提交厨房', icon: 'success' });
+      // 清空购物车（已提交的菜品不可修改）
+      self.clearCart();
+    }).catch(function (err) {
+      wx.hideLoading();
+      wx.showToast({ title: err.message || '提交失败', icon: 'none' });
+    });
+  },
+
+  _checkOrderStatus: function () {
+    var self = this;
+    if (!self.data.orderId) return;
+
+    api.scanOrderStatus(self.data.orderId).then(function (data) {
+      self.setData({
+        orderStatus: data,
+        showStatusPopup: true,
+      });
+    }).catch(function (err) {
+      wx.showToast({ title: err.message || '查询失败', icon: 'none' });
+    });
+  },
+
+  closeStatusPopup: function () {
+    this.setData({ showStatusPopup: false });
   },
 
   // ─── 数据加载 ───
@@ -86,9 +200,22 @@ Page({
     var filtered = dishes;
 
     // 分类筛选
-    if (catId && catId !== 'recommend') {
+    if (catId === 'recommend') {
+      // 推荐分类：推荐菜品置顶
+      var recommendedIds = {};
+      self.data.recommendations.forEach(function (r) {
+        recommendedIds[r.dish_id] = true;
+      });
+      var recommended = filtered.filter(function (d) {
+        return recommendedIds[d.dish_id || d.id];
+      });
+      var others = filtered.filter(function (d) {
+        return !recommendedIds[d.dish_id || d.id];
+      });
+      filtered = recommended.concat(others);
+    } else if (catId) {
       filtered = filtered.filter(function (d) {
-        return d.category === catId || d.category_name === catId;
+        return d.category === catId || d.category_name === catId || d.category_id === catId;
       });
     }
 
@@ -134,7 +261,8 @@ Page({
   },
 
   _addToCart: function (dish) {
-    var cart = this.data.cartItems.slice();
+    var self = this;
+    var cart = self.data.cartItems.slice();
     var idx = -1;
     for (var i = 0; i < cart.length; i++) {
       if (cart[i].dish.id === dish.id) { idx = i; break; }
@@ -146,7 +274,19 @@ Page({
       cart.push({ dish: dish, quantity: 1 });
     }
 
-    this._updateCart(cart);
+    self._updateCart(cart);
+
+    // 扫码点单模式：同步加菜到服务端
+    if (self.data.scanOrderMode && self.data.orderId) {
+      api.scanOrderAddItem(
+        self.data.orderId,
+        dish.dish_id || dish.id,
+        1,
+        ''
+      ).catch(function (err) {
+        wx.showToast({ title: err.message || '加菜失败', icon: 'none' });
+      });
+    }
   },
 
   _removeFromCart: function (dishId) {
@@ -216,6 +356,12 @@ Page({
   goToCheckout: function () {
     if (this.data.cartCount === 0) return;
 
+    // 扫码点单模式：提交到厨房
+    if (this.data.scanOrderMode) {
+      this._submitToKitchen();
+      return;
+    }
+
     var orderItems = this.data.cartItems.map(function (item) {
       return {
         dishId: item.dish.id || item.dish.dish_id,
@@ -231,5 +377,11 @@ Page({
            '&total=' + this.data.cartTotalFen +
            '&table=' + (this.data.tableNo || ''),
     });
+  },
+
+  // ─── 出餐进度 ───
+
+  viewOrderStatus: function () {
+    this._checkOrderStatus();
   },
 });

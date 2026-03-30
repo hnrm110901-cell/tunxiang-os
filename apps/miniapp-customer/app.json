@@ -13,7 +13,8 @@
     {
       "root": "pages/extra",
       "pages": [
-        "corporate/corporate"
+        "corporate/corporate",
+        "invoice/invoice"
       ]
     }
   ],

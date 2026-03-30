@@ -217,6 +217,25 @@ async def dispatch_order_to_kds(
         except (OSError, ConnectionError, TimeoutError) as e:
             log.error("kds_dispatch.print_failed", error=str(e), exc_info=True)
 
+    # ── 7. 同桌同出协同 — 计算延迟开始时间 ──
+    from .cooking_scheduler import coordinate_same_table
+
+    all_tasks = [task for dept in dept_tasks for task in dept["items"]]
+    coordination = await coordinate_same_table(order_id, all_tasks, db)
+
+    # 将 start_delay 和 target_completion 写入每个任务的 metadata
+    coord_map = {c["task_id"]: c for c in coordination}
+    for dept in dept_tasks:
+        for task in dept["items"]:
+            coord = coord_map.get(task["task_id"])
+            if coord:
+                task["metadata"] = {
+                    **(task.get("metadata") or {}),
+                    "start_delay_seconds": coord["start_delay_seconds"],
+                    "target_completion": coord["target_completion"],
+                    "estimated_seconds": coord["estimated_seconds"],
+                }
+
     log.info("kds_dispatch.done", dept_count=len(dept_tasks), total_tasks=sum(len(d["items"]) for d in dept_tasks))
     return {"dept_tasks": dept_tasks}
 
