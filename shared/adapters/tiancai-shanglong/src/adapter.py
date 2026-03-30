@@ -345,6 +345,25 @@ class TiancaiShanglongAdapter:
             qty = Decimal(str(item.get("last_qty", item.get("orig_qty", 1))))
             subtotal = Decimal(str(item.get("last_total", 0))) / 100
 
+            # original_price_fen — 天财 orig_price（折前价，分）
+            orig_price_raw = item.get("orig_price")
+            original_price_fen = int(orig_price_raw) if orig_price_raw is not None else None
+
+            # single_discount_fen — 天财 disc_total（品项级折扣，分）
+            disc_raw = item.get("disc_total", item.get("disc_money"))
+            single_discount_fen = int(disc_raw) if disc_raw is not None else None
+
+            # practice_names — 天财 taste_customization / taste_name
+            taste_raw = item.get("taste_customization") or item.get("taste_name") or ""
+            practice_names = str(taste_raw).strip() if taste_raw else None
+
+            # is_gift — 天财 is_gift / gift_flag
+            is_gift = bool(item.get("is_gift") or item.get("gift_flag", False))
+            gift_reason = item.get("gift_reason") if is_gift else None
+
+            # combo_id — 天财 pkg_id / combo_id
+            combo_id = item.get("pkg_id") or item.get("combo_id")
+
             items.append(OrderItemSchema(
                 item_id=str(item.get("item_id", f"{raw.get('bs_id', '')}_{idx}")),
                 dish_id=str(item.get("item_code", item.get("item_id", ""))),
@@ -354,11 +373,27 @@ class TiancaiShanglongAdapter:
                 unit_price=unit_price,
                 subtotal=subtotal,
                 special_requirements=None,
+                original_price_fen=original_price_fen,
+                single_discount_fen=single_discount_fen,
+                practice_names=practice_names,
+                is_gift=is_gift,
+                gift_reason=gift_reason,
+                combo_id=str(combo_id) if combo_id else None,
             ))
 
         total = Decimal(str(raw.get("last_total", 0))) / 100
         discount = Decimal(str(raw.get("disc_total", 0))) / 100
         subtotal = Decimal(str(raw.get("orig_total", 0))) / 100
+
+        # service_charge_fen — 天财 service_fee_income_money（分）
+        service_fee_raw = raw.get("service_fee_income_money", 0)
+        service_charge_fen = int(service_fee_raw) if service_fee_raw else None
+
+        # waiter_code 同时写入 waiter_id；天财没有独立 cashier 字段，
+        # 当 waiter_role 明确为收银时也写入 cashier_id
+        waiter_code = raw.get("waiter_code") or raw.get("waiter_name")
+        waiter_role = raw.get("waiter_role", "")
+        cashier_id = waiter_code if str(waiter_role).lower() in ("cashier", "收银") else None
 
         # 时间解析：优先 settle_time，退化到 open_time
         time_raw = raw.get("settle_time") or raw.get("open_time", "")
@@ -366,6 +401,14 @@ class TiancaiShanglongAdapter:
             created_at = datetime.fromisoformat(str(time_raw).replace("T", " "))
         except (ValueError, TypeError):
             created_at = datetime.now(timezone.utc).replace(tzinfo=None)
+
+        logger.debug(
+            "tiancai_to_order",
+            bs_id=raw.get("bs_id"),
+            service_charge_fen=service_charge_fen,
+            waiter_code=waiter_code,
+            cashier_id=cashier_id,
+        )
 
         return OrderSchema(
             order_id=str(raw.get("bs_id", "")),
@@ -382,7 +425,9 @@ class TiancaiShanglongAdapter:
             service_charge=Decimal(str(raw.get("service_fee_income_money", 0))) / 100,
             total=total,
             created_at=created_at,
-            waiter_id=raw.get("waiter_code") or raw.get("waiter_name"),
+            waiter_id=waiter_code,
+            cashier_id=cashier_id,
+            service_charge_fen=service_charge_fen,
             notes=None,
         )
 

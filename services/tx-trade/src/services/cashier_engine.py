@@ -1133,3 +1133,95 @@ class CashierEngine:
             "credit_account": "挂账",
         }
         return mapping.get(method, "other")
+
+    # ─────────────────────────────────────
+    # 6. Table Transfer (转台)
+    # ─────────────────────────────────────
+
+    async def transfer_table(
+        self,
+        order_id: str,
+        target_table_no: str,
+        operator_id: Optional[str] = None,
+    ) -> dict:
+        """转台 — 校验目标桌空闲 → 更新Order → 释放原桌 → 锁新桌
+
+        业务规则：
+        1. 订单必须处于 pending/confirmed 状态
+        2. 目标桌必须为 free 状态
+        3. 原桌号记录到 order.table_transfer_from 以供追溯
+        """
+        order_uuid = uuid.UUID(order_id)
+        order = await self._get_order(order_uuid)
+
+        # 校验订单状态
+        if order.status in (OrderStatus.completed.value, OrderStatus.cancelled.value):
+            raise ValueError(f"订单状态 {order.status}，无法转台")
+
+        old_table_no = order.table_number
+        if not old_table_no:
+            raise ValueError("订单无桌台信息，无法转台")
+
+        if old_table_no == target_table_no:
+            raise ValueError("目标桌与当前桌相同，无需转台")
+
+        store_uuid = order.store_id
+
+        # 查询目标桌台
+        target_result = await self.db.execute(
+            select(Table).where(
+                Table.store_id == store_uuid,
+                Table.table_no == target_table_no,
+                Table.tenant_id == self.tenant_id,
+                Table.is_active == True,  # noqa: E712
+            )
+        )
+        target_table = target_result.scalar_one_or_none()
+        if not target_table:
+            raise ValueError(f"目标桌台不存在: {target_table_no}")
+
+        if target_table.status != TableStatus.free.value:
+            raise ValueError(
+                f"目标桌台 {target_table_no} 当前状态 {target_table.status}，"
+                f"不是空闲状态，无法转入"
+            )
+
+        # 释放原桌
+        await self._release_table(str(store_uuid), old_table_no)
+
+        # 锁定目标桌
+        target_table.status = TableStatus.occupied.value
+        target_table.current_order_id = order_uuid
+
+        # 更新订单桌号 + 记录转台历史
+        order.table_number = target_table_no
+        order.table_transfer_from = old_table_no
+        order.order_metadata = {
+            **(order.order_metadata or {}),
+            "last_transfer": {
+                "from": old_table_no,
+                "to": target_table_no,
+                "operator_id": operator_id,
+                "transferred_at": datetime.now(timezone.utc).isoformat(),
+            },
+        }
+
+        await self.db.flush()
+
+        logger.info(
+            "table_transferred",
+            order_id=order_id,
+            order_no=order.order_no,
+            from_table=old_table_no,
+            to_table=target_table_no,
+            operator_id=operator_id,
+        )
+
+        return {
+            "order_id": order_id,
+            "order_no": order.order_no,
+            "from_table": old_table_no,
+            "to_table": target_table_no,
+            "status": order.status,
+            "operator_id": operator_id,
+        }

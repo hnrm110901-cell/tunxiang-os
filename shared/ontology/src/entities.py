@@ -333,6 +333,12 @@ class Order(TenantBase):
     served_at: Mapped[str | None] = mapped_column(DateTime(timezone=True), comment="出餐完成时间")
     serve_duration_min: Mapped[int | None] = mapped_column(Integer, comment="出餐耗时(分钟)")
 
+    # 收银员 & 来源 & 转台（v011 补全）
+    cashier_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), comment="收银员ID")
+    service_charge_fen: Mapped[int | None] = mapped_column(Integer, comment="服务费总额(分)")
+    order_source: Mapped[str | None] = mapped_column(String(50), comment="原始订单来源编码")
+    table_transfer_from: Mapped[str | None] = mapped_column(String(20), comment="转台前桌号")
+
     # 关联
     items = relationship("OrderItem", back_populates="order", cascade="all, delete-orphan")
 
@@ -365,6 +371,14 @@ class OrderItem(TenantBase):
     kds_station: Mapped[str | None] = mapped_column(String(50), comment="目标档口")
     return_flag: Mapped[bool] = mapped_column(Boolean, default=False, comment="退菜标记")
     return_reason: Mapped[str | None] = mapped_column(String(200), comment="退菜原因")
+
+    # 价格 & 折扣 & 做法 & 赠菜 & 套餐（v011 补全）
+    original_price_fen: Mapped[int | None] = mapped_column(Integer, comment="原价/折前价(分)")
+    single_discount_fen: Mapped[int | None] = mapped_column(Integer, comment="单品折扣金额(分)")
+    practice_names: Mapped[str | None] = mapped_column(String(500), comment="做法名称(冗余,逗号分隔)")
+    is_gift: Mapped[bool] = mapped_column(Boolean, default=False, comment="是否赠菜")
+    gift_reason: Mapped[str | None] = mapped_column(String(200), comment="赠菜原因")
+    combo_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), comment="所属套餐ID(NULL=非套餐)")
 
     order = relationship("Order", back_populates="items")
 

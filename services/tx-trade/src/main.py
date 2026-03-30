@@ -26,6 +26,10 @@ from .api.approval_routes import router as approval_router
 from .api.booking_api import router as booking_router
 from .api.kds_shortage_routes import router as kds_shortage_router
 from .api.scan_order_routes import router as scan_order_router
+from .api.order_ops_routes import router as order_ops_router
+from .api.shift_routes import router as shift_router
+from .api.dish_practice_routes import router as dish_practice_router
+from .api.table_ops_routes import router as table_ops_router
 
 
 @asynccontextmanager
@@ -67,6 +71,10 @@ app.include_router(approval_router)
 app.include_router(booking_router)
 app.include_router(kds_shortage_router)
 app.include_router(scan_order_router)
+app.include_router(order_ops_router)
+app.include_router(shift_router)
+app.include_router(dish_practice_router)
+app.include_router(table_ops_router)
 
 
 @app.get("/health")

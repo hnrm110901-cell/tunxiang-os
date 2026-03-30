@@ -667,6 +667,34 @@ class PinzhiAdapter:
         for idx, dish in enumerate(raw.get("dishList", []), start=1):
             unit_price = Decimal(str(dish.get("dishPrice", dish.get("price", 0)))) / 100
             qty = int(dish.get("dishNum", dish.get("quantity", 1)))
+
+            # 原价（折前价）— 品智 dishOriginalPrice / originalPrice
+            orig_price_raw = dish.get("dishOriginalPrice", dish.get("originalPrice"))
+            original_price_fen = int(orig_price_raw) if orig_price_raw is not None else None
+
+            # 单品折扣金额 — 品智 discountPrice / specialPrice
+            disc_raw = dish.get("discountPrice", dish.get("specialPrice"))
+            single_discount_fen = int(disc_raw) if disc_raw is not None else None
+
+            # 做法/口味 → practice_names（逗号拼接）
+            practice_parts = []
+            for p in dish.get("practice", []):
+                name = p.get("name") or p.get("practiceName")
+                if name:
+                    practice_parts.append(str(name))
+            for t in dish.get("taste", []):
+                name = t.get("name") or t.get("tasteName")
+                if name:
+                    practice_parts.append(str(name))
+            practice_names = ",".join(practice_parts) if practice_parts else None
+
+            # 赠菜判断 — 品智 isGift / giftFlag
+            is_gift = bool(dish.get("isGift") or dish.get("giftFlag", False))
+            gift_reason = dish.get("giftReason") if is_gift else None
+
+            # 套餐 — 品智 comboId / packageId
+            combo_id = dish.get("comboId") or dish.get("packageId")
+
             items.append(OrderItemSchema(
                 item_id=str(dish.get("dishId", f"{raw.get('billId', '')}_{idx}")),
                 dish_id=str(dish.get("dishId", "")),
@@ -675,10 +703,33 @@ class PinzhiAdapter:
                 quantity=qty,
                 unit_price=unit_price,
                 subtotal=unit_price * qty,
+                original_price_fen=original_price_fen,
+                single_discount_fen=single_discount_fen,
+                practice_names=practice_names,
+                is_gift=is_gift,
+                gift_reason=gift_reason,
+                combo_id=str(combo_id) if combo_id else None,
             ))
 
-        order_source = raw.get("orderSource", 1)
-        order_type = OrderType.DINE_IN if order_source == 1 else OrderType.DELIVERY
+        order_source_raw = raw.get("orderSource", 1)
+        order_type = OrderType.DINE_IN if order_source_raw == 1 else OrderType.DELIVERY
+
+        # cashier_id — 品智 cashiers 字段（收银员工号）
+        cashier_id_raw = raw.get("cashiers")
+
+        # service_charge_fen — 品智 teaPrice（茶位费/服务费，原始单位分）
+        service_charge_fen = int(raw.get("teaPrice", 0)) or None
+
+        # order_source — 保留品智原始编码字符串
+        order_source_str = str(order_source_raw) if order_source_raw is not None else None
+
+        logger.debug(
+            "pinzhi_to_order",
+            bill_id=raw.get("billId"),
+            order_source=order_source_str,
+            cashier_id=cashier_id_raw,
+            service_charge_fen=service_charge_fen,
+        )
 
         return OrderSchema(
             order_id=str(raw.get("billId", "")),
@@ -697,7 +748,9 @@ class PinzhiAdapter:
             created_at=created_at,
             completed_at=completed_at,
             waiter_id=raw.get("openOrderUser"),
-            cashier_id=raw.get("cashiers"),
+            cashier_id=cashier_id_raw,
+            order_source=order_source_str,
+            service_charge_fen=service_charge_fen,
             notes=raw.get("remark"),
         )
 
