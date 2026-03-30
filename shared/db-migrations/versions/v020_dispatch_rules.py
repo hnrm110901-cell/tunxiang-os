@@ -128,10 +128,10 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.execute("DROP POLICY IF EXISTS dispatch_rules_select ON dispatch_rules;
+    op.execute("DROP POLICY IF EXISTS dispatch_rules_select ON dispatch_rules;")
     op.execute("DROP POLICY IF EXISTS dispatch_rules_insert ON dispatch_rules;")
     op.execute("DROP POLICY IF EXISTS dispatch_rules_update ON dispatch_rules;")
-    op.execute("DROP POLICY IF EXISTS dispatch_rules_delete ON dispatch_rules;")")
+    op.execute("DROP POLICY IF EXISTS dispatch_rules_delete ON dispatch_rules;")
     op.execute("ALTER TABLE dispatch_rules DISABLE ROW LEVEL SECURITY;")
     op.drop_index("ix_dispatch_rules_match_brand_id", table_name="dispatch_rules")
     op.drop_index("ix_dispatch_rules_match_dish_id", table_name="dispatch_rules")

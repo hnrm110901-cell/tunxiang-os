@@ -2,12 +2,15 @@
 
 Golden ID 全渠道画像、RFM 分层、营销活动、用户旅程、私域运营、储值卡、积分商城、付费会员
 """
+import asyncio
 from contextlib import asynccontextmanager
 
+import structlog
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from shared.ontology.src.database import init_db
+from shared.ontology.src.database import init_db, async_session_factory
 from api.members import router as member_router
 from api.marketing import router as marketing_router
 from api.analytics_routes import router as analytics_router
@@ -20,12 +23,50 @@ from api.smart_dispatch_routes import router as smart_dispatch_router
 from api.stored_value_routes import router as stored_value_router
 from api.premium_card_routes import router as premium_card_router
 from api.points_mall_routes import router as points_mall_router
+from api.rfm_routes import router as rfm_router
+from workers.rfm_updater import RFMUpdater
+
+logger = structlog.get_logger(__name__)
+
+# 全局 scheduler 实例（lifespan 中启动/关闭）
+_scheduler = AsyncIOScheduler(timezone="Asia/Shanghai")
+
+
+async def _run_rfm_update() -> None:
+    """定时任务入口：获取 DB session 并执行全量 RFM 更新"""
+    logger.info("rfm_scheduled_job_started")
+    async with async_session_factory() as db:
+        try:
+            result = await RFMUpdater().update_all_tenants(db)
+            logger.info("rfm_scheduled_job_finished", **result)
+        except (OSError, RuntimeError, ValueError) as exc:
+            logger.error(
+                "rfm_scheduled_job_error",
+                error=str(exc),
+                exc_info=True,
+            )
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()
+
+    # 注册 RFM 每日凌晨2点定时任务（Asia/Shanghai）
+    _scheduler.add_job(
+        lambda: asyncio.create_task(_run_rfm_update()),
+        "cron",
+        hour=2,
+        minute=0,
+        id="rfm_daily_update",
+        replace_existing=True,
+    )
+    _scheduler.start()
+    logger.info("rfm_scheduler_started", next_run=str(_scheduler.get_job("rfm_daily_update").next_run_time))
+
     yield
+
+    _scheduler.shutdown(wait=False)
+    logger.info("rfm_scheduler_stopped")
 
 
 app = FastAPI(
@@ -54,6 +95,7 @@ app.include_router(smart_dispatch_router)
 app.include_router(stored_value_router)
 app.include_router(premium_card_router)
 app.include_router(points_mall_router)
+app.include_router(rfm_router)
 
 
 @app.get("/health")

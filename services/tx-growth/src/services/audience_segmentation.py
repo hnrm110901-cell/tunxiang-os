@@ -1,21 +1,351 @@
-"""客户分群引擎 — 从会员列表升级到经营人群池
+"""客户分群引擎 — 基于 RFM、行为特征、消费偏好的精准人群池
 
-基于 RFM、行为特征、消费偏好等多维度规则，将会员划分为
-系统预设 + 自定义人群包，支持动态计算与 AI 推荐。
+分群体系：
+  - 内置分群（BUILTIN_SEGMENTS）：28个预定义人群，覆盖 RFM 8象限、时间、
+    消费时段、生命周期、宴席等维度，可直接使用，无需用户配置。
+  - 自定义分群：运营人员通过规则 DSL 灵活组合条件，AND 逻辑，
+    支持 eq/ne/gt/gte/lt/lte/in/contains/between 操作符。
+
+所有实际客户数据通过调用 tx-member 服务获取，本模块负责：
+  1. 将分群定义转换为 tx-member API 查询参数
+  2. 管理内存分群注册表（含租户自定义分群）
+  3. 维护 5 分钟人数缓存，避免频繁打穿 tx-member
 
 金额单位：分(fen)
 """
-import uuid
-from datetime import datetime, timezone
-from typing import Any, Optional
+from __future__ import annotations
 
+import os
+import time
+import uuid
+from datetime import datetime, timedelta, timezone
+from typing import Any, Optional
+from uuid import UUID
+
+import httpx
+import structlog
+
+logger = structlog.get_logger(__name__)
+
+# ---------------------------------------------------------------------------
+# 配置
+# ---------------------------------------------------------------------------
+
+TX_MEMBER_URL: str = os.getenv("TX_MEMBER_SERVICE_URL", "http://tx-member:8000")
+_CACHE_TTL_SECONDS: int = 300  # 5 分钟
+
+# ---------------------------------------------------------------------------
+# 内置分群定义
+# ---------------------------------------------------------------------------
+
+BUILTIN_SEGMENTS: dict[str, dict[str, Any]] = {
+    # ── RFM 8象限 ───────────────────────────────────────────────────────────
+    "rfm_champions": {
+        "r": [4, 5], "f": [4, 5], "m": [4, 5],
+        "name": "冠军客户",
+        "description": "近期消费、高频、高额的最优质客户",
+    },
+    "rfm_loyal": {
+        "r": [2, 5], "f": [3, 5], "m": [3, 5],
+        "name": "忠诚客户",
+        "description": "消费频次高、金额高的长期客户",
+    },
+    "rfm_potential": {
+        "r": [3, 5], "f": [1, 3], "m": [1, 3],
+        "name": "潜力客户",
+        "description": "近期活跃但频次和消费额有待提升",
+    },
+    "rfm_new": {
+        "r": [4, 5], "f": [1, 1], "m": [1, 5],
+        "name": "新客户",
+        "description": "最近消费但仅一次的新会员",
+    },
+    "rfm_at_risk": {
+        "r": [2, 3], "f": [2, 5], "m": [2, 5],
+        "name": "流失风险",
+        "description": "曾经活跃但近期消费减少",
+    },
+    "rfm_cant_lose": {
+        "r": [1, 2], "f": [4, 5], "m": [4, 5],
+        "name": "不能失去",
+        "description": "高价值高频但已较长时间未消费，亟需召回",
+    },
+    "rfm_hibernating": {
+        "r": [1, 2], "f": [1, 2], "m": [1, 2],
+        "name": "休眠客户",
+        "description": "各维度评分均低，处于半休眠状态",
+    },
+    "rfm_lost": {
+        "r": [1, 1], "f": [1, 5], "m": [1, 5],
+        "name": "已流失",
+        "description": "最近度极低，基本可认定为流失",
+    },
+
+    # ── 时间分群 ────────────────────────────────────────────────────────────
+    "silent_90d": {
+        "last_order_days_min": 90,
+        "name": "90天未消费",
+        "description": "超过90天没有消费记录",
+    },
+    "silent_180d": {
+        "last_order_days_min": 180,
+        "name": "180天未消费",
+        "description": "超过180天没有消费记录",
+    },
+    "silent_365d": {
+        "last_order_days_min": 365,
+        "name": "1年未消费",
+        "description": "超过1年没有消费记录，高度疑似永久流失",
+    },
+    "active_7d": {
+        "last_order_days_max": 7,
+        "name": "7天内活跃",
+        "description": "7天内有消费，用于复购刺激",
+    },
+    "active_30d": {
+        "last_order_days_max": 30,
+        "name": "30天内活跃",
+        "description": "30天内有消费",
+    },
+
+    # ── 消费时段分群 ────────────────────────────────────────────────────────
+    "lunch_regulars": {
+        "preferred_time_range": ["11:00", "14:00"],
+        "name": "午餐常客",
+        "description": "偏好11:00-14:00时段消费",
+    },
+    "dinner_regulars": {
+        "preferred_time_range": ["17:00", "21:00"],
+        "name": "晚餐常客",
+        "description": "偏好17:00-21:00时段消费",
+    },
+    "weekend_visitors": {
+        "visit_days": [5, 6],
+        "name": "周末族",
+        "description": "主要在周六/周日消费",
+    },
+    "weekday_visitors": {
+        "visit_days": [0, 1, 2, 3, 4],
+        "name": "工作日族",
+        "description": "主要在工作日消费",
+    },
+
+    # ── 生命周期分群 ────────────────────────────────────────────────────────
+    "new_7d": {
+        "registered_days_max": 7,
+        "name": "新注册7天",
+        "description": "注册不超过7天的新会员",
+    },
+    "new_30d": {
+        "registered_days_max": 30,
+        "name": "新注册30天",
+        "description": "注册不超过30天的新会员",
+    },
+    "birthday_week": {
+        "birthday_days": 7,
+        "name": "生日周",
+        "description": "未来7天内生日的会员",
+    },
+    "high_churn_risk": {
+        "risk_score_min": 0.7,
+        "name": "高流失风险",
+        "description": "流失风险评分 ≥ 0.7 的客户",
+    },
+
+    # ── 宴席相关 ────────────────────────────────────────────────────────────
+    "banquet_prospects": {
+        "tags_include": ["宴席意向"],
+        "name": "宴席潜客",
+        "description": "标签含"宴席意向"的潜在宴席客户",
+    },
+    "banquet_regulars": {
+        "total_banquet_min": 2,
+        "name": "宴席常客",
+        "description": "累计宴席消费 ≥ 2 次",
+    },
+}
 
 # ---------------------------------------------------------------------------
 # 内存存储
 # ---------------------------------------------------------------------------
 
-_segments: dict[str, dict] = {}
-_segment_users: dict[str, list[dict]] = {}  # segment_id -> [user_data]
+# 自定义分群注册表：{f"{tenant_id}:{segment_id}": segment_dict}
+_custom_segments: dict[str, dict[str, Any]] = {}
+
+# 人数缓存：{f"{tenant_id}:{segment_id}": {"count": int, "expires_at": float}}
+_count_cache: dict[str, dict[str, Any]] = {}
+
+
+# ---------------------------------------------------------------------------
+# 工具函数
+# ---------------------------------------------------------------------------
+
+def _cache_key(tenant_id: UUID, segment_id: str) -> str:
+    return f"{tenant_id}:{segment_id}"
+
+
+def _build_rfm_params(seg_def: dict[str, Any]) -> dict[str, Any]:
+    """将 RFM 分群定义转换为 tx-member 查询参数。"""
+    params: dict[str, Any] = {}
+    if "r" in seg_def:
+        params["r_score_min"], params["r_score_max"] = seg_def["r"]
+    if "f" in seg_def:
+        params["f_score_min"], params["f_score_max"] = seg_def["f"]
+    if "m" in seg_def:
+        params["m_score_min"], params["m_score_max"] = seg_def["m"]
+    return params
+
+
+def _build_builtin_params(segment_id: str, seg_def: dict[str, Any]) -> dict[str, Any]:
+    """将内置分群定义转换为 tx-member /api/v1/member/customers 查询参数。"""
+    params: dict[str, Any] = {}
+
+    # RFM 评分范围
+    params.update(_build_rfm_params(seg_def))
+
+    # 时间分群 — 距上次消费天数
+    if "last_order_days_min" in seg_def:
+        params["no_visit_days_min"] = seg_def["last_order_days_min"]
+    if "last_order_days_max" in seg_def:
+        params["no_visit_days_max"] = seg_def["last_order_days_max"]
+
+    # 消费时段（传给 tx-member，由其过滤）
+    if "preferred_time_range" in seg_def:
+        params["preferred_time_start"] = seg_def["preferred_time_range"][0]
+        params["preferred_time_end"] = seg_def["preferred_time_range"][1]
+
+    # 偏好星期
+    if "visit_days" in seg_def:
+        params["visit_weekdays"] = ",".join(str(d) for d in seg_def["visit_days"])
+
+    # 注册天数
+    if "registered_days_max" in seg_def:
+        params["registered_days_max"] = seg_def["registered_days_max"]
+
+    # 生日
+    if "birthday_days" in seg_def:
+        params["birthday_within_days"] = seg_def["birthday_days"]
+
+    # 流失风险
+    if "risk_score_min" in seg_def:
+        params["risk_score_min"] = seg_def["risk_score_min"]
+
+    # 标签
+    if "tags_include" in seg_def:
+        params["tags_include"] = ",".join(seg_def["tags_include"])
+
+    # 宴席次数
+    if "total_banquet_min" in seg_def:
+        params["total_banquet_count_min"] = seg_def["total_banquet_min"]
+
+    return params
+
+
+_SUPPORTED_FIELDS = frozenset({
+    "rfm_level", "r_score", "f_score", "m_score", "risk_score",
+    "last_order_at", "total_order_count", "total_order_amount_fen",
+    "tags", "store_id", "source",
+})
+
+_SUPPORTED_OPS = frozenset({
+    "eq", "ne", "gt", "gte", "lt", "lte", "in", "contains", "between",
+})
+
+
+def _build_custom_params(rules: list[dict[str, Any]]) -> dict[str, Any]:
+    """将自定义规则列表（AND 逻辑）转换为 tx-member 查询参数。
+
+    字段/操作符映射：
+      rfm_level     in      → rfm_level (逗号分隔)
+      r_score       gte/lte → r_score_min / r_score_max
+      f_score       gte/lte → f_score_min / f_score_max
+      m_score       gte/lte → m_score_min / m_score_max
+      risk_score    gte/lte → risk_score_min / risk_score_max
+      last_order_at gte/lte → last_order_after / last_order_before
+      total_order_count  gte/lte → order_count_min / order_count_max
+      total_order_amount_fen gte/lte → amount_min_fen / amount_max_fen
+      tags          contains → tags_include
+      store_id      eq/in   → store_id
+      source        eq/in   → source
+    """
+    params: dict[str, Any] = {}
+
+    for rule in rules:
+        field: str = rule.get("field", "")
+        op: str = rule.get("op", "")
+        value: Any = rule.get("value")
+
+        if field not in _SUPPORTED_FIELDS:
+            logger.warning("unsupported_segment_field", field=field)
+            continue
+        if op not in _SUPPORTED_OPS:
+            logger.warning("unsupported_segment_op", op=op, field=field)
+            continue
+
+        if field == "rfm_level":
+            if op == "in" and isinstance(value, list):
+                params["rfm_level"] = ",".join(value)
+            elif op == "eq":
+                params["rfm_level"] = value
+
+        elif field in ("r_score", "f_score", "m_score"):
+            prefix = field  # e.g. "r_score"
+            if op in ("eq", "gte"):
+                params[f"{prefix}_min"] = value
+            if op in ("eq", "lte"):
+                params[f"{prefix}_max"] = value
+            if op == "gt":
+                params[f"{prefix}_min"] = value + 1
+            if op == "lt":
+                params[f"{prefix}_max"] = value - 1
+            if op == "between" and isinstance(value, list) and len(value) == 2:
+                params[f"{prefix}_min"] = value[0]
+                params[f"{prefix}_max"] = value[1]
+
+        elif field == "risk_score":
+            if op in ("eq", "gte"):
+                params["risk_score_min"] = value
+            if op in ("eq", "lte"):
+                params["risk_score_max"] = value
+
+        elif field == "last_order_at":
+            if op in ("gte", "gt"):
+                params["last_order_after"] = value
+            if op in ("lte", "lt"):
+                params["last_order_before"] = value
+            if op == "between" and isinstance(value, list) and len(value) == 2:
+                params["last_order_after"] = value[0]
+                params["last_order_before"] = value[1]
+
+        elif field == "total_order_count":
+            if op in ("eq", "gte"):
+                params["order_count_min"] = value
+            if op in ("eq", "lte"):
+                params["order_count_max"] = value
+
+        elif field == "total_order_amount_fen":
+            if op in ("eq", "gte"):
+                params["amount_min_fen"] = value
+            if op in ("eq", "lte"):
+                params["amount_max_fen"] = value
+
+        elif field == "tags":
+            if op == "contains":
+                params["tags_include"] = value
+
+        elif field == "store_id":
+            if op == "eq":
+                params["store_id"] = value
+            elif op == "in" and isinstance(value, list):
+                params["store_id"] = ",".join(value)
+
+        elif field == "source":
+            if op == "eq":
+                params["source"] = value
+            elif op == "in" and isinstance(value, list):
+                params["source"] = ",".join(value)
+
+    return params
 
 
 # ---------------------------------------------------------------------------
@@ -23,391 +353,257 @@ _segment_users: dict[str, list[dict]] = {}  # segment_id -> [user_data]
 # ---------------------------------------------------------------------------
 
 class AudienceSegmentationService:
-    """客户分群引擎 — 从会员列表升级到经营人群池"""
+    """客户分群引擎 — 内置分群 + 自定义规则分群 + 5分钟人数缓存"""
 
-    SYSTEM_SEGMENTS = {
-        "new_customer": "新客",
-        "first_no_repeat": "首单未复购",
-        "high_potential_new": "高潜新客",
-        "dormant": "沉睡客",
-        "high_frequency": "高频复购客",
-        "high_value_banquet": "高价值宴请客",
-        "family_dining": "家庭聚餐客",
-        "price_sensitive": "价格敏感客",
-        "health_oriented": "健康导向客",
-        "festival_consumer": "节日消费客",
-        "stored_value": "会员储值倾向客",
-    }
+    # ------------------------------------------------------------------
+    # 公开：分群查询
+    # ------------------------------------------------------------------
 
-    # 系统分群的默认规则
-    _SYSTEM_RULES: dict[str, dict] = {
-        "new_customer": {
-            "conditions": [{"field": "first_order_days", "op": "<=", "value": 30}],
-            "description": "首次消费在30天内",
-        },
-        "first_no_repeat": {
-            "conditions": [
-                {"field": "order_count", "op": "==", "value": 1},
-                {"field": "first_order_days", "op": ">=", "value": 3},
-            ],
-            "description": "仅消费1次且首单超过3天",
-        },
-        "high_potential_new": {
-            "conditions": [
-                {"field": "order_count", "op": "<=", "value": 2},
-                {"field": "avg_order_fen", "op": ">=", "value": 15000},
-            ],
-            "description": "消费不超过2次但客单价≥150元",
-        },
-        "dormant": {
-            "conditions": [
-                {"field": "recency_days", "op": ">=", "value": 60},
-                {"field": "order_count", "op": ">=", "value": 2},
-            ],
-            "description": "60天未消费且有过2次以上消费",
-        },
-        "high_frequency": {
-            "conditions": [
-                {"field": "monthly_frequency", "op": ">=", "value": 4},
-            ],
-            "description": "月均消费≥4次",
-        },
-        "high_value_banquet": {
-            "conditions": [
-                {"field": "avg_order_fen", "op": ">=", "value": 50000},
-                {"field": "avg_party_size", "op": ">=", "value": 6},
-            ],
-            "description": "客单价≥500元且平均就餐人数≥6人",
-        },
-        "family_dining": {
-            "conditions": [
-                {"field": "avg_party_size", "op": ">=", "value": 3},
-                {"field": "weekend_ratio", "op": ">=", "value": 0.6},
-            ],
-            "description": "平均就餐≥3人且周末消费占比≥60%",
-        },
-        "price_sensitive": {
-            "conditions": [
-                {"field": "coupon_usage_rate", "op": ">=", "value": 0.7},
-                {"field": "avg_order_fen", "op": "<=", "value": 8000},
-            ],
-            "description": "优惠券使用率≥70%且客单价≤80元",
-        },
-        "health_oriented": {
-            "conditions": [
-                {"field": "health_dish_ratio", "op": ">=", "value": 0.4},
-            ],
-            "description": "健康菜品点单占比≥40%",
-        },
-        "festival_consumer": {
-            "conditions": [
-                {"field": "festival_order_ratio", "op": ">=", "value": 0.5},
-            ],
-            "description": "节假日消费占比≥50%",
-        },
-        "stored_value": {
-            "conditions": [
-                {"field": "has_stored_value", "op": "==", "value": True},
-                {"field": "stored_value_balance_fen", "op": ">=", "value": 10000},
-            ],
-            "description": "有储值且余额≥100元",
-        },
-    }
+    async def get_segment_members(
+        self,
+        segment_id: str,
+        tenant_id: UUID,
+        page: int = 1,
+        size: int = 100,
+    ) -> dict[str, Any]:
+        """获取分群成员列表（分页）。
 
-    def __init__(self) -> None:
-        self._ensure_system_segments()
+        优先查内置分群，再查租户自定义分群。
+        通过 tx-member API 实时获取，返回格式：
+          {segment_id, segment_name, total, members: [customer_id, ...], refresh_at}
+        """
+        seg_name, api_params = self._resolve_segment(segment_id, tenant_id)
+        if api_params is None:
+            raise ValueError(f"分群不存在: {segment_id}")
 
-    def _ensure_system_segments(self) -> None:
-        """初始化系统预设分群"""
-        for seg_key, seg_name in self.SYSTEM_SEGMENTS.items():
-            if seg_key not in _segments:
-                rules = self._SYSTEM_RULES.get(seg_key, {"conditions": []})
-                _segments[seg_key] = {
-                    "segment_id": seg_key,
-                    "name": seg_name,
-                    "segment_type": "system",
-                    "rules": rules,
-                    "created_at": datetime.now(timezone.utc).isoformat(),
-                    "updated_at": datetime.now(timezone.utc).isoformat(),
-                }
+        api_params["page"] = page
+        api_params["size"] = size
 
-    def create_segment(
+        log = logger.bind(tenant_id=str(tenant_id), segment_id=segment_id, page=page)
+        log.info("segment_members_fetch_start")
+
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(
+                f"{TX_MEMBER_URL}/api/v1/member/customers",
+                headers={"X-Tenant-ID": str(tenant_id)},
+                params=api_params,
+            )
+        resp.raise_for_status()
+
+        payload = resp.json()
+        items: list[dict] = payload.get("data", {}).get("items", [])
+        total: int = payload.get("data", {}).get("total", 0)
+
+        # 仅返回 customer_id 列表，减少数据传输量
+        member_ids = [item.get("customer_id") or item.get("id") for item in items]
+
+        log.info("segment_members_fetch_done", total=total, returned=len(member_ids))
+        return {
+            "segment_id": segment_id,
+            "segment_name": seg_name,
+            "total": total,
+            "members": member_ids,
+            "page": page,
+            "size": size,
+            "refresh_at": datetime.now(timezone.utc).isoformat(),
+        }
+
+    async def count_segment(self, segment_id: str, tenant_id: UUID) -> int:
+        """快速获取分群人数（仅返回 total，不获取明细）。
+
+        优先从 5 分钟内存缓存读取；缓存失效时查询 tx-member。
+        """
+        ck = _cache_key(tenant_id, segment_id)
+        cached = _count_cache.get(ck)
+        if cached and cached["expires_at"] > time.monotonic():
+            return cached["count"]
+
+        # 缓存失效或不存在，重新查询（size=1 节省传输）
+        seg_name, api_params = self._resolve_segment(segment_id, tenant_id)
+        if api_params is None:
+            raise ValueError(f"分群不存在: {segment_id}")
+
+        api_params["page"] = 1
+        api_params["size"] = 1
+
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(
+                f"{TX_MEMBER_URL}/api/v1/member/customers",
+                headers={"X-Tenant-ID": str(tenant_id)},
+                params=api_params,
+            )
+        resp.raise_for_status()
+
+        total: int = resp.json().get("data", {}).get("total", 0)
+        _count_cache[ck] = {
+            "count": total,
+            "expires_at": time.monotonic() + _CACHE_TTL_SECONDS,
+        }
+        logger.info("segment_count_refreshed", tenant_id=str(tenant_id),
+                    segment_id=segment_id, count=total)
+        return total
+
+    async def create_custom_segment(
         self,
         name: str,
-        rules: dict,
-        segment_type: str = "custom",
-    ) -> dict:
-        """创建自定义分群
+        rules: list[dict[str, Any]],
+        tenant_id: UUID,
+    ) -> dict[str, Any]:
+        """创建自定义分群（规则存入内存注册表）。
 
         Args:
-            name: 分群名称
-            rules: 分群规则
-                {"conditions": [{"field": "recency_days", "op": ">=", "value": 90}],
-                 "logic": "and", "description": "..."}
-            segment_type: 分群类型 "system" | "custom" | "ai_recommended"
+            name:      分群名称
+            rules:     规则列表，AND 逻辑，例如:
+                       [{"field": "r_score", "op": "gte", "value": 4},
+                        {"field": "tags", "op": "contains", "value": "常客"}]
+            tenant_id: 租户 UUID
+
+        Returns:
+            分群元数据 dict
         """
+        # 验证规则字段/操作符合法性
+        for rule in rules:
+            field = rule.get("field", "")
+            op = rule.get("op", "")
+            if field not in _SUPPORTED_FIELDS:
+                raise ValueError(f"不支持的分群字段: {field}，支持: {sorted(_SUPPORTED_FIELDS)}")
+            if op not in _SUPPORTED_OPS:
+                raise ValueError(f"不支持的操作符: {op}，支持: {sorted(_SUPPORTED_OPS)}")
+
         segment_id = str(uuid.uuid4())[:8]
         now = datetime.now(timezone.utc).isoformat()
-        segment = {
+        segment: dict[str, Any] = {
             "segment_id": segment_id,
             "name": name,
-            "segment_type": segment_type,
+            "segment_type": "custom",
             "rules": rules,
+            "tenant_id": str(tenant_id),
             "created_at": now,
             "updated_at": now,
         }
-        _segments[segment_id] = segment
+        ck = _cache_key(tenant_id, segment_id)
+        _custom_segments[ck] = segment
+
+        logger.info("custom_segment_created", tenant_id=str(tenant_id),
+                    segment_id=segment_id, name=name, rule_count=len(rules))
         return segment
 
-    def list_segments(self) -> list[dict]:
-        """列出所有分群"""
-        return list(_segments.values())
+    async def list_segments(self, tenant_id: UUID) -> list[dict[str, Any]]:
+        """列出所有内置分群 + 该租户的自定义分群，附带缓存人数。
 
-    def get_segment_detail(self, segment_id: str) -> dict:
-        """获取分群详情"""
-        segment = _segments.get(segment_id)
-        if not segment:
-            return {"error": f"分群不存在: {segment_id}"}
-        return segment
+        人数通过 count_segment 读取（5 分钟缓存），首次调用时 total 为 None（异步延迟加载）。
+        """
+        result: list[dict[str, Any]] = []
 
-    def get_segment_users(
-        self,
-        segment_id: str,
-        page: int = 1,
-        size: int = 20,
-    ) -> dict:
-        """获取分群下的用户列表（分页）"""
-        if segment_id not in _segments:
-            return {"error": f"分群不存在: {segment_id}"}
+        # 内置分群
+        for seg_id, seg_def in BUILTIN_SEGMENTS.items():
+            ck = _cache_key(tenant_id, seg_id)
+            cached = _count_cache.get(ck)
+            cached_count = cached["count"] if (cached and cached["expires_at"] > time.monotonic()) else None
+            result.append({
+                "segment_id": seg_id,
+                "name": seg_def["name"],
+                "description": seg_def.get("description", ""),
+                "segment_type": "builtin",
+                "total": cached_count,
+            })
 
-        users = _segment_users.get(segment_id, [])
-        total = len(users)
-        start = (page - 1) * size
-        end = start + size
-        return {
-            "segment_id": segment_id,
-            "items": users[start:end],
-            "total": total,
-            "page": page,
-            "size": size,
-        }
+        # 自定义分群（当前租户）
+        prefix = f"{tenant_id}:"
+        for ck, seg in _custom_segments.items():
+            if not ck.startswith(prefix):
+                continue
+            seg_id = seg["segment_id"]
+            count_cache = _count_cache.get(ck)
+            cached_count = count_cache["count"] if (count_cache and count_cache["expires_at"] > time.monotonic()) else None
+            result.append({
+                "segment_id": seg_id,
+                "name": seg["name"],
+                "description": "",
+                "segment_type": "custom",
+                "rules": seg["rules"],
+                "total": cached_count,
+                "created_at": seg["created_at"],
+            })
 
-    def compute_segment_stats(self, segment_id: str) -> dict:
-        """计算分群统计指标"""
-        if segment_id not in _segments:
-            return {"error": f"分群不存在: {segment_id}"}
+        return result
 
-        users = _segment_users.get(segment_id, [])
-        count = len(users)
-
-        if count == 0:
-            return {
-                "segment_id": segment_id,
-                "count": 0,
-                "revenue_contribution_fen": 0,
-                "avg_order_value_fen": 0,
-                "avg_frequency": 0.0,
-                "repeat_probability": 0.0,
-            }
-
-        total_revenue_fen = sum(u.get("total_spent_fen", 0) for u in users)
-        total_orders = sum(u.get("order_count", 0) for u in users)
-        avg_order_fen = total_revenue_fen // total_orders if total_orders > 0 else 0
-        avg_frequency = total_orders / count if count > 0 else 0.0
-        repeat_users = sum(1 for u in users if u.get("order_count", 0) >= 2)
-        repeat_probability = repeat_users / count if count > 0 else 0.0
-
-        return {
-            "segment_id": segment_id,
-            "count": count,
-            "revenue_contribution_fen": total_revenue_fen,
-            "avg_order_value_fen": avg_order_fen,
-            "avg_frequency": round(avg_frequency, 2),
-            "repeat_probability": round(repeat_probability, 3),
-        }
-
-    def classify_user(self, user_data: dict) -> list[str]:
-        """将用户分类到匹配的分群
-
-        Args:
-            user_data: 用户数据字典，包含各维度指标
+    async def delete_custom_segment(self, segment_id: str, tenant_id: UUID) -> bool:
+        """删除租户自定义分群。
 
         Returns:
-            匹配的 segment_id 列表
+            True  — 删除成功
+            False — 分群不存在
         """
-        matched: list[str] = []
-        for segment_id, segment in _segments.items():
-            rules = segment.get("rules", {})
-            conditions = rules.get("conditions", [])
-            logic = rules.get("logic", "and")
-
-            if not conditions:
-                continue
-
-            results = [
-                self._evaluate_condition(cond, user_data)
-                for cond in conditions
-            ]
-
-            if logic == "or":
-                if any(results):
-                    matched.append(segment_id)
-            else:  # and
-                if all(results):
-                    matched.append(segment_id)
-
-        return matched
-
-    def ai_recommend_segments(self, brand_id: str) -> list[dict]:
-        """AI 推荐分群（基于数据模式分析）
-
-        返回 AI 建议的分群定义，由运营人员确认后创建。
-        """
-        # 基于常见餐饮业务模式的推荐
-        recommendations = [
-            {
-                "name": "午市工作餐常客",
-                "description": "工作日午间高频消费，客单价60-100元，偏好快出餐品",
-                "rules": {
-                    "conditions": [
-                        {"field": "weekday_lunch_ratio", "op": ">=", "value": 0.6},
-                        {"field": "monthly_frequency", "op": ">=", "value": 6},
-                        {"field": "avg_order_fen", "op": "<=", "value": 10000},
-                    ],
-                    "logic": "and",
-                },
-                "estimated_count": 320,
-                "marketing_suggestion": "推午市套餐+储值卡，提高锁客率",
-                "confidence": 0.82,
-            },
-            {
-                "name": "晚市社交聚餐客",
-                "description": "周末晚间消费为主，4人以上聚餐，客单价偏高",
-                "rules": {
-                    "conditions": [
-                        {"field": "weekend_dinner_ratio", "op": ">=", "value": 0.5},
-                        {"field": "avg_party_size", "op": ">=", "value": 4},
-                        {"field": "avg_order_fen", "op": ">=", "value": 20000},
-                    ],
-                    "logic": "and",
-                },
-                "estimated_count": 185,
-                "marketing_suggestion": "推包间预订+宴会套餐，提升桌均消费",
-                "confidence": 0.78,
-            },
-            {
-                "name": "外卖偏好客",
-                "description": "外卖订单占比超过50%，可能未到过门店",
-                "rules": {
-                    "conditions": [
-                        {"field": "delivery_order_ratio", "op": ">=", "value": 0.5},
-                    ],
-                    "logic": "and",
-                },
-                "estimated_count": 540,
-                "marketing_suggestion": "到店首单奖励，引导到店体验",
-                "confidence": 0.85,
-            },
-            {
-                "name": "新品尝鲜客",
-                "description": "新品上线30天内必点，乐于尝试新菜",
-                "rules": {
-                    "conditions": [
-                        {"field": "new_dish_trial_ratio", "op": ">=", "value": 0.3},
-                        {"field": "dish_variety_count", "op": ">=", "value": 15},
-                    ],
-                    "logic": "and",
-                },
-                "estimated_count": 210,
-                "marketing_suggestion": "新品优先内测+口碑传播激励",
-                "confidence": 0.75,
-            },
-        ]
-
-        return recommendations
-
-    def get_lifecycle_distribution(self) -> dict:
-        """获取客户生命周期分布
-
-        new → active → loyal → dormant → churned
-        """
-        # 汇总所有分群用户的生命周期阶段
-        lifecycle = {
-            "new": {"count": 0, "label": "新客", "description": "首次消费30天内"},
-            "active": {"count": 0, "label": "活跃客", "description": "30天内有消费"},
-            "loyal": {"count": 0, "label": "忠诚客", "description": "月均消费≥3次"},
-            "dormant": {"count": 0, "label": "沉睡客", "description": "30-90天未消费"},
-            "churned": {"count": 0, "label": "流失客", "description": "90天以上未消费"},
-        }
-
-        # 聚合已分类用户
-        seen_users: set[str] = set()
-        for seg_id, users in _segment_users.items():
-            for u in users:
-                uid = u.get("user_id", "")
-                if uid in seen_users:
-                    continue
-                seen_users.add(uid)
-
-                recency = u.get("recency_days", 999)
-                frequency = u.get("monthly_frequency", 0)
-                first_order_days = u.get("first_order_days", 999)
-
-                if first_order_days <= 30:
-                    lifecycle["new"]["count"] += 1
-                elif frequency >= 3 and recency <= 30:
-                    lifecycle["loyal"]["count"] += 1
-                elif recency <= 30:
-                    lifecycle["active"]["count"] += 1
-                elif recency <= 90:
-                    lifecycle["dormant"]["count"] += 1
-                else:
-                    lifecycle["churned"]["count"] += 1
-
-        total = sum(stage["count"] for stage in lifecycle.values())
-        for stage in lifecycle.values():
-            stage["pct"] = round(stage["count"] / total * 100, 1) if total > 0 else 0.0
-
-        return {"total": total, "stages": lifecycle}
-
-    @staticmethod
-    def _evaluate_condition(condition: dict, user_data: dict) -> bool:
-        """评估单个条件"""
-        field = condition.get("field", "")
-        op = condition.get("op", "==")
-        target = condition.get("value")
-        actual = user_data.get(field)
-
-        if actual is None:
+        ck = _cache_key(tenant_id, segment_id)
+        if ck not in _custom_segments:
             return False
+        del _custom_segments[ck]
+        _count_cache.pop(ck, None)
+        logger.info("custom_segment_deleted", tenant_id=str(tenant_id), segment_id=segment_id)
+        return True
 
-        if op == "==":
-            return actual == target
-        elif op == "!=":
-            return actual != target
-        elif op == ">=":
-            return actual >= target
-        elif op == "<=":
-            return actual <= target
-        elif op == ">":
-            return actual > target
-        elif op == "<":
-            return actual < target
-        elif op == "in":
-            return actual in target
-        elif op == "not_in":
-            return actual not in target
-        return False
+    async def refresh_segment_cache(self, tenant_id: UUID) -> dict[str, Any]:
+        """强制刷新当前租户所有分群的人数缓存（内置 + 自定义）。
 
+        适合后台任务定期调用（如每小时刷一次）。
+        Returns:
+          {"refreshed": int, "failed": int, "details": {segment_id: count}}
+        """
+        all_segment_ids = list(BUILTIN_SEGMENTS.keys())
 
-def add_users_to_segment(segment_id: str, users: list[dict]) -> None:
-    """辅助函数：向分群添加用户数据（用于测试和数据导入）"""
-    if segment_id not in _segment_users:
-        _segment_users[segment_id] = []
-    _segment_users[segment_id].extend(users)
+        # 加入当前租户自定义分群
+        prefix = f"{tenant_id}:"
+        for ck, seg in _custom_segments.items():
+            if ck.startswith(prefix):
+                all_segment_ids.append(seg["segment_id"])
 
+        refreshed = 0
+        failed = 0
+        details: dict[str, int] = {}
 
-def clear_all_segments() -> None:
-    """辅助函数：清空所有分群数据（仅测试用）"""
-    _segments.clear()
-    _segment_users.clear()
+        for seg_id in all_segment_ids:
+            ck = _cache_key(tenant_id, seg_id)
+            # 强制过期缓存
+            _count_cache.pop(ck, None)
+            try:
+                count = await self.count_segment(seg_id, tenant_id)
+                details[seg_id] = count
+                refreshed += 1
+            except (httpx.HTTPError, ValueError) as exc:
+                logger.warning("segment_cache_refresh_failed",
+                               segment_id=seg_id, tenant_id=str(tenant_id), error=str(exc))
+                failed += 1
+
+        logger.info("segment_cache_refresh_complete",
+                    tenant_id=str(tenant_id), refreshed=refreshed, failed=failed)
+        return {"refreshed": refreshed, "failed": failed, "details": details}
+
+    # ------------------------------------------------------------------
+    # 私有：分群解析
+    # ------------------------------------------------------------------
+
+    def _resolve_segment(
+        self,
+        segment_id: str,
+        tenant_id: UUID,
+    ) -> tuple[str, dict[str, Any] | None]:
+        """根据 segment_id 返回 (名称, tx-member 查询参数)。
+
+        查找顺序：内置分群 → 租户自定义分群。
+        未找到时返回 (segment_id, None)。
+        """
+        # 内置分群
+        seg_def = BUILTIN_SEGMENTS.get(segment_id)
+        if seg_def is not None:
+            api_params = _build_builtin_params(segment_id, seg_def)
+            return seg_def["name"], api_params
+
+        # 自定义分群
+        ck = _cache_key(tenant_id, segment_id)
+        custom = _custom_segments.get(ck)
+        if custom is not None:
+            api_params = _build_custom_params(custom["rules"])
+            return custom["name"], api_params
+
+        return segment_id, None

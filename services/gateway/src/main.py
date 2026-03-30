@@ -9,6 +9,8 @@ from .proxy import router as proxy_router
 from .auth import router as auth_router
 from .hub_api import router as hub_router
 from .growth_intel_relay import router as relay_router
+from .wecom_routes import router as wecom_router
+from .wecom_scrm_routes import router as wecom_scrm_router
 from .response import ok
 
 app = FastAPI(
@@ -35,6 +37,12 @@ app.include_router(hub_router)
 
 # 情报→增长自动接力 API
 app.include_router(relay_router)
+
+# 企业微信回调 API
+app.include_router(wecom_router)
+
+# 企业微信 SCRM 管理 API
+app.include_router(wecom_scrm_router)
 
 # 域路由代理（通配路由 /api/v1/{domain}/{path}，放最后）
 app.include_router(proxy_router)

@@ -4,6 +4,10 @@
 
 七大引擎协同驱动连锁餐饮品牌的精细化增长。
 """
+import asyncio
+
+import structlog
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import Any, Optional
@@ -15,6 +19,9 @@ from services.content_engine import ContentEngine
 from services.offer_engine import OfferEngine
 from services.channel_engine import ChannelEngine
 from services.roi_attribution import ROIAttributionService
+from workers.journey_executor import JourneyExecutor
+
+logger = structlog.get_logger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -22,9 +29,64 @@ from services.roi_attribution import ROIAttributionService
 # ---------------------------------------------------------------------------
 
 from .api.campaign_routes import router as campaign_router
+from .api.segmentation_routes import router as segmentation_router
 
 app = FastAPI(title="TunxiangOS tx-growth", version="3.0.0")
 app.include_router(campaign_router)
+app.include_router(segmentation_router)
+
+# ---------------------------------------------------------------------------
+# APScheduler — 旅程执行引擎（每60秒 tick 一次）
+# ---------------------------------------------------------------------------
+
+_scheduler = AsyncIOScheduler()
+_journey_executor = JourneyExecutor()
+
+
+def _schedule_tick() -> None:
+    """
+    调度回调：创建一个 asyncio Task 执行 JourneyExecutor.tick()。
+
+    使用 asyncio.create_task 而非 await，保证 APScheduler 的调度线程不阻塞。
+    Task 内部异常通过 structlog 记录，不会静默丢失。
+    """
+    task = asyncio.create_task(_journey_executor.tick())
+    task.add_done_callback(_on_tick_done)
+
+
+def _on_tick_done(task: asyncio.Task) -> None:
+    """tick Task 完成回调：捕获并记录未处理异常。"""
+    exc = task.exception() if not task.cancelled() else None
+    if exc is not None:
+        logger.error(
+            "journey_executor_tick_unhandled_error",
+            error=str(exc),
+            exc_info=exc,
+        )
+
+
+@app.on_event("startup")
+async def start_scheduler() -> None:
+    """FastAPI 启动时启动 APScheduler，每60秒驱动旅程引擎 tick。"""
+    _scheduler.add_job(
+        _schedule_tick,
+        trigger="interval",
+        seconds=60,
+        id="journey_executor",
+        replace_existing=True,
+        max_instances=1,          # 防止并发 tick 重叠
+        misfire_grace_time=30,    # 系统繁忙时延迟30秒内可补发
+    )
+    _scheduler.start()
+    logger.info("journey_executor_scheduler_started", interval_seconds=60)
+
+
+@app.on_event("shutdown")
+async def stop_scheduler() -> None:
+    """FastAPI 关闭时优雅停止调度器。"""
+    if _scheduler.running:
+        _scheduler.shutdown(wait=False)
+        logger.info("journey_executor_scheduler_stopped")
 
 # 服务实例
 brand_svc = BrandStrategyService()

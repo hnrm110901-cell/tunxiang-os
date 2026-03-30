@@ -76,8 +76,15 @@ class Customer(TenantBase):
     confidence_score: Mapped[float] = mapped_column(Float, default=1.0)
     extra: Mapped[dict | None] = mapped_column(JSON, default=dict)
 
+    # 企业微信客户联系（SCRM）
+    wecom_external_userid: Mapped[str | None] = mapped_column(String(128), index=True, comment="企微客户联系外部联系人ID")
+    wecom_follow_user: Mapped[str | None] = mapped_column(String(100), comment="负责跟进的导购（企微userid）")
+    wecom_follow_at: Mapped[str | None] = mapped_column(DateTime(timezone=True), comment="加好友时间")
+    wecom_remark: Mapped[str | None] = mapped_column(String(500), comment="导购备注")
+
     __table_args__ = (
         Index("idx_customer_phone_active", "primary_phone", "is_merged"),
+        Index("idx_customer_wecom_external", "wecom_external_userid"),
         {"comment": "CDP统一消费者身份"},
     )
 

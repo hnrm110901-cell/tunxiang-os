@@ -5,9 +5,17 @@
 
 迁移自 tunxiang V2.x people_agent/agent.py + reservation/agent.py + banquet/agent.py
 """
+import os
 import statistics
+from datetime import datetime, timezone
 from typing import Any
+
+import httpx
+import structlog
+
 from ..base import SkillAgent, AgentResult
+
+logger = structlog.get_logger(__name__)
 
 
 # 绩效规则（6种岗位）— 迁移自 performance/agent.py
@@ -232,27 +240,219 @@ class PrivateOpsAgent(SkillAgent):
         )
 
     async def _pd_dashboard(self, params: dict) -> AgentResult:
-        total_members = params.get("total_members", 0)
-        active_pct = params.get("active_pct", 0)
-        churn_risk = params.get("churn_risk_count", 0)
-        return AgentResult(success=True, action="get_private_domain_dashboard",
-                         data={"total_members": total_members, "active_pct": active_pct,
-                               "churn_risk_count": churn_risk, "active_journeys": params.get("active_journeys", 0)},
-                         reasoning=f"私域总览: {total_members}会员，{active_pct}%活跃", confidence=0.9)
+        """私域仪表盘 — 聚合 tx-member + tx-growth 真实数据"""
+        member_base_url = os.getenv("TX_MEMBER_SERVICE_URL", "http://tx-member:8000")
+        growth_base_url = os.getenv("TX_GROWTH_SERVICE_URL", "http://tx-growth:8000")
+        tenant_id = str(params.get("tenant_id", ""))
+        headers = {"X-Tenant-ID": tenant_id}
+
+        # 构建日期范围（近 30 天）
+        now = datetime.now(timezone.utc)
+        end_date = now.strftime("%Y-%m-%d")
+        start_date = (now.replace(day=1) if now.day > 1 else now).strftime("%Y-%m-%d")
+        date_params = {"start_date": start_date, "end_date": end_date}
+
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                # 1. 获取总会员数
+                growth_resp = await client.get(
+                    f"{member_base_url}/api/v1/member/analytics/growth",
+                    headers=headers,
+                    params=date_params,
+                )
+                growth_resp.raise_for_status()
+
+                # 2. 获取活跃率
+                activity_resp = await client.get(
+                    f"{member_base_url}/api/v1/member/analytics/activity",
+                    headers=headers,
+                    params=date_params,
+                )
+                activity_resp.raise_for_status()
+
+                # 3. 获取流失风险数
+                churn_resp = await client.get(
+                    f"{member_base_url}/api/v1/member/analytics/churn-prediction",
+                    headers=headers,
+                )
+                churn_resp.raise_for_status()
+
+                # 4. 获取活跃旅程数
+                journey_resp = await client.get(
+                    f"{growth_base_url}/api/v1/growth/journeys",
+                    headers=headers,
+                    params={"status": "active", "size": 1},
+                )
+                journey_resp.raise_for_status()
+
+        except httpx.ConnectError as e:
+            logger.warning("pd_dashboard_connect_error", error=str(e))
+            return AgentResult(
+                success=True, action="get_private_domain_dashboard",
+                data={"degraded": True, "reason": "service_unavailable",
+                      "total_members": 0, "active_pct": 0.0,
+                      "churn_risk_count": 0, "active_journeys": 0},
+                reasoning="内部服务连接失败，返回降级数据", confidence=0.3,
+            )
+        except httpx.TimeoutException as e:
+            logger.warning("pd_dashboard_timeout", error=str(e))
+            return AgentResult(
+                success=True, action="get_private_domain_dashboard",
+                data={"degraded": True, "reason": "timeout",
+                      "total_members": 0, "active_pct": 0.0,
+                      "churn_risk_count": 0, "active_journeys": 0},
+                reasoning="内部服务请求超时，返回降级数据", confidence=0.3,
+            )
+        except httpx.HTTPStatusError as e:
+            logger.warning("pd_dashboard_http_error", status=e.response.status_code, error=str(e))
+            return AgentResult(
+                success=True, action="get_private_domain_dashboard",
+                data={"degraded": True, "reason": f"http_{e.response.status_code}",
+                      "total_members": 0, "active_pct": 0.0,
+                      "churn_risk_count": 0, "active_journeys": 0},
+                reasoning=f"内部服务返回 HTTP {e.response.status_code}，返回降级数据", confidence=0.3,
+            )
+
+        growth_data = growth_resp.json().get("data", {})
+        activity_data = activity_resp.json().get("data", {})
+        churn_data = churn_resp.json().get("data", {})
+        journey_data = journey_resp.json().get("data", {})
+
+        total_members = growth_data.get("total", 0)
+        active_pct = activity_data.get("active_rate", 0.0)
+        churn_risk_count = churn_data.get("high_risk_count", 0)
+        active_journeys = journey_data.get("total", 0)
+
+        logger.info(
+            "pd_dashboard_fetched",
+            tenant_id=tenant_id,
+            total_members=total_members,
+            active_pct=active_pct,
+            churn_risk_count=churn_risk_count,
+            active_journeys=active_journeys,
+        )
+
+        return AgentResult(
+            success=True, action="get_private_domain_dashboard",
+            data={
+                "total_members": total_members,
+                "active_pct": active_pct,
+                "churn_risk_count": churn_risk_count,
+                "active_journeys": active_journeys,
+                "last_updated": datetime.now(timezone.utc).isoformat(),
+            },
+            reasoning=f"私域总览: {total_members}会员，活跃率{active_pct:.1%}，{churn_risk_count}高风险流失",
+            confidence=0.9,
+        )
 
     async def _trigger_campaign(self, params: dict) -> AgentResult:
-        campaign_type = params.get("type", "general")
-        target_count = params.get("target_count", 0)
-        return AgentResult(success=True, action="trigger_campaign",
-                         data={"campaign_type": campaign_type, "target_count": target_count, "status": "triggered"},
-                         reasoning=f"触发 {campaign_type} 活动，目标 {target_count} 人", confidence=0.85)
+        """触发营销活动 — 激活已有活动或创建新活动"""
+        campaign_id = params.get("campaign_id")
+        base_url = os.getenv("TX_GROWTH_SERVICE_URL", "http://tx-growth:8000")
+        tenant_id = str(params.get("tenant_id", ""))
+        headers = {"X-Tenant-ID": tenant_id}
+
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                if campaign_id:
+                    resp = await client.post(
+                        f"{base_url}/api/v1/growth/campaigns/{campaign_id}/activate",
+                        headers=headers,
+                    )
+                else:
+                    resp = await client.post(
+                        f"{base_url}/api/v1/growth/campaigns",
+                        headers=headers,
+                        json=params,
+                    )
+                resp.raise_for_status()
+
+        except httpx.ConnectError as e:
+            logger.warning("trigger_campaign_connect_error", error=str(e))
+            return AgentResult(
+                success=False, action="trigger_campaign",
+                data={"degraded": True, "reason": "service_unavailable"},
+                error="tx-growth 服务不可用", confidence=0.0,
+            )
+        except httpx.TimeoutException as e:
+            logger.warning("trigger_campaign_timeout", error=str(e))
+            return AgentResult(
+                success=False, action="trigger_campaign",
+                data={"degraded": True, "reason": "timeout"},
+                error="tx-growth 服务请求超时", confidence=0.0,
+            )
+        except httpx.HTTPStatusError as e:
+            logger.warning("trigger_campaign_http_error", status=e.response.status_code, error=str(e))
+            return AgentResult(
+                success=False, action="trigger_campaign",
+                data={"degraded": True, "reason": f"http_{e.response.status_code}"},
+                error=f"tx-growth 返回 HTTP {e.response.status_code}", confidence=0.0,
+            )
+
+        data = resp.json().get("data", {})
+        logger.info("trigger_campaign_success", tenant_id=tenant_id, campaign_id=campaign_id)
+        return AgentResult(
+            success=True, action="trigger_campaign",
+            data={"ok": True, "campaign": data},
+            reasoning=f"营销活动{'激活' if campaign_id else '创建'}成功",
+            confidence=0.85,
+        )
 
     async def _advance_journey(self, params: dict) -> AgentResult:
-        journey_id = params.get("journey_id", "")
-        current_step = params.get("current_step", 0)
-        return AgentResult(success=True, action="advance_journey",
-                         data={"journey_id": journey_id, "new_step": current_step + 1, "status": "advanced"},
-                         reasoning=f"旅程推进到第 {current_step + 1} 步", confidence=0.9)
+        """推进用户旅程到下一步"""
+        journey_id = params.get("journey_id")
+        customer_id = params.get("customer_id")
+        base_url = os.getenv("TX_GROWTH_SERVICE_URL", "http://tx-growth:8000")
+        tenant_id = str(params.get("tenant_id", ""))
+        headers = {"X-Tenant-ID": tenant_id}
+
+        if not journey_id:
+            return AgentResult(
+                success=False, action="advance_journey",
+                error="缺少必要参数: journey_id", confidence=0.0,
+            )
+
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resp = await client.post(
+                    f"{base_url}/api/v1/growth/journeys/{journey_id}/advance",
+                    headers=headers,
+                    json={"customer_id": customer_id},
+                )
+                resp.raise_for_status()
+
+        except httpx.ConnectError as e:
+            logger.warning("advance_journey_connect_error", journey_id=journey_id, error=str(e))
+            return AgentResult(
+                success=False, action="advance_journey",
+                data={"degraded": True, "reason": "service_unavailable"},
+                error="tx-growth 服务不可用", confidence=0.0,
+            )
+        except httpx.TimeoutException as e:
+            logger.warning("advance_journey_timeout", journey_id=journey_id, error=str(e))
+            return AgentResult(
+                success=False, action="advance_journey",
+                data={"degraded": True, "reason": "timeout"},
+                error="tx-growth 服务请求超时", confidence=0.0,
+            )
+        except httpx.HTTPStatusError as e:
+            logger.warning("advance_journey_http_error", journey_id=journey_id,
+                          status=e.response.status_code, error=str(e))
+            return AgentResult(
+                success=False, action="advance_journey",
+                data={"degraded": True, "reason": f"http_{e.response.status_code}"},
+                error=f"tx-growth 返回 HTTP {e.response.status_code}", confidence=0.0,
+            )
+
+        data = resp.json().get("data", {})
+        logger.info("advance_journey_success", tenant_id=tenant_id,
+                    journey_id=journey_id, customer_id=customer_id)
+        return AgentResult(
+            success=True, action="advance_journey",
+            data=data,
+            reasoning=f"旅程 {journey_id} 推进成功",
+            confidence=0.9,
+        )
 
     async def _optimize_shift(self, params: dict) -> AgentResult:
         employees = params.get("employees", [])

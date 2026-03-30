@@ -2,18 +2,26 @@
 
 安全要求：
 - 消费先扣赠送金再扣本金
-- 退款仅退本金，赠送金按比例扣回
+- 退款仅退本金，不退赠送余额
 - 并发安全：使用 SELECT ... FOR UPDATE
 - 所有操作记录流水（StoredValueTransaction）
+
+v2 新增：
+- create_card：开卡
+- recharge_by_plan：按套餐充值（替代按金额+规则匹配）
+- get_balance：按 card_id 查询余额
+- get_transactions_by_id：按 card_id 分页查询流水
+- list_recharge_plans：查询有效套餐列表
+- create_recharge_plan：新建套餐
 """
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Optional
 
 import structlog
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = structlog.get_logger()
@@ -27,12 +35,56 @@ class CardNotActiveError(Exception):
     pass
 
 
+class PlanNotFoundError(Exception):
+    pass
+
+
 class StoredValueService:
     """储值卡核心服务"""
 
-    async def get_card(self, db: AsyncSession, card_no: str) -> Optional[dict]:
-        """查询储值卡信息"""
+    # ──────────────────────────────────────────────────────────────
+    # 开卡
+    # ──────────────────────────────────────────────────────────────
+
+    async def create_card(
+        self,
+        db: AsyncSession,
+        customer_id: uuid.UUID,
+        tenant_id: uuid.UUID,
+        store_id: uuid.UUID | None = None,
+        scope_type: str = "brand",
+        operator_id: uuid.UUID | None = None,
+        remark: str | None = None,
+    ) -> dict:
+        """开卡 — 生成唯一卡号，插入 StoredValueCard"""
         from models.stored_value import StoredValueCard
+
+        card_no = f"SV-{datetime.now(timezone.utc).strftime('%Y%m%d')}-{str(uuid.uuid4())[:6].upper()}"
+
+        card = StoredValueCard(
+            id=uuid.uuid4(),
+            tenant_id=tenant_id,
+            card_no=card_no,
+            customer_id=customer_id,
+            store_id=store_id,
+            scope_type=scope_type,
+            operator_id=operator_id,
+            remark=remark,
+        )
+        db.add(card)
+        await db.flush()
+
+        logger.info("stored_value_create_card", card_no=card_no, customer_id=str(customer_id))
+        return _card_to_dict(card)
+
+    # ──────────────────────────────────────────────────────────────
+    # 查询（按 card_no）
+    # ──────────────────────────────────────────────────────────────
+
+    async def get_card(self, db: AsyncSession, card_no: str) -> Optional[dict]:
+        """查询储值卡信息（按卡号）"""
+        from models.stored_value import StoredValueCard
+
         result = await db.execute(
             select(StoredValueCard).where(
                 StoredValueCard.card_no == card_no,
@@ -42,18 +94,141 @@ class StoredValueService:
         card = result.scalar_one_or_none()
         if not card:
             return None
+        return _card_to_dict(card)
+
+    # ──────────────────────────────────────────────────────────────
+    # 查询（按 card_id）
+    # ──────────────────────────────────────────────────────────────
+
+    async def get_balance(
+        self,
+        db: AsyncSession,
+        card_id: uuid.UUID,
+        tenant_id: uuid.UUID,
+    ) -> dict:
+        """查询储值卡余额（按 card_id）"""
+        from models.stored_value import StoredValueCard
+
+        result = await db.execute(
+            select(StoredValueCard).where(
+                StoredValueCard.id == card_id,
+                StoredValueCard.tenant_id == tenant_id,
+                StoredValueCard.is_deleted.is_(False),
+            )
+        )
+        card = result.scalar_one_or_none()
+        if not card:
+            raise ValueError(f"储值卡不存在: {card_id}")
         return {
-            "id": str(card.id),
             "card_no": card.card_no,
-            "customer_id": str(card.customer_id),
-            "card_type": card.card_type,
-            "status": card.status,
             "balance_fen": card.balance_fen,
+            "main_balance_fen": card.main_balance_fen,
             "gift_balance_fen": card.gift_balance_fen,
-            "total_balance_fen": card.balance_fen + card.gift_balance_fen,
-            "total_recharged_fen": card.total_recharged_fen,
-            "total_consumed_fen": card.total_consumed_fen,
+            "status": card.status,
+            "expiry_date": str(card.expiry_date) if card.expiry_date else None,
         }
+
+    async def get_card_by_id(
+        self,
+        db: AsyncSession,
+        card_id: uuid.UUID,
+        tenant_id: uuid.UUID,
+    ) -> Optional[dict]:
+        """查询储值卡详情（按 card_id）"""
+        from models.stored_value import StoredValueCard
+
+        result = await db.execute(
+            select(StoredValueCard).where(
+                StoredValueCard.id == card_id,
+                StoredValueCard.tenant_id == tenant_id,
+                StoredValueCard.is_deleted.is_(False),
+            )
+        )
+        card = result.scalar_one_or_none()
+        if not card:
+            return None
+        return _card_to_dict(card)
+
+    # ──────────────────────────────────────────────────────────────
+    # 充值 — 按 plan_id（v2 新逻辑）
+    # ──────────────────────────────────────────────────────────────
+
+    async def recharge_by_plan(
+        self,
+        db: AsyncSession,
+        card_id: uuid.UUID,
+        plan_id: uuid.UUID,
+        tenant_id: uuid.UUID,
+        operator_id: uuid.UUID | None = None,
+        store_id: uuid.UUID | None = None,
+    ) -> dict:
+        """按套餐充值 — 验证套餐有效性，同一事务内更新卡余额并记录流水"""
+        from models.stored_value import StoredValueCard, StoredValueRechargePlan, StoredValueTransaction
+
+        # 查套餐（带 tenant_id 隔离）
+        plan_result = await db.execute(
+            select(StoredValueRechargePlan).where(
+                StoredValueRechargePlan.id == plan_id,
+                StoredValueRechargePlan.tenant_id == tenant_id,
+                StoredValueRechargePlan.is_deleted.is_(False),
+            )
+        )
+        plan = plan_result.scalar_one_or_none()
+        if not plan:
+            raise PlanNotFoundError(f"充值套餐不存在: {plan_id}")
+        if not plan.is_active:
+            raise PlanNotFoundError("充值套餐已下架")
+
+        now = datetime.now(timezone.utc)
+        if plan.valid_from and now < plan.valid_from:
+            raise PlanNotFoundError("充值套餐尚未开始")
+        if plan.valid_until and now > plan.valid_until:
+            raise PlanNotFoundError("充值套餐已过期")
+
+        # 查卡（加行锁）
+        card = await self._get_card_by_id_for_update(db, card_id, tenant_id)
+        _check_card_active_and_not_expired(card)
+
+        card.main_balance_fen += plan.recharge_amount_fen
+        card.gift_balance_fen += plan.gift_amount_fen
+        card.balance_fen = card.main_balance_fen + card.gift_balance_fen
+        card.total_recharged_fen += plan.recharge_amount_fen
+
+        total_amount = plan.recharge_amount_fen + plan.gift_amount_fen
+        txn = StoredValueTransaction(
+            id=uuid.uuid4(),
+            tenant_id=tenant_id,
+            card_id=card.id,
+            customer_id=card.customer_id,
+            txn_type="recharge",
+            amount_fen=total_amount,
+            main_amount_fen=plan.recharge_amount_fen,
+            gift_amount_fen=plan.gift_amount_fen,
+            balance_after_fen=card.balance_fen,
+            gift_balance_after_fen=card.gift_balance_fen,
+            recharge_plan_id=str(plan.id),
+            operator_id=operator_id,
+            store_id=store_id,
+            remark=(
+                f"充值套餐[{plan.name}] "
+                f"充{plan.recharge_amount_fen / 100:.2f}元"
+                + (f"赠{plan.gift_amount_fen / 100:.2f}元" if plan.gift_amount_fen else "")
+            ),
+        )
+        db.add(txn)
+
+        logger.info(
+            "stored_value_recharge_by_plan",
+            card_id=str(card_id),
+            plan_id=str(plan_id),
+            recharge=plan.recharge_amount_fen,
+            gift=plan.gift_amount_fen,
+        )
+        return _txn_to_dict(txn)
+
+    # ──────────────────────────────────────────────────────────────
+    # 充值 — 按金额（v1 兼容保留）
+    # ──────────────────────────────────────────────────────────────
 
     async def recharge(
         self,
@@ -63,7 +238,7 @@ class StoredValueService:
         operator_id: str | None = None,
         store_id: str | None = None,
     ) -> dict:
-        """充值（含自动匹配赠送规则）"""
+        """充值（按金额，含自动匹配赠送规则）— 兼容 v1 路由"""
         from models.stored_value import StoredValueCard, StoredValueTransaction, RechargeRule
 
         if amount_fen <= 0:
@@ -73,16 +248,19 @@ class StoredValueService:
 
         gift_fen = await self._match_recharge_gift(db, amount_fen, store_id)
 
-        card.balance_fen += amount_fen
+        card.main_balance_fen += amount_fen
         card.gift_balance_fen += gift_fen
+        card.balance_fen = card.main_balance_fen + card.gift_balance_fen
         card.total_recharged_fen += amount_fen
 
         txn = StoredValueTransaction(
             id=uuid.uuid4(),
             tenant_id=card.tenant_id,
             card_id=card.id,
+            customer_id=card.customer_id,
             txn_type="recharge",
-            amount_fen=amount_fen,
+            amount_fen=amount_fen + gift_fen,
+            main_amount_fen=amount_fen,
             gift_amount_fen=gift_fen,
             balance_after_fen=card.balance_fen,
             gift_balance_after_fen=card.gift_balance_fen,
@@ -102,6 +280,10 @@ class StoredValueService:
             "txn_id": str(txn.id),
         }
 
+    # ──────────────────────────────────────────────────────────────
+    # 消费
+    # ──────────────────────────────────────────────────────────────
+
     async def consume(
         self,
         db: AsyncSession,
@@ -118,26 +300,29 @@ class StoredValueService:
             raise ValueError("消费金额必须大于0")
 
         card = await self._get_active_card_for_update(db, card_no)
+        _check_card_active_and_not_expired(card)
 
-        total_available = card.balance_fen + card.gift_balance_fen
-        if total_available < amount_fen:
+        if card.balance_fen < amount_fen:
             raise InsufficientBalanceError(
-                f"余额不足：可用{total_available / 100:.2f}元，需{amount_fen / 100:.2f}元"
+                f"余额不足：可用{card.balance_fen / 100:.2f}元，需{amount_fen / 100:.2f}元"
             )
 
         gift_deduct = min(card.gift_balance_fen, amount_fen)
         principal_deduct = amount_fen - gift_deduct
 
         card.gift_balance_fen -= gift_deduct
-        card.balance_fen -= principal_deduct
+        card.main_balance_fen -= principal_deduct
+        card.balance_fen = card.main_balance_fen + card.gift_balance_fen
         card.total_consumed_fen += amount_fen
 
         txn = StoredValueTransaction(
             id=uuid.uuid4(),
             tenant_id=card.tenant_id,
             card_id=card.id,
+            customer_id=card.customer_id,
             txn_type="consume",
             amount_fen=-amount_fen,
+            main_amount_fen=-principal_deduct,
             gift_amount_fen=-gift_deduct,
             balance_after_fen=card.balance_fen,
             gift_balance_after_fen=card.gift_balance_fen,
@@ -159,6 +344,61 @@ class StoredValueService:
             "txn_id": str(txn.id),
         }
 
+    async def consume_by_id(
+        self,
+        db: AsyncSession,
+        card_id: uuid.UUID,
+        amount_fen: int,
+        tenant_id: uuid.UUID,
+        order_id: uuid.UUID | None = None,
+        store_id: uuid.UUID | None = None,
+    ) -> dict:
+        """消费扣款（按 card_id，v2 路由用）"""
+        from models.stored_value import StoredValueCard, StoredValueTransaction
+
+        if amount_fen <= 0:
+            raise ValueError("消费金额必须大于0")
+
+        card = await self._get_card_by_id_for_update(db, card_id, tenant_id)
+        _check_card_active_and_not_expired(card)
+
+        if card.balance_fen < amount_fen:
+            raise InsufficientBalanceError(
+                f"余额不足：可用{card.balance_fen / 100:.2f}元，需{amount_fen / 100:.2f}元"
+            )
+
+        gift_deduct = min(card.gift_balance_fen, amount_fen)
+        principal_deduct = amount_fen - gift_deduct
+
+        card.gift_balance_fen -= gift_deduct
+        card.main_balance_fen -= principal_deduct
+        card.balance_fen = card.main_balance_fen + card.gift_balance_fen
+        card.total_consumed_fen += amount_fen
+
+        txn = StoredValueTransaction(
+            id=uuid.uuid4(),
+            tenant_id=tenant_id,
+            card_id=card.id,
+            customer_id=card.customer_id,
+            txn_type="consume",
+            amount_fen=-amount_fen,
+            main_amount_fen=-principal_deduct,
+            gift_amount_fen=-gift_deduct,
+            balance_after_fen=card.balance_fen,
+            gift_balance_after_fen=card.gift_balance_fen,
+            order_id=order_id,
+            store_id=store_id,
+            remark=f"消费{amount_fen / 100:.2f}元（赠送金{gift_deduct / 100:.2f}+本金{principal_deduct / 100:.2f}）",
+        )
+        db.add(txn)
+
+        logger.info("stored_value_consume_by_id", card_id=str(card_id), amount=amount_fen)
+        return _txn_to_dict(txn)
+
+    # ──────────────────────────────────────────────────────────────
+    # 退款
+    # ──────────────────────────────────────────────────────────────
+
     async def refund(
         self,
         db: AsyncSession,
@@ -167,7 +407,7 @@ class StoredValueService:
         order_id: str | None = None,
         operator_id: str | None = None,
     ) -> dict:
-        """退款 — 仅退本金，赠送金按比例扣回"""
+        """退款 — 仅退本金（兼容 v1 路由）"""
         from models.stored_value import StoredValueCard, StoredValueTransaction
 
         if amount_fen <= 0:
@@ -175,21 +415,24 @@ class StoredValueService:
 
         card = await self._get_active_card_for_update(db, card_no)
 
-        card.balance_fen += amount_fen
+        card.main_balance_fen += amount_fen
+        card.balance_fen = card.main_balance_fen + card.gift_balance_fen
         card.total_refunded_fen += amount_fen
 
         txn = StoredValueTransaction(
             id=uuid.uuid4(),
             tenant_id=card.tenant_id,
             card_id=card.id,
+            customer_id=card.customer_id,
             txn_type="refund",
             amount_fen=amount_fen,
+            main_amount_fen=amount_fen,
             gift_amount_fen=0,
             balance_after_fen=card.balance_fen,
             gift_balance_after_fen=card.gift_balance_fen,
             order_id=uuid.UUID(order_id) if order_id else None,
             operator_id=uuid.UUID(operator_id) if operator_id else None,
-            remark=f"退款{amount_fen / 100:.2f}元",
+            remark=f"退款{amount_fen / 100:.2f}元（仅退本金）",
         )
         db.add(txn)
 
@@ -202,66 +445,80 @@ class StoredValueService:
             "txn_id": str(txn.id),
         }
 
-    async def freeze(self, db: AsyncSession, card_no: str, operator_id: str | None = None) -> dict:
-        """冻结储值卡"""
+    async def refund_by_transaction(
+        self,
+        db: AsyncSession,
+        transaction_id: uuid.UUID,
+        refund_amount_fen: int,
+        tenant_id: uuid.UUID,
+        operator_id: uuid.UUID | None = None,
+    ) -> dict:
+        """按原始流水退款 — 退款不超过原始消费额，仅退本金（v2 路由用）"""
         from models.stored_value import StoredValueCard, StoredValueTransaction
 
-        card = await self._get_active_card_for_update(db, card_no)
-        card.status = "frozen"
-        card.frozen_at = datetime.now(timezone.utc)
+        if refund_amount_fen <= 0:
+            raise ValueError("退款金额必须大于0")
 
-        txn = StoredValueTransaction(
+        # 查原始 consume 流水
+        txn_result = await db.execute(
+            select(StoredValueTransaction).where(
+                StoredValueTransaction.id == transaction_id,
+                StoredValueTransaction.tenant_id == tenant_id,
+                StoredValueTransaction.is_deleted.is_(False),
+            )
+        )
+        orig_txn = txn_result.scalar_one_or_none()
+        if not orig_txn:
+            raise ValueError(f"原始流水不存在: {transaction_id}")
+        if orig_txn.txn_type != "consume":
+            raise ValueError(f"只能对消费流水发起退款，当前流水类型: {orig_txn.txn_type}")
+
+        orig_amount = abs(orig_txn.amount_fen)
+        if refund_amount_fen > orig_amount:
+            raise ValueError(
+                f"退款金额({refund_amount_fen / 100:.2f}元)超过原始消费额({orig_amount / 100:.2f}元)"
+            )
+
+        # 加锁查卡
+        card = await self._get_card_by_id_for_update(db, orig_txn.card_id, tenant_id)
+
+        # 仅退本金（不退赠送余额）
+        card.main_balance_fen += refund_amount_fen
+        card.balance_fen = card.main_balance_fen + card.gift_balance_fen
+        card.total_refunded_fen += refund_amount_fen
+
+        refund_txn = StoredValueTransaction(
             id=uuid.uuid4(),
-            tenant_id=card.tenant_id,
+            tenant_id=tenant_id,
             card_id=card.id,
-            txn_type="freeze",
-            amount_fen=0,
+            customer_id=card.customer_id,
+            txn_type="refund",
+            amount_fen=refund_amount_fen,
+            main_amount_fen=refund_amount_fen,
             gift_amount_fen=0,
             balance_after_fen=card.balance_fen,
             gift_balance_after_fen=card.gift_balance_fen,
-            operator_id=uuid.UUID(operator_id) if operator_id else None,
-            remark="冻结储值卡",
+            order_id=orig_txn.order_id,
+            operator_id=operator_id,
+            remark=f"退款{refund_amount_fen / 100:.2f}元（原流水 {transaction_id}，仅退本金）",
         )
-        db.add(txn)
-        return {"card_no": card_no, "status": "frozen"}
+        db.add(refund_txn)
 
-    async def unfreeze(self, db: AsyncSession, card_no: str, operator_id: str | None = None) -> dict:
-        """解冻储值卡"""
-        from models.stored_value import StoredValueCard, StoredValueTransaction
-
-        result = await db.execute(
-            select(StoredValueCard)
-            .where(StoredValueCard.card_no == card_no, StoredValueCard.is_deleted.is_(False))
-            .with_for_update()
+        logger.info(
+            "stored_value_refund_by_txn",
+            orig_txn_id=str(transaction_id),
+            refund_amount=refund_amount_fen,
         )
-        card = result.scalar_one_or_none()
-        if not card:
-            raise ValueError(f"储值卡不存在: {card_no}")
-        if card.status != "frozen":
-            raise CardNotActiveError("卡片非冻结状态，无需解冻")
+        return _txn_to_dict(refund_txn)
 
-        card.status = "active"
-        card.frozen_at = None
-
-        txn = StoredValueTransaction(
-            id=uuid.uuid4(),
-            tenant_id=card.tenant_id,
-            card_id=card.id,
-            txn_type="unfreeze",
-            amount_fen=0,
-            gift_amount_fen=0,
-            balance_after_fen=card.balance_fen,
-            gift_balance_after_fen=card.gift_balance_fen,
-            operator_id=uuid.UUID(operator_id) if operator_id else None,
-            remark="解冻储值卡",
-        )
-        db.add(txn)
-        return {"card_no": card_no, "status": "active"}
+    # ──────────────────────────────────────────────────────────────
+    # 流水查询
+    # ──────────────────────────────────────────────────────────────
 
     async def get_transactions(
         self, db: AsyncSession, card_no: str, limit: int = 20, offset: int = 0,
     ) -> dict:
-        """查询储值卡交易流水"""
+        """查询储值卡流水（按卡号，v1 兼容）"""
         from models.stored_value import StoredValueCard, StoredValueTransaction
 
         card_result = await db.execute(
@@ -296,9 +553,191 @@ class StoredValueService:
             ],
         }
 
+    async def get_transactions_by_id(
+        self,
+        db: AsyncSession,
+        card_id: uuid.UUID,
+        tenant_id: uuid.UUID,
+        page: int = 1,
+        size: int = 20,
+    ) -> dict:
+        """按 card_id 分页查询流水（v2 路由用）"""
+        from models.stored_value import StoredValueTransaction
+
+        offset = (page - 1) * size
+
+        count_result = await db.execute(
+            select(func.count()).where(
+                StoredValueTransaction.card_id == card_id,
+                StoredValueTransaction.tenant_id == tenant_id,
+                StoredValueTransaction.is_deleted.is_(False),
+            )
+        )
+        total: int = count_result.scalar_one()
+
+        result = await db.execute(
+            select(StoredValueTransaction)
+            .where(
+                StoredValueTransaction.card_id == card_id,
+                StoredValueTransaction.tenant_id == tenant_id,
+                StoredValueTransaction.is_deleted.is_(False),
+            )
+            .order_by(StoredValueTransaction.created_at.desc())
+            .offset(offset)
+            .limit(size)
+        )
+        txns = result.scalars().all()
+        return {
+            "items": [_txn_to_dict(t) for t in txns],
+            "total": total,
+            "page": page,
+            "size": size,
+        }
+
+    # ──────────────────────────────────────────────────────────────
+    # 套餐管理
+    # ──────────────────────────────────────────────────────────────
+
+    async def list_recharge_plans(
+        self,
+        db: AsyncSession,
+        tenant_id: uuid.UUID,
+    ) -> list[dict]:
+        """查询有效套餐列表（is_active=True，在有效期内）"""
+        from models.stored_value import StoredValueRechargePlan
+
+        now = datetime.now(timezone.utc)
+
+        result = await db.execute(
+            select(StoredValueRechargePlan)
+            .where(
+                StoredValueRechargePlan.tenant_id == tenant_id,
+                StoredValueRechargePlan.is_active.is_(True),
+                StoredValueRechargePlan.is_deleted.is_(False),
+            )
+            .order_by(StoredValueRechargePlan.sort_order.asc())
+        )
+        plans = result.scalars().all()
+
+        # 在 Python 层过滤时间范围（兼顾 nullable valid_from/until）
+        return [
+            _plan_to_dict(p)
+            for p in plans
+            if (p.valid_from is None or p.valid_from <= now)
+            and (p.valid_until is None or p.valid_until >= now)
+        ]
+
+    async def create_recharge_plan(
+        self,
+        db: AsyncSession,
+        tenant_id: uuid.UUID,
+        name: str,
+        recharge_amount_fen: int,
+        gift_amount_fen: int = 0,
+        scope_type: str = "brand",
+        sort_order: int = 0,
+        valid_from: datetime | None = None,
+        valid_until: datetime | None = None,
+        remark: str | None = None,
+    ) -> dict:
+        """新建充值套餐"""
+        from models.stored_value import StoredValueRechargePlan
+
+        if recharge_amount_fen <= 0:
+            raise ValueError("充值金额必须大于0")
+        if gift_amount_fen < 0:
+            raise ValueError("赠送金额不能为负")
+
+        plan = StoredValueRechargePlan(
+            id=uuid.uuid4(),
+            tenant_id=tenant_id,
+            name=name,
+            recharge_amount_fen=recharge_amount_fen,
+            gift_amount_fen=gift_amount_fen,
+            scope_type=scope_type,
+            sort_order=sort_order,
+            valid_from=valid_from,
+            valid_until=valid_until,
+            remark=remark,
+        )
+        db.add(plan)
+        await db.flush()
+
+        logger.info("stored_value_create_plan", plan_id=str(plan.id), name=name)
+        return _plan_to_dict(plan)
+
+    # ──────────────────────────────────────────────────────────────
+    # 冻结 / 解冻
+    # ──────────────────────────────────────────────────────────────
+
+    async def freeze(self, db: AsyncSession, card_no: str, operator_id: str | None = None) -> dict:
+        """冻结储值卡"""
+        from models.stored_value import StoredValueCard, StoredValueTransaction
+
+        card = await self._get_active_card_for_update(db, card_no)
+        card.status = "frozen"
+        card.frozen_at = datetime.now(timezone.utc)
+
+        txn = StoredValueTransaction(
+            id=uuid.uuid4(),
+            tenant_id=card.tenant_id,
+            card_id=card.id,
+            customer_id=card.customer_id,
+            txn_type="freeze",
+            amount_fen=0,
+            main_amount_fen=0,
+            gift_amount_fen=0,
+            balance_after_fen=card.balance_fen,
+            gift_balance_after_fen=card.gift_balance_fen,
+            operator_id=uuid.UUID(operator_id) if operator_id else None,
+            remark="冻结储值卡",
+        )
+        db.add(txn)
+        return {"card_no": card_no, "status": "frozen"}
+
+    async def unfreeze(self, db: AsyncSession, card_no: str, operator_id: str | None = None) -> dict:
+        """解冻储值卡"""
+        from models.stored_value import StoredValueCard, StoredValueTransaction
+
+        result = await db.execute(
+            select(StoredValueCard)
+            .where(StoredValueCard.card_no == card_no, StoredValueCard.is_deleted.is_(False))
+            .with_for_update()
+        )
+        card = result.scalar_one_or_none()
+        if not card:
+            raise ValueError(f"储值卡不存在: {card_no}")
+        if card.status != "frozen":
+            raise CardNotActiveError("卡片非冻结状态，无需解冻")
+
+        card.status = "active"
+        card.frozen_at = None
+
+        txn = StoredValueTransaction(
+            id=uuid.uuid4(),
+            tenant_id=card.tenant_id,
+            card_id=card.id,
+            customer_id=card.customer_id,
+            txn_type="unfreeze",
+            amount_fen=0,
+            main_amount_fen=0,
+            gift_amount_fen=0,
+            balance_after_fen=card.balance_fen,
+            gift_balance_after_fen=card.gift_balance_fen,
+            operator_id=uuid.UUID(operator_id) if operator_id else None,
+            remark="解冻储值卡",
+        )
+        db.add(txn)
+        return {"card_no": card_no, "status": "active"}
+
+    # ──────────────────────────────────────────────────────────────
+    # 内部辅助方法
+    # ──────────────────────────────────────────────────────────────
+
     async def _get_active_card_for_update(self, db: AsyncSession, card_no: str):
-        """获取活跃卡并加行锁（防并发）"""
+        """获取活跃卡并加行锁（防并发）— 按卡号"""
         from models.stored_value import StoredValueCard
+
         result = await db.execute(
             select(StoredValueCard)
             .where(StoredValueCard.card_no == card_no, StoredValueCard.is_deleted.is_(False))
@@ -311,11 +750,35 @@ class StoredValueService:
             raise CardNotActiveError(f"储值卡状态异常: {card.status}")
         return card
 
+    async def _get_card_by_id_for_update(
+        self,
+        db: AsyncSession,
+        card_id: uuid.UUID,
+        tenant_id: uuid.UUID,
+    ):
+        """获取卡并加行锁（防并发）— 按 card_id，带 tenant_id 校验"""
+        from models.stored_value import StoredValueCard
+
+        result = await db.execute(
+            select(StoredValueCard)
+            .where(
+                StoredValueCard.id == card_id,
+                StoredValueCard.tenant_id == tenant_id,
+                StoredValueCard.is_deleted.is_(False),
+            )
+            .with_for_update()
+        )
+        card = result.scalar_one_or_none()
+        if not card:
+            raise ValueError(f"储值卡不存在: {card_id}")
+        return card
+
     async def _match_recharge_gift(
         self, db: AsyncSession, amount_fen: int, store_id: str | None,
     ) -> int:
-        """匹配充值赠送规则，返回赠送金额"""
+        """匹配充值赠送规则，返回赠送金额（v1 兼容）"""
         from models.stored_value import RechargeRule
+
         now = datetime.now(timezone.utc)
 
         result = await db.execute(
@@ -335,3 +798,72 @@ class StoredValueService:
             return rule.gift_amount_fen
 
         return 0
+
+
+# ──────────────────────────────────────────────────────────────────
+# 序列化辅助函数
+# ──────────────────────────────────────────────────────────────────
+
+def _card_to_dict(card) -> dict:
+    return {
+        "id": str(card.id),
+        "card_no": card.card_no,
+        "customer_id": str(card.customer_id),
+        "store_id": str(card.store_id) if card.store_id else None,
+        "balance_fen": card.balance_fen,
+        "main_balance_fen": card.main_balance_fen,
+        "gift_balance_fen": card.gift_balance_fen,
+        "total_recharged_fen": card.total_recharged_fen,
+        "total_consumed_fen": card.total_consumed_fen,
+        "total_refunded_fen": card.total_refunded_fen,
+        "scope_type": card.scope_type,
+        "scope_id": str(card.scope_id) if getattr(card, "scope_id", None) else None,
+        "status": card.status,
+        "expiry_date": str(card.expiry_date) if getattr(card, "expiry_date", None) else None,
+        "remark": card.remark,
+        "created_at": str(card.created_at) if card.created_at else None,
+    }
+
+
+def _txn_to_dict(txn) -> dict:
+    return {
+        "id": str(txn.id),
+        "card_id": str(txn.card_id),
+        "customer_id": str(txn.customer_id) if txn.customer_id else None,
+        "store_id": str(txn.store_id) if txn.store_id else None,
+        "txn_type": txn.txn_type,
+        "amount_fen": txn.amount_fen,
+        "main_amount_fen": txn.main_amount_fen,
+        "gift_amount_fen": txn.gift_amount_fen,
+        "balance_after_fen": txn.balance_after_fen,
+        "order_id": str(txn.order_id) if txn.order_id else None,
+        "recharge_plan_id": txn.recharge_plan_id,
+        "operator_id": str(txn.operator_id) if txn.operator_id else None,
+        "remark": txn.remark,
+        "created_at": str(txn.created_at) if txn.created_at else None,
+    }
+
+
+def _plan_to_dict(plan) -> dict:
+    return {
+        "id": str(plan.id),
+        "name": plan.name,
+        "recharge_amount_fen": plan.recharge_amount_fen,
+        "gift_amount_fen": plan.gift_amount_fen,
+        "scope_type": plan.scope_type,
+        "is_active": plan.is_active,
+        "sort_order": plan.sort_order,
+        "valid_from": str(plan.valid_from) if plan.valid_from else None,
+        "valid_until": str(plan.valid_until) if plan.valid_until else None,
+        "remark": getattr(plan, "remark", None),
+        "created_at": str(plan.created_at) if plan.created_at else None,
+    }
+
+
+def _check_card_active_and_not_expired(card) -> None:
+    """检查卡状态为 active 且未过期"""
+    if card.status != "active":
+        raise CardNotActiveError(f"储值卡状态异常: {card.status}")
+    expiry: date | None = getattr(card, "expiry_date", None)
+    if expiry and expiry < datetime.now(timezone.utc).date():
+        raise CardNotActiveError("储值卡已过期")

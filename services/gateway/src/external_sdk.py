@@ -25,6 +25,17 @@ logger = structlog.get_logger()
 
 
 # ═══════════════════════════════════════
+# 自定义异常
+# ═══════════════════════════════════════
+
+class WecomAPIError(Exception):
+    def __init__(self, errcode: int, errmsg: str):
+        self.errcode = errcode
+        self.errmsg = errmsg
+        super().__init__(f"WecomAPI error {errcode}: {errmsg}")
+
+
+# ═══════════════════════════════════════
 # D1: 微信支付
 # ═══════════════════════════════════════
 
@@ -97,50 +108,205 @@ class WecomConfig:
     secret: str = os.getenv("WECOM_SECRET", "")
 
 
+_token_cache: dict = {"token": None, "expires_at": 0}
+
+
 class WecomSDK:
     """企业微信 API"""
     BASE = "https://qyapi.weixin.qq.com/cgi-bin"
 
     def __init__(self, config: WecomConfig = None):
         self.config = config or WecomConfig()
-        self._token: Optional[str] = None
-        self._token_expires: float = 0
 
     async def get_access_token(self) -> str:
-        if self._token and time.time() < self._token_expires:
-            return self._token
-        # TODO: 真实请求
-        self._token = f"wecom_token_{int(time.time())}"
-        self._token_expires = time.time() + 7200
-        return self._token
+        """获取 access_token，内存缓存，提前300秒刷新"""
+        now = time.time()
+        if _token_cache["token"] and now < _token_cache["expires_at"] - 300:
+            return _token_cache["token"]
+
+        url = (
+            f"{self.BASE}/gettoken"
+            f"?grant_type=client_credential"
+            f"&corpid={self.config.corp_id}"
+            f"&corpsecret={self.config.secret}"
+        )
+        async with httpx.AsyncClient(timeout=10) as client:
+            try:
+                resp = await client.get(url)
+                resp.raise_for_status()
+            except httpx.HTTPStatusError as exc:
+                logger.error("wecom_token_http_error", status=exc.response.status_code)
+                raise
+            except httpx.ConnectError as exc:
+                logger.error("wecom_token_connect_error", error=str(exc))
+                raise
+            except httpx.TimeoutException as exc:
+                logger.error("wecom_token_timeout", error=str(exc))
+                raise
+
+        data = resp.json()
+        if data.get("errcode", 0) != 0:
+            raise WecomAPIError(data["errcode"], data.get("errmsg", ""))
+
+        _token_cache["token"] = data["access_token"]
+        _token_cache["expires_at"] = now + 7200
+        logger.info("wecom_token_refreshed")
+        return _token_cache["token"]
+
+    async def _post_message(self, payload: dict) -> dict:
+        """内部：发送消息通用方法"""
+        token = await self.get_access_token()
+        url = f"{self.BASE}/message/send?access_token={token}"
+        async with httpx.AsyncClient(timeout=10) as client:
+            try:
+                resp = await client.post(url, json=payload)
+                resp.raise_for_status()
+            except httpx.HTTPStatusError as exc:
+                logger.error("wecom_post_http_error", status=exc.response.status_code)
+                raise
+            except httpx.ConnectError as exc:
+                logger.error("wecom_post_connect_error", error=str(exc))
+                raise
+            except httpx.TimeoutException as exc:
+                logger.error("wecom_post_timeout", error=str(exc))
+                raise
+
+        data = resp.json()
+        if data.get("errcode", 0) != 0:
+            raise WecomAPIError(data["errcode"], data.get("errmsg", ""))
+        return data
 
     async def send_text_card(self, user_id: str, title: str, description: str, url: str, btntxt: str = "详情") -> dict:
         """发送文本卡片消息（决策推送用）"""
-        token = await self.get_access_token()
         payload = {
             "touser": user_id,
             "msgtype": "textcard",
-            "agentid": self.config.agent_id,
-            "textcard": {"title": title[:128], "description": description[:512], "url": url, "btntxt": btntxt},
+            "agentid": int(self.config.agent_id),
+            "textcard": {
+                "title": title[:128],
+                "description": description[:512],
+                "url": url,
+                "btntxt": btntxt,
+            },
         }
-        logger.info("wecom_send", user_id=user_id, title=title)
-        return {"errcode": 0, "errmsg": "ok"}
+        logger.info("wecom_send_text_card", user_id=user_id, title=title)
+        return await self._post_message(payload)
 
     async def send_markdown(self, user_id: str, content: str) -> dict:
         """发送 Markdown 消息"""
-        return {"errcode": 0, "errmsg": "ok"}
+        payload = {
+            "touser": user_id,
+            "msgtype": "markdown",
+            "agentid": int(self.config.agent_id),
+            "markdown": {"content": content},
+        }
+        logger.info("wecom_send_markdown", user_id=user_id)
+        return await self._post_message(payload)
+
+    async def send_text(self, user_id: str, content: str) -> dict:
+        """发送文本消息"""
+        payload = {
+            "touser": user_id,
+            "msgtype": "text",
+            "agentid": int(self.config.agent_id),
+            "text": {"content": content},
+        }
+        logger.info("wecom_send_text", user_id=user_id)
+        return await self._post_message(payload)
+
+    async def send_news(self, user_id: str, articles: list[dict]) -> dict:
+        """发送图文消息
+        articles格式: [{"title":..., "description":..., "url":..., "picurl":...}]
+        """
+        payload = {
+            "touser": user_id,
+            "msgtype": "news",
+            "agentid": int(self.config.agent_id),
+            "news": {"articles": articles},
+        }
+        logger.info("wecom_send_news", user_id=user_id, article_count=len(articles))
+        return await self._post_message(payload)
+
+    async def batch_send_text(self, user_ids: list[str], content: str) -> dict:
+        """批量发送文本消息（企微支持 touser 用|分隔，最多1000个）"""
+        touser = "|".join(user_ids[:1000])
+        payload = {
+            "touser": touser,
+            "msgtype": "text",
+            "agentid": int(self.config.agent_id),
+            "text": {"content": content},
+        }
+        logger.info("wecom_batch_send_text", user_count=min(len(user_ids), 1000))
+        return await self._post_message(payload)
 
     async def get_user_info_by_code(self, code: str) -> dict:
         """扫码登录 — 通过 code 获取用户信息"""
-        return {"userid": "", "name": "", "department": []}
+        token = await self.get_access_token()
+        url = f"{self.BASE}/user/getuserinfo?access_token={token}&code={code}"
+        async with httpx.AsyncClient(timeout=10) as client:
+            try:
+                resp = await client.get(url)
+                resp.raise_for_status()
+            except httpx.HTTPStatusError as exc:
+                logger.error("wecom_getuserinfo_http_error", status=exc.response.status_code)
+                raise
+            except httpx.ConnectError as exc:
+                logger.error("wecom_getuserinfo_connect_error", error=str(exc))
+                raise
+            except httpx.TimeoutException as exc:
+                logger.error("wecom_getuserinfo_timeout", error=str(exc))
+                raise
+
+        data = resp.json()
+        if data.get("errcode", 0) != 0:
+            raise WecomAPIError(data["errcode"], data.get("errmsg", ""))
+        return data
 
     async def sync_department(self) -> list[dict]:
         """同步部门列表"""
-        return []
+        token = await self.get_access_token()
+        url = f"{self.BASE}/department/list?access_token={token}"
+        async with httpx.AsyncClient(timeout=10) as client:
+            try:
+                resp = await client.get(url)
+                resp.raise_for_status()
+            except httpx.HTTPStatusError as exc:
+                logger.error("wecom_department_list_http_error", status=exc.response.status_code)
+                raise
+            except httpx.ConnectError as exc:
+                logger.error("wecom_department_list_connect_error", error=str(exc))
+                raise
+            except httpx.TimeoutException as exc:
+                logger.error("wecom_department_list_timeout", error=str(exc))
+                raise
+
+        data = resp.json()
+        if data.get("errcode", 0) != 0:
+            raise WecomAPIError(data["errcode"], data.get("errmsg", ""))
+        return data.get("department", [])
 
     async def sync_users(self, department_id: int = 1) -> list[dict]:
         """同步部门下的用户列表"""
-        return []
+        token = await self.get_access_token()
+        url = f"{self.BASE}/user/list?access_token={token}&department_id={department_id}&fetch_child=1"
+        async with httpx.AsyncClient(timeout=10) as client:
+            try:
+                resp = await client.get(url)
+                resp.raise_for_status()
+            except httpx.HTTPStatusError as exc:
+                logger.error("wecom_user_list_http_error", status=exc.response.status_code)
+                raise
+            except httpx.ConnectError as exc:
+                logger.error("wecom_user_list_connect_error", error=str(exc))
+                raise
+            except httpx.TimeoutException as exc:
+                logger.error("wecom_user_list_timeout", error=str(exc))
+                raise
+
+        data = resp.json()
+        if data.get("errcode", 0) != 0:
+            raise WecomAPIError(data["errcode"], data.get("errmsg", ""))
+        return data.get("userlist", [])
 
 
 # ═══════════════════════════════════════
