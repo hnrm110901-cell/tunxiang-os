@@ -67,6 +67,18 @@ class KDSTask(TenantBase):
         comment="最近一次催菜时间（限流滑动窗口起点）"
     )
 
+    # ── 等叫（calling）状态字段 ──
+    called_at: Mapped[Optional[datetime]] = mapped_column(
+        comment="厨师标记等叫的时间"
+    )
+    served_at: Mapped[Optional[datetime]] = mapped_column(
+        comment="服务员确认上桌的时间"
+    )
+    call_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0,
+        comment="等叫累计次数"
+    )
+
     # ── 重做记录 ──
     remake_count: Mapped[int] = mapped_column(
         Integer, nullable=False, default=0,
@@ -87,17 +99,14 @@ class KDSTask(TenantBase):
         Index(
             "ix_kds_tasks_tenant_dept_status",
             "tenant_id", "dept_id", "status",
-            comment="档口任务队列查询"
         ),
         Index(
             "ix_kds_tasks_tenant_status_created",
             "tenant_id", "status", "created_at",
-            comment="重启恢复查询：按状态+时间过滤活跃任务"
         ),
         Index(
             "ix_kds_tasks_promised_at",
             "promised_at",
             postgresql_where="promised_at IS NOT NULL AND status NOT IN ('done', 'cancelled')",
-            comment="催菜SLA超时检查（局部索引）"
         ),
     )
