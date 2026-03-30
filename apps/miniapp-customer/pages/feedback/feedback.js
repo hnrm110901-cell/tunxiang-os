@@ -1,20 +1,30 @@
-// 评价 + 售后 — 打分+文字+拍照
+// 评价反馈 — 五维评分+文字+拍照+匿名
 var app = getApp();
 var api = require('../../utils/api.js');
 
 Page({
   data: {
     activeTab: 'new',
-    // ─── 新评价 ───
-    rating: 5,
+    // --- 五维评分 ---
+    dimensions: [
+      { key: 'taste', label: '口味', score: 5 },
+      { key: 'service', label: '服务', score: 5 },
+      { key: 'environment', label: '环境', score: 5 },
+      { key: 'value', label: '性价比', score: 5 },
+      { key: 'overall', label: '整体', score: 5 },
+    ],
     ratingLabels: ['很差', '较差', '一般', '不错', '很棒'],
+    // 旧的单一评分（兼容）
+    rating: 5,
     ratingLabel: '很棒',
+    // --- 评价内容 ---
     content: '',
     images: [],
     maxImages: 6,
     orderId: '',
+    isAnonymous: false,
     submitting: false,
-    // ─── 我的评价 ───
+    // --- 我的评价 ---
     feedbacks: [],
     loadingFeedbacks: false,
   },
@@ -43,8 +53,49 @@ Page({
     }
   },
 
-  // ─── 新评价 ───
+  // --- 五维评分 ---
 
+  setDimensionScore: function (e) {
+    var dimKey = e.currentTarget.dataset.dim;
+    var score = Number(e.currentTarget.dataset.score);
+    var dims = this.data.dimensions.slice();
+    for (var i = 0; i < dims.length; i++) {
+      if (dims[i].key === dimKey) {
+        dims[i] = {
+          key: dims[i].key,
+          label: dims[i].label,
+          score: score,
+        };
+        break;
+      }
+    }
+
+    // 计算整体平均分（向上取整）
+    var total = 0;
+    var count = 0;
+    for (var j = 0; j < dims.length; j++) {
+      if (dims[j].key !== 'overall') {
+        total += dims[j].score;
+        count++;
+      }
+    }
+    var avgScore = count > 0 ? Math.round(total / count) : 5;
+    // 更新整体分
+    for (var k = 0; k < dims.length; k++) {
+      if (dims[k].key === 'overall') {
+        dims[k] = { key: 'overall', label: '整体', score: avgScore };
+        break;
+      }
+    }
+
+    this.setData({
+      dimensions: dims,
+      rating: avgScore,
+      ratingLabel: this.data.ratingLabels[avgScore - 1],
+    });
+  },
+
+  // --- 兼容旧单一评分 ---
   setRating: function (e) {
     var score = Number(e.currentTarget.dataset.score);
     this.setData({
@@ -53,9 +104,19 @@ Page({
     });
   },
 
+  // --- 匿名 ---
+
+  toggleAnonymous: function () {
+    this.setData({ isAnonymous: !this.data.isAnonymous });
+  },
+
+  // --- 内容 ---
+
   onContentInput: function (e) {
     this.setData({ content: e.detail.value });
   },
+
+  // --- 图片 ---
 
   chooseImage: function () {
     var self = this;
@@ -95,6 +156,8 @@ Page({
     });
   },
 
+  // --- 提交 ---
+
   submitFeedback: function () {
     var self = this;
     if (!self.data.content.trim()) {
@@ -103,6 +166,12 @@ Page({
     }
 
     self.setData({ submitting: true });
+
+    // 构造五维评分数据
+    var dimensionScores = {};
+    self.data.dimensions.forEach(function (d) {
+      dimensionScores[d.key] = d.score;
+    });
 
     // 先上传图片，再提交评价
     var uploadPromise = self.data.images.length > 0
@@ -115,17 +184,27 @@ Page({
         customer_id: wx.getStorageSync('tx_customer_id') || '',
         order_id: self.data.orderId || '',
         rating: self.data.rating,
+        dimension_scores: dimensionScores,
         content: self.data.content,
         image_urls: imageUrls,
+        is_anonymous: self.data.isAnonymous,
       });
     }).then(function () {
       wx.showToast({ title: '评价成功', icon: 'success' });
       self.setData({
+        dimensions: [
+          { key: 'taste', label: '口味', score: 5 },
+          { key: 'service', label: '服务', score: 5 },
+          { key: 'environment', label: '环境', score: 5 },
+          { key: 'value', label: '性价比', score: 5 },
+          { key: 'overall', label: '整体', score: 5 },
+        ],
         rating: 5,
         ratingLabel: '很棒',
         content: '',
         images: [],
         orderId: '',
+        isAnonymous: false,
         submitting: false,
         activeTab: 'list',
       });
@@ -172,7 +251,7 @@ Page({
     return Promise.all(promises);
   },
 
-  // ─── 我的评价 ───
+  // --- 我的评价 ---
 
   _loadFeedbacks: function () {
     var self = this;
@@ -184,10 +263,12 @@ Page({
           return {
             id: f.id,
             rating: f.rating || 5,
+            dimensionScores: f.dimension_scores || {},
             content: f.content || '',
             imageUrls: f.image_urls || [],
             createdAt: (f.created_at || '').slice(0, 10),
             reply: f.reply || '',
+            isAnonymous: f.is_anonymous || false,
           };
         });
         self.setData({ feedbacks: items, loadingFeedbacks: false });

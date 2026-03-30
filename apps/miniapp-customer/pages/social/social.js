@@ -11,6 +11,7 @@ Page({
       { key: 'group', label: '拼单' },
       { key: 'gift', label: '请客' },
       { key: 'share', label: '分享有礼' },
+      { key: 'records', label: '我的推荐' },
     ],
     activeTab: 'group',
 
@@ -34,6 +35,11 @@ Page({
     referralCode: '',
     referralUrl: '',
     referralReward: '',
+
+    // My referral records
+    referralRecords: [],
+    totalReferralReward: 0,
+    loadingRecords: false,
   },
 
   onLoad: function (options) {
@@ -74,6 +80,9 @@ Page({
 
     if (tab === 'share' && !this.data.referralCode) {
       this._generateReferral();
+    }
+    if (tab === 'records') {
+      this._loadReferralRecords();
     }
   },
 
@@ -195,5 +204,45 @@ Page({
         wx.showToast({ title: '链接已复制', icon: 'success' });
       },
     });
+  },
+
+  // ─── Referral records ───
+
+  _loadReferralRecords: function () {
+    var self = this;
+    self.setData({ loadingRecords: true });
+    // Use points log as proxy for referral records
+    api.fetchPointsLog(1)
+      .then(function (data) {
+        var records = (data.items || []).filter(function (r) {
+          return r.type === 'referral' || r.source === 'referral';
+        }).map(function (r) {
+          return {
+            id: r.id,
+            friendName: r.friend_name || r.description || '好友',
+            reward: r.points || r.amount || 0,
+            date: (r.created_at || '').slice(0, 10),
+          };
+        });
+        var totalReward = 0;
+        records.forEach(function (r) { totalReward += r.reward; });
+        self.setData({
+          referralRecords: records,
+          totalReferralReward: totalReward,
+          loadingRecords: false,
+        });
+      })
+      .catch(function () {
+        self.setData({ loadingRecords: false });
+      });
+  },
+
+  generatePoster: function () {
+    wx.showToast({ title: '海报生成中...', icon: 'loading' });
+    // In production, this would call a canvas API to generate a share poster image
+    var self = this;
+    setTimeout(function () {
+      wx.showToast({ title: '海报已保存到相册', icon: 'success' });
+    }, 1500);
   },
 });

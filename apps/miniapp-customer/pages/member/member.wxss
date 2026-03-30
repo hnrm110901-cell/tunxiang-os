@@ -1,6 +1,6 @@
 .page-container { min-height: 100vh; background: #0B1A20; color: #fff; padding-bottom: 120rpx; }
 
-/* ─── 未登录 ─── */
+/* --- 未登录 --- */
 .login-section {
   display: flex;
   flex-direction: column;
@@ -34,13 +34,28 @@
   width: 100%;
 }
 
-/* ─── 会员卡 ─── */
+/* --- 会员卡 --- */
 .member-card {
   margin: 32rpx;
   background: linear-gradient(135deg, #1a3040, #112228);
   border-radius: 24rpx;
   padding: 36rpx;
   border: 1rpx solid #1a2a33;
+}
+
+.member-card-silver {
+  background: linear-gradient(135deg, #4a5568, #2d3748);
+  border-color: rgba(192, 192, 192, 0.3);
+}
+
+.member-card-gold {
+  background: linear-gradient(135deg, #d69e2e, #b7791f);
+  border-color: rgba(255, 215, 0, 0.3);
+}
+
+.member-card-diamond {
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  border-color: rgba(185, 242, 255, 0.3);
 }
 
 .member-header {
@@ -61,9 +76,33 @@
   display: flex;
   flex-direction: column;
   gap: 10rpx;
+  flex: 1;
 }
 
 .member-name { font-size: 34rpx; font-weight: bold; color: #fff; }
+
+/* 等级徽章 */
+.level-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4rpx 16rpx;
+  border-radius: 20rpx;
+  font-size: 22rpx;
+  align-self: flex-start;
+}
+
+.level-normal { background: rgba(153, 153, 153, 0.2); color: #ccc; }
+.level-silver { background: rgba(192, 192, 192, 0.2); color: #C0C0C0; }
+.level-gold { background: rgba(255, 215, 0, 0.2); color: #FFD700; }
+.level-diamond { background: rgba(185, 242, 255, 0.2); color: #B9F2FF; }
+
+.level-text { font-size: 22rpx; font-weight: 600; }
+
+.edit-btn {
+  padding: 12rpx;
+}
+
+.edit-icon { font-size: 32rpx; }
 
 /* 资产区 */
 .assets-row {
@@ -88,10 +127,10 @@
 .asset-divider {
   width: 1rpx;
   height: 60rpx;
-  background: #1a2a33;
+  background: rgba(255, 255, 255, 0.1);
 }
 
-/* ─── 功能菜单 ─── */
+/* --- 功能菜单 --- */
 .menu-section {
   margin: 24rpx 32rpx;
   background: #112228;
@@ -119,7 +158,7 @@
 .menu-label { font-size: 30rpx; color: #fff; }
 .menu-arrow { font-size: 28rpx; color: #666; }
 
-/* ─── 消费统计 ─── */
+/* --- 消费统计 --- */
 .stats-card {
   margin: 24rpx 32rpx;
   background: #112228;
@@ -127,7 +166,15 @@
   padding: 28rpx;
 }
 
-.stats-title { font-size: 28rpx; color: #999; margin-bottom: 20rpx; display: block; }
+.stats-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20rpx;
+}
+
+.stats-title { font-size: 28rpx; color: #999; }
+.stats-more { font-size: 24rpx; color: #FF6B2C; }
 
 .stats-row { display: flex; }
 
@@ -142,7 +189,7 @@
 .stats-value { font-size: 34rpx; font-weight: bold; color: #FF6B2C; }
 .stats-label { font-size: 22rpx; color: #999; }
 
-/* ─── 弹层 ─── */
+/* --- 弹层 --- */
 .popup-mask {
   position: fixed;
   top: 0; left: 0; right: 0; bottom: 0;
@@ -197,3 +244,111 @@
 .log-amount.expense { color: #FF6B2C; }
 
 .empty-state { text-align: center; color: #666; font-size: 28rpx; padding: 80rpx 0; }
+.loading-tip { text-align: center; color: #999; font-size: 28rpx; padding: 60rpx 0; }
+
+/* --- 优惠券 --- */
+.coupon-tabs {
+  display: flex;
+  padding: 0 32rpx;
+  border-bottom: 1rpx solid #1a2a33;
+}
+
+.coupon-tab {
+  flex: 1;
+  text-align: center;
+  padding: 20rpx 0;
+  font-size: 28rpx;
+  color: #999;
+  position: relative;
+}
+
+.coupon-tab.active {
+  color: #FF6B2C;
+}
+
+.coupon-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 30%;
+  right: 30%;
+  height: 4rpx;
+  background: #FF6B2C;
+  border-radius: 2rpx;
+}
+
+.coupon-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24rpx 0;
+  border-bottom: 1rpx solid #1a2a33;
+}
+
+.coupon-card.disabled { opacity: 0.5; }
+
+.coupon-left { display: flex; flex-direction: column; gap: 6rpx; flex: 1; }
+.coupon-name { font-size: 28rpx; color: #fff; font-weight: 600; }
+.coupon-desc { font-size: 24rpx; color: #999; }
+.coupon-expire { font-size: 22rpx; color: #666; }
+
+.coupon-right { padding-left: 20rpx; }
+.coupon-discount { font-size: 32rpx; color: #FF6B2C; font-weight: bold; }
+
+/* --- 消费记录 --- */
+.consume-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24rpx 0;
+  border-bottom: 1rpx solid #1a2a33;
+}
+
+.consume-left { display: flex; flex-direction: column; gap: 8rpx; flex: 1; }
+.consume-name { font-size: 28rpx; color: #fff; }
+.consume-time { font-size: 22rpx; color: #666; }
+.consume-amount { font-size: 30rpx; color: #FF6B2C; font-weight: bold; }
+
+/* --- 个人信息编辑 --- */
+.edit-form {
+  padding: 32rpx;
+}
+
+.edit-row {
+  margin-bottom: 32rpx;
+}
+
+.edit-label {
+  font-size: 28rpx;
+  color: #999;
+  margin-bottom: 12rpx;
+  display: block;
+}
+
+.edit-input {
+  background: #1a2a33;
+  padding: 20rpx 24rpx;
+  border-radius: 12rpx;
+  font-size: 28rpx;
+  color: #fff;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.edit-picker {
+  display: flex;
+  align-items: center;
+  min-height: 44rpx;
+}
+
+.edit-placeholder { color: #666; }
+
+.save-btn {
+  margin-top: 48rpx;
+  background: #FF6B2C !important;
+  color: #fff !important;
+  border-radius: 44rpx;
+  font-size: 32rpx;
+  height: 88rpx;
+  line-height: 88rpx;
+}

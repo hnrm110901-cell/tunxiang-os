@@ -1,4 +1,4 @@
-// 订单状态 — 制作进度 + 出餐提醒
+// 等待出餐页 — 桌号+订单号+实时制作进度+加菜入口
 var app = getApp();
 var api = require('../../utils/api.js');
 
@@ -6,6 +6,7 @@ Page({
   data: {
     orderId: '',
     orderNo: '',
+    tableNo: '',
     orderStatus: '',
     orderStatusText: '',
     items: [],
@@ -23,6 +24,7 @@ Page({
     this.setData({
       orderId: options.order_id || '',
       orderNo: options.order_no || '',
+      tableNo: options.table_no || '',
     });
 
     if (this.data.orderId) {
@@ -32,8 +34,17 @@ Page({
   },
 
   onUnload: function () {
-    if (this.data._pollTimer) {
-      clearInterval(this.data._pollTimer);
+    this._stopPolling();
+  },
+
+  onHide: function () {
+    this._stopPolling();
+  },
+
+  onShow: function () {
+    if (this.data.orderId && !this.data._pollTimer) {
+      this._loadStatus();
+      this._startPolling();
     }
   },
 
@@ -44,7 +55,7 @@ Page({
     });
   },
 
-  // ─── 加载状态 ───
+  // --- 加载状态 ---
 
   _loadStatus: function () {
     var self = this;
@@ -70,21 +81,31 @@ Page({
         done: '已出餐',
       };
 
+      var kdsIconMap = {
+        not_submitted: '',
+        pending: '\u23f3',    // hourglass
+        cooking: '\ud83c\udf73', // cooking
+        done: '\u2705',       // check
+      };
+
       var items = (data.items || []).map(function (item) {
+        var kds = item.kds_status || 'pending';
         return {
           itemId: item.item_id,
           dishName: item.dish_name,
           quantity: item.quantity,
-          kdsStatus: item.kds_status,
-          kdsStatusText: kdsStatusMap[item.kds_status] || item.kds_status,
+          kdsStatus: kds,
+          kdsStatusText: kdsStatusMap[kds] || kds,
+          kdsIcon: kdsIconMap[kds] || '',
           kdsStation: item.kds_station || '',
-          isDone: item.kds_status === 'done',
-          isCooking: item.kds_status === 'cooking',
+          isDone: kds === 'done',
+          isCooking: kds === 'cooking',
         };
       });
 
       self.setData({
         orderNo: data.order_no || self.data.orderNo,
+        tableNo: data.table_no || self.data.tableNo,
         orderStatus: data.order_status,
         orderStatusText: statusMap[data.order_status] || data.order_status,
         items: items,
@@ -102,11 +123,11 @@ Page({
     });
   },
 
-  // ─── 轮询（每10秒刷新） ───
+  // --- 轮询（每10秒刷新） ---
 
   _startPolling: function () {
     var self = this;
-    if (self.data._pollTimer) clearInterval(self.data._pollTimer);
+    self._stopPolling();
 
     var timer = setInterval(function () {
       self._loadStatus();
@@ -121,7 +142,14 @@ Page({
     }
   },
 
-  // ─── 请求结账 ───
+  // --- 加菜 ---
+
+  addMoreDishes: function () {
+    // 回到菜单页追加点菜
+    wx.navigateBack();
+  },
+
+  // --- 请求结账 ---
 
   requestCheckout: function () {
     var self = this;
@@ -147,11 +175,5 @@ Page({
         });
       },
     });
-  },
-
-  // ─── 继续点餐 ───
-
-  continueOrder: function () {
-    wx.navigateBack();
   },
 });

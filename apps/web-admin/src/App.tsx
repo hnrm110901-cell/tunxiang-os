@@ -47,6 +47,9 @@ import { RegionalPage } from './pages/hq/ops/RegionalPage';
 import { CruiseMonitorPage } from './pages/hq/ops/CruiseMonitorPage';
 import { FinanceAnalysisPage } from './pages/hq/analytics/FinanceAnalysisPage';
 import { MemberAnalysisPage } from './pages/hq/analytics/MemberAnalysisPage';
+import { MultiStoreComparePage } from './pages/hq/analytics/MultiStoreComparePage';
+import { TrendAnalysisPage } from './pages/hq/analytics/TrendAnalysisPage';
+import { BanquetBoardPage } from './pages/hq/BanquetBoardPage';
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem('tx_token'));
@@ -113,6 +116,9 @@ function App() {
           <Route path="/hq/ops/cruise" element={<CruiseMonitorPage />} />
           <Route path="/hq/analytics/finance" element={<FinanceAnalysisPage />} />
           <Route path="/hq/analytics/member" element={<MemberAnalysisPage />} />
+          <Route path="/hq/analytics/multi-store" element={<MultiStoreComparePage />} />
+          <Route path="/hq/analytics/trend" element={<TrendAnalysisPage />} />
+          <Route path="/hq/banquet" element={<BanquetBoardPage />} />
         </Routes>
       </ShellHQ>
     </BrowserRouter>

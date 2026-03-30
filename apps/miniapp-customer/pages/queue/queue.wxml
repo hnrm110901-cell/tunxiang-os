@@ -6,13 +6,26 @@
 
     <!-- 人数选择 -->
     <view class="form-item">
-      <text class="form-label">用餐人数</text>
+      <text class="form-label">选择用餐人数</text>
       <view class="guest-options">
         <view class="guest-item {{selectedGuests === item.value ? 'active' : ''}}"
               wx:for="{{guestOptions}}" wx:key="value"
               bindtap="selectGuests" data-value="{{item.value}}">
-          {{item.label}}
+          <text class="guest-icon">{{item.icon}}</text>
+          <text class="guest-label">{{item.label}}</text>
         </view>
+      </view>
+    </view>
+
+    <!-- 选中人数后显示预估 -->
+    <view class="estimate-card" wx:if="{{estimate}}">
+      <view class="estimate-row">
+        <text class="estimate-label">当前等待</text>
+        <text class="estimate-value highlight">{{estimate.waiting}} 桌</text>
+      </view>
+      <view class="estimate-row">
+        <text class="estimate-label">预估等待时间</text>
+        <text class="estimate-value highlight">约 {{estimate.estimateMin}} 分钟</text>
       </view>
     </view>
 
@@ -59,11 +72,16 @@
       </view>
     </view>
 
-    <!-- 提示 -->
-    <view class="tip-box">
-      <text class="tip-text">请留意叫号提醒，过号需重新取号。</text>
+    <!-- 叫号状态 -->
+    <view class="called-banner" wx:if="{{queueTicket.status === 'called'}}">
+      <text class="called-text">您的号码已到，请前往就座!</text>
     </view>
 
-    <button class="cancel-btn" bindtap="cancelQueue">取消排队</button>
+    <!-- 提示 -->
+    <view class="tip-box" wx:if="{{queueTicket.status !== 'called'}}">
+      <text class="tip-text">请留意叫号提醒，过号需重新取号。系统每10秒自动刷新。</text>
+    </view>
+
+    <button class="cancel-btn" bindtap="cancelQueue" wx:if="{{queueTicket.status !== 'called'}}">取消排队</button>
   </view>
 </view>

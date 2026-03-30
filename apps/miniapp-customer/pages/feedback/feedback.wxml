@@ -1,4 +1,4 @@
-<!-- 评价 + 售后 -->
+<!-- 评价反馈 — 五维评分+文字+拍照+匿名 -->
 <view class="container">
   <!-- Tab 切换 -->
   <view class="tab-bar">
@@ -8,17 +8,22 @@
 
   <!-- 新评价 -->
   <view class="form-section" wx:if="{{activeTab === 'new'}}">
-    <!-- 评分 -->
+    <!-- 五维评分 -->
     <view class="rating-section">
-      <text class="form-label">整体评分</text>
-      <view class="rating-stars">
-        <view class="star {{rating >= item ? 'active' : ''}}"
-              wx:for="{{[1,2,3,4,5]}}" wx:key="*this"
-              bindtap="setRating" data-score="{{item}}">
-          ★
+      <text class="form-label">用餐评分</text>
+      <view class="dimension-list">
+        <view class="dimension-item" wx:for="{{dimensions}}" wx:key="key">
+          <text class="dimension-label">{{item.label}}</text>
+          <view class="dimension-stars">
+            <view class="star {{item.score >= s ? 'active' : ''}}"
+                  wx:for="{{[1,2,3,4,5]}}" wx:for-item="s" wx:key="*this"
+                  bindtap="setDimensionScore" data-dim="{{item.key}}" data-score="{{s}}">
+              \u2605
+            </view>
+          </view>
+          <text class="dimension-score-text">{{ratingLabels[item.score - 1]}}</text>
         </view>
       </view>
-      <text class="rating-label">{{ratingLabel}}</text>
     </view>
 
     <!-- 评价内容 -->
@@ -39,12 +44,23 @@
         <view class="image-item" wx:for="{{images}}" wx:key="*this">
           <image class="upload-image" src="{{item}}" mode="aspectFill"
                  bindtap="previewImage" data-url="{{item}}" />
-          <view class="image-remove" catchtap="removeImage" data-index="{{index}}">✕</view>
+          <view class="image-remove" catchtap="removeImage" data-index="{{index}}">\u2715</view>
         </view>
         <view class="image-add" wx:if="{{images.length < maxImages}}" bindtap="chooseImage">
           <text class="add-icon">+</text>
           <text class="add-text">添加</text>
         </view>
+      </view>
+    </view>
+
+    <!-- 匿名选项 -->
+    <view class="anonymous-section">
+      <view class="anonymous-row" bindtap="toggleAnonymous">
+        <view class="anonymous-check {{isAnonymous ? 'checked' : ''}}">
+          <text wx:if="{{isAnonymous}}">\u2713</text>
+        </view>
+        <text class="anonymous-label">匿名评价</text>
+        <text class="anonymous-hint">开启后商家将看不到您的个人信息</text>
       </view>
     </view>
 
@@ -61,14 +77,24 @@
     <view class="feedback-card" wx:for="{{feedbacks}}" wx:key="id">
       <view class="feedback-header">
         <view class="feedback-stars">
-          <text class="star active" wx:for="{{item.rating}}" wx:for-item="s" wx:key="*this">★</text>
+          <text class="star active" wx:for="{{item.rating}}" wx:for-item="s" wx:key="*this">\u2605</text>
         </view>
         <text class="feedback-date">{{item.createdAt}}</text>
+      </view>
+      <!-- 五维评分展示（如果有） -->
+      <view class="feedback-dims" wx:if="{{item.dimensionScores.taste}}">
+        <text class="dim-tag">口味{{item.dimensionScores.taste}}</text>
+        <text class="dim-tag">服务{{item.dimensionScores.service}}</text>
+        <text class="dim-tag">环境{{item.dimensionScores.environment}}</text>
+        <text class="dim-tag">性价比{{item.dimensionScores.value}}</text>
       </view>
       <text class="feedback-content">{{item.content}}</text>
       <view class="feedback-images" wx:if="{{item.imageUrls.length > 0}}">
         <image class="feedback-img" wx:for="{{item.imageUrls}}" wx:for-item="img" wx:key="*this"
                src="{{img}}" mode="aspectFill" lazy-load />
+      </view>
+      <view class="feedback-anonymous" wx:if="{{item.isAnonymous}}">
+        <text class="anonymous-tag">匿名评价</text>
       </view>
       <view class="feedback-reply" wx:if="{{item.reply}}">
         <text class="reply-label">商家回复：</text>

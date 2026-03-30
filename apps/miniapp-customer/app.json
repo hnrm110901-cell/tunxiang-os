@@ -36,6 +36,12 @@
       ]
     },
     {
+      "root": "pages/cart",
+      "pages": [
+        "cart"
+      ]
+    },
+    {
       "root": "pages/order-track",
       "pages": [
         "order-track"

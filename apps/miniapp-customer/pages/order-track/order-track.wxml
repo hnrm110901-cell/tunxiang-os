@@ -9,12 +9,13 @@
     <text class="track-store" wx:if="{{storeName}}">{{storeName}} {{tableNo ? '· ' + tableNo + '号桌' : ''}}</text>
   </view>
 
-  <!-- Progress tracker -->
+  <!-- Progress tracker (Domino's-style 4-step) -->
   <order-progress
     steps="{{steps}}"
     currentStep="{{currentStep}}"
     remainingSeconds="{{remainingSeconds}}"
     estimatedReadyAt="{{estimatedReadyAt}}"
+    currentDish="{{currentDish}}"
     showRush="{{canRush}}"
     bind:rush="onRush"
   />

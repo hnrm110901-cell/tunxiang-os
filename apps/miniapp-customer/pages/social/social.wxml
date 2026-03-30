@@ -106,8 +106,40 @@
       </view>
     </view>
 
+    <!-- Poster generation -->
+    <view class="poster-section" wx:if="{{referralCode}}">
+      <button class="action-btn primary poster-btn" bindtap="generatePoster">生成海报</button>
+    </view>
+
     <view class="loading-tip" wx:if="{{!referralCode}}">
       <text>生成邀请链接中...</text>
+    </view>
+  </view>
+
+  <!-- My Referral Records -->
+  <view class="tab-content" wx:if="{{activeTab === 'records'}}">
+    <view class="records-header">
+      <text class="records-title">我的推荐</text>
+      <text class="records-total" wx:if="{{totalReferralReward > 0}}">累计奖励: {{totalReferralReward}}积分</text>
+    </view>
+
+    <view class="loading-tip" wx:if="{{loadingRecords}}">
+      <text>加载中...</text>
+    </view>
+
+    <view class="records-list" wx:if="{{!loadingRecords}}">
+      <view class="empty-state" wx:if="{{referralRecords.length === 0}}">
+        <text>暂无推荐记录</text>
+        <text class="empty-hint">分享给好友，邀请注册即可获得奖励</text>
+      </view>
+
+      <view class="record-item" wx:for="{{referralRecords}}" wx:key="id">
+        <view class="record-info">
+          <text class="record-friend">{{item.friendName}}</text>
+          <text class="record-date">{{item.date}}</text>
+        </view>
+        <text class="record-reward">+{{item.reward}}积分</text>
+      </view>
     </view>
   </view>
 </view>

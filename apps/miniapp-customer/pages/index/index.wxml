@@ -1,7 +1,7 @@
-<!-- Homepage -- 3-mode tabs + AI recommend + quick entries + GPS stores -->
+<!-- 首页 — 到店点餐/外卖/大厨到家 + 进行中订单 + 猜你喜欢 + 快捷入口 + 附近门店 -->
 <view class="page-container">
 
-  <!-- Top: Store info + scan icon -->
+  <!-- 顶部: 门店信息 + 扫码按钮 -->
   <view class="store-header">
     <view class="store-info">
       <text class="store-name">{{storeName || '屯象点餐'}}</text>
@@ -18,7 +18,7 @@
     </view>
   </view>
 
-  <!-- Mode tabs: Dine-in / Takeaway / Chef-at-home -->
+  <!-- 三Tab切换: 到店点餐 / 外卖 / 大厨到家 -->
   <view class="mode-tabs">
     <view class="mode-tab {{activeMode === item.key ? 'active' : ''}}"
           wx:for="{{modes}}" wx:key="key"
@@ -27,29 +27,46 @@
     </view>
   </view>
 
-  <!-- Quick entries (4-grid) -->
+  <!-- 进行中订单悬浮卡片 (制作进度+预计时间) -->
+  <view class="active-order-card" wx:if="{{activeOrder}}" bindtap="goToActiveOrder">
+    <view class="active-order-top">
+      <view class="active-order-status">
+        <view class="active-dot"></view>
+        <text class="active-status-text">{{activeOrder.statusText}}</text>
+      </view>
+      <text class="active-order-time">预计 {{activeOrder.estimatedMinutes}} 分钟</text>
+    </view>
+    <view class="active-order-progress">
+      <view class="progress-track">
+        <view class="progress-fill" style="width: {{activeOrder.progress * 25}}%"></view>
+      </view>
+      <view class="progress-labels">
+        <text class="progress-label">接单</text>
+        <text class="progress-label">制作</text>
+        <text class="progress-label">出餐</text>
+        <text class="progress-label">可取</text>
+      </view>
+    </view>
+    <view class="active-order-bottom" wx:if="{{activeOrder.currentDish}}">
+      <text class="active-dish-label">正在制作: {{activeOrder.currentDish}}</text>
+    </view>
+    <text class="active-order-action">查看详情 ></text>
+  </view>
+
+  <!-- 快捷入口 (4宫格: 扫码点餐/排队取号/预订/我的会员卡) -->
   <view class="quick-entries">
     <view class="entry-item" wx:for="{{quickEntries}}" wx:key="label"
           bindtap="goToEntry" data-route="{{item.route}}" data-type="{{item.type}}">
       <view class="entry-icon-circle">
-        <image class="entry-icon-img" src="{{item.icon}}" mode="aspectFit" wx:if="{{item.icon && item.icon.indexOf('/') >= 0}}" />
+        <image class="entry-icon-img" src="{{item.icon}}" mode="aspectFit"
+               wx:if="{{item.icon && item.icon.indexOf('/') >= 0}}" />
         <text class="entry-icon-emoji" wx:else>{{item.icon}}</text>
       </view>
       <text class="entry-label">{{item.label}}</text>
     </view>
   </view>
 
-  <!-- Active order floating bar (like Luckin "制作中") -->
-  <view class="active-order-bar" wx:if="{{activeOrder}}" bindtap="goToActiveOrder">
-    <view class="active-order-left">
-      <view class="active-dot"></view>
-      <text class="active-text">{{activeOrder.statusText}}</text>
-      <text class="active-order-no">{{activeOrder.orderNo}}</text>
-    </view>
-    <text class="active-order-action">查看进度 ></text>
-  </view>
-
-  <!-- Current queue / booking status -->
+  <!-- 当前排队/预订状态卡片 -->
   <view class="status-card" wx:if="{{currentQueue}}" bindtap="goToQueue">
     <view class="status-left">
       <text class="status-type">排队中</text>
@@ -66,7 +83,7 @@
     <text class="status-action">查看详情 ></text>
   </view>
 
-  <!-- AI recommendations (horizontal scroll strip) -->
+  <!-- 猜你喜欢 个性化推荐区 (4宫格) -->
   <ai-recommend
     items="{{recommendations}}"
     loading="{{loadingRecommendations}}"
@@ -75,14 +92,14 @@
     bind:select="onRecommendSelect"
   />
 
-  <!-- Big CTA: Start ordering -->
+  <!-- 开始点餐 CTA -->
   <view class="cta-section" wx:if="{{activeMode !== 'chef_home'}}">
     <button class="cta-btn" bindtap="goToMenu">
       {{activeMode === 'takeaway' ? '开始外卖点餐' : '开始点餐'}}
     </button>
   </view>
 
-  <!-- Nearby stores -->
+  <!-- 附近门店列表 (GPS距离排序) -->
   <view class="section">
     <text class="section-title">附近门店</text>
 

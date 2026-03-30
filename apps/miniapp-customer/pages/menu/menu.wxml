@@ -1,15 +1,22 @@
-<!-- 菜单浏览 + 点餐 -->
+<!-- 智能菜单 — 搜索(语音) + 菜品(溯源/点单数/过敏原) + AI推荐 + 定制弹层 -->
 <view class="menu-page">
-  <!-- 顶部门店 + 搜索 -->
+  <!-- 顶部门店 + 搜索栏(含语音按钮) -->
   <view class="menu-header">
     <view class="header-top">
       <text class="store-name">{{storeName}}</text>
       <text class="table-tag" wx:if="{{tableNo}}">{{tableNo}}号桌</text>
     </view>
     <view class="search-bar">
+      <view class="search-icon-wrap">
+        <text class="search-icon-text">搜</text>
+      </view>
       <input class="search-input" placeholder="搜索菜品" placeholderClass="search-placeholder"
              bindinput="onSearchInput" value="{{searchKeyword}}" />
-      <view class="search-clear" wx:if="{{searchKeyword}}" bindtap="clearSearch">✕</view>
+      <view class="search-clear" wx:if="{{searchKeyword}}" bindtap="clearSearch">&#10005;</view>
+      <view class="voice-btn {{isVoiceListening ? 'listening' : ''}}"
+            bindtouchstart="startVoiceSearch" bindtouchend="stopVoiceSearch">
+        <text class="voice-icon">&#127908;</text>
+      </view>
     </view>
   </view>
 
@@ -31,6 +38,18 @@
 
     <!-- 右侧菜品列表 -->
     <scroll-view scroll-y class="dish-list">
+      <!-- "为你推荐" AI区 (基于已选菜品推荐搭配) -->
+      <ai-recommend
+        wx:if="{{cartCount > 0}}"
+        items="{{cartRecommendations}}"
+        storeId="{{storeId}}"
+        cartDishIds="{{cartDishIds}}"
+        autoFetch="{{true}}"
+        title="为你推荐"
+        bind:add="onRecommendAdd"
+        bind:select="onRecommendSelect"
+      />
+
       <view class="empty-state" wx:if="{{filteredDishes.length === 0}}">
         <text>暂无菜品</text>
       </view>
@@ -41,9 +60,15 @@
           quantity="{{item._qty}}"
           bind:add="onDishAdd"
           bind:minus="onDishMinus"
+          bind:detail="onDishDetail"
         />
       </block>
     </scroll-view>
+  </view>
+
+  <!-- 凑单提示条 -->
+  <view class="smart-bar" wx:if="{{addonSuggestion}}">
+    <text class="smart-text">{{addonSuggestion}}</text>
   </view>
 
   <!-- 底部购物车栏 -->
@@ -63,9 +88,9 @@
     </view>
     <scroll-view scroll-y class="cart-popup-list">
       <view class="cart-popup-item" wx:for="{{cartItems}}" wx:key="dish.id">
-        <text class="cart-item-name">{{item.dish.name}}</text>
+        <text class="cart-item-name">{{item.dish.name || item.dish.dish_name}}</text>
         <view class="cart-item-right">
-          <text class="cart-item-price">¥{{item.dish.priceFen ? (item.dish.priceFen / 100).toFixed(2) : '0.00'}}</text>
+          <text class="cart-item-price">¥{{item.dish.priceFen ? (item.dish.priceFen / 100).toFixed(2) : (item.dish.price_fen ? (item.dish.price_fen / 100).toFixed(2) : '0.00')}}</text>
           <view class="cart-item-qty">
             <view class="qty-btn" catchtap="onDishMinus" data-dish="{{item.dish}}">-</view>
             <text class="qty-num">{{item.quantity}}</text>
@@ -75,4 +100,12 @@
       </view>
     </scroll-view>
   </view>
+
+  <!-- 菜品定制弹层 (辣度/份量/做法/加料) -->
+  <dish-customize
+    visible="{{showDishCustomize}}"
+    dish="{{customizeDish}}"
+    bind:close="closeDishCustomize"
+    bind:confirm="onDishCustomizeConfirm"
+  />
 </view>

@@ -12,11 +12,35 @@
 .form-label { font-size: 28rpx; color: #999; margin-bottom: 16rpx; display: block; }
 
 .picker-value { background: #1a2a33; padding: 20rpx 24rpx; border-radius: 12rpx; font-size: 28rpx; color: #fff; }
+.picker-value.placeholder { color: #666; }
+
+/* 午市/晚市 */
+.meal-period-list { display: flex; gap: 20rpx; }
+.meal-period-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8rpx;
+  padding: 24rpx 0;
+  background: #1a2a33;
+  border-radius: 16rpx;
+  color: #999;
+  border: 2rpx solid transparent;
+  transition: all 200ms;
+}
+.meal-period-item.active {
+  background: rgba(255, 107, 44, 0.1);
+  color: #FF6B2C;
+  border-color: #FF6B2C;
+}
+.meal-icon { font-size: 36rpx; }
+.meal-label { font-size: 26rpx; }
 
 /* 时段选择 */
 .slot-list { display: flex; flex-wrap: wrap; gap: 16rpx; }
-.slot-item { padding: 16rpx 28rpx; background: #1a2a33; border-radius: 12rpx; font-size: 26rpx; color: #999; }
-.slot-item.active { background: #FF6B2C; color: #fff; }
+.slot-item { padding: 16rpx 28rpx; background: #1a2a33; border-radius: 12rpx; font-size: 26rpx; color: #999; border: 2rpx solid transparent; }
+.slot-item.active { background: rgba(255, 107, 44, 0.1); color: #FF6B2C; border-color: #FF6B2C; }
 
 /* 人数步进器 */
 .stepper { display: flex; align-items: center; }
@@ -25,8 +49,31 @@
 
 /* 包间偏好 */
 .room-list { display: flex; flex-wrap: wrap; gap: 16rpx; }
-.room-item { padding: 16rpx 28rpx; background: #1a2a33; border-radius: 12rpx; font-size: 26rpx; color: #999; }
-.room-item.active { background: #FF6B2C; color: #fff; }
+.room-item {
+  padding: 16rpx 28rpx;
+  background: #1a2a33;
+  border-radius: 12rpx;
+  font-size: 26rpx;
+  color: #999;
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  border: 2rpx solid transparent;
+}
+.room-item.active { background: rgba(255, 107, 44, 0.1); color: #FF6B2C; border-color: #FF6B2C; }
+.room-icon { font-size: 28rpx; }
+
+/* 备注快捷标签 */
+.remark-tags { display: flex; flex-wrap: wrap; gap: 12rpx; margin-bottom: 16rpx; }
+.remark-tag {
+  padding: 10rpx 24rpx;
+  background: #1a2a33;
+  border-radius: 24rpx;
+  font-size: 24rpx;
+  color: #999;
+  border: 2rpx solid transparent;
+}
+.remark-tag.active { background: rgba(255, 107, 44, 0.1); color: #FF6B2C; border-color: #FF6B2C; }
 
 /* 输入框 */
 .form-input { background: #1a2a33; padding: 20rpx 24rpx; border-radius: 12rpx; font-size: 28rpx; color: #fff; }
@@ -35,6 +82,10 @@
 /* 提交按钮 */
 .submit-btn { margin-top: 48rpx; background: #FF6B2C !important; color: #fff !important; border-radius: 44rpx; font-size: 32rpx; padding: 0 60rpx; height: 88rpx; line-height: 88rpx; }
 .submit-btn[disabled] { opacity: 0.6; }
+
+/* 预订提示 */
+.booking-tip { text-align: center; margin-top: 24rpx; }
+.booking-tip-text { font-size: 24rpx; color: #666; }
 
 /* 预订列表 */
 .list-section { padding: 30rpx; }

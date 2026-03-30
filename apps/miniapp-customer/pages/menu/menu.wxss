@@ -39,9 +39,50 @@
   height: 68rpx;
 }
 
+.search-icon-wrap {
+  width: 40rpx;
+  height: 40rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 12rpx;
+}
+
+.search-icon-text {
+  font-size: 24rpx;
+  color: #666;
+}
+
 .search-input { flex: 1; font-size: 28rpx; color: #fff; }
 .search-placeholder { color: #666; }
 .search-clear { color: #999; font-size: 28rpx; padding: 8rpx; }
+
+/* Voice search button */
+.voice-btn {
+  width: 52rpx;
+  height: 52rpx;
+  border-radius: 50%;
+  background: rgba(255, 107, 44, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 12rpx;
+  transition: all 200ms ease;
+}
+
+.voice-btn.listening {
+  background: #FF6B2C;
+  animation: voicePulse 1s ease-in-out infinite;
+}
+
+.voice-icon {
+  font-size: 28rpx;
+}
+
+@keyframes voicePulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 107, 44, 0.4); }
+  50% { box-shadow: 0 0 0 12rpx rgba(255, 107, 44, 0); }
+}
 
 /* ─── 加载 ─── */
 .loading-container {
@@ -186,3 +227,15 @@
 .qty-num { font-size: 28rpx; color: #fff; min-width: 32rpx; text-align: center; }
 
 .empty-state { text-align: center; color: #666; font-size: 28rpx; padding: 120rpx 0; }
+
+/* ─── Smart addon suggestion bar ─── */
+.smart-bar {
+  padding: 16rpx 32rpx;
+  background: rgba(255, 107, 44, 0.08);
+  text-align: center;
+}
+
+.smart-text {
+  font-size: 24rpx;
+  color: #FF6B2C;
+}

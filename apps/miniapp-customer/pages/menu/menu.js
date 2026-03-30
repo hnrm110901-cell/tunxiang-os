@@ -25,11 +25,22 @@ Page({
     cartCount: 0,
     cartTotalFen: 0,
     showCartPopup: false,
-    // 搜索
+    // 搜索 (含语音)
     searchKeyword: '',
+    isVoiceListening: false,
+    // 购物车菜品ID列表 (用于AI推荐)
+    cartDishIds: [],
     // 出餐进度
     showStatusPopup: false,
     orderStatus: null,
+    // Dish customize popup
+    showDishCustomize: false,
+    customizeDish: {},
+    // Smart addon suggestion
+    addonSuggestion: '',
+    // Cart-based AI recommendations
+    cartRecommendations: [],
+    storeId: '',
   },
 
   onLoad: function (options) {
@@ -127,9 +138,14 @@ Page({
     wx.showLoading({ title: '提交中...' });
     api.scanOrderSubmit(self.data.orderId).then(function (data) {
       wx.hideLoading();
-      wx.showToast({ title: '已提交厨房', icon: 'success' });
       // 清空购物车（已提交的菜品不可修改）
       self.clearCart();
+      // 跳转到等待出餐页
+      wx.navigateTo({
+        url: '/pages/scan-order/status?order_id=' + encodeURIComponent(self.data.orderId) +
+             '&order_no=' + encodeURIComponent(self.data.orderNo) +
+             '&table_no=' + encodeURIComponent(self.data.tableNo),
+      });
     }).catch(function (err) {
       wx.hideLoading();
       wx.showToast({ title: err.message || '提交失败', icon: 'none' });
@@ -248,6 +264,46 @@ Page({
     this._filterDishes();
   },
 
+  startVoiceSearch: function () {
+    var self = this;
+    self.setData({ isVoiceListening: true });
+    var recManager = wx.getRecorderManager();
+    recManager.onStop(function (res) {
+      self.setData({ isVoiceListening: false });
+      wx.uploadFile({
+        url: (app.globalData.apiBase || '') + '/api/v1/self-order/voice-search',
+        filePath: res.tempFilePath,
+        name: 'audio',
+        success: function (uploadRes) {
+          try {
+            var data = JSON.parse(uploadRes.data);
+            if (data.ok && data.data && data.data.text) {
+              self.setData({ searchKeyword: data.data.text });
+              self._filterDishes();
+            }
+          } catch (parseErr) {
+            wx.showToast({ title: '语音识别失败', icon: 'none' });
+          }
+        },
+        fail: function () {
+          wx.showToast({ title: '语音上传失败', icon: 'none' });
+        },
+      });
+    });
+    recManager.start({ duration: 10000, format: 'mp3' });
+    setTimeout(function () {
+      if (self.data.isVoiceListening) {
+        recManager.stop();
+      }
+    }, 5000);
+  },
+
+  stopVoiceSearch: function () {
+    this.setData({ isVoiceListening: false });
+    var recManager = wx.getRecorderManager();
+    recManager.stop();
+  },
+
   // ─── 购物车操作 ───
 
   onDishAdd: function (e) {
@@ -310,16 +366,20 @@ Page({
   _updateCart: function (cart) {
     var count = 0;
     var total = 0;
+    var dishIds = [];
     cart.forEach(function (item) {
       count += item.quantity;
       total += (item.dish.priceFen || item.dish.price_fen || 0) * item.quantity;
+      dishIds.push(item.dish.id || item.dish.dish_id);
     });
 
     this.setData({
       cartItems: cart,
       cartCount: count,
       cartTotalFen: total,
+      cartDishIds: dishIds,
     });
+    this._updateAddonSuggestion();
   },
 
   getQuantityForDish: function (dishId) {
@@ -369,11 +429,13 @@ Page({
         quantity: item.quantity,
         unitPriceFen: item.dish.priceFen || item.dish.price_fen || 0,
         imageUrl: item.dish.imageUrl || item.dish.image_url || '',
+        notes: item.dish.notes || '',
       };
     });
 
+    // Navigate to smart cart page
     wx.navigateTo({
-      url: '/pages/order/order?items=' + encodeURIComponent(JSON.stringify(orderItems)) +
+      url: '/pages/cart/cart?items=' + encodeURIComponent(JSON.stringify(orderItems)) +
            '&total=' + this.data.cartTotalFen +
            '&table=' + (this.data.tableNo || ''),
     });
@@ -383,5 +445,107 @@ Page({
 
   viewOrderStatus: function () {
     this._checkOrderStatus();
+  },
+
+  // ─── Dish customize popup ───
+
+  onDishDetail: function (e) {
+    var dish = e.detail.dish;
+    // Fetch full dish detail for customization
+    var self = this;
+    api.fetchDishDetail(dish.id || dish.dish_id)
+      .then(function (detail) {
+        self.setData({
+          customizeDish: detail,
+          showDishCustomize: true,
+        });
+      })
+      .catch(function () {
+        // Fallback: use basic dish data
+        self.setData({
+          customizeDish: dish,
+          showDishCustomize: true,
+        });
+      });
+  },
+
+  closeDishCustomize: function () {
+    this.setData({ showDishCustomize: false });
+  },
+
+  onDishCustomizeConfirm: function (e) {
+    var detail = e.detail;
+    var dish = detail.dish;
+    // Add to cart with customization notes
+    var customDish = Object.assign({}, dish, {
+      _customSpice: detail.spice,
+      _customPortion: detail.portion,
+      _customToppings: detail.toppings,
+      priceFen: detail.totalPriceFen,
+      price_fen: detail.totalPriceFen,
+    });
+    var qty = detail.quantity || 1;
+    for (var i = 0; i < qty; i++) {
+      this._addToCart(customDish);
+    }
+    this.setData({ showDishCustomize: false });
+    wx.showToast({ title: '已加入购物车', icon: 'success' });
+  },
+
+  // ─── AI recommendations (cart-context) ───
+
+  onRecommendAdd: function (e) {
+    var dish = e.detail.dish;
+    this._addToCart(dish);
+  },
+
+  onRecommendSelect: function (e) {
+    var dish = e.detail.dish;
+    this.setData({
+      customizeDish: dish,
+      showDishCustomize: true,
+    });
+  },
+
+  // ─── Smart addon suggestion ───
+
+  _updateAddonSuggestion: function () {
+    var self = this;
+    var total = self.data.cartTotalFen;
+    // Check common thresholds
+    var thresholds = [5000, 8000, 10000, 15000]; // 50, 80, 100, 150 yuan
+    var nearestThreshold = null;
+    for (var i = 0; i < thresholds.length; i++) {
+      if (total > 0 && total < thresholds[i] && (thresholds[i] - total) <= 2000) {
+        nearestThreshold = thresholds[i];
+        break;
+      }
+    }
+
+    if (nearestThreshold) {
+      var gap = nearestThreshold - total;
+      var gapYuan = (gap / 100).toFixed(0);
+      self.setData({
+        addonSuggestion: '再点' + gapYuan + '元享满' + (nearestThreshold / 100) + '减优惠',
+      });
+    } else if (total > 0) {
+      // Check if missing category
+      var hasDrink = false;
+      var hasStaple = false;
+      self.data.cartItems.forEach(function (item) {
+        var tags = item.dish.tags || [];
+        if (tags.indexOf('drink') >= 0 || tags.indexOf('beverage') >= 0) hasDrink = true;
+        if (tags.indexOf('staple') >= 0 || tags.indexOf('rice') >= 0 || tags.indexOf('noodle') >= 0) hasStaple = true;
+      });
+      if (!hasStaple && self.data.cartCount >= 2) {
+        self.setData({ addonSuggestion: '还没点主食，建议加一份' });
+      } else if (!hasDrink && self.data.cartCount >= 3) {
+        self.setData({ addonSuggestion: '来一杯饮品搭配吧' });
+      } else {
+        self.setData({ addonSuggestion: '' });
+      }
+    } else {
+      self.setData({ addonSuggestion: '' });
+    }
   },
 });

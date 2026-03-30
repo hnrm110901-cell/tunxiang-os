@@ -202,6 +202,44 @@
   gap: 20rpx;
 }
 
+/* Poster */
+.poster-section { margin-top: 24rpx; }
+.poster-btn { margin-top: 0 !important; }
+
+/* Referral records */
+.records-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24rpx;
+}
+
+.records-title { font-size: 32rpx; font-weight: bold; color: #fff; }
+.records-total { font-size: 26rpx; color: #FF6B2C; }
+
+.records-list {
+  background: #112228;
+  border-radius: 24rpx;
+  padding: 8rpx 28rpx;
+}
+
+.record-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24rpx 0;
+  border-bottom: 1rpx solid #1a2a33;
+}
+
+.record-item:last-child { border-bottom: none; }
+
+.record-info { display: flex; flex-direction: column; gap: 6rpx; }
+.record-friend { font-size: 28rpx; color: #fff; }
+.record-date { font-size: 22rpx; color: #999; }
+.record-reward { font-size: 28rpx; color: #FF6B2C; font-weight: bold; }
+
+.empty-hint { font-size: 24rpx; color: #666; display: block; margin-top: 12rpx; }
+
 /* Misc */
 .loading-tip { text-align: center; padding: 60rpx 0; color: #999; font-size: 28rpx; }
 .empty-state { text-align: center; color: #999; font-size: 26rpx; padding: 40rpx 0; }

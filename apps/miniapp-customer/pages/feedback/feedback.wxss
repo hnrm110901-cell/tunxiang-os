@@ -10,27 +10,42 @@
 .form-section { padding: 30rpx; }
 .form-label { font-size: 28rpx; color: #999; margin-bottom: 16rpx; display: block; }
 
-/* 评分 */
+/* 五维评分 */
 .rating-section { margin-bottom: 36rpx; }
 
-.rating-stars {
+.dimension-list { display: flex; flex-direction: column; gap: 20rpx; }
+
+.dimension-item {
   display: flex;
+  align-items: center;
   gap: 16rpx;
-  margin-bottom: 12rpx;
+}
+
+.dimension-label {
+  font-size: 26rpx;
+  color: #ccc;
+  width: 100rpx;
+  flex-shrink: 0;
+}
+
+.dimension-stars {
+  display: flex;
+  gap: 8rpx;
+}
+
+.dimension-score-text {
+  font-size: 22rpx;
+  color: #FF6B2C;
+  margin-left: 12rpx;
 }
 
 .star {
-  font-size: 52rpx;
+  font-size: 44rpx;
   color: #333;
   transition: color 200ms;
 }
 
 .star.active { color: #FFC107; }
-
-.rating-label {
-  font-size: 26rpx;
-  color: #FF6B2C;
-}
 
 /* 评价内容 */
 .content-section { margin-bottom: 36rpx; position: relative; }
@@ -57,7 +72,7 @@
 }
 
 /* 图片上传 */
-.image-section { margin-bottom: 48rpx; }
+.image-section { margin-bottom: 36rpx; }
 
 .image-grid {
   display: flex;
@@ -107,6 +122,37 @@
 .add-icon { font-size: 48rpx; color: #666; }
 .add-text { font-size: 22rpx; color: #666; }
 
+/* 匿名选项 */
+.anonymous-section { margin-bottom: 48rpx; }
+
+.anonymous-row {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  padding: 20rpx 0;
+}
+
+.anonymous-check {
+  width: 40rpx;
+  height: 40rpx;
+  border-radius: 8rpx;
+  border: 2rpx solid #666;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24rpx;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.anonymous-check.checked {
+  background: #FF6B2C;
+  border-color: #FF6B2C;
+}
+
+.anonymous-label { font-size: 28rpx; color: #fff; }
+.anonymous-hint { font-size: 22rpx; color: #666; }
+
 /* 提交 */
 .submit-btn {
   background: #FF6B2C !important;
@@ -141,6 +187,22 @@
 .feedback-stars { display: flex; gap: 4rpx; }
 .feedback-date { font-size: 24rpx; color: #666; }
 
+/* 五维评分标签 */
+.feedback-dims {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  margin-bottom: 16rpx;
+}
+
+.dim-tag {
+  font-size: 22rpx;
+  color: #999;
+  background: #1a2a33;
+  padding: 6rpx 16rpx;
+  border-radius: 8rpx;
+}
+
 .feedback-content {
   font-size: 28rpx;
   color: #ccc;
@@ -160,6 +222,15 @@
   width: 160rpx;
   height: 160rpx;
   border-radius: 8rpx;
+}
+
+.feedback-anonymous { margin-bottom: 12rpx; }
+.anonymous-tag {
+  font-size: 22rpx;
+  color: #999;
+  background: #1a2a33;
+  padding: 4rpx 12rpx;
+  border-radius: 6rpx;
 }
 
 .feedback-reply {

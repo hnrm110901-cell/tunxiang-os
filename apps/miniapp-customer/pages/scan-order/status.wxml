@@ -1,8 +1,11 @@
-<!-- 订单状态 — 制作进度 + 出餐提醒 -->
+<!-- 等待出餐页 — 桌号+订单号+实时进度 -->
 <view class="page-container status-page">
-  <!-- 顶部状态 -->
+  <!-- 顶部桌号和订单号 -->
   <view class="status-header">
-    <text class="status-order-no">订单号: {{orderNo}}</text>
+    <view class="header-left">
+      <text class="table-no" wx:if="{{tableNo}}">{{tableNo}}号桌</text>
+      <text class="status-order-no">订单号: {{orderNo}}</text>
+    </view>
     <view class="status-badge status-{{orderStatus}}">
       <text>{{orderStatusText}}</text>
     </view>
@@ -39,7 +42,7 @@
     <view class="status-item {{item.isDone ? 'done' : ''}} {{item.isCooking ? 'cooking' : ''}}"
           wx:for="{{items}}" wx:key="itemId">
       <view class="status-item-left">
-        <view class="status-dot {{item.kdsStatus}}"></view>
+        <text class="status-icon">{{item.kdsIcon}}</text>
         <view class="status-item-info">
           <text class="status-item-name">{{item.dishName}}</text>
           <text class="status-item-qty">x{{item.quantity}}</text>
@@ -68,7 +71,7 @@
 
   <!-- 底部操作 -->
   <view class="bottom-actions" wx:if="{{!loading}}">
-    <button class="btn-continue" bindtap="continueOrder">继续点餐</button>
+    <button class="btn-continue" bindtap="addMoreDishes">加菜</button>
     <button class="btn-checkout" bindtap="requestCheckout">请求结账</button>
   </view>
 </view>

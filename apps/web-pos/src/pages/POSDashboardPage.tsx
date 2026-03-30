@@ -33,6 +33,7 @@ const shortcuts = [
   { label: '反结账', path: '/reverse-settle', icon: '[↺]', color: '#A32D2D' },
   { label: '排队', path: '/queue', icon: '[Q]', color: '#13c2c2' },
   { label: '报表', path: '/reports', icon: '[G]', color: '#52c41a' },
+  { label: '快速收银', path: '/quick-cashier', icon: '[$]', color: '#FF6B35' },
   { label: '设置', path: '/settings', icon: '[⚙]', color: '#8899A6' },
 ];
 

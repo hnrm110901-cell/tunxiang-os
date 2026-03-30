@@ -1,4 +1,4 @@
-<!-- 预订页 -->
+<!-- 预订页 — 日历+午市晚市+30分钟时段+包厢+备注 -->
 <view class="container">
   <!-- 切换 Tab -->
   <view class="tab-bar">
@@ -8,24 +8,40 @@
 
   <!-- 新建预订 -->
   <view class="form-section" wx:if="{{activeTab === 'new'}}">
+    <!-- 日期选择 -->
     <view class="form-item">
       <text class="form-label">预订日期</text>
-      <picker mode="date" start="{{today}}" bindchange="onDateChange">
-        <view class="picker-value">{{date || '请选择日期'}}</view>
+      <picker mode="date" start="{{today}}" end="{{maxDate}}" bindchange="onDateChange">
+        <view class="picker-value {{date ? '' : 'placeholder'}}">{{date || '请选择日期(最多预订30天内)'}}</view>
       </picker>
     </view>
 
+    <!-- 午市/晚市 -->
     <view class="form-item">
       <text class="form-label">用餐时段</text>
+      <view class="meal-period-list">
+        <view class="meal-period-item {{mealPeriod === item.value ? 'active' : ''}}"
+              wx:for="{{mealPeriods}}" wx:key="value"
+              bindtap="selectMealPeriod" data-period="{{item.value}}">
+          <text class="meal-icon">{{item.icon}}</text>
+          <text class="meal-label">{{item.label}}</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 时间段（30分钟间隔） -->
+    <view class="form-item" wx:if="{{currentSlots.length > 0}}">
+      <text class="form-label">到店时间</text>
       <view class="slot-list">
         <view class="slot-item {{selectedSlot === item ? 'active' : ''}}"
-              wx:for="{{timeSlots}}" wx:key="*this"
+              wx:for="{{currentSlots}}" wx:key="*this"
               bindtap="selectSlot" data-slot="{{item}}">
           {{item}}
         </view>
       </view>
     </view>
 
+    <!-- 人数 -->
     <view class="form-item">
       <text class="form-label">用餐人数</text>
       <view class="stepper">
@@ -35,26 +51,40 @@
       </view>
     </view>
 
+    <!-- 包厢偏好 -->
     <view class="form-item">
       <text class="form-label">包间偏好</text>
       <view class="room-list">
         <view class="room-item {{selectedRoom === item.value ? 'active' : ''}}"
               wx:for="{{roomOptions}}" wx:key="value"
               bindtap="selectRoom" data-room="{{item.value}}">
-          {{item.label}}
+          <text class="room-icon" wx:if="{{item.icon}}">{{item.icon}}</text>
+          <text>{{item.label}}</text>
         </view>
       </view>
     </view>
 
+    <!-- 备注快捷标签 -->
     <view class="form-item">
       <text class="form-label">备注</text>
-      <input class="form-input" placeholder="如有特殊需求请备注" placeholderClass="placeholder"
+      <view class="remark-tags">
+        <view class="remark-tag {{selectedRemarkTag === item ? 'active' : ''}}"
+              wx:for="{{remarkTags}}" wx:key="*this"
+              bindtap="selectRemarkTag" data-tag="{{item}}">
+          {{item}}
+        </view>
+      </view>
+      <input class="form-input" placeholder="其他备注信息..." placeholderClass="placeholder"
              bindinput="onRemarkInput" value="{{remark}}" />
     </view>
 
     <button class="submit-btn" bindtap="submitBooking" disabled="{{submitting}}">
       {{submitting ? '提交中...' : '提交预订'}}
     </button>
+
+    <view class="booking-tip">
+      <text class="booking-tip-text">提交后请等待商家确认，确认后将收到通知。</text>
+    </view>
   </view>
 
   <!-- 我的预订列表 -->

@@ -1,0 +1,90 @@
+<!-- 智能购物车 — 已选清单 + 凑单提示 + AA分摊 + 优惠匹配 + 下单 -->
+<view class="cart-page">
+
+  <!-- 凑单提示 -->
+  <view class="addon-tip" wx:if="{{addonTip}}" bindtap="goBackToMenu">
+    <text class="addon-text">{{addonTip}}</text>
+    <text class="addon-action">去凑单 ></text>
+  </view>
+
+  <!-- 已选清单 -->
+  <view class="cart-section">
+    <text class="section-title">已选菜品 ({{items.length}})</text>
+
+    <view class="empty-state" wx:if="{{items.length === 0}}">
+      <text>购物车空空如也</text>
+      <view class="empty-btn" bindtap="goBackToMenu">去点菜</view>
+    </view>
+
+    <view class="cart-item" wx:for="{{items}}" wx:key="dishId">
+      <image class="cart-item-img" src="{{item.imageUrl || '/assets/dish-placeholder.png'}}" mode="aspectFill" />
+      <view class="cart-item-info">
+        <text class="cart-item-name">{{item.dishName}}</text>
+        <text class="cart-item-notes" wx:if="{{item.notes}}">{{item.notes}}</text>
+        <text class="cart-item-price">¥{{(item.unitPriceFen / 100).toFixed(2)}}</text>
+      </view>
+      <view class="cart-item-qty">
+        <view class="qty-btn" bindtap="changeQty" data-index="{{index}}" data-delta="-1">-</view>
+        <text class="qty-num">{{item.quantity}}</text>
+        <view class="qty-btn plus" bindtap="changeQty" data-index="{{index}}" data-delta="1">+</view>
+      </view>
+    </view>
+  </view>
+
+  <!-- AA分摊入口 -->
+  <view class="aa-section" bindtap="toggleAASplit">
+    <view class="aa-header">
+      <text class="aa-title">AA分摊</text>
+      <text class="aa-toggle">{{showAASplit ? '收起' : '展开'}}</text>
+    </view>
+    <view class="aa-body" wx:if="{{showAASplit}}" catchtap="">
+      <view class="aa-party">
+        <text class="aa-label">共</text>
+        <view class="aa-qty">
+          <view class="qty-btn" catchtap="changePartySize" data-delta="-1">-</view>
+          <text class="qty-num">{{partySize}}</text>
+          <view class="qty-btn plus" catchtap="changePartySize" data-delta="1">+</view>
+        </view>
+        <text class="aa-label">人用餐</text>
+      </view>
+      <text class="aa-result">每人约 ¥{{(perPersonFen / 100).toFixed(2)}}</text>
+    </view>
+  </view>
+
+  <!-- 可用优惠 -->
+  <view class="coupon-section" wx:if="{{availableCoupons.length > 0}}">
+    <text class="section-title">可用优惠</text>
+    <view class="coupon-list">
+      <view class="coupon-item {{selectedCoupon && selectedCoupon.id === item.id ? 'selected' : ''}}"
+            wx:for="{{availableCoupons}}" wx:key="id"
+            bindtap="selectCoupon" data-index="{{index}}">
+        <text class="coupon-name">{{item.name || item.title}}</text>
+        <text class="coupon-value">-¥{{((item.discount_fen || item.amount_fen || 0) / 100).toFixed(0)}}</text>
+      </view>
+    </view>
+    <view class="coupon-clear" wx:if="{{selectedCoupon}}" bindtap="clearCoupon">
+      <text class="coupon-clear-text">不使用优惠</text>
+    </view>
+  </view>
+
+  <!-- 备注 -->
+  <view class="notes-section">
+    <text class="section-title">订单备注</text>
+    <input class="notes-input" placeholder="如: 不要葱姜蒜" placeholderClass="notes-placeholder"
+           bindinput="onNotesInput" value="{{orderNotes}}" />
+  </view>
+
+  <!-- 底部结算 -->
+  <view class="checkout-bar">
+    <view class="checkout-info">
+      <view class="checkout-total-row">
+        <text class="checkout-label">合计</text>
+        <text class="checkout-total">¥{{(finalTotalFen / 100).toFixed(2)}}</text>
+      </view>
+      <text class="checkout-discount" wx:if="{{discountFen > 0}}">已优惠 ¥{{(discountFen / 100).toFixed(2)}}</text>
+    </view>
+    <view class="checkout-btn {{items.length === 0 ? 'disabled' : ''}}" bindtap="submitOrder">
+      <text class="checkout-btn-text">下单</text>
+    </view>
+  </view>
+</view>

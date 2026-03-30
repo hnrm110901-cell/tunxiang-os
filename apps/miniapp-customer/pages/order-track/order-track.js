@@ -13,6 +13,7 @@ Page({
     // Progress
     steps: [],
     currentStep: 0,
+    currentDish: '',
     remainingSeconds: 0,
     estimatedReadyAt: '',
     // Order details
@@ -90,6 +91,7 @@ Page({
         self.setData({
           steps: data.steps || [],
           currentStep: data.current_step || 0,
+          currentDish: data.current_dish || '',
           remainingSeconds: data.remaining_seconds || 0,
           estimatedReadyAt: data.estimated_ready_at || '',
         });

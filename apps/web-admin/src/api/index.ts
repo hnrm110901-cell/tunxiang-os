@@ -32,6 +32,7 @@ export * from './memberAnalyticsApi';
 export * from './reviewApi';
 export * from './regionalApi';
 export * from './dispatchApi';
+export * from './banquetApi';
 
 // ─── 门店健康 ───
 

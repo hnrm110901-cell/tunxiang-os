@@ -1,18 +1,18 @@
-// 排队取号页
+// 排队取号页 — 选人数/显示等待/取号/轮询叫号
 var app = getApp();
 var api = require('../../utils/api.js');
 
 Page({
   data: {
     guestOptions: [
-      { label: '1-2人', value: '1-2' },
-      { label: '3-4人', value: '3-4' },
-      { label: '5-6人', value: '5-6' },
-      { label: '7人以上', value: '7+' },
+      { label: '1-4人', value: '1-4', icon: '\ud83d\udc65' },
+      { label: '5-8人', value: '5-8', icon: '\ud83d\udc68\u200d\ud83d\udc69\u200d\ud83d\udc67\u200d\ud83d\udc66' },
+      { label: '9人以上', value: '9+', icon: '\ud83c\udf89' },
     ],
     selectedGuests: '',
     queueSummary: [],
     queueTicket: null,
+    estimate: null,
     submitting: false,
     pollTimer: null,
   },
@@ -28,8 +28,32 @@ Page({
     }
   },
 
+  onShow: function () {
+    this.loadQueueSummary();
+  },
+
   selectGuests: function (e) {
-    this.setData({ selectedGuests: e.currentTarget.dataset.value });
+    var value = e.currentTarget.dataset.value;
+    this.setData({ selectedGuests: value });
+    this._loadEstimate(value);
+  },
+
+  _loadEstimate: function (guestRange) {
+    var self = this;
+    var storeId = app.globalData.storeId;
+    api.fetchQueueEstimate(storeId, guestRange)
+      .then(function (data) {
+        self.setData({
+          estimate: {
+            waiting: data.waiting || 0,
+            estimateMin: data.estimate_min || 0,
+          },
+        });
+      })
+      .catch(function (err) {
+        console.warn('loadEstimate failed', err);
+        self.setData({ estimate: null });
+      });
   },
 
   loadQueueSummary: function () {
@@ -86,7 +110,7 @@ Page({
     if (self.data.pollTimer) clearInterval(self.data.pollTimer);
     var timer = setInterval(function () {
       self.refreshTicketStatus();
-    }, 15000);
+    }, 10000);
     self.setData({ pollTimer: timer });
   },
 
@@ -98,16 +122,22 @@ Page({
         if (data) {
           self.setData({ queueTicket: data });
           if (data.status === 'called') {
+            // 叫号提醒
             wx.showModal({
               title: '叫号通知',
               content: '您的号码 ' + data.ticketNo + ' 已到，请前往就座！',
               showCancel: false,
+              confirmColor: '#FF6B2C',
             });
+            // 振动提示
+            wx.vibrateShort({ type: 'heavy' });
             clearInterval(self.data.pollTimer);
+            self.setData({ pollTimer: null });
           }
         } else {
           self.setData({ queueTicket: null });
           clearInterval(self.data.pollTimer);
+          self.setData({ pollTimer: null });
         }
       })
       .catch(function (err) {
@@ -120,13 +150,16 @@ Page({
     wx.showModal({
       title: '提示',
       content: '确定取消排队？',
+      confirmColor: '#FF6B2C',
       success: function (res) {
         if (!res.confirm) return;
         var ticket = self.data.queueTicket;
         api.cancelQueueTicket(ticket.id)
           .then(function () {
             wx.showToast({ title: '已取消', icon: 'success' });
-            clearInterval(self.data.pollTimer);
+            if (self.data.pollTimer) {
+              clearInterval(self.data.pollTimer);
+            }
             self.setData({ queueTicket: null, pollTimer: null });
             self.loadQueueSummary();
           })

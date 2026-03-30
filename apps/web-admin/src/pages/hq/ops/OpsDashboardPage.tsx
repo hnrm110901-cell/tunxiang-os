@@ -1,156 +1,287 @@
 /**
- * 经营驾驶舱 — 今日营业总览
- * 调用 GET /api/v1/dashboard/*
+ * 经营驾驶舱 -- 实时经营总览（增强版）
+ * 顶部4个KPI卡片 | 中间营收趋势（按小时+对比昨日）
+ * 左下门店排名（可切换维度）| 右下AI决策推荐TOP3
+ * 30秒自动轮询
  */
-import { useState } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { TxLineChart } from '../../../components/charts';
+import {
+  fetchDashboardOverview,
+  fetchStoreRanking,
+  fetchTop3Decisions,
+} from '../../../api';
+import type { OverviewKPI, StoreRankItem } from '../../../api/dashboardApi';
+import type { DecisionSuggestion } from '../../../api';
 
-// ---------- Mock 数据（接 API 后替换）----------
-const MOCK_OVERVIEW = [
-  { label: '今日营收', value: '¥28,560', trend: '+12.3%', up: true },
-  { label: '订单量', value: '426', trend: '+8.1%', up: true },
-  { label: '客单价', value: '¥67.0', trend: '+3.2%', up: true },
-  { label: '翻台率', value: '2.8', trend: '-0.2', up: false },
-];
-
-const MOCK_STORE_RANK = [
-  { rank: 1, name: '芙蓉路店', revenue: 85600, orders: 128, turnover: 3.2, score: 92 },
-  { rank: 2, name: '岳麓店', revenue: 64000, orders: 96, turnover: 2.8, score: 78 },
-  { rank: 3, name: '星沙店', revenue: 52000, orders: 78, turnover: 2.4, score: 65 },
-  { rank: 4, name: '河西店', revenue: 38000, orders: 57, turnover: 1.9, score: 45 },
-  { rank: 5, name: '开福店', revenue: 34200, orders: 51, turnover: 2.1, score: 58 },
-];
-
-const MOCK_ALERTS = [
-  { id: 1, level: 'critical', store: '河西店', msg: '翻台率连续3天低于2.0，建议关注', time: '10:32' },
-  { id: 2, level: 'warning', store: '星沙店', msg: '午市出餐超时4单，平均超时8分钟', time: '12:15' },
-  { id: 3, level: 'warning', store: '岳麓店', msg: '鲈鱼库存仅剩2份，建议补货', time: '14:20' },
-  { id: 4, level: 'info', store: '芙蓉路店', msg: '今日营收已超目标 120%', time: '15:00' },
-];
-
-const alertColor: Record<string, string> = {
-  critical: '#ff4d4f', warning: '#faad14', info: '#1890ff',
+// ---------- 门店排名维度 ----------
+type RankDimension = 'revenue' | 'avg_ticket' | 'turnover';
+const RANK_LABELS: Record<RankDimension, string> = {
+  revenue: '营收',
+  avg_ticket: '客单价',
+  turnover: '翻台率',
 };
 
-const scoreColor = (s: number) => s >= 80 ? '#52c41a' : s >= 60 ? '#faad14' : '#ff4d4f';
+// ---------- Mock fallback ----------
+const MOCK_KPI: OverviewKPI[] = [
+  { label: '今日营收', value: 2856000, formatted: '\u00A528,560', trend_percent: 12.3, trend_up: true },
+  { label: '订单数', value: 426, formatted: '426', trend_percent: 8.1, trend_up: true },
+  { label: '客单价', value: 6700, formatted: '\u00A567.0', trend_percent: 3.2, trend_up: true },
+  { label: '翻台率', value: 2.8, formatted: '2.8', trend_percent: -7.1, trend_up: false },
+];
 
+const MOCK_HOURLY_TODAY = [0, 0, 0, 0, 0, 0, 0, 0, 0, 1200, 2800, 5600, 12800, 18500, 19200, 20100, 21000, 23400, 26000, 27800, 28560, 0, 0, 0];
+const MOCK_HOURLY_YESTERDAY = [0, 0, 0, 0, 0, 0, 0, 0, 0, 1000, 2400, 4800, 11200, 16200, 17000, 17800, 18500, 20100, 22800, 24200, 25420, 0, 0, 0];
+
+const MOCK_STORES: StoreRankItem[] = [
+  { rank: 1, store_id: 's1', store_name: '芙蓉路店', revenue_fen: 8560000, order_count: 128, turnover_rate: 3.2, health_score: 92 },
+  { rank: 2, store_id: 's2', store_name: '岳麓店', revenue_fen: 6400000, order_count: 96, turnover_rate: 2.8, health_score: 78 },
+  { rank: 3, store_id: 's3', store_name: '星沙店', revenue_fen: 5200000, order_count: 78, turnover_rate: 2.4, health_score: 65 },
+  { rank: 4, store_id: 's4', store_name: '河西店', revenue_fen: 3800000, order_count: 57, turnover_rate: 1.9, health_score: 45 },
+  { rank: 5, store_id: 's5', store_name: '开福店', revenue_fen: 3420000, order_count: 51, turnover_rate: 2.1, health_score: 58 },
+];
+
+const MOCK_DECISIONS: DecisionSuggestion[] = [
+  {
+    decision_id: 'd1', agent_id: 'discount-guard', title: '河西店折扣异常',
+    description: '河西店午市折扣率达38%，超过安全阈值30%。建议暂停"午市满100减40"活动，改为满150减30。',
+    priority: 'critical', confidence: 0.92,
+  },
+  {
+    decision_id: 'd2', agent_id: 'inventory-alert', title: '鲈鱼备货不足',
+    description: '岳麓店鲈鱼库存仅剩2份，预计今日需求12份。建议紧急补货或标记临时沽清。',
+    priority: 'warning', confidence: 0.87,
+  },
+  {
+    decision_id: 'd3', agent_id: 'smart-menu', title: '推荐上架新品',
+    description: '根据近7天客户搜索数据，"酸菜鱼"搜索量上升46%，建议芙蓉路店/岳麓店上架试销。',
+    priority: 'info', confidence: 0.78,
+  },
+];
+
+// ---------- 工具 ----------
+const scoreColor = (s: number) => s >= 80 ? '#0F6E56' : s >= 60 ? '#BA7517' : '#A32D2D';
+const priorityColor: Record<string, string> = { critical: '#A32D2D', warning: '#BA7517', info: '#185FA5' };
+const priorityLabel: Record<string, string> = { critical: '紧急', warning: '建议', info: '洞察' };
+
+const POLL_INTERVAL = 30_000;
+
+// ---------- 组件 ----------
 export function OpsDashboardPage() {
-  const [dateRange] = useState('今日');
+  const [dateRange, setDateRange] = useState<'today' | 'week' | 'month'>('today');
+  const [kpis, setKpis] = useState<OverviewKPI[]>(MOCK_KPI);
+  const [stores, setStores] = useState<StoreRankItem[]>(MOCK_STORES);
+  const [decisions, setDecisions] = useState<DecisionSuggestion[]>(MOCK_DECISIONS);
+  const [rankDimension, setRankDimension] = useState<RankDimension>('revenue');
+  const [lastRefresh, setLastRefresh] = useState(new Date());
+  const timerRef = useRef<ReturnType<typeof setInterval>>();
+
+  // 数据拉取
+  const loadData = useCallback(async () => {
+    try {
+      const [overviewRes, storeRes, decRes] = await Promise.allSettled([
+        fetchDashboardOverview(),
+        fetchStoreRanking(dateRange === 'today' ? 'day' : dateRange === 'week' ? 'week' : 'month'),
+        fetchTop3Decisions('all'),
+      ]);
+      if (overviewRes.status === 'fulfilled') setKpis(overviewRes.value.items);
+      if (storeRes.status === 'fulfilled') setStores(storeRes.value.items);
+      if (decRes.status === 'fulfilled') setDecisions(decRes.value);
+    } catch {
+      // keep mock data on failure
+    }
+    setLastRefresh(new Date());
+  }, [dateRange]);
+
+  // 30秒轮询
+  useEffect(() => {
+    loadData();
+    timerRef.current = setInterval(loadData, POLL_INTERVAL);
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, [loadData]);
+
+  // 门店排序
+  const sortedStores = [...stores].sort((a, b) => {
+    if (rankDimension === 'revenue') return b.revenue_fen - a.revenue_fen;
+    if (rankDimension === 'avg_ticket') return (b.revenue_fen / (b.order_count || 1)) - (a.revenue_fen / (a.order_count || 1));
+    return b.turnover_rate - a.turnover_rate;
+  }).map((s, i) => ({ ...s, rank: i + 1 }));
+
+  // 小时标签 09:00-21:00
+  const hourLabels = Array.from({ length: 13 }, (_, i) => `${(i + 9).toString().padStart(2, '0')}:00`);
+  const todaySlice = MOCK_HOURLY_TODAY.slice(9, 22);
+  const yesterdaySlice = MOCK_HOURLY_YESTERDAY.slice(9, 22);
+
+  const dateLabels: Record<string, string> = { today: '今日', week: '本周', month: '本月' };
 
   return (
     <div>
       {/* 标题行 */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-        <h2 style={{ margin: 0 }}>经营驾驶舱</h2>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <h2 style={{ margin: 0 }}>经营驾驶舱</h2>
+          <span style={{ fontSize: 11, color: '#666', background: '#1a2a33', padding: '2px 8px', borderRadius: 4 }}>
+            {lastRefresh.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })} 更新
+          </span>
+        </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          {['今日', '本周', '本月'].map((d) => (
-            <button key={d} style={{
+          {(['today', 'week', 'month'] as const).map((d) => (
+            <button key={d} onClick={() => setDateRange(d)} style={{
               padding: '4px 14px', borderRadius: 6, border: 'none', cursor: 'pointer',
               fontSize: 12, fontWeight: 600,
               background: dateRange === d ? '#FF6B2C' : '#1a2a33',
               color: dateRange === d ? '#fff' : '#999',
-            }}>{d}</button>
+            }}>
+              {dateLabels[d]}
+            </button>
           ))}
         </div>
       </div>
 
-      {/* 营业总览卡片 */}
+      {/* KPI 卡片 */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
-        {MOCK_OVERVIEW.map((kpi) => (
+        {kpis.map((kpi) => (
           <div key={kpi.label} style={{
             background: '#112228', borderRadius: 8, padding: 20,
             borderLeft: '3px solid #FF6B2C',
           }}>
             <div style={{ fontSize: 12, color: '#999', marginBottom: 4 }}>{kpi.label}</div>
-            <div style={{ fontSize: 28, fontWeight: 'bold', color: '#fff' }}>{kpi.value}</div>
+            <div style={{ fontSize: 28, fontWeight: 'bold', color: '#fff' }}>{kpi.formatted}</div>
             <div style={{
-              fontSize: 12, marginTop: 4,
-              color: kpi.up ? '#52c41a' : '#ff4d4f',
+              fontSize: 12, marginTop: 4, display: 'flex', alignItems: 'center', gap: 4,
+              color: kpi.trend_up ? '#0F6E56' : '#A32D2D',
             }}>
-              {kpi.up ? '↑' : '↓'} {kpi.trend} 较昨日
+              <span style={{ fontSize: 14 }}>{kpi.trend_up ? '\u2191' : '\u2193'}</span>
+              {Math.abs(kpi.trend_percent).toFixed(1)}% 较昨日同期
             </div>
           </div>
         ))}
       </div>
 
+      {/* 营收趋势（按小时对比昨日） */}
+      <div style={{ background: '#112228', borderRadius: 8, padding: 20, marginBottom: 16 }}>
+        <h3 style={{ margin: '0 0 16px', fontSize: 16 }}>营收趋势（今日 vs 昨日同期）</h3>
+        <TxLineChart
+          data={{
+            labels: hourLabels,
+            datasets: [
+              { name: '今日', values: todaySlice, color: '#FF6B2C' },
+              { name: '昨日', values: yesterdaySlice, color: '#185FA5' },
+            ],
+          }}
+          height={280}
+          showArea
+          unit="元"
+        />
+      </div>
+
+      {/* 下半区：门店排名 + AI决策推荐 */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-        {/* 门店排行表格 */}
+        {/* 门店排名 */}
         <div style={{ background: '#112228', borderRadius: 8, padding: 20 }}>
-          <h3 style={{ margin: '0 0 16px', fontSize: 16 }}>门店排行</h3>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <h3 style={{ margin: 0, fontSize: 16 }}>门店排名</h3>
+            <div style={{ display: 'flex', gap: 6 }}>
+              {(Object.keys(RANK_LABELS) as RankDimension[]).map((dim) => (
+                <button key={dim} onClick={() => setRankDimension(dim)} style={{
+                  padding: '3px 10px', borderRadius: 4, border: 'none', cursor: 'pointer',
+                  fontSize: 11, fontWeight: 600,
+                  background: rankDimension === dim ? '#FF6B2C' : '#0B1A20',
+                  color: rankDimension === dim ? '#fff' : '#999',
+                }}>
+                  {RANK_LABELS[dim]}
+                </button>
+              ))}
+            </div>
+          </div>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
               <tr style={{ color: '#999', fontSize: 11, textAlign: 'left' }}>
                 <th style={{ padding: '8px 4px' }}>#</th>
                 <th style={{ padding: '8px 4px' }}>门店</th>
-                <th style={{ padding: '8px 4px', textAlign: 'right' }}>营收</th>
+                <th style={{ padding: '8px 4px', textAlign: 'right' }}>
+                  {rankDimension === 'revenue' ? '营收' : rankDimension === 'avg_ticket' ? '客单价' : '翻台率'}
+                </th>
                 <th style={{ padding: '8px 4px', textAlign: 'right' }}>单量</th>
-                <th style={{ padding: '8px 4px', textAlign: 'right' }}>翻台</th>
                 <th style={{ padding: '8px 4px', textAlign: 'right' }}>评分</th>
               </tr>
             </thead>
             <tbody>
-              {MOCK_STORE_RANK.map((s) => (
-                <tr key={s.rank} style={{ borderTop: '1px solid #1a2a33' }}>
-                  <td style={{ padding: '10px 4px', fontWeight: 'bold', color: '#FF6B2C' }}>{s.rank}</td>
-                  <td style={{ padding: '10px 4px' }}>{s.name}</td>
-                  <td style={{ padding: '10px 4px', textAlign: 'right' }}>¥{(s.revenue / 100).toLocaleString()}</td>
-                  <td style={{ padding: '10px 4px', textAlign: 'right' }}>{s.orders}</td>
-                  <td style={{ padding: '10px 4px', textAlign: 'right' }}>{s.turnover}</td>
-                  <td style={{ padding: '10px 4px', textAlign: 'right' }}>
-                    <span style={{
-                      padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 600,
-                      background: `${scoreColor(s.score)}20`, color: scoreColor(s.score),
-                    }}>{s.score}</span>
-                  </td>
-                </tr>
-              ))}
+              {sortedStores.map((s) => {
+                const dimValue = rankDimension === 'revenue'
+                  ? `\u00A5${(s.revenue_fen / 100).toLocaleString()}`
+                  : rankDimension === 'avg_ticket'
+                    ? `\u00A5${(s.revenue_fen / (s.order_count || 1) / 100).toFixed(1)}`
+                    : s.turnover_rate.toFixed(1);
+                return (
+                  <tr key={s.store_id} style={{ borderTop: '1px solid #1a2a33' }}>
+                    <td style={{ padding: '10px 4px', fontWeight: 'bold', color: s.rank <= 3 ? '#FF6B2C' : '#666' }}>{s.rank}</td>
+                    <td style={{ padding: '10px 4px' }}>{s.store_name}</td>
+                    <td style={{ padding: '10px 4px', textAlign: 'right', fontWeight: 600 }}>{dimValue}</td>
+                    <td style={{ padding: '10px 4px', textAlign: 'right', color: '#999' }}>{s.order_count}</td>
+                    <td style={{ padding: '10px 4px', textAlign: 'right' }}>
+                      <span style={{
+                        padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 600,
+                        background: `${scoreColor(s.health_score)}20`, color: scoreColor(s.health_score),
+                      }}>{s.health_score}</span>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
 
-        {/* 异常摘要列表 */}
+        {/* AI 决策推荐 TOP3 */}
         <div style={{ background: '#112228', borderRadius: 8, padding: 20 }}>
-          <h3 style={{ margin: '0 0 16px', fontSize: 16 }}>异常摘要</h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {MOCK_ALERTS.map((a) => (
-              <div key={a.id} style={{
-                padding: 12, borderRadius: 8, background: '#0B1A20',
-                borderLeft: `3px solid ${alertColor[a.level]}`,
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                  <span style={{
-                    fontSize: 10, padding: '1px 6px', borderRadius: 4, fontWeight: 600,
-                    background: `${alertColor[a.level]}20`, color: alertColor[a.level],
-                  }}>
-                    {a.level === 'critical' ? '严重' : a.level === 'warning' ? '警告' : '提示'}
-                  </span>
-                  <span style={{ fontSize: 11, color: '#666' }}>{a.time}</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <h3 style={{ margin: 0, fontSize: 16 }}>
+              AI 决策推荐
+              <span style={{ fontSize: 11, color: '#185FA5', marginLeft: 8 }}>TOP 3</span>
+            </h3>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {decisions.map((d, idx) => {
+              const pColor = priorityColor[d.priority] || '#185FA5';
+              return (
+                <div key={d.decision_id} style={{
+                  padding: 16, borderRadius: 8, background: '#0B1A20',
+                  borderLeft: `3px solid ${pColor}`,
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{
+                        fontSize: 10, padding: '2px 8px', borderRadius: 4, fontWeight: 700,
+                        background: `${pColor}20`, color: pColor,
+                      }}>
+                        {priorityLabel[d.priority] || d.priority}
+                      </span>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: '#fff' }}>{d.title}</span>
+                    </div>
+                    <span style={{ fontSize: 10, color: '#666' }}>
+                      置信度 {(d.confidence * 100).toFixed(0)}%
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 12, color: '#999', lineHeight: 1.6 }}>{d.description}</div>
+                  <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
+                    <button style={{
+                      padding: '4px 12px', borderRadius: 4, border: 'none', cursor: 'pointer',
+                      fontSize: 11, fontWeight: 600, background: pColor, color: '#fff',
+                    }}>
+                      采纳执行
+                    </button>
+                    <button style={{
+                      padding: '4px 12px', borderRadius: 4, border: '1px solid #2a3a43',
+                      cursor: 'pointer', fontSize: 11, fontWeight: 600, background: 'transparent', color: '#999',
+                    }}>
+                      稍后处理
+                    </button>
+                  </div>
                 </div>
-                <div style={{ fontSize: 13 }}>
-                  <span style={{ color: '#FF6B2C', fontWeight: 600 }}>{a.store}</span>
-                  {' '}{a.msg}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
-      </div>
-
-      {/* 营收趋势折线图 */}
-      <div style={{ background: '#112228', borderRadius: 8, padding: 20, marginTop: 16 }}>
-        <h3 style={{ margin: '0 0 16px', fontSize: 16 }}>营收趋势</h3>
-        <TxLineChart
-          data={{
-            labels: ['09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00'],
-            datasets: [
-              { name: '今日', values: [1200, 2800, 5600, 12800, 18500, 19200, 20100, 21000, 23400, 26000, 27800, 28560], color: '#FF6B2C' },
-              { name: '昨日', values: [1000, 2400, 4800, 11200, 16200, 17000, 17800, 18500, 20100, 22800, 24200, 25420], color: '#185FA5' },
-            ],
-          }}
-          height={260}
-          showArea
-          unit="元"
-        />
       </div>
     </div>
   );

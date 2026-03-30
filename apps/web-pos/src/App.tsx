@@ -16,6 +16,7 @@ import { ReverseSettlePage } from './pages/ReverseSettlePage';
 import { SplitPayPage } from './pages/SplitPayPage';
 import { TaxInvoicePage } from './pages/TaxInvoicePage';
 import { HandoverPage } from './pages/HandoverPage';
+import { QuickCashierPage } from './pages/QuickCashierPage';
 
 function App() {
   return (
@@ -39,6 +40,7 @@ function App() {
         <Route path="/settings" element={<POSSettingsPage />} />
         <Route path="/reports" element={<POSReportsPage />} />
         <Route path="/handover" element={<HandoverPage />} />
+        <Route path="/quick-cashier" element={<QuickCashierPage />} />
       </Routes>
     </BrowserRouter>
   );

@@ -30,6 +30,7 @@ export * from './enterpriseApi';
 export * from './handoverApi';
 export * from './couponApi';
 export * from './orderExtApi';
+export * from './posOpsApi';
 
 // ─── 排队 ───
 

@@ -111,19 +111,23 @@
 
 .entry-label { font-size: 24rpx; color: #ccc; }
 
-/* ─── Active order floating bar ─── */
-.active-order-bar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+/* ─── Active order floating card (with progress + estimated time) ─── */
+.active-order-card {
   margin: 20rpx 32rpx;
-  padding: 24rpx 28rpx;
-  background: linear-gradient(135deg, rgba(255, 107, 44, 0.15), rgba(255, 107, 44, 0.08));
-  border-radius: 20rpx;
+  padding: 28rpx;
+  background: linear-gradient(135deg, rgba(255, 107, 44, 0.15), rgba(255, 107, 44, 0.05));
+  border-radius: 24rpx;
   border: 2rpx solid rgba(255, 107, 44, 0.3);
 }
 
-.active-order-left {
+.active-order-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20rpx;
+}
+
+.active-order-status {
   display: flex;
   align-items: center;
   gap: 12rpx;
@@ -137,13 +141,52 @@
   animation: blink 1.5s ease-in-out infinite;
 }
 
-.active-text {
-  font-size: 28rpx;
+.active-status-text {
+  font-size: 30rpx;
   font-weight: 600;
   color: #FF6B2C;
 }
 
-.active-order-no {
+.active-order-time {
+  font-size: 26rpx;
+  color: #ccc;
+}
+
+/* Progress bar */
+.active-order-progress {
+  margin-bottom: 16rpx;
+}
+
+.progress-track {
+  height: 8rpx;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4rpx;
+  overflow: hidden;
+  margin-bottom: 12rpx;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #FF6B2C, #FF9F5C);
+  border-radius: 4rpx;
+  transition: width 500ms ease;
+}
+
+.progress-labels {
+  display: flex;
+  justify-content: space-between;
+}
+
+.progress-label {
+  font-size: 22rpx;
+  color: #999;
+}
+
+.active-order-bottom {
+  margin-bottom: 12rpx;
+}
+
+.active-dish-label {
   font-size: 24rpx;
   color: #ccc;
 }
@@ -151,6 +194,8 @@
 .active-order-action {
   font-size: 26rpx;
   color: #FF6B2C;
+  display: block;
+  text-align: right;
 }
 
 @keyframes blink {
