@@ -10,12 +10,14 @@ import hashlib
 import hmac
 import json
 import os
+import uuid as _uuid_module
 from datetime import date, datetime
 from typing import Optional
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
@@ -157,6 +159,16 @@ async def webhook_receive_order(
             tenant_id=tenant_id,
             db=db,
         )
+
+        # 映射增强：查询 platform_dish_mappings 并为未映射条目创建占位记录
+        await _enrich_order_with_mappings(
+            platform=platform,
+            store_id=store_id,
+            tenant_id=tenant_id,
+            order=order,
+            db=db,
+        )
+
         await db.commit()
         log.info("omni_channel.webhook.ok", platform_order_id=order.platform_order_id)
         return {"ok": True, "data": {"order_id": order.internal_order_id, "platform": platform}, "error": None}
@@ -384,6 +396,218 @@ async def get_channel_stats(
         }
 
     return {"ok": True, "data": {"date": str(target_date), "platforms": stats_by_platform}, "error": None}
+
+
+# ─── 接单增强：映射查询与未映射记录落库 ─────────────────────────────────────────
+
+
+async def _enrich_order_with_mappings(
+    platform: str,
+    store_id: str,
+    tenant_id: str,
+    order,
+    db: AsyncSession,
+) -> None:
+    """查询 platform_dish_mappings，为每个订单菜品丰富 internal_dish_id。
+
+    - 找到映射的：写入 item.internal_dish_id
+    - 未找到映射的：创建 is_active=false 的占位记录（便于后续批量处理）
+    """
+    if not order.items:
+        return
+
+    tid = _uuid_module.UUID(tenant_id)
+    sid = _uuid_module.UUID(store_id)
+
+    # 设置 RLS context
+    await db.execute(
+        text("SELECT set_config('app.tenant_id', :tid, true)"),
+        {"tid": tenant_id},
+    )
+
+    for item in order.items:
+        if not item.sku_id:
+            continue
+
+        mapping_result = await db.execute(
+            text("""
+                SELECT dish_id
+                FROM platform_dish_mappings
+                WHERE tenant_id       = :tid
+                  AND store_id        = :sid
+                  AND platform        = :platform
+                  AND platform_item_id = :platform_item_id
+                  AND is_active       = true
+                LIMIT 1
+            """),
+            {
+                "tid": tid,
+                "sid": sid,
+                "platform": platform,
+                "platform_item_id": item.sku_id,
+            },
+        )
+        row = mapping_result.fetchone()
+
+        if row and row[0]:
+            # 已映射：填入 internal_dish_id
+            item.internal_dish_id = str(row[0])
+        else:
+            # 未映射：upsert 占位记录（is_active=false，待人工处理）
+            try:
+                await db.execute(
+                    text("""
+                        INSERT INTO platform_dish_mappings
+                            (tenant_id, store_id, platform, platform_item_id,
+                             platform_item_name, dish_id, is_active, updated_at)
+                        VALUES
+                            (:tid, :sid, :platform, :platform_item_id,
+                             :platform_item_name, NULL, false, NOW())
+                        ON CONFLICT (tenant_id, store_id, platform, platform_item_id)
+                        DO UPDATE SET
+                            platform_item_name = COALESCE(
+                                EXCLUDED.platform_item_name,
+                                platform_dish_mappings.platform_item_name
+                            ),
+                            updated_at = NOW()
+                        WHERE platform_dish_mappings.dish_id IS NULL
+                    """),
+                    {
+                        "tid": tid,
+                        "sid": sid,
+                        "platform": platform,
+                        "platform_item_id": item.sku_id,
+                        "platform_item_name": item.name,
+                    },
+                )
+            except Exception as exc:
+                logger.warning(
+                    "omni_channel.enrich.upsert_placeholder_failed",
+                    platform_item_id=item.sku_id,
+                    error=str(exc),
+                )
+
+
+@router.get("/unmapped-items", summary="汇总所有平台未映射菜品（带自动匹配建议）")
+async def get_unmapped_items(
+    store_id: str = Query(..., description="门店ID"),
+    platform: Optional[str] = Query(None, description="平台筛选（meituan/eleme/douyin），不传则查所有平台"),
+    include_suggestions: bool = Query(True, description="是否包含自动匹配建议"),
+    request: Request = None,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """汇总所有平台未映射菜品列表，可选带自动匹配建议（编辑距离算法）。
+
+    需要先安装 tx-menu 的 channel_mapping_service（可通过依赖注入或直接在同库中引用）。
+    为避免跨服务依赖，此处直接操作 platform_dish_mappings 表。
+    """
+    tenant_id = _get_tenant_id(request)
+    tid = _uuid_module.UUID(tenant_id)
+    sid = _uuid_module.UUID(store_id)
+
+    await db.execute(
+        text("SELECT set_config('app.tenant_id', :tid, true)"),
+        {"tid": tenant_id},
+    )
+
+    platforms_to_check = (
+        [platform] if platform and platform in OmniChannelService.PLATFORMS
+        else OmniChannelService.PLATFORMS
+    )
+
+    all_unmapped: list[dict] = []
+    for plat in platforms_to_check:
+        result = await db.execute(
+            text("""
+                SELECT platform_item_id, platform_item_name, created_at, updated_at
+                FROM platform_dish_mappings
+                WHERE tenant_id = :tid
+                  AND store_id  = :sid
+                  AND platform  = :platform
+                  AND dish_id IS NULL
+                ORDER BY updated_at DESC
+            """),
+            {"tid": tid, "sid": sid, "platform": plat},
+        )
+        for row in result.fetchall():
+            all_unmapped.append({
+                "platform": plat,
+                "platform_item_id": row[0],
+                "platform_item_name": row[1],
+                "first_seen_at": row[2].isoformat() if row[2] else None,
+                "last_seen_at": row[3].isoformat() if row[3] else None,
+                "suggestions": [],
+            })
+
+    # 自动匹配建议（仅当 include_suggestions=True 且有未映射条目时）
+    if include_suggestions and all_unmapped:
+        # 获取内部菜品候选
+        dish_result = await db.execute(
+            text("""
+                SELECT id, dish_name
+                FROM dishes
+                WHERE tenant_id = :tid
+                  AND (store_id = :sid OR store_id IS NULL)
+                  AND is_available = true
+                  AND is_deleted = false
+                ORDER BY dish_name
+            """),
+            {"tid": tid, "sid": sid},
+        )
+        dish_rows = dish_result.fetchall()
+
+        if dish_rows:
+            from ..services.omni_channel_service import OmniChannelService as _OCS
+
+            def _levenshtein(a: str, b: str) -> int:
+                if a == b:
+                    return 0
+                la, lb = len(a), len(b)
+                if la == 0:
+                    return lb
+                if lb == 0:
+                    return la
+                prev = list(range(lb + 1))
+                for i, ca in enumerate(a, 1):
+                    curr = [i] + [0] * lb
+                    for j, cb in enumerate(b, 1):
+                        cost = 0 if ca == cb else 1
+                        curr[j] = min(prev[j] + 1, curr[j - 1] + 1, prev[j - 1] + cost)
+                    prev = curr
+                return prev[lb]
+
+            for entry in all_unmapped:
+                name = entry["platform_item_name"] or ""
+                if not name:
+                    continue
+                best_conf = 0.0
+                best_dish_id = None
+                best_dish_name = ""
+                for d_id, d_name in dish_rows:
+                    a, b = name.strip().lower(), d_name.strip().lower()
+                    max_len = max(len(a), len(b), 1)
+                    conf = max(0.0, 1.0 - _levenshtein(a, b) / max_len)
+                    if conf > best_conf:
+                        best_conf = conf
+                        best_dish_id = d_id
+                        best_dish_name = d_name
+                if best_conf >= 0.60 and best_dish_id:
+                    entry["suggestions"] = [
+                        {
+                            "dish_id": str(best_dish_id),
+                            "dish_name": best_dish_name,
+                            "confidence": round(best_conf, 4),
+                        }
+                    ]
+
+    return {
+        "ok": True,
+        "data": {
+            "unmapped_items": all_unmapped,
+            "total": len(all_unmapped),
+        },
+        "error": None,
+    }
 
 
 @router.post("/auto-reject/run", summary="触发超时自动拒单")

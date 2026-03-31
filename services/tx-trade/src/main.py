@@ -44,6 +44,10 @@ from .api.kds_config_routes import router as kds_config_router
 from .api.kitchen_monitor_routes import router as kitchen_monitor_router
 from .api.table_monitor_routes import router as table_monitor_router
 from .api.booking_prep_routes import router as booking_prep_router
+from .api.delivery_ops_routes import router as delivery_ops_router
+from .api.banquet_payment_routes import router as banquet_payment_router
+from .api.collab_order_routes import router as collab_order_router
+from .api.table_layout_routes import router as table_layout_router
 
 
 @asynccontextmanager
@@ -106,6 +110,10 @@ app.include_router(kds_config_router,      prefix="/api/v1/kds-call")
 app.include_router(kitchen_monitor_router, prefix="/api/v1/kitchen")
 app.include_router(table_monitor_router)
 app.include_router(booking_prep_router,    prefix="/api/v1/booking-prep")
+app.include_router(delivery_ops_router)
+app.include_router(banquet_payment_router)
+app.include_router(collab_order_router)
+app.include_router(table_layout_router)
 
 
 @app.get("/health")

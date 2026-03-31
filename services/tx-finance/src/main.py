@@ -13,6 +13,7 @@ from api.analytics_routes import router as analytics_router
 from api.cost_routes import router as cost_router
 from api.pl_routes import router as pl_router
 from api.e_invoice_routes import router as invoice_router
+from api.settlement_routes import router as settlement_router
 
 
 @asynccontextmanager
@@ -40,6 +41,7 @@ app.include_router(analytics_router)
 app.include_router(cost_router,    prefix="/api/v1/costs")
 app.include_router(pl_router,      prefix="/api/v1/pl")
 app.include_router(invoice_router, prefix="/api/v1/invoices")
+app.include_router(settlement_router)
 
 
 @app.get("/health")
