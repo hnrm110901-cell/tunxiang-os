@@ -85,6 +85,7 @@ const MENU_CONFIGS: Record<string, MenuConfig> = {
       ]},
       { label: '配置', items: [
         { id: 'settings', label: '模板配置', icon: '⚙️', path: '/hq/ops/settings' },
+        { id: 'receipt-editor', label: '小票模板', icon: '🧾', path: '/receipt-editor' },
       ]},
     ],
   },

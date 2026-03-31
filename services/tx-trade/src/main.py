@@ -79,6 +79,7 @@ from .routers.delivery_router import router as delivery_router
 from .routers.delivery_panel_router import router as delivery_panel_router
 from .routers.self_pay_router import router as self_pay_router
 from .api.production_dept_routes import router as production_dept_router
+from .api.template_editor_routes import router as template_editor_router
 
 
 @asynccontextmanager
@@ -176,6 +177,7 @@ app.include_router(delivery_panel_router)  # 新接单面板（完整实现）�
 app.include_router(delivery_router)         # 旧骨架路由（保留 /webhook/ 和 /platforms 端点）
 app.include_router(self_pay_router)
 app.include_router(production_dept_router)
+app.include_router(template_editor_router)
 
 
 @app.get("/health")

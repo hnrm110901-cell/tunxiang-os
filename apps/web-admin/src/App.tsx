@@ -50,6 +50,7 @@ import { MemberAnalysisPage } from './pages/hq/analytics/MemberAnalysisPage';
 import { MultiStoreComparePage } from './pages/hq/analytics/MultiStoreComparePage';
 import { TrendAnalysisPage } from './pages/hq/analytics/TrendAnalysisPage';
 import { BanquetBoardPage } from './pages/hq/BanquetBoardPage';
+import { ReceiptEditorPage } from './pages/ReceiptEditorPage';
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem('tx_token'));
@@ -119,6 +120,8 @@ function App() {
           <Route path="/hq/analytics/multi-store" element={<MultiStoreComparePage />} />
           <Route path="/hq/analytics/trend" element={<TrendAnalysisPage />} />
           <Route path="/hq/banquet" element={<BanquetBoardPage />} />
+          <Route path="/receipt-editor" element={<ReceiptEditorPage />} />
+          <Route path="/receipt-editor/:templateId" element={<ReceiptEditorPage />} />
         </Routes>
       </ShellHQ>
     </BrowserRouter>
