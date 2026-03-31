@@ -10,6 +10,7 @@ from typing import Optional
 import structlog
 from pydantic import BaseModel
 from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..services.kds_dispatch import dispatch_order_to_kds
@@ -512,11 +513,13 @@ class TableSessionService:
                 {"order_id": order_id, "tenant_id": self._tenant_id},
             )
             kds_sent = True
-        except Exception:
+        except (SQLAlchemyError, ValueError, RuntimeError) as exc:
             logger.warning(
                 "collab_kds_dispatch_failed",
                 order_id=str(order_id),
                 tenant_id=str(self._tenant_id),
+                error=str(exc),
+                error_type=type(exc).__name__,
                 exc_info=True,
             )
 

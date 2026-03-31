@@ -12,6 +12,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useKdsWebSocket, type KDSTicket, type RemakeAlert } from '../hooks/useKdsWebSocket';
 import { warmUpAudio } from '../utils/audio';
+import { pauseTicket, resumeTicket, grabTicket } from '../api/kdsOpsApi';
 
 // ─── KDS 配置（从 localStorage 读取） ───
 
@@ -117,6 +118,18 @@ export function KitchenBoard() {
   const [selectedDept, setSelectedDept] = useState<string>('all');
   const [audioWarmed, setAudioWarmed] = useState(false);
 
+  // ── 新功能状态 ──
+  // 抢单模式：开启后每张 pending 卡片显示"抢单"按钮
+  const [grabMode, setGrabMode] = useState<boolean>(
+    () => localStorage.getItem('kds_grab_mode') === 'on'
+  );
+  // 批量合并视图：按菜品合并多桌同一菜品的数量
+  const [batchView, setBatchView] = useState<boolean>(false);
+  // 停菜中的 ticket IDs 本地状态（实时 UI 反馈）
+  const [pausedIds, setPausedIds] = useState<Set<string>>(new Set());
+  // 当前操作员ID（实际应从登录信息获取）
+  const operatorId = (window as any).__OPERATOR_ID__ as string | undefined;
+
   // 每秒刷新倒计时
   useEffect(() => {
     const timer = setInterval(() => setTick(t => t + 1), 1000);
@@ -138,6 +151,46 @@ export function KitchenBoard() {
     setTickets(update);
     if (wsEnabled) setWsTickets(update);
   }, [wsEnabled, setWsTickets]);
+
+  // 停菜/恢复
+  const togglePause = useCallback(async (id: string) => {
+    const isPaused = pausedIds.has(id);
+    // 乐观更新
+    setPausedIds(prev => {
+      const next = new Set(prev);
+      if (isPaused) next.delete(id); else next.add(id);
+      return next;
+    });
+    try {
+      if (isPaused) {
+        await resumeTicket(id, operatorId);
+      } else {
+        await pauseTicket(id, operatorId);
+      }
+    } catch {
+      // 失败回滚
+      setPausedIds(prev => {
+        const next = new Set(prev);
+        if (isPaused) next.add(id); else next.delete(id);
+        return next;
+      });
+    }
+  }, [pausedIds, operatorId]);
+
+  // 抢单
+  const handleGrab = useCallback(async (id: string) => {
+    if (!operatorId) return;
+    try {
+      await grabTicket(id, operatorId);
+      const update = (prev: KDSTicket[]) =>
+        prev.map(t => t.id === id ? { ...t, status: 'cooking' as const, startedAt: Date.now() } : t);
+      setTickets(update);
+      if (wsEnabled) setWsTickets(update);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : '抢单失败';
+      alert(msg);
+    }
+  }, [operatorId, wsEnabled, setWsTickets]);
 
   // 完成出品
   const completeCooking = useCallback((id: string) => {
@@ -233,6 +286,46 @@ export function KitchenBoard() {
               {connected ? '已连接' : '断开'}
             </span>
           )}
+          {/* 抢单模式切换 */}
+          <button
+            onClick={() => {
+              const next = !grabMode;
+              setGrabMode(next);
+              localStorage.setItem('kds_grab_mode', next ? 'on' : 'off');
+            }}
+            style={{
+              padding: '6px 14px',
+              minHeight: 48,
+              background: grabMode ? '#FF6B35' : '#1A1A1A',
+              color: grabMode ? '#fff' : '#666',
+              border: `1px solid ${grabMode ? '#FF6B35' : '#333'}`,
+              borderRadius: 8,
+              fontSize: 15,
+              fontWeight: grabMode ? 700 : 400,
+              cursor: 'pointer',
+            }}
+          >
+            {grabMode ? '🏃 抢单中' : '抢单模式'}
+          </button>
+
+          {/* 批量合并视图切换 */}
+          <button
+            onClick={() => setBatchView(v => !v)}
+            style={{
+              padding: '6px 14px',
+              minHeight: 48,
+              background: batchView ? '#1A3050' : '#1A1A1A',
+              color: batchView ? '#64D2FF' : '#666',
+              border: `1px solid ${batchView ? '#1A6CF0' : '#333'}`,
+              borderRadius: 8,
+              fontSize: 15,
+              fontWeight: batchView ? 700 : 400,
+              cursor: 'pointer',
+            }}
+          >
+            {batchView ? '合并视图' : '合并视图'}
+          </button>
+
           {!wsEnabled && (
             <span style={{ fontSize: 16, color: '#BA7517' }}>
               离线模式（未配置 Mac mini 地址）
@@ -265,6 +358,8 @@ export function KitchenBoard() {
               onAction={() => startCooking(t.id)}
               tick={tick}
               isFlashing={rushTicketIds.has(t.id)}
+              isPaused={pausedIds.has(t.id)}
+              onGrab={grabMode && operatorId ? () => handleGrab(t.id) : undefined}
             />
           ))}
         </BoardColumn>
@@ -280,6 +375,8 @@ export function KitchenBoard() {
               onAction={() => completeCooking(t.id)}
               tick={tick}
               isFlashing={rushTicketIds.has(t.id)}
+              isPaused={pausedIds.has(t.id)}
+              onPause={() => togglePause(t.id)}
             />
           ))}
         </BoardColumn>
@@ -438,9 +535,12 @@ function BoardColumn({ title, count, color, bgColor, children }: {
 
 // ─── 工单卡片 ───
 
-function TicketCard({ ticket: t, actionLabel, actionColor, onAction, tick: _tick, isFlashing }: {
+function TicketCard({ ticket: t, actionLabel, actionColor, onAction, tick: _tick, isFlashing, isPaused, onPause, onGrab }: {
   ticket: KDSTicket; actionLabel: string; actionColor: string;
   onAction: () => void; tick: number; isFlashing?: boolean;
+  isPaused?: boolean;
+  onPause?: () => void;
+  onGrab?: () => void;
 }) {
   const level = getTimeLevel(t.createdAt);
   const elapsed = formatElapsed(t.createdAt);
@@ -520,22 +620,77 @@ function TicketCard({ ticket: t, actionLabel, actionColor, onAction, tick: _tick
         </div>
       ))}
 
-      {/* 操作按钮 */}
-      <button
-        onClick={onAction}
-        style={{
-          width: '100%', marginTop: 10, padding: '14px 0',
-          border: 'none', borderRadius: 8,
-          background: actionColor, color: '#fff',
-          fontSize: 20, fontWeight: 'bold',
-          cursor: 'pointer', minHeight: 56,
-          transition: 'transform 200ms ease',
-        }}
-        onTouchStart={e => (e.currentTarget.style.transform = 'scale(0.97)')}
-        onTouchEnd={e => (e.currentTarget.style.transform = 'scale(1)')}
-      >
-        {actionLabel}
-      </button>
+      {/* 停菜标记 */}
+      {isPaused && (
+        <div style={{
+          background: '#2A2A00', border: '1px solid #666600',
+          borderRadius: 6, padding: '4px 10px', marginTop: 8,
+          fontSize: 14, color: '#CCCC00', fontWeight: 600,
+        }}>
+          ⏸ 已停菜 — 暂缓出品
+        </div>
+      )}
+
+      {/* 操作按钮区 */}
+      <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+        {/* 抢单按钮（仅 pending + 抢单模式） */}
+        {onGrab && (
+          <button
+            onClick={onGrab}
+            style={{
+              flex: 1, padding: '14px 0', border: 'none', borderRadius: 8,
+              background: '#FF6B35', color: '#fff',
+              fontSize: 20, fontWeight: 'bold', cursor: 'pointer', minHeight: 56,
+              transition: 'transform 200ms ease',
+            }}
+            onTouchStart={e => (e.currentTarget.style.transform = 'scale(0.97)')}
+            onTouchEnd={e => (e.currentTarget.style.transform = 'scale(1)')}
+          >
+            🏃 抢单
+          </button>
+        )}
+
+        {/* 主操作按钮（无抢单模式时展示） */}
+        {!onGrab && (
+          <button
+            onClick={onAction}
+            disabled={isPaused}
+            style={{
+              flex: 1, padding: '14px 0', border: 'none', borderRadius: 8,
+              background: isPaused ? '#2A2A2A' : actionColor, color: '#fff',
+              fontSize: 20, fontWeight: 'bold',
+              cursor: isPaused ? 'not-allowed' : 'pointer',
+              opacity: isPaused ? 0.5 : 1,
+              minHeight: 56, transition: 'transform 200ms ease',
+            }}
+            onTouchStart={e => !isPaused && (e.currentTarget.style.transform = 'scale(0.97)')}
+            onTouchEnd={e => (e.currentTarget.style.transform = 'scale(1)')}
+          >
+            {actionLabel}
+          </button>
+        )}
+
+        {/* 停菜/恢复按钮（cooking 状态才显示） */}
+        {onPause && (
+          <button
+            onClick={onPause}
+            style={{
+              padding: '14px 14px', border: 'none', borderRadius: 8,
+              background: isPaused ? '#2A2A00' : '#1A1A1A',
+              color: isPaused ? '#CCCC00' : '#666',
+              fontSize: 18, fontWeight: 'bold',
+              cursor: 'pointer', minHeight: 56, minWidth: 72,
+              border: `1px solid ${isPaused ? '#666600' : '#333'}`,
+              transition: 'transform 200ms ease',
+            } as React.CSSProperties}
+            onTouchStart={e => (e.currentTarget.style.transform = 'scale(0.97)')}
+            onTouchEnd={e => (e.currentTarget.style.transform = 'scale(1)')}
+            title={isPaused ? '恢复出品' : '停菜'}
+          >
+            {isPaused ? '▶' : '⏸'}
+          </button>
+        )}
+      </div>
     </div>
   );
 }

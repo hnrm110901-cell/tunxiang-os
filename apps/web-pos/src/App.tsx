@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { InventoryAlertBanner } from './pages/InventoryAlertBanner';
 import { CashierPage } from './pages/CashierPage';
 import { OrderPage } from './pages/OrderPage';
 import { SettlePage } from './pages/SettlePage';
@@ -17,10 +18,21 @@ import { SplitPayPage } from './pages/SplitPayPage';
 import { TaxInvoicePage } from './pages/TaxInvoicePage';
 import { HandoverPage } from './pages/HandoverPage';
 import { QuickCashierPage } from './pages/QuickCashierPage';
+import { DiscountAuditPage } from './pages/DiscountAuditPage';
+import { LiveMenuEditorPage } from './pages/LiveMenuEditorPage';
+import { MenuEngineeringPage } from './pages/MenuEngineeringPage';
+import { MenuBoardControlPage } from './pages/MenuBoardControlPage';
 
-function App() {
+const STORE_ID: string =
+  (window as Record<string, unknown>).__STORE_ID__ as string || '';
+
+/** 内层布局组件（必须在 BrowserRouter 内，InventoryAlertBanner 需要 useNavigate） */
+function AppLayout() {
   return (
-    <BrowserRouter>
+    <div style={{ minHeight: '100vh', background: '#111827' }}>
+      {/* 全局库存预警横幅 — 每60秒轮询，有预警才显示 */}
+      <InventoryAlertBanner storeId={STORE_ID} />
+
       <Routes>
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="/dashboard" element={<POSDashboardPage />} />
@@ -41,7 +53,19 @@ function App() {
         <Route path="/reports" element={<POSReportsPage />} />
         <Route path="/handover" element={<HandoverPage />} />
         <Route path="/quick-cashier" element={<QuickCashierPage />} />
+        <Route path="/discount-audit" element={<DiscountAuditPage />} />
+        <Route path="/live-menu" element={<LiveMenuEditorPage />} />
+        <Route path="/menu-engineering" element={<MenuEngineeringPage />} />
+        <Route path="/menu-board-control" element={<MenuBoardControlPage />} />
       </Routes>
+    </div>
+  );
+}
+
+function App() {
+  return (
+    <BrowserRouter>
+      <AppLayout />
     </BrowserRouter>
   );
 }

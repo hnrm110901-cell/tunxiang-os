@@ -1,196 +1,451 @@
-"""中央厨房完整链路 API 路由
+"""中央厨房 API 路由
 
-生产计划→加工任务→配送路由→门店签收
+供应链模块核心功能：生产计划→工单→配送→门店收货确认 完整链路。
 
-# ROUTER REGISTRATION:
-# from .api.central_kitchen_routes import router as ck_router
-# app.include_router(ck_router, prefix="/api/v1/ck")
+路由前缀：/api/v1/supply/central-kitchen
+认证头：X-Tenant-ID（所有接口必填）
+
+端点列表：
+  GET  /kitchens                           中央厨房列表
+  POST /kitchens                           新建中央厨房档案
+
+  GET  /plans                              生产计划列表
+  POST /plans                              创建生产计划
+  GET  /plans/{id}                         计划详情
+  POST /plans/{id}/confirm                 确认计划，生成工单
+
+  GET  /production-orders                  生产工单列表
+  PUT  /production-orders/{id}/progress    更新工单进度
+
+  GET  /distribution                       配送单列表
+  POST /distribution                       创建配送单
+  POST /distribution/{id}/deliver         标记已发出
+  POST /distribution/{id}/receive         门店确认收货
+
+  GET  /dashboard                          日看板
+  GET  /demand-forecast                    需求预测
 """
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
+import structlog
 from fastapi import APIRouter, Header, HTTPException, Query
 from pydantic import BaseModel, Field
 
-router = APIRouter(prefix="/api/v1/ck", tags=["central_kitchen"])
+log = structlog.get_logger(__name__)
+
+router = APIRouter(
+    prefix="/api/v1/supply/central-kitchen",
+    tags=["central_kitchen"],
+)
 
 
-# ─── 请求模型 ───
+# ─── 请求体模型（Pydantic V2）───────────────────────────────────────────────
 
 
-class GeneratePlanRequest(BaseModel):
-    kitchen_id: str
-    plan_date: str = Field(..., description="生产日期，格式 YYYY-MM-DD")
-    store_ids: List[str] = Field(..., min_length=1, description="参与汇总需求的门店 ID 列表")
-    created_by: Optional[str] = None
-    capacity_kg: float = Field(5000.0, gt=0, description="中央厨房产能上限（kg）")
+class CreateKitchenRequest(BaseModel):
+    name: str = Field(..., min_length=1, max_length=100, description="中央厨房名称")
+    address: Optional[str] = Field(None, max_length=255, description="地址")
+    capacity_daily: float = Field(0.0, ge=0, description="日产能（份/公斤，视菜品单位）")
+    manager_id: Optional[str] = Field(None, description="负责人员工 ID")
+    contact_phone: Optional[str] = Field(None, max_length=20, description="联系电话")
 
 
-class CompleteTaskRequest(BaseModel):
-    actual_qty: float = Field(..., ge=0, description="实际产量")
+class PlanItemInput(BaseModel):
+    dish_id: str = Field(..., description="菜品 ID")
+    dish_name: str = Field(..., min_length=1, description="菜品名称")
+    quantity: float = Field(..., gt=0, description="计划产量")
+    unit: str = Field("份", description="单位")
+    target_stores: List[str] = Field(default_factory=list, description="目标门店 ID 列表")
 
 
-class DispatchRequest(BaseModel):
-    driver_name: Optional[str] = None
-    vehicle_plate: Optional[str] = None
+class CreateProductionPlanRequest(BaseModel):
+    kitchen_id: str = Field(..., description="中央厨房 ID")
+    plan_date: str = Field(..., description="生产日期 YYYY-MM-DD")
+    items: List[PlanItemInput] = Field(
+        default_factory=list,
+        description="生产菜品清单，留空则自动从需求预测生成",
+    )
+    created_by: Optional[str] = Field(None, description="创建人员工 ID")
 
 
-class SignReceiptRequest(BaseModel):
-    actual_qty: float = Field(..., ge=0, description="实收数量")
-    operator_id: str = Field(..., description="签收操作人 ID")
+class ConfirmPlanRequest(BaseModel):
+    operator_id: str = Field(..., description="确认操作人员工 ID")
 
 
-# ─── 端点 ───
+class UpdateProgressRequest(BaseModel):
+    status: str = Field(
+        ...,
+        description="新状态：in_progress / completed / cancelled",
+    )
+    quantity_done: Optional[float] = Field(
+        None,
+        ge=0,
+        description="已完成数量（status=completed 时必填）",
+    )
 
 
-@router.post("/plans/generate")
-async def generate_plan(
-    body: GeneratePlanRequest,
+class DistributionItemInput(BaseModel):
+    dish_id: str = Field(..., description="菜品 ID")
+    dish_name: str = Field(..., min_length=1, description="菜品名称")
+    quantity: float = Field(..., gt=0, description="配送数量")
+    unit: str = Field("份", description="单位")
+
+
+class CreateDistributionOrderRequest(BaseModel):
+    kitchen_id: str = Field(..., description="中央厨房 ID")
+    target_store_id: str = Field(..., description="目标门店 ID")
+    items: List[DistributionItemInput] = Field(..., min_length=1, description="配送明细")
+    scheduled_at: str = Field(..., description="计划配送时间（ISO 8601）")
+    driver_name: Optional[str] = Field(None, max_length=50, description="司机姓名")
+    driver_phone: Optional[str] = Field(None, max_length=20, description="司机电话")
+
+
+class ReceivingItemInput(BaseModel):
+    dish_id: str = Field(..., description="菜品 ID")
+    dish_name: str = Field(..., description="菜品名称")
+    received_qty: float = Field(..., ge=0, description="实收数量")
+    unit: str = Field("份", description="单位")
+    variance_notes: Optional[str] = Field(None, description="差异备注")
+
+
+class StoreReceivingRequest(BaseModel):
+    store_id: str = Field(..., description="收货门店 ID")
+    confirmed_by: str = Field(..., description="确认人员工 ID")
+    items: List[ReceivingItemInput] = Field(..., min_length=1, description="实收明细")
+    notes: Optional[str] = Field(None, description="整单备注")
+
+
+# ─── 厨房档案 ──────────────────────────────────────────────────────────────
+
+
+@router.get("/kitchens", summary="中央厨房列表")
+async def list_kitchens(
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
 ) -> Dict[str, Any]:
-    """根据各门店次日需求量生成生产计划"""
-    from ..services.production_plan_service import ProductionPlanService
+    """返回当前租户的所有中央厨房档案。"""
+    from ..services.central_kitchen_service import CentralKitchenService
 
-    svc = ProductionPlanService()
+    svc = CentralKitchenService()
     try:
-        result = await svc.generate_plan(
+        kitchens = await svc.list_kitchens(tenant_id=x_tenant_id)
+        return {"ok": True, "data": {"items": [k.model_dump() for k in kitchens]}}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.post("/kitchens", summary="新建中央厨房档案", status_code=201)
+async def create_kitchen(
+    body: CreateKitchenRequest,
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+) -> Dict[str, Any]:
+    """创建中央厨房档案（名称/地址/日产能/负责人/联系电话）。"""
+    from ..services.central_kitchen_service import CentralKitchenService
+
+    svc = CentralKitchenService()
+    try:
+        kitchen = await svc.create_kitchen(
+            tenant_id=x_tenant_id,
+            name=body.name,
+            address=body.address,
+            capacity_daily=body.capacity_daily,
+            manager_id=body.manager_id,
+            contact_phone=body.contact_phone,
+        )
+        return {"ok": True, "data": kitchen.model_dump()}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+# ─── 生产计划 ──────────────────────────────────────────────────────────────
+
+
+@router.get("/plans", summary="生产计划列表")
+async def list_production_plans(
+    kitchen_id: Optional[str] = Query(None, description="按厨房过滤"),
+    plan_date: Optional[str] = Query(None, description="按日期过滤 YYYY-MM-DD"),
+    status: Optional[str] = Query(None, description="按状态过滤"),
+    page: int = Query(1, ge=1),
+    size: int = Query(20, ge=1, le=100),
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+) -> Dict[str, Any]:
+    """查询生产计划列表，支持按厨房/日期/状态过滤。"""
+    from ..services.central_kitchen_service import CentralKitchenService
+
+    svc = CentralKitchenService()
+    try:
+        result = await svc.list_production_plans(
+            tenant_id=x_tenant_id,
+            kitchen_id=kitchen_id,
+            plan_date=plan_date,
+            status=status,
+            page=page,
+            size=size,
+        )
+        return {"ok": True, "data": result}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.post("/plans", summary="创建生产计划", status_code=201)
+async def create_production_plan(
+    body: CreateProductionPlanRequest,
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+) -> Dict[str, Any]:
+    """创建生产计划草稿。
+
+    - items 留空时自动从需求预测（近30天历史均值）生成菜品建议量
+    - 周末目标日期自动 ×1.3 权重
+    """
+    from ..services.central_kitchen_service import CentralKitchenService
+
+    svc = CentralKitchenService()
+    try:
+        items_raw = [i.model_dump() for i in body.items]
+        plan = await svc.create_production_plan(
+            tenant_id=x_tenant_id,
             kitchen_id=body.kitchen_id,
             plan_date=body.plan_date,
-            tenant_id=x_tenant_id,
-            store_ids=body.store_ids,
+            items=items_raw,
             created_by=body.created_by,
-            capacity_kg=body.capacity_kg,
         )
-        return {"ok": True, "data": result}
+        return {"ok": True, "data": plan.model_dump()}
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
 
-@router.get("/plans")
-async def list_plans(
-    kitchen_id: str = Query(..., description="中央厨房 ID"),
-    date: Optional[str] = Query(None, description="过滤日期 YYYY-MM-DD"),
-    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
-) -> Dict[str, Any]:
-    """查询生产计划列表"""
-    from ..services.production_plan_service import ProductionPlanService
-
-    svc = ProductionPlanService()
-    try:
-        results = await svc.list_plans(
-            kitchen_id=kitchen_id,
-            plan_date=date,
-            tenant_id=x_tenant_id,
-        )
-        return {"ok": True, "data": results}
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
-
-
-@router.post("/plans/{plan_id}/confirm")
-async def confirm_plan(
+@router.get("/plans/{plan_id}", summary="生产计划详情")
+async def get_production_plan(
     plan_id: str,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
 ) -> Dict[str, Any]:
-    """确认生产计划，锁定所有生产任务"""
-    from ..services.production_plan_service import ProductionPlanService
+    """查询单个生产计划详情（含菜品清单）。"""
+    from ..services.central_kitchen_service import CentralKitchenService
 
-    svc = ProductionPlanService()
+    svc = CentralKitchenService()
     try:
-        result = await svc.confirm_plan(plan_id=plan_id, tenant_id=x_tenant_id)
-        return {"ok": True, "data": result}
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
-
-
-@router.post("/tasks/{task_id}/complete")
-async def complete_task(
-    task_id: str,
-    body: CompleteTaskRequest,
-    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
-) -> Dict[str, Any]:
-    """标记加工任务完成，记录实际产量"""
-    from ..services.production_plan_service import ProductionPlanService
-
-    svc = ProductionPlanService()
-    try:
-        result = await svc.complete_task(
-            task_id=task_id,
-            actual_qty=body.actual_qty,
-            tenant_id=x_tenant_id,
-        )
-        return {"ok": True, "data": result}
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
-
-
-@router.post("/plans/{plan_id}/dispatch")
-async def dispatch_trips(
-    plan_id: str,
-    body: DispatchRequest,
-    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
-) -> Dict[str, Any]:
-    """生产完成后生成配送任务（按地理聚类分组优化路线）"""
-    from ..services.production_plan_service import ProductionPlanService
-
-    svc = ProductionPlanService()
-    try:
-        trips = await svc.generate_delivery_trips(plan_id=plan_id, tenant_id=x_tenant_id)
-        return {"ok": True, "data": {"trips": trips, "trip_count": len(trips)}}
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
-
-
-@router.get("/trips/{trip_id}")
-async def get_trip(
-    trip_id: str,
-    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
-) -> Dict[str, Any]:
-    """查询配送单详情（含路线顺序和配送明细）"""
-    from ..services.production_plan_service import _trips
-
-    trip = _trips.get(trip_id)
-    if not trip:
-        raise HTTPException(status_code=404, detail=f"配送单 {trip_id} 不存在")
-    if trip["tenant_id"] != x_tenant_id:
-        raise HTTPException(status_code=404, detail=f"配送单 {trip_id} 不存在")
-    return {"ok": True, "data": trip}
-
-
-@router.post("/deliveries/{item_id}/sign")
-async def sign_delivery_item(
-    item_id: str,
-    body: SignReceiptRequest,
-    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
-) -> Dict[str, Any]:
-    """门店签收：记录实收量，差异超 5% 自动标记 disputed"""
-    from ..services.delivery_route_service import DeliveryRouteService
-
-    svc = DeliveryRouteService()
-    try:
-        result = await svc.sign_receipt(
-            delivery_item_id=item_id,
-            actual_qty=body.actual_qty,
-            operator_id=body.operator_id,
-            tenant_id=x_tenant_id,
-        )
-        return {"ok": True, "data": result}
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
-
-
-@router.get("/plans/{plan_id}/variance-report")
-async def get_variance_report(
-    plan_id: str,
-    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
-) -> Dict[str, Any]:
-    """生成差异报告：实收 vs 计划，汇总 disputed 记录"""
-    from ..services.production_plan_service import ProductionPlanService
-
-    svc = ProductionPlanService()
-    try:
-        report = await svc.get_variance_report(plan_id=plan_id, tenant_id=x_tenant_id)
-        return {"ok": True, "data": report}
+        plan = await svc.get_production_plan(tenant_id=x_tenant_id, plan_id=plan_id)
+        return {"ok": True, "data": plan.model_dump()}
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
+
+
+@router.post("/plans/{plan_id}/confirm", summary="确认生产计划")
+async def confirm_production_plan(
+    plan_id: str,
+    body: ConfirmPlanRequest,
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+) -> Dict[str, Any]:
+    """确认草稿生产计划，自动为每个菜品生成独立生产工单。"""
+    from ..services.central_kitchen_service import CentralKitchenService
+
+    svc = CentralKitchenService()
+    try:
+        plan = await svc.confirm_production_plan(
+            tenant_id=x_tenant_id,
+            plan_id=plan_id,
+            operator_id=body.operator_id,
+        )
+        return {"ok": True, "data": plan.model_dump()}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+# ─── 生产工单 ──────────────────────────────────────────────────────────────
+
+
+@router.get("/production-orders", summary="生产工单列表")
+async def list_production_orders(
+    kitchen_id: Optional[str] = Query(None, description="按厨房过滤"),
+    plan_id: Optional[str] = Query(None, description="按计划过滤"),
+    status: Optional[str] = Query(None, description="按状态过滤"),
+    page: int = Query(1, ge=1),
+    size: int = Query(20, ge=1, le=100),
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+) -> Dict[str, Any]:
+    """查询生产工单列表，支持按厨房/计划/状态过滤。"""
+    from ..services.central_kitchen_service import CentralKitchenService
+
+    svc = CentralKitchenService()
+    try:
+        result = await svc.list_production_orders(
+            tenant_id=x_tenant_id,
+            kitchen_id=kitchen_id,
+            plan_id=plan_id,
+            status=status,
+            page=page,
+            size=size,
+        )
+        return {"ok": True, "data": result}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.put(
+    "/production-orders/{order_id}/progress",
+    summary="更新生产工单进度",
+)
+async def update_production_progress(
+    order_id: str,
+    body: UpdateProgressRequest,
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+) -> Dict[str, Any]:
+    """更新工单状态（pending→in_progress→completed / cancelled）。
+
+    completed 状态须同时提供 quantity_done。
+    """
+    from ..services.central_kitchen_service import CentralKitchenService
+
+    svc = CentralKitchenService()
+    try:
+        order = await svc.update_production_progress(
+            tenant_id=x_tenant_id,
+            order_id=order_id,
+            status=body.status,
+            quantity_done=body.quantity_done,
+        )
+        return {"ok": True, "data": order.model_dump()}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+# ─── 配送单 ────────────────────────────────────────────────────────────────
+
+
+@router.get("/distribution", summary="配送单列表")
+async def list_distribution_orders(
+    kitchen_id: Optional[str] = Query(None, description="按厨房过滤"),
+    store_id: Optional[str] = Query(None, description="按目标门店过滤"),
+    status: Optional[str] = Query(None, description="按状态过滤"),
+    page: int = Query(1, ge=1),
+    size: int = Query(20, ge=1, le=100),
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+) -> Dict[str, Any]:
+    """查询配送单列表，支持按厨房/门店/状态过滤。"""
+    from ..services.central_kitchen_service import CentralKitchenService
+
+    svc = CentralKitchenService()
+    try:
+        result = await svc.list_distribution_orders(
+            tenant_id=x_tenant_id,
+            kitchen_id=kitchen_id,
+            store_id=store_id,
+            status=status,
+            page=page,
+            size=size,
+        )
+        return {"ok": True, "data": result}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.post("/distribution", summary="创建配送单", status_code=201)
+async def create_distribution_order(
+    body: CreateDistributionOrderRequest,
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+) -> Dict[str, Any]:
+    """创建从中央厨房到门店的配送单。"""
+    from ..services.central_kitchen_service import CentralKitchenService
+
+    svc = CentralKitchenService()
+    try:
+        items_raw = [i.model_dump() for i in body.items]
+        order = await svc.create_distribution_order(
+            tenant_id=x_tenant_id,
+            kitchen_id=body.kitchen_id,
+            store_id=body.target_store_id,
+            items=items_raw,
+            scheduled_at=body.scheduled_at,
+            driver_name=body.driver_name,
+            driver_phone=body.driver_phone,
+        )
+        return {"ok": True, "data": order.model_dump()}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.post("/distribution/{order_id}/deliver", summary="标记配送单已发出")
+async def mark_distribution_dispatched(
+    order_id: str,
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+) -> Dict[str, Any]:
+    """将配送单状态从 pending 更新为 dispatched（货已出库发车）。"""
+    from ..services.central_kitchen_service import CentralKitchenService
+
+    svc = CentralKitchenService()
+    try:
+        order = await svc.mark_dispatched(tenant_id=x_tenant_id, order_id=order_id)
+        return {"ok": True, "data": order.model_dump()}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.post("/distribution/{order_id}/receive", summary="门店确认收货")
+async def store_receive(
+    order_id: str,
+    body: StoreReceivingRequest,
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+) -> Dict[str, Any]:
+    """门店确认收货，记录实收数量，差异 >5% 自动生成差异备注。"""
+    from ..services.central_kitchen_service import CentralKitchenService
+
+    svc = CentralKitchenService()
+    try:
+        items_raw = [i.model_dump() for i in body.items]
+        confirmation = await svc.confirm_store_receiving(
+            tenant_id=x_tenant_id,
+            distribution_order_id=order_id,
+            store_id=body.store_id,
+            confirmed_by=body.confirmed_by,
+            items=items_raw,
+            notes=body.notes,
+        )
+        return {"ok": True, "data": confirmation.model_dump()}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+# ─── 看板与预测 ────────────────────────────────────────────────────────────
+
+
+@router.get("/dashboard", summary="中央厨房日看板")
+async def get_daily_dashboard(
+    kitchen_id: str = Query(..., description="中央厨房 ID"),
+    date: str = Query(..., description="日期 YYYY-MM-DD"),
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+) -> Dict[str, Any]:
+    """日看板：当日生产计划总数/工单状态分布/配送单状态分布。"""
+    from ..services.central_kitchen_service import CentralKitchenService
+
+    svc = CentralKitchenService()
+    try:
+        dashboard = await svc.get_daily_dashboard(
+            tenant_id=x_tenant_id,
+            kitchen_id=kitchen_id,
+            date=date,
+        )
+        return {"ok": True, "data": dashboard.model_dump()}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.get("/demand-forecast", summary="需求预测")
+async def demand_forecast(
+    kitchen_id: str = Query(..., description="中央厨房 ID"),
+    target_date: str = Query(..., description="预测日期 YYYY-MM-DD"),
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+) -> Dict[str, Any]:
+    """基于近30天历史消耗预测各菜品需求量（周末×1.3）。"""
+    from ..services.central_kitchen_service import CentralKitchenService
+
+    svc = CentralKitchenService()
+    try:
+        forecast = await svc.forecast_demand(
+            tenant_id=x_tenant_id,
+            kitchen_id=kitchen_id,
+            target_date=target_date,
+        )
+        return {"ok": True, "data": forecast.model_dump()}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))

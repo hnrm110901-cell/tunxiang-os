@@ -18,6 +18,23 @@ import { ServiceConfirmPage } from './pages/ServiceConfirmPage';
 import { PeakAlertPage } from './pages/PeakAlertPage';
 import { OrderStatusPage } from './pages/OrderStatusPage';
 import { TableServedNotice } from './pages/TableServedNotice';
+import { TableDetailPage } from './pages/TableDetailPage';
+import TableSidePayPage from './pages/TableSidePayPage';
+import { ServiceBellBadge } from './pages/ServiceBellBadge';
+import { PatrolAutoCheckin } from './pages/PatrolAutoCheckin';
+import { TableMapView } from './pages/TableMapView';
+import { SeatSplitPage } from './pages/SeatSplitPage';
+import { CrewStatsPage } from './pages/CrewStatsPage';
+import { ManagerMobileApp } from './pages/ManagerMobileApp';
+import { ReceivingPage } from './pages/ReceivingPage';
+import { StocktakePage } from './pages/StocktakePage';
+import { PurchaseApprovalPage } from './pages/PurchaseApprovalPage';
+import { HandoverMobilePage } from './pages/HandoverMobilePage';
+import { RouteOptimizePage } from './pages/RouteOptimizePage';
+import { ShiftSchedulePage } from './pages/ShiftSchedulePage';
+import DishRecognizePage from './pages/DishRecognizePage';
+import { ShiftSummaryPage } from './pages/ShiftSummaryPage';
+import SelfPayLinkPage from './pages/SelfPayLinkPage';
 
 const tabs = [
   { path: '/tables', label: '桌台', icon: 'T' },
@@ -31,7 +48,7 @@ const tabs = [
 function BottomTab() {
   const loc = useLocation();
   // 在全屏子页面中隐藏底栏
-  const hiddenPaths = ['/open-table', '/order-full', '/rush', '/table-ops', '/member', '/complaint', '/service-confirm', '/peak-alert', '/order-status'];
+  const hiddenPaths = ['/open-table', '/order-full', '/rush', '/table-ops', '/member', '/complaint', '/service-confirm', '/peak-alert', '/order-status', '/table-detail', '/table-side-pay', '/seat-split', '/crew-stats', '/manager-app', '/receiving', '/stocktake', '/handover', '/route-optimize', '/shift-schedule', '/dish-recognize', '/shift-summary', '/self-pay-link'];
   const shouldHide = hiddenPaths.some(p => loc.pathname.startsWith(p));
   if (shouldHide) return null;
 
@@ -72,6 +89,13 @@ export default function App() {
       <div style={{ background: '#0B1A20', minHeight: '100vh', color: '#fff', paddingBottom: 64 }}>
         {/* 传菜员全桌上齐通知（固定顶部横幅，WebSocket实时推送） */}
         <TableServedNotice />
+        {/* 服务铃实时响应（固定右下角悬浮角标） */}
+        <ServiceBellBadge storeId={(window as any).__STORE_ID__ || ''} />
+        {/* 巡台自动签到（BLE感应，固定右下角，ServiceBellBadge上方） */}
+        <PatrolAutoCheckin
+          storeId={(window as any).__STORE_ID__ || ''}
+          crewId={(window as any).__CREW_ID__ || ''}
+        />
         <Routes>
           <Route path="/" element={<Navigate to="/tables" replace />} />
           {/* 主Tab页 */}
@@ -91,6 +115,21 @@ export default function App() {
           <Route path="/service-confirm" element={<ServiceConfirmPage />} />
           <Route path="/peak-alert" element={<PeakAlertPage />} />
           <Route path="/order-status" element={<OrderStatusPage />} />
+          <Route path="/table-detail" element={<TableDetailPage />} />
+          <Route path="/table-side-pay" element={<TableSidePayPage />} />
+          <Route path="/table-map" element={<TableMapView />} />
+          <Route path="/seat-split" element={<SeatSplitPage />} />
+          <Route path="/crew-stats" element={<CrewStatsPage />} />
+          <Route path="/manager-app" element={<ManagerMobileApp />} />
+          <Route path="/receiving" element={<ReceivingPage />} />
+          <Route path="/stocktake" element={<StocktakePage />} />
+          <Route path="/purchase-approval" element={<PurchaseApprovalPage />} />
+          <Route path="/route-optimize" element={<RouteOptimizePage />} />
+          <Route path="/handover" element={<HandoverMobilePage />} />
+          <Route path="/shift-schedule" element={<ShiftSchedulePage />} />
+          <Route path="/dish-recognize" element={<DishRecognizePage />} />
+          <Route path="/shift-summary" element={<ShiftSummaryPage />} />
+          <Route path="/self-pay-link" element={<SelfPayLinkPage />} />
         </Routes>
         <BottomTab />
       </div>

@@ -48,6 +48,35 @@ from .api.delivery_ops_routes import router as delivery_ops_router
 from .api.banquet_payment_routes import router as banquet_payment_router
 from .api.collab_order_routes import router as collab_order_router
 from .api.table_layout_routes import router as table_layout_router
+from .api.kds_pause_grab_routes import router as kds_pause_grab_router
+from .api.kds_soldout_routes import router as kds_soldout_router
+from .api.kds_chef_stats_routes import router as kds_chef_stats_router
+from .api.kds_swimlane_routes import router as kds_swimlane_router
+from .api.kds_prep_routes import router as kds_prep_router
+from .api.kds_station_profit_routes import router as kds_station_profit_router
+from .api.discount_audit_routes import router as discount_audit_router
+from .api.service_bell_routes import router as service_bell_router
+from .api.course_firing_routes import router as course_firing_router
+from .api.seat_order_routes import router as seat_order_router
+from .api.manager_app_routes import router as manager_app_router
+from .api.crew_stats_routes import router as crew_stats_router
+from .api.allergen_routes import router as allergen_router
+from .api.inventory_menu_routes import router as inventory_menu_router
+from .api.supply_chain_mobile_routes import router as supply_chain_mobile_router
+from .api.prediction_routes import router as prediction_router
+from .api.proactive_service_routes import router as proactive_service_router
+from .api.crew_handover_router import router as crew_handover_router
+from .routers.payment_router import router as table_side_pay_router
+from .routers.crew_schedule_router import router as crew_schedule_router
+from .routers.menu_engineering_router import router as menu_engineering_router
+from .routers.voice_order_router import router as voice_order_router
+from .routers.vision_router import router as vision_router
+from .routers.patrol_router import router as patrol_router
+from .api.digital_menu_board_router import router as digital_menu_board_router
+from .routers.shift_summary_router import router as shift_summary_router
+from .routers.sync_ingest_router import router as sync_ingest_router
+from .routers.delivery_router import router as delivery_router
+from .routers.self_pay_router import router as self_pay_router
 
 
 @asynccontextmanager
@@ -114,6 +143,35 @@ app.include_router(delivery_ops_router)
 app.include_router(banquet_payment_router)
 app.include_router(collab_order_router)
 app.include_router(table_layout_router)
+app.include_router(kds_pause_grab_router)
+app.include_router(kds_soldout_router)
+app.include_router(kds_chef_stats_router)
+app.include_router(kds_swimlane_router)
+app.include_router(kds_prep_router)
+app.include_router(kds_station_profit_router)
+app.include_router(discount_audit_router)
+app.include_router(service_bell_router)
+app.include_router(course_firing_router)
+app.include_router(seat_order_router)
+app.include_router(manager_app_router)
+app.include_router(crew_stats_router)
+app.include_router(allergen_router)
+app.include_router(inventory_menu_router)
+app.include_router(supply_chain_mobile_router)
+app.include_router(prediction_router)
+app.include_router(proactive_service_router)
+app.include_router(crew_handover_router)
+app.include_router(table_side_pay_router)
+app.include_router(crew_schedule_router)
+app.include_router(menu_engineering_router)
+app.include_router(voice_order_router)
+app.include_router(vision_router)
+app.include_router(patrol_router)
+app.include_router(digital_menu_board_router)
+app.include_router(shift_summary_router)
+app.include_router(sync_ingest_router)
+app.include_router(delivery_router)
+app.include_router(self_pay_router)
 
 
 @app.get("/health")

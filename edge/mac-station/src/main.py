@@ -390,6 +390,73 @@ async def print_receipt(data: dict) -> dict:
     return {"ok": True, "data": {"channel": "android_pos_forward"}}
 
 
+# ─── 数字菜单展示屏 WebSocket（Redis Pub/Sub → 前端） ───
+
+menu_board_clients: dict[str, list[WebSocket]] = {}
+
+
+@app.websocket("/ws/menu-board-updates")
+async def menu_board_ws(
+    websocket: WebSocket,
+    store_id: str = "",
+    tenant_id: str = "",
+) -> None:
+    """数字菜单展示屏 WebSocket 端点。
+
+    前端连接后，监听来自 tx-trade 通过 Redis Pub/Sub 广播的菜单更新事件。
+    支持的事件：dish_soldout / dish_available / price_update / announcement_update
+    """
+    await websocket.accept()
+    channel = f"menu_board:{tenant_id}:{store_id}" if tenant_id and store_id else "menu_board:*"
+    menu_board_clients.setdefault(channel, []).append(websocket)
+    logger.info("menu_board_ws_connected", channel=channel, total=len(menu_board_clients.get(channel, [])))
+
+    # 启动 Redis 订阅（每条连接独立订阅，适合低并发场景）
+    redis_task = asyncio.create_task(_subscribe_menu_board_redis(channel, websocket))
+
+    try:
+        while True:
+            data = await websocket.receive_text()
+            if data == "ping":
+                await websocket.send_text("pong")
+    except (WebSocketDisconnect, RuntimeError, OSError, ConnectionError):
+        pass
+    finally:
+        redis_task.cancel()
+        clients = menu_board_clients.get(channel, [])
+        try:
+            clients.remove(websocket)
+        except ValueError:
+            pass
+        logger.info("menu_board_ws_disconnected", channel=channel)
+
+
+async def _subscribe_menu_board_redis(channel: str, websocket: WebSocket) -> None:
+    """订阅 Redis Pub/Sub 频道，将消息转发给对应 WebSocket 客户端。
+
+    Redis 不可用时静默退出（前端 mock 数据兜底）。
+    """
+    try:
+        import redis.asyncio as aioredis  # type: ignore
+        redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+        async with aioredis.from_url(redis_url, decode_responses=True) as client:
+            async with client.pubsub() as pubsub:
+                await pubsub.subscribe(channel)
+                async for message in pubsub.listen():
+                    if message["type"] != "message":
+                        continue
+                    try:
+                        await websocket.send_text(message["data"])
+                    except (RuntimeError, OSError, ConnectionError):
+                        break
+    except ImportError:
+        logger.warning("redis_not_installed_menu_board")
+    except (ConnectionError, OSError) as e:
+        logger.warning("redis_subscribe_failed_menu_board", channel=channel, error=str(e))
+    except asyncio.CancelledError:
+        pass
+
+
 @app.post("/api/cash-box")
 async def open_cash_box() -> dict:
     """接收钱箱开启请求"""

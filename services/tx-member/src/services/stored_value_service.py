@@ -43,6 +43,11 @@ class TransferNotAllowedError(Exception):
     pass
 
 
+class CardNotFoundError(ValueError):
+    """储值卡不存在（ValueError 子类，兼容现有 except ValueError 捕获）"""
+    pass
+
+
 class StoredValueService:
     """储值卡核心服务"""
 
@@ -1071,6 +1076,126 @@ class StoredValueService:
         )
         db.add(txn)
         return {"card_no": card_no, "status": "active"}
+
+    # ──────────────────────────────────────────────────────────────
+    # 积分兑换余额
+    # ──────────────────────────────────────────────────────────────
+
+    async def exchange_points_for_balance(
+        self,
+        db: AsyncSession,
+        tenant_id: uuid.UUID,
+        member_id: uuid.UUID,
+        points: int,
+        points_to_fen_ratio: int = 100,
+    ) -> dict:
+        """积分兑换储值余额
+
+        流程：
+        1. 查找会员储值卡（按 customer_id，取第一张 active 卡）
+        2. 从 member_cards 扣除积分（乐观检查余额）
+        3. 将兑换金额充入储值卡余额（作为本金）
+        4. 记录 sv_transactions 流水（type='exchange'）
+        5. 返回交易记录
+
+        参数：
+            points: 要兑换的积分数（> 0）
+            points_to_fen_ratio: 每多少积分兑换 1 分（默认 100 积分 = 1 分钱）
+
+        异常：
+            ValueError: points <= 0
+            CardNotFoundError: 该会员没有 active 储值卡
+            InsufficientBalanceError: 积分余额不足
+        """
+        from sqlalchemy import text
+        from models.stored_value import StoredValueCard, StoredValueTransaction
+
+        if points <= 0:
+            raise ValueError("兑换积分必须大于0")
+
+        amount_fen = points // points_to_fen_ratio
+        if amount_fen <= 0:
+            raise ValueError(
+                f"积分不足以兑换（需至少 {points_to_fen_ratio} 积分兑换 1 分钱，"
+                f"当前 {points} 积分）"
+            )
+
+        # 1. 查找会员 active 储值卡（customer_id = member_id）
+        card_result = await db.execute(
+            select(StoredValueCard)
+            .where(
+                StoredValueCard.customer_id == member_id,
+                StoredValueCard.tenant_id == tenant_id,
+                StoredValueCard.status == "active",
+                StoredValueCard.is_deleted.is_(False),
+            )
+            .order_by(StoredValueCard.created_at.asc())
+            .limit(1)
+            .with_for_update()
+        )
+        card = card_result.scalar_one_or_none()
+        if not card:
+            raise CardNotFoundError(
+                f"会员 {member_id} 没有有效的储值卡，请先开卡"
+            )
+
+        # 2. 从 member_cards 扣积分（raw SQL，兼容现有积分体系）
+        deduct_result = await db.execute(
+            text(
+                "UPDATE member_cards "
+                "SET points = points - :pts, updated_at = :now "
+                "WHERE customer_id = :mid AND tenant_id = :tid "
+                "AND is_deleted = false AND points >= :pts "
+                "RETURNING id, points"
+            ),
+            {
+                "pts": points,
+                "mid": member_id,
+                "tid": tenant_id,
+                "now": datetime.now(timezone.utc),
+            },
+        )
+        row = deduct_result.fetchone()
+        if not row:
+            raise InsufficientBalanceError(
+                f"积分余额不足（需 {points} 积分）或会员卡不存在"
+            )
+
+        # 3. 充入储值卡（仅充本金）
+        balance_before = card.balance_fen
+        card.main_balance_fen += amount_fen
+        card.balance_fen = card.main_balance_fen + card.gift_balance_fen
+        card.total_recharged_fen += amount_fen
+
+        # 4. 记录流水
+        txn = StoredValueTransaction(
+            id=uuid.uuid4(),
+            tenant_id=tenant_id,
+            card_id=card.id,
+            customer_id=member_id,
+            txn_type="exchange",
+            amount_fen=amount_fen,
+            main_amount_fen=amount_fen,
+            gift_amount_fen=0,
+            balance_after_fen=card.balance_fen,
+            gift_balance_after_fen=card.gift_balance_fen,
+            remark=f"积分兑换余额：{points} 积分 → {amount_fen / 100:.2f} 元",
+        )
+        db.add(txn)
+
+        logger.info(
+            "stored_value_exchange_points",
+            member_id=str(member_id),
+            points=points,
+            amount_fen=amount_fen,
+            card_id=str(card.id),
+        )
+
+        return {
+            **_txn_to_dict(txn),
+            "points_deducted": points,
+            "balance_before_fen": balance_before,
+        }
 
     # ──────────────────────────────────────────────────────────────
     # 内部辅助方法

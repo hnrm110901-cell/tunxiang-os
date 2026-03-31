@@ -19,6 +19,173 @@ from .sql_queries import (
 log = structlog.get_logger()
 
 
+# ─── 门店健康评分 ───
+
+async def calculate_health_score(
+    store_id: str,
+    tenant_id: str,
+    target_date,
+    db: AsyncSession,
+) -> float:
+    """门店健康评分（0-100）
+
+    维度权重：
+    - 营业额达成率（目标完成度）×30分
+    - 翻台率                     ×20分
+    - 顾客满意度（投诉率反向）    ×20分
+    - 食材损耗率（反向）          ×15分
+    - 员工出勤率                  ×15分
+
+    Returns:
+        float: 0-100 健康分，DB不可用时返回 50.0（基准分）
+    """
+    if db is None:
+        return 50.0
+
+    score = 0.0
+
+    try:
+        # ── 1. 营业额达成率 ×30分 ──
+        row = await db.execute(
+            text("""
+                SELECT
+                    COALESCE(SUM(o.final_amount_fen), 0) AS actual_fen,
+                    COALESCE(s.revenue_target_fen, 0)    AS target_fen
+                FROM orders o
+                JOIN stores s ON s.id = o.store_id AND s.tenant_id = o.tenant_id
+                WHERE o.store_id   = :store_id
+                  AND o.tenant_id  = :tenant_id
+                  AND COALESCE(o.biz_date, DATE(o.created_at)) = :target_date
+                  AND o.status     = 'paid'
+                  AND o.is_deleted = FALSE
+            """),
+            {"store_id": store_id, "tenant_id": tenant_id, "target_date": target_date},
+        )
+        rev_row = row.mappings().first()
+        if rev_row and rev_row["target_fen"] and rev_row["target_fen"] > 0:
+            achievement = min(rev_row["actual_fen"] / rev_row["target_fen"], 1.2)
+            score += min(achievement, 1.0) * 30
+        else:
+            score += 15  # 目标未设置时给基准15分
+
+        # ── 2. 翻台率 ×20分 ──
+        row = await db.execute(
+            text("""
+                SELECT
+                    COUNT(DISTINCT ts.table_id)                     AS used_tables,
+                    COUNT(ts.id)                                     AS session_count,
+                    COALESCE(MAX(s.table_count), 1)                  AS total_tables
+                FROM table_sessions ts
+                JOIN stores s ON s.id = :store_id AND s.tenant_id = :tenant_id
+                WHERE ts.store_id   = :store_id
+                  AND ts.tenant_id  = :tenant_id
+                  AND DATE(ts.started_at) = :target_date
+                  AND ts.is_deleted = FALSE
+            """),
+            {"store_id": store_id, "tenant_id": tenant_id, "target_date": target_date},
+        )
+        table_row = row.mappings().first()
+        if table_row and table_row["total_tables"] > 0:
+            # 目标翻台率按3次/天计算满分
+            turnover = table_row["session_count"] / table_row["total_tables"]
+            score += min(turnover / 3.0, 1.0) * 20
+        else:
+            score += 10  # 基准10分
+
+        # ── 3. 顾客满意度（投诉率反向）×20分 ──
+        row = await db.execute(
+            text("""
+                SELECT
+                    COUNT(*) FILTER (WHERE o.status IN ('refunded', 'cancelled')) AS complaint_count,
+                    COUNT(*) AS total_count
+                FROM orders o
+                WHERE o.store_id   = :store_id
+                  AND o.tenant_id  = :tenant_id
+                  AND COALESCE(o.biz_date, DATE(o.created_at)) = :target_date
+                  AND o.is_deleted = FALSE
+            """),
+            {"store_id": store_id, "tenant_id": tenant_id, "target_date": target_date},
+        )
+        sat_row = row.mappings().first()
+        if sat_row and sat_row["total_count"] > 0:
+            complaint_rate = sat_row["complaint_count"] / sat_row["total_count"]
+            # 投诉率每超1%扣2分，上限10%扣满
+            score += max(0.0, 1.0 - complaint_rate * 10) * 20
+        else:
+            score += 16  # 基准16分（无数据时偏高）
+
+        # ── 4. 食材损耗率（反向）×15分 ──
+        row = await db.execute(
+            text("""
+                SELECT
+                    COALESCE(SUM(w.waste_cost_fen), 0) AS waste_fen,
+                    COALESCE(SUM(p.amount_fen), 0)     AS purchase_fen
+                FROM (
+                    SELECT wi.store_id, wi.tenant_id,
+                           SUM(wi.quantity * wi.unit_cost_fen) AS waste_cost_fen
+                    FROM waste_records wi
+                    WHERE wi.store_id   = :store_id
+                      AND wi.tenant_id  = :tenant_id
+                      AND DATE(wi.wasted_at) = :target_date
+                      AND wi.is_deleted = FALSE
+                    GROUP BY wi.store_id, wi.tenant_id
+                ) w,
+                (
+                    SELECT pi.store_id, pi.tenant_id,
+                           SUM(pi.total_amount_fen) AS amount_fen
+                    FROM purchase_orders pi
+                    WHERE pi.store_id   = :store_id
+                      AND pi.tenant_id  = :tenant_id
+                      AND DATE(pi.received_at) = :target_date
+                      AND pi.is_deleted = FALSE
+                    GROUP BY pi.store_id, pi.tenant_id
+                ) p
+            """),
+            {"store_id": store_id, "tenant_id": tenant_id, "target_date": target_date},
+        )
+        waste_row = row.mappings().first()
+        if waste_row and waste_row["purchase_fen"] and waste_row["purchase_fen"] > 0:
+            waste_rate = waste_row["waste_fen"] / waste_row["purchase_fen"]
+            # 损耗率低于3%满分，超过10%得0分
+            score += max(0.0, 1.0 - max(0.0, waste_rate - 0.03) / 0.07) * 15
+        else:
+            score += 10  # 基准10分
+
+        # ── 5. 员工出勤率 ×15分 ──
+        row = await db.execute(
+            text("""
+                SELECT
+                    COUNT(*) FILTER (WHERE a.status = 'present') AS present_count,
+                    COUNT(*)                                       AS scheduled_count
+                FROM attendance_records a
+                WHERE a.store_id   = :store_id
+                  AND a.tenant_id  = :tenant_id
+                  AND DATE(a.scheduled_date) = :target_date
+                  AND a.is_deleted = FALSE
+            """),
+            {"store_id": store_id, "tenant_id": tenant_id, "target_date": target_date},
+        )
+        att_row = row.mappings().first()
+        if att_row and att_row["scheduled_count"] > 0:
+            attendance_rate = att_row["present_count"] / att_row["scheduled_count"]
+            score += attendance_rate * 15
+        else:
+            score += 12  # 基准12分
+
+    except Exception as exc:  # 最外层兜底：保持驾驶舱可用
+        log.warning(
+            "calculate_health_score.error",
+            store_id=store_id,
+            tenant_id=tenant_id,
+            date=str(target_date),
+            exc_info=True,
+        )
+        _ = exc  # suppress unused variable warning
+        return 50.0
+
+    return round(min(max(score, 0.0), 100.0), 1)
+
+
 # ─── 纯函数：环比计算 ───
 
 def calc_pct_change(current: int, previous: int) -> Optional[float]:
@@ -143,11 +310,13 @@ async def _query_daily_summary(db: AsyncSession, store_id: str, tenant_id: str, 
     from .sql_queries import query_table_sessions
     table_data = await query_table_sessions(store_id, date, tenant_id, db)
 
+    health = await calculate_health_score(store_id, tenant_id, date, db)
+
     return {
         "revenue_fen": revenue_data["revenue_fen"],
         "order_count": revenue_data["order_count"],
         "table_turnover_rate": table_data["turnover_rate"],
-        "health_score": 50.0,  # TODO: 接入门店健康评分服务
+        "health_score": health,
     }
 
 

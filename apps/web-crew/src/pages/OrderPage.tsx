@@ -6,8 +6,42 @@
  *       + 8个快捷操作 + AI推荐 + 出餐进度 + 扫码结账
  * 移动端竖屏, 最小字体16px, 热区>=48px
  */
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+
+/* ---------- API 工具函数 ---------- */
+const API_BASE = (): string =>
+  (typeof window !== 'undefined' && (window as unknown as Record<string, string>).__TX_API_BASE__) || '';
+
+const TENANT_ID = (): string =>
+  (typeof window !== 'undefined' && (window as unknown as Record<string, string>).__TENANT_ID__) || '';
+
+async function txFetch<T = unknown>(
+  path: string,
+  options: RequestInit = {},
+): Promise<T> {
+  const url = `${API_BASE()}${path}`;
+  const res = await fetch(url, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Tenant-ID': TENANT_ID(),
+      ...(options.headers || {}),
+    },
+  });
+  const json = await res.json();
+  if (!res.ok || json.ok === false) {
+    throw new Error(json.error?.message || json.detail || `HTTP ${res.status}`);
+  }
+  return json.data ?? json;
+}
+
+/* ---------- Toast 类型 ---------- */
+interface ToastMsg {
+  id: number;
+  text: string;
+  color: string; // green | red
+}
 
 /* ---------- 样式常量(Design Token) ---------- */
 const C = {
@@ -196,6 +230,30 @@ export function OrderPage() {
   const [payTargetOrder, setPayTargetOrder] = useState('');
   const [payPaymentId, setPayPaymentId] = useState('');
 
+  /* ---------- Toast ---------- */
+  const [toasts, setToasts] = useState<ToastMsg[]>([]);
+  const toastIdRef = useRef(0);
+  const showToast = useCallback((text: string, color: string, durationMs = 2000) => {
+    const id = ++toastIdRef.current;
+    setToasts(prev => [...prev, { id, text, color }]);
+    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), durationMs);
+  }, []);
+  const toastOk = useCallback((text: string) => showToast(text, C.green, 2000), [showToast]);
+  const toastErr = useCallback((text: string) => showToast(text, '#ef4444', 3000), [showToast]);
+
+  /* ---------- 操作 loading 状态 ---------- */
+  const [refreshingDish, setRefreshingDish] = useState(false);
+  const [rushingTaskId, setRushingTaskId] = useState<string | null>(null);
+  const [updatingTable, setUpdatingTable] = useState(false);
+  const [verifyingCoupon, setVerifyingCoupon] = useState(false);
+  const [copyingDishes, setCopyingDishes] = useState(false);
+  const [historyOrders, setHistoryOrders] = useState<
+    { id: string; items: { dish_id: string; dish_name: string; qty: number; price_fen: number }[] }[]
+  >([]);
+  const [togglingDishId, setTogglingDishId] = useState<string | null>(null);
+  const [settingLimit, setSettingLimit] = useState(false);
+  const [updatingWaiter, setUpdatingWaiter] = useState(false);
+
   const filteredDishes = useMemo(
     () => DISHES.filter(d => d.catId === activeCat),
     [activeCat],
@@ -330,8 +388,26 @@ export function OrderPage() {
     if (key === '_return') { setActiveModal('none'); navigate(`/return?order_id=${orderId}`); return; }
     if (key === '_refresh') {
       setActiveModal('none');
-      // TODO: 调用 refreshDishStatus API
-      alert('菜品状态已刷新');
+      if (refreshingDish) return;
+      setRefreshingDish(true);
+      const storeId = params.get('store_id') || '';
+      txFetch<{ id: string; is_available: boolean }[]>(
+        `/api/v1/dishes?store_id=${encodeURIComponent(storeId)}&status=available`,
+      )
+        .then(data => {
+          // 将远端可用状态同步到本地
+          const map: Record<string, boolean> = {};
+          if (Array.isArray(data)) {
+            data.forEach(d => { map[d.id] = d.is_available; });
+          }
+          setDishAvailability(prev => ({ ...prev, ...map }));
+          toastOk('菜品状态已刷新');
+        })
+        .catch((err: unknown) => {
+          const msg = err instanceof Error ? err.message : '刷新失败';
+          toastErr(`刷新失败: ${msg}`);
+        })
+        .finally(() => setRefreshingDish(false));
       return;
     }
     // 埋单加载数据
@@ -363,8 +439,20 @@ export function OrderPage() {
 
   /* 催菜 */
   const handleRushTask = (taskId: string) => {
-    // TODO: 调用 rushKdsTask API
-    alert(`已催菜: ${taskId}`);
+    if (rushingTaskId) return;
+    setRushingTaskId(taskId);
+    txFetch(`/api/v1/orders/${encodeURIComponent(orderId)}/rush-items`, {
+      method: 'POST',
+      body: JSON.stringify({ item_ids: [taskId] }),
+    })
+      .then(() => {
+        toastOk('已催菜，后厨收到加急通知');
+      })
+      .catch((err: unknown) => {
+        const msg = err instanceof Error ? err.message : '催菜失败';
+        toastErr(`催菜失败: ${msg}`);
+      })
+      .finally(() => setRushingTaskId(null));
   };
 
   const kdsStatusColor = (status: string, isOvertime: boolean) => {
@@ -941,17 +1029,34 @@ export function OrderPage() {
           </div>
           <button
             onClick={() => {
-              // TODO: 调用 updateTableInfo API
-              setActiveModal('none');
-              alert(`已修改: 人数=${editGuestCount}, 服务员=${editWaiterId || '未变'}`);
+              if (updatingTable) return;
+              setUpdatingTable(true);
+              const body: Record<string, unknown> = {
+                guest_count: parseInt(editGuestCount, 10) || 0,
+              };
+              if (editWaiterId.trim()) body.table_remark = editWaiterId.trim();
+              txFetch(`/api/v1/orders/${encodeURIComponent(orderId)}`, {
+                method: 'PATCH',
+                body: JSON.stringify(body),
+              })
+                .then(() => {
+                  setActiveModal('none');
+                  toastOk(`开台信息已更新: ${editGuestCount}人`);
+                })
+                .catch((err: unknown) => {
+                  const msg = err instanceof Error ? err.message : '更新失败';
+                  toastErr(`更新失败: ${msg}`);
+                })
+                .finally(() => setUpdatingTable(false));
             }}
+            disabled={updatingTable}
             style={{
               width: '100%', minHeight: 56, borderRadius: 12,
-              background: C.accent, color: C.white, border: 'none',
-              fontSize: 18, fontWeight: 700, cursor: 'pointer',
+              background: updatingTable ? C.muted : C.accent, color: C.white, border: 'none',
+              fontSize: 18, fontWeight: 700, cursor: updatingTable ? 'not-allowed' : 'pointer',
             }}
           >
-            确认修改
+            {updatingTable ? '保存中...' : '确认修改'}
           </button>
         </>
       ))}
@@ -994,17 +1099,38 @@ export function OrderPage() {
             </button>
             <button
               onClick={() => {
-                if (!couponCode.trim()) return;
-                // TODO: 调用 verifyPlatformCoupon API
-                setCouponResult('验券成功: 美团50元代100元券, 优惠50元');
+                if (!couponCode.trim() || verifyingCoupon) return;
+                setVerifyingCoupon(true);
+                // 平台从 couponCode 前缀猜测（实际可让服务员选择）
+                const platform = couponCode.startsWith('MT') ? 'meituan'
+                  : couponCode.startsWith('DY') ? 'douyin' : 'universal';
+                txFetch<{ discount_fen: number; description: string }>(
+                  '/api/v1/coupons/verify',
+                  {
+                    method: 'POST',
+                    body: JSON.stringify({ code: couponCode.trim(), platform, order_id: orderId }),
+                  },
+                )
+                  .then(data => {
+                    const yuan = (data.discount_fen / 100).toFixed(0);
+                    setCouponResult(`验券成功: ${data.description}，优惠 ¥${yuan}`);
+                    toastOk(`券已核销，优惠 ¥${yuan}`);
+                  })
+                  .catch((err: unknown) => {
+                    const msg = err instanceof Error ? err.message : '验券失败';
+                    setCouponResult(null);
+                    toastErr(`验券失败: ${msg}`);
+                  })
+                  .finally(() => setVerifyingCoupon(false));
               }}
+              disabled={verifyingCoupon}
               style={{
                 flex: 1, minHeight: 56, borderRadius: 12,
-                background: C.accent, color: C.white, border: 'none',
-                fontSize: 16, fontWeight: 700, cursor: 'pointer',
+                background: verifyingCoupon ? C.muted : C.accent, color: C.white, border: 'none',
+                fontSize: 16, fontWeight: 700, cursor: verifyingCoupon ? 'not-allowed' : 'pointer',
               }}
             >
-              验证
+              {verifyingCoupon ? '验证中...' : '验证'}
             </button>
           </div>
           {couponResult && (
@@ -1019,42 +1145,108 @@ export function OrderPage() {
       ))}
 
       {/* ===== A3. 复制菜品弹窗 ===== */}
-      {renderOverlay(activeModal === 'copy-dishes', () => setActiveModal('none'), (
+      {renderOverlay(activeModal === 'copy-dishes', () => { setActiveModal('none'); setHistoryOrders([]); setSourceOrderId(''); }, (
         <>
           <h3 style={{ fontSize: 20, fontWeight: 700, color: C.white, margin: '0 0 16px' }}>
             复制菜品
           </h3>
           <div style={{ fontSize: 16, color: C.muted, marginBottom: 16 }}>
-            从历史订单一键复制菜品到当前订单
+            从同桌历史订单一键复制菜品到当前订单
           </div>
-          <div style={{ marginBottom: 16 }}>
-            <input
-              type="text"
-              value={sourceOrderId}
-              onChange={e => setSourceOrderId(e.target.value)}
-              placeholder="输入源订单号"
-              style={{
-                width: '100%', padding: 14, fontSize: 18,
-                background: C.card, border: `1px solid ${C.border}`,
-                borderRadius: 12, color: C.white, boxSizing: 'border-box',
+
+          {/* 第一步：查询历史订单 */}
+          {historyOrders.length === 0 && (
+            <button
+              onClick={() => {
+                if (copyingDishes) return;
+                setCopyingDishes(true);
+                txFetch<{ items: typeof historyOrders }>(
+                  `/api/v1/orders?table_no=${encodeURIComponent(tableNo)}&status=active&limit=5`,
+                )
+                  .then(data => {
+                    const orders = Array.isArray(data) ? data : (data as { items: typeof historyOrders }).items ?? [];
+                    if (orders.length === 0) {
+                      toastErr('未找到同桌历史订单');
+                    } else {
+                      setHistoryOrders(orders as typeof historyOrders);
+                    }
+                  })
+                  .catch((err: unknown) => {
+                    const msg = err instanceof Error ? err.message : '查询失败';
+                    toastErr(`查询失败: ${msg}`);
+                  })
+                  .finally(() => setCopyingDishes(false));
               }}
-            />
-          </div>
-          <button
-            onClick={() => {
-              if (!sourceOrderId.trim()) return;
-              // TODO: 调用 copyDishesFromOrder API
-              setActiveModal('none');
-              alert(`已从订单 ${sourceOrderId} 复制菜品`);
-            }}
-            style={{
-              width: '100%', minHeight: 56, borderRadius: 12,
-              background: C.accent, color: C.white, border: 'none',
-              fontSize: 18, fontWeight: 700, cursor: 'pointer',
-            }}
-          >
-            复制到当前订单
-          </button>
+              disabled={copyingDishes}
+              style={{
+                width: '100%', minHeight: 56, borderRadius: 12,
+                background: copyingDishes ? C.muted : C.info, color: C.white, border: 'none',
+                fontSize: 18, fontWeight: 700, cursor: copyingDishes ? 'not-allowed' : 'pointer',
+                marginBottom: 12,
+              }}
+            >
+              {copyingDishes ? '查询中...' : '查询同桌历史订单'}
+            </button>
+          )}
+
+          {/* 第二步：选择订单并复制 */}
+          {historyOrders.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {historyOrders.map(order => (
+                <button
+                  key={order.id}
+                  onClick={() => {
+                    if (copyingDishes) return;
+                    setCopyingDishes(true);
+                    // 将历史订单菜品加入购物车
+                    const newItems: CartItem[] = order.items.map(i => ({
+                      dishId: i.dish_id,
+                      name: i.dish_name,
+                      qty: i.qty,
+                      priceFen: i.price_fen,
+                      note: '',
+                    }));
+                    setCart(prev => {
+                      const merged = [...prev];
+                      newItems.forEach(ni => {
+                        const exist = merged.find(x => x.dishId === ni.dishId && !x.spec);
+                        if (exist) exist.qty += ni.qty;
+                        else merged.push(ni);
+                      });
+                      return merged;
+                    });
+                    setCopyingDishes(false);
+                    setHistoryOrders([]);
+                    setSourceOrderId(order.id);
+                    setActiveModal('none');
+                    toastOk(`已复制 ${order.items.length} 道菜品到购物车`);
+                  }}
+                  style={{
+                    padding: 14, borderRadius: 12,
+                    background: C.card, border: `1px solid ${C.border}`,
+                    cursor: 'pointer', textAlign: 'left',
+                  }}
+                >
+                  <div style={{ fontSize: 16, fontWeight: 700, color: C.white, marginBottom: 4 }}>
+                    订单 {order.id}
+                  </div>
+                  <div style={{ fontSize: 16, color: C.muted }}>
+                    {order.items.map(i => `${i.dish_name}x${i.qty}`).join(' / ')}
+                  </div>
+                </button>
+              ))}
+              <button
+                onClick={() => setHistoryOrders([])}
+                style={{
+                  minHeight: 48, borderRadius: 12,
+                  background: 'transparent', border: `1px solid ${C.border}`,
+                  color: C.muted, fontSize: 16, cursor: 'pointer',
+                }}
+              >
+                重新查询
+              </button>
+            </div>
+          )}
         </>
       ))}
 
@@ -1073,15 +1265,34 @@ export function OrderPage() {
               return (
                 <button
                   key={dish.id}
+                  disabled={togglingDishId === dish.id}
                   onClick={() => {
-                    setDishAvailability(prev => ({ ...prev, [dish.id]: !prev[dish.id] }));
-                    // TODO: 调用 setDishAvailability API
+                    if (togglingDishId) return;
+                    const newVal = !dishAvailability[dish.id];
+                    // 乐观更新
+                    setDishAvailability(prev => ({ ...prev, [dish.id]: newVal }));
+                    setTogglingDishId(dish.id);
+                    txFetch(`/api/v1/dishes/${encodeURIComponent(dish.id)}/availability`, {
+                      method: 'PATCH',
+                      body: JSON.stringify({ is_available: newVal }),
+                    })
+                      .then(() => {
+                        toastOk(newVal ? `${dish.name} 已恢复在售` : `${dish.name} 已沽清`);
+                      })
+                      .catch((err: unknown) => {
+                        // 回滚
+                        setDishAvailability(prev => ({ ...prev, [dish.id]: !newVal }));
+                        const msg = err instanceof Error ? err.message : '操作失败';
+                        toastErr(`操作失败: ${msg}`);
+                      })
+                      .finally(() => setTogglingDishId(null));
                   }}
                   style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                     padding: 14, borderRadius: 12,
                     background: C.card, border: `1px solid ${C.border}`,
-                    cursor: 'pointer', opacity: available ? 1 : 0.5,
+                    cursor: togglingDishId === dish.id ? 'not-allowed' : 'pointer',
+                    opacity: (available ? 1 : 0.5) * (togglingDishId === dish.id ? 0.6 : 1),
                   }}
                 >
                   <span style={{ fontSize: 16, color: C.white }}>{dish.name}</span>
@@ -1148,18 +1359,35 @@ export function OrderPage() {
               </div>
               <button
                 onClick={() => {
-                  // TODO: 调用 setDishDailyLimit API
-                  setActiveModal('none');
-                  const dish = DISHES.find(d => d.id === limitDishId);
-                  alert(`${dish?.name || limitDishId} 每日限量设为 ${limitValue || '不限'}`);
+                  if (settingLimit || !limitDishId) return;
+                  const dailyLimit = parseInt(limitValue, 10) || 0;
+                  setSettingLimit(true);
+                  txFetch(`/api/v1/dishes/${encodeURIComponent(limitDishId)}/daily-limit`, {
+                    method: 'PATCH',
+                    body: JSON.stringify({ daily_limit: dailyLimit }),
+                  })
+                    .then(() => {
+                      setActiveModal('none');
+                      const dish = DISHES.find(d => d.id === limitDishId);
+                      const label = dailyLimit === 0 ? '不限' : `${dailyLimit}份`;
+                      toastOk(`${dish?.name || limitDishId} 每日限量已设为 ${label}`);
+                      setLimitDishId('');
+                      setLimitValue('');
+                    })
+                    .catch((err: unknown) => {
+                      const msg = err instanceof Error ? err.message : '设置失败';
+                      toastErr(`设置失败: ${msg}`);
+                    })
+                    .finally(() => setSettingLimit(false));
                 }}
+                disabled={settingLimit}
                 style={{
                   width: '100%', minHeight: 56, borderRadius: 12,
-                  background: C.accent, color: C.white, border: 'none',
-                  fontSize: 18, fontWeight: 700, cursor: 'pointer',
+                  background: settingLimit ? C.muted : C.accent, color: C.white, border: 'none',
+                  fontSize: 18, fontWeight: 700, cursor: settingLimit ? 'not-allowed' : 'pointer',
                 }}
               >
-                确认设置
+                {settingLimit ? '保存中...' : '确认设置'}
               </button>
             </>
           )}
@@ -1190,18 +1418,31 @@ export function OrderPage() {
           </div>
           <button
             onClick={() => {
-              if (!newWaiterId.trim()) return;
-              // TODO: 调用 updateOrderWaiter API
-              setActiveModal('none');
-              alert(`点菜员已更换为: ${newWaiterId}`);
+              if (!newWaiterId.trim() || updatingWaiter) return;
+              setUpdatingWaiter(true);
+              txFetch(`/api/v1/orders/${encodeURIComponent(orderId)}/waiter`, {
+                method: 'PATCH',
+                body: JSON.stringify({ waiter_id: newWaiterId.trim(), waiter_name: newWaiterId.trim() }),
+              })
+                .then(() => {
+                  setActiveModal('none');
+                  toastOk(`点菜员已更换为: ${newWaiterId}`);
+                  setNewWaiterId('');
+                })
+                .catch((err: unknown) => {
+                  const msg = err instanceof Error ? err.message : '更新失败';
+                  toastErr(`更新失败: ${msg}`);
+                })
+                .finally(() => setUpdatingWaiter(false));
             }}
+            disabled={updatingWaiter}
             style={{
               width: '100%', minHeight: 56, borderRadius: 12,
-              background: C.accent, color: C.white, border: 'none',
-              fontSize: 18, fontWeight: 700, cursor: 'pointer',
+              background: updatingWaiter ? C.muted : C.accent, color: C.white, border: 'none',
+              fontSize: 18, fontWeight: 700, cursor: updatingWaiter ? 'not-allowed' : 'pointer',
             }}
           >
-            确认更换
+            {updatingWaiter ? '更新中...' : '确认更换'}
           </button>
         </>
       ))}
@@ -1242,15 +1483,17 @@ export function OrderPage() {
                 {item.status !== 'done' && (
                   <button
                     onClick={() => handleRushTask(item.taskId)}
+                    disabled={rushingTaskId === item.taskId}
                     style={{
                       minWidth: 64, minHeight: 48, borderRadius: 10,
-                      background: item.isOvertime ? C.danger : `${C.warning}22`,
+                      background: rushingTaskId === item.taskId ? C.muted : item.isOvertime ? C.danger : `${C.warning}22`,
                       border: item.isOvertime ? 'none' : `1px solid ${C.warning}`,
                       color: item.isOvertime ? C.white : C.warning,
-                      fontSize: 16, fontWeight: 700, cursor: 'pointer',
+                      fontSize: 16, fontWeight: 700,
+                      cursor: rushingTaskId === item.taskId ? 'not-allowed' : 'pointer',
                     }}
                   >
-                    催菜
+                    {rushingTaskId === item.taskId ? '催...' : '催菜'}
                   </button>
                 )}
               </div>
@@ -1266,6 +1509,28 @@ export function OrderPage() {
           </div>
         </>
       ))}
+
+      {/* ===== Toast 通知层 ===== */}
+      <div style={{
+        position: 'fixed', top: 16, left: '50%', transform: 'translateX(-50%)',
+        zIndex: 9999, display: 'flex', flexDirection: 'column', gap: 8,
+        pointerEvents: 'none', minWidth: 240, maxWidth: '90vw',
+      }}>
+        {toasts.map(t => (
+          <div
+            key={t.id}
+            style={{
+              padding: '12px 20px', borderRadius: 12,
+              background: t.color === C.green ? '#14532d' : '#450a0a',
+              border: `1px solid ${t.color}`,
+              color: t.color, fontSize: 16, fontWeight: 600,
+              textAlign: 'center', boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+            }}
+          >
+            {t.text}
+          </div>
+        ))}
+      </div>
 
       {/* ===== D. 快捷结账弹窗 ===== */}
       {renderOverlay(activeModal === 'checkout', () => { if (!checkoutProcessing) { setActiveModal('none'); setCheckoutDone(false); } }, (

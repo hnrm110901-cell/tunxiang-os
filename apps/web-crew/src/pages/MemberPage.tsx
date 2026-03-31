@@ -27,24 +27,50 @@ interface MockMember {
   points: number;
   balanceYuan: number;
   preferences: string[];
+  allergens: string[];      // 过敏原代码列表
+  dietNotes: string;        // 自由文字忌口备注
   visitCount: number;
   lastVisit: string;
 }
+
+// 过敏原代码 → 中文标签 + emoji + 严重程度
+const ALLERGEN_META: Record<string, { label: string; emoji: string; severity: 'danger' | 'warning' }> = {
+  peanut:    { label: '花生',       emoji: '🥜', severity: 'danger'  },
+  shellfish: { label: '贝壳海鲜',   emoji: '🦐', severity: 'danger'  },
+  fish:      { label: '鱼',         emoji: '🐟', severity: 'danger'  },
+  egg:       { label: '鸡蛋',       emoji: '🥚', severity: 'danger'  },
+  milk:      { label: '牛奶',       emoji: '🥛', severity: 'danger'  },
+  soy:       { label: '大豆',       emoji: '🫘', severity: 'danger'  },
+  wheat:     { label: '小麦/面筋',  emoji: '🌾', severity: 'danger'  },
+  sesame:    { label: '芝麻',       emoji: '🌱', severity: 'danger'  },
+  tree_nut:  { label: '坚果',       emoji: '🌰', severity: 'danger'  },
+  pork:      { label: '猪肉',       emoji: '🐷', severity: 'warning' },
+  beef:      { label: '牛肉',       emoji: '🐄', severity: 'warning' },
+  spicy:     { label: '辣',         emoji: '🌶', severity: 'warning' },
+  msg:       { label: '味精',       emoji: '🧂', severity: 'warning' },
+  sulfite:   { label: '亚硫酸盐',   emoji: '⚗️', severity: 'danger'  },
+};
 
 const MOCK_MEMBERS: MockMember[] = [
   {
     id: 'm1', name: '王建国', phone: '138****1234', level: '金卡',
     points: 12680, balanceYuan: 856, preferences: ['不吃香菜', '微辣', '喜欢鱼类'],
+    allergens: ['peanut', 'shellfish'],
+    dietNotes: '请少盐，不加香菜',
     visitCount: 46, lastVisit: '2026-03-25',
   },
   {
     id: 'm2', name: '李晓红', phone: '139****5678', level: '银卡',
     points: 5200, balanceYuan: 320, preferences: ['不吃辣', '少盐'],
+    allergens: ['spicy', 'msg'],
+    dietNotes: '素食，不吃葱蒜',
     visitCount: 18, lastVisit: '2026-03-20',
   },
   {
     id: 'm3', name: '张伟', phone: '136****9012', level: '普通',
     points: 860, balanceYuan: 0, preferences: [],
+    allergens: [],
+    dietNotes: '',
     visitCount: 3, lastVisit: '2026-02-14',
   },
 ];
@@ -219,6 +245,62 @@ export function MemberPage() {
                   </span>
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* 过敏/忌口 */}
+          {(selected.allergens.length > 0 || selected.dietNotes) && (
+            <div style={{
+              marginBottom: 16,
+              background: C.bg,
+              borderRadius: 10,
+              padding: '12px 14px',
+              border: '1.5px solid #7f1d1d',
+            }}>
+              <div style={{
+                fontSize: 16,
+                fontWeight: 700,
+                color: '#ef4444',
+                marginBottom: 10,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+              }}>
+                <span>🚨</span> 过敏/忌口
+              </div>
+              {selected.allergens.length > 0 && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', marginBottom: selected.dietNotes ? 10 : 0 }}>
+                  {selected.allergens.map(code => {
+                    const meta = ALLERGEN_META[code];
+                    if (!meta) return null;
+                    const isDanger = meta.severity === 'danger';
+                    return (
+                      <span key={code} style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 5,
+                        padding: '6px 12px',
+                        borderRadius: 8,
+                        fontSize: 16,
+                        fontWeight: 700,
+                        background: isDanger ? '#7f1d1d' : '#713f12',
+                        color: isDanger ? '#ef4444' : '#facc15',
+                        border: `1px solid ${isDanger ? '#ef4444' : '#facc15'}`,
+                        margin: '3px 6px 3px 0',
+                      }}>
+                        <span style={{ fontSize: 18 }}>{meta.emoji}</span>
+                        {meta.label}
+                      </span>
+                    );
+                  })}
+                </div>
+              )}
+              {selected.dietNotes && (
+                <div style={{ fontSize: 16, color: C.muted }}>
+                  <span style={{ color: '#facc15', marginRight: 4 }}>备注：</span>
+                  {selected.dietNotes}
+                </div>
+              )}
             </div>
           )}
 

@@ -21,11 +21,13 @@ from api.coupon_engine_routes import router as coupon_engine_router
 from api.gift_card_routes import router as gift_card_router
 from api.smart_dispatch_routes import router as smart_dispatch_router
 from api.stored_value_routes import router as stored_value_router
+from api.stored_value_router import router as stored_value_v2_router
 from api.premium_card_routes import router as premium_card_router
 from api.points_mall_routes import router as points_mall_router
 from api.rfm_routes import router as rfm_router
 from api.group_routes import router as group_router
 from api.lifecycle_routes import router as lifecycle_router
+from api.lifecycle_router import router as lifecycle_v2_router
 from api.platform_routes import router as platform_router
 from api.group_member_routes import router as group_member_router
 from workers.rfm_updater import RFMUpdater, RFMEventListener
@@ -131,11 +133,13 @@ app.include_router(coupon_engine_router)
 app.include_router(gift_card_router)
 app.include_router(smart_dispatch_router)
 app.include_router(stored_value_router)
+app.include_router(stored_value_v2_router)
 app.include_router(premium_card_router)
 app.include_router(points_mall_router)
 app.include_router(rfm_router)
 app.include_router(group_router)
 app.include_router(lifecycle_router)
+app.include_router(lifecycle_v2_router)
 app.include_router(platform_router)
 app.include_router(group_member_router)
 

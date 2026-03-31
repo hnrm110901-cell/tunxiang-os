@@ -10,11 +10,14 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone, timedelta
 from typing import Any, List, Optional
 
+import httpx
 import structlog
 from sqlalchemy import select, update, and_
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .kds_dispatch import dispatch_order_to_kds
+from shared.adapters.base.src.adapter import APIError as AdapterAPIError
 
 logger = structlog.get_logger()
 
@@ -248,7 +251,7 @@ class OmniChannelService:
             internal_order_id = await self._persist_order(order, db)
             order.internal_order_id = internal_order_id
             log.info("omni_channel.receive_order.persisted", internal_order_id=internal_order_id)
-        except Exception as exc:
+        except (SQLAlchemyError, ValueError) as exc:
             log.error("omni_channel.receive_order.persist_failed", error=str(exc), exc_info=True)
             raise
 
@@ -273,7 +276,7 @@ class OmniChannelService:
                 channel="takeaway",
             )
             log.info("omni_channel.receive_order.kds_dispatched")
-        except Exception as exc:
+        except (SQLAlchemyError, ValueError, RuntimeError) as exc:
             log.error("omni_channel.receive_order.kds_failed", error=str(exc), exc_info=True)
             # 不重新抛出：KDS失败不影响内部订单流程
 
@@ -312,11 +315,12 @@ class OmniChannelService:
             adapter = self._get_platform_adapter(order_row.source_channel)
             await adapter.confirm_order(order_row.platform_order_id)
             log.info("omni_channel.accept_order.platform_callback_ok", platform=order_row.source_channel)
-        except Exception as exc:
+        except (AdapterAPIError, httpx.HTTPError, ConnectionError, UnsupportedPlatformError) as exc:
             log.error(
                 "omni_channel.accept_order.platform_callback_failed",
                 platform=order_row.source_channel,
                 error=str(exc),
+                error_type=type(exc).__name__,
                 exc_info=True,
             )
             # 平台回调失败只记录日志，不影响内部订单状态
@@ -362,11 +366,12 @@ class OmniChannelService:
             adapter = self._get_platform_adapter(order_row.source_channel)
             await adapter.cancel_order(order_row.platform_order_id, reason_code, reason_text)
             log.info("omni_channel.reject_order.platform_callback_ok", platform=order_row.source_channel)
-        except Exception as exc:
+        except (AdapterAPIError, httpx.HTTPError, ConnectionError, UnsupportedPlatformError) as exc:
             log.error(
                 "omni_channel.reject_order.platform_callback_failed",
                 platform=order_row.source_channel,
                 error=str(exc),
+                error_type=type(exc).__name__,
                 exc_info=True,
             )
 
@@ -505,22 +510,24 @@ class OmniChannelService:
                         1,
                         "超时未接单，系统自动拒单",
                     )
-                except Exception as exc:
+                except (AdapterAPIError, httpx.HTTPError, ConnectionError, UnsupportedPlatformError) as exc:
                     log.error(
                         "omni_channel.auto_reject.platform_callback_failed",
                         order_id=order_id_str,
                         platform=order_row.source_channel,
                         error=str(exc),
+                        error_type=type(exc).__name__,
                         exc_info=True,
                     )
 
                 rejected_ids.append(order_id_str)
                 log.info("omni_channel.auto_reject.done", order_id=order_id_str)
-            except Exception as exc:
+            except (SQLAlchemyError, ValueError, OmniChannelError) as exc:
                 log.error(
                     "omni_channel.auto_reject.failed",
                     order_id=order_id_str,
                     error=str(exc),
+                    error_type=type(exc).__name__,
                     exc_info=True,
                 )
 

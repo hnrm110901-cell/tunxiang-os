@@ -18,15 +18,9 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, Field
+from shared.ontology.src.database import get_db as _get_db
 
 router = APIRouter(tags=["smart-replenishment"])
-
-
-# ─── 数据库依赖占位 ───
-
-async def _get_db():
-    """数据库会话依赖 — 由 main.py 覆盖"""
-    raise NotImplementedError("DB session dependency not configured")
 
 
 # ─── 请求模型 ───

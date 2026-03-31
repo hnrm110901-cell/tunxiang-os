@@ -7,7 +7,7 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 
 import structlog
-from fastapi import APIRouter, Depends, Header
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, text
 
@@ -16,10 +16,16 @@ from shared.ontology.src.entities import Order, OrderItem, Store
 
 from services.store_pnl import StorePnLService
 from services.voucher_service import generate_voucher_from_settlement, format_for_kingdee
+from services.revenue_engine import RevenueEngine
+from services.pnl_engine import PnLEngine
+from services.report_engine import ReportEngine
 
 logger = structlog.get_logger()
 router = APIRouter(prefix="/api/v1/finance", tags=["finance"])
 pnl_service = StorePnLService()
+_revenue_engine = RevenueEngine()
+_pnl_engine = PnLEngine()
+_report_engine = ReportEngine()
 
 
 def _parse_date(d: str) -> date:
@@ -32,6 +38,54 @@ async def _get_tenant_db(x_tenant_id: str = Header(..., alias="X-Tenant-ID")):
     """从 header 提取 tenant_id 并返回带 RLS 的 DB session"""
     async for session in get_db_with_tenant(x_tenant_id):
         yield session
+
+
+# ── 日营收 ────────────────────────────────────────────────────
+
+@router.get("/daily-revenue")
+async def get_daily_revenue(
+    store_id: str,
+    date: str = "today",
+    db: AsyncSession = Depends(_get_tenant_db),
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+):
+    """日营收快报 — 含支付方式分类、退款明细、净营收"""
+    biz_date = _parse_date(date)
+    try:
+        sid = _uuid.UUID(store_id)
+        tid = _uuid.UUID(x_tenant_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=f"参数格式错误: {exc}") from exc
+
+    try:
+        rev = await _revenue_engine.get_daily_revenue(tid, sid, biz_date, db)
+    except Exception as exc:
+        logger.error("get_daily_revenue.failed", store_id=store_id, error=str(exc), exc_info=True)
+        raise HTTPException(status_code=500, detail="日营收查询失败") from exc
+
+    return {
+        "ok": True,
+        "data": {
+            "store_id": store_id,
+            "biz_date": str(biz_date),
+            "gross_revenue_fen": rev.gross_revenue_fen,
+            "discount_fen": rev.total_discount_fen,
+            "refund_fen": rev.refund_fen,
+            "net_revenue_fen": rev.net_revenue_fen,
+            "order_count": rev.order_count,
+            "avg_ticket_fen": rev.avg_ticket_fen,
+            "payment_breakdown": [
+                {
+                    "method": pb.method,
+                    "label": pb.label,
+                    "amount_fen": pb.amount_fen,
+                    "order_count": pb.order_count,
+                    "ratio": pb.ratio,
+                }
+                for pb in rev.payment_breakdown
+            ],
+        },
+    }
 
 
 # ── 日利润快报 ────────────────────────────────────────────────
@@ -288,8 +342,72 @@ async def get_budget_execution(store_id: str):
 # ── 现金流 ────────────────────────────────────────────────────
 
 @router.get("/cashflow/forecast")
-async def forecast_cashflow(store_id: str, days: int = 30):
-    return {"ok": True, "data": {"forecast": [], "note": "Cashflow forecast planned for Phase 1.1.3"}}
+async def forecast_cashflow(
+    store_id: str,
+    days: int = Query(30, ge=1, le=90, description="预测天数，默认30天"),
+    db: AsyncSession = Depends(_get_tenant_db),
+):
+    """现金流预测 — 基于近7日日均营收线性外推
+
+    算法：
+    1. 查询近7日每日净营收
+    2. 计算 7 日均值作为日预测基线
+    3. 叠加简单周期权重（周末 +15%，周一 -10%）生成逐日预测
+    """
+    sid = _uuid.UUID(store_id)
+    today = date.today()
+    lookback_start = today - timedelta(days=7)
+
+    start_dt = datetime.combine(lookback_start, datetime.min.time()).replace(tzinfo=timezone.utc)
+    end_dt = datetime.combine(today - timedelta(days=1), datetime.max.time()).replace(tzinfo=timezone.utc)
+
+    try:
+        hist_rows = await db.execute(
+            select(
+                func.date_trunc("day", Order.created_at).label("day"),
+                func.coalesce(func.sum(Order.final_amount_fen), 0).label("revenue"),
+            )
+            .where(Order.store_id == sid)
+            .where(Order.status.in_(["completed", "settled"]))
+            .where(Order.created_at >= start_dt)
+            .where(Order.created_at <= end_dt)
+            .group_by(text("1"))
+            .order_by(text("1"))
+        )
+        hist = [{"date": str(r.day.date()), "revenue_fen": int(r.revenue)} for r in hist_rows.all()]
+    except Exception as exc:
+        logger.error("forecast_cashflow.history_query_failed", store_id=store_id, error=str(exc), exc_info=True)
+        raise HTTPException(status_code=500, detail="现金流预测查询失败") from exc
+
+    if not hist:
+        daily_avg = 0
+    else:
+        daily_avg = sum(h["revenue_fen"] for h in hist) // len(hist)
+
+    # 周期权重：1=周一(低) ... 5=周五, 6=周六(高), 7=周日(高)
+    _day_weights = {0: 0.90, 1: 0.95, 2: 1.00, 3: 1.02, 4: 1.05, 5: 1.15, 6: 1.15}
+    forecast = []
+    for i in range(days):
+        forecast_date = today + timedelta(days=i + 1)
+        weight = _day_weights.get(forecast_date.weekday(), 1.0)
+        forecast.append({
+            "date": str(forecast_date),
+            "day_of_week": forecast_date.strftime("%A"),
+            "forecast_revenue_fen": int(daily_avg * weight),
+            "weight": weight,
+        })
+
+    return {
+        "ok": True,
+        "data": {
+            "store_id": store_id,
+            "forecast_days": days,
+            "daily_avg_fen": daily_avg,
+            "history_days": len(hist),
+            "history": hist,
+            "forecast": forecast,
+        },
+    }
 
 
 # ── 月度报告 ──────────────────────────────────────────────────
@@ -364,6 +482,151 @@ async def get_monthly_report(
 async def get_monthly_report_html(store_id: str, month: Optional[str] = None):
     """HTML 月报（浏览器打印 PDF）— 规划中"""
     return {"ok": True, "data": {"html": "", "note": "HTML report planned for Phase 1.1.4"}}
+
+
+# ── P0 日报表 ─────────────────────────────────────────────────
+
+@router.get("/reports/daily/revenue-summary")
+async def get_daily_revenue_summary(
+    store_id: str = Query(..., description="门店 ID"),
+    date: str = Query("today", description="业务日期 YYYY-MM-DD 或 today"),
+    db: AsyncSession = Depends(_get_tenant_db),
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+):
+    """P0-1 营业收入汇总表 — 渠道分布、餐段分布、净营收"""
+    biz_date = _parse_date(date)
+    try:
+        sid = _uuid.UUID(store_id)
+        tid = _uuid.UUID(x_tenant_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=f"参数格式错误: {exc}") from exc
+
+    try:
+        report = await _report_engine.daily_revenue_summary(tid, sid, biz_date, db)
+    except Exception as exc:
+        logger.error("daily_revenue_summary.failed", store_id=store_id, error=str(exc), exc_info=True)
+        raise HTTPException(status_code=500, detail="营业收入汇总表生成失败") from exc
+
+    return {"ok": True, "data": report.to_dict()}
+
+
+@router.get("/reports/daily/payment-discount")
+async def get_payment_discount_report(
+    store_id: str = Query(..., description="门店 ID"),
+    date: str = Query("today", description="业务日期 YYYY-MM-DD 或 today"),
+    db: AsyncSession = Depends(_get_tenant_db),
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+):
+    """P0-2 门店付款折扣表 — 支付方式分布、折扣类型分布、赠菜统计"""
+    biz_date = _parse_date(date)
+    try:
+        sid = _uuid.UUID(store_id)
+        tid = _uuid.UUID(x_tenant_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=f"参数格式错误: {exc}") from exc
+
+    try:
+        report = await _report_engine.payment_discount_report(tid, sid, biz_date, db)
+    except Exception as exc:
+        logger.error("payment_discount_report.failed", store_id=store_id, error=str(exc), exc_info=True)
+        raise HTTPException(status_code=500, detail="付款折扣表生成失败") from exc
+
+    return {"ok": True, "data": report.to_dict()}
+
+
+@router.get("/reports/daily/cashflow")
+async def get_cashflow_by_store(
+    store_id: str = Query(..., description="门店 ID"),
+    date: str = Query("today", description="业务日期 YYYY-MM-DD 或 today"),
+    db: AsyncSession = Depends(_get_tenant_db),
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+):
+    """P0-3 门店日现金流报表 — 各渠道收款 + 退款 = 净现金流"""
+    biz_date = _parse_date(date)
+    try:
+        sid = _uuid.UUID(store_id)
+        tid = _uuid.UUID(x_tenant_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=f"参数格式错误: {exc}") from exc
+
+    try:
+        report = await _report_engine.cashflow_by_store(tid, sid, biz_date, db)
+    except Exception as exc:
+        logger.error("cashflow_by_store.failed", store_id=store_id, error=str(exc), exc_info=True)
+        raise HTTPException(status_code=500, detail="日现金流报表生成失败") from exc
+
+    return {"ok": True, "data": report.to_dict()}
+
+
+@router.get("/reports/daily/dish-sales")
+async def get_dish_sales_stats(
+    store_id: str = Query(..., description="门店 ID"),
+    date: str = Query("today", description="业务日期 YYYY-MM-DD 或 today"),
+    top_n: int = Query(20, ge=1, le=100, description="返回销量 TOP-N 菜品"),
+    db: AsyncSession = Depends(_get_tenant_db),
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+):
+    """P0-4 菜品销售统计表 — 销量排行 TOP-N + 分类汇总"""
+    biz_date = _parse_date(date)
+    try:
+        sid = _uuid.UUID(store_id)
+        tid = _uuid.UUID(x_tenant_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=f"参数格式错误: {exc}") from exc
+
+    try:
+        report = await _report_engine.dish_sales_stats(tid, sid, biz_date, db, top_n=top_n)
+    except Exception as exc:
+        logger.error("dish_sales_stats.failed", store_id=store_id, error=str(exc), exc_info=True)
+        raise HTTPException(status_code=500, detail="菜品销售统计表生成失败") from exc
+
+    return {"ok": True, "data": report.to_dict()}
+
+
+@router.get("/reports/daily/billing-audit")
+async def get_billing_audit(
+    store_id: str = Query(..., description="门店 ID"),
+    date: str = Query("today", description="稽核日期 YYYY-MM-DD 或 today"),
+    db: AsyncSession = Depends(_get_tenant_db),
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+):
+    """P0-5 账单稽核表 — 退菜、赠菜、异常订单、毛利告警、按小时分布"""
+    biz_date = _parse_date(date)
+    try:
+        sid = _uuid.UUID(store_id)
+        tid = _uuid.UUID(x_tenant_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=f"参数格式错误: {exc}") from exc
+
+    try:
+        report = await _report_engine.billing_audit(tid, sid, biz_date, db)
+    except Exception as exc:
+        logger.error("billing_audit.failed", store_id=store_id, error=str(exc), exc_info=True)
+        raise HTTPException(status_code=500, detail="账单稽核表生成失败") from exc
+
+    return {"ok": True, "data": report.to_dict()}
+
+
+@router.get("/reports/realtime")
+async def get_realtime_store_stats(
+    store_id: str = Query(..., description="门店 ID"),
+    db: AsyncSession = Depends(_get_tenant_db),
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+):
+    """P0-6 门店实时营业统计 — 当日截至此刻的营收、单量、高峰时段"""
+    try:
+        sid = _uuid.UUID(store_id)
+        tid = _uuid.UUID(x_tenant_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=f"参数格式错误: {exc}") from exc
+
+    try:
+        report = await _report_engine.realtime_store_stats(tid, sid, db)
+    except Exception as exc:
+        logger.error("realtime_store_stats.failed", store_id=store_id, error=str(exc), exc_info=True)
+        raise HTTPException(status_code=500, detail="实时营业统计生成失败") from exc
+
+    return {"ok": True, "data": report.to_dict()}
 
 
 # ── 凭证 ──────────────────────────────────────────────────────

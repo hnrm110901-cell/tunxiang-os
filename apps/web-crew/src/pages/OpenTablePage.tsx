@@ -3,7 +3,7 @@
  * 移动端竖屏优先，最小字体16px，热区>=48px
  */
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 
 /* ---------- 样式常量 ---------- */
 const C = {
@@ -48,20 +48,29 @@ function statusColor(s: TableStatus): string {
 /* ---------- 组件 ---------- */
 export function OpenTablePage() {
   const navigate = useNavigate();
-  const [selected, setSelected] = useState<string | null>(null);
+  const [searchParams] = useSearchParams();
+  const prefilledTable = searchParams.get('table') || '';
+  const isPrefilled = searchParams.get('prefilled') === 'true';
+
+  const [selected, setSelected] = useState<string | null>(prefilledTable || null);
   const [guestCount, setGuestCount] = useState(2);
+  const [seatModeEnabled, setSeatModeEnabled] = useState(false);
+  const [seatCount, setSeatCount] = useState(2);
   const [confirming, setConfirming] = useState(false);
 
   const idleTables = MOCK_TABLES.filter(t => t.status === 'idle');
   const otherTables = MOCK_TABLES.filter(t => t.status !== 'idle');
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     if (!selected) return;
     setConfirming(true);
-    // 模拟 API 调用
-    setTimeout(() => {
-      navigate(`/order-full?table=${selected}&guests=${guestCount}`);
-    }, 600);
+    try {
+      await new Promise(r => setTimeout(r, 400));
+      const url = `/order-full?table=${selected}&guests=${guestCount}${seatModeEnabled ? `&seat_count=${seatCount}` : ''}`;
+      navigate(url);
+    } finally {
+      setConfirming(false);
+    }
   };
 
   return (
@@ -73,6 +82,20 @@ export function OpenTablePage() {
         选择空闲桌台并确认开台
       </p>
 
+      {isPrefilled && (
+        <div style={{
+          background: 'rgba(255, 107, 53, 0.15)',
+          border: '1px solid #FF6B35',
+          borderRadius: 8,
+          padding: '10px 14px',
+          marginBottom: 12,
+          fontSize: 14,
+          color: '#FF9F0A',
+        }}>
+          📷 已扫码识别桌台 {prefilledTable}，请确认人数后开台
+        </div>
+      )}
+
       {/* 可选桌台（空闲） */}
       <h2 style={{ fontSize: 17, fontWeight: 600, color: C.white, margin: '0 0 10px' }}>
         空闲桌台（{idleTables.length}）
@@ -80,10 +103,12 @@ export function OpenTablePage() {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 20 }}>
         {idleTables.map(t => {
           const isSelected = selected === t.no;
+          const isPrefilledThis = isPrefilled && prefilledTable === t.no;
           return (
             <button
               key={t.no}
-              onClick={() => setSelected(isSelected ? null : t.no)}
+              onClick={() => !isPrefilled && setSelected(isSelected ? null : t.no)}
+              disabled={isPrefilled && !isPrefilledThis}
               style={{
                 minHeight: 80,
                 padding: 12,
@@ -91,9 +116,10 @@ export function OpenTablePage() {
                 border: isSelected ? `2px solid ${C.accent}` : `1px solid ${C.border}`,
                 borderRadius: 12,
                 color: C.white,
-                cursor: 'pointer',
+                cursor: isPrefilled ? (isPrefilledThis ? 'default' : 'not-allowed') : 'pointer',
                 textAlign: 'center',
                 transition: 'transform .15s',
+                opacity: isPrefilled && !isPrefilledThis ? 0.4 : 1,
               }}
             >
               <div style={{ fontSize: 20, fontWeight: 700 }}>{t.no}</div>
@@ -175,6 +201,70 @@ export function OpenTablePage() {
                 +
               </button>
             </div>
+          </div>
+
+          {/* 座位模式（AA制分账） */}
+          <div style={{
+            background: C.card,
+            border: `1px solid ${seatModeEnabled ? C.accent : C.border}`,
+            borderRadius: 12,
+            padding: '12px 14px',
+            marginBottom: 12,
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div>
+                <div style={{ fontSize: 16, fontWeight: 600, color: C.text }}>座位模式（AA制分账）</div>
+                <div style={{ fontSize: 14, color: C.muted, marginTop: 2 }}>每道菜可指定归属座位</div>
+              </div>
+              <button
+                onClick={() => setSeatModeEnabled(v => !v)}
+                style={{
+                  width: 56, height: 30, borderRadius: 15,
+                  background: seatModeEnabled ? C.accent : C.muted,
+                  border: 'none', cursor: 'pointer', position: 'relative',
+                  transition: 'background 0.2s',
+                  flexShrink: 0,
+                }}
+              >
+                <div style={{
+                  position: 'absolute', top: 3,
+                  left: seatModeEnabled ? 28 : 4,
+                  width: 24, height: 24, borderRadius: '50%',
+                  background: C.white, transition: 'left 0.2s',
+                }} />
+              </button>
+            </div>
+
+            {seatModeEnabled && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 12 }}>
+                <span style={{ fontSize: 16, color: C.text }}>座位数</span>
+                <button
+                  onClick={() => setSeatCount(Math.max(1, seatCount - 1))}
+                  style={{
+                    width: 48, height: 48, borderRadius: 12,
+                    background: '#0B1A20', border: `1px solid ${C.border}`,
+                    color: C.white, fontSize: 24, cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}
+                >
+                  -
+                </button>
+                <span style={{ fontSize: 24, fontWeight: 700, color: C.accent, minWidth: 32, textAlign: 'center' }}>
+                  {seatCount}
+                </span>
+                <button
+                  onClick={() => setSeatCount(Math.min(20, seatCount + 1))}
+                  style={{
+                    width: 48, height: 48, borderRadius: 12,
+                    background: '#0B1A20', border: `1px solid ${C.border}`,
+                    color: C.white, fontSize: 24, cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}
+                >
+                  +
+                </button>
+              </div>
+            )}
           </div>
           <button
             onClick={handleConfirm}

@@ -391,7 +391,7 @@ export function RunnerStation() {
             </span>
           )}
         </div>
-        <div style={{ display: 'flex', gap: 28, fontSize: 18 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 20, fontSize: 18 }}>
           <span>
             待取菜{' '}
             <b style={{ color: '#BA7517', fontSize: 28, fontFamily: 'JetBrains Mono, monospace' }}>
@@ -404,6 +404,33 @@ export function RunnerStation() {
               {deliveringDishes.length}
             </b>
           </span>
+          {/* 路线优化入口：跳转到服务员端 PWA */}
+          <a
+            href="/route-optimize"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              minWidth: 100,
+              minHeight: 48,
+              padding: '0 18px',
+              background: 'rgba(255,107,53,0.15)',
+              color: '#FF6B35',
+              border: '1px solid #FF6B35',
+              borderRadius: 10,
+              fontSize: 16,
+              fontWeight: 'bold',
+              textDecoration: 'none',
+              whiteSpace: 'nowrap',
+              transition: 'opacity 200ms',
+            }}
+            onMouseEnter={e => (e.currentTarget.style.opacity = '0.8')}
+            onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
+          >
+            路线优化
+          </a>
         </div>
       </header>
 
