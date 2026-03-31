@@ -19,6 +19,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from vision_service import router as vision_router
 from voice_service import router as voice_router
 from federated_client import router as federated_router
+from heartbeat_routes import router as heartbeat_router
 
 logger = structlog.get_logger()
 
@@ -45,6 +46,9 @@ app.include_router(voice_router)
 
 # ─── Federated Learning 路由 ───
 app.include_router(federated_router)
+
+# ─── 设备心跳注册表路由 ───
+app.include_router(heartbeat_router)
 
 # ─── 健康检查 ───
 

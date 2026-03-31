@@ -7,7 +7,10 @@
 """
 from datetime import datetime, timezone
 from typing import Any, Optional
+import structlog
 from ..base import SkillAgent, AgentResult
+
+logger = structlog.get_logger(__name__)
 
 
 # RFM 分层阈值
@@ -39,6 +42,7 @@ class MemberInsightAgent(SkillAgent):
             "analyze_rfm", "detect_signals", "detect_competitor",
             "trigger_journey", "get_churn_risks", "process_bad_review",
             "monitor_service_quality", "handle_complaint", "collect_feedback",
+            "rfm_analysis",
         ]
 
     async def execute(self, action: str, params: dict[str, Any]) -> AgentResult:
@@ -52,6 +56,7 @@ class MemberInsightAgent(SkillAgent):
             "detect_competitor": self._detect_competitor,
             "handle_complaint": self._handle_complaint,
             "collect_feedback": self._collect_feedback,
+            "rfm_analysis": self._rfm_analysis,
         }
         handler = dispatch.get(action)
         if not handler:
@@ -282,3 +287,104 @@ class MemberInsightAgent(SkillAgent):
                          data={"stored": True, "rating": feedback.get("rating", 0),
                                "category": feedback.get("category", "general")},
                          reasoning="反馈已收集", confidence=0.95)
+
+    # ─── RFM分析（真实DB） ───
+
+    async def _rfm_analysis(self, params: dict) -> AgentResult:
+        store_id = params.get("store_id") or self.store_id
+        top_n = params.get("top_n", 20)
+
+        if self._db:
+            from sqlalchemy import text
+            from datetime import datetime, timezone
+
+            now = datetime.now(timezone.utc)
+
+            rows = await self._db.execute(text("""
+                SELECT
+                    o.customer_id,
+                    COUNT(DISTINCT o.id) as frequency,
+                    MAX(o.completed_at) as last_order_at,
+                    COALESCE(SUM(o.final_amount_fen), 0) as monetary_fen,
+                    EXTRACT(DAY FROM NOW() - MAX(o.completed_at)) as recency_days
+                FROM orders o
+                WHERE o.tenant_id = :tenant_id
+                  AND (:store_id::UUID IS NULL OR o.store_id = :store_id::UUID)
+                  AND o.status = 'completed'
+                  AND o.customer_id IS NOT NULL
+                  AND o.completed_at >= NOW() - INTERVAL '90 days'
+                GROUP BY o.customer_id
+                ORDER BY monetary_fen DESC
+                LIMIT :top_n
+            """), {"tenant_id": self.tenant_id, "store_id": store_id, "top_n": top_n})
+
+            members = []
+            for row in rows.mappings():
+                r = dict(row)
+                recency = float(r.get("recency_days") or 90)
+                frequency = int(r.get("frequency") or 1)
+                monetary = int(r.get("monetary_fen") or 0)
+
+                # RFM评分（各1-5分）
+                r_score = 5 if recency <= 7 else (4 if recency <= 14 else (3 if recency <= 30 else (2 if recency <= 60 else 1)))
+                f_score = 5 if frequency >= 10 else (4 if frequency >= 6 else (3 if frequency >= 3 else (2 if frequency >= 2 else 1)))
+                m_score = 5 if monetary >= 50000 else (4 if monetary >= 20000 else (3 if monetary >= 10000 else (2 if monetary >= 5000 else 1)))
+                total = r_score + f_score + m_score
+
+                segment = "高价值" if total >= 13 else ("成长型" if total >= 10 else ("潜在" if total >= 7 else "流失风险"))
+
+                members.append({
+                    "customer_id": str(r["customer_id"]),
+                    "recency_days": round(recency, 1),
+                    "frequency": frequency,
+                    "monetary_fen": monetary,
+                    "rfm_score": total,
+                    "segment": segment,
+                    "r_score": r_score, "f_score": f_score, "m_score": m_score,
+                })
+
+            segments: dict[str, int] = {}
+            for m in members:
+                seg = m["segment"]
+                segments[seg] = segments.get(seg, 0) + 1
+
+            # Claude生成会员运营建议
+            suggestion = ""
+            if self._router and members:
+                try:
+                    seg_summary = "，".join([f"{k}{v}人" for k, v in segments.items()])
+                    suggestion = await self._router.complete(
+                        tenant_id=self.tenant_id,
+                        task_type="standard_analysis",
+                        system="你是餐饮会员运营专家，根据RFM数据给出精准的会员激活和留存建议，100字内，中文。",
+                        messages=[{"role": "user", "content":
+                            f"近90天会员分布：{seg_summary}，共{len(members)}名活跃会员。"
+                            f"高价值均消费{sum(m['monetary_fen'] for m in members if m['segment']=='高价值') // max(1, segments.get('高价值', 1)) / 100:.0f}元。"
+                            f"请给出运营建议。"}],
+                        max_tokens=200,
+                        db=self._db,
+                    )
+                except Exception as exc:  # noqa: BLE001 — Claude不可用时降级
+                    logger.warning("member_insight_llm_fallback", error=str(exc))
+
+            return AgentResult(
+                success=True, action="rfm_analysis",
+                data={
+                    "members": members,
+                    "total_analyzed": len(members),
+                    "segments": segments,
+                    "suggestion": suggestion,
+                },
+                reasoning=f"分析{len(members)}名会员：{dict(segments)}。{suggestion[:40] if suggestion else ''}",
+                confidence=0.9 if suggestion else 0.8,
+                inference_layer="cloud" if suggestion else "edge",
+            )
+
+        # 降级
+        members = params.get("members", [])
+        return AgentResult(
+            success=True, action="rfm_analysis",
+            data={"members": members, "total_analyzed": len(members), "segments": {}},
+            reasoning="无DB连接，返回传入数据",
+            confidence=0.5,
+        )
