@@ -1,6 +1,9 @@
-"""支付网关 — 收钱吧聚合支付对接 + 多支付拆单
+"""支付网关 — 收钱吧/拉卡拉聚合支付对接 + 多支付拆单
 
-收钱吧SDK封装：微信/支付宝/银联/云闪付统一处理。
+支持两个聚合支付 provider：
+  - 收钱吧 (ShouqianbA/Upay)：默认 provider
+  - 拉卡拉聚合支付：通过 lakala_client 参数启用
+
 所有金额单位：分（fen）。
 """
 import uuid
@@ -16,11 +19,14 @@ from shared.ontology.src.enums import OrderStatus
 from ..models.payment import Payment, Refund
 from ..models.enums import PaymentStatus, RefundType
 from .shouqianba_client import ShouqianbaClient, ShouqianbaError
+from .lakala_client import LakalaClient, LakalaError
 
 logger = structlog.get_logger()
 
 # 需要走收钱吧的支付方式
 _SQB_METHODS = {"wechat", "alipay", "unionpay"}
+# 需要走拉卡拉的支付方式（与收钱吧互斥，由构造时传入的 client 决定）
+_LKL_METHODS = {"wechat", "alipay", "unionpay", "yunshan"}
 
 
 def _gen_payment_no() -> str:
@@ -34,13 +40,8 @@ def _gen_refund_no() -> str:
 
 
 class PaymentGateway:
-    """支付网关 — 收钱吧聚合支付对接 + 多支付拆单
+    """支付网关 — 收钱吧/拉卡拉聚合支付对接 + 多支付拆单"""
 
-    收钱吧SDK封装：微信/支付宝/银联/云闪付统一处理。
-    """
-
-    # fee_rate_permil: 手续费千分比（整数），避免 float 精度问题
-    # 例：6 表示千分之六 (0.6%)
     PAYMENT_METHODS = {
         "cash": {"name": "现金", "need_trade_no": False, "fee_rate_permil": 0},
         "wechat": {"name": "微信支付", "need_trade_no": True, "fee_rate_permil": 6},
@@ -55,6 +56,7 @@ class PaymentGateway:
         db: AsyncSession,
         tenant_id: str,
         sqb_client: Optional[ShouqianbaClient] = None,
+        lakala_client: Optional[LakalaClient] = None,
     ):
         self.db = db
         if not tenant_id:
@@ -64,6 +66,7 @@ class PaymentGateway:
         except (ValueError, AttributeError) as exc:
             raise ValueError(f"tenant_id 格式非法: {tenant_id}") from exc
         self.sqb_client = sqb_client
+        self.lakala_client = lakala_client
 
     async def create_payment(
         self,
@@ -71,10 +74,15 @@ class PaymentGateway:
         method: str,
         amount_fen: int,
         auth_code: Optional[str] = None,
+        extra_params: Optional[dict] = None,
     ) -> dict:
-        """创建支付 — 扫码支付时 auth_code 为顾客付款码
+        """创建支付
 
-        对于微信/支付宝/银联等在线支付，调用收钱吧 Upay API。
+        extra_params（拉卡拉场景）:
+          - spbill_ip:  终端IP（默认 "127.0.0.1"）
+          - sub_openid: 用户openID（公众号/小程序必传）
+          - notify_url: 异步通知地址
+          - pay_type:   "dynamic_qr"（默认）/ "jsapi" / "mini_jsapi"
         """
         if method not in self.PAYMENT_METHODS:
             raise ValueError(f"不支持的支付方式: {method}")
@@ -83,7 +91,6 @@ class PaymentGateway:
 
         method_config = self.PAYMENT_METHODS[method]
 
-        # 验证订单存在
         order_uuid = uuid.UUID(order_id)
         result = await self.db.execute(
             select(Order).where(Order.id == order_uuid, Order.tenant_id == self.tenant_id)
@@ -93,52 +100,105 @@ class PaymentGateway:
             raise ValueError(f"订单不存在: {order_id}")
 
         payment_no = _gen_payment_no()
-
         trade_no = None
         qr_code = None
-        sqb_response: Optional[dict] = None
 
         if method in _SQB_METHODS and method_config["need_trade_no"]:
-            if not self.sqb_client:
-                raise RuntimeError("收钱吧客户端未配置，无法处理在线支付")
-
-            subject = f"订单{order_id[:8]}"
-            try:
-                if auth_code:
-                    # B扫C：收银员扫顾客付款码
-                    sqb_response = await self.sqb_client.pay(
-                        client_sn=payment_no,
-                        total_amount=amount_fen,
-                        dynamic_id=auth_code,
-                        subject=subject,
+            if self.lakala_client:
+                # ── 拉卡拉聚合支付 ──────────────────────────────────────────────
+                subject = f"订单{order_id[:8]}"
+                spbill_ip = (extra_params or {}).get("spbill_ip", "127.0.0.1")
+                sub_openid = (extra_params or {}).get("sub_openid", "")
+                notify_url = (extra_params or {}).get("notify_url", "")
+                try:
+                    if auth_code:
+                        lkl_response = await self.lakala_client.micropay(
+                            out_trade_no=payment_no,
+                            amount_fen=amount_fen,
+                            subject=subject,
+                            auth_code=auth_code,
+                            spbill_ip=spbill_ip,
+                            notify_url=notify_url,
+                        )
+                        trade_no = lkl_response.get("transactionId", "")
+                    else:
+                        pay_type = (extra_params or {}).get("pay_type", "dynamic_qr")
+                        if pay_type == "mini_jsapi":
+                            lkl_response = await self.lakala_client.mini_jsapi(
+                                out_trade_no=payment_no,
+                                amount_fen=amount_fen,
+                                subject=subject,
+                                spbill_ip=spbill_ip,
+                                sub_openid=sub_openid,
+                                notify_url=notify_url,
+                            )
+                        elif pay_type == "jsapi":
+                            lkl_response = await self.lakala_client.jsapi(
+                                out_trade_no=payment_no,
+                                amount_fen=amount_fen,
+                                subject=subject,
+                                spbill_ip=spbill_ip,
+                                sub_openid=sub_openid,
+                                notify_url=notify_url,
+                            )
+                        else:
+                            lkl_response = await self.lakala_client.dynamic_qr(
+                                out_trade_no=payment_no,
+                                amount_fen=amount_fen,
+                                subject=subject,
+                                spbill_ip=spbill_ip,
+                                notify_url=notify_url,
+                            )
+                            qr_code = lkl_response.get("qrUrl", "")
+                        trade_no = lkl_response.get("transactionId", "")
+                except LakalaError as exc:
+                    logger.error(
+                        "lakala_payment_failed",
+                        payment_no=payment_no,
+                        method=method,
+                        amount_fen=amount_fen,
+                        error=str(exc),
+                        rsp_code=exc.rsp_code,
                     )
-                    trade_no = sqb_response.get("sn")
-                else:
-                    # C扫B：顾客扫店铺码
-                    sqb_response = await self.sqb_client.precreate(
-                        client_sn=payment_no,
-                        total_amount=amount_fen,
-                        subject=subject,
-                    )
-                    trade_no = sqb_response.get("sn")
-                    qr_code = sqb_response.get("qr_code")
-            except ShouqianbaError as exc:
-                logger.error(
-                    "sqb_payment_failed",
-                    payment_no=payment_no,
-                    method=method,
-                    amount_fen=amount_fen,
-                    error=str(exc),
-                    result_code=exc.result_code,
-                    error_code=exc.error_code,
-                )
-                raise RuntimeError(f"收钱吧支付失败: {exc}") from exc
+                    raise RuntimeError(f"拉卡拉支付失败: {exc}") from exc
 
-        # 计算手续费（整数千分比，避免 float 精度丢失）
+            elif self.sqb_client:
+                # ── 收钱吧聚合支付 ──────────────────────────────────────────────
+                subject = f"订单{order_id[:8]}"
+                try:
+                    if auth_code:
+                        sqb_response = await self.sqb_client.pay(
+                            client_sn=payment_no,
+                            total_amount=amount_fen,
+                            dynamic_id=auth_code,
+                            subject=subject,
+                        )
+                        trade_no = sqb_response.get("sn")
+                    else:
+                        sqb_response = await self.sqb_client.precreate(
+                            client_sn=payment_no,
+                            total_amount=amount_fen,
+                            subject=subject,
+                        )
+                        trade_no = sqb_response.get("sn")
+                        qr_code = sqb_response.get("qr_code")
+                except ShouqianbaError as exc:
+                    logger.error(
+                        "sqb_payment_failed",
+                        payment_no=payment_no,
+                        method=method,
+                        amount_fen=amount_fen,
+                        error=str(exc),
+                        result_code=exc.result_code,
+                        error_code=exc.error_code,
+                    )
+                    raise RuntimeError(f"收钱吧支付失败: {exc}") from exc
+            else:
+                raise RuntimeError("支付客户端未配置（收钱吧/拉卡拉均未注入），无法处理在线支付")
+
         fee_rate_permil: int = method_config["fee_rate_permil"]
-        fee_fen = (amount_fen * fee_rate_permil + 999) // 1000  # 向上取整
+        fee_fen = (amount_fen * fee_rate_permil + 999) // 1000
 
-        # C扫B 预下单时状态为 pending（等待顾客扫码支付）
         initial_status = PaymentStatus.paid.value
         paid_at = datetime.now(timezone.utc)
         if method in _SQB_METHODS and not auth_code:
@@ -214,11 +274,7 @@ class PaymentGateway:
         refund_amount_fen: int,
         reason: str,
     ) -> dict:
-        """退款 — 原路返回
-
-        微信/支付宝等在线支付走原路退款（调收钱吧退款接口）。
-        现金退款标记状态。
-        """
+        """退款 — 原路返回"""
         pay_uuid = uuid.UUID(payment_id)
         result = await self.db.execute(
             select(Payment).where(Payment.id == pay_uuid, Payment.tenant_id == self.tenant_id)
@@ -233,7 +289,6 @@ class PaymentGateway:
         if refund_amount_fen <= 0:
             raise ValueError(f"退款金额必须大于0，当前值: {refund_amount_fen}")
 
-        # 查询已退款总额，防止多次部分退款累计超过支付金额
         existing_refunds_result = await self.db.execute(
             select(func.coalesce(func.sum(Refund.amount_fen), 0)).where(
                 Refund.payment_id == pay_uuid,
@@ -250,33 +305,51 @@ class PaymentGateway:
             )
 
         refund_no = _gen_refund_no()
-
-        # 原路退款：在线支付走收钱吧退款API
         refund_trade_no = None
-        method_config = self.PAYMENT_METHODS.get(payment.method, {})
-        if payment.method in _SQB_METHODS and payment.trade_no:
-            if not self.sqb_client:
-                raise RuntimeError("收钱吧客户端未配置，无法处理在线退款")
-            try:
-                sqb_refund_resp = await self.sqb_client.refund(
-                    sn=payment.trade_no,
-                    refund_request_no=refund_no,
-                    refund_amount=refund_amount_fen,
-                )
-                refund_trade_no = sqb_refund_resp.get("sn")
-            except ShouqianbaError as exc:
-                logger.error(
-                    "sqb_refund_failed",
-                    payment_no=payment.payment_no,
-                    refund_no=refund_no,
-                    amount_fen=refund_amount_fen,
-                    error=str(exc),
-                    result_code=exc.result_code,
-                    error_code=exc.error_code,
-                )
-                raise RuntimeError(f"收钱吧退款失败: {exc}") from exc
 
-        # 确定退款类型（基于累计退款总额判断）
+        if payment.method in _SQB_METHODS and payment.trade_no:
+            if self.lakala_client:
+                try:
+                    lkl_refund_resp = await self.lakala_client.refund(
+                        out_trade_no=payment.payment_no,
+                        out_refund_no=refund_no,
+                        refund_amount_fen=refund_amount_fen,
+                        total_amount_fen=payment.amount_fen,
+                        reason=reason,
+                    )
+                    refund_trade_no = lkl_refund_resp.get("transactionId", "")
+                except LakalaError as exc:
+                    logger.error(
+                        "lakala_refund_failed",
+                        payment_no=payment.payment_no,
+                        refund_no=refund_no,
+                        amount_fen=refund_amount_fen,
+                        error=str(exc),
+                        rsp_code=exc.rsp_code,
+                    )
+                    raise RuntimeError(f"拉卡拉退款失败: {exc}") from exc
+            elif self.sqb_client:
+                try:
+                    sqb_refund_resp = await self.sqb_client.refund(
+                        sn=payment.trade_no,
+                        refund_request_no=refund_no,
+                        refund_amount=refund_amount_fen,
+                    )
+                    refund_trade_no = sqb_refund_resp.get("sn")
+                except ShouqianbaError as exc:
+                    logger.error(
+                        "sqb_refund_failed",
+                        payment_no=payment.payment_no,
+                        refund_no=refund_no,
+                        amount_fen=refund_amount_fen,
+                        error=str(exc),
+                        result_code=exc.result_code,
+                        error_code=exc.error_code,
+                    )
+                    raise RuntimeError(f"收钱吧退款失败: {exc}") from exc
+            else:
+                raise RuntimeError("支付客户端未配置，无法处理在线退款")
+
         total_refunded_after = already_refunded_fen + refund_amount_fen
         refund_type = (
             RefundType.full.value
@@ -298,14 +371,12 @@ class PaymentGateway:
         )
         self.db.add(refund_record)
 
-        # 更新支付状态（基于累计退款总额判断）
         new_status = (
             PaymentStatus.refunded.value
             if total_refunded_after == payment.amount_fen
             else PaymentStatus.partial_refund.value
         )
         payment.status = new_status
-
         await self.db.flush()
 
         logger.info(
@@ -324,18 +395,8 @@ class PaymentGateway:
             "status": new_status,
         }
 
-    async def split_payment(
-        self,
-        order_id: str,
-        splits: list[dict],
-    ) -> dict:
-        """拆单支付 — 多种支付方式组合
-
-        Args:
-            splits: [{method, amount_fen, auth_code?}]
-
-        按顺序执行每笔支付。任一失败则回滚已成功的支付。
-        """
+    async def split_payment(self, order_id: str, splits: list[dict]) -> dict:
+        """拆单支付 — 多种支付方式组合，任一失败自动回滚"""
         order_uuid = uuid.UUID(order_id)
         result = await self.db.execute(
             select(Order).where(Order.id == order_uuid, Order.tenant_id == self.tenant_id)
@@ -347,24 +408,18 @@ class PaymentGateway:
         if not splits:
             raise ValueError("拆单列表不能为空")
 
-        # 逐项校验
         for idx, s in enumerate(splits):
             if "method" not in s or "amount_fen" not in s:
                 raise ValueError(f"拆单第{idx+1}项缺少 method 或 amount_fen")
             if not isinstance(s["amount_fen"], int) or s["amount_fen"] <= 0:
                 raise ValueError(f"拆单第{idx+1}项金额必须为正整数(分)")
 
-        # 校验总额
         total_split = sum(s["amount_fen"] for s in splits)
         if total_split != order.final_amount_fen:
-            raise ValueError(
-                f"拆单总额 {total_split} != 订单应付 {order.final_amount_fen}"
-            )
+            raise ValueError(f"拆单总额 {total_split} != 订单应付 {order.final_amount_fen}")
 
-        # 按顺序执行支付
         payment_records = []
         total_fee_fen = 0
-        completed_payment_ids = []
 
         for i, split in enumerate(splits):
             try:
@@ -376,17 +431,10 @@ class PaymentGateway:
                 )
                 payment_records.append(pay_result)
                 total_fee_fen += pay_result["fee_fen"]
-                completed_payment_ids.append(pay_result["payment_id"])
             except (ValueError, RuntimeError) as e:
-                # 回滚已完成的支付
-                logger.error(
-                    "split_payment_failed",
-                    order_id=order_id,
-                    failed_index=i,
-                    error=str(e),
-                )
-                # 回滚：已完成的在线支付需调用收钱吧退款/撤单
+                logger.error("split_payment_failed", order_id=order_id, failed_index=i, error=str(e))
                 rollback_errors: list[str] = []
+
                 for pay_rec in payment_records:
                     pid = pay_rec["payment_id"]
                     pay_q = await self.db.execute(
@@ -396,45 +444,40 @@ class PaymentGateway:
                     if not pay:
                         continue
 
-                    # 在线支付且有 trade_no，需调收钱吧撤单
-                    if (
-                        pay.method in _SQB_METHODS
-                        and pay.trade_no
-                        and self.sqb_client
-                    ):
-                        try:
-                            await self.sqb_client.cancel(pay.trade_no)
-                            logger.info(
-                                "split_rollback_cancel_ok",
-                                payment_no=pay.payment_no,
-                                trade_no=pay.trade_no,
-                            )
-                        except ShouqianbaError as cancel_err:
-                            # 撤单失败，尝试退款
+                    if pay.method in _SQB_METHODS:
+                        if self.lakala_client:
                             try:
-                                rollback_refund_no = _gen_refund_no()
-                                await self.sqb_client.refund(
-                                    sn=pay.trade_no,
-                                    refund_request_no=rollback_refund_no,
-                                    refund_amount=pay.amount_fen,
-                                )
-                                logger.info(
-                                    "split_rollback_refund_ok",
-                                    payment_no=pay.payment_no,
-                                    trade_no=pay.trade_no,
-                                )
-                            except ShouqianbaError as refund_err:
-                                rollback_errors.append(
-                                    f"{pay.payment_no}: 撤单失败({cancel_err})，"
-                                    f"退款也失败({refund_err})"
-                                )
-                                logger.error(
-                                    "split_rollback_failed",
-                                    payment_no=pay.payment_no,
-                                    trade_no=pay.trade_no,
-                                    cancel_error=str(cancel_err),
-                                    refund_error=str(refund_err),
-                                )
+                                await self.lakala_client.close(pay.payment_no)
+                                logger.info("split_rollback_lkl_close_ok", payment_no=pay.payment_no)
+                            except LakalaError as close_err:
+                                try:
+                                    rollback_refund_no = _gen_refund_no()
+                                    await self.lakala_client.refund(
+                                        out_trade_no=pay.payment_no,
+                                        out_refund_no=rollback_refund_no,
+                                        refund_amount_fen=pay.amount_fen,
+                                        total_amount_fen=pay.amount_fen,
+                                    )
+                                    logger.info("split_rollback_lkl_refund_ok", payment_no=pay.payment_no)
+                                except LakalaError as refund_err:
+                                    rollback_errors.append(
+                                        f"{pay.payment_no}: 拉卡拉关单失败({close_err})，退款也失败({refund_err})"
+                                    )
+                        elif pay.trade_no and self.sqb_client:
+                            try:
+                                await self.sqb_client.cancel(pay.trade_no)
+                            except ShouqianbaError as cancel_err:
+                                try:
+                                    rollback_refund_no = _gen_refund_no()
+                                    await self.sqb_client.refund(
+                                        sn=pay.trade_no,
+                                        refund_request_no=rollback_refund_no,
+                                        refund_amount=pay.amount_fen,
+                                    )
+                                except ShouqianbaError as refund_err:
+                                    rollback_errors.append(
+                                        f"{pay.payment_no}: 撤单失败({cancel_err})，退款也失败({refund_err})"
+                                    )
 
                     pay.status = PaymentStatus.failed.value
 
@@ -458,20 +501,11 @@ class PaymentGateway:
             "total_fee_fen": total_fee_fen,
         }
 
-    async def daily_summary(
-        self,
-        store_id: str,
-        biz_date: str,
-    ) -> dict:
-        """日汇总 — 按支付方式汇总当日流水
-
-        Args:
-            biz_date: "YYYY-MM-DD"
-        """
+    async def daily_summary(self, store_id: str, biz_date: str) -> dict:
+        """日汇总 — 按支付方式汇总当日流水"""
         store_uuid = uuid.UUID(store_id)
         target_date = datetime.strptime(biz_date, "%Y-%m-%d").date()
 
-        # 查当日所有已完成订单
         orders_result = await self.db.execute(
             select(Order).where(
                 Order.store_id == store_uuid,
@@ -494,7 +528,6 @@ class PaymentGateway:
                 "by_method": {},
             }
 
-        # 查所有支付记录（必须带 tenant_id 过滤）
         payments_result = await self.db.execute(
             select(Payment).where(
                 Payment.order_id.in_(order_ids),
@@ -504,7 +537,6 @@ class PaymentGateway:
         )
         payments = payments_result.scalars().all()
 
-        # 查退款（必须带 tenant_id 过滤）
         refunds_result = await self.db.execute(
             select(Refund).where(
                 Refund.order_id.in_(order_ids),
@@ -513,7 +545,6 @@ class PaymentGateway:
         )
         refunds = refunds_result.scalars().all()
 
-        # 按支付方式汇总
         by_method = {}
         total_revenue = 0
         total_fee = 0
