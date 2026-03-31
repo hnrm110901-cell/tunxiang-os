@@ -173,9 +173,8 @@ class CostTracker:
                 "created_at":    record.created_at,
             })
             await db.commit()
-        except Exception as exc:
-            # 成本记录失败不应影响主业务，仅 warning
-            logger.warning("cost_record_failed", error=str(exc), tenant_id=record.tenant_id)
+        except Exception as exc:  # noqa: BLE001 — 成本记录失败不阻塞主业务
+            logger.warning("cost_record_failed", error=str(exc), tenant_id=record.tenant_id, exc_info=True)
 
     async def get_tenant_usage(
         self,
@@ -236,8 +235,8 @@ class CostTracker:
         try:
             agg_row   = (await db.execute(aggregate_sql, params)).mappings().one()
             model_rows = (await db.execute(by_model_sql, params)).mappings().all()
-        except Exception as exc:
-            logger.error("get_tenant_usage_failed", error=str(exc), tenant_id=tenant_id)
+        except Exception as exc:  # noqa: BLE001 — DB查询失败降级返回空统计
+            logger.error("get_tenant_usage_failed", error=str(exc), tenant_id=tenant_id, exc_info=True)
             return {
                 "tenant_id": tenant_id,
                 "start_date": str(start_date),
@@ -330,8 +329,8 @@ class CircuitBreaker:
                 import redis.asyncio as aioredis
                 self._redis = aioredis.from_url(self._redis_url, decode_responses=True)
                 await self._redis.ping()
-            except Exception as exc:
-                logger.warning("circuit_breaker_redis_unavailable", reason=str(exc))
+            except Exception as exc:  # noqa: BLE001 — Redis连接失败降级为内存状态
+                logger.warning("circuit_breaker_redis_unavailable", reason=str(exc), exc_info=True)
                 self._redis = None
                 self._redis_available = False
         return self._redis
@@ -360,8 +359,8 @@ class CircuitBreaker:
             failure_count = int(failure_val) if failure_val else 0
             opened_at = float(opened_val) if opened_val else None
             return state, failure_count, opened_at
-        except Exception as exc:
-            logger.warning("circuit_breaker_redis_read_failed", reason=str(exc))
+        except Exception as exc:  # noqa: BLE001 — Redis读取失败降级为内存状态
+            logger.warning("circuit_breaker_redis_read_failed", reason=str(exc), exc_info=True)
             return self._state, self._failure_count, self._opened_at
 
     async def _save_state(
@@ -389,8 +388,8 @@ class CircuitBreaker:
             else:
                 pipe.delete(self._redis_key("opened_at"))
             await pipe.execute()
-        except Exception as exc:
-            logger.warning("circuit_breaker_redis_write_failed", reason=str(exc))
+        except Exception as exc:  # noqa: BLE001 — Redis写入失败仅影响跨进程共享，内存状态已更新
+            logger.warning("circuit_breaker_redis_write_failed", reason=str(exc), exc_info=True)
 
     # ── 核心状态机 ──────────────────────────────────────────────────────────
 
@@ -469,8 +468,7 @@ class CircuitBreaker:
             raise
         except CircuitOpenError:
             raise
-        except Exception as exc:
-            # 其他异常不计入熔断计数
+        except Exception as exc:  # noqa: BLE001 — 其他异常不计入熔断计数，直接透传
             raise
 
 
