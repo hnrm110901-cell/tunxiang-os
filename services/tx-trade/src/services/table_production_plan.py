@@ -172,7 +172,7 @@ class TableFireCoordinator:
         try:
             db.add(db_plan)
             await db.flush()
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 — MLPS3-P0: DB flush异常类型多变，记录后上抛
             log.error(
                 "table_fire.create_plan.db_error",
                 error=str(exc),
@@ -247,7 +247,7 @@ class TableFireCoordinator:
             )
             await db.execute(stmt)
             await db.flush()
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 — MLPS3-P0: DB execute异常类型多变，记录后上抛
             log.error(
                 "table_fire.notify_dept_ready.db_error",
                 error=str(exc),
@@ -280,7 +280,7 @@ class TableFireCoordinator:
                         "ready_at": datetime.now(timezone.utc).isoformat(),
                     },
                 )
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 — MLPS3-P0: WS推送失败不阻断业务，最外层兜底
                 # WebSocket 推送失败不阻断业务流程，记录日志
                 log.error(
                     "table_fire.notify_dept_ready.ws_push_failed",

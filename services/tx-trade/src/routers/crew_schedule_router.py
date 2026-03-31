@@ -166,7 +166,7 @@ async def checkin(
     except ValueError as e:
         log.warning("crew_checkin_value_error", error=str(e))
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 — MLPS3-P0: 最外层HTTP兜底
         log.error("crew_checkin_error", error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail="服务器内部错误")
 
@@ -200,7 +200,7 @@ async def get_schedule(
     except ValueError as e:
         log.warning("crew_schedule_value_error", error=str(e))
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 — MLPS3-P0: 最外层HTTP兜底
         log.error("crew_schedule_error", error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail="服务器内部错误")
 
@@ -249,7 +249,7 @@ async def create_shift_swap(
     except ValueError as e:
         log.warning("crew_shift_swap_value_error", error=str(e))
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 — MLPS3-P0: 最外层HTTP兜底
         log.error("crew_shift_swap_error", error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail="服务器内部错误")
 
@@ -278,6 +278,6 @@ async def get_my_shift_swaps(
     except ValueError as e:
         log.warning("crew_shift_swaps_value_error", error=str(e))
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 — MLPS3-P0: 最外层HTTP兜底
         log.error("crew_shift_swaps_error", error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail="服务器内部错误")

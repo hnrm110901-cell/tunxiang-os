@@ -8,6 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .middleware import TenantMiddleware, RequestLogMiddleware
+from .middleware.audit_middleware import AuditMiddleware
 from .proxy import router as proxy_router
 from .auth import router as auth_router
 from .hub_api import router as hub_router
@@ -99,6 +100,8 @@ async def _shutdown() -> None:
     logger.info("gateway_scheduler_stopped")
 
 # Middleware（执行顺序：后添加先执行）
+# AuditMiddleware 在 RateLimiter 之后执行（先添加先执行），记录所有敏感路径和4xx/5xx
+app.add_middleware(AuditMiddleware)
 app.add_middleware(RequestLogMiddleware)
 app.add_middleware(TenantMiddleware)
 app.add_middleware(

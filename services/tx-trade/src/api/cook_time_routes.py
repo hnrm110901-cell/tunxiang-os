@@ -69,7 +69,7 @@ async def _daily_recompute_job(db_factory) -> None:
                 # 此处无法枚举所有租户，需由平台层调用或改为事件驱动
                 # 实际生产中应从 tenants 表查出所有活跃租户再逐一触发
                 log.info("cook_time_stats.scheduler.trigger", note="需从tenants表枚举所有租户")
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 — MLPS3-P0: 后台定时任务最外层兜底，不能崩溃
             log.error("cook_time_stats.scheduler.failed", error=str(exc))
 
 
@@ -215,7 +215,7 @@ async def trigger_recompute(
                 "cook_time_stats.manual_recompute.done",
                 baselines_updated=len(baselines),
             )
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 — MLPS3-P0: 后台重算任务最外层兜底
             log.error("cook_time_stats.manual_recompute.failed", error=str(exc))
 
     background_tasks.add_task(_do_recompute, dept_id, tenant_id)

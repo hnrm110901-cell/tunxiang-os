@@ -281,7 +281,7 @@ async def expo_dispatch_and_fire(
             dept_tasks=dept_tasks,
             db=db,
         )
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — MLPS3-P0: 创建失败不阻断分单，最外层兜底
         # TableFire 创建失败不阻断分单流程，记录日志后继续
         log.error(
             "expo_routes.dispatch_fire.table_fire_failed",

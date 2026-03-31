@@ -151,3 +151,72 @@ class RateLimiter:
                 error=str(exc),
             )
             return None
+
+
+class LoginBruteForceProtection:
+    """
+    等保三级要求：连续失败5次→锁定30分钟
+    独立于普通限速，专门针对登录接口
+    Key: "login_fail:ip:{ip}" 和 "login_fail:user:{username}"
+    """
+
+    MAX_ATTEMPTS = 5
+    LOCKOUT_SECONDS = 1800  # 30分钟
+
+    def __init__(self, redis_client=None) -> None:
+        self._redis = redis_client
+
+    def set_redis(self, client) -> None:
+        self._redis = client
+
+    async def record_failure(self, ip: str, username: str) -> int:
+        """记录失败，返回剩余尝试次数。Redis不可用时降级为放行。"""
+        if not self._redis:
+            return self.MAX_ATTEMPTS
+        try:
+            pipe = self._redis.pipeline()
+            ip_key = f"login_fail:ip:{ip}"
+            user_key = f"login_fail:user:{username}"
+            pipe.incr(ip_key)
+            pipe.expire(ip_key, self.LOCKOUT_SECONDS)
+            pipe.incr(user_key)
+            pipe.expire(user_key, self.LOCKOUT_SECONDS)
+            results = await pipe.execute()
+            count = max(results[0], results[2])
+            remaining = max(0, self.MAX_ATTEMPTS - count)
+            logger.info(
+                "login_failure_recorded",
+                ip=ip,
+                username=username,
+                count=count,
+                remaining=remaining,
+            )
+            return remaining
+        except Exception as exc:  # noqa: BLE001 — Redis故障不阻断登录（降级）
+            logger.warning("brute_force_redis_error", error=str(exc))
+            return self.MAX_ATTEMPTS
+
+    async def is_locked(self, ip: str, username: str) -> bool:
+        """检查IP或用户名是否已被锁定。"""
+        if not self._redis:
+            return False
+        try:
+            ip_key = f"login_fail:ip:{ip}"
+            user_key = f"login_fail:user:{username}"
+            ip_count = await self._redis.get(ip_key) or 0
+            user_count = await self._redis.get(user_key) or 0
+            return int(ip_count) >= self.MAX_ATTEMPTS or int(user_count) >= self.MAX_ATTEMPTS
+        except Exception as exc:  # noqa: BLE001 — Redis故障降级为放行
+            logger.warning("brute_force_check_error", error=str(exc))
+            return False
+
+    async def clear_on_success(self, ip: str, username: str) -> None:
+        """登录成功后清除失败计数。"""
+        if not self._redis:
+            return
+        try:
+            await self._redis.delete(
+                f"login_fail:ip:{ip}", f"login_fail:user:{username}"
+            )
+        except Exception as exc:  # noqa: BLE001 — Redis故障不阻断成功登录
+            logger.warning("brute_force_clear_error", error=str(exc))

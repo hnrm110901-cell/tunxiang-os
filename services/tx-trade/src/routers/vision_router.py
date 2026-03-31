@@ -187,7 +187,7 @@ async def recognize_dish(
     if matches is None:
         try:
             matches = await _recognize_via_claude(body.image_base64, body.store_id)
-        except Exception as exc:
+        except (httpx.HTTPError, httpx.TimeoutException, ValueError, KeyError) as exc:  # MLPS3-P0: 异常收窄
             logger.error("claude_vision_error", error=str(exc), store_id=body.store_id, exc_info=True)
             matches = []
 

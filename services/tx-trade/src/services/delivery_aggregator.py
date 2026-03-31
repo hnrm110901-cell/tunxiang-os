@@ -193,7 +193,7 @@ class DeliveryAggregator:
                 )
                 log.info("delivery_order_broadcasted_to_kds",
                          platform_order_id=order.platform_order_id)
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 — MLPS3-P0: KDS广播失败不阻断接单，最外层兜底
                 # 广播失败不阻断主流程
                 log.warning("delivery_kds_broadcast_failed", error=str(exc), exc_info=True)
 

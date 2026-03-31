@@ -47,6 +47,11 @@ services:
       WECOM_CALLBACK_TOKEN: ${WECOM_CALLBACK_TOKEN}
       TX_MEMBER_SERVICE_URL: http://tx-member:8003
       TX_GROWTH_SERVICE_URL: http://tx-growth:8004
+      # 等保三级安全认证配置（生产环境必须在 /etc/txos/security.env 中配置真实值）
+      TX_JWT_SECRET_KEY: ${TX_JWT_SECRET_KEY:-dev_jwt_secret_key_CHANGE_IN_PRODUCTION_32chars}
+      TX_MFA_ENCRYPT_KEY: ${TX_MFA_ENCRYPT_KEY:-}
+      TX_FIELD_ENCRYPTION_KEY: ${TX_FIELD_ENCRYPTION_KEY:-}
+      TX_INTEGRITY_SECRET: ${TX_INTEGRITY_SECRET:-}
     depends_on:
       postgres:
         condition: service_healthy

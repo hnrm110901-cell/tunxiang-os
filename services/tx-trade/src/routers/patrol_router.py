@@ -111,7 +111,7 @@ async def patrol_checkin(
     except ValueError as exc:
         log.warning("patrol_checkin_value_error", error=str(exc))
         raise HTTPException(status_code=400, detail=str(exc))
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — MLPS3-P0: 最外层HTTP兜底，异常收窄至此
         log.error("patrol_checkin_error", error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="服务器内部错误")
 
@@ -170,6 +170,6 @@ async def patrol_summary(
     except ValueError as exc:
         log.warning("patrol_summary_value_error", error=str(exc))
         raise HTTPException(status_code=400, detail=str(exc))
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — MLPS3-P0: 最外层HTTP兜底
         log.error("patrol_summary_error", error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="服务器内部错误")

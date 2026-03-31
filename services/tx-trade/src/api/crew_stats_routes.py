@@ -133,7 +133,7 @@ async def get_my_stats(
     except KeyError as e:
         log.warning("crew_stats_me_key_error", error=str(e))
         raise HTTPException(status_code=400, detail=f"无效参数: {e}")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 — MLPS3-P0: 最外层HTTP兜底
         log.error("crew_stats_me_error", error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail="服务器内部错误")
 
@@ -161,7 +161,7 @@ async def get_leaderboard(
     except ValueError as e:
         log.warning("crew_stats_leaderboard_value_error", error=str(e))
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 — MLPS3-P0: 最外层HTTP兜底
         log.error("crew_stats_leaderboard_error", error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail="服务器内部错误")
 
@@ -182,6 +182,6 @@ async def get_trend(
     except ValueError as e:
         log.warning("crew_stats_trend_value_error", error=str(e))
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 — MLPS3-P0: 最外层HTTP兜底
         log.error("crew_stats_trend_error", error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail="服务器内部错误")

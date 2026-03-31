@@ -22,6 +22,9 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from shared.ontology.permissions import Action, Resource
+from shared.ontology.roles import PlatformRole, TenantRole
+from ..middleware.rbac import UserContext, require_permission, require_roles
 from ..services.audit_log_service import AuditAction, AuditEntry, AuditLogService
 from ..services.security_report_service import SecurityReportService
 
@@ -95,6 +98,11 @@ async def list_audit_logs(
     size: int = Query(20, ge=1, le=200, description="每页条数，最大200"),
     db: AsyncSession = Depends(_get_db),
     audit_svc: AuditLogService = Depends(_get_audit_service),
+    # 三权分立：只有 audit_admin（平台）或 auditor（租户内）可查看审计日志
+    # system_admin 被明确排除（权限矩阵中无 AUDIT_LOGS 权限）
+    _user: UserContext = Depends(
+        require_roles(PlatformRole.AUDIT_ADMIN, TenantRole.AUDITOR)
+    ),
 ) -> JSONResponse:
     """
     分页查询审计日志，支持多维度过滤。
@@ -123,6 +131,10 @@ async def get_security_alerts(
     hours: int = Query(24, ge=1, le=168, description="查询过去 N 小时，最大168（7天）"),
     db: AsyncSession = Depends(_get_db),
     audit_svc: AuditLogService = Depends(_get_audit_service),
+    # 安全告警属于审计域，需要 audit_admin 或 security_admin
+    _user: UserContext = Depends(
+        require_roles(PlatformRole.AUDIT_ADMIN, PlatformRole.SECURITY_ADMIN, TenantRole.AUDITOR)
+    ),
 ) -> JSONResponse:
     """
     返回最近 N 小时内的安全告警，包括：
@@ -203,6 +215,8 @@ async def export_audit_logs(
     body: AuditLogExportRequest,
     db: AsyncSession = Depends(_get_db),
     audit_svc: AuditLogService = Depends(_get_audit_service),
+    # 导出审计日志是高风险操作，仅允许 audit_admin（三权分立：system_admin 不可导出）
+    _user: UserContext = Depends(require_roles(PlatformRole.AUDIT_ADMIN)),
 ) -> JSONResponse:
     """
     导出审计日志（JSON 格式）。

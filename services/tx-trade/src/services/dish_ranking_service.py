@@ -16,6 +16,7 @@ from typing import List, Optional
 
 import structlog
 from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = structlog.get_logger()
@@ -78,7 +79,7 @@ class DishRankingService:
             hot = await DishRankingService._query_hot(store_id, tenant_id, db, date_str)
             remake = await DishRankingService._query_remake(store_id, tenant_id, db, date_str)
             cold = await DishRankingService._query_cold(store_id, tenant_id, db, date_str)
-        except Exception as exc:
+        except SQLAlchemyError as exc:  # MLPS3-P0: 异常收窄
             logger.error(
                 "dish_ranking.get_rankings_failed",
                 store_id=store_id,
@@ -333,7 +334,7 @@ class DishRankingService:
             if row is None or row.total_count == 0:
                 return 0.0
             return round(row.remake_count / row.total_count, 4)
-        except Exception as exc:
+        except SQLAlchemyError as exc:  # MLPS3-P0: 异常收窄
             logger.error(
                 "dish_ranking.get_remake_rate_failed",
                 dish_id=dish_id,

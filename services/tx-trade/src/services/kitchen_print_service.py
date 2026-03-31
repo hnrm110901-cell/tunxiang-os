@@ -365,7 +365,7 @@ async def _enqueue_for_retry(
             job_id=job_id,
             print_error=error_reason,
         )
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — MLPS3-P0: 打印重试入队失败，最外层兜底不阻断业务
         log.error("kitchen_print.enqueue_failed", error=str(exc), exc_info=True)
 
 

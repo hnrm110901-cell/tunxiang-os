@@ -6,3 +6,5 @@ asyncpg>=0.29.0
 structlog>=24.0.0
 httpx>=0.27.0
 apscheduler>=3.10.0  # RFM定时Job + tx-member scheduler
+# ── Phase 2: PII字段AES-256加密 ──
+cryptography>=42.0.0  # AES-256-GCM字段级加密（shared/utils/field_encryption.py）

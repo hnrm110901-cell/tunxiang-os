@@ -205,6 +205,6 @@ async def get_shift_summary_history(
     except ValueError as e:
         log.warning("shift_summary_history_value_error", error=str(e))
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 — MLPS3-P0: 最外层HTTP兜底
         log.error("shift_summary_history_error", error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail="服务器内部错误")

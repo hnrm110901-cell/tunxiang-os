@@ -43,7 +43,7 @@ async def _get_db():
         from shared.ontology.src.database import async_session_factory
         async with async_session_factory() as session:
             yield session
-    except Exception:
+    except Exception:  # noqa: BLE001 — MLPS3-P0: 离线/测试环境DB不可用，降级为None
         yield None
 
 

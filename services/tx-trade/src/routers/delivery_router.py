@@ -96,7 +96,7 @@ async def _handle_webhook(
     try:
         raw_body: bytes = await request.body()
         payload: dict = await request.json()
-    except Exception as exc:
+    except (ValueError, KeyError, UnicodeDecodeError) as exc:  # MLPS3-P0: 异常收窄
         log.warning("delivery_webhook_parse_body_failed", error=str(exc))
         raise HTTPException(status_code=400, detail="请求体解析失败") from exc
 
@@ -135,7 +135,7 @@ async def webhook_meituan(
     except ValueError as exc:
         logger.warning("webhook_meituan_value_error", error=str(exc))
         raise HTTPException(status_code=400, detail=str(exc))
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — MLPS3-P0: 最外层HTTP兜底
         logger.error("webhook_meituan_error", error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="服务器内部错误")
 
@@ -159,7 +159,7 @@ async def webhook_eleme(
     except ValueError as exc:
         logger.warning("webhook_eleme_value_error", error=str(exc))
         raise HTTPException(status_code=400, detail=str(exc))
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — MLPS3-P0: 最外层HTTP兜底
         logger.error("webhook_eleme_error", error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="服务器内部错误")
 
@@ -183,7 +183,7 @@ async def webhook_douyin(
     except ValueError as exc:
         logger.warning("webhook_douyin_value_error", error=str(exc))
         raise HTTPException(status_code=400, detail=str(exc))
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — MLPS3-P0: 最外层HTTP兜底
         logger.error("webhook_douyin_error", error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="服务器内部错误")
 
@@ -235,7 +235,7 @@ async def list_delivery_orders(
 
     except HTTPException:
         raise
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — MLPS3-P0: 最外层HTTP兜底
         log.error("delivery_list_orders_error", error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="服务器内部错误")
 
@@ -258,7 +258,7 @@ async def get_delivery_order(
 
     except HTTPException:
         raise
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — MLPS3-P0: 最外层HTTP兜底
         log.error("delivery_get_order_error", error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="服务器内部错误")
 
@@ -287,7 +287,7 @@ async def confirm_delivery_order(
     except ValueError as exc:
         log.warning("delivery_confirm_value_error", error=str(exc))
         raise HTTPException(status_code=400, detail=str(exc))
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — MLPS3-P0: 最外层HTTP兜底
         log.error("delivery_confirm_error", error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="服务器内部错误")
 
@@ -317,7 +317,7 @@ async def reject_delivery_order(
     except ValueError as exc:
         log.warning("delivery_reject_value_error", error=str(exc))
         raise HTTPException(status_code=400, detail=str(exc))
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — MLPS3-P0: 最外层HTTP兜底
         log.error("delivery_reject_error", error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="服务器内部错误")
 
@@ -362,7 +362,7 @@ async def delivery_daily_stats(
     except ValueError as exc:
         log.warning("delivery_daily_stats_value_error", error=str(exc))
         raise HTTPException(status_code=400, detail=str(exc))
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — MLPS3-P0: 最外层HTTP兜底
         log.error("delivery_daily_stats_error", error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="服务器内部错误")
 
@@ -423,7 +423,7 @@ async def delivery_commission_stats(
     except ValueError as exc:
         log.warning("delivery_commission_stats_value_error", error=str(exc))
         raise HTTPException(status_code=400, detail=f"日期格式错误: {exc}")
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — MLPS3-P0: 最外层HTTP兜底
         log.error("delivery_commission_stats_error", error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="服务器内部错误")
 
@@ -451,7 +451,7 @@ async def list_platform_configs(
 
     except HTTPException:
         raise
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — MLPS3-P0: 最外层HTTP兜底
         log.error("delivery_list_platforms_error", error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="服务器内部错误")
 
@@ -501,7 +501,7 @@ async def create_platform_config(
     except ValueError as exc:
         log.warning("delivery_create_platform_config_value_error", error=str(exc))
         raise HTTPException(status_code=400, detail=str(exc))
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — MLPS3-P0: 最外层HTTP兜底
         log.error("delivery_create_platform_config_error", error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="服务器内部错误")
 
@@ -543,6 +543,6 @@ async def update_platform_config(
     except ValueError as exc:
         log.warning("delivery_update_platform_config_value_error", error=str(exc))
         raise HTTPException(status_code=400, detail=str(exc))
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — MLPS3-P0: 最外层HTTP兜底
         log.error("delivery_update_platform_config_error", error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="服务器内部错误")

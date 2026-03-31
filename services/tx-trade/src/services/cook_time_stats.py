@@ -16,6 +16,7 @@ from typing import Optional
 
 import structlog
 from sqlalchemy import select, text, and_
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models.cook_time_baseline import CookTimeBaseline, MIN_RELIABLE_SAMPLES
@@ -109,7 +110,7 @@ class CookTimeStatsService:
         try:
             result = await self._db.execute(sql, params)
             rows = result.all()
-        except Exception as exc:
+        except SQLAlchemyError as exc:  # MLPS3-P0: 异常收窄（kds_tasks表可能不存在）
             # kds_tasks表可能还不存在（P1-A并行开发中）
             log.warning(
                 "cook_time_stats.recompute.kds_tasks_unavailable",
@@ -309,7 +310,7 @@ class CookTimeStatsService:
                 "tenant_id": tenant_id,
             })
             rows = result.all()
-        except Exception as exc:
+        except SQLAlchemyError as exc:  # MLPS3-P0: 异常收窄
             log.warning("cook_time_stats.queue_estimate.query_failed", error=str(exc))
             rows = []
 
@@ -419,7 +420,7 @@ class CookTimeStatsService:
         try:
             result = await self._db.execute(stmt)
             baselines = result.scalars().all()
-        except Exception as exc:
+        except SQLAlchemyError as exc:  # MLPS3-P0: 异常收窄
             logger.warning(
                 "cook_time_stats.get_dept_baselines.failed",
                 dept_id=dept_id,
@@ -485,7 +486,7 @@ class CookTimeStatsService:
         try:
             result = await self._db.execute(stmt)
             baseline = result.scalar_one_or_none()
-        except Exception as exc:
+        except SQLAlchemyError as exc:  # MLPS3-P0: 异常收窄
             logger.warning(
                 "cook_time_stats._get_baseline.query_failed",
                 dish_id=dish_id,
@@ -531,7 +532,7 @@ class CookTimeStatsService:
             result = await self._db.execute(stmt)
             minutes = result.scalar_one_or_none()
             return int(minutes) if minutes and minutes > 0 else 25
-        except Exception as exc:
+        except SQLAlchemyError as exc:  # MLPS3-P0: 异常收窄
             logger.warning(
                 "cook_time_stats._get_dept_default.query_failed",
                 dept_id=dept_id,
@@ -595,7 +596,7 @@ class CookTimeStatsService:
 
             await self._db.flush()
 
-        except Exception as exc:
+        except SQLAlchemyError as exc:  # MLPS3-P0: 异常收窄
             logger.warning(
                 "cook_time_stats._upsert_baseline.failed",
                 dish_id=str(dish_id),
