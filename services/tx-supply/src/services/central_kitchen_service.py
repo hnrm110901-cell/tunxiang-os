@@ -430,6 +430,120 @@ class CentralKitchenService:
             raise ValueError(f"生产计划 {plan_id} 不属于当前租户")
         return ProductionPlan(**plan)
 
+    # ── 生产计划状态流转 ───────────────────────────────────────────────
+
+    async def start_production(
+        self,
+        tenant_id: str,
+        plan_id: str,
+    ) -> ProductionPlan:
+        """开始生产：将已确认计划状态更新为 in_progress，并将所有 pending 工单标记为 in_progress。
+
+        状态机：confirmed → in_progress
+
+        Args:
+            tenant_id: 租户 ID
+            plan_id: 生产计划 ID
+
+        Returns:
+            更新后的 ProductionPlan
+
+        Raises:
+            ValueError: 计划不存在/不属于当前租户/状态不是 confirmed
+        """
+        plan = _plans.get(plan_id)
+        if not plan:
+            raise ValueError(f"生产计划 {plan_id} 不存在")
+        if plan["tenant_id"] != tenant_id:
+            raise ValueError(f"生产计划 {plan_id} 不属于当前租户")
+        if plan["status"] != "confirmed":
+            raise ValueError(
+                f"计划状态为 {plan['status']}，只有 confirmed 状态可开始生产"
+            )
+
+        now = _now_iso()
+        plan["status"] = "in_progress"
+
+        # 将所有 pending 工单标记为 in_progress
+        started_count = 0
+        for order in _production_orders.values():
+            if order["plan_id"] == plan_id and order["tenant_id"] == tenant_id:
+                if order["status"] == "pending":
+                    order["status"] = "in_progress"
+                    order["started_at"] = now
+                    started_count += 1
+
+        log.info(
+            "production_started",
+            plan_id=plan_id,
+            orders_started=started_count,
+            tenant_id=tenant_id,
+        )
+        return ProductionPlan(**plan)
+
+    async def complete_production_order(
+        self,
+        tenant_id: str,
+        order_id: str,
+        actual_qty: float,
+    ) -> ProductionOrder:
+        """完成单个生产工单：记录实际产量，更新状态为 completed。
+
+        若同计划所有工单均已完成，自动将计划状态升为 completed。
+
+        Args:
+            tenant_id: 租户 ID
+            order_id: 生产工单 ID
+            actual_qty: 实际产量（必须 >= 0）
+
+        Returns:
+            更新后的 ProductionOrder
+
+        Raises:
+            ValueError: 工单不存在/不属于当前租户/状态不允许完成/actual_qty 非法
+        """
+        if actual_qty < 0:
+            raise ValueError("actual_qty 不能为负数")
+
+        order = _production_orders.get(order_id)
+        if not order:
+            raise ValueError(f"生产工单 {order_id} 不存在")
+        if order["tenant_id"] != tenant_id:
+            raise ValueError(f"生产工单 {order_id} 不属于当前租户")
+        if order["status"] in ("completed", "cancelled"):
+            raise ValueError(
+                f"工单 {order_id} 已处于 {order['status']} 状态，不可再次完成"
+            )
+
+        now = _now_iso()
+        order["status"] = "completed"
+        order["completed_at"] = now
+        order["quantity"] = actual_qty
+        if not order.get("started_at"):
+            order["started_at"] = now
+
+        # 检查同计划所有工单是否全部完成
+        plan_id = order["plan_id"]
+        plan = _plans.get(plan_id)
+        if plan:
+            plan_orders = [
+                o for o in _production_orders.values()
+                if o["plan_id"] == plan_id and o["tenant_id"] == tenant_id
+            ]
+            if plan_orders and all(
+                o["status"] in ("completed", "cancelled") for o in plan_orders
+            ):
+                plan["status"] = "completed"
+                log.info("production_plan_auto_completed", plan_id=plan_id, tenant_id=tenant_id)
+
+        log.info(
+            "production_order_completed",
+            order_id=order_id,
+            actual_qty=actual_qty,
+            tenant_id=tenant_id,
+        )
+        return ProductionOrder(**order)
+
     # ── 生产工单 ──────────────────────────────────────────────────────
 
     async def update_production_progress(

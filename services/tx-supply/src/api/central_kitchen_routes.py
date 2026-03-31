@@ -6,23 +6,28 @@
 认证头：X-Tenant-ID（所有接口必填）
 
 端点列表：
-  GET  /kitchens                           中央厨房列表
-  POST /kitchens                           新建中央厨房档案
+  GET  /kitchens                            中央厨房列表
+  POST /kitchens                            新建中央厨房档案
+  GET  /kitchens/{id}/dashboard            中央厨房看板（path-param 版）
 
   GET  /plans                              生产计划列表
   POST /plans                              创建生产计划
   GET  /plans/{id}                         计划详情
   POST /plans/{id}/confirm                 确认计划，生成工单
+  PUT  /plans/{id}/start                   开始生产（confirmed→in_progress）
+  POST /plans/{id}/distribute              从计划批量创建多门店配送单
 
+  PUT  /orders/{id}/complete               完成生产工单（记录实际产量）
   GET  /production-orders                  生产工单列表
-  PUT  /production-orders/{id}/progress    更新工单进度
+  PUT  /production-orders/{id}/progress    更新工单进度（通用版）
 
   GET  /distribution                       配送单列表
   POST /distribution                       创建配送单
   POST /distribution/{id}/deliver         标记已发出
-  POST /distribution/{id}/receive         门店确认收货
+  POST /distribution/{id}/receive         门店确认收货（POST 版）
+  PUT  /distribution/{id}/confirm         门店确认收货（PUT 版，RESTful 语义）
 
-  GET  /dashboard                          日看板
+  GET  /dashboard                          日看板（query-param 版）
   GET  /demand-forecast                    需求预测
 """
 from __future__ import annotations
@@ -115,6 +120,22 @@ class StoreReceivingRequest(BaseModel):
     confirmed_by: str = Field(..., description="确认人员工 ID")
     items: List[ReceivingItemInput] = Field(..., min_length=1, description="实收明细")
     notes: Optional[str] = Field(None, description="整单备注")
+
+
+class StoreAssignmentInput(BaseModel):
+    """计划维度配送分配：一个门店分配一批菜品"""
+    store_id: str = Field(..., description="目标门店 ID")
+    items: List[DistributionItemInput] = Field(..., min_length=1, description="该门店配送明细")
+    scheduled_at: str = Field(..., description="计划配送时间（ISO 8601）")
+    driver_name: Optional[str] = Field(None, max_length=50, description="司机姓名")
+    driver_phone: Optional[str] = Field(None, max_length=20, description="司机电话")
+
+
+class PlanDistributeRequest(BaseModel):
+    """从生产计划创建多门店配送单"""
+    store_assignments: List[StoreAssignmentInput] = Field(
+        ..., min_length=1, description="各门店配送分配"
+    )
 
 
 # ─── 厨房档案 ──────────────────────────────────────────────────────────────
@@ -252,6 +273,25 @@ async def confirm_production_plan(
         raise HTTPException(status_code=400, detail=str(exc))
 
 
+@router.put("/plans/{plan_id}/start", summary="开始生产")
+async def start_production(
+    plan_id: str,
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+) -> Dict[str, Any]:
+    """开始生产：将已确认计划状态更新为 in_progress，所有 pending 工单同步开始。
+
+    状态机：confirmed → in_progress
+    """
+    from ..services.central_kitchen_service import CentralKitchenService
+
+    svc = CentralKitchenService()
+    try:
+        plan = await svc.start_production(tenant_id=x_tenant_id, plan_id=plan_id)
+        return {"ok": True, "data": plan.model_dump()}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
 # ─── 生产工单 ──────────────────────────────────────────────────────────────
 
 
@@ -278,6 +318,30 @@ async def list_production_orders(
             size=size,
         )
         return {"ok": True, "data": result}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.put("/orders/{order_id}/complete", summary="完成生产工单")
+async def complete_production_order(
+    order_id: str,
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    actual_qty: float = Query(..., ge=0, description="实际产量"),
+) -> Dict[str, Any]:
+    """完成单个生产工单，记录实际产量。
+
+    若计划内所有工单均完成，计划自动升为 completed。
+    """
+    from ..services.central_kitchen_service import CentralKitchenService
+
+    svc = CentralKitchenService()
+    try:
+        order = await svc.complete_production_order(
+            tenant_id=x_tenant_id,
+            order_id=order_id,
+            actual_qty=actual_qty,
+        )
+        return {"ok": True, "data": order.model_dump()}
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
@@ -406,6 +470,74 @@ async def store_receive(
         raise HTTPException(status_code=400, detail=str(exc))
 
 
+@router.put("/distribution/{order_id}/confirm", summary="门店确认收货（PUT 别名）")
+async def store_receive_confirm(
+    order_id: str,
+    body: StoreReceivingRequest,
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+) -> Dict[str, Any]:
+    """门店确认收货 PUT 版本（与 POST /receive 功能相同，语义更符合 REST 规范）。
+
+    差异 >5% 自动生成 variance_notes。
+    """
+    from ..services.central_kitchen_service import CentralKitchenService
+
+    svc = CentralKitchenService()
+    try:
+        items_raw = [i.model_dump() for i in body.items]
+        confirmation = await svc.confirm_store_receiving(
+            tenant_id=x_tenant_id,
+            distribution_order_id=order_id,
+            store_id=body.store_id,
+            confirmed_by=body.confirmed_by,
+            items=items_raw,
+            notes=body.notes,
+        )
+        return {"ok": True, "data": confirmation.model_dump()}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.post("/plans/{plan_id}/distribute", summary="从生产计划创建多门店配送单", status_code=201)
+async def plan_distribute(
+    plan_id: str,
+    body: PlanDistributeRequest,
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+) -> Dict[str, Any]:
+    """从已确认/进行中的生产计划批量创建各门店配送单。
+
+    每个 store_assignment 对应一张独立配送单，返回所有创建的配送单列表。
+    """
+    from ..services.central_kitchen_service import CentralKitchenService
+
+    svc = CentralKitchenService()
+    try:
+        # 先校验计划存在且属于当前租户
+        plan = await svc.get_production_plan(tenant_id=x_tenant_id, plan_id=plan_id)
+        if plan.status not in ("confirmed", "in_progress"):
+            raise ValueError(
+                f"计划状态为 {plan.status}，只有 confirmed 或 in_progress 状态可创建配送单"
+            )
+
+        created_orders = []
+        for assignment in body.store_assignments:
+            items_raw = [i.model_dump() for i in assignment.items]
+            order = await svc.create_distribution_order(
+                tenant_id=x_tenant_id,
+                kitchen_id=plan.kitchen_id,
+                store_id=assignment.store_id,
+                items=items_raw,
+                scheduled_at=assignment.scheduled_at,
+                driver_name=assignment.driver_name,
+                driver_phone=assignment.driver_phone,
+            )
+            created_orders.append(order.model_dump())
+
+        return {"ok": True, "data": {"items": created_orders, "total": len(created_orders)}}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
 # ─── 看板与预测 ────────────────────────────────────────────────────────────
 
 
@@ -447,5 +579,29 @@ async def demand_forecast(
             target_date=target_date,
         )
         return {"ok": True, "data": forecast.model_dump()}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.get("/kitchens/{kitchen_id}/dashboard", summary="中央厨房看板（path-param 版）")
+async def get_kitchen_dashboard(
+    kitchen_id: str,
+    date: str = Query(..., description="日期 YYYY-MM-DD"),
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+) -> Dict[str, Any]:
+    """通过路径参数指定厨房 ID 的日看板。
+
+    返回：今日计划数/工单状态汇总/配送单状态汇总。
+    """
+    from ..services.central_kitchen_service import CentralKitchenService
+
+    svc = CentralKitchenService()
+    try:
+        dashboard = await svc.get_daily_dashboard(
+            tenant_id=x_tenant_id,
+            kitchen_id=kitchen_id,
+            date=date,
+        )
+        return {"ok": True, "data": dashboard.model_dump()}
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
