@@ -10,6 +10,8 @@ from .api.store_analysis_routes import router as store_analysis_router
 from .api.dish_analysis_routes import router as dish_analysis_router
 from .api.report_routes import router as report_router
 from .api.private_domain_routes import router as private_domain_router
+from .api.knowledge_query import router as knowledge_router
+from .api.inventory_analysis_routes import router as inventory_analysis_router
 
 app = FastAPI(title="TunxiangOS tx-analytics", version="3.0.0")
 app.include_router(analytics_router)
@@ -18,6 +20,8 @@ app.include_router(store_analysis_router)
 app.include_router(dish_analysis_router)
 app.include_router(report_router)
 app.include_router(private_domain_router)
+app.include_router(knowledge_router)
+app.include_router(inventory_analysis_router)
 
 @app.get("/health")
 async def health():

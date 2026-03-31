@@ -11,6 +11,7 @@ from .api.menu_version_routes import router as menu_version_router
 from .api.dish_lifecycle_routes import router as dish_lifecycle_router
 from .api.channel_mapping_routes import router as channel_mapping_router
 from .api.menu_approval_routes import router as menu_approval_router
+from .api.dish_intel_routes import router as dish_intel_router
 
 app = FastAPI(title="TunxiangOS tx-menu", version="3.0.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -24,6 +25,7 @@ app.include_router(menu_version_router)
 app.include_router(dish_lifecycle_router, prefix="/api/v1/dish-lifecycle")
 app.include_router(channel_mapping_router)
 app.include_router(menu_approval_router)
+app.include_router(dish_intel_router)
 
 @app.get("/health")
 async def health():

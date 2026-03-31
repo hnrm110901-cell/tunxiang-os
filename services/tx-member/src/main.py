@@ -28,6 +28,7 @@ from api.group_routes import router as group_router
 from api.lifecycle_routes import router as lifecycle_router
 from api.platform_routes import router as platform_router
 from api.group_member_routes import router as group_member_router
+from api.social_routes import router as social_router
 from workers.rfm_updater import RFMUpdater, RFMEventListener
 from shared.events.event_publisher import MemberEventPublisher
 
@@ -138,6 +139,7 @@ app.include_router(group_router)
 app.include_router(lifecycle_router)
 app.include_router(platform_router)
 app.include_router(group_member_router)
+app.include_router(social_router)
 
 
 @app.get("/health")
