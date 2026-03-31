@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from shared.ontology.src.database import get_db
 from ..services.cashier_engine import CashierEngine
 from ..services.payment_gateway import PaymentGateway
+from ..services.payment_saga_service import PaymentSagaService
 from ..services.daily_settlement import DailySettlementService
 from ..services.permission_client import CashierPermissionClient
 
@@ -89,6 +90,30 @@ class PaymentEntry(BaseModel):
 
 class SettleOrderReq(BaseModel):
     payments: list[PaymentEntry]
+
+
+# ─── 收银台支付请求（支持幂等键）───
+#
+# 幂等键格式（客户端负责生成）：
+#   {device_id}-{order_id[:8]}-{unix_timestamp_seconds}
+#
+#   例：pos001-a3f2b1c4-1743420000
+#
+# 规则：
+#   - 同一笔支付操作，POS 重试时必须使用相同的幂等键
+#   - 不同笔支付（即使同一订单）必须使用不同的幂等键
+#   - 幂等键有效期 24 小时（DB 索引不自动清理，依赖 VACUUM）
+#   - 如果客户端不传，服务端不做幂等保护（向下兼容旧客户端）
+#   - failed 状态支付后可用相同幂等键重试
+class PayCheckoutRequest(BaseModel):
+    method: str = Field(..., description="支付方式：cash/wechat/alipay/unionpay/member_balance/credit_account")
+    amount_fen: int = Field(..., ge=1, description="支付金额（分）")
+    auth_code: Optional[str] = Field(None, description="B扫C时的顾客付款码")
+    idempotency_key: Optional[str] = Field(
+        None,
+        description="客户端幂等键，格式建议: {device_id}-{order_id[:8]}-{unix_ts_seconds}，24小时内有效",
+        max_length=128,
+    )
 
 
 class CancelOrderReq(BaseModel):
@@ -314,6 +339,71 @@ async def settle_order(
         return _ok(result)
     except ValueError as e:
         _err(str(e))
+
+
+# ─── 6b. 收银台支付（幂等版）───
+
+
+@router.post("/orders/{order_id}/checkout")
+async def checkout_payment(
+    order_id: str,
+    req: PayCheckoutRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """收银台支付 — Saga补偿事务保障原子性（P0安全）
+
+    完整流程：验证订单 → 收钱吧扣款 → 标记订单completed。
+    若"标记订单completed"失败，自动调用退款补偿，保证不出现
+    "钱扣了但订单未完成"的情况。
+
+    POS 重试场景：
+      1. 收银员扫码 → 网络超时 → POS 使用相同 idempotency_key 重试
+      2. 服务端命中幂等记录 → 直接返回原支付结果，不再扣款
+      3. 返回体包含 status=done 标记，POS 可据此判断是否成功
+
+    idempotency_key 格式建议：{device_id}-{order_id[:8]}-{unix_ts_seconds}
+    """
+    tenant_id = _get_tenant_id(request)
+    try:
+        order_uuid = UUID(order_id)
+    except ValueError:
+        _err(f"order_id 格式非法: {order_id}")
+        return  # unreachable，帮助类型检查
+
+    gateway = PaymentGateway(db, tenant_id)
+    saga_service = PaymentSagaService(
+        db=db,
+        tenant_id=UUID(tenant_id) if isinstance(tenant_id, str) else tenant_id,
+        payment_gateway=gateway,
+    )
+
+    try:
+        result = await saga_service.execute(
+            order_id=order_uuid,
+            method=req.method,
+            amount_fen=req.amount_fen,
+            auth_code=req.auth_code,
+            idempotency_key=req.idempotency_key,
+        )
+    except ValueError as e:
+        _err(str(e))
+        return
+    except RuntimeError as e:
+        _err(str(e), 502)
+        return
+
+    if result["status"] != "done":
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "ok": False,
+                "data": result,
+                "error": {"message": result.get("error") or "支付处理失败，已自动退款"},
+            },
+        )
+
+    return _ok(result)
 
 
 # ─── 7. 取消 ───
