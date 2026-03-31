@@ -11,9 +11,12 @@ from datetime import date, datetime, timezone
 from decimal import Decimal
 from typing import Any
 
+import anthropic
 import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
+
+logger = structlog.get_logger()
 
 logger = structlog.get_logger()
 
@@ -29,10 +32,17 @@ _TOPIC_CATEGORIES = [
 
 
 class ReviewCollectorService:
-    """全渠道点评采集与分析服务"""
+    """全渠道点评采集与分析服务
 
-    def __init__(self, db: AsyncSession) -> None:
+    ai_client 应由调用方注入 ModelRouter 实例（遵循 CLAUDE.md 规范）。
+    tx-intel 与 tx-agent 独立部署时，通过 HTTP 调用 tx-agent /ai/complete 端点；
+    单体部署时直接注入 ModelRouter。未注入时降级为直接调用（仅限测试环境）。
+    """
+
+    def __init__(self, db: AsyncSession, ai_client: anthropic.AsyncAnthropic | None = None) -> None:
         self._db = db
+        # 生产环境应注入 ModelRouter；此处接受 AsyncAnthropic 作为兼容接口
+        self._ai = ai_client or anthropic.AsyncAnthropic()
 
     async def collect_store_reviews(
         self,
@@ -150,11 +160,8 @@ class ReviewCollectorService:
             return None
 
         try:
-            import anthropic
-            client = anthropic.AsyncAnthropic()
-
-            message = await client.messages.create(
-                model="claude-opus-4-5",
+            message = await self._ai.messages.create(
+                model="claude-haiku-4-5-20251001",
                 max_tokens=64,
                 messages=[
                     {
@@ -188,12 +195,9 @@ class ReviewCollectorService:
 
         topic_list_str = "、".join(_TOPIC_CATEGORIES)
         try:
-            import anthropic
             import json
-            client = anthropic.AsyncAnthropic()
-
-            message = await client.messages.create(
-                model="claude-opus-4-5",
+            message = await self._ai.messages.create(
+                model="claude-haiku-4-5-20251001",
                 max_tokens=256,
                 messages=[
                     {
