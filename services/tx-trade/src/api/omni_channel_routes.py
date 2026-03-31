@@ -480,7 +480,7 @@ async def _enrich_order_with_mappings(
                         "platform_item_name": item.name,
                     },
                 )
-            except Exception as exc:
+            except (OSError, ValueError, RuntimeError) as exc:
                 logger.warning(
                     "omni_channel.enrich.upsert_placeholder_failed",
                     platform_item_id=item.sku_id,

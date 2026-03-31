@@ -48,6 +48,11 @@ from .api.delivery_ops_routes import router as delivery_ops_router
 from .api.banquet_payment_routes import router as banquet_payment_router
 from .api.collab_order_routes import router as collab_order_router
 from .api.table_layout_routes import router as table_layout_router
+from .api.chef_at_home_routes import router as chef_at_home_router
+from .api.omni_channel_routes import router as omni_channel_router
+from .api.scan_order_api import router as scan_order_ext_router
+from .api.self_order_routes import router as self_order_router
+from .api.kds_analytics_routes import router as kds_analytics_router
 
 
 @asynccontextmanager
@@ -114,6 +119,11 @@ app.include_router(delivery_ops_router)
 app.include_router(banquet_payment_router)
 app.include_router(collab_order_router)
 app.include_router(table_layout_router)
+app.include_router(chef_at_home_router)
+app.include_router(omni_channel_router,   prefix="/api/v1")
+app.include_router(scan_order_ext_router)
+app.include_router(self_order_router)
+app.include_router(kds_analytics_router,  prefix="/api/v1/kds-analytics")
 
 
 @app.get("/health")

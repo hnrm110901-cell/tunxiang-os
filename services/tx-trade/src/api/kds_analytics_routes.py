@@ -275,12 +275,13 @@ async def get_new_customer_rate(
         total = row.total_orders if row else 0
         new_orders = row.new_orders if row else 0
         rate = round(new_orders / total, 4) if total > 0 else 0.0
-    except Exception as exc:
+    except (OSError, RuntimeError) as exc:
         logger.error(
             "kds_analytics.new_customer_rate_error",
             store_id=store_id,
             date=date_str,
             error=str(exc),
+            exc_info=True,
         )
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
