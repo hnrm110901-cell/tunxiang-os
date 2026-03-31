@@ -25,8 +25,6 @@ logger = structlog.get_logger()
 
 # 需要走收钱吧的支付方式
 _SQB_METHODS = {"wechat", "alipay", "unionpay"}
-# 需要走拉卡拉的支付方式（与收钱吧互斥，由构造时传入的 client 决定）
-_LKL_METHODS = {"wechat", "alipay", "unionpay", "yunshan"}
 
 
 def _gen_payment_no() -> str:
@@ -438,7 +436,10 @@ class PaymentGateway:
                 for pay_rec in payment_records:
                     pid = pay_rec["payment_id"]
                     pay_q = await self.db.execute(
-                        select(Payment).where(Payment.id == uuid.UUID(pid))
+                        select(Payment).where(
+                            Payment.id == uuid.UUID(pid),
+                            Payment.tenant_id == self.tenant_id,
+                        )
                     )
                     pay = pay_q.scalar_one_or_none()
                     if not pay:
