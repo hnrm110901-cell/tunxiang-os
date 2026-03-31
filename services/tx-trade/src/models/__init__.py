@@ -15,3 +15,4 @@ from .banquet import (
     BanquetFeedback,
     BanquetCase,
 )
+from .retail_mall import RetailProduct, RetailOrder, RetailOrderItem

@@ -1,0 +1,152 @@
+"""v073: 零售商城表 — 商品 / 订单 / 订单明细
+
+新增表：
+  retail_products_v2    — 零售商品
+  retail_orders_v2      — 零售订单
+  retail_order_items_v2 — 零售订单明细
+
+RLS 策略：
+  全部使用 v006+ 标准安全模式（4操作 + NULL guard + FORCE ROW LEVEL SECURITY）
+
+Revision ID: v073
+Revises: v070
+Create Date: 2026-03-31
+"""
+
+from alembic import op
+
+revision = "v073"
+down_revision = "v070"
+branch_labels = None
+depends_on = None
+
+
+def _apply_rls(table_name: str) -> None:
+    """为指定表启用 RLS 并创建 4 条标准策略"""
+    op.execute(f"ALTER TABLE {table_name} ENABLE ROW LEVEL SECURITY;")
+    op.execute(f"ALTER TABLE {table_name} FORCE ROW LEVEL SECURITY;")
+
+    for action in ("SELECT", "INSERT", "UPDATE", "DELETE"):
+        op.execute(f"""
+            CREATE POLICY {table_name}_{action.lower()}_tenant ON {table_name}
+            AS RESTRICTIVE FOR {action}
+            USING (
+                current_setting('app.tenant_id', TRUE) IS NOT NULL
+                AND current_setting('app.tenant_id', TRUE) <> ''
+                AND tenant_id = NULLIF(current_setting('app.tenant_id', TRUE), '')::UUID
+            );
+        """)
+
+
+def upgrade() -> None:
+    # ─────────────────────────────────────────────────────────────────
+    # retail_products_v2 — 零售商品
+    # ─────────────────────────────────────────────────────────────────
+    op.execute("""
+        CREATE TABLE IF NOT EXISTS retail_products_v2 (
+            id              UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+            tenant_id       UUID         NOT NULL,
+            store_id        UUID         NOT NULL,
+            name            VARCHAR(200) NOT NULL,
+            sku             VARCHAR(100) NOT NULL,
+            category        VARCHAR(50)  NOT NULL DEFAULT 'merchandise',
+            price_fen       INTEGER      NOT NULL,
+            cost_fen        INTEGER      NOT NULL DEFAULT 0,
+            stock_qty       INTEGER      NOT NULL DEFAULT 0,
+            min_stock       INTEGER      NOT NULL DEFAULT 0,
+            image_url       TEXT,
+            status          VARCHAR(20)  NOT NULL DEFAULT 'active',
+            is_weighable    BOOLEAN      NOT NULL DEFAULT FALSE,
+            is_deleted      BOOLEAN      NOT NULL DEFAULT FALSE,
+            created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+            updated_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+        );
+    """)
+
+    _apply_rls("retail_products_v2")
+
+    op.execute("""
+        CREATE INDEX IF NOT EXISTS ix_retail_products_v2_tenant
+            ON retail_products_v2 (tenant_id);
+    """)
+    op.execute("""
+        CREATE INDEX IF NOT EXISTS ix_retail_products_v2_store_status
+            ON retail_products_v2 (store_id, status);
+    """)
+    op.execute("""
+        CREATE INDEX IF NOT EXISTS ix_retail_products_v2_tenant_category
+            ON retail_products_v2 (tenant_id, category);
+    """)
+
+    # ─────────────────────────────────────────────────────────────────
+    # retail_orders_v2 — 零售订单
+    # ─────────────────────────────────────────────────────────────────
+    op.execute("""
+        CREATE TABLE IF NOT EXISTS retail_orders_v2 (
+            id              UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+            tenant_id       UUID         NOT NULL,
+            store_id        UUID         NOT NULL,
+            order_no        VARCHAR(50)  NOT NULL UNIQUE,
+            customer_id     UUID,
+            total_fen       INTEGER      NOT NULL DEFAULT 0,
+            discount_fen    INTEGER      NOT NULL DEFAULT 0,
+            final_fen       INTEGER      NOT NULL DEFAULT 0,
+            payment_method  VARCHAR(30),
+            status          VARCHAR(20)  NOT NULL DEFAULT 'pending',
+            paid_at         TIMESTAMPTZ,
+            is_deleted      BOOLEAN      NOT NULL DEFAULT FALSE,
+            created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+            updated_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+        );
+    """)
+
+    _apply_rls("retail_orders_v2")
+
+    op.execute("""
+        CREATE INDEX IF NOT EXISTS ix_retail_orders_v2_tenant
+            ON retail_orders_v2 (tenant_id);
+    """)
+    op.execute("""
+        CREATE INDEX IF NOT EXISTS ix_retail_orders_v2_store_status
+            ON retail_orders_v2 (store_id, status);
+    """)
+
+    # ─────────────────────────────────────────────────────────────────
+    # retail_order_items_v2 — 零售订单明细
+    # ─────────────────────────────────────────────────────────────────
+    op.execute("""
+        CREATE TABLE IF NOT EXISTS retail_order_items_v2 (
+            id              UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+            tenant_id       UUID         NOT NULL,
+            order_id        UUID         NOT NULL REFERENCES retail_orders_v2(id),
+            product_id      UUID         NOT NULL REFERENCES retail_products_v2(id),
+            product_name    VARCHAR(200) NOT NULL,
+            quantity        INTEGER      NOT NULL,
+            unit_price_fen  INTEGER      NOT NULL,
+            subtotal_fen    INTEGER      NOT NULL,
+            is_deleted      BOOLEAN      NOT NULL DEFAULT FALSE,
+            created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+            updated_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+        );
+    """)
+
+    _apply_rls("retail_order_items_v2")
+
+    op.execute("""
+        CREATE INDEX IF NOT EXISTS ix_retail_order_items_v2_tenant
+            ON retail_order_items_v2 (tenant_id);
+    """)
+    op.execute("""
+        CREATE INDEX IF NOT EXISTS ix_retail_order_items_v2_order
+            ON retail_order_items_v2 (order_id);
+    """)
+    op.execute("""
+        CREATE INDEX IF NOT EXISTS ix_retail_order_items_v2_product
+            ON retail_order_items_v2 (product_id);
+    """)
+
+
+def downgrade() -> None:
+    op.execute("DROP TABLE IF EXISTS retail_order_items_v2 CASCADE;")
+    op.execute("DROP TABLE IF EXISTS retail_orders_v2 CASCADE;")
+    op.execute("DROP TABLE IF EXISTS retail_products_v2 CASCADE;")
