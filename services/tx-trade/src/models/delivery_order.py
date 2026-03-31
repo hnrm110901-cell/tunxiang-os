@@ -125,6 +125,35 @@ class DeliveryOrder(TenantBase):
     # 备注
     notes: Mapped[str | None] = mapped_column(Text, comment="订单备注")
 
+    # ── 接单面板新增字段（v032）──────────────────────────────────────────────
+    platform_order_no: Mapped[str | None] = mapped_column(
+        String(100), nullable=True, comment="平台展示给用户的订单号",
+    )
+    customer_name: Mapped[str | None] = mapped_column(
+        String(50), nullable=True, comment="顾客姓名",
+    )
+    special_request: Mapped[str | None] = mapped_column(
+        Text, nullable=True, comment="顾客特殊备注",
+    )
+    estimated_prep_time: Mapped[int | None] = mapped_column(
+        Integer, nullable=True, comment="预计备餐分钟数",
+    )
+    actual_revenue_fen: Mapped[int | None] = mapped_column(
+        Integer, nullable=True, comment="实际到账金额（分）= total_fen - commission_fen",
+    )
+    auto_accepted: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, comment="是否由自动接单规则接单",
+    )
+    accepted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, comment="接单时间",
+    )
+    rejected_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, comment="拒单时间",
+    )
+    rejected_reason: Mapped[str | None] = mapped_column(
+        String(500), nullable=True, comment="拒单原因",
+    )
+
     __table_args__ = (
         Index("idx_delivery_order_store_platform", "store_id", "platform"),
         Index("idx_delivery_order_store_status", "store_id", "status"),

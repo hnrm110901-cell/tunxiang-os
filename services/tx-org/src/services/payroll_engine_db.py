@@ -641,21 +641,27 @@ class PayrollEngine:
         year: int,
         month: int,
     ) -> Dict[str, Dict[str, Any]]:
-        """读取门店当月考勤汇总，返回 {employee_id: {...}}"""
-        # 同时整合 attendance_records 和 crew_shifts（排班出勤记录）
+        """读取门店当月考勤汇总，返回 {employee_id: {...}}
+
+        从 attendance_records 汇总各员工月度考勤数据：
+        - work_days: 正常出勤天数（absence_type IS NULL）
+        - work_hours: 实际工时合计
+        - overtime_hours: 加班工时合计
+        - absence_days: 缺勤天数（旷工+病假+事假，不含节假日/调休）
+        - late_count: 迟到次数（从 clock_records 获取，降级到 0）
+        - early_leave_count: 早退次数（从 clock_records 获取，降级到 0）
+        """
         rows = await db.execute(
             text("""
                 SELECT
                     ar.employee_id,
-                    COUNT(*) FILTER (WHERE ar.absence_type IS NULL)  AS work_days,
-                    COALESCE(SUM(ar.work_hours), 0)                  AS work_hours,
-                    COALESCE(SUM(ar.overtime_hours), 0)              AS overtime_hours,
-                    COUNT(*) FILTER (WHERE ar.absence_type IS NOT NULL
-                                      AND ar.absence_type NOT IN ('holiday','compensatory'))
-                                                                     AS absence_days,
-                    0  AS late_count,
-                    0  AS early_leave_count,
-                    0  AS sales_amount_fen
+                    COUNT(*) FILTER (WHERE ar.absence_type IS NULL)        AS work_days,
+                    COALESCE(SUM(ar.work_hours), 0)                        AS work_hours,
+                    COALESCE(SUM(ar.overtime_hours), 0)                    AS overtime_hours,
+                    COUNT(*) FILTER (
+                        WHERE ar.absence_type IS NOT NULL
+                          AND ar.absence_type NOT IN ('holiday', 'compensatory')
+                    )                                                       AS absence_days
                 FROM attendance_records ar
                 JOIN employees e
                        ON e.id = ar.employee_id
@@ -663,7 +669,7 @@ class PayrollEngine:
                       AND e.tenant_id = ar.tenant_id
                       AND e.is_deleted = FALSE
                 WHERE ar.tenant_id = :tenant_id
-                  AND EXTRACT(YEAR FROM ar.work_date)  = :year
+                  AND EXTRACT(YEAR  FROM ar.work_date) = :year
                   AND EXTRACT(MONTH FROM ar.work_date) = :month
                   AND ar.is_deleted = FALSE
                 GROUP BY ar.employee_id
@@ -675,7 +681,59 @@ class PayrollEngine:
                 "month": month,
             },
         )
-        return {str(r["employee_id"]): dict(r) for r in rows.mappings().all()}
+        base_map: Dict[str, Dict[str, Any]] = {
+            str(r["employee_id"]): dict(r) for r in rows.mappings().all()
+        }
+
+        # 尝试从 clock_records 补充迟到/早退次数（表可能不存在，安全降级）
+        try:
+            late_rows = await db.execute(
+                text("""
+                    SELECT
+                        cr.employee_id,
+                        COUNT(*) FILTER (WHERE cr.is_late = TRUE)        AS late_count,
+                        COUNT(*) FILTER (WHERE cr.is_early_leave = TRUE)  AS early_leave_count
+                    FROM clock_records cr
+                    JOIN employees e
+                           ON e.id = cr.employee_id
+                          AND e.store_id = :store_id
+                          AND e.tenant_id = cr.tenant_id
+                          AND e.is_deleted = FALSE
+                    WHERE cr.tenant_id = :tenant_id
+                      AND EXTRACT(YEAR  FROM cr.clock_date) = :year
+                      AND EXTRACT(MONTH FROM cr.clock_date) = :month
+                      AND cr.is_deleted = FALSE
+                    GROUP BY cr.employee_id
+                """),
+                {
+                    "tenant_id": str(tenant_id),
+                    "store_id": str(store_id),
+                    "year": year,
+                    "month": month,
+                },
+            )
+            for row in late_rows.mappings().all():
+                emp_key = str(row["employee_id"])
+                if emp_key in base_map:
+                    base_map[emp_key]["late_count"] = int(row["late_count"] or 0)
+                    base_map[emp_key]["early_leave_count"] = int(row["early_leave_count"] or 0)
+        except Exception:  # noqa: BLE001 — clock_records 表可能不存在或结构不同，安全降级到 0
+            log.warning(
+                "payroll.fetch_attendance_summary.clock_records_unavailable",
+                tenant_id=str(tenant_id),
+                store_id=str(store_id),
+                year=year,
+                month=month,
+                exc_info=True,
+            )
+
+        # 确保所有记录都有 late_count / early_leave_count / sales_amount_fen 字段
+        for att in base_map.values():
+            att.setdefault("late_count", 0)
+            att.setdefault("early_leave_count", 0)
+            att.setdefault("sales_amount_fen", 0)
+
+        return base_map
 
     async def _fetch_si_config(
         self,

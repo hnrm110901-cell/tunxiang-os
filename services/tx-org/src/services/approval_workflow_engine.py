@@ -28,7 +28,7 @@ log: structlog.stdlib.BoundLogger = structlog.get_logger(__name__)
 # ── 常量 ──────────────────────────────────────────────────────────────────────
 
 VALID_BUSINESS_TYPES = frozenset(
-    ["purchase_order", "discount", "menu_change", "hr_request", "expense"]
+    ["purchase_order", "discount", "menu_change", "hr_request", "expense", "leave"]
 )
 
 STATUS_PENDING = "pending"
@@ -262,6 +262,9 @@ async def _dispatch_on_approved(
     elif business_type == "expense":
         # TODO: 调用 tx-finance POST /api/v1/expenses/{business_id}/approve
         log.info("approval_callback_expense", business_id=business_id)
+    elif business_type == "leave":
+        # 调用 tx-org POST /api/v1/leave-requests/{business_id}/approve-callback
+        log.info("approval_callback_leave", business_id=business_id)
 
 
 async def _dispatch_on_rejected(

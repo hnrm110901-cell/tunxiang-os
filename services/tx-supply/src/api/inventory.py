@@ -11,6 +11,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from shared.ontology.src.database import get_db as _get_db
 
 from ..services import inventory_io, expiry_monitor, stock_forecast
+from ..services.transfer_service import (
+    get_brand_ingredient_overview,
+    get_brand_low_stock_alert,
+)
 
 router = APIRouter(prefix="/api/v1/supply", tags=["supply"])
 
@@ -340,3 +344,47 @@ async def get_waste_rate(store_id: str):
 @router.get("/demand/forecast")
 async def forecast_demand(store_id: str, days: int = 7):
     return {"ok": True, "data": {"forecast": []}}
+
+
+# ─── 多门店库存汇总（品牌维度） ───
+
+
+@router.get("/inventory/brand-overview")
+async def get_brand_overview(
+    ingredient_id: str,
+    x_tenant_id: str = Header(alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(_get_db),
+):
+    """品牌维度：查看所有门店某食材的库存量。
+
+    返回: [{store_id, ingredient_name, quantity, unit, min_quantity, status}]
+    方便决策从哪个门店调拨。
+    """
+    try:
+        result = await get_brand_ingredient_overview(
+            tenant_id=x_tenant_id,
+            ingredient_id=ingredient_id,
+            db=db,
+        )
+        return {"ok": True, "data": {"stores": result, "total_stores": len(result)}}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.get("/inventory/low-stock-alert")
+async def get_low_stock_alert(
+    x_tenant_id: str = Header(alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(_get_db),
+):
+    """全品牌低库存预警：所有门店中库存低于安全库存的食材+所在门店。"""
+    result = await get_brand_low_stock_alert(
+        tenant_id=x_tenant_id,
+        db=db,
+    )
+    return {
+        "ok": True,
+        "data": {
+            "alerts": result,
+            "total": len(result),
+        },
+    }

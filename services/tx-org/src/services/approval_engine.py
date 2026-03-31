@@ -1,31 +1,57 @@
-"""通用审批引擎
+"""可配置审批流引擎（v3）
 
-支持多级审批流、条件路由、超时催办、审批历史查询。
-所有数据库操作通过 AsyncSession 执行，tenant_id 显式传入确保隔离。
+基于 approval_flow_templates + approval_flow_nodes +
+     approval_instances + approval_node_instances 四张表（v060 迁移）。
 
-审批通知失败不阻塞审批流程本身。
+核心能力：
+  - 支持 role_level / specific_role / specific_person / auto 四种节点类型
+  - 支持 any_one（任一通过）/ all_must（全部通过）多人审批策略
+  - 模板级 trigger_conditions：不满足则审批单自动通过，无需人工
+  - 节点级 auto_approve_condition：满足时节点自动通过
+  - 超时动作：auto_approve / auto_reject / escalate
+  - on_approval_complete 按业务类型分发回调（leave/purchase/discount/price_change/refund/expense）
+  - 通知失败不阻塞主流程
+
+架构约定：
+  - ApprovalEngine 为实例化类，可通过 FastAPI 依赖注入注入
+  - 所有 DB 操作通过 AsyncSession，tenant_id 显式传入
+  - 禁止 except Exception，精确捕获已知错误类型
+  - 全函数 type hints，日志用 structlog JSON 格式
 """
 
 from __future__ import annotations
 
-import logging
+import json
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional
-from uuid import UUID
+from typing import Any
 
+import structlog
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models.approval_flow import (
-    ApprovalFlowDefinition,
-    ApprovalInstance,
-    ApprovalRecord,
-    FlowStep,
-    InstanceStatus,
-    RecordAction,
+from ..models.approval_flow_engine import (
+    eval_condition,
+    eval_trigger_conditions,
+    NodeRow,
+    TemplateRow,
+    InstanceRow,
+    NodeInstanceRow,
 )
 
-logger = logging.getLogger(__name__)
+log: structlog.stdlib.BoundLogger = structlog.get_logger(__name__)
+
+# ── 内部状态常量 ──────────────────────────────────────────────────────────────
+
+_STATUS_PENDING = "pending"
+_STATUS_APPROVED = "approved"
+_STATUS_REJECTED = "rejected"
+_STATUS_CANCELLED = "cancelled"
+_STATUS_TIMEOUT = "timeout"
+_STATUS_SKIPPED = "skipped"
+
+# 系统用户 UUID（自动审批时使用）
+_SYSTEM_USER_ID = "00000000-0000-0000-0000-000000000000"
+
 
 # ── 通知存根 ──────────────────────────────────────────────────────────────────
 
@@ -34,81 +60,240 @@ async def _send_notification(
     recipient_id: str,
     title: str,
     body: str,
-    metadata: Dict[str, Any],
+    meta: dict[str, Any],
 ) -> None:
-    """发送审批通知。失败时仅记录日志，不抛出异常。"""
+    """发送审批通知。失败时仅记录日志，不抛出异常（不阻塞主流程）。"""
     try:
-        # TODO: 接入消息中心（Redis Streams / PG LISTEN-NOTIFY）
-        logger.info(
+        # TODO: 接入消息中心（Redis Streams / PG LISTEN-NOTIFY / WeChat Work API）
+        log.info(
             "approval_notification",
-            extra={
-                "recipient_id": recipient_id,
-                "title": title,
-                "body": body,
-                "metadata": metadata,
-            },
+            recipient_id=recipient_id,
+            title=title,
+            body=body,
+            meta=meta,
         )
-    except Exception:  # noqa: BLE001 — 通知失败不阻塞主流程
-        logger.warning("notification_failed", extra={"recipient_id": recipient_id})
+    except (OSError, RuntimeError) as exc:
+        log.warning(
+            "approval_notification_failed",
+            recipient_id=recipient_id,
+            error=str(exc),
+        )
 
 
-# ── 数据库辅助函数 ─────────────────────────────────────────────────────────────
+# ── DB 辅助函数 ───────────────────────────────────────────────────────────────
 
 
-async def _get_flow_def(
-    flow_def_id: str,
+async def _fetch_template(
+    template_id: str,
     tenant_id: str,
     db: AsyncSession,
-) -> Optional[Dict[str, Any]]:
-    """从 DB 查询审批流定义"""
+) -> TemplateRow | None:
+    """查询审批流模板（只返回 is_active=TRUE 的）"""
     row = await db.execute(
         text(
-            "SELECT id, tenant_id, flow_name, business_type, steps, is_active, created_at "
-            "FROM approval_flow_definitions "
-            "WHERE id = :id AND tenant_id = :tenant_id AND is_active = TRUE"
+            "SELECT id, tenant_id, template_name, business_type, "
+            "       trigger_conditions, is_active, created_by, created_at "
+            "FROM approval_flow_templates "
+            "WHERE id = :id AND tenant_id = :tid AND is_active = TRUE"
         ),
-        {"id": flow_def_id, "tenant_id": tenant_id},
+        {"id": template_id, "tid": tenant_id},
     )
     result = row.mappings().first()
     return dict(result) if result else None
 
 
-async def _get_instance(
+async def _fetch_nodes(
+    template_id: str,
+    tenant_id: str,
+    db: AsyncSession,
+) -> list[NodeRow]:
+    """查询模板下所有节点，按 node_order 升序"""
+    rows = await db.execute(
+        text(
+            "SELECT id, tenant_id, template_id, node_order, node_name, "
+            "       node_type, approver_role_level, approver_role_id, "
+            "       approver_employee_id, approve_type, "
+            "       auto_approve_condition, timeout_hours, timeout_action, "
+            "       created_at "
+            "FROM approval_flow_nodes "
+            "WHERE template_id = :tmpl_id AND tenant_id = :tid "
+            "ORDER BY node_order ASC"
+        ),
+        {"tmpl_id": template_id, "tid": tenant_id},
+    )
+    return [dict(r) for r in rows.mappings().fetchall()]
+
+
+async def _fetch_instance(
     instance_id: str,
     tenant_id: str,
     db: AsyncSession,
-) -> Optional[Dict[str, Any]]:
-    """从 DB 查询审批实例"""
+) -> InstanceRow | None:
+    """查询审批实例（含 v060 新增字段）"""
     row = await db.execute(
         text(
-            "SELECT id, tenant_id, flow_def_id, business_type, source_id, title, "
-            "amount, current_step, status, initiator_id, store_id, context, "
-            "created_at, completed_at "
+            "SELECT id, tenant_id, flow_template_id, "
+            "       business_type, business_id, title, initiator_id, "
+            "       store_id, current_node_order, status, summary, "
+            "       context_data, created_at, updated_at, completed_at "
             "FROM approval_instances "
-            "WHERE id = :id AND tenant_id = :tenant_id"
+            "WHERE id = :id AND tenant_id = :tid AND is_deleted = FALSE"
         ),
-        {"id": instance_id, "tenant_id": tenant_id},
+        {"id": instance_id, "tid": tenant_id},
     )
     result = row.mappings().first()
     return dict(result) if result else None
 
 
-async def _find_approvers_by_role(
-    role: str,
+async def _fetch_node_instances(
+    instance_id: str,
+    node_order: int,
+    tenant_id: str,
+    db: AsyncSession,
+) -> list[NodeInstanceRow]:
+    """查询某节点的所有审批记录"""
+    rows = await db.execute(
+        text(
+            "SELECT id, tenant_id, instance_id, node_order, "
+            "       approver_id, status, comment, decided_at, created_at "
+            "FROM approval_node_instances "
+            "WHERE instance_id = :iid AND node_order = :node_order "
+            "AND tenant_id = :tid"
+        ),
+        {"iid": instance_id, "node_order": node_order, "tid": tenant_id},
+    )
+    return [dict(r) for r in rows.mappings().fetchall()]
+
+
+async def _find_approvers_by_role_level(
+    store_id: str,
+    min_level: int,
+    tenant_id: str,
+    db: AsyncSession,
+) -> list[str]:
+    """查找门店内角色等级 >= min_level 的员工 ID 列表（按等级升序，取最低满足等级）"""
+    rows = await db.execute(
+        text(
+            "SELECT e.id FROM employees e "
+            "JOIN role_configs rc "
+            "    ON rc.tenant_id = e.tenant_id AND rc.role_code = e.role "
+            "WHERE e.tenant_id = :tid AND e.store_id = :sid "
+            "AND rc.role_level >= :min_level "
+            "AND e.is_deleted = FALSE "
+            "ORDER BY rc.role_level ASC"
+        ),
+        {"tid": tenant_id, "sid": store_id, "min_level": min_level},
+    )
+    return [str(r[0]) for r in rows.fetchall()]
+
+
+async def _find_approvers_by_role_id(
+    store_id: str,
+    role_id: str,
+    tenant_id: str,
+    db: AsyncSession,
+) -> list[str]:
+    """查找门店内持有指定角色配置的员工 ID 列表"""
+    rows = await db.execute(
+        text(
+            "SELECT e.id FROM employees e "
+            "JOIN role_configs rc "
+            "    ON rc.id = :role_id "
+            "    AND rc.tenant_id = e.tenant_id "
+            "    AND rc.role_code = e.role "
+            "WHERE e.tenant_id = :tid AND e.store_id = :sid "
+            "AND e.is_deleted = FALSE"
+        ),
+        {"tid": tenant_id, "sid": store_id, "role_id": role_id},
+    )
+    return [str(r[0]) for r in rows.fetchall()]
+
+
+async def _find_approvers_for_node(
+    node: NodeRow,
     store_id: str,
     tenant_id: str,
     db: AsyncSession,
-) -> List[str]:
-    """按角色查找门店审批人 ID 列表"""
-    rows = await db.execute(
-        text(
-            "SELECT id FROM employees "
-            "WHERE tenant_id = :tenant_id AND store_id = :store_id "
-            "AND role = :role AND is_deleted = FALSE"
-        ),
-        {"tenant_id": tenant_id, "store_id": store_id, "role": role},
+) -> list[str]:
+    """根据节点配置找到实际审批人 ID 列表"""
+    node_type: str = node["node_type"]
+
+    if node_type == "role_level":
+        min_level: int = int(node.get("approver_role_level") or 1)
+        return await _find_approvers_by_role_level(store_id, min_level, tenant_id, db)
+
+    if node_type == "specific_role":
+        role_id = str(node["approver_role_id"])
+        return await _find_approvers_by_role_id(store_id, role_id, tenant_id, db)
+
+    if node_type == "specific_person":
+        emp_id = node.get("approver_employee_id")
+        return [str(emp_id)] if emp_id else []
+
+    # node_type == "auto"：无需审批人
+    return []
+
+
+def _parse_jsonb(value: Any) -> dict[str, Any]:
+    """将 DB 返回的 JSONB（可能是 str/dict/None）统一解析为 dict"""
+    if value is None:
+        return {}
+    if isinstance(value, dict):
+        return value
+    if isinstance(value, str):
+        return json.loads(value)
+    return {}
+
+
+# ── 业务回调 ──────────────────────────────────────────────────────────────────
+
+
+async def _dispatch_on_approved(
+    business_type: str,
+    business_id: str,
+    summary: dict[str, Any],
+    tenant_id: str,
+) -> None:
+    """审批通过后按业务类型分发回调（HTTP 调用 / 事件发布）。"""
+    log.info(
+        "approval_on_approved",
+        business_type=business_type,
+        business_id=business_id,
+        tenant_id=tenant_id,
     )
-    return [str(r[0]) for r in rows.fetchall()]
+    if business_type == "leave":
+        # TODO: POST /api/v1/leave-requests/{business_id}/confirm
+        log.info("approval_callback_leave", business_id=business_id)
+    elif business_type == "purchase":
+        # TODO: POST /api/v1/purchase-orders/{business_id}/confirm  (tx-supply)
+        log.info("approval_callback_purchase", business_id=business_id)
+    elif business_type == "discount":
+        # TODO: POST /api/v1/discounts/{business_id}/approve  (tx-trade)
+        log.info("approval_callback_discount", business_id=business_id)
+    elif business_type == "price_change":
+        # TODO: POST /api/v1/menu-changes/{business_id}/apply  (tx-menu)
+        log.info("approval_callback_price_change", business_id=business_id)
+    elif business_type == "refund":
+        # TODO: POST /api/v1/refunds/{business_id}/approve  (tx-trade)
+        log.info("approval_callback_refund", business_id=business_id)
+    elif business_type == "expense":
+        # TODO: POST /api/v1/expenses/{business_id}/approve  (tx-finance)
+        log.info("approval_callback_expense", business_id=business_id)
+    # custom 类型无标准回调
+
+
+async def _dispatch_on_rejected(
+    business_type: str,
+    business_id: str,
+    tenant_id: str,
+) -> None:
+    """审批拒绝后通知，各业务服务自行订阅事件。"""
+    log.info(
+        "approval_on_rejected",
+        business_type=business_type,
+        business_id=business_id,
+        tenant_id=tenant_id,
+    )
 
 
 # ── 核心引擎 ──────────────────────────────────────────────────────────────────
@@ -116,464 +301,917 @@ async def _find_approvers_by_role(
 
 class ApprovalEngine:
     """
-    通用审批引擎。
+    可配置审批流引擎。
 
-    所有方法为静态异步方法，通过显式参数接受 tenant_id 和 db，
-    不持有任何实例状态，便于在 FastAPI 依赖注入体系中使用。
+    支持：
+      - role_level / specific_role / specific_person / auto 四种节点类型
+      - any_one（任一通过）/ all_must（全部通过）多人审批策略
+      - 模板级触发条件（不满足则自动通过，无需人工审批）
+      - 节点级自动审批条件（满足时跳过人工，直接通过该节点）
+      - 超时动作（auto_approve / auto_reject / escalate）
+
+    用法（FastAPI 依赖注入）：
+        engine = ApprovalEngine()
+        instance = await engine.create_instance(...)
     """
 
-    # ── 发起审批 ──────────────────────────────────────────────────────────────
+    # ── 创建审批实例 ──────────────────────────────────────────────────────────
 
-    @staticmethod
-    async def submit(
-        flow_def_id: str,
-        source_id: Optional[str],
-        title: str,
-        context: Dict[str, Any],
+    async def create_instance(
+        self,
+        template_id: str,
+        business_type: str,
+        business_id: str,
         initiator_id: str,
         store_id: str,
+        title: str,
+        summary: dict[str, Any],
         tenant_id: str,
         db: AsyncSession,
-        amount: Optional[float] = None,
-    ) -> Dict[str, Any]:
+    ) -> InstanceRow:
         """
-        发起审批：创建 instance，路由到第一个有效步骤的审批人，发通知。
-
-        Args:
-            flow_def_id: 审批流定义 ID
-            source_id: 关联业务单据 ID（可选）
-            title: 审批标题
-            context: 业务上下文，用于条件路由
-            initiator_id: 发起人 ID
-            store_id: 门店 ID
-            tenant_id: 租户 ID
-            db: 数据库会话
-            amount: 关联金额（用于条件路由，也可直接放在 context["amount"] 中）
+        发起审批：
+        1. 验证模板存在且有效
+        2. 检查触发条件（不满足 → 直接创建已通过实例，无需人工）
+        3. 创建 approval_instances 记录（status=pending）
+        4. 激活第一个节点（创建 node_instances + 发通知）
 
         Returns:
-            新建的 ApprovalInstance 字典
+            新建的审批实例 dict
+        Raises:
+            ValueError: 模板不存在、无节点配置等业务错误
         """
-        # 将 amount 写入 context 以便条件路由评估
-        if amount is not None:
-            context = {**context, "amount": amount}
+        template = await _fetch_template(template_id, tenant_id, db)
+        if not template:
+            raise ValueError(f"审批流模板不存在或已停用: {template_id}")
 
-        # 查询流程定义
-        flow_raw = await _get_flow_def(flow_def_id, tenant_id, db)
-        if not flow_raw:
-            raise ValueError(f"审批流定义不存在或已停用: {flow_def_id}")
+        trigger_cond = _parse_jsonb(template.get("trigger_conditions"))
 
-        # 反序列化以便调用 get_applicable_steps
-        flow_def = ApprovalFlowDefinition.model_validate(
-            {**flow_raw, "steps": flow_raw["steps"]}
-        )
-        applicable_steps = flow_def.get_applicable_steps(context)
-        if not applicable_steps:
-            raise ValueError("当前上下文没有匹配的审批步骤，请检查流程定义条件")
-
-        first_step = applicable_steps[0]
-
-        # 写入实例记录
-        await db.execute(
-            text(
-                "INSERT INTO approval_instances "
-                "(tenant_id, flow_def_id, business_type, source_id, title, amount, "
-                " current_step, status, initiator_id, store_id, context) "
-                "VALUES (:tenant_id, :flow_def_id, :business_type, :source_id, :title, :amount, "
-                "        :current_step, :status, :initiator_id, :store_id, :context::jsonb) "
-                "RETURNING id, created_at"
-            ),
-            {
-                "tenant_id": tenant_id,
-                "flow_def_id": flow_def_id,
-                "business_type": flow_def.business_type,
-                "source_id": source_id,
-                "title": title,
-                "amount": amount,
-                "current_step": first_step.step,
-                "status": InstanceStatus.PENDING,
-                "initiator_id": initiator_id,
-                "store_id": store_id,
-                "context": __import__("json").dumps(context, ensure_ascii=False),
-            },
-        )
-        await db.commit()
-
-        # 重新查询以获取完整实例
-        instance_row = await db.execute(
-            text(
-                "SELECT * FROM approval_instances "
-                "WHERE tenant_id = :tenant_id AND initiator_id = :initiator_id "
-                "AND title = :title ORDER BY created_at DESC LIMIT 1"
-            ),
-            {"tenant_id": tenant_id, "initiator_id": initiator_id, "title": title},
-        )
-        instance_data = dict(instance_row.mappings().first())
-
-        # 通知第一审批人
-        approvers = await _find_approvers_by_role(
-            role=first_step.role,
-            store_id=store_id,
-            tenant_id=tenant_id,
-            db=db,
-        )
-        for approver_id in approvers:
-            await _send_notification(
-                recipient_id=approver_id,
-                title=f"【待审批】{title}",
-                body=f"您有一条新的审批待处理（步骤 {first_step.step}：{first_step.role}）",
-                metadata={"instance_id": str(instance_data["id"]), "step": first_step.step},
-            )
-
-        return instance_data
-
-    # ── 同意审批 ──────────────────────────────────────────────────────────────
-
-    @staticmethod
-    async def approve(
-        instance_id: str,
-        approver_id: str,
-        comment: Optional[str],
-        tenant_id: str,
-        db: AsyncSession,
-    ) -> Dict[str, Any]:
-        """
-        审批人同意：记录操作，判断是否有下一步，完成或流转。
-
-        Returns:
-            更新后的 ApprovalInstance 字典
-        """
-        instance_data = await _get_instance(instance_id, tenant_id, db)
-        if not instance_data:
-            raise ValueError(f"审批实例不存在: {instance_id}")
-        if instance_data["status"] != InstanceStatus.PENDING:
-            raise ValueError(f"审批已结束，当前状态: {instance_data['status']}")
-
-        current_step = instance_data["current_step"]
-
-        # 写审批记录
-        await db.execute(
-            text(
-                "INSERT INTO approval_records "
-                "(tenant_id, instance_id, step, approver_id, action, comment) "
-                "VALUES (:tenant_id, :instance_id, :step, :approver_id, :action, :comment)"
-            ),
-            {
-                "tenant_id": tenant_id,
-                "instance_id": instance_id,
-                "step": current_step,
-                "approver_id": approver_id,
-                "action": RecordAction.APPROVED,
-                "comment": comment,
-            },
-        )
-
-        # 获取流程定义以确定下一步
-        flow_raw = await _get_flow_def(
-            str(instance_data["flow_def_id"]), tenant_id, db
-        )
-        if not flow_raw:
-            raise ValueError("审批流定义已停用，无法继续流转")
-
-        ctx = instance_data.get("context") or {}
-        if isinstance(ctx, str):
-            ctx = __import__("json").loads(ctx)
-        if instance_data.get("amount") is not None:
-            ctx = {**ctx, "amount": float(instance_data["amount"])}
-
-        flow_def = ApprovalFlowDefinition.model_validate(
-            {**flow_raw, "steps": flow_raw["steps"]}
-        )
-        applicable_steps = flow_def.get_applicable_steps(ctx)
-
-        # 找到当前步骤在适用步骤列表中的位置
-        current_idx = next(
-            (i for i, s in enumerate(applicable_steps) if s.step == current_step),
-            None,
-        )
-        next_step: Optional[FlowStep] = None
-        if current_idx is not None and current_idx + 1 < len(applicable_steps):
-            next_step = applicable_steps[current_idx + 1]
-
-        if next_step:
-            # 流转到下一步
-            await db.execute(
-                text(
-                    "UPDATE approval_instances SET current_step = :next_step "
-                    "WHERE id = :id AND tenant_id = :tenant_id"
-                ),
-                {
-                    "next_step": next_step.step,
-                    "id": instance_id,
-                    "tenant_id": tenant_id,
-                },
-            )
-            await db.commit()
-
-            # 通知下一级审批人
-            approvers = await _find_approvers_by_role(
-                role=next_step.role,
-                store_id=str(instance_data["store_id"]),
+        # 触发条件不满足 → 自动通过，无需人工审批
+        if not eval_trigger_conditions(trigger_cond, summary):
+            return await self._create_auto_approved_instance(
+                template_id=template_id,
+                business_type=business_type,
+                business_id=business_id,
+                initiator_id=initiator_id,
+                store_id=store_id,
+                title=title,
+                summary=summary,
                 tenant_id=tenant_id,
                 db=db,
             )
-            for aid in approvers:
-                await _send_notification(
-                    recipient_id=aid,
-                    title=f"【待审批】{instance_data['title']}",
-                    body=f"审批流转至步骤 {next_step.step}（{next_step.role}），请处理",
-                    metadata={"instance_id": instance_id, "step": next_step.step},
-                )
-        else:
-            # 全部步骤完成，审批通过
-            await db.execute(
-                text(
-                    "UPDATE approval_instances "
-                    "SET status = :status, completed_at = NOW() "
-                    "WHERE id = :id AND tenant_id = :tenant_id"
-                ),
-                {
-                    "status": InstanceStatus.APPROVED,
-                    "id": instance_id,
-                    "tenant_id": tenant_id,
-                },
-            )
-            await db.commit()
 
-            # 通知发起人
-            await _send_notification(
-                recipient_id=str(instance_data["initiator_id"]),
-                title=f"【审批通过】{instance_data['title']}",
-                body="您发起的审批已全部通过",
-                metadata={"instance_id": instance_id},
-            )
+        # 加载节点
+        nodes = await _fetch_nodes(template_id, tenant_id, db)
+        if not nodes:
+            raise ValueError(f"审批流模板没有配置节点，请先添加审批节点: {template_id}")
 
-        updated = await _get_instance(instance_id, tenant_id, db)
-        return updated or {}
+        summary_json = json.dumps(summary, ensure_ascii=False)
 
-    # ── 拒绝审批 ──────────────────────────────────────────────────────────────
-
-    @staticmethod
-    async def reject(
-        instance_id: str,
-        approver_id: str,
-        comment: Optional[str],
-        tenant_id: str,
-        db: AsyncSession,
-    ) -> Dict[str, Any]:
-        """
-        审批人拒绝：记录操作，终止流程，通知发起人。
-
-        Returns:
-            更新后的 ApprovalInstance 字典
-        """
-        instance_data = await _get_instance(instance_id, tenant_id, db)
-        if not instance_data:
-            raise ValueError(f"审批实例不存在: {instance_id}")
-        if instance_data["status"] != InstanceStatus.PENDING:
-            raise ValueError(f"审批已结束，当前状态: {instance_data['status']}")
-
-        current_step = instance_data["current_step"]
-
-        # 写审批记录
-        await db.execute(
+        result = await db.execute(
             text(
-                "INSERT INTO approval_records "
-                "(tenant_id, instance_id, step, approver_id, action, comment) "
-                "VALUES (:tenant_id, :instance_id, :step, :approver_id, :action, :comment)"
+                "INSERT INTO approval_instances "
+                "(tenant_id, flow_template_id, business_type, business_id, "
+                " title, initiator_id, store_id, current_node_order, status, "
+                " summary, context_data) "
+                "VALUES (:tid, :tmpl_id, :bt, :bid, :title, :initiator_id, "
+                "        :store_id, :node_order, :status, "
+                "        :summary::jsonb, :summary::jsonb) "
+                "RETURNING id, tenant_id, flow_template_id, business_type, "
+                "          business_id, title, initiator_id, store_id, "
+                "          current_node_order, status, summary, created_at, updated_at"
             ),
             {
-                "tenant_id": tenant_id,
-                "instance_id": instance_id,
-                "step": current_step,
-                "approver_id": approver_id,
-                "action": RecordAction.REJECTED,
-                "comment": comment,
+                "tid": tenant_id,
+                "tmpl_id": template_id,
+                "bt": business_type,
+                "bid": business_id,
+                "title": title,
+                "initiator_id": initiator_id,
+                "store_id": store_id,
+                "node_order": nodes[0]["node_order"],
+                "status": _STATUS_PENDING,
+                "summary": summary_json,
             },
         )
+        await db.commit()
+        instance = dict(result.mappings().first())
+        instance_id = str(instance["id"])
 
-        # 终止流程
+        # 激活第一节点
+        await self._activate_node(
+            instance_id=instance_id,
+            node=nodes[0],
+            store_id=store_id,
+            title=title,
+            summary=summary,
+            tenant_id=tenant_id,
+            db=db,
+        )
+
+        log.info(
+            "approval_instance_created",
+            instance_id=instance_id,
+            template_id=template_id,
+            business_type=business_type,
+            tenant_id=tenant_id,
+        )
+        return await _fetch_instance(instance_id, tenant_id, db) or instance
+
+    # ── 激活节点（内部）──────────────────────────────────────────────────────
+
+    async def _activate_node(
+        self,
+        instance_id: str,
+        node: NodeRow,
+        store_id: str,
+        title: str,
+        summary: dict[str, Any],
+        tenant_id: str,
+        db: AsyncSession,
+    ) -> None:
+        """
+        激活指定节点：
+        1. auto 节点 → 直接自动通过
+        2. 检查节点级 auto_approve_condition → 满足则自动通过
+        3. 查找审批人 → 创建 node_instance 记录 → 发通知
+        4. 无审批人时自动通过（避免卡死）
+        """
+        node_order: int = node["node_order"]
+        node_type: str = node["node_type"]
+
+        # auto 节点
+        if node_type == "auto":
+            await self._auto_approve_node(
+                instance_id=instance_id,
+                node=node,
+                tenant_id=tenant_id,
+                db=db,
+            )
+            return
+
+        # 节点级自动审批条件
+        auto_cond_raw = node.get("auto_approve_condition")
+        if auto_cond_raw:
+            auto_cond = _parse_jsonb(auto_cond_raw)
+            if eval_condition(auto_cond, summary):
+                await self._auto_approve_node(
+                    instance_id=instance_id,
+                    node=node,
+                    tenant_id=tenant_id,
+                    db=db,
+                )
+                return
+
+        # 查找审批人
+        approvers = await _find_approvers_for_node(node, store_id, tenant_id, db)
+        if not approvers:
+            log.warning(
+                "approval_no_approvers_found_auto_approve",
+                instance_id=instance_id,
+                node_order=node_order,
+                node_type=node_type,
+                tenant_id=tenant_id,
+            )
+            # 无审批人时自动通过，避免卡死
+            await self._auto_approve_node(
+                instance_id=instance_id,
+                node=node,
+                tenant_id=tenant_id,
+                db=db,
+            )
+            return
+
+        # 创建各审批人的 node_instance 记录
+        for approver_id in approvers:
+            await db.execute(
+                text(
+                    "INSERT INTO approval_node_instances "
+                    "(tenant_id, instance_id, node_order, approver_id, status) "
+                    "VALUES (:tid, :iid, :node_order, :approver_id, :status)"
+                ),
+                {
+                    "tid": tenant_id,
+                    "iid": instance_id,
+                    "node_order": node_order,
+                    "approver_id": approver_id,
+                    "status": _STATUS_PENDING,
+                },
+            )
+            await _send_notification(
+                recipient_id=approver_id,
+                title=f"【待审批】{title}",
+                body=(
+                    f"您有一条新的审批待处理"
+                    f"（节点 {node_order}：{node['node_name']}）"
+                ),
+                meta={
+                    "instance_id": instance_id,
+                    "node_order": node_order,
+                    "node_name": node["node_name"],
+                },
+            )
+
+        await db.commit()
+
+    # ── 自动通过节点（内部）──────────────────────────────────────────────────
+
+    async def _auto_approve_node(
+        self,
+        instance_id: str,
+        node: NodeRow,
+        tenant_id: str,
+        db: AsyncSession,
+    ) -> None:
+        """自动通过节点，写系统审批记录，然后推进到下一节点或完成。"""
+        node_order: int = node["node_order"]
+
         await db.execute(
             text(
-                "UPDATE approval_instances "
-                "SET status = :status, completed_at = NOW() "
-                "WHERE id = :id AND tenant_id = :tenant_id"
+                "INSERT INTO approval_node_instances "
+                "(tenant_id, instance_id, node_order, approver_id, "
+                " status, comment, decided_at) "
+                "VALUES (:tid, :iid, :node_order, :approver_id, "
+                "        :status, :comment, NOW())"
             ),
             {
-                "status": InstanceStatus.REJECTED,
-                "id": instance_id,
-                "tenant_id": tenant_id,
+                "tid": tenant_id,
+                "iid": instance_id,
+                "node_order": node_order,
+                "approver_id": _SYSTEM_USER_ID,
+                "status": _STATUS_APPROVED,
+                "comment": "系统自动审批通过",
             },
         )
         await db.commit()
 
-        # 通知发起人
-        await _send_notification(
-            recipient_id=str(instance_data["initiator_id"]),
-            title=f"【审批拒绝】{instance_data['title']}",
-            body=f"您发起的审批在步骤 {current_step} 被拒绝。原因：{comment or '无'}",
-            metadata={"instance_id": instance_id, "step": current_step},
-        )
-
-        updated = await _get_instance(instance_id, tenant_id, db)
-        return updated or {}
-
-    # ── 路由到下一步（内部辅助） ───────────────────────────────────────────────
-
-    @staticmethod
-    async def _route_to_next_step(
-        instance_data: Dict[str, Any],
-        flow_def: ApprovalFlowDefinition,
-        db: AsyncSession,
-        tenant_id: str,
-    ) -> None:
-        """
-        路由下一审批人：
-        1. 读取 flow_def.steps[current_step]
-        2. 检查 condition（如 amount > 500）
-        3. 按 role 查找审批人（从员工表查对应角色的人）
-        4. 发送审批通知
-        """
-        ctx = instance_data.get("context") or {}
-        if isinstance(ctx, str):
-            ctx = __import__("json").loads(ctx)
-        if instance_data.get("amount") is not None:
-            ctx = {**ctx, "amount": float(instance_data["amount"])}
-
-        applicable_steps = flow_def.get_applicable_steps(ctx)
-        current_step = instance_data["current_step"]
-        target = next((s for s in applicable_steps if s.step == current_step), None)
-        if not target:
-            logger.warning(
-                "no_applicable_step",
-                extra={
-                    "instance_id": str(instance_data["id"]),
-                    "current_step": current_step,
-                },
-            )
-            return
-
-        approvers = await _find_approvers_by_role(
-            role=target.role,
-            store_id=str(instance_data["store_id"]),
+        await self._advance_instance(
+            instance_id=instance_id,
+            current_node_order=node_order,
             tenant_id=tenant_id,
             db=db,
         )
-        for approver_id in approvers:
-            await _send_notification(
-                recipient_id=approver_id,
-                title=f"【待审批】{instance_data['title']}",
-                body=f"审批步骤 {current_step}（{target.role}）请处理",
-                metadata={
-                    "instance_id": str(instance_data["id"]),
-                    "step": current_step,
-                },
-            )
 
-    # ── 超时催办 ──────────────────────────────────────────────────────────────
+    # ── 推进实例到下一节点（内部）────────────────────────────────────────────
 
-    @staticmethod
-    async def check_timeouts(
+    async def _advance_instance(
+        self,
+        instance_id: str,
+        current_node_order: int,
         tenant_id: str,
         db: AsyncSession,
-    ) -> Dict[str, Any]:
+    ) -> None:
         """
-        定时任务：检查超时未处理的审批，向当前步骤审批人发催办通知。
+        当前节点完成后推进流程：
+        - 有下一节点 → 更新 current_node_order，激活下一节点
+        - 无下一节点 → 标记整体 approved，触发回调，通知发起人
+        """
+        instance = await _fetch_instance(instance_id, tenant_id, db)
+        if not instance:
+            return
 
-        逻辑：
-        - 查询 status=pending 的实例
-        - 结合流程定义中当前步骤的 timeout_hours，计算是否超时
-        - 超时则发催办通知（不修改实例状态）
+        template_id = str(instance.get("flow_template_id") or "")
+        nodes = await _fetch_nodes(template_id, tenant_id, db) if template_id else []
+
+        next_node: NodeRow | None = None
+        for node in nodes:
+            if int(node["node_order"]) > current_node_order:
+                next_node = node
+                break
+
+        if next_node:
+            await db.execute(
+                text(
+                    "UPDATE approval_instances "
+                    "SET current_node_order = :node_order, updated_at = NOW() "
+                    "WHERE id = :iid AND tenant_id = :tid"
+                ),
+                {
+                    "node_order": next_node["node_order"],
+                    "iid": instance_id,
+                    "tid": tenant_id,
+                },
+            )
+            await db.commit()
+
+            store_id = str(instance.get("store_id") or "")
+            summary = _parse_jsonb(instance.get("summary"))
+            title = str(instance.get("title") or "")
+
+            await self._activate_node(
+                instance_id=instance_id,
+                node=next_node,
+                store_id=store_id,
+                title=title,
+                summary=summary,
+                tenant_id=tenant_id,
+                db=db,
+            )
+        else:
+            # 所有节点完成，审批整体通过
+            await db.execute(
+                text(
+                    "UPDATE approval_instances "
+                    "SET status = :status, completed_at = NOW(), updated_at = NOW() "
+                    "WHERE id = :iid AND tenant_id = :tid"
+                ),
+                {"status": _STATUS_APPROVED, "iid": instance_id, "tid": tenant_id},
+            )
+            await db.commit()
+
+            await _dispatch_on_approved(
+                business_type=str(instance.get("business_type") or ""),
+                business_id=str(instance.get("business_id") or ""),
+                summary=_parse_jsonb(instance.get("summary")),
+                tenant_id=tenant_id,
+            )
+            await _send_notification(
+                recipient_id=str(instance.get("initiator_id") or ""),
+                title=f"【审批通过】{instance.get('title')}",
+                body="您发起的审批已全部通过",
+                meta={"instance_id": instance_id},
+            )
+            log.info(
+                "approval_instance_completed",
+                instance_id=instance_id,
+                status=_STATUS_APPROVED,
+                tenant_id=tenant_id,
+            )
+
+    # ── 创建自动通过实例（触发条件不满足时）────────────────────────────────────
+
+    async def _create_auto_approved_instance(
+        self,
+        template_id: str,
+        business_type: str,
+        business_id: str,
+        initiator_id: str,
+        store_id: str,
+        title: str,
+        summary: dict[str, Any],
+        tenant_id: str,
+        db: AsyncSession,
+    ) -> InstanceRow:
+        """触发条件不满足，直接创建状态为 approved 的实例，无需人工审批。"""
+        summary_json = json.dumps(summary, ensure_ascii=False)
+        result = await db.execute(
+            text(
+                "INSERT INTO approval_instances "
+                "(tenant_id, flow_template_id, business_type, business_id, "
+                " title, initiator_id, store_id, current_node_order, status, "
+                " summary, context_data, completed_at) "
+                "VALUES (:tid, :tmpl_id, :bt, :bid, :title, :initiator_id, "
+                "        :store_id, 0, :status, "
+                "        :summary::jsonb, :summary::jsonb, NOW()) "
+                "RETURNING id, status, created_at"
+            ),
+            {
+                "tid": tenant_id,
+                "tmpl_id": template_id,
+                "bt": business_type,
+                "bid": business_id,
+                "title": title,
+                "initiator_id": initiator_id,
+                "store_id": store_id,
+                "status": _STATUS_APPROVED,
+                "summary": summary_json,
+            },
+        )
+        await db.commit()
+        row = dict(result.mappings().first())
+        instance_id = str(row["id"])
+
+        log.info(
+            "approval_auto_approved_trigger_not_met",
+            instance_id=instance_id,
+            template_id=template_id,
+            tenant_id=tenant_id,
+        )
+        return await _fetch_instance(instance_id, tenant_id, db) or row
+
+    # ── 审批同意 ──────────────────────────────────────────────────────────────
+
+    async def approve(
+        self,
+        instance_id: str,
+        node_order: int,
+        approver_id: str,
+        comment: str | None,
+        tenant_id: str,
+        db: AsyncSession,
+    ) -> InstanceRow:
+        """
+        审批人同意：
+        1. 验证实例状态 = pending，当前节点序号匹配
+        2. 验证审批人在节点审批人列表中且状态为 pending
+        3. 更新 node_instance.status = 'approved'
+        4. 判断节点是否完成（any_one / all_must 策略）
+        5. 节点完成后推进到下一节点或完成整体审批
+           - any_one：同节点其他人标记为 skipped
 
         Returns:
-            {"checked": int, "reminded": int}
+            更新后的审批实例 dict
+        Raises:
+            ValueError: 实例不存在、状态不对、审批人不在列表等
+        """
+        instance = await _fetch_instance(instance_id, tenant_id, db)
+        if not instance:
+            raise ValueError(f"审批实例不存在: {instance_id}")
+        if instance["status"] != _STATUS_PENDING:
+            raise ValueError(f"审批已结束，当前状态: {instance['status']}")
+
+        current_node_order: int = int(instance.get("current_node_order") or 1)
+        if current_node_order != node_order:
+            raise ValueError(
+                f"当前节点为 {current_node_order}，不能处理节点 {node_order}"
+            )
+
+        node_instances = await _fetch_node_instances(instance_id, node_order, tenant_id, db)
+        my_record = next(
+            (ni for ni in node_instances if str(ni["approver_id"]) == approver_id),
+            None,
+        )
+        if not my_record:
+            raise ValueError(
+                f"审批人 {approver_id} 不在节点 {node_order} 的审批人列表中"
+            )
+        if my_record["status"] != _STATUS_PENDING:
+            raise ValueError(
+                f"该审批人已处理此节点，当前状态: {my_record['status']}"
+            )
+
+        # 更新 node_instance
+        await db.execute(
+            text(
+                "UPDATE approval_node_instances "
+                "SET status = :status, comment = :comment, decided_at = NOW() "
+                "WHERE id = :id AND tenant_id = :tid"
+            ),
+            {
+                "status": _STATUS_APPROVED,
+                "comment": comment,
+                "id": str(my_record["id"]),
+                "tid": tenant_id,
+            },
+        )
+        await db.commit()
+
+        # 获取节点配置以判断 approve_type
+        template_id = str(instance.get("flow_template_id") or "")
+        nodes = await _fetch_nodes(template_id, tenant_id, db) if template_id else []
+        current_node = next((n for n in nodes if int(n["node_order"]) == node_order), None)
+        approve_type: str = current_node["approve_type"] if current_node else "any_one"
+
+        node_complete = await self._is_node_complete(
+            instance_id=instance_id,
+            node_order=node_order,
+            approve_type=approve_type,
+            tenant_id=tenant_id,
+            db=db,
+        )
+
+        if node_complete:
+            # any_one：将同节点其他 pending 记录标记为 skipped
+            if approve_type == "any_one":
+                await db.execute(
+                    text(
+                        "UPDATE approval_node_instances "
+                        "SET status = :skipped, decided_at = NOW() "
+                        "WHERE instance_id = :iid AND node_order = :node_order "
+                        "AND tenant_id = :tid AND status = :pending"
+                    ),
+                    {
+                        "skipped": _STATUS_SKIPPED,
+                        "iid": instance_id,
+                        "node_order": node_order,
+                        "tid": tenant_id,
+                        "pending": _STATUS_PENDING,
+                    },
+                )
+                await db.commit()
+
+            log.info(
+                "approval_node_completed",
+                instance_id=instance_id,
+                node_order=node_order,
+                approve_type=approve_type,
+                tenant_id=tenant_id,
+            )
+            await self._advance_instance(
+                instance_id=instance_id,
+                current_node_order=node_order,
+                tenant_id=tenant_id,
+                db=db,
+            )
+
+        return await _fetch_instance(instance_id, tenant_id, db) or instance
+
+    # ── 判断节点是否完成（内部）──────────────────────────────────────────────
+
+    async def _is_node_complete(
+        self,
+        instance_id: str,
+        node_order: int,
+        approve_type: str,
+        tenant_id: str,
+        db: AsyncSession,
+    ) -> bool:
+        """
+        判断节点是否已满足完成条件：
+        - any_one：只要有一人 approved 即完成
+        - all_must：所有非 skipped 记录都 approved 才完成
+        """
+        node_instances = await _fetch_node_instances(instance_id, node_order, tenant_id, db)
+
+        if approve_type == "any_one":
+            return any(ni["status"] == _STATUS_APPROVED for ni in node_instances)
+
+        # all_must
+        active = [ni for ni in node_instances if ni["status"] != _STATUS_SKIPPED]
+        if not active:
+            return True
+        return all(ni["status"] == _STATUS_APPROVED for ni in active)
+
+    # ── 审批拒绝 ──────────────────────────────────────────────────────────────
+
+    async def reject(
+        self,
+        instance_id: str,
+        node_order: int,
+        approver_id: str,
+        comment: str | None,
+        tenant_id: str,
+        db: AsyncSession,
+    ) -> InstanceRow:
+        """
+        审批人拒绝：整个审批单立即拒绝（不等其他人），
+        同节点其他待审批记录标记为 skipped。
+
+        Returns:
+            更新后的审批实例 dict
+        Raises:
+            ValueError: 实例不存在、状态不对、审批人不在列表等
+        """
+        instance = await _fetch_instance(instance_id, tenant_id, db)
+        if not instance:
+            raise ValueError(f"审批实例不存在: {instance_id}")
+        if instance["status"] != _STATUS_PENDING:
+            raise ValueError(f"审批已结束，当前状态: {instance['status']}")
+
+        current_node_order: int = int(instance.get("current_node_order") or 1)
+        if current_node_order != node_order:
+            raise ValueError(
+                f"当前节点为 {current_node_order}，不能处理节点 {node_order}"
+            )
+
+        node_instances = await _fetch_node_instances(instance_id, node_order, tenant_id, db)
+        my_record = next(
+            (ni for ni in node_instances if str(ni["approver_id"]) == approver_id),
+            None,
+        )
+        if not my_record:
+            raise ValueError(
+                f"审批人 {approver_id} 不在节点 {node_order} 的审批人列表中"
+            )
+        if my_record["status"] != _STATUS_PENDING:
+            raise ValueError(
+                f"该审批人已处理此节点，当前状态: {my_record['status']}"
+            )
+
+        # 更新拒绝记录
+        await db.execute(
+            text(
+                "UPDATE approval_node_instances "
+                "SET status = :status, comment = :comment, decided_at = NOW() "
+                "WHERE id = :id AND tenant_id = :tid"
+            ),
+            {
+                "status": _STATUS_REJECTED,
+                "comment": comment,
+                "id": str(my_record["id"]),
+                "tid": tenant_id,
+            },
+        )
+
+        # 同节点其他 pending → skipped
+        await db.execute(
+            text(
+                "UPDATE approval_node_instances "
+                "SET status = :skipped, decided_at = NOW() "
+                "WHERE instance_id = :iid AND node_order = :node_order "
+                "AND tenant_id = :tid AND status = :pending"
+            ),
+            {
+                "skipped": _STATUS_SKIPPED,
+                "iid": instance_id,
+                "node_order": node_order,
+                "tid": tenant_id,
+                "pending": _STATUS_PENDING,
+            },
+        )
+
+        # 整体实例标记为 rejected
+        await db.execute(
+            text(
+                "UPDATE approval_instances "
+                "SET status = :status, completed_at = NOW(), updated_at = NOW() "
+                "WHERE id = :iid AND tenant_id = :tid"
+            ),
+            {"status": _STATUS_REJECTED, "iid": instance_id, "tid": tenant_id},
+        )
+        await db.commit()
+
+        await _dispatch_on_rejected(
+            business_type=str(instance.get("business_type") or ""),
+            business_id=str(instance.get("business_id") or ""),
+            tenant_id=tenant_id,
+        )
+        await _send_notification(
+            recipient_id=str(instance.get("initiator_id") or ""),
+            title=f"【审批拒绝】{instance.get('title')}",
+            body=f"您发起的审批在节点 {node_order} 被拒绝。原因：{comment or '无'}",
+            meta={"instance_id": instance_id, "node_order": node_order},
+        )
+
+        log.info(
+            "approval_rejected",
+            instance_id=instance_id,
+            approver_id=approver_id,
+            node_order=node_order,
+            tenant_id=tenant_id,
+        )
+        return await _fetch_instance(instance_id, tenant_id, db) or instance
+
+    # ── 撤回审批 ──────────────────────────────────────────────────────────────
+
+    async def cancel(
+        self,
+        instance_id: str,
+        initiator_id: str,
+        tenant_id: str,
+        db: AsyncSession,
+    ) -> InstanceRow:
+        """
+        撤回：仅发起人可撤回，且只有 pending 状态可撤。
+        将当前节点所有 pending 记录标记为 skipped。
+
+        Returns:
+            更新后的审批实例 dict
+        Raises:
+            ValueError: 不是发起人、非 pending 状态
+        """
+        instance = await _fetch_instance(instance_id, tenant_id, db)
+        if not instance:
+            raise ValueError(f"审批实例不存在: {instance_id}")
+        if str(instance.get("initiator_id") or "") != initiator_id:
+            raise ValueError("只有发起人可以撤回审批")
+        if instance["status"] != _STATUS_PENDING:
+            raise ValueError(f"只有 pending 状态可撤回，当前状态: {instance['status']}")
+
+        current_node_order: int = int(instance.get("current_node_order") or 1)
+
+        # 当前节点所有 pending 记录 → skipped
+        await db.execute(
+            text(
+                "UPDATE approval_node_instances "
+                "SET status = :skipped, decided_at = NOW() "
+                "WHERE instance_id = :iid AND node_order = :node_order "
+                "AND tenant_id = :tid AND status = :pending"
+            ),
+            {
+                "skipped": _STATUS_SKIPPED,
+                "iid": instance_id,
+                "node_order": current_node_order,
+                "tid": tenant_id,
+                "pending": _STATUS_PENDING,
+            },
+        )
+        await db.execute(
+            text(
+                "UPDATE approval_instances "
+                "SET status = :status, completed_at = NOW(), updated_at = NOW() "
+                "WHERE id = :iid AND tenant_id = :tid"
+            ),
+            {"status": _STATUS_CANCELLED, "iid": instance_id, "tid": tenant_id},
+        )
+        await db.commit()
+
+        log.info(
+            "approval_cancelled",
+            instance_id=instance_id,
+            initiator_id=initiator_id,
+            tenant_id=tenant_id,
+        )
+        return await _fetch_instance(instance_id, tenant_id, db) or instance
+
+    # ── 超时检查（定时任务）──────────────────────────────────────────────────
+
+    async def check_timeouts(
+        self,
+        tenant_id: str,
+        db: AsyncSession,
+    ) -> dict[str, Any]:
+        """
+        定时任务：检查所有 pending 实例，对超时的节点执行 timeout_action。
+
+        超时判定：实例 created_at + 当前节点 timeout_hours < now
+
+        timeout_action 行为：
+          - auto_approve：当前节点自动通过，推进到下一节点
+          - auto_reject：整体标记为 timeout 拒绝
+          - escalate：仅发催办通知，不修改状态
+
+        Returns:
+            {"checked": int, "timed_out": int, "auto_approved": int, "auto_rejected": int}
         """
         rows = await db.execute(
             text(
-                "SELECT ai.id, ai.tenant_id, ai.flow_def_id, ai.business_type, "
-                "ai.title, ai.current_step, ai.store_id, ai.context, ai.amount, "
-                "ai.created_at, ai.initiator_id, "
-                "afd.steps "
-                "FROM approval_instances ai "
-                "JOIN approval_flow_definitions afd ON ai.flow_def_id = afd.id "
-                "WHERE ai.tenant_id = :tenant_id AND ai.status = 'pending'"
+                "SELECT id, tenant_id, flow_template_id, "
+                "       business_type, business_id, title, "
+                "       current_node_order, initiator_id, store_id, "
+                "       summary, created_at "
+                "FROM approval_instances "
+                "WHERE tenant_id = :tid AND status = :status "
+                "AND is_deleted = FALSE "
+                "AND flow_template_id IS NOT NULL"
             ),
-            {"tenant_id": tenant_id},
+            {"tid": tenant_id, "status": _STATUS_PENDING},
         )
-        pending = rows.mappings().fetchall()
+        pending_instances = rows.mappings().fetchall()
 
         checked = 0
-        reminded = 0
+        timed_out = 0
+        auto_approved = 0
+        auto_rejected = 0
         now = datetime.now(tz=timezone.utc)
 
-        for row in pending:
+        for row in pending_instances:
             checked += 1
             try:
-                import json
+                instance_id = str(row["id"])
+                template_id = str(row["flow_template_id"])
+                current_node_order = int(row["current_node_order"] or 1)
 
-                steps_raw = row["steps"]
-                if isinstance(steps_raw, str):
-                    steps_raw = json.loads(steps_raw)
-
-                flow_def = ApprovalFlowDefinition.model_validate(
-                    {
-                        "id": str(row["flow_def_id"]),
-                        "tenant_id": str(row["tenant_id"]),
-                        "flow_name": "",
-                        "business_type": row["business_type"],
-                        "steps": steps_raw,
-                    }
-                )
-
-                ctx = row["context"] or {}
-                if isinstance(ctx, str):
-                    ctx = json.loads(ctx)
-                if row["amount"] is not None:
-                    ctx = {**ctx, "amount": float(row["amount"])}
-
-                applicable_steps = flow_def.get_applicable_steps(ctx)
-                current_step_num = row["current_step"]
-                target = next(
-                    (s for s in applicable_steps if s.step == current_step_num),
+                nodes = await _fetch_nodes(template_id, tenant_id, db)
+                current_node = next(
+                    (n for n in nodes if int(n["node_order"]) == current_node_order),
                     None,
                 )
-                if not target:
+                if not current_node:
                     continue
 
-                created_at = row["created_at"]
+                timeout_hours = current_node.get("timeout_hours")
+                if timeout_hours is None:
+                    continue  # 该节点不超时
+
+                created_at: datetime = row["created_at"]
                 if created_at.tzinfo is None:
                     created_at = created_at.replace(tzinfo=timezone.utc)
 
-                # 判断是否超过 timeout_hours
-                deadline = created_at + timedelta(hours=target.timeout_hours)
+                deadline = created_at + timedelta(hours=int(timeout_hours))
                 if now < deadline:
                     continue
 
-                # 发催办
-                approvers = await _find_approvers_by_role(
-                    role=target.role,
-                    store_id=str(row["store_id"]),
-                    tenant_id=tenant_id,
-                    db=db,
-                )
-                for aid in approvers:
-                    await _send_notification(
-                        recipient_id=aid,
-                        title=f"【催办提醒】{row['title']}",
-                        body=(
-                            f"审批步骤 {current_step_num}（{target.role}）"
-                            f"已超过 {target.timeout_hours} 小时未处理，请尽快审批"
+                timed_out += 1
+                timeout_action: str = current_node.get("timeout_action") or "escalate"
+
+                if timeout_action == "auto_approve":
+                    # 当前节点超时记录 → timeout，推进
+                    await db.execute(
+                        text(
+                            "UPDATE approval_node_instances "
+                            "SET status = :status, decided_at = NOW() "
+                            "WHERE instance_id = :iid AND node_order = :node_order "
+                            "AND tenant_id = :tid AND status = :pending"
                         ),
-                        metadata={
-                            "instance_id": str(row["id"]),
-                            "step": current_step_num,
+                        {
+                            "status": _STATUS_TIMEOUT,
+                            "iid": instance_id,
+                            "node_order": current_node_order,
+                            "tid": tenant_id,
+                            "pending": _STATUS_PENDING,
                         },
                     )
-                reminded += 1
+                    await db.commit()
+                    await self._advance_instance(
+                        instance_id=instance_id,
+                        current_node_order=current_node_order,
+                        tenant_id=tenant_id,
+                        db=db,
+                    )
+                    auto_approved += 1
+
+                elif timeout_action == "auto_reject":
+                    await db.execute(
+                        text(
+                            "UPDATE approval_node_instances "
+                            "SET status = :status, decided_at = NOW() "
+                            "WHERE instance_id = :iid AND node_order = :node_order "
+                            "AND tenant_id = :tid AND status = :pending"
+                        ),
+                        {
+                            "status": _STATUS_TIMEOUT,
+                            "iid": instance_id,
+                            "node_order": current_node_order,
+                            "tid": tenant_id,
+                            "pending": _STATUS_PENDING,
+                        },
+                    )
+                    await db.execute(
+                        text(
+                            "UPDATE approval_instances "
+                            "SET status = :status, completed_at = NOW(), "
+                            "    updated_at = NOW() "
+                            "WHERE id = :iid AND tenant_id = :tid"
+                        ),
+                        {
+                            "status": _STATUS_TIMEOUT,
+                            "iid": instance_id,
+                            "tid": tenant_id,
+                        },
+                    )
+                    await db.commit()
+                    auto_rejected += 1
+                    await _send_notification(
+                        recipient_id=str(row["initiator_id"]),
+                        title=f"【审批超时】{row['title']}",
+                        body=(
+                            f"您发起的审批在节点 {current_node_order} "
+                            f"（{current_node['node_name']}）已超过 "
+                            f"{timeout_hours} 小时未处理，已自动超时拒绝"
+                        ),
+                        meta={
+                            "instance_id": instance_id,
+                            "node_order": current_node_order,
+                        },
+                    )
+
+                else:  # escalate — 仅催办，不改状态
+                    store_id = str(row.get("store_id") or "")
+                    approvers = await _find_approvers_for_node(
+                        current_node, store_id, tenant_id, db
+                    )
+                    for approver_id in approvers:
+                        await _send_notification(
+                            recipient_id=approver_id,
+                            title=f"【催办提醒】{row['title']}",
+                            body=(
+                                f"审批节点 {current_node_order}"
+                                f"（{current_node['node_name']}）"
+                                f"已超过 {timeout_hours} 小时未处理，请尽快审批"
+                            ),
+                            meta={
+                                "instance_id": instance_id,
+                                "node_order": current_node_order,
+                            },
+                        )
 
             except (KeyError, ValueError, TypeError) as exc:
-                logger.warning(
-                    "timeout_check_error",
-                    extra={"instance_id": str(row.get("id")), "error": str(exc)},
+                log.warning(
+                    "approval_timeout_check_error",
+                    instance_id=str(row.get("id")),
+                    error=str(exc),
+                    tenant_id=tenant_id,
                 )
 
-        return {"checked": checked, "reminded": reminded}
+        await db.commit()
+        log.info(
+            "approval_timeout_check_done",
+            tenant_id=tenant_id,
+            checked=checked,
+            timed_out=timed_out,
+            auto_approved=auto_approved,
+            auto_rejected=auto_rejected,
+        )
+        return {
+            "checked": checked,
+            "timed_out": timed_out,
+            "auto_approved": auto_approved,
+            "auto_rejected": auto_rejected,
+        }
+
+    # ── 模板详情查询（含节点列表）────────────────────────────────────────────
+
+    async def get_template_with_nodes(
+        self,
+        template_id: str,
+        tenant_id: str,
+        db: AsyncSession,
+    ) -> dict[str, Any]:
+        """查询审批流模板详情（含节点列表）"""
+        row = await db.execute(
+            text(
+                "SELECT id, tenant_id, template_name, business_type, "
+                "       trigger_conditions, is_active, created_by, "
+                "       created_at, updated_at "
+                "FROM approval_flow_templates "
+                "WHERE id = :id AND tenant_id = :tid"
+            ),
+            {"id": template_id, "tid": tenant_id},
+        )
+        template = row.mappings().first()
+        if not template:
+            raise ValueError(f"模板不存在: {template_id}")
+        template_dict = dict(template)
+        template_dict["nodes"] = await _fetch_nodes(template_id, tenant_id, db)
+        return template_dict

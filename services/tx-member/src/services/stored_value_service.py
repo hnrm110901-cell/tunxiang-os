@@ -1042,6 +1042,43 @@ class StoredValueService:
         db.add(txn)
         return {"card_no": card_no, "status": "frozen"}
 
+    async def freeze_by_id(
+        self,
+        db: AsyncSession,
+        card_id: uuid.UUID,
+        tenant_id: uuid.UUID,
+        operator_id: uuid.UUID | None = None,
+        remark: str | None = None,
+    ) -> dict:
+        """冻结储值卡（按 card_id）"""
+        from models.stored_value import StoredValueCard, StoredValueTransaction
+
+        card = await self._get_card_by_id_for_update(db, card_id, tenant_id)
+        if card.status != "active":
+            raise CardNotActiveError(f"只能冻结 active 状态的卡，当前状态: {card.status}")
+
+        card.status = "frozen"
+        card.frozen_at = datetime.now(timezone.utc)
+
+        txn = StoredValueTransaction(
+            id=uuid.uuid4(),
+            tenant_id=tenant_id,
+            card_id=card.id,
+            customer_id=card.customer_id,
+            txn_type="freeze",
+            amount_fen=0,
+            main_amount_fen=0,
+            gift_amount_fen=0,
+            balance_after_fen=card.balance_fen,
+            gift_balance_after_fen=card.gift_balance_fen,
+            operator_id=operator_id,
+            remark=remark or "冻结储值卡",
+        )
+        db.add(txn)
+
+        logger.info("stored_value_freeze_by_id", card_id=str(card_id))
+        return {"card_id": str(card_id), "card_no": card.card_no, "status": "frozen"}
+
     async def unfreeze(self, db: AsyncSession, card_no: str, operator_id: str | None = None) -> dict:
         """解冻储值卡"""
         from models.stored_value import StoredValueCard, StoredValueTransaction
@@ -1076,6 +1113,74 @@ class StoredValueService:
         )
         db.add(txn)
         return {"card_no": card_no, "status": "active"}
+
+    async def unfreeze_by_id(
+        self,
+        db: AsyncSession,
+        card_id: uuid.UUID,
+        tenant_id: uuid.UUID,
+        operator_id: uuid.UUID | None = None,
+        remark: str | None = None,
+    ) -> dict:
+        """解冻储值卡（按 card_id）"""
+        from models.stored_value import StoredValueCard, StoredValueTransaction
+
+        card = await self._get_card_by_id_for_update(db, card_id, tenant_id)
+        if card.status != "frozen":
+            raise CardNotActiveError("卡片非冻结状态，无需解冻")
+
+        card.status = "active"
+        card.frozen_at = None
+
+        txn = StoredValueTransaction(
+            id=uuid.uuid4(),
+            tenant_id=tenant_id,
+            card_id=card.id,
+            customer_id=card.customer_id,
+            txn_type="unfreeze",
+            amount_fen=0,
+            main_amount_fen=0,
+            gift_amount_fen=0,
+            balance_after_fen=card.balance_fen,
+            gift_balance_after_fen=card.gift_balance_fen,
+            operator_id=operator_id,
+            remark=remark or "解冻储值卡",
+        )
+        db.add(txn)
+
+        logger.info("stored_value_unfreeze_by_id", card_id=str(card_id))
+        return {"card_id": str(card_id), "card_no": card.card_no, "status": "active"}
+
+    async def list_cards_by_customer(
+        self,
+        db: AsyncSession,
+        customer_id: uuid.UUID,
+        tenant_id: uuid.UUID,
+        include_inactive: bool = False,
+    ) -> list[dict]:
+        """查询会员名下所有储值卡（按 customer_id）
+
+        参数：
+            include_inactive: True 时返回所有卡（含冻结/过期），
+                              False 时只返回 active 卡（默认）。
+        """
+        from models.stored_value import StoredValueCard
+
+        stmt = (
+            select(StoredValueCard)
+            .where(
+                StoredValueCard.customer_id == customer_id,
+                StoredValueCard.tenant_id == tenant_id,
+                StoredValueCard.is_deleted.is_(False),
+            )
+            .order_by(StoredValueCard.created_at.asc())
+        )
+        if not include_inactive:
+            stmt = stmt.where(StoredValueCard.status == "active")
+
+        result = await db.execute(stmt)
+        cards = result.scalars().all()
+        return [_card_to_dict(c) for c in cards]
 
     # ──────────────────────────────────────────────────────────────
     # 积分兑换余额

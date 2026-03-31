@@ -21,6 +21,11 @@ from api.approval_router import router as approval_router
 from api.payroll_router import router as payroll_v2_router
 from api.patrol_routes import router as patrol_router
 from api.franchise_settlement_routes import router as franchise_settlement_router
+from api.permission_routes import router as permission_router
+from api.permission_routes import role_limits_router
+from api.attendance_routes import router as attendance_router
+from api.leave_routes import router as leave_router
+from api.store_clone_routes import router as store_clone_router
 
 app = FastAPI(title="TunxiangOS tx-org", version="3.0.0")
 app.include_router(emp_router)
@@ -40,6 +45,11 @@ app.include_router(franchise_v2_router)
 app.include_router(approval_router,        prefix="/api/v1")
 app.include_router(patrol_router,              prefix="/api/v1")
 app.include_router(franchise_settlement_router)
+app.include_router(permission_router)    # 权限检查 API（v075）
+app.include_router(role_limits_router)   # 角色限制配置 CRUD（v075）
+app.include_router(attendance_router)    # 考勤打卡 API（v077）
+app.include_router(leave_router)         # 请假管理 API（v077）
+app.include_router(store_clone_router)   # 快速开店克隆 API（v078）
 
 @app.get("/health")
 async def health():

@@ -16,6 +16,9 @@ from api.e_invoice_routes import router as invoice_router
 from api.settlement_routes import router as settlement_router
 from api.erp_routes import router as erp_router
 from api.reconciliation_routes import router as reconciliation_router
+from api.revenue_aggregation_routes import router as revenue_aggregation_router
+from api.finance_cost_routes import router as finance_cost_router
+from api.finance_pl_routes import router as finance_pl_router
 
 
 @asynccontextmanager
@@ -46,6 +49,9 @@ app.include_router(invoice_router, prefix="/api/v1/invoices")
 app.include_router(settlement_router)
 app.include_router(erp_router)
 app.include_router(reconciliation_router, prefix="/api/v1")
+app.include_router(revenue_aggregation_router)
+app.include_router(finance_cost_router, prefix="/api/v1/finance")
+app.include_router(finance_pl_router,   prefix="/api/v1/finance")
 
 
 @app.get("/health")

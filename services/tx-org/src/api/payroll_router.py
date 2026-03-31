@@ -5,24 +5,31 @@
 # app.include_router(new_payroll_router, prefix="/api/v1/payroll")
 
 端点清单：
-  POST /api/v1/payroll/calculate              触发月度薪资计算
-  GET  /api/v1/payroll/records                薪资记录列表（按月/门店/员工筛选）
-  GET  /api/v1/payroll/records/{id}           薪资记录详情
-  POST /api/v1/payroll/confirm                确认当月薪资
-  POST /api/v1/payroll/mark-paid              批量标记发放
-  GET  /api/v1/payroll/summary                汇总统计
-  GET  /api/v1/payroll/payslip/{employee_id}  个人工资条
-  GET  /api/v1/payroll/attendance             考勤汇总
+  POST /api/v1/payroll/calculate                        触发月度薪资计算
+  GET  /api/v1/payroll/records                          薪资记录列表（按月/门店/员工筛选）
+  GET  /api/v1/payroll/records/{id}                     薪资记录详情
+  POST /api/v1/payroll/confirm                          确认当月薪资
+  POST /api/v1/payroll/mark-paid                        批量标记发放
+  GET  /api/v1/payroll/summary                          汇总统计
+  GET  /api/v1/payroll/payslip/{employee_id}            管理员查看员工工资条
+  GET  /api/v1/payroll/attendance                       考勤汇总
 
-  GET  /api/v1/payroll/schemes                薪资方案列表
-  POST /api/v1/payroll/schemes                创建方案
-  PUT  /api/v1/payroll/schemes/{id}           更新方案
+  GET  /api/v1/payroll/schemes                          薪资方案列表
+  POST /api/v1/payroll/schemes                          创建方案
+  PUT  /api/v1/payroll/schemes/{id}                     更新方案
 
-  GET  /api/v1/payroll/si-configs             社保配置列表（按地区）
-  POST /api/v1/payroll/si-configs             新建社保配置
+  GET  /api/v1/payroll/si-configs                       社保配置列表（按地区）
+  POST /api/v1/payroll/si-configs                       新建社保配置
+
+  GET  /api/v1/payroll/employees/{id}/salary-config     查询员工薪资配置
+  PUT  /api/v1/payroll/employees/{id}/salary-config     设置员工薪资配置（调薪）
+
+  GET  /api/v1/payroll/my-payslips                      员工自查工资条列表
+  GET  /api/v1/payroll/my-payslips/{payslip_id}         员工自查单月工资条明细
 
 统一响应格式: {"ok": bool, "data": {}, "error": None}
 所有接口需 X-Tenant-ID header。
+员工自查接口还需 X-Employee-ID header 或 auth middleware 注入 request.state.employee_id。
 """
 
 from __future__ import annotations
@@ -135,9 +142,12 @@ async def calculate_payroll(
         records = await _engine.calculate_monthly_payroll(
             db, tenant_id, store_id, req.year, req.month
         )
-    except Exception as exc:
-        log.error("payroll.calculate.error", error=str(exc), exc_info=True)
-        raise HTTPException(status_code=500, detail=f"薪资计算失败: {exc}") from exc
+    except (ValueError, KeyError, ZeroDivisionError) as exc:
+        log.error("payroll.calculate.validation_error", error=str(exc), exc_info=True)
+        raise HTTPException(status_code=400, detail=f"薪资计算参数异常: {exc}") from exc
+    except OSError as exc:
+        log.error("payroll.calculate.db_error", error=str(exc), exc_info=True)
+        raise HTTPException(status_code=500, detail=f"数据库访问失败: {exc}") from exc
 
     await db.commit()
     return _ok({
@@ -465,6 +475,324 @@ async def create_salary_scheme(
     await db.commit()
     created = dict(row.mappings().one())
     return _ok(created)
+
+
+# ── 员工薪资配置 ───────────────────────────────────────────────────────────────
+
+
+class CreateEmployeeSalaryConfigReq(BaseModel):
+    scheme_id: Optional[str] = Field(None, description="薪资方案 UUID")
+    base_salary_fen: int = Field(..., ge=0, description="个人协议工资（分），覆盖方案默认值")
+    commission_rate: float = Field(default=0.0, ge=0.0, le=1.0, description="提成比例")
+    social_insurance_base_fen: int = Field(default=0, ge=0, description="社保缴费基数（分，0表示使用base_salary_fen）")
+    effective_from: str = Field(..., description="生效日期 YYYY-MM-DD")
+    effective_to: Optional[str] = Field(None, description="失效日期 YYYY-MM-DD，NULL=持续生效")
+
+
+@router.get("/employees/{employee_id}/salary-config")
+async def get_employee_salary_config(
+    employee_id: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> Dict[str, Any]:
+    """查询员工薪资配置（当前有效配置优先，返回历史记录列表）"""
+    tenant_id = _get_tenant_id(request)
+    _uuid(employee_id, "employee_id")
+
+    rows = await db.execute(
+        text("""
+            SELECT
+                esc.*,
+                ss.name            AS scheme_name,
+                ss.scheme_type,
+                ss.overtime_multiplier
+            FROM employee_salary_configs esc
+            LEFT JOIN salary_schemes ss
+                   ON ss.id = esc.scheme_id
+                  AND ss.tenant_id = esc.tenant_id
+                  AND ss.is_deleted = FALSE
+            WHERE esc.tenant_id = :tenant_id
+              AND esc.employee_id = :employee_id
+              AND esc.is_deleted = FALSE
+            ORDER BY esc.effective_from DESC
+        """),
+        {"tenant_id": tenant_id, "employee_id": employee_id},
+    )
+    items = [dict(r) for r in rows.mappings().all()]
+    current = items[0] if items else None
+    return _ok({"current": current, "history": items})
+
+
+@router.put("/employees/{employee_id}/salary-config")
+async def upsert_employee_salary_config(
+    employee_id: str,
+    req: CreateEmployeeSalaryConfigReq,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> Dict[str, Any]:
+    """设置员工薪资配置（调薪时自动封闭旧配置）
+
+    逻辑：
+    1. 将该员工当前有效配置（effective_to IS NULL）的 effective_to 设为新配置的 effective_from - 1 天
+    2. 插入新薪资配置记录
+    """
+    tenant_id = _get_tenant_id(request)
+    _uuid(employee_id, "employee_id")
+    if req.scheme_id:
+        _uuid(req.scheme_id, "scheme_id")
+
+    from datetime import date as _date, timedelta as _timedelta
+
+    try:
+        eff_from = _date.fromisoformat(req.effective_from)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=f"effective_from 日期格式无效: {req.effective_from}",
+        ) from exc
+
+    eff_to_str: Optional[str] = req.effective_to
+    if eff_to_str:
+        try:
+            _date.fromisoformat(eff_to_str)
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=400,
+                detail=f"effective_to 日期格式无效: {eff_to_str}",
+            ) from exc
+
+    # 1. 封闭旧有效配置（effective_to IS NULL 且 effective_from < 新生效日）
+    seal_date = (eff_from - _timedelta(days=1)).isoformat()
+    await db.execute(
+        text("""
+            UPDATE employee_salary_configs
+            SET effective_to = :seal_date,
+                updated_at   = NOW()
+            WHERE tenant_id    = :tenant_id
+              AND employee_id  = :employee_id
+              AND effective_to IS NULL
+              AND is_deleted   = FALSE
+              AND effective_from < :eff_from
+        """),
+        {
+            "tenant_id": tenant_id,
+            "employee_id": employee_id,
+            "seal_date": seal_date,
+            "eff_from": req.effective_from,
+        },
+    )
+
+    # 2. 插入新配置
+    si_base = req.social_insurance_base_fen if req.social_insurance_base_fen > 0 else req.base_salary_fen
+    new_row = await db.execute(
+        text("""
+            INSERT INTO employee_salary_configs (
+                tenant_id, employee_id, scheme_id,
+                base_salary_fen, commission_rate,
+                social_insurance_base_fen,
+                effective_from, effective_to
+            ) VALUES (
+                :tenant_id, :employee_id, :scheme_id,
+                :base_salary_fen, :commission_rate,
+                :social_insurance_base_fen,
+                :effective_from, :effective_to
+            )
+            RETURNING *
+        """),
+        {
+            "tenant_id": tenant_id,
+            "employee_id": employee_id,
+            "scheme_id": req.scheme_id,
+            "base_salary_fen": req.base_salary_fen,
+            "commission_rate": req.commission_rate,
+            "social_insurance_base_fen": si_base,
+            "effective_from": req.effective_from,
+            "effective_to": eff_to_str,
+        },
+    )
+    mapping = new_row.mappings().first()
+    if not mapping:
+        raise HTTPException(
+            status_code=409,
+            detail=f"薪资配置日期区间冲突: employee_id={employee_id}, effective_from={req.effective_from}",
+        )
+    await db.commit()
+    return _ok(dict(mapping))
+
+
+# ── 员工自查工资条（my-payslips） ──────────────────────────────────────────────
+
+
+@router.get("/my-payslips")
+async def list_my_payslips(
+    request: Request,
+    year: Optional[int] = Query(None, ge=2020, le=2099, description="按年份筛选"),
+    page: int = Query(default=1, ge=1),
+    size: int = Query(default=12, ge=1, le=60),
+    db: AsyncSession = Depends(get_db),
+) -> Dict[str, Any]:
+    """员工查看自己的工资条列表
+
+    需要 request.state.employee_id 或 X-Employee-ID header（由认证中间件注入）。
+    仅返回 confirmed/paid 状态的记录（已发布的工资条）。
+    """
+    tenant_id = _get_tenant_id(request)
+    employee_id: Optional[str] = getattr(request.state, "employee_id", None)
+    if not employee_id:
+        employee_id = request.headers.get("X-Employee-ID", "")
+    if not employee_id:
+        raise HTTPException(
+            status_code=400,
+            detail="X-Employee-ID header 缺失（或认证中间件未注入 employee_id）",
+        )
+    _uuid(employee_id, "employee_id")
+
+    filters: List[str] = [
+        "tenant_id = :tenant_id",
+        "employee_id = :employee_id",
+        "status IN ('confirmed', 'paid')",
+        "is_deleted = FALSE",
+    ]
+    params: Dict[str, Any] = {
+        "tenant_id": tenant_id,
+        "employee_id": employee_id,
+        "offset": (page - 1) * size,
+        "limit": size,
+    }
+    if year is not None:
+        filters.append("period_year = :year")
+        params["year"] = year
+
+    where = " AND ".join(filters)
+
+    count_row = await db.execute(
+        text(f"SELECT COUNT(*) FROM payroll_records_v2 WHERE {where}"),
+        params,
+    )
+    total: int = count_row.scalar_one()
+
+    rows = await db.execute(
+        text(f"""
+            SELECT
+                id, period_year, period_month,
+                base_salary_fen, commission_fen, overtime_pay_fen, bonus_fen,
+                deductions_fen, social_insurance_fen, housing_fund_fen,
+                gross_salary_fen, net_salary_fen,
+                work_days, work_hours, overtime_hours,
+                status, confirmed_at, paid_at
+            FROM payroll_records_v2
+            WHERE {where}
+            ORDER BY period_year DESC, period_month DESC
+            LIMIT :limit OFFSET :offset
+        """),
+        params,
+    )
+    items = []
+    for r in rows.mappings().all():
+        rec = dict(r)
+        rec["gross_salary_yuan"] = round(int(rec.get("gross_salary_fen") or 0) / 100, 2)
+        rec["net_salary_yuan"] = round(int(rec.get("net_salary_fen") or 0) / 100, 2)
+        rec["period"] = f"{rec['period_year']}-{rec['period_month']:02d}"
+        items.append(rec)
+
+    return _ok({"items": items, "total": total, "page": page, "size": size})
+
+
+@router.get("/my-payslips/{payslip_id}")
+async def get_my_payslip_detail(
+    payslip_id: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> Dict[str, Any]:
+    """员工查看单月工资条详情（payslip_id = payroll_records_v2.id）
+
+    只返回属于当前登录员工且状态为 confirmed/paid 的记录，并附上明细行。
+    """
+    tenant_id = _get_tenant_id(request)
+    _uuid(payslip_id, "payslip_id")
+
+    employee_id: Optional[str] = getattr(request.state, "employee_id", None)
+    if not employee_id:
+        employee_id = request.headers.get("X-Employee-ID", "")
+    if not employee_id:
+        raise HTTPException(status_code=400, detail="X-Employee-ID header 缺失")
+    _uuid(employee_id, "employee_id")
+
+    row = await db.execute(
+        text("""
+            SELECT *
+            FROM payroll_records_v2
+            WHERE tenant_id  = :tenant_id
+              AND id          = :id
+              AND employee_id = :employee_id
+              AND status IN ('confirmed', 'paid')
+              AND is_deleted  = FALSE
+        """),
+        {"tenant_id": tenant_id, "id": payslip_id, "employee_id": employee_id},
+    )
+    mapping = row.mappings().first()
+    if not mapping:
+        raise HTTPException(
+            status_code=404,
+            detail=f"工资条不存在或无权查看: id={payslip_id}",
+        )
+
+    rec = dict(mapping)
+
+    def _fen(key: str) -> int:
+        return int(rec.get(key) or 0)
+
+    items_display = []
+
+    def _add(label: str, fen: int, is_deduction: bool = False) -> None:
+        if fen != 0:
+            items_display.append({
+                "label": label,
+                "amount_fen": fen,
+                "amount_yuan": round(fen / 100, 2),
+                "is_deduction": is_deduction,
+            })
+
+    _add("基本工资", _fen("base_salary_fen"))
+    _add("提成", _fen("commission_fen"))
+    _add("加班费", _fen("overtime_pay_fen"))
+    _add("奖金/全勤", _fen("bonus_fen"))
+    _add("考勤扣款", _fen("deductions_fen"), is_deduction=True)
+    _add("养老/医疗/失业险（个人）", _fen("social_insurance_fen"), is_deduction=True)
+    _add("住房公积金（个人）", _fen("housing_fund_fen"), is_deduction=True)
+    items_display.append({
+        "label": "应发合计",
+        "amount_fen": _fen("gross_salary_fen"),
+        "amount_yuan": round(_fen("gross_salary_fen") / 100, 2),
+        "is_deduction": False,
+        "is_summary": True,
+    })
+    items_display.append({
+        "label": "实发合计",
+        "amount_fen": _fen("net_salary_fen"),
+        "amount_yuan": round(_fen("net_salary_fen") / 100, 2),
+        "is_deduction": False,
+        "is_summary": True,
+    })
+
+    return _ok({
+        "id": str(rec["id"]),
+        "employee_id": str(rec["employee_id"]),
+        "period": f"{rec['period_year']}-{rec['period_month']:02d}",
+        "period_year": rec["period_year"],
+        "period_month": rec["period_month"],
+        "status": rec["status"],
+        "gross_salary_fen": _fen("gross_salary_fen"),
+        "gross_salary_yuan": round(_fen("gross_salary_fen") / 100, 2),
+        "net_salary_fen": _fen("net_salary_fen"),
+        "net_salary_yuan": round(_fen("net_salary_fen") / 100, 2),
+        "work_days": rec.get("work_days", 0),
+        "work_hours": float(rec.get("work_hours") or 0),
+        "overtime_hours": float(rec.get("overtime_hours") or 0),
+        "confirmed_at": rec.get("confirmed_at"),
+        "paid_at": rec.get("paid_at"),
+        "items": items_display,
+    })
 
 
 @router.put("/schemes/{scheme_id}")

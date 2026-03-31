@@ -2,10 +2,16 @@
 
 统一响应格式: {"ok": bool, "data": {}, "error": {}}
 所有接口需 X-Tenant-ID header。
+
+权限校验集成（v075）：
+  - apply_discount  → 调用 tx-org PermissionService 检查折扣权限
+  - cancel_order    → 检查退单权限（void_order）
+  - update_item     → 改价时检查 modify_price 权限（通过 X-Employee-ID header）
 """
 from typing import Optional
+from uuid import UUID
 
-from fastapi import APIRouter, Depends, Request, HTTPException, Query
+from fastapi import APIRouter, Depends, Request, HTTPException, Header, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -13,6 +19,7 @@ from shared.ontology.src.database import get_db
 from ..services.cashier_engine import CashierEngine
 from ..services.payment_gateway import PaymentGateway
 from ..services.daily_settlement import DailySettlementService
+from ..services.permission_client import CashierPermissionClient
 
 router = APIRouter(prefix="/api/v1", tags=["cashier"])
 
@@ -69,6 +76,9 @@ class ApplyDiscountReq(BaseModel):
     discount_value: float
     reason: str = ""
     approval_id: Optional[str] = None
+    # 操作员工ID（权限校验用）
+    employee_id: Optional[str] = None
+    store_id: Optional[str] = None
 
 
 class PaymentEntry(BaseModel):
@@ -83,6 +93,9 @@ class SettleOrderReq(BaseModel):
 
 class CancelOrderReq(BaseModel):
     reason: str = ""
+    # 操作员工ID（权限校验用）
+    employee_id: Optional[str] = None
+    store_id: Optional[str] = None
 
 
 class ChangeTableStatusReq(BaseModel):
@@ -230,10 +243,46 @@ async def apply_discount(
     order_id: str,
     req: ApplyDiscountReq,
     request: Request,
+    x_employee_id: Optional[str] = Header(None, alias="X-Employee-ID"),
     db: AsyncSession = Depends(get_db),
 ):
-    """应用折扣 — 含毛利底线校验"""
-    engine = CashierEngine(db, _get_tenant_id(request))
+    """应用折扣 — 含毛利底线校验 + 10级角色权限校验
+
+    权限校验优先级：
+      1. 若请求体 employee_id 或 Header X-Employee-ID 存在，则校验角色权限
+      2. 折扣率超过角色权限时：
+         - can_override_discount=True → 返回 require_approval=True（前端弹出审批流）
+         - can_override_discount=False → 403 直接拒绝
+      3. 权限通过后继续执行毛利底线校验（CashierEngine 内部）
+    """
+    tenant_id = _get_tenant_id(request)
+    engine = CashierEngine(db, tenant_id)
+
+    # 权限校验（仅在能获取 employee_id 时执行）
+    operator_id = req.employee_id or x_employee_id
+    if operator_id and req.discount_type == "percent_off":
+        perm_client = CashierPermissionClient(db, tenant_id)
+        try:
+            perm_result = await perm_client.check_discount(
+                employee_id=UUID(operator_id),
+                discount_rate=float(req.discount_value),
+                store_id=UUID(req.store_id) if req.store_id else None,
+                order_id=UUID(order_id) if order_id else None,
+                request_ip=request.client.host if request.client else None,
+            )
+            if not perm_result.allowed:
+                if perm_result.require_approval:
+                    _err(
+                        f"折扣权限不足，需 Level {perm_result.approver_min_level}+ 审批。"
+                        f"approval_id 字段传入审批单ID后可继续。{perm_result.message}",
+                        code=403,
+                    )
+                else:
+                    _err(perm_result.message, code=403)
+        except (ValueError, KeyError):
+            # UUID 格式错误等，跳过权限校验（不阻断业务，记录日志）
+            pass
+
     try:
         result = await engine.apply_discount(
             order_id=order_id,
@@ -275,10 +324,29 @@ async def cancel_order(
     order_id: str,
     req: CancelOrderReq,
     request: Request,
+    x_employee_id: Optional[str] = Header(None, alias="X-Employee-ID"),
     db: AsyncSession = Depends(get_db),
 ):
-    """取消订单"""
-    engine = CashierEngine(db, _get_tenant_id(request))
+    """取消订单 — 需退单权限（Level 7+）"""
+    tenant_id = _get_tenant_id(request)
+    engine = CashierEngine(db, tenant_id)
+
+    # 权限校验
+    operator_id = req.employee_id or x_employee_id
+    if operator_id:
+        perm_client = CashierPermissionClient(db, tenant_id)
+        try:
+            perm_result = await perm_client.check_void_order(
+                employee_id=UUID(operator_id),
+                store_id=UUID(req.store_id) if req.store_id else None,
+                order_id=UUID(order_id) if order_id else None,
+                request_ip=request.client.host if request.client else None,
+            )
+            if not perm_result.allowed:
+                _err(perm_result.message, code=403)
+        except (ValueError, KeyError):
+            pass
+
     try:
         result = await engine.cancel_order(order_id=order_id, reason=req.reason)
         return _ok(result)

@@ -76,7 +76,9 @@ from .api.digital_menu_board_router import router as digital_menu_board_router
 from .routers.shift_summary_router import router as shift_summary_router
 from .routers.sync_ingest_router import router as sync_ingest_router
 from .routers.delivery_router import router as delivery_router
+from .routers.delivery_panel_router import router as delivery_panel_router
 from .routers.self_pay_router import router as self_pay_router
+from .api.production_dept_routes import router as production_dept_router
 
 
 @asynccontextmanager
@@ -170,8 +172,10 @@ app.include_router(patrol_router)
 app.include_router(digital_menu_board_router)
 app.include_router(shift_summary_router)
 app.include_router(sync_ingest_router)
-app.include_router(delivery_router)
+app.include_router(delivery_panel_router)  # 新接单面板（完整实现）先注册，优先匹配
+app.include_router(delivery_router)         # 旧骨架路由（保留 /webhook/ 和 /platforms 端点）
 app.include_router(self_pay_router)
+app.include_router(production_dept_router)
 
 
 @app.get("/health")
