@@ -17,6 +17,7 @@ from .wecom_scrm_routes import router as wecom_scrm_router
 from .wecom_jssdk import router as wecom_jssdk_router
 from .wecom_internal import router as wecom_internal_router
 from .wecom_group_routes import router as wecom_group_router
+from .gdpr_routes import router as gdpr_router
 from .response import ok
 
 logger = structlog.get_logger(__name__)
@@ -130,6 +131,9 @@ app.include_router(wecom_internal_router)
 
 # 企微群运营 SOP API
 app.include_router(wecom_group_router)
+
+# GDPR 个人信息保护合规 API
+app.include_router(gdpr_router)
 
 # 域路由代理（通配路由 /api/v1/{domain}/{path}，放最后）
 app.include_router(proxy_router)

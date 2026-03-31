@@ -7,7 +7,8 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 
 import structlog
-from fastapi import APIRouter, Depends, Header
+from fastapi import APIRouter, Depends, Header, Query
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, text
 
@@ -16,10 +17,12 @@ from shared.ontology.src.entities import Order, OrderItem, Store
 
 from services.store_pnl import StorePnLService
 from services.voucher_service import generate_voucher_from_settlement, format_for_kingdee
+from services.budget_service import BudgetService
 
 logger = structlog.get_logger()
 router = APIRouter(prefix="/api/v1/finance", tags=["finance"])
 pnl_service = StorePnLService()
+budget_service = BudgetService()
 
 
 def _parse_date(d: str) -> date:
@@ -272,24 +275,200 @@ async def get_store_pnl(
     return {"ok": True, "data": pnl}
 
 
+# ── 预算 Pydantic 请求模型 ───────────────────────────────────
+
+class CreateBudgetRequest(BaseModel):
+    store_id: str
+    department: str
+    period: str = Field(..., description="monthly / quarterly / yearly")
+    period_start: date
+    period_end: date
+    category: str = Field(..., description="revenue / cost / labor / material / marketing / overhead")
+    budget_amount_fen: int = Field(..., ge=0)
+    note: Optional[str] = None
+
+
+class RecordExecutionRequest(BaseModel):
+    budget_id: str
+    actual_amount_fen: int
+    recorded_date: date
+    source_type: str = Field(..., description="order / purchase / payroll / expense")
+    description: Optional[str] = None
+
+
+class ApproveBudgetRequest(BaseModel):
+    budget_id: str
+
+
 # ── 预算 ──────────────────────────────────────────────────────
 
 @router.get("/budget")
-async def get_budget(store_id: str, month: Optional[str] = None):
-    """预算查询 — 暂返回门店配置中的目标值"""
-    return {"ok": True, "data": {"budget": {}, "note": "Budget module planned for Phase 1.1.3"}}
+async def list_budgets(
+    store_id: str,
+    department: Optional[str] = None,
+    period: Optional[str] = None,
+    category: Optional[str] = None,
+    status: Optional[str] = None,
+    page: int = Query(1, ge=1),
+    size: int = Query(20, ge=1, le=100),
+    db: AsyncSession = Depends(_get_tenant_db),
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+):
+    """预算列表查询 — 按门店/部门/期间/类别筛选"""
+    tid = _uuid.UUID(x_tenant_id)
+    sid = _uuid.UUID(store_id)
+    result = await budget_service.list_budgets(
+        db=db,
+        tenant_id=tid,
+        store_id=sid,
+        department=department,
+        period=period,
+        category=category,
+        status=status,
+        page=page,
+        size=size,
+    )
+    items_data = [
+        {
+            "id": str(b.id),
+            "store_id": str(b.store_id),
+            "department": b.department,
+            "period": b.period,
+            "period_start": str(b.period_start),
+            "period_end": str(b.period_end),
+            "category": b.category,
+            "budget_amount_fen": b.budget_amount_fen,
+            "status": b.status,
+            "note": b.note,
+            "created_at": b.created_at.isoformat() if b.created_at else None,
+        }
+        for b in result["items"]
+    ]
+    return {
+        "ok": True,
+        "data": {
+            "items": items_data,
+            "total": result["total"],
+            "page": result["page"],
+            "size": result["size"],
+        },
+    }
+
+
+@router.post("/budget")
+async def create_budget(
+    body: CreateBudgetRequest,
+    db: AsyncSession = Depends(_get_tenant_db),
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+):
+    """创建预算"""
+    tid = _uuid.UUID(x_tenant_id)
+    sid = _uuid.UUID(body.store_id)
+    budget = await budget_service.create_budget(
+        db=db,
+        tenant_id=tid,
+        store_id=sid,
+        department=body.department,
+        period=body.period,
+        period_start=body.period_start,
+        period_end=body.period_end,
+        category=body.category,
+        budget_amount_fen=body.budget_amount_fen,
+        note=body.note,
+    )
+    await db.commit()
+    return {
+        "ok": True,
+        "data": {
+            "id": str(budget.id),
+            "store_id": str(budget.store_id),
+            "category": budget.category,
+            "budget_amount_fen": budget.budget_amount_fen,
+            "status": budget.status,
+        },
+    }
+
+
+@router.post("/budget/approve")
+async def approve_budget(
+    body: ApproveBudgetRequest,
+    db: AsyncSession = Depends(_get_tenant_db),
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+):
+    """审批预算：draft → approved"""
+    tid = _uuid.UUID(x_tenant_id)
+    bid = _uuid.UUID(body.budget_id)
+    budget = await budget_service.approve_budget(db=db, tenant_id=tid, budget_id=bid)
+    await db.commit()
+    return {
+        "ok": True,
+        "data": {"id": str(budget.id), "status": budget.status},
+    }
 
 
 @router.get("/budget/execution")
-async def get_budget_execution(store_id: str):
-    return {"ok": True, "data": {"execution": {}, "note": "Budget execution planned for Phase 1.1.3"}}
+async def get_budget_execution(
+    store_id: str,
+    category: Optional[str] = None,
+    db: AsyncSession = Depends(_get_tenant_db),
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+):
+    """获取预算执行情况 — 预算 vs 实际，偏差率"""
+    tid = _uuid.UUID(x_tenant_id)
+    sid = _uuid.UUID(store_id)
+    summaries = await budget_service.get_budget_execution(
+        db=db, tenant_id=tid, store_id=sid, category=category,
+    )
+    return {"ok": True, "data": {"execution": summaries}}
+
+
+@router.post("/budget/execution")
+async def record_budget_execution(
+    body: RecordExecutionRequest,
+    db: AsyncSession = Depends(_get_tenant_db),
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+):
+    """记录预算执行（实际发生金额）"""
+    tid = _uuid.UUID(x_tenant_id)
+    bid = _uuid.UUID(body.budget_id)
+    execution = await budget_service.record_execution(
+        db=db,
+        tenant_id=tid,
+        budget_id=bid,
+        actual_amount_fen=body.actual_amount_fen,
+        recorded_date=body.recorded_date,
+        source_type=body.source_type,
+        description=body.description,
+    )
+    await db.commit()
+    return {
+        "ok": True,
+        "data": {
+            "id": str(execution.id),
+            "budget_id": str(execution.budget_id),
+            "actual_amount_fen": execution.actual_amount_fen,
+            "variance_fen": execution.variance_fen,
+            "variance_pct": execution.variance_pct,
+        },
+    }
 
 
 # ── 现金流 ────────────────────────────────────────────────────
 
 @router.get("/cashflow/forecast")
-async def forecast_cashflow(store_id: str, days: int = 30):
-    return {"ok": True, "data": {"forecast": [], "note": "Cashflow forecast planned for Phase 1.1.3"}}
+async def forecast_cashflow(
+    store_id: str,
+    days: int = Query(30, ge=1, le=365),
+    db: AsyncSession = Depends(_get_tenant_db),
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+):
+    """现金流预测 — 基于预算+历史趋势"""
+    tid = _uuid.UUID(x_tenant_id)
+    sid = _uuid.UUID(store_id)
+    forecast = await budget_service.get_cashflow_forecast(
+        db=db, tenant_id=tid, store_id=sid, days=days,
+    )
+    return {"ok": True, "data": {"forecast": forecast, "days": days, "store_id": store_id}}
 
 
 # ── 月度报告 ──────────────────────────────────────────────────
