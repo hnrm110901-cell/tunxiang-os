@@ -7,7 +7,12 @@
 """
 import statistics
 from typing import Any
+
+import structlog
+
 from ..base import SkillAgent, AgentResult
+
+logger = structlog.get_logger()
 
 
 # 上市检查清单
@@ -221,25 +226,60 @@ class SmartMenuAgent(SkillAgent):
         )
 
     async def _optimize_menu(self, params: dict) -> AgentResult:
-        """菜单结构优化建议"""
+        """菜单结构优化建议 — 有 DB 时查真实销量，有 model_router 时用 Claude 生成建议"""
+        store_id = params.get("store_id") or self.store_id
         dishes = params.get("dishes", [])
-        if not dishes:
+
+        # 若有 DB 且有 store_id，从 order_items 聚合近30天真实销量数据
+        db_dishes: list[dict] = []
+        if self._db and store_id:
+            from sqlalchemy import text
+            rows = await self._db.execute(
+                text("""
+                    SELECT oi.dish_id, oi.dish_name,
+                           COUNT(*) AS order_count,
+                           SUM(oi.quantity) AS total_qty,
+                           AVG(oi.unit_price_fen) AS avg_price_fen
+                    FROM order_items oi
+                    JOIN orders o ON oi.order_id = o.id
+                    WHERE o.tenant_id = :tenant_id
+                      AND o.store_id = :store_id
+                      AND o.created_at >= NOW() - INTERVAL '30 days'
+                      AND o.status = 'completed'
+                    GROUP BY oi.dish_id, oi.dish_name
+                    ORDER BY total_qty DESC
+                    LIMIT 20
+                """),
+                {"tenant_id": self.tenant_id, "store_id": store_id},
+            )
+            db_dishes = [dict(r) for r in rows.mappings().all()]
+
+        # 合并：DB 数据优先，无 DB 数据时退回 params 中的 dishes
+        working_dishes = db_dishes if db_dishes else dishes
+        if not working_dishes:
             return AgentResult(success=False, action="optimize_menu", error="无菜品数据")
 
-        # 分类统计
-        quadrants = {"star": [], "cash_cow": [], "question": [], "dog": []}
-        for d in dishes:
-            sales = d.get("total_sales", 0)
+        # 规则引擎四象限分类（始终执行）
+        quadrants: dict[str, list[str]] = {"star": [], "cash_cow": [], "question": [], "dog": []}
+        for d in working_dishes:
+            # 兼容 DB 返回（total_qty）和 params 传入（total_sales）两种字段名
+            sales = d.get("total_qty") or d.get("total_sales", 0)
             margin = d.get("margin_rate", 0)
-            avg_s = statistics.mean([x.get("total_sales", 0) for x in dishes]) if dishes else 1
-            avg_m = statistics.mean([x.get("margin_rate", 0) for x in dishes]) if dishes else 0.3
+            name = d.get("dish_name") or d.get("name", "")
+            avg_s = statistics.mean(
+                [(x.get("total_qty") or x.get("total_sales", 0)) for x in working_dishes]
+            ) if working_dishes else 1
+            avg_m = statistics.mean(
+                [x.get("margin_rate", 0) for x in working_dishes]
+            ) if working_dishes else 0.3
 
             q = ("star" if sales >= avg_s and margin >= avg_m else
                  "cash_cow" if sales < avg_s and margin >= avg_m else
                  "question" if sales >= avg_s and margin < avg_m else "dog")
-            quadrants[q].append(d.get("name", ""))
+            quadrants[q].append(name)
 
-        suggestions = []
+        # 规则引擎基础建议
+        suggestions: list[str] = []
         if quadrants["dog"]:
             suggestions.append(f"建议下架/改良: {', '.join(quadrants['dog'][:3])}")
         if quadrants["question"]:
@@ -247,10 +287,46 @@ class SmartMenuAgent(SkillAgent):
         if quadrants["star"]:
             suggestions.append(f"重点推广: {', '.join(quadrants['star'][:3])}")
 
+        llm_suggestions = ""
+        # 若有 model_router，用 Claude 生成更详细的菜单优化建议
+        if self._router:
+            dish_summary = "\n".join(
+                f"- {d.get('dish_name') or d.get('name', '')}: "
+                f"销量{d.get('total_qty') or d.get('total_sales', 0)}份，"
+                f"均价{(d.get('avg_price_fen') or 0) / 100:.1f}元，"
+                f"毛利率{d.get('margin_rate', 0):.1%}"
+                for d in working_dishes[:10]
+            )
+            try:
+                llm_suggestions = await self._router.complete(
+                    tenant_id=self.tenant_id,
+                    task_type="standard_analysis",
+                    system="你是连锁餐饮菜单运营专家，根据近30天销量数据给出菜单优化建议，重点关注盈利改善和客户满意度，用中文回复200字以内。",
+                    messages=[{"role": "user", "content":
+                        f"以下是门店近30天菜品销售数据：\n{dish_summary}\n\n"
+                        f"四象限分布：明星{len(quadrants['star'])}道，现金牛{len(quadrants['cash_cow'])}道，"
+                        f"问题{len(quadrants['question'])}道，瘦狗{len(quadrants['dog'])}道。\n"
+                        f"请给出具体的菜单优化建议。"}],
+                    max_tokens=400,
+                    db=self._db,
+                )
+            except Exception as exc:  # noqa: BLE001 — Claude不可用时降级为规则引擎建议
+                logger.warning("smart_menu_llm_fallback", error=str(exc))
+
+        if llm_suggestions:
+            suggestions.append(f"AI深度分析: {llm_suggestions}")
+
         return AgentResult(
             success=True, action="optimize_menu",
-            data={"quadrant_distribution": {k: len(v) for k, v in quadrants.items()},
-                  "suggestions": suggestions, "total_dishes": len(dishes)},
-            reasoning=f"菜单分析：明星{len(quadrants['star'])}道，瘦狗{len(quadrants['dog'])}道",
-            confidence=0.8,
+            data={
+                "quadrant_distribution": {k: len(v) for k, v in quadrants.items()},
+                "suggestions": suggestions,
+                "total_dishes": len(working_dishes),
+                "data_source": "db_realtime" if db_dishes else "params",
+                "store_id": store_id,
+            },
+            reasoning=f"菜单分析：明星{len(quadrants['star'])}道，瘦狗{len(quadrants['dog'])}道"
+                      f"{'（AI增强）' if llm_suggestions else '（规则引擎）'}",
+            confidence=0.8 if not llm_suggestions else 0.92,
+            inference_layer="cloud" if llm_suggestions else "edge",
         )

@@ -8,7 +8,12 @@
 """
 from datetime import datetime, timezone
 from typing import Any
+
+import structlog
+
 from ..base import SkillAgent, AgentResult
+
+logger = structlog.get_logger()
 
 
 # 报表类型
@@ -47,15 +52,29 @@ class DiscountGuardAgent(SkillAgent):
         return await handler(params)
 
     async def _detect_anomaly(self, params: dict) -> AgentResult:
-        """折扣异常检测 — 边缘优先"""
-        order_data = params.get("order", {})
+        """折扣异常检测 — 边缘优先，有 DB 时查真实订单，有 model_router 时用 Claude 深度分析"""
+        order_id = params.get("order_id")
+
+        # 若有 order_id 且 DB 可用，从 DB 查真实数据；否则降级到 params 中的 order 字典
+        if order_id and self._db:
+            from sqlalchemy import text
+            row = await self._db.execute(
+                text(
+                    "SELECT total_amount_fen, discount_amount_fen, status, store_id "
+                    "FROM orders WHERE id = :id AND tenant_id = :tid"
+                ),
+                {"id": order_id, "tid": self.tenant_id},
+            )
+            order_data = dict(row.mappings().first() or {})
+        else:
+            order_data = params.get("order", {})
+
         total = order_data.get("total_amount_fen", 0)
         discount = order_data.get("discount_amount_fen", 0)
         discount_rate = discount / total if total > 0 else 0
         threshold = params.get("threshold", 0.5)
 
-        is_anomaly = discount_rate > threshold
-        # 多维度评分
+        # 规则引擎先算（边缘推理，快速）
         risk_factors = []
         if discount_rate > 0.7:
             risk_factors.append("折扣率超70%")
@@ -63,6 +82,25 @@ class DiscountGuardAgent(SkillAgent):
             risk_factors.append("大额订单高折扣")
         if order_data.get("waiter_discount_count", 0) > 5:
             risk_factors.append("同一服务员频繁打折")
+
+        is_anomaly = discount_rate > threshold or len(risk_factors) >= 2
+
+        # 若有 model_router 且风险较高，用 Claude 做深度分析
+        llm_analysis = ""
+        if self._router and is_anomaly:
+            try:
+                llm_analysis = await self._router.complete(
+                    tenant_id=self.tenant_id,
+                    task_type="standard_analysis",
+                    system="你是餐饮收银审计专家，分析折扣异常风险并给出处理建议。用中文回复，控制在100字内。",
+                    messages=[{"role": "user", "content":
+                        f"订单金额{total/100:.2f}元，折扣{discount/100:.2f}元（折扣率{discount_rate:.1%}），"
+                        f"风险因素：{risk_factors}。请评估风险等级并给出建议。"}],
+                    max_tokens=200,
+                    db=self._db,
+                )
+            except Exception as exc:  # noqa: BLE001 — Claude不可用时降级为规则结果
+                logger.warning("discount_guard_llm_fallback", error=str(exc))
 
         return AgentResult(
             success=True, action="detect_discount_anomaly",
@@ -72,10 +110,14 @@ class DiscountGuardAgent(SkillAgent):
                 "threshold": threshold,
                 "risk_factors": risk_factors,
                 "risk_score": min(1.0, discount_rate * 1.5 + len(risk_factors) * 0.1),
-                "price_fen": total, "cost_fen": order_data.get("cost_fen", 0),
+                "price_fen": total,
+                "cost_fen": order_data.get("cost_fen", 0),
+                "llm_analysis": llm_analysis,
+                "order_id": order_id,
             },
-            reasoning=f"折扣率 {discount_rate:.1%}，{'异常' if is_anomaly else '正常'}，{len(risk_factors)} 个风险因子",
-            confidence=0.95, inference_layer="edge",
+            reasoning=f"折扣率{discount_rate:.1%}，{len(risk_factors)}个风险因素。{llm_analysis[:50] if llm_analysis else '规则引擎判断'}",
+            confidence=0.95 if not llm_analysis else 0.99,
+            inference_layer="edge" if not llm_analysis else "cloud",
         )
 
     async def _scan_licenses(self, params: dict) -> AgentResult:
@@ -139,13 +181,32 @@ class DiscountGuardAgent(SkillAgent):
         )
 
     async def _explain_voucher(self, params: dict) -> AgentResult:
-        """凭证解释"""
+        """凭证解释 — 接入 Claude API"""
         voucher_id = params.get("voucher_id", "")
+        voucher_data = params.get("voucher_data", {})
+
+        if not self._router:
+            return AgentResult(
+                success=False, action="explain_voucher",
+                error="model_router 未注入，无法调用 Claude API",
+            )
+
+        content = f"凭证ID: {voucher_id}\n凭证数据: {voucher_data}"
+        explanation = await self._router.complete(
+            tenant_id=self.tenant_id,
+            task_type="standard_analysis",
+            system="你是餐饮财务专家，用清晰通俗的语言解释财务凭证的含义，100字以内。",
+            messages=[{"role": "user", "content": f"请解释这个财务凭证：\n{content}"}],
+            max_tokens=200,
+            db=self._db,
+        )
+
         return AgentResult(
             success=True, action="explain_voucher",
-            data={"voucher_id": voucher_id, "explanation": f"凭证 {voucher_id} 的解释（需接入 LLM）"},
-            reasoning="凭证解释需要 LLM 支持",
-            confidence=0.6,
+            data={"voucher_id": voucher_id, "explanation": explanation},
+            reasoning="Claude财务专家解释",
+            confidence=0.9,
+            inference_layer="cloud",
         )
 
     async def _reconciliation(self, params: dict) -> AgentResult:

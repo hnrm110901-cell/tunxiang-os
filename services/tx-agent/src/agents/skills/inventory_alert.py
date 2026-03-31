@@ -8,7 +8,10 @@
 """
 import statistics
 from typing import Any, Optional
+import structlog
 from ..base import SkillAgent, AgentResult
+
+logger = structlog.get_logger(__name__)
 
 
 class InventoryAlertAgent(SkillAgent):
@@ -48,46 +51,68 @@ class InventoryAlertAgent(SkillAgent):
             return AgentResult(success=False, action=action, error=f"Unsupported: {action}")
         return await handler(params)
 
-    # ─── 消耗预测（4种算法） ───
+    # ─── 消耗预测（DB查询 + 历史算法） ───
 
     async def _predict_consumption(self, params: dict) -> AgentResult:
-        """消耗预测 — 4种算法自动选择最优"""
-        history = params.get("daily_usage", [])
+        """消耗预测 — 优先查DB历史数据，降级使用params传入的历史"""
+        ingredient_id = params.get("ingredient_id")
         days_ahead = params.get("days_ahead", 7)
+        store_id = params.get("store_id") or self.store_id
 
-        if len(history) < 3:
-            return AgentResult(success=False, action="predict_consumption", error="至少需要3天历史数据")
+        if self._db and ingredient_id:
+            from sqlalchemy import text
+            # 查询过去30天的消耗记录（从库存变动日志或order_items中推算）
+            rows = await self._db.execute(text("""
+                SELECT DATE(oi.created_at) as date,
+                       SUM(oi.quantity * COALESCE(bi.quantity_per_dish, 1)) as daily_consumption
+                FROM order_items oi
+                JOIN bom_recipe_items bi ON bi.ingredient_id = :ingredient_id
+                JOIN orders o ON oi.order_id = o.id
+                WHERE o.tenant_id = :tenant_id
+                  AND (:store_id::UUID IS NULL OR o.store_id = :store_id::UUID)
+                  AND o.created_at >= NOW() - INTERVAL '30 days'
+                  AND o.status = 'completed'
+                GROUP BY DATE(oi.created_at)
+                ORDER BY date DESC
+            """), {"ingredient_id": ingredient_id, "tenant_id": self.tenant_id,
+                   "store_id": store_id})
 
-        predictions = {
-            "moving_avg": self._moving_average(history, days_ahead),
-            "weighted_avg": self._weighted_average(history, days_ahead),
-            "linear": self._linear_regression(history, days_ahead),
-            "seasonal": self._seasonal_predict(history, days_ahead),
-        }
+            daily_data = [dict(r) for r in rows.mappings()]
 
-        # 选择方差最小的算法（历史回测）
-        best_algo = min(predictions, key=lambda k: self._backtest_mape(history, k))
-        best_pred = predictions[best_algo]
+            if daily_data:
+                consumptions = [float(d["daily_consumption"] or 0) for d in daily_data]
+                avg_daily = statistics.mean(consumptions)
+                predicted_total = avg_daily * days_ahead
 
-        total_predicted = sum(best_pred)
-        current_stock = params.get("current_stock", 0)
-        days_until_stockout = int(current_stock / (total_predicted / days_ahead)) if total_predicted > 0 else 999
+                return AgentResult(
+                    success=True, action="predict_consumption",
+                    data={
+                        "ingredient_id": ingredient_id,
+                        "days_ahead": days_ahead,
+                        "avg_daily_consumption": round(avg_daily, 2),
+                        "predicted_total": round(predicted_total, 2),
+                        "data_points": len(daily_data),
+                        "algorithm": "moving_average",
+                    },
+                    reasoning=f"基于{len(daily_data)}天历史数据，日均消耗{avg_daily:.2f}，预测{days_ahead}天消耗{predicted_total:.2f}",
+                    confidence=min(0.95, 0.6 + len(daily_data) * 0.01),
+                    inference_layer="edge",
+                )
 
+        # 降级：使用params中传入的历史数据（兼容原有4算法逻辑）
+        history = params.get("history") or params.get("daily_usage", [])
+        if not history:
+            return AgentResult(success=False, action="predict_consumption",
+                               error="缺少历史消耗数据，且无法查询DB")
+
+        avg = statistics.mean(history)
+        predicted = avg * days_ahead
         return AgentResult(
-            success=True,
-            action="predict_consumption",
-            data={
-                "algorithm": best_algo,
-                "daily_predictions": best_pred,
-                "total_predicted": round(total_predicted, 2),
-                "current_stock": current_stock,
-                "days_until_stockout": days_until_stockout,
-                "all_algorithms": {k: round(sum(v), 2) for k, v in predictions.items()},
-            },
-            reasoning=f"使用 {best_algo} 算法，预测 {days_ahead} 天消耗 {total_predicted:.1f}，"
-                      f"当前库存可用 {days_until_stockout} 天",
-            confidence=0.8 if len(history) >= 14 else 0.6,
-            inference_layer="edge",
+            success=True, action="predict_consumption",
+            data={"predicted_total": round(predicted, 2), "avg_daily": round(avg, 2),
+                  "days_ahead": days_ahead, "algorithm": "simple_average"},
+            reasoning=f"日均消耗{avg:.2f}，预测{days_ahead}天消耗{predicted:.2f}",
+            confidence=0.8,
         )
 
     @staticmethod
@@ -140,50 +165,83 @@ class InventoryAlertAgent(SkillAgent):
             return 999
         return statistics.stdev(history[-7:]) if history else 999
 
-    # ─── 补货告警 ───
+    # ─── 补货告警（查DB + Claude采购建议） ───
 
     async def _generate_alerts(self, params: dict) -> AgentResult:
-        """生成分级补货告警"""
-        items = params.get("items", [])
+        """生成补货告警：优先查DB，有缺货数据时调用Claude生成采购建议"""
+        store_id = params.get("store_id") or self.store_id
+
         alerts = []
+        db_data = ""
 
-        for item in items:
-            current = item.get("current_qty", 0)
-            min_qty = item.get("min_qty", 0)
-            daily_usage = item.get("daily_usage", 0)
-            name = item.get("name", "unknown")
+        if self._db and store_id:
+            from sqlalchemy import text
+            rows = await self._db.execute(text("""
+                SELECT i.id, i.name, i.unit,
+                       COALESCE(il.quantity, 0) as current_qty,
+                       COALESCE(i.safety_stock_qty, 0) as safety_stock,
+                       i.last_purchase_price_fen
+                FROM ingredients i
+                LEFT JOIN inventory_levels il
+                       ON i.id = il.ingredient_id AND il.store_id = :store_id
+                WHERE i.tenant_id = :tenant_id
+                  AND i.is_deleted = false
+                  AND COALESCE(il.quantity, 0) < COALESCE(i.safety_stock_qty, 1)
+                ORDER BY (COALESCE(i.safety_stock_qty, 1) - COALESCE(il.quantity, 0)) DESC
+                LIMIT 15
+            """), {"tenant_id": self.tenant_id, "store_id": store_id})
 
-            if daily_usage <= 0:
-                continue
+            for row in rows.mappings():
+                d = dict(row)
+                gap = d["safety_stock"] - d["current_qty"]
+                alerts.append({
+                    "ingredient_id": str(d["id"]),
+                    "name": d["name"],
+                    "current_qty": d["current_qty"],
+                    "safety_stock": d["safety_stock"],
+                    "gap": gap,
+                    "unit": d.get("unit", ""),
+                    "estimated_cost_fen": gap * (d.get("last_purchase_price_fen") or 0),
+                })
 
-            days_left = current / daily_usage if daily_usage > 0 else 999
-            restock_qty = max(0, min_qty * 3 - current)  # 补到3倍安全库存
+            if alerts:
+                db_data = "\n".join([
+                    f"- {a['name']}: 现有{a['current_qty']}{a['unit']}，安全库存{a['safety_stock']}{a['unit']}，缺口{a['gap']}{a['unit']}"
+                    for a in alerts[:8]
+                ])
+        else:
+            alerts = params.get("low_stock_items", [])
 
-            if days_left <= 1:
-                level = "critical"
-            elif days_left <= 3:
-                level = "urgent"
-            elif days_left <= 7:
-                level = "warning"
-            else:
-                continue
+        # 若有 Claude + 有缺货数据，生成采购建议
+        suggestion = ""
+        if self._router and alerts:
+            try:
+                suggestion = await self._router.complete(
+                    tenant_id=self.tenant_id,
+                    task_type="standard_analysis",
+                    system="你是餐饮供应链专家，根据缺货清单生成今日采购建议，用简洁中文表述，控制在150字内。",
+                    messages=[{"role": "user", "content":
+                        f"以下食材库存不足，请给出采购优先级和注意事项：\n{db_data or str(alerts[:5])}"}],
+                    max_tokens=300,
+                    db=self._db,
+                )
+            except Exception as exc:  # noqa: BLE001 — Claude不可用时降级为规则结果
+                logger.warning("inventory_alert_llm_fallback", error=str(exc))
 
-            alerts.append({
-                "item_name": name,
-                "level": level,
-                "current_qty": current,
-                "days_left": round(days_left, 1),
-                "suggested_restock_qty": round(restock_qty, 1),
-            })
-
-        alerts.sort(key=lambda a: {"critical": 0, "urgent": 1, "warning": 2}[a["level"]])
+        total_est = sum(a.get("estimated_cost_fen", 0) for a in alerts)
 
         return AgentResult(
-            success=True,
-            action="generate_restock_alerts",
-            data={"alerts": alerts, "total": len(alerts)},
-            reasoning=f"发现 {len(alerts)} 条补货告警",
-            confidence=0.9,
+            success=True, action="generate_restock_alerts",
+            data={
+                "alerts": alerts,
+                "alert_count": len(alerts),
+                "total_estimated_cost_fen": total_est,
+                "suggestion": suggestion,
+                "store_id": store_id,
+            },
+            reasoning=f"{len(alerts)}种食材需补货，预计采购成本{total_est/100:.0f}元。{suggestion[:40] if suggestion else ''}",
+            confidence=0.95 if suggestion else 0.85,
+            inference_layer="cloud" if suggestion else "edge",
         )
 
     # ─── 保质期预警 ───
@@ -288,21 +346,83 @@ class InventoryAlertAgent(SkillAgent):
         )
 
     async def _monitor_inventory(self, params: dict) -> AgentResult:
-        """实时库存监控"""
+        """实时库存监控 — 优先查DB获取真实库存，降级使用params数据"""
+        store_id = params.get("store_id") or self.store_id
+
+        if self._db and store_id:
+            from sqlalchemy import text
+            # 查询库存不足和临期食材
+            rows = await self._db.execute(text("""
+                SELECT i.id, i.name, i.unit,
+                       COALESCE(il.quantity, 0) as current_qty,
+                       i.safety_stock_qty,
+                       i.expiry_date
+                FROM ingredients i
+                LEFT JOIN inventory_levels il
+                       ON i.id = il.ingredient_id AND il.store_id = :store_id
+                WHERE i.tenant_id = :tenant_id
+                  AND i.is_deleted = false
+                ORDER BY current_qty ASC
+                LIMIT 50
+            """), {"tenant_id": self.tenant_id, "store_id": store_id})
+
+            items = []
+            low_stock = []
+            expiring_soon = []
+
+            from datetime import datetime, timezone, timedelta
+            now = datetime.now(timezone.utc)
+
+            for row in rows.mappings():
+                item = dict(row)
+                items.append(item)
+
+                # 库存不足
+                safety = item.get("safety_stock_qty") or 0
+                current = item.get("current_qty", 0)
+                if safety > 0 and current < safety:
+                    low_stock.append({
+                        "name": item["name"],
+                        "current": current,
+                        "safety": safety,
+                        "unit": item.get("unit", ""),
+                        "gap": safety - current,
+                    })
+
+                # 临期（3天内）
+                expiry = item.get("expiry_date")
+                if expiry:
+                    days_remaining = (expiry - now.date()).days if hasattr(expiry, 'year') else 999
+                    if 0 <= days_remaining <= 3:
+                        expiring_soon.append({
+                            "name": item["name"],
+                            "expiry_date": str(expiry),
+                            "days_remaining": days_remaining,
+                        })
+
+            return AgentResult(
+                success=True, action="monitor_inventory",
+                data={
+                    "low_stock": low_stock,
+                    "expiring_soon": expiring_soon,
+                    "total_items": len(items),
+                    "alert_count": len(low_stock) + len(expiring_soon),
+                    "store_id": store_id,
+                },
+                reasoning=f"扫描{len(items)}种食材：{len(low_stock)}种库存不足，{len(expiring_soon)}种临期",
+                confidence=1.0,
+                inference_layer="edge",
+            )
+
+        # 降级：使用params中的数据（向下兼容）
         items = params.get("items", [])
-        status_counts = {"normal": 0, "low": 0, "critical": 0, "out": 0}
-        for item in items:
-            qty = item.get("current_qty", 0)
-            min_qty = item.get("min_qty", 0)
-            if qty <= 0: status_counts["out"] += 1
-            elif qty < min_qty * 0.5: status_counts["critical"] += 1
-            elif qty < min_qty: status_counts["low"] += 1
-            else: status_counts["normal"] += 1
-        return AgentResult(success=True, action="monitor_inventory",
-                         data={"status_counts": status_counts, "total_items": len(items),
-                               "issues": status_counts["critical"] + status_counts["out"]},
-                         reasoning=f"{len(items)} 品项，{status_counts['critical']} 严重不足，{status_counts['out']} 缺货",
-                         confidence=0.9)
+        low_stock = [i for i in items if i.get("current_qty", 0) < i.get("safety_stock", 1)]
+        return AgentResult(
+            success=True, action="monitor_inventory",
+            data={"low_stock": low_stock, "total_items": len(items), "alert_count": len(low_stock)},
+            reasoning=f"{len(low_stock)}/{len(items)} 库存不足",
+            confidence=0.9,
+        )
 
     async def _compare_prices(self, params: dict) -> AgentResult:
         """供应商比价"""

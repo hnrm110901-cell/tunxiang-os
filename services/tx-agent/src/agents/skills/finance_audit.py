@@ -7,7 +7,10 @@
 """
 import statistics
 from typing import Any, Optional
+import structlog
 from ..base import SkillAgent, AgentResult
+
+logger = structlog.get_logger(__name__)
 
 
 # 场景优先级（从 scenario_matcher.py 迁移）
@@ -33,6 +36,8 @@ class FinanceAuditAgent(SkillAgent):
             "generate_biz_insight",
             "match_scenario",
             "analyze_order_trend",
+            "cost_analysis",
+            "daily_reconciliation",
         ]
 
     async def execute(self, action: str, params: dict[str, Any]) -> AgentResult:
@@ -44,6 +49,8 @@ class FinanceAuditAgent(SkillAgent):
             "analyze_order_trend": self._analyze_order_trend,
             "get_financial_report": self._get_report,
             "generate_biz_insight": self._biz_insight,
+            "cost_analysis": self._cost_analysis,
+            "daily_reconciliation": self._daily_reconciliation,
         }
         handler = dispatch.get(action)
         if handler:
@@ -258,3 +265,160 @@ class FinanceAuditAgent(SkillAgent):
         return AgentResult(success=True, action="generate_biz_insight",
                          data={"insights": insights, "total": len(insights)},
                          reasoning=f"生成 {len(insights)} 条经营洞察", confidence=0.8)
+
+    # ─── 成本分析（真实DB） ───
+
+    async def _cost_analysis(self, params: dict) -> AgentResult:
+        store_id = params.get("store_id") or self.store_id
+        date_from = params.get("date_from")  # YYYY-MM-DD
+        date_to = params.get("date_to")
+
+        if self._db:
+            from sqlalchemy import text
+            from datetime import datetime, timezone, timedelta
+
+            if not date_from:
+                date_from = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d")
+            if not date_to:
+                date_to = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+            # 查询实际营收
+            rev_row = await self._db.execute(text("""
+                SELECT
+                    COALESCE(SUM(final_amount_fen), 0) as revenue_fen,
+                    COUNT(*) as order_count
+                FROM orders
+                WHERE tenant_id = :tenant_id
+                  AND (:store_id::UUID IS NULL OR store_id = :store_id::UUID)
+                  AND status = 'completed'
+                  AND created_at >= :date_from::date
+                  AND created_at < :date_to::date + INTERVAL '1 day'
+            """), {"tenant_id": self.tenant_id, "store_id": store_id,
+                   "date_from": date_from, "date_to": date_to})
+            rev = dict(rev_row.mappings().first() or {})
+
+            # 查询成本（从BOM计算，如无BOM则用营收*行业均值估算）
+            cost_row = await self._db.execute(text("""
+                SELECT COALESCE(SUM(oi.quantity * COALESCE(d.cost_price_fen, oi.unit_price_fen * 0.35)), 0) as cost_fen
+                FROM order_items oi
+                JOIN orders o ON oi.order_id = o.id
+                LEFT JOIN dishes d ON oi.dish_id = d.id
+                WHERE o.tenant_id = :tenant_id
+                  AND (:store_id::UUID IS NULL OR o.store_id = :store_id::UUID)
+                  AND o.status = 'completed'
+                  AND o.created_at >= :date_from::date
+                  AND o.created_at < :date_to::date + INTERVAL '1 day'
+            """), {"tenant_id": self.tenant_id, "store_id": store_id,
+                   "date_from": date_from, "date_to": date_to})
+            cost = dict(cost_row.mappings().first() or {})
+
+            revenue_fen = int(rev.get("revenue_fen") or 0)
+            cost_fen = int(cost.get("cost_fen") or 0)
+            order_count = int(rev.get("order_count") or 0)
+            gross_profit_fen = revenue_fen - cost_fen
+            gross_margin = gross_profit_fen / revenue_fen if revenue_fen > 0 else 0
+
+            # Claude深度分析
+            analysis = ""
+            if self._router and revenue_fen > 0:
+                try:
+                    analysis = await self._router.complete(
+                        tenant_id=self.tenant_id,
+                        task_type="cost_analysis",
+                        system="你是餐饮财务顾问，根据成本数据给出简洁的经营建议，100字内，中文。",
+                        messages=[{"role": "user", "content":
+                            f"营收{revenue_fen/100:.0f}元，成本{cost_fen/100:.0f}元，"
+                            f"毛利率{gross_margin:.1%}，订单数{order_count}，"
+                            f"统计区间{date_from}至{date_to}。请评估并给出改善建议。"}],
+                        max_tokens=200,
+                        db=self._db,
+                    )
+                except Exception as exc:  # noqa: BLE001 — Claude不可用时降级为规则分析
+                    logger.warning("finance_audit_llm_fallback", error=str(exc))
+
+            return AgentResult(
+                success=True, action="cost_analysis",
+                data={
+                    "revenue_fen": revenue_fen,
+                    "cost_fen": cost_fen,
+                    "gross_profit_fen": gross_profit_fen,
+                    "gross_margin": round(gross_margin, 4),
+                    "order_count": order_count,
+                    "avg_order_value_fen": revenue_fen // order_count if order_count else 0,
+                    "date_from": date_from,
+                    "date_to": date_to,
+                    "analysis": analysis,
+                },
+                reasoning=f"营收{revenue_fen/100:.0f}元，毛利率{gross_margin:.1%}，{analysis[:40] if analysis else '规则计算'}",
+                confidence=0.95 if analysis else 0.85,
+                inference_layer="cloud" if analysis else "edge",
+            )
+
+        # 降级：使用params传入的数据
+        revenue = params.get("revenue_fen", 0)
+        costs = params.get("costs", {})
+        total_cost = sum(costs.values()) if isinstance(costs, dict) else params.get("total_cost_fen", 0)
+        gross = revenue - total_cost
+        margin = gross / revenue if revenue > 0 else 0
+        return AgentResult(
+            success=True, action="cost_analysis",
+            data={"revenue_fen": revenue, "cost_fen": total_cost,
+                  "gross_profit_fen": gross, "gross_margin": round(margin, 4)},
+            reasoning=f"毛利率{margin:.1%}",
+            confidence=0.8,
+        )
+
+    # ─── 日结对账（真实DB） ───
+
+    async def _daily_reconciliation(self, params: dict) -> AgentResult:
+        store_id = params.get("store_id") or self.store_id
+        date = params.get("date")  # YYYY-MM-DD，默认今天
+
+        if self._db:
+            from sqlalchemy import text
+            from datetime import datetime, timezone
+
+            if not date:
+                date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+            rows = await self._db.execute(text("""
+                SELECT
+                    p.method,
+                    COUNT(*) as txn_count,
+                    COALESCE(SUM(p.amount_fen), 0) as total_fen,
+                    COALESCE(SUM(CASE WHEN p.status = 'paid' THEN p.amount_fen ELSE 0 END), 0) as paid_fen,
+                    COALESCE(SUM(CASE WHEN p.status = 'refunded' THEN p.amount_fen ELSE 0 END), 0) as refunded_fen
+                FROM payments p
+                JOIN orders o ON p.order_id = o.id
+                WHERE o.tenant_id = :tenant_id
+                  AND (:store_id::UUID IS NULL OR o.store_id = :store_id::UUID)
+                  AND DATE(p.created_at) = :date::date
+                GROUP BY p.method
+            """), {"tenant_id": self.tenant_id, "store_id": store_id, "date": date})
+
+            by_method = [dict(r) for r in rows.mappings()]
+            total_paid = sum(r["paid_fen"] for r in by_method)
+            total_refunded = sum(r["refunded_fen"] for r in by_method)
+
+            return AgentResult(
+                success=True, action="daily_reconciliation",
+                data={
+                    "date": date,
+                    "by_method": by_method,
+                    "total_paid_fen": total_paid,
+                    "total_refunded_fen": total_refunded,
+                    "net_fen": total_paid - total_refunded,
+                    "discrepancies": [],  # 需接入第三方平台数据才能对比
+                },
+                reasoning=f"{date}实收{total_paid/100:.0f}元，退款{total_refunded/100:.0f}元，净收{(total_paid-total_refunded)/100:.0f}元",
+                confidence=1.0,
+                inference_layer="edge",
+            )
+
+        # 降级
+        return AgentResult(
+            success=True, action="daily_reconciliation",
+            data={"date": params.get("date", ""), "discrepancies": [], "total_paid_fen": 0},
+            reasoning="无DB连接，无法查询真实对账数据",
+            confidence=0.3,
+        )
