@@ -1,0 +1,158 @@
+"""v069: 配送管理持久化表
+
+新增表：
+  distribution_warehouses — 仓库配置（含坐标）
+  distribution_plans      — 配送计划
+  distribution_trips      — 配送行程
+  distribution_items      — 配送明细
+
+RLS 策略：
+  全部使用 v006+ 标准安全模式（4操作 + NULL guard + FORCE ROW LEVEL SECURITY）
+
+Revision ID: v069
+Revises: v046
+Create Date: 2026-03-31
+"""
+
+from alembic import op
+
+revision = "v069"
+down_revision = "v046"
+branch_labels = None
+depends_on = None
+
+_TABLES = [
+    "distribution_warehouses",
+    "distribution_plans",
+    "distribution_trips",
+    "distribution_items",
+]
+
+
+def _apply_rls(table: str) -> None:
+    """为单张表配置 RLS（4操作 + NULL guard + FORCE）"""
+    op.execute(f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY;")
+    op.execute(f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY;")
+
+    for action in ("SELECT", "INSERT", "UPDATE", "DELETE"):
+        op.execute(f"""
+            CREATE POLICY {table}_{action.lower()}_tenant ON {table}
+            AS RESTRICTIVE FOR {action}
+            USING (
+                current_setting('app.tenant_id', TRUE) IS NOT NULL
+                AND current_setting('app.tenant_id', TRUE) <> ''
+                AND tenant_id = NULLIF(current_setting('app.tenant_id', TRUE), '')::UUID
+            );
+        """)
+
+
+def upgrade() -> None:
+    # ── distribution_warehouses ──
+    op.execute("""
+        CREATE TABLE IF NOT EXISTS distribution_warehouses (
+            id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+            tenant_id       UUID        NOT NULL,
+            warehouse_name  VARCHAR(200) NOT NULL,
+            lat             DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+            lng             DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+            address         VARCHAR(500),
+            capacity        DOUBLE PRECISION,
+            contact_name    VARCHAR(100),
+            contact_phone   VARCHAR(50),
+            is_deleted      BOOLEAN     NOT NULL DEFAULT FALSE,
+            created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+    """)
+
+    # ── distribution_plans ──
+    op.execute("""
+        CREATE TABLE IF NOT EXISTS distribution_plans (
+            id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+            tenant_id       UUID        NOT NULL,
+            warehouse_id    UUID        NOT NULL REFERENCES distribution_warehouses(id),
+            status          VARCHAR(20) NOT NULL DEFAULT 'planned',
+            store_count     INT         NOT NULL DEFAULT 0,
+            total_items     INT         NOT NULL DEFAULT 0,
+            driver_id       UUID,
+            driver_name     VARCHAR(100),
+            vehicle_no      VARCHAR(50),
+            route_json      JSONB,
+            dispatched_at   TIMESTAMPTZ,
+            completed_at    TIMESTAMPTZ,
+            is_deleted      BOOLEAN     NOT NULL DEFAULT FALSE,
+            created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+    """)
+
+    # ── distribution_trips ──
+    op.execute("""
+        CREATE TABLE IF NOT EXISTS distribution_trips (
+            id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+            tenant_id       UUID        NOT NULL,
+            plan_id         UUID        NOT NULL REFERENCES distribution_plans(id),
+            store_id        UUID        NOT NULL,
+            sequence        INT         NOT NULL DEFAULT 0,
+            status          VARCHAR(20) NOT NULL DEFAULT 'pending',
+            scheduled_at    TIMESTAMPTZ,
+            delivered_at    TIMESTAMPTZ,
+            is_deleted      BOOLEAN     NOT NULL DEFAULT FALSE,
+            created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+    """)
+
+    # ── distribution_items ──
+    op.execute("""
+        CREATE TABLE IF NOT EXISTS distribution_items (
+            id                  UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+            tenant_id           UUID        NOT NULL,
+            trip_id             UUID        NOT NULL REFERENCES distribution_trips(id),
+            item_id             VARCHAR(200) NOT NULL,
+            item_name           VARCHAR(200) NOT NULL DEFAULT '',
+            quantity            NUMERIC(10,3) NOT NULL DEFAULT 0,
+            unit                VARCHAR(20)  NOT NULL DEFAULT '',
+            received_quantity   NUMERIC(10,3),
+            status              VARCHAR(20)  NOT NULL DEFAULT 'pending',
+            notes               TEXT,
+            is_deleted          BOOLEAN      NOT NULL DEFAULT FALSE,
+            created_at          TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+            updated_at          TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+        );
+    """)
+
+    # ── RLS ──
+    for table in _TABLES:
+        _apply_rls(table)
+
+    # ── 索引 ──
+    op.execute("""
+        CREATE INDEX IF NOT EXISTS ix_dist_warehouses_tenant
+            ON distribution_warehouses (tenant_id);
+    """)
+    op.execute("""
+        CREATE INDEX IF NOT EXISTS ix_dist_plans_tenant_warehouse
+            ON distribution_plans (tenant_id, warehouse_id);
+    """)
+    op.execute("""
+        CREATE INDEX IF NOT EXISTS ix_dist_plans_status
+            ON distribution_plans (tenant_id, status);
+    """)
+    op.execute("""
+        CREATE INDEX IF NOT EXISTS ix_dist_trips_plan
+            ON distribution_trips (tenant_id, plan_id);
+    """)
+    op.execute("""
+        CREATE INDEX IF NOT EXISTS ix_dist_trips_store
+            ON distribution_trips (tenant_id, store_id);
+    """)
+    op.execute("""
+        CREATE INDEX IF NOT EXISTS ix_dist_items_trip
+            ON distribution_items (tenant_id, trip_id);
+    """)
+
+
+def downgrade() -> None:
+    for table in reversed(_TABLES):
+        op.execute(f"DROP TABLE IF EXISTS {table} CASCADE;")

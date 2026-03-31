@@ -2,10 +2,12 @@
 
 5 个端点：创建配送计划、路线优化、派车、门店签收、配送看板。
 """
-from fastapi import APIRouter, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from services.tx_supply.src.services import distribution
+from shared.ontology.src.database import get_db
 
 router = APIRouter(prefix="/api/v1/supply/distribution", tags=["distribution"])
 
@@ -38,12 +40,14 @@ class ConfirmDeliveryRequest(BaseModel):
 async def create_distribution_plan(
     body: CreatePlanRequest,
     x_tenant_id: str = Header(alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """创建配送计划"""
-    result = distribution.create_distribution_plan(
+    result = await distribution.create_distribution_plan(
         warehouse_id=body.warehouse_id,
         store_orders=body.store_orders,
         tenant_id=x_tenant_id,
+        db=db,
     )
     return {"ok": True, "data": result}
 
@@ -52,12 +56,14 @@ async def create_distribution_plan(
 async def optimize_route(
     plan_id: str,
     x_tenant_id: str = Header(alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """路线优化（按门店距离排序）"""
     try:
-        result = distribution.optimize_route(
+        result = await distribution.optimize_route(
             plan_id=plan_id,
             tenant_id=x_tenant_id,
+            db=db,
         )
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
@@ -69,13 +75,15 @@ async def dispatch_delivery(
     plan_id: str,
     body: DispatchRequest,
     x_tenant_id: str = Header(alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """派车"""
     try:
-        result = distribution.dispatch_delivery(
+        result = await distribution.dispatch_delivery(
             plan_id=plan_id,
             driver_id=body.driver_id,
             tenant_id=x_tenant_id,
+            db=db,
         )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
@@ -87,14 +95,16 @@ async def confirm_delivery(
     plan_id: str,
     body: ConfirmDeliveryRequest,
     x_tenant_id: str = Header(alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """门店签收"""
     try:
-        result = distribution.confirm_delivery(
+        result = await distribution.confirm_delivery(
             plan_id=plan_id,
             store_id=body.store_id,
             received_items=body.received_items,
             tenant_id=x_tenant_id,
+            db=db,
         )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
@@ -105,10 +115,12 @@ async def confirm_delivery(
 async def get_distribution_dashboard(
     warehouse_id: str,
     x_tenant_id: str = Header(alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """配送看板"""
-    result = distribution.get_distribution_dashboard(
+    result = await distribution.get_distribution_dashboard(
         warehouse_id=warehouse_id,
         tenant_id=x_tenant_id,
+        db=db,
     )
     return {"ok": True, "data": result}
