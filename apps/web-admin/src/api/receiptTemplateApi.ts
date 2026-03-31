@@ -18,7 +18,12 @@ export type ElementType =
   | 'barcode'
   | 'custom_text'
   | 'blank_lines'
-  | 'logo_text';
+  | 'logo_text'
+  | 'inverted_header'
+  | 'styled_separator'
+  | 'box_section'
+  | 'logo_image'
+  | 'underlined_text';
 
 export interface TemplateElement {
   id: string;
@@ -33,9 +38,14 @@ export interface TemplateElement {
   show_subtotal?: boolean;
   show_discount?: boolean; // total_summary
   show_service_fee?: boolean;
-  content?: string;        // custom_text, logo_text
+  content?: string;        // custom_text, logo_text, underlined_text, inverted_header
   content_field?: string;  // qrcode
   count?: number;          // blank_lines
+  style?: string;          // styled_separator 风格, box_section 边框风格
+  lines?: string[];        // box_section 内容行
+  padding?: number;        // inverted_header 内边距
+  image_base64?: string;   // logo_image
+  max_width_dots?: number; // logo_image
 }
 
 export interface TemplateConfig {
@@ -130,4 +140,22 @@ export const receiptTemplateApi = {
   /** 获取元素目录 */
   getElementCatalog: (): Promise<{ items: ElementCatalogItem[] }> =>
     txFetch('/api/v1/receipt-templates/elements/catalog'),
+
+  /** 获取预置模板列表 */
+  getPresets: async (): Promise<Array<{
+    key: string;
+    name: string;
+    description: string;
+    thumbnail_style: string;
+    config: TemplateConfig;
+  }>> => {
+    const res = await txFetch('/api/v1/receipt-templates/presets') as { data: Array<{
+      key: string;
+      name: string;
+      description: string;
+      thumbnail_style: string;
+      config: TemplateConfig;
+    }> };
+    return res.data;
+  },
 };

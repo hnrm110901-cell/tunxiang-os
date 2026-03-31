@@ -10,6 +10,7 @@ import { ElementPalette } from '../components/receipt-editor/ElementPalette';
 import { ReceiptCanvas } from '../components/receipt-editor/ReceiptCanvas';
 import { PropertyPanel } from '../components/receipt-editor/PropertyPanel';
 import { TemplateListPanel } from '../components/receipt-editor/TemplateListPanel';
+import { TemplateGallery } from '../components/receipt-editor/TemplateGallery';
 import { receiptTemplateApi } from '../api/receiptTemplateApi';
 import type {
   TemplateElement,
@@ -68,6 +69,7 @@ export function ReceiptEditorPage() {
   const [previewLoading, setPreviewLoading] = useState(false);
   const [listRefreshKey, setListRefreshKey] = useState(0);
   const [isDirty, setIsDirty] = useState(false);
+  const [galleryOpen, setGalleryOpen] = useState(false);
 
   const saveMsgTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -247,6 +249,7 @@ export function ReceiptEditorPage() {
         onSaveAs={handleSaveAs}
         onPreview={handlePreview}
         onNew={handleNew}
+        onOpenGallery={() => setGalleryOpen(true)}
         saving={saving}
         previewLoading={previewLoading}
         isDirty={isDirty}
@@ -310,6 +313,18 @@ export function ReceiptEditorPage() {
           refreshKey={listRefreshKey}
         />
       </div>
+
+      {/* 模板库弹窗 */}
+      <TemplateGallery
+        open={galleryOpen}
+        onClose={() => setGalleryOpen(false)}
+        onSelect={(config) => {
+          setElements(config.elements);
+          setPaperWidth(config.paper_width);
+          setGalleryOpen(false);
+          setIsDirty(true);
+        }}
+      />
     </div>
   );
 }
@@ -325,6 +340,7 @@ interface ToolbarProps {
   onSaveAs: () => void;
   onPreview: () => void;
   onNew: () => void;
+  onOpenGallery: () => void;
   saving: boolean;
   previewLoading: boolean;
   isDirty: boolean;
@@ -341,6 +357,7 @@ function Toolbar({
   onSaveAs,
   onPreview,
   onNew,
+  onOpenGallery,
   saving,
   previewLoading,
   isDirty,
@@ -414,6 +431,9 @@ function Toolbar({
       {/* 操作按钮组 */}
       <ToolBtn onClick={onNew} title="新建空白模板">
         新建
+      </ToolBtn>
+      <ToolBtn onClick={onOpenGallery} title="从预置模板库选择">
+        🎨 模板库
       </ToolBtn>
       <ToolBtn onClick={onPreview} disabled={previewLoading} title="预览小票效果">
         {previewLoading ? '加载中...' : '预览'}

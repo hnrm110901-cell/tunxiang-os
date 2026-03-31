@@ -16,6 +16,11 @@
   custom_text     — 自定义文字（支持 {{变量}} 替换）
   blank_lines     — 空行
   logo_text       — 品牌口号/备注文字
+  inverted_header — 反色横幅（黑底白字，最显眼的设计元素）
+  styled_separator — 创意分隔符（10种风格）
+  box_section     — 盒型边框区块（制表符围框）
+  logo_image      — Logo位图（base64图片，需Pillow）
+  underlined_text — 下划线文字
 """
 import re
 from typing import Any
@@ -40,6 +45,11 @@ from .printer_driver import (
     _gbk_len,
     _pad_two_columns,
     _pad_three_columns,
+    GS_INVERT_ON,
+    GS_INVERT_OFF,
+    ESC_UNDERLINE_ON,
+    ESC_UNDERLINE_OFF,
+    image_to_escpos_raster,
 )
 
 logger = structlog.get_logger()
@@ -227,6 +237,11 @@ class TemplateRenderer:
             "custom_text": self._render_custom_text,
             "blank_lines": self._render_blank_lines,
             "logo_text": self._render_logo_text,
+            "inverted_header": self._render_inverted_header,
+            "styled_separator": self._render_styled_separator,
+            "box_section": self._render_box_section,
+            "logo_image": self._render_logo_image,
+            "underlined_text": self._render_underlined_text,
         }
         handler = handlers.get(elem_type)
         if handler is None:
@@ -510,6 +525,240 @@ class TemplateRenderer:
             buf += ESC_BOLD_OFF
         buf += ESC_ALIGN_LEFT
         return bytes(buf)
+
+    def _resolve_vars(self, text: str, ctx: dict) -> str:
+        """将 {{key}} 占位符替换为 context 中的值（内部辅助）。"""
+        return _apply_template_vars(text, ctx)
+
+    def _render_inverted_header(self, elem: dict, ctx: dict, line_width: int) -> bytes:
+        """
+        反色横幅：黑底白字。
+
+        elem配置：
+          content: str — 文字内容（支持{{变量}}）
+          align: "left"|"center"|"right" — 默认center
+          size: "normal"|"double_height"|"double_both" — 默认double_height
+          padding: int — 两侧空格数，默认2
+
+        效果（80mm纸）：
+        ████████████████████████████████████████████████
+        █            好味道火锅总店                     █
+        ████████████████████████████████████████████████
+        """
+        buf = b''
+        content = self._resolve_vars(elem.get("content", ctx.get("store_name", "")), ctx)
+        align = elem.get("align", "center")
+        size = elem.get("size", "double_height")
+        padding = elem.get("padding", 2)
+
+        # 根据size决定有效行宽
+        if size in ("double_width", "double_both"):
+            effective_width = line_width // 2
+        else:
+            effective_width = line_width
+
+        # 反色开启
+        buf += GS_INVERT_ON
+        buf += _SIZE_BYTES.get(size, GS_SIZE_DOUBLE_HEIGHT)
+        buf += _ALIGN_BYTES.get(align, ESC_ALIGN_CENTER)
+        buf += ESC_BOLD_ON
+
+        # 上方满行空格（形成黑色横带效果）
+        buf += (b' ' * effective_width) + LF
+
+        # 内容行（带padding）
+        padded = " " * padding + content + " " * padding
+        buf += padded.encode("gbk", errors="replace") + LF
+
+        # 下方黑色横带
+        buf += (b' ' * effective_width) + LF
+
+        # 重置
+        buf += GS_INVERT_OFF + GS_SIZE_NORMAL + ESC_BOLD_OFF + ESC_ALIGN_LEFT
+        return buf
+
+    def _render_styled_separator(self, elem: dict, ctx: dict, line_width: int) -> bytes:
+        """
+        创意分隔符。
+
+        style选项：
+          "double"    — ════════════════════════════════════════════════
+          "dots"      — ················································
+          "diamond"   — ◆◆◆◆◆◆◆◆◆◆◆◆◆◆◆◆◆◆◆◆◆◆◆◆◆◆◆◆◆◆◆◆◆◆◆◆◆◆◆
+          "star"      — ★★★★★★★★★★★★★★★★★★★★★★★★
+          "wave"      — ～～～～～～～～～～～～～～～～～～～～～～～～
+          "dash"      — ------------------------------------------------
+          "bold_dash" — ================================================
+          "dot_line"  — ·  ·  ·  ·  ·  ·  ·  ·  ·  ·  ·  ·  ·  ·  ·
+          "ornament"  — ✦──────────────────────────────────────────────✦
+          "bracket"   — 【────────────────────────────────────────────】
+          default     — ————————————————————————————————————————————————
+        """
+        buf = b''
+        style = elem.get("style", "dash")
+
+        style_chars = {
+            "double":    ("═", line_width),
+            "dots":      ("·", line_width),
+            "diamond":   ("◆", line_width // 2),  # 双字节字符占2格
+            "star":      ("★", line_width // 2),
+            "wave":      ("～", line_width // 2),
+            "dash":      ("-", line_width),
+            "bold_dash": ("=", line_width),
+            "dot_line":  ("· ", line_width // 2),
+        }
+
+        buf += ESC_ALIGN_CENTER
+
+        if style == "ornament":
+            mid = "─" * (line_width - 4)
+            line = f"✦{mid}✦"
+        elif style == "bracket":
+            mid = "─" * (line_width - 4)
+            line = f"【{mid}】"
+        elif style in style_chars:
+            ch, count = style_chars[style]
+            line = ch * count
+        else:
+            line = "-" * line_width
+
+        try:
+            buf += line.encode("gbk", errors="replace") + LF
+        except (UnicodeEncodeError, ValueError):
+            buf += ("-" * line_width).encode("ascii") + LF
+
+        buf += ESC_ALIGN_LEFT
+        return buf
+
+    def _render_box_section(self, elem: dict, ctx: dict, line_width: int) -> bytes:
+        """
+        盒型边框区块：用制表符绘制围框，内含文字。
+
+        elem配置：
+          lines: list[str] — 内容行列表（支持{{变量}}）
+          style: "single"|"double" — 边框样式
+          align: "left"|"center"|"right" — 内容对齐
+          padding: int — 内边距，默认1
+
+        效果（single）：
+        ┌──────────────────────────────────────────────┐
+        │           感谢您的光临！                      │
+        │         祝您用餐愉快！                        │
+        └──────────────────────────────────────────────┘
+
+        效果（double）：
+        ╔══════════════════════════════════════════════╗
+        ║           本单享受8.8折优惠                   ║
+        ╚══════════════════════════════════════════════╝
+        """
+        buf = b''
+        style = elem.get("style", "single")
+        lines_raw = elem.get("lines", ["感谢光临"])
+        align = elem.get("align", "center")
+        padding = elem.get("padding", 1)
+
+        if style == "double":
+            tl, tr, bl, br, h, v = "╔", "╗", "╚", "╝", "═", "║"
+        else:
+            tl, tr, bl, br, h, v = "┌", "┐", "└", "┘", "─", "│"
+
+        inner_width = line_width - 2  # 左右各一个边框字符
+
+        buf += ESC_ALIGN_LEFT
+
+        # 顶部边框
+        top_line = tl + h * (inner_width - 1) + tr
+        try:
+            buf += top_line.encode("gbk", errors="replace") + LF
+        except (UnicodeEncodeError, ValueError):
+            buf += (("+" + "-" * (inner_width - 1) + "+").encode("ascii")) + LF
+
+        # 内容行
+        for raw_line in lines_raw:
+            content = self._resolve_vars(raw_line, ctx)
+            gbk_len_content = _gbk_len(content)
+            space_total = inner_width - 1 - gbk_len_content  # -1为左边框
+
+            if align == "center":
+                left_sp = space_total // 2
+                right_sp = space_total - left_sp
+            elif align == "right":
+                left_sp, right_sp = space_total - padding, padding
+            else:
+                left_sp, right_sp = padding, space_total - padding
+
+            left_sp = max(0, left_sp)
+            right_sp = max(0, right_sp)
+
+            row = v + " " * left_sp + content + " " * right_sp + v
+            try:
+                buf += row.encode("gbk", errors="replace") + LF
+            except (UnicodeEncodeError, ValueError):
+                buf += (v + content[:inner_width - 1] + v).encode("ascii", errors="replace") + LF
+
+        # 底部边框
+        bot_line = bl + h * (inner_width - 1) + br
+        try:
+            buf += bot_line.encode("gbk", errors="replace") + LF
+        except (UnicodeEncodeError, ValueError):
+            buf += (("+" + "-" * (inner_width - 1) + "+").encode("ascii")) + LF
+
+        return buf
+
+    def _render_logo_image(self, elem: dict, ctx: dict, line_width: int) -> bytes:
+        """
+        Logo位图打印。
+
+        elem配置：
+          image_base64: str — base64编码的PNG/JPEG图片数据
+          align: "left"|"center" — 默认center
+          max_width_dots: int — 最大点宽，默认按纸宽（80mm=384点，58mm=288点）
+
+        如果Pillow未安装或图片无效，降级为文字占位（不报错）。
+        """
+        import base64
+        buf = b''
+        img_b64 = elem.get("image_base64", "")
+        if not img_b64:
+            return buf  # 无图片，跳过
+
+        max_dots = elem.get("max_width_dots", 384 if line_width >= 48 else 288)
+        align = elem.get("align", "center")
+
+        try:
+            img_bytes = base64.b64decode(img_b64)
+            raster = image_to_escpos_raster(img_bytes, max_width_dots=max_dots)
+            buf += _ALIGN_BYTES.get(align, ESC_ALIGN_CENTER)
+            buf += raster
+            buf += LF + ESC_ALIGN_LEFT
+        except ImportError:
+            # Pillow未安装，打印文字提示
+            logger.warning("logo_image.pillow_not_installed")
+            buf += ESC_ALIGN_CENTER
+            buf += "[LOGO]".encode("ascii") + LF
+            buf += ESC_ALIGN_LEFT
+        except (ValueError, KeyError, OSError) as exc:
+            logger.warning("logo_image.render_failed", error=str(exc))
+
+        return buf
+
+    def _render_underlined_text(self, elem: dict, ctx: dict, line_width: int) -> bytes:
+        """下划线文字。"""
+        buf = b''
+        content = self._resolve_vars(elem.get("content", ""), ctx)
+        align = _ALIGN_BYTES.get(elem.get("align", "left"), ESC_ALIGN_LEFT)
+        bold = elem.get("bold", False)
+
+        buf += align
+        if bold:
+            buf += ESC_BOLD_ON
+        buf += ESC_UNDERLINE_ON
+        buf += content.encode("gbk", errors="replace") + LF
+        buf += ESC_UNDERLINE_OFF
+        if bold:
+            buf += ESC_BOLD_OFF
+        buf += ESC_ALIGN_LEFT
+        return buf
 
 
 # 模块级单例（供其他模块 import 使用）

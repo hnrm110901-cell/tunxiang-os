@@ -2,8 +2,7 @@
  * PropertyPanel — 右侧属性编辑面板（280px）
  * 根据选中元素类型动态显示对应属性
  */
-import { useState } from 'react';
-import type { CSSProperties, ReactNode } from 'react';
+import type { CSSProperties, ReactNode, ChangeEvent } from 'react';
 import type { TemplateElement } from '../../api/receiptTemplateApi';
 
 interface PropertyPanelProps {
@@ -281,6 +280,185 @@ export function PropertyPanel({ element, onChange }: PropertyPanelProps) {
             />
           </PropSection>
         )}
+
+        {/* inverted_header：反色横幅 */}
+        {element.type === 'inverted_header' && (
+          <>
+            <PropSection title="文字内容">
+              <TextareaInput
+                value={element.content || ''}
+                placeholder="输入横幅文字，支持变量..."
+                onChange={(v) => update({ content: v })}
+              />
+              <div style={{
+                marginTop: 6,
+                padding: '6px 8px',
+                background: 'var(--bg-2, #1a2a33)',
+                borderRadius: 4,
+                fontSize: 10,
+                color: 'var(--text-4, #666)',
+                lineHeight: 1.7,
+              }}>
+                <div style={{ fontWeight: 600, marginBottom: 2, color: 'var(--text-3, #999)' }}>可用变量</div>
+                {'{{store_name}} {{order_no}} {{datetime}}'.split(' ').map((v) => (
+                  <div
+                    key={v}
+                    style={{ cursor: 'pointer', color: 'var(--brand, #FF6B35)' }}
+                    onClick={() => update({ content: (element.content || '') + v })}
+                  >
+                    {v}
+                  </div>
+                ))}
+              </div>
+            </PropSection>
+            <PropSection title="对齐方式">
+              <AlignSelector
+                value={element.align || 'center'}
+                onChange={(v) => update({ align: v })}
+              />
+            </PropSection>
+            <PropSection title="字体大小">
+              <RadioGroup
+                value={element.size || 'double_height'}
+                options={[
+                  { value: 'normal', label: '正常' },
+                  { value: 'double_height', label: '高大' },
+                  { value: 'double_both', label: '双倍' },
+                ]}
+                onChange={(v) => update({ size: v as TemplateElement['size'] })}
+              />
+            </PropSection>
+            <PropSection title="内边距">
+              <NumberStepper
+                value={element.padding ?? 2}
+                min={1}
+                max={4}
+                onChange={(v) => update({ padding: v })}
+              />
+            </PropSection>
+          </>
+        )}
+
+        {/* styled_separator：创意分隔线 */}
+        {element.type === 'styled_separator' && (
+          <PropSection title="分隔线样式">
+            <SeparatorStylePicker
+              value={element.style || 'dash'}
+              onChange={(v) => update({ style: v })}
+            />
+          </PropSection>
+        )}
+
+        {/* box_section：盒型边框区块 */}
+        {element.type === 'box_section' && (
+          <>
+            <PropSection title="边框风格">
+              <RadioGroup
+                value={element.style || 'single'}
+                options={[
+                  { value: 'single', label: '┌─┐ 单线边框' },
+                  { value: 'double', label: '╔═╗ 双线边框' },
+                ]}
+                onChange={(v) => update({ style: v })}
+              />
+            </PropSection>
+            <PropSection title="内容文字（每行一条）">
+              <textarea
+                value={(element.lines ?? ['感谢光临']).join('\n')}
+                rows={4}
+                placeholder="每行一条文字..."
+                onChange={(e) => update({ lines: e.target.value.split('\n') })}
+                style={{
+                  width: '100%',
+                  padding: '6px 8px',
+                  borderRadius: 5,
+                  border: '1px solid var(--bg-2, #1a2a33)',
+                  background: 'var(--bg-0, #0B1A20)',
+                  color: 'var(--text-1, #fff)',
+                  fontSize: 12,
+                  outline: 'none',
+                  resize: 'vertical',
+                  boxSizing: 'border-box',
+                  fontFamily: 'inherit',
+                }}
+              />
+            </PropSection>
+            <PropSection title="内容对齐">
+              <AlignSelector
+                value={element.align || 'center'}
+                onChange={(v) => update({ align: v })}
+              />
+            </PropSection>
+          </>
+        )}
+
+        {/* logo_image：Logo图片 */}
+        {element.type === 'logo_image' && (
+          <>
+            <PropSection title="Logo图片">
+              <LogoImageUploader
+                value={element.image_base64 || null}
+                onChange={(b64) => update({ image_base64: b64 ?? undefined })}
+              />
+            </PropSection>
+            <PropSection title="打印宽度">
+              <RadioGroup
+                value={String(element.max_width_dots ?? 384)}
+                options={[
+                  { value: '384', label: '384点（80mm纸）' },
+                  { value: '288', label: '288点（58mm纸）' },
+                ]}
+                onChange={(v) => update({ max_width_dots: Number(v) })}
+              />
+            </PropSection>
+          </>
+        )}
+
+        {/* underlined_text：下划线文字 */}
+        {element.type === 'underlined_text' && (
+          <>
+            <PropSection title="文字内容">
+              <TextareaInput
+                value={element.content || ''}
+                placeholder="输入文字，支持 {{变量}}..."
+                onChange={(v) => update({ content: v })}
+              />
+              <div style={{
+                marginTop: 6,
+                padding: '6px 8px',
+                background: 'var(--bg-2, #1a2a33)',
+                borderRadius: 4,
+                fontSize: 10,
+                color: 'var(--text-4, #666)',
+                lineHeight: 1.7,
+              }}>
+                <div style={{ fontWeight: 600, marginBottom: 2, color: 'var(--text-3, #999)' }}>可用变量</div>
+                {'{{store_name}} {{order_no}} {{cashier}} {{datetime}} {{table_no}}'.split(' ').map((v) => (
+                  <div
+                    key={v}
+                    style={{ cursor: 'pointer', color: 'var(--brand, #FF6B35)' }}
+                    onClick={() => update({ content: (element.content || '') + v })}
+                  >
+                    {v}
+                  </div>
+                ))}
+              </div>
+            </PropSection>
+            <PropSection title="对齐方式">
+              <AlignSelector
+                value={element.align || 'left'}
+                onChange={(v) => update({ align: v })}
+              />
+            </PropSection>
+            <PropSection title="加粗">
+              <Toggle
+                value={element.bold ?? false}
+                onChange={(v) => update({ bold: v })}
+                label="粗体文字"
+              />
+            </PropSection>
+          </>
+        )}
       </div>
     </div>
   );
@@ -305,6 +483,11 @@ const ELEMENT_LABELS: Record<string, string> = {
   custom_text: '自定义文字',
   blank_lines: '空行',
   logo_text: '品牌口号',
+  inverted_header: '反色横幅',
+  styled_separator: '创意分隔线',
+  box_section: '边框区块',
+  logo_image: 'Logo图片',
+  underlined_text: '下划线文字',
 };
 
 // ─── 子组件：属性分区 ───
@@ -623,4 +806,142 @@ function stepperBtnStyle(disabled: boolean): CSSProperties {
     alignItems: 'center',
     justifyContent: 'center',
   };
+}
+
+// ─── 子组件：创意分隔线样式选择器 ───
+
+const SEPARATOR_STYLES = [
+  { key: 'dash',      preview: '-------------------------------' },
+  { key: 'double',    preview: '═══════════════════════════' },
+  { key: 'dots',      preview: '···············································' },
+  { key: 'diamond',   preview: '◆ ◆ ◆ ◆ ◆ ◆ ◆ ◆' },
+  { key: 'star',      preview: '★ ★ ★ ★ ★ ★ ★ ★' },
+  { key: 'ornament',  preview: '✦──────────────────────✦' },
+  { key: 'bracket',   preview: '【──────────────────────】' },
+  { key: 'bold_dash', preview: '==============================' },
+  { key: 'wave',      preview: '～～～～～～～～～～～～' },
+  { key: 'dot_line',  preview: '·  ·  ·  ·  ·  ·  ·  ·' },
+];
+
+function SeparatorStylePicker({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      {SEPARATOR_STYLES.map((s) => (
+        <button
+          key={s.key}
+          onClick={() => onChange(s.key)}
+          style={{
+            padding: '5px 8px',
+            borderRadius: 5,
+            border: '1px solid',
+            borderColor: value === s.key ? 'var(--brand, #FF6B35)' : 'var(--bg-2, #1a2a33)',
+            background: value === s.key ? 'rgba(255,107,53,0.15)' : 'var(--bg-2, #1a2a33)',
+            color: value === s.key ? 'var(--brand, #FF6B35)' : 'var(--text-3, #999)',
+            fontSize: 10,
+            cursor: 'pointer',
+            textAlign: 'left',
+            fontFamily: '"Courier New", Courier, monospace',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            transition: 'all 0.15s',
+          }}
+          title={s.key}
+        >
+          {s.preview}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ─── 子组件：Logo图片上传 ───
+
+function LogoImageUploader({
+  value,
+  onChange,
+}: {
+  value: string | null;
+  onChange: (b64: string | null) => void;
+}) {
+  const handleFile = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      // 去掉 data:image/xxx;base64, 前缀
+      const b64 = result.split(',')[1] ?? result;
+      onChange(b64);
+    };
+    reader.readAsDataURL(file);
+    // 清空input，允许重复上传同一文件
+    e.target.value = '';
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {value && (
+        <div style={{ textAlign: 'center' }}>
+          <img
+            src={`data:image/png;base64,${value}`}
+            alt="logo preview"
+            style={{
+              maxWidth: '100%',
+              maxHeight: 64,
+              objectFit: 'contain',
+              filter: 'grayscale(100%)',
+              border: '1px solid var(--bg-2, #1a2a33)',
+              borderRadius: 4,
+              padding: 4,
+            }}
+          />
+        </div>
+      )}
+      <label style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+        padding: '7px 12px',
+        borderRadius: 5,
+        border: '1px dashed var(--bg-2, #1a2a33)',
+        background: 'var(--bg-0, #0B1A20)',
+        color: 'var(--text-3, #999)',
+        fontSize: 12,
+        cursor: 'pointer',
+        transition: 'border-color 0.15s',
+      }}>
+        🖼 {value ? '重新上传' : '选择图片'}
+        <input
+          type="file"
+          accept=".png,.jpg,.jpeg"
+          style={{ display: 'none' }}
+          onChange={handleFile}
+        />
+      </label>
+      {value && (
+        <button
+          onClick={() => onChange(null)}
+          style={{
+            padding: '5px 10px',
+            borderRadius: 5,
+            border: '1px solid rgba(163,45,45,0.5)',
+            background: 'rgba(163,45,45,0.15)',
+            color: '#c66',
+            fontSize: 12,
+            cursor: 'pointer',
+          }}
+        >
+          清除图片
+        </button>
+      )}
+    </div>
+  );
 }

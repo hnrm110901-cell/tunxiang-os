@@ -87,9 +87,39 @@ const ELEMENT_CATALOG: Record<ElementType, ElementMeta> = {
     category: '装饰元素',
     defaultConfig: { content: '美食之旅，从这里开始', align: 'center', bold: true },
   },
+  inverted_header: {
+    label: '反色横幅',
+    icon: '▓',
+    category: '设计增强',
+    defaultConfig: { content: '{{store_name}}', align: 'center', size: 'double_height' },
+  },
+  styled_separator: {
+    label: '创意分隔线',
+    icon: '〰',
+    category: '设计增强',
+    defaultConfig: { style: 'dash' },
+  },
+  box_section: {
+    label: '边框区块',
+    icon: '▢',
+    category: '设计增强',
+    defaultConfig: { style: 'single', lines: ['感谢光临'], align: 'center' },
+  },
+  logo_image: {
+    label: 'Logo图片',
+    icon: '🖼',
+    category: '设计增强',
+    defaultConfig: { align: 'center', max_width_dots: 384 },
+  },
+  underlined_text: {
+    label: '下划线文字',
+    icon: 'U̲',
+    category: '设计增强',
+    defaultConfig: { content: '下划线文字', align: 'left', bold: false },
+  },
 };
 
-const CATEGORIES = ['基础信息', '订单内容', '合计支付', '装饰元素'];
+const CATEGORIES = ['基础信息', '订单内容', '合计支付', '装饰元素', '设计增强'];
 
 interface ElementPaletteProps {
   onAdd: (type: ElementType, defaults: Partial<TemplateElement>) => void;

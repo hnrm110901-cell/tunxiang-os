@@ -448,3 +448,73 @@ def build_escpos_commands() -> dict[str, bytes]:
         "open_drawer": ESC_OPEN_DRAWER,
         "chinese_on": ESC_CHINESE_ON,
     }
+
+
+# ── 反色/高亮打印 ──────────────────────────────────────────────
+GS_INVERT_ON  = b'\x1d\x42\x01'   # GS B 1 — 开启白底黑字反色
+GS_INVERT_OFF = b'\x1d\x42\x00'   # GS B 0 — 关闭反色
+
+# ── 下划线 ─────────────────────────────────────────────────────
+ESC_UNDERLINE_ON  = b'\x1b\x2d\x01'  # ESC - 1
+ESC_UNDERLINE_OFF = b'\x1b\x2d\x00'  # ESC - 0
+
+# ── 位图打印（光栅模式）─────────────────────────────────────────
+# GS v 0 m xL xH yL yH d1...dk
+# 用于打印1位深度位图（Logo图片）
+GS_RASTER_IMAGE_HEADER = b'\x1d\x76\x30\x00'  # mode=0（正常）
+
+# ── 走纸 ────────────────────────────────────────────────────────
+ESC_FEED_N = lambda n: b'\x1b\x64' + bytes([n])  # ESC d n — 走n行
+
+
+def image_to_escpos_raster(img_bytes: bytes, max_width_dots: int = 384) -> bytes:
+    """
+    将PNG/JPEG图片转为ESC/POS光栅位图指令字节流。
+
+    要求安装 Pillow（pip install Pillow）。
+    如果Pillow未安装，抛出 ImportError。
+
+    max_width_dots: 打印机最大点宽（80mm纸 = 384点，58mm = 288点）
+    """
+    try:
+        from PIL import Image
+        import io
+    except ImportError as exc:
+        raise ImportError("位图打印需要安装 Pillow: pip install Pillow") from exc
+
+    img = Image.open(io.BytesIO(img_bytes)).convert("L")  # 转灰度
+
+    # 缩放到适合纸宽
+    w, h = img.size
+    if w > max_width_dots:
+        new_h = int(h * max_width_dots / w)
+        img = img.resize((max_width_dots, new_h), Image.LANCZOS)
+        w, h = img.size
+
+    # 转1位（黑白），用抖动算法保留层次
+    img = img.convert("1", dither=Image.FLOYDSTEINBERG)
+
+    # 生成ESC/POS光栅数据
+    # 每行字节数（向上取整到8的倍数）
+    byte_width = (w + 7) // 8
+
+    buf = b''
+    # GS v 0 0 xL xH yL yH
+    xL = byte_width & 0xFF
+    xH = (byte_width >> 8) & 0xFF
+    yL = h & 0xFF
+    yH = (h >> 8) & 0xFF
+    buf += GS_RASTER_IMAGE_HEADER + bytes([xL, xH, yL, yH])
+
+    pixels = img.load()
+    for y in range(h):
+        row = 0
+        for x in range(byte_width * 8):
+            row <<= 1
+            if x < w and pixels[x, y] == 0:  # PIL 1-bit: 0=黑
+                row |= 1
+            if (x + 1) % 8 == 0:
+                buf += bytes([row & 0xFF])
+                row = 0
+
+    return buf

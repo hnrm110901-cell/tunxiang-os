@@ -29,14 +29,17 @@ export function ReceiptCanvas({
   return (
     <div
       style={{
-        background: '#FFFFFF',
         width: canvasWidth,
         minHeight: 400,
-        padding: '12px 10px',
-        boxShadow: '0 4px 24px rgba(0,0,0,0.25)',
-        borderRadius: 2,
+        backgroundColor: '#FFFFF8',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.15), 0 0 0 1px rgba(0,0,0,0.05)',
+        fontFamily: "'Courier New', Courier, monospace",
+        fontSize: '11px',
+        lineHeight: '1.4',
+        padding: '16px 8px 12px',
         position: 'relative',
         cursor: 'default',
+        borderRadius: 2,
       }}
       onClick={(e) => {
         if (e.target === e.currentTarget) onSelect(null);
@@ -469,6 +472,127 @@ function ElementPreview({ element }: { element: TemplateElement }) {
       return (
         <div style={{ height: count * 14, fontSize: 10, color: '#ddd', textAlign: 'center', lineHeight: `${count * 14}px` }}>
           {/* 空行 × {count} */}
+        </div>
+      );
+    }
+
+    case 'inverted_header': {
+      const sizeStyle: CSSProperties = {
+        double_both:   { fontSize: 16, fontWeight: 700 },
+        double_height: { fontSize: 14, fontWeight: 700 },
+        double_width:  { fontSize: 12, fontWeight: 700, letterSpacing: '0.15em' },
+        normal:        { fontSize: 11, fontWeight: 700 },
+      }[element.size ?? 'double_height'] ?? { fontSize: 14, fontWeight: 700 };
+      return (
+        <div style={{
+          backgroundColor: '#000',
+          color: '#fff',
+          textAlign: 'center',
+          padding: `${(element.padding ?? 2) * 3}px 8px`,
+          fontFamily: '"Courier New", Courier, monospace',
+          ...sizeStyle,
+        }}>
+          <div style={{ opacity: 0, fontSize: 9, lineHeight: '1em' }}>█</div>
+          {element.content || '示例门店名称'}
+          <div style={{ opacity: 0, fontSize: 9, lineHeight: '1em' }}>█</div>
+        </div>
+      );
+    }
+
+    case 'styled_separator': {
+      const styleMap: Record<string, string> = {
+        double:    '════════════════════════════════════════════',
+        dots:      '················································',
+        diamond:   '◆ ◆ ◆ ◆ ◆ ◆ ◆ ◆ ◆ ◆ ◆ ◆',
+        star:      '★ ★ ★ ★ ★ ★ ★ ★ ★ ★ ★ ★',
+        wave:      '～～～～～～～～～～～～～～～～～～～',
+        dash:      '------------------------------------------------',
+        bold_dash: '================================================',
+        dot_line:  '·  ·  ·  ·  ·  ·  ·  ·  ·  ·  ·  ·  ·',
+        ornament:  '✦──────────────────────────────────────✦',
+        bracket:   '【──────────────────────────────────────】',
+      };
+      return (
+        <div style={{
+          textAlign: 'center',
+          color: '#888',
+          overflow: 'hidden',
+          fontSize: 10,
+          padding: '2px 0',
+          fontFamily: '"Courier New", Courier, monospace',
+        }}>
+          {styleMap[element.style ?? 'dash'] ?? '--------------------------------'}
+        </div>
+      );
+    }
+
+    case 'box_section': {
+      const isDouble = element.style === 'double';
+      const [tl, tr, bl, br, h, v] = isDouble
+        ? ['╔', '╗', '╚', '╝', '═', '║']
+        : ['┌', '┐', '└', '┘', '─', '│'];
+      const lines = element.lines ?? ['感谢光临'];
+      const width = 38;
+      return (
+        <div style={{
+          fontSize: 10,
+          padding: '2px 0',
+          fontFamily: '"Courier New", Courier, monospace',
+          color: '#1a1a1a',
+          whiteSpace: 'pre',
+          overflow: 'hidden',
+        }}>
+          <div>{tl}{h.repeat(width)}{tr}</div>
+          {lines.map((line, i) => {
+            const padded = line.padStart(Math.floor((width + line.length) / 2)).padEnd(width);
+            return <div key={i}>{v}{padded}{v}</div>;
+          })}
+          <div>{bl}{h.repeat(width)}{br}</div>
+        </div>
+      );
+    }
+
+    case 'logo_image': {
+      return (
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '4px 0' }}>
+          {element.image_base64 ? (
+            <img
+              src={`data:image/png;base64,${element.image_base64}`}
+              alt="logo"
+              style={{ maxHeight: 64, objectFit: 'contain', filter: 'grayscale(100%)' }}
+            />
+          ) : (
+            <div style={{
+              border: '1px dashed #ccc',
+              width: 96,
+              height: 48,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#aaa',
+              fontSize: 10,
+              gap: 4,
+            }}>
+              🖼 点击上传Logo
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    case 'underlined_text': {
+      const alignStyle = { left: 'left', center: 'center', right: 'right' }[element.align ?? 'left'] as CSSProperties['textAlign'];
+      return (
+        <div style={{
+          fontSize: 11,
+          textDecoration: 'underline',
+          padding: '2px 4px',
+          textAlign: alignStyle,
+          fontWeight: element.bold ? 700 : 400,
+          fontFamily: '"Courier New", Courier, monospace',
+          color: '#1a1a1a',
+        }}>
+          {element.content || '下划线文字'}
         </div>
       );
     }

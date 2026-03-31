@@ -263,7 +263,207 @@ _ELEMENTS_CATALOG = [
             {"key": "bold", "label": "加粗", "type": "boolean", "default": False},
         ],
     },
+    {
+        "type": "inverted_header",
+        "label": "反色横幅",
+        "icon": "highlight",
+        "category": "美化增强",
+        "props": [
+            {"key": "content", "label": "文字内容（支持 {{变量}}）", "type": "text",
+             "default": "{{store_name}}"},
+            {"key": "align", "label": "对齐", "type": "select",
+             "options": ["left", "center", "right"], "default": "center"},
+            {"key": "size", "label": "字体大小", "type": "select",
+             "options": ["normal", "double_width", "double_height", "double_both"],
+             "default": "double_height"},
+            {"key": "padding", "label": "两侧填充空格数", "type": "number", "default": 2},
+        ],
+    },
+    {
+        "type": "styled_separator",
+        "label": "创意分隔符",
+        "icon": "design",
+        "category": "美化增强",
+        "props": [
+            {"key": "style", "label": "风格", "type": "select",
+             "options": [
+                 "dash", "bold_dash", "double", "dots", "dot_line",
+                 "diamond", "star", "wave", "ornament", "bracket",
+             ],
+             "default": "dash"},
+        ],
+    },
+    {
+        "type": "box_section",
+        "label": "盒型边框",
+        "icon": "box",
+        "category": "美化增强",
+        "props": [
+            {"key": "lines", "label": "内容行（支持 {{变量}}，每行一条）",
+             "type": "textarea_list", "default": ["感谢光临，欢迎再来"]},
+            {"key": "style", "label": "边框样式", "type": "select",
+             "options": ["single", "double"], "default": "single"},
+            {"key": "align", "label": "内容对齐", "type": "select",
+             "options": ["left", "center", "right"], "default": "center"},
+            {"key": "padding", "label": "内边距", "type": "number", "default": 1},
+        ],
+    },
+    {
+        "type": "logo_image",
+        "label": "Logo图片",
+        "icon": "image",
+        "category": "多媒体",
+        "props": [
+            {"key": "image_base64", "label": "图片（Base64 PNG/JPEG）",
+             "type": "image_upload", "default": ""},
+            {"key": "align", "label": "对齐", "type": "select",
+             "options": ["left", "center"], "default": "center"},
+            {"key": "max_width_dots", "label": "最大点宽（80mm纸=384，58mm=288）",
+             "type": "number", "default": 384},
+        ],
+    },
+    {
+        "type": "underlined_text",
+        "label": "下划线文字",
+        "icon": "underline",
+        "category": "美化增强",
+        "props": [
+            {"key": "content", "label": "文字内容（支持 {{变量}}）", "type": "text",
+             "default": "扫码评价享优惠"},
+            {"key": "align", "label": "对齐", "type": "select",
+             "options": ["left", "center", "right"], "default": "center"},
+            {"key": "bold", "label": "加粗", "type": "boolean", "default": False},
+        ],
+    },
 ]
+
+# ─── 预设模板库 ───
+
+_PRESET_TEMPLATES = {
+    "minimal": {
+        "name": "简约风",
+        "description": "干净留白，突出内容",
+        "thumbnail_style": "minimal",
+        "config": {
+            "paper_width": 80,
+            "elements": [
+                {"id": "p1", "type": "blank_lines", "count": 1},
+                {"id": "p2", "type": "store_name", "align": "center", "bold": True, "size": "double_height"},
+                {"id": "p3", "type": "store_address", "align": "center", "bold": False, "size": "normal"},
+                {"id": "p4", "type": "blank_lines", "count": 1},
+                {"id": "p5", "type": "styled_separator", "style": "dots"},
+                {"id": "p6", "type": "order_info", "fields": ["table_no", "order_no", "datetime"]},
+                {"id": "p7", "type": "styled_separator", "style": "dots"},
+                {"id": "p8", "type": "order_items", "show_price": True, "show_qty": True, "show_subtotal": True},
+                {"id": "p9", "type": "styled_separator", "style": "dots"},
+                {"id": "p10", "type": "total_summary", "show_discount": True, "show_service_fee": False},
+                {"id": "p11", "type": "payment_method", "show_change": True},
+                {"id": "p12", "type": "blank_lines", "count": 1},
+                {"id": "p13", "type": "qrcode", "content_field": "order_id", "size": 6},
+                {"id": "p14", "type": "custom_text", "content": "感谢惠顾", "align": "center"},
+                {"id": "p15", "type": "blank_lines", "count": 2},
+            ]
+        }
+    },
+    "classic": {
+        "name": "中式经典",
+        "description": "盒型边框，传统美学",
+        "thumbnail_style": "classic",
+        "config": {
+            "paper_width": 80,
+            "elements": [
+                {"id": "c1", "type": "blank_lines", "count": 1},
+                {"id": "c2", "type": "box_section", "style": "double", "lines": ["{{store_name}}"], "align": "center"},
+                {"id": "c3", "type": "store_address", "align": "center"},
+                {"id": "c4", "type": "styled_separator", "style": "ornament"},
+                {"id": "c5", "type": "order_info", "fields": ["table_no", "order_no", "cashier", "datetime"]},
+                {"id": "c6", "type": "styled_separator", "style": "ornament"},
+                {"id": "c7", "type": "order_items", "show_price": True, "show_qty": True, "show_subtotal": True},
+                {"id": "c8", "type": "styled_separator", "style": "double"},
+                {"id": "c9", "type": "total_summary", "show_discount": True, "show_service_fee": True},
+                {"id": "c10", "type": "payment_method", "show_change": True},
+                {"id": "c11", "type": "styled_separator", "style": "ornament"},
+                {"id": "c12", "type": "qrcode", "content_field": "order_id", "size": 7},
+                {"id": "c13", "type": "box_section", "style": "single", "lines": ["感谢光临，欢迎再来", "祝您用餐愉快"], "align": "center"},
+                {"id": "c14", "type": "blank_lines", "count": 2},
+            ]
+        }
+    },
+    "business": {
+        "name": "商务风",
+        "description": "反色标题，专业大气",
+        "thumbnail_style": "business",
+        "config": {
+            "paper_width": 80,
+            "elements": [
+                {"id": "b1", "type": "inverted_header", "content": "{{store_name}}", "align": "center", "size": "double_height"},
+                {"id": "b2", "type": "store_address", "align": "center"},
+                {"id": "b3", "type": "styled_separator", "style": "bold_dash"},
+                {"id": "b4", "type": "order_info", "fields": ["table_no", "order_no", "cashier", "datetime"]},
+                {"id": "b5", "type": "styled_separator", "style": "dash"},
+                {"id": "b6", "type": "order_items", "show_price": True, "show_qty": True, "show_subtotal": True},
+                {"id": "b7", "type": "styled_separator", "style": "bold_dash"},
+                {"id": "b8", "type": "total_summary", "show_discount": True, "show_service_fee": True},
+                {"id": "b9", "type": "payment_method", "show_change": True},
+                {"id": "b10", "type": "styled_separator", "style": "dash"},
+                {"id": "b11", "type": "qrcode", "content_field": "order_id", "size": 7},
+                {"id": "b12", "type": "inverted_header", "content": "感谢您的惠顾", "align": "center", "size": "normal"},
+                {"id": "b13", "type": "blank_lines", "count": 2},
+            ]
+        }
+    },
+    "warm": {
+        "name": "温馨风",
+        "description": "星形装饰，亲切友好",
+        "thumbnail_style": "warm",
+        "config": {
+            "paper_width": 80,
+            "elements": [
+                {"id": "w1", "type": "styled_separator", "style": "star"},
+                {"id": "w2", "type": "store_name", "align": "center", "bold": True, "size": "double_both"},
+                {"id": "w3", "type": "store_address", "align": "center"},
+                {"id": "w4", "type": "styled_separator", "style": "star"},
+                {"id": "w5", "type": "order_info", "fields": ["table_no", "order_no", "datetime"]},
+                {"id": "w6", "type": "styled_separator", "style": "dots"},
+                {"id": "w7", "type": "order_items", "show_price": True, "show_qty": True, "show_subtotal": True},
+                {"id": "w8", "type": "styled_separator", "style": "star"},
+                {"id": "w9", "type": "total_summary", "show_discount": True, "show_service_fee": False},
+                {"id": "w10", "type": "payment_method", "show_change": True},
+                {"id": "w11", "type": "blank_lines", "count": 1},
+                {"id": "w12", "type": "qrcode", "content_field": "order_id", "size": 7},
+                {"id": "w13", "type": "box_section", "style": "single", "lines": ["★ 感谢您的光临 ★", "期待您的下次到来"], "align": "center"},
+                {"id": "w14", "type": "blank_lines", "count": 2},
+            ]
+        }
+    },
+    "premium": {
+        "name": "精品风",
+        "description": "多层次设计，高端定位",
+        "thumbnail_style": "premium",
+        "config": {
+            "paper_width": 80,
+            "elements": [
+                {"id": "pr1", "type": "blank_lines", "count": 1},
+                {"id": "pr2", "type": "inverted_header", "content": "{{store_name}}", "align": "center", "size": "double_both"},
+                {"id": "pr3", "type": "styled_separator", "style": "ornament"},
+                {"id": "pr4", "type": "store_address", "align": "center"},
+                {"id": "pr5", "type": "styled_separator", "style": "ornament"},
+                {"id": "pr6", "type": "order_info", "fields": ["table_no", "order_no", "cashier", "datetime"]},
+                {"id": "pr7", "type": "styled_separator", "style": "double"},
+                {"id": "pr8", "type": "order_items", "show_price": True, "show_qty": True, "show_subtotal": True},
+                {"id": "pr9", "type": "styled_separator", "style": "double"},
+                {"id": "pr10", "type": "total_summary", "show_discount": True, "show_service_fee": True},
+                {"id": "pr11", "type": "payment_method", "show_change": True},
+                {"id": "pr12", "type": "styled_separator", "style": "ornament"},
+                {"id": "pr13", "type": "qrcode", "content_field": "order_id", "size": 8},
+                {"id": "pr14", "type": "underlined_text", "content": "扫码评价享优惠", "align": "center", "bold": False},
+                {"id": "pr15", "type": "box_section", "style": "double", "lines": ["感谢您选择{{store_name}}", "您的满意是我们最大的动力"], "align": "center"},
+                {"id": "pr16", "type": "blank_lines", "count": 2},
+            ]
+        }
+    },
+}
+
 
 # ─── 预览用示例数据 ───
 
@@ -661,6 +861,24 @@ async def create_template(
             "id": str(template_id),
             "template_name": req.template_name,
         },
+    }
+
+
+@router.get("/presets")
+async def list_presets():
+    """返回5种预设计模板（含完整config，可直接加载到编辑器）。"""
+    return {
+        "ok": True,
+        "data": [
+            {
+                "key": key,
+                "name": v["name"],
+                "description": v["description"],
+                "thumbnail_style": v["thumbnail_style"],
+                "config": v["config"],
+            }
+            for key, v in _PRESET_TEMPLATES.items()
+        ]
     }
 
 
