@@ -33,8 +33,12 @@ import { ChannelCenterPage } from './pages/hq/growth/ChannelCenterPage';
 import { ReferralCenterPage } from './pages/hq/growth/ReferralCenterPage';
 import { StoreExecutionPage } from './pages/hq/growth/StoreExecutionPage';
 import { CompetitorCenterPage } from './pages/hq/market-intel/CompetitorCenterPage';
+import { CompetitorDetailPage } from './pages/hq/market-intel/CompetitorDetailPage';
 import { ReviewTopicPage } from './pages/hq/market-intel/ReviewTopicPage';
 import { TrendReportPage } from './pages/hq/market-intel/TrendReportPage';
+import { TrendRadarPage } from './pages/hq/market-intel/TrendRadarPage';
+import { ReviewIntelPage } from './pages/hq/market-intel/ReviewIntelPage';
+import { JourneyDetailPage } from './pages/hq/growth/JourneyDetailPage';
 import { OpsDashboardPage } from './pages/hq/ops/OpsDashboardPage';
 import { StoreAnalysisPage } from './pages/hq/ops/StoreAnalysisPage';
 import { DishAnalysisPage } from './pages/hq/ops/DishAnalysisPage';
@@ -92,6 +96,7 @@ function App() {
           <Route path="/hq/growth/dashboard" element={<GrowthDashboardPage />} />
           <Route path="/hq/growth/segments" element={<SegmentCenterPage />} />
           <Route path="/hq/growth/journeys" element={<JourneyListPage />} />
+          <Route path="/hq/growth/journeys/:journeyId" element={<JourneyDetailPage />} />
           <Route path="/hq/growth/journeys/:journeyId/canvas" element={<JourneyCanvasPage />} />
           <Route path="/hq/growth/roi" element={<ROIOverviewPage />} />
           <Route path="/hq/market-intel/dashboard" element={<IntelDashboardPage />} />
@@ -103,8 +108,11 @@ function App() {
           <Route path="/hq/growth/referral" element={<ReferralCenterPage />} />
           <Route path="/hq/growth/execution" element={<StoreExecutionPage />} />
           <Route path="/hq/market-intel/competitors" element={<CompetitorCenterPage />} />
+          <Route path="/hq/market-intel/competitors/:competitorId" element={<CompetitorDetailPage />} />
           <Route path="/hq/market-intel/reviews" element={<ReviewTopicPage />} />
           <Route path="/hq/market-intel/reports" element={<TrendReportPage />} />
+          <Route path="/hq/market-intel/trend-radar" element={<TrendRadarPage />} />
+          <Route path="/hq/market-intel/review-intel" element={<ReviewIntelPage />} />
           <Route path="/hq/ops/dashboard" element={<OpsDashboardPage />} />
           <Route path="/hq/ops/store-analysis" element={<StoreAnalysisPage />} />
           <Route path="/hq/ops/dish-analysis" element={<DishAnalysisPage />} />

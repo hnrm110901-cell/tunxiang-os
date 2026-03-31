@@ -1,7 +1,9 @@
 """试点门店推荐 Agent — P1 | 云端
 
 试点门店筛选、门店画像对比、试点方案设计、试点效果监测、推广可行性评估、门店聚类分析。
+扩展：一键从情报建议创建试点计划、活跃试点状态汇总。
 """
+import uuid
 from typing import Any
 from ..base import SkillAgent, AgentResult
 
@@ -27,6 +29,8 @@ class PilotRecommenderAgent(SkillAgent):
             "monitor_pilot_effect",
             "assess_rollout_feasibility",
             "cluster_stores",
+            "create_pilot_from_recommendation",
+            "get_pilot_status_summary",
         ]
 
     async def execute(self, action: str, params: dict[str, Any]) -> AgentResult:
@@ -37,6 +41,8 @@ class PilotRecommenderAgent(SkillAgent):
             "monitor_pilot_effect": self._monitor_effect,
             "assess_rollout_feasibility": self._assess_rollout,
             "cluster_stores": self._cluster_stores,
+            "create_pilot_from_recommendation": self._create_pilot_from_recommendation,
+            "get_pilot_status_summary": self._get_pilot_status_summary,
         }
         handler = dispatch.get(action)
         if handler:
@@ -297,4 +303,109 @@ class PilotRecommenderAgent(SkillAgent):
             },
             reasoning=f"门店聚类: " + ", ".join(f"{k}{len(v)}家" for k, v in clusters.items() if v),
             confidence=0.75,
+        )
+
+    async def _create_pilot_from_recommendation(self, params: dict) -> AgentResult:
+        """一键从情报建议创建试点计划（draft 状态）
+
+        params 示例：
+        {
+            "tenant_id": "uuid",
+            "recommendation_data": {
+                "name": "引入麻辣香锅试点",
+                "pilot_type": "new_dish",
+                "hypothesis": "引入麻辣香锅可提升年轻客群复购率15%",
+                "recommendation_source": "intel_report",
+                "source_ref_id": "uuid",
+                "start_date": "2026-04-01",
+                "end_date": "2026-04-14",
+                "success_criteria": [{"metric": "total_sales", "operator": "gt", "threshold": 30}]
+            },
+            "target_stores": [{"store_id": "uuid", "store_name": "长沙解放西店"}],
+            "control_stores": []
+        }
+        """
+        tenant_id_str = params.get("tenant_id", "")
+        recommendation_data = params.get("recommendation_data", {})
+        target_stores = params.get("target_stores", [])
+        control_stores = params.get("control_stores", [])
+
+        if not tenant_id_str:
+            return AgentResult(success=False, action="create_pilot_from_recommendation", error="缺少 tenant_id")
+        if not recommendation_data.get("name"):
+            return AgentResult(success=False, action="create_pilot_from_recommendation", error="缺少试点名称")
+        if not target_stores:
+            return AgentResult(success=False, action="create_pilot_from_recommendation", error="缺少目标门店列表")
+
+        pilot_draft = {
+            "pilot_id": str(uuid.uuid4()),
+            "tenant_id": tenant_id_str,
+            "name": recommendation_data.get("name", ""),
+            "pilot_type": recommendation_data.get("pilot_type", "new_dish"),
+            "recommendation_source": recommendation_data.get("recommendation_source", "intel_report"),
+            "source_ref_id": recommendation_data.get("source_ref_id"),
+            "hypothesis": recommendation_data.get("hypothesis", ""),
+            "target_stores": target_stores,
+            "control_stores": control_stores,
+            "start_date": recommendation_data.get("start_date", ""),
+            "end_date": recommendation_data.get("end_date", ""),
+            "status": "draft",
+            "success_criteria": recommendation_data.get("success_criteria", []),
+            "note": "由 Agent 自动从情报建议生成，需人工确认后激活",
+        }
+
+        return AgentResult(
+            success=True, action="create_pilot_from_recommendation",
+            data={
+                "pilot_draft": pilot_draft,
+                "next_step": "调用 POST /api/v1/pilots 提交此草稿，再调用 POST /api/v1/pilots/{id}/activate 激活",
+                "stores_selected": len(target_stores),
+            },
+            reasoning=f"从情报建议生成试点草稿「{pilot_draft['name']}」，"
+                      f"目标 {len(target_stores)} 家门店，等待人工确认",
+            confidence=0.85,
+        )
+
+    async def _get_pilot_status_summary(self, params: dict) -> AgentResult:
+        """所有活跃试点的状态汇总
+
+        params: {"active_pilots": [...]}  — 传入从 pilot_programs 查询到的活跃试点列表
+        """
+        active_pilots = params.get("active_pilots", [])
+
+        summary = []
+        for p in active_pilots:
+            days_elapsed = p.get("days_elapsed", 0)
+            total_days = p.get("total_days", 1)
+            progress_pct = round(days_elapsed / max(1, total_days) * 100, 1)
+
+            status_flag = "正常"
+            if p.get("kpi_pass_rate", 0) < 0.4:
+                status_flag = "预警：KPI达标率偏低"
+            elif progress_pct >= 80 and p.get("kpi_pass_rate", 0) >= 0.8:
+                status_flag = "优秀：可提前收尾"
+
+            summary.append({
+                "pilot_id": p.get("pilot_id", ""),
+                "name": p.get("name", ""),
+                "pilot_type": p.get("pilot_type", ""),
+                "progress_pct": progress_pct,
+                "days_remaining": max(0, total_days - days_elapsed),
+                "kpi_pass_rate": p.get("kpi_pass_rate", 0),
+                "status_flag": status_flag,
+                "store_count": len(p.get("target_stores", [])),
+            })
+
+        summary.sort(key=lambda x: x["progress_pct"], reverse=True)
+        warning_count = sum(1 for s in summary if "预警" in s["status_flag"])
+
+        return AgentResult(
+            success=True, action="get_pilot_status_summary",
+            data={
+                "active_count": len(summary),
+                "warning_count": warning_count,
+                "pilots": summary,
+            },
+            reasoning=f"汇总 {len(summary)} 个活跃试点，{warning_count} 个预警",
+            confidence=0.8,
         )

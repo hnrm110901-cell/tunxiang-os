@@ -5,7 +5,6 @@
 import { useState, useMemo } from 'react';
 
 // ---- 颜色常量 ----
-const BG_0 = '#0B1A20';
 const BG_1 = '#112228';
 const BG_2 = '#1a2a33';
 const BRAND = '#FF6B2C';
@@ -404,7 +403,7 @@ function TrendMiniChart({ data }: { data: TrendDataPoint[] }) {
           <circle key={i} cx={i * 30 + 15} cy={chartH - ((d.count - minCount) / range) * (chartH - 10) - 5}
             r={2.5} fill={BRAND} />
         ))}
-        {data.filter((_, i) => i % 3 === 0).map((d, _i, arr) => {
+        {data.filter((_, i) => i % 3 === 0).map((d, _i, _arr) => {
           const origIdx = data.indexOf(d);
           return (
             <text key={origIdx} x={origIdx * 30 + 15} y={chartH + 14} textAnchor="middle" fill={TEXT_4} fontSize={9}>

@@ -90,11 +90,58 @@ from .api.campaign_routes import router as campaign_router
 from .api.segmentation_routes import router as segmentation_router
 from .api.referral_routes import router as referral_router
 from .api.attribution_routes import router as attribution_router
+from .api.touch_attribution_routes import router as touch_attribution_router
 from .api.ab_test_routes import router as ab_test_router
 from .api.approval_routes import router as approval_router
+from .api.brand_strategy_routes import router as brand_strategy_router
+from .api.journey_routes import router as journey_router
 from services.approval_service import ApprovalService as _ApprovalService
+from engine.journey_engine import JourneyEngine as _JourneyEngine
+from engine.event_bridge import get_event_bridge as _get_event_bridge
 
 _approval_service = _ApprovalService()
+
+# ---------------------------------------------------------------------------
+# Journey Engine — 定时任务（每分钟处理到期 enrollment 步骤）
+# ---------------------------------------------------------------------------
+
+_journey_engine = _JourneyEngine()
+# EventBridge 在 lifespan 中初始化（需要 db_session_factory）
+_journey_engine_task: asyncio.Task | None = None
+
+
+async def _run_journey_engine_tick() -> None:
+    """定时任务：每分钟推进到期的 Journey enrollment 步骤。"""
+    logger.info("journey_engine_tick_started")
+    async with async_session_factory() as db:
+        try:
+            result = await _journey_engine.process_pending_steps(db)
+            await db.commit()
+            logger.info("journey_engine_tick_done", **result)
+        except (OSError, RuntimeError, ValueError) as exc:
+            await db.rollback()
+            logger.error(
+                "journey_engine_tick_error",
+                error=str(exc),
+                exc_info=True,
+            )
+
+
+def _schedule_journey_engine_tick() -> None:
+    """APScheduler 回调：在事件循环中创建 Task 执行 Journey Engine tick。"""
+    task = asyncio.create_task(_run_journey_engine_tick())
+    task.add_done_callback(_on_journey_engine_tick_done)
+
+
+def _on_journey_engine_tick_done(task: asyncio.Task) -> None:
+    """Journey Engine tick Task 完成回调。"""
+    exc = task.exception() if not task.cancelled() else None
+    if exc is not None:
+        logger.error(
+            "journey_engine_tick_unhandled_error",
+            error=str(exc),
+            exc_info=exc,
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -196,9 +243,29 @@ async def lifespan(app: FastAPI):
         misfire_grace_time=300,  # 超时检查允许5分钟内补发
     )
 
+    # Journey Engine tick — 每分钟推进到期 enrollment 步骤
+    _scheduler.add_job(
+        _schedule_journey_engine_tick,
+        trigger="interval",
+        seconds=60,
+        id="journey_engine_tick",
+        replace_existing=True,
+        max_instances=1,
+        misfire_grace_time=30,
+    )
+
     _scheduler.start()
     logger.info("journey_executor_scheduler_started", interval_seconds=60)
     logger.info("approval_expiry_scheduler_started", interval_hours=1)
+    logger.info("journey_engine_scheduler_started", interval_seconds=60)
+
+    # 启动 EventBridge（桥接业务事件 → JourneyEngine）
+    _bridge = _get_event_bridge(
+        journey_engine=_journey_engine,
+        db_session_factory=async_session_factory,
+    )
+    await _bridge.start()
+    logger.info("journey_event_bridge_started")
 
     # 启动旅程事件监听后台任务（MEMBER_REGISTERED / ORDER_PAID → 实时触发旅程）
     _journey_listener_task = asyncio.create_task(_run_journey_event_listener())
@@ -215,6 +282,16 @@ async def lifespan(app: FastAPI):
         _scheduler.shutdown(wait=False)
         logger.info("journey_executor_scheduler_stopped")
         logger.info("approval_expiry_scheduler_stopped")
+        logger.info("journey_engine_scheduler_stopped")
+
+    # 停止 EventBridge
+    try:
+        from engine.event_bridge import _bridge_instance as _eb
+        if _eb is not None:
+            await _eb.stop()
+            logger.info("journey_event_bridge_stopped")
+    except (OSError, RuntimeError, ImportError):
+        pass
 
     await MemberEventPublisher.close()
 
@@ -224,8 +301,11 @@ app.include_router(campaign_router)
 app.include_router(segmentation_router)
 app.include_router(referral_router)
 app.include_router(attribution_router)
+app.include_router(touch_attribution_router)
 app.include_router(ab_test_router)
 app.include_router(approval_router)
+app.include_router(brand_strategy_router)
+app.include_router(journey_router)
 
 # 服务实例
 brand_svc = BrandStrategyService()

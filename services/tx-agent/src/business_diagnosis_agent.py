@@ -150,7 +150,7 @@ class BusinessDiagnosisAgent:
             )
             return report
 
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 — Agent执行兜底，需捕获所有异常避免崩溃
             log.error("diagnosis_failed", error=str(exc), exc_info=True)
             raise
 

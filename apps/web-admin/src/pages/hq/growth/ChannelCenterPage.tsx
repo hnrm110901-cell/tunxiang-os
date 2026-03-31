@@ -5,7 +5,6 @@
  */
 import { useState } from 'react';
 
-const BG_0 = '#0B1A20';
 const BG_1 = '#112228';
 const BG_2 = '#1a2a33';
 const BRAND = '#FF6B2C';
@@ -307,7 +306,6 @@ function SendLogs({ logs }: { logs: SendLog[] }) {
         </thead>
         <tbody>
           {filtered.map(l => {
-            const successRate = l.targetCount > 0 ? (l.successCount / l.targetCount * 100).toFixed(1) : '0';
             return (
               <tr key={l.id} style={{ borderBottom: `1px solid ${BG_2}` }}>
                 <td style={{ padding: '10px', color: TEXT_1, fontWeight: 500 }}>{l.channel}</td>

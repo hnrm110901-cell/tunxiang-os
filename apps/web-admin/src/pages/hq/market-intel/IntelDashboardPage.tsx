@@ -5,7 +5,6 @@
 import { useState } from 'react';
 
 // ---- 颜色常量 ----
-const BG_0 = '#0f1923';
 const BG_1 = '#1a2836';
 const BG_2 = '#243442';
 const BRAND = '#ff6b2c';
@@ -20,14 +19,6 @@ const TEXT_2 = '#cccccc';
 const TEXT_3 = '#999999';
 const TEXT_4 = '#666666';
 
-// ---- 类型定义 ----
-interface TrendTopic {
-  id: string;
-  keyword: string;
-  heat: number;
-  trend: 'up' | 'down' | 'stable';
-  changePercent: number;
-}
 
 interface IntelAlert {
   id: string;
@@ -84,17 +75,6 @@ interface BottomCard {
 }
 
 // ---- Mock 数据 ----
-const MOCK_TRENDS: TrendTopic[] = [
-  { id: 't-1', keyword: '酸汤火锅', heat: 95, trend: 'up', changePercent: 42 },
-  { id: 't-2', keyword: '健康轻食', heat: 88, trend: 'up', changePercent: 28 },
-  { id: 't-3', keyword: '一人食套餐', heat: 82, trend: 'up', changePercent: 35 },
-  { id: 't-4', keyword: '地方特色菜', heat: 78, trend: 'stable', changePercent: 5 },
-  { id: 't-5', keyword: '预制菜到家', heat: 75, trend: 'up', changePercent: 18 },
-  { id: 't-6', keyword: '性价比套餐', heat: 92, trend: 'up', changePercent: 22 },
-  { id: 't-7', keyword: '围炉煮茶', heat: 65, trend: 'down', changePercent: -12 },
-  { id: 't-8', keyword: '国潮餐饮', heat: 70, trend: 'stable', changePercent: 3 },
-];
-
 const MOCK_ALERTS: IntelAlert[] = [
   { id: 'a-1', type: '新品机会', title: '酸汤系列搜索量激增40%', severity: 'high', date: '2026-03-26' },
   { id: 'a-2', type: '新品机会', title: '一人食套餐需求持续增长', severity: 'medium', date: '2026-03-25' },

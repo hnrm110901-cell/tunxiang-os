@@ -2,7 +2,7 @@
  * GrowthDashboardPage — 增长中心仪表盘
  * HQ 增长分析总览：KPI、趋势、雷达图、门店排行、预警、Agent建议
  */
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 
 // ---- 颜色常量 ----
 const BG_0 = '#0B1A20';
@@ -291,10 +291,6 @@ function RadarChart({ dimensions }: { dimensions: RadarDimension[] }) {
     return `${p.x},${p.y}`;
   }).join(' ');
 
-  const outerPoints = dimensions.map((_, i) => {
-    const p = getPoint(i, 100);
-    return `${p.x},${p.y}`;
-  }).join(' ');
 
   return (
     <div style={{

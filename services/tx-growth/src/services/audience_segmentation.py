@@ -156,7 +156,7 @@ BUILTIN_SEGMENTS: dict[str, dict[str, Any]] = {
     "banquet_prospects": {
         "tags_include": ["宴席意向"],
         "name": "宴席潜客",
-        "description": "标签含"宴席意向"的潜在宴席客户",
+        "description": "标签含「宴席意向」的潜在宴席客户",
     },
     "banquet_regulars": {
         "total_banquet_min": 2,

@@ -5,7 +5,6 @@
  */
 import { useState } from 'react';
 
-const BG_0 = '#0f1923';
 const BG_1 = '#1a2836';
 const BG_2 = '#243442';
 const BRAND = '#ff6b2c';

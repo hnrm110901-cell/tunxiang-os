@@ -45,6 +45,12 @@ AGENT_SCHEDULES: dict[str, dict[str, Any]] = {
         "task": "collect_decision_outcomes",
         "description": "收集当日决策效果数据",
     },
+    "pilot_metrics_collect": {
+        "hour": 2,
+        "minute": 0,
+        "task": "collect_pilot_metrics_for_all_tenants",
+        "description": "每日凌晨采集所有活跃试点的前一日指标快照",
+    },
     # 已有的 4 时间点推送
     "morning_push": {
         "hour": 8,
@@ -250,11 +256,41 @@ def collect_decision_outcomes(
 
 # ─── 任务注册表 ───
 
+async def collect_pilot_metrics_for_all_tenants(
+    active_tenant_ids: list[str],
+    db_session: Any = None,
+) -> list[dict]:
+    """凌晨 02:00 定时任务：为所有活跃租户采集试点指标
+
+    Args:
+        active_tenant_ids: 活跃租户 UUID 字符串列表
+        db_session: 数据库会话（由调用方注入）
+
+    Returns:
+        每个租户的采集结果列表
+    """
+    from .services.pilot_metrics_collector import PilotMetricsCollector
+
+    results = []
+    for tenant_id_str in active_tenant_ids:
+        try:
+            tid = uuid.UUID(tenant_id_str)
+            collector = PilotMetricsCollector(db_session=db_session)
+            result = await collector.collect_for_all_active_pilots(tid)
+            results.append({"tenant_id": tenant_id_str, "status": "ok", **result})
+            logger.info("pilot_metrics_collected", tenant_id=tenant_id_str, pilots=result.get("pilots_processed", 0))
+        except Exception as exc:  # noqa: BLE001 — scheduler 每租户独立隔离，捕获所有异常
+            logger.error("pilot_metrics_collect_tenant_error", tenant_id=tenant_id_str, error=str(exc), exc_info=True)
+            results.append({"tenant_id": tenant_id_str, "status": "error", "error": str(exc)})
+    return results
+
+
 TASK_REGISTRY: dict[str, callable] = {
     "generate_daily_plans_for_all_stores": generate_daily_plans_for_all_stores,
     "remind_unapproved_plans": remind_unapproved_plans,
     "auto_execute_approved_plans": auto_execute_approved_plans,
     "collect_decision_outcomes": collect_decision_outcomes,
+    "collect_pilot_metrics_for_all_tenants": collect_pilot_metrics_for_all_tenants,
 }
 
 

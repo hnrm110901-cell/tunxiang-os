@@ -250,7 +250,7 @@ class KnowledgeRetrievalService:
                 {"brand_id": brand_id},
             )
             rows = result.fetchall()
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 — DB驱动异常类型多样
             logger.warning(
                 "index_menu_knowledge_db_error",
                 brand_id=brand_id,

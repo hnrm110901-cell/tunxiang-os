@@ -28,6 +28,7 @@ from .reservation_flow import (
 )
 from .queue_service import QueueService
 from ..repositories.reservation_repo import ReservationRepository
+from .attribution_hook import fire_reservation_attribution
 from ..models.reservation import Reservation
 
 logger = structlog.get_logger()
@@ -252,6 +253,22 @@ class ReservationService:
             reservation_id=reservation_id,
             confirmed_by=confirmed_by,
         )
+
+        # 触发归因检查（fire-and-forget，不阻断确认流程）
+        if getattr(record, "customer_id", None):
+            try:
+                _tenant_id = uuid.UUID(str(record.tenant_id))
+                _customer_id = uuid.UUID(str(record.customer_id))
+                _reservation_uuid = uuid.UUID(str(record.id))
+                _deposit = round(getattr(record, "deposit_fen", 0) / 100, 2)
+                fire_reservation_attribution(
+                    tenant_id=_tenant_id,
+                    customer_id=_customer_id,
+                    reservation_id=_reservation_uuid,
+                    deposit_yuan=_deposit,
+                )
+            except (ValueError, AttributeError) as exc:
+                logger.warning("attribution_hook_setup_failed", error=str(exc))
 
         return {
             "reservation_id": reservation_id,

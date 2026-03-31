@@ -5,7 +5,6 @@
  */
 import { useState } from 'react';
 
-const BG_0 = '#0f1923';
 const BG_1 = '#1a2836';
 const BG_2 = '#243442';
 const BRAND = '#ff6b2c';
@@ -13,8 +12,6 @@ const GREEN = '#52c41a';
 const RED = '#ff4d4f';
 const YELLOW = '#faad14';
 const BLUE = '#1890ff';
-const PURPLE = '#722ed1';
-const CYAN = '#13c2c2';
 const TEXT_1 = '#ffffff';
 const TEXT_2 = '#cccccc';
 const TEXT_3 = '#999999';

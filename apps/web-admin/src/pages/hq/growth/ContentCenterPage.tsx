@@ -6,7 +6,6 @@
 import { useState } from 'react';
 
 // ---- 颜色常量 ----
-const BG_0 = '#0B1A20';
 const BG_1 = '#112228';
 const BG_2 = '#1a2a33';
 const BRAND = '#FF6B2C';
@@ -15,7 +14,6 @@ const RED = '#ff4d4f';
 const YELLOW = '#faad14';
 const BLUE = '#1890ff';
 const PURPLE = '#722ed1';
-const CYAN = '#13c2c2';
 const TEXT_1 = '#ffffff';
 const TEXT_2 = '#cccccc';
 const TEXT_3 = '#999999';

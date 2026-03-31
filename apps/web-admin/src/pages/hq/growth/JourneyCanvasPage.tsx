@@ -9,7 +9,6 @@ import { useNavigate, useParams } from 'react-router-dom';
 const BG_0 = '#0B1A20';
 const BG_1 = '#112228';
 const BG_2 = '#1a2a33';
-const BG_3 = '#243540';
 const BRAND = '#FF6B2C';
 const GREEN = '#52c41a';
 const RED = '#ff4d4f';
@@ -703,8 +702,6 @@ export function JourneyCanvasPage() {
       const node = prev.find(n => n.id === id);
       if (!node) return prev;
 
-      // Re-link parent to children
-      const parent = prev.find(n => n.children.includes(id));
       const updated = prev
         .filter(n => n.id !== id)
         .map(n => {

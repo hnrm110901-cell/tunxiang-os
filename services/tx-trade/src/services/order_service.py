@@ -20,6 +20,7 @@ from shared.ontology.src.entities import Order, OrderItem, Store
 from shared.ontology.src.enums import OrderStatus
 from ..models.tables import Table
 from ..models.enums import TableStatus, OrderType
+from .attribution_hook import fire_order_attribution
 
 if TYPE_CHECKING:
     from edge.sync_engine.src.offline_sync_service import OfflineSyncService  # noqa: F401
@@ -361,6 +362,17 @@ class OrderService:
 
         await self.db.flush()
         logger.info("order_settled", order_no=order.order_no, final_fen=order.final_amount_fen)
+
+        # 触发归因检查（fire-and-forget，不阻断结算流程）
+        if order.customer_id:
+            fire_order_attribution(
+                tenant_id=self.tenant_id,
+                customer_id=order.customer_id,
+                order_id=order.id,
+                order_amount_yuan=round((order.final_amount_fen or 0) / 100, 2),
+                completed_at=order.completed_at,
+            )
+
         return {
             "order_id": order_id,
             "order_no": order.order_no,

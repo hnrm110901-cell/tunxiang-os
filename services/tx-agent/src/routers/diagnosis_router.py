@@ -77,7 +77,7 @@ async def run_diagnosis(
     except ValueError as exc:
         log.error("diagnosis_value_error", error=str(exc), exc_info=True)
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — 最外层HTTP兜底
         log.error("diagnosis_unexpected_error", error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="诊断执行失败") from exc
 

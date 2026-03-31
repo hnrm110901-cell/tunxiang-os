@@ -14,7 +14,6 @@ const RED = '#ff4d4f';
 const YELLOW = '#faad14';
 const BLUE = '#1890ff';
 const TEXT_1 = '#ffffff';
-const TEXT_2 = '#cccccc';
 const TEXT_3 = '#999999';
 const TEXT_4 = '#666666';
 
@@ -126,7 +125,7 @@ export function NewProductListPage() {
       }}>
         {statuses.map(s => (
           <button key={s} onClick={() => setStatusFilter(s)} style={{
-            padding: '6px 14px', borderRadius: 8, border: 'none', cursor: 'pointer',
+            padding: '6px 14px', borderRadius: 8, cursor: 'pointer',
             background: statusFilter === s ? (statusColors[s] || BRAND) + '22' : BG_1,
             color: statusFilter === s ? (statusColors[s] || BRAND) : TEXT_3,
             fontSize: 12, fontWeight: 600,
