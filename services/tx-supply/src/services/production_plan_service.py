@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 import structlog
-from sqlalchemy import select, text, and_, func
+from sqlalchemy import select, text, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from services.tx_supply.src.models.central_kitchen import (

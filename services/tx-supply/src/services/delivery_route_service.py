@@ -25,7 +25,6 @@ from services.tx_supply.src.models.central_kitchen import (
 )
 from services.tx_supply.src.services.production_plan_service import (
     _store_geo,
-    inject_store_geo,
 )
 
 log = structlog.get_logger(__name__)
