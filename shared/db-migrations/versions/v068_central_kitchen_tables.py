@@ -1,0 +1,163 @@
+"""v068: 中央厨房生产计划 + 配送行程持久化
+
+新增表：
+  production_plans   — 生产计划（按日汇总门店需求）
+  production_tasks   — 生产任务（每条食材加工）
+  delivery_trips     — 配送行程（一次出车覆盖多个门店）
+  delivery_items     — 配送明细（食材 x 门店）
+
+RLS 策略：
+  全部使用 v006+ 标准安全模式（4操作 + NULL guard + FORCE ROW LEVEL SECURITY）
+
+Revision ID: v068
+Revises: v046
+Create Date: 2026-03-31
+"""
+
+from alembic import op
+
+revision = "v068"
+down_revision = "v046"
+branch_labels = None
+depends_on = None
+
+_TABLES = [
+    "production_plans",
+    "production_tasks",
+    "delivery_trips",
+    "delivery_items",
+]
+
+
+def upgrade() -> None:
+    # ─────────────────────────────────────────────────────────────────
+    # production_plans — 中央厨房生产计划
+    # ─────────────────────────────────────────────────────────────────
+    op.execute("""
+        CREATE TABLE IF NOT EXISTS production_plans (
+            id             UUID          PRIMARY KEY DEFAULT gen_random_uuid(),
+            tenant_id      UUID          NOT NULL,
+            kitchen_id     UUID          NOT NULL,
+            plan_date      DATE          NOT NULL,
+            status         VARCHAR(20)   NOT NULL DEFAULT 'draft',
+            total_items    INTEGER       NOT NULL DEFAULT 0,
+            created_by     UUID,
+            created_at     TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+            updated_at     TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+            is_deleted     BOOLEAN       NOT NULL DEFAULT FALSE
+        );
+    """)
+
+    op.execute("""
+        CREATE INDEX IF NOT EXISTS ix_production_plans_tenant_kitchen
+            ON production_plans (tenant_id, kitchen_id);
+    """)
+    op.execute("""
+        CREATE INDEX IF NOT EXISTS ix_production_plans_tenant_date
+            ON production_plans (tenant_id, plan_date);
+    """)
+
+    # ─────────────────────────────────────────────────────────────────
+    # production_tasks — 生产任务
+    # ─────────────────────────────────────────────────────────────────
+    op.execute("""
+        CREATE TABLE IF NOT EXISTS production_tasks (
+            id                UUID          PRIMARY KEY DEFAULT gen_random_uuid(),
+            tenant_id         UUID          NOT NULL,
+            plan_id           UUID          NOT NULL REFERENCES production_plans(id) ON DELETE CASCADE,
+            ingredient_id     UUID          NOT NULL,
+            planned_qty       NUMERIC(10,3) NOT NULL,
+            unit              VARCHAR(20)   NOT NULL,
+            assigned_station  VARCHAR(50),
+            status            VARCHAR(20)   NOT NULL DEFAULT 'pending',
+            actual_qty        NUMERIC(10,3),
+            started_at        TIMESTAMPTZ,
+            completed_at      TIMESTAMPTZ,
+            created_at        TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+            updated_at        TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+            is_deleted        BOOLEAN       NOT NULL DEFAULT FALSE
+        );
+    """)
+
+    op.execute("""
+        CREATE INDEX IF NOT EXISTS ix_production_tasks_tenant_plan
+            ON production_tasks (tenant_id, plan_id);
+    """)
+
+    # ─────────────────────────────────────────────────────────────────
+    # delivery_trips — 配送行程
+    # ─────────────────────────────────────────────────────────────────
+    op.execute("""
+        CREATE TABLE IF NOT EXISTS delivery_trips (
+            id              UUID          PRIMARY KEY DEFAULT gen_random_uuid(),
+            tenant_id       UUID          NOT NULL,
+            plan_id         UUID          NOT NULL REFERENCES production_plans(id) ON DELETE CASCADE,
+            trip_no         VARCHAR(30)   NOT NULL,
+            driver_name     VARCHAR(50),
+            vehicle_plate   VARCHAR(20),
+            departure_time  TIMESTAMPTZ,
+            status          VARCHAR(20)   NOT NULL DEFAULT 'pending',
+            route_sequence  JSONB,
+            created_at      TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+            updated_at      TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+            is_deleted      BOOLEAN       NOT NULL DEFAULT FALSE
+        );
+    """)
+
+    op.execute("""
+        CREATE INDEX IF NOT EXISTS ix_delivery_trips_tenant_plan
+            ON delivery_trips (tenant_id, plan_id);
+    """)
+
+    # ─────────────────────────────────────────────────────────────────
+    # delivery_items — 配送明细
+    # ─────────────────────────────────────────────────────────────────
+    op.execute("""
+        CREATE TABLE IF NOT EXISTS delivery_items (
+            id              UUID          PRIMARY KEY DEFAULT gen_random_uuid(),
+            tenant_id       UUID          NOT NULL,
+            trip_id         UUID          NOT NULL REFERENCES delivery_trips(id) ON DELETE CASCADE,
+            store_id        UUID          NOT NULL,
+            ingredient_id   UUID          NOT NULL,
+            planned_qty     NUMERIC(10,3) NOT NULL,
+            received_qty    NUMERIC(10,3),
+            variance_qty    NUMERIC(10,3),
+            received_at     TIMESTAMPTZ,
+            status          VARCHAR(20)   NOT NULL DEFAULT 'pending',
+            created_at      TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+            updated_at      TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+            is_deleted      BOOLEAN       NOT NULL DEFAULT FALSE
+        );
+    """)
+
+    op.execute("""
+        CREATE INDEX IF NOT EXISTS ix_delivery_items_tenant_trip
+            ON delivery_items (tenant_id, trip_id);
+    """)
+    op.execute("""
+        CREATE INDEX IF NOT EXISTS ix_delivery_items_tenant_store
+            ON delivery_items (tenant_id, store_id);
+    """)
+
+    # ─────────────────────────────────────────────────────────────────
+    # RLS — 4操作 + NULL guard + FORCE ROW LEVEL SECURITY
+    # ─────────────────────────────────────────────────────────────────
+    for table in _TABLES:
+        op.execute(f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY;")
+        op.execute(f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY;")
+
+        for action in ("SELECT", "INSERT", "UPDATE", "DELETE"):
+            op.execute(f"""
+                CREATE POLICY {table}_{action.lower()}_tenant ON {table}
+                AS RESTRICTIVE FOR {action}
+                USING (
+                    current_setting('app.tenant_id', TRUE) IS NOT NULL
+                    AND current_setting('app.tenant_id', TRUE) <> ''
+                    AND tenant_id = NULLIF(current_setting('app.tenant_id', TRUE), '')::UUID
+                );
+            """)
+
+
+def downgrade() -> None:
+    for table in reversed(_TABLES):
+        op.execute(f"DROP TABLE IF EXISTS {table} CASCADE;")

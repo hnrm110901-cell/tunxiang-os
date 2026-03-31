@@ -7,8 +7,9 @@
 from typing import Optional
 
 import structlog
-from fastapi import APIRouter, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..services.dish_service import (
     create_dish,
@@ -38,6 +39,13 @@ from ..services.stockout_sync import (
     get_sold_out_list,
     restore_dish,
 )
+
+
+# ─── 依赖注入占位 ───
+
+async def get_db() -> AsyncSession:  # type: ignore[override]
+    """数据库会话依赖 — 由 main.py 中 app.dependency_overrides 注入"""
+    raise NotImplementedError("DB session dependency not configured")
 
 log = structlog.get_logger()
 
@@ -265,10 +273,12 @@ async def api_list_by_season(
 async def api_create_template(
     req: TemplateCreateReq,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """创建菜单模板"""
     try:
-        tpl = create_template(
+        tpl = await create_template(
+            db=db,
             name=req.name,
             dishes=[d.model_dump() for d in req.dishes],
             rules=req.rules,
@@ -282,9 +292,10 @@ async def api_create_template(
 @router.get("/templates")
 async def api_list_templates(
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """列出菜单模板"""
-    templates = list_templates(x_tenant_id)
+    templates = await list_templates(db=db, tenant_id=x_tenant_id)
     return {"ok": True, "data": {"items": templates, "total": len(templates)}}
 
 
@@ -292,9 +303,10 @@ async def api_list_templates(
 async def api_get_template(
     template_id: str,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """获取模板详情"""
-    tpl = get_template(template_id, x_tenant_id)
+    tpl = await get_template(db=db, template_id=template_id, tenant_id=x_tenant_id)
     if not tpl:
         _err(404, f"模板不存在: {template_id}")
     return {"ok": True, "data": tpl}
@@ -309,10 +321,16 @@ async def api_get_template(
 async def api_publish_to_store(
     req: PublishToStoreReq,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """将模板发布到门店"""
     try:
-        result = publish_to_store(req.template_id, req.store_id, x_tenant_id)
+        result = await publish_to_store(
+            db=db,
+            template_id=req.template_id,
+            store_id=req.store_id,
+            tenant_id=x_tenant_id,
+        )
         return {"ok": True, "data": result}
     except ValueError as exc:
         _err(400, str(exc))
@@ -323,10 +341,13 @@ async def api_get_store_menu(
     store_id: str,
     channel: str = Query("dine_in", description="渠道: dine_in/takeout/delivery/miniapp"),
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """获取门店当前菜单（按渠道）"""
     try:
-        menu = get_store_menu(store_id, channel, x_tenant_id)
+        menu = await get_store_menu(
+            db=db, store_id=store_id, channel=channel, tenant_id=x_tenant_id,
+        )
         return {"ok": True, "data": menu}
     except ValueError as exc:
         _err(400, str(exc))
@@ -341,10 +362,12 @@ async def api_get_store_menu(
 async def api_set_channel_price(
     req: ChannelPriceReq,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """设置菜品渠道差异价"""
     try:
-        record = set_channel_price(
+        record = await set_channel_price(
+            db=db,
             dish_id=req.dish_id,
             channel=req.channel,
             price_fen=req.price_fen,
@@ -364,10 +387,12 @@ async def api_set_channel_price(
 async def api_set_seasonal_menu(
     req: SeasonalMenuReq,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """设置门店季节菜单"""
     try:
-        record = set_seasonal_menu(
+        record = await set_seasonal_menu(
+            db=db,
             store_id=req.store_id,
             season=req.season,
             dishes=[d.model_dump() for d in req.dishes],
@@ -383,10 +408,13 @@ async def api_get_seasonal_menu(
     store_id: str,
     season: str,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """获取门店季节菜单"""
     try:
-        menu = get_seasonal_menu(store_id, season, x_tenant_id)
+        menu = await get_seasonal_menu(
+            db=db, store_id=store_id, season=season, tenant_id=x_tenant_id,
+        )
         if not menu:
             _err(404, f"门店 {store_id} 没有 {season} 季节菜单")
         return {"ok": True, "data": menu}
@@ -403,10 +431,12 @@ async def api_get_seasonal_menu(
 async def api_set_room_menu(
     req: RoomMenuReq,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """设置门店包厢专属菜单"""
     try:
-        record = set_room_menu(
+        record = await set_room_menu(
+            db=db,
             store_id=req.store_id,
             room_type=req.room_type,
             dishes=[d.model_dump() for d in req.dishes],
@@ -422,10 +452,13 @@ async def api_get_room_menu(
     store_id: str,
     room_type: str,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """获取门店包厢菜单"""
     try:
-        menu = get_room_menu(store_id, room_type, x_tenant_id)
+        menu = await get_room_menu(
+            db=db, store_id=store_id, room_type=room_type, tenant_id=x_tenant_id,
+        )
         if not menu:
             _err(404, f"门店 {store_id} 没有 {room_type} 包厢菜单")
         return {"ok": True, "data": menu}
@@ -442,10 +475,12 @@ async def api_get_room_menu(
 async def api_create_banquet_package(
     req: BanquetPackageReq,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """创建宴席套餐"""
     try:
-        pkg = create_banquet_package(
+        pkg = await create_banquet_package(
+            db=db,
             name=req.name,
             dishes=[d.model_dump() for d in req.dishes],
             package_price_fen=req.package_price_fen,

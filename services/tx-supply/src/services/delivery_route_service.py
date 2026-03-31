@@ -5,15 +5,28 @@
   2. 按门店区域分组（地理坐标聚类）
   3. fallback：按门店 sort_order 字段顺序
 
-注：运行时依赖 production_plan_service 中的共享内存存储（同进程同一字典对象）。
-API 路由层通过相对导入加载本模块；测试层通过 sys.path 加载，两者使用相同内存状态。
+持久化层: PostgreSQL (SQLAlchemy async) + RLS 租户隔离
 """
 from __future__ import annotations
 
 import math
+import uuid
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 import structlog
+from sqlalchemy import select, text, and_
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from services.tx_supply.src.models.central_kitchen import (
+    DeliveryItemORM,
+    DeliveryTripORM,
+    ProductionPlanORM,
+)
+from services.tx_supply.src.services.production_plan_service import (
+    _store_geo,
+    inject_store_geo,
+)
 
 log = structlog.get_logger(__name__)
 
@@ -24,49 +37,19 @@ VARIANCE_THRESHOLD_PCT = 0.05
 MAP_API_ENABLED = False
 
 
-def _shared() -> Dict[str, Any]:
-    """获取 production_plan_service 中的共享内存存储。
-
-    延迟导入以避免循环依赖。在测试模式和包模式下均可正常工作，
-    因为两个服务必然通过同一路径被加载（同进程内同一 Python 模块对象）。
-    """
-    import sys
-    # 优先从已加载的模块中取，保证拿到同一份字典
-    for mod_name in list(sys.modules):
-        if mod_name.endswith("production_plan_service"):
-            mod = sys.modules[mod_name]
-            return {
-                "items": mod._items,
-                "trips": mod._trips,
-                "plans": mod._plans,
-                "store_geo": mod._store_geo,
-                "now_iso": mod._now_iso,
-                "gen_id": mod._gen_id,
-            }
-    # fallback：直接导入（测试环境 sys.path 已包含 src/）
-    from services.production_plan_service import (  # noqa: PLC0415
-        _gen_id,
-        _items,
-        _now_iso,
-        _plans,
-        _store_geo,
-        _trips,
+async def _set_tenant(db: AsyncSession, tenant_id: str) -> None:
+    """在当前 DB 连接上设置 RLS 租户上下文"""
+    await db.execute(
+        text("SELECT set_config('app.tenant_id', :tid, true)"),
+        {"tid": tenant_id},
     )
-    return {
-        "items": _items,
-        "trips": _trips,
-        "plans": _plans,
-        "store_geo": _store_geo,
-        "now_iso": _now_iso,
-        "gen_id": _gen_id,
-    }
 
 
 class DeliveryRouteService:
 
     def _get_store_geo(self, store_id: str, tenant_id: str) -> Optional[Dict[str, Any]]:
-        """获取门店地理信息（从共享存储读取）"""
-        return _shared()["store_geo"].get(f"{tenant_id}:{store_id}")
+        """获取门店地理信息"""
+        return _store_geo.get(f"{tenant_id}:{store_id}")
 
     def cluster_stores_by_region(
         self,
@@ -78,8 +61,8 @@ class DeliveryRouteService:
 
         降级策略：无地理信息的门店按原始顺序分组。
         """
-        stores_with_geo = []
-        stores_without_geo = []
+        stores_with_geo: List[tuple[str, float, float]] = []
+        stores_without_geo: List[str] = []
 
         for store_id in store_ids:
             geo = self._get_store_geo(store_id, tenant_id)
@@ -182,7 +165,7 @@ class DeliveryRouteService:
         self,
         trip_id: str,
         tenant_id: str,
-        db: Any = None,
+        db: AsyncSession,
     ) -> Dict[str, Any]:
         """重新优化指定配送单的路线顺序。
 
@@ -192,16 +175,17 @@ class DeliveryRouteService:
         Raises:
             ValueError: 配送单不存在或租户不匹配
         """
-        trips = _shared()["trips"]
-        trip = trips.get(trip_id)
-        if not trip:
+        await _set_tenant(db, tenant_id)
+
+        trip = await db.get(DeliveryTripORM, uuid.UUID(trip_id))
+        if not trip or trip.is_deleted:
             raise ValueError(f"配送单 {trip_id} 不存在")
-        if trip["tenant_id"] != tenant_id:
+        if str(trip.tenant_id) != tenant_id:
             raise ValueError(f"配送单 {trip_id} 不属于当前租户")
 
-        store_ids = [entry["store_id"] for entry in trip["route_sequence"]]
+        store_ids = [entry["store_id"] for entry in (trip.route_sequence or [])]
         if not store_ids:
-            store_ids = list({item["store_id"] for item in trip["items"]})
+            store_ids = list({str(item.store_id) for item in trip.items})
 
         log.info(
             "optimizing_route",
@@ -213,18 +197,17 @@ class DeliveryRouteService:
         if MAP_API_ENABLED:
             try:
                 optimized_seq = await self._call_map_api(store_ids, tenant_id)
-            except Exception as exc:
+            except NotImplementedError:
                 log.warning(
-                    "map_api_failed_fallback",
+                    "map_api_not_implemented_fallback",
                     trip_id=trip_id,
-                    error=str(exc),
-                    exc_info=True,
                 )
                 optimized_seq = self.build_route_sequence(store_ids, tenant_id)
         else:
             optimized_seq = self.build_route_sequence(store_ids, tenant_id)
 
-        trip["route_sequence"] = optimized_seq
+        trip.route_sequence = optimized_seq
+        await db.flush()
         return {"trip_id": trip_id, "route_sequence": optimized_seq, "optimized": True}
 
     async def _call_map_api(
@@ -245,55 +228,67 @@ class DeliveryRouteService:
         actual_qty: float,
         operator_id: str,
         tenant_id: str,
-        db: Any = None,
+        db: AsyncSession,
     ) -> Dict[str, Any]:
         """门店签收：记录实收量，差异超过 5% 时标记 disputed。
 
         Raises:
             ValueError: 配送明细不存在、租户不匹配或数量非法
         """
-        store = _shared()
-        items: Dict[str, Dict[str, Any]] = store["items"]
-        item = items.get(delivery_item_id)
-        if not item:
+        await _set_tenant(db, tenant_id)
+
+        item = await db.get(DeliveryItemORM, uuid.UUID(delivery_item_id))
+        if not item or item.is_deleted:
             raise ValueError(f"配送明细 {delivery_item_id} 不存在")
-        if item["tenant_id"] != tenant_id:
+        if str(item.tenant_id) != tenant_id:
             raise ValueError(f"配送明细 {delivery_item_id} 不属于当前租户")
         if actual_qty < 0:
             raise ValueError("实收量不能为负数")
-        if item["status"] in ("signed", "disputed"):
+        if item.status in ("signed", "disputed"):
             raise ValueError(f"配送明细 {delivery_item_id} 已签收，不能重复操作")
 
-        variance = actual_qty - item["planned_qty"]
-        variance_pct = abs(variance) / item["planned_qty"] if item["planned_qty"] > 0 else 0.0
+        planned = float(item.planned_qty)
+        variance = actual_qty - planned
+        variance_pct = abs(variance) / planned if planned > 0 else 0.0
 
-        item["received_qty"] = actual_qty
-        item["variance_qty"] = round(variance, 3)
-        item["received_at"] = store["now_iso"]()
+        item.received_qty = actual_qty
+        item.variance_qty = round(variance, 3)
+        item.received_at = datetime.now(timezone.utc)
 
         if variance_pct > VARIANCE_THRESHOLD_PCT:
-            item["status"] = "disputed"
+            item.status = "disputed"
             log.warning(
                 "delivery_item_disputed",
                 delivery_item_id=delivery_item_id,
-                planned_qty=item["planned_qty"],
+                planned_qty=planned,
                 actual_qty=actual_qty,
                 variance_pct=round(variance_pct * 100, 2),
                 operator_id=operator_id,
                 tenant_id=tenant_id,
             )
         else:
-            item["status"] = "signed"
+            item.status = "signed"
+
+        await db.flush()
 
         log.info(
             "delivery_item_signed",
             delivery_item_id=delivery_item_id,
-            status=item["status"],
+            status=item.status,
             operator_id=operator_id,
             tenant_id=tenant_id,
         )
         return {
-            **item,
+            "id": str(item.id),
+            "tenant_id": str(item.tenant_id),
+            "trip_id": str(item.trip_id),
+            "store_id": str(item.store_id),
+            "ingredient_id": str(item.ingredient_id),
+            "planned_qty": planned,
+            "received_qty": actual_qty,
+            "variance_qty": round(variance, 3),
+            "received_at": item.received_at.isoformat() if item.received_at else None,
+            "status": item.status,
             "variance_pct": round(variance_pct * 100, 2),
             "operator_id": operator_id,
         }
@@ -302,7 +297,7 @@ class DeliveryRouteService:
         self,
         trip_id: str,
         tenant_id: str,
-        db: Any = None,
+        db: AsyncSession,
     ) -> Dict[str, Any]:
         """签收完成后更新各门店库存（INSERT inventory_records）。
 
@@ -311,70 +306,77 @@ class DeliveryRouteService:
         Raises:
             ValueError: 配送单不存在、租户不匹配或仍有未签收明细
         """
-        store = _shared()
-        trips: Dict[str, Dict[str, Any]] = store["trips"]
-        plans: Dict[str, Dict[str, Any]] = store["plans"]
-        now_iso = store["now_iso"]
-        gen_id = store["gen_id"]
+        await _set_tenant(db, tenant_id)
 
-        trip = trips.get(trip_id)
-        if not trip:
+        trip = await db.get(DeliveryTripORM, uuid.UUID(trip_id))
+        if not trip or trip.is_deleted:
             raise ValueError(f"配送单 {trip_id} 不存在")
-        if trip["tenant_id"] != tenant_id:
+        if str(trip.tenant_id) != tenant_id:
             raise ValueError(f"配送单 {trip_id} 不属于当前租户")
 
         unsigned = [
-            item for item in trip["items"]
-            if item["status"] not in ("signed", "disputed")
+            item for item in trip.items
+            if item.status not in ("signed", "disputed")
         ]
         if unsigned:
             raise ValueError(
                 f"配送单 {trip_id} 仍有 {len(unsigned)} 条明细未签收，无法更新库存"
             )
 
-        inventory_records = []
-        for item in trip["items"]:
-            qty = item["received_qty"] if item["received_qty"] is not None else 0.0
+        inventory_records: List[Dict[str, Any]] = []
+        now_iso = datetime.now(timezone.utc).isoformat()
+        for item in trip.items:
+            qty = float(item.received_qty) if item.received_qty is not None else 0.0
             record = {
-                "id": gen_id("inv"),
+                "id": str(uuid.uuid4()),
                 "tenant_id": tenant_id,
-                "store_id": item["store_id"],
-                "ingredient_id": item["ingredient_id"],
+                "store_id": str(item.store_id),
+                "ingredient_id": str(item.ingredient_id),
                 "quantity_change": qty,
                 "direction": "in",
                 "source": "central_kitchen_delivery",
                 "source_ref_id": trip_id,
-                "created_at": now_iso(),
+                "created_at": now_iso,
             }
             inventory_records.append(record)
             log.info(
                 "inventory_record_created",
-                store_id=item["store_id"],
-                ingredient_id=item["ingredient_id"],
+                store_id=str(item.store_id),
+                ingredient_id=str(item.ingredient_id),
                 qty=qty,
                 tenant_id=tenant_id,
             )
 
-        trip["status"] = "completed"
+        trip.status = "completed"
 
         # 检查计划下所有配送单是否全部完成
-        plan = plans.get(trip["plan_id"])
+        plan = await db.get(ProductionPlanORM, trip.plan_id)
         if plan:
-            plan_trips = [
-                t for t in trips.values()
-                if t["plan_id"] == plan["id"] and t["tenant_id"] == tenant_id
-            ]
-            if plan_trips and all(t["status"] == "completed" for t in plan_trips):
-                plan["status"] = "completed"
+            stmt = (
+                select(DeliveryTripORM)
+                .where(
+                    and_(
+                        DeliveryTripORM.plan_id == plan.id,
+                        DeliveryTripORM.tenant_id == uuid.UUID(tenant_id),
+                        DeliveryTripORM.is_deleted == False,  # noqa: E712
+                    )
+                )
+            )
+            result = await db.execute(stmt)
+            plan_trips = result.scalars().all()
+            if plan_trips and all(t.status == "completed" for t in plan_trips):
+                plan.status = "completed"
                 log.info(
                     "production_plan_completed",
-                    plan_id=plan["id"],
+                    plan_id=str(plan.id),
                     tenant_id=tenant_id,
                 )
 
+        await db.flush()
+
         return {
             "trip_id": trip_id,
-            "trip_status": trip["status"],
+            "trip_status": trip.status,
             "inventory_records_created": len(inventory_records),
             "records": inventory_records,
         }

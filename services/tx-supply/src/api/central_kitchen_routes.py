@@ -1,6 +1,6 @@
 """中央厨房完整链路 API 路由
 
-生产计划→加工任务→配送路由→门店签收
+生产计划->加工任务->配送路由->门店签收
 
 # ROUTER REGISTRATION:
 # from .api.central_kitchen_routes import router as ck_router
@@ -10,10 +10,19 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(prefix="/api/v1/ck", tags=["central_kitchen"])
+
+
+# ─── DB 依赖占位（由 main.py 覆盖） ───
+
+
+async def _get_db():
+    """数据库会话依赖 — 由 main.py 覆盖"""
+    raise NotImplementedError("DB session dependency not configured")
 
 
 # ─── 请求模型 ───
@@ -48,6 +57,7 @@ class SignReceiptRequest(BaseModel):
 async def generate_plan(
     body: GeneratePlanRequest,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(_get_db),
 ) -> Dict[str, Any]:
     """根据各门店次日需求量生成生产计划"""
     from ..services.production_plan_service import ProductionPlanService
@@ -59,6 +69,7 @@ async def generate_plan(
             plan_date=body.plan_date,
             tenant_id=x_tenant_id,
             store_ids=body.store_ids,
+            db=db,
             created_by=body.created_by,
             capacity_kg=body.capacity_kg,
         )
@@ -72,6 +83,7 @@ async def list_plans(
     kitchen_id: str = Query(..., description="中央厨房 ID"),
     date: Optional[str] = Query(None, description="过滤日期 YYYY-MM-DD"),
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(_get_db),
 ) -> Dict[str, Any]:
     """查询生产计划列表"""
     from ..services.production_plan_service import ProductionPlanService
@@ -82,6 +94,7 @@ async def list_plans(
             kitchen_id=kitchen_id,
             plan_date=date,
             tenant_id=x_tenant_id,
+            db=db,
         )
         return {"ok": True, "data": results}
     except ValueError as exc:
@@ -92,13 +105,14 @@ async def list_plans(
 async def confirm_plan(
     plan_id: str,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(_get_db),
 ) -> Dict[str, Any]:
     """确认生产计划，锁定所有生产任务"""
     from ..services.production_plan_service import ProductionPlanService
 
     svc = ProductionPlanService()
     try:
-        result = await svc.confirm_plan(plan_id=plan_id, tenant_id=x_tenant_id)
+        result = await svc.confirm_plan(plan_id=plan_id, tenant_id=x_tenant_id, db=db)
         return {"ok": True, "data": result}
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
@@ -109,6 +123,7 @@ async def complete_task(
     task_id: str,
     body: CompleteTaskRequest,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(_get_db),
 ) -> Dict[str, Any]:
     """标记加工任务完成，记录实际产量"""
     from ..services.production_plan_service import ProductionPlanService
@@ -119,6 +134,7 @@ async def complete_task(
             task_id=task_id,
             actual_qty=body.actual_qty,
             tenant_id=x_tenant_id,
+            db=db,
         )
         return {"ok": True, "data": result}
     except ValueError as exc:
@@ -130,13 +146,16 @@ async def dispatch_trips(
     plan_id: str,
     body: DispatchRequest,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(_get_db),
 ) -> Dict[str, Any]:
     """生产完成后生成配送任务（按地理聚类分组优化路线）"""
     from ..services.production_plan_service import ProductionPlanService
 
     svc = ProductionPlanService()
     try:
-        trips = await svc.generate_delivery_trips(plan_id=plan_id, tenant_id=x_tenant_id)
+        trips = await svc.generate_delivery_trips(
+            plan_id=plan_id, tenant_id=x_tenant_id, db=db,
+        )
         return {"ok": True, "data": {"trips": trips, "trip_count": len(trips)}}
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
@@ -146,16 +165,17 @@ async def dispatch_trips(
 async def get_trip(
     trip_id: str,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(_get_db),
 ) -> Dict[str, Any]:
     """查询配送单详情（含路线顺序和配送明细）"""
-    from ..services.production_plan_service import _trips
+    from ..services.production_plan_service import ProductionPlanService
 
-    trip = _trips.get(trip_id)
-    if not trip:
-        raise HTTPException(status_code=404, detail=f"配送单 {trip_id} 不存在")
-    if trip["tenant_id"] != x_tenant_id:
-        raise HTTPException(status_code=404, detail=f"配送单 {trip_id} 不存在")
-    return {"ok": True, "data": trip}
+    svc = ProductionPlanService()
+    try:
+        result = await svc.get_trip(trip_id=trip_id, tenant_id=x_tenant_id, db=db)
+        return {"ok": True, "data": result}
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
 
 
 @router.post("/deliveries/{item_id}/sign")
@@ -163,6 +183,7 @@ async def sign_delivery_item(
     item_id: str,
     body: SignReceiptRequest,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(_get_db),
 ) -> Dict[str, Any]:
     """门店签收：记录实收量，差异超 5% 自动标记 disputed"""
     from ..services.delivery_route_service import DeliveryRouteService
@@ -174,6 +195,7 @@ async def sign_delivery_item(
             actual_qty=body.actual_qty,
             operator_id=body.operator_id,
             tenant_id=x_tenant_id,
+            db=db,
         )
         return {"ok": True, "data": result}
     except ValueError as exc:
@@ -184,13 +206,16 @@ async def sign_delivery_item(
 async def get_variance_report(
     plan_id: str,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(_get_db),
 ) -> Dict[str, Any]:
     """生成差异报告：实收 vs 计划，汇总 disputed 记录"""
     from ..services.production_plan_service import ProductionPlanService
 
     svc = ProductionPlanService()
     try:
-        report = await svc.get_variance_report(plan_id=plan_id, tenant_id=x_tenant_id)
+        report = await svc.get_variance_report(
+            plan_id=plan_id, tenant_id=x_tenant_id, db=db,
+        )
         return {"ok": True, "data": report}
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
