@@ -20,6 +20,7 @@ from vision_service import router as vision_router
 from voice_service import router as voice_router
 from federated_client import router as federated_router
 from heartbeat_routes import router as heartbeat_router
+from ota_routes import router as ota_router
 
 logger = structlog.get_logger()
 
@@ -49,6 +50,9 @@ app.include_router(federated_router)
 
 # ─── 设备心跳注册表路由 ───
 app.include_router(heartbeat_router)
+
+# ─── OTA 版本检查路由（带1小时本地缓存）───
+app.include_router(ota_router)
 
 # ─── 健康检查 ───
 
