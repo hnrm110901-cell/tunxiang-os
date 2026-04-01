@@ -43,7 +43,7 @@ class CreateVersionRequest(BaseModel):
     version_name: str = Field(..., max_length=50)
     version_code: int = Field(..., ge=1)
     min_version_code: int = Field(0, ge=0)
-    download_url: str = Field(..., max_length=500)
+    download_url: str = Field(..., max_length=500, pattern=r'^https?://')
     file_sha256: Optional[str] = Field(None, max_length=64)
     file_size_bytes: Optional[int] = None
     release_notes: Optional[str] = None
