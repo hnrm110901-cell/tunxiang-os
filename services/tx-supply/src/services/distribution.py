@@ -1,7 +1,14 @@
-"""中央仓配送调度 -- 配送计划 / 路线优化 / 派车 / 签收 / 看板
+"""中央仓配送调度 — 已迁移到 DB（v096）
+
+本文件的内存实现已由 distribution_repository.DistributionRepository 替代。
+路由层（distribution_routes.py）已切换到 Repository。
+
+保留原因：
+  1. _clear_store() 供旧版单元测试调用（待测试迁移后删除）
+  2. _haversine_distance() 已复制到 distribution_repository.py 作为纯函数
+  3. 作为迁移前的历史参考
 
 配送状态: planned -> dispatched -> in_transit -> delivered
-所有操作强制 tenant_id 租户隔离。
 """
 import math
 import uuid

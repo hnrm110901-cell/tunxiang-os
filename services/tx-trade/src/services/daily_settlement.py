@@ -3,6 +3,7 @@
 日结 = 营业日收尾：汇总→盘点→对账→店长说明→审核。
 所有金额单位：分（fen）。
 """
+import asyncio
 import uuid
 from datetime import datetime, timezone, date, timedelta
 from typing import Optional
@@ -10,6 +11,8 @@ from typing import Optional
 import structlog
 from sqlalchemy import select, update, func, and_, cast, Date
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from shared.events import UniversalPublisher, TradeEventType
 
 from shared.ontology.src.entities import Order
 from shared.ontology.src.enums import OrderStatus
@@ -277,6 +280,19 @@ class DailySettlementService:
             settlement_id=settlement_id,
             reviewer_id=reviewer_id,
         )
+
+        asyncio.create_task(UniversalPublisher.publish(
+            event_type=TradeEventType.DAILY_SETTLEMENT_COMPLETED,
+            tenant_id=self.tenant_id,
+            store_id=settlement.store_id,
+            entity_id=settlement.id,
+            event_data={
+                "revenue_fen": settlement.total_revenue_fen,
+                "order_count": settlement.total_orders,
+                "store_id": str(settlement.store_id),
+            },
+            source_service="tx-trade",
+        ))
 
         return {
             "settlement_id": settlement_id,

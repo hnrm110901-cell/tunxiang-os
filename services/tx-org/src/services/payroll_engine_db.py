@@ -11,6 +11,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import calendar
 from dataclasses import dataclass, field
 from datetime import date, datetime
@@ -20,6 +21,8 @@ from uuid import UUID
 import structlog
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from shared.events import UniversalPublisher, OrgEventType
 
 from services.payroll_engine import (
     compute_absence_deduction,
@@ -227,6 +230,18 @@ class PayrollEngine:
             store_id=str(store_id),
             count=len(records),
         )
+
+        if records:
+            total_amount_fen = sum(r.net_salary_fen for r in records)
+            asyncio.create_task(UniversalPublisher.publish(
+                event_type=OrgEventType.PAYROLL_GENERATED,
+                tenant_id=tenant_id,
+                store_id=store_id,
+                entity_id=store_id,
+                event_data={"year_month": f"{year}-{month:02d}", "employee_count": len(records), "total_amount_fen": total_amount_fen},
+                source_service="tx-org",
+            ))
+
         return records
 
     async def confirm_payroll(

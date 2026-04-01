@@ -6,7 +6,13 @@
 3. 协调多 Agent 协同（如库存预警 → 排菜调整）
 4. 双层推理路由：边缘(Core ML) vs 云端(Claude API)
 """
-from typing import Any, Optional
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any, Optional
+
+if TYPE_CHECKING:
+    from .event_bus import AgentEvent
+    from .orchestrator import OrchestratorResult
 
 import structlog
 
@@ -121,6 +127,34 @@ class MasterAgent:
             r if isinstance(r, AgentResult) else AgentResult(success=False, action="unknown", error=str(r))
             for r in results
         ]
+
+    async def orchestrate(
+        self,
+        trigger: "AgentEvent | str",
+        context: Optional[dict] = None,
+        tenant_id: Optional[str] = None,
+    ) -> "OrchestratorResult":
+        """AI 驱动的多 Agent 编排（新入口，替代 route_intent 的关键词路由）
+
+        tenant_id 参数优先于 self.tenant_id，允许事件消费者以真实租户身份
+        发起编排，避免 master("system") 导致成本统计错误和日志混淆。
+
+        与 route_intent / dispatch 向后兼容，不影响现有调用路径。
+        """
+        from .orchestrator import AgentOrchestrator
+        effective_tenant = tenant_id or self.tenant_id
+        orchestrator = AgentOrchestrator(
+            master_agent=self,
+            model_router=self._get_model_router(),
+            tenant_id=effective_tenant,
+            store_id=self.store_id,
+        )
+        return await orchestrator.orchestrate(trigger, context)
+
+    def _get_model_router(self) -> Any:
+        """获取 ModelRouter 实例（延迟导入避免循环依赖）"""
+        from ..services.model_router import ModelRouter
+        return ModelRouter()
 
     def get_system_context(self) -> dict:
         """获取系统上下文（供 LLM prompt 注入）"""

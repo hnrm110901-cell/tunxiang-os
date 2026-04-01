@@ -11,7 +11,8 @@ from typing import Any, Optional
 
 import httpx
 import structlog
-from fastapi import APIRouter, Header, HTTPException
+from fastapi import APIRouter
+from shared.ontology.src.database import get_db as _get_db, Header, HTTPException
 from pydantic import BaseModel, Field
 
 log = structlog.get_logger(__name__)
@@ -45,9 +46,6 @@ class RetryRequest(BaseModel):
 #  依赖注入占位
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-async def _get_db():
-    """数据库会话依赖 — 由 main.py 覆盖"""
-    raise NotImplementedError("DB session dependency not configured")
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

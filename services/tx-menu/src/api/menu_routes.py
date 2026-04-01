@@ -7,8 +7,10 @@
 from typing import Optional
 
 import structlog
-from fastapi import APIRouter, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession
+from shared.ontology.src.database import get_db
 
 from ..services.dish_service import (
     create_dish,
@@ -19,18 +21,11 @@ from ..services.dish_service import (
     list_dishes_by_status,
     list_dishes_by_season,
 )
-from ..services.menu_template import (
-    create_template,
-    get_template,
-    list_templates,
-    publish_to_store,
-    get_store_menu,
-    set_channel_price,
-    set_seasonal_menu,
-    get_seasonal_menu,
-    set_room_menu,
-    get_room_menu,
-    create_banquet_package,
+from ..services.menu_template_repository import (
+    MenuTemplateRepository,
+    VALID_CHANNELS,
+    VALID_SEASONS,
+    VALID_ROOM_TYPES,
 )
 from ..services.stockout_sync import (
     mark_sold_out,
@@ -143,6 +138,10 @@ class RestoreDishReq(BaseModel):
 
 def _err(status: int, msg: str):
     raise HTTPException(status_code=status, detail={"ok": False, "error": {"message": msg}})
+
+
+def _repo(db: AsyncSession, tenant_id: str) -> MenuTemplateRepository:
+    return MenuTemplateRepository(db=db, tenant_id=tenant_id)
 
 
 # ═══════════════════════════════════════════
@@ -265,15 +264,17 @@ async def api_list_by_season(
 async def api_create_template(
     req: TemplateCreateReq,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """创建菜单模板"""
     try:
-        tpl = create_template(
+        repo = _repo(db, x_tenant_id)
+        tpl = await repo.create_template(
             name=req.name,
             dishes=[d.model_dump() for d in req.dishes],
             rules=req.rules,
-            tenant_id=x_tenant_id,
         )
+        await db.commit()
         return {"ok": True, "data": tpl}
     except ValueError as exc:
         _err(400, str(exc))
@@ -282,9 +283,11 @@ async def api_create_template(
 @router.get("/templates")
 async def api_list_templates(
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """列出菜单模板"""
-    templates = list_templates(x_tenant_id)
+    repo = _repo(db, x_tenant_id)
+    templates = await repo.list_templates()
     return {"ok": True, "data": {"items": templates, "total": len(templates)}}
 
 
@@ -292,9 +295,11 @@ async def api_list_templates(
 async def api_get_template(
     template_id: str,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """获取模板详情"""
-    tpl = get_template(template_id, x_tenant_id)
+    repo = _repo(db, x_tenant_id)
+    tpl = await repo.get_template(template_id)
     if not tpl:
         _err(404, f"模板不存在: {template_id}")
     return {"ok": True, "data": tpl}
@@ -309,10 +314,13 @@ async def api_get_template(
 async def api_publish_to_store(
     req: PublishToStoreReq,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """将模板发布到门店"""
     try:
-        result = publish_to_store(req.template_id, req.store_id, x_tenant_id)
+        repo = _repo(db, x_tenant_id)
+        result = await repo.publish_to_store(req.template_id, req.store_id)
+        await db.commit()
         return {"ok": True, "data": result}
     except ValueError as exc:
         _err(400, str(exc))
@@ -323,10 +331,14 @@ async def api_get_store_menu(
     store_id: str,
     channel: str = Query("dine_in", description="渠道: dine_in/takeout/delivery/miniapp"),
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """获取门店当前菜单（按渠道）"""
     try:
-        menu = get_store_menu(store_id, channel, x_tenant_id)
+        if channel not in VALID_CHANNELS:
+            _err(400, f"channel 必须为 {VALID_CHANNELS} 之一，收到: {channel!r}")
+        repo = _repo(db, x_tenant_id)
+        menu = await repo.get_store_menu(store_id, channel)
         return {"ok": True, "data": menu}
     except ValueError as exc:
         _err(400, str(exc))
@@ -341,15 +353,19 @@ async def api_get_store_menu(
 async def api_set_channel_price(
     req: ChannelPriceReq,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """设置菜品渠道差异价"""
     try:
-        record = set_channel_price(
+        if req.channel not in VALID_CHANNELS:
+            _err(400, f"channel 必须为 {VALID_CHANNELS} 之一，收到: {req.channel!r}")
+        repo = _repo(db, x_tenant_id)
+        record = await repo.set_channel_price(
             dish_id=req.dish_id,
             channel=req.channel,
             price_fen=req.price_fen,
-            tenant_id=x_tenant_id,
         )
+        await db.commit()
         return {"ok": True, "data": record}
     except ValueError as exc:
         _err(400, str(exc))
@@ -364,15 +380,19 @@ async def api_set_channel_price(
 async def api_set_seasonal_menu(
     req: SeasonalMenuReq,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """设置门店季节菜单"""
     try:
-        record = set_seasonal_menu(
+        if req.season not in VALID_SEASONS:
+            _err(400, f"season 必须为 {VALID_SEASONS} 之一，收到: {req.season!r}")
+        repo = _repo(db, x_tenant_id)
+        record = await repo.set_seasonal_menu(
             store_id=req.store_id,
             season=req.season,
             dishes=[d.model_dump() for d in req.dishes],
-            tenant_id=x_tenant_id,
         )
+        await db.commit()
         return {"ok": True, "data": record}
     except ValueError as exc:
         _err(400, str(exc))
@@ -383,10 +403,14 @@ async def api_get_seasonal_menu(
     store_id: str,
     season: str,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """获取门店季节菜单"""
     try:
-        menu = get_seasonal_menu(store_id, season, x_tenant_id)
+        if season not in VALID_SEASONS:
+            _err(400, f"season 必须为 {VALID_SEASONS} 之一，收到: {season!r}")
+        repo = _repo(db, x_tenant_id)
+        menu = await repo.get_seasonal_menu(store_id, season)
         if not menu:
             _err(404, f"门店 {store_id} 没有 {season} 季节菜单")
         return {"ok": True, "data": menu}
@@ -403,15 +427,19 @@ async def api_get_seasonal_menu(
 async def api_set_room_menu(
     req: RoomMenuReq,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """设置门店包厢专属菜单"""
     try:
-        record = set_room_menu(
+        if req.room_type not in VALID_ROOM_TYPES:
+            _err(400, f"room_type 必须为 {VALID_ROOM_TYPES} 之一，收到: {req.room_type!r}")
+        repo = _repo(db, x_tenant_id)
+        record = await repo.set_room_menu(
             store_id=req.store_id,
             room_type=req.room_type,
             dishes=[d.model_dump() for d in req.dishes],
-            tenant_id=x_tenant_id,
         )
+        await db.commit()
         return {"ok": True, "data": record}
     except ValueError as exc:
         _err(400, str(exc))
@@ -422,10 +450,14 @@ async def api_get_room_menu(
     store_id: str,
     room_type: str,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """获取门店包厢菜单"""
     try:
-        menu = get_room_menu(store_id, room_type, x_tenant_id)
+        if room_type not in VALID_ROOM_TYPES:
+            _err(400, f"room_type 必须为 {VALID_ROOM_TYPES} 之一，收到: {room_type!r}")
+        repo = _repo(db, x_tenant_id)
+        menu = await repo.get_room_menu(store_id, room_type)
         if not menu:
             _err(404, f"门店 {store_id} 没有 {room_type} 包厢菜单")
         return {"ok": True, "data": menu}
@@ -442,17 +474,19 @@ async def api_get_room_menu(
 async def api_create_banquet_package(
     req: BanquetPackageReq,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """创建宴席套餐"""
     try:
-        pkg = create_banquet_package(
+        repo = _repo(db, x_tenant_id)
+        pkg = await repo.create_banquet_package(
             name=req.name,
             dishes=[d.model_dump() for d in req.dishes],
             package_price_fen=req.package_price_fen,
             guest_count=req.guest_count,
-            tenant_id=x_tenant_id,
             description=req.description,
         )
+        await db.commit()
         return {"ok": True, "data": pkg}
     except ValueError as exc:
         _err(400, str(exc))

@@ -15,9 +15,12 @@ from dataclasses import dataclass, field
 from datetime import date, timedelta
 from typing import Any
 
+import asyncio
+
 import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from shared.events import UniversalPublisher, FinanceEventType
 from .cost_engine_repository import CostEngineRepository
 
 logger = structlog.get_logger(__name__)
@@ -210,6 +213,20 @@ class CostEngineService:
         except (SQLAlchemyError, ValueError) as exc:
             log.warning("daily_cost_report.breakdown_failed", error=str(exc))
 
+        # ── 节点2：成本率超标事件 ─────────────────────────────
+        if health.status in ("high", "critical"):
+            asyncio.create_task(UniversalPublisher.publish(
+                event_type=FinanceEventType.COST_RATE_EXCEEDED,
+                tenant_id=tenant_id,
+                store_id=store_id,
+                entity_id=store_id,
+                event_data={
+                    "category": "food_cost",
+                    "actual_pct": round(food_cost_rate * 100, 2),
+                    "threshold_pct": round(_NORMAL_THRESHOLD * 100, 2),
+                },
+                source_service="tx-finance",
+            ))
         return DailyCostReport(
             store_id=str(store_id),
             biz_date=str(biz_date),

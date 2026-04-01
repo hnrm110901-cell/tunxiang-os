@@ -7,8 +7,11 @@
 
 from __future__ import annotations
 
+import asyncio
 from datetime import date, datetime, time, timedelta
 from typing import Any, Dict, List, Optional, Tuple
+
+from shared.events import UniversalPublisher, OrgEventType
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  常量
@@ -62,13 +65,16 @@ class AttendanceEngine:
     def __init__(
         self,
         scheduled_shifts: Optional[Dict[str, Dict[str, str]]] = None,
+        tenant_id: Optional[str] = None,
     ) -> None:
         """
         Args:
             scheduled_shifts: {employee_id: {date_iso: shift_name}}
                 排班数据，用于判定迟到/早退
+            tenant_id: 租户 UUID 字符串，用于事件发布（可选）
         """
         self.scheduled_shifts = scheduled_shifts or {}
+        self.tenant_id = tenant_id
         self._clock_records: List[Dict[str, Any]] = []
         self._clock_counter = 0
         self._leave_requests: List[Dict[str, Any]] = []
@@ -157,6 +163,17 @@ class AttendanceEngine:
         }
 
         self._clock_records.append(record)
+
+        if status == "late" and diff_min > 0 and self.tenant_id:
+            asyncio.create_task(UniversalPublisher.publish(
+                event_type=OrgEventType.ATTENDANCE_LATE,
+                tenant_id=self.tenant_id,
+                store_id=store_id,
+                entity_id=employee_id,
+                event_data={"employee_id": employee_id, "late_minutes": diff_min, "schedule_id": shift_name},
+                source_service="tx-org",
+                extra_fields={"employee_id": employee_id},
+            ))
 
         return {
             "ok": True,
@@ -701,4 +718,18 @@ class AttendanceEngine:
         anomalies.sort(
             key=lambda x: {"high": 0, "medium": 1, "low": 2}.get(x["severity"], 9)
         )
+
+        if anomalies and self.tenant_id:
+            for anomaly in anomalies:
+                if anomaly["anomaly_type"] in ("absent", "missing_clock_out", "unscheduled_work"):
+                    asyncio.create_task(UniversalPublisher.publish(
+                        event_type=OrgEventType.ATTENDANCE_EXCEPTION,
+                        tenant_id=self.tenant_id,
+                        store_id=str(store_id),
+                        entity_id=anomaly["employee_id"],
+                        event_data={"employee_id": anomaly["employee_id"], "exception_type": anomaly["anomaly_type"]},
+                        source_service="tx-org",
+                        extra_fields={"employee_id": anomaly["employee_id"]},
+                    ))
+
         return anomalies

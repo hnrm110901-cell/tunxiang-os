@@ -35,6 +35,7 @@ import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
+from shared.ontology.src.database import get_db
 
 from ..services.brand_publish_service import BrandPublishService
 
@@ -45,8 +46,6 @@ router = APIRouter(prefix="/api/v1/menu", tags=["brand-publish"])
 
 # ─── 依赖注入占位（由 main.py 的 app.dependency_overrides 注入）───
 
-async def get_db() -> AsyncSession:  # type: ignore[override]
-    raise NotImplementedError("DB session dependency not configured")
 
 
 # ─── 辅助 ───

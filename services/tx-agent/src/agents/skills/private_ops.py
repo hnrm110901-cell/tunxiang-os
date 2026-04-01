@@ -39,6 +39,7 @@ class PrivateOpsAgent(SkillAgent):
             "get_private_domain_dashboard", "trigger_campaign", "advance_journey",
             "optimize_shift", "score_performance", "analyze_labor_cost", "warn_attendance",
             "create_reservation", "manage_banquet", "generate_beo", "allocate_seating",
+            "check_journey_trigger",
         ]
 
     async def execute(self, action: str, params: dict[str, Any]) -> AgentResult:
@@ -54,6 +55,7 @@ class PrivateOpsAgent(SkillAgent):
             "optimize_shift": self._optimize_shift,
             "create_reservation": self._create_reservation,
             "manage_banquet": self._manage_banquet,
+            "check_journey_trigger": self._check_journey_trigger,
         }
         handler = dispatch.get(action)
         if handler:
@@ -478,3 +480,104 @@ class PrivateOpsAgent(SkillAgent):
         return AgentResult(success=True, action="manage_banquet",
                          data={"event_name": event_name, "current_stage": stage, "next_stage": next_stage},
                          reasoning=f"宴会 {event_name}: {stage} → {next_stage}", confidence=0.9)
+
+    # ─── 事件驱动：订单支付后检查私域旅程触发条件 ───
+
+    async def _check_journey_trigger(self, params: dict) -> AgentResult:
+        """trade.order.paid 事件触发：根据订单特征决定是否启动私域旅程
+
+        触发逻辑：
+        - 首次消费客户 → 触发 new_customer 欢迎旅程
+        - 沉默客户（30天未来）再消费 → 触发 reactivation 召回旅程
+        - 高价值订单（≥500元）→ 触发 vip_retention 维护旅程
+        - 生日月消费 → 触发 birthday 关怀旅程
+        """
+        event_data = params.get("event_data", {})
+        customer_id = params.get("customer_id") or event_data.get("customer_id")
+        store_id = params.get("store_id") or self.store_id
+        order_amount_fen = params.get("total_fen") or event_data.get("total_fen", 0)
+        order_count = params.get("order_count") or event_data.get("order_count", 1)
+        days_since_last = params.get("days_since_last_order") or event_data.get("days_since_last_order", 0)
+        is_birthday_month = params.get("is_birthday_month") or event_data.get("is_birthday_month", False)
+
+        # 若有 DB，从会员历史补充缺失字段
+        if self._db and customer_id:
+            from sqlalchemy import text
+            row = await self._db.execute(text("""
+                SELECT
+                    COUNT(DISTINCT o.id) as order_count,
+                    EXTRACT(DAY FROM NOW() - MAX(o.completed_at)) as days_since_last,
+                    EXTRACT(MONTH FROM NOW()) = EXTRACT(MONTH FROM c.birth_date) as is_birthday_month
+                FROM orders o
+                JOIN customers c ON c.id = o.customer_id
+                WHERE o.tenant_id = :tenant_id
+                  AND o.customer_id = :customer_id
+                  AND o.status = 'completed'
+                GROUP BY c.birth_date
+            """), {"tenant_id": self.tenant_id, "customer_id": customer_id})
+            r = dict(row.mappings().first() or {})
+            if r:
+                order_count = int(r.get("order_count") or order_count)
+                days_since_last = float(r.get("days_since_last") or days_since_last)
+                is_birthday_month = bool(r.get("is_birthday_month") or is_birthday_month)
+
+        # 旅程触发规则（按优先级）
+        triggered_journeys: list[dict] = []
+
+        if order_count == 1:
+            triggered_journeys.append({
+                "journey_type": "new_customer",
+                "reason": "首次消费，启动欢迎旅程",
+                "priority": 1,
+            })
+
+        if days_since_last >= 30 and order_count > 1:
+            triggered_journeys.append({
+                "journey_type": "reactivation",
+                "reason": f"沉默{int(days_since_last)}天后再消费，触发召回旅程",
+                "priority": 2,
+            })
+
+        if order_amount_fen >= 50000:  # ≥500元
+            triggered_journeys.append({
+                "journey_type": "vip_retention",
+                "reason": f"高价值订单 ¥{order_amount_fen/100:.0f}，触发VIP维护旅程",
+                "priority": 3,
+            })
+
+        if is_birthday_month:
+            triggered_journeys.append({
+                "journey_type": "birthday",
+                "reason": "生日月消费，触发生日关怀旅程",
+                "priority": 4,
+            })
+
+        # 取最高优先级旅程（优先级数字越小越高）
+        best_journey = min(triggered_journeys, key=lambda j: j["priority"]) if triggered_journeys else None
+
+        logger.info(
+            "journey_trigger_checked",
+            customer_id=customer_id,
+            store_id=store_id,
+            triggered_count=len(triggered_journeys),
+            best_journey=best_journey.get("journey_type") if best_journey else None,
+        )
+
+        return AgentResult(
+            success=True,
+            action="check_journey_trigger",
+            data={
+                "customer_id": customer_id,
+                "store_id": store_id,
+                "should_trigger": len(triggered_journeys) > 0,
+                "triggered_journeys": triggered_journeys,
+                "recommended_journey": best_journey,
+                "order_amount_fen": order_amount_fen,
+                "order_count": order_count,
+                "days_since_last": days_since_last,
+            },
+            reasoning=(
+                f"检查旅程触发：{'触发 ' + best_journey['journey_type'] if best_journey else '无需触发旅程'}"
+            ),
+            confidence=0.88,
+        )

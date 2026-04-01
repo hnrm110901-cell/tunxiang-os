@@ -49,12 +49,29 @@ import { SettingsPage } from './pages/hq/ops/SettingsPage';
 import { PeakMonitorPage } from './pages/hq/ops/PeakMonitorPage';
 import { RegionalPage } from './pages/hq/ops/RegionalPage';
 import { CruiseMonitorPage } from './pages/hq/ops/CruiseMonitorPage';
+import { OperationPlanPage } from './pages/hq/ops/OperationPlanPage';
+import { EventBusHealthPage } from './pages/hq/ops/EventBusHealthPage';
+import { StoreClonePage } from './pages/hq/ops/StoreClonePage';
+import { DailyReviewPage } from './pages/hq/ops/DailyReviewPage';
+import { SmartSpecialsPage } from './pages/hq/ops/SmartSpecialsPage';
 import { FinanceAnalysisPage } from './pages/hq/analytics/FinanceAnalysisPage';
+import { PLReportPage } from './pages/hq/analytics/PLReportPage';
 import { MemberAnalysisPage } from './pages/hq/analytics/MemberAnalysisPage';
 import { MultiStoreComparePage } from './pages/hq/analytics/MultiStoreComparePage';
 import { TrendAnalysisPage } from './pages/hq/analytics/TrendAnalysisPage';
 import { BanquetBoardPage } from './pages/hq/BanquetBoardPage';
 import { ReceiptEditorPage } from './pages/ReceiptEditorPage';
+import { GroupBuyPage } from './pages/hq/growth/GroupBuyPage';
+import { StampCardPage } from './pages/hq/growth/StampCardPage';
+import { XHSIntegrationPage } from './pages/hq/growth/XHSIntegrationPage';
+import { RetailMallPage } from './pages/hq/growth/RetailMallPage';
+import { JourneyMonitorPage } from './pages/hq/growth/JourneyMonitorPage';
+import { DeliveryPage } from './pages/hq/trade/DeliveryPage';
+import { InventoryIntelPage } from './pages/hq/supply/InventoryIntelPage';
+import { SupplyChainPage } from './pages/hq/supply/SupplyChainPage';
+import { HRDashboardPage } from './pages/hq/org/HRDashboardPage';
+import { BudgetTrackerPage } from './pages/hq/analytics/BudgetTrackerPage';
+import { MemberCardPage } from './pages/hq/growth/MemberCardPage';
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem('tx_token'));
@@ -123,13 +140,30 @@ function App() {
           <Route path="/hq/ops/peak-monitor" element={<PeakMonitorPage />} />
           <Route path="/hq/ops/regional" element={<RegionalPage />} />
           <Route path="/hq/ops/cruise" element={<CruiseMonitorPage />} />
+          <Route path="/hq/ops/operation-plans" element={<OperationPlanPage />} />
+          <Route path="/hq/ops/event-bus-health" element={<EventBusHealthPage />} />
+          <Route path="/hq/ops/store-clone" element={<StoreClonePage />} />
+          <Route path="/hq/ops/daily-review" element={<DailyReviewPage />} />
+          <Route path="/hq/ops/smart-specials" element={<SmartSpecialsPage />} />
           <Route path="/hq/analytics/finance" element={<FinanceAnalysisPage />} />
+          <Route path="/hq/analytics/pl-report" element={<PLReportPage />} />
           <Route path="/hq/analytics/member" element={<MemberAnalysisPage />} />
           <Route path="/hq/analytics/multi-store" element={<MultiStoreComparePage />} />
           <Route path="/hq/analytics/trend" element={<TrendAnalysisPage />} />
+          <Route path="/hq/analytics/budget" element={<BudgetTrackerPage />} />
+          <Route path="/hq/growth/group-buy" element={<GroupBuyPage />} />
+          <Route path="/hq/growth/stamp-card" element={<StampCardPage />} />
+          <Route path="/hq/growth/xhs" element={<XHSIntegrationPage />} />
+          <Route path="/hq/growth/retail-mall" element={<RetailMallPage />} />
+          <Route path="/hq/growth/journey-monitor" element={<JourneyMonitorPage />} />
+          <Route path="/hq/trade/delivery" element={<DeliveryPage />} />
+          <Route path="/hq/supply/inventory-intel" element={<InventoryIntelPage />} />
+          <Route path="/hq/supply/chain" element={<SupplyChainPage />} />
+          <Route path="/hq/org/hr" element={<HRDashboardPage />} />
           <Route path="/hq/banquet" element={<BanquetBoardPage />} />
           <Route path="/receipt-editor" element={<ReceiptEditorPage />} />
           <Route path="/receipt-editor/:templateId" element={<ReceiptEditorPage />} />
+          <Route path="/hq/growth/member-cards" element={<MemberCardPage />} />
         </Routes>
       </ShellHQ>
     </BrowserRouter>

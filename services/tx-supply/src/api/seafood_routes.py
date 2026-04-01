@@ -10,6 +10,7 @@ import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
+from shared.ontology.src.database import get_db as _get_db
 
 from services.tx_supply.src.services import live_seafood_v2
 from services.tx_supply.src.services import seafood_management_service as svc
@@ -110,10 +111,6 @@ class TankReadingRequest(BaseModel):
 
 # ─── 依赖注入占位 ─────────────────────────────────────────────────────────────
 
-
-async def _get_db():
-    """数据库会话依赖 -- 由 main.py 覆盖"""
-    raise NotImplementedError("DB session dependency not configured")
 
 
 # ─── 原有端点（保持不变） ─────────────────────────────────────────────────────

@@ -21,6 +21,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -28,6 +29,8 @@ from typing import Any
 import structlog
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from shared.events import UniversalPublisher, OrgEventType
 
 from ..models.approval_flow_engine import (
     eval_condition,
@@ -637,6 +640,14 @@ class ApprovalEngine:
                 status=_STATUS_APPROVED,
                 tenant_id=tenant_id,
             )
+            asyncio.create_task(UniversalPublisher.publish(
+                event_type=OrgEventType.APPROVAL_COMPLETED,
+                tenant_id=tenant_id,
+                store_id=instance.get("store_id"),
+                entity_id=instance_id,
+                event_data={"instance_id": instance_id, "business_type": str(instance.get("business_type") or ""), "result": _STATUS_APPROVED},
+                source_service="tx-org",
+            ))
 
     # ── 创建自动通过实例（触发条件不满足时）────────────────────────────────────
 
@@ -940,6 +951,14 @@ class ApprovalEngine:
             node_order=node_order,
             tenant_id=tenant_id,
         )
+        asyncio.create_task(UniversalPublisher.publish(
+            event_type=OrgEventType.APPROVAL_COMPLETED,
+            tenant_id=tenant_id,
+            store_id=instance.get("store_id"),
+            entity_id=instance_id,
+            event_data={"instance_id": instance_id, "business_type": str(instance.get("business_type") or ""), "result": _STATUS_REJECTED},
+            source_service="tx-org",
+        ))
         return await _fetch_instance(instance_id, tenant_id, db) or instance
 
     # ── 撤回审批 ──────────────────────────────────────────────────────────────

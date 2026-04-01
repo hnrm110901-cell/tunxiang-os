@@ -8,14 +8,18 @@
 WS /ws/menu-board-updates 由 mac-station 转发 Redis 消息到前端。
 """
 import json
+import uuid
 from typing import Optional
 
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..db import get_db
+from shared.ontology.src.entities import Dish, DishCategory, Store
+
+from shared.ontology.src.database import get_db
 
 logger = structlog.get_logger()
 
@@ -92,60 +96,44 @@ async def get_board_data(
     """
     logger.info("board_data_requested", store_id=store_id, tenant_id=x_tenant_id)
 
-    # TODO: 从数据库查询真实菜单数据
-    # dishes = await dish_repo.get_board_dishes(db, tenant_id=x_tenant_id, store_id=store_id)
-    mock_dishes = [
+    await db.execute(
+        text("SELECT set_config('app.tenant_id', :tid, true)"),
+        {"tid": x_tenant_id},
+    )
+    tid = uuid.UUID(x_tenant_id)
+    sid = uuid.UUID(store_id)
+
+    result = await db.execute(
+        select(Dish, DishCategory.name)
+        .outerjoin(DishCategory, Dish.category_id == DishCategory.id)
+        .where(
+            Dish.tenant_id == tid,
+            Dish.is_deleted.is_(False),
+            (Dish.store_id == sid) | (Dish.store_id.is_(None)),
+        )
+        .order_by(DishCategory.sort_order, Dish.dish_name)
+    )
+    rows = result.all()
+    dishes = [
         {
-            "id": "d1",
-            "name": "宫保鸡丁",
-            "price": 3800,
-            "original_price": None,
-            "image_url": None,
-            "category": "热菜",
-            "is_available": True,
-            "is_new": False,
-            "is_special": False,
-        },
-        {
-            "id": "d2",
-            "name": "佛跳墙",
-            "price": 18800,
-            "original_price": 22800,
-            "image_url": None,
-            "category": "热菜",
-            "is_available": True,
-            "is_new": False,
-            "is_special": True,
-        },
-        {
-            "id": "d3",
-            "name": "清蒸鲈鱼",
-            "price": 9800,
-            "original_price": None,
-            "image_url": None,
-            "category": "海鲜",
-            "is_available": False,
-            "is_new": False,
-            "is_special": False,
-        },
-        {
-            "id": "d4",
-            "name": "醉鹅",
-            "price": 8800,
-            "original_price": None,
-            "image_url": None,
-            "category": "热菜",
-            "is_available": True,
-            "is_new": True,
-            "is_special": False,
-        },
+            "id": str(dish.id),
+            "name": dish.dish_name,
+            "price": dish.price_fen,
+            "original_price": dish.original_price_fen,
+            "image_url": dish.image_url,
+            "category": category_name or "其他",
+            "is_available": dish.is_available,
+            "is_new": bool(dish.tags and "新品" in dish.tags),
+            "is_special": bool(dish.tags and "特价" in dish.tags),
+        }
+        for dish, category_name in rows
     ]
 
     return {
         "ok": True,
         "data": {
             "store_id": store_id,
-            "dishes": mock_dishes,
+            "dishes": dishes,
         },
     }
 
@@ -162,14 +150,57 @@ async def get_board_config(
     """
     logger.info("board_config_requested", store_id=store_id, tenant_id=x_tenant_id)
 
-    # TODO: 从数据库查询门店菜单屏配置
+    await db.execute(
+        text("SELECT set_config('app.tenant_id', :tid, true)"),
+        {"tid": x_tenant_id},
+    )
+    tid = uuid.UUID(x_tenant_id)
+    sid = uuid.UUID(store_id)
+
+    store_result = await db.execute(
+        select(Store.store_name, Store.config).where(Store.id == sid, Store.tenant_id == tid)
+    )
+    store_row = store_result.one_or_none()
+    store_name = store_row[0] if store_row else "屯象餐厅"
+    store_config = store_row[1] if store_row else {}
+    announcement = (store_config or {}).get("board_announcement", "")
+
+    cat_result = await db.execute(
+        select(DishCategory.name)
+        .where(DishCategory.tenant_id == tid, DishCategory.is_active.is_(True))
+        .order_by(DishCategory.sort_order)
+    )
+    category_order = [r for (r,) in cat_result.all()] or ["热菜", "海鲜", "凉菜", "主食", "汤品", "饮品"]
+
+    special_result = await db.execute(
+        select(Dish.id)
+        .where(
+            Dish.tenant_id == tid,
+            Dish.is_deleted.is_(False),
+            Dish.is_available.is_(True),
+            text("tags @> ARRAY['特价']"),
+        )
+    )
+    special_ids = [str(r) for (r,) in special_result.all()]
+
+    featured_result = await db.execute(
+        select(Dish.id)
+        .where(
+            Dish.tenant_id == tid,
+            Dish.is_deleted.is_(False),
+            Dish.is_available.is_(True),
+            text("tags @> ARRAY['新品']"),
+        )
+    )
+    featured_ids = [str(r) for (r,) in featured_result.all()]
+
     config = {
-        "store_name": "屯象餐厅",
+        "store_name": store_name,
         "logo_url": None,
-        "announcement": "今日特供：佛跳墙限量10份 · 营业时间 10:00–22:00 · 服务电话 400-888-8888 · 欢迎光临，祝您用餐愉快！",
-        "category_order": ["热菜", "海鲜", "凉菜", "主食", "汤品", "饮品"],
-        "featured_dish_ids": ["d4"],
-        "special_dish_ids": ["d2"],
+        "announcement": announcement,
+        "category_order": category_order,
+        "featured_dish_ids": featured_ids,
+        "special_dish_ids": special_ids,
     }
 
     return {"ok": True, "data": config}
@@ -204,7 +235,19 @@ async def update_board_announcement(
     }
     published = await _publish_to_redis(channel, ws_message)
 
-    # TODO: 持久化公告到数据库（下次 board-config 接口能读到）
+    await db.execute(
+        text("SELECT set_config('app.tenant_id', :tid, true)"),
+        {"tid": x_tenant_id},
+    )
+    await db.execute(
+        text("""
+            UPDATE stores
+               SET config = COALESCE(config, '{}') || jsonb_build_object('board_announcement', :msg)
+             WHERE id = :sid::uuid AND tenant_id = :tid::uuid
+        """),
+        {"tid": x_tenant_id, "sid": body.store_id, "msg": body.announcement},
+    )
+    await db.commit()
 
     return {
         "ok": True,

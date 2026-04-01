@@ -21,6 +21,7 @@ from voice_service import router as voice_router
 from federated_client import router as federated_router
 from heartbeat_routes import router as heartbeat_router
 from ota_routes import router as ota_router
+from offline_routes import router as offline_router
 
 logger = structlog.get_logger()
 
@@ -54,32 +55,14 @@ app.include_router(heartbeat_router)
 # ─── OTA 版本检查路由（带1小时本地缓存）───
 app.include_router(ota_router)
 
+# ─── 离线查询路由（本地 PG）───
+app.include_router(offline_router)
+
 # ─── 健康检查 ───
 
 @app.get("/health")
 async def health() -> dict:
     return {"ok": True, "data": {"service": "mac-station", "version": "4.1.0"}}
-
-
-# ─── 离线查询 API ───
-
-@app.get("/api/v1/offline/revenue")
-async def query_revenue_offline(store_id: str, date: str = "today") -> dict:
-    """离线查询营业额（从本地 PG 读取）"""
-    # TODO: 接入本地 PG
-    return {"ok": True, "data": {"store_id": store_id, "date": date, "revenue_fen": 0, "source": "local_cache"}}
-
-
-@app.get("/api/v1/offline/inventory")
-async def query_inventory_offline(store_id: str) -> dict:
-    """离线查询库存（从本地 PG 读取）"""
-    return {"ok": True, "data": {"store_id": store_id, "items": [], "source": "local_cache"}}
-
-
-@app.get("/api/v1/offline/orders")
-async def query_orders_offline(store_id: str, status: str = "pending") -> dict:
-    """离线查询订单"""
-    return {"ok": True, "data": {"store_id": store_id, "orders": [], "source": "local_cache"}}
 
 
 # ─── Core ML 代理 ───
@@ -127,8 +110,105 @@ async def agent_push_ws(websocket: WebSocket) -> None:
 # ─── KDS WebSocket 推送 ───
 
 from kds_pusher import KDSPusher
+from pos_pusher import POSPusher, DiscountAlert
 
 kds_pusher = KDSPusher()
+pos_pusher = POSPusher()
+
+
+# ─── POS WebSocket 推送 ───
+
+
+@app.websocket("/ws/pos/{store_id}/{terminal_id}")
+async def pos_ws_endpoint(
+    websocket: WebSocket, store_id: str, terminal_id: str
+) -> None:
+    """POS 收银终端 WebSocket 连接端点。
+
+    收银端连接后可接收：
+    - discount_alert: 折扣守护预警
+    - operation_alert: 运营通知（库存低/临期/班次提醒/销售里程碑）
+    支持心跳：客户端发 "ping"，服务端回 "pong"
+    """
+    await websocket.accept()
+    await pos_pusher.connect(store_id, terminal_id, websocket)
+
+    try:
+        while True:
+            data = await asyncio.wait_for(websocket.receive_text(), timeout=30)
+            if data == "ping":
+                await websocket.send_text("pong")
+    except asyncio.TimeoutError:
+        # 30秒无心跳 → 断开，等待客户端重连
+        logger.info(
+            "pos_ws_heartbeat_timeout",
+            store_id=store_id,
+            terminal_id=terminal_id,
+        )
+    except WebSocketDisconnect:
+        pass
+    finally:
+        pos_pusher.disconnect(store_id, terminal_id)
+
+
+# ─── POS HTTP Push 接口（供 tx-agent 调用） ───
+
+
+@app.post("/api/v1/pos/push-discount-alert")
+async def pos_push_discount_alert(data: dict) -> dict:
+    """HTTP → WebSocket 桥接：tx-agent 通过此接口触发折扣预警推送。
+
+    请求体:
+        store_id: str — 目标门店 ID
+        alert: dict  — DiscountAlert 字段（见 pos_pusher.DiscountAlert）
+
+    响应:
+        { "ok": true, "data": { "store_id": str, "sent_count": int } }
+    """
+    store_id = data.get("store_id", "")
+    alert_data = data.get("alert", {})
+
+    if not store_id:
+        return {
+            "ok": False,
+            "error": {"code": "INVALID_PARAMS", "message": "store_id required"},
+        }
+
+    alert = DiscountAlert(
+        alert_id=alert_data.get("alert_id", ""),
+        store_id=store_id,
+        order_id=alert_data.get("order_id", ""),
+        employee_id=alert_data.get("employee_id", alert_data.get("operator_id", "")),
+        employee_name=alert_data.get("employee_name", alert_data.get("operator_id", "")),
+        discount_rate=float(alert_data.get("discount_rate", 0)),
+        threshold=float(alert_data.get("threshold", 0.5)),
+        amount_fen=int(alert_data.get("amount_fen", alert_data.get("discount_amount_fen", 0))),
+        risk_level=alert_data.get("risk_level", alert_data.get("severity", "medium")),
+        message=alert_data.get("message", alert_data.get("violation_type", "")),
+        timestamp=alert_data.get("timestamp", alert_data.get("logged_at", "")),
+    )
+
+    sent = await pos_pusher.push_discount_alert(store_id, alert)
+    terminals = pos_pusher.get_connected_terminals(store_id)
+
+    return {
+        "ok": True,
+        "data": {
+            "store_id": store_id,
+            "sent_count": sent,
+            "terminals_online": terminals,
+        },
+    }
+
+
+@app.get("/api/v1/pos/terminals/{store_id}")
+async def pos_get_terminals(store_id: str) -> dict:
+    """查询门店当前在线的 POS 终端列表。"""
+    terminals = pos_pusher.get_connected_terminals(store_id)
+    return {
+        "ok": True,
+        "data": {"store_id": store_id, "terminals": terminals, "count": len(terminals)},
+    }
 
 
 @app.websocket("/ws/kds/{station_id}")

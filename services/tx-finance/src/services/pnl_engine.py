@@ -20,10 +20,13 @@ from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
 from typing import Any
 
+import asyncio
+
 import structlog
 from sqlalchemy import func, select, text, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from shared.events import UniversalPublisher, FinanceEventType
 from shared.ontology.src.entities import Order, OrderItem, Store
 
 logger = structlog.get_logger(__name__)
@@ -347,7 +350,7 @@ class PnLEngine:
             order_count=order_count,
         )
 
-        return PnLStatement(
+        stmt = PnLStatement(
             store_id=store_id,
             period_start=biz_date,
             period_end=biz_date,
@@ -362,6 +365,21 @@ class PnLEngine:
             other_opex_fen=other_opex_fen,
             order_count=order_count,
         )
+        # ── 节点1：日P&L生成事件 ──────────────────────────────
+        asyncio.create_task(UniversalPublisher.publish(
+            event_type=FinanceEventType.DAILY_PL_GENERATED,
+            tenant_id=tenant_id,
+            store_id=store_id,
+            entity_id=store_id,
+            event_data={
+                "date": str(biz_date),
+                "revenue_fen": stmt.net_revenue_fen,
+                "cost_fen": stmt.food_cost_fen,
+                "gross_margin_pct": stmt.gross_margin,
+            },
+            source_service="tx-finance",
+        ))
+        return stmt
 
     async def get_monthly_pnl(
         self,
@@ -392,6 +410,18 @@ class PnLEngine:
             days_with_data=monthly.days_with_data,
             net_revenue_fen=monthly.net_revenue_fen,
         )
+        # ── 节点3：月结完成事件 ───────────────────────────────
+        asyncio.create_task(UniversalPublisher.publish(
+            event_type=FinanceEventType.MONTHLY_CLOSE_COMPLETED,
+            tenant_id=tenant_id,
+            store_id=store_id,
+            entity_id=store_id,
+            event_data={
+                "year_month": f"{year}-{month:02d}",
+                "net_profit_fen": monthly.operating_profit_fen,
+            },
+            source_service="tx-finance",
+        ))
         return monthly
 
     # ── 内部方法 ──────────────────────────────────────────────

@@ -13,6 +13,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
+from shared.ontology.src.database import get_db
 
 from ..services.pricing_engine import PricingEngine
 
@@ -23,11 +24,6 @@ _CHANNELS = ("dine_in", "meituan", "eleme", "miniapp", "douyin")
 
 
 # ─── 依赖注入占位 ───
-
-async def get_db() -> AsyncSession:  # type: ignore[override]
-    """数据库会话依赖 — 由 main.py 中 app.dependency_overrides 注入"""
-    raise NotImplementedError("DB session dependency not configured")
-
 
 # ─── 请求/响应模型 ───
 

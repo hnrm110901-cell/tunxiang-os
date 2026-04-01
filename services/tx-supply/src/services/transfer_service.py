@@ -11,6 +11,7 @@
 """
 from __future__ import annotations
 
+import asyncio
 import uuid
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -20,6 +21,8 @@ import structlog
 from sqlalchemy import select, func, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+
+from shared.events import UniversalPublisher, SupplyEventType
 
 from shared.ontology.src.entities import (
     Ingredient,
@@ -646,6 +649,20 @@ async def receive_transfer_order(
         received_count=len(inventory_results),
         loss_count=len(loss_results),
     )
+
+    # ── 事件总线：门店调拨完成 ──────────────────────────────
+    asyncio.create_task(UniversalPublisher.publish(
+        event_type=SupplyEventType.TRANSFER_COMPLETED,
+        tenant_id=_uuid(tenant_id),
+        store_id=order.to_store_id,
+        entity_id=order.id,
+        event_data={
+            "from_store_id": str(order.from_store_id),
+            "to_store_id": str(order.to_store_id),
+            "items_count": len(inventory_results),
+        },
+        source_service="tx-supply",
+    ))
 
     return {
         "order_id": order_id,

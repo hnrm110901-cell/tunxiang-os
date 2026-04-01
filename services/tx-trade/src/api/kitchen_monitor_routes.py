@@ -19,7 +19,8 @@ from datetime import datetime, timezone, timedelta
 from typing import Any, List, Optional
 
 import structlog
-from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from fastapi import APIRouter
+from shared.ontology.src.database import get_db as _get_db, Depends, Header, HTTPException, Request
 
 router = APIRouter(tags=["kitchen-monitor"])
 
@@ -28,9 +29,6 @@ log = structlog.get_logger(__name__)
 
 # ─── 数据库依赖占位 ───
 
-async def _get_db():
-    """数据库会话依赖 — 由 main.py 覆盖"""
-    raise NotImplementedError("DB session dependency not configured")
 
 
 def _get_tenant_id(request: Request) -> str:

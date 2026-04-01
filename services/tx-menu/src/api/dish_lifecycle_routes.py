@@ -27,6 +27,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
+from shared.ontology.src.database import get_db
 
 from ..services.dish_health_score import DishHealthScoreEngine, ScoreWeights
 from ..services.dish_lifecycle import DishLifecycleService
@@ -85,11 +86,6 @@ _STAGE_ORDER = {s["stage"]: s["order"] for s in _LIFECYCLE_STAGES}
 
 
 # ─── 依赖注入占位 ─────────────────────────────────────────────────────────────
-
-
-async def get_db() -> AsyncSession:  # type: ignore[override]
-    """数据库会话依赖 — 由 main.py 中 app.dependency_overrides 注入"""
-    raise NotImplementedError("DB session dependency not configured")
 
 
 # ─── 请求模型 ─────────────────────────────────────────────────────────────────
@@ -275,9 +271,7 @@ async def get_new_dish_report(
 lifecycle_router = APIRouter(prefix="/api/v1", tags=["dish-lifecycle-manage"])
 
 
-async def _get_lifecycle_db() -> AsyncSession:  # type: ignore[override]
-    """数据库会话依赖 — 由 main.py 中 app.dependency_overrides 注入"""
-    raise NotImplementedError("DB session dependency not configured")
+from shared.ontology.src.database import get_db as _get_lifecycle_db
 
 
 async def _set_rls(db: AsyncSession, tenant_id: str) -> None:

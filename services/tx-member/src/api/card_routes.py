@@ -4,8 +4,22 @@
 """
 from typing import Optional
 
-from fastapi import APIRouter, Header, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession
+from shared.ontology.src.database import get_db
+
+from ..services.card_engine import (
+    create_card_type,
+    set_card_levels,
+    create_anonymous_card,
+    issue_card,
+    upgrade_level,
+    downgrade_level,
+    set_member_day,
+    get_card_benefits,
+    batch_card_operations,
+)
 
 router = APIRouter(prefix="/api/v1/member/card", tags=["member-card"])
 
@@ -42,28 +56,25 @@ class BatchOperationsRequest(BaseModel):
 # ── 1. 创建卡类型 ─────────────────────────────────────────────
 
 @router.post("/types")
-async def create_card_type(
+async def create_card_type_route(
     body: CreateCardTypeRequest,
-    x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """创建会员卡类型（含储值/积分使用规则）"""
-    # TODO: 注入真实 DB session 后调用 card_engine.create_card_type
-    return {
-        "ok": True,
-        "data": {
-            "card_type_id": "placeholder",
-            "name": body.name,
-            "rules": body.rules,
-            "created_at": "2026-01-01T00:00:00+00:00",
-        },
-    }
+    try:
+        data = await create_card_type(body.name, body.rules, x_tenant_id, db)
+        return {"ok": True, "data": data}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
 
 # ── 2. 获取卡类型列表 ─────────────────────────────────────────
 
 @router.get("/types")
 async def list_card_types(
-    x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """获取会员卡类型列表"""
     return {
@@ -78,20 +89,18 @@ async def list_card_types(
 # ── 3. 设置卡等级 ─────────────────────────────────────────────
 
 @router.put("/types/{card_type_id}/levels")
-async def set_card_levels(
+async def set_card_levels_route(
     card_type_id: str,
     body: SetCardLevelsRequest,
-    x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """设置卡等级（权益/升级规则/降级规则）"""
-    return {
-        "ok": True,
-        "data": {
-            "card_type_id": card_type_id,
-            "levels_count": len(body.levels),
-            "levels": body.levels,
-        },
-    }
+    try:
+        data = await set_card_levels(card_type_id, body.levels, x_tenant_id, db)
+        return {"ok": True, "data": data}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
 
 # ── 4. 批量创建匿名实体卡 ─────────────────────────────────────
@@ -100,129 +109,110 @@ async def set_card_levels(
 async def create_anonymous_cards(
     card_type_id: str,
     body: CreateAnonymousCardRequest,
-    x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """批量创建匿名实体卡"""
-    return {
-        "ok": True,
-        "data": {
-            "batch_no": body.batch_no,
-            "count": body.count,
-            "card_ids": [],
-        },
-    }
+    try:
+        data = await create_anonymous_card(card_type_id, body.batch_no, body.count, x_tenant_id, db)
+        return {"ok": True, "data": data}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
 
 # ── 5. 发卡 ───────────────────────────────────────────────────
 
 @router.post("/issue")
-async def issue_card(
+async def issue_card_route(
     body: IssueCardRequest,
-    x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """给客户发放会员卡"""
-    return {
-        "ok": True,
-        "data": {
-            "card_id": "placeholder",
-            "customer_id": body.customer_id,
-            "card_type_id": body.card_type_id,
-            "status": "active",
-            "issued_at": "2026-01-01T00:00:00+00:00",
-        },
-    }
+    try:
+        data = await issue_card(body.customer_id, body.card_type_id, x_tenant_id, db)
+        return {"ok": True, "data": data}
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
 
 
 # ── 6. 等级升级 ───────────────────────────────────────────────
 
 @router.post("/cards/{card_id}/upgrade")
-async def upgrade_level(
+async def upgrade_level_route(
     card_id: str,
-    x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """等级升级（根据规则自动判定）"""
-    return {
-        "ok": True,
-        "data": {
-            "card_id": card_id,
-            "old_rank": 0,
-            "new_rank": 0,
-            "upgraded": False,
-        },
-    }
+    try:
+        data = await upgrade_level(card_id, x_tenant_id, db)
+        return {"ok": True, "data": data}
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
 
 
 # ── 7. 等级降级 ───────────────────────────────────────────────
 
 @router.post("/cards/{card_id}/downgrade")
-async def downgrade_level(
+async def downgrade_level_route(
     card_id: str,
-    x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """等级降级"""
-    return {
-        "ok": True,
-        "data": {
-            "card_id": card_id,
-            "old_rank": 0,
-            "new_rank": 0,
-            "downgraded": False,
-        },
-    }
+    try:
+        data = await downgrade_level(card_id, x_tenant_id, db)
+        return {"ok": True, "data": data}
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
 
 
 # ── 8. 设置会员日 ─────────────────────────────────────────────
 
 @router.put("/types/{card_type_id}/member-day")
-async def set_member_day(
+async def set_member_day_route(
     card_type_id: str,
     body: SetMemberDayRequest,
-    x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """设置会员日（周几/每月几号）"""
-    return {
-        "ok": True,
-        "data": {
-            "card_type_id": card_type_id,
-            "member_day_config": body.config,
-        },
-    }
+    try:
+        data = await set_member_day(card_type_id, body.config, x_tenant_id, db)
+        return {"ok": True, "data": data}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
 
 # ── 9. 获取卡权益 ─────────────────────────────────────────────
 
 @router.get("/cards/{card_id}/benefits")
-async def get_card_benefits(
+async def get_card_benefits_route(
     card_id: str,
     store_id: str = Query(..., description="门店 ID"),
-    x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """获取当前卡的所有权益（含门店差异化）"""
-    return {
-        "ok": True,
-        "data": {
-            "card_id": card_id,
-            "level_name": "default",
-            "level_rank": 0,
-            "benefits": [],
-        },
-    }
+    try:
+        data = await get_card_benefits(card_id, store_id, x_tenant_id, db)
+        return {"ok": True, "data": data}
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
 
 
 # ── 10. 批量操作 ──────────────────────────────────────────────
 
 @router.post("/batch-operations")
-async def batch_card_operations(
+async def batch_card_operations_route(
     body: BatchOperationsRequest,
-    x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """批量操作（充值/扣减/转移）"""
-    return {
-        "ok": True,
-        "data": {
-            "total_ops": len(body.operations),
-            "success_count": 0,
-            "failed_count": 0,
-            "results": [],
-        },
-    }
+    try:
+        data = await batch_card_operations(body.operations, x_tenant_id, db)
+        return {"ok": True, "data": data}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))

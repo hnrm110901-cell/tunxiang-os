@@ -31,7 +31,7 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
 from enum import Enum
-from typing import Any, Optional
+from typing import Any, AsyncGenerator, Optional
 
 import structlog
 from anthropic import AsyncAnthropic, APIConnectionError, APIStatusError, APITimeoutError
@@ -268,6 +268,30 @@ class CostTracker:
             ],
         }
 
+    def estimate_cost_fen(self, task_type: str, messages: list[dict], strategy: "ModelSelectionStrategy") -> int:
+        """粗略估算本次调用成本（分）。
+
+        Args:
+            task_type:  任务类型
+            messages:   对话消息列表
+            strategy:   模型选择策略实例，用于推断目标模型
+
+        Returns:
+            估算成本，单位：分（人民币）
+        """
+        total_chars = sum(len(str(m.get("content", ""))) for m in messages)
+        estimated_tokens = int(total_chars * 1.5)
+
+        model = strategy.select_model(task_type)
+        # 粗略价格（分/千token，仅用于预算估算）
+        price_per_1k = {
+            "claude-haiku-4-5-20251001": 1,    # ~0.01元/千token
+            "claude-sonnet-4-6":         5,    # ~0.05元/千token
+            "claude-opus-4-6":          20,    # ~0.20元/千token
+        }.get(model, 5)
+
+        return (estimated_tokens * price_per_1k) // 1000
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 3. 熔断器
@@ -499,6 +523,9 @@ class ModelRouter:
     RETRY_DELAYS   = [1, 2, 4]   # 秒，指数退避
     DEFAULT_TIMEOUT_S = 30
 
+    # 默认预算：每租户每月 500 元（50000 分）
+    DEFAULT_MONTHLY_BUDGET_FEN: int = 50_000
+
     def __init__(
         self,
         api_key: Optional[str] = None,
@@ -514,6 +541,111 @@ class ModelRouter:
         self._circuit        = circuit_breaker or CircuitBreaker()
         self._cost_tracker   = cost_tracker or CostTracker()
         self._strategy       = model_strategy or ModelSelectionStrategy()
+
+        # Redis 客户端（懒加载，用于租户预算检查）
+        self._redis: Any = None
+        self._redis_url: str = os.environ.get("REDIS_URL", "redis://localhost:6379")
+        self._redis_available: bool = True  # 首次尝试前假设可用
+
+    async def _get_router_redis(self) -> Any:
+        """懒加载 Redis 客户端，失败则标记不可用。"""
+        if not self._redis_available:
+            return None
+        if self._redis is None:
+            try:
+                import redis.asyncio as aioredis
+                self._redis = aioredis.from_url(self._redis_url, decode_responses=True)
+                await self._redis.ping()
+            except (OSError, RuntimeError) as exc:
+                logger.warning("model_router_redis_unavailable", reason=str(exc))
+                self._redis = None
+                self._redis_available = False
+        return self._redis
+
+    async def _check_tenant_budget(
+        self,
+        tenant_id: str,
+        estimated_cost_fen: int,
+    ) -> None:
+        """检查租户月度成本是否将超预算。
+
+        超预算时记录 warning 日志，不阻断请求（软限制）。
+        若超过预算 2 倍则记录 critical 日志。
+
+        Args:
+            tenant_id:          租户 UUID
+            estimated_cost_fen: 本次预估成本（分）
+        """
+        redis = await self._get_router_redis()
+        if redis is None:
+            return
+
+        now = datetime.now(timezone.utc)
+        month_key = f"tenant:cost:{tenant_id}:{now.year:04d}-{now.month:02d}"
+
+        try:
+            current_cost_str = await redis.get(month_key)
+            current_cost_fen = int(current_cost_str) if current_cost_str else 0
+        except (OSError, RuntimeError) as exc:
+            logger.warning("tenant_budget_redis_read_failed", reason=str(exc), tenant_id=tenant_id)
+            return
+
+        projected_cost_fen = current_cost_fen + estimated_cost_fen
+        budget = self.DEFAULT_MONTHLY_BUDGET_FEN
+
+        if projected_cost_fen >= budget * 2:
+            logger.critical(
+                "tenant_budget_critical",
+                tenant_id=tenant_id,
+                current_cost_fen=current_cost_fen,
+                estimated_cost_fen=estimated_cost_fen,
+                projected_cost_fen=projected_cost_fen,
+                budget_fen=budget,
+                budget_critical=True,
+            )
+        elif projected_cost_fen >= budget:
+            logger.warning(
+                "tenant_budget_exceeded",
+                tenant_id=tenant_id,
+                current_cost_fen=current_cost_fen,
+                estimated_cost_fen=estimated_cost_fen,
+                projected_cost_fen=projected_cost_fen,
+                budget_fen=budget,
+            )
+
+    def _auto_detect_task_type(self, messages: list[dict]) -> str:
+        """根据消息内容自动推断最合适的 task_type。
+
+        优先级：content特征 > 消息长度
+
+        Args:
+            messages: 对话消息列表
+
+        Returns:
+            推断出的 task_type 字符串
+        """
+        content = " ".join(str(m.get("content", "")) for m in messages)
+        length = len(content)
+
+        # 简单分类任务 → haiku
+        if length < 300 and any(
+            kw in content for kw in ["分类", "判断是否", "是还是否", "true/false", "属于哪"]
+        ):
+            return "quick_classification"
+
+        # 复杂推理任务 → opus
+        if any(
+            kw in content
+            for kw in ["预测未来", "根本原因", "深度分析", "财务预测", "战略建议", "为什么会"]
+        ):
+            return "complex_reasoning"
+
+        # 长文本 → sonnet
+        if length > 2000:
+            return "standard_analysis"
+
+        # 默认 → sonnet
+        return "standard_analysis"
 
     async def complete(
         self,
@@ -549,6 +681,9 @@ class ModelRouter:
             APITimeoutError:    超时（重试后仍超时）
             APIStatusError:     API 返回错误状态码
         """
+        if task_type == "auto":
+            task_type = self._auto_detect_task_type(messages)
+
         model = self._strategy.select_model(task_type, urgency)
         req_id = request_id or str(uuid.uuid4())
 
@@ -560,6 +695,9 @@ class ModelRouter:
             urgency=urgency,
             request_id=req_id,
         )
+
+        estimated_cost_fen = self._cost_tracker.estimate_cost_fen(task_type, messages, self._strategy)
+        await self._check_tenant_budget(tenant_id, estimated_cost_fen)
 
         last_exc: Optional[Exception] = None
         start_ms = time.monotonic()
@@ -724,3 +862,68 @@ class ModelRouter:
             self._client.messages.create(**kwargs),
             timeout=timeout_s,
         )
+
+    async def stream_complete(
+        self,
+        tenant_id: str,
+        task_type: str,
+        messages: list[dict],
+        system: Optional[str] = None,
+        urgency: str = "normal",
+        max_tokens: int = 1024,
+    ) -> AsyncGenerator[str, None]:
+        """流式输出，适用于报告生成、长文本分析场景。
+
+        使用方式：
+            async for chunk in router.stream_complete(...):
+                yield chunk  # 发送给前端 SSE
+
+        Args:
+            tenant_id:  租户 UUID（用于成本预算检查）
+            task_type:  任务类型，见 ModelSelectionStrategy.TASK_MODEL_MAP；支持 "auto"
+            messages:   对话消息列表，格式同 Anthropic SDK
+            system:     系统 prompt（可选）
+            urgency:    "fast" | "normal" | "quality"
+            max_tokens: 最大输出 token 数
+
+        Yields:
+            模型生成的文本片段
+        """
+        if task_type == "auto":
+            task_type = self._auto_detect_task_type(messages)
+
+        model = self._strategy.select_model(task_type, urgency)
+
+        logger.info(
+            "model_router_stream_start",
+            tenant_id=tenant_id,
+            task_type=task_type,
+            model=model,
+            urgency=urgency,
+        )
+
+        estimated_cost_fen = self._cost_tracker.estimate_cost_fen(task_type, messages, self._strategy)
+        await self._check_tenant_budget(tenant_id, estimated_cost_fen)
+
+        kwargs: dict[str, Any] = {
+            "model":      model,
+            "max_tokens": max_tokens,
+            "messages":   messages,
+        }
+        if system:
+            kwargs["system"] = system
+
+        try:
+            async with self._client.messages.stream(**kwargs) as stream:
+                async for text in stream.text_stream:
+                    yield text
+        except (APIConnectionError, APIStatusError, APITimeoutError) as exc:
+            logger.error(
+                "model_router_stream_failed",
+                tenant_id=tenant_id,
+                task_type=task_type,
+                model=model,
+                error_type=type(exc).__name__,
+                error=str(exc),
+            )
+            return

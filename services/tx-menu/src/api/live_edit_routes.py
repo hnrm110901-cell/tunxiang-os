@@ -1,12 +1,16 @@
 """菜单实时编辑 API — PATCH /api/v1/menu/dishes/{dish_id}/live"""
 import os
+import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
 import httpx
 import structlog
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, Field
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
+from shared.ontology.src.database import get_db
 
 logger = structlog.get_logger(__name__)
 
@@ -88,7 +92,12 @@ async def _broadcast_bulk_update(dish_ids: list[str], is_available: bool, reason
 # ─── 端点 ───
 
 @router.patch("/dishes/{dish_id}/live")
-async def live_update_dish(dish_id: str, req: LiveDishUpdate):
+async def live_update_dish(
+    dish_id: str,
+    req: LiveDishUpdate,
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
+):
     """
     实时编辑菜品（不停机同步到所有终端）。
 
@@ -103,8 +112,27 @@ async def live_update_dish(dish_id: str, req: LiveDishUpdate):
     if not changes:
         raise HTTPException(status_code=400, detail="至少需要提供一个要修改的字段")
 
-    # TODO: 实际数据库写入（当前为 stub，等 DB layer 完成后接入）
-    # await dish_repository.live_update(dish_id=dish_id, changes=changes, tenant_id=tenant_id)
+    await db.execute(
+        text("SELECT set_config('app.tenant_id', :tid, true)"),
+        {"tid": x_tenant_id},
+    )
+    # Map pydantic field names to DB column names
+    col_map = {
+        "name": "dish_name",
+        "price": "price_fen",
+        "description": "description",
+        "is_available": "is_available",
+        "daily_limit": "daily_limit",
+        "image_url": "image_url",
+    }
+    set_clauses = ", ".join(
+        f"{col_map.get(k, k)} = :{k}" for k in changes
+    )
+    await db.execute(
+        text(f"UPDATE dishes SET {set_clauses}, updated_at = NOW() WHERE id = :dish_id AND tenant_id = :tid::uuid AND is_deleted = false"),
+        {**changes, "dish_id": dish_id, "tid": x_tenant_id},
+    )
+    await db.commit()
 
     synced_at = datetime.now(timezone.utc).isoformat()
     updated_by = req.updated_by or "unknown"
@@ -133,7 +161,11 @@ async def live_update_dish(dish_id: str, req: LiveDishUpdate):
 
 
 @router.post("/dishes/bulk-availability")
-async def bulk_update_availability(req: BulkAvailabilityUpdate):
+async def bulk_update_availability(
+    req: BulkAvailabilityUpdate,
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
+):
     """
     批量上/下架菜品（例如今日估清）。
 
@@ -142,12 +174,25 @@ async def bulk_update_availability(req: BulkAvailabilityUpdate):
     if not req.dish_ids:
         raise HTTPException(status_code=400, detail="dish_ids 不能为空")
 
-    # TODO: 实际数据库批量写入
-    # await dish_repository.bulk_update_availability(
-    #     dish_ids=req.dish_ids,
-    #     is_available=req.is_available,
-    #     tenant_id=tenant_id,
-    # )
+    await db.execute(
+        text("SELECT set_config('app.tenant_id', :tid, true)"),
+        {"tid": x_tenant_id},
+    )
+    await db.execute(
+        text("""
+            UPDATE dishes
+               SET is_available = :is_available, updated_at = NOW()
+             WHERE id = ANY(:ids::uuid[])
+               AND tenant_id = :tid::uuid
+               AND is_deleted = false
+        """),
+        {
+            "is_available": req.is_available,
+            "ids": req.dish_ids,
+            "tid": x_tenant_id,
+        },
+    )
+    await db.commit()
 
     updated_by = req.updated_by or "unknown"
     reason = req.reason or ""

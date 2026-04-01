@@ -58,6 +58,29 @@
       "pages": [
         "social"
       ]
+    },
+    {
+      "root": "pages/group-buy",
+      "pages": [
+        "index"
+      ]
+    },
+    {
+      "root": "pages/stamp-card",
+      "pages": [
+        "index"
+      ]
+    },
+    {
+      "root": "pages/retail-mall",
+      "pages": [
+        "index",
+        "product",
+        "product-detail",
+        "cart",
+        "order",
+        "checkout"
+      ]
     }
   ],
   "window": {

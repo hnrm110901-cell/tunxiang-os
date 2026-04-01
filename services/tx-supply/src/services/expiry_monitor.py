@@ -3,6 +3,7 @@
 三条硬约束之一：食安合规 — 临期/过期食材不可用于出品。
 过期原料 = food safety violation，必须处理。
 """
+import asyncio
 import json
 import uuid
 from datetime import date, timedelta
@@ -12,6 +13,7 @@ import structlog
 from sqlalchemy import select, func, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from shared.events import UniversalPublisher, SupplyEventType
 from shared.ontology.src.entities import Ingredient, IngredientTransaction
 from shared.ontology.src.enums import TransactionType
 
@@ -192,6 +194,23 @@ async def check_expiring_items(
         count=len(expiring),
         tenant_id=tenant_id,
     )
+
+    # ── 事件总线：食材临期预警 ──────────────────────────────
+    for item in expiring:
+        asyncio.create_task(UniversalPublisher.publish(
+            event_type=SupplyEventType.INGREDIENT_EXPIRING,
+            tenant_id=_uuid(tenant_id),
+            store_id=_uuid(store_id),
+            entity_id=_uuid(item["ingredient_id"]),
+            event_data={
+                "ingredient_id": item["ingredient_id"],
+                "expire_date": item["expiry_date"],
+                "days_remaining": item["remaining_days"],
+                "qty": item["quantity"],
+            },
+            source_service="tx-supply",
+        ))
+
     return expiring
 
 

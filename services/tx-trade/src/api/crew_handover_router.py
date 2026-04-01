@@ -7,8 +7,11 @@ from datetime import datetime, timezone
 from typing import Optional
 
 import structlog
-from fastapi import APIRouter, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
+from shared.ontology.src.database import get_db
 
 logger = structlog.get_logger(__name__)
 
@@ -79,40 +82,39 @@ async def get_shift_summary(
 async def submit_handover(
     payload: HandoverRequest,
     x_tenant_id: str = Header(default="", alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """保存交班记录。
 
     更新 crew_shifts.end_at 与 notes，写入本班汇总数据。
-    当前实现 Mock 成功响应，生产环境需写入 DB：
-      UPDATE crew_shifts
-         SET end_at = NOW(), notes = :notes
-       WHERE crew_id = :crew_id AND end_at IS NULL;
     """
     log = logger.bind(crew_id=payload.crew_id, tenant_id=x_tenant_id)
     try:
         if not payload.crew_id:
             raise ValueError("crew_id 不能为空")
 
-        # TODO: 生产环境替换为真实 DB 操作
-        # async with get_session() as session:
-        #     await session.execute(
-        #         text("""
-        #             UPDATE crew_shifts
-        #                SET end_at = NOW(),
-        #                    notes = :notes,
-        #                    summary_data = :summary
-        #              WHERE crew_id = :crew_id
-        #                AND end_at IS NULL
-        #                AND tenant_id = :tenant_id
-        #         """),
-        #         {
-        #             "crew_id": payload.crew_id,
-        #             "notes": payload.notes or "",
-        #             "summary": payload.shift_summary_data.model_dump(),
-        #             "tenant_id": x_tenant_id,
-        #         },
-        #     )
-        #     await session.commit()
+        await db.execute(
+            text("SELECT set_config('app.tenant_id', :tid, true)"),
+            {"tid": x_tenant_id},
+        )
+        await db.execute(
+            text("""
+                UPDATE crew_shifts
+                   SET end_at = NOW(),
+                       notes = :notes,
+                       summary_data = :summary
+                 WHERE crew_id = :crew_id
+                   AND end_at IS NULL
+                   AND tenant_id = :tenant_id
+            """),
+            {
+                "crew_id": payload.crew_id,
+                "notes": payload.notes or "",
+                "summary": payload.shift_summary_data.model_dump(),
+                "tenant_id": x_tenant_id,
+            },
+        )
+        await db.commit()
 
         handover_id = f"handover-{payload.crew_id}-{int(datetime.now(timezone.utc).timestamp())}"
         log.info(

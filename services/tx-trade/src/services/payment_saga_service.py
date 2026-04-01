@@ -15,6 +15,7 @@ Saga步骤：
   paying 状态：查询payment网关确认是否已扣款，已扣款则继续S3或补偿
   completing 状态：重试S3，失败则补偿
 """
+import asyncio
 import uuid
 from datetime import datetime, timezone, timedelta
 from typing import Optional
@@ -23,6 +24,8 @@ import structlog
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from shared.events import UniversalPublisher, TradeEventType
 
 logger = structlog.get_logger(__name__)
 
@@ -231,6 +234,15 @@ class PaymentSagaService:
         await self._update_step(saga_id, SagaStep.DONE)
         log.info("saga_done", payment_id=payment_id, payment_no=payment_no)
 
+        asyncio.create_task(UniversalPublisher.publish(
+            event_type=TradeEventType.ORDER_PAID,
+            tenant_id=self._tenant_id,
+            store_id=None,
+            entity_id=order_id,
+            event_data={"total_fen": amount_fen, "channel": method},
+            source_service="tx-trade",
+        ))
+
         return {
             "saga_id": str(saga_id),
             "payment_id": payment_id,
@@ -306,6 +318,16 @@ class PaymentSagaService:
         )
         await self._db.flush()
         log.info("saga_compensated", payment_id=payment_id)
+
+        asyncio.create_task(UniversalPublisher.publish(
+            event_type=TradeEventType.ORDER_REFUNDED,
+            tenant_id=self._tenant_id,
+            store_id=None,
+            entity_id=row["payment_id"],
+            event_data={"amount_fen": amount_fen, "reason": reason},
+            source_service="tx-trade",
+        ))
+
         return True
 
     # ─────────────────────────────────────────────────────────────────

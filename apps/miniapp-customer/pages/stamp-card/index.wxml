@@ -1,0 +1,109 @@
+<!-- Stamp Card / 集点卡 -->
+<view class="page-container">
+  <!-- Tabs -->
+  <view class="tabs-bar">
+    <view class="tab-item {{tab === 'cards' ? 'active' : ''}}"
+          bindtap="switchTab" data-tab="cards">我的集点卡</view>
+    <view class="tab-item {{tab === 'all' ? 'active' : ''}}"
+          bindtap="switchTab" data-tab="all">全部活动</view>
+  </view>
+
+  <!-- My Cards -->
+  <view class="card-list" wx:if="{{tab === 'cards'}}">
+    <view class="stamp-card" wx:for="{{myCards}}" wx:key="id">
+      <!-- Card header -->
+      <view class="card-header">
+        <text class="card-name">{{item.template_name}}</text>
+        <text class="card-status {{item.status}}">
+          {{item.status === 'active' ? '集印中' : item.status === 'completed' ? '已集满' : '已过期'}}
+        </text>
+      </view>
+
+      <!-- Stamp grid -->
+      <view class="stamp-grid">
+        <view class="stamp-slot" wx:for="{{item.target_stamps}}" wx:for-index="si" wx:key="*this">
+          <view class="stamp-circle {{si < item.current_stamps ? 'stamped' : 'empty'}}">
+            <text wx:if="{{si < item.current_stamps}}">✓</text>
+            <text wx:else>{{si + 1}}</text>
+          </view>
+          <!-- Reward indicator on last stamp -->
+          <view class="reward-indicator" wx:if="{{si === item.target_stamps - 1}}">
+            <text class="reward-icon">🎁</text>
+          </view>
+        </view>
+      </view>
+
+      <!-- Progress text -->
+      <view class="card-progress">
+        <text class="progress-label">
+          {{item.status === 'completed' ? '已集满，可兑换奖励！' : '再消费 ' + (item.target_stamps - item.current_stamps) + ' 次即可兑换'}}
+        </text>
+        <text class="progress-count">{{item.current_stamps}}/{{item.target_stamps}}</text>
+      </view>
+
+      <!-- Reward description -->
+      <view class="card-reward">
+        <text class="reward-label">奖励:</text>
+        <text class="reward-value">{{item.reward_desc}}</text>
+      </view>
+
+      <!-- Validity -->
+      <view class="card-validity">
+        <text class="validity-text">有效期至 {{item.expire_date}}</text>
+      </view>
+
+      <!-- Actions -->
+      <view class="card-actions" wx:if="{{item.status === 'completed' && !item.redeemed}}">
+        <button class="redeem-btn" bindtap="onRedeemCard" data-id="{{item.id}}"
+                disabled="{{redeeming}}">
+          {{redeeming ? '兑换中...' : '立即兑换'}}
+        </button>
+      </view>
+      <view class="card-actions" wx:if="{{item.redeemed}}">
+        <view class="redeemed-badge">✓ 已兑换</view>
+      </view>
+    </view>
+
+    <!-- Empty -->
+    <view class="empty-state" wx:if="{{myCards.length === 0 && !loading}}">
+      <text class="empty-icon">🎯</text>
+      <text class="empty-text">还没有集点卡</text>
+      <text class="empty-sub">消费后自动获得，快去看看有哪些活动吧</text>
+    </view>
+  </view>
+
+  <!-- All Templates -->
+  <view class="template-list" wx:if="{{tab === 'all'}}">
+    <view class="template-card" wx:for="{{templates}}" wx:key="id">
+      <view class="template-header">
+        <text class="template-name">{{item.name}}</text>
+      </view>
+      <view class="template-info">
+        <view class="template-row">
+          <text class="label">集印目标</text>
+          <text class="value">{{item.target_stamps}} 次消费</text>
+        </view>
+        <view class="template-row">
+          <text class="label">奖励</text>
+          <text class="value reward-text">{{item.reward_desc}}</text>
+        </view>
+        <view class="template-row">
+          <text class="label">门槛</text>
+          <text class="value">{{item.min_order_fen > 0 ? '消费满¥' + (item.min_order_fen / 100) + '自动集印' : '每次消费自动集印'}}</text>
+        </view>
+        <view class="template-row">
+          <text class="label">有效期</text>
+          <text class="value">领取后 {{item.validity_days}} 天</text>
+        </view>
+      </view>
+      <view class="template-tip">
+        <text>{{item.auto_stamp ? '✓ 消费后自动集印' : '需在门店手动集印'}}</text>
+      </view>
+    </view>
+
+    <view class="empty-state" wx:if="{{templates.length === 0 && !loading}}">
+      <text class="empty-icon">📋</text>
+      <text class="empty-text">暂无集点活动</text>
+    </view>
+  </view>
+</view>

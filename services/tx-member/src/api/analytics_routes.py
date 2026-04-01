@@ -4,8 +4,18 @@
 """
 from typing import Optional
 
-from fastapi import APIRouter, Header, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
+from shared.ontology.src.database import get_db
+
+from ..services.member_analytics import (
+    member_growth,
+    activity_analysis,
+    repurchase_analysis,
+    churn_prediction,
+    preference_insight,
+)
 
 router = APIRouter(prefix="/api/v1/member/analytics", tags=["member-analytics"])
 
@@ -23,20 +33,15 @@ class DateRangeParams(BaseModel):
 async def get_member_growth(
     start_date: str = Query(..., description="开始日期 YYYY-MM-DD"),
     end_date: str = Query(..., description="结束日期 YYYY-MM-DD"),
-    x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """会员增长分析 — 新增、总量、增长率、渠道分布"""
-    # TODO: 注入真实 DB session 后调用 member_analytics.member_growth
-    return {
-        "ok": True,
-        "data": {
-            "new_members": 0,
-            "total": 0,
-            "growth_rate": 0.0,
-            "by_channel": {},
-            "date_range": [start_date, end_date],
-        },
-    }
+    try:
+        data = await member_growth(x_tenant_id, (start_date, end_date), db)
+        return {"ok": True, "data": data}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
 
 # ── 2. 活跃度分析 ─────────────────────────────────────────────
@@ -45,21 +50,15 @@ async def get_member_growth(
 async def get_activity_analysis(
     start_date: str = Query(..., description="开始日期 YYYY-MM-DD"),
     end_date: str = Query(..., description="结束日期 YYYY-MM-DD"),
-    x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """会员活跃度分析 — 活跃率、DAU、MAU、门店分布"""
-    return {
-        "ok": True,
-        "data": {
-            "active_rate": 0.0,
-            "active_members": 0,
-            "total_members": 0,
-            "dau": 0.0,
-            "mau": 0,
-            "by_store": {},
-            "date_range": [start_date, end_date],
-        },
-    }
+    try:
+        data = await activity_analysis(x_tenant_id, (start_date, end_date), db)
+        return {"ok": True, "data": data}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
 
 # ── 3. 复购分析 ───────────────────────────────────────────────
@@ -68,40 +67,33 @@ async def get_activity_analysis(
 async def get_repurchase_analysis(
     start_date: str = Query(..., description="开始日期 YYYY-MM-DD"),
     end_date: str = Query(..., description="结束日期 YYYY-MM-DD"),
-    x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """复购率分析 — 复购率、平均间隔天数、频次带分布"""
-    return {
-        "ok": True,
-        "data": {
-            "repurchase_rate": 0.0,
-            "repurchase_count": 0,
-            "total_buyers": 0,
-            "avg_interval_days": 0.0,
-            "by_frequency_band": [],
-            "date_range": [start_date, end_date],
-        },
-    }
+    try:
+        data = await repurchase_analysis(x_tenant_id, (start_date, end_date), db)
+        return {"ok": True, "data": data}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
 
 # ── 4. 流失预警 ───────────────────────────────────────────────
 
 @router.get("/churn-prediction")
 async def get_churn_prediction(
-    x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """流失风险预测 — 按风险分排序的会员列表
 
     规则: >60天未消费=高风险, 30-60天=中风险
     """
-    return {
-        "ok": True,
-        "data": {
-            "predictions": [],
-            "high_risk_count": 0,
-            "medium_risk_count": 0,
-        },
-    }
+    try:
+        data = await churn_prediction(x_tenant_id, db)
+        return {"ok": True, "data": data}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
 
 # ── 5. 偏好洞察 ───────────────────────────────────────────────
@@ -109,21 +101,12 @@ async def get_churn_prediction(
 @router.get("/preference/{customer_id}")
 async def get_preference_insight(
     customer_id: str,
-    x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """单个会员偏好洞察 — 最爱菜品、到店时段、消费水平"""
-    return {
-        "ok": True,
-        "data": {
-            "customer_id": customer_id,
-            "favorite_dishes": [],
-            "visit_pattern": {},
-            "day_pattern": {},
-            "avg_spend_fen": 0,
-            "preferred_time": None,
-            "rfm": {},
-            "total_order_count": 0,
-            "total_order_amount_fen": 0,
-            "tags": [],
-        },
-    }
+    try:
+        data = await preference_insight(customer_id, x_tenant_id, db)
+        return {"ok": True, "data": data}
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))

@@ -13,6 +13,7 @@ from .api.private_domain_routes import router as private_domain_router
 from .api.reports_router import router as p0_reports_router
 from .api.cost_health_routes import router as cost_health_router
 from .api.boss_bi_routes import router as boss_bi_router
+from .api.stream_report_routes import router as stream_report_router
 
 app = FastAPI(title="TunxiangOS tx-analytics", version="3.0.0")
 app.include_router(analytics_router)
@@ -24,6 +25,7 @@ app.include_router(private_domain_router)
 app.include_router(p0_reports_router)
 app.include_router(cost_health_router)
 app.include_router(boss_bi_router)
+app.include_router(stream_report_router)
 
 @app.get("/health")
 async def health():

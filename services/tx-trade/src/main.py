@@ -80,15 +80,19 @@ from .routers.delivery_panel_router import router as delivery_panel_router
 from .routers.self_pay_router import router as self_pay_router
 from .api.production_dept_routes import router as production_dept_router
 from .api.template_editor_routes import router as template_editor_router
+from .api.group_buy_routes import router as group_buy_router
+from .api.xhs_routes import router as xhs_router
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     import asyncio
     from .services.cook_time_stats import start_daily_scheduler
+    from .services.group_buy_scheduler import start_group_buy_expiry_scheduler
     from shared.ontology.src.database import async_session_factory
     await init_db()
     asyncio.create_task(start_daily_scheduler(async_session_factory))
+    asyncio.create_task(start_group_buy_expiry_scheduler(async_session_factory))
     yield
 
 
@@ -178,6 +182,8 @@ app.include_router(delivery_router)         # 旧骨架路由（保留 /webhook/
 app.include_router(self_pay_router)
 app.include_router(production_dept_router)
 app.include_router(template_editor_router)
+app.include_router(group_buy_router)
+app.include_router(xhs_router)
 
 
 @app.get("/health")

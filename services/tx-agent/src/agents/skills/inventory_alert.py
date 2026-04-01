@@ -7,6 +7,7 @@
 迁移自 tunxiang V2.x packages/agents/inventory/src/agent.py
 """
 import statistics
+from datetime import datetime, timezone
 from typing import Any, Optional
 import structlog
 from ..base import SkillAgent, AgentResult
@@ -32,6 +33,9 @@ class InventoryAlertAgent(SkillAgent):
             "evaluate_supplier",
             "scan_contract_risks",
             "analyze_waste",
+            "assess_shortage_severity",
+            "urgent_reorder_notify",
+            "plan_usage",
         ]
 
     async def execute(self, action: str, params: dict[str, Any]) -> AgentResult:
@@ -45,6 +49,9 @@ class InventoryAlertAgent(SkillAgent):
             "compare_supplier_prices": self._compare_prices,
             "scan_contract_risks": self._scan_contracts,
             "analyze_waste": self._analyze_waste,
+            "assess_shortage_severity": self._assess_shortage_severity,
+            "urgent_reorder_notify": self._urgent_reorder_notify,
+            "plan_usage": self._plan_usage,
         }
         handler = dispatch.get(action)
         if not handler:
@@ -468,3 +475,270 @@ class InventoryAlertAgent(SkillAgent):
                          data={"total_waste_yuan": round(total_fen / 100, 2), "event_count": len(waste_events),
                                "top_causes": [{"cause": c, "cost_yuan": round(v/100, 2)} for c, v in top_causes]},
                          reasoning=f"总损耗 ¥{total_fen/100:.0f}，{len(waste_events)} 个事件", confidence=0.8)
+
+    # ─── 事件驱动：评估库存短缺程度 ───
+
+    async def _assess_shortage_severity(self, params: dict) -> AgentResult:
+        """supply.stock.low 触发：评估库存短缺的严重程度和运营影响
+
+        综合考虑：
+        - 当前库存与安全库存的差距
+        - 预计还能支撑多少小时营业
+        - 缺货食材的关键程度（主食/配料/辅料）
+        - 是否有替代方案
+        """
+        store_id = params.get("store_id") or self.store_id
+        event_data = params.get("event_data", {})
+        ingredient_id = params.get("ingredient_id") or event_data.get("ingredient_id")
+        ingredient_name = params.get("ingredient_name") or event_data.get("ingredient_name", "")
+        current_qty = params.get("current_qty") or event_data.get("current_qty", 0)
+        safety_stock = params.get("safety_stock") or event_data.get("safety_stock", 0)
+        daily_usage = params.get("daily_usage") or event_data.get("daily_usage", 0)
+        ingredient_type = params.get("ingredient_type") or event_data.get("ingredient_type", "general")
+        # general / main_ingredient / seasoning / garnish
+        has_substitute = params.get("has_substitute") or event_data.get("has_substitute", False)
+
+        # 缺口分析
+        shortage_qty = max(0, safety_stock - current_qty)
+        shortage_pct = shortage_qty / safety_stock if safety_stock > 0 else 0
+
+        # 预计可用小时（按日用量推算，按12营业小时折算）
+        hours_remaining = (current_qty / daily_usage * 12) if daily_usage > 0 else 999
+
+        # 关键程度权重
+        criticality_map = {
+            "main_ingredient": 1.0,   # 主食材：最高
+            "general": 0.7,
+            "seasoning": 0.4,
+            "garnish": 0.2,
+        }
+        criticality = criticality_map.get(ingredient_type, 0.7)
+
+        # 严重度评分 (0-1)
+        severity_score = min(1.0, shortage_pct * criticality * (1 - 0.3 * has_substitute))
+
+        severity_level = (
+            "critical" if severity_score >= 0.7 or hours_remaining < 2 else
+            "high" if severity_score >= 0.5 or hours_remaining < 4 else
+            "medium" if severity_score >= 0.3 or hours_remaining < 8 else
+            "low"
+        )
+
+        # 建议动作
+        recommended_actions = []
+        if severity_level == "critical":
+            recommended_actions.append("立即联系供应商紧急补货")
+            if not has_substitute:
+                recommended_actions.append("暂时下架依赖此食材的菜品")
+        elif severity_level == "high":
+            recommended_actions.append("今日内安排采购")
+            if has_substitute:
+                recommended_actions.append("临时启用替代食材")
+        else:
+            recommended_actions.append("纳入下次常规采购计划")
+
+        logger.info(
+            "shortage_severity_assessed",
+            store_id=store_id,
+            ingredient_id=ingredient_id,
+            ingredient_name=ingredient_name,
+            severity_level=severity_level,
+            hours_remaining=hours_remaining,
+        )
+
+        return AgentResult(
+            success=True,
+            action="assess_shortage_severity",
+            data={
+                "store_id": store_id,
+                "ingredient_id": ingredient_id,
+                "ingredient_name": ingredient_name,
+                "ingredient_type": ingredient_type,
+                "current_qty": current_qty,
+                "safety_stock": safety_stock,
+                "shortage_qty": shortage_qty,
+                "shortage_pct": round(shortage_pct, 4),
+                "hours_remaining": round(hours_remaining, 1),
+                "criticality": criticality,
+                "severity_score": round(severity_score, 4),
+                "severity_level": severity_level,
+                "has_substitute": has_substitute,
+                "recommended_actions": recommended_actions,
+            },
+            reasoning=(
+                f"短缺评估：{ingredient_name} 库存{current_qty}，"
+                f"预计{hours_remaining:.1f}小时耗尽，严重度={severity_level}"
+            ),
+            confidence=0.85 if daily_usage > 0 else 0.65,
+        )
+
+    # ─── 事件驱动：紧急补货通知 ───
+
+    async def _urgent_reorder_notify(self, params: dict) -> AgentResult:
+        """supply.stock.zero 触发：发出紧急补货通知，生成采购指令草稿
+
+        库存归零时触发，需要最快速度通知相关人员并准备采购单。
+        """
+        store_id = params.get("store_id") or self.store_id
+        event_data = params.get("event_data", {})
+        ingredient_id = params.get("ingredient_id") or event_data.get("ingredient_id")
+        ingredient_name = params.get("ingredient_name") or event_data.get("ingredient_name", "")
+        unit = params.get("unit") or event_data.get("unit", "")
+        preferred_supplier_id = params.get("preferred_supplier_id") or event_data.get("preferred_supplier_id")
+        preferred_supplier_name = params.get("preferred_supplier_name") or event_data.get("preferred_supplier_name", "")
+        last_purchase_price_fen = params.get("last_purchase_price_fen") or event_data.get("last_purchase_price_fen", 0)
+        suggested_order_qty = params.get("suggested_order_qty") or event_data.get("suggested_order_qty", 0)
+        # 如无建议量，用安全库存的2倍
+        if not suggested_order_qty:
+            suggested_order_qty = (params.get("safety_stock") or event_data.get("safety_stock", 10)) * 2
+
+        estimated_cost_fen = int(suggested_order_qty * last_purchase_price_fen)
+
+        # 通知对象
+        notify_targets = ["store_manager", "purchaser"]
+
+        notification = {
+            "notification_id": f"NOTIF-{store_id[:8] if store_id else 'STORE'}-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}",
+            "store_id": store_id,
+            "urgency": "critical",
+            "subject": f"🚨 紧急缺货：{ingredient_name} 库存归零",
+            "message": (
+                f"门店 {store_id} 的 {ingredient_name} 库存已归零，"
+                f"需立即补货 {suggested_order_qty}{unit}。"
+                f"建议供应商：{preferred_supplier_name or '联系默认供应商'}，"
+                f"预估采购成本 ¥{estimated_cost_fen/100:.0f}。"
+            ),
+            "notify_targets": notify_targets,
+            "triggered_at": datetime.now(timezone.utc).isoformat(),
+        }
+
+        purchase_draft = {
+            "ingredient_id": ingredient_id,
+            "ingredient_name": ingredient_name,
+            "order_qty": suggested_order_qty,
+            "unit": unit,
+            "supplier_id": preferred_supplier_id,
+            "supplier_name": preferred_supplier_name,
+            "estimated_unit_price_fen": last_purchase_price_fen,
+            "estimated_total_fen": estimated_cost_fen,
+            "priority": "urgent",
+        }
+
+        logger.info(
+            "urgent_reorder_notified",
+            store_id=store_id,
+            ingredient_id=ingredient_id,
+            ingredient_name=ingredient_name,
+            suggested_order_qty=suggested_order_qty,
+        )
+
+        return AgentResult(
+            success=True,
+            action="urgent_reorder_notify",
+            data={
+                "notification": notification,
+                "purchase_draft": purchase_draft,
+                "store_id": store_id,
+                "ingredient_name": ingredient_name,
+                "estimated_cost_fen": estimated_cost_fen,
+            },
+            reasoning=(
+                f"紧急补货通知：{ingredient_name} 库存归零，"
+                f"建议补货{suggested_order_qty}{unit}，预估¥{estimated_cost_fen/100:.0f}"
+            ),
+            confidence=0.9,
+        )
+
+    # ─── 事件驱动：制定快速用料计划 ───
+
+    async def _plan_usage(self, params: dict) -> AgentResult:
+        """supply.ingredient.expiring 触发：为临期食材制定快速用料计划
+
+        目标：在食材过期前最大化使用，减少损耗。
+        策略：提升含该食材菜品的推荐权重 + 建议特价促销。
+        """
+        store_id = params.get("store_id") or self.store_id
+        event_data = params.get("event_data", {})
+        ingredient_id = params.get("ingredient_id") or event_data.get("ingredient_id")
+        ingredient_name = params.get("ingredient_name") or event_data.get("ingredient_name", "")
+        current_qty = params.get("current_qty") or event_data.get("current_qty", 0)
+        unit = params.get("unit") or event_data.get("unit", "")
+        expiry_date = params.get("expiry_date") or event_data.get("expiry_date", "")
+        days_to_expiry = params.get("days_to_expiry") or event_data.get("days_to_expiry", 3)
+        cost_per_unit_fen = params.get("cost_per_unit_fen") or event_data.get("cost_per_unit_fen", 0)
+        related_dishes = params.get("related_dishes") or event_data.get("related_dishes", [])
+        # related_dishes: [{"dish_id": ..., "dish_name": ..., "usage_per_dish": ...}]
+
+        total_cost_fen = int(current_qty * cost_per_unit_fen)
+
+        # 每天需要消耗的最低量
+        daily_min_usage = current_qty / days_to_expiry if days_to_expiry > 0 else current_qty
+
+        # 用料策略
+        usage_strategies = []
+
+        # 1. 菜单推广
+        if related_dishes:
+            push_dishes = [d.get("dish_name", "") for d in related_dishes[:3]]
+            usage_strategies.append({
+                "type": "menu_push",
+                "action": f"提升菜单推荐权重：{', '.join(push_dishes)}",
+                "expected_consumption_per_day": daily_min_usage * 0.5,
+            })
+
+        # 2. 特价促销（剩余天数 ≤2 天时更激进）
+        discount_pct = 20 if days_to_expiry <= 2 else 10
+        usage_strategies.append({
+            "type": "price_promotion",
+            "action": f"对含{ingredient_name}菜品推出{discount_pct}%折扣特价",
+            "expected_consumption_per_day": daily_min_usage * 0.3,
+            "estimated_discount_cost_fen": int(total_cost_fen * discount_pct / 100 * 0.5),
+        })
+
+        # 3. 员工餐处理（最后手段）
+        if days_to_expiry <= 1:
+            usage_strategies.append({
+                "type": "staff_meal",
+                "action": f"今日员工餐优先消耗{ingredient_name}",
+                "expected_consumption_per_day": min(daily_min_usage * 0.3, 5),
+            })
+
+        # 预计可避免损耗
+        avoidable_waste_pct = min(0.8, 0.3 * len(usage_strategies))
+        avoidable_cost_fen = int(total_cost_fen * avoidable_waste_pct)
+
+        logger.info(
+            "usage_plan_created",
+            store_id=store_id,
+            ingredient_id=ingredient_id,
+            ingredient_name=ingredient_name,
+            days_to_expiry=days_to_expiry,
+            total_cost_fen=total_cost_fen,
+        )
+
+        return AgentResult(
+            success=True,
+            action="plan_usage",
+            data={
+                "store_id": store_id,
+                "ingredient_id": ingredient_id,
+                "ingredient_name": ingredient_name,
+                "current_qty": current_qty,
+                "unit": unit,
+                "expiry_date": expiry_date,
+                "days_to_expiry": days_to_expiry,
+                "daily_min_usage": round(daily_min_usage, 2),
+                "total_cost_fen": total_cost_fen,
+                "related_dishes": related_dishes,
+                "usage_strategies": usage_strategies,
+                "avoidable_waste_pct": round(avoidable_waste_pct, 2),
+                "avoidable_cost_fen": avoidable_cost_fen,
+            },
+            reasoning=(
+                f"用料计划：{ingredient_name} 还剩{days_to_expiry}天到期，"
+                f"当前库存{current_qty}{unit}（价值¥{total_cost_fen/100:.0f}），"
+                f"制定{len(usage_strategies)}条用料策略，"
+                f"可避免损耗¥{avoidable_cost_fen/100:.0f}"
+            ),
+            confidence=0.8,
+        )

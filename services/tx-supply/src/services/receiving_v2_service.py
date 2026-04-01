@@ -8,6 +8,7 @@
 """
 from __future__ import annotations
 
+import asyncio
 import uuid
 from datetime import date, datetime, timezone
 from decimal import Decimal
@@ -17,6 +18,8 @@ import structlog
 from sqlalchemy import select, func, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+
+from shared.events import UniversalPublisher, SupplyEventType
 
 from shared.ontology.src.entities import (
     Ingredient,
@@ -421,6 +424,43 @@ async def complete_receiving(
         rejected_count=rejected_count,
         tenant_id=tenant_id,
     )
+
+    # ── 事件总线：收货完成 ──────────────────────────────────
+    if received_count > 0:
+        asyncio.create_task(UniversalPublisher.publish(
+            event_type=SupplyEventType.RECEIVING_COMPLETED,
+            tenant_id=_uuid(tenant_id),
+            store_id=order.store_id,
+            entity_id=order.id,
+            event_data={
+                "po_id": str(order.procurement_order_id) if order.procurement_order_id else None,
+                "supplier_id": str(order.supplier_id) if order.supplier_id else None,
+                "items_count": received_count,
+            },
+            source_service="tx-supply",
+        ))
+
+    # ── 事件总线：收货差异超5% ──────────────────────────────
+    for item in order.items:
+        expected = float(item.expected_quantity or 0)
+        accepted = float(item.accepted_quantity or 0)
+        if expected > 0:
+            variance_pct = (expected - accepted) / expected
+            if variance_pct > 0.05:
+                variance_fen = round((expected - accepted) * (item.unit_price_fen or 0))
+                asyncio.create_task(UniversalPublisher.publish(
+                    event_type=SupplyEventType.RECEIVING_VARIANCE,
+                    tenant_id=_uuid(tenant_id),
+                    store_id=order.store_id,
+                    entity_id=order.id,
+                    event_data={
+                        "po_id": str(order.procurement_order_id) if order.procurement_order_id else None,
+                        "ingredient_id": str(item.ingredient_id),
+                        "variance_pct": round(variance_pct, 4),
+                        "variance_fen": variance_fen,
+                    },
+                    source_service="tx-supply",
+                ))
 
     return {
         "order_id": order_id,

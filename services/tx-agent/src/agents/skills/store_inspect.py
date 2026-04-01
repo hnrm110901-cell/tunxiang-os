@@ -5,8 +5,12 @@
 
 迁移自 tunxiang V2.x ops_agent.py
 """
+from datetime import datetime, timezone
 from typing import Any
+import structlog
 from ..base import SkillAgent, AgentResult
+
+logger = structlog.get_logger(__name__)
 
 
 RUNBOOK_DB = {
@@ -37,6 +41,7 @@ class StoreInspectAgent(SkillAgent):
         return [
             "health_check", "diagnose_fault", "suggest_runbook",
             "predict_maintenance", "security_advice", "food_safety_status", "store_dashboard",
+            "trigger_shift_checklist", "log_attendance_issue", "create_followup_task",
         ]
 
     async def execute(self, action: str, params: dict[str, Any]) -> AgentResult:
@@ -48,6 +53,9 @@ class StoreInspectAgent(SkillAgent):
             "food_safety_status": self._food_safety,
             "security_advice": self._security,
             "store_dashboard": self._dashboard,
+            "trigger_shift_checklist": self._trigger_shift_checklist,
+            "log_attendance_issue": self._log_attendance_issue,
+            "create_followup_task": self._create_followup_task,
         }
         handler = dispatch.get(action)
         if handler:
@@ -231,3 +239,237 @@ class StoreInspectAgent(SkillAgent):
                                "network_score": params.get("net", 100),
                                "overall": round((params.get("sw", 100) + params.get("hw", 100) + params.get("net", 100)) / 3)},
                          reasoning="门店健康总览", confidence=0.9)
+
+    # ─── 事件驱动：班次交接质检清单 ───
+
+    async def _trigger_shift_checklist(self, params: dict) -> AgentResult:
+        """shift_handover / trade.daily_settlement.completed 触发：生成班次交接质检清单
+
+        根据班次类型（早/晚班）生成不同的检查项，
+        并将未完成项推送给当班人员，确保交接规范。
+        """
+        store_id = params.get("store_id") or self.store_id
+        event_data = params.get("event_data", {})
+        shift_type = params.get("shift_type") or event_data.get("shift_type", "day")
+        shift_date = params.get("shift_date") or event_data.get("shift_date", "")
+        handover_person = params.get("handover_person") or event_data.get("handover_person", "")
+
+        # 通用交接检查项
+        common_items = [
+            {"id": "cash_count", "name": "现金盘点核对", "category": "financial", "required": True},
+            {"id": "pos_settle", "name": "POS日结/班结操作", "category": "financial", "required": True},
+            {"id": "receipt_print", "name": "打印交接单", "category": "financial", "required": True},
+            {"id": "fridge_temp", "name": "冰箱温度记录（≤4°C）", "category": "food_safety", "required": True},
+            {"id": "surface_clean", "name": "台面/地面清洁检查", "category": "hygiene", "required": True},
+            {"id": "waste_bin", "name": "垃圾桶清理", "category": "hygiene", "required": True},
+            {"id": "stock_check", "name": "关键食材盘点", "category": "inventory", "required": True},
+            {"id": "device_status", "name": "设备状态确认（POS/打印机/秤）", "category": "equipment", "required": True},
+        ]
+
+        # 晚班额外项
+        night_only_items = [
+            {"id": "door_lock", "name": "门窗上锁检查", "category": "security", "required": True},
+            {"id": "gas_off", "name": "燃气总阀关闭确认", "category": "safety", "required": True},
+            {"id": "light_off", "name": "非必要照明关闭", "category": "energy", "required": False},
+            {"id": "cash_safe", "name": "营业款存入保险柜", "category": "financial", "required": True},
+            {"id": "data_backup", "name": "确认 Mac mini 同步完成", "category": "data", "required": True},
+        ]
+
+        checklist = common_items.copy()
+        if shift_type in ("night", "closing"):
+            checklist.extend(night_only_items)
+
+        required_count = sum(1 for item in checklist if item["required"])
+
+        checklist_id = f"CHK-{store_id[:8] if store_id else 'STORE'}-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
+
+        logger.info(
+            "shift_checklist_triggered",
+            store_id=store_id,
+            shift_type=shift_type,
+            shift_date=shift_date,
+            checklist_id=checklist_id,
+            total_items=len(checklist),
+        )
+
+        return AgentResult(
+            success=True,
+            action="trigger_shift_checklist",
+            data={
+                "checklist_id": checklist_id,
+                "store_id": store_id,
+                "shift_type": shift_type,
+                "shift_date": shift_date,
+                "handover_person": handover_person,
+                "checklist": checklist,
+                "total_items": len(checklist),
+                "required_items": required_count,
+                "status": "pending",
+                "triggered_at": datetime.now(timezone.utc).isoformat(),
+            },
+            reasoning=(
+                f"{shift_date} {shift_type}班质检清单已触发：{len(checklist)}项（必填{required_count}项）"
+            ),
+            confidence=0.95,
+        )
+
+    # ─── 事件驱动：记录考勤问题 ───
+
+    async def _log_attendance_issue(self, params: dict) -> AgentResult:
+        """org.attendance.late 触发：记录迟到事件，评估影响等级
+
+        将考勤事件结构化记录，并根据频次判断是否需要升级处理。
+        实际写 DB 由 tx-org service 负责；Agent 做分析和建议。
+        """
+        store_id = params.get("store_id") or self.store_id
+        event_data = params.get("event_data", {})
+        employee_id = params.get("employee_id") or event_data.get("employee_id")
+        employee_name = params.get("employee_name") or event_data.get("employee_name", "")
+        scheduled_time = params.get("scheduled_time") or event_data.get("scheduled_time", "")
+        actual_time = params.get("actual_time") or event_data.get("actual_time", "")
+        late_minutes = params.get("late_minutes") or event_data.get("late_minutes", 0)
+        late_count_this_month = params.get("late_count_this_month") or event_data.get("late_count_this_month", 1)
+        role = params.get("role") or event_data.get("role", "staff")
+
+        # 严重程度评估
+        severity = (
+            "critical" if late_minutes > 60 or late_count_this_month >= 5 else
+            "high" if late_minutes > 30 or late_count_this_month >= 3 else
+            "medium" if late_minutes > 15 or late_count_this_month >= 2 else
+            "low"
+        )
+
+        # 影响评估（关键岗位迟到影响更大）
+        critical_roles = {"manager", "chef", "cashier"}
+        operational_impact = role in critical_roles
+
+        recommended_actions = []
+        if severity in ("critical", "high"):
+            recommended_actions.append("通知直属上级")
+        if late_count_this_month >= 3:
+            recommended_actions.append("启动考勤约谈流程")
+        if operational_impact:
+            recommended_actions.append("安排临时顶岗，避免运营影响")
+        if late_minutes > 0:
+            recommended_actions.append(f"按制度扣除{min(late_minutes // 10, 3)}分绩效分")
+
+        issue_id = f"ATT-{employee_id or 'EMP'}-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
+
+        logger.info(
+            "attendance_issue_logged",
+            store_id=store_id,
+            employee_id=employee_id,
+            late_minutes=late_minutes,
+            late_count_this_month=late_count_this_month,
+            severity=severity,
+        )
+
+        return AgentResult(
+            success=True,
+            action="log_attendance_issue",
+            data={
+                "issue_id": issue_id,
+                "store_id": store_id,
+                "employee_id": employee_id,
+                "employee_name": employee_name,
+                "role": role,
+                "scheduled_time": scheduled_time,
+                "actual_time": actual_time,
+                "late_minutes": late_minutes,
+                "late_count_this_month": late_count_this_month,
+                "severity": severity,
+                "operational_impact": operational_impact,
+                "recommended_actions": recommended_actions,
+                "logged_at": datetime.now(timezone.utc).isoformat(),
+            },
+            reasoning=(
+                f"考勤问题记录：{employee_name or employee_id} 迟到{late_minutes}分钟，"
+                f"本月第{late_count_this_month}次，严重度={severity}"
+            ),
+            confidence=0.95,
+        )
+
+    # ─── 事件驱动：创建跟进任务 ───
+
+    async def _create_followup_task(self, params: dict) -> AgentResult:
+        """org.attendance.exception 触发：针对考勤异常创建跟进任务
+
+        将需要人工介入的考勤异常自动转化为结构化任务，
+        分配给对应责任人并设置截止时间。
+        """
+        store_id = params.get("store_id") or self.store_id
+        event_data = params.get("event_data", {})
+        exception_type = params.get("exception_type") or event_data.get("exception_type", "attendance_anomaly")
+        employee_id = params.get("employee_id") or event_data.get("employee_id")
+        employee_name = params.get("employee_name") or event_data.get("employee_name", "")
+        exception_detail = params.get("exception_detail") or event_data.get("exception_detail", "")
+        assigned_to = params.get("assigned_to") or event_data.get("assigned_to", "store_manager")
+
+        # 按异常类型生成任务模板
+        task_templates = {
+            "absence": {
+                "title": f"处理{employee_name or '员工'}旷工异常",
+                "description": "核实旷工原因，按制度处理，更新考勤台账",
+                "due_hours": 24,
+                "priority": "high",
+            },
+            "overtime_exception": {
+                "title": f"核查{employee_name or '员工'}超时加班",
+                "description": "确认加班是否获授权，核算加班费，更新排班",
+                "due_hours": 48,
+                "priority": "medium",
+            },
+            "late_repeat": {
+                "title": f"约谈{employee_name or '员工'}多次迟到",
+                "description": "与员工面谈了解情况，说明制度，制定改善计划",
+                "due_hours": 72,
+                "priority": "medium",
+            },
+            "attendance_anomaly": {
+                "title": f"跟进{employee_name or '员工'}考勤异常",
+                "description": f"异常详情：{exception_detail or '待核实'}",
+                "due_hours": 48,
+                "priority": "medium",
+            },
+        }
+
+        template = task_templates.get(exception_type, task_templates["attendance_anomaly"])
+        task_id = f"TASK-{store_id[:8] if store_id else 'STORE'}-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
+
+        from datetime import timedelta
+        due_at = (
+            datetime.now(timezone.utc) + timedelta(hours=template["due_hours"])
+        ).isoformat()
+
+        logger.info(
+            "followup_task_created",
+            store_id=store_id,
+            task_id=task_id,
+            exception_type=exception_type,
+            employee_id=employee_id,
+            assigned_to=assigned_to,
+        )
+
+        return AgentResult(
+            success=True,
+            action="create_followup_task",
+            data={
+                "task_id": task_id,
+                "store_id": store_id,
+                "title": template["title"],
+                "description": template["description"],
+                "exception_type": exception_type,
+                "employee_id": employee_id,
+                "employee_name": employee_name,
+                "assigned_to": assigned_to,
+                "priority": template["priority"],
+                "due_at": due_at,
+                "status": "open",
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            },
+            reasoning=(
+                f"跟进任务已创建：{template['title']}，"
+                f"分配给{assigned_to}，{template['due_hours']}小时内处理"
+            ),
+            confidence=0.9,
+        )

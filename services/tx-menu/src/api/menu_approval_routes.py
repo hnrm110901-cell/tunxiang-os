@@ -22,6 +22,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
+from shared.ontology.src.database import get_db
 
 from ..services.menu_approval_service import (
     MenuApprovalService,
@@ -37,11 +38,6 @@ _APPROVAL_TYPES = frozenset({"price_change", "new_dish", "soldout", "remove_dish
 
 
 # ─── DB 依赖占位（与其他路由保持一致） ─────────────────────────────────────────
-
-
-async def get_db() -> AsyncSession:  # type: ignore[override]
-    """数据库会话依赖 — 由 main.py 中 app.dependency_overrides 注入"""
-    raise NotImplementedError("DB session dependency not configured")
 
 
 # ─── 工具函数 ──────────────────────────────────────────────────────────────────

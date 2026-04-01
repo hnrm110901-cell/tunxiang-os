@@ -35,8 +35,10 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional
 
 import structlog
-from fastapi import APIRouter, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession
+from shared.ontology.src.database import get_db
 
 log = structlog.get_logger(__name__)
 
@@ -144,13 +146,14 @@ class PlanDistributeRequest(BaseModel):
 @router.get("/kitchens", summary="中央厨房列表")
 async def list_kitchens(
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
     """返回当前租户的所有中央厨房档案。"""
     from ..services.central_kitchen_service import CentralKitchenService
 
-    svc = CentralKitchenService()
+    svc = CentralKitchenService(db, x_tenant_id)
     try:
-        kitchens = await svc.list_kitchens(tenant_id=x_tenant_id)
+        kitchens = await svc.list_kitchens()
         return {"ok": True, "data": {"items": [k.model_dump() for k in kitchens]}}
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
@@ -160,20 +163,21 @@ async def list_kitchens(
 async def create_kitchen(
     body: CreateKitchenRequest,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
     """创建中央厨房档案（名称/地址/日产能/负责人/联系电话）。"""
     from ..services.central_kitchen_service import CentralKitchenService
 
-    svc = CentralKitchenService()
+    svc = CentralKitchenService(db, x_tenant_id)
     try:
         kitchen = await svc.create_kitchen(
-            tenant_id=x_tenant_id,
             name=body.name,
             address=body.address,
             capacity_daily=body.capacity_daily,
             manager_id=body.manager_id,
             contact_phone=body.contact_phone,
         )
+        await db.commit()
         return {"ok": True, "data": kitchen.model_dump()}
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
@@ -190,14 +194,14 @@ async def list_production_plans(
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
     """查询生产计划列表，支持按厨房/日期/状态过滤。"""
     from ..services.central_kitchen_service import CentralKitchenService
 
-    svc = CentralKitchenService()
+    svc = CentralKitchenService(db, x_tenant_id)
     try:
         result = await svc.list_production_plans(
-            tenant_id=x_tenant_id,
             kitchen_id=kitchen_id,
             plan_date=plan_date,
             status=status,
@@ -213,6 +217,7 @@ async def list_production_plans(
 async def create_production_plan(
     body: CreateProductionPlanRequest,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
     """创建生产计划草稿。
 
@@ -221,16 +226,16 @@ async def create_production_plan(
     """
     from ..services.central_kitchen_service import CentralKitchenService
 
-    svc = CentralKitchenService()
+    svc = CentralKitchenService(db, x_tenant_id)
     try:
         items_raw = [i.model_dump() for i in body.items]
         plan = await svc.create_production_plan(
-            tenant_id=x_tenant_id,
             kitchen_id=body.kitchen_id,
             plan_date=body.plan_date,
             items=items_raw,
             created_by=body.created_by,
         )
+        await db.commit()
         return {"ok": True, "data": plan.model_dump()}
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
@@ -240,13 +245,14 @@ async def create_production_plan(
 async def get_production_plan(
     plan_id: str,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
     """查询单个生产计划详情（含菜品清单）。"""
     from ..services.central_kitchen_service import CentralKitchenService
 
-    svc = CentralKitchenService()
+    svc = CentralKitchenService(db, x_tenant_id)
     try:
-        plan = await svc.get_production_plan(tenant_id=x_tenant_id, plan_id=plan_id)
+        plan = await svc.get_production_plan(plan_id=plan_id)
         return {"ok": True, "data": plan.model_dump()}
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
@@ -257,17 +263,18 @@ async def confirm_production_plan(
     plan_id: str,
     body: ConfirmPlanRequest,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
     """确认草稿生产计划，自动为每个菜品生成独立生产工单。"""
     from ..services.central_kitchen_service import CentralKitchenService
 
-    svc = CentralKitchenService()
+    svc = CentralKitchenService(db, x_tenant_id)
     try:
         plan = await svc.confirm_production_plan(
-            tenant_id=x_tenant_id,
             plan_id=plan_id,
             operator_id=body.operator_id,
         )
+        await db.commit()
         return {"ok": True, "data": plan.model_dump()}
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
@@ -277,6 +284,7 @@ async def confirm_production_plan(
 async def start_production(
     plan_id: str,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
     """开始生产：将已确认计划状态更新为 in_progress，所有 pending 工单同步开始。
 
@@ -284,9 +292,10 @@ async def start_production(
     """
     from ..services.central_kitchen_service import CentralKitchenService
 
-    svc = CentralKitchenService()
+    svc = CentralKitchenService(db, x_tenant_id)
     try:
-        plan = await svc.start_production(tenant_id=x_tenant_id, plan_id=plan_id)
+        plan = await svc.start_production(plan_id=plan_id)
+        await db.commit()
         return {"ok": True, "data": plan.model_dump()}
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
@@ -303,14 +312,14 @@ async def list_production_orders(
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
     """查询生产工单列表，支持按厨房/计划/状态过滤。"""
     from ..services.central_kitchen_service import CentralKitchenService
 
-    svc = CentralKitchenService()
+    svc = CentralKitchenService(db, x_tenant_id)
     try:
         result = await svc.list_production_orders(
-            tenant_id=x_tenant_id,
             kitchen_id=kitchen_id,
             plan_id=plan_id,
             status=status,
@@ -327,6 +336,7 @@ async def complete_production_order(
     order_id: str,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
     actual_qty: float = Query(..., ge=0, description="实际产量"),
+    db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
     """完成单个生产工单，记录实际产量。
 
@@ -334,13 +344,13 @@ async def complete_production_order(
     """
     from ..services.central_kitchen_service import CentralKitchenService
 
-    svc = CentralKitchenService()
+    svc = CentralKitchenService(db, x_tenant_id)
     try:
         order = await svc.complete_production_order(
-            tenant_id=x_tenant_id,
             order_id=order_id,
             actual_qty=actual_qty,
         )
+        await db.commit()
         return {"ok": True, "data": order.model_dump()}
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
@@ -354,6 +364,7 @@ async def update_production_progress(
     order_id: str,
     body: UpdateProgressRequest,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
     """更新工单状态（pending→in_progress→completed / cancelled）。
 
@@ -361,14 +372,14 @@ async def update_production_progress(
     """
     from ..services.central_kitchen_service import CentralKitchenService
 
-    svc = CentralKitchenService()
+    svc = CentralKitchenService(db, x_tenant_id)
     try:
         order = await svc.update_production_progress(
-            tenant_id=x_tenant_id,
             order_id=order_id,
             status=body.status,
             quantity_done=body.quantity_done,
         )
+        await db.commit()
         return {"ok": True, "data": order.model_dump()}
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
@@ -385,14 +396,14 @@ async def list_distribution_orders(
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
     """查询配送单列表，支持按厨房/门店/状态过滤。"""
     from ..services.central_kitchen_service import CentralKitchenService
 
-    svc = CentralKitchenService()
+    svc = CentralKitchenService(db, x_tenant_id)
     try:
         result = await svc.list_distribution_orders(
-            tenant_id=x_tenant_id,
             kitchen_id=kitchen_id,
             store_id=store_id,
             status=status,
@@ -408,15 +419,15 @@ async def list_distribution_orders(
 async def create_distribution_order(
     body: CreateDistributionOrderRequest,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
     """创建从中央厨房到门店的配送单。"""
     from ..services.central_kitchen_service import CentralKitchenService
 
-    svc = CentralKitchenService()
+    svc = CentralKitchenService(db, x_tenant_id)
     try:
         items_raw = [i.model_dump() for i in body.items]
         order = await svc.create_distribution_order(
-            tenant_id=x_tenant_id,
             kitchen_id=body.kitchen_id,
             store_id=body.target_store_id,
             items=items_raw,
@@ -424,6 +435,7 @@ async def create_distribution_order(
             driver_name=body.driver_name,
             driver_phone=body.driver_phone,
         )
+        await db.commit()
         return {"ok": True, "data": order.model_dump()}
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
@@ -433,13 +445,15 @@ async def create_distribution_order(
 async def mark_distribution_dispatched(
     order_id: str,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
     """将配送单状态从 pending 更新为 dispatched（货已出库发车）。"""
     from ..services.central_kitchen_service import CentralKitchenService
 
-    svc = CentralKitchenService()
+    svc = CentralKitchenService(db, x_tenant_id)
     try:
-        order = await svc.mark_dispatched(tenant_id=x_tenant_id, order_id=order_id)
+        order = await svc.mark_dispatched(order_id=order_id)
+        await db.commit()
         return {"ok": True, "data": order.model_dump()}
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
@@ -450,21 +464,22 @@ async def store_receive(
     order_id: str,
     body: StoreReceivingRequest,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
     """门店确认收货，记录实收数量，差异 >5% 自动生成差异备注。"""
     from ..services.central_kitchen_service import CentralKitchenService
 
-    svc = CentralKitchenService()
+    svc = CentralKitchenService(db, x_tenant_id)
     try:
         items_raw = [i.model_dump() for i in body.items]
         confirmation = await svc.confirm_store_receiving(
-            tenant_id=x_tenant_id,
             distribution_order_id=order_id,
             store_id=body.store_id,
             confirmed_by=body.confirmed_by,
             items=items_raw,
             notes=body.notes,
         )
+        await db.commit()
         return {"ok": True, "data": confirmation.model_dump()}
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
@@ -475,6 +490,7 @@ async def store_receive_confirm(
     order_id: str,
     body: StoreReceivingRequest,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
     """门店确认收货 PUT 版本（与 POST /receive 功能相同，语义更符合 REST 规范）。
 
@@ -482,17 +498,17 @@ async def store_receive_confirm(
     """
     from ..services.central_kitchen_service import CentralKitchenService
 
-    svc = CentralKitchenService()
+    svc = CentralKitchenService(db, x_tenant_id)
     try:
         items_raw = [i.model_dump() for i in body.items]
         confirmation = await svc.confirm_store_receiving(
-            tenant_id=x_tenant_id,
             distribution_order_id=order_id,
             store_id=body.store_id,
             confirmed_by=body.confirmed_by,
             items=items_raw,
             notes=body.notes,
         )
+        await db.commit()
         return {"ok": True, "data": confirmation.model_dump()}
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
@@ -503,6 +519,7 @@ async def plan_distribute(
     plan_id: str,
     body: PlanDistributeRequest,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
     """从已确认/进行中的生产计划批量创建各门店配送单。
 
@@ -510,10 +527,10 @@ async def plan_distribute(
     """
     from ..services.central_kitchen_service import CentralKitchenService
 
-    svc = CentralKitchenService()
+    svc = CentralKitchenService(db, x_tenant_id)
     try:
         # 先校验计划存在且属于当前租户
-        plan = await svc.get_production_plan(tenant_id=x_tenant_id, plan_id=plan_id)
+        plan = await svc.get_production_plan(plan_id=plan_id)
         if plan.status not in ("confirmed", "in_progress"):
             raise ValueError(
                 f"计划状态为 {plan.status}，只有 confirmed 或 in_progress 状态可创建配送单"
@@ -523,7 +540,6 @@ async def plan_distribute(
         for assignment in body.store_assignments:
             items_raw = [i.model_dump() for i in assignment.items]
             order = await svc.create_distribution_order(
-                tenant_id=x_tenant_id,
                 kitchen_id=plan.kitchen_id,
                 store_id=assignment.store_id,
                 items=items_raw,
@@ -533,6 +549,7 @@ async def plan_distribute(
             )
             created_orders.append(order.model_dump())
 
+        await db.commit()
         return {"ok": True, "data": {"items": created_orders, "total": len(created_orders)}}
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
@@ -546,17 +563,14 @@ async def get_daily_dashboard(
     kitchen_id: str = Query(..., description="中央厨房 ID"),
     date: str = Query(..., description="日期 YYYY-MM-DD"),
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
     """日看板：当日生产计划总数/工单状态分布/配送单状态分布。"""
     from ..services.central_kitchen_service import CentralKitchenService
 
-    svc = CentralKitchenService()
+    svc = CentralKitchenService(db, x_tenant_id)
     try:
-        dashboard = await svc.get_daily_dashboard(
-            tenant_id=x_tenant_id,
-            kitchen_id=kitchen_id,
-            date=date,
-        )
+        dashboard = await svc.get_daily_dashboard(kitchen_id=kitchen_id, date=date)
         return {"ok": True, "data": dashboard.model_dump()}
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
@@ -567,17 +581,14 @@ async def demand_forecast(
     kitchen_id: str = Query(..., description="中央厨房 ID"),
     target_date: str = Query(..., description="预测日期 YYYY-MM-DD"),
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
     """基于近30天历史消耗预测各菜品需求量（周末×1.3）。"""
     from ..services.central_kitchen_service import CentralKitchenService
 
-    svc = CentralKitchenService()
+    svc = CentralKitchenService(db, x_tenant_id)
     try:
-        forecast = await svc.forecast_demand(
-            tenant_id=x_tenant_id,
-            kitchen_id=kitchen_id,
-            target_date=target_date,
-        )
+        forecast = await svc.forecast_demand(kitchen_id=kitchen_id, target_date=target_date)
         return {"ok": True, "data": forecast.model_dump()}
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
@@ -588,6 +599,7 @@ async def get_kitchen_dashboard(
     kitchen_id: str,
     date: str = Query(..., description="日期 YYYY-MM-DD"),
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
     """通过路径参数指定厨房 ID 的日看板。
 
@@ -595,13 +607,9 @@ async def get_kitchen_dashboard(
     """
     from ..services.central_kitchen_service import CentralKitchenService
 
-    svc = CentralKitchenService()
+    svc = CentralKitchenService(db, x_tenant_id)
     try:
-        dashboard = await svc.get_daily_dashboard(
-            tenant_id=x_tenant_id,
-            kitchen_id=kitchen_id,
-            date=date,
-        )
+        dashboard = await svc.get_daily_dashboard(kitchen_id=kitchen_id, date=date)
         return {"ok": True, "data": dashboard.model_dump()}
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
