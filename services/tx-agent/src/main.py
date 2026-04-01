@@ -11,6 +11,7 @@ from shared.ontology.src.database import get_db_with_tenant
 from .api.planner import router as planner_router
 from .api.observability import router as observability_router
 from .api.voice_routes import router as voice_router
+from .api.scene_routes import router as scene_router
 from .routers.diagnosis_router import router as diagnosis_router
 from .routers.pilot_router import router as pilot_router
 
@@ -28,6 +29,7 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], all
 app.include_router(planner_router)
 app.include_router(observability_router)
 app.include_router(voice_router)
+app.include_router(scene_router)
 app.include_router(diagnosis_router)
 app.include_router(pilot_router)
 
