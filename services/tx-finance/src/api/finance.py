@@ -17,7 +17,7 @@ from shared.ontology.src.entities import Order, OrderItem, Store
 
 from services.store_pnl import StorePnLService
 from services.voucher_service import generate_voucher_from_settlement, format_for_kingdee
-from services.budget_service import BudgetService
+from ..services.budget_service import BudgetService
 
 logger = structlog.get_logger()
 router = APIRouter(prefix="/api/v1/finance", tags=["finance"])
