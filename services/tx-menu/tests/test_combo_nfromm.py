@@ -14,14 +14,14 @@
 
 依赖：FastAPI + httpx.AsyncClient + unittest.mock（全Mock，无真实DB连接）
 """
-import sys
 import os
+import sys
 import uuid
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from fastapi import FastAPI
-from httpx import AsyncClient, ASGITransport
+from httpx import ASGITransport, AsyncClient
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../src"))
 
@@ -51,6 +51,7 @@ HEADERS = {
 def _build_app_with_mock(mock_db: AsyncMock) -> FastAPI:
     """构建带 Mock DB 的测试应用"""
     from api.combo_routes import router
+
     from shared.ontology.src.database import get_db
 
     app = FastAPI()
@@ -580,8 +581,8 @@ class TestComboGroupRequestValidation:
 
     def test_add_group_item_negative_extra_price_rejected(self):
         """AddGroupItemReq：extra_price_fen 不能为负数（ge=0）"""
-        from pydantic import ValidationError
         from api.combo_routes import AddGroupItemReq
+        from pydantic import ValidationError
         with pytest.raises(ValidationError):
             AddGroupItemReq(
                 dish_id=str(uuid.uuid4()),
@@ -592,8 +593,8 @@ class TestComboGroupRequestValidation:
 
     def test_add_group_item_zero_quantity_rejected(self):
         """AddGroupItemReq：quantity 必须 >= 1"""
-        from pydantic import ValidationError
         from api.combo_routes import AddGroupItemReq
+        from pydantic import ValidationError
         with pytest.raises(ValidationError):
             AddGroupItemReq(
                 dish_id=str(uuid.uuid4()),
@@ -604,8 +605,8 @@ class TestComboGroupRequestValidation:
 
     def test_selection_group_req_requires_item_ids(self):
         """SelectionGroupReq：item_ids 为必填字段"""
-        from pydantic import ValidationError
         from api.combo_routes import SelectionGroupReq
+        from pydantic import ValidationError
         # 缺少 item_ids → ValidationError
         with pytest.raises((ValidationError, TypeError)):
             SelectionGroupReq(group_id=str(uuid.uuid4()))

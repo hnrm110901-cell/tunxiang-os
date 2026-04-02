@@ -21,7 +21,7 @@
 
 import asyncio
 import uuid
-from typing import Any, Callable, Awaitable
+from typing import Any, Callable
 
 import structlog
 

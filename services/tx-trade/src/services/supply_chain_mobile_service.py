@@ -1,9 +1,9 @@
 """供应链移动端 Service"""
 
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Optional
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 import structlog
 from sqlalchemy import text

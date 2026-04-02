@@ -1,6 +1,6 @@
 """日计划 API"""
+
 from fastapi import APIRouter
-from typing import Optional
 
 router = APIRouter(prefix="/api/v1/agent/plans", tags=["planner"])
 

@@ -1,18 +1,16 @@
 """Agent OS 框架测试 — 约束校验 + Memory Bus + Master 编排 + Skill Agent"""
-import sys
-import os
 import asyncio
+import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from agents.base import SkillAgent, AgentResult
-from agents.constraints import ConstraintChecker, ConstraintResult
-from agents.memory_bus import MemoryBus, Finding
+from agents.constraints import ConstraintChecker
 from agents.master import MasterAgent
+from agents.memory_bus import Finding, MemoryBus
 from agents.skills.discount_guard import DiscountGuardAgent
-from agents.skills.smart_menu import SmartMenuAgent
 from agents.skills.serve_dispatch import ServeDispatchAgent
-
+from agents.skills.smart_menu import SmartMenuAgent
 
 # ─── 约束校验测试 ───
 

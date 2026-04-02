@@ -1,23 +1,25 @@
 """tx-menu — 域B 商品菜单微服务"""
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from .api.dishes import router as dish_router
-from .api.publish import router as publish_router
-from .api.pricing_routes import router as pricing_router
-from .api.menu_routes import router as menu_center_router
-from .api.practice_routes import router as practice_router
-from .api.combo_routes import router as combo_router
-from .api.menu_version_routes import router as menu_version_router
-from .api.dish_lifecycle_routes import router as dish_lifecycle_router
-from .api.dish_lifecycle_routes import lifecycle_router as dish_lifecycle_manage_router
-from .api.channel_mapping_routes import router as channel_mapping_router
-from .api.menu_approval_routes import router as menu_approval_router
-from .api.live_edit_routes import router as live_edit_router
+
+from .api.banquet_menu_routes import router as banquet_menu_router
 from .api.brand_publish_routes import router as brand_publish_router
+from .api.channel_mapping_routes import router as channel_mapping_router
+from .api.combo_routes import router as combo_router
+from .api.dish_lifecycle_routes import lifecycle_router as dish_lifecycle_manage_router
+from .api.dish_lifecycle_routes import router as dish_lifecycle_router
+from .api.dishes import router as dish_router
+from .api.live_edit_routes import router as live_edit_router
+from .api.live_seafood_query_routes import router as live_seafood_query_router
+
 # 徐记海鲜专属模块
 from .api.live_seafood_routes import router as live_seafood_router
-from .api.live_seafood_query_routes import router as live_seafood_query_router
-from .api.banquet_menu_routes import router as banquet_menu_router
+from .api.menu_approval_routes import router as menu_approval_router
+from .api.menu_routes import router as menu_center_router
+from .api.menu_version_routes import router as menu_version_router
+from .api.practice_routes import router as practice_router
+from .api.pricing_routes import router as pricing_router
+from .api.publish import router as publish_router
 
 app = FastAPI(title="TunxiangOS tx-menu", version="3.0.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])

@@ -1,20 +1,18 @@
 """食安合规与追溯中心 -- 纯函数 + 温控 + 留样 + 合规检查表测试"""
-import sys
 import os
+import sys
 from datetime import date, datetime, timedelta
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from services.food_safety import (
+    SAMPLE_RETENTION_HOURS,
+    EventSeverity,
     _check_temperature,
+    get_compliance_checklist,
     record_sample,
     record_temperature,
-    get_compliance_checklist,
-    SAMPLE_RETENTION_HOURS,
-    TEMP_THRESHOLDS,
-    EventSeverity,
 )
-
 
 # ─── 温控校验 ───
 

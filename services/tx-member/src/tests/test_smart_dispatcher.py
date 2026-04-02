@@ -8,15 +8,14 @@
   - 升级机会计算
   - 权益自动应用
 """
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+from api.smart_dispatch_routes import router as dispatch_router
 from fastapi.testclient import TestClient
 from main import app
-
-from api.smart_dispatch_routes import router as dispatch_router
 
 if not any(r.prefix == "/api/v1/member/dispatch" for r in app.routes if hasattr(r, "prefix")):
     app.include_router(dispatch_router)
@@ -25,19 +24,18 @@ client = TestClient(app)
 
 # 导入服务层辅助函数做单元测试
 from services.smart_dispatcher import (
-    _calc_upgrade_progress,
-    _get_banner,
-    _get_available_benefits,
-    _get_scene_actions,
-    _rank_to_level,
+    LEVEL_NAMES_CN,
     LEVEL_RANK,
-    UPGRADE_THRESHOLDS_FEN,
+    NOTIFICATION_CHANNELS,
     POINTS_MULTIPLIER,
     QUEUE_PRIORITY,
-    NOTIFICATION_CHANNELS,
-    LEVEL_NAMES_CN,
+    UPGRADE_THRESHOLDS_FEN,
+    _calc_upgrade_progress,
+    _get_available_benefits,
+    _get_banner,
+    _get_scene_actions,
+    _rank_to_level,
 )
-
 
 # ── API 冒烟测试 ──────────────────────────────────────────────
 

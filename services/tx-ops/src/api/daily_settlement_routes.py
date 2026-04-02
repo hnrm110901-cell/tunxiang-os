@@ -13,15 +13,16 @@ from datetime import date, datetime, timezone
 from typing import Any, Dict, List, Optional
 
 import structlog
-from fastapi import APIRouter, Header, HTTPException, Query
+from fastapi import APIRouter, Header, Query
 from pydantic import BaseModel, Field
+
+from .daily_summary_routes import _summaries
+from .inspection_routes import _reports
+from .issues_routes import _issues
+from .performance_routes import _performance
 
 # 从同包路由复用内存存储（生产替换为统一 DB 查询）
 from .shift_routes import _shifts
-from .daily_summary_routes import _summaries
-from .issues_routes import _issues
-from .inspection_routes import _reports
-from .performance_routes import _performance
 
 router = APIRouter(prefix="/api/v1/ops/settlement", tags=["ops-settlement"])
 log = structlog.get_logger(__name__)
@@ -206,8 +207,9 @@ async def run_daily_settlement(
     e2_existing = _summaries.get(e2_key)
     if not e2_existing or (body.force_regenerate and e2_existing["status"] != "locked"):
         # 懒加载 avoid circular import
-        from .daily_summary_routes import _aggregate_orders
         import uuid as _uuid
+
+        from .daily_summary_routes import _aggregate_orders
 
         aggregated = await _aggregate_orders(body.store_id, body.settlement_date, x_tenant_id)
         summary_id = e2_existing["id"] if e2_existing else str(_uuid.uuid4())
@@ -234,8 +236,9 @@ async def run_daily_settlement(
 
     # ── E5: 自动扫描预警──────────────────────────────────────────────
     from .issues_routes import (
-        _scan_kds_timeout, _scan_discount_abuse, _scan_low_inventory,
-        _calc_due_at,
+        _scan_discount_abuse,
+        _scan_kds_timeout,
+        _scan_low_inventory,
     )
     today = body.settlement_date
     kds_timeouts = await _scan_kds_timeout(body.store_id, x_tenant_id)
@@ -259,11 +262,14 @@ async def run_daily_settlement(
     steps.append({"node": "E6_整改跟踪", "action": "check", **e6})
 
     # ── E7: 自动计算员工绩效 ─────────────────────────────────────────
-    from .performance_routes import (
-        _aggregate_cashier_performance, _aggregate_chef_performance,
-        _aggregate_waiter_performance, _calc_commission_fen,
-    )
     import uuid as _uuid2
+
+    from .performance_routes import (
+        _aggregate_cashier_performance,
+        _aggregate_chef_performance,
+        _aggregate_waiter_performance,
+        _calc_commission_fen,
+    )
     cashier_data = await _aggregate_cashier_performance(body.store_id, body.settlement_date, x_tenant_id)
     chef_data = await _aggregate_chef_performance(body.store_id, body.settlement_date, x_tenant_id)
     waiter_data = await _aggregate_waiter_performance(body.store_id, body.settlement_date, x_tenant_id)

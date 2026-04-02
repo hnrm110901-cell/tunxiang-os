@@ -11,16 +11,15 @@ from __future__ import annotations
 
 import uuid
 from datetime import date, timedelta
-from typing import List
 
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
+from services.pnl_engine import PnLEngine
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db_with_tenant
-from services.pnl_engine import PnLEngine
 
 logger = structlog.get_logger(__name__)
 router = APIRouter(tags=["finance-pnl"])

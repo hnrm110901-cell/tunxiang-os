@@ -3,24 +3,24 @@
 10 个端点：订单同步、接单/拒单、沽清、配送、仪表盘、对账、菜品管理、自动接单。
 所有接口需要 X-Tenant-ID header。
 """
-from typing import Optional
 
-from fastapi import APIRouter, Depends, Request, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+
 from ..services.takeaway_manager import (
-    sync_meituan_orders,
-    sync_eleme_orders,
     accept_order,
+    get_platform_reconciliation,
+    get_takeaway_dashboard,
+    manage_online_menu,
     reject_order,
+    set_auto_accept_rules,
+    sync_eleme_orders,
+    sync_meituan_orders,
     sync_stockout_to_platforms,
     update_delivery_status,
-    get_takeaway_dashboard,
-    get_platform_reconciliation,
-    manage_online_menu,
-    set_auto_accept_rules,
 )
 
 router = APIRouter(prefix="/api/v1/takeaway", tags=["takeaway"])

@@ -27,9 +27,10 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from shared.ontology.src.database import get_db
 
-from ..services.dish_health_score import DishHealthScoreEngine, ScoreWeights
+from ..services.dish_health_score import DishHealthScoreEngine
 from ..services.dish_lifecycle import DishLifecycleService
 
 log = structlog.get_logger(__name__)

@@ -15,12 +15,14 @@
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone, timedelta
-from typing import Any, List, Optional
+from datetime import datetime, timezone
+from typing import Any, List
 
 import structlog
 from fastapi import APIRouter
-from shared.ontology.src.database import get_db as _get_db, Depends, Header, HTTPException, Request
+
+from shared.ontology.src.database import Depends, HTTPException, Request
+from shared.ontology.src.database import get_db as _get_db
 
 router = APIRouter(tags=["kitchen-monitor"])
 

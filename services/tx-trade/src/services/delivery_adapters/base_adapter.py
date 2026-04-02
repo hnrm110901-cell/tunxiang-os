@@ -6,10 +6,8 @@ import hmac
 from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Optional
-from uuid import UUID
 
 from pydantic import BaseModel, Field
-
 
 # ─────────────────────────────────────────────────────────────────
 # 统一数据模型

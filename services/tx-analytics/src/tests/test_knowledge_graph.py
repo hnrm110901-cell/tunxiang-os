@@ -8,7 +8,6 @@ from ..services.knowledge_graph import (
     seed_knowledge_graph,
 )
 
-
 # ─── Fixtures ───
 
 

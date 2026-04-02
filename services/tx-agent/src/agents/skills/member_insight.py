@@ -5,10 +5,11 @@
 
 迁移自 tunxiang V2.x private_domain/agent.py + service/agent.py
 """
-from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any
+
 import structlog
-from ..base import SkillAgent, AgentResult
+
+from ..base import AgentResult, SkillAgent
 
 logger = structlog.get_logger(__name__)
 
@@ -187,7 +188,7 @@ class MemberInsightAgent(SkillAgent):
         severity = "high" if rating <= 2 or len(issues) >= 2 else "medium" if rating <= 3 else "low"
 
         # 生成回复模板
-        reply = f"尊敬的顾客，感谢您的反馈。"
+        reply = "尊敬的顾客，感谢您的反馈。"
         if issues:
             reply += f"对于您提到的{'、'.join(issues[:3])}问题，我们深表歉意。"
         reply += "我们会立即改进，期待您再次光临。"
@@ -296,8 +297,9 @@ class MemberInsightAgent(SkillAgent):
         top_n = params.get("top_n", 20)
 
         if self._db:
-            from sqlalchemy import text
             from datetime import datetime, timezone
+
+            from sqlalchemy import text
 
             now = datetime.now(timezone.utc)
 

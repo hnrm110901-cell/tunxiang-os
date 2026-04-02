@@ -16,7 +16,6 @@ TODO: 真正集成后替换为 Core ML 模型调用：
 from __future__ import annotations
 
 import random
-from typing import Any
 
 import structlog
 from fastapi import APIRouter
@@ -115,7 +114,7 @@ async def predict_table_turn_stub(data: dict) -> dict:
 
     # 找最近匹配的座位数
     keys = sorted(_TABLE_AVG_MINUTES.keys())
-    avg_minutes = _TABLE_AVG_MINUTES.get(seats, None)
+    avg_minutes = _TABLE_AVG_MINUTES.get(seats)
     if avg_minutes is None:
         best = keys[0]
         for k in keys:

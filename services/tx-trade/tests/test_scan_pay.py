@@ -12,8 +12,8 @@
 - scan_pay_routes.py 使用内存存储，无需 mock DB
 - 路由内有 asyncio.sleep(1.5)，通过 mock 跳过等待
 """
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 sys.path.insert(
@@ -21,15 +21,16 @@ sys.path.insert(
     os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..")),
 )
 
-from unittest.mock import patch, AsyncMock
+from unittest.mock import AsyncMock, patch
+
 import pytest
 import pytest_asyncio
-from httpx import AsyncClient, ASGITransport
 
 # ─── 构建仅含 scan_pay 路由的轻量 app ────────────────────────────────────────
-
 from fastapi import FastAPI
-from src.api.scan_pay_routes import router as scan_pay_router, _payments
+from httpx import ASGITransport, AsyncClient
+from src.api.scan_pay_routes import _payments
+from src.api.scan_pay_routes import router as scan_pay_router
 
 _app = FastAPI(title="scan-pay-test")
 _app.include_router(scan_pay_router)

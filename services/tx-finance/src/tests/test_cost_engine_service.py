@@ -11,19 +11,14 @@ from __future__ import annotations
 
 import uuid
 from datetime import date
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
-
 from services.tx_finance.src.services.cost_engine_service import (
     CostEngineService,
     DailyCostReport,
     calculate_cost_health_score,
 )
-from services.tx_finance.src.services.cost_engine_repository import (
-    CostEngineRepository,
-)
-
 
 # ─── 测试夹具 ────────────────────────────────────────────────────────────────
 
@@ -319,9 +314,6 @@ class TestCostRateCalculations:
 
     def test_food_cost_rate_formula(self):
         """食材成本率 = 食材成本 / 营收"""
-        from services.tx_finance.src.services.cost_engine_service import (
-            DailyCostReport,
-        )
         report = DailyCostReport(
             store_id="test",
             biz_date="2026-03-31",

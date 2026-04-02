@@ -13,31 +13,26 @@
 编码: GBK。
 """
 from datetime import datetime
-from typing import Optional
 
 import structlog
 
 from .printer_driver import (
-    ESC_INIT,
-    ESC_ALIGN_LEFT,
     ESC_ALIGN_CENTER,
-    ESC_ALIGN_RIGHT,
-    ESC_BOLD_ON,
+    ESC_ALIGN_LEFT,
     ESC_BOLD_OFF,
-    GS_SIZE_NORMAL,
-    GS_SIZE_DOUBLE_WIDTH,
-    GS_SIZE_DOUBLE_HEIGHT,
-    GS_SIZE_DOUBLE_BOTH,
-    GS_CUT_PARTIAL,
-    GS_CUT_FULL,
-    ESC_OPEN_DRAWER,
+    ESC_BOLD_ON,
     ESC_FEED,
-    ESC_CHINESE_ON,
+    ESC_INIT,
+    GS_CUT_FULL,
+    GS_CUT_PARTIAL,
+    GS_SIZE_DOUBLE_BOTH,
+    GS_SIZE_DOUBLE_HEIGHT,
+    GS_SIZE_NORMAL,
     LF,
     LINE_WIDTH,
     _gbk_len,
-    _pad_two_columns,
     _pad_three_columns,
+    _pad_two_columns,
 )
 
 logger = structlog.get_logger()

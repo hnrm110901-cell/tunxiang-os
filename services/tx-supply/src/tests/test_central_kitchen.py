@@ -9,20 +9,20 @@
 6. 签收差异记录（实收 vs 计划）
 7. tenant_id 隔离
 """
-import sys
 import os
+import sys
 
 # 将 src/ 目录加入 Python 路径，与其他测试文件保持一致
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import pytest
+from services.delivery_route_service import DeliveryRouteService
 from services.production_plan_service import (
     ProductionPlanService,
     _clear_store,
     inject_store_demand,
     inject_store_geo,
 )
-from services.delivery_route_service import DeliveryRouteService
 
 TENANT = "tenant-ck-001"
 OTHER_TENANT = "tenant-ck-999"

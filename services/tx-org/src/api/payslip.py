@@ -2,24 +2,20 @@
 
 提供工资条的批量生成、列表查询和员工个人工资条查询。
 """
-from typing import Optional
-from datetime import date
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
-
-from services.salary_item_library import get_all_items, compute_salary_by_items
 from services.payroll_engine import (
-    compute_base_salary,
-    compute_overtime_pay,
-    derive_hourly_rate,
     compute_absence_deduction,
+    compute_base_salary,
+    compute_full_attendance_bonus,
     compute_late_deduction,
+    compute_monthly_tax,
+    compute_overtime_pay,
     compute_performance_bonus,
     compute_seniority_subsidy,
-    compute_full_attendance_bonus,
-    compute_monthly_tax,
     count_work_days,
+    derive_hourly_rate,
     summarize_payroll,
 )
 

@@ -5,8 +5,8 @@
 """
 import uuid
 from typing import Any
-from ..base import SkillAgent, AgentResult
 
+from ..base import AgentResult, SkillAgent
 
 # 门店评估维度
 STORE_EVAL_DIMENSIONS = [
@@ -301,7 +301,7 @@ class PilotRecommenderAgent(SkillAgent):
                 "traffic_median": traffic_mid,
                 "ticket_median_yuan": round(ticket_mid / 100, 2),
             },
-            reasoning=f"门店聚类: " + ", ".join(f"{k}{len(v)}家" for k, v in clusters.items() if v),
+            reasoning="门店聚类: " + ", ".join(f"{k}{len(v)}家" for k, v in clusters.items() if v),
             confidence=0.75,
         )
 

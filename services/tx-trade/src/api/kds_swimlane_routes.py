@@ -7,11 +7,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import get_db
 from ..services.kds_swimlane import (
-    get_steps_for_dept,
-    upsert_step,
-    init_task_steps,
     advance_step,
+    get_steps_for_dept,
     get_swimlane_board,
+    upsert_step,
 )
 
 router = APIRouter(prefix="/api/v1/kds/swimlane", tags=["kds-swimlane"])

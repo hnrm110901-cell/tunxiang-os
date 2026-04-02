@@ -18,16 +18,15 @@ from __future__ import annotations
 
 import calendar
 import os
-
-import httpx
-import structlog
 from datetime import date, datetime, timedelta
 from typing import Any, List, Optional
 from uuid import UUID, uuid4
 
+import httpx
+import structlog
 from pydantic import BaseModel, Field
 
-from ..models.franchise import Franchisee, FranchiseeStatus, RoyaltyTier
+from ..models.franchise import Franchisee, RoyaltyTier
 from .royalty_calculator import RoyaltyCalculator
 
 logger = structlog.get_logger(__name__)

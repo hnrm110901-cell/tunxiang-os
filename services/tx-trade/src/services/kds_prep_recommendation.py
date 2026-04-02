@@ -13,12 +13,11 @@
 输出：
   每道菜 → 推荐备料份数（整数）
 """
-import uuid
-from datetime import date, datetime, timedelta
+from datetime import date
 from typing import Optional
 
 import structlog
-from sqlalchemy import select, func, text
+from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 

@@ -1,14 +1,12 @@
 """调度器测试 — 配置完整性 + 纯函数任务"""
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-import pytest
 
 from scheduler import (
     AGENT_SCHEDULES,
-    REQUIRED_SCHEDULE_FIELDS,
     auto_execute_approved_plans,
     collect_decision_outcomes,
     generate_daily_plans_for_all_stores,

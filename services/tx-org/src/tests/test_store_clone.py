@@ -24,9 +24,8 @@
   20. get_clone_preview 返回 available_items 列表完整
 """
 
-import sys
 import os
-from datetime import date
+import sys
 
 import pytest
 
@@ -38,16 +37,14 @@ if _src not in sys.path:
 
 from services.store_clone import (
     CLONE_ITEMS,
-    NON_CLONE_ITEMS,
-    StoreCloneTask,
+    _clone_attendance_rules,
+    _clone_tables,
+    _get_source_store_data,
+    batch_clone,
     clone_store,
     clone_store_config,
     get_clone_preview,
     setup_new_store,
-    batch_clone,
-    _get_source_store_data,
-    _clone_tables,
-    _clone_attendance_rules,
 )
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -422,7 +419,6 @@ def test_clone_tables_status_reset_to_free():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 def test_clone_attendance_rules_effective_from_today():
-    from services.store_clone import _clone_attendance_rules
     from datetime import datetime
 
     source_items = [
@@ -522,9 +518,9 @@ def test_legacy_clone_store_empty_address_raises():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 try:
-    from fastapi.testclient import TestClient
-    from fastapi import FastAPI
     from api.store_clone_routes import router as clone_router
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
 
     _api_app = FastAPI()
     _api_app.include_router(clone_router)

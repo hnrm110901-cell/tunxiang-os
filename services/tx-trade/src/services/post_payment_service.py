@@ -10,8 +10,7 @@
   d. 消费满额 → 发"满赠券"
 """
 import uuid
-from datetime import datetime, timezone, timedelta
-from typing import Optional
+from datetime import datetime, timedelta, timezone
 
 import structlog
 from sqlalchemy import select
@@ -127,7 +126,7 @@ class PostPaymentService:
         if rfm_level in ("S1", "S2"):
             coupon = self._create_coupon(
                 customer_id=customer_id,
-                coupon_name=f"VIP专属券 · 满200减50",
+                coupon_name="VIP专属券 · 满200减50",
                 coupon_type="activity",
                 discount_fen=5000,
                 min_order_amount_fen=20000,
@@ -262,7 +261,7 @@ class PostPaymentService:
                     "first": {"value": "感谢您的光临，为您送上专属优惠券！"},
                     "keyword1": {"value": f"¥{amount_yuan:.2f}"},
                     "keyword2": {"value": coupon_summary},
-                    "keyword3": {"value": f"有效期30天"},
+                    "keyword3": {"value": "有效期30天"},
                     "remark": {"value": "点击查看券详情，期待再次为您服务"},
                 },
                 url=f"/pages/coupon/list?source=post_payment&order={str(order.id)[:8]}",

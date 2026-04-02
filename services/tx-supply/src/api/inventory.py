@@ -8,9 +8,10 @@ from typing import Optional
 from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from shared.ontology.src.database import get_db as _get_db
 
-from ..services import inventory_io, expiry_monitor, stock_forecast
+from ..services import expiry_monitor, inventory_io, stock_forecast
 from ..services.transfer_service import (
     get_brand_ingredient_overview,
     get_brand_low_stock_alert,

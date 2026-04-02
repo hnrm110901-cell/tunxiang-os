@@ -101,6 +101,7 @@ async def _fallback_redis_stream(
     """Redis Stream 降级：写入 attribution_events stream。"""
     try:
         import json
+
         import redis.asyncio as aioredis  # type: ignore
         redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
         r = aioredis.from_url(redis_url, decode_responses=True, socket_connect_timeout=1)

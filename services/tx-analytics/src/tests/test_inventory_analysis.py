@@ -14,7 +14,6 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-
 TENANT_ID = str(uuid.uuid4())
 STORE_ID = str(uuid.uuid4())
 DATE_RANGE = {"start": "2026-03-01", "end": "2026-03-27"}

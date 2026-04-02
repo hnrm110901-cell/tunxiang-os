@@ -12,8 +12,8 @@ from decimal import Decimal
 from typing import Any
 
 import structlog
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = structlog.get_logger()
 
@@ -254,9 +254,10 @@ async def _fetch_from_platform(source: str, platform_store_id: str) -> dict[str,
     调用对应平台适配器采集快照数据，返回标准化字典。
     适配器实例由调用方注入（此处为简化的工厂调用，生产中通过 DI 注入）。
     """
-    from adapters.meituan_adapter import MeituanAdapter
-    from adapters.douyin_adapter import DouyinAdapter
     import os
+
+    from adapters.douyin_adapter import DouyinAdapter
+    from adapters.meituan_adapter import MeituanAdapter
 
     if source == "meituan":
         adapter = MeituanAdapter(

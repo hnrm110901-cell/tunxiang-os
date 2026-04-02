@@ -14,7 +14,6 @@ import math
 import uuid
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Optional
 
 import structlog
 

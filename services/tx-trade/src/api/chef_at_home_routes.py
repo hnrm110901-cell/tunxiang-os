@@ -5,22 +5,23 @@
 """
 from typing import AsyncGenerator, Optional
 
-from fastapi import APIRouter, Depends, Request, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db_with_tenant
+
 from ..services.chef_at_home import (
-    create_booking,
-    list_available_chefs,
-    get_chef_profile,
     calculate_price,
-    confirm_booking,
-    start_service,
     complete_service,
-    rate_service,
+    confirm_booking,
+    create_booking,
     get_booking_history,
+    get_chef_profile,
     get_chef_schedule,
+    list_available_chefs,
+    rate_service,
+    start_service,
 )
 
 router = APIRouter(prefix="/api/v1/chef-at-home", tags=["chef-at-home"])

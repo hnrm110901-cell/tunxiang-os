@@ -7,15 +7,15 @@
 - 异常门店识别
 - AI 改进建议 mock
 """
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
 from src.services.cost_health_engine import (
+    BrandCostBenchmark,
     CostHealthEngine,
     StoreCostHealthReport,
-    BrandCostBenchmark,
-    calc_ingredient_cost_rate,
     calc_dimension_score,
+    calc_ingredient_cost_rate,
     calc_weighted_health_score,
     classify_cost_health,
     detect_deviation,

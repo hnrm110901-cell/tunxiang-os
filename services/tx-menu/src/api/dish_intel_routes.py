@@ -3,7 +3,6 @@
 4 个端点：口碑指标、经营状态推导、生命周期、动作建议。
 """
 from fastapi import APIRouter, Header
-
 from services.tx_menu.src.services import dish_intelligence
 
 router = APIRouter(prefix="/api/v1/menu/dish-intel", tags=["dish-intelligence"])

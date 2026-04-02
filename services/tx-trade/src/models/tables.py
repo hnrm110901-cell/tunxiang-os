@@ -1,11 +1,12 @@
 """桌台模型 — 门店桌台拓扑管理"""
 import uuid
 
-from sqlalchemy import String, Integer, Boolean, ForeignKey
-from sqlalchemy.dialects.postgresql import UUID, JSON
+from sqlalchemy import Boolean, ForeignKey, Integer, String
+from sqlalchemy.dialects.postgresql import JSON, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from shared.ontology.src.base import TenantBase
+
 from .enums import TableStatus
 
 

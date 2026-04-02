@@ -2,28 +2,24 @@
 工作流 & 审批工单引擎测试 -- workflow_engine.py 纯函数测试
 """
 
+from datetime import date, datetime
+
 import pytest
-from datetime import date, datetime, timedelta
 from services.workflow_engine import (
     WorkflowStatus,
-    ApprovalNodeType,
-    can_transition,
-    transition,
     build_approval_chain,
-    find_step_by_level,
-    find_next_step,
-    process_approve,
-    process_reject,
-    process_escalate,
-    check_countersign_complete,
     calc_phase_deadline,
-    calc_approval_deadline,
-    is_phase_expired,
-    simple_diff,
-    resolve_role_from_position,
+    can_transition,
+    check_countersign_complete,
     get_positions_for_role,
+    is_phase_expired,
+    process_approve,
+    process_escalate,
+    process_reject,
+    resolve_role_from_position,
+    simple_diff,
+    transition,
 )
-
 
 # ── 基础审批链配置（测试用） ──────────────────────────────────────
 

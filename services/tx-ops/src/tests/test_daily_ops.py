@@ -1,10 +1,15 @@
 """日清日结服务测试"""
-import sys, os
+import os
+import sys
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from services.daily_ops_service import (
-    get_node_definition, compute_flow_progress, compute_node_check_result,
-    get_flow_timeline, NODE_DEFINITIONS,
+    NODE_DEFINITIONS,
+    compute_flow_progress,
+    compute_node_check_result,
+    get_flow_timeline,
+    get_node_definition,
 )
 
 

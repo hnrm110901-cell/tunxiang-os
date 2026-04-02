@@ -8,9 +8,8 @@
 - Store 虚拟门店支持
 - Module imports
 """
-import sys
 import os
-import importlib
+import sys
 
 import pytest
 from fastapi.testclient import TestClient
@@ -173,7 +172,7 @@ class TestSalesChannel:
 
     def test_add_new_channel_without_code_change(self):
         """新增渠道不改代码 — 加一条记录即可"""
-        from sales_channel import SalesChannel, DEFAULT_CHANNELS
+        from sales_channel import DEFAULT_CHANNELS, SalesChannel
 
         new_channel = SalesChannel(
             channel_id="ch_pinduoduo",
@@ -316,25 +315,25 @@ class TestModuleImports:
 
     def test_import_ontology_entities(self):
         """Ontology entities importable"""
-        from entities import Order, Store, Customer, Dish, Employee
+        from entities import Order, Store
         assert Order is not None
         assert Store is not None
 
     def test_import_amount_convention(self):
         """Amount convention importable"""
-        from amount_convention import yuan_to_fen, fen_to_yuan, format_amount, validate_fen
+        from amount_convention import fen_to_yuan, yuan_to_fen
         assert callable(yuan_to_fen)
         assert callable(fen_to_yuan)
 
     def test_import_sales_channel(self):
         """SalesChannel importable"""
-        from sales_channel import SalesChannel, DEFAULT_CHANNELS, get_channel_by_id
+        from sales_channel import DEFAULT_CHANNELS, SalesChannel
         assert SalesChannel is not None
         assert len(DEFAULT_CHANNELS) > 0
 
     def test_import_monolith_modules(self):
         """All monolith module packages importable"""
-        from services.tunxiang_api.src.modules import trade, ops, brain, gateway
+        from services.tunxiang_api.src.modules import brain, gateway, ops, trade
         assert trade is not None
         assert ops is not None
         assert brain is not None
@@ -343,7 +342,11 @@ class TestModuleImports:
     def test_import_api_routes(self):
         """All API route modules importable"""
         from services.tunxiang_api.src.api.v1 import (
-            auth_routes, hub_routes, trade_routes, ops_routes, brain_routes,
+            auth_routes,
+            brain_routes,
+            hub_routes,
+            ops_routes,
+            trade_routes,
         )
         assert auth_routes.router is not None
         assert hub_routes.router is not None
@@ -353,7 +356,7 @@ class TestModuleImports:
 
     def test_import_shared(self):
         """Shared utilities importable"""
-        from services.tunxiang_api.src.shared.response import ok, err, paginated
+        from services.tunxiang_api.src.shared.response import err, ok, paginated
         assert callable(ok)
         assert callable(err)
         assert callable(paginated)

@@ -41,15 +41,14 @@ async def start_group_buy_expiry_scheduler(
                 continue
 
             for tid in tenant_ids:
-                async with session_factory() as db:
-                    async with db.begin():
-                        result = await expire_teams(tid, db)
-                        if result["expired_count"] > 0:
-                            logger.info(
-                                "group_buy_scheduler.expired",
-                                tenant_id=tid,
-                                count=result["expired_count"],
-                            )
+                async with session_factory() as db, db.begin():
+                    result = await expire_teams(tid, db)
+                    if result["expired_count"] > 0:
+                        logger.info(
+                            "group_buy_scheduler.expired",
+                            tenant_id=tid,
+                            count=result["expired_count"],
+                        )
         except asyncio.CancelledError:
             logger.info("group_buy_scheduler.stopped")
             break

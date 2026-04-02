@@ -17,9 +17,8 @@ from pydantic import BaseModel
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from shared.ontology.src.entities import Dish, DishCategory, Store
-
 from shared.ontology.src.database import get_db
+from shared.ontology.src.entities import Dish, DishCategory, Store
 
 logger = structlog.get_logger()
 
@@ -67,8 +66,9 @@ async def _publish_to_redis(channel: str, message: dict) -> bool:
     Redis 不可用时仅记录警告，不抛异常。
     """
     try:
-        import redis.asyncio as aioredis  # type: ignore
         import os
+
+        import redis.asyncio as aioredis  # type: ignore
         redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
         async with aioredis.from_url(redis_url, decode_responses=True) as client:
             await client.publish(channel, json.dumps(message, ensure_ascii=False))

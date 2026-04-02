@@ -16,8 +16,8 @@ import structlog
 from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models.delivery_order import DeliveryOrder as DeliveryOrderModel
 from ..models.delivery_auto_accept_rule import DeliveryAutoAcceptRule
+from ..models.delivery_order import DeliveryOrder as DeliveryOrderModel
 
 logger = structlog.get_logger(__name__)
 

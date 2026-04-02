@@ -28,7 +28,7 @@ import structlog
 from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field
 
-from .response import ok, err
+from .response import err, ok
 from .services.jwt_service import JWTService
 from .services.mfa_service import MFAService
 

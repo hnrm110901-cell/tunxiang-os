@@ -8,7 +8,6 @@ Endpoints:
   GET /api/v1/live-seafood/tanks?store_id=          — 门店鱼缸列表（含库存摘要）
   GET /api/v1/live-seafood/tanks/{zone_code}/dishes?store_id=  — 指定鱼缸当前可点菜品
 """
-import uuid as _uuid
 from typing import Optional
 
 import structlog

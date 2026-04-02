@@ -1,6 +1,6 @@
 """总部管理功能测试 — 门店克隆 / 法人公司 / 批量操作"""
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 

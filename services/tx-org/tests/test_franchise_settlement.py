@@ -12,29 +12,24 @@
 
 from __future__ import annotations
 
-import pytest
 from datetime import date, datetime, timedelta
-from decimal import Decimal
-from typing import Any, Dict, List, Optional
 from unittest.mock import AsyncMock, MagicMock, patch
-from uuid import UUID, uuid4
+from uuid import uuid4
 
+import pytest
 from services.tx_org.src.models.franchise import (
     Franchisee,
     FranchiseeStatus,
     RoyaltyTier,
 )
 from services.tx_org.src.services.franchise_settlement_service import (
-    FranchiseSettlement,
-    FranchiseSettlementItem,
     FranchiseeStatement,
+    FranchiseSettlement,
     FranchiseSettlementService,
-    SettlementStatus,
     InvalidStatusTransitionError,
-    SettlementAlreadyFinalizedError,
+    SettlementStatus,
 )
 from services.tx_org.src.services.royalty_calculator import RoyaltyCalculator
-
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  固定数据与 Fixture

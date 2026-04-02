@@ -11,18 +11,14 @@ TOP5损耗 + 根因分析 + 整改跟踪 + AI预测
 
 from __future__ import annotations
 
-import math
 from datetime import date, datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 from services.waste_guard_service import (
     ROOT_CAUSE_ACTIONS,
-    action_for_causes,
     build_top5_item,
     build_waste_rate_summary,
     classify_waste_status,
-    compute_waste_change,
-    compute_waste_rate,
 )
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

@@ -57,8 +57,8 @@ async def start_orchestration(
     返回 OrchestratorResult 序列化结果。
     编排完成后非阻塞写入 AgentDecisionLog 决策留痕。
     """
-    from ..agents.master import MasterAgent
     from ..agents.event_bus import AgentEvent
+    from ..agents.master import MasterAgent
     from ..services.decision_log_service import DecisionLogService
 
     # X-Tenant-ID header 优先；body 中的 tenant_id 作为向后兼容保留

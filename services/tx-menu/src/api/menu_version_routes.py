@@ -13,8 +13,8 @@ import structlog
 from fastapi import APIRouter, Header, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from ..services.menu_version_service import MenuVersionService
 from ..services.menu_dispatch_service import MenuDispatchService
+from ..services.menu_version_service import MenuVersionService
 
 log = structlog.get_logger()
 

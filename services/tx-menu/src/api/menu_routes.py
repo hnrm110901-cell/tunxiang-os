@@ -10,27 +10,28 @@ import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from shared.ontology.src.database import get_db
 
 from ..services.dish_service import (
     create_dish,
-    get_dish,
-    update_dish,
     delete_dish,
+    get_dish,
     list_dishes,
-    list_dishes_by_status,
     list_dishes_by_season,
+    list_dishes_by_status,
+    update_dish,
 )
 from ..services.menu_template_repository import (
-    MenuTemplateRepository,
     VALID_CHANNELS,
-    VALID_SEASONS,
     VALID_ROOM_TYPES,
+    VALID_SEASONS,
+    MenuTemplateRepository,
 )
 from ..services.stockout_sync import (
-    mark_sold_out,
     auto_check_stockout,
     get_sold_out_list,
+    mark_sold_out,
     restore_dish,
 )
 

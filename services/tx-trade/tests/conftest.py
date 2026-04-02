@@ -10,8 +10,8 @@
 - TENANT_ID 固定为 "00000000-0000-0000-0000-000000000001"，方便追查日志
 - 所有 DB 路由通过 app.dependency_overrides[get_db] 注入 mock_db
 """
-import sys
 import os
+import sys
 
 # 确保项目根（shared/ 所在位置）和 src 在 Python path 中
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
@@ -20,13 +20,12 @@ for p in [ROOT, SRC]:
     if p not in sys.path:
         sys.path.insert(0, p)
 
+from unittest.mock import AsyncMock
+
 import pytest
 import pytest_asyncio
-from unittest.mock import AsyncMock, MagicMock
-from contextlib import asynccontextmanager
-
 from fastapi import FastAPI
-from httpx import AsyncClient, ASGITransport
+from httpx import ASGITransport, AsyncClient
 
 # ─── 常量 ────────────────────────────────────────────────────────────────────
 
@@ -43,9 +42,9 @@ def build_test_app() -> FastAPI:
     不执行 lifespan 中的 init_db / scheduler，避免测试依赖真实数据库连接。
     """
     from fastapi.middleware.cors import CORSMiddleware
+    from src.api.discount_engine_routes import router as discount_engine_router
     from src.api.scan_pay_routes import router as scan_pay_router
     from src.api.stored_value_routes import router as stored_value_router
-    from src.api.discount_engine_routes import router as discount_engine_router
 
     test_app = FastAPI(title="tx-trade-test")
     test_app.add_middleware(

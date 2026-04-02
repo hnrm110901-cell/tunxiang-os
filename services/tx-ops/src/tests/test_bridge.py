@@ -10,10 +10,10 @@
 """
 from __future__ import annotations
 
-import sys
 import os
+import sys
 from dataclasses import dataclass, field
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -21,12 +21,12 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from services.agent_dispatch_bridge import (
     DISPATCHABLE_EVENTS,
-    EVENT_TO_ALERT_TYPE,
     EVENT_SEVERITY_MAP,
+    EVENT_TO_ALERT_TYPE,
+    _event_to_dict,
     listen_agent_events,
     register_agent_hooks,
     route_to_dispatch,
-    _event_to_dict,
 )
 
 TENANT = "tenant_test_001"

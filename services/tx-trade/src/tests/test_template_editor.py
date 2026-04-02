@@ -9,9 +9,8 @@
 
 共 25+ 测试用例，全部不依赖真实数据库或打印机。
 """
-import json
-import sys
 import os
+import sys
 import uuid
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -21,19 +20,14 @@ from fastapi.testclient import TestClient
 # 路径修正（在 tests/ 目录下直接运行 pytest）
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from services.template_renderer import TemplateRenderer, _apply_template_vars, _yuan_str
 from services.printer_driver import (
-    ESC_INIT,
-    ESC_ALIGN_CENTER,
-    ESC_ALIGN_LEFT,
     ESC_BOLD_ON,
-    ESC_BOLD_OFF,
-    GS_SIZE_NORMAL,
-    GS_SIZE_DOUBLE_HEIGHT,
-    GS_SIZE_DOUBLE_BOTH,
+    ESC_INIT,
     GS_CUT_PARTIAL,
+    GS_SIZE_DOUBLE_HEIGHT,
     LF,
 )
+from services.template_renderer import TemplateRenderer, _apply_template_vars, _yuan_str
 
 # ─── 共用示例数据 ───
 
@@ -311,8 +305,8 @@ class TestTemplateRenderer:
 
 def _make_app():
     """创建测试用 FastAPI app，屏蔽真实 DB。"""
-    from fastapi import FastAPI
     from api.template_editor_routes import router
+    from fastapi import FastAPI
 
     app = FastAPI()
     app.include_router(router)

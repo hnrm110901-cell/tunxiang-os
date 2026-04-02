@@ -13,8 +13,7 @@
 """
 from __future__ import annotations
 
-import uuid
-from datetime import date, datetime, timezone
+from datetime import date
 from typing import Any
 
 import structlog

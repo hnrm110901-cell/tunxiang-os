@@ -1,13 +1,13 @@
 """私域运营数据看板单元测试"""
-import pytest
 from unittest.mock import AsyncMock, patch
+
+import pytest
 
 from ..services.private_domain_dashboard import (
     _compute_member_health_score,
     get_member_health,
     get_private_domain_dashboard,
 )
-
 
 # ─── _compute_member_health_score ─────────────────────────────────────────────
 

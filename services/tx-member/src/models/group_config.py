@@ -6,9 +6,8 @@ tenant_id 在此表中代表"集团主租户ID"，由集团管理员身份写入
 金额单位：分（fen）。
 """
 import uuid
-from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Index, String, UniqueConstraint
+from sqlalchemy import Boolean, Index, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSON, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 

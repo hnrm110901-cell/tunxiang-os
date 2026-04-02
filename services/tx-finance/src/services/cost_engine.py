@@ -11,11 +11,11 @@
 import uuid
 from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Any, Optional
 
 import structlog
-from sqlalchemy import select, func, and_, text
+from sqlalchemy import and_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = structlog.get_logger(__name__)
@@ -291,7 +291,7 @@ class CostEngine:
 
         注意：依赖 RLS + 显式 tenant_id 双重隔离。
         """
-        from shared.ontology.src.entities import OrderItem, Order
+        from shared.ontology.src.entities import Order, OrderItem
 
         result = await db.execute(
             select(OrderItem)
@@ -464,8 +464,9 @@ class CostEngine:
         db: AsyncSession,
     ) -> list[uuid.UUID]:
         """查询指定门店指定日期的所有已完成订单ID"""
-        from shared.ontology.src.entities import Order
         from datetime import datetime, timezone
+
+        from shared.ontology.src.entities import Order
 
         start_dt = datetime.combine(biz_date, datetime.min.time()).replace(tzinfo=timezone.utc)
         end_dt = datetime.combine(biz_date, datetime.max.time()).replace(tzinfo=timezone.utc)

@@ -9,11 +9,10 @@
 """
 from __future__ import annotations
 
-import sys
 import os
-import uuid
+import sys
 from datetime import date
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -21,13 +20,12 @@ import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 from services.supplier_scoring_engine import (
-    SupplierScoringEngine,
-    DimensionScores,
-    SupplierScoreResult,
     SCORE_WEIGHTS,
     TIER_THRESHOLDS,
+    DimensionScores,
+    SupplierScoreResult,
+    SupplierScoringEngine,
 )
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 辅助工具

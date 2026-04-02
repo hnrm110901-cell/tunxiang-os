@@ -11,7 +11,6 @@ from typing import Any, Dict, List, Optional
 import structlog
 
 from .check_item_templates import get_node_from_template
-from .daily_ops_service import compute_node_check_result
 
 log = structlog.get_logger(__name__)
 

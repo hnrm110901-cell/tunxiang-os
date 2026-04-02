@@ -21,7 +21,6 @@ from __future__ import annotations
 
 import itertools
 import uuid
-from datetime import datetime, timezone
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -142,9 +141,9 @@ def _apply_single_discount(amount_fen: int, d: DiscountInput) -> int:
             result = round(amount_fen * d.rate)
         elif d.deduct_fen is not None:
             result = amount_fen - d.deduct_fen
-    elif d.type == "full_reduction":
+    elif d.type == "full_reduction":  # noqa: SIM102
         # 满减：只有当前金额 >= condition_fen 才触发
-        if d.condition_fen is not None and d.deduct_fen is not None:
+        if d.condition_fen is not None and d.deduct_fen is not None:  # noqa: SIM102
             if amount_fen >= d.condition_fen:
                 result = amount_fen - d.deduct_fen
     return max(0, result)
@@ -459,7 +458,6 @@ async def create_discount_rule(
             text("SELECT set_config('app.tenant_id', :tid, true)"),
             {"tid": tenant_id},
         )
-        import json
         rule_id = str(uuid.uuid4())
         await db.execute(
             text("""
@@ -538,7 +536,7 @@ async def update_discount_rule(
             params["description"] = req.description
 
         result = await db.execute(
-            text(f"""
+            text(f"""  # noqa: S608 — mock SQL, not user input
                 UPDATE discount_rules
                 SET {', '.join(set_clauses)}
                 WHERE id = :rule_id::uuid

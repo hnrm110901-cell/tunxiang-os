@@ -13,16 +13,12 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import List
 
 import structlog
-from sqlalchemy import select, update, and_, text
+from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from shared.ontology.src.entities import Order, OrderItem
-from ..models.kds_task import KDSTask
-from ..models.production_dept import DishDeptMapping
 
 logger = structlog.get_logger()
 

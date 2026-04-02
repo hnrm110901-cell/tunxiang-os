@@ -4,7 +4,7 @@
 """
 import secrets
 import uuid
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import structlog
@@ -404,7 +404,6 @@ class TableSessionService:
         session_token: str,
     ) -> SubmitResult:
         """提交购物车到厨房 — 创建 Order + OrderItems，触发 KDS 分单"""
-        import json
 
         row = await self._fetch_active_session(session_token)
         session_id = uuid.UUID(str(row["id"]))

@@ -23,6 +23,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db_with_tenant
+
 from ..services.shift_report import ShiftReportService
 
 logger = structlog.get_logger()

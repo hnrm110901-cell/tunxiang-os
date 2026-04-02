@@ -21,8 +21,8 @@ from fastapi import APIRouter, Header, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from ..services.franchise_settlement_service import (
-    FranchiseSettlement,
     FranchiseeStatement,
+    FranchiseSettlement,
     FranchiseSettlementService,
     InvalidStatusTransitionError,
     SettlementNotFoundError,

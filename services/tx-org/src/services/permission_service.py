@@ -17,12 +17,11 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
-from datetime import datetime
 from typing import Optional
 from uuid import UUID
 
 import structlog
-from sqlalchemy import select, text
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = structlog.get_logger(__name__)
@@ -255,9 +254,7 @@ class PermissionService:
             return early_deny
 
         # 管理员无限制
-        if role.level >= 10 or role.max_discount_rate == 0.0:
-            result = PermissionCheckResult.permit()
-        elif discount_rate >= role.max_discount_rate:
+        if role.level >= 10 or role.max_discount_rate == 0.0 or discount_rate >= role.max_discount_rate:
             result = PermissionCheckResult.permit()
         elif role.can_override_discount:
             approver_level = min(role.level + 2, 10)
@@ -308,9 +305,7 @@ class PermissionService:
             )
             return early_deny
 
-        if role.level >= 10:
-            result = PermissionCheckResult.permit()
-        elif amount_fen <= role.max_wipeoff_fen:
+        if role.level >= 10 or amount_fen <= role.max_wipeoff_fen:
             result = PermissionCheckResult.permit()
         else:
             result = PermissionCheckResult.deny(
@@ -472,9 +467,7 @@ class PermissionService:
         if early_deny is not None:
             return early_deny
 
-        if role.level >= 10 or role.data_query_days >= 9999:
-            result = PermissionCheckResult.permit()
-        elif query_days <= role.data_query_days:
+        if role.level >= 10 or role.data_query_days >= 9999 or query_days <= role.data_query_days:
             result = PermissionCheckResult.permit()
         else:
             result = PermissionCheckResult.deny(

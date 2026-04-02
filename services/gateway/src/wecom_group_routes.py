@@ -19,7 +19,6 @@ import structlog
 from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from .models.wecom_group import WecomGroupConfig, WecomGroupMessage
 from .response import ok

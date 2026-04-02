@@ -18,25 +18,27 @@ from __future__ import annotations
 
 import os
 import uuid
-from datetime import datetime, timezone, time
+from datetime import datetime, time, timezone
 from typing import Optional
 from uuid import UUID
 
 import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..models.delivery_auto_accept_rule import DeliveryAutoAcceptRule
+from ..models.delivery_order import DeliveryOrder as DeliveryOrderModel
+from ..repositories.delivery_order_repo import (
+    DeliveryAutoAcceptRuleRepository,
+    DeliveryOrderRepository,
+)
 from .delivery_adapters import (
     BaseDeliveryAdapter,
-    DeliveryOrder as AdapterOrder,
-    MeituanAdapter,
-    ElemeAdapter,
     DouyinAdapter,
+    ElemeAdapter,
+    MeituanAdapter,
 )
-from ..models.delivery_order import DeliveryOrder as DeliveryOrderModel
-from ..models.delivery_auto_accept_rule import DeliveryAutoAcceptRule
-from ..repositories.delivery_order_repo import (
-    DeliveryOrderRepository,
-    DeliveryAutoAcceptRuleRepository,
+from .delivery_adapters import (
+    DeliveryOrder as AdapterOrder,
 )
 
 logger = structlog.get_logger(__name__)

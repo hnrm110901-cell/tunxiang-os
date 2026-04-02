@@ -15,10 +15,8 @@
   修复目标：统一为 app.tenant_id（项目标准，见 CLAUDE.md / v056_fix_rls_vulnerabilities.py）
 """
 import os
-import re
 import uuid
 from dataclasses import dataclass, field
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 常量
@@ -95,7 +93,7 @@ class MockRLSDatabase:
         if table in self._rls_tables:
             if self._current_tenant is None or self._current_tenant == "":
                 raise PermissionError(
-                    f"RLS INSERT blocked: app.tenant_id is not set (NULL/empty)"
+                    "RLS INSERT blocked: app.tenant_id is not set (NULL/empty)"
                 )
             if tenant_id != self._current_tenant:
                 raise PermissionError(

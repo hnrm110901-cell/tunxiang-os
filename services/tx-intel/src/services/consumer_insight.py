@@ -3,10 +3,9 @@
 信号来源：评价、反馈、搜索趋势、社交媒体、预订备注、员工上报。
 """
 import uuid
-import math
 from collections import Counter
 from dataclasses import dataclass, field
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from typing import Optional
 
 import structlog

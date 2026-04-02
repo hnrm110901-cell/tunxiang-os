@@ -16,17 +16,17 @@ GET  /api/v1/orders/{order_id}/constraint-status
 """
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any
 
 from fastapi import APIRouter, Depends, Header, Query
 
 from ..services.proactive_service_agent import (
-    ServiceSuggestion,
     ConstraintStatus,
-    get_service_suggestions,
-    get_table_suggestions,
+    ServiceSuggestion,
     dismiss_suggestion,
     get_constraint_status,
+    get_service_suggestions,
+    get_table_suggestions,
 )
 
 router = APIRouter()

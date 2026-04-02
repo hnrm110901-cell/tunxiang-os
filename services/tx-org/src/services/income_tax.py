@@ -7,8 +7,7 @@
 from __future__ import annotations
 
 import os
-from typing import Any, Dict, List, Optional, Tuple
-
+from typing import Any, Dict, List, Tuple
 
 # ── 2024年个税税率表（年度累计应纳税所得额，元）──────────────────────────────
 # 格式：(级距上限元, 税率, 速算扣除数元)

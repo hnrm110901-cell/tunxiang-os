@@ -7,7 +7,7 @@ from typing import Optional
 
 import httpx
 import structlog
-from sqlalchemy import select, update, func
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models.kds_task import KDSTask

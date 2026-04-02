@@ -10,22 +10,21 @@
 
 所有 DB 交互通过 AsyncMock 模拟，纯函数逻辑独立测试。
 """
+import os
+
+# ─── 导入被测服务和 Repository ───
+import sys
 import uuid
-from datetime import datetime, time, date
+from datetime import datetime, time
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-# ─── 导入被测服务和 Repository ───
-
-import sys
-import os
 # 保证在 pytest 直接运行时也能找到包
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
 
-from ..services.brand_publish_service import BrandPublishService
 from ..services.brand_publish_repository import BrandPublishRepository
-
+from ..services.brand_publish_service import BrandPublishService
 
 # ══════════════════════════════════════════════════════
 # Fixtures
@@ -210,12 +209,11 @@ class TestAddPlanItems:
 
         with patch.object(
             BrandPublishRepository, "get_publish_plan", AsyncMock(return_value=published_plan)
-        ):
-            with pytest.raises(ValueError, match="状态"):
-                await svc.add_items_to_plan(
-                    plan_id=PLAN_ID,
-                    items=[{"dish_id": DISH_ID_1}],
-                )
+        ), pytest.raises(ValueError, match="状态"):
+            await svc.add_items_to_plan(
+                plan_id=PLAN_ID,
+                items=[{"dish_id": DISH_ID_1}],
+            )
 
     @pytest.mark.asyncio
     async def test_empty_items_raises(self):
@@ -225,9 +223,8 @@ class TestAddPlanItems:
 
         with patch.object(
             BrandPublishRepository, "get_publish_plan", AsyncMock(return_value=draft_plan)
-        ):
-            with pytest.raises(ValueError, match="items"):
-                await svc.add_items_to_plan(plan_id=PLAN_ID, items=[])
+        ), pytest.raises(ValueError, match="items"):
+            await svc.add_items_to_plan(plan_id=PLAN_ID, items=[])
 
     @pytest.mark.asyncio
     async def test_negative_override_price_raises(self):
@@ -237,12 +234,11 @@ class TestAddPlanItems:
 
         with patch.object(
             BrandPublishRepository, "get_publish_plan", AsyncMock(return_value=draft_plan)
-        ):
-            with pytest.raises(ValueError, match="override_price_fen"):
-                await svc.add_items_to_plan(
-                    plan_id=PLAN_ID,
-                    items=[{"dish_id": DISH_ID_1, "override_price_fen": -100}],
-                )
+        ), pytest.raises(ValueError, match="override_price_fen"):
+            await svc.add_items_to_plan(
+                plan_id=PLAN_ID,
+                items=[{"dish_id": DISH_ID_1, "override_price_fen": -100}],
+            )
 
     @pytest.mark.asyncio
     async def test_success(self):
@@ -282,9 +278,8 @@ class TestExecutePublishPlan:
 
         with patch.object(
             BrandPublishRepository, "get_publish_plan", AsyncMock(return_value=archived)
-        ):
-            with pytest.raises(ValueError, match="归档"):
-                await svc.execute_publish_plan(PLAN_ID)
+        ), pytest.raises(ValueError, match="归档"):
+            await svc.execute_publish_plan(PLAN_ID)
 
     @pytest.mark.asyncio
     async def test_no_items_raises(self):
@@ -298,10 +293,9 @@ class TestExecutePublishPlan:
             patch.object(BrandPublishRepository, "get_target_store_ids",
                          AsyncMock(return_value=[STORE_ID])),
             patch.object(BrandPublishRepository, "get_plan_items",
-                         AsyncMock(return_value=[])),
+                         AsyncMock(return_value=[])),pytest.raises(ValueError, match="菜品")
         ):
-            with pytest.raises(ValueError, match="菜品"):
-                await svc.execute_publish_plan(PLAN_ID)
+            await svc.execute_publish_plan(PLAN_ID)
 
     @pytest.mark.asyncio
     async def test_new_dish_creates_override(self):
@@ -581,12 +575,11 @@ class TestPriceRuleValidation:
         with patch.object(
             BrandPublishRepository, "get_price_rule",
             AsyncMock(return_value=None)
-        ):
-            with pytest.raises(ValueError, match="调价规则不存在"):
-                await svc.bind_dishes_to_rule(
-                    rule_id=RULE_ID,
-                    dish_ids=[DISH_ID_1],
-                )
+        ), pytest.raises(ValueError, match="调价规则不存在"):
+            await svc.bind_dishes_to_rule(
+                rule_id=RULE_ID,
+                dish_ids=[DISH_ID_1],
+            )
 
 
 # ══════════════════════════════════════════════════════

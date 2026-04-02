@@ -32,18 +32,19 @@ from typing import Optional
 from uuid import UUID
 
 import structlog
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+
 from ..services.delivery_panel_service import (
-    DeliveryPanelService,
     DeliveryOrderNotFound,
     DeliveryOrderStatusError,
+    DeliveryPanelService,
+    DuplicateOrderError,
     PlatformAdapterError,
     SignatureVerifyError,
-    DuplicateOrderError,
 )
 
 logger = structlog.get_logger(__name__)

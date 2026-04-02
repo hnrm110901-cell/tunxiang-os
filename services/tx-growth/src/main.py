@@ -6,23 +6,23 @@
 """
 import asyncio
 from contextlib import asynccontextmanager
+from typing import Any, Optional
 
 import structlog
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from pydantic import BaseModel
-from typing import Any, Optional
-
-from shared.ontology.src.database import init_db, async_session_factory
-from services.brand_strategy import BrandStrategyService
 from services.audience_segmentation import AudienceSegmentationService
-from services.journey_orchestrator import JourneyOrchestratorService
-from services.content_engine import ContentEngine
-from services.offer_engine import OfferEngine
+from services.brand_strategy import BrandStrategyService
 from services.channel_engine import ChannelEngine
+from services.content_engine import ContentEngine
+from services.journey_orchestrator import JourneyOrchestratorService
+from services.offer_engine import OfferEngine
 from services.roi_attribution import ROIAttributionService
-from workers.journey_executor import JourneyExecutor, JourneyEventListener
+from workers.journey_executor import JourneyEventListener, JourneyExecutor
+
 from shared.events.event_publisher import MemberEventPublisher
+from shared.ontology.src.database import async_session_factory, init_db
 
 logger = structlog.get_logger(__name__)
 
@@ -86,18 +86,19 @@ def _on_tick_done(task: asyncio.Task) -> None:
 # FastAPI App（lifespan 管理 DB 初始化 + scheduler）
 # ---------------------------------------------------------------------------
 
-from .api.campaign_routes import router as campaign_router
-from .api.segmentation_routes import router as segmentation_router
-from .api.referral_routes import router as referral_router
-from .api.attribution_routes import router as attribution_router
-from .api.touch_attribution_routes import router as touch_attribution_router
+from engine.event_bridge import get_event_bridge as _get_event_bridge
+from engine.journey_engine import JourneyEngine as _JourneyEngine
+from services.approval_service import ApprovalService as _ApprovalService
+
 from .api.ab_test_routes import router as ab_test_router
 from .api.approval_routes import router as approval_router
+from .api.attribution_routes import router as attribution_router
 from .api.brand_strategy_routes import router as brand_strategy_router
+from .api.campaign_routes import router as campaign_router
 from .api.journey_routes import router as journey_router
-from services.approval_service import ApprovalService as _ApprovalService
-from engine.journey_engine import JourneyEngine as _JourneyEngine
-from engine.event_bridge import get_event_bridge as _get_event_bridge
+from .api.referral_routes import router as referral_router
+from .api.segmentation_routes import router as segmentation_router
+from .api.touch_attribution_routes import router as touch_attribution_router
 
 _approval_service = _ApprovalService()
 

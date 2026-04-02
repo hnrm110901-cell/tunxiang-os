@@ -11,11 +11,9 @@
 """
 from __future__ import annotations
 
-import asyncio
 from dataclasses import dataclass
-from typing import Optional
-from uuid import UUID
 from datetime import datetime, timezone
+from typing import Optional
 
 import structlog
 

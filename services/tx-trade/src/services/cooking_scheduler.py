@@ -11,10 +11,10 @@
 """
 import statistics
 import uuid
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 
 import structlog
-from sqlalchemy import select, func, and_, text
+from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.entities import Dish, Order, OrderItem

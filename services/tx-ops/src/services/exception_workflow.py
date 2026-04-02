@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Optional
 
 import structlog
 
-from .workflow_engine import WorkflowStatus, can_transition, transition
+from .workflow_engine import WorkflowStatus, transition
 
 log = structlog.get_logger(__name__)
 

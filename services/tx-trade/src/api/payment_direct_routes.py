@@ -5,17 +5,17 @@
 """
 from typing import Optional
 
-from fastapi import APIRouter, Request, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from ..services.payment_direct import (
-    create_wechat_payment,
     create_alipay_payment,
     create_unionpay_payment,
-    query_payment_status,
-    process_refund,
-    handle_concurrent_payment,
+    create_wechat_payment,
     get_payment_risk_check,
+    handle_concurrent_payment,
+    process_refund,
+    query_payment_status,
 )
 
 router = APIRouter(prefix="/api/v1/payment-direct", tags=["payment-direct"])

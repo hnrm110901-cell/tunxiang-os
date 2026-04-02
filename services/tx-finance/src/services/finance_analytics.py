@@ -5,11 +5,11 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime, timezone
-from typing import Any, Optional
+from datetime import datetime, timezone
+from typing import Any
 
 import structlog
-from sqlalchemy import select, func, case, text, and_, extract
+from sqlalchemy import extract, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.entities import Order, OrderItem, Store

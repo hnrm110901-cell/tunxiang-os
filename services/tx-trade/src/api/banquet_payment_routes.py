@@ -26,7 +26,8 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from shared.ontology.src.database import get_db_with_tenant, get_db_no_rls
+from shared.ontology.src.database import get_db_no_rls, get_db_with_tenant
+
 from ..services.banquet_payment_service import BanquetPaymentService
 
 logger = structlog.get_logger()

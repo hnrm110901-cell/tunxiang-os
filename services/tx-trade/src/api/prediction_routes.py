@@ -22,10 +22,9 @@
 from __future__ import annotations
 
 from datetime import date as dt_date
-from typing import Optional
 
 import structlog
-from fastapi import APIRouter, Header, Query, Request
+from fastapi import APIRouter, Query, Request
 
 router = APIRouter(prefix="/api/v1/predict", tags=["prediction"])
 

@@ -11,14 +11,12 @@ D5: 电子发票(诺诺)
 D6: 钉钉/飞书登录
 """
 import base64
-import os
-import hashlib
-import hmac
 import json
+import os
 import time
 import uuid as _uuid_mod
-from typing import Optional
 from dataclasses import dataclass
+from typing import Optional
 
 import httpx
 import structlog
@@ -72,9 +70,9 @@ class WechatPaySDK:
             raise ValueError("WECHAT_PAY_PRIVATE_KEY_PATH 未配置或文件不存在")
 
         try:
-            from cryptography.hazmat.primitives.serialization import load_pem_private_key  # type: ignore
             from cryptography.hazmat.primitives.asymmetric.padding import PKCS1v15  # type: ignore
             from cryptography.hazmat.primitives.hashes import SHA256  # type: ignore
+            from cryptography.hazmat.primitives.serialization import load_pem_private_key  # type: ignore
         except ImportError as exc:
             raise RuntimeError("缺少 cryptography 库，请 pip install cryptography") from exc
 

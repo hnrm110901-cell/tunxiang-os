@@ -1,6 +1,7 @@
 """菜品管理 API"""
 from typing import Optional
-from fastapi import APIRouter, Query
+
+from fastapi import APIRouter
 from pydantic import BaseModel
 
 router = APIRouter(prefix="/api/v1/menu", tags=["menu"])

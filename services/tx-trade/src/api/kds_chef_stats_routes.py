@@ -1,12 +1,12 @@
 """厨师绩效计件 API 路由"""
 from datetime import date, timedelta
-from typing import Optional, Literal
+from typing import Literal, Optional
 
 from fastapi import APIRouter, Depends, Header, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import get_db
-from ..services.kds_chef_stats import get_leaderboard, get_chef_daily_detail
+from ..services.kds_chef_stats import get_chef_daily_detail, get_leaderboard
 
 router = APIRouter(prefix="/api/v1/kds/chef-stats", tags=["kds-chef-stats"])
 

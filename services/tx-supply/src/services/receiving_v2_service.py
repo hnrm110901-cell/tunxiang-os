@@ -15,12 +15,11 @@ from decimal import Decimal
 from typing import Optional
 
 import structlog
-from sqlalchemy import select, func, and_
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from shared.events import UniversalPublisher, SupplyEventType
-
+from shared.events import SupplyEventType, UniversalPublisher
 from shared.ontology.src.entities import (
     Ingredient,
     IngredientTransaction,

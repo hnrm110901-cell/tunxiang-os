@@ -8,10 +8,9 @@ import os
 import time
 from typing import Any
 
+import structlog
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
-
-import structlog
 
 from ..services.delivery_adapter import DeliveryPlatformAdapter
 

@@ -6,8 +6,8 @@
 import uuid
 from datetime import date, timedelta
 from typing import Any
-from ..base import SkillAgent, AgentResult
 
+from ..base import AgentResult, SkillAgent
 
 # 菜品品类
 DISH_CATEGORIES = ["凉菜", "热菜", "汤品", "主食", "甜品", "饮品", "小吃", "季节限定"]

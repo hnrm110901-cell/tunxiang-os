@@ -7,11 +7,10 @@ import uuid
 from datetime import datetime, timezone
 
 import structlog
-from sqlalchemy import select, update
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models.tables import Table
-from .state_machine import can_table_transition, TABLE_STATES
 
 logger = structlog.get_logger()
 

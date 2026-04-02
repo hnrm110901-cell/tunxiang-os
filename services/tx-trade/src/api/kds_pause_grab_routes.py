@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import get_db
-from ..services.kds_pause_grab import pause_task, resume_task, grab_task
+from ..services.kds_pause_grab import grab_task, pause_task, resume_task
 
 router = APIRouter(prefix="/api/v1/kds/tickets", tags=["kds-pause-grab"])
 

@@ -1,7 +1,7 @@
 """服务铃 Service"""
 import os
 import uuid
-from datetime import datetime, timezone, date
+from datetime import date, datetime, timezone
 from typing import Optional
 
 import httpx
@@ -113,8 +113,7 @@ async def get_call_history(
     tenant_id: str,
     db: AsyncSession,
 ) -> list[ServiceBellCall]:
-    from sqlalchemy import func, cast
-    from sqlalchemy import Date
+    from sqlalchemy import Date, cast
 
     result = await db.execute(
         select(ServiceBellCall)

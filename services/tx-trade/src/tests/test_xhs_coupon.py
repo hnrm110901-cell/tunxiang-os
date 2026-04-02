@@ -8,14 +8,14 @@
 5. Webhook 端点冒烟
 6. POI 绑定端点冒烟
 """
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../.."))
 
 import pytest
-from shared.adapters.xiaohongshu.src.xhs_client import XHSClient
 
+from shared.adapters.xiaohongshu.src.xhs_client import XHSClient
 
 # ===========================================================================
 # 1. XHSClient 签名

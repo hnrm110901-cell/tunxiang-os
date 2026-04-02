@@ -1,34 +1,34 @@
 """Tests for Vision Service — 菜品质检、卫生巡检、菜品识别、客流统计"""
 
 import io
-import struct
+import os
+
+# Adjust import path — tests run from the src directory
+import sys
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 import pytest_asyncio
-from httpx import AsyncClient, ASGITransport
+from httpx import ASGITransport, AsyncClient
 
-# Adjust import path — tests run from the src directory
-import sys
-import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+from fastapi import FastAPI, HTTPException
 from vision_service import (
-    VisionService,
-    DishQualityResult,
-    HygieneResult,
-    DishRecognitionResult,
-    CustomerCountResult,
     HYGIENE_VIOLATIONS,
-    _validate_image,
+    MAX_IMAGE_SIZE,
+    CustomerCountResult,
+    DishQualityResult,
+    DishRecognitionResult,
+    HygieneResult,
+    VisionService,
+    _mock_customer_count,
     _mock_dish_quality,
     _mock_hygiene,
     _mock_recognize_dish,
-    _mock_customer_count,
+    _validate_image,
     router,
-    MAX_IMAGE_SIZE,
 )
-from fastapi import FastAPI, HTTPException
 
 # ─── Fixtures ───
 

@@ -8,13 +8,15 @@ from __future__ import annotations
 import asyncio
 import os
 import sys
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock
 
 # 将 src 目录加入 path，以便无 package 安装时也能导入
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+from agents.base import AgentResult
+from agents.event_bus import AgentEvent
 from agents.orchestrator import (
     AgentOrchestrator,
     ExecutionPlan,
@@ -22,9 +24,6 @@ from agents.orchestrator import (
     OrchestratorResult,
     StepStatus,
 )
-from agents.base import AgentResult
-from agents.event_bus import AgentEvent
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 辅助工具

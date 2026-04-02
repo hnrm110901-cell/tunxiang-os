@@ -12,9 +12,8 @@ SQLAlchemy ORM 模型用于数据库操作。
 
 from __future__ import annotations
 
-from datetime import datetime
 from typing import Any, Literal, Optional
-from uuid import UUID, uuid4
+from uuid import UUID
 
 from pydantic import BaseModel, Field
 

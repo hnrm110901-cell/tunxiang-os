@@ -204,7 +204,7 @@ async def get_pending_count(
 ) -> Dict[str, Any]:
     """返回各状态的 GDPR 请求数量，供运营看板使用。"""
     from sqlalchemy import text as sa_text
-    from shared.ontology.src.database import get_db_with_tenant
+
 
     result = await db.execute(
         sa_text("""

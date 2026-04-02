@@ -268,8 +268,7 @@ class AutoProcurementService:
             return {"on_time_rate": 0.0, "quality_rate": 0.0, "price_score": 0.5, "total_deliveries": 0}
 
         try:
-            import uuid as _uuid_mod
-            from sqlalchemy import select, func, text
+            from sqlalchemy import text
 
             # 查询收货记录中该供应商对该原料的历史数据
             # 注：实际表结构依赖receiving_records表的具体字段
@@ -348,6 +347,7 @@ class AutoProcurementService:
             采购建议列表（仅含需要采购的原料，按urgency排序）
         """
         import uuid as _uuid_mod
+
         from sqlalchemy import select, text
 
         from shared.ontology.src.entities import Ingredient

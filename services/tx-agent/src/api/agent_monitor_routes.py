@@ -11,8 +11,8 @@ from datetime import date, datetime, timezone
 
 import structlog
 from fastapi import APIRouter, Depends, Header, Query
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db_with_tenant
 

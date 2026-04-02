@@ -11,7 +11,6 @@
 import math
 import random
 import time
-import uuid
 from typing import Any, Optional
 
 import httpx
@@ -136,7 +135,7 @@ class FederatedClient:
         start_time = time.time()
         epoch_losses: list[float] = []
 
-        for epoch in range(epochs):
+        for _epoch in range(epochs):
             epoch_loss = 0.0
             # 随机打乱训练数据索引
             indices = list(range(sample_count))
@@ -218,7 +217,7 @@ class FederatedClient:
             "learning_rate": learning_rate,
             "sample_count": sample_count,
             "metrics": metrics,
-            "epoch_losses": [round(l, 6) for l in epoch_losses],
+            "epoch_losses": [round(loss, 6) for loss in epoch_losses],
             "trained_at": time.time(),
         }
         self.training_history.append(history_entry)
@@ -237,7 +236,7 @@ class FederatedClient:
             "ok": True,
             "model_id": model_id,
             "metrics": metrics,
-            "epoch_losses": [round(l, 6) for l in epoch_losses],
+            "epoch_losses": [round(loss, 6) for loss in epoch_losses],
             "weight_count": weight_count,
             "sample_count": sample_count,
         }

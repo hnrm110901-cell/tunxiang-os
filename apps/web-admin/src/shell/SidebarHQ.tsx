@@ -55,6 +55,9 @@ const MENU_CONFIGS: Record<string, MenuConfig> = {
   },
   analytics: {
     moduleId: 'analytics', groups: [
+      { label: '驾驶舱', items: [
+        { id: 'analytics-dashboard', label: '经营驾驶舱', icon: '🖥️', path: '/analytics/dashboard' },
+      ]},
       { label: '分析', items: [
         { id: 'daily', label: '日报', icon: '📰', path: '/analytics/daily' },
         { id: 'kpi', label: 'KPI 监控', icon: '🎯', path: '/analytics/kpi' },
@@ -98,6 +101,31 @@ const MENU_CONFIGS: Record<string, MenuConfig> = {
       ]},
     ],
   },
+  finance: {
+    moduleId: 'finance', groups: [
+      { label: '财务分析', items: [
+        { id: 'finance-analysis', label: '财务分析', icon: '💹', path: '/hq/analytics/finance' },
+        { id: 'pl-report', label: '损益表 P&L', icon: '📊', path: '/hq/analytics/pl-report' },
+        { id: 'budget-tracker', label: '预算追踪', icon: '🎯', path: '/hq/analytics/budget' },
+      ]},
+      { label: 'AI 稽核', items: [
+        { id: 'finance-audit', label: 'AI 财务稽核', icon: '🔍', path: '/finance/audit' },
+      ]},
+    ],
+  },
+  org: {
+    moduleId: 'org', groups: [
+      { label: '组织管理', items: [
+        { id: 'hr-dashboard', label: '人力管理',     icon: '👥', path: '/hq/org/hr'          },
+        { id: 'franchise',    label: '加盟管理',     icon: '🏪', path: '/franchise-dashboard' },
+      ]},
+      { label: '人事管理', items: [
+        { id: 'payroll-configs',  label: '薪资方案配置', icon: '⚙️', path: '/org/payroll-configs'  },
+        { id: 'payroll-records',  label: '月度薪资管理', icon: '💴', path: '/org/payroll-records'  },
+        { id: 'payroll-manage',   label: '薪资总览',     icon: '📋', path: '/payroll-manage'        },
+      ]},
+    ],
+  },
   ops: {
     moduleId: 'ops', groups: [
       { label: '经营管理', items: [
@@ -105,6 +133,9 @@ const MENU_CONFIGS: Record<string, MenuConfig> = {
         { id: 'store-analysis', label: '门店分析', icon: '🏪', path: '/hq/ops/store-analysis' },
         { id: 'dish-analysis', label: '菜品分析', icon: '🍜', path: '/hq/ops/dish-analysis' },
         { id: 'smart-specials', label: '今日特供', icon: '🍽️', path: '/hq/ops/smart-specials' },
+      ]},
+      { label: '巡检质控', items: [
+        { id: 'patrol-inspection', label: 'AI巡店质检', icon: '🔍', path: '/ops/patrol-inspection' },
       ]},
       { label: '实时监控', items: [
         { id: 'cruise-monitor', label: '营业巡航', icon: '🚢', path: '/hq/ops/cruise' },

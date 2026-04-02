@@ -16,10 +16,11 @@ import structlog
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from shared.ontology.src.entities import Order, OrderItem, Store
+from shared.ontology.src.entities import Order, OrderItem
 from shared.ontology.src.enums import OrderStatus
+
+from ..models.enums import OrderType, TableStatus
 from ..models.tables import Table
-from ..models.enums import TableStatus, OrderType
 from .attribution_hook import fire_order_attribution
 
 if TYPE_CHECKING:

@@ -17,8 +17,8 @@
 DB 层通过 app.dependency_overrides[get_db] 注入 AsyncMock，
 避免真实数据库连接，并精确控制 SELECT / UPDATE / INSERT 的返回值。
 """
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 sys.path.insert(
@@ -27,14 +27,15 @@ sys.path.insert(
 )
 
 import uuid
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import pytest_asyncio
 from fastapi import FastAPI
-from httpx import AsyncClient, ASGITransport
+from httpx import ASGITransport, AsyncClient
+from src.api.stored_value_routes import _calc_bonus
+from src.api.stored_value_routes import router as stored_value_router
 
-from src.api.stored_value_routes import router as stored_value_router, _calc_bonus
 from shared.ontology.src.database import get_db
 
 # ─── 测试 app ─────────────────────────────────────────────────────────────────

@@ -4,9 +4,9 @@
 叠加规则：同类型不叠加，不同类型可叠加。
 优先级：商品券(free_item/upgrade/buy_gift) > 折扣券(discount) > 代金券(cash)。
 """
-import uuid
 import random
 import string
+import uuid
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Optional

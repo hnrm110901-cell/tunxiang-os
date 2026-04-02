@@ -16,9 +16,6 @@ from uuid import UUID
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from shared.ontology.src.database import get_db
 from services.group_member_service import (
     CrossBrandNotAllowedError,
     CrossBrandProfile,
@@ -29,6 +26,9 @@ from services.group_member_service import (
     InsufficientPointsError,
     TenantNotInGroupError,
 )
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from shared.ontology.src.database import get_db
 
 logger = structlog.get_logger(__name__)
 

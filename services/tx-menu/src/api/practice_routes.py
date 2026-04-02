@@ -5,15 +5,15 @@
 - DELETE /api/v1/menu/practices/{practice_id}     删除单条做法
 """
 import uuid
-from typing import Optional
 
 import structlog
-from fastapi import APIRouter, Depends, Request, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
-from sqlalchemy import select, delete
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+
 from ..models.dish_practice import DishPractice
 
 logger = structlog.get_logger()

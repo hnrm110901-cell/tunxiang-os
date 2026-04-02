@@ -15,9 +15,7 @@ V1迁入 550行 + 新写合并报表。
 """
 from __future__ import annotations
 
-import math
-from datetime import date, timedelta
-from typing import Any, Optional
+from typing import Any
 
 import structlog
 

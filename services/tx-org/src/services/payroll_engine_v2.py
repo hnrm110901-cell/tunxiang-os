@@ -13,22 +13,22 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
+from models.payroll_record import PayrollRecord, PayrollRecordStatus, StoreSalarySummary
+from services.income_tax import IncomeTaxCalculator
 from services.payroll_engine import (
+    compute_absence_deduction,
     compute_base_salary,
     compute_commission,
-    compute_full_attendance_bonus,
-    compute_absence_deduction,
-    compute_late_deduction,
     compute_early_leave_deduction,
+    compute_full_attendance_bonus,
+    compute_late_deduction,
+    compute_overtime_pay,
     compute_performance_bonus,
     compute_seniority_subsidy,
-    compute_overtime_pay,
-    derive_hourly_rate,
     count_work_days,
+    derive_hourly_rate,
 )
 from services.social_insurance import SocialInsuranceCalculator
-from services.income_tax import IncomeTaxCalculator
-from models.payroll_record import PayrollRecord, PayrollRecordStatus, StoreSalarySummary
 
 
 class PayrollEngine:

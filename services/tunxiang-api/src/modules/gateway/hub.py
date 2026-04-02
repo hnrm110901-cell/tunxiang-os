@@ -2,8 +2,8 @@
 
 直接引用 gateway 的 hub_api 模块。
 """
-import sys
 import os
+import sys
 
 _gateway_src = os.path.join(
     os.path.dirname(__file__), "..", "..", "..", "..", "gateway", "src"

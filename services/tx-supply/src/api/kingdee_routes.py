@@ -12,8 +12,10 @@ from typing import Any, Optional
 import httpx
 import structlog
 from fastapi import APIRouter
-from shared.ontology.src.database import get_db as _get_db, Header, HTTPException
 from pydantic import BaseModel, Field
+
+from shared.ontology.src.database import Header, HTTPException
+from shared.ontology.src.database import get_db as _get_db
 
 log = structlog.get_logger(__name__)
 
@@ -265,8 +267,9 @@ async def api_sync_inventory(
         return {"ok": True, "data": {"skipped": True, "reason": "金蝶未配置"}}
 
     try:
-        from shared.ontology.src.database import async_session_factory
         from sqlalchemy import text
+
+        from shared.ontology.src.database import async_session_factory
 
         async with async_session_factory() as db:
             rows = await db.execute(
@@ -333,8 +336,9 @@ async def api_sync_purchase(
         return {"ok": True, "data": {"skipped": True, "reason": "金蝶未配置"}}
 
     try:
-        from shared.ontology.src.database import async_session_factory
         from sqlalchemy import text
+
+        from shared.ontology.src.database import async_session_factory
 
         filters = "tenant_id = :tid AND store_id = :sid AND is_deleted = false"
         bind: dict = {"tid": x_tenant_id, "sid": req.store_id}

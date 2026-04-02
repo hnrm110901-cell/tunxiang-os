@@ -10,7 +10,7 @@ import structlog
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError, ProgrammingError
 
-from ..base import SkillAgent, AgentResult
+from ..base import AgentResult, SkillAgent
 
 logger = structlog.get_logger(__name__)
 

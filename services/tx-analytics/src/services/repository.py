@@ -3,14 +3,14 @@
 封装门店健康度、日报、KPI 预警、决策推荐的聚合查询。
 """
 import uuid
-from datetime import datetime, timezone, timedelta, date
+from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 
-from sqlalchemy import select, func, text, case, and_
+from sqlalchemy import case, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from shared.ontology.src.entities import Order, OrderItem, Store, Ingredient, Employee
-from shared.ontology.src.enums import OrderStatus, InventoryStatus
+from shared.ontology.src.entities import Employee, Ingredient, Order, OrderItem, Store
+from shared.ontology.src.enums import InventoryStatus, OrderStatus
 
 
 class AnalyticsRepository:

@@ -6,17 +6,16 @@
 3. 同一菜品30分钟内催菜超2次被限流
 4. 承诺时间到期未完成触发升级告警
 """
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import uuid
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-
 
 # ─── 工具 ───
 

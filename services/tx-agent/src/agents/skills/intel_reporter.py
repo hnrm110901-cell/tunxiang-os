@@ -3,7 +3,8 @@
 生成竞对周报、需求变化周报、新品趋势周报、原料趋势周报、商圈情报周报、月度报告、自定义报告。
 """
 from typing import Any
-from ..base import SkillAgent, AgentResult
+
+from ..base import AgentResult, SkillAgent
 
 
 class IntelReporterAgent(SkillAgent):

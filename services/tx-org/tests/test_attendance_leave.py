@@ -24,22 +24,17 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
 
 from datetime import date, datetime, time, timezone
-from typing import Any, Optional
 from unittest.mock import AsyncMock, patch
 
 import pytest
-
 from services.attendance_engine import (
-    GRACE_PERIOD_MINUTES,
     AttendanceEngine,
 )
 from services.leave_service import (
-    VALID_LEAVE_TYPES,
     compute_balance_after_deduction,
     count_leave_work_days,
     validate_leave_request,
 )
-
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  AttendanceEngine (内存版) 测试
@@ -433,7 +428,7 @@ class TestLeaveRepositoryCallbacks:
     @pytest.mark.asyncio
     async def test_on_leave_approved_calls_deduct(self) -> None:
         """审批通过：调用余额扣减和 daily_attendance 更新"""
-        from services.leave_repository import on_leave_approved, BALANCE_CHECKED_TYPES
+        from services.leave_repository import on_leave_approved
 
         # Mock DB
         db = AsyncMock()
@@ -474,7 +469,7 @@ class TestLeaveRepositoryCallbacks:
     @pytest.mark.asyncio
     async def test_on_leave_approved_no_deduct_for_sick(self) -> None:
         """病假审批通过：不扣减余额（病假不在 BALANCE_CHECKED_TYPES）"""
-        from services.leave_repository import on_leave_approved, BALANCE_CHECKED_TYPES
+        from services.leave_repository import BALANCE_CHECKED_TYPES, on_leave_approved
 
         assert "sick" not in BALANCE_CHECKED_TYPES
 
@@ -517,6 +512,5 @@ class TestLeaveRepositoryCallbacks:
             "services.leave_repository.get_leave_request",
             new_callable=AsyncMock,
             return_value=None,
-        ):
-            with pytest.raises(ValueError, match="请假申请不存在"):
-                await on_leave_approved("nonexistent", "t1", db)
+        ), pytest.raises(ValueError, match="请假申请不存在"):
+            await on_leave_approved("nonexistent", "t1", db)

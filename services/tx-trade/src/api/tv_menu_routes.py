@@ -1,7 +1,8 @@
 """电视点菜墙 API 路由"""
+from typing import Optional
+
 from fastapi import APIRouter, Header, HTTPException, Query
 from pydantic import BaseModel
-from typing import Optional
 
 from ..services import tv_menu_service
 

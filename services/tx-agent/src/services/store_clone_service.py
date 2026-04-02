@@ -14,10 +14,10 @@ from __future__ import annotations
 import asyncio
 import json
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Optional
 from uuid import UUID, uuid4
-from datetime import datetime, timezone
 
 import structlog
 from sqlalchemy import text

@@ -12,19 +12,20 @@ import uuid
 from typing import Optional
 
 import structlog
-from fastapi import APIRouter, Depends, Request, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
-from sqlalchemy import select, and_
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
-from shared.ontology.src.entities import Order, OrderItem, Dish
+from shared.ontology.src.entities import Dish, Order, OrderItem
 from shared.ontology.src.enums import OrderStatus
-from ..models.tables import Table
+
 from ..models.enums import TableStatus
+from ..models.tables import Table
 from ..services.cashier_engine import CashierEngine
-from ..services.menu_recommender import get_recommendations
 from ..services.kds_dispatch import dispatch_order_to_kds
+from ..services.menu_recommender import get_recommendations
 
 logger = structlog.get_logger()
 

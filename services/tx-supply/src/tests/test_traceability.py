@@ -1,25 +1,25 @@
 """原料追溯服务测试 -- 正向追溯 / 反向追溯 / 时间线 / 报告 / 关系图"""
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from services.traceability import (
-    full_trace_forward,
-    full_trace_backward,
-    get_trace_timeline,
-    generate_trace_report,
+    TraceDirection,
+    TraceNodeType,
+    _clear_store,
     build_ingredient_graph,
+    full_trace_backward,
+    full_trace_forward,
+    generate_trace_report,
+    get_trace_timeline,
     inject_batch,
     inject_batch_transaction,
     inject_bom_link,
-    inject_order_dish,
-    inject_order_customer,
-    inject_ingredient_supplier,
     inject_ingredient_alternative,
-    TraceNodeType,
-    TraceDirection,
-    _clear_store,
+    inject_ingredient_supplier,
+    inject_order_customer,
+    inject_order_dish,
 )
 
 TENANT = "tenant-trace-001"

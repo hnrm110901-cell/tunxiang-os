@@ -10,28 +10,24 @@
 7. 接单后自动推送到KDS
 8. tenant_id隔离
 """
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 import uuid
-from datetime import datetime, timezone, timedelta
-from unittest.mock import AsyncMock, MagicMock, patch, call
-
-import pytest
+from datetime import datetime, timedelta, timezone
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
-
+import pytest
 from services.omni_channel_service import (
+    OmniChannelError,
     OmniChannelService,
     UnifiedOrder,
-    UnifiedOrderItem,
-    OmniChannelError,
     UnsupportedPlatformError,
     stable_omni_order_no,
 )
-
 
 # ─── 测试工具 ────────────────────────────────────────────────────────────────
 

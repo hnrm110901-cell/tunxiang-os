@@ -16,8 +16,8 @@
 13. 日统计聚合正确
 14. 多租户隔离 — 不同 tenant_id 查不到对方的订单
 """
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../../../../"))
 
@@ -113,7 +113,7 @@ def _mock_order_model(
     m.platform_name = "美团外卖"
     m.platform_order_id = platform_order_id
     m.platform_order_no = None
-    m.order_no = f"MT20260331ABCDEF"
+    m.order_no = "MT20260331ABCDEF"
     m.status = status
     m.total_fen = total_fen
     m.commission_rate = 0.18
@@ -266,8 +266,8 @@ class TestDeliveryPanelServiceAccept:
     async def test_accept_order_wrong_status_raises(self):
         """接单时订单非 pending_accept 状态，抛出 DeliveryOrderStatusError"""
         from services.tx_trade.src.services.delivery_panel_service import (
-            DeliveryPanelService,
             DeliveryOrderStatusError,
+            DeliveryPanelService,
         )
 
         order_id = uuid.uuid4()

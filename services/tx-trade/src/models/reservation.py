@@ -1,11 +1,12 @@
 """预订模型 — 7状态机，支持包间分配与定金"""
 import uuid
 
-from sqlalchemy import String, Integer, Boolean, Date, Index
-from sqlalchemy.dialects.postgresql import UUID, JSON
+from sqlalchemy import Boolean, Index, Integer, String
+from sqlalchemy.dialects.postgresql import JSON, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from shared.ontology.src.base import TenantBase
+
 from .enums import ReservationStatus, ReservationType
 
 

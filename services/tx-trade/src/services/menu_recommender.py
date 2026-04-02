@@ -8,11 +8,11 @@ d. 顾客历史：如果有 customer_id，推荐常点菜品
 e. 热度排行：最近 7 天销量 Top 10
 """
 import uuid
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import structlog
-from sqlalchemy import select, func, and_, desc
+from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.entities import Dish, Order, OrderItem

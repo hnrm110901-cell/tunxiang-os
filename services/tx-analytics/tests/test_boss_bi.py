@@ -11,16 +11,16 @@ from __future__ import annotations
 
 import os
 import sys
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../src"))
 
 from services.group_dashboard_service import (
+    BrandPerformance,
     GroupDashboardService,
     GroupKPISnapshot,
-    BrandPerformance,
     StoreAlert,
     _calc_deviation_pct,
 )
@@ -68,7 +68,7 @@ async def test_get_today_group_kpi_returns_snapshot():
     assert result.tenant_id == TENANT_ID
     assert result.total_revenue_fen >= 0
     assert result.avg_ticket_fen >= 0
-    assert 0.0 <= result.table_turnover_rate
+    assert result.table_turnover_rate >= 0.0
     assert 0.0 <= result.gross_margin_pct <= 100.0
     assert result.active_store_count >= 0
     assert result.alert_count >= 0

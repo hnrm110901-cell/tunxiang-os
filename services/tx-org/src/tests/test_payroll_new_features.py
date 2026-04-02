@@ -16,35 +16,35 @@
 
 from __future__ import annotations
 
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-import pytest
-from decimal import Decimal
 from uuid import uuid4
 
+import pytest
+from services.income_tax import IncomeTaxCalculator
 from services.payroll_engine import (
-    compute_base_salary,
-    compute_overtime_pay,
-    derive_hourly_rate,
     compute_absence_deduction,
-    compute_late_deduction,
+    compute_base_salary,
     compute_commission,
     compute_full_attendance_bonus,
+    compute_late_deduction,
+    compute_overtime_pay,
     count_work_days,
+    derive_hourly_rate,
     summarize_payroll,
 )
-from services.payroll_engine_v2 import PayrollEngine as PayrollEngineV2
-from services.income_tax import IncomeTaxCalculator
-from services.social_insurance import SocialInsuranceCalculator
 from services.payroll_engine_db import (
     PayrollEngine as PayrollEngineDB,
-    SocialInsuranceConfig,
-    SIResult,
 )
-
+from services.payroll_engine_db import (
+    SIResult,
+    SocialInsuranceConfig,
+)
+from services.payroll_engine_v2 import PayrollEngine as PayrollEngineV2
+from services.social_insurance import SocialInsuranceCalculator
 
 TENANT_ID = str(uuid4())
 STORE_ID = str(uuid4())

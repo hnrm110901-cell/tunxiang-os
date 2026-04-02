@@ -18,18 +18,16 @@
 """
 import uuid
 from datetime import date
-from typing import Optional
 
 import structlog
-from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
+from services.tx_finance.src.services.cost_engine_service import (
+    CostEngineService,
+)
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db_with_tenant
-from services.tx_finance.src.services.cost_engine_service import (
-    CostEngineService,
-    calculate_cost_health_score,
-)
 
 logger = structlog.get_logger(__name__)
 router = APIRouter(tags=["finance-cost"])

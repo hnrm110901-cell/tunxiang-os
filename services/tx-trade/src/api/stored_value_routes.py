@@ -14,16 +14,15 @@ POST /api/v1/members/{member_id}/stored-value/refund
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, field_validator
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
-from fastapi import Depends
 
 router = APIRouter(prefix="/api/v1", tags=["stored-value"])
 
@@ -358,7 +357,7 @@ async def consume(
         balance_after=balance_after,
         order_id=body.order_id,
         operator_id=body.operator_id,
-        note=f"订单消费",
+        note="订单消费",
     )
 
     await db.commit()

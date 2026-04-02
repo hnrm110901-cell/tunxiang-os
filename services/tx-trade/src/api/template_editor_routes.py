@@ -21,7 +21,7 @@ import structlog
 from fastapi import APIRouter, Header, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import text
-from sqlalchemy.exc import NoResultFound, IntegrityError
+from sqlalchemy.exc import IntegrityError
 
 from shared.ontology.src.database import async_session_factory
 
@@ -814,42 +814,41 @@ async def create_template(
     config_dict = req.config.model_dump()
 
     try:
-        async with async_session_factory() as session:
-            async with session.begin():
-                # 若设为默认，先清除同类型旧默认
-                if req.is_default:
-                    await session.execute(
-                        text(
-                            "UPDATE receipt_templates SET is_default = false "
-                            "WHERE tenant_id = :tenant_id AND store_id = :store_id "
-                            "AND print_type = :print_type AND is_deleted = false"
-                        ),
-                        {
-                            "tenant_id": tenant_id,
-                            "store_id": req.store_id,
-                            "print_type": req.print_type,
-                        },
-                    )
+        async with async_session_factory() as session, session.begin():
+            # 若设为默认，先清除同类型旧默认
+            if req.is_default:
                 await session.execute(
                     text(
-                        "INSERT INTO receipt_templates "
-                        "(id, tenant_id, store_id, template_name, print_type, "
-                        "paper_width, template_content, is_default, is_active, config) "
-                        "VALUES (:id, :tenant_id, :store_id, :template_name, :print_type, "
-                        ":paper_width, :template_content, :is_default, true, :config::jsonb)"
+                        "UPDATE receipt_templates SET is_default = false "
+                        "WHERE tenant_id = :tenant_id AND store_id = :store_id "
+                        "AND print_type = :print_type AND is_deleted = false"
                     ),
                     {
-                        "id": template_id,
                         "tenant_id": tenant_id,
                         "store_id": req.store_id,
-                        "template_name": req.template_name,
                         "print_type": req.print_type,
-                        "paper_width": req.paper_width,
-                        "template_content": "",     # JSON 模板不需要 Jinja 内容
-                        "is_default": req.is_default,
-                        "config": __import__("json").dumps(config_dict, ensure_ascii=False),
                     },
                 )
+            await session.execute(
+                text(
+                    "INSERT INTO receipt_templates "
+                    "(id, tenant_id, store_id, template_name, print_type, "
+                    "paper_width, template_content, is_default, is_active, config) "
+                    "VALUES (:id, :tenant_id, :store_id, :template_name, :print_type, "
+                    ":paper_width, :template_content, :is_default, true, :config::jsonb)"
+                ),
+                {
+                    "id": template_id,
+                    "tenant_id": tenant_id,
+                    "store_id": req.store_id,
+                    "template_name": req.template_name,
+                    "print_type": req.print_type,
+                    "paper_width": req.paper_width,
+                    "template_content": "",     # JSON 模板不需要 Jinja 内容
+                    "is_default": req.is_default,
+                    "config": __import__("json").dumps(config_dict, ensure_ascii=False),
+                },
+            )
     except IntegrityError as exc:
         logger.error("template.create_failed", error=str(exc))
         raise HTTPException(status_code=409, detail="模板创建冲突，请检查参数") from exc
@@ -929,37 +928,35 @@ async def update_template(
             req.config.model_dump(), ensure_ascii=False
         )
 
-    import json
 
-    async with async_session_factory() as session:
-        async with session.begin():
-            if req.is_default is True:
-                # 清除同门店同类型其他默认
-                effective_print_type = req.print_type or existing["print_type"]
-                await session.execute(
-                    text(
-                        "UPDATE receipt_templates SET is_default = false "
-                        "WHERE tenant_id = :tenant_id AND store_id = :store_id "
-                        "AND print_type = :print_type AND is_deleted = false"
-                    ),
-                    {
-                        "tenant_id": tenant_id,
-                        "store_id": existing["store_id"],
-                        "print_type": effective_print_type,
-                    },
-                )
-                set_parts.append("is_default = true")
-            elif req.is_default is False:
-                set_parts.append("is_default = false")
-
-            set_clause = ", ".join(set_parts)
+    async with async_session_factory() as session, session.begin():
+        if req.is_default is True:
+            # 清除同门店同类型其他默认
+            effective_print_type = req.print_type or existing["print_type"]
             await session.execute(
                 text(
-                    f"UPDATE receipt_templates SET {set_clause} "
-                    f"WHERE id = :id AND tenant_id = :tenant_id AND is_deleted = false"
+                    "UPDATE receipt_templates SET is_default = false "
+                    "WHERE tenant_id = :tenant_id AND store_id = :store_id "
+                    "AND print_type = :print_type AND is_deleted = false"
                 ),
-                params,
+                {
+                    "tenant_id": tenant_id,
+                    "store_id": existing["store_id"],
+                    "print_type": effective_print_type,
+                },
             )
+            set_parts.append("is_default = true")
+        elif req.is_default is False:
+            set_parts.append("is_default = false")
+
+        set_clause = ", ".join(set_parts)
+        await session.execute(
+            text(
+                f"UPDATE receipt_templates SET {set_clause} "
+                f"WHERE id = :id AND tenant_id = :tenant_id AND is_deleted = false"
+            ),
+            params,
+        )
 
     logger.info("template.updated", template_id=str(template_id))
     return {"ok": True, "data": {"id": str(template_id)}}
@@ -974,16 +971,15 @@ async def delete_template(
     tenant_id = uuid.UUID(x_tenant_id)
     await _get_template_or_404(template_id, tenant_id)
 
-    async with async_session_factory() as session:
-        async with session.begin():
-            await session.execute(
-                text(
-                    "UPDATE receipt_templates "
-                    "SET is_deleted = true, updated_at = NOW() "
-                    "WHERE id = :id AND tenant_id = :tenant_id"
-                ),
-                {"id": template_id, "tenant_id": tenant_id},
-            )
+    async with async_session_factory() as session, session.begin():
+        await session.execute(
+            text(
+                "UPDATE receipt_templates "
+                "SET is_deleted = true, updated_at = NOW() "
+                "WHERE id = :id AND tenant_id = :tenant_id"
+            ),
+            {"id": template_id, "tenant_id": tenant_id},
+        )
 
     logger.info("template.deleted", template_id=str(template_id))
     return {"ok": True, "data": {"id": str(template_id)}}
@@ -998,30 +994,29 @@ async def set_default_template(
     tenant_id = uuid.UUID(x_tenant_id)
     row = await _get_template_or_404(template_id, tenant_id)
 
-    async with async_session_factory() as session:
-        async with session.begin():
-            # 清除旧默认
-            await session.execute(
-                text(
-                    "UPDATE receipt_templates SET is_default = false "
-                    "WHERE tenant_id = :tenant_id AND store_id = :store_id "
-                    "AND print_type = :print_type AND is_deleted = false"
-                ),
-                {
-                    "tenant_id": tenant_id,
-                    "store_id": row["store_id"],
-                    "print_type": row["print_type"],
-                },
-            )
-            # 设新默认
-            await session.execute(
-                text(
-                    "UPDATE receipt_templates "
-                    "SET is_default = true, updated_at = NOW() "
-                    "WHERE id = :id AND tenant_id = :tenant_id"
-                ),
-                {"id": template_id, "tenant_id": tenant_id},
-            )
+    async with async_session_factory() as session, session.begin():
+        # 清除旧默认
+        await session.execute(
+            text(
+                "UPDATE receipt_templates SET is_default = false "
+                "WHERE tenant_id = :tenant_id AND store_id = :store_id "
+                "AND print_type = :print_type AND is_deleted = false"
+            ),
+            {
+                "tenant_id": tenant_id,
+                "store_id": row["store_id"],
+                "print_type": row["print_type"],
+            },
+        )
+        # 设新默认
+        await session.execute(
+            text(
+                "UPDATE receipt_templates "
+                "SET is_default = true, updated_at = NOW() "
+                "WHERE id = :id AND tenant_id = :tenant_id"
+            ),
+            {"id": template_id, "tenant_id": tenant_id},
+        )
 
     logger.info("template.set_default", template_id=str(template_id))
     return {"ok": True, "data": {"id": str(template_id), "is_default": True}}
@@ -1042,27 +1037,26 @@ async def duplicate_template(
     new_name = f"{row['template_name']} (副本)"[:100]
     config_json = json.dumps(row.get("config") or {}, ensure_ascii=False)
 
-    async with async_session_factory() as session:
-        async with session.begin():
-            await session.execute(
-                text(
-                    "INSERT INTO receipt_templates "
-                    "(id, tenant_id, store_id, template_name, print_type, "
-                    "paper_width, template_content, is_default, is_active, config) "
-                    "VALUES (:id, :tenant_id, :store_id, :template_name, :print_type, "
-                    ":paper_width, :template_content, false, true, :config::jsonb)"
-                ),
-                {
-                    "id": new_id,
-                    "tenant_id": tenant_id,
-                    "store_id": row["store_id"],
-                    "template_name": new_name,
-                    "print_type": row["print_type"],
-                    "paper_width": row["paper_width"],
-                    "template_content": "",
-                    "config": config_json,
-                },
-            )
+    async with async_session_factory() as session, session.begin():
+        await session.execute(
+            text(
+                "INSERT INTO receipt_templates "
+                "(id, tenant_id, store_id, template_name, print_type, "
+                "paper_width, template_content, is_default, is_active, config) "
+                "VALUES (:id, :tenant_id, :store_id, :template_name, :print_type, "
+                ":paper_width, :template_content, false, true, :config::jsonb)"
+            ),
+            {
+                "id": new_id,
+                "tenant_id": tenant_id,
+                "store_id": row["store_id"],
+                "template_name": new_name,
+                "print_type": row["print_type"],
+                "paper_width": row["paper_width"],
+                "template_content": "",
+                "config": config_json,
+            },
+        )
 
     logger.info(
         "template.duplicated",

@@ -1,25 +1,24 @@
-// 智能购物车 — 已选清单 + 凑单提示 + AA分摊 + 优惠自动匹配 + 下单
+// 购物车结算页 — 菜品清单 + 单品备注 + 优惠匹配 + 支付方式 + 下单
 var app = getApp();
 var api = require('../../utils/api.js');
 
 Page({
   data: {
-    // 已选菜品
+    // 菜品列表
     items: [],
     totalFen: 0,
+    totalCount: 0,
     tableNo: '',
 
     // 凑单提示
     addonTip: '',
-    addonThreshold: 0,
-    addonGapFen: 0,
 
     // AA分摊
     showAASplit: false,
     partySize: 2,
     perPersonFen: 0,
 
-    // 可用优惠
+    // 优惠券
     availableCoupons: [],
     selectedCoupon: null,
     discountFen: 0,
@@ -27,28 +26,73 @@ Page({
 
     // 备注
     orderNotes: '',
+
+    // 储值卡 / 企业账户
+    storedValueBalance: 0,
+    hasEnterpriseAccount: false,
+
+    // 支付方式
+    paymentMethod: 'wechat', // wechat / stored_value / enterprise
+
+    // 结算弹层
+    showCheckoutSheet: false,
+    submitting: false,
   },
 
   onLoad: function (options) {
     var tableNo = options.table || '';
-    var total = parseInt(options.total, 10) || 0;
-    var items = [];
+    this.setData({ tableNo: tableNo });
+    this._loadCartFromGlobal();
+    this._loadMemberInfo();
+  },
 
-    try {
-      items = JSON.parse(decodeURIComponent(options.items || '[]'));
-    } catch (e) {
-      items = [];
+  onShow: function () {
+    // 每次进入页面刷新购物车（防止从菜单页加菜后数据不同步）
+    this._loadCartFromGlobal();
+  },
+
+  // ─── 从 globalData 读取购物车 ───
+
+  _loadCartFromGlobal: function () {
+    var cart = (app.globalData && app.globalData.cart) || [];
+    // 兼容旧格式：URL 传参
+    if (cart.length === 0) {
+      var stored = wx.getStorageSync('tx_cart');
+      if (stored) {
+        try { cart = JSON.parse(stored); } catch (e) { cart = []; }
+      }
     }
 
+    var total = 0;
+    var count = 0;
+    cart.forEach(function (it) {
+      total += (it.unitPriceFen || 0) * (it.quantity || 0);
+      count += (it.quantity || 0);
+    });
+
     this.setData({
-      items: items,
+      items: cart,
       totalFen: total,
-      finalTotalFen: total,
-      tableNo: tableNo,
+      totalCount: count,
+      finalTotalFen: Math.max(0, total - this.data.discountFen),
     });
 
     this._checkAddonTip(total);
     this._loadCoupons(total);
+  },
+
+  // ─── 会员信息（储值卡/企业账户）───
+
+  _loadMemberInfo: function () {
+    var self = this;
+    api.fetchMemberProfile()
+      .then(function (data) {
+        self.setData({
+          storedValueBalance: data.stored_value_balance_fen || 0,
+          hasEnterpriseAccount: !!(data.enterprise_account_id),
+        });
+      })
+      .catch(function () {});
   },
 
   // ─── 凑单提示 ───
@@ -59,9 +103,7 @@ Page({
       var gap = thresholds[i] - total;
       if (gap > 0 && gap <= 2000) {
         this.setData({
-          addonTip: '再点¥' + (gap / 100).toFixed(0) + '享满' + (thresholds[i] / 100) + '减优惠',
-          addonThreshold: thresholds[i],
-          addonGapFen: gap,
+          addonTip: '再点¥' + (gap / 100).toFixed(0) + '享满¥' + (thresholds[i] / 100) + '减优惠',
         });
         return;
       }
@@ -76,10 +118,9 @@ Page({
     api.fetchCoupons('available')
       .then(function (data) {
         var coupons = (data.items || data || []).filter(function (c) {
-          var minAmount = c.min_amount_fen || 0;
-          return total >= minAmount;
+          return total >= (c.min_amount_fen || 0);
         });
-        // Auto-select best coupon
+        // 自动选最优券
         var best = null;
         var bestDiscount = 0;
         coupons.forEach(function (c) {
@@ -124,43 +165,54 @@ Page({
     var idx = e.currentTarget.dataset.index;
     var delta = parseInt(e.currentTarget.dataset.delta, 10);
     var items = this.data.items.slice();
-    var item = items[idx];
+    var item = Object.assign({}, items[idx]);
     if (!item) return;
 
-    item.quantity = Math.max(0, item.quantity + delta);
+    item.quantity = Math.max(0, (item.quantity || 0) + delta);
     if (item.quantity === 0) {
       items.splice(idx, 1);
+    } else {
+      items[idx] = item;
     }
 
     var total = 0;
+    var count = 0;
     items.forEach(function (it) {
-      total += (it.unitPriceFen || 0) * it.quantity;
+      total += (it.unitPriceFen || 0) * (it.quantity || 0);
+      count += (it.quantity || 0);
     });
+
+    // 同步到 globalData 和 Storage
+    if (app.globalData) app.globalData.cart = items;
+    wx.setStorageSync('tx_cart', JSON.stringify(items));
 
     this.setData({
       items: items,
       totalFen: total,
+      totalCount: count,
       finalTotalFen: Math.max(0, total - this.data.discountFen),
     });
     this._checkAddonTip(total);
   },
 
-  removeItem: function (e) {
+  // ─── 单品备注 ───
+
+  onItemRemarkInput: function (e) {
     var idx = e.currentTarget.dataset.index;
+    var value = e.detail.value;
     var items = this.data.items.slice();
-    items.splice(idx, 1);
+    if (items[idx]) {
+      items[idx] = Object.assign({}, items[idx], { notes: value });
+      this.setData({ items: items });
+      if (app.globalData) app.globalData.cart = items;
+      wx.setStorageSync('tx_cart', JSON.stringify(items));
+    }
+  },
 
-    var total = 0;
-    items.forEach(function (it) {
-      total += (it.unitPriceFen || 0) * it.quantity;
-    });
+  // ─── 整单备注 ───
 
-    this.setData({
-      items: items,
-      totalFen: total,
-      finalTotalFen: Math.max(0, total - this.data.discountFen),
-    });
-    this._checkAddonTip(total);
+  onNotesInput: function (e) {
+    this.setData({ orderNotes: e.detail.value });
   },
 
   // ─── AA分摊 ───
@@ -168,9 +220,7 @@ Page({
   toggleAASplit: function () {
     var show = !this.data.showAASplit;
     this.setData({ showAASplit: show });
-    if (show) {
-      this._calcPerPerson();
-    }
+    if (show) this._calcPerPerson();
   },
 
   changePartySize: function (e) {
@@ -181,66 +231,96 @@ Page({
   },
 
   _calcPerPerson: function () {
-    var total = this.data.finalTotalFen;
-    var perPerson = Math.ceil(total / this.data.partySize);
+    var perPerson = Math.ceil(this.data.finalTotalFen / this.data.partySize);
     this.setData({ perPersonFen: perPerson });
   },
 
-  // ─── 备注 ───
+  // ─── 支付方式 ───
 
-  onNotesInput: function (e) {
-    this.setData({ orderNotes: e.detail.value });
+  selectPayment: function (e) {
+    var method = e.currentTarget.dataset.method;
+    this.setData({ paymentMethod: method });
+  },
+
+  // ─── 结算弹层 ───
+
+  openCheckoutSheet: function () {
+    if (this.data.items.length === 0) {
+      wx.showToast({ title: '购物车为空', icon: 'none' });
+      return;
+    }
+    this.setData({ showCheckoutSheet: true });
+  },
+
+  closeCheckoutSheet: function () {
+    this.setData({ showCheckoutSheet: false });
   },
 
   // ─── 继续点菜 ───
 
   goBackToMenu: function () {
-    wx.navigateBack();
+    wx.navigateBack({ delta: 1 });
   },
 
-  // ─── 下单 ───
+  // ─── 确认下单 ───
 
   submitOrder: function () {
     var self = this;
+    if (self.data.submitting) return;
     if (self.data.items.length === 0) {
       wx.showToast({ title: '购物车为空', icon: 'none' });
       return;
     }
 
+    self.setData({ submitting: true });
     wx.showLoading({ title: '下单中...' });
 
     var orderData = {
-      store_id: app.globalData.storeId,
-      customer_id: wx.getStorageSync('tx_customer_id') || '',
+      store_id: app.globalData.storeId || '',
+      table_id: app.globalData.tableId || '',
       table_no: self.data.tableNo,
+      customer_id: wx.getStorageSync('tx_customer_id') || '',
       items: self.data.items.map(function (item) {
         return {
           dish_id: item.dishId,
           dish_name: item.dishName,
           quantity: item.quantity,
           unit_price_fen: item.unitPriceFen,
-          notes: item.notes || '',
+          remark: item.notes || '',
         };
       }),
-      total_fen: self.data.totalFen,
+      coupon_id: self.data.selectedCoupon ? self.data.selectedCoupon.id : '',
+      payment_method: self.data.paymentMethod,
+      total_amount_fen: self.data.totalFen,
       discount_fen: self.data.discountFen,
       final_total_fen: self.data.finalTotalFen,
-      coupon_id: self.data.selectedCoupon ? self.data.selectedCoupon.id : '',
-      notes: self.data.orderNotes,
+      remark: self.data.orderNotes,
       party_size: self.data.showAASplit ? self.data.partySize : 1,
     };
 
     api.createOrder(orderData)
       .then(function (data) {
         wx.hideLoading();
+        // 清空购物车
+        if (app.globalData) app.globalData.cart = [];
+        wx.removeStorageSync('tx_cart');
+
         var orderId = data.id || data.order_id;
         wx.redirectTo({
-          url: '/pages/order-track/order-track?order_id=' + orderId,
+          url: '/pages/order-track/order-track?order_id=' + encodeURIComponent(orderId),
         });
       })
       .catch(function (err) {
         wx.hideLoading();
-        wx.showToast({ title: err.message || '下单失败', icon: 'none' });
+        self.setData({ submitting: false });
+        wx.showToast({ title: err.message || '下单失败，请重试', icon: 'none' });
       });
+  },
+
+  onShareAppMessage: function () {
+    return {
+      title: '快来一起点餐！',
+      path: '/pages/menu/menu',
+    };
   },
 });

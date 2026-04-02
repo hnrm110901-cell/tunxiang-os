@@ -28,7 +28,6 @@ from fastapi import APIRouter, Header, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from ..services.franchise_service import FranchiseService
-from ..services.royalty_calculator import RoyaltyCalculator
 
 logger = structlog.get_logger(__name__)
 

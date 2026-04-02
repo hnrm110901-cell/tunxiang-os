@@ -84,6 +84,11 @@ import { ApprovalTemplatePage } from './pages/ops/approval/ApprovalTemplatePage'
 import { ApprovalCenterPage as ApprovalCenterPageNew } from './pages/ops/approval/ApprovalCenterPage';
 import { PayrollManagePage } from './pages/org/payroll/PayrollManagePage';
 import { FranchiseDashboardPage } from './pages/org/franchise/FranchiseDashboardPage';
+import { PayrollConfigPage } from './pages/org/PayrollConfigPage';
+import { PayrollRecordsPage } from './pages/org/PayrollRecordsPage';
+import { FinanceAuditPage } from './pages/finance/FinanceAuditPage';
+import { PatrolInspectionPage } from './pages/ops/PatrolInspectionPage';
+import { AnalyticsDashboardPage } from './pages/analytics/DashboardPage';
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem('tx_token'));
@@ -188,6 +193,11 @@ function App() {
           <Route path="/approval-center" element={<ApprovalCenterPageNew />} />
           <Route path="/payroll-manage" element={<PayrollManagePage />} />
           <Route path="/franchise-dashboard" element={<FranchiseDashboardPage />} />
+          <Route path="/org/payroll-configs" element={<PayrollConfigPage />} />
+          <Route path="/org/payroll-records" element={<PayrollRecordsPage />} />
+          <Route path="/finance/audit" element={<FinanceAuditPage />} />
+          <Route path="/ops/patrol-inspection" element={<PatrolInspectionPage />} />
+          <Route path="/analytics/dashboard" element={<AnalyticsDashboardPage />} />
         </Routes>
       </ShellHQ>
     </BrowserRouter>

@@ -32,15 +32,15 @@ import structlog
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from shared.events import UniversalPublisher, OrgEventType
+from shared.events import OrgEventType, UniversalPublisher
 
 from ..models.approval_flow_engine import (
-    eval_condition,
-    eval_trigger_conditions,
-    NodeRow,
-    TemplateRow,
     InstanceRow,
     NodeInstanceRow,
+    NodeRow,
+    TemplateRow,
+    eval_condition,
+    eval_trigger_conditions,
 )
 
 log: structlog.stdlib.BoundLogger = structlog.get_logger(__name__)

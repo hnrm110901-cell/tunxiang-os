@@ -45,15 +45,15 @@ S3失败（触发补偿）：
 Saga记录：
   T25: 每次step变更都有flush调用（不污染外部事务）
 """
-import sys
 import os
+import sys
 import uuid
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
-from unittest.mock import AsyncMock, MagicMock, patch, call
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from sqlalchemy.exc import OperationalError, SQLAlchemyError
+from sqlalchemy.exc import OperationalError
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../../.."))
 
@@ -165,7 +165,6 @@ from services.payment_saga_service import (
     PaymentSagaService,
     SagaStep,
 )
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 辅助：构造 PaymentSagaService，注入 mock _validate_order / _complete_order

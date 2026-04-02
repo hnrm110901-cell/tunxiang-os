@@ -1,6 +1,5 @@
 {
   "navigationBarTitleText": "购物车",
-  "usingComponents": {
-    "ai-recommend": "/components/ai-recommend/ai-recommend"
-  }
+  "navigationStyle": "custom",
+  "usingComponents": {}
 }

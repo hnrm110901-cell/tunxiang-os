@@ -22,6 +22,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db_with_tenant
+
 from ..services.cost_health_engine import (
     CostHealthEngine,
     _cache_get,
@@ -431,7 +432,8 @@ async def get_cost_suggestions(
     # 需要 AI 建议时，从应用状态获取 ModelRouter
     # 实际部署中通过 app.state.model_router 注入
     try:
-        from fastapi import Request
+        from fastapi import Request  # noqa: F401
+
         # ModelRouter 在 main.py 中挂载到 app.state
         # 此处通过模块导入获取实例
         from tx_agent.src.services.model_router import ModelRouter  # type: ignore[import]

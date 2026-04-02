@@ -7,9 +7,8 @@
 """
 from __future__ import annotations
 
-import uuid
 import json
-import logging
+import uuid
 from datetime import date, datetime, timezone
 from typing import Any, Literal
 
@@ -21,7 +20,7 @@ logger = structlog.get_logger(__name__)
 # ---------------------------------------------------------------------------
 # Pydantic 数据模型
 # ---------------------------------------------------------------------------
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class SuccessCriterion(BaseModel):

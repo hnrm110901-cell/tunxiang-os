@@ -7,7 +7,6 @@ AI推荐权重: 历史偏好0.3 + 时段0.2 + 毛利0.2 + 热度0.2 + 天气0.1
 from __future__ import annotations
 
 import math
-import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
@@ -166,9 +165,7 @@ async def ai_recommend_dishes(
 
         # 天气分 (0~1)
         s_weather = 0.0
-        if weather == "cold" and ("hot_pot" in tags or "soup" in tags or "warm" in tags):
-            s_weather = 1.0
-        elif weather == "hot" and ("cold" in tags or "refreshing" in tags or "iced" in tags):
+        if weather == "cold" and ("hot_pot" in tags or "soup" in tags or "warm" in tags) or weather == "hot" and ("cold" in tags or "refreshing" in tags or "iced" in tags):
             s_weather = 1.0
         elif weather == "rainy" and ("comfort" in tags or "soup" in tags):
             s_weather = 0.8

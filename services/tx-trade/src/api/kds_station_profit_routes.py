@@ -1,6 +1,6 @@
 """档口毛利核算 API 路由"""
 from datetime import date, timedelta
-from typing import Optional, Literal
+from typing import Literal, Optional
 
 from fastapi import APIRouter, Depends, Header, Query
 from sqlalchemy.ext.asyncio import AsyncSession

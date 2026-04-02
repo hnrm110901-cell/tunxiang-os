@@ -11,14 +11,14 @@
 8. 删除档口时有菜品映射报错（非force模式）
 9. force=True 删除档口同时软删除菜品映射
 """
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../src"))
 
 import uuid
 from datetime import datetime, timezone
-from unittest.mock import AsyncMock, MagicMock, patch, call
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 

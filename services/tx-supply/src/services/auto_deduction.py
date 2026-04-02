@@ -11,19 +11,16 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
 from typing import Any
 
 import structlog
-from sqlalchemy import select, func, text, and_
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.entities import (
-    Dish,
     DishIngredient,
     Ingredient,
     IngredientTransaction,
-    OrderItem,
 )
 from shared.ontology.src.enums import InventoryStatus
 

@@ -9,15 +9,15 @@ from datetime import date, datetime, timezone
 from typing import List, Optional
 
 import structlog
-from fastapi import APIRouter, Depends, HTTPException, Request, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
-from ..services.batch_group_service import BatchGroupService, BatchGroup
-from ..services.dish_ranking_service import DishRankingService, DishRankings
-from ..services.new_customer_tagger import NewCustomerTagger
+
+from ..services.batch_group_service import BatchGroupService
+from ..services.dish_ranking_service import DishRankingService
 
 logger = structlog.get_logger()
 

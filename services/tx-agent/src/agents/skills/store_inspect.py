@@ -7,8 +7,10 @@
 """
 from datetime import datetime, timezone
 from typing import Any
+
 import structlog
-from ..base import SkillAgent, AgentResult
+
+from ..base import AgentResult, SkillAgent
 
 logger = structlog.get_logger(__name__)
 

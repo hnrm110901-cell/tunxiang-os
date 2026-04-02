@@ -17,8 +17,8 @@
 
 from __future__ import annotations
 
-import sys
 import os
+import sys
 
 # 确保模块可被解析
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "..", "..", ".."))
@@ -26,7 +26,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import pytest
 from models.approval_flow_engine import eval_condition, eval_trigger_conditions
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 条件评估函数测试（纯函数，无 DB 依赖）
@@ -127,8 +126,7 @@ class TestEvalTriggerConditions:
 # ApprovalEngine 核心流程测试（使用 AsyncMock 模拟 DB）
 # ─────────────────────────────────────────────────────────────────────────────
 
-from unittest.mock import AsyncMock, MagicMock, patch
-import asyncio
+from unittest.mock import AsyncMock, MagicMock
 
 
 def _make_db_mock():

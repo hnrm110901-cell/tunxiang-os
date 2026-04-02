@@ -17,12 +17,12 @@ from uuid import UUID
 
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..services.oauth2_service import OAuth2Service
 from ..middleware.rate_limiter import RateLimiter
+from ..services.oauth2_service import OAuth2Service
 
 logger = structlog.get_logger()
 

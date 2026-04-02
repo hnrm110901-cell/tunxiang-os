@@ -12,10 +12,10 @@
 
 from __future__ import annotations
 
-import pytest
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from uuid import UUID, uuid4
 
+import pytest
 from services.tx_org.src.models.franchise import (
     Franchisee,
     FranchiseeStatus,
@@ -25,11 +25,10 @@ from services.tx_org.src.models.franchise import (
     RoyaltyTier,
 )
 from services.tx_org.src.services.franchise_service import (
-    FranchiseService,
     OVERDUE_ALERT_THRESHOLD,
+    FranchiseService,
 )
-from services.tx_org.src.services.royalty_calculator import RoyaltyCalculator, OVERDUE_DAYS
-
+from services.tx_org.src.services.royalty_calculator import OVERDUE_DAYS, RoyaltyCalculator
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  固定数据

@@ -7,13 +7,12 @@
   - 写入 market_trend_signals 表
 """
 import uuid
-from datetime import date, datetime, timedelta, timezone
-from decimal import Decimal
+from datetime import date, timedelta
 from typing import Any
 
 import structlog
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = structlog.get_logger()
 
@@ -49,6 +48,7 @@ class TrendScannerService:
 
         try:
             import os
+
             from adapters.douyin_adapter import DouyinAdapter
             adapter = DouyinAdapter(
                 client_key=os.environ.get("DOUYIN_CLIENT_KEY", ""),

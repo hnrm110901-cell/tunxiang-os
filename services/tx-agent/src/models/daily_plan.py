@@ -1,8 +1,7 @@
 """DailyPlan 模型 — 每日经营计划，Agent 自动生成，店长审批执行"""
-import uuid
 
-from sqlalchemy import String, DateTime, Text, func
-from sqlalchemy.dialects.postgresql import UUID, JSON
+from sqlalchemy import DateTime, String, func
+from sqlalchemy.dialects.postgresql import JSON
 from sqlalchemy.orm import Mapped, mapped_column
 
 from shared.ontology.src.base import TenantBase

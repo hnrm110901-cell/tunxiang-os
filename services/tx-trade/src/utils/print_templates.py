@@ -19,7 +19,6 @@ from __future__ import annotations
 
 from typing import Optional
 
-
 # ─── 基础标记构建函数 ──────────────────────────────────────────────────────────
 
 def center(text: str) -> str:

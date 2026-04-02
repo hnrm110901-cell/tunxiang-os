@@ -9,6 +9,7 @@ from sqlalchemy.exc import IntegrityError, NoResultFound
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+
 from ..services.seat_order_service import (
     OrderSeat,
     SeatSummary,

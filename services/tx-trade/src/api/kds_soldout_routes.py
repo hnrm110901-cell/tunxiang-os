@@ -1,11 +1,12 @@
 """沽清全链路同步 API 路由"""
-from fastapi import APIRouter, Depends, HTTPException, Header
-from pydantic import BaseModel
 from typing import Optional
+
+from fastapi import APIRouter, Depends, Header, HTTPException
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import get_db
-from ..services.kds_soldout_sync import mark_soldout, restore_soldout, get_active_soldout
+from ..services.kds_soldout_sync import get_active_soldout, mark_soldout, restore_soldout
 
 router = APIRouter(prefix="/api/v1/kds/soldout", tags=["kds-soldout"])
 

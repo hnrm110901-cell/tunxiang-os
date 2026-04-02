@@ -113,8 +113,8 @@ async def _get_db_for_tenant(
 
 def _get_planner(db: AsyncSession) -> Any:
     """获取 OperationPlanner 实例，注入 DB session。"""
-    from ..services.operation_planner import OperationPlanner
     from ..services.model_router import ModelRouter
+    from ..services.operation_planner import OperationPlanner
 
     try:
         router_instance = ModelRouter()

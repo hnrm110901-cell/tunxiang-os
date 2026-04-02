@@ -24,8 +24,8 @@ try:
     )
 except ImportError:
     # 回退：通过 sys.path 查找（本地开发时路径可能不同）
-    import sys
     import os
+    import sys
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../../../tx-org/src"))
     from services.permission_service import (  # type: ignore[import]
         PermissionCheckResult,

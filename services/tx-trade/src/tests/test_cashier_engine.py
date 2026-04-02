@@ -9,17 +9,14 @@
 6. 拆单支付(微信200+支付宝100+现金50=350)
 7. 称重菜品定价(龙虾 280/斤 × 1.5斤 = 420)
 """
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import uuid
-from datetime import datetime, timezone, date
-from unittest.mock import AsyncMock, MagicMock, patch
+from datetime import date, datetime, timezone
 from decimal import Decimal
-
-import pytest
 
 # ─── 模拟数据库对象（脱离真实PG） ───
 

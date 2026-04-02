@@ -8,7 +8,7 @@
 """
 import uuid
 from datetime import date
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Optional
 
 import structlog
@@ -289,8 +289,9 @@ def _get_dish_cost(dish_id: uuid.UUID, tenant_id: uuid.UUID, db) -> Optional[int
     if db is None:
         return None
     try:
-        from sqlalchemy import text
         from datetime import datetime, timezone
+
+        from sqlalchemy import text
         now = datetime.now(timezone.utc)
         # 取当前有效 BOM
         bom_result = db.execute(text("""

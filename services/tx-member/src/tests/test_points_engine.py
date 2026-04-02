@@ -1,13 +1,12 @@
 """积分引擎测试 — API 冒烟 + 服务逻辑单元测试"""
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+from api.points_routes import router as points_router
 from fastapi.testclient import TestClient
 from main import app
-
-from api.points_routes import router as points_router
 
 if not any(r.prefix == "/api/v1/member/points" for r in app.routes if hasattr(r, "prefix")):
     app.include_router(points_router)
@@ -159,15 +158,15 @@ class TestCrossStoreSettlementAPI:
 # ── 服务层纯函数单元测试 ─────────────────────────────────────
 
 from services.points_engine import (
-    calculate_earn_points,
-    calculate_cash_offset_fen,
-    validate_earn_rules,
-    validate_spend_rules,
-    validate_multiplier_conditions,
-    EARN_SOURCES,
-    SPEND_PURPOSES,
     DEFAULT_EARN_RATIO,
     DEFAULT_SPEND_RATIO,
+    EARN_SOURCES,
+    SPEND_PURPOSES,
+    calculate_cash_offset_fen,
+    calculate_earn_points,
+    validate_earn_rules,
+    validate_multiplier_conditions,
+    validate_spend_rules,
 )
 
 

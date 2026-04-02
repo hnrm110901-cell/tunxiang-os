@@ -14,8 +14,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, timezone
-from decimal import Decimal, ROUND_HALF_UP
-from typing import Any, Optional
+from typing import Any
 
 import structlog
 

@@ -14,10 +14,8 @@ from typing import Any, Optional
 import structlog
 
 from .models import (
-    AggregateResult,
     NeighborResult,
     NodeModel,
-    PathResult,
     RelationshipModel,
 )
 from .schema import (

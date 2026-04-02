@@ -11,15 +11,14 @@ from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, Header, Query
 from pydantic import BaseModel, Field
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from services.stamp_card_service import (
-    create_template,
-    list_templates,
     auto_stamp,
+    create_template,
     get_my_cards,
+    list_templates,
     redeem_card,
 )
+from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(prefix="/api/v1/stamp-cards", tags=["stamp-cards"])
 

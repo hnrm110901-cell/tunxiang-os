@@ -16,8 +16,8 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
 import structlog
-from pydantic import BaseModel, Field
-from sqlalchemy import and_, func, select, update
+from pydantic import BaseModel
+from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.events import UniversalPublisher
@@ -144,7 +144,6 @@ class DeliveryOpsService:
         db: AsyncSession,
     ) -> DeliveryStoreConfig:
         """获取门店指定平台的外卖运营配置，不存在则自动创建默认配置"""
-        from shared.ontology.src.database import run_with_tenant  # noqa: PLC0415
 
         sid = uuid.UUID(str(store_id))
         tid = uuid.UUID(str(tenant_id))
@@ -710,7 +709,6 @@ class DeliveryOpsService:
             text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tid)}
         )
 
-        from datetime import date  # noqa: PLC0415
 
         cutoff = datetime.now(tz=timezone.utc).date() - timedelta(days=days)
         tbl = _PlatformHealthSnapshotRow.__table__
@@ -742,8 +740,8 @@ class DeliveryOpsService:
         db: AsyncSession,
     ) -> dict[str, Any]:
         """插入或更新平台健康度每日快照（供爬虫/数据同步任务调用）"""
+
         from sqlalchemy import text  # noqa: PLC0415
-        from datetime import date  # noqa: PLC0415
 
         sid = uuid.UUID(str(store_id))
         tid = uuid.UUID(str(tenant_id))
@@ -940,8 +938,14 @@ class DeliveryOpsService:
 class _DeliveryStoreConfigRow:
     """Table accessor — maps to delivery_store_configs DDL in v039 migration"""
     from sqlalchemy import (  # noqa: PLC0415
-        Table, Column, MetaData, Boolean, Integer, String, Numeric,
+        Boolean,
+        Column,
         DateTime,
+        Integer,
+        MetaData,
+        Numeric,
+        String,
+        Table,
     )
     from sqlalchemy.dialects.postgresql import UUID as _PGUUID  # noqa: PLC0415
 
@@ -965,8 +969,17 @@ def _build_tables() -> None:
     before this runs.
     """
     from sqlalchemy import (  # noqa: PLC0415
-        Table, Column, MetaData, Boolean, Integer, String, Numeric,
-        DateTime, Date, ARRAY, Text,
+        ARRAY,
+        Boolean,
+        Column,
+        Date,
+        DateTime,
+        Integer,
+        MetaData,
+        Numeric,
+        String,
+        Table,
+        Text,
     )
     from sqlalchemy.dialects.postgresql import UUID as PGUUID  # noqa: PLC0415
 

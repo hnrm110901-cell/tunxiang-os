@@ -1,17 +1,16 @@
 """菜品经营分析纯函数测试 — 销量排行、退菜率、四象限、优化建议"""
-import sys
 import os
+import sys
 from decimal import Decimal
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from services.dish_analysis import (
-    compute_sales_ranking,
-    compute_return_rate,
     classify_quadrant,
+    compute_return_rate,
+    compute_sales_ranking,
     generate_optimization_suggestion,
 )
-
 
 # ═══════════════════════════════════════════════
 # 销量排行纯函数测试

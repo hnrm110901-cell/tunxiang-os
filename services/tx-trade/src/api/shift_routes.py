@@ -6,11 +6,12 @@
 from typing import AsyncGenerator
 
 import structlog
-from fastapi import APIRouter, Depends, Request, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db_with_tenant
+
 from ..services.shift_handover_service import ShiftHandoverService
 
 logger = structlog.get_logger()

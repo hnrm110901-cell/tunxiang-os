@@ -4,18 +4,18 @@
 开发模式使用内存模拟，生产环境连接真实Neo4j。
 """
 
-from .schema import NODE_LABELS, RELATIONSHIP_TYPES
-from .models import (
-    NodeModel,
-    RelationshipModel,
-    PathResult,
-    NeighborResult,
-    AggregateResult,
-)
-from .repository import OntologyRepository
-from .data_sync import PGToNeo4jSync
-from .reasoning import CausalReasoningEngine
 from .bootstrap import OntologyBootstrap
+from .data_sync import PGToNeo4jSync
+from .models import (
+    AggregateResult,
+    NeighborResult,
+    NodeModel,
+    PathResult,
+    RelationshipModel,
+)
+from .reasoning import CausalReasoningEngine
+from .repository import OntologyRepository
+from .schema import NODE_LABELS, RELATIONSHIP_TYPES
 
 __all__ = [
     "NODE_LABELS",

@@ -9,18 +9,15 @@
 from __future__ import annotations
 
 import calendar
-import structlog
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
+import structlog
+
 from ..models.franchise import (
     Franchisee,
-    FranchiseeStatus,
-    FranchiseeStore,
     RoyaltyBill,
-    RoyaltyBillStatus,
-    RoyaltyTier,
 )
 
 logger = structlog.get_logger(__name__)

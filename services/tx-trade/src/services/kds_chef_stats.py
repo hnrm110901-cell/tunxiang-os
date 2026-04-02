@@ -14,17 +14,16 @@
   - remake_count  返工次数（负绩效参考）
 """
 import uuid
-from datetime import date, datetime, timezone, timedelta
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Optional
 
 import structlog
-from sqlalchemy import select, func, text
+from sqlalchemy import func, select, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models.chef_performance_daily import ChefPerformanceDaily
-from ..models.kds_task import KDSTask
 
 logger = structlog.get_logger()
 

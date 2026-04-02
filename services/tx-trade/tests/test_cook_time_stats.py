@@ -8,13 +8,11 @@
 5. tenant_id隔离
 """
 import uuid
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-
 from services.tx_trade.src.services.cook_time_stats import CookTimeStatsService
-
 
 # ─── 测试夹具 ───
 

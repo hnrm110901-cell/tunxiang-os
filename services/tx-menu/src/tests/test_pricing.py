@@ -3,13 +3,12 @@
 使用 mock DB 模拟 SQLAlchemy AsyncSession，验证 PricingEngine 逻辑。
 """
 import uuid
-from datetime import datetime, timedelta
-from unittest.mock import AsyncMock, MagicMock, patch
+from datetime import datetime
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from ..services.pricing_engine import PricingEngine, DEFAULT_MIN_MARGIN_RATE
-
+from ..services.pricing_engine import DEFAULT_MIN_MARGIN_RATE, PricingEngine
 
 # ─── Fixtures ───
 

@@ -15,14 +15,13 @@
 """
 
 import uuid
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import structlog
-from sqlalchemy import select, update, text
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from engine.action_executors import ActionExecutorRegistry
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = structlog.get_logger(__name__)
 

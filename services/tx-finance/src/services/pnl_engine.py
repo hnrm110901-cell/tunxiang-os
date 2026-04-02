@@ -26,21 +26,20 @@ P&L 结构（全部以分为单位）：
 """
 from __future__ import annotations
 
+import asyncio
 import calendar
 import uuid
 from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 
-import asyncio
-
 import structlog
-from sqlalchemy import func, select, text, and_, update, insert
-from sqlalchemy.exc import SQLAlchemyError, IntegrityError
+from sqlalchemy import and_, func, select, text
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from shared.events import UniversalPublisher, FinanceEventType
+from shared.events import FinanceEventType, UniversalPublisher
 from shared.ontology.src.entities import Order, OrderItem, Store
 
 logger = structlog.get_logger(__name__)

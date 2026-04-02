@@ -2,19 +2,19 @@
 
 5 个端点：增长分析、活跃度分析、复购分析、流失预警、偏好洞察
 """
-from typing import Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from shared.ontology.src.database import get_db
 
 from ..services.member_analytics import (
-    member_growth,
     activity_analysis,
-    repurchase_analysis,
     churn_prediction,
+    member_growth,
     preference_insight,
+    repurchase_analysis,
 )
 
 router = APIRouter(prefix="/api/v1/member/analytics", tags=["member-analytics"])

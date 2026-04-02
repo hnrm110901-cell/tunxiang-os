@@ -5,14 +5,14 @@
 2. 集点卡模板执行（盖章中/集满完成）
 3. 奖励类型校验
 """
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import pytest
-from campaigns.stamp_card import execute as stamp_card_execute, CONFIG_SCHEMA
-
+from campaigns.stamp_card import CONFIG_SCHEMA
+from campaigns.stamp_card import execute as stamp_card_execute
 
 TENANT = "tenant-test-001"
 

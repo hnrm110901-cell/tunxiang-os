@@ -20,15 +20,14 @@ Phase 4-B 安全合规测试套件
 """
 from __future__ import annotations
 
-import sys
-import os
 import copy
 import json
+import os
+import sys
 import uuid
-from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID
 
 import pytest
@@ -66,7 +65,7 @@ def _make_db_mock(rows: list[dict] | None = None, scalar: Any = None) -> AsyncMo
     for i, row in enumerate(rows or []):
         for k, v in row.items():
             mapping_rows[i].__getitem__ = lambda s, key, _r=row: _r[key]
-            setattr(mapping_rows[i], "__iter__", lambda s, _r=row: iter(_r.items()))
+            mapping_rows[i].__iter__ = lambda s, _r=row: iter(_r.items())
 
     mappings_mock = MagicMock()
     mappings_mock.all.return_value = rows or []
@@ -435,7 +434,7 @@ class TestDataMaskerIdCard:
 
     def test_short_id_card_fully_masked(self):
         result = DataMasker.mask_id_card("12345")
-        assert "*" * 5 == result
+        assert result == "*" * 5
 
     def test_id_card_middle_all_stars(self):
         result = DataMasker.mask_id_card("110101199001011234")
@@ -599,8 +598,9 @@ class TestWeeklyReport:
     @pytest.mark.asyncio
     async def test_weekly_report_contains_required_fields(self):
         """周报必须包含所有规定字段。"""
-        from services.security_report_service import SecurityReportService
         from datetime import date
+
+        from services.security_report_service import SecurityReportService
 
         svc = SecurityReportService()
 
@@ -633,8 +633,9 @@ class TestWeeklyReport:
     @pytest.mark.asyncio
     async def test_weekly_report_week_range_correct(self):
         """week_end 应为 week_start + 7天。"""
-        from services.security_report_service import SecurityReportService
         from datetime import date
+
+        from services.security_report_service import SecurityReportService
 
         svc = SecurityReportService()
 

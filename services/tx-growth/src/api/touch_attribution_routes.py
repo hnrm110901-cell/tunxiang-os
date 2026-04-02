@@ -36,10 +36,10 @@ from typing import Any, Optional
 import structlog
 from fastapi import APIRouter, Header, HTTPException, Query, Request
 from pydantic import BaseModel, field_validator
+from services.attribution_aggregator import AttributionAggregator
+from services.touch_tracker import TouchTracker
 
 from shared.ontology.src.database import async_session_factory
-from services.touch_tracker import TouchTracker
-from services.attribution_aggregator import AttributionAggregator
 
 log = structlog.get_logger(__name__)
 
@@ -58,8 +58,9 @@ async def _get_redis() -> Optional[Any]:
     if _redis is not None:
         return _redis
     try:
-        import redis.asyncio as aioredis  # type: ignore
         import os
+
+        import redis.asyncio as aioredis  # type: ignore
         _redis = aioredis.from_url(
             os.getenv("REDIS_URL", "redis://localhost:6379/0"),
             decode_responses=True,

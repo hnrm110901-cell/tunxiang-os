@@ -1,13 +1,11 @@
 """Event Bus 测试 — 发布/处理/链路追踪/事件流"""
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-import asyncio
 
 import pytest
-
 from agents.event_bus import (
     DEFAULT_EVENT_HANDLERS,
     AgentEvent,

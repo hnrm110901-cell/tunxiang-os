@@ -9,31 +9,31 @@
 6. list_scm_reports() 返回 15 条
 7. 各报表 SQL_TEMPLATE 不为空
 """
-import sys
 import os
+import sys
 
 import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from reports import (
-    scm_purchase_stats,
-    scm_receiving_detail,
-    scm_supplier_summary,
-    scm_purchase_ranking,
-    scm_transfer_stats,
-    scm_waste_report,
-    scm_inventory_balance,
-    scm_inventory_status,
-    scm_receipt_balance,
-    scm_inventory_ledger,
-    scm_inventory_warning,
-    scm_cost_margin,
-    scm_yield_comparison,
-    scm_bom_cost_analysis,
-    scm_ar_ledger,
     REPORT_REGISTRY,
     list_scm_reports,
+    scm_ar_ledger,
+    scm_bom_cost_analysis,
+    scm_cost_margin,
+    scm_inventory_balance,
+    scm_inventory_ledger,
+    scm_inventory_status,
+    scm_inventory_warning,
+    scm_purchase_ranking,
+    scm_purchase_stats,
+    scm_receipt_balance,
+    scm_receiving_detail,
+    scm_supplier_summary,
+    scm_transfer_stats,
+    scm_waste_report,
+    scm_yield_comparison,
 )
 
 SCM_MODULES = [

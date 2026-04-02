@@ -13,7 +13,6 @@ POS 实时推送器 — 通过 WebSocket 向收银终端推送折扣守护预警
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
 
 import structlog
 from fastapi import WebSocket

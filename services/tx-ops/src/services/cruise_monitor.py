@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Optional
 
 import structlog
 
-from shared.events import UniversalPublisher, OpsEventType
+from shared.events import OpsEventType, UniversalPublisher
 
 log = structlog.get_logger(__name__)
 

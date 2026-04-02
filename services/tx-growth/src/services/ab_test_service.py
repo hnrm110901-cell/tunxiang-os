@@ -19,11 +19,10 @@ from datetime import datetime, timezone
 from typing import Any, Optional
 
 import structlog
+from models.ab_test import ABTest, ABTestAssignment
 from sqlalchemy import select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from models.ab_test import ABTest, ABTestAssignment
 
 log = structlog.get_logger(__name__)
 

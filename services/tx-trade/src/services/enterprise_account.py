@@ -8,10 +8,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 import structlog
-from sqlalchemy import select, update, func, and_
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from shared.ontology.src.entities import Order, OrderItem
 
 logger = structlog.get_logger()
 

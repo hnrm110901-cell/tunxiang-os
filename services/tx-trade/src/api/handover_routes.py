@@ -3,16 +3,16 @@
 统一响应格式: {"ok": bool, "data": {}, "error": {}}
 所有接口需 X-Tenant-ID header。
 """
-from typing import Optional
 
-from fastapi import APIRouter, Depends, Request, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+
+from ..services.channel_verify import ChannelVerifyService
 from ..services.shift_handover_service import ShiftHandoverService
 from ..services.shift_reconciliation import ShiftReconciliationService
-from ..services.channel_verify import ChannelVerifyService
 
 router = APIRouter(prefix="/api/v1", tags=["handover"])
 

@@ -12,15 +12,12 @@
 """
 from __future__ import annotations
 
-import asyncio
 import uuid
 from typing import Any, Dict, List
-from unittest.mock import AsyncMock, MagicMock, call, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-
 import services.tx_supply.src.services.stocktake_service as svc
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 工具函数

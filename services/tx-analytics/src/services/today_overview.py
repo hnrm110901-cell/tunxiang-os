@@ -3,17 +3,16 @@
 提供单店今日概览 + 多店概览（总部视角）。
 金额单位：分(fen)，前端展示时 /100 转元。
 """
-import structlog
 from datetime import datetime, timedelta
 from typing import Optional
 
+import structlog
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .sql_queries import (
     query_daily_revenue,
     query_hourly_distribution,
-    query_alerts_today,
 )
 
 log = structlog.get_logger()

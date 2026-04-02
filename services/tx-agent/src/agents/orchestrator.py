@@ -21,7 +21,7 @@ from typing import Any, Optional
 
 import structlog
 
-from .base import SkillAgent, AgentResult  # noqa: F401 — re-exported for callers
+from .base import AgentResult, SkillAgent  # noqa: F401 — re-exported for callers
 from .event_bus import AgentEvent
 
 logger = structlog.get_logger()

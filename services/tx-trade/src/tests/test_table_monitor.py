@@ -9,23 +9,22 @@
 6. 单桌详情包含所有菜品状态
 7. 租户隔离
 """
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import uuid
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from ..services.table_monitor_service import (
+    DEFAULT_STANDARD_MINUTES,
     TableMonitorService,
     _infer_zone,
-    DEFAULT_STANDARD_MINUTES,
 )
-
 
 # ─── 工具 ───
 

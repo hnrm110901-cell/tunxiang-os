@@ -5,7 +5,7 @@
 """
 import json
 import uuid
-from datetime import datetime, time, date
+from datetime import datetime
 from typing import Optional
 
 import structlog

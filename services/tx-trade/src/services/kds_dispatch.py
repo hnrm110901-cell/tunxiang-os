@@ -13,12 +13,13 @@ import uuid
 from datetime import datetime, timezone
 
 import structlog
-from sqlalchemy import select, func, update, and_
+from sqlalchemy import and_, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.entities import Order, OrderItem
-from ..models.production_dept import ProductionDept, DishDeptMapping
+
 from ..models.kds_task import KDSTask
+from ..models.production_dept import DishDeptMapping, ProductionDept
 from .dispatch_rule_engine import dispatch_rule_engine
 
 logger = structlog.get_logger()

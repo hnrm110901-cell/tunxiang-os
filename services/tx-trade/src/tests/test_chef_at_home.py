@@ -10,24 +10,22 @@
 7. 厨师排期 — 按月查询+冲突检测
 8. 边界校验 — 无菜品/无效厨师/状态不允许
 """
+
 import pytest
-from datetime import datetime, timezone, timedelta
 
 from ..services import chef_at_home as cah_mod
 from ..services.chef_at_home import (
-    create_booking,
-    list_available_chefs,
-    get_chef_profile,
+    _calc_service_fee_fen,
     calculate_price,
-    confirm_booking,
-    start_service,
     complete_service,
-    rate_service,
+    confirm_booking,
+    create_booking,
     get_booking_history,
     get_chef_schedule,
-    _calc_service_fee_fen,
+    list_available_chefs,
+    rate_service,
+    start_service,
 )
-
 
 TENANT = "tenant-changsha-001"
 

@@ -1,11 +1,17 @@
 """桌台/订单状态机测试"""
-import sys, os
+import os
+import sys
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from services.state_machine import (
-    can_table_transition, get_table_next_states, TABLE_STATES,
-    can_order_transition, get_order_next_states, validate_order_lifecycle,
+    TABLE_STATES,
+    can_order_transition,
+    can_table_transition,
+    get_order_next_states,
+    get_table_next_states,
     sync_table_on_order_change,
+    validate_order_lifecycle,
 )
 
 

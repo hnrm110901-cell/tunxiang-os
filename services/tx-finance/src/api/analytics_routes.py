@@ -3,19 +3,18 @@
 5 个端点：营收构成、折扣结构、优惠券成本、门店利润、财务稽核
 所有硬编码0已替换为真实 finance_analytics 服务调用。
 """
+import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from services.finance_analytics import (
+    coupon_cost_analysis,
+    discount_structure,
+    financial_audit_view,
+    revenue_composition,
+    store_profit_analysis,
+)
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db_with_tenant
-from services.finance_analytics import (
-    revenue_composition,
-    discount_structure,
-    coupon_cost_analysis,
-    store_profit_analysis,
-    financial_audit_view,
-)
-
-import structlog
 
 logger = structlog.get_logger(__name__)
 router = APIRouter(prefix="/api/v1/finance/analytics", tags=["finance-analytics"])

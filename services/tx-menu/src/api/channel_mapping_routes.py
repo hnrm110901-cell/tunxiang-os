@@ -14,18 +14,17 @@ from __future__ import annotations
 
 import uuid as _uuid
 from typing import Optional
-from uuid import UUID
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from shared.ontology.src.database import get_db
 
 from ..services.channel_mapping_service import (
     ChannelMappingService,
-    DishOverride,
 )
 
 log = structlog.get_logger(__name__)

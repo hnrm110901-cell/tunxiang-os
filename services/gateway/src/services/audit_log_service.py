@@ -18,7 +18,7 @@ from typing import Any
 from uuid import UUID
 
 import structlog
-from sqlalchemy import select, func, text
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = structlog.get_logger(__name__)

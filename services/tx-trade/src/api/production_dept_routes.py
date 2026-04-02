@@ -26,18 +26,19 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+
 from ..services.production_dept_service import (
-    create_production_dept,
-    get_production_depts,
-    get_production_dept_by_id,
-    get_dept_by_kds_device_id,
-    update_production_dept,
-    delete_production_dept,
-    set_dish_dept_mapping,
     batch_set_dish_dept_mappings,
+    create_production_dept,
+    delete_production_dept,
+    get_dept_by_kds_device_id,
     get_dish_dept_mapping,
-    remove_dish_dept_mapping,
+    get_production_dept_by_id,
+    get_production_depts,
     list_dish_mappings_for_dept,
+    remove_dish_dept_mapping,
+    set_dish_dept_mapping,
+    update_production_dept,
 )
 
 router = APIRouter(prefix="/api/v1/production-depts", tags=["production-depts"])

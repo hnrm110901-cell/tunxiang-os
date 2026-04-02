@@ -1,21 +1,20 @@
 """申购全流程测试"""
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import pytest
 from services.requisition import (
-    create_requisition,
-    create_replenishment,
-    submit_for_approval,
     approve_requisition,
     convert_to_purchase,
+    create_replenishment,
+    create_requisition,
     create_return_request,
     get_approval_log,
     get_requisition_flow,
+    submit_for_approval,
 )
-
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  创建申购单

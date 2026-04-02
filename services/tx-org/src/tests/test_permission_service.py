@@ -16,13 +16,11 @@
   13. 无角色员工 — 所有操作被拒
   14. PermissionCheckResult 工厂方法
 """
-import sys
 import os
+import sys
 import uuid
-from dataclasses import dataclass
 from typing import Optional
-from unittest.mock import AsyncMock, patch, MagicMock
-from uuid import UUID
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -32,11 +30,10 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "..", "..
 
 from services.permission_service import (
     PermissionCheckResult,
-    PermissionService,
     PermissionRepository,
+    PermissionService,
     RoleSnapshot,
 )
-
 
 # ─── 测试数据工厂 ───────────────────────────────────────────────
 

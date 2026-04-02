@@ -17,7 +17,6 @@
 """
 import os
 import uuid
-from collections import Counter
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
@@ -78,8 +77,8 @@ class ReferralService:
         Raises:
             ReferralError: 活动不存在/已结束/超出邀请上限
         """
-        from models.referral import ReferralCampaign, ReferralRecord
-        from sqlalchemy import select, func
+        from models.referral import ReferralRecord
+        from sqlalchemy import func, select
 
         # 1. 查活动并验证状态
         campaign = await self._get_active_campaign(campaign_id, tenant_id, db)
@@ -578,7 +577,7 @@ class ReferralService:
             }
         """
         from models.referral import ReferralRecord
-        from sqlalchemy import select, func
+        from sqlalchemy import func, select
 
         # 验证活动归属
         await self._assert_campaign_ownership(campaign_id, tenant_id, db)
@@ -788,7 +787,7 @@ class ReferralService:
     ) -> bool:
         """检查同设备在同 campaign 内是否已被使用（防刷）"""
         from models.referral import ReferralRecord
-        from sqlalchemy import select, func
+        from sqlalchemy import func, select
 
         result = await db.execute(
             select(func.count(ReferralRecord.id)).where(
@@ -810,7 +809,7 @@ class ReferralService:
     ) -> bool:
         """检查同手机前7位在同 campaign 内是否已注册（防家庭套现）"""
         from models.referral import ReferralRecord
-        from sqlalchemy import select, func
+        from sqlalchemy import func, select
 
         result = await db.execute(
             select(func.count(ReferralRecord.id)).where(
@@ -832,7 +831,7 @@ class ReferralService:
     ) -> bool:
         """检查同IP在同 campaign 内是否已注册（可选，移动端不可靠）"""
         from models.referral import ReferralRecord
-        from sqlalchemy import select, func
+        from sqlalchemy import func, select
 
         result = await db.execute(
             select(func.count(ReferralRecord.id)).where(

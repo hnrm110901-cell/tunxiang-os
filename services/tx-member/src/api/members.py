@@ -1,5 +1,4 @@
 """会员管理 API — Golden ID + RFM + 旅程 + 企微 SCRM 绑定"""
-import asyncio
 from datetime import datetime
 from typing import Optional
 from uuid import UUID
@@ -7,12 +6,10 @@ from uuid import UUID
 import structlog
 from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel
+from services.repository import WecomRepository
 from sqlalchemy.exc import IntegrityError
 
 from shared.ontology.src.database import get_db_with_tenant
-from services.repository import WecomRepository
-from shared.events.event_publisher import MemberEventPublisher
-from shared.events.member_events import MemberEventType
 
 logger = structlog.get_logger()
 

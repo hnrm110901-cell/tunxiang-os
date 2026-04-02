@@ -20,9 +20,6 @@
 """
 from __future__ import annotations
 
-from datetime import date, timedelta
-from typing import Literal, Optional
-
 import structlog
 from fastapi import APIRouter, Query, Request
 
@@ -131,11 +128,13 @@ async def get_engineering_analysis(
     raw: list[dict] = []
 
     try:
-        from shared.ontology.src.database import async_session_factory  # type: ignore[import]
-        from shared.ontology.src.entities import Dish, OrderItem, Order  # type: ignore[import]
-        from sqlalchemy import func, select, cast, Float  # type: ignore[import]
-        from sqlalchemy.dialects.postgresql import UUID  # type: ignore[import]
         import datetime as _dt
+
+        from sqlalchemy import func, select  # type: ignore[import]
+        from sqlalchemy.dialects.postgresql import UUID  # type: ignore[import]  # noqa: F401
+
+        from shared.ontology.src.database import async_session_factory  # type: ignore[import]
+        from shared.ontology.src.entities import Dish, Order, OrderItem  # type: ignore[import]
 
         since = _dt.datetime.utcnow() - _dt.timedelta(days=days)
 
@@ -214,10 +213,12 @@ async def patch_dish(
         return {"ok": False, "error": {"code": "INVALID_STATUS", "message": "仅支持 status=soldout"}}
 
     try:
+        import uuid as _uuid
+
+        from sqlalchemy import select, update  # type: ignore[import]  # noqa: F401
+
         from shared.ontology.src.database import async_session_factory  # type: ignore[import]
         from shared.ontology.src.entities import Dish  # type: ignore[import]
-        from sqlalchemy import select, update  # type: ignore[import]
-        import uuid as _uuid
 
         async with async_session_factory() as session:
             stmt = (

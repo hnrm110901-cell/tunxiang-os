@@ -14,10 +14,10 @@ import uuid
 from typing import Optional
 
 import structlog
-from sqlalchemy import select, and_, update, delete, func
+from sqlalchemy import and_, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models.production_dept import ProductionDept, DishDeptMapping
+from ..models.production_dept import DishDeptMapping, ProductionDept
 
 logger = structlog.get_logger()
 

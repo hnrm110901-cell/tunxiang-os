@@ -1,8 +1,5 @@
 """小票打印服务 — ESC/POS 命令生成 + 厨房分单"""
 import hashlib
-import uuid
-from datetime import datetime, timezone
-from typing import Optional
 
 import structlog
 

@@ -12,7 +12,6 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-
 TENANT_ID = str(uuid.uuid4())
 STORE_ID = str(uuid.uuid4())
 DEPT_ID = str(uuid.uuid4())

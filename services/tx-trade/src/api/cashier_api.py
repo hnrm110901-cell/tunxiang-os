@@ -14,23 +14,23 @@
 from typing import List, Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Request, HTTPException, Header, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+
 from ..services.cashier_engine import CashierEngine
+from ..services.daily_settlement import DailySettlementService
 from ..services.payment_gateway import PaymentGateway
 from ..services.payment_saga_service import PaymentSagaService
-from ..services.daily_settlement import DailySettlementService
 from ..services.permission_client import CashierPermissionClient
 from .discount_engine_routes import (
     DiscountInput,
-    CalculateRequest,
-    _resolve_conflicts,
     _build_steps,
     _fetch_active_rules,
     _insert_discount_log,
+    _resolve_conflicts,
 )
 
 router = APIRouter(prefix="/api/v1", tags=["cashier"])

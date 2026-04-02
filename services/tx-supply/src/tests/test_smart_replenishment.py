@@ -10,18 +10,17 @@
 7. 无需补货时 auto 返回 skipped=True，items_count=0
 8. 租户隔离：不同 tenant_id 只能看到自己的数据
 """
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import math
 import uuid
 from datetime import datetime, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
-
 
 # ─── 工具 ───
 
@@ -73,13 +72,11 @@ def _make_db(execute_results=None):
 # ─── 导入服务 ───
 
 from services.smart_replenishment import (
-    SmartReplenishmentService,
+    DUAL_EARLY_TRIGGER_RATIO,
     InventoryThreshold,
     ReplenishmentItem,
-    HIGH_CONSUMPTION_RATIO,
-    DUAL_EARLY_TRIGGER_RATIO,
+    SmartReplenishmentService,
 )
-
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  场景 1: 库存低于 safety_stock 触发补货

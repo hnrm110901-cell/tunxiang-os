@@ -12,20 +12,17 @@
 """
 from __future__ import annotations
 
-import json
-from datetime import date, datetime, timedelta, timezone
+from datetime import date
 from unittest.mock import AsyncMock, MagicMock, patch
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 import pytest
-
 from src.services.ontology_snapshot_service import (
-    OntologySnapshotService,
     ENTITY_TYPES,
     SNAPSHOT_TYPES,
+    OntologySnapshotService,
     _get_model_router,
 )
-
 
 # ─── 常量 ─────────────────────────────────────────────────────────────────────
 
@@ -682,8 +679,8 @@ class TestConstants:
         """ENTITY_TYPES 包含全部6大实体。"""
         assert len(ENTITY_TYPES) == 6
         expected = {"customer", "dish", "store", "order", "ingredient", "employee"}
-        assert ENTITY_TYPES == expected
+        assert expected == ENTITY_TYPES
 
     def test_snapshot_types_contains_three(self):
         """SNAPSHOT_TYPES 包含 daily / weekly / monthly。"""
-        assert SNAPSHOT_TYPES == {"daily", "weekly", "monthly"}
+        assert {"daily", "weekly", "monthly"} == SNAPSHOT_TYPES

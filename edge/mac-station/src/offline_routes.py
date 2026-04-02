@@ -11,14 +11,12 @@
   - 本地 PG 由 sync-engine 定期从云端增量同步
 """
 from datetime import date, datetime, timezone
-from typing import Optional
 
 import structlog
 from fastapi import APIRouter, Depends, Query
+from offline_db import local_db_dependency
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from offline_db import local_db_dependency
 
 log = structlog.get_logger(__name__)
 

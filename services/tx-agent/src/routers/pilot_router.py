@@ -140,7 +140,7 @@ async def create_pilot(
     tenant_id = _require_tenant(x_tenant_id)
     created_by = uuid.UUID(x_user_id) if x_user_id else None
 
-    from ..services.pilot_service import PilotProgramCreate, StoreRef, SuccessCriterion, PilotItemCreate
+    from ..services.pilot_service import PilotItemCreate, PilotProgramCreate, StoreRef, SuccessCriterion
     pilot_data = PilotProgramCreate(
         name=body.name,
         description=body.description,

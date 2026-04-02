@@ -10,13 +10,13 @@ from typing import Optional
 import structlog
 
 from .menu_version_service import (
-    MenuVersionService,
-    _dispatch_records,
-    DISPATCH_TYPE_FULL,
-    DISPATCH_TYPE_PILOT,
     DISPATCH_STATUS_APPLIED,
     DISPATCH_STATUS_FAILED,
     DISPATCH_STATUS_PENDING,
+    DISPATCH_TYPE_FULL,
+    DISPATCH_TYPE_PILOT,
+    MenuVersionService,
+    _dispatch_records,
 )
 
 log = structlog.get_logger()

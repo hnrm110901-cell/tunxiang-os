@@ -10,15 +10,12 @@
 7. to_excel 带金额列转换
 8. to_excel 自定义工作表名
 """
-import sys
 import os
-
-import pytest
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from services.report_export import to_csv, to_excel
-
 
 SAMPLE_DATA = [
     {"store_name": "长沙店", "revenue_fen": 1500000, "order_count": 120},
@@ -90,8 +87,9 @@ class TestToExcel:
         )
         assert isinstance(xlsx_bytes, bytes)
         # 验证文件可被 openpyxl 读取
-        from openpyxl import load_workbook
         import io
+
+        from openpyxl import load_workbook
         wb = load_workbook(io.BytesIO(xlsx_bytes))
         assert wb.sheetnames[0] == "营收报表"
         ws = wb.active
@@ -103,16 +101,18 @@ class TestToExcel:
             SAMPLE_DATA, COLUMNS,
             column_labels=LABELS,
         )
-        from openpyxl import load_workbook
         import io
+
+        from openpyxl import load_workbook
         wb = load_workbook(io.BytesIO(xlsx_bytes))
         ws = wb.active
         assert ws.cell(row=1, column=1).value == "门店名称"
 
     def test_excel_empty_data(self):
         xlsx_bytes = to_excel([], COLUMNS)
-        from openpyxl import load_workbook
         import io
+
+        from openpyxl import load_workbook
         wb = load_workbook(io.BytesIO(xlsx_bytes))
         ws = wb.active
         # 只有表头

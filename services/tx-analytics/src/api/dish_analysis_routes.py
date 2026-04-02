@@ -13,16 +13,16 @@ from datetime import date, timedelta
 from decimal import Decimal
 from typing import Optional
 
-from fastapi import APIRouter, Header, Query, HTTPException
+from fastapi import APIRouter, Header, HTTPException, Query
 
 from ..services.dish_analysis import (
-    sales_ranking,
-    return_rate_analysis,
-    negative_review_dishes,
-    stockout_frequency,
     dish_structure_analysis,
-    new_dish_performance,
     menu_optimization_suggestions,
+    negative_review_dishes,
+    new_dish_performance,
+    return_rate_analysis,
+    sales_ranking,
+    stockout_frequency,
 )
 
 router = APIRouter(prefix="/api/v1/analysis/dish", tags=["dish-analysis"])

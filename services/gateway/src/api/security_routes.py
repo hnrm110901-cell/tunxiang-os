@@ -13,18 +13,17 @@
 from __future__ import annotations
 
 from datetime import date, datetime, timezone
-from typing import Annotated
 from uuid import UUID
 
 import structlog
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from shared.ontology.permissions import Action, Resource
 from shared.ontology.roles import PlatformRole, TenantRole
-from ..middleware.rbac import UserContext, require_permission, require_roles
+
+from ..middleware.rbac import UserContext, require_roles
 from ..services.audit_log_service import AuditAction, AuditEntry, AuditLogService
 from ..services.security_report_service import SecurityReportService
 

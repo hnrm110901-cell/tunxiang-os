@@ -21,10 +21,9 @@ _src = os.path.abspath(os.path.join(_here, ".."))
 if _src not in sys.path:
     sys.path.insert(0, _src)
 
-import pytest
 import httpx
+import pytest
 import respx
-
 from services.edge_inference import EdgeInferenceClient
 
 # ─── Fixtures ────────────────────────────────────────────────────────────────

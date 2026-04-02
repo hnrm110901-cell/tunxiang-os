@@ -1,8 +1,7 @@
 """工序步骤定义模型（泳道模式）"""
 import uuid
-from typing import Optional
 
-from sqlalchemy import String, Integer, Boolean
+from sqlalchemy import Boolean, Integer, String
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 

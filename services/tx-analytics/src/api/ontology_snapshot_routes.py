@@ -25,10 +25,11 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db_with_tenant
+
 from ..services.ontology_snapshot_service import (
-    OntologySnapshotService,
     ENTITY_TYPES,
     SNAPSHOT_TYPES,
+    OntologySnapshotService,
 )
 
 logger = structlog.get_logger(__name__)

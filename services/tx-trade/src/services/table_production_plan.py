@@ -13,16 +13,17 @@
 """
 import json
 import uuid
-from dataclasses import dataclass, field
-from datetime import datetime, timezone, timedelta
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import structlog
 from pydantic import BaseModel
-from sqlalchemy import select, and_, update
+from sqlalchemy import and_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.events import UniversalPublisher
+
 from ..models.table_production_plan import TableProductionPlan
 
 logger = structlog.get_logger()

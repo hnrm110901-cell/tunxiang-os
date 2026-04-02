@@ -15,13 +15,12 @@ import httpx
 import structlog
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-
-from vision_service import router as vision_router
-from voice_service import router as voice_router
 from federated_client import router as federated_router
 from heartbeat_routes import router as heartbeat_router
-from ota_routes import router as ota_router
 from offline_routes import router as offline_router
+from ota_routes import router as ota_router
+from vision_service import router as vision_router
+from voice_service import router as voice_router
 
 logger = structlog.get_logger()
 
@@ -110,7 +109,7 @@ async def agent_push_ws(websocket: WebSocket) -> None:
 # ─── KDS WebSocket 推送 ───
 
 from kds_pusher import KDSPusher
-from pos_pusher import POSPusher, DiscountAlert
+from pos_pusher import DiscountAlert, POSPusher
 
 kds_pusher = KDSPusher()
 pos_pusher = POSPusher()
@@ -527,16 +526,15 @@ async def _subscribe_menu_board_redis(channel: str, websocket: WebSocket) -> Non
     try:
         import redis.asyncio as aioredis  # type: ignore
         redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
-        async with aioredis.from_url(redis_url, decode_responses=True) as client:
-            async with client.pubsub() as pubsub:
-                await pubsub.subscribe(channel)
-                async for message in pubsub.listen():
-                    if message["type"] != "message":
-                        continue
-                    try:
-                        await websocket.send_text(message["data"])
-                    except (RuntimeError, OSError, ConnectionError):
-                        break
+        async with aioredis.from_url(redis_url, decode_responses=True) as client, client.pubsub() as pubsub:
+            await pubsub.subscribe(channel)
+            async for message in pubsub.listen():
+                if message["type"] != "message":
+                    continue
+                try:
+                    await websocket.send_text(message["data"])
+                except (RuntimeError, OSError, ConnectionError):
+                    break
     except ImportError:
         logger.warning("redis_not_installed_menu_board")
     except (ConnectionError, OSError) as e:

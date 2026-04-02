@@ -6,7 +6,7 @@
 - POST /api/v1/crew/shift-swap     — 创建换班申请
 - GET  /api/v1/crew/shift-swaps    — 查询我的换班申请列表
 """
-from datetime import date, datetime, time, timedelta
+from datetime import date, datetime, timedelta
 from typing import Literal, Optional
 
 import structlog

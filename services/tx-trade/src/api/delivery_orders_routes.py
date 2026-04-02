@@ -24,10 +24,11 @@ from typing import Literal, Optional
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
-from sqlalchemy import select, update
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+
 from ..models.delivery_order import DeliveryOrder
 
 logger = structlog.get_logger(__name__)
@@ -157,7 +158,7 @@ async def update_order_status(
             order.ready_at = now
         elif body.status == "delivering":
             # delivering_at 字段由 v110 迁移添加，用 setattr 防止旧 schema 报错
-            setattr(order, "delivering_at", now)
+            order.delivering_at = now
         elif body.status == "completed":
             order.completed_at = now
 
@@ -223,7 +224,7 @@ async def cancel_order(
         order.status = "cancelled"
         order.cancel_reason = body.reason
         order.cancelled_at = now
-        setattr(order, "cancel_by", "staff")
+        order.cancel_by = "staff"
 
         await db.commit()
         await db.refresh(order)
@@ -423,9 +424,9 @@ async def mock_new_order(
         )
 
         # v110 新增字段（兼容旧 schema）
-        setattr(order, "subtotal_fen", subtotal_fen)
-        setattr(order, "delivery_fee_fen", delivery_fee_fen)
-        setattr(order, "platform_discount_fen", platform_discount_fen)
+        order.subtotal_fen = subtotal_fen
+        order.delivery_fee_fen = delivery_fee_fen
+        order.platform_discount_fen = platform_discount_fen
 
         db.add(order)
         await db.commit()

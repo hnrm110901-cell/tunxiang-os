@@ -4,17 +4,17 @@
 所有金额单位：分（fen）。
 """
 import uuid
-from datetime import datetime, timezone, date
-from typing import Optional
+from datetime import datetime, timezone
 
 import structlog
-from sqlalchemy import select, func, and_, cast, Date
+from sqlalchemy import Date, cast, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.entities import Order
 from shared.ontology.src.enums import OrderStatus
-from ..models.payment import Payment, Refund
-from ..models.enums import PaymentMethod, PaymentStatus
+
+from ..models.enums import PaymentStatus
+from ..models.payment import Payment
 
 logger = structlog.get_logger()
 

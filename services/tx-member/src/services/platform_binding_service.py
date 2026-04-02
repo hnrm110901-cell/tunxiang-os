@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 from typing import Any, Literal
 
 import structlog
-from sqlalchemy import func, or_, select, text, update
+from sqlalchemy import func, or_, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 

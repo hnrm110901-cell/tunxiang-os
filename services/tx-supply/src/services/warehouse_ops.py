@@ -17,7 +17,7 @@ from typing import Any, Dict, List, Optional
 
 import structlog
 from sqlalchemy import text
-from sqlalchemy.exc import ProgrammingError, OperationalError
+from sqlalchemy.exc import OperationalError, ProgrammingError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 log = structlog.get_logger(__name__)

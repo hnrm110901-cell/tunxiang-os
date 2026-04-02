@@ -19,10 +19,9 @@ from typing import Any
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
+from services.payroll_engine_v3 import PayrollEngine
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from services.payroll_engine_v3 import PayrollEngine
 
 log = structlog.get_logger(__name__)
 router = APIRouter(prefix="/api/v1/org/payroll", tags=["payroll-engine-v3"])

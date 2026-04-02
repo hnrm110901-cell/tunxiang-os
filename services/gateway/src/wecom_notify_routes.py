@@ -22,7 +22,7 @@ import structlog
 from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel, Field
 
-from .external_sdk import WecomSDK, WecomConfig, WecomAPIError
+from .external_sdk import WecomAPIError, WecomConfig, WecomSDK
 from .response import ok
 
 logger = structlog.get_logger(__name__)
@@ -179,9 +179,10 @@ async def list_wecom_groups(
 
     # 从数据库读取群配置（通过内部服务调用避免重复 DB 依赖）
     try:
+        from sqlalchemy import select
+
         from .database import get_async_session  # type: ignore[import]
         from .models.wecom_group import WecomGroupConfig  # type: ignore[import]
-        from sqlalchemy import select
 
         async for db in get_async_session():
             stmt = (

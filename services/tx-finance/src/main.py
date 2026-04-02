@@ -4,26 +4,26 @@ FCT业财税、预算、现金流、月报、成本分析、P&L、凭证生成
 """
 from contextlib import asynccontextmanager
 
+from api.analytics_routes import router as analytics_router
+from api.cost_routes import router as cost_router
+from api.cost_routes_v2 import router as cost_v2_router
+from api.e_invoice_routes import router as invoice_router
+from api.erp_routes import router as erp_router
+from api.finance import router as finance_router
+from api.finance_cost_routes import router as finance_cost_router
+from api.finance_pl_routes import router as finance_pl_router
+from api.pl_routes import router as pl_router
+from api.pnl_routes import router as pnl_router
+from api.reconciliation_routes import router as reconciliation_router
+from api.revenue_aggregation_routes import router as revenue_aggregation_router
+from api.revenue_routes import router as revenue_router
+from api.seafood_loss_routes import router as seafood_loss_router
+from api.settlement_routes import router as settlement_router
+from api.split_routes import router as split_router
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from shared.ontology.src.database import init_db
-from api.finance import router as finance_router
-from api.analytics_routes import router as analytics_router
-from api.cost_routes import router as cost_router
-from api.pl_routes import router as pl_router
-from api.e_invoice_routes import router as invoice_router
-from api.settlement_routes import router as settlement_router
-from api.erp_routes import router as erp_router
-from api.reconciliation_routes import router as reconciliation_router
-from api.revenue_aggregation_routes import router as revenue_aggregation_router
-from api.finance_cost_routes import router as finance_cost_router
-from api.finance_pl_routes import router as finance_pl_router
-from api.split_routes import router as split_router
-from api.pnl_routes import router as pnl_router
-from api.cost_routes_v2 import router as cost_v2_router
-from api.revenue_routes import router as revenue_router
-from api.seafood_loss_routes import router as seafood_loss_router
 
 
 @asynccontextmanager

@@ -7,14 +7,14 @@ reference_id 存批次号，notes 存 JSON 扩展信息（含 expiry_date）。
 import asyncio
 import json
 import uuid
-from datetime import date, datetime, timezone
+from datetime import date
 from typing import Optional
 
 import structlog
-from sqlalchemy import select, func, update, text, and_
+from sqlalchemy import and_, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from shared.events import UniversalPublisher, SupplyEventType
+from shared.events import SupplyEventType, UniversalPublisher
 from shared.ontology.src.entities import Ingredient, IngredientTransaction
 from shared.ontology.src.enums import InventoryStatus, TransactionType
 

@@ -12,10 +12,10 @@ from datetime import date
 
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from services.tx_finance.src.services.pl_service import PLService
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db_with_tenant
-from services.tx_finance.src.services.pl_service import PLService
 
 logger = structlog.get_logger(__name__)
 router = APIRouter(tags=["finance-pl"])

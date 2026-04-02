@@ -11,7 +11,6 @@
 """
 from __future__ import annotations
 
-import math
 import os
 import sys
 
@@ -24,10 +23,9 @@ import pytest
 
 # ─── 从服务直接导入，避免 DB 依赖 ───
 from services.procurement_forecast_service import (
-    ProcurementForecastService,
     IngredientDemandForecast,
+    ProcurementForecastService,
     PurchaseOrderDraft,
-    UrgentIngredient,
     _calc_purchase_qty,
 )
 

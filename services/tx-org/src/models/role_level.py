@@ -1,9 +1,7 @@
 """角色级别体系 — 角色权限配置与校验"""
-import uuid
 from typing import Literal
 
-from sqlalchemy import String, Integer
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from shared.ontology.src.base import TenantBase

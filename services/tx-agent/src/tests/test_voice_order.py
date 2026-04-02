@@ -6,9 +6,8 @@
 共 9 个测试用例 (>=6)
 """
 import pytest
-from agents.skills.voice_order import VoiceOrderAgent
 from agents.skills.ai_waiter import AIWaiterAgent
-
+from agents.skills.voice_order import VoiceOrderAgent
 
 TENANT_ID = "test-tenant-001"
 STORE_ID = "store-001"
@@ -167,7 +166,7 @@ class TestAIWaiterAgent:
         assert result.success
         # 推荐结果中不应包含辣的菜
         for dish in result.data["recommended_dishes"]:
-            assert "剁椒鱼头" != dish["name"] or True  # 过滤非严格，至少应尝试过滤
+            assert dish["name"] != "剁椒鱼头" or True  # 过滤非严格，至少应尝试过滤
 
     @pytest.mark.asyncio
     async def test_answer_question_spicy(self, agent):

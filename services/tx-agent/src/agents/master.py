@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 
 import structlog
 
-from .base import SkillAgent, AgentResult
+from .base import AgentResult, SkillAgent
 from .memory_bus import MemoryBus
 
 logger = structlog.get_logger()

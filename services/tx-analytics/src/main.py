@@ -4,17 +4,18 @@
 来源：34 个 service 文件迁移自 tunxiang V2.x
 """
 from fastapi import FastAPI
+
 from .api.analytics import router as analytics_router
-from .api.dashboard_routes import router as dashboard_router
-from .api.store_analysis_routes import router as store_analysis_router
-from .api.dish_analysis_routes import router as dish_analysis_router
-from .api.report_routes import router as report_router
-from .api.private_domain_routes import router as private_domain_router
-from .api.reports_router import router as p0_reports_router
-from .api.cost_health_routes import router as cost_health_router
 from .api.boss_bi_routes import router as boss_bi_router
-from .api.stream_report_routes import router as stream_report_router
+from .api.cost_health_routes import router as cost_health_router
+from .api.dashboard_routes import router as dashboard_router
+from .api.dish_analysis_routes import router as dish_analysis_router
 from .api.group_dashboard_routes import router as group_dashboard_router
+from .api.private_domain_routes import router as private_domain_router
+from .api.report_routes import router as report_router
+from .api.reports_router import router as p0_reports_router
+from .api.store_analysis_routes import router as store_analysis_router
+from .api.stream_report_routes import router as stream_report_router
 
 app = FastAPI(title="TunxiangOS tx-analytics", version="3.0.0")
 app.include_router(analytics_router)

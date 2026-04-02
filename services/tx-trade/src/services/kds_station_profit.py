@@ -16,9 +16,7 @@
 
 输出按档口分组，每档口一行汇总数据。
 """
-import uuid
-from datetime import date, datetime
-from typing import Optional
+from datetime import date
 
 import structlog
 from sqlalchemy import text

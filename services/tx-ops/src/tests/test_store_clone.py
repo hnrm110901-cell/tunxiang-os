@@ -1,10 +1,10 @@
 """快速开店 — 配置克隆测试"""
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from api.store_clone import execute_clone, StoreCloneRequest, CloneItemResult
+from api.store_clone import execute_clone
 
 
 class TestExecuteClone:

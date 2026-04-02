@@ -9,12 +9,11 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Integer, String, Text, Index
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy import Boolean, DateTime, Index, Integer, String, Text
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from shared.ontology.src.base import TenantBase
-
 
 PRODUCT_TYPES = ("physical", "coupon", "dish", "stored_value")
 ORDER_STATUSES = ("pending", "fulfilled", "cancelled", "expired")

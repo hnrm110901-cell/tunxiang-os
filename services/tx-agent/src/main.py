@@ -12,24 +12,23 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from shared.ontology.src.database import get_db_with_tenant
 
 from .agents.domain_event_consumer import DomainEventConsumer
-from .agents.event_bus import create_default_event_bus  # 保留：测试和降级用
-from .api.planner import router as planner_router
-from .api.observability import router as observability_router
-from .api.voice_routes import router as voice_router
-from .api.orchestrator_routes import router as orchestrator_router
-from .api.notification_routes import router as notification_router
-from .api.operation_plan_routes import router as operation_plan_router
-from .api.stream_routes import router as stream_router
-from .api.health_routes import router as health_router
-from .api.store_clone_routes import router as store_clone_router
-from .routers.diagnosis_router import router as diagnosis_router
-from .routers.pilot_router import router as pilot_router
+from .api.agent_monitor_routes import router as agent_monitor_router
 from .api.daily_review_routes import router as daily_review_router
 from .api.dashboard_routes import router as dashboard_router
-from .api.specials_routes import router as specials_router
+from .api.health_routes import router as health_router
 from .api.inventory_routes import router as inventory_router
-from .api.agent_monitor_routes import router as agent_monitor_router
+from .api.notification_routes import router as notification_router
+from .api.observability import router as observability_router
+from .api.operation_plan_routes import router as operation_plan_router
+from .api.orchestrator_routes import router as orchestrator_router
+from .api.planner import router as planner_router
+from .api.specials_routes import router as specials_router
+from .api.store_clone_routes import router as store_clone_router
 from .api.store_health_routes import router as store_health_router
+from .api.stream_routes import router as stream_router
+from .api.voice_routes import router as voice_router
+from .routers.diagnosis_router import router as diagnosis_router
+from .routers.pilot_router import router as pilot_router
 
 
 async def get_db_with_tenant_factory(
@@ -43,8 +42,8 @@ async def get_db_with_tenant_factory(
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """服务生命周期：启动时运行 DomainEventConsumer 后台任务，关闭时优雅停止。"""
-    from .agents.master import MasterAgent
     from .agents.handler_factory import AgentEventHandlerFactory
+    from .agents.master import MasterAgent
     from .agents.skills import ALL_SKILL_AGENTS
 
     # 创建 MasterAgent 并注册所有 Skill Agents（无 DB/ModelRouter，事件驱动场景）

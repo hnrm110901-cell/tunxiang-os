@@ -4,8 +4,7 @@
 金额从 orders 表读 fen（分）。
 每条查询强制 tenant_id 过滤 + RLS 兼容。
 """
-from datetime import date, datetime, timezone, timedelta
-from typing import Optional
+from datetime import date, datetime, timedelta, timezone
 
 import structlog
 from sqlalchemy import text

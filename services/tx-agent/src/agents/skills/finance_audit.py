@@ -7,8 +7,10 @@
 """
 import statistics
 from typing import Any, Optional
+
 import structlog
-from ..base import SkillAgent, AgentResult
+
+from ..base import AgentResult, SkillAgent
 
 logger = structlog.get_logger(__name__)
 
@@ -288,8 +290,9 @@ class FinanceAuditAgent(SkillAgent):
         date_to = params.get("date_to")
 
         if self._db:
+            from datetime import datetime, timedelta, timezone
+
             from sqlalchemy import text
-            from datetime import datetime, timezone, timedelta
 
             if not date_from:
                 date_from = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d")
@@ -389,8 +392,9 @@ class FinanceAuditAgent(SkillAgent):
         date = params.get("date")  # YYYY-MM-DD，默认今天
 
         if self._db:
-            from sqlalchemy import text
             from datetime import datetime, timezone
+
+            from sqlalchemy import text
 
             if not date:
                 date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
@@ -462,8 +466,9 @@ class FinanceAuditAgent(SkillAgent):
         # 若有 DB，从 orders 表实时聚合今日营收
         actual_daily_fen: Optional[int] = None
         if self._db and store_id:
-            from sqlalchemy import text
             from datetime import datetime, timezone
+
+            from sqlalchemy import text
             today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
             row = await self._db.execute(text("""
                 SELECT COALESCE(SUM(final_amount_fen), 0) as daily_revenue

@@ -14,35 +14,29 @@
   11. AI 建议触发阈值（差异 >500元 = 50000分才触发）
   12. 自动核销小额差异（< max_amount 分）
 """
+import os
+import sys
 import uuid
-from datetime import date, datetime, timezone
-from decimal import Decimal
-from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from datetime import datetime, timezone
+from unittest.mock import AsyncMock, patch
 
 import pytest
 import pytest_asyncio
-from sqlalchemy import event, text
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-import sys
-import os
-
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
+from models.three_way_match import (
+    Base as MatchBase,
+)
 from services.three_way_match_engine import (
-    ThreeWayMatchEngine,
     MatchResult,
-    BatchMatchResult,
-    VarianceItem,
     MatchStatus,
     PurchaseOrderNotFoundError,
-)
-from models.three_way_match import (
-    ThreeWayMatchRecord,
-    Base as MatchBase,
+    ThreeWayMatchEngine,
+    VarianceItem,
 )
 
 # ── 常量 ─────────────────────────────────────────────────────────────────────

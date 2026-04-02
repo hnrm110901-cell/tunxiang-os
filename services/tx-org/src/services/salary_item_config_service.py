@@ -9,10 +9,9 @@ from typing import Any, Dict, List, Optional
 from uuid import UUID, uuid4
 
 import structlog
+from services.salary_item_library import _ITEM_INDEX, STORE_TEMPLATES
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from services.salary_item_library import STORE_TEMPLATES, _ITEM_INDEX
 
 log = structlog.get_logger(__name__)
 

@@ -13,14 +13,13 @@ AI 调用：通过 ModelRouter，不直接调用 API。
 """
 from __future__ import annotations
 
-import logging
 from datetime import date, datetime, timedelta, timezone
 from typing import Any
 from uuid import UUID
 
 import structlog
 from sqlalchemy import text
-from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = structlog.get_logger(__name__)
@@ -97,7 +96,7 @@ async def _compute_customer_metrics(
           AND is_deleted = FALSE
           AND is_merged = FALSE
         {store_filter}
-    """), params))
+    """), params)
     r = row.mappings().one()
 
     return {
@@ -148,7 +147,7 @@ async def _compute_dish_metrics(
           AND is_deleted = FALSE
           {brand_filter}
           {store_filter}
-    """), params))
+    """), params)
     r = row.mappings().one()
 
     return {
@@ -203,7 +202,7 @@ async def _compute_order_metrics(
           AND o.created_at < :next_day
           {brand_filter}
           {store_filter}
-    """), params))
+    """), params)
     r = row.mappings().one()
 
     return {
@@ -245,7 +244,7 @@ async def _compute_ingredient_metrics(
         WHERE tenant_id = :tenant_id
           AND is_deleted = FALSE
           {store_filter}
-    """), params))
+    """), params)
     r = row.mappings().one()
 
     return {
@@ -297,7 +296,7 @@ async def _compute_employee_metrics(
           AND is_deleted = FALSE
           {brand_filter}
           {store_filter}
-    """), params))
+    """), params)
     r = row.mappings().one()
 
     return {
@@ -349,7 +348,7 @@ async def _compute_store_metrics(
           AND is_deleted = FALSE
           {brand_filter_store}
           {store_filter_store}
-    """), params))
+    """), params)
     sr = store_row.mappings().one()
 
     order_row = await db.execute(text(f"""
@@ -367,7 +366,7 @@ async def _compute_store_metrics(
               {store_filter_order}
             GROUP BY o.store_id
         ) daily_rev
-    """), params))
+    """), params)
     orr = order_row.mappings().one()
 
     return {

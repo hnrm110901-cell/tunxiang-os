@@ -11,15 +11,15 @@
   - [VALIDATION] phone 空字符串校验
   - [STATS] get_queue_history 改用 SQL 聚合统计，避免二次全表扫描
 """
-import json
 import uuid
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.events import UniversalPublisher
+
 from ..repositories.queue_repo import QueueRepository
 
 logger = structlog.get_logger()

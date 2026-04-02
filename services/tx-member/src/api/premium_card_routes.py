@@ -22,12 +22,12 @@
 import uuid
 from typing import Optional
 
+import services.premium_card as svc
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db_with_tenant
-import services.premium_card as svc
 
 router = APIRouter(prefix="/api/v1/member/premium-cards", tags=["premium-card"])
 

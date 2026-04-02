@@ -45,7 +45,7 @@ SYSTEM_PROMPT = (
 def _build_user_prompt(data: ShiftData) -> str:
     revenue_yuan = data.revenue_fen / 100
     lines = [
-        f"本班次数据如下：",
+        "本班次数据如下：",
         f"- 接待桌次：{data.table_count} 桌",
         f"- 营业额：{revenue_yuan:.0f} 元",
         f"- 翻台率：{data.turnover_rate:.1f} 次",

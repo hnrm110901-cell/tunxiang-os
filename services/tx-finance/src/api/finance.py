@@ -8,17 +8,16 @@ from typing import Optional
 
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from services.pnl_engine import PnLEngine
+from services.report_engine import ReportEngine
+from services.revenue_engine import RevenueEngine
+from services.store_pnl import StorePnLService
+from services.voucher_service import format_for_kingdee, generate_voucher_from_settlement
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, text
 
 from shared.ontology.src.database import get_db_with_tenant
 from shared.ontology.src.entities import Order, OrderItem, Store
-
-from services.store_pnl import StorePnLService
-from services.voucher_service import generate_voucher_from_settlement, format_for_kingdee
-from services.revenue_engine import RevenueEngine
-from services.pnl_engine import PnLEngine
-from services.report_engine import ReportEngine
 
 logger = structlog.get_logger()
 router = APIRouter(prefix="/api/v1/finance", tags=["finance"])

@@ -1,8 +1,8 @@
 """营销方案 API — 计算、创建、列出方案"""
 from typing import Optional
+
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
-
 from services.marketing_engine import (
     SCHEME_TYPES,
     apply_schemes_in_order,

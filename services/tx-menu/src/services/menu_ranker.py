@@ -8,7 +8,6 @@
 from dataclasses import dataclass
 from typing import Optional
 
-
 WEIGHTS = {
     "trend": 0.30,
     "margin": 0.25,

@@ -21,11 +21,11 @@ from __future__ import annotations
 import math
 import uuid
 from datetime import date, datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 import structlog
 from sqlalchemy import text
-from sqlalchemy.exc import ProgrammingError, OperationalError
+from sqlalchemy.exc import OperationalError, ProgrammingError
 
 log = structlog.get_logger(__name__)
 

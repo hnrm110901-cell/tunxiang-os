@@ -1,18 +1,17 @@
 """C5 收货验收 + 退货 + 调拨测试"""
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import pytest
 from services.receiving_service import (
-    create_receiving,
-    reject_item,
-    create_transfer,
     confirm_transfer,
+    create_receiving,
+    create_transfer,
     get_central_warehouse_stock,
+    reject_item,
 )
-
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  收货验收

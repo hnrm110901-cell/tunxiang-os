@@ -40,11 +40,11 @@ from uuid import UUID
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
+from services.payroll_engine_db import PayrollEngine
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
-from services.payroll_engine_db import PayrollEngine, SocialInsuranceConfig
 
 log = structlog.get_logger(__name__)
 
@@ -541,7 +541,8 @@ async def upsert_employee_salary_config(
     if req.scheme_id:
         _uuid(req.scheme_id, "scheme_id")
 
-    from datetime import date as _date, timedelta as _timedelta
+    from datetime import date as _date
+    from datetime import timedelta as _timedelta
 
     try:
         eff_from = _date.fromisoformat(req.effective_from)

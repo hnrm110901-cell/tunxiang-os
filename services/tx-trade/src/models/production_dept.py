@@ -7,7 +7,7 @@ v076 新增字段：
 import uuid
 from typing import Optional
 
-from sqlalchemy import String, Integer, Boolean, ForeignKey, Index
+from sqlalchemy import Boolean, ForeignKey, Index, Integer, String
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 

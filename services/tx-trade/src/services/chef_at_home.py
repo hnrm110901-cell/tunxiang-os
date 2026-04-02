@@ -7,7 +7,7 @@
 厨师状态：available / booked / on_service / off_duty。
 """
 import uuid
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from typing import Optional
 
 import structlog

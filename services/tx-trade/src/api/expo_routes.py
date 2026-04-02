@@ -11,20 +11,21 @@
   GET  /expo/{plan_id}/status         - 单桌协调状态
   POST /expo/dispatch/{order_id}/fire - 分单并创建TableFire计划（集成入口）
 """
+import uuid
 from typing import Optional
 
 import structlog
-from fastapi import APIRouter, Depends, Request, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
+from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
-from ..services.table_production_plan import TableFireCoordinator
+
+from ..models.table_production_plan import TableProductionPlan
 from ..services.cooking_scheduler import create_table_fire_plan
 from ..services.kds_dispatch import dispatch_order_to_kds
-from ..models.table_production_plan import TableProductionPlan
-from sqlalchemy import select, and_
-import uuid
+from ..services.table_production_plan import TableFireCoordinator
 
 logger = structlog.get_logger()
 router = APIRouter(prefix="/api/v1/expo", tags=["expo"])

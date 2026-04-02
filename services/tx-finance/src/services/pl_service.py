@@ -26,8 +26,8 @@ from datetime import date, timedelta
 from typing import Any
 
 import structlog
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from .cost_engine_repository import CostEngineRepository
 from .cost_engine_service import CostEngineService, calculate_cost_health_score

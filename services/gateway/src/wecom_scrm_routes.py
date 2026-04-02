@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import httpx
 import structlog
-from fastapi import APIRouter, HTTPException, Header
+from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel
 
 from .wecom_contact import WecomAPIError, wecom_contact_sdk

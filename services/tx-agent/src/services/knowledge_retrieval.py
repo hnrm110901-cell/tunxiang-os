@@ -18,7 +18,7 @@ import structlog
 
 from shared.vector_store.client import QdrantClient
 from shared.vector_store.embeddings import EmbeddingService
-from shared.vector_store.indexes import COLLECTIONS, get_vector_size
+from shared.vector_store.indexes import get_vector_size
 
 logger = structlog.get_logger()
 

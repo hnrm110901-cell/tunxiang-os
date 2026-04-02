@@ -4,12 +4,8 @@
       manage_training, get_training_progress, get_employee_scorecard,
       以及5个API端点
 """
-import sys
 import os
-import uuid
-from datetime import datetime, timezone
-
-import pytest
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -89,13 +85,13 @@ class TestEmployeeDepthAPI:
 
 from services.employee_depth import (
     COMMISSION_BASE_RATE,
-    COMMISSION_RECOMMEND_RATE,
     COMMISSION_BOTTLE_FEN,
+    COMMISSION_RECOMMEND_RATE,
     COMMISSION_UPSELL_RATE,
-    TRAINING_STATUS_PENDING,
-    TRAINING_STATUS_IN_PROGRESS,
     TRAINING_STATUS_COMPLETED,
     TRAINING_STATUS_FAILED,
+    TRAINING_STATUS_IN_PROGRESS,
+    TRAINING_STATUS_PENDING,
 )
 
 

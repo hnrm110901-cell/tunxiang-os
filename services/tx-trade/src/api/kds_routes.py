@@ -4,21 +4,31 @@
 """
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Request, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
-from ..services.kds_dispatch import (
-    dispatch_order_to_kds, get_dept_queue, get_store_kds_overview,
-    resolve_dept_for_dish, get_kds_tasks_by_dept,
-)
-from ..services.cooking_scheduler import calculate_cooking_order, estimate_cooking_time, get_dept_load
-from ..services.kds_actions import (
-    start_cooking, finish_cooking, request_rush, request_remake,
-    report_shortage, get_task_timeline, confirm_rush, check_rush_overdue,
-)
+
+from ..services.cooking_scheduler import calculate_cooking_order, get_dept_load
 from ..services.cooking_timeout import check_timeouts, get_timeout_config
+from ..services.kds_actions import (
+    check_rush_overdue,
+    confirm_rush,
+    finish_cooking,
+    get_task_timeline,
+    report_shortage,
+    request_remake,
+    request_rush,
+    start_cooking,
+)
+from ..services.kds_dispatch import (
+    dispatch_order_to_kds,
+    get_dept_queue,
+    get_kds_tasks_by_dept,
+    get_store_kds_overview,
+    resolve_dept_for_dish,
+)
 
 router = APIRouter(prefix="/api/v1/kds", tags=["kds"])
 
@@ -291,9 +301,11 @@ async def api_rush_status(
 
     返回当前任务的催菜次数、承诺时间及是否已超时。
     """
-    from ..models.kds_task import KDSTask
-    from sqlalchemy import select, and_
     import uuid as _uuid
+
+    from sqlalchemy import and_, select
+
+    from ..models.kds_task import KDSTask
 
     tenant_id = _get_tenant_id(request)
 

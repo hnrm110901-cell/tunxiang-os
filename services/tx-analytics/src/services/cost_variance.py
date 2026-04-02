@@ -10,8 +10,7 @@
 """
 import uuid
 from datetime import date
-from decimal import Decimal, ROUND_HALF_UP
-from typing import Optional
+from decimal import ROUND_HALF_UP, Decimal
 
 import structlog
 

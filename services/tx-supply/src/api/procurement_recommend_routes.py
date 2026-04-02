@@ -14,10 +14,11 @@
 """
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import List
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel
+
 from shared.ontology.src.database import get_db as _get_db
 
 router = APIRouter(tags=["procurement-recommend"])
@@ -96,8 +97,7 @@ async def apply_recommendations(
         recommendation_ids: 要采纳的建议ID列表
         requester_id: 操作人ID
     """
-    from ..services.auto_procurement import AutoProcurementService, ProcurementRecommendation
-    from ..services.demand_forecast import DemandForecastService
+    from ..services.auto_procurement import AutoProcurementService
 
     if not body.recommendation_ids:
         raise HTTPException(status_code=400, detail="recommendation_ids 不可为空")
@@ -152,8 +152,9 @@ async def get_supplier_scores(
 
     评分公式：准期率×0.5 + 质量合格率×0.3 + 价格竞争力×0.2
     """
-    from ..services.auto_procurement import AutoProcurementService
     from sqlalchemy import text
+
+    from ..services.auto_procurement import AutoProcurementService
 
     svc = AutoProcurementService()
 

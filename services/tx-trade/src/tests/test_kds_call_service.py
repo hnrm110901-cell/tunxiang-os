@@ -10,13 +10,13 @@
 7. 出单模式默认 IMMEDIATE
 8. POST_PAYMENT 模式：下单不推，收银后推
 """
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import uuid
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -161,7 +161,7 @@ async def test_confirm_served_from_done_raises():
 @pytest.mark.asyncio
 async def test_calling_stats_wait_time_calculation():
     """等叫统计的 avg_waiting_minutes 应准确反映 called_at 到现在的时长。"""
-    from services.kds_call_service import KdsCallService, CallingStats
+    from services.kds_call_service import CallingStats, KdsCallService
 
     # 构造两个 calling 任务，等待时间分别为 4 分钟和 8 分钟
     now = datetime.now(timezone.utc)
@@ -257,20 +257,18 @@ async def test_post_payment_mode_no_push_then_deferred():
 
     db_deferred.execute = AsyncMock(side_effect=_execute_side_effect)
 
-    import httpx
 
     with patch("services.order_push_config.OrderPushConfigService.get_store_mode",
-               new=AsyncMock(return_value=OrderPushMode.POST_PAYMENT)):
-        with patch("httpx.AsyncClient") as mock_client_cls:
-            mock_client = AsyncMock()
-            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-            mock_client.__aexit__ = AsyncMock(return_value=False)
-            mock_client.post = AsyncMock(return_value=MagicMock(status_code=200))
-            mock_client_cls.return_value = mock_client
+               new=AsyncMock(return_value=OrderPushMode.POST_PAYMENT)), patch("httpx.AsyncClient") as mock_client_cls:
+        mock_client = AsyncMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+        mock_client.post = AsyncMock(return_value=MagicMock(status_code=200))
+        mock_client_cls.return_value = mock_client
 
-            count = await OrderPushConfigService.push_deferred_tasks(
-                ORDER_ID, TENANT_ID, db_deferred
-            )
+        count = await OrderPushConfigService.push_deferred_tasks(
+            ORDER_ID, TENANT_ID, db_deferred
+        )
 
     assert count == 1
     db_deferred.flush.assert_called_once()

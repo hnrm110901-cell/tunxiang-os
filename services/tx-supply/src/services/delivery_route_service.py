@@ -297,7 +297,6 @@ class DeliveryRouteService:
 
         若高德 API 单段请求失败，降级为 Haversine 估算距离，不中断整体流程。
         """
-        import asyncio
         try:
             import httpx
         except ImportError:

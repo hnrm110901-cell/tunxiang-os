@@ -1,10 +1,13 @@
 """TableDispatch + CostDiagnosis + ReviewSummary Agent 测试"""
-import sys, os, asyncio
+import asyncio
+import os
+import sys
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from agents.skills.table_dispatch import TableDispatchAgent
 from agents.skills.cost_diagnosis import CostDiagnosisAgent
 from agents.skills.review_summary import ReviewSummaryAgent
+from agents.skills.table_dispatch import TableDispatchAgent
 
 TID = "00000000-0000-0000-0000-000000000001"
 

@@ -6,23 +6,21 @@
 import uuid
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Request, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+
+from ..services.room_rules import (
+    get_room_usage_today,
+)
 from ..services.table_operations import (
-    transfer_table,
+    clear_table,
+    get_table_status_board,
     merge_tables,
     split_table,
-    clear_table,
-    lock_table,
-    get_table_status_board,
-)
-from ..services.room_rules import (
-    check_minimum_charge,
-    get_room_config,
-    get_room_usage_today,
+    transfer_table,
 )
 
 router = APIRouter(prefix="/api/v1/tables", tags=["tables"])

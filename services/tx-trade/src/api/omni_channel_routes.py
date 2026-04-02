@@ -21,9 +21,10 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+
 from ..services.omni_channel_service import (
-    OmniChannelService,
     OmniChannelError,
+    OmniChannelService,
     UnsupportedPlatformError,
     omni_order_match_clause,
     row_omni_platform_key,
@@ -287,8 +288,10 @@ async def get_orders(
 ) -> dict:
     """查询门店历史外卖订单（含渠道信息），支持按平台筛选，分页返回。"""
     import uuid as _uuid
+
+    from sqlalchemy import and_, func, or_, select
+
     from shared.ontology.src.entities import Order as OrderModel
-    from sqlalchemy import select, and_, func, or_
 
     tenant_id = _get_tenant_id(request)
     tid = _uuid.UUID(tenant_id)
@@ -410,8 +413,10 @@ async def get_channel_stats(
 ) -> dict:
     """按平台统计当日GMV、订单量、接单率。"""
     import uuid as _uuid
+
+    from sqlalchemy import and_, case, func, or_, select
+
     from shared.ontology.src.entities import Order as OrderModel
-    from sqlalchemy import select, and_, func, case, or_
 
     tenant_id = _get_tenant_id(request)
     tid = _uuid.UUID(tenant_id)
@@ -632,7 +637,6 @@ async def get_unmapped_items(
         dish_rows = dish_result.fetchall()
 
         if dish_rows:
-            from ..services.omni_channel_service import OmniChannelService as _OCS
 
             def _levenshtein(a: str, b: str) -> int:
                 if a == b:

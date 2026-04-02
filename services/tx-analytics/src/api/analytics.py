@@ -1,5 +1,6 @@
 """经营分析 API"""
 from typing import Optional
+
 from fastapi import APIRouter
 
 router = APIRouter(prefix="/api/v1/analytics", tags=["analytics"])

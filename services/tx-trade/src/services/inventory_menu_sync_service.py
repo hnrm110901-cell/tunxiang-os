@@ -10,13 +10,12 @@
 import math
 import os
 import uuid
-from datetime import datetime, timezone
 from dataclasses import dataclass, field
-from typing import Optional
+from datetime import datetime, timezone
 
 import httpx
 import structlog
-from sqlalchemy import select, update, text
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models.soldout_record import SoldoutRecord

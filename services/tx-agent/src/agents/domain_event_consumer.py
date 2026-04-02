@@ -12,8 +12,8 @@ from typing import Optional
 
 import structlog
 
-from .event_bus import AgentEvent, EventBus
 from ..services.daily_review_service import DailyReviewService
+from .event_bus import AgentEvent, EventBus
 
 logger = structlog.get_logger()
 

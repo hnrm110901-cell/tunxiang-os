@@ -14,15 +14,14 @@
 - 提成计算等深度绩效能力: 新项目暂无对应，提取业务规则做约束验证
 """
 
-import sys
-import os
 import asyncio
+import os
+import sys
 
 import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from agents.base import AgentResult
 from agents.constraints import ConstraintChecker
 from agents.master import MasterAgent
 from agents.skills.finance_audit import FinanceAuditAgent

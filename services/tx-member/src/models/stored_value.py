@@ -6,8 +6,8 @@ v2: 增加 main_balance_fen、scope_type/scope_id、expiry_date、StoredValueRec
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import Boolean, Date, DateTime, Integer, String, ForeignKey, Index
-from sqlalchemy.dialects.postgresql import UUID, JSON
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Index, Integer, String
+from sqlalchemy.dialects.postgresql import JSON, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from shared.ontology.src.base import TenantBase

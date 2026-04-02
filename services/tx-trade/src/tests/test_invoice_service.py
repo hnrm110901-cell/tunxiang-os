@@ -11,12 +11,13 @@
 8. 生成开票二维码数据
 9. 发票台账查询
 """
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import uuid
+
 import pytest
 
 
@@ -29,7 +30,7 @@ TENANT_ID = _uid()
 
 @pytest.fixture(autouse=True)
 def _clear_stores():
-    from services.invoice_service import _invoices, _invoice_queue
+    from services.invoice_service import _invoice_queue, _invoices
     _invoices.clear()
     _invoice_queue.clear()
 

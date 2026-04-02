@@ -1,6 +1,5 @@
 """菜单实时编辑 API — PATCH /api/v1/menu/dishes/{dish_id}/live"""
 import os
-import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -10,6 +9,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from shared.ontology.src.database import get_db
 
 logger = structlog.get_logger(__name__)

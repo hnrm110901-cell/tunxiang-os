@@ -319,6 +319,15 @@ function appendOrderItems(orderId, items) {
   });
 }
 
+function callServiceBell(orderId, storeId, tableNo) {
+  return txRequest('/api/v1/trade/service-bell', 'POST', {
+    order_id: orderId,
+    store_id: storeId || getApp().globalData.storeId,
+    table_no: tableNo || '',
+    customer_id: wx.getStorageSync('tx_customer_id') || '',
+  });
+}
+
 // ─── 社交裂变 ───
 
 function createGroupOrder(storeId, tableNo) {
@@ -508,6 +517,7 @@ module.exports = {
   fetchCookingProgress: fetchCookingProgress,
   rushOrder: rushOrder,
   appendOrderItems: appendOrderItems,
+  callServiceBell: callServiceBell,
   // 社交裂变
   createGroupOrder: createGroupOrder,
   joinGroupOrder: joinGroupOrder,

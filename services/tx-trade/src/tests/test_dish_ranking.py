@@ -9,17 +9,16 @@
 6. TOP 限制：最多返回10条
 7. 租户隔离（不同租户数据互不干扰）
 """
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import uuid
 from datetime import date
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
 import pytest
-
 
 # ── 测试工具 ──────────────────────────────────────────────────
 
@@ -213,7 +212,7 @@ async def test_no_data_returns_empty_lists():
 @pytest.mark.asyncio
 async def test_top_n_limit():
     """即使数据库返回超过10条，仍只保留10条（SQL LIMIT 保证）"""
-    from services.dish_ranking_service import DishRankingService, TOP_N
+    from services.dish_ranking_service import TOP_N, DishRankingService
 
     # 模拟 SQL 已按 LIMIT 10 返回最多10条
     hot_rows = [
@@ -284,8 +283,9 @@ async def test_tenant_isolation():
 @pytest.mark.asyncio
 async def test_as_of_timestamp_present():
     """DishRankings.as_of 应返回当前时间（不为 None）"""
+    from datetime import datetime
+
     from services.dish_ranking_service import DishRankingService
-    from datetime import datetime, timezone
 
     db = _mock_db(
         FakeResult(rows=[]),

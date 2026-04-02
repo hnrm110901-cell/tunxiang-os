@@ -6,8 +6,8 @@
 - 合法 UUID 的 X-Tenant-ID 通过
 - 白名单路径（/health, /docs, /api/v1/auth/）免检
 """
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 

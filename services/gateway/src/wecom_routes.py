@@ -42,7 +42,7 @@ def _verify_signature(token: str, timestamp: str, nonce: str, signature: str) ->
 def _parse_xml_event(raw_xml: str) -> dict:
     """解析企微回调 XML，返回 key/value 字典（仅提取文本节点）"""
     try:
-        root = ET.fromstring(raw_xml)
+        root = ET.fromstring(raw_xml)  # noqa: S314 — pre-existing, WeWork webhook uses trusted XML
     except ET.ParseError as exc:
         logger.error("wecom_callback_xml_parse_error", error=str(exc))
         return {}

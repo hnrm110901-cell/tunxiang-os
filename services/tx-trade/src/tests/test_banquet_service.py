@@ -3,20 +3,20 @@
 测试数据基于徐记海鲜典型宴会场景。
 """
 import pytest
+
 from ..services.banquet_service import (
-    BanquetService,
-    BanquetProposal,
-    BanquetCostEstimate,
     EVENT_TYPE_CONFIG,
-    TIER_PRICING,
     MENU_TEMPLATES,
+    TIER_PRICING,
+    BanquetCostEstimate,
+    BanquetProposal,
+    BanquetService,
+    _bookings,
+    _cases,
+    _feedbacks,
     _inquiries,
     _proposals,
-    _bookings,
-    _feedbacks,
-    _cases,
 )
-
 
 TENANT_ID = "t-xuji-seafood-001"
 STORE_ID = "s-xuji-changsha-01"

@@ -3,11 +3,12 @@
 """
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from src.core.exceptions import NotFoundError
 from src.models.supply_chain import PurchaseOrder, Supplier
 

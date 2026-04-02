@@ -8,28 +8,25 @@
 - 4 种角色看板
 """
 
-import sys
 import os
+import sys
 
 # 确保 src 目录在 import path 中
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from services.labor_efficiency_service import (
-    INDUSTRY_BENCHMARKS,
+    compare_stores,
+    compute_guests_per_hour,
     compute_labor_cost_ratio,
     compute_revenue_per_capita,
     compute_revenue_per_hour,
-    compute_guests_per_hour,
-    compute_work_effectiveness,
     compute_store_efficiency,
-    compare_stores,
-    generate_efficiency_alerts,
+    compute_work_effectiveness,
     get_boss_view,
     get_hr_view,
     get_manager_view,
     get_staff_view,
 )
-
 
 # ── 辅助：构造门店数据 ────────────────────────────────────────
 

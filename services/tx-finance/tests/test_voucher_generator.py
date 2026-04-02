@@ -14,23 +14,20 @@ from __future__ import annotations
 import json
 import os
 import pathlib
-import uuid
-from datetime import date
-from unittest.mock import AsyncMock, MagicMock, patch
-
-import pytest
 
 # ─── 模块路径适配（无需安装，直接 sys.path 注入）────────────────────────────────
-
 import sys
+import uuid
+from datetime import date
+from unittest.mock import AsyncMock, MagicMock
+
+import pytest
 
 _REPO = pathlib.Path(__file__).parents[3]  # tunxiang-os/
 sys.path.insert(0, str(_REPO / "services/tx-finance/src"))
 sys.path.insert(0, str(_REPO))
 
 from shared.adapters.erp.src.base import (
-    ERPAccount,
-    ERPPushResult,
     ERPType,
     ERPVoucher,
     ERPVoucherEntry,
@@ -38,7 +35,6 @@ from shared.adapters.erp.src.base import (
     VoucherType,
 )
 from shared.adapters.erp.src.factory import get_erp_adapter
-
 
 # ─── 工具函数 ─────────────────────────────────────────────────────────────────
 
@@ -269,7 +265,6 @@ class TestKingdeeAdapter:
     @pytest.mark.asyncio
     async def test_push_voucher_business_error_raises(self, adapter) -> None:
         """ERP 业务错误时抛出 RuntimeError"""
-        import httpx
 
         mock_response = MagicMock()
         mock_response.status_code = 200

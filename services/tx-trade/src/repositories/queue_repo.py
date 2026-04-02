@@ -9,10 +9,10 @@
 import uuid
 from typing import Optional
 
-from sqlalchemy import select, and_, func, update, text
+from sqlalchemy import and_, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models.queue import QueueEntry, QueueCounter
+from ..models.queue import QueueCounter, QueueEntry
 
 
 class QueueRepository:

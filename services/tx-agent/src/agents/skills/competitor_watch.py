@@ -3,11 +3,10 @@
 扫描竞对最新动态、检测价格变动、检测新品上线、检测营销活动、生成威胁预警、对比品牌定位、生成周报。
 新增：generate_weekly_intel_report — 整合竞对快照+点评+市场信号生成结构化周报。
 """
-import uuid
 from datetime import date, timedelta
 from typing import Any
-from ..base import SkillAgent, AgentResult
 
+from ..base import AgentResult, SkillAgent
 
 # 竞对监测维度
 MONITOR_DIMENSIONS = ["价格", "新品", "营销活动", "门店扩张", "服务变化", "评分变化"]

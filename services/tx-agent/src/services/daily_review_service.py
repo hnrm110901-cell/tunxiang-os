@@ -10,9 +10,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime, time, timezone
 from enum import Enum
 from typing import Optional
-from datetime import datetime, timezone, time
+
 import structlog
 
 logger = structlog.get_logger(__name__)

@@ -6,19 +6,18 @@
 import asyncio
 import uuid
 from datetime import datetime, timezone
-from typing import Optional
 
 import structlog
-from sqlalchemy import select, func, and_, cast, Date
+from sqlalchemy import Date, cast, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from shared.events import UniversalPublisher, TradeEventType
-
+from shared.events import TradeEventType, UniversalPublisher
 from shared.ontology.src.entities import Order
 from shared.ontology.src.enums import OrderStatus
-from ..models.settlement import ShiftHandover
+
+from ..models.enums import PaymentStatus
 from ..models.payment import Payment, Refund
-from ..models.enums import PaymentMethod, PaymentStatus
+from ..models.settlement import ShiftHandover
 
 logger = structlog.get_logger()
 

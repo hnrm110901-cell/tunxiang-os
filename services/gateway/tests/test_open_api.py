@@ -21,27 +21,21 @@
 18. revoke_token后verify返回None
 """
 
-import asyncio
-import hashlib
-import hmac
-import json
+import os
+
+# ── 被测模块 ──────────────────────────────────────────────────────
+import sys
 from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
-import pytest_asyncio
-
-# ── 被测模块 ──────────────────────────────────────────────────────
-import sys
-import os
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
+from middleware.rate_limiter import RateLimiter
 from services.oauth2_service import OAuth2Service
 from services.webhook_dispatcher import WebhookDispatcher
-from middleware.rate_limiter import RateLimiter
-
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  Helpers

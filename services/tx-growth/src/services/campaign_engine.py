@@ -15,7 +15,6 @@ from datetime import datetime, timezone
 from typing import Any, Optional
 
 import structlog
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from .campaign_repository import CampaignRepository
 
@@ -456,11 +455,7 @@ class TriggerEngine:
             schedule_type = schedule.get("type", "")
 
             should_run = False
-            if schedule_type == "weekly" and weekday in schedule.get("weekdays", []):
-                should_run = True
-            elif schedule_type == "monthly" and day_of_month in schedule.get("days_of_month", []):
-                should_run = True
-            elif schedule_type == "daily":
+            if schedule_type == "weekly" and weekday in schedule.get("weekdays", []) or schedule_type == "monthly" and day_of_month in schedule.get("days_of_month", []) or schedule_type == "daily":
                 should_run = True
 
             if should_run:

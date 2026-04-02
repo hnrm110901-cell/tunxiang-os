@@ -3,8 +3,8 @@
 菜品四象限分析、菜单结构诊断、定价优化、上下架建议、套餐组合优化、菜单AB测试。
 """
 from typing import Any
-from ..base import SkillAgent, AgentResult
 
+from ..base import AgentResult, SkillAgent
 
 # 四象限定义
 QUADRANTS = {

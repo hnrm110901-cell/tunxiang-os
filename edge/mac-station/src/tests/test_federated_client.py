@@ -8,18 +8,15 @@
 - 训练历史记录
 - FastAPI 路由
 """
-import math
-import sys
 import os
+import sys
 
 import pytest
-import pytest_asyncio
 
 # 确保 src 可导入
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from federated_client import FederatedClient, router, get_federated_client
-
+from federated_client import FederatedClient, get_federated_client, router
 
 # ─── Fixtures ───
 

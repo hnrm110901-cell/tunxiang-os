@@ -3,44 +3,46 @@
 覆盖: 菜品档案CRUD、按状态/季节筛选、菜单模板、门店发布、
       渠道差异价、季节菜单、包厢菜单、宴席套餐、沽清联动
 """
-import sys
 import os
+import sys
 import uuid
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import pytest
-
 from services.dish_service import (
-    create_dish,
-    get_dish,
-    update_dish,
-    delete_dish,
-    list_dishes,
-    list_dishes_by_status,
-    list_dishes_by_season,
     _clear_store,
+    create_dish,
+    delete_dish,
+    get_dish,
+    list_dishes,
+    list_dishes_by_season,
+    list_dishes_by_status,
+    update_dish,
 )
 from services.menu_template import (
-    create_template,
-    get_template,
-    list_templates,
-    publish_to_store,
-    get_store_menu,
-    set_channel_price,
-    set_seasonal_menu,
-    get_seasonal_menu,
-    set_room_menu,
-    get_room_menu,
-    create_banquet_package,
     _clear_all as _clear_templates,
 )
+from services.menu_template import (
+    create_banquet_package,
+    create_template,
+    get_room_menu,
+    get_seasonal_menu,
+    get_store_menu,
+    get_template,
+    publish_to_store,
+    set_channel_price,
+    set_room_menu,
+    set_seasonal_menu,
+)
 from services.stockout_sync import (
-    mark_sold_out,
+    _clear_all as _clear_stockout,
+)
+from services.stockout_sync import (
     auto_check_stockout,
     get_sold_out_list,
+    mark_sold_out,
     restore_dish,
-    _clear_all as _clear_stockout,
 )
 
 TENANT = str(uuid.uuid4())

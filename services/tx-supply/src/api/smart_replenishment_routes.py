@@ -19,10 +19,9 @@
 """
 from __future__ import annotations
 
-from typing import Optional
-
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
+
 from shared.ontology.src.database import get_db as _get_db
 
 router = APIRouter(tags=["smart-replenishment"])

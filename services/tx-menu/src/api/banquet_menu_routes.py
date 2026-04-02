@@ -9,7 +9,6 @@
   - 宴席通知单打印
 """
 import uuid as _uuid
-from datetime import datetime
 from typing import Optional
 
 import structlog

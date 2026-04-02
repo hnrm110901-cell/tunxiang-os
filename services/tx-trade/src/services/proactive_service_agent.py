@@ -389,8 +389,9 @@ async def _check_food_safety_constraint(
     """检查食材食安状态。DB 不可用时使用演示数据。"""
     if db is not None:
         try:
-            from sqlalchemy import text
             from datetime import timedelta
+
+            from sqlalchemy import text
             now_date = datetime.now(timezone.utc).date()
             warn_date = now_date + timedelta(days=3)
 

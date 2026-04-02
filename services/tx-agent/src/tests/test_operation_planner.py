@@ -13,8 +13,8 @@ from __future__ import annotations
 
 import os
 import sys
-from datetime import datetime, timezone, timedelta
-from unittest.mock import AsyncMock, MagicMock, patch
+from datetime import datetime, timedelta, timezone
+from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID, uuid4
 
 import pytest
@@ -22,14 +22,12 @@ import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from services.operation_planner import (
-    ImpactAnalysis,
+    PLAN_MODE_RULES,
     OperationPlan,
     OperationPlanner,
     OperationStatus,
-    PLAN_MODE_RULES,
     RiskLevel,
 )
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 辅助工具

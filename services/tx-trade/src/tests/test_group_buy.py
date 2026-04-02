@@ -8,14 +8,14 @@
 5.  超时过期处理
 6.  campaign 模板执行
 """
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import pytest
-from campaigns.group_buy import execute as group_buy_execute, CONFIG_SCHEMA
-
+from campaigns.group_buy import CONFIG_SCHEMA
+from campaigns.group_buy import execute as group_buy_execute
 
 TENANT = "tenant-test-001"
 

@@ -13,19 +13,15 @@ from datetime import date, datetime, timezone
 from typing import Any, Optional
 
 import structlog
-from sqlalchemy import and_, select, text, update
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from models.brand_strategy import (
+    BrandContentConstraintsCreate,
     BrandProfileCreate,
-    BrandProfileResponse,
     BrandProfileUpdate,
     BrandSeasonalCalendarCreate,
-    BrandSeasonalCalendarResponse,
-    BrandContentConstraintsCreate,
-    BrandContentConstraintsResponse,
     ContentBrief,
 )
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 
 log = structlog.get_logger(__name__)
 

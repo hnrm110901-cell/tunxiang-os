@@ -12,20 +12,20 @@
 """
 from __future__ import annotations
 
+import os
+import sys
 import uuid
-from decimal import Decimal
+from unittest.mock import MagicMock
 
 import pytest
 import pytest_asyncio
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from unittest.mock import MagicMock
 
 from shared.ontology.src.base import TenantBase
-from shared.ontology.src.entities import Ingredient, IngredientTransaction, TransferOrder
+from shared.ontology.src.entities import Ingredient, IngredientTransaction
 from shared.ontology.src.enums import TransactionType, TransferOrderStatus
 
-import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../../../.."))
 
 from services.tx_supply.src.services.transfer_service import (
@@ -34,11 +34,9 @@ from services.tx_supply.src.services.transfer_service import (
     cancel_transfer_order,
     create_transfer_order,
     get_transfer_order,
-    list_transfer_orders,
     receive_transfer_order,
     ship_transfer_order,
 )
-
 
 # ─── Fixtures ─────────────────────────────────────────────
 

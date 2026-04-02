@@ -5,8 +5,8 @@
 - 品牌B: 徐记·南洋（东南亚菜）
 - 品牌C: 徐记·海鲜工坊（快餐/外卖）
 """
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 

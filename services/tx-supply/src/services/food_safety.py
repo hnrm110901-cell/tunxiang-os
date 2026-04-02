@@ -14,12 +14,12 @@ from typing import Optional
 from uuid import UUID
 
 import structlog
-from sqlalchemy import select, update, and_, text
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from shared.events import SupplyEventType, UniversalPublisher
 from shared.ontology.src.entities import Ingredient, IngredientTransaction
 from shared.ontology.src.enums import TransactionType
-from shared.events import UniversalPublisher, SupplyEventType
 
 logger = structlog.get_logger()
 

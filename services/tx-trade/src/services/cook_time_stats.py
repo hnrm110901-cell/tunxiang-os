@@ -11,15 +11,15 @@
 - 所有查询必须显式传入 tenant_id，禁止通过上下文隐式传递
 """
 import uuid
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import structlog
-from sqlalchemy import select, text, and_
+from sqlalchemy import and_, select, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models.cook_time_baseline import CookTimeBaseline, MIN_RELIABLE_SAMPLES
+from ..models.cook_time_baseline import MIN_RELIABLE_SAMPLES, CookTimeBaseline
 from ..models.production_dept import ProductionDept
 
 logger = structlog.get_logger()

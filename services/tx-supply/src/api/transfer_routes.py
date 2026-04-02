@@ -20,6 +20,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from shared.ontology.src.database import get_db as _get_db
 
 from ..services.transfer_service import (
@@ -27,8 +28,6 @@ from ..services.transfer_service import (
     approve_transfer_order,
     cancel_transfer_order,
     create_transfer_order,
-    get_brand_ingredient_overview,
-    get_brand_low_stock_alert,
     get_store_ingredient_stock,
     get_transfer_order,
     list_transfer_orders,

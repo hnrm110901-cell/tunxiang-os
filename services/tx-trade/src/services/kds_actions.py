@@ -20,17 +20,18 @@ import asyncio
 import os
 import uuid
 from collections import OrderedDict
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import httpx
 import structlog
-from sqlalchemy import select, update, and_
+from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.entities import Order, OrderItem
-from ..models.production_dept import ProductionDept
+
 from ..models.kds_task import KDSTask
+from ..models.production_dept import ProductionDept
 
 logger = structlog.get_logger()
 

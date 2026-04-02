@@ -17,11 +17,10 @@ from typing import Any, Optional
 
 import structlog
 from fastapi import APIRouter, Header, HTTPException, Request
-from pydantic import BaseModel, field_validator
-from sqlalchemy import and_, select
-
 from models.approval import ApprovalRequest, ApprovalWorkflow
+from pydantic import BaseModel, field_validator
 from services.approval_service import ApprovalService
+from sqlalchemy import and_, select
 
 log = structlog.get_logger(__name__)
 

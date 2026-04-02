@@ -19,11 +19,7 @@ from typing import Any, Dict, List, Optional
 from uuid import UUID
 
 import structlog
-from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from shared.events import UniversalPublisher, OrgEventType
-
+from services.income_tax import IncomeTaxCalculator
 from services.payroll_engine import (
     compute_absence_deduction,
     compute_base_salary,
@@ -32,13 +28,14 @@ from services.payroll_engine import (
     compute_full_attendance_bonus,
     compute_late_deduction,
     compute_overtime_pay,
-    compute_performance_bonus,
-    compute_seniority_subsidy,
-    derive_hourly_rate,
     count_work_days,
+    derive_hourly_rate,
 )
 from services.social_insurance import SocialInsuranceCalculator
-from services.income_tax import IncomeTaxCalculator
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from shared.events import OrgEventType, UniversalPublisher
 
 log = structlog.get_logger(__name__)
 

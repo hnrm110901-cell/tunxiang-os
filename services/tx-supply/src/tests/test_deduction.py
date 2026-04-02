@@ -6,11 +6,10 @@
 - 损耗归因：多维度分析
 - 使用 Mock 代替真实 DB
 """
-import sys
 import os
+import sys
 import uuid
-from unittest.mock import AsyncMock, MagicMock, patch
-from datetime import datetime, timezone
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -156,7 +155,7 @@ class TestStocktakeService:
 
     @pytest.mark.asyncio
     async def test_create_stocktake(self):
-        from services.stocktake_service import create_stocktake, _stocktakes
+        from services.stocktake_service import _stocktakes, create_stocktake
 
         # 清理内存
         _stocktakes.clear()
@@ -179,7 +178,9 @@ class TestStocktakeService:
     @pytest.mark.asyncio
     async def test_record_count(self):
         from services.stocktake_service import (
-            create_stocktake, record_count, _stocktakes,
+            _stocktakes,
+            create_stocktake,
+            record_count,
         )
 
         _stocktakes.clear()
@@ -204,7 +205,9 @@ class TestStocktakeService:
     @pytest.mark.asyncio
     async def test_record_count_wrong_tenant(self):
         from services.stocktake_service import (
-            create_stocktake, record_count, _stocktakes,
+            _stocktakes,
+            create_stocktake,
+            record_count,
         )
 
         _stocktakes.clear()
@@ -244,9 +247,9 @@ class TestDeductionRoutes:
     """API 路由基础测试"""
 
     def _get_client(self):
-        from fastapi.testclient import TestClient
-        from fastapi import FastAPI
         from api.deduction_routes import router
+        from fastapi import FastAPI
+        from fastapi.testclient import TestClient
 
         app = FastAPI()
         app.include_router(router)

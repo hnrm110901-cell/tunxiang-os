@@ -7,11 +7,11 @@ RFM: R(最近消费天数) F(消费频次) M(消费金额) 各1-5分。
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime, timedelta, timezone
-from typing import Any, Optional
+from datetime import datetime, timedelta, timezone
+from typing import Any
 
 import structlog
-from sqlalchemy import select, func, case, text, and_, extract
+from sqlalchemy import extract, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.entities import Customer, Order, OrderItem

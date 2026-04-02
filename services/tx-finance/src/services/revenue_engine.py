@@ -11,10 +11,10 @@ from datetime import date, datetime, timezone
 from typing import Any
 
 import structlog
-from sqlalchemy import func, select, text, and_
+from sqlalchemy import and_, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from shared.ontology.src.entities import Order, OrderItem, DishCategory, Dish
+from shared.ontology.src.entities import Dish, DishCategory, Order, OrderItem
 
 logger = structlog.get_logger(__name__)
 

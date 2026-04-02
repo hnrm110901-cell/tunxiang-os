@@ -25,11 +25,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
-from ..services.leave_service import (
-    VALID_LEAVE_TYPES,
-    count_leave_work_days,
-    validate_leave_request,
-)
+
 from ..services.leave_repository import (
     BALANCE_CHECKED_TYPES,
     cancel_leave_request,
@@ -41,6 +37,11 @@ from ..services.leave_repository import (
     on_leave_approved,
     on_leave_rejected,
     update_leave_request_approval_instance,
+)
+from ..services.leave_service import (
+    VALID_LEAVE_TYPES,
+    count_leave_work_days,
+    validate_leave_request,
 )
 
 log: structlog.stdlib.BoundLogger = structlog.get_logger(__name__)

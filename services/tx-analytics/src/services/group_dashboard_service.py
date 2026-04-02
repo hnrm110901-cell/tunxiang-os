@@ -14,7 +14,7 @@ AI 调用约束（CLAUDE.md）：
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from typing import Optional, Any
+from typing import Any, Optional
 
 import structlog
 from pydantic import BaseModel, Field

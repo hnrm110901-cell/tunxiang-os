@@ -12,19 +12,20 @@
 """
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from shared.ontology.src.database import get_db
 
 from ..services.auto_deduction import deduct_for_order, rollback_deduction
 from ..services.stocktake_service import (
     create_stocktake,
-    record_count,
     finalize_stocktake,
     get_stocktake_history,
+    record_count,
 )
 from ..services.waste_attribution import analyze_waste, get_top_waste_items
 

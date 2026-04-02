@@ -32,11 +32,10 @@ from enum import Enum
 from typing import Any, Optional
 
 import structlog
-from pydantic import BaseModel, Field
-from sqlalchemy import select, and_, func, update
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from models.three_way_match import ThreeWayMatchRecord
+from pydantic import BaseModel, Field
+from sqlalchemy import and_, select, update
+from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = structlog.get_logger()
 
@@ -874,7 +873,6 @@ class ThreeWayMatchEngine:
         db: AsyncSession,
     ) -> None:
         """将匹配结果写入 purchase_match_records（upsert by purchase_order_id）。"""
-        from sqlalchemy import text
 
         tid = uuid.UUID(str(po.get("tenant_id", "")))
         pid = uuid.UUID(result.purchase_order_id)

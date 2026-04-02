@@ -4,8 +4,7 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
-from shared.events import UniversalPublisher, MenuEventType
-
+from shared.events import MenuEventType, UniversalPublisher
 
 VALID_ADJUSTMENT_TYPES = {"time_period", "holiday", "delivery"}
 

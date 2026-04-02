@@ -13,10 +13,10 @@ from decimal import Decimal
 from typing import Any, Optional
 
 import structlog
+from models.invoice import Invoice
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from models.invoice import Invoice
 from shared.adapters.nuonuo.src.invoice_client import NuonuoInvoiceClient
 
 logger = structlog.get_logger()

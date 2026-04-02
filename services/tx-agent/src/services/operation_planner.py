@@ -25,8 +25,9 @@ from typing import Any, Optional
 from uuid import UUID
 
 import structlog
-from sqlalchemy import String, Boolean, DateTime, Text, func, select
-from sqlalchemy.dialects.postgresql import UUID as PGUUID, JSONB
+from sqlalchemy import DateTime, String, select
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -197,6 +198,7 @@ class OperationPlanner:
 
         # 异步发送通知（企微 + Redis），失败不阻断主业务
         import asyncio
+
         from .plan_notifier import OperationPlanNotifier
         asyncio.create_task(OperationPlanNotifier.notify(plan))
 

@@ -1,9 +1,10 @@
 """平台团购核销 API — 聚合核销(美团/抖音/口碑/广发银行)"""
-from fastapi import APIRouter, Depends, Request, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+
 from ..services import coupon_platform_service as cps
 
 router = APIRouter(

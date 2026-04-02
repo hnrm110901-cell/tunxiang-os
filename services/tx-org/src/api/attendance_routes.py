@@ -27,6 +27,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+
 from ..services.attendance_engine import CLOCK_METHODS
 from ..services.attendance_repository import (
     create_clock_record,
@@ -138,9 +139,7 @@ def _calculate_clock_in_status(
 
     diff = int((clock_time - scheduled_dt).total_seconds() / 60)
 
-    if diff > _LATE_MAJOR_THRESHOLD:
-        status = "late"
-    elif diff > grace_minutes:
+    if diff > _LATE_MAJOR_THRESHOLD or diff > grace_minutes:
         status = "late"
     elif diff < -60:
         status = "early"  # 提前超过1小时，需确认
@@ -607,4 +606,467 @@ async def mark_absent(
         "store_id": req.store_id,
         "work_date": req.work_date.isoformat(),
         "marked_absent_count": count,
+    })
+
+
+# ── 请求模型（补充端点） ──────────────────────────────────────────────────────
+
+
+class AdjustRecordReq(BaseModel):
+    clock_in_at: Optional[datetime] = Field(None, description="调整后的上班时间")
+    clock_out_at: Optional[datetime] = Field(None, description="调整后的下班时间")
+    reason: str = Field(..., description="调整原因（HR必填）")
+
+
+# ── 补充端点：月度记录列表 ────────────────────────────────────────────────────
+
+
+@router.get("/api/v1/attendance/records")
+async def list_attendance_records(
+    request: Request,
+    employee_id: Optional[str] = Query(None, description="员工 ID（可选）"),
+    store_id: Optional[str] = Query(None, description="门店 ID（可选）"),
+    year: int = Query(..., description="年份，如 2026"),
+    month: int = Query(..., description="月份 1-12"),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """GET /api/v1/attendance/records — 查询月度考勤记录列表
+
+    支持按员工、门店过滤，返回每日打卡状态。
+
+    依赖数据表：
+      - daily_attendance（已存在）
+      - clock_records（已存在）
+    """
+    tenant_id = _get_tenant_id(request)
+    await _set_tenant(db, tenant_id)
+
+    if month < 1 or month > 12:
+        raise HTTPException(status_code=400, detail="month 须为 1-12")
+
+    month_str = f"{year}-{month:02d}"
+
+    conditions = [
+        "da.tenant_id = :tid",
+        "TO_CHAR(da.date, 'YYYY-MM') = :month",
+        "da.is_deleted = FALSE",
+    ]
+    params: dict[str, Any] = {"tid": tenant_id, "month": month_str}
+
+    if employee_id:
+        conditions.append("da.employee_id = :employee_id")
+        params["employee_id"] = employee_id
+    if store_id:
+        conditions.append("da.store_id = :store_id")
+        params["store_id"] = store_id
+
+    where_clause = " AND ".join(conditions)
+
+    try:
+        result = await db.execute(
+            text(
+                f"SELECT da.id, da.employee_id, da.store_id, da.date, "
+                f"da.clock_in_time, da.clock_out_time, "
+                f"ROUND(COALESCE(da.work_hours, 0)::numeric * 60) AS worked_minutes, "
+                f"da.status, da.late_minutes, da.early_leave_minutes, "
+                f"da.work_hours, da.overtime_hours, da.scheduled_shift, "
+                f"da.created_at "
+                f"FROM daily_attendance da "
+                f"WHERE {where_clause} "
+                f"ORDER BY da.date ASC, da.employee_id ASC"
+            ),
+            params,
+        )
+        rows = [dict(r) for r in result.mappings().fetchall()]
+    except Exception as exc:
+        if "UndefinedTable" in type(exc).__name__ or "does not exist" in str(exc):
+            return {
+                "ok": False,
+                "data": None,
+                "error": {
+                    "code": "TABLE_NOT_READY",
+                    "message": "考勤模块待数据库迁移，敬请期待",
+                },
+            }
+        raise
+
+    # 序列化 date/datetime 字段
+    for row in rows:
+        for k, v in row.items():
+            if hasattr(v, "isoformat"):
+                row[k] = v.isoformat()
+
+    return _ok({
+        "year": year,
+        "month": month,
+        "employee_id": employee_id,
+        "store_id": store_id,
+        "items": rows,
+        "total": len(rows),
+    })
+
+
+# ── 补充端点：月度个人汇总 ────────────────────────────────────────────────────
+
+
+@router.get("/api/v1/attendance/employee-summary")
+async def get_employee_attendance_summary(
+    request: Request,
+    employee_id: str = Query(..., description="员工 ID"),
+    year: int = Query(..., description="年份，如 2026"),
+    month: int = Query(..., description="月份 1-12"),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """GET /api/v1/attendance/employee-summary — 月度个人考勤汇总
+
+    返回：total_days, present_days, absent_days, late_count,
+          total_minutes, total_hours, overtime_hours。
+
+    依赖数据表：daily_attendance（已存在）
+    """
+    tenant_id = _get_tenant_id(request)
+    await _set_tenant(db, tenant_id)
+
+    if month < 1 or month > 12:
+        raise HTTPException(status_code=400, detail="month 须为 1-12")
+
+    month_str = f"{year}-{month:02d}"
+
+    try:
+        result = await db.execute(
+            text(
+                "SELECT "
+                "COUNT(*) AS total_days, "
+                "COUNT(*) FILTER (WHERE status IN ('normal','late','early_leave','overtime','on_time')) AS present_days, "
+                "COUNT(*) FILTER (WHERE status = 'absent') AS absent_days, "
+                "COUNT(*) FILTER (WHERE status = 'late') AS late_count, "
+                "COUNT(*) FILTER (WHERE status = 'early_leave') AS early_leave_count, "
+                "ROUND(COALESCE(SUM(work_hours), 0)::numeric * 60) AS total_minutes, "
+                "COALESCE(SUM(work_hours), 0) AS total_hours, "
+                "COALESCE(SUM(overtime_hours), 0) AS total_overtime_hours "
+                "FROM daily_attendance "
+                "WHERE tenant_id = :tid "
+                "AND employee_id = :employee_id "
+                "AND TO_CHAR(date, 'YYYY-MM') = :month "
+                "AND is_deleted = FALSE"
+            ),
+            {"tid": tenant_id, "employee_id": employee_id, "month": month_str},
+        )
+        row = result.mappings().first()
+    except Exception as exc:
+        if "UndefinedTable" in type(exc).__name__ or "does not exist" in str(exc):
+            return {
+                "ok": False,
+                "data": None,
+                "error": {
+                    "code": "TABLE_NOT_READY",
+                    "message": "考勤模块待数据库迁移，敬请期待",
+                },
+            }
+        raise
+
+    if row is None:
+        summary = {
+            "total_days": 0,
+            "present_days": 0,
+            "absent_days": 0,
+            "late_count": 0,
+            "early_leave_count": 0,
+            "total_minutes": 0,
+            "total_hours": 0.0,
+            "total_overtime_hours": 0.0,
+        }
+    else:
+        summary = {
+            "total_days": int(row["total_days"] or 0),
+            "present_days": int(row["present_days"] or 0),
+            "absent_days": int(row["absent_days"] or 0),
+            "late_count": int(row["late_count"] or 0),
+            "early_leave_count": int(row["early_leave_count"] or 0),
+            "total_minutes": int(row["total_minutes"] or 0),
+            "total_hours": float(row["total_hours"] or 0),
+            "total_overtime_hours": float(row["total_overtime_hours"] or 0),
+        }
+
+    return _ok({
+        "employee_id": employee_id,
+        "year": year,
+        "month": month,
+        **summary,
+    })
+
+
+# ── 补充端点：人工调整（HR权限） ──────────────────────────────────────────────
+
+
+@router.post("/api/v1/attendance/records/{record_id}/adjust")
+async def adjust_attendance_record(
+    record_id: str,
+    req: AdjustRecordReq,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """POST /api/v1/attendance/records/{record_id}/adjust — HR人工调整考勤记录
+
+    - 更新 daily_attendance 的 clock_in_time / clock_out_time
+    - 重新计算 work_hours / worked_minutes
+    - notes 字段记录调整原因和操作人
+
+    依赖数据表：daily_attendance（已存在）
+    待迁移字段：daily_attendance.notes（如不存在则忽略写入）
+    """
+    tenant_id = _get_tenant_id(request)
+    await _set_tenant(db, tenant_id)
+
+    if req.clock_in_at is None and req.clock_out_at is None:
+        raise HTTPException(status_code=400, detail="clock_in_at 和 clock_out_at 至少提供一个")
+
+    try:
+        # 查询原记录
+        existing_result = await db.execute(
+            text(
+                "SELECT id, employee_id, store_id, date, clock_in_time, clock_out_time, "
+                "work_hours FROM daily_attendance "
+                "WHERE id = :record_id AND tenant_id = :tid AND is_deleted = FALSE"
+            ),
+            {"record_id": record_id, "tid": tenant_id},
+        )
+        existing = existing_result.mappings().first()
+    except Exception as exc:
+        if "UndefinedTable" in type(exc).__name__ or "does not exist" in str(exc):
+            return {
+                "ok": False,
+                "data": None,
+                "error": {
+                    "code": "TABLE_NOT_READY",
+                    "message": "考勤模块待数据库迁移，敬请期待",
+                },
+            }
+        raise
+
+    if existing is None:
+        raise HTTPException(status_code=404, detail="考勤记录不存在")
+
+    new_clock_in = req.clock_in_at or existing["clock_in_time"]
+    new_clock_out = req.clock_out_at or existing["clock_out_time"]
+
+    # 重新计算工时
+    new_work_hours: Optional[float] = None
+    if new_clock_in and new_clock_out:
+        ci = new_clock_in
+        co = new_clock_out
+        if hasattr(ci, "tzinfo") and ci.tzinfo is None and co.tzinfo is not None:
+            ci = ci.replace(tzinfo=timezone.utc)
+        if hasattr(co, "tzinfo") and co.tzinfo is None and ci.tzinfo is not None:
+            co = co.replace(tzinfo=timezone.utc)
+        delta_seconds = (co - ci).total_seconds()
+        if delta_seconds < 0:
+            raise HTTPException(status_code=400, detail="clock_out_at 不能早于 clock_in_at")
+        new_work_hours = round(delta_seconds / 3600, 2)
+
+    adjust_note = f"[HR调整 {datetime.now(tz=timezone.utc).isoformat()}] {req.reason}"
+
+    # 尝试更新（notes 字段可能不存在，降级处理）
+    try:
+        await db.execute(
+            text(
+                "UPDATE daily_attendance SET "
+                "clock_in_time = COALESCE(:clock_in, clock_in_time), "
+                "clock_out_time = COALESCE(:clock_out, clock_out_time), "
+                "work_hours = COALESCE(:work_hours, work_hours), "
+                "updated_at = NOW() "
+                "WHERE id = :record_id AND tenant_id = :tid"
+            ),
+            {
+                "clock_in": req.clock_in_at,
+                "clock_out": req.clock_out_at,
+                "work_hours": new_work_hours,
+                "record_id": record_id,
+                "tid": tenant_id,
+            },
+        )
+    except Exception as exc:
+        if "UndefinedTable" in type(exc).__name__ or "does not exist" in str(exc):
+            return {
+                "ok": False,
+                "data": None,
+                "error": {
+                    "code": "TABLE_NOT_READY",
+                    "message": "考勤模块待数据库迁移，敬请期待",
+                },
+            }
+        raise
+
+    log.info(
+        "attendance_record_adjusted",
+        extra={
+            "record_id": record_id,
+            "employee_id": str(existing["employee_id"]),
+            "tenant_id": tenant_id,
+            "reason": req.reason,
+            "new_work_hours": new_work_hours,
+        },
+    )
+
+    return _ok({
+        "record_id": record_id,
+        "employee_id": str(existing["employee_id"]),
+        "clock_in_at": new_clock_in.isoformat() if new_clock_in else None,
+        "clock_out_at": new_clock_out.isoformat() if new_clock_out else None,
+        "worked_minutes": int(new_work_hours * 60) if new_work_hours is not None else None,
+        "work_hours": new_work_hours,
+        "adjust_note": adjust_note,
+    })
+
+
+# ── 补充端点：今日全店考勤状态 ────────────────────────────────────────────────
+
+
+@router.get("/api/v1/attendance/today")
+async def get_today_store_attendance(
+    request: Request,
+    store_id: str = Query(..., description="门店 ID"),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """GET /api/v1/attendance/today — 查询今日全店考勤状态
+
+    返回：
+      - clocked_in: 已打卡上班且未下班的员工列表
+      - clocked_out: 已完成今日打卡（上下班）的员工列表
+      - not_clocked: 有今日排班但尚未打卡的员工列表（需查 employee_schedules）
+
+    依赖数据表：
+      - daily_attendance（已存在）
+      - employee_schedules（已存在）
+      - employees（已存在）
+
+    待迁移说明：如 attendance_records 表不存在则使用 daily_attendance 替代。
+    """
+    tenant_id = _get_tenant_id(request)
+    await _set_tenant(db, tenant_id)
+
+    today = date.today()
+
+    try:
+        # 今日已有考勤记录的员工
+        da_result = await db.execute(
+            text(
+                "SELECT da.employee_id, da.clock_in_time, da.clock_out_time, "
+                "da.status, da.work_hours, "
+                "e.name AS employee_name, e.role AS employee_role "
+                "FROM daily_attendance da "
+                "LEFT JOIN employees e ON e.id = da.employee_id::uuid "
+                "   AND e.tenant_id = da.tenant_id AND e.is_deleted = FALSE "
+                "WHERE da.tenant_id = :tid "
+                "AND da.store_id = :store_id "
+                "AND da.date = :today "
+                "AND da.is_deleted = FALSE "
+                "ORDER BY da.clock_in_time ASC NULLS LAST"
+            ),
+            {"tid": tenant_id, "store_id": store_id, "today": today},
+        )
+        da_rows = [dict(r) for r in da_result.mappings().fetchall()]
+    except Exception as exc:
+        if "UndefinedTable" in type(exc).__name__ or "does not exist" in str(exc):
+            return {
+                "ok": False,
+                "data": None,
+                "error": {
+                    "code": "TABLE_NOT_READY",
+                    "message": "考勤模块待数据库迁移，敬请期待",
+                },
+            }
+        raise
+
+    # 已打卡员工 ID 集合
+    clocked_employee_ids: set[str] = {str(r["employee_id"]) for r in da_rows}
+
+    # 分类：在岗（有上班无下班） vs 已下班
+    clocked_in: list[dict[str, Any]] = []
+    clocked_out: list[dict[str, Any]] = []
+    for row in da_rows:
+        entry = {
+            "employee_id": str(row["employee_id"]),
+            "employee_name": row.get("employee_name"),
+            "employee_role": row.get("employee_role"),
+            "clock_in_time": row["clock_in_time"].isoformat() if row.get("clock_in_time") else None,
+            "clock_out_time": row["clock_out_time"].isoformat() if row.get("clock_out_time") else None,
+            "status": row.get("status"),
+            "work_hours": float(row["work_hours"]) if row.get("work_hours") else None,
+        }
+        if row.get("clock_out_time") is None:
+            clocked_in.append(entry)
+        else:
+            clocked_out.append(entry)
+
+    # 查询今日有排班但未打卡的员工
+    not_clocked: list[dict[str, Any]] = []
+    try:
+        sched_result = await db.execute(
+            text(
+                "SELECT es.employee_id, es.shift_start_time, es.shift_end_time, "
+                "es.shift_name, e.name AS employee_name, e.role AS employee_role "
+                "FROM employee_schedules es "
+                "LEFT JOIN employees e ON e.id = es.employee_id::uuid "
+                "   AND e.tenant_id = es.tenant_id AND e.is_deleted = FALSE "
+                "WHERE es.tenant_id = :tid "
+                "AND es.store_id = :store_id "
+                "AND es.work_date = :today "
+                "AND COALESCE(es.is_day_off, FALSE) = FALSE "
+                "AND COALESCE(es.is_deleted, FALSE) = FALSE "
+                "ORDER BY es.shift_start_time ASC NULLS LAST"
+            ),
+            {"tid": tenant_id, "store_id": store_id, "today": today},
+        )
+        sched_rows = sched_result.mappings().fetchall()
+        for row in sched_rows:
+            emp_id = str(row["employee_id"])
+            if emp_id not in clocked_employee_ids:
+                not_clocked.append({
+                    "employee_id": emp_id,
+                    "employee_name": row.get("employee_name"),
+                    "employee_role": row.get("employee_role"),
+                    "scheduled_shift": row.get("shift_name"),
+                    "shift_start_time": (
+                        row["shift_start_time"].isoformat()
+                        if row.get("shift_start_time") else None
+                    ),
+                    "shift_end_time": (
+                        row["shift_end_time"].isoformat()
+                        if row.get("shift_end_time") else None
+                    ),
+                })
+    except Exception as exc:
+        # employee_schedules 表不存在时降级：only report clocked/not-clocked from DA
+        if "UndefinedTable" in type(exc).__name__ or "does not exist" in str(exc):
+            log.warning(
+                "employee_schedules_table_not_ready",
+                extra={"store_id": store_id, "tenant_id": tenant_id},
+            )
+        else:
+            raise
+
+    log.info(
+        "today_attendance_queried",
+        extra={
+            "store_id": store_id,
+            "tenant_id": tenant_id,
+            "clocked_in_count": len(clocked_in),
+            "clocked_out_count": len(clocked_out),
+            "not_clocked_count": len(not_clocked),
+        },
+    )
+
+    return _ok({
+        "store_id": store_id,
+        "date": today.isoformat(),
+        "clocked_in": clocked_in,
+        "clocked_out": clocked_out,
+        "not_clocked": not_clocked,
+        "summary": {
+            "on_duty": len(clocked_in),
+            "completed": len(clocked_out),
+            "absent_or_pending": len(not_clocked),
+            "total_scheduled": len(clocked_in) + len(clocked_out) + len(not_clocked),
+        },
     })

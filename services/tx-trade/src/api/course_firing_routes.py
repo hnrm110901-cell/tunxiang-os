@@ -1,14 +1,14 @@
 """Course Firing API 路由 — 打菜时机控制"""
-from fastapi import APIRouter, Depends, HTTPException, Header
+from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import get_db
 from ..services.course_firing_service import (
     assign_course,
+    check_fire_suggestion,
     fire_course,
     get_courses_status,
-    check_fire_suggestion,
 )
 
 router = APIRouter(prefix="/api/v1/orders", tags=["course-firing"])

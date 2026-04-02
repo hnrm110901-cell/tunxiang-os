@@ -19,12 +19,12 @@ from datetime import datetime, timezone
 from typing import Optional
 
 import structlog
-from sqlalchemy import select, update, delete
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models.production_step import ProductionStep
-from ..models.kds_task_step import KDSTaskStep
 from ..models.kds_task import KDSTask
+from ..models.kds_task_step import KDSTaskStep
+from ..models.production_step import ProductionStep
 
 logger = structlog.get_logger()
 

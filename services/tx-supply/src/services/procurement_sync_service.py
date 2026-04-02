@@ -79,8 +79,8 @@ async def sync_purchase_orders(
         同步统计 {"total_fetched", "upserted", "failed", "skipped"}
     """
     # 延迟导入映射层（避免循环依赖）
-    import sys
     import os as _os
+    import sys
     _service_dir = _os.path.dirname(__file__)
     _repo_root = _os.path.abspath(_os.path.join(_service_dir, "../../../../.."))
     _mapper_dir = _os.path.join(_repo_root, "shared", "adapters", "aoqiwei", "src")
@@ -225,8 +225,8 @@ async def sync_suppliers(
     Returns:
         同步统计 {"total_fetched", "upserted", "failed"}
     """
-    import sys
     import os as _os
+    import sys
     _service_dir = _os.path.dirname(__file__)
     _repo_root = _os.path.abspath(_os.path.join(_service_dir, "../../../../.."))
     _mapper_dir = _os.path.join(_repo_root, "shared", "adapters", "aoqiwei", "src")
@@ -362,8 +362,8 @@ async def sync_receiving_records(
     Returns:
         同步统计 {"total_fetched", "upserted", "failed"}
     """
-    import sys
     import os as _os
+    import sys
     _service_dir = _os.path.dirname(__file__)
     _repo_root = _os.path.abspath(_os.path.join(_service_dir, "../../../../.."))
     _mapper_dir = _os.path.join(_repo_root, "shared", "adapters", "aoqiwei", "src")

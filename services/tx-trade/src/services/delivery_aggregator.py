@@ -11,9 +11,7 @@
 """
 from __future__ import annotations
 
-import uuid
 from datetime import date, datetime, timezone
-from typing import Optional
 from uuid import UUID
 
 import structlog

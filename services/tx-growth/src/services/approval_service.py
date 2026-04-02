@@ -16,10 +16,9 @@ from typing import Optional
 
 import httpx
 import structlog
+from models.approval import ApprovalRequest, ApprovalWorkflow
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from models.approval import ApprovalRequest, ApprovalWorkflow
 
 log = structlog.get_logger(__name__)
 

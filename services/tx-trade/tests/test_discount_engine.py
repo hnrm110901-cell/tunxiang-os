@@ -16,8 +16,8 @@ DB 层通过 app.dependency_overrides[get_db] 注入 AsyncMock。
 折扣计算的核心逻辑全在内存中运行（_resolve_conflicts / _build_steps），
 DB 只用于读 discount_rules 和写 checkout_discount_log。
 """
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 sys.path.insert(
@@ -31,16 +31,18 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 import pytest_asyncio
 from fastapi import FastAPI
-from httpx import AsyncClient, ASGITransport
-
+from httpx import ASGITransport, AsyncClient
 from src.api.discount_engine_routes import (
-    router as discount_engine_router,
+    DiscountInput,
     _apply_single_discount,
+    _build_steps,
     _calc_combination,
     _resolve_conflicts,
-    _build_steps,
-    DiscountInput,
 )
+from src.api.discount_engine_routes import (
+    router as discount_engine_router,
+)
+
 from shared.ontology.src.database import get_db
 
 # ─── 测试 app ─────────────────────────────────────────────────────────────────

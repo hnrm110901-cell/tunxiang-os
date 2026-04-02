@@ -3,16 +3,17 @@
 对标 Lightspeed / Odoo 库存-菜单联动：
   当食材库存低于阈值时，自动下架依赖此食材的菜品。
 """
-from fastapi import APIRouter, Depends, HTTPException, Header, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+
 from ..services.inventory_menu_sync_service import (
     check_and_auto_soldout,
-    restore_dishes_by_ingredient,
-    get_soldout_watch,
     get_inventory_dashboard,
+    get_soldout_watch,
+    restore_dishes_by_ingredient,
 )
 
 router = APIRouter(prefix="/api/v1/inventory", tags=["inventory-menu"])

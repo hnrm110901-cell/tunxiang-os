@@ -3,23 +3,23 @@
 完整实现10个API端点的后端逻辑，覆盖开台→点单→结算全流程。
 所有金额单位：分（fen）。三条硬约束在此层校验。
 """
-import uuid
 import math
-from datetime import datetime, timezone, date
+import uuid
+from datetime import datetime, timezone
 from typing import Optional
 
 import structlog
-from sqlalchemy import select, update, func, and_, cast, Date
+from sqlalchemy import Date, and_, cast, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from shared.ontology.src.entities import Order, OrderItem, Store, Dish, Customer
+from shared.ontology.src.entities import Customer, Dish, Order, OrderItem, Store
 from shared.ontology.src.enums import OrderStatus
+
+from ..models.enums import TableStatus
 from ..models.tables import Table
-from ..models.enums import TableStatus, OrderType
 from .state_machine import (
-    can_table_transition,
     TABLE_STATES,
-    sync_table_on_order_change,
+    can_table_transition,
 )
 
 logger = structlog.get_logger()
@@ -490,9 +490,7 @@ class CashierEngine:
         if discount_type == "percent_off":
             # discount_value = 0.8 means 打八折, 折扣额 = total * (1 - 0.8)
             discount_fen = round(total * (1.0 - discount_value))
-        elif discount_type == "amount_off":
-            discount_fen = int(discount_value)
-        elif discount_type == "free_item":
+        elif discount_type == "amount_off" or discount_type == "free_item":
             discount_fen = int(discount_value)
         elif discount_type == "member_price":
             # discount_value 是会员价总额（分），折扣 = 原价 - 会员价
@@ -665,8 +663,8 @@ class CashierEngine:
                 change_fen = total_paid - order.final_amount_fen
 
         # 创建支付记录
-        from ..models.payment import Payment
         from ..models.enums import PaymentStatus
+        from ..models.payment import Payment
 
         payment_records = []
         for p in payments:

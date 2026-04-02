@@ -10,7 +10,7 @@
 7. GET    /api/v1/finance/budgets/summary      门店期间预算汇总
 8. GET    /api/v1/finance/budgets/categories   查看支持的科目列表
 """
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Path, Query
 from pydantic import BaseModel, Field, field_validator

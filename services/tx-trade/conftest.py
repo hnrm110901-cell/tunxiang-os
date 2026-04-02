@@ -1,6 +1,6 @@
 """conftest.py — 将项目根目录和 src 目录加入 Python path"""
-import sys
 import os
+import sys
 
 # 项目根目录（shared/ 所在位置）
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))

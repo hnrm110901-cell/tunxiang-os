@@ -11,7 +11,7 @@ from typing import Any
 
 import structlog
 
-from ..base import SkillAgent, AgentResult
+from ..base import AgentResult, SkillAgent
 
 logger = structlog.get_logger()
 
@@ -160,7 +160,7 @@ class SmartMenuAgent(SkillAgent):
             data={"ready": ready, "completed": completed, "missing": missing,
                   "completion_pct": round(len(completed) / len(LAUNCH_CHECKLIST) * 100, 1),
                   "checklist": LAUNCH_CHECKLIST},
-            reasoning=f"就绪度 {len(completed)}/{len(LAUNCH_CHECKLIST)}，{'可上市' if ready else f'缺少: {', '.join(missing[:3])}'}",
+            reasoning=f"就绪度 {len(completed)}/{len(LAUNCH_CHECKLIST)}，{'可上市' if ready else '缺少: ' + ', '.join(missing[:3])}",
             confidence=0.95,
         )
 

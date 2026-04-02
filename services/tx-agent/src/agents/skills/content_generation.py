@@ -12,13 +12,12 @@
     4. 融入当前节气/节日营销上下文
 """
 import os
-import uuid
 from typing import Any, Optional
 
 import httpx
 import structlog
 
-from ..base import SkillAgent, AgentResult
+from ..base import AgentResult, SkillAgent
 
 log = structlog.get_logger(__name__)
 
@@ -451,7 +450,7 @@ class ContentGenerationAgent(SkillAgent):
                 reply = f"感谢您的好评！能让您满意是我们最大的动力，欢迎常来{brand_name}品尝更多美味！"
         elif rating >= 3:
             tone = "中性"
-            reply = f"感谢您的反馈！您提出的建议我们已认真记录，会持续改进。期待下次给您更好的体验。"
+            reply = "感谢您的反馈！您提出的建议我们已认真记录，会持续改进。期待下次给您更好的体验。"
         else:
             tone = "致歉"
             issues = []

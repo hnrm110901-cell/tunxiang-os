@@ -4,6 +4,280 @@
 
 ---
 
+## 2026-04-02（Round 12 进行中）
+
+---
+
+## 2026-04-02（Round 11 全部完成 — 9大Agent全部实现 + 质检前端 + 催菜加菜）
+
+### 今日完成（超级智能体团队 Round 11 交付）
+
+**Team Q — 智能排菜+私域运营Agent（P0+P2，9大Agent最后2个）**
+- [tx-brain/agents] 新建 menu_optimizer.py（P0，claude-sonnet-4-6）
+  - Python预计算：识别临期食材(expiry_days≤3)→强制进dishes_to_deplete
+  - 按日均销量Top20传Claude分析，生成featured_dishes+推荐套餐
+  - constraints_check：margin_ok≥40%/food_safety_ok(临期已纳入消耗)/experience_ok(多样性)
+- [tx-brain/agents] 新建 crm_operator.py（P2，claude-haiku-4-5-20251001）
+  - 5种活动类型侧重点不同的System Prompt
+  - 生成4套文案（微信群≤300字/朋友圈≤140字/推送标题≤15字/推送内容≤30字）
+  - Fallback：模板文案插入brand_name和key_dishes[0]
+- [tx-brain/api] brain_routes.py追加2个端点：POST /menu/optimize + POST /crm/campaign
+- **🎉 9大核心Agent全部实现！**（折扣守护/会员洞察/出餐预测/库存预警/财务稽核/巡店质检/智能客服/智能排菜/私域运营）
+
+**Team R — web-admin 巡店质检管理页面**
+- [web-admin/pages/ops] 新建 PatrolInspectionPage.tsx
+  - EditableProTable可行内编辑检查清单（预设12项：食安×3/卫生×3/服务×2/设备×2/消防×2）
+  - AI分析结果：风险等级Badge/auto_alert_required横幅/违规项/三条硬约束卡/导出.txt
+  - 历史记录localStorage（最多50条）+ Drawer详情
+- [web-admin/App.tsx] 追加路由 /ops/patrol-inspection
+- [web-admin/SidebarHQ.tsx] ops模块追加"巡检质控"分组
+
+**Team S — web-crew 催菜/加菜流程**
+- [web-crew/pages] 新建 UrgePage.tsx
+  - 桌台选择器（仅occupied状态）+ 制作中菜品列表（等待时间橙色/红色预警）
+  - 催菜理由快选Sheet（超时/顾客催促/特殊需求/其他）
+  - 催菜成功绿色Toast，失败降级，30秒轮询自动刷新
+- [web-crew/components] 新建 AddDishSheet.tsx
+  - 底部抽屉（80vh，slideUp 300ms）+ 搜索栏 + 分类Tab横向滚动
+  - 菜品2列网格，沽清遮罩，加减控件，底部确认区
+- [web-crew/App.tsx] 追加 /urge 路由（hiddenPaths全屏）
+
+### 里程碑
+- **🎉 9/9 核心Agent全部实现**（tx-brain已成完整AI决策中枢）
+- **9大Agent总计：** 折扣守护+会员洞察+出餐预测+库存预警+财务稽核+巡店质检+智能客服+智能排菜+私域运营
+
+### 数据变化
+- 新增AI Agent：2个（智能排菜/私域运营）
+- 新增前端页面：2个（巡店质检+催菜页）
+- 新增组件：1个（AddDishSheet加菜抽屉）
+
+---
+
+## 2026-04-02（Round 10 全部完成 — 智能客服Agent + 财务稽核前端 + miniapp购物车）
+
+### 今日完成（超级智能体团队 Round 10 交付）
+
+**Team L — 智能客服Agent（P2，claude-sonnet-4-6）**
+- [tx-brain/agents] 新建 customer_service.py
+  - Python预处理：VIP+投诉→强制升级，退款>5000分→升级，食品安全关键词→立即行动
+  - 历史对话注入（最近10条context_history）
+  - Fallback：JSON解析失败返回人工升级响应
+  - structlog记录intent/sentiment/escalate/food_safety_detected
+- [tx-brain/api] brain_routes.py追加 POST /api/v1/brain/customer-service/handle
+- AI Agent总数：7/9（折扣守护/会员洞察/出餐预测/库存预警/财务稽核/巡店质检/智能客服）
+
+**Team M — web-admin AI财务稽核报告页面**
+- [web-admin/pages/finance] 新建 FinanceAuditPage.tsx
+  - 搜索触发区（门店+日期+一键稽核）
+  - 风险等级卡（4色：critical红/high橙/medium黄/low绿）
+  - 三条硬约束横排3卡（margin_ok/void_rate_ok/cash_diff_ok）
+  - 异常项Table（severity Tag三色）+ 审计建议List
+  - 历史记录（localStorage，最多20条，Modal查看JSON详情）
+- [web-admin/App.tsx] 追加路由 /finance/audit
+- [web-admin/SidebarHQ.tsx] finance模块追加"AI稽核"分组
+
+**Team N — miniapp购物车+订单状态页完善**
+- [miniapp/pages/cart] 购物车结算页全面重写
+  - 单品独立备注框（实时回写globalData+Storage）
+  - 底部结算弹层：优惠券/储值卡余额/三种支付方式（微信/储值卡/企业挂账）
+  - 数量增减同步globalData.cart，下单成功清空购物车跳转order-track
+- [miniapp/pages/order-track] 订单状态页全面重写
+  - 5秒轮询，就绪时wx.showToast+绿色横幅
+  - 叫服务员（60秒冷却防重复呼叫）
+  - 定时器用实例变量（this._pollTimer避免setData序列化失败）
+- [miniapp/utils/api.js] 新增 callServiceBell()函数
+
+### 数据变化
+- 新增AI Agent：1个（智能客服），AI Agent总数7/9
+- 新增前端页面：1个（AI财务稽核）
+- miniapp完善：2个页面重写（cart+order-track）
+- 9大Agent进度：7/9已实现（剩余：智能排菜/私域运营）
+
+---
+
+## 2026-04-02（Round 9 全部完成 — AI Agent扩展 + 薪资管理前端）
+
+### 今日完成（超级智能体团队 Round 9 交付）
+
+**Team G — 财务稽核Agent（P1）**
+- [tx-brain/agents] 新建 finance_auditor.py（~270行）
+  - claude-haiku-4-5-20251001，Python预计算四项指标（毛利率/作废率/现金差异/折扣率）
+  - constraints_check在路由层由Python结果强制覆盖，不依赖Claude输出，确保准确性
+  - fallback纯Python规则引擎：critical/high/medium/low四级分类
+  - structlog记录完整AgentDecisionLog，constraints_check必填
+- [tx-brain/api] brain_routes.py追加 POST /api/v1/brain/finance/audit
+- health端点agents字典追加 finance_auditor: ready
+
+**Team H — web-admin 薪资管理双页面**
+- [web-admin/pages/org] 新建 PayrollConfigPage.tsx
+  - ProTable + ModalForm（salary_type Radio联动：月薪/时薪/计件不同字段）
+  - Popconfirm软删除，三维筛选（岗位/门店/状态）
+- [web-admin/pages/org] 新建 PayrollRecordsPage.tsx
+  - ProTable薪资单列表，4色状态Tag（draft灰/approved蓝/paid绿/voided红）
+  - 一键计算（ModalForm）+ 批量审批（Promise.all）+ 详情抽屉（Descriptions+line_items表格）
+- [web-admin/App.tsx] 追加2条路由（/org/payroll-configs / /org/payroll-records）
+- [web-admin/shell/SidebarHQ.tsx] org模块追加"人事管理"分组（薪资方案配置/月度薪资管理）
+
+**Team K — 巡店质检Agent（P2）**
+- [tx-brain/agents] 新建 patrol_inspector.py（387行）
+  - claude-haiku-4-5-20251001，两阶段设计（Python预计算+Claude语义分析）
+  - 食安/消防任何fail → auto_alert_required=True（立即通知区域经理）
+  - score<60 → critical，下降>10分 → declining+预警
+  - fallback：食安/消防critical+1天期限，score≤3 major+3天，其余minor+7天
+- [tx-brain/api] brain_routes.py追加 POST /api/v1/brain/patrol/analyze
+- health端点agents字典追加 patrol_inspector: ready
+
+### 数据变化
+- 新增AI Agent：2个（财务稽核+巡店质检），AI Agent总数：6个
+- 新增前端页面：2个（薪资方案配置+月度薪资管理）
+- 新增API端点：2个（finance/audit + patrol/analyze）
+- tx-brain已实现Agent：折扣守护/会员洞察/出餐预测/库存预警/财务稽核/巡店质检（6/9）
+
+---
+
+## 2026-04-02（Round 8 全部完成 — 薪资引擎 + 部署完善 + POS折扣AI集成）
+
+### 今日完成（超级智能体团队 Round 8 交付）
+
+**Team P — tx-org 薪资计算引擎 API**
+- [tx-org/api] payroll_routes.py 完整重写（原mock实现→真实DB实现）
+  - 11个端点：配置CRUD + 薪资单状态机（draft/approve/void）+ 核心计算引擎
+  - POST /calculate：三种薪资类型（月薪/时薪/计件）自动计算，自动生成line_items明细行
+  - 个税计算：起征5000元，简化3%税率
+  - 门店级配置优先于品牌级（store_id IS NOT NULL优先匹配）
+  - 每次DB操作前set_config激活RLS，确保租户隔离
+  - main.py已注册（无需修改），payroll_router已在line 25/47
+
+**Team D — Dockerfile补全 + 部署完善**
+- [services/tx-brain] 新建 Dockerfile：多阶段构建，非root用户txuser，暴露8010
+- [edge/sync-engine] 新建 Dockerfile：多阶段构建，非root用户txuser，安装asyncpg/structlog等
+- [根目录] 新建 .dockerignore：排除node_modules/apps/docs等大目录
+- docker-compose.yml build context验证：路径完全一致，无需修改
+
+**Team F — web-pos 折扣守护AI集成**
+- [web-pos/components] 新建 DiscountPreviewSheet.tsx：AI折扣分析底部抽屉
+  - 三态：加载中（旋转spinner）/ 成功（决策大图标+置信度条+三条硬约束）/ 错误（降级可用）
+  - reject时确认按钮置灰；error时降级为"忽略风险确认"
+  - AbortController 8秒超时控制，触控按压反馈
+- [web-pos/pages] SettlePage.tsx 集成折扣入口：
+  - 5个折扣档位按钮（九折/八折/七折/减50元/免单）
+  - 折扣仅在AI批准后才调用 orderStore.applyDiscount()，拒绝则不生效
+  - 折扣守护Agent与收银流程完整闭环
+
+### 数据变化
+- 薪资引擎API：11个端点（含状态机+计算引擎）
+- Dockerfile：2个新增（tx-brain/sync-engine）
+- 前端组件：1个新增（DiscountPreviewSheet，折扣AI守护集成）
+- 折扣守护Agent完成端到端闭环：tx-brain Claude分析→POS前端展示→收银确认
+
+---
+
+## 2026-04-02（Round 7 全部完成 — 部署基础设施 + AI扩展 + 店长看板）
+
+### 今日完成（超级智能体团队 Round 7 交付）
+
+**Team X — tx-brain AI Agent扩展**
+- [tx-brain/agents] 新建 dispatch_predictor.py：出餐调度预测Agent
+  - 双路径设计：快速路径（Python静态估算）+ 慢速路径（Claude API）
+  - 触发慢速路径条件：pending_tasks>20 / avg_wait>25min / table_size>10 / 活鲜食材
+  - 响应包含 source: "quick"|"claude" 字段
+- [tx-brain/agents] 新建 inventory_sentinel.py：库存预警Agent
+  - 使用 claude-haiku-4-5-20251001（高频调用成本优化）
+  - 食安硬约束：效期≤3天强制 risk_level=high + expiry_warning=True
+  - Claude解析失败自动fallback为Python计算结果
+- [tx-brain/api] brain_routes.py：追加2个端点
+  - POST /api/v1/brain/dispatch/predict
+  - POST /api/v1/brain/inventory/analyze
+
+**Team Z — 部署基础设施**
+- [docker-compose.yml] 新增7个服务：tx-analytics(:8009) / tx-brain(:8010)+ANTHROPIC_API_KEY / tx-intel(:8011) / tx-org(:8012) / tx-supply(:8006) / tx-finance(:8007) / sync-engine(profiles:edge)
+- [infra/nginx/nginx.conf] 新增6个upstream + 6个location块 + /ws/ WebSocket路由，tx-brain超时120s（流式响应）
+- [.env.example] 完整环境变量模板：DATABASE_URL / ANTHROPIC_API_KEY / CLOUD_PG_DSN / 支付/短信/各微服务URL
+- [tx-brain/requirements.txt] FastAPI栈 + anthropic>=0.25.0
+
+**Team Y — web-crew 店长实时经营看板（1014行）**
+- [web-crew/pages] 新建 ManagerDashboardPage.tsx（1014行）
+  - KPI卡片横向滚动行（营收/翻台率/订单数/毛利率/客单价，毛利率<35%红色告警）
+  - 桌台实时状态网格图（空桌灰/用餐中橙/待清洁黄/预订蓝）
+  - E1-E8清单进度条（点击跳转/daily-settlement）
+  - AI库存预警（调用inventory/analyze，效期<3天红色）
+  - 员工实时状态（在岗/休息/各岗位分布）
+  - 15秒自动刷新（Promise.allSettled并行请求，useEffect cleanup防泄漏）
+- [web-crew/App.tsx] 注册 /manager-dashboard 路由
+
+### 数据变化
+- 新增AI Agent：2个（出餐预测/库存预警）
+- 部署配置：docker-compose新增7服务 + nginx新增6路由
+- 新增前端页面：1个（店长看板1014行）
+- AI Agent总数：4个真实接入（折扣守护+会员洞察+出餐预测+库存预警）
+
+---
+
+## 2026-04-02（Round 6 三团队全部完成 — 质量提升与AI接入）
+
+### 今日完成（超级智能体团队 Round 6 交付）
+
+**Team U — tx-brain Claude AI决策中枢（真实接入）**
+- [tx-brain/agents] 新建 discount_guardian.py：折扣守护Agent
+  - 使用 claude-sonnet-4-6，system prompt强制输出三条硬约束校验
+  - 返回 allow/warn/reject + 置信度 + constraints_check（margin_ok/authority_ok/pattern_ok）
+  - JSON解析失败兜底（warn+0.5置信度触发人工审核）
+  - structlog记录每次AI决策留痕（符合AgentDecisionLog规范）
+- [tx-brain/agents] 新建 member_insight.py：会员洞察Agent
+  - 使用 claude-haiku-4-5-20251001（节省成本）
+  - 输出会员分层（vip/regular/at_risk/new）+ 推荐菜品 + 行动建议
+  - 自动统计常点菜品Top5，计算月均消费
+- [tx-brain/api] 新建 brain_routes.py：3个端点（折扣分析/会员洞察/Claude连通性健康检查）
+- [tx-brain/main.py] 注册 brain_router + 更新/info capabilities
+
+**Team V — Bug修复 + Gateway补全 + miniapp会员中心**
+- [tx-menu/api] live_seafood_routes.py：create_weigh_record修复
+  - dish_id存在性校验：真实DB查询dishes表（is_deleted=false），不存在返回HTTP 404
+  - dish_name从数据库取真实值，彻底消除'未知菜品'fallback
+  - zone_code校验也升级为真实DB查询fish_tank_zones表
+- [gateway/src] proxy.py：DOMAIN_ROUTES端口修正（supply:8004→8006/finance:8005→8007/org:8006→8012）+ 新增brain/ops/print/kds别名路由
+- [miniapp/member] member.wxml/.js/.wxss：补全会员中心
+  - 等级进度条（渐变色#FF6B35→#FF9A5C，显示当前积分/下一级门槛）
+  - 储值卡余额块（has_card=true时展示，静默失败不影响主页）
+  - 会员专属优惠入口（优惠券数量/积分兑换/升级权益三快捷入口）
+
+**Team W — 项目全景扫描 + README更新**
+- [docs] 新建 api-route-catalog.md：完整路由清单
+  - tx-trade:77模块 / tx-menu:20 / tx-ops:15 / tx-finance:17 / tx-org:35 / tx-supply:24
+  - web-admin:76路由 / web-crew:48 / web-kds:23 / web-pos:22
+- [docs] 新建 migration-chain-report.md：迁移链分析
+  - v022a/b、v100/v100b等为并行分支（Alembic支持多头），非真正冲突
+  - v056/v056b历史性双链（RLS修复链+多渠道发布链），合并点存在
+  - 跳号v041/v044为历史删除的迁移
+- [README.md] 全面更新：十大差距全部→✅，迁移版本113→130，API模块~211→~357
+
+### 数据变化
+- 新增AI Agent：2个（折扣守护/会员洞察，真实Claude API）
+- Bug修复：1个关键（create_weigh_record dish_id校验）
+- Gateway路由修正：7处端口错误修正 + 4条别名路由新增
+- 文档：3个新文档（api-route-catalog/migration-chain-report/README更新）
+
+### 当前系统规模
+- 微服务：16个（:8000-:8012）
+- 前端应用：10个
+- 迁移版本：~130个（v001-v125，含并行分支）
+- API模块：~357个
+- 前端路由：~169条（web-admin×76+crew×48+kds×23+pos×22）
+- AI Agent：2个真实接入（折扣守护+会员洞察）
+
+### 遗留问题
+- Gateway proxy.py修正后需重启服务验证路由
+- 迁移链v056双头历史问题（不影响功能，若需清理则alembic merge）
+- anthropic SDK需在tx-brain的requirements.txt中确认已包含
+
+### 下轮计划（Round 7 — 出餐调度Agent + 店长看板 + Docker部署）
+- tx-brain：出餐调度预测Agent（Core ML + Claude双层推理）
+- web-crew：店长实时经营看板（今日数据/预警/员工状态）
+- 部署配置：docker-compose更新（含新增服务）+ nginx配置补全
+- 库存预警Agent（tx-brain：基于BOM用量预测缺货风险）
+
+---
+
 ## 2026-04-02（Round 5 三团队全部完成 — 🎉 十大差距全部清零）
 
 ### 今日完成（超级智能体团队 Round 5 交付）

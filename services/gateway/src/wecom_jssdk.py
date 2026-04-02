@@ -14,7 +14,6 @@ import hashlib
 import os
 import secrets
 import time
-from typing import Optional
 
 import httpx
 import structlog

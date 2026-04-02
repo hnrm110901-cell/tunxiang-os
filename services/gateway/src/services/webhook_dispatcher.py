@@ -13,7 +13,6 @@ import asyncio
 import hashlib
 import hmac
 import json
-import os
 from datetime import datetime, timezone
 from uuid import UUID
 

@@ -10,17 +10,18 @@
 """
 from __future__ import annotations
 
+import asyncio
 import uuid
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 from typing import Any
 
-import asyncio
-
 import structlog
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from shared.events import UniversalPublisher, FinanceEventType
+from shared.events import FinanceEventType, UniversalPublisher
+
 from .cost_engine_repository import CostEngineRepository
 
 logger = structlog.get_logger(__name__)

@@ -6,14 +6,13 @@
 迁移自 tunxiang V2.x people_agent/agent.py + reservation/agent.py + banquet/agent.py
 """
 import os
-import statistics
 from datetime import datetime, timezone
 from typing import Any
 
 import httpx
 import structlog
 
-from ..base import SkillAgent, AgentResult
+from ..base import AgentResult, SkillAgent
 
 logger = structlog.get_logger(__name__)
 

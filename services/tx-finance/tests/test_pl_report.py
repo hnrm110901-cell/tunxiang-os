@@ -8,13 +8,10 @@
 """
 import uuid
 from datetime import date
-from decimal import Decimal
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
-
 from services.tx_finance.src.services.pl_report import PLReport, PLReportService
-
 
 # ─── Fixtures ────────────────────────────────────────────────────────────────
 

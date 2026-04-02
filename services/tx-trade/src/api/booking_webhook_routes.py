@@ -30,6 +30,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db_with_tenant
+
 from ..services.reservation_service import ReservationService
 
 logger = logging.getLogger(__name__)
@@ -554,21 +555,21 @@ async def mock_new_reservation(
     直接写入数据库并返回创建结果。
     """
     tenant_id = _get_tenant_id(request)
-    channel = random.choice(_MOCK_CHANNELS)
+    channel = random.choice(_MOCK_CHANNELS)  # noqa: S311 — mock data generator
 
     # 随机到店时间：今天或明天的 11:00-21:00
-    days_offset = random.choice([0, 1])
+    days_offset = random.choice([0, 1])  # noqa: S311 — mock data generator
     base_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
     arrive_date = base_date + timedelta(days=days_offset)
-    hour = random.choice([11, 12, 13, 17, 18, 19, 20])
-    minute = random.choice([0, 15, 30, 45])
+    hour = random.choice([11, 12, 13, 17, 18, 19, 20])  # noqa: S311 — mock data generator
+    minute = random.choice([0, 15, 30, 45])  # noqa: S311 — mock data generator
     arrive_dt = arrive_date.replace(hour=hour, minute=minute)
 
-    name = random.choice(_MOCK_NAMES)
-    phone = random.choice(_MOCK_PHONES)
-    party_size = random.randint(2, 8)
-    table_type = random.choice(_MOCK_TABLE_TYPES)
-    special_req = random.choice(_MOCK_SPECIAL_REQUESTS)
+    name = random.choice(_MOCK_NAMES)  # noqa: S311 — mock data generator
+    phone = random.choice(_MOCK_PHONES)  # noqa: S311 — mock data generator
+    party_size = random.randint(2, 8)  # noqa: S311 — mock data generator
+    table_type = random.choice(_MOCK_TABLE_TYPES)  # noqa: S311 — mock data generator
+    special_req = random.choice(_MOCK_SPECIAL_REQUESTS)  # noqa: S311 — mock data generator
     mock_order_id = f"mock_{channel}_{uuid.uuid4().hex[:12]}"
 
     normalized: dict

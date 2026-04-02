@@ -16,11 +16,11 @@ from typing import Literal
 
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from services.revenue_aggregation_service import RevenueAggregationService
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db_with_tenant
-from services.revenue_aggregation_service import RevenueAggregationService
 
 logger = structlog.get_logger(__name__)
 router = APIRouter(prefix="/api/v1/finance/revenue", tags=["revenue-aggregation"])

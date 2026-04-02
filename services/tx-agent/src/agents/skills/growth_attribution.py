@@ -13,7 +13,7 @@ from typing import Any
 
 import structlog
 
-from ..base import SkillAgent, AgentResult
+from ..base import AgentResult, SkillAgent
 
 try:
     from services.tunxiang_api.src.shared.core.model_router import model_router

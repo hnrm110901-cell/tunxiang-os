@@ -9,23 +9,20 @@
 """
 from __future__ import annotations
 
-import calendar
 import uuid
 from datetime import date
 from unittest.mock import AsyncMock, patch
 
 import pytest
-
 from services.tx_finance.src.services.pl_service import (
+    CostBreakdown,
+    OperatingExpenses,
     PLService,
     PLStatement,
     RevenueBreakdown,
-    CostBreakdown,
-    OperatingExpenses,
-    _prorate,
     _days_in_period,
+    _prorate,
 )
-
 
 # ─── 测试夹具 ────────────────────────────────────────────────────────────────
 

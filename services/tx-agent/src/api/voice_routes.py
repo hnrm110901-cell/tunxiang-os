@@ -7,7 +7,6 @@
   POST /api/v1/voice/confirm-order  — 确认下单
   GET  /api/v1/voice/stats/{store_id} — 语音点餐统计
 """
-from typing import Optional
 
 from fastapi import APIRouter, Header
 from pydantic import BaseModel, Field
@@ -46,6 +45,7 @@ async def voice_transcribe(
 ):
     """语音转文字"""
     import base64
+
     from ..agents.skills.voice_order import VoiceOrderAgent
 
     try:

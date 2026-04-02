@@ -3,10 +3,9 @@
 异常类型：discount_anomaly / cooking_timeout / stockout / margin_drop / food_safety
 严重级别：critical / warning / info
 """
-import structlog
 from datetime import datetime
-from typing import Optional
 
+import structlog
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 

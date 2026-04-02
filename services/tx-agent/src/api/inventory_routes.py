@@ -5,10 +5,10 @@ GET  /api/v1/inventory/dashboard      — 库存总览（缺货/临期/正常数
 POST /api/v1/inventory/restock-plan   — 生成 AI 补货计划（调用 inventory_alert agent）
 GET  /api/v1/inventory/restock-plan   — 获取最新补货计划（从 DB 缓存）
 """
-from fastapi import APIRouter, Depends, Header
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import text
 import structlog
+from fastapi import APIRouter, Depends, Header
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db_with_tenant
 

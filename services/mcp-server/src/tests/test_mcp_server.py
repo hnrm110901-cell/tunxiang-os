@@ -8,16 +8,16 @@ Tests cover:
 - Error handling for unknown tools
 """
 
-import asyncio
 import json
 import sys
 from pathlib import Path
 
 import pytest
-import pytest_asyncio
 
 # Ensure src is importable
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
+
+from mcp.types import Tool
 
 from src.agent_registry import (
     TOOL_REGISTRY,
@@ -26,9 +26,8 @@ from src.agent_registry import (
     get_tool_names,
     get_tools_by_agent,
 )
-from mcp.types import Tool
-from src.server import _execute_tool, _serialise_result, _stub_result, server, list_tools as _list_tools
-
+from src.server import _execute_tool, _serialise_result, _stub_result
+from src.server import list_tools as _list_tools
 
 # ===========================================================================
 # Registry tests

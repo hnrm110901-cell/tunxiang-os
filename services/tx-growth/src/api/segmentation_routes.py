@@ -20,7 +20,6 @@ import httpx
 import structlog
 from fastapi import APIRouter, Header, HTTPException, Query
 from pydantic import BaseModel, Field
-
 from services.audience_segmentation import (
     BUILTIN_SEGMENTS,
     AudienceSegmentationService,

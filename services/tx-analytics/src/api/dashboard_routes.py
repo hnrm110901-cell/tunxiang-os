@@ -7,11 +7,12 @@ GET /dashboard/alerts/{store_id}  — 异常摘要
 GET /dashboard/alerts/stats       — 异常统计
 """
 from typing import Optional
-from fastapi import APIRouter, Header, Query, HTTPException
 
-from ..services.today_overview import get_today_overview, get_multi_store_overview
-from ..services.store_ranking import get_store_ranking, get_store_comparison
-from ..services.alert_summary import get_today_alerts, get_alert_stats
+from fastapi import APIRouter, Header, HTTPException, Query
+
+from ..services.alert_summary import get_alert_stats, get_today_alerts
+from ..services.store_ranking import get_store_comparison, get_store_ranking
+from ..services.today_overview import get_multi_store_overview, get_today_overview
 
 router = APIRouter(prefix="/api/v1/dashboard", tags=["dashboard"])
 

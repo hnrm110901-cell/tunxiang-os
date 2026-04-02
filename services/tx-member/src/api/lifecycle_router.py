@@ -17,6 +17,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+
 from ..services.lifecycle_service import LifecycleService
 
 logger = structlog.get_logger(__name__)
@@ -87,7 +88,7 @@ async def get_lifecycle_distribution(
 
     # 累计所有阶段（含项目定义的5个阶段）
     stage_order = ("new_member", "active", "at_risk", "churned", "reactivated")
-    counts: dict[str, int] = {s: 0 for s in stage_order}
+    counts: dict[str, int] = dict.fromkeys(stage_order, 0)
     total = 0
     for stage, cnt in rows:
         key = stage or "active"
@@ -324,9 +325,7 @@ async def get_member_lifecycle(
 
     # 重新计算阶段（基于任务规格的5阶段逻辑）
     computed_stage = stage  # 默认使用 DB 存储值
-    if first_order_at is None:
-        computed_stage = "new_member"
-    elif days_since_join is not None and days_since_join <= 30:
+    if first_order_at is None or days_since_join is not None and days_since_join <= 30:
         computed_stage = "new_member"
     elif days_since_last is not None and days_since_last <= 30:
         computed_stage = "active"

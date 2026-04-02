@@ -21,15 +21,14 @@ from typing import Any, Optional
 
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from models.brand_strategy import (
+    BrandContentConstraintsCreate,
     BrandProfileCreate,
     BrandProfileUpdate,
     BrandSeasonalCalendarCreate,
-    BrandContentConstraintsCreate,
 )
 from services.brand_strategy_db_service import BrandStrategyDbService
+
 from shared.ontology.src.database import get_db_with_tenant
 
 log = structlog.get_logger(__name__)

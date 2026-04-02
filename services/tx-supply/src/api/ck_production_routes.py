@@ -24,6 +24,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from shared.ontology.src.database import get_db
 
 log = structlog.get_logger(__name__)
@@ -124,9 +125,7 @@ def _row_to_dict(row) -> dict:
     for k, v in d.items():
         if hasattr(v, "isoformat"):
             d[k] = v.isoformat()
-        elif isinstance(v, Decimal):
-            d[k] = str(v)
-        elif hasattr(v, "__str__") and type(v).__name__ == "UUID":
+        elif isinstance(v, Decimal) or hasattr(v, "__str__") and type(v).__name__ == "UUID":
             d[k] = str(v)
     return d
 

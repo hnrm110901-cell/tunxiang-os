@@ -19,20 +19,19 @@
 
 import os
 import uuid
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import httpx
 import structlog
-from sqlalchemy import select, update
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from models.journey_instance import JourneyInstance
 from services.journey_orchestrator import (
-    _journeys,
     _journey_executions,
+    _journeys,
 )
 from services.roi_attribution import ROIAttributionService
+from sqlalchemy import select, update
+from sqlalchemy.ext.asyncio import AsyncSession
 
 _roi_service = ROIAttributionService()
 
@@ -910,8 +909,8 @@ class JourneyExecutor:
             2. 查询会员的企微 external_userid
             3. ChannelEngine.send_wecom_message 通过 gateway 内部 API 发送
         """
-        from services.content_engine import PersonalizedContentEngine
         from services.channel_engine import ChannelEngine
+        from services.content_engine import PersonalizedContentEngine
 
         content_type: str = node.get("content_type", "wecom_chat")
         template_key: str = node.get("template_key", "generic")
@@ -1281,10 +1280,10 @@ class JourneyEventListener:
             db: 长存活的 AsyncSession（从调用方传入）
                 注意：调用方负责 session 生命周期管理。
         """
-        from shared.events.event_publisher import MemberEventPublisher
-        from shared.events.event_consumer import STREAM_KEY, DLQ_STREAM_KEY
-
         import asyncio
+
+        from shared.events.event_consumer import DLQ_STREAM_KEY, STREAM_KEY
+        from shared.events.event_publisher import MemberEventPublisher
 
         redis = await MemberEventPublisher.get_redis()
         await self._consumer.ensure_group(redis)
@@ -1381,7 +1380,8 @@ class JourneyEventListener:
                 error=str(exc),
                 exc_info=True,
             )
-            from datetime import datetime, timezone as tz
+            from datetime import datetime
+            from datetime import timezone as tz
             await redis.xadd(
                 dlq_key,
                 {

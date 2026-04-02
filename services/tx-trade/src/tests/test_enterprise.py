@@ -12,17 +12,14 @@
 9. 未结账单查询
 10. 边界场景（重复账单/零额度）
 """
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import uuid
+
 import pytest
-import pytest_asyncio
-
-from unittest.mock import AsyncMock
-
 
 # ─── 模拟 AsyncSession ───
 
@@ -63,8 +60,8 @@ TENANT_ID_OTHER = str(uuid.uuid4())
 
 def _clear_stores():
     """清理模块级内存存储"""
-    from services.enterprise_account import _enterprises, _agreement_prices, _sign_records
-    from services.enterprise_billing import _bills, _bill_items
+    from services.enterprise_account import _agreement_prices, _enterprises, _sign_records
+    from services.enterprise_billing import _bill_items, _bills
     _enterprises.clear()
     _agreement_prices.clear()
     _sign_records.clear()

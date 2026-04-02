@@ -19,12 +19,12 @@ import uuid
 from typing import Any, Optional
 
 import structlog
+from engine.journey_engine import JourneyEngine
 from fastapi import APIRouter, Header, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 
 from shared.ontology.src.database import async_session_factory
-from engine.journey_engine import JourneyEngine
 
 logger = structlog.get_logger(__name__)
 

@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Callable
 
 import structlog
 
-from .event_bus import AgentEvent, EventBus, DEFAULT_EVENT_HANDLERS
+from .event_bus import DEFAULT_EVENT_HANDLERS, AgentEvent, EventBus
 
 if TYPE_CHECKING:
     from .master import MasterAgent

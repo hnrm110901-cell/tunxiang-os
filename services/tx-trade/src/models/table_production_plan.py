@@ -5,8 +5,8 @@ TableProductionPlan 记录一张桌子的多档口出品协调状态，
 """
 import uuid
 
-from sqlalchemy import String, DateTime
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy import DateTime, String
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from shared.ontology.src.base import TenantBase

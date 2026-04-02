@@ -19,14 +19,14 @@ from typing import Annotated
 import httpx
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from services.voucher_generator import VoucherGenerator
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from shared.ontology.src.database import get_db_with_tenant
 from shared.adapters.erp.src import (
     ERPType,
     get_erp_adapter,
 )
-from services.voucher_generator import VoucherGenerator
+from shared.ontology.src.database import get_db_with_tenant
 
 log = structlog.get_logger(__name__)
 router = APIRouter(prefix="/api/v1/erp", tags=["erp"])
@@ -243,12 +243,13 @@ async def erp_health_check(
 )
 async def get_push_queue() -> dict:
     """返回用友离线队列中待重试的凭证条目数"""
-    from shared.adapters.erp.src import YonyouAdapter
     import os
+
+    from shared.adapters.erp.src import YonyouAdapter
 
     adapter = YonyouAdapter.__new__(YonyouAdapter)
     import pathlib
-    queue_path = os.environ.get("YONYOU_QUEUE_PATH", "/tmp/yonyou_push_queue.jsonl")
+    queue_path = os.environ.get("YONYOU_QUEUE_PATH", "/tmp/yonyou_push_queue.jsonl")  # noqa: S108 — pre-existing, tmp dir for ERP export
     adapter._queue_path = pathlib.Path(queue_path)
 
     size = adapter.queue_size()

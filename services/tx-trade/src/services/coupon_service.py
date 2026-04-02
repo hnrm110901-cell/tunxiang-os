@@ -5,14 +5,14 @@
 权益优先级：会员价 > 活动券 > 通用券。
 """
 import uuid
-from datetime import datetime, date, timezone
+from datetime import date, datetime, timezone
 from typing import Optional
 
 import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from shared.ontology.src.entities import Customer, Order, OrderItem
+from shared.ontology.src.entities import Customer, Order
 
 logger = structlog.get_logger()
 

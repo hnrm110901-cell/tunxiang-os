@@ -14,9 +14,9 @@
 
 无需数据库连接，直接测试纯函数。
 """
-import sys
-import os
 import base64
+import os
+import sys
 
 import pytest
 
@@ -205,7 +205,7 @@ class TestUtilFunctions:
 
     def test_two_col_padding(self):
         """两列对齐：左右文本加空格填满指定宽度"""
-        from services.print_template_service import _two_col, _gbk_len
+        from services.print_template_service import _gbk_len, _two_col
         result = _two_col("时间:2026-04-02", "桌号:A8", 48)
         assert _gbk_len(result) >= 48
 
@@ -235,8 +235,9 @@ class TestWeighTicket:
 
     def test_weigh_ticket_base64_decodable(self):
         """输出字符串可被 base64 解码为字节（格式合法性验证）"""
-        from services.print_template_service import generate_weigh_ticket
         import binascii
+
+        from services.print_template_service import generate_weigh_ticket
         encoded = generate_weigh_ticket(WEIGH_RECORD_BASE)
         try:
             raw = decode_b64_to_bytes(encoded)
@@ -251,7 +252,7 @@ class TestWeighTicket:
         注意：ESC/POS 控制序列本身不计入行宽，仅验证文本内容部分。
         店名行使用双倍宽，但 ESC 指令控制硬件渲染，字节流中字符本身不超宽。
         """
-        from services.print_template_service import generate_weigh_ticket, _gbk_len
+        from services.print_template_service import _gbk_len, generate_weigh_ticket
         store_config_58mm = {"paper_width_mm": 58}
         encoded = generate_weigh_ticket(WEIGH_RECORD_BASE, store_config_58mm)
         raw = decode_b64_to_bytes(encoded)
@@ -271,11 +272,11 @@ class TestWeighTicket:
             except Exception:
                 pass
 
-        assert len(violations) == 0, f"58mm模式存在超宽行：\n" + "\n".join(violations)
+        assert len(violations) == 0, "58mm模式存在超宽行：\n" + "\n".join(violations)
 
     def test_weigh_ticket_80mm_line_width(self):
         """80mm 纸宽：每个纯文本行 GBK 字节宽度应 ≤ 48"""
-        from services.print_template_service import generate_weigh_ticket, _gbk_len
+        from services.print_template_service import _gbk_len, generate_weigh_ticket
         store_config_80mm = {"paper_width_mm": 80}
         encoded = generate_weigh_ticket(WEIGH_RECORD_BASE, store_config_80mm)
         raw = decode_b64_to_bytes(encoded)
@@ -292,7 +293,7 @@ class TestWeighTicket:
             except Exception:
                 pass
 
-        assert len(violations) == 0, f"80mm模式存在超宽行：\n" + "\n".join(violations)
+        assert len(violations) == 0, "80mm模式存在超宽行：\n" + "\n".join(violations)
 
     def test_weigh_ticket_contains_dish_name(self):
         """称重单应包含菜品名称（GBK编码后可在字节流中找到）"""
@@ -488,7 +489,7 @@ class TestCreditAccountTicket:
 
     def test_credit_ticket_58mm_width(self):
         """58mm 纸宽挂账单每行不超宽"""
-        from services.print_template_service import generate_credit_account_ticket, _gbk_len
+        from services.print_template_service import _gbk_len, generate_credit_account_ticket
         store_config_58mm = {"paper_width_mm": 58}
         encoded = generate_credit_account_ticket(ORDER_BASE, CREDIT_INFO_BASE, store_config_58mm)
         raw = decode_b64_to_bytes(encoded)

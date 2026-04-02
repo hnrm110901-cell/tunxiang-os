@@ -16,21 +16,22 @@
   - [VALIDATION] phone 空字符串校验
 """
 import uuid
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.events import UniversalPublisher
+
+from ..models.reservation import Reservation
+from ..repositories.reservation_repo import ReservationRepository
+from .attribution_hook import fire_reservation_attribution
+from .queue_service import QueueService
 from .reservation_flow import (
     RESERVATION_TRANSITIONS,
     can_reservation_transition,
 )
-from .queue_service import QueueService
-from ..repositories.reservation_repo import ReservationRepository
-from .attribution_hook import fire_reservation_attribution
-from ..models.reservation import Reservation
 
 logger = structlog.get_logger()
 

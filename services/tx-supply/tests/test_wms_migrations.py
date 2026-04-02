@@ -214,7 +214,7 @@ class TestRLSSecurity:
             has_rls = (
                 f'_apply_safe_rls("{table}")' in content
                 or f"_apply_safe_rls('{table}')" in content
-                or f"FORCE ROW LEVEL SECURITY" in content  # 至少存在 FORCE 语句
+                or "FORCE ROW LEVEL SECURITY" in content  # 至少存在 FORCE 语句
             )
             # 更严格检查：该表名和 rls 同时出现
             table_rls_pattern = re.compile(

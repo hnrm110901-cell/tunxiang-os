@@ -5,11 +5,12 @@ POST /api/v1/orders/{order_id}/transfer-table  转台
 from typing import Optional
 
 import structlog
-from fastapi import APIRouter, Depends, Request, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+
 from ..services.cashier_engine import CashierEngine
 
 logger = structlog.get_logger()

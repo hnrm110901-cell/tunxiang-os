@@ -17,7 +17,7 @@ import json
 from typing import Optional
 
 import structlog
-from fastapi import APIRouter, Depends, Request, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -126,6 +126,7 @@ async def set_dish_availability(
 
     try:
         from sqlalchemy import update
+
         from shared.ontology.src.entities import Dish
 
         await db.execute(
@@ -157,6 +158,7 @@ async def set_dish_daily_limit(
 
     try:
         from sqlalchemy import update
+
         from shared.ontology.src.entities import Dish
 
         await db.execute(
@@ -188,6 +190,7 @@ async def update_order_waiter(
 
     try:
         from sqlalchemy import update
+
         from shared.ontology.src.entities import Order
 
         await db.execute(
@@ -219,6 +222,7 @@ async def copy_dishes_from_order(
 
     try:
         from sqlalchemy import select
+
         from shared.ontology.src.entities import OrderItem
 
         # 查询源订单的所有菜品
@@ -272,6 +276,7 @@ async def refresh_dish_status(
 
     try:
         from sqlalchemy import select
+
         from shared.ontology.src.entities import Dish
 
         result = await db.execute(
@@ -348,6 +353,7 @@ async def pre_bill(
 
     try:
         from sqlalchemy import select
+
         from shared.ontology.src.entities import Order, OrderItem
 
         order_result = await db.execute(
@@ -417,7 +423,9 @@ async def fire_to_kitchen(
 
     try:
         from sqlalchemy import select
+
         from shared.ontology.src.entities import Order, OrderItem
+
         from ..services.kds_dispatch import dispatch_order_to_kds
 
         order_result = await db.execute(
@@ -498,6 +506,7 @@ async def mark_item_served(
 
     try:
         from sqlalchemy import select, update
+
         from shared.ontology.src.entities import OrderItem
 
         # 确认item存在且属于该订单
@@ -554,6 +563,7 @@ async def override_item_price(
 
     try:
         from sqlalchemy import select, update
+
         from shared.ontology.src.entities import Order, OrderItem
 
         item_result = await db.execute(
@@ -639,9 +649,11 @@ async def transfer_single_item(
     log = logger.bind(order_id=order_id, item_id=item_id, tenant_id=tenant_id)
 
     try:
-        from sqlalchemy import select, update, delete
-        from shared.ontology.src.entities import Order, OrderItem
         import uuid as uuid_mod
+
+        from sqlalchemy import delete, select, update
+
+        from shared.ontology.src.entities import Order, OrderItem
 
         # 验证源item
         item_result = await db.execute(
@@ -745,7 +757,9 @@ async def print_order_receipt(
 
     try:
         from sqlalchemy import select
+
         from shared.ontology.src.entities import Order, OrderItem
+
         from ..services.receipt_service import ReceiptService
 
         order_result = await db.execute(
@@ -869,7 +883,8 @@ async def transfer_payment(
     )
 
     try:
-        from sqlalchemy import select, update
+        from sqlalchemy import select
+
         from shared.ontology.src.entities import Order
 
         # 验证源订单和目标订单都存在

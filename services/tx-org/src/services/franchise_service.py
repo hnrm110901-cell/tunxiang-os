@@ -10,10 +10,11 @@
 
 from __future__ import annotations
 
-import structlog
 from datetime import date, datetime
 from typing import Any, Dict, List, Optional
 from uuid import UUID, uuid4
+
+import structlog
 
 from ..models.franchise import (
     Franchisee,

@@ -47,7 +47,8 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
-from ..services.franchise_clone_service import clone_store, _update_clone_status
+
+from ..services.franchise_clone_service import _update_clone_status, clone_store
 
 log: structlog.stdlib.BoundLogger = structlog.get_logger(__name__)
 

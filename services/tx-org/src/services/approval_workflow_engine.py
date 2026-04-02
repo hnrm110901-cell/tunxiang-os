@@ -15,16 +15,16 @@
 from __future__ import annotations
 
 import json
-import logging
 import os
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import httpx
 import structlog
-from shared.events import UniversalPublisher
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from shared.events import UniversalPublisher
 
 log: structlog.stdlib.BoundLogger = structlog.get_logger(__name__)
 

@@ -8,7 +8,7 @@ import hashlib
 import os
 import struct
 import time
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from typing import Optional
 
 import httpx
@@ -128,7 +128,7 @@ def _validate_image(image_bytes: bytes, content_type: Optional[str], filename: O
 
 def _image_hash_seed(image_bytes: bytes) -> int:
     """Derive a deterministic seed from image content for consistent mock results."""
-    digest = hashlib.md5(image_bytes).digest()
+    digest = hashlib.md5(image_bytes).digest()  # noqa: S324 — md5 for non-security hash (mock data seed)
     return struct.unpack("<I", digest[:4])[0]
 
 
@@ -137,14 +137,14 @@ def _image_hash_seed(image_bytes: bytes) -> int:
 
 def _seeded_score(seed: int, salt: str, low: int = 55, high: int = 98) -> int:
     """Generate a deterministic score in [low, high] from seed + salt."""
-    h = hashlib.md5(f"{seed}:{salt}".encode()).digest()
+    h = hashlib.md5(f"{seed}:{salt}".encode()).digest()  # noqa: S324 — md5 for non-security hash (mock data seed)
     val = struct.unpack("<H", h[:2])[0]
     return low + (val % (high - low + 1))
 
 
 def _seeded_float(seed: int, salt: str) -> float:
     """Generate a deterministic float in [0.0, 1.0) from seed + salt."""
-    h = hashlib.md5(f"{seed}:{salt}".encode()).digest()
+    h = hashlib.md5(f"{seed}:{salt}".encode()).digest()  # noqa: S324 — md5 for non-security hash (mock data seed)
     val = struct.unpack("<I", h[:4])[0]
     return val / 0xFFFFFFFF
 

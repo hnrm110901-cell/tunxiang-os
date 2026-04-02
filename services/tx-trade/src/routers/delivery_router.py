@@ -23,15 +23,15 @@ Webhook 接收（外卖平台推送）：
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime, timezone
+from datetime import date
 from typing import Optional
 from uuid import UUID
 
 import structlog
-from fastapi import APIRouter, Body, Header, HTTPException, Query, Request
+from fastapi import APIRouter, Header, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
-from ..services.delivery_aggregator import DeliveryAggregator, DeliveryDailyStats
+from ..services.delivery_aggregator import DeliveryAggregator
 
 logger = structlog.get_logger(__name__)
 

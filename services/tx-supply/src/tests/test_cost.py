@@ -1,21 +1,18 @@
 """理论成本 + 实际成本 纯函数测试"""
-import sys
 import os
-from decimal import Decimal
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from services.theoretical_cost import (
-    compute_dish_theoretical_cost_from_bom,
-    _sum_bom_item_costs,
-    get_dish_theoretical_cost,
-)
 from services.actual_cost import (
+    calculate_actual_dish_cost,
     compute_actual_cost_from_prices,
     get_ingredient_actual_price,
-    calculate_actual_dish_cost,
 )
-
+from services.theoretical_cost import (
+    compute_dish_theoretical_cost_from_bom,
+    get_dish_theoretical_cost,
+)
 
 # ═══════════════════════════════════════════════
 # 理论成本测试

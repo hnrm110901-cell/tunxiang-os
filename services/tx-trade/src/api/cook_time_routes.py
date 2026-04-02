@@ -7,13 +7,12 @@
 """
 import asyncio
 from datetime import datetime, timezone
-from typing import Optional
 
 import structlog
-from fastapi import APIRouter, Depends, Request, HTTPException, BackgroundTasks
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..services.cook_time_stats import CookTimeStatsService
 

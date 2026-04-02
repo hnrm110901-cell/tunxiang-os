@@ -22,15 +22,11 @@ from typing import Any
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
-
-from shared.ontology.src.database import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from shared.ontology.src.database import get_db
+
 from ..services.patrol_service import (
-    VALID_CATEGORIES,
-    VALID_ISSUE_STATUSES,
-    VALID_ITEM_TYPES,
-    VALID_SEVERITIES,
     PatrolService,
 )
 

@@ -18,18 +18,18 @@ from typing import Optional
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from pydantic import BaseModel, Field
+from services.three_way_match_engine import (
+    BatchMatchResult,
+    MatchResult,
+    MatchStatus,
+    PurchaseOrderNotFoundError,
+    ThreeWayMatchEngine,
+    ThreeWayMatchError,
+    VarianceItem,
+)
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db_with_tenant
-from services.three_way_match_engine import (
-    ThreeWayMatchEngine,
-    MatchResult,
-    BatchMatchResult,
-    VarianceItem,
-    MatchStatus,
-    PurchaseOrderNotFoundError,
-    ThreeWayMatchError,
-)
 
 logger = structlog.get_logger()
 router = APIRouter(prefix="/reconciliation", tags=["reconciliation"])
@@ -305,9 +305,9 @@ async def resolve_variance(
             resolved_by=body.resolved_by,
         )
         # 手动核销状态改为 resolved（而非 auto_approved）
-        from sqlalchemy import update
+
         from models.three_way_match import ThreeWayMatchRecord
-        from datetime import datetime, timezone
+        from sqlalchemy import update
 
         tid = uuid.UUID(tenant_id)
         vid = uuid.UUID(variance_id)

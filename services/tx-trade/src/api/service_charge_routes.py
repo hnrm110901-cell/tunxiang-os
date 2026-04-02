@@ -5,15 +5,15 @@
 """
 from typing import Optional
 
-from fastapi import APIRouter, Request, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from ..services.service_charge import (
     calculate_service_charge,
-    get_charge_config,
-    set_charge_config,
     create_charge_template,
+    get_charge_config,
     publish_template,
+    set_charge_config,
 )
 
 router = APIRouter(prefix="/api/v1/service-charge", tags=["service-charge"])

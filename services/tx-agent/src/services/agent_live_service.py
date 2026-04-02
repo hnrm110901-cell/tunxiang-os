@@ -15,7 +15,7 @@ from __future__ import annotations
 import time
 import uuid
 from copy import deepcopy
-from typing import Any, Optional
+from typing import Any
 
 import structlog
 

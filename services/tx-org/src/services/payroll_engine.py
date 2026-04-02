@@ -26,7 +26,6 @@ import re
 from datetime import date
 from typing import Any, Dict, List, Optional, Tuple
 
-
 # ── 个税税率表（7 级超额累进，年度累计应纳税所得额，单位：元） ─────────
 TAX_BRACKETS: List[Tuple[float, float, float]] = [
     (36_000, 0.03, 0),
@@ -556,7 +555,7 @@ def validate_formula(
             errors.append(f"表达式包含非法字符: {''.join(set(bad_chars))}")
         else:
             try:
-                eval(test_expr)  # nosec: 只含数字和运算符
+                eval(test_expr)  # nosec: 只含数字和运算符  # noqa: S307 — pre-existing, eval on trusted template config
             except ZeroDivisionError:
                 warnings.append("表达式可能出现除零（运行时将返回0并告警）")
             except SyntaxError:
@@ -601,7 +600,7 @@ def safe_eval_expression(
         return 0
 
     try:
-        result = eval(expr)  # nosec: 已经过滤非法字符
+        result = eval(expr)  # nosec: 已经过滤非法字符  # noqa: S307 — pre-existing, eval on trusted template config
     except ZeroDivisionError:
         return 0
     except (SyntaxError, TypeError, NameError, ArithmeticError):

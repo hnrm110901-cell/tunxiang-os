@@ -15,15 +15,15 @@
 """
 import uuid
 from datetime import date
-from typing import List, Optional
+from typing import Optional
 
 import structlog
-from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel
+from services.tx_finance.src.services.pl_report import PLReportService
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db_with_tenant
-from services.tx_finance.src.services.pl_report import PLReportService
 
 logger = structlog.get_logger(__name__)
 router = APIRouter(tags=["pl"])
@@ -158,8 +158,9 @@ async def get_stores_pl_comparison(
         sid_list = [_parse_uuid(s.strip(), "store_id") for s in store_ids.split(",") if s.strip()]
     else:
         # 查询当前租户所有门店
-        from shared.ontology.src.entities import Store
         from sqlalchemy import select
+
+        from shared.ontology.src.entities import Store
         result = await db.execute(
             select(Store.id).where(Store.tenant_id == tid).where(Store.is_deleted == False)
         )
@@ -293,7 +294,6 @@ async def _generate_voucher_internal(
     生产中可扩展接入金蝶/用友科目体系。
     """
     import secrets
-    from datetime import datetime, timezone
 
     # 生成凭证编号（格式：V{YYYYMMDD}{8位随机hex}）
     voucher_no = f"V{biz_date.strftime('%Y%m%d')}{secrets.token_hex(4).upper()}"

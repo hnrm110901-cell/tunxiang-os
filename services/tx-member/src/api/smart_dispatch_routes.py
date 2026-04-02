@@ -5,16 +5,17 @@
 from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from shared.ontology.src.database import get_db
 
 from ..services.smart_dispatcher import (
-    get_personalized_home,
-    dispatch_menu,
-    dispatch_queue,
-    dispatch_offer,
-    dispatch_reservation,
     apply_level_benefits,
     check_upgrade_opportunity,
+    dispatch_menu,
+    dispatch_offer,
+    dispatch_queue,
+    dispatch_reservation,
+    get_personalized_home,
 )
 
 router = APIRouter(prefix="/api/v1/member/dispatch", tags=["member-dispatch"])

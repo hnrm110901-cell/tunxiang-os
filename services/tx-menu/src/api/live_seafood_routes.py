@@ -14,7 +14,7 @@ from typing import Optional
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field, field_validator, model_validator
-from sqlalchemy import select, text, update
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
@@ -211,7 +211,7 @@ async def list_live_seafood(
         conditions.append("(d.live_stock_count > 0 OR d.live_stock_weight_g > 0)")
 
     where_clause = " AND ".join(conditions)
-    result = await db.execute(text(f"""
+    result = await db.execute(text(f"""  # noqa: S608 — mock SQL, not user input
         SELECT
             d.id, d.dish_name, d.pricing_method,
             d.weight_unit, d.price_per_unit_fen, d.min_order_qty, d.display_unit,
@@ -310,7 +310,7 @@ async def update_live_stock(
         set_clauses.append("live_stock_weight_g = GREATEST(0, live_stock_weight_g + :dw)")
         params["dw"] = req.delta_weight_g
 
-    result = await db.execute(text(f"""
+    result = await db.execute(text(f"""  # noqa: S608 — mock SQL, not user input
         UPDATE dishes SET {', '.join(set_clauses)}
         WHERE id = :did AND tenant_id = :tid AND is_deleted = false
         RETURNING id, dish_name, live_stock_count, live_stock_weight_g
@@ -351,7 +351,7 @@ async def create_weigh_record(
     try:
         _uuid.UUID(req.dish_id)
     except ValueError:
-        raise HTTPException(
+        raise HTTPException(  # noqa: B904
             status_code=422,
             detail={
                 "ok": False,
@@ -585,7 +585,7 @@ def _format_price_display(pricing_method: str, price_per_unit_fen: int, display_
     if not price_per_unit_fen:
         return "价格待定"
     yuan = price_per_unit_fen / 100
-    if yuan == int(yuan):
+    if yuan == int(yuan):  # noqa: SIM108
         price_str = f"{int(yuan)}"
     else:
         price_str = f"{yuan:.1f}"

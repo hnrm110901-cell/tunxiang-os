@@ -17,29 +17,23 @@
 from __future__ import annotations
 
 import calendar
-import statistics
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
-from uuid import UUID
 
 import structlog
-from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from services.payroll_engine import (
     compute_absence_deduction,
     compute_base_salary,
-    compute_commission,
     compute_early_leave_deduction,
-    compute_full_attendance_bonus,
     compute_late_deduction,
     compute_overtime_pay,
-    compute_performance_bonus,
     compute_seniority_subsidy,
     count_work_days,
     derive_hourly_rate,
 )
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 
 log = structlog.get_logger(__name__)
 

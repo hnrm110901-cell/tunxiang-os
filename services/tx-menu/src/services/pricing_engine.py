@@ -15,7 +15,7 @@ import structlog
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from shared.events import UniversalPublisher, MenuEventType
+from shared.events import MenuEventType, UniversalPublisher
 
 log = structlog.get_logger(__name__)
 

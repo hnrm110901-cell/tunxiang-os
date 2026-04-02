@@ -53,6 +53,8 @@ import { MemberLookupPage } from './pages/MemberLookupPage';
 import { MemberPointsPage } from './pages/MemberPointsPage';
 import { PointsTransactionPage } from './pages/PointsTransactionPage';
 import { ApprovalPage } from './pages/ApprovalPage';
+import { ManagerDashboardPage } from './pages/ManagerDashboardPage';
+import { UrgePage } from './pages/UrgePage';
 
 const tabs = [
   { path: '/tables', label: '桌台', icon: 'T' },
@@ -67,7 +69,7 @@ const tabs = [
 function BottomTab() {
   const loc = useLocation();
   // 在全屏子页面中隐藏底栏
-  const hiddenPaths = ['/open-table', '/order-full', '/rush', '/table-ops', '/member', '/complaint', '/service-confirm', '/peak-alert', '/order-status', '/table-detail', '/table-side-pay', '/seat-split', '/crew-stats', '/manager-app', '/receiving', '/stocktake', '/handover', '/route-optimize', '/shift-schedule', '/dish-recognize', '/shift-summary', '/self-pay-link', '/discount-request', '/scan-pay', '/stored-value-recharge', '/printer-settings', '/waitlist', '/member-level-config', '/group-dashboard', '/store-detail', '/live-seafood', '/reservations', '/daily-settlement', '/shift-handover', '/issue-report', '/member-lookup', '/member-points', '/member/', '/approvals'];
+  const hiddenPaths = ['/open-table', '/order-full', '/rush', '/table-ops', '/member', '/complaint', '/service-confirm', '/peak-alert', '/order-status', '/table-detail', '/table-side-pay', '/seat-split', '/crew-stats', '/manager-app', '/receiving', '/stocktake', '/handover', '/route-optimize', '/shift-schedule', '/dish-recognize', '/shift-summary', '/self-pay-link', '/discount-request', '/scan-pay', '/stored-value-recharge', '/printer-settings', '/waitlist', '/member-level-config', '/group-dashboard', '/store-detail', '/live-seafood', '/reservations', '/daily-settlement', '/shift-handover', '/issue-report', '/member-lookup', '/member-points', '/member/', '/approvals', '/manager-dashboard', '/urge'];
   const shouldHide = hiddenPaths.some(p => loc.pathname.startsWith(p));
   if (shouldHide) return null;
 
@@ -170,6 +172,10 @@ export default function App() {
           <Route path="/member/:memberId/points" element={<PointsTransactionPage />} />
           {/* 审批处理 */}
           <Route path="/approvals" element={<ApprovalPage />} />
+          {/* 店长实时经营看板 */}
+          <Route path="/manager-dashboard" element={<ManagerDashboardPage />} />
+          {/* 催菜/加菜流程 */}
+          <Route path="/urge" element={<UrgePage />} />
         </Routes>
         <BottomTab />
       </div>

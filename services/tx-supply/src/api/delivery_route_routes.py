@@ -16,7 +16,7 @@ from __future__ import annotations
 from typing import List, Optional
 
 import structlog
-from fastapi import APIRouter, Header, HTTPException, Query
+from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel, Field
 
 log = structlog.get_logger(__name__)

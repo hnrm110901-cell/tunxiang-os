@@ -10,9 +10,7 @@
 """
 
 import pytest
-
 from shared.core.model_router import ModelRouter, TaskComplexity, model_router
-
 
 # ---------------------------------------------------------------------------
 # Fixtures

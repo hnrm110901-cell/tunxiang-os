@@ -14,10 +14,11 @@ from typing import Optional
 
 import structlog
 from pydantic import BaseModel
-from sqlalchemy import select, and_, func
+from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.entities import Order, OrderItem
+
 from ..models.kds_task import KDSTask
 
 logger = structlog.get_logger()

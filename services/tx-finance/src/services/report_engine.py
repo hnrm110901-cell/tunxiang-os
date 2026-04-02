@@ -15,15 +15,15 @@
 from __future__ import annotations
 
 import uuid
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 import structlog
-from sqlalchemy import func, select, text, and_, extract
+from sqlalchemy import and_, extract, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from shared.ontology.src.entities import Order, OrderItem, Store, Dish, DishCategory
+from shared.ontology.src.entities import Dish, DishCategory, Order, OrderItem
 
 logger = structlog.get_logger(__name__)
 

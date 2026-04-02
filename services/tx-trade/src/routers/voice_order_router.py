@@ -223,7 +223,7 @@ async def parse_order(body: ParseOrderRequest) -> dict:
         items = await _call_claude_parse(body.text, body.menu_context)
     except (httpx.HTTPError, json.JSONDecodeError, KeyError) as exc:
         logger.warning("voice_order parse-order: Claude 调用失败 — %s，使用 fallback", exc)
-    except Exception as exc:  # noqa: BLE001 — 最外层兜底，必须记录
+    except Exception:  # noqa: BLE001 — 最外层兜底，必须记录
         logger.error("voice_order parse-order: 未预期错误", exc_info=True)
 
     if not items:

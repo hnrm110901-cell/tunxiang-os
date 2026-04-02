@@ -34,7 +34,7 @@ from enum import Enum
 from typing import Any, AsyncGenerator, Optional
 
 import structlog
-from anthropic import AsyncAnthropic, APIConnectionError, APIStatusError, APITimeoutError
+from anthropic import APIConnectionError, APIStatusError, APITimeoutError, AsyncAnthropic
 
 logger = structlog.get_logger()
 
@@ -487,12 +487,12 @@ class CircuitBreaker:
             result = await coro
             await self.record_success()
             return result
-        except (APIConnectionError, APITimeoutError, APIStatusError) as exc:
+        except (APIConnectionError, APITimeoutError, APIStatusError):
             await self.record_failure()
             raise
         except CircuitOpenError:
             raise
-        except Exception as exc:  # noqa: BLE001 — 其他异常不计入熔断计数，直接透传
+        except Exception:  # noqa: BLE001 — 其他异常不计入熔断计数，直接透传
             raise
 
 

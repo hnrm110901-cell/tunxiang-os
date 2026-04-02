@@ -22,7 +22,7 @@ from __future__ import annotations
 import threading
 from collections import OrderedDict
 from datetime import date
-from typing import Dict, Optional, Tuple
+from typing import Optional
 
 import structlog
 from sqlalchemy import text

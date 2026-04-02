@@ -10,14 +10,15 @@
 7. 待备餐列表只含未完成（pending/started）
 8. 租户隔离
 """
+from datetime import datetime, timedelta, timezone
+
 import pytest
-from datetime import datetime, timezone, timedelta
 
 from ..services import booking_prep_service as bps_mod
 from ..services.booking_prep_service import (
     BookingPrepService,
-    _register_booking,
     _clear_store,
+    _register_booking,
 )
 
 TENANT_A = "tenant-a-001"

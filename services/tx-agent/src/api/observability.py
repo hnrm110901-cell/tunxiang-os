@@ -3,7 +3,6 @@
 提供 KPI 汇总、实时事件流、决策追踪、效果分析、健康度监控等接口。
 当前返回 mock 数据，生产环境替换为 EventBus + DecisionFeedbackService 真实数据。
 """
-import time
 import uuid
 from typing import Optional
 

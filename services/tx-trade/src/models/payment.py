@@ -1,11 +1,12 @@
 """支付模型 — 多支付方式 + 退款"""
 import uuid
 
-from sqlalchemy import String, Integer, Float, Boolean, DateTime, Text, ForeignKey, func
-from sqlalchemy.dialects.postgresql import UUID, JSON
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy.dialects.postgresql import JSON, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from shared.ontology.src.base import TenantBase
+
 from .enums import PaymentMethod, PaymentStatus, RefundType
 
 

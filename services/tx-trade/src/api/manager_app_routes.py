@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 
 import structlog
-from fastapi import APIRouter, Query, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
 logger = structlog.get_logger()

@@ -14,15 +14,15 @@
 
 依赖：FastAPI + httpx.AsyncClient + unittest.mock（全Mock，无真实DB连接）
 """
-import sys
 import os
+import sys
 import uuid
 from decimal import Decimal
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from fastapi import FastAPI
-from httpx import AsyncClient, ASGITransport
+from httpx import ASGITransport, AsyncClient
 
 # 将 tx-menu/src 加入路径
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../src"))
@@ -51,6 +51,7 @@ def app_with_mock_db():
     返回 (app, mock_db) 元组供测试使用。
     """
     from api.live_seafood_routes import router
+
     from shared.ontology.src.database import get_db
 
     app = FastAPI()
@@ -125,8 +126,8 @@ class TestWeighRecordReqValidation:
 
     def test_invalid_weigh_quantity_negative(self):
         """负数重量应被 Pydantic gt=0 校验拒绝（本地验证，不走HTTP）"""
-        from pydantic import ValidationError
         from api.live_seafood_routes import WeighRecordReq
+        from pydantic import ValidationError
         with pytest.raises(ValidationError) as exc_info:
             WeighRecordReq(
                 store_id=STORE_ID,
@@ -140,8 +141,8 @@ class TestWeighRecordReqValidation:
 
     def test_invalid_weigh_quantity_zero(self):
         """零重量也应被拒绝（gt=0）"""
-        from pydantic import ValidationError
         from api.live_seafood_routes import WeighRecordReq
+        from pydantic import ValidationError
         with pytest.raises(ValidationError):
             WeighRecordReq(
                 store_id=STORE_ID,
@@ -153,8 +154,8 @@ class TestWeighRecordReqValidation:
 
     def test_invalid_weight_unit_enum(self):
         """不在枚举内的重量单位应被拒绝"""
-        from pydantic import ValidationError
         from api.live_seafood_routes import WeighRecordReq
+        from pydantic import ValidationError
         with pytest.raises(ValidationError):
             WeighRecordReq(
                 store_id=STORE_ID,
@@ -166,8 +167,8 @@ class TestWeighRecordReqValidation:
 
     def test_update_live_seafood_weight_method_requires_unit(self):
         """pricing_method=weight 时 weight_unit 为必填"""
-        from pydantic import ValidationError
         from api.live_seafood_routes import UpdateLiveSeafoodReq
+        from pydantic import ValidationError
         with pytest.raises(ValidationError) as exc_info:
             UpdateLiveSeafoodReq(
                 pricing_method="weight",
@@ -245,6 +246,7 @@ async def test_create_weigh_record_weight_mode():
     场景：0.5斤 × 18800分/斤，期望 amount_fen=9400，amount_display='¥94.00'
     """
     from api.live_seafood_routes import router
+
     from shared.ontology.src.database import get_db
 
     app = FastAPI()
@@ -312,6 +314,7 @@ async def test_create_weigh_record_count_mode():
     场景：3条 × 8800分/条，期望 amount_fen=26400，amount_display='¥264.00'
     """
     from api.live_seafood_routes import router
+
     from shared.ontology.src.database import get_db
 
     app = FastAPI()
@@ -366,6 +369,7 @@ async def test_confirm_weigh_deducts_stock():
     2. 调用了两次 UPDATE（称重记录 + 菜品库存）
     """
     from api.live_seafood_routes import router
+
     from shared.ontology.src.database import get_db
 
     app = FastAPI()
@@ -434,6 +438,7 @@ async def test_confirm_weigh_updates_order():
     验证响应数据中 order_id 和 final_amount_fen 字段正确。
     """
     from api.live_seafood_routes import router
+
     from shared.ontology.src.database import get_db
 
     app = FastAPI()
@@ -489,6 +494,7 @@ async def test_weigh_pending_list():
     验证响应结构和 total 字段。
     """
     from api.live_seafood_routes import router
+
     from shared.ontology.src.database import get_db
 
     app = FastAPI()
@@ -547,6 +553,7 @@ async def test_weigh_cancel_restores_stock():
     """
     # 验证 create_weigh_record 只做 INSERT，不做库存扣减
     from api.live_seafood_routes import router
+
     from shared.ontology.src.database import get_db
 
     app = FastAPI()
@@ -610,6 +617,7 @@ async def test_invalid_weigh_quantity_http_422():
     FastAPI 的 Pydantic 验证失败应返回 422 Unprocessable Entity。
     """
     from api.live_seafood_routes import router
+
     from shared.ontology.src.database import get_db
 
     app = FastAPI()
@@ -643,6 +651,7 @@ async def test_invalid_weigh_quantity_http_422():
 async def test_weigh_nonexistent_dish_returns_404():
     """POST /api/v1/menu/live-seafood/weigh：菜品不存在时返回 404（DB 校验）"""
     from api.live_seafood_routes import router
+
     from shared.ontology.src.database import get_db
 
     app = FastAPI()
@@ -691,6 +700,7 @@ async def test_weigh_confirm_already_confirmed():
     源码第107行：rec[7] != 'pending' 时 raise HTTPException(400)
     """
     from api.live_seafood_routes import router
+
     from shared.ontology.src.database import get_db
 
     app = FastAPI()
@@ -736,6 +746,7 @@ async def test_missing_tenant_id_header_returns_400():
     源码 _tenant() 函数：tid 为空时 raise HTTPException(400)
     """
     from api.live_seafood_routes import router
+
     from shared.ontology.src.database import get_db
 
     app = FastAPI()

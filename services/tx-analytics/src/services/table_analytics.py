@@ -4,10 +4,10 @@
 金额单位统一为分(fen)。
 """
 import uuid
-from datetime import datetime, date, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 import structlog
-from sqlalchemy import select, func, text, and_
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = structlog.get_logger()
@@ -36,7 +36,6 @@ async def calculate_turnover_rate(
         }
     """
     # 查询门店桌台总数（从 tables 表）
-    from services.tx_trade_models import Table  # 跨域查询需通过 shared view 或直接 SQL
 
     # 使用原生 SQL 查询 tables 表中该门店的桌台数
     total_tables_result = await db.execute(
@@ -154,7 +153,7 @@ async def get_table_heatmap(
 
     # 组装热力图
     tables_map: dict[str, dict[int, int]] = {}
-    hourly_totals: dict[int, int] = {h: 0 for h in range(24)}
+    hourly_totals: dict[int, int] = dict.fromkeys(range(24), 0)
 
     for row in rows:
         table_no = row["table_no"]

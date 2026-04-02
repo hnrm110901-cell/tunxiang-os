@@ -8,9 +8,11 @@
 """
 import statistics
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any
+
 import structlog
-from ..base import SkillAgent, AgentResult
+
+from ..base import AgentResult, SkillAgent
 
 logger = structlog.get_logger(__name__)
 
@@ -377,7 +379,7 @@ class InventoryAlertAgent(SkillAgent):
             low_stock = []
             expiring_soon = []
 
-            from datetime import datetime, timezone, timedelta
+            from datetime import datetime, timezone
             now = datetime.now(timezone.utc)
 
             for row in rows.mappings():

@@ -477,8 +477,9 @@ def image_to_escpos_raster(img_bytes: bytes, max_width_dots: int = 384) -> bytes
     max_width_dots: 打印机最大点宽（80mm纸 = 384点，58mm = 288点）
     """
     try:
-        from PIL import Image
         import io
+
+        from PIL import Image
     except ImportError as exc:
         raise ImportError("位图打印需要安装 Pillow: pip install Pillow") from exc
 

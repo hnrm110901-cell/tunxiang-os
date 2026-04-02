@@ -11,7 +11,6 @@
 from __future__ import annotations
 
 from typing import Any, Callable
-from uuid import UUID
 
 import structlog
 from sqlalchemy.ext.asyncio import AsyncSession

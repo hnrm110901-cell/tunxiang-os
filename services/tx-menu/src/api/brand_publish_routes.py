@@ -28,13 +28,14 @@
 统一响应格式: {"ok": bool, "data": {}, "error": {}}
 所有接口需 X-Tenant-ID header。
 """
-from datetime import datetime, time, date
+from datetime import date, datetime, time
 from typing import Optional
 
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from shared.ontology.src.database import get_db
 
 from ..services.brand_publish_service import BrandPublishService
@@ -77,8 +78,9 @@ async def list_brand_dishes(
     db: AsyncSession = Depends(get_db),
 ):
     """品牌菜品库列表（is_brand_standard=true 的菜品）。"""
-    from sqlalchemy import text
     import uuid
+
+    from sqlalchemy import text
 
     try:
         await db.execute(

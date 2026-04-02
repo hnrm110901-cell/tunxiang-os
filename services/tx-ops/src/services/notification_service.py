@@ -10,12 +10,12 @@
 """
 from __future__ import annotations
 
-import os
-import uuid
 import hashlib
 import hmac
 import json
+import os
 import time
+import uuid
 from datetime import datetime, timezone
 from typing import Any, Optional
 
@@ -418,16 +418,15 @@ class NotificationService:
         signature = self._calc_aliyun_signature(query_params)
         query_params["Signature"] = signature
 
-        async with aiohttp.ClientSession() as session:
-            async with session.get(
-                api_url, params=query_params, timeout=aiohttp.ClientTimeout(total=10)
-            ) as resp:
-                result = await resp.json()
-                if result.get("Code") != "OK":
-                    raise ValueError(
-                        f"Aliyun SMS error: {result.get('Code')} - {result.get('Message')}"
-                    )
-                return result
+        async with aiohttp.ClientSession() as session, session.get(
+            api_url, params=query_params, timeout=aiohttp.ClientTimeout(total=10)
+        ) as resp:
+            result = await resp.json()
+            if result.get("Code") != "OK":
+                raise ValueError(
+                    f"Aliyun SMS error: {result.get('Code')} - {result.get('Message')}"
+                )
+            return result
 
     def _calc_aliyun_signature(self, params: dict[str, str]) -> str:
         """计算阿里云API签名（HMAC-SHA1）"""
@@ -466,19 +465,18 @@ class NotificationService:
             f"&secret={self._wechat_app_secret}"
         )
 
-        async with aiohttp.ClientSession() as session:
-            async with session.get(
-                url, timeout=aiohttp.ClientTimeout(total=10)
-            ) as resp:
-                result = await resp.json()
-                if "access_token" not in result:
-                    raise ValueError(
-                        f"WeChat token error: {result.get('errcode')} - {result.get('errmsg')}"
-                    )
-                self._wechat_access_token = result["access_token"]
-                # 提前5分钟过期
-                self._wechat_token_expires_at = now + result.get("expires_in", 7200) - 300
-                return self._wechat_access_token
+        async with aiohttp.ClientSession() as session, session.get(
+            url, timeout=aiohttp.ClientTimeout(total=10)
+        ) as resp:
+            result = await resp.json()
+            if "access_token" not in result:
+                raise ValueError(
+                    f"WeChat token error: {result.get('errcode')} - {result.get('errmsg')}"
+                )
+            self._wechat_access_token = result["access_token"]
+            # 提前5分钟过期
+            self._wechat_token_expires_at = now + result.get("expires_in", 7200) - 300
+            return self._wechat_access_token
 
     async def _call_wechat_template_msg(
         self,
@@ -504,18 +502,17 @@ class NotificationService:
         if url:
             payload["url"] = url
 
-        async with aiohttp.ClientSession() as session:
-            async with session.post(
-                api_url,
-                json=payload,
-                timeout=aiohttp.ClientTimeout(total=10),
-            ) as resp:
-                result = await resp.json()
-                if result.get("errcode", 0) != 0:
-                    raise ValueError(
-                        f"WeChat template msg error: {result.get('errcode')} - {result.get('errmsg')}"
-                    )
-                return result
+        async with aiohttp.ClientSession() as session, session.post(
+            api_url,
+            json=payload,
+            timeout=aiohttp.ClientTimeout(total=10),
+        ) as resp:
+            result = await resp.json()
+            if result.get("errcode", 0) != 0:
+                raise ValueError(
+                    f"WeChat template msg error: {result.get('errcode')} - {result.get('errmsg')}"
+                )
+            return result
 
     # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     #  内部方法 — 企业微信群机器人
@@ -547,18 +544,17 @@ class NotificationService:
             if mentioned_list:
                 payload["text"]["mentioned_list"] = mentioned_list
 
-        async with aiohttp.ClientSession() as session:
-            async with session.post(
-                webhook_url,
-                json=payload,
-                timeout=aiohttp.ClientTimeout(total=10),
-            ) as resp:
-                result = await resp.json()
-                if result.get("errcode", 0) != 0:
-                    raise ValueError(
-                        f"WeCom webhook error: {result.get('errcode')} - {result.get('errmsg')}"
-                    )
-                return result
+        async with aiohttp.ClientSession() as session, session.post(
+            webhook_url,
+            json=payload,
+            timeout=aiohttp.ClientTimeout(total=10),
+        ) as resp:
+            result = await resp.json()
+            if result.get("errcode", 0) != 0:
+                raise ValueError(
+                    f"WeCom webhook error: {result.get('errcode')} - {result.get('errmsg')}"
+                )
+            return result
 
     # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     #  内部方法 — 持久化

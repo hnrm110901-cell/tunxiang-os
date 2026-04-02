@@ -14,7 +14,7 @@ from typing import Optional
 
 import structlog
 
-from shared.events import UniversalPublisher, MenuEventType
+from shared.events import MenuEventType, UniversalPublisher
 
 log = structlog.get_logger()
 

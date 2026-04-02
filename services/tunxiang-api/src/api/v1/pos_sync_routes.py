@@ -10,19 +10,19 @@
 """
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import date
 from uuid import UUID
 
 import structlog
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends
 
-from ...shared.core.exceptions import POSAdapterError
-from ...shared.response import err, ok
 from ...modules.gateway.integrations.pos_sync_schemas import (
     BackfillRequest,
     SyncTodayRequest,
 )
 from ...modules.gateway.integrations.pos_sync_service import POSSyncService
+from ...shared.core.exceptions import POSAdapterError
+from ...shared.response import err, ok
 
 logger = structlog.get_logger(__name__)
 
@@ -55,9 +55,9 @@ def _get_tenant_id(merchant_code: str) -> UUID:
 
 # ── 依赖注入：数据库会话 ──────────────────────────────────────────────────────
 # 使用 shared/ontology 提供的统一数据库连接
-from shared.ontology.src.database import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from shared.ontology.src.database import get_db
 
 # ── 路由 ──────────────────────────────────────────────────────────────────────
 

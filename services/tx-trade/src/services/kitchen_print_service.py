@@ -17,10 +17,15 @@ import httpx
 import structlog
 
 from .receipt_service import (
-    ESC, GS, LF, CUT,
-    ALIGN_CENTER, ALIGN_LEFT,
-    BOLD_ON, BOLD_OFF,
-    DOUBLE_HEIGHT, NORMAL_SIZE,
+    ALIGN_CENTER,
+    ALIGN_LEFT,
+    BOLD_OFF,
+    BOLD_ON,
+    CUT,
+    DOUBLE_HEIGHT,
+    ESC,
+    LF,
+    NORMAL_SIZE,
 )
 
 logger = structlog.get_logger()
@@ -51,7 +56,7 @@ def _get_print_queue():
         sys.path.insert(0, edge_mac_mini_path)
 
     try:
-        from print_queue import PrintQueue, PrintJob  # noqa: PLC0415
+        from print_queue import PrintQueue  # noqa: PLC0415
         _print_queue = PrintQueue()
         logger.info("kitchen_print.queue_loaded", db_path=os.getenv("PRINT_QUEUE_DB", "(default)"))
     except ImportError:

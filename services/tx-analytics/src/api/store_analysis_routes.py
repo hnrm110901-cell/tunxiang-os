@@ -14,16 +14,16 @@ import uuid
 from datetime import date, timedelta
 from typing import Optional
 
-from fastapi import APIRouter, Header, Query, HTTPException
+from fastapi import APIRouter, Header, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from ..services.store_analysis import (
-    revenue_analysis,
-    turnover_deep_analysis,
-    ticket_analysis,
     peak_hour_analysis,
+    revenue_analysis,
     shift_analysis,
     store_comparison,
+    ticket_analysis,
+    turnover_deep_analysis,
 )
 
 router = APIRouter(prefix="/api/v1/analysis/store", tags=["store-analysis"])

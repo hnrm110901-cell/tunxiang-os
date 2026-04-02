@@ -30,7 +30,7 @@ from typing import Any
 
 from sqlalchemy import Date, DateTime, Index, Numeric, String, func
 from sqlalchemy.dialects.postgresql import JSONB, UUID
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column
 
 from .cost_snapshot import Base
 

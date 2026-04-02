@@ -1,14 +1,13 @@
 """会员分析服务 (D4) 测试 — API 冒烟 + 服务逻辑单元测试"""
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from fastapi.testclient import TestClient
-from main import app
-
 # 注册 analytics_routes（若 main.py 尚未注册，在此补充）
 from api.analytics_routes import router as analytics_router
+from fastapi.testclient import TestClient
+from main import app
 
 if not any(r.prefix == "/api/v1/member/analytics" for r in app.routes if hasattr(r, "prefix")):
     app.include_router(analytics_router)

@@ -8,8 +8,8 @@ E5 闭店检查 → E6 日结对账 → E7 复盘归因 → E8 整改跟踪
 import uuid
 from datetime import date
 
-from sqlalchemy import String, Integer, Boolean, Date, DateTime, Text, ForeignKey, func
-from sqlalchemy.dialects.postgresql import UUID, JSON
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy.dialects.postgresql import JSON, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from shared.ontology.src.base import TenantBase

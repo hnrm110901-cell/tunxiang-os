@@ -16,14 +16,15 @@ import uuid
 from typing import Optional
 
 import structlog
-from fastapi import APIRouter, Depends, Request, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
-from shared.ontology.src.entities import Order, OrderItem, Dish
+from shared.ontology.src.entities import Dish, Order, OrderItem
 from shared.ontology.src.enums import OrderStatus
+
 from ..models.dish_combo import DishCombo
 
 logger = structlog.get_logger()

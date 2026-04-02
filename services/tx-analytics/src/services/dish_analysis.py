@@ -7,17 +7,14 @@
 比率: 百分比, Decimal(5,2)
 """
 import uuid
-from datetime import date, datetime, timezone, timedelta
-from decimal import Decimal, ROUND_HALF_UP
+from datetime import date, datetime, timedelta, timezone
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Optional
 
 import structlog
 
 from .dish_margin import (
-    compute_margin,
     get_dish_margin_ranking,
-    _get_store_dishes,
-    _get_dish_cost,
 )
 
 log = structlog.get_logger()

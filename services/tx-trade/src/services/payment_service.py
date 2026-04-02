@@ -4,13 +4,11 @@ from datetime import datetime, timezone
 from typing import Optional
 
 import structlog
-from sqlalchemy import select, update
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from shared.ontology.src.entities import Order
-from shared.ontology.src.enums import OrderStatus
+from ..models.enums import PaymentStatus, RefundType
 from ..models.payment import Payment, Refund
-from ..models.enums import PaymentMethod, PaymentStatus, RefundType
 
 logger = structlog.get_logger()
 

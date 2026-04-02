@@ -8,14 +8,12 @@ from unittest.mock import MagicMock
 
 import pytest
 import pytest_asyncio
-from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
+from services.tx_trade.src.services import kds_shortage_link
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from shared.ontology.src.base import TenantBase
-from shared.ontology.src.entities import Ingredient, IngredientTransaction
-from shared.ontology.src.enums import InventoryStatus, TransactionType
-from services.tx_trade.src.services import kds_shortage_link
-
+from shared.ontology.src.entities import Ingredient
+from shared.ontology.src.enums import InventoryStatus
 
 # ─── Fixtures ───
 

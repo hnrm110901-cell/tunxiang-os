@@ -12,11 +12,11 @@
 from __future__ import annotations
 
 import asyncio
-import sys
 import os
+import sys
 import time
-from datetime import date, datetime, timezone
-from unittest.mock import AsyncMock, MagicMock, patch, call
+from datetime import date
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -32,7 +32,6 @@ from services.model_router import (
     ModelRouter,
     ModelSelectionStrategy,
 )
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Fixtures
@@ -232,7 +231,6 @@ class TestCircuitBreaker:
     @pytest.mark.asyncio
     async def test_closed_to_open_after_threshold_failures(self, circuit: CircuitBreaker):
         """连续 5 次失败后，CLOSED → OPEN"""
-        from anthropic import APIConnectionError as AnthropicConnError
 
         for _ in range(circuit.failure_threshold):
             await circuit.record_failure()
@@ -408,7 +406,6 @@ class TestModelRouterComplete:
     @pytest.mark.asyncio
     async def test_complete_timeout_control(self, router: ModelRouter):
         """超时控制：asyncio.wait_for 超时后抛 asyncio.TimeoutError"""
-        from anthropic import APITimeoutError as AnthropicTimeoutError
 
         async def slow_api(**kwargs):
             await asyncio.sleep(100)  # 模拟极慢的 API

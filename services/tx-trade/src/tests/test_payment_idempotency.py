@@ -9,17 +9,14 @@
 
 共 20 个测试用例，全部使用 mock DB，不依赖真实数据库。
 """
-import asyncio
 import uuid
 from typing import Optional
-from unittest.mock import AsyncMock, MagicMock, patch, PropertyMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from sqlalchemy.exc import IntegrityError
 
 from ..services.payment_gateway import PaymentGateway
-from ..models.enums import PaymentStatus
-
 
 # ─── 测试工具 ────────────────────────────────────────────────────────────────
 
@@ -498,9 +495,8 @@ class TestCashierApiIntegration:
     @pytest.mark.asyncio
     async def test_checkout_endpoint_passes_idempotency_key_to_gateway(self):
         """TC-18: POST /orders/{id}/checkout 将 idempotency_key 透传给 PaymentGateway"""
-        from fastapi.testclient import TestClient
+
         from fastapi import FastAPI
-        from unittest.mock import patch, AsyncMock as _AsyncMock
 
         app = FastAPI()
 
@@ -555,6 +551,7 @@ class TestCashierApiIntegration:
     async def test_checkout_request_model_max_length_128(self):
         """TC-20: PayCheckoutRequest idempotency_key 超过 128 字符时验证失败"""
         from pydantic import ValidationError
+
         from ..api.cashier_api import PayCheckoutRequest
 
         long_key = "x" * 129

@@ -6,9 +6,8 @@
 复用 table_analytics.py 翻台基础能力。
 """
 import uuid
-from datetime import datetime, date, timedelta, timezone
-from decimal import Decimal, ROUND_HALF_UP
-from typing import Optional
+from datetime import date, datetime, timedelta, timezone
+from decimal import ROUND_HALF_UP, Decimal
 
 import structlog
 from sqlalchemy import text

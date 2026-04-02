@@ -7,19 +7,19 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .middleware import TenantMiddleware, RequestLogMiddleware
+from .auth import router as auth_router
+from .growth_intel_relay import router as relay_router
+from .hub_api import router as hub_router
+from .middleware import RequestLogMiddleware, TenantMiddleware
 from .middleware.audit_middleware import AuditMiddleware
 from .proxy import router as proxy_router
-from .auth import router as auth_router
-from .hub_api import router as hub_router
-from .growth_intel_relay import router as relay_router
+from .response import ok
+from .wecom_group_routes import router as wecom_group_router
+from .wecom_internal import router as wecom_internal_router
+from .wecom_jssdk import router as wecom_jssdk_router
+from .wecom_notify_routes import router as wecom_notify_router
 from .wecom_routes import router as wecom_router
 from .wecom_scrm_routes import router as wecom_scrm_router
-from .wecom_jssdk import router as wecom_jssdk_router
-from .wecom_internal import router as wecom_internal_router
-from .wecom_group_routes import router as wecom_group_router
-from .wecom_notify_routes import router as wecom_notify_router
-from .response import ok
 
 logger = structlog.get_logger(__name__)
 
@@ -44,10 +44,11 @@ async def _run_daily_sop() -> None:
     log.info("wecom_group_daily_sop_job_start")
 
     try:
+        from sqlalchemy import distinct, select
+
         from .database import get_async_session  # type: ignore[import]
-        from .wecom_group_service import WecomGroupService
         from .models.wecom_group import WecomGroupConfig
-        from sqlalchemy import select, distinct
+        from .wecom_group_service import WecomGroupService
 
         service = WecomGroupService()
 
