@@ -1,0 +1,18 @@
+{
+  "name": "windows-pos-shell",
+  "version": "0.1.0",
+  "private": true,
+  "description": "屯象OS Windows POS 壳 — Electron WebView + TXBridge 预加载（与安卓壳行为对齐）",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "rebuild": "electron-rebuild -f -w printer"
+  },
+  "optionalDependencies": {
+    "printer": "^0.4.0"
+  },
+  "devDependencies": {
+    "@electron/rebuild": "^3.6.0",
+    "electron": "^28.3.3"
+  }
+}

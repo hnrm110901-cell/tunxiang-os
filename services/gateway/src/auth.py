@@ -32,6 +32,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import text
 
 from shared.ontology.src.database import async_session_factory
+from shared.tenant_registry import MERCHANT_CODE_TO_TENANT_UUID
 
 from .response import err, ok
 from .services.audit_log_service import AuditAction, AuditEntry, AuditLogService
@@ -68,7 +69,7 @@ DEMO_USERS: dict[str, dict] = {
         "password": os.getenv("DEMO_CZQ_PASSWORD", ""),
         "name": "尝在一起管理员",
         "role": "merchant_admin",
-        "tenant_id": "a0000000-0000-0000-0000-000000000002",
+        "tenant_id": MERCHANT_CODE_TO_TENANT_UUID["czyz"],
         "merchant": "尝在一起",
         "user_id": "u0000000-0000-0000-0000-000000000002",
         "mfa_enabled": False,
@@ -79,7 +80,7 @@ DEMO_USERS: dict[str, dict] = {
         "password": os.getenv("DEMO_ZQX_PASSWORD", ""),
         "name": "最黔线管理员",
         "role": "merchant_admin",
-        "tenant_id": "a0000000-0000-0000-0000-000000000003",
+        "tenant_id": MERCHANT_CODE_TO_TENANT_UUID["zqx"],
         "merchant": "最黔线",
         "user_id": "u0000000-0000-0000-0000-000000000003",
         "mfa_enabled": False,
@@ -90,7 +91,7 @@ DEMO_USERS: dict[str, dict] = {
         "password": os.getenv("DEMO_SGC_PASSWORD", ""),
         "name": "尚宫厨管理员",
         "role": "merchant_admin",
-        "tenant_id": "a0000000-0000-0000-0000-000000000004",
+        "tenant_id": MERCHANT_CODE_TO_TENANT_UUID["sgc"],
         "merchant": "尚宫厨",
         "user_id": "u0000000-0000-0000-0000-000000000004",
         "mfa_enabled": False,

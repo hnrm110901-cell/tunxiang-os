@@ -4,6 +4,48 @@
 
 ---
 
+## 2026-04-02（Hub 接 PG + Windows RAW 打印）
+
+### 今日完成
+- [db-migrations] `v132_platform_hub.py`：`platform_tenants`、`hub_store_overlay`、`hub_adapter_connections`、`hub_edge_devices`、`hub_tickets`、`hub_billing_monthly`、`hub_agent_metrics_daily`；种子数据与 Hub 演示一致
+- [gateway] `hub_service.py`：上述表 + `stores`/`orders` 聚合；`hub_api.py` 改为 `Depends(get_db_no_rls)`，表未迁移时 503
+- [windows-pos-shell] `main.js`：`ipcMain` + 可选 `printer` 模块 **RAW** 打印；`TX_PRINTER_NAME`；`npm run rebuild`；README 补充
+
+### 数据变化
+- 迁移：v131 → **v132**
+
+### 遗留问题
+- Hub 写接口（开户/推送更新/工单创建）仍为占位 INSERT
+- `printer` 仅 Windows 常用；macOS 开发可仅用日志回退
+
+### 明日计划
+- Hub 写路径与审计；打印在目标机实测商米/芯烨等驱动名
+
+---
+
+## 2026-04-02（Phase1 租户 UUID 单一事实源 + web-hub Hub API + Windows 壳）
+
+### 今日完成
+- [shared] `shared/tenant_registry.py`：商户码 czyz/zqx/sgc ↔ 租户 UUID 单一事实源
+- [gateway] `auth.py`：DEMO 用户 `tenant_id` 改为引用 `MERCHANT_CODE_TO_TENANT_UUID`，与 POS 同步一致
+- [tunxiang-api] `pos_sync_routes.py`：`_get_tenant_id` 已用 `tenant_registry`（此前会话已接）
+- [shared/tests] `test_tenant_registry.py`：映射与解析用例（pytest 3 条）
+- [web-hub] `src/api/hubApi.ts`：`hubGet`/`hubPost` 解析 `{ ok, data }`
+- [web-hub] 商户/门店/模板/Adapter/计费/工单/部署/平台数据等页改为请求 `/api/v1/hub/*`；Agent 监控页增加 Hub `/agents/health` 全局条
+- [apps/windows-pos-shell] Electron + `preload` 注入 `TXBridge` 占位，README 说明环境变量
+
+### 数据变化
+- 无新迁移
+
+### 遗留问题
+- Hub 接口仍为网关演示数据；商户级账单/平台 GMV 等与数仓打通后替换
+- Windows 壳外设需按厂商 SDK 接 `ipcMain` 实现
+
+### 明日计划
+- 按需将 Hub 数据接 PG/数仓；Windows 壳打印 POC
+
+---
+
 ## 2026-04-02（Claude 执行方案 + 商户布署 Runbook + P0 代码）
 
 ### 今日完成

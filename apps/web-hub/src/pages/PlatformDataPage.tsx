@@ -1,6 +1,9 @@
 /**
- * 平台数据 — 商户数/门店数/GMV
+ * 平台数据（GET /api/v1/hub/platform/stats）
  */
+import { useEffect, useState } from 'react';
+import { hubGet } from '../api/hubApi';
+
 const s = {
   page: { color: '#E0E0E0' } as React.CSSProperties,
   title: { fontSize: 22, fontWeight: 700, color: '#FFFFFF', marginBottom: 20 } as React.CSSProperties,
@@ -28,93 +31,103 @@ const s = {
     color: '#6B8A97', fontWeight: 600, fontSize: 12,
   } as React.CSSProperties,
   td: { padding: '10px 12px', borderBottom: '1px solid #112A33' } as React.CSSProperties,
-  bar: (pct: number, color: string) => ({
-    width: 120, height: 8, borderRadius: 4, background: '#1A3540', position: 'relative' as const, display: 'inline-block',
-  }) as React.CSSProperties,
-  barFill: (pct: number, color: string) => ({
-    width: `${pct}%`, height: '100%', borderRadius: 4, position: 'absolute' as const, top: 0, left: 0,
-    background: color,
-  }) as React.CSSProperties,
+  err: { color: '#EF4444', fontSize: 13, marginBottom: 12 } as React.CSSProperties,
 };
 
-const metrics = [
-  { merchant: '尝在一起', stores: 12, monthGmv: 580000, orders: 12450, avgTicket: 46.6, growth: '+12%' },
-  { merchant: '最黔线', stores: 6, monthGmv: 320000, orders: 7800, avgTicket: 41.0, growth: '+8%' },
-  { merchant: '尚宫厨', stores: 8, monthGmv: 450000, orders: 5600, avgTicket: 80.4, growth: '+15%' },
-  { merchant: '湘味传奇', stores: 3, monthGmv: 120000, orders: 3200, avgTicket: 37.5, growth: '-3%' },
-];
-
-const totalGmv = metrics.reduce((sum, m) => sum + m.monthGmv, 0);
-const totalOrders = metrics.reduce((sum, m) => sum + m.orders, 0);
-const totalStores = metrics.reduce((sum, m) => sum + m.stores, 0);
-const maxGmv = Math.max(...metrics.map((m) => m.monthGmv));
+type HubPlatformStats = {
+  total_merchants: number;
+  total_stores: number;
+  active_stores_today: number;
+  total_orders_today: number;
+  gmv_today_yuan: number;
+  agent_calls_today: number;
+  avg_response_ms: number;
+};
 
 export function PlatformDataPage() {
+  const [stats, setStats] = useState<HubPlatformStats | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    hubGet<HubPlatformStats>('/platform/stats')
+      .then((d) => {
+        if (!cancelled) {
+          setStats(d);
+          setErr(null);
+        }
+      })
+      .catch((e: Error) => {
+        if (!cancelled) setErr(e.message || '加载失败');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const gmvWan = stats ? stats.gmv_today_yuan / 10000 : 0;
+
   return (
     <div style={s.page}>
       <div style={s.title}>平台数据</div>
+      {err && <div style={s.err}>{err}</div>}
+      {loading && <div style={{ color: '#6B8A97', marginBottom: 16 }}>加载中…</div>}
       <div style={s.cards}>
-        <div style={s.card}><div style={s.cardLabel}>商户总数</div><div style={s.cardValue}>{metrics.length}</div></div>
-        <div style={s.card}><div style={s.cardLabel}>门店总数</div><div style={{ ...s.cardValue, color: '#3B82F6' }}>{totalStores}</div></div>
-        <div style={s.card}><div style={s.cardLabel}>本月GMV</div><div style={{ ...s.cardValue, color: '#22C55E' }}>{(totalGmv / 10000).toFixed(1)}万</div></div>
-        <div style={s.card}><div style={s.cardLabel}>本月订单</div><div style={{ ...s.cardValue, color: '#A855F7' }}>{totalOrders.toLocaleString()}</div></div>
+        <div style={s.card}><div style={s.cardLabel}>商户总数</div><div style={s.cardValue}>{stats?.total_merchants ?? '—'}</div></div>
+        <div style={s.card}><div style={s.cardLabel}>门店总数</div><div style={{ ...s.cardValue, color: '#3B82F6' }}>{stats?.total_stores ?? '—'}</div></div>
+        <div style={s.card}><div style={s.cardLabel}>今日GMV</div><div style={{ ...s.cardValue, color: '#22C55E' }}>{stats ? `${gmvWan.toFixed(1)}万` : '—'}</div></div>
+        <div style={s.card}><div style={s.cardLabel}>今日订单</div><div style={{ ...s.cardValue, color: '#A855F7' }}>{stats?.total_orders_today?.toLocaleString() ?? '—'}</div></div>
       </div>
 
       <div style={s.row}>
         <div style={s.section}>
-          <div style={s.sectionTitle}>商户GMV排行</div>
-          {metrics.sort((a, b) => b.monthGmv - a.monthGmv).map((m) => (
-            <div key={m.merchant} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-              <span style={{ fontSize: 13, width: 100 }}>{m.merchant}</span>
-              <div style={s.bar(0, '')}>
-                <div style={s.barFill(Math.round((m.monthGmv / maxGmv) * 100), '#FF6B2C')} />
-              </div>
-              <span style={{ fontSize: 12, color: '#FF6B2C', width: 60, textAlign: 'right' as const }}>{(m.monthGmv / 10000).toFixed(1)}万</span>
-            </div>
-          ))}
+          <div style={s.sectionTitle}>今日运营</div>
+          <div style={{ fontSize: 13, color: '#8BA5B2', lineHeight: 2.0 }}>
+            <div>在营门店（今日）：<strong style={{ color: '#FFFFFF' }}>{stats?.active_stores_today ?? '—'}</strong></div>
+            <div>Agent 调用次数：<strong style={{ color: '#FFFFFF' }}>{stats?.agent_calls_today?.toLocaleString() ?? '—'}</strong></div>
+            <div>接口平均响应：<strong style={{ color: '#FFFFFF' }}>{stats?.avg_response_ms ?? '—'} ms</strong></div>
+          </div>
         </div>
         <div style={s.section}>
-          <div style={s.sectionTitle}>关键指标汇总</div>
+          <div style={s.sectionTitle}>说明</div>
           <div style={{ fontSize: 13, color: '#8BA5B2', lineHeight: 2.0 }}>
-            <div>平台月均客单价: <strong style={{ color: '#FFFFFF' }}>{(totalGmv / totalOrders).toFixed(1)}元</strong></div>
-            <div>平均单店GMV: <strong style={{ color: '#FFFFFF' }}>{(totalGmv / totalStores / 10000).toFixed(2)}万</strong></div>
-            <div>日均订单: <strong style={{ color: '#FFFFFF' }}>{Math.round(totalOrders / 30).toLocaleString()}单</strong></div>
-            <div>活跃商户占比: <strong style={{ color: '#22C55E' }}>100%</strong></div>
+            数据来自网关 Hub 演示接口；后续可替换为真实数仓汇总。
           </div>
         </div>
       </div>
 
       <div style={s.toolbar}>
-        <div style={{ fontSize: 14, color: '#8BA5B2' }}>商户经营数据</div>
+        <div style={{ fontSize: 14, color: '#8BA5B2' }}>平台汇总指标</div>
       </div>
       <table style={s.table}>
         <thead>
           <tr>
-            <th style={s.th}>商户</th>
-            <th style={s.th}>门店数</th>
-            <th style={s.th}>本月GMV</th>
-            <th style={s.th}>订单数</th>
-            <th style={s.th}>客单价</th>
-            <th style={s.th}>环比增长</th>
+            <th style={s.th}>指标</th>
+            <th style={s.th}>数值</th>
             <th style={s.th}>操作</th>
           </tr>
         </thead>
         <tbody>
-          {metrics.map((m) => (
-            <tr key={m.merchant}>
-              <td style={s.td}>{m.merchant}</td>
-              <td style={s.td}>{m.stores}</td>
-              <td style={s.td}>{(m.monthGmv / 10000).toFixed(1)}万</td>
-              <td style={s.td}>{m.orders.toLocaleString()}</td>
-              <td style={s.td}>{m.avgTicket.toFixed(1)}元</td>
-              <td style={s.td}>
-                <span style={{ color: m.growth.startsWith('+') ? '#22C55E' : '#EF4444', fontWeight: 600 }}>{m.growth}</span>
-              </td>
-              <td style={s.td}>
-                <button style={s.btnSec}>查看详情</button>
-              </td>
-            </tr>
-          ))}
+          <tr>
+            <td style={s.td}>今日 GMV（元）</td>
+            <td style={s.td}>{stats?.gmv_today_yuan?.toLocaleString() ?? '—'}</td>
+            <td style={s.td}><button type="button" style={s.btnSec}>查看详情</button></td>
+          </tr>
+          <tr>
+            <td style={s.td}>今日订单数</td>
+            <td style={s.td}>{stats?.total_orders_today?.toLocaleString() ?? '—'}</td>
+            <td style={s.td}><button type="button" style={s.btnSec}>查看详情</button></td>
+          </tr>
+          <tr>
+            <td style={s.td}>Agent 调用</td>
+            <td style={s.td}>{stats?.agent_calls_today?.toLocaleString() ?? '—'}</td>
+            <td style={s.td}><button type="button" style={s.btnSec}>查看详情</button></td>
+          </tr>
         </tbody>
       </table>
     </div>

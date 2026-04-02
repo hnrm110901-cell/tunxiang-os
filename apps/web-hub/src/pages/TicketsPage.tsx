@@ -1,6 +1,9 @@
 /**
- * 工单系统 — 报障/实施/SLA
+ * 工单系统（GET /api/v1/hub/tickets）
  */
+import { useEffect, useMemo, useState } from 'react';
+import { hubGet, type HubListResult } from '../api/hubApi';
+
 const s = {
   page: { color: '#E0E0E0' } as React.CSSProperties,
   title: { fontSize: 22, fontWeight: 700, color: '#FFFFFF', marginBottom: 20 } as React.CSSProperties,
@@ -30,33 +33,98 @@ const s = {
     display: 'inline-block', padding: '2px 10px', borderRadius: 20,
     fontSize: 11, fontWeight: 600, background: `${color}22`, color,
   }) as React.CSSProperties,
+  err: { color: '#EF4444', fontSize: 13, marginBottom: 12 } as React.CSSProperties,
 };
 
-const tickets = [
-  { id: 'TK-2026-001', merchant: '尝在一起', store: '五一广场店', type: '报障', title: 'POS打印机断连', priority: 'P1', status: '处理中', sla: '2小时', created: '2026-03-23 09:15' },
-  { id: 'TK-2026-002', merchant: '最黔线', store: '太平街店', type: '实施', title: '新门店部署', priority: 'P2', status: '待分配', sla: '48小时', created: '2026-03-22 14:30' },
-  { id: 'TK-2026-003', merchant: '尚宫厨', store: '天心店', type: '报障', title: 'Mac mini离线', priority: 'P0', status: '处理中', sla: '1小时', created: '2026-03-23 10:00' },
-  { id: 'TK-2026-004', merchant: '湘味传奇', store: '侯家塘店', type: '实施', title: 'Adapter对接金蝶', priority: 'P2', status: '已完成', sla: '72小时', created: '2026-03-20 11:00' },
-  { id: 'TK-2026-005', merchant: '尝在一起', store: '万达店', type: '报障', title: 'KDS屏幕卡顿', priority: 'P1', status: '待分配', sla: '4小时', created: '2026-03-23 08:45' },
-];
+type HubTicket = {
+  id: string;
+  merchant: string;
+  title: string;
+  priority: string;
+  status: string;
+  created: string;
+  assignee: string;
+};
 
-const priorityColor: Record<string, string> = { P0: '#EF4444', P1: '#F59E0B', P2: '#3B82F6' };
-const statusColor: Record<string, string> = { '处理中': '#F59E0B', '待分配': '#3B82F6', '已完成': '#22C55E' };
+const priorityLabel = (p: string): string => {
+  const x = p.toLowerCase();
+  if (x === 'high') return 'P1';
+  if (x === 'medium') return 'P2';
+  if (x === 'low') return 'P3';
+  if (x === 'p0') return 'P0';
+  if (x === 'p1') return 'P1';
+  if (x === 'p2') return 'P2';
+  return p.toUpperCase();
+};
+
+const priorityColor: Record<string, string> = {
+  P0: '#EF4444', P1: '#F59E0B', P2: '#3B82F6', P3: '#6B8A97',
+};
+
+const statusZh = (st: string): string => {
+  const x = st.toLowerCase();
+  if (x === 'open') return '待分配';
+  if (x === 'in_progress') return '处理中';
+  if (x === 'closed' || x === 'done') return '已完成';
+  return st;
+};
+
+const statusColor: Record<string, string> = {
+  处理中: '#F59E0B',
+  待分配: '#3B82F6',
+  已完成: '#22C55E',
+};
 
 export function TicketsPage() {
-  const open = tickets.filter((t) => t.status !== '已完成').length;
+  const [items, setItems] = useState<HubTicket[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    hubGet<HubListResult<HubTicket>>('/tickets')
+      .then((d) => {
+        if (!cancelled) {
+          setItems(d.items || []);
+          setErr(null);
+        }
+      })
+      .catch((e: Error) => {
+        if (!cancelled) setErr(e.message || '加载失败');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const open = useMemo(
+    () => items.filter((t) => statusZh(t.status) !== '已完成').length,
+    [items],
+  );
+
+  const p0 = useMemo(
+    () => items.filter((t) => priorityLabel(t.priority) === 'P0').length,
+    [items],
+  );
+
   return (
     <div style={s.page}>
       <div style={s.title}>工单中心</div>
+      {err && <div style={s.err}>{err}</div>}
+      {loading && <div style={{ color: '#6B8A97', marginBottom: 16 }}>加载中…</div>}
       <div style={s.cards}>
-        <div style={s.card}><div style={s.cardLabel}>工单总数</div><div style={s.cardValue}>{tickets.length}</div></div>
+        <div style={s.card}><div style={s.cardLabel}>工单总数</div><div style={s.cardValue}>{items.length}</div></div>
         <div style={s.card}><div style={s.cardLabel}>未完成</div><div style={{ ...s.cardValue, color: '#F59E0B' }}>{open}</div></div>
-        <div style={s.card}><div style={s.cardLabel}>P0工单</div><div style={{ ...s.cardValue, color: '#EF4444' }}>{tickets.filter((t) => t.priority === 'P0').length}</div></div>
-        <div style={s.card}><div style={s.cardLabel}>SLA达标率</div><div style={{ ...s.cardValue, color: '#22C55E' }}>87%</div></div>
+        <div style={s.card}><div style={s.cardLabel}>P0工单</div><div style={{ ...s.cardValue, color: '#EF4444' }}>{p0}</div></div>
+        <div style={s.card}><div style={s.cardLabel}>SLA达标率</div><div style={{ ...s.cardValue, color: '#22C55E' }}>—</div></div>
       </div>
       <div style={s.toolbar}>
         <div style={{ fontSize: 14, color: '#8BA5B2' }}>所有工单</div>
-        <button style={s.btn}>+ 新建工单</button>
+        <button type="button" style={s.btn}>+ 新建工单</button>
       </div>
       <table style={s.table}>
         <thead>
@@ -64,31 +132,35 @@ export function TicketsPage() {
             <th style={s.th}>工单号</th>
             <th style={s.th}>商户</th>
             <th style={s.th}>门店</th>
-            <th style={s.th}>类型</th>
             <th style={s.th}>标题</th>
             <th style={s.th}>优先级</th>
             <th style={s.th}>状态</th>
-            <th style={s.th}>SLA</th>
+            <th style={s.th}>负责人</th>
+            <th style={s.th}>创建时间</th>
             <th style={s.th}>操作</th>
           </tr>
         </thead>
         <tbody>
-          {tickets.map((t) => (
-            <tr key={t.id}>
-              <td style={s.td}>{t.id}</td>
-              <td style={s.td}>{t.merchant}</td>
-              <td style={s.td}>{t.store}</td>
-              <td style={s.td}><span style={s.badge('#3B82F6')}>{t.type}</span></td>
-              <td style={s.td}>{t.title}</td>
-              <td style={s.td}><span style={s.badge(priorityColor[t.priority] || '#6B8A97')}>{t.priority}</span></td>
-              <td style={s.td}><span style={{ color: statusColor[t.status] || '#6B8A97', fontWeight: 600 }}>{t.status}</span></td>
-              <td style={s.td}>{t.sla}</td>
-              <td style={s.td}>
-                <button style={s.btnSec}>处理</button>
-                <button style={s.btnSec}>查看详情</button>
-              </td>
-            </tr>
-          ))}
+          {items.map((t) => {
+            const pl = priorityLabel(t.priority);
+            const sz = statusZh(t.status);
+            return (
+              <tr key={t.id}>
+                <td style={s.td}>{t.id}</td>
+                <td style={s.td}>{t.merchant}</td>
+                <td style={s.td}>—</td>
+                <td style={s.td}>{t.title}</td>
+                <td style={s.td}><span style={s.badge(priorityColor[pl] || '#6B8A97')}>{pl}</span></td>
+                <td style={s.td}><span style={{ color: statusColor[sz] || '#6B8A97', fontWeight: 600 }}>{sz}</span></td>
+                <td style={s.td}>{t.assignee}</td>
+                <td style={s.td}>{t.created}</td>
+                <td style={s.td}>
+                  <button type="button" style={s.btnSec}>处理</button>
+                  <button type="button" style={s.btnSec}>查看详情</button>
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
