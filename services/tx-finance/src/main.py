@@ -19,6 +19,7 @@ from api.reconciliation_routes import router as reconciliation_router
 from api.revenue_aggregation_routes import router as revenue_aggregation_router
 from api.finance_cost_routes import router as finance_cost_router
 from api.finance_pl_routes import router as finance_pl_router
+from api.split_routes import router as split_router
 
 
 @asynccontextmanager
@@ -52,6 +53,7 @@ app.include_router(reconciliation_router, prefix="/api/v1")
 app.include_router(revenue_aggregation_router)
 app.include_router(finance_cost_router, prefix="/api/v1/finance")
 app.include_router(finance_pl_router,   prefix="/api/v1/finance")
+app.include_router(split_router)  # /api/v1/finance/splits/* — v100 分润规则与分账流水
 
 
 @app.get("/health")
