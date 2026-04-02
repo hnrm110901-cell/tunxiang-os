@@ -56,6 +56,14 @@ import { TrendAnalysisPage } from './pages/hq/analytics/TrendAnalysisPage';
 import { BanquetBoardPage } from './pages/hq/BanquetBoardPage';
 import { ReceiptEditorPage } from './pages/ReceiptEditorPage';
 
+// ── P0 原生 AI Agent 页面 ──
+import OrchestratorPage from './pages/hq/agent/OrchestratorPage';
+import AlertsCenterPage from './pages/hq/AlertsCenterPage';
+import FrontWorkbenchPage from './pages/front/FrontWorkbenchPage';
+import ReservationsPage from './pages/front/ReservationsPage';
+import TableBoardPage from './pages/front/TableBoardPage';
+import DayClosePage from './pages/store/DayClosePage';
+
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem('tx_token'));
 
@@ -130,6 +138,14 @@ function App() {
           <Route path="/hq/banquet" element={<BanquetBoardPage />} />
           <Route path="/receipt-editor" element={<ReceiptEditorPage />} />
           <Route path="/receipt-editor/:templateId" element={<ReceiptEditorPage />} />
+
+          {/* ── P0 原生 AI Agent 页面 ── */}
+          <Route path="/hub/agent/orchestrator" element={<OrchestratorPage />} />
+          <Route path="/hub/alerts" element={<AlertsCenterPage />} />
+          <Route path="/front/workbench" element={<FrontWorkbenchPage />} />
+          <Route path="/front/reservations" element={<ReservationsPage />} />
+          <Route path="/front/tables" element={<TableBoardPage />} />
+          <Route path="/store/manager/day-close" element={<DayClosePage />} />
         </Routes>
       </ShellHQ>
     </BrowserRouter>
