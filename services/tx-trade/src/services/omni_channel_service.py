@@ -12,11 +12,10 @@ from typing import Any, List, Optional
 
 import httpx
 import structlog
-from sqlalchemy import select, update, and_
+from sqlalchemy import select, update, and_, or_
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .kds_dispatch import dispatch_order_to_kds
 from shared.adapters.base.src.adapter import APIError as AdapterAPIError
 
 logger = structlog.get_logger()
@@ -52,7 +51,7 @@ class UnifiedOrder:
     """统一订单格式——所有平台标准化后的内部表示"""
     platform: str                     # meituan / eleme / douyin
     platform_order_id: str            # 平台原始订单ID
-    source_channel: str               # 同 platform，写入 orders.source_channel
+    source_channel: str               # 同 platform，写入 orders.sales_channel_id
     tenant_id: str
     store_id: str
     status: str                       # pending / confirmed / rejected / cancelled
@@ -190,6 +189,78 @@ PLATFORM_REJECT_REASON_MAP = {
 }
 
 
+def _omni_meta(row: Any) -> dict[str, Any]:
+    md = getattr(row, "order_metadata", None) or {}
+    if not isinstance(md, dict):
+        return {}
+    om = md.get("omni")
+    return om if isinstance(om, dict) else {}
+
+
+def row_omni_platform_key(row: Any, platforms: list[str]) -> str:
+    """解析用于 Adapter 的平台 slug（meituan/eleme/douyin）。"""
+    sch = str(getattr(row, "sales_channel_id", None) or "").strip().lower()
+    if sch in platforms:
+        return sch
+    for p in platforms:
+        if p and p in sch:
+            return p
+    leg = str(_omni_meta(row).get("platform", "")).strip().lower()
+    if leg in platforms:
+        return leg
+    return ""
+
+
+def row_omni_platform_order_id(row: Any) -> str:
+    pid = _omni_meta(row).get("platform_order_id")
+    if pid:
+        return str(pid)
+    return ""
+
+
+def stable_omni_order_no(order: UnifiedOrder) -> str:
+    """稳定、唯一、≤64 的内部 order_no（同平台单号重复推单可幂等识别）。"""
+    seed = f"{order.tenant_id}:{order.store_id}:{order.source_channel}:{order.platform_order_id}"
+    h = uuid.uuid5(uuid.NAMESPACE_URL, seed).hex
+    return f"O{h}"[:64]
+
+
+def _items_from_omni_meta(row: Any) -> list[UnifiedOrderItem]:
+    om = _omni_meta(row)
+    raw_items = om.get("items_snapshot") or om.get("items") or []
+    if not isinstance(raw_items, list):
+        return []
+    out: list[UnifiedOrderItem] = []
+    for item in raw_items:
+        if not isinstance(item, dict):
+            continue
+        out.append(
+            UnifiedOrderItem(
+                name=str(item.get("name", item.get("item_name", ""))),
+                quantity=int(item.get("quantity", 1)),
+                price_fen=int(item.get("price_fen", item.get("unit_price_fen", 0))),
+                sku_id=str(item.get("sku_id", "")),
+                notes=str(item.get("notes", "")),
+            )
+        )
+    return out
+
+
+async def _dispatch_order_to_kds(*args: Any, **kwargs: Any) -> Any:
+    """延迟导入 kds_dispatch，便于单测在无相对包结构时只测标准化/落库逻辑。"""
+    from .kds_dispatch import dispatch_order_to_kds
+
+    return await dispatch_order_to_kds(*args, **kwargs)
+
+
+def omni_order_match_clause(order_cls: Any, platforms: list[str]) -> Any:
+    """ORM 条件：外卖聚合单（sales_channel_id ∈ 平台 或 legacy order_metadata.omni）。"""
+    return or_(
+        order_cls.sales_channel_id.in_(platforms),
+        order_cls.order_metadata["omni"].isnot(None),
+    )
+
+
 # ─── 主服务类 ─────────────────────────────────────────────────────────────────
 
 
@@ -198,7 +269,7 @@ class OmniChannelService:
 
     职责：
     - 将各平台原始推单payload标准化为统一内部格式
-    - 写入orders表（source_channel = platform）
+    - 写入 orders：order_type=delivery，sales_channel_id=平台，order_metadata.omni 存平台单号与明细快照
     - 接单/拒单并回调平台
     - 超时未接单自动拒单（可配置，默认3分钟）
     - 接单后自动推送到KDS
@@ -236,7 +307,7 @@ class OmniChannelService:
         """接收平台推单：标准化 → 写库 → 推送KDS → 返回UnifiedOrder
 
         1. 根据platform调用对应normalizer转为统一Order格式
-        2. 写入orders表，source_channel = platform
+        2. 写入 orders 表（sales_channel_id + order_metadata.omni）
         3. 推送到KDS（调用kds_dispatch）
         4. 返回UnifiedOrder
         """
@@ -267,7 +338,7 @@ class OmniChannelService:
                 }
                 for item in order.items
             ]
-            await dispatch_order_to_kds(
+            await _dispatch_order_to_kds(
                 order_id=internal_order_id,
                 order_items=kds_items,
                 tenant_id=tenant_id,
@@ -307,28 +378,37 @@ class OmniChannelService:
 
         order_row = await self._get_order(order_id, tenant_id, db)
 
+        platform_key = row_omni_platform_key(order_row, self.PLATFORMS)
+        ext_order_id = row_omni_platform_order_id(order_row)
+
         # 更新内部状态
         await self._update_order_status(order_id, "confirmed", tenant_id, db)
 
         # 回调平台（失败不阻塞内部流程）
-        try:
-            adapter = self._get_platform_adapter(order_row.source_channel)
-            await adapter.confirm_order(order_row.platform_order_id)
-            log.info("omni_channel.accept_order.platform_callback_ok", platform=order_row.source_channel)
-        except (AdapterAPIError, httpx.HTTPError, ConnectionError, UnsupportedPlatformError) as exc:
-            log.error(
-                "omni_channel.accept_order.platform_callback_failed",
-                platform=order_row.source_channel,
-                error=str(exc),
-                error_type=type(exc).__name__,
-                exc_info=True,
+        if platform_key and ext_order_id:
+            try:
+                adapter = self._get_platform_adapter(platform_key)
+                await adapter.confirm_order(ext_order_id)
+                log.info("omni_channel.accept_order.platform_callback_ok", platform=platform_key)
+            except (AdapterAPIError, httpx.HTTPError, ConnectionError, UnsupportedPlatformError) as exc:
+                log.error(
+                    "omni_channel.accept_order.platform_callback_failed",
+                    platform=platform_key,
+                    error=str(exc),
+                    error_type=type(exc).__name__,
+                    exc_info=True,
+                )
+        else:
+            log.warning(
+                "omni_channel.accept_order.skip_platform_callback",
+                platform_key=platform_key,
+                has_ext_id=bool(ext_order_id),
             )
-            # 平台回调失败只记录日志，不影响内部订单状态
 
         return {
             "ok": True,
             "order_id": order_id,
-            "platform": order_row.source_channel,
+            "platform": platform_key or getattr(order_row, "sales_channel_id", None),
             "estimated_minutes": estimated_minutes,
         }
 
@@ -358,27 +438,37 @@ class OmniChannelService:
         order_row = await self._get_order(order_id, tenant_id, db)
         reason_text = PLATFORM_REJECT_REASON_MAP.get(reason_code, "其他原因")
 
+        platform_key = row_omni_platform_key(order_row, self.PLATFORMS)
+        ext_order_id = row_omni_platform_order_id(order_row)
+
         # 更新内部状态
         await self._update_order_status(order_id, "rejected", tenant_id, db)
 
         # 回调平台拒单（失败只记录）
-        try:
-            adapter = self._get_platform_adapter(order_row.source_channel)
-            await adapter.cancel_order(order_row.platform_order_id, reason_code, reason_text)
-            log.info("omni_channel.reject_order.platform_callback_ok", platform=order_row.source_channel)
-        except (AdapterAPIError, httpx.HTTPError, ConnectionError, UnsupportedPlatformError) as exc:
-            log.error(
-                "omni_channel.reject_order.platform_callback_failed",
-                platform=order_row.source_channel,
-                error=str(exc),
-                error_type=type(exc).__name__,
-                exc_info=True,
+        if platform_key and ext_order_id:
+            try:
+                adapter = self._get_platform_adapter(platform_key)
+                await adapter.cancel_order(ext_order_id, reason_code, reason_text)
+                log.info("omni_channel.reject_order.platform_callback_ok", platform=platform_key)
+            except (AdapterAPIError, httpx.HTTPError, ConnectionError, UnsupportedPlatformError) as exc:
+                log.error(
+                    "omni_channel.reject_order.platform_callback_failed",
+                    platform=platform_key,
+                    error=str(exc),
+                    error_type=type(exc).__name__,
+                    exc_info=True,
+                )
+        else:
+            log.warning(
+                "omni_channel.reject_order.skip_platform_callback",
+                platform_key=platform_key,
+                has_ext_id=bool(ext_order_id),
             )
 
         return {
             "ok": True,
             "order_id": order_id,
-            "platform": order_row.source_channel,
+            "platform": platform_key or getattr(order_row, "sales_channel_id", None),
             "reason_code": reason_code,
         }
 
@@ -415,7 +505,8 @@ class OmniChannelService:
                     OrderModel.tenant_id == tid,
                     OrderModel.store_id == sid,
                     OrderModel.status == "pending",
-                    OrderModel.source_channel.in_(self.PLATFORMS),
+                    OrderModel.order_type.in_(["delivery", "takeaway"]),
+                    omni_order_match_clause(OrderModel, self.PLATFORMS),
                     OrderModel.is_deleted == False,  # noqa: E712
                 )
             )
@@ -426,32 +517,33 @@ class OmniChannelService:
 
         orders = []
         for row in rows:
-            items_snapshot = getattr(row, "items_snapshot", []) or []
-            unified_items = [
-                UnifiedOrderItem(
-                    name=item.get("name", item.get("item_name", "")),
-                    quantity=item.get("quantity", 1),
-                    price_fen=item.get("price_fen", item.get("unit_price_fen", 0)),
-                    sku_id=item.get("sku_id", ""),
-                    notes=item.get("notes", ""),
+            plat = row_omni_platform_key(row, self.PLATFORMS) or str(
+                getattr(row, "sales_channel_id", "") or ""
+            )
+            ext_id = row_omni_platform_order_id(row) or str(row.order_no or "")
+            unified_items = _items_from_omni_meta(row)
+            om = _omni_meta(row)
+            md_full = getattr(row, "order_metadata", None)
+            md_top = md_full if isinstance(md_full, dict) else {}
+            delivery_addr = str(om.get("delivery_address") or md_top.get("delivery_address") or "")
+
+            orders.append(
+                UnifiedOrder(
+                    platform=plat,
+                    platform_order_id=ext_id,
+                    source_channel=plat,
+                    tenant_id=tenant_id,
+                    store_id=store_id,
+                    status=str(row.status),
+                    total_fen=int(getattr(row, "total_amount_fen", 0) or 0),
+                    items=unified_items,
+                    notes=str(row.notes or ""),
+                    customer_phone=str(getattr(row, "customer_phone", "") or ""),
+                    delivery_address=delivery_addr,
+                    created_at=row.created_at,
+                    internal_order_id=str(row.id),
                 )
-                for item in items_snapshot
-            ]
-            orders.append(UnifiedOrder(
-                platform=str(row.source_channel),
-                platform_order_id=str(getattr(row, "platform_order_id", row.order_no or "")),
-                source_channel=str(row.source_channel),
-                tenant_id=tenant_id,
-                store_id=store_id,
-                status=str(row.status),
-                total_fen=int(getattr(row, "total_amount_fen", 0)),
-                items=unified_items,
-                notes=str(row.notes or ""),
-                customer_phone=str(getattr(row, "customer_phone", "") or ""),
-                delivery_address=str(getattr(row, "delivery_address", "") or ""),
-                created_at=row.created_at,
-                internal_order_id=str(row.id),
-            ))
+            )
 
         log.info("omni_channel.get_pending_orders", count=len(orders))
         return orders
@@ -487,7 +579,8 @@ class OmniChannelService:
                     OrderModel.tenant_id == tid,
                     OrderModel.store_id == sid,
                     OrderModel.status == "pending",
-                    OrderModel.source_channel.in_(self.PLATFORMS),
+                    OrderModel.order_type.in_(["delivery", "takeaway"]),
+                    omni_order_match_clause(OrderModel, self.PLATFORMS),
                     OrderModel.created_at <= cutoff_time,
                     OrderModel.is_deleted == False,  # noqa: E712
                 )
@@ -502,23 +595,27 @@ class OmniChannelService:
             try:
                 await self._update_order_status(order_id_str, "rejected", tenant_id, db)
 
+                platform_key = row_omni_platform_key(order_row, self.PLATFORMS)
+                ext_order_id = row_omni_platform_order_id(order_row)
+
                 # 回调平台拒单
-                try:
-                    adapter = self._get_platform_adapter(order_row.source_channel)
-                    await adapter.cancel_order(
-                        order_row.platform_order_id,
-                        1,
-                        "超时未接单，系统自动拒单",
-                    )
-                except (AdapterAPIError, httpx.HTTPError, ConnectionError, UnsupportedPlatformError) as exc:
-                    log.error(
-                        "omni_channel.auto_reject.platform_callback_failed",
-                        order_id=order_id_str,
-                        platform=order_row.source_channel,
-                        error=str(exc),
-                        error_type=type(exc).__name__,
-                        exc_info=True,
-                    )
+                if platform_key and ext_order_id:
+                    try:
+                        adapter = self._get_platform_adapter(platform_key)
+                        await adapter.cancel_order(
+                            ext_order_id,
+                            1,
+                            "超时未接单，系统自动拒单",
+                        )
+                    except (AdapterAPIError, httpx.HTTPError, ConnectionError, UnsupportedPlatformError) as exc:
+                        log.error(
+                            "omni_channel.auto_reject.platform_callback_failed",
+                            order_id=order_id_str,
+                            platform=platform_key,
+                            error=str(exc),
+                            error_type=type(exc).__name__,
+                            exc_info=True,
+                        )
 
                 rejected_ids.append(order_id_str)
                 log.info("omni_channel.auto_reject.done", order_id=order_id_str)
@@ -592,34 +689,36 @@ class OmniChannelService:
             }
             for item in order.items
         ]
+        now = order.created_at or datetime.now(timezone.utc)
+        order_metadata: dict[str, Any] = {
+            "omni": {
+                "platform": order.platform,
+                "platform_order_id": order.platform_order_id,
+                "items_snapshot": items_snapshot,
+                "delivery_address": order.delivery_address,
+            },
+            "delivery_address": order.delivery_address or None,
+        }
 
-        # 使用原生INSERT避免依赖具体ORM字段细节
-        from sqlalchemy import insert as sa_insert, text
-
-        try:
-            new_order = OrderModel(
-                id=uuid.UUID(internal_id),
-                tenant_id=uuid.UUID(order.tenant_id),
-                store_id=uuid.UUID(order.store_id),
-                order_no=order.platform_order_id,
-                order_type="takeaway",
-                status="pending",
-                source_channel=order.source_channel,
-                total_amount_fen=order.total_fen,
-                notes=order.notes,
-                items_snapshot=items_snapshot,
-                platform_order_id=order.platform_order_id,
-                customer_phone=order.customer_phone,
-                delivery_address=order.delivery_address,
-                created_at=order.created_at or datetime.now(timezone.utc),
-                updated_at=datetime.now(timezone.utc),
-                is_deleted=False,
-            )
-            db.add(new_order)
-            await db.flush()
-        except (AttributeError, TypeError) as exc:
-            # Order模型字段可能与UnifiedOrder不完全匹配，记录警告但继续
-            logger.warning("omni_channel.persist_order.field_mismatch", error=str(exc))
+        new_order = OrderModel(
+            id=uuid.UUID(internal_id),
+            tenant_id=uuid.UUID(order.tenant_id),
+            store_id=uuid.UUID(order.store_id),
+            order_no=stable_omni_order_no(order),
+            order_type="delivery",
+            sales_channel_id=order.source_channel,
+            total_amount_fen=order.total_fen,
+            discount_amount_fen=0,
+            final_amount_fen=order.total_fen,
+            status="pending",
+            order_time=now,
+            notes=order.notes or None,
+            customer_phone=order.customer_phone or None,
+            order_metadata=order_metadata,
+            is_deleted=False,
+        )
+        db.add(new_order)
+        await db.flush()
 
         return internal_id
 

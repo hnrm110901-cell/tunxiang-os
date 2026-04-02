@@ -3,8 +3,9 @@
  * 状态: 待制作/制作中/已出品
  * 移动端竖屏, 最小字体16px, 热区>=48px
  */
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { txFetch } from '../api/index';
 
 /* ---------- 样式常量 ---------- */
 const C = {
@@ -77,14 +78,47 @@ function statusColor(s: TaskStatus): string {
 export function RushPage() {
   const [params] = useSearchParams();
   const filterTable = params.get('table') || '';
+  const storeId = (window as any).__STORE_ID__ || 'store_001';
 
   const [tables, setTables] = useState(MOCK_TABLES_WITH_TASKS);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const url = filterTable
+      ? `/api/v1/kds/tasks?store_id=${encodeURIComponent(storeId)}&table_no=${encodeURIComponent(filterTable)}&status=pending,cooking`
+      : `/api/v1/kds/tasks?store_id=${encodeURIComponent(storeId)}&status=pending,cooking`;
+
+    txFetch<{ items: Array<{ task_id: string; order_id: string; table_no: string; dish_name: string; quantity: number; spec?: string; status: string; created_at: string }> }>(url)
+      .then(res => {
+        // 按桌台分组
+        const grouped: Record<string, typeof MOCK_TABLES_WITH_TASKS[0]> = {};
+        for (const item of res.items) {
+          if (!grouped[item.table_no]) {
+            grouped[item.table_no] = { tableNo: item.table_no, orderId: item.order_id, tasks: [] };
+          }
+          const elapsedMin = Math.floor((Date.now() - new Date(item.created_at).getTime()) / 60000);
+          grouped[item.table_no].tasks.push({
+            id: item.task_id,
+            dishName: item.dish_name,
+            qty: item.quantity,
+            spec: item.spec,
+            status: item.status as TaskStatus,
+            elapsedMin,
+            rushed: false,
+          });
+        }
+        setTables(Object.values(grouped));
+      })
+      .catch(() => { /* 保留 mock 数据 */ })
+      .finally(() => setLoading(false));
+  }, [storeId, filterTable]);
 
   const displayed = filterTable
     ? tables.filter(t => t.tableNo === filterTable)
     : tables;
 
-  const handleRushTask = (tableIdx: number, taskId: string) => {
+  const handleRushTask = async (tableIdx: number, taskId: string) => {
+    // 乐观更新
     setTables(prev => prev.map((table, tIdx) => {
       if (tIdx !== tableIdx) return table;
       return {
@@ -94,18 +128,29 @@ export function RushPage() {
         ),
       };
     }));
+    try {
+      await txFetch(`/api/v1/kds/tasks/${encodeURIComponent(taskId)}/rush`, { method: 'POST' });
+    } catch {
+      // 催菜失败静默处理，UI已更新不回滚（避免闪烁）
+    }
   };
 
-  const handleRushAll = (tableIdx: number) => {
-    setTables(prev => prev.map((table, tIdx) => {
-      if (tIdx !== tableIdx) return table;
+  const handleRushAll = async (tableIdx: number) => {
+    const table = tables[tableIdx];
+    setTables(prev => prev.map((t, tIdx) => {
+      if (tIdx !== tableIdx) return t;
       return {
-        ...table,
-        tasks: table.tasks.map(task =>
+        ...t,
+        tasks: t.tasks.map(task =>
           task.status !== 'done' ? { ...task, rushed: true } : task
         ),
       };
     }));
+    // 并行催所有未完成任务
+    const pending = table.tasks.filter(t => t.status !== 'done' && !t.rushed);
+    await Promise.allSettled(
+      pending.map(t => txFetch(`/api/v1/kds/tasks/${encodeURIComponent(t.id)}/rush`, { method: 'POST' }))
+    );
   };
 
   return (
@@ -117,13 +162,15 @@ export function RushPage() {
         查看出餐进度，一键催菜
       </p>
 
-      {displayed.length === 0 && (
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: 40, color: C.muted, fontSize: 16 }}>加载中...</div>
+      ) : displayed.length === 0 ? (
         <div style={{ textAlign: 'center', padding: 40, color: C.muted, fontSize: 16 }}>
           暂无进行中的订单
         </div>
-      )}
+      ) : null}
 
-      {displayed.map((table, tIdx) => {
+      {displayed.map((table, _tIdx) => {
         const realIdx = tables.indexOf(table);
         const pendingCount = table.tasks.filter(t => t.status !== 'done').length;
         const doneCount = table.tasks.filter(t => t.status === 'done').length;

@@ -1,8 +1,9 @@
 /**
  * 采购审批 — 店长/采购经理移动端审批采购申请
  */
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { txFetch } from '../api/index';
 
 const C = {
   bg: '#0B1A20',
@@ -126,18 +127,52 @@ function statusBadge(status: PurchaseRequest['status']) {
 
 export function PurchaseApprovalPage() {
   const navigate = useNavigate();
+  const storeId = (window as any).__STORE_ID__ || 'store_001';
   const [requests, setRequests] = useState<PurchaseRequest[]>(MOCK_REQUESTS);
   const [rejectTarget, setRejectTarget] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [actionError, setActionError] = useState('');
 
   const pendingCount = requests.filter(r => r.status === 'pending').length;
 
-  const handleApprove = (id: string) => {
+  useEffect(() => {
+    txFetch<{ items: PurchaseRequest[] }>(
+      `/api/v1/supply/purchase-requests?store_id=${encodeURIComponent(storeId)}&status=pending`,
+    )
+      .then(res => setRequests(res.items))
+      .catch(() => { /* 保留 mock 数据作为兜底 */ })
+      .finally(() => setLoading(false));
+  }, [storeId]);
+
+  const handleApprove = async (id: string) => {
+    setActionError('');
+    // 先乐观更新 UI
     setRequests(prev => prev.map(r => r.id === id ? { ...r, status: 'approved' } : r));
+    try {
+      await txFetch(`/api/v1/supply/purchase-requests/${encodeURIComponent(id)}/approve`, {
+        method: 'POST',
+        body: JSON.stringify({ approver_id: (window as any).__STAFF_ID__ || '' }),
+      });
+    } catch (err) {
+      // 回滚
+      setRequests(prev => prev.map(r => r.id === id ? { ...r, status: 'pending' } : r));
+      setActionError(err instanceof Error ? err.message : '审批失败，请重试');
+    }
   };
 
-  const handleReject = (id: string, comment: string) => {
+  const handleReject = async (id: string, comment: string) => {
+    setActionError('');
     setRequests(prev => prev.map(r => r.id === id ? { ...r, status: 'rejected' } : r));
     setRejectTarget(null);
+    try {
+      await txFetch(`/api/v1/supply/purchase-requests/${encodeURIComponent(id)}/reject`, {
+        method: 'POST',
+        body: JSON.stringify({ reason: comment, approver_id: (window as any).__STAFF_ID__ || '' }),
+      });
+    } catch (err) {
+      setRequests(prev => prev.map(r => r.id === id ? { ...r, status: 'pending' } : r));
+      setActionError(err instanceof Error ? err.message : '拒绝失败，请重试');
+    }
   };
 
   return (
@@ -166,6 +201,24 @@ export function PurchaseApprovalPage() {
 
       {/* 列表 */}
       <div style={{ padding: '12px 16px 32px' }}>
+        {actionError && (
+          <div style={{
+            background: '#2D0B0B', border: `1px solid ${C.red}`,
+            borderRadius: 10, padding: '12px 14px', marginBottom: 12,
+            fontSize: 16, color: C.red,
+          }}>
+            {actionError}
+          </div>
+        )}
+        {loading ? (
+          <div style={{ textAlign: 'center', padding: 40, color: C.muted, fontSize: 16 }}>
+            加载中...
+          </div>
+        ) : requests.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: 40, color: C.muted, fontSize: 16 }}>
+            暂无待审批申请
+          </div>
+        ) : null}
         {requests.map(req => {
           const badge = statusBadge(req.status);
           return (

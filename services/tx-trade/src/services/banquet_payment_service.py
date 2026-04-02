@@ -124,38 +124,42 @@ def _row_to_confirmation(row: dict) -> BanquetConfirmation:
     )
 
 
-# ─── Mock 微信支付 ──────────────────────────────────────────────────────────
+# ─── Mock / 占位 微信 JSAPI ─────────────────────────────────────────────────
 
 
-def _mock_wechat_unified_order(
+def _build_wechat_jsapi_order_result(
     payment_no: str,
     amount_fen: int,
     openid: str,
     notify_url: str,
+    *,
+    existing_prepay_id: Optional[str] = None,
 ) -> dict:
-    """Mock 微信统一下单（JSAPI模式）
+    """生成（或复用）小程序调起支付参数。
 
-    TODO: 真实实现需配置以下环境变量：
-      - WECHAT_APP_ID      微信小程序 AppID
-      - WECHAT_MCH_ID      微信商户号
-      - WECHAT_MCH_KEY     微信商户API密钥（v3使用 WECHAT_MCH_V3_KEY）
-    TODO: 调用微信 https://api.mch.weixin.qq.com/v3/pay/transactions/jsapi
-    TODO: 使用 wechatpayv3 SDK 或手动拼装签名
+    - 无 ``existing_prepay_id`` 时生成 ``mock_prepay_{payment_no}``，模拟统一下单。
+    - 有 ``existing_prepay_id`` 时用于 **幂等重试**：前端重复调起仍用同一 prepay，仅刷新 nonce/时间戳。
+
+    ``amount_fen`` / ``openid`` / ``notify_url`` 供真实微信 v3 JSAPI 对接时使用。
+
+    TODO: 调用 https://api.mch.weixin.qq.com/v3/pay/transactions/jsapi
     """
     app_id = os.getenv("WECHAT_APP_ID", "wx_mock_appid")
-    # TODO: mch_id = os.getenv("WECHAT_MCH_ID", "")
-    # TODO: mch_key = os.getenv("WECHAT_MCH_KEY", "")
+    logger.debug(
+        "banquet_wechat_jsapi_build",
+        payment_no=payment_no,
+        amount_fen=amount_fen,
+        has_openid=bool(openid),
+        has_notify=bool(notify_url),
+        reuse_prepay=bool(existing_prepay_id),
+    )
 
-    # Mock prepay_id
-    prepay_id = f"mock_prepay_{payment_no}"
+    prepay_id = existing_prepay_id or f"mock_prepay_{payment_no}"
 
-    # Mock JSAPI 签名参数（真实环境须用商户私钥 RSA 签名）
     timestamp = str(int(time.time()))
     nonce_str = "".join(random.choices(string.ascii_letters + string.digits, k=32))
     package = f"prepay_id={prepay_id}"
 
-    # TODO: 真实签名：message = f"{app_id}\n{timestamp}\n{nonce_str}\n{package}\n"
-    #       sign = rsa_sign(private_key, message)
     mock_sign = hmac.new(
         b"mock_key",
         f"{app_id}{timestamp}{nonce_str}{package}".encode(),
@@ -238,7 +242,7 @@ class BanquetPaymentService:
         # 1. 查询定金记录
         result = await self._db.execute(
             text("""
-                SELECT id, total_deposit_fen, status, payment_no
+                SELECT id, total_deposit_fen, status, payment_no, wechat_prepay_id
                 FROM banquet_deposits
                 WHERE id = :id AND tenant_id = :tenant_id
             """),
@@ -252,18 +256,39 @@ class BanquetPaymentService:
         if row["status"] not in ("pending",):
             raise ValueError(f"定金状态不允许发起支付：{row['status']}")
 
-        # 2. 生成支付流水号（幂等：已有则复用）
+        # 2. 支付流水号（幂等：已有则复用）
         payment_no: str = row["payment_no"] or _gen_payment_no()
 
-        # 3. Mock 微信统一下单
-        wechat_result = _mock_wechat_unified_order(
+        # 3. 已存在 prepay：仅刷新 JSAPI 参数，不写库（支付通道重试幂等）
+        existing_prepay = row.get("wechat_prepay_id")
+        if existing_prepay and payment_no:
+            wechat_result = _build_wechat_jsapi_order_result(
+                payment_no=payment_no,
+                amount_fen=row["total_deposit_fen"],
+                openid=openid,
+                notify_url=notify_url,
+                existing_prepay_id=str(existing_prepay),
+            )
+            logger.info(
+                "banquet_deposit.wechat_pay_idempotent",
+                deposit_id=str(deposit_id),
+                payment_no=payment_no,
+            )
+            return WechatPayResult(
+                deposit_id=deposit_id,
+                payment_no=payment_no,
+                jsapi_params=wechat_result["jsapi_params"],
+                qr_code_url=None,
+            )
+
+        # 4. 首次下单：生成 prepay 并落库
+        wechat_result = _build_wechat_jsapi_order_result(
             payment_no=payment_no,
             amount_fen=row["total_deposit_fen"],
             openid=openid,
             notify_url=notify_url,
         )
 
-        # 4. 持久化 payment_no 和 prepay_id
         await self._db.execute(
             text("""
                 UPDATE banquet_deposits
@@ -300,7 +325,39 @@ class BanquetPaymentService:
         paid_fen: int,
         paid_at: datetime,
     ) -> BanquetDeposit:
-        """处理微信支付回调，更新定金状态为 paid"""
+        """处理微信支付回调，更新定金状态为 paid（**幂等**：已 paid 且金额一致则直接返回）。"""
+        cur = await self._db.execute(
+            text("""
+                SELECT id, banquet_id, total_deposit_fen, paid_fen,
+                       status, due_date, paid_at
+                FROM banquet_deposits
+                WHERE payment_no = :payment_no
+                LIMIT 1
+            """),
+            {"payment_no": payment_no},
+        )
+        existing = cur.mappings().first()
+        if existing is None:
+            raise ValueError(f"支付回调匹配失败，payment_no={payment_no}")
+
+        if existing["status"] == "paid":
+            if int(existing["paid_fen"]) != int(paid_fen):
+                raise ValueError(
+                    f"重复回调金额不一致: payment_no={payment_no}, "
+                    f"已有 paid_fen={existing['paid_fen']}, 回调 paid_fen={paid_fen}"
+                )
+            logger.info(
+                "banquet_deposit.callback_idempotent",
+                payment_no=payment_no,
+                wechat_transaction_id=wechat_transaction_id,
+            )
+            return _row_to_deposit(dict(existing))
+
+        if existing["status"] != "pending":
+            raise ValueError(
+                f"支付回调状态非法: payment_no={payment_no}, status={existing['status']}"
+            )
+
         result = await self._db.execute(
             text("""
                 UPDATE banquet_deposits
@@ -322,7 +379,7 @@ class BanquetPaymentService:
         )
         row = result.mappings().first()
         if row is None:
-            raise ValueError(f"支付回调匹配失败，payment_no={payment_no}")
+            raise ValueError(f"支付回调并发冲突，payment_no={payment_no}")
         await self._db.commit()
         logger.info(
             "banquet_deposit.paid",

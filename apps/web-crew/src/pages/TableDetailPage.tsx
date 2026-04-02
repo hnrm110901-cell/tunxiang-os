@@ -26,19 +26,13 @@
  *   - 白色主背景（与天财商龙对齐）
  *   - 图标+标签，清晰易辨
  */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   preBill,
   fireToKitchen,
-  markItemServed,
-  overrideItemPrice,
-  transferSingleItem,
   printOrderReceipt,
   sendKitchenMessage,
-  transferPayment,
-  updateTableInfo,
-  getOrderKdsStatus,
 } from '../api/mobileOpsApi';
 import { ConstraintStatusBar } from './ConstraintStatusBar';
 import { ServiceSuggestionCard } from './ServiceSuggestionCard';
@@ -221,7 +215,7 @@ function OrderDetailTab({
   items,
   editMode,
   onToggleEdit,
-  onGift,
+  onGift: _onGift,
 }: {
   items: OrderItem[];
   editMode: boolean;
@@ -750,17 +744,70 @@ export function TableDetailPage() {
   const tableNo = params.get('table') || 'A1';
   const orderId = params.get('order_id') || '';
 
-  const [order, setOrder] = useState<OrderDetail>(MOCK_ORDER);
+  const [order, setOrder] = useState<OrderDetail | null>(null);
   const [activeTab, setActiveTab] = useState<ActiveTab>('detail');
   const [editMode, setEditMode] = useState(false);
   const [modal, setModal] = useState<ActiveModal>('none');
   const [loading, setLoading] = useState(false);
+  const [orderLoading, setOrderLoading] = useState(true);
   const [toast, setToast] = useState<string | null>(null);
 
   const showToast = useCallback((msg: string) => {
     setToast(msg);
     setTimeout(() => setToast(null), 2500);
   }, []);
+
+  // ── 加载真实订单数据 ──
+  useEffect(() => {
+    if (!orderId) {
+      // 无 order_id 时使用 MOCK_ORDER（开发 fallback）
+      setOrder(MOCK_ORDER);
+      setOrderLoading(false);
+      return;
+    }
+    setOrderLoading(true);
+    fetch(`/api/v1/orders/${orderId}`, {
+      headers: {
+        'X-Tenant-ID': (window as any).__TENANT_ID__ || '',
+      },
+    })
+      .then((res) => res.json())
+      .then((json) => {
+        if (json.ok && json.data) {
+          const d = json.data;
+          setOrder({
+            order_id: d.id ?? d.order_id ?? orderId,
+            table_no: d.table_no ?? tableNo,
+            guest_count: d.guest_count ?? 0,
+            total_fen: d.final_amount_fen ?? d.total_fen ?? 0,
+            waiter_name: d.waiter_name,
+            created_at: d.created_at,
+            items: (d.items ?? []).map((item: any) => ({
+              item_id: item.item_id,
+              dish_id: item.dish_id,
+              dish_name: item.dish_name,
+              qty: item.qty ?? item.quantity ?? 0,
+              price_fen: item.price_fen ?? item.unit_price_fen ?? 0,
+              spec: item.spec,
+              note: item.note,
+              is_served: item.is_served ?? false,
+              served_qty: item.served_qty ?? 0,
+              is_gift: item.is_gift ?? false,
+            })),
+          });
+        } else {
+          // API 返回非 ok 时 fallback 到 MOCK_ORDER（开发模式）
+          setOrder(MOCK_ORDER);
+        }
+      })
+      .catch(() => {
+        // 请求失败时 fallback 到 MOCK_ORDER（开发模式）
+        setOrder(MOCK_ORDER);
+      })
+      .finally(() => {
+        setOrderLoading(false);
+      });
+  }, [orderId, tableNo]);
 
   const closeModal = useCallback(() => setModal('none'), []);
 
@@ -777,7 +824,7 @@ export function TableDetailPage() {
       case 'pre-bill':
         setLoading(true);
         try {
-          await preBill(orderId || order.order_id);
+          await preBill(orderId || order?.order_id || '');
           showToast('埋单成功，账单已打印');
         } finally {
           setLoading(false);
@@ -786,7 +833,7 @@ export function TableDetailPage() {
       case 'fire':
         setLoading(true);
         try {
-          await fireToKitchen(orderId || order.order_id);
+          await fireToKitchen(orderId || order?.order_id || '');
           showToast('已通知后厨起菜');
         } finally {
           setLoading(false);
@@ -794,7 +841,7 @@ export function TableDetailPage() {
         break;
       case 'mark-served':
         showToast('请在出餐追踪页面选择已上菜品');
-        navigate(`/order-status?order_id=${orderId || order.order_id}`);
+        navigate(`/order-status?order_id=${orderId || order?.order_id || ''}`);
         break;
       case 'stop-dish':
         navigate(`/shortage?table=${tableNo}`);
@@ -812,7 +859,7 @@ export function TableDetailPage() {
         navigate(`/order-full?table=${tableNo}&order_id=${orderId}&mode=return`);
         break;
       case 'rush':
-        navigate(`/rush?table=${tableNo}&order_id=${orderId || order.order_id}`);
+        navigate(`/rush?table=${tableNo}&order_id=${orderId || order?.order_id || ''}`);
         break;
       case 'edit-table':
         setModal('edit-table');
@@ -832,14 +879,14 @@ export function TableDetailPage() {
       case 'print':
         setLoading(true);
         try {
-          await printOrderReceipt(orderId || order.order_id);
+          await printOrderReceipt(orderId || order?.order_id || '');
           showToast('客单已打印');
         } finally {
           setLoading(false);
         }
         break;
       case 'member':
-        navigate(`/member?order_id=${orderId || order.order_id}`);
+        navigate(`/member?order_id=${orderId || order?.order_id || ''}`);
         break;
       case 'kitchen-msg':
         setModal('kitchen-msg');
@@ -853,15 +900,15 @@ export function TableDetailPage() {
       default:
         showToast(`${action} 功能开发中`);
     }
-  }, [navigate, order.order_id, orderId, tableNo, showToast]);
+  }, [navigate, order?.order_id, orderId, tableNo, showToast]);
 
   const handleGift = useCallback((itemIds: string[], reason: string) => {
-    setOrder((prev) => ({
+    setOrder((prev) => prev ? ({
       ...prev,
       items: prev.items.map((item) =>
         itemIds.includes(item.item_id) ? { ...item, is_gift: true } : item
       ),
-    }));
+    }) : null);
     showToast(`已标记赠单，原因：${reason}`);
     closeModal();
   }, [closeModal, showToast]);
@@ -877,6 +924,38 @@ export function TableDetailPage() {
       closeModal();
     }
   }, [navigate, showToast, closeModal]);
+
+  // 订单数据加载中：显示全屏 spinner
+  if (orderLoading || !order) {
+    return (
+      <div
+        style={{
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: T.bg,
+          flexDirection: 'column',
+          gap: 16,
+          fontSize: 16,
+          color: T.text2,
+        }}
+      >
+        <div
+          style={{
+            width: 40,
+            height: 40,
+            border: `4px solid ${T.border}`,
+            borderTop: `4px solid ${T.tabActive}`,
+            borderRadius: '50%',
+            animation: 'spin 0.8s linear infinite',
+          }}
+        />
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        加载中…
+      </div>
+    );
+  }
 
   const displayNo = `${order.table_no}(${order.guest_count}人)`;
 
@@ -924,7 +1003,7 @@ export function TableDetailPage() {
           ‹ {displayNo}
         </button>
         <button
-          onClick={() => navigate(`/order-status?order_id=${orderId || order.order_id}`)}
+          onClick={() => navigate(`/order-status?order_id=${orderId || order?.order_id || ''}`)}
           style={{
             background: 'none',
             border: 'none',
@@ -941,7 +1020,7 @@ export function TableDetailPage() {
 
       {/* ── 三约束实时看板（Phase 3-B） ── */}
       <ConstraintStatusBar
-        orderId={orderId || order.order_id}
+        orderId={orderId || order?.order_id || ''}
         storeId={(window as any).__STORE_ID__ || 'store-mock-001'}
       />
 
@@ -999,12 +1078,12 @@ export function TableDetailPage() {
             editMode={editMode}
             onToggleEdit={() => setEditMode((v) => !v)}
             onGift={(id) => {
-              setOrder((prev) => ({
+              setOrder((prev) => prev ? ({
                 ...prev,
                 items: prev.items.map((i) =>
                   i.item_id === id ? { ...i, is_gift: !i.is_gift } : i
                 ),
-              }));
+              }) : null);
             }}
           />
         ) : (
@@ -1014,12 +1093,12 @@ export function TableDetailPage() {
 
       {/* ── 主动服务建议（Phase 3-B） ── */}
       <ServiceSuggestionCard
-        orderId={orderId || order.order_id}
+        orderId={orderId || order?.order_id || ''}
         onAction={(suggestion: ServiceSuggestion) => {
           if (suggestion.type === 'upsell' || suggestion.type === 'refill' || suggestion.type === 'dessert') {
-            navigate(`/order-full?table=${tableNo}&order_id=${orderId || order.order_id}&mode=add`);
+            navigate(`/order-full?table=${tableNo}&order_id=${orderId || order?.order_id || ''}&mode=add`);
           } else if (suggestion.type === 'checkout_hint') {
-            navigate(`/order-full?table=${tableNo}&order_id=${orderId || order.order_id}&mode=checkout`);
+            navigate(`/order-full?table=${tableNo}&order_id=${orderId || order?.order_id || ''}&mode=checkout`);
           }
         }}
       />

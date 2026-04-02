@@ -399,6 +399,23 @@ function fetchQueueEstimate(storeId, guestRange) {
     '&guest_range=' + encodeURIComponent(guestRange));
 }
 
+// ─── 套餐N选M ───
+
+function fetchComboGroups(comboId) {
+  return txRequest('/api/v1/menu/combos/' + encodeURIComponent(comboId) + '/groups');
+}
+
+function fetchComboGroupItems(groupId) {
+  return txRequest('/api/v1/menu/combo-groups/' + encodeURIComponent(groupId) + '/items');
+}
+
+function validateComboSelection(comboId, groupSelections) {
+  return txRequest('/api/v1/menu/combo-groups/validate-selection', 'POST', {
+    combo_id: comboId,
+    group_selections: groupSelections,
+  });
+}
+
 // ─── 企业团餐 ───
 
 function fetchCorporateAccount() {
@@ -506,4 +523,8 @@ module.exports = {
   // 虚拟排队
   takeVirtualQueue: takeVirtualQueue,
   fetchQueueEstimate: fetchQueueEstimate,
+  // 套餐N选M
+  fetchComboGroups: fetchComboGroups,
+  fetchComboGroupItems: fetchComboGroupItems,
+  validateComboSelection: validateComboSelection,
 };

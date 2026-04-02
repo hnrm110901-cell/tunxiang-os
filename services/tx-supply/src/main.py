@@ -25,6 +25,8 @@ from .api.delivery_route_routes import router as delivery_route_router
 from .api.supplier_scoring_routes import router as supplier_scoring_router
 from .api.receiving_v2_routes import router as receiving_v2_router
 from .api.transfer_routes import router as transfer_router
+from .api.ck_production_routes import router as ck_production_router
+from .api.ck_recipe_routes import router as ck_recipe_router
 
 app = FastAPI(title="TunxiangOS tx-supply", version="3.0.0")
 app.include_router(inv_router)
@@ -48,6 +50,8 @@ app.include_router(delivery_route_router)
 app.include_router(supplier_scoring_router)
 app.include_router(receiving_v2_router)
 app.include_router(transfer_router)
+app.include_router(ck_production_router)
+app.include_router(ck_recipe_router)
 
 @app.get("/health")
 async def health():

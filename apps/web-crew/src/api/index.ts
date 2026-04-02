@@ -24,7 +24,7 @@ export async function txFetch<T>(path: string, options?: RequestInit): Promise<T
 
 // ─── 各域 API 统一导出 ───
 
-export { fetchKdsTasks, rushKdsTask, fetchTableCookProgress } from './kdsApi';
+export { fetchTableCookProgress } from './kdsApi';
 export type { KdsTask as KdsTaskDetail } from './kdsApi';
 export {
   updateTableInfo, verifyPlatformCoupon, copyDishesFromOrder,
@@ -42,11 +42,13 @@ export type {
 export { fetchTables, openTable as openTableV2, clearTable as clearTableV2, transferTable as transferTableV2, mergeTables as mergeTablesV2, reserveTable } from './tablesApi';
 export { searchMember as searchMemberV2, getMemberDetail, bindMemberToOrder as bindMemberV2, fetchMemberRecommendations, deductPoints } from './memberApi';
 export { fetchDailyOpsFlow as fetchDailyOpsFlowV2, confirmCheck, advanceNode, fetchDailyOpsHistory } from './dailyOpsApi';
-export { fetchPeakStatus, fetchRushDishes, fetchDispatchSuggestions, respondDispatch } from './peakApi';
-export type { PeakLevel, PeakStatus, RushDish, DispatchRequest } from './peakApi';
-export type { CruiseNode, DailyOpsFlow as DailyOpsFlowV2 } from './dailyOpsApi';
+export { fetchPeakStatus as fetchPeakStatusV2, fetchRushDishes as fetchRushDishesV2, fetchDispatchSuggestions, respondDispatch } from './peakApi';
+export type { PeakLevel as PeakLevelV2, PeakStatus as PeakStatusV2, RushDish, DispatchRequest as DispatchRequestV2 } from './peakApi';
+export type { CruiseNode as CruiseNodeV2, DailyOpsFlow as DailyOpsFlowV2 } from './dailyOpsApi';
 export type { MemberInfo as MemberInfoV2, MemberRecommendation } from './memberApi';
 export type { TableInfo as TableInfoV2 } from './tablesApi';
+export { getStoredValue, rechargeStoredValue, consumeStoredValue, refundToStoredValue, calcBonus } from './storedValueApi';
+export type { StoredValueAccount, StoredValueTransaction, StoredValueTxnType, RechargeResult, ConsumeResult, RefundResult } from './storedValueApi';
 
 // ─── 桌台状态 ───
 
@@ -212,6 +214,8 @@ export interface DishInfo {
   is_market_price: boolean;   // 时价菜
   is_weighed: boolean;        // 称重菜
   specs?: DishSpec[];
+  is_combo?: boolean;         // 是否为N选M套餐菜品
+  combo_id?: string;          // 关联套餐ID（is_combo=true时有效）
 }
 
 export interface DishSpec {
@@ -462,6 +466,69 @@ export async function addItemsToOrder(
     method: 'POST',
     body: JSON.stringify({ items }),
   });
+}
+
+// ─── 集团跨店数据看板 ───
+
+export interface GroupStoreTodayData {
+  store_id: string;
+  store_name: string;
+  status: 'open' | 'prep' | 'closed' | 'error';
+  revenue_fen: number;
+  order_count: number;
+  table_turnover: number;
+  occupied_tables: number;
+  total_tables: number;
+  current_diners: number;
+  avg_serve_time_min: number;
+  revenue_vs_yesterday_pct: number;
+  alerts: string[];
+}
+
+export interface GroupSummary {
+  total_revenue_fen: number;
+  total_orders: number;
+  avg_table_turnover: number;
+  active_stores: number;
+  total_stores: number;
+  revenue_vs_yesterday_pct: number;
+  current_diners: number;
+}
+
+export interface GroupTodayResponse {
+  summary: GroupSummary;
+  stores: GroupStoreTodayData[];
+}
+
+export interface GroupTrendResponse {
+  dates: string[];
+  total_revenue: number[];
+  by_store: Record<string, number[]>;
+}
+
+export interface GroupAlertItem {
+  severity: 'danger' | 'warning' | 'info';
+  store_name: string;
+  type: string;
+  title: string;
+  body: string;
+  created_at: string;
+}
+
+export interface GroupAlertsResponse {
+  alerts: GroupAlertItem[];
+}
+
+export async function fetchGroupToday(brandId: string): Promise<GroupTodayResponse> {
+  return txFetch(`/api/v1/analytics/group/today?brand_id=${encodeURIComponent(brandId)}`);
+}
+
+export async function fetchGroupTrend(brandId: string, days = 7): Promise<GroupTrendResponse> {
+  return txFetch(`/api/v1/analytics/group/trend?brand_id=${encodeURIComponent(brandId)}&days=${days}`);
+}
+
+export async function fetchGroupAlerts(brandId: string): Promise<GroupAlertsResponse> {
+  return txFetch(`/api/v1/analytics/group/alerts?brand_id=${encodeURIComponent(brandId)}`);
 }
 
 // ─── 退菜 ───

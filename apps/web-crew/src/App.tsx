@@ -35,12 +35,31 @@ import { ShiftSchedulePage } from './pages/ShiftSchedulePage';
 import DishRecognizePage from './pages/DishRecognizePage';
 import { ShiftSummaryPage } from './pages/ShiftSummaryPage';
 import SelfPayLinkPage from './pages/SelfPayLinkPage';
+import { DiscountRequestPage } from './pages/DiscountRequestPage';
+import ScanPayPage from './pages/ScanPayPage';
+import { StoredValueRechargePage } from './pages/StoredValueRechargePage';
+import { PrinterSettingsPage } from './pages/PrinterSettingsPage';
+import { WaitlistPage } from './pages/WaitlistPage';
+import { ReservationInboxPage } from './pages/ReservationInboxPage';
+import { DeliveryDashboardPage } from './pages/DeliveryDashboardPage';
+import { MemberLevelConfigPage } from './pages/MemberLevelConfigPage';
+import { GroupDashboardPage } from './pages/GroupDashboardPage';
+import { StoreDetailPage } from './pages/StoreDetailPage';
+import { LiveSeafoodOrderPage } from './pages/LiveSeafoodOrderPage';
+import { DailySettlementPage } from './pages/DailySettlementPage';
+import { ShiftHandoverPage } from './pages/ShiftHandoverPage';
+import { IssueReportPage } from './pages/IssueReportPage';
+import { MemberLookupPage } from './pages/MemberLookupPage';
+import { MemberPointsPage } from './pages/MemberPointsPage';
+import { PointsTransactionPage } from './pages/PointsTransactionPage';
+import { ApprovalPage } from './pages/ApprovalPage';
 
 const tabs = [
   { path: '/tables', label: '桌台', icon: 'T' },
   { path: '/order', label: '点餐', icon: 'O' },
   { path: '/active', label: '进行中', icon: 'A' },
   { path: '/cruise', label: '巡航', icon: 'C' },
+  { path: '/delivery', label: '外卖', icon: 'D' },
   { path: '/review', label: '复盘', icon: 'R' },
   { path: '/profile', label: '我的', icon: 'P' },
 ];
@@ -48,7 +67,7 @@ const tabs = [
 function BottomTab() {
   const loc = useLocation();
   // 在全屏子页面中隐藏底栏
-  const hiddenPaths = ['/open-table', '/order-full', '/rush', '/table-ops', '/member', '/complaint', '/service-confirm', '/peak-alert', '/order-status', '/table-detail', '/table-side-pay', '/seat-split', '/crew-stats', '/manager-app', '/receiving', '/stocktake', '/handover', '/route-optimize', '/shift-schedule', '/dish-recognize', '/shift-summary', '/self-pay-link'];
+  const hiddenPaths = ['/open-table', '/order-full', '/rush', '/table-ops', '/member', '/complaint', '/service-confirm', '/peak-alert', '/order-status', '/table-detail', '/table-side-pay', '/seat-split', '/crew-stats', '/manager-app', '/receiving', '/stocktake', '/handover', '/route-optimize', '/shift-schedule', '/dish-recognize', '/shift-summary', '/self-pay-link', '/discount-request', '/scan-pay', '/stored-value-recharge', '/printer-settings', '/waitlist', '/member-level-config', '/group-dashboard', '/store-detail', '/live-seafood', '/reservations', '/daily-settlement', '/shift-handover', '/issue-report', '/member-lookup', '/member-points', '/member/', '/approvals'];
   const shouldHide = hiddenPaths.some(p => loc.pathname.startsWith(p));
   if (shouldHide) return null;
 
@@ -103,6 +122,7 @@ export default function App() {
           <Route path="/order" element={<QuickOrderView />} />
           <Route path="/active" element={<ActiveOrdersView />} />
           <Route path="/cruise" element={<DailyCruisePage />} />
+          <Route path="/delivery" element={<DeliveryDashboardPage />} />
           <Route path="/review" element={<ReviewPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           {/* 功能子页面 */}
@@ -130,6 +150,26 @@ export default function App() {
           <Route path="/dish-recognize" element={<DishRecognizePage />} />
           <Route path="/shift-summary" element={<ShiftSummaryPage />} />
           <Route path="/self-pay-link" element={<SelfPayLinkPage />} />
+          <Route path="/discount-request" element={<DiscountRequestPage />} />
+          <Route path="/scan-pay" element={<ScanPayPage />} />
+          <Route path="/stored-value-recharge" element={<StoredValueRechargePage />} />
+          <Route path="/printer-settings" element={<PrinterSettingsPage />} />
+          <Route path="/waitlist" element={<WaitlistPage />} />
+          <Route path="/member-level-config" element={<MemberLevelConfigPage />} />
+          <Route path="/group-dashboard" element={<GroupDashboardPage />} />
+          <Route path="/store-detail" element={<StoreDetailPage />} />
+          <Route path="/live-seafood" element={<LiveSeafoodOrderPage />} />
+          <Route path="/reservations" element={<ReservationInboxPage />} />
+          {/* 日清日结 E1-E8 */}
+          <Route path="/daily-settlement" element={<DailySettlementPage />} />
+          <Route path="/shift-handover" element={<ShiftHandoverPage />} />
+          <Route path="/issue-report" element={<IssueReportPage />} />
+          {/* 会员积分管理 */}
+          <Route path="/member-lookup" element={<MemberLookupPage />} />
+          <Route path="/member-points" element={<MemberPointsPage />} />
+          <Route path="/member/:memberId/points" element={<PointsTransactionPage />} />
+          {/* 审批处理 */}
+          <Route path="/approvals" element={<ApprovalPage />} />
         </Routes>
         <BottomTab />
       </div>

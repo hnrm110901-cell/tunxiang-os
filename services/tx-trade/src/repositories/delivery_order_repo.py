@@ -13,7 +13,7 @@ from typing import Optional
 from uuid import UUID
 
 import structlog
-from sqlalchemy import and_, func, select, update
+from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models.delivery_order import DeliveryOrder as DeliveryOrderModel
@@ -23,6 +23,9 @@ logger = structlog.get_logger(__name__)
 
 # 活跃状态：用于统计并发单量
 _ACTIVE_STATUSES = ("pending_accept", "accepted", "preparing")
+
+# 终态：对账任务只扫这些状态，避免与进行中单混淆
+_TERMINAL_STATUSES = ("completed", "cancelled", "refunded")
 
 
 class DeliveryOrderRepository:
@@ -168,6 +171,202 @@ class DeliveryOrderRepository:
             }
             for r in rows
         ]
+
+    @staticmethod
+    def _amount_variance_condition():
+        """实际到账与商户实收不一致，或 total-commission 与 merchant_receive 不一致。"""
+        net_expr = DeliveryOrderModel.total_fen - DeliveryOrderModel.commission_fen
+        return or_(
+            and_(
+                DeliveryOrderModel.actual_revenue_fen.isnot(None),
+                DeliveryOrderModel.actual_revenue_fen != DeliveryOrderModel.merchant_receive_fen,
+            ),
+            net_expr != DeliveryOrderModel.merchant_receive_fen,
+        )
+
+    @staticmethod
+    def _reconciliation_base_conditions(
+        tenant_id: UUID,
+        date_from: date,
+        date_to: date,
+        *,
+        store_id: Optional[UUID] = None,
+        platform: Optional[str] = None,
+    ) -> list:
+        conds = [
+            DeliveryOrderModel.tenant_id == tenant_id,
+            DeliveryOrderModel.is_deleted.is_(False),
+            DeliveryOrderModel.status.in_(_TERMINAL_STATUSES),
+            func.date(DeliveryOrderModel.created_at) >= date_from,
+            func.date(DeliveryOrderModel.created_at) <= date_to,
+        ]
+        if store_id is not None:
+            conds.append(DeliveryOrderModel.store_id == store_id)
+        if platform is not None:
+            conds.append(DeliveryOrderModel.platform == platform)
+        return conds
+
+    @staticmethod
+    async def list_reconciliation_candidates(
+        db: AsyncSession,
+        tenant_id: UUID,
+        *,
+        date_from: date,
+        date_to: date,
+        store_id: Optional[UUID] = None,
+        platform: Optional[str] = None,
+        issue_type: str = "any",
+        page: int = 1,
+        size: int = 20,
+    ) -> tuple[list[DeliveryOrderModel], int]:
+        """外卖对账候选单（Y-A5 骨架）：终态单 + 日期范围内 + 异常条件。
+
+        issue_type:
+          - any: 未关联内部订单 **或** 金额口径不一致
+          - unlink: 仅 internal_order_id 为空
+          - amount: 仅金额口径疑似不一致
+        """
+        base = DeliveryOrderRepository._reconciliation_base_conditions(
+            tenant_id, date_from, date_to, store_id=store_id, platform=platform
+        )
+        unlink = DeliveryOrderModel.internal_order_id.is_(None)
+        amt = DeliveryOrderRepository._amount_variance_condition()
+        if issue_type == "unlink":
+            base.append(unlink)
+        elif issue_type == "amount":
+            base.append(amt)
+        else:
+            base.append(or_(unlink, amt))
+
+        where = and_(*base)
+        count_stmt = select(func.count()).select_from(DeliveryOrderModel).where(where)
+        total: int = (await db.execute(count_stmt)).scalar_one()
+
+        data_stmt = (
+            select(DeliveryOrderModel)
+            .where(where)
+            .order_by(DeliveryOrderModel.created_at.desc())
+            .offset((page - 1) * size)
+            .limit(size)
+        )
+        rows = (await db.execute(data_stmt)).scalars().all()
+        return list(rows), total
+
+    @staticmethod
+    async def reconciliation_summary(
+        db: AsyncSession,
+        tenant_id: UUID,
+        *,
+        date_from: date,
+        date_to: date,
+        store_id: Optional[UUID] = None,
+        platform: Optional[str] = None,
+    ) -> dict:
+        """对账看板计数（同一单可同时计入 unlink 与 amount）。"""
+        base = DeliveryOrderRepository._reconciliation_base_conditions(
+            tenant_id, date_from, date_to, store_id=store_id, platform=platform
+        )
+        unlink = DeliveryOrderModel.internal_order_id.is_(None)
+        amt = DeliveryOrderRepository._amount_variance_condition()
+
+        async def _cnt(extra) -> int:
+            w = and_(*base, extra)
+            stmt = select(func.count()).select_from(DeliveryOrderModel).where(w)
+            return int((await db.execute(stmt)).scalar_one())
+
+        unlink_n = await _cnt(unlink)
+        amount_n = await _cnt(amt)
+        candidates_n = await _cnt(or_(unlink, amt))
+        return {
+            "candidates_total": candidates_n,
+            "unlink_count": unlink_n,
+            "amount_variance_count": amount_n,
+        }
+
+    @staticmethod
+    async def find_internal_order_id_by_omni_platform_order(
+        db: AsyncSession,
+        tenant_id: UUID,
+        store_id: UUID,
+        platform: str,
+        platform_order_id: str,
+    ) -> Optional[UUID]:
+        """根据 omni 落库元数据匹配 ``orders.id``（用于未关联 ``internal_order_id`` 的补偿建议）。
+
+        先按 ``sales_channel_id == platform`` + ``order_metadata.omni.platform_order_id`` 精确匹配；
+        若无唯一命中，再放宽为仅元数据平台单号（仍限同店同租户）。多行命中返回 None。
+        """
+        from shared.ontology.src.entities import Order as OrderModel
+
+        base_conds = [
+            OrderModel.tenant_id == tenant_id,
+            OrderModel.store_id == store_id,
+            OrderModel.is_deleted.is_(False),
+            OrderModel.order_metadata["omni"]["platform_order_id"].astext
+            == platform_order_id,
+        ]
+
+        stmt_strict = (
+            select(OrderModel.id)
+            .where(and_(*base_conds, OrderModel.sales_channel_id == platform))
+            .limit(2)
+        )
+        strict_rows = list((await db.execute(stmt_strict)).scalars().all())
+        if len(strict_rows) == 1:
+            return strict_rows[0]
+        if len(strict_rows) > 1:
+            return None
+
+        stmt_relaxed = select(OrderModel.id).where(and_(*base_conds)).limit(2)
+        relaxed_rows = list((await db.execute(stmt_relaxed)).scalars().all())
+        if len(relaxed_rows) == 1:
+            return relaxed_rows[0]
+        return None
+
+    @staticmethod
+    async def link_delivery_to_internal_order(
+        db: AsyncSession,
+        *,
+        delivery_order_id: UUID,
+        tenant_id: UUID,
+        internal_order_id: UUID,
+    ) -> bool:
+        """外卖单行写入 ``internal_order_id``。要求：外卖单存在、尚未关联、内部订单同租户且未删除。"""
+        from shared.ontology.src.entities import Order as OrderModel
+
+        delivery = await DeliveryOrderRepository.get_by_id(
+            db, delivery_order_id, tenant_id
+        )
+        if delivery is None or delivery.internal_order_id is not None:
+            return False
+
+        o_stmt = select(OrderModel.id).where(
+            and_(
+                OrderModel.id == internal_order_id,
+                OrderModel.tenant_id == tenant_id,
+                OrderModel.is_deleted.is_(False),
+            )
+        )
+        if (await db.execute(o_stmt)).scalar_one_or_none() is None:
+            return False
+
+        stmt = (
+            update(DeliveryOrderModel)
+            .where(
+                and_(
+                    DeliveryOrderModel.id == delivery_order_id,
+                    DeliveryOrderModel.tenant_id == tenant_id,
+                    DeliveryOrderModel.is_deleted.is_(False),
+                    DeliveryOrderModel.internal_order_id.is_(None),
+                )
+            )
+            .values(
+                internal_order_id=internal_order_id,
+                updated_at=datetime.now(timezone.utc),
+            )
+        )
+        result = await db.execute(stmt)
+        return result.rowcount > 0
 
     # ─── 写入 ──────────────────────────────────────────────────────────────────
 

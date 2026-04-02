@@ -1,13 +1,17 @@
-<!-- 厨师详情 -->
+<!-- 厨师详情 + 预约表单 -->
 <view class="container">
+
+  <!-- 加载中 -->
   <view class="loading-tip" wx:if="{{loading}}">
+    <view class="loading-spinner"></view>
     <text>加载中...</text>
   </view>
 
   <block wx:elif="{{chef}}">
-    <!-- 厨师头像+基本信息 -->
+    <!-- 厨师头像 + 基本信息 -->
     <view class="profile-header">
-      <image class="profile-avatar" src="{{chef.avatar}}" mode="aspectFill" lazy-load />
+      <image class="profile-avatar" src="{{chef.avatar || '/assets/chef-default.png'}}"
+             mode="aspectFill" lazy-load />
       <view class="profile-info">
         <view class="profile-name-row">
           <text class="profile-name">{{chef.name}}</text>
@@ -18,14 +22,19 @@
             <text class="stat-value">{{chef.rating}}</text>
             <text class="stat-label">评分</text>
           </view>
+          <view class="stat-divider"></view>
           <view class="stat-item">
             <text class="stat-value">{{chef.total_services}}</text>
             <text class="stat-label">服务次数</text>
           </view>
+          <view class="stat-divider"></view>
           <view class="stat-item">
-            <text class="stat-value">{{chef.years_experience}}年</text>
-            <text class="stat-label">从业经验</text>
+            <text class="stat-value">{{chef.years_experience}}</text>
+            <text class="stat-label">从业年限</text>
           </view>
+        </view>
+        <view class="cuisine-tags">
+          <text class="cuisine-tag" wx:for="{{chef.cuisine_types}}" wx:key="*this">{{item}}</text>
         </view>
       </view>
     </view>
@@ -33,11 +42,12 @@
     <!-- Tab 切换 -->
     <view class="tab-bar">
       <view class="tab-item {{activeTab === 'intro' ? 'active' : ''}}" bindtap="switchTab" data-tab="intro">简介</view>
-      <view class="tab-item {{activeTab === 'portfolio' ? 'active' : ''}}" bindtap="switchTab" data-tab="portfolio">作品集</view>
+      <view class="tab-item {{activeTab === 'portfolio' ? 'active' : ''}}" bindtap="switchTab" data-tab="portfolio">特色菜品</view>
+      <view class="tab-item {{activeTab === 'booking' ? 'active' : ''}}" bindtap="switchTab" data-tab="booking">立即预约</view>
       <view class="tab-item {{activeTab === 'ratings' ? 'active' : ''}}" bindtap="switchTab" data-tab="ratings">评价</view>
     </view>
 
-    <!-- 简介 -->
+    <!-- ─── 简介 Tab ─── -->
     <view class="tab-content" wx:if="{{activeTab === 'intro'}}">
       <view class="info-block">
         <text class="info-title">擅长菜系</text>
@@ -59,7 +69,7 @@
       </view>
     </view>
 
-    <!-- 作品集 -->
+    <!-- ─── 特色菜品 Tab ─── -->
     <view class="tab-content" wx:if="{{activeTab === 'portfolio'}}">
       <view class="portfolio-grid" wx:if="{{chef.portfolio && chef.portfolio.length > 0}}">
         <view class="portfolio-item" wx:for="{{chef.portfolio}}" wx:key="image"
@@ -69,16 +79,117 @@
         </view>
       </view>
       <view class="empty-tip" wx:else>
-        <text>暂无作品</text>
+        <text>暂无作品集</text>
       </view>
     </view>
 
-    <!-- 评价 -->
+    <!-- ─── 立即预约 Tab ─── -->
+    <view class="tab-content booking-tab" wx:if="{{activeTab === 'booking'}}">
+
+      <!-- 可用日期日历 -->
+      <view class="form-block">
+        <text class="form-block-title">选择服务日期</text>
+        <view class="loading-inline" wx:if="{{loadingSchedule}}">
+          <text>加载排期中...</text>
+        </view>
+        <view wx:else>
+          <view class="calendar-month-nav">
+            <view class="month-nav-btn" bindtap="prevMonth">‹</view>
+            <text class="month-label">{{currentMonthLabel}}</text>
+            <view class="month-nav-btn" bindtap="nextMonth">›</view>
+          </view>
+          <view class="calendar-grid">
+            <view class="calendar-weekday" wx:for="{{weekdayHeaders}}" wx:key="*this">{{item}}</view>
+            <view class="calendar-cell {{item.available ? 'available' : 'unavailable'}} {{bookingDate === item.date ? 'selected' : ''}} {{item.empty ? 'empty' : ''}}"
+                  wx:for="{{calendarDays}}" wx:key="date"
+                  bindtap="selectBookingDate" data-date="{{item.date}}" data-available="{{item.available}}">
+              <text wx:if="{{!item.empty}}">{{item.dayNum}}</text>
+            </view>
+          </view>
+          <view class="calendar-legend">
+            <view class="legend-item">
+              <view class="legend-dot available"></view>
+              <text>可预约</text>
+            </view>
+            <view class="legend-item">
+              <view class="legend-dot unavailable"></view>
+              <text>不可用</text>
+            </view>
+            <view class="legend-item">
+              <view class="legend-dot selected"></view>
+              <text>已选</text>
+            </view>
+          </view>
+        </view>
+      </view>
+
+      <!-- 时间段选择 -->
+      <view class="form-block" wx:if="{{bookingDate}}">
+        <text class="form-block-title">选择上门时间</text>
+        <view class="slot-list">
+          <view class="slot-item {{bookingTime === item ? 'active' : ''}}"
+                wx:for="{{timeSlots}}" wx:key="*this"
+                bindtap="selectBookingTime" data-time="{{item}}">
+            {{item}}
+          </view>
+        </view>
+      </view>
+
+      <!-- 用餐人数（最少2人） -->
+      <view class="form-block">
+        <text class="form-block-title">用餐人数</text>
+        <text class="form-block-hint">（最少2人）</text>
+        <view class="guest-stepper">
+          <view class="stepper-btn {{guestCount <= 2 ? 'disabled' : ''}}"
+                bindtap="changeGuests" data-delta="{{-1}}">
+            <text>-</text>
+          </view>
+          <text class="stepper-value">{{guestCount}}人</text>
+          <view class="stepper-btn" bindtap="changeGuests" data-delta="{{1}}">
+            <text>+</text>
+          </view>
+        </view>
+      </view>
+
+      <!-- 上门地址 -->
+      <view class="form-block">
+        <text class="form-block-title">上门地址</text>
+        <view class="address-row">
+          <input class="form-input address-input"
+                 value="{{serviceAddress}}"
+                 bindinput="onAddressInput"
+                 placeholder="请输入详细地址"
+                 placeholder-class="placeholder" />
+          <view class="location-pick-btn" bindtap="chooseLocation">
+            <text>📍定位</text>
+          </view>
+        </view>
+      </view>
+
+      <!-- 备注（特殊饮食要求） -->
+      <view class="form-block">
+        <text class="form-block-title">备注</text>
+        <textarea class="form-textarea"
+                  value="{{remark}}"
+                  bindinput="onRemarkInput"
+                  placeholder="过敏信息、忌口、特殊饮食要求等"
+                  placeholder-class="placeholder"
+                  maxlength="200" />
+        <text class="char-count">{{remark.length}}/200</text>
+      </view>
+
+      <!-- 底部占位 -->
+      <view class="bottom-spacer"></view>
+    </view>
+
+    <!-- ─── 评价 Tab ─── -->
     <view class="tab-content" wx:if="{{activeTab === 'ratings'}}">
       <view wx:if="{{chef.recent_ratings && chef.recent_ratings.length > 0}}">
         <view class="rating-card" wx:for="{{chef.recent_ratings}}" wx:key="created_at">
           <view class="rating-header">
-            <text class="rating-stars">{{item.rating >= 1 ? '★' : '☆'}}{{item.rating >= 2 ? '★' : '☆'}}{{item.rating >= 3 ? '★' : '☆'}}{{item.rating >= 4 ? '★' : '☆'}}{{item.rating >= 5 ? '★' : '☆'}}</text>
+            <text class="rating-stars">
+              {{item.rating >= 1 ? '★' : '☆'}}{{item.rating >= 2 ? '★' : '☆'}}{{item.rating >= 3 ? '★' : '☆'}}{{item.rating >= 4 ? '★' : '☆'}}{{item.rating >= 5 ? '★' : '☆'}}
+            </text>
             <text class="rating-date">{{item.created_at}}</text>
           </view>
           <text class="rating-comment" wx:if="{{item.comment}}">{{item.comment}}</text>
@@ -88,16 +199,40 @@
         <text>暂无评价</text>
       </view>
     </view>
+  </block>
 
-    <!-- 底部选择按钮 -->
-    <view class="bottom-spacer"></view>
-    <view class="bottom-action">
-      <button class="select-btn" bindtap="selectThisChef" wx:if="{{chef.status === 'available'}}">
-        选择该厨师
-      </button>
-      <button class="select-btn disabled" disabled wx:else>
-        暂不可预约
-      </button>
+  <!-- 加载失败 -->
+  <view class="load-error" wx:elif="{{!loading}}">
+    <text class="error-text">加载失败，请返回重试</text>
+  </view>
+
+  <!-- ─── 底部固定操作栏 ─── -->
+  <block wx:if="{{chef && !loading}}">
+    <!-- 简介/菜品/评价 Tab：展示选择按钮 -->
+    <view class="bottom-action" wx:if="{{activeTab !== 'booking'}}">
+      <view class="bottom-fee-info">
+        <text class="bottom-fee-label">服务费</text>
+        <text class="bottom-fee-price">¥{{chef.base_fee_fen / 100}}起</text>
+      </view>
+      <view class="switch-booking-btn" bindtap="switchTab" data-tab="booking"
+            wx:if="{{chef.status === 'available'}}">
+        <text>立即预约</text>
+      </view>
+      <view class="switch-booking-btn disabled" wx:else>
+        <text>暂不可约</text>
+      </view>
+    </view>
+
+    <!-- 预约 Tab：展示确认按钮 -->
+    <view class="bottom-action" wx:if="{{activeTab === 'booking'}}">
+      <view class="booking-summary" wx:if="{{bookingDate && bookingTime}}">
+        <text class="booking-date-label">{{bookingDate}} {{bookingTime}}</text>
+        <text class="booking-guests-label">{{guestCount}}人</text>
+      </view>
+      <view class="confirm-booking-btn {{submitting ? 'loading' : ''}}"
+            bindtap="confirmBooking">
+        <text>{{submitting ? '提交中...' : '确认预约'}}</text>
+      </view>
     </view>
   </block>
 </view>

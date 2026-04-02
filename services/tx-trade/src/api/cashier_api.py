@@ -7,8 +7,11 @@
   - apply_discount  → 调用 tx-org PermissionService 检查折扣权限
   - cancel_order    → 检查退单权限（void_order）
   - update_item     → 改价时检查 modify_price 权限（通过 X-Employee-ID header）
+
+折扣引擎集成（v106）：
+  - checkout_with_discounts → 调用折扣引擎计算叠加优惠，写 checkout_discount_log
 """
-from typing import Optional
+from typing import List, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Request, HTTPException, Header, Query
@@ -21,6 +24,14 @@ from ..services.payment_gateway import PaymentGateway
 from ..services.payment_saga_service import PaymentSagaService
 from ..services.daily_settlement import DailySettlementService
 from ..services.permission_client import CashierPermissionClient
+from .discount_engine_routes import (
+    DiscountInput,
+    CalculateRequest,
+    _resolve_conflicts,
+    _build_steps,
+    _fetch_active_rules,
+    _insert_discount_log,
+)
 
 router = APIRouter(prefix="/api/v1", tags=["cashier"])
 
@@ -615,3 +626,135 @@ async def list_orders(
         size=size,
     )
     return _ok(result)
+
+
+# ─── 14. 带折扣结账（折扣引擎集成）───
+
+
+class CheckoutWithDiscountsReq(BaseModel):
+    """结账时携带优惠信息，引擎自动计算叠加"""
+    method: str = Field(..., description="支付方式：cash/wechat/alipay/unionpay/member_balance/credit_account")
+    base_amount_fen: int = Field(..., ge=1, description="原始金额（分）")
+    discounts: List[DiscountInput] = Field(default_factory=list, description="待叠加的优惠列表")
+    store_id: Optional[str] = None
+    auth_code: Optional[str] = None
+    idempotency_key: Optional[str] = Field(None, max_length=128)
+
+
+@router.post("/orders/{order_id}/checkout-with-discounts")
+async def checkout_with_discounts(
+    order_id: str,
+    req: CheckoutWithDiscountsReq,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """结账 + 折扣引擎一体化接口（v106）
+
+    流程：
+      1. 调用折扣引擎计算叠加优惠（互斥检测 + 最优组合）
+      2. 将 applied_steps 写入 checkout_discount_log
+      3. 用 final_amount_fen 调用 Saga 支付
+      4. 返回折扣明细 + 支付结果
+    """
+    tenant_id = _get_tenant_id(request)
+    try:
+        order_uuid = UUID(order_id)
+    except ValueError:
+        _err(f"order_id 格式非法: {order_id}")
+        return
+
+    # ── Step 1: 折扣引擎计算 ──
+    discount_result: dict = {
+        "base_amount_fen": req.base_amount_fen,
+        "applied_steps": [],
+        "total_saved_fen": 0,
+        "final_amount_fen": req.base_amount_fen,
+        "conflicts": [],
+        "log_id": None,
+    }
+
+    if req.discounts:
+        try:
+            rules = await _fetch_active_rules(db, tenant_id, req.store_id)
+            rule_map: dict = {}
+            for r in rules:
+                t = r["type"]
+                if t not in rule_map:
+                    rule_map[t] = {
+                        "can_stack_with": list(r["can_stack_with"] or []),
+                        "apply_order": r["apply_order"],
+                    }
+
+            chosen, conflicts = _resolve_conflicts(req.base_amount_fen, req.discounts, rule_map)
+            applied_steps = _build_steps(req.base_amount_fen, chosen, rule_map)
+            final_amount_fen = applied_steps[-1]["after"] if applied_steps else req.base_amount_fen
+            total_saved_fen = req.base_amount_fen - final_amount_fen
+
+            # 写审计日志（失败不阻断结账）
+            log_id = None
+            try:
+                log_id = await _insert_discount_log(
+                    db,
+                    tenant_id=tenant_id,
+                    order_id=order_id,
+                    base_amount_fen=req.base_amount_fen,
+                    applied_steps=applied_steps,
+                    total_saved_fen=total_saved_fen,
+                    final_amount_fen=final_amount_fen,
+                    conflicts=conflicts,
+                )
+                await db.commit()
+            except Exception:
+                await db.rollback()
+
+            discount_result = {
+                "base_amount_fen": req.base_amount_fen,
+                "applied_steps": applied_steps,
+                "total_saved_fen": total_saved_fen,
+                "final_amount_fen": final_amount_fen,
+                "conflicts": conflicts,
+                "log_id": log_id,
+            }
+        except Exception:
+            # 折扣计算失败，降级到原始金额，不阻断支付
+            discount_result["final_amount_fen"] = req.base_amount_fen
+
+    final_pay_fen = discount_result["final_amount_fen"]
+
+    # ── Step 2: Saga 支付 ──
+    gateway = PaymentGateway(db, tenant_id)
+    saga_service = PaymentSagaService(
+        db=db,
+        tenant_id=UUID(tenant_id) if isinstance(tenant_id, str) else tenant_id,
+        payment_gateway=gateway,
+    )
+
+    try:
+        payment_result = await saga_service.execute(
+            order_id=order_uuid,
+            method=req.method,
+            amount_fen=final_pay_fen,
+            auth_code=req.auth_code,
+            idempotency_key=req.idempotency_key,
+        )
+    except ValueError as e:
+        _err(str(e))
+        return
+    except RuntimeError as e:
+        _err(str(e), 502)
+        return
+
+    if payment_result["status"] != "done":
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "ok": False,
+                "data": {**discount_result, "payment": payment_result},
+                "error": {"message": payment_result.get("error") or "支付处理失败，已自动退款"},
+            },
+        )
+
+    return _ok({
+        "discount": discount_result,
+        "payment": payment_result,
+    })

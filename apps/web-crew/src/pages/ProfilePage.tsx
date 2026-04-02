@@ -136,6 +136,124 @@ export function ProfilePage() {
         </button>
       )}
 
+      {/* 集团驾驶舱入口（店长/老板专属） */}
+      {isManager && (
+        <button
+          onClick={() => navigate('/group-dashboard')}
+          style={{
+            width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            background: C.card, borderRadius: 12, padding: '14px 16px', marginBottom: 16,
+            border: `1px solid ${C.border}`, cursor: 'pointer', textAlign: 'left',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{
+              width: 40, height: 40, borderRadius: 10,
+              background: `${C.accent}22`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 20, flexShrink: 0,
+            }}>
+              📡
+            </div>
+            <div>
+              <div style={{ fontSize: 16, fontWeight: 700, color: C.white }}>集团驾驶舱</div>
+              <div style={{ fontSize: 13, color: C.muted, marginTop: 2 }}>
+                跨店实时营收与异常告警
+              </div>
+            </div>
+          </div>
+          <span style={{ fontSize: 18, color: C.muted }}>›</span>
+        </button>
+      )}
+
+      {/* 会员等级配置入口（店长/老板专属） */}
+      {isManager && (
+        <button
+          onClick={() => navigate('/member-level-config')}
+          style={{
+            width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            background: C.card, borderRadius: 12, padding: '14px 16px', marginBottom: 16,
+            border: `1px solid ${C.border}`, cursor: 'pointer', textAlign: 'left',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{
+              width: 40, height: 40, borderRadius: 10,
+              background: '#facc1522',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 20, flexShrink: 0,
+            }}>
+              🥇
+            </div>
+            <div>
+              <div style={{ fontSize: 16, fontWeight: 700, color: C.white }}>会员等级配置</div>
+              <div style={{ fontSize: 13, color: C.muted, marginTop: 2 }}>
+                配置等级权益与积分规则
+              </div>
+            </div>
+          </div>
+          <span style={{ fontSize: 18, color: C.muted }}>›</span>
+        </button>
+      )}
+
+      {/* 打印机配置入口（店长/老板专属） */}
+      {isManager && (
+        <button
+          onClick={() => navigate('/printer-settings')}
+          style={{
+            width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            background: C.card, borderRadius: 12, padding: '14px 16px', marginBottom: 16,
+            border: `1px solid ${C.border}`, cursor: 'pointer', textAlign: 'left',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{
+              width: 40, height: 40, borderRadius: 10,
+              background: `${C.accent}22`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 20, flexShrink: 0,
+            }}>
+              🖨
+            </div>
+            <div>
+              <div style={{ fontSize: 16, fontWeight: 700, color: C.white }}>打印机配置</div>
+              <div style={{ fontSize: 13, color: C.muted, marginTop: 2 }}>
+                配置打印机与菜品路由规则
+              </div>
+            </div>
+          </div>
+          <span style={{ fontSize: 18, color: C.muted }}>›</span>
+        </button>
+      )}
+
+      {/* 预订收件箱入口（所有人可见） */}
+      <button
+        onClick={() => navigate('/reservations')}
+        style={{
+          width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          background: C.card, borderRadius: 12, padding: '14px 16px', marginBottom: 16,
+          border: `1px solid ${C.border}`, cursor: 'pointer', textAlign: 'left',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{
+            width: 40, height: 40, borderRadius: 10,
+            background: 'rgba(255,107,44,0.15)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 20, flexShrink: 0,
+          }}>
+            📅
+          </div>
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: C.white }}>预订收件箱</div>
+            <div style={{ fontSize: 13, color: C.muted, marginTop: 2 }}>
+              美团/大众点评/微信多渠道预订聚合
+            </div>
+          </div>
+        </div>
+        <span style={{ fontSize: 18, color: C.muted }}>›</span>
+      </button>
+
       {/* 供应链移动端入口 */}
       <div style={{ marginBottom: 16 }}>
         <h2 style={{ fontSize: 15, fontWeight: 600, color: C.muted, margin: '0 0 10px' }}>供应链</h2>

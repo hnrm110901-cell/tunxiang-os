@@ -76,7 +76,7 @@ type SpeechRecognitionConstructor = new () => SpeechRecognitionInstance;
 // ─── 内部工具 ────────────────────────────────────────────────────────────────
 
 function getSpeechRecognition(): SpeechRecognitionConstructor | null {
-  const w = window as Record<string, unknown>;
+  const w = window as unknown as Record<string, unknown>;
   return (
     (w['SpeechRecognition'] as SpeechRecognitionConstructor | undefined) ??
     (w['webkitSpeechRecognition'] as SpeechRecognitionConstructor | undefined) ??
@@ -85,7 +85,7 @@ function getSpeechRecognition(): SpeechRecognitionConstructor | null {
 }
 
 function getApiBase(): string {
-  const w = window as Record<string, unknown>;
+  const w = window as unknown as Record<string, unknown>;
   return (w['__TX_API_BASE__'] as string | undefined) ?? '';
 }
 

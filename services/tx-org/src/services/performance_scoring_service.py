@@ -241,14 +241,25 @@ async def get_scores(
     rows = await db.execute(
         text(
             f"""
-            SELECT
-                ps.id, ps.employee_id, ps.scorer_id, ps.month,
-                ps.dimension_scores, ps.weighted_total, ps.comment, ps.created_at,
-                e.emp_name, e.role, e.store_id
-            FROM performance_scores ps
-            JOIN employees e ON e.id = ps.employee_id AND e.tenant_id = ps.tenant_id
-            WHERE {where_sql}
-            ORDER BY ps.created_at DESC
+            SELECT * FROM (
+                SELECT
+                    ps.id, ps.employee_id, ps.scorer_id, ps.month,
+                    ps.dimension_scores, ps.weighted_total, ps.comment, ps.created_at,
+                    e.emp_name, e.role, e.store_id,
+                    s.store_name AS store_name,
+                    RANK() OVER (
+                        PARTITION BY e.store_id, ps.month
+                        ORDER BY ps.weighted_total DESC NULLS LAST,
+                                 ps.created_at DESC,
+                                 ps.id
+                    ) AS rank_in_store
+                FROM performance_scores ps
+                JOIN employees e ON e.id = ps.employee_id AND e.tenant_id = ps.tenant_id
+                LEFT JOIN stores s
+                    ON s.id = e.store_id AND s.tenant_id = e.tenant_id AND s.is_deleted = FALSE
+                WHERE {where_sql}
+            ) AS ranked
+            ORDER BY ranked.created_at DESC
             LIMIT :limit OFFSET :offset
             """
         ),

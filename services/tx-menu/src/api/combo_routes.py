@@ -1,8 +1,16 @@
-"""套餐组合 API — 3个端点
+"""套餐组合 API — 8个端点
 
-- GET  /api/v1/menu/combos              列出套餐
-- POST /api/v1/menu/combos              创建套餐
-- POST /api/v1/menu/combos/{combo_id}/order  点套餐→自动展开为多条 OrderItem
+基础端点（原有）：
+- GET  /api/v1/menu/combos                              列出套餐
+- POST /api/v1/menu/combos                              创建套餐
+- POST /api/v1/menu/combos/{combo_id}/order             点套餐→自动展开为多条 OrderItem
+
+N选M分组管理（新增）：
+- GET  /api/v1/menu/combos/{combo_id}/groups                        获取套餐分组列表（含菜品）
+- POST /api/v1/menu/combos/{combo_id}/groups                        创建分组
+- POST /api/v1/menu/combos/{combo_id}/groups/{group_id}/items       添加菜品到分组
+- DELETE /api/v1/menu/combos/{combo_id}/groups/{group_id}/items/{item_id}  从分组移除菜品
+- POST /api/v1/menu/combos/{combo_id}/validate-selection            验证顾客选择是否满足规则
 """
 import uuid
 from typing import Optional
@@ -10,7 +18,7 @@ from typing import Optional
 import structlog
 from fastapi import APIRouter, Depends, Request, HTTPException, Query
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
@@ -162,6 +170,161 @@ async def create_combo(
     })
 
 
+@router.get("/combos/{combo_id}/detail")
+async def get_combo_detail(
+    combo_id: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """获取套餐N选M完整结构（含分组和可选菜品）
+
+    TODO: 当前返回 Mock 数据，待 combo_groups / combo_group_items 表接入后
+          替换为真实数据库查询：
+          SELECT cg.*, cgi.* FROM combo_groups cg
+          JOIN combo_group_items cgi ON cgi.group_id = cg.id
+          WHERE cg.combo_id = :combo_id AND cg.tenant_id = :tenant_id
+          AND cg.is_deleted = false AND cgi.is_deleted = false
+          ORDER BY cg.sort_order, cgi.sort_order
+    """
+    tenant_id = _get_tenant_id(request)
+    tenant_uuid = uuid.UUID(tenant_id)
+
+    # 查套餐基本信息
+    result = await db.execute(
+        select(DishCombo).where(
+            DishCombo.id == uuid.UUID(combo_id),
+            DishCombo.tenant_id == tenant_uuid,
+            DishCombo.is_deleted == False,  # noqa: E712
+        )
+    )
+    combo = result.scalar_one_or_none()
+    if not combo:
+        raise HTTPException(status_code=404, detail="套餐不存在")
+
+    # TODO: 替换为真实的 combo_groups + combo_group_items 查询
+    # 当前使用 Mock 分组数据演示N选M结构
+    mock_groups = [
+        {
+            "group_id": f"grp-mock-{combo_id[:8]}-01",
+            "group_name": "主菜（任选1款）",
+            "min_select": 1,
+            "max_select": 1,
+            "is_required": True,
+            "items": [
+                {
+                    "item_id": f"item-mock-{combo_id[:8]}-01a",
+                    "dish_id": "dish-mock-qingluyuye",
+                    "dish_name": "清蒸鲈鱼",
+                    "extra_price_fen": 0,
+                    "is_default": False,
+                    "image_url": None,
+                    "sold_out": False,
+                },
+                {
+                    "item_id": f"item-mock-{combo_id[:8]}-01b",
+                    "dish_id": "dish-mock-hongshaorou",
+                    "dish_name": "红烧肉",
+                    "extra_price_fen": 0,
+                    "is_default": False,
+                    "image_url": None,
+                    "sold_out": False,
+                },
+                {
+                    "item_id": f"item-mock-{combo_id[:8]}-01c",
+                    "dish_id": "dish-mock-baizhuoxia",
+                    "dish_name": "白灼虾",
+                    "extra_price_fen": 1800,
+                    "is_default": False,
+                    "image_url": None,
+                    "sold_out": False,
+                },
+            ],
+        },
+        {
+            "group_id": f"grp-mock-{combo_id[:8]}-02",
+            "group_name": "例汤（固定）",
+            "min_select": 1,
+            "max_select": 1,
+            "is_required": True,
+            "items": [
+                {
+                    "item_id": f"item-mock-{combo_id[:8]}-02a",
+                    "dish_id": "dish-mock-suancaiyu-tang",
+                    "dish_name": "酸菜鱼汤（固定）",
+                    "extra_price_fen": 0,
+                    "is_default": True,
+                    "image_url": None,
+                    "sold_out": False,
+                },
+            ],
+        },
+        {
+            "group_id": f"grp-mock-{combo_id[:8]}-03",
+            "group_name": "主食（任选1款）",
+            "min_select": 1,
+            "max_select": 1,
+            "is_required": True,
+            "items": [
+                {
+                    "item_id": f"item-mock-{combo_id[:8]}-03a",
+                    "dish_id": "dish-mock-baifan",
+                    "dish_name": "白饭",
+                    "extra_price_fen": 0,
+                    "is_default": False,
+                    "image_url": None,
+                    "sold_out": False,
+                },
+                {
+                    "item_id": f"item-mock-{combo_id[:8]}-03b",
+                    "dish_id": "dish-mock-chaofan",
+                    "dish_name": "炒饭",
+                    "extra_price_fen": 0,
+                    "is_default": False,
+                    "image_url": None,
+                    "sold_out": False,
+                },
+            ],
+        },
+        {
+            "group_id": f"grp-mock-{combo_id[:8]}-04",
+            "group_name": "饮料（可选）",
+            "min_select": 0,
+            "max_select": 2,
+            "is_required": False,
+            "items": [
+                {
+                    "item_id": f"item-mock-{combo_id[:8]}-04a",
+                    "dish_id": "dish-mock-kele",
+                    "dish_name": "可乐",
+                    "extra_price_fen": 800,
+                    "is_default": False,
+                    "image_url": None,
+                    "sold_out": False,
+                },
+                {
+                    "item_id": f"item-mock-{combo_id[:8]}-04b",
+                    "dish_id": "dish-mock-xuebi",
+                    "dish_name": "雪碧",
+                    "extra_price_fen": 800,
+                    "is_default": False,
+                    "image_url": None,
+                    "sold_out": False,
+                },
+            ],
+        },
+    ]
+
+    return _ok({
+        "combo_id": str(combo.id),
+        "combo_name": combo.combo_name,
+        "price_fen": combo.combo_price_fen,
+        "description": combo.description or "",
+        "min_person": None,  # TODO: 从 combo.min_person 读取（v113 新增列）
+        "image_url": combo.image_url,
+        "groups": mock_groups,
+    })
+
+
 @router.post("/combos/{combo_id}/order")
 async def order_combo(
     combo_id: str,
@@ -295,3 +458,476 @@ async def order_combo(
         "order_total_fen": order.total_amount_fen,
         "order_final_fen": order.final_amount_fen,
     })
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 套餐N选M分组管理 — combo_groups / combo_group_items（v113 创建）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# combo_groups 表：
+#   id, tenant_id, combo_id, group_name, min_select, max_select,
+#   is_required, sort_order, created_at, updated_at, is_deleted
+#
+# combo_group_items 表：
+#   id, tenant_id, group_id, dish_id, dish_name(冗余), quantity,
+#   extra_price_fen, is_default, sort_order, created_at, updated_at, is_deleted
+
+
+async def _rls_menu(db: AsyncSession, tid: str) -> None:
+    await db.execute(text("SELECT set_config('app.tenant_id', :t, true)"), {"t": tid})
+
+
+def _row_to_group(row) -> dict:
+    return {
+        "id":          str(row.id),
+        "combo_id":    str(row.combo_id),
+        "group_name":  row.group_name,
+        "min_select":  row.min_select,
+        "max_select":  row.max_select,
+        "is_required": row.is_required,
+        "sort_order":  row.sort_order,
+    }
+
+
+def _row_to_group_item(row) -> dict:
+    return {
+        "id":              str(row.id),
+        "group_id":        str(row.group_id),
+        "dish_id":         str(row.dish_id) if row.dish_id else None,
+        "dish_name":       row.dish_name,
+        "quantity":        row.quantity,
+        "extra_price_fen": row.extra_price_fen,
+        "is_default":      row.is_default,
+        "sort_order":      row.sort_order,
+    }
+
+
+# ─── 请求模型（N选M） ──────────────────────────────────────────────────────────
+
+class CreateGroupReq(BaseModel):
+    group_name: str = Field(..., description="分组名称，如「主食选一款」")
+    min_select: int = Field(default=1, ge=0, description="最少选N个")
+    max_select: int = Field(default=1, ge=1, description="最多选M个")
+    is_required: bool = Field(default=True, description="是否必选")
+    sort_order: int = Field(default=0, description="显示排序")
+
+
+class AddGroupItemReq(BaseModel):
+    dish_id: str = Field(..., description="菜品ID")
+    dish_name: str = Field(..., description="菜品名称（冗余，避免联表）")
+    quantity: int = Field(default=1, ge=1, description="该选项的菜品数量")
+    extra_price_fen: int = Field(default=0, ge=0, description="额外加价（分），0=不加价")
+    is_default: bool = Field(default=False, description="是否默认选中")
+    sort_order: int = Field(default=0, description="显示排序")
+
+
+class SelectionGroupReq(BaseModel):
+    group_id: str
+    item_ids: list[str] = Field(..., description="用户选择的 combo_group_items.id 列表")
+
+
+class ValidateSelectionReq(BaseModel):
+    selections: list[SelectionGroupReq]
+
+
+# ─── GET /combos/{combo_id}/groups ────────────────────────────────────────────
+
+@router.get("/combos/{combo_id}/groups", summary="获取套餐N选M分组列表（含每组可选菜品）")
+async def list_combo_groups(
+    combo_id: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """返回该套餐的所有分组，每个分组内嵌可选菜品列表。"""
+    tenant_id = _get_tenant_id(request)
+    await _rls_menu(db, tenant_id)
+
+    # 校验套餐存在
+    combo_check = await db.execute(
+        select(DishCombo).where(
+            DishCombo.id == uuid.UUID(combo_id),
+            DishCombo.tenant_id == uuid.UUID(tenant_id),
+            DishCombo.is_deleted == False,  # noqa: E712
+        )
+    )
+    combo = combo_check.scalar_one_or_none()
+    if not combo:
+        raise HTTPException(status_code=404, detail="套餐不存在")
+
+    # 查分组
+    groups_sql = text("""
+        SELECT id, combo_id, group_name, min_select, max_select,
+               is_required, sort_order
+        FROM combo_groups
+        WHERE combo_id   = :combo_id
+          AND tenant_id  = :tenant_id
+          AND is_deleted = false
+        ORDER BY sort_order ASC, created_at ASC
+    """)
+    groups_result = await db.execute(groups_sql, {
+        "combo_id":  combo_id,
+        "tenant_id": tenant_id,
+    })
+    group_rows = groups_result.fetchall()
+
+    if not group_rows:
+        return _ok({"combo_id": combo_id, "groups": []})
+
+    group_ids = [str(r.id) for r in group_rows]
+    id_placeholders = ", ".join([f"'{gid}'" for gid in group_ids])
+
+    # 查所有分组的菜品（一次查询）
+    items_sql = text(f"""
+        SELECT id, group_id, dish_id, dish_name, quantity,
+               extra_price_fen, is_default, sort_order
+        FROM combo_group_items
+        WHERE group_id   IN ({id_placeholders})
+          AND tenant_id  = :tenant_id
+          AND is_deleted = false
+        ORDER BY sort_order ASC, created_at ASC
+    """)
+    items_result = await db.execute(items_sql, {"tenant_id": tenant_id})
+    item_rows = items_result.fetchall()
+
+    # 按 group_id 分组
+    items_by_group: dict[str, list] = {}
+    for item_row in item_rows:
+        gid = str(item_row.group_id)
+        items_by_group.setdefault(gid, []).append(_row_to_group_item(item_row))
+
+    groups_out = []
+    for g in group_rows:
+        g_dict = _row_to_group(g)
+        g_dict["items"] = items_by_group.get(str(g.id), [])
+        groups_out.append(g_dict)
+
+    return _ok({
+        "combo_id":    combo_id,
+        "combo_name":  combo.combo_name,
+        "groups":      groups_out,
+        "total_groups": len(groups_out),
+    })
+
+
+# ─── POST /combos/{combo_id}/groups ───────────────────────────────────────────
+
+@router.post("/combos/{combo_id}/groups", summary="创建套餐N选M分组")
+async def create_combo_group(
+    combo_id: str,
+    req: CreateGroupReq,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    tenant_id = _get_tenant_id(request)
+    await _rls_menu(db, tenant_id)
+
+    # 校验套餐存在
+    combo_check = await db.execute(
+        select(DishCombo).where(
+            DishCombo.id == uuid.UUID(combo_id),
+            DishCombo.tenant_id == uuid.UUID(tenant_id),
+            DishCombo.is_deleted == False,  # noqa: E712
+        )
+    )
+    if not combo_check.scalar_one_or_none():
+        raise HTTPException(status_code=404, detail="套餐不存在")
+
+    if req.max_select < req.min_select:
+        raise HTTPException(status_code=422, detail="max_select 不能小于 min_select")
+
+    new_id = str(uuid.uuid4())
+    insert_sql = text("""
+        INSERT INTO combo_groups
+          (id, tenant_id, combo_id, group_name, min_select, max_select,
+           is_required, sort_order, created_at, updated_at, is_deleted)
+        VALUES
+          (:id, :tenant_id, :combo_id, :group_name, :min_select, :max_select,
+           :is_required, :sort_order, NOW(), NOW(), false)
+        RETURNING id, combo_id, group_name, min_select, max_select,
+                  is_required, sort_order
+    """)
+    result = await db.execute(insert_sql, {
+        "id":          new_id,
+        "tenant_id":   tenant_id,
+        "combo_id":    combo_id,
+        "group_name":  req.group_name,
+        "min_select":  req.min_select,
+        "max_select":  req.max_select,
+        "is_required": req.is_required,
+        "sort_order":  req.sort_order,
+    })
+    row = result.fetchone()
+    await db.commit()
+
+    logger.info("combo_group_created", combo_id=combo_id, group_id=new_id, group_name=req.group_name)
+    group_dict = _row_to_group(row)
+    group_dict["items"] = []
+    return _ok({"group": group_dict})
+
+
+# ─── POST /combos/{combo_id}/groups/{group_id}/items ──────────────────────────
+
+@router.post("/combos/{combo_id}/groups/{group_id}/items", summary="添加菜品到套餐分组")
+async def add_item_to_combo_group(
+    combo_id: str,
+    group_id: str,
+    req: AddGroupItemReq,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    tenant_id = _get_tenant_id(request)
+    await _rls_menu(db, tenant_id)
+
+    # 校验分组存在且属于该套餐
+    check_sql = text("""
+        SELECT id FROM combo_groups
+        WHERE id        = :group_id
+          AND combo_id  = :combo_id
+          AND tenant_id = :tenant_id
+          AND is_deleted = false
+    """)
+    check_result = await db.execute(check_sql, {
+        "group_id":  group_id,
+        "combo_id":  combo_id,
+        "tenant_id": tenant_id,
+    })
+    if not check_result.fetchone():
+        raise HTTPException(status_code=404, detail="分组不存在或不属于该套餐")
+
+    new_id = str(uuid.uuid4())
+    insert_sql = text("""
+        INSERT INTO combo_group_items
+          (id, tenant_id, group_id, dish_id, dish_name, quantity,
+           extra_price_fen, is_default, sort_order, created_at, updated_at, is_deleted)
+        VALUES
+          (:id, :tenant_id, :group_id, :dish_id, :dish_name, :quantity,
+           :extra_price_fen, :is_default, :sort_order, NOW(), NOW(), false)
+        RETURNING id, group_id, dish_id, dish_name, quantity,
+                  extra_price_fen, is_default, sort_order
+    """)
+    result = await db.execute(insert_sql, {
+        "id":              new_id,
+        "tenant_id":       tenant_id,
+        "group_id":        group_id,
+        "dish_id":         req.dish_id,
+        "dish_name":       req.dish_name,
+        "quantity":        req.quantity,
+        "extra_price_fen": req.extra_price_fen,
+        "is_default":      req.is_default,
+        "sort_order":      req.sort_order,
+    })
+    row = result.fetchone()
+    await db.commit()
+
+    logger.info(
+        "combo_group_item_added",
+        combo_id=combo_id,
+        group_id=group_id,
+        item_id=new_id,
+        dish_name=req.dish_name,
+    )
+    return _ok({"item": _row_to_group_item(row)})
+
+
+# ─── DELETE /combos/{combo_id}/groups/{group_id}/items/{item_id} ──────────────
+
+@router.delete(
+    "/combos/{combo_id}/groups/{group_id}/items/{item_id}",
+    summary="从套餐分组移除菜品（软删除）",
+)
+async def remove_item_from_combo_group(
+    combo_id: str,
+    group_id: str,
+    item_id: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    tenant_id = _get_tenant_id(request)
+    await _rls_menu(db, tenant_id)
+
+    # 校验 item 存在且属于该分组
+    check_sql = text("""
+        SELECT i.id FROM combo_group_items i
+        JOIN combo_groups g ON g.id = i.group_id
+        WHERE i.id        = :item_id
+          AND i.group_id  = :group_id
+          AND g.combo_id  = :combo_id
+          AND i.tenant_id = :tenant_id
+          AND i.is_deleted = false
+    """)
+    check_result = await db.execute(check_sql, {
+        "item_id":   item_id,
+        "group_id":  group_id,
+        "combo_id":  combo_id,
+        "tenant_id": tenant_id,
+    })
+    if not check_result.fetchone():
+        raise HTTPException(status_code=404, detail="菜品不存在于该分组")
+
+    del_sql = text("""
+        UPDATE combo_group_items
+        SET is_deleted = true, updated_at = NOW()
+        WHERE id = :item_id AND tenant_id = :tenant_id
+    """)
+    await db.execute(del_sql, {"item_id": item_id, "tenant_id": tenant_id})
+    await db.commit()
+
+    logger.info("combo_group_item_removed", combo_id=combo_id, group_id=group_id, item_id=item_id)
+    return _ok({"item_id": item_id, "removed": True})
+
+
+# ─── POST /combos/{combo_id}/validate-selection ───────────────────────────────
+
+@router.post("/combos/{combo_id}/validate-selection", summary="验证顾客套餐N选M选择是否合规")
+async def validate_combo_selection(
+    combo_id: str,
+    req: ValidateSelectionReq,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """验证顾客对该套餐各分组的选择是否满足 min_select/max_select/is_required 规则。
+
+    返回：
+      valid  — True=全部合规，False=有违规
+      errors — 违规分组列表，每项含 group_id + group_name + message
+    """
+    tenant_id = _get_tenant_id(request)
+    await _rls_menu(db, tenant_id)
+
+    # 查套餐所有分组
+    groups_sql = text("""
+        SELECT id, group_name, min_select, max_select, is_required
+        FROM combo_groups
+        WHERE combo_id   = :combo_id
+          AND tenant_id  = :tenant_id
+          AND is_deleted = false
+    """)
+    groups_result = await db.execute(groups_sql, {
+        "combo_id":  combo_id,
+        "tenant_id": tenant_id,
+    })
+    groups = {str(r.id): r for r in groups_result.fetchall()}
+
+    if not groups:
+        raise HTTPException(status_code=404, detail="套餐不存在或无分组")
+
+    # 构建顾客选择 map: group_id -> [item_id, ...]
+    selection_map: dict[str, list[str]] = {}
+    for sel in req.selections:
+        selection_map[sel.group_id] = sel.item_ids
+
+    # 校验选择的 item_id 是否都有效（属于该套餐且未删除）
+    all_selected_ids: list[str] = []
+    for item_ids in selection_map.values():
+        all_selected_ids.extend(item_ids)
+
+    valid_item_ids: set[str] = set()
+    if all_selected_ids:
+        id_placeholders = ", ".join([f"'{iid}'" for iid in all_selected_ids])
+        valid_sql = text(f"""
+            SELECT i.id, i.group_id FROM combo_group_items i
+            JOIN combo_groups g ON g.id = i.group_id
+            WHERE i.id       IN ({id_placeholders})
+              AND g.combo_id  = :combo_id
+              AND i.tenant_id = :tenant_id
+              AND i.is_deleted = false
+        """)
+        valid_result = await db.execute(valid_sql, {
+            "combo_id":  combo_id,
+            "tenant_id": tenant_id,
+        })
+        for vr in valid_result.fetchall():
+            valid_item_ids.add(str(vr.id))
+
+    # 查各 item_id 所属分组（用于"菜品不在该分组"校验）
+    item_group_map: dict[str, str] = {}  # item_id -> group_id
+    if all_selected_ids:
+        id_placeholders_2 = ", ".join([f"'{iid}'" for iid in all_selected_ids])
+        item_group_sql = text(f"""
+            SELECT i.id, i.group_id FROM combo_group_items i
+            JOIN combo_groups g ON g.id = i.group_id
+            WHERE i.id       IN ({id_placeholders_2})
+              AND g.combo_id  = :combo_id
+              AND i.tenant_id = :tenant_id
+              AND i.is_deleted = false
+        """)
+        item_group_result = await db.execute(item_group_sql, {
+            "combo_id":  combo_id,
+            "tenant_id": tenant_id,
+        })
+        for igr in item_group_result.fetchall():
+            item_group_map[str(igr.id)] = str(igr.group_id)
+
+    def _combo_error(code_message: str, group_id: str) -> None:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "ok": False,
+                "data": None,
+                "error": {
+                    "code": "COMBO_VALIDATION_ERROR",
+                    "message": code_message,
+                    "field": group_id,
+                },
+            },
+        )
+
+    errors: list[dict] = []
+
+    for group_id, group in groups.items():
+        selected_ids = selection_map.get(group_id, [])
+
+        # 防御4: 重复选择 — 同一个 item_id 在同一组出现两次
+        if len(selected_ids) != len(set(selected_ids)):
+            _combo_error("不可重复选择同一菜品", group_id)
+
+        # 防御3: 无效 dish_id — 选择了不属于该分组的菜品
+        for iid in selected_ids:
+            actual_group = item_group_map.get(iid)
+            if actual_group is None:
+                # item_id 在整个套餐中都不存在
+                _combo_error("菜品不在该套餐分组中", group_id)
+            elif actual_group != group_id:
+                # item_id 属于该套餐，但不在此分组
+                _combo_error("菜品不在该套餐分组中", group_id)
+
+        # 只统计已通过有效性校验的 item
+        valid_selected = [iid for iid in selected_ids if iid in valid_item_ids]
+        count = len(valid_selected)
+
+        # 防御3 兜底: 仍有无效 id（上面按分组校验后还剩余的）
+        invalid_ids = [iid for iid in selected_ids if iid not in valid_item_ids]
+        if invalid_ids:
+            errors.append({
+                "group_id":   group_id,
+                "group_name": group.group_name,
+                "message":    f"「{group.group_name}」包含无效菜品选项：{invalid_ids}",
+                "code":       "COMBO_VALIDATION_ERROR",
+            })
+            continue
+
+        # 防御1: 超选 — selected_count > group.max_select
+        if count > group.max_select:
+            _combo_error("超出最大选择数量", group_id)
+
+        # 防御2: 未选必选项 — is_required=True 且 selected_count < group.min_select
+        if group.is_required and count < group.min_select:
+            _combo_error("请完成必选项", group_id)
+
+        # 非必选但选了又不够 min_select（理论上 min_select>0 且 is_required=False 很少见）
+        if not group.is_required and count > 0 and count < group.min_select:
+            errors.append({
+                "group_id":   group_id,
+                "group_name": group.group_name,
+                "message":    f"「{group.group_name}」至少需要选 {group.min_select} 个，当前选了 {count} 个",
+                "code":       "COMBO_VALIDATION_ERROR",
+            })
+
+    valid = len(errors) == 0
+    logger.info(
+        "combo_selection_validated",
+        combo_id=combo_id,
+        valid=valid,
+        errors_count=len(errors),
+    )
+    return _ok({"valid": valid, "errors": errors})

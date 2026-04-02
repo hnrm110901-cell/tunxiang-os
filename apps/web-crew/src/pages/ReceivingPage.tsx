@@ -1,7 +1,7 @@
 /**
  * 移动收货 — 3步向导：基本信息 → 货品录入 → 确认提交
  */
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 const C = {

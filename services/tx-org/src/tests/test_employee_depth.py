@@ -93,10 +93,9 @@ from services.employee_depth import (
     COMMISSION_BOTTLE_FEN,
     COMMISSION_UPSELL_RATE,
     TRAINING_STATUS_PENDING,
+    TRAINING_STATUS_IN_PROGRESS,
     TRAINING_STATUS_COMPLETED,
     TRAINING_STATUS_FAILED,
-    _training_store,
-    _training_key,
 )
 
 
@@ -130,29 +129,11 @@ class TestCommissionConstants:
         assert bottle_commission == 1500
 
 
-class TestTrainingStore:
-    """培训存储逻辑测试"""
-
-    def setup_method(self):
-        _training_store.clear()
-
-    def test_training_key(self):
-        key = _training_key("emp1", "tenant1")
-        assert key == "tenant1:emp1"
-
-    def test_empty_store(self):
-        key = _training_key("emp1", "tenant1")
-        assert _training_store.get(key) is None
-
-    def test_store_and_retrieve(self):
-        key = _training_key("emp1", "tenant1")
-        _training_store[key] = [
-            {"training_id": "t1", "status": TRAINING_STATUS_PENDING},
-        ]
-        assert len(_training_store[key]) == 1
-        assert _training_store[key][0]["status"] == TRAINING_STATUS_PENDING
+class TestTrainingConstants:
+    """培训状态常量（manage_training 已落库 employee_trainings，不再使用内存 dict）。"""
 
     def test_training_status_values(self):
         assert TRAINING_STATUS_PENDING == "pending"
+        assert TRAINING_STATUS_IN_PROGRESS == "in_progress"
         assert TRAINING_STATUS_COMPLETED == "completed"
         assert TRAINING_STATUS_FAILED == "failed"

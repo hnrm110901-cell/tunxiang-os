@@ -53,6 +53,20 @@
     <text class="active-order-action">查看详情 ></text>
   </view>
 
+  <!-- 大厨到家入口 Banner -->
+  <view class="chef-home-banner" bindtap="goToChefHome">
+    <view class="chef-home-banner-content">
+      <view class="chef-home-banner-text">
+        <text class="chef-home-banner-title">大厨到家</text>
+        <text class="chef-home-banner-subtitle">专业大厨，到家烹制</text>
+      </view>
+      <view class="chef-home-banner-btn">
+        <text class="chef-home-banner-btn-text">立即预订</text>
+      </view>
+    </view>
+    <text class="chef-home-banner-deco">🍳</text>
+  </view>
+
   <!-- 快捷入口 (4宫格: 扫码点餐/排队取号/预订/我的会员卡) -->
   <view class="quick-entries">
     <view class="entry-item" wx:for="{{quickEntries}}" wx:key="label"

@@ -355,7 +355,9 @@ class Order(TenantBase):
     table_transfer_from: Mapped[str | None] = mapped_column(String(20), comment="转台前桌号")
 
     # 关联
-    items = relationship("OrderItem", back_populates="order", cascade="all, delete-orphan")
+    items: Mapped[list["OrderItem"]] = relationship(
+        "OrderItem", back_populates="order", cascade="all, delete-orphan"
+    )
 
     __table_args__ = (
         Index("idx_order_store_status", "store_id", "status"),
@@ -395,7 +397,7 @@ class OrderItem(TenantBase):
     gift_reason: Mapped[str | None] = mapped_column(String(200), comment="赠菜原因")
     combo_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), comment="所属套餐ID(NULL=非套餐)")
 
-    order = relationship("Order", back_populates="items")
+    order: Mapped["Order"] = relationship("Order", back_populates="items")
 
 
 # ─────────────────────────────────────────────
@@ -568,7 +570,7 @@ class ReceivingOrder(TenantBase):
     signed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     remarks: Mapped[str | None] = mapped_column(Text)
 
-    items: "list[ReceivingOrderItem]" = relationship(
+    items: Mapped[list["ReceivingOrderItem"]] = relationship(
         "ReceivingOrderItem", back_populates="order", cascade="all, delete-orphan"
     )
 
@@ -615,7 +617,7 @@ class ReceivingOrderItem(TenantBase):
         nullable=False,
     )
 
-    order: "ReceivingOrder" = relationship("ReceivingOrder", back_populates="items")
+    order: Mapped["ReceivingOrder"] = relationship("ReceivingOrder", back_populates="items")
 
 
 # ─────────────────────────────────────────────
@@ -649,7 +651,7 @@ class TransferOrder(TenantBase):
     received_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     notes: Mapped[str | None] = mapped_column(Text)
 
-    items: "list[TransferOrderItem]" = relationship(
+    items: Mapped[list["TransferOrderItem"]] = relationship(
         "TransferOrderItem", back_populates="order", cascade="all, delete-orphan"
     )
 
@@ -681,5 +683,5 @@ class TransferOrderItem(TenantBase):
         Integer, comment="成本价（分），用于财务核算"
     )
 
-    order: "TransferOrder" = relationship("TransferOrder", back_populates="items")
+    order: Mapped["TransferOrder"] = relationship("TransferOrder", back_populates="items")
     training_completed: Mapped[list | None] = mapped_column(ARRAY(String), default=list)

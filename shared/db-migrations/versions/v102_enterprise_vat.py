@@ -24,7 +24,7 @@ Create Date: 2026-04-01
 from alembic import op
 
 revision = "v102"
-down_revision = "v101"
+down_revision = "v101b"
 branch_labels = None
 depends_on = None
 

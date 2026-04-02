@@ -1,0 +1,114 @@
+<!-- 套餐N选M点餐页 -->
+<view class="combo-page">
+
+  <!-- 加载中 -->
+  <view class="loading-wrap" wx:if="{{loading}}">
+    <text class="loading-text">加载套餐中...</text>
+  </view>
+
+  <!-- 主体内容 -->
+  <block wx:if="{{!loading}}">
+
+    <!-- 顶部：套餐信息 -->
+    <view class="combo-header">
+      <view class="combo-info">
+        <text class="combo-name">{{comboName}}</text>
+        <view class="combo-meta">
+          <text class="combo-base-price">¥{{basePriceYuan}}</text>
+          <text class="combo-serve" wx:if="{{serveCount > 0}}">约{{serveCount}}人份</text>
+        </view>
+      </view>
+      <view class="combo-progress">
+        <text class="progress-label">
+          已选 {{totalSelectedCount}} / {{totalRequiredCount}} 分组
+        </text>
+        <view class="progress-bar-wrap">
+          <view class="progress-bar-fill" style="width:{{progressPercent}}%"></view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 分组 Tabs -->
+    <scroll-view scroll-x class="group-tabs" enhanced enable-flex>
+      <view
+        wx:for="{{groups}}"
+        wx:key="group_id"
+        class="group-tab {{activeGroupIndex === index ? 'active' : ''}} {{item._isComplete ? 'complete' : ''}} {{item.is_required && !item._isComplete ? 'required-incomplete' : ''}}"
+        bindtap="switchGroup"
+        data-index="{{index}}"
+      >
+        <text class="tab-name">{{item.group_name}}</text>
+        <text class="tab-status" wx:if="{{item._selectedCount > 0}}">
+          {{item._selectedCount}}/{{item.max_select}}
+        </text>
+        <view class="tab-dot required-dot" wx:if="{{item.is_required && !item._isComplete}}"></view>
+        <view class="tab-dot done-dot" wx:elif="{{item._isComplete}}">✓</view>
+      </view>
+    </scroll-view>
+
+    <!-- 当前分组信息 -->
+    <view class="group-desc" wx:if="{{currentGroup}}">
+      <text class="group-title">{{currentGroup.group_name}}</text>
+      <text class="group-rule" wx:if="{{currentGroup.is_required && currentGroup.min_select === currentGroup.max_select}}">
+        必选{{currentGroup.min_select}}个
+      </text>
+      <text class="group-rule" wx:elif="{{currentGroup.is_required}}">
+        必选{{currentGroup.min_select}}~{{currentGroup.max_select}}个
+      </text>
+      <text class="group-rule optional" wx:else>
+        可选，最多{{currentGroup.max_select}}个
+      </text>
+      <text class="group-selected-hint">
+        已选 {{currentGroup._selectedCount || 0}} / 最多 {{currentGroup.max_select}}
+      </text>
+    </view>
+
+    <!-- 菜品列表（当前分组） -->
+    <scroll-view scroll-y class="item-list">
+      <view wx:if="{{currentItems.length === 0}}" class="empty-group">
+        <text>该分组暂无菜品</text>
+      </view>
+      <combo-group-item
+        wx:for="{{currentItems}}"
+        wx:key="item_id"
+        item="{{item}}"
+        maxSelect="{{currentGroup.max_select}}"
+        selectedCount="{{item._selectedCount || 0}}"
+        groupSelectedTotal="{{currentGroup._selectedCount || 0}}"
+        bind:add="onItemAdd"
+        bind:remove="onItemRemove"
+      />
+    </scroll-view>
+
+    <!-- 未完成提示 -->
+    <view class="incomplete-tip" wx:if="{{incompleteTip}}">
+      <text class="tip-icon">⚠</text>
+      <text class="tip-text">{{incompleteTip}}</text>
+    </view>
+
+  </block>
+
+  <!-- 底部固定栏 -->
+  <view class="bottom-bar" wx:if="{{!loading}}">
+    <view class="bottom-summary">
+      <view class="summary-count">
+        <text class="count-num">{{totalItemCount}}</text>
+        <text class="count-label">件</text>
+      </view>
+      <view class="summary-price">
+        <text class="price-label">合计</text>
+        <text class="price-value">¥{{totalPriceYuan}}</text>
+      </view>
+    </view>
+    <view
+      class="add-cart-btn {{isSelectionComplete ? '' : 'disabled'}}"
+      bindtap="onAddToCart"
+    >
+      <text>{{isSelectionComplete ? '加入购物车' : '请完成选择'}}</text>
+    </view>
+  </view>
+
+  <!-- 底部安全区占位 -->
+  <view class="bottom-safe"></view>
+
+</view>

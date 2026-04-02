@@ -4,6 +4,8 @@
  */
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import DiscountPreviewSheet, { type DiscountInputItem, type DiscountCalculateResult } from './DiscountPreviewSheet';
+
 
 // ─── 类型 ───
 
@@ -63,6 +65,10 @@ export default function TableSidePayPage() {
   const [settling, setSettling] = useState(false);
   const [settled, setSettled] = useState(false);
   const [settleError, setSettleError] = useState('');
+
+  // ─── 折扣 Sheet 状态 ───
+  const [showDiscountSheet, setShowDiscountSheet] = useState(false);
+  const [discountResult, setDiscountResult] = useState<DiscountCalculateResult | null>(null);
 
   // ─── 加载订单 ───
   useEffect(() => {
@@ -135,16 +141,14 @@ export default function TableSidePayPage() {
 
     setSettling(true);
     setSettleError('');
-    const finalAmount =
-      memberInfo && memberInfo.discount_rate < 1
-        ? calcDiscountedAmount(order.total_amount, memberInfo.discount_rate)
-        : order.total_amount;
-
     try {
       const body: Record<string, unknown> = {
         method: selectedMethod,
         member_id: memberInfo?.member_id ?? null,
         remark: selectedMethod === 'tab' ? tabUnit.trim() : null,
+        amount: memberInfo && memberInfo.discount_rate < 1
+          ? calcDiscountedAmount(order.total_amount, memberInfo.discount_rate)
+          : order.total_amount,
       };
       const res = await fetch(`/api/v1/orders/${order.order_id}/settle`, {
         method: 'POST',
@@ -168,12 +172,20 @@ export default function TableSidePayPage() {
     }
   }
 
+  // 折后实付金额：优先使用 DiscountPreviewSheet 确认的结果，其次会员折扣率
   const actualAmount =
     order
-      ? memberInfo && memberInfo.discount_rate < 1
-        ? calcDiscountedAmount(order.total_amount, memberInfo.discount_rate)
-        : order.total_amount
+      ? discountResult !== null
+        ? discountResult.final_amount_fen
+        : memberInfo && memberInfo.discount_rate < 1
+          ? calcDiscountedAmount(order.total_amount, memberInfo.discount_rate)
+          : order.total_amount
       : 0;
+
+  // 构建传给 DiscountPreviewSheet 的折扣列表（根据已查询的会员信息）
+  const discountItems: DiscountInputItem[] = memberInfo && memberInfo.discount_rate < 1
+    ? [{ type: 'member_discount', member_id: memberInfo.member_id, rate: memberInfo.discount_rate }]
+    : [];
 
   // ─── 成功全屏 ───
   if (settled) {
@@ -407,6 +419,75 @@ export default function TableSidePayPage() {
           )}
         </div>
 
+        {/* ─── 折扣入口卡片 ─── */}
+        {order && (
+          <button
+            onClick={() => setShowDiscountSheet(true)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 14,
+              width: '100%',
+              minHeight: 64,
+              background: discountResult && discountResult.total_saved_fen > 0
+                ? 'rgba(255,107,53,0.12)'
+                : '#112228',
+              border: discountResult && discountResult.total_saved_fen > 0
+                ? '1px solid rgba(255,107,53,0.5)'
+                : '1px solid #1a2a33',
+              borderRadius: 12,
+              padding: '0 16px',
+              marginBottom: 16,
+              cursor: 'pointer',
+              textAlign: 'left',
+            }}
+          >
+            {/* 标签图标 */}
+            <span style={{ fontSize: 22, flexShrink: 0 }}>🏷️</span>
+
+            {/* 文字区 */}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 16, fontWeight: 600, color: '#E0EEF0' }}>
+                可用优惠
+              </div>
+              {discountResult && discountResult.total_saved_fen > 0 ? (
+                <div
+                  style={{
+                    fontSize: 14,
+                    color: '#FF6B35',
+                    marginTop: 2,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {discountResult.applied_steps.map((s) => s.description).join(' · ')}
+                </div>
+              ) : discountResult !== null ? (
+                <div style={{ fontSize: 14, color: '#5F7A85', marginTop: 2 }}>
+                  暂无可用优惠
+                </div>
+              ) : (
+                <div style={{ fontSize: 14, color: '#9DB4B2', marginTop: 2 }}>
+                  点击查看可叠加优惠
+                </div>
+              )}
+            </div>
+
+            {/* 右侧：已优惠金额 或 箭头 */}
+            {discountResult && discountResult.total_saved_fen > 0 ? (
+              <div style={{ flexShrink: 0, textAlign: 'right' }}>
+                <div style={{ fontSize: 13, color: '#9DB4B2' }}>已优惠</div>
+                <div style={{ fontSize: 18, fontWeight: 700, color: '#FF6B35' }}>
+                  ¥{(discountResult.total_saved_fen / 100).toFixed(2)}
+                </div>
+              </div>
+            ) : (
+              <span style={{ fontSize: 20, color: '#9DB4B2', flexShrink: 0 }}>›</span>
+            )}
+          </button>
+        )}
+
         {/* ─── 支付方式选择 ─── */}
         <div
           style={{
@@ -482,6 +563,53 @@ export default function TableSidePayPage() {
               );
             })}
           </div>
+
+          {/* ─── 扫码收款快捷入口 ─── */}
+          <button
+            onClick={() => {
+              const params = new URLSearchParams({
+                order_id: order?.order_id || orderId,
+                amount_fen: String(actualAmount),
+                table: tableNo,
+              });
+              navigate(`/scan-pay?${params.toString()}`);
+            }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 14,
+              minHeight: 72,
+              background: '#1a0800',
+              border: '2px dashed #FF6B35',
+              borderRadius: 10,
+              color: '#FF6B35',
+              fontSize: 18,
+              fontWeight: 700,
+              cursor: 'pointer',
+              padding: '0 18px',
+              marginTop: 4,
+              width: '100%',
+              textAlign: 'left',
+            }}
+          >
+            <span
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: 10,
+                background: '#FF6B35',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 20,
+                flexShrink: 0,
+              }}
+            >
+              📱
+            </span>
+            <span style={{ flex: 1 }}>扫码收款（付款码）</span>
+            <span style={{ fontSize: 14, color: '#9DB4B2', fontWeight: 400 }}>微信/支付宝/银联</span>
+          </button>
         </div>
 
         {/* ─── 错误提示 ─── */}
@@ -498,6 +626,36 @@ export default function TableSidePayPage() {
             }}
           >
             {settleError}
+          </div>
+        )}
+
+        {/* ─── 金额汇总（有折扣时显示原价划线 + 折后价） ─── */}
+        {selectedMethod && order && discountResult && discountResult.total_saved_fen > 0 && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'flex-end',
+              gap: 12,
+              marginBottom: 12,
+              padding: '10px 16px',
+              background: 'rgba(255,107,53,0.08)',
+              borderRadius: 10,
+              border: '1px solid rgba(255,107,53,0.2)',
+            }}
+          >
+            <div style={{ fontSize: 14, color: '#9DB4B2' }}>
+              原价{' '}
+              <span style={{ textDecoration: 'line-through', color: '#5F7A85' }}>
+                ¥{fenToYuan(order.total_amount)}
+              </span>
+            </div>
+            <div style={{ fontSize: 14, color: '#27AE7A', fontWeight: 600 }}>
+              优惠 ¥{fenToYuan(discountResult.total_saved_fen)}
+            </div>
+            <div style={{ fontSize: 22, fontWeight: 800, color: '#FF6B35' }}>
+              ¥{fenToYuan(actualAmount)}
+            </div>
           </div>
         )}
 
@@ -620,6 +778,25 @@ export default function TableSidePayPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* ─── 折扣预览 Sheet ─── */}
+      {order && (
+        <DiscountPreviewSheet
+          visible={showDiscountSheet}
+          orderId={order.order_id}
+          baseAmountFen={order.total_amount}
+          discounts={discountItems}
+          payMethod={selectedMethod ?? 'wechat'}
+          onClose={() => setShowDiscountSheet(false)}
+          onPaySuccess={(result) => {
+            // 保存折扣计算结果，并标记支付成功
+            setDiscountResult(result.discount);
+            setShowDiscountSheet(false);
+            setSettled(true);
+            setTimeout(() => navigate('/tables'), 3000);
+          }}
+        />
       )}
     </div>
   );

@@ -80,11 +80,6 @@ function getBgColor(urgency: ServiceSuggestion['urgency']): string {
   return '#F0F8FF';
 }
 
-function getIconColor(urgency: ServiceSuggestion['urgency']): string {
-  if (urgency === 'urgent') return '#E53E3E';
-  if (urgency === 'suggest') return '#FF6B35';
-  return '#1A9BE8';
-}
 
 function getTypeIcon(type: ServiceSuggestion['type']): string {
   if (type === 'upsell') return '➕';
@@ -104,7 +99,6 @@ interface SuggestionRowProps {
 function SuggestionRow({ suggestion, onAction, onDismiss }: SuggestionRowProps) {
   const borderColor = getBorderColor(suggestion.urgency);
   const bgColor = getBgColor(suggestion.urgency);
-  const iconColor = getIconColor(suggestion.urgency);
 
   return (
     <div

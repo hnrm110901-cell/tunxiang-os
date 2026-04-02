@@ -2,6 +2,7 @@
   "pages": [
     "pages/index/index",
     "pages/menu/menu",
+    "pages/combo-detail/combo-detail",
     "pages/order/order",
     "pages/queue/queue",
     "pages/reservation/reservation",

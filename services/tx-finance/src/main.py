@@ -20,6 +20,10 @@ from api.revenue_aggregation_routes import router as revenue_aggregation_router
 from api.finance_cost_routes import router as finance_cost_router
 from api.finance_pl_routes import router as finance_pl_router
 from api.split_routes import router as split_router
+from api.pnl_routes import router as pnl_router
+from api.cost_routes_v2 import router as cost_v2_router
+from api.revenue_routes import router as revenue_router
+from api.seafood_loss_routes import router as seafood_loss_router
 
 
 @asynccontextmanager
@@ -54,6 +58,12 @@ app.include_router(revenue_aggregation_router)
 app.include_router(finance_cost_router, prefix="/api/v1/finance")
 app.include_router(finance_pl_router,   prefix="/api/v1/finance")
 app.include_router(split_router)  # /api/v1/finance/splits/* — v100 分润规则与分账流水
+
+# v117 财务计算引擎路由
+app.include_router(pnl_router,         prefix="/api/v1/finance")   # /pnl/*
+app.include_router(cost_v2_router,     prefix="/api/v1/finance")   # /costs/* /configs/*
+app.include_router(revenue_router,     prefix="/api/v1/finance")   # /revenue/*
+app.include_router(seafood_loss_router, prefix="/api/v1/finance")  # /seafood-loss/*
 
 
 @app.get("/health")

@@ -141,7 +141,7 @@ function CheckinTab() {
         body.lat = posRef.current.coords.latitude;
         body.lng = posRef.current.coords.longitude;
       }
-      const deviceId = (window as Record<string, unknown>).__DEVICE_ID__ as string | undefined;
+      const deviceId = (window as unknown as Record<string, unknown>).__DEVICE_ID__ as string | undefined;
       if (deviceId) body.device_id = deviceId;
 
       await fetch('/api/v1/crew/checkin', {
@@ -296,7 +296,7 @@ function CheckinTab() {
 
 /* ---------- Tab 2 — 本周排班 ---------- */
 function ScheduleTab() {
-  const [schedule, setSchedule] = useState<DaySchedule[]>(MOCK_WEEK_SCHEDULE);
+  const schedule = MOCK_WEEK_SCHEDULE;
   const [selectedIdx, setSelectedIdx] = useState(
     MOCK_WEEK_SCHEDULE.findIndex(d => d.isToday) ?? 0,
   );

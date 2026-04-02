@@ -1,4 +1,4 @@
-"""分账引擎 API — 7 个端点（v100）
+"""分账引擎 API — 8 个端点（v100 + 通道通知）
 
 端点：
 1. POST   /api/v1/finance/splits/rules              创建/更新分润规则
@@ -8,16 +8,21 @@
 5. POST   /api/v1/finance/splits/settle             批量结算（pending→settled）
 6. GET    /api/v1/finance/splits/transactions       分润流水
 7. GET    /api/v1/finance/splits/settlement         分账汇总（按收款方）
+8. POST   /api/v1/finance/splits/channel-notify     通道异步结果（Y-B2 骨架 + 可选 HMAC）
 """
-from typing import Any, Dict, List, Optional
+from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Path, Query
-from pydantic import BaseModel, Field, field_validator
+import json
+from typing import Any, Dict, List, Literal, Optional
+
+from fastapi import APIRouter, Depends, Header, HTTPException, Path, Query, Request
+from pydantic import BaseModel, Field, ValidationError, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db_with_tenant
 
 from ..services.split_engine import RECIPIENT_TYPES, SPLIT_METHODS, SplitEngine
+from ..services.split_notify_security import verify_split_channel_notify_signature
 
 router = APIRouter(prefix="/api/v1/finance/splits", tags=["split_engine"])
 
@@ -78,6 +83,33 @@ class ExecuteSplitRequest(BaseModel):
 
 class SettleRequest(BaseModel):
     record_ids: List[str] = Field(..., min_length=1, description="要结算的流水 ID 列表")
+
+
+class ChannelNotifyItem(BaseModel):
+    record_id: str = Field(..., min_length=1, description="profit_split_records.id")
+    outcome: Literal["settled", "failed"] = Field(
+        ...,
+        description="settled=通道分账成功 → pending→settled；failed→pending→cancelled",
+    )
+    channel_transaction_id: Optional[str] = Field(
+        None,
+        max_length=200,
+        description="微信/支付宝返回的分账单号（仅记录用途，当前不入库）",
+    )
+
+
+class ChannelNotifyRequest(BaseModel):
+    idempotency_key: str = Field(
+        ...,
+        min_length=8,
+        max_length=128,
+        description="调用方幂等键（日志与对账；重试应使用同一键）",
+    )
+    items: List[ChannelNotifyItem] = Field(
+        ...,
+        min_length=1,
+        description="本批通道结果，一条对应一条分润流水",
+    )
 
 
 # ─── 1. 创建/更新规则 ─────────────────────────────────────────────────────────
@@ -203,6 +235,56 @@ async def settle_split_records(
         "data": {
             "requested": len(body.record_ids),
             "settled": settled_count,
+        },
+    }
+
+
+# ─── 5b. 通道异步通知（微信/支付宝分账结果回调形状）────────────────────────────
+
+@router.post("/channel-notify", summary="通道分账异步结果（幂等）")
+async def channel_split_notify(
+    request: Request,
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(_get_tenant_db),
+    x_split_notify_signature: Optional[str] = Header(None, alias="X-Split-Notify-Signature"),
+) -> Dict[str, Any]:
+    """接收支付机构分账完成/失败通知，更新 ``profit_split_records``。
+
+    - 仅 ``pending`` 行会被更新；已 ``settled`` / ``cancelled`` 的重复通知无副作用（幂等）。
+    - 生产环境建议配置 ``TX_FINANCE_SPLIT_NOTIFY_SECRET``，并传入
+      ``X-Split-Notify-Signature: hex(hmac_sha256(secret, raw_body))``。
+    - 真实微信/支付宝回调需再适配各自报文结构与平台公钥验签；本端点为内部统一入口骨架。
+    """
+    body_bytes = await request.body()
+    try:
+        verify_split_channel_notify_signature(body_bytes, x_split_notify_signature)
+    except ValueError as exc:
+        raise HTTPException(status_code=401, detail=str(exc)) from exc
+
+    try:
+        raw = json.loads(body_bytes.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise HTTPException(status_code=400, detail="invalid JSON body") from exc
+
+    try:
+        body = ChannelNotifyRequest.model_validate(raw)
+    except ValidationError as exc:
+        raise HTTPException(status_code=422, detail=exc.errors()) from exc
+
+    engine = SplitEngine(db, x_tenant_id)
+    try:
+        result = await engine.apply_channel_notification(
+            [i.model_dump() for i in body.items],
+        )
+        await db.commit()
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    return {
+        "ok": True,
+        "data": {
+            "idempotency_key": body.idempotency_key,
+            **result,
         },
     }
 

@@ -11,7 +11,7 @@ import hmac
 import json
 import os
 import uuid as _uuid_module
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Optional
 
 import structlog
@@ -25,7 +25,11 @@ from ..services.omni_channel_service import (
     OmniChannelService,
     OmniChannelError,
     UnsupportedPlatformError,
+    omni_order_match_clause,
+    row_omni_platform_key,
+    row_omni_platform_order_id,
 )
+from ..services.unified_order_hub import list_unified_orders
 
 logger = structlog.get_logger()
 router = APIRouter(prefix="/omni", tags=["omni-channel"])
@@ -284,26 +288,36 @@ async def get_orders(
     """查询门店历史外卖订单（含渠道信息），支持按平台筛选，分页返回。"""
     import uuid as _uuid
     from shared.ontology.src.entities import Order as OrderModel
-    from sqlalchemy import select, and_, func
+    from sqlalchemy import select, and_, func, or_
 
     tenant_id = _get_tenant_id(request)
     tid = _uuid.UUID(tenant_id)
     sid = _uuid.UUID(store_id)
 
     target_date = order_date or datetime.now().date()
-    day_start = datetime(target_date.year, target_date.month, target_date.day, 0, 0, 0, tzinfo=datetime.now().astimezone().tzinfo)
-    day_end = datetime(target_date.year, target_date.month, target_date.day, 23, 59, 59, tzinfo=datetime.now().astimezone().tzinfo)
+    local_tz = datetime.now().astimezone().tzinfo
+    day_start = datetime(
+        target_date.year, target_date.month, target_date.day, 0, 0, 0, tzinfo=local_tz
+    )
+    day_end = datetime(
+        target_date.year, target_date.month, target_date.day, 23, 59, 59, tzinfo=local_tz
+    )
 
     conditions = [
         OrderModel.tenant_id == tid,
         OrderModel.store_id == sid,
-        OrderModel.source_channel.in_(OmniChannelService.PLATFORMS),
+        omni_order_match_clause(OrderModel, OmniChannelService.PLATFORMS),
         OrderModel.created_at >= day_start,
         OrderModel.created_at <= day_end,
         OrderModel.is_deleted == False,  # noqa: E712
     ]
     if platform and platform in OmniChannelService.PLATFORMS:
-        conditions.append(OrderModel.source_channel == platform)
+        conditions.append(
+            or_(
+                OrderModel.sales_channel_id == platform,
+                OrderModel.order_metadata["omni"]["platform"].astext == platform,
+            )
+        )
 
     total_stmt = select(func.count()).select_from(OrderModel).where(and_(*conditions))
     total_result = await db.execute(total_stmt)
@@ -322,8 +336,9 @@ async def get_orders(
     items = [
         {
             "order_id": str(row.id),
-            "platform": row.source_channel,
-            "platform_order_id": getattr(row, "platform_order_id", row.order_no),
+            "platform": row_omni_platform_key(row, OmniChannelService.PLATFORMS)
+            or (row.sales_channel_id or ""),
+            "platform_order_id": row_omni_platform_order_id(row) or row.order_no,
             "status": row.status,
             "total_fen": getattr(row, "total_amount_fen", 0),
             "created_at": row.created_at.isoformat() if row.created_at else None,
@@ -332,6 +347,58 @@ async def get_orders(
     ]
 
     return {"ok": True, "data": {"items": items, "total": total, "page": page, "size": size}, "error": None}
+
+
+@router.get("/unified-orders", summary="全渠道订单统一列表（总部/HQ）")
+async def get_unified_orders_hq(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    store_id: Optional[str] = Query(
+        None,
+        description="门店 ID；不传则租户下全部门店",
+    ),
+    date_from: Optional[date] = Query(None, description="开始日期，默认 date_to-7 天"),
+    date_to: Optional[date] = Query(None, description="结束日期，默认今天"),
+    source: str = Query(
+        "hq_all",
+        description="hq_all=orders+未关联外卖；internal_only=仅 orders；delivery_unlinked=仅未关联 delivery_orders",
+    ),
+    status: Optional[str] = Query(
+        None,
+        description="订单状态筛选，逗号分隔（如 pending,confirmed），与各源表 status 列匹配",
+    ),
+    channel_key: Optional[str] = Query(
+        None,
+        description="精确匹配统一列 channel_key（如 meituan、dine_in、delivery）",
+    ),
+    page: int = Query(1, ge=1),
+    size: int = Query(20, ge=1, le=100),
+) -> dict:
+    """Y-A12 骨架：``orders`` 与尚未写入 ``internal_order_id`` 的 ``delivery_orders`` 合并时间线。
+
+    已与 omni 落库到 ``orders`` 的外卖单只出现在 internal 侧，避免与 ``delivery_orders`` 双计。
+    """
+    tenant_id = _get_tenant_id(request)
+    if date_to is None:
+        date_to = datetime.now().astimezone().date()
+    if date_from is None:
+        date_from = date_to - timedelta(days=7)
+    try:
+        data = await list_unified_orders(
+            db,
+            tenant_id,
+            date_from=date_from,
+            date_to=date_to,
+            store_id=store_id,
+            source=source,
+            status=status,
+            channel_key=channel_key,
+            page=page,
+            size=size,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"ok": True, "data": data, "error": None}
 
 
 @router.get("/stats", summary="渠道统计（GMV/单量/接单率）")
@@ -344,15 +411,20 @@ async def get_channel_stats(
     """按平台统计当日GMV、订单量、接单率。"""
     import uuid as _uuid
     from shared.ontology.src.entities import Order as OrderModel
-    from sqlalchemy import select, and_, func, case
+    from sqlalchemy import select, and_, func, case, or_
 
     tenant_id = _get_tenant_id(request)
     tid = _uuid.UUID(tenant_id)
     sid = _uuid.UUID(store_id)
 
     target_date = stat_date or datetime.now().date()
-    day_start = datetime(target_date.year, target_date.month, target_date.day, 0, 0, 0)
-    day_end = datetime(target_date.year, target_date.month, target_date.day, 23, 59, 59)
+    local_tz = datetime.now().astimezone().tzinfo
+    day_start = datetime(
+        target_date.year, target_date.month, target_date.day, 0, 0, 0, tzinfo=local_tz
+    )
+    day_end = datetime(
+        target_date.year, target_date.month, target_date.day, 23, 59, 59, tzinfo=local_tz
+    )
 
     stats_by_platform = {}
     for platform in OmniChannelService.PLATFORMS:
@@ -374,7 +446,10 @@ async def get_channel_stats(
             and_(
                 OrderModel.tenant_id == tid,
                 OrderModel.store_id == sid,
-                OrderModel.source_channel == platform,
+                or_(
+                    OrderModel.sales_channel_id == platform,
+                    OrderModel.order_metadata["omni"]["platform"].astext == platform,
+                ),
                 OrderModel.created_at >= day_start,
                 OrderModel.created_at <= day_end,
                 OrderModel.is_deleted == False,  # noqa: E712

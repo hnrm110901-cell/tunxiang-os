@@ -2,6 +2,7 @@
 
 收银引擎：开单/点餐/结算/支付/退款/打印/日结
 """
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -24,6 +25,7 @@ from .api.webhook_routes import router as webhook_router
 from .api.printer_routes import router as printer_router
 from .api.approval_routes import router as approval_router
 from .api.booking_api import router as booking_router
+from .api.booking_webhook_routes import router as booking_webhook_router
 from .api.kds_shortage_routes import router as kds_shortage_router
 from .api.scan_order_routes import router as scan_order_router
 from .api.order_ops_routes import router as order_ops_router
@@ -55,6 +57,7 @@ from .api.kds_swimlane_routes import router as kds_swimlane_router
 from .api.kds_prep_routes import router as kds_prep_router
 from .api.kds_station_profit_routes import router as kds_station_profit_router
 from .api.discount_audit_routes import router as discount_audit_router
+from .api.discount_engine_routes import router as discount_engine_router
 from .api.service_bell_routes import router as service_bell_router
 from .api.course_firing_routes import router as course_firing_router
 from .api.seat_order_routes import router as seat_order_router
@@ -76,12 +79,25 @@ from .api.digital_menu_board_router import router as digital_menu_board_router
 from .routers.shift_summary_router import router as shift_summary_router
 from .routers.sync_ingest_router import router as sync_ingest_router
 from .routers.delivery_router import router as delivery_router
+from .api.split_payment_routes import router as split_payment_router
 from .routers.delivery_panel_router import router as delivery_panel_router
 from .routers.self_pay_router import router as self_pay_router
 from .api.production_dept_routes import router as production_dept_router
 from .api.template_editor_routes import router as template_editor_router
 from .api.group_buy_routes import router as group_buy_router
 from .api.xhs_routes import router as xhs_router
+from .api.chef_at_home_routes import router as chef_at_home_router
+from .api.omni_channel_routes import router as omni_channel_router
+from .api.scan_pay_routes import router as scan_pay_router
+from .api.stored_value_routes import router as stored_value_router
+from .api.printer_config_routes import router as printer_config_router
+from .api.waitlist_routes import router as waitlist_router
+# 外卖订单接单面板扩展：状态流转/取消/Webhook mock/Mock订单生成
+from .api.delivery_orders_routes import router as delivery_orders_router
+# 打印模板：活鲜称重单 / 宴席通知单 / 企业挂账单
+from .api.print_template_routes import router as print_template_router
+# 菜品→档口映射管理（KDS分单依据）
+from .api.dish_dept_mapping_routes import router as dish_dept_mapping_router
 
 
 @asynccontextmanager
@@ -126,6 +142,7 @@ app.include_router(webhook_router)
 app.include_router(printer_router)
 app.include_router(approval_router)
 app.include_router(booking_router)
+app.include_router(booking_webhook_router)    # 多平台预订 Webhook + Mock 生成
 app.include_router(kds_shortage_router)
 app.include_router(scan_order_router)
 app.include_router(order_ops_router)
@@ -147,6 +164,7 @@ app.include_router(kitchen_monitor_router, prefix="/api/v1/kitchen")
 app.include_router(table_monitor_router)
 app.include_router(booking_prep_router,    prefix="/api/v1/booking-prep")
 app.include_router(delivery_ops_router)
+app.include_router(omni_channel_router, prefix="/api/v1")
 app.include_router(banquet_payment_router)
 app.include_router(collab_order_router)
 app.include_router(table_layout_router)
@@ -157,6 +175,7 @@ app.include_router(kds_swimlane_router)
 app.include_router(kds_prep_router)
 app.include_router(kds_station_profit_router)
 app.include_router(discount_audit_router)
+app.include_router(discount_engine_router)
 app.include_router(service_bell_router)
 app.include_router(course_firing_router)
 app.include_router(seat_order_router)
@@ -184,6 +203,26 @@ app.include_router(production_dept_router)
 app.include_router(template_editor_router)
 app.include_router(group_buy_router)
 app.include_router(xhs_router)
+app.include_router(split_payment_router)
+# 大厨到家：默认开启；生产可设 TX_FEATURE_CHEF_AT_HOME=0|false 关闭
+if os.environ.get("TX_FEATURE_CHEF_AT_HOME", "1").lower() in ("1", "true", "yes"):
+    app.include_router(chef_at_home_router)
+app.include_router(scan_pay_router)
+app.include_router(stored_value_router)
+# 注意：printer_config_router 必须在 printer_router 之后注册
+# printer_router  = 打印执行（/api/v1/printer 单数）
+# printer_config_router = 打印机配置（/api/v1/printers 复数）
+app.include_router(printer_config_router)
+app.include_router(waitlist_router,      prefix="/api/v1/waitlist")
+# 外卖接单面板扩展端点（状态流转/取消/Webhook mock/Mock订单）
+# 注意：delivery_orders_router 与 delivery_panel_router 共享 /api/v1/delivery 前缀
+# delivery_panel_router 已在上方注册（接单/拒单/出餐/统计），本 router 补充其余端点
+app.include_router(delivery_orders_router)
+# 徐记海鲜：宴席同步出品（开席/推进节/进度查询）
+from .api.kds_banquet_routes import router as kds_banquet_router
+app.include_router(kds_banquet_router)
+app.include_router(print_template_router)
+app.include_router(dish_dept_mapping_router)
 
 
 @app.get("/health")

@@ -234,7 +234,6 @@ export function TableMapView() {
 
   const occupiedCount = floorTables.filter(t => t.status === 'occupied' || t.status === 'checkout').length;
   const freeCount = floorTables.filter(t => t.status === 'free').length;
-  const totalTurns = tables.filter(t => t.status === 'free' || t.minutesElapsed !== undefined).length;
   const turnRate = occupiedCount > 0 ? (occupiedCount / Math.max(floorTables.length, 1) * 3.5).toFixed(1) : '0.0';
 
   const handleTableClick = (t: TableLayout) => {

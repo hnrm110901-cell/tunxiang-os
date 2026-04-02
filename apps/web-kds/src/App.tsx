@@ -19,6 +19,9 @@
  *   /prep          → PrepRecommendationPanel（预制量智能推荐）
  *   /station-profit → StationProfitPage（档口毛利核算）
  *   /calling-screen → CustomerCallingScreen（快餐顾客叫号屏）
+ *
+ * 徐记海鲜专属页面：
+ *   /banquet-control → BanquetControlScreen（宴席控菜大屏，厨师长宴席同步出品）
  */
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { KDSBoardPage } from './pages/KDSBoardPage';
@@ -43,6 +46,7 @@ import { PrepRecommendationPanel } from './pages/PrepRecommendationPanel';
 import { StationProfitPage } from './pages/StationProfitPage';
 import { CustomerCallingScreen } from './pages/CustomerCallingScreen';
 import { DigitalMenuBoardPage } from './pages/DigitalMenuBoardPage';
+import BanquetControlScreen from './pages/BanquetControlScreen';
 
 export default function App() {
   return (
@@ -71,6 +75,8 @@ export default function App() {
         <Route path="/station-profit" element={<StationProfitPage />} />
         <Route path="/calling-screen" element={<CustomerCallingScreen />} />
         <Route path="/menu-board" element={<DigitalMenuBoardPage />} />
+        {/* 徐记海鲜：宴席控菜大屏 */}
+        <Route path="/banquet-control" element={<BanquetControlScreen />} />
 
         {/* 原有页面（保留兼容） */}
         <Route path="/board-legacy" element={<KDSBoardPage />} />

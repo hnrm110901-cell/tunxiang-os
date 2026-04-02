@@ -32,6 +32,8 @@ from api.lifecycle_router import router as lifecycle_v2_router
 from api.platform_routes import router as platform_router
 from api.group_member_routes import router as group_member_router
 from api.stamp_card_routes import router as stamp_card_router
+from api.member_level_routes import router as member_level_router
+from api.member_insight_routes import router as member_insight_router
 from workers.rfm_updater import RFMUpdater, RFMEventListener
 from shared.events.event_publisher import MemberEventPublisher
 
@@ -146,6 +148,8 @@ app.include_router(lifecycle_v2_router)
 app.include_router(platform_router)
 app.include_router(group_member_router)
 app.include_router(stamp_card_router)
+app.include_router(member_level_router)
+app.include_router(member_insight_router)
 
 
 @app.get("/health")

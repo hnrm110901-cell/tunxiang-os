@@ -4,6 +4,7 @@
  */
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { fetchTableStatus, txFetch } from '../api/index';
 
 /* ---------- 颜色常量 ---------- */
 const C = {
@@ -33,38 +34,15 @@ interface PendingOrder {
   created_at: string;
 }
 
-/* ---------- Mock 数据 ---------- */
-const MOCK_CREW = {
-  name: '张三',
-  employee_id: 'EMP-0023',
-  shift_start: '09:00',
-  avatar_letter: '张',
-};
-
-const MOCK_SUMMARY = {
-  table_count: 8,
-  order_count: 14,
-  revenue: 382600,
-  bell_responses: 23,
+/* ---------- 默认值 ---------- */
+const DEFAULT_SUMMARY = {
+  table_count: 0,
+  order_count: 0,
+  revenue: 0,
+  bell_responses: 0,
   complaints: 0,
-  good_reviews: 5,
+  good_reviews: 0,
 };
-
-const MOCK_TABLES: TableStatus[] = [
-  { table_no: 'T01', name: 'A01桌', status: 'occupied', has_unpaid_order: true },
-  { table_no: 'T02', name: 'A02桌', status: 'dirty',    has_unpaid_order: false },
-  { table_no: 'T03', name: 'A03桌', status: 'empty',    has_unpaid_order: false },
-  { table_no: 'T04', name: 'A04桌', status: 'occupied', has_unpaid_order: true },
-  { table_no: 'T05', name: 'B01桌', status: 'dirty',    has_unpaid_order: false },
-  { table_no: 'T06', name: 'B02桌', status: 'empty',    has_unpaid_order: false },
-  { table_no: 'T07', name: 'B03桌', status: 'occupied', has_unpaid_order: false },
-  { table_no: 'T08', name: 'B04桌', status: 'empty',    has_unpaid_order: false },
-];
-
-const MOCK_PENDING_ORDERS: PendingOrder[] = [
-  { order_no: 'ORD-20260331-001', table_no: 'A01桌', amount: 28800, created_at: '11:32' },
-  { order_no: 'ORD-20260331-004', table_no: 'A04桌', amount: 19600, created_at: '13:05' },
-];
 
 /* ---------- 工具函数 ---------- */
 function formatAmount(fen: number): string {
@@ -94,6 +72,78 @@ export function HandoverMobilePage() {
   const [shiftDuration, setShiftDuration] = useState('');
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  /* 真实数据 state */
+  const storeId: string = (window as any).__STORE_ID__ || 'store_001';
+  const crewName: string = (window as any).__CREW_NAME__ || '服务员';
+  const crewId: string = (window as any).__CREW_ID__ || '';
+
+  const [summary, setSummary] = useState(DEFAULT_SUMMARY);
+  const [tables, setTables] = useState<TableStatus[]>([]);
+  const [shiftStart, setShiftStart] = useState('09:00');
+
+  /* 加载真实数据 */
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const [tableRes, summaryRes] = await Promise.all([
+          fetchTableStatus(storeId),
+          txFetch<Record<string, any>>(`/api/v1/trade/handover/summary?store_id=${storeId}`),
+        ]);
+
+        /* 映射桌台数据 */
+        if (tableRes?.items) {
+          const mapped: TableStatus[] = tableRes.items.map((item: any) => ({
+            table_no: item.table_no,
+            name: `${item.table_no}桌`,
+            status: item.status === 'occupied'
+              ? 'occupied'
+              : item.status === 'cleaning'
+                ? 'dirty'
+                : 'empty',
+            has_unpaid_order: item.status === 'occupied' && item.order_id !== null,
+          }));
+          setTables(mapped);
+        }
+
+        /* 映射汇总数据 */
+        if (summaryRes) {
+          setSummary({
+            table_count: summaryRes.table_count ?? 0,
+            order_count: summaryRes.order_count ?? 0,
+            revenue: summaryRes.revenue ?? 0,
+            bell_responses: summaryRes.bell_responses ?? 0,
+            complaints: summaryRes.complaints ?? 0,
+            good_reviews: summaryRes.good_reviews ?? 0,
+          });
+          if (summaryRes.shift_start) {
+            setShiftStart(summaryRes.shift_start);
+          }
+        }
+      } catch (_err) {
+        /* 加载失败降级：保持默认值，页面不崩溃 */
+      }
+    }
+    loadData();
+  }, [storeId]);
+
+  /* 未结订单：从桌台数据中派生 */
+  const pendingOrders: PendingOrder[] = tables
+    .filter(t => t.has_unpaid_order)
+    .map(t => ({
+      order_no: `—`,
+      table_no: t.name,
+      amount: 0,
+      created_at: '—',
+    }));
+
+  /* 员工信息（从全局变量获取） */
+  const crew = {
+    name: crewName,
+    employee_id: crewId || '—',
+    shift_start: shiftStart,
+    avatar_letter: crewName.charAt(0) || '服',
+  };
+
   /* 实时时钟 */
   useEffect(() => {
     function tick() {
@@ -103,8 +153,8 @@ export function HandoverMobilePage() {
       const s = String(now.getSeconds()).padStart(2, '0');
       setCurrentTime(`${h}:${m}:${s}`);
 
-      // 计算上班时长（Mock：从 09:00 开始）
-      const [sh, sm] = MOCK_CREW.shift_start.split(':').map(Number);
+      /* 计算上班时长 */
+      const [sh, sm] = shiftStart.split(':').map(Number);
       const startDate = new Date(now);
       startDate.setHours(sh, sm, 0, 0);
       const diffMs = now.getTime() - startDate.getTime();
@@ -120,12 +170,12 @@ export function HandoverMobilePage() {
     tick();
     timerRef.current = setInterval(tick, 1000);
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, []);
+  }, [shiftStart]);
 
-  /* 打印交班单（Mock） */
+  /* 打印交班单 */
   function handlePrint() {
     if ((window as any).TXBridge) {
-      (window as any).TXBridge.print('[交班单]\n' + JSON.stringify(MOCK_SUMMARY, null, 2));
+      (window as any).TXBridge.print('[交班单]\n' + JSON.stringify(summary, null, 2));
     } else {
       alert('打印功能需在 POS 终端上使用');
     }
@@ -135,14 +185,13 @@ export function HandoverMobilePage() {
   async function handleConfirmHandover() {
     setSubmitting(true);
     try {
-      const crewId = (window as any).__CREW_ID__ || 'op-001';
       const res = await fetch('/api/v1/crew/handover', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           crew_id: crewId,
           notes,
-          shift_summary_data: MOCK_SUMMARY,
+          shift_summary_data: summary,
         }),
       });
       const json = await res.json();
@@ -151,7 +200,7 @@ export function HandoverMobilePage() {
       } else {
         alert('交班失败：' + (json.error?.message || '未知错误'));
       }
-    } catch (err) {
+    } catch (_err) {
       alert('网络错误，请重试');
     } finally {
       setSubmitting(false);
@@ -160,12 +209,12 @@ export function HandoverMobilePage() {
   }
 
   const summaryItems = [
-    { label: '接待桌次', value: `${MOCK_SUMMARY.table_count}桌` },
-    { label: '点单笔数', value: `${MOCK_SUMMARY.order_count}笔` },
-    { label: '营业额',   value: formatAmount(MOCK_SUMMARY.revenue) },
-    { label: '服务铃响应', value: `${MOCK_SUMMARY.bell_responses}次` },
-    { label: '投诉件数', value: `${MOCK_SUMMARY.complaints}件`, accent: MOCK_SUMMARY.complaints > 0 ? C.red : C.success },
-    { label: '好评数',   value: `${MOCK_SUMMARY.good_reviews}条`, accent: C.success },
+    { label: '接待桌次', value: `${summary.table_count}桌` },
+    { label: '点单笔数', value: `${summary.order_count}笔` },
+    { label: '营业额',   value: formatAmount(summary.revenue) },
+    { label: '服务铃响应', value: `${summary.bell_responses}次` },
+    { label: '投诉件数', value: `${summary.complaints}件`, accent: summary.complaints > 0 ? C.red : C.success },
+    { label: '好评数',   value: `${summary.good_reviews}条`, accent: C.success },
   ];
 
   return (
@@ -210,18 +259,18 @@ export function HandoverMobilePage() {
             justifyContent: 'center', fontSize: 24, fontWeight: 700,
             color: '#fff', flexShrink: 0,
           }}>
-            {MOCK_CREW.avatar_letter}
+            {crew.avatar_letter}
           </div>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 20, fontWeight: 700, color: '#fff', marginBottom: 4 }}>
-              {MOCK_CREW.name}
+              {crew.name}
             </div>
             <div style={{ fontSize: 16, color: C.muted, marginBottom: 4 }}>
-              工号：{MOCK_CREW.employee_id}
+              工号：{crew.employee_id}
             </div>
             <div style={{ fontSize: 16, color: C.muted }}>
               上班时长：<span style={{ color: C.primary, fontWeight: 600 }}>{shiftDuration}</span>
-              <span style={{ marginLeft: 8 }}>（{MOCK_CREW.shift_start} 上班）</span>
+              <span style={{ marginLeft: 8 }}>（{crew.shift_start} 上班）</span>
             </div>
           </div>
         </div>
@@ -259,14 +308,14 @@ export function HandoverMobilePage() {
           overflow: 'hidden', marginBottom: 16,
           maxHeight: 280, overflowY: 'auto',
         }}>
-          {MOCK_TABLES.map((t, idx) => {
+          {tables.map((t, idx) => {
             const badge = getTableBadge(t);
             return (
               <div key={t.table_no} style={{
                 display: 'flex', alignItems: 'center',
                 padding: '14px 16px', minHeight: 52,
                 background: getTableRowBg(t),
-                borderBottom: idx < MOCK_TABLES.length - 1
+                borderBottom: idx < tables.length - 1
                   ? `1px solid ${C.border}` : 'none',
               }}>
                 <span style={{ fontSize: 16, flex: 1, color: '#fff', fontWeight: 500 }}>
@@ -287,7 +336,7 @@ export function HandoverMobilePage() {
         </div>
 
         {/* ---- 未结订单列表 ---- */}
-        {MOCK_PENDING_ORDERS.length > 0 && (
+        {pendingOrders.length > 0 && (
           <>
             <h2 style={{ fontSize: 16, fontWeight: 600, color: '#fff', margin: '0 0 10px' }}>
               未结订单
@@ -295,17 +344,17 @@ export function HandoverMobilePage() {
                 marginLeft: 8, fontSize: 13, color: C.red,
                 border: `1px solid ${C.red}`, borderRadius: 6, padding: '1px 6px',
               }}>
-                {MOCK_PENDING_ORDERS.length}单
+                {pendingOrders.length}单
               </span>
             </h2>
             <div style={{
               background: C.card, borderRadius: 12, border: `1px solid ${C.border}`,
               overflow: 'hidden', marginBottom: 16,
             }}>
-              {MOCK_PENDING_ORDERS.map((order, idx) => (
-                <div key={order.order_no} style={{
+              {pendingOrders.map((order, idx) => (
+                <div key={order.order_no + idx} style={{
                   padding: '14px 16px', minHeight: 52,
-                  borderBottom: idx < MOCK_PENDING_ORDERS.length - 1
+                  borderBottom: idx < pendingOrders.length - 1
                     ? `1px solid ${C.border}` : 'none',
                   background: 'rgba(239,68,68,0.06)',
                 }}>

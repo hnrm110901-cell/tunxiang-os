@@ -18,6 +18,7 @@ STORES_TABLE = Store.__tablename__
 POINT_LOGS_TABLE = "employee_point_logs"
 
 POINT_RULES: dict[str, dict[str, str | int]] = {
+    "manual_adjust": {"name": "人工调整", "points": 0, "period": "per_action"},
     "attendance_perfect": {"name": "全勤", "points": 100, "period": "monthly"},
     "attendance_on_time": {"name": "准时打卡", "points": 2, "period": "daily"},
     "sales_target_hit": {"name": "达成销售目标", "points": 50, "period": "monthly"},
@@ -125,6 +126,7 @@ async def _sum_employee_points(
             SELECT COALESCE(SUM(points), 0) AS s
             FROM {POINT_LOGS_TABLE}
             WHERE tenant_id = :tid AND employee_id = :eid
+              AND is_deleted = FALSE
             """
         ),
         {"tid": tenant_uuid, "eid": employee_uuid},
@@ -148,6 +150,7 @@ async def _fetch_recent_actions(
                    ROW_NUMBER() OVER (PARTITION BY employee_id ORDER BY created_at DESC) AS rn
             FROM {POINT_LOGS_TABLE}
             WHERE tenant_id = :tid AND employee_id = ANY(:eids)
+              AND is_deleted = FALSE
             """
         ),
         {"tid": tenant_uuid, "eids": employee_ids},
@@ -286,6 +289,55 @@ async def deduct_points(
     }
 
 
+async def apply_manual_points_delta(
+    db: AsyncSession,
+    tenant_id: str,
+    employee_id: str,
+    delta: int,
+    note: str = "",
+) -> dict[str, Any]:
+    """人工加减任意积分（正/负），rule_code 固定为 manual_adjust。"""
+    if delta == 0:
+        raise ValueError("调整积分不能为 0")
+    tid = _parse_uuid(tenant_id, "tenant_id")
+    eid = _parse_uuid(employee_id, "employee_id")
+    await _set_tenant(db, tenant_id)
+    log_id = uuid.uuid4()
+    await db.execute(
+        text(
+            f"""
+            INSERT INTO {POINT_LOGS_TABLE}
+                (id, tenant_id, employee_id, rule_code, points, note, created_at)
+            VALUES
+                (:id, :tid, :eid, 'manual_adjust', :pts, :note, NOW())
+            """
+        ),
+        {
+            "id": log_id,
+            "tid": tid,
+            "eid": eid,
+            "pts": int(delta),
+            "note": note or None,
+        },
+    )
+    await db.flush()
+    new_total = await _sum_employee_points(db, tid, eid)
+    lvl = compute_level(new_total)
+    logger.info(
+        "employee_points.manual_adjust",
+        tenant_id=tenant_id,
+        employee_id=employee_id,
+        delta=delta,
+        new_total=new_total,
+    )
+    return {
+        "employee_id": employee_id,
+        "points_awarded": int(delta),
+        "new_total": new_total,
+        "new_level": lvl,
+    }
+
+
 async def get_leaderboard(
     db: AsyncSession,
     tenant_id: str,
@@ -335,7 +387,9 @@ async def get_leaderboard(
                     COALESCE(SUM(l.points) FILTER (WHERE {period_filter}), 0) AS monthly_points
                 FROM {EMPLOYEES_TABLE} e
                 LEFT JOIN {POINT_LOGS_TABLE} l
-                    ON l.employee_id = e.id AND l.tenant_id = e.tenant_id
+                    ON l.employee_id = e.id
+                    AND l.tenant_id = e.tenant_id
+                    AND l.is_deleted = FALSE
                 WHERE e.tenant_id = :tid AND e.is_deleted = FALSE AND ({store_clause})
                 GROUP BY e.id, e.emp_name
             ),
@@ -397,9 +451,9 @@ async def get_employee_points_detail(
     hr = await db.execute(
         text(
             f"""
-            SELECT rule_code, points, note, created_at
+            SELECT id, rule_code, points, note, created_at
             FROM {POINT_LOGS_TABLE}
-            WHERE tenant_id = :tid AND employee_id = :eid
+            WHERE tenant_id = :tid AND employee_id = :eid AND is_deleted = FALSE
             ORDER BY created_at DESC
             """
         ),
@@ -415,6 +469,7 @@ async def get_employee_points_detail(
             ds = str(ca)
         history.append(
             {
+                "id": str(row["id"]),
                 "rule_code": rc,
                 "rule_name": _rule_name(rc) if rc in POINT_RULES else rc,
                 "points": int(row["points"]),
@@ -463,7 +518,9 @@ async def get_horse_race_ranking(
                 LEFT JOIN {EMPLOYEES_TABLE} e
                     ON e.store_id = s.id AND e.tenant_id = s.tenant_id
                 LEFT JOIN {POINT_LOGS_TABLE} l
-                    ON l.employee_id = e.id AND l.tenant_id = e.tenant_id
+                    ON l.employee_id = e.id
+                    AND l.tenant_id = e.tenant_id
+                    AND l.is_deleted = FALSE
                 WHERE s.tenant_id = :tid AND s.id = ANY(:sids) AND s.is_deleted = FALSE
                 GROUP BY s.id, s.store_name
             ),

@@ -97,6 +97,20 @@ class ReservationService:
 
     # ─── 创建预订 ───
 
+    async def find_by_platform_order_id(
+        self,
+        source_channel: str,
+        platform_order_id: str,
+    ) -> Optional[dict]:
+        """通过平台渠道 + 平台订单号查找已有预订。返回 dict 或 None。"""
+        record = await self._repo.find_by_platform_order_id(
+            source_channel=source_channel,
+            platform_order_id=platform_order_id,
+        )
+        if record is None:
+            return None
+        return record.to_dict()
+
     async def create_reservation(
         self,
         store_id: str,
@@ -111,6 +125,8 @@ class ReservationService:
         deposit_required: bool = False,
         deposit_amount_fen: int = 0,
         consumer_id: Optional[str] = None,
+        source_channel: str = "phone",
+        platform_order_id: Optional[str] = None,
     ) -> dict:
         """创建预订
 
@@ -193,6 +209,8 @@ class ReservationService:
             deposit_paid=False,
             consumer_id=consumer_id,
             status="pending",
+            source_channel=source_channel,
+            platform_order_id=platform_order_id,
         )
 
         logger.info(

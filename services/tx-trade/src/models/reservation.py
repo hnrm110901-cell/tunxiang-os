@@ -53,6 +53,16 @@ class Reservation(TenantBase):
     queue_id: Mapped[str | None] = mapped_column(String(20), comment="关联排队ID")
     order_id: Mapped[str | None] = mapped_column(String(50), comment="关联订单ID")
 
+    # 渠道（v118 新增）
+    source_channel: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="phone",
+        comment="来源渠道: meituan/dianping/wechat/phone/walkin",
+    )
+    platform_order_id: Mapped[str | None] = mapped_column(
+        String(100), nullable=True,
+        comment="平台原始订单号，与 source_channel 联合唯一（去重用）",
+    )
+
     # 状态
     status: Mapped[str] = mapped_column(
         String(20), nullable=False, default=ReservationStatus.pending.value, index=True,
@@ -100,6 +110,8 @@ class Reservation(TenantBase):
             "queue_id": self.queue_id,
             "order_id": self.order_id,
             "confirmed_by": self.confirmed_by,
+            "source_channel": self.source_channel,
+            "platform_order_id": self.platform_order_id,
             "cancel_reason": self.cancel_reason,
             "cancel_fee_fen": self.cancel_fee_fen,
             "no_show_recorded": self.no_show_recorded,

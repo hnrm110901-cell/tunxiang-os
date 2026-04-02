@@ -492,6 +492,25 @@ Page({
     wx.showToast({ title: '已加入购物车', icon: 'success' });
   },
 
+  // ─── 套餐选择 ───
+
+  onComboSelect: function (e) {
+    var dish = e.currentTarget.dataset.dish;
+    var comboId = dish.combo_id || dish.id;
+    if (!comboId) {
+      wx.showToast({ title: '套餐信息缺失', icon: 'none' });
+      return;
+    }
+    wx.navigateTo({
+      url: '/pages/combo-detail/combo-detail' +
+        '?combo_id=' + encodeURIComponent(comboId) +
+        '&combo_name=' + encodeURIComponent(dish.name || dish.dish_name || '套餐') +
+        '&base_price=' + (dish.priceFen || dish.price_fen || 0) +
+        '&serve_count=' + (dish.serve_count || 0) +
+        '&table=' + encodeURIComponent(this.data.tableNo || ''),
+    });
+  },
+
   // ─── AI recommendations (cart-context) ───
 
   onRecommendAdd: function (e) {

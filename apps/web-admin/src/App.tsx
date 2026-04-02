@@ -72,6 +72,18 @@ import { SupplyChainPage } from './pages/hq/supply/SupplyChainPage';
 import { HRDashboardPage } from './pages/hq/org/HRDashboardPage';
 import { BudgetTrackerPage } from './pages/hq/analytics/BudgetTrackerPage';
 import { MemberCardPage } from './pages/hq/growth/MemberCardPage';
+import { LiveSeafoodPage } from './pages/menu/live-seafood/LiveSeafoodPage';
+import { BanquetMenuPage } from './pages/trade/banquet-menu/BanquetMenuPage';
+import { DishDeptMappingPage } from './pages/trade/kds-mapping/DishDeptMappingPage';
+import { OperationsDashboardPage } from './pages/OperationsDashboardPage';
+import { MenuTemplatePage } from './pages/menu/template/MenuTemplatePage';
+import { CentralKitchenPage } from './pages/CentralKitchenPage';
+import { BomEditorPage } from './pages/supply/bom/BomEditorPage';
+import { PayrollPage } from './pages/PayrollPage';
+import { ApprovalTemplatePage } from './pages/ops/approval/ApprovalTemplatePage';
+import { ApprovalCenterPage as ApprovalCenterPageNew } from './pages/ops/approval/ApprovalCenterPage';
+import { PayrollManagePage } from './pages/org/payroll/PayrollManagePage';
+import { FranchiseDashboardPage } from './pages/org/franchise/FranchiseDashboardPage';
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem('tx_token'));
@@ -100,6 +112,7 @@ function App() {
         <Routes>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/operations-dashboard" element={<OperationsDashboardPage />} />
           <Route path="/store-health" element={<StoreHealthPage />} />
           <Route path="/agents" element={<AgentMonitorPage />} />
           <Route path="/trade" element={<TradePage />} />
@@ -164,6 +177,17 @@ function App() {
           <Route path="/receipt-editor" element={<ReceiptEditorPage />} />
           <Route path="/receipt-editor/:templateId" element={<ReceiptEditorPage />} />
           <Route path="/hq/growth/member-cards" element={<MemberCardPage />} />
+          <Route path="/hq/menu/live-seafood" element={<LiveSeafoodPage />} />
+          <Route path="/hq/trade/banquet-menu" element={<BanquetMenuPage />} />
+          <Route path="/hq/kds/dish-dept-mapping" element={<DishDeptMappingPage />} />
+          <Route path="/menu-templates" element={<MenuTemplatePage />} />
+          <Route path="/central-kitchen" element={<CentralKitchenPage />} />
+          <Route path="/supply/bom" element={<BomEditorPage />} />
+          <Route path="/payroll" element={<PayrollPage />} />
+          <Route path="/approval-templates" element={<ApprovalTemplatePage />} />
+          <Route path="/approval-center" element={<ApprovalCenterPageNew />} />
+          <Route path="/payroll-manage" element={<PayrollManagePage />} />
+          <Route path="/franchise-dashboard" element={<FranchiseDashboardPage />} />
         </Routes>
       </ShellHQ>
     </BrowserRouter>

@@ -296,6 +296,56 @@ class SplitEngine:
         log.info("split_records_settled", count=result.rowcount, tenant_id=self.tenant_id)
         return result.rowcount
 
+    async def fail_records(self, record_ids: List[str]) -> int:
+        """将 pending 记录标记为 cancelled（通道分账失败 / 拒付等）。"""
+        await self._set_tenant()
+        if not record_ids:
+            return 0
+        uuids = [uuid.UUID(r) for r in record_ids]
+        result = await self.db.execute(
+            text("""
+                UPDATE profit_split_records
+                SET status = 'cancelled'
+                WHERE tenant_id = :tid AND id = ANY(:ids) AND status = 'pending'
+            """),
+            {"tid": self._tid, "ids": uuids},
+        )
+        await self.db.flush()
+        log.info(
+            "split_records_cancelled",
+            count=result.rowcount,
+            tenant_id=self.tenant_id,
+        )
+        return result.rowcount
+
+    async def apply_channel_notification(
+        self,
+        items: List[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        """支付通道异步结果：按条将流水置为 settled 或 cancelled。
+
+        仅处理 ``status = pending`` 的行；已结算/已取消的重试调用不会产生副作用（幂等）。
+        """
+        settled_ids: List[str] = []
+        failed_ids: List[str] = []
+        for it in items:
+            rid = str(it.get("record_id", "")).strip()
+            outcome = str(it.get("outcome", "")).strip().lower()
+            if not rid:
+                continue
+            if outcome == "settled":
+                settled_ids.append(rid)
+            elif outcome in ("failed", "cancelled", "canceled"):
+                failed_ids.append(rid)
+        settled_n = await self.settle_records(settled_ids)
+        failed_n = await self.fail_records(failed_ids)
+        return {
+            "settled": settled_n,
+            "cancelled": failed_n,
+            "settled_requested": len(settled_ids),
+            "cancelled_requested": len(failed_ids),
+        }
+
     # ══════════════════════════════════════════════════════
     # 查询 & 汇总
     # ══════════════════════════════════════════════════════

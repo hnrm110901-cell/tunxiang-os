@@ -54,7 +54,7 @@ export interface UseMenuLiveSyncReturn {
 // ─── 内部工具 ───
 
 function getWsUrl(): string {
-  return (window as Record<string, unknown>).__KDS_WS_URL__ as string || '';
+  return (window as unknown as Record<string, unknown>).__KDS_WS_URL__ as string || '';
 }
 
 // ─── Hook ───

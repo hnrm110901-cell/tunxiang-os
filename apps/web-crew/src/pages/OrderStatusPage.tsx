@@ -36,12 +36,6 @@ function estimateColor(minutes: number): string {
 }
 
 /* ---------- 预测数据类型 ---------- */
-interface DishTimePrediction {
-  dish_id: string;
-  estimated_minutes: number;
-  confidence: 'high' | 'medium' | 'low';
-  method: 'ml' | 'rule';
-}
 
 interface OrderCompletionPrediction {
   order_id: string;
@@ -235,7 +229,7 @@ export function OrderStatusPage() {
 
       {/* 菜品列表 */}
       <div style={{
-        flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' as string,
+        flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' as any,
         padding: '12px', paddingBottom: 80,
       }}>
         {sortedItems.map(item => (
