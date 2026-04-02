@@ -6,13 +6,23 @@
  * that needs a specific storage state.
  */
 
-import Taro from '@tarojs/taro'
+import type TaroType from '@tarojs/taro'
 import type { UserProfile, MemberLevel } from '../../store/useUserStore'
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
-function freshStore() {
+// Mutable reference kept in sync with freshStore() so assertions use the
+// same Taro mock instance that the freshly-required store module uses.
+// eslint-disable-next-line prefer-const
+let MockTaro = require('@tarojs/taro').default as typeof TaroType
+
+function freshStore(getStorageSyncImpl?: (key: string) => string) {
   jest.resetModules()
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  MockTaro = require('@tarojs/taro').default as typeof TaroType
+  if (getStorageSyncImpl) {
+    ;(MockTaro.getStorageSync as jest.Mock).mockImplementation(getStorageSyncImpl)
+  }
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const mod = require('../../store/useUserStore') as typeof import('../../store/useUserStore')
   return mod.useUserStore
@@ -35,7 +45,6 @@ const FULL_PROFILE: UserProfile = {
 describe('useUserStore', () => {
   beforeEach(() => {
     jest.clearAllMocks()
-    ;(Taro.getStorageSync as jest.Mock).mockReturnValue('')
   })
 
   // ── setUser ────────────────────────────────────────────────────────────────
@@ -109,7 +118,7 @@ describe('useUserStore', () => {
       store.getState().setUser(FULL_PROFILE)
       store.getState().logout()
 
-      expect(Taro.clearStorageSync).toHaveBeenCalledTimes(1)
+      expect(MockTaro.clearStorageSync).toHaveBeenCalledTimes(1)
     })
   })
 
@@ -165,35 +174,28 @@ describe('useUserStore', () => {
 
   describe('restoreSession', () => {
     it('restores userId and sets isLoggedIn=true when both tx_user_id and tx_token exist in storage', () => {
-      // getStorageSync is called with different keys — simulate per-key response
-      ;(Taro.getStorageSync as jest.Mock).mockImplementation((key: string) => {
+      const store = freshStore((key: string) => {
         if (key === 'tx_user_id') return 'u-restored'
         if (key === 'tx_token') return 'jwt-token-abc'
         return ''
       })
-
-      const store = freshStore()
       expect(store.getState().isLoggedIn).toBe(true)
       expect(store.getState().userId).toBe('u-restored')
     })
 
     it('stays logged out when tx_token is missing', () => {
-      ;(Taro.getStorageSync as jest.Mock).mockImplementation((key: string) => {
+      const store = freshStore((key: string) => {
         if (key === 'tx_user_id') return 'u-restored'
         return '' // no token
       })
-
-      const store = freshStore()
       expect(store.getState().isLoggedIn).toBe(false)
     })
 
     it('stays logged out when tx_user_id is missing', () => {
-      ;(Taro.getStorageSync as jest.Mock).mockImplementation((key: string) => {
+      const store = freshStore((key: string) => {
         if (key === 'tx_token') return 'jwt-token-abc'
         return '' // no userId
       })
-
-      const store = freshStore()
       expect(store.getState().isLoggedIn).toBe(false)
     })
   })

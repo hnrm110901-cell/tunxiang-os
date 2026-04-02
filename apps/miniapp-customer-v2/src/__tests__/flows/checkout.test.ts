@@ -229,7 +229,7 @@ describe('Checkout flow', () => {
     })
 
     it('omits the mode prefix for dine-in orders', () => {
-      const dineMode = 'dine-in'
+      const dineMode: string = 'dine-in'
       const remark = '窗边桌'
       const orderRemark = [
         dineMode === 'takeaway' ? '【外带】' : dineMode === 'reservation' ? '【预约】' : '',

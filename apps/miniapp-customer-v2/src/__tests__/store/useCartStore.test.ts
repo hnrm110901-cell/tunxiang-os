@@ -6,14 +6,29 @@
  * Zustand store between tests to guarantee isolation.
  */
 
-import Taro from '@tarojs/taro'
+import type TaroType from '@tarojs/taro'
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
-/** Re-import the store fresh so the module-level restore() call picks up the
- *  mocked storage value that was set before this helper runs. */
-function freshStore() {
+/**
+ * Mutable reference to the Taro mock that the most recently required store
+ * module is using.  Updated every time freshStore() runs so that assertions
+ * like `expect(MockTaro.setStorageSync).toHaveBeenCalledTimes(n)` point to
+ * the same object that the store's persist() helper is calling.
+ */
+// eslint-disable-next-line prefer-const
+let MockTaro = require('@tarojs/taro').default as typeof TaroType
+
+/**
+ * Re-import the store fresh so the module-level restore() call picks up the
+ * mocked storage value configured before this call.
+ * Optionally pre-configure getStorageSync return value for the new module.
+ */
+function freshStore(storageValue = '') {
   jest.resetModules()
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  MockTaro = require('@tarojs/taro').default as typeof TaroType
+  ;(MockTaro.getStorageSync as jest.Mock).mockReturnValue(storageValue)
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { useCartStore } = require('../../store/useCartStore') as typeof import('../../store/useCartStore')
   return useCartStore
@@ -28,7 +43,6 @@ describe('useCartStore', () => {
   beforeEach(() => {
     // Reset all mock state and return values before every test
     jest.clearAllMocks()
-    ;(Taro.getStorageSync as jest.Mock).mockReturnValue('')
   })
 
   // ── addItem ────────────────────────────────────────────────────────────────
@@ -92,9 +106,9 @@ describe('useCartStore', () => {
       store.getState().addItem(MAPO)
       store.getState().addItem(GONG)
 
-      expect(Taro.setStorageSync).toHaveBeenCalledTimes(2)
+      expect(MockTaro.setStorageSync).toHaveBeenCalledTimes(2)
       // Second call should include both items in the JSON
-      const lastCall = (Taro.setStorageSync as jest.Mock).mock.calls[1]
+      const lastCall = (MockTaro.setStorageSync as jest.Mock).mock.calls[1]
       expect(lastCall[0]).toBe('tx_cart')
       const saved = JSON.parse(lastCall[1] as string) as unknown[]
       expect(saved).toHaveLength(2)
@@ -154,7 +168,7 @@ describe('useCartStore', () => {
       jest.clearAllMocks()
       store.getState().removeItem('dish-1')
 
-      expect(Taro.setStorageSync).toHaveBeenCalledTimes(1)
+      expect(MockTaro.setStorageSync).toHaveBeenCalledTimes(1)
     })
   })
 
@@ -180,7 +194,7 @@ describe('useCartStore', () => {
       jest.clearAllMocks()
       store.getState().clearCart()
 
-      expect(Taro.setStorageSync).toHaveBeenCalledWith('tx_cart', '[]')
+      expect(MockTaro.setStorageSync).toHaveBeenCalledWith('tx_cart', '[]')
     })
   })
 
@@ -241,9 +255,7 @@ describe('useCartStore', () => {
       const savedItems = [
         { dishId: 'dish-1', name: '麻婆豆腐', price_fen: 2800, quantity: 3 },
       ]
-      ;(Taro.getStorageSync as jest.Mock).mockReturnValue(JSON.stringify(savedItems))
-
-      const store = freshStore()
+      const store = freshStore(JSON.stringify(savedItems))
       const { items, totalFen, totalCount } = store.getState()
 
       expect(items).toHaveLength(1)
@@ -253,16 +265,14 @@ describe('useCartStore', () => {
     })
 
     it('starts with an empty cart when storage contains corrupted JSON', () => {
-      ;(Taro.getStorageSync as jest.Mock).mockReturnValue('not-valid-json{{{')
+      const store = freshStore('not-valid-json{{{')
 
-      const store = freshStore()
       expect(store.getState().items).toHaveLength(0)
     })
 
     it('starts with an empty cart when storage contains a non-array value', () => {
-      ;(Taro.getStorageSync as jest.Mock).mockReturnValue(JSON.stringify({ items: [] }))
+      const store = freshStore(JSON.stringify({ items: [] }))
 
-      const store = freshStore()
       expect(store.getState().items).toHaveLength(0)
     })
   })
