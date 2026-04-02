@@ -11,15 +11,13 @@
 """
 from __future__ import annotations
 
-import os
 from datetime import datetime
 from typing import Any, Optional
 
 import structlog
 from fastapi import APIRouter, Header, HTTPException, Request
-from pydantic import BaseModel, Field, field_validator
-
 from offline_sync_service import OfflineSyncService, SyncResult, SyncStatus
+from pydantic import BaseModel, Field, field_validator
 
 logger = structlog.get_logger()
 

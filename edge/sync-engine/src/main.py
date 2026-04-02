@@ -20,7 +20,6 @@ import os
 
 import httpx
 import structlog
-
 from sync_engine import SyncEngine
 from sync_tracker import SyncTracker
 

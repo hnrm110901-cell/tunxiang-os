@@ -14,7 +14,6 @@ from typing import List
 
 import aiosqlite
 import structlog
-
 from models import (
     LOCAL_CHANGE_LOG_DDL,
     LOCAL_CHANGE_LOG_IDX,
