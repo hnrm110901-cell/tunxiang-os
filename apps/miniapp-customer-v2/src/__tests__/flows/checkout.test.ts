@@ -86,7 +86,8 @@ const MOCK_COUPON: Coupon = {
 /** Get a fresh cart store instance (resets module-level state). */
 function freshCartStore() {
   jest.resetModules()
-  jest.mock('@tarojs/taro', () => require('../../__tests__/__mocks__/taro').default)
+  // moduleNameMapper in jest.config.js already remaps @tarojs/taro → __mocks__/taro.ts;
+  // do NOT call jest.mock() here or it creates an infinite require loop.
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { useCartStore } = require('../../store/useCartStore') as typeof import('../../store/useCartStore')
   return useCartStore
