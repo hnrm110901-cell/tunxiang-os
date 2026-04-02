@@ -5,6 +5,7 @@
   POST /api/v1/attendance/clock-out         打卡下班
   GET  /api/v1/attendance/daily             指定日期门店打卡状态
   GET  /api/v1/attendance/summary           月度考勤汇总
+  GET  /api/v1/attendance/monthly-summary   月度考勤月报（与 summary 同源）
   GET  /api/v1/attendance/anomalies         考勤异常列表
   GET  /api/v1/attendance/payroll-data      薪资引擎数据接口
   POST /api/v1/attendance/mark-absent       手动触发缺勤标记（运维/定时任务）
@@ -190,6 +191,39 @@ def _calculate_clock_out_status(
 
 
 # ── 端点 ──────────────────────────────────────────────────────────────────────
+
+
+async def _monthly_summary_payload(
+    store_id: str,
+    month: str,
+    tenant_id: str,
+    db: AsyncSession,
+) -> dict[str, Any]:
+    rows = await db.execute(
+        text(
+            "SELECT employee_id, "
+            "COUNT(*) FILTER (WHERE status IN ('normal','late','early_leave','overtime')) AS work_days, "
+            "COUNT(*) FILTER (WHERE status = 'absent') AS absent_days, "
+            "COUNT(*) FILTER (WHERE status = 'late') AS late_times, "
+            "COUNT(*) FILTER (WHERE status = 'early_leave') AS early_leave_times, "
+            "COALESCE(SUM(work_hours), 0) AS total_work_hours, "
+            "COALESCE(SUM(overtime_hours), 0) AS overtime_hours, "
+            "COUNT(*) FILTER (WHERE status = 'on_leave') AS on_leave_days "
+            "FROM daily_attendance "
+            "WHERE tenant_id = :tid AND store_id = :sid "
+            "AND TO_CHAR(date, 'YYYY-MM') = :month "
+            "AND is_deleted = FALSE "
+            "GROUP BY employee_id ORDER BY employee_id"
+        ),
+        {"tid": tenant_id, "sid": store_id, "month": month},
+    )
+    items = [dict(r) for r in rows.mappings().fetchall()]
+    return {
+        "store_id": store_id,
+        "month": month,
+        "items": items,
+        "total": len(items),
+    }
 
 
 @router.post("/api/v1/attendance/clock-in")
@@ -465,33 +499,22 @@ async def get_attendance_summary(
     """GET /api/v1/attendance/summary — 月度考勤汇总（按员工聚合）"""
     tenant_id = _get_tenant_id(request)
     await _set_tenant(db, tenant_id)
+    payload = await _monthly_summary_payload(store_id, month, tenant_id, db)
+    return _ok(payload)
 
-    rows = await db.execute(
-        text(
-            "SELECT employee_id, "
-            "COUNT(*) FILTER (WHERE status IN ('normal','late','early_leave','overtime')) AS work_days, "
-            "COUNT(*) FILTER (WHERE status = 'absent') AS absent_days, "
-            "COUNT(*) FILTER (WHERE status = 'late') AS late_times, "
-            "COUNT(*) FILTER (WHERE status = 'early_leave') AS early_leave_times, "
-            "COALESCE(SUM(work_hours), 0) AS total_work_hours, "
-            "COALESCE(SUM(overtime_hours), 0) AS overtime_hours, "
-            "COUNT(*) FILTER (WHERE status = 'on_leave') AS on_leave_days "
-            "FROM daily_attendance "
-            "WHERE tenant_id = :tid AND store_id = :sid "
-            "AND TO_CHAR(date, 'YYYY-MM') = :month "
-            "AND is_deleted = FALSE "
-            "GROUP BY employee_id ORDER BY employee_id"
-        ),
-        {"tid": tenant_id, "sid": store_id, "month": month},
-    )
-    items = [dict(r) for r in rows.mappings().fetchall()]
 
-    return _ok({
-        "store_id": store_id,
-        "month": month,
-        "items": items,
-        "total": len(items),
-    })
+@router.get("/api/v1/attendance/monthly-summary")
+async def get_monthly_attendance_summary(
+    store_id: str = Query(..., description="门店 ID"),
+    month: str = Query(..., description="月份 YYYY-MM"),
+    request: Request = None,
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """GET /api/v1/attendance/monthly-summary — 获取某门店某月的考勤月报"""
+    tenant_id = _get_tenant_id(request)
+    await _set_tenant(db, tenant_id)
+    payload = await _monthly_summary_payload(store_id, month, tenant_id, db)
+    return _ok(payload)
 
 
 @router.get("/api/v1/attendance/anomalies")

@@ -32,6 +32,10 @@ from .intel_reporter import IntelReporterAgent
 from .voice_order import VoiceOrderAgent
 from .ai_waiter import AIWaiterAgent
 
+# HR Agent (人力Agent)
+from .compliance_alert import ComplianceAlertAgent
+from .salary_advisor import SalaryAdvisorAgent
+
 ALL_SKILL_AGENTS = [
     # 原有9个核心Agent
     DiscountGuardAgent,
@@ -64,4 +68,7 @@ ALL_SKILL_AGENTS = [
     # 语音点菜 + AI服务员
     VoiceOrderAgent,
     AIWaiterAgent,
+    # HR Agent (人力Agent)
+    ComplianceAlertAgent,
+    SalaryAdvisorAgent,
 ]

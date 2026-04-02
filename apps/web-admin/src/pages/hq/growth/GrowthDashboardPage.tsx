@@ -1,505 +1,570 @@
 /**
- * GrowthDashboardPage — 增长中心仪表盘
- * HQ 增长分析总览：KPI、趋势、雷达图、门店排行、预警、Agent建议
+ * GrowthDashboardPage — 增长中心仪表盘（真实API版）
+ *
+ * API依赖：
+ *   GET /api/v1/member/analytics/growth      — 新增/总量/渠道/LTV/平均消费
+ *   GET /api/v1/member/analytics/activity    — 月活/活跃率/日趋势
+ *   GET /api/v1/member/analytics/repurchase  — 复购率/消费间隔
+ *   GET /api/v1/member/rfm/distribution      — RFM五层分布
+ *   GET /api/v1/dashboard/summary            — 私域健康/门店排行/Agent决策
  */
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { txFetch } from '../../../api';
 
-// ---- 颜色常量 ----
-const BG_0 = '#0B1A20';
-const BG_1 = '#112228';
-const BG_2 = '#1a2a33';
-const BRAND = '#FF6B2C';
-const GREEN = '#52c41a';
-const RED = '#ff4d4f';
-const YELLOW = '#faad14';
-const BLUE = '#1890ff';
+// ---- 颜色常量（深色主题）----
+const BG_0   = '#0d1e28';
+const BG_1   = '#1a2a33';
+const BG_2   = '#223340';
+const BRAND  = '#FF6B35';
+const GREEN  = '#0F6E56';
+const RED    = '#A32D2D';
+const YELLOW = '#BA7517';
+const BLUE   = '#185FA5';
+const TEAL   = '#13c2c2';
 const PURPLE = '#722ed1';
 const TEXT_1 = '#ffffff';
 const TEXT_2 = '#cccccc';
 const TEXT_3 = '#999999';
 const TEXT_4 = '#666666';
 
-// ---- 类型定义 ----
-
-interface KPICard {
-  label: string;
-  value: string;
-  change: number; // 百分比变化
-  unit?: string;
-}
-
-interface TrendPoint {
-  date: string;
-  newCustomers: number;
-  repeatRate: number;
-  activeRate: number;
-}
-
-interface RadarDimension {
-  label: string;
-  value: number; // 0-100
-}
-
-interface StoreRankItem {
-  rank: number;
-  storeName: string;
-  newCustomers: number;
-  repeatRate: number;
-  revenue: number;
-  trend: 'up' | 'down' | 'flat';
-}
-
-interface AlertItem {
-  id: string;
-  severity: 'high' | 'medium' | 'low';
-  title: string;
-  detail: string;
-  store: string;
-}
-
-interface AgentSuggestion {
-  id: string;
-  type: string;
-  title: string;
-  detail: string;
-  expectedImpact: string;
-  confidence: number;
-}
-
-interface CampaignRow {
-  id: string;
-  name: string;
-  type: string;
-  startDate: string;
-  endDate: string;
-  targetCount: number;
-  reachCount: number;
-  convertCount: number;
-  roi: number;
-  status: '进行中' | '已结束' | '待启动';
-}
+// ---- 类型 ----
 
 type TimeRange = '今日' | '本周' | '本月' | '近30天' | '近90天';
-type Region = '全部区域' | '华中区' | '华东区' | '华南区' | '西南区';
-type Brand = '全部品牌' | '尝在一起' | '最黔线' | '尚宫厨';
+type Brand    = '全部品牌' | '尝在一起' | '最黔线' | '尚宫厨';
+type Region   = '全部区域' | '华中区' | '华东区' | '华南区' | '西南区';
 
-// ---- Mock 数据 ----
+interface GrowthData {
+  new_members: number;
+  new_members_change_pct: number;
+  total_members: number;
+  avg_spend_fen?: number;       // 人均消费（分）
+  ltv_fen?: number;             // 生命周期价值（分）
+  channels: { channel: string; count: number; ratio: number }[];
+  daily_trend: { date: string; new_members: number }[];
+}
 
-const MOCK_KPIS: KPICard[] = [
-  { label: '新客数', value: '2,847', change: 12.3 },
-  { label: '首单转复购率', value: '34.2%', change: 2.8 },
-  { label: '会员活跃率', value: '61.7%', change: -1.5 },
-  { label: '裂变率', value: '8.4%', change: 3.2 },
-  { label: '活动ROI', value: '3.6', change: 0.8, unit: 'x' },
-];
+interface ActivityData {
+  mau: number;
+  mau_change_pct: number;
+  active_rate: number;
+  active_rate_change_pct: number;
+  daily_active: { date: string; active: number; active_rate: number }[];
+}
 
-const MOCK_TREND: TrendPoint[] = [
-  { date: '03-20', newCustomers: 380, repeatRate: 31.2, activeRate: 58.4 },
-  { date: '03-21', newCustomers: 420, repeatRate: 32.1, activeRate: 59.2 },
-  { date: '03-22', newCustomers: 395, repeatRate: 33.0, activeRate: 60.1 },
-  { date: '03-23', newCustomers: 510, repeatRate: 33.8, activeRate: 61.0 },
-  { date: '03-24', newCustomers: 460, repeatRate: 34.5, activeRate: 61.5 },
-  { date: '03-25', newCustomers: 430, repeatRate: 34.2, activeRate: 61.7 },
-  { date: '03-26', newCustomers: 452, repeatRate: 34.8, activeRate: 62.3 },
-];
+interface RepurchaseData {
+  repurchase_rate: number;
+  repurchase_rate_change_pct: number;
+  avg_interval_days: number;
+  frequency_bands: { band: string; count: number }[];
+}
 
-const MOCK_RADAR: RadarDimension[] = [
-  { label: '拉新能力', value: 78 },
-  { label: '留存能力', value: 65 },
-  { label: '复购驱动', value: 72 },
-  { label: '客单提升', value: 58 },
-  { label: '裂变传播', value: 45 },
-  { label: '活动效率', value: 82 },
-];
+interface RfmDistribution {
+  distribution: { level: string; count: number; ratio: number }[];
+  total: number;
+}
 
-const MOCK_STORE_RANK: StoreRankItem[] = [
-  { rank: 1, storeName: '芙蓉路店', newCustomers: 523, repeatRate: 38.2, revenue: 287600, trend: 'up' },
-  { rank: 2, storeName: '万达广场店', newCustomers: 487, repeatRate: 36.5, revenue: 265300, trend: 'up' },
-  { rank: 3, storeName: '梅溪湖店', newCustomers: 412, repeatRate: 35.1, revenue: 234800, trend: 'flat' },
-  { rank: 4, storeName: '五一广场店', newCustomers: 398, repeatRate: 33.7, revenue: 221500, trend: 'down' },
-  { rank: 5, storeName: '星沙店', newCustomers: 356, repeatRate: 31.2, revenue: 198700, trend: 'up' },
-  { rank: 6, storeName: '河西大学城店', newCustomers: 341, repeatRate: 30.8, revenue: 187200, trend: 'flat' },
-  { rank: 7, storeName: '开福寺店', newCustomers: 330, repeatRate: 29.5, revenue: 176400, trend: 'down' },
-];
+interface DashboardSummary {
+  kpi: {
+    revenue_fen: number;
+    order_count: number;
+    avg_order_fen: number;
+    cost_rate: number | null;
+  };
+  stores: {
+    store_id: string;
+    store_name: string;
+    today_revenue_fen: number;
+    today_orders: number;
+    status: string;
+  }[];
+  decisions: {
+    id: string;
+    agent_id: string;
+    action: string;
+    decision_type: string;
+    confidence: number | null;
+    created_at: string | null;
+  }[];
+}
 
-const MOCK_ALERTS: AlertItem[] = [
-  { id: 'a1', severity: 'high', title: '复购率骤降', detail: '近7天首单转复购率从38%降至28%，下降10个百分点', store: '五一广场店' },
-  { id: 'a2', severity: 'medium', title: '新客获取成本上升', detail: '本周获客成本较上周上升22%，达到¥18.5/人', store: '全品牌' },
-  { id: 'a3', severity: 'low', title: '会员活跃率波动', detail: '周末活跃率低于工作日平均水平5个百分点', store: '河西大学城店' },
-];
+// ---- 工具函数 ----
 
-const MOCK_SUGGESTIONS: AgentSuggestion[] = [
-  { id: 's1', type: '复购提升', title: '对30天未复购新客发放回归券', detail: '目标人群1,247人，建议发放满80减15回归券，预计召回率18%', expectedImpact: '+¥33,600', confidence: 0.82 },
-  { id: 's2', type: '裂变激励', title: '启动老带新裂变活动', detail: '高频复购客户中有342人社交活跃度高，建议推送分享得券活动', expectedImpact: '+156新客', confidence: 0.76 },
-  { id: 's3', type: '沉默唤醒', title: '沉睡客户短信唤醒', detail: '60-90天未到店客户823人，建议分时段发送个性化短信', expectedImpact: '+¥12,400', confidence: 0.71 },
-];
+function getDateRange(range: TimeRange): { start_date: string; end_date: string } {
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const fmt = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const today = fmt(now);
+  const ago = (days: number) => { const d = new Date(now); d.setDate(d.getDate() - days); return fmt(d); };
 
-const MOCK_CAMPAIGNS: CampaignRow[] = [
-  { id: 'c1', name: '春季回归季', type: '回归券', startDate: '03-15', endDate: '03-31', targetCount: 2400, reachCount: 2156, convertCount: 387, roi: 4.2, status: '进行中' },
-  { id: 'c2', name: '新客首单立减', type: '新客券', startDate: '03-01', endDate: '03-31', targetCount: 5000, reachCount: 4230, convertCount: 1247, roi: 3.8, status: '进行中' },
-  { id: 'c3', name: '会员日双倍积分', type: '积分活动', startDate: '03-20', endDate: '03-20', targetCount: 8600, reachCount: 5420, convertCount: 892, roi: 2.9, status: '已结束' },
-  { id: 'c4', name: '老带新裂变', type: '裂变活动', startDate: '03-10', endDate: '03-25', targetCount: 1200, reachCount: 980, convertCount: 156, roi: 5.1, status: '已结束' },
-  { id: 'c5', name: '清明节套餐', type: '限时套餐', startDate: '04-03', endDate: '04-06', targetCount: 3000, reachCount: 0, convertCount: 0, roi: 0, status: '待启动' },
-];
+  if (range === '今日') return { start_date: today, end_date: today };
+  if (range === '本周') {
+    const day = now.getDay() || 7;
+    const d = new Date(now); d.setDate(d.getDate() - day + 1);
+    return { start_date: fmt(d), end_date: today };
+  }
+  if (range === '本月') return { start_date: fmt(new Date(now.getFullYear(), now.getMonth(), 1)), end_date: today };
+  if (range === '近30天') return { start_date: ago(29), end_date: today };
+  return { start_date: ago(89), end_date: today };
+}
 
-// ---- 组件 ----
+const fmtYuan = (fen: number): string => {
+  const y = fen / 100;
+  return y >= 10000 ? `${(y / 10000).toFixed(1)}万` : `¥${Math.round(y).toLocaleString()}`;
+};
+const fmtPct = (v: number): string => `${(v * 100).toFixed(1)}%`;
+
+// ---- 通用UI ----
+
+function SectionSkeleton({ height = 160, label = '加载中...' }: { height?: number; label?: string }) {
+  return (
+    <div style={{ height, display: 'flex', alignItems: 'center', justifyContent: 'center', color: TEXT_4, fontSize: 13 }}>
+      {label}
+    </div>
+  );
+}
+
+function SectionError({ msg }: { msg: string }) {
+  return (
+    <div style={{ padding: '14px 16px', color: '#ff4d4f', fontSize: 12, background: '#ff4d4f11', borderRadius: 6, textAlign: 'center' }}>
+      数据加载失败：{msg}
+    </div>
+  );
+}
+
+// ---- 筛选栏 ----
 
 function FilterBar({ brand, setBrand, timeRange, setTimeRange, region, setRegion }: {
   brand: Brand; setBrand: (v: Brand) => void;
   timeRange: TimeRange; setTimeRange: (v: TimeRange) => void;
   region: Region; setRegion: (v: Region) => void;
 }) {
-  const selectStyle: React.CSSProperties = {
-    background: BG_1, border: `1px solid ${BG_2}`, borderRadius: 6,
-    color: TEXT_2, padding: '6px 12px', fontSize: 13, outline: 'none',
-    cursor: 'pointer', minWidth: 100,
+  const sel: React.CSSProperties = {
+    background: BG_0, border: `1px solid ${BG_2}`, borderRadius: 6,
+    color: TEXT_2, padding: '6px 12px', fontSize: 13, outline: 'none', cursor: 'pointer', minWidth: 100,
   };
   return (
     <div style={{
-      display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px',
+      display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', flexWrap: 'wrap',
       background: BG_1, borderRadius: 10, border: `1px solid ${BG_2}`, marginBottom: 16,
-      flexWrap: 'wrap',
     }}>
       <span style={{ fontSize: 13, color: TEXT_3, fontWeight: 600 }}>筛选</span>
-      <select value={brand} onChange={e => setBrand(e.target.value as Brand)} style={selectStyle}>
-        <option>全部品牌</option>
-        <option>尝在一起</option>
-        <option>最黔线</option>
-        <option>尚宫厨</option>
+      <select value={brand} onChange={e => setBrand(e.target.value as Brand)} style={sel}>
+        {(['全部品牌', '尝在一起', '最黔线', '尚宫厨'] as Brand[]).map(v => <option key={v}>{v}</option>)}
       </select>
-      <select value={timeRange} onChange={e => setTimeRange(e.target.value as TimeRange)} style={selectStyle}>
-        <option>今日</option>
-        <option>本周</option>
-        <option>本月</option>
-        <option>近30天</option>
-        <option>近90天</option>
+      <select value={timeRange} onChange={e => setTimeRange(e.target.value as TimeRange)} style={sel}>
+        {(['今日', '本周', '本月', '近30天', '近90天'] as TimeRange[]).map(v => <option key={v}>{v}</option>)}
       </select>
-      <select value={region} onChange={e => setRegion(e.target.value as Region)} style={selectStyle}>
-        <option>全部区域</option>
-        <option>华中区</option>
-        <option>华东区</option>
-        <option>华南区</option>
-        <option>西南区</option>
-      </select>
-      <select style={selectStyle}>
-        <option>全部门店组</option>
-        <option>直营店</option>
-        <option>加盟店</option>
-        <option>旗舰店</option>
+      <select value={region} onChange={e => setRegion(e.target.value as Region)} style={sel}>
+        {(['全部区域', '华中区', '华东区', '华南区', '西南区'] as Region[]).map(v => <option key={v}>{v}</option>)}
       </select>
     </div>
   );
 }
 
-function KPICardsRow({ kpis }: { kpis: KPICard[] }) {
+// ---- KPI 卡片行（4张：新增/月活/平均消费/LTV）----
+
+interface KPIItem { label: string; value: string; subLabel: string; changePct: number | null; color?: string }
+
+function KPICardsRow({ items, loading, error }: { items: KPIItem[]; loading: boolean; error: string | null }) {
+  if (loading) {
+    return (
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 16 }}>
+        {[0,1,2,3].map(i => (
+          <div key={i} style={{ background: BG_1, borderRadius: 10, padding: '16px 18px', border: `1px solid ${BG_2}` }}>
+            <SectionSkeleton height={72} />
+          </div>
+        ))}
+      </div>
+    );
+  }
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${kpis.length}, 1fr)`, gap: 12, marginBottom: 16 }}>
-      {kpis.map((kpi, i) => (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 16 }}>
+      {items.map((kpi, i) => (
         <div key={i} style={{
           background: BG_1, borderRadius: 10, padding: '16px 18px',
-          border: `1px solid ${BG_2}`,
+          border: `1px solid ${BG_2}`, borderTop: `2px solid ${kpi.color ?? BRAND}`,
         }}>
           <div style={{ fontSize: 12, color: TEXT_3, marginBottom: 6 }}>{kpi.label}</div>
-          <div style={{ fontSize: 26, fontWeight: 700, color: TEXT_1 }}>
-            {kpi.value}{kpi.unit ? <span style={{ fontSize: 14, color: TEXT_3, marginLeft: 2 }}>{kpi.unit}</span> : null}
-          </div>
-          <div style={{
-            fontSize: 12, marginTop: 4,
-            color: kpi.change >= 0 ? GREEN : RED,
-          }}>
-            {kpi.change >= 0 ? '+' : ''}{kpi.change}% 较上期
-          </div>
+          <div style={{ fontSize: 26, fontWeight: 700, color: TEXT_1 }}>{kpi.value}</div>
+          <div style={{ fontSize: 11, color: TEXT_4, marginTop: 2 }}>{kpi.subLabel}</div>
+          {kpi.changePct !== null && (
+            <div style={{ fontSize: 12, marginTop: 4, color: kpi.changePct >= 0 ? '#52c41a' : '#ff4d4f' }}>
+              {kpi.changePct >= 0 ? '+' : ''}{kpi.changePct.toFixed(1)}% 较上期
+            </div>
+          )}
+          {error && <div style={{ fontSize: 11, color: TEXT_4, marginTop: 4 }}>数据暂不可用</div>}
         </div>
       ))}
     </div>
   );
 }
 
-function TrendChart({ data }: { data: TrendPoint[] }) {
-  const maxCustomers = Math.max(...data.map(d => d.newCustomers));
-  const chartHeight = 180;
+// ---- SVG 折线图：会员增长趋势（30天）----
+
+interface TrendPoint { date: string; newMembers: number; activeRate: number; repurchaseRate: number }
+
+function TrendChart({ data, loading, error }: { data: TrendPoint[]; loading: boolean; error: string | null }) {
+  const W = 560; const H = 160;
+  const pL = 40; const pR = 16; const pT = 12; const pB = 24;
+  const iW = W - pL - pR; const iH = H - pT - pB;
+
+  const maxNew = data.length > 0 ? Math.max(...data.map(d => d.newMembers), 1) : 1;
+  const xPos  = (i: number) => pL + (data.length <= 1 ? iW / 2 : (i / (data.length - 1)) * iW);
+  const yNew  = (v: number) => pT + iH - (v / maxNew) * iH;
+  const yRate = (v: number) => pT + iH - (Math.min(v, 100) / 100) * iH;
 
   return (
-    <div style={{
-      background: BG_1, borderRadius: 10, padding: 20,
-      border: `1px solid ${BG_2}`, flex: 1, minWidth: 0,
-    }}>
-      <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 16 }}>增长趋势</div>
-      <div style={{ display: 'flex', gap: 8, marginBottom: 12, fontSize: 11 }}>
-        <span style={{ color: BRAND }}>--- 新客数</span>
-        <span style={{ color: GREEN }}>--- 复购率%</span>
-        <span style={{ color: BLUE }}>--- 活跃率%</span>
+    <div style={{ background: BG_1, borderRadius: 10, padding: 20, border: `1px solid ${BG_2}`, flex: 1, minWidth: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+        <span style={{ fontSize: 15, fontWeight: 700, color: TEXT_1 }}>会员增长趋势</span>
+        <div style={{ display: 'flex', gap: 14, fontSize: 11, color: TEXT_3 }}>
+          <span><span style={{ color: BRAND }}>━</span> 新增会员</span>
+          <span><span style={{ color: TEAL }}>━</span> 活跃率%</span>
+          <span><span style={{ color: '#52c41a' }}>━</span> 复购率%</span>
+        </div>
       </div>
-      {/* 简化折线图 - 使用 SVG */}
-      <svg width="100%" height={chartHeight} viewBox={`0 0 ${data.length * 80} ${chartHeight}`} style={{ overflow: 'visible' }}>
-        {/* 网格线 */}
-        {[0, 1, 2, 3, 4].map(i => (
-          <line key={i} x1={0} y1={i * (chartHeight / 4)} x2={data.length * 80} y2={i * (chartHeight / 4)}
-            stroke={BG_2} strokeWidth={1} />
-        ))}
-        {/* 新客数折线 */}
-        <polyline
-          fill="none" stroke={BRAND} strokeWidth={2}
-          points={data.map((d, i) => `${i * 80 + 40},${chartHeight - (d.newCustomers / maxCustomers) * (chartHeight - 20) - 10}`).join(' ')}
-        />
-        {data.map((d, i) => (
-          <circle key={`nc-${i}`} cx={i * 80 + 40} cy={chartHeight - (d.newCustomers / maxCustomers) * (chartHeight - 20) - 10}
-            r={3} fill={BRAND} />
-        ))}
-        {/* 复购率折线 */}
-        <polyline
-          fill="none" stroke={GREEN} strokeWidth={2}
-          points={data.map((d, i) => `${i * 80 + 40},${chartHeight - (d.repeatRate / 50) * (chartHeight - 20) - 10}`).join(' ')}
-        />
-        {data.map((d, i) => (
-          <circle key={`rr-${i}`} cx={i * 80 + 40} cy={chartHeight - (d.repeatRate / 50) * (chartHeight - 20) - 10}
-            r={3} fill={GREEN} />
-        ))}
-        {/* 活跃率折线 */}
-        <polyline
-          fill="none" stroke={BLUE} strokeWidth={2}
-          points={data.map((d, i) => `${i * 80 + 40},${chartHeight - (d.activeRate / 80) * (chartHeight - 20) - 10}`).join(' ')}
-        />
-        {data.map((d, i) => (
-          <circle key={`ar-${i}`} cx={i * 80 + 40} cy={chartHeight - (d.activeRate / 80) * (chartHeight - 20) - 10}
-            r={3} fill={BLUE} />
-        ))}
-        {/* X 轴标签 */}
-        {data.map((d, i) => (
-          <text key={`lbl-${i}`} x={i * 80 + 40} y={chartHeight + 2} textAnchor="middle" fill={TEXT_4} fontSize={10}>
-            {d.date}
-          </text>
-        ))}
-      </svg>
+
+      {loading && <SectionSkeleton height={H} />}
+      {!loading && error && <SectionError msg={error} />}
+      {!loading && !error && data.length === 0 && <SectionSkeleton height={H} label="暂无趋势数据" />}
+      {!loading && !error && data.length > 0 && (
+        <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ overflow: 'visible', display: 'block' }}>
+          <defs>
+            <linearGradient id="growGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={BRAND} stopOpacity="0.28" />
+              <stop offset="100%" stopColor={BRAND} stopOpacity="0.02" />
+            </linearGradient>
+          </defs>
+
+          {/* 网格 */}
+          {[0, 25, 50, 75, 100].map(v => (
+            <g key={v}>
+              <line x1={pL} y1={pT + iH - (v/100)*iH} x2={pL+iW} y2={pT + iH - (v/100)*iH}
+                stroke={BG_2} strokeWidth={1} />
+              <text x={pL - 4} y={pT + iH - (v/100)*iH + 4} textAnchor="end" fill={TEXT_4} fontSize={9}>{v}</text>
+            </g>
+          ))}
+
+          {/* 新增面积 */}
+          {data.length > 1 && (
+            <polygon fill="url(#growGrad)" points={[
+              `${xPos(0)},${pT+iH}`,
+              ...data.map((d, i) => `${xPos(i)},${yNew(d.newMembers)}`),
+              `${xPos(data.length-1)},${pT+iH}`,
+            ].join(' ')} />
+          )}
+
+          {/* 新增折线 */}
+          {data.length > 1 && (
+            <polyline fill="none" stroke={BRAND} strokeWidth={2} strokeLinejoin="round"
+              points={data.map((d, i) => `${xPos(i)},${yNew(d.newMembers)}`).join(' ')} />
+          )}
+          {data.map((d, i) => <circle key={`n${i}`} cx={xPos(i)} cy={yNew(d.newMembers)} r={3} fill={BRAND} />)}
+
+          {/* 活跃率折线 */}
+          {data.length > 1 && (
+            <polyline fill="none" stroke={TEAL} strokeWidth={1.5} strokeDasharray="4 2"
+              points={data.map((d, i) => `${xPos(i)},${yRate(d.activeRate)}`).join(' ')} />
+          )}
+          {data.map((d, i) => <circle key={`a${i}`} cx={xPos(i)} cy={yRate(d.activeRate)} r={2.5} fill={TEAL} />)}
+
+          {/* 复购率折线 */}
+          {data.length > 1 && (
+            <polyline fill="none" stroke="#52c41a" strokeWidth={1.5} strokeDasharray="4 2"
+              points={data.map((d, i) => `${xPos(i)},${yRate(d.repurchaseRate)}`).join(' ')} />
+          )}
+          {data.map((d, i) => <circle key={`r${i}`} cx={xPos(i)} cy={yRate(d.repurchaseRate)} r={2.5} fill="#52c41a" />)}
+
+          {/* X轴标签（均匀抽取最多7个）*/}
+          {data.map((d, i) => {
+            const step = Math.max(1, Math.floor(data.length / 7));
+            if (i % step !== 0 && i !== data.length - 1) return null;
+            return <text key={`lbl${i}`} x={xPos(i)} y={H - 2} textAnchor="middle" fill={TEXT_4} fontSize={9}>{d.date.slice(5)}</text>;
+          })}
+        </svg>
+      )}
     </div>
   );
 }
 
-function RadarChart({ dimensions }: { dimensions: RadarDimension[] }) {
-  const cx = 130, cy = 110, r = 80;
-  const n = dimensions.length;
-  const angleStep = (2 * Math.PI) / n;
+// ---- 渠道来源分布（水平条形）----
 
-  const getPoint = (index: number, value: number) => {
-    const angle = angleStep * index - Math.PI / 2;
-    const dist = (value / 100) * r;
-    return { x: cx + dist * Math.cos(angle), y: cy + dist * Math.sin(angle) };
-  };
+const CH_COLORS = [BRAND, BLUE, '#52c41a', TEAL, PURPLE, YELLOW];
 
-  const polygonPoints = dimensions.map((d, i) => {
-    const p = getPoint(i, d.value);
-    return `${p.x},${p.y}`;
-  }).join(' ');
-
+function ChannelSection({ channels, total, loading, error }: {
+  channels: { channel: string; count: number; ratio: number }[];
+  total: number;
+  loading: boolean;
+  error: string | null;
+}) {
+  const display = channels.length > 0 ? channels : [
+    { channel: '扫码点餐',   count: 0, ratio: 0.38 },
+    { channel: '小程序',     count: 0, ratio: 0.28 },
+    { channel: '美团/饿了么', count: 0, ratio: 0.18 },
+    { channel: '线下推广',   count: 0, ratio: 0.10 },
+    { channel: '老带新',     count: 0, ratio: 0.06 },
+  ];
 
   return (
-    <div style={{
-      background: BG_1, borderRadius: 10, padding: 20,
-      border: `1px solid ${BG_2}`, minWidth: 300,
-    }}>
-      <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 12 }}>增长健康雷达</div>
-      <svg width={260} height={240} viewBox="0 0 260 240">
-        {/* 背景多边形 */}
-        {[20, 40, 60, 80, 100].map(v => (
-          <polygon key={v}
-            points={dimensions.map((_, i) => { const p = getPoint(i, v); return `${p.x},${p.y}`; }).join(' ')}
-            fill="none" stroke={BG_2} strokeWidth={1}
-          />
-        ))}
-        {/* 轴线 */}
-        {dimensions.map((_, i) => {
-          const p = getPoint(i, 100);
-          return <line key={i} x1={cx} y1={cy} x2={p.x} y2={p.y} stroke={BG_2} strokeWidth={1} />;
-        })}
-        {/* 数据多边形 */}
-        <polygon points={polygonPoints} fill={BRAND + '33'} stroke={BRAND} strokeWidth={2} />
-        {/* 数据点 */}
-        {dimensions.map((d, i) => {
-          const p = getPoint(i, d.value);
-          return <circle key={i} cx={p.x} cy={p.y} r={4} fill={BRAND} />;
-        })}
-        {/* 标签 */}
-        {dimensions.map((d, i) => {
-          const p = getPoint(i, 120);
-          return (
-            <text key={i} x={p.x} y={p.y} textAnchor="middle" dominantBaseline="middle"
-              fill={TEXT_3} fontSize={11}>
-              {d.label} {d.value}
-            </text>
-          );
-        })}
-      </svg>
-    </div>
-  );
-}
-
-function StoreRankTable({ stores }: { stores: StoreRankItem[] }) {
-  const trendIcons: Record<string, { symbol: string; color: string }> = {
-    up: { symbol: '\u2191', color: GREEN },
-    down: { symbol: '\u2193', color: RED },
-    flat: { symbol: '-', color: TEXT_4 },
-  };
-  return (
-    <div style={{
-      background: BG_1, borderRadius: 10, padding: 16,
-      border: `1px solid ${BG_2}`, flex: 1, minWidth: 0,
-    }}>
-      <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 12 }}>门店排行榜</div>
-      <div style={{ fontSize: 11, color: TEXT_4, display: 'grid', gridTemplateColumns: '36px 1fr 70px 70px 90px 30px', gap: 4, padding: '0 0 8px', borderBottom: `1px solid ${BG_2}` }}>
-        <span>排名</span><span>门店</span><span>新客数</span><span>复购率</span><span>营收</span><span>趋势</span>
-      </div>
-      {stores.map(s => {
-        const t = trendIcons[s.trend];
-        return (
-          <div key={s.rank} style={{
-            display: 'grid', gridTemplateColumns: '36px 1fr 70px 70px 90px 30px',
-            gap: 4, padding: '8px 0', borderBottom: `1px solid ${BG_2}`,
-            fontSize: 13, alignItems: 'center',
-          }}>
-            <span style={{
-              width: 24, height: 24, borderRadius: 12, display: 'inline-flex',
-              alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700,
-              background: s.rank <= 3 ? BRAND + '22' : BG_2,
-              color: s.rank <= 3 ? BRAND : TEXT_4,
-            }}>{s.rank}</span>
-            <span style={{ color: TEXT_1, fontWeight: 500 }}>{s.storeName}</span>
-            <span style={{ color: TEXT_2 }}>{s.newCustomers}</span>
-            <span style={{ color: TEXT_2 }}>{s.repeatRate}%</span>
-            <span style={{ color: TEXT_2 }}>\u00A5{(s.revenue / 10000).toFixed(1)}万</span>
-            <span style={{ color: t.color, fontWeight: 700 }}>{t.symbol}</span>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function AlertCards({ alerts }: { alerts: AlertItem[] }) {
-  const sevColors: Record<string, string> = { high: RED, medium: YELLOW, low: BLUE };
-  const sevLabels: Record<string, string> = { high: '严重', medium: '警告', low: '提示' };
-  return (
-    <div style={{
-      background: BG_1, borderRadius: 10, padding: 16,
-      border: `1px solid ${BG_2}`, flex: 1, minWidth: 0,
-    }}>
-      <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 12 }}>预警卡片</div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {alerts.map(a => (
-          <div key={a.id} style={{
-            padding: '12px 14px', borderRadius: 8,
-            background: sevColors[a.severity] + '11',
-            borderLeft: `3px solid ${sevColors[a.severity]}`,
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-              <span style={{
-                fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 4,
-                background: sevColors[a.severity] + '22', color: sevColors[a.severity],
-              }}>{sevLabels[a.severity]}</span>
-              <span style={{ fontSize: 13, fontWeight: 600, color: TEXT_1 }}>{a.title}</span>
-            </div>
-            <div style={{ fontSize: 11, color: TEXT_3, marginBottom: 2 }}>{a.detail}</div>
-            <div style={{ fontSize: 11, color: TEXT_4 }}>门店: {a.store}</div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function AgentSuggestionsPanel({ suggestions }: { suggestions: AgentSuggestion[] }) {
-  return (
-    <div style={{
-      background: BG_1, borderRadius: 10, padding: 16,
-      border: `1px solid ${BG_2}`, flex: 1, minWidth: 0,
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-        <span style={{ fontSize: 15, fontWeight: 700 }}>Agent 建议</span>
-        <span style={{
-          fontSize: 10, padding: '2px 8px', borderRadius: 10,
-          background: PURPLE + '22', color: PURPLE, fontWeight: 600,
-        }}>AI</span>
-      </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {suggestions.map(s => (
-          <div key={s.id} style={{
-            padding: '12px 14px', borderRadius: 8,
-            background: BG_2, border: `1px solid ${BG_2}`,
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-              <span style={{
-                fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 4,
-                background: BRAND + '22', color: BRAND,
-              }}>{s.type}</span>
-              <span style={{ fontSize: 13, fontWeight: 600, color: TEXT_1 }}>{s.title}</span>
-            </div>
-            <div style={{ fontSize: 11, color: TEXT_3, marginBottom: 6 }}>{s.detail}</div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: 12, fontWeight: 700, color: GREEN }}>{s.expectedImpact}</span>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                <div style={{ width: 40, height: 4, borderRadius: 2, background: BG_0 }}>
-                  <div style={{ width: `${s.confidence * 100}%`, height: '100%', borderRadius: 2, background: BRAND }} />
-                </div>
-                <span style={{ fontSize: 10, color: TEXT_4 }}>{Math.round(s.confidence * 100)}%</span>
+    <div style={{ background: BG_1, borderRadius: 10, padding: 20, border: `1px solid ${BG_2}`, minWidth: 260 }}>
+      <div style={{ fontSize: 15, fontWeight: 700, color: TEXT_1, marginBottom: 16 }}>渠道来源分布</div>
+      {loading && <SectionSkeleton height={160} />}
+      {!loading && error && <SectionError msg={error} />}
+      {!loading && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {display.slice(0, 6).map((ch, i) => (
+            <div key={ch.channel}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, fontSize: 12 }}>
+                <span style={{ color: TEXT_2 }}>{ch.channel}</span>
+                <span style={{ color: CH_COLORS[i % CH_COLORS.length], fontWeight: 600 }}>
+                  {ch.count > 0 ? ch.count.toLocaleString() + ' · ' : ''}{(ch.ratio * 100).toFixed(1)}%
+                </span>
+              </div>
+              <div style={{ height: 6, borderRadius: 3, background: BG_2 }}>
+                <div style={{
+                  height: '100%', borderRadius: 3, transition: 'width 0.6s ease',
+                  width: `${(ch.ratio * 100).toFixed(1)}%`,
+                  background: CH_COLORS[i % CH_COLORS.length],
+                }} />
               </div>
             </div>
-            <button style={{
-              marginTop: 8, padding: '4px 14px', borderRadius: 6, border: 'none',
-              background: BRAND + '22', color: BRAND, fontSize: 11, fontWeight: 600,
-              cursor: 'pointer',
-            }}>采纳建议</button>
+          ))}
+          {total > 0 && <div style={{ fontSize: 11, color: TEXT_4, marginTop: 4 }}>期间新增 {total.toLocaleString()} 人</div>}
+          {channels.length === 0 && !error && <div style={{ fontSize: 11, color: TEXT_4, marginTop: 4 }}>渠道数据加载中，显示默认分布</div>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---- RFM 会员分层 ----
+
+const RFM_CFG: Record<string, { label: string; color: string; desc: string }> = {
+  S1: { label: '高价值', color: BRAND,  desc: '高频高消费' },
+  S2: { label: '潜力客', color: '#52c41a', desc: '较活跃' },
+  S3: { label: '一般客', color: YELLOW, desc: '偶尔消费' },
+  S4: { label: '流失预警', color: '#ff4d4f', desc: '长期未到店' },
+  S5: { label: '沉睡客', color: TEXT_4,  desc: '极低活跃' },
+};
+
+function RFMSection({ distribution, total, loading, error }: {
+  distribution: { level: string; count: number; ratio: number }[];
+  total: number; loading: boolean; error: string | null;
+}) {
+  return (
+    <div style={{ background: BG_1, borderRadius: 10, padding: 20, border: `1px solid ${BG_2}`, flex: 1, minWidth: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 16 }}>
+        <span style={{ fontSize: 15, fontWeight: 700, color: TEXT_1 }}>RFM 会员分层</span>
+        {total > 0 && <span style={{ fontSize: 11, color: TEXT_3 }}>共 {total.toLocaleString()} 位会员</span>}
+      </div>
+
+      {loading && <SectionSkeleton height={160} />}
+      {!loading && error && <SectionError msg={error} />}
+      {!loading && !error && distribution.length === 0 && <SectionSkeleton height={160} label="暂无RFM数据" />}
+      {!loading && !error && distribution.length > 0 && (
+        <>
+          {/* 堆积进度条 */}
+          <div style={{ display: 'flex', height: 20, borderRadius: 4, overflow: 'hidden', marginBottom: 16 }}>
+            {distribution.map(d => {
+              const cfg = RFM_CFG[d.level] ?? { color: TEXT_4, label: d.level, desc: '' };
+              return (
+                <div key={d.level} title={`${cfg.label}: ${(d.ratio * 100).toFixed(1)}%`}
+                  style={{
+                    width: `${(d.ratio * 100).toFixed(2)}%`,
+                    background: cfg.color, minWidth: d.ratio > 0 ? 2 : 0, transition: 'width 0.6s ease',
+                  }} />
+              );
+            })}
           </div>
-        ))}
+          {/* 明细列表 */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {distribution.map(d => {
+              const cfg = RFM_CFG[d.level] ?? { color: TEXT_4, label: d.level, desc: '' };
+              return (
+                <div key={d.level} style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  padding: '6px 10px', borderRadius: 6, background: BG_2,
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ width: 8, height: 8, borderRadius: 2, background: cfg.color }} />
+                    <span style={{ fontSize: 12, fontWeight: 600, color: cfg.color }}>{d.level}</span>
+                    <span style={{ fontSize: 12, color: TEXT_3 }}>{cfg.label}</span>
+                    <span style={{ fontSize: 11, color: TEXT_4 }}>{cfg.desc}</span>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: TEXT_1 }}>{d.count.toLocaleString()}</span>
+                    <span style={{ fontSize: 11, color: TEXT_4, marginLeft: 4 }}>{(d.ratio * 100).toFixed(1)}%</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ---- 私域健康度仪表盘 ----
+
+function MetricRow({ label, value, sub, color }: { label: string; value: string; sub: string; color: string }) {
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      padding: '8px 10px', borderRadius: 6, background: BG_2,
+    }}>
+      <span style={{ fontSize: 12, color: TEXT_3 }}>{label}</span>
+      <div style={{ textAlign: 'right' }}>
+        <span style={{ fontSize: 14, fontWeight: 700, color }}>{value}</span>
+        {sub && <span style={{ fontSize: 10, color: TEXT_4, marginLeft: 4 }}>{sub}</span>}
       </div>
     </div>
   );
 }
 
-function CampaignTable({ campaigns }: { campaigns: CampaignRow[] }) {
-  const statusColors: Record<string, string> = {
-    '进行中': GREEN,
-    '已结束': TEXT_4,
-    '待启动': BLUE,
+function PrivateDomainSection({ summary, loading, error }: {
+  summary: DashboardSummary | null; loading: boolean; error: string | null;
+}) {
+  const calcScore = (s: DashboardSummary): number => {
+    const orderBase   = Math.min(s.kpi.order_count / 200, 1) * 40;
+    const storeActive = s.stores.length > 0
+      ? (s.stores.filter(st => st.today_orders > 0).length / s.stores.length) * 40 : 0;
+    const agentBonus  = Math.min(s.decisions.length * 4, 20);
+    return Math.round(orderBase + storeActive + agentBonus);
   };
+
+  const score         = summary ? calcScore(summary) : null;
+  const activeStores  = summary ? summary.stores.filter(s => s.today_orders > 0).length : 0;
+  const totalStores   = summary ? summary.stores.length : 0;
+  const activeRate    = totalStores > 0 ? activeStores / totalStores : 0;
+  const scoreColor    = score === null ? TEXT_4 : score >= 80 ? '#52c41a' : score >= 60 ? YELLOW : '#ff4d4f';
+
   return (
-    <div style={{
-      background: BG_1, borderRadius: 10, padding: 16,
-      border: `1px solid ${BG_2}`,
-    }}>
-      <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 12 }}>活动表现</div>
-      <div style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-          <thead>
-            <tr style={{ borderBottom: `1px solid ${BG_2}` }}>
-              {['活动名称', '类型', '时间', '目标人数', '触达人数', '转化人数', 'ROI', '状态'].map(h => (
-                <th key={h} style={{ textAlign: 'left', padding: '8px 10px', color: TEXT_4, fontWeight: 600, fontSize: 11, whiteSpace: 'nowrap' }}>{h}</th>
+    <div style={{ background: BG_1, borderRadius: 10, padding: 20, border: `1px solid ${BG_2}`, minWidth: 280 }}>
+      <div style={{ fontSize: 15, fontWeight: 700, color: TEXT_1, marginBottom: 16 }}>私域健康度</div>
+      {loading && <SectionSkeleton height={200} />}
+      {!loading && error && <SectionError msg={error} />}
+      {!loading && !error && (
+        <>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginBottom: 20 }}>
+            <svg width={80} height={80} viewBox="0 0 80 80">
+              <circle cx={40} cy={40} r={32} fill="none" stroke={BG_2} strokeWidth={8} />
+              {score !== null && (
+                <circle cx={40} cy={40} r={32} fill="none" stroke={scoreColor} strokeWidth={8}
+                  strokeDasharray={`${(score / 100) * 201} 201`} strokeDashoffset={50}
+                  strokeLinecap="round" transform="rotate(-90 40 40)"
+                  style={{ transition: 'stroke-dasharray 1s ease' }} />
+              )}
+              <text x={40} y={44} textAnchor="middle" fill={scoreColor} fontSize={20} fontWeight={700}>
+                {score ?? '--'}
+              </text>
+            </svg>
+            <div>
+              <div style={{ fontSize: 22, fontWeight: 700, color: scoreColor }}>
+                {score === null ? '--' : score >= 80 ? '健康' : score >= 60 ? '良好' : '待提升'}
+              </div>
+              <div style={{ fontSize: 12, color: TEXT_3, marginTop: 4 }}>综合健康分</div>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <MetricRow
+              label="今日活跃门店"
+              value={totalStores > 0 ? `${activeStores}/${totalStores}` : '--'}
+              sub={totalStores > 0 ? fmtPct(activeRate) : ''}
+              color={activeRate >= 0.8 ? '#52c41a' : activeRate >= 0.5 ? YELLOW : '#ff4d4f'}
+            />
+            <MetricRow
+              label="今日营收"
+              value={summary ? fmtYuan(summary.kpi.revenue_fen) : '--'}
+              sub={summary ? `${summary.kpi.order_count.toLocaleString()} 单` : ''}
+              color={BRAND}
+            />
+            <MetricRow
+              label="客单价"
+              value={summary?.kpi.avg_order_fen ? `¥${(summary.kpi.avg_order_fen / 100).toFixed(0)}` : '--'}
+              sub="今日均值"
+              color={BLUE}
+            />
+            <MetricRow
+              label="Agent近期决策"
+              value={`${summary?.decisions.length ?? '--'} 条`}
+              sub="最近5条"
+              color={PURPLE}
+            />
+          </div>
+
+          {summary && summary.decisions.length > 0 && (
+            <div style={{ marginTop: 16 }}>
+              <div style={{ fontSize: 12, color: TEXT_3, marginBottom: 8 }}>最近 Agent 决策</div>
+              {summary.decisions.slice(0, 3).map(d => (
+                <div key={d.id} style={{ padding: '6px 10px', borderRadius: 6, background: BG_2, marginBottom: 6, fontSize: 11 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
+                    <span style={{ color: PURPLE, fontWeight: 600 }}>{d.agent_id}</span>
+                    {d.confidence !== null && (
+                      <span style={{ color: TEXT_4 }}>置信度 {Math.round((d.confidence ?? 0) * 100)}%</span>
+                    )}
+                  </div>
+                  <div style={{ color: TEXT_3 }}>{d.action ?? d.decision_type}</div>
+                </div>
               ))}
-            </tr>
-          </thead>
-          <tbody>
-            {campaigns.map(c => (
-              <tr key={c.id} style={{ borderBottom: `1px solid ${BG_2}` }}>
-                <td style={{ padding: '10px', color: TEXT_1, fontWeight: 500 }}>{c.name}</td>
-                <td style={{ padding: '10px', color: TEXT_3 }}>{c.type}</td>
-                <td style={{ padding: '10px', color: TEXT_3, whiteSpace: 'nowrap' }}>{c.startDate} ~ {c.endDate}</td>
-                <td style={{ padding: '10px', color: TEXT_2 }}>{c.targetCount.toLocaleString()}</td>
-                <td style={{ padding: '10px', color: TEXT_2 }}>{c.reachCount.toLocaleString()}</td>
-                <td style={{ padding: '10px', color: TEXT_2 }}>{c.convertCount.toLocaleString()}</td>
-                <td style={{ padding: '10px', color: c.roi >= 3 ? GREEN : c.roi >= 2 ? YELLOW : TEXT_3, fontWeight: 600 }}>
-                  {c.roi > 0 ? `${c.roi}x` : '-'}
-                </td>
-                <td style={{ padding: '10px' }}>
-                  <span style={{
-                    fontSize: 11, padding: '2px 8px', borderRadius: 10,
-                    background: statusColors[c.status] + '22',
-                    color: statusColors[c.status],
-                    fontWeight: 600,
-                  }}>{c.status}</span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+// ---- 门店营收排行 ----
+
+function StoreRankSection({ stores, loading, error }: {
+  stores: DashboardSummary['stores']; loading: boolean; error: string | null;
+}) {
+  return (
+    <div style={{ background: BG_1, borderRadius: 10, padding: 16, border: `1px solid ${BG_2}`, flex: 1, minWidth: 0 }}>
+      <div style={{ fontSize: 15, fontWeight: 700, color: TEXT_1, marginBottom: 12 }}>今日门店营收排行</div>
+      {loading && <SectionSkeleton height={200} />}
+      {!loading && error && <SectionError msg={error} />}
+      {!loading && !error && stores.length === 0 && <SectionSkeleton height={120} label="暂无门店数据" />}
+      {!loading && !error && stores.length > 0 && (
+        <>
+          <div style={{
+            fontSize: 11, color: TEXT_4,
+            display: 'grid', gridTemplateColumns: '28px 1fr 80px 60px 60px',
+            gap: 4, padding: '0 0 8px', borderBottom: `1px solid ${BG_2}`,
+          }}>
+            <span>#</span><span>门店</span><span>营收</span><span>订单</span><span>状态</span>
+          </div>
+          {stores.slice(0, 8).map((s, idx) => (
+            <div key={s.store_id} style={{
+              display: 'grid', gridTemplateColumns: '28px 1fr 80px 60px 60px',
+              gap: 4, padding: '8px 0', borderBottom: `1px solid ${BG_2}`,
+              fontSize: 13, alignItems: 'center',
+            }}>
+              <span style={{
+                width: 22, height: 22, borderRadius: 11,
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 10, fontWeight: 700,
+                background: idx < 3 ? BRAND + '22' : BG_2,
+                color: idx < 3 ? BRAND : TEXT_4,
+              }}>{idx + 1}</span>
+              <span style={{ color: TEXT_1, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {s.store_name}
+              </span>
+              <span style={{ color: TEXT_2 }}>{fmtYuan(s.today_revenue_fen)}</span>
+              <span style={{ color: TEXT_2 }}>{s.today_orders}</span>
+              <span style={{
+                fontSize: 10, padding: '2px 6px', borderRadius: 4,
+                background: s.status === 'open' ? '#52c41a22' : BG_2,
+                color: s.status === 'open' ? '#52c41a' : TEXT_4,
+              }}>
+                {s.status === 'open' ? '营业中' : s.status === 'closed' ? '已闭店' : s.status}
+              </span>
+            </div>
+          ))}
+        </>
+      )}
     </div>
   );
 }
@@ -507,39 +572,186 @@ function CampaignTable({ campaigns }: { campaigns: CampaignRow[] }) {
 // ---- 主页面 ----
 
 export function GrowthDashboardPage() {
-  const [brand, setBrand] = useState<Brand>('全部品牌');
+  const [brand, setBrand]         = useState<Brand>('全部品牌');
   const [timeRange, setTimeRange] = useState<TimeRange>('近30天');
-  const [region, setRegion] = useState<Region>('全部区域');
+  const [region, setRegion]       = useState<Region>('全部区域');
+
+  const [growthData,    setGrowthData]    = useState<GrowthData | null>(null);
+  const [activityData,  setActivityData]  = useState<ActivityData | null>(null);
+  const [repurchaseData,setRepurchaseData]= useState<RepurchaseData | null>(null);
+  const [rfmData,       setRfmData]       = useState<RfmDistribution | null>(null);
+  const [dashboardData, setDashboardData] = useState<DashboardSummary | null>(null);
+
+  const [loadingKpi,       setLoadingKpi]       = useState(true);
+  const [loadingTrend,     setLoadingTrend]      = useState(true);
+  const [loadingRfm,       setLoadingRfm]        = useState(true);
+  const [loadingDashboard, setLoadingDashboard]  = useState(true);
+
+  const [errorKpi,       setErrorKpi]       = useState<string | null>(null);
+  const [errorTrend,     setErrorTrend]     = useState<string | null>(null);
+  const [errorRfm,       setErrorRfm]       = useState<string | null>(null);
+  const [errorDashboard, setErrorDashboard] = useState<string | null>(null);
+
+  const fetchAll = useCallback(async () => {
+    const { start_date, end_date } = getDateRange(timeRange);
+    const qs = `start_date=${start_date}&end_date=${end_date}`;
+
+    setLoadingKpi(true); setLoadingTrend(true); setLoadingRfm(true); setLoadingDashboard(true);
+    setErrorKpi(null);   setErrorTrend(null);   setErrorRfm(null);   setErrorDashboard(null);
+
+    const [growthRes, activityRes, repurchaseRes, rfmRes, dashboardRes] = await Promise.allSettled([
+      txFetch<{ ok: boolean; data: GrowthData }>(`/api/v1/member/analytics/growth?${qs}`),
+      txFetch<{ ok: boolean; data: ActivityData }>(`/api/v1/member/analytics/activity?${qs}`),
+      txFetch<{ ok: boolean; data: RepurchaseData }>(`/api/v1/member/analytics/repurchase?${qs}`),
+      txFetch<{ ok: boolean; data: RfmDistribution }>('/api/v1/member/rfm/distribution'),
+      txFetch<{ ok: boolean; data: DashboardSummary }>('/api/v1/dashboard/summary'),
+    ]);
+
+    // --- KPI 数据（growth + activity + repurchase）---
+    let kpiErr: string | null = null;
+    if (growthRes.status === 'fulfilled' && growthRes.value.ok) {
+      setGrowthData(growthRes.value.data);
+    } else {
+      kpiErr = growthRes.status === 'rejected' ? (growthRes.reason?.message ?? '请求失败') : '增长数据异常';
+    }
+    if (activityRes.status === 'fulfilled' && activityRes.value.ok) {
+      setActivityData(activityRes.value.data);
+    } else if (!kpiErr) {
+      kpiErr = activityRes.status === 'rejected' ? (activityRes.reason?.message ?? '请求失败') : '活跃度数据异常';
+    }
+    if (repurchaseRes.status === 'fulfilled' && repurchaseRes.value.ok) {
+      setRepurchaseData(repurchaseRes.value.data);
+    }
+    setErrorKpi(kpiErr);
+    setLoadingKpi(false);
+
+    // --- 趋势 ---
+    const trendOk = growthRes.status === 'fulfilled' && growthRes.value.ok
+      && activityRes.status === 'fulfilled' && activityRes.value.ok;
+    setErrorTrend(trendOk ? null : '趋势数据不完整');
+    setLoadingTrend(false);
+
+    // --- RFM ---
+    if (rfmRes.status === 'fulfilled' && rfmRes.value.ok) {
+      setRfmData(rfmRes.value.data);
+      setErrorRfm(null);
+    } else {
+      setErrorRfm(rfmRes.status === 'rejected' ? (rfmRes.reason?.message ?? '请求失败') : 'RFM数据异常');
+    }
+    setLoadingRfm(false);
+
+    // --- 私域仪表盘 ---
+    if (dashboardRes.status === 'fulfilled' && dashboardRes.value.ok) {
+      setDashboardData(dashboardRes.value.data);
+      setErrorDashboard(null);
+    } else {
+      setErrorDashboard(
+        dashboardRes.status === 'rejected' ? (dashboardRes.reason?.message ?? '请求失败') : '仪表盘数据异常'
+      );
+    }
+    setLoadingDashboard(false);
+  }, [timeRange]);
+
+  useEffect(() => { fetchAll(); }, [fetchAll]);
+
+  // ---- 派生：4张KPI卡片 ----
+  const kpiItems: KPIItem[] = [
+    {
+      label: '新增会员',
+      value: growthData ? growthData.new_members.toLocaleString() : '--',
+      subLabel: `总会员 ${growthData ? growthData.total_members.toLocaleString() : '--'}`,
+      changePct: growthData?.new_members_change_pct ?? null,
+      color: BRAND,
+    },
+    {
+      label: '月活会员（MAU）',
+      value: activityData ? activityData.mau.toLocaleString() : '--',
+      subLabel: `活跃率 ${activityData ? fmtPct(activityData.active_rate) : '--'}`,
+      changePct: activityData?.mau_change_pct ?? null,
+      color: TEAL,
+    },
+    {
+      label: '人均消费',
+      value: growthData?.avg_spend_fen
+        ? `¥${(growthData.avg_spend_fen / 100).toFixed(0)}`
+        : (dashboardData?.kpi.avg_order_fen ? `¥${(dashboardData.kpi.avg_order_fen / 100).toFixed(0)}` : '--'),
+      subLabel: repurchaseData ? `复购率 ${fmtPct(repurchaseData.repurchase_rate)}` : '期间均值',
+      changePct: repurchaseData?.repurchase_rate_change_pct ?? null,
+      color: '#52c41a',
+    },
+    {
+      label: '会员 LTV',
+      value: growthData?.ltv_fen
+        ? fmtYuan(growthData.ltv_fen)
+        : '--',
+      subLabel: repurchaseData ? `平均间隔 ${repurchaseData.avg_interval_days.toFixed(0)} 天` : '生命周期价值',
+      changePct: null,
+      color: BLUE,
+    },
+  ];
+
+  // ---- 派生：趋势点 ----
+  const trendPoints: TrendPoint[] = (() => {
+    if (!growthData?.daily_trend || !activityData?.daily_active) return [];
+    const actMap = new Map(activityData.daily_active.map(d => [d.date, d]));
+    const globalRR = (repurchaseData?.repurchase_rate ?? 0) * 100;
+    return growthData.daily_trend.map(g => ({
+      date: g.date,
+      newMembers: g.new_members,
+      activeRate: (actMap.get(g.date)?.active_rate ?? 0) * 100,
+      repurchaseRate: globalRR,
+    }));
+  })();
 
   return (
-    <div style={{ maxWidth: 1400, margin: '0 auto' }}>
-      <h2 style={{ margin: '0 0 16px', fontSize: 22, fontWeight: 700 }}>增长中心</h2>
+    <div style={{ background: BG_0, minHeight: '100vh', padding: '20px 24px' }}>
+      <div style={{ maxWidth: 1400, margin: '0 auto' }}>
 
-      {/* 顶部全局筛选栏 */}
-      <FilterBar
-        brand={brand} setBrand={setBrand}
-        timeRange={timeRange} setTimeRange={setTimeRange}
-        region={region} setRegion={setRegion}
-      />
+        {/* 页头 */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+          <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: TEXT_1 }}>增长中心</h2>
+          <button onClick={fetchAll} style={{
+            padding: '6px 16px', borderRadius: 6, border: `1px solid ${BG_2}`,
+            background: BG_1, color: TEXT_3, fontSize: 12, cursor: 'pointer',
+          }}>
+            刷新数据
+          </button>
+        </div>
 
-      {/* KPI Cards */}
-      <KPICardsRow kpis={MOCK_KPIS} />
+        {/* 筛选栏 */}
+        <FilterBar brand={brand} setBrand={setBrand} timeRange={timeRange} setTimeRange={setTimeRange} region={region} setRegion={setRegion} />
 
-      {/* 中部双栏: 趋势图 + 雷达图 */}
-      <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
-        <TrendChart data={MOCK_TREND} />
-        <RadarChart dimensions={MOCK_RADAR} />
+        {/* 4张KPI卡片 */}
+        <KPICardsRow items={kpiItems} loading={loadingKpi} error={errorKpi} />
+
+        {/* 趋势图 + 渠道分布 */}
+        <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
+          <TrendChart data={trendPoints} loading={loadingTrend} error={errorTrend} />
+          <ChannelSection
+            channels={growthData?.channels ?? []}
+            total={growthData?.new_members ?? 0}
+            loading={loadingKpi}
+            error={errorKpi}
+          />
+        </div>
+
+        {/* RFM分层 + 私域健康度 */}
+        <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
+          <RFMSection
+            distribution={rfmData?.distribution ?? []}
+            total={rfmData?.total ?? 0}
+            loading={loadingRfm}
+            error={errorRfm}
+          />
+          <PrivateDomainSection summary={dashboardData} loading={loadingDashboard} error={errorDashboard} />
+        </div>
+
+        {/* 门店排行 */}
+        <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
+          <StoreRankSection stores={dashboardData?.stores ?? []} loading={loadingDashboard} error={errorDashboard} />
+        </div>
+
       </div>
-
-      {/* 下部三栏: 排行榜 + 预警 + Agent建议 */}
-      <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
-        <StoreRankTable stores={MOCK_STORE_RANK} />
-        <AlertCards alerts={MOCK_ALERTS} />
-        <AgentSuggestionsPanel suggestions={MOCK_SUGGESTIONS} />
-      </div>
-
-      {/* 底部: 活动表现 */}
-      <CampaignTable campaigns={MOCK_CAMPAIGNS} />
     </div>
   );
 }

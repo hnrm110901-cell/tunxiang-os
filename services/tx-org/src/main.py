@@ -28,6 +28,9 @@ from api.leave_routes import router as leave_router
 from api.store_clone_routes import router as store_clone_router
 from api.device_routes import router as device_router
 from api.ota_routes import router as ota_router
+from api.compliance_routes import router as compliance_router
+from api.im_sync_routes import router as im_sync_router
+from api.performance_routes import router as performance_router
 
 app = FastAPI(title="TunxiangOS tx-org", version="3.0.0")
 app.include_router(emp_router)
@@ -54,6 +57,9 @@ app.include_router(leave_router)         # 请假管理 API（v077）
 app.include_router(store_clone_router)   # 快速开店克隆 API（v078）
 app.include_router(device_router)        # 品牌级设备管理 API（v093）
 app.include_router(ota_router)           # OTA 版本管理 API（v094）
+app.include_router(compliance_router)
+app.include_router(im_sync_router)       # IM 同步 API（企微/钉钉）
+app.include_router(performance_router)
 
 @app.get("/health")
 async def health():

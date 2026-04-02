@@ -16,8 +16,10 @@
 
 from typing import List, Optional
 
-from fastapi import APIRouter, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession
+from shared.ontology.src.database import get_db
 
 from services.store_clone import (
     CLONE_ITEMS,
@@ -165,15 +167,17 @@ async def clone_preview(
 async def clone_store_api(
     req: CloneRequest,
     x_tenant_id: Optional[str] = Header(None),
+    db: AsyncSession = Depends(get_db),
 ) -> dict:
     tenant_id = _get_tenant(x_tenant_id)
     try:
-        task = clone_store_config(
+        task = await clone_store_config(
             source_store_id=req.source_store_id,
             target_store_id=req.target_store_id,
             selected_items=req.selected_items,
             tenant_id=tenant_id,
             created_by=req.created_by,
+            db=db,
         )
     except PermissionError as e:
         raise HTTPException(status_code=403, detail=str(e))

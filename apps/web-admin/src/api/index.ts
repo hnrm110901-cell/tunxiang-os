@@ -33,6 +33,8 @@ export * from './reviewApi';
 export * from './regionalApi';
 export * from './dispatchApi';
 export * from './banquetApi';
+export * from './storeHealthApi';
+export * from './hrApi';
 
 // ─── 门店健康 ───
 

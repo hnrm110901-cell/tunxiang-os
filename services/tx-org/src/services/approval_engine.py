@@ -23,9 +23,11 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
+import httpx
 import structlog
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -251,6 +253,32 @@ def _parse_jsonb(value: Any) -> dict[str, Any]:
 # ── 业务回调 ──────────────────────────────────────────────────────────────────
 
 
+_SUPPLY_URL = os.getenv("TX_SUPPLY_SERVICE_URL", "http://tx-supply:8001")
+_TRADE_URL = os.getenv("TX_TRADE_SERVICE_URL", "http://tx-trade:8002")
+_MENU_URL = os.getenv("TX_MENU_SERVICE_URL", "http://tx-menu:8003")
+_FINANCE_URL = os.getenv("TX_FINANCE_SERVICE_URL", "http://tx-finance:8004")
+_ORG_URL = os.getenv("TX_ORG_SERVICE_URL", "http://tx-org:8005")
+
+
+async def _post_callback(url: str, tenant_id: str, business_id: str) -> None:
+    """向下游服务发送审批通过回调，失败只记日志不抛异常。"""
+    headers = {"X-Tenant-ID": tenant_id, "Content-Type": "application/json"}
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            resp = await client.post(url, headers=headers)
+            if resp.status_code >= 400:
+                log.warning(
+                    "approval_callback_http_error",
+                    url=url,
+                    status_code=resp.status_code,
+                    business_id=business_id,
+                )
+            else:
+                log.info("approval_callback_ok", url=url, business_id=business_id)
+    except (httpx.HTTPError, httpx.TimeoutException) as exc:
+        log.warning("approval_callback_failed", url=url, business_id=business_id, error=str(exc))
+
+
 async def _dispatch_on_approved(
     business_type: str,
     business_id: str,
@@ -265,23 +293,35 @@ async def _dispatch_on_approved(
         tenant_id=tenant_id,
     )
     if business_type == "leave":
-        # TODO: POST /api/v1/leave-requests/{business_id}/confirm
-        log.info("approval_callback_leave", business_id=business_id)
+        await _post_callback(
+            f"{_ORG_URL}/api/v1/leave-requests/{business_id}/confirm",
+            tenant_id, business_id,
+        )
     elif business_type == "purchase":
-        # TODO: POST /api/v1/purchase-orders/{business_id}/confirm  (tx-supply)
-        log.info("approval_callback_purchase", business_id=business_id)
+        await _post_callback(
+            f"{_SUPPLY_URL}/api/v1/purchase-orders/{business_id}/confirm",
+            tenant_id, business_id,
+        )
     elif business_type == "discount":
-        # TODO: POST /api/v1/discounts/{business_id}/approve  (tx-trade)
-        log.info("approval_callback_discount", business_id=business_id)
+        await _post_callback(
+            f"{_TRADE_URL}/api/v1/discounts/{business_id}/approve",
+            tenant_id, business_id,
+        )
     elif business_type == "price_change":
-        # TODO: POST /api/v1/menu-changes/{business_id}/apply  (tx-menu)
-        log.info("approval_callback_price_change", business_id=business_id)
+        await _post_callback(
+            f"{_MENU_URL}/api/v1/menu-changes/{business_id}/apply",
+            tenant_id, business_id,
+        )
     elif business_type == "refund":
-        # TODO: POST /api/v1/refunds/{business_id}/approve  (tx-trade)
-        log.info("approval_callback_refund", business_id=business_id)
+        await _post_callback(
+            f"{_TRADE_URL}/api/v1/refunds/{business_id}/approve",
+            tenant_id, business_id,
+        )
     elif business_type == "expense":
-        # TODO: POST /api/v1/expenses/{business_id}/approve  (tx-finance)
-        log.info("approval_callback_expense", business_id=business_id)
+        await _post_callback(
+            f"{_FINANCE_URL}/api/v1/expenses/{business_id}/approve",
+            tenant_id, business_id,
+        )
     # custom 类型无标准回调
 
 

@@ -33,6 +33,8 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 import structlog
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = structlog.get_logger(__name__)
 
@@ -126,113 +128,57 @@ def _assert_same_tenant(
 #  门店数据读取（纯函数，无 DB 依赖，便于单元测试替换）
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-def _get_source_store_data(source_store_id: str, tenant_id: str) -> Dict[str, Any]:
-    """
-    读取源门店可克隆的配置数据。
-
-    在真实项目中，本函数替换为对 DB 的实际查询（AsyncSession.execute）。
-    当前实现为模拟数据，返回结构与真实 DB 行字段完全对应。
-    """
+async def _get_source_store_data(
+    source_store_id: str, tenant_id: str, db: AsyncSession
+) -> Dict[str, Any]:
+    """读取源门店可克隆的配置数据（真实 DB 查询）。"""
+    await db.execute(
+        text("SELECT set_config('app.tenant_id', :tid, true)"),
+        {"tid": tenant_id},
+    )
     sid = source_store_id
+
+    def _rows(result) -> List[Dict[str, Any]]:
+        keys = result.keys()
+        return [dict(zip(keys, row)) for row in result.fetchall()]
+
+    tables = _rows(await db.execute(
+        text("SELECT id, table_no, area, floor, seats, min_consume_fen, sort_order, is_active, config FROM tables WHERE store_id = :sid::uuid AND is_deleted = false ORDER BY sort_order"),
+        {"sid": sid},
+    ))
+    production_depts = _rows(await db.execute(
+        text("SELECT id, dept_name, dept_code, brand_id, fixed_fee_type, sort_order FROM production_depts WHERE tenant_id = :tid::uuid AND is_deleted = false"),
+        {"tid": tenant_id},
+    ))
+    receipt_templates = _rows(await db.execute(
+        text("SELECT id, template_name, print_type, template_content, paper_width, is_default, is_active, config FROM receipt_templates WHERE store_id = :sid::uuid AND is_deleted = false"),
+        {"sid": sid},
+    ))
+    attendance_rules = _rows(await db.execute(
+        text("SELECT id, rule_name, grace_period_minutes, early_leave_grace_minutes, overtime_min_minutes, max_hours_week, max_overtime_month_hours, late_deduction_fen, early_leave_deduction_fen, full_attendance_bonus_fen, clock_methods, effective_from, effective_to, is_active FROM attendance_rules WHERE store_id = :sid AND is_deleted = false"),
+        {"sid": sid},
+    ))
+    shift_configs = _rows(await db.execute(
+        text("SELECT id, shift_name, start_time, end_time, color, is_active FROM shift_configs WHERE store_id = :sid::uuid AND is_deleted = false"),
+        {"sid": sid},
+    ))
+    dispatch_rules = _rows(await db.execute(
+        text("SELECT id, name, priority, match_dish_id, match_dish_category, match_brand_id, match_channel, match_time_start, match_time_end, match_day_type, target_dept_id FROM dispatch_rules WHERE tenant_id = :tid::uuid"),
+        {"tid": tenant_id},
+    ))
+    store_push_configs = _rows(await db.execute(
+        text("SELECT id, push_mode FROM store_push_configs WHERE store_id = :sid::uuid AND tenant_id = :tid::uuid"),
+        {"sid": sid, "tid": tenant_id},
+    ))
+
     return {
-        "tables": [
-            {
-                "id": _new_id(), "table_no": f"A{i:02d}", "area": "大厅",
-                "floor": 1, "seats": 4, "min_consume_fen": 0,
-                "sort_order": i, "is_active": True, "config": None,
-                "store_id": sid,
-            }
-            for i in range(1, 11)
-        ] + [
-            {
-                "id": _new_id(), "table_no": f"B{i:02d}", "area": "包间",
-                "floor": 1, "seats": 8, "min_consume_fen": 50000,
-                "sort_order": 10 + i, "is_active": True, "config": None,
-                "store_id": sid,
-            }
-            for i in range(1, 4)
-        ],
-        "production_depts": [
-            {
-                "id": _new_id(), "dept_name": "热菜档", "dept_code": "HOT",
-                "brand_id": "brand-001", "fixed_fee_type": None, "sort_order": 1,
-            },
-            {
-                "id": _new_id(), "dept_name": "凉菜档", "dept_code": "COLD",
-                "brand_id": "brand-001", "fixed_fee_type": None, "sort_order": 2,
-            },
-            {
-                "id": _new_id(), "dept_name": "饮品档", "dept_code": "DRINK",
-                "brand_id": "brand-001", "fixed_fee_type": None, "sort_order": 3,
-            },
-        ],
-        "receipt_templates": [
-            {
-                "id": _new_id(), "template_name": "前台收银小票", "print_type": "receipt",
-                "template_content": "{{store_name}}\n{{order_items}}\n合计：{{total}}",
-                "paper_width": 80, "is_default": True, "is_active": True, "config": None,
-            },
-            {
-                "id": _new_id(), "template_name": "厨房出单", "print_type": "kitchen",
-                "template_content": "桌号：{{table_no}}\n{{order_items}}",
-                "paper_width": 58, "is_default": False, "is_active": True, "config": None,
-            },
-        ],
-        "attendance_rules": [
-            {
-                "id": _new_id(), "rule_name": "标准考勤规则",
-                "grace_period_minutes": 5, "early_leave_grace_minutes": 5,
-                "overtime_min_minutes": 30, "max_hours_week": 40,
-                "max_overtime_month_hours": 36,
-                "late_deduction_fen": 5000, "early_leave_deduction_fen": 5000,
-                "full_attendance_bonus_fen": 30000,
-                "clock_methods": ["device", "face", "app"],
-                "effective_from": "2026-01-01", "effective_to": None,
-                "is_active": True,
-            },
-        ],
-        "shift_configs": [
-            {
-                "id": _new_id(), "shift_name": "早班",
-                "start_time": "08:00:00", "end_time": "16:00:00",
-                "color": "#FF6B35", "is_active": True,
-            },
-            {
-                "id": _new_id(), "shift_name": "晚班",
-                "start_time": "16:00:00", "end_time": "23:30:00",
-                "color": "#4ECDC4", "is_active": True,
-            },
-            {
-                "id": _new_id(), "shift_name": "全天班",
-                "start_time": "10:00:00", "end_time": "22:00:00",
-                "color": "#45B7D1", "is_active": True,
-            },
-        ],
-        "dispatch_rules": [
-            {
-                "id": _new_id(), "name": "热菜路由",
-                "priority": 10,
-                "match_dish_id": None, "match_dish_category": "热菜",
-                "match_brand_id": None, "match_channel": None,
-                "match_time_start": None, "match_time_end": None,
-                "match_day_type": None,
-                "target_dept_id": "dept-hot-001", "target_printer_id": None,
-            },
-            {
-                "id": _new_id(), "name": "凉菜路由",
-                "priority": 10,
-                "match_dish_id": None, "match_dish_category": "凉菜",
-                "match_brand_id": None, "match_channel": None,
-                "match_time_start": None, "match_time_end": None,
-                "match_day_type": None,
-                "target_dept_id": "dept-cold-001", "target_printer_id": None,
-            },
-        ],
-        "store_push_configs": [
-            {
-                "id": _new_id(), "push_mode": "immediate",
-            },
-        ],
+        "tables": tables,
+        "production_depts": production_depts,
+        "receipt_templates": receipt_templates,
+        "attendance_rules": attendance_rules,
+        "shift_configs": shift_configs,
+        "dispatch_rules": dispatch_rules,
+        "store_push_configs": store_push_configs,
     }
 
 
@@ -287,11 +233,11 @@ def get_clone_preview(
 #  单个配置项克隆器
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-def _clone_tables(
+async def _clone_tables(
     source_items: List[Dict[str, Any]],
     target_store_id: str,
     tenant_id: str,
-    db: Any,
+    db: AsyncSession,
 ) -> CloneItemResult:
     """
     克隆桌台：复制 table_no/area/floor/seats/min_consume_fen/sort_order/config。
@@ -301,32 +247,36 @@ def _clone_tables(
     """
     cloned = 0
     for tbl in source_items:
-        _new_row = {
-            "id": _new_id(),
-            "tenant_id": tenant_id,
-            "store_id": target_store_id,
-            "table_no": tbl["table_no"],
-            "area": tbl.get("area"),
-            "floor": tbl.get("floor", 1),
-            "seats": tbl["seats"],
-            "min_consume_fen": tbl.get("min_consume_fen", 0),
-            "status": "free",            # 新门店桌态重置
-            "current_order_id": None,    # 不继承在桌订单
-            "sort_order": tbl.get("sort_order", 0),
-            "is_active": tbl.get("is_active", True),
-            "config": tbl.get("config"),
-            "cloned_from_id": tbl["id"],
-        }
-        # TODO: session.execute(insert(Table).values(**_new_row))
+        await db.execute(
+            text("""
+                INSERT INTO tables (id, tenant_id, store_id, table_no, area, floor, seats,
+                    min_consume_fen, status, sort_order, is_active, config)
+                VALUES (:id, :tid::uuid, :sid::uuid, :table_no, :area, :floor, :seats,
+                    :min_consume_fen, 'free', :sort_order, :is_active, :config)
+            """),
+            {
+                "id": _new_id(),
+                "tid": tenant_id,
+                "sid": target_store_id,
+                "table_no": tbl["table_no"],
+                "area": tbl.get("area"),
+                "floor": tbl.get("floor", 1),
+                "seats": tbl["seats"],
+                "min_consume_fen": tbl.get("min_consume_fen", 0),
+                "sort_order": tbl.get("sort_order", 0),
+                "is_active": tbl.get("is_active", True),
+                "config": tbl.get("config"),
+            },
+        )
         cloned += 1
     return CloneItemResult(status="ok", cloned=cloned)
 
 
-def _clone_production_depts(
+async def _clone_production_depts(
     source_items: List[Dict[str, Any]],
     target_store_id: str,
     tenant_id: str,
-    db: Any,
+    db: AsyncSession,
 ) -> CloneItemResult:
     """
     克隆出品部门。
@@ -335,53 +285,62 @@ def _clone_production_depts(
     """
     cloned = 0
     for dept in source_items:
-        _new_row = {
-            "id": _new_id(),
-            "tenant_id": tenant_id,
-            "dept_name": dept["dept_name"],
-            "dept_code": dept["dept_code"],
-            "brand_id": dept.get("brand_id"),
-            "fixed_fee_type": dept.get("fixed_fee_type"),
-            "sort_order": dept.get("sort_order", 0),
-            "cloned_from_id": dept["id"],
-        }
-        # TODO: session.execute(insert(ProductionDept).values(**_new_row))
+        await db.execute(
+            text("""
+                INSERT INTO production_depts (id, tenant_id, dept_name, dept_code, brand_id, fixed_fee_type, sort_order)
+                VALUES (:id, :tid::uuid, :dept_name, :dept_code, :brand_id::uuid, :fixed_fee_type, :sort_order)
+            """),
+            {
+                "id": _new_id(),
+                "tid": tenant_id,
+                "dept_name": dept["dept_name"],
+                "dept_code": dept["dept_code"],
+                "brand_id": dept.get("brand_id"),
+                "fixed_fee_type": dept.get("fixed_fee_type"),
+                "sort_order": dept.get("sort_order", 0),
+            },
+        )
         cloned += 1
     return CloneItemResult(status="ok", cloned=cloned)
 
 
-def _clone_receipt_templates(
+async def _clone_receipt_templates(
     source_items: List[Dict[str, Any]],
     target_store_id: str,
     tenant_id: str,
-    db: Any,
+    db: AsyncSession,
 ) -> CloneItemResult:
     """克隆小票模板：内容完整复制，store_id 更新为目标门店。"""
     cloned = 0
     for tmpl in source_items:
-        _new_row = {
-            "id": _new_id(),
-            "tenant_id": tenant_id,
-            "store_id": target_store_id,
-            "template_name": tmpl["template_name"],
-            "print_type": tmpl.get("print_type", "receipt"),
-            "template_content": tmpl["template_content"],
-            "paper_width": tmpl.get("paper_width", 80),
-            "is_default": tmpl.get("is_default", False),
-            "is_active": tmpl.get("is_active", True),
-            "config": tmpl.get("config"),
-            "cloned_from_id": tmpl["id"],
-        }
-        # TODO: session.execute(insert(ReceiptTemplate).values(**_new_row))
+        await db.execute(
+            text("""
+                INSERT INTO receipt_templates (id, tenant_id, store_id, template_name, print_type,
+                    template_content, paper_width, is_default, is_active)
+                VALUES (:id, :tid::uuid, :sid::uuid, :template_name, :print_type,
+                    :template_content, :paper_width, :is_default, :is_active)
+            """),
+            {
+                "id": _new_id(),
+                "tid": tenant_id,
+                "sid": target_store_id,
+                "template_name": tmpl["template_name"],
+                "print_type": tmpl.get("print_type", "receipt"),
+                "template_content": tmpl["template_content"],
+                "paper_width": tmpl.get("paper_width", 80),
+                "is_default": tmpl.get("is_default", False),
+                "is_active": tmpl.get("is_active", True),
+            },
+        )
         cloned += 1
     return CloneItemResult(status="ok", cloned=cloned)
 
 
-def _clone_attendance_rules(
+async def _clone_attendance_rules(
     source_items: List[Dict[str, Any]],
     target_store_id: str,
     tenant_id: str,
-    db: Any,
+    db: AsyncSession,
 ) -> CloneItemResult:
     """
     克隆考勤规则：store_id 更新为目标门店，effective_from 重置为今日。
@@ -389,60 +348,74 @@ def _clone_attendance_rules(
     cloned = 0
     today = datetime.now().strftime("%Y-%m-%d")
     for rule in source_items:
-        _new_row = {
-            "id": _new_id(),
-            "tenant_id": tenant_id,
-            "store_id": target_store_id,
-            "rule_name": rule["rule_name"],
-            "grace_period_minutes": rule.get("grace_period_minutes", 5),
-            "early_leave_grace_minutes": rule.get("early_leave_grace_minutes", 5),
-            "overtime_min_minutes": rule.get("overtime_min_minutes", 30),
-            "max_hours_week": rule.get("max_hours_week", 40),
-            "max_overtime_month_hours": rule.get("max_overtime_month_hours", 36),
-            "late_deduction_fen": rule.get("late_deduction_fen", 5000),
-            "early_leave_deduction_fen": rule.get("early_leave_deduction_fen", 5000),
-            "full_attendance_bonus_fen": rule.get("full_attendance_bonus_fen", 30000),
-            "clock_methods": rule.get("clock_methods", ["device", "face", "app"]),
-            "effective_from": today,
-            "effective_to": None,        # 新门店规则无截止日
-            "is_active": True,
-            "cloned_from_id": rule["id"],
-        }
-        # TODO: session.execute(insert(AttendanceRule).values(**_new_row))
+        await db.execute(
+            text("""
+                INSERT INTO attendance_rules (id, tenant_id, store_id, rule_name,
+                    grace_period_minutes, early_leave_grace_minutes, overtime_min_minutes,
+                    max_hours_week, max_overtime_month_hours, late_deduction_fen,
+                    early_leave_deduction_fen, full_attendance_bonus_fen,
+                    clock_methods, effective_from, effective_to, is_active)
+                VALUES (:id, :tid::uuid, :sid, :rule_name,
+                    :grace, :early_leave_grace, :ot_min,
+                    :max_week, :max_ot_month, :late_ded,
+                    :early_ded, :bonus,
+                    :clock_methods, :effective_from, NULL, true)
+            """),
+            {
+                "id": _new_id(),
+                "tid": tenant_id,
+                "sid": target_store_id,
+                "rule_name": rule["rule_name"],
+                "grace": rule.get("grace_period_minutes", 5),
+                "early_leave_grace": rule.get("early_leave_grace_minutes", 5),
+                "ot_min": rule.get("overtime_min_minutes", 30),
+                "max_week": rule.get("max_hours_week", 40),
+                "max_ot_month": rule.get("max_overtime_month_hours", 36),
+                "late_ded": rule.get("late_deduction_fen", 5000),
+                "early_ded": rule.get("early_leave_deduction_fen", 5000),
+                "bonus": rule.get("full_attendance_bonus_fen", 30000),
+                "clock_methods": rule.get("clock_methods", ["device", "face", "app"]),
+                "effective_from": today,
+            },
+        )
         cloned += 1
     return CloneItemResult(status="ok", cloned=cloned)
 
 
-def _clone_shift_configs(
+async def _clone_shift_configs(
     source_items: List[Dict[str, Any]],
     target_store_id: str,
     tenant_id: str,
-    db: Any,
+    db: AsyncSession,
 ) -> CloneItemResult:
     """克隆班次配置：store_id 更新为目标门店。"""
     cloned = 0
     for shift in source_items:
-        _new_row = {
-            "id": _new_id(),
-            "tenant_id": tenant_id,
-            "store_id": target_store_id,
-            "shift_name": shift["shift_name"],
-            "start_time": shift["start_time"],
-            "end_time": shift["end_time"],
-            "color": shift.get("color", "#FF6B35"),
-            "is_active": shift.get("is_active", True),
-            "cloned_from_id": shift["id"],
-        }
-        # TODO: session.execute(insert(ShiftConfig).values(**_new_row))
+        await db.execute(
+            text("""
+                INSERT INTO shift_configs (id, tenant_id, store_id, shift_name, start_time, end_time, color, is_active)
+                VALUES (:id, :tid::uuid, :sid::uuid, :shift_name, :start_time, :end_time, :color, :is_active)
+            """),
+            {
+                "id": _new_id(),
+                "tid": tenant_id,
+                "sid": target_store_id,
+                "shift_name": shift["shift_name"],
+                "start_time": shift["start_time"],
+                "end_time": shift["end_time"],
+                "color": shift.get("color", "#FF6B35"),
+                "is_active": shift.get("is_active", True),
+            },
+        )
         cloned += 1
     return CloneItemResult(status="ok", cloned=cloned)
 
 
-def _clone_dispatch_rules(
+async def _clone_dispatch_rules(
     source_items: List[Dict[str, Any]],
     target_store_id: str,
     tenant_id: str,
-    db: Any,
+    db: AsyncSession,
 ) -> CloneItemResult:
     """
     克隆档口路由规则。
@@ -451,50 +424,57 @@ def _clone_dispatch_rules(
     """
     cloned = 0
     for rule in source_items:
-        _new_row = {
-            "id": _new_id(),
-            "tenant_id": tenant_id,
-            "name": rule["name"],
-            "priority": rule.get("priority", 0),
-            "match_dish_id": rule.get("match_dish_id"),
-            "match_dish_category": rule.get("match_dish_category"),
-            "match_brand_id": rule.get("match_brand_id"),
-            "match_channel": rule.get("match_channel"),
-            "match_time_start": rule.get("match_time_start"),
-            "match_time_end": rule.get("match_time_end"),
-            "match_day_type": rule.get("match_day_type"),
-            "target_dept_id": rule["target_dept_id"],
-            "target_printer_id": None,   # 新门店打印机需重新绑定
-            "cloned_from_id": rule["id"],
-        }
-        # TODO: session.execute(insert(DispatchRule).values(**_new_row))
+        await db.execute(
+            text("""
+                INSERT INTO dispatch_rules (id, tenant_id, name, priority, match_dish_id,
+                    match_dish_category, match_brand_id, match_channel, match_time_start,
+                    match_time_end, match_day_type, target_dept_id, target_printer_id)
+                VALUES (:id, :tid::uuid, :name, :priority, :match_dish_id,
+                    :match_dish_category, :match_brand_id, :match_channel, :match_time_start,
+                    :match_time_end, :match_day_type, :target_dept_id, NULL)
+            """),
+            {
+                "id": _new_id(),
+                "tid": tenant_id,
+                "name": rule["name"],
+                "priority": rule.get("priority", 0),
+                "match_dish_id": rule.get("match_dish_id"),
+                "match_dish_category": rule.get("match_dish_category"),
+                "match_brand_id": rule.get("match_brand_id"),
+                "match_channel": rule.get("match_channel"),
+                "match_time_start": rule.get("match_time_start"),
+                "match_time_end": rule.get("match_time_end"),
+                "match_day_type": rule.get("match_day_type"),
+                "target_dept_id": rule["target_dept_id"],
+            },
+        )
         cloned += 1
     return CloneItemResult(status="ok", cloned=cloned)
 
 
-def _clone_store_push_configs(
+async def _clone_store_push_configs(
     source_items: List[Dict[str, Any]],
     target_store_id: str,
     tenant_id: str,
-    db: Any,
+    db: AsyncSession,
 ) -> CloneItemResult:
     """克隆出单模式配置（store_push_configs 表，UNIQUE(tenant_id, store_id)）。"""
     if not source_items:
         return CloneItemResult(status="skipped", cloned=0)
     cfg = source_items[0]
-    _new_row = {
-        "id": _new_id(),
-        "tenant_id": tenant_id,
-        "store_id": target_store_id,
-        "push_mode": cfg.get("push_mode", "immediate"),
-    }
-    # TODO: session.execute(
-    #   insert(StorePushConfig).values(**_new_row)
-    #   .on_conflict_do_update(
-    #       index_elements=["tenant_id", "store_id"],
-    #       set_={"push_mode": _new_row["push_mode"]}
-    #   )
-    # )
+    await db.execute(
+        text("""
+            INSERT INTO store_push_configs (id, tenant_id, store_id, push_mode)
+            VALUES (:id, :tid::uuid, :sid::uuid, :push_mode)
+            ON CONFLICT (tenant_id, store_id) DO UPDATE SET push_mode = EXCLUDED.push_mode
+        """),
+        {
+            "id": _new_id(),
+            "tid": tenant_id,
+            "sid": target_store_id,
+            "push_mode": cfg.get("push_mode", "immediate"),
+        },
+    )
     return CloneItemResult(status="ok", cloned=1)
 
 
@@ -517,13 +497,13 @@ _CLONE_DISPATCH: Dict[
 #  主克隆函数（同步版，供 API 路由调用）
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-def clone_store_config(
+async def clone_store_config(
     source_store_id: str,
     target_store_id: str,
     selected_items: List[str],
     tenant_id: str,
     created_by: Optional[str] = None,
-    db: Any = None,
+    db: Optional[AsyncSession] = None,
 ) -> StoreCloneTask:
     """
     将源门店的选定配置项克隆到目标门店。
@@ -569,7 +549,7 @@ def clone_store_config(
     log.info("store_clone.started")
 
     # ── 读取源门店数据 ──
-    source_data = _get_source_store_data(source_store_id, tenant_id)
+    source_data = await _get_source_store_data(source_store_id, tenant_id, db)
 
     # ── 创建任务记录 ──
     task = StoreCloneTask(
@@ -591,7 +571,7 @@ def clone_store_config(
         clone_fn = _CLONE_DISPATCH[item_type]
         source_items = source_data.get(item_type, [])
 
-        item_result: CloneItemResult = clone_fn(
+        item_result: CloneItemResult = await clone_fn(
             source_items, target_store_id, tenant_id, db
         )
         result_summary[item_type] = {
@@ -610,6 +590,9 @@ def clone_store_config(
             status=item_result.status,
             progress=task.progress,
         )
+
+    if db is not None:
+        await db.commit()
 
     task.status = "failed" if errors else "completed"
     task.progress = 100

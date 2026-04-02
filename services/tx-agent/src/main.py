@@ -29,6 +29,7 @@ from .api.dashboard_routes import router as dashboard_router
 from .api.specials_routes import router as specials_router
 from .api.inventory_routes import router as inventory_router
 from .api.agent_monitor_routes import router as agent_monitor_router
+from .api.store_health_routes import router as store_health_router
 
 
 async def get_db_with_tenant_factory(
@@ -93,6 +94,7 @@ app.include_router(dashboard_router)
 app.include_router(specials_router)
 app.include_router(inventory_router)
 app.include_router(agent_monitor_router)
+app.include_router(store_health_router)
 
 
 @app.get("/health")
