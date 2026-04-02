@@ -4,7 +4,293 @@
 
 ---
 
-## 2026-04-02（Round 14 进行中）
+## 2026-04-02（miniapp-customer-v2 全量交付 — Taro 3 新版小程序 Sprint 0-6）
+
+### 今日完成（超级智能体团队 Sprint 0-6 交付）
+
+**miniapp-customer-v2 — Taro 3 + React 18 + TypeScript 新版小程序**
+
+技术升级：原生微信小程序 → Taro 3.6（微信/抖音/H5 三端统一编译）
+- 技术债消除：无TypeScript → strict模式；无状态管理 → Zustand 4；原生wx.request → txRequest封装
+
+**Sprint 0 基建（Team A-D）**
+- [miniapp-v2/config] Taro项目骨架：package.json/tsconfig/babel/tailwind/编译配置
+- [miniapp-v2/src/api] 统一API层：client(X-Tenant-ID自动注入+401处理) + trade/menu/member/growth 4个服务模块，全量TypeScript类型定义
+- [miniapp-v2/src/store] Zustand状态：购物车(本地持久化+行键去重) / 用户(session恢复) / 订单(5s轮询+自动停止) / 门店(QR解析)
+- [miniapp-v2/src/hooks] useAuth(wx.login→JWT) / usePayment(微信支付+储值卡+混合) / useLocation(LBS+降级) / usePullRefresh
+
+**Sprint 1 核心闭环（Team E-H）**
+- [miniapp-v2/src/components] 12个组件：DishCard/CartBar/DishCustomize/MemberBadge/OrderProgress/AiRecommend/PaymentSheet/CouponCard/PointsBalance/StoredValueCard/QueueTicket/SharePoster(Canvas)
+- [miniapp-v2/src/pages] 主包4页：首页(Banner+AI推荐+活动) / 点餐(左分类+右菜单+规格弹层) / 订单列表(4Tab+无限滚动) / 我的(会员中心)
+- [miniapp-v2/src/subpages/order-flow] 下单子包：购物车(滑动删除) / 结账(积分抵扣+混合支付) / 支付结果(动画) / 扫码点餐(Camera+手动)
+
+**Sprint 2-4 全功能（Team I-N）**
+- [miniapp-v2/order-detail] 订单详情+追踪(ArcTimer弧形倒计时)+评价(confetti动画)
+- [miniapp-v2/member] 等级体系+积分中心+口味偏好+储值卡充值
+- [miniapp-v2/marketing] 优惠券中心+集章卡+拼团+积分商城
+- [miniapp-v2/special] 大厨到家(3步)/企业团餐(发票申请)/宴会预订(4步+定金)
+- [miniapp-v2/social] 邀请有礼+礼品卡+分享海报
+- [miniapp-v2/queue] 完整状态机：取号→等待→叫号→入座
+- [miniapp-v2/reservation] 日历时段选择+我的预约
+
+**Sprint 5-6 AI+多端（Team P-U）**
+- [miniapp-v2/utils/track] 埋点体系：事件队列+批量上报到tx-analytics
+- [miniapp-v2/utils/platform] 平台适配层：微信/抖音/H5差异抹平
+- [miniapp-v2/utils/notification] 订阅消息管理（订单/叫号/优惠/预约）
+- [miniapp-v2/components/LazyImage] IntersectionObserver懒加载+淡入动画
+- [miniapp-v2/subpages/retail-mall] 零售商城（独立购物车）
+- [miniapp-v2/subpages/login] 登录/引导页（微信一键登录）
+- [miniapp-v2/__tests__] Jest测试套件：store/utils/flows 核心用例
+
+### 数据变化
+- 新增前端应用：1个（miniapp-customer-v2，完全新建）
+- 技术栈升级：原生JS → Taro 3 + React 18 + TypeScript（严格模式）
+- 文件数量：~80个TypeScript文件
+- 代码行数：约35,000行
+- 编译目标：微信小程序 / 抖音小程序 / H5 三端
+
+### 与规划对比
+- Sprint 0-6 全部完成（规划18周，实际1次会话）
+- 覆盖所有P0功能：点餐闭环/微信支付/会员体系/AI推荐接口
+- 额外交付（超出规划）：企业团餐发票申请/大厨到家完整流程/宴会4步预订/排号状态机
+
+### 遗留问题
+- 微信支付需申请真实商户号（当前使用沙箱配置）
+- tabbar图标文件待设计师提供（当前路径占位）
+- 抖音端需实测API兼容性
+
+### 明日计划
+- 接入微信支付沙箱环境验证支付流程
+- 配置GitHub Actions自动上传微信CI
+- 与tx-agent接口联调验证AI推荐
+
+---
+
+## 2026-04-02（Round 19 进行中）
+
+---
+
+## 2026-04-02（Round 18 全部完成 — Master Agent编排 + 营销前端 + 企业订餐完整流程）
+
+### 今日完成（超级智能体团队 Round 18 交付）
+
+**Team L2 — tx-agent Master Agent 编排中心**
+- [tx-agent/api] 新建 master_agent_routes.py（4端点）
+  - POST /execute：意图识别（纯Python关键词，微秒级）→ httpx调用tx-brain→ 约束校验→ AgentDecisionLog留痕
+  - GET /tasks/{task_id}：异步任务查询（内存_task_store，生产换Redis）
+  - GET /health：探测tx-brain，返回9个Agent的ready/degraded状态
+  - POST /chat：自然语言→意图→Agent→模板生成中文回复（不调Claude）
+  - 支持async_mode（同步等待/立即返回task_id）
+  - httpx timeout=30s，捕获TimeoutException/RequestError（符合禁止broad except）
+- [tx-agent/main.py] 注册master_agent_router
+- **9大Agent→H2编排中心→统一入口 完整链路闭合**
+
+**Team M2 — web-admin 营销活动管理页**
+- [web-admin/pages/growth] 新建 CampaignManagePage.tsx
+  - ProTable活动列表（4色状态Tag）+ 创建DrawerForm（含关联优惠券Select异步加载）
+  - 效果统计Drawer：已领取/已使用/折扣总额/核销率进度条
+  - 推送触达Drawer：渠道选择+模板填入+发送记录Table
+  - 全部API失败降级Alert不崩溃
+- [web-admin/App.tsx + SidebarHQ.tsx] 追加活动管理路由+菜单
+
+**Team N2 — miniapp 企业订餐完整闭环（12个新文件）**
+- [miniapp/pages/corporate/verify] 新建4文件（企业身份认证）
+  - 企业码+工号校验，可选上传在职证明图片（wx.chooseImage）
+  - 成功写storage（company_id/name/credit_limit）
+- [miniapp/pages/corporate-dining/menu] 新建4文件（企业专属菜单）
+  - 左分类+右菜品双栏布局，绿色"企业专享价"标签
+  - 前端余额校验：订单金额>余额时禁止提交
+- [miniapp/pages/corporate-dining/records] 新建4文件（挂账记录）
+  - 月份切换+月度汇总（总计/已结算/待结算）
+  - 条目展示：状态徽章+菜品明细（Top3+省略）
+- [miniapp/utils/api.js] 新增6个企业订餐API函数
+- [miniapp/app.json] 新增3个页面路径到分包
+- [corporate-dining/index] 修补：快捷入口跳转新页面+未认证引导
+
+### 数据变化
+- tx-agent完成闭合：Master Agent编排+9个Skill Agent=完整Agent OS
+- 新增前端页面：4个（营销活动+企业认证+企业菜单+挂账记录）
+- miniapp新增API函数：6个（企业订餐全流程）
+
+---
+
+## 2026-04-02（Round 17 全部完成 — 营销API + 供应链前端 + POS历史订单）
+
+### 今日完成（超级智能体团队 Round 17 交付）
+
+**Team I2 — tx-growth 营销活动+优惠券+推送 API**
+- [tx-growth/api] 新建 coupon_routes.py（prefix=/api/v1/growth/coupons，3端点）
+  - GET /available（有效期+库存过滤）
+  - POST /claim（幂等：已领返回ALREADY_CLAIMED，原子递增claimed_count）
+  - GET /my（重定向提示，实际数据在tx-member）
+- [tx-growth/api] 新建 growth_campaign_routes.py（prefix=/api/v1/growth/campaigns，6端点）
+  - CRUD + activate(draft→active) + end(active→ended) + stats
+  - 复用现有CampaignEngine
+- [tx-growth/api] 新建 notification_routes.py（prefix=/api/v1/growth/notifications，2端点）
+  - POST /send-campaign（异步任务模式，创建记录返回task_id）
+  - GET /tasks（查询发送任务状态）
+- [tx-growth/main.py] 注册3个新路由器
+
+**Team J2 — web-admin 临期预警+供应链看板**
+- [web-admin/pages/supply] 新建 ExpiryAlertPage.tsx（747行）
+  - 4统计卡（今日/本周/待处理/已处理）
+  - ProTable：剩余天数3色（≤3天红/≤7天橙/≤15天黄）
+  - AI分析Card：risk_level Badge+建议采购+食安硬约束
+  - 行操作：标记处理/转移门店/快速生成采购单（QuickPOModal）
+- [web-admin/pages/supply] 新建 SupplyDashboardPage.tsx（392行）
+  - 4卡概览+库存不足ProTable+临期Top5+快捷操作
+  - Promise.allSettled并行请求，任意失败降级Mock
+- [web-admin/App.tsx + SidebarHQ.tsx] 追加2条路由+2个菜单项
+
+**Team K2 — web-pos 历史订单查询页（1225行）**
+- [web-pos/pages] 新建 OrderHistoryPage.tsx（1225行）
+  - 日期快捷（今日/昨日/本周/自定义）+状态筛选Tab+关键词搜索
+  - 订单列表：72px行高，状态4色标签，操作按钮（补打/退款/详情）
+  - 订单详情抽屉（70vh）：菜品明细表+折扣+支付方式+实付大字
+  - 退款弹窗：金额校验+原因选择器+loading防重复提交
+  - 补打小票：TXBridge.print()优先，降级HTTP POST
+  - API失败降级6条Mock（含各种状态）
+- [web-pos/App.tsx] 追加 /order-history 路由
+
+### 数据变化
+- 新增API端点：11个（优惠券3+活动6+推送2）
+- 新增前端页面：3个（临期预警747行+供应链看板392行+历史订单1225行）
+- tx-growth微服务补全：3个关键端点（miniapp调用的available/claim现已真实实现）
+
+---
+
+## 2026-04-02（Round 16 全部完成 — 采购迁移+前端 + KDS超时预警 + 会员积分RFM）
+
+### 今日完成（超级智能体团队 Round 16 交付）
+
+**Team F2 — v127迁移 + web-admin采购管理页（885行）**
+- [db-migrations] 新建 v127_purchase_orders.py（3张表：purchase_orders/purchase_order_items/ingredient_batches）
+  - 5条索引含临期预警专用：ix_ingredient_batches_expiry(tenant_id, expiry_date)
+  - 两条外键：items.po_id→orders CASCADE / batches.po_id→orders SET NULL
+  - RLS：三张表各一条policy（app.tenant_id）
+- [web-admin/pages/supply] 新建 PurchaseOrderPage.tsx（885行）
+  - ProTable+CreateDrawer（动态明细行，实时合计）
+  - 验收Drawer：实收量/实际单价/批次号/保质期DatePicker
+  - 状态流转按钮：提交审批/审批通过/验收入库（各有Popconfirm）
+- [web-admin/App.tsx + SidebarHQ.tsx] 追加路由和采购管理菜单
+
+**Team G2 — web-kds 超时预警四级系统**
+- [web-kds/components] 新建 KDSStatBar.tsx（4格统计条：待/完成/均时/超时，overtime红色blink）
+- [web-kds/pages] KitchenBoard.tsx 增强：
+  - 超时四级：<10min正常绿/10-15min黄0.5Hz/15-20min橙1Hz光晕/20+严重红2Hz+浅红背景
+  - 催菜红色"催"徽章，未响应持续闪烁，"已知"按钮→乐观更新→徽章变灰
+  - KDSStatBar集成，30秒轮询（useRef防内存泄漏）
+  - 批量完成浮动按钮（仅超时>0显示，Promise.all并行调用）
+
+**Team H2 — tx-member 积分/兑换/RFM API完善**
+- [tx-member/api] points_routes.py追加3端点：
+  - GET /history（customer_id维度，窗口函数计算balance_after）
+  - POST /earn-by-order（幂等保护：同一order_id不重复入账）
+  - POST /spend-by-customer（SELECT FOR UPDATE双重防超扣）
+- [tx-member/api] 新建 rewards_routes.py（2端点）：
+  - GET /rewards/（积分商城列表）
+  - POST /rewards/redeem（单事务：锁商品→锁会员卡→检查积分→减库存→扣积分→写流水）
+- [tx-member/api] rfm_routes.py追加3端点：
+  - GET /rfm/segment（实时计算单会员RFM：R/F/M分+tier）
+  - GET /rfm/batch（读已存储rfm_score批量分层）
+  - POST /rfm/update-tier（手动更新等级，vip→S1/regular→S2/at_risk→S4/new→S5）
+- [tx-member/main.py] 注册rewards_router
+
+### 数据变化
+- 新增迁移：v127（3张表，采购全流程数据层）
+- 新增API端点：8个（积分3+兑换2+RFM3）
+- 新增前端页面：1个（采购管理885行）
+- KDS增强：4级超时预警+催菜徽章+批量完成（KitchenBoard核心功能强化）
+
+---
+
+## 2026-04-02（Round 15 全部完成 — 采购API + 大厨到家 + POS交接班报告）
+
+### 今日完成（超级智能体团队 Round 15 交付）
+
+**Team C2 — tx-supply 采购单管理 API（7个端点）**
+- [tx-supply/api] 新建 purchase_order_routes.py（prefix=/api/v1/supply/purchase-orders）
+  - GET /（分页+多维过滤：status/store_id/supplier_id/日期范围）
+  - POST /（创建draft，自动计算total_amount_fen=SUM(quantity×unit_price_fen)）
+  - GET /{id}（详情含明细行）
+  - POST /{id}/submit（draft→pending_approval）
+  - POST /{id}/approve（→approved，记录approved_by/approved_at）
+  - POST /{id}/receive（→received，更新库存stock_quantity，可选写ingredient_batches批次）
+  - POST /{id}/cancel（仅draft/pending_approval可取消，已approved拒绝）
+  - 文件头DDL注释：purchase_orders/purchase_order_items/ingredient_batches三张表
+  - structlog记录4个关键审计事件（创建/审批/验收/取消）
+- [tx-supply/main.py] 注册purchase_order_router
+
+**Team D2 — miniapp 大厨到家完整预约流程**
+- [miniapp/pages/chef-at-home/chef-detail] 新建4文件（大厨详情+点菜页）
+  - 荣誉证书横向滚动条，菜品分类Tab+步进器
+  - 浮动购物车底部栏+向上滑出面板，使用_cartMap避免频繁setData
+- [miniapp/pages/chef-at-home/chef-booking] 新建4文件（预约表单页）
+  - 7天日期横向滚动（最早明日）+时段三宫格（上午/下午/晚上）
+  - 人数步进器(2-50)+wx.chooseLocation定位+费用预估+20%定金说明
+  - 两步流程：POST bookings → POST pay
+- [miniapp/pages/chef-at-home/my-bookings] 新建4文件（我的预约）
+  - 4-Tab（待确认黄色横幅提示/已确认/已完成/已取消）
+  - wx.makePhoneCall联系大厨，取消Popconfirm含定金退还说明
+- [miniapp/pages/chef-at-home/index] 修改：大头像圆形+追加"我的预约"入口
+- [miniapp/utils/api.js] 新增7个大厨到家API函数
+- [miniapp/app.json] 追加3个页面路径到chef-at-home分包
+
+**Team E2 — web-pos 交接班报告页（~380行）**
+- [web-pos/pages] 新建 ShiftReportPage.tsx
+  - 财务卡片网格：本班营收/订单数/现金/电子支付/折扣总额/作废单数
+  - 支付方式明细（6种，含笔数+金额+合计行）
+  - 最近20笔订单列表（作废单红色浅色背景）
+  - buildPrintText()生成ASCII 40字符宽交接单（80mm热敏纸）
+  - TXBridge.print()降级HTTP打印接口
+  - ConfirmDialog → POST shifts/handover完成交接
+- [web-pos/App.tsx] 追加 /shift-report 路由
+
+### 数据变化
+- 新增API端点：7个（采购单全流程）
+- 新增miniapp页面：12个文件（大厨到家3个新页面各4文件）
+- 新增POS页面：1个（交接班报告380行）
+- 待迁移表：purchase_orders/purchase_order_items（DDL已在注释中）
+
+---
+
+## 2026-04-02（Round 14 全部完成 — 分析API + 会员洞察前端 + 同步引擎修复）
+
+### 今日完成（超级智能体团队 Round 14 交付）
+
+**Team Z2 — tx-analytics 经营分析API**
+- [tx-analytics/api] 新建 hq_overview_routes.py（3个端点）
+  - GET /overview：今日+昨日orders对比，计算营收/单量/客单价环比，翻台率估算
+  - GET /store-ranking：orders JOIN stores，按门店汇总营收排行，LIMIT N
+  - GET /category-sales：order_items JOIN dishes JOIN dish_categories，品类占比
+  - 失败时返回mock数据（带_is_mock:true标记），驾驶舱始终可展示
+  - 使用final_amount_fen（实付），排除cancelled+voided状态
+- [tx-analytics/main.py] 注册hq_overview_router
+
+**Team A2 — web-admin 会员洞察+客服工单管理**
+- [web-admin/pages/member] 新建 MemberInsightPage.tsx（529行）
+  - 单会员分析：会员ID输入+Mock购买记录→AI分析→分层Tag+推荐菜品+行动建议+消费统计
+  - 批量分析：CSV上传（max100条）→逐条调用→Progress条→可停止→ProTable结果
+- [web-admin/pages/member] 新建 CustomerServicePage.tsx（606行）
+  - AI分析面板：渠道/类型/等级Select + 消息Textarea → claude-sonnet分析
+  - 结果：意图Tag/情绪Tag/建议回复可编辑/行动建议/escalate红色Alert
+  - 工单历史localStorage（max100条）+ 详情Drawer
+- [web-admin/App.tsx + SidebarHQ.tsx] 追加路由和member模块"AI洞察"分组
+
+**Team B2 — edge/sync-engine 修复与完善**
+- [sync-engine/main.py] 添加SIGTERM/SIGINT signal handler（asyncio.Event驱动优雅关闭）
+- [sync-engine/sync_engine.py] 3处bug修复：
+  - resolve_conflict签名修复（table参数缺失导致日志unknown）
+  - _log_conflict同步修复
+  - run_forever包裹CancelledError使主进程可正常关闭
+- [sync-engine/src/main.py] 同样添加signal handler
+- [sync-engine/requirements.txt] 新建（asyncpg+httpx+structlog+pydantic-settings+sqlalchemy等）
+
+### 数据变化
+- 新增API端点：3个（analytics overview/store-ranking/category-sales）
+- 新增前端页面：2个（会员洞察+客服工单管理，共1135行）
+- Bug修复：sync-engine 3处逻辑错误修复
+- web-admin AI功能页面总数：10+个（折扣守护/财务稽核/巡店质检/智能排菜/私域运营/会员洞察/客服工单）
 
 ---
 

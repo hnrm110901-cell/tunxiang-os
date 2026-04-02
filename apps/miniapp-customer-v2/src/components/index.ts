@@ -1,3 +1,5 @@
+export { default as LazyImage }       from './LazyImage'
+export type { LazyImageProps }        from './LazyImage'
 export { default as DishCard }        from './DishCard'
 export { default as DishCustomize }   from './DishCustomize'
 export { default as CartBar }         from './CartBar'

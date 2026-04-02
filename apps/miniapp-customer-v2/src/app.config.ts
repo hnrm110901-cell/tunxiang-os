@@ -4,6 +4,8 @@ export default defineAppConfig({
     'pages/menu/index',
     'pages/order/index',
     'pages/mine/index',
+    'pages/login/index',
+    'pages/error/index',
   ],
   subPackages: [
     {
@@ -103,6 +105,26 @@ export default defineAppConfig({
       },
     ],
   },
+  preloadRule: {
+    'pages/index/index': {
+      network: 'all',
+      packages: ['src/subpages/order-flow', 'src/subpages/order-detail'],
+    },
+    'pages/menu/index': {
+      network: 'all',
+      packages: ['src/subpages/order-flow'],
+    },
+    'pages/mine/index': {
+      network: 'wifi',
+      packages: ['src/subpages/member', 'src/subpages/marketing'],
+    },
+  },
+  permission: {
+    'scope.userLocation': {
+      desc: '用于推荐附近门店',
+    },
+  },
+  requiredPrivateInfos: ['getLocation'],
   window: {
     backgroundTextStyle: 'light',
     navigationBarBackgroundColor: '#0B1A20',
