@@ -12,7 +12,6 @@
   - 异常用 structlog 记录，不静默吞没
 """
 import json
-import os
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone, timedelta
@@ -23,6 +22,7 @@ from pydantic import BaseModel
 from sqlalchemy import select, and_, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from shared.events import UniversalPublisher
 from ..models.table_production_plan import TableProductionPlan
 
 logger = structlog.get_logger()
@@ -82,16 +82,13 @@ async def push_table_ready_ws(
     log.info("table_fire.ws_push", table_no=data.get("table_no"), event=event)
     # 通过 Redis Pub/Sub 向 mac-station 广播，mac-station 转发 WebSocket 至 ExpoStation
     try:
-        import redis.asyncio as aioredis  # type: ignore
-
-        redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
-        async with aioredis.from_url(redis_url, decode_responses=True) as r:
-            payload = json.dumps(
-                {"event": event, "store_id": store_id, **data},
-                ensure_ascii=False,
-                default=str,
-            )
-            await r.publish(f"table_fire:{tenant_id}:{store_id}", payload)
+        r = await UniversalPublisher.get_redis()
+        payload = json.dumps(
+            {"event": event, "store_id": store_id, **data},
+            ensure_ascii=False,
+            default=str,
+        )
+        await r.publish(f"table_fire:{tenant_id}:{store_id}", payload)
     except (OSError, RuntimeError) as exc:
         log.warning("table_fire.ws_push_failed", error=str(exc))
 

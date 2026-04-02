@@ -11,7 +11,6 @@ Pydantic 模型:
 """
 from __future__ import annotations
 
-import os
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
@@ -20,6 +19,8 @@ import structlog
 from pydantic import BaseModel, Field
 from sqlalchemy import and_, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from shared.events import UniversalPublisher
 
 logger = structlog.get_logger()
 
@@ -498,23 +499,20 @@ class DeliveryOpsService:
         ).warning("delivery_ops.negative_alert_triggered")
         # 向 sms_jobs Redis Stream 推送差评预警作业，告警 Worker 消费后发送企微/短信通知
         try:
-            import redis.asyncio as aioredis  # type: ignore
-
-            redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
-            async with aioredis.from_url(redis_url, decode_responses=True) as r:
-                await r.xadd(
-                    "sms_jobs",
-                    {
-                        "sms_type": "delivery_negative_review",
-                        "review_id": str(rid),
-                        "store_id": str(row.get("store_id") or ""),
-                        "platform": str(row.get("platform") or ""),
-                        "rating": str(row.get("rating") or ""),
-                        "tenant_id": str(tid),
-                    },
-                    maxlen=50_000,
-                    approximate=True,
-                )
+            r = await UniversalPublisher.get_redis()
+            await r.xadd(
+                "sms_jobs",
+                {
+                    "sms_type": "delivery_negative_review",
+                    "review_id": str(rid),
+                    "store_id": str(row.get("store_id") or ""),
+                    "platform": str(row.get("platform") or ""),
+                    "rating": str(row.get("rating") or ""),
+                    "tenant_id": str(tid),
+                },
+                maxlen=50_000,
+                approximate=True,
+            )
         except (OSError, RuntimeError) as exc:
             logger.warning("delivery_ops.alert_publish_failed", review_id=str(rid), error=str(exc))
 

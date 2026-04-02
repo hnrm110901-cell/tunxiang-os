@@ -22,6 +22,7 @@ from typing import Any
 
 import httpx
 import structlog
+from shared.events import UniversalPublisher
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -95,15 +96,12 @@ async def _notify(
         meta=meta,
     )
     try:
-        import redis.asyncio as aioredis  # type: ignore
-
-        redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
-        async with aioredis.from_url(redis_url, decode_responses=True) as r:
-            payload = json.dumps(
-                {"title": title, "body": body, "meta": meta},
-                ensure_ascii=False,
-            )
-            await r.publish(f"notifications:{recipient_id}", payload)
+        redis = await UniversalPublisher.get_redis()
+        payload = json.dumps(
+            {"title": title, "body": body, "meta": meta},
+            ensure_ascii=False,
+        )
+        await redis.publish(f"notifications:{recipient_id}", payload)
     except (OSError, RuntimeError) as exc:
         log.warning(
             "approval_notification_redis_failed",

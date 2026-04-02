@@ -122,20 +122,16 @@ async def list_reports(
         where_clauses += " AND report_date <= :end_date"
         params["end_date"] = str(end_date)
 
-    count_row = await db.execute(
-        text(f"SELECT COUNT(*) FROM business_diagnosis_reports WHERE {where_clauses}"),
-        params,
-    )
+    count_sql = "SELECT COUNT(*) FROM business_diagnosis_reports WHERE " + where_clauses
+    count_row = await db.execute(text(count_sql), params)
     total = count_row.scalar() or 0
 
-    rows = await db.execute(
-        text(
-            f"SELECT id, store_id, report_date, anomalies, summary_text, created_at "
-            f"FROM business_diagnosis_reports WHERE {where_clauses} "
-            f"ORDER BY report_date DESC LIMIT :size OFFSET :offset"
-        ),
-        params,
+    list_sql = (
+        "SELECT id, store_id, report_date, anomalies, summary_text, created_at "
+        "FROM business_diagnosis_reports WHERE " + where_clauses +
+        " ORDER BY report_date DESC LIMIT :size OFFSET :offset"
     )
+    rows = await db.execute(text(list_sql), params)
     items = [dict(r._mapping) for r in rows.fetchall()]
     for item in items:
         item["id"] = str(item["id"])

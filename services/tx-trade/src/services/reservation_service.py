@@ -15,7 +15,6 @@
   - [PAGINATION] list_reservations 增加分页
   - [VALIDATION] phone 空字符串校验
 """
-import os
 import uuid
 from datetime import datetime, timezone, timedelta
 from typing import Optional
@@ -23,6 +22,7 @@ from typing import Optional
 import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from shared.events import UniversalPublisher
 from .reservation_flow import (
     RESERVATION_TRANSITIONS,
     can_reservation_transition,
@@ -884,24 +884,21 @@ class ReservationService:
         )
         # 向 sms_jobs Redis Stream 推送预订确认短信作业，SMS Worker 消费后发送
         try:
-            import redis.asyncio as aioredis  # type: ignore
-
-            redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
-            async with aioredis.from_url(redis_url, decode_responses=True) as r:
-                await r.xadd(
-                    "sms_jobs",
-                    {
-                        "sms_type": "reservation_confirmation",
-                        "phone": record.phone or "",
-                        "customer_name": record.customer_name or "",
-                        "confirmation_code": record.confirmation_code or "",
-                        "date": str(record.date),
-                        "time": str(record.time),
-                        "tenant_id": self.tenant_id,
-                    },
-                    maxlen=50_000,
-                    approximate=True,
-                )
+            r = await UniversalPublisher.get_redis()
+            await r.xadd(
+                "sms_jobs",
+                {
+                    "sms_type": "reservation_confirmation",
+                    "phone": record.phone or "",
+                    "customer_name": record.customer_name or "",
+                    "confirmation_code": record.confirmation_code or "",
+                    "date": str(record.date),
+                    "time": str(record.time),
+                    "tenant_id": self.tenant_id,
+                },
+                maxlen=50_000,
+                approximate=True,
+            )
         except (OSError, RuntimeError) as exc:
             logger.warning(
                 "reservation_sms_publish_failed",
