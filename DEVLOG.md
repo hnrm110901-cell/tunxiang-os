@@ -4,7 +4,105 @@
 
 ---
 
-## 2026-04-02（Round 12 进行中）
+## 2026-04-02（Round 14 进行中）
+
+---
+
+## 2026-04-02（Round 13 全部完成 — 排班迁移 + 考勤前端 + 打卡页 + miniapp积分券）
+
+### 今日完成（超级智能体团队 Round 13 交付）
+
+**Team W2 — v126迁移 + 考勤管理页（652行）**
+- [db-migrations] 新建 v126_work_schedules.py（v121-v125已存在，自动续接v126）
+  - work_schedules表：12字段，RLS Policy，唯一约束(tenant+employee+date+shift_start)
+  - 2个索引：tenant_store_date / employee_date
+- [web-admin/pages/org] 新建 AttendancePage.tsx（652行）
+  - TodayBoard：今日全店在岗/已下班/未打卡三列统计卡
+  - ProTable月度考勤：状态Tag四色（normal绿/late橙/early_leave黄/absent红）
+  - EmployeeSummaryCard：月度个人汇总（出勤/缺勤/迟到/总工时）
+  - WeekScheduleView：7列网格排班视图，新建排班ModalForm
+  - 考勤调整ModalForm：TimePicker×2+原因TextArea
+- [web-admin/App.tsx+SidebarHQ.tsx] 追加考勤管理路由和菜单项
+
+**Team X2 — web-crew 排班+打卡双页（分离架构）**
+- [web-crew/pages] 新建 SchedulePage.tsx
+  - 7天横向滚动日历（今天橙色圆形高亮，有班次显示时间段）
+  - 三状态打卡区：未打卡→上班打卡按钮/已打卡→下班+计时器/已完成→绿色状态
+  - 底部最近7天考勤缓存（5分钟TTL localStorage）
+- [web-crew/pages] 新建 ClockInPage.tsx（全屏）
+  - 直径200px超大圆形打卡按钮，脉冲辉光动画（pulseGlow keyframes）
+  - 打卡成功三层圆环扩散动画（rippleOut keyframes）
+  - 秒级时钟更新，已上班计时器
+- [web-crew/App.tsx] 排班加入Tab导航，追加2条路由
+
+**Team Y2 — miniapp积分兑换+优惠券中心（完整实现）**
+- [miniapp/pages/points] 新建4文件（积分商城+积分明细双Tab）
+  - 顶部积分卡片（橙色渐变，96rpx大字）
+  - 兑换商城2列网格，积分不足按钮置灰，确认弹层（消耗/当前/兑换后三行）
+  - 积分明细分页加载（onReachBottom），+N绿/-N橙红
+  - API失败降级4个mock商品（感谢券/优先排队/免配送费/9折券）
+- [miniapp/pages/coupon] 全部4文件重写（3-Tab：可使用/可领取/已使用过期）
+  - 左侧色系分类：满减橙/折扣绿/赠品蓝
+  - 到期≤3天红色"即将过期"徽章
+  - 领取后局部状态更新（无需重新请求）
+- [miniapp/utils/api.js] 新增7个API函数（积分/兑换/优惠券）
+- [miniapp/app.json] points页注册到subPackages
+
+### 数据变化
+- 新增迁移：v126（work_schedules表，排班管理）
+- 新增前端页面：5个（考勤管理+排班查看+全屏打卡+积分商城+优惠券中心重写）
+- 新增miniapp API函数：7个
+- 迁移链：v001→v126（含所有并行分支）
+
+---
+
+## 2026-04-02（Round 12 全部完成 — 驾驶舱大屏 + 考勤排班API + AI运营前端）
+
+### 今日完成（超级智能体团队 Round 12 交付）
+
+**Team T — 经营驾驶舱大屏（821行，纯SVG/CSS图表）**
+- [web-admin/pages/analytics] 新建 DashboardPage.tsx（821行，零编译错误）
+  - 5个KPI卡片：今日营收/订单数/翻台率/客单价/在线门店，环比箭头（↑绿↓红）
+  - 门店营收排行：纯CSS进度条（冠军#FF6B35渐变）
+  - 品类销售占比：SVG stroke-dasharray环形图（5色），中心总额标注
+  - AI预警中心：右侧竖向列表，critical红色脉冲动画
+  - 实时时钟秒级更新，全屏切换（requestFullscreen API）
+  - 30秒自动刷新，4个API并发，任一失败降级Mock
+- [web-admin/App.tsx] 追加路由 /analytics/dashboard
+- [web-admin/SidebarHQ.tsx] analytics模块追加"经营驾驶舱"入口
+
+**Team U — tx-org 考勤+排班 API**
+- [tx-org/api] attendance_routes.py（已有文件）追加4个端点：
+  - GET /records（月度考勤列表）
+  - GET /employee-summary（月度汇总：出勤天数/迟到次数/工时合计）
+  - POST /records/{id}/adjust（HR人工调整，重计工时）
+  - GET /today（全店今日状态：在岗/已下班/未打卡三分类）
+- [tx-org/api] 新建 schedule_routes.py（prefix=/api/v1/schedules，6个端点）
+  - GET /week（周排班视图，dates×employees格式）
+  - POST /（创建单条排班）
+  - POST /batch（批量排班，ON CONFLICT DO NOTHING）
+  - PUT /{id}（调班：时间/换人/岗位，动态SET子句）
+  - DELETE /{id}（软删除+status=cancelled）
+  - GET /conflicts（自关联JOIN检测同员工同日重叠班次）
+  - 文件头注释：work_schedules表完整DDL（待v121迁移）
+- [tx-org/main.py] 追加schedule_v2_router注册
+
+**Team V2 — 智能排菜+私域运营前端页面**
+- [web-admin/pages/menu] 新建 MenuOptimizePage.tsx
+  - Mock payload含10种食材+15道菜品7日表现数据
+  - 重点推荐卡片（priority=1橙色边框+TOP PICK徽章）
+  - 临期食材告警条（红色）+套餐组合表格+一键导出.txt
+- [web-admin/pages/growth] 新建 CRMCampaignPage.tsx
+  - ProForm 8字段配置区 + 4套文案结果区
+  - 微信群/朋友圈/推送标题/推送内容各含字数统计+复制按钮
+  - 历史方案localStorage（最多20条，支持载入/删除）
+- [web-admin/App.tsx] 追加2条路由
+- [web-admin/SidebarHQ.tsx] menu模块→"AI决策"分组，growth模块→"AI运营"分组
+
+### 数据变化
+- 新增前端页面：4个（驾驶舱+巡检+智能排菜+私域运营）
+- 新增API端点：10个（考勤4+排班6）
+- 待迁移数据表：work_schedules（DDL已在代码注释中，等待v121迁移）
 
 ---
 

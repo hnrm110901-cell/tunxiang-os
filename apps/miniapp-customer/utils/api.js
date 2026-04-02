@@ -367,6 +367,48 @@ function generateReferralLink() {
   return txRequest('/api/v1/social/referral/generate', 'POST', {});
 }
 
+// ─── 积分中心（新页面 pages/points）───
+
+function fetchMemberPointsProfile() {
+  var customerId = wx.getStorageSync('tx_customer_id') || '';
+  return txRequest('/api/v1/member/profile?customer_id=' + encodeURIComponent(customerId));
+}
+
+function fetchPointsHistory(page) {
+  var customerId = wx.getStorageSync('tx_customer_id') || '';
+  return txRequest('/api/v1/member/points/history?customer_id=' + encodeURIComponent(customerId) + '&page=' + (page || 1));
+}
+
+function fetchRewards() {
+  return txRequest('/api/v1/member/rewards');
+}
+
+function redeemReward(rewardId, customerId) {
+  return txRequest('/api/v1/member/rewards/redeem', 'POST', {
+    reward_id: rewardId,
+    customer_id: customerId || wx.getStorageSync('tx_customer_id') || '',
+  });
+}
+
+// ─── 优惠券中心（新页面 pages/coupon）───
+
+function fetchMyCoupons(status) {
+  var customerId = wx.getStorageSync('tx_customer_id') || '';
+  return txRequest('/api/v1/member/coupons?customer_id=' + encodeURIComponent(customerId) + (status ? '&status=' + encodeURIComponent(status) : ''));
+}
+
+function fetchClaimableCoupons() {
+  return txRequest('/api/v1/growth/coupons/available');
+}
+
+function claimCoupon(couponId) {
+  var customerId = wx.getStorageSync('tx_customer_id') || '';
+  return txRequest('/api/v1/growth/coupons/claim', 'POST', {
+    coupon_id: couponId,
+    customer_id: customerId,
+  });
+}
+
 // ─── 积分商城 ───
 
 function fetchMallItems(category, page) {
@@ -525,6 +567,15 @@ module.exports = {
   createGift: createGift,
   claimGift: claimGift,
   generateReferralLink: generateReferralLink,
+  // 积分中心
+  fetchMemberPointsProfile: fetchMemberPointsProfile,
+  fetchPointsHistory: fetchPointsHistory,
+  fetchRewards: fetchRewards,
+  redeemReward: redeemReward,
+  // 优惠券中心
+  fetchMyCoupons: fetchMyCoupons,
+  fetchClaimableCoupons: fetchClaimableCoupons,
+  claimCoupon: claimCoupon,
   // 积分商城
   fetchMallItems: fetchMallItems,
   redeemMallItem: redeemMallItem,

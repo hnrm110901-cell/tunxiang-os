@@ -47,6 +47,9 @@ const MENU_CONFIGS: Record<string, MenuConfig> = {
         { id: 'ranking', label: '菜单排名', icon: '🏆', path: '/menu/ranking' },
         { id: 'pricing', label: '定价仿真', icon: '💲', path: '/menu/pricing' },
       ]},
+      { label: 'AI 决策', items: [
+        { id: 'menu-optimize', label: 'AI排菜建议', icon: '🧠', path: '/menu/optimize' },
+      ]},
       { label: '研发', items: [
         { id: 'new-dish', label: '新菜研发', icon: '🧪', path: '/menu/rd' },
         { id: 'quality', label: '质量检测', icon: '✅', path: '/menu/quality' },
@@ -99,6 +102,9 @@ const MENU_CONFIGS: Record<string, MenuConfig> = {
         { id: 'retail-mall', label: '零售商城', icon: '🏪', path: '/hq/growth/retail-mall' },
         { id: 'execution', label: '门店执行', icon: '📋', path: '/hq/growth/execution' },
       ]},
+      { label: 'AI 运营', items: [
+        { id: 'crm-campaign', label: '私域运营生成', icon: '📢', path: '/growth/crm-campaign' },
+      ]},
     ],
   },
   finance: {
@@ -123,6 +129,7 @@ const MENU_CONFIGS: Record<string, MenuConfig> = {
         { id: 'payroll-configs',  label: '薪资方案配置', icon: '⚙️', path: '/org/payroll-configs'  },
         { id: 'payroll-records',  label: '月度薪资管理', icon: '💴', path: '/org/payroll-records'  },
         { id: 'payroll-manage',   label: '薪资总览',     icon: '📋', path: '/payroll-manage'        },
+        { id: 'attendance',       label: '考勤管理',     icon: '🕐', path: '/org/attendance'        },
       ]},
     ],
   },

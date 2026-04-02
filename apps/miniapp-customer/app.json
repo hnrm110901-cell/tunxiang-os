@@ -55,6 +55,12 @@
       ]
     },
     {
+      "root": "pages/points",
+      "pages": [
+        "points"
+      ]
+    },
+    {
       "root": "pages/social",
       "pages": [
         "social"

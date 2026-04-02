@@ -18,17 +18,23 @@
   - GET /api/v1/auth/verify 兼容旧版内存 token（如现有服务依赖）
 """
 
+import json
 import os
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
+import bcrypt
 import structlog
 from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field
+from sqlalchemy import text
+
+from shared.ontology.src.database import async_session_factory
 
 from .response import err, ok
+from .services.audit_log_service import AuditAction, AuditEntry, AuditLogService
 from .services.jwt_service import JWTService
 from .services.mfa_service import MFAService
 
@@ -40,6 +46,7 @@ router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 # ─────────────────────────────────────────────────────────────────
 _jwt_service = JWTService()
 _mfa_service = MFAService()
+_audit_log_service = AuditLogService()
 
 # ─────────────────────────────────────────────────────────────────
 # Demo 用户（向后兼容，明文密码仅供开发/演示环境）
@@ -207,8 +214,15 @@ def _user_info_from_demo(username: str, user: dict) -> dict:
     }
 
 
-def _issue_tokens(user_id: str, tenant_id: str, role: str, mfa_verified: bool) -> dict:
-    """签发 access_token + refresh_token，存储 refresh_token。"""
+async def _issue_tokens(
+    user_id: str,
+    tenant_id: str,
+    role: str,
+    mfa_verified: bool,
+    ip_address: str = "",
+    user_agent: str = "",
+) -> dict:
+    """签发 access_token + refresh_token，写入 refresh_tokens 数据库表。"""
     access_token = _jwt_service.create_access_token(
         user_id=user_id,
         tenant_id=tenant_id,
@@ -217,7 +231,30 @@ def _issue_tokens(user_id: str, tenant_id: str, role: str, mfa_verified: bool) -
     )
     refresh_token, jti = _jwt_service.create_refresh_token(user_id=user_id)
 
-    # 生产环境 TODO: 写入 refresh_tokens 数据库表
+    expires_at = datetime.now(timezone.utc) + timedelta(days=7)
+
+    # 写入 refresh_tokens 数据库表，同时保留内存备份（向后兼容）
+    try:
+        async with async_session_factory() as db:
+            await db.execute(
+                text("""
+                    INSERT INTO refresh_tokens (jti, user_id, tenant_id, issued_at, expires_at, ip_address, user_agent)
+                    VALUES (:jti, :user_id, :tenant_id, NOW(), :expires_at, :ip_address, :user_agent)
+                    ON CONFLICT (jti) DO NOTHING
+                """),
+                {
+                    "jti": jti,
+                    "user_id": user_id,
+                    "tenant_id": tenant_id,
+                    "expires_at": expires_at,
+                    "ip_address": ip_address or None,
+                    "user_agent": user_agent or None,
+                },
+            )
+            await db.commit()
+    except Exception as exc:  # DB写入失败时回退到内存存储，保证业务不中断
+        logger.warning("refresh_token_db_write_failed", jti=jti, error=str(exc))
+
     _refresh_store[jti] = {
         "user_id": user_id,
         "expires_at": time.time() + 7 * 86400,
@@ -279,10 +316,62 @@ async def login(body: LoginBody, request: Request):
             status_code=423,
         )
 
-    # 2. 验证用户凭证
-    # 生产环境 TODO: 查询 users 表，使用 bcrypt.checkpw() 验证
-    user = DEMO_USERS.get(username)
-    if not user or not user["password"] or user["password"] != body.password:
+    # 2. 验证用户凭证 — 优先查询 users 表（bcrypt），回退到 DEMO_USERS（开发/演示）
+    user = None
+    db_user_row = None
+    try:
+        async with async_session_factory() as db:
+            result = await db.execute(
+                text("""
+                    SELECT id, tenant_id, username, name, role,
+                           password_hash, mfa_enabled, mfa_secret_enc, mfa_backup_codes
+                    FROM users
+                    WHERE username = :username AND is_deleted = FALSE AND is_active = TRUE
+                    LIMIT 1
+                """),
+                {"username": username},
+            )
+            db_user_row = result.mappings().first()
+    except Exception as exc:
+        logger.warning("login_db_lookup_failed", username=username, error=str(exc))
+
+    password_ok = False
+    if db_user_row is not None:
+        ph: Optional[str] = db_user_row.get("password_hash")
+        if ph:
+            try:
+                password_ok = bcrypt.checkpw(
+                    body.password.encode(), ph.encode()
+                )
+            except (ValueError, TypeError):
+                password_ok = False
+        if password_ok:
+            # 从 DB 行构建 user dict，兼容后续逻辑
+            backup_codes_raw = db_user_row.get("mfa_backup_codes")
+            if isinstance(backup_codes_raw, str):
+                try:
+                    backup_codes_raw = json.loads(backup_codes_raw)
+                except (ValueError, TypeError):
+                    backup_codes_raw = []
+            user = {
+                "user_id": str(db_user_row["id"]),
+                "tenant_id": str(db_user_row["tenant_id"]),
+                "username": db_user_row["username"],
+                "name": db_user_row.get("name") or username,
+                "role": db_user_row.get("role", "staff"),
+                "merchant": "",  # 从 stores 表可进一步关联，此处留空
+                "mfa_enabled": bool(db_user_row.get("mfa_enabled")),
+                "mfa_secret_enc": db_user_row.get("mfa_secret_enc"),
+                "mfa_backup_codes": backup_codes_raw or [],
+            }
+    if user is None:
+        # 回退到 DEMO_USERS（开发/演示环境）
+        demo = DEMO_USERS.get(username)
+        if demo and demo.get("password") and demo["password"] == body.password:
+            password_ok = True
+            user = dict(demo)
+
+    if not password_ok or user is None:
         _brute_force_guard.record_failure(username)
         logger.warning(
             "login_failed",
@@ -290,7 +379,25 @@ async def login(body: LoginBody, request: Request):
             ip=ip,
             # 注意：密码不写入日志
         )
-        # audit_log TODO: 写入 audit_logs 表（需要 DB session）
+        # 写入登录失败审计日志
+        try:
+            async with async_session_factory() as db:
+                await _audit_log_service.log(
+                    AuditEntry(
+                        tenant_id=uuid.UUID("00000000-0000-0000-0000-000000000000"),
+                        action=AuditAction.LOGIN_FAILED,
+                        actor_id=username,
+                        actor_type="user",
+                        resource_type="auth",
+                        ip_address=ip,
+                        user_agent=ua,
+                        severity="warning",
+                    ),
+                    db,
+                )
+                await db.commit()
+        except Exception as audit_exc:
+            logger.warning("audit_log_write_failed", error=str(audit_exc))
         return err("用户名或密码错误", code="AUTH_FAILED", status_code=401)
 
     # 3. 登录成功，重置暴力破解计数
@@ -314,11 +421,13 @@ async def login(body: LoginBody, request: Request):
         })
 
     # 5. 未启用MFA，直接签发token
-    tokens = _issue_tokens(
+    tokens = await _issue_tokens(
         user_id=user["user_id"],
         tenant_id=user["tenant_id"],
         role=user["role"],
         mfa_verified=False,
+        ip_address=ip,
+        user_agent=ua,
     )
 
     # 向后兼容: 同时写入旧版内存 token store
@@ -332,7 +441,24 @@ async def login(body: LoginBody, request: Request):
         ip=ip,
         mfa_enabled=False,
     )
-    # audit_log TODO: 写入 audit_logs 表
+    # 写入登录成功审计日志
+    try:
+        async with async_session_factory() as db:
+            await _audit_log_service.log(
+                AuditEntry(
+                    tenant_id=uuid.UUID(user["tenant_id"]),
+                    action=AuditAction.LOGIN,
+                    actor_id=user["user_id"],
+                    actor_type="user",
+                    resource_type="auth",
+                    ip_address=ip,
+                    user_agent=ua,
+                ),
+                db,
+            )
+            await db.commit()
+    except Exception as audit_exc:
+        logger.warning("audit_log_write_failed", error=str(audit_exc))
 
     return ok({
         **tokens,
@@ -382,11 +508,32 @@ async def mfa_verify(body: MFAVerifyBody, request: Request):
         hashed_codes: list[str] = user.get("mfa_backup_codes", [])
         idx = _mfa_service.verify_backup_code(hashed_codes, code)
         if idx is not None:
-            # 生产环境 TODO: 从数据库中移除已使用的备用码
+            # 从内存中移除已使用的备用码
             hashed_codes.pop(idx)
             user["mfa_backup_codes"] = hashed_codes
             verified = True
             logger.info("mfa_backup_code_used", username=username, remaining=len(hashed_codes))
+            # 同步更新 users 数据库表中的备用码列表
+            try:
+                async with async_session_factory() as db:
+                    await db.execute(
+                        text("SELECT set_config('app.tenant_id', :tid, true)"),
+                        {"tid": user.get("tenant_id", "")},
+                    )
+                    await db.execute(
+                        text("""
+                            UPDATE users
+                            SET mfa_backup_codes = :codes::jsonb, updated_at = NOW()
+                            WHERE username = :username AND is_deleted = FALSE
+                        """),
+                        {
+                            "codes": json.dumps(hashed_codes, ensure_ascii=False),
+                            "username": username,
+                        },
+                    )
+                    await db.commit()
+            except Exception as exc:
+                logger.warning("mfa_backup_code_db_update_failed", username=username, error=str(exc))
 
     if not verified:
         session["failed_count"] = session.get("failed_count", 0) + 1
@@ -414,11 +561,14 @@ async def mfa_verify(body: MFAVerifyBody, request: Request):
     _mfa_sessions.pop(body.session_token, None)
     user_info = _user_info_from_demo(username, user)
 
-    tokens = _issue_tokens(
+    ua = request.headers.get("User-Agent", "")
+    tokens = await _issue_tokens(
         user_id=user["user_id"],
         tenant_id=user["tenant_id"],
         role=user["role"],
         mfa_verified=True,
+        ip_address=ip,
+        user_agent=ua,
     )
 
     # 向后兼容
@@ -431,7 +581,25 @@ async def mfa_verify(body: MFAVerifyBody, request: Request):
         tenant_id=user["tenant_id"],
         ip=ip,
     )
-    # audit_log TODO: 写入 audit_logs 表
+    # 写入 MFA 验证成功审计日志
+    try:
+        async with async_session_factory() as db:
+            await _audit_log_service.log(
+                AuditEntry(
+                    tenant_id=uuid.UUID(user["tenant_id"]),
+                    action=AuditAction.LOGIN,
+                    actor_id=user["user_id"],
+                    actor_type="user",
+                    resource_type="auth",
+                    ip_address=ip,
+                    user_agent=ua,
+                    extra={"mfa_verified": True},
+                ),
+                db,
+            )
+            await db.commit()
+    except Exception as audit_exc:
+        logger.warning("audit_log_write_failed", error=str(audit_exc))
 
     return ok({
         **tokens,
@@ -457,42 +625,108 @@ async def refresh_token(body: RefreshBody, request: Request):
     jti = payload.get("jti", "")
     user_id = payload.get("sub", "")
 
-    # 检查撤销状态（生产环境 TODO: 查询 refresh_tokens 数据库表）
-    stored = _refresh_store.get(jti)
-    if not stored:
-        logger.warning("refresh_token_not_found", jti=jti)
-        return err("refresh_token不存在或已撤销", code="REFRESH_TOKEN_REVOKED", status_code=401)
+    # 检查撤销状态 — 优先查询 refresh_tokens 数据库表，回退到内存 _refresh_store
+    db_token_row = None
+    try:
+        async with async_session_factory() as db:
+            result = await db.execute(
+                text("""
+                    SELECT jti, user_id, tenant_id, expires_at, revoked_at
+                    FROM refresh_tokens
+                    WHERE jti = :jti
+                    LIMIT 1
+                """),
+                {"jti": jti},
+            )
+            db_token_row = result.mappings().first()
+    except Exception as exc:
+        logger.warning("refresh_token_db_lookup_failed", jti=jti, error=str(exc))
 
-    if stored.get("revoked"):
-        logger.warning("refresh_token_already_revoked", jti=jti)
-        return err("refresh_token已撤销，请重新登录", code="REFRESH_TOKEN_REVOKED", status_code=401)
+    if db_token_row is not None:
+        if db_token_row.get("revoked_at") is not None:
+            logger.warning("refresh_token_already_revoked", jti=jti)
+            return err("refresh_token已撤销，请重新登录", code="REFRESH_TOKEN_REVOKED", status_code=401)
+        expires_at_dt = db_token_row.get("expires_at")
+        if expires_at_dt and datetime.now(timezone.utc) > expires_at_dt:
+            return err("refresh_token已过期，请重新登录", code="REFRESH_TOKEN_EXPIRED", status_code=401)
+    else:
+        # 回退到内存存储
+        stored = _refresh_store.get(jti)
+        if not stored:
+            logger.warning("refresh_token_not_found", jti=jti)
+            return err("refresh_token不存在或已撤销", code="REFRESH_TOKEN_REVOKED", status_code=401)
+        if stored.get("revoked"):
+            logger.warning("refresh_token_already_revoked", jti=jti)
+            return err("refresh_token已撤销，请重新登录", code="REFRESH_TOKEN_REVOKED", status_code=401)
+        if time.time() > stored.get("expires_at", 0):
+            _refresh_store.pop(jti, None)
+            return err("refresh_token已过期，请重新登录", code="REFRESH_TOKEN_EXPIRED", status_code=401)
 
-    if time.time() > stored.get("expires_at", 0):
-        _refresh_store.pop(jti, None)
-        return err("refresh_token已过期，请重新登录", code="REFRESH_TOKEN_EXPIRED", status_code=401)
-
-    # 查找用户信息（生产环境 TODO: 查询 users 表）
+    # 查找用户信息 — 优先查询 users 表，回退到 DEMO_USERS
     user = None
     username = None
-    for uname, udata in DEMO_USERS.items():
-        if udata["user_id"] == user_id:
-            user = udata
-            username = uname
-            break
+    try:
+        async with async_session_factory() as db:
+            result = await db.execute(
+                text("""
+                    SELECT id, tenant_id, username, name, role, mfa_enabled
+                    FROM users
+                    WHERE id = :user_id AND is_deleted = FALSE AND is_active = TRUE
+                    LIMIT 1
+                """),
+                {"user_id": user_id},
+            )
+            row = result.mappings().first()
+            if row is not None:
+                user = {
+                    "user_id": str(row["id"]),
+                    "tenant_id": str(row["tenant_id"]),
+                    "username": row["username"],
+                    "name": row.get("name") or row["username"],
+                    "role": row.get("role", "staff"),
+                    "merchant": "",
+                    "mfa_enabled": bool(row.get("mfa_enabled")),
+                }
+                username = row["username"]
+    except Exception as exc:
+        logger.warning("refresh_user_db_lookup_failed", user_id=user_id, error=str(exc))
+
+    if user is None:
+        # 回退到 DEMO_USERS
+        for uname, udata in DEMO_USERS.items():
+            if udata["user_id"] == user_id:
+                user = udata
+                username = uname
+                break
 
     if not user:
         logger.warning("refresh_user_not_found", user_id=user_id)
         return err("用户不存在", code="USER_NOT_FOUND", status_code=401)
 
-    # 撤销旧 refresh_token（轮换策略）
-    stored["revoked"] = True
+    # 撤销旧 refresh_token（轮换策略）— 更新 DB 和内存
+    try:
+        async with async_session_factory() as db:
+            await db.execute(
+                text("UPDATE refresh_tokens SET revoked_at = NOW() WHERE jti = :jti"),
+                {"jti": jti},
+            )
+            await db.commit()
+    except Exception as exc:
+        logger.warning("refresh_token_revoke_db_failed", jti=jti, error=str(exc))
+    if jti in _refresh_store:
+        _refresh_store[jti]["revoked"] = True
+
+    ip = _client_ip(request)
+    ua = request.headers.get("User-Agent", "")
 
     # 签发新的 token 对
-    tokens = _issue_tokens(
+    tokens = await _issue_tokens(
         user_id=user["user_id"],
         tenant_id=user["tenant_id"],
         role=user["role"],
         mfa_verified=False,  # refresh 后 mfa_verified 重置，需重新MFA
+        ip_address=ip,
+        user_agent=ua,
     )
 
     logger.info("token_refreshed", user_id=user_id)
@@ -514,13 +748,40 @@ async def logout(request: Request, body: Optional[RefreshBody] = None):
         payload = _jwt_service.decode_refresh_token(body.refresh_token)
         if payload:
             jti = payload.get("jti", "")
+            user_id_logout = payload.get("sub", "")
+            # 更新 refresh_tokens 数据库表
+            try:
+                async with async_session_factory() as db:
+                    await db.execute(
+                        text("UPDATE refresh_tokens SET revoked_at = NOW() WHERE jti = :jti"),
+                        {"jti": jti},
+                    )
+                    await db.commit()
+            except Exception as exc:
+                logger.warning("logout_db_revoke_failed", jti=jti, error=str(exc))
+            # 同时更新内存存储
             if jti in _refresh_store:
                 _refresh_store[jti]["revoked"] = True
-                logger.info(
-                    "refresh_token_revoked",
-                    jti=jti,
-                    # audit_log TODO
-                )
+            logger.info("refresh_token_revoked", jti=jti)
+            # 写入登出审计日志
+            try:
+                async with async_session_factory() as db:
+                    await _audit_log_service.log(
+                        AuditEntry(
+                            tenant_id=uuid.UUID("00000000-0000-0000-0000-000000000000"),
+                            action=AuditAction.LOGOUT,
+                            actor_id=user_id_logout or "unknown",
+                            actor_type="user",
+                            resource_type="auth",
+                            ip_address=_client_ip(request),
+                            user_agent=request.headers.get("User-Agent", ""),
+                            extra={"jti": jti},
+                        ),
+                        db,
+                    )
+                    await db.commit()
+            except Exception as audit_exc:
+                logger.warning("audit_log_write_failed", error=str(audit_exc))
 
     # 清理旧版内存 token（向后兼容）
     legacy_token = _extract_token(request)
@@ -548,15 +809,49 @@ async def me(request: Request):
     payload = _jwt_service.verify_access_token(token)
     if payload:
         user_id = payload.get("sub", "")
-        # 查找用户信息（生产环境 TODO: 查询 users 表）
-        for username, user in DEMO_USERS.items():
-            if user["user_id"] == user_id:
-                return ok({
-                    **_user_info_from_demo(username, user),
-                    "mfa_verified": payload.get("mfa_verified", False),
-                    "token_expires_at": payload.get("exp"),
-                })
-        return err("用户不存在", code="USER_NOT_FOUND", status_code=401)
+        # 查询 users 表，回退到 DEMO_USERS
+        user_info_result = None
+        try:
+            async with async_session_factory() as db:
+                result = await db.execute(
+                    text("""
+                        SELECT id, tenant_id, username, name, role, mfa_enabled
+                        FROM users
+                        WHERE id = :user_id AND is_deleted = FALSE AND is_active = TRUE
+                        LIMIT 1
+                    """),
+                    {"user_id": user_id},
+                )
+                row = result.mappings().first()
+                if row is not None:
+                    user_info_result = {
+                        "user_id": str(row["id"]),
+                        "username": row["username"],
+                        "name": row.get("name") or row["username"],
+                        "role": row.get("role", "staff"),
+                        "tenant_id": str(row["tenant_id"]),
+                        "merchant": "",
+                        "mfa_enabled": bool(row.get("mfa_enabled")),
+                        "mfa_verified": payload.get("mfa_verified", False),
+                        "token_expires_at": payload.get("exp"),
+                    }
+        except Exception as exc:
+            logger.warning("me_db_lookup_failed", user_id=user_id, error=str(exc))
+
+        if user_info_result is None:
+            # 回退到 DEMO_USERS
+            for uname, udata in DEMO_USERS.items():
+                if udata["user_id"] == user_id:
+                    user_info_result = {
+                        **_user_info_from_demo(uname, udata),
+                        "mfa_verified": payload.get("mfa_verified", False),
+                        "token_expires_at": payload.get("exp"),
+                    }
+                    break
+
+        if user_info_result is None:
+            return err("用户不存在", code="USER_NOT_FOUND", status_code=401)
+        return ok(user_info_result)
 
     # 回退：旧版内存 token
     if token in _legacy_token_store:
@@ -653,15 +948,62 @@ async def mfa_enable(body: MFASetupEnableBody, request: Request):
     backup_codes_plain = _mfa_service.generate_backup_codes()
     backup_codes_hashed = _mfa_service.hash_backup_codes(backup_codes_plain)
 
-    # 正式启用MFA（生产环境 TODO: 写入 users 表）
+    now_utc = datetime.now(timezone.utc)
+
+    # 正式启用MFA — 写入 users 数据库表，同时更新内存 DEMO_USERS（向后兼容）
+    try:
+        async with async_session_factory() as db:
+            await db.execute(
+                text("SELECT set_config('app.tenant_id', :tid, true)"),
+                {"tid": user.get("tenant_id", "")},
+            )
+            await db.execute(
+                text("""
+                    UPDATE users
+                    SET mfa_enabled = TRUE,
+                        mfa_secret_enc = :mfa_secret_enc,
+                        mfa_backup_codes = :mfa_backup_codes::jsonb,
+                        mfa_verified_at = :mfa_verified_at,
+                        updated_at = NOW()
+                    WHERE id = :user_id AND is_deleted = FALSE
+                """),
+                {
+                    "mfa_secret_enc": pending_secret,
+                    "mfa_backup_codes": json.dumps(backup_codes_hashed, ensure_ascii=False),
+                    "mfa_verified_at": now_utc,
+                    "user_id": user_id,
+                },
+            )
+            await db.commit()
+    except Exception as exc:
+        logger.warning("mfa_enable_db_write_failed", user_id=user_id, error=str(exc))
+
     user["mfa_enabled"] = True
     user["mfa_secret_enc"] = pending_secret
     user["mfa_backup_codes"] = backup_codes_hashed
-    user["mfa_verified_at"] = datetime.now(timezone.utc).isoformat()
+    user["mfa_verified_at"] = now_utc.isoformat()
     user.pop("_pending_mfa_secret_enc", None)
 
     logger.info("mfa_enabled", user_id=user_id, username=username)
-    # audit_log TODO
+    # 写入 MFA 启用审计日志
+    try:
+        async with async_session_factory() as db:
+            await _audit_log_service.log(
+                AuditEntry(
+                    tenant_id=uuid.UUID(user.get("tenant_id", "00000000-0000-0000-0000-000000000000")),
+                    action=AuditAction.CONFIG_CHANGE,
+                    actor_id=user_id,
+                    actor_type="user",
+                    resource_type="user_mfa",
+                    resource_id=user_id,
+                    after_state={"mfa_enabled": True},
+                    severity="info",
+                ),
+                db,
+            )
+            await db.commit()
+    except Exception as audit_exc:
+        logger.warning("audit_log_write_failed", error=str(audit_exc))
 
     return ok({
         "message": "MFA已成功启用",

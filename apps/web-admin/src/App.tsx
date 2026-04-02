@@ -89,6 +89,9 @@ import { PayrollRecordsPage } from './pages/org/PayrollRecordsPage';
 import { FinanceAuditPage } from './pages/finance/FinanceAuditPage';
 import { PatrolInspectionPage } from './pages/ops/PatrolInspectionPage';
 import { AnalyticsDashboardPage } from './pages/analytics/DashboardPage';
+import { MenuOptimizePage } from './pages/menu/MenuOptimizePage';
+import { CRMCampaignPage } from './pages/growth/CRMCampaignPage';
+import { AttendancePage } from './pages/org/AttendancePage';
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem('tx_token'));
@@ -198,6 +201,9 @@ function App() {
           <Route path="/finance/audit" element={<FinanceAuditPage />} />
           <Route path="/ops/patrol-inspection" element={<PatrolInspectionPage />} />
           <Route path="/analytics/dashboard" element={<AnalyticsDashboardPage />} />
+          <Route path="/menu/optimize" element={<MenuOptimizePage />} />
+          <Route path="/growth/crm-campaign" element={<CRMCampaignPage />} />
+          <Route path="/org/attendance" element={<AttendancePage />} />
         </Routes>
       </ShellHQ>
     </BrowserRouter>
