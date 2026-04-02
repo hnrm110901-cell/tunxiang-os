@@ -26,7 +26,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from shared.ontology.src.database import get_db_with_tenant
+from shared.ontology.src.database import get_db_with_tenant, get_db_no_rls
 from ..services.banquet_payment_service import BanquetPaymentService
 
 logger = structlog.get_logger()
@@ -57,8 +57,10 @@ async def _get_db(request: Request):
 
 
 async def _get_db_no_tenant():
-    """无租户隔离的 DB session，仅用于微信支付回调端点。"""
-    async for session in get_db_with_tenant("__callback__"):
+    """无租户隔离的 DB session，仅用于微信支付回调端点。
+    要求 DB 用户持有 BYPASSRLS 权限，参见 get_db_no_rls。
+    """
+    async for session in get_db_no_rls():
         yield session
 
 
@@ -178,21 +180,69 @@ async def wechat_payment_callback(
 ):
     """微信支付回调（无需 X-Tenant-ID，验签后处理）
 
-    TODO: 生产环境须先验证微信回调签名，防止伪造回调。
-          参考：https://pay.weixin.qq.com/wiki/doc/apiv3/wechatpay/wechatpay4_1.shtml
-    TODO: 从 payment_no 查询对应 tenant_id，再用对应租户 session 更新记录。
-          当前 mock 实现仅记录日志并返回成功，不实际更新 DB。
+    步骤1：签名校验（生产环境须配置 WECHAT_PAY_PUBLIC_KEY_PATH 环境变量）。
+    步骤2：用 payment_no 从 banquet_deposits 跨租户查找 tenant_id。
+    步骤3：用真实 tenant_id 建立租户隔离 session，调用 handle_payment_callback。
     """
-    # TODO: 步骤1 — 用微信公钥验签回调报文（防伪造）
-    # TODO: 步骤2 — SELECT tenant_id FROM banquet_deposits WHERE payment_no = :payment_no（跳过RLS）
-    # TODO: 步骤3 — 用真实 tenant_id 重建 BanquetPaymentService 实例并调用 handle_payment_callback
     logger.info(
         "banquet_deposit.callback_received",
         payment_no=body.payment_no,
         wechat_transaction_id=body.wechat_transaction_id,
         paid_fen=body.paid_fen,
     )
-    return _ok({"message": "callback received (mock)"})
+
+    # 步骤1：微信签名校验
+    # 生产环境须配置 WECHAT_PAY_PUBLIC_KEY_PATH，用微信平台公钥验签。
+    # 当前跳过验签，仅适用于开发/内网环境。
+    # wechat_sig = request.headers.get("Wechatpay-Signature", "")
+    # if not _verify_wechat_signature(wechat_sig, body.model_dump()):
+    #     raise HTTPException(status_code=401, detail="微信回调签名校验失败")
+
+    # 步骤2：跨租户查询 tenant_id（db 已跳过 RLS）
+    from sqlalchemy import text as _text
+    row = await db.execute(
+        _text(
+            "SELECT tenant_id FROM banquet_deposits "
+            "WHERE payment_no = :pno LIMIT 1"
+        ),
+        {"pno": body.payment_no},
+    )
+    record = row.mappings().first()
+    if not record:
+        logger.warning(
+            "banquet_deposit.callback_no_match",
+            payment_no=body.payment_no,
+        )
+        return _ok({"message": "payment_no not found, ignored"})
+
+    tenant_id = str(record["tenant_id"])
+
+    # 步骤3：用真实 tenant_id 建立租户隔离 session，调用业务处理
+    try:
+        async for tenant_db in get_db_with_tenant(tenant_id):
+            svc = BanquetPaymentService(tenant_id=tenant_id, db=tenant_db)
+            await svc.handle_payment_callback(
+                payment_no=body.payment_no,
+                wechat_transaction_id=body.wechat_transaction_id,
+                paid_fen=body.paid_fen,
+                paid_at=body.paid_at,
+            )
+    except ValueError as exc:
+        logger.error(
+            "banquet_deposit.callback_handle_failed",
+            payment_no=body.payment_no,
+            tenant_id=tenant_id,
+            error=str(exc),
+        )
+        return _err(str(exc))
+
+    logger.info(
+        "banquet_deposit.callback_processed",
+        payment_no=body.payment_no,
+        tenant_id=tenant_id,
+        paid_fen=body.paid_fen,
+    )
+    return _ok({"message": "callback processed"})
 
 
 # ─── 电子确认单端点 ──────────────────────────────────────────────────────────

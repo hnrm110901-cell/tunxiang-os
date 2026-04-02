@@ -67,19 +67,31 @@ async def _send_notification(
     body: str,
     meta: dict[str, Any],
 ) -> None:
-    """发送审批通知。失败时仅记录日志，不抛出异常（不阻塞主流程）。"""
+    """发送审批通知。失败时仅记录日志，不抛出异常（不阻塞主流程）。
+
+    通过 Redis Pub/Sub 发布到频道 notifications:{recipient_id}，
+    mac-station 订阅后通过 WebSocket 推送至员工的 manager app。
+    """
+    log.info(
+        "approval_notification",
+        recipient_id=recipient_id,
+        title=title,
+        body=body,
+        meta=meta,
+    )
     try:
-        # TODO: 接入消息中心（Redis Streams / PG LISTEN-NOTIFY / WeChat Work API）
-        log.info(
-            "approval_notification",
-            recipient_id=recipient_id,
-            title=title,
-            body=body,
-            meta=meta,
-        )
+        import redis.asyncio as aioredis  # type: ignore
+
+        redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+        async with aioredis.from_url(redis_url, decode_responses=True) as r:
+            payload = json.dumps(
+                {"title": title, "body": body, "meta": meta},
+                ensure_ascii=False,
+            )
+            await r.publish(f"notifications:{recipient_id}", payload)
     except (OSError, RuntimeError) as exc:
         log.warning(
-            "approval_notification_failed",
+            "approval_notification_redis_failed",
             recipient_id=recipient_id,
             error=str(exc),
         )

@@ -11,8 +11,12 @@ from datetime import date
 from typing import Optional
 
 import structlog
-from fastapi import APIRouter, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from shared.ontology.src.database import get_db_with_tenant
 
 logger = structlog.get_logger()
 
@@ -82,6 +86,11 @@ async def run_diagnosis(
         raise HTTPException(status_code=500, detail="诊断执行失败") from exc
 
 
+async def _get_db(x_tenant_id: str = Header(..., alias="X-Tenant-ID")):
+    async for session in get_db_with_tenant(x_tenant_id):
+        yield session
+
+
 @router.get("/reports", response_model=dict)
 async def list_reports(
     store_id: str = Query(..., description="门店 ID"),
@@ -90,11 +99,9 @@ async def list_reports(
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(_get_db),
 ) -> dict:
-    """查询历史诊断报告列表（分页）。
-
-    TODO: 对接 business_diagnosis_reports 表查询逻辑。
-    """
+    """查询历史诊断报告列表（分页）。"""
     logger.info(
         "list_reports",
         tenant_id=x_tenant_id,
@@ -104,21 +111,41 @@ async def list_reports(
         page=page,
         size=size,
     )
-    # TODO: 从 business_diagnosis_reports 表分页查询
-    # SELECT * FROM business_diagnosis_reports
-    # WHERE tenant_id = :tenant_id AND store_id = :store_id
-    #   AND (:start_date IS NULL OR report_date >= :start_date)
-    #   AND (:end_date IS NULL OR report_date <= :end_date)
-    # ORDER BY report_date DESC
-    # LIMIT :size OFFSET (:page - 1) * :size
+    offset = (page - 1) * size
+    params: dict = {"tenant_id": x_tenant_id, "store_id": store_id, "size": size, "offset": offset}
+
+    where_clauses = "tenant_id = :tenant_id::uuid AND store_id = :store_id::uuid"
+    if start_date:
+        where_clauses += " AND report_date >= :start_date"
+        params["start_date"] = str(start_date)
+    if end_date:
+        where_clauses += " AND report_date <= :end_date"
+        params["end_date"] = str(end_date)
+
+    count_row = await db.execute(
+        text(f"SELECT COUNT(*) FROM business_diagnosis_reports WHERE {where_clauses}"),
+        params,
+    )
+    total = count_row.scalar() or 0
+
+    rows = await db.execute(
+        text(
+            f"SELECT id, store_id, report_date, anomalies, summary_text, created_at "
+            f"FROM business_diagnosis_reports WHERE {where_clauses} "
+            f"ORDER BY report_date DESC LIMIT :size OFFSET :offset"
+        ),
+        params,
+    )
+    items = [dict(r._mapping) for r in rows.fetchall()]
+    for item in items:
+        item["id"] = str(item["id"])
+        item["store_id"] = str(item["store_id"])
+        item["report_date"] = str(item["report_date"])
+        item["created_at"] = str(item["created_at"])
+
     return {
         "ok": True,
-        "data": {
-            "items": [],
-            "total": 0,
-            "page": page,
-            "size": size,
-        },
+        "data": {"items": items, "total": total, "page": page, "size": size},
     }
 
 
@@ -126,13 +153,24 @@ async def list_reports(
 async def get_report(
     report_id: str,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(_get_db),
 ) -> dict:
-    """查询单条诊断报告详情。
-
-    TODO: 对接 business_diagnosis_reports 表查询逻辑。
-    """
+    """查询单条诊断报告详情。"""
     logger.info("get_report", tenant_id=x_tenant_id, report_id=report_id)
-    # TODO: 从 business_diagnosis_reports 表查询
-    # SELECT * FROM business_diagnosis_reports
-    # WHERE id = :report_id AND tenant_id = :tenant_id
-    raise HTTPException(status_code=404, detail="报告不存在或暂未实现持久化查询")
+    row = await db.execute(
+        text(
+            "SELECT id, store_id, report_date, anomalies, summary_text, raw_data, created_at "
+            "FROM business_diagnosis_reports "
+            "WHERE id = :report_id::uuid AND tenant_id = :tenant_id::uuid"
+        ),
+        {"report_id": report_id, "tenant_id": x_tenant_id},
+    )
+    record = row.mappings().first()
+    if not record:
+        raise HTTPException(status_code=404, detail="报告不存在")
+    data = dict(record)
+    data["id"] = str(data["id"])
+    data["store_id"] = str(data["store_id"])
+    data["report_date"] = str(data["report_date"])
+    data["created_at"] = str(data["created_at"])
+    return {"ok": True, "data": data}

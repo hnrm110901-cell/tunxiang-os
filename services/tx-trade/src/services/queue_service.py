@@ -11,6 +11,8 @@
   - [VALIDATION] phone 空字符串校验
   - [STATS] get_queue_history 改用 SQL 聚合统计，避免二次全表扫描
 """
+import json
+import os
 import uuid
 from datetime import datetime, timezone, timedelta
 from typing import Optional
@@ -230,7 +232,27 @@ class QueueService:
             customer_name=record.customer_name,
             notification_queued=True,
         )
-        # TODO: 接入消息队列发送叫号短信通知
+        # 向 sms_jobs Redis Stream 推送叫号短信作业，SMS Worker 消费后发送
+        try:
+            import redis.asyncio as aioredis  # type: ignore
+
+            redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+            async with aioredis.from_url(redis_url, decode_responses=True) as r:
+                await r.xadd(
+                    "sms_jobs",
+                    {
+                        "sms_type": "queue_called",
+                        "phone": record.phone or "",
+                        "customer_name": record.customer_name or "",
+                        "queue_number": str(record.queue_number),
+                        "tenant_id": self.tenant_id,
+                        "store_id": str(self._repo.store_id) if hasattr(self._repo, "store_id") else "",
+                    },
+                    maxlen=50_000,
+                    approximate=True,
+                )
+        except (OSError, RuntimeError) as exc:
+            logger.warning("queue_sms_publish_failed", queue_id=queue_id, error=str(exc))
 
         return {
             "queue_id": queue_id,

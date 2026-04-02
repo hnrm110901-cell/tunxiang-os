@@ -13,6 +13,8 @@
 统一响应格式: {"ok": bool, "data": {}, "error": {}}
 所有接口需 X-Tenant-ID header，通过 RLS 实现租户隔离。
 """
+import json
+import os
 from typing import Optional
 
 import structlog
@@ -817,14 +819,26 @@ async def send_kitchen_message(
         message_id = str(uuid_mod.uuid4())
         now = datetime.now(timezone.utc).isoformat()
 
-        # TODO: 实际生产中通过 Redis Streams 或 WebSocket 推送到 KDS
-        # channel: kds:{tenant_id}:messages
         log.info(
             "kitchen_message_sent",
             message_id=message_id,
             message=body.message,
             table_no=body.table_no,
         )
+        # 通过 Redis Pub/Sub 推送到 KDS，mac-station 订阅后转发 WebSocket
+        try:
+            import redis.asyncio as aioredis  # type: ignore
+
+            redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+            async with aioredis.from_url(redis_url, decode_responses=True) as r:
+                payload = json.dumps(
+                    {"event": "kitchen_message", "message_id": message_id,
+                     "message": body.message, "table_no": body.table_no, "sent_at": now},
+                    ensure_ascii=False,
+                )
+                await r.publish(f"kds:{tenant_id}:messages", payload)
+        except (OSError, RuntimeError) as exc:
+            log.warning("kitchen_message_redis_failed", error=str(exc))
         return _ok({
             "message_id": message_id,
             "message": body.message,

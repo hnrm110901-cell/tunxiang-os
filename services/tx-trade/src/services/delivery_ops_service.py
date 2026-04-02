@@ -11,6 +11,7 @@ Pydantic 模型:
 """
 from __future__ import annotations
 
+import os
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
@@ -489,13 +490,33 @@ class DeliveryOpsService:
             )
             return self._review_row_to_model(row)
 
-        # TODO: 实现真实预警推送渠道（企微Webhook / 短信 / tx-agent事件总线）
         logger.bind(
             review_id=str(rid),
             store_id=str(row.get("store_id")),
             platform=row.get("platform"),
             rating=row.get("rating"),
-        ).warning("delivery_ops.negative_alert_sent [TODO: real push channel]")
+        ).warning("delivery_ops.negative_alert_triggered")
+        # 向 sms_jobs Redis Stream 推送差评预警作业，告警 Worker 消费后发送企微/短信通知
+        try:
+            import redis.asyncio as aioredis  # type: ignore
+
+            redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+            async with aioredis.from_url(redis_url, decode_responses=True) as r:
+                await r.xadd(
+                    "sms_jobs",
+                    {
+                        "sms_type": "delivery_negative_review",
+                        "review_id": str(rid),
+                        "store_id": str(row.get("store_id") or ""),
+                        "platform": str(row.get("platform") or ""),
+                        "rating": str(row.get("rating") or ""),
+                        "tenant_id": str(tid),
+                    },
+                    maxlen=50_000,
+                    approximate=True,
+                )
+        except (OSError, RuntimeError) as exc:
+            logger.warning("delivery_ops.alert_publish_failed", review_id=str(rid), error=str(exc))
 
         stmt = (
             _DeliveryReviewRow.__table__.update()

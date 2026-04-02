@@ -160,24 +160,38 @@ async def _run_approval_expiry_check() -> None:
     此处为占位实现，RLS 策略需在调用处通过 SET LOCAL app.tenant_id 激活。
     """
     logger.info("approval_expiry_check_started")
-    async with async_session_factory() as db:
+    # 先查出所有活跃租户（用无 RLS 连接查 DISTINCT tenant_id）
+    from sqlalchemy import text as _text
+    async with async_session_factory() as probe_db:
         try:
-            # TODO: 按活跃租户列表循环；当前仅记录启动日志
-            # 生产实现：
-            #   tenants = await fetch_active_tenant_ids(db)
-            #   for tenant_id in tenants:
-            #       await db.execute(text(f"SET LOCAL app.tenant_id='{tenant_id}'"))
-            #       result = await _approval_service.check_expired_requests(tenant_id, db)
-            #       logger.info("approval_expiry_check_tenant_done", tenant_id=str(tenant_id), **result)
-            await db.commit()
-            logger.info("approval_expiry_check_finished")
-        except (OSError, RuntimeError, ValueError) as exc:
-            await db.rollback()
-            logger.error(
-                "approval_expiry_check_error",
-                error=str(exc),
-                exc_info=True,
+            result = await probe_db.execute(
+                _text("SELECT DISTINCT tenant_id FROM stores WHERE is_active = true")
             )
+            tenant_ids = [str(row[0]) for row in result.fetchall()]
+        except (OSError, RuntimeError, ValueError) as exc:
+            logger.error("approval_expiry_fetch_tenants_error", error=str(exc), exc_info=True)
+            return
+
+    for tenant_id in tenant_ids:
+        async with async_session_factory() as db:
+            try:
+                await db.execute(
+                    _text("SELECT set_config('app.tenant_id', :tid, true)"),
+                    {"tid": tenant_id},
+                )
+                result = await _approval_service.check_expired_requests(tenant_id, db)
+                await db.commit()
+                logger.info("approval_expiry_check_tenant_done", tenant_id=tenant_id, **result)
+            except (OSError, RuntimeError, ValueError) as exc:
+                await db.rollback()
+                logger.error(
+                    "approval_expiry_check_tenant_error",
+                    tenant_id=tenant_id,
+                    error=str(exc),
+                    exc_info=True,
+                )
+
+    logger.info("approval_expiry_check_finished", tenant_count=len(tenant_ids))
 
 
 def _schedule_approval_expiry() -> None:

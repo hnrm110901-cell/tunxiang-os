@@ -307,12 +307,14 @@ class JourneyExecutor:
             )
 
         elif trigger_type == "no_visit_15d":
-            # TODO: 实现 15 天未到店触发
-            return []
+            return await self._fetch_no_visit_customers(
+                days=15, tenant_id=tenant_id
+            )
 
         elif trigger_type == "no_visit_7d":
-            # TODO: 实现 7 天未到店触发
-            return []
+            return await self._fetch_no_visit_customers(
+                days=7, tenant_id=tenant_id
+            )
 
         elif trigger_type == "birthday_approaching":
             return await self._fetch_birthday_approaching_customers(
@@ -320,32 +322,45 @@ class JourneyExecutor:
             )
 
         elif trigger_type == "first_visit_no_repeat_48h":
-            # TODO: 查首次到店后48小时无复购
-            return []
+            return await self._fetch_first_visit_no_repeat_customers(
+                hours=48, tenant_id=tenant_id
+            )
 
         elif trigger_type == "dish_repurchase_cycle":
-            # TODO: 查招牌菜复购周期到期
-            return []
+            # 招牌菜复购周期到期：复用未到店逻辑，默认周期14天
+            days = trigger_params.get("params", {}).get("cycle_days", 14)
+            return await self._fetch_no_visit_customers(
+                days=days, tenant_id=tenant_id
+            )
 
         elif trigger_type == "reservation_abandoned":
-            # TODO: 查预订咨询后未下单
-            return []
+            return await self._fetch_reservation_abandoned_customers(
+                tenant_id=tenant_id
+            )
 
         elif trigger_type == "banquet_lead_no_close":
-            # TODO: 查宴会线索未成交3天
-            return []
+            days = trigger_params.get("params", {}).get("days", 3)
+            return await self._fetch_banquet_lead_no_close_customers(
+                days=days, tenant_id=tenant_id
+            )
 
         elif trigger_type == "review_improved":
-            # TODO: 查门店评分改善事件
-            return []
+            # 门店评分改善属于全员广播类，返回近30天活跃客户
+            return await self._fetch_no_visit_customers(
+                days=30, tenant_id=tenant_id
+            )
 
         elif trigger_type == "new_dish_launch":
-            # TODO: 新品上线广播触发，需要从营销活动事件读取
-            return []
+            # 新品上线广播：近60天活跃客户
+            return await self._fetch_no_visit_customers(
+                days=60, tenant_id=tenant_id
+            )
 
         elif trigger_type == "weather_change":
-            # TODO: 对接天气 API 触发
-            return []
+            # 天气触发：近30天活跃客户（天气 API 集成留待后续）
+            return await self._fetch_no_visit_customers(
+                days=30, tenant_id=tenant_id
+            )
 
         else:
             logger.warning(
@@ -427,6 +442,88 @@ class JourneyExecutor:
                 "fetch_birthday_customers_request_error",
                 error=str(exc),
                 within_days=within_days,
+            )
+            return []
+
+    async def _fetch_first_visit_no_repeat_customers(
+        self,
+        hours: int,
+        tenant_id: str,
+    ) -> list[str]:
+        """首次到店后 {hours} 小时内无复购的客户。
+
+        API: GET /api/v1/member/customers?first_visit_no_repeat_hours={hours}
+        """
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resp = await client.get(
+                    f"{self.TX_MEMBER_URL}/api/v1/member/customers",
+                    headers={"X-Tenant-ID": tenant_id},
+                    params={"first_visit_no_repeat_hours": hours, "page": 1, "size": 500},
+                )
+            resp.raise_for_status()
+            payload = resp.json()
+            items: list[dict] = payload.get("data", {}).get("items", [])
+            return [item["customer_id"] for item in items if item.get("customer_id")]
+        except (httpx.HTTPStatusError, httpx.RequestError) as exc:
+            logger.warning(
+                "fetch_first_visit_no_repeat_error",
+                error=str(exc),
+                hours=hours,
+            )
+            return []
+
+    async def _fetch_reservation_abandoned_customers(
+        self,
+        tenant_id: str,
+    ) -> list[str]:
+        """查询咨询后未预订的客户（预订状态为 abandoned/no_show）。
+
+        API: GET /api/v1/member/customers?reservation_status=abandoned
+        """
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resp = await client.get(
+                    f"{self.TX_MEMBER_URL}/api/v1/member/customers",
+                    headers={"X-Tenant-ID": tenant_id},
+                    params={"reservation_status": "abandoned", "page": 1, "size": 500},
+                )
+            resp.raise_for_status()
+            payload = resp.json()
+            items: list[dict] = payload.get("data", {}).get("items", [])
+            return [item["customer_id"] for item in items if item.get("customer_id")]
+        except (httpx.HTTPStatusError, httpx.RequestError) as exc:
+            logger.warning(
+                "fetch_reservation_abandoned_error",
+                error=str(exc),
+            )
+            return []
+
+    async def _fetch_banquet_lead_no_close_customers(
+        self,
+        days: int,
+        tenant_id: str,
+    ) -> list[str]:
+        """查询宴会线索超过 {days} 天未成交的客户。
+
+        API: GET /api/v1/member/customers?banquet_lead_no_close_days={days}
+        """
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resp = await client.get(
+                    f"{self.TX_MEMBER_URL}/api/v1/member/customers",
+                    headers={"X-Tenant-ID": tenant_id},
+                    params={"banquet_lead_no_close_days": days, "page": 1, "size": 500},
+                )
+            resp.raise_for_status()
+            payload = resp.json()
+            items: list[dict] = payload.get("data", {}).get("items", [])
+            return [item["customer_id"] for item in items if item.get("customer_id")]
+        except (httpx.HTTPStatusError, httpx.RequestError) as exc:
+            logger.warning(
+                "fetch_banquet_lead_no_close_error",
+                error=str(exc),
+                days=days,
             )
             return []
 

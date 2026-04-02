@@ -13,6 +13,8 @@
 """
 from __future__ import annotations
 
+import json
+import os
 import uuid
 from datetime import date, datetime, timedelta
 from enum import Enum
@@ -21,6 +23,7 @@ from typing import Any, Optional
 import httpx
 import structlog
 from pydantic import BaseModel, Field
+from sqlalchemy import text
 
 logger = structlog.get_logger()
 
@@ -397,13 +400,36 @@ class BusinessDiagnosisAgent:
     # ──────────────────────────────────────────────
     async def _save_report(self, report: DiagnosisReport) -> None:
         """将诊断报告写入 business_diagnosis_reports 表。"""
-        # TODO: 使用项目标准 DB session（asyncpg / SQLAlchemy async）
-        # 示例 SQL（供集成时参考）：
-        # INSERT INTO business_diagnosis_reports
-        #   (id, tenant_id, store_id, report_date, anomalies, summary_text, raw_data, created_at)
-        # VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7::jsonb, $8)
+        from shared.ontology.src.database import get_db_with_tenant
+
+        anomalies_json = json.dumps(
+            [a.model_dump() for a in report.anomalies], ensure_ascii=False, default=str
+        )
+        raw_data_json = json.dumps(report.raw_data, ensure_ascii=False, default=str)
+
+        async for db in get_db_with_tenant(self.tenant_id):
+            await db.execute(
+                text(
+                    "INSERT INTO business_diagnosis_reports "
+                    "(id, tenant_id, store_id, report_date, anomalies, summary_text, raw_data) "
+                    "VALUES (:id::uuid, :tenant_id::uuid, :store_id::uuid, :report_date, "
+                    ":anomalies::jsonb, :summary_text, :raw_data::jsonb) "
+                    "ON CONFLICT (tenant_id, store_id, report_date) DO UPDATE SET "
+                    "anomalies = EXCLUDED.anomalies, summary_text = EXCLUDED.summary_text, "
+                    "raw_data = EXCLUDED.raw_data"
+                ),
+                {
+                    "id": report.id,
+                    "tenant_id": self.tenant_id,
+                    "store_id": self.store_id,
+                    "report_date": str(report.report_date),
+                    "anomalies": anomalies_json,
+                    "summary_text": report.summary_text,
+                    "raw_data": raw_data_json,
+                },
+            )
         logger.info(
-            "report_saved_stub",
+            "report_saved",
             report_id=report.id,
             anomaly_count=len(report.anomalies),
         )
@@ -448,23 +474,58 @@ class BusinessDiagnosisAgent:
                 report_id=report.id,
             )
 
-        # TODO: 企业微信通知
-        # await self._notify_wecom(report)
-
-        # TODO: 钉钉通知
-        # await self._notify_dingtalk(report)
+        await self._notify_wecom(report)
+        await self._notify_dingtalk(report)
 
     # ──────────────────────────────────────────────
     # Stub：第三方通知（待实现）
     # ──────────────────────────────────────────────
-    async def _notify_wecom(self, report: DiagnosisReport) -> None:  # pragma: no cover
-        """TODO: 发送企业微信群机器人通知。
-        参考：https://developer.work.weixin.qq.com/document/path/91770
-        """
-        raise NotImplementedError
+    async def _notify_wecom(self, report: DiagnosisReport) -> None:
+        """发送企业微信群机器人通知。
 
-    async def _notify_dingtalk(self, report: DiagnosisReport) -> None:  # pragma: no cover
-        """TODO: 发送钉钉自定义机器人通知。
-        参考：https://open.dingtalk.com/document/orgapp/custom-robot-access
+        配置：WECOM_ROBOT_WEBHOOK_URL 环境变量（群机器人 Webhook URL）。
         """
-        raise NotImplementedError
+        webhook_url = os.getenv("WECOM_ROBOT_WEBHOOK_URL")
+        if not webhook_url:
+            return
+        critical_count = sum(1 for a in report.anomalies if a.severity == AnomalySeverity.CRITICAL)
+        content = (
+            f"【经营诊断预警】{report.report_date}\n"
+            f"门店ID：{report.store_id}\n"
+            f"发现异常：{len(report.anomalies)} 条（其中严重 {critical_count} 条）\n"
+            f"{report.summary_text[:200]}"
+        )
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                await client.post(
+                    webhook_url,
+                    json={"msgtype": "text", "text": {"content": content}},
+                )
+                logger.info("wecom_notification_sent", report_id=report.id)
+        except (httpx.HTTPError, OSError) as exc:
+            logger.warning("wecom_notification_failed", error=str(exc), report_id=report.id)
+
+    async def _notify_dingtalk(self, report: DiagnosisReport) -> None:
+        """发送钉钉自定义机器人通知。
+
+        配置：DINGTALK_ROBOT_WEBHOOK_URL 环境变量（自定义机器人 Webhook URL）。
+        """
+        webhook_url = os.getenv("DINGTALK_ROBOT_WEBHOOK_URL")
+        if not webhook_url:
+            return
+        critical_count = sum(1 for a in report.anomalies if a.severity == AnomalySeverity.CRITICAL)
+        content = (
+            f"【经营诊断预警】{report.report_date}\n"
+            f"门店ID：{report.store_id}\n"
+            f"发现异常：{len(report.anomalies)} 条（其中严重 {critical_count} 条）\n"
+            f"{report.summary_text[:200]}"
+        )
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                await client.post(
+                    webhook_url,
+                    json={"msgtype": "text", "text": {"content": content}},
+                )
+                logger.info("dingtalk_notification_sent", report_id=report.id)
+        except (httpx.HTTPError, OSError) as exc:
+            logger.warning("dingtalk_notification_failed", error=str(exc), report_id=report.id)

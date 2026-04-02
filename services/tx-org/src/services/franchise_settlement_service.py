@@ -17,6 +17,9 @@
 from __future__ import annotations
 
 import calendar
+import os
+
+import httpx
 import structlog
 from datetime import date, datetime, timedelta
 from typing import Any, List, Optional
@@ -792,14 +795,50 @@ class FranchiseSettlementService:
                 month=settlement.month,
                 total_amount_fen=settlement.total_amount_fen,
             )
-            # TODO: 集成企业微信 WeCom API
-            # await wecom_client.send_settlement_notice(
-            #     franchisee_id=str(settlement.franchisee_id),
-            #     year=settlement.year,
-            #     month=settlement.month,
-            #     total_amount_yuan=settlement.total_amount_fen / 100,
-            # )
-        except OSError as e:
+            # 通过企业微信 WeCom HTTP API 发送结算单通知
+            # 需要环境变量：WECOM_CORP_ID, WECOM_CORP_SECRET, WECOM_AGENT_ID
+            corp_id = os.getenv("WECOM_CORP_ID")
+            corp_secret = os.getenv("WECOM_CORP_SECRET")
+            agent_id = os.getenv("WECOM_AGENT_ID")
+            wecom_to_user = os.getenv("WECOM_FRANCHISEE_TOUSER", "@all")
+
+            if corp_id and corp_secret and agent_id:
+                async with httpx.AsyncClient(timeout=5.0) as client:
+                    # Step 1: 获取 access_token
+                    token_resp = await client.get(
+                        "https://qyapi.weixin.qq.com/cgi-bin/gettoken",
+                        params={"corpid": corp_id, "corpsecret": corp_secret},
+                    )
+                    token_data = token_resp.json()
+                    access_token = token_data.get("access_token", "")
+
+                    if access_token:
+                        # Step 2: 发送文字消息
+                        total_yuan = settlement.total_amount_fen / 100
+                        content = (
+                            f"【结算单通知】{settlement.year}年{settlement.month}月结算单已生成\n"
+                            f"加盟商ID：{settlement.franchisee_id}\n"
+                            f"结算金额：¥{total_yuan:.2f}"
+                        )
+                        await client.post(
+                            f"https://qyapi.weixin.qq.com/cgi-bin/message/send?access_token={access_token}",
+                            json={
+                                "touser": wecom_to_user,
+                                "msgtype": "text",
+                                "agentid": int(agent_id),
+                                "text": {"content": content},
+                            },
+                        )
+                        log.info(
+                            "franchise_settlement.wecom_notify.sent",
+                            franchisee_id=str(settlement.franchisee_id),
+                        )
+            else:
+                log.warning(
+                    "franchise_settlement.wecom_notify.skipped",
+                    reason="WECOM_CORP_ID/WECOM_CORP_SECRET/WECOM_AGENT_ID not configured",
+                )
+        except (OSError, httpx.HTTPError) as e:
             log.warning(
                 "franchise_settlement.wecom_notify.failed",
                 error=str(e),

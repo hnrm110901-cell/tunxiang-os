@@ -1,13 +1,19 @@
 /**
  * ReferralCenterPage — 裂变增长中心
  * 路由: /hq/growth/referral
- * 裂变活动列表 + 漏斗分析 + 奖励结算 + 反作弊监控
+ * 裂变活动列表 + KPI卡片 + 推荐排行榜 + 新建活动弹窗
+ * 数据来源:
+ *   - /api/v1/member/referral-campaigns
+ *   - /api/v1/member/referrals/leaderboard
  */
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { txFetch } from '../../../api';
 
+// ─── 主题常量 ───
+const BG = '#0d1e28';
 const BG_1 = '#112228';
 const BG_2 = '#1a2a33';
-const BRAND = '#FF6B2C';
+const BRAND = '#FF6B35';
 const GREEN = '#52c41a';
 const RED = '#ff4d4f';
 const YELLOW = '#faad14';
@@ -18,87 +24,169 @@ const TEXT_2 = '#cccccc';
 const TEXT_3 = '#999999';
 const TEXT_4 = '#666666';
 
-type TabKey = 'campaigns' | 'funnel' | 'rewards' | 'antifraud';
+type TabKey = 'campaigns' | 'leaderboard' | 'create';
 
+// ─── API 类型 ───
 interface ReferralCampaign {
   id: string;
   name: string;
-  type: '老带新' | '拼团' | '分享有礼';
-  status: '进行中' | '已结束' | '待启动';
-  startDate: string;
-  endDate: string;
-  inviterReward: string;
-  inviteeReward: string;
-  totalInviters: number;
-  totalInvitees: number;
-  firstOrders: number;
-  repeatOrders: number;
-  totalRevenue: number;
+  campaign_type: string;
+  status: string;
+  start_date: string;
+  end_date: string;
+  inviter_reward: string;
+  invitee_reward: string;
+  total_inviters: number;
+  total_invitees: number;
+  first_orders: number;
+  total_revenue_fen: number;
 }
 
-interface FunnelStep {
-  label: string;
-  count: number;
-  rate: number;
+interface LeaderboardEntry {
+  rank: number;
+  member_id: string;
+  name: string;
+  phone: string;
+  total_referrals: number;
+  successful_conversions: number;
+  total_reward_fen: number;
 }
 
-interface RewardRecord {
-  id: string;
-  inviterName: string;
-  inviterPhone: string;
-  inviteeName: string;
-  rewardType: string;
-  rewardValue: string;
-  status: '已发放' | '待结算' | '冻结';
-  date: string;
+interface ReferralStats {
+  total_campaigns: number;
+  active_campaigns: number;
+  total_referrers: number;
+  total_new_members: number;
+  total_gmv_fen: number;
+  k_factor: number;
 }
 
-interface FraudAlert {
-  id: string;
-  type: string;
-  severity: 'high' | 'medium' | 'low';
-  description: string;
-  involvedUsers: number;
-  detectedAt: string;
-  status: '待处理' | '已处理' | '误报';
+// ─── 工具函数 ───
+function fenToWan(fen: number): string {
+  const yuan = fen / 100;
+  if (yuan >= 10000) return `¥${(yuan / 10000).toFixed(1)}万`;
+  if (yuan >= 1000) return `¥${(yuan / 1000).toFixed(1)}千`;
+  return `¥${yuan.toFixed(0)}`;
 }
 
-const MOCK_CAMPAIGNS: ReferralCampaign[] = [
-  { id: 'rc1', name: '春季老带新大赏', type: '老带新', status: '进行中', startDate: '2026-03-01', endDate: '2026-03-31', inviterReward: '邀请1人得¥20券', inviteeReward: '新客满60减25', totalInviters: 856, totalInvitees: 1247, firstOrders: 892, repeatOrders: 312, totalRevenue: 186400 },
-  { id: 'rc2', name: '3人成团享5折', type: '拼团', status: '进行中', startDate: '2026-03-15', endDate: '2026-04-05', inviterReward: '团长免单一份菜', inviteeReward: '成团5折', totalInviters: 342, totalInvitees: 684, firstOrders: 456, repeatOrders: 128, totalRevenue: 98200 },
-  { id: 'rc3', name: '分享有礼·集赞换券', type: '分享有礼', status: '进行中', startDate: '2026-03-10', endDate: '2026-03-31', inviterReward: '集20赞得¥30券', inviteeReward: '点击即得¥10券', totalInviters: 1234, totalInvitees: 3456, firstOrders: 678, repeatOrders: 89, totalRevenue: 72800 },
-  { id: 'rc4', name: '年末裂变冲刺', type: '老带新', status: '已结束', startDate: '2025-12-15', endDate: '2026-01-05', inviterReward: '邀请1人得¥30券', inviteeReward: '新客满50减20', totalInviters: 1520, totalInvitees: 2340, firstOrders: 1680, repeatOrders: 520, totalRevenue: 342000 },
-  { id: 'rc5', name: '清明踏青拼团', type: '拼团', status: '待启动', startDate: '2026-04-03', endDate: '2026-04-06', inviterReward: '团长得双倍积分', inviteeReward: '成团8折', totalInviters: 0, totalInvitees: 0, firstOrders: 0, repeatOrders: 0, totalRevenue: 0 },
-];
+// ─── KPI卡片 ───
+function KpiCard({
+  label, value, sub, color, icon,
+}: {
+  label: string; value: string; sub?: string; color?: string; icon?: string;
+}) {
+  return (
+    <div style={{
+      background: BG_1, borderRadius: 10, padding: '14px 16px',
+      border: `1px solid ${BG_2}`,
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+        <span style={{ fontSize: 11, color: TEXT_4 }}>{label}</span>
+        {icon && <span style={{ fontSize: 18 }}>{icon}</span>}
+      </div>
+      <div style={{ fontSize: 22, fontWeight: 700, color: color || TEXT_1 }}>{value}</div>
+      {sub && <div style={{ fontSize: 11, color: TEXT_3, marginTop: 4 }}>{sub}</div>}
+    </div>
+  );
+}
 
-const MOCK_FUNNEL: FunnelStep[] = [
-  { label: '发起邀请', count: 2432, rate: 100 },
-  { label: '受邀注册', count: 5387, rate: 72.4 },
-  { label: '首次下单', count: 2026, rate: 37.6 },
-  { label: '复购到店', count: 529, rate: 26.1 },
-];
+// ─── 活动状态标签 ───
+function StatusBadge({ status }: { status: string }) {
+  const map: Record<string, { label: string; color: string }> = {
+    '进行中': { label: '进行中', color: GREEN },
+    'active':  { label: '进行中', color: GREEN },
+    '已结束':  { label: '已结束', color: TEXT_4 },
+    'ended':   { label: '已结束', color: TEXT_4 },
+    '待启动':  { label: '待启动', color: BLUE },
+    'pending': { label: '待启动', color: BLUE },
+    '暂停':    { label: '已暂停', color: YELLOW },
+    'paused':  { label: '已暂停', color: YELLOW },
+  };
+  const s = map[status] || { label: status, color: TEXT_3 };
+  return (
+    <span style={{
+      fontSize: 10, padding: '2px 8px', borderRadius: 4,
+      background: s.color + '22', color: s.color, fontWeight: 600,
+    }}>{s.label}</span>
+  );
+}
 
-const MOCK_REWARDS: RewardRecord[] = [
-  { id: 'rw1', inviterName: '张***', inviterPhone: '138****5678', inviteeName: '李***', rewardType: '现金券', rewardValue: '¥20', status: '已发放', date: '2026-03-26' },
-  { id: 'rw2', inviterName: '王***', inviterPhone: '159****1234', inviteeName: '赵***', rewardType: '现金券', rewardValue: '¥20', status: '已发放', date: '2026-03-26' },
-  { id: 'rw3', inviterName: '陈***', inviterPhone: '186****4567', inviteeName: '孙***', rewardType: '免单券', rewardValue: '免费菜1份', status: '待结算', date: '2026-03-26' },
-  { id: 'rw4', inviterName: '刘***', inviterPhone: '137****8901', inviteeName: '周***', rewardType: '现金券', rewardValue: '¥30', status: '待结算', date: '2026-03-25' },
-  { id: 'rw5', inviterName: '高***', inviterPhone: '152****2345', inviteeName: '吴***', rewardType: '现金券', rewardValue: '¥20', status: '冻结', date: '2026-03-25' },
-  { id: 'rw6', inviterName: '林***', inviterPhone: '188****6789', inviteeName: '黄***', rewardType: '积分', rewardValue: '200积分', status: '已发放', date: '2026-03-24' },
-  { id: 'rw7', inviterName: '杨***', inviterPhone: '135****0123', inviteeName: '何***', rewardType: '现金券', rewardValue: '¥20', status: '已发放', date: '2026-03-24' },
-];
+// ─── 活动类型标签 ───
+function TypeBadge({ type }: { type: string }) {
+  const map: Record<string, { label: string; color: string }> = {
+    '老带新':     { label: '老带新', color: BRAND },
+    'referral':   { label: '老带新', color: BRAND },
+    '拼团':       { label: '拼团',   color: PURPLE },
+    'group':      { label: '拼团',   color: PURPLE },
+    '分享有礼':   { label: '分享', color: BLUE },
+    'share':      { label: '分享', color: BLUE },
+  };
+  const s = map[type] || { label: type, color: TEXT_3 };
+  return (
+    <span style={{
+      fontSize: 10, padding: '2px 8px', borderRadius: 4,
+      background: s.color + '22', color: s.color, fontWeight: 600,
+    }}>{s.label}</span>
+  );
+}
 
-const MOCK_FRAUD_ALERTS: FraudAlert[] = [
-  { id: 'fa1', type: '同设备多账号', severity: 'high', description: '检测到同一设备在24小时内注册了8个新账号，疑似刷单', involvedUsers: 8, detectedAt: '2026-03-26 09:45', status: '待处理' },
-  { id: 'fa2', type: '异常邀请频率', severity: 'medium', description: '用户138****5678在1小时内成功邀请23人，远超正常水平', involvedUsers: 24, detectedAt: '2026-03-26 11:20', status: '待处理' },
-  { id: 'fa3', type: '虚假消费', severity: 'high', description: '3个关联账号互相邀请，均在最低消费门槛下单后立即退款', involvedUsers: 3, detectedAt: '2026-03-25 16:30', status: '已处理' },
-  { id: 'fa4', type: '地址异常', severity: 'low', description: '多个被邀请人填写相同收货地址，可能为同一人操作', involvedUsers: 5, detectedAt: '2026-03-25 14:00', status: '已处理' },
-  { id: 'fa5', type: '批量注册', severity: 'medium', description: '同IP段30分钟内出现15个新注册，手机号段连续', involvedUsers: 15, detectedAt: '2026-03-24 20:15', status: '误报' },
-];
+// ─── 裂变活动卡片列表 ───
+function CampaignList({
+  campaigns,
+  loading,
+  apiMissing,
+}: {
+  campaigns: ReferralCampaign[];
+  loading: boolean;
+  apiMissing: boolean;
+}) {
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {[1, 2, 3].map(i => (
+          <div key={i} style={{
+            background: BG_1, borderRadius: 10, padding: 20,
+            border: `1px solid ${BG_2}`, height: 100,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <span style={{ fontSize: 12, color: TEXT_4 }}>加载中...</span>
+          </div>
+        ))}
+      </div>
+    );
+  }
 
-function CampaignCards({ campaigns }: { campaigns: ReferralCampaign[] }) {
-  const statusColors: Record<string, string> = { '进行中': GREEN, '已结束': TEXT_4, '待启动': BLUE };
-  const typeColors: Record<string, string> = { '老带新': BRAND, '拼团': PURPLE, '分享有礼': BLUE };
+  if (apiMissing) {
+    return (
+      <div style={{
+        background: BG_1, borderRadius: 10, padding: 32,
+        border: `1px solid ${BG_2}`, textAlign: 'center',
+      }}>
+        <div style={{ fontSize: 32, marginBottom: 12 }}>🚧</div>
+        <div style={{ fontSize: 15, fontWeight: 600, color: TEXT_2, marginBottom: 8 }}>功能对接中</div>
+        <div style={{ fontSize: 12, color: TEXT_4, lineHeight: 1.8 }}>
+          裂变活动列表 API 尚未就绪<br />
+          <code style={{ color: BRAND, fontSize: 11 }}>/api/v1/member/referral-campaigns</code>
+        </div>
+        <div style={{ marginTop: 16, fontSize: 11, color: TEXT_4 }}>
+          接入后将在此处展示所有裂变活动及转化数据
+        </div>
+      </div>
+    );
+  }
+
+  if (campaigns.length === 0) {
+    return (
+      <div style={{
+        background: BG_1, borderRadius: 10, padding: 32,
+        border: `1px solid ${BG_2}`, textAlign: 'center',
+      }}>
+        <div style={{ fontSize: 32, marginBottom: 12 }}>📭</div>
+        <div style={{ fontSize: 14, color: TEXT_3 }}>暂无裂变活动</div>
+        <div style={{ fontSize: 11, color: TEXT_4, marginTop: 6 }}>点击「新建活动」创建第一个裂变活动</div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -109,34 +197,47 @@ function CampaignCards({ campaigns }: { campaigns: ReferralCampaign[] }) {
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 16, fontWeight: 700, color: TEXT_1 }}>{c.name}</span>
-              <span style={{
-                fontSize: 10, padding: '2px 8px', borderRadius: 4,
-                background: typeColors[c.type] + '22', color: typeColors[c.type], fontWeight: 600,
-              }}>{c.type}</span>
-              <span style={{
-                fontSize: 10, padding: '2px 8px', borderRadius: 4,
-                background: statusColors[c.status] + '22', color: statusColors[c.status], fontWeight: 600,
-              }}>{c.status}</span>
+              <span style={{ fontSize: 15, fontWeight: 700, color: TEXT_1 }}>{c.name}</span>
+              <TypeBadge type={c.campaign_type} />
+              <StatusBadge status={c.status} />
             </div>
-            <span style={{ fontSize: 11, color: TEXT_4 }}>{c.startDate} ~ {c.endDate}</span>
-          </div>
-          <div style={{ display: 'flex', gap: 8, marginBottom: 12, fontSize: 11 }}>
-            <span style={{ color: TEXT_3, padding: '4px 8px', background: BG_2, borderRadius: 4 }}>
-              邀请人奖励: <strong style={{ color: BRAND }}>{c.inviterReward}</strong>
-            </span>
-            <span style={{ color: TEXT_3, padding: '4px 8px', background: BG_2, borderRadius: 4 }}>
-              被邀请人奖励: <strong style={{ color: GREEN }}>{c.inviteeReward}</strong>
+            <span style={{ fontSize: 11, color: TEXT_4 }}>
+              {c.start_date} ~ {c.end_date}
             </span>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 10 }}>
+
+          {(c.inviter_reward || c.invitee_reward) && (
+            <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+              {c.inviter_reward && (
+                <span style={{ color: TEXT_3, padding: '3px 8px', background: BG_2, borderRadius: 4, fontSize: 11 }}>
+                  邀请人: <strong style={{ color: BRAND }}>{c.inviter_reward}</strong>
+                </span>
+              )}
+              {c.invitee_reward && (
+                <span style={{ color: TEXT_3, padding: '3px 8px', background: BG_2, borderRadius: 4, fontSize: 11 }}>
+                  被邀请人: <strong style={{ color: GREEN }}>{c.invitee_reward}</strong>
+                </span>
+              )}
+            </div>
+          )}
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10 }}>
             {[
-              { label: '邀请人数', value: c.totalInviters.toLocaleString(), color: TEXT_1 },
-              { label: '被邀请人数', value: c.totalInvitees.toLocaleString(), color: TEXT_1 },
-              { label: '首单转化', value: c.firstOrders.toLocaleString(), color: GREEN },
-              { label: '复购转化', value: c.repeatOrders.toLocaleString(), color: BLUE },
-              { label: '总营收', value: c.totalRevenue > 0 ? `\u00A5${(c.totalRevenue / 10000).toFixed(1)}万` : '-', color: BRAND },
-              { label: 'K系数', value: c.totalInviters > 0 ? (c.totalInvitees / c.totalInviters).toFixed(2) : '-', color: PURPLE },
+              { label: '邀请人数', value: c.total_inviters.toLocaleString(), color: TEXT_1 },
+              { label: '被邀请人数', value: c.total_invitees.toLocaleString(), color: TEXT_1 },
+              { label: '首单转化', value: c.first_orders.toLocaleString(), color: GREEN },
+              {
+                label: '裂变GMV',
+                value: c.total_revenue_fen > 0 ? fenToWan(c.total_revenue_fen) : '-',
+                color: BRAND,
+              },
+              {
+                label: 'K系数',
+                value: c.total_inviters > 0
+                  ? (c.total_invitees / c.total_inviters).toFixed(2)
+                  : '-',
+                color: PURPLE,
+              },
             ].map((item, i) => (
               <div key={i} style={{ textAlign: 'center' }}>
                 <div style={{ fontSize: 10, color: TEXT_4, marginBottom: 4 }}>{item.label}</div>
@@ -150,227 +251,430 @@ function CampaignCards({ campaigns }: { campaigns: ReferralCampaign[] }) {
   );
 }
 
-function FunnelChart({ steps }: { steps: FunnelStep[] }) {
+// ─── 推荐排行榜 ───
+function Leaderboard({
+  entries,
+  loading,
+  apiMissing,
+}: {
+  entries: LeaderboardEntry[];
+  loading: boolean;
+  apiMissing: boolean;
+}) {
+  const medalColors = ['#FFD700', '#C0C0C0', '#CD7F32'];
+
+  if (loading) {
+    return (
+      <div style={{ background: BG_1, borderRadius: 10, padding: 20, border: `1px solid ${BG_2}` }}>
+        <div style={{ textAlign: 'center', color: TEXT_4, fontSize: 12, padding: '40px 0' }}>加载中...</div>
+      </div>
+    );
+  }
+
+  if (apiMissing) {
+    return (
+      <div style={{
+        background: BG_1, borderRadius: 10, padding: 32,
+        border: `1px solid ${BG_2}`, textAlign: 'center',
+      }}>
+        <div style={{ fontSize: 32, marginBottom: 12 }}>🏆</div>
+        <div style={{ fontSize: 15, fontWeight: 600, color: TEXT_2, marginBottom: 8 }}>推荐排行榜</div>
+        <div style={{ fontSize: 12, color: TEXT_4, lineHeight: 1.8 }}>
+          排行榜 API 尚未就绪<br />
+          <code style={{ color: BRAND, fontSize: 11 }}>/api/v1/member/referrals/leaderboard</code>
+        </div>
+        <div style={{ marginTop: 16, fontSize: 11, color: TEXT_4 }}>
+          接入后展示推荐人数 TOP 榜单
+        </div>
+      </div>
+    );
+  }
+
+  if (entries.length === 0) {
+    return (
+      <div style={{
+        background: BG_1, borderRadius: 10, padding: 32,
+        border: `1px solid ${BG_2}`, textAlign: 'center',
+      }}>
+        <div style={{ fontSize: 32, marginBottom: 12 }}>📋</div>
+        <div style={{ fontSize: 14, color: TEXT_3 }}>暂无排行数据</div>
+      </div>
+    );
+  }
+
   return (
-    <div style={{
-      background: BG_1, borderRadius: 10, padding: 20,
-      border: `1px solid ${BG_2}`,
-    }}>
-      <h3 style={{ margin: '0 0 20px', fontSize: 15, fontWeight: 700, color: TEXT_1 }}>裂变转化漏斗</h3>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 16, alignItems: 'center' }}>
-        {steps.map((step, i) => {
-          const widthPct = Math.max(30, step.rate);
-          return (
-            <div key={i} style={{ width: '100%', maxWidth: 600 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                <span style={{ fontSize: 13, fontWeight: 600, color: TEXT_1 }}>{step.label}</span>
-                <span style={{ fontSize: 13, color: TEXT_2 }}>{step.count.toLocaleString()}</span>
+    <div style={{ background: BG_1, borderRadius: 10, padding: 16, border: `1px solid ${BG_2}` }}>
+      <h3 style={{ margin: '0 0 16px', fontSize: 15, fontWeight: 700, color: TEXT_1 }}>推荐人排行榜 · 本月</h3>
+
+      {/* 前三名高亮 */}
+      {entries.slice(0, 3).length > 0 && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 16 }}>
+          {entries.slice(0, 3).map((e, i) => (
+            <div key={e.member_id} style={{
+              background: BG_2, borderRadius: 10, padding: '14px 12px', textAlign: 'center',
+              border: `1px solid ${medalColors[i]}44`,
+            }}>
+              <div style={{ fontSize: 22, marginBottom: 4 }}>
+                {['🥇', '🥈', '🥉'][i]}
               </div>
-              <div style={{ position: 'relative', height: 36 }}>
-                <div style={{
-                  width: `${widthPct}%`, height: '100%', borderRadius: 6,
-                  background: `linear-gradient(90deg, ${BRAND}, ${BRAND}88)`,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  margin: '0 auto',
-                }}>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>{step.rate}%</span>
+              <div style={{ fontSize: 13, fontWeight: 700, color: TEXT_1, marginBottom: 2 }}>
+                {e.name || `用户${e.member_id.slice(-4)}`}
+              </div>
+              <div style={{ fontSize: 10, color: TEXT_4, marginBottom: 8 }}>
+                {e.phone ? `${e.phone.slice(0, 3)}****${e.phone.slice(-4)}` : '—'}
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                <div>
+                  <div style={{ fontSize: 9, color: TEXT_4 }}>推荐数</div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: BRAND }}>{e.total_referrals}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 9, color: TEXT_4 }}>转化数</div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: GREEN }}>{e.successful_conversions}</div>
                 </div>
               </div>
-              {i < steps.length - 1 && (
-                <div style={{ textAlign: 'center', fontSize: 11, color: TEXT_4, marginTop: 4 }}>
-                  {'\u2193'} 转化率 {((steps[i + 1].count / step.count) * 100).toFixed(1)}%
+              {e.total_reward_fen > 0 && (
+                <div style={{ marginTop: 6, fontSize: 11, color: YELLOW }}>
+                  奖励 {fenToWan(e.total_reward_fen)}
                 </div>
               )}
             </div>
-          );
-        })}
-      </div>
-
-      {/* 关键指标 */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginTop: 20 }}>
-        {[
-          { label: '总邀请发起', value: '2,432', color: TEXT_1 },
-          { label: '注册转化率', value: '72.4%', color: GREEN },
-          { label: '首单转化率', value: '37.6%', color: BRAND },
-          { label: '复购留存率', value: '26.1%', color: BLUE },
-        ].map((item, i) => (
-          <div key={i} style={{ background: BG_2, borderRadius: 8, padding: 12, textAlign: 'center' }}>
-            <div style={{ fontSize: 10, color: TEXT_4, marginBottom: 4 }}>{item.label}</div>
-            <div style={{ fontSize: 20, fontWeight: 700, color: item.color }}>{item.value}</div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function RewardSettlement({ rewards }: { rewards: RewardRecord[] }) {
-  const statusColors: Record<string, string> = { '已发放': GREEN, '待结算': YELLOW, '冻结': RED };
-  const [filter, setFilter] = useState('全部');
-  const filtered = filter === '全部' ? rewards : rewards.filter(r => r.status === filter);
-
-  return (
-    <div style={{
-      background: BG_1, borderRadius: 10, padding: 16,
-      border: `1px solid ${BG_2}`,
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-        <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: TEXT_1 }}>奖励结算</h3>
-        {['全部', '已发放', '待结算', '冻结'].map(s => (
-          <button key={s} onClick={() => setFilter(s)} style={{
-            padding: '3px 10px', borderRadius: 6, border: 'none', cursor: 'pointer',
-            background: filter === s ? BRAND : BG_2, color: filter === s ? '#fff' : TEXT_3,
-            fontSize: 11, fontWeight: 600,
-          }}>{s}</button>
-        ))}
-      </div>
-
-      {/* 汇总 */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 14 }}>
-        {[
-          { label: '已发放', value: `${rewards.filter(r => r.status === '已发放').length} 笔`, color: GREEN },
-          { label: '待结算', value: `${rewards.filter(r => r.status === '待结算').length} 笔`, color: YELLOW },
-          { label: '已冻结', value: `${rewards.filter(r => r.status === '冻结').length} 笔`, color: RED },
-        ].map((item, i) => (
-          <div key={i} style={{ background: BG_2, borderRadius: 8, padding: 10, textAlign: 'center' }}>
-            <div style={{ fontSize: 10, color: TEXT_4 }}>{item.label}</div>
-            <div style={{ fontSize: 16, fontWeight: 700, color: item.color }}>{item.value}</div>
-          </div>
-        ))}
-      </div>
-
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-        <thead>
-          <tr style={{ borderBottom: `1px solid ${BG_2}` }}>
-            {['邀请人', '手机号', '被邀请人', '奖励类型', '奖励值', '状态', '日期'].map(h => (
-              <th key={h} style={{ textAlign: 'left', padding: '8px 10px', color: TEXT_4, fontWeight: 600, fontSize: 11 }}>{h}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {filtered.map(r => (
-            <tr key={r.id} style={{ borderBottom: `1px solid ${BG_2}` }}>
-              <td style={{ padding: '10px', color: TEXT_1 }}>{r.inviterName}</td>
-              <td style={{ padding: '10px', color: TEXT_3 }}>{r.inviterPhone}</td>
-              <td style={{ padding: '10px', color: TEXT_2 }}>{r.inviteeName}</td>
-              <td style={{ padding: '10px', color: TEXT_3 }}>{r.rewardType}</td>
-              <td style={{ padding: '10px', color: BRAND, fontWeight: 600 }}>{r.rewardValue}</td>
-              <td style={{ padding: '10px' }}>
-                <span style={{
-                  fontSize: 10, padding: '2px 8px', borderRadius: 4,
-                  background: statusColors[r.status] + '22', color: statusColors[r.status], fontWeight: 600,
-                }}>{r.status}</span>
-              </td>
-              <td style={{ padding: '10px', color: TEXT_4 }}>{r.date}</td>
-            </tr>
           ))}
-        </tbody>
-      </table>
+        </div>
+      )}
+
+      {/* 4-10名列表 */}
+      {entries.slice(3).length > 0 && (
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+          <thead>
+            <tr style={{ borderBottom: `1px solid ${BG_2}` }}>
+              {['排名', '会员', '手机号', '推荐数', '转化数', '获得奖励'].map(h => (
+                <th key={h} style={{
+                  textAlign: 'left', padding: '8px 10px',
+                  color: TEXT_4, fontWeight: 600, fontSize: 11,
+                }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {entries.slice(3).map(e => (
+              <tr key={e.member_id} style={{ borderBottom: `1px solid ${BG_2}` }}>
+                <td style={{ padding: '10px', color: TEXT_3, fontWeight: 600 }}>#{e.rank}</td>
+                <td style={{ padding: '10px', color: TEXT_1 }}>
+                  {e.name || `用户${e.member_id.slice(-4)}`}
+                </td>
+                <td style={{ padding: '10px', color: TEXT_3 }}>
+                  {e.phone ? `${e.phone.slice(0, 3)}****${e.phone.slice(-4)}` : '—'}
+                </td>
+                <td style={{ padding: '10px', color: BRAND, fontWeight: 600 }}>{e.total_referrals}</td>
+                <td style={{ padding: '10px', color: GREEN }}>{e.successful_conversions}</td>
+                <td style={{ padding: '10px', color: YELLOW }}>
+                  {e.total_reward_fen > 0 ? fenToWan(e.total_reward_fen) : '—'}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
     </div>
   );
 }
 
-function AntiFraudMonitor({ alerts }: { alerts: FraudAlert[] }) {
-  const sevColors: Record<string, string> = { high: RED, medium: YELLOW, low: BLUE };
-  const sevLabels: Record<string, string> = { high: '严重', medium: '警告', low: '提示' };
-  const statusColors: Record<string, string> = { '待处理': RED, '已处理': GREEN, '误报': TEXT_4 };
+// ─── 新建活动弹窗 ───
+interface CreateCampaignModalProps {
+  onClose: () => void;
+  onSubmit: (data: Record<string, string>) => void;
+  submitting: boolean;
+}
+
+function CreateCampaignModal({ onClose, onSubmit, submitting }: CreateCampaignModalProps) {
+  const [form, setForm] = useState({
+    name: '',
+    campaign_type: 'referral',
+    start_date: '',
+    end_date: '',
+    inviter_reward: '',
+    invitee_reward: '',
+    description: '',
+  });
+
+  function set(key: string, value: string) {
+    setForm(prev => ({ ...prev, [key]: value }));
+  }
+
+  function handleSubmit() {
+    if (!form.name || !form.start_date || !form.end_date) return;
+    onSubmit(form);
+  }
 
   return (
     <div style={{
-      background: BG_1, borderRadius: 10, padding: 16,
-      border: `1px solid ${BG_2}`,
-    }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-        <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: TEXT_1 }}>反作弊监控</h3>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <span style={{ fontSize: 12, color: RED }}>待处理: {alerts.filter(a => a.status === '待处理').length}</span>
-          <span style={{ fontSize: 12, color: GREEN }}>已处理: {alerts.filter(a => a.status === '已处理').length}</span>
+      position: 'fixed', inset: 0, zIndex: 1000,
+      background: 'rgba(0,0,0,0.7)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+    }} onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={{
+        background: BG_1, borderRadius: 12, padding: 24,
+        border: `1px solid ${BG_2}`, width: 520, maxHeight: '90vh', overflowY: 'auto',
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+          <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: TEXT_1 }}>新建裂变活动</h3>
+          <button onClick={onClose} style={{
+            background: 'none', border: 'none', color: TEXT_4,
+            fontSize: 18, cursor: 'pointer', lineHeight: 1, padding: '4px 6px',
+          }}>✕</button>
+        </div>
+
+        {[
+          { label: '活动名称 *', key: 'name', placeholder: '如：五一老带新活动' },
+          { label: '活动开始日期 *', key: 'start_date', placeholder: '2026-05-01' },
+          { label: '活动结束日期 *', key: 'end_date', placeholder: '2026-05-07' },
+          { label: '邀请人奖励', key: 'inviter_reward', placeholder: '如：邀请1人得¥20券' },
+          { label: '被邀请人奖励', key: 'invitee_reward', placeholder: '如：新客满60减25' },
+          { label: '活动说明', key: 'description', placeholder: '简要描述活动规则...' },
+        ].map(field => (
+          <div key={field.key} style={{ marginBottom: 14 }}>
+            <label style={{ display: 'block', fontSize: 12, color: TEXT_3, marginBottom: 5 }}>
+              {field.label}
+            </label>
+            <input
+              value={form[field.key as keyof typeof form]}
+              onChange={e => set(field.key, e.target.value)}
+              placeholder={field.placeholder}
+              style={{
+                width: '100%', padding: '9px 12px', borderRadius: 6,
+                border: `1px solid ${BG_2}`, background: BG_2,
+                color: TEXT_1, fontSize: 13, boxSizing: 'border-box',
+                outline: 'none',
+              }}
+            />
+          </div>
+        ))}
+
+        {/* 活动类型选择 */}
+        <div style={{ marginBottom: 20 }}>
+          <label style={{ display: 'block', fontSize: 12, color: TEXT_3, marginBottom: 5 }}>
+            活动类型
+          </label>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {[
+              { value: 'referral', label: '老带新' },
+              { value: 'group', label: '拼团' },
+              { value: 'share', label: '分享有礼' },
+            ].map(opt => (
+              <button key={opt.value} onClick={() => set('campaign_type', opt.value)} style={{
+                padding: '7px 16px', borderRadius: 6,
+                border: `1px solid ${form.campaign_type === opt.value ? BRAND : BG_2}`,
+                background: form.campaign_type === opt.value ? BRAND + '22' : 'transparent',
+                color: form.campaign_type === opt.value ? BRAND : TEXT_3,
+                fontSize: 12, fontWeight: 600, cursor: 'pointer',
+              }}>{opt.label}</button>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+          <button onClick={onClose} style={{
+            padding: '9px 20px', borderRadius: 6,
+            border: `1px solid ${BG_2}`, background: 'transparent',
+            color: TEXT_3, fontSize: 13, cursor: 'pointer',
+          }}>取消</button>
+          <button
+            onClick={handleSubmit}
+            disabled={submitting || !form.name || !form.start_date || !form.end_date}
+            style={{
+              padding: '9px 24px', borderRadius: 6, border: 'none',
+              background: submitting ? TEXT_4 : BRAND,
+              color: '#fff', fontSize: 13, fontWeight: 600,
+              cursor: submitting ? 'not-allowed' : 'pointer',
+              opacity: (!form.name || !form.start_date || !form.end_date) ? 0.5 : 1,
+            }}
+          >{submitting ? '提交中...' : '创建活动'}</button>
         </div>
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {alerts.map(a => (
-          <div key={a.id} style={{
-            padding: '14px 16px', background: BG_2, borderRadius: 8,
-            borderLeft: `3px solid ${sevColors[a.severity]}`,
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{
-                  fontSize: 10, padding: '1px 6px', borderRadius: 4,
-                  background: sevColors[a.severity] + '22', color: sevColors[a.severity], fontWeight: 700,
-                }}>{sevLabels[a.severity]}</span>
-                <span style={{ fontSize: 13, fontWeight: 600, color: TEXT_1 }}>{a.type}</span>
-              </div>
-              <span style={{
-                fontSize: 10, padding: '2px 8px', borderRadius: 4,
-                background: statusColors[a.status] + '22', color: statusColors[a.status], fontWeight: 600,
-              }}>{a.status}</span>
-            </div>
-            <div style={{ fontSize: 12, color: TEXT_3, lineHeight: 1.6, marginBottom: 6 }}>{a.description}</div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: TEXT_4 }}>
-              <span>涉及用户: {a.involvedUsers} 人</span>
-              <span>{a.detectedAt}</span>
-            </div>
-            {a.status === '待处理' && (
-              <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-                <button style={{
-                  padding: '4px 12px', borderRadius: 6, border: 'none',
-                  background: RED + '22', color: RED, fontSize: 11, fontWeight: 600, cursor: 'pointer',
-                }}>冻结奖励</button>
-                <button style={{
-                  padding: '4px 12px', borderRadius: 6, border: 'none',
-                  background: BG_1, color: TEXT_3, fontSize: 11, fontWeight: 600, cursor: 'pointer',
-                }}>标记误报</button>
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
     </div>
   );
 }
 
-// ---- 主页面 ----
-
+// ─── 主页面 ───
 export function ReferralCenterPage() {
   const [activeTab, setActiveTab] = useState<TabKey>('campaigns');
+  const [loadingCampaigns, setLoadingCampaigns] = useState(true);
+  const [loadingLeaderboard, setLoadingLeaderboard] = useState(true);
+  const [campaigns, setCampaigns] = useState<ReferralCampaign[]>([]);
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [stats, setStats] = useState<ReferralStats | null>(null);
+  const [campaignApiMissing, setCampaignApiMissing] = useState(false);
+  const [leaderboardApiMissing, setLeaderboardApiMissing] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [createResult, setCreateResult] = useState<'success' | 'error' | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadCampaigns() {
+      setLoadingCampaigns(true);
+      try {
+        const resp = await txFetch<{
+          items: ReferralCampaign[];
+          stats?: ReferralStats;
+        }>('/api/v1/member/referral-campaigns?page=1&size=20');
+        if (!cancelled) {
+          setCampaigns(resp.items || []);
+          if (resp.stats) setStats(resp.stats);
+          setCampaignApiMissing(false);
+        }
+      } catch {
+        if (!cancelled) setCampaignApiMissing(true);
+      } finally {
+        if (!cancelled) setLoadingCampaigns(false);
+      }
+    }
+
+    async function loadLeaderboard() {
+      setLoadingLeaderboard(true);
+      try {
+        const resp = await txFetch<{ items: LeaderboardEntry[] }>(
+          '/api/v1/member/referrals/leaderboard?period=month&size=10',
+        );
+        if (!cancelled) {
+          setLeaderboard(resp.items || []);
+          setLeaderboardApiMissing(false);
+        }
+      } catch {
+        if (!cancelled) setLeaderboardApiMissing(true);
+      } finally {
+        if (!cancelled) setLoadingLeaderboard(false);
+      }
+    }
+
+    loadCampaigns();
+    loadLeaderboard();
+    return () => { cancelled = true; };
+  }, []);
+
+  async function handleCreateCampaign(data: Record<string, string>) {
+    setCreating(true);
+    setCreateResult(null);
+    try {
+      await txFetch('/api/v1/member/referral-campaigns', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+      setCreateResult('success');
+      setShowCreateModal(false);
+      // 刷新列表
+      const resp = await txFetch<{ items: ReferralCampaign[] }>(
+        '/api/v1/member/referral-campaigns?page=1&size=20',
+      );
+      setCampaigns(resp.items || []);
+    } catch {
+      setCreateResult('error');
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  // 计算KPI（优先用API stats，否则从campaigns推算）
+  const activeCampaigns = stats?.active_campaigns
+    ?? campaigns.filter(c => c.status === '进行中' || c.status === 'active').length;
+  const totalReferrers = stats?.total_referrers
+    ?? campaigns.reduce((s, c) => s + c.total_inviters, 0);
+  const totalNewMembers = stats?.total_new_members
+    ?? campaigns.reduce((s, c) => s + c.first_orders, 0);
+  const totalGmv = stats?.total_gmv_fen
+    ?? campaigns.reduce((s, c) => s + c.total_revenue_fen, 0);
+  const kFactor = stats?.k_factor
+    ?? (totalReferrers > 0
+      ? campaigns.reduce((s, c) => s + c.total_invitees, 0) / Math.max(totalReferrers, 1)
+      : 0);
+
   const tabs: { key: TabKey; label: string }[] = [
     { key: 'campaigns', label: '裂变活动' },
-    { key: 'funnel', label: '转化漏斗' },
-    { key: 'rewards', label: '奖励结算' },
-    { key: 'antifraud', label: '反作弊监控' },
+    { key: 'leaderboard', label: '推荐排行榜' },
+    { key: 'create', label: '+ 新建活动' },
   ];
 
   return (
-    <div style={{ maxWidth: 1400, margin: '0 auto' }}>
-      <h2 style={{ margin: '0 0 16px', fontSize: 22, fontWeight: 700 }}>裂变增长中心</h2>
-
-      {/* KPI */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12, marginBottom: 16 }}>
-        {[
-          { label: '活跃裂变活动', value: '3', change: 0, color: GREEN },
-          { label: '本月新增邀请', value: '2,432', change: 18.5, color: TEXT_1 },
-          { label: '裂变新客', value: '2,026', change: 22.3, color: BRAND },
-          { label: 'K系数', value: '1.45', change: 0.12, color: PURPLE },
-          { label: '裂变贡献营收', value: '\u00A535.7万', change: 15.2, color: GREEN },
-        ].map((kpi, i) => (
-          <div key={i} style={{
-            background: BG_1, borderRadius: 10, padding: '14px 16px',
-            border: `1px solid ${BG_2}`,
-          }}>
-            <div style={{ fontSize: 12, color: TEXT_3, marginBottom: 6 }}>{kpi.label}</div>
-            <div style={{ fontSize: 24, fontWeight: 700, color: kpi.color }}>{kpi.value}</div>
-            {kpi.change !== 0 && (
-              <div style={{ fontSize: 11, color: kpi.change > 0 ? GREEN : RED, marginTop: 4 }}>
-                {kpi.change > 0 ? '+' : ''}{kpi.change}% 较上期
-              </div>
-            )}
-          </div>
-        ))}
+    <div style={{ maxWidth: 1400, margin: '0 auto', background: BG, minHeight: '100vh', padding: '0 0 32px' }}>
+      {/* 页头 */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+        <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: TEXT_1 }}>裂变增长中心</h2>
+        <button onClick={() => setShowCreateModal(true)} style={{
+          padding: '8px 18px', borderRadius: 8, border: 'none',
+          background: BRAND, color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+        }}>+ 新建活动</button>
       </div>
 
+      {/* 创建结果提示 */}
+      {createResult === 'success' && (
+        <div style={{
+          padding: '10px 16px', background: GREEN + '22', borderRadius: 8,
+          marginBottom: 12, fontSize: 13, color: GREEN,
+          display: 'flex', justifyContent: 'space-between',
+        }}>
+          <span>✓ 活动创建成功！</span>
+          <button onClick={() => setCreateResult(null)} style={{
+            background: 'none', border: 'none', color: GREEN, cursor: 'pointer', fontSize: 16,
+          }}>×</button>
+        </div>
+      )}
+      {createResult === 'error' && (
+        <div style={{
+          padding: '10px 16px', background: RED + '22', borderRadius: 8,
+          marginBottom: 12, fontSize: 13, color: RED,
+          display: 'flex', justifyContent: 'space-between',
+        }}>
+          <span>✗ 创建失败，API 尚未就绪（功能对接中）</span>
+          <button onClick={() => setCreateResult(null)} style={{
+            background: 'none', border: 'none', color: RED, cursor: 'pointer', fontSize: 16,
+          }}>×</button>
+        </div>
+      )}
+
+      {/* KPI 卡片 */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12, marginBottom: 16 }}>
+        <KpiCard
+          label="活跃裂变活动"
+          value={campaignApiMissing ? '—' : String(activeCampaigns)}
+          sub={campaignApiMissing ? '功能对接中' : '进行中'}
+          color={GREEN}
+          icon="🎯"
+        />
+        <KpiCard
+          label="总推荐人数"
+          value={campaignApiMissing ? '—' : totalReferrers.toLocaleString()}
+          sub={campaignApiMissing ? '功能对接中' : '累计邀请人'}
+          color={TEXT_1}
+          icon="👥"
+        />
+        <KpiCard
+          label="成功转化"
+          value={campaignApiMissing ? '—' : totalNewMembers.toLocaleString()}
+          sub={campaignApiMissing ? '功能对接中' : '首单新客'}
+          color={BRAND}
+          icon="✅"
+        />
+        <KpiCard
+          label="K系数"
+          value={campaignApiMissing || kFactor === 0 ? '—' : kFactor.toFixed(2)}
+          sub={campaignApiMissing ? '功能对接中' : kFactor >= 1 ? '病毒式传播' : '待提升'}
+          color={PURPLE}
+          icon="📈"
+        />
+        <KpiCard
+          label="裂变GMV"
+          value={campaignApiMissing || totalGmv === 0 ? '—' : fenToWan(totalGmv)}
+          sub={campaignApiMissing ? '功能对接中' : '累计贡献'}
+          color={GREEN}
+          icon="💰"
+        />
+      </div>
+
+      {/* Tab 切换 */}
       <div style={{ display: 'flex', gap: 4, marginBottom: 16 }}>
-        {tabs.map(t => (
+        {tabs.filter(t => t.key !== 'create').map(t => (
           <button key={t.key} onClick={() => setActiveTab(t.key)} style={{
             padding: '8px 18px', borderRadius: 8, border: 'none', cursor: 'pointer',
             background: activeTab === t.key ? BRAND : BG_1,
@@ -380,10 +684,30 @@ export function ReferralCenterPage() {
         ))}
       </div>
 
-      {activeTab === 'campaigns' && <CampaignCards campaigns={MOCK_CAMPAIGNS} />}
-      {activeTab === 'funnel' && <FunnelChart steps={MOCK_FUNNEL} />}
-      {activeTab === 'rewards' && <RewardSettlement rewards={MOCK_REWARDS} />}
-      {activeTab === 'antifraud' && <AntiFraudMonitor alerts={MOCK_FRAUD_ALERTS} />}
+      {/* 内容区 */}
+      {activeTab === 'campaigns' && (
+        <CampaignList
+          campaigns={campaigns}
+          loading={loadingCampaigns}
+          apiMissing={campaignApiMissing}
+        />
+      )}
+      {activeTab === 'leaderboard' && (
+        <Leaderboard
+          entries={leaderboard}
+          loading={loadingLeaderboard}
+          apiMissing={leaderboardApiMissing}
+        />
+      )}
+
+      {/* 新建活动弹窗 */}
+      {showCreateModal && (
+        <CreateCampaignModal
+          onClose={() => { setShowCreateModal(false); setCreateResult(null); }}
+          onSubmit={handleCreateCampaign}
+          submitting={creating}
+        />
+      )}
     </div>
   );
 }

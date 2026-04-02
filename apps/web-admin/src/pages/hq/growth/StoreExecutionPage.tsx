@@ -1,13 +1,17 @@
 /**
  * StoreExecutionPage — 门店执行中心
  * 路由: /hq/growth/execution
- * 任务总览 + 日历视图 + 门店进度 + 问题升级看板
+ * 接入真实API：/api/v1/ops/daily-review/status 获取各门店E1-E8完成状态
+ * 支持按门店筛选，执行评分按E1-E8完成率计算
  */
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { txFetch } from '../../../api';
 
-const BG_1 = '#112228';
-const BG_2 = '#1a2a33';
-const BRAND = '#FF6B2C';
+// ---- 颜色常量 ----
+const BG_0 = '#0d1e28';
+const BG_1 = '#1a2a33';
+const BG_2 = '#243443';
+const BRAND = '#FF6B35';
 const GREEN = '#52c41a';
 const RED = '#ff4d4f';
 const YELLOW = '#faad14';
@@ -18,351 +22,462 @@ const TEXT_2 = '#cccccc';
 const TEXT_3 = '#999999';
 const TEXT_4 = '#666666';
 
-type TabKey = 'overview' | 'calendar' | 'progress' | 'issues';
+// ---- 类型定义 ----
 
-interface TaskSummary {
-  total: number;
-  completed: number;
-  pending: number;
-  overdue: number;
+interface NodeStatus {
+  node_id: string;
+  node_name: string;
+  status: 'completed' | 'in_progress' | 'pending' | 'skipped' | 'error';
+  completed_at?: string;
+  score?: number;
+  detail?: string;
 }
 
-interface StoreTask {
-  id: string;
-  taskName: string;
-  type: '物料布置' | '活动执行' | '话术培训' | '数据录入' | '顾客回访';
-  storeName: string;
-  assignee: string;
-  dueDate: string;
-  status: '已完成' | '进行中' | '待开始' | '已逾期';
-  completionRate: number;
-}
-
-interface CalendarEvent {
-  id: string;
+interface StoreReviewStatus {
   date: string;
-  title: string;
-  type: string;
-  storeCount: number;
-  status: '已完成' | '进行中' | '待启动';
+  store_id: string;
+  store_name: string;
+  region?: string;
+  overall_score: number;
+  nodes: NodeStatus[];
+  completed_count: number;
+  total_count: number;
 }
 
-interface StoreProgress {
-  storeName: string;
-  region: string;
-  totalTasks: number;
-  completedTasks: number;
-  overdueTasks: number;
-  avgCompletionTime: number;
-  score: number;
+interface AllStoresReviewResponse {
+  date: string;
+  items: StoreReviewStatus[];
+  total: number;
 }
 
-interface IssueItem {
-  id: string;
-  title: string;
-  storeName: string;
-  reporter: string;
-  severity: 'high' | 'medium' | 'low';
-  category: string;
-  reportedAt: string;
-  status: '待处理' | '处理中' | '已解决';
-  description: string;
-}
+// ---- 工具函数 ----
 
-const MOCK_SUMMARY: TaskSummary = { total: 248, completed: 186, pending: 42, overdue: 20 };
+const todayStr = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
 
-const MOCK_TASKS: StoreTask[] = [
-  { id: 'st1', taskName: '春季海报张贴', type: '物料布置', storeName: '芙蓉路店', assignee: '张伟', dueDate: '2026-03-26', status: '已完成', completionRate: 100 },
-  { id: 'st2', taskName: '新品话术培训', type: '话术培训', storeName: '万达广场店', assignee: '李敏', dueDate: '2026-03-26', status: '进行中', completionRate: 60 },
-  { id: 'st3', taskName: '会员日活动执行', type: '活动执行', storeName: '梅溪湖店', assignee: '王芳', dueDate: '2026-03-27', status: '待开始', completionRate: 0 },
-  { id: 'st4', taskName: '顾客满意度回访', type: '顾客回访', storeName: '五一广场店', assignee: '陈思', dueDate: '2026-03-25', status: '已逾期', completionRate: 30 },
-  { id: 'st5', taskName: '储值卡推广物料', type: '物料布置', storeName: '星沙店', assignee: '赵磊', dueDate: '2026-03-26', status: '已完成', completionRate: 100 },
-  { id: 'st6', taskName: '裂变活动推广', type: '活动执行', storeName: '河西大学城店', assignee: '周晓', dueDate: '2026-03-26', status: '进行中', completionRate: 45 },
-  { id: 'st7', taskName: '新品销量录入', type: '数据录入', storeName: '开福寺店', assignee: '吴刚', dueDate: '2026-03-24', status: '已逾期', completionRate: 0 },
-  { id: 'st8', taskName: '清明节活动准备', type: '活动执行', storeName: '芙蓉路店', assignee: '张伟', dueDate: '2026-04-02', status: '待开始', completionRate: 0 },
-];
+const calcScore = (nodes: NodeStatus[]): number => {
+  if (!nodes || nodes.length === 0) return 0;
+  const completed = nodes.filter(n => n.status === 'completed').length;
+  const total = nodes.length;
+  const base = Math.round((completed / total) * 100);
+  // 加权：error节点扣分
+  const errorCount = nodes.filter(n => n.status === 'error').length;
+  return Math.max(0, base - errorCount * 5);
+};
 
-const MOCK_CALENDAR: CalendarEvent[] = [
-  { id: 'ce1', date: '2026-03-20', title: '春季海报更换', type: '物料布置', storeCount: 12, status: '已完成' },
-  { id: 'ce2', date: '2026-03-22', title: '新品上线培训', type: '话术培训', storeCount: 12, status: '已完成' },
-  { id: 'ce3', date: '2026-03-24', title: '会员日准备', type: '活动执行', storeCount: 12, status: '已完成' },
-  { id: 'ce4', date: '2026-03-25', title: '会员日执行', type: '活动执行', storeCount: 12, status: '已完成' },
-  { id: 'ce5', date: '2026-03-26', title: '裂变推广启动', type: '活动执行', storeCount: 8, status: '进行中' },
-  { id: 'ce6', date: '2026-03-27', title: '顾客回访', type: '顾客回访', storeCount: 6, status: '待启动' },
-  { id: 'ce7', date: '2026-03-28', title: '周末促销布置', type: '物料布置', storeCount: 12, status: '待启动' },
-  { id: 'ce8', date: '2026-03-31', title: '月末数据汇总', type: '数据录入', storeCount: 12, status: '待启动' },
-  { id: 'ce9', date: '2026-04-02', title: '清明节准备', type: '活动执行', storeCount: 12, status: '待启动' },
-  { id: 'ce10', date: '2026-04-04', title: '清明节执行', type: '活动执行', storeCount: 12, status: '待启动' },
-];
+const NODE_NAMES: Record<string, string> = {
+  E1: '开市', E2: '目标', E3: '午市', E4: '午复',
+  E5: '晚备', E6: '晚市', E7: '收市', E8: '日结',
+};
 
-const MOCK_PROGRESS: StoreProgress[] = [
-  { storeName: '芙蓉路店', region: '华中区', totalTasks: 32, completedTasks: 30, overdueTasks: 0, avgCompletionTime: 1.2, score: 95 },
-  { storeName: '万达广场店', region: '华中区', totalTasks: 32, completedTasks: 28, overdueTasks: 1, avgCompletionTime: 1.5, score: 88 },
-  { storeName: '梅溪湖店', region: '华中区', totalTasks: 32, completedTasks: 26, overdueTasks: 2, avgCompletionTime: 1.8, score: 82 },
-  { storeName: '五一广场店', region: '华中区', totalTasks: 32, completedTasks: 22, overdueTasks: 5, avgCompletionTime: 2.3, score: 72 },
-  { storeName: '星沙店', region: '华中区', totalTasks: 32, completedTasks: 27, overdueTasks: 1, avgCompletionTime: 1.6, score: 85 },
-  { storeName: '河西大学城店', region: '华中区', totalTasks: 32, completedTasks: 24, overdueTasks: 3, avgCompletionTime: 2.0, score: 76 },
-  { storeName: '开福寺店', region: '华中区', totalTasks: 32, completedTasks: 20, overdueTasks: 6, avgCompletionTime: 2.8, score: 65 },
-];
+// ---- Tab 类型 ----
 
-const MOCK_ISSUES: IssueItem[] = [
-  { id: 'is1', title: '新品物料未到货', storeName: '五一广场店', reporter: '陈思', severity: 'high', category: '物料问题', reportedAt: '2026-03-26 09:30', status: '待处理', description: '酸汤系列推广海报和桌贴未到货，影响新品推广执行' },
-  { id: 'is2', title: '收银系统券核销异常', storeName: '开福寺店', reporter: '吴刚', severity: 'high', category: '系统问题', reportedAt: '2026-03-26 10:15', status: '处理中', description: 'POS系统无法正确核销老带新邀请券，多位顾客投诉' },
-  { id: 'is3', title: '培训人员不足', storeName: '河西大学城店', reporter: '周晓', severity: 'medium', category: '人员问题', reportedAt: '2026-03-25 16:00', status: '待处理', description: '新品话术培训需要全员参与，但当天排班人手不够' },
-  { id: 'is4', title: '活动海报破损', storeName: '梅溪湖店', reporter: '王芳', severity: 'low', category: '物料问题', reportedAt: '2026-03-25 14:20', status: '已解决', description: '门口展架海报因风雨破损，需要补发' },
-  { id: 'is5', title: '储值活动规则不清', storeName: '万达广场店', reporter: '李敏', severity: 'medium', category: '流程问题', reportedAt: '2026-03-24 11:30', status: '已解决', description: '员工对储值赠送规则理解不一致，需重新培训' },
-];
+type TabKey = 'overview' | 'store_nodes' | 'ranking' | 'anomalies';
 
-function TaskOverview({ summary, tasks }: { summary: TaskSummary; tasks: StoreTask[] }) {
-  const statusColors: Record<string, string> = { '已完成': GREEN, '进行中': BLUE, '待开始': TEXT_4, '已逾期': RED };
-  const typeColors: Record<string, string> = { '物料布置': BRAND, '活动执行': BLUE, '话术培训': PURPLE, '数据录入': TEXT_3, '顾客回访': GREEN };
+// ---- 子组件 ----
 
+function LoadingSpinner() {
   return (
-    <div>
-      {/* Summary cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 16 }}>
-        {[
-          { label: '总任务', value: summary.total, color: TEXT_1 },
-          { label: '已完成', value: summary.completed, color: GREEN },
-          { label: '待完成', value: summary.pending, color: YELLOW },
-          { label: '已逾期', value: summary.overdue, color: RED },
-        ].map((c, i) => (
-          <div key={i} style={{
-            background: BG_1, borderRadius: 10, padding: '16px 18px',
-            border: `1px solid ${BG_2}`,
-          }}>
-            <div style={{ fontSize: 12, color: TEXT_3, marginBottom: 6 }}>{c.label}</div>
-            <div style={{ fontSize: 30, fontWeight: 700, color: c.color }}>{c.value}</div>
-            <div style={{
-              width: '100%', height: 4, borderRadius: 2, background: BG_2, marginTop: 8,
-            }}>
-              <div style={{
-                width: `${(c.value / summary.total) * 100}%`, height: '100%',
-                borderRadius: 2, background: c.color,
-              }} />
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Task list */}
-      <div style={{
-        background: BG_1, borderRadius: 10, padding: 16,
-        border: `1px solid ${BG_2}`,
-      }}>
-        <h3 style={{ margin: '0 0 14px', fontSize: 15, fontWeight: 700, color: TEXT_1 }}>任务列表</h3>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-          <thead>
-            <tr style={{ borderBottom: `1px solid ${BG_2}` }}>
-              {['任务名称', '类型', '门店', '负责人', '截止日期', '完成度', '状态'].map(h => (
-                <th key={h} style={{ textAlign: 'left', padding: '8px 10px', color: TEXT_4, fontWeight: 600, fontSize: 11 }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {tasks.map(t => (
-              <tr key={t.id} style={{ borderBottom: `1px solid ${BG_2}` }}>
-                <td style={{ padding: '10px', color: TEXT_1, fontWeight: 500 }}>{t.taskName}</td>
-                <td style={{ padding: '10px' }}>
-                  <span style={{
-                    fontSize: 10, padding: '2px 8px', borderRadius: 4,
-                    background: (typeColors[t.type] || TEXT_4) + '22', color: typeColors[t.type] || TEXT_4, fontWeight: 600,
-                  }}>{t.type}</span>
-                </td>
-                <td style={{ padding: '10px', color: TEXT_2 }}>{t.storeName}</td>
-                <td style={{ padding: '10px', color: TEXT_3 }}>{t.assignee}</td>
-                <td style={{ padding: '10px', color: t.status === '已逾期' ? RED : TEXT_3 }}>{t.dueDate}</td>
-                <td style={{ padding: '10px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <div style={{ width: 60, height: 4, borderRadius: 2, background: BG_2 }}>
-                      <div style={{
-                        width: `${t.completionRate}%`, height: '100%', borderRadius: 2,
-                        background: t.completionRate === 100 ? GREEN : t.completionRate > 0 ? BLUE : TEXT_4,
-                      }} />
-                    </div>
-                    <span style={{ fontSize: 11, color: TEXT_3 }}>{t.completionRate}%</span>
-                  </div>
-                </td>
-                <td style={{ padding: '10px' }}>
-                  <span style={{
-                    fontSize: 10, padding: '2px 8px', borderRadius: 4,
-                    background: statusColors[t.status] + '22', color: statusColors[t.status], fontWeight: 600,
-                  }}>{t.status}</span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+    <div style={{
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      padding: 40, color: TEXT_4, fontSize: 14,
+    }}>
+      加载中...
     </div>
   );
 }
 
-function CalendarView({ events }: { events: CalendarEvent[] }) {
-  const statusColors: Record<string, string> = { '已完成': GREEN, '进行中': BLUE, '待启动': TEXT_4 };
-  // Group by week
-  const weeks = ['第12周 (3/20-3/26)', '第13周 (3/27-3/31)', '第14周 (4/1-4/6)'];
-  const weekEvents = [
-    events.filter(e => e.date >= '2026-03-20' && e.date <= '2026-03-26'),
-    events.filter(e => e.date >= '2026-03-27' && e.date <= '2026-03-31'),
-    events.filter(e => e.date >= '2026-04-01' && e.date <= '2026-04-06'),
-  ];
-
+function ErrorDisplay({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (
     <div style={{
-      background: BG_1, borderRadius: 10, padding: 20,
-      border: `1px solid ${BG_2}`,
+      padding: '20px', borderRadius: 10,
+      background: BG_1, border: `1px solid ${RED}44`,
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
     }}>
-      <h3 style={{ margin: '0 0 16px', fontSize: 15, fontWeight: 700, color: TEXT_1 }}>活动日历</h3>
-      {weeks.map((week, wi) => (
-        <div key={wi} style={{ marginBottom: 20 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: TEXT_2, marginBottom: 10, padding: '4px 0', borderBottom: `1px solid ${BG_2}` }}>
-            {week}
+      <div>
+        <div style={{ color: RED, fontWeight: 600, fontSize: 13 }}>数据加载失败</div>
+        <div style={{ color: TEXT_4, fontSize: 12, marginTop: 4 }}>{message}</div>
+      </div>
+      <button
+        onClick={onRetry}
+        style={{
+          padding: '6px 16px', borderRadius: 6, border: `1px solid ${RED}66`,
+          background: 'transparent', color: RED, fontSize: 12, cursor: 'pointer',
+          fontWeight: 600,
+        }}
+      >
+        重试
+      </button>
+    </div>
+  );
+}
+
+// 门店筛选器
+function StoreFilter({
+  stores,
+  selectedStore,
+  onSelect,
+}: {
+  stores: StoreReviewStatus[];
+  selectedStore: string;
+  onSelect: (id: string) => void;
+}) {
+  return (
+    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
+      <button
+        onClick={() => onSelect('all')}
+        style={{
+          padding: '6px 14px', borderRadius: 8, border: 'none', cursor: 'pointer',
+          background: selectedStore === 'all' ? BRAND : BG_2,
+          color: selectedStore === 'all' ? '#fff' : TEXT_3,
+          fontSize: 12, fontWeight: 600, transition: 'all .15s',
+        }}
+      >
+        全部门店
+      </button>
+      {stores.map(s => (
+        <button
+          key={s.store_id}
+          onClick={() => onSelect(s.store_id)}
+          style={{
+            padding: '6px 14px', borderRadius: 8, border: 'none', cursor: 'pointer',
+            background: selectedStore === s.store_id ? BRAND : BG_2,
+            color: selectedStore === s.store_id ? '#fff' : TEXT_3,
+            fontSize: 12, fontWeight: 600, transition: 'all .15s',
+          }}
+        >
+          {s.store_name}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// 汇总指标卡片
+function SummaryCards({ stores }: { stores: StoreReviewStatus[] }) {
+  const total = stores.length;
+  const avgScore = total > 0
+    ? Math.round(stores.reduce((s, st) => s + calcScore(st.nodes), 0) / total)
+    : 0;
+  const allCompleted = stores.filter(st => st.completed_count === st.total_count).length;
+  const hasError = stores.filter(st => st.nodes?.some(n => n.status === 'error')).length;
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 20 }}>
+      {[
+        { label: '参与门店', value: total, color: TEXT_1, icon: '🏪' },
+        { label: '平均执行分', value: avgScore, color: avgScore >= 85 ? GREEN : avgScore >= 70 ? YELLOW : RED, icon: '📊' },
+        { label: '全节点完成', value: allCompleted, color: GREEN, icon: '✅' },
+        { label: '有异常门店', value: hasError, color: hasError > 0 ? RED : TEXT_4, icon: '⚠️' },
+      ].map((item, i) => (
+        <div key={i} style={{
+          background: BG_1, borderRadius: 12, padding: '16px 18px',
+          border: `1px solid ${BG_2}`,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+            <span style={{ fontSize: 18 }}>{item.icon}</span>
+            <span style={{ fontSize: 12, color: TEXT_3 }}>{item.label}</span>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {weekEvents[wi].map(e => (
-              <div key={e.id} style={{
-                display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px',
-                background: BG_2, borderRadius: 8,
-                borderLeft: `3px solid ${statusColors[e.status]}`,
-              }}>
-                <span style={{ fontSize: 13, fontWeight: 700, color: BRAND, minWidth: 70 }}>{e.date.slice(5)}</span>
-                <span style={{ fontSize: 13, fontWeight: 600, color: TEXT_1, flex: 1 }}>{e.title}</span>
-                <span style={{
-                  fontSize: 10, padding: '2px 8px', borderRadius: 4,
-                  background: BG_1, color: TEXT_3, fontWeight: 600,
-                }}>{e.type}</span>
-                <span style={{ fontSize: 11, color: TEXT_3 }}>{e.storeCount} 门店</span>
-                <span style={{
-                  fontSize: 10, padding: '2px 8px', borderRadius: 4,
-                  background: statusColors[e.status] + '22', color: statusColors[e.status], fontWeight: 600,
-                }}>{e.status}</span>
-              </div>
-            ))}
-            {weekEvents[wi].length === 0 && (
-              <div style={{ padding: 14, textAlign: 'center', fontSize: 12, color: TEXT_4 }}>暂无活动安排</div>
-            )}
-          </div>
+          <div style={{ fontSize: 28, fontWeight: 700, color: item.color }}>{item.value}</div>
         </div>
       ))}
     </div>
   );
 }
 
-function StoreProgressTable({ stores }: { stores: StoreProgress[] }) {
-  const sorted = [...stores].sort((a, b) => b.score - a.score);
+// 门店E节点详情表
+function StoreNodesTable({ stores, selectedStore }: { stores: StoreReviewStatus[]; selectedStore: string }) {
+  const filtered = selectedStore === 'all' ? stores : stores.filter(s => s.store_id === selectedStore);
+
+  const statusDot = (status: string) => {
+    const colors: Record<string, string> = {
+      completed: GREEN, in_progress: BLUE, pending: TEXT_4, skipped: TEXT_4, error: RED,
+    };
+    return <span style={{
+      display: 'inline-block', width: 8, height: 8, borderRadius: 4,
+      background: colors[status] || TEXT_4,
+    }} />;
+  };
+
+  const nodeKeys = ['E1', 'E2', 'E3', 'E4', 'E5', 'E6', 'E7', 'E8'];
 
   return (
-    <div style={{
-      background: BG_1, borderRadius: 10, padding: 16,
-      border: `1px solid ${BG_2}`,
-    }}>
-      <h3 style={{ margin: '0 0 14px', fontSize: 15, fontWeight: 700, color: TEXT_1 }}>门店执行进度</h3>
+    <div style={{ background: BG_1, borderRadius: 12, padding: 16, border: `1px solid ${BG_2}` }}>
+      <h3 style={{ margin: '0 0 14px', fontSize: 15, fontWeight: 700, color: TEXT_1 }}>
+        门店 E1-E8 节点执行状态
+      </h3>
+
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, minWidth: 700 }}>
+          <thead>
+            <tr style={{ borderBottom: `1px solid ${BG_2}` }}>
+              <th style={{ textAlign: 'left', padding: '8px 10px', color: TEXT_4, fontWeight: 600, fontSize: 11 }}>门店</th>
+              {nodeKeys.map(k => (
+                <th key={k} style={{ textAlign: 'center', padding: '8px 6px', color: TEXT_4, fontWeight: 600, fontSize: 11, minWidth: 54 }}>
+                  <div>{k}</div>
+                  <div style={{ fontWeight: 400, fontSize: 9, color: TEXT_4 }}>{NODE_NAMES[k]}</div>
+                </th>
+              ))}
+              <th style={{ textAlign: 'center', padding: '8px 10px', color: TEXT_4, fontWeight: 600, fontSize: 11 }}>完成率</th>
+              <th style={{ textAlign: 'center', padding: '8px 10px', color: TEXT_4, fontWeight: 600, fontSize: 11 }}>评分</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map(store => {
+              const nodeMap = new Map(store.nodes?.map(n => [n.node_id.toUpperCase(), n]));
+              const score = calcScore(store.nodes ?? []);
+              const completedCount = store.nodes?.filter(n => n.status === 'completed').length ?? 0;
+              const totalCount = store.nodes?.length ?? 8;
+              const pct = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+
+              return (
+                <tr key={store.store_id} style={{ borderBottom: `1px solid ${BG_2}` }}>
+                  <td style={{ padding: '10px', color: TEXT_1, fontWeight: 500, whiteSpace: 'nowrap' }}>
+                    {store.store_name}
+                  </td>
+                  {nodeKeys.map(k => {
+                    const node = nodeMap.get(k);
+                    const status = node?.status ?? 'pending';
+                    const colors: Record<string, string> = {
+                      completed: GREEN, in_progress: BLUE, pending: TEXT_4, skipped: TEXT_4, error: RED,
+                    };
+                    const labels: Record<string, string> = {
+                      completed: '✓', in_progress: '⟳', pending: '·', skipped: '—', error: '✗',
+                    };
+                    return (
+                      <td key={k} style={{ padding: '10px 6px', textAlign: 'center' }}>
+                        <span
+                          title={node?.detail || status}
+                          style={{ color: colors[status], fontSize: 14, fontWeight: 700 }}
+                        >
+                          {labels[status] || '·'}
+                        </span>
+                      </td>
+                    );
+                  })}
+                  <td style={{ padding: '10px', textAlign: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'center' }}>
+                      <div style={{ width: 48, height: 4, borderRadius: 2, background: BG_2 }}>
+                        <div style={{
+                          width: `${pct}%`, height: '100%', borderRadius: 2,
+                          background: pct >= 80 ? GREEN : pct >= 50 ? YELLOW : RED,
+                        }} />
+                      </div>
+                      <span style={{ fontSize: 11, color: TEXT_3 }}>{pct}%</span>
+                    </div>
+                  </td>
+                  <td style={{ padding: '10px', textAlign: 'center' }}>
+                    <span style={{
+                      fontSize: 13, fontWeight: 700,
+                      color: score >= 85 ? GREEN : score >= 70 ? YELLOW : RED,
+                    }}>
+                      {score}
+                    </span>
+                  </td>
+                </tr>
+              );
+            })}
+            {filtered.length === 0 && (
+              <tr>
+                <td colSpan={11} style={{ padding: '24px', textAlign: 'center', color: TEXT_4 }}>
+                  暂无数据
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* 图例 */}
+      <div style={{
+        marginTop: 12, display: 'flex', gap: 16, flexWrap: 'wrap',
+        padding: '8px 10px', background: BG_2, borderRadius: 6,
+      }}>
+        {[
+          { symbol: '✓', label: '已完成', color: GREEN },
+          { symbol: '⟳', label: '进行中', color: BLUE },
+          { symbol: '·', label: '待执行', color: TEXT_4 },
+          { symbol: '—', label: '已跳过', color: TEXT_4 },
+          { symbol: '✗', label: '异常', color: RED },
+        ].map(item => (
+          <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <span style={{ color: item.color, fontSize: 13, fontWeight: 700 }}>{item.symbol}</span>
+            <span style={{ fontSize: 11, color: TEXT_4 }}>{item.label}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// 门店排名
+function StoreRanking({ stores }: { stores: StoreReviewStatus[] }) {
+  const ranked = [...stores]
+    .map(s => ({
+      ...s,
+      score: calcScore(s.nodes ?? []),
+      completionRate: s.total_count > 0
+        ? Math.round((s.completed_count / s.total_count) * 100)
+        : 0,
+    }))
+    .sort((a, b) => b.score - a.score);
+
+  return (
+    <div style={{ background: BG_1, borderRadius: 12, padding: 16, border: `1px solid ${BG_2}` }}>
+      <h3 style={{ margin: '0 0 14px', fontSize: 15, fontWeight: 700, color: TEXT_1 }}>
+        门店执行评分排名
+      </h3>
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
         <thead>
           <tr style={{ borderBottom: `1px solid ${BG_2}` }}>
-            {['排名', '门店', '区域', '总任务', '已完成', '已逾期', '平均耗时(天)', '完成率', '评分'].map(h => (
-              <th key={h} style={{ textAlign: 'left', padding: '8px 10px', color: TEXT_4, fontWeight: 600, fontSize: 11 }}>{h}</th>
+            {['排名', '门店', '区域', '完成节点', '完成率', 'E节点完成率', '综合评分'].map(h => (
+              <th key={h} style={{ textAlign: 'left', padding: '8px 10px', color: TEXT_4, fontWeight: 600, fontSize: 11 }}>
+                {h}
+              </th>
             ))}
           </tr>
         </thead>
         <tbody>
-          {sorted.map((s, i) => {
-            const completionRate = (s.completedTasks / s.totalTasks * 100).toFixed(0);
-            return (
-              <tr key={s.storeName} style={{ borderBottom: `1px solid ${BG_2}` }}>
-                <td style={{ padding: '10px' }}>
-                  <span style={{
-                    width: 24, height: 24, borderRadius: 12, display: 'inline-flex',
-                    alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700,
-                    background: i < 3 ? BRAND + '22' : BG_2, color: i < 3 ? BRAND : TEXT_4,
-                  }}>{i + 1}</span>
-                </td>
-                <td style={{ padding: '10px', color: TEXT_1, fontWeight: 500 }}>{s.storeName}</td>
-                <td style={{ padding: '10px', color: TEXT_3 }}>{s.region}</td>
-                <td style={{ padding: '10px', color: TEXT_2 }}>{s.totalTasks}</td>
-                <td style={{ padding: '10px', color: GREEN }}>{s.completedTasks}</td>
-                <td style={{ padding: '10px', color: s.overdueTasks > 0 ? RED : TEXT_4 }}>{s.overdueTasks}</td>
-                <td style={{ padding: '10px', color: s.avgCompletionTime > 2 ? YELLOW : TEXT_2 }}>{s.avgCompletionTime}</td>
-                <td style={{ padding: '10px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <div style={{ width: 60, height: 4, borderRadius: 2, background: BG_2 }}>
-                      <div style={{
-                        width: `${completionRate}%`, height: '100%', borderRadius: 2,
-                        background: Number(completionRate) > 85 ? GREEN : Number(completionRate) > 70 ? YELLOW : RED,
-                      }} />
-                    </div>
-                    <span style={{ fontSize: 11, color: TEXT_3 }}>{completionRate}%</span>
+          {ranked.map((s, i) => (
+            <tr key={s.store_id} style={{ borderBottom: `1px solid ${BG_2}` }}>
+              <td style={{ padding: '10px' }}>
+                <span style={{
+                  width: 24, height: 24, borderRadius: 12,
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 11, fontWeight: 700,
+                  background: i < 3 ? BRAND + '22' : BG_2,
+                  color: i < 3 ? BRAND : TEXT_4,
+                }}>
+                  {i + 1}
+                </span>
+              </td>
+              <td style={{ padding: '10px', color: TEXT_1, fontWeight: 500 }}>{s.store_name}</td>
+              <td style={{ padding: '10px', color: TEXT_3 }}>{s.region || '—'}</td>
+              <td style={{ padding: '10px', color: TEXT_2 }}>
+                {s.completed_count}/{s.total_count}
+              </td>
+              <td style={{ padding: '10px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <div style={{ width: 60, height: 4, borderRadius: 2, background: BG_2 }}>
+                    <div style={{
+                      width: `${s.completionRate}%`, height: '100%', borderRadius: 2,
+                      background: s.completionRate >= 80 ? GREEN : s.completionRate >= 50 ? YELLOW : RED,
+                    }} />
                   </div>
-                </td>
-                <td style={{ padding: '10px' }}>
-                  <span style={{
-                    fontSize: 14, fontWeight: 700,
-                    color: s.score >= 85 ? GREEN : s.score >= 70 ? YELLOW : RED,
-                  }}>{s.score}</span>
-                </td>
-              </tr>
-            );
-          })}
+                  <span style={{ fontSize: 11, color: TEXT_3 }}>{s.completionRate}%</span>
+                </div>
+              </td>
+              <td style={{ padding: '10px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  {(['E1','E2','E3','E4','E5','E6','E7','E8']).map(k => {
+                    const node = s.nodes?.find(n => n.node_id.toUpperCase() === k);
+                    const status = node?.status ?? 'pending';
+                    const colors: Record<string, string> = {
+                      completed: GREEN, in_progress: BLUE, pending: BG_2, skipped: BG_2, error: RED,
+                    };
+                    return (
+                      <div key={k} title={k} style={{
+                        width: 10, height: 10, borderRadius: 2,
+                        background: colors[status] || BG_2,
+                      }} />
+                    );
+                  })}
+                </div>
+              </td>
+              <td style={{ padding: '10px' }}>
+                <span style={{
+                  fontSize: 15, fontWeight: 700,
+                  color: s.score >= 85 ? GREEN : s.score >= 70 ? YELLOW : RED,
+                }}>
+                  {s.score}
+                </span>
+              </td>
+            </tr>
+          ))}
+          {ranked.length === 0 && (
+            <tr>
+              <td colSpan={7} style={{ padding: '24px', textAlign: 'center', color: TEXT_4 }}>
+                暂无数据
+              </td>
+            </tr>
+          )}
         </tbody>
       </table>
     </div>
   );
 }
 
-function IssueBoard({ issues }: { issues: IssueItem[] }) {
-  const sevColors: Record<string, string> = { high: RED, medium: YELLOW, low: BLUE };
-  const sevLabels: Record<string, string> = { high: '紧急', medium: '一般', low: '低' };
-  const statusColors: Record<string, string> = { '待处理': RED, '处理中': YELLOW, '已解决': GREEN };
+// 异常节点面板
+function AnomalyPanel({ stores, selectedStore }: { stores: StoreReviewStatus[]; selectedStore: string }) {
+  const filtered = selectedStore === 'all' ? stores : stores.filter(s => s.store_id === selectedStore);
 
-  const columns = ['待处理', '处理中', '已解决'] as const;
+  const anomalies: Array<{
+    store: StoreReviewStatus;
+    node: NodeStatus;
+  }> = [];
+
+  for (const store of filtered) {
+    for (const node of store.nodes ?? []) {
+      if (node.status === 'error') {
+        anomalies.push({ store, node });
+      }
+    }
+  }
 
   return (
-    <div style={{
-      background: BG_1, borderRadius: 10, padding: 16,
-      border: `1px solid ${BG_2}`,
-    }}>
-      <h3 style={{ margin: '0 0 14px', fontSize: 15, fontWeight: 700, color: TEXT_1 }}>问题升级看板</h3>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
-        {columns.map(col => {
-          const colIssues = issues.filter(i => i.status === col);
-          return (
-            <div key={col}>
-              <div style={{
-                padding: '8px 12px', borderRadius: '8px 8px 0 0',
-                background: statusColors[col] + '22', textAlign: 'center',
-                fontSize: 13, fontWeight: 600, color: statusColors[col],
-              }}>
-                {col} ({colIssues.length})
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingTop: 8 }}>
-                {colIssues.map(issue => (
-                  <div key={issue.id} style={{
-                    padding: '12px 14px', background: BG_2, borderRadius: 8,
-                    borderLeft: `3px solid ${sevColors[issue.severity]}`,
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-                      <span style={{
-                        fontSize: 10, padding: '1px 6px', borderRadius: 4,
-                        background: sevColors[issue.severity] + '22', color: sevColors[issue.severity], fontWeight: 700,
-                      }}>{sevLabels[issue.severity]}</span>
-                      <span style={{
-                        fontSize: 10, padding: '1px 6px', borderRadius: 4,
-                        background: BG_1, color: TEXT_3, fontWeight: 600,
-                      }}>{issue.category}</span>
-                    </div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: TEXT_1, marginBottom: 4 }}>{issue.title}</div>
-                    <div style={{ fontSize: 11, color: TEXT_3, lineHeight: 1.5, marginBottom: 6 }}>{issue.description}</div>
-                    <div style={{ fontSize: 10, color: TEXT_4 }}>
-                      {issue.storeName} | {issue.reporter} | {issue.reportedAt}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          );
-        })}
+    <div style={{ background: BG_1, borderRadius: 12, padding: 16, border: `1px solid ${BG_2}` }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+        <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: TEXT_1 }}>异常节点</h3>
+        {anomalies.length > 0 && (
+          <span style={{
+            padding: '2px 8px', borderRadius: 8,
+            background: RED + '22', color: RED, fontSize: 11, fontWeight: 700,
+          }}>
+            {anomalies.length} 个异常
+          </span>
+        )}
       </div>
+
+      {anomalies.length === 0 ? (
+        <div style={{
+          padding: '32px', textAlign: 'center',
+          color: GREEN, fontSize: 14,
+        }}>
+          <div style={{ fontSize: 32, marginBottom: 8 }}>✓</div>
+          <div>所有门店节点运行正常</div>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {anomalies.map(({ store, node }, i) => (
+            <div key={i} style={{
+              padding: '12px 14px', background: BG_2, borderRadius: 8,
+              borderLeft: `3px solid ${RED}`,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{
+                    padding: '2px 8px', borderRadius: 4,
+                    background: RED + '22', color: RED, fontSize: 11, fontWeight: 700,
+                  }}>
+                    {node.node_id.toUpperCase()}
+                  </span>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: TEXT_1 }}>
+                    {NODE_NAMES[node.node_id.toUpperCase()] || node.node_name}
+                  </span>
+                </div>
+                <span style={{ fontSize: 12, color: TEXT_3 }}>{store.store_name}</span>
+              </div>
+              {node.detail && (
+                <div style={{ fontSize: 12, color: TEXT_3, lineHeight: 1.5 }}>
+                  {node.detail}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -371,32 +486,273 @@ function IssueBoard({ issues }: { issues: IssueItem[] }) {
 
 export function StoreExecutionPage() {
   const [activeTab, setActiveTab] = useState<TabKey>('overview');
-  const tabs: { key: TabKey; label: string }[] = [
-    { key: 'overview', label: '任务总览' },
-    { key: 'calendar', label: '活动日历' },
-    { key: 'progress', label: '门店进度' },
-    { key: 'issues', label: '问题升级' },
+  const [date, setDate] = useState(todayStr());
+  const [selectedStore, setSelectedStore] = useState('all');
+
+  const [storesData, setStoresData] = useState<StoreReviewStatus[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const tabs: { key: TabKey; label: string; icon: string }[] = [
+    { key: 'overview',     label: '总览',     icon: '📊' },
+    { key: 'store_nodes',  label: '节点状态',  icon: '🔗' },
+    { key: 'ranking',      label: '排名',      icon: '🏆' },
+    { key: 'anomalies',    label: '异常',      icon: '⚠️' },
   ];
 
-  return (
-    <div style={{ maxWidth: 1400, margin: '0 auto' }}>
-      <h2 style={{ margin: '0 0 16px', fontSize: 22, fontWeight: 700 }}>门店执行中心</h2>
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const resp = await txFetch<AllStoresReviewResponse>(
+        `/api/v1/ops/daily-review/status?date=${encodeURIComponent(date)}&all_stores=true`,
+      );
+      setStoresData(resp.items ?? []);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '数据加载失败');
+      setStoresData([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [date]);
 
-      <div style={{ display: 'flex', gap: 4, marginBottom: 16 }}>
-        {tabs.map(t => (
-          <button key={t.key} onClick={() => setActiveTab(t.key)} style={{
-            padding: '8px 18px', borderRadius: 8, border: 'none', cursor: 'pointer',
-            background: activeTab === t.key ? BRAND : BG_1,
-            color: activeTab === t.key ? '#fff' : TEXT_3,
-            fontSize: 13, fontWeight: 600,
-          }}>{t.label}</button>
-        ))}
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  // 当选中的门店在新数据中不存在时，重置为全部
+  useEffect(() => {
+    if (selectedStore !== 'all' && storesData.length > 0) {
+      const exists = storesData.some(s => s.store_id === selectedStore);
+      if (!exists) setSelectedStore('all');
+    }
+  }, [storesData, selectedStore]);
+
+  const anomalyCount = storesData.reduce((sum, s) => (
+    sum + (s.nodes?.filter(n => n.status === 'error').length ?? 0)
+  ), 0);
+
+  return (
+    <div style={{ maxWidth: 1400, margin: '0 auto', background: BG_0, minHeight: '100vh', padding: '0 0 40px' }}>
+      {/* 顶部 */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        marginBottom: 20, flexWrap: 'wrap', gap: 12,
+        padding: '20px 0 16px',
+        borderBottom: `1px solid ${BG_2}`,
+      }}>
+        <div>
+          <h2 style={{ margin: '0 0 4px', fontSize: 22, fontWeight: 700, color: TEXT_1 }}>
+            门店执行中心
+          </h2>
+          <div style={{ fontSize: 12, color: TEXT_3 }}>
+            各门店 E1-E8 节点完成状态实时监控
+          </div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <input
+            type="date"
+            value={date}
+            onChange={e => setDate(e.target.value)}
+            style={{
+              background: BG_1, border: `1px solid ${BG_2}`, borderRadius: 8,
+              color: TEXT_2, padding: '6px 12px', fontSize: 13, outline: 'none', cursor: 'pointer',
+            }}
+          />
+          <button
+            onClick={loadData}
+            disabled={loading}
+            style={{
+              padding: '8px 16px', borderRadius: 8, border: `1px solid ${BG_2}`,
+              background: loading ? BG_2 : BG_1, color: loading ? TEXT_4 : TEXT_2,
+              fontSize: 13, cursor: loading ? 'not-allowed' : 'pointer',
+              fontWeight: 600,
+            }}
+          >
+            {loading ? '加载中...' : '刷新'}
+          </button>
+        </div>
       </div>
 
-      {activeTab === 'overview' && <TaskOverview summary={MOCK_SUMMARY} tasks={MOCK_TASKS} />}
-      {activeTab === 'calendar' && <CalendarView events={MOCK_CALENDAR} />}
-      {activeTab === 'progress' && <StoreProgressTable stores={MOCK_PROGRESS} />}
-      {activeTab === 'issues' && <IssueBoard issues={MOCK_ISSUES} />}
+      {/* 错误提示 */}
+      {error && !loading && (
+        <div style={{ marginBottom: 16 }}>
+          <ErrorDisplay message={error} onRetry={loadData} />
+        </div>
+      )}
+
+      {/* 汇总卡片 */}
+      {!loading && !error && (
+        <SummaryCards stores={storesData} />
+      )}
+
+      {/* 门店筛选 */}
+      {!loading && storesData.length > 0 && (
+        <StoreFilter
+          stores={storesData}
+          selectedStore={selectedStore}
+          onSelect={setSelectedStore}
+        />
+      )}
+
+      {/* Tab 栏 */}
+      <div style={{ display: 'flex', gap: 4, marginBottom: 16 }}>
+        {tabs.map(t => {
+          const isActive = activeTab === t.key;
+          const showBadge = t.key === 'anomalies' && anomalyCount > 0;
+          return (
+            <button
+              key={t.key}
+              onClick={() => setActiveTab(t.key)}
+              style={{
+                padding: '8px 18px', borderRadius: 8, border: 'none', cursor: 'pointer',
+                background: isActive ? BRAND : BG_1,
+                color: isActive ? '#fff' : TEXT_3,
+                fontSize: 13, fontWeight: 600,
+                display: 'flex', alignItems: 'center', gap: 6,
+                transition: 'all .15s',
+              }}
+            >
+              <span>{t.icon}</span>
+              <span>{t.label}</span>
+              {showBadge && (
+                <span style={{
+                  background: RED, color: '#fff',
+                  fontSize: 10, padding: '1px 5px', borderRadius: 8, fontWeight: 700,
+                }}>
+                  {anomalyCount}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* 内容区 */}
+      {loading ? (
+        <LoadingSpinner />
+      ) : (
+        <>
+          {activeTab === 'overview' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {/* 快速状态概览 */}
+              <div style={{
+                background: BG_1, borderRadius: 12, padding: 16,
+                border: `1px solid ${BG_2}`,
+              }}>
+                <h3 style={{ margin: '0 0 14px', fontSize: 15, fontWeight: 700, color: TEXT_1 }}>
+                  今日执行快览
+                  <span style={{ fontSize: 12, color: TEXT_3, fontWeight: 400, marginLeft: 8 }}>
+                    {date}
+                  </span>
+                </h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {(selectedStore === 'all' ? storesData : storesData.filter(s => s.store_id === selectedStore))
+                    .map(store => {
+                      const score = calcScore(store.nodes ?? []);
+                      const pct = store.total_count > 0
+                        ? Math.round((store.completed_count / store.total_count) * 100)
+                        : 0;
+                      const hasError = store.nodes?.some(n => n.status === 'error');
+
+                      return (
+                        <div key={store.store_id} style={{
+                          display: 'flex', alignItems: 'center', gap: 12,
+                          padding: '10px 12px', background: BG_2, borderRadius: 8,
+                          borderLeft: `3px solid ${hasError ? RED : pct >= 80 ? GREEN : YELLOW}`,
+                        }}>
+                          <div style={{ minWidth: 100, fontWeight: 600, color: TEXT_1, fontSize: 13 }}>
+                            {store.store_name}
+                          </div>
+                          {/* 节点状态小方块 */}
+                          <div style={{ display: 'flex', gap: 4, flex: 1 }}>
+                            {(['E1','E2','E3','E4','E5','E6','E7','E8']).map(k => {
+                              const node = store.nodes?.find(n => n.node_id.toUpperCase() === k);
+                              const status = node?.status ?? 'pending';
+                              const bgColors: Record<string, string> = {
+                                completed: GREEN, in_progress: BLUE,
+                                pending: BG_1, skipped: TEXT_4 + '44', error: RED,
+                              };
+                              return (
+                                <div
+                                  key={k}
+                                  title={`${k}: ${status}`}
+                                  style={{
+                                    width: 28, height: 24, borderRadius: 4, fontSize: 9,
+                                    background: bgColors[status] || BG_1,
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    color: status === 'completed' ? '#fff' : TEXT_4, fontWeight: 700,
+                                  }}
+                                >
+                                  {k.replace('E', '')}
+                                </div>
+                              );
+                            })}
+                          </div>
+                          {/* 完成率进度 */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 90 }}>
+                            <div style={{ width: 50, height: 4, borderRadius: 2, background: BG_1 }}>
+                              <div style={{
+                                width: `${pct}%`, height: '100%', borderRadius: 2,
+                                background: pct >= 80 ? GREEN : pct >= 50 ? YELLOW : RED,
+                              }} />
+                            </div>
+                            <span style={{ fontSize: 11, color: TEXT_3 }}>{pct}%</span>
+                          </div>
+                          {/* 评分 */}
+                          <div style={{
+                            minWidth: 40, textAlign: 'right',
+                            fontSize: 15, fontWeight: 700,
+                            color: score >= 85 ? GREEN : score >= 70 ? YELLOW : RED,
+                          }}>
+                            {score}
+                          </div>
+                          {hasError && (
+                            <span style={{ fontSize: 12, color: RED }}>⚠</span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  {storesData.length === 0 && (
+                    <div style={{ padding: '20px', textAlign: 'center', color: TEXT_4 }}>
+                      暂无门店数据，请检查API连接
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'store_nodes' && (
+            <StoreNodesTable stores={storesData} selectedStore={selectedStore} />
+          )}
+
+          {activeTab === 'ranking' && (
+            <StoreRanking stores={storesData} />
+          )}
+
+          {activeTab === 'anomalies' && (
+            <AnomalyPanel stores={storesData} selectedStore={selectedStore} />
+          )}
+        </>
+      )}
+
+      {/* 底部：数据来源说明 */}
+      <div style={{
+        marginTop: 20, padding: '12px 16px', borderRadius: 8,
+        background: BG_1, border: `1px solid ${BG_2}`,
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      }}>
+        <span style={{ fontSize: 12, color: TEXT_4 }}>
+          数据来源：
+          <span style={{ color: TEXT_3 }}>
+            GET /api/v1/ops/daily-review/status?date={date}&all_stores=true
+          </span>
+        </span>
+        <span style={{ fontSize: 11, color: TEXT_4 }}>
+          评分算法：E1-E8完成率 × 100，每个error节点 -5分
+        </span>
+      </div>
     </div>
   );
 }

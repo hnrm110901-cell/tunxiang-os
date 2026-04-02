@@ -1,328 +1,430 @@
 /**
- * DailyPlanPage -- 每日经营计划审批页面
- * 商家端：5个区块折叠面板，逐条审批 AI 建议
+ * DailyPlanPage -- 每日运营执行中心
+ * 接入真实API：E1-E8节点状态 + 今日营收目标 vs 实际 + 待审批/异常数
  */
-import { useState, useMemo } from 'react';
-
-// ---- 类型定义 ----
-
-type PlanStatus = 'pending' | 'approved' | 'executing' | 'completed';
-type ItemStatus = 'pending' | 'approved' | 'adjusted' | 'skipped';
-type SectionKey = 'dishes' | 'purchase' | 'staffing' | 'marketing' | 'risks';
-
-interface PlanItem {
-  id: string;
-  status: ItemStatus;
-  confidence: number;    // 0~1
-  impactYuan: number;    // 预期影响 (正=节省/增收, 负=花费)
-  [key: string]: unknown;
-}
-
-interface DishItem extends PlanItem {
-  name: string;
-  action: '主推' | '减推' | '试点';
-  reason: string;
-}
-
-interface PurchaseItem extends PlanItem {
-  ingredient: string;
-  quantity: string;
-  urgency: 'urgent' | 'normal';
-  supplier: string;
-}
-
-interface StaffItem extends PlanItem {
-  position: string;
-  action: '增加' | '减少' | '调换';
-  shift: string;
-  reason: string;
-}
-
-interface MarketingItem extends PlanItem {
-  audience: string;
-  action: '发券' | '短信' | '推送';
-  content: string;
-  count: number;
-}
-
-interface RiskItem extends PlanItem {
-  type: string;
-  severity: 'high' | 'medium' | 'low';
-  detail: string;
-  suggestedAction: string;
-}
+import { useState, useEffect, useCallback } from 'react';
+import { txFetch } from '../api';
 
 // ---- 颜色常量 ----
-const BG_0 = '#0B1A20';
-const BG_1 = '#112228';
-const BG_2 = '#1a2a33';
-const BRAND = '#FF6B2C';
+const BG_0 = '#0d1e28';
+const BG_1 = '#1a2a33';
+const BG_2 = '#243443';
+const BRAND = '#FF6B35';
 const GREEN = '#52c41a';
 const RED = '#ff4d4f';
 const YELLOW = '#faad14';
+const BLUE = '#1890ff';
 const TEXT_1 = '#ffffff';
 const TEXT_2 = '#cccccc';
 const TEXT_3 = '#999999';
 const TEXT_4 = '#666666';
 
-// ---- Mock 数据 ----
+// ---- 类型定义 ----
 
-const today = () => {
+interface NodeStatus {
+  node_id: string;     // E1~E8
+  node_name: string;
+  status: 'completed' | 'in_progress' | 'pending' | 'skipped' | 'error';
+  completed_at?: string;
+  score?: number;
+  detail?: string;
+}
+
+interface DailyReviewStatus {
+  date: string;
+  store_id: string;
+  store_name: string;
+  overall_score: number;
+  nodes: NodeStatus[];
+  completed_count: number;
+  total_count: number;
+}
+
+interface DailyProfitData {
+  date: string;
+  revenue_fen: number;
+  cost_fen: number;
+  profit_fen: number;
+  margin_rate: number;
+  target_revenue_fen?: number;
+  target_profit_fen?: number;
+}
+
+interface ApprovalCount {
+  pending_count: number;
+}
+
+interface AnomalyCount {
+  anomaly_count: number;
+}
+
+// ---- 工具函数 ----
+
+const todayStr = () => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 
-const MOCK_DISHES: DishItem[] = [
-  { id: 'dish-1', name: '剁椒鱼头', action: '主推', reason: '近7天销量上升23%, 毛利率62%, 库存充足', confidence: 0.92, impactYuan: 1200, status: 'pending' },
-  { id: 'dish-2', name: '外婆鸡', action: '减推', reason: '鸡肉库存偏低, 明日到货前需控制出品量', confidence: 0.85, impactYuan: 350, status: 'pending' },
-  { id: 'dish-3', name: '酸菜鱼', action: '试点', reason: '新菜试点第3天, 好评率87%, 建议继续观察', confidence: 0.78, impactYuan: 500, status: 'pending' },
-];
+const fenToYuan = (fen: number) => (fen / 100).toLocaleString('zh-CN', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
-const MOCK_PURCHASE: PurchaseItem[] = [
-  { id: 'pur-1', ingredient: '基围虾', quantity: '15kg', urgency: 'urgent', supplier: '湘江水产', confidence: 0.95, impactYuan: -480, status: 'pending' },
-  { id: 'pur-2', ingredient: '香菜', quantity: '5kg', urgency: 'normal', supplier: '红星农批', confidence: 0.82, impactYuan: -35, status: 'pending' },
-];
-
-const MOCK_STAFFING: StaffItem[] = [
-  { id: 'staff-1', position: '服务员', action: '增加', shift: '11:00-14:00 午高峰', reason: '预测今日午间客流+18%, 当前排班不足', confidence: 0.88, impactYuan: 600, status: 'pending' },
-];
-
-const MOCK_MARKETING: MarketingItem[] = [
-  { id: 'mkt-1', audience: '30天未到店老客', action: '发券', content: '满100减20回归券', count: 156, confidence: 0.76, impactYuan: 2400, status: 'pending' },
-  { id: 'mkt-2', audience: '周边3km新注册用户', action: '推送', content: '新人首单立减15元', count: 89, confidence: 0.71, impactYuan: 800, status: 'pending' },
-];
-
-const MOCK_RISKS: RiskItem[] = [
-  { id: 'risk-1', type: '食材效期', severity: 'high', detail: '冷库三文鱼(批次B2403)明日到期, 剩余2.3kg', suggestedAction: '今日午市前用完或转员工餐', confidence: 0.97, impactYuan: 180, status: 'pending' },
-  { id: 'risk-2', type: '设备异常', severity: 'medium', detail: '2号出餐口打印机响应延迟>3秒', suggestedAction: '安排维修或切换至1号备用打印机', confidence: 0.89, impactYuan: 0, status: 'pending' },
-];
-
-// ---- 组件 ----
-
-const STATUS_MAP: Record<PlanStatus, { label: string; emoji: string; color: string }> = {
-  pending:   { label: '待审批', emoji: '\u23F3', color: YELLOW },
-  approved:  { label: '已批准', emoji: '\u2705', color: GREEN },
-  executing: { label: '执行中', emoji: '\uD83D\uDD04', color: '#1890ff' },
-  completed: { label: '已完成', emoji: '\u2713', color: GREEN },
+const weekDayMap = ['日', '一', '二', '三', '四', '五', '六'];
+const formatDateTitle = (dateStr: string) => {
+  const d = new Date(dateStr);
+  const month = d.getMonth() + 1;
+  const day = d.getDate();
+  const weekday = weekDayMap[d.getDay()];
+  return `${month}月${day}日 星期${weekday}`;
 };
 
-function StatusBadge({ status }: { status: PlanStatus }) {
-  const s = STATUS_MAP[status];
+// ---- E节点名称映射 ----
+const NODE_NAMES: Record<string, string> = {
+  E1: '开市准备',
+  E2: '营业目标确认',
+  E3: '午市执行',
+  E4: '午市复盘',
+  E5: '晚市准备',
+  E6: '晚市执行',
+  E7: '收市结算',
+  E8: '日结复盘',
+};
+
+const NODE_ICONS: Record<string, string> = {
+  E1: '🌅',
+  E2: '🎯',
+  E3: '🍽️',
+  E4: '📊',
+  E5: '🌆',
+  E6: '🍜',
+  E7: '💰',
+  E8: '📋',
+};
+
+// ---- 状态配置 ----
+const STATUS_CONFIG = {
+  completed:   { label: '已完成', color: GREEN,  bg: GREEN + '22' },
+  in_progress: { label: '进行中', color: BLUE,   bg: BLUE + '22' },
+  pending:     { label: '待执行', color: TEXT_4, bg: BG_2 },
+  skipped:     { label: '已跳过', color: TEXT_4, bg: BG_2 },
+  error:       { label: '异常',   color: RED,    bg: RED + '22' },
+};
+
+// ---- 子组件 ----
+
+function LoadingCard({ height = 120 }: { height?: number }) {
   return (
-    <span style={{
-      display: 'inline-flex', alignItems: 'center', gap: 4,
-      padding: '4px 12px', borderRadius: 12,
-      background: s.color + '22', color: s.color,
-      fontSize: 12, fontWeight: 600,
+    <div style={{
+      background: BG_1, borderRadius: 12, height,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      border: `1px solid ${BG_2}`,
     }}>
-      {s.emoji} {s.label}
-    </span>
-  );
-}
-
-function ConfidenceBar({ value }: { value: number }) {
-  const pct = Math.round(value * 100);
-  const color = pct >= 85 ? GREEN : pct >= 70 ? YELLOW : RED;
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 120 }}>
-      <div style={{ flex: 1, height: 6, borderRadius: 3, background: BG_2 }}>
-        <div style={{ width: `${pct}%`, height: '100%', borderRadius: 3, background: color, transition: 'width .3s' }} />
-      </div>
-      <span style={{ fontSize: 11, color: TEXT_3, minWidth: 32 }}>{pct}%</span>
+      <div style={{ color: TEXT_4, fontSize: 13 }}>加载中...</div>
     </div>
   );
 }
 
-function ActionButtons({ status, onApprove, onAdjust, onSkip }: {
-  status: ItemStatus;
-  onApprove: () => void;
-  onAdjust: () => void;
-  onSkip: () => void;
-}) {
-  if (status !== 'pending') {
-    const labelMap: Record<ItemStatus, { text: string; color: string }> = {
-      approved: { text: '已批准', color: GREEN },
-      adjusted: { text: '已调整', color: YELLOW },
-      skipped:  { text: '已跳过', color: TEXT_4 },
-      pending:  { text: '', color: '' },
-    };
-    const info = labelMap[status];
-    return <span style={{ fontSize: 12, color: info.color, fontWeight: 600 }}>{info.text}</span>;
-  }
-  const btnBase: React.CSSProperties = {
-    padding: '4px 12px', borderRadius: 6, border: 'none', cursor: 'pointer',
-    fontSize: 12, fontWeight: 600, transition: 'opacity .15s',
-  };
+function ErrorCard({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (
-    <div style={{ display: 'flex', gap: 6 }}>
-      <button style={{ ...btnBase, background: GREEN, color: '#fff' }} onClick={onApprove}>批准</button>
-      <button style={{ ...btnBase, background: YELLOW + '33', color: YELLOW, border: `1px solid ${YELLOW}55` }} onClick={onAdjust}>调整</button>
-      <button style={{ ...btnBase, background: 'transparent', color: TEXT_4, border: `1px solid ${BG_2}` }} onClick={onSkip}>跳过</button>
-    </div>
-  );
-}
-
-function ImpactBadge({ yuan }: { yuan: number }) {
-  const isPositive = yuan >= 0;
-  return (
-    <span style={{
-      fontSize: 13, fontWeight: 700,
-      color: isPositive ? GREEN : RED,
+    <div style={{
+      background: BG_1, borderRadius: 12, padding: '16px 20px',
+      border: `1px solid ${RED}44`,
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
     }}>
-      {isPositive ? '+' : ''}\u00A5{Math.abs(yuan).toLocaleString()}
-    </span>
-  );
-}
-
-// ---- 区块配置 ----
-
-interface SectionConfig {
-  key: SectionKey;
-  icon: string;
-  title: string;
-  renderItem: (item: PlanItem, onAction: (id: string, action: ItemStatus) => void) => React.ReactNode;
-}
-
-function DishRow({ item, onAction }: { item: DishItem; onAction: (id: string, a: ItemStatus) => void }) {
-  const actionColors: Record<string, string> = { '\u4E3B\u63A8': GREEN, '\u51CF\u63A8': YELLOW, '\u8BD5\u70B9': '#1890ff' };
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: `1px solid ${BG_2}` }}>
-      <span style={{
-        padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 700,
-        background: (actionColors[item.action] || TEXT_4) + '22',
-        color: actionColors[item.action] || TEXT_4,
-      }}>{item.action}</span>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 14, fontWeight: 600 }}>{item.name}</div>
-        <div style={{ fontSize: 11, color: TEXT_3, marginTop: 2 }}>{item.reason}</div>
-      </div>
-      <ConfidenceBar value={item.confidence} />
-      <ImpactBadge yuan={item.impactYuan} />
-      <ActionButtons status={item.status} onApprove={() => onAction(item.id, 'approved')} onAdjust={() => onAction(item.id, 'adjusted')} onSkip={() => onAction(item.id, 'skipped')} />
-    </div>
-  );
-}
-
-function PurchaseRow({ item, onAction }: { item: PurchaseItem; onAction: (id: string, a: ItemStatus) => void }) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: `1px solid ${BG_2}` }}>
-      <span style={{ fontSize: 16 }}>{item.urgency === 'urgent' ? '\uD83D\uDD34' : '\uD83D\uDFE1'}</span>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 14, fontWeight: 600 }}>{item.ingredient} <span style={{ color: TEXT_3, fontWeight: 400 }}>x {item.quantity}</span></div>
-        <div style={{ fontSize: 11, color: TEXT_3, marginTop: 2 }}>供应商: {item.supplier} {item.urgency === 'urgent' ? '| 紧急采购' : ''}</div>
-      </div>
-      <ConfidenceBar value={item.confidence} />
-      <ImpactBadge yuan={item.impactYuan} />
-      <ActionButtons status={item.status} onApprove={() => onAction(item.id, 'approved')} onAdjust={() => onAction(item.id, 'adjusted')} onSkip={() => onAction(item.id, 'skipped')} />
-    </div>
-  );
-}
-
-function StaffRow({ item, onAction }: { item: StaffItem; onAction: (id: string, a: ItemStatus) => void }) {
-  const actionColors: Record<string, string> = { '\u589E\u52A0': GREEN, '\u51CF\u5C11': RED, '\u8C03\u6362': '#1890ff' };
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: `1px solid ${BG_2}` }}>
-      <span style={{
-        padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 700,
-        background: (actionColors[item.action] || TEXT_4) + '22',
-        color: actionColors[item.action] || TEXT_4,
-      }}>{item.action}</span>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 14, fontWeight: 600 }}>{item.position} <span style={{ color: TEXT_3, fontWeight: 400 }}>| {item.shift}</span></div>
-        <div style={{ fontSize: 11, color: TEXT_3, marginTop: 2 }}>{item.reason}</div>
-      </div>
-      <ConfidenceBar value={item.confidence} />
-      <ImpactBadge yuan={item.impactYuan} />
-      <ActionButtons status={item.status} onApprove={() => onAction(item.id, 'approved')} onAdjust={() => onAction(item.id, 'adjusted')} onSkip={() => onAction(item.id, 'skipped')} />
-    </div>
-  );
-}
-
-function MarketingRow({ item, onAction }: { item: MarketingItem; onAction: (id: string, a: ItemStatus) => void }) {
-  const actionIcons: Record<string, string> = { '\u53D1\u5238': '\uD83C\uDF9F\uFE0F', '\u77ED\u4FE1': '\uD83D\uDCE7', '\u63A8\u9001': '\uD83D\uDCE3' };
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: `1px solid ${BG_2}` }}>
-      <span style={{ fontSize: 16 }}>{actionIcons[item.action] || '\uD83D\uDCE3'}</span>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 14, fontWeight: 600 }}>{item.action}: {item.content}</div>
-        <div style={{ fontSize: 11, color: TEXT_3, marginTop: 2 }}>目标: {item.audience} | {item.count}人</div>
-      </div>
-      <ConfidenceBar value={item.confidence} />
-      <ImpactBadge yuan={item.impactYuan} />
-      <ActionButtons status={item.status} onApprove={() => onAction(item.id, 'approved')} onAdjust={() => onAction(item.id, 'adjusted')} onSkip={() => onAction(item.id, 'skipped')} />
-    </div>
-  );
-}
-
-function RiskRow({ item, onAction }: { item: RiskItem; onAction: (id: string, a: ItemStatus) => void }) {
-  const sevColors: Record<string, string> = { high: RED, medium: YELLOW, low: '#1890ff' };
-  const sevLabels: Record<string, string> = { high: '\u9AD8', medium: '\u4E2D', low: '\u4F4E' };
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: `1px solid ${BG_2}` }}>
-      <span style={{
-        padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 700,
-        background: sevColors[item.severity] + '22',
-        color: sevColors[item.severity],
-      }}>{sevLabels[item.severity]}</span>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 14, fontWeight: 600 }}>[{item.type}] {item.detail}</div>
-        <div style={{ fontSize: 11, color: TEXT_3, marginTop: 2 }}>建议: {item.suggestedAction}</div>
-      </div>
-      <ConfidenceBar value={item.confidence} />
-      <ImpactBadge yuan={item.impactYuan} />
-      <ActionButtons status={item.status} onApprove={() => onAction(item.id, 'approved')} onAdjust={() => onAction(item.id, 'adjusted')} onSkip={() => onAction(item.id, 'skipped')} />
-    </div>
-  );
-}
-
-// ---- 折叠面板区块 ----
-
-function PlanSection({ icon, title, items, children, onApproveAll }: {
-  icon: string;
-  title: string;
-  items: PlanItem[];
-  children: React.ReactNode;
-  onApproveAll: () => void;
-}) {
-  const [collapsed, setCollapsed] = useState(false);
-  const pendingCount = items.filter(i => i.status === 'pending').length;
-  return (
-    <div style={{ background: BG_1, borderRadius: 10, marginBottom: 12, overflow: 'hidden', border: `1px solid ${BG_2}` }}>
-      <div
+      <span style={{ color: RED, fontSize: 13 }}>加载失败: {message}</span>
+      <button
+        onClick={onRetry}
         style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '12px 16px', cursor: 'pointer', userSelect: 'none',
+          padding: '4px 12px', borderRadius: 6, border: `1px solid ${RED}66`,
+          background: 'transparent', color: RED, fontSize: 12, cursor: 'pointer',
         }}
-        onClick={() => setCollapsed(!collapsed)}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 18 }}>{icon}</span>
-          <span style={{ fontSize: 15, fontWeight: 700 }}>{title}</span>
+        重试
+      </button>
+    </div>
+  );
+}
+
+// E1-E8 节点状态卡片
+function NodeStatusCard({
+  data,
+  loading,
+  error,
+  onRetry,
+}: {
+  data: DailyReviewStatus | null;
+  loading: boolean;
+  error: string | null;
+  onRetry: () => void;
+}) {
+  if (loading) return <LoadingCard height={200} />;
+  if (error) return <ErrorCard message={error} onRetry={onRetry} />;
+
+  const nodes = data?.nodes ?? Object.keys(NODE_NAMES).map(k => ({
+    node_id: k,
+    node_name: NODE_NAMES[k],
+    status: 'pending' as const,
+  }));
+
+  const completedCount = nodes.filter(n => n.status === 'completed').length;
+  const totalCount = nodes.length;
+  const completionPct = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+
+  return (
+    <div style={{
+      background: BG_1, borderRadius: 12, padding: '20px',
+      border: `1px solid ${BG_2}`,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+        <div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: TEXT_1 }}>今日执行节点</div>
+          <div style={{ fontSize: 12, color: TEXT_3, marginTop: 2 }}>
+            {data?.store_name || '全部门店'} · E1-E8
+          </div>
+        </div>
+        <div style={{ textAlign: 'right' }}>
+          <div style={{ fontSize: 26, fontWeight: 700, color: BRAND }}>{completionPct}%</div>
+          <div style={{ fontSize: 11, color: TEXT_3 }}>{completedCount}/{totalCount} 完成</div>
+        </div>
+      </div>
+
+      {/* 进度条 */}
+      <div style={{ width: '100%', height: 6, borderRadius: 3, background: BG_2, marginBottom: 16 }}>
+        <div style={{
+          width: `${completionPct}%`, height: '100%', borderRadius: 3,
+          background: completionPct >= 80 ? GREEN : completionPct >= 50 ? YELLOW : BRAND,
+          transition: 'width .4s',
+        }} />
+      </div>
+
+      {/* 节点网格 */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
+        {nodes.map(node => {
+          const cfg = STATUS_CONFIG[node.status] ?? STATUS_CONFIG.pending;
+          const nodeKey = node.node_id.toUpperCase();
+          return (
+            <div
+              key={node.node_id}
+              title={node.detail || node.node_name}
+              style={{
+                padding: '10px 8px', borderRadius: 8, textAlign: 'center',
+                background: cfg.bg, border: `1px solid ${cfg.color}44`,
+                cursor: 'default',
+              }}
+            >
+              <div style={{ fontSize: 18, marginBottom: 4 }}>
+                {NODE_ICONS[nodeKey] || '⚙️'}
+              </div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: cfg.color }}>{nodeKey}</div>
+              <div style={{ fontSize: 10, color: TEXT_3, marginTop: 2, lineHeight: 1.3 }}>
+                {NODE_NAMES[nodeKey] || node.node_name}
+              </div>
+              <div style={{
+                marginTop: 4, fontSize: 10, padding: '1px 4px', borderRadius: 3,
+                background: cfg.color + '33', color: cfg.color, fontWeight: 600,
+              }}>
+                {cfg.label}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {data?.overall_score != null && (
+        <div style={{
+          marginTop: 14, padding: '8px 12px', borderRadius: 8,
+          background: BG_2, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        }}>
+          <span style={{ fontSize: 12, color: TEXT_3 }}>今日执行评分</span>
           <span style={{
-            fontSize: 11, padding: '1px 8px', borderRadius: 10,
-            background: BRAND + '22', color: BRAND,
-          }}>{items.length} 条</span>
-          <span style={{ fontSize: 12, color: collapsed ? TEXT_4 : 'transparent', transition: 'color .2s' }}>
-            {collapsed ? '\u25B6' : '\u25BC'}
+            fontSize: 18, fontWeight: 700,
+            color: data.overall_score >= 85 ? GREEN : data.overall_score >= 70 ? YELLOW : RED,
+          }}>
+            {data.overall_score} 分
           </span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {pendingCount > 0 && (
-            <button
-              style={{
-                padding: '4px 14px', borderRadius: 6, border: 'none', cursor: 'pointer',
-                background: GREEN + '22', color: GREEN, fontSize: 12, fontWeight: 600,
-              }}
-              onClick={(e) => { e.stopPropagation(); onApproveAll(); }}
-            >
-              全部批准
-            </button>
-          )}
+      )}
+    </div>
+  );
+}
+
+// 今日营收卡片
+function RevenueCard({
+  data,
+  loading,
+  error,
+  onRetry,
+}: {
+  data: DailyProfitData | null;
+  loading: boolean;
+  error: string | null;
+  onRetry: () => void;
+}) {
+  if (loading) return <LoadingCard height={180} />;
+  if (error) return <ErrorCard message={error} onRetry={onRetry} />;
+
+  const revenue = data?.revenue_fen ?? 0;
+  const target = data?.target_revenue_fen ?? 0;
+  const profit = data?.profit_fen ?? 0;
+  const cost = data?.cost_fen ?? 0;
+  const margin = data?.margin_rate ?? 0;
+  const reachPct = target > 0 ? Math.min(Math.round((revenue / target) * 100), 999) : 0;
+
+  return (
+    <div style={{
+      background: BG_1, borderRadius: 12, padding: '20px',
+      border: `1px solid ${BG_2}`,
+    }}>
+      <div style={{ fontSize: 15, fontWeight: 700, color: TEXT_1, marginBottom: 16 }}>
+        今日营收 vs 目标
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
+        <div style={{ padding: '12px 14px', background: BG_2, borderRadius: 8 }}>
+          <div style={{ fontSize: 11, color: TEXT_3, marginBottom: 4 }}>实际营收</div>
+          <div style={{ fontSize: 22, fontWeight: 700, color: TEXT_1 }}>
+            ¥{fenToYuan(revenue)}
+          </div>
+        </div>
+        <div style={{ padding: '12px 14px', background: BG_2, borderRadius: 8 }}>
+          <div style={{ fontSize: 11, color: TEXT_3, marginBottom: 4 }}>目标营收</div>
+          <div style={{ fontSize: 22, fontWeight: 700, color: target > 0 ? TEXT_2 : TEXT_4 }}>
+            {target > 0 ? `¥${fenToYuan(target)}` : '未设置'}
+          </div>
         </div>
       </div>
-      {!collapsed && (
-        <div style={{ padding: '0 16px 12px' }}>
-          {children}
+
+      {target > 0 && (
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+            <span style={{ fontSize: 12, color: TEXT_3 }}>目标达成率</span>
+            <span style={{
+              fontSize: 13, fontWeight: 700,
+              color: reachPct >= 100 ? GREEN : reachPct >= 80 ? YELLOW : RED,
+            }}>
+              {reachPct}%
+            </span>
+          </div>
+          <div style={{ width: '100%', height: 6, borderRadius: 3, background: BG_2 }}>
+            <div style={{
+              width: `${Math.min(reachPct, 100)}%`, height: '100%', borderRadius: 3,
+              background: reachPct >= 100 ? GREEN : reachPct >= 80 ? YELLOW : RED,
+              transition: 'width .4s',
+            }} />
+          </div>
+        </div>
+      )}
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+        {[
+          { label: '毛利润', value: `¥${fenToYuan(profit)}`, color: profit >= 0 ? GREEN : RED },
+          { label: '成本', value: `¥${fenToYuan(cost)}`, color: TEXT_2 },
+          { label: '毛利率', value: `${(margin * 100).toFixed(1)}%`, color: margin >= 0.5 ? GREEN : margin >= 0.35 ? YELLOW : RED },
+        ].map((item, i) => (
+          <div key={i} style={{
+            padding: '8px 10px', background: BG_2, borderRadius: 6, textAlign: 'center',
+          }}>
+            <div style={{ fontSize: 10, color: TEXT_4, marginBottom: 2 }}>{item.label}</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: item.color }}>{item.value}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// 待审批卡片
+function ApprovalCard({
+  count,
+  loading,
+  error,
+  onRetry,
+}: {
+  count: number;
+  loading: boolean;
+  error: string | null;
+  onRetry: () => void;
+}) {
+  if (loading) return <LoadingCard height={120} />;
+
+  return (
+    <div style={{
+      background: BG_1, borderRadius: 12, padding: '20px',
+      border: `1px solid ${error ? RED + '44' : BG_2}`,
+      display: 'flex', flexDirection: 'column', gap: 10,
+    }}>
+      <div style={{ fontSize: 15, fontWeight: 700, color: TEXT_1 }}>待处理审批</div>
+      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8 }}>
+        <div style={{
+          fontSize: 42, fontWeight: 700,
+          color: error ? TEXT_4 : count > 0 ? YELLOW : GREEN,
+        }}>
+          {error ? '-' : count}
+        </div>
+        <div style={{ fontSize: 13, color: TEXT_3, paddingBottom: 6 }}>条</div>
+      </div>
+      {error ? (
+        <button
+          onClick={onRetry}
+          style={{
+            padding: '4px 10px', borderRadius: 5, border: `1px solid ${TEXT_4}44`,
+            background: 'transparent', color: TEXT_4, fontSize: 11, cursor: 'pointer',
+            alignSelf: 'flex-start',
+          }}
+        >
+          重新加载
+        </button>
+      ) : (
+        <div style={{ fontSize: 12, color: count > 0 ? YELLOW : TEXT_4 }}>
+          {count > 0 ? `${count} 条AI建议等待审批` : '暂无待审批事项'}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// 异常预警卡片
+function AnomalyCard({
+  count,
+  loading,
+  error,
+  onRetry,
+}: {
+  count: number;
+  loading: boolean;
+  error: string | null;
+  onRetry: () => void;
+}) {
+  if (loading) return <LoadingCard height={120} />;
+
+  return (
+    <div style={{
+      background: BG_1, borderRadius: 12, padding: '20px',
+      border: `1px solid ${error ? RED + '44' : count > 0 ? RED + '44' : BG_2}`,
+      display: 'flex', flexDirection: 'column', gap: 10,
+    }}>
+      <div style={{ fontSize: 15, fontWeight: 700, color: TEXT_1 }}>当前异常</div>
+      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8 }}>
+        <div style={{
+          fontSize: 42, fontWeight: 700,
+          color: error ? TEXT_4 : count > 0 ? RED : GREEN,
+        }}>
+          {error ? '-' : count}
+        </div>
+        <div style={{ fontSize: 13, color: TEXT_3, paddingBottom: 6 }}>条</div>
+      </div>
+      {error ? (
+        <button
+          onClick={onRetry}
+          style={{
+            padding: '4px 10px', borderRadius: 5, border: `1px solid ${TEXT_4}44`,
+            background: 'transparent', color: TEXT_4, fontSize: 11, cursor: 'pointer',
+            alignSelf: 'flex-start',
+          }}
+        >
+          重新加载
+        </button>
+      ) : (
+        <div style={{ fontSize: 12, color: count > 0 ? RED : TEXT_4 }}>
+          {count > 0 ? `${count} 条异常需要处理` : '运营状态正常'}
         </div>
       )}
     </div>
@@ -332,196 +434,263 @@ function PlanSection({ icon, title, items, children, onApproveAll }: {
 // ---- 主页面 ----
 
 export function DailyPlanPage() {
-  const [date, setDate] = useState(today());
-  const [planStatus, setPlanStatus] = useState<PlanStatus>('pending');
-  const [dishes, setDishes] = useState<DishItem[]>(MOCK_DISHES);
-  const [purchase, setPurchase] = useState<PurchaseItem[]>(MOCK_PURCHASE);
-  const [staffing, setStaffing] = useState<StaffItem[]>(MOCK_STAFFING);
-  const [marketing, setMarketing] = useState<MarketingItem[]>(MOCK_MARKETING);
-  const [risks, setRisks] = useState<RiskItem[]>(MOCK_RISKS);
+  const [date, setDate] = useState(todayStr());
 
-  // 所有条目聚合
-  const allItems = useMemo(
-    () => [...dishes, ...purchase, ...staffing, ...marketing, ...risks],
-    [dishes, purchase, staffing, marketing, risks],
-  );
+  // E1-E8 节点状态
+  const [nodeData, setNodeData] = useState<DailyReviewStatus | null>(null);
+  const [nodeLoading, setNodeLoading] = useState(true);
+  const [nodeError, setNodeError] = useState<string | null>(null);
 
-  const totalCount = allItems.length;
-  const pendingCount = allItems.filter(i => i.status === 'pending').length;
-  const totalSavingYuan = allItems
-    .filter(i => i.status === 'approved' || i.status === 'pending')
-    .reduce((s, i) => s + i.impactYuan, 0);
+  // 今日营收
+  const [profitData, setProfitData] = useState<DailyProfitData | null>(null);
+  const [profitLoading, setProfitLoading] = useState(true);
+  const [profitError, setProfitError] = useState<string | null>(null);
 
-  // 通用 action handler
-  function makeAction<T extends PlanItem>(
-    setter: React.Dispatch<React.SetStateAction<T[]>>,
-  ) {
-    return (id: string, action: ItemStatus) => {
-      setter(prev => prev.map(item => item.id === id ? { ...item, status: action } : item));
-    };
-  }
+  // 待审批数
+  const [approvalCount, setApprovalCount] = useState(0);
+  const [approvalLoading, setApprovalLoading] = useState(true);
+  const [approvalError, setApprovalError] = useState<string | null>(null);
 
-  function makeApproveAll<T extends PlanItem>(
-    setter: React.Dispatch<React.SetStateAction<T[]>>,
-  ) {
-    return () => {
-      setter(prev => prev.map(item => item.status === 'pending' ? { ...item, status: 'approved' } : item));
-    };
-  }
+  // 异常数
+  const [anomalyCount, setAnomalyCount] = useState(0);
+  const [anomalyLoading, setAnomalyLoading] = useState(true);
+  const [anomalyError, setAnomalyError] = useState<string | null>(null);
 
-  const approveAllItems = () => {
-    makeApproveAll(setDishes)();
-    makeApproveAll(setPurchase)();
-    makeApproveAll(setStaffing)();
-    makeApproveAll(setMarketing)();
-    makeApproveAll(setRisks)();
+  const loadNodeStatus = useCallback(async () => {
+    setNodeLoading(true);
+    setNodeError(null);
+    try {
+      const data = await txFetch<DailyReviewStatus>(
+        `/api/v1/ops/daily-review/status?date=${encodeURIComponent(date)}`,
+      );
+      setNodeData(data);
+    } catch (e) {
+      setNodeError(e instanceof Error ? e.message : '未知错误');
+      setNodeData(null);
+    } finally {
+      setNodeLoading(false);
+    }
+  }, [date]);
+
+  const loadProfit = useCallback(async () => {
+    setProfitLoading(true);
+    setProfitError(null);
+    try {
+      const data = await txFetch<DailyProfitData>(
+        `/api/v1/finance/daily-profit?date=${encodeURIComponent(date)}`,
+      );
+      setProfitData(data);
+    } catch (e) {
+      setProfitError(e instanceof Error ? e.message : '未知错误');
+      setProfitData(null);
+    } finally {
+      setProfitLoading(false);
+    }
+  }, [date]);
+
+  const loadApprovalCount = useCallback(async () => {
+    setApprovalLoading(true);
+    setApprovalError(null);
+    try {
+      const data = await txFetch<ApprovalCount>(
+        `/api/v1/ops/approvals/count?date=${encodeURIComponent(date)}&status=pending`,
+      );
+      setApprovalCount(data.pending_count ?? 0);
+    } catch {
+      // 降级：显示0，不报错
+      setApprovalCount(0);
+      setApprovalError('接口不可用');
+    } finally {
+      setApprovalLoading(false);
+    }
+  }, [date]);
+
+  const loadAnomalyCount = useCallback(async () => {
+    setAnomalyLoading(true);
+    setAnomalyError(null);
+    try {
+      const data = await txFetch<AnomalyCount>(
+        `/api/v1/ops/anomalies/count?date=${encodeURIComponent(date)}&status=open`,
+      );
+      setAnomalyCount(data.anomaly_count ?? 0);
+    } catch {
+      // 降级：显示0
+      setAnomalyCount(0);
+      setAnomalyError('接口不可用');
+    } finally {
+      setAnomalyLoading(false);
+    }
+  }, [date]);
+
+  useEffect(() => {
+    loadNodeStatus();
+    loadProfit();
+    loadApprovalCount();
+    loadAnomalyCount();
+  }, [loadNodeStatus, loadProfit, loadApprovalCount, loadAnomalyCount]);
+
+  const handleDateChange = (newDate: string) => {
+    setDate(newDate);
   };
 
-  const handleGenerate = () => {
-    // 模拟生成 - 重置所有状态
-    setDishes(MOCK_DISHES.map(d => ({ ...d, status: 'pending' as ItemStatus })));
-    setPurchase(MOCK_PURCHASE.map(d => ({ ...d, status: 'pending' as ItemStatus })));
-    setStaffing(MOCK_STAFFING.map(d => ({ ...d, status: 'pending' as ItemStatus })));
-    setMarketing(MOCK_MARKETING.map(d => ({ ...d, status: 'pending' as ItemStatus })));
-    setRisks(MOCK_RISKS.map(d => ({ ...d, status: 'pending' as ItemStatus })));
-    setPlanStatus('pending');
-  };
-
-  const handleComplete = () => {
-    setPlanStatus('approved');
-  };
+  const isToday = date === todayStr();
 
   return (
-    <div style={{ maxWidth: 1100, margin: '0 auto' }}>
-      {/* 顶部 */}
+    <div style={{ maxWidth: 1100, margin: '0 auto', background: BG_0, minHeight: '100vh', padding: '0 0 40px' }}>
+      {/* 顶部标题栏 */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        marginBottom: 20, flexWrap: 'wrap', gap: 12,
+        marginBottom: 24, flexWrap: 'wrap', gap: 12,
+        padding: '20px 0 16px',
+        borderBottom: `1px solid ${BG_2}`,
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>每日经营计划</h2>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: TEXT_1 }}>
+              每日运营执行
+            </h2>
+            {isToday && (
+              <span style={{
+                padding: '3px 10px', borderRadius: 10,
+                background: BRAND + '22', color: BRAND,
+                fontSize: 11, fontWeight: 700,
+              }}>今日</span>
+            )}
+          </div>
+          <div style={{ fontSize: 15, color: TEXT_2, marginTop: 4, fontWeight: 500 }}>
+            {formatDateTitle(date)}
+          </div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <input
             type="date"
             value={date}
-            onChange={e => setDate(e.target.value)}
+            onChange={e => handleDateChange(e.target.value)}
             style={{
-              background: BG_1, border: `1px solid ${BG_2}`, borderRadius: 6,
-              color: TEXT_2, padding: '4px 10px', fontSize: 13, outline: 'none',
+              background: BG_1, border: `1px solid ${BG_2}`, borderRadius: 8,
+              color: TEXT_2, padding: '6px 12px', fontSize: 13, outline: 'none',
+              cursor: 'pointer',
             }}
           />
-          <span style={{ fontSize: 13, color: TEXT_3 }}>尝在一起 \u00B7 芙蓉路店</span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <StatusBadge status={planStatus} />
           <button
-            onClick={handleGenerate}
+            onClick={() => {
+              loadNodeStatus();
+              loadProfit();
+              loadApprovalCount();
+              loadAnomalyCount();
+            }}
             style={{
-              padding: '8px 18px', borderRadius: 8, border: 'none', cursor: 'pointer',
-              background: BRAND, color: '#fff', fontSize: 13, fontWeight: 700,
-              transition: 'opacity .15s',
+              padding: '8px 16px', borderRadius: 8, border: `1px solid ${BG_2}`,
+              background: BG_1, color: TEXT_2, fontSize: 13, cursor: 'pointer',
+              fontWeight: 600, transition: 'background .15s',
             }}
           >
-            生成今日计划
+            刷新
           </button>
         </div>
       </div>
 
-      {/* 5个区块 */}
-      <PlanSection
-        icon={'\uD83D\uDCCB'}
-        title="排菜建议"
-        items={dishes}
-        onApproveAll={makeApproveAll(setDishes)}
-      >
-        {dishes.map(item => (
-          <DishRow key={item.id} item={item} onAction={makeAction(setDishes)} />
+      {/* 快速指标行 */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 20 }}>
+        {[
+          {
+            label: '今日日期',
+            value: formatDateTitle(date),
+            sub: isToday ? '今天' : '历史',
+            color: BRAND,
+            icon: '📅',
+          },
+          {
+            label: 'E节点完成',
+            value: nodeData
+              ? `${nodeData.completed_count}/${nodeData.total_count}`
+              : nodeLoading ? '...' : '-/-',
+            sub: nodeData ? `完成率 ${Math.round((nodeData.completed_count / (nodeData.total_count || 1)) * 100)}%` : '',
+            color: GREEN,
+            icon: '✅',
+          },
+          {
+            label: '待审批',
+            value: approvalLoading ? '...' : String(approvalCount),
+            sub: approvalCount > 0 ? '需要处理' : '全部清空',
+            color: approvalCount > 0 ? YELLOW : GREEN,
+            icon: '📋',
+          },
+          {
+            label: '当前异常',
+            value: anomalyLoading ? '...' : String(anomalyCount),
+            sub: anomalyCount > 0 ? '需要处理' : '运营正常',
+            color: anomalyCount > 0 ? RED : GREEN,
+            icon: '⚠️',
+          },
+        ].map((item, i) => (
+          <div key={i} style={{
+            background: BG_1, borderRadius: 12, padding: '16px 18px',
+            border: `1px solid ${BG_2}`,
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+              <span style={{ fontSize: 18 }}>{item.icon}</span>
+              <span style={{ fontSize: 12, color: TEXT_3 }}>{item.label}</span>
+            </div>
+            <div style={{ fontSize: 20, fontWeight: 700, color: item.color }}>{item.value}</div>
+            {item.sub && (
+              <div style={{ fontSize: 11, color: TEXT_4, marginTop: 2 }}>{item.sub}</div>
+            )}
+          </div>
         ))}
-      </PlanSection>
+      </div>
 
-      <PlanSection
-        icon={'\uD83D\uDCE6'}
-        title="紧急采购"
-        items={purchase}
-        onApproveAll={makeApproveAll(setPurchase)}
-      >
-        {purchase.map(item => (
-          <PurchaseRow key={item.id} item={item} onAction={makeAction(setPurchase)} />
-        ))}
-      </PlanSection>
+      {/* 主要内容：2列布局 */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+        {/* 左：E1-E8 节点状态 */}
+        <NodeStatusCard
+          data={nodeData}
+          loading={nodeLoading}
+          error={nodeError}
+          onRetry={loadNodeStatus}
+        />
 
-      <PlanSection
-        icon={'\uD83D\uDC65'}
-        title="排班微调"
-        items={staffing}
-        onApproveAll={makeApproveAll(setStaffing)}
-      >
-        {staffing.map(item => (
-          <StaffRow key={item.id} item={item} onAction={makeAction(setStaffing)} />
-        ))}
-      </PlanSection>
+        {/* 右：今日营收 */}
+        <RevenueCard
+          data={profitData}
+          loading={profitLoading}
+          error={profitError}
+          onRetry={loadProfit}
+        />
+      </div>
 
-      <PlanSection
-        icon={'\uD83D\uDCE3'}
-        title="营销触发"
-        items={marketing}
-        onApproveAll={makeApproveAll(setMarketing)}
-      >
-        {marketing.map(item => (
-          <MarketingRow key={item.id} item={item} onAction={makeAction(setMarketing)} />
-        ))}
-      </PlanSection>
+      {/* 第二行：审批 + 异常 */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+        <ApprovalCard
+          count={approvalCount}
+          loading={approvalLoading}
+          error={approvalError}
+          onRetry={loadApprovalCount}
+        />
+        <AnomalyCard
+          count={anomalyCount}
+          loading={anomalyLoading}
+          error={anomalyError}
+          onRetry={loadAnomalyCount}
+        />
+      </div>
 
-      <PlanSection
-        icon={'\u26A0\uFE0F'}
-        title="风险预警"
-        items={risks}
-        onApproveAll={makeApproveAll(setRisks)}
-      >
-        {risks.map(item => (
-          <RiskRow key={item.id} item={item} onAction={makeAction(setRisks)} />
-        ))}
-      </PlanSection>
-
-      {/* 底部汇总 */}
+      {/* 底部：数据来源说明 */}
       <div style={{
-        background: BG_1, borderRadius: 10, padding: '16px 20px', marginTop: 8,
-        border: `1px solid ${BG_2}`,
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        flexWrap: 'wrap', gap: 12,
+        marginTop: 20, padding: '12px 16px', borderRadius: 8,
+        background: BG_1, border: `1px solid ${BG_2}`,
+        display: 'flex', alignItems: 'center', gap: 8,
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 20, fontSize: 14 }}>
-          <span>总建议 <strong style={{ color: BRAND }}>{totalCount}</strong> 条</span>
-          <span style={{ color: TEXT_4 }}>|</span>
-          <span>待处理 <strong style={{ color: YELLOW }}>{pendingCount}</strong> 条</span>
-          <span style={{ color: TEXT_4 }}>|</span>
-          <span>预期影响 <strong style={{ color: GREEN }}>+\u00A5{totalSavingYuan.toLocaleString()}</strong></span>
-        </div>
-        <div style={{ display: 'flex', gap: 10 }}>
-          <button
-            onClick={approveAllItems}
-            style={{
-              padding: '10px 28px', borderRadius: 8, border: 'none', cursor: 'pointer',
-              background: GREEN, color: '#fff', fontSize: 15, fontWeight: 700,
-              boxShadow: `0 4px 16px ${GREEN}44`,
-              transition: 'transform .15s, box-shadow .15s',
-            }}
-          >
-            一键全部批准
-          </button>
-          <button
-            onClick={handleComplete}
-            disabled={pendingCount > 0}
-            style={{
-              padding: '10px 28px', borderRadius: 8, border: `1px solid ${BG_2}`, cursor: pendingCount > 0 ? 'not-allowed' : 'pointer',
-              background: pendingCount > 0 ? BG_2 : BG_1, color: pendingCount > 0 ? TEXT_4 : TEXT_1,
-              fontSize: 15, fontWeight: 700,
-              opacity: pendingCount > 0 ? 0.5 : 1,
-              transition: 'opacity .15s',
-            }}
-          >
-            逐条审批完成
-          </button>
-        </div>
+        <span style={{ fontSize: 12, color: TEXT_4 }}>
+          数据来源：
+          <span style={{ color: TEXT_3 }}>/api/v1/ops/daily-review/status</span>
+          <span style={{ margin: '0 8px', color: BG_2 }}>|</span>
+          <span style={{ color: TEXT_3 }}>/api/v1/finance/daily-profit</span>
+          <span style={{ margin: '0 8px', color: BG_2 }}>|</span>
+          <span style={{ color: TEXT_3 }}>/api/v1/ops/approvals/count</span>
+          <span style={{ margin: '0 8px', color: BG_2 }}>|</span>
+          <span style={{ color: TEXT_3 }}>/api/v1/ops/anomalies/count</span>
+        </span>
       </div>
     </div>
   );
