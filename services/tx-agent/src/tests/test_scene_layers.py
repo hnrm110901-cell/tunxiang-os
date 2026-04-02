@@ -7,13 +7,20 @@
 - L5 状态机：桌态、订单、出品、结算状态流转
 - 业务流矩阵：配置正确性
 """
+
 import pytest
 
+from ..layers.flow_matrix import (
+    BUSINESS_FLOWS,
+    AdaptationMode,
+    get_agent_flows,
+    get_agent_led_flows,
+)
+from ..layers.orchestrator import create_dispatcher
 from ..layers.scene_session import (
     IntentType,
     SceneSessionManager,
     SessionContext,
-    ShiftPeriod,
     UserRole,
 )
 from ..layers.state_machines import (
@@ -29,20 +36,13 @@ from ..layers.state_machines import (
     TransitionError,
 )
 from ..layers.tool_gateway import (
+    _AGENT_TOOL_MAPPING,
     TOOL_INDEX,
     ToolGateway,
-    _AGENT_TOOL_MAPPING,
 )
-from ..layers.flow_matrix import (
-    BUSINESS_FLOWS,
-    AdaptationMode,
-    get_agent_led_flows,
-    get_agent_flows,
-)
-from ..layers.orchestrator import Dispatcher, create_dispatcher
-
 
 # ─── L1 场景会话层测试 ───────────────────────────────────────────────────────
+
 
 class TestSceneSession:
     def setup_method(self):
@@ -74,9 +74,15 @@ class TestSceneSession:
 
     def test_parse_intent_kpi(self):
         ctx = self.mgr.create_session(tenant_id="t-001", user_role=UserRole.STORE_MANAGER)
-        intent = self.mgr.parse_intent("今天翻台率怎么样", ctx)
+        intent = self.mgr.parse_intent("今天营业额多少", ctx)
         assert intent.target_agent == "store_ops"
         assert intent.action == "kpi_query"
+
+    def test_parse_intent_turnover(self):
+        ctx = self.mgr.create_session(tenant_id="t-001", user_role=UserRole.STORE_MANAGER)
+        intent = self.mgr.parse_intent("今天翻台率怎么样", ctx)
+        assert intent.target_agent == "waitlist_table"
+        assert intent.action == "query_tables"
 
     def test_parse_intent_kitchen(self):
         ctx = self.mgr.create_session(tenant_id="t-001", user_role=UserRole.CHEF)
@@ -120,6 +126,7 @@ class TestSceneSession:
 
 # ─── L5 状态机测试 ────────────────────────────────────────────────────────────
 
+
 class TestTableStateMachine:
     def test_normal_flow(self):
         sm = TableStateMachine("table-01")
@@ -144,7 +151,8 @@ class TestTableStateMachine:
 
     def test_invalid_transition(self):
         sm = TableStateMachine("table-03")
-        sm.transition(TableState.OCCUPIED.value, "direct_seat")
+        sm.transition(TableState.SEATING.value, "walk_in")
+        sm.transition(TableState.OCCUPIED.value, "order_placed")
         with pytest.raises(TransitionError):
             sm.transition(TableState.AVAILABLE.value, "skip_cleaning")
 
@@ -252,6 +260,7 @@ class TestStateMachineRegistry:
 
 # ─── L3 Tool 网关测试 ─────────────────────────────────────────────────────────
 
+
 class TestToolGateway:
     def test_tool_definitions_exist(self):
         assert len(TOOL_INDEX) > 20
@@ -261,8 +270,14 @@ class TestToolGateway:
     def test_agent_tool_mapping(self):
         # 每个专业 Agent 都有工具映射
         expected_agents = [
-            "reception", "waitlist_table", "ordering", "kitchen",
-            "member_growth", "checkout_risk", "store_ops", "hq_analytics",
+            "reception",
+            "waitlist_table",
+            "ordering",
+            "kitchen",
+            "member_growth",
+            "checkout_risk",
+            "store_ops",
+            "hq_analytics",
         ]
         for agent_id in expected_agents:
             assert agent_id in _AGENT_TOOL_MAPPING, f"{agent_id} 缺少工具映射"
@@ -273,7 +288,8 @@ class TestToolGateway:
         gw = ToolGateway()
         # 顾客不能查预订
         result = await gw.call_tool(
-            "query_reservations", {"date": "today"},
+            "query_reservations",
+            {"date": "today"},
             caller_role=UserRole.CUSTOMER,
             caller_agent="test",
             tenant_id="t-001",
@@ -318,6 +334,7 @@ class TestToolGateway:
 
 # ─── 业务流矩阵测试 ──────────────────────────────────────────────────────────
 
+
 class TestFlowMatrix:
     def test_all_flows_defined(self):
         assert len(BUSINESS_FLOWS) == 12
@@ -340,6 +357,7 @@ class TestFlowMatrix:
 
 # ─── L2 编排层测试 ────────────────────────────────────────────────────────────
 
+
 class TestDispatcher:
     def test_create_dispatcher(self):
         d = create_dispatcher()
@@ -349,8 +367,14 @@ class TestDispatcher:
     def test_specialist_ids(self):
         d = create_dispatcher()
         expected = {
-            "reception", "waitlist_table", "ordering", "kitchen",
-            "member_growth", "checkout_risk", "store_ops", "hq_analytics",
+            "reception",
+            "waitlist_table",
+            "ordering",
+            "kitchen",
+            "member_growth",
+            "checkout_risk",
+            "store_ops",
+            "hq_analytics",
         }
         actual = {s["agent_id"] for s in d.list_specialists()}
         assert expected == actual

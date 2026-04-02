@@ -2,6 +2,9 @@
 # ═══════════════════════════════════════════════════════════
 #  屯象OS — 品智POS接入部署脚本
 #  在服务器 42.194.229.21 上执行
+#
+#  安全要求：所有商户凭证必须通过环境变量注入，禁止硬编码。
+#  凭证来源：运维通过 Vault / 密钥管理服务注入 .env 文件。
 # ═══════════════════════════════════════════════════════════
 set -e
 
@@ -18,73 +21,55 @@ cd $PROJECT_DIR
 git pull origin main
 echo "✓ 代码已更新"
 
-# ── Step 2: 写入商户凭证到 .env ──
+# ── Step 2: 检查商户凭证 ──
 echo ""
-echo "=== Step 2: 写入商户凭证 ==="
+echo "=== Step 2: 检查商户凭证 ==="
 
-# 检查是否已配置
-if grep -q "CZYZ_PINZHI_API_TOKEN" $PROJECT_DIR/.env 2>/dev/null; then
-    echo "⚠️  .env 中已有品智配置，跳过写入"
-else
-    cat >> $PROJECT_DIR/.env << 'MERCHANT_EOF'
+# 必须的环境变量列表
+REQUIRED_VARS=(
+    "CZYZ_PINZHI_API_TOKEN"
+    "CZYZ_AOQIWEI_APP_KEY"
+    "ZQX_PINZHI_API_TOKEN"
+    "ZQX_AOQIWEI_APP_KEY"
+    "SGC_PINZHI_API_TOKEN"
+    "SGC_AOQIWEI_APP_KEY"
+    "SGC_COUPON_APP_KEY"
+)
 
-# ══════════════════════════════════════════════════════════
-#  三家商户 POS/CRM 凭证 (2026-03-28 配置)
-# ══════════════════════════════════════════════════════════
-
-# ── 尝在一起 (CZYZ) — 品智收银 ──
-CZYZ_PINZHI_BASE_URL=https://czyq.pinzhikeji.net/api/v1
-CZYZ_PINZHI_API_TOKEN=3bbc9bed2b42c1e1b3cca26389fbb81c
-CZYZ_PINZHI_STORE_2461_TOKEN=752b4b16a863ce47def11cf33b1b521f
-CZYZ_PINZHI_STORE_7269_TOKEN=f5cc1a27db6e215ae7bb5512b6b57981
-CZYZ_PINZHI_STORE_19189_TOKEN=56cd51b69211297104a0608f6a696b80
-
-# ── 尝在一起 — 奥琦玮CRM ──
-CZYZ_AOQIWEI_BASE_URL=https://api.acewill.net
-CZYZ_AOQIWEI_APP_ID=dp25MLoc2gnXE7A223ZiVv
-CZYZ_AOQIWEI_APP_KEY=3d2eaa5f9b9a6a6746a18d28e770b501
-CZYZ_AOQIWEI_MERCHANT_ID=1275413383
-
-# ── 最黔线 (ZQX) — 品智收银 ──
-ZQX_PINZHI_BASE_URL=https://ljcg.pinzhikeji.net/api/v1
-ZQX_PINZHI_API_TOKEN=47a428538d350fac1640a51b6bbda68c
-ZQX_PINZHI_STORE_20529_TOKEN=29cdb6acac3615070bb853afcbb32f60
-ZQX_PINZHI_STORE_32109_TOKEN=ed2c948284d09cf9e096e9d965936aa3
-ZQX_PINZHI_STORE_32304_TOKEN=43f0b54db12b0618ea612b2a0a4d2675
-ZQX_PINZHI_STORE_32305_TOKEN=a8a4e4daf86875d4a4e0254b6eb7191e
-ZQX_PINZHI_STORE_32306_TOKEN=d656668d285a100c851bbe149d4364f3
-ZQX_PINZHI_STORE_32309_TOKEN=36bf0644e5703adc8a4d1ddd7b8f0e95
-
-# ── 最黔线 — 奥琦玮CRM ──
-ZQX_AOQIWEI_BASE_URL=https://api.acewill.net
-ZQX_AOQIWEI_APP_ID=dp2C8kqBMmGrHUVpBjqAw8q3
-ZQX_AOQIWEI_APP_KEY=56573c798c8ab0dc565e704190207f12
-ZQX_AOQIWEI_MERCHANT_ID=1827518239
-
-# ── 尚宫厨 (SGC) — 品智收银 ──
-SGC_PINZHI_BASE_URL=https://xcsgc.pinzhikeji.net/api/v1
-SGC_PINZHI_API_TOKEN=8275cf74d1943d7a32531d2d4f889870
-SGC_PINZHI_STORE_2463_TOKEN=852f1d34c75af0b8eb740ef47f133130
-SGC_PINZHI_STORE_7896_TOKEN=27a36f2feea6d3a914438f6cb32108c3
-SGC_PINZHI_STORE_24777_TOKEN=5cbfb449112f698218e0b1be1a3bc7c6
-SGC_PINZHI_STORE_36199_TOKEN=08f3791e15f48338405728a3a92fcd7f
-SGC_PINZHI_STORE_41405_TOKEN=bb7e89dcd0ac339b51631eca99e51c9b
-
-# ── 尚宫厨 — 奥琦玮CRM ──
-SGC_AOQIWEI_BASE_URL=https://api.acewill.net
-SGC_AOQIWEI_APP_ID=dp0X0jl45wauwdGgkRETITz
-SGC_AOQIWEI_APP_KEY=649738234c7426bfa0dbfa431c92a750
-SGC_AOQIWEI_MERCHANT_ID=1549254243
-
-# ── 尚宫厨 — 卡券中心 ──
-SGC_COUPON_BASE_URL=https://apigateway.acewill.net
-SGC_COUPON_APP_ID=1549254243_6
-SGC_COUPON_APP_KEY=d650652396b1bab5434d51c44c4d1436
-SGC_COUPON_PLATFORMS=DOUYIN,ALIPAY,KUAISHOU,XHS,VIDEONUMBER,BANK,QITIAN,JD,TAOBAO,SHANGOU,AMAP
-
-MERCHANT_EOF
-    echo "✓ 三家商户凭证已写入 .env"
+# 检查 .env 是否存在
+if [ ! -f "$PROJECT_DIR/.env" ]; then
+    echo "❌ .env 文件不存在！"
+    echo ""
+    echo "请先从密钥管理服务获取凭证并写入 .env："
+    echo "  参考模板: $PROJECT_DIR/.env.example"
+    echo "  必须包含: ${REQUIRED_VARS[*]}"
+    echo ""
+    echo "  方式1: 从 Vault 拉取"
+    echo "    vault kv get -format=json secret/tunxiang/merchants > /tmp/creds.json"
+    echo "    python3 scripts/inject-merchant-env.py /tmp/creds.json $PROJECT_DIR/.env"
+    echo ""
+    echo "  方式2: 手动创建"
+    echo "    cp $PROJECT_DIR/.env.example $PROJECT_DIR/.env"
+    echo "    # 然后填入真实凭证值"
+    exit 1
 fi
+
+# 逐个检查必要环境变量
+MISSING=0
+for VAR in "${REQUIRED_VARS[@]}"; do
+    if ! grep -q "^${VAR}=" "$PROJECT_DIR/.env" 2>/dev/null; then
+        echo "❌ 缺少: $VAR"
+        MISSING=1
+    fi
+done
+
+if [ "$MISSING" -eq 1 ]; then
+    echo ""
+    echo "请补充缺失的凭证到 .env 文件后重新运行部署。"
+    exit 1
+fi
+
+echo "✓ 所有商户凭证已配置"
 
 # ── Step 3: 重启服务加载新环境变量 ──
 echo ""
@@ -119,9 +104,10 @@ fi
 # ── Step 5: 验证品智API连通性 ──
 echo ""
 echo "=== Step 5: 验证品智API连通性 ==="
-# 用尝在一起文化城店测试
+# 从 .env 读取 token（不硬编码）
+CZYZ_TOKEN=$(grep '^CZYZ_PINZHI_API_TOKEN=' "$PROJECT_DIR/.env" | cut -d'=' -f2)
 RESPONSE=$(curl -sf -X POST "https://czyq.pinzhikeji.net/api/v1/pinzhi/organizations.do" \
-    -d "token=3bbc9bed2b42c1e1b3cca26389fbb81c" 2>&1) && echo "✓ 品智API可达" || echo "⚠️  品智API不可达: $RESPONSE"
+    -d "token=${CZYZ_TOKEN}" 2>&1) && echo "✓ 品智API可达" || echo "⚠️  品智API不可达: $RESPONSE"
 
 # ── Step 6: 拉取尝在一起昨日数据 ──
 echo ""

@@ -32,8 +32,10 @@ repos:
     rev: 1.7.8
     hooks:
       - id: bandit
-        args: [-r, services/, -ll, --skip, B101]
+        args: [-ll, --skip, B101]
+        files: ^services/
         # B101: assert_used - 测试中使用assert是合理的
+        # files过滤确保只扫描services/下的Python文件
 
   # 密钥检测
   - repo: https://github.com/Yelp/detect-secrets
