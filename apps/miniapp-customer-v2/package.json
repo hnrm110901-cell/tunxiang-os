@@ -1,0 +1,31 @@
+{
+  "name": "miniapp-customer-v2",
+  "version": "2.0.0",
+  "private": true,
+  "scripts": {
+    "dev:weapp": "taro build --type weapp --watch",
+    "dev:tt": "taro build --type tt --watch",
+    "dev:h5": "taro build --type h5 --watch",
+    "build:weapp": "taro build --type weapp",
+    "build:tt": "taro build --type tt",
+    "build:h5": "taro build --type h5"
+  },
+  "dependencies": {
+    "@tarojs/components": "3.6.22",
+    "@tarojs/plugin-framework-react": "3.6.22",
+    "@tarojs/runtime": "3.6.22",
+    "@tarojs/taro": "3.6.22",
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0",
+    "zustand": "^4.4.0"
+  },
+  "devDependencies": {
+    "@tarojs/cli": "3.6.22",
+    "@tarojs/plugin-tailwind": "^1.0.0",
+    "@tarojs/webpack5-runner": "3.6.22",
+    "@types/react": "^18.0.0",
+    "@types/node": "^18.0.0",
+    "typescript": "^5.0.0",
+    "tailwindcss": "^3.3.0"
+  }
+}
