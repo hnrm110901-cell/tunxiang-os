@@ -27,6 +27,25 @@ Page({
       gold: { name: '黄金会员', gradient: 'linear-gradient(135deg, #d69e2e, #b7791f)' },
       diamond: { name: '钻石会员', gradient: 'linear-gradient(135deg, #667eea, #764ba2)' },
     },
+    // 等级门槛配置（积分）
+    levelThresholds: [
+      { level: 'normal', threshold: 0, name: '普通会员' },
+      { level: 'silver', threshold: 500, name: '白银会员' },
+      { level: 'gold', threshold: 2000, name: '黄金会员' },
+      { level: 'diamond', threshold: 8000, name: '钻石会员' },
+    ],
+    // 等级进度
+    levelProgress: {
+      pct: 0,
+      nextLevelName: '',
+      nextThreshold: 0,
+      pointsNeeded: 0,
+    },
+    // 储值卡
+    storedValue: {
+      hasCard: false,
+      balanceYuan: '0.00',
+    },
     // 菜单项
     menuItems: [
       { icon: '\ud83c\udf81', label: '积分商城', route: '/pages/points-mall/points-mall' },
@@ -90,6 +109,7 @@ Page({
       .then(function (data) {
         var level = data.level || 'normal';
         var config = self.data.levelConfig[level] || self.data.levelConfig.normal;
+        var points = data.points_balance || 0;
         self.setData({
           'profile.nickname': data.nickname || data.phone || '未设置昵称',
           'profile.avatarUrl': data.avatar_url || '',
@@ -97,15 +117,71 @@ Page({
           'profile.birthday': data.birthday || '',
           'profile.level': level,
           'profile.levelName': config.name,
-          'profile.pointsBalance': data.points_balance || 0,
+          'profile.pointsBalance': points,
           'profile.balanceFen': data.balance_fen || 0,
           'profile.balanceYuan': ((data.balance_fen || 0) / 100).toFixed(2),
           'profile.totalSpentYuan': ((data.total_spent_fen || 0) / 100).toFixed(2),
           'profile.orderCount': data.order_count || 0,
+          'profile.couponCount': data.coupon_count || 0,
         });
+        self._calcLevelProgress(level, points);
+        self._loadStoredValue();
       })
       .catch(function (err) {
         console.warn('加载会员信息失败', err);
+      });
+  },
+
+  // 计算等级进度条数据
+  _calcLevelProgress: function (currentLevel, points) {
+    var thresholds = this.data.levelThresholds;
+    var currentIdx = -1;
+    for (var i = 0; i < thresholds.length; i++) {
+      if (thresholds[i].level === currentLevel) {
+        currentIdx = i;
+        break;
+      }
+    }
+    var nextIdx = currentIdx + 1;
+    if (nextIdx >= thresholds.length) {
+      // 已是最高级
+      this.setData({ levelProgress: { pct: 100, nextLevelName: '', nextThreshold: 0, pointsNeeded: 0 } });
+      return;
+    }
+    var currentThreshold = thresholds[currentIdx].threshold;
+    var nextThreshold = thresholds[nextIdx].threshold;
+    var nextLevelName = thresholds[nextIdx].name;
+    var range = nextThreshold - currentThreshold;
+    var earned = Math.max(0, points - currentThreshold);
+    var pct = range > 0 ? Math.min(100, Math.floor(earned / range * 100)) : 0;
+    var pointsNeeded = Math.max(0, nextThreshold - points);
+    this.setData({
+      levelProgress: {
+        pct: pct,
+        nextLevelName: nextLevelName,
+        nextThreshold: nextThreshold,
+        pointsNeeded: pointsNeeded,
+      },
+    });
+  },
+
+  // 加载储值卡余额
+  _loadStoredValue: function () {
+    var self = this;
+    api.txRequest('/api/v1/member/stored-value/balance', 'GET', null)
+      .then(function (resp) {
+        var d = (resp && resp.data) || {};
+        var balanceFen = d.balance_fen || 0;
+        self.setData({
+          storedValue: {
+            hasCard: balanceFen > 0,
+            balanceYuan: (balanceFen / 100).toFixed(2),
+          },
+        });
+      })
+      .catch(function () {
+        // 储值卡接口不可用时静默失败，不影响主页面
+        self.setData({ 'storedValue.hasCard': false });
       });
   },
 

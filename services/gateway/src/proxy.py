@@ -25,13 +25,18 @@ DOMAIN_ROUTES = {
     "trade": os.getenv("TX_TRADE_URL", "http://localhost:8001"),
     "menu": os.getenv("TX_MENU_URL", "http://localhost:8002"),
     "member": os.getenv("TX_MEMBER_URL", "http://localhost:8003"),
-    "supply": os.getenv("TX_SUPPLY_URL", "http://localhost:8004"),
-    "finance": os.getenv("TX_FINANCE_URL", "http://localhost:8005"),
-    "org": os.getenv("TX_ORG_URL", "http://localhost:8006"),
-    "analytics": os.getenv("TX_ANALYTICS_URL", "http://localhost:8007"),
+    "growth": os.getenv("TX_GROWTH_URL", "http://localhost:8004"),
+    "ops": os.getenv("TX_OPS_URL", "http://localhost:8005"),
+    "supply": os.getenv("TX_SUPPLY_URL", "http://localhost:8006"),
+    "finance": os.getenv("TX_FINANCE_URL", "http://localhost:8007"),
     "agent": os.getenv("TX_AGENT_URL", "http://localhost:8008"),
-    "growth": os.getenv("TX_GROWTH_URL", "http://localhost:8012"),
-    "intel": os.getenv("TX_INTEL_URL", "http://localhost:8013"),
+    "analytics": os.getenv("TX_ANALYTICS_URL", "http://localhost:8009"),
+    "brain": os.getenv("TX_BRAIN_URL", "http://localhost:8010"),
+    "intel": os.getenv("TX_INTEL_URL", "http://localhost:8011"),
+    "org": os.getenv("TX_ORG_URL", "http://localhost:8012"),
+    # 别名路由：print/* 和 kds/* 均转发到 tx-trade
+    "print": os.getenv("TX_TRADE_URL", "http://localhost:8001"),
+    "kds": os.getenv("TX_TRADE_URL", "http://localhost:8001"),
 }
 
 # 旧单体回退（M4a 后可移除）

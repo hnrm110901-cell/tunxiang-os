@@ -352,3 +352,137 @@
   height: 88rpx;
   line-height: 88rpx;
 }
+
+/* --- 等级进度条 --- */
+.level-progress-wrap {
+  margin-top: 24rpx;
+  padding: 20rpx 0 4rpx;
+  border-top: 1rpx solid rgba(255,255,255,0.08);
+}
+
+.level-progress-labels {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14rpx;
+}
+
+.level-progress-current { font-size: 24rpx; color: rgba(255,255,255,0.7); font-weight: 600; }
+.level-progress-next { font-size: 22rpx; color: rgba(255,255,255,0.45); }
+
+.level-progress-track {
+  height: 10rpx;
+  background: rgba(255,255,255,0.12);
+  border-radius: 5rpx;
+  overflow: hidden;
+  margin-bottom: 12rpx;
+}
+
+.level-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #FF6B35, #FF9A5C);
+  border-radius: 5rpx;
+  transition: width 600ms ease;
+}
+
+.level-progress-detail {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.level-progress-pts { font-size: 22rpx; color: rgba(255,255,255,0.45); }
+.level-progress-link { font-size: 22rpx; color: #FF6B35; }
+
+/* --- 储值卡 --- */
+.stored-card {
+  margin: 0 32rpx 24rpx;
+  background: linear-gradient(135deg, #1a3040, #0e2030);
+  border: 1rpx solid rgba(255,107,53,0.2);
+  border-radius: 20rpx;
+  padding: 28rpx;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.stored-card-left {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+}
+
+.stored-card-icon { font-size: 48rpx; }
+
+.stored-card-info {
+  display: flex;
+  flex-direction: column;
+  gap: 6rpx;
+}
+
+.stored-card-title { font-size: 28rpx; color: #fff; font-weight: 600; }
+.stored-card-sub { font-size: 22rpx; color: #999; }
+
+.stored-card-right {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
+
+.stored-card-amount { font-size: 36rpx; font-weight: bold; color: #FF6B35; }
+.stored-card-arrow { font-size: 28rpx; color: #666; }
+
+/* --- 会员专属优惠 --- */
+.exclusive-section {
+  margin: 0 32rpx 24rpx;
+  background: #112228;
+  border-radius: 20rpx;
+  padding: 28rpx;
+}
+
+.exclusive-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 28rpx;
+}
+
+.exclusive-title { font-size: 28rpx; color: #fff; font-weight: 600; }
+.exclusive-more { font-size: 24rpx; color: #FF6B35; }
+
+.exclusive-list {
+  display: flex;
+  justify-content: space-around;
+}
+
+.exclusive-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14rpx;
+}
+
+.exclusive-badge {
+  width: 96rpx;
+  height: 96rpx;
+  border-radius: 50%;
+  background: rgba(255,107,53,0.12);
+  border: 2rpx solid rgba(255,107,53,0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.exclusive-badge-orange {
+  background: rgba(255,107,53,0.15);
+  border-color: rgba(255,107,53,0.4);
+}
+
+.exclusive-badge-gold {
+  background: rgba(214,158,46,0.15);
+  border-color: rgba(214,158,46,0.4);
+}
+
+.exclusive-badge-text { font-size: 32rpx; font-weight: bold; color: #FF6B35; }
+.exclusive-badge-icon { font-size: 40rpx; }
+.exclusive-item-label { font-size: 24rpx; color: #ccc; }

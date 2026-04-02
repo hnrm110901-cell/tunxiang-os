@@ -252,20 +252,23 @@ async def test_create_weigh_record_weight_mode():
 
     mock_db = AsyncMock()
 
-    # Mock INSERT 操作
+    rls_result = MagicMock()
+
+    # Mock 菜品存在性校验（SELECT id, dish_name）
+    dish_name_result = MagicMock()
+    dish_name_result.fetchone.return_value = (uuid.UUID(DISH_ID), "活鲜鲈鱼")
+
+    # Mock INSERT 称重记录
     insert_result = MagicMock()
     insert_result.fetchone.return_value = None
-
-    # Mock 查菜品名称
-    dish_name_result = MagicMock()
-    dish_name_result.fetchone.return_value = ["活鲜鲈鱼"]
 
     # Mock UPDATE dish_name 快照
     update_result = MagicMock()
 
     mock_db.execute = AsyncMock(side_effect=[
-        insert_result,
+        rls_result,
         dish_name_result,
+        insert_result,
         update_result,
     ])
     mock_db.commit = AsyncMock()
@@ -315,12 +318,15 @@ async def test_create_weigh_record_count_mode():
     app.include_router(router)
 
     mock_db = AsyncMock()
+    rls_result = MagicMock()
+    dish_name_result = MagicMock()
+    dish_name_result.fetchone.return_value = (uuid.UUID(DISH_ID), "石斑鱼")
     insert_result = MagicMock()
     insert_result.fetchone.return_value = None
-    dish_name_result = MagicMock()
-    dish_name_result.fetchone.return_value = ["石斑鱼"]
     update_result = MagicMock()
-    mock_db.execute = AsyncMock(side_effect=[insert_result, dish_name_result, update_result])
+    mock_db.execute = AsyncMock(
+        side_effect=[rls_result, dish_name_result, insert_result, update_result]
+    )
     mock_db.commit = AsyncMock()
 
     async def override_db():
@@ -383,12 +389,15 @@ async def test_confirm_weigh_deducts_stock():
     rec_result = MagicMock()
     rec_result.fetchone.return_value = rec_row
 
+    rls_result = MagicMock()
+
     # Mock 更新称重记录
     update_rec_result = MagicMock()
     # Mock 扣减库存
     update_stock_result = MagicMock()
 
     mock_db.execute = AsyncMock(side_effect=[
+        rls_result,
         rec_result,
         update_rec_result,
         update_stock_result,
@@ -413,8 +422,8 @@ async def test_confirm_weigh_deducts_stock():
     data = resp.json()
     assert data["ok"] is True
     assert data["data"]["status"] == "confirmed"
-    # 验证 execute 被调用了3次（查询 + 更新称重记录 + 扣库存）
-    assert mock_db.execute.call_count == 3
+    # RLS set_config + 查询记录 + 更新称重记录 + 扣库存
+    assert mock_db.execute.call_count == 4
     mock_db.commit.assert_called_once()
 
 
@@ -446,7 +455,10 @@ async def test_confirm_weigh_updates_order():
     rec_result = MagicMock()
     rec_result.fetchone.return_value = rec_row
 
-    mock_db.execute = AsyncMock(side_effect=[rec_result, MagicMock(), MagicMock()])
+    rls_result = MagicMock()
+    mock_db.execute = AsyncMock(
+        side_effect=[rls_result, rec_result, MagicMock(), MagicMock()]
+    )
     mock_db.commit = AsyncMock()
 
     async def override_db():
@@ -544,7 +556,6 @@ async def test_weigh_cancel_restores_stock():
     insert_result = MagicMock()
     insert_result.fetchone.return_value = None
     dish_result = MagicMock()
-    dish_result.fetchone.return_value = ["活鲜虾"]
     update_name_result = MagicMock()
 
     call_log = []
@@ -552,10 +563,13 @@ async def test_weigh_cancel_restores_stock():
     async def tracked_execute(sql, params=None):
         sql_str = str(sql)
         call_log.append(sql_str)
+        if "set_config('app.tenant_id'" in sql_str:
+            return MagicMock()
+        if "SELECT id, dish_name FROM dishes" in sql_str:
+            dish_result.fetchone.return_value = (uuid.UUID(DISH_ID), "活鲜虾")
+            return dish_result
         if "INSERT INTO live_seafood_weigh_records" in sql_str:
             return insert_result
-        if "SELECT dish_name" in sql_str:
-            return dish_result
         if "UPDATE live_seafood_weigh_records SET dish_name" in sql_str:
             return update_name_result
         return MagicMock()
@@ -626,15 +640,8 @@ async def test_invalid_weigh_quantity_http_422():
 
 
 @pytest.mark.asyncio
-async def test_weigh_nonexistent_dish_still_creates_record():
-    """POST /api/v1/menu/live-seafood/weigh：菜品不存在时 dish_name 为 '未知菜品'
-
-    NOTE: 当前源码实现中，create_weigh_record 先 INSERT 再查菜品名，
-    如果菜品不存在则 dish_name 为 '未知菜品'（第49行 fetchone() or ['未知菜品']）。
-    实际上 INSERT 不会报404，但调用方可能期望404。
-    这是一个潜在 BUG：create 端点不验证 dish_id 存在性，仅查名称快照。
-    本测试记录此行为。
-    """
+async def test_weigh_nonexistent_dish_returns_404():
+    """POST /api/v1/menu/live-seafood/weigh：菜品不存在时返回 404（DB 校验）"""
     from api.live_seafood_routes import router
     from shared.ontology.src.database import get_db
 
@@ -642,14 +649,11 @@ async def test_weigh_nonexistent_dish_still_creates_record():
     app.include_router(router)
     mock_db = AsyncMock()
 
-    insert_result = MagicMock()
-    insert_result.fetchone.return_value = None
-    # 菜品不存在：fetchone 返回 None
+    rls_result = MagicMock()
     dish_result = MagicMock()
     dish_result.fetchone.return_value = None
-    update_result = MagicMock()
 
-    mock_db.execute = AsyncMock(side_effect=[insert_result, dish_result, update_result])
+    mock_db.execute = AsyncMock(side_effect=[rls_result, dish_result])
     mock_db.commit = AsyncMock()
 
     async def override_db():
@@ -674,10 +678,10 @@ async def test_weigh_nonexistent_dish_still_creates_record():
             headers=HEADERS,
         )
 
-    # BUG标注：当前实现不验证dish_id存在性，返回201且dish_name='未知菜品'
-    # 期望行为应是404，但实际是201
-    assert resp.status_code == 201
-    assert resp.json()["data"]["dish_name"] == "未知菜品"
+    assert resp.status_code == 404
+    body = resp.json()["detail"]
+    assert body["error"]["code"] == "DISH_NOT_FOUND"
+    mock_db.commit.assert_not_called()
 
 
 @pytest.mark.asyncio

@@ -363,25 +363,34 @@ async def create_weigh_record(
             },
         )
 
-    # ── 校验 dish_id 存在性
-    # TODO: 替换为真实DB查询 SELECT id FROM dishes WHERE id=$dish_id AND tenant_id=$tenant_id AND is_deleted=FALSE
-    if req.dish_id not in _MOCK_DISH_IDS:
+    # ── 校验 dish_id 存在性（真实 DB 查询）
+    dish_check = await db.execute(
+        text("SELECT id, dish_name FROM dishes WHERE id = :id AND tenant_id = :tid AND is_deleted = false"),
+        {"id": _uuid.UUID(req.dish_id), "tid": _uuid.UUID(tid)},
+    )
+    dish_row = dish_check.fetchone()
+    if not dish_row:
         raise HTTPException(
-            status_code=422,
+            status_code=404,
             detail={
                 "ok": False,
                 "error": {
                     "code": "DISH_NOT_FOUND",
-                    "message": "菜品不存在或已下架",
+                    "message": f"菜品 {req.dish_id} 不存在",
                     "field": "dish_id",
                 },
             },
         )
+    real_dish_name: str = dish_row[1]
 
     # ── 校验 zone_code 合法性（如果传入）
     if req.zone_code is not None:
         zone_code_upper = req.zone_code.upper()
-        if zone_code_upper not in _MOCK_VALID_ZONE_CODES:
+        zone_result = await db.execute(
+            text("SELECT zone_code FROM fish_tank_zones WHERE store_id = :sid AND tenant_id = :tid AND zone_code = :zc AND is_deleted = false"),
+            {"sid": _uuid.UUID(req.store_id), "tid": _uuid.UUID(tid), "zc": zone_code_upper},
+        )
+        if not zone_result.fetchone():
             raise HTTPException(
                 status_code=422,
                 detail={
@@ -430,11 +439,8 @@ async def create_weigh_record(
         "notes": req.notes,
     })
 
-    # 获取菜品名称
-    dish_row = await db.execute(text(
-        "SELECT dish_name FROM dishes WHERE id = :did AND tenant_id = :tid"
-    ), {"did": _uuid.UUID(req.dish_id), "tid": _uuid.UUID(tid)})
-    dish_name = (dish_row.fetchone() or ["未知菜品"])[0]
+    # 菜品名称已在存在性校验时获取，直接使用
+    dish_name = real_dish_name
 
     # 更新 dish_name 快照
     await db.execute(text("""
