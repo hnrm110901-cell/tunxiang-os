@@ -78,20 +78,39 @@ import { DishDeptMappingPage } from './pages/trade/kds-mapping/DishDeptMappingPa
 import { OperationsDashboardPage } from './pages/OperationsDashboardPage';
 import { MenuTemplatePage } from './pages/menu/template/MenuTemplatePage';
 import { CentralKitchenPage } from './pages/CentralKitchenPage';
+import { CentralKitchenPage as CentralKitchenPageV2 } from './pages/supply/CentralKitchenPage';
 import { BomEditorPage } from './pages/supply/bom/BomEditorPage';
 import { PayrollPage } from './pages/PayrollPage';
 import { ApprovalTemplatePage } from './pages/ops/approval/ApprovalTemplatePage';
 import { ApprovalCenterPage as ApprovalCenterPageNew } from './pages/ops/approval/ApprovalCenterPage';
 import { PayrollManagePage } from './pages/org/payroll/PayrollManagePage';
 import { FranchiseDashboardPage } from './pages/org/franchise/FranchiseDashboardPage';
+import { FranchisePage } from './pages/franchise/FranchisePage';
 import { PayrollConfigPage } from './pages/org/PayrollConfigPage';
 import { PayrollRecordsPage } from './pages/org/PayrollRecordsPage';
 import { FinanceAuditPage } from './pages/finance/FinanceAuditPage';
+import PnLReportPage from './pages/finance/PnLReportPage';
+import PayrollPage from './pages/finance/PayrollPage';
 import { PatrolInspectionPage } from './pages/ops/PatrolInspectionPage';
 import { AnalyticsDashboardPage } from './pages/analytics/DashboardPage';
+import { HQDashboardPage } from './pages/analytics/HQDashboardPage';
+import { DishAnalyticsPage } from './pages/analytics/DishAnalyticsPage';
 import { MenuOptimizePage } from './pages/menu/MenuOptimizePage';
+import { DishSpecPage } from './pages/menu/DishSpecPage';
+import { DishSortPage } from './pages/menu/DishSortPage';
+import { DishBatchPage } from './pages/menu/DishBatchPage';
 import { CRMCampaignPage } from './pages/growth/CRMCampaignPage';
+import { CampaignManagePage } from './pages/growth/CampaignManagePage';
 import { AttendancePage } from './pages/org/AttendancePage';
+import { PerformancePage } from './pages/org/PerformancePage';
+import { MemberInsightPage } from './pages/member/MemberInsightPage';
+import { CustomerServicePage } from './pages/member/CustomerServicePage';
+import { MemberTierPage } from './pages/member/MemberTierPage';
+import { PurchaseOrderPage } from './pages/supply/PurchaseOrderPage';
+import { ExpiryAlertPage } from './pages/supply/ExpiryAlertPage';
+import { SupplyDashboardPage } from './pages/supply/SupplyDashboardPage';
+import { ReviewManagePage } from './pages/ops/ReviewManagePage';
+import { StoreManagePage } from './pages/store/StoreManagePage';
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem('tx_token'));
@@ -107,6 +126,7 @@ function App() {
     }
     localStorage.removeItem('tx_token');
     localStorage.removeItem('tx_user');
+    localStorage.removeItem('tx_tenant_id');
     setIsLoggedIn(false);
   };
 
@@ -190,20 +210,40 @@ function App() {
           <Route path="/hq/kds/dish-dept-mapping" element={<DishDeptMappingPage />} />
           <Route path="/menu-templates" element={<MenuTemplatePage />} />
           <Route path="/central-kitchen" element={<CentralKitchenPage />} />
+          <Route path="/supply/central-kitchen" element={<CentralKitchenPageV2 />} />
           <Route path="/supply/bom" element={<BomEditorPage />} />
           <Route path="/payroll" element={<PayrollPage />} />
           <Route path="/approval-templates" element={<ApprovalTemplatePage />} />
           <Route path="/approval-center" element={<ApprovalCenterPageNew />} />
+          <Route path="/ops/approval-center" element={<ApprovalCenterPageNew />} />
           <Route path="/payroll-manage" element={<PayrollManagePage />} />
           <Route path="/franchise-dashboard" element={<FranchiseDashboardPage />} />
+          <Route path="/franchise" element={<FranchisePage />} />
           <Route path="/org/payroll-configs" element={<PayrollConfigPage />} />
           <Route path="/org/payroll-records" element={<PayrollRecordsPage />} />
           <Route path="/finance/audit" element={<FinanceAuditPage />} />
+          <Route path="/finance/pnl-report" element={<PnLReportPage />} />
+          <Route path="/finance/payroll" element={<PayrollPage />} />
           <Route path="/ops/patrol-inspection" element={<PatrolInspectionPage />} />
           <Route path="/analytics/dashboard" element={<AnalyticsDashboardPage />} />
+          <Route path="/analytics/hq-dashboard" element={<HQDashboardPage />} />
+          <Route path="/analytics/dishes" element={<DishAnalyticsPage />} />
           <Route path="/menu/optimize" element={<MenuOptimizePage />} />
+          <Route path="/menu/specs" element={<DishSpecPage />} />
+          <Route path="/menu/sort" element={<DishSortPage />} />
+          <Route path="/menu/batch" element={<DishBatchPage />} />
           <Route path="/growth/crm-campaign" element={<CRMCampaignPage />} />
+          <Route path="/growth/campaigns" element={<CampaignManagePage />} />
           <Route path="/org/attendance" element={<AttendancePage />} />
+          <Route path="/org/performance" element={<PerformancePage />} />
+          <Route path="/member/insight" element={<MemberInsightPage />} />
+          <Route path="/member/customer-service" element={<CustomerServicePage />} />
+          <Route path="/member/tiers" element={<MemberTierPage />} />
+          <Route path="/supply/purchase-orders" element={<PurchaseOrderPage />} />
+          <Route path="/supply/expiry-alerts" element={<ExpiryAlertPage />} />
+          <Route path="/supply/dashboard" element={<SupplyDashboardPage />} />
+          <Route path="/ops/reviews" element={<ReviewManagePage />} />
+          <Route path="/store/manage" element={<StoreManagePage />} />
         </Routes>
       </ShellHQ>
     </BrowserRouter>

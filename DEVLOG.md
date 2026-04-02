@@ -4,6 +4,77 @@
 
 ---
 
+## 2026-04-02（Claude 执行方案 + 商户布署 Runbook + P0 代码）
+
+### 今日完成
+- [docs] `docs/claude-dev-execution-plan-merchant-deploy.md`：今日已落地项（`tx_tenant_id` 登录、Gateway `/open-api` 挂载）+ 明日单商户环境 Runbook
+- [web-admin] 登录成功写入 `localStorage.tx_tenant_id`；登出清除
+- [gateway] `main.py` 增加 `include_router(open_api_router)`
+- [docs] `forge-openapi-key-lifecycle.md` §5 与已挂载状态一致
+- [README] 链至 `claude-dev-execution-plan-merchant-deploy.md`
+
+### 数据变化
+- 无
+
+### 遗留问题
+- 服务器上需自行 `git pull`、重建 gateway、迁移 DB、发布 web-admin 静态资源（见 Runbook）
+
+### 明日计划
+- 按 Runbook 布署单商户环境并验收租户头一致
+
+---
+
+## 2026-04-02（门店端架构文档 + README）
+
+### 今日完成
+- [docs] `docs/architecture-store-terminals-stable-ai.md`：门店端硬件兼容、稳定交付、AI 智能体分层与工程映射（定稿入库）
+- [README] 新增「门店端架构」摘要、硬件表补充 Windows 收银与打印主机说明、链至上述文档与 `development-plan-mixed-terminals-claude-2026Q2.md`
+
+### 数据变化
+- 无
+
+### 遗留问题
+- Windows 壳目录尚未创建，仍以开发计划 Phase 2 为准
+
+### 明日计划
+- 按需实现 Phase 1 租户上下文或 Windows 壳选型
+
+---
+
+## 2026-04-02（混合终端架构 + Claude 开发计划）
+
+### 今日完成
+- [docs] `docs/development-plan-mixed-terminals-claude-2026Q2.md`：Windows 收银 + Android 区域屏 + Android/iOS 移动场景下的架构/产品映射、Phase0–6 分阶段任务与验收（含 Windows 壳与打印主机策略）
+
+### 数据变化
+- 无
+
+### 遗留问题
+- Windows 壳技术选型（WebView2 vs Electron）待 Phase 0 评审
+
+### 明日计划
+- 按需启动 Phase 0 规格冻结或 Phase 1 租户上下文统一
+
+---
+
+## 2026-04-02（Hub / Forge / OS 规格文档）
+
+### 今日完成
+- [docs] `docs/hub-modules-api-rbac-acceptance.md`：按 `domain-architecture-v3` 九大模块整理 API 建议路径、RBAC、验收项（对齐 `gateway/hub_api.py` 占位）
+- [docs] `docs/forge-openapi-key-lifecycle.md`：Forge 与 v069 开放表、`OAuth2Service`、`open_api_routes` 生命周期对齐说明
+- [docs] `docs/web-admin-real-data-routes.md`：OS 路由 A/B/C 数据来源分类（仅真数据 / 降级 / 演示为主）
+
+### 数据变化
+- 无
+
+### 遗留问题
+- 开放 API 路由需在 `services/gateway/src/main.py` 确认 `include_router(open_api_router)` 后，Forge 控制台方可联调真接口
+
+### 明日计划
+- web-hub 各页改为调用 `/api/v1/hub/*` 并逐步替换占位 JSON 为 DB 聚合
+
+---
+
 ## 2026-04-02（miniapp-customer-v2 全量交付 — Taro 3 新版小程序 Sprint 0-6）
 
 ### 今日完成（超级智能体团队 Sprint 0-6 交付）
@@ -66,7 +137,288 @@
 
 ---
 
-## 2026-04-02（Round 19 进行中）
+## 2026-04-02（Round 28 全部完成 — 薪资管理页 + miniapp邀请好友 + v131迁移+考勤管理）
+
+### 今日完成（超级智能体团队 Round 28 交付）
+
+**Team P3 — 财务薪资管理页**
+- [tx-finance/payroll_routes] 9端点：薪资单CRUD/审批/标记已发/方案配置/近6月历史，Mock存储
+- [web-admin/PayrollPage] 3Tab：薪资单列表（ProTable+Drawer明细+审批Popconfirm）/ 方案配置（4岗位卡片+ModalForm）/ 发薪历史（SVG双折线近6月）
+- [web-admin/App.tsx] 注册 /finance/payroll 路由
+
+**Team Q3 — miniapp邀请有礼**
+- [miniapp/pages/invite] 4文件：渐变头部+邀请码虚线框+圆形进度+奖励规则+分享按钮，wx.shareAppMessage带invite_code
+- [miniapp/pages/invite-records] 4文件：统计栏+记录列表+下拉刷新+上拉加载，积分状态badge
+- [tx-member/invite_routes] 3端点：my-code/records/claim，Mock含TODO标注
+- [miniapp/app.json] 追加2条页面路径
+
+**Team R3 — v131迁移+考勤（发现已有实现）**
+- [v131] 4张表：dish_spec_groups/dish_spec_options（菜品规格）+ attendance_records/attendance_leave_requests（员工考勤），全RLS，唯一约束防重复打卡
+- attendance_routes.py/AttendancePage.tsx/路由注册均已存在，跳过重复创建
+
+### 数据变化
+- 迁移版本：v130 → v131
+- 新增 API 模块：10个（payroll×9 + invite×3）
+- 新增前端页面：PayrollPage + invite + invite-records
+
+---
+
+## 2026-04-02（Round 27 全部完成 — 门店管理+桌台配置 + miniapp扫码点餐 + 菜品管理三补页）
+
+### 今日完成（超级智能体团队 Round 27 交付）
+
+**Team M3 — web-admin门店管理和桌台配置**
+- [web-admin/StoreManagePage] 两Tab：门店列表（4统计卡+筛选表格+新增Modal+暂停二次确认） + 桌台配置（左侧门店选择+右侧分区网格+80×80px桌台卡）
+- [tx-trade/store_management_routes] 10端点：门店CRUD + 桌台CRUD，Mock内存存储
+- [tx-trade/main.py] 注册store_management_router
+- [web-admin/App.tsx + SidebarHQ.tsx] 路由/store/manage，侧边栏修复所有菜单navigate跳转
+
+**Team N3 — miniapp扫码点餐完整流程**
+- [miniapp/pages/menu] 已有扫码点餐主菜单（左分类+右菜单+浮动购物车，本轮确认完整）
+- [miniapp/pages/dish-detail] 4文件全新实现：规格选择+数量+加购，ES5风格，cartMap持久化
+
+**Team O3 — web-admin菜品管理三补页**
+- [web-admin/DishSpecPage] 规格管理：规格组+规格值TreeTable，ProForm Modal，批量删除
+- [web-admin/DishSortPage] 排序管理：拖拽排序（DragHandle），分类分组，一键保存
+- [web-admin/DishBatchPage] 批量操作：批量上下架/调价/标签/转移分类/CSV导入导出
+- [tx-menu/dish_spec_routes] 6端点：规格组CRUD + 规格值管理，Mock数据
+
+---
+
+## 2026-04-02（Round 26 全部完成 — 沽清管理 + v130迁移+菜品分析 + miniapp会员权益）
+
+### 今日完成（超级智能体团队 Round 26 交付）
+
+**Team J3 — POS沽清管理 + Crew加菜历史**
+- [web-pos/SoldOutPage] 乐观更新，沽清置顶，useTouchScale，二次确认必选原因才激活按钮
+- [web-crew/AddItemsHistoryPage] 按桌台分组，待出单优先，30s刷新，底部上滑详情
+- [web-pos/App.tsx + web-crew/App.tsx] 注册/soldout和/add-history路由
+
+**Team K3 — v130迁移 + 菜品分析**
+- [v130] 4张表：order_reviews/review_media/member_tier_configs/tier_upgrade_logs（全RLS）
+- [tx-analytics/dish_analytics_routes] 4端点：热销/时段热力/搭配/预警
+- [web-admin/DishAnalyticsPage] 4Tab：CSS Grid热力图（7×24，rgba渐变）+搭配分析+预警Popconfirm
+
+**Team L3 — miniapp会员中心完善**
+- [miniapp/member-benefits] 4等级渐变卡+升级进度条+权益网格+横滚对比表+积分渠道
+- [miniapp/checkin] 200rpx大圆按钮+连续天数+里程碑+月历7列，签到写tx_points缓存联动
+- [miniapp/app.json + member页] 注册+4个快捷入口
+
+### 数据变化
+- 迁移版本：v130（4张表）
+- 新增 API 端点：4个（dish_analytics）
+- 新增前端页面：6个
+
+---
+
+## 2026-04-02（Round 25 全部完成 — 会员等级 + KDS备料站 + 评价管理）
+
+### 今日完成（超级智能体团队 Round 25 交付）
+
+**Team G3 — 会员等级体系**
+- [tx-member/tier_routes] 7端点：等级CRUD + 升降级日志 + 升级资格检查（/upgrade-log和/check-upgrade在/{tier_id}前，避免路由歧义）
+- [web-admin/MemberTierPage] 4个等级卡片（点击选中高亮）+ 左栏配置编辑（EditableTagGroup权益标签增删）+ 右栏升降级Timeline（升绿/降红）+ 权益横向对比表（最高档品牌色加粗）
+- [tx-member/main + App.tsx + SidebarHQ] 完整注册
+
+**Team H3 — KDS备料预备站**
+- [web-kds/PrepStation] 食材需求聚合列表（3状态：○待备/✓已备/⚠缺料），已备置底+缺料置顶+橙色边框，48×48px状态圆钮，navigator.vibrate反馈
+- [web-kds/ShortageReportPage] 3档紧急程度大按钮（72px高），失败Mock成功，1.5s后返回
+- [web-kds/KitchenBoard] 头部添加"备料站"按钮（橙黄色，跳转/prep-station）
+- [web-kds/App.tsx] 注册/prep-station + /shortage-report（保留原/prep不冲突）
+
+**Team I3 — 评价管理（后端+前端）**
+- [tx-trade/review_routes] 5端点：列表/提交/商家回复/隐藏/统计，差评自动进入pending_review
+- [web-admin/ReviewManagePage] 5统计卡片+4Select筛选+ProTable展开行（分项评分条形图+图片缩略图+商家回复气泡）+统计Drawer（CSS进度条雷达图+SVG折线+标签词云）
+- [tx-trade/main + App.tsx + SidebarHQ] 完整注册
+
+### 数据变化
+- 新增 API 端点：19个（tier×7 + review×5 + 各路由）
+- 新增前端页面：5个（MemberTier + PrepStation + ShortageReport + ReviewManage + KitchenBoard改造）
+
+---
+
+## 2026-04-02（Round 24 全部完成 — 集团驾驶舱 + 绩效考核 + 评价系统）
+
+### 今日完成（超级智能体团队 Round 24 交付）
+
+**Team D3 — 集团经营驾驶舱大屏（869行）**
+- [web-admin/HQDashboardPage] 暗色主题，CSS Grid布局，30s倒计时自动刷新
+- 复用RealtimeDashboard组件（实时指标区）
+- 纯SVG营收折线图（今日橙/昨日蓝/上周灰虚线，当前时刻竖线标注，面积渐变）
+- 门店排行榜（金银铜emoji，同比Tag箭头）
+- 菜品热销TOP10（纯CSS水平进度条，TOP3橙色渐变）
+- Agent预警区（3级颜色，新预警fadein动画，脉冲动画）
+- [App.tsx + SidebarHQ] 注册集团驾驶舱🚀导航入口
+
+**Team E3 — 员工绩效考核（853行）**
+- 发现：performance_routes.py后端已存在完整DB版本，无需重建
+- [web-admin/PerformancePage] 三Tab：月度排行（颁奖台TOP3+ProTable+Drawer分项）/ 考核录入（KPI模板动态生成打分行+实时加权总分）/ 奖惩记录（ProTable.Summary固定合计）
+- [App.tsx + SidebarHQ] /org/performance + "绩效考核🏆"导航
+
+**Team F3 — miniapp顾客评价系统**
+- [miniapp/review] 5星整体评分+4维分项+快速标签Chips（8个）+最多6张图+匿名开关
+- [miniapp/reviews-list] 综合评分+评分分布进度条+4分项均分+5Tab筛选+商家回复引用框
+- [miniapp/order-track] 订单完成后显示"去评价"按钮（canReview互斥控制）
+- [app.json] 分包注册，避免主包体积膨胀
+
+### 数据变化
+- 新增前端页面：5个（HQDashboard + Performance + review + reviews-list + 订单详情改造）
+- 后端：2个服务中均发现已有实现（performance + central_kitchen），节省重复开发
+
+---
+
+## 2026-04-02（Round 23 全部完成 — Taro社区 + POS储值卡 + v129迁移+实时数据）
+
+### 今日完成（超级智能体团队 Round 23 交付）
+
+**Team A3 — miniapp-customer-v2（Taro版）**
+- [v2/community] 双列瀑布流，乐观点赞+静默回滚，useRef分页防抖，txRequest正确3参形式
+- [v2/community-detail] 评论列表+固定底栏（点赞圆形+Input+发送），乐观点赞+评论提交回滚
+- [v2/points-mall] 重定向stub→已有子包实现（避免700行重复）
+- [v2/app.config.ts] 注册3个新页面
+- 关键：发现points-mall已在subpages/marketing完整实现，避免重复
+
+**Team B3 — web-pos储值卡 + h5自助点餐**
+- [web-pos/StoredValuePage] 纯inline style，充值预设6档（100/200/500/1000/2000/5000），赠送计算（≥500赠5%），层级Badge（普通/银/金/黑金），右侧滑入明细Drawer
+- [h5-self-order/ScanEntry] URL参数自动识别桌台（?table_id=T01&store_id=XXX），跳过摄像头扫码
+- [web-pos/App.tsx] 注册/stored-value路由
+
+**Team C3 — v129迁移 + 实时数据**
+- [v129] 5张表：store_requisitions/items + production_plans/items + approval_records，全部RLS
+- [tx-analytics/realtime_routes] 4端点：today/hourly-trend/store-comparison/alerts，按小时动态mock数据
+- [web-admin/RealtimeDashboard] 可复用组件，compact模式，厨房队列>10脉冲动画，30s自动刷新
+
+### 数据变化
+- 迁移版本：v129（5张表，审批+中央厨房）
+- 新增 API 端点：4个（analytics/realtime×4）
+- 新增前端文件：6个（community/detail/points-mall×Taro + StoredValuePage + RealtimeDashboard）
+
+---
+
+## 2026-04-02（Round 22 全部完成 — 中央厨房 + 大厨到家首页 + 审批中心）
+
+### 今日完成（超级智能体团队 Round 22 交付）
+
+**Team X2 — 中央厨房管理（十大差距推进）**
+- [supply/CentralKitchenPage] 4Tab全量实现（今日总览/需求单/排产计划/配送管理）
+- 发现：central_kitchen_routes.py后端已完整存在（已注册），前端对接真实API /api/v1/supply/central-kitchen/*
+- 一键生成排产计划（aggregate-demand聚合→自动填充Modal）
+- [App.tsx] /supply/central-kitchen + [SidebarHQ] 中央厨房导航入口
+
+**Team Y2 — 大厨到家首页+搜索**
+- [miniapp/chef-at-home/index] Banner轮播(3s)+菜系筛选scroll-view+主厨推荐横向卡片+厨师列表无限滚动
+- [miniapp/chef-at-home/chef-search] 自动聚焦+防抖500ms+历史记录(10条)+Mock本地搜索
+- ES5原生小程序风格，normalizeChef()统一处理price_fen→priceYuan
+- [app.json] 分包新增index/index + chef-search/chef-search
+
+**Team Z2 — 审批中心（十大差距推进）**
+- [tx-ops/approval_center_routes] 5端点：待审/历史/单条审批/批量审批/统计，运行时状态模拟（内存列表，操作后实时变化）
+- [web-admin/ApprovalCenterPage] 左60%+右40%分栏：紧急红色左边框+行内同意/拒绝+拒绝必填原因+乐观更新
+- 批量同意工具栏，ProTable rowSelection多选
+- [tx-ops/main] 注册approval_center_router
+- [App.tsx + SidebarHQ] 路由和导航注册
+
+### 数据变化
+- 新增 API 端点：5个（approval-center）
+- 新增前端页面：4个（CentralKitchenPage + chef-at-home/index + chef-search + ApprovalCenter重写）
+- 十大差距：中央厨房 🟡 + 审批流 🟡
+
+---
+
+## 2026-04-02（Round 21 全部完成 — v128迁移 + 美食社区 + 加盟管理）
+
+### 今日完成（超级智能体团队 Round 21 交付）
+
+**Team U2 — v128数据库迁移（5张表）**
+- [v128] coupons（优惠券模板，对齐coupon_routes真实字段）
+- [v128] customer_coupons（领券记录，唯一约束幂等性保障）
+- [v128] campaigns（营销活动，target_segments JSONB）
+- [v128] notification_tasks（异步通知任务）
+- [v128] anomaly_dismissals（异常已知悉，tx-intel用）
+- 全部5张表启用RLS策略，downgrade()逆序删除
+
+**Team V2 — miniapp美食社区**
+- [miniapp/community] 双列瀑布流，三Tab（推荐/关注/附近），乐观点赞更新
+- [miniapp/community-publish] 图片上传（最多9张），标签多选（最多5个），发布后_needRefresh联动
+- [miniapp/app.json] 注册2个新页面
+- [miniapp/index.js] 首页快捷入口新增"美食社区"（图标🍜）
+
+**Team W2 — 加盟管理（十大差距推进）**
+- [tx-org/franchise_v4_routes] 8个端点（加盟商CRUD+合同+费用+总览），避免覆盖已有franchise_routes
+- [web-admin/FranchisePage] 三Tab：总览（4卡片+逾期Alert+ProTable）/ 合同（到期预警）/ 费用收缴（逾期行红色高亮）
+- [tx-org/main] 注册franchise_v4_mock_router
+- [web-admin/App.tsx] /franchise路由
+- [web-admin/SidebarHQ] 新加盟管理入口（保留旧驾驶舱兼容）
+
+### 数据变化
+- 迁移版本：v128（5张表）
+- 新增 API 端点：8个（franchise_v4×8）+ 6个（tx-intel路由已在Round20计入）
+- 新增前端页面：3个（FranchisePage + community + community-publish）
+- 十大差距：加盟管理 🟡（前后端完成，待真实数据库接入）
+
+---
+
+## 2026-04-02（Round 20 全部完成 — P&L可视化 + 商业智能服务 + TV菜单屏）
+
+### 今日完成（超级智能体团队 Round 20 交付）
+
+**Team R2 — P&L利润报表可视化**
+- [web-admin/PnLReportPage] 月度汇总4卡片（营收/食材/人力/毛利，含占比Tag和警色阈值）
+- [web-admin/PnLReportPage] 纯SVG折线图（viewBox 800×300，3条polyline，Y轴刻度，hover tooltip）
+- [web-admin/PnLReportPage] ProTable多月对比（8列，毛利率三色Tag：<30%红/<50%橙/>50%绿）
+- [web-admin/PnLReportPage] 纯CSS预算执行进度条（超预算红色，综合执行率antd Progress）
+- [web-admin/App.tsx] 新增 /finance/pnl-report 路由
+- [web-admin/SidebarHQ] 财务分组新增"P&L报表"导航入口
+
+**Team S2 — tx-intel 商业智能服务**
+- [tx-intel/health_score_routes] 经营健康度评分：5维度加权（营收趋势30%/成本25%/满意度20%/效率15%/库存10%），A/B/C/D分级
+- [tx-intel/dish_matrix_routes] 菜品四象限：以销量×毛利率中位数为轴，明星/现金牛/问题菜/瘦狗，带优先级运营建议
+- [tx-intel/anomaly_routes] 异常检测：5类阈值（营收下滑/成本骤升/高退单率/慢出餐/效期风险），dismiss标记
+- [tx-intel/main] 注册3个新路由，补充CORSMiddleware
+- [web-admin/BusinessIntelPage] conic-gradient圆形仪表盘 + SVG散点四象限图 + Timeline异常列表（乐观更新）
+
+**Team T2 — web-tv-menu TV数字菜单屏（3个页面）**
+- [web-tv-menu/MenuDisplayPage] 1920×1080全屏，左侧分类栏30s自动轮播，4×3菜品网格，CSS跑马灯，售罄灰色蒙层
+- [web-tv-menu/SpecialDisplayPage] 渐变背景，2×3特价卡片（错位入场动画），营业结束倒计时HH:MM:SS
+- [web-tv-menu/QueueDisplayPage] 叫号大字（200px红色，变号脉冲动画），等待桌数，10s轮询
+- [web-tv-menu/App.tsx] URL参数mode=menu/special/queue分发，全局cursor:none，备用/tv/*路由
+
+### 数据变化
+- 新增 API 端点：5个（tx-intel：health-score×2 + dish-matrix×2 + anomalies×2）
+- 新增前端页面：5个（PnLReport + BusinessIntel + TV三页面）
+- 十大差距更新：财务引擎 🟡（P&L可视化完成）
+
+---
+
+## 2026-04-02（Round 19 全部完成 — Agent监控中枢 + 财务P&L + 前台接待全流程）
+
+### 今日完成（超级智能体团队 Round 19 交付）
+
+**Team O2 — Agent监控中枢全量重写**
+- [web-admin/AgentMonitorPage] 3×3 Agent健康状态网格（30s自动刷新，green/yellow/red）
+- [web-admin/AgentMonitorPage] ChatGPT风格对话界面（5个快速指令、打字动画效果）
+- [web-admin/AgentMonitorPage] 执行日志表格（localStorage最多200条、三约束图标✓/✗/-）
+- [web-admin/AgentMonitorPage] 手动测试折叠面板（JSON编辑器 + 原始响应展示）
+
+**Team P2 — 财务P&L引擎完善**
+- [tx-finance/pnl_routes] 新增3个端点：/monthly-summary（含人力/食材成本JOIN）、/compare（多月对比数组）、/daily（每日趋势）
+- [tx-finance/budget_v2_routes] 新建年度预算CRUD：GET列表 + POST UPSERT 3个预算项 + GET执行率
+- [tx-finance/main] 注册budget_v2_routes；发现并补注册了原有budget_routes（历史遗漏）
+
+**Team Q2 — 前台接待系统全量接入真实API**
+- [web-reception/App] GlobalHeader实时统计（等位数/预约数/可用桌台，30s刷新，横竖屏自适应）
+- [web-reception/ReservationBoard] 真实API集成，确认到店按钮，短信通知mock，VIP金色边框
+- [web-reception/QueuePage] 真实API集成，手机字段，自动大桌检测（≥6人），预估等待算法，桌台状态网格
+- [web-reception/SeatAssignPage] 真实API集成，VIP金色边框，剩余用餐时间估算（60分钟均值）
+
+### 数据变化
+- 新增 API 端点：5个（pnl×3 + budget_v2×3）
+- 前端模块更新：4个（AgentMonitor + Reservation + Queue + SeatAssign）
+- 遗留bug修复：budget_routes注册遗漏
+
+### 遗留问题
+- P&L计算依赖payroll_records和purchase_orders表存在才能真实计算
+- AgentMonitorPage对话功能目前仅走tx-agent /chat模板回复，未直接调用Claude
 
 ---
 

@@ -31,6 +31,10 @@ export function LoginPage({ onLogin }: LoginPageProps) {
       if (json.ok) {
         localStorage.setItem('tx_token', json.data.token);
         localStorage.setItem('tx_user', JSON.stringify(json.data.user));
+        const u = json.data.user as { tenant_id?: string } | undefined;
+        if (u?.tenant_id) {
+          localStorage.setItem('tx_tenant_id', u.tenant_id);
+        }
         onLogin();
       } else {
         setError(json.error?.message || '登录失败');

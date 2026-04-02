@@ -7,6 +7,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from .api.open_api_routes import router as open_api_router
 from .auth import router as auth_router
 from .growth_intel_relay import router as relay_router
 from .hub_api import router as hub_router
@@ -117,6 +118,9 @@ app.include_router(auth_router)
 
 # Hub 运维管理 API（必须在 proxy 之前注册，否则被通配路由拦截）
 app.include_router(hub_router)
+
+# 开放 API（ISV 应用 + OAuth2 client_credentials；依赖 DB 未配置时相关端点返回 503）
+app.include_router(open_api_router)
 
 # 情报→增长自动接力 API
 app.include_router(relay_router)
