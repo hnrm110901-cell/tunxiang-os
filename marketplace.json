@@ -1,0 +1,11 @@
+{
+  "plugins": [
+    {
+      "id": "example-plugin",
+      "name": "Example Plugin",
+      "version": "0.1.0",
+      "description": "TODO: Describe what this plugin does.",
+      "path": "plugins/example-plugin/plugin.json"
+    }
+  ]
+}
