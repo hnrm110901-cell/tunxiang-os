@@ -1,11 +1,9 @@
 /**
  * web-admin — 总部管理后台
- * 决策1: Shell-HQ 四栏布局
- * 决策2: Agent Console 右侧面板
- * 决策3: Auth Guard — 未登录则显示 LoginPage
  */
 import { useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { getToken, clearAuth, isTokenExpired } from './api/client';
 import { ShellHQ } from './shell/ShellHQ';
 import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
@@ -113,9 +111,16 @@ import { ReviewManagePage } from './pages/ops/ReviewManagePage';
 import { StoreManagePage } from './pages/store/StoreManagePage';
 
 function App() {
-  const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem('tx_token'));
+  const [isLoggedIn, setIsLoggedIn] = useState(() => {
+    const token = getToken();
+    if (!token || isTokenExpired()) { clearAuth(); return false; }
+    return true;
+  });
 
   const handleLogout = () => {
+    const token = getToken();
+    if (token) { fetch('/api/v1/auth/logout', { method: 'POST', headers: { Authorization: `Bearer ${token}` } }).catch(() => {}); }
+    clearAuth(); setIsLoggedIn(false);
     const token = localStorage.getItem('tx_token');
     // Fire-and-forget logout call
     if (token) {
@@ -130,9 +135,7 @@ function App() {
     setIsLoggedIn(false);
   };
 
-  if (!isLoggedIn) {
-    return <LoginPage onLogin={() => setIsLoggedIn(true)} />;
-  }
+  if (!isLoggedIn) { return <LoginPage onLogin={() => setIsLoggedIn(true)} />; }
 
   return (
     <BrowserRouter>
