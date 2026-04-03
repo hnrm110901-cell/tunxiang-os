@@ -20,6 +20,9 @@ from api.member_insight_routes import router as member_insight_router
 from api.member_level_routes import router as member_level_router
 from api.members import router as member_router
 from api.platform_routes import router as platform_router
+from api.group_member_routes import router as group_member_router
+from api.social_routes import router as social_router
+from workers.rfm_updater import RFMUpdater, RFMEventListener
 from api.points_mall_routes import router as points_mall_router
 from api.points_routes import router as points_router
 from api.premium_card_routes import router as premium_card_router
@@ -147,6 +150,7 @@ app.include_router(lifecycle_router)
 app.include_router(lifecycle_v2_router)
 app.include_router(platform_router)
 app.include_router(group_member_router)
+app.include_router(social_router)
 app.include_router(stamp_card_router)
 app.include_router(member_level_router)
 app.include_router(member_insight_router)

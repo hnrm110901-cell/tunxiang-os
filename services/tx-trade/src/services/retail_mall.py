@@ -1,136 +1,115 @@
-"""甄选商城 — 徐记海鲜线上零售（海味礼盒/预制菜/调味品/周边）
+"""零售商城服务层 — 商品管理 / 购物车 / 订单 / 库存扣减
 
-独立于堂食订单系统。所有金额单位：分(fen)。
+所有金额单位：分(fen)。
+SELECT FOR UPDATE 防超卖，退款恢复库存。
 """
 from __future__ import annotations
 
-import json
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Optional
 
 import structlog
-from sqlalchemy import text
+from sqlalchemy import select, func, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-logger = structlog.get_logger(__name__)
+from ..models.retail_mall import RetailProduct, RetailOrder, RetailOrderItem
 
+logger = structlog.get_logger(__name__)
 
 # ── 商品分类常量 ──────────────────────────────────────────────
 RETAIL_CATEGORIES = ("seafood_gift", "prepared_dish", "seasoning", "merchandise")
 
-# ── 零售订单状态 ──────────────────────────────────────────────
-RETAIL_ORDER_STATUSES = (
-    "pending",       # 待支付
-    "paid",          # 已支付
-    "preparing",     # 备货中
-    "shipped",       # 已发货
-    "delivered",     # 已签收
-    "completed",     # 已完成
-    "cancelled",     # 已取消
-    "refunded",      # 已退款
-)
+# ── 订单状态常量 ──────────────────────────────────────────────
+VALID_ORDER_STATUSES = ("pending", "paid", "refunded", "cancelled")
 
+# ── 商品状态常量 ──────────────────────────────────────────────
+VALID_PRODUCT_STATUSES = ("active", "inactive", "sold_out")
 
-# ── 工具函数 ──────────────────────────────────────────────────
 
 def _now_utc() -> datetime:
     return datetime.now(timezone.utc)
 
 
-async def _set_tenant(db: AsyncSession, tenant_id: str) -> None:
-    """设置 RLS tenant 上下文"""
-    await db.execute(
-        text("SELECT set_config('app.tenant_id', :tid, true)"),
-        {"tid": tenant_id},
-    )
-
-
-def validate_retail_items(items: list[dict]) -> tuple[bool, str]:
-    """校验零售订单商品列表"""
-    if not items:
-        return False, "items_empty"
-    for i, item in enumerate(items):
-        if "product_id" not in item:
-            return False, f"missing_product_id_at_{i}"
-        qty = item.get("quantity", 0)
-        if not isinstance(qty, int) or qty <= 0:
-            return False, f"invalid_quantity_at_{i}:{qty}"
-        if "sku_id" not in item:
-            return False, f"missing_sku_id_at_{i}"
-    return True, "ok"
-
-
-def validate_address(address: dict) -> tuple[bool, str]:
-    """校验收货地址"""
-    required_fields = ("name", "phone", "province", "city", "district", "detail")
-    for field in required_fields:
-        if not address.get(field):
-            return False, f"missing_address_field:{field}"
-    return True, "ok"
-
-
-# ── 服务函数 ──────────────────────────────────────────────────
+# ════════════════════════════════════════════════════════════════
+# 商品管理
+# ════════════════════════════════════════════════════════════════
 
 
 async def list_products(
-    category: Optional[str],
     tenant_id: str,
+    store_id: str,
     db: AsyncSession,
+    category: Optional[str] = None,
     page: int = 1,
     size: int = 20,
 ) -> dict[str, Any]:
-    """商品列表 — 海味礼盒/预制菜/调味品/周边
+    """商品列表（分页、分类筛选）
 
     Args:
-        category: 商品分类，None 表示全部
-        tenant_id: 租户 ID
+        tenant_id: 租户ID
+        store_id: 门店ID
         db: 数据库会话
-        page: 页码
+        category: 商品分类筛选，None 表示全部
+        page: 页码（从1开始）
         size: 每页数量
 
     Returns:
         {"items": [...], "total": int, "page": int, "size": int}
     """
-    await _set_tenant(db, tenant_id)
-
     if category and category not in RETAIL_CATEGORIES:
         raise ValueError(f"invalid_category:{category}, valid: {RETAIL_CATEGORIES}")
 
+    tid = uuid.UUID(tenant_id)
+    sid = uuid.UUID(store_id)
     offset = (page - 1) * size
 
-    # 查询总数
-    count_params: dict[str, Any] = {"tid": tenant_id}
-    count_sql = """
-        SELECT COUNT(*) FROM retail_products
-        WHERE tenant_id = :tid AND is_deleted = false AND status = 'on_sale'
-    """
+    # 构建基础查询条件
+    base_filter = [
+        RetailProduct.tenant_id == tid,
+        RetailProduct.store_id == sid,
+        RetailProduct.is_deleted.is_(False),
+        RetailProduct.status == "active",
+    ]
     if category:
-        count_sql += " AND category = :cat"
-        count_params["cat"] = category
+        base_filter.append(RetailProduct.category == category)
 
-    total_row = await db.execute(text(count_sql), count_params)
-    total = total_row.scalar() or 0
+    # 查询总数
+    count_stmt = select(func.count(RetailProduct.id)).where(*base_filter)
+    total_result = await db.execute(count_stmt)
+    total = total_result.scalar() or 0
 
     # 查询商品列表
-    query_params: dict[str, Any] = {"tid": tenant_id, "lim": size, "off": offset}
-    query_sql = """
-        SELECT id, name, category, cover_image, price_fen, original_price_fen,
-               sales_count, rating, tags
-        FROM retail_products
-        WHERE tenant_id = :tid AND is_deleted = false AND status = 'on_sale'
-    """
-    if category:
-        query_sql += " AND category = :cat"
-        query_params["cat"] = category
-    query_sql += " ORDER BY sort_order ASC, created_at DESC LIMIT :lim OFFSET :off"
+    query_stmt = (
+        select(RetailProduct)
+        .where(*base_filter)
+        .order_by(RetailProduct.created_at.desc())
+        .offset(offset)
+        .limit(size)
+    )
+    rows = await db.execute(query_stmt)
+    products = rows.scalars().all()
 
-    rows = await db.execute(text(query_sql), query_params)
-    items = [dict(r._mapping) for r in rows]
+    items = [
+        {
+            "id": str(p.id),
+            "name": p.name,
+            "sku": p.sku,
+            "category": p.category,
+            "price_fen": p.price_fen,
+            "cost_fen": p.cost_fen,
+            "stock_qty": p.stock_qty,
+            "image_url": p.image_url,
+            "status": p.status,
+            "is_weighable": p.is_weighable,
+        }
+        for p in products
+    ]
 
     logger.info(
         "retail_products_listed",
         tenant_id=tenant_id,
+        store_id=store_id,
         category=category,
         total=total,
         page=page,
@@ -139,338 +118,571 @@ async def list_products(
     return {"items": items, "total": total, "page": page, "size": size}
 
 
-async def get_product_detail(
-    product_id: str,
+async def create_product(
     tenant_id: str,
+    store_id: str,
+    data: dict[str, Any],
     db: AsyncSession,
 ) -> dict[str, Any]:
-    """商品详情 — 图片/规格/产地/保质期
-
-    Returns:
-        {"product_id", "name", "images", "skus", "origin", "shelf_life", ...}
-    """
-    await _set_tenant(db, tenant_id)
-
-    row = await db.execute(
-        text("""
-            SELECT id, name, category, description, images, skus,
-                   origin, shelf_life_days, storage_method,
-                   price_fen, original_price_fen, cover_image,
-                   sales_count, rating, stock_count, tags
-            FROM retail_products
-            WHERE id = :pid AND tenant_id = :tid AND is_deleted = false
-        """),
-        {"pid": product_id, "tid": tenant_id},
-    )
-    product = row.mappings().first()
-    if not product:
-        raise ValueError("product_not_found")
-
-    result = dict(product)
-    # 解析 JSON 字段
-    for json_field in ("images", "skus", "tags"):
-        if isinstance(result.get(json_field), str):
-            result[json_field] = json.loads(result[json_field])
-
-    logger.info(
-        "retail_product_detail",
-        tenant_id=tenant_id,
-        product_id=product_id,
-        name=result["name"],
-    )
-
-    return result
-
-
-async def create_retail_order(
-    customer_id: str,
-    items: list[dict],
-    address: dict,
-    tenant_id: str,
-    db: AsyncSession,
-) -> dict[str, Any]:
-    """创建零售订单
+    """创建零售商品
 
     Args:
-        customer_id: 客户 ID
-        items: [{"product_id", "sku_id", "quantity", "price_fen"}]
-        address: {"name", "phone", "province", "city", "district", "detail"}
-        tenant_id: 租户 ID
+        tenant_id: 租户ID
+        store_id: 门店ID
+        data: 商品数据 {name, sku, category, price_fen, cost_fen, stock_qty, min_stock, image_url, is_weighable}
         db: 数据库会话
 
     Returns:
-        {"order_id", "order_no", "total_fen", "status", "items", "address"}
+        创建后的商品字典
     """
-    await _set_tenant(db, tenant_id)
+    category = data.get("category", "merchandise")
+    if category not in RETAIL_CATEGORIES:
+        raise ValueError(f"invalid_category:{category}, valid: {RETAIL_CATEGORIES}")
 
-    valid, msg = validate_retail_items(items)
-    if not valid:
-        raise ValueError(msg)
+    price_fen = data.get("price_fen", 0)
+    if price_fen <= 0:
+        raise ValueError("price_fen must be positive")
 
-    valid_addr, addr_msg = validate_address(address)
-    if not valid_addr:
-        raise ValueError(addr_msg)
+    product = RetailProduct(
+        tenant_id=uuid.UUID(tenant_id),
+        store_id=uuid.UUID(store_id),
+        name=data["name"],
+        sku=data["sku"],
+        category=category,
+        price_fen=price_fen,
+        cost_fen=data.get("cost_fen", 0),
+        stock_qty=data.get("stock_qty", 0),
+        min_stock=data.get("min_stock", 0),
+        image_url=data.get("image_url"),
+        status="active",
+        is_weighable=data.get("is_weighable", False),
+    )
+    db.add(product)
+    await db.flush()
 
-    order_id = str(uuid.uuid4())
+    logger.info(
+        "retail_product_created",
+        tenant_id=tenant_id,
+        store_id=store_id,
+        product_id=str(product.id),
+        name=product.name,
+        sku=product.sku,
+    )
+
+    return {
+        "id": str(product.id),
+        "name": product.name,
+        "sku": product.sku,
+        "category": product.category,
+        "price_fen": product.price_fen,
+        "cost_fen": product.cost_fen,
+        "stock_qty": product.stock_qty,
+        "min_stock": product.min_stock,
+        "image_url": product.image_url,
+        "status": product.status,
+        "is_weighable": product.is_weighable,
+    }
+
+
+async def update_product(
+    tenant_id: str,
+    product_id: str,
+    data: dict[str, Any],
+    db: AsyncSession,
+) -> dict[str, Any]:
+    """更新零售商品
+
+    Args:
+        tenant_id: 租户ID
+        product_id: 商品ID
+        data: 更新字段（支持 name, sku, category, price_fen, cost_fen, stock_qty, min_stock, image_url, status, is_weighable）
+        db: 数据库会话
+
+    Returns:
+        更新后的商品字典
+    """
+    tid = uuid.UUID(tenant_id)
+    pid = uuid.UUID(product_id)
+
+    stmt = (
+        select(RetailProduct)
+        .where(
+            RetailProduct.id == pid,
+            RetailProduct.tenant_id == tid,
+            RetailProduct.is_deleted.is_(False),
+        )
+    )
+    result = await db.execute(stmt)
+    product = result.scalar_one_or_none()
+    if not product:
+        raise ValueError("product_not_found")
+
+    # 校验可更新字段
+    allowed_fields = {
+        "name", "sku", "category", "price_fen", "cost_fen",
+        "stock_qty", "min_stock", "image_url", "status", "is_weighable",
+    }
+    for key, value in data.items():
+        if key not in allowed_fields:
+            continue
+        if key == "category" and value not in RETAIL_CATEGORIES:
+            raise ValueError(f"invalid_category:{value}")
+        if key == "status" and value not in VALID_PRODUCT_STATUSES:
+            raise ValueError(f"invalid_status:{value}")
+        if key == "price_fen" and value <= 0:
+            raise ValueError("price_fen must be positive")
+        setattr(product, key, value)
+
+    product.updated_at = _now_utc()
+    await db.flush()
+
+    logger.info(
+        "retail_product_updated",
+        tenant_id=tenant_id,
+        product_id=product_id,
+        updated_fields=list(data.keys()),
+    )
+
+    return {
+        "id": str(product.id),
+        "name": product.name,
+        "sku": product.sku,
+        "category": product.category,
+        "price_fen": product.price_fen,
+        "cost_fen": product.cost_fen,
+        "stock_qty": product.stock_qty,
+        "min_stock": product.min_stock,
+        "image_url": product.image_url,
+        "status": product.status,
+        "is_weighable": product.is_weighable,
+    }
+
+
+# ════════════════════════════════════════════════════════════════
+# 零售订单
+# ════════════════════════════════════════════════════════════════
+
+
+async def create_retail_order(
+    tenant_id: str,
+    store_id: str,
+    items: list[dict[str, Any]],
+    db: AsyncSession,
+    customer_id: Optional[str] = None,
+    payment_method: Optional[str] = None,
+) -> dict[str, Any]:
+    """创建零售订单（含库存扣减，SELECT FOR UPDATE 防超卖）
+
+    Args:
+        tenant_id: 租户ID
+        store_id: 门店ID
+        items: [{"product_id": str, "quantity": int}]
+        db: 数据库会话
+        customer_id: 顾客ID（可选）
+        payment_method: 支付方式（可选）
+
+    Returns:
+        订单信息字典
+
+    Raises:
+        ValueError: 参数校验失败或库存不足
+    """
+    if not items:
+        raise ValueError("items_empty")
+
+    tid = uuid.UUID(tenant_id)
+    sid = uuid.UUID(store_id)
+
     order_no = f"RM{datetime.now().strftime('%Y%m%d%H%M%S')}{uuid.uuid4().hex[:6].upper()}"
     now = _now_utc()
 
-    # 计算订单总金额
     total_fen = 0
-    order_items = []
-    for item in items:
-        # 查询商品价格
-        prod_row = await db.execute(
-            text("""
-                SELECT price_fen, name FROM retail_products
-                WHERE id = :pid AND tenant_id = :tid AND is_deleted = false
-            """),
-            {"pid": item["product_id"], "tid": tenant_id},
+    order_items_data: list[dict[str, Any]] = []
+
+    for idx, item in enumerate(items):
+        if "product_id" not in item:
+            raise ValueError(f"missing_product_id_at_{idx}")
+        qty = item.get("quantity", 0)
+        if not isinstance(qty, int) or qty <= 0:
+            raise ValueError(f"invalid_quantity_at_{idx}:{qty}")
+
+        pid = uuid.UUID(item["product_id"])
+
+        # SELECT FOR UPDATE 锁定商品行，防止并发超卖
+        lock_stmt = (
+            select(RetailProduct)
+            .where(
+                RetailProduct.id == pid,
+                RetailProduct.tenant_id == tid,
+                RetailProduct.is_deleted.is_(False),
+                RetailProduct.status == "active",
+            )
+            .with_for_update()
         )
-        prod = prod_row.mappings().first()
-        if not prod:
+        lock_result = await db.execute(lock_stmt)
+        product = lock_result.scalar_one_or_none()
+
+        if not product:
             raise ValueError(f"product_not_found:{item['product_id']}")
 
-        item_total = prod["price_fen"] * item["quantity"]
-        total_fen += item_total
-        order_items.append({
-            "product_id": item["product_id"],
-            "sku_id": item["sku_id"],
-            "product_name": prod["name"],
-            "quantity": item["quantity"],
-            "unit_price_fen": prod["price_fen"],
-            "total_fen": item_total,
+        if product.stock_qty < qty:
+            raise ValueError(
+                f"insufficient_stock:{product.name},"
+                f"available={product.stock_qty},requested={qty}"
+            )
+
+        # 扣减库存
+        product.stock_qty -= qty
+        if product.stock_qty == 0:
+            product.status = "sold_out"
+        product.updated_at = now
+
+        subtotal = product.price_fen * qty
+        total_fen += subtotal
+
+        order_items_data.append({
+            "product_id": pid,
+            "product_name": product.name,
+            "quantity": qty,
+            "unit_price_fen": product.price_fen,
+            "subtotal_fen": subtotal,
         })
 
-    # 插入订单主表
-    await db.execute(
-        text("""
-            INSERT INTO retail_orders
-                (id, tenant_id, order_no, customer_id, total_fen, status,
-                 items, address, created_at, updated_at, is_deleted)
-            VALUES (:id, :tid, :ono, :cid, :total, 'pending',
-                    :items::jsonb, :addr::jsonb, :now, :now, false)
-        """),
-        {
-            "id": order_id,
-            "tid": tenant_id,
-            "ono": order_no,
-            "cid": customer_id,
-            "total": total_fen,
-            "items": json.dumps(order_items, ensure_ascii=False),
-            "addr": json.dumps(address, ensure_ascii=False),
-            "now": now,
-        },
+    # 创建订单主记录
+    order = RetailOrder(
+        tenant_id=tid,
+        store_id=sid,
+        order_no=order_no,
+        customer_id=uuid.UUID(customer_id) if customer_id else None,
+        total_fen=total_fen,
+        discount_fen=0,
+        final_fen=total_fen,
+        payment_method=payment_method,
+        status="pending",
     )
+    db.add(order)
+    await db.flush()  # 获取 order.id
+
+    # 创建订单明细
+    result_items = []
+    for oi_data in order_items_data:
+        order_item = RetailOrderItem(
+            tenant_id=tid,
+            order_id=order.id,
+            product_id=oi_data["product_id"],
+            product_name=oi_data["product_name"],
+            quantity=oi_data["quantity"],
+            unit_price_fen=oi_data["unit_price_fen"],
+            subtotal_fen=oi_data["subtotal_fen"],
+        )
+        db.add(order_item)
+        result_items.append({
+            "product_id": str(oi_data["product_id"]),
+            "product_name": oi_data["product_name"],
+            "quantity": oi_data["quantity"],
+            "unit_price_fen": oi_data["unit_price_fen"],
+            "subtotal_fen": oi_data["subtotal_fen"],
+        })
+
     await db.flush()
 
     logger.info(
         "retail_order_created",
         tenant_id=tenant_id,
-        order_id=order_id,
+        store_id=store_id,
+        order_id=str(order.id),
         order_no=order_no,
         customer_id=customer_id,
         total_fen=total_fen,
+        items_count=len(result_items),
+    )
+
+    return {
+        "order_id": str(order.id),
+        "order_no": order_no,
+        "store_id": store_id,
+        "customer_id": customer_id,
+        "total_fen": total_fen,
+        "discount_fen": 0,
+        "final_fen": total_fen,
+        "payment_method": payment_method,
+        "status": "pending",
+        "items": result_items,
+        "created_at": order.created_at.isoformat() if order.created_at else now.isoformat(),
+    }
+
+
+async def get_retail_order(
+    tenant_id: str,
+    order_id: str,
+    db: AsyncSession,
+) -> dict[str, Any]:
+    """查询零售订单详情（含明细）
+
+    Args:
+        tenant_id: 租户ID
+        order_id: 订单ID
+        db: 数据库会话
+
+    Returns:
+        订单信息字典（含 items 列表）
+
+    Raises:
+        ValueError: 订单不存在
+    """
+    tid = uuid.UUID(tenant_id)
+    oid = uuid.UUID(order_id)
+
+    stmt = (
+        select(RetailOrder)
+        .where(
+            RetailOrder.id == oid,
+            RetailOrder.tenant_id == tid,
+            RetailOrder.is_deleted.is_(False),
+        )
+    )
+    result = await db.execute(stmt)
+    order = result.scalar_one_or_none()
+    if not order:
+        raise ValueError("order_not_found")
+
+    # 查询订单明细
+    items_stmt = (
+        select(RetailOrderItem)
+        .where(
+            RetailOrderItem.order_id == oid,
+            RetailOrderItem.tenant_id == tid,
+            RetailOrderItem.is_deleted.is_(False),
+        )
+    )
+    items_result = await db.execute(items_stmt)
+    order_items = items_result.scalars().all()
+
+    items = [
+        {
+            "id": str(oi.id),
+            "product_id": str(oi.product_id),
+            "product_name": oi.product_name,
+            "quantity": oi.quantity,
+            "unit_price_fen": oi.unit_price_fen,
+            "subtotal_fen": oi.subtotal_fen,
+        }
+        for oi in order_items
+    ]
+
+    logger.info(
+        "retail_order_queried",
+        tenant_id=tenant_id,
+        order_id=order_id,
+        status=order.status,
+    )
+
+    return {
+        "order_id": str(order.id),
+        "order_no": order.order_no,
+        "store_id": str(order.store_id),
+        "customer_id": str(order.customer_id) if order.customer_id else None,
+        "total_fen": order.total_fen,
+        "discount_fen": order.discount_fen,
+        "final_fen": order.final_fen,
+        "payment_method": order.payment_method,
+        "status": order.status,
+        "paid_at": order.paid_at.isoformat() if order.paid_at else None,
+        "items": items,
+        "created_at": order.created_at.isoformat() if order.created_at else None,
+    }
+
+
+async def refund_retail_order(
+    tenant_id: str,
+    order_id: str,
+    db: AsyncSession,
+) -> dict[str, Any]:
+    """退款零售订单（恢复库存）
+
+    只有 paid 状态的订单可以退款。退款后恢复商品库存。
+
+    Args:
+        tenant_id: 租户ID
+        order_id: 订单ID
+        db: 数据库会话
+
+    Returns:
+        退款后的订单信息
+
+    Raises:
+        ValueError: 订单不存在或状态不允许退款
+    """
+    tid = uuid.UUID(tenant_id)
+    oid = uuid.UUID(order_id)
+    now = _now_utc()
+
+    # 锁定订单
+    stmt = (
+        select(RetailOrder)
+        .where(
+            RetailOrder.id == oid,
+            RetailOrder.tenant_id == tid,
+            RetailOrder.is_deleted.is_(False),
+        )
+        .with_for_update()
+    )
+    result = await db.execute(stmt)
+    order = result.scalar_one_or_none()
+    if not order:
+        raise ValueError("order_not_found")
+
+    if order.status != "paid":
+        raise ValueError(f"order_cannot_refund:status={order.status}")
+
+    # 查询订单明细并恢复库存
+    items_stmt = (
+        select(RetailOrderItem)
+        .where(
+            RetailOrderItem.order_id == oid,
+            RetailOrderItem.tenant_id == tid,
+            RetailOrderItem.is_deleted.is_(False),
+        )
+    )
+    items_result = await db.execute(items_stmt)
+    order_items = items_result.scalars().all()
+
+    for oi in order_items:
+        # 锁定商品行恢复库存
+        prod_stmt = (
+            select(RetailProduct)
+            .where(
+                RetailProduct.id == oi.product_id,
+                RetailProduct.tenant_id == tid,
+            )
+            .with_for_update()
+        )
+        prod_result = await db.execute(prod_stmt)
+        product = prod_result.scalar_one_or_none()
+        if product:
+            product.stock_qty += oi.quantity
+            if product.status == "sold_out" and product.stock_qty > 0:
+                product.status = "active"
+            product.updated_at = now
+
+    # 更新订单状态
+    order.status = "refunded"
+    order.updated_at = now
+    await db.flush()
+
+    logger.info(
+        "retail_order_refunded",
+        tenant_id=tenant_id,
+        order_id=order_id,
+        order_no=order.order_no,
+        refund_fen=order.final_fen,
         items_count=len(order_items),
     )
 
     return {
-        "order_id": order_id,
-        "order_no": order_no,
-        "total_fen": total_fen,
-        "status": "pending",
-        "items": order_items,
-        "address": address,
-        "created_at": now.isoformat(),
+        "order_id": str(order.id),
+        "order_no": order.order_no,
+        "status": "refunded",
+        "refund_fen": order.final_fen,
+        "items_restored": len(order_items),
     }
 
 
-async def apply_member_discount(
-    order_id: str,
-    card_id: str,
+# ════════════════════════════════════════════════════════════════
+# 零售统计
+# ════════════════════════════════════════════════════════════════
+
+
+async def get_retail_stats(
     tenant_id: str,
+    store_id: str,
     db: AsyncSession,
 ) -> dict[str, Any]:
-    """会员折扣 — 根据会员卡等级计算零售折扣
+    """零售统计 — GMV / 订单量 / 畅销品
+
+    Args:
+        tenant_id: 租户ID
+        store_id: 门店ID
+        db: 数据库会话
 
     Returns:
-        {"order_id", "card_id", "original_fen", "discount_fen", "final_fen", "discount_rate"}
+        {"gmv_fen": int, "order_count": int, "paid_order_count": int, "top_products": [...]}
     """
-    await _set_tenant(db, tenant_id)
+    tid = uuid.UUID(tenant_id)
+    sid = uuid.UUID(store_id)
 
-    # 查询订单
-    order_row = await db.execute(
-        text("""
-            SELECT total_fen, status FROM retail_orders
-            WHERE id = :oid AND tenant_id = :tid AND is_deleted = false
-        """),
-        {"oid": order_id, "tid": tenant_id},
+    # GMV 和订单量（仅 paid 订单）
+    gmv_stmt = (
+        select(
+            func.coalesce(func.sum(RetailOrder.final_fen), 0).label("gmv_fen"),
+            func.count(RetailOrder.id).label("paid_count"),
+        )
+        .where(
+            RetailOrder.tenant_id == tid,
+            RetailOrder.store_id == sid,
+            RetailOrder.status == "paid",
+            RetailOrder.is_deleted.is_(False),
+        )
     )
-    order = order_row.mappings().first()
-    if not order:
-        raise ValueError("order_not_found")
-    if order["status"] != "pending":
-        raise ValueError("order_not_pending")
+    gmv_result = await db.execute(gmv_stmt)
+    gmv_row = gmv_result.one()
 
-    # 查询会员卡等级
-    card_row = await db.execute(
-        text("""
-            SELECT mc.level_rank, ct.levels::text
-            FROM member_cards mc
-            JOIN card_types ct ON ct.id = mc.card_type_id
-            WHERE mc.id = :cid AND mc.tenant_id = :tid AND mc.is_deleted = false
-        """),
-        {"cid": card_id, "tid": tenant_id},
+    # 总订单量（含所有状态）
+    total_stmt = (
+        select(func.count(RetailOrder.id))
+        .where(
+            RetailOrder.tenant_id == tid,
+            RetailOrder.store_id == sid,
+            RetailOrder.is_deleted.is_(False),
+        )
     )
-    card = card_row.mappings().first()
-    if not card:
-        raise ValueError("card_not_found")
+    total_result = await db.execute(total_stmt)
+    total_count = total_result.scalar() or 0
 
-    levels = json.loads(card["levels"]) if card["levels"] else []
-    level_rank = card["level_rank"]
-
-    # 找到当前等级的零售折扣
-    discount_rate = 100  # 默认无折扣(100%)
-    for lvl in levels:
-        if lvl["rank"] == level_rank:
-            for benefit in lvl.get("benefits", []):
-                if benefit.get("key") == "retail_discount":
-                    discount_rate = benefit.get("value", 100)
-            break
-
-    original_fen = order["total_fen"]
-    discount_fen = original_fen - int(original_fen * discount_rate / 100)
-    final_fen = original_fen - discount_fen
-
-    # 更新订单折扣
-    now = _now_utc()
-    await db.execute(
-        text("""
-            UPDATE retail_orders
-            SET discount_fen = :disc, final_fen = :final,
-                card_id = :cid, updated_at = :now
-            WHERE id = :oid AND tenant_id = :tid
-        """),
+    # 畅销品 Top 10
+    top_stmt = (
+        select(
+            RetailOrderItem.product_id,
+            RetailOrderItem.product_name,
+            func.sum(RetailOrderItem.quantity).label("total_qty"),
+            func.sum(RetailOrderItem.subtotal_fen).label("total_revenue_fen"),
+        )
+        .join(RetailOrder, RetailOrderItem.order_id == RetailOrder.id)
+        .where(
+            RetailOrderItem.tenant_id == tid,
+            RetailOrder.store_id == sid,
+            RetailOrder.status == "paid",
+            RetailOrderItem.is_deleted.is_(False),
+            RetailOrder.is_deleted.is_(False),
+        )
+        .group_by(RetailOrderItem.product_id, RetailOrderItem.product_name)
+        .order_by(func.sum(RetailOrderItem.quantity).desc())
+        .limit(10)
+    )
+    top_result = await db.execute(top_stmt)
+    top_products = [
         {
-            "disc": discount_fen,
-            "final": final_fen,
-            "cid": card_id,
-            "oid": order_id,
-            "tid": tenant_id,
-            "now": now,
-        },
-    )
-    await db.flush()
+            "product_id": str(row.product_id),
+            "product_name": row.product_name,
+            "total_qty": int(row.total_qty),
+            "total_revenue_fen": int(row.total_revenue_fen),
+        }
+        for row in top_result
+    ]
 
     logger.info(
-        "retail_member_discount_applied",
+        "retail_stats_queried",
         tenant_id=tenant_id,
-        order_id=order_id,
-        card_id=card_id,
-        original_fen=original_fen,
-        discount_fen=discount_fen,
-        final_fen=final_fen,
-        discount_rate=discount_rate,
+        store_id=store_id,
+        gmv_fen=int(gmv_row.gmv_fen),
+        paid_count=int(gmv_row.paid_count),
     )
 
     return {
-        "order_id": order_id,
-        "card_id": card_id,
-        "original_fen": original_fen,
-        "discount_fen": discount_fen,
-        "final_fen": final_fen,
-        "discount_rate": discount_rate,
-    }
-
-
-async def track_delivery(
-    order_id: str,
-    tenant_id: str,
-    db: AsyncSession,
-) -> dict[str, Any]:
-    """快递追踪
-
-    Returns:
-        {"order_id", "order_no", "status", "express_company", "tracking_no", "traces"}
-    """
-    await _set_tenant(db, tenant_id)
-
-    row = await db.execute(
-        text("""
-            SELECT id, order_no, status, express_company, tracking_no,
-                   delivery_traces
-            FROM retail_orders
-            WHERE id = :oid AND tenant_id = :tid AND is_deleted = false
-        """),
-        {"oid": order_id, "tid": tenant_id},
-    )
-    order = row.mappings().first()
-    if not order:
-        raise ValueError("order_not_found")
-
-    traces = order.get("delivery_traces")
-    if isinstance(traces, str):
-        traces = json.loads(traces)
-
-    logger.info(
-        "retail_delivery_tracked",
-        tenant_id=tenant_id,
-        order_id=order_id,
-        status=order["status"],
-    )
-
-    return {
-        "order_id": order["id"],
-        "order_no": order["order_no"],
-        "status": order["status"],
-        "express_company": order.get("express_company"),
-        "tracking_no": order.get("tracking_no"),
-        "traces": traces or [],
-    }
-
-
-async def get_gift_cards(
-    tenant_id: str,
-    db: AsyncSession,
-    page: int = 1,
-    size: int = 20,
-) -> dict[str, Any]:
-    """礼品卡列表 — 送礼场景
-
-    Returns:
-        {"items": [...], "total": int}
-    """
-    await _set_tenant(db, tenant_id)
-    offset = (page - 1) * size
-
-    total_row = await db.execute(
-        text("""
-            SELECT COUNT(*) FROM retail_gift_cards
-            WHERE tenant_id = :tid AND is_deleted = false AND status = 'on_sale'
-        """),
-        {"tid": tenant_id},
-    )
-    total = total_row.scalar() or 0
-
-    rows = await db.execute(
-        text("""
-            SELECT id, name, cover_image, price_fen, face_value_fen,
-                   description, valid_days, sales_count
-            FROM retail_gift_cards
-            WHERE tenant_id = :tid AND is_deleted = false AND status = 'on_sale'
-            ORDER BY sort_order ASC, created_at DESC
-            LIMIT :lim OFFSET :off
-        """),
-        {"tid": tenant_id, "lim": size, "off": offset},
-    )
-    items = [dict(r._mapping) for r in rows]
-
-    logger.info(
-        "retail_gift_cards_listed",
-        tenant_id=tenant_id,
-        total=total,
-    )
-
+        "gmv_fen": int(gmv_row.gmv_fen),
+        "order_count": total_count,
+        "paid_order_count": int(gmv_row.paid_count),
+        "top_products": top_products,
     return {"items": items, "total": total, "page": page, "size": size}
 
 

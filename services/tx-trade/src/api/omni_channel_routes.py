@@ -560,6 +560,7 @@ async def _enrich_order_with_mappings(
                         "platform_item_name": item.name,
                     },
                 )
+            except (OSError, ValueError, RuntimeError) as exc:
             except Exception as exc:  # noqa: BLE001 — MLPS3-P0: 单条upsert失败不阻断整批，最外层兜底
                 logger.warning(
                     "omni_channel.enrich.upsert_placeholder_failed",

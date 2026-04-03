@@ -83,6 +83,11 @@ from .api.split_payment_routes import router as split_payment_router
 from .api.stored_value_routes import router as stored_value_router
 from .api.supply_chain_mobile_routes import router as supply_chain_mobile_router
 from .api.table_layout_routes import router as table_layout_router
+from .api.chef_at_home_routes import router as chef_at_home_router
+from .api.omni_channel_routes import router as omni_channel_router
+from .api.scan_order_api import router as scan_order_ext_router
+from .api.self_order_routes import router as self_order_router
+from .api.kds_analytics_routes import router as kds_analytics_router
 from .api.table_monitor_routes import router as table_monitor_router
 from .api.table_ops_routes import router as table_ops_router
 from .api.table_routes import router as table_router
@@ -174,6 +179,11 @@ app.include_router(omni_channel_router, prefix="/api/v1")
 app.include_router(banquet_payment_router)
 app.include_router(collab_order_router)
 app.include_router(table_layout_router)
+app.include_router(chef_at_home_router)
+app.include_router(omni_channel_router,   prefix="/api/v1")
+app.include_router(scan_order_ext_router)
+app.include_router(self_order_router)
+app.include_router(kds_analytics_router,  prefix="/api/v1/kds-analytics")
 app.include_router(kds_pause_grab_router)
 app.include_router(kds_soldout_router)
 app.include_router(kds_chef_stats_router)

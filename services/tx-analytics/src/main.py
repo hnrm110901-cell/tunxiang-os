@@ -12,6 +12,8 @@ from .api.dashboard_routes import router as dashboard_router
 from .api.dish_analysis_routes import router as dish_analysis_router
 from .api.group_dashboard_routes import router as group_dashboard_router
 from .api.private_domain_routes import router as private_domain_router
+from .api.knowledge_query import router as knowledge_router
+from .api.inventory_analysis_routes import router as inventory_analysis_router
 from .api.report_routes import router as report_router
 from .api.reports_router import router as p0_reports_router
 from .api.store_analysis_routes import router as store_analysis_router
@@ -24,6 +26,8 @@ app.include_router(store_analysis_router)
 app.include_router(dish_analysis_router)
 app.include_router(report_router)
 app.include_router(private_domain_router)
+app.include_router(knowledge_router)
+app.include_router(inventory_analysis_router)
 app.include_router(p0_reports_router)
 app.include_router(cost_health_router)
 app.include_router(boss_bi_router)
