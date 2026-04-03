@@ -7,11 +7,18 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .middleware import TenantMiddleware, RequestLogMiddleware
-from .proxy import router as proxy_router
+from .api.open_api_routes import router as open_api_router
 from .auth import router as auth_router
-from .hub_api import router as hub_router
 from .growth_intel_relay import router as relay_router
+from .hub_api import router as hub_router
+from .middleware import RequestLogMiddleware, TenantMiddleware
+from .middleware.audit_middleware import AuditMiddleware
+from .proxy import router as proxy_router
+from .response import ok
+from .wecom_group_routes import router as wecom_group_router
+from .wecom_internal import router as wecom_internal_router
+from .wecom_jssdk import router as wecom_jssdk_router
+from .wecom_notify_routes import router as wecom_notify_router
 from .wecom_routes import router as wecom_router
 from .wecom_scrm_routes import router as wecom_scrm_router
 from .wecom_jssdk import router as wecom_jssdk_router
@@ -43,10 +50,11 @@ async def _run_daily_sop() -> None:
     log.info("wecom_group_daily_sop_job_start")
 
     try:
+        from sqlalchemy import distinct, select
+
         from .database import get_async_session  # type: ignore[import]
-        from .wecom_group_service import WecomGroupService
         from .models.wecom_group import WecomGroupConfig
-        from sqlalchemy import select, distinct
+        from .wecom_group_service import WecomGroupService
 
         service = WecomGroupService()
 
@@ -99,6 +107,8 @@ async def _shutdown() -> None:
     logger.info("gateway_scheduler_stopped")
 
 # Middleware（执行顺序：后添加先执行）
+# AuditMiddleware 在 RateLimiter 之后执行（先添加先执行），记录所有敏感路径和4xx/5xx
+app.add_middleware(AuditMiddleware)
 app.add_middleware(RequestLogMiddleware)
 app.add_middleware(TenantMiddleware)
 app.add_middleware(
@@ -113,6 +123,9 @@ app.include_router(auth_router)
 
 # Hub 运维管理 API（必须在 proxy 之前注册，否则被通配路由拦截）
 app.include_router(hub_router)
+
+# 开放 API（ISV 应用 + OAuth2 client_credentials；依赖 DB 未配置时相关端点返回 503）
+app.include_router(open_api_router)
 
 # 情报→增长自动接力 API
 app.include_router(relay_router)
@@ -134,6 +147,8 @@ app.include_router(wecom_group_router)
 
 # GDPR 个人信息保护合规 API
 app.include_router(gdpr_router)
+# 企微群管理与通知推送 API（群创建/列表/发消息/通知/状态）
+app.include_router(wecom_notify_router)
 
 # 域路由代理（通配路由 /api/v1/{domain}/{path}，放最后）
 app.include_router(proxy_router)

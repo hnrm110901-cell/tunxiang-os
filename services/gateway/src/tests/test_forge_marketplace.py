@@ -12,13 +12,11 @@
 """
 
 import pytest
-
 from forge_marketplace import (
     APP_CATEGORIES,
     PRICING_MODELS,
     ForgeMarketplaceService,
 )
-
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  Fixtures

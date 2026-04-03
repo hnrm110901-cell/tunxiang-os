@@ -6,8 +6,48 @@
  *       + 8个快捷操作 + AI推荐 + 出餐进度 + 扫码结账
  * 移动端竖屏, 最小字体16px, 热区>=48px
  */
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { fetchDishCategories, fetchDishes, addItemsToOrder } from '../api/index';
+import type { DishCategory, DishInfo } from '../api/index';
+import { WeighDishSheet } from './WeighDishSheet';
+import { ComboSelectionSheet } from './ComboSelectionSheet';
+import { fetchComboDetail } from '../api/comboApi';
+import type { ComboDetail, ComboSelection } from '../api/comboApi';
+
+/* ---------- API 工具函数 ---------- */
+const API_BASE = (): string =>
+  (typeof window !== 'undefined' && (window as unknown as Record<string, string>).__TX_API_BASE__) || '';
+
+const TENANT_ID = (): string =>
+  (typeof window !== 'undefined' && (window as unknown as Record<string, string>).__TENANT_ID__) || '';
+
+async function txFetch<T = unknown>(
+  path: string,
+  options: RequestInit = {},
+): Promise<T> {
+  const url = `${API_BASE()}${path}`;
+  const res = await fetch(url, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Tenant-ID': TENANT_ID(),
+      ...(options.headers || {}),
+    },
+  });
+  const json = await res.json();
+  if (!res.ok || json.ok === false) {
+    throw new Error(json.error?.message || json.detail || `HTTP ${res.status}`);
+  }
+  return json.data ?? json;
+}
+
+/* ---------- Toast 类型 ---------- */
+interface ToastMsg {
+  id: number;
+  text: string;
+  color: string; // green | red
+}
 
 /* ---------- 样式常量(Design Token) ---------- */
 const C = {
@@ -25,44 +65,7 @@ const C = {
   info: '#185FA5',
 };
 
-/* ---------- Mock 数据 ---------- */
-const CATEGORIES = [
-  { id: 'hot', name: '热菜' },
-  { id: 'cold', name: '凉菜' },
-  { id: 'soup', name: '汤品' },
-  { id: 'seafood', name: '海鲜' },
-  { id: 'staple', name: '主食' },
-  { id: 'drink', name: '饮品' },
-  { id: 'dessert', name: '甜品' },
-];
-
-interface MockDish {
-  id: string;
-  name: string;
-  catId: string;
-  priceFen: number;
-  tags: string[];
-  soldOut: boolean;
-  isMarketPrice: boolean;
-  isWeighed: boolean;
-  specs: { name: string; options: string[] }[];
-}
-
-const DISHES: MockDish[] = [
-  { id: 'd1', name: '剁椒鱼头', catId: 'hot', priceFen: 8800, tags: ['招牌', '辣'], soldOut: false, isMarketPrice: false, isWeighed: false, specs: [{ name: '做法', options: ['红剁椒', '黄剁椒', '双色'] }] },
-  { id: 'd2', name: '小炒黄牛肉', catId: 'hot', priceFen: 6800, tags: ['辣'], soldOut: false, isMarketPrice: false, isWeighed: false, specs: [{ name: '辣度', options: ['微辣', '中辣', '特辣'] }] },
-  { id: 'd3', name: '红烧肉', catId: 'hot', priceFen: 5800, tags: ['招牌'], soldOut: false, isMarketPrice: false, isWeighed: false, specs: [] },
-  { id: 'd4', name: '酸菜鱼', catId: 'hot', priceFen: 7800, tags: [], soldOut: false, isMarketPrice: false, isWeighed: false, specs: [{ name: '鱼种', options: ['草鱼', '黑鱼'] }] },
-  { id: 'd5', name: '蒜蓉蒸虾', catId: 'seafood', priceFen: 12800, tags: ['新品'], soldOut: false, isMarketPrice: false, isWeighed: false, specs: [] },
-  { id: 'd6', name: '波士顿龙虾', catId: 'seafood', priceFen: 0, tags: ['时价'], soldOut: false, isMarketPrice: true, isWeighed: true, specs: [{ name: '做法', options: ['蒜蓉蒸', '芝士焗', '上汤'] }] },
-  { id: 'd7', name: '凉拌黄瓜', catId: 'cold', priceFen: 1800, tags: [], soldOut: false, isMarketPrice: false, isWeighed: false, specs: [] },
-  { id: 'd8', name: '口味虾', catId: 'hot', priceFen: 12800, tags: ['招牌', '辣'], soldOut: true, isMarketPrice: false, isWeighed: false, specs: [] },
-  { id: 'd9', name: '老鸭汤', catId: 'soup', priceFen: 4800, tags: [], soldOut: false, isMarketPrice: false, isWeighed: false, specs: [] },
-  { id: 'd10', name: '米饭', catId: 'staple', priceFen: 300, tags: [], soldOut: false, isMarketPrice: false, isWeighed: false, specs: [] },
-  { id: 'd11', name: '酸梅汤', catId: 'drink', priceFen: 800, tags: [], soldOut: false, isMarketPrice: false, isWeighed: false, specs: [] },
-  { id: 'd12', name: '杨枝甘露', catId: 'dessert', priceFen: 2800, tags: ['新品'], soldOut: false, isMarketPrice: false, isWeighed: false, specs: [] },
-  { id: 'd13', name: '活鱼(称重)', catId: 'seafood', priceFen: 9800, tags: ['称重'], soldOut: false, isMarketPrice: false, isWeighed: true, specs: [{ name: '做法', options: ['清蒸', '红烧', '水煮'] }] },
-];
+/* ---------- Mock AI 推荐 & KDS(保持 mock，待后续接真实 API) ---------- */
 
 /* Mock AI 推荐 */
 const MOCK_AI_RECS = [
@@ -120,13 +123,25 @@ export function OrderPage() {
   const guests = params.get('guests') || '';
   const orderId = params.get('order_id') || 'mock-order-001';
 
-  const [activeCat, setActiveCat] = useState(CATEGORIES[0].id);
+  const storeId = (window as unknown as Record<string, string>).__STORE_ID__ || 'store_001';
+
+  const [categories, setCategories] = useState<DishCategory[]>([]);
+  const [dishes, setDishes] = useState<DishInfo[]>([]);
+  const [menuLoading, setMenuLoading] = useState(false);
+
+  const [activeCat, setActiveCat] = useState<string | null>(null);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [showCart, setShowCart] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
+  // 称重菜弹层
+  const [weighDish, setWeighDish] = useState<DishInfo | null>(null);
+
+  // 套餐N选M弹层
+  const [comboSheet, setComboSheet] = useState<ComboDetail | null>(null);
+
   // 弹窗: 时价/称重/做法
-  const [editingDish, setEditingDish] = useState<MockDish | null>(null);
+  const [editingDish, setEditingDish] = useState<DishInfo | null>(null);
   const [editPrice, setEditPrice] = useState('');
   const [editWeight, setEditWeight] = useState('');
   const [editSpec, setEditSpec] = useState('');
@@ -146,15 +161,11 @@ export function OrderPage() {
   const [couponCode, setCouponCode] = useState('');
   const [couponResult, setCouponResult] = useState<string | null>(null);
 
-  // 复制菜品
-  const [sourceOrderId, setSourceOrderId] = useState('');
+  // 复制菜品（sourceOrderId 用于记录已复制来源，暂不展示）
+  const [_sourceOrderId, setSourceOrderId] = useState('');
 
-  // 沽清管理 (mock)
-  const [dishAvailability, setDishAvailability] = useState<Record<string, boolean>>(() => {
-    const map: Record<string, boolean> = {};
-    DISHES.forEach(d => { map[d.id] = !d.soldOut; });
-    return map;
-  });
+  // 沽清管理
+  const [dishAvailability, setDishAvailability] = useState<Record<string, boolean>>({});
 
   // 限量设置
   const [limitDishId, setLimitDishId] = useState('');
@@ -170,36 +181,77 @@ export function OrderPage() {
   const [checkoutProcessing, setCheckoutProcessing] = useState(false);
   const [checkoutDone, setCheckoutDone] = useState(false);
 
-  // 埋单
-  const [preBillData, setPreBillData] = useState<{
+  // 埋单（preBillData 待结账面板接入）
+  const [_preBillData, setPreBillData] = useState<{
     items: { item_name: string; quantity: number; unit_price_fen: number; subtotal_fen: number; is_gift: boolean }[];
     subtotal_fen: number; discount_fen: number; service_charge_fen: number; total_fen: number;
   } | null>(null);
 
-  // 上菜/划菜
-  const [servedItems, setServedItems] = useState<Record<string, boolean>>({});
-
-  // 菜品变价
-  const [priceOverrideItemId, setPriceOverrideItemId] = useState('');
-  const [priceOverrideValue, setPriceOverrideValue] = useState('');
-
-  // 单品转台
-  const [transferItemId, setTransferItemId] = useState('');
-  const [transferTargetTable, setTransferTargetTable] = useState('');
-
   // 后厨通知
-  const [kitchenMsg, setKitchenMsg] = useState('');
-  const [kitchenMsgSent, setKitchenMsgSent] = useState(false);
+  const [_kitchenMsg, setKitchenMsg] = useState('');
+  const [_kitchenMsgSent, setKitchenMsgSent] = useState(false);
 
-  // 转账
-  const [paySourceOrder, setPaySourceOrder] = useState('');
-  const [payTargetOrder, setPayTargetOrder] = useState('');
-  const [payPaymentId, setPayPaymentId] = useState('');
+  /* ---------- Toast ---------- */
+  const [toasts, setToasts] = useState<ToastMsg[]>([]);
+  const toastIdRef = useRef(0);
+  const showToast = useCallback((text: string, color: string, durationMs = 2000) => {
+    const id = ++toastIdRef.current;
+    setToasts(prev => [...prev, { id, text, color }]);
+    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), durationMs);
+  }, []);
+  const toastOk = useCallback((text: string) => showToast(text, C.green, 2000), [showToast]);
+  const toastErr = useCallback((text: string) => showToast(text, '#ef4444', 3000), [showToast]);
 
-  const filteredDishes = useMemo(
-    () => DISHES.filter(d => d.catId === activeCat),
-    [activeCat],
-  );
+  /* ---------- 操作 loading 状态 ---------- */
+  const [refreshingDish, setRefreshingDish] = useState(false);
+  const [rushingTaskId, setRushingTaskId] = useState<string | null>(null);
+  const [updatingTable, setUpdatingTable] = useState(false);
+  const [verifyingCoupon, setVerifyingCoupon] = useState(false);
+  const [copyingDishes, setCopyingDishes] = useState(false);
+  const [historyOrders, setHistoryOrders] = useState<
+    { id: string; items: { dish_id: string; dish_name: string; qty: number; price_fen: number }[] }[]
+  >([]);
+  const [togglingDishId, setTogglingDishId] = useState<string | null>(null);
+  const [settingLimit, setSettingLimit] = useState(false);
+  const [updatingWaiter, setUpdatingWaiter] = useState(false);
+
+  /* ---------- 加载菜品分类 ---------- */
+  useEffect(() => {
+    fetchDishCategories(storeId)
+      .then(res => {
+        setCategories(res.items);
+        if (res.items.length > 0) {
+          setActiveCat(res.items[0].category_id);
+        }
+      })
+      .catch((err: unknown) => {
+        const msg = err instanceof Error ? err.message : '加载分类失败';
+        toastErr(`加载分类失败: ${msg}`);
+      });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storeId]);
+
+  /* ---------- 切换分类时加载菜品 ---------- */
+  useEffect(() => {
+    if (!activeCat) return;
+    setMenuLoading(true);
+    fetchDishes(storeId, activeCat)
+      .then(res => {
+        setDishes(res.items);
+        // 同步沽清状态
+        setDishAvailability(prev => {
+          const map = { ...prev };
+          res.items.forEach(d => { map[d.dish_id] = !d.sold_out; });
+          return map;
+        });
+      })
+      .catch((err: unknown) => {
+        const msg = err instanceof Error ? err.message : '加载菜品失败';
+        toastErr(`加载菜品失败: ${msg}`);
+      })
+      .finally(() => setMenuLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storeId, activeCat]);
 
   const cartTotal = cart.reduce((sum, item) => {
     const weight = item.weight || 1;
@@ -209,41 +261,77 @@ export function OrderPage() {
   const cartCount = cart.reduce((sum, i) => sum + i.qty, 0);
 
   /* 添加到购物车（普通菜直接加，特殊菜弹窗） */
-  const handleDishPress = (dish: MockDish) => {
-    if (dish.soldOut) return;
-    if (dish.isMarketPrice || dish.isWeighed || dish.specs.length > 0) {
+  const handleDishPress = (dish: DishInfo) => {
+    if (dish.sold_out) return;
+    // 套餐菜：弹出N选M选择面板
+    if (dish.is_combo && dish.combo_id) {
+      fetchComboDetail(dish.combo_id)
+        .then(detail => setComboSheet(detail))
+        .catch((err: unknown) => {
+          const msg = err instanceof Error ? err.message : '加载套餐失败';
+          toastErr(`加载套餐失败: ${msg}`);
+        });
+      return;
+    }
+    // 称重菜：弹出专用称重面板
+    if (dish.is_weighed) {
+      setWeighDish(dish);
+      return;
+    }
+    const specs = dish.specs || [];
+    if (dish.is_market_price || specs.length > 0) {
       setEditingDish(dish);
-      setEditPrice(dish.isMarketPrice ? '' : String(dish.priceFen / 100));
-      setEditWeight(dish.isWeighed ? '' : '1');
-      setEditSpec(dish.specs.length > 0 ? dish.specs[0].options[0] : '');
+      setEditPrice(dish.is_market_price ? '' : String(dish.price_fen / 100));
+      setEditWeight('1');
+      setEditSpec(specs.length > 0 ? specs[0].options[0] : '');
       setEditNote('');
       return;
     }
     addToCartSimple(dish);
   };
 
-  const addToCartSimple = (dish: MockDish) => {
+  const addToCartSimple = (dish: DishInfo) => {
     setCart(prev => {
-      const existing = prev.find(i => i.dishId === dish.id && !i.spec);
+      const existing = prev.find(i => i.dishId === dish.dish_id && !i.spec);
       if (existing) {
-        return prev.map(i => i.dishId === dish.id && !i.spec ? { ...i, qty: i.qty + 1 } : i);
+        return prev.map(i => i.dishId === dish.dish_id && !i.spec ? { ...i, qty: i.qty + 1 } : i);
       }
-      return [...prev, { dishId: dish.id, name: dish.name, qty: 1, priceFen: dish.priceFen, note: '' }];
+      return [...prev, { dishId: dish.dish_id, name: dish.dish_name, qty: 1, priceFen: dish.price_fen, note: '' }];
     });
   };
 
+  /** 通用加入购物车（供套餐确认回调使用） */
+  const addToCart = useCallback((item: {
+    dish_id: string;
+    dish_name: string;
+    quantity: number;
+    unit_price_fen: number;
+    special_notes?: string;
+  }) => {
+    setCart(prev => [
+      ...prev,
+      {
+        dishId: item.dish_id,
+        name: item.dish_name,
+        qty: item.quantity,
+        priceFen: item.unit_price_fen,
+        note: item.special_notes || '',
+      },
+    ]);
+  }, []);
+
   const confirmEditDish = () => {
     if (!editingDish) return;
-    const priceFen = editingDish.isMarketPrice
+    const priceFen = editingDish.is_market_price
       ? Math.round(parseFloat(editPrice || '0') * 100)
-      : editingDish.priceFen;
-    const weight = editingDish.isWeighed ? parseFloat(editWeight || '1') : undefined;
+      : editingDish.price_fen;
+    const weight = editingDish.is_weighed ? parseFloat(editWeight || '1') : undefined;
 
     setCart(prev => [
       ...prev,
       {
-        dishId: editingDish.id,
-        name: editingDish.name,
+        dishId: editingDish.dish_id,
+        name: editingDish.dish_name,
         qty: 1,
         priceFen: priceFen,
         weight,
@@ -266,12 +354,24 @@ export function OrderPage() {
   const handleSubmit = () => {
     if (cart.length === 0) return;
     setSubmitting(true);
-    setTimeout(() => {
-      setSubmitting(false);
-      setCart([]);
-      setShowCart(false);
-      navigate('/active');
-    }, 800);
+    const items = cart.map(i => ({
+      dish_id: i.dishId,
+      dish_name: i.name,
+      quantity: i.qty,
+      unit_price_fen: i.priceFen,
+      special_notes: [i.spec, i.note].filter(Boolean).join(' / ') || undefined,
+    }));
+    addItemsToOrder(orderId, items)
+      .then(() => {
+        setCart([]);
+        setShowCart(false);
+        navigate('/active');
+      })
+      .catch((err: unknown) => {
+        const msg = err instanceof Error ? err.message : '提交失败';
+        toastErr(`提交失败: ${msg}`);
+      })
+      .finally(() => setSubmitting(false));
   };
 
   const cartItemQty = (dishId: string): number =>
@@ -279,10 +379,19 @@ export function OrderPage() {
 
   /* AI推荐: 一键加入 */
   const addAIRecToCart = useCallback((rec: typeof MOCK_AI_RECS[0]) => {
-    const dish = DISHES.find(d => d.id === rec.id);
-    if (dish) handleDishPress(dish);
-    else addToCartSimple({ id: rec.id, name: rec.name, catId: '', priceFen: rec.priceFen, tags: [], soldOut: false, isMarketPrice: false, isWeighed: false, specs: [] });
-  }, []);
+    const dish = dishes.find(d => d.dish_id === rec.id);
+    if (dish) {
+      handleDishPress(dish);
+    } else {
+      // 菜品未在当前分类，构造临时 DishInfo 直接加购
+      addToCartSimple({
+        dish_id: rec.id, dish_name: rec.name, category_id: '',
+        price_fen: rec.priceFen, sold_out: false,
+        is_market_price: false, is_weighed: false,
+      });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dishes]);
 
   /* 更多操作菜单项 — 5x5 网格，对标天财商龙 */
   const MORE_OPS: { key: string; label: string; icon: string; color?: string }[] = [
@@ -330,8 +439,26 @@ export function OrderPage() {
     if (key === '_return') { setActiveModal('none'); navigate(`/return?order_id=${orderId}`); return; }
     if (key === '_refresh') {
       setActiveModal('none');
-      // TODO: 调用 refreshDishStatus API
-      alert('菜品状态已刷新');
+      if (refreshingDish) return;
+      setRefreshingDish(true);
+      const storeId = params.get('store_id') || '';
+      txFetch<{ id: string; is_available: boolean }[]>(
+        `/api/v1/dishes?store_id=${encodeURIComponent(storeId)}&status=available`,
+      )
+        .then(data => {
+          // 将远端可用状态同步到本地
+          const map: Record<string, boolean> = {};
+          if (Array.isArray(data)) {
+            data.forEach(d => { map[d.id] = d.is_available; });
+          }
+          setDishAvailability(prev => ({ ...prev, ...map }));
+          toastOk('菜品状态已刷新');
+        })
+        .catch((err: unknown) => {
+          const msg = err instanceof Error ? err.message : '刷新失败';
+          toastErr(`刷新失败: ${msg}`);
+        })
+        .finally(() => setRefreshingDish(false));
       return;
     }
     // 埋单加载数据
@@ -353,7 +480,7 @@ export function OrderPage() {
   };
 
   /* 结账处理 */
-  const handleCheckout = (method: string) => {
+  const handleCheckout = (_method: string) => {
     setCheckoutProcessing(true);
     setTimeout(() => {
       setCheckoutProcessing(false);
@@ -363,8 +490,20 @@ export function OrderPage() {
 
   /* 催菜 */
   const handleRushTask = (taskId: string) => {
-    // TODO: 调用 rushKdsTask API
-    alert(`已催菜: ${taskId}`);
+    if (rushingTaskId) return;
+    setRushingTaskId(taskId);
+    txFetch(`/api/v1/orders/${encodeURIComponent(orderId)}/rush-items`, {
+      method: 'POST',
+      body: JSON.stringify({ item_ids: [taskId] }),
+    })
+      .then(() => {
+        toastOk('已催菜，后厨收到加急通知');
+      })
+      .catch((err: unknown) => {
+        const msg = err instanceof Error ? err.message : '催菜失败';
+        toastErr(`催菜失败: ${msg}`);
+      })
+      .finally(() => setRushingTaskId(null));
   };
 
   const kdsStatusColor = (status: string, isOvertime: boolean) => {
@@ -397,7 +536,7 @@ export function OrderPage() {
           style={{
             width: '100%', background: C.bg, borderRadius: '16px 16px 0 0',
             padding: '20px 16px 32px', maxHeight: '80vh', overflowY: 'auto',
-            WebkitOverflowScrolling: 'touch' as string,
+            WebkitOverflowScrolling: 'touch' as any,
           }}
           onClick={e => e.stopPropagation()}
         >
@@ -496,7 +635,7 @@ export function OrderPage() {
         {aiExpanded && (
           <div style={{
             display: 'flex', gap: 10, overflowX: 'auto',
-            WebkitOverflowScrolling: 'touch',
+            WebkitOverflowScrolling: 'touch' as any,
             padding: '0 12px 12px',
           }}>
             {MOCK_AI_RECS.map(rec => (
@@ -534,58 +673,87 @@ export function OrderPage() {
       {/* ===== 分类横向滚动 ===== */}
       <div style={{
         display: 'flex', gap: 0, overflowX: 'auto',
-        WebkitOverflowScrolling: 'touch',
+        WebkitOverflowScrolling: 'touch' as any,
         padding: '8px 12px', background: C.card,
         borderBottom: `1px solid ${C.border}`,
       }}>
-        {CATEGORIES.map(cat => (
+        {/* 🐟 活鲜 — 特殊入口，navigate 到活鲜点单页 */}
+        <button
+          onClick={() => navigate(`/live-seafood?order_id=${encodeURIComponent(orderId)}&table=${encodeURIComponent(tableNo)}`)}
+          style={{
+            minWidth: 72, minHeight: 48, padding: '8px 14px',
+            borderRadius: 8, border: 'none',
+            background: `${C.accent}22`,
+            color: C.accent,
+            fontSize: 16, fontWeight: 700,
+            cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
+          }}
+        >
+          {'\uD83D\uDC1F'} 活鲜
+        </button>
+        {categories.map(cat => (
           <button
-            key={cat.id}
-            onClick={() => setActiveCat(cat.id)}
+            key={cat.category_id}
+            onClick={() => setActiveCat(cat.category_id)}
             style={{
               minWidth: 64, minHeight: 48, padding: '8px 14px',
               borderRadius: 8, border: 'none',
-              background: activeCat === cat.id ? C.accent : 'transparent',
-              color: activeCat === cat.id ? C.white : C.text,
-              fontSize: 16, fontWeight: activeCat === cat.id ? 700 : 400,
+              background: activeCat === cat.category_id ? C.accent : 'transparent',
+              color: activeCat === cat.category_id ? C.white : C.text,
+              fontSize: 16, fontWeight: activeCat === cat.category_id ? 700 : 400,
               cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
             }}
           >
-            {cat.name}
+            {cat.category_name}
           </button>
         ))}
       </div>
 
       {/* ===== 菜品列表 ===== */}
       <div style={{
-        flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' as string,
+        flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' as any,
         padding: '12px', paddingBottom: cart.length > 0 ? 140 : 80,
       }}>
-        {filteredDishes.length === 0 && (
+        {menuLoading && (
+          <div style={{ textAlign: 'center', padding: 40, color: C.muted, fontSize: 16 }}>
+            加载中...
+          </div>
+        )}
+        {!menuLoading && dishes.length === 0 && (
           <div style={{ textAlign: 'center', padding: 40, color: C.muted, fontSize: 16 }}>
             该分类暂无菜品
           </div>
         )}
-        {filteredDishes.map(dish => {
-          const qty = cartItemQty(dish.id);
+        {dishes.map(dish => {
+          const qty = cartItemQty(dish.dish_id);
+          const tags = dish.tags || [];
           return (
             <button
-              key={dish.id}
+              key={dish.dish_id}
               onClick={() => handleDishPress(dish)}
-              disabled={dish.soldOut}
+              disabled={dish.sold_out}
               style={{
                 display: 'flex', alignItems: 'center', width: '100%',
                 padding: 14, marginBottom: 8, borderRadius: 12,
                 background: C.card, border: `1px solid ${C.border}`,
-                cursor: dish.soldOut ? 'not-allowed' : 'pointer',
-                opacity: dish.soldOut ? 0.4 : 1,
+                cursor: dish.sold_out ? 'not-allowed' : 'pointer',
+                opacity: dish.sold_out ? 0.4 : 1,
                 textAlign: 'left', position: 'relative',
               }}
             >
               <div style={{ flex: 1 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: 18, fontWeight: 600, color: C.white }}>{dish.name}</span>
-                  {dish.tags.map(tag => (
+                  <span style={{ fontSize: 18, fontWeight: 600, color: C.white }}>{dish.dish_name}</span>
+                  {dish.is_weighed && (
+                    <span style={{
+                      fontSize: 14, padding: '1px 6px', borderRadius: 4,
+                      background: `${C.accent}22`, color: C.accent,
+                      fontWeight: 700, letterSpacing: 0.5,
+                    }}>
+                      称重
+                    </span>
+                  )}
+                  {tags.map(tag => (
                     <span key={tag} style={{
                       fontSize: 16, padding: '1px 6px', borderRadius: 4,
                       background: tag === '招牌' ? `${C.accent}22` : tag === '新品' ? `${C.green}22` : tag === '辣' ? `${C.danger}22` : `${C.warning}22`,
@@ -594,13 +762,13 @@ export function OrderPage() {
                       {tag}
                     </span>
                   ))}
-                  {dish.soldOut && (
+                  {dish.sold_out && (
                     <span style={{ fontSize: 16, color: C.danger, fontWeight: 700 }}>已沽清</span>
                   )}
                 </div>
                 <div style={{ fontSize: 16, color: C.accent, fontWeight: 700, marginTop: 4 }}>
-                  {dish.isMarketPrice ? '时价' : `\u00A5${(dish.priceFen / 100).toFixed(0)}`}
-                  {dish.isWeighed && <span style={{ fontSize: 16, color: C.muted, fontWeight: 400 }}>/斤</span>}
+                  {dish.is_market_price ? '时价' : `\u00A5${(dish.price_fen / 100).toFixed(0)}`}
+                  {dish.is_weighed && <span style={{ fontSize: 16, color: C.muted, fontWeight: 400 }}>/斤</span>}
                 </div>
               </div>
               {qty > 0 && (
@@ -675,7 +843,7 @@ export function OrderPage() {
             style={{
               position: 'absolute', bottom: 56 + 68, left: 0, right: 0,
               maxHeight: '60vh', overflowY: 'auto',
-              WebkitOverflowScrolling: 'touch' as string,
+              WebkitOverflowScrolling: 'touch' as any,
               background: C.bg, borderRadius: '16px 16px 0 0',
               padding: '16px 12px',
             }}
@@ -694,54 +862,146 @@ export function OrderPage() {
                 清空
               </button>
             </div>
-            {cart.map((item, idx) => (
-              <div key={`${item.dishId}-${idx}`} style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                padding: '12px 0', borderBottom: `1px solid ${C.border}`,
-              }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 16, color: C.white }}>{item.name}</div>
-                  <div style={{ fontSize: 16, color: C.muted }}>
-                    {'\u00A5'}{(item.priceFen / 100).toFixed(0)}
-                    {item.weight ? ` \u00D7 ${item.weight}斤` : ''}
-                    {item.spec ? ` / ${item.spec}` : ''}
-                    {item.note ? ` / ${item.note}` : ''}
+            {cart.map((item, idx) => {
+              // 称重菜：note 里含有 "xkg" 标记（由 WeighDishSheet 的 onConfirm 写入）
+              const isWeighedItem = !!item.note && /[0-9.]+kg/.test(item.note);
+              // 套餐项：note 里含有 " | " 分隔的选择记录（如"主菜: 清蒸鲈鱼 | 主食: 炒饭"）
+              const isComboItem = !!item.note && item.note.includes(' | ');
+              return (
+                <div key={`${item.dishId}-${idx}`} style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  padding: '12px 0', borderBottom: `1px solid ${C.border}`,
+                }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 16, color: C.white }}>
+                      {item.name}
+                      {isWeighedItem && (
+                        <span style={{
+                          fontSize: 14, color: C.muted,
+                          marginLeft: 6, fontWeight: 400,
+                        }}>
+                          · {item.note}
+                        </span>
+                      )}
+                    </div>
+                    {/* 套餐选择明细 — 小字分行显示 */}
+                    {isComboItem && (
+                      <div style={{ fontSize: 14, color: C.muted, marginTop: 2, lineHeight: 1.6 }}>
+                        {item.note.split(' | ').map((seg, si) => (
+                          <span key={si} style={{ display: 'block' }}>
+                            {seg}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    <div style={{ fontSize: 16, color: C.muted }}>
+                      {isWeighedItem
+                        ? /* 称重菜：显示总价 */
+                          `\u00A5${(item.priceFen / 100).toFixed(2)}`
+                        : isComboItem
+                          ? /* 套餐：显示合计价 */
+                            `套餐合计 \u00A5${(item.priceFen / 100).toFixed(2)}`
+                          : /* 普通菜：显示单价 × 数量 */
+                            `\u00A5${(item.priceFen / 100).toFixed(0)}${item.spec ? ` / ${item.spec}` : ''}${item.note && !isComboItem ? ` / ${item.note}` : ''}`
+                      }
+                    </div>
                   </div>
+                  {/* 称重菜不显示 +/- 按钮，只显示删除 */}
+                  {isWeighedItem ? (
+                    <button
+                      onClick={() => updateQty(idx, -item.qty)}
+                      style={{
+                        width: 48, height: 48, borderRadius: 12,
+                        background: C.card, border: `1px solid ${C.border}`,
+                        color: '#ef4444', fontSize: 18, cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      }}
+                      title="移除"
+                    >
+                      ✕
+                    </button>
+                  ) : (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <button
+                        onClick={() => updateQty(idx, -1)}
+                        style={{
+                          width: 48, height: 48, borderRadius: 12,
+                          background: C.card, border: `1px solid ${C.border}`,
+                          color: C.white, fontSize: 20, cursor: 'pointer',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        }}
+                      >
+                        -
+                      </button>
+                      <span style={{ fontSize: 20, fontWeight: 700, color: C.white, minWidth: 24, textAlign: 'center' }}>
+                        {item.qty}
+                      </span>
+                      <button
+                        onClick={() => updateQty(idx, 1)}
+                        style={{
+                          width: 48, height: 48, borderRadius: 12,
+                          background: C.card, border: `1px solid ${C.border}`,
+                          color: C.white, fontSize: 20, cursor: 'pointer',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        }}
+                      >
+                        +
+                      </button>
+                    </div>
+                  )}
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <button
-                    onClick={() => updateQty(idx, -1)}
-                    style={{
-                      width: 48, height: 48, borderRadius: 12,
-                      background: C.card, border: `1px solid ${C.border}`,
-                      color: C.white, fontSize: 20, cursor: 'pointer',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    }}
-                  >
-                    -
-                  </button>
-                  <span style={{ fontSize: 20, fontWeight: 700, color: C.white, minWidth: 24, textAlign: 'center' }}>
-                    {item.qty}
-                  </span>
-                  <button
-                    onClick={() => updateQty(idx, 1)}
-                    style={{
-                      width: 48, height: 48, borderRadius: 12,
-                      background: C.card, border: `1px solid ${C.border}`,
-                      color: C.white, fontSize: 20, cursor: 'pointer',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    }}
-                  >
-                    +
-                  </button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
 
-      {/* ===== 特殊菜弹窗(时价/称重/做法) ===== */}
+      {/* ===== 称重菜弹层 ===== */}
+      {weighDish && (
+        <WeighDishSheet
+          dish={weighDish}
+          onConfirm={(weightKg, totalFen) => {
+            setCart(prev => [
+              ...prev,
+              {
+                dishId: weighDish.dish_id,
+                name: weighDish.dish_name,
+                qty: 1,
+                priceFen: totalFen,        // 存储的是总价（分）
+                weight: undefined,
+                spec: undefined,
+                note: `${weightKg.toFixed(3)}kg`,
+              },
+            ]);
+            setWeighDish(null);
+            showToast(`已加入：${weighDish.dish_name} ${weightKg.toFixed(3)}kg ¥${(totalFen / 100).toFixed(2)}`, C.green, 2500);
+          }}
+          onClose={() => setWeighDish(null)}
+        />
+      )}
+
+      {/* ===== 套餐N选M弹层 ===== */}
+      {comboSheet && (
+        <ComboSelectionSheet
+          combo={comboSheet}
+          onConfirm={(selections: ComboSelection[], totalFen: number) => {
+            addToCart({
+              dish_id: comboSheet.combo_id,
+              dish_name: comboSheet.combo_name,
+              quantity: 1,
+              unit_price_fen: totalFen,
+              special_notes: selections.map(s =>
+                `${s.group_name}: ${s.selected_items.map(i => i.dish_name).join('/')}`
+              ).join(' | '),
+            });
+            showToast(`已加入：${comboSheet.combo_name} ¥${(totalFen / 100).toFixed(2)}`, C.green, 2500);
+            setComboSheet(null);
+          }}
+          onClose={() => setComboSheet(null)}
+        />
+      )}
+
+      {/* ===== 特殊菜弹窗(时价/做法) ===== */}
       {editingDish && (
         <div
           style={{
@@ -759,10 +1019,10 @@ export function OrderPage() {
             onClick={e => e.stopPropagation()}
           >
             <h3 style={{ fontSize: 20, fontWeight: 700, color: C.white, margin: '0 0 16px' }}>
-              {editingDish.name}
+              {editingDish.dish_name}
             </h3>
 
-            {editingDish.isMarketPrice && (
+            {editingDish.is_market_price && (
               <div style={{ marginBottom: 16 }}>
                 <label style={{ fontSize: 16, color: C.text, display: 'block', marginBottom: 8 }}>
                   价格(元)
@@ -783,7 +1043,7 @@ export function OrderPage() {
               </div>
             )}
 
-            {editingDish.isWeighed && (
+            {editingDish.is_weighed && (
               <div style={{ marginBottom: 16 }}>
                 <label style={{ fontSize: 16, color: C.text, display: 'block', marginBottom: 8 }}>
                   重量(斤)
@@ -804,10 +1064,10 @@ export function OrderPage() {
               </div>
             )}
 
-            {editingDish.specs.map(spec => (
-              <div key={spec.name} style={{ marginBottom: 16 }}>
+            {(editingDish.specs || []).map(spec => (
+              <div key={spec.spec_name} style={{ marginBottom: 16 }}>
                 <label style={{ fontSize: 16, color: C.text, display: 'block', marginBottom: 8 }}>
-                  {spec.name}
+                  {spec.spec_name}
                 </label>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                   {spec.options.map(opt => (
@@ -941,17 +1201,34 @@ export function OrderPage() {
           </div>
           <button
             onClick={() => {
-              // TODO: 调用 updateTableInfo API
-              setActiveModal('none');
-              alert(`已修改: 人数=${editGuestCount}, 服务员=${editWaiterId || '未变'}`);
+              if (updatingTable) return;
+              setUpdatingTable(true);
+              const body: Record<string, unknown> = {
+                guest_count: parseInt(editGuestCount, 10) || 0,
+              };
+              if (editWaiterId.trim()) body.table_remark = editWaiterId.trim();
+              txFetch(`/api/v1/orders/${encodeURIComponent(orderId)}`, {
+                method: 'PATCH',
+                body: JSON.stringify(body),
+              })
+                .then(() => {
+                  setActiveModal('none');
+                  toastOk(`开台信息已更新: ${editGuestCount}人`);
+                })
+                .catch((err: unknown) => {
+                  const msg = err instanceof Error ? err.message : '更新失败';
+                  toastErr(`更新失败: ${msg}`);
+                })
+                .finally(() => setUpdatingTable(false));
             }}
+            disabled={updatingTable}
             style={{
               width: '100%', minHeight: 56, borderRadius: 12,
-              background: C.accent, color: C.white, border: 'none',
-              fontSize: 18, fontWeight: 700, cursor: 'pointer',
+              background: updatingTable ? C.muted : C.accent, color: C.white, border: 'none',
+              fontSize: 18, fontWeight: 700, cursor: updatingTable ? 'not-allowed' : 'pointer',
             }}
           >
-            确认修改
+            {updatingTable ? '保存中...' : '确认修改'}
           </button>
         </>
       ))}
@@ -994,17 +1271,38 @@ export function OrderPage() {
             </button>
             <button
               onClick={() => {
-                if (!couponCode.trim()) return;
-                // TODO: 调用 verifyPlatformCoupon API
-                setCouponResult('验券成功: 美团50元代100元券, 优惠50元');
+                if (!couponCode.trim() || verifyingCoupon) return;
+                setVerifyingCoupon(true);
+                // 平台从 couponCode 前缀猜测（实际可让服务员选择）
+                const platform = couponCode.startsWith('MT') ? 'meituan'
+                  : couponCode.startsWith('DY') ? 'douyin' : 'universal';
+                txFetch<{ discount_fen: number; description: string }>(
+                  '/api/v1/coupons/verify',
+                  {
+                    method: 'POST',
+                    body: JSON.stringify({ code: couponCode.trim(), platform, order_id: orderId }),
+                  },
+                )
+                  .then(data => {
+                    const yuan = (data.discount_fen / 100).toFixed(0);
+                    setCouponResult(`验券成功: ${data.description}，优惠 ¥${yuan}`);
+                    toastOk(`券已核销，优惠 ¥${yuan}`);
+                  })
+                  .catch((err: unknown) => {
+                    const msg = err instanceof Error ? err.message : '验券失败';
+                    setCouponResult(null);
+                    toastErr(`验券失败: ${msg}`);
+                  })
+                  .finally(() => setVerifyingCoupon(false));
               }}
+              disabled={verifyingCoupon}
               style={{
                 flex: 1, minHeight: 56, borderRadius: 12,
-                background: C.accent, color: C.white, border: 'none',
-                fontSize: 16, fontWeight: 700, cursor: 'pointer',
+                background: verifyingCoupon ? C.muted : C.accent, color: C.white, border: 'none',
+                fontSize: 16, fontWeight: 700, cursor: verifyingCoupon ? 'not-allowed' : 'pointer',
               }}
             >
-              验证
+              {verifyingCoupon ? '验证中...' : '验证'}
             </button>
           </div>
           {couponResult && (
@@ -1019,42 +1317,108 @@ export function OrderPage() {
       ))}
 
       {/* ===== A3. 复制菜品弹窗 ===== */}
-      {renderOverlay(activeModal === 'copy-dishes', () => setActiveModal('none'), (
+      {renderOverlay(activeModal === 'copy-dishes', () => { setActiveModal('none'); setHistoryOrders([]); setSourceOrderId(''); }, (
         <>
           <h3 style={{ fontSize: 20, fontWeight: 700, color: C.white, margin: '0 0 16px' }}>
             复制菜品
           </h3>
           <div style={{ fontSize: 16, color: C.muted, marginBottom: 16 }}>
-            从历史订单一键复制菜品到当前订单
+            从同桌历史订单一键复制菜品到当前订单
           </div>
-          <div style={{ marginBottom: 16 }}>
-            <input
-              type="text"
-              value={sourceOrderId}
-              onChange={e => setSourceOrderId(e.target.value)}
-              placeholder="输入源订单号"
-              style={{
-                width: '100%', padding: 14, fontSize: 18,
-                background: C.card, border: `1px solid ${C.border}`,
-                borderRadius: 12, color: C.white, boxSizing: 'border-box',
+
+          {/* 第一步：查询历史订单 */}
+          {historyOrders.length === 0 && (
+            <button
+              onClick={() => {
+                if (copyingDishes) return;
+                setCopyingDishes(true);
+                txFetch<{ items: typeof historyOrders }>(
+                  `/api/v1/orders?table_no=${encodeURIComponent(tableNo)}&status=active&limit=5`,
+                )
+                  .then(data => {
+                    const orders = Array.isArray(data) ? data : (data as { items: typeof historyOrders }).items ?? [];
+                    if (orders.length === 0) {
+                      toastErr('未找到同桌历史订单');
+                    } else {
+                      setHistoryOrders(orders as typeof historyOrders);
+                    }
+                  })
+                  .catch((err: unknown) => {
+                    const msg = err instanceof Error ? err.message : '查询失败';
+                    toastErr(`查询失败: ${msg}`);
+                  })
+                  .finally(() => setCopyingDishes(false));
               }}
-            />
-          </div>
-          <button
-            onClick={() => {
-              if (!sourceOrderId.trim()) return;
-              // TODO: 调用 copyDishesFromOrder API
-              setActiveModal('none');
-              alert(`已从订单 ${sourceOrderId} 复制菜品`);
-            }}
-            style={{
-              width: '100%', minHeight: 56, borderRadius: 12,
-              background: C.accent, color: C.white, border: 'none',
-              fontSize: 18, fontWeight: 700, cursor: 'pointer',
-            }}
-          >
-            复制到当前订单
-          </button>
+              disabled={copyingDishes}
+              style={{
+                width: '100%', minHeight: 56, borderRadius: 12,
+                background: copyingDishes ? C.muted : C.info, color: C.white, border: 'none',
+                fontSize: 18, fontWeight: 700, cursor: copyingDishes ? 'not-allowed' : 'pointer',
+                marginBottom: 12,
+              }}
+            >
+              {copyingDishes ? '查询中...' : '查询同桌历史订单'}
+            </button>
+          )}
+
+          {/* 第二步：选择订单并复制 */}
+          {historyOrders.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {historyOrders.map(order => (
+                <button
+                  key={order.id}
+                  onClick={() => {
+                    if (copyingDishes) return;
+                    setCopyingDishes(true);
+                    // 将历史订单菜品加入购物车
+                    const newItems: CartItem[] = order.items.map(i => ({
+                      dishId: i.dish_id,
+                      name: i.dish_name,
+                      qty: i.qty,
+                      priceFen: i.price_fen,
+                      note: '',
+                    }));
+                    setCart(prev => {
+                      const merged = [...prev];
+                      newItems.forEach(ni => {
+                        const exist = merged.find(x => x.dishId === ni.dishId && !x.spec);
+                        if (exist) exist.qty += ni.qty;
+                        else merged.push(ni);
+                      });
+                      return merged;
+                    });
+                    setCopyingDishes(false);
+                    setHistoryOrders([]);
+                    setSourceOrderId(order.id);
+                    setActiveModal('none');
+                    toastOk(`已复制 ${order.items.length} 道菜品到购物车`);
+                  }}
+                  style={{
+                    padding: 14, borderRadius: 12,
+                    background: C.card, border: `1px solid ${C.border}`,
+                    cursor: 'pointer', textAlign: 'left',
+                  }}
+                >
+                  <div style={{ fontSize: 16, fontWeight: 700, color: C.white, marginBottom: 4 }}>
+                    订单 {order.id}
+                  </div>
+                  <div style={{ fontSize: 16, color: C.muted }}>
+                    {order.items.map(i => `${i.dish_name}x${i.qty}`).join(' / ')}
+                  </div>
+                </button>
+              ))}
+              <button
+                onClick={() => setHistoryOrders([])}
+                style={{
+                  minHeight: 48, borderRadius: 12,
+                  background: 'transparent', border: `1px solid ${C.border}`,
+                  color: C.muted, fontSize: 16, cursor: 'pointer',
+                }}
+              >
+                重新查询
+              </button>
+            </div>
+          )}
         </>
       ))}
 
@@ -1068,23 +1432,42 @@ export function OrderPage() {
             点击切换菜品售罄/上架状态
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {DISHES.map(dish => {
-              const available = dishAvailability[dish.id] ?? true;
+            {dishes.map(dish => {
+              const available = dishAvailability[dish.dish_id] ?? !dish.sold_out;
               return (
                 <button
-                  key={dish.id}
+                  key={dish.dish_id}
+                  disabled={togglingDishId === dish.dish_id}
                   onClick={() => {
-                    setDishAvailability(prev => ({ ...prev, [dish.id]: !prev[dish.id] }));
-                    // TODO: 调用 setDishAvailability API
+                    if (togglingDishId) return;
+                    const newVal = !dishAvailability[dish.dish_id];
+                    // 乐观更新
+                    setDishAvailability(prev => ({ ...prev, [dish.dish_id]: newVal }));
+                    setTogglingDishId(dish.dish_id);
+                    txFetch(`/api/v1/dishes/${encodeURIComponent(dish.dish_id)}/availability`, {
+                      method: 'PATCH',
+                      body: JSON.stringify({ is_available: newVal }),
+                    })
+                      .then(() => {
+                        toastOk(newVal ? `${dish.dish_name} 已恢复在售` : `${dish.dish_name} 已沽清`);
+                      })
+                      .catch((err: unknown) => {
+                        // 回滚
+                        setDishAvailability(prev => ({ ...prev, [dish.dish_id]: !newVal }));
+                        const msg = err instanceof Error ? err.message : '操作失败';
+                        toastErr(`操作失败: ${msg}`);
+                      })
+                      .finally(() => setTogglingDishId(null));
                   }}
                   style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                     padding: 14, borderRadius: 12,
                     background: C.card, border: `1px solid ${C.border}`,
-                    cursor: 'pointer', opacity: available ? 1 : 0.5,
+                    cursor: togglingDishId === dish.dish_id ? 'not-allowed' : 'pointer',
+                    opacity: (available ? 1 : 0.5) * (togglingDishId === dish.dish_id ? 0.6 : 1),
                   }}
                 >
-                  <span style={{ fontSize: 16, color: C.white }}>{dish.name}</span>
+                  <span style={{ fontSize: 16, color: C.white }}>{dish.dish_name}</span>
                   <span style={{
                     fontSize: 16, fontWeight: 700, padding: '4px 12px', borderRadius: 8,
                     background: available ? `${C.green}22` : `${C.danger}22`,
@@ -1110,19 +1493,19 @@ export function OrderPage() {
               选择菜品
             </label>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
-              {DISHES.filter(d => !d.soldOut).map(dish => (
+              {dishes.filter(d => !d.sold_out).map(dish => (
                 <button
-                  key={dish.id}
-                  onClick={() => setLimitDishId(dish.id)}
+                  key={dish.dish_id}
+                  onClick={() => setLimitDishId(dish.dish_id)}
                   style={{
                     minHeight: 48, padding: '8px 14px', borderRadius: 8,
-                    background: limitDishId === dish.id ? `${C.accent}22` : C.card,
-                    border: limitDishId === dish.id ? `2px solid ${C.accent}` : `1px solid ${C.border}`,
-                    color: limitDishId === dish.id ? C.accent : C.text,
+                    background: limitDishId === dish.dish_id ? `${C.accent}22` : C.card,
+                    border: limitDishId === dish.dish_id ? `2px solid ${C.accent}` : `1px solid ${C.border}`,
+                    color: limitDishId === dish.dish_id ? C.accent : C.text,
                     fontSize: 16, cursor: 'pointer',
                   }}
                 >
-                  {dish.name}
+                  {dish.dish_name}
                 </button>
               ))}
             </div>
@@ -1148,18 +1531,35 @@ export function OrderPage() {
               </div>
               <button
                 onClick={() => {
-                  // TODO: 调用 setDishDailyLimit API
-                  setActiveModal('none');
-                  const dish = DISHES.find(d => d.id === limitDishId);
-                  alert(`${dish?.name || limitDishId} 每日限量设为 ${limitValue || '不限'}`);
+                  if (settingLimit || !limitDishId) return;
+                  const dailyLimit = parseInt(limitValue, 10) || 0;
+                  setSettingLimit(true);
+                  txFetch(`/api/v1/dishes/${encodeURIComponent(limitDishId)}/daily-limit`, {
+                    method: 'PATCH',
+                    body: JSON.stringify({ daily_limit: dailyLimit }),
+                  })
+                    .then(() => {
+                      setActiveModal('none');
+                      const dish = dishes.find(d => d.dish_id === limitDishId);
+                      const label = dailyLimit === 0 ? '不限' : `${dailyLimit}份`;
+                      toastOk(`${dish?.dish_name || limitDishId} 每日限量已设为 ${label}`);
+                      setLimitDishId('');
+                      setLimitValue('');
+                    })
+                    .catch((err: unknown) => {
+                      const msg = err instanceof Error ? err.message : '设置失败';
+                      toastErr(`设置失败: ${msg}`);
+                    })
+                    .finally(() => setSettingLimit(false));
                 }}
+                disabled={settingLimit}
                 style={{
                   width: '100%', minHeight: 56, borderRadius: 12,
-                  background: C.accent, color: C.white, border: 'none',
-                  fontSize: 18, fontWeight: 700, cursor: 'pointer',
+                  background: settingLimit ? C.muted : C.accent, color: C.white, border: 'none',
+                  fontSize: 18, fontWeight: 700, cursor: settingLimit ? 'not-allowed' : 'pointer',
                 }}
               >
-                确认设置
+                {settingLimit ? '保存中...' : '确认设置'}
               </button>
             </>
           )}
@@ -1190,18 +1590,31 @@ export function OrderPage() {
           </div>
           <button
             onClick={() => {
-              if (!newWaiterId.trim()) return;
-              // TODO: 调用 updateOrderWaiter API
-              setActiveModal('none');
-              alert(`点菜员已更换为: ${newWaiterId}`);
+              if (!newWaiterId.trim() || updatingWaiter) return;
+              setUpdatingWaiter(true);
+              txFetch(`/api/v1/orders/${encodeURIComponent(orderId)}/waiter`, {
+                method: 'PATCH',
+                body: JSON.stringify({ waiter_id: newWaiterId.trim(), waiter_name: newWaiterId.trim() }),
+              })
+                .then(() => {
+                  setActiveModal('none');
+                  toastOk(`点菜员已更换为: ${newWaiterId}`);
+                  setNewWaiterId('');
+                })
+                .catch((err: unknown) => {
+                  const msg = err instanceof Error ? err.message : '更新失败';
+                  toastErr(`更新失败: ${msg}`);
+                })
+                .finally(() => setUpdatingWaiter(false));
             }}
+            disabled={updatingWaiter}
             style={{
               width: '100%', minHeight: 56, borderRadius: 12,
-              background: C.accent, color: C.white, border: 'none',
-              fontSize: 18, fontWeight: 700, cursor: 'pointer',
+              background: updatingWaiter ? C.muted : C.accent, color: C.white, border: 'none',
+              fontSize: 18, fontWeight: 700, cursor: updatingWaiter ? 'not-allowed' : 'pointer',
             }}
           >
-            确认更换
+            {updatingWaiter ? '更新中...' : '确认更换'}
           </button>
         </>
       ))}
@@ -1242,15 +1655,17 @@ export function OrderPage() {
                 {item.status !== 'done' && (
                   <button
                     onClick={() => handleRushTask(item.taskId)}
+                    disabled={rushingTaskId === item.taskId}
                     style={{
                       minWidth: 64, minHeight: 48, borderRadius: 10,
-                      background: item.isOvertime ? C.danger : `${C.warning}22`,
+                      background: rushingTaskId === item.taskId ? C.muted : item.isOvertime ? C.danger : `${C.warning}22`,
                       border: item.isOvertime ? 'none' : `1px solid ${C.warning}`,
                       color: item.isOvertime ? C.white : C.warning,
-                      fontSize: 16, fontWeight: 700, cursor: 'pointer',
+                      fontSize: 16, fontWeight: 700,
+                      cursor: rushingTaskId === item.taskId ? 'not-allowed' : 'pointer',
                     }}
                   >
-                    催菜
+                    {rushingTaskId === item.taskId ? '催...' : '催菜'}
                   </button>
                 )}
               </div>
@@ -1266,6 +1681,28 @@ export function OrderPage() {
           </div>
         </>
       ))}
+
+      {/* ===== Toast 通知层 ===== */}
+      <div style={{
+        position: 'fixed', top: 16, left: '50%', transform: 'translateX(-50%)',
+        zIndex: 9999, display: 'flex', flexDirection: 'column', gap: 8,
+        pointerEvents: 'none', minWidth: 240, maxWidth: '90vw',
+      }}>
+        {toasts.map(t => (
+          <div
+            key={t.id}
+            style={{
+              padding: '12px 20px', borderRadius: 12,
+              background: t.color === C.green ? '#14532d' : '#450a0a',
+              border: `1px solid ${t.color}`,
+              color: t.color, fontSize: 16, fontWeight: 600,
+              textAlign: 'center', boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+            }}
+          >
+            {t.text}
+          </div>
+        ))}
+      </div>
 
       {/* ===== D. 快捷结账弹窗 ===== */}
       {renderOverlay(activeModal === 'checkout', () => { if (!checkoutProcessing) { setActiveModal('none'); setCheckoutDone(false); } }, (

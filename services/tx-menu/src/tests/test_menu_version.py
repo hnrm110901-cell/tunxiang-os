@@ -13,11 +13,11 @@ import uuid
 
 import pytest
 
+from ..services.menu_dispatch_service import MenuDispatchService
 from ..services.menu_version_service import (
     MenuVersionService,
     _clear_all,
 )
-from ..services.menu_dispatch_service import MenuDispatchService
 
 # ─── 常量 ───
 

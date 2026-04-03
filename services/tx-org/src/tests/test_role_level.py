@@ -1,6 +1,6 @@
 """角色级别体系测试"""
-import sys
 import os
+import sys
 
 # 项目根目录（让 shared.ontology.src.base 可被解析）
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "..", "..", ".."))
@@ -9,7 +9,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from fastapi.testclient import TestClient
 from main import app
-
 from models.role_level import check_role_permission
 
 client = TestClient(app)

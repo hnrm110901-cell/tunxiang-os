@@ -13,20 +13,19 @@
 
 from __future__ import annotations
 
-import sys
 import os
+import sys
 
 # 确保 src 目录在导入路径中
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-import pytest
 from uuid import uuid4
 
-from services.social_insurance import SocialInsuranceCalculator, CITY_RATES
-from services.income_tax import IncomeTaxCalculator, TAX_BRACKETS, BASIC_DEDUCTION
+import pytest
+from models.payroll_record import PayrollRecordStatus
+from services.income_tax import IncomeTaxCalculator
 from services.payroll_engine_v2 import PayrollEngine
-from models.payroll_record import PayrollRecord, PayrollRecordStatus
-
+from services.social_insurance import SocialInsuranceCalculator
 
 # ── 测试数据常量 ────────────────────────────────────────────────────────────
 

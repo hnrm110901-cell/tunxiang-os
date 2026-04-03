@@ -4,13 +4,13 @@
 # from .api.dispatch_code_routes import router as dispatch_code_router
 # app.include_router(dispatch_code_router, prefix="/api/v1/dispatch-codes")
 """
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+
 from ..services.dispatch_code_service import DispatchCodeService
 
 router = APIRouter(tags=["dispatch-codes"])

@@ -3,11 +3,11 @@
 测试链路：开单 → 加菜 → 改菜 → 折扣 → 结算 → 支付 → 退款
 不依赖真实数据库，使用 mock AsyncSession。
 """
-import sys
-import os
 import asyncio
+import os
+import sys
 import uuid
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 # import via package to support relative imports within src/
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", ".."))

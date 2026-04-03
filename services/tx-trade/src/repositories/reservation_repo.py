@@ -7,10 +7,10 @@
 import uuid
 from typing import Optional
 
-from sqlalchemy import select, and_, func
+from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models.reservation import Reservation, NoShowRecord
+from ..models.reservation import NoShowRecord, Reservation
 
 
 class ReservationRepository:
@@ -127,6 +127,59 @@ class ReservationRepository:
         )
         result = await self.db.execute(stmt)
         return list(result.scalars().all())
+
+    async def find_by_platform_order_id(
+        self,
+        source_channel: str,
+        platform_order_id: str,
+    ) -> Optional[Reservation]:
+        """通过平台渠道 + 平台订单号查找已有预订（去重用）"""
+        stmt = select(Reservation).where(
+            and_(
+                Reservation.tenant_id == self.tenant_id,
+                Reservation.source_channel == source_channel,
+                Reservation.platform_order_id == platform_order_id,
+                Reservation.is_deleted.is_(False),
+            )
+        )
+        result = await self.db.execute(stmt)
+        return result.scalar_one_or_none()
+
+    async def list_by_store_channel(
+        self,
+        store_id: str,
+        date: Optional[str] = None,
+        status_list: Optional[list[str]] = None,
+        source_channel: Optional[str] = None,
+        offset: int = 0,
+        limit: int = 50,
+    ) -> tuple[list[Reservation], int]:
+        """按门店+渠道查询预订列表（分页），支持多状态筛选"""
+        store_uuid = uuid.UUID(store_id)
+        conditions = [
+            Reservation.tenant_id == self.tenant_id,
+            Reservation.store_id == store_uuid,
+            Reservation.is_deleted.is_(False),
+        ]
+        if date:
+            conditions.append(Reservation.date == date)
+        if status_list:
+            conditions.append(Reservation.status.in_(status_list))
+        if source_channel:
+            conditions.append(Reservation.source_channel == source_channel)
+
+        count_stmt = select(func.count()).select_from(Reservation).where(and_(*conditions))
+        total = (await self.db.execute(count_stmt)).scalar_one()
+
+        stmt = (
+            select(Reservation)
+            .where(and_(*conditions))
+            .order_by(Reservation.date, Reservation.time)
+            .offset(offset)
+            .limit(limit)
+        )
+        result = await self.db.execute(stmt)
+        return list(result.scalars().all()), total
 
     async def add_no_show_record(self, phone: str, reservation_id: str) -> None:
         """添加爽约记录"""

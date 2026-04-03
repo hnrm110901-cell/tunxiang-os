@@ -8,8 +8,9 @@
 """
 import statistics
 from typing import Any
-from ..base import SkillAgent, AgentResult
-from ..memory_bus import MemoryBus, Finding
+
+from ..base import AgentResult, SkillAgent
+from ..memory_bus import Finding, MemoryBus
 
 
 class ServeDispatchAgent(SkillAgent):

@@ -1,58 +1,165 @@
-.container { padding: 0; background: #0B1A20; min-height: 100vh; color: #fff; }
+.container { padding: 0; background: #0B1A20; min-height: 100vh; color: #fff; padding-bottom: 60rpx; }
 
 /* 顶部横幅 */
-.hero-banner { background: linear-gradient(135deg, #FF6B2C, #E55A28); padding: 60rpx 32rpx 48rpx; }
-.hero-title { font-size: 44rpx; font-weight: bold; display: block; }
-.hero-subtitle { font-size: 26rpx; color: rgba(255,255,255,0.85); margin-top: 12rpx; display: block; }
+.hero-banner {
+  background: linear-gradient(135deg, #FF6B35, #FF8C5A);
+  padding: 48rpx 32rpx 36rpx;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.hero-text { display: flex; flex-direction: column; gap: 10rpx; }
+.hero-title { font-size: 44rpx; font-weight: bold; color: #fff; display: block; }
+.hero-subtitle { font-size: 26rpx; color: rgba(255,255,255,0.9); display: block; }
+.hero-deco { font-size: 80rpx; }
 
-/* 通用 section */
-.section { padding: 32rpx; }
-.section-title { font-size: 32rpx; font-weight: bold; display: block; margin-bottom: 24rpx; }
+/* 地址/搜索栏 */
+.search-bar { padding: 20rpx 32rpx; background: #112228; }
+.location-row {
+  display: flex;
+  align-items: center;
+  background: #1a2a33;
+  border-radius: 16rpx;
+  padding: 20rpx 24rpx;
+  gap: 12rpx;
+}
+.location-icon { font-size: 28rpx; }
+.location-text { flex: 1; font-size: 28rpx; color: #ccc; }
+.location-arrow { font-size: 32rpx; color: #FF6B35; font-weight: bold; }
+
+/* 日期筛选 */
+.date-filter-wrap { padding: 20rpx 0 0; background: #112228; border-bottom: 1rpx solid #1a2a33; }
+.date-scroll { width: 100%; }
+.date-list { display: flex; padding: 0 24rpx 20rpx; white-space: nowrap; }
+.date-item {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 100rpx;
+  margin-right: 16rpx;
+  padding: 16rpx 20rpx;
+  border-radius: 16rpx;
+  background: #1a2a33;
+  gap: 6rpx;
+}
+.date-item.active { background: #FF6B35; }
+.date-weekday { font-size: 22rpx; color: #999; }
+.date-item.active .date-weekday { color: rgba(255,255,255,0.8); }
+.date-day { font-size: 32rpx; font-weight: bold; color: #fff; }
+.date-month { font-size: 20rpx; color: #666; }
+.date-item.active .date-month { color: rgba(255,255,255,0.7); }
 
 /* 菜系筛选 */
-.cuisine-filter { white-space: nowrap; padding-bottom: 8rpx; }
-.cuisine-item { display: inline-block; padding: 14rpx 28rpx; background: #1a2a33; border-radius: 24rpx; font-size: 26rpx; color: #999; margin-right: 16rpx; }
-.cuisine-item.active { background: #FF6B2C; color: #fff; }
+.cuisine-filter-wrap { padding: 20rpx 0; background: #0B1A20; }
+.cuisine-filter { white-space: nowrap; padding: 0 24rpx; }
+.cuisine-item {
+  display: inline-block;
+  padding: 14rpx 28rpx;
+  background: #1a2a33;
+  border-radius: 24rpx;
+  font-size: 26rpx;
+  color: #999;
+  margin-right: 16rpx;
+}
+.cuisine-item.active { background: #FF6B35; color: #fff; }
+
+/* 厨师列表 */
+.chef-list-wrap { padding: 0 32rpx; }
+
+.loading-tip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 80rpx 0;
+  color: #999;
+  font-size: 28rpx;
+  gap: 20rpx;
+}
+.loading-spinner {
+  width: 60rpx;
+  height: 60rpx;
+  border-radius: 50%;
+  border: 4rpx solid #1a2a33;
+  border-top-color: #FF6B35;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.error-tip { display: flex; flex-direction: column; align-items: center; padding: 80rpx 0; gap: 24rpx; }
+.error-text { font-size: 28rpx; color: #999; }
+.retry-btn { padding: 16rpx 48rpx; background: #FF6B35; color: #fff; border-radius: 44rpx; font-size: 28rpx; }
+
+.empty-tip { display: flex; flex-direction: column; align-items: center; padding: 80rpx 0; gap: 16rpx; }
+.empty-icon { font-size: 80rpx; }
+.empty-text { font-size: 30rpx; color: #fff; font-weight: 500; }
+.empty-sub { font-size: 26rpx; color: #666; }
 
 /* 厨师卡片 */
-.chef-section { padding: 0 32rpx 32rpx; }
-.chef-card { background: #112228; border-radius: 24rpx; padding: 28rpx; margin-bottom: 24rpx; display: flex; align-items: flex-start; position: relative; border: 2rpx solid transparent; }
-.chef-card.selected { border-color: #FF6B2C; }
-.chef-avatar { width: 120rpx; height: 120rpx; border-radius: 16rpx; margin-right: 24rpx; flex-shrink: 0; background: #1a2a33; }
-.chef-info { flex: 1; min-width: 0; }
-.chef-name-row { display: flex; align-items: center; margin-bottom: 12rpx; }
-.chef-name { font-size: 30rpx; font-weight: bold; margin-right: 12rpx; }
-.chef-title { font-size: 22rpx; color: #FF6B2C; background: rgba(255,107,44,0.15); padding: 4rpx 12rpx; border-radius: 8rpx; }
-.chef-tags { display: flex; flex-wrap: wrap; gap: 8rpx; margin-bottom: 12rpx; }
-.chef-tag { font-size: 22rpx; color: #999; background: #1a2a33; padding: 4rpx 12rpx; border-radius: 8rpx; }
-.chef-stats { display: flex; gap: 20rpx; font-size: 24rpx; color: #999; margin-bottom: 8rpx; }
+.chef-card {
+  display: flex;
+  align-items: flex-start;
+  background: #112228;
+  border-radius: 24rpx;
+  padding: 28rpx;
+  margin-bottom: 24rpx;
+  margin-top: 20rpx;
+  gap: 20rpx;
+}
+
+.chef-avatar {
+  width: 120rpx;
+  height: 120rpx;
+  border-radius: 16rpx;
+  flex-shrink: 0;
+  background: #1a2a33;
+}
+
+.chef-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 10rpx; }
+
+.chef-name-row { display: flex; align-items: center; gap: 12rpx; }
+.chef-name { font-size: 30rpx; font-weight: bold; color: #fff; }
+.chef-title-badge {
+  font-size: 20rpx;
+  color: #FF6B35;
+  background: rgba(255,107,53,0.15);
+  padding: 4rpx 12rpx;
+  border-radius: 8rpx;
+  flex-shrink: 0;
+}
+
+.chef-tags { display: flex; flex-wrap: wrap; gap: 8rpx; }
+.chef-tag {
+  font-size: 22rpx;
+  color: #999;
+  background: #1a2a33;
+  padding: 4rpx 12rpx;
+  border-radius: 8rpx;
+}
+
+.chef-stats-row { display: flex; align-items: center; gap: 8rpx; font-size: 24rpx; color: #999; }
 .chef-rating { color: #FFC832; }
+.chef-dot { color: #333; }
+
 .chef-specialties { font-size: 24rpx; color: #666; }
-.chef-select-icon { position: absolute; top: 20rpx; right: 20rpx; width: 44rpx; height: 44rpx; background: #FF6B2C; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24rpx; }
-.chef-detail-btn { position: absolute; bottom: 20rpx; right: 20rpx; font-size: 24rpx; color: #FF6B2C; padding: 8rpx 16rpx; }
 
-.loading-tip, .empty-tip { text-align: center; color: #666; font-size: 28rpx; padding: 60rpx 0; }
+.chef-price-row { display: flex; align-items: center; gap: 12rpx; }
+.chef-fee-label { font-size: 22rpx; color: #999; }
+.chef-fee { font-size: 26rpx; color: #FF6B35; font-weight: bold; }
+.chef-distance { font-size: 22rpx; color: #666; margin-left: auto; }
 
-/* 菜品列表 */
-.dish-list { display: flex; flex-direction: column; gap: 20rpx; }
-.dish-card { background: #112228; border-radius: 16rpx; padding: 20rpx; display: flex; align-items: center; }
-.dish-image { width: 100rpx; height: 100rpx; border-radius: 12rpx; margin-right: 20rpx; flex-shrink: 0; background: #1a2a33; }
-.dish-info { flex: 1; min-width: 0; }
-.dish-name { font-size: 28rpx; display: block; margin-bottom: 8rpx; }
-.dish-price { font-size: 28rpx; color: #FF6B2C; font-weight: bold; }
+/* 预约按钮（右侧竖向） */
+.chef-book-btn {
+  flex-shrink: 0;
+  background: #FF6B35;
+  color: #fff;
+  font-size: 24rpx;
+  font-weight: 600;
+  padding: 16rpx 20rpx;
+  border-radius: 12rpx;
+  text-align: center;
+  align-self: center;
+  writing-mode: vertical-rl;
+  letter-spacing: 4rpx;
+}
 
-/* 步进器 */
-.dish-stepper { display: flex; align-items: center; flex-shrink: 0; }
-.stepper-btn { width: 52rpx; height: 52rpx; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 32rpx; text-align: center; line-height: 52rpx; }
-.stepper-btn.minus { background: #1a2a33; color: #FF6B2C; }
-.stepper-btn.minus.disabled { opacity: 0.3; }
-.stepper-btn.plus { background: #FF6B2C; color: #fff; }
-.stepper-value { font-size: 28rpx; margin: 0 16rpx; min-width: 36rpx; text-align: center; }
-
-/* 底部栏 */
-.bottom-spacer { height: 140rpx; }
-.bottom-bar { position: fixed; bottom: 0; left: 0; right: 0; height: 120rpx; background: #112228; display: flex; align-items: center; justify-content: space-between; padding: 0 32rpx; border-top: 1rpx solid #1a2a33; z-index: 100; }
-.bar-info { display: flex; flex-direction: column; }
-.bar-count { font-size: 28rpx; color: #fff; }
-.bar-price { font-size: 24rpx; color: #FF6B2C; margin-top: 4rpx; }
-.bar-btn { background: #FF6B2C; color: #fff; padding: 20rpx 48rpx; border-radius: 44rpx; font-size: 30rpx; font-weight: bold; }
+.bottom-spacer { height: 60rpx; }

@@ -11,15 +11,13 @@
 - 端到端：竞对动态 → 情报检测 → 试点建议
 """
 import pytest
-
-from services.competitor_monitor import CompetitorMonitorService, MONITOR_DIMENSIONS
-from services.consumer_insight import ConsumerInsightService, INSIGHT_CATEGORIES
-from services.review_topic_engine import ReviewTopicEngine, TOPIC_TYPES
+from services.competitor_monitor import CompetitorMonitorService
+from services.consumer_insight import ConsumerInsightService
+from services.intel_report_engine import IntelReportEngine
 from services.new_product_radar import NewProductRadar
-from services.pricing_insight import PricingInsightService
-from services.intel_report_engine import IntelReportEngine, REPORT_TYPES
 from services.pilot_suggestion import PilotSuggestionService
-
+from services.pricing_insight import PricingInsightService
+from services.review_topic_engine import ReviewTopicEngine
 
 # ═══════════════════════════════════════
 # 竞对监测测试
@@ -919,7 +917,7 @@ class TestEndToEnd:
             source_id=threat_action_id,
             suggestion_type="competitor_response",
             title="长沙核心商圈防御性活动",
-            description=f"费大厨长沙新开3店，需要在周边门店启动防御性营销",
+            description="费大厨长沙新开3店，需要在周边门店启动防御性营销",
             recommended_stores=["S001", "S002", "S003"],
             period_days=30,
             success_metrics=[

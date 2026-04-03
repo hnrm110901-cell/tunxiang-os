@@ -10,30 +10,28 @@
 7. 跨夜班时间窗口计算正确
 8. 空任务列表时统计数值为0/0.0
 """
-import sys
 import os
+import sys
 
 # 将 tx-trade/src 加入 sys.path，使 import services.xxx 可以工作
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 import uuid
 from datetime import date, datetime, time, timedelta
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-
 from services.shift_report import (
-    ShiftReportService,
-    ShiftSummary,
+    DeptComparison,
     DeptStats,
     OperatorStats,
-    DeptComparison,
-    _shift_window,
+    ShiftReportService,
+    ShiftSummary,
     _aggregate_tasks,
     _group_by_dept,
     _group_by_operator,
+    _shift_window,
 )
-
 
 # ─── 测试工具 ────────────────────────────────────────────────────────────────
 

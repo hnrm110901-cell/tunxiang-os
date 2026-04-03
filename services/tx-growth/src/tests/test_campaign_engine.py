@@ -16,26 +16,25 @@
 13. 报名抽奖 (报名+开奖)
 14. 活动效果分析
 """
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import pytest
+from campaigns.lottery import draw_prize, validate_prizes
+from campaigns.points_exchange import execute as points_execute
+from campaigns.report_draw import clear_report_entries
+from campaigns.report_draw import execute as report_execute
+from campaigns.sign_in import execute as sign_in_execute
+from campaigns.stored_value_gift import execute as sv_execute
 from services.campaign_engine import (
     CampaignEngine,
-    TriggerEngine,
     RewardEngine,
-    clear_all_campaigns,
+    TriggerEngine,
     _campaigns,
+    clear_all_campaigns,
 )
-from campaigns.lottery import validate_prizes, draw_prize
-from campaigns.stored_value_gift import execute as sv_execute
-from campaigns.referral import execute as referral_execute
-from campaigns.report_draw import execute as report_execute, clear_report_entries
-from campaigns.sign_in import execute as sign_in_execute
-from campaigns.spend_reward import execute as spend_execute
-from campaigns.points_exchange import execute as points_execute
 
 TENANT = "tenant-xuji"
 

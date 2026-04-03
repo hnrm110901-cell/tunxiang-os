@@ -1,0 +1,3 @@
+// android-shell/settings.gradle
+rootProject.name = "tunxiang-pos"
+include ':app'

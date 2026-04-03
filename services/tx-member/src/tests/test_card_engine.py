@@ -1,13 +1,12 @@
 """会员卡引擎测试 — API 冒烟 + 服务逻辑单元测试"""
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+from api.card_routes import router as card_router
 from fastapi.testclient import TestClient
 from main import app
-
-from api.card_routes import router as card_router
 
 if not any(r.prefix == "/api/v1/member/card" for r in app.routes if hasattr(r, "prefix")):
     app.include_router(card_router)
@@ -160,15 +159,15 @@ class TestBatchOperationsAPI:
 # ── 服务层纯函数单元测试 ─────────────────────────────────────
 
 from services.card_engine import (
-    validate_level_rules,
-    check_upgrade_eligible,
+    BATCH_OP_TYPES,
+    MEMBER_DAY_TYPES,
+    UPGRADE_CRITERIA,
     check_downgrade_eligible,
-    validate_member_day_config,
+    check_upgrade_eligible,
     resolve_store_benefits,
     validate_batch_operations,
-    UPGRADE_CRITERIA,
-    MEMBER_DAY_TYPES,
-    BATCH_OP_TYPES,
+    validate_level_rules,
+    validate_member_day_config,
 )
 
 

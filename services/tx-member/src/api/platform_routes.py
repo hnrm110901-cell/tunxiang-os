@@ -15,10 +15,10 @@ from typing import Any, Literal, Optional
 import structlog
 from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel, field_validator
+from services.platform_binding_service import PlatformBindingService
 from sqlalchemy.exc import IntegrityError
 
 from shared.ontology.src.database import get_db_with_tenant
-from services.platform_binding_service import PlatformBindingService
 
 logger = structlog.get_logger()
 router = APIRouter(prefix="/api/v1/member/platform", tags=["platform-binding"])

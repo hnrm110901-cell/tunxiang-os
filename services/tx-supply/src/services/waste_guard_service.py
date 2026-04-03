@@ -7,7 +7,6 @@
 """
 from typing import Optional
 
-
 # ─── 根因 → 行动建议映射表 ───
 
 ROOT_CAUSE_ACTIONS: dict[str, str] = {

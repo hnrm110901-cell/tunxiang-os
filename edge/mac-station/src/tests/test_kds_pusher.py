@@ -2,13 +2,11 @@
 KDS Pusher 测试
 覆盖连接管理、票据推送、催菜广播、订单拆分
 """
-import pytest
-import asyncio
-import json
-from unittest.mock import AsyncMock, MagicMock
-
-import sys
 import os
+import sys
+from unittest.mock import AsyncMock
+
+import pytest
 
 # 将 mac-station/src 加入搜索路径
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))

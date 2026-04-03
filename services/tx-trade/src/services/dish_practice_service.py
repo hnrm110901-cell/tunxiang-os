@@ -7,7 +7,6 @@
 所有金额单位：分（fen）。
 """
 import uuid
-from typing import Optional
 
 import structlog
 

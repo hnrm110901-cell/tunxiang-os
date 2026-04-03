@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 import uuid
-from datetime import datetime, timezone, timedelta, date
+from datetime import date, datetime, timedelta, timezone
 from typing import Any, Optional
 
 import structlog
@@ -1159,7 +1159,6 @@ async def purchase_annual_card(
     if not plan:
         raise ValueError(f"invalid_plan_id:{plan_id}")
 
-    import json as _json
     existing = await db.execute(
         text("""
             SELECT id FROM premium_cards

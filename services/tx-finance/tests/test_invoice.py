@@ -9,33 +9,32 @@
   6. 发票金额与订单金额校验（防止异常）
   7. tenant_id 隔离
 """
+import os
+
+# ── 路径适配（CI 环境下直接 import service 层）────────────────────────────────
+import sys
 import uuid
 from decimal import Decimal
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import pytest_asyncio
-from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-# ── 路径适配（CI 环境下直接 import service 层）────────────────────────────────
-import sys
-import os
-
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-from models.invoice import Invoice
 from models.cost_snapshot import Base
+from models.invoice import Invoice
 from services.invoice_service import (
     InvoiceAmountMismatchError,
     InvoiceNotFoundError,
     InvoiceService,
     InvoiceStatusError,
-    _invoice_to_dict,
 )
+
 from shared.adapters.nuonuo.src.invoice_client import NuonuoInvoiceClient, NuonuoResponse
 
 # ── 夹具：内存 SQLite DB（仅测试用，生产使用 PostgreSQL）────────────────────────

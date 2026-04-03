@@ -4,9 +4,8 @@
 """
 import pytest
 from agents.skills.enterprise_activation import EnterpriseActivationAgent
-from agents.skills.smart_customer_service import SmartCustomerServiceAgent
 from agents.skills.growth_attribution import GrowthAttributionAgent
-
+from agents.skills.smart_customer_service import SmartCustomerServiceAgent
 
 TENANT_ID = "test-tenant-001"
 STORE_ID = "store-001"

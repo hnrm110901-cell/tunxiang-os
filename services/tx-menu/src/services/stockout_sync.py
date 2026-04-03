@@ -7,11 +7,14 @@
 
 菜品状态: sold_out ↔ active
 """
+import asyncio
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
 import structlog
+
+from shared.events import MenuEventType, UniversalPublisher
 
 log = structlog.get_logger()
 
@@ -85,6 +88,16 @@ def mark_sold_out(
         store_id=store_id,
         reason=reason,
     )
+
+    asyncio.create_task(UniversalPublisher.publish(
+        event_type=MenuEventType.DISH_SOLDOUT,
+        tenant_id=uuid.UUID(tenant_id),
+        store_id=uuid.UUID(store_id),
+        entity_id=uuid.UUID(dish_id),
+        event_data={"dish_id": dish_id, "store_id": store_id},
+        source_service="tx-menu",
+    ))
+
     return record
 
 

@@ -6,11 +6,11 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, date, timezone
-from typing import Any, Optional
+from datetime import datetime, timezone
+from typing import Any
 
 import structlog
-from sqlalchemy import select, func, and_, text, extract
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.entities import Employee, Order, OrderItem
@@ -29,10 +29,6 @@ TRAINING_STATUS_IN_PROGRESS = "in_progress"
 TRAINING_STATUS_COMPLETED = "completed"
 TRAINING_STATUS_FAILED = "failed"
 
-# ── 内存培训存储（轻量模拟） ──────────────────────────────────
-_training_store: dict[str, list[dict]] = {}  # key: f"{tenant_id}:{employee_id}"
-
-
 def _to_uuid(val: str) -> uuid.UUID:
     return uuid.UUID(val)
 
@@ -43,10 +39,6 @@ async def _set_tenant(db: AsyncSession, tenant_id: str) -> None:
         text("SELECT set_config('app.tenant_id', :tid, true)"),
         {"tid": tenant_id},
     )
-
-
-def _training_key(employee_id: str, tenant_id: str) -> str:
-    return f"{tenant_id}:{employee_id}"
 
 
 # ── 1. 业绩归因 ─────────────────────────────────────────────
@@ -302,56 +294,58 @@ async def manage_training(
         {training_id, status, message}
     """
     await _set_tenant(db, tenant_id)
-    key = _training_key(employee_id, tenant_id)
     action = training_plan.get("action", "assign")
     course_id = training_plan.get("course_id", str(uuid.uuid4()))
     course_name = training_plan.get("course_name", "未命名课程")
     category = training_plan.get("category", "service")
-    now = datetime.now(timezone.utc).isoformat()
-
-    if key not in _training_store:
-        _training_store[key] = []
-
-    trainings = _training_store[key]
+    eid = _to_uuid(employee_id)
+    tid = _to_uuid(tenant_id)
+    now = datetime.now(timezone.utc)
 
     if action == "assign":
-        # 分配新培训
-        training_id = str(uuid.uuid4())
-        record = {
-            "training_id": training_id,
-            "course_id": course_id,
-            "course_name": course_name,
-            "category": category,
-            "status": TRAINING_STATUS_PENDING,
-            "assigned_at": now,
-            "started_at": None,
-            "completed_at": None,
-            "score": None,
-            "certificate_id": None,
-            "pass_threshold": training_plan.get("pass_threshold", 60),
-        }
-        trainings.append(record)
-        _training_store[key] = trainings
-
-        logger.info(
-            "training_assigned",
-            employee_id=employee_id,
-            training_id=training_id,
-            course_name=course_name,
-            tenant_id=tenant_id,
+        training_id = uuid.uuid4()
+        await db.execute(
+            text("""
+                INSERT INTO employee_trainings
+                    (id, tenant_id, employee_id, course_id, course_name, category,
+                     status, pass_threshold, assigned_at, created_at, updated_at)
+                VALUES
+                    (:id, :tid, :eid, :course_id, :course_name, :category,
+                     'pending', :pass_threshold, :now, :now, :now)
+            """),
+            {
+                "id": training_id,
+                "tid": tid,
+                "eid": eid,
+                "course_id": course_id,
+                "course_name": course_name,
+                "category": category,
+                "pass_threshold": training_plan.get("pass_threshold", 60),
+                "now": now,
+            },
         )
+        await db.flush()
+        logger.info("training_assigned", employee_id=employee_id,
+                    training_id=str(training_id), course_name=course_name,
+                    tenant_id=tenant_id)
         return {
-            "training_id": training_id,
+            "training_id": str(training_id),
             "status": TRAINING_STATUS_PENDING,
             "message": f"已分配培训课程: {course_name}",
         }
 
     # 查找已有培训记录
-    existing = None
-    for t in trainings:
-        if t["course_id"] == course_id:
-            existing = t
-            break
+    row_result = await db.execute(
+        text("""
+            SELECT id, status, pass_threshold, score, course_name
+            FROM employee_trainings
+            WHERE tenant_id = :tid AND employee_id = :eid AND course_id = :course_id
+            ORDER BY assigned_at DESC
+            LIMIT 1
+        """),
+        {"tid": tid, "eid": eid, "course_id": course_id},
+    )
+    existing = row_result.fetchone()
 
     if not existing:
         return {
@@ -360,24 +354,28 @@ async def manage_training(
             "message": f"未找到课程 {course_id} 的培训记录",
         }
 
+    training_id_str = str(existing.id)
+
     if action == "complete":
         score = training_plan.get("score", 0)
-        pass_threshold = existing.get("pass_threshold", 60)
-        if score >= pass_threshold:
-            existing["status"] = TRAINING_STATUS_COMPLETED
-            existing["completed_at"] = now
-            existing["score"] = score
-            msg = f"培训完成: {course_name}, 得分{score}"
-        else:
-            existing["status"] = TRAINING_STATUS_FAILED
-            existing["completed_at"] = now
-            existing["score"] = score
-            msg = f"培训未通过: {course_name}, 得分{score}, 及格线{pass_threshold}"
-
+        pass_threshold = existing.pass_threshold or 60
+        new_status = TRAINING_STATUS_COMPLETED if score >= pass_threshold else TRAINING_STATUS_FAILED
+        msg = (
+            f"培训完成: {existing.course_name}, 得分{score}"
+            if new_status == TRAINING_STATUS_COMPLETED
+            else f"培训未通过: {existing.course_name}, 得分{score}, 及格线{pass_threshold}"
+        )
+        await db.execute(
+            text("""
+                UPDATE employee_trainings
+                SET status = :status, score = :score, completed_at = :now, updated_at = :now
+                WHERE id = :id AND tenant_id = :tid
+            """),
+            {"status": new_status, "score": score, "now": now,
+             "id": existing.id, "tid": tid},
+        )
         # 更新 Employee 的 training_completed 列表
-        if existing["status"] == TRAINING_STATUS_COMPLETED:
-            eid = _to_uuid(employee_id)
-            tid = _to_uuid(tenant_id)
+        if new_status == TRAINING_STATUS_COMPLETED:
             emp_result = await db.execute(
                 select(Employee)
                 .where(Employee.id == eid)
@@ -389,36 +387,28 @@ async def manage_training(
                 if course_id not in completed:
                     completed.append(course_id)
                     emp.training_completed = completed
-                    await db.flush()
-
-        logger.info(
-            "training_completed",
-            employee_id=employee_id,
-            course_id=course_id,
-            score=score,
-            passed=existing["status"] == TRAINING_STATUS_COMPLETED,
-            tenant_id=tenant_id,
-        )
-        return {
-            "training_id": existing["training_id"],
-            "status": existing["status"],
-            "message": msg,
-        }
+        await db.flush()
+        logger.info("training_completed", employee_id=employee_id,
+                    course_id=course_id, score=score,
+                    passed=new_status == TRAINING_STATUS_COMPLETED,
+                    tenant_id=tenant_id)
+        return {"training_id": training_id_str, "status": new_status, "message": msg}
 
     elif action == "certify":
         cert_id = training_plan.get("certificate_id", str(uuid.uuid4()))
-        existing["certificate_id"] = cert_id
-        existing["status"] = TRAINING_STATUS_COMPLETED
-
-        logger.info(
-            "training_certified",
-            employee_id=employee_id,
-            course_id=course_id,
-            certificate_id=cert_id,
-            tenant_id=tenant_id,
+        await db.execute(
+            text("""
+                UPDATE employee_trainings
+                SET status = 'completed', certificate_id = :cert_id, updated_at = :now
+                WHERE id = :id AND tenant_id = :tid
+            """),
+            {"cert_id": cert_id, "now": now, "id": existing.id, "tid": tid},
         )
+        await db.flush()
+        logger.info("training_certified", employee_id=employee_id,
+                    course_id=course_id, certificate_id=cert_id, tenant_id=tenant_id)
         return {
-            "training_id": existing["training_id"],
+            "training_id": training_id_str,
             "status": TRAINING_STATUS_COMPLETED,
             "message": f"已颁发认证: {cert_id}",
             "certificate_id": cert_id,
@@ -445,17 +435,46 @@ async def get_training_progress(
         {completed, in_progress, pending, failed, total, completion_rate, trainings}
     """
     await _set_tenant(db, tenant_id)
-    key = _training_key(employee_id, tenant_id)
-    trainings = _training_store.get(key, [])
+    eid = _to_uuid(employee_id)
+    tid = _to_uuid(tenant_id)
 
-    completed = [t for t in trainings if t["status"] == TRAINING_STATUS_COMPLETED]
-    in_progress = [t for t in trainings if t["status"] == TRAINING_STATUS_IN_PROGRESS]
-    pending = [t for t in trainings if t["status"] == TRAINING_STATUS_PENDING]
-    failed = [t for t in trainings if t["status"] == TRAINING_STATUS_FAILED]
+    result = await db.execute(
+        text("""
+            SELECT id, course_id, course_name, category, status,
+                   pass_threshold, score, certificate_id,
+                   assigned_at, started_at, completed_at
+            FROM employee_trainings
+            WHERE tenant_id = :tid AND employee_id = :eid
+            ORDER BY assigned_at DESC
+        """),
+        {"tid": tid, "eid": eid},
+    )
+    rows = result.fetchall()
+
+    trainings = [
+        {
+            "training_id": str(r.id),
+            "course_id": r.course_id,
+            "course_name": r.course_name,
+            "category": r.category,
+            "status": r.status,
+            "pass_threshold": r.pass_threshold,
+            "score": r.score,
+            "certificate_id": r.certificate_id,
+            "assigned_at": r.assigned_at.isoformat() if r.assigned_at else None,
+            "started_at": r.started_at.isoformat() if r.started_at else None,
+            "completed_at": r.completed_at.isoformat() if r.completed_at else None,
+        }
+        for r in rows
+    ]
+
+    cnt_completed = sum(1 for t in trainings if t["status"] == TRAINING_STATUS_COMPLETED)
+    cnt_in_progress = sum(1 for t in trainings if t["status"] == TRAINING_STATUS_IN_PROGRESS)
+    cnt_pending = sum(1 for t in trainings if t["status"] == TRAINING_STATUS_PENDING)
+    cnt_failed = sum(1 for t in trainings if t["status"] == TRAINING_STATUS_FAILED)
     total = len(trainings)
-    completion_rate = round(len(completed) / max(total, 1), 4)
+    completion_rate = round(cnt_completed / max(total, 1), 4)
 
-    # 按类别汇总
     by_category: dict[str, dict] = {}
     for t in trainings:
         cat = t.get("category", "other")
@@ -465,21 +484,16 @@ async def get_training_progress(
         if t["status"] == TRAINING_STATUS_COMPLETED:
             by_category[cat]["completed"] += 1
 
-    logger.info(
-        "training_progress_queried",
-        employee_id=employee_id,
-        total=total,
-        completed=len(completed),
-        completion_rate=completion_rate,
-        tenant_id=tenant_id,
-    )
+    logger.info("training_progress_queried", employee_id=employee_id,
+                total=total, completed=cnt_completed,
+                completion_rate=completion_rate, tenant_id=tenant_id)
 
     return {
         "employee_id": employee_id,
-        "completed": len(completed),
-        "in_progress": len(in_progress),
-        "pending": len(pending),
-        "failed": len(failed),
+        "completed": cnt_completed,
+        "in_progress": cnt_in_progress,
+        "pending": cnt_pending,
+        "failed": cnt_failed,
         "total": total,
         "completion_rate": completion_rate,
         "by_category": by_category,

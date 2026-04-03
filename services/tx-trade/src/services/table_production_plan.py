@@ -11,15 +11,18 @@
   - 不硬编码密钥
   - 异常用 structlog 记录，不静默吞没
 """
+import json
 import uuid
-from dataclasses import dataclass, field
-from datetime import datetime, timezone, timedelta
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import structlog
 from pydantic import BaseModel
-from sqlalchemy import select, and_, update
+from sqlalchemy import and_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from shared.events import UniversalPublisher
 
 from ..models.table_production_plan import TableProductionPlan
 
@@ -78,7 +81,17 @@ async def push_table_ready_ws(
     """
     log = logger.bind(store_id=store_id, tenant_id=tenant_id, event=event)
     log.info("table_fire.ws_push", table_no=data.get("table_no"), event=event)
-    # TODO: 接入 Redis Streams / PG LISTEN-NOTIFY 广播
+    # 通过 Redis Pub/Sub 向 mac-station 广播，mac-station 转发 WebSocket 至 ExpoStation
+    try:
+        r = await UniversalPublisher.get_redis()
+        payload = json.dumps(
+            {"event": event, "store_id": store_id, **data},
+            ensure_ascii=False,
+            default=str,
+        )
+        await r.publish(f"table_fire:{tenant_id}:{store_id}", payload)
+    except (OSError, RuntimeError) as exc:
+        log.warning("table_fire.ws_push_failed", error=str(exc))
 
 
 # ─── TableFireCoordinator ───
@@ -172,7 +185,7 @@ class TableFireCoordinator:
         try:
             db.add(db_plan)
             await db.flush()
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 — MLPS3-P0: DB flush异常类型多变，记录后上抛
             log.error(
                 "table_fire.create_plan.db_error",
                 error=str(exc),
@@ -247,7 +260,7 @@ class TableFireCoordinator:
             )
             await db.execute(stmt)
             await db.flush()
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 — MLPS3-P0: DB execute异常类型多变，记录后上抛
             log.error(
                 "table_fire.notify_dept_ready.db_error",
                 error=str(exc),
@@ -280,7 +293,7 @@ class TableFireCoordinator:
                         "ready_at": datetime.now(timezone.utc).isoformat(),
                     },
                 )
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 — MLPS3-P0: WS推送失败不阻断业务，最外层兜底
                 # WebSocket 推送失败不阻断业务流程，记录日志
                 log.error(
                     "table_fire.notify_dept_ready.ws_push_failed",

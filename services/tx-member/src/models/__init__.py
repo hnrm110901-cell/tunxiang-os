@@ -1,1 +1,1 @@
-from .points_mall import PointsMallProduct, PointsMallOrder  # noqa: F401
+from .points_mall import PointsMallOrder, PointsMallProduct  # noqa: F401

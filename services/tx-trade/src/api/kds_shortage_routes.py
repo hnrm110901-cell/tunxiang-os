@@ -3,16 +3,16 @@
 所有接口需要 X-Tenant-ID header。
 """
 from datetime import date
-from typing import Optional
 
-from fastapi import APIRouter, Depends, Request, HTTPException
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, Depends, HTTPException, Request
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+
 from ..services.kds_shortage_link import (
-    on_shortage_reported,
     get_production_rhythm,
+    on_shortage_reported,
     optimize_production_sequence,
 )
 

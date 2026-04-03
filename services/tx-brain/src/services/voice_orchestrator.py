@@ -13,7 +13,6 @@ from __future__ import annotations
 import re
 import time
 import uuid
-from dataclasses import dataclass, field
 from typing import Any, Optional
 
 import structlog
@@ -188,8 +187,8 @@ class VoiceOrchestrator:
         self, audio_bytes: bytes, language: str, start: float
     ) -> dict[str, Any]:
         """Whisper v3 实际转写。"""
-        import tempfile
         import os
+        import tempfile
 
         tmp_path = ""
         try:

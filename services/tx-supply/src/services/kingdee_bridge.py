@@ -6,7 +6,7 @@ Mock接口，结构与金蝶K3/Cloud兼容。
 导出状态: pending → processing → completed / failed
 """
 import uuid
-from datetime import date, datetime, timezone
+from datetime import datetime, timezone
 from typing import Optional
 
 import structlog

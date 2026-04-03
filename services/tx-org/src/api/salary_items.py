@@ -1,14 +1,14 @@
 """薪资项目库 API"""
 from typing import Optional
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
-
 from services.salary_item_library import (
-    get_all_items,
-    get_items_by_category,
-    get_categories,
-    init_store_salary_config,
     compute_salary_by_items,
+    get_all_items,
+    get_categories,
+    get_items_by_category,
+    init_store_salary_config,
 )
 
 router = APIRouter(prefix="/api/v1/org", tags=["salary-items"])

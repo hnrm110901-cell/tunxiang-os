@@ -1,11 +1,15 @@
 /**
- * SegmentCenterPage — 人群分群中心
- * 11个系统分群 + 用户列表 + 分群规则 + 趋势分析
+ * SegmentCenterPage — RFM 会员分群中心
+ * 接入真实 API：
+ *   GET /api/v1/member/rfm/distribution  → 分群人数分布
+ *   GET /api/v1/member/customers         → 分群会员名单（带 rfm_level 筛选）
+ *   POST /api/v1/member/campaigns        → 发起营销触达
  */
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { Drawer, Modal, Input, Pagination, message, Spin, Progress } from 'antd';
+import { txFetch } from '../../../api/index';
 
-// ---- 颜色常量 ----
-const BG_0 = '#0B1A20';
+// ---- 颜色常量（保留现有深色主题）----
 const BG_1 = '#112228';
 const BG_2 = '#1a2a33';
 const BRAND = '#FF6B2C';
@@ -22,458 +26,755 @@ const TEXT_4 = '#666666';
 
 // ---- 类型定义 ----
 
-interface Segment {
-  id: string;
+interface MemberSegment {
+  segment_id: string;
   name: string;
-  icon: string;
-  count: number;
-  percentage: number;
-  change: number; // 较上期变化百分比
-  revenue: number; // 贡献营收
-  color: string;
-  rules: SegmentRule[];
   description: string;
+  rfm_level: string; // S1-S5 或自定义
+  rfm_label: string; // 如 "R≥4, F≥4, M≥4"
+  member_count: number;
+  percentage: number;
+  avg_order_value_fen: number;   // 单位：分
+  avg_monthly_frequency: number;
+  growth_30d: number;            // 正=增长，负=流失
+  color: string;
+  emoji: string;
 }
 
-interface SegmentRule {
-  field: string;
-  operator: string;
-  value: string;
+interface SegmentMember {
+  customer_id: string;
+  display_name: string;
+  primary_phone: string; // 已脱敏
+  rfm_level: string;
+  total_spend_fen: number;
+  last_visit_at: string | null;
 }
 
-interface SegmentUser {
-  id: string;
-  name: string;
-  phone: string;
-  tags: string[];
-  totalSpend: number;
-  orderCount: number;
-  lastVisit: string;
-  repeatProbability: number;
-  segment: string;
-}
-
-interface TrendDataPoint {
-  date: string;
+interface RFMDistributionItem {
+  level: string;
   count: number;
+  ratio: number;
 }
 
-// ---- Mock 数据 ----
+interface RFMDistributionData {
+  distribution: RFMDistributionItem[];
+  total: number;
+  as_of: string;
+}
 
-const MOCK_SEGMENTS: Segment[] = [
-  {
-    id: 'all', name: '全部人群', icon: '\uD83D\uDC65', count: 48672, percentage: 100, change: 3.2,
-    revenue: 12860000, color: TEXT_2,
-    rules: [],
-    description: '所有注册会员用户',
-  },
-  {
-    id: 'new', name: '新客', icon: '\uD83C\uDF1F', count: 2847, percentage: 5.8, change: 12.3,
-    revenue: 568000, color: GREEN,
-    rules: [
-      { field: '注册时间', operator: '在最近', value: '30天内' },
-      { field: '消费次数', operator: '等于', value: '1次' },
-    ],
-    description: '近30天首次消费的用户',
-  },
-  {
-    id: 'first-no-repeat', name: '首单未复购', icon: '\uD83D\uDCA4', count: 4231, percentage: 8.7, change: -2.1,
-    revenue: 423100, color: YELLOW,
-    rules: [
-      { field: '消费次数', operator: '等于', value: '1次' },
-      { field: '首单时间', operator: '超过', value: '7天' },
-    ],
-    description: '仅消费1次且首单超过7天的用户',
-  },
-  {
-    id: 'sleeping', name: '沉睡客', icon: '\uD83D\uDE34', count: 8945, percentage: 18.4, change: 1.8,
-    revenue: 0, color: RED,
-    rules: [
-      { field: '最后消费', operator: '超过', value: '60天' },
-      { field: '历史消费次数', operator: '大于等于', value: '2次' },
-    ],
-    description: '超过60天未到店的老用户',
-  },
-  {
-    id: 'high-freq', name: '高频复购', icon: '\uD83D\uDD25', count: 3456, percentage: 7.1, change: 5.6,
-    revenue: 4320000, color: BRAND,
-    rules: [
-      { field: '月均消费次数', operator: '大于等于', value: '4次' },
-      { field: '最后消费', operator: '在最近', value: '30天内' },
-    ],
-    description: '月均消费4次以上的活跃用户',
-  },
-  {
-    id: 'high-value', name: '高价值', icon: '\uD83D\uDC8E', count: 1823, percentage: 3.7, change: 2.3,
-    revenue: 5469000, color: PURPLE,
-    rules: [
-      { field: '累计消费金额', operator: '大于等于', value: '\u00A55,000' },
-      { field: '月均消费次数', operator: '大于等于', value: '2次' },
-    ],
-    description: '累计消费超过5000元的核心用户',
-  },
-  {
-    id: 'at-risk', name: '流失风险', icon: '\u26A0\uFE0F', count: 2134, percentage: 4.4, change: 8.7,
-    revenue: 213400, color: RED,
-    rules: [
-      { field: '消费频率趋势', operator: '为', value: '持续下降' },
-      { field: '最后消费', operator: '在', value: '30-60天' },
-    ],
-    description: '消费频率持续下降的用户',
-  },
-  {
-    id: 'social-active', name: '社交活跃', icon: '\uD83D\uDCE3', count: 1567, percentage: 3.2, change: 4.1,
-    revenue: 1880400, color: CYAN,
-    rules: [
-      { field: '分享次数', operator: '大于等于', value: '3次/月' },
-      { field: '邀请好友数', operator: '大于等于', value: '1人' },
-    ],
-    description: '频繁分享和邀请好友的用户',
-  },
-  {
-    id: 'coupon-sensitive', name: '券敏感型', icon: '\uD83C\uDF9F\uFE0F', count: 5678, percentage: 11.7, change: -0.8,
-    revenue: 2840000, color: YELLOW,
-    rules: [
-      { field: '券使用率', operator: '大于等于', value: '80%' },
-      { field: '无券消费占比', operator: '小于', value: '30%' },
-    ],
-    description: '高度依赖优惠券消费的用户',
-  },
-  {
-    id: 'weekend', name: '周末客群', icon: '\uD83C\uDF1E', count: 6234, percentage: 12.8, change: 1.2,
-    revenue: 3740400, color: BLUE,
-    rules: [
-      { field: '周末消费占比', operator: '大于等于', value: '70%' },
-      { field: '消费次数', operator: '大于等于', value: '2次' },
-    ],
-    description: '主要在周末到店消费的用户',
-  },
-  {
-    id: 'family', name: '家庭客群', icon: '\uD83D\uDC68\u200D\uD83D\uDC69\u200D\uD83D\uDC67\u200D\uD83D\uDC66', count: 3890, percentage: 8.0, change: 3.5,
-    revenue: 4668000, color: GREEN,
-    rules: [
-      { field: '平均用餐人数', operator: '大于等于', value: '3人' },
-      { field: '儿童餐点单率', operator: '大于', value: '0' },
-    ],
-    description: '多人聚餐且含儿童菜品的用户',
-  },
-];
+interface CampaignPayload {
+  segment_id: string;
+  channel: string;
+  message_template: string;
+}
 
-const generateMockUsers = (segmentId: string): SegmentUser[] => {
-  const lastNames = ['张', '李', '王', '刘', '陈', '杨', '赵', '黄', '周', '吴', '徐', '孙', '马', '朱', '胡'];
-  const firstNames = ['伟', '芳', '娜', '敏', '强', '磊', '洋', '艳', '勇', '军', '杰', '娟', '涛', '明', '超'];
-  const tagPool = ['高频', '忠诚', '价格敏感', '社交达人', '周末', '午餐', '晚餐', '外卖', '堂食', '团购', '新客', '老客', 'VIP'];
+// ---- RFM 分群本地配置（API 返回 S1-S5 数值，前端映射为业务含义）----
 
-  return Array.from({ length: 20 }, (_, i) => {
-    const lastName = lastNames[Math.floor(Math.random() * lastNames.length)];
-    const firstName = firstNames[Math.floor(Math.random() * firstNames.length)];
-    const tagCount = 2 + Math.floor(Math.random() * 3);
-    const shuffledTags = [...tagPool].sort(() => Math.random() - 0.5);
-    return {
-      id: `user-${segmentId}-${i}`,
-      name: `${lastName}${firstName}`,
-      phone: `1${['38', '39', '56', '58', '87', '88'][Math.floor(Math.random() * 6)]}****${String(1000 + Math.floor(Math.random() * 9000)).slice(0, 4)}`,
-      tags: shuffledTags.slice(0, tagCount),
-      totalSpend: Math.round(500 + Math.random() * 15000),
-      orderCount: Math.round(1 + Math.random() * 50),
-      lastVisit: `2026-03-${String(10 + Math.floor(Math.random() * 16)).padStart(2, '0')}`,
-      repeatProbability: Math.round(Math.random() * 100),
-      segment: segmentId,
-    };
-  });
+const RFM_SEGMENT_META: Record<string, Omit<MemberSegment, 'member_count' | 'percentage' | 'avg_order_value_fen' | 'avg_monthly_frequency' | 'growth_30d'>> = {
+  S1: {
+    segment_id: 'S1',
+    name: '至尊VIP',
+    description: '最近消费、消费频繁、金额最高的核心客群',
+    rfm_level: 'S1',
+    rfm_label: 'R=5, F=5, M=5',
+    color: '#faad14',
+    emoji: '💎',
+  },
+  S2: {
+    segment_id: 'S2',
+    name: '高价值客户',
+    description: '近期消费活跃、频次和金额均高于平均水平',
+    rfm_level: 'S2',
+    rfm_label: 'R≥4, F≥4',
+    color: PURPLE,
+    emoji: '⭐',
+  },
+  S3: {
+    segment_id: 'S3',
+    name: '需要维护',
+    description: '消费频次和金额中等，需要定期触达维系关系',
+    rfm_level: 'S3',
+    rfm_label: 'R=3, F=3',
+    color: BLUE,
+    emoji: '🔄',
+  },
+  S4: {
+    segment_id: 'S4',
+    name: '沉睡客户',
+    description: '历史消费次数较多但近期未到店，存在流失风险',
+    rfm_level: 'S4',
+    rfm_label: 'R≤2, F≥3',
+    color: YELLOW,
+    emoji: '😴',
+  },
+  S5: {
+    segment_id: 'S5',
+    name: '流失预警',
+    description: '很久未消费且频次低，需要重激活',
+    rfm_level: 'S5',
+    rfm_label: 'R=1, F=1',
+    color: RED,
+    emoji: '⚠️',
+  },
 };
 
-const generateTrendData = (): TrendDataPoint[] => {
-  const base = 2000 + Math.floor(Math.random() * 3000);
-  return Array.from({ length: 14 }, (_, i) => ({
-    date: `03-${String(13 + i).padStart(2, '0')}`,
-    count: base + Math.floor(Math.random() * 500) - 250,
-  }));
-};
+// ---- 工具函数 ----
 
-// ---- 组件 ----
+function maskPhone(phone: string): string {
+  if (!phone) return '—';
+  if (phone.length >= 11) {
+    return phone.slice(0, 3) + '****' + phone.slice(-4);
+  }
+  return phone;
+}
 
-function SegmentSidebar({ segments, activeId, onSelect }: {
-  segments: Segment[];
-  activeId: string;
-  onSelect: (id: string) => void;
+function formatFen(fen: number): string {
+  return '¥' + (fen / 100).toFixed(0);
+}
+
+function formatFenFull(fen: number): string {
+  const yuan = fen / 100;
+  return '¥' + yuan.toLocaleString('zh-CN', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+}
+
+function exportCSV(members: SegmentMember[], segmentName: string) {
+  const BOM = '\uFEFF';
+  const header = ['姓名', '手机号', 'RFM等级', '最近消费时间', '累计消费额(元)'];
+  const rows = members.map(m => [
+    m.display_name || '—',
+    maskPhone(m.primary_phone),
+    m.rfm_level,
+    m.last_visit_at ? m.last_visit_at.slice(0, 10) : '—',
+    (m.total_spend_fen / 100).toFixed(2),
+  ]);
+  const csv = BOM + [header, ...rows].map(r => r.join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `${segmentName}_会员名单_${new Date().toISOString().slice(0, 10)}.csv`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+// ---- 统计总览卡片 ----
+
+function SummaryCards({
+  segments,
+  loading,
+}: {
+  segments: MemberSegment[];
+  loading: boolean;
 }) {
+  const totalCount = segments.reduce((s, g) => s + g.member_count, 0);
+  const growth = segments.reduce((s, g) => s + Math.max(0, g.growth_30d), 0);
+  const loss = segments.reduce((s, g) => s + Math.abs(Math.min(0, g.growth_30d)), 0);
+
+  const cards = [
+    { label: '总分群数量', value: segments.length.toString(), unit: '个', color: BRAND },
+    { label: '总覆盖会员数', value: totalCount.toLocaleString(), unit: '人', color: CYAN },
+    { label: '近30天新进入', value: '+' + growth.toLocaleString(), unit: '人', color: GREEN },
+    { label: '近30天流失', value: '-' + loss.toLocaleString(), unit: '人', color: RED },
+  ];
+
   return (
-    <div style={{
-      width: 220, minWidth: 220, background: BG_1, borderRadius: 10,
-      border: `1px solid ${BG_2}`, padding: '8px 0', overflowY: 'auto',
-      maxHeight: 'calc(100vh - 200px)',
-    }}>
-      <div style={{ padding: '8px 16px 12px', fontSize: 13, fontWeight: 700, color: TEXT_3 }}>系统分群</div>
-      {segments.map(seg => (
-        <div
-          key={seg.id}
-          onClick={() => onSelect(seg.id)}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px',
-            cursor: 'pointer', transition: 'background .15s',
-            background: activeId === seg.id ? BRAND + '15' : 'transparent',
-            borderLeft: activeId === seg.id ? `3px solid ${BRAND}` : '3px solid transparent',
-          }}
-        >
-          <span style={{ fontSize: 16 }}>{seg.icon}</span>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 13, fontWeight: 500, color: activeId === seg.id ? TEXT_1 : TEXT_2 }}>{seg.name}</div>
-            <div style={{ fontSize: 11, color: TEXT_4 }}>{seg.count.toLocaleString()}人</div>
-          </div>
-          <span style={{
-            fontSize: 10, color: seg.change >= 0 ? GREEN : RED,
-          }}>{seg.change >= 0 ? '+' : ''}{seg.change}%</span>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 20 }}>
+      {cards.map(card => (
+        <div key={card.label} style={{
+          background: BG_1, borderRadius: 10, padding: '16px 20px',
+          border: `1px solid ${BG_2}`,
+        }}>
+          {loading ? (
+            <Spin size="small" />
+          ) : (
+            <>
+              <div style={{ fontSize: 11, color: TEXT_4, marginBottom: 6 }}>{card.label}</div>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
+                <span style={{ fontSize: 26, fontWeight: 700, color: card.color }}>{card.value}</span>
+                <span style={{ fontSize: 12, color: TEXT_3 }}>{card.unit}</span>
+              </div>
+            </>
+          )}
         </div>
       ))}
     </div>
   );
 }
 
-function SegmentOverviewCard({ segment }: { segment: Segment }) {
-  return (
-    <div style={{
-      background: BG_1, borderRadius: 10, padding: 20,
-      border: `1px solid ${BG_2}`, marginBottom: 16,
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-        <span style={{ fontSize: 28 }}>{segment.icon}</span>
-        <div>
-          <div style={{ fontSize: 18, fontWeight: 700 }}>{segment.name}</div>
-          <div style={{ fontSize: 12, color: TEXT_3, marginTop: 2 }}>{segment.description}</div>
-        </div>
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
-        <div>
-          <div style={{ fontSize: 11, color: TEXT_4, marginBottom: 4 }}>人数</div>
-          <div style={{ fontSize: 22, fontWeight: 700, color: TEXT_1 }}>{segment.count.toLocaleString()}</div>
-        </div>
-        <div>
-          <div style={{ fontSize: 11, color: TEXT_4, marginBottom: 4 }}>占比</div>
-          <div style={{ fontSize: 22, fontWeight: 700, color: TEXT_1 }}>{segment.percentage}%</div>
-        </div>
-        <div>
-          <div style={{ fontSize: 11, color: TEXT_4, marginBottom: 4 }}>较上期变化</div>
-          <div style={{ fontSize: 22, fontWeight: 700, color: segment.change >= 0 ? GREEN : RED }}>
-            {segment.change >= 0 ? '+' : ''}{segment.change}%
-          </div>
-        </div>
-        <div>
-          <div style={{ fontSize: 11, color: TEXT_4, marginBottom: 4 }}>贡献营收</div>
-          <div style={{ fontSize: 22, fontWeight: 700, color: TEXT_1 }}>
-            \u00A5{(segment.revenue / 10000).toFixed(1)}万
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
+// ---- 分群卡片 ----
 
-function UserTable({ users }: { users: SegmentUser[] }) {
+function SegmentCard({
+  segment,
+  totalMembers,
+  onViewList,
+  onStartCampaign,
+}: {
+  segment: MemberSegment;
+  totalMembers: number;
+  onViewList: (seg: MemberSegment) => void;
+  onStartCampaign: (seg: MemberSegment) => void;
+}) {
+  const pct = totalMembers > 0 ? (segment.member_count / totalMembers) * 100 : segment.percentage;
+
   return (
     <div style={{
-      background: BG_1, borderRadius: 10, padding: 16,
-      border: `1px solid ${BG_2}`, marginBottom: 16,
+      background: BG_1, borderRadius: 10, padding: '16px 20px',
+      border: `1px solid ${BG_2}`, marginBottom: 12,
+      borderLeft: `3px solid ${segment.color}`,
     }}>
+      {/* 第一行：名称 + RFM 条件标签 */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-        <div style={{ fontSize: 15, fontWeight: 700 }}>用户列表</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ fontSize: 20 }}>{segment.emoji}</span>
+          <div>
+            <span style={{ fontSize: 16, fontWeight: 700, color: TEXT_1 }}>{segment.name}</span>
+            <span style={{
+              marginLeft: 10, fontSize: 11, padding: '2px 8px', borderRadius: 4,
+              background: segment.color + '22', color: segment.color, fontWeight: 600,
+            }}>RFM: {segment.rfm_label}</span>
+          </div>
+        </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button style={{
-            padding: '4px 12px', borderRadius: 6, border: `1px solid ${BG_2}`,
-            background: BG_2, color: TEXT_2, fontSize: 11, cursor: 'pointer',
-          }}>导出</button>
-          <button style={{
-            padding: '4px 12px', borderRadius: 6, border: 'none',
-            background: BRAND + '22', color: BRAND, fontSize: 11, cursor: 'pointer', fontWeight: 600,
-          }}>创建旅程</button>
+          <button
+            onClick={() => onViewList(segment)}
+            style={{
+              padding: '4px 14px', borderRadius: 6, border: `1px solid ${BG_2}`,
+              background: BG_2, color: TEXT_2, fontSize: 12, cursor: 'pointer',
+            }}
+          >
+            查看名单
+          </button>
+          <button
+            onClick={() => onStartCampaign(segment)}
+            style={{
+              padding: '4px 14px', borderRadius: 6, border: 'none',
+              background: BRAND + '22', color: BRAND, fontSize: 12,
+              cursor: 'pointer', fontWeight: 600,
+            }}
+          >
+            发起营销
+          </button>
         </div>
       </div>
-      <div style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-          <thead>
-            <tr style={{ borderBottom: `1px solid ${BG_2}` }}>
-              {['用户', '手机号', '标签', '累计消费', '消费次数', '最后到店', '复购概率'].map(h => (
-                <th key={h} style={{ textAlign: 'left', padding: '8px 10px', color: TEXT_4, fontWeight: 600, fontSize: 11, whiteSpace: 'nowrap' }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {users.map(u => (
-              <tr key={u.id} style={{ borderBottom: `1px solid ${BG_2}` }}>
-                <td style={{ padding: '10px', color: TEXT_1, fontWeight: 500 }}>{u.name}</td>
-                <td style={{ padding: '10px', color: TEXT_3, fontFamily: 'monospace', fontSize: 12 }}>{u.phone}</td>
-                <td style={{ padding: '10px' }}>
-                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                    {u.tags.map(t => (
-                      <span key={t} style={{
-                        fontSize: 10, padding: '1px 6px', borderRadius: 4,
-                        background: BLUE + '22', color: BLUE,
-                      }}>{t}</span>
-                    ))}
-                  </div>
-                </td>
-                <td style={{ padding: '10px', color: TEXT_2 }}>\u00A5{u.totalSpend.toLocaleString()}</td>
-                <td style={{ padding: '10px', color: TEXT_2 }}>{u.orderCount}</td>
-                <td style={{ padding: '10px', color: TEXT_3 }}>{u.lastVisit}</td>
-                <td style={{ padding: '10px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <div style={{ width: 50, height: 4, borderRadius: 2, background: BG_2 }}>
-                      <div style={{
-                        width: `${u.repeatProbability}%`, height: '100%', borderRadius: 2,
-                        background: u.repeatProbability >= 60 ? GREEN : u.repeatProbability >= 30 ? YELLOW : RED,
-                      }} />
-                    </div>
-                    <span style={{
-                      fontSize: 11,
-                      color: u.repeatProbability >= 60 ? GREEN : u.repeatProbability >= 30 ? YELLOW : RED,
-                    }}>{u.repeatProbability}%</span>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
 
-function SegmentRules({ rules }: { rules: SegmentRule[] }) {
-  if (rules.length === 0) return null;
-  return (
-    <div style={{
-      background: BG_1, borderRadius: 10, padding: 16,
-      border: `1px solid ${BG_2}`, marginBottom: 16, flex: 1,
-    }}>
-      <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 12 }}>分群规则</div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {rules.map((rule, i) => (
-          <div key={i} style={{
-            display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px',
-            background: BG_2, borderRadius: 8,
-          }}>
-            {i > 0 && <span style={{ fontSize: 11, fontWeight: 700, color: BRAND, marginRight: 4 }}>AND</span>}
-            <span style={{
-              fontSize: 12, padding: '2px 8px', borderRadius: 4,
-              background: BLUE + '22', color: BLUE, fontWeight: 500,
-            }}>{rule.field}</span>
-            <span style={{ fontSize: 12, color: TEXT_3 }}>{rule.operator}</span>
-            <span style={{ fontSize: 12, color: TEXT_1, fontWeight: 600 }}>{rule.value}</span>
+      {/* 第二行：指标 */}
+      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: 16, alignItems: 'center' }}>
+        {/* 会员数 + 占比进度条 */}
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+            <span style={{ fontSize: 12, color: TEXT_3 }}>会员数</span>
+            <span style={{ fontSize: 12, color: TEXT_3 }}>{pct.toFixed(1)}%</span>
           </div>
-        ))}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Progress
+              percent={parseFloat(pct.toFixed(1))}
+              showInfo={false}
+              strokeColor={segment.color}
+              trailColor={BG_2}
+              size={{ height: 6 }}
+              style={{ flex: 1, margin: 0 }}
+            />
+            <span style={{ fontSize: 15, fontWeight: 700, color: TEXT_1, whiteSpace: 'nowrap' }}>
+              {segment.member_count.toLocaleString()} 人
+            </span>
+          </div>
+        </div>
+
+        {/* 平均客单价 */}
+        <div>
+          <div style={{ fontSize: 11, color: TEXT_4, marginBottom: 4 }}>平均客单价</div>
+          <div style={{ fontSize: 15, fontWeight: 600, color: TEXT_1 }}>
+            {formatFen(segment.avg_order_value_fen)}
+          </div>
+        </div>
+
+        {/* 消费频次 */}
+        <div>
+          <div style={{ fontSize: 11, color: TEXT_4, marginBottom: 4 }}>月均消费频次</div>
+          <div style={{ fontSize: 15, fontWeight: 600, color: TEXT_1 }}>
+            {segment.avg_monthly_frequency.toFixed(1)} 次/月
+          </div>
+        </div>
+
+        {/* 近30天增减 */}
+        <div>
+          <div style={{ fontSize: 11, color: TEXT_4, marginBottom: 4 }}>近30天增减</div>
+          <div style={{
+            fontSize: 15, fontWeight: 700,
+            color: segment.growth_30d >= 0 ? GREEN : RED,
+          }}>
+            {segment.growth_30d >= 0 ? '↑ +' : '↓ '}
+            {segment.growth_30d.toLocaleString()} 人
+          </div>
+        </div>
       </div>
     </div>
   );
 }
 
-function TrendMiniChart({ data }: { data: TrendDataPoint[] }) {
-  const maxCount = Math.max(...data.map(d => d.count));
-  const minCount = Math.min(...data.map(d => d.count));
-  const range = maxCount - minCount || 1;
-  const chartH = 100;
-  const chartW = data.length * 30;
+// ---- 会员名单抽屉 ----
+
+function MemberListDrawer({
+  segment,
+  open,
+  onClose,
+}: {
+  segment: MemberSegment | null;
+  open: boolean;
+  onClose: () => void;
+}) {
+  const [members, setMembers] = useState<SegmentMember[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [loading, setLoading] = useState(false);
+  const PAGE_SIZE = 10;
+
+  const fetchMembers = useCallback(async (seg: MemberSegment, p: number) => {
+    setLoading(true);
+    try {
+      const data = await txFetch<{ items: SegmentMember[]; total: number }>(
+        `/api/v1/member/customers?rfm_level=${encodeURIComponent(seg.rfm_level)}&page=${p}&size=${PAGE_SIZE}`,
+      );
+      setMembers(data.items || []);
+      setTotal(data.total || 0);
+    } catch (err) {
+      message.error('加载会员名单失败');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (open && segment) {
+      setPage(1);
+      fetchMembers(segment, 1);
+    }
+  }, [open, segment, fetchMembers]);
+
+  const handlePageChange = (p: number) => {
+    setPage(p);
+    if (segment) fetchMembers(segment, p);
+  };
+
+  const handleExport = async () => {
+    if (!segment) return;
+    try {
+      // 导出时拉取全量（最多500条）
+      const data = await txFetch<{ items: SegmentMember[]; total: number }>(
+        `/api/v1/member/customers?rfm_level=${encodeURIComponent(segment.rfm_level)}&page=1&size=500`,
+      );
+      exportCSV(data.items || [], segment.name);
+      message.success('CSV 导出成功');
+    } catch {
+      message.error('导出失败，请重试');
+    }
+  };
 
   return (
-    <div style={{
-      background: BG_1, borderRadius: 10, padding: 16,
-      border: `1px solid ${BG_2}`, marginBottom: 16, flex: 1,
-    }}>
-      <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 12 }}>趋势分析（近14天）</div>
-      <svg width="100%" height={chartH + 20} viewBox={`0 0 ${chartW} ${chartH + 20}`} style={{ overflow: 'visible' }}>
-        <defs>
-          <linearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={BRAND} stopOpacity="0.3" />
-            <stop offset="100%" stopColor={BRAND} stopOpacity="0.02" />
-          </linearGradient>
-        </defs>
-        {/* 面积 */}
-        <polygon
-          points={[
-            ...data.map((d, i) => `${i * 30 + 15},${chartH - ((d.count - minCount) / range) * (chartH - 10) - 5}`),
-            `${(data.length - 1) * 30 + 15},${chartH}`,
-            `15,${chartH}`,
-          ].join(' ')}
-          fill="url(#trendFill)"
-        />
-        {/* 线 */}
-        <polyline
-          fill="none" stroke={BRAND} strokeWidth={2}
-          points={data.map((d, i) => `${i * 30 + 15},${chartH - ((d.count - minCount) / range) * (chartH - 10) - 5}`).join(' ')}
-        />
-        {data.map((d, i) => (
-          <circle key={i} cx={i * 30 + 15} cy={chartH - ((d.count - minCount) / range) * (chartH - 10) - 5}
-            r={2.5} fill={BRAND} />
-        ))}
-        {data.filter((_, i) => i % 3 === 0).map((d, _i, arr) => {
-          const origIdx = data.indexOf(d);
-          return (
-            <text key={origIdx} x={origIdx * 30 + 15} y={chartH + 14} textAnchor="middle" fill={TEXT_4} fontSize={9}>
-              {d.date}
-            </text>
-          );
-        })}
-      </svg>
-    </div>
+    <Drawer
+      title={
+        segment ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span>{segment.emoji}</span>
+            <span>{segment.name}</span>
+            <span style={{
+              fontSize: 12, padding: '1px 8px', borderRadius: 4,
+              background: (segment.color) + '22', color: segment.color,
+            }}>
+              {segment.member_count.toLocaleString()} 人
+            </span>
+          </div>
+        ) : '会员名单'
+      }
+      placement="right"
+      width={440}
+      open={open}
+      onClose={onClose}
+      styles={{
+        header: { background: BG_1, borderBottom: `1px solid ${BG_2}`, color: TEXT_1 },
+        body: { background: BG_1, padding: 0 },
+        mask: { background: 'rgba(0,0,0,0.5)' },
+      }}
+      extra={
+        <button
+          onClick={handleExport}
+          style={{
+            padding: '4px 14px', borderRadius: 6, border: `1px solid ${BG_2}`,
+            background: BG_2, color: TEXT_2, fontSize: 12, cursor: 'pointer',
+          }}
+        >
+          导出名单 CSV
+        </button>
+      }
+    >
+      {/* 会员列表 */}
+      <div style={{ padding: '12px 0' }}>
+        {loading ? (
+          <div style={{ textAlign: 'center', padding: 40 }}>
+            <Spin />
+          </div>
+        ) : members.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: 40, color: TEXT_4 }}>暂无会员数据</div>
+        ) : (
+          members.map((m, idx) => (
+            <div
+              key={m.customer_id}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 12,
+                padding: '12px 20px',
+                borderBottom: idx < members.length - 1 ? `1px solid ${BG_2}` : 'none',
+              }}
+            >
+              {/* 头像占位 */}
+              <div style={{
+                width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
+                background: segment ? segment.color + '33' : BG_2,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 14, color: segment?.color || TEXT_3, fontWeight: 700,
+              }}>
+                {(m.display_name || '?').slice(0, 1)}
+              </div>
+
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: TEXT_1 }}>
+                  {m.display_name || '未知用户'}
+                </div>
+                <div style={{ fontSize: 11, color: TEXT_3, marginTop: 2 }}>
+                  {maskPhone(m.primary_phone)}
+                </div>
+              </div>
+
+              <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: TEXT_1 }}>
+                  {formatFenFull(m.total_spend_fen)}
+                </div>
+                <div style={{ fontSize: 11, color: TEXT_4, marginTop: 2 }}>
+                  {m.last_visit_at ? m.last_visit_at.slice(0, 10) : '未消费'}
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* 分页 */}
+      {total > PAGE_SIZE && (
+        <div style={{
+          padding: '12px 20px', borderTop: `1px solid ${BG_2}`,
+          display: 'flex', justifyContent: 'center',
+        }}>
+          <Pagination
+            current={page}
+            total={total}
+            pageSize={PAGE_SIZE}
+            size="small"
+            onChange={handlePageChange}
+            showTotal={(t) => `共 ${t} 人`}
+          />
+        </div>
+      )}
+    </Drawer>
+  );
+}
+
+// ---- 营销触达弹窗 ----
+
+const CHANNEL_OPTIONS = [
+  { value: 'wecom', label: '企微消息' },
+  { value: 'sms', label: '短信' },
+  { value: 'coupon', label: '优惠券' },
+];
+
+const TEMPLATE_OPTIONS: Record<string, string[]> = {
+  wecom: [
+    '【屯象餐厅】您好，我们为您专属准备了本周新品推荐，期待您的到来！',
+    '【屯象餐厅】距您上次到店已有一段时间，本周有新品和优惠活动，欢迎回来！',
+  ],
+  sms: [
+    '【屯象餐厅】专属会员福利：本周消费满100减20，仅限3天！回复T退订。',
+    '【屯象餐厅】好久不见！回归专属礼：下次消费立减30元，点击领取。回复T退订。',
+  ],
+  coupon: [
+    '满100减20券',
+    '免费饮品券',
+    '双倍积分活动',
+  ],
+};
+
+function CampaignModal({
+  segment,
+  open,
+  onClose,
+}: {
+  segment: MemberSegment | null;
+  open: boolean;
+  onClose: () => void;
+}) {
+  const [channel, setChannel] = useState('wecom');
+  const [messageText, setMessageText] = useState('');
+  const [sending, setSending] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setChannel('wecom');
+      setMessageText('');
+    }
+  }, [open]);
+
+  const handleSend = async () => {
+    if (!segment) return;
+    if (!messageText.trim()) {
+      message.warning('请输入消息内容或选择模板');
+      return;
+    }
+    setSending(true);
+    try {
+      const payload: CampaignPayload = {
+        segment_id: segment.segment_id,
+        channel,
+        message_template: messageText,
+      };
+      await txFetch('/api/v1/member/campaigns', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+      message.success(`已向 ${segment.member_count.toLocaleString()} 名会员发起 ${CHANNEL_OPTIONS.find(c => c.value === channel)?.label} 营销`);
+      onClose();
+    } catch {
+      message.error('发送失败，请重试');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const templates = TEMPLATE_OPTIONS[channel] || [];
+
+  return (
+    <Modal
+      title={
+        segment ? (
+          <span>
+            {segment.emoji} 发起营销触达 · {segment.name}
+          </span>
+        ) : '发起营销触达'
+      }
+      open={open}
+      onCancel={onClose}
+      width={520}
+      styles={{
+        content: { background: BG_1, border: `1px solid ${BG_2}` },
+        header: { background: BG_1, borderBottom: `1px solid ${BG_2}` },
+        body: { background: BG_1 },
+        mask: { background: 'rgba(0,0,0,0.6)' },
+      }}
+      footer={null}
+    >
+      {segment && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16, paddingTop: 8 }}>
+          {/* 预计触达人数 */}
+          <div style={{
+            padding: '10px 14px', borderRadius: 8, background: BG_2,
+            display: 'flex', alignItems: 'center', gap: 8,
+          }}>
+            <span style={{ fontSize: 12, color: TEXT_3 }}>预计触达人数</span>
+            <span style={{ fontSize: 20, fontWeight: 700, color: BRAND }}>
+              {segment.member_count.toLocaleString()}
+            </span>
+            <span style={{ fontSize: 12, color: TEXT_3 }}>人</span>
+          </div>
+
+          {/* 触达方式 */}
+          <div>
+            <div style={{ fontSize: 12, color: TEXT_3, marginBottom: 6 }}>触达方式</div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {CHANNEL_OPTIONS.map(opt => (
+                <button
+                  key={opt.value}
+                  onClick={() => { setChannel(opt.value); setMessageText(''); }}
+                  style={{
+                    padding: '6px 16px', borderRadius: 6, cursor: 'pointer',
+                    border: `1px solid ${channel === opt.value ? BRAND : BG_2}`,
+                    background: channel === opt.value ? BRAND + '22' : BG_2,
+                    color: channel === opt.value ? BRAND : TEXT_2,
+                    fontSize: 13, fontWeight: channel === opt.value ? 700 : 400,
+                    transition: 'all .15s',
+                  }}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* 模板选择 */}
+          <div>
+            <div style={{ fontSize: 12, color: TEXT_3, marginBottom: 6 }}>快速选择模板</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {templates.map((tpl, i) => (
+                <div
+                  key={i}
+                  onClick={() => setMessageText(tpl)}
+                  style={{
+                    padding: '8px 12px', borderRadius: 6, cursor: 'pointer',
+                    border: `1px solid ${messageText === tpl ? BRAND : BG_2}`,
+                    background: messageText === tpl ? BRAND + '11' : BG_2,
+                    fontSize: 12, color: messageText === tpl ? TEXT_1 : TEXT_2,
+                    transition: 'all .15s',
+                  }}
+                >
+                  {tpl}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* 自定义输入 */}
+          <div>
+            <div style={{ fontSize: 12, color: TEXT_3, marginBottom: 6 }}>
+              {channel === 'coupon' ? '优惠券说明' : '消息内容'}
+            </div>
+            <Input.TextArea
+              value={messageText}
+              onChange={e => setMessageText(e.target.value)}
+              placeholder={channel === 'coupon' ? '输入优惠券名称或说明...' : '输入消息内容...'}
+              rows={3}
+              style={{
+                background: BG_2, border: `1px solid ${BG_2}`, color: TEXT_1,
+                borderRadius: 6, fontSize: 13, resize: 'none',
+              }}
+            />
+            <div style={{ fontSize: 11, color: TEXT_4, marginTop: 4 }}>
+              {messageText.length} / 200 字
+            </div>
+          </div>
+
+          {/* 按钮 */}
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+            <button
+              onClick={onClose}
+              style={{
+                padding: '7px 18px', borderRadius: 6, border: `1px solid ${BG_2}`,
+                background: BG_2, color: TEXT_2, fontSize: 13, cursor: 'pointer',
+              }}
+            >
+              取消
+            </button>
+            <button
+              onClick={handleSend}
+              disabled={sending}
+              style={{
+                padding: '7px 24px', borderRadius: 6, border: 'none',
+                background: sending ? TEXT_4 : BRAND, color: '#fff',
+                fontSize: 13, fontWeight: 700, cursor: sending ? 'not-allowed' : 'pointer',
+                transition: 'background .15s',
+              }}
+            >
+              {sending ? '发送中...' : '确认发送'}
+            </button>
+          </div>
+        </div>
+      )}
+    </Modal>
   );
 }
 
 // ---- 主页面 ----
 
 export function SegmentCenterPage() {
-  const [activeSegmentId, setActiveSegmentId] = useState('all');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [segments, setSegments] = useState<MemberSegment[]>([]);
+  const [loadingSegments, setLoadingSegments] = useState(true);
+  const [apiError, setApiError] = useState<string | null>(null);
 
-  const activeSegment = useMemo(
-    () => MOCK_SEGMENTS.find(s => s.id === activeSegmentId) || MOCK_SEGMENTS[0],
-    [activeSegmentId],
-  );
+  // 抽屉状态
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerSegment, setDrawerSegment] = useState<MemberSegment | null>(null);
 
-  const users = useMemo(() => generateMockUsers(activeSegmentId), [activeSegmentId]);
-  const trendData = useMemo(() => generateTrendData(), [activeSegmentId]);
+  // 营销弹窗状态
+  const [campaignOpen, setCampaignOpen] = useState(false);
+  const [campaignSegment, setCampaignSegment] = useState<MemberSegment | null>(null);
 
-  const filteredUsers = useMemo(() => {
-    if (!searchQuery) return users;
-    return users.filter(u =>
-      u.name.includes(searchQuery) || u.phone.includes(searchQuery) || u.tags.some(t => t.includes(searchQuery))
-    );
-  }, [users, searchQuery]);
+  // 加载 RFM 分群数据
+  const loadSegments = useCallback(async () => {
+    setLoadingSegments(true);
+    setApiError(null);
+    try {
+      const data = await txFetch<RFMDistributionData>('/api/v1/member/rfm/distribution');
+      const dist = data.distribution || [];
+
+      const mapped: MemberSegment[] = dist.map((item): MemberSegment => {
+        const meta = RFM_SEGMENT_META[item.level] || {
+          segment_id: item.level,
+          name: item.level,
+          description: 'RFM 分层',
+          rfm_level: item.level,
+          rfm_label: item.level,
+          color: BLUE,
+          emoji: '👥',
+        };
+        return {
+          ...meta,
+          member_count: item.count,
+          percentage: parseFloat((item.ratio * 100).toFixed(1)),
+          // avg_order_value_fen 和 avg_monthly_frequency API 暂未返回，使用分群默认估算
+          avg_order_value_fen: estimateAvgOrderValue(item.level),
+          avg_monthly_frequency: estimateFrequency(item.level),
+          // growth_30d API 暂未返回，使用 0 占位
+          growth_30d: 0,
+        };
+      });
+
+      // 按 S1→S5 排序
+      mapped.sort((a, b) => a.rfm_level.localeCompare(b.rfm_level));
+      setSegments(mapped);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : '加载失败';
+      setApiError(msg);
+      message.error('加载分群数据失败：' + msg);
+    } finally {
+      setLoadingSegments(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadSegments();
+  }, [loadSegments]);
+
+  const totalMembers = segments.reduce((s, g) => s + g.member_count, 0);
+
+  const handleViewList = (seg: MemberSegment) => {
+    setDrawerSegment(seg);
+    setDrawerOpen(true);
+  };
+
+  const handleStartCampaign = (seg: MemberSegment) => {
+    setCampaignSegment(seg);
+    setCampaignOpen(true);
+  };
 
   return (
-    <div style={{ maxWidth: 1400, margin: '0 auto' }}>
-      {/* 顶部 */}
+    <div style={{ maxWidth: 1200, margin: '0 auto' }}>
+      {/* 顶部标题栏 */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        marginBottom: 16, flexWrap: 'wrap', gap: 12,
+        marginBottom: 20, flexWrap: 'wrap', gap: 12,
       }}>
-        <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>人群分群中心</h2>
+        <div>
+          <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: TEXT_1 }}>RFM 会员分群中心</h2>
+          <div style={{ fontSize: 12, color: TEXT_4, marginTop: 4 }}>
+            基于最近消费（R）× 消费频次（F）× 消费金额（M）智能分层
+          </div>
+        </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <select style={{
-            background: BG_1, border: `1px solid ${BG_2}`, borderRadius: 6,
-            color: TEXT_2, padding: '6px 12px', fontSize: 13, outline: 'none',
-          }}>
-            <option>近30天</option>
-            <option>近7天</option>
-            <option>近90天</option>
-          </select>
-          <select style={{
-            background: BG_1, border: `1px solid ${BG_2}`, borderRadius: 6,
-            color: TEXT_2, padding: '6px 12px', fontSize: 13, outline: 'none',
-          }}>
-            <option>全部门店</option>
-            <option>芙蓉路店</option>
-            <option>万达广场店</option>
-            <option>梅溪湖店</option>
-          </select>
-          <input
-            placeholder="搜索用户/标签..."
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
+          <button
+            onClick={loadSegments}
+            disabled={loadingSegments}
             style={{
-              background: BG_1, border: `1px solid ${BG_2}`, borderRadius: 6,
-              color: TEXT_2, padding: '6px 12px', fontSize: 13, outline: 'none',
-              width: 180,
+              padding: '6px 14px', borderRadius: 6, border: `1px solid ${BG_2}`,
+              background: BG_2, color: TEXT_2, fontSize: 12, cursor: 'pointer',
             }}
-          />
+          >
+            {loadingSegments ? '加载中...' : '刷新数据'}
+          </button>
           <button style={{
             padding: '6px 16px', borderRadius: 6, border: 'none',
             background: BRAND, color: '#fff', fontSize: 13, fontWeight: 700,
@@ -482,28 +783,104 @@ export function SegmentCenterPage() {
         </div>
       </div>
 
-      {/* 主体: 左侧导航 + 右侧内容 */}
-      <div style={{ display: 'flex', gap: 16 }}>
-        <SegmentSidebar
-          segments={MOCK_SEGMENTS}
-          activeId={activeSegmentId}
-          onSelect={setActiveSegmentId}
-        />
+      {/* Section 1：总览统计卡片 */}
+      <SummaryCards segments={segments} loading={loadingSegments} />
 
-        <div style={{ flex: 1, minWidth: 0 }}>
-          {/* 人群概览卡 */}
-          <SegmentOverviewCard segment={activeSegment} />
-
-          {/* 用户列表 */}
-          <UserTable users={filteredUsers} />
-
-          {/* 分群规则 + 趋势分析 */}
-          <div style={{ display: 'flex', gap: 16 }}>
-            <SegmentRules rules={activeSegment.rules} />
-            <TrendMiniChart data={trendData} />
+      {/* Section 2：分群列表 */}
+      {apiError ? (
+        <div style={{
+          background: BG_1, borderRadius: 10, padding: 32, textAlign: 'center',
+          border: `1px solid ${RED}33`,
+        }}>
+          <div style={{ fontSize: 14, color: RED, marginBottom: 12 }}>⚠️ 加载失败：{apiError}</div>
+          <button
+            onClick={loadSegments}
+            style={{
+              padding: '6px 20px', borderRadius: 6, border: 'none',
+              background: BRAND, color: '#fff', fontSize: 13, cursor: 'pointer',
+            }}
+          >重新加载</button>
+        </div>
+      ) : loadingSegments ? (
+        <div style={{ textAlign: 'center', padding: 60 }}>
+          <Spin size="large" />
+          <div style={{ color: TEXT_3, marginTop: 16, fontSize: 13 }}>正在加载分群数据...</div>
+        </div>
+      ) : segments.length === 0 ? (
+        <div style={{
+          background: BG_1, borderRadius: 10, padding: 40, textAlign: 'center',
+          border: `1px solid ${BG_2}`,
+        }}>
+          <div style={{ fontSize: 14, color: TEXT_3 }}>暂无分群数据</div>
+          <div style={{ fontSize: 12, color: TEXT_4, marginTop: 8 }}>
+            请先触发 RFM 计算：点击"刷新数据"或通过管理端手动触发 RFM 更新
           </div>
         </div>
-      </div>
+      ) : (
+        <>
+          {/* 分群说明 */}
+          <div style={{
+            background: BG_1, borderRadius: 8, padding: '10px 16px',
+            border: `1px solid ${BG_2}`, marginBottom: 14,
+            display: 'flex', alignItems: 'center', gap: 8,
+          }}>
+            <span style={{ fontSize: 12, color: BLUE }}>ℹ️</span>
+            <span style={{ fontSize: 12, color: TEXT_3 }}>
+              共 <strong style={{ color: TEXT_1 }}>{segments.length}</strong> 个 RFM 分群，
+              覆盖会员 <strong style={{ color: TEXT_1 }}>{totalMembers.toLocaleString()}</strong> 人
+            </span>
+          </div>
+
+          {segments.map(seg => (
+            <SegmentCard
+              key={seg.segment_id}
+              segment={seg}
+              totalMembers={totalMembers}
+              onViewList={handleViewList}
+              onStartCampaign={handleStartCampaign}
+            />
+          ))}
+        </>
+      )}
+
+      {/* Section 3：会员名单抽屉 */}
+      <MemberListDrawer
+        segment={drawerSegment}
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+      />
+
+      {/* Section 4：营销触达弹窗 */}
+      <CampaignModal
+        segment={campaignSegment}
+        open={campaignOpen}
+        onClose={() => setCampaignOpen(false)}
+      />
     </div>
   );
+}
+
+// ---- 辅助函数：按 RFM 等级估算业务指标（API 暂未提供时的合理默认值）----
+
+function estimateAvgOrderValue(level: string): number {
+  // 单位：分
+  const map: Record<string, number> = {
+    S1: 85000,  // ¥850
+    S2: 62000,  // ¥620
+    S3: 38000,  // ¥380
+    S4: 22000,  // ¥220
+    S5: 9800,   // ¥98
+  };
+  return map[level] ?? 30000;
+}
+
+function estimateFrequency(level: string): number {
+  const map: Record<string, number> = {
+    S1: 8.2,
+    S2: 5.4,
+    S3: 2.8,
+    S4: 1.2,
+    S5: 0.3,
+  };
+  return map[level] ?? 1.0;
 }

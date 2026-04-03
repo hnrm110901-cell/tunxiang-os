@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import re
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 import structlog
@@ -110,8 +110,8 @@ class VoiceService:
         self, audio_bytes: bytes, language: str, start: float
     ) -> TranscriptionResult:
         """使用本地 Whisper 模型进行转写。"""
-        import tempfile
         import os
+        import tempfile
 
         # Whisper 需要文件路径，写入临时文件
         tmp_path = ""
@@ -351,7 +351,7 @@ def _chinese_num_to_int(s: str) -> int:
 
 # ─── FastAPI Router ───
 
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 
 router = APIRouter(prefix="/api/v1/voice", tags=["voice"])

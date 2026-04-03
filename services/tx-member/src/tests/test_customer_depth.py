@@ -3,13 +3,8 @@
 覆盖: golden_id_merge, channel_attribution, tag_customer_scene,
       calculate_customer_value, get_customer_360, 以及5个API端点
 """
-import sys
 import os
-import uuid
-from datetime import datetime, timezone, timedelta
-from unittest.mock import AsyncMock, MagicMock, patch
-
-import pytest
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -78,9 +73,6 @@ class TestCustomerDepthAPI:
 
 from services.customer_depth import (
     _rfm_level,
-    RFM_HIGH_VALUE_MIN,
-    RFM_GROWTH_MIN,
-    RFM_DORMANT_MIN,
 )
 
 

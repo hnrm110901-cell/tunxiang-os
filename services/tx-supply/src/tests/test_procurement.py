@@ -1,11 +1,18 @@
 """采购全流程测试"""
-import sys, os
+import os
+import sys
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from services.procurement_service import (
-    can_procurement_transition, create_requisition, approve_requisition,
-    reject_requisition, create_purchase_order, receive_delivery,
-    inspect_and_stock, suggest_procurement,
+    approve_requisition,
+    can_procurement_transition,
+    create_purchase_order,
+    create_requisition,
+    inspect_and_stock,
+    receive_delivery,
+    reject_requisition,
+    suggest_procurement,
 )
 
 

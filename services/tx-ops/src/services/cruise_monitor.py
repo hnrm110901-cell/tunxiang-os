@@ -4,11 +4,14 @@
 """
 from __future__ import annotations
 
+import asyncio
 import uuid
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 import structlog
+
+from shared.events import OpsEventType, UniversalPublisher
 
 log = structlog.get_logger(__name__)
 
@@ -360,4 +363,17 @@ async def record_patrol(
         operator_id=operator_id,
         findings_count=len(enriched_findings),
     )
+
+    issues_count = sum(
+        1 for f in enriched_findings if f.get("severity") in ("warning", "critical")
+    )
+    asyncio.create_task(UniversalPublisher.publish(
+        event_type=OpsEventType.INSPECTION_COMPLETED,
+        tenant_id=uuid.UUID(tenant_id),
+        store_id=uuid.UUID(store_id),
+        entity_id=None,
+        event_data={"inspection_id": patrol_id, "score": None, "issues_count": issues_count},
+        source_service="tx-ops",
+    ))
+
     return record

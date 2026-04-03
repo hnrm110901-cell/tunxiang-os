@@ -31,7 +31,6 @@ from services.lifecycle_service import (  # noqa: E402
     LifecycleStage,
 )
 
-
 # ── 工具 ──────────────────────────────────────────────────────
 
 def _now() -> datetime:

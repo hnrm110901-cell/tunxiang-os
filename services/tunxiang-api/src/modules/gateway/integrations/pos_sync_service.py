@@ -12,7 +12,6 @@
 """
 from __future__ import annotations
 
-import asyncio
 import json
 import os
 from datetime import date, datetime, timedelta
@@ -24,7 +23,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ....shared.core.exceptions import PinzhiAPIError, POSAdapterError
-from .pos_mapper import pinzhi_order_to_db, pinzhi_order_items_to_db
+from .pos_mapper import pinzhi_order_items_to_db, pinzhi_order_to_db
 from .pos_sync_schemas import StoreSyncSummary, SyncResult, SyncStatusResponse
 
 logger = structlog.get_logger(__name__)

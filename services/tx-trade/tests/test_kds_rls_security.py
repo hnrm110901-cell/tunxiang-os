@@ -7,11 +7,8 @@
 4. RLS 具备 NULL 防护（未设置 tenant 时不可见全表）
 5. 跨租户 INSERT 被阻止（RLS WITH CHECK 校验）
 """
-import re
 import uuid
 from dataclasses import dataclass, field
-from typing import Any
-
 
 # ──────────────────────────────────────────────────────────────────
 # 常量
@@ -73,7 +70,7 @@ class MockRLSDatabase:
         if table in self._rls_tables:
             if self._current_tenant is None or self._current_tenant == "":
                 raise PermissionError(
-                    f"RLS INSERT blocked: app.tenant_id is not set (NULL/empty)"
+                    "RLS INSERT blocked: app.tenant_id is not set (NULL/empty)"
                 )
             if tenant_id != self._current_tenant:
                 raise PermissionError(

@@ -12,8 +12,6 @@ from typing import Optional
 
 import structlog
 
-from .state_machine import TABLE_STATES, TABLE_TRANSITIONS, can_table_transition
-
 logger = structlog.get_logger()
 
 

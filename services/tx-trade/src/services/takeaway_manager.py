@@ -6,8 +6,9 @@
 所有金额单位：分（fen）。
 """
 import uuid
-from datetime import datetime, timezone, timedelta, time as dtime
-from typing import Any, Optional
+from datetime import datetime, timedelta, timezone
+from datetime import time as dtime
+from typing import Any
 
 import structlog
 

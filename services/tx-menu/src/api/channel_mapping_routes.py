@@ -4,6 +4,7 @@
   - 平台菜品映射管理（查询/创建更新/自动匹配/批量确认）
   - 渠道菜单发布（发布版本/查历史/回滚）
   - 各渠道差异对比
+  - 多渠道发布管理（渠道列表/渠道菜品/添加移除/一键发布）
 
 ROUTER REGISTRATION (在tx-menu/src/main.py中添加):
     from .api.channel_mapping_routes import router as channel_mapping_router
@@ -11,30 +12,36 @@ ROUTER REGISTRATION (在tx-menu/src/main.py中添加):
 """
 from __future__ import annotations
 
+import uuid as _uuid
 from typing import Optional
-from uuid import UUID
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from shared.ontology.src.database import get_db
 
 from ..services.channel_mapping_service import (
     ChannelMappingService,
-    DishOverride,
 )
 
 log = structlog.get_logger(__name__)
 
 router = APIRouter(prefix="/api/v1/menu", tags=["channel-mapping"])
 
+# 支持的渠道及显示名
+_CHANNELS: dict[str, str] = {
+    "dine_in": "堂食",
+    "meituan": "外卖-美团",
+    "eleme": "外卖-饿了么",
+    "miniapp": "小程序",
+    "douyin": "抖音",
+}
+
 
 # ─── DB 依赖占位（与其他路由保持一致） ─────────────────────────────────────────
-
-
-async def get_db() -> AsyncSession:  # type: ignore[override]
-    """数据库会话依赖 — 由 main.py 中 app.dependency_overrides 注入"""
-    raise NotImplementedError("DB session dependency not configured")
 
 
 # ─── 工具函数 ───────────────────────────────────────────────────────────────────
@@ -264,3 +271,380 @@ async def get_channel_diff(
     svc = ChannelMappingService(db=db, tenant_id=tenant_id)
     diff = await svc.get_channel_diff(store_id=store_id)
     return {"ok": True, "data": diff.model_dump(mode="json"), "error": None}
+
+
+# ─── 多渠道发布管理 ────────────────────────────────────────────────────────────
+
+
+class AddChannelDishReq(BaseModel):
+    dish_id: str = Field(..., description="菜品ID")
+    channel_price_fen: Optional[int] = Field(None, ge=0, description="渠道特有价格（分），None 用基础价")
+    is_available: bool = True
+    sort_order: int = 0
+
+
+class UpdateChannelPriceReq(BaseModel):
+    channel_price_fen: int = Field(..., ge=0, description="新价格（分）")
+
+
+async def _set_rls(db: AsyncSession, tenant_id: str) -> None:
+    await db.execute(
+        text("SELECT set_config('app.tenant_id', :tid, true)"),
+        {"tid": tenant_id},
+    )
+
+
+@router.get("/channels", summary="获取门店支持的渠道列表")
+async def list_channels(
+    store_id: str = Query(..., description="门店ID"),
+    request: Request = None,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """返回系统支持的所有渠道及各渠道已上架菜品数量。
+
+    渠道：堂食 / 外卖-美团 / 外卖-饿了么 / 小程序 / 抖音
+    """
+    tenant_id = _tenant_id(request)
+    await _set_rls(db, tenant_id)
+    tid = _uuid.UUID(tenant_id)
+    sid = _uuid.UUID(store_id)
+
+    # 统计各渠道已上架菜品数
+    count_result = await db.execute(
+        text("""
+            SELECT channel, COUNT(*) AS cnt
+            FROM channel_menu_items
+            WHERE tenant_id = :tid
+              AND store_id  = :sid
+              AND is_available = true
+            GROUP BY channel
+        """),
+        {"tid": tid, "sid": sid},
+    )
+    counts: dict[str, int] = {row[0]: int(row[1]) for row in count_result.fetchall()}
+
+    data = [
+        {
+            "channel": ch,
+            "display_name": display,
+            "dish_count": counts.get(ch, 0),
+        }
+        for ch, display in _CHANNELS.items()
+    ]
+    log.info("channels.list", store_id=store_id, tenant_id=tenant_id)
+    return {"ok": True, "data": {"channels": data, "total": len(data)}, "error": None}
+
+
+@router.get("/channels/{channel}/dishes", summary="获取指定渠道菜品列表（含渠道价）")
+async def list_channel_dishes(
+    channel: str,
+    store_id: str = Query(..., description="门店ID"),
+    request: Request = None,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """获取指定渠道的菜品列表，包含渠道特有价格（无 override 时显示基础价）。"""
+    if channel not in _CHANNELS:
+        raise HTTPException(status_code=400, detail=f"不支持的渠道: {channel}，有效值: {list(_CHANNELS)}")
+    tenant_id = _tenant_id(request)
+    await _set_rls(db, tenant_id)
+    tid = _uuid.UUID(tenant_id)
+    sid = _uuid.UUID(store_id)
+
+    result = await db.execute(
+        text("""
+            SELECT
+                cmi.id,
+                cmi.dish_id,
+                d.dish_name,
+                d.price_fen           AS base_price_fen,
+                cmi.channel_price_fen AS channel_price_fen,
+                COALESCE(cmi.channel_price_fen, d.price_fen) AS effective_price_fen,
+                cmi.is_available,
+                cmi.sort_order,
+                d.image_url,
+                d.category_id
+            FROM channel_menu_items cmi
+            JOIN dishes d ON d.id = cmi.dish_id AND d.tenant_id = cmi.tenant_id
+            WHERE cmi.tenant_id = :tid
+              AND cmi.store_id  = :sid
+              AND cmi.channel   = :channel
+              AND d.is_deleted  = false
+            ORDER BY cmi.sort_order, d.dish_name
+        """),
+        {"tid": tid, "sid": sid, "channel": channel},
+    )
+    rows = result.fetchall()
+    dishes = [
+        {
+            "id": str(r[0]),
+            "dish_id": str(r[1]),
+            "dish_name": r[2],
+            "base_price_fen": r[3],
+            "channel_price_fen": r[4],
+            "effective_price_fen": r[5],
+            "is_available": r[6],
+            "sort_order": r[7],
+            "image_url": r[8],
+            "category_id": str(r[9]) if r[9] else None,
+        }
+        for r in rows
+    ]
+    log.info("channel_dishes.list", channel=channel, store_id=store_id, count=len(dishes))
+    return {
+        "ok": True,
+        "data": {
+            "channel": channel,
+            "display_name": _CHANNELS[channel],
+            "items": dishes,
+            "total": len(dishes),
+        },
+        "error": None,
+    }
+
+
+@router.post("/channels/{channel}/dishes", summary="添加菜品到渠道", status_code=201)
+async def add_dish_to_channel(
+    channel: str,
+    req: AddChannelDishReq,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """将菜品添加到指定渠道（存在则更新）。
+
+    外卖渠道可配置独立加价（channel_price_fen），None 则使用基础价。
+    """
+    if channel not in _CHANNELS:
+        raise HTTPException(status_code=400, detail=f"不支持的渠道: {channel}")
+    tenant_id = _tenant_id(request)
+    store_id = request.headers.get("X-Store-ID", "")
+    if not store_id:
+        raise HTTPException(status_code=400, detail="X-Store-ID header required")
+    await _set_rls(db, tenant_id)
+    tid = _uuid.UUID(tenant_id)
+    sid = _uuid.UUID(store_id)
+    did = _uuid.UUID(req.dish_id)
+
+    # 验证菜品存在
+    dish_check = await db.execute(
+        text("SELECT id, dish_name FROM dishes WHERE id = :did AND tenant_id = :tid AND is_deleted = false"),
+        {"did": did, "tid": tid},
+    )
+    dish_row = dish_check.fetchone()
+    if not dish_row:
+        raise HTTPException(status_code=404, detail=f"菜品不存在: {req.dish_id}")
+
+    result = await db.execute(
+        text("""
+            INSERT INTO channel_menu_items
+                (tenant_id, store_id, dish_id, channel, channel_price_fen, is_available, sort_order)
+            VALUES
+                (:tid, :sid, :did, :channel, :channel_price_fen, :is_available, :sort_order)
+            ON CONFLICT (tenant_id, store_id, dish_id, channel) DO UPDATE SET
+                channel_price_fen = EXCLUDED.channel_price_fen,
+                is_available      = EXCLUDED.is_available,
+                sort_order        = EXCLUDED.sort_order,
+                updated_at        = NOW()
+            RETURNING id, channel_price_fen, is_available, sort_order
+        """),
+        {
+            "tid": tid,
+            "sid": sid,
+            "did": did,
+            "channel": channel,
+            "channel_price_fen": req.channel_price_fen,
+            "is_available": req.is_available,
+            "sort_order": req.sort_order,
+        },
+    )
+    row = result.fetchone()
+    await db.commit()
+    log.info("channel_dish.added", channel=channel, dish_id=req.dish_id, store_id=store_id)
+    return {
+        "ok": True,
+        "data": {
+            "id": str(row[0]),
+            "dish_id": req.dish_id,
+            "dish_name": dish_row[1],
+            "channel": channel,
+            "channel_price_fen": row[1],
+            "is_available": row[2],
+            "sort_order": row[3],
+        },
+        "error": None,
+    }
+
+
+@router.delete(
+    "/channels/{channel}/dishes/{dish_id}",
+    summary="从渠道移除菜品",
+    status_code=200,
+)
+async def remove_dish_from_channel(
+    channel: str,
+    dish_id: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """将菜品从指定渠道下线（设为 is_available=false），不物理删除。"""
+    if channel not in _CHANNELS:
+        raise HTTPException(status_code=400, detail=f"不支持的渠道: {channel}")
+    tenant_id = _tenant_id(request)
+    store_id = request.headers.get("X-Store-ID", "")
+    if not store_id:
+        raise HTTPException(status_code=400, detail="X-Store-ID header required")
+    await _set_rls(db, tenant_id)
+    tid = _uuid.UUID(tenant_id)
+    sid = _uuid.UUID(store_id)
+    did = _uuid.UUID(dish_id)
+
+    result = await db.execute(
+        text("""
+            UPDATE channel_menu_items
+            SET is_available = false, updated_at = NOW()
+            WHERE tenant_id = :tid
+              AND store_id  = :sid
+              AND dish_id   = :did
+              AND channel   = :channel
+            RETURNING id
+        """),
+        {"tid": tid, "sid": sid, "did": did, "channel": channel},
+    )
+    row = result.fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail=f"菜品 {dish_id} 不在渠道 {channel} 中")
+    await db.commit()
+    log.info("channel_dish.removed", channel=channel, dish_id=dish_id, store_id=store_id)
+    return {"ok": True, "data": {"dish_id": dish_id, "channel": channel, "is_available": False}, "error": None}
+
+
+@router.put(
+    "/channels/{channel}/dishes/{dish_id}/price",
+    summary="更新渠道菜品价格",
+)
+async def update_channel_dish_price(
+    channel: str,
+    dish_id: str,
+    req: UpdateChannelPriceReq,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """单独更新某菜品在指定渠道的渠道价。菜品须已存在于该渠道。"""
+    if channel not in _CHANNELS:
+        raise HTTPException(status_code=400, detail=f"不支持的渠道: {channel}")
+    tenant_id = _tenant_id(request)
+    store_id = request.headers.get("X-Store-ID", "")
+    if not store_id:
+        raise HTTPException(status_code=400, detail="X-Store-ID header required")
+    await _set_rls(db, tenant_id)
+    tid = _uuid.UUID(tenant_id)
+    sid = _uuid.UUID(store_id)
+    did = _uuid.UUID(dish_id)
+
+    result = await db.execute(
+        text("""
+            UPDATE channel_menu_items
+            SET channel_price_fen = :price, updated_at = NOW()
+            WHERE tenant_id = :tid
+              AND store_id  = :sid
+              AND dish_id   = :did
+              AND channel   = :channel
+            RETURNING id, channel_price_fen
+        """),
+        {"tid": tid, "sid": sid, "did": did, "channel": channel, "price": req.channel_price_fen},
+    )
+    row = result.fetchone()
+    if not row:
+        raise HTTPException(
+            status_code=404,
+            detail=f"菜品 {dish_id} 不在渠道 {channel} 中，请先调用 POST /channels/{channel}/dishes 添加",
+        )
+    await db.commit()
+    log.info("channel_dish.price_updated", channel=channel, dish_id=dish_id, price=req.channel_price_fen)
+    return {
+        "ok": True,
+        "data": {
+            "dish_id": dish_id,
+            "channel": channel,
+            "channel_price_fen": row[1],
+        },
+        "error": None,
+    }
+
+
+@router.post("/channels/{channel}/publish", summary="一键发布到渠道")
+async def publish_to_channel(
+    channel: str,
+    store_id: str = Query(..., description="门店ID"),
+    request: Request = None,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """将当前渠道所有 is_available=true 的菜品发布（同步写入 channel_menu_versions 快照）。
+
+    等效于调用 channel_mapping_service.publish_channel_menu 并以 channel_menu_items
+    中的实时数据作为 dish_overrides。
+    """
+    if channel not in _CHANNELS:
+        raise HTTPException(status_code=400, detail=f"不支持的渠道: {channel}")
+    tenant_id = _tenant_id(request)
+    await _set_rls(db, tenant_id)
+    tid = _uuid.UUID(tenant_id)
+    sid = _uuid.UUID(store_id)
+
+    # 读取当前渠道所有可用菜品
+    items_result = await db.execute(
+        text("""
+            SELECT dish_id, channel_price_fen, is_available
+            FROM channel_menu_items
+            WHERE tenant_id = :tid
+              AND store_id  = :sid
+              AND channel   = :channel
+              AND is_available = true
+            ORDER BY sort_order
+        """),
+        {"tid": tid, "sid": sid, "channel": channel},
+    )
+    items = items_result.fetchall()
+
+    if not items:
+        raise HTTPException(
+            status_code=422,
+            detail=f"渠道 {channel} 没有可发布的菜品，请先使用 POST /channels/{channel}/dishes 添加菜品",
+        )
+
+    overrides = [
+        {
+            "dish_id": str(r[0]),
+            "channel_price_fen": r[1],
+            "is_available": r[2],
+        }
+        for r in items
+    ]
+
+    svc = ChannelMappingService(db=db, tenant_id=tenant_id)
+    published_by = request.headers.get("X-User-ID") if request else None
+    version = await svc.publish_channel_menu(
+        store_id=store_id,
+        channel_id=channel,
+        dish_overrides=overrides,
+        published_by=published_by,
+    )
+    # commit 在 service 内部未 commit，需在此处 commit
+    await db.commit()
+
+    log.info(
+        "channel.published",
+        channel=channel,
+        store_id=store_id,
+        version_no=version.version_no,
+        dish_count=len(overrides),
+    )
+    return {
+        "ok": True,
+        "data": {
+            "channel": channel,
+            "display_name": _CHANNELS[channel],
+            "version": version.model_dump(mode="json"),
+            "published_dishes": len(overrides),
+        },
+        "error": None,
+    }

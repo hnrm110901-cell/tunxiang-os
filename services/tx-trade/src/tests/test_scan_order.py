@@ -10,17 +10,15 @@
 7. KDS同步 — 未发送菜品推送到后厨
 8. 扫码统计 — 订单数/金额/热门菜品
 """
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import uuid
-from datetime import datetime, timezone, date, timedelta
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
-
 
 # ─── 工具 ───
 
@@ -110,7 +108,7 @@ class TestGenerateTableQrcode:
 
     def test_qrcode_contains_short_code(self):
         """桌码包含门店简码"""
-        from services.scan_order_service import generate_table_qrcode, _store_short_code
+        from services.scan_order_service import _store_short_code, generate_table_qrcode
 
         result = generate_table_qrcode(
             store_id=STORE_ID,

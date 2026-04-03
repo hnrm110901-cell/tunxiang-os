@@ -4,8 +4,9 @@
 """
 from __future__ import annotations
 
-import pytest
 from datetime import date, datetime, timedelta
+
+import pytest
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  E1 开店准备
@@ -39,8 +40,8 @@ async def test_create_opening_checklist():
 async def test_check_item_pass():
     """E1: 打勾一项检查，状态应正确更新。"""
     from services.tx_ops.src.services.store_opening import (
-        create_opening_checklist,
         check_item,
+        create_opening_checklist,
     )
 
     checklist = await create_opening_checklist(
@@ -189,8 +190,8 @@ async def test_stockout_cruise_alerts():
 async def test_exception_report_and_escalate():
     """E4: 上报异常并升级，状态和层级应正确变更。"""
     from services.tx_ops.src.services.exception_workflow import (
-        report_exception,
         escalate_exception,
+        report_exception,
     )
 
     exc = await report_exception(

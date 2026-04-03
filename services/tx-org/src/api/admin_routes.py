@@ -10,21 +10,20 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel
-
-from services.store_clone import clone_store, get_clone_preview, batch_clone
 from services.legal_entity import (
-    create_legal_entity,
-    create_company,
     assign_store_to_company,
-    get_entity_structure,
+    create_company,
+    create_legal_entity,
     get_company_stores,
+    get_entity_structure,
 )
 from services.store_batch import (
-    batch_create_stores,
     batch_activate,
+    batch_create_stores,
     batch_deactivate,
     import_stores_from_excel,
 )
+from services.store_clone import batch_clone, clone_store, get_clone_preview
 
 router = APIRouter(prefix="/api/v1/admin", tags=["admin"])
 

@@ -16,9 +16,9 @@
 """
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..services.kds_call_service import KdsCallService
 from ..services.order_push_config import OrderPushConfigService, OrderPushMode

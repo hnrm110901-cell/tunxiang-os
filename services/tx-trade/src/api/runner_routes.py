@@ -10,13 +10,13 @@
   POST /runner/task/{task_id}/ready     - KDS完成出品后标记ready（→ ready）
   POST /runner/task/register            - 注册传菜任务（KDS分单时调用）
 """
-from typing import Optional
 
-from fastapi import APIRouter, Depends, Request, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+
 from ..services.runner_service import (
     confirm_served,
     get_runner_history,

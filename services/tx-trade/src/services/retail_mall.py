@@ -683,4 +683,102 @@ async def get_retail_stats(
         "order_count": total_count,
         "paid_order_count": int(gmv_row.paid_count),
         "top_products": top_products,
+    return {"items": items, "total": total, "page": page, "size": size}
+
+
+# ── 后台管理 ─────────────────────────────────────────────────
+
+VALID_PRODUCT_STATUSES = ("draft", "on_sale", "off_sale")
+
+
+async def create_product(
+    name: str,
+    category: str,
+    price_fen: int,
+    original_price_fen: Optional[int],
+    cover_image: Optional[str],
+    description: Optional[str],
+    stock: int,
+    tags: list[str],
+    origin: Optional[str],
+    shelf_life: Optional[str],
+    tenant_id: str,
+    db: AsyncSession,
+) -> dict[str, Any]:
+    """创建零售商品（后台）"""
+    await _set_tenant(db, tenant_id)
+
+    if category not in RETAIL_CATEGORIES:
+        raise ValueError(f"invalid_category:{category}, valid: {RETAIL_CATEGORIES}")
+
+    import json as _json
+    product_id = uuid.uuid4()
+    now = _now_utc()
+
+    await db.execute(
+        text("""
+            INSERT INTO retail_products
+                (id, tenant_id, name, category, cover_image, description,
+                 price_fen, original_price_fen, stock, tags, origin, shelf_life,
+                 status, created_at, updated_at)
+            VALUES
+                (:id, :tid, :name, :cat, :cover, :desc,
+                 :price, :orig_price, :stock, :tags::jsonb, :origin, :shelf,
+                 'draft', :now, :now)
+        """),
+        {
+            "id": product_id, "tid": uuid.UUID(tenant_id),
+            "name": name, "cat": category,
+            "cover": cover_image, "desc": description,
+            "price": price_fen, "orig_price": original_price_fen or price_fen,
+            "stock": stock, "tags": _json.dumps(tags),
+            "origin": origin, "shelf": shelf_life,
+            "now": now,
+        },
+    )
+    await db.flush()
+    logger.info("retail_product_created", product_id=str(product_id), name=name)
+    return {
+        "product_id": str(product_id),
+        "name": name,
+        "category": category,
+        "price_fen": price_fen,
+        "status": "draft",
+    }
+
+
+async def update_product_status(
+    product_id: str,
+    status: str,
+    tenant_id: str,
+    db: AsyncSession,
+) -> dict[str, Any]:
+    """商品上下架"""
+    await _set_tenant(db, tenant_id)
+
+    if status not in VALID_PRODUCT_STATUSES:
+        raise ValueError(f"invalid_status:{status}, valid: {VALID_PRODUCT_STATUSES}")
+
+    result = await db.execute(
+        text("""
+            UPDATE retail_products
+            SET status = :status, updated_at = NOW()
+            WHERE id = :id AND tenant_id = :tid AND is_deleted = false
+            RETURNING id, name, status
+        """),
+        {
+            "id": uuid.UUID(product_id),
+            "tid": uuid.UUID(tenant_id),
+            "status": status,
+        },
+    )
+    row = result.fetchone()
+    if not row:
+        raise ValueError("product_not_found")
+
+    logger.info("retail_product_status_updated", product_id=product_id, status=status)
+    return {
+        "product_id": str(row.id),
+        "name": row.name,
+        "status": row.status,
     }

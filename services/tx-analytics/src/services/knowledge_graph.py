@@ -17,8 +17,8 @@ Graph Structure:
 (BestPractice)-[:DISCOVERED_AT]->(Store)-[:APPLICABLE_TO]->(BusinessType)
 """
 import re
-import time
 import statistics
+import time
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Optional

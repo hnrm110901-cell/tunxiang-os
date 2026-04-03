@@ -1,12 +1,13 @@
 """排队叫号模型 — 6状态机，支持VIP优先与美团同步"""
 import uuid
 
-from sqlalchemy import String, Integer, Boolean, Index
+from sqlalchemy import Boolean, Index, Integer, String
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from shared.ontology.src.base import TenantBase
-from .enums import QueueStatus, QueueSource
+
+from .enums import QueueSource, QueueStatus
 
 
 class QueueEntry(TenantBase):

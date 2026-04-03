@@ -8,9 +8,8 @@
 5. Qdrant不可用时graceful降级（返回空结果，不报错）
 6. 批量索引（大量文档一次性写入）
 """
-import sys
 import os
-import asyncio
+import sys
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -24,12 +23,12 @@ _ROOT_DIR = os.path.dirname(_SERVICES_DIR)                              # tunxia
 sys.path.insert(0, _SRC_DIR)
 sys.path.insert(0, _ROOT_DIR)
 
-from shared.vector_store.client import QdrantClient
-from shared.vector_store.embeddings import EmbeddingService
-from shared.vector_store.indexes import COLLECTIONS, get_vector_size, list_collections
 # knowledge_retrieval位于 src/services/ 下，_SRC_DIR已加入sys.path
 from services.knowledge_retrieval import KnowledgeRetrievalService
 
+from shared.vector_store.client import QdrantClient
+from shared.vector_store.embeddings import EmbeddingService
+from shared.vector_store.indexes import COLLECTIONS, get_vector_size, list_collections
 
 # ── 工具：生成固定长度的假向量 ────────────────────────────────
 

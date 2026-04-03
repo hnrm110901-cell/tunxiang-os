@@ -73,8 +73,8 @@ export const startScan = (): Promise<string> => {
   return new Promise((resolve) => {
     if (isAndroidPOS() && window.TXBridge) {
       const callbackName = `__txScanCb_${Date.now()}`;
-      (window as Record<string, unknown>)[callbackName] = (result: string) => {
-        delete (window as Record<string, unknown>)[callbackName];
+      (window as unknown as Record<string, unknown>)[callbackName] = (result: string) => {
+        delete (window as unknown as Record<string, unknown>)[callbackName];
         resolve(result);
       };
       window.TXBridge.scan();
@@ -91,4 +91,51 @@ export const getDeviceInfo = (): Record<string, string> => {
     return JSON.parse(window.TXBridge.getDeviceInfo());
   }
   return { model: 'browser', serial: 'dev' };
+};
+
+/** 开始监听电子秤 */
+export const startScale = (): void => {
+  if (isAndroidPOS() && window.TXBridge) {
+    window.TXBridge.startScale();
+  }
+};
+
+/** 停止监听电子秤 */
+export const stopScale = (): void => {
+  if (isAndroidPOS() && window.TXBridge) {
+    (window.TXBridge as NativeTXBridge & { stopScale?: () => void }).stopScale?.();
+  }
+};
+
+/**
+ * 监听称重回调（返回 cleanup 函数）
+ * 真实商米秤通过 onScaleData 推送数据，格式: "S,ST,+001.350kg"（稳定）或 "S,US,+001.350kg"（不稳定）
+ */
+export const onScaleWeight = (
+  callback: (kg: number, stable: boolean) => void,
+): (() => void) => {
+  if (isAndroidPOS() && window.TXBridge) {
+    const cbName = `__txScale_${Date.now()}`;
+    (window as unknown as Record<string, unknown>)[cbName] = (raw: string) => {
+      // 商米秤数据格式: "S,ST,+001.350kg"(稳定) 或 "S,US,+001.350kg"(不稳定)
+      const stable = raw.includes(',ST,');
+      const match = raw.match(/([0-9.]+)kg/);
+      if (match) callback(parseFloat(match[1]), stable);
+    };
+    window.TXBridge.onScaleData(cbName);
+    return () => {
+      delete (window as unknown as Record<string, unknown>)[cbName];
+    };
+  } else {
+    // 开发模式：模拟秤数据（每500ms随机波动，3秒后稳定）
+    let count = 0;
+    const mockWeight = 1.2 + Math.random() * 0.5;
+    const timer = setInterval(() => {
+      count++;
+      const stable = count > 6;
+      const weight = stable ? mockWeight : mockWeight + (Math.random() - 0.5) * 0.05;
+      callback(parseFloat(weight.toFixed(3)), stable);
+    }, 500);
+    return () => clearInterval(timer);
+  }
 };

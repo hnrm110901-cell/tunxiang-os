@@ -7,8 +7,8 @@
 5. 推荐追踪
 6. 社交统计
 """
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -17,7 +17,6 @@ from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock
 
 import pytest
-
 from services.social_engine import (
     create_group_order,
     create_share_link,
@@ -26,7 +25,6 @@ from services.social_engine import (
     send_gift,
     track_referral,
 )
-
 
 TENANT_ID = str(uuid.uuid4())
 STORE_ID = str(uuid.uuid4())

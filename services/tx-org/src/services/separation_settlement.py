@@ -26,8 +26,8 @@
 from __future__ import annotations
 
 import math
-from datetime import date, timedelta
-from typing import Any, List, Optional, Tuple
+from datetime import date
+from typing import List, Optional, Tuple
 
 import structlog
 

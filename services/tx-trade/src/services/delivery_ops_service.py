@@ -16,9 +16,11 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
 import structlog
-from pydantic import BaseModel, Field
-from sqlalchemy import and_, func, select, update
+from pydantic import BaseModel
+from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from shared.events import UniversalPublisher
 
 logger = structlog.get_logger()
 
@@ -142,7 +144,6 @@ class DeliveryOpsService:
         db: AsyncSession,
     ) -> DeliveryStoreConfig:
         """获取门店指定平台的外卖运营配置，不存在则自动创建默认配置"""
-        from shared.ontology.src.database import run_with_tenant  # noqa: PLC0415
 
         sid = uuid.UUID(str(store_id))
         tid = uuid.UUID(str(tenant_id))
@@ -489,13 +490,30 @@ class DeliveryOpsService:
             )
             return self._review_row_to_model(row)
 
-        # TODO: 实现真实预警推送渠道（企微Webhook / 短信 / tx-agent事件总线）
         logger.bind(
             review_id=str(rid),
             store_id=str(row.get("store_id")),
             platform=row.get("platform"),
             rating=row.get("rating"),
-        ).warning("delivery_ops.negative_alert_sent [TODO: real push channel]")
+        ).warning("delivery_ops.negative_alert_triggered")
+        # 向 sms_jobs Redis Stream 推送差评预警作业，告警 Worker 消费后发送企微/短信通知
+        try:
+            r = await UniversalPublisher.get_redis()
+            await r.xadd(
+                "sms_jobs",
+                {
+                    "sms_type": "delivery_negative_review",
+                    "review_id": str(rid),
+                    "store_id": str(row.get("store_id") or ""),
+                    "platform": str(row.get("platform") or ""),
+                    "rating": str(row.get("rating") or ""),
+                    "tenant_id": str(tid),
+                },
+                maxlen=50_000,
+                approximate=True,
+            )
+        except (OSError, RuntimeError) as exc:
+            logger.warning("delivery_ops.alert_publish_failed", review_id=str(rid), error=str(exc))
 
         stmt = (
             _DeliveryReviewRow.__table__.update()
@@ -691,7 +709,6 @@ class DeliveryOpsService:
             text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tid)}
         )
 
-        from datetime import date  # noqa: PLC0415
 
         cutoff = datetime.now(tz=timezone.utc).date() - timedelta(days=days)
         tbl = _PlatformHealthSnapshotRow.__table__
@@ -723,8 +740,8 @@ class DeliveryOpsService:
         db: AsyncSession,
     ) -> dict[str, Any]:
         """插入或更新平台健康度每日快照（供爬虫/数据同步任务调用）"""
+
         from sqlalchemy import text  # noqa: PLC0415
-        from datetime import date  # noqa: PLC0415
 
         sid = uuid.UUID(str(store_id))
         tid = uuid.UUID(str(tenant_id))
@@ -921,8 +938,14 @@ class DeliveryOpsService:
 class _DeliveryStoreConfigRow:
     """Table accessor — maps to delivery_store_configs DDL in v039 migration"""
     from sqlalchemy import (  # noqa: PLC0415
-        Table, Column, MetaData, Boolean, Integer, String, Numeric,
+        Boolean,
+        Column,
         DateTime,
+        Integer,
+        MetaData,
+        Numeric,
+        String,
+        Table,
     )
     from sqlalchemy.dialects.postgresql import UUID as _PGUUID  # noqa: PLC0415
 
@@ -946,8 +969,17 @@ def _build_tables() -> None:
     before this runs.
     """
     from sqlalchemy import (  # noqa: PLC0415
-        Table, Column, MetaData, Boolean, Integer, String, Numeric,
-        DateTime, Date, ARRAY, Text,
+        ARRAY,
+        Boolean,
+        Column,
+        Date,
+        DateTime,
+        Integer,
+        MetaData,
+        Numeric,
+        String,
+        Table,
+        Text,
     )
     from sqlalchemy.dialects.postgresql import UUID as PGUUID  # noqa: PLC0415
 

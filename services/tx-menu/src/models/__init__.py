@@ -1,5 +1,4 @@
 """tx-menu ORM 模型"""
-from .dish_practice import DishPractice
 from .dish_combo import DishCombo
 from .menu_template import (
     MenuTemplate,
@@ -8,6 +7,7 @@ from .menu_template import (
     SeasonalMenu,
     RoomMenu,
 )
+from .dish_practice import DishPractice
 
 __all__ = [
     "DishPractice",

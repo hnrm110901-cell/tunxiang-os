@@ -1,18 +1,17 @@
 """优惠券引擎 API — 8端点"""
 from typing import Optional
+
 from fastapi import APIRouter, Header
 from pydantic import BaseModel, Field
-
 from services.coupon_engine import (
-    CouponType,
-    create_coupon,
     batch_issue,
-    verify_coupon,
-    redeem_coupon,
-    check_stacking_rules,
     calculate_discount,
-    set_revenue_rule,
+    check_stacking_rules,
+    create_coupon,
     get_coupon_stats,
+    redeem_coupon,
+    set_revenue_rule,
+    verify_coupon,
 )
 
 router = APIRouter(prefix="/api/v1/member/coupons", tags=["coupon-engine"])

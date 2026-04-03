@@ -12,9 +12,13 @@ Covers:
 - Auto-insight generation
 """
 
-import pytest
-from datetime import datetime
 
+import pytest
+
+from ..ontology.bootstrap import OntologyBootstrap
+from ..ontology.data_sync import PGToNeo4jSync
+from ..ontology.reasoning import CausalReasoningEngine
+from ..ontology.repository import OntologyRepository
 from ..ontology.schema import (
     NODE_LABELS,
     RELATIONSHIP_TYPES,
@@ -22,14 +26,8 @@ from ..ontology.schema import (
     validate_node_properties,
     validate_relationship_type,
 )
-from ..ontology.models import NodeModel, RelationshipModel, BOMEntry, DishCostBreakdown
-from ..ontology.repository import OntologyRepository
-from ..ontology.bootstrap import OntologyBootstrap, SEED_BOM, SEED_DISHES
-from ..ontology.data_sync import PGToNeo4jSync
-from ..ontology.reasoning import CausalReasoningEngine
 from ..services.cost_truth_engine import CostTruthEngine
 from ..services.reasoning_engine import ReasoningEngine
-
 
 # ─── Fixtures ───
 

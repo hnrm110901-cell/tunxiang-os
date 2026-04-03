@@ -1,21 +1,22 @@
 """礼品卡服务测试 — 制卡/激活/售卖/使用/余额/线上配置"""
-import sys
 import os
+import sys
+
 import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from services.gift_card import (
-    create_gift_card_type,
-    batch_create_cards,
+    _CardStore,
+    _CardTypeStore,
+    _OnlineConfigStore,
     activate_cards,
-    sell_card,
-    use_card,
+    batch_create_cards,
+    create_gift_card_type,
     get_card_balance,
     online_purchase_config,
-    _CardTypeStore,
-    _CardStore,
-    _OnlineConfigStore,
+    sell_card,
+    use_card,
 )
 
 TENANT = "t-test-001"

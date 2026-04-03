@@ -13,15 +13,14 @@
 - 库存水位优化 -> InventoryAlertAgent.optimize_stock_levels (新增能力)
 """
 
-import sys
-import os
 import asyncio
+import os
+import sys
 
 import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from agents.base import AgentResult
 from agents.constraints import ConstraintChecker
 from agents.skills.inventory_alert import InventoryAlertAgent
 

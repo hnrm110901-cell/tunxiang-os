@@ -2,32 +2,31 @@
 
 覆盖：today_overview / store_ranking / alert_summary
 """
-import sys
 import os
+import sys
+
 import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from services.today_overview import (
-    calc_pct_change,
-    find_peak_hour,
-    get_today_overview,
-    get_multi_store_overview,
+from services.alert_summary import (
+    aggregate_alert_stats,
+    get_alert_stats,
+    get_today_alerts,
+    sort_alerts_by_severity,
 )
 from services.store_ranking import (
     calc_vs_avg_pct,
     determine_trend,
-    get_store_ranking,
     get_store_comparison,
-    VALID_METRICS,
+    get_store_ranking,
 )
-from services.alert_summary import (
-    aggregate_alert_stats,
-    sort_alerts_by_severity,
-    get_today_alerts,
-    get_alert_stats,
+from services.today_overview import (
+    calc_pct_change,
+    find_peak_hour,
+    get_multi_store_overview,
+    get_today_overview,
 )
-
 
 # ════════════════════════════════════════
 # today_overview 测试

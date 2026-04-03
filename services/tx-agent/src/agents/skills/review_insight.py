@@ -3,8 +3,8 @@
 评论主题提取、情感分析、评分趋势监测、差评根因分析、评论关键词云、评论回复建议。
 """
 from typing import Any
-from ..base import SkillAgent, AgentResult
 
+from ..base import AgentResult, SkillAgent
 
 # 评论主题分类
 REVIEW_TOPICS = {
@@ -261,7 +261,7 @@ class ReviewInsightAgent(SkillAgent):
                 reply = f"感谢您对{brand_name}的认可，您的支持是我们前进的动力！"
                 urgency = "low"
             elif rating >= 3:
-                reply = f"感谢您的反馈，我们会认真改进，期待为您提供更好的体验。"
+                reply = "感谢您的反馈，我们会认真改进，期待为您提供更好的体验。"
                 urgency = "medium"
             else:
                 # 识别具体问题

@@ -11,8 +11,7 @@
 核销记录必须关联 order_id，确保财务对账闭环。
 """
 import re
-import uuid
-from datetime import datetime, date, timezone
+from datetime import date, datetime, timezone
 from typing import Optional
 
 import structlog

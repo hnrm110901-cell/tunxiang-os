@@ -3,8 +3,8 @@
 新原料发现、原料趋势分析、原料替代建议、供应商对比、原料成本预测、原料合规检查。
 """
 from typing import Any
-from ..base import SkillAgent, AgentResult
 
+from ..base import AgentResult, SkillAgent
 
 # 原料品类
 INGREDIENT_CATEGORIES = ["肉类", "海鲜", "蔬菜", "调味料", "粮油", "乳制品", "饮品原料", "预制半成品"]

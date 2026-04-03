@@ -7,7 +7,7 @@ from typing import Optional
 from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel, Field
 
-from ..services.print_manager import get_print_manager, PrinterRole
+from ..services.print_manager import PrinterRole, get_print_manager
 
 router = APIRouter(prefix="/api/v1/printer", tags=["printer"])
 

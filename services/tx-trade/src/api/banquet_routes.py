@@ -1,12 +1,11 @@
 """宴会全流程 API — 线索→报价→签约→定金→菜单→执行→结账→回访"""
-from typing import Optional
-from fastapi import APIRouter, Request, Depends
+import structlog
+from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-import structlog
-
 from shared.ontology.src.database import get_db_with_tenant
+
 from ..services.banquet_integration import BanquetIntegrationService
 
 logger = structlog.get_logger()

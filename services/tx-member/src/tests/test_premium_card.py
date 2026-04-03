@@ -9,15 +9,14 @@
 6. 赠送年卡 (正常/无效手机号)
 7. 年卡常量校验
 """
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+from api.premium_card_routes import router as premium_router
 from fastapi.testclient import TestClient
 from main import app
-
-from api.premium_card_routes import router as premium_router
 
 if not any(r.prefix == "/api/v1/member/premium" for r in app.routes if hasattr(r, "prefix")):
     app.include_router(premium_router)

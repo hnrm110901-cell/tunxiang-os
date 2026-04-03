@@ -1,0 +1,92 @@
+// android-shell/app/build.gradle
+// 屯象 POS 安卓壳层模块构建配置
+// 目标机型：商米 T2 / V2（Android 7.1 → 11，本项目 minSdk=26 覆盖 Android 8.0+）
+
+plugins {
+    id 'com.android.application'
+    id 'kotlin-android'
+}
+
+android {
+    namespace 'com.tunxiang.pos'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.tunxiang.pos"
+        minSdk 26          // Android 8.0 — 商米 T2/V2 最低版本
+        targetSdk 34       // Android 14
+        versionCode 1
+        versionName "0.1.0"
+
+        // 仅支持商米 POS 机型 ABI（ARM 64-bit 为主）
+        ndk {
+            abiFilters 'arm64-v8a', 'armeabi-v7a'
+        }
+    }
+
+    buildTypes {
+        debug {
+            debuggable true
+            // 允许 WebView 远程调试（chrome://inspect）
+            buildConfigField "boolean", "WEBVIEW_DEBUG", "true"
+        }
+        release {
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            buildConfigField "boolean", "WEBVIEW_DEBUG", "false"
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = '17'
+    }
+
+    // 离线 HTML 打包到 assets（React build 产物放于此处）
+    sourceSets {
+        main {
+            assets.srcDirs = ['src/main/assets']
+        }
+    }
+}
+
+dependencies {
+    // AndroidX 基础库
+    implementation 'androidx.core:core-ktx:1.12.0'
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+
+    // WebView（系统 WebView，商米设备已内置更新版本）
+    // WebView 无需单独依赖，由系统提供
+
+    // JSON 处理（TXBridge.getDeviceInfo 返回值序列化）
+    implementation 'org.json:json:20231013'
+
+    // ─── 商米 SDK 占位 ────────────────────────────────────────────────────
+    // TODO: 从商米开发者平台下载并放入 libs/ 目录后取消注释：
+    //
+    // 打印 SDK（InnerPrinterManager）：
+    // implementation fileTree(dir: 'libs', include: ['SunmiPrinterSDK-*.aar'])
+    //
+    // 钱箱 SDK（SunmiCashDrawer）：
+    // implementation fileTree(dir: 'libs', include: ['SunmiCashDrawer-*.aar'])
+    //
+    // 电子秤 SDK（ScaleManager）：
+    // implementation fileTree(dir: 'libs', include: ['SunmiScale-*.aar'])
+    //
+    // 扫码 SDK（SunmiScanHead）：
+    // implementation fileTree(dir: 'libs', include: ['SunmiScan-*.aar'])
+    //
+    // 商米设备信息 SDK（SunmiDevice.getSerial()）：
+    // implementation fileTree(dir: 'libs', include: ['SunmiDevice-*.aar'])
+    // ─────────────────────────────────────────────────────────────────────
+
+    // 测试（仅 Bridge 层单元测试，不测业务逻辑）
+    testImplementation 'junit:junit:4.13.2'
+    androidTestImplementation 'androidx.test.ext:junit:1.1.5'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
+}

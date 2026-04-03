@@ -4,6 +4,11 @@
 x-common-env: &common-env
   DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-tunxiang}:${POSTGRES_PASSWORD}@postgres/${POSTGRES_DB:-tunxiang_os}
   REDIS_URL: redis://:${REDIS_PASSWORD:-changeme}@redis:6379/0
+  # 等保三级安全配置（生产环境在 /etc/txos/security.env 中配置，通过 env_file 注入）
+  TX_JWT_SECRET_KEY: ${TX_JWT_SECRET_KEY}
+  TX_MFA_ENCRYPT_KEY: ${TX_MFA_ENCRYPT_KEY}
+  TX_FIELD_ENCRYPTION_KEY: ${TX_FIELD_ENCRYPTION_KEY}
+  TX_INTEGRITY_SECRET: ${TX_INTEGRITY_SECRET}
 
 x-service-defaults: &service-defaults
   restart: always

@@ -13,15 +13,12 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import List
 
 import structlog
-from sqlalchemy import select, update, and_, text
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from shared.ontology.src.entities import Order, OrderItem
-from ..models.kds_task import KDSTask
-from ..models.production_dept import DishDeptMapping
 
 logger = structlog.get_logger()
 
@@ -82,7 +79,7 @@ class BatchGroupService:
                 return 1
             base_qty = row[0]
             return base_qty if base_qty and base_qty > 0 else 1
-        except Exception as exc:
+        except SQLAlchemyError as exc:  # MLPS3-P0: 异常收窄
             logger.warning(
                 "batch_group.get_base_qty_failed",
                 dish_id=dish_id,
@@ -151,7 +148,7 @@ class BatchGroupService:
             )
         except ValueError:
             raise
-        except Exception as exc:
+        except SQLAlchemyError as exc:  # MLPS3-P0: 异常收窄
             await db.rollback()
             logger.error(
                 "batch_group.set_base_quantity_failed",
@@ -209,7 +206,7 @@ class BatchGroupService:
                 },
             )
             task_rows = rows.fetchall()
-        except Exception as exc:
+        except SQLAlchemyError as exc:  # MLPS3-P0: 异常收窄
             logger.error(
                 "batch_group.get_batched_queue_failed",
                 dept_id=dept_id,

@@ -25,7 +25,7 @@ from datetime import date, datetime, timezone
 from typing import Any
 
 import structlog
-from sqlalchemy import select, update, distinct
+from sqlalchemy import distinct, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.entities import Customer
@@ -450,7 +450,7 @@ class RFMEventListener:
 
     async def listen(
         self,
-        session_factory: "AsyncSessionFactory",  # type: ignore[name-defined]
+        session_factory: "AsyncSessionFactory",  # type: ignore[name-defined]  # noqa: F821
     ) -> None:
         """持续监听 Redis Stream，收到 ORDER_PAID 后立即更新对应客户 RFM。
 
@@ -458,9 +458,8 @@ class RFMEventListener:
             session_factory: async_session_factory（来自 shared.ontology.src.database）
                              每次处理事件时创建独立 session，避免长事务。
         """
-        from shared.events.member_events import MemberEvent, MemberEventType
-        from shared.events.event_publisher import MemberEventPublisher
         from shared.events.event_consumer import STREAM_KEY
+        from shared.events.event_publisher import MemberEventPublisher
 
         redis = await MemberEventPublisher.get_redis()
         await self._consumer.ensure_group(redis)
@@ -503,14 +502,14 @@ class RFMEventListener:
 
     async def _handle_event_entry(
         self,
-        redis: "aioredis.Redis",  # type: ignore[name-defined]
+        redis: "aioredis.Redis",  # type: ignore[name-defined]  # noqa: F821
         entry_id: str,
         fields: dict[str, str],
-        session_factory: "AsyncSessionFactory",  # type: ignore[name-defined]
+        session_factory: "AsyncSessionFactory",  # type: ignore[name-defined]  # noqa: F821
     ) -> None:
         """处理单条事件，仅响应 ORDER_PAID。"""
+        from shared.events.event_consumer import DLQ_STREAM_KEY, STREAM_KEY, _deserialize_event
         from shared.events.member_events import MemberEventType
-        from shared.events.event_consumer import _deserialize_event, DLQ_STREAM_KEY
 
         event_type_str: str = fields.get("event_type", "")
         if event_type_str != MemberEventType.ORDER_PAID.value:

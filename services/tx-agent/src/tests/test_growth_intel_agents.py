@@ -3,23 +3,22 @@
 每个Agent至少测试2个action，共32+个测试用例。
 """
 import pytest
-from agents.skills.new_customer_convert import NewCustomerConvertAgent
-from agents.skills.dormant_recall import DormantRecallAgent
 from agents.skills.banquet_growth import BanquetGrowthAgent
-from agents.skills.seasonal_campaign import SeasonalCampaignAgent
-from agents.skills.referral_growth import ReferralGrowthAgent
-from agents.skills.high_value_member import HighValueMemberAgent
-from agents.skills.off_peak_traffic import OffPeakTrafficAgent
-from agents.skills.content_generation import ContentGenerationAgent
 from agents.skills.competitor_watch import CompetitorWatchAgent
-from agents.skills.review_insight import ReviewInsightAgent
-from agents.skills.trend_discovery import TrendDiscoveryAgent
-from agents.skills.new_product_scout import NewProductScoutAgent
+from agents.skills.content_generation import ContentGenerationAgent
+from agents.skills.dormant_recall import DormantRecallAgent
+from agents.skills.high_value_member import HighValueMemberAgent
 from agents.skills.ingredient_radar import IngredientRadarAgent
-from agents.skills.menu_advisor import MenuAdvisorAgent
-from agents.skills.pilot_recommender import PilotRecommenderAgent
 from agents.skills.intel_reporter import IntelReporterAgent
-
+from agents.skills.menu_advisor import MenuAdvisorAgent
+from agents.skills.new_customer_convert import NewCustomerConvertAgent
+from agents.skills.new_product_scout import NewProductScoutAgent
+from agents.skills.off_peak_traffic import OffPeakTrafficAgent
+from agents.skills.pilot_recommender import PilotRecommenderAgent
+from agents.skills.referral_growth import ReferralGrowthAgent
+from agents.skills.review_insight import ReviewInsightAgent
+from agents.skills.seasonal_campaign import SeasonalCampaignAgent
+from agents.skills.trend_discovery import TrendDiscoveryAgent
 
 TENANT_ID = "test-tenant-001"
 STORE_ID = "store-001"

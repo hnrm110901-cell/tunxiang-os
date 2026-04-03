@@ -6,6 +6,8 @@ ROUTER REGISTRATION (在 tx-trade/src/main.py 中添加):
 """
 from __future__ import annotations
 
+import uuid
+from datetime import date, timedelta
 from typing import Optional
 
 import structlog
@@ -14,10 +16,13 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+
+from ..models.delivery_order import DeliveryOrder as DeliveryOrderModel
+from ..repositories.delivery_order_repo import DeliveryOrderRepository
 from ..services.delivery_ops_service import (
-    DeliveryOpsService,
-    DeliveryOpsError,
     ConfigNotFoundError,
+    DeliveryOpsError,
+    DeliveryOpsService,
     ReviewNotFoundError,
 )
 
@@ -25,6 +30,7 @@ logger = structlog.get_logger()
 router = APIRouter(prefix="/api/v1/delivery", tags=["delivery-ops"])
 
 _VALID_PLATFORMS = {"meituan", "eleme", "douyin"}
+_VALID_RECON_ISSUE = {"any", "unlink", "amount"}
 
 
 # ─── 工具函数 ──────────────────────────────────────────────────────────────────
@@ -45,6 +51,39 @@ def _validate_platform(platform: str) -> None:
         )
 
 
+def _validate_recon_issue(issue_type: str) -> None:
+    if issue_type not in _VALID_RECON_ISSUE:
+        raise HTTPException(
+            status_code=400,
+            detail=f"issue_type 无效: {issue_type}，有效值: {sorted(_VALID_RECON_ISSUE)}",
+        )
+
+
+def _serialize_recon_candidate(o: DeliveryOrderModel) -> dict:
+    issues: list[str] = []
+    if o.internal_order_id is None:
+        issues.append("no_internal_order")
+    net = o.total_fen - o.commission_fen
+    if o.actual_revenue_fen is not None and o.actual_revenue_fen != o.merchant_receive_fen:
+        issues.append("actual_vs_merchant_mismatch")
+    if net != o.merchant_receive_fen:
+        issues.append("total_minus_commission_vs_merchant")
+    return {
+        "id": str(o.id),
+        "order_no": o.order_no,
+        "platform": o.platform,
+        "platform_order_id": o.platform_order_id,
+        "status": o.status,
+        "total_fen": o.total_fen,
+        "commission_fen": o.commission_fen,
+        "merchant_receive_fen": o.merchant_receive_fen,
+        "actual_revenue_fen": o.actual_revenue_fen,
+        "internal_order_id": str(o.internal_order_id) if o.internal_order_id else None,
+        "issues": issues,
+        "created_at": o.created_at.isoformat() if o.created_at else None,
+    }
+
+
 # ─── 请求体模型 ────────────────────────────────────────────────────────────────
 
 
@@ -63,6 +102,13 @@ class EnableBusyModeReq(BaseModel):
 
 class ReplyReviewReq(BaseModel):
     content: str
+
+
+class LinkDeliveryInternalReq(BaseModel):
+    """将 delivery_orders 行关联到 orders.id（补偿未写 internal_order_id 的场景）。"""
+
+    delivery_order_id: str
+    internal_order_id: str
 
 
 # ─── 运营配置 ──────────────────────────────────────────────────────────────────
@@ -418,3 +464,219 @@ async def get_health_trend(
         return {"ok": True, "data": {"trend": serialized, "days": days}, "error": None}
     except DeliveryOpsError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+# ─── 外卖对账候选（Y-A5 骨架：查询 + 汇总，供定时任务 / HQ 使用）──────────────────
+
+
+@router.get(
+    "/reconciliation/candidates",
+    summary="外卖对账候选单列表",
+)
+async def list_reconciliation_candidates(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    store_id: Optional[str] = Query(None, description="门店 ID，不传则全部门店"),
+    platform: Optional[str] = Query(None, description="meituan / eleme / douyin"),
+    date_from: Optional[date] = Query(None, description="开始日期，默认 date_to-7 天"),
+    date_to: Optional[date] = Query(None, description="结束日期，默认今天"),
+    issue_type: str = Query(
+        "any",
+        description="any=未关联内部单或金额异常；unlink=仅未关联；amount=仅金额口径异常",
+    ),
+    page: int = Query(1, ge=1),
+    size: int = Query(20, ge=1, le=100),
+) -> dict:
+    """终态外卖单（completed/cancelled/refunded）在日期范围内的对账候选。
+
+    后续可接：平台账单拉取、差异写入对账任务表、自动补偿重试。
+    """
+    _validate_recon_issue(issue_type)
+    if platform:
+        _validate_platform(platform)
+    tenant_uuid = uuid.UUID(_get_tenant_id(request))
+    if date_to is None:
+        date_to = date.today()
+    if date_from is None:
+        date_from = date_to - timedelta(days=7)
+    if date_from > date_to:
+        raise HTTPException(status_code=400, detail="date_from 不能晚于 date_to")
+
+    sid = uuid.UUID(store_id) if store_id else None
+    items, total = await DeliveryOrderRepository.list_reconciliation_candidates(
+        db,
+        tenant_uuid,
+        date_from=date_from,
+        date_to=date_to,
+        store_id=sid,
+        platform=platform,
+        issue_type=issue_type,
+        page=page,
+        size=size,
+    )
+    return {
+        "ok": True,
+        "data": {
+            "items": [_serialize_recon_candidate(o) for o in items],
+            "total": total,
+            "page": page,
+            "size": size,
+            "date_from": date_from.isoformat(),
+            "date_to": date_to.isoformat(),
+            "issue_type": issue_type,
+        },
+        "error": None,
+    }
+
+
+@router.get(
+    "/reconciliation/summary",
+    summary="外卖对账候选汇总计数",
+)
+async def get_reconciliation_summary(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    store_id: Optional[str] = Query(None),
+    platform: Optional[str] = Query(None),
+    date_from: Optional[date] = Query(None),
+    date_to: Optional[date] = Query(None),
+) -> dict:
+    if platform:
+        _validate_platform(platform)
+    tenant_uuid = uuid.UUID(_get_tenant_id(request))
+    if date_to is None:
+        date_to = date.today()
+    if date_from is None:
+        date_from = date_to - timedelta(days=7)
+    if date_from > date_to:
+        raise HTTPException(status_code=400, detail="date_from 不能晚于 date_to")
+    sid = uuid.UUID(store_id) if store_id else None
+    summary = await DeliveryOrderRepository.reconciliation_summary(
+        db,
+        tenant_uuid,
+        date_from=date_from,
+        date_to=date_to,
+        store_id=sid,
+        platform=platform,
+    )
+    return {
+        "ok": True,
+        "data": {
+            **summary,
+            "date_from": date_from.isoformat(),
+            "date_to": date_to.isoformat(),
+        },
+        "error": None,
+    }
+
+
+@router.get(
+    "/reconciliation/compensation-suggestions",
+    summary="外卖对账补偿建议（按 omni 元数据匹配内部单）",
+)
+async def list_compensation_suggestions(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    store_id: Optional[str] = Query(None, description="门店 ID，不传则全部门店"),
+    platform: Optional[str] = Query(None, description="meituan / eleme / douyin"),
+    date_from: Optional[date] = Query(None, description="开始日期，默认 date_to-7 天"),
+    date_to: Optional[date] = Query(None, description="结束日期，默认今天"),
+    page: int = Query(1, ge=1),
+    size: int = Query(20, ge=1, le=100),
+) -> dict:
+    """Y-A5 补偿骨架：仅针对 **未关联 internal_order_id** 的终态单，尝试用
+    ``orders.order_metadata.omni.platform_order_id`` 推断可关联的 ``orders.id``。
+
+    不写库；运营确认后调用 ``POST /reconciliation/link-internal-order``。
+    """
+    if platform:
+        _validate_platform(platform)
+    tenant_uuid = uuid.UUID(_get_tenant_id(request))
+    if date_to is None:
+        date_to = date.today()
+    if date_from is None:
+        date_from = date_to - timedelta(days=7)
+    if date_from > date_to:
+        raise HTTPException(status_code=400, detail="date_from 不能晚于 date_to")
+
+    sid = uuid.UUID(store_id) if store_id else None
+    items, total = await DeliveryOrderRepository.list_reconciliation_candidates(
+        db,
+        tenant_uuid,
+        date_from=date_from,
+        date_to=date_to,
+        store_id=sid,
+        platform=platform,
+        issue_type="unlink",
+        page=page,
+        size=size,
+    )
+
+    out_items: list[dict] = []
+    for o in items:
+        row = _serialize_recon_candidate(o)
+        suggested = await DeliveryOrderRepository.find_internal_order_id_by_omni_platform_order(
+            db,
+            tenant_uuid,
+            o.store_id,
+            o.platform,
+            o.platform_order_id,
+        )
+        row["suggested_internal_order_id"] = str(suggested) if suggested else None
+        row["suggestion_source"] = "omni_order_metadata" if suggested else "none"
+        out_items.append(row)
+
+    return {
+        "ok": True,
+        "data": {
+            "items": out_items,
+            "total": total,
+            "page": page,
+            "size": size,
+            "date_from": date_from.isoformat(),
+            "date_to": date_to.isoformat(),
+        },
+        "error": None,
+    }
+
+
+@router.post(
+    "/reconciliation/link-internal-order",
+    summary="手动将外卖单关联到内部订单（补偿）",
+)
+async def link_delivery_internal_order(
+    req: LinkDeliveryInternalReq,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """写入 ``delivery_orders.internal_order_id``。外卖单必须尚未关联，且内部单须存在、同租户。"""
+    tenant_uuid = uuid.UUID(_get_tenant_id(request))
+    try:
+        delivery_oid = uuid.UUID(req.delivery_order_id.strip())
+        internal_oid = uuid.UUID(req.internal_order_id.strip())
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail="delivery_order_id / internal_order_id 须为合法 UUID",
+        ) from exc
+
+    ok = await DeliveryOrderRepository.link_delivery_to_internal_order(
+        db,
+        delivery_order_id=delivery_oid,
+        tenant_id=tenant_uuid,
+        internal_order_id=internal_oid,
+    )
+    if not ok:
+        raise HTTPException(
+            status_code=400,
+            detail="关联失败：外卖单不存在、已关联内部单、或内部订单不存在/已删除",
+        )
+    await db.commit()
+    return {
+        "ok": True,
+        "data": {
+            "delivery_order_id": str(delivery_oid),
+            "internal_order_id": str(internal_oid),
+        },
+        "error": None,
+    }

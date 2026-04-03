@@ -13,14 +13,11 @@
 10. 异常折扣检测
 """
 import math
-import uuid
+import os
+import sys
 from datetime import date, datetime, timezone
-from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-
-import sys
-import os
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 

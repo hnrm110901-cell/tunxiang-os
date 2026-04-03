@@ -1,11 +1,11 @@
 """券权益与会员识别 API — 9个端点"""
-from typing import Optional
 
-from fastapi import APIRouter, Depends, Request, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+
 from ..services import coupon_service as cs
 
 router = APIRouter(prefix="/api/v1/trade/coupon", tags=["coupon-benefit"])

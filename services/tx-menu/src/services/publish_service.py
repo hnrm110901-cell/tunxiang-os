@@ -1,8 +1,10 @@
 """菜品三级发布方案 — 纯函数实现（不依赖DB）"""
+import asyncio
 import uuid
 from datetime import datetime
 from typing import Optional
 
+from shared.events import MenuEventType, UniversalPublisher
 
 VALID_ADJUSTMENT_TYPES = {"time_period", "holiday", "delivery"}
 
@@ -56,6 +58,8 @@ def execute_publish(
     plan_id: str,
     dish_data: list[dict],
     target_stores: list[str],
+    tenant_id: Optional[str] = None,
+    effective_date: Optional[str] = None,
 ) -> dict:
     """执行发布方案，返回每个门店的发布结果。
 
@@ -97,7 +101,7 @@ def execute_publish(
         }
         success_count += 1
 
-    return {
+    execution_result = {
         "plan_id": plan_id,
         "status": "completed",
         "total_stores": len(target_stores),
@@ -106,6 +110,19 @@ def execute_publish(
         "results": results,
         "executed_at": datetime.utcnow().isoformat(),
     }
+
+    if tenant_id and success_count > 0:
+        dish_ids = [d.get("dish_id") for d in dish_data if d.get("dish_id")]
+        asyncio.create_task(UniversalPublisher.publish(
+            event_type=MenuEventType.DISH_PUBLISHED,
+            tenant_id=uuid.UUID(tenant_id),
+            store_id=None,
+            entity_id=uuid.UUID(dish_ids[0]) if dish_ids else None,
+            event_data={"dish_ids": dish_ids, "store_ids": list(target_stores), "effective_date": effective_date},
+            source_service="tx-menu",
+        ))
+
+    return execution_result
 
 
 def create_price_adjustment(

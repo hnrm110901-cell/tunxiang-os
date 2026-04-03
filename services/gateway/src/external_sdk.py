@@ -10,13 +10,13 @@ D4: 美团/饿了么外卖
 D5: 电子发票(诺诺)
 D6: 钉钉/飞书登录
 """
-import os
-import hashlib
-import hmac
+import base64
 import json
+import os
 import time
-from typing import Optional
+import uuid as _uuid_mod
 from dataclasses import dataclass
+from typing import Optional
 
 import httpx
 import structlog
@@ -45,6 +45,8 @@ class WechatPayConfig:
     mch_id: str = os.getenv("WECHAT_PAY_MCH_ID", "")
     api_key: str = os.getenv("WECHAT_PAY_API_KEY", "")
     notify_url: str = os.getenv("WECHAT_PAY_NOTIFY_URL", "")
+    private_key_path: str = os.getenv("WECHAT_PAY_PRIVATE_KEY_PATH", "")
+    serial_no: str = os.getenv("WECHAT_PAY_SERIAL_NO", "")
 
 
 class WechatPaySDK:
@@ -53,6 +55,39 @@ class WechatPaySDK:
 
     def __init__(self, config: WechatPayConfig = None):
         self.config = config or WechatPayConfig()
+
+    def _build_authorization(self, method: str, url_path: str, body: str) -> str:
+        """构造微信支付 V3 Authorization header（RSA-SHA256 签名）。
+
+        要求环境变量：WECHAT_PAY_PRIVATE_KEY_PATH、WECHAT_PAY_SERIAL_NO。
+        """
+        timestamp = str(int(time.time()))
+        nonce = str(_uuid_mod.uuid4()).replace("-", "")[:32]
+        message = f"{method}\n{url_path}\n{timestamp}\n{nonce}\n{body}\n"
+
+        private_key_path = self.config.private_key_path
+        if not private_key_path or not os.path.exists(private_key_path):
+            raise ValueError("WECHAT_PAY_PRIVATE_KEY_PATH 未配置或文件不存在")
+
+        try:
+            from cryptography.hazmat.primitives.asymmetric.padding import PKCS1v15  # type: ignore
+            from cryptography.hazmat.primitives.hashes import SHA256  # type: ignore
+            from cryptography.hazmat.primitives.serialization import load_pem_private_key  # type: ignore
+        except ImportError as exc:
+            raise RuntimeError("缺少 cryptography 库，请 pip install cryptography") from exc
+
+        with open(private_key_path, "rb") as f:
+            private_key = load_pem_private_key(f.read(), password=None)
+
+        signature = base64.b64encode(
+            private_key.sign(message.encode("utf-8"), PKCS1v15(), SHA256())
+        ).decode("utf-8")
+
+        return (
+            f'WECHATPAY2-SHA256-RSA2048 mchid="{self.config.mch_id}",'
+            f'nonce_str="{nonce}",signature="{signature}",'
+            f'timestamp="{timestamp}",serial_no="{self.config.serial_no}"'
+        )
 
     async def create_jsapi_order(self, order_no: str, amount_fen: int, description: str, openid: str) -> dict:
         """JSAPI 下单（小程序/公众号）"""
@@ -65,9 +100,29 @@ class WechatPaySDK:
             "amount": {"total": amount_fen, "currency": "CNY"},
             "payer": {"openid": openid},
         }
-        # TODO: 签名 + 发起请求
         logger.info("wechat_pay_create", order_no=order_no, amount_fen=amount_fen)
-        return {"prepay_id": f"wx_prepay_{order_no}", "payload": payload}
+
+        if not self.config.mch_id or not self.config.private_key_path:
+            # 未配置微信支付凭证，返回沙箱响应（开发环境）
+            logger.warning("wechat_pay_not_configured_returning_sandbox")
+            return {"prepay_id": f"wx_prepay_{order_no}", "payload": payload}
+
+        url_path = "/v3/pay/transactions/jsapi"
+        body_str = json.dumps(payload, ensure_ascii=False)
+        authorization = self._build_authorization("POST", url_path, body_str)
+
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.post(
+                f"{self.BASE}{url_path}",
+                content=body_str.encode("utf-8"),
+                headers={
+                    "Content-Type": "application/json",
+                    "Accept": "application/json",
+                    "Authorization": authorization,
+                },
+            )
+            resp.raise_for_status()
+            return resp.json()
 
     async def create_native_order(self, order_no: str, amount_fen: int, description: str) -> dict:
         """Native 下单（扫码支付 — POS 端）"""

@@ -9,19 +9,16 @@
 6. 异常改单申请 + 审批流程
 7. 改单审批执行（移除菜品+调价）
 """
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import uuid
-from datetime import datetime, timezone
-from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from shared.ontology.src.enums import OrderStatus
-
 
 # ─── 模拟对象 ───
 
@@ -221,7 +218,7 @@ async def test_merge_orders_too_few():
 @pytest.mark.asyncio
 async def test_request_and_approve_change():
     """异常改单申请 + 审批流程"""
-    from services.order_extensions import request_order_change, approve_order_change, _OrderChangeRequest
+    from services.order_extensions import _OrderChangeRequest, approve_order_change, request_order_change
 
     # 清理全局状态
     _OrderChangeRequest._store.clear()
@@ -257,7 +254,7 @@ async def test_request_and_approve_change():
 @pytest.mark.asyncio
 async def test_approve_change_wrong_tenant():
     """审批改单 — 租户不匹配"""
-    from services.order_extensions import request_order_change, approve_order_change, _OrderChangeRequest
+    from services.order_extensions import _OrderChangeRequest, approve_order_change, request_order_change
 
     _OrderChangeRequest._store.clear()
 

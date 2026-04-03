@@ -3,19 +3,18 @@
 测试数据基于徐记海鲜典型海鲜池场景。
 """
 import pytest
+
 from ..services.live_seafood_service import (
-    LiveSeafoodService,
-    TankStatus,
     SPECIES_DATABASE,
+    LiveSeafoodService,
     _batches,
-    _tanks,
+    _compliance_logs,
     _inspections,
     _market_prices,
     _price_history,
     _sales,
-    _compliance_logs,
+    _tanks,
 )
-
 
 TENANT_ID = "t-xuji-seafood-001"
 STORE_ID = "s-xuji-changsha-01"

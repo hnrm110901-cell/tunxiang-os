@@ -1,0 +1,14 @@
+{
+  "name": "屯象OS KDS",
+  "short_name": "屯象KDS",
+  "description": "屯象OS 厨房出品显示屏",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0B1A20",
+  "theme_color": "#1A2E3B",
+  "orientation": "landscape",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

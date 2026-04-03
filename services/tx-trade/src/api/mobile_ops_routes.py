@@ -13,13 +13,15 @@
 统一响应格式: {"ok": bool, "data": {}, "error": {}}
 所有接口需 X-Tenant-ID header，通过 RLS 实现租户隔离。
 """
+import json
 from typing import Optional
 
 import structlog
-from fastapi import APIRouter, Depends, Request, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from shared.events import UniversalPublisher
 from shared.ontology.src.database import get_db_with_tenant
 
 logger = structlog.get_logger()
@@ -124,6 +126,7 @@ async def set_dish_availability(
 
     try:
         from sqlalchemy import update
+
         from shared.ontology.src.entities import Dish
 
         await db.execute(
@@ -155,6 +158,7 @@ async def set_dish_daily_limit(
 
     try:
         from sqlalchemy import update
+
         from shared.ontology.src.entities import Dish
 
         await db.execute(
@@ -186,6 +190,7 @@ async def update_order_waiter(
 
     try:
         from sqlalchemy import update
+
         from shared.ontology.src.entities import Order
 
         await db.execute(
@@ -217,6 +222,7 @@ async def copy_dishes_from_order(
 
     try:
         from sqlalchemy import select
+
         from shared.ontology.src.entities import OrderItem
 
         # 查询源订单的所有菜品
@@ -270,6 +276,7 @@ async def refresh_dish_status(
 
     try:
         from sqlalchemy import select
+
         from shared.ontology.src.entities import Dish
 
         result = await db.execute(
@@ -346,6 +353,7 @@ async def pre_bill(
 
     try:
         from sqlalchemy import select
+
         from shared.ontology.src.entities import Order, OrderItem
 
         order_result = await db.execute(
@@ -415,7 +423,9 @@ async def fire_to_kitchen(
 
     try:
         from sqlalchemy import select
+
         from shared.ontology.src.entities import Order, OrderItem
+
         from ..services.kds_dispatch import dispatch_order_to_kds
 
         order_result = await db.execute(
@@ -496,6 +506,7 @@ async def mark_item_served(
 
     try:
         from sqlalchemy import select, update
+
         from shared.ontology.src.entities import OrderItem
 
         # 确认item存在且属于该订单
@@ -552,6 +563,7 @@ async def override_item_price(
 
     try:
         from sqlalchemy import select, update
+
         from shared.ontology.src.entities import Order, OrderItem
 
         item_result = await db.execute(
@@ -637,9 +649,11 @@ async def transfer_single_item(
     log = logger.bind(order_id=order_id, item_id=item_id, tenant_id=tenant_id)
 
     try:
-        from sqlalchemy import select, update, delete
-        from shared.ontology.src.entities import Order, OrderItem
         import uuid as uuid_mod
+
+        from sqlalchemy import delete, select, update
+
+        from shared.ontology.src.entities import Order, OrderItem
 
         # 验证源item
         item_result = await db.execute(
@@ -743,7 +757,9 @@ async def print_order_receipt(
 
     try:
         from sqlalchemy import select
+
         from shared.ontology.src.entities import Order, OrderItem
+
         from ..services.receipt_service import ReceiptService
 
         order_result = await db.execute(
@@ -817,14 +833,23 @@ async def send_kitchen_message(
         message_id = str(uuid_mod.uuid4())
         now = datetime.now(timezone.utc).isoformat()
 
-        # TODO: 实际生产中通过 Redis Streams 或 WebSocket 推送到 KDS
-        # channel: kds:{tenant_id}:messages
         log.info(
             "kitchen_message_sent",
             message_id=message_id,
             message=body.message,
             table_no=body.table_no,
         )
+        # 通过 Redis Pub/Sub 推送到 KDS，mac-station 订阅后转发 WebSocket
+        try:
+            r = await UniversalPublisher.get_redis()
+            payload = json.dumps(
+                {"event": "kitchen_message", "message_id": message_id,
+                 "message": body.message, "table_no": body.table_no, "sent_at": now},
+                ensure_ascii=False,
+            )
+            await r.publish(f"kds:{tenant_id}:messages", payload)
+        except (OSError, RuntimeError) as exc:
+            log.warning("kitchen_message_redis_failed", error=str(exc))
         return _ok({
             "message_id": message_id,
             "message": body.message,
@@ -858,7 +883,8 @@ async def transfer_payment(
     )
 
     try:
-        from sqlalchemy import select, update
+        from sqlalchemy import select
+
         from shared.ontology.src.entities import Order
 
         # 验证源订单和目标订单都存在

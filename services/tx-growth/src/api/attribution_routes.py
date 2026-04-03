@@ -13,16 +13,15 @@
 响应格式：{"ok": bool, "data": {}, "error": {}}
 """
 import uuid
-from datetime import datetime, timezone, date
+from datetime import date, datetime, timezone
 from typing import Any, Optional
 
 import structlog
 from fastapi import APIRouter, Header, HTTPException, Query
 from pydantic import BaseModel, field_validator
-from sqlalchemy.ext.asyncio import AsyncSession
+from services.roi_attribution import ROIAttributionService
 
 from shared.ontology.src.database import async_session_factory
-from services.roi_attribution import ROIAttributionService
 
 log = structlog.get_logger(__name__)
 

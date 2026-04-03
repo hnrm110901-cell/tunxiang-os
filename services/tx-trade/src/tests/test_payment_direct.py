@@ -14,12 +14,13 @@
 11. 风控检查 — 大额预警
 12. 风控检查 — 零金额拒绝
 """
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import uuid
+
 import pytest
 
 

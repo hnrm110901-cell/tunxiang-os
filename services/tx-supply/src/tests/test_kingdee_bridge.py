@@ -12,8 +12,8 @@
 9. 凭证金额单位为分
 10. 导出记录结构完整性
 """
-import sys
 import os
+import sys
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -21,26 +21,24 @@ import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from services.kingdee_bridge import (
+    ACCOUNT_ADMIN_EXPENSE,
     ACCOUNT_AP,
+    ACCOUNT_INVENTORY_GOODS,
     ACCOUNT_MAIN_BIZ_COST,
+    ACCOUNT_MAIN_BIZ_REVENUE,
     ACCOUNT_RAW_MATERIAL,
     ACCOUNT_SALARY_PAYABLE,
-    ACCOUNT_ADMIN_EXPENSE,
-    ACCOUNT_MAIN_BIZ_REVENUE,
-    ACCOUNT_INVENTORY_GOODS,
     EXPORT_STATUS_COMPLETED,
-    EXPORT_STATUS_FAILED,
-    export_purchase_receipt,
+    _make_voucher_entry,
     export_cost_transfer,
-    export_transfer_in_out,
-    export_salary_accrual,
     export_daily_revenue,
+    export_purchase_receipt,
+    export_salary_accrual,
     export_sales_delivery,
+    export_transfer_in_out,
     get_export_history,
     retry_failed_export,
-    _make_voucher_entry,
 )
-
 
 # ─── Mock 工具 ───
 

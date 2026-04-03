@@ -1,16 +1,15 @@
 """移库与拆组测试"""
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import pytest
 from services.warehouse_ops import (
-    create_transfer_order,
-    create_split_assembly,
     create_bom_split,
+    create_split_assembly,
+    create_transfer_order,
 )
-
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  移库单

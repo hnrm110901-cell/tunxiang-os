@@ -1,0 +1,351 @@
+/* 积分中心页样式 */
+
+.page-container {
+  min-height: 100vh;
+  background: #0B1A20;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* ──── 顶部积分卡片 ──── */
+.points-card {
+  margin: 24rpx 32rpx;
+  border-radius: 24rpx;
+  background: linear-gradient(135deg, #FF6B35, #FF9A5C);
+  padding: 40rpx 32rpx 32rpx;
+  box-shadow: 0 8rpx 24rpx rgba(255, 107, 53, 0.3);
+}
+
+.points-card-main {
+  display: flex;
+  align-items: baseline;
+  gap: 12rpx;
+  margin-bottom: 32rpx;
+}
+
+.points-big-num {
+  font-size: 96rpx;
+  font-weight: bold;
+  color: #fff;
+  line-height: 1;
+}
+
+.points-big-label {
+  font-size: 28rpx;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.points-card-stats {
+  display: flex;
+  align-items: center;
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 16rpx;
+  padding: 20rpx 0;
+}
+
+.stat-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6rpx;
+}
+
+.stat-value {
+  font-size: 32rpx;
+  font-weight: bold;
+  color: #fff;
+}
+
+.stat-label {
+  font-size: 24rpx;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.stat-divider {
+  width: 1rpx;
+  height: 48rpx;
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* ──── Tab切换 ──── */
+.tab-bar {
+  display: flex;
+  margin: 0 32rpx 24rpx;
+  background: #112228;
+  border-radius: 16rpx;
+  padding: 8rpx;
+}
+
+.tab-item {
+  flex: 1;
+  text-align: center;
+  padding: 20rpx 0;
+  font-size: 28rpx;
+  color: #999;
+  border-radius: 12rpx;
+  transition: all 0.2s;
+}
+
+.tab-item.active {
+  background: #FF6B35;
+  color: #fff;
+  font-weight: 600;
+}
+
+/* ──── 兑换商城网格 ──── */
+.reward-grid {
+  display: flex;
+  flex-wrap: wrap;
+  padding: 0 32rpx;
+  gap: 20rpx;
+}
+
+.reward-card {
+  width: calc(50% - 10rpx);
+  background: #112228;
+  border-radius: 20rpx;
+  overflow: hidden;
+}
+
+.reward-img {
+  width: 100%;
+  height: 240rpx;
+  display: block;
+}
+
+.reward-body {
+  padding: 16rpx 16rpx 20rpx;
+}
+
+.reward-name {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #fff;
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-bottom: 12rpx;
+}
+
+.reward-bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.reward-cost {
+  display: flex;
+  align-items: baseline;
+  gap: 4rpx;
+}
+
+.cost-num {
+  font-size: 32rpx;
+  font-weight: bold;
+  color: #FF6B35;
+}
+
+.cost-unit {
+  font-size: 22rpx;
+  color: #FF6B35;
+}
+
+.redeem-btn {
+  background: #FF6B35 !important;
+  color: #fff !important;
+  font-size: 24rpx !important;
+  border-radius: 24rpx;
+  padding: 0 20rpx;
+  height: 56rpx;
+  line-height: 56rpx;
+  min-height: unset;
+}
+
+.redeem-btn.disabled {
+  background: #333 !important;
+  color: #666 !important;
+  opacity: 1;
+}
+
+/* ──── 积分明细列表 ──── */
+.history-list {
+  padding: 0 32rpx;
+}
+
+.history-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 28rpx 0;
+  border-bottom: 1rpx solid rgba(255, 255, 255, 0.06);
+}
+
+.history-left {
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+  flex: 1;
+}
+
+.history-desc {
+  font-size: 28rpx;
+  color: #fff;
+}
+
+.history-time {
+  font-size: 24rpx;
+  color: #666;
+}
+
+.history-points {
+  font-size: 32rpx;
+  font-weight: bold;
+  min-width: 120rpx;
+  text-align: right;
+}
+
+.history-points.earned {
+  color: #0F6E56;
+}
+
+.history-points.used {
+  color: #E55A28;
+}
+
+/* ──── 状态提示 ──── */
+.loading-tip {
+  text-align: center;
+  padding: 80rpx 0;
+  color: #666;
+  font-size: 28rpx;
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 120rpx 0;
+  gap: 16rpx;
+}
+
+.empty-icon {
+  font-size: 80rpx;
+}
+
+.empty-text {
+  font-size: 28rpx;
+  color: #666;
+}
+
+.load-more-tip {
+  text-align: center;
+  padding: 32rpx 0;
+  font-size: 24rpx;
+  color: #555;
+}
+
+.safe-bottom {
+  height: 40rpx;
+}
+
+/* ──── 兑换确认弹层 ──── */
+.popup-mask {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.65);
+  z-index: 200;
+}
+
+.confirm-popup {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  background: #112228;
+  border-radius: 32rpx 32rpx 0 0;
+  padding: 40rpx 32rpx;
+  padding-bottom: calc(40rpx + env(safe-area-inset-bottom));
+  z-index: 201;
+  transform: translateY(100%);
+  transition: transform 300ms ease-out;
+}
+
+.confirm-popup.show {
+  transform: translateY(0);
+}
+
+.popup-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 32rpx;
+}
+
+.popup-title {
+  font-size: 34rpx;
+  font-weight: bold;
+  color: #fff;
+}
+
+.popup-close {
+  font-size: 32rpx;
+  color: #666;
+  padding: 8rpx;
+}
+
+.popup-item-name {
+  font-size: 30rpx;
+  color: #ccc;
+  text-align: center;
+  margin-bottom: 32rpx;
+}
+
+.popup-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20rpx 0;
+  border-bottom: 1rpx solid rgba(255, 255, 255, 0.06);
+}
+
+.popup-label {
+  font-size: 28rpx;
+  color: #999;
+}
+
+.popup-val {
+  font-size: 28rpx;
+  color: #fff;
+  font-weight: 600;
+}
+
+.popup-val.cost {
+  color: #FF6B35;
+  font-size: 32rpx;
+}
+
+.popup-actions {
+  display: flex;
+  gap: 20rpx;
+  margin-top: 40rpx;
+}
+
+.btn-cancel {
+  flex: 1;
+  background: #1a2a33 !important;
+  color: #999 !important;
+  border-radius: 44rpx;
+  height: 88rpx;
+  line-height: 88rpx;
+  font-size: 30rpx;
+}
+
+.btn-confirm {
+  flex: 1;
+  background: #FF6B35 !important;
+  color: #fff !important;
+  border-radius: 44rpx;
+  height: 88rpx;
+  line-height: 88rpx;
+  font-size: 30rpx;
+  font-weight: 600;
+}

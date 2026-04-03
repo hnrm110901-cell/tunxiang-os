@@ -5,6 +5,7 @@
 from fastapi import APIRouter, Header
 
 from ..services import dish_intelligence
+from services.tx_menu.src.services import dish_intelligence
 
 router = APIRouter(prefix="/api/v1/menu/dish-intel", tags=["dish-intelligence"])
 

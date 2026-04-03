@@ -4,15 +4,17 @@ FIFO 先进先出扣料。金额单位：分（fen）。
 批次通过 purchase 类型的 IngredientTransaction 记录跟踪，
 reference_id 存批次号，notes 存 JSON 扩展信息（含 expiry_date）。
 """
+import asyncio
 import json
 import uuid
-from datetime import date, datetime, timezone
+from datetime import date
 from typing import Optional
 
 import structlog
-from sqlalchemy import select, func, update, text, and_
+from sqlalchemy import and_, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from shared.events import SupplyEventType, UniversalPublisher
 from shared.ontology.src.entities import Ingredient, IngredientTransaction
 from shared.ontology.src.enums import InventoryStatus, TransactionType
 
@@ -323,6 +325,22 @@ async def issue_stock(
         store_id=store_id,
         tenant_id=tenant_id,
     )
+
+    # ── 事件总线：出库后库存触底检测 ────────────────────────
+    if status in (InventoryStatus.low.value, InventoryStatus.critical.value, InventoryStatus.out_of_stock.value):
+        asyncio.create_task(UniversalPublisher.publish(
+            event_type=SupplyEventType.STOCK_LOW,
+            tenant_id=_uuid(tenant_id),
+            store_id=_uuid(store_id),
+            entity_id=_uuid(ingredient_id),
+            event_data={
+                "ingredient_id": ingredient_id,
+                "current_qty": ingredient.current_quantity,
+                "threshold_qty": ingredient.min_quantity,
+                "unit": ingredient.unit,
+            },
+            source_service="tx-supply",
+        ))
 
     return {
         "transactions": transactions,

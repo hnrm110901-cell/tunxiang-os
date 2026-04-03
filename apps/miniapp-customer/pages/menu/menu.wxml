@@ -55,7 +55,30 @@
       </view>
 
       <block wx:for="{{filteredDishes}}" wx:key="id">
+        <!-- 套餐商品：显示"选择"按钮 -->
+        <view wx:if="{{item.is_combo}}" class="combo-dish-row" bindtap="onComboSelect" data-dish="{{item}}">
+          <image
+            class="combo-dish-img"
+            src="{{item.imageUrl || item.image_url || '/assets/dish-placeholder.png'}}"
+            mode="aspectFill"
+            lazy-load
+          />
+          <view class="combo-dish-body">
+            <view class="combo-dish-name-row">
+              <text class="combo-dish-name">{{item.name || item.dish_name}}</text>
+              <view class="combo-badge">套餐</view>
+            </view>
+            <text class="combo-dish-desc" wx:if="{{item.description}}">{{item.description}}</text>
+            <view class="combo-dish-footer">
+              <text class="combo-dish-price">¥{{item.priceFen ? (item.priceFen / 100).toFixed(0) : (item.price_fen ? (item.price_fen / 100).toFixed(0) : '0')}}</text>
+              <view class="combo-select-btn">选择</view>
+            </view>
+          </view>
+        </view>
+
+        <!-- 普通菜品 -->
         <dish-card
+          wx:else
           dish="{{item}}"
           quantity="{{item._qty}}"
           bind:add="onDishAdd"

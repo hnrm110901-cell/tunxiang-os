@@ -4,12 +4,13 @@
 """
 import secrets
 import uuid
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import structlog
 from pydantic import BaseModel
 from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..services.kds_dispatch import dispatch_order_to_kds
@@ -403,7 +404,6 @@ class TableSessionService:
         session_token: str,
     ) -> SubmitResult:
         """提交购物车到厨房 — 创建 Order + OrderItems，触发 KDS 分单"""
-        import json
 
         row = await self._fetch_active_session(session_token)
         session_id = uuid.UUID(str(row["id"]))
@@ -512,11 +512,13 @@ class TableSessionService:
                 {"order_id": order_id, "tenant_id": self._tenant_id},
             )
             kds_sent = True
-        except Exception:
+        except (SQLAlchemyError, ValueError, RuntimeError) as exc:
             logger.warning(
                 "collab_kds_dispatch_failed",
                 order_id=str(order_id),
                 tenant_id=str(self._tenant_id),
+                error=str(exc),
+                error_type=type(exc).__name__,
                 exc_info=True,
             )
 

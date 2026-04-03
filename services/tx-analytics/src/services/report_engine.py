@@ -7,9 +7,8 @@ from __future__ import annotations
 
 import csv
 import io
-import re
 from dataclasses import dataclass, field
-from datetime import date, datetime, timezone
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Optional
 
@@ -333,7 +332,7 @@ class ReportEngine:
         # 分页
         offset = (page - 1) * page_size
         sql = sql.rstrip().rstrip(";")
-        sql += f"\nLIMIT :_limit OFFSET :_offset"
+        sql += "\nLIMIT :_limit OFFSET :_offset"
         bind_params["_limit"] = page_size
         bind_params["_offset"] = offset
 

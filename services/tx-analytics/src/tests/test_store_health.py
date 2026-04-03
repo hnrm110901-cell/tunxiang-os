@@ -1,12 +1,18 @@
 """门店健康指数纯函数测试"""
-import sys, os
+import os
+import sys
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from services.store_health_service import (
-    compute_health_score, classify_health,
-    score_revenue_completion, score_table_turnover,
-    score_cost_rate, score_complaint_rate, score_staff_efficiency,
+    classify_health,
+    compute_health_score,
     find_weakest_dimension,
+    score_complaint_rate,
+    score_cost_rate,
+    score_revenue_completion,
+    score_staff_efficiency,
+    score_table_turnover,
 )
 
 
@@ -64,7 +70,7 @@ class TestDimensionScores:
         # 月目标 10万元，当日营收 3500元(350000分)，月30天，日均目标 333333分
         score = score_revenue_completion(350000, 100000, 30)
         assert score is not None
-        assert 100 <= score + 5  # ~105 capped at 100
+        assert score + 5 >= 100  # ~105 capped at 100
 
     def test_revenue_no_target(self):
         assert score_revenue_completion(100000, 0, 30) is None

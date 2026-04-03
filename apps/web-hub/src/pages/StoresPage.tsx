@@ -1,6 +1,9 @@
 /**
- * 全局门店管理 — 跨商户，在线状态
+ * 全局门店管理 — 跨商户，在线状态（GET /api/v1/hub/stores）
  */
+import { useEffect, useState } from 'react';
+import { hubGet, type HubListResult } from '../api/hubApi';
+
 const s = {
   page: { color: '#E0E0E0' } as React.CSSProperties,
   title: { fontSize: 22, fontWeight: 700, color: '#FFFFFF', marginBottom: 20 } as React.CSSProperties,
@@ -30,21 +33,51 @@ const s = {
     display: 'inline-block', width: 8, height: 8, borderRadius: '50%',
     background: online ? '#22C55E' : '#EF4444', marginRight: 6,
   }) as React.CSSProperties,
+  err: { color: '#EF4444', fontSize: 13, marginBottom: 12 } as React.CSSProperties,
 };
 
-const stores = [
-  { name: '尝在一起(五一广场店)', merchant: '尝在一起', city: '长沙', online: true, posVer: '3.0.1', lastSync: '2分钟前' },
-  { name: '尝在一起(万达店)', merchant: '尝在一起', city: '长沙', online: true, posVer: '3.0.1', lastSync: '1分钟前' },
-  { name: '最黔线(太平街店)', merchant: '最黔线', city: '长沙', online: true, posVer: '3.0.0', lastSync: '5分钟前' },
-  { name: '尚宫厨(天心店)', merchant: '尚宫厨', city: '长沙', online: false, posVer: '2.9.8', lastSync: '3小时前' },
-  { name: '湘味传奇(侯家塘店)', merchant: '湘味传奇', city: '长沙', online: true, posVer: '3.0.1', lastSync: '30秒前' },
-];
+type HubStore = {
+  store_id: string;
+  name: string;
+  merchant: string;
+  online: boolean;
+  last_sync: string;
+  version: string;
+};
 
 export function StoresPage() {
+  const [stores, setStores] = useState<HubStore[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    hubGet<HubListResult<HubStore>>('/stores?page=1&size=200')
+      .then((d) => {
+        if (!cancelled) {
+          setStores(d.items || []);
+          setErr(null);
+        }
+      })
+      .catch((e: Error) => {
+        if (!cancelled) setErr(e.message || '加载失败');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const onlineCount = stores.filter((st) => st.online).length;
+
   return (
     <div style={s.page}>
       <div style={s.title}>门店总览</div>
+      {err && <div style={s.err}>{err}</div>}
+      {loading && <div style={{ color: '#6B8A97', marginBottom: 16 }}>加载中…</div>}
       <div style={s.cards}>
         <div style={s.card}><div style={s.cardLabel}>门店总数</div><div style={s.cardValue}>{stores.length}</div></div>
         <div style={s.card}><div style={s.cardLabel}>在线门店</div><div style={{ ...s.cardValue, color: '#22C55E' }}>{onlineCount}</div></div>
@@ -52,7 +85,7 @@ export function StoresPage() {
       </div>
       <div style={s.toolbar}>
         <div style={{ fontSize: 14, color: '#8BA5B2' }}>所有门店（跨商户）</div>
-        <button style={s.btn}>+ 新建门店</button>
+        <button type="button" style={s.btn}>+ 新建门店</button>
       </div>
       <table style={s.table}>
         <thead>
@@ -68,16 +101,16 @@ export function StoresPage() {
         </thead>
         <tbody>
           {stores.map((st) => (
-            <tr key={st.name}>
+            <tr key={st.store_id}>
               <td style={s.td}>{st.name}</td>
               <td style={s.td}>{st.merchant}</td>
-              <td style={s.td}>{st.city}</td>
+              <td style={s.td}>—</td>
               <td style={s.td}><span style={s.dot(st.online)} />{st.online ? '在线' : '离线'}</td>
-              <td style={s.td}>{st.posVer}</td>
-              <td style={s.td}>{st.lastSync}</td>
+              <td style={s.td}>{st.version}</td>
+              <td style={s.td}>{st.last_sync}</td>
               <td style={s.td}>
-                <button style={s.btnSec}>查看详情</button>
-                <button style={s.btnSec}>编辑</button>
+                <button type="button" style={s.btnSec}>查看详情</button>
+                <button type="button" style={s.btnSec}>编辑</button>
               </td>
             </tr>
           ))}

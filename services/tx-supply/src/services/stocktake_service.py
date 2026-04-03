@@ -6,6 +6,11 @@
 3. finalize_stocktake -> 计算差异，生成 adjustment 流水，更新库存
 
 金额单位：分(fen)
+
+持久化层：
+- stocktakes 表 — 盘点单头
+- stocktake_items 表 — 盘点明细（每原料一行）
+- 若 v064 迁移未运行（表不存在），自动降级到内存模式并记录 WARNING
 """
 from __future__ import annotations
 
@@ -14,7 +19,8 @@ from datetime import datetime, timezone
 from typing import Any, Optional
 
 import structlog
-from sqlalchemy import select, func, text, and_
+from sqlalchemy import select, text
+from sqlalchemy.exc import OperationalError, ProgrammingError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.entities import Ingredient, IngredientTransaction
@@ -24,11 +30,11 @@ log = structlog.get_logger(__name__)
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-#  内部盘点状态存储（后续可迁移至 stocktakes 表）
+#  内存降级存储（仅在 v064 迁移未运行时使用）
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-# 内存缓存（用于 MVP 阶段；生产环境应建 stocktakes + stocktake_items 表）
 _stocktakes: dict[str, dict[str, Any]] = {}
+_db_mode: Optional[bool] = None  # None=未检测, True=DB模式, False=内存模式
 
 
 async def _set_tenant(db: AsyncSession, tenant_id: str) -> None:
@@ -36,6 +42,24 @@ async def _set_tenant(db: AsyncSession, tenant_id: str) -> None:
         text("SELECT set_config('app.tenant_id', :tid, true)"),
         {"tid": tenant_id},
     )
+
+
+async def _check_db_mode(db: AsyncSession) -> bool:
+    """检测 stocktakes 表是否存在（v064 迁移是否已运行）"""
+    global _db_mode
+    if _db_mode is not None:
+        return _db_mode
+    try:
+        await db.execute(text("SELECT 1 FROM stocktakes LIMIT 1"))
+        _db_mode = True
+        log.info("stocktake_service.mode", mode="db")
+    except (ProgrammingError, OperationalError):
+        _db_mode = False
+        log.warning(
+            "stocktake_service.fallback_to_memory",
+            reason="stocktakes table not found — run v064_wms_persistence migration",
+        )
+    return _db_mode
 
 
 def _calc_status(current: float, min_qty: float) -> str:
@@ -77,7 +101,8 @@ async def create_stocktake(
     ingredients = result.scalars().all()
 
     stocktake_id = str(uuid.uuid4())
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(timezone.utc)
+    now_iso = now.isoformat()
 
     items: dict[str, dict[str, Any]] = {}
     for ing in ingredients:
@@ -87,21 +112,75 @@ async def create_stocktake(
             "category": ing.category,
             "unit": ing.unit,
             "system_qty": ing.current_quantity,
-            "actual_qty": None,  # 待录入
+            "actual_qty": None,
             "unit_price_fen": ing.unit_price_fen,
         }
 
-    stocktake = {
-        "stocktake_id": stocktake_id,
-        "store_id": store_id,
-        "tenant_id": tenant_id,
-        "status": "open",
-        "created_at": now,
-        "items": items,
-    }
-    _stocktakes[stocktake_id] = stocktake
+    use_db = await _check_db_mode(db)
 
-    log.info("stocktake.created", stocktake_id=stocktake_id, item_count=len(items))
+    if use_db:
+        # DB 模式：写入 stocktakes + stocktake_items 表
+        # 注意：v064 迁移中 stocktakes.id 为 UUID，status 枚举为 draft/in_progress/completed/cancelled
+        # 盘点开始即为 in_progress（对应原 open 语义）
+        await db.execute(
+            text("""
+                INSERT INTO stocktakes
+                    (id, tenant_id, store_id, status, started_at, created_at, updated_at)
+                VALUES
+                    (:id::uuid, :tenant_id::uuid, :store_id::uuid,
+                     'in_progress', :now, :now, :now)
+            """),
+            {
+                "id": stocktake_id,
+                "tenant_id": tenant_id,
+                "store_id": store_id,
+                "now": now,
+            },
+        )
+
+        for item in items.values():
+            await db.execute(
+                text("""
+                    INSERT INTO stocktake_items
+                        (id, stocktake_id, tenant_id, ingredient_id,
+                         ingredient_name, unit,
+                         expected_qty, actual_qty, cost_price,
+                         created_at, updated_at)
+                    VALUES
+                        (:id::uuid, :stocktake_id::uuid, :tenant_id::uuid,
+                         :ingredient_id::uuid,
+                         :ingredient_name, :unit,
+                         :system_qty, NULL,
+                         :cost_price,
+                         :now, :now)
+                """),
+                {
+                    "id": str(uuid.uuid4()),
+                    "stocktake_id": stocktake_id,
+                    "tenant_id": tenant_id,
+                    "ingredient_id": item["ingredient_id"],
+                    "ingredient_name": item["ingredient_name"],
+                    "unit": item["unit"],
+                    "system_qty": item["system_qty"],
+                    # v064 用 cost_price (单价，原始数值)；unit_price_fen 存分为单位
+                    "cost_price": (item["unit_price_fen"] / 100.0) if item.get("unit_price_fen") else None,
+                    "now": now,
+                },
+            )
+
+        await db.flush()
+    else:
+        # 内存降级模式
+        _stocktakes[stocktake_id] = {
+            "stocktake_id": stocktake_id,
+            "store_id": store_id,
+            "tenant_id": tenant_id,
+            "status": "open",
+            "created_at": now_iso,
+            "items": items,
+        }
+
+    log.info("stocktake.created", stocktake_id=stocktake_id, item_count=len(items), mode="db" if use_db else "memory")
 
     return {
         "ok": True,
@@ -136,13 +215,91 @@ async def record_count(
     Returns:
         {ok, ingredient_id, ingredient_name, system_qty, actual_qty, variance}
     """
+    use_db = await _check_db_mode(db)
+
+    if use_db:
+        await _set_tenant(db, tenant_id)
+
+        # 查 stocktake 头（校验租户 + 状态）
+        row = await db.execute(
+            text("""
+                SELECT id, tenant_id, status
+                FROM stocktakes
+                WHERE id = :id::uuid AND tenant_id = :tenant_id::uuid
+            """),
+            {"id": stocktake_id, "tenant_id": tenant_id},
+        )
+        stocktake_row = row.mappings().one_or_none()
+        if not stocktake_row:
+            return {"ok": False, "error": f"Stocktake {stocktake_id} not found"}
+        if stocktake_row["status"] != "in_progress":
+            return {"ok": False, "error": f"Stocktake is {stocktake_row['status']}, not in_progress"}
+
+        # 查 item 行（v064 列名：expected_qty, cost_price）
+        item_row = await db.execute(
+            text("""
+                SELECT id, ingredient_name, expected_qty, cost_price
+                FROM stocktake_items
+                WHERE stocktake_id = :stocktake_id::uuid
+                  AND ingredient_id = :ingredient_id::uuid
+                  AND tenant_id = :tenant_id::uuid
+            """),
+            {
+                "stocktake_id": stocktake_id,
+                "ingredient_id": ingredient_id,
+                "tenant_id": tenant_id,
+            },
+        )
+        item = item_row.mappings().one_or_none()
+        if not item:
+            return {"ok": False, "error": f"Ingredient {ingredient_id} not in stocktake"}
+
+        system_qty = float(item["expected_qty"])
+        variance = actual_qty - system_qty
+
+        # 更新 actual_qty
+        await db.execute(
+            text("""
+                UPDATE stocktake_items
+                SET actual_qty = :actual_qty, updated_at = :now
+                WHERE stocktake_id = :stocktake_id::uuid
+                  AND ingredient_id = :ingredient_id::uuid
+                  AND tenant_id = :tenant_id::uuid
+            """),
+            {
+                "actual_qty": actual_qty,
+                "now": datetime.now(timezone.utc),
+                "stocktake_id": stocktake_id,
+                "ingredient_id": ingredient_id,
+                "tenant_id": tenant_id,
+            },
+        )
+        await db.flush()
+
+        log.info(
+            "stocktake.count_recorded",
+            stocktake_id=stocktake_id,
+            ingredient_name=item["ingredient_name"],
+            system_qty=system_qty,
+            actual_qty=actual_qty,
+            variance=variance,
+        )
+
+        return {
+            "ok": True,
+            "ingredient_id": ingredient_id,
+            "ingredient_name": item["ingredient_name"],
+            "system_qty": system_qty,
+            "actual_qty": actual_qty,
+            "variance": round(variance, 4),
+        }
+
+    # 内存降级模式
     stocktake = _stocktakes.get(stocktake_id)
     if not stocktake:
         return {"ok": False, "error": f"Stocktake {stocktake_id} not found"}
-
     if stocktake["tenant_id"] != tenant_id:
         return {"ok": False, "error": "Tenant mismatch"}
-
     if stocktake["status"] != "open":
         return {"ok": False, "error": f"Stocktake is {stocktake['status']}, not open"}
 
@@ -191,42 +348,85 @@ async def finalize_stocktake(
             details: [...]
         }
     """
-    stocktake = _stocktakes.get(stocktake_id)
-    if not stocktake:
-        return {"ok": False, "error": f"Stocktake {stocktake_id} not found"}
-
-    if stocktake["tenant_id"] != tenant_id:
-        return {"ok": False, "error": "Tenant mismatch"}
-
-    if stocktake["status"] != "open":
-        return {"ok": False, "error": f"Stocktake already {stocktake['status']}"}
-
+    use_db = await _check_db_mode(db)
     tenant_uuid = uuid.UUID(tenant_id)
     await _set_tenant(db, tenant_id)
 
-    total_items = len(stocktake["items"])
-    matched = 0
-    surplus = 0
-    deficit = 0
-    uncounted = 0
-    deficit_cost_fen = 0
-    surplus_cost_fen = 0
+    if use_db:
+        # 查盘点头（v064 status 枚举: draft/in_progress/completed/cancelled）
+        header_row = await db.execute(
+            text("""
+                SELECT id, store_id, status
+                FROM stocktakes
+                WHERE id = :id::uuid AND tenant_id = :tenant_id::uuid
+            """),
+            {"id": stocktake_id, "tenant_id": tenant_id},
+        )
+        header = header_row.mappings().one_or_none()
+        if not header:
+            return {"ok": False, "error": f"Stocktake {stocktake_id} not found"}
+        if header["status"] != "in_progress":
+            return {"ok": False, "error": f"Stocktake already {header['status']}"}
+
+        # 查所有明细行（v064 列名：expected_qty, cost_price）
+        items_result = await db.execute(
+            text("""
+                SELECT ingredient_id, ingredient_name, unit,
+                       expected_qty, actual_qty, cost_price
+                FROM stocktake_items
+                WHERE stocktake_id = :stocktake_id::uuid
+                  AND tenant_id = :tenant_id::uuid
+            """),
+            {"stocktake_id": stocktake_id, "tenant_id": tenant_id},
+        )
+        items_rows = items_result.mappings().all()
+        store_id = str(header["store_id"])
+
+    else:
+        # 内存降级模式读取数据
+        stocktake = _stocktakes.get(stocktake_id)
+        if not stocktake:
+            return {"ok": False, "error": f"Stocktake {stocktake_id} not found"}
+        if stocktake["tenant_id"] != tenant_id:
+            return {"ok": False, "error": "Tenant mismatch"}
+        if stocktake["status"] != "open":
+            return {"ok": False, "error": f"Stocktake already {stocktake['status']}"}
+
+        store_id = stocktake["store_id"]
+        items_rows = [
+            {
+                "ingredient_id": ing_id,
+                "ingredient_name": v["ingredient_name"],
+                "unit": v["unit"],
+                "expected_qty": v["system_qty"],
+                "actual_qty": v.get("actual_qty"),
+                # 内存模式保留 unit_price_fen（分）；DB 模式用 cost_price（元）
+                "cost_price": (v.get("unit_price_fen") or 0) / 100.0,
+            }
+            for ing_id, v in stocktake["items"].items()
+        ]
+
+    total_items = len(items_rows)
+    matched = surplus = deficit = uncounted = 0
+    deficit_cost_fen = surplus_cost_fen = 0
     details: list[dict[str, Any]] = []
 
     async with db.begin_nested():
-        for ing_id, item in stocktake["items"].items():
-            actual_qty = item.get("actual_qty")
+        for item in items_rows:
+            actual_qty = item["actual_qty"]
 
             if actual_qty is None:
                 uncounted += 1
                 continue
 
-            system_qty = item["system_qty"]
+            system_qty = float(item["expected_qty"])
+            actual_qty = float(actual_qty)
             variance = round(actual_qty - system_qty, 4)
-            unit_price = item.get("unit_price_fen") or 0
+            # cost_price 以元为单位；内部计算转为分
+            cost_price = float(item.get("cost_price") or 0)
+            unit_price = int(cost_price * 100)  # 转回分用于成本计算
 
             if abs(variance) < 0.001:
-                # 匹配
                 matched += 1
                 status = "matched"
             elif variance > 0:
@@ -238,9 +438,9 @@ async def finalize_stocktake(
                 deficit_cost_fen += int(abs(variance) * unit_price)
                 status = "deficit"
 
-            # 创建调整流水 + 更新库存（仅差异 != 0 时）
+            # 库存调整（仅差异 != 0 时）
             if abs(variance) >= 0.001:
-                ing_uuid = uuid.UUID(ing_id)
+                ing_uuid = uuid.UUID(str(item["ingredient_id"]))
                 ing_result = await db.execute(
                     select(Ingredient)
                     .where(Ingredient.id == ing_uuid)
@@ -257,7 +457,7 @@ async def finalize_stocktake(
                         id=uuid.uuid4(),
                         tenant_id=tenant_uuid,
                         ingredient_id=ing_uuid,
-                        store_id=uuid.UUID(stocktake["store_id"]),
+                        store_id=uuid.UUID(store_id),
                         transaction_type="adjustment",
                         quantity=variance,
                         unit_cost_fen=unit_price if unit_price else None,
@@ -271,20 +471,39 @@ async def finalize_stocktake(
                     db.add(txn)
 
             details.append({
-                "ingredient_id": ing_id,
+                "ingredient_id": str(item["ingredient_id"]),
                 "ingredient_name": item["ingredient_name"],
                 "unit": item["unit"],
                 "system_qty": system_qty,
                 "actual_qty": actual_qty,
                 "variance": variance,
-                "variance_cost_fen": int(abs(variance) * unit_price),
+                "variance_cost_fen": int(abs(variance) * unit_price),  # unit_price 已是分
                 "status": status,
             })
 
-    await db.flush()
+    now_finalized = datetime.now(timezone.utc)
 
-    stocktake["status"] = "finalized"
-    stocktake["finalized_at"] = datetime.now(timezone.utc).isoformat()
+    if use_db:
+        # v064 schema: status 枚举为 completed，无 matched_count 等聚合列
+        await db.execute(
+            text("""
+                UPDATE stocktakes
+                SET status = 'completed',
+                    completed_at = :now,
+                    updated_at = :now
+                WHERE id = :id::uuid AND tenant_id = :tenant_id::uuid
+            """),
+            {
+                "id": stocktake_id,
+                "tenant_id": tenant_id,
+                "now": now_finalized,
+            },
+        )
+    else:
+        _stocktakes[stocktake_id]["status"] = "finalized"
+        _stocktakes[stocktake_id]["finalized_at"] = now_finalized.isoformat()
+
+    await db.flush()
 
     counted = total_items - uncounted
 
@@ -296,6 +515,7 @@ async def finalize_stocktake(
         surplus=surplus,
         deficit=deficit,
         deficit_cost_fen=deficit_cost_fen,
+        mode="db" if use_db else "memory",
     )
 
     return {
@@ -327,20 +547,56 @@ async def get_stocktake_history(
     Returns:
         {ok, stocktakes: [{stocktake_id, status, created_at, item_count, ...}]}
     """
-    records = [
-        {
-            "stocktake_id": st["stocktake_id"],
-            "store_id": st["store_id"],
-            "status": st["status"],
-            "created_at": st["created_at"],
-            "finalized_at": st.get("finalized_at"),
-            "item_count": len(st["items"]),
-        }
-        for st in _stocktakes.values()
-        if st["store_id"] == store_id and st["tenant_id"] == tenant_id
-    ]
+    use_db = await _check_db_mode(db)
 
-    # 按创建时间倒序
-    records.sort(key=lambda x: x["created_at"], reverse=True)
+    if use_db:
+        await _set_tenant(db, tenant_id)
+
+        # v064 stocktakes 用 completed_at（无 finalized_at 列）
+        result = await db.execute(
+            text("""
+                SELECT
+                    s.id AS stocktake_id,
+                    s.store_id,
+                    s.status,
+                    s.created_at,
+                    s.completed_at,
+                    COUNT(si.id) AS item_count
+                FROM stocktakes s
+                LEFT JOIN stocktake_items si
+                    ON si.stocktake_id = s.id AND si.tenant_id = s.tenant_id
+                WHERE s.store_id = :store_id::uuid AND s.tenant_id = :tenant_id::uuid
+                  AND s.is_deleted = FALSE
+                GROUP BY s.id, s.store_id, s.status, s.created_at, s.completed_at
+                ORDER BY s.created_at DESC
+            """),
+            {"store_id": store_id, "tenant_id": tenant_id},
+        )
+        rows = result.mappings().all()
+        records = [
+            {
+                "stocktake_id": str(r["stocktake_id"]),
+                "store_id": str(r["store_id"]),
+                "status": r["status"],
+                "created_at": r["created_at"].isoformat() if hasattr(r["created_at"], "isoformat") else str(r["created_at"]),
+                "finalized_at": r["completed_at"].isoformat() if r["completed_at"] and hasattr(r["completed_at"], "isoformat") else r["completed_at"],
+                "item_count": r["item_count"],
+            }
+            for r in rows
+        ]
+    else:
+        records = [
+            {
+                "stocktake_id": st["stocktake_id"],
+                "store_id": st["store_id"],
+                "status": st["status"],
+                "created_at": st["created_at"],
+                "finalized_at": st.get("finalized_at"),
+                "item_count": len(st["items"]),
+            }
+            for st in _stocktakes.values()
+            if st["store_id"] == store_id and st["tenant_id"] == tenant_id
+        ]
+        records.sort(key=lambda x: x["created_at"], reverse=True)
 
     return {"ok": True, "stocktakes": records}

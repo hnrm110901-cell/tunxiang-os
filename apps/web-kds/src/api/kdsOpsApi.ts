@@ -130,3 +130,99 @@ export async function splitToStations(
     body: JSON.stringify({ order_id: orderId }),
   });
 }
+
+// ─── 停菜控制 ───
+
+/** 停菜：暂缓出品（半成品已做好但暂缓上桌） */
+export async function pauseTicket(
+  ticketId: string,
+  operatorId?: string,
+): Promise<{ task_id: string; is_paused: boolean; paused_at: string }> {
+  return txFetch(`/api/v1/kds/tickets/${encodeURIComponent(ticketId)}/pause`, {
+    method: 'POST',
+    body: JSON.stringify({ operator_id: operatorId }),
+  });
+}
+
+/** 恢复停菜 */
+export async function resumeTicket(
+  ticketId: string,
+  operatorId?: string,
+): Promise<{ task_id: string; is_paused: boolean; resumed_at: string }> {
+  return txFetch(`/api/v1/kds/tickets/${encodeURIComponent(ticketId)}/resume`, {
+    method: 'POST',
+    body: JSON.stringify({ operator_id: operatorId }),
+  });
+}
+
+// ─── 抢单 ───
+
+/** 抢单：厨师主动认领 pending 任务并立即开始制作 */
+export async function grabTicket(
+  ticketId: string,
+  operatorId: string,
+): Promise<{ task_id: string; grabbed_by: string; status: string; started_at: string }> {
+  return txFetch(`/api/v1/kds/tickets/${encodeURIComponent(ticketId)}/grab`, {
+    method: 'POST',
+    body: JSON.stringify({ operator_id: operatorId }),
+  });
+}
+
+// ─── 沽清 ───
+
+export interface SoldoutItem {
+  dish_id: string;
+  dish_name: string;
+  soldout_at: string;
+  reason: string | null;
+  source: string;
+}
+
+/** 标记沽清 */
+export async function markSoldout(payload: {
+  store_id: string;
+  dish_id: string;
+  dish_name: string;
+  reason?: string;
+  reported_by?: string;
+}): Promise<{ dish_id: string; record_id: string; soldout_at: string }> {
+  return txFetch('/api/v1/kds/soldout', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+/** 恢复沽清 */
+export async function restoreSoldout(payload: {
+  store_id: string;
+  dish_id: string;
+}): Promise<{ dish_id: string; restored_at: string }> {
+  return txFetch('/api/v1/kds/soldout', {
+    method: 'DELETE',
+    body: JSON.stringify(payload),
+  });
+}
+
+/** 查询当前门店所有沽清菜品 */
+export async function fetchActiveSoldout(
+  storeId: string,
+): Promise<{ items: SoldoutItem[]; total: number }> {
+  return txFetch(`/api/v1/kds/soldout?store_id=${encodeURIComponent(storeId)}`);
+}
+
+// ─── 同菜批量合并 ───
+
+export interface BatchDishGroup {
+  dish_id: string;
+  dish_name: string;
+  dept_id: string;
+  total_qty: number;
+  tickets: Array<{ ticket_id: string; table_no: string; qty: number; priority: string }>;
+}
+
+/** 获取批量合并视图（同档口同菜品聚合） */
+export async function fetchBatchedQueue(
+  deptId: string,
+): Promise<{ groups: BatchDishGroup[] }> {
+  return txFetch(`/api/v1/kds/queue/batched?dept_id=${encodeURIComponent(deptId)}`);
+}

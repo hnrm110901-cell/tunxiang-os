@@ -4,7 +4,6 @@
 金额单位: 分(fen), int 类型。
 """
 import uuid
-from typing import Optional
 
 import structlog
 from sqlalchemy import text

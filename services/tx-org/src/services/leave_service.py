@@ -17,7 +17,6 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
-
 # ── 假期类型 → 默认年度配额（天） ────────────────────────────────
 
 DEFAULT_ANNUAL_QUOTAS: Dict[str, float] = {

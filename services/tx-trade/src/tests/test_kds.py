@@ -12,17 +12,16 @@
 9. KDS操作 — 缺料上报
 10. KDS操作 — 任务时间线完整性
 """
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import uuid
-from datetime import datetime, timezone, timedelta
-from unittest.mock import AsyncMock, MagicMock, patch
+from datetime import datetime, timezone
+from unittest.mock import AsyncMock
 
 import pytest
-
 
 # ─── 工具 ───
 
@@ -177,7 +176,7 @@ async def test_cooking_order_urgent_highest():
 @pytest.mark.asyncio
 async def test_start_cooking_transitions_to_cooking():
     """pending → cooking 状态流转"""
-    from services.kds_actions import start_cooking, _task_store, STATUS_COOKING, STATUS_PENDING
+    from services.kds_actions import STATUS_COOKING, STATUS_PENDING, _task_store, start_cooking
 
     db = AsyncMock()
     task_id = _uid()
@@ -199,7 +198,7 @@ async def test_start_cooking_transitions_to_cooking():
 @pytest.mark.asyncio
 async def test_finish_cooking_transitions_to_done():
     """cooking → done 状态流转"""
-    from services.kds_actions import finish_cooking, _task_store, STATUS_COOKING, STATUS_DONE
+    from services.kds_actions import STATUS_COOKING, STATUS_DONE, _task_store, finish_cooking
 
     db = AsyncMock()
     task_id = _uid()
@@ -222,7 +221,7 @@ async def test_finish_cooking_transitions_to_done():
 @pytest.mark.asyncio
 async def test_remake_resets_to_pending():
     """重做应将状态重置为 pending 并标记 urgent"""
-    from services.kds_actions import request_remake, _task_store, STATUS_DONE, STATUS_PENDING
+    from services.kds_actions import STATUS_DONE, STATUS_PENDING, _task_store, request_remake
 
     db = AsyncMock()
     task_id = _uid()
@@ -260,7 +259,7 @@ def test_timeout_classification():
 @pytest.mark.asyncio
 async def test_report_shortage():
     """缺料上报应记录事件并返回成功"""
-    from services.kds_actions import report_shortage, _task_store
+    from services.kds_actions import _task_store, report_shortage
 
     db = AsyncMock()
     task_id = _uid()
@@ -284,8 +283,11 @@ async def test_report_shortage():
 async def test_task_timeline_completeness():
     """完整操作流程应产生完整时间线"""
     from services.kds_actions import (
-        start_cooking, finish_cooking, _task_store,
-        get_task_timeline, STATUS_PENDING,
+        STATUS_PENDING,
+        _task_store,
+        finish_cooking,
+        get_task_timeline,
+        start_cooking,
     )
 
     db = AsyncMock()

@@ -3,19 +3,21 @@
 交班流程：start_handover → record_cash_count → finalize_handover → get_shift_summary
 所有金额单位：分（fen）。
 """
+import asyncio
 import uuid
 from datetime import datetime, timezone
-from typing import Optional
 
 import structlog
-from sqlalchemy import select, func, and_, cast, Date
+from sqlalchemy import Date, cast, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from shared.events import TradeEventType, UniversalPublisher
 from shared.ontology.src.entities import Order
 from shared.ontology.src.enums import OrderStatus
-from ..models.settlement import ShiftHandover
+
+from ..models.enums import PaymentStatus
 from ..models.payment import Payment, Refund
-from ..models.enums import PaymentMethod, PaymentStatus
+from ..models.settlement import ShiftHandover
 
 logger = structlog.get_logger()
 
@@ -203,6 +205,19 @@ class ShiftHandoverService:
         handover.pending_issues = details
 
         await self.db.flush()
+
+        asyncio.create_task(UniversalPublisher.publish(
+            event_type=TradeEventType.SHIFT_HANDOVER,
+            tenant_id=self.tenant_id,
+            store_id=handover.store_id,
+            entity_id=handover.id,
+            event_data={
+                "shift_id": str(handover.id),
+                "from_employee_id": handover.from_employee_id,
+                "to_employee_id": handover.to_employee_id,
+            },
+            source_service="tx-trade",
+        ))
 
         report = {
             "handover_id": handover_id,

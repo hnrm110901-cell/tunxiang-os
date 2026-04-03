@@ -56,7 +56,6 @@ from datetime import datetime, timezone
 from typing import Optional
 from uuid import UUID
 
-
 # ── 枚举值常量（与 DB VARCHAR 对应） ──────────────────────────
 
 LIFECYCLE_STAGES = ("new", "active", "dormant", "churned", "reactivated")

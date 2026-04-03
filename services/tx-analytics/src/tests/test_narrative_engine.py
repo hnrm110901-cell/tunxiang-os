@@ -1,9 +1,15 @@
 """经营叙事引擎纯函数测试"""
-import sys, os
+import os
+import sys
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from services.narrative_engine import (
-    build_overview, detect_anomalies, build_action, compose_brief, BRIEF_MAX_CHARS,
+    BRIEF_MAX_CHARS,
+    build_action,
+    build_overview,
+    compose_brief,
+    detect_anomalies,
 )
 
 

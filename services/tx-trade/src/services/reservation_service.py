@@ -16,19 +16,22 @@
   - [VALIDATION] phone 空字符串校验
 """
 import uuid
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from shared.events import UniversalPublisher
+
+from ..models.reservation import Reservation
+from ..repositories.reservation_repo import ReservationRepository
+from .attribution_hook import fire_reservation_attribution
+from .queue_service import QueueService
 from .reservation_flow import (
     RESERVATION_TRANSITIONS,
     can_reservation_transition,
 )
-from .queue_service import QueueService
-from ..repositories.reservation_repo import ReservationRepository
-from ..models.reservation import Reservation
 
 logger = structlog.get_logger()
 
@@ -95,6 +98,20 @@ class ReservationService:
 
     # ─── 创建预订 ───
 
+    async def find_by_platform_order_id(
+        self,
+        source_channel: str,
+        platform_order_id: str,
+    ) -> Optional[dict]:
+        """通过平台渠道 + 平台订单号查找已有预订。返回 dict 或 None。"""
+        record = await self._repo.find_by_platform_order_id(
+            source_channel=source_channel,
+            platform_order_id=platform_order_id,
+        )
+        if record is None:
+            return None
+        return record.to_dict()
+
     async def create_reservation(
         self,
         store_id: str,
@@ -109,6 +126,8 @@ class ReservationService:
         deposit_required: bool = False,
         deposit_amount_fen: int = 0,
         consumer_id: Optional[str] = None,
+        source_channel: str = "phone",
+        platform_order_id: Optional[str] = None,
     ) -> dict:
         """创建预订
 
@@ -191,6 +210,8 @@ class ReservationService:
             deposit_paid=False,
             consumer_id=consumer_id,
             status="pending",
+            source_channel=source_channel,
+            platform_order_id=platform_order_id,
         )
 
         logger.info(
@@ -252,6 +273,22 @@ class ReservationService:
             reservation_id=reservation_id,
             confirmed_by=confirmed_by,
         )
+
+        # 触发归因检查（fire-and-forget，不阻断确认流程）
+        if getattr(record, "customer_id", None):
+            try:
+                _tenant_id = uuid.UUID(str(record.tenant_id))
+                _customer_id = uuid.UUID(str(record.customer_id))
+                _reservation_uuid = uuid.UUID(str(record.id))
+                _deposit = round(getattr(record, "deposit_fen", 0) / 100, 2)
+                fire_reservation_attribution(
+                    tenant_id=_tenant_id,
+                    customer_id=_customer_id,
+                    reservation_id=_reservation_uuid,
+                    deposit_yuan=_deposit,
+                )
+            except (ValueError, AttributeError) as exc:
+                logger.warning("attribution_hook_setup_failed", error=str(exc))
 
         return {
             "reservation_id": reservation_id,
@@ -864,5 +901,27 @@ class ReservationService:
             date=record.date,
             time=record.time,
         )
-        # TODO: 接入消息队列发送短信/微信通知
+        # 向 sms_jobs Redis Stream 推送预订确认短信作业，SMS Worker 消费后发送
+        try:
+            r = await UniversalPublisher.get_redis()
+            await r.xadd(
+                "sms_jobs",
+                {
+                    "sms_type": "reservation_confirmation",
+                    "phone": record.phone or "",
+                    "customer_name": record.customer_name or "",
+                    "confirmation_code": record.confirmation_code or "",
+                    "date": str(record.date),
+                    "time": str(record.time),
+                    "tenant_id": self.tenant_id,
+                },
+                maxlen=50_000,
+                approximate=True,
+            )
+        except (OSError, RuntimeError) as exc:
+            logger.warning(
+                "reservation_sms_publish_failed",
+                phone=record.phone,
+                error=str(exc),
+            )
         return True

@@ -22,7 +22,6 @@ import pytest
 
 from ..services.auto_dispatch import (
     SLA_MINUTES,
-    _reset_store as reset_dispatch,
     check_sla,
     get_dispatch_dashboard,
     get_dispatch_rules,
@@ -30,8 +29,13 @@ from ..services.auto_dispatch import (
     register_alert_handler,
     set_dispatch_rule,
 )
+from ..services.auto_dispatch import (
+    _reset_store as reset_dispatch,
+)
 from ..services.notification_engine import (
     _reset_store as reset_notification,
+)
+from ..services.notification_engine import (
     get_notification_history,
     send_alert_notification,
     send_notification,

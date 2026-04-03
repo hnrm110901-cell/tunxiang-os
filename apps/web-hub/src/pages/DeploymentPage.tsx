@@ -1,6 +1,9 @@
 /**
- * 部署管理 — Mac mini舰队状态
+ * 部署管理 — Mac mini 舰队（GET /api/v1/hub/deployment/mac-minis）
  */
+import { useEffect, useMemo, useState } from 'react';
+import { hubGet } from '../api/hubApi';
+
 const s = {
   page: { color: '#E0E0E0' } as React.CSSProperties,
   title: { fontSize: 22, fontWeight: 700, color: '#FFFFFF', marginBottom: 20 } as React.CSSProperties,
@@ -34,22 +37,62 @@ const s = {
     display: 'inline-block', padding: '2px 10px', borderRadius: 20,
     fontSize: 11, fontWeight: 600, background: `${color}22`, color,
   }) as React.CSSProperties,
+  err: { color: '#EF4444', fontSize: 13, marginBottom: 12 } as React.CSSProperties,
 };
 
-const minis = [
-  { store: '尝在一起(五一广场店)', ip: '192.168.1.100', tailscale: true, tsIp: '100.64.0.11', version: '3.0.1', heartbeat: '30秒前', cpu: '12%', mem: '4.2GB' },
-  { store: '尝在一起(万达店)', ip: '192.168.1.101', tailscale: true, tsIp: '100.64.0.12', version: '3.0.1', heartbeat: '15秒前', cpu: '8%', mem: '3.8GB' },
-  { store: '最黔线(太平街店)', ip: '192.168.2.100', tailscale: true, tsIp: '100.64.0.21', version: '3.0.0', heartbeat: '1分钟前', cpu: '22%', mem: '5.1GB' },
-  { store: '尚宫厨(天心店)', ip: '192.168.3.100', tailscale: false, tsIp: '-', version: '2.9.8', heartbeat: '3小时前', cpu: '-', mem: '-' },
-  { store: '湘味传奇(侯家塘店)', ip: '192.168.4.100', tailscale: true, tsIp: '100.64.0.41', version: '3.0.1', heartbeat: '45秒前', cpu: '15%', mem: '4.5GB' },
-];
+type HubMini = {
+  store: string;
+  ip: string;
+  tailscale: string;
+  version: string;
+  last_heartbeat: string;
+  cpu_pct: number;
+  mem_pct: number;
+};
+
+const TARGET_VER = '3.3.0';
 
 export function DeploymentPage() {
-  const online = minis.filter((m) => m.tailscale).length;
-  const outdated = minis.filter((m) => m.version !== '3.0.1').length;
+  const [minis, setMinis] = useState<HubMini[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    hubGet<HubMini[]>('/deployment/mac-minis')
+      .then((d) => {
+        if (!cancelled) {
+          setMinis(Array.isArray(d) ? d : []);
+          setErr(null);
+        }
+      })
+      .catch((e: Error) => {
+        if (!cancelled) setErr(e.message || '加载失败');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const { online, outdated } = useMemo(() => {
+    let on = 0;
+    let od = 0;
+    for (const m of minis) {
+      if (m.tailscale === 'online') on += 1;
+      if (m.version !== TARGET_VER) od += 1;
+    }
+    return { online: on, outdated: od };
+  }, [minis]);
+
   return (
     <div style={s.page}>
       <div style={s.title}>部署管理</div>
+      {err && <div style={s.err}>{err}</div>}
+      {loading && <div style={{ color: '#6B8A97', marginBottom: 16 }}>加载中…</div>}
       <div style={s.cards}>
         <div style={s.card}><div style={s.cardLabel}>Mac mini总数</div><div style={s.cardValue}>{minis.length}</div></div>
         <div style={s.card}><div style={s.cardLabel}>Tailscale在线</div><div style={{ ...s.cardValue, color: '#22C55E' }}>{online}</div></div>
@@ -59,16 +102,15 @@ export function DeploymentPage() {
       <div style={s.toolbar}>
         <div style={{ fontSize: 14, color: '#8BA5B2' }}>Mac mini 舰队</div>
         <div>
-          <button style={s.btn}>推送更新</button>
+          <button type="button" style={s.btn}>推送更新</button>
         </div>
       </div>
       <table style={s.table}>
         <thead>
           <tr>
             <th style={s.th}>门店</th>
-            <th style={s.th}>局域网IP</th>
+            <th style={s.th}>IP</th>
             <th style={s.th}>Tailscale状态</th>
-            <th style={s.th}>Tailscale IP</th>
             <th style={s.th}>软件版本</th>
             <th style={s.th}>最后心跳</th>
             <th style={s.th}>CPU</th>
@@ -77,27 +119,30 @@ export function DeploymentPage() {
           </tr>
         </thead>
         <tbody>
-          {minis.map((m) => (
-            <tr key={m.store}>
-              <td style={s.td}>{m.store}</td>
-              <td style={s.td}><code style={{ color: '#8BA5B2' }}>{m.ip}</code></td>
-              <td style={s.td}><span style={s.dot(m.tailscale)} />{m.tailscale ? '已连接' : '断开'}</td>
-              <td style={s.td}><code style={{ color: '#8BA5B2' }}>{m.tsIp}</code></td>
-              <td style={s.td}>
-                {m.version === '3.0.1'
-                  ? <span style={s.badge('#22C55E')}>{m.version}</span>
-                  : <span style={s.badge('#F59E0B')}>{m.version}</span>}
-              </td>
-              <td style={s.td}>{m.heartbeat}</td>
-              <td style={s.td}>{m.cpu}</td>
-              <td style={s.td}>{m.mem}</td>
-              <td style={s.td}>
-                <button style={s.btnSec}>SSH</button>
-                <button style={s.btnSec}>更新</button>
-                <button style={s.btnSec}>查看详情</button>
-              </td>
-            </tr>
-          ))}
+          {minis.map((m) => {
+            const tsOk = m.tailscale === 'online';
+            const verOk = m.version === TARGET_VER;
+            return (
+              <tr key={m.store}>
+                <td style={s.td}>{m.store}</td>
+                <td style={s.td}><code style={{ color: '#8BA5B2' }}>{m.ip}</code></td>
+                <td style={s.td}><span style={s.dot(tsOk)} />{tsOk ? '已连接' : '断开'}</td>
+                <td style={s.td}>
+                  {verOk
+                    ? <span style={s.badge('#22C55E')}>{m.version}</span>
+                    : <span style={s.badge('#F59E0B')}>{m.version}</span>}
+                </td>
+                <td style={s.td}>{m.last_heartbeat}</td>
+                <td style={s.td}>{m.cpu_pct}%</td>
+                <td style={s.td}>{m.mem_pct}%</td>
+                <td style={s.td}>
+                  <button type="button" style={s.btnSec}>SSH</button>
+                  <button type="button" style={s.btnSec}>更新</button>
+                  <button type="button" style={s.btnSec}>查看详情</button>
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>

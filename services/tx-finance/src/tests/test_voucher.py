@@ -1,8 +1,10 @@
 """自动凭证生成测试"""
-import sys, os
+import os
+import sys
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from services.voucher_service import generate_voucher_from_settlement, format_for_kingdee
+from services.voucher_service import format_for_kingdee, generate_voucher_from_settlement
 
 
 class TestVoucherGeneration:

@@ -18,7 +18,7 @@ from typing import Optional
 
 import structlog
 
-from .dish_health_score import DishHealthScoreEngine, DishHealthScore, ScoreWeights
+from .dish_health_score import DishHealthScoreEngine, ScoreWeights
 
 log = structlog.get_logger(__name__)
 

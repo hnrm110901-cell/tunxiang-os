@@ -16,11 +16,10 @@ from typing import Any, List
 
 import httpx
 import structlog
+from conflict_resolver import ConflictResolver
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
-
-from conflict_resolver import ConflictResolver
 from sync_tracker import SyncTracker
 
 logger = structlog.get_logger()

@@ -9,7 +9,13 @@ from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from services.tx_supply.src.services import inventory_io, expiry_monitor, stock_forecast
+from shared.ontology.src.database import get_db as _get_db
+
+from ..services import expiry_monitor, inventory_io, stock_forecast
+from ..services.transfer_service import (
+    get_brand_ingredient_overview,
+    get_brand_low_stock_alert,
+)
 
 router = APIRouter(prefix="/api/v1/supply", tags=["supply"])
 
@@ -42,14 +48,6 @@ class AdjustStockRequest(BaseModel):
     reason: str
     store_id: str
     performed_by: Optional[str] = None
-
-
-# ─── 依赖注入占位（实际使用时由 main.py 提供） ───
-
-
-async def _get_db():
-    """数据库会话依赖 — 由 main.py 覆盖"""
-    raise NotImplementedError("DB session dependency not configured")
 
 
 # ─── 库存基础查询 ───
@@ -347,3 +345,47 @@ async def get_waste_rate(store_id: str):
 @router.get("/demand/forecast")
 async def forecast_demand(store_id: str, days: int = 7):
     return {"ok": True, "data": {"forecast": []}}
+
+
+# ─── 多门店库存汇总（品牌维度） ───
+
+
+@router.get("/inventory/brand-overview")
+async def get_brand_overview(
+    ingredient_id: str,
+    x_tenant_id: str = Header(alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(_get_db),
+):
+    """品牌维度：查看所有门店某食材的库存量。
+
+    返回: [{store_id, ingredient_name, quantity, unit, min_quantity, status}]
+    方便决策从哪个门店调拨。
+    """
+    try:
+        result = await get_brand_ingredient_overview(
+            tenant_id=x_tenant_id,
+            ingredient_id=ingredient_id,
+            db=db,
+        )
+        return {"ok": True, "data": {"stores": result, "total_stores": len(result)}}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.get("/inventory/low-stock-alert")
+async def get_low_stock_alert(
+    x_tenant_id: str = Header(alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(_get_db),
+):
+    """全品牌低库存预警：所有门店中库存低于安全库存的食材+所在门店。"""
+    result = await get_brand_low_stock_alert(
+        tenant_id=x_tenant_id,
+        db=db,
+    )
+    return {
+        "ok": True,
+        "data": {
+            "alerts": result,
+            "total": len(result),
+        },
+    }

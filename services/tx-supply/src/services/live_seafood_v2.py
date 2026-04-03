@@ -5,11 +5,11 @@
 活鲜状态流转：alive → weak → dead（不可逆）。
 """
 import uuid
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timezone
 from typing import Optional
 
 import structlog
-from sqlalchemy import select, func, and_, text, case, literal_column
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.entities import Ingredient, IngredientTransaction

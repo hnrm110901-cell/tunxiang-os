@@ -1,20 +1,19 @@
 """部门领用测试"""
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import pytest
 from services.dept_issue import (
+    check_yield_rate,
+    create_dept_transfer,
     create_issue_order,
     create_return_order,
-    create_dept_transfer,
-    check_yield_rate,
-    sales_to_inventory,
     get_issue_flow,
     get_monthly_summary,
+    sales_to_inventory,
 )
-
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  创建领用单

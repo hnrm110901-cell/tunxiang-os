@@ -18,7 +18,7 @@ import structlog
 
 from shared.vector_store.client import QdrantClient
 from shared.vector_store.embeddings import EmbeddingService
-from shared.vector_store.indexes import COLLECTIONS, get_vector_size
+from shared.vector_store.indexes import get_vector_size
 
 logger = structlog.get_logger()
 
@@ -250,7 +250,7 @@ class KnowledgeRetrievalService:
                 {"brand_id": brand_id},
             )
             rows = result.fetchall()
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 — DB驱动异常类型多样
             logger.warning(
                 "index_menu_knowledge_db_error",
                 brand_id=brand_id,

@@ -9,32 +9,27 @@
 6. 下架建议列表（包含理由）
 7. tenant_id 隔离
 """
-import sys
-import os
 import asyncio
+import os
+import sys
 from datetime import datetime, timedelta, timezone
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../src"))
 
 import pytest
-
 from services.dish_health_score import (
     DishHealthScoreEngine,
     ScoreWeights,
-    MARGIN_FULL_SCORE_RATE,
-    MARGIN_ZERO_SCORE_RATE,
-    inject_dish_score_data,
     _clear_score_store,
+    inject_dish_score_data,
 )
 from services.dish_lifecycle import (
+    LOW_SALES_THRESHOLD,
+    REMOVAL_LOW_HEALTH_DAYS,
     DishLifecycleService,
-    inject_dish_lifecycle_data,
     _clear_lifecycle_store,
     _get_notifications,
-    LOW_SALES_THRESHOLD,
-    LOW_MARGIN_THRESHOLD,
-    REMOVAL_MARGIN_CRITICAL,
-    REMOVAL_LOW_HEALTH_DAYS,
+    inject_dish_lifecycle_data,
 )
 
 TENANT_A = "tenant-test-aaa"

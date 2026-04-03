@@ -246,6 +246,10 @@ Page({
     }
   },
 
+  goToChefHome: function () {
+    wx.navigateTo({ url: '/pages/chef-at-home/index' });
+  },
+
   goToMenu: function () {
     wx.switchTab({ url: '/pages/menu/menu' });
   },

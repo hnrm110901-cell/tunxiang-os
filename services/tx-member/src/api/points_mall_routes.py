@@ -26,6 +26,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+
 from ..services.points_mall_v2 import (
     cancel_order,
     create_product,

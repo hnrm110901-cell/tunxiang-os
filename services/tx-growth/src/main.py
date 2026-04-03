@@ -6,23 +6,23 @@
 """
 import asyncio
 from contextlib import asynccontextmanager
+from typing import Any, Optional
 
 import structlog
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from pydantic import BaseModel
-from typing import Any, Optional
-
-from shared.ontology.src.database import init_db, async_session_factory
-from services.brand_strategy import BrandStrategyService
 from services.audience_segmentation import AudienceSegmentationService
-from services.journey_orchestrator import JourneyOrchestratorService
-from services.content_engine import ContentEngine
-from services.offer_engine import OfferEngine
+from services.brand_strategy import BrandStrategyService
 from services.channel_engine import ChannelEngine
+from services.content_engine import ContentEngine
+from services.journey_orchestrator import JourneyOrchestratorService
+from services.offer_engine import OfferEngine
 from services.roi_attribution import ROIAttributionService
-from workers.journey_executor import JourneyExecutor, JourneyEventListener
+from workers.journey_executor import JourneyEventListener, JourneyExecutor
+
 from shared.events.event_publisher import MemberEventPublisher
+from shared.ontology.src.database import async_session_factory, init_db
 
 logger = structlog.get_logger(__name__)
 
@@ -86,15 +86,63 @@ def _on_tick_done(task: asyncio.Task) -> None:
 # FastAPI App（lifespan 管理 DB 初始化 + scheduler）
 # ---------------------------------------------------------------------------
 
-from .api.campaign_routes import router as campaign_router
-from .api.segmentation_routes import router as segmentation_router
-from .api.referral_routes import router as referral_router
-from .api.attribution_routes import router as attribution_router
-from .api.ab_test_routes import router as ab_test_router
-from .api.approval_routes import router as approval_router
+from engine.event_bridge import get_event_bridge as _get_event_bridge
+from engine.journey_engine import JourneyEngine as _JourneyEngine
 from services.approval_service import ApprovalService as _ApprovalService
 
+from .api.ab_test_routes import router as ab_test_router
+from .api.approval_routes import router as approval_router
+from .api.attribution_routes import router as attribution_router
+from .api.brand_strategy_routes import router as brand_strategy_router
+from .api.campaign_routes import router as campaign_router
+from .api.journey_routes import router as journey_router
+from .api.referral_routes import router as referral_router
+from .api.segmentation_routes import router as segmentation_router
+from .api.touch_attribution_routes import router as touch_attribution_router
+
 _approval_service = _ApprovalService()
+
+# ---------------------------------------------------------------------------
+# Journey Engine — 定时任务（每分钟处理到期 enrollment 步骤）
+# ---------------------------------------------------------------------------
+
+_journey_engine = _JourneyEngine()
+# EventBridge 在 lifespan 中初始化（需要 db_session_factory）
+_journey_engine_task: asyncio.Task | None = None
+
+
+async def _run_journey_engine_tick() -> None:
+    """定时任务：每分钟推进到期的 Journey enrollment 步骤。"""
+    logger.info("journey_engine_tick_started")
+    async with async_session_factory() as db:
+        try:
+            result = await _journey_engine.process_pending_steps(db)
+            await db.commit()
+            logger.info("journey_engine_tick_done", **result)
+        except (OSError, RuntimeError, ValueError) as exc:
+            await db.rollback()
+            logger.error(
+                "journey_engine_tick_error",
+                error=str(exc),
+                exc_info=True,
+            )
+
+
+def _schedule_journey_engine_tick() -> None:
+    """APScheduler 回调：在事件循环中创建 Task 执行 Journey Engine tick。"""
+    task = asyncio.create_task(_run_journey_engine_tick())
+    task.add_done_callback(_on_journey_engine_tick_done)
+
+
+def _on_journey_engine_tick_done(task: asyncio.Task) -> None:
+    """Journey Engine tick Task 完成回调。"""
+    exc = task.exception() if not task.cancelled() else None
+    if exc is not None:
+        logger.error(
+            "journey_engine_tick_unhandled_error",
+            error=str(exc),
+            exc_info=exc,
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -113,24 +161,38 @@ async def _run_approval_expiry_check() -> None:
     此处为占位实现，RLS 策略需在调用处通过 SET LOCAL app.tenant_id 激活。
     """
     logger.info("approval_expiry_check_started")
-    async with async_session_factory() as db:
+    # 先查出所有活跃租户（用无 RLS 连接查 DISTINCT tenant_id）
+    from sqlalchemy import text as _text
+    async with async_session_factory() as probe_db:
         try:
-            # TODO: 按活跃租户列表循环；当前仅记录启动日志
-            # 生产实现：
-            #   tenants = await fetch_active_tenant_ids(db)
-            #   for tenant_id in tenants:
-            #       await db.execute(text(f"SET LOCAL app.tenant_id='{tenant_id}'"))
-            #       result = await _approval_service.check_expired_requests(tenant_id, db)
-            #       logger.info("approval_expiry_check_tenant_done", tenant_id=str(tenant_id), **result)
-            await db.commit()
-            logger.info("approval_expiry_check_finished")
-        except (OSError, RuntimeError, ValueError) as exc:
-            await db.rollback()
-            logger.error(
-                "approval_expiry_check_error",
-                error=str(exc),
-                exc_info=True,
+            result = await probe_db.execute(
+                _text("SELECT DISTINCT tenant_id FROM stores WHERE is_active = true")
             )
+            tenant_ids = [str(row[0]) for row in result.fetchall()]
+        except (OSError, RuntimeError, ValueError) as exc:
+            logger.error("approval_expiry_fetch_tenants_error", error=str(exc), exc_info=True)
+            return
+
+    for tenant_id in tenant_ids:
+        async with async_session_factory() as db:
+            try:
+                await db.execute(
+                    _text("SELECT set_config('app.tenant_id', :tid, true)"),
+                    {"tid": tenant_id},
+                )
+                result = await _approval_service.check_expired_requests(tenant_id, db)
+                await db.commit()
+                logger.info("approval_expiry_check_tenant_done", tenant_id=tenant_id, **result)
+            except (OSError, RuntimeError, ValueError) as exc:
+                await db.rollback()
+                logger.error(
+                    "approval_expiry_check_tenant_error",
+                    tenant_id=tenant_id,
+                    error=str(exc),
+                    exc_info=True,
+                )
+
+    logger.info("approval_expiry_check_finished", tenant_count=len(tenant_ids))
 
 
 def _schedule_approval_expiry() -> None:
@@ -196,9 +258,29 @@ async def lifespan(app: FastAPI):
         misfire_grace_time=300,  # 超时检查允许5分钟内补发
     )
 
+    # Journey Engine tick — 每分钟推进到期 enrollment 步骤
+    _scheduler.add_job(
+        _schedule_journey_engine_tick,
+        trigger="interval",
+        seconds=60,
+        id="journey_engine_tick",
+        replace_existing=True,
+        max_instances=1,
+        misfire_grace_time=30,
+    )
+
     _scheduler.start()
     logger.info("journey_executor_scheduler_started", interval_seconds=60)
     logger.info("approval_expiry_scheduler_started", interval_hours=1)
+    logger.info("journey_engine_scheduler_started", interval_seconds=60)
+
+    # 启动 EventBridge（桥接业务事件 → JourneyEngine）
+    _bridge = _get_event_bridge(
+        journey_engine=_journey_engine,
+        db_session_factory=async_session_factory,
+    )
+    await _bridge.start()
+    logger.info("journey_event_bridge_started")
 
     # 启动旅程事件监听后台任务（MEMBER_REGISTERED / ORDER_PAID → 实时触发旅程）
     _journey_listener_task = asyncio.create_task(_run_journey_event_listener())
@@ -215,6 +297,16 @@ async def lifespan(app: FastAPI):
         _scheduler.shutdown(wait=False)
         logger.info("journey_executor_scheduler_stopped")
         logger.info("approval_expiry_scheduler_stopped")
+        logger.info("journey_engine_scheduler_stopped")
+
+    # 停止 EventBridge
+    try:
+        from engine.event_bridge import _bridge_instance as _eb
+        if _eb is not None:
+            await _eb.stop()
+            logger.info("journey_event_bridge_stopped")
+    except (OSError, RuntimeError, ImportError):
+        pass
 
     await MemberEventPublisher.close()
 
@@ -224,8 +316,11 @@ app.include_router(campaign_router)
 app.include_router(segmentation_router)
 app.include_router(referral_router)
 app.include_router(attribution_router)
+app.include_router(touch_attribution_router)
 app.include_router(ab_test_router)
 app.include_router(approval_router)
+app.include_router(brand_strategy_router)
+app.include_router(journey_router)
 
 # 服务实例
 brand_svc = BrandStrategyService()

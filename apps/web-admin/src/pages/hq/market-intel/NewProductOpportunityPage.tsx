@@ -1,12 +1,17 @@
 /**
- * NewProductOpportunityPage -- 新品机会详情
+ * NewProductOpportunityPage — 新品机会详情（真实API版）
  * 路由: /hq/market-intel/new-products/:opportunityId
+ * API: GET /api/v1/analytics/new-product-opportunities/{id}
+ *      POST /api/v1/orchestrate  (AI深度分析)
+ *      POST /api/v1/menu/rd/opportunities  (加入研发计划)
  */
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { txFetch } from '../../../api';
 
-// ---- 颜色常量 ----
-const BG_1 = '#1a2836';
+// ---- 颜色常量（深色主题） ----
+const BG_0 = '#0d1e28';
+const BG_1 = '#1a2a33';
 const BG_2 = '#243442';
 const BRAND = '#ff6b2c';
 const GREEN = '#52c41a';
@@ -21,7 +26,9 @@ const TEXT_3 = '#999999';
 const TEXT_4 = '#666666';
 
 // ---- 类型定义 ----
+
 type OpportunityStatus = '待评估' | '评估中' | '试点中' | '已采纳' | '已否决';
+type TrendDir = 'up' | 'down' | 'stable';
 
 interface ScoreDimension {
   label: string;
@@ -36,27 +43,26 @@ interface TrendSource {
   date: string;
 }
 
-interface StoreMatch {
-  storeName: string;
-  matchScore: number;
-  reasons: string[];
+interface BomItem {
+  ingredient: string;
+  amount: string;
+  cost_estimate: string;
+  note?: string;
 }
 
-interface PilotPlan {
-  duration: string;
-  storeCount: number;
-  targetMetrics: string[];
-  estimatedCost: number;
-  expectedRevenue: number;
-  suggestedDishes: string[];
+interface PricingRange {
+  low: number;
+  mid: number;
+  high: number;
+  recommended: number;
+  competitor_avg?: number;
 }
 
-interface SampleData {
-  id: string;
-  source: string;
-  content: string;
-  date: string;
-  sentiment: 'positive' | 'neutral' | 'negative';
+interface RiskItem {
+  type: '市场' | '供应链' | '口味' | '运营' | '竞对';
+  level: 'high' | 'medium' | 'low';
+  description: string;
+  mitigation: string;
 }
 
 interface RelatedCompetitor {
@@ -69,16 +75,13 @@ interface RelatedCompetitor {
 interface RelatedTopic {
   keyword: string;
   heat: number;
-  trend: 'up' | 'down' | 'stable';
+  trend: TrendDir;
 }
 
-interface HistoricalPilot {
-  name: string;
-  store: string;
-  period: string;
-  result: '成功' | '失败' | '进行中';
-  avgDailySales: number;
-  satisfaction: number;
+interface StoreMatch {
+  store_name: string;
+  match_score: number;
+  reasons: string[];
 }
 
 interface OpportunityDetail {
@@ -86,230 +89,67 @@ interface OpportunityDetail {
   name: string;
   score: number;
   status: OpportunityStatus;
-  isFavorite: boolean;
+  is_favorite: boolean;
   summary: string;
-  fitScenarios: string[];
-  suggestedDishTypes: string[];
-  recommendedFlavors: string[];
+  fit_scenarios: string[];
+  suggested_dish_types: string[];
+  recommended_flavors: string[];
   scores: ScoreDimension[];
-  trendSources: TrendSource[];
-  storeMatches: StoreMatch[];
-  pilotPlan: PilotPlan;
-  samples: SampleData[];
-  relatedCompetitors: RelatedCompetitor[];
-  relatedTopics: RelatedTopic[];
-  historicalPilots: HistoricalPilot[];
+  trend_sources: TrendSource[];
+  store_matches: StoreMatch[];
+  related_competitors: RelatedCompetitor[];
+  related_topics: RelatedTopic[];
+  bom_suggestions: BomItem[];
+  pricing_range: PricingRange;
+  risks: RiskItem[];
 }
 
-// ---- Mock 数据 ----
-const MOCK_OPPORTUNITIES: Record<string, OpportunityDetail> = {
-  'opp-1': {
-    id: 'opp-1', name: '酸汤火锅', score: 87, status: '待评估', isFavorite: false,
-    summary: '酸汤类菜品在全国范围内搜索量激增40%，社交媒体相关内容增长200%。海底捞等头部品牌已推出酸汤系列，市场验证充分。酸汤口味与湘菜品牌高度适配，建议优先开发酸汤鱼、酸汤肥牛等核心产品。',
-    fitScenarios: ['家庭聚餐', '朋友聚会', '冬季暖身', '情侣约会'],
-    suggestedDishTypes: ['酸汤鱼', '酸汤肥牛', '酸汤肥肠', '酸汤时蔬'],
-    recommendedFlavors: ['酸辣', '番茄酸汤', '酸笋酸汤', '贵州红酸汤'],
-    scores: [
-      { label: '市场热度', score: 95, color: RED },
-      { label: '品牌适配', score: 78, color: BLUE },
-      { label: '客群适配', score: 82, color: GREEN },
-      { label: '成本可行', score: 75, color: YELLOW },
-      { label: '供应稳定', score: 80, color: CYAN },
-    ],
-    trendSources: [
-      { type: '竞对', content: '海底捞全国门店推出6款酸汤锅底，定价89-129元', metric: '覆盖率100%', date: '2026-03-25' },
-      { type: '搜索', content: '"酸汤"关键词搜索量同比增长40%', metric: '月搜索量120万', date: '2026-03-24' },
-      { type: '评论', content: '大众点评/美团顾客提及"想吃酸汤"相关评论增长65%', metric: '月评论2.8万条', date: '2026-03-23' },
-      { type: '社媒', content: '小红书"酸汤"相关笔记增长200%，抖音话题播放量破5亿', metric: '互动率8.5%', date: '2026-03-22' },
-      { type: '行业', content: '2026年餐饮趋势报告将"酸汤"列为年度TOP3风味趋势', date: '2026-03-20' },
-    ],
-    storeMatches: [
-      { storeName: '芙蓉路店', matchScore: 92, reasons: ['家庭客群占比高', '厨房条件满足', '商圈消费力匹配'] },
-      { storeName: '五一店', matchScore: 85, reasons: ['年轻客群多', '翻台率高', '外卖占比大'] },
-      { storeName: '武汉光谷店', matchScore: 78, reasons: ['湖北酸汤接受度高', '竞争较少', '新店需要引流'] },
-      { storeName: '梅溪湖店', matchScore: 75, reasons: ['家庭客群增长快', '周末客流大'] },
-      { storeName: '广州天河店', matchScore: 70, reasons: ['广东酸汤接受度待验证', '但消费力强'] },
-    ],
-    pilotPlan: {
-      duration: '14天',
-      storeCount: 3,
-      targetMetrics: ['日均销量 >= 50份', '好评率 >= 85%', '毛利率 >= 55%', '复购率 >= 30%'],
-      estimatedCost: 28000,
-      expectedRevenue: 84000,
-      suggestedDishes: ['酸汤鱼(主打)', '酸汤肥牛', '酸汤时蔬(低成本配搭)'],
-    },
-    samples: [
-      { id: 's-1', source: '小红书', content: '最近酸汤火锅太火了吧！长沙哪里有好吃的酸汤鱼推荐？', date: '2026-03-25', sentiment: 'positive' },
-      { id: 's-2', source: '大众点评', content: '希望尝在一起能出酸汤系列，他们家的鱼做得好，酸汤鱼一定好吃', date: '2026-03-24', sentiment: 'positive' },
-      { id: 's-3', source: '抖音评论', content: '看了酸汤肥牛的视频馋死了，长沙有没有正宗的酸汤店？', date: '2026-03-23', sentiment: 'positive' },
-      { id: 's-4', source: '美团评论', content: '去海底捞吃了酸汤锅底，感觉一般，不够正宗', date: '2026-03-22', sentiment: 'neutral' },
-      { id: 's-5', source: '微博', content: '贵州酸汤才是正宗！其他品牌做的都不行', date: '2026-03-21', sentiment: 'negative' },
-    ],
-    relatedCompetitors: [
-      { name: '海底捞', action: '推出6款酸汤锅底', date: '2026-03-25', detail: '全国门店同步上线，主打酸汤肥牛和酸汤鱼' },
-      { name: '太二', action: '酸菜鱼+酸汤组合', date: '2026-03-20', detail: '在酸菜鱼基础上增加酸汤系列，形成双品类矩阵' },
-      { name: '费大厨', action: '限时酸汤辣椒炒肉', date: '2026-03-18', detail: '将招牌辣椒炒肉与酸汤结合，推出限时新品' },
-    ],
-    relatedTopics: [
-      { keyword: '酸汤', heat: 95, trend: 'up' },
-      { keyword: '贵州风味', heat: 72, trend: 'up' },
-      { keyword: '酸笋', heat: 68, trend: 'up' },
-      { keyword: '番茄锅', heat: 60, trend: 'stable' },
-      { keyword: '低脂火锅', heat: 55, trend: 'up' },
-    ],
-    historicalPilots: [
-      { name: '酸菜鱼试点', store: '芙蓉路店', period: '2025-11-01 ~ 2025-11-14', result: '成功', avgDailySales: 62, satisfaction: 88 },
-      { name: '椰子鸡试点', store: '五一店', period: '2025-09-15 ~ 2025-09-28', result: '失败', avgDailySales: 18, satisfaction: 65 },
-      { name: '剁椒系列扩展', store: '梅溪湖店', period: '2026-01-10 ~ 2026-01-23', result: '成功', avgDailySales: 45, satisfaction: 82 },
-    ],
-  },
-  'opp-2': {
-    id: 'opp-2', name: '一人食精品套餐', score: 82, status: '评估中', isFavorite: true,
-    summary: '一人食消费场景持续增长，抖音"一人食"话题播放量破10亿。年轻白领和学生客群需求旺盛，竞对费大厨已推出外卖一人食套餐。建议开发堂食+外卖双场景一人食套餐。',
-    fitScenarios: ['白领午餐', '学生快餐', '外卖场景', '晚间独食'],
-    suggestedDishTypes: ['主菜+米饭+小菜', '迷你套餐', '轻食碗', '拌饭系列'],
-    recommendedFlavors: ['经典湘味', '微辣', '酸辣', '清淡'],
-    scores: [
-      { label: '市场热度', score: 88, color: RED },
-      { label: '品牌适配', score: 85, color: BLUE },
-      { label: '客群适配', score: 82, color: GREEN },
-      { label: '成本可行', score: 82, color: YELLOW },
-      { label: '供应稳定', score: 90, color: CYAN },
-    ],
-    trendSources: [
-      { type: '社媒', content: '抖音"一人食"话题播放量破10亿', metric: '月增长35%', date: '2026-03-25' },
-      { type: '竞对', content: '费大厨上线39.9元外卖一人食套餐', metric: '日均200单', date: '2026-03-22' },
-      { type: '搜索', content: '"一人食 湘菜"搜索量增长55%', metric: '月搜索量45万', date: '2026-03-20' },
-      { type: '评论', content: '顾客多次提到"一个人来吃份量太大"', metric: '月提及1.2万次', date: '2026-03-18' },
-    ],
-    storeMatches: [
-      { storeName: '五一店', matchScore: 90, reasons: ['白领客群密集', '午间翻台率高', '外卖占比35%'] },
-      { storeName: '芙蓉路店', matchScore: 82, reasons: ['学生客群多', '周边写字楼密集'] },
-      { storeName: '武汉光谷店', matchScore: 80, reasons: ['IT从业者多', '一人食需求旺'] },
-    ],
-    pilotPlan: {
-      duration: '7天',
-      storeCount: 2,
-      targetMetrics: ['日均销量 >= 80份', '好评率 >= 80%', '毛利率 >= 60%'],
-      estimatedCost: 12000,
-      expectedRevenue: 44800,
-      suggestedDishes: ['辣椒炒肉饭', '剁椒鱼头饭', '酸菜肉丝饭'],
-    },
-    samples: [
-      { id: 's-1', source: '美团评论', content: '一个人来吃，菜的份量太大了，希望有小份', date: '2026-03-24', sentiment: 'neutral' },
-      { id: 's-2', source: '抖音', content: '一人食湘菜套餐，39块钱吃得又好又饱', date: '2026-03-22', sentiment: 'positive' },
-    ],
-    relatedCompetitors: [
-      { name: '费大厨', action: '推出外卖一人食套餐', date: '2026-03-22', detail: '39.9元含主菜+米饭+小菜，美团专属' },
-    ],
-    relatedTopics: [
-      { keyword: '一人食', heat: 88, trend: 'up' },
-      { keyword: '快餐化', heat: 72, trend: 'up' },
-      { keyword: '小份菜', heat: 65, trend: 'up' },
-    ],
-    historicalPilots: [],
-  },
-  'opp-3': {
-    id: 'opp-3', name: '低脂健康套餐', score: 79, status: '待评估', isFavorite: false,
-    summary: '健康饮食在年轻消费群体中持续走热，低盐低脂成为餐饮新关键词。建议在现有菜品基础上推出卡路里标注和健康标签系列。',
-    fitScenarios: ['健身人群', '减脂期', '白领午餐', '轻食场景'],
-    suggestedDishTypes: ['蒸菜系列', '少油炒菜', '沙拉碗', '杂粮饭'],
-    recommendedFlavors: ['清蒸', '白灼', '酸辣轻口', '蒜蓉'],
-    scores: [
-      { label: '市场热度', score: 85, color: RED },
-      { label: '品牌适配', score: 72, color: BLUE },
-      { label: '客群适配', score: 78, color: GREEN },
-      { label: '成本可行', score: 80, color: YELLOW },
-      { label: '供应稳定', score: 85, color: CYAN },
-    ],
-    trendSources: [
-      { type: '社媒', content: '小红书"健康餐饮"笔记增长80%', metric: '月笔记量15万', date: '2026-03-24' },
-      { type: '搜索', content: '"低脂 湘菜"搜索量增长30%', date: '2026-03-22' },
-    ],
-    storeMatches: [
-      { storeName: '芙蓉路店', matchScore: 80, reasons: ['年轻客群多', '健身房周边'] },
-      { storeName: '五一店', matchScore: 75, reasons: ['白领需求旺'] },
-    ],
-    pilotPlan: {
-      duration: '10天',
-      storeCount: 2,
-      targetMetrics: ['日均销量 >= 40份', '好评率 >= 82%', '毛利率 >= 58%'],
-      estimatedCost: 15000,
-      expectedRevenue: 32000,
-      suggestedDishes: ['清蒸鲈鱼', '蒜蓉西兰花', '杂粮饭套餐'],
-    },
-    samples: [
-      { id: 's-1', source: '小红书', content: '有没有健康的湘菜推荐？减脂期也想吃辣', date: '2026-03-23', sentiment: 'positive' },
-    ],
-    relatedCompetitors: [],
-    relatedTopics: [
-      { keyword: '健康饮食', heat: 85, trend: 'up' },
-      { keyword: '低盐低脂', heat: 65, trend: 'up' },
-      { keyword: '卡路里标注', heat: 55, trend: 'up' },
-    ],
-    historicalPilots: [],
-  },
-};
-
-// 为 opp-4 ~ opp-10 生成简单默认数据
-const DEFAULT_DETAIL = (id: string, name: string, score: number, status: OpportunityStatus): OpportunityDetail => ({
-  id, name, score, status, isFavorite: false,
-  summary: `${name}是基于市场趋势分析发现的新品机会，综合评分${score}分，目前处于${status}阶段。`,
-  fitScenarios: ['待分析'],
-  suggestedDishTypes: ['待确定'],
-  recommendedFlavors: ['待确定'],
-  scores: [
-    { label: '市场热度', score: Math.round(score * 0.85), color: RED },
-    { label: '品牌适配', score: Math.round(score * 0.9), color: BLUE },
-    { label: '客群适配', score: Math.round(score * 0.88), color: GREEN },
-    { label: '成本可行', score: Math.round(score * 0.92), color: YELLOW },
-    { label: '供应稳定', score: Math.round(score * 0.95), color: CYAN },
-  ],
-  trendSources: [{ type: '行业', content: '来源于市场情报Agent自动发现', date: '2026-03-20' }],
-  storeMatches: [{ storeName: '芙蓉路店', matchScore: 75, reasons: ['待详细评估'] }],
-  pilotPlan: { duration: '14天', storeCount: 1, targetMetrics: ['待设定'], estimatedCost: 10000, expectedRevenue: 25000, suggestedDishes: ['待确定'] },
-  samples: [],
-  relatedCompetitors: [],
-  relatedTopics: [{ keyword: name, heat: score, trend: 'up' }],
-  historicalPilots: [],
-});
-
-const FALLBACK_MAP: Record<string, [string, number, OpportunityStatus]> = {
-  'opp-4': ['酸笋系列配菜', 75, '试点中'],
-  'opp-5': ['春季时令菜品', 73, '已采纳'],
-  'opp-6': ['外卖专属套餐', 80, '评估中'],
-  'opp-7': ['儿童友好餐', 68, '待评估'],
-  'opp-8': ['下午茶甜品', 58, '已否决'],
-  'opp-9': ['预制菜到家系列', 72, '评估中'],
-  'opp-10': ['辣度分级体系', 77, '已采纳'],
-};
-
-function getOpportunity(id: string): OpportunityDetail | null {
-  if (MOCK_OPPORTUNITIES[id]) return MOCK_OPPORTUNITIES[id];
-  const fb = FALLBACK_MAP[id];
-  if (fb) return DEFAULT_DETAIL(id, fb[0], fb[1], fb[2]);
-  return null;
+interface AiAnalysis {
+  summary: string;
+  market_demand: string;
+  competitor_status: string;
+  recommendation: string;
+  confidence: number;
+  generated_at: string;
 }
 
-// ---- 组件 ----
+// ---- 辅助映射 ----
 
-function ScoreRadar({ scores }: { scores: ScoreDimension[] }) {
+const statusColors: Record<OpportunityStatus, string> = {
+  '待评估': TEXT_3, '评估中': BLUE, '试点中': CYAN,
+  '已采纳': GREEN, '已否决': RED,
+};
+
+const trendIcons: Record<TrendDir, string> = { up: '↑', down: '↓', stable: '→' };
+const trendColors: Record<TrendDir, string> = { up: GREEN, down: RED, stable: TEXT_3 };
+
+const riskColors: Record<'high' | 'medium' | 'low', string> = {
+  high: RED, medium: YELLOW, low: GREEN,
+};
+
+const sourceTypeColors: Record<TrendSource['type'], string> = {
+  '竞对': RED, '搜索': BLUE, '评论': YELLOW, '社媒': PURPLE, '行业': CYAN,
+};
+
+// ---- 子组件：综合评分雷达（水平条形图） ----
+
+function ScorePanel({ scores }: { scores: ScoreDimension[] }) {
   return (
     <div style={{
-      display: 'flex', gap: 12, flexWrap: 'wrap',
+      background: BG_1, borderRadius: 10, padding: '18px 22px',
+      border: `1px solid ${BG_2}`,
     }}>
+      <div style={{ fontSize: 14, fontWeight: 700, color: TEXT_1, marginBottom: 14 }}>综合评分维度</div>
       {scores.map(s => (
-        <div key={s.label} style={{
-          flex: 1, minWidth: 100, textAlign: 'center', padding: '10px 8px',
-          background: BG_2, borderRadius: 8,
-        }}>
-          <div style={{ fontSize: 24, fontWeight: 700, color: s.color, marginBottom: 4 }}>{s.score}</div>
-          <div style={{ fontSize: 11, color: TEXT_3 }}>{s.label}</div>
-          <div style={{
-            height: 4, borderRadius: 2, background: BG_1, marginTop: 6,
-          }}>
+        <div key={s.label} style={{ marginBottom: 10 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+            <span style={{ fontSize: 12, color: TEXT_2 }}>{s.label}</span>
+            <span style={{ fontSize: 13, fontWeight: 700, color: s.color }}>{s.score}</span>
+          </div>
+          <div style={{ height: 6, borderRadius: 3, background: BG_2 }}>
             <div style={{
-              width: `${s.score}%`, height: '100%', borderRadius: 2, background: s.color,
+              width: `${s.score}%`, height: '100%', borderRadius: 3,
+              background: s.color, transition: 'width 0.6s ease',
             }} />
           </div>
         </div>
@@ -318,390 +158,616 @@ function ScoreRadar({ scores }: { scores: ScoreDimension[] }) {
   );
 }
 
-function SourceIcon({ type }: { type: TrendSource['type'] }) {
-  const icons: Record<string, string> = { '竞对': '\uD83C\uDFAF', '搜索': '\uD83D\uDD0D', '评论': '\uD83D\uDCAC', '社媒': '\uD83D\uDCF1', '行业': '\uD83D\uDCCA' };
-  const colors: Record<string, string> = { '竞对': RED, '搜索': BLUE, '评论': GREEN, '社媒': PURPLE, '行业': CYAN };
+// ---- 子组件：市场需求分析 ----
+
+function MarketDemandPanel({ sources, topics }: {
+  sources: TrendSource[];
+  topics: RelatedTopic[];
+}) {
   return (
-    <span style={{
-      fontSize: 10, padding: '2px 6px', borderRadius: 4,
-      background: colors[type] + '22', color: colors[type], fontWeight: 600,
-    }}>{icons[type]} {type}</span>
-  );
-}
-
-type TabKey = 'samples' | 'competitors' | 'topics' | 'pilots';
-
-export function NewProductOpportunityPage() {
-  const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<TabKey>('samples');
-  const [isFavorite, setIsFavorite] = useState(false);
-
-  const opp = getOpportunity(id || '');
-
-  if (!opp) {
-    return (
-      <div style={{ maxWidth: 1200, margin: '0 auto', textAlign: 'center', paddingTop: 80 }}>
-        <h2 style={{ color: TEXT_3 }}>未找到该机会</h2>
-        <button onClick={() => navigate('/hq/market-intel/new-products')} style={{
-          padding: '8px 18px', borderRadius: 8, border: 'none', cursor: 'pointer',
-          background: BRAND, color: '#fff', fontSize: 13, fontWeight: 700, marginTop: 16,
-        }}>返回列表</button>
-      </div>
-    );
-  }
-
-  const statusColors: Record<string, string> = {
-    '待评估': YELLOW, '评估中': BLUE, '试点中': BRAND, '已采纳': GREEN, '已否决': TEXT_4,
-  };
-
-  const tabs: { key: TabKey; label: string }[] = [
-    { key: 'samples', label: '原始样本' },
-    { key: 'competitors', label: '关联竞对' },
-    { key: 'topics', label: '关联主题' },
-    { key: 'pilots', label: '历史试点' },
-  ];
-
-  return (
-    <div style={{ maxWidth: 1200, margin: '0 auto' }}>
-      {/* 返回按钮 */}
-      <button onClick={() => navigate('/hq/market-intel/new-products')} style={{
-        background: 'none', border: 'none', color: TEXT_3, cursor: 'pointer',
-        fontSize: 13, padding: 0, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 4,
-      }}>
-        &larr; 返回新品机会列表
-      </button>
-
-      {/* 顶部 */}
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16,
-        flexWrap: 'wrap', gap: 12,
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>{opp.name}</h2>
-          <div style={{
-            width: 44, height: 44, borderRadius: '50%',
-            border: `3px solid ${opp.score >= 80 ? GREEN : opp.score >= 65 ? YELLOW : RED}`,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 16, fontWeight: 700, color: opp.score >= 80 ? GREEN : opp.score >= 65 ? YELLOW : RED,
-          }}>{opp.score}</div>
+    <div style={{
+      background: BG_1, borderRadius: 10, padding: '18px 22px',
+      border: `1px solid ${BG_2}`,
+    }}>
+      <div style={{ fontSize: 15, fontWeight: 700, color: TEXT_1, marginBottom: 14 }}>市场需求分析</div>
+      {sources.map((s, i) => (
+        <div key={i} style={{
+          display: 'flex', gap: 10, marginBottom: 10, padding: '10px 12px',
+          background: BG_2, borderRadius: 8,
+        }}>
           <span style={{
-            fontSize: 12, padding: '3px 10px', borderRadius: 6,
-            background: (statusColors[opp.status] || TEXT_4) + '22',
-            color: statusColors[opp.status] || TEXT_4, fontWeight: 600,
-          }}>{opp.status}</span>
-        </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button onClick={() => setIsFavorite(!isFavorite)} style={{
-            padding: '8px 16px', borderRadius: 8, border: `1px solid ${BG_2}`, cursor: 'pointer',
-            background: isFavorite ? YELLOW + '22' : BG_1, color: isFavorite ? YELLOW : TEXT_3,
-            fontSize: 13, fontWeight: 600,
-          }}>
-            {isFavorite ? '\u2605 已收藏' : '\u2606 收藏'}
-          </button>
-          <button style={{
-            padding: '8px 16px', borderRadius: 8, border: 'none', cursor: 'pointer',
-            background: BRAND, color: '#fff', fontSize: 13, fontWeight: 700,
-          }}>
-            创建试点
-          </button>
-        </div>
-      </div>
-
-      {/* 评分卡 */}
-      <div style={{
-        background: BG_1, borderRadius: 10, padding: 18, marginBottom: 16,
-        border: `1px solid ${BG_2}`,
-      }}>
-        <ScoreRadar scores={opp.scores} />
-      </div>
-
-      {/* 中部双栏: 机会说明 | 趋势来源 */}
-      <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
-        <div style={{
-          flex: 1, minWidth: 340, background: BG_1, borderRadius: 10, padding: 18,
-          border: `1px solid ${BG_2}`,
-        }}>
-          <h3 style={{ margin: '0 0 12px', fontSize: 15, fontWeight: 700 }}>机会说明</h3>
-          <div style={{ fontSize: 13, color: TEXT_2, lineHeight: 1.8, marginBottom: 14 }}>{opp.summary}</div>
-          <div style={{ marginBottom: 10 }}>
-            <div style={{ fontSize: 12, color: TEXT_3, marginBottom: 6, fontWeight: 600 }}>适配场景</div>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              {opp.fitScenarios.map((s, i) => (
-                <span key={i} style={{
-                  fontSize: 11, padding: '3px 8px', borderRadius: 4,
-                  background: BLUE + '22', color: BLUE,
-                }}>{s}</span>
-              ))}
-            </div>
+            fontSize: 10, padding: '2px 7px', borderRadius: 6, flexShrink: 0,
+            background: sourceTypeColors[s.type] + '22',
+            color: sourceTypeColors[s.type], fontWeight: 700,
+            alignSelf: 'flex-start', marginTop: 1,
+          }}>{s.type}</span>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 13, color: TEXT_1, marginBottom: 2 }}>{s.content}</div>
+            {s.metric && (
+              <span style={{ fontSize: 11, color: BRAND, fontWeight: 600 }}>{s.metric}</span>
+            )}
           </div>
-          <div style={{ marginBottom: 10 }}>
-            <div style={{ fontSize: 12, color: TEXT_3, marginBottom: 6, fontWeight: 600 }}>建议菜型</div>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              {opp.suggestedDishTypes.map((d, i) => (
-                <span key={i} style={{
-                  fontSize: 11, padding: '3px 8px', borderRadius: 4,
-                  background: GREEN + '22', color: GREEN,
-                }}>{d}</span>
-              ))}
-            </div>
-          </div>
-          <div>
-            <div style={{ fontSize: 12, color: TEXT_3, marginBottom: 6, fontWeight: 600 }}>推荐风味</div>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              {opp.recommendedFlavors.map((f, i) => (
-                <span key={i} style={{
-                  fontSize: 11, padding: '3px 8px', borderRadius: 4,
-                  background: BRAND + '22', color: BRAND,
-                }}>{f}</span>
-              ))}
-            </div>
-          </div>
+          <span style={{ fontSize: 10, color: TEXT_4, flexShrink: 0, alignSelf: 'flex-end' }}>{s.date}</span>
         </div>
+      ))}
 
-        <div style={{
-          flex: 1, minWidth: 340, background: BG_1, borderRadius: 10, padding: 18,
-          border: `1px solid ${BG_2}`,
-        }}>
-          <h3 style={{ margin: '0 0 12px', fontSize: 15, fontWeight: 700 }}>趋势来源</h3>
-          {opp.trendSources.map((ts, i) => (
-            <div key={i} style={{
-              padding: '10px 0',
-              borderBottom: i < opp.trendSources.length - 1 ? `1px solid ${BG_2}` : 'none',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                <SourceIcon type={ts.type} />
-                <span style={{ fontSize: 11, color: TEXT_4 }}>{ts.date}</span>
-              </div>
-              <div style={{ fontSize: 13, color: TEXT_2, lineHeight: 1.5 }}>{ts.content}</div>
-              {ts.metric && (
-                <div style={{ fontSize: 11, color: BRAND, marginTop: 2, fontWeight: 600 }}>{ts.metric}</div>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* 下部双栏: 适配门店建议 | 试点方案建议 */}
-      <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
-        <div style={{
-          flex: 1, minWidth: 340, background: BG_1, borderRadius: 10, padding: 18,
-          border: `1px solid ${BG_2}`,
-        }}>
-          <h3 style={{ margin: '0 0 12px', fontSize: 15, fontWeight: 700 }}>适配门店建议</h3>
-          {opp.storeMatches.map((store, i) => (
-            <div key={i} style={{
-              padding: '10px 0',
-              borderBottom: i < opp.storeMatches.length - 1 ? `1px solid ${BG_2}` : 'none',
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                <span style={{ fontSize: 14, fontWeight: 600, color: TEXT_1 }}>{store.storeName}</span>
+      {topics.length > 0 && (
+        <>
+          <div style={{ fontSize: 12, color: TEXT_3, margin: '14px 0 8px' }}>相关热词</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {topics.map((t, i) => (
+              <div key={i} style={{
+                display: 'flex', alignItems: 'center', gap: 4,
+                padding: '4px 10px', borderRadius: 20,
+                background: BG_2, border: `1px solid ${BG_2}`,
+              }}>
+                <span style={{ fontSize: 12, color: TEXT_2 }}>{t.keyword}</span>
                 <span style={{
-                  fontSize: 14, fontWeight: 700,
-                  color: store.matchScore >= 85 ? GREEN : store.matchScore >= 70 ? YELLOW : TEXT_3,
-                }}>匹配 {store.matchScore}</span>
-              </div>
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                {store.reasons.map((r, j) => (
-                  <span key={j} style={{
-                    fontSize: 10, padding: '2px 6px', borderRadius: 3,
-                    background: BG_2, color: TEXT_3,
-                  }}>{r}</span>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <div style={{
-          flex: 1, minWidth: 340, background: BG_1, borderRadius: 10, padding: 18,
-          border: `1px solid ${BG_2}`,
-        }}>
-          <h3 style={{ margin: '0 0 12px', fontSize: 15, fontWeight: 700 }}>试点方案建议</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
-            <div style={{ background: BG_2, borderRadius: 8, padding: 12, textAlign: 'center' }}>
-              <div style={{ fontSize: 20, fontWeight: 700, color: BRAND }}>{opp.pilotPlan.duration}</div>
-              <div style={{ fontSize: 11, color: TEXT_3, marginTop: 2 }}>建议周期</div>
-            </div>
-            <div style={{ background: BG_2, borderRadius: 8, padding: 12, textAlign: 'center' }}>
-              <div style={{ fontSize: 20, fontWeight: 700, color: BLUE }}>{opp.pilotPlan.storeCount}家</div>
-              <div style={{ fontSize: 11, color: TEXT_3, marginTop: 2 }}>建议门店</div>
-            </div>
-            <div style={{ background: BG_2, borderRadius: 8, padding: 12, textAlign: 'center' }}>
-              <div style={{ fontSize: 20, fontWeight: 700, color: RED }}>{(opp.pilotPlan.estimatedCost / 10000).toFixed(1)}万</div>
-              <div style={{ fontSize: 11, color: TEXT_3, marginTop: 2 }}>预估成本</div>
-            </div>
-            <div style={{ background: BG_2, borderRadius: 8, padding: 12, textAlign: 'center' }}>
-              <div style={{ fontSize: 20, fontWeight: 700, color: GREEN }}>{(opp.pilotPlan.expectedRevenue / 10000).toFixed(1)}万</div>
-              <div style={{ fontSize: 11, color: TEXT_3, marginTop: 2 }}>预期收入</div>
-            </div>
-          </div>
-          <div style={{ marginBottom: 10 }}>
-            <div style={{ fontSize: 12, color: TEXT_3, marginBottom: 6, fontWeight: 600 }}>目标指标</div>
-            {opp.pilotPlan.targetMetrics.map((m, i) => (
-              <div key={i} style={{ fontSize: 12, color: TEXT_2, padding: '3px 0', display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ color: GREEN }}>&#10003;</span> {m}
+                  fontSize: 11, fontWeight: 700,
+                  color: t.heat >= 80 ? RED : t.heat >= 60 ? YELLOW : TEXT_3,
+                }}>{t.heat}</span>
+                <span style={{ fontSize: 11, color: trendColors[t.trend] }}>{trendIcons[t.trend]}</span>
               </div>
             ))}
           </div>
-          <div>
-            <div style={{ fontSize: 12, color: TEXT_3, marginBottom: 6, fontWeight: 600 }}>建议菜品</div>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              {opp.pilotPlan.suggestedDishes.map((d, i) => (
-                <span key={i} style={{
-                  fontSize: 11, padding: '3px 8px', borderRadius: 4,
-                  background: BRAND + '22', color: BRAND,
-                }}>{d}</span>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ---- 子组件：竞品现状 ----
+
+function CompetitorStatusPanel({ competitors }: { competitors: RelatedCompetitor[] }) {
+  if (!competitors.length) {
+    return (
+      <div style={{
+        background: BG_1, borderRadius: 10, padding: '18px 22px',
+        border: `1px solid ${BG_2}`,
+      }}>
+        <div style={{ fontSize: 15, fontWeight: 700, color: TEXT_1, marginBottom: 12 }}>竞品现状</div>
+        <div style={{ textAlign: 'center', padding: '24px 0', color: TEXT_4, fontSize: 13 }}>
+          暂无竞品相关动态
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div style={{
+      background: BG_1, borderRadius: 10, padding: '18px 22px',
+      border: `1px solid ${BG_2}`,
+    }}>
+      <div style={{ fontSize: 15, fontWeight: 700, color: TEXT_1, marginBottom: 14 }}>竞品现状</div>
+      {competitors.map((c, i) => (
+        <div key={i} style={{
+          padding: '10px 12px', background: BG_2, borderRadius: 8, marginBottom: 10,
+          borderLeft: `3px solid ${RED}`,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color: TEXT_1 }}>{c.name}</span>
+            <span style={{ fontSize: 12, color: YELLOW }}>{c.action}</span>
+            <span style={{ fontSize: 10, color: TEXT_4, marginLeft: 'auto' }}>{c.date}</span>
+          </div>
+          <div style={{ fontSize: 12, color: TEXT_3, lineHeight: 1.6 }}>{c.detail}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ---- 子组件：BOM 建议 ----
+
+function BomPanel({ items }: { items: BomItem[] }) {
+  if (!items.length) return null;
+  return (
+    <div style={{
+      background: BG_1, borderRadius: 10, padding: '18px 22px',
+      border: `1px solid ${BG_2}`,
+    }}>
+      <div style={{ fontSize: 15, fontWeight: 700, color: TEXT_1, marginBottom: 14 }}>BOM 建议（参考物料清单）</div>
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+          <thead>
+            <tr>
+              {['原料', '用量', '成本估算', '备注'].map(h => (
+                <th key={h} style={{
+                  textAlign: 'left', padding: '6px 10px',
+                  color: TEXT_4, fontWeight: 600, fontSize: 11,
+                  borderBottom: `1px solid ${BG_2}`,
+                }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((item, i) => (
+              <tr key={i} style={{ borderBottom: `1px solid ${BG_2}` }}>
+                <td style={{ padding: '8px 10px', color: TEXT_1, fontWeight: 600 }}>{item.ingredient}</td>
+                <td style={{ padding: '8px 10px', color: TEXT_2 }}>{item.amount}</td>
+                <td style={{ padding: '8px 10px', color: YELLOW, fontWeight: 600 }}>{item.cost_estimate}</td>
+                <td style={{ padding: '8px 10px', color: TEXT_3 }}>{item.note ?? '—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ---- 子组件：定价区间 ----
+
+function PricingPanel({ pricing }: { pricing: PricingRange }) {
+  const items = [
+    { label: '低端区间', value: pricing.low, color: GREEN },
+    { label: '中间区间', value: pricing.mid, color: BLUE },
+    { label: '高端区间', value: pricing.high, color: YELLOW },
+    { label: '建议定价', value: pricing.recommended, color: BRAND },
+    ...(pricing.competitor_avg != null
+      ? [{ label: '竞对均价', value: pricing.competitor_avg, color: RED }]
+      : []),
+  ];
+
+  return (
+    <div style={{
+      background: BG_1, borderRadius: 10, padding: '18px 22px',
+      border: `1px solid ${BG_2}`,
+    }}>
+      <div style={{ fontSize: 15, fontWeight: 700, color: TEXT_1, marginBottom: 14 }}>定价区间建议</div>
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+        {items.map(item => (
+          <div key={item.label} style={{
+            flex: '1 1 100px', background: BG_2, borderRadius: 8, padding: '12px 14px',
+            textAlign: 'center', border: item.label === '建议定价' ? `2px solid ${BRAND}` : '2px solid transparent',
+          }}>
+            <div style={{ fontSize: 11, color: TEXT_4, marginBottom: 6 }}>{item.label}</div>
+            <div style={{ fontSize: 20, fontWeight: 800, color: item.color }}>¥{item.value}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ---- 子组件：风险评估 ----
+
+function RiskPanel({ risks }: { risks: RiskItem[] }) {
+  if (!risks.length) return null;
+  return (
+    <div style={{
+      background: BG_1, borderRadius: 10, padding: '18px 22px',
+      border: `1px solid ${BG_2}`,
+    }}>
+      <div style={{ fontSize: 15, fontWeight: 700, color: TEXT_1, marginBottom: 14 }}>风险评估</div>
+      {risks.map((r, i) => (
+        <div key={i} style={{
+          padding: '10px 12px', background: BG_2, borderRadius: 8,
+          marginBottom: 10, borderLeft: `3px solid ${riskColors[r.level]}`,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+            <span style={{
+              fontSize: 10, padding: '2px 8px', borderRadius: 6,
+              background: riskColors[r.level] + '22', color: riskColors[r.level], fontWeight: 700,
+            }}>{r.type}风险 · {r.level === 'high' ? '高' : r.level === 'medium' ? '中' : '低'}</span>
+          </div>
+          <div style={{ fontSize: 13, color: TEXT_1, marginBottom: 4 }}>{r.description}</div>
+          <div style={{ fontSize: 12, color: TEXT_3 }}>
+            <span style={{ color: GREEN, fontWeight: 600 }}>应对：</span>{r.mitigation}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ---- 子组件：门店适配 ----
+
+function StoreMatchPanel({ matches }: { matches: StoreMatch[] }) {
+  if (!matches.length) return null;
+  return (
+    <div style={{
+      background: BG_1, borderRadius: 10, padding: '18px 22px',
+      border: `1px solid ${BG_2}`,
+    }}>
+      <div style={{ fontSize: 15, fontWeight: 700, color: TEXT_1, marginBottom: 14 }}>门店适配分析</div>
+      {matches.map((m, i) => (
+        <div key={i} style={{
+          display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 12,
+          padding: '10px 12px', background: BG_2, borderRadius: 8,
+        }}>
+          <div style={{ flexShrink: 0, textAlign: 'center' }}>
+            <div style={{
+              width: 46, height: 46, borderRadius: '50%', border: `3px solid ${
+                m.match_score >= 85 ? GREEN : m.match_score >= 70 ? YELLOW : RED
+              }`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 14, fontWeight: 800,
+              color: m.match_score >= 85 ? GREEN : m.match_score >= 70 ? YELLOW : RED,
+            }}>{m.match_score}</div>
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: TEXT_1, marginBottom: 4 }}>
+              {m.store_name}
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+              {m.reasons.map((r, j) => (
+                <span key={j} style={{
+                  fontSize: 10, padding: '2px 7px', borderRadius: 10,
+                  background: BLUE + '22', color: BLUE,
+                }}>{r}</span>
               ))}
             </div>
           </div>
         </div>
+      ))}
+    </div>
+  );
+}
+
+// ---- 子组件：AI深度分析面板 ----
+
+function AiAnalysisPanel({
+  analysis, loading, onTrigger,
+}: {
+  analysis: AiAnalysis | null;
+  loading: boolean;
+  onTrigger: () => void;
+}) {
+  return (
+    <div style={{
+      background: BG_1, borderRadius: 10, padding: '18px 22px',
+      border: `1px solid ${BLUE}44`,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+        <span style={{
+          fontSize: 10, padding: '2px 8px', borderRadius: 6,
+          background: BLUE + '22', color: BLUE, fontWeight: 700,
+        }}>AI</span>
+        <span style={{ fontSize: 15, fontWeight: 700, color: TEXT_1 }}>智能深度分析</span>
+        <span style={{ flex: 1 }} />
+        {!analysis && !loading && (
+          <button onClick={onTrigger} style={{
+            padding: '6px 14px', borderRadius: 6, border: 'none',
+            background: BLUE, color: '#fff', fontSize: 12, cursor: 'pointer',
+            fontWeight: 600,
+          }}>触发AI分析</button>
+        )}
+        {loading && (
+          <span style={{ fontSize: 12, color: BLUE }}>AI 分析中...</span>
+        )}
+        {analysis && !loading && (
+          <button onClick={onTrigger} style={{
+            padding: '5px 12px', borderRadius: 6, border: `1px solid ${BG_2}`,
+            background: 'transparent', color: TEXT_3, fontSize: 11, cursor: 'pointer',
+          }}>重新分析</button>
+        )}
       </div>
 
-      {/* 底部Tab切换 */}
-      <div style={{
-        background: BG_1, borderRadius: 10, padding: 18,
-        border: `1px solid ${BG_2}`,
-      }}>
-        <div style={{ display: 'flex', gap: 4, marginBottom: 16 }}>
-          {tabs.map(t => (
-            <button key={t.key} onClick={() => setActiveTab(t.key)} style={{
-              padding: '8px 16px', borderRadius: 8, border: 'none', cursor: 'pointer',
-              background: activeTab === t.key ? BRAND : BG_2,
-              color: activeTab === t.key ? '#fff' : TEXT_3,
-              fontSize: 13, fontWeight: 600, transition: 'all .15s',
-            }}>{t.label}</button>
-          ))}
+      {loading && (
+        <div style={{
+          textAlign: 'center', padding: '32px 0', color: BLUE, fontSize: 13,
+          animation: 'pulse 1.5s ease-in-out infinite',
+        }}>
+          menu_advisor Agent 正在深度分析，通常需要 10-30 秒...
         </div>
+      )}
 
-        {/* 原始样本 */}
-        {activeTab === 'samples' && (
-          <div>
-            {opp.samples.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: 30, color: TEXT_4 }}>暂无原始样本数据</div>
-            ) : opp.samples.map(s => {
-              const sentColors: Record<string, string> = { positive: GREEN, neutral: TEXT_3, negative: RED };
-              const sentLabels: Record<string, string> = { positive: '正面', neutral: '中性', negative: '负面' };
-              return (
-                <div key={s.id} style={{
-                  padding: '12px 0',
-                  borderBottom: `1px solid ${BG_2}`,
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                    <span style={{
-                      fontSize: 10, padding: '1px 6px', borderRadius: 4,
-                      background: BLUE + '22', color: BLUE, fontWeight: 600,
-                    }}>{s.source}</span>
-                    <span style={{
-                      fontSize: 10, padding: '1px 6px', borderRadius: 4,
-                      background: sentColors[s.sentiment] + '22',
-                      color: sentColors[s.sentiment], fontWeight: 600,
-                    }}>{sentLabels[s.sentiment]}</span>
-                    <span style={{ fontSize: 11, color: TEXT_4 }}>{s.date}</span>
-                  </div>
-                  <div style={{ fontSize: 13, color: TEXT_2, lineHeight: 1.6 }}>"{s.content}"</div>
-                </div>
-              );
-            })}
+      {!loading && !analysis && (
+        <div style={{
+          textAlign: 'center', padding: '32px 0',
+          color: TEXT_4, fontSize: 13,
+        }}>
+          点击「触发AI分析」获取 Agent 的深度市场洞察与研发建议
+        </div>
+      )}
+
+      {!loading && analysis && (
+        <div>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 8,
+            marginBottom: 12, padding: '8px 12px',
+            background: BG_2, borderRadius: 8,
+          }}>
+            <span style={{ fontSize: 12, color: TEXT_4 }}>综合置信度</span>
+            <div style={{ flex: 1, height: 6, borderRadius: 3, background: BG_0 }}>
+              <div style={{
+                width: `${analysis.confidence * 100}%`, height: '100%', borderRadius: 3,
+                background: analysis.confidence >= 0.8 ? GREEN : analysis.confidence >= 0.6 ? YELLOW : RED,
+              }} />
+            </div>
+            <span style={{ fontSize: 12, fontWeight: 700, color: TEXT_1 }}>
+              {(analysis.confidence * 100).toFixed(0)}%
+            </span>
           </div>
+
+          {[
+            { title: '综合结论', content: analysis.summary, color: BRAND },
+            { title: '市场需求判断', content: analysis.market_demand, color: BLUE },
+            { title: '竞品格局评估', content: analysis.competitor_status, color: YELLOW },
+            { title: '研发建议', content: analysis.recommendation, color: GREEN },
+          ].map(sec => (
+            <div key={sec.title} style={{ marginBottom: 14 }}>
+              <div style={{
+                fontSize: 12, color: sec.color, fontWeight: 600, marginBottom: 5,
+              }}>{sec.title}</div>
+              <div style={{
+                fontSize: 13, color: TEXT_2, lineHeight: 1.7,
+                padding: '8px 12px', background: BG_2, borderRadius: 8,
+              }}>{sec.content}</div>
+            </div>
+          ))}
+
+          <div style={{ textAlign: 'right', fontSize: 10, color: TEXT_4 }}>
+            生成于 {analysis.generated_at}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---- 骨架屏 ----
+
+function SkeletonBlock({ h = 120, mb = 16 }: { h?: number; mb?: number }) {
+  return (
+    <div style={{
+      height: h, borderRadius: 10, background: BG_1,
+      marginBottom: mb, border: `1px solid ${BG_2}`,
+      animation: 'pulse 1.5s ease-in-out infinite',
+    }} />
+  );
+}
+
+// ---- 主页面 ----
+
+export function NewProductOpportunityPage() {
+  const { opportunityId } = useParams<{ opportunityId: string }>();
+  const navigate = useNavigate();
+
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [detail, setDetail] = useState<OpportunityDetail | null>(null);
+
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiAnalysis, setAiAnalysis] = useState<AiAnalysis | null>(null);
+  const [aiError, setAiError] = useState<string | null>(null);
+
+  const [addingToRd, setAddingToRd] = useState(false);
+  const [rdSuccess, setRdSuccess] = useState(false);
+
+  // 加载机会详情
+  useEffect(() => {
+    if (!opportunityId) return;
+    setLoading(true);
+    setError(null);
+    txFetch<OpportunityDetail>(
+      `/api/v1/analytics/new-product-opportunities/${encodeURIComponent(opportunityId)}`
+    )
+      .then(data => { setDetail(data); })
+      .catch(err => { setError(err instanceof Error ? err.message : '加载失败'); })
+      .finally(() => { setLoading(false); });
+  }, [opportunityId]);
+
+  // AI深度分析
+  const handleAiAnalysis = async () => {
+    if (!opportunityId || aiLoading) return;
+    setAiLoading(true);
+    setAiError(null);
+    try {
+      const result = await txFetch<AiAnalysis>('/api/v1/orchestrate', {
+        method: 'POST',
+        body: JSON.stringify({
+          agent: 'menu_advisor',
+          action: 'analyze_opportunity',
+          params: { opportunity_id: opportunityId },
+        }),
+      });
+      setAiAnalysis(result);
+    } catch (err) {
+      setAiError(err instanceof Error ? err.message : 'AI分析失败');
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  // 加入研发计划
+  const handleAddToRd = async () => {
+    if (!opportunityId || addingToRd || rdSuccess) return;
+    setAddingToRd(true);
+    try {
+      await txFetch('/api/v1/menu/rd/opportunities', {
+        method: 'POST',
+        body: JSON.stringify({ opportunity_id: opportunityId }),
+      });
+      setRdSuccess(true);
+    } catch {
+      // 静默失败，保持按钮可重试
+    } finally {
+      setAddingToRd(false);
+    }
+  };
+
+  const totalScore = detail?.score ?? 0;
+  const scoreColor = totalScore >= 85 ? GREEN : totalScore >= 70 ? YELLOW : RED;
+
+  return (
+    <div style={{ maxWidth: 1400, margin: '0 auto', background: BG_0, minHeight: '100vh', padding: 16 }}>
+      <style>{`
+        @keyframes pulse {
+          0%, 100% { opacity: 0.6; }
+          50% { opacity: 1; }
+        }
+      `}</style>
+
+      {/* 顶部导航 */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+        <button
+          onClick={() => navigate('/hq/market-intel/new-products')}
+          style={{
+            padding: '6px 14px', borderRadius: 6, border: `1px solid ${BG_2}`,
+            background: 'transparent', color: TEXT_3, fontSize: 12, cursor: 'pointer',
+          }}
+        >← 返回新品机会</button>
+        <span style={{ color: TEXT_4 }}>/</span>
+        <span style={{ fontSize: 20, fontWeight: 700, color: TEXT_1 }}>
+          {detail?.name ?? '机会详情'}
+        </span>
+        {detail && (
+          <span style={{
+            fontSize: 11, padding: '3px 10px', borderRadius: 10,
+            background: statusColors[detail.status] + '22',
+            color: statusColors[detail.status], fontWeight: 700,
+          }}>{detail.status}</span>
         )}
-
-        {/* 关联竞对 */}
-        {activeTab === 'competitors' && (
-          <div>
-            {opp.relatedCompetitors.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: 30, color: TEXT_4 }}>暂无关联竞对数据</div>
-            ) : opp.relatedCompetitors.map((c, i) => {
-              const compColors: Record<string, string> = {
-                '海底捞': RED, '西贝': BLUE, '太二': GREEN, '费大厨': BRAND, '望湘园': PURPLE,
-              };
-              return (
-                <div key={i} style={{
-                  padding: '12px 0',
-                  borderBottom: i < opp.relatedCompetitors.length - 1 ? `1px solid ${BG_2}` : 'none',
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                    <span style={{
-                      fontSize: 11, padding: '2px 8px', borderRadius: 4,
-                      background: (compColors[c.name] || TEXT_4) + '22',
-                      color: compColors[c.name] || TEXT_4, fontWeight: 600,
-                    }}>{c.name}</span>
-                    <span style={{ fontSize: 14, fontWeight: 600, color: TEXT_1 }}>{c.action}</span>
-                    <span style={{ fontSize: 11, color: TEXT_4 }}>{c.date}</span>
-                  </div>
-                  <div style={{ fontSize: 12, color: TEXT_3, lineHeight: 1.5 }}>{c.detail}</div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {/* 关联主题 */}
-        {activeTab === 'topics' && (
-          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-            {opp.relatedTopics.map((t, i) => {
-              const trendIcons: Record<string, string> = { up: '\u2191', down: '\u2193', stable: '\u2192' };
-              const trendColors: Record<string, string> = { up: GREEN, down: RED, stable: TEXT_3 };
-              return (
-                <div key={i} style={{
-                  background: BG_2, borderRadius: 8, padding: '12px 16px', minWidth: 140,
-                }}>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: TEXT_1, marginBottom: 4 }}>{t.keyword}</div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 12, color: BRAND, fontWeight: 600 }}>热度 {t.heat}</span>
-                    <span style={{ fontSize: 14, color: trendColors[t.trend], fontWeight: 700 }}>{trendIcons[t.trend]}</span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {/* 历史试点 */}
-        {activeTab === 'pilots' && (
-          <div>
-            {opp.historicalPilots.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: 30, color: TEXT_4 }}>暂无历史试点数据</div>
-            ) : (
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                  <thead>
-                    <tr>
-                      {['试点名称', '门店', '周期', '结果', '日均销量', '满意度'].map(h => (
-                        <th key={h} style={{
-                          textAlign: 'left', padding: '8px 12px', fontSize: 12, color: TEXT_3,
-                          borderBottom: `1px solid ${BG_2}`, fontWeight: 600,
-                        }}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {opp.historicalPilots.map((p, i) => {
-                      const resultColors: Record<string, string> = { '成功': GREEN, '失败': RED, '进行中': BLUE };
-                      return (
-                        <tr key={i}>
-                          <td style={{ padding: '8px 12px', fontSize: 13, color: TEXT_1, borderBottom: `1px solid ${BG_2}` }}>{p.name}</td>
-                          <td style={{ padding: '8px 12px', fontSize: 13, color: TEXT_2, borderBottom: `1px solid ${BG_2}` }}>{p.store}</td>
-                          <td style={{ padding: '8px 12px', fontSize: 11, color: TEXT_3, borderBottom: `1px solid ${BG_2}` }}>{p.period}</td>
-                          <td style={{ padding: '8px 12px', borderBottom: `1px solid ${BG_2}` }}>
-                            <span style={{
-                              fontSize: 11, padding: '2px 6px', borderRadius: 4,
-                              background: resultColors[p.result] + '22',
-                              color: resultColors[p.result], fontWeight: 600,
-                            }}>{p.result}</span>
-                          </td>
-                          <td style={{ padding: '8px 12px', fontSize: 13, color: TEXT_2, fontWeight: 600, borderBottom: `1px solid ${BG_2}` }}>{p.avgDailySales}份</td>
-                          <td style={{ padding: '8px 12px', fontSize: 13, color: p.satisfaction >= 80 ? GREEN : YELLOW, fontWeight: 600, borderBottom: `1px solid ${BG_2}` }}>{p.satisfaction}%</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
+        <div style={{ flex: 1 }} />
+        {/* 加入研发计划按钮 */}
+        {!loading && !error && detail && (
+          <button
+            onClick={handleAddToRd}
+            disabled={addingToRd || rdSuccess}
+            style={{
+              padding: '8px 18px', borderRadius: 8, border: 'none',
+              background: rdSuccess ? GREEN : BRAND,
+              color: '#fff', fontSize: 13, cursor: addingToRd || rdSuccess ? 'not-allowed' : 'pointer',
+              fontWeight: 700, opacity: addingToRd ? 0.7 : 1,
+              transition: 'background 0.3s',
+            }}
+          >
+            {rdSuccess ? '✓ 已加入研发计划' : addingToRd ? '提交中...' : '+ 加入研发计划'}
+          </button>
         )}
       </div>
+
+      {/* 加载骨架 */}
+      {loading && (
+        <>
+          <SkeletonBlock h={120} />
+          <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
+            <SkeletonBlock h={200} mb={0} />
+            <SkeletonBlock h={200} mb={0} />
+          </div>
+          <SkeletonBlock h={180} />
+          <SkeletonBlock h={160} />
+          <SkeletonBlock h={200} />
+        </>
+      )}
+
+      {/* 降级提示 */}
+      {!loading && error && (
+        <div style={{
+          background: BG_1, borderRadius: 10, padding: '48px 24px',
+          border: `1px solid ${BG_2}`, textAlign: 'center',
+        }}>
+          <div style={{ fontSize: 40, marginBottom: 12 }}>🔍</div>
+          <div style={{ fontSize: 16, fontWeight: 600, color: TEXT_1, marginBottom: 8 }}>
+            该机会数据整理中
+          </div>
+          <div style={{ fontSize: 13, color: TEXT_3, marginBottom: 20 }}>
+            {error}。市场情报 Agent 正在持续分析，稍后再来查看。
+          </div>
+          <button
+            onClick={() => navigate('/hq/market-intel/new-products')}
+            style={{
+              padding: '8px 20px', borderRadius: 8, border: 'none',
+              background: BRAND, color: '#fff', fontSize: 13, cursor: 'pointer',
+            }}
+          >返回新品机会列表</button>
+        </div>
+      )}
+
+      {/* 正常内容 */}
+      {!loading && !error && detail && (
+        <>
+          {/* 顶部摘要卡 */}
+          <div style={{
+            background: BG_1, borderRadius: 10, padding: '18px 22px',
+            border: `1px solid ${BG_2}`, borderTop: `3px solid ${scoreColor}`,
+            marginBottom: 16,
+          }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16 }}>
+              <div style={{
+                width: 60, height: 60, borderRadius: 14, flexShrink: 0,
+                background: scoreColor + '22',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                flexDirection: 'column',
+              }}>
+                <div style={{ fontSize: 22, fontWeight: 900, color: scoreColor, lineHeight: 1 }}>
+                  {totalScore}
+                </div>
+                <div style={{ fontSize: 9, color: TEXT_4, marginTop: 2 }}>综合评分</div>
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 18, fontWeight: 700, color: TEXT_1, marginBottom: 8 }}>
+                  {detail.name}
+                </div>
+                <div style={{ fontSize: 13, color: TEXT_2, lineHeight: 1.7, marginBottom: 10 }}>
+                  {detail.summary}
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  {detail.fit_scenarios.map(s => (
+                    <span key={s} style={{
+                      fontSize: 11, padding: '2px 9px', borderRadius: 10,
+                      background: CYAN + '18', color: CYAN,
+                    }}>{s}</span>
+                  ))}
+                  {detail.suggested_dish_types.slice(0, 4).map(t => (
+                    <span key={t} style={{
+                      fontSize: 11, padding: '2px 9px', borderRadius: 10,
+                      background: BRAND + '18', color: BRAND,
+                    }}>{t}</span>
+                  ))}
+                  {detail.recommended_flavors.slice(0, 3).map(f => (
+                    <span key={f} style={{
+                      fontSize: 11, padding: '2px 9px', borderRadius: 10,
+                      background: PURPLE + '18', color: PURPLE,
+                    }}>{f}</span>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 主体两栏布局 */}
+          <div style={{ display: 'flex', gap: 16, marginBottom: 16, alignItems: 'flex-start' }}>
+            {/* 左栏 */}
+            <div style={{ flex: 3, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <MarketDemandPanel sources={detail.trend_sources} topics={detail.related_topics} />
+              <CompetitorStatusPanel competitors={detail.related_competitors} />
+              {detail.bom_suggestions?.length > 0 && <BomPanel items={detail.bom_suggestions} />}
+            </div>
+            {/* 右栏 */}
+            <div style={{ flex: 2, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <ScorePanel scores={detail.scores} />
+              {detail.pricing_range && <PricingPanel pricing={detail.pricing_range} />}
+              <StoreMatchPanel matches={detail.store_matches} />
+            </div>
+          </div>
+
+          {/* 风险评估（全宽） */}
+          {detail.risks?.length > 0 && (
+            <div style={{ marginBottom: 16 }}>
+              <RiskPanel risks={detail.risks} />
+            </div>
+          )}
+
+          {/* AI错误提示 */}
+          {aiError && (
+            <div style={{
+              padding: '10px 14px', borderRadius: 8, marginBottom: 12,
+              background: RED + '18', border: `1px solid ${RED}44`,
+              fontSize: 12, color: RED,
+            }}>
+              AI分析失败：{aiError}。请稍后重试。
+            </div>
+          )}
+
+          {/* AI深度分析（全宽） */}
+          <AiAnalysisPanel
+            analysis={aiAnalysis}
+            loading={aiLoading}
+            onTrigger={handleAiAnalysis}
+          />
+        </>
+      )}
     </div>
   );
 }

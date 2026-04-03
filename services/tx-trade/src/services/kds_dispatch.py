@@ -5,18 +5,21 @@
 
 分单完成后自动：
 1. 回写 OrderItem.kds_station（自动映射，前端无需手动传）
-2. 为每个档口生成 ESC/POS 厨打单并发送到对应网络打印机
-3. 通过 WebSocket 推送新票据到 KDS 终端
+2. 为每道菜创建 KDS Task 持久化记录（关联 dept_id）
+3. 为每个档口生成 ESC/POS 厨打单并发送到对应网络打印机
+4. 通过 WebSocket 推送新票据到 KDS 终端
 """
 import uuid
 from datetime import datetime, timezone
 
 import structlog
-from sqlalchemy import select, func, update, and_
+from sqlalchemy import and_, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.entities import Order, OrderItem
-from ..models.production_dept import ProductionDept, DishDeptMapping
+
+from ..models.kds_task import KDSTask
+from ..models.production_dept import DishDeptMapping, ProductionDept
 from .dispatch_rule_engine import dispatch_rule_engine
 
 logger = structlog.get_logger()
@@ -238,6 +241,85 @@ async def dispatch_order_to_kds(
             log.warning("kds_dispatch.update_item_failed", order_item_id=order_item_id, error=str(exc))
     await db.flush()
 
+    # ── 5b. 持久化 KDS Task（每道菜一条记录，关联 dept_id） ──
+    # 任务已被赋予 task_id（uuid4），直接写入 kds_tasks 表
+    # 查找订单的桌号/单号（如果调用方已传则跳过查询）
+    _kds_table_number = table_number
+    _kds_order_no = order_no
+    if not _kds_table_number or not _kds_order_no:
+        try:
+            order_meta_stmt = select(Order.table_number, Order.order_no).where(
+                and_(Order.id == uuid.UUID(order_id), Order.tenant_id == tid)
+            )
+            order_meta_row = (await db.execute(order_meta_stmt)).one_or_none()
+            if order_meta_row:
+                _kds_table_number = _kds_table_number or order_meta_row[0] or ""
+                _kds_order_no = _kds_order_no or order_meta_row[1] or ""
+        except (ValueError, AttributeError):
+            pass
+
+    kds_tasks_to_insert: list[KDSTask] = []
+    for dept_task in dept_tasks:
+        dept_id_str = dept_task.get("dept_id")
+        # "default" 是虚拟兜底档口，无真实档口ID，跳过持久化
+        if dept_id_str == "default":
+            continue
+
+        try:
+            dept_uuid = uuid.UUID(dept_id_str)
+        except (ValueError, TypeError):
+            continue
+
+        for item in dept_task.get("items", []):
+            order_item_id_str = item.get("order_item_id")
+            if not order_item_id_str:
+                continue
+
+            try:
+                order_item_uuid = uuid.UUID(order_item_id_str)
+            except (ValueError, TypeError):
+                continue
+
+            dish_id_str = item.get("dish_id")
+            dish_uuid: uuid.UUID | None = None
+            if dish_id_str:
+                try:
+                    dish_uuid = uuid.UUID(dish_id_str)
+                except (ValueError, TypeError):
+                    pass
+
+            kds_task = KDSTask(
+                id=uuid.UUID(item["task_id"]),  # 复用已分配的 task_id
+                tenant_id=tid,
+                order_item_id=order_item_uuid,
+                order_id=uuid.UUID(order_id),
+                dept_id=dept_uuid,
+                dish_id=dish_uuid,
+                dish_name=item.get("dish_name", ""),
+                quantity=item.get("quantity", 1),
+                table_number=_kds_table_number or "",
+                order_no=_kds_order_no or "",
+                notes=item.get("notes") or "",
+                status=TASK_STATUS_PENDING,
+                priority="normal",
+            )
+            kds_tasks_to_insert.append(kds_task)
+
+    if kds_tasks_to_insert:
+        try:
+            db.add_all(kds_tasks_to_insert)
+            await db.flush()
+            log.info(
+                "kds_dispatch.tasks_persisted",
+                count=len(kds_tasks_to_insert),
+            )
+        except Exception as exc:  # noqa: BLE001 — KDS任务持久化失败不阻断分单主流程
+            log.error(
+                "kds_dispatch.tasks_persist_failed",
+                error=str(exc),
+                exc_info=True,
+            )
+
     # ── 6. 自动发送厨打单到各档口打印机 ──
     if auto_print:
         # 延迟导入避免循环依赖
@@ -291,16 +373,74 @@ async def get_dept_queue(
     store_id: str,
     tenant_id: str,
     db: AsyncSession,
+    status_filter: list[str] | None = None,
 ) -> list[dict]:
     """获取某档口当前待出品队列。
 
-    查询该档口下所有 pending/cooking 状态的任务，按创建时间排序（urgent 优先）。
+    优先从 kds_tasks 表查询（v076 持久化后的数据源）。
+    kds_tasks 表有数据时直接返回；否则降级到 OrderItem.kds_station 兼容查询。
+
+    Args:
+        dept_id: 档口ID
+        store_id: 门店ID（兼容查询时使用）
+        tenant_id: 租户ID
+        db: 数据库会话
+        status_filter: 任务状态过滤，默认 pending/cooking
+
+    Returns:
+        任务列表，按创建时间升序（催菜高优先级任务在前）
     """
     tid = uuid.UUID(tenant_id)
+    dept_uuid = uuid.UUID(dept_id)
     log = logger.bind(dept_id=dept_id, store_id=store_id, tenant_id=tenant_id)
 
-    # 查询该档口的 pending/cooking 订单项
-    # 通过 OrderItem.kds_station 关联档口
+    if status_filter is None:
+        status_filter = [TASK_STATUS_PENDING, TASK_STATUS_COOKING]
+
+    # ── 优先从 kds_tasks 表查询 ──
+    kds_stmt = (
+        select(KDSTask)
+        .where(
+            and_(
+                KDSTask.tenant_id == tid,
+                KDSTask.dept_id == dept_uuid,
+                KDSTask.status.in_(status_filter),
+                KDSTask.is_deleted == False,  # noqa: E712
+            )
+        )
+        .order_by(
+            # urgent/rush 优先，再按创建时间升序
+            KDSTask.priority.desc(),
+            KDSTask.created_at.asc(),
+        )
+    )
+    kds_result = await db.execute(kds_stmt)
+    kds_tasks = kds_result.scalars().all()
+
+    if kds_tasks:
+        queue = [
+            {
+                "task_id": str(t.id),
+                "order_item_id": str(t.order_item_id),
+                "order_id": str(t.order_id) if t.order_id else None,
+                "order_no": t.order_no or "",
+                "table_number": t.table_number or "",
+                "dish_id": str(t.dish_id) if t.dish_id else None,
+                "dish_name": t.dish_name or "",
+                "quantity": t.quantity,
+                "notes": t.notes or "",
+                "status": t.status,
+                "priority": t.priority,
+                "dept_id": dept_id,
+                "created_at": t.created_at.isoformat() if t.created_at else None,
+                "started_at": t.started_at.isoformat() if t.started_at else None,
+            }
+            for t in kds_tasks
+        ]
+        log.info("kds_dispatch.get_dept_queue", source="kds_tasks", queue_size=len(queue))
+        return queue
+
+    # ── 降级：从 OrderItem.kds_station 兼容查询（v076之前写入的旧数据） ──
     stmt = (
         select(OrderItem, Order.order_no, Order.table_number)
         .join(Order, OrderItem.order_id == Order.id)
@@ -321,6 +461,7 @@ async def get_dept_queue(
     queue = []
     for item, order_no, table_no in rows:
         queue.append({
+            "task_id": None,
             "order_item_id": str(item.id),
             "order_id": str(item.order_id),
             "order_no": order_no,
@@ -328,12 +469,92 @@ async def get_dept_queue(
             "dish_id": str(item.dish_id) if item.dish_id else None,
             "dish_name": item.item_name,
             "quantity": item.quantity,
-            "notes": item.notes,
+            "notes": item.notes or "",
+            "status": TASK_STATUS_PENDING,
+            "priority": "normal",
+            "dept_id": dept_id,
             "created_at": item.created_at.isoformat() if item.created_at else None,
+            "started_at": None,
         })
 
-    log.info("kds_dispatch.get_dept_queue", queue_size=len(queue))
+    log.info("kds_dispatch.get_dept_queue", source="order_items_fallback", queue_size=len(queue))
     return queue
+
+
+async def get_kds_tasks_by_dept(
+    dept_id: str,
+    tenant_id: str,
+    db: AsyncSession,
+    status: str | None = None,
+    page: int = 1,
+    size: int = 50,
+) -> tuple[list[dict], int]:
+    """按档口ID查询 KDS 任务列表（分页）。
+
+    供 KDS 屏幕轮询接口使用。支持按状态过滤。
+
+    Args:
+        dept_id: 档口ID
+        tenant_id: 租户ID
+        db: 数据库会话
+        status: 任务状态过滤（None=返回 pending+cooking）
+        page: 页码，从1开始
+        size: 每页条数
+
+    Returns:
+        (tasks_list, total_count)
+    """
+    tid = uuid.UUID(tenant_id)
+    dept_uuid = uuid.UUID(dept_id)
+
+    conditions = [
+        KDSTask.tenant_id == tid,
+        KDSTask.dept_id == dept_uuid,
+        KDSTask.is_deleted == False,  # noqa: E712
+    ]
+
+    if status:
+        conditions.append(KDSTask.status == status)
+    else:
+        conditions.append(
+            KDSTask.status.in_([TASK_STATUS_PENDING, TASK_STATUS_COOKING])
+        )
+
+    count_stmt = select(func.count()).select_from(KDSTask).where(and_(*conditions))
+    total = (await db.execute(count_stmt)).scalar() or 0
+
+    stmt = (
+        select(KDSTask)
+        .where(and_(*conditions))
+        .order_by(KDSTask.priority.desc(), KDSTask.created_at.asc())
+        .offset((page - 1) * size)
+        .limit(size)
+    )
+    tasks = list((await db.execute(stmt)).scalars().all())
+
+    result = [
+        {
+            "task_id": str(t.id),
+            "order_item_id": str(t.order_item_id),
+            "order_id": str(t.order_id) if t.order_id else None,
+            "order_no": t.order_no or "",
+            "table_number": t.table_number or "",
+            "dish_id": str(t.dish_id) if t.dish_id else None,
+            "dish_name": t.dish_name or "",
+            "quantity": t.quantity,
+            "notes": t.notes or "",
+            "status": t.status,
+            "priority": t.priority,
+            "dept_id": dept_id,
+            "created_at": t.created_at.isoformat() if t.created_at else None,
+            "started_at": t.started_at.isoformat() if t.started_at else None,
+            "rush_count": t.rush_count,
+            "promised_at": t.promised_at.isoformat() if t.promised_at else None,
+        }
+        for t in tasks
+    ]
+
+    return result, total
 
 
 async def get_store_kds_overview(

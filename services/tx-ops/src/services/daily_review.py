@@ -4,11 +4,14 @@
 """
 from __future__ import annotations
 
+import asyncio
 import uuid
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 from typing import Any, Dict, List, Optional
 
 import structlog
+
+from shared.events import OpsEventType, UniversalPublisher
 
 log = structlog.get_logger(__name__)
 
@@ -274,6 +277,16 @@ async def sign_off_review(
         manager_id=manager_id,
         date=date_.isoformat(),
     )
+
+    total_revenue_fen = (review or {}).get("revenue_summary", {}).get("total_revenue_fen", 0)
+    asyncio.create_task(UniversalPublisher.publish(
+        event_type=OpsEventType.DAILY_E7_SETTLEMENT_DONE,
+        tenant_id=uuid.UUID(tenant_id),
+        store_id=uuid.UUID(store_id),
+        entity_id=None,
+        event_data={"store_id": store_id, "total_revenue_fen": total_revenue_fen},
+        source_service="tx-ops",
+    ))
 
     return {
         "signed_off": True,

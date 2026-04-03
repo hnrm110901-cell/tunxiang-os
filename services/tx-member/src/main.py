@@ -6,31 +6,39 @@ import asyncio
 from contextlib import asynccontextmanager
 
 import structlog
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-
-from shared.ontology.src.database import init_db, async_session_factory
-from api.members import router as member_router
-from api.marketing import router as marketing_router
 from api.analytics_routes import router as analytics_router
-from api.customer_depth_routes import router as customer_depth_router
 from api.card_routes import router as card_router
-from api.points_routes import router as points_router
 from api.coupon_engine_routes import router as coupon_engine_router
+from api.customer_depth_routes import router as customer_depth_router
 from api.gift_card_routes import router as gift_card_router
-from api.smart_dispatch_routes import router as smart_dispatch_router
-from api.stored_value_routes import router as stored_value_router
-from api.premium_card_routes import router as premium_card_router
-from api.points_mall_routes import router as points_mall_router
-from api.rfm_routes import router as rfm_router
+from api.group_member_routes import router as group_member_router
 from api.group_routes import router as group_router
+from api.lifecycle_router import router as lifecycle_v2_router
 from api.lifecycle_routes import router as lifecycle_router
+from api.marketing import router as marketing_router
+from api.member_insight_routes import router as member_insight_router
+from api.member_level_routes import router as member_level_router
+from api.members import router as member_router
 from api.platform_routes import router as platform_router
 from api.group_member_routes import router as group_member_router
 from api.social_routes import router as social_router
 from workers.rfm_updater import RFMUpdater, RFMEventListener
+from api.points_mall_routes import router as points_mall_router
+from api.points_routes import router as points_router
+from api.premium_card_routes import router as premium_card_router
+from api.rfm_routes import router as rfm_router
+from api.smart_dispatch_routes import router as smart_dispatch_router
+from api.stamp_card_routes import router as stamp_card_router
+from api.stored_value_card_routes import router as stored_value_card_router
+from api.stored_value_router import router as stored_value_v2_router
+from api.stored_value_routes import router as stored_value_router
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from workers.rfm_updater import RFMEventListener, RFMUpdater
+
 from shared.events.event_publisher import MemberEventPublisher
+from shared.ontology.src.database import async_session_factory, init_db
 
 logger = structlog.get_logger(__name__)
 
@@ -132,14 +140,20 @@ app.include_router(coupon_engine_router)
 app.include_router(gift_card_router)
 app.include_router(smart_dispatch_router)
 app.include_router(stored_value_router)
+app.include_router(stored_value_v2_router)
+app.include_router(stored_value_card_router)
 app.include_router(premium_card_router)
 app.include_router(points_mall_router)
 app.include_router(rfm_router)
 app.include_router(group_router)
 app.include_router(lifecycle_router)
+app.include_router(lifecycle_v2_router)
 app.include_router(platform_router)
 app.include_router(group_member_router)
 app.include_router(social_router)
+app.include_router(stamp_card_router)
+app.include_router(member_level_router)
+app.include_router(member_insight_router)
 
 
 @app.get("/health")

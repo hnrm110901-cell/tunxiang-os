@@ -6,6 +6,7 @@
 金额单位: 分(fen), int 类型。
 重量单位: 克(g), int 类型。
 """
+import asyncio
 import uuid
 from datetime import datetime
 from typing import Optional
@@ -13,6 +14,8 @@ from typing import Optional
 import structlog
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from shared.events import MenuEventType, UniversalPublisher
 
 log = structlog.get_logger(__name__)
 
@@ -683,7 +686,7 @@ class PricingEngine:
         # 查询调价申请
         result = await self.db.execute(
             text("""
-                SELECT id, dish_id, new_price_fen, status
+                SELECT id, dish_id, old_price_fen, new_price_fen, status
                 FROM price_change_requests
                 WHERE id = :change_id
                   AND tenant_id = :tenant_id
@@ -777,6 +780,19 @@ class PricingEngine:
             dish_id=str(row["dish_id"]),
             new_price_fen=int(row["new_price_fen"]),
         )
+
+        asyncio.create_task(UniversalPublisher.publish(
+            event_type=MenuEventType.DISH_PRICE_CHANGED,
+            tenant_id=self._tenant_uuid,
+            store_id=None,
+            entity_id=row["dish_id"],
+            event_data={
+                "dish_id": str(row["dish_id"]),
+                "old_price_fen": int(row["old_price_fen"]) if row["old_price_fen"] is not None else None,
+                "new_price_fen": int(row["new_price_fen"]),
+            },
+            source_service="tx-menu",
+        ))
 
         return {
             "change_id": change_id,

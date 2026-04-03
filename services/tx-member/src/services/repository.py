@@ -7,11 +7,11 @@ from datetime import datetime, timezone
 from typing import Optional
 
 import structlog
-from sqlalchemy import select, update, func, case, text
+from sqlalchemy import func, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from shared.ontology.src.entities import Customer, Order
+from shared.ontology.src.entities import Customer
 
 logger = structlog.get_logger()
 

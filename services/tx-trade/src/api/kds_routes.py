@@ -4,21 +4,31 @@
 """
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Request, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+
+from ..services.cooking_scheduler import calculate_cooking_order, get_dept_load
+from ..services.cooking_timeout import check_timeouts, get_timeout_config
+from ..services.kds_actions import (
+    check_rush_overdue,
+    confirm_rush,
+    finish_cooking,
+    get_task_timeline,
+    report_shortage,
+    request_remake,
+    request_rush,
+    start_cooking,
+)
 from ..services.kds_dispatch import (
-    dispatch_order_to_kds, get_dept_queue, get_store_kds_overview,
+    dispatch_order_to_kds,
+    get_dept_queue,
+    get_kds_tasks_by_dept,
+    get_store_kds_overview,
     resolve_dept_for_dish,
 )
-from ..services.cooking_scheduler import calculate_cooking_order, estimate_cooking_time, get_dept_load
-from ..services.kds_actions import (
-    start_cooking, finish_cooking, request_rush, request_remake,
-    report_shortage, get_task_timeline, confirm_rush, check_rush_overdue,
-)
-from ..services.cooking_timeout import check_timeouts, get_timeout_config
 
 router = APIRouter(prefix="/api/v1/kds", tags=["kds"])
 
@@ -95,6 +105,41 @@ async def api_dispatch_order(
     return {"ok": True, "data": {"dept_tasks": sorted_tasks}}
 
 
+@router.get("/tasks")
+async def api_kds_tasks(
+    request: Request,
+    dept_id: str = Query(description="档口ID — KDS设备按档口拉取待出品任务"),
+    status: Optional[str] = Query(
+        default=None,
+        description="任务状态过滤：pending/cooking/done/cancelled（不传=pending+cooking）",
+    ),
+    page: int = Query(default=1, ge=1),
+    size: int = Query(default=50, ge=1, le=200),
+    db: AsyncSession = Depends(get_db),
+):
+    """KDS任务查询 — 按档口ID查询待出品任务列表（KDS屏轮询接口）。
+
+    KDS平板定时调用此接口获取本档口的待出品任务。
+    返回 pending+cooking 状态的任务，按优先级+创建时间排序。
+
+    示例：GET /api/v1/kds/tasks?dept_id=xxx&status=pending
+    """
+    tenant_id = _get_tenant_id(request)
+    try:
+        tasks, total = await get_kds_tasks_by_dept(
+            dept_id=dept_id,
+            tenant_id=tenant_id,
+            db=db,
+            status=status,
+            page=page,
+            size=size,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    return {"ok": True, "data": {"items": tasks, "total": total, "page": page, "size": size}}
+
+
 @router.get("/queue/{dept_id}")
 async def api_dept_queue(
     dept_id: str,
@@ -102,7 +147,11 @@ async def api_dept_queue(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
-    """档口队列 — 获取某档口当前待出品任务"""
+    """档口队列 — 获取某档口当前待出品任务（兼容接口）
+
+    新接口请使用 GET /api/v1/kds/tasks?dept_id=xxx。
+    本接口保留兼容旧版 KDS 客户端。
+    """
     tenant_id = _get_tenant_id(request)
     queue = await get_dept_queue(dept_id, store_id, tenant_id, db)
     return {"ok": True, "data": {"items": queue, "total": len(queue)}}
@@ -252,9 +301,11 @@ async def api_rush_status(
 
     返回当前任务的催菜次数、承诺时间及是否已超时。
     """
-    from ..models.kds_task import KDSTask
-    from sqlalchemy import select, and_
     import uuid as _uuid
+
+    from sqlalchemy import and_, select
+
+    from ..models.kds_task import KDSTask
 
     tenant_id = _get_tenant_id(request)
 

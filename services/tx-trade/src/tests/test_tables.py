@@ -2,11 +2,10 @@
 
 使用 mock AsyncSession 避免真实数据库依赖。
 """
-import sys
 import os
+import sys
 import uuid
-from datetime import datetime, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 

@@ -10,19 +10,20 @@
 """
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import date
 from uuid import UUID
 
 import structlog
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends
 
-from ...shared.core.exceptions import POSAdapterError
-from ...shared.response import err, ok
 from ...modules.gateway.integrations.pos_sync_schemas import (
     BackfillRequest,
     SyncTodayRequest,
 )
 from ...modules.gateway.integrations.pos_sync_service import POSSyncService
+from ...shared.core.exceptions import POSAdapterError
+from ...shared.response import err, ok
+from shared.tenant_registry import MERCHANT_CODE_TO_TENANT_UUID
 
 logger = structlog.get_logger(__name__)
 
@@ -34,17 +35,11 @@ router = APIRouter(
 # 单例服务
 _sync_service = POSSyncService()
 
-# 临时硬编码的租户ID映射（正式版从JWT/中间件获取）
-_MERCHANT_TENANT_MAP: dict[str, str] = {
-    "czyz": "00000000-0000-0000-0000-000000000001",  # 尝在一起
-    "zqx": "00000000-0000-0000-0000-000000000002",   # 最黔线
-    "sgc": "00000000-0000-0000-0000-000000000003",   # 尚宫厨
-}
-
 
 def _get_tenant_id(merchant_code: str) -> UUID:
-    """从商户编码获取租户ID（临时方案，正式版从认证中间件获取）"""
-    tid = _MERCHANT_TENANT_MAP.get(merchant_code)
+    """从商户编码获取租户 UUID（与 Gateway DEMO 用户 tenant_id 单一事实源，见 shared/tenant_registry.py）"""
+    key = (merchant_code or "").strip().lower()
+    tid = MERCHANT_CODE_TO_TENANT_UUID.get(key)
     if not tid:
         raise POSAdapterError(
             f"未知商户编码: {merchant_code}",
@@ -55,9 +50,9 @@ def _get_tenant_id(merchant_code: str) -> UUID:
 
 # ── 依赖注入：数据库会话 ──────────────────────────────────────────────────────
 # 使用 shared/ontology 提供的统一数据库连接
-from shared.ontology.src.database import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from shared.ontology.src.database import get_db
 
 # ── 路由 ──────────────────────────────────────────────────────────────────────
 

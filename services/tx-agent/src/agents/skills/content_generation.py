@@ -1,10 +1,116 @@
 """内容生成 Agent — P1 | 云端
 
 营销文案生成、社交媒体内容、菜品描述、活动海报文案、短视频脚本、评论回复。
+
+品牌约束层：
+  所有生成方法在执行前会调用 tx-growth 的 /api/v1/brand/content-brief 端点，
+  获取 BrandStrategyDbService.build_content_brief() 返回的完整约束包，
+  并将 system_prompt 注入 LLM 的 system message，确保：
+    1. 生成内容符合品牌 voice（tone/style/preferred_words）
+    2. 不出现 forbidden_words / forbidden_elements
+    3. 遵守渠道字数限制（max_length）
+    4. 融入当前节气/节日营销上下文
 """
-import uuid
-from typing import Any
-from ..base import SkillAgent, AgentResult
+import os
+from typing import Any, Optional
+
+import httpx
+import structlog
+
+from ..base import AgentResult, SkillAgent
+
+log = structlog.get_logger(__name__)
+
+# tx-growth 服务地址（通过环境变量配置，本地开发默认值）
+_GROWTH_BASE_URL = os.getenv("TX_GROWTH_URL", "http://localhost:8040")
+
+# 渠道名称到 content-brief channel 参数的映射
+_CHANNEL_MAP: dict[str, str] = {
+    "wechat_moments": "wechat",
+    "wechat_push": "wechat",
+    "douyin": "douyin",
+    "xiaohongshu": "xiaohongshu",
+    "sms": "sms",
+    "poster": "poster",
+    "wecom": "wecom",
+    "miniapp": "miniapp",
+}
+
+
+async def _fetch_content_brief(
+    tenant_id: str,
+    channel: str,
+    segment: str,
+    purpose: str,
+) -> Optional[dict[str, Any]]:
+    """从 tx-growth 获取品牌内容简报
+
+    Args:
+        tenant_id: 租户 UUID 字符串
+        channel:   渠道标识（经过 _CHANNEL_MAP 映射后的值）
+        segment:   目标客群名称
+        purpose:   内容目的
+
+    Returns:
+        ContentBrief dict 或 None（若服务不可用则降级，不阻塞生成）
+    """
+    if not tenant_id:
+        return None
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            resp = await client.get(
+                f"{_GROWTH_BASE_URL}/api/v1/brand/content-brief",
+                params={"channel": channel, "segment": segment, "purpose": purpose},
+                headers={"X-Tenant-ID": tenant_id},
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                if data.get("ok"):
+                    return data.get("data")
+    except (httpx.ConnectError, httpx.TimeoutException, httpx.HTTPError) as exc:
+        log.warning(
+            "brand_brief_fetch_failed",
+            tenant_id=tenant_id,
+            channel=channel,
+            error=str(exc),
+        )
+    return None
+
+
+def _apply_brand_constraints(
+    content: str,
+    brief: Optional[dict[str, Any]],
+    max_chars: int,
+) -> str:
+    """应用品牌约束到已生成文案
+
+    1. 若品牌有 max_length 约束，取品牌限制与平台限制的较小值截断
+    2. 检查并移除 forbidden_words（简单替换为空，生产环境应重新生成）
+    """
+    if brief is None:
+        if len(content) > max_chars:
+            content = content[:max_chars - 3] + "..."
+        return content
+
+    # 渠道字数约束：取品牌约束与平台约束的较小值
+    brand_max = brief.get("max_length")
+    effective_max = min(brand_max, max_chars) if brand_max else max_chars
+    if len(content) > effective_max:
+        content = content[:effective_max - 3] + "..."
+
+    # 禁止词检查（替换处理，生产环境建议重新生成）
+    for word in brief.get("forbidden_words", []):
+        if word and word in content:
+            content = content.replace(word, "")
+            log.warning("forbidden_word_removed", word=word)
+
+    for elem in brief.get("forbidden_elements", []):
+        elem_str = str(elem) if elem else ""
+        if elem_str and elem_str in content:
+            content = content.replace(elem_str, "")
+            log.warning("forbidden_element_removed", element=elem_str)
+
+    return content
 
 
 # 文案风格模板
@@ -59,12 +165,42 @@ class ContentGenerationAgent(SkillAgent):
         return AgentResult(success=False, action=action, error=f"不支持的操作: {action}")
 
     async def _marketing_copy(self, params: dict) -> AgentResult:
-        """营销文案生成"""
+        """营销文案生成
+
+        执行前调用 tx-growth /api/v1/brand/content-brief 获取品牌约束包，
+        将 system_prompt 注入 LLM（当前为模板生成，LLM 集成时直接传入）。
+        """
         campaign_type = params.get("campaign_type", "general")
         brand_name = params.get("brand_name", "")
         offer = params.get("offer", "")
         tone = params.get("tone", "warm")
         target_audience = params.get("target_audience", "全部顾客")
+        tenant_id: str = params.get("tenant_id", "")
+
+        # 获取品牌约束简报（降级安全：失败不阻塞生成）
+        channel = _CHANNEL_MAP.get(params.get("platform", "wechat_moments"), "wechat")
+        brand_brief = await _fetch_content_brief(
+            tenant_id=tenant_id,
+            channel=channel,
+            segment=target_audience,
+            purpose=f"{campaign_type}营销文案",
+        )
+
+        # 若品牌档案有品牌名，优先使用
+        if brand_brief and brand_brief.get("brand_name"):
+            brand_name = brand_brief["brand_name"]
+
+        # 若品牌有语气配置，覆盖默认 tone 参数
+        if brand_brief and brand_brief.get("tone"):
+            brand_tone_name = brand_brief["tone"]
+            # 将品牌语气名映射回内部枚举（模糊匹配）
+            if any(k in brand_tone_name for k in ["高端", "精致", "奢"]):
+                tone = "premium"
+            elif any(k in brand_tone_name for k in ["活泼", "轻松", "年轻"]):
+                tone = "playful"
+            elif any(k in brand_tone_name for k in ["促销", "优惠", "折扣"]):
+                tone = "promotional"
+            # 否则保持传入的 tone 或 warm 默认值
 
         tone_info = TONE_STYLES.get(tone, TONE_STYLES["warm"])
 
@@ -95,32 +231,72 @@ class ContentGenerationAgent(SkillAgent):
                 f"{offer}——{brand_name}邀您共享美味时光。",
             ]
 
+        # 应用品牌约束（forbidden_words / max_length）
+        constrained_copies = [
+            _apply_brand_constraints(c, brand_brief, 500) for c in copies
+        ]
+
         return AgentResult(
             success=True, action="generate_marketing_copy",
             data={
                 "campaign_type": campaign_type,
                 "tone": tone,
                 "tone_name": tone_info["name"],
-                "copies": [{"version": i + 1, "text": c, "char_count": len(c)} for i, c in enumerate(copies)],
+                "copies": [
+                    {"version": i + 1, "text": c, "char_count": len(c)}
+                    for i, c in enumerate(constrained_copies)
+                ],
                 "recommended_version": 1,
                 "target_audience": target_audience,
+                "brand_constrained": brand_brief is not None,
+                "brand_system_prompt": brand_brief.get("system_prompt") if brand_brief else None,
             },
-            reasoning=f"为{campaign_type}活动生成 {len(copies)} 版文案，风格: {tone_info['name']}",
+            reasoning=(
+                f"为{campaign_type}活动生成 {len(constrained_copies)} 版文案，"
+                f"风格: {tone_info['name']}"
+                + ("（已应用品牌约束）" if brand_brief else "（品牌档案未配置，使用默认约束）")
+            ),
             confidence=0.8,
         )
 
     async def _social_content(self, params: dict) -> AgentResult:
-        """社交媒体内容生成"""
+        """社交媒体内容生成（注入品牌约束）"""
         platform = params.get("platform", "wechat_moments")
         topic = params.get("topic", "")
         brand_name = params.get("brand_name", "")
         dishes = params.get("featured_dishes", [])
+        tenant_id: str = params.get("tenant_id", "")
+        target_segment: str = params.get("target_segment", "全部顾客")
+
+        # 获取品牌约束简报
+        channel = _CHANNEL_MAP.get(platform, "wechat")
+        brand_brief = await _fetch_content_brief(
+            tenant_id=tenant_id,
+            channel=channel,
+            segment=target_segment,
+            purpose=f"社交媒体{platform}内容",
+        )
+        if brand_brief and brand_brief.get("brand_name"):
+            brand_name = brand_brief["brand_name"]
+
+        # 若有节气上下文且 topic 为空，融入节气主题
+        if not topic and brand_brief:
+            season_ctx = brand_brief.get("current_season_context") or {}
+            active = season_ctx.get("active_campaigns", [])
+            nearest = season_ctx.get("nearest_solar_term", {})
+            if active:
+                topic = active[0].get("campaign_theme") or active[0].get("period_name", "")
+            elif nearest:
+                topic = nearest.get("name", "")
 
         platform_info = PLATFORM_SPECS.get(platform, PLATFORM_SPECS["wechat_moments"])
         max_chars = platform_info["max_chars"]
 
         # 根据平台生成内容
         dish_text = "、".join(dishes[:3]) if dishes else "招牌美食"
+        # topic 默认值（兜底）
+        if not topic:
+            topic = "美食探店"
         if platform == "douyin":
             content = f"来{brand_name}必点{dish_text}！#美食探店 #{brand_name}"
             image_guide = "建议拍摄15-30秒菜品特写视频"
@@ -137,9 +313,8 @@ class ContentGenerationAgent(SkillAgent):
             content = f"{topic}\n{brand_name}{dish_text}，每一口都是幸福的味道。"
             image_guide = "建议3-6张菜品高清图"
 
-        # 截断
-        if len(content) > max_chars:
-            content = content[:max_chars - 3] + "..."
+        # 应用品牌约束（forbidden_words / max_length / channel max_chars）
+        content = _apply_brand_constraints(content, brand_brief, max_chars)
 
         return AgentResult(
             success=True, action="generate_social_content",
@@ -152,8 +327,13 @@ class ContentGenerationAgent(SkillAgent):
                 "image_guide": image_guide,
                 "best_post_time": "11:30-12:30 或 17:30-18:30",
                 "hashtags": [f"#{brand_name}", f"#{topic}"] if platform_info.get("hashtags") else [],
+                "brand_constrained": brand_brief is not None,
+                "brand_system_prompt": brand_brief.get("system_prompt") if brand_brief else None,
             },
-            reasoning=f"为{platform_info['name']}生成内容，{len(content)}字",
+            reasoning=(
+                f"为{platform_info['name']}生成内容，{len(content)}字"
+                + ("（已应用品牌约束）" if brand_brief else "")
+            ),
             confidence=0.8,
         )
 
@@ -270,7 +450,7 @@ class ContentGenerationAgent(SkillAgent):
                 reply = f"感谢您的好评！能让您满意是我们最大的动力，欢迎常来{brand_name}品尝更多美味！"
         elif rating >= 3:
             tone = "中性"
-            reply = f"感谢您的反馈！您提出的建议我们已认真记录，会持续改进。期待下次给您更好的体验。"
+            reply = "感谢您的反馈！您提出的建议我们已认真记录，会持续改进。期待下次给您更好的体验。"
         else:
             tone = "致歉"
             issues = []

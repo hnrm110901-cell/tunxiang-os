@@ -8,19 +8,16 @@
 5. 今日趋势按小时分桶，数据结构正确
 6. 租户隔离：set_config 携带正确 tenant_id，不混用
 """
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import uuid
-from datetime import datetime, timezone, timedelta
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
-from fastapi.testclient import TestClient
 from fastapi import FastAPI
-
 
 # ─── 工具 ───
 
@@ -60,7 +57,7 @@ def _make_db(execute_results=None):
 
 # ─── 加载路由 ───
 
-from api.kitchen_monitor_routes import router, _get_overtime_tasks, _get_shortage_alerts, _get_remake_tasks, _get_hourly_trend
+from api.kitchen_monitor_routes import _get_hourly_trend, _get_overtime_tasks, _get_shortage_alerts, router
 
 app = FastAPI()
 app.include_router(router, prefix="/api/v1/kitchen-monitor")
@@ -129,8 +126,8 @@ async def test_dashboard_empty_when_no_anomalies():
          patch("api.kitchen_monitor_routes._get_shortage_alerts", AsyncMock(return_value=[])), \
          patch("api.kitchen_monitor_routes._get_remake_tasks", AsyncMock(return_value=[])):
 
-        from fastapi.testclient import TestClient as SyncClient
         from api.kitchen_monitor_routes import _get_db
+        from fastapi.testclient import TestClient as SyncClient
 
         def _override_db():
             return db
@@ -209,8 +206,8 @@ async def test_individual_overtime_endpoint():
     db = AsyncMock()
 
     with patch("api.kitchen_monitor_routes._get_overtime_tasks", AsyncMock(return_value=overtime)):
-        from fastapi.testclient import TestClient as SyncClient
         from api.kitchen_monitor_routes import _get_db
+        from fastapi.testclient import TestClient as SyncClient
 
         app.dependency_overrides[_get_db] = lambda: db
         client = SyncClient(app)
@@ -235,8 +232,8 @@ async def test_individual_shortage_endpoint():
     db = AsyncMock()
 
     with patch("api.kitchen_monitor_routes._get_shortage_alerts", AsyncMock(return_value=shortage)):
-        from fastapi.testclient import TestClient as SyncClient
         from api.kitchen_monitor_routes import _get_db
+        from fastapi.testclient import TestClient as SyncClient
 
         app.dependency_overrides[_get_db] = lambda: db
         client = SyncClient(app)
@@ -261,8 +258,8 @@ async def test_individual_remake_endpoint():
     db = AsyncMock()
 
     with patch("api.kitchen_monitor_routes._get_remake_tasks", AsyncMock(return_value=remake)):
-        from fastapi.testclient import TestClient as SyncClient
         from api.kitchen_monitor_routes import _get_db
+        from fastapi.testclient import TestClient as SyncClient
 
         app.dependency_overrides[_get_db] = lambda: db
         client = SyncClient(app)
@@ -291,8 +288,8 @@ async def test_trend_hourly_bucketing():
         {"hour": 1, "overtime_count": 1, "shortage_count": 0, "remake_count": 0},
         {"hour": 2, "overtime_count": 0, "shortage_count": 2, "remake_count": 1},
     ])):
-        from fastapi.testclient import TestClient as SyncClient
         from api.kitchen_monitor_routes import _get_db
+        from fastapi.testclient import TestClient as SyncClient
 
         app.dependency_overrides[_get_db] = lambda: db
         client = SyncClient(app)

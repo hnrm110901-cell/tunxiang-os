@@ -1,5 +1,6 @@
 """快速开店 — 配置克隆 API"""
 from typing import List, Literal
+
 from fastapi import APIRouter
 from pydantic import BaseModel
 

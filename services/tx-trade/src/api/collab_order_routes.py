@@ -21,7 +21,6 @@ WebSocket：
 """
 import asyncio
 import uuid
-from typing import Optional
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
@@ -29,6 +28,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+
 from ..services.table_session_service import TableSessionService
 
 logger = structlog.get_logger()
@@ -50,7 +50,7 @@ async def _broadcast_session(session_token: str, payload: dict) -> None:
     for ws in list(connections):
         try:
             await ws.send_json(payload)
-        except Exception:
+        except Exception:  # noqa: BLE001 — MLPS3-P0: WebSocket断开时异常类型不固定，收窄后兜底
             dead.add(ws)
     for ws in dead:
         connections.discard(ws)
@@ -63,7 +63,7 @@ async def _broadcast_waiter(store_id: str, payload: dict) -> None:
     for ws in list(connections):
         try:
             await ws.send_json(payload)
-        except Exception:
+        except Exception:  # noqa: BLE001 — MLPS3-P0: WebSocket断开时异常类型不固定，收窄后兜底
             dead.add(ws)
     for ws in dead:
         connections.discard(ws)

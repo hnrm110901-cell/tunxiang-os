@@ -6,20 +6,17 @@
 3. 重试超过5次的任务标记为死信，不再重试
 4. 重试有指数退避（1s, 2s, 4s, 8s, 16s）
 """
-import asyncio
 import os
-import tempfile
-from datetime import datetime, timezone, timedelta
-from unittest.mock import AsyncMock, patch
-
-import pytest
 
 # 将 edge/mac-mini 加入测试路径
 import sys
+from datetime import datetime, timedelta, timezone
+
+import pytest
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../../../edge/mac-mini"))
 
-from print_queue import PrintQueue, PrintJob, JobStatus
-
+from print_queue import JobStatus, PrintJob, PrintQueue
 
 # ─── 测试夹具 ───
 

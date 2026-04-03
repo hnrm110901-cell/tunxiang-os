@@ -2,13 +2,18 @@
 
 营收增长归因分析、营销活动ROI评估、增长驱动因素识别、增长轨迹预测。
 通过 ModelRouter (MODERATE) 调用 LLM 生成增长洞察。
+
+v088 新增：
+  - get_customer_touch_history — 客户触达历史（近 N 天）
+  - get_campaign_roi           — 活动 ROI（从 campaign_summaries 读取）
+  - get_attribution_report     — 租户级归因汇总报告
 """
 import statistics
 from typing import Any
 
 import structlog
 
-from ..base import SkillAgent, AgentResult
+from ..base import AgentResult, SkillAgent
 
 try:
     from services.tunxiang_api.src.shared.core.model_router import model_router
@@ -44,7 +49,15 @@ class GrowthAttributionAgent(SkillAgent):
     run_location = "cloud"
 
     def get_supported_actions(self) -> list[str]:
-        return ["attribute", "evaluate_roi", "identify_drivers", "predict"]
+        return [
+            "attribute",
+            "evaluate_roi",
+            "identify_drivers",
+            "predict",
+            "get_customer_touch_history",
+            "get_campaign_roi",
+            "get_attribution_report",
+        ]
 
     async def execute(self, action: str, params: dict[str, Any]) -> AgentResult:
         dispatch = {
@@ -52,6 +65,9 @@ class GrowthAttributionAgent(SkillAgent):
             "evaluate_roi": self._evaluate_campaign_roi,
             "identify_drivers": self._identify_growth_drivers,
             "predict": self._predict_growth_trajectory,
+            "get_customer_touch_history": self._get_customer_touch_history,
+            "get_campaign_roi": self._get_campaign_roi,
+            "get_attribution_report": self._get_attribution_report,
         }
         handler = dispatch.get(action)
         if handler:
@@ -440,4 +456,243 @@ class GrowthAttributionAgent(SkillAgent):
                 f"预测未来 {months} 个月营收走势"
             ),
             confidence=round(fit_quality, 2),
+        )
+
+    # ------------------------------------------------------------------
+    # v088 新增：触达归因链路查询 Actions
+    # ------------------------------------------------------------------
+
+    async def _get_customer_touch_history(self, params: dict) -> AgentResult:
+        """查询客户最近 N 天的触达历史（从 touch_events 表读取）。
+
+        params:
+            customer_id (str): 客户 UUID
+            tenant_id   (str): 租户 UUID
+            days        (int): 查最近多少天，默认 30
+            touches     (list[dict]): 触达记录（由调用方从 tx-growth 预查后传入）
+        """
+        customer_id = params.get("customer_id", "")
+        tenant_id = params.get("tenant_id", self.tenant_id or "")
+        days = int(params.get("days", 30))
+
+        # 触达记录由调用方查询后通过 params 传入，Agent 负责分析层
+        touches: list[dict] = params.get("touches", [])
+
+        if not touches:
+            return AgentResult(
+                success=True,
+                action="get_customer_touch_history",
+                data={
+                    "customer_id": customer_id,
+                    "days": days,
+                    "total_touches": 0,
+                    "touches": [],
+                    "channels": {},
+                    "last_touch": None,
+                },
+                reasoning=f"客户 {customer_id} 近 {days} 天无触达记录",
+                confidence=1.0,
+            )
+
+        # 渠道分布统计
+        channel_counts: dict[str, int] = {}
+        for t in touches:
+            ch = t.get("channel", "unknown")
+            channel_counts[ch] = channel_counts.get(ch, 0) + 1
+
+        # 最近一次触达
+        sorted_touches = sorted(touches, key=lambda x: x.get("sent_at", ""), reverse=True)
+        last_touch = sorted_touches[0] if sorted_touches else None
+
+        # 点击率
+        clicked = sum(1 for t in touches if t.get("clicked_at"))
+        click_rate = round(clicked / max(1, len(touches)), 4)
+
+        return AgentResult(
+            success=True,
+            action="get_customer_touch_history",
+            data={
+                "customer_id": customer_id,
+                "tenant_id": tenant_id,
+                "days": days,
+                "total_touches": len(touches),
+                "clicked_touches": clicked,
+                "click_rate": click_rate,
+                "click_rate_pct": round(click_rate * 100, 1),
+                "channels": channel_counts,
+                "last_touch": last_touch,
+                "touches": sorted_touches[:20],  # 最多返回最近20条
+            },
+            reasoning=(
+                f"客户 {customer_id} 近 {days} 天共触达 {len(touches)} 次，"
+                f"点击率 {click_rate:.1%}，"
+                f"主要渠道: {max(channel_counts, key=channel_counts.get) if channel_counts else '无'}"
+            ),
+            confidence=0.95,
+        )
+
+    async def _get_campaign_roi(self, params: dict) -> AgentResult:
+        """从 campaign_summaries 读取活动 ROI 数据，结合 LLM 生成分析报告。
+
+        params:
+            campaign_id   (str):  活动 UUID
+            campaign_name (str):  活动名称（展示用）
+            summary       (dict): campaign_summaries 行数据（由调用方预查后传入）
+        """
+        campaign_id = params.get("campaign_id", "")
+        campaign_name = params.get("campaign_name", "")
+        summary: dict = params.get("summary", {})
+
+        if not summary:
+            return AgentResult(
+                success=False,
+                action="get_campaign_roi",
+                error=f"活动 {campaign_id} 暂无汇总数据，请稍后重试或触发手动聚合",
+            )
+
+        total_touches = summary.get("total_touches", 0)
+        delivered = summary.get("delivered_count", 0)
+        clicked = summary.get("clicked_count", 0)
+        reservations = summary.get("reservations_attributed", 0)
+        orders = summary.get("orders_attributed", 0)
+        revenue = summary.get("revenue_attributed", 0.0)
+        cac = summary.get("cac", 0.0)
+        roi = summary.get("roi", 0.0)
+
+        # ROI 评级
+        if roi >= 5.0:
+            roi_grade = "优秀"
+        elif roi >= 2.0:
+            roi_grade = "良好"
+        elif roi >= 1.0:
+            roi_grade = "一般"
+        elif roi >= 0.0:
+            roi_grade = "较差"
+        else:
+            roi_grade = "亏损"
+
+        click_rate = round(clicked / max(1, delivered), 4)
+        conversion_rate = round((reservations + orders) / max(1, total_touches), 4)
+
+        return AgentResult(
+            success=True,
+            action="get_campaign_roi",
+            data={
+                "campaign_id": campaign_id,
+                "campaign_name": campaign_name,
+                "period": {
+                    "start": summary.get("period_start", ""),
+                    "end": summary.get("period_end", ""),
+                },
+                "funnel": {
+                    "total_touches": total_touches,
+                    "delivered": delivered,
+                    "clicked": clicked,
+                    "reservations": reservations,
+                    "orders": orders,
+                },
+                "metrics": {
+                    "click_rate": click_rate,
+                    "click_rate_pct": round(click_rate * 100, 1),
+                    "conversion_rate": conversion_rate,
+                    "conversion_rate_pct": round(conversion_rate * 100, 1),
+                    "revenue_attributed": revenue,
+                    "cac": cac,
+                    "roi": roi,
+                    "roi_grade": roi_grade,
+                },
+                "top_segments": summary.get("top_segments", []),
+            },
+            reasoning=(
+                f"活动《{campaign_name}》ROI {roi:.1f}（{roi_grade}），"
+                f"触达 {total_touches} 人，转化率 {conversion_rate:.1%}，"
+                f"归因收入 {revenue:.0f} 元"
+            ),
+            confidence=0.9,
+        )
+
+    async def _get_attribution_report(self, params: dict) -> AgentResult:
+        """生成租户级归因汇总报告（多活动对比 + 渠道效果 + 人群效果）。
+
+        params:
+            tenant_id        (str):        租户 UUID
+            period_start     (str):        开始日期 YYYY-MM-DD
+            period_end       (str):        结束日期 YYYY-MM-DD
+            campaign_summaries (list[dict]): 各活动汇总（由调用方预查后传入）
+            channel_perf     (list[dict]): 渠道效果（由调用方预查后传入）
+            segment_perf     (list[dict]): 人群效果（由调用方预查后传入）
+        """
+        tenant_id = params.get("tenant_id", self.tenant_id or "")
+        period_start = params.get("period_start", "")
+        period_end = params.get("period_end", "")
+
+        campaigns: list[dict] = params.get("campaign_summaries", [])
+        channel_perf: list[dict] = params.get("channel_perf", [])
+        segment_perf: list[dict] = params.get("segment_perf", [])
+
+        # 全局汇总
+        total_revenue = sum(c.get("revenue_attributed", 0) for c in campaigns)
+        total_touches = sum(c.get("total_touches", 0) for c in campaigns)
+        total_orders = sum(c.get("orders_attributed", 0) for c in campaigns)
+        total_reservations = sum(c.get("reservations_attributed", 0) for c in campaigns)
+
+        overall_conversion_rate = round(
+            (total_orders + total_reservations) / max(1, total_touches), 4
+        )
+
+        # Top 活动（按归因收入）
+        top_campaigns = sorted(
+            campaigns, key=lambda x: x.get("revenue_attributed", 0), reverse=True
+        )[:5]
+
+        # 最佳渠道
+        best_channel = (
+            max(channel_perf, key=lambda x: x.get("conversion_rate", 0))
+            if channel_perf
+            else None
+        )
+
+        # 最佳人群
+        best_segment = (
+            max(segment_perf, key=lambda x: x.get("conversion_rate", 0))
+            if segment_perf
+            else None
+        )
+
+        return AgentResult(
+            success=True,
+            action="get_attribution_report",
+            data={
+                "tenant_id": tenant_id,
+                "period": {"start": period_start, "end": period_end},
+                "overall": {
+                    "total_touches": total_touches,
+                    "total_orders_attributed": total_orders,
+                    "total_reservations_attributed": total_reservations,
+                    "total_revenue_attributed": round(total_revenue, 2),
+                    "overall_conversion_rate": overall_conversion_rate,
+                    "overall_conversion_rate_pct": round(overall_conversion_rate * 100, 1),
+                },
+                "top_campaigns": [
+                    {
+                        "campaign_name": c.get("campaign_name", ""),
+                        "revenue_attributed": c.get("revenue_attributed", 0),
+                        "roi": c.get("roi", 0),
+                        "orders": c.get("orders_attributed", 0),
+                    }
+                    for c in top_campaigns
+                ],
+                "channel_performance": channel_perf,
+                "segment_performance": segment_perf,
+                "best_channel": best_channel.get("channel") if best_channel else None,
+                "best_segment": best_segment.get("segment_name") if best_segment else None,
+            },
+            reasoning=(
+                f"租户 {tenant_id} {period_start}~{period_end} 归因报告：\n"
+                f"总触达 {total_touches} 次，转化率 {overall_conversion_rate:.1%}，"
+                f"归因收入 {total_revenue:.0f} 元；\n"
+                f"最佳渠道 {best_channel.get('channel') if best_channel else '无'}，"
+                f"最佳人群 {best_segment.get('segment_name') if best_segment else '无'}"
+            ),
+            confidence=0.85,
         )

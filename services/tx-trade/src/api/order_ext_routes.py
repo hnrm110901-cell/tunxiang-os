@@ -1,11 +1,11 @@
 """点单扩展 API — 赠菜/拆单/并单/异常改单"""
-from typing import Optional
 
-from fastapi import APIRouter, Depends, Request, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+
 from ..services import order_extensions as ext
 
 router = APIRouter(prefix="/api/v1/trade/orders", tags=["order-extensions"])

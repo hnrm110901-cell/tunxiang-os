@@ -12,18 +12,16 @@
 from __future__ import annotations
 
 import io
-import pytest
-import pytest_asyncio
 
+import pytest
 from voice_service import (
-    VoiceService,
-    TranscriptionResult,
     IntentResult,
+    TranscriptionResult,
     VoiceCommandResult,
+    VoiceService,
     _chinese_num_to_int,
     router,
 )
-
 
 # ─── Fixtures ───
 

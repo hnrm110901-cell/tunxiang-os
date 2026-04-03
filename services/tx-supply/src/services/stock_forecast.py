@@ -5,14 +5,13 @@
 """
 import uuid
 from datetime import date, datetime, timedelta, timezone
-from typing import Optional
 
 import structlog
-from sqlalchemy import select, func, and_, text
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.entities import Ingredient, IngredientTransaction
-from shared.ontology.src.enums import InventoryStatus, TransactionType
+from shared.ontology.src.enums import TransactionType
 
 logger = structlog.get_logger()
 

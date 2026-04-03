@@ -5,16 +5,15 @@
 2. 沽清预警 — 单菜品预测、批量扫描
 3. 审计留痕 — 记录决策、查询日志、汇总统计
 """
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import pytest
-
+from agents.skills.audit_trail import AuditTrailAgent
 from agents.skills.cashier_audit import CashierAuditAgent
 from agents.skills.stockout_alert import StockoutAlertAgent
-from agents.skills.audit_trail import AuditTrailAgent
 
 TENANT = "test-tenant-001"
 STORE = "store-001"

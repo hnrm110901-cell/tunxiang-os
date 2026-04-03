@@ -4,7 +4,7 @@
 """
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import date
 
 import pytest
 
@@ -12,12 +12,10 @@ from ..services.issue_tracker import (
     assign_issue,
     create_issue,
     cross_store_benchmark,
-    get_regional_issues,
     get_store_issue_board,
     update_issue_status,
 )
 from ..services.knowledge_base import (
-    get_best_practices,
     get_sop_suggestions,
     save_case,
     search_cases,

@@ -5,19 +5,15 @@
 2. 恢复连接后增量同步到云端
 3. 重复同步不会导致重复 KDS 任务（幂等性）
 """
-import asyncio
 import json
 import os
-import tempfile
-from unittest.mock import AsyncMock, MagicMock, patch
+import sys
 
 import pytest
 
-import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../../../edge/mac-mini"))
 
 from offline_buffer import OfflineBuffer
-
 
 # ─── 测试夹具 ───
 

@@ -6,19 +6,20 @@
 """
 import hashlib
 import uuid
-from datetime import datetime, timezone, date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 
 import structlog
-from sqlalchemy import select, update, func, and_
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from shared.ontology.src.entities import Order, OrderItem, Dish, Store
+from shared.ontology.src.entities import Dish, Order, OrderItem
 from shared.ontology.src.enums import OrderStatus
+
+from ..models.enums import TableStatus
 from ..models.tables import Table
-from ..models.enums import TableStatus, OrderType
-from ..services.order_service import _gen_order_no
 from ..services.kds_dispatch import dispatch_order_to_kds
+from ..services.order_service import _gen_order_no
 
 logger = structlog.get_logger()
 

@@ -9,11 +9,11 @@
 """
 from __future__ import annotations
 
-import structlog
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
-from sqlalchemy import select, func, and_, text
+import structlog
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 log = structlog.get_logger(__name__)
@@ -114,7 +114,7 @@ class DemandForecastService:
         try:
             import uuid as _uuid_mod
 
-            from shared.ontology.src.entities import BOMTemplate, BOMItem, Order, OrderItem
+            from shared.ontology.src.entities import BOMItem, BOMTemplate, Order, OrderItem
 
             def _uuid(val: str) -> _uuid_mod.UUID:
                 return _uuid_mod.UUID(str(val))

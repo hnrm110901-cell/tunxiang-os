@@ -5,9 +5,7 @@
 
 所有金额单位：分（fen）。
 """
-import uuid
-from dataclasses import dataclass, field
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import structlog

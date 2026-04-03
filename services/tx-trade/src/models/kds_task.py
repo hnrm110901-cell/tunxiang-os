@@ -7,12 +7,21 @@
   promised_at   — 厨师确认催菜后承诺完成时间
   rush_count    — 同一任务累计催菜次数（用于30分钟限流）
   last_rush_at  — 最后一次催菜时间（用于限流滑动窗口）
+
+v076 新增冗余字段（方便KDS展示，避免联表查询）：
+  order_id      — 订单ID（便于按订单聚合任务进度）
+  dish_id       — 菜品ID
+  dish_name     — 菜品名称
+  quantity      — 菜品数量
+  table_number  — 桌号
+  order_no      — 订单号
+  notes         — 菜品备注
 """
 import uuid
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import String, Integer, Text, Index
+from sqlalchemy import Index, Integer, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -32,9 +41,39 @@ class KDSTask(TenantBase):
         UUID(as_uuid=True), nullable=False, index=True,
         comment="关联订单明细ID"
     )
+    order_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), index=True,
+        comment="关联订单ID（冗余存储，方便按订单聚合查询所有档口任务）"
+    )
     dept_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True), index=True,
         comment="出品档口ID（关联 production_depts）"
+    )
+
+    # ── 菜品信息（冗余存储，KDS展示用，避免联表查询） ──
+    dish_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        comment="菜品ID（冗余存储，便于按菜品统计出品数据）"
+    )
+    dish_name: Mapped[Optional[str]] = mapped_column(
+        String(100),
+        comment="菜品名称（冗余存储，KDS展示用）"
+    )
+    quantity: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default="1",
+        comment="菜品数量"
+    )
+    table_number: Mapped[Optional[str]] = mapped_column(
+        String(20),
+        comment="桌号（冗余存储，KDS展示用）"
+    )
+    order_no: Mapped[Optional[str]] = mapped_column(
+        String(50),
+        comment="订单号（冗余存储，KDS展示用）"
+    )
+    notes: Mapped[Optional[str]] = mapped_column(
+        Text,
+        comment="菜品备注（如不要辣、少盐等）"
     )
 
     # ── 任务状态 ──
@@ -108,5 +147,17 @@ class KDSTask(TenantBase):
             "ix_kds_tasks_promised_at",
             "promised_at",
             postgresql_where="promised_at IS NOT NULL AND status NOT IN ('done', 'cancelled')",
+        ),
+        # v076：KDS轮询"某档口待出品任务"的核心查询路径
+        Index(
+            "ix_kds_tasks_dept_status_created",
+            "dept_id", "status", "created_at",
+            postgresql_where="is_deleted = false",
+        ),
+        # v076：按订单聚合任务进度
+        Index(
+            "ix_kds_tasks_order_id",
+            "order_id",
+            postgresql_where="order_id IS NOT NULL AND is_deleted = false",
         ),
     )

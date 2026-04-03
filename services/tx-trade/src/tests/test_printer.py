@@ -2,37 +2,34 @@
 
 所有测试不需要真实打印机，验证 ESC/POS 指令生成和模板渲染的正确性。
 """
-import asyncio
-import sys
 import os
+import sys
 
 import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+from services.print_manager import PrinterRole, PrintManager
+from services.print_template import ReceiptTemplate
 from services.printer_driver import (
-    ESCPOSPrinter,
-    ESC_INIT,
-    ESC_ALIGN_LEFT,
     ESC_ALIGN_CENTER,
+    ESC_ALIGN_LEFT,
     ESC_ALIGN_RIGHT,
-    ESC_BOLD_ON,
     ESC_BOLD_OFF,
-    GS_SIZE_NORMAL,
-    GS_SIZE_DOUBLE_BOTH,
-    GS_CUT_PARTIAL,
-    GS_CUT_FULL,
+    ESC_BOLD_ON,
+    ESC_INIT,
     ESC_OPEN_DRAWER,
-    ESC_CHINESE_ON,
+    GS_CUT_FULL,
+    GS_CUT_PARTIAL,
+    GS_SIZE_DOUBLE_BOTH,
+    GS_SIZE_NORMAL,
     LINE_WIDTH,
+    ESCPOSPrinter,
     _gbk_len,
-    _pad_two_columns,
     _pad_three_columns,
+    _pad_two_columns,
     build_escpos_commands,
 )
-from services.print_template import ReceiptTemplate
-from services.print_manager import PrintManager, PrinterRole, PrintTaskStatus
-
 
 # ─── 测试数据 ───
 

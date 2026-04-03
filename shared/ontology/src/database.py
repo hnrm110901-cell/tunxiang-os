@@ -71,6 +71,22 @@ async def get_db_with_tenant(tenant_id: str) -> AsyncGenerator[AsyncSession, Non
             raise
 
 
+async def get_db_no_rls() -> AsyncGenerator[AsyncSession, None]:
+    """跳过 RLS 的 DB session，仅限系统级操作（微信回调跨租户查询等）。
+
+    要求：DB 用户须持有 BYPASSRLS 权限（或 SUPERUSER）。
+    生产部署：GRANT BYPASSRLS ON ROLE tunxiang TO tunxiang;
+    """
+    async with async_session_factory() as session:
+        try:
+            await session.execute(text("SET LOCAL row_security = off"))
+            yield session
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            raise
+
+
 async def init_db():
     """初始化数据库（创建表，开发环境用）"""
     from .base import TenantBase

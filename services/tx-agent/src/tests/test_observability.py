@@ -8,16 +8,15 @@ Tests all 6 endpoints of the observability router:
   - GET /api/v1/agent/observability/health
   - GET /api/v1/agent/observability/event-chain/{correlation_id}
 """
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import pytest
-from fastapi import FastAPI
-from httpx import AsyncClient, ASGITransport
-
 from api.observability import router
+from fastapi import FastAPI
+from httpx import ASGITransport, AsyncClient
 
 # Build a lightweight test app with only the observability router
 _test_app = FastAPI()

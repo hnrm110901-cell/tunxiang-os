@@ -4,18 +4,20 @@
 金额统一存分（fen），展示时 /100 转元。
 """
 import uuid
+from datetime import datetime
 
 from sqlalchemy import (
     Boolean, Date, DateTime, Float, Integer, Numeric, String, Text,
     ForeignKey, Index, UniqueConstraint, func,
 )
-from sqlalchemy.dialects.postgresql import ARRAY, JSON, UUID
+from sqlalchemy.dialects.postgresql import ARRAY, JSON, JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import TenantBase
 from .enums import (
     OrderStatus, StoreStatus, InventoryStatus, TransactionType,
     EmploymentStatus, EmploymentType, StorageType, RFMLevel,
+    ReceivingOrderStatus, ReceivingItemStatus, TransferOrderStatus,
 )
 
 
@@ -353,7 +355,9 @@ class Order(TenantBase):
     table_transfer_from: Mapped[str | None] = mapped_column(String(20), comment="转台前桌号")
 
     # 关联
-    items = relationship("OrderItem", back_populates="order", cascade="all, delete-orphan")
+    items: Mapped[list["OrderItem"]] = relationship(
+        "OrderItem", back_populates="order", cascade="all, delete-orphan"
+    )
 
     __table_args__ = (
         Index("idx_order_store_status", "store_id", "status"),
@@ -393,7 +397,7 @@ class OrderItem(TenantBase):
     gift_reason: Mapped[str | None] = mapped_column(String(200), comment="赠菜原因")
     combo_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), comment="所属套餐ID(NULL=非套餐)")
 
-    order = relationship("Order", back_populates="items")
+    order: Mapped["Order"] = relationship("Order", back_populates="items")
 
 
 # ─────────────────────────────────────────────
@@ -528,4 +532,156 @@ class Employee(TenantBase):
     org_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), index=True)
     preferences: Mapped[dict | None] = mapped_column(JSON, default=dict)
     performance_score: Mapped[str | None] = mapped_column(String(10))
+
+
+# ─────────────────────────────────────────────
+# 7. ReceivingOrder — 收货验收单
+# ─────────────────────────────────────────────
+
+class ReceivingOrder(TenantBase):
+    """收货验收单 — 供应商送货到门店时的验收记录"""
+    __tablename__ = "receiving_orders"
+
+    store_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("stores.id"), nullable=False, index=True
+    )
+    procurement_order_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), nullable=True, comment="关联采购单（可为NULL表示非计划收货）"
+    )
+    supplier_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), nullable=True, index=True
+    )
+    delivery_note_no: Mapped[str | None] = mapped_column(
+        String(100), comment="供应商送货单号"
+    )
+    status: Mapped[str] = mapped_column(
+        String(30),
+        default=ReceivingOrderStatus.draft.value,
+        nullable=False,
+        index=True,
+    )
+    total_items: Mapped[int] = mapped_column(Integer, default=0)
+    received_items: Mapped[int] = mapped_column(Integer, default=0)
+    rejected_items: Mapped[int] = mapped_column(Integer, default=0)
+    receiver_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), nullable=True, comment="收货员"
+    )
+    inspected_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    signed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    remarks: Mapped[str | None] = mapped_column(Text)
+
+    items: Mapped[list["ReceivingOrderItem"]] = relationship(
+        "ReceivingOrderItem", back_populates="order", cascade="all, delete-orphan"
+    )
+
+
+class ReceivingOrderItem(TenantBase):
+    """收货验收单明细"""
+    __tablename__ = "receiving_order_items"
+
+    receiving_order_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("receiving_orders.id"), nullable=False, index=True
+    )
+    ingredient_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("ingredients.id"), nullable=False
+    )
+    ingredient_name: Mapped[str] = mapped_column(
+        String(100), nullable=False, comment="冗余存储，防食材删除后丢失"
+    )
+    expected_quantity: Mapped[float] = mapped_column(
+        Numeric(12, 3), nullable=False, comment="采购单预期数量"
+    )
+    expected_unit: Mapped[str] = mapped_column(String(20), nullable=False)
+    actual_quantity: Mapped[float] = mapped_column(
+        Numeric(12, 3), default=0, comment="实际到货数量"
+    )
+    accepted_quantity: Mapped[float] = mapped_column(
+        Numeric(12, 3), default=0, comment="验收通过数量"
+    )
+    rejected_quantity: Mapped[float] = mapped_column(
+        Numeric(12, 3), default=0, comment="拒收数量"
+    )
+    unit_price_fen: Mapped[int | None] = mapped_column(
+        Integer, comment="到货价格（分），可能与采购价不同"
+    )
+    batch_no: Mapped[str | None] = mapped_column(String(100), comment="批次号")
+    production_date: Mapped[datetime | None] = mapped_column(Date)
+    expiry_date: Mapped[datetime | None] = mapped_column(Date, comment="保质期")
+    rejection_reason: Mapped[str | None] = mapped_column(String(500))
+    quality_photos: Mapped[dict | None] = mapped_column(
+        JSONB, default=list, comment="质检照片URL列表"
+    )
+    status: Mapped[str] = mapped_column(
+        String(20),
+        default=ReceivingItemStatus.pending.value,
+        nullable=False,
+    )
+
+    order: Mapped["ReceivingOrder"] = relationship("ReceivingOrder", back_populates="items")
+
+
+# ─────────────────────────────────────────────
+# 8. TransferOrder — 门店调拨单
+# ─────────────────────────────────────────────
+
+class TransferOrder(TenantBase):
+    """门店间库存调拨单"""
+    __tablename__ = "transfer_orders"
+
+    from_store_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("stores.id"), nullable=False, index=True,
+        comment="调出门店"
+    )
+    to_store_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("stores.id"), nullable=False, index=True,
+        comment="调入门店"
+    )
+    status: Mapped[str] = mapped_column(
+        String(20),
+        default=TransferOrderStatus.draft.value,
+        nullable=False,
+        index=True,
+    )
+    transfer_reason: Mapped[str | None] = mapped_column(String(500))
+    requested_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    approved_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    requested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    shipped_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    received_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    notes: Mapped[str | None] = mapped_column(Text)
+
+    items: Mapped[list["TransferOrderItem"]] = relationship(
+        "TransferOrderItem", back_populates="order", cascade="all, delete-orphan"
+    )
+
+
+class TransferOrderItem(TenantBase):
+    """门店调拨单明细"""
+    __tablename__ = "transfer_order_items"
+
+    transfer_order_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("transfer_orders.id"), nullable=False, index=True
+    )
+    ingredient_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("ingredients.id"), nullable=False
+    )
+    ingredient_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    requested_quantity: Mapped[float] = mapped_column(Numeric(12, 3), nullable=False)
+    unit: Mapped[str] = mapped_column(String(20), nullable=False)
+    approved_quantity: Mapped[float | None] = mapped_column(
+        Numeric(12, 3), comment="审批时可调整"
+    )
+    shipped_quantity: Mapped[float | None] = mapped_column(
+        Numeric(12, 3), comment="实际发货数量"
+    )
+    received_quantity: Mapped[float | None] = mapped_column(
+        Numeric(12, 3), comment="实际签收数量"
+    )
+    batch_no: Mapped[str | None] = mapped_column(String(100), comment="库存批次号")
+    unit_cost_fen: Mapped[int | None] = mapped_column(
+        Integer, comment="成本价（分），用于财务核算"
+    )
+
+    order: Mapped["TransferOrder"] = relationship("TransferOrder", back_populates="items")
     training_completed: Mapped[list | None] = mapped_column(ARRAY(String), default=list)

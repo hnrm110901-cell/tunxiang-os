@@ -19,7 +19,6 @@ import structlog
 from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from .models.wecom_group import WecomGroupConfig, WecomGroupMessage
 from .response import ok
@@ -44,15 +43,17 @@ def _parse_tenant_id(x_tenant_id: str) -> UUID:
         raise HTTPException(status_code=400, detail="X-Tenant-ID 格式错误") from exc
 
 
-async def _get_db() -> AsyncSession:  # type: ignore[return]
-    """数据库会话依赖（由 gateway 的 db 模块注入，此处为占位符）
-
-    实际项目中应替换为：
-        from .database import get_async_session
+async def _get_db():  # type: ignore[return]
+    """数据库会话依赖（代理到 gateway 的 database 模块）"""
+    try:
+        from .database import get_async_session  # type: ignore[import]
         async for session in get_async_session():
             yield session
-    """
-    raise NotImplementedError("请配置数据库会话依赖")
+    except ImportError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="数据库未配置，请检查 gateway database 模块",
+        ) from exc
 
 
 # ─────────────────────────────────────────────────────────────────

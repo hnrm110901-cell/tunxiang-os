@@ -1,4 +1,6 @@
 {
-  "navigationBarTitleText": "我的优惠券",
+  "navigationBarTitleText": "优惠券中心",
+  "navigationBarBackgroundColor": "#0B1A20",
+  "navigationBarTextStyle": "white",
   "enablePullDownRefresh": true
 }

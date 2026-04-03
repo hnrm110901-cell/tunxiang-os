@@ -11,6 +11,10 @@
 金额单位统一为"分"（fen），与 V2.x 保持一致。
 
 存储层：PostgreSQL（通过 SQLAlchemy async ORM）
+持久化层：
+- supplier_profiles 表 — 供应商主档（register_supplier / update_supplier / get_supplier）
+- 若 v064 迁移未运行（表不存在），自动降级到内存模式并记录 WARNING
+- 评分计算仍在内存完成（AI 评分由 Phase 1-D 接管）
 """
 
 from __future__ import annotations
@@ -18,7 +22,13 @@ from __future__ import annotations
 import math
 import uuid as _uuid
 from datetime import date, datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
+
+import structlog
+from sqlalchemy import text
+from sqlalchemy.exc import OperationalError, ProgrammingError
+
+log = structlog.get_logger(__name__)
 
 import structlog
 from sqlalchemy import select, update, func, text, and_, cast, Date
@@ -59,6 +69,43 @@ async def _set_tenant(db: AsyncSession, tenant_id: str) -> None:
 
 class SupplierPortalService:
     """供应链深度管理 — DB 持久化版"""
+    """供应链深度管理 — 从进销存到供应链协同网络"""
+
+    def __init__(self) -> None:
+        self._suppliers: Dict[str, dict] = {}
+        self._rfqs: Dict[str, dict] = {}
+        self._contracts: Dict[str, dict] = {}
+        self._price_history: Dict[str, list] = {}  # {ingredient: [{date, supplier_id, price_fen}]}
+        self._delivery_records: Dict[str, list] = {}  # {supplier_id: [{on_time, quality, date}]}
+        self._store_suppliers: Dict[str, list] = {}  # {store_id: [supplier_id]}
+        self._last_risk_assessment: Dict[str, dict] = {}  # cache: {store_id: assessment}
+        self._db_mode: Optional[bool] = None  # None=未检测, True=DB, False=内存降级
+
+    # ──────────────────────────────────────────────────────
+    #  DB 模式检测（supplier_profiles 表是否存在）
+    # ──────────────────────────────────────────────────────
+
+    async def _check_db_mode(self, db: Any) -> bool:
+        """检测 supplier_profiles 表是否存在（v064 迁移是否已运行）"""
+        if self._db_mode is not None:
+            return self._db_mode
+        try:
+            await db.execute(text("SELECT 1 FROM supplier_profiles LIMIT 1"))
+            self._db_mode = True
+            log.info("supplier_portal.mode", mode="db")
+        except (ProgrammingError, OperationalError):
+            self._db_mode = False
+            log.warning(
+                "supplier_portal.fallback_to_memory",
+                reason="supplier_profiles table not found — run v064_wms_persistence migration",
+            )
+        return self._db_mode
+
+    async def _set_tenant(self, db: Any, tenant_id: str) -> None:
+        await db.execute(
+            text("SELECT set_config('app.tenant_id', :tid, true)"),
+            {"tid": tenant_id},
+        )
 
     # ──────────────────────────────────────────────────────
     #  1. Supplier Management（供应商管理）
@@ -100,6 +147,33 @@ class SupplierPortalService:
         logger.info("supplier_registered", supplier_id=str(account.id), name=name)
         return {
             "supplier_id": str(account.id),
+        tenant_id: str = "",
+        db: Any = None,
+    ) -> dict:
+        """注册供应商，持久化到 supplier_profiles 表（v064 已运行时）。
+
+        Args:
+            name: 供应商名称
+            category: 供应商类别 (seafood/meat/vegetable/seasoning/frozen/dry_goods/beverage/other)
+            contact: 联系信息 {"person": "张三", "phone": "138xxx", "address": "长沙市xxx"}
+            certifications: 资质认证列表 ["食品经营许可证", "ISO22000", ...]
+            payment_terms: 付款条件 (net30/net60/cod)
+            tenant_id: 租户 ID（DB 模式必填）
+            db: 数据库会话（DB 模式必填）
+
+        Returns:
+            供应商字典
+        """
+        if category not in SUPPLIER_CATEGORIES:
+            raise ValueError(f"无效供应商类别: {category}，可选: {SUPPLIER_CATEGORIES}")
+
+        supplier_id = f"sup_{uuid.uuid4().hex[:8]}"
+        now = datetime.now(timezone.utc)
+        now_iso = now.isoformat()
+
+        import json as _json
+        supplier = {
+            "supplier_id": supplier_id,
             "name": name,
             "category": category,
             "contact": contact,
@@ -110,6 +184,198 @@ class SupplierPortalService:
             "order_count": 0,
             "registered_at": account.created_at.isoformat() if account.created_at else datetime.now(timezone.utc).isoformat(),
         }
+            "registered_at": now_iso,
+        }
+
+        use_db = db is not None and tenant_id and await self._check_db_mode(db)
+
+        if use_db:
+            await self._set_tenant(db, tenant_id)
+            # v064 schema: supplier_name, contact_name, contact_phone, address, categories JSONB
+            await db.execute(
+                text("""
+                    INSERT INTO supplier_profiles
+                        (id, tenant_id, supplier_name,
+                         contact_name, contact_phone, address,
+                         categories,
+                         status,
+                         created_at, updated_at)
+                    VALUES
+                        (gen_random_uuid(), :tenant_id::uuid, :name,
+                         :contact_name, :contact_phone, :address,
+                         :categories::jsonb,
+                         'active',
+                         :now, :now)
+                    RETURNING id
+                """),
+                {
+                    "tenant_id": tenant_id,
+                    "name": name,
+                    "contact_name": contact.get("person", ""),
+                    "contact_phone": contact.get("phone", ""),
+                    "address": contact.get("address", ""),
+                    # categories JSONB: 存单个 category 作为 array
+                    "categories": _json.dumps([category], ensure_ascii=False),
+                    "now": now,
+                },
+            )
+            await db.flush()
+
+        # 同步写入内存（保证计算逻辑可用）
+        self._suppliers[supplier_id] = supplier
+
+        log.info(
+            "supplier.registered",
+            supplier_id=supplier_id,
+            name=name,
+            category=category,
+            mode="db" if use_db else "memory",
+        )
+        return supplier
+
+    async def update_supplier(
+        self,
+        supplier_id: str,
+        tenant_id: str,
+        db: Any,
+        *,
+        status: Optional[str] = None,
+        overall_score: Optional[float] = None,
+        order_count: Optional[int] = None,
+    ) -> dict:
+        """更新供应商信息（持久化版本）。
+
+        Args:
+            supplier_id: 供应商 ID
+            tenant_id: 租户 ID
+            db: 数据库会话
+            status: 新状态（可选）
+            overall_score: 新综合评分（可选）
+            order_count: 新订单数（可选）
+
+        Returns:
+            更新后的供应商字典
+        """
+        use_db = await self._check_db_mode(db)
+
+        if use_db:
+            await self._set_tenant(db, tenant_id)
+
+            # v064: supplier_profiles 无 overall_score / order_count 列
+            set_clauses = ["updated_at = :now"]
+            params: Dict[str, Any] = {
+                "id": supplier_id,
+                "tenant_id": tenant_id,
+                "now": datetime.now(timezone.utc),
+            }
+            if status is not None:
+                set_clauses.append("status = :status")
+                params["status"] = status
+
+            result = await db.execute(
+                text(f"""
+                    UPDATE supplier_profiles
+                    SET {', '.join(set_clauses)}
+                    WHERE id = :id::uuid AND tenant_id = :tenant_id::uuid
+                    RETURNING id
+                """),
+                params,
+            )
+            if not result.scalar_one_or_none():
+                raise ValueError(f"供应商不存在（DB）: {supplier_id}")
+
+            await db.flush()
+
+        # 同步更新内存缓存
+        supplier = self._suppliers.get(supplier_id)
+        if supplier:
+            if status is not None:
+                supplier["status"] = status
+            if overall_score is not None:
+                supplier["overall_score"] = overall_score
+            if order_count is not None:
+                supplier["order_count"] = order_count
+        elif not use_db:
+            raise ValueError(f"供应商不存在: {supplier_id}")
+
+        log.info(
+            "supplier.updated",
+            supplier_id=supplier_id,
+            mode="db" if use_db else "memory",
+        )
+        return self._suppliers.get(supplier_id, {"supplier_id": supplier_id})
+
+    async def get_supplier(
+        self,
+        supplier_id: str,
+        tenant_id: str,
+        db: Any,
+    ) -> dict:
+        """从 DB 查询供应商（DB 模式），或从内存读取（降级模式）。
+
+        Args:
+            supplier_id: 供应商 ID
+            tenant_id: 租户 ID
+            db: 数据库会话
+
+        Returns:
+            供应商字典
+        """
+        use_db = await self._check_db_mode(db)
+
+        if use_db:
+            await self._set_tenant(db, tenant_id)
+
+            import json as _json
+            # v064 schema: supplier_name, contact_name, contact_phone, address, categories JSONB
+            row = await db.execute(
+                text("""
+                    SELECT id, supplier_name, categories,
+                           contact_name, contact_phone, address,
+                           status, created_at
+                    FROM supplier_profiles
+                    WHERE id = :id::uuid AND tenant_id = :tenant_id::uuid
+                      AND is_deleted = FALSE
+                """),
+                {"id": supplier_id, "tenant_id": tenant_id},
+            )
+            r = row.mappings().one_or_none()
+            if not r:
+                raise ValueError(f"供应商不存在: {supplier_id}")
+
+            cats_raw = r["categories"]
+            try:
+                cats = _json.loads(cats_raw) if isinstance(cats_raw, str) else (cats_raw or [])
+            except ValueError:
+                cats = []
+            # categories[0] 作为主类别，兼容旧内存模式 category 字段
+            main_category = cats[0] if cats else "other"
+
+            supplier = {
+                "supplier_id": str(r["id"]),
+                "name": r["supplier_name"],
+                "category": main_category,
+                "contact": {
+                    "person": r["contact_name"] or "",
+                    "phone": r["contact_phone"] or "",
+                    "address": r["address"] or "",
+                },
+                "certifications": [],  # v064 无 certifications 列，保留字段兼容
+                "payment_terms": "net30",  # v064 无 payment_terms 列
+                "status": r["status"],
+                "overall_score": 0.0,
+                "order_count": 0,
+                "registered_at": r["created_at"].isoformat() if r["created_at"] else None,
+            }
+            # 同步到内存缓存（供评分计算使用）
+            self._suppliers[supplier_id] = supplier
+            return supplier
+
+        # 内存降级
+        supplier = self._suppliers.get(supplier_id)
+        if not supplier:
+            raise ValueError(f"供应商不存在: {supplier_id}")
+        return supplier
 
     async def list_suppliers(
         self,
@@ -122,6 +388,16 @@ class SupplierPortalService:
         """列出供应商"""
         await _set_tenant(db, tenant_id)
         tid = _uuid.UUID(tenant_id)
+        """列出供应商（从内存缓存读取；调用前请确保 get_supplier 或 register_supplier 已同步缓存）。
+
+        Args:
+            category: 筛选类别
+            rating_min: 最低评分筛选
+
+        Returns:
+            供应商列表
+        """
+        result = list(self._suppliers.values())
 
         conditions = [SupplierAccount.tenant_id == tid, SupplierAccount.is_deleted == False]  # noqa: E712
         if category:
@@ -160,6 +436,9 @@ class SupplierPortalService:
             )
         )
         supplier = result.scalar_one_or_none()
+    def get_supplier_profile(self, supplier_id: str) -> dict:
+        """获取供应商详情（含交付统计，从内存缓存读取）"""
+        supplier = self._suppliers.get(supplier_id)
         if not supplier:
             raise ValueError(f"供应商不存在: {supplier_id}")
 

@@ -7,17 +7,16 @@
 5. 成就系统
 6. 生日月特权
 """
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import uuid
-from datetime import datetime, date, timezone
+from datetime import date, datetime, timezone
 from unittest.mock import AsyncMock
 
 import pytest
-
 from services.points_mall import (
     ACHIEVEMENT_DEFINITIONS,
     check_birthday_privilege,
@@ -27,7 +26,6 @@ from services.points_mall import (
     get_exchange_history,
     list_mall_items,
 )
-
 
 TENANT_ID = str(uuid.uuid4())
 CUSTOMER_ID = str(uuid.uuid4())

@@ -6,6 +6,7 @@
 数据结构：Module → Group → MenuItem → Permission
 """
 from typing import Optional
+
 from pydantic import BaseModel
 
 

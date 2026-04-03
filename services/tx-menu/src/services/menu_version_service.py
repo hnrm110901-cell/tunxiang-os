@@ -3,9 +3,11 @@
 所有操作强制 tenant_id 租户隔离。
 使用 in-memory 存储（可替换为 DB 实现）。
 """
+import json
+import os
 import uuid
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Any, Optional
 
 import structlog
 
@@ -24,6 +26,57 @@ DISPATCH_STATUS_APPLIED = "applied"
 DISPATCH_STATUS_FAILED = "failed"
 
 log = structlog.get_logger()
+
+# ─── Redis Pub/Sub（懒加载，不可用时降级为仅日志）───
+_redis_client: Any = None
+
+
+async def _get_redis() -> Optional[Any]:
+    global _redis_client
+    if _redis_client is not None:
+        return _redis_client
+    try:
+        import redis.asyncio as aioredis  # type: ignore
+        client = aioredis.from_url(
+            os.getenv("REDIS_URL", "redis://localhost:6379/0"),
+            encoding="utf-8",
+            decode_responses=True,
+        )
+        await client.ping()
+        _redis_client = client
+        return _redis_client
+    except Exception:
+        log.warning("menu_version.redis_unavailable_ws_push_disabled")
+        return None
+
+
+async def _publish_menu_update(tenant_id: str, store_ids: list[str], version_id: str) -> None:
+    """向 Redis 频道发布菜单更新事件，mac-station 订阅后通过 WebSocket 推送至门店终端。
+
+    频道格式：menu_update:{tenant_id}
+    消息格式：{"event": "menu_update", "version_id": "...", "store_ids": [...]}
+    """
+    redis = await _get_redis()
+    if redis is None:
+        return
+    channel = f"menu_update:{tenant_id}"
+    payload = json.dumps({"event": "menu_update", "version_id": version_id, "store_ids": store_ids})
+    try:
+        await redis.publish(channel, payload)
+        log.info(
+            "menu_version.ws_push_published",
+            tenant_id=tenant_id,
+            version_id=version_id,
+            store_count=len(store_ids),
+        )
+    except Exception as exc:
+        log.warning(
+            "menu_version.ws_push_failed",
+            tenant_id=tenant_id,
+            version_id=version_id,
+            error=str(exc),
+        )
+
 
 # ─── In-Memory Storage ───
 _versions: dict[str, dict] = {}
@@ -209,8 +262,8 @@ class MenuVersionService:
             dispatch_type=dispatch_type,
         )
 
-        # TODO: 推送 WebSocket 通知各门店更新菜单
-        # await websocket_broadcast(tenant_id, store_ids, {"event": "menu_update", "version_id": version_id})
+        # 通过 Redis Pub/Sub 通知 mac-station 向各门店终端推送 WebSocket 消息
+        await _publish_menu_update(tenant_id=tenant_id, store_ids=store_ids, version_id=version_id)
 
         return records
 

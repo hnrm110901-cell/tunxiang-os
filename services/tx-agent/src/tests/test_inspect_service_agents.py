@@ -1,9 +1,12 @@
 """StoreInspect + SmartService Agent 测试"""
-import sys, os, asyncio
+import asyncio
+import os
+import sys
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from agents.skills.store_inspect import StoreInspectAgent
 from agents.skills.smart_service import SmartServiceAgent
+from agents.skills.store_inspect import StoreInspectAgent
 
 TID = "00000000-0000-0000-0000-000000000001"
 

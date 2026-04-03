@@ -4,8 +4,7 @@
 金额统一存分（fen），展示时 /100 转元。
 """
 import math
-import uuid
-from datetime import date, datetime, timezone
+from datetime import date
 from typing import Optional
 
 import structlog

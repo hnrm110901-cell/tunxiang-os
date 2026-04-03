@@ -3,7 +3,7 @@
 检测支付方式/营销方案/优惠券的沉睡状态（N天未使用），
 帮助清理不再使用的配置，减轻 POS 选择列表的负担。
 """
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from typing import Optional
 
 

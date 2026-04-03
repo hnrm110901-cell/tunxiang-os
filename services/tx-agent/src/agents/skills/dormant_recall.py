@@ -4,8 +4,8 @@
 """
 import uuid
 from typing import Any
-from ..base import SkillAgent, AgentResult
 
+from ..base import AgentResult, SkillAgent
 
 # 沉睡分层定义（天数）
 DORMANT_TIERS = {

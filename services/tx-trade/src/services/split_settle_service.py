@@ -413,8 +413,9 @@ class SplitSettleService:
     async def _complete_order(self, order_id: str) -> None:
         """全部子账单付完后，完成订单并释放桌台"""
         from sqlalchemy import update
-        from ..models.tables import Table
+
         from ..models.enums import TableStatus
+        from ..models.tables import Table
 
         order = await self._get_order(order_id)
         order.status = OrderStatus.completed.value

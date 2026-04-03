@@ -2,8 +2,21 @@
 
 7 个端点：个性化首页、等级菜单、排队调度、个性化优惠、预订调度、应用等级权益、升级机会
 """
-from fastapi import APIRouter, Header
+from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from shared.ontology.src.database import get_db
+
+from ..services.smart_dispatcher import (
+    apply_level_benefits,
+    check_upgrade_opportunity,
+    dispatch_menu,
+    dispatch_offer,
+    dispatch_queue,
+    dispatch_reservation,
+    get_personalized_home,
+)
 
 router = APIRouter(prefix="/api/v1/member/dispatch", tags=["member-dispatch"])
 
@@ -27,38 +40,17 @@ class ApplyBenefitsRequest(BaseModel):
 # ── 1. 个性化首页 ────────────────────────────────────────────
 
 @router.get("/home/{customer_id}")
-async def get_personalized_home(
+async def get_personalized_home_route(
     customer_id: str,
-    x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """按等级+历史+场景定制个性化首页"""
-    # TODO: 注入真实 DB session 后调用 smart_dispatcher.get_personalized_home
-    from services.smart_dispatcher import LEVEL_NAMES_CN, _get_banner, _get_available_benefits, _get_scene_actions
-
-    # 占位逻辑：默认 normal 等级
-    level = "normal"
-    level_cn = LEVEL_NAMES_CN.get(level, "会员")
-
-    return {
-        "ok": True,
-        "data": {
-            "customer_id": customer_id,
-            "level": level,
-            "greeting": f"尊敬的{level_cn}",
-            "exclusive_banner": _get_banner(level),
-            "recommended_dishes": [],
-            "available_benefits": _get_available_benefits(level),
-            "upgrade_progress": {
-                "has_next_level": True,
-                "next_level": "silver",
-                "next_level_cn": "银卡会员",
-                "remaining_fen": 500_000,
-                "progress_percent": 0.0,
-                "message": "再消费5000元即可升级银卡会员",
-            },
-            "scene_actions": _get_scene_actions(level),
-        },
-    }
+    try:
+        data = await get_personalized_home(customer_id, x_tenant_id, db)
+        return {"ok": True, "data": data}
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
 
 
 # ── 2. 等级菜单 ──────────────────────────────────────────────
@@ -67,24 +59,15 @@ async def get_personalized_home(
 async def get_level_menu(
     customer_id: str,
     store_id: str,
-    x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """按等级展示专属菜品/价格"""
-    # TODO: 注入真实 DB session 后调用 smart_dispatcher.dispatch_menu
-    return {
-        "ok": True,
-        "data": {
-            "customer_id": customer_id,
-            "store_id": store_id,
-            "level": "normal",
-            "menu_type": "standard",
-            "price_tag": "standard",
-            "sections": ["standard"],
-            "show_upgrade_banner": True,
-            "perks": ["标准菜单"],
-            "upgrade_hint": "开通会员即可享受会员价优惠",
-        },
-    }
+    try:
+        data = await dispatch_menu(customer_id, store_id, x_tenant_id, db)
+        return {"ok": True, "data": data}
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
 
 
 # ── 3. 排队调度 ──────────────────────────────────────────────
@@ -93,24 +76,15 @@ async def get_level_menu(
 async def get_queue_dispatch(
     customer_id: str,
     store_id: str,
-    x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """VIP 快速通道排队调度"""
-    # TODO: 注入真实 DB session 后调用 smart_dispatcher.dispatch_queue
-    return {
-        "ok": True,
-        "data": {
-            "queue_ticket": "PLACEHOLDER",
-            "customer_id": customer_id,
-            "store_id": store_id,
-            "level": "normal",
-            "priority_score": 0,
-            "queue_type": "normal",
-            "estimated_wait_minutes": 20,
-            "message": "您好，已为您取号，请耐心等候",
-            "perks": ["正常排队"],
-        },
-    }
+    try:
+        data = await dispatch_queue(customer_id, store_id, x_tenant_id, db)
+        return {"ok": True, "data": data}
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
 
 
 # ── 4. 个性化优惠 ────────────────────────────────────────────
@@ -118,21 +92,15 @@ async def get_queue_dispatch(
 @router.get("/offers/{customer_id}")
 async def get_personalized_offers(
     customer_id: str,
-    x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """按等级推送个性化优惠"""
-    # TODO: 注入真实 DB session 后调用 smart_dispatcher.dispatch_offer
-    return {
-        "ok": True,
-        "data": {
-            "customer_id": customer_id,
-            "level": "normal",
-            "offers": [
-                {"type": "new_customer", "name": "新客满100减20", "threshold_fen": 10000, "amount_fen": 2000},
-                {"type": "upgrade_guide", "name": "升级银卡享会员价", "target_level": "silver"},
-            ],
-        },
-    }
+    try:
+        data = await dispatch_offer(customer_id, x_tenant_id, db)
+        return {"ok": True, "data": data}
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
 
 
 # ── 5. 预订调度 ──────────────────────────────────────────────
@@ -140,26 +108,20 @@ async def get_personalized_offers(
 @router.post("/reservation")
 async def create_reservation_dispatch(
     body: ReservationRequest,
-    x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """高等级会员优先分配包厢"""
-    # TODO: 注入真实 DB session 后调用 smart_dispatcher.dispatch_reservation
-    return {
-        "ok": True,
-        "data": {
-            "reservation_id": "placeholder",
-            "customer_id": body.customer_id,
-            "level": "normal",
-            "party_size": body.party_size,
-            "requested_date": body.date,
-            "store_id": body.store_id,
-            "room_type": "standard",
-            "priority": "normal",
-            "free_upgrade": False,
-            "perks": ["正常排期", "包厢需加收"],
-            "room_surcharge": True,
-        },
-    }
+    try:
+        data = await dispatch_reservation(
+            customer_id=body.customer_id,
+            request=body.model_dump(),
+            tenant_id=x_tenant_id,
+            db=db,
+        )
+        return {"ok": True, "data": data}
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
 
 
 # ── 6. 应用等级权益 ──────────────────────────────────────────
@@ -167,46 +129,28 @@ async def create_reservation_dispatch(
 @router.post("/apply-benefits")
 async def apply_benefits(
     body: ApplyBenefitsRequest,
-    x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """自动应用等级权益到订单（无需用户操作）"""
-    # TODO: 注入真实 DB session 后调用 smart_dispatcher.apply_level_benefits
-    return {
-        "ok": True,
-        "data": {
-            "customer_id": body.customer_id,
-            "order_id": body.order_id,
-            "level": "normal",
-            "applied_benefits": [],
-            "benefits_count": 0,
-            "auto_applied": True,
-        },
-    }
+    try:
+        data = await apply_level_benefits(body.customer_id, body.order_id, x_tenant_id, db)
+        return {"ok": True, "data": data}
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
 
 
 # ── 7. 升级机会 ──────────────────────────────────────────────
 
 @router.get("/upgrade/{customer_id}")
-async def get_upgrade_opportunity(
+async def get_upgrade_opportunity_route(
     customer_id: str,
-    x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """升级机会检测: 购物车/结账页面的升级激励"""
-    # TODO: 注入真实 DB session 后调用 smart_dispatcher.check_upgrade_opportunity
-    from services.smart_dispatcher import LEVEL_NAMES_CN
-
-    return {
-        "ok": True,
-        "data": {
-            "customer_id": customer_id,
-            "current_level": "normal",
-            "current_level_cn": LEVEL_NAMES_CN["normal"],
-            "total_growth_value": 0,
-            "has_next_level": True,
-            "next_level": "silver",
-            "next_level_cn": LEVEL_NAMES_CN["silver"],
-            "remaining_fen": 500_000,
-            "progress_percent": 0.0,
-            "message": "再消费5000元即可升级银卡会员",
-        },
-    }
+    try:
+        data = await check_upgrade_opportunity(customer_id, x_tenant_id, db)
+        return {"ok": True, "data": data}
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))

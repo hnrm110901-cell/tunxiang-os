@@ -11,24 +11,21 @@
 
 from __future__ import annotations
 
-import calendar
-from datetime import date, datetime
+from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
 from services.payroll_engine import (
-    compute_base_salary,
-    compute_overtime_pay,
-    compute_commission,
-    compute_performance_bonus,
     compute_absence_deduction,
-    compute_late_deduction,
+    compute_base_salary,
+    compute_commission,
     compute_early_leave_deduction,
     compute_full_attendance_bonus,
+    compute_late_deduction,
+    compute_overtime_pay,
+    compute_performance_bonus,
     compute_seniority_subsidy,
-    compute_tax_yuan,
     count_work_days,
     derive_hourly_rate,
-    summarize_payroll,
 )
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

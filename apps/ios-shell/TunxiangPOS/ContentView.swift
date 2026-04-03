@@ -1,45 +1,59 @@
-/// TunxiangOS iPad POS Shell — WKWebView 壳层
+/// TunxiangOS iPad Shell — WKWebView + 首次配置页
 ///
-/// 规则：
-/// - 不写业务逻辑，只做 WebView 加载
-/// - 不连接任何外设
-/// - 打印/称重等指令通过 HTTP 发送到安卓 POS 主机执行
-/// - 安卓 POS 断开时降级为"仅查看"模式
+/// 规则：不写业务逻辑，只做 WebView 加载
+/// 不连任何外设。打印/扫码指令 HTTP 转发到安卓 POS。
 
 import SwiftUI
-import WebKit
 
 struct ContentView: View {
+    @State private var showSetup = !AppConfig.isConfigured
+
     var body: some View {
-        POSWebView()
+        if showSetup {
+            SetupView(onComplete: { showSetup = false })
+        } else {
+            WebViewController(
+                url: URL(string: AppConfig.appUrl)!,
+                posHostUrl: AppConfig.posHostUrl,
+                macMiniUrl: AppConfig.macMiniUrl
+            )
             .ignoresSafeArea()
-    }
-}
-
-struct POSWebView: UIViewRepresentable {
-    // Mac mini 本地 API 地址（同时也是 web-pos 的服务地址）
-    /// WEB_POS_URL 必须通过 Xcode Scheme / Info.plist 注入，不硬编码 IP
-    let webAppURL = ProcessInfo.processInfo.environment["WEB_POS_URL"]
-        ?? "http://localhost:5173"
-
-    func makeUIView(context: Context) -> WKWebView {
-        let config = WKWebViewConfiguration()
-        config.allowsInlineMediaPlayback = true
-
-        let webView = WKWebView(frame: .zero, configuration: config)
-        webView.scrollView.bounces = false
-        webView.isOpaque = false
-
-        if let url = URL(string: webAppURL) {
-            webView.load(URLRequest(url: url))
+            .statusBar(hidden: true)
         }
-
-        return webView
     }
-
-    func updateUIView(_ uiView: WKWebView, context: Context) {}
 }
 
-#Preview {
-    ContentView()
+/// 首次启动配置页 — 填写服务器地址
+struct SetupView: View {
+    @State private var appUrl = AppConfig.appUrl
+    @State private var posHostUrl = AppConfig.posHostUrl
+    @State private var macMiniUrl = AppConfig.macMiniUrl
+    var onComplete: () -> Void
+
+    var body: some View {
+        NavigationView {
+            Form {
+                Section(header: Text("门店服务器")) {
+                    TextField("Web App 地址", text: $appUrl)
+                        .keyboardType(.URL).autocapitalization(.none)
+                    TextField("POS 主机地址（外设转发）", text: $posHostUrl)
+                        .keyboardType(.URL).autocapitalization(.none)
+                    TextField("Mac mini 地址（AI推理）", text: $macMiniUrl)
+                        .keyboardType(.URL).autocapitalization(.none)
+                }
+                Section {
+                    Button("开始使用") {
+                        AppConfig.appUrl = appUrl
+                        AppConfig.posHostUrl = posHostUrl
+                        AppConfig.macMiniUrl = macMiniUrl
+                        AppConfig.markConfigured()
+                        onComplete()
+                    }
+                    .frame(maxWidth: .infinity, alignment: .center)
+                }
+            }
+            .navigationTitle("屯象OS — iPad 配置")
+        }
+        .navigationViewStyle(.stack)
+    }
 }

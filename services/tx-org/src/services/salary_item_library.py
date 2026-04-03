@@ -8,23 +8,22 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from typing import Any, Dict, List, Optional
 
 from services.payroll_engine import (
-    compute_base_salary,
-    compute_overtime_pay,
-    derive_hourly_rate,
-    compute_commission,
     compute_absence_deduction,
-    compute_late_deduction,
+    compute_base_salary,
+    compute_commission,
     compute_early_leave_deduction,
+    compute_full_attendance_bonus,
+    compute_late_deduction,
+    compute_monthly_tax,
+    compute_overtime_pay,
     compute_performance_bonus,
     compute_seniority_subsidy,
-    compute_full_attendance_bonus,
-    compute_monthly_tax,
+    derive_hourly_rate,
 )
-
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  数据结构

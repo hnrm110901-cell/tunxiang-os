@@ -14,14 +14,13 @@ touch → open → click → reserve → visit → order → repeat
 """
 import uuid
 from collections import defaultdict
-from datetime import datetime, timezone, timedelta, date
+from datetime import date, datetime, timedelta, timezone
 from typing import Any, Optional
 
 import structlog
-from sqlalchemy import select, update, func, and_
+from models.attribution import AttributionSummary, MarketingTouch
+from sqlalchemy import and_, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from models.attribution import MarketingTouch, AttributionSummary
 
 log = structlog.get_logger(__name__)
 

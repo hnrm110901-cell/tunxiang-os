@@ -3,9 +3,9 @@
 礼品卡面值单位：分（fen）。
 卡密码：6位随机数字。
 """
-import uuid
 import random
 import string
+import uuid
 from datetime import datetime, timezone
 from typing import Optional
 

@@ -9,15 +9,14 @@
 同时提供出品节拍分析和出品顺序优化。
 """
 import uuid
-from datetime import date, datetime, timedelta, timezone
-from typing import Optional
+from datetime import date, datetime, timezone
 
 import structlog
-from sqlalchemy import select, func, and_, text
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from shared.ontology.src.entities import Ingredient, IngredientTransaction
-from shared.ontology.src.enums import InventoryStatus, TransactionType
+from shared.ontology.src.entities import Ingredient
+from shared.ontology.src.enums import InventoryStatus
 
 logger = structlog.get_logger()
 

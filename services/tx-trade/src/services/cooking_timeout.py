@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 
 import httpx
 import structlog
-from sqlalchemy import select, and_
+from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.entities import Order, OrderItem
@@ -282,5 +282,19 @@ async def _trigger_serve_dispatch_agent(
         critical_count=critical_count,
         dishes=[t["dish"] for t in timeout_items if t["status"] == "critical"],
     )
-    # TODO: HTTP 调用 tx-agent 的 serve_dispatch Agent
-    # await httpx.post(f"{AGENT_URL}/api/v1/agent/serve-dispatch/trigger", json={...})
+    agent_url = os.getenv("TX_AGENT_SERVICE_URL", "http://tx-agent:8007")
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            await client.post(
+                f"{agent_url}/api/v1/agent/serve-dispatch/trigger",
+                headers={"X-Tenant-ID": tenant_id, "Content-Type": "application/json"},
+                json={
+                    "store_id": store_id,
+                    "critical_count": critical_count,
+                    "timeout_items": [
+                        t for t in timeout_items if t["status"] == "critical"
+                    ],
+                },
+            )
+    except (httpx.HTTPError, OSError) as exc:
+        log.warning("cooking_timeout.agent_call_failed", error=str(exc))

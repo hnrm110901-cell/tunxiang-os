@@ -10,16 +10,16 @@
 7. GET  /export/history
 8. POST /export/retry
 """
-import sys
 import os
+import sys
 
 import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from api.kingdee_routes import (
-    MonthExportRequest,
     DailyExportRequest,
+    MonthExportRequest,
     RetryRequest,
     router,
 )

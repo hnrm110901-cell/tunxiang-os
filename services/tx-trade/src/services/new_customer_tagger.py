@@ -22,10 +22,11 @@ from __future__ import annotations
 import threading
 from collections import OrderedDict
 from datetime import date
-from typing import Dict, Optional, Tuple
+from typing import Optional
 
 import structlog
 from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = structlog.get_logger()
@@ -155,7 +156,7 @@ class NewCustomerTagger:
             )
             return is_new
 
-        except Exception as exc:
+        except SQLAlchemyError as exc:  # MLPS3-P0: 异常收窄
             logger.error(
                 "new_customer_tagger.is_new_customer_failed",
                 customer_id=customer_id,
@@ -268,7 +269,7 @@ class NewCustomerTagger:
 
         except ValueError:
             raise
-        except Exception as exc:
+        except SQLAlchemyError as exc:  # MLPS3-P0: 异常收窄
             await db.rollback()
             logger.error(
                 "new_customer_tagger.tag_order_failed",

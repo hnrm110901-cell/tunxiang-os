@@ -1,11 +1,11 @@
 """人效指标 API"""
 from typing import Optional
+
 from fastapi import APIRouter, Query
 from services.labor_efficiency_service import (
     INDUSTRY_BENCHMARKS,
-    compute_store_efficiency,
     compare_stores,
-    generate_efficiency_alerts,
+    compute_store_efficiency,
     get_boss_view,
     get_hr_view,
     get_manager_view,

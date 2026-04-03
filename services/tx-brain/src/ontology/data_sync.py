@@ -7,7 +7,6 @@ In dev mode, simulates the sync pipeline in-memory.
 In prod, connects to real PG notifications and Redis Streams.
 """
 
-import time
 import uuid
 from collections import deque
 from datetime import datetime

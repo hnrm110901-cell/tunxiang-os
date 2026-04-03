@@ -9,7 +9,6 @@
 """
 from __future__ import annotations
 
-import uuid
 from datetime import datetime, timezone
 from typing import Any, Optional
 
@@ -208,7 +207,7 @@ class LifecycleService:
         Returns:
             {new: n, active: n, dormant: n, churned: n, reactivated: n, changed: n}
         """
-        members = self._fetch_all_members(tenant_id=tenant_id, db=db)
+        members = await self._fetch_all_members(tenant_id=tenant_id, db=db)
 
         counters: dict[str, int] = {
             "new": 0, "active": 0, "dormant": 0,
@@ -288,7 +287,7 @@ class LifecycleService:
         Returns:
             {"action_taken": str, "error": str | None}
         """
-        config = self._get_lifecycle_config(stage=new_stage, tenant_id=tenant_id, db=db)
+        config = await self._get_lifecycle_config(stage=new_stage, tenant_id=tenant_id, db=db)
 
         if config is None or not config.get("is_active", False):
             return {"action_taken": "none", "error": None}
@@ -430,22 +429,43 @@ class LifecycleService:
 
     # ── 内部 DB 操作（可被测试替换） ──────────────────────────
 
-    def _fetch_all_members(
+    async def _fetch_all_members(
         self,
         tenant_id: str,
         db: Any,
     ) -> list[dict[str, Any]]:
-        """从 DB 获取指定 tenant 的所有有效会员（同步代理，实际为 asyncio）。
+        """从 DB 获取指定 tenant 的所有有效会员。
 
-        实际 SQL（不创建 Alembic）：
+        SQL：
             SELECT id, lifecycle_stage, first_order_at, last_order_at
             FROM customers
             WHERE tenant_id = :tid AND is_deleted = FALSE
         """
-        # 测试时由 patch.object 替换此方法
-        raise NotImplementedError(
-            "_fetch_all_members 需在真实环境中被实现或 mock 替换"
+        from sqlalchemy import text
+
+        await db.execute(
+            text("SELECT set_config('app.tenant_id', :tid, true)"),
+            {"tid": tenant_id},
         )
+
+        result = await db.execute(
+            text("""
+                SELECT id, lifecycle_stage, first_order_at, last_order_at
+                FROM customers
+                WHERE tenant_id = :tid AND is_deleted = FALSE
+            """),
+            {"tid": tenant_id},
+        )
+        rows = result.fetchall()
+        return [
+            {
+                "id": str(row[0]),
+                "lifecycle_stage": row[1],
+                "first_order_at": row[2],
+                "last_order_at": row[3],
+            }
+            for row in rows
+        ]
 
     async def _update_member_stage(
         self,
@@ -566,24 +586,39 @@ class LifecycleService:
 
     # ── 营销动作（可被测试替换） ───────────────────────────────
 
-    def _get_lifecycle_config(
+    async def _get_lifecycle_config(
         self,
         stage: str,
         tenant_id: str,
         db: Any,
     ) -> Optional[dict[str, Any]]:
-        """从 lifecycle_configs 表获取阶段配置（测试时由 mock 替换）。
+        """从 lifecycle_configs 表获取阶段配置。
 
-        实际 SQL：
+        SQL：
             SELECT auto_action, coupon_template_id, message_template, is_active
             FROM lifecycle_configs
             WHERE tenant_id = :tid AND stage = :stage AND is_active = TRUE
         """
-        # 测试时由 patch.object 替换此方法
-        # 生产环境需要在调用处 await 并传入 db
-        raise NotImplementedError(
-            "_get_lifecycle_config 需在真实环境中被实现或 mock 替换"
+        from sqlalchemy import text
+
+        result = await db.execute(
+            text("""
+                SELECT auto_action, coupon_template_id, message_template, is_active
+                FROM lifecycle_configs
+                WHERE tenant_id = :tid AND stage = :stage AND is_active = TRUE
+                LIMIT 1
+            """),
+            {"tid": tenant_id, "stage": stage},
         )
+        row = result.fetchone()
+        if row is None:
+            return None
+        return {
+            "auto_action": row[0],
+            "coupon_template_id": str(row[1]) if row[1] else None,
+            "message_template": row[2],
+            "is_active": row[3],
+        }
 
     async def _issue_coupon_to_member(
         self,

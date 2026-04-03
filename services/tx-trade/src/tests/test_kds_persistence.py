@@ -6,17 +6,16 @@
 3. Mac mini重启场景：从DB恢复pending/cooking任务
 4. tenant_id隔离：不同租户看不到彼此的任务
 """
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import uuid
 from datetime import datetime, timezone
-from unittest.mock import AsyncMock, MagicMock, patch, call
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-
 
 # ─── 工具 ───
 
@@ -148,8 +147,9 @@ class TestStateTransition:
     @pytest.mark.asyncio
     async def test_finish_cooking_records_duration(self):
         """完成出品时记录制作耗时"""
-        from services.kds_actions import finish_cooking
         from datetime import timedelta
+
+        from services.kds_actions import finish_cooking
 
         task_id = _uid()
         db = _fake_db()

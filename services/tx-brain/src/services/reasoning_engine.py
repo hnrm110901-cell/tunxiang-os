@@ -11,8 +11,6 @@ V1迁入（530行核心逻辑），在V3架构上重建。
 - "为什么"问答：自然语言→结构化归因
 """
 
-import math
-import random
 from datetime import datetime, timedelta
 from typing import Any, Optional
 
@@ -634,7 +632,7 @@ class ReasoningEngine:
     ) -> float:
         """Get the change percentage for a specific factor."""
         # Try direct property first
-        change = store_props.get(f"{factor}_change_pct", None)
+        change = store_props.get(f"{factor}_change_pct")
         if change is not None and isinstance(change, (int, float)):
             return float(change)
 

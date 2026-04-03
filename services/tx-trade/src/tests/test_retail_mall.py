@@ -9,15 +9,14 @@
 6. 礼品卡列表 (正常)
 7. 校验函数单元测试
 """
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+from api.retail_mall_routes import router as retail_router
 from fastapi.testclient import TestClient
 from main import app
-
-from api.retail_mall_routes import router as retail_router
 
 if not any(r.prefix == "/api/v1/retail" for r in app.routes if hasattr(r, "prefix")):
     app.include_router(retail_router)

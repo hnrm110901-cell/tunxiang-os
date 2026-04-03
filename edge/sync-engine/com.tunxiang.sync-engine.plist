@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- 服务唯一标识 -->
+    <key>Label</key>
+    <string>com.tunxiang.sync-engine</string>
+
+    <!-- 启动命令：使用 /opt/tunxiang/sync-engine 作为生产部署路径 -->
+    <key>ProgramArguments</key>
+    <array>
+        <string>/opt/tunxiang/venv/bin/python3</string>
+        <string>/opt/tunxiang/sync-engine/main.py</string>
+    </array>
+
+    <!-- 工作目录（.env 文件所在路径） -->
+    <key>WorkingDirectory</key>
+    <string>/opt/tunxiang/sync-engine</string>
+
+    <!-- 环境变量（生产部署时按需覆盖） -->
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PYTHONUNBUFFERED</key>
+        <string>1</string>
+        <key>PYTHONDONTWRITEBYTECODE</key>
+        <string>1</string>
+    </dict>
+
+    <!-- 开机自动加载 -->
+    <key>RunAtLoad</key>
+    <true/>
+
+    <!-- 崩溃后自动重启 -->
+    <key>KeepAlive</key>
+    <true/>
+
+    <!-- 标准输出日志 -->
+    <key>StandardOutPath</key>
+    <string>/var/log/tunxiang/sync-engine.log</string>
+
+    <!-- 标准错误日志 -->
+    <key>StandardErrorPath</key>
+    <string>/var/log/tunxiang/sync-engine-error.log</string>
+
+    <!-- 资源限制：防止 OOM 杀死整机 -->
+    <key>SoftResourceLimits</key>
+    <dict>
+        <key>NumberOfFiles</key>
+        <integer>4096</integer>
+    </dict>
+</dict>
+</plist>

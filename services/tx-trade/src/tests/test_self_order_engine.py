@@ -8,18 +8,15 @@
 6. GPS最近门店
 7. 预计等待时间
 """
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-import math
 import uuid
-from datetime import datetime, timedelta, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock
 
 import pytest
-
 from services.self_order_engine import (
     PREPARATION_STEPS,
     STEP_KEY_TO_INDEX,
@@ -32,13 +29,8 @@ from services.self_order_engine import (
     _haversine_km,
     ai_recommend_dishes,
     calculate_aa_split,
-    calculate_combo_suggestion,
-    estimate_wait_time,
     find_best_deal,
-    get_nearest_stores,
-    track_preparation,
 )
-
 
 TENANT_ID = str(uuid.uuid4())
 STORE_ID = str(uuid.uuid4())

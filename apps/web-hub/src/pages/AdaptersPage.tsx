@@ -1,6 +1,9 @@
 /**
- * Adapter监控 — 品智/G10/金蝶连接状态
+ * Adapter监控（GET /api/v1/hub/adapters）
  */
+import { useEffect, useMemo, useState } from 'react';
+import { hubGet } from '../api/hubApi';
+
 const s = {
   page: { color: '#E0E0E0' } as React.CSSProperties,
   title: { fontSize: 22, fontWeight: 700, color: '#FFFFFF', marginBottom: 20 } as React.CSSProperties,
@@ -34,31 +37,80 @@ const s = {
     display: 'inline-block', padding: '2px 10px', borderRadius: 20,
     fontSize: 11, fontWeight: 600, background: `${color}22`, color,
   }) as React.CSSProperties,
+  err: { color: '#EF4444', fontSize: 13, marginBottom: 12 } as React.CSSProperties,
 };
 
-const adapters = [
-  { name: '品智POS', merchant: '尝在一起', type: 'POS', status: true, syncRate: '99.8%', lastSync: '1分钟前', errors: 0 },
-  { name: '品智POS', merchant: '最黔线', type: 'POS', status: true, syncRate: '99.5%', lastSync: '3分钟前', errors: 2 },
-  { name: 'G10进销存', merchant: '尚宫厨', type: '供应链', status: true, syncRate: '98.2%', lastSync: '10分钟前', errors: 5 },
-  { name: '金蝶财务', merchant: '尝在一起', type: '财务', status: false, syncRate: '95.1%', lastSync: '2小时前', errors: 12 },
-  { name: '微生活会员', merchant: '最黔线', type: '会员', status: true, syncRate: '99.9%', lastSync: '30秒前', errors: 0 },
-];
+type HubAdapter = {
+  adapter: string;
+  merchant: string;
+  status: string;
+  last_sync: string;
+  success_rate: number;
+  error?: string;
+};
+
+const ADAPTER_NAMES: Record<string, string> = {
+  pinzhi: '品智POS',
+  aoqiwei: '奥琦玮',
+  kingdee: '金蝶',
+  meituan: '美团',
+};
+
+function adapterLabel(id: string): string {
+  return ADAPTER_NAMES[id.toLowerCase()] || id;
+}
 
 export function AdaptersPage() {
-  const online = adapters.filter((a) => a.status).length;
-  const totalErrors = adapters.reduce((sum, a) => sum + a.errors, 0);
+  const [adapters, setAdapters] = useState<HubAdapter[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    hubGet<HubAdapter[]>('/adapters')
+      .then((d) => {
+        if (!cancelled) {
+          setAdapters(Array.isArray(d) ? d : []);
+          setErr(null);
+        }
+      })
+      .catch((e: Error) => {
+        if (!cancelled) setErr(e.message || '加载失败');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const { online, totalErrors } = useMemo(() => {
+    let oe = 0;
+    let te = 0;
+    for (const a of adapters) {
+      const ok = a.status === 'connected';
+      if (ok) oe += 1;
+      te += a.error ? 1 : 0;
+    }
+    return { online: oe, totalErrors: te };
+  }, [adapters]);
+
   return (
     <div style={s.page}>
       <div style={s.title}>Adapter监控</div>
+      {err && <div style={s.err}>{err}</div>}
+      {loading && <div style={{ color: '#6B8A97', marginBottom: 16 }}>加载中…</div>}
       <div style={s.cards}>
         <div style={s.card}><div style={s.cardLabel}>Adapter总数</div><div style={s.cardValue}>{adapters.length}</div></div>
         <div style={s.card}><div style={s.cardLabel}>在线</div><div style={{ ...s.cardValue, color: '#22C55E' }}>{online}</div></div>
         <div style={s.card}><div style={s.cardLabel}>离线</div><div style={{ ...s.cardValue, color: '#EF4444' }}>{adapters.length - online}</div></div>
-        <div style={s.card}><div style={s.cardLabel}>今日错误数</div><div style={{ ...s.cardValue, color: '#F59E0B' }}>{totalErrors}</div></div>
+        <div style={s.card}><div style={s.cardLabel}>异常连接</div><div style={{ ...s.cardValue, color: '#F59E0B' }}>{totalErrors}</div></div>
       </div>
       <div style={s.toolbar}>
         <div style={{ fontSize: 14, color: '#8BA5B2' }}>所有Adapter连接</div>
-        <button style={s.btn}>+ 新建连接</button>
+        <button type="button" style={s.btn}>+ 新建连接</button>
       </div>
       <table style={s.table}>
         <thead>
@@ -69,26 +121,29 @@ export function AdaptersPage() {
             <th style={s.th}>连接状态</th>
             <th style={s.th}>同步率</th>
             <th style={s.th}>最后同步</th>
-            <th style={s.th}>错误数</th>
+            <th style={s.th}>备注</th>
             <th style={s.th}>操作</th>
           </tr>
         </thead>
         <tbody>
-          {adapters.map((a, i) => (
-            <tr key={i}>
-              <td style={s.td}>{a.name}</td>
-              <td style={s.td}>{a.merchant}</td>
-              <td style={s.td}><span style={s.badge('#3B82F6')}>{a.type}</span></td>
-              <td style={s.td}><span style={s.dot(a.status)} />{a.status ? '已连接' : '断开'}</td>
-              <td style={s.td}>{a.syncRate}</td>
-              <td style={s.td}>{a.lastSync}</td>
-              <td style={s.td}>{a.errors > 0 ? <span style={{ color: '#EF4444' }}>{a.errors}</span> : '0'}</td>
-              <td style={s.td}>
-                <button style={s.btnSec}>重连</button>
-                <button style={s.btnSec}>查看日志</button>
-              </td>
-            </tr>
-          ))}
+          {adapters.map((a, i) => {
+            const ok = a.status === 'connected';
+            return (
+              <tr key={`${a.adapter}-${a.merchant}-${i}`}>
+                <td style={s.td}>{adapterLabel(a.adapter)}</td>
+                <td style={s.td}>{a.merchant}</td>
+                <td style={s.td}><span style={s.badge('#3B82F6')}>集成</span></td>
+                <td style={s.td}><span style={s.dot(ok)} />{ok ? '已连接' : '断开'}</td>
+                <td style={s.td}>{a.success_rate.toFixed(1)}%</td>
+                <td style={s.td}>{a.last_sync}</td>
+                <td style={s.td}>{a.error ? <span style={{ color: '#EF4444' }}>{a.error}</span> : '—'}</td>
+                <td style={s.td}>
+                  <button type="button" style={s.btnSec}>重连</button>
+                  <button type="button" style={s.btnSec}>查看日志</button>
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>

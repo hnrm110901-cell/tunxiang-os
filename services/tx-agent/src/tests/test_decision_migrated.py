@@ -15,25 +15,20 @@
 - 建议生成 -> FinanceAuditAgent.generate_insight + match_scenario
 """
 
-import sys
-import os
 import asyncio
+import os
+import sys
 
 import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from agents.base import SkillAgent, AgentResult
 from agents.constraints import (
     ConstraintChecker,
-    ConstraintResult,
-    DEFAULT_MIN_MARGIN_RATE,
-    DEFAULT_EXPIRY_BUFFER_HOURS,
-    DEFAULT_MAX_SERVE_MINUTES,
 )
 from agents.master import MasterAgent
-from agents.skills.finance_audit import FinanceAuditAgent
 from agents.skills.discount_guard import DiscountGuardAgent
+from agents.skills.finance_audit import FinanceAuditAgent
 from agents.skills.smart_menu import SmartMenuAgent
 
 TID = "00000000-0000-0000-0000-000000000001"

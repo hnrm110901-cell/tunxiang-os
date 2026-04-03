@@ -10,8 +10,8 @@
 7. query_returns 汇总退菜数据
 8. query_alerts_today 返回排序后告警
 """
-import sys
 import os
+import sys
 from datetime import date, datetime, timezone
 from unittest.mock import AsyncMock, MagicMock
 
@@ -20,16 +20,15 @@ import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from services.sql_queries import (
+    query_alerts_today,
     query_daily_revenue,
-    query_order_count,
     query_dish_sales,
     query_hourly_distribution,
+    query_order_count,
     query_payment_breakdown,
-    query_table_sessions,
     query_returns,
-    query_alerts_today,
+    query_table_sessions,
 )
-
 
 # ─── Mock 数据库会话工具 ───
 

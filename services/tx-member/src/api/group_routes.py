@@ -14,12 +14,12 @@ from typing import Optional
 
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from models.group_config import BrandGroup
 from pydantic import BaseModel, Field
+from services.group_analytics import GroupAnalyticsService
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db_session
-from models.group_config import BrandGroup
-from services.group_analytics import GroupAnalyticsService
 
 logger = structlog.get_logger(__name__)
 

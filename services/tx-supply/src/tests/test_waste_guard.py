@@ -1,10 +1,16 @@
 """损耗监控纯函数测试"""
-import sys, os
+import os
+import sys
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from services.waste_guard_service import (
-    action_for_causes, compute_waste_rate, classify_waste_status,
-    compute_waste_change, build_top5_item, build_waste_rate_summary,
+    action_for_causes,
+    build_top5_item,
+    build_waste_rate_summary,
+    classify_waste_status,
+    compute_waste_change,
+    compute_waste_rate,
 )
 
 

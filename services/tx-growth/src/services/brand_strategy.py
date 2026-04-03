@@ -6,10 +6,8 @@
 金额单位：分(fen)
 """
 import re
-import uuid
 from datetime import datetime, timezone
-from typing import Any, Optional
-
+from typing import Optional
 
 # ---------------------------------------------------------------------------
 # 内存存储（生产环境替换为 PostgreSQL + RLS）

@@ -7,9 +7,9 @@
 - isinstance 继承关系
 """
 
-import pytest
 from unittest.mock import patch
 
+import pytest
 
 # ---------------------------------------------------------------------------
 # 辅助：一次性导入全部异常类
@@ -18,29 +18,29 @@ from unittest.mock import patch
 @pytest.fixture()
 def all_exception_classes():
     from shared.core.exceptions import (
-        TunxiangBaseError,
-        ExternalAPIError,
-        POSAdapterError,
-        PinzhiAPIError,
-        AoqiweiAPIError,
-        MeituanAPIError,
-        WeComWebhookError,
-        FeishuWebhookError,
-        SMSServiceError,
-        DataValidationError,
-        ReconciliationMismatchError,
-        TenantIsolationError,
-        BusinessRuleError,
-        MarginViolationError,
-        FoodSafetyError,
-        ServiceTimeoutError,
-        InfrastructureError,
-        CacheConnectionError,
-        VectorDBError,
-        ModelRouterError,
-        AgentError,
-        AgentDecisionError,
         AgentConstraintViolation,
+        AgentDecisionError,
+        AgentError,
+        AoqiweiAPIError,
+        BusinessRuleError,
+        CacheConnectionError,
+        DataValidationError,
+        ExternalAPIError,
+        FeishuWebhookError,
+        FoodSafetyError,
+        InfrastructureError,
+        MarginViolationError,
+        MeituanAPIError,
+        ModelRouterError,
+        PinzhiAPIError,
+        POSAdapterError,
+        ReconciliationMismatchError,
+        ServiceTimeoutError,
+        SMSServiceError,
+        TenantIsolationError,
+        TunxiangBaseError,
+        VectorDBError,
+        WeComWebhookError,
     )
     return {
         "TunxiangBaseError": TunxiangBaseError,
@@ -170,9 +170,15 @@ class TestInheritanceHierarchy:
 
     def test_external_api_errors(self):
         from shared.core.exceptions import (
-            TunxiangBaseError, ExternalAPIError, POSAdapterError,
-            PinzhiAPIError, AoqiweiAPIError, MeituanAPIError,
-            WeComWebhookError, FeishuWebhookError, SMSServiceError,
+            AoqiweiAPIError,
+            ExternalAPIError,
+            FeishuWebhookError,
+            MeituanAPIError,
+            PinzhiAPIError,
+            POSAdapterError,
+            SMSServiceError,
+            TunxiangBaseError,
+            WeComWebhookError,
         )
         # POSAdapterError 子类
         for cls in [PinzhiAPIError, AoqiweiAPIError, MeituanAPIError]:
@@ -191,7 +197,9 @@ class TestInheritanceHierarchy:
 
     def test_data_validation_errors(self):
         from shared.core.exceptions import (
-            TunxiangBaseError, DataValidationError, ReconciliationMismatchError,
+            DataValidationError,
+            ReconciliationMismatchError,
+            TunxiangBaseError,
         )
         err = ReconciliationMismatchError("mismatch")
         assert isinstance(err, DataValidationError)
@@ -199,8 +207,11 @@ class TestInheritanceHierarchy:
 
     def test_business_rule_errors(self):
         from shared.core.exceptions import (
-            TunxiangBaseError, BusinessRuleError,
-            MarginViolationError, FoodSafetyError, ServiceTimeoutError,
+            BusinessRuleError,
+            FoodSafetyError,
+            MarginViolationError,
+            ServiceTimeoutError,
+            TunxiangBaseError,
         )
         for cls in [MarginViolationError, FoodSafetyError, ServiceTimeoutError]:
             err = cls("test")
@@ -209,8 +220,11 @@ class TestInheritanceHierarchy:
 
     def test_infrastructure_errors(self):
         from shared.core.exceptions import (
-            TunxiangBaseError, InfrastructureError,
-            CacheConnectionError, VectorDBError, ModelRouterError,
+            CacheConnectionError,
+            InfrastructureError,
+            ModelRouterError,
+            TunxiangBaseError,
+            VectorDBError,
         )
         for cls in [CacheConnectionError, VectorDBError, ModelRouterError]:
             err = cls("test")
@@ -219,8 +233,10 @@ class TestInheritanceHierarchy:
 
     def test_agent_errors(self):
         from shared.core.exceptions import (
-            TunxiangBaseError, AgentError,
-            AgentDecisionError, AgentConstraintViolation,
+            AgentConstraintViolation,
+            AgentDecisionError,
+            AgentError,
+            TunxiangBaseError,
         )
         for cls in [AgentDecisionError, AgentConstraintViolation]:
             err = cls("test")
@@ -229,11 +245,14 @@ class TestInheritanceHierarchy:
 
     def test_tenant_isolation_is_direct_child(self):
         with patch("shared.core.exceptions.logger"):
-            from shared.core.exceptions import TunxiangBaseError, TenantIsolationError
+            from shared.core.exceptions import TenantIsolationError, TunxiangBaseError
             err = TenantIsolationError("breach")
             assert isinstance(err, TunxiangBaseError)
             from shared.core.exceptions import (
-                ExternalAPIError, BusinessRuleError, InfrastructureError, AgentError,
+                AgentError,
+                BusinessRuleError,
+                ExternalAPIError,
+                InfrastructureError,
             )
             assert not isinstance(err, ExternalAPIError)
             assert not isinstance(err, BusinessRuleError)

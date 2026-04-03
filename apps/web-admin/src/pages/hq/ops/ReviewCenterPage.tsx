@@ -130,7 +130,7 @@ export function ReviewCenterPage() {
               )}
               <div>
                 {s.actions.map((action, i) => (
-                  <div key={i} style={{ fontSize: 12, color: '#999', marginBottom: 2 }}>-> {action}</div>
+                  <div key={i} style={{ fontSize: 12, color: '#999', marginBottom: 2 }}>{'-> '}{action}</div>
                 ))}
               </div>
             </div>

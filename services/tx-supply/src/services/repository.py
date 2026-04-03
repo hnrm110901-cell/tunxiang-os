@@ -3,10 +3,10 @@
 封装 Ingredient / IngredientTransaction 的查询与库存调整。
 """
 import uuid
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from sqlalchemy import select, func, update, text, and_, case
+from sqlalchemy import case, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.entities import Ingredient, IngredientTransaction

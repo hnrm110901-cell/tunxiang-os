@@ -3,14 +3,15 @@
 统一响应格式: {"ok": bool, "data": {}, "error": {}}
 所有接口需 X-Tenant-ID header，通过 get_db_with_tenant 实现 RLS 租户隔离。
 """
-from typing import AsyncGenerator, Optional
+from typing import AsyncGenerator
 
 import structlog
-from fastapi import APIRouter, Depends, Request, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db_with_tenant
+
 from ..services import order_extensions as ext
 
 logger = structlog.get_logger()

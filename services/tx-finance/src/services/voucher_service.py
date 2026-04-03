@@ -10,8 +10,6 @@
   贷：其他业务收入（服务费/茶位费）
 """
 from datetime import date
-from typing import Optional
-
 
 # 科目映射
 ACCOUNT_MAPPING = {

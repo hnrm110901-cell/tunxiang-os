@@ -20,8 +20,8 @@ from typing import Optional
 
 import structlog
 
-from .printer_driver import ESCPOSPrinter, PrinterStatus
 from .print_template import ReceiptTemplate
+from .printer_driver import ESCPOSPrinter, PrinterStatus
 
 logger = structlog.get_logger()
 
@@ -466,10 +466,17 @@ class PrintManager:
 
         # 构建测试页内容
         from .printer_driver import (
-            ESC_INIT, ESC_ALIGN_CENTER, ESC_ALIGN_LEFT,
-            GS_SIZE_DOUBLE_BOTH, GS_SIZE_NORMAL,
-            ESC_BOLD_ON, ESC_BOLD_OFF,
-            GS_CUT_PARTIAL, ESC_FEED, LF, LINE_WIDTH,
+            ESC_ALIGN_CENTER,
+            ESC_ALIGN_LEFT,
+            ESC_BOLD_OFF,
+            ESC_BOLD_ON,
+            ESC_FEED,
+            ESC_INIT,
+            GS_CUT_PARTIAL,
+            GS_SIZE_DOUBLE_BOTH,
+            GS_SIZE_NORMAL,
+            LF,
+            LINE_WIDTH,
         )
         buf = bytearray()
         buf += ESC_INIT

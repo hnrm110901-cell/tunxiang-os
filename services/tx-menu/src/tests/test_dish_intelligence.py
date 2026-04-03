@@ -1,21 +1,21 @@
 """菜品深度智能服务测试 -- 口碑 / 状态推导 / 生命周期 / 动作建议"""
-import sys
 import os
+import sys
 from datetime import datetime, timedelta, timezone
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from services.dish_intelligence import (
-    calculate_dish_reputation,
-    auto_derive_status,
-    get_dish_lifecycle,
-    suggest_dish_action,
-    inject_dish_sales,
-    inject_dish_reviews,
-    DishStatus,
-    DishLifecycle,
     DishAction,
+    DishLifecycle,
+    DishStatus,
     _clear_store,
+    auto_derive_status,
+    calculate_dish_reputation,
+    get_dish_lifecycle,
+    inject_dish_reviews,
+    inject_dish_sales,
+    suggest_dish_action,
 )
 
 TENANT = "tenant-test-001"

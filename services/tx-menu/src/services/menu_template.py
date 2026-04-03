@@ -1,10 +1,16 @@
-"""菜单模板管理 — 模板创建 / 门店发布 / 渠道差异价 / 季节菜单 / 包厢菜单
+"""菜单模板管理 — 已迁移到 DB（v095）
 
 渠道: dine_in / takeout / delivery / miniapp
 价格单位: 分(fen)
 所有操作强制 tenant_id 租户隔离。
 
 持久化：PostgreSQL + SQLAlchemy async，Repository 模式。
+本文件的内存实现已由 menu_template_repository.MenuTemplateRepository 替代。
+路由层（menu_routes.py）已切换到 Repository，本文件不再被导入。
+
+保留原因：
+  1. _clear_all() 供旧版单元测试调用（待测试迁移后删除）
+  2. 作为迁移前的历史参考
 """
 import uuid
 from typing import Optional

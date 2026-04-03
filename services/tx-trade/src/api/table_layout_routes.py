@@ -13,18 +13,19 @@
 """
 from __future__ import annotations
 
+import uuid
+
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Request, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+
 from ..services.table_layout_service import (
     TableLayoutService,
     layout_connections,
 )
-
-import uuid
 
 logger = structlog.get_logger()
 

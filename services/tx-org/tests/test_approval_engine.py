@@ -17,7 +17,6 @@
 
 from __future__ import annotations
 
-import json
 import os
 import sys
 
@@ -32,7 +31,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
-
 from models.approval_flow import (
     ApprovalFlowDefinition,
     ApprovalInstance,
@@ -43,7 +41,6 @@ from models.approval_flow import (
     StepCondition,
 )
 from services.approval_engine import ApprovalEngine
-
 
 # ── 测试夹具 ──────────────────────────────────────────────────────────────────
 
@@ -292,22 +289,21 @@ class TestApprovalEngineSubmit:
         with patch(
             "services.approval_engine._send_notification",
             side_effect=mock_notify,
+        ), patch(
+            "services.approval_engine._find_approvers_by_role",
+            return_value=[STORE_MANAGER_ID],
         ):
-            with patch(
-                "services.approval_engine._find_approvers_by_role",
-                return_value=[STORE_MANAGER_ID],
-            ):
-                result = await ApprovalEngine.submit(
-                    flow_def_id=FLOW_DEF_ID,
-                    source_id=str(uuid4()),
-                    title="折扣申请 100元",
-                    context={"amount": 100},
-                    initiator_id=INITIATOR_ID,
-                    store_id=STORE_ID,
-                    tenant_id=TENANT_A,
-                    db=db,
-                    amount=100,
-                )
+            result = await ApprovalEngine.submit(
+                flow_def_id=FLOW_DEF_ID,
+                source_id=str(uuid4()),
+                title="折扣申请 100元",
+                context={"amount": 100},
+                initiator_id=INITIATOR_ID,
+                store_id=STORE_ID,
+                tenant_id=TENANT_A,
+                db=db,
+                amount=100,
+            )
 
         db.commit.assert_called_once()
         # 应发送通知给店长
@@ -386,18 +382,17 @@ class TestApprovalEngineApprove:
         with patch(
             "services.approval_engine._send_notification",
             side_effect=mock_notify,
+        ), patch(
+            "services.approval_engine._find_approvers_by_role",
+            return_value=[AREA_DIRECTOR_ID],
         ):
-            with patch(
-                "services.approval_engine._find_approvers_by_role",
-                return_value=[AREA_DIRECTOR_ID],
-            ):
-                result = await ApprovalEngine.approve(
-                    instance_id=INSTANCE_ID,
-                    approver_id=STORE_MANAGER_ID,
-                    comment="同意",
-                    tenant_id=TENANT_A,
-                    db=db,
-                )
+            result = await ApprovalEngine.approve(
+                instance_id=INSTANCE_ID,
+                approver_id=STORE_MANAGER_ID,
+                comment="同意",
+                tenant_id=TENANT_A,
+                db=db,
+            )
 
         db.commit.assert_called_once()
         # 应通知区域总监
@@ -443,18 +438,17 @@ class TestApprovalEngineApprove:
         with patch(
             "services.approval_engine._send_notification",
             side_effect=mock_notify,
+        ), patch(
+            "services.approval_engine._find_approvers_by_role",
+            return_value=[],
         ):
-            with patch(
-                "services.approval_engine._find_approvers_by_role",
-                return_value=[],
-            ):
-                result = await ApprovalEngine.approve(
-                    instance_id=INSTANCE_ID,
-                    approver_id=AREA_DIRECTOR_ID,
-                    comment=None,
-                    tenant_id=TENANT_A,
-                    db=db,
-                )
+            result = await ApprovalEngine.approve(
+                instance_id=INSTANCE_ID,
+                approver_id=AREA_DIRECTOR_ID,
+                comment=None,
+                tenant_id=TENANT_A,
+                db=db,
+            )
 
         # 应通知发起人审批通过
         assert any(
@@ -652,15 +646,14 @@ class TestCheckTimeouts:
         with patch(
             "services.approval_engine._send_notification",
             side_effect=mock_notify,
+        ), patch(
+            "services.approval_engine._find_approvers_by_role",
+            return_value=[STORE_MANAGER_ID],
         ):
-            with patch(
-                "services.approval_engine._find_approvers_by_role",
-                return_value=[STORE_MANAGER_ID],
-            ):
-                result = await ApprovalEngine.check_timeouts(
-                    tenant_id=TENANT_A,
-                    db=db,
-                )
+            result = await ApprovalEngine.check_timeouts(
+                tenant_id=TENANT_A,
+                db=db,
+            )
 
         assert result["checked"] >= 1
         assert result["reminded"] >= 1
@@ -704,15 +697,14 @@ class TestCheckTimeouts:
         with patch(
             "services.approval_engine._send_notification",
             side_effect=mock_notify,
+        ), patch(
+            "services.approval_engine._find_approvers_by_role",
+            return_value=[STORE_MANAGER_ID],
         ):
-            with patch(
-                "services.approval_engine._find_approvers_by_role",
-                return_value=[STORE_MANAGER_ID],
-            ):
-                result = await ApprovalEngine.check_timeouts(
-                    tenant_id=TENANT_A,
-                    db=db,
-                )
+            result = await ApprovalEngine.check_timeouts(
+                tenant_id=TENANT_A,
+                db=db,
+            )
 
         assert result["reminded"] == 0
         assert len(notifications) == 0

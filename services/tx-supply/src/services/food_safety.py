@@ -5,16 +5,19 @@
 温控标准：冷藏 0-4C, 冷冻 <-18C, 热链 >60C。
 食安事件：severity=critical 时自动通知区域经理。
 """
+import asyncio
 import json
 import uuid
 from datetime import date, datetime, timedelta
 from enum import Enum
 from typing import Optional
+from uuid import UUID
 
 import structlog
-from sqlalchemy import select, update, and_, text
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from shared.events import SupplyEventType, UniversalPublisher
 from shared.ontology.src.entities import Ingredient, IngredientTransaction
 from shared.ontology.src.enums import TransactionType
 
@@ -99,7 +102,17 @@ async def _notify_regional_manager(
         tenant_id=tenant_id,
         action="notify_regional_manager",
     )
-    # TODO: 接入消息推送通道 (Redis Streams / 企业微信 / 短信)
+    # 发布到 supply_events Redis Stream，区域经理端和告警 Worker 消费该事件
+    asyncio.create_task(
+        UniversalPublisher.publish(
+            event_type=SupplyEventType.INGREDIENT_EXPIRED,
+            tenant_id=UUID(tenant_id),
+            store_id=UUID(store_id),
+            entity_id=None,
+            event_data={"event_type": event_type, "detail": detail, "severity": "critical"},
+            source_service="tx-supply",
+        )
+    )
 
 
 # ─── 核心服务函数 ───

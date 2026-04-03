@@ -4,7 +4,7 @@
 所有操作强制 tenant_id 租户隔离。
 """
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Optional
 

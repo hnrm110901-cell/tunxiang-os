@@ -4,6 +4,7 @@
  *
  * 状态色: 绿色(已出) / 黄色(制作中) / 灰色(待制作) / 红色(超时)
  * 支持一键催菜
+ * Phase 3-A: 出餐时间预测（AI-Native）
  * 移动端竖屏, 最小字体16px, 热区>=48px
  */
 import { useState, useEffect } from 'react';
@@ -24,6 +25,26 @@ const C = {
   info: '#185FA5',
 };
 
+const API_BASE = (window as any).__API_BASE__ || '';
+
+/* ---------- 预计时间颜色 ---------- */
+function estimateColor(minutes: number): string {
+  if (minutes < 5)  return '#22c55e';   // 绿：快好了
+  if (minutes <= 15) return '#94a3b8';  // 灰：正常
+  if (minutes <= 30) return '#FF9F0A';  // 橙：提醒
+  return '#FF3B30';                      // 红：超时预警
+}
+
+/* ---------- 预测数据类型 ---------- */
+
+interface OrderCompletionPrediction {
+  order_id: string;
+  estimated_minutes: number;
+  earliest_dish: string;
+  latest_dish: string;
+  pending_count: number;
+}
+
 /* ---------- Mock KDS 数据 ---------- */
 interface KdsItem {
   taskId: string;
@@ -34,6 +55,9 @@ interface KdsItem {
   createdAt: string;
   isOvertime: boolean;
   rushCount: number;
+  /** Phase 3-A: 预计还需N分钟（来自预测API） */
+  estimatedMinutes?: number;
+  estimatedConfidence?: 'high' | 'medium' | 'low';
 }
 
 const MOCK_KDS: KdsItem[] = [
@@ -76,10 +100,29 @@ export function OrderStatusPage() {
 
   const [items, setItems] = useState<KdsItem[]>(MOCK_KDS);
   const [refreshing, setRefreshing] = useState(false);
+  const [orderPrediction, setOrderPrediction] = useState<OrderCompletionPrediction | null>(null);
 
   const doneCount = items.filter(i => i.status === 'done').length;
   const totalCount = items.length;
   const hasOvertime = items.some(i => i.isOvertime);
+
+  // Phase 3-A: 挂载时拉取订单预测数据
+  useEffect(() => {
+    if (!orderId || !API_BASE) return;
+    const fetchPrediction = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/v1/predict/order/${orderId}/completion`);
+        if (!res.ok) return;
+        const json = await res.json();
+        if (json.ok && json.data) {
+          setOrderPrediction(json.data as OrderCompletionPrediction);
+        }
+      } catch {
+        // 预测失败静默降级，不影响主流程
+      }
+    };
+    fetchPrediction();
+  }, [orderId]);
 
   const handleRefresh = () => {
     setRefreshing(true);
@@ -159,9 +202,17 @@ export function OrderStatusPage() {
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         borderBottom: `1px solid ${C.border}`,
       }}>
-        <span style={{ fontSize: 18, fontWeight: 700, color: hasOvertime ? C.danger : C.green }}>
-          已出 {doneCount} / {totalCount} 道
-        </span>
+        <div>
+          <span style={{ fontSize: 18, fontWeight: 700, color: hasOvertime ? C.danger : C.green }}>
+            已出 {doneCount} / {totalCount} 道
+          </span>
+          {/* Phase 3-A: 订单整体预测 */}
+          {orderPrediction && doneCount < totalCount && (
+            <div style={{ fontSize: 14, color: estimateColor(orderPrediction.estimated_minutes), marginTop: 2 }}>
+              预计全部出餐：约 {orderPrediction.estimated_minutes} 分钟
+            </div>
+          )}
+        </div>
         {doneCount < totalCount && (
           <button
             onClick={handleRushAll}
@@ -178,7 +229,7 @@ export function OrderStatusPage() {
 
       {/* 菜品列表 */}
       <div style={{
-        flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' as string,
+        flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' as any,
         padding: '12px', paddingBottom: 80,
       }}>
         {sortedItems.map(item => (
@@ -201,7 +252,7 @@ export function OrderStatusPage() {
                   <span style={{ fontSize: 16, color: C.muted }}>/ {item.spec}</span>
                 )}
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
                 <span style={{
                   fontSize: 16, fontWeight: 700, padding: '2px 8px', borderRadius: 6,
                   background: `${statusColor(item.status, item.isOvertime)}22`,
@@ -218,6 +269,25 @@ export function OrderStatusPage() {
                   </span>
                 )}
               </div>
+              {/* Phase 3-A: 预计时间显示 */}
+              {item.status !== 'done' && orderPrediction && orderPrediction.estimated_minutes > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                  <span style={{
+                    fontSize: 14,
+                    color: estimateColor(orderPrediction.estimated_minutes),
+                    fontWeight: 600,
+                  }}>
+                    约 {orderPrediction.estimated_minutes} 分钟
+                  </span>
+                  <span style={{ fontSize: 12, color: C.muted }}>
+                    {orderPrediction.estimated_minutes < 5
+                      ? '快好了'
+                      : orderPrediction.estimated_minutes > 30
+                        ? '超时预警'
+                        : ''}
+                  </span>
+                </div>
+              )}
             </div>
             {item.status !== 'done' && (
               <button

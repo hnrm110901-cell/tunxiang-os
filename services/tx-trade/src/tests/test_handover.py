@@ -10,17 +10,15 @@
 7. 渠道核对 → 单渠道+全渠道报告
 8. 现金长短款明细（长款/短款/平衡）
 """
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import uuid
-from datetime import datetime, timezone, date
-from unittest.mock import AsyncMock, MagicMock, patch
+from datetime import datetime, timezone
 
 import pytest
-
 
 # ─── 模拟数据库对象（脱离真实PG） ───
 

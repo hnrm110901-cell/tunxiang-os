@@ -7,7 +7,7 @@ import uuid
 from fastapi import APIRouter, Request
 from pydantic import BaseModel
 
-from ...shared.response import ok, err
+from ...shared.response import err, ok
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 

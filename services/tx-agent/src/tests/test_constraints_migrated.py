@@ -10,26 +10,24 @@
 无论由哪个 Skill Agent 触发。
 """
 
-import sys
-import os
 import asyncio
+import os
+import sys
 
 import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from agents.base import SkillAgent, AgentResult
 from agents.constraints import (
-    ConstraintChecker,
-    ConstraintResult,
-    DEFAULT_MIN_MARGIN_RATE,
     DEFAULT_EXPIRY_BUFFER_HOURS,
     DEFAULT_MAX_SERVE_MINUTES,
+    DEFAULT_MIN_MARGIN_RATE,
+    ConstraintChecker,
 )
 from agents.skills.discount_guard import DiscountGuardAgent
-from agents.skills.smart_menu import SmartMenuAgent
-from agents.skills.serve_dispatch import ServeDispatchAgent
 from agents.skills.inventory_alert import InventoryAlertAgent
+from agents.skills.serve_dispatch import ServeDispatchAgent
+from agents.skills.smart_menu import SmartMenuAgent
 
 TID = "00000000-0000-0000-0000-000000000001"
 

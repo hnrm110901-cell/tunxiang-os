@@ -1,15 +1,16 @@
-<!-- Order Tracking -- real-time cooking progress -->
+<!-- 订单状态追踪页 — 出餐进度 + 菜品清单 + 服务操作 -->
 <view class="page-container">
-  <!-- Header -->
+
+  <!-- 订单头部信息 -->
   <view class="track-header">
     <view class="track-header-top">
       <text class="track-title">订单进度</text>
       <text class="track-order-no" wx:if="{{orderNo}}">{{orderNo}}</text>
     </view>
-    <text class="track-store" wx:if="{{storeName}}">{{storeName}} {{tableNo ? '· ' + tableNo + '号桌' : ''}}</text>
+    <text class="track-store" wx:if="{{storeName}}">{{storeName}}{{tableNo ? ' · ' + tableNo + '号桌' : ''}}</text>
   </view>
 
-  <!-- Progress tracker (Domino's-style 4-step) -->
+  <!-- 出餐进度条（Domino's 风格 4步） -->
   <order-progress
     steps="{{steps}}"
     currentStep="{{currentStep}}"
@@ -20,19 +21,26 @@
     bind:rush="onRush"
   />
 
-  <!-- Rush cooldown notice -->
+  <!-- 催菜冷却提示 -->
   <view class="rush-cooldown" wx:if="{{!canRush && rushCooldown > 0}}">
     <text class="cooldown-text">{{rushCooldown}}秒后可再次催菜</text>
   </view>
 
-  <!-- Order items -->
+  <!-- 出餐就绪通知横幅 -->
+  <view class="ready-banner" wx:if="{{isReady}}">
+    <text class="ready-icon">🍽️</text>
+    <text class="ready-text">您的餐品已准备好，请取餐！</text>
+  </view>
+
+  <!-- 订单菜品清单 -->
   <view class="items-section">
     <text class="section-title">订单详情</text>
     <view class="order-item" wx:for="{{items}}" wx:key="name">
       <image class="item-img" wx:if="{{item.imageUrl}}" src="{{item.imageUrl}}" mode="aspectFill" lazy-load />
       <view class="item-info">
         <text class="item-name">{{item.name}}</text>
-        <text class="item-qty">x{{item.quantity}}</text>
+        <text class="item-remark" wx:if="{{item.remark}}">备注：{{item.remark}}</text>
+        <text class="item-qty">× {{item.quantity}}</text>
       </view>
       <text class="item-price">¥{{item.priceYuan}}</text>
     </view>
@@ -43,12 +51,7 @@
     </view>
   </view>
 
-  <!-- Append items button -->
-  <view class="append-section" wx:if="{{canAppend}}">
-    <button class="append-btn" bindtap="goToAppend">+ 加菜</button>
-  </view>
-
-  <!-- Order info -->
+  <!-- 订单信息 -->
   <view class="info-section">
     <view class="info-row">
       <text class="info-label">下单时间</text>
@@ -56,7 +59,33 @@
     </view>
     <view class="info-row">
       <text class="info-label">订单编号</text>
-      <text class="info-value">{{orderNo}}</text>
+      <text class="info-value selectable">{{orderNo}}</text>
+    </view>
+    <view class="info-row">
+      <text class="info-label">支付方式</text>
+      <text class="info-value">{{paymentMethodText}}</text>
     </view>
   </view>
+
+  <!-- 底部操作按钮 -->
+  <view class="action-section">
+    <!-- 加菜按钮（制作中才显示） -->
+    <view class="action-btn outline" wx:if="{{canAppend}}" bindtap="goToAppend">
+      <text class="action-btn-text">+ 加菜</text>
+    </view>
+
+    <!-- 叫服务员 -->
+    <view class="action-btn outline service" bindtap="callServiceBell">
+      <text class="action-icon">🔔</text>
+      <text class="action-btn-text">叫服务员</text>
+    </view>
+
+    <!-- 继续点餐（返回菜单） -->
+    <view class="action-btn primary" bindtap="goToMenu">
+      <text class="action-btn-text">继续点餐</text>
+    </view>
+  </view>
+
+  <!-- 底部安全区 -->
+  <view class="safe-area-bottom"></view>
 </view>

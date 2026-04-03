@@ -5,6 +5,7 @@
  * KPI 卡片始终展示在顶部。
  */
 import { useState, useEffect, useCallback } from 'react';
+import { hubGet } from '../api/hubApi';
 
 // ── 颜色常量（与 Hub 主题一致）──
 const BG_0 = '#0B1A20';
@@ -21,6 +22,14 @@ const TEXT_3 = '#8BA5B2';
 const TEXT_4 = '#6B8A97';
 
 const API_BASE = '/api/v1/agent/observability';
+
+/** Hub 运维 — GET /api/v1/hub/agents/health（与可观测性 API 并行展示） */
+interface HubAgentsHealth {
+  total_executions_today: number;
+  success_rate: number;
+  constraint_violations: number;
+  top_agents: { agent: string; executions: number; violations: number }[];
+}
 
 // ── 类型定义 ──
 
@@ -879,6 +888,13 @@ export function AgentMonitorPage() {
   const [decisions, setDecisions] = useState<DecisionItem[]>(MOCK_DECISIONS);
   const [effectiveness, setEffectiveness] = useState<EffectivenessData>(MOCK_EFFECTIVENESS);
   const [health, setHealth] = useState<HealthData>(MOCK_HEALTH);
+  const [hubHealth, setHubHealth] = useState<HubAgentsHealth | null>(null);
+
+  useEffect(() => {
+    hubGet<HubAgentsHealth>('/agents/health')
+      .then(setHubHealth)
+      .catch(() => setHubHealth(null));
+  }, []);
 
   const loadData = useCallback(async () => {
     const [kpiData, evtData, decData, effData, healthData] = await Promise.all([
@@ -902,6 +918,29 @@ export function AgentMonitorPage() {
   return (
     <div style={s.page}>
       <div style={s.title}>Agent 可观测性中心</div>
+
+      {hubHealth && (
+        <div
+          style={{
+            background: BG_1,
+            border: `1px solid ${BG_2}`,
+            borderRadius: 10,
+            padding: '12px 16px',
+            marginBottom: 16,
+            fontSize: 13,
+            color: TEXT_3,
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: 16,
+            alignItems: 'center',
+          }}
+        >
+          <span style={{ color: BRAND, fontWeight: 700 }}>Hub 全局</span>
+          <span>今日执行 {hubHealth.total_executions_today.toLocaleString()}</span>
+          <span>成功率 {hubHealth.success_rate}%</span>
+          <span>约束违规 {hubHealth.constraint_violations}</span>
+        </div>
+      )}
 
       <KpiCards data={kpis} />
 

@@ -12,17 +12,16 @@
 9. test_rule管理员测试接口
 10. 渠道不匹配时跳过规则
 """
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../src"))
 
 import uuid
 from datetime import datetime, time, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-
 
 # ─── 测试工具 ───
 
@@ -326,7 +325,6 @@ async def test_no_rule_match_fallback_to_dish_dept_mapping():
 async def test_higher_priority_rule_wins():
     """优先级高的规则应先于低优先级规则匹配。"""
     from services.dispatch_rule_engine import DispatchRuleEngine, _rule_cache
-    from services.dispatch_rule_engine import _rule_matches
 
     _rule_cache.clear()
 
@@ -386,7 +384,7 @@ async def test_tenant_isolation():
 
 def test_invalidate_store_cache_clears_only_target():
     """缓存失效只影响目标门店，不影响其他门店。"""
-    from services.dispatch_rule_engine import invalidate_store_cache, _rule_cache, _cache_key
+    from services.dispatch_rule_engine import _cache_key, _rule_cache, invalidate_store_cache
 
     _rule_cache.clear()
 
@@ -453,7 +451,7 @@ def test_channel_mismatch_skips_rule():
 @pytest.mark.asyncio
 async def test_rule_test_interface_matched():
     """test_rule 接口对匹配的规则返回 matched=True。"""
-    from services.dispatch_rule_engine import DispatchRuleEngine, DispatchRule
+    from services.dispatch_rule_engine import DispatchRuleEngine
 
     engine = DispatchRuleEngine()
 

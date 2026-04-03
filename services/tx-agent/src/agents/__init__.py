@@ -1,4 +1,4 @@
-from .base import SkillAgent, AgentResult
+from .base import AgentResult, SkillAgent
 from .constraints import ConstraintChecker, ConstraintResult
-from .memory_bus import MemoryBus
 from .master import MasterAgent
+from .memory_bus import MemoryBus

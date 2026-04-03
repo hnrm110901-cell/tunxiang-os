@@ -14,8 +14,8 @@
 11. 核销对账报告 — 按平台汇总
 12. 平台对账 — 金额比对
 """
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -23,7 +23,6 @@ import uuid
 from datetime import datetime, timezone
 
 import pytest
-
 
 # ─── 辅助 ───
 
@@ -98,7 +97,7 @@ def test_identify_platform_unknown():
 @pytest.mark.asyncio
 async def test_aggregate_verify_meituan():
     """聚合验证 — 自动识别美团并验证"""
-    from services.coupon_platform_service import aggregate_verify, _PlatformCouponStore
+    from services.coupon_platform_service import _PlatformCouponStore, aggregate_verify
 
     _PlatformCouponStore.clear()
     db = FakeSession()
@@ -115,7 +114,7 @@ async def test_aggregate_verify_meituan():
 @pytest.mark.asyncio
 async def test_aggregate_verify_unknown_platform():
     """聚合验证 — 无法识别平台"""
-    from services.coupon_platform_service import aggregate_verify, _PlatformCouponStore
+    from services.coupon_platform_service import _PlatformCouponStore, aggregate_verify
 
     _PlatformCouponStore.clear()
     db = FakeSession()
@@ -133,9 +132,9 @@ async def test_aggregate_verify_unknown_platform():
 async def test_redeem_coupon_success():
     """核销 — 关联 order_id 成功"""
     from services.coupon_platform_service import (
+        _PlatformCouponStore,
         aggregate_verify,
         redeem_coupon,
-        _PlatformCouponStore,
     )
 
     _PlatformCouponStore.clear()
@@ -157,7 +156,7 @@ async def test_redeem_coupon_success():
 @pytest.mark.asyncio
 async def test_redeem_coupon_missing_order_id():
     """核销 — 缺少 order_id 报错"""
-    from services.coupon_platform_service import redeem_coupon, _PlatformCouponStore
+    from services.coupon_platform_service import _PlatformCouponStore, redeem_coupon
 
     _PlatformCouponStore.clear()
     db = FakeSession()
@@ -170,9 +169,9 @@ async def test_redeem_coupon_missing_order_id():
 async def test_redeem_coupon_already_redeemed():
     """核销 — 已核销的券不可重复核销"""
     from services.coupon_platform_service import (
+        _PlatformCouponStore,
         aggregate_verify,
         redeem_coupon,
-        _PlatformCouponStore,
     )
 
     _PlatformCouponStore.clear()
@@ -195,10 +194,10 @@ async def test_redeem_coupon_already_redeemed():
 async def test_redemption_report():
     """核销对账报告 — 按平台汇总"""
     from services.coupon_platform_service import (
-        aggregate_verify,
-        redeem_coupon,
-        get_redemption_report,
         _PlatformCouponStore,
+        aggregate_verify,
+        get_redemption_report,
+        redeem_coupon,
     )
 
     _PlatformCouponStore.clear()
@@ -234,10 +233,10 @@ async def test_redemption_report():
 async def test_reconcile_platform():
     """平台对账 — 金额比对"""
     from services.coupon_platform_service import (
-        aggregate_verify,
-        redeem_coupon,
-        reconcile_platform,
         _PlatformCouponStore,
+        aggregate_verify,
+        reconcile_platform,
+        redeem_coupon,
     )
 
     _PlatformCouponStore.clear()

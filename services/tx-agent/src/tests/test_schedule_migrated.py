@@ -12,19 +12,16 @@
 - 出餐时限约束 -> ConstraintChecker.check_experience
 """
 
-import sys
-import os
 import asyncio
+import os
+import sys
 
 import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from agents.base import AgentResult
 from agents.constraints import ConstraintChecker
-from agents.master import MasterAgent
 from agents.skills.serve_dispatch import ServeDispatchAgent
-from agents.skills.inventory_alert import InventoryAlertAgent
 
 TID = "00000000-0000-0000-0000-000000000001"
 

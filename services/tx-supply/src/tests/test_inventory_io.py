@@ -2,22 +2,19 @@
 
 使用 SQLite 内存数据库模拟 PostgreSQL，测试核心业务逻辑。
 """
-import json
 import uuid
-from datetime import date, datetime, timedelta, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
+from datetime import date, timedelta
+from unittest.mock import MagicMock
 
 import pytest
 import pytest_asyncio
-from sqlalchemy import create_engine, text, event
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
-from sqlalchemy.orm import Session
+from services.tx_supply.src.services import expiry_monitor, inventory_io, stock_forecast
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from shared.ontology.src.base import TenantBase
-from shared.ontology.src.entities import Ingredient, IngredientTransaction
-from shared.ontology.src.enums import InventoryStatus, TransactionType
-from services.tx_supply.src.services import inventory_io, expiry_monitor, stock_forecast
-
+from shared.ontology.src.entities import Ingredient
+from shared.ontology.src.enums import InventoryStatus
 
 # ─── Fixtures ───
 

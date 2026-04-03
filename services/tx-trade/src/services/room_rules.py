@@ -3,7 +3,7 @@
 金额单位统一为分(fen)。
 """
 import uuid
-from datetime import datetime, timezone, date
+from datetime import datetime, timezone
 
 import structlog
 from sqlalchemy import select

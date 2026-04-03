@@ -11,13 +11,15 @@ from datetime import datetime, timezone
 from typing import Optional
 
 import structlog
-from sqlalchemy import select, func, cast, Date
+from sqlalchemy import Date, cast, func, select, text
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.entities import Order
 from shared.ontology.src.enums import OrderStatus
-from ..models.payment import Payment, Refund
+
 from ..models.enums import PaymentStatus, RefundType
+from ..models.payment import Payment, Refund
 from .shouqianba_client import ShouqianbaClient, ShouqianbaError
 from .lakala_client import LakalaClient, LakalaError
 
@@ -73,6 +75,7 @@ class PaymentGateway:
         amount_fen: int,
         auth_code: Optional[str] = None,
         extra_params: Optional[dict] = None,
+        idempotency_key: Optional[str] = None,
     ) -> dict:
         """创建支付
 
@@ -81,6 +84,18 @@ class PaymentGateway:
           - sub_openid: 用户openID（公众号/小程序必传）
           - notify_url: 异步通知地址
           - pay_type:   "dynamic_qr"（默认）/ "jsapi" / "mini_jsapi"
+        对于微信/支付宝/银联等在线支付，调用收钱吧 Upay API。
+
+        idempotency_key 参数说明：
+          客户端幂等键，格式建议: {device_id}-{order_id[:8]}-{unix_timestamp_seconds}
+          例：pos001-a3f2b1c4-1743420000
+
+          规则：
+            - 同一笔支付操作，POS 重试时必须使用相同的幂等键
+            - 不同笔支付（即使同一订单）必须使用不同的幂等键
+            - 幂等键有效期 24 小时（DB 索引不自动清理，依赖 VACUUM）
+            - 如果客户端不传，服务端不做幂等保护（向下兼容旧客户端）
+            - failed 状态的支付记录不触发幂等命中，允许用相同 key 重试
         """
         if method not in self.PAYMENT_METHODS:
             raise ValueError(f"不支持的支付方式: {method}")
@@ -96,6 +111,36 @@ class PaymentGateway:
         order = result.scalar_one_or_none()
         if not order:
             raise ValueError(f"订单不存在: {order_id}")
+
+        # ── 幂等检查：如果相同 idempotency_key 已有非失败记录，直接返回 ────
+        if idempotency_key:
+            existing_result = await self.db.execute(
+                text(
+                    "SELECT id, payment_no, trade_no, status, "
+                    "extra->>'qr_code' AS qr_code, extra->>'fee_fen' AS fee_fen "
+                    "FROM payments "
+                    "WHERE tenant_id = :tid AND idempotency_key = :ikey "
+                    "AND status <> 'failed' "
+                    "LIMIT 1"
+                ),
+                {"tid": str(self.tenant_id), "ikey": idempotency_key},
+            )
+            existing = existing_result.mappings().first()
+            if existing:
+                logger.info(
+                    "payment.idempotent_hit",
+                    idempotency_key=idempotency_key,
+                    payment_no=existing["payment_no"],
+                )
+                return {
+                    "payment_id": str(existing["id"]),
+                    "payment_no": existing["payment_no"],
+                    "trade_no": existing["trade_no"],
+                    "qr_code": existing["qr_code"],
+                    "status": existing["status"],
+                    "fee_fen": int(existing["fee_fen"] or 0),
+                    "idempotent": True,  # 标记本次为幂等命中，非新支付
+                }
 
         payment_no = _gen_payment_no()
         trade_no = None
@@ -214,6 +259,7 @@ class PaymentGateway:
             trade_no=trade_no,
             paid_at=paid_at,
             payment_category=self._method_to_category(method),
+            idempotency_key=idempotency_key,
             extra={
                 "fee_fen": fee_fen,
                 "fee_rate_permil": fee_rate_permil,
@@ -221,7 +267,42 @@ class PaymentGateway:
             },
         )
         self.db.add(payment)
-        await self.db.flush()
+        try:
+            await self.db.flush()
+        except IntegrityError as exc:
+            # 并发写入相同 idempotency_key 时，唯一约束触发 IntegrityError
+            # 回滚当前 flush，重新查询已落盘的记录并返回（幂等命中）
+            await self.db.rollback()
+            if idempotency_key:
+                logger.warning(
+                    "payment.idempotency_conflict",
+                    idempotency_key=idempotency_key,
+                    payment_no=payment_no,
+                    error=str(exc),
+                )
+                retry_result = await self.db.execute(
+                    text(
+                        "SELECT id, payment_no, trade_no, status, "
+                        "extra->>'qr_code' AS qr_code, extra->>'fee_fen' AS fee_fen "
+                        "FROM payments "
+                        "WHERE tenant_id = :tid AND idempotency_key = :ikey "
+                        "AND status <> 'failed' "
+                        "LIMIT 1"
+                    ),
+                    {"tid": str(self.tenant_id), "ikey": idempotency_key},
+                )
+                winner = retry_result.mappings().first()
+                if winner:
+                    return {
+                        "payment_id": str(winner["id"]),
+                        "payment_no": winner["payment_no"],
+                        "trade_no": winner["trade_no"],
+                        "qr_code": winner["qr_code"],
+                        "status": winner["status"],
+                        "fee_fen": int(winner["fee_fen"] or 0),
+                        "idempotent": True,
+                    }
+            raise SQLAlchemyError(f"支付记录写入失败（非幂等冲突）: {exc}") from exc
 
         logger.info(
             "payment_created",

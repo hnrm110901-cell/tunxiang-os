@@ -1,10 +1,18 @@
 """决策推送纯函数测试"""
-import sys, os
+import os
+import sys
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from services.decision_push import (
-    format_morning_card, format_noon_anomaly, format_prebattle, format_evening_recap,
-    should_push_noon, should_push_prebattle, should_push_evening, MAX_DESC_CHARS,
+    MAX_DESC_CHARS,
+    format_evening_recap,
+    format_morning_card,
+    format_noon_anomaly,
+    format_prebattle,
+    should_push_evening,
+    should_push_noon,
+    should_push_prebattle,
 )
 
 SAMPLE_DECISIONS = [

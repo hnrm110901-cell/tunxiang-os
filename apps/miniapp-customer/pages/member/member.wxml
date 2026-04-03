@@ -49,6 +49,30 @@
           <text class="asset-label">订单</text>
         </view>
       </view>
+
+      <!-- 等级进度条 -->
+      <view class="level-progress-wrap" wx:if="{{levelProgress.nextLevelName}}">
+        <view class="level-progress-labels">
+          <text class="level-progress-current">{{profile.levelName}}</text>
+          <text class="level-progress-next">距{{levelProgress.nextLevelName}} 还需 {{levelProgress.pointsNeeded}} 积分</text>
+        </view>
+        <view class="level-progress-track">
+          <view class="level-progress-fill" style="width: {{levelProgress.pct}}%"></view>
+        </view>
+        <view class="level-progress-detail" bindtap="showPointsDetail">
+          <text class="level-progress-pts">{{profile.pointsBalance}} / {{levelProgress.nextThreshold}} 积分</text>
+          <text class="level-progress-link">积分明细 ></text>
+        </view>
+      </view>
+      <view class="level-progress-wrap" wx:if="{{!levelProgress.nextLevelName}}">
+        <view class="level-progress-labels">
+          <text class="level-progress-current">{{profile.levelName}} · 最高级别</text>
+        </view>
+        <view class="level-progress-detail" bindtap="showPointsDetail">
+          <text class="level-progress-pts">当前积分 {{profile.pointsBalance}}</text>
+          <text class="level-progress-link">积分明细 ></text>
+        </view>
+      </view>
     </view>
 
     <!-- 功能菜单 -->
@@ -60,6 +84,49 @@
           <text class="menu-label">{{item.label}}</text>
         </view>
         <text class="menu-arrow">></text>
+      </view>
+    </view>
+
+    <!-- 储值卡余额 -->
+    <view class="stored-card" wx:if="{{storedValue.hasCard}}" bindtap="showBalanceDetail">
+      <view class="stored-card-left">
+        <text class="stored-card-icon">\ud83d\udcb3</text>
+        <view class="stored-card-info">
+          <text class="stored-card-title">储值卡余额</text>
+          <text class="stored-card-sub">可用于消费抵扣</text>
+        </view>
+      </view>
+      <view class="stored-card-right">
+        <text class="stored-card-amount">\u00a5{{storedValue.balanceYuan}}</text>
+        <text class="stored-card-arrow">></text>
+      </view>
+    </view>
+
+    <!-- 会员专属优惠入口 -->
+    <view class="exclusive-section">
+      <view class="exclusive-header">
+        <text class="exclusive-title">会员专属优惠</text>
+        <text class="exclusive-more" bindtap="openCouponPanel">查看全部 ></text>
+      </view>
+      <view class="exclusive-list">
+        <view class="exclusive-item" bindtap="openCouponPanel">
+          <view class="exclusive-badge">
+            <text class="exclusive-badge-text">{{profile.couponCount || 0}}</text>
+          </view>
+          <text class="exclusive-item-label">优惠券</text>
+        </view>
+        <view class="exclusive-item" bindtap="goToRoute" data-route="/pages/points-mall/points-mall">
+          <view class="exclusive-badge exclusive-badge-orange">
+            <text class="exclusive-badge-icon">\ud83c\udf81</text>
+          </view>
+          <text class="exclusive-item-label">积分兑换</text>
+        </view>
+        <view class="exclusive-item" bindtap="goToRoute" data-route="/pages/premium-card/premium-card">
+          <view class="exclusive-badge exclusive-badge-gold">
+            <text class="exclusive-badge-icon">\u2b50</text>
+          </view>
+          <text class="exclusive-item-label">升级权益</text>
+        </view>
       </view>
     </view>
 

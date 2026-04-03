@@ -12,8 +12,8 @@
 9. ReportScheduler 执行定时任务
 10. 多维度交叉查询(门店x日期)
 """
-import sys
 import os
+import sys
 from datetime import date, datetime, timezone
 from unittest.mock import AsyncMock, MagicMock
 
@@ -23,7 +23,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from services.report_engine import (
     DimensionDef,
-    ExportFormat,
     FilterDef,
     MetricDef,
     ReportCategory,
@@ -35,10 +34,8 @@ from services.report_engine import (
     ReportRenderer,
     ReportResult,
     ReportScheduler,
-    SortDirection,
 )
 from services.report_registry import ReportRegistry, create_default_registry
-
 
 # ─── Mock 工具 ───
 

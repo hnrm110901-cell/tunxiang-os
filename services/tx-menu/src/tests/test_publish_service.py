@@ -1,15 +1,15 @@
 """发布方案纯函数测试 — >=6 个测试用例"""
-import sys, os
+import os
+import sys
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import pytest
-
 from services.publish_service import (
+    create_price_adjustment,
     create_publish_plan,
     execute_publish,
-    create_price_adjustment,
 )
-
 
 # ---------- create_publish_plan ----------
 

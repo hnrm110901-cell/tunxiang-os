@@ -21,7 +21,6 @@ from typing import AsyncGenerator
 import structlog
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-
 from offline_sync_service import OfflineSyncService
 from sync_routes import router as sync_router
 

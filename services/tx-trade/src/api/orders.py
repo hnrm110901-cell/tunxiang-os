@@ -1,11 +1,12 @@
 """交易域 API — 订单 CRUD + 支付 + 小票打印（已接通数据库）"""
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Request, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+
 from ..services.order_service import OrderService
 from ..services.payment_service import PaymentService
 from ..services.receipt_service import ReceiptService

@@ -11,14 +11,13 @@
 """
 import uuid
 from datetime import date
-from typing import Optional
 
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from services.tx_finance.src.services.cost_engine import CostEngine
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db_with_tenant
-from services.tx_finance.src.services.cost_engine import CostEngine
 
 logger = structlog.get_logger(__name__)
 router = APIRouter(tags=["costs"])
@@ -78,7 +77,7 @@ async def get_order_cost(
     try:
         tid = uuid.UUID(x_tenant_id)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=f"无效的 X-Tenant-ID") from exc
+        raise HTTPException(status_code=400, detail="无效的 X-Tenant-ID") from exc
 
     try:
         margin = await _engine.get_order_margin(oid, tid, db)

@@ -2,8 +2,8 @@
 
 覆盖：辅助函数、餐段判断、日期解析、API 路由校验、对比指标校验
 """
-import sys
 import os
+import sys
 import uuid
 from datetime import date, timedelta
 from decimal import Decimal
@@ -13,12 +13,11 @@ import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from services.store_analysis import (
-    _safe_avg_fen,
-    _pct,
-    _determine_meal_period,
     _date_range_to_timestamps,
+    _determine_meal_period,
+    _pct,
+    _safe_avg_fen,
 )
-
 
 # ─── 辅助函数测试 ───
 
@@ -106,7 +105,7 @@ class TestDateRangeToTimestamps:
 # ─── API 路由辅助函数测试 ───
 
 
-from api.store_analysis_routes import _parse_date_range, _require_tenant, _parse_store_id
+from api.store_analysis_routes import _parse_date_range, _parse_store_id, _require_tenant
 from fastapi import HTTPException
 
 

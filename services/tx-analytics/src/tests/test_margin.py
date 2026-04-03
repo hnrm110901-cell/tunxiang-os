@@ -1,27 +1,26 @@
 """菜品毛利 + 门店报表 + 成本偏差 纯函数测试"""
-import sys
 import os
+import sys
 from decimal import Decimal
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+from services.cost_variance import (
+    build_variance_report,
+    classify_variance_cause,
+    compute_dish_variance,
+    generate_actions,
+)
 from services.dish_margin import (
     compute_margin,
     compute_margin_ranking,
     filter_low_margin,
 )
 from services.store_margin_report import (
-    compute_margin_rate,
-    compute_cost_variance,
     build_daily_report,
+    compute_cost_variance,
+    compute_margin_rate,
 )
-from services.cost_variance import (
-    compute_dish_variance,
-    classify_variance_cause,
-    generate_actions,
-    build_variance_report,
-)
-
 
 # ═══════════════════════════════════════════════
 # 菜品毛利计算测试

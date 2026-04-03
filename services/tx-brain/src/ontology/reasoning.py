@@ -8,11 +8,10 @@ and the BOM/pricing data to compute numeric evidence.
 """
 
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
 import structlog
 
-from .models import CausalChain, CausalLink
 from .repository import OntologyRepository
 
 logger = structlog.get_logger()

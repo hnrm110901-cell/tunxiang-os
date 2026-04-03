@@ -1,23 +1,24 @@
 """优惠券引擎测试 — 7种券类型 + 叠加 + 计算 + 统计 + API"""
-import sys
 import os
+import sys
+
 import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from services.coupon_engine import (
     CouponType,
-    create_coupon,
-    batch_issue,
-    verify_coupon,
-    redeem_coupon,
-    check_stacking_rules,
-    calculate_discount,
-    set_revenue_rule,
-    get_coupon_stats,
-    _CouponTemplateStore,
     _CouponInstanceStore,
+    _CouponTemplateStore,
     _RevenueRuleStore,
+    batch_issue,
+    calculate_discount,
+    check_stacking_rules,
+    create_coupon,
+    get_coupon_stats,
+    redeem_coupon,
+    set_revenue_rule,
+    verify_coupon,
 )
 
 TENANT = "t-test-001"

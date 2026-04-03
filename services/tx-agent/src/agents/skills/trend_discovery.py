@@ -3,8 +3,8 @@
 搜索热词分析、趋势变化检测、消费者需求洞察、区域热度对比、品类趋势预测、热点事件关联。
 """
 from typing import Any
-from ..base import SkillAgent, AgentResult
 
+from ..base import AgentResult, SkillAgent
 
 # 餐饮搜索趋势品类
 FOOD_CATEGORIES = [

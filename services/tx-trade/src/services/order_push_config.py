@@ -23,7 +23,7 @@ from enum import Enum
 from typing import Optional
 
 import structlog
-from sqlalchemy import select, text, and_, update
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = structlog.get_logger()
@@ -241,8 +241,9 @@ class OrderPushConfigService:
 
         # 广播激活事件（逐任务推送，方便前端按任务处理）
         try:
-            import httpx as _httpx
             import os as _os
+
+            import httpx as _httpx
 
             mac_url = _os.getenv("MAC_STATION_URL", "http://localhost:8000")
             async with _httpx.AsyncClient(timeout=3) as client:

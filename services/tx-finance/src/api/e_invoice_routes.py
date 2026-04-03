@@ -18,10 +18,8 @@ from typing import Any, Optional
 
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
+from models.invoice import Invoice
 from pydantic import BaseModel, Field
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from shared.ontology.src.database import get_db_with_tenant
 from services.invoice_service import (
     InvoiceAmountMismatchError,
     InvoiceNotFoundError,
@@ -29,8 +27,10 @@ from services.invoice_service import (
     InvoiceStatusError,
     _invoice_to_dict,
 )
-from models.invoice import Invoice
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from shared.ontology.src.database import get_db_with_tenant
 
 logger = structlog.get_logger()
 router = APIRouter(tags=["e-invoice"])

@@ -22,7 +22,6 @@ from ..src.services.runner_service import (
     pickup_dish,
 )
 
-
 # ─── Fixtures ───
 
 @pytest.fixture

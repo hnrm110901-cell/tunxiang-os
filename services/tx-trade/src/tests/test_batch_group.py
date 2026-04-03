@@ -8,16 +8,15 @@
 5. 不同档口独立累单（A档口数据不影响B档口）
 6. 空档口返回空列表
 """
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import uuid
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-
 
 # ── 测试工具 ──────────────────────────────────────────────────
 
@@ -118,7 +117,7 @@ async def test_multi_table_same_dish_merged():
 @pytest.mark.asyncio
 async def test_batch_count_and_remainder():
     """烤鸭×8，base_quantity=3 → batch_count=2，remainder=2"""
-    from services.batch_group_service import BatchGroupService, BatchGroup
+    from services.batch_group_service import BatchGroup
 
     task_rows = [
         FakeRow(

@@ -4,24 +4,21 @@
 
 import pytest
 from services.payroll_engine import (
-    compute_base_salary,
-    compute_overtime_pay,
-    derive_hourly_rate,
-    compute_commission,
-    compute_tiered_commission,
     compute_absence_deduction,
-    compute_late_deduction,
+    compute_base_salary,
+    compute_commission,
     compute_early_leave_deduction,
+    compute_full_attendance_bonus,
+    compute_late_deduction,
+    compute_overtime_pay,
     compute_performance_bonus,
     compute_seniority_subsidy,
-    compute_full_attendance_bonus,
     compute_tax_yuan,
-    compute_monthly_tax,
+    compute_tiered_commission,
     count_work_days,
+    safe_eval_expression,
     summarize_payroll,
     validate_formula,
-    safe_eval_expression,
-    SENIORITY_SUBSIDY_TABLE,
 )
 
 

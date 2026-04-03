@@ -13,16 +13,15 @@
 10. 会员价计算（S1 VIP 8.5折）
 11. 券核销审计
 """
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import uuid
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pytest
-
 
 # ─── 模拟对象 ───
 
@@ -85,7 +84,7 @@ async def test_identify_member_not_found():
 @pytest.mark.asyncio
 async def test_create_stored_value_card():
     """储值卡开卡"""
-    from services.coupon_service import create_stored_value_card, _StoredValueStore
+    from services.coupon_service import _StoredValueStore, create_stored_value_card
 
     _StoredValueStore._cards.clear()
     db = FakeSession()
@@ -104,7 +103,7 @@ async def test_create_stored_value_card():
 @pytest.mark.asyncio
 async def test_recharge():
     """储值充值"""
-    from services.coupon_service import create_stored_value_card, recharge, _StoredValueStore
+    from services.coupon_service import _StoredValueStore, create_stored_value_card, recharge
 
     _StoredValueStore._cards.clear()
     db = FakeSession()
@@ -117,7 +116,7 @@ async def test_recharge():
 @pytest.mark.asyncio
 async def test_deduct_stored_value_success():
     """储值消费 — 余额充足"""
-    from services.coupon_service import create_stored_value_card, deduct_stored_value, _StoredValueStore
+    from services.coupon_service import _StoredValueStore, create_stored_value_card, deduct_stored_value
 
     _StoredValueStore._cards.clear()
     db = FakeSession()
@@ -131,7 +130,7 @@ async def test_deduct_stored_value_success():
 @pytest.mark.asyncio
 async def test_deduct_stored_value_insufficient():
     """储值消费 — 余额不足"""
-    from services.coupon_service import create_stored_value_card, deduct_stored_value, _StoredValueStore
+    from services.coupon_service import _StoredValueStore, create_stored_value_card, deduct_stored_value
 
     _StoredValueStore._cards.clear()
     db = FakeSession()
@@ -158,7 +157,7 @@ async def test_verify_coupon_not_found():
 @pytest.mark.asyncio
 async def test_verify_and_redeem_coupon():
     """券验证 + 核销流程"""
-    from services.coupon_service import verify_coupon, redeem_coupon, _CouponStore
+    from services.coupon_service import _CouponStore, redeem_coupon, verify_coupon
 
     _CouponStore._coupons.clear()
 
@@ -260,7 +259,7 @@ async def test_member_price_s5_no_discount():
 @pytest.mark.asyncio
 async def test_coupon_audit_empty():
     """券核销审计 — 无记录"""
-    from services.coupon_service import get_coupon_audit, _CouponStore
+    from services.coupon_service import _CouponStore, get_coupon_audit
 
     _CouponStore._coupons.clear()
     db = FakeSession()

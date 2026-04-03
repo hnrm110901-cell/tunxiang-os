@@ -1,13 +1,14 @@
+/* 订单状态追踪页 */
 .page-container {
   min-height: 100vh;
   background: #0B1A20;
-  padding-bottom: calc(40rpx + env(safe-area-inset-bottom));
+  color: #fff;
 }
 
-/* Header */
+/* ─── 订单头部 ─── */
 .track-header {
   padding: 32rpx;
-  background: linear-gradient(180deg, #112228, #0B1A20);
+  background: linear-gradient(180deg, #112228 0%, #0B1A20 100%);
 }
 
 .track-header-top {
@@ -33,7 +34,7 @@
   color: #ccc;
 }
 
-/* Rush cooldown */
+/* ─── 催菜冷却 ─── */
 .rush-cooldown {
   text-align: center;
   padding: 16rpx 0;
@@ -44,9 +45,30 @@
   color: #999;
 }
 
-/* Items */
+/* ─── 出餐就绪横幅 ─── */
+.ready-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16rpx;
+  margin: 0 32rpx 24rpx;
+  padding: 24rpx;
+  background: rgba(15, 110, 86, 0.15);
+  border: 2rpx solid #0F6E56;
+  border-radius: 20rpx;
+}
+
+.ready-icon { font-size: 40rpx; }
+
+.ready-text {
+  font-size: 28rpx;
+  color: #0F6E56;
+  font-weight: 600;
+}
+
+/* ─── 订单菜品清单 ─── */
 .items-section {
-  margin: 0 32rpx;
+  margin: 0 32rpx 24rpx;
   background: #112228;
   border-radius: 24rpx;
   padding: 28rpx;
@@ -64,7 +86,7 @@
   display: flex;
   align-items: center;
   padding: 16rpx 0;
-  border-bottom: 1rpx solid #1a2a33;
+  border-bottom: 1rpx solid rgba(255,255,255,0.06);
   gap: 16rpx;
 }
 
@@ -91,6 +113,11 @@
   color: #fff;
 }
 
+.item-remark {
+  font-size: 22rpx;
+  color: #999;
+}
+
 .item-qty {
   font-size: 24rpx;
   color: #999;
@@ -98,8 +125,9 @@
 
 .item-price {
   font-size: 28rpx;
-  color: #FF6B2C;
+  color: #FF6B35;
   font-weight: 600;
+  flex-shrink: 0;
 }
 
 .order-total {
@@ -108,7 +136,7 @@
   align-items: center;
   padding-top: 20rpx;
   margin-top: 12rpx;
-  border-top: 2rpx solid #1a2a33;
+  border-top: 2rpx solid rgba(255,255,255,0.08);
 }
 
 .total-label {
@@ -119,28 +147,13 @@
 
 .total-value {
   font-size: 36rpx;
-  color: #FF6B2C;
+  color: #FF6B35;
   font-weight: bold;
 }
 
-/* Append */
-.append-section {
-  padding: 24rpx 32rpx;
-}
-
-.append-btn {
-  background: transparent !important;
-  border: 2rpx solid #FF6B2C !important;
-  color: #FF6B2C !important;
-  border-radius: 44rpx;
-  font-size: 30rpx;
-  height: 80rpx;
-  line-height: 80rpx;
-}
-
-/* Info section */
+/* ─── 订单信息 ─── */
 .info-section {
-  margin: 24rpx 32rpx;
+  margin: 0 32rpx 24rpx;
   background: #112228;
   border-radius: 24rpx;
   padding: 24rpx 28rpx;
@@ -149,8 +162,12 @@
 .info-row {
   display: flex;
   justify-content: space-between;
-  padding: 12rpx 0;
+  align-items: center;
+  padding: 14rpx 0;
+  border-bottom: 1rpx solid rgba(255,255,255,0.06);
 }
+
+.info-row:last-child { border-bottom: none; }
 
 .info-label {
   font-size: 26rpx;
@@ -160,4 +177,45 @@
 .info-value {
   font-size: 26rpx;
   color: #ccc;
+}
+
+/* ─── 底部操作区 ─── */
+.action-section {
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+  margin: 0 32rpx;
+}
+
+.action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12rpx;
+  height: 88rpx;
+  border-radius: 44rpx;
+  font-size: 30rpx;
+  font-weight: 600;
+}
+
+.action-btn.outline {
+  background: transparent;
+  border: 2rpx solid rgba(255,255,255,0.3);
+}
+
+.action-btn.outline.service {
+  border-color: #FF6B35;
+}
+
+.action-btn.primary {
+  background: #FF6B35;
+}
+
+.action-icon { font-size: 32rpx; }
+
+.action-btn-text { color: #fff; font-size: 30rpx; font-weight: 600; }
+
+/* ─── 安全区 ─── */
+.safe-area-bottom {
+  height: calc(40rpx + env(safe-area-inset-bottom));
 }

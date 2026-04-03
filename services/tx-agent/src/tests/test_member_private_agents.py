@@ -1,5 +1,8 @@
 """MemberInsight + PrivateOps Agent 测试"""
-import sys, os, asyncio
+import asyncio
+import os
+import sys
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from agents.skills.member_insight import MemberInsightAgent

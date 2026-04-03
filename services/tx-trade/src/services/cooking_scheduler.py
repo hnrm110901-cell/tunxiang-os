@@ -11,10 +11,10 @@
 """
 import statistics
 import uuid
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 
 import structlog
-from sqlalchemy import select, func, and_, text
+from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.entities import Dish, Order, OrderItem
@@ -289,7 +289,7 @@ async def create_table_fire_plan(
             items_by_dept=items_by_dept,
             db=db,
         )
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — MLPS3-P0: 协调计划创建失败降级为None，最外层兜底
         log.error(
             "cooking_scheduler.table_fire.create_plan_failed",
             error=str(exc),

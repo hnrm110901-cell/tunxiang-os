@@ -7,11 +7,11 @@
 规则增删改时通过 invalidate_store_cache() 失效。
 """
 import uuid
-from datetime import datetime, time
+from datetime import datetime
 from typing import Optional
 
 import structlog
-from sqlalchemy import select, and_
+from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models.dispatch_rule import DispatchRule
@@ -131,9 +131,7 @@ def _rule_matches(
     # 工作日类型匹配
     if rule.match_day_type is not None:
         weekday = order_time.weekday()  # 0=周一 … 6=周日
-        if rule.match_day_type == "weekday" and weekday >= 5:
-            return False
-        elif rule.match_day_type == "weekend" and weekday < 5:
+        if rule.match_day_type == "weekday" and weekday >= 5 or rule.match_day_type == "weekend" and weekday < 5:
             return False
         # holiday 类型需要外部维护节假日表，此处跳过（不拦截）
 

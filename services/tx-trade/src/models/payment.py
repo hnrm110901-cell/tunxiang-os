@@ -1,11 +1,12 @@
 """支付模型 — 多支付方式 + 退款"""
 import uuid
 
-from sqlalchemy import String, Integer, Float, Boolean, DateTime, Text, ForeignKey, func
-from sqlalchemy.dialects.postgresql import UUID, JSON
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy.dialects.postgresql import JSON, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from shared.ontology.src.base import TenantBase
+
 from .enums import PaymentMethod, PaymentStatus, RefundType
 
 
@@ -48,6 +49,12 @@ class Payment(TenantBase):
 
     notes: Mapped[str | None] = mapped_column(Text)
     extra: Mapped[dict | None] = mapped_column(JSON, default=dict)
+
+    # 幂等键 — 客户端生成，格式建议: {device_id}-{order_id[:8]}-{unix_ts_seconds}
+    # NULL 表示旧客户端未传，不做幂等保护（向下兼容）
+    idempotency_key: Mapped[str | None] = mapped_column(
+        String(128), nullable=True, index=False, comment="客户端幂等键，(tenant_id, idempotency_key) 唯一"
+    )
 
 
 class Refund(TenantBase):

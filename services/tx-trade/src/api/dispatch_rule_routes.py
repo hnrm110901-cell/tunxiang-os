@@ -9,12 +9,13 @@ from datetime import datetime, timezone
 from typing import Optional
 
 import structlog
-from fastapi import APIRouter, Depends, Request, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
-from sqlalchemy import select, and_
+from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+
 from ..models.dispatch_rule import DispatchRule
 from ..models.production_dept import ProductionDept
 from ..services.dispatch_rule_engine import dispatch_rule_engine, invalidate_store_cache

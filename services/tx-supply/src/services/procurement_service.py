@@ -5,8 +5,6 @@
 """
 import uuid
 from datetime import datetime, timezone
-from typing import Optional
-
 
 # 采购单状态
 PROCUREMENT_STATES = {

@@ -4,7 +4,8 @@
  * 并台: 多选桌台 → 选主桌 → 确认
  * 移动端竖屏, 最小字体16px, 热区>=48px
  */
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { fetchTables, transferTable, mergeTables, TableInfo } from '../api/tablesApi';
 
 /* ---------- 样式常量 ---------- */
 const C = {
@@ -20,29 +21,12 @@ const C = {
   info: '#185FA5',
 };
 
-/* ---------- Mock 数据 ---------- */
-interface MockTable {
-  no: string;
-  seats: number;
-  status: 'idle' | 'occupied';
-  guests: number;
-}
-
-const MOCK_TABLES: MockTable[] = [
-  { no: 'A01', seats: 4, status: 'occupied', guests: 3 },
-  { no: 'A02', seats: 4, status: 'idle', guests: 0 },
-  { no: 'A03', seats: 6, status: 'occupied', guests: 5 },
-  { no: 'A04', seats: 4, status: 'idle', guests: 0 },
-  { no: 'B01', seats: 8, status: 'occupied', guests: 8 },
-  { no: 'B02', seats: 10, status: 'idle', guests: 0 },
-  { no: 'B03', seats: 8, status: 'occupied', guests: 6 },
-  { no: 'B04', seats: 6, status: 'idle', guests: 0 },
-];
-
 type Mode = 'transfer' | 'merge';
 type Step = 'select-source' | 'select-target' | 'confirm';
 
 /* ---------- 组件 ---------- */
+const storeId = (window as any).__STORE_ID__ || 'store_001';
+
 export function TableOpsPage() {
   const [mode, setMode] = useState<Mode>('transfer');
   const [step, setStep] = useState<Step>('select-source');
@@ -53,9 +37,21 @@ export function TableOpsPage() {
   const [mainTable, setMainTable] = useState<string | null>(null);
   const [processing, setProcessing] = useState(false);
   const [done, setDone] = useState(false);
+  const [tables, setTables] = useState<TableInfo[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const occupied = MOCK_TABLES.filter(t => t.status === 'occupied');
-  const idle = MOCK_TABLES.filter(t => t.status === 'idle');
+  useEffect(() => {
+    fetchTables(storeId).then(res => {
+      setTables(res.items);
+    }).catch((err: unknown) => {
+      console.error(err);
+      setError('桌台数据加载失败');
+    }).finally(() => setLoading(false));
+  }, []);
+
+  const occupied = tables.filter(t => t.status === 'occupied');
+  const idle = tables.filter(t => t.status === 'idle');
 
   const reset = () => {
     setStep('select-source');
@@ -82,12 +78,19 @@ export function TableOpsPage() {
     setStep('confirm');
   };
 
-  const handleConfirmTransfer = () => {
+  const handleConfirmTransfer = async () => {
+    if (!sourceTable || !targetTable) return;
     setProcessing(true);
-    setTimeout(() => {
-      setProcessing(false);
+    setError(null);
+    try {
+      await transferTable(storeId, sourceTable, targetTable);
       setDone(true);
-    }, 600);
+    } catch (err: unknown) {
+      console.error(err);
+      setError('转台失败，请重试');
+    } finally {
+      setProcessing(false);
+    }
   };
 
   /* ---- 并台逻辑 ---- */
@@ -97,17 +100,24 @@ export function TableOpsPage() {
     );
   };
 
-  const handleConfirmMerge = () => {
+  const handleConfirmMerge = async () => {
+    if (!mainTable) return;
     setProcessing(true);
-    setTimeout(() => {
-      setProcessing(false);
+    setError(null);
+    try {
+      await mergeTables(storeId, mainTable, mergeSelection);
       setDone(true);
-    }, 600);
+    } catch (err: unknown) {
+      console.error(err);
+      setError('并台失败，请重试');
+    } finally {
+      setProcessing(false);
+    }
   };
 
   /* ---- 渲染桌台按钮 ---- */
   const renderTableBtn = (
-    t: MockTable,
+    t: TableInfo,
     opts: {
       selected?: boolean;
       disabled?: boolean;
@@ -115,7 +125,7 @@ export function TableOpsPage() {
     },
   ) => (
     <button
-      key={t.no}
+      key={t.table_no}
       onClick={opts.onPress}
       disabled={opts.disabled}
       style={{
@@ -127,9 +137,9 @@ export function TableOpsPage() {
         textAlign: 'center',
       }}
     >
-      <div style={{ fontSize: 20, fontWeight: 700 }}>{t.no}</div>
+      <div style={{ fontSize: 20, fontWeight: 700 }}>{t.table_no}</div>
       <div style={{ fontSize: 16, color: t.status === 'occupied' ? C.accent : C.green, marginTop: 4 }}>
-        {t.status === 'occupied' ? `${t.guests}人` : '空闲'}
+        {t.status === 'occupied' ? `${t.guest_count}人` : '空闲'}
       </div>
     </button>
   );
@@ -139,6 +149,25 @@ export function TableOpsPage() {
       <h1 style={{ fontSize: 20, fontWeight: 700, color: C.white, margin: '0 0 16px' }}>
         桌台操作
       </h1>
+
+      {loading && (
+        <div style={{ textAlign: 'center', padding: 40, color: C.muted, fontSize: 16 }}>
+          加载中...
+        </div>
+      )}
+
+      {error && (
+        <div style={{
+          background: `${C.danger}22`, border: `1px solid ${C.danger}`,
+          borderRadius: 12, padding: 12, marginBottom: 16,
+          color: '#ff9999', fontSize: 16, textAlign: 'center',
+        }}>
+          {error}
+        </div>
+      )}
+
+      {!loading && (
+      <>
 
       {/* 模式切换 */}
       <div style={{ display: 'flex', gap: 0, marginBottom: 20, borderRadius: 12, overflow: 'hidden' }}>
@@ -199,7 +228,7 @@ export function TableOpsPage() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
                 {occupied.map(t => renderTableBtn(t, {
                   selected: false,
-                  onPress: () => handleSelectSource(t.no),
+                  onPress: () => handleSelectSource(t.table_no),
                 }))}
               </div>
               {occupied.length === 0 && (
@@ -236,7 +265,7 @@ export function TableOpsPage() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
                 {idle.map(t => renderTableBtn(t, {
                   selected: false,
-                  onPress: () => handleSelectTarget(t.no),
+                  onPress: () => handleSelectTarget(t.table_no),
                 }))}
               </div>
               {idle.length === 0 && (
@@ -294,8 +323,8 @@ export function TableOpsPage() {
               </h2>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 16 }}>
                 {occupied.map(t => renderTableBtn(t, {
-                  selected: mergeSelection.includes(t.no),
-                  onPress: () => toggleMergeSelect(t.no),
+                  selected: mergeSelection.includes(t.table_no),
+                  onPress: () => toggleMergeSelect(t.table_no),
                 }))}
               </div>
               {mergeSelection.length >= 2 && (
@@ -305,7 +334,7 @@ export function TableOpsPage() {
                   </h2>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 16 }}>
                     {mergeSelection.map(no => {
-                      const t = MOCK_TABLES.find(tb => tb.no === no)!;
+                      const t = tables.find(tb => tb.table_no === no)!;
                       return renderTableBtn(t, {
                         selected: false,
                         onPress: () => setMainTable(no),
@@ -351,6 +380,9 @@ export function TableOpsPage() {
             </div>
           )}
         </>
+      )}
+
+      </> /* end !loading */
       )}
     </div>
   );

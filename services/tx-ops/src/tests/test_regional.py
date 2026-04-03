@@ -1,23 +1,20 @@
 """E8 区域追踪与整改测试"""
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import pytest
 from services.regional_management import (
-    dispatch_rectification,
-    track_rectification,
-    submit_review,
-    get_regional_scorecard,
+    _score_to_color,
     cross_store_benchmark,
+    dispatch_rectification,
     generate_regional_report,
     get_rectification_archive,
-    RECTIFICATION_STATUSES,
-    RECTIFICATION_TRANSITIONS,
-    _score_to_color,
+    get_regional_scorecard,
+    submit_review,
+    track_rectification,
 )
-
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  整改派发与状态机

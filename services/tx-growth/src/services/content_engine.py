@@ -5,8 +5,7 @@
 """
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Optional
-
+from typing import Optional
 
 # ---------------------------------------------------------------------------
 # 内存存储
@@ -323,8 +322,9 @@ class ContentEngine:
 # ---------------------------------------------------------------------------
 
 import os
-import httpx
 from uuid import UUID
+
+import httpx
 
 
 class PersonalizedContentEngine:

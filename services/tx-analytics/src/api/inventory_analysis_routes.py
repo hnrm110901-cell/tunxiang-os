@@ -3,7 +3,6 @@
 8 个端点: 周转率/涨跌监控/损耗排行/盘点差异/采购偏差/成本偏差/活鲜损耗/食安图谱
 统一响应格式: {"ok": bool, "data": {}, "error": {}}
 """
-from typing import Optional
 
 from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel

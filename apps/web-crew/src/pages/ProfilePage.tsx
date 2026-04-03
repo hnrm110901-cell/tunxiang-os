@@ -1,6 +1,7 @@
 /**
  * 个人中心 — 员工信息、本月绩效、排班日历占位
  */
+import { useNavigate } from 'react-router-dom';
 
 /* ---------- 样式常量 ---------- */
 const C = {
@@ -63,6 +64,12 @@ function shiftLabel(shift: string) {
 
 /* ---------- 组件 ---------- */
 export function ProfilePage() {
+  const navigate = useNavigate();
+  const role = (window as any).__STAFF_ROLE__;
+  const isManager = role === 'manager' || role === 'owner';
+  const todayRank = 2;
+  const totalStaff = 5;
+
   return (
     <div style={{ padding: '16px 12px 80px', background: C.bg, minHeight: '100vh' }}>
       {/* 员工信息卡 */}
@@ -112,6 +119,215 @@ export function ProfilePage() {
           </div>
         </div>
       </div>
+
+      {/* 管理驾驶舱入口（店长/老板专属） */}
+      {isManager && (
+        <button
+          onClick={() => navigate('/manager-app')}
+          style={{
+            width: '100%', height: 56, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            gap: 10, background: C.accent, borderRadius: 12, marginBottom: 16,
+            border: 'none', cursor: 'pointer',
+          }}
+        >
+          <span style={{ fontSize: 22 }}>🏪</span>
+          <span style={{ fontSize: 17, fontWeight: 700, color: C.white }}>管理驾驶舱</span>
+          <span style={{ fontSize: 18, color: `${C.white}80` }}>›</span>
+        </button>
+      )}
+
+      {/* 集团驾驶舱入口（店长/老板专属） */}
+      {isManager && (
+        <button
+          onClick={() => navigate('/group-dashboard')}
+          style={{
+            width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            background: C.card, borderRadius: 12, padding: '14px 16px', marginBottom: 16,
+            border: `1px solid ${C.border}`, cursor: 'pointer', textAlign: 'left',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{
+              width: 40, height: 40, borderRadius: 10,
+              background: `${C.accent}22`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 20, flexShrink: 0,
+            }}>
+              📡
+            </div>
+            <div>
+              <div style={{ fontSize: 16, fontWeight: 700, color: C.white }}>集团驾驶舱</div>
+              <div style={{ fontSize: 13, color: C.muted, marginTop: 2 }}>
+                跨店实时营收与异常告警
+              </div>
+            </div>
+          </div>
+          <span style={{ fontSize: 18, color: C.muted }}>›</span>
+        </button>
+      )}
+
+      {/* 会员等级配置入口（店长/老板专属） */}
+      {isManager && (
+        <button
+          onClick={() => navigate('/member-level-config')}
+          style={{
+            width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            background: C.card, borderRadius: 12, padding: '14px 16px', marginBottom: 16,
+            border: `1px solid ${C.border}`, cursor: 'pointer', textAlign: 'left',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{
+              width: 40, height: 40, borderRadius: 10,
+              background: '#facc1522',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 20, flexShrink: 0,
+            }}>
+              🥇
+            </div>
+            <div>
+              <div style={{ fontSize: 16, fontWeight: 700, color: C.white }}>会员等级配置</div>
+              <div style={{ fontSize: 13, color: C.muted, marginTop: 2 }}>
+                配置等级权益与积分规则
+              </div>
+            </div>
+          </div>
+          <span style={{ fontSize: 18, color: C.muted }}>›</span>
+        </button>
+      )}
+
+      {/* 打印机配置入口（店长/老板专属） */}
+      {isManager && (
+        <button
+          onClick={() => navigate('/printer-settings')}
+          style={{
+            width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            background: C.card, borderRadius: 12, padding: '14px 16px', marginBottom: 16,
+            border: `1px solid ${C.border}`, cursor: 'pointer', textAlign: 'left',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{
+              width: 40, height: 40, borderRadius: 10,
+              background: `${C.accent}22`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 20, flexShrink: 0,
+            }}>
+              🖨
+            </div>
+            <div>
+              <div style={{ fontSize: 16, fontWeight: 700, color: C.white }}>打印机配置</div>
+              <div style={{ fontSize: 13, color: C.muted, marginTop: 2 }}>
+                配置打印机与菜品路由规则
+              </div>
+            </div>
+          </div>
+          <span style={{ fontSize: 18, color: C.muted }}>›</span>
+        </button>
+      )}
+
+      {/* 预订收件箱入口（所有人可见） */}
+      <button
+        onClick={() => navigate('/reservations')}
+        style={{
+          width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          background: C.card, borderRadius: 12, padding: '14px 16px', marginBottom: 16,
+          border: `1px solid ${C.border}`, cursor: 'pointer', textAlign: 'left',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{
+            width: 40, height: 40, borderRadius: 10,
+            background: 'rgba(255,107,44,0.15)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 20, flexShrink: 0,
+          }}>
+            📅
+          </div>
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: C.white }}>预订收件箱</div>
+            <div style={{ fontSize: 13, color: C.muted, marginTop: 2 }}>
+              美团/大众点评/微信多渠道预订聚合
+            </div>
+          </div>
+        </div>
+        <span style={{ fontSize: 18, color: C.muted }}>›</span>
+      </button>
+
+      {/* 供应链移动端入口 */}
+      <div style={{ marginBottom: 16 }}>
+        <h2 style={{ fontSize: 15, fontWeight: 600, color: C.muted, margin: '0 0 10px' }}>供应链</h2>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <button
+            onClick={() => navigate('/receiving')}
+            style={{
+              height: 64, display: 'flex', flexDirection: 'column',
+              alignItems: 'center', justifyContent: 'center', gap: 4,
+              background: C.card, borderRadius: 12,
+              border: `1px solid ${C.border}`, cursor: 'pointer',
+            }}
+          >
+            <span style={{ fontSize: 22 }}>📦</span>
+            <span style={{ fontSize: 15, fontWeight: 600, color: C.white }}>移动收货</span>
+          </button>
+          <button
+            onClick={() => navigate('/stocktake')}
+            style={{
+              height: 64, display: 'flex', flexDirection: 'column',
+              alignItems: 'center', justifyContent: 'center', gap: 4,
+              background: C.card, borderRadius: 12,
+              border: `1px solid ${C.border}`, cursor: 'pointer',
+            }}
+          >
+            <span style={{ fontSize: 22 }}>📋</span>
+            <span style={{ fontSize: 15, fontWeight: 600, color: C.white }}>库存盘点</span>
+          </button>
+        </div>
+        {isManager && (
+          <button
+            onClick={() => navigate('/purchase-approval')}
+            style={{
+              width: '100%', height: 56, display: 'flex',
+              alignItems: 'center', justifyContent: 'center', gap: 10,
+              background: C.card, borderRadius: 12, marginTop: 10,
+              border: `1px solid ${C.border}`, cursor: 'pointer',
+            }}
+          >
+            <span style={{ fontSize: 20 }}>✅</span>
+            <span style={{ fontSize: 16, fontWeight: 600, color: C.white }}>采购审批</span>
+            <span style={{ fontSize: 13, color: C.muted }}>（店长专属）</span>
+          </button>
+        )}
+      </div>
+
+      {/* 我的绩效入口卡 */}
+      <button
+        onClick={() => navigate('/crew-stats')}
+        style={{
+          width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          background: C.card, borderRadius: 12, padding: '14px 16px', marginBottom: 16,
+          border: `1px solid ${C.border}`, borderLeft: `4px solid ${C.accent}`,
+          cursor: 'pointer', textAlign: 'left',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{
+            width: 40, height: 40, borderRadius: 10,
+            background: `${C.accent}22`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 20, flexShrink: 0,
+          }}>
+            📊
+          </div>
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: C.white }}>我的绩效</div>
+            <div style={{ fontSize: 13, color: C.muted, marginTop: 2 }}>
+              今日第 {todayRank} 名 / 共 {totalStaff} 人
+            </div>
+          </div>
+        </div>
+        <span style={{ fontSize: 18, color: C.muted }}>›</span>
+      </button>
 
       {/* 本月绩效 */}
       <h2 style={{ fontSize: 17, fontWeight: 600, color: C.white, margin: '0 0 10px' }}>

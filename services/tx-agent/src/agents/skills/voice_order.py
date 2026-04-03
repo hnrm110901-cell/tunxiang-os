@@ -8,7 +8,7 @@ from typing import Any, Optional
 
 import structlog
 
-from ..base import SkillAgent, AgentResult
+from ..base import AgentResult, SkillAgent
 
 logger = structlog.get_logger()
 

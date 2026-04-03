@@ -12,11 +12,13 @@
   - [STATS] get_queue_history 改用 SQL 聚合统计，避免二次全表扫描
 """
 import uuid
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from shared.events import UniversalPublisher
 
 from ..repositories.queue_repo import QueueRepository
 
@@ -230,7 +232,24 @@ class QueueService:
             customer_name=record.customer_name,
             notification_queued=True,
         )
-        # TODO: 接入消息队列发送叫号短信通知
+        # 向 sms_jobs Redis Stream 推送叫号短信作业，SMS Worker 消费后发送
+        try:
+            r = await UniversalPublisher.get_redis()
+            await r.xadd(
+                "sms_jobs",
+                {
+                    "sms_type": "queue_called",
+                    "phone": record.phone or "",
+                    "customer_name": record.customer_name or "",
+                    "queue_number": str(record.queue_number),
+                    "tenant_id": self.tenant_id,
+                    "store_id": str(self._repo.store_id) if hasattr(self._repo, "store_id") else "",
+                },
+                maxlen=50_000,
+                approximate=True,
+            )
+        except (OSError, RuntimeError) as exc:
+            logger.warning("queue_sms_publish_failed", queue_id=queue_id, error=str(exc))
 
         return {
             "queue_id": queue_id,

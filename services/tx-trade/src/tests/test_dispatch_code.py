@@ -10,18 +10,16 @@
 7.  跨租户隔离 — 租户 A 的 code 不能被租户 B 扫
 8.  待确认列表 — 只返回未确认订单
 """
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import re
 import uuid
 from datetime import datetime
-from unittest.mock import AsyncMock, patch
 
 import pytest
-
 
 # ─── 工具 ───
 
@@ -35,7 +33,7 @@ TENANT_B = _uid()
 
 def _clear_stores():
     """在测试间清理内存存储，避免状态污染"""
-    from services.dispatch_code_service import _store_by_order, _store_by_code
+    from services.dispatch_code_service import _store_by_code, _store_by_order
     _store_by_order.clear()
     _store_by_code.clear()
 
@@ -333,6 +331,7 @@ async def test_generate_code_base62_chars():
     """生成的 code 字符集严格为 A-Z、a-z、0-9"""
     _clear_stores()
     import string
+
     from services.dispatch_code_service import generate_dispatch_code
 
     allowed = set(string.ascii_uppercase + string.ascii_lowercase + string.digits)

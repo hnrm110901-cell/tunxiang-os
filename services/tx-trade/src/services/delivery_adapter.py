@@ -7,14 +7,15 @@ v2: 订单持久化到 PostgreSQL delivery_orders 表（RLS 隔离）。
 """
 import os
 import uuid
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
 import structlog
-from sqlalchemy import select, and_
+from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from shared.ontology.src.database import async_session_factory, _SET_TENANT_SQL
+from shared.ontology.src.database import _SET_TENANT_SQL, async_session_factory
+
 from ..models.delivery_order import DeliveryOrder
 
 logger = structlog.get_logger()

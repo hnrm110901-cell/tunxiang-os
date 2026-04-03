@@ -43,6 +43,11 @@ class TransferNotAllowedError(Exception):
     pass
 
 
+class CardNotFoundError(ValueError):
+    """储值卡不存在（ValueError 子类，兼容现有 except ValueError 捕获）"""
+    pass
+
+
 class StoredValueService:
     """储值卡核心服务"""
 
@@ -167,7 +172,7 @@ class StoredValueService:
         store_id: uuid.UUID | None = None,
     ) -> dict:
         """按套餐充值 — 验证套餐有效性，同一事务内更新卡余额并记录流水"""
-        from models.stored_value import StoredValueCard, StoredValueRechargePlan, StoredValueTransaction
+        from models.stored_value import StoredValueRechargePlan, StoredValueTransaction
 
         # 查套餐（带 tenant_id 隔离）
         plan_result = await db.execute(
@@ -231,6 +236,7 @@ class StoredValueService:
 
         # 发布储值充值事件（不阻塞主流程）
         import asyncio
+
         from shared.events.event_publisher import MemberEventPublisher
         from shared.events.member_events import MemberEventType
 
@@ -262,7 +268,7 @@ class StoredValueService:
         store_id: str | None = None,
     ) -> dict:
         """充值（按金额，含自动匹配赠送规则）— 兼容 v1 路由"""
-        from models.stored_value import StoredValueCard, StoredValueTransaction, RechargeRule
+        from models.stored_value import StoredValueTransaction
 
         if amount_fen <= 0:
             raise ValueError("充值金额必须大于0")
@@ -297,6 +303,7 @@ class StoredValueService:
 
         # 发布储值充值事件（不阻塞主流程）
         import asyncio
+
         from shared.events.event_publisher import MemberEventPublisher
         from shared.events.member_events import MemberEventType
 
@@ -336,7 +343,7 @@ class StoredValueService:
         store_id: str | None = None,
     ) -> dict:
         """消费扣款 — 先扣赠送金再扣本金"""
-        from models.stored_value import StoredValueCard, StoredValueTransaction
+        from models.stored_value import StoredValueTransaction
 
         if amount_fen <= 0:
             raise ValueError("消费金额必须大于0")
@@ -396,7 +403,7 @@ class StoredValueService:
         store_id: uuid.UUID | None = None,
     ) -> dict:
         """消费扣款（按 card_id，v2 路由用）"""
-        from models.stored_value import StoredValueCard, StoredValueTransaction
+        from models.stored_value import StoredValueTransaction
 
         if amount_fen <= 0:
             raise ValueError("消费金额必须大于0")
@@ -450,7 +457,7 @@ class StoredValueService:
         operator_id: str | None = None,
     ) -> dict:
         """退款 — 仅退本金（兼容 v1 路由）"""
-        from models.stored_value import StoredValueCard, StoredValueTransaction
+        from models.stored_value import StoredValueTransaction
 
         if amount_fen <= 0:
             raise ValueError("退款金额必须大于0")
@@ -496,7 +503,7 @@ class StoredValueService:
         operator_id: uuid.UUID | None = None,
     ) -> dict:
         """按原始流水退款 — 退款不超过原始消费额，仅退本金（v2 路由用）"""
-        from models.stored_value import StoredValueCard, StoredValueTransaction
+        from models.stored_value import StoredValueTransaction
 
         if refund_amount_fen <= 0:
             raise ValueError("退款金额必须大于0")
@@ -727,7 +734,7 @@ class StoredValueService:
 
         满赠逻辑由调用方计算并通过 gift_amount_fen 传入。
         """
-        from models.stored_value import StoredValueCard, StoredValueTransaction
+        from models.stored_value import StoredValueTransaction
 
         if amount_fen <= 0:
             raise ValueError("充值金额必须大于0")
@@ -788,7 +795,7 @@ class StoredValueService:
         remark: str | None = None,
     ) -> dict:
         """直接退款（仅退本金）— 按 card_id，不验证原始流水。"""
-        from models.stored_value import StoredValueCard, StoredValueTransaction
+        from models.stored_value import StoredValueTransaction
 
         if amount_fen <= 0:
             raise ValueError("退款金额必须大于0")
@@ -1014,7 +1021,7 @@ class StoredValueService:
 
     async def freeze(self, db: AsyncSession, card_no: str, operator_id: str | None = None) -> dict:
         """冻结储值卡"""
-        from models.stored_value import StoredValueCard, StoredValueTransaction
+        from models.stored_value import StoredValueTransaction
 
         card = await self._get_active_card_for_update(db, card_no)
         card.status = "frozen"
@@ -1036,6 +1043,43 @@ class StoredValueService:
         )
         db.add(txn)
         return {"card_no": card_no, "status": "frozen"}
+
+    async def freeze_by_id(
+        self,
+        db: AsyncSession,
+        card_id: uuid.UUID,
+        tenant_id: uuid.UUID,
+        operator_id: uuid.UUID | None = None,
+        remark: str | None = None,
+    ) -> dict:
+        """冻结储值卡（按 card_id）"""
+        from models.stored_value import StoredValueTransaction
+
+        card = await self._get_card_by_id_for_update(db, card_id, tenant_id)
+        if card.status != "active":
+            raise CardNotActiveError(f"只能冻结 active 状态的卡，当前状态: {card.status}")
+
+        card.status = "frozen"
+        card.frozen_at = datetime.now(timezone.utc)
+
+        txn = StoredValueTransaction(
+            id=uuid.uuid4(),
+            tenant_id=tenant_id,
+            card_id=card.id,
+            customer_id=card.customer_id,
+            txn_type="freeze",
+            amount_fen=0,
+            main_amount_fen=0,
+            gift_amount_fen=0,
+            balance_after_fen=card.balance_fen,
+            gift_balance_after_fen=card.gift_balance_fen,
+            operator_id=operator_id,
+            remark=remark or "冻结储值卡",
+        )
+        db.add(txn)
+
+        logger.info("stored_value_freeze_by_id", card_id=str(card_id))
+        return {"card_id": str(card_id), "card_no": card.card_no, "status": "frozen"}
 
     async def unfreeze(self, db: AsyncSession, card_no: str, operator_id: str | None = None) -> dict:
         """解冻储值卡"""
@@ -1071,6 +1115,194 @@ class StoredValueService:
         )
         db.add(txn)
         return {"card_no": card_no, "status": "active"}
+
+    async def unfreeze_by_id(
+        self,
+        db: AsyncSession,
+        card_id: uuid.UUID,
+        tenant_id: uuid.UUID,
+        operator_id: uuid.UUID | None = None,
+        remark: str | None = None,
+    ) -> dict:
+        """解冻储值卡（按 card_id）"""
+        from models.stored_value import StoredValueTransaction
+
+        card = await self._get_card_by_id_for_update(db, card_id, tenant_id)
+        if card.status != "frozen":
+            raise CardNotActiveError("卡片非冻结状态，无需解冻")
+
+        card.status = "active"
+        card.frozen_at = None
+
+        txn = StoredValueTransaction(
+            id=uuid.uuid4(),
+            tenant_id=tenant_id,
+            card_id=card.id,
+            customer_id=card.customer_id,
+            txn_type="unfreeze",
+            amount_fen=0,
+            main_amount_fen=0,
+            gift_amount_fen=0,
+            balance_after_fen=card.balance_fen,
+            gift_balance_after_fen=card.gift_balance_fen,
+            operator_id=operator_id,
+            remark=remark or "解冻储值卡",
+        )
+        db.add(txn)
+
+        logger.info("stored_value_unfreeze_by_id", card_id=str(card_id))
+        return {"card_id": str(card_id), "card_no": card.card_no, "status": "active"}
+
+    async def list_cards_by_customer(
+        self,
+        db: AsyncSession,
+        customer_id: uuid.UUID,
+        tenant_id: uuid.UUID,
+        include_inactive: bool = False,
+    ) -> list[dict]:
+        """查询会员名下所有储值卡（按 customer_id）
+
+        参数：
+            include_inactive: True 时返回所有卡（含冻结/过期），
+                              False 时只返回 active 卡（默认）。
+        """
+        from models.stored_value import StoredValueCard
+
+        stmt = (
+            select(StoredValueCard)
+            .where(
+                StoredValueCard.customer_id == customer_id,
+                StoredValueCard.tenant_id == tenant_id,
+                StoredValueCard.is_deleted.is_(False),
+            )
+            .order_by(StoredValueCard.created_at.asc())
+        )
+        if not include_inactive:
+            stmt = stmt.where(StoredValueCard.status == "active")
+
+        result = await db.execute(stmt)
+        cards = result.scalars().all()
+        return [_card_to_dict(c) for c in cards]
+
+    # ──────────────────────────────────────────────────────────────
+    # 积分兑换余额
+    # ──────────────────────────────────────────────────────────────
+
+    async def exchange_points_for_balance(
+        self,
+        db: AsyncSession,
+        tenant_id: uuid.UUID,
+        member_id: uuid.UUID,
+        points: int,
+        points_to_fen_ratio: int = 100,
+    ) -> dict:
+        """积分兑换储值余额
+
+        流程：
+        1. 查找会员储值卡（按 customer_id，取第一张 active 卡）
+        2. 从 member_cards 扣除积分（乐观检查余额）
+        3. 将兑换金额充入储值卡余额（作为本金）
+        4. 记录 sv_transactions 流水（type='exchange'）
+        5. 返回交易记录
+
+        参数：
+            points: 要兑换的积分数（> 0）
+            points_to_fen_ratio: 每多少积分兑换 1 分（默认 100 积分 = 1 分钱）
+
+        异常：
+            ValueError: points <= 0
+            CardNotFoundError: 该会员没有 active 储值卡
+            InsufficientBalanceError: 积分余额不足
+        """
+        from models.stored_value import StoredValueCard, StoredValueTransaction
+        from sqlalchemy import text
+
+        if points <= 0:
+            raise ValueError("兑换积分必须大于0")
+
+        amount_fen = points // points_to_fen_ratio
+        if amount_fen <= 0:
+            raise ValueError(
+                f"积分不足以兑换（需至少 {points_to_fen_ratio} 积分兑换 1 分钱，"
+                f"当前 {points} 积分）"
+            )
+
+        # 1. 查找会员 active 储值卡（customer_id = member_id）
+        card_result = await db.execute(
+            select(StoredValueCard)
+            .where(
+                StoredValueCard.customer_id == member_id,
+                StoredValueCard.tenant_id == tenant_id,
+                StoredValueCard.status == "active",
+                StoredValueCard.is_deleted.is_(False),
+            )
+            .order_by(StoredValueCard.created_at.asc())
+            .limit(1)
+            .with_for_update()
+        )
+        card = card_result.scalar_one_or_none()
+        if not card:
+            raise CardNotFoundError(
+                f"会员 {member_id} 没有有效的储值卡，请先开卡"
+            )
+
+        # 2. 从 member_cards 扣积分（raw SQL，兼容现有积分体系）
+        deduct_result = await db.execute(
+            text(
+                "UPDATE member_cards "
+                "SET points = points - :pts, updated_at = :now "
+                "WHERE customer_id = :mid AND tenant_id = :tid "
+                "AND is_deleted = false AND points >= :pts "
+                "RETURNING id, points"
+            ),
+            {
+                "pts": points,
+                "mid": member_id,
+                "tid": tenant_id,
+                "now": datetime.now(timezone.utc),
+            },
+        )
+        row = deduct_result.fetchone()
+        if not row:
+            raise InsufficientBalanceError(
+                f"积分余额不足（需 {points} 积分）或会员卡不存在"
+            )
+
+        # 3. 充入储值卡（仅充本金）
+        balance_before = card.balance_fen
+        card.main_balance_fen += amount_fen
+        card.balance_fen = card.main_balance_fen + card.gift_balance_fen
+        card.total_recharged_fen += amount_fen
+
+        # 4. 记录流水
+        txn = StoredValueTransaction(
+            id=uuid.uuid4(),
+            tenant_id=tenant_id,
+            card_id=card.id,
+            customer_id=member_id,
+            txn_type="exchange",
+            amount_fen=amount_fen,
+            main_amount_fen=amount_fen,
+            gift_amount_fen=0,
+            balance_after_fen=card.balance_fen,
+            gift_balance_after_fen=card.gift_balance_fen,
+            remark=f"积分兑换余额：{points} 积分 → {amount_fen / 100:.2f} 元",
+        )
+        db.add(txn)
+
+        logger.info(
+            "stored_value_exchange_points",
+            member_id=str(member_id),
+            points=points,
+            amount_fen=amount_fen,
+            card_id=str(card.id),
+        )
+
+        return {
+            **_txn_to_dict(txn),
+            "points_deducted": points,
+            "balance_before_fen": balance_before,
+        }
 
     # ──────────────────────────────────────────────────────────────
     # 内部辅助方法

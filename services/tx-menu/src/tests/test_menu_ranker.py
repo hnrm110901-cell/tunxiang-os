@@ -1,10 +1,17 @@
 """菜单排名引擎测试"""
-import sys, os
+import os
+import sys
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from services.menu_ranker import (
-    calc_trend_score, calc_margin_score, calc_stock_score,
-    calc_time_slot_score, calc_low_refund_score, compute_ranking, DishScore,
+    DishScore,
+    calc_low_refund_score,
+    calc_margin_score,
+    calc_stock_score,
+    calc_time_slot_score,
+    calc_trend_score,
+    compute_ranking,
 )
 
 SAMPLE_DISHES = [

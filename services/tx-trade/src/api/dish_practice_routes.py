@@ -10,7 +10,7 @@
   GET  /api/v1/practices/templates                    通用做法模板
 """
 import structlog
-from fastapi import APIRouter, Request, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from ..services import dish_practice_service as svc

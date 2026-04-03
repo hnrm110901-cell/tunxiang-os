@@ -7,19 +7,18 @@
 """
 from __future__ import annotations
 
-import asyncio
 import uuid
-from datetime import date, datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import Any
 
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
+from workers.rfm_updater import RFMUpdater
 
 from shared.ontology.src.database import get_db
 from shared.ontology.src.entities import Customer
-from workers.rfm_updater import RFMUpdater
 
 logger = structlog.get_logger(__name__)
 
@@ -179,7 +178,6 @@ async def get_rfm_changes(
 
     # 尝试从 rfm_change_logs 表查询（如不存在则降级为简易查询）
     try:
-        from sqlalchemy.exc import ProgrammingError
 
         change_sql = text("""
             SELECT

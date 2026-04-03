@@ -12,13 +12,10 @@ from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-
 from services.tx_finance.src.services.cost_engine import (
     CostEngine,
-    DishCostResult,
     OrderCostResult,
 )
-
 
 # ─── Fixtures ────────────────────────────────────────────────────────────────
 

@@ -1,0 +1,101 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Brand CSS custom properties */
+:root {
+  --color-brand: #FF6B2C;
+  --color-brand-dark: #E55A1C;
+  --color-brand-light: #FF8F5E;
+
+  --color-app-bg: #0B1A20;
+  --color-card-bg: #132029;
+  --color-surface-bg: #1A2E38;
+
+  --color-text-primary: #FFFFFF;
+  --color-text-secondary: #9EB5C0;
+  --color-text-disabled: #4A6572;
+
+  --color-border-default: #1E3340;
+  --color-border-strong: #2A4558;
+
+  --color-success: #34C759;
+  --color-warning: #FF9F0A;
+  --color-error: #FF3B30;
+  --color-info: #0A84FF;
+}
+
+/* Base reset */
+page {
+  background-color: var(--color-app-bg);
+  color: var(--color-text-primary);
+  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Helvetica Neue', sans-serif;
+  font-size: 28px;
+  line-height: 1.5;
+  box-sizing: border-box;
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  display: none;
+}
+
+/* Component utilities */
+@layer components {
+  .card {
+    @apply bg-card-bg rounded-xl p-4;
+    border: 1px solid var(--color-border-default);
+  }
+
+  .btn-primary {
+    @apply bg-brand text-text-primary rounded-xl font-semibold;
+    @apply flex items-center justify-center;
+    height: 88px;
+    font-size: 32px;
+  }
+
+  .btn-primary:active {
+    @apply bg-brand-dark;
+  }
+
+  .btn-ghost {
+    @apply rounded-xl font-semibold;
+    @apply flex items-center justify-center;
+    height: 88px;
+    font-size: 32px;
+    color: var(--color-brand);
+    border: 1px solid var(--color-brand);
+  }
+
+  .btn-ghost:active {
+    background-color: rgba(255, 107, 44, 0.1);
+  }
+
+  .section-title {
+    @apply text-text-primary font-semibold;
+    font-size: 36px;
+  }
+
+  .section-subtitle {
+    @apply text-text-secondary;
+    font-size: 24px;
+  }
+
+  .divider {
+    height: 1px;
+    background-color: var(--color-border-default);
+  }
+
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .safe-area-top {
+    padding-top: env(safe-area-inset-top);
+  }
+}

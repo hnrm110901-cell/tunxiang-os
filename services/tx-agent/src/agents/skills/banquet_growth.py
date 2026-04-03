@@ -2,10 +2,9 @@
 
 宴会线索挖掘、宴会套餐推荐、宴会转化跟踪、宴会档期管理、宴会收益分析、宴会口碑管理。
 """
-import uuid
 from typing import Any
-from ..base import SkillAgent, AgentResult
 
+from ..base import AgentResult, SkillAgent
 
 # 宴会类型及客单价参考
 BANQUET_TYPES = {

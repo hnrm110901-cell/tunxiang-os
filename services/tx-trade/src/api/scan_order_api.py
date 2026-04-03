@@ -10,25 +10,25 @@
 7. POST /scan-order/sync-kds            — 手动同步KDS
 8. GET  /scan-order/stats               — 扫码点餐统计
 """
-import uuid
 from datetime import date
 from typing import Optional
 
 import structlog
-from fastapi import APIRouter, Depends, Request, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+
 from ..services.scan_order_service import (
-    generate_table_qrcode,
-    parse_qrcode,
-    create_scan_order,
     add_items_to_order,
+    create_scan_order,
+    generate_table_qrcode,
+    get_scan_order_stats,
     get_table_order,
+    parse_qrcode,
     request_checkout,
     sync_to_kds,
-    get_scan_order_stats,
 )
 
 logger = structlog.get_logger()

@@ -9,7 +9,6 @@ from __future__ import annotations
 import os
 from typing import Any, Dict, Optional
 
-
 # ── 默认费率（2026年标准） ──────────────────────────────────────────────────
 # 可通过城市配置或环境变量覆盖
 

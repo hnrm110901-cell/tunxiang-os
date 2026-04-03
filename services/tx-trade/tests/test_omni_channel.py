@@ -10,25 +10,24 @@
 7. 接单后自动推送到KDS
 8. tenant_id隔离
 """
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 import uuid
-from datetime import datetime, timezone, timedelta
-from unittest.mock import AsyncMock, MagicMock, patch, call
+from datetime import datetime, timedelta, timezone
+from unittest.mock import AsyncMock, MagicMock, patch
 
+import httpx
 import pytest
-
 from services.omni_channel_service import (
+    OmniChannelError,
     OmniChannelService,
     UnifiedOrder,
-    UnifiedOrderItem,
-    OmniChannelError,
     UnsupportedPlatformError,
+    stable_omni_order_no,
 )
-
 
 # ─── 测试工具 ────────────────────────────────────────────────────────────────
 
@@ -47,10 +46,42 @@ def _make_db_mock() -> AsyncMock:
     """创建模拟数据库会话"""
     db = AsyncMock()
     db.execute = AsyncMock()
+    db.add = MagicMock()
     db.flush = AsyncMock()
     db.commit = AsyncMock()
     db.rollback = AsyncMock()
     return db
+
+
+def _omni_row(
+    *,
+    order_uuid: uuid.UUID | None = None,
+    sales_channel: str = "meituan",
+    platform_order_id: str = "MT_ORDER_001",
+    items_snapshot: list | None = None,
+) -> MagicMock:
+    """模拟 Order ORM 行：sales_channel_id + order_metadata.omni（与实体一致）。"""
+    oid = order_uuid or uuid.UUID(ORDER_ID)
+    snap = items_snapshot if items_snapshot is not None else []
+    m = MagicMock()
+    m.id = oid
+    m.sales_channel_id = sales_channel
+    m.order_no = "Otest"
+    m.order_metadata = {
+        "omni": {
+            "platform": sales_channel,
+            "platform_order_id": platform_order_id,
+            "items_snapshot": snap,
+        }
+    }
+    m.status = "pending"
+    m.tenant_id = uuid.UUID(TENANT_A)
+    m.store_id = uuid.UUID(STORE_ID)
+    m.total_amount_fen = 100
+    m.notes = ""
+    m.customer_phone = ""
+    m.created_at = datetime.now(timezone.utc)
+    return m
 
 
 def _make_exec_result(rows: list) -> MagicMock:
@@ -174,6 +205,27 @@ class TestNormalizePlatformOrder:
             svc.normalize(platform="unknown_platform", raw={}, store_id=STORE_ID, tenant_id=TENANT_A)
 
 
+class TestStableOmniOrderNo:
+    """internal order_no：同租户+门店+平台+平台单号稳定唯一。"""
+
+    def test_stable_omni_order_no_deterministic(self):
+        u = UnifiedOrder(
+            platform="meituan",
+            platform_order_id="X1",
+            source_channel="meituan",
+            tenant_id=TENANT_A,
+            store_id=STORE_ID,
+            status="pending",
+            total_fen=1,
+            items=[],
+        )
+        a = stable_omni_order_no(u)
+        b = stable_omni_order_no(u)
+        assert a == b
+        assert len(a) <= 64
+        assert a.startswith("O")
+
+
 # ─── 测试：接单 ──────────────────────────────────────────────────────────────
 
 
@@ -186,15 +238,7 @@ class TestAcceptOrder:
         db = _make_db_mock()
         svc = OmniChannelService()
 
-        # 模拟数据库查到订单
-        mock_order_row = MagicMock()
-        mock_order_row.id = uuid.UUID(ORDER_ID)
-        mock_order_row.platform_order_id = "MT_ORDER_001"
-        mock_order_row.source_channel = "meituan"
-        mock_order_row.status = "pending"
-        mock_order_row.tenant_id = uuid.UUID(TENANT_A)
-        mock_order_row.store_id = uuid.UUID(STORE_ID)
-        mock_order_row.items_snapshot = []
+        mock_order_row = _omni_row(platform_order_id="MT_ORDER_001", sales_channel="meituan")
 
         exec_result = _make_exec_result([mock_order_row])
         db.execute.return_value = exec_result
@@ -240,21 +284,16 @@ class TestAcceptOrder:
         db = _make_db_mock()
         svc = OmniChannelService()
 
-        mock_order_row = MagicMock()
-        mock_order_row.id = uuid.UUID(ORDER_ID)
-        mock_order_row.platform_order_id = "EL_ORDER_001"
-        mock_order_row.source_channel = "eleme"
-        mock_order_row.status = "pending"
-        mock_order_row.tenant_id = uuid.UUID(TENANT_A)
-        mock_order_row.store_id = uuid.UUID(STORE_ID)
-        mock_order_row.items_snapshot = []
+        mock_order_row = _omni_row(platform_order_id="EL_ORDER_001", sales_channel="eleme")
 
         exec_result = _make_exec_result([mock_order_row])
         db.execute.return_value = exec_result
 
         with patch.object(svc, "_get_platform_adapter") as mock_get_adapter:
             mock_adapter = MagicMock()
-            mock_adapter.confirm_order = AsyncMock(side_effect=Exception("平台API超时"))
+            mock_adapter.confirm_order = AsyncMock(
+                side_effect=httpx.ConnectTimeout("平台API超时"),
+            )
             mock_get_adapter.return_value = mock_adapter
 
             # 不应抛出异常，平台回调失败只记录日志
@@ -280,13 +319,7 @@ class TestRejectOrder:
         db = _make_db_mock()
         svc = OmniChannelService()
 
-        mock_order_row = MagicMock()
-        mock_order_row.id = uuid.UUID(ORDER_ID)
-        mock_order_row.platform_order_id = "EL_ORDER_001"
-        mock_order_row.source_channel = "eleme"
-        mock_order_row.status = "pending"
-        mock_order_row.tenant_id = uuid.UUID(TENANT_A)
-        mock_order_row.store_id = uuid.UUID(STORE_ID)
+        mock_order_row = _omni_row(platform_order_id="EL_ORDER_001", sales_channel="eleme")
 
         exec_result = _make_exec_result([mock_order_row])
         db.execute.return_value = exec_result
@@ -314,13 +347,7 @@ class TestRejectOrder:
         db = _make_db_mock()
         svc = OmniChannelService()
 
-        mock_order_row = MagicMock()
-        mock_order_row.id = uuid.UUID(ORDER_ID)
-        mock_order_row.platform_order_id = "DY_ORDER_001"
-        mock_order_row.source_channel = "douyin"
-        mock_order_row.status = "pending"
-        mock_order_row.tenant_id = uuid.UUID(TENANT_A)
-        mock_order_row.store_id = uuid.UUID(STORE_ID)
+        mock_order_row = _omni_row(platform_order_id="DY_ORDER_001", sales_channel="douyin")
 
         exec_result = _make_exec_result([mock_order_row])
         db.execute.return_value = exec_result
@@ -357,14 +384,11 @@ class TestAutoRejectOverdue:
         now = datetime.now(timezone.utc)
         overdue_time = now - timedelta(minutes=4)
 
-        mock_order_1 = MagicMock()
-        mock_order_1.id = uuid.UUID(ORDER_ID)
-        mock_order_1.platform_order_id = "MT_OVERDUE_001"
-        mock_order_1.source_channel = "meituan"
-        mock_order_1.status = "pending"
+        mock_order_1 = _omni_row(
+            platform_order_id="MT_OVERDUE_001",
+            sales_channel="meituan",
+        )
         mock_order_1.created_at = overdue_time
-        mock_order_1.tenant_id = uuid.UUID(TENANT_A)
-        mock_order_1.store_id = uuid.UUID(STORE_ID)
 
         overdue_result = MagicMock()
         overdue_result.scalars = MagicMock(
@@ -435,7 +459,7 @@ class TestAcceptAndDispatchToKDS:
         insert_result.scalar_one_or_none = MagicMock(return_value=None)
         db.execute.return_value = insert_result
 
-        with patch("services.omni_channel_service.dispatch_order_to_kds") as mock_kds:
+        with patch("services.omni_channel_service._dispatch_order_to_kds") as mock_kds:
             mock_kds.return_value = {"dept_tasks": []}
 
             order = await svc.receive_order(
@@ -461,8 +485,8 @@ class TestAcceptAndDispatchToKDS:
         insert_result = MagicMock()
         db.execute.return_value = insert_result
 
-        with patch("services.omni_channel_service.dispatch_order_to_kds") as mock_kds:
-            mock_kds.side_effect = Exception("KDS连接超时")
+        with patch("services.omni_channel_service._dispatch_order_to_kds") as mock_kds:
+            mock_kds.side_effect = RuntimeError("KDS连接超时")
 
             # 不应抛出异常
             order = await svc.receive_order(
@@ -488,20 +512,8 @@ class TestTenantIsolation:
         db = _make_db_mock()
         svc = OmniChannelService()
 
-        # 模拟只返回TENANT_A的订单
-        mock_order = MagicMock()
-        mock_order.id = uuid.UUID(ORDER_ID)
-        mock_order.tenant_id = uuid.UUID(TENANT_A)
-        mock_order.store_id = uuid.UUID(STORE_ID)
-        mock_order.platform_order_id = "MT_001"
-        mock_order.source_channel = "meituan"
-        mock_order.status = "pending"
-        mock_order.total_fen = 5000
-        mock_order.items_snapshot = []
-        mock_order.notes = ""
-        mock_order.customer_phone = ""
-        mock_order.delivery_address = ""
-        mock_order.created_at = datetime.now(timezone.utc)
+        mock_order = _omni_row(platform_order_id="MT_001", sales_channel="meituan")
+        mock_order.total_amount_fen = 5000
 
         result_mock = MagicMock()
         result_mock.scalars = MagicMock(
