@@ -1,0 +1,72 @@
+.bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  padding-bottom: calc(8px + var(--safe-area-bottom));
+  background: var(--tx-bg-secondary);
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  z-index: 100;
+}
+
+.cartIcon {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--tx-bg-tertiary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.badge {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  min-width: 20px;
+  height: 20px;
+  border-radius: 10px;
+  background: var(--tx-brand);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 5px;
+}
+
+.totalSection {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.totalLabel {
+  font-size: var(--tx-font-xs);
+  color: var(--tx-text-secondary);
+}
+
+.totalAmount {
+  font-size: var(--tx-font-xl);
+  font-weight: 700;
+  color: var(--tx-text-primary);
+}
+
+.checkoutBtn {
+  padding: 0 24px;
+  height: 48px;
+  border-radius: var(--tx-radius-full);
+  background: var(--tx-brand);
+  color: #fff;
+  font-size: var(--tx-font-md);
+  font-weight: 600;
+  white-space: nowrap;
+}

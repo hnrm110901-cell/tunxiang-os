@@ -7,7 +7,7 @@
 
 决策4（菜单配置引擎）的上层：模板决定哪些域可用，菜单引擎按域裁剪菜单。
 """
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 
 @dataclass

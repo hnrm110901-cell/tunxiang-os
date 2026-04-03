@@ -1,22 +1,22 @@
 """营销方案引擎测试 — 覆盖 7 种方案 + 互斥 + 执行顺序 + API"""
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from services.marketing_engine import (
-    calculate_special_price,
-    calculate_buy_gift,
-    calculate_add_on,
-    calculate_rebuy,
-    calculate_member_discount,
-    calculate_order_discount,
-    calculate_threshold,
-    check_exclusion,
-    apply_schemes_in_order,
-)
 from fastapi.testclient import TestClient
 from main import app
+from services.marketing_engine import (
+    apply_schemes_in_order,
+    calculate_add_on,
+    calculate_buy_gift,
+    calculate_member_discount,
+    calculate_order_discount,
+    calculate_rebuy,
+    calculate_special_price,
+    calculate_threshold,
+    check_exclusion,
+)
 
 client = TestClient(app)
 

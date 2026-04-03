@@ -34,5 +34,11 @@ class Settings:
     CLAUDE_API_KEY: str = os.getenv("TX_CLAUDE_API_KEY", "")
     COREML_BRIDGE_URL: str = os.getenv("TX_COREML_URL", "http://localhost:8100")
 
+    # POS集成 — 品智
+    PINZHI_BASE_URL: str = os.getenv("PINZHI_BASE_URL", "")
+    PINZHI_TOKEN: str = os.getenv("PINZHI_TOKEN", "")
+    PINZHI_TIMEOUT: int = int(os.getenv("PINZHI_TIMEOUT", "30"))
+    PINZHI_RETRY_TIMES: int = int(os.getenv("PINZHI_RETRY_TIMES", "3"))
+
 
 settings = Settings()

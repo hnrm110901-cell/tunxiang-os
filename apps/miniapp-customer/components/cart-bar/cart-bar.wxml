@@ -1,0 +1,24 @@
+<!-- 底部购物车栏组件 -->
+<view class="cart-bar-wrapper" wx:if="{{count > 0 || alwaysShow}}">
+  <view class="cart-bar">
+    <!-- 左侧：购物车图标+数量 -->
+    <view class="cart-left" bindtap="onTapCart">
+      <view class="cart-icon-wrap">
+        <view class="cart-icon">🛒</view>
+        <view class="cart-badge" wx:if="{{count > 0}}">{{count > 99 ? '99+' : count}}</view>
+      </view>
+      <view class="cart-price-info">
+        <text class="cart-total">¥{{totalYuan}}</text>
+        <text class="cart-hint" wx:if="{{deliveryFeeText}}">{{deliveryFeeText}}</text>
+      </view>
+    </view>
+
+    <!-- 右侧：结算按钮 -->
+    <button class="checkout-btn {{count === 0 ? 'disabled' : ''}}" disabled="{{count === 0}}" bindtap="onCheckout">
+      去结算
+    </button>
+  </view>
+
+  <!-- 安全区域占位 -->
+  <view class="safe-area-placeholder"></view>
+</view>

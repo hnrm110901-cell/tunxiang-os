@@ -6,7 +6,6 @@
 V1迁入（560行核心逻辑），在V3架构上重建。
 """
 
-import statistics
 from datetime import datetime, timedelta
 from typing import Any, Optional
 

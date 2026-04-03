@@ -205,7 +205,7 @@ class YiDingClient:
                 ) as response:
                     try:
                         data = await response.json()
-                    except Exception:
+                    except (ValueError, aiohttp.ContentTypeError):
                         text = await response.text()
                         raise YiDingAPIError(
                             f"易订API返回非JSON: {text[:200]}"
@@ -296,6 +296,6 @@ class YiDingClient:
         try:
             await self.get_token()
             return True
-        except Exception as e:
-            self.logger.error("yiding_health_check_failed", error=str(e))
+        except Exception as e:  # 健康检查兜底：任何异常都视为不健康
+            self.logger.error("yiding_health_check_failed", error=str(e), exc_info=True)
             return False

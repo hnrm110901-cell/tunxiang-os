@@ -11,11 +11,10 @@ from __future__ import annotations
 
 import pytest
 
-from ..services.voice_orchestrator import VoiceOrchestrator, _chinese_num_to_int
-from ..services.voice_session import VoiceSessionManager
 from ..services.cfo_dashboard import CFODashboardService
 from ..services.evolution_2030 import Evolution2030Service
-
+from ..services.voice_orchestrator import VoiceOrchestrator, _chinese_num_to_int
+from ..services.voice_session import VoiceSessionManager
 
 # ═══════════════════════════════════════════════════════════════════
 # Fixtures

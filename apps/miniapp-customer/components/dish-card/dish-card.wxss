@@ -1,0 +1,121 @@
+.dish-card {
+  display: flex;
+  padding: 24rpx 0;
+  border-bottom: 1rpx solid #1a2a33;
+}
+
+.dish-img {
+  width: 180rpx;
+  height: 140rpx;
+  border-radius: 16rpx;
+  margin-right: 24rpx;
+  flex-shrink: 0;
+}
+
+.dish-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 140rpx;
+}
+
+.dish-header {
+  display: flex;
+  flex-direction: column;
+}
+
+.dish-name {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 6rpx;
+}
+
+.dish-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8rpx;
+  margin-bottom: 6rpx;
+}
+
+.dish-tag {
+  display: inline-block;
+  font-size: 20rpx;
+  color: #FF6B2C;
+  background: rgba(255, 107, 44, 0.1);
+  padding: 2rpx 10rpx;
+  border-radius: 6rpx;
+}
+
+.dish-desc {
+  font-size: 24rpx;
+  color: #999;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dish-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8rpx;
+}
+
+.dish-price-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10rpx;
+}
+
+.dish-price {
+  font-size: 32rpx;
+  color: #FF6B2C;
+  font-weight: bold;
+}
+
+.dish-original-price {
+  font-size: 24rpx;
+  color: #666;
+  text-decoration: line-through;
+}
+
+.dish-actions {
+  display: flex;
+  align-items: center;
+}
+
+.qty-control {
+  display: flex;
+  align-items: center;
+}
+
+.qty-btn {
+  width: 48rpx;
+  height: 48rpx;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32rpx;
+  text-align: center;
+  line-height: 48rpx;
+}
+
+.qty-btn.plus {
+  background: #FF6B2C;
+  color: #fff;
+}
+
+.qty-btn.minus {
+  background: #1a2a33;
+  color: #999;
+}
+
+.qty-value {
+  font-size: 28rpx;
+  color: #fff;
+  min-width: 48rpx;
+  text-align: center;
+}

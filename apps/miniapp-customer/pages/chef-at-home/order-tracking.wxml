@@ -1,0 +1,115 @@
+<!-- 大厨到家订单跟踪 -->
+<view class="container">
+  <view class="loading-tip" wx:if="{{loading}}">
+    <text>加载中...</text>
+  </view>
+
+  <block wx:elif="{{booking}}">
+    <!-- 状态进度条 -->
+    <view class="status-progress">
+      <view class="step {{index <= currentStepIndex ? 'done' : ''}} {{index === currentStepIndex ? 'current' : ''}}"
+            wx:for="{{statusSteps}}" wx:key="key">
+        <view class="step-dot">
+          <text class="step-icon">{{item.icon}}</text>
+        </view>
+        <text class="step-label">{{item.label}}</text>
+        <view class="step-line" wx:if="{{index < statusSteps.length - 1}}"></view>
+      </view>
+    </view>
+
+    <!-- 订单信息卡片 -->
+    <view class="order-card">
+      <view class="card-header">
+        <text class="card-title">订单详情</text>
+        <text class="order-id">{{booking.id}}</text>
+      </view>
+
+      <view class="info-row">
+        <text class="info-label">厨师</text>
+        <text class="info-value">{{booking.chef_name}}</text>
+      </view>
+      <view class="info-row">
+        <text class="info-label">服务时间</text>
+        <text class="info-value">{{booking.service_datetime}}</text>
+      </view>
+      <view class="info-row">
+        <text class="info-label">地址</text>
+        <text class="info-value">{{booking.address}}</text>
+      </view>
+      <view class="info-row">
+        <text class="info-label">人数</text>
+        <text class="info-value">{{booking.guest_count}}人</text>
+      </view>
+    </view>
+
+    <!-- 菜品列表 -->
+    <view class="order-card">
+      <text class="card-title">菜品</text>
+      <view class="dish-row" wx:for="{{booking.dishes}}" wx:key="dish_id">
+        <text class="dish-name">{{item.name}}</text>
+        <text class="dish-qty">x{{item.quantity}}</text>
+        <text class="dish-price">¥{{item.price_fen * item.quantity / 100}}</text>
+      </view>
+      <view class="total-row">
+        <text class="total-label">合计</text>
+        <text class="total-value">¥{{booking.total_fen / 100}}</text>
+      </view>
+    </view>
+
+    <!-- 出品照片（完成后展示） -->
+    <view class="order-card" wx:if="{{booking.photos && booking.photos.length > 0}}">
+      <text class="card-title">出品照片</text>
+      <view class="photo-grid">
+        <image class="photo-item" wx:for="{{booking.photos}}" wx:key="*this"
+               src="{{item}}" mode="aspectFill" lazy-load />
+      </view>
+    </view>
+
+    <!-- 评价区域 -->
+    <view class="rating-section" wx:if="{{showRating && booking.status === 'completed'}}">
+      <view class="order-card">
+        <text class="card-title">服务评价</text>
+        <view class="star-row">
+          <text class="star {{ratingScore >= 1 ? 'active' : ''}}" bindtap="setRating" data-score="1">★</text>
+          <text class="star {{ratingScore >= 2 ? 'active' : ''}}" bindtap="setRating" data-score="2">★</text>
+          <text class="star {{ratingScore >= 3 ? 'active' : ''}}" bindtap="setRating" data-score="3">★</text>
+          <text class="star {{ratingScore >= 4 ? 'active' : ''}}" bindtap="setRating" data-score="4">★</text>
+          <text class="star {{ratingScore >= 5 ? 'active' : ''}}" bindtap="setRating" data-score="5">★</text>
+        </view>
+        <textarea class="comment-input" value="{{ratingComment}}" bindinput="onCommentInput"
+                  placeholder="分享您的用餐体验..." placeholder-class="placeholder" />
+        <button class="rate-btn" bindtap="submitRating" disabled="{{submittingRating}}">
+          {{submittingRating ? '提交中...' : '提交评价'}}
+        </button>
+      </view>
+    </view>
+
+    <!-- 已评价展示 -->
+    <view class="order-card" wx:if="{{booking.status === 'rated'}}">
+      <text class="card-title">我的评价</text>
+      <view class="star-row readonly">
+        <text class="star {{booking.rating >= 1 ? 'active' : ''}}">★</text>
+        <text class="star {{booking.rating >= 2 ? 'active' : ''}}">★</text>
+        <text class="star {{booking.rating >= 3 ? 'active' : ''}}">★</text>
+        <text class="star {{booking.rating >= 4 ? 'active' : ''}}">★</text>
+        <text class="star {{booking.rating >= 5 ? 'active' : ''}}">★</text>
+      </view>
+      <text class="rated-comment" wx:if="{{booking.comment}}">{{booking.comment}}</text>
+    </view>
+
+    <!-- 操作按钮 -->
+    <view class="action-area">
+      <view class="action-btn outline" bindtap="callChef"
+            wx:if="{{booking.status !== 'completed' && booking.status !== 'rated' && booking.status !== 'cancelled'}}">
+        <text>联系厨师</text>
+      </view>
+      <view class="action-btn primary" bindtap="goBack">
+        <text>返回</text>
+      </view>
+    </view>
+  </block>
+
+  <view class="empty-tip" wx:else>
+    <text>订单不存在</text>
+  </view>
+</view>

@@ -7,6 +7,30 @@ from sqlalchemy import engine_from_config, pool
 
 from shared.ontology.src.base import TenantBase
 
+# Import all models so TenantBase.metadata discovers them for autogenerate
+from shared.ontology.src.entities import *  # noqa: F401, F403
+
+# tx-trade domain models (also inherit TenantBase, must be imported for autogenerate)
+# Directory is "tx-trade" (hyphen), so we add it to sys.path for import resolution.
+import sys as _sys
+from pathlib import Path as _Path
+
+_tx_trade_src = str(_Path(__file__).resolve().parent.parent.parent / "services" / "tx-trade" / "src")
+if _tx_trade_src not in _sys.path:
+    _sys.path.insert(0, _tx_trade_src)
+
+try:
+    from models.reservation import Reservation, NoShowRecord  # noqa: F401
+    from models.queue import QueueEntry, QueueCounter  # noqa: F401
+    from models.delivery_order import DeliveryOrder  # noqa: F401
+    from models.production_dept import ProductionDept, DishDeptMapping  # noqa: F401
+    from models.payment import Payment, Refund  # noqa: F401
+    from models.tables import Table  # noqa: F401
+    from models.settlement import Settlement, ShiftHandover  # noqa: F401
+    from models.receipt import ReceiptTemplate, ReceiptLog  # noqa: F401
+except ImportError:
+    pass  # Models not available; autogenerate will miss tx-trade tables
+
 config = context.config
 
 if config.config_file_name is not None:

@@ -4,16 +4,15 @@
 """
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException, Query
-from pydantic import BaseModel, Field
-
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
 from services.competitor_monitor import CompetitorMonitorService
 from services.consumer_insight import ConsumerInsightService
-from services.review_topic_engine import ReviewTopicEngine
-from services.new_product_radar import NewProductRadar
-from services.pricing_insight import PricingInsightService
 from services.intel_report_engine import IntelReportEngine
+from services.new_product_radar import NewProductRadar
 from services.pilot_suggestion import PilotSuggestionService
+from services.pricing_insight import PricingInsightService
+from services.review_topic_engine import ReviewTopicEngine
 
 app = FastAPI(
     title="屯象OS — 市场情报中枢",

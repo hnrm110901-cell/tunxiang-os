@@ -2,15 +2,24 @@
 
 统一响应格式: {"ok": bool, "data": {}, "error": {}}
 所有接口需 X-Tenant-ID header。
+
+修复:
+  - [DB-SESSION] _get_db_session 改为 AsyncGenerator + Depends，确保 commit/rollback 生命周期正确
+  - [PAGINATION] 预订列表 list_reservations 增加分页参数
+  - [VALIDATION] phone 空字符串校验 (Pydantic min_length)
+  - [RETURN] _err() 之后不再有 unreachable code
 """
-from typing import Optional
+from typing import AsyncGenerator, Optional
 
-from fastapi import APIRouter, Depends, Request, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..services.reservation_service import ReservationService
-from ..services.queue_service import QueueService
+from shared.ontology.src.database import get_db_with_tenant
+
 from ..services.banquet_lifecycle import BanquetLifecycleService
+from ..services.queue_service import QueueService
+from ..services.reservation_service import ReservationService
 
 router = APIRouter(prefix="/api/v1", tags=["booking"])
 
@@ -24,11 +33,24 @@ def _get_tenant_id(request: Request) -> str:
     return tid
 
 
-def _ok(data) -> dict:
+async def _get_db_session(request: Request) -> AsyncGenerator[AsyncSession, None]:
+    """获取带租户隔离的DB session — 通过 Depends 注入，保证 generator 生命周期完整。
+
+    修复说明: 原实现用 `async for ... return` 从 generator 中提取 session，
+    导致 generator 永远无法走到 yield 之后的 commit/rollback。
+    改为 yield 形式，由 FastAPI Depends 自动管理生命周期。
+    """
+    tenant_id = _get_tenant_id(request)
+    async for session in get_db_with_tenant(tenant_id):
+        yield session
+
+
+def _ok(data: object) -> dict:
     return {"ok": True, "data": data, "error": None}
 
 
-def _err(msg: str, code: int = 400) -> dict:
+def _err(msg: str, code: int = 400) -> None:
+    """抛出 HTTPException。返回类型标注为 None 以明确不会返回值。"""
     raise HTTPException(
         status_code=code,
         detail={"ok": False, "data": None, "error": {"message": msg}},
@@ -41,8 +63,8 @@ def _err(msg: str, code: int = 400) -> dict:
 
 class CreateReservationReq(BaseModel):
     store_id: str
-    customer_name: str
-    phone: str
+    customer_name: str = Field(min_length=1)
+    phone: str = Field(min_length=1, description="手机号，不能为空")
     type: str = "regular"
     date: str = Field(description="YYYY-MM-DD")
     time: str = Field(description="HH:MM")
@@ -63,12 +85,16 @@ class UpdateReservationStatusReq(BaseModel):
 
 
 @router.post("/reservations")
-async def create_reservation(req: CreateReservationReq, request: Request):
+async def create_reservation(
+    req: CreateReservationReq,
+    request: Request,
+    db: AsyncSession = Depends(_get_db_session),
+):
     """创建预订"""
     tenant_id = _get_tenant_id(request)
-    svc = ReservationService(tenant_id=tenant_id, store_id=req.store_id)
+    svc = ReservationService(db=db, tenant_id=tenant_id, store_id=req.store_id)
     try:
-        result = svc.create_reservation(
+        result = await svc.create_reservation(
             store_id=req.store_id,
             customer_name=req.customer_name,
             phone=req.phone,
@@ -92,32 +118,32 @@ async def update_reservation_status(
     reservation_id: str,
     req: UpdateReservationStatusReq,
     request: Request,
+    db: AsyncSession = Depends(_get_db_session),
 ):
     """更新预订状态（确认/到店/入座/完成/取消/爽约）"""
     tenant_id = _get_tenant_id(request)
-    svc = ReservationService(tenant_id=tenant_id, store_id="")
+    svc = ReservationService(db=db, tenant_id=tenant_id, store_id="")
     try:
         if req.action == "confirm":
-            result = svc.confirm_reservation(reservation_id, confirmed_by=req.confirmed_by or "system")
+            result = await svc.confirm_reservation(reservation_id, confirmed_by=req.confirmed_by or "system")
         elif req.action == "arrive":
-            result = svc.customer_arrived(reservation_id)
+            result = await svc.customer_arrived(reservation_id)
         elif req.action == "seat":
             if not req.table_no:
                 _err("table_no is required for seating")
-            result = svc.seat_reservation(reservation_id, req.table_no)
+            result = await svc.seat_reservation(reservation_id, req.table_no)  # type: ignore[arg-type]
         elif req.action == "complete":
-            result = svc.complete_reservation(reservation_id)
+            result = await svc.complete_reservation(reservation_id)
         elif req.action == "cancel":
-            result = svc.cancel_reservation(
+            result = await svc.cancel_reservation(
                 reservation_id,
                 reason=req.reason or "customer_request",
                 cancel_fee_fen=req.cancel_fee_fen,
             )
         elif req.action == "no_show":
-            result = svc.mark_no_show(reservation_id)
+            result = await svc.mark_no_show(reservation_id)
         else:
             _err(f"Unknown action: {req.action}")
-            return
         return _ok(result)
     except ValueError as e:
         _err(str(e))
@@ -126,43 +152,54 @@ async def update_reservation_status(
 @router.get("/reservations")
 async def list_reservations(
     request: Request,
+    db: AsyncSession = Depends(_get_db_session),
     store_id: str = Query(...),
     date: Optional[str] = Query(None),
     status: Optional[str] = Query(None),
     type: Optional[str] = Query(None),
+    page: int = Query(1, ge=1, description="页码"),
+    size: int = Query(50, ge=1, le=200, description="每页条数"),
 ):
-    """查询预订列表"""
+    """查询预订列表（带分页）
+
+    修复说明: 原实现无分页，全表扫描风险。
+    """
     tenant_id = _get_tenant_id(request)
-    svc = ReservationService(tenant_id=tenant_id, store_id=store_id)
-    result = svc.list_reservations(store_id=store_id, date=date, status=status, type=type)
+    svc = ReservationService(db=db, tenant_id=tenant_id, store_id=store_id)
+    result = await svc.list_reservations(
+        store_id=store_id, date=date, status=status, type=type,
+        page=page, size=size,
+    )
     return _ok(result)
 
 
 @router.get("/reservations/time-slots")
 async def get_time_slots(
     request: Request,
+    db: AsyncSession = Depends(_get_db_session),
     store_id: str = Query(...),
     date: str = Query(...),
     party_size: int = Query(..., ge=1),
 ):
     """查询可用时段"""
     tenant_id = _get_tenant_id(request)
-    svc = ReservationService(tenant_id=tenant_id, store_id=store_id)
-    result = svc.get_time_slots(store_id=store_id, date=date, party_size=party_size)
+    svc = ReservationService(db=db, tenant_id=tenant_id, store_id=store_id)
+    result = await svc.get_time_slots(store_id=store_id, date=date, party_size=party_size)
     return _ok(result)
 
 
 @router.get("/reservations/stats")
 async def get_reservation_stats(
     request: Request,
+    db: AsyncSession = Depends(_get_db_session),
     store_id: str = Query(...),
     start_date: str = Query(...),
     end_date: str = Query(...),
 ):
     """预订统计"""
     tenant_id = _get_tenant_id(request)
-    svc = ReservationService(tenant_id=tenant_id, store_id=store_id)
-    result = svc.get_reservation_stats(store_id=store_id, date_range=(start_date, end_date))
+    svc = ReservationService(db=db, tenant_id=tenant_id, store_id=store_id)
+    result = await svc.get_reservation_stats(store_id=store_id, date_range=(start_date, end_date))
     return _ok(result)
 
 
@@ -172,8 +209,8 @@ async def get_reservation_stats(
 
 class TakeNumberReq(BaseModel):
     store_id: str
-    customer_name: str
-    phone: str
+    customer_name: str = Field(min_length=1)
+    phone: str = Field(min_length=1, description="手机号，不能为空")
     party_size: int = Field(ge=1)
     source: str = "walk_in"
     vip_priority: bool = False
@@ -199,12 +236,16 @@ class SyncMeituanReq(BaseModel):
 
 
 @router.post("/queues")
-async def take_queue_number(req: TakeNumberReq, request: Request):
+async def take_queue_number(
+    req: TakeNumberReq,
+    request: Request,
+    db: AsyncSession = Depends(_get_db_session),
+):
     """取排队号"""
     tenant_id = _get_tenant_id(request)
-    svc = QueueService(tenant_id=tenant_id, store_id=req.store_id)
+    svc = QueueService(db=db, tenant_id=tenant_id, store_id=req.store_id)
     try:
-        result = svc.take_number(
+        result = await svc.take_number(
             store_id=req.store_id,
             customer_name=req.customer_name,
             phone=req.phone,
@@ -218,12 +259,16 @@ async def take_queue_number(req: TakeNumberReq, request: Request):
 
 
 @router.post("/queues/call")
-async def call_queue_number(req: CallNumberReq, request: Request):
+async def call_queue_number(
+    req: CallNumberReq,
+    request: Request,
+    db: AsyncSession = Depends(_get_db_session),
+):
     """叫号"""
     tenant_id = _get_tenant_id(request)
-    svc = QueueService(tenant_id=tenant_id, store_id="")
+    svc = QueueService(db=db, tenant_id=tenant_id, store_id="")
     try:
-        result = svc.call_number(req.queue_id)
+        result = await svc.call_number(req.queue_id)
         return _ok(result)
     except ValueError as e:
         _err(str(e))
@@ -232,37 +277,46 @@ async def call_queue_number(req: CallNumberReq, request: Request):
 @router.post("/queues/call-next")
 async def call_next_queue(
     request: Request,
+    db: AsyncSession = Depends(_get_db_session),
     store_id: str = Query(...),
     prefix: str = Query(""),
 ):
     """自动叫下一号"""
     tenant_id = _get_tenant_id(request)
-    svc = QueueService(tenant_id=tenant_id, store_id=store_id)
-    result = svc.call_next(store_id=store_id, prefix=prefix)
+    svc = QueueService(db=db, tenant_id=tenant_id, store_id=store_id)
+    result = await svc.call_next(store_id=store_id, prefix=prefix)
     if result is None:
         return _ok({"message": "No waiting customers"})
     return _ok(result)
 
 
 @router.post("/queues/seat")
-async def seat_queue_customer(req: SeatQueueReq, request: Request):
+async def seat_queue_customer(
+    req: SeatQueueReq,
+    request: Request,
+    db: AsyncSession = Depends(_get_db_session),
+):
     """排队入座"""
     tenant_id = _get_tenant_id(request)
-    svc = QueueService(tenant_id=tenant_id, store_id="")
+    svc = QueueService(db=db, tenant_id=tenant_id, store_id="")
     try:
-        result = svc.seat_customer(req.queue_id, req.table_no)
+        result = await svc.seat_customer(req.queue_id, req.table_no)
         return _ok(result)
     except ValueError as e:
         _err(str(e))
 
 
 @router.post("/queues/skip")
-async def skip_queue_customer(req: SkipQueueReq, request: Request):
+async def skip_queue_customer(
+    req: SkipQueueReq,
+    request: Request,
+    db: AsyncSession = Depends(_get_db_session),
+):
     """过号"""
     tenant_id = _get_tenant_id(request)
-    svc = QueueService(tenant_id=tenant_id, store_id="")
+    svc = QueueService(db=db, tenant_id=tenant_id, store_id="")
     try:
-        result = svc.skip_customer(req.queue_id, reason=req.reason)
+        result = await svc.skip_customer(req.queue_id, reason=req.reason)
         return _ok(result)
     except ValueError as e:
         _err(str(e))
@@ -271,31 +325,34 @@ async def skip_queue_customer(req: SkipQueueReq, request: Request):
 @router.get("/queues/board")
 async def get_queue_board(
     request: Request,
+    db: AsyncSession = Depends(_get_db_session),
     store_id: str = Query(...),
 ):
     """排队看板"""
     tenant_id = _get_tenant_id(request)
-    svc = QueueService(tenant_id=tenant_id, store_id=store_id)
-    result = svc.get_queue_board(store_id=store_id)
+    svc = QueueService(db=db, tenant_id=tenant_id, store_id=store_id)
+    result = await svc.get_queue_board(store_id=store_id)
     return _ok(result)
 
 
 @router.get("/queues/estimate")
 async def estimate_wait_time(
     request: Request,
+    db: AsyncSession = Depends(_get_db_session),
     store_id: str = Query(...),
     party_size: int = Query(..., ge=1),
 ):
     """预估等位时间"""
     tenant_id = _get_tenant_id(request)
-    svc = QueueService(tenant_id=tenant_id, store_id=store_id)
-    result = svc.estimate_wait_time(store_id=store_id, party_size=party_size)
+    svc = QueueService(db=db, tenant_id=tenant_id, store_id=store_id)
+    result = await svc.estimate_wait_time(store_id=store_id, party_size=party_size)
     return _ok(result)
 
 
 @router.get("/queues/history")
 async def get_queue_history(
     request: Request,
+    db: AsyncSession = Depends(_get_db_session),
     store_id: str = Query(...),
     date: str = Query(...),
     page: int = Query(1, ge=1),
@@ -303,17 +360,21 @@ async def get_queue_history(
 ):
     """排队历史"""
     tenant_id = _get_tenant_id(request)
-    svc = QueueService(tenant_id=tenant_id, store_id=store_id)
-    result = svc.get_queue_history(store_id=store_id, date=date, page=page, size=size)
+    svc = QueueService(db=db, tenant_id=tenant_id, store_id=store_id)
+    result = await svc.get_queue_history(store_id=store_id, date=date, page=page, size=size)
     return _ok(result)
 
 
 @router.post("/queues/sync-meituan")
-async def sync_meituan_queue(req: SyncMeituanReq, request: Request):
+async def sync_meituan_queue(
+    req: SyncMeituanReq,
+    request: Request,
+    db: AsyncSession = Depends(_get_db_session),
+):
     """美团排队同步"""
     tenant_id = _get_tenant_id(request)
-    svc = QueueService(tenant_id=tenant_id, store_id=req.store_id)
-    result = svc.sync_meituan_queue(store_id=req.store_id, meituan_data=req.meituan_data)
+    svc = QueueService(db=db, tenant_id=tenant_id, store_id=req.store_id)
+    result = await svc.sync_meituan_queue(store_id=req.store_id, meituan_data=req.meituan_data)
     return _ok(result)
 
 

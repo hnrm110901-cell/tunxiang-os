@@ -29,13 +29,14 @@ app.add_middleware(
 # app.add_middleware(TenantMiddleware)
 
 # Routes — 按模块注册，未来可一键拆出
-from .api.v1 import auth_routes, hub_routes, trade_routes, ops_routes, brain_routes
+from .api.v1 import auth_routes, brain_routes, hub_routes, ops_routes, pos_sync_routes, trade_routes
 
 app.include_router(auth_routes.router)
 app.include_router(hub_routes.router)
 app.include_router(trade_routes.router)
 app.include_router(ops_routes.router)
 app.include_router(brain_routes.router)
+app.include_router(pos_sync_routes.router)
 
 
 @app.get("/health")

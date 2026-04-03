@@ -1,0 +1,244 @@
+.customize-mask {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 200;
+  display: flex;
+  align-items: flex-end;
+}
+
+.customize-sheet {
+  width: 100%;
+  background: var(--tx-bg-1, #0B1A20);
+  border-radius: 32rpx 32rpx 0 0;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  transform: translateY(100%);
+  transition: transform 300ms ease-out;
+}
+
+.customize-sheet.show {
+  transform: translateY(0);
+}
+
+/* Swiper */
+.dish-swiper {
+  width: 100%;
+  height: 400rpx;
+  border-radius: 32rpx 32rpx 0 0;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.dish-big-img {
+  width: 100%;
+  height: 100%;
+}
+
+/* Content */
+.customize-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 28rpx 32rpx;
+  padding-bottom: 180rpx;
+}
+
+.dish-main-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12rpx;
+}
+
+.dish-detail-name {
+  font-size: 36rpx;
+  font-weight: bold;
+  color: #fff;
+  flex: 1;
+}
+
+.dish-detail-price {
+  font-size: 36rpx;
+  font-weight: bold;
+  color: var(--tx-primary, #FF6B2C);
+  margin-left: 20rpx;
+}
+
+.dish-detail-desc {
+  font-size: 26rpx;
+  color: #999;
+  display: block;
+  margin-bottom: 20rpx;
+  line-height: 1.5;
+}
+
+/* Nutrition */
+.nutrition-row {
+  display: flex;
+  gap: 24rpx;
+  margin-bottom: 24rpx;
+  flex-wrap: wrap;
+}
+
+.nutrition-item {
+  font-size: 22rpx;
+  color: #ccc;
+  background: var(--tx-bg-3, #1a2a33);
+  padding: 8rpx 16rpx;
+  border-radius: 8rpx;
+}
+
+.nutrition-item.allergen {
+  color: var(--tx-warning, #BA7517);
+  background: rgba(186, 117, 23, 0.15);
+}
+
+/* Social proof */
+.social-proof {
+  margin-bottom: 16rpx;
+}
+
+.proof-text {
+  font-size: 24rpx;
+  color: #FF6B2C;
+  background: rgba(255, 107, 44, 0.1);
+  padding: 6rpx 16rpx;
+  border-radius: 8rpx;
+}
+
+/* Origin traceability */
+.origin-section {
+  margin-bottom: 28rpx;
+}
+
+.section-label {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #fff;
+  display: block;
+  margin-bottom: 16rpx;
+}
+
+.origin-card {
+  display: flex;
+  background: var(--tx-bg-2, #112228);
+  border-radius: 16rpx;
+  overflow: hidden;
+}
+
+.origin-img {
+  width: 160rpx;
+  height: 120rpx;
+  flex-shrink: 0;
+}
+
+.origin-info {
+  flex: 1;
+  padding: 16rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 6rpx;
+}
+
+.origin-name { font-size: 26rpx; color: #fff; font-weight: 600; }
+.origin-location { font-size: 22rpx; color: #999; }
+.origin-story { font-size: 22rpx; color: #ccc; line-height: 1.4; }
+
+/* Option sections */
+.option-section {
+  margin-bottom: 28rpx;
+}
+
+.option-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+}
+
+.option-chip {
+  padding: 12rpx 28rpx;
+  border-radius: 32rpx;
+  background: var(--tx-bg-3, #1a2a33);
+  color: #ccc;
+  font-size: 26rpx;
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  transition: all 200ms ease;
+}
+
+.option-chip.selected {
+  background: rgba(255, 107, 44, 0.15);
+  color: var(--tx-primary, #FF6B2C);
+  border: 2rpx solid var(--tx-primary, #FF6B2C);
+}
+
+.option-extra {
+  font-size: 22rpx;
+  color: var(--tx-primary, #FF6B2C);
+}
+
+/* Bottom bar */
+.customize-bottom {
+  display: flex;
+  align-items: center;
+  padding: 20rpx 32rpx;
+  padding-bottom: calc(20rpx + env(safe-area-inset-bottom));
+  background: var(--tx-bg-2, #112228);
+  border-top: 1rpx solid var(--tx-border, #1a2a33);
+  flex-shrink: 0;
+}
+
+.qty-control {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  margin-right: 24rpx;
+}
+
+.qty-btn {
+  width: 52rpx;
+  height: 52rpx;
+  border-radius: 50%;
+  background: var(--tx-bg-3, #1a2a33);
+  color: #ccc;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32rpx;
+  text-align: center;
+  line-height: 52rpx;
+}
+
+.qty-btn.plus {
+  background: var(--tx-primary, #FF6B2C);
+  color: #fff;
+}
+
+.qty-num {
+  font-size: 32rpx;
+  color: #fff;
+  min-width: 40rpx;
+  text-align: center;
+}
+
+.customize-price {
+  flex: 1;
+  display: flex;
+  align-items: baseline;
+  gap: 8rpx;
+}
+
+.price-label { font-size: 26rpx; color: #999; }
+.price-value { font-size: 36rpx; font-weight: bold; color: var(--tx-primary, #FF6B2C); }
+
+.confirm-btn {
+  background: var(--tx-primary, #FF6B2C) !important;
+  color: #fff !important;
+  border-radius: 44rpx;
+  font-size: 30rpx;
+  height: 80rpx;
+  line-height: 80rpx;
+  padding: 0 48rpx;
+}

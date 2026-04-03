@@ -1,0 +1,107 @@
+"""日本語"""
+
+LANG_CODE = "ja_JP"
+LANG_NAME = "日本語"
+
+# ── カテゴリ ────────────────────────────────────────────
+CATEGORIES = {
+    "hot_dish": "温かい料理",
+    "cold_dish": "冷菜",
+    "seafood": "海鮮",
+    "soup": "スープ",
+    "staple": "ご飯・麺類",
+    "drink": "ドリンク",
+    "dessert": "デザート",
+    "snack": "軽食",
+    "bbq": "焼き物",
+    "hotpot": "鍋料理",
+}
+
+# ── UI テキスト ─────────────────────────────────────────
+UI = {
+    "checkout": "お会計",
+    "order": "注文",
+    "rush_order": "急ぎ注文",
+    "return_dish": "返品",
+    "add_dish": "追加注文",
+    "table_number": "テーブル番号",
+    "guest_count": "人数",
+    "total": "合計",
+    "discount": "割引",
+    "pay": "支払い",
+    "cash": "現金",
+    "wechat_pay": "WeChat Pay",
+    "alipay": "Alipay",
+    "card": "カード",
+    "receipt": "レシート",
+    "print_receipt": "レシート印刷",
+    "confirm": "確認",
+    "cancel": "キャンセル",
+    "back": "戻る",
+    "search": "検索",
+    "voice_order": "音声注文",
+    "scan_order": "QR注文",
+    "member": "会員",
+    "member_price": "会員価格",
+    "original_price": "定価",
+    "sold_out": "売り切れ",
+    "popular": "人気",
+    "new": "新着",
+    "spicy": "辛い",
+    "recommend": "おすすめ",
+    "quantity": "数量",
+    "remark": "備考",
+    "no_spicy": "辛くない",
+    "mild_spicy": "少し辛い",
+    "medium_spicy": "中辛",
+    "extra_spicy": "激辛",
+    "order_success": "注文完了",
+    "order_failed": "注文失敗",
+    "waiting": "待機中",
+    "preparing": "調理中",
+    "ready": "出来上がり",
+    "served": "提供済み",
+}
+
+# ── 料理名 ──────────────────────────────────────────────
+DISH_NAMES = {
+    "steamed_fish_head_chopped_chili": "唐辛子蒸し魚頭",
+    "braised_pork": "豚の角煮",
+    "kung_pao_chicken": "宮保鶏丁",
+    "mapo_tofu": "麻婆豆腐",
+    "boiled_fish": "四川水煮魚",
+    "steamed_bass": "蒸しスズキ",
+    "stir_fried_vegetables": "季節野菜炒め",
+    "egg_fried_rice": "卵チャーハン",
+    "tomato_egg": "トマトと卵の炒め",
+    "cold_cucumber": "きゅうりの和え物",
+    "hot_and_sour_soup": "酸辣湯",
+    "wonton_soup": "ワンタンスープ",
+    "steamed_rice": "白ご飯",
+    "beer": "ビール",
+    "cola": "コーラ",
+    "plum_juice": "梅ジュース",
+    "herbal_tea": "漢方茶",
+}
+
+# ── レシート ────────────────────────────────────────────
+RECEIPT = {
+    "header": "お会計票",
+    "store_name": "店舗名",
+    "order_no": "注文番号",
+    "table_no": "テーブル番号",
+    "cashier": "担当者",
+    "time": "時間",
+    "item": "品目",
+    "qty": "数量",
+    "price": "単価",
+    "subtotal": "小計",
+    "total": "合計",
+    "discount": "割引",
+    "payable": "お支払い額",
+    "paid": "お預かり",
+    "change": "お釣り",
+    "payment_method": "支払い方法",
+    "footer": "ご来店ありがとうございました！",
+    "vat_note": "領収書が必要な場合はフロントへ",
+}

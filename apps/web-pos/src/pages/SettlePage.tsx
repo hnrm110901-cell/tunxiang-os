@@ -1,11 +1,17 @@
 /**
  * 结算页面 — 对接 tx-trade 支付 API + 打印
+ *
+ * 2026-04-02 新增：折扣 AI 分析抽屉（DiscountPreviewSheet）
+ *   - 点击"折扣"按钮 → 打开底部抽屉 → 调用 tx-brain 折扣分析 API
+ *   - allow/warn 决策后收银员可确认，reject 时禁止执行
+ *   - API 失败时降级处理，不阻断正常操作
  */
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useOrderStore } from '../store/orderStore';
 import { settleOrder, createPayment, printReceipt as apiPrintReceipt } from '../api/tradeApi';
 import { printReceipt as bridgePrint, openCashBox } from '../bridge/TXBridge';
+import { DiscountPreviewSheet, type DiscountParams } from '../components/DiscountPreviewSheet';
 
 const fen2yuan = (fen: number) => `¥${(fen / 100).toFixed(2)}`;
 
@@ -18,11 +24,61 @@ const PAYMENT_METHODS = [
   { key: 'member_balance', label: '会员余额', color: '#13c2c2' },
 ];
 
+// 默认用于演示的折扣档位（收银员手动选择，实际可扩展为输入框）
+const DISCOUNT_PRESETS: { label: string; type: DiscountParams['discountType']; value: number }[] = [
+  { label: '九折', type: 'percentage', value: 0.9 },
+  { label: '八折', type: 'percentage', value: 0.8 },
+  { label: '七折', type: 'percentage', value: 0.7 },
+  { label: '减50元', type: 'fixed', value: 5000 },
+  { label: '免单', type: 'free_item', value: 1 },
+];
+
+// 估算毛利率（实际应从菜品成本数据中获取，此处使用保守估算值）
+const ESTIMATED_MARGIN_RATE = 0.45;
+
 export function SettlePage() {
   const navigate = useNavigate();
-  const { items, totalFen, discountFen, tableNo, orderId, clear } = useOrderStore();
+  const { items, totalFen, discountFen, tableNo, orderId, applyDiscount, clear } = useOrderStore();
   const finalFen = totalFen - discountFen;
   const [paying, setPaying] = useState(false);
+
+  // 折扣 AI 分析抽屉状态
+  const [discountSheetVisible, setDiscountSheetVisible] = useState(false);
+  const [discountParams, setDiscountParams] = useState<DiscountParams | null>(null);
+  // 暂存待确认的折扣金额，AI 批准后才真正写入 store
+  const [pendingDiscountFen, setPendingDiscountFen] = useState<number>(0);
+
+  /** 点击某个折扣档位 → 计算折扣金额 → 打开 AI 分析抽屉 */
+  const handleDiscountPress = (preset: typeof DISCOUNT_PRESETS[0]) => {
+    if (totalFen <= 0) return;
+
+    let discountAmount = 0;
+    if (preset.type === 'percentage') {
+      discountAmount = totalFen - Math.round(totalFen * preset.value);
+    } else if (preset.type === 'fixed') {
+      discountAmount = Math.min(preset.value, totalFen);
+    } else if (preset.type === 'free_item') {
+      discountAmount = totalFen;
+    }
+
+    setPendingDiscountFen(discountAmount);
+
+    setDiscountParams({
+      orderId: orderId ?? 'temp',
+      discountType: preset.type,
+      discountValue: preset.value,
+      orderAmountFen: totalFen,
+      employeeId: localStorage.getItem('employeeId') ?? 'unknown',
+      currentMarginRate: ESTIMATED_MARGIN_RATE,
+    });
+
+    setDiscountSheetVisible(true);
+  };
+
+  /** AI 分析通过后，收银员点击确认 → 真正写入折扣 */
+  const handleDiscountConfirm = () => {
+    applyDiscount(pendingDiscountFen);
+  };
 
   const handlePay = async (method: string) => {
     if (paying) return;
@@ -89,6 +145,56 @@ export function SettlePage() {
         <div style={{ marginTop: 16, fontSize: 24, fontWeight: 'bold', color: '#FF6B2C', textAlign: 'right' }}>
           应付: {fen2yuan(finalFen)}
         </div>
+
+        {/* 折扣区域 */}
+        {discountFen > 0 && (
+          <div style={{
+            marginTop: 8,
+            padding: '10px 14px',
+            borderRadius: 8,
+            background: 'rgba(255,107,53,0.12)',
+            border: '1px solid rgba(255,107,53,0.3)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            fontSize: 17,
+          }}>
+            <span style={{ color: '#FF6B35', fontWeight: 600 }}>已优惠</span>
+            <span style={{ color: '#FF6B35', fontWeight: 700 }}>-{fen2yuan(discountFen)}</span>
+          </div>
+        )}
+
+        {/* 折扣档位按钮组 */}
+        <div style={{ marginTop: 20 }}>
+          <div style={{ fontSize: 17, color: '#8A94A4', marginBottom: 10, fontWeight: 600 }}>
+            添加折扣（AI 风险分析）
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {DISCOUNT_PRESETS.map((preset) => (
+              <button
+                key={preset.label}
+                type="button"
+                onClick={() => handleDiscountPress(preset)}
+                disabled={items.length === 0}
+                style={{
+                  padding: '10px 16px',
+                  minHeight: 48,
+                  border: '1.5px solid #FF6B35',
+                  borderRadius: 8,
+                  background: 'rgba(255,107,53,0.12)',
+                  color: items.length === 0 ? '#666' : '#FF6B35',
+                  fontSize: 17,
+                  fontWeight: 600,
+                  cursor: items.length === 0 ? 'not-allowed' : 'pointer',
+                  fontFamily: 'inherit',
+                  opacity: items.length === 0 ? 0.4 : 1,
+                }}
+              >
+                {preset.label}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
       {/* 右侧 — 支付方式 */}
@@ -108,13 +214,42 @@ export function SettlePage() {
             {paying ? '处理中...' : m.label}
           </button>
         ))}
+        {/* 高级结算入口 */}
+        <div style={{ borderTop: '1px solid #333', paddingTop: 12, marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <button
+            onClick={() => navigate(`/credit-pay/${orderId || 'temp'}`)}
+            style={{ padding: 14, border: '1px solid #722ed1', borderRadius: 8, background: 'transparent', color: '#722ed1', cursor: 'pointer', fontSize: 16, minHeight: 48 }}
+          >
+            企业挂账
+          </button>
+          <button
+            onClick={() => navigate(`/split-pay/${orderId || 'temp'}`)}
+            style={{ padding: 14, border: '1px solid #1677FF', borderRadius: 8, background: 'transparent', color: '#1677FF', cursor: 'pointer', fontSize: 16, minHeight: 48 }}
+          >
+            拆单结账
+          </button>
+          <button
+            onClick={() => navigate(`/tax-invoice/${orderId || 'temp'}`)}
+            style={{ padding: 14, border: '1px solid #faad14', borderRadius: 8, background: 'transparent', color: '#faad14', cursor: 'pointer', fontSize: 16, minHeight: 48 }}
+          >
+            开具发票
+          </button>
+        </div>
         <button
           onClick={() => navigate(-1)}
-          style={{ padding: 12, border: '1px solid #444', borderRadius: 8, background: 'transparent', color: '#999', cursor: 'pointer', marginTop: 'auto' }}
+          style={{ padding: 12, border: '1px solid #444', borderRadius: 8, background: 'transparent', color: '#999', cursor: 'pointer', marginTop: 12 }}
         >
           返回修改
         </button>
       </div>
+
+      {/* 折扣 AI 分析抽屉 */}
+      <DiscountPreviewSheet
+        visible={discountSheetVisible}
+        onClose={() => setDiscountSheetVisible(false)}
+        onConfirm={handleDiscountConfirm}
+        discountParams={discountParams}
+      />
     </div>
   );
 }

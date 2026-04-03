@@ -12,6 +12,7 @@ const MODULES = [
   { id: 'finance', icon: '💹', label: '财务' },
   { id: 'org', icon: '🏢', label: '组织' },
   { id: 'analytics', icon: '📈', label: '分析' },
+  { id: 'ops', icon: '🎯', label: '经营' },
   { id: 'agent', icon: '🤖', label: 'Agent' },
 ];
 

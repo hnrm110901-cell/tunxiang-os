@@ -33,6 +33,32 @@ class TransactionType(str, enum.Enum):
     waste = "waste"
     adjustment = "adjustment"
     transfer = "transfer"
+    receiving = "receiving"        # 验收入库
+    transfer_out = "transfer_out"  # 调拨出库
+    transfer_in = "transfer_in"    # 调拨入库
+
+
+class ReceivingOrderStatus(str, enum.Enum):
+    draft = "draft"
+    inspecting = "inspecting"
+    partially_received = "partially_received"
+    fully_received = "fully_received"
+    rejected = "rejected"
+
+
+class ReceivingItemStatus(str, enum.Enum):
+    pending = "pending"
+    accepted = "accepted"
+    partial = "partial"
+    rejected = "rejected"
+
+
+class TransferOrderStatus(str, enum.Enum):
+    draft = "draft"
+    approved = "approved"
+    shipped = "shipped"
+    received = "received"
+    cancelled = "cancelled"
 
 
 class EmploymentStatus(str, enum.Enum):

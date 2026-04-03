@@ -6,7 +6,6 @@
 """
 from typing import Optional
 
-
 # ─── 桌台状态机 ───
 
 TABLE_STATES = {

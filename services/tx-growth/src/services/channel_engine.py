@@ -3,11 +3,15 @@
 统一管理企微、短信、小程序、App Push 等渠道的消息发送，
 强制频率限制防止用户骚扰，记录发送日志用于归因。
 """
+import os
 import uuid
-from datetime import datetime, timezone, date
-from typing import Any, Optional
 from collections import defaultdict
+from datetime import date, datetime, timezone
+from typing import Optional
+from uuid import UUID
 
+import httpx
+import structlog
 
 # ---------------------------------------------------------------------------
 # 内存存储
@@ -23,8 +27,13 @@ _daily_send_counts: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(
 # ChannelEngine
 # ---------------------------------------------------------------------------
 
+_logger = structlog.get_logger(__name__)
+
+
 class ChannelEngine:
     """渠道触达引擎 — 统一渠道配置、发送能力和合规频控"""
+
+    GATEWAY_URL: str = os.getenv("GATEWAY_SERVICE_URL", "http://gateway:8000")
 
     CHANNELS = {
         "wecom": {"name": "企业微信", "max_daily": 3},
@@ -35,6 +44,88 @@ class ChannelEngine:
         "reservation_page": {"name": "预订确认页", "max_daily": 1},
         "store_task": {"name": "门店人工任务", "max_daily": 1},
     }
+
+    async def send_wecom_message(
+        self,
+        user_id: str,
+        content: dict,
+        tenant_id: UUID,
+        offer_id: Optional[str] = None,
+    ) -> dict:
+        """通过 gateway 内部 API 向企微用户发送个性化消息
+
+        通过 POST /internal/wecom/send 调用 gateway 服务，
+        gateway 再调用 WecomSDK 完成实际发送。
+
+        Args:
+            user_id:   企微 external_userid
+            content:   {"title", "description", "url"(可选), "btntxt"(可选)}
+            tenant_id: 租户 UUID（用于 X-Tenant-ID header）
+            offer_id:  关联优惠 ID（可选，用于发送日志）
+
+        Returns:
+            {"channel": "wecom", "status": "sent"|"placeholder", ...}
+        """
+        log = _logger.bind(channel="wecom", user_id=user_id, tenant_id=str(tenant_id))
+
+        # 频控检查（用 user_id 作为频控 key）
+        freq_check = self.check_frequency_limit(user_id, "wecom")
+        if not freq_check["allowed"]:
+            log.warning("wecom_send_frequency_limited", reason=freq_check["reason"])
+            return {
+                "channel": "wecom",
+                "status": "blocked",
+                "reason": freq_check["reason"],
+            }
+
+        # 判断消息类型：有 url 则发 text_card，否则发 text
+        message_type = "text_card" if content.get("url") else "text"
+
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resp = await client.post(
+                    f"{self.GATEWAY_URL}/internal/wecom/send",
+                    headers={"X-Tenant-ID": str(tenant_id)},
+                    json={
+                        "user_id": user_id,
+                        "message_type": message_type,
+                        "title": content.get("title", ""),
+                        "description": content.get("description", ""),
+                        "url": content.get("url", ""),
+                        "btntxt": content.get("btntxt", "查看详情"),
+                    },
+                )
+            resp.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            log.warning(
+                "wecom_send_gateway_http_error",
+                status_code=exc.response.status_code,
+            )
+            return {"channel": "wecom", "status": "failed", "error": f"http_{exc.response.status_code}"}
+        except httpx.RequestError as exc:
+            log.warning("wecom_send_gateway_request_error", error=str(exc))
+            return {"channel": "wecom", "status": "failed", "error": str(exc)}
+
+        # 更新频控计数 + 发送日志
+        message_id = str(uuid.uuid4())[:8]
+        now = datetime.now(timezone.utc).isoformat()
+        today = date.today().isoformat()
+
+        log_entry = {
+            "message_id": message_id,
+            "channel": "wecom",
+            "user_id": user_id,
+            "content": f"{content.get('title', '')} | {content.get('description', '')}",
+            "offer_id": offer_id,
+            "status": "sent",
+            "sent_at": now,
+            "date": today,
+        }
+        _send_logs.append(log_entry)
+        _daily_send_counts[user_id]["wecom"] += 1
+
+        log.info("wecom_send_success", message_id=message_id, message_type=message_type)
+        return {"channel": "wecom", "status": "sent", "message_id": message_id}
 
     def send_message(
         self,

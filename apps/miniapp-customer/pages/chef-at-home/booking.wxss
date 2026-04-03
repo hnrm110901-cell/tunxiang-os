@@ -1,0 +1,123 @@
+.container { padding: 0; background: #0B1A20; min-height: 100vh; color: #fff; padding-bottom: 160rpx; }
+
+/* ─── 支付成功页 ─── */
+.success-page { display: flex; flex-direction: column; align-items: center; padding: 80rpx 32rpx 160rpx; }
+.success-icon-wrap {
+  width: 120rpx;
+  height: 120rpx;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #FF6B35, #FF8C5A);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 32rpx;
+}
+.success-icon { font-size: 56rpx; color: #fff; font-weight: bold; }
+.success-title { font-size: 40rpx; font-weight: bold; color: #fff; margin-bottom: 16rpx; }
+.success-subtitle { font-size: 26rpx; color: #999; margin-bottom: 48rpx; text-align: center; }
+
+.success-card {
+  width: 100%;
+  background: #112228;
+  border-radius: 24rpx;
+  padding: 32rpx;
+  margin-bottom: 48rpx;
+}
+.success-row { display: flex; justify-content: space-between; align-items: flex-start; padding: 16rpx 0; border-bottom: 1rpx solid #1a2a33; }
+.success-row:last-child { border-bottom: none; }
+.success-label { font-size: 26rpx; color: #999; flex-shrink: 0; width: 160rpx; }
+.success-value { font-size: 28rpx; color: #fff; text-align: right; flex: 1; }
+.success-value.address-val { word-break: break-all; }
+
+.success-actions { width: 100%; display: flex; flex-direction: column; gap: 20rpx; }
+.success-btn {
+  text-align: center;
+  padding: 28rpx 0;
+  border-radius: 44rpx;
+  font-size: 30rpx;
+  font-weight: 600;
+}
+.success-btn.outline { border: 2rpx solid #FF6B35; color: #FF6B35; }
+.success-btn.primary { background: #FF6B35; color: #fff; }
+
+/* ─── 厨师摘要 ─── */
+.chef-summary {
+  background: linear-gradient(135deg, #FF6B35, #FF8C5A);
+  padding: 32rpx;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.chef-summary-left { display: flex; flex-direction: column; gap: 8rpx; }
+.chef-label { font-size: 22rpx; color: rgba(255,255,255,0.8); display: block; }
+.chef-row { display: flex; align-items: center; gap: 12rpx; }
+.chef-name { font-size: 34rpx; font-weight: bold; color: #fff; }
+.chef-title { font-size: 22rpx; color: rgba(255,255,255,0.9); background: rgba(255,255,255,0.2); padding: 4rpx 14rpx; border-radius: 8rpx; }
+.chef-avatar-placeholder { font-size: 80rpx; }
+
+/* ─── 摘要卡片 ─── */
+.summary-card { background: #112228; margin: 20rpx 32rpx 0; border-radius: 24rpx; padding: 28rpx; }
+.card-title { font-size: 30rpx; font-weight: bold; display: block; margin-bottom: 20rpx; }
+
+.summary-row { display: flex; justify-content: space-between; align-items: flex-start; padding: 14rpx 0; border-bottom: 1rpx solid #1a2a33; }
+.summary-row:last-child { border-bottom: none; }
+.summary-label { font-size: 26rpx; color: #999; flex-shrink: 0; width: 160rpx; }
+.summary-value { font-size: 28rpx; color: #fff; text-align: right; flex: 1; }
+.summary-value.address-val { word-break: break-all; }
+
+/* 已选菜品 */
+.dish-row { display: flex; align-items: center; padding: 12rpx 0; border-bottom: 1rpx solid #1a2a33; }
+.dish-row:last-child { border-bottom: none; }
+.dish-row .dish-name { flex: 1; font-size: 28rpx; }
+.dish-row .dish-qty { font-size: 26rpx; color: #999; margin: 0 20rpx; }
+.dish-row .dish-price { font-size: 28rpx; color: #FF6B35; }
+
+/* 表单 */
+.form-item { margin-bottom: 20rpx; }
+.form-label { font-size: 26rpx; color: #999; margin-bottom: 12rpx; display: block; }
+.form-input { background: #1a2a33; padding: 20rpx 24rpx; border-radius: 12rpx; font-size: 28rpx; color: #fff; width: 100%; box-sizing: border-box; }
+.placeholder { color: #555; }
+
+/* 价格明细 */
+.price-card { background: #112228; margin: 20rpx 32rpx 0; border-radius: 24rpx; padding: 28rpx; }
+.price-loading { font-size: 26rpx; color: #999; padding: 20rpx 0; }
+.price-row { display: flex; justify-content: space-between; align-items: center; padding: 14rpx 0; }
+.price-label { font-size: 28rpx; color: #999; }
+.price-value { font-size: 28rpx; color: #fff; }
+.price-divider { height: 1rpx; background: #1a2a33; margin: 8rpx 0; }
+.price-total-row { display: flex; justify-content: space-between; align-items: center; padding: 16rpx 0; }
+.price-total-label { font-size: 30rpx; font-weight: bold; }
+.price-total-value { font-size: 40rpx; color: #FF6B35; font-weight: bold; }
+
+.bottom-spacer { height: 160rpx; }
+
+/* ─── 底部支付栏 ─── */
+.bottom-pay-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #112228;
+  border-top: 1rpx solid #1a2a33;
+  padding: 20rpx 32rpx;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24rpx;
+  z-index: 100;
+}
+
+.pay-total-info { display: flex; flex-direction: column; gap: 4rpx; }
+.pay-label { font-size: 22rpx; color: #999; }
+.pay-amount { font-size: 40rpx; color: #FF6B35; font-weight: bold; }
+
+.pay-btn {
+  background: #FF6B35;
+  color: #fff;
+  padding: 24rpx 64rpx;
+  border-radius: 44rpx;
+  font-size: 32rpx;
+  font-weight: bold;
+  flex-shrink: 0;
+}
+.pay-btn.loading { opacity: 0.7; }

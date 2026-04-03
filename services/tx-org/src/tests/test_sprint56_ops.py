@@ -13,8 +13,8 @@
 - 排班效率（预测 vs 实际）
 """
 
-import sys
 import os
+import sys
 
 # ── Setup path BEFORE any local imports ──
 _here = os.path.dirname(os.path.abspath(__file__))
@@ -26,33 +26,25 @@ for _p in [
     if _abs not in sys.path:
         sys.path.insert(0, _abs)
 
+import importlib.util as _ilu
 from datetime import date, datetime, timedelta
 
 import pytest
-
-from services.smart_schedule import (
-    SmartScheduleService,
-    EMPLOYEE_DATABASE,
-    SHIFT_DEFINITIONS,
-    MAX_CONSECUTIVE_DAYS,
-    MAX_OVERTIME_MONTH_HOURS,
-    DAY_OF_WEEK_FACTOR,
-    HOURLY_DISTRIBUTION,
-)
 from services.attendance_engine import (
-    AttendanceEngine,
     SHIFT_TIMES,
-    LEAVE_TYPES,
-    GRACE_PERIOD_MINUTES,
+    AttendanceEngine,
 )
 from services.payroll_service import (
-    PayrollService,
-    SOCIAL_INSURANCE_RATES,
     EMPLOYEE_SALARY_CONFIG,
-    TAX_BRACKETS_YUAN,
-    MONTHLY_EXEMPTION_YUAN,
+    PayrollService,
 )
-import importlib.util as _ilu
+from services.smart_schedule import (
+    EMPLOYEE_DATABASE,
+    MAX_OVERTIME_MONTH_HOURS,
+    SHIFT_DEFINITIONS,
+    SmartScheduleService,
+)
+
 _wg_path = os.path.join(_here, "..", "..", "..", "tx-supply", "src", "services", "waste_guard_v2.py")
 _wg_spec = _ilu.spec_from_file_location("waste_guard_v2", os.path.abspath(_wg_path))
 _wg_mod = _ilu.module_from_spec(_wg_spec)

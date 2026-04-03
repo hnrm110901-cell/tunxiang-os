@@ -34,6 +34,7 @@ log_error() { echo -e "${RED}[ERROR]${NC} $*"; }
 # ─── DNS 记录定义 ───
 # 格式: "子域名|记录类型|记录值|用途说明"
 DNS_RECORDS=(
+    # ── 生产环境（商户使用） ──
     "@|A|${SERVER_IP}|官网 tunxiangos.com"
     "www|CNAME|${DOMAIN}.|www 重定向到裸域名"
     "hub|A|${SERVER_IP}|总部 Hub 管理后台"
@@ -45,6 +46,17 @@ DNS_RECORDS=(
     "api|A|${SERVER_IP}|API Gateway"
     "ws|A|${SERVER_IP}|WebSocket 入口"
     "docs|A|${SERVER_IP}|文档站"
+    # ── 灰度环境（灰度商户，同一台服务器 port 8081） ──
+    "gray-pos|A|${SERVER_IP}|灰度 POS"
+    "gray-kds|A|${SERVER_IP}|灰度 KDS"
+    "gray-os|A|${SERVER_IP}|灰度管理后台"
+    "gray-api|A|${SERVER_IP}|灰度 API"
+    "gray-m|A|${SERVER_IP}|灰度小程序"
+    # ── Staging 环境（开发者，同一台服务器 port 8080） ──
+    "stg-pos|A|${SERVER_IP}|Staging POS"
+    "stg-os|A|${SERVER_IP}|Staging 管理后台"
+    "stg-api|A|${SERVER_IP}|Staging API"
+    # ── 通配符兜底 ──
     "*|A|${SERVER_IP}|通配符兜底（可选）"
 )
 

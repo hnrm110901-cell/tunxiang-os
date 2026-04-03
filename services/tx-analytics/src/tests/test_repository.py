@@ -1,12 +1,9 @@
 """AnalyticsRepository 单元测试 — 使用 mock AsyncSession"""
 import uuid
-from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-
 from services.repository import AnalyticsRepository
-
 
 TENANT_ID = str(uuid.uuid4())
 STORE_ID = str(uuid.uuid4())

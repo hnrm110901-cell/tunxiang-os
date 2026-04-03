@@ -2,6 +2,7 @@ package com.tunxiang.pos.data.remote
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.tunxiang.pos.BuildConfig
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
@@ -48,16 +49,21 @@ class ApiClient(
     }
 
     private val loggingInterceptor = HttpLoggingInterceptor().apply {
-        level = HttpLoggingInterceptor.Level.BODY
+        level = if (BuildConfig.DEBUG) {
+            HttpLoggingInterceptor.Level.BODY
+        } else {
+            HttpLoggingInterceptor.Level.BASIC  // 生产环境只记录请求行，省 5-10ms
+        }
     }
 
     private val okHttpClient = OkHttpClient.Builder()
         .addInterceptor(authInterceptor)
         .addInterceptor(loggingInterceptor)
-        .connectTimeout(10, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
-        .writeTimeout(30, TimeUnit.SECONDS)
+        .connectTimeout(5, TimeUnit.SECONDS)
+        .readTimeout(15, TimeUnit.SECONDS)
+        .writeTimeout(10, TimeUnit.SECONDS)
         .retryOnConnectionFailure(true)
+        .connectionPool(okhttp3.ConnectionPool(10, 5, TimeUnit.MINUTES))  // 复用连接
         .build()
 
     private val retrofit = Retrofit.Builder()

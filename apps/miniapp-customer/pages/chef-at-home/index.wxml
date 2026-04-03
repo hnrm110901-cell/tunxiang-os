@@ -1,0 +1,112 @@
+<!-- 大厨到家首页 — 地址/搜索 + 日期筛选 + 厨师列表 -->
+<view class="container">
+
+  <!-- 顶部横幅 -->
+  <view class="hero-banner">
+    <view class="hero-text">
+      <text class="hero-title">大厨到家</text>
+      <text class="hero-subtitle">专业大厨，携带食材上门烹制</text>
+    </view>
+    <text class="hero-deco">👨‍🍳</text>
+  </view>
+
+  <!-- 地址/搜索栏 -->
+  <view class="search-bar">
+    <view class="location-row" bindtap="chooseServiceAddress">
+      <text class="location-icon">📍</text>
+      <text class="location-text">{{serviceAddress || '选择上门地址'}}</text>
+      <text class="location-arrow">›</text>
+    </view>
+  </view>
+
+  <!-- 日期筛选 -->
+  <view class="date-filter-wrap">
+    <scroll-view class="date-scroll" scroll-x scroll-with-animation>
+      <view class="date-list">
+        <view class="date-item {{selectedDate === item.value ? 'active' : ''}}"
+              wx:for="{{dateList}}" wx:key="value"
+              bindtap="selectDate" data-value="{{item.value}}">
+          <text class="date-weekday">{{item.weekday}}</text>
+          <text class="date-day">{{item.day}}</text>
+          <text class="date-month" wx:if="{{item.isToday}}">今天</text>
+          <text class="date-month" wx:else>{{item.month}}月</text>
+        </view>
+      </view>
+    </scroll-view>
+  </view>
+
+  <!-- 菜系筛选 -->
+  <view class="cuisine-filter-wrap">
+    <scroll-view class="cuisine-filter" scroll-x>
+      <view class="cuisine-item {{selectedCuisine === item ? 'active' : ''}}"
+            wx:for="{{cuisineTypes}}" wx:key="*this"
+            bindtap="selectCuisine" data-type="{{item}}">
+        {{item}}
+      </view>
+    </scroll-view>
+  </view>
+
+  <!-- 厨师列表 -->
+  <view class="chef-list-wrap">
+
+    <!-- 加载中 -->
+    <view class="loading-tip" wx:if="{{loadingChefs}}">
+      <view class="loading-spinner"></view>
+      <text>正在为您查找可用大厨...</text>
+    </view>
+
+    <!-- 加载失败 -->
+    <view class="error-tip" wx:elif="{{loadError}}">
+      <text class="error-text">加载失败，请重试</text>
+      <view class="retry-btn" bindtap="loadChefs">重新加载</view>
+    </view>
+
+    <!-- 空状态 -->
+    <view class="empty-tip" wx:elif="{{chefs.length === 0}}">
+      <text class="empty-icon">🍳</text>
+      <text class="empty-text">{{selectedDate}}暂无可用大厨</text>
+      <text class="empty-sub">请换个日期或菜系试试</text>
+    </view>
+
+    <!-- 厨师卡片列表 -->
+    <view wx:else>
+      <view class="chef-card" wx:for="{{chefs}}" wx:key="id">
+        <!-- 左侧头像 -->
+        <image class="chef-avatar" src="{{item.avatar || '/assets/chef-default.png'}}"
+               mode="aspectFill" lazy-load />
+
+        <!-- 中间信息 -->
+        <view class="chef-info">
+          <view class="chef-name-row">
+            <text class="chef-name">{{item.name}}</text>
+            <text class="chef-title-badge">{{item.title}}</text>
+          </view>
+          <view class="chef-tags">
+            <text class="chef-tag" wx:for="{{item.cuisine_types}}" wx:for-item="ct" wx:key="*this">{{ct}}</text>
+          </view>
+          <view class="chef-stats-row">
+            <text class="chef-rating">⭐ {{item.rating}}</text>
+            <text class="chef-dot">·</text>
+            <text class="chef-services">{{item.total_services}}次服务</text>
+            <text class="chef-dot">·</text>
+            <text class="chef-exp">{{item.years_experience}}年经验</text>
+          </view>
+          <text class="chef-specialties">招牌: {{item.specialties[0]}}{{item.specialties[1] ? '、' + item.specialties[1] : ''}}</text>
+          <view class="chef-price-row">
+            <text class="chef-fee-label">服务费</text>
+            <text class="chef-fee">¥{{item.base_fee_fen / 100}}/次</text>
+            <text class="chef-distance" wx:if="{{item.distance_km}}">📍{{item.distance_km}}km</text>
+          </view>
+        </view>
+
+        <!-- 右侧预约按钮 -->
+        <view class="chef-book-btn" bindtap="goToChefProfile" data-id="{{item.id}}">
+          <text>立即预约</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 底部留白 -->
+  <view class="bottom-spacer"></view>
+</view>

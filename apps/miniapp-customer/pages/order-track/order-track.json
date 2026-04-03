@@ -1,0 +1,6 @@
+{
+  "navigationBarTitleText": "订单进度",
+  "usingComponents": {
+    "order-progress": "../../components/order-progress/order-progress"
+  }
+}

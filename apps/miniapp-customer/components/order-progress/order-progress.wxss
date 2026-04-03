@@ -1,0 +1,143 @@
+.progress-wrapper {
+  background: var(--tx-bg-2, #112228);
+  border-radius: 24rpx;
+  padding: 32rpx;
+  margin: 24rpx 0;
+}
+
+/* Countdown */
+.progress-countdown {
+  text-align: center;
+  margin-bottom: 32rpx;
+}
+
+.countdown-text {
+  font-size: 32rpx;
+  font-weight: bold;
+  color: var(--tx-primary, #FF6B2C);
+}
+
+/* Steps row */
+.steps-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+}
+
+.step-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 120rpx;
+}
+
+.step-circle {
+  width: 56rpx;
+  height: 56rpx;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26rpx;
+  font-weight: bold;
+  margin-bottom: 12rpx;
+  transition: all 300ms ease;
+}
+
+.step-circle.pending {
+  background: var(--tx-bg-3, #1a2a33);
+  color: #666;
+}
+
+.step-circle.active {
+  background: var(--tx-primary, #FF6B2C);
+  color: #fff;
+  box-shadow: 0 0 16rpx rgba(255, 107, 44, 0.4);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.step-circle.done {
+  background: var(--tx-success, #0F6E56);
+  color: #fff;
+}
+
+.step-icon { font-size: 28rpx; }
+.step-num { font-size: 24rpx; }
+
+.step-label {
+  font-size: 22rpx;
+  color: #999;
+  text-align: center;
+}
+
+.step-label.active {
+  color: var(--tx-primary, #FF6B2C);
+  font-weight: 600;
+}
+
+/* Connector line */
+.step-line {
+  flex: 1;
+  height: 4rpx;
+  background: var(--tx-bg-3, #1a2a33);
+  margin-top: 28rpx;
+  min-width: 40rpx;
+  transition: background 300ms ease;
+}
+
+.step-line.done {
+  background: var(--tx-success, #0F6E56);
+}
+
+/* Rush button */
+.rush-area {
+  margin-top: 28rpx;
+  text-align: center;
+}
+
+.rush-btn {
+  display: inline-block;
+  background: transparent !important;
+  border: 2rpx solid var(--tx-primary, #FF6B2C) !important;
+  color: var(--tx-primary, #FF6B2C) !important;
+  border-radius: 44rpx;
+  font-size: 28rpx;
+  padding: 0 48rpx;
+  height: 68rpx;
+  line-height: 68rpx;
+}
+
+/* Step time */
+.step-time {
+  font-size: 20rpx;
+  color: #666;
+  margin-top: 4rpx;
+}
+
+/* Current dish */
+.current-dish {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8rpx;
+  margin-top: 24rpx;
+  padding: 16rpx;
+  background: rgba(255, 107, 44, 0.08);
+  border-radius: 12rpx;
+}
+
+.current-dish-label {
+  font-size: 24rpx;
+  color: #999;
+}
+
+.current-dish-name {
+  font-size: 26rpx;
+  color: #FF6B2C;
+  font-weight: 600;
+}
+
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 0 16rpx rgba(255, 107, 44, 0.4); }
+  50% { box-shadow: 0 0 32rpx rgba(255, 107, 44, 0.7); }
+}

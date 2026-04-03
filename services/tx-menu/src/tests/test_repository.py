@@ -1,12 +1,10 @@
 """DishRepository 单元测试 — 使用 mock AsyncSession"""
 import uuid
 from datetime import datetime, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-
 from services.repository import DishRepository
-
 
 TENANT_ID = str(uuid.uuid4())
 STORE_ID = str(uuid.uuid4())
@@ -19,13 +17,13 @@ def _make_dish(**overrides):
     dish.tenant_id = uuid.UUID(TENANT_ID)
     dish.dish_name = overrides.get("dish_name", "宫保鸡丁")
     dish.dish_code = overrides.get("dish_code", "GBCJ001")
-    dish.category_id = overrides.get("category_id", None)
+    dish.category_id = overrides.get("category_id")
     dish.price_fen = overrides.get("price_fen", 3800)
-    dish.original_price_fen = overrides.get("original_price_fen", None)
+    dish.original_price_fen = overrides.get("original_price_fen")
     dish.cost_fen = overrides.get("cost_fen", 1200)
-    dish.profit_margin = overrides.get("profit_margin", None)
+    dish.profit_margin = overrides.get("profit_margin")
     dish.description = overrides.get("description", "经典川菜")
-    dish.image_url = overrides.get("image_url", None)
+    dish.image_url = overrides.get("image_url")
     dish.kitchen_station = overrides.get("kitchen_station", "炒锅")
     dish.preparation_time = overrides.get("preparation_time", 15)
     dish.unit = overrides.get("unit", "份")
@@ -35,7 +33,7 @@ def _make_dish(**overrides):
     dish.sort_order = overrides.get("sort_order", 0)
     dish.total_sales = overrides.get("total_sales", 100)
     dish.total_revenue_fen = overrides.get("total_revenue_fen", 380000)
-    dish.rating = overrides.get("rating", None)
+    dish.rating = overrides.get("rating")
     dish.tags = overrides.get("tags", ["川菜"])
     dish.created_at = overrides.get("created_at", datetime.now(timezone.utc))
     return dish
@@ -46,7 +44,7 @@ def _make_category(**overrides):
     cat.id = overrides.get("id", uuid.uuid4())
     cat.name = overrides.get("name", "川菜")
     cat.code = overrides.get("code", "CC")
-    cat.parent_id = overrides.get("parent_id", None)
+    cat.parent_id = overrides.get("parent_id")
     cat.sort_order = overrides.get("sort_order", 0)
     cat.is_active = overrides.get("is_active", True)
     return cat

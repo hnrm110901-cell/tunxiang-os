@@ -4,8 +4,8 @@
 """
 import uuid
 from typing import Any
-from ..base import SkillAgent, AgentResult
 
+from ..base import AgentResult, SkillAgent
 
 # 裂变活动模板
 REFERRAL_TEMPLATES = {

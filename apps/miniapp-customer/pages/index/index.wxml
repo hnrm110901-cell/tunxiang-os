@@ -1,34 +1,145 @@
-<!-- 点餐首页 — 扫码点餐入口 -->
-<view class="container">
-  <view class="header">
-    <text class="store-name">{{storeName || '屯象点餐'}}</text>
-    <text class="table-info" wx:if="{{tableNo}}">桌号: {{tableNo}}</text>
-  </view>
+<!-- 首页 — 到店点餐/外卖/大厨到家 + 进行中订单 + 猜你喜欢 + 快捷入口 + 附近门店 -->
+<view class="page-container">
 
-  <!-- 菜品分类 -->
-  <scroll-view scroll-x class="categories">
-    <view class="category-item {{activeCategory === item ? 'active' : ''}}"
-          wx:for="{{categories}}" wx:key="*this"
-          bindtap="selectCategory" data-name="{{item}}">
-      {{item}}
+  <!-- 顶部: 门店信息 + 扫码按钮 -->
+  <view class="store-header">
+    <view class="store-info">
+      <text class="store-name">{{storeName || '屯象点餐'}}</text>
+      <text class="store-address" wx:if="{{storeAddress}}">{{storeAddress}}</text>
     </view>
-  </scroll-view>
-
-  <!-- 菜品列表 -->
-  <scroll-view scroll-y class="dish-list">
-    <view class="dish-card" wx:for="{{dishes}}" wx:key="id" bindtap="addToCart" data-dish="{{item}}">
-      <image class="dish-img" src="{{item.imageUrl || '/assets/dish-placeholder.png'}}" mode="aspectFill" />
-      <view class="dish-info">
-        <text class="dish-name">{{item.name}}</text>
-        <text class="dish-price">¥{{item.priceFen / 100}}</text>
+    <view class="header-actions">
+      <view class="table-badge" wx:if="{{tableNo}}">
+        <text class="table-label">桌号</text>
+        <text class="table-no">{{tableNo}}</text>
+      </view>
+      <view class="scan-btn" bindtap="startScan">
+        <text class="scan-icon">&#xe600;</text>
       </view>
     </view>
-  </scroll-view>
+  </view>
 
-  <!-- 底部购物车栏 -->
-  <view class="cart-bar" wx:if="{{cartCount > 0}}">
-    <text class="cart-count">已选 {{cartCount}} 件</text>
-    <text class="cart-total">¥{{cartTotal / 100}}</text>
-    <button class="submit-btn" bindtap="submitOrder">去结算</button>
+  <!-- 三Tab切换: 到店点餐 / 外卖 / 大厨到家 -->
+  <view class="mode-tabs">
+    <view class="mode-tab {{activeMode === item.key ? 'active' : ''}}"
+          wx:for="{{modes}}" wx:key="key"
+          bindtap="switchMode" data-mode="{{item.key}}">
+      <text>{{item.label}}</text>
+    </view>
+  </view>
+
+  <!-- 进行中订单悬浮卡片 (制作进度+预计时间) -->
+  <view class="active-order-card" wx:if="{{activeOrder}}" bindtap="goToActiveOrder">
+    <view class="active-order-top">
+      <view class="active-order-status">
+        <view class="active-dot"></view>
+        <text class="active-status-text">{{activeOrder.statusText}}</text>
+      </view>
+      <text class="active-order-time">预计 {{activeOrder.estimatedMinutes}} 分钟</text>
+    </view>
+    <view class="active-order-progress">
+      <view class="progress-track">
+        <view class="progress-fill" style="width: {{activeOrder.progress * 25}}%"></view>
+      </view>
+      <view class="progress-labels">
+        <text class="progress-label">接单</text>
+        <text class="progress-label">制作</text>
+        <text class="progress-label">出餐</text>
+        <text class="progress-label">可取</text>
+      </view>
+    </view>
+    <view class="active-order-bottom" wx:if="{{activeOrder.currentDish}}">
+      <text class="active-dish-label">正在制作: {{activeOrder.currentDish}}</text>
+    </view>
+    <text class="active-order-action">查看详情 ></text>
+  </view>
+
+  <!-- 大厨到家入口 Banner -->
+  <view class="chef-home-banner" bindtap="goToChefHome">
+    <view class="chef-home-banner-content">
+      <view class="chef-home-banner-text">
+        <text class="chef-home-banner-title">大厨到家</text>
+        <text class="chef-home-banner-subtitle">专业大厨，到家烹制</text>
+      </view>
+      <view class="chef-home-banner-btn">
+        <text class="chef-home-banner-btn-text">立即预订</text>
+      </view>
+    </view>
+    <text class="chef-home-banner-deco">🍳</text>
+  </view>
+
+  <!-- 快捷入口 (4宫格: 扫码点餐/排队取号/预订/我的会员卡) -->
+  <view class="quick-entries">
+    <view class="entry-item" wx:for="{{quickEntries}}" wx:key="label"
+          bindtap="goToEntry" data-route="{{item.route}}" data-type="{{item.type}}">
+      <view class="entry-icon-circle">
+        <image class="entry-icon-img" src="{{item.icon}}" mode="aspectFit"
+               wx:if="{{item.icon && item.icon.indexOf('/') >= 0}}" />
+        <text class="entry-icon-emoji" wx:else>{{item.icon}}</text>
+      </view>
+      <text class="entry-label">{{item.label}}</text>
+    </view>
+  </view>
+
+  <!-- 当前排队/预订状态卡片 -->
+  <view class="status-card" wx:if="{{currentQueue}}" bindtap="goToQueue">
+    <view class="status-left">
+      <text class="status-type">排队中</text>
+      <text class="status-detail">{{currentQueue.ticketNo}} · 前方{{currentQueue.ahead}}桌</text>
+    </view>
+    <text class="status-action">查看详情 ></text>
+  </view>
+
+  <view class="status-card" wx:if="{{currentBooking}}" bindtap="goToReservation">
+    <view class="status-left">
+      <text class="status-type">预订</text>
+      <text class="status-detail">{{currentBooking.date}} {{currentBooking.timeSlot}}</text>
+    </view>
+    <text class="status-action">查看详情 ></text>
+  </view>
+
+  <!-- 猜你喜欢 个性化推荐区 (4宫格) -->
+  <ai-recommend
+    items="{{recommendations}}"
+    loading="{{loadingRecommendations}}"
+    title="猜你喜欢"
+    bind:add="onRecommendAdd"
+    bind:select="onRecommendSelect"
+  />
+
+  <!-- 开始点餐 CTA -->
+  <view class="cta-section" wx:if="{{activeMode !== 'chef_home'}}">
+    <button class="cta-btn" bindtap="goToMenu">
+      {{activeMode === 'takeaway' ? '开始外卖点餐' : '开始点餐'}}
+    </button>
+  </view>
+
+  <!-- 附近门店列表 (GPS距离排序) -->
+  <view class="section">
+    <text class="section-title">附近门店</text>
+
+    <view class="loading-tip" wx:if="{{loadingStores}}">
+      <text>加载中...</text>
+    </view>
+
+    <view class="store-list" wx:if="{{!loadingStores}}">
+      <view class="empty-state" wx:if="{{nearbyStores.length === 0}}">
+        暂无附近门店，请授权定位
+      </view>
+
+      <view class="store-card" wx:for="{{nearbyStores}}" wx:key="id"
+            bindtap="goToStore" data-id="{{item.id}}">
+        <image class="store-card-img" wx:if="{{item.imageUrl}}"
+               src="{{item.imageUrl}}" mode="aspectFill" lazy-load />
+        <view class="store-card-main">
+          <text class="store-card-name">{{item.name}}</text>
+          <text class="store-card-address">{{item.address}}</text>
+          <text class="store-card-hours" wx:if="{{item.businessHours}}">{{item.businessHours}}</text>
+        </view>
+        <view class="store-card-right">
+          <text class="store-card-distance" wx:if="{{item.distance}}">{{item.distance}}</text>
+          <text class="store-card-queue" wx:if="{{item.queueWaiting > 0}}">排队{{item.queueWaiting}}桌</text>
+        </view>
+      </view>
+    </view>
   </view>
 </view>

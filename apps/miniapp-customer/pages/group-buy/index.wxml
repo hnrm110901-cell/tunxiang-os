@@ -1,0 +1,127 @@
+<!-- Group Buy / 拼团 -->
+<view class="page-container">
+  <!-- Tabs (list vs mine) -->
+  <view class="tabs-bar" wx:if="{{tab !== 'detail'}}">
+    <view class="tab-item {{tab === 'list' ? 'active' : ''}}"
+          bindtap="switchTab" data-tab="list">热门拼团</view>
+    <view class="tab-item {{tab === 'mine' ? 'active' : ''}}"
+          bindtap="switchTab" data-tab="mine">我的拼团</view>
+  </view>
+
+  <!-- Back button for detail -->
+  <view class="back-bar" wx:if="{{tab === 'detail'}}" bindtap="goBack">
+    <text class="back-arrow">←</text>
+    <text>返回列表</text>
+  </view>
+
+  <!-- Activity List -->
+  <view class="activity-list" wx:if="{{tab === 'list'}}">
+    <view class="activity-card" wx:for="{{activities}}" wx:key="id">
+      <view class="activity-img-placeholder">
+        <text class="activity-badge">{{item.group_size}}人团</text>
+      </view>
+      <view class="activity-info">
+        <text class="activity-name">{{item.name}}</text>
+        <view class="price-row">
+          <text class="group-price">¥{{item.group_price_fen / 100}}</text>
+          <text class="original-price">¥{{item.original_price_fen / 100}}</text>
+          <text class="discount-tag">省¥{{(item.original_price_fen - item.group_price_fen) / 100}}</text>
+        </view>
+        <view class="stats-row">
+          <text class="stat-text">已拼 {{item.success_count}} 单</text>
+          <text class="stat-text expire-text">限时 {{item.expire_minutes}} 分钟</text>
+        </view>
+        <button class="start-team-btn" bindtap="onCreateTeam" data-id="{{item.id}}">
+          一键开团
+        </button>
+      </view>
+    </view>
+
+    <view class="empty-state" wx:if="{{activities.length === 0 && !loading}}">
+      <text class="empty-icon">🎉</text>
+      <text class="empty-text">暂无进行中的拼团活动</text>
+      <text class="empty-sub">敬请期待更多优惠</text>
+    </view>
+  </view>
+
+  <!-- My Teams -->
+  <view class="my-teams" wx:if="{{tab === 'mine'}}">
+    <view class="team-card" wx:for="{{myTeams}}" wx:key="id"
+          bindtap="_loadTeamDetail" data-id="{{item.team_id}}">
+      <view class="team-header">
+        <text class="team-activity-name">{{item.activity_name}}</text>
+        <text class="team-status {{item.status}}">
+          {{item.status === 'forming' ? '拼团中' : item.status === 'completed' ? '已成团' : '已过期'}}
+        </text>
+      </view>
+      <view class="team-progress">
+        <view class="progress-bar">
+          <view class="progress-fill" style="width: {{(item.current_size / item.target_size) * 100}}%"></view>
+        </view>
+        <text class="progress-text">{{item.current_size}}/{{item.target_size}}人</text>
+      </view>
+    </view>
+
+    <view class="empty-state" wx:if="{{myTeams.length === 0 && !loading}}">
+      <text class="empty-icon">📦</text>
+      <text class="empty-text">还没有参与拼团</text>
+      <text class="empty-sub">去看看有什么优惠吧</text>
+    </view>
+  </view>
+
+  <!-- Team Detail -->
+  <view class="team-detail" wx:if="{{tab === 'detail' && teamDetail}}">
+    <view class="detail-hero">
+      <text class="detail-activity-name">{{teamDetail.activity_name}}</text>
+      <view class="detail-price-row">
+        <text class="detail-group-price">¥{{teamDetail.group_price_fen / 100}}</text>
+        <text class="detail-original-price">原价 ¥{{teamDetail.original_price_fen / 100}}</text>
+      </view>
+    </view>
+
+    <!-- Timer -->
+    <view class="countdown-bar" wx:if="{{teamDetail.status === 'forming'}}">
+      <text class="countdown-label">距离成团截止</text>
+      <text class="countdown-time">{{teamDetail.remaining_time || '计算中...'}}</text>
+    </view>
+
+    <!-- Members -->
+    <view class="member-section">
+      <text class="section-title">拼团成员 ({{teamDetail.current_size}}/{{teamDetail.target_size}})</text>
+      <view class="member-list">
+        <view class="member-avatar" wx:for="{{teamDetail.members}}" wx:key="customer_id">
+          <view class="avatar-circle {{index === 0 ? 'leader' : ''}}">
+            <text>{{item.nickname ? item.nickname[0] : '?'}}</text>
+          </view>
+          <text class="avatar-label">{{index === 0 ? '团长' : '成员'}}</text>
+        </view>
+        <view class="member-avatar empty" wx:for="{{teamDetail.target_size - teamDetail.current_size}}" wx:key="*this">
+          <view class="avatar-circle waiting">
+            <text>?</text>
+          </view>
+          <text class="avatar-label">等待中</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- Actions -->
+    <view class="detail-actions" wx:if="{{teamDetail.status === 'forming'}}">
+      <button class="action-btn share-btn" open-type="share">邀请好友参团</button>
+      <button class="action-btn join-btn" bindtap="onJoinTeam" disabled="{{joining}}">
+        {{joining ? '加入中...' : '立即参团'}}
+      </button>
+    </view>
+
+    <view class="detail-result" wx:if="{{teamDetail.status === 'completed'}}">
+      <view class="result-icon">✅</view>
+      <text class="result-text">拼团成功！</text>
+      <text class="result-sub">优惠已自动发放到您的账户</text>
+    </view>
+
+    <view class="detail-result expired" wx:if="{{teamDetail.status === 'expired'}}">
+      <view class="result-icon">⏰</view>
+      <text class="result-text">拼团已过期</text>
+      <text class="result-sub">下次早点邀请好友一起拼哦</text>
+    </view>
+  </view>
+</view>

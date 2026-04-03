@@ -1,0 +1,29 @@
+<!-- 扫码入口 — 识别桌码 → 跳转菜单 -->
+<view class="page-container scan-entry">
+  <!-- 扫码中 -->
+  <view class="scan-loading" wx:if="{{scanning}}">
+    <view class="scan-icon-wrap">
+      <image class="scan-icon" src="/assets/icon-scan.png" mode="aspectFit" />
+    </view>
+    <text class="scan-hint">正在识别桌码...</text>
+  </view>
+
+  <!-- 扫码失败 -->
+  <view class="scan-error" wx:if="{{errorMsg && !scanning}}">
+    <view class="error-icon-wrap">
+      <text class="error-icon">!</text>
+    </view>
+    <text class="error-msg">{{errorMsg}}</text>
+    <button class="btn-retry" bindtap="retrySccan">重新扫码</button>
+  </view>
+
+  <!-- 默认状态（等待扫码） -->
+  <view class="scan-default" wx:if="{{!scanning && !errorMsg}}">
+    <view class="scan-icon-wrap">
+      <image class="scan-icon" src="/assets/icon-scan.png" mode="aspectFit" />
+    </view>
+    <text class="scan-title">扫码点餐</text>
+    <text class="scan-desc">请扫描桌台上的二维码开始点餐</text>
+    <button class="btn-scan" bindtap="startScan">开始扫码</button>
+  </view>
+</view>

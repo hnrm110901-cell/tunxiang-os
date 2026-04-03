@@ -49,9 +49,17 @@ class SkillAgent(ABC):
     run_location: str = "cloud"  # "edge", "cloud", "edge+cloud"
     agent_level: int = 1  # 1=suggest, 2=auto+rollback, 3=fully_autonomous
 
-    def __init__(self, tenant_id: str, store_id: Optional[str] = None):
+    def __init__(
+        self,
+        tenant_id: str,
+        store_id: Optional[str] = None,
+        db: Optional[Any] = None,
+        model_router: Optional[Any] = None,
+    ):
         self.tenant_id = tenant_id
         self.store_id = store_id
+        self._db = db            # AsyncSession，可选
+        self._router = model_router  # ModelRouter，可选
 
     async def run(self, action: str, params: dict[str, Any]) -> AgentResult:
         """统一入口 — 执行 + 约束校验 + 决策留痕 + 自治等级标注
@@ -66,8 +74,8 @@ class SkillAgent(ABC):
 
         try:
             result = await self.execute(action, params)
-        except Exception as e:
-            logger.error("agent_error", agent=self.agent_id, action=action, error=str(e))
+        except Exception as e:  # noqa: BLE001 — Agent最外层兜底，子类可能抛任意异常
+            logger.error("agent_error", agent=self.agent_id, action=action, error=str(e), exc_info=True)
             result = AgentResult(
                 success=False,
                 action=action,

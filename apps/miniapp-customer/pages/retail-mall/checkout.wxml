@@ -1,0 +1,82 @@
+<!-- Retail Mall: Checkout -->
+<view class="page-container">
+  <!-- Address -->
+  <view class="address-card" wx:if="{{deliveryType === 'express'}}">
+    <view wx:if="{{address}}">
+      <view class="address-name-row">
+        <text class="address-name">{{address.name}}</text>
+        <text class="address-phone">{{address.phone}}</text>
+      </view>
+      <text class="address-detail">{{address.province}}{{address.city}}{{address.district}} {{address.detail}}</text>
+    </view>
+    <view class="address-empty" wx:else>
+      <text>请选择收货地址</text>
+      <text class="address-add-btn">添加</text>
+    </view>
+  </view>
+
+  <!-- Delivery type -->
+  <view class="delivery-section">
+    <text class="section-title">配送方式</text>
+    <view class="delivery-options">
+      <view class="delivery-option {{deliveryType === 'express' ? 'selected' : ''}}"
+            bindtap="switchDelivery" data-type="express">
+        <text class="delivery-label">📦 快递配送</text>
+        <text class="delivery-desc">{{freightFen > 0 ? '运费¥' + (freightFen / 100) : '免运费'}}</text>
+      </view>
+      <view class="delivery-option {{deliveryType === 'pickup' ? 'selected' : ''}}"
+            bindtap="switchDelivery" data-type="pickup">
+        <text class="delivery-label">🏪 到店自提</text>
+        <text class="delivery-desc">免运费</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- Order items -->
+  <view class="items-section">
+    <text class="section-title">商品清单</text>
+    <view class="order-item" wx:for="{{items}}" wx:key="product_id">
+      <view class="item-image-placeholder"></view>
+      <view class="item-info">
+        <text class="item-name">{{item.name}}</text>
+        <view class="item-bottom">
+          <text class="item-price">¥{{item.price_fen / 100}}</text>
+          <text class="item-qty">×{{item.quantity}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- Remark -->
+  <view class="remark-section">
+    <text class="section-title">备注</text>
+    <input class="remark-input" placeholder="选填：订单备注" value="{{remark}}" bindinput="onInputRemark" />
+  </view>
+
+  <!-- Summary -->
+  <view class="summary-section">
+    <view class="summary-row">
+      <text>商品金额</text>
+      <text>¥{{totalFen / 100}}</text>
+    </view>
+    <view class="summary-row" wx:if="{{deliveryType === 'express'}}">
+      <text>运费</text>
+      <text>{{freightFen > 0 ? '¥' + (freightFen / 100) : '免运费'}}</text>
+    </view>
+    <view class="summary-row total">
+      <text>合计</text>
+      <text class="total-price">¥{{(totalFen + freightFen) / 100}}</text>
+    </view>
+  </view>
+
+  <!-- Submit -->
+  <view class="submit-bar">
+    <view class="submit-left">
+      <text class="submit-total-label">实付</text>
+      <text class="submit-total-price">¥{{(totalFen + freightFen) / 100}}</text>
+    </view>
+    <button class="submit-btn" bindtap="onSubmitOrder" disabled="{{submitting}}">
+      {{submitting ? '提交中...' : '提交订单'}}
+    </button>
+  </view>
+</view>

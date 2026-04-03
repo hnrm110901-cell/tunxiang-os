@@ -1,0 +1,112 @@
+.page-container { min-height: 100vh; background: #0B1A20; padding-bottom: 60rpx; }
+
+.tabs-bar {
+  display: flex; padding: 24rpx 32rpx; gap: 16rpx;
+}
+.tab-item {
+  flex: 1; text-align: center; padding: 20rpx 0; font-size: 28rpx;
+  color: #999; background: #112228; border-radius: 16rpx;
+}
+.tab-item.active {
+  background: #FF6B2C; color: #fff; font-weight: 600;
+}
+
+/* Stamp Card */
+.card-list { padding: 0 32rpx; }
+.stamp-card {
+  background: linear-gradient(135deg, #112228 0%, #1a2a33 100%);
+  border-radius: 24rpx; padding: 32rpx; margin-bottom: 24rpx;
+  border: 1rpx solid rgba(255,255,255,0.06);
+}
+
+.card-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 28rpx;
+}
+.card-name { font-size: 32rpx; font-weight: 700; color: #fff; }
+.card-status {
+  font-size: 24rpx; padding: 4rpx 16rpx; border-radius: 12rpx;
+}
+.card-status.active { background: rgba(24,144,255,0.15); color: #1890ff; }
+.card-status.completed { background: rgba(82,196,26,0.15); color: #52c41a; }
+.card-status.expired { background: rgba(255,255,255,0.06); color: #666; }
+
+/* Stamp grid */
+.stamp-grid {
+  display: flex; flex-wrap: wrap; gap: 16rpx; margin-bottom: 24rpx;
+  justify-content: center;
+}
+.stamp-slot { position: relative; }
+.stamp-circle {
+  width: 72rpx; height: 72rpx; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 28rpx; font-weight: 600;
+}
+.stamp-circle.stamped {
+  background: #FF6B2C; color: #fff;
+}
+.stamp-circle.empty {
+  background: rgba(255,255,255,0.06); color: #666;
+  border: 2rpx dashed rgba(255,255,255,0.15);
+}
+.reward-indicator {
+  position: absolute; top: -8rpx; right: -8rpx;
+}
+.reward-icon { font-size: 24rpx; }
+
+.card-progress {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 16rpx;
+}
+.progress-label { font-size: 26rpx; color: #ccc; }
+.progress-count { font-size: 26rpx; color: #FF6B2C; font-weight: 600; }
+
+.card-reward {
+  background: rgba(255,107,44,0.08); border-radius: 12rpx;
+  padding: 16rpx 20rpx; margin-bottom: 12rpx;
+}
+.reward-label { font-size: 24rpx; color: #999; margin-right: 8rpx; }
+.reward-value { font-size: 26rpx; color: #FF6B2C; font-weight: 600; }
+
+.card-validity { margin-bottom: 16rpx; }
+.validity-text { font-size: 22rpx; color: #666; }
+
+.card-actions { margin-top: 8rpx; }
+.redeem-btn {
+  width: 100% !important; height: 80rpx; line-height: 80rpx;
+  background: #52c41a !important; color: #fff !important;
+  border-radius: 40rpx; font-size: 30rpx; font-weight: 600;
+}
+.redeemed-badge {
+  text-align: center; padding: 16rpx 0; font-size: 28rpx;
+  color: #52c41a; font-weight: 500;
+}
+
+/* Template List */
+.template-list { padding: 0 32rpx; }
+.template-card {
+  background: #112228; border-radius: 20rpx; padding: 28rpx;
+  margin-bottom: 20rpx; border: 1rpx solid rgba(255,255,255,0.04);
+}
+.template-header { margin-bottom: 20rpx; }
+.template-name { font-size: 32rpx; font-weight: 600; color: #fff; }
+
+.template-info { margin-bottom: 16rpx; }
+.template-row {
+  display: flex; justify-content: space-between; padding: 10rpx 0;
+  border-bottom: 1rpx solid rgba(255,255,255,0.04);
+}
+.template-row .label { font-size: 26rpx; color: #999; }
+.template-row .value { font-size: 26rpx; color: #ccc; }
+.template-row .reward-text { color: #FF6B2C; font-weight: 600; }
+
+.template-tip {
+  padding: 12rpx 16rpx; background: rgba(82,196,26,0.08);
+  border-radius: 8rpx; font-size: 24rpx; color: #52c41a;
+}
+
+/* Empty */
+.empty-state { text-align: center; padding: 120rpx 0; }
+.empty-icon { font-size: 80rpx; display: block; margin-bottom: 16rpx; }
+.empty-text { font-size: 30rpx; color: #ccc; display: block; margin-bottom: 8rpx; }
+.empty-sub { font-size: 24rpx; color: #666; display: block; }

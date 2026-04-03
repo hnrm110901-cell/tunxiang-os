@@ -1,7 +1,7 @@
 """薪资项目库测试 -- >=10 个测试用例"""
 
-import sys
 import os
+import sys
 
 # 确保 src 目录在导入路径中
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -9,17 +9,12 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import pytest
 from services.salary_item_library import (
     SALARY_ITEMS,
-    CATEGORIES,
-    STORE_TEMPLATES,
-    SalaryItem,
-    get_all_items,
-    get_items_by_category,
-    get_item_by_code,
-    get_categories,
-    init_store_salary_config,
     compute_salary_by_items,
+    get_all_items,
+    get_categories,
+    get_items_by_category,
+    init_store_salary_config,
 )
-
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  1. 项目库完整性

@@ -1,1 +1,251 @@
-.container { padding: 30rpx; background: #0B1A20; min-height: 100vh; color: #fff; }
+.page-container { min-height: 100vh; background: #0B1A20; color: #fff; padding-bottom: env(safe-area-inset-bottom); }
+
+/* ═══ 确认下单 ═══ */
+.confirm-page { padding: 24rpx 32rpx; padding-bottom: 200rpx; }
+
+.info-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #112228;
+  border-radius: 20rpx;
+  padding: 28rpx;
+  margin-bottom: 24rpx;
+}
+
+.info-label { font-size: 28rpx; color: #999; }
+.info-value { font-size: 28rpx; color: #FF6B2C; font-weight: 600; }
+
+.order-section {
+  background: #112228;
+  border-radius: 20rpx;
+  padding: 28rpx;
+  margin-bottom: 24rpx;
+}
+
+.section-label {
+  font-size: 28rpx;
+  color: #999;
+  margin-bottom: 20rpx;
+  display: block;
+}
+
+.order-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16rpx 0;
+  border-bottom: 1rpx solid #1a2a33;
+}
+
+.order-item:last-child { border-bottom: none; }
+
+.order-item-left { display: flex; align-items: center; gap: 16rpx; flex: 1; }
+.order-item-name { font-size: 28rpx; color: #fff; }
+.order-item-qty { font-size: 26rpx; color: #999; }
+.order-item-price { font-size: 28rpx; color: #FF6B2C; font-weight: bold; }
+
+/* 备注 */
+.remark-section {
+  background: #112228;
+  border-radius: 20rpx;
+  padding: 28rpx;
+  margin-bottom: 24rpx;
+}
+
+.remark-input {
+  background: #1a2a33;
+  border-radius: 12rpx;
+  padding: 20rpx 24rpx;
+  font-size: 28rpx;
+  color: #fff;
+  margin-top: 12rpx;
+}
+
+.remark-placeholder { color: #666; }
+
+/* 支付方式 */
+.pay-section {
+  background: #112228;
+  border-radius: 20rpx;
+  padding: 28rpx;
+  margin-bottom: 24rpx;
+}
+
+.pay-options { display: flex; gap: 20rpx; margin-top: 12rpx; }
+
+.pay-option {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12rpx;
+  padding: 24rpx;
+  background: #1a2a33;
+  border-radius: 16rpx;
+  font-size: 28rpx;
+  color: #999;
+  border: 2rpx solid transparent;
+}
+
+.pay-option.active {
+  border-color: #FF6B2C;
+  color: #FF6B2C;
+}
+
+.pay-icon { font-size: 36rpx; }
+
+/* 底部提交 */
+.confirm-footer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20rpx 32rpx;
+  padding-bottom: calc(20rpx + env(safe-area-inset-bottom));
+  background: #112228;
+  border-top: 1rpx solid #1a2a33;
+}
+
+.confirm-total { display: flex; align-items: baseline; gap: 12rpx; }
+.total-label { font-size: 28rpx; color: #999; }
+.total-amount { font-size: 40rpx; color: #FF6B2C; font-weight: bold; }
+
+.confirm-btn {
+  background: #FF6B2C !important;
+  color: #fff !important;
+  border-radius: 44rpx;
+  font-size: 32rpx;
+  padding: 0 56rpx !important;
+  height: 84rpx;
+  line-height: 84rpx;
+}
+
+.confirm-btn[disabled] { opacity: 0.5; }
+
+/* ═══ 历史订单 ═══ */
+.order-tabs {
+  display: flex;
+  padding: 0 32rpx;
+  border-bottom: 1rpx solid #1a2a33;
+  background: #112228;
+}
+
+.order-tab {
+  flex: 1;
+  text-align: center;
+  padding: 24rpx 0;
+  font-size: 28rpx;
+  color: #999;
+  position: relative;
+}
+
+.order-tab.active { color: #FF6B2C; }
+
+.order-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 25%;
+  right: 25%;
+  height: 4rpx;
+  background: #FF6B2C;
+  border-radius: 2rpx;
+}
+
+.order-list { padding: 24rpx 32rpx; }
+
+.loading-tip { text-align: center; color: #999; font-size: 28rpx; padding: 60rpx 0; }
+.empty-state { text-align: center; color: #666; font-size: 28rpx; padding: 120rpx 0; }
+
+.order-card {
+  background: #112228;
+  border-radius: 20rpx;
+  padding: 28rpx;
+  margin-bottom: 20rpx;
+}
+
+.order-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16rpx;
+}
+
+.order-card-time { font-size: 24rpx; color: #999; }
+
+.order-card-status { font-size: 24rpx; padding: 4rpx 14rpx; border-radius: 8rpx; }
+.status-pending_payment { background: rgba(255, 107, 44, 0.15); color: #FF6B2C; }
+.status-paid, .status-cooking { background: rgba(186, 117, 23, 0.15); color: #BA7517; }
+.status-ready { background: rgba(15, 110, 86, 0.15); color: #0F6E56; }
+.status-completed { background: rgba(76, 175, 80, 0.15); color: #4CAF50; }
+.status-cancelled, .status-refunded { background: rgba(153, 153, 153, 0.15); color: #999; }
+
+.order-card-body { margin-bottom: 16rpx; }
+.order-card-dish { font-size: 28rpx; color: #ccc; }
+
+.order-card-footer { display: flex; justify-content: space-between; align-items: center; }
+.order-card-total { font-size: 32rpx; color: #FF6B2C; font-weight: bold; }
+.order-card-actions { display: flex; align-items: center; gap: 20rpx; }
+.order-card-action { font-size: 26rpx; color: #FF6B2C; }
+.order-card-invoice {
+  font-size: 24rpx;
+  color: #4CAF50;
+  padding: 6rpx 18rpx;
+  border: 1rpx solid #4CAF50;
+  border-radius: 24rpx;
+}
+
+/* ═══ 支付成功 ═══ */
+.paid-success-page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 80rpx 48rpx;
+}
+
+.success-icon-wrap {
+  width: 120rpx;
+  height: 120rpx;
+  border-radius: 50%;
+  background: #4CAF50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 32rpx;
+}
+
+.success-icon-text { font-size: 56rpx; color: #fff; }
+
+.success-title { font-size: 36rpx; color: #fff; font-weight: 600; margin-bottom: 16rpx; }
+.success-amount { font-size: 48rpx; color: #FF6B2C; font-weight: bold; margin-bottom: 12rpx; }
+.success-order-no { font-size: 24rpx; color: #999; margin-bottom: 48rpx; }
+
+.invoice-entry, .coupon-entry {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  background: #112228;
+  border-radius: 16rpx;
+  padding: 28rpx 32rpx;
+  margin-bottom: 20rpx;
+}
+
+.invoice-icon-text, .coupon-icon-text { font-size: 36rpx; margin-right: 16rpx; }
+.invoice-text, .coupon-text { flex: 1; font-size: 30rpx; color: #fff; }
+.invoice-arrow, .coupon-arrow { font-size: 28rpx; color: #999; }
+
+.back-to-orders-btn {
+  margin-top: 40rpx;
+  background: transparent !important;
+  color: #FF6B2C !important;
+  border: 2rpx solid #FF6B2C;
+  border-radius: 44rpx;
+  font-size: 30rpx;
+  width: 100%;
+  height: 84rpx;
+  line-height: 84rpx;
+}

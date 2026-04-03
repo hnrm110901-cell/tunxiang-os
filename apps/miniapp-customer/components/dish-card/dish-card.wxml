@@ -1,0 +1,31 @@
+<!-- 菜品卡片组件 -->
+<view class="dish-card" bindtap="onTapCard">
+  <image
+    class="dish-img"
+    src="{{dish.imageUrl || '/assets/dish-placeholder.png'}}"
+    mode="aspectFill"
+    lazy-load
+  />
+  <view class="dish-body">
+    <view class="dish-header">
+      <text class="dish-name">{{dish.name}}</text>
+      <view class="dish-tags" wx:if="{{dish.tags && dish.tags.length > 0}}">
+        <text class="dish-tag" wx:for="{{dish.tags}}" wx:key="*this">{{item}}</text>
+      </view>
+    </view>
+    <text class="dish-desc" wx:if="{{dish.description}}">{{dish.description}}</text>
+    <view class="dish-footer">
+      <view class="dish-price-row">
+        <text class="dish-price">¥{{priceYuan}}</text>
+        <text class="dish-original-price" wx:if="{{dish.originalPriceFen && dish.originalPriceFen > dish.priceFen}}">¥{{originalPriceYuan}}</text>
+      </view>
+      <view class="dish-actions">
+        <view class="qty-control" wx:if="{{quantity > 0}}" catchtap="">
+          <view class="qty-btn minus" catchtap="onMinus">-</view>
+          <text class="qty-value">{{quantity}}</text>
+        </view>
+        <view class="qty-btn plus" catchtap="onPlus">+</view>
+      </view>
+    </view>
+  </view>
+</view>

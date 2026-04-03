@@ -7,8 +7,6 @@
   empty → reserved(预订确认) → waiting_seat(到店) → dining(入座开台)
 """
 from datetime import datetime, timezone
-from typing import Optional
-
 
 # ─── 预订状态机 ───
 

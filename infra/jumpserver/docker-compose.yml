@@ -1,0 +1,81 @@
+# JumpServer 社区版 v3.10.7
+# 等保三级要求：统一运维入口，操作录屏，账号审计，危险命令拦截
+# 访问方式：仅通过 Tailscale VPN 访问，不暴露公网
+# 部署服务器：腾讯云广州 42.194.229.21
+
+version: '3.8'
+
+services:
+  jms_all:
+    image: jumpserver/jms_all:v3.10.7
+    container_name: jms_all
+    restart: always
+    privileged: true
+    environment:
+      # 必填：随机密钥（首次部署后不可更改，否则数据库加密数据无法解密）
+      # 生成命令：openssl rand -base64 42
+      - SECRET_KEY=${JMS_SECRET_KEY}
+
+      # 必填：组件认证Token
+      # 生成命令：openssl rand -base64 16
+      - BOOTSTRAP_TOKEN=${JMS_BOOTSTRAP_TOKEN}
+
+      # 日志级别（生产环境用ERROR，减少日志量）
+      - LOG_LEVEL=ERROR
+
+      # 数据库：使用屯象OS现有PostgreSQL实例（jumpserver库）
+      - DB_ENGINE=postgresql
+      - DB_HOST=127.0.0.1
+      - DB_PORT=5432
+      - DB_USER=${JMS_DB_USER}
+      - DB_PASSWORD=${JMS_DB_PASSWORD}
+      - DB_NAME=jumpserver
+
+      # Redis：使用屯象OS现有Redis实例（DB 5隔离）
+      - REDIS_HOST=127.0.0.1
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - REDIS_DB_SESSION=5
+
+      # JumpServer自身访问地址（Tailscale IP，用于组件间通信）
+      # Tailscale IP 示例：100.x.x.x，通过 tailscale ip -4 获取
+      - HTTP_BIND_HOST=0.0.0.0
+      - SERVER_NAME=${JMS_SERVER_NAME:-jumpserver.txos.internal}
+
+    ports:
+      # 绑定 127.0.0.1，由 Tailscale 转发，不直接暴露公网
+      - "127.0.0.1:9090:80"     # Web 管理界面（通过 Tailscale 访问）
+      - "127.0.0.1:2222:2222"   # SSH 代理端口（运维人员 SSH 入口）
+
+    volumes:
+      # 录屏文件存储（重要！等保审计依据，至少保留180天）
+      - ./data:/opt/jumpserver/data
+      # 日志文件
+      - ./logs:/opt/jumpserver/logs
+
+    # 仅在内部网络通信，不对外暴露
+    networks:
+      - jumpserver_net
+
+    # 资源限制（防止影响主业务）
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.5'
+        reservations:
+          memory: 512M
+
+networks:
+  jumpserver_net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.25.0.0/24
+
+# ── 说明 ──────────────────────────────────────────────────────────────────────
+# 启动前必须配置 .env 文件（参考 infra/jumpserver/.env.example）
+# 访问：
+#   Web UI： http://<tailscale-ip>:9090  （开发者通过 Tailscale 访问）
+#   SSH代理：ssh -p 2222 admin@<tailscale-ip>
+# 初始账号：admin / admin（首次登录强制修改密码）

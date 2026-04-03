@@ -1,1 +1,488 @@
-.container { padding: 30rpx; background: #0B1A20; min-height: 100vh; color: #fff; }
+.page-container { min-height: 100vh; background: #0B1A20; color: #fff; padding-bottom: 120rpx; }
+
+/* --- 未登录 --- */
+.login-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 120rpx 60rpx 60rpx;
+}
+
+.login-avatar-placeholder {
+  width: 160rpx;
+  height: 160rpx;
+  border-radius: 50%;
+  background: #1a2a33;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 72rpx;
+  text-align: center;
+  line-height: 160rpx;
+  margin-bottom: 32rpx;
+}
+
+.login-hint { font-size: 28rpx; color: #999; margin-bottom: 48rpx; }
+
+.login-btn {
+  background: #FF6B2C !important;
+  color: #fff !important;
+  border-radius: 44rpx;
+  font-size: 32rpx;
+  height: 88rpx;
+  line-height: 88rpx;
+  width: 100%;
+}
+
+/* --- 会员卡 --- */
+.member-card {
+  margin: 32rpx;
+  background: linear-gradient(135deg, #1a3040, #112228);
+  border-radius: 24rpx;
+  padding: 36rpx;
+  border: 1rpx solid #1a2a33;
+}
+
+.member-card-silver {
+  background: linear-gradient(135deg, #4a5568, #2d3748);
+  border-color: rgba(192, 192, 192, 0.3);
+}
+
+.member-card-gold {
+  background: linear-gradient(135deg, #d69e2e, #b7791f);
+  border-color: rgba(255, 215, 0, 0.3);
+}
+
+.member-card-diamond {
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  border-color: rgba(185, 242, 255, 0.3);
+}
+
+.member-header {
+  display: flex;
+  align-items: center;
+  gap: 24rpx;
+  margin-bottom: 36rpx;
+}
+
+.member-avatar {
+  width: 100rpx;
+  height: 100rpx;
+  border-radius: 50%;
+  border: 4rpx solid rgba(255, 107, 44, 0.3);
+}
+
+.member-info {
+  display: flex;
+  flex-direction: column;
+  gap: 10rpx;
+  flex: 1;
+}
+
+.member-name { font-size: 34rpx; font-weight: bold; color: #fff; }
+
+/* 等级徽章 */
+.level-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4rpx 16rpx;
+  border-radius: 20rpx;
+  font-size: 22rpx;
+  align-self: flex-start;
+}
+
+.level-normal { background: rgba(153, 153, 153, 0.2); color: #ccc; }
+.level-silver { background: rgba(192, 192, 192, 0.2); color: #C0C0C0; }
+.level-gold { background: rgba(255, 215, 0, 0.2); color: #FFD700; }
+.level-diamond { background: rgba(185, 242, 255, 0.2); color: #B9F2FF; }
+
+.level-text { font-size: 22rpx; font-weight: 600; }
+
+.edit-btn {
+  padding: 12rpx;
+}
+
+.edit-icon { font-size: 32rpx; }
+
+/* 资产区 */
+.assets-row {
+  display: flex;
+  align-items: center;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 16rpx;
+  padding: 24rpx 0;
+}
+
+.asset-item {
+  flex: 1;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+
+.asset-value { font-size: 36rpx; font-weight: bold; color: #FF6B2C; }
+.asset-label { font-size: 22rpx; color: #999; }
+
+.asset-divider {
+  width: 1rpx;
+  height: 60rpx;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* --- 功能菜单 --- */
+.menu-section {
+  margin: 24rpx 32rpx;
+  background: #112228;
+  border-radius: 20rpx;
+  overflow: hidden;
+}
+
+.menu-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 32rpx 28rpx;
+  border-bottom: 1rpx solid #1a2a33;
+}
+
+.menu-item:last-child { border-bottom: none; }
+
+.menu-item-left {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+}
+
+.menu-icon { font-size: 36rpx; }
+.menu-label { font-size: 30rpx; color: #fff; }
+.menu-arrow { font-size: 28rpx; color: #666; }
+
+/* --- 消费统计 --- */
+.stats-card {
+  margin: 24rpx 32rpx;
+  background: #112228;
+  border-radius: 20rpx;
+  padding: 28rpx;
+}
+
+.stats-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20rpx;
+}
+
+.stats-title { font-size: 28rpx; color: #999; }
+.stats-more { font-size: 24rpx; color: #FF6B2C; }
+
+.stats-row { display: flex; }
+
+.stats-item {
+  flex: 1;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+
+.stats-value { font-size: 34rpx; font-weight: bold; color: #FF6B2C; }
+.stats-label { font-size: 22rpx; color: #999; }
+
+/* --- 弹层 --- */
+.popup-mask {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 99;
+}
+
+.popup-sheet {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  background: #112228;
+  border-radius: 32rpx 32rpx 0 0;
+  z-index: 100;
+  max-height: 70vh;
+  transform: translateY(100%);
+  transition: transform 300ms ease-out;
+}
+
+.popup-sheet.show { transform: translateY(0); }
+
+.popup-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 28rpx 32rpx;
+  border-bottom: 1rpx solid #1a2a33;
+}
+
+.popup-title { font-size: 32rpx; font-weight: bold; color: #fff; }
+.popup-close { font-size: 32rpx; color: #999; padding: 8rpx; }
+
+.popup-list {
+  max-height: 60vh;
+  padding: 0 32rpx;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.log-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24rpx 0;
+  border-bottom: 1rpx solid #1a2a33;
+}
+
+.log-left { display: flex; flex-direction: column; gap: 8rpx; }
+.log-desc { font-size: 28rpx; color: #fff; }
+.log-time { font-size: 22rpx; color: #666; }
+
+.log-amount { font-size: 30rpx; font-weight: bold; }
+.log-amount.income { color: #0F6E56; }
+.log-amount.expense { color: #FF6B2C; }
+
+.empty-state { text-align: center; color: #666; font-size: 28rpx; padding: 80rpx 0; }
+.loading-tip { text-align: center; color: #999; font-size: 28rpx; padding: 60rpx 0; }
+
+/* --- 优惠券 --- */
+.coupon-tabs {
+  display: flex;
+  padding: 0 32rpx;
+  border-bottom: 1rpx solid #1a2a33;
+}
+
+.coupon-tab {
+  flex: 1;
+  text-align: center;
+  padding: 20rpx 0;
+  font-size: 28rpx;
+  color: #999;
+  position: relative;
+}
+
+.coupon-tab.active {
+  color: #FF6B2C;
+}
+
+.coupon-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 30%;
+  right: 30%;
+  height: 4rpx;
+  background: #FF6B2C;
+  border-radius: 2rpx;
+}
+
+.coupon-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24rpx 0;
+  border-bottom: 1rpx solid #1a2a33;
+}
+
+.coupon-card.disabled { opacity: 0.5; }
+
+.coupon-left { display: flex; flex-direction: column; gap: 6rpx; flex: 1; }
+.coupon-name { font-size: 28rpx; color: #fff; font-weight: 600; }
+.coupon-desc { font-size: 24rpx; color: #999; }
+.coupon-expire { font-size: 22rpx; color: #666; }
+
+.coupon-right { padding-left: 20rpx; }
+.coupon-discount { font-size: 32rpx; color: #FF6B2C; font-weight: bold; }
+
+/* --- 消费记录 --- */
+.consume-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24rpx 0;
+  border-bottom: 1rpx solid #1a2a33;
+}
+
+.consume-left { display: flex; flex-direction: column; gap: 8rpx; flex: 1; }
+.consume-name { font-size: 28rpx; color: #fff; }
+.consume-time { font-size: 22rpx; color: #666; }
+.consume-amount { font-size: 30rpx; color: #FF6B2C; font-weight: bold; }
+
+/* --- 个人信息编辑 --- */
+.edit-form {
+  padding: 32rpx;
+}
+
+.edit-row {
+  margin-bottom: 32rpx;
+}
+
+.edit-label {
+  font-size: 28rpx;
+  color: #999;
+  margin-bottom: 12rpx;
+  display: block;
+}
+
+.edit-input {
+  background: #1a2a33;
+  padding: 20rpx 24rpx;
+  border-radius: 12rpx;
+  font-size: 28rpx;
+  color: #fff;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.edit-picker {
+  display: flex;
+  align-items: center;
+  min-height: 44rpx;
+}
+
+.edit-placeholder { color: #666; }
+
+.save-btn {
+  margin-top: 48rpx;
+  background: #FF6B2C !important;
+  color: #fff !important;
+  border-radius: 44rpx;
+  font-size: 32rpx;
+  height: 88rpx;
+  line-height: 88rpx;
+}
+
+/* --- 等级进度条 --- */
+.level-progress-wrap {
+  margin-top: 24rpx;
+  padding: 20rpx 0 4rpx;
+  border-top: 1rpx solid rgba(255,255,255,0.08);
+}
+
+.level-progress-labels {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14rpx;
+}
+
+.level-progress-current { font-size: 24rpx; color: rgba(255,255,255,0.7); font-weight: 600; }
+.level-progress-next { font-size: 22rpx; color: rgba(255,255,255,0.45); }
+
+.level-progress-track {
+  height: 10rpx;
+  background: rgba(255,255,255,0.12);
+  border-radius: 5rpx;
+  overflow: hidden;
+  margin-bottom: 12rpx;
+}
+
+.level-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #FF6B35, #FF9A5C);
+  border-radius: 5rpx;
+  transition: width 600ms ease;
+}
+
+.level-progress-detail {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.level-progress-pts { font-size: 22rpx; color: rgba(255,255,255,0.45); }
+.level-progress-link { font-size: 22rpx; color: #FF6B35; }
+
+/* --- 储值卡 --- */
+.stored-card {
+  margin: 0 32rpx 24rpx;
+  background: linear-gradient(135deg, #1a3040, #0e2030);
+  border: 1rpx solid rgba(255,107,53,0.2);
+  border-radius: 20rpx;
+  padding: 28rpx;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.stored-card-left {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+}
+
+.stored-card-icon { font-size: 48rpx; }
+
+.stored-card-info {
+  display: flex;
+  flex-direction: column;
+  gap: 6rpx;
+}
+
+.stored-card-title { font-size: 28rpx; color: #fff; font-weight: 600; }
+.stored-card-sub { font-size: 22rpx; color: #999; }
+
+.stored-card-right {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
+
+.stored-card-amount { font-size: 36rpx; font-weight: bold; color: #FF6B35; }
+.stored-card-arrow { font-size: 28rpx; color: #666; }
+
+/* --- 会员专属优惠 --- */
+.exclusive-section {
+  margin: 0 32rpx 24rpx;
+  background: #112228;
+  border-radius: 20rpx;
+  padding: 28rpx;
+}
+
+.exclusive-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 28rpx;
+}
+
+.exclusive-title { font-size: 28rpx; color: #fff; font-weight: 600; }
+.exclusive-more { font-size: 24rpx; color: #FF6B35; }
+
+.exclusive-list {
+  display: flex;
+  justify-content: space-around;
+}
+
+.exclusive-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14rpx;
+}
+
+.exclusive-badge {
+  width: 96rpx;
+  height: 96rpx;
+  border-radius: 50%;
+  background: rgba(255,107,53,0.12);
+  border: 2rpx solid rgba(255,107,53,0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.exclusive-badge-orange {
+  background: rgba(255,107,53,0.15);
+  border-color: rgba(255,107,53,0.4);
+}
+
+.exclusive-badge-gold {
+  background: rgba(214,158,46,0.15);
+  border-color: rgba(214,158,46,0.4);
+}
+
+.exclusive-badge-text { font-size: 32rpx; font-weight: bold; color: #FF6B35; }
+.exclusive-badge-icon { font-size: 40rpx; }
+.exclusive-item-label { font-size: 24rpx; color: #ccc; }

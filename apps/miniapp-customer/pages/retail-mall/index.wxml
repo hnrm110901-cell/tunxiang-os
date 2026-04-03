@@ -1,0 +1,62 @@
+<!-- 甄选商城首页 — 分类+推荐+促销 -->
+<view class="page-container">
+
+  <!-- 顶部搜索栏 -->
+  <view class="search-bar">
+    <view class="search-input-wrap">
+      <input class="search-input" placeholder="搜索海味礼盒、预制菜..." value="{{searchKeyword}}" bindinput="onSearchInput" bindconfirm="doSearch" />
+    </view>
+    <view class="cart-btn" bindtap="goToCart">
+      <text class="cart-icon">&#xe601;</text>
+      <view class="cart-badge" wx:if="{{cartCount > 0}}">
+        <text>{{cartCount}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 促销轮播 -->
+  <swiper class="banner-swiper" indicator-dots="{{true}}" autoplay="{{true}}" circular="{{true}}" wx:if="{{banners.length > 0}}">
+    <swiper-item wx:for="{{banners}}" wx:key="id">
+      <image class="banner-image" src="{{item.image}}" mode="aspectFill" />
+    </swiper-item>
+  </swiper>
+
+  <!-- 分类Tab -->
+  <scroll-view class="category-scroll" scroll-x="{{true}}">
+    <view class="category-tab {{activeCategory === item.key ? 'active' : ''}}"
+          wx:for="{{categories}}" wx:key="key"
+          bindtap="switchCategory" data-key="{{item.key}}">
+      <text>{{item.label}}</text>
+    </view>
+  </scroll-view>
+
+  <!-- 商品列表（双列瀑布流） -->
+  <view class="product-grid">
+    <view class="product-card" wx:for="{{products}}" wx:key="id" bindtap="goToProduct" data-id="{{item.id}}">
+      <image class="product-image" src="{{item.cover_image}}" mode="aspectFill" />
+      <view class="product-info">
+        <text class="product-name">{{item.name}}</text>
+        <view class="product-tags" wx:if="{{item.tags}}">
+          <text class="product-tag" wx:for="{{item.tags}}" wx:for-item="tag" wx:key="*this">{{tag}}</text>
+        </view>
+        <view class="product-price-row">
+          <text class="product-price">¥{{item.price_fen / 100}}</text>
+          <text class="product-original" wx:if="{{item.original_price_fen > item.price_fen}}">¥{{item.original_price_fen / 100}}</text>
+        </view>
+        <text class="product-sales">已售{{item.sales_count || 0}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 加载状态 -->
+  <view class="loading-tip" wx:if="{{loading}}">
+    <text>加载中...</text>
+  </view>
+  <view class="loading-tip" wx:if="{{!hasMore && products.length > 0}}">
+    <text>已经到底了</text>
+  </view>
+  <view class="empty-tip" wx:if="{{!loading && products.length === 0}}">
+    <text>暂无商品</text>
+  </view>
+
+</view>

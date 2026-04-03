@@ -15,6 +15,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from .api.brain_routes import router as brain_router
 from .api.voice_api import router as voice_router
 from .services.cfo_dashboard import CFODashboardService
 from .services.evolution_2030 import Evolution2030Service
@@ -39,6 +40,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         "voice_session_mgr",
         "cfo_dashboard",
         "evolution_2030",
+        "discount_guardian",
+        "member_insight",
     ])
     yield
     logger.info("tx_brain_shutting_down")
@@ -65,6 +68,7 @@ app.add_middleware(
 # ─── Register Routers ────────────────────────────────────────────
 
 app.include_router(voice_router)
+app.include_router(brain_router)
 
 
 # ─── Health & Info ───────────────────────────────────────────────
@@ -80,6 +84,8 @@ async def health() -> dict[str, Any]:
             "voice_session": "ready",
             "cfo_dashboard": "ready",
             "evolution_2030": "ready",
+            "discount_guardian": "ready",
+            "member_insight": "ready",
         },
     }
 
@@ -109,6 +115,8 @@ async def brain_info() -> dict[str, Any]:
                 "evolution_multi_region",
                 "evolution_multi_currency",
                 "evolution_agent_levels",
+                "discount_guardian_agent",
+                "member_insight_agent",
             ],
         },
     }

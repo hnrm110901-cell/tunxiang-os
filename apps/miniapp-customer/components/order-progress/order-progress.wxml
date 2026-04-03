@@ -1,0 +1,37 @@
+<!-- Order Progress -- 4-step Domino's-style tracker -->
+<view class="progress-wrapper">
+  <!-- Countdown header -->
+  <view class="progress-countdown" wx:if="{{countdownText}}">
+    <text class="countdown-text">{{countdownText}}</text>
+  </view>
+
+  <!-- Step indicators -->
+  <view class="steps-row">
+    <block wx:for="{{steps}}" wx:key="step">
+      <view class="step-item">
+        <!-- Circle -->
+        <view class="step-circle {{item.state === 'done' ? 'done' : (item.state === 'active' ? 'active' : 'pending')}}">
+          <text class="step-icon" wx:if="{{item.state === 'done'}}">&#10003;</text>
+          <text class="step-num" wx:else>{{item.step}}</text>
+        </view>
+        <!-- Label -->
+        <text class="step-label {{item.state === 'active' ? 'active' : ''}}">{{item.label}}</text>
+        <!-- Time -->
+        <text class="step-time" wx:if="{{item.time}}">{{item.time}}</text>
+      </view>
+      <!-- Connector line -->
+      <view class="step-line {{item.state === 'done' ? 'done' : ''}}" wx:if="{{index < steps.length - 1}}"></view>
+    </block>
+  </view>
+
+  <!-- Current dish being prepared -->
+  <view class="current-dish" wx:if="{{currentDish}}">
+    <text class="current-dish-label">当前制作:</text>
+    <text class="current-dish-name">{{currentDish}}</text>
+  </view>
+
+  <!-- Rush button -->
+  <view class="rush-area" wx:if="{{showRush && currentStep >= 1 && currentStep < 4}}">
+    <button class="rush-btn" bindtap="onRush">催一下</button>
+  </view>
+</view>

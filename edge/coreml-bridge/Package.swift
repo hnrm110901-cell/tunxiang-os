@@ -5,20 +5,16 @@
 import PackageDescription
 
 let package = Package(
-    name: "coreml-bridge",
-    platforms: [
-        .macOS(.v14)
-    ],
+    name: "CoreMLBridge",
+    platforms: [.macOS(.v14)],
     dependencies: [
-        .package(url: "https://github.com/hummingbird-project/hummingbird.git", from: "2.0.0"),
+        .package(url: "https://github.com/vapor/vapor.git", from: "4.89.0"),
     ],
     targets: [
         .executableTarget(
             name: "CoreMLBridge",
-            dependencies: [
-                .product(name: "Hummingbird", package: "hummingbird"),
-            ],
-            path: "Sources"
+            dependencies: [.product(name: "Vapor", package: "vapor")],
+            path: "Sources/CoreMLBridge"
         ),
     ]
 )

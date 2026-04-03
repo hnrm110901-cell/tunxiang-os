@@ -1,0 +1,152 @@
+<!-- 优惠券中心 — 可使用 / 可领取 / 已使用/过期 -->
+<view class="page-container">
+
+  <!-- Tab切换 -->
+  <view class="tab-bar">
+    <view class="tab-item {{activeTab === 'available' ? 'active' : ''}}"
+          bindtap="switchTab" data-tab="available">可使用</view>
+    <view class="tab-item {{activeTab === 'claimable' ? 'active' : ''}}"
+          bindtap="switchTab" data-tab="claimable">可领取</view>
+    <view class="tab-item {{activeTab === 'history' ? 'active' : ''}}"
+          bindtap="switchTab" data-tab="history">已使用/过期</view>
+  </view>
+
+  <!-- ══ 可使用 Tab ══ -->
+  <view wx:if="{{activeTab === 'available'}}">
+    <view class="loading-tip" wx:if="{{loading}}">加载中...</view>
+
+    <view class="coupon-list" wx:if="{{!loading && coupons.length > 0}}">
+      <view class="coupon-card" wx:for="{{coupons}}" wx:key="id">
+        <!-- 左侧金额区 -->
+        <view class="coupon-left coupon-bg-{{item.colorType}}">
+          <view class="coupon-amount" wx:if="{{item.type === 'reduction'}}">
+            <text class="amount-sym">¥</text>
+            <text class="amount-val">{{item.discountDisplay}}</text>
+          </view>
+          <view class="coupon-amount" wx:if="{{item.type === 'discount'}}">
+            <text class="amount-val">{{item.discountDisplay}}</text>
+            <text class="amount-sym small">折</text>
+          </view>
+          <view class="coupon-amount" wx:if="{{item.type === 'gift'}}">
+            <text class="amount-sym gift">赠</text>
+          </view>
+          <text class="coupon-threshold">{{item.thresholdText}}</text>
+          <!-- 即将过期 -->
+          <view class="expire-soon-badge" wx:if="{{item.expireSoon}}">即将过期</view>
+        </view>
+
+        <!-- 虚线分隔 -->
+        <view class="coupon-divider"></view>
+
+        <!-- 右侧信息 -->
+        <view class="coupon-right">
+          <text class="coupon-name">{{item.name}}</text>
+          <text class="coupon-condition" wx:if="{{item.condition}}">{{item.condition}}</text>
+          <text class="coupon-expire {{item.expireSoon ? 'red' : ''}}">{{item.expireText}}</text>
+        </view>
+
+        <!-- 使用按钮 -->
+        <view class="coupon-action">
+          <button class="use-btn" bindtap="useCoupon" data-id="{{item.id}}">去使用</button>
+        </view>
+      </view>
+    </view>
+
+    <view class="empty-state" wx:if="{{!loading && coupons.length === 0}}">
+      <text class="empty-icon">🎟</text>
+      <text class="empty-text">暂无可用优惠券</text>
+    </view>
+  </view>
+
+  <!-- ══ 可领取 Tab ══ -->
+  <view wx:if="{{activeTab === 'claimable'}}">
+    <view class="loading-tip" wx:if="{{claimableLoading}}">加载中...</view>
+
+    <view class="claimable-list" wx:if="{{!claimableLoading && claimable.length > 0}}">
+      <view class="claimable-card" wx:for="{{claimable}}" wx:key="id">
+        <!-- 左侧金额 -->
+        <view class="claimable-left coupon-bg-{{item.colorType}}">
+          <view class="coupon-amount" wx:if="{{item.type === 'reduction'}}">
+            <text class="amount-sym">¥</text>
+            <text class="amount-val">{{item.discountDisplay}}</text>
+          </view>
+          <view class="coupon-amount" wx:if="{{item.type === 'discount'}}">
+            <text class="amount-val">{{item.discountDisplay}}</text>
+            <text class="amount-sym small">折</text>
+          </view>
+          <view class="coupon-amount" wx:if="{{item.type === 'gift'}}">
+            <text class="amount-sym gift">赠</text>
+          </view>
+          <text class="coupon-threshold">{{item.thresholdText}}</text>
+        </view>
+
+        <!-- 右侧信息 + 按钮 -->
+        <view class="claimable-right">
+          <view class="claimable-info">
+            <text class="coupon-name">{{item.name}}</text>
+            <text class="claimable-condition" wx:if="{{item.condition}}">{{item.condition}}</text>
+            <text class="claimable-valid">{{item.validText}}</text>
+          </view>
+          <button
+            class="claim-btn {{item.claimed ? 'claimed' : ''}}"
+            disabled="{{item.claimed}}"
+            bindtap="claimCoupon"
+            data-id="{{item.id}}">
+            {{item.claimed ? '已领取' : '立即领取'}}
+          </button>
+        </view>
+      </view>
+    </view>
+
+    <view class="empty-state" wx:if="{{!claimableLoading && claimable.length === 0}}">
+      <text class="empty-icon">🎁</text>
+      <text class="empty-text">暂无可领取的优惠券</text>
+    </view>
+  </view>
+
+  <!-- ══ 已使用/过期 Tab ══ -->
+  <view wx:if="{{activeTab === 'history'}}">
+    <view class="loading-tip" wx:if="{{historyLoading}}">加载中...</view>
+
+    <view class="coupon-list" wx:if="{{!historyLoading && historyList.length > 0}}">
+      <view class="coupon-card disabled" wx:for="{{historyList}}" wx:key="id">
+        <!-- 左侧 -->
+        <view class="coupon-left coupon-bg-gray">
+          <view class="coupon-amount" wx:if="{{item.type === 'reduction'}}">
+            <text class="amount-sym">¥</text>
+            <text class="amount-val">{{item.discountDisplay}}</text>
+          </view>
+          <view class="coupon-amount" wx:if="{{item.type === 'discount'}}">
+            <text class="amount-val">{{item.discountDisplay}}</text>
+            <text class="amount-sym small">折</text>
+          </view>
+          <view class="coupon-amount" wx:if="{{item.type === 'gift'}}">
+            <text class="amount-sym gift">赠</text>
+          </view>
+          <text class="coupon-threshold">{{item.thresholdText}}</text>
+        </view>
+
+        <view class="coupon-divider"></view>
+
+        <!-- 右侧 -->
+        <view class="coupon-right">
+          <text class="coupon-name">{{item.name}}</text>
+          <text class="coupon-expire">{{item.expireText}}</text>
+        </view>
+
+        <!-- 状态标签 -->
+        <view class="coupon-action">
+          <text class="status-label">{{item.status === 'used' ? '已使用' : '已过期'}}</text>
+        </view>
+      </view>
+    </view>
+
+    <view class="empty-state" wx:if="{{!historyLoading && historyList.length === 0}}">
+      <text class="empty-icon">📋</text>
+      <text class="empty-text">暂无历史优惠券</text>
+    </view>
+  </view>
+
+  <!-- 底部安全区 -->
+  <view class="safe-bottom"></view>
+</view>

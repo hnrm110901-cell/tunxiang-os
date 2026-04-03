@@ -1,0 +1,107 @@
+"""한국어"""
+
+LANG_CODE = "ko_KR"
+LANG_NAME = "한국어"
+
+# ── 카테고리 ────────────────────────────────────────────
+CATEGORIES = {
+    "hot_dish": "따뜻한 요리",
+    "cold_dish": "냉채",
+    "seafood": "해산물",
+    "soup": "탕/국",
+    "staple": "밥/면",
+    "drink": "음료",
+    "dessert": "디저트",
+    "snack": "간식",
+    "bbq": "구이",
+    "hotpot": "훠궈",
+}
+
+# ── UI 텍스트 ───────────────────────────────────────────
+UI = {
+    "checkout": "계산",
+    "order": "주문",
+    "rush_order": "급한 주문",
+    "return_dish": "반품",
+    "add_dish": "추가 주문",
+    "table_number": "테이블 번호",
+    "guest_count": "인원",
+    "total": "합계",
+    "discount": "할인",
+    "pay": "결제",
+    "cash": "현금",
+    "wechat_pay": "위챗페이",
+    "alipay": "알리페이",
+    "card": "카드",
+    "receipt": "영수증",
+    "print_receipt": "영수증 인쇄",
+    "confirm": "확인",
+    "cancel": "취소",
+    "back": "뒤로",
+    "search": "검색",
+    "voice_order": "음성 주문",
+    "scan_order": "QR 주문",
+    "member": "회원",
+    "member_price": "회원가",
+    "original_price": "정가",
+    "sold_out": "품절",
+    "popular": "인기",
+    "new": "신메뉴",
+    "spicy": "매운",
+    "recommend": "추천",
+    "quantity": "수량",
+    "remark": "비고",
+    "no_spicy": "안 매운",
+    "mild_spicy": "약간 매운",
+    "medium_spicy": "보통 매운",
+    "extra_spicy": "아주 매운",
+    "order_success": "주문 완료",
+    "order_failed": "주문 실패",
+    "waiting": "대기 중",
+    "preparing": "조리 중",
+    "ready": "준비 완료",
+    "served": "서빙 완료",
+}
+
+# ── 요리 이름 ───────────────────────────────────────────
+DISH_NAMES = {
+    "steamed_fish_head_chopped_chili": "다진 고추 찐 생선머리",
+    "braised_pork": "동파육",
+    "kung_pao_chicken": "궁바오지딩",
+    "mapo_tofu": "마파두부",
+    "boiled_fish": "수이주위",
+    "steamed_bass": "찐 농어",
+    "stir_fried_vegetables": "계절 채소 볶음",
+    "egg_fried_rice": "계란 볶음밥",
+    "tomato_egg": "토마토 계란 볶음",
+    "cold_cucumber": "오이무침",
+    "hot_and_sour_soup": "산라탕",
+    "wonton_soup": "완탕 수프",
+    "steamed_rice": "공기밥",
+    "beer": "맥주",
+    "cola": "콜라",
+    "plum_juice": "매실 주스",
+    "herbal_tea": "한방차",
+}
+
+# ── 영수증 ──────────────────────────────────────────────
+RECEIPT = {
+    "header": "영수증",
+    "store_name": "매장명",
+    "order_no": "주문번호",
+    "table_no": "테이블 번호",
+    "cashier": "담당자",
+    "time": "시간",
+    "item": "품목",
+    "qty": "수량",
+    "price": "단가",
+    "subtotal": "소계",
+    "total": "합계",
+    "discount": "할인",
+    "payable": "결제 금액",
+    "paid": "받은 금액",
+    "change": "거스름돈",
+    "payment_method": "결제 방법",
+    "footer": "방문해 주셔서 감사합니다!",
+    "vat_note": "영수증이 필요하시면 프런트에 문의하세요",
+}

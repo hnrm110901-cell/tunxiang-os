@@ -4,8 +4,8 @@
 """
 import uuid
 from typing import Any
-from ..base import SkillAgent, AgentResult
 
+from ..base import AgentResult, SkillAgent
 
 # 新客欢迎权益模板
 WELCOME_OFFER_TEMPLATES = {

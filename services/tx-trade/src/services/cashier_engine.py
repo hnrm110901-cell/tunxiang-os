@@ -3,23 +3,23 @@
 完整实现10个API端点的后端逻辑，覆盖开台→点单→结算全流程。
 所有金额单位：分（fen）。三条硬约束在此层校验。
 """
-import uuid
 import math
-from datetime import datetime, timezone, date
+import uuid
+from datetime import datetime, timezone
 from typing import Optional
 
 import structlog
-from sqlalchemy import select, update, func, and_, cast, Date
+from sqlalchemy import Date, and_, cast, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from shared.ontology.src.entities import Order, OrderItem, Store, Dish
+from shared.ontology.src.entities import Customer, Dish, Order, OrderItem, Store
 from shared.ontology.src.enums import OrderStatus
+
+from ..models.enums import TableStatus
 from ..models.tables import Table
-from ..models.enums import TableStatus, OrderType
 from .state_machine import (
-    can_table_transition,
     TABLE_STATES,
-    sync_table_on_order_change,
+    can_table_transition,
 )
 
 logger = structlog.get_logger()
@@ -274,39 +274,45 @@ class CashierEngine:
     ) -> dict:
         """加菜 — 支持固定价/称重/时价三种定价模式"""
         order_uuid = uuid.UUID(order_id)
+        dish_uuid = uuid.UUID(dish_id) if dish_id else None
 
-        # 检查订单存在且可加菜
-        order = await self._get_order(order_uuid)
+        # 单次查询同时获取 Order + Dish（合并 2 次 DB 往返为 1 次）
+        if dish_uuid:
+            result = await self.db.execute(
+                select(Order, Dish)
+                .outerjoin(Dish, Dish.id == dish_uuid)
+                .where(Order.id == order_uuid, Order.tenant_id == self.tenant_id)
+            )
+            row = result.one_or_none()
+            if not row:
+                raise ValueError(f"订单不存在: {order_id}")
+            order, dish = row[0], row[1]
+        else:
+            order = await self._get_order(order_uuid)
+            dish = None
+
         if order.status in (OrderStatus.completed.value, OrderStatus.cancelled.value):
             raise ValueError(f"订单状态 {order.status}，无法加菜")
 
         # 计算小计
         if pricing_mode == "weighted" and weight_value is not None:
             subtotal_fen = round(unit_price_fen * weight_value)
-        elif pricing_mode == "market_price":
-            # 时价菜品直接用传入的单价
-            subtotal_fen = unit_price_fen * qty
         else:
             subtotal_fen = unit_price_fen * qty
 
-        # 查菜品BOM成本
+        # BOM 成本（从已加载的 dish 对象取，无额外查询）
         food_cost_fen = None
         gross_margin = None
-        if dish_id:
-            dish_result = await self.db.execute(
-                select(Dish).where(Dish.id == uuid.UUID(dish_id))
-            )
-            dish = dish_result.scalar_one_or_none()
-            if dish and dish.cost_fen:
-                food_cost_fen = dish.cost_fen * qty
-                if subtotal_fen > 0:
-                    gross_margin = round((subtotal_fen - food_cost_fen) / subtotal_fen, 4)
+        if dish and dish.cost_fen:
+            food_cost_fen = dish.cost_fen * qty
+            if subtotal_fen > 0:
+                gross_margin = round((subtotal_fen - food_cost_fen) / subtotal_fen, 4)
 
         item = OrderItem(
             id=uuid.uuid4(),
             tenant_id=self.tenant_id,
             order_id=order_uuid,
-            dish_id=uuid.UUID(dish_id) if dish_id else None,
+            dish_id=dish_uuid,
             item_name=dish_name,
             quantity=qty,
             unit_price_fen=unit_price_fen,
@@ -320,19 +326,12 @@ class CashierEngine:
         )
         self.db.add(item)
 
-        # 重新计算订单总额
+        # 重新计算订单总额（与 INSERT 合并为单次 flush）
         new_total = order.total_amount_fen + subtotal_fen
         new_final = new_total - order.discount_amount_fen
-
-        await self.db.execute(
-            update(Order)
-            .where(Order.id == order_uuid)
-            .values(
-                total_amount_fen=new_total,
-                final_amount_fen=new_final,
-                status=OrderStatus.confirmed.value,
-            )
-        )
+        order.total_amount_fen = new_total
+        order.final_amount_fen = new_final
+        order.status = OrderStatus.confirmed.value
 
         await self.db.flush()
         logger.info(
@@ -491,9 +490,7 @@ class CashierEngine:
         if discount_type == "percent_off":
             # discount_value = 0.8 means 打八折, 折扣额 = total * (1 - 0.8)
             discount_fen = round(total * (1.0 - discount_value))
-        elif discount_type == "amount_off":
-            discount_fen = int(discount_value)
-        elif discount_type == "free_item":
+        elif discount_type == "amount_off" or discount_type == "free_item":
             discount_fen = int(discount_value)
         elif discount_type == "member_price":
             # discount_value 是会员价总额（分），折扣 = 原价 - 会员价
@@ -526,22 +523,58 @@ class CashierEngine:
                 floor = 1.0 - store.cost_ratio_target
             margin_check["floor"] = floor
 
-            if margin < floor:
+            if margin < floor and not approval_id:
                 margin_check["passed"] = False
                 logger.warning(
-                    "margin_floor_rejected",
+                    "margin_floor_needs_approval",
                     order_id=order_id,
                     margin=margin,
                     floor=floor,
                     discount_fen=discount_fen,
                 )
-                return {
-                    "applied": False,
-                    "discount_fen": 0,
-                    "new_total_fen": order.final_amount_fen,
-                    "margin_check": margin_check,
-                    "error": f"折扣后毛利率 {margin:.1%} 低于底线 {floor:.1%}，需上级审批",
-                }
+
+                # 创建审批单而非直接拒绝
+                try:
+                    from .approval_service import ApprovalService
+                    approval_svc = ApprovalService(
+                        self.db, str(self.tenant_id), str(order.store_id)
+                    )
+                    approval_result = await approval_svc.create_approval(
+                        order_id=order_id,
+                        discount_info={
+                            "discount_type": discount_type,
+                            "discount_value": discount_value,
+                            "discount_fen": discount_fen,
+                            "current_margin": round(margin, 4),
+                            "margin_floor": floor,
+                            "new_final_fen": new_final,
+                        },
+                        reason=reason or f"折扣后毛利率 {margin:.1%} 低于底线 {floor:.1%}",
+                    )
+                    return {
+                        "applied": False,
+                        "needs_approval": True,
+                        "approval_id": approval_result["approval_id"],
+                        "discount_fen": 0,
+                        "new_total_fen": order.final_amount_fen,
+                        "margin_check": margin_check,
+                        "message": f"折扣后毛利率 {margin:.1%} 低于底线 {floor:.1%}，已创建审批单",
+                    }
+                except (ValueError, ImportError) as exc:
+                    logger.error(
+                        "approval_creation_failed",
+                        order_id=order_id,
+                        error=str(exc),
+                    )
+                    return {
+                        "applied": False,
+                        "needs_approval": True,
+                        "approval_id": None,
+                        "discount_fen": 0,
+                        "new_total_fen": order.final_amount_fen,
+                        "margin_check": margin_check,
+                        "error": f"折扣后毛利率 {margin:.1%} 低于底线 {floor:.1%}，审批单创建失败",
+                    }
 
         # 应用折扣
         order.discount_amount_fen = discount_fen
@@ -582,11 +615,15 @@ class CashierEngine:
         self,
         order_id: str,
         payments: list[dict],
+        auto_pay: bool = False,
+        customer_id: Optional[str] = None,
     ) -> dict:
-        """结算 — 多支付方式结账
+        """结算 — 多支付方式结账 / 无感支付
 
         Args:
             payments: [{method, amount_fen, trade_no?}]
+            auto_pay: 如果为 True 且顾客有储值卡余额 >= final_amount，自动扣款
+            customer_id: 顾客ID（auto_pay 时必传）
         """
         order_uuid = uuid.UUID(order_id)
         order = await self._get_order(order_uuid)
@@ -595,6 +632,21 @@ class CashierEngine:
             raise ValueError("订单已结算")
         if order.status == OrderStatus.cancelled.value:
             raise ValueError("订单已取消")
+
+        # ─── 无感支付：储值卡自动扣款 ───
+        auto_pay_result: Optional[dict] = None
+        if auto_pay and customer_id:
+            auto_pay_result = await self._try_auto_pay(
+                order_id=order_id,
+                customer_id=customer_id,
+                final_amount_fen=order.final_amount_fen,
+            )
+            if auto_pay_result and auto_pay_result.get("success"):
+                # 自动扣款成功，构造支付记录
+                payments = [{
+                    "method": "member_balance",
+                    "amount_fen": order.final_amount_fen,
+                }]
 
         # 验证支付总额 >= 应付金额
         total_paid = sum(p["amount_fen"] for p in payments)
@@ -611,8 +663,8 @@ class CashierEngine:
                 change_fen = total_paid - order.final_amount_fen
 
         # 创建支付记录
-        from ..models.payment import Payment
         from ..models.enums import PaymentStatus
+        from ..models.payment import Payment
 
         payment_records = []
         for p in payments:
@@ -665,14 +717,41 @@ class CashierEngine:
             order_no=order.order_no,
             final_fen=order.final_amount_fen,
             payments_count=len(payments),
+            auto_pay=auto_pay,
         )
 
-        return {
+        # ─── 支付后推券（异步不阻塞） ───
+        effective_customer_id = customer_id or (
+            str(order.customer_id) if order.customer_id else None
+        )
+        if effective_customer_id:
+            try:
+                from .post_payment_service import PostPaymentService
+
+                post_svc = PostPaymentService(self.db, str(self.tenant_id))
+                await post_svc.trigger_post_payment(order_id, effective_customer_id)
+            except (ImportError, ValueError, RuntimeError) as exc:
+                logger.warning(
+                    "post_payment_trigger_failed",
+                    order_id=order_id,
+                    error=str(exc),
+                )
+
+        result = {
             "settled": True,
             "payment_records": payment_records,
             "change_fen": change_fen,
             "receipt_data": receipt_data,
         }
+
+        if auto_pay_result and auto_pay_result.get("success"):
+            result["auto_pay"] = {
+                "deducted_fen": auto_pay_result["deducted_fen"],
+                "balance_fen": auto_pay_result["balance_fen"],
+                "card_id": auto_pay_result["card_id"],
+            }
+
+        return result
 
     async def cancel_order(
         self,
@@ -938,6 +1017,108 @@ class CashierEngine:
             .values(status=TableStatus.free.value, current_order_id=None)
         )
 
+    async def _try_auto_pay(
+        self,
+        order_id: str,
+        customer_id: str,
+        final_amount_fen: int,
+    ) -> Optional[dict]:
+        """无感支付 — 尝试从储值卡自动扣款
+
+        查找顾客活跃储值卡，余额 >= final_amount 时自动扣款。
+        扣款成功后推送微信通知。
+        """
+        from .coupon_service import _StoredValueStore
+
+        # 遍历储值卡找到该顾客的卡（余额充足）
+        target_card: Optional[dict] = None
+        for card_data in _StoredValueStore._cards.values():
+            if (
+                card_data.get("customer_id") == customer_id
+                and card_data.get("tenant_id") == str(self.tenant_id)
+                and card_data.get("status") == "active"
+                and card_data.get("balance_fen", 0) >= final_amount_fen
+            ):
+                target_card = card_data
+                break
+
+        if not target_card:
+            logger.info(
+                "auto_pay_no_eligible_card",
+                order_id=order_id,
+                customer_id=customer_id,
+                required_fen=final_amount_fen,
+            )
+            return {"success": False, "reason": "无可用储值卡或余额不足"}
+
+        # 执行扣款
+        from .coupon_service import deduct_stored_value
+
+        deduct_result = await deduct_stored_value(
+            card_id=target_card["card_id"],
+            amount_fen=final_amount_fen,
+            order_id=order_id,
+            tenant_id=str(self.tenant_id),
+            db=self.db,
+        )
+
+        logger.info(
+            "auto_pay_success",
+            order_id=order_id,
+            customer_id=customer_id,
+            card_id=target_card["card_id"],
+            deducted_fen=final_amount_fen,
+            balance_fen=deduct_result["balance_fen"],
+        )
+
+        # 推送微信通知"已自动扣款"
+        try:
+            customer_result = await self.db.execute(
+                select(Customer).where(
+                    Customer.id == uuid.UUID(customer_id),
+                    Customer.tenant_id == self.tenant_id,
+                )
+            )
+            customer = customer_result.scalar_one_or_none()
+
+            if customer and customer.wechat_openid:
+                try:
+                    from services.tx_ops.src.services.notification_service import NotificationService  # noqa: E501
+                except ImportError:
+                    customer = None  # 跳过通知
+
+                if customer:
+                    notification_svc = NotificationService(
+                        db=self.db,
+                        tenant_id=str(self.tenant_id),
+                    )
+                    amount_yuan = final_amount_fen / 100
+                    balance_yuan = deduct_result["balance_fen"] / 100
+                    await notification_svc.send_wechat(
+                        openid=customer.wechat_openid,
+                        template_id="auto_pay_deducted",
+                        data={
+                            "first": {"value": "储值卡已自动扣款"},
+                            "keyword1": {"value": f"¥{amount_yuan:.2f}"},
+                            "keyword2": {"value": f"¥{balance_yuan:.2f}"},
+                            "remark": {"value": "如有疑问请联系门店"},
+                        },
+                    )
+        except (ConnectionError, TimeoutError, ValueError, RuntimeError) as exc:
+            # 通知失败不影响扣款结果
+            logger.warning(
+                "auto_pay_notification_failed",
+                order_id=order_id,
+                error=str(exc),
+            )
+
+        return {
+            "success": True,
+            "card_id": target_card["card_id"],
+            "deducted_fen": final_amount_fen,
+            "balance_fen": deduct_result["balance_fen"],
+        }
+
     @staticmethod
     def _method_to_category(method: str) -> str:
         """支付方式映射到支付类别"""
@@ -950,3 +1131,95 @@ class CashierEngine:
             "credit_account": "挂账",
         }
         return mapping.get(method, "other")
+
+    # ─────────────────────────────────────
+    # 6. Table Transfer (转台)
+    # ─────────────────────────────────────
+
+    async def transfer_table(
+        self,
+        order_id: str,
+        target_table_no: str,
+        operator_id: Optional[str] = None,
+    ) -> dict:
+        """转台 — 校验目标桌空闲 → 更新Order → 释放原桌 → 锁新桌
+
+        业务规则：
+        1. 订单必须处于 pending/confirmed 状态
+        2. 目标桌必须为 free 状态
+        3. 原桌号记录到 order.table_transfer_from 以供追溯
+        """
+        order_uuid = uuid.UUID(order_id)
+        order = await self._get_order(order_uuid)
+
+        # 校验订单状态
+        if order.status in (OrderStatus.completed.value, OrderStatus.cancelled.value):
+            raise ValueError(f"订单状态 {order.status}，无法转台")
+
+        old_table_no = order.table_number
+        if not old_table_no:
+            raise ValueError("订单无桌台信息，无法转台")
+
+        if old_table_no == target_table_no:
+            raise ValueError("目标桌与当前桌相同，无需转台")
+
+        store_uuid = order.store_id
+
+        # 查询目标桌台
+        target_result = await self.db.execute(
+            select(Table).where(
+                Table.store_id == store_uuid,
+                Table.table_no == target_table_no,
+                Table.tenant_id == self.tenant_id,
+                Table.is_active == True,  # noqa: E712
+            )
+        )
+        target_table = target_result.scalar_one_or_none()
+        if not target_table:
+            raise ValueError(f"目标桌台不存在: {target_table_no}")
+
+        if target_table.status != TableStatus.free.value:
+            raise ValueError(
+                f"目标桌台 {target_table_no} 当前状态 {target_table.status}，"
+                f"不是空闲状态，无法转入"
+            )
+
+        # 释放原桌
+        await self._release_table(str(store_uuid), old_table_no)
+
+        # 锁定目标桌
+        target_table.status = TableStatus.occupied.value
+        target_table.current_order_id = order_uuid
+
+        # 更新订单桌号 + 记录转台历史
+        order.table_number = target_table_no
+        order.table_transfer_from = old_table_no
+        order.order_metadata = {
+            **(order.order_metadata or {}),
+            "last_transfer": {
+                "from": old_table_no,
+                "to": target_table_no,
+                "operator_id": operator_id,
+                "transferred_at": datetime.now(timezone.utc).isoformat(),
+            },
+        }
+
+        await self.db.flush()
+
+        logger.info(
+            "table_transferred",
+            order_id=order_id,
+            order_no=order.order_no,
+            from_table=old_table_no,
+            to_table=target_table_no,
+            operator_id=operator_id,
+        )
+
+        return {
+            "order_id": order_id,
+            "order_no": order.order_no,
+            "from_table": old_table_no,
+            "to_table": target_table_no,
+            "status": order.status,
+            "operator_id": operator_id,
+        }

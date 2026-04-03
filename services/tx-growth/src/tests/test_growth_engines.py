@@ -10,34 +10,43 @@
 - ROI 归因（5种模型）
 - 端到端：分群 → 旅程 → 发送 → 转化 → ROI
 """
-import sys
 import os
+import sys
 
 # 确保可以从 src 目录导入
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import pytest
-from services.brand_strategy import BrandStrategyService, _brand_strategies
 from services.audience_segmentation import (
-    AudienceSegmentationService, add_users_to_segment,
-    clear_all_segments, _segments, _segment_users,
+    AudienceSegmentationService,
+    add_users_to_segment,
+    clear_all_segments,
 )
-from services.journey_orchestrator import (
-    JourneyOrchestratorService, clear_all_journeys,
+from services.brand_strategy import BrandStrategyService, _brand_strategies
+from services.channel_engine import (
+    ChannelEngine,
+    clear_all_channel_data,
 )
 from services.content_engine import (
-    ContentEngine, record_content_performance, clear_all_content,
+    ContentEngine,
+    clear_all_content,
+    record_content_performance,
+)
+from services.journey_orchestrator import (
+    JourneyOrchestratorService,
+    clear_all_journeys,
 )
 from services.offer_engine import (
-    OfferEngine, record_redemption, set_offer_issued_count, clear_all_offers,
-)
-from services.channel_engine import (
-    ChannelEngine, reset_daily_counts, clear_all_channel_data,
+    OfferEngine,
+    clear_all_offers,
+    record_redemption,
+    set_offer_issued_count,
 )
 from services.roi_attribution import (
-    ROIAttributionService, set_campaign_cost, clear_all_attribution_data,
+    ROIAttributionService,
+    clear_all_attribution_data,
+    set_campaign_cost,
 )
-
 
 # ===========================================================================
 # Fixtures — 真实中餐连锁数据

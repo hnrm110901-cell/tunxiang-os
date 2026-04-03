@@ -4,8 +4,8 @@
 - 供应商: 湘江渔港(海鲜)、马王堆市场(蔬菜)、新农都冻品(冻品)
 - 食材: 鲈鱼、基围虾、波士顿龙虾、空心菜、冻鱿鱼
 """
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 

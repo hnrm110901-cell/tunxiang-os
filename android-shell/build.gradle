@@ -1,0 +1,33 @@
+// android-shell/build.gradle（根项目）
+// 屯象 POS 安卓壳层根构建配置
+
+buildscript {
+    ext {
+        kotlin_version = '1.9.22'
+        agp_version = '8.2.2'    // Android Gradle Plugin
+    }
+
+    repositories {
+        google()
+        mavenCentral()
+    }
+
+    dependencies {
+        classpath "com.android.tools.build:gradle:$agp_version"
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+    }
+}
+
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+
+        // 商米 SDK 本地 AAR 仓库（将 SDK 文件放入 android-shell/libs/）
+        // flatDir { dirs 'libs' }
+    }
+}
+
+task clean(type: Delete) {
+    delete rootProject.buildDir
+}

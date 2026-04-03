@@ -11,6 +11,7 @@ from ..services.narrative_engine import compose_brief
 from ..services.store_health_service import classify_health
 
 logger = structlog.get_logger()
+from fastapi import APIRouter
 
 router = APIRouter(prefix="/api/v1/analytics", tags=["analytics"])
 

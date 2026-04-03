@@ -1,0 +1,9 @@
+{
+  "navigationBarTitleText": "套餐选择",
+  "navigationBarBackgroundColor": "#0B1A20",
+  "navigationBarTextStyle": "white",
+  "backgroundColor": "#0B1A20",
+  "usingComponents": {
+    "combo-group-item": "/components/combo-group-item/combo-group-item"
+  }
+}

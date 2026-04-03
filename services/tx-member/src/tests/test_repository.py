@@ -4,9 +4,7 @@ from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-
 from services.repository import CustomerRepository
-
 
 TENANT_ID = str(uuid.uuid4())
 STORE_ID = str(uuid.uuid4())
@@ -29,7 +27,7 @@ def _make_customer(**overrides):
     c.first_order_at = overrides.get("first_order_at", datetime.now(timezone.utc))
     c.last_order_at = overrides.get("last_order_at", datetime.now(timezone.utc))
     c.tags = overrides.get("tags", ["VIP"])
-    c.wechat_nickname = overrides.get("wechat_nickname", None)
+    c.wechat_nickname = overrides.get("wechat_nickname")
     c.created_at = overrides.get("created_at", datetime.now(timezone.utc))
     return c
 

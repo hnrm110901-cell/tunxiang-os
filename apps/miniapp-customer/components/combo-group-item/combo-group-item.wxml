@@ -1,0 +1,35 @@
+<!-- 套餐分组内商品行组件 -->
+<view class="combo-item">
+  <!-- 左侧图片 -->
+  <image
+    class="item-img"
+    src="{{item.image_url || '/assets/dish-placeholder.png'}}"
+    mode="aspectFill"
+    lazy-load
+  />
+
+  <!-- 中间信息 -->
+  <view class="item-body">
+    <text class="item-name">{{item.item_name || item.name}}</text>
+    <view class="item-price-row">
+      <text class="item-extra-price" wx:if="{{item.extra_price_fen > 0}}">
+        +¥{{extraPriceYuan}}
+      </text>
+      <text class="item-included" wx:else>已含</text>
+    </view>
+    <text class="item-desc" wx:if="{{item.description}}">{{item.description}}</text>
+  </view>
+
+  <!-- 右侧数量控制 -->
+  <view class="item-actions">
+    <view
+      class="qty-btn minus {{selectedCount <= 0 ? 'disabled' : ''}}"
+      catchtap="onMinus"
+    >-</view>
+    <text class="qty-value" wx:if="{{selectedCount > 0}}">{{selectedCount}}</text>
+    <view
+      class="qty-btn plus {{reachedMax ? 'disabled' : ''}}"
+      catchtap="onPlus"
+    >+</view>
+  </view>
+</view>

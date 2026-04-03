@@ -1,10 +1,13 @@
 """新品机会发现 Agent — P1 | 云端
 
 新品趋势扫描、新品可行性评估、新品定价建议、新品试销方案、竞品新品跟踪、新品上线评估。
+扩展：发现建议时自动登记 draft 试点、待决策试点列表。
 """
+import uuid
+from datetime import date, timedelta
 from typing import Any
-from ..base import SkillAgent, AgentResult
 
+from ..base import AgentResult, SkillAgent
 
 # 菜品品类
 DISH_CATEGORIES = ["凉菜", "热菜", "汤品", "主食", "甜品", "饮品", "小吃", "季节限定"]
@@ -28,6 +31,8 @@ class NewProductScoutAgent(SkillAgent):
             "plan_trial_sale",
             "track_competitor_new_products",
             "evaluate_launch_readiness",
+            "register_scouted_pilot",
+            "get_scouted_pending_pilots",
         ]
 
     async def execute(self, action: str, params: dict[str, Any]) -> AgentResult:
@@ -38,6 +43,8 @@ class NewProductScoutAgent(SkillAgent):
             "plan_trial_sale": self._plan_trial,
             "track_competitor_new_products": self._track_competitor_np,
             "evaluate_launch_readiness": self._evaluate_launch,
+            "register_scouted_pilot": self._register_scouted_pilot,
+            "get_scouted_pending_pilots": self._get_scouted_pending_pilots,
         }
         handler = dispatch.get(action)
         if handler:
@@ -289,5 +296,101 @@ class NewProductScoutAgent(SkillAgent):
                 }.get(decision, ""),
             },
             reasoning=f"「{dish_name}」上线评估 {total}分，决策: {decision}",
+            confidence=0.8,
+        )
+
+    async def _register_scouted_pilot(self, params: dict) -> AgentResult:
+        """
+        在发现新品 / 新原料建议时，将建议登记为 draft 试点计划。
+
+        params 示例：
+        {
+            "tenant_id": "uuid",
+            "dish_name": "麻辣香锅",
+            "category": "热菜",
+            "opportunity_score": 82.0,
+            "source": "趋势扫描",
+            "source_ref_id": "uuid",          # 来源情报 ID（可选）
+            "suggested_trial_days": 14,
+            "target_stores": [{"store_id": "uuid", "store_name": "长沙解放西店"}]
+        }
+        """
+        tenant_id_str = params.get("tenant_id", "")
+        dish_name = params.get("dish_name", "")
+        source = params.get("source", "trend_signal")
+        opportunity_score = params.get("opportunity_score", 0)
+        target_stores = params.get("target_stores", [])
+        trial_days = params.get("suggested_trial_days", 14)
+
+        if not dish_name:
+            return AgentResult(success=False, action="register_scouted_pilot", error="缺少 dish_name")
+
+        today = date.today()
+        start_date = (today + timedelta(days=7)).isoformat()
+        end_date = (today + timedelta(days=7 + trial_days)).isoformat()
+
+        pilot_draft = {
+            "pilot_id": str(uuid.uuid4()),
+            "tenant_id": tenant_id_str,
+            "name": f"【新品侦察】{dish_name} 试销验证",
+            "pilot_type": "new_dish",
+            "recommendation_source": "trend_signal",
+            "source_ref_id": params.get("source_ref_id"),
+            "hypothesis": f"引入{dish_name}可吸引新客群并提升品类丰富度，预期试销期日均销量 ≥ 15 份",
+            "target_stores": target_stores,
+            "control_stores": [],
+            "start_date": start_date,
+            "end_date": end_date,
+            "status": "draft",
+            "success_criteria": [
+                {"metric": "total_sales", "operator": "gte", "threshold": 15 * trial_days,
+                 "description": f"试销期总销量 ≥ {15 * trial_days} 份"},
+            ],
+            "opportunity_score": opportunity_score,
+            "scout_source": source,
+            "note": "由新品侦察 Agent 自动发现，需人工决策后激活",
+        }
+
+        return AgentResult(
+            success=True, action="register_scouted_pilot",
+            data={
+                "pilot_draft": pilot_draft,
+                "auto_registered": True,
+                "next_step": "调用 POST /api/v1/pilots 提交草稿，等待运营团队决策",
+            },
+            reasoning=f"新品「{dish_name}」（机会评分 {opportunity_score}）已登记试点草稿，"
+                      f"建议 {start_date} 至 {end_date} 试销",
+            confidence=0.75,
+        )
+
+    async def _get_scouted_pending_pilots(self, params: dict) -> AgentResult:
+        """
+        获取待决策的新品侦察试点建议列表（来源为 trend_signal 的 draft 试点）。
+
+        params: {"draft_pilots": [...]}  — 从 pilot_programs 查询到的 draft 列表
+        """
+        draft_pilots = params.get("draft_pilots", [])
+
+        # 筛选新品侦察来源
+        scouted = [
+            p for p in draft_pilots
+            if p.get("recommendation_source") in ("trend_signal", "competitor_watch")
+        ]
+        scouted.sort(key=lambda p: p.get("opportunity_score", 0), reverse=True)
+
+        urgent = [p for p in scouted if p.get("opportunity_score", 0) >= 75]
+        watch = [p for p in scouted if p.get("opportunity_score", 0) < 75]
+
+        return AgentResult(
+            success=True, action="get_scouted_pending_pilots",
+            data={
+                "total_pending": len(scouted),
+                "urgent_decision": len(urgent),
+                "watch_list": len(watch),
+                "pilots": scouted[:20],
+                "action_required": "请在7天内对高分建议（评分≥75）做出试点决策",
+            },
+            reasoning=f"待决策新品试点建议 {len(scouted)} 个，"
+                      f"其中紧急决策 {len(urgent)} 个（评分≥75）",
             confidence=0.8,
         )

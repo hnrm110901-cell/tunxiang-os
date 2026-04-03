@@ -11,20 +11,18 @@
 8. 平台菜单同步
 9. T+1自动对账日程
 """
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import uuid
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pytest
-
-from services.reconciliation import ReconciliationService
 from services.delivery_adapter import DeliveryPlatformAdapter
 from services.member_golden_id import MemberGoldenIDService
-
+from services.reconciliation import ReconciliationService
 
 # ─── Fixtures ───
 

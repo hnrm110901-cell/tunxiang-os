@@ -1,0 +1,62 @@
+<!-- 确认下单 — 提交到厨房 -->
+<view class="page-container confirm-page">
+  <!-- 桌号提示 -->
+  <view class="table-info-bar">
+    <text class="table-info-label">{{tableId}}号桌</text>
+    <text class="table-info-hint">确认菜品后提交到厨房</text>
+  </view>
+
+  <!-- 菜品列表 -->
+  <view class="order-items-section" wx:if="{{!submitted}}">
+    <view class="section-title">已选菜品</view>
+    <view class="order-item" wx:for="{{orderItems}}" wx:key="dishId">
+      <image class="item-img" src="{{item.imageUrl}}" mode="aspectFill"
+             wx:if="{{item.imageUrl}}" />
+      <view class="item-info">
+        <text class="item-name">{{item.dishName}}</text>
+        <view class="item-meta">
+          <text class="item-price">¥{{item.unitPriceYuan}}</text>
+          <text class="item-qty">x{{item.quantity}}</text>
+          <text class="item-subtotal">¥{{item.subtotalYuan}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 备注 -->
+  <view class="remark-section" wx:if="{{!submitted}}">
+    <text class="section-title">备注</text>
+    <textarea class="remark-input" placeholder="如有特殊要求请备注（如：少辣、不要香菜）"
+              value="{{remark}}" bindinput="onRemarkInput"
+              maxlength="200" auto-height />
+  </view>
+
+  <!-- 合计 -->
+  <view class="total-section" wx:if="{{!submitted}}">
+    <text class="total-label">合计</text>
+    <text class="total-amount">¥{{totalYuan}}</text>
+  </view>
+
+  <!-- 提交按钮 -->
+  <view class="submit-section" wx:if="{{!submitted}}">
+    <button class="btn-submit {{submitting ? 'disabled' : ''}}"
+            bindtap="submitOrder" disabled="{{submitting}}">
+      {{submitting ? '提交中...' : '提交到厨房'}}
+    </button>
+  </view>
+
+  <!-- 提交成功 -->
+  <view class="success-section" wx:if="{{submitted}}">
+    <view class="success-icon-wrap">
+      <text class="success-icon-text">✓</text>
+    </view>
+    <text class="success-title">已提交厨房</text>
+    <text class="success-hint">菜品正在制作中，请耐心等待</text>
+
+    <view class="success-actions">
+      <button class="btn-continue" bindtap="continueOrder">继续点餐</button>
+      <button class="btn-status" bindtap="viewStatus">查看进度</button>
+      <button class="btn-checkout" bindtap="requestCheckout">请求结账</button>
+    </view>
+  </view>
+</view>

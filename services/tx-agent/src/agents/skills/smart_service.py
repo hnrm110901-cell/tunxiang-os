@@ -7,8 +7,8 @@
 """
 import statistics
 from typing import Any
-from ..base import SkillAgent, AgentResult
 
+from ..base import AgentResult, SkillAgent
 
 # 岗位技能要求
 ROLE_SKILLS = {

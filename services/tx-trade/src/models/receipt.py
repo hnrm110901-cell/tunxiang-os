@@ -1,11 +1,12 @@
 """小票模型 — 模板管理 + 打印日志"""
 import uuid
 
-from sqlalchemy import String, Integer, Boolean, DateTime, Text, ForeignKey, func
-from sqlalchemy.dialects.postgresql import UUID, JSON
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy.dialects.postgresql import JSON, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from shared.ontology.src.base import TenantBase
+
 from .enums import PrintType
 
 

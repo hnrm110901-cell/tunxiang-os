@@ -6,6 +6,7 @@ import jwt
 import structlog
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import JSONResponse
 
 from .response import err
 
@@ -17,6 +18,22 @@ AUTH_WHITELIST: set[str] = {"/health", "/api/v1/auth/login", "/docs", "/openapi.
 def _is_whitelisted(path: str) -> bool:
     return path in AUTH_WHITELIST or path.startswith("/docs") or path.startswith("/redoc")
 
+TENANT_EXEMPT_PREFIXES = (
+    "/health",
+    "/docs",
+    "/openapi.json",
+    "/redoc",
+    "/api/v1/auth/",
+)
+
+
+class TenantMiddleware(BaseHTTPMiddleware):
+    """从 X-Tenant-ID header 提取租户 ID，注入 request.state。
+
+    安全策略：
+    - 白名单路径（健康检查/认证/文档）免检
+    - 其余路径必须携带合法 UUID 格式的 X-Tenant-ID，否则 403
+    """
 
 class AuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
@@ -62,6 +79,41 @@ class TenantMiddleware(BaseHTTPMiddleware):
             except ValueError:
                 return err("Invalid tenant_id format", code="INVALID_TENANT", status_code=400)
         return await call_next(request)
+        path = request.url.path
+
+        if any(path.startswith(prefix) for prefix in TENANT_EXEMPT_PREFIXES):
+            request.state.tenant_id = None
+            return await call_next(request)
+
+        tenant_id = request.headers.get("X-Tenant-ID")
+
+        if not tenant_id:
+            logger.warning("missing_tenant_id", path=path, method=request.method)
+            return JSONResponse(
+                status_code=403,
+                content={
+                    "ok": False,
+                    "data": None,
+                    "error": {"code": "MISSING_TENANT", "message": "X-Tenant-ID header is required"},
+                },
+            )
+
+        try:
+            uuid.UUID(tenant_id)
+        except ValueError:
+            logger.warning("invalid_tenant_id", path=path, tenant_id=tenant_id)
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "ok": False,
+                    "data": None,
+                    "error": {"code": "INVALID_TENANT", "message": "X-Tenant-ID must be a valid UUID"},
+                },
+            )
+
+        request.state.tenant_id = tenant_id
+        response = await call_next(request)
+        return response
 
 
 class RequestLogMiddleware(BaseHTTPMiddleware):

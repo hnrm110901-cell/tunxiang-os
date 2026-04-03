@@ -1,0 +1,334 @@
+/* 套餐N选M点餐页样式 */
+
+.combo-page {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: #0B1A20;
+  color: #fff;
+}
+
+/* ─── 加载 ─── */
+.loading-wrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.loading-text {
+  font-size: 28rpx;
+  color: #666;
+}
+
+/* ─── 顶部套餐信息 ─── */
+.combo-header {
+  background: #112228;
+  padding: 28rpx 32rpx 20rpx;
+  flex-shrink: 0;
+  border-bottom: 1rpx solid #1a2a33;
+}
+
+.combo-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16rpx;
+}
+
+.combo-name {
+  font-size: 34rpx;
+  font-weight: bold;
+  color: #fff;
+  flex: 1;
+}
+
+.combo-meta {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  flex-shrink: 0;
+  margin-left: 16rpx;
+}
+
+.combo-base-price {
+  font-size: 36rpx;
+  font-weight: bold;
+  color: #FF6B2C;
+}
+
+.combo-serve {
+  font-size: 22rpx;
+  color: #666;
+  background: #1a2a33;
+  padding: 4rpx 12rpx;
+  border-radius: 8rpx;
+}
+
+/* 进度条 */
+.combo-progress {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+}
+
+.progress-label {
+  font-size: 22rpx;
+  color: #999;
+  flex-shrink: 0;
+}
+
+.progress-bar-wrap {
+  flex: 1;
+  height: 8rpx;
+  background: #1a2a33;
+  border-radius: 4rpx;
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: #FF6B2C;
+  border-radius: 4rpx;
+  transition: width 300ms ease;
+}
+
+/* ─── 分组 Tabs ─── */
+.group-tabs {
+  display: flex;
+  flex-direction: row;
+  white-space: nowrap;
+  background: #112228;
+  padding: 0 16rpx;
+  flex-shrink: 0;
+  border-bottom: 1rpx solid #1a2a33;
+}
+
+.group-tab {
+  display: inline-flex;
+  align-items: center;
+  padding: 20rpx 20rpx;
+  font-size: 26rpx;
+  color: #999;
+  position: relative;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.group-tab.active {
+  color: #FF6B2C;
+  font-weight: 600;
+}
+
+.group-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 16rpx;
+  right: 16rpx;
+  height: 4rpx;
+  background: #FF6B2C;
+  border-radius: 2rpx;
+}
+
+.group-tab.complete {
+  color: #4CAF50;
+}
+
+.group-tab.required-incomplete {
+  color: #FF9800;
+}
+
+.tab-name {
+  margin-right: 8rpx;
+}
+
+.tab-status {
+  font-size: 20rpx;
+  color: #FF6B2C;
+  background: rgba(255, 107, 44, 0.12);
+  padding: 2rpx 8rpx;
+  border-radius: 10rpx;
+}
+
+.tab-dot {
+  width: 20rpx;
+  height: 20rpx;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16rpx;
+  margin-left: 6rpx;
+  flex-shrink: 0;
+}
+
+.required-dot {
+  background: #FF9800;
+}
+
+.done-dot {
+  background: #4CAF50;
+  color: #fff;
+  font-size: 14rpx;
+}
+
+/* ─── 当前分组描述 ─── */
+.group-desc {
+  display: flex;
+  align-items: center;
+  padding: 16rpx 32rpx;
+  background: #0d1f26;
+  gap: 12rpx;
+  flex-shrink: 0;
+}
+
+.group-title {
+  font-size: 26rpx;
+  font-weight: 600;
+  color: #fff;
+  margin-right: 4rpx;
+}
+
+.group-rule {
+  font-size: 22rpx;
+  color: #FF9800;
+  background: rgba(255, 152, 0, 0.1);
+  padding: 4rpx 12rpx;
+  border-radius: 8rpx;
+}
+
+.group-rule.optional {
+  color: #666;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.group-selected-hint {
+  font-size: 22rpx;
+  color: #666;
+  margin-left: auto;
+}
+
+/* ─── 菜品列表 ─── */
+.item-list {
+  flex: 1;
+  padding-bottom: 180rpx;
+}
+
+.empty-group {
+  text-align: center;
+  color: #666;
+  font-size: 28rpx;
+  padding: 80rpx 0;
+}
+
+/* ─── 未完成提示 ─── */
+.incomplete-tip {
+  position: fixed;
+  bottom: 140rpx;
+  left: 32rpx;
+  right: 32rpx;
+  background: rgba(255, 152, 0, 0.15);
+  border: 1rpx solid rgba(255, 152, 0, 0.3);
+  border-radius: 16rpx;
+  padding: 16rpx 24rpx;
+  display: flex;
+  align-items: flex-start;
+  gap: 10rpx;
+  z-index: 10;
+}
+
+.tip-icon {
+  font-size: 26rpx;
+  flex-shrink: 0;
+  line-height: 1.4;
+  color: #FF9800;
+}
+
+.tip-text {
+  font-size: 24rpx;
+  color: #FF9800;
+  line-height: 1.5;
+}
+
+/* ─── 底部固定栏 ─── */
+.bottom-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 120rpx;
+  background: #112228;
+  border-top: 1rpx solid #1a2a33;
+  display: flex;
+  align-items: center;
+  padding: 0 32rpx;
+  padding-bottom: env(safe-area-inset-bottom);
+  z-index: 100;
+  gap: 20rpx;
+}
+
+.bottom-summary {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+}
+
+.summary-count {
+  display: flex;
+  align-items: baseline;
+  gap: 4rpx;
+}
+
+.count-num {
+  font-size: 38rpx;
+  font-weight: bold;
+  color: #FF6B2C;
+}
+
+.count-label {
+  font-size: 22rpx;
+  color: #999;
+}
+
+.summary-price {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.price-label {
+  font-size: 20rpx;
+  color: #666;
+}
+
+.price-value {
+  font-size: 30rpx;
+  font-weight: bold;
+  color: #fff;
+}
+
+.add-cart-btn {
+  height: 80rpx;
+  min-width: 220rpx;
+  background: #FF6B2C;
+  color: #fff;
+  font-size: 28rpx;
+  font-weight: 600;
+  border-radius: 40rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 32rpx;
+}
+
+.add-cart-btn.disabled {
+  background: #2a3a43;
+  color: #666;
+}
+
+.bottom-safe {
+  height: calc(120rpx + env(safe-area-inset-bottom));
+  flex-shrink: 0;
+}

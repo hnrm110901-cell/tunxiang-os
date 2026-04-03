@@ -3,8 +3,8 @@
 高价值会员识别、专属权益设计、流失预警、个性化服务、生命周期管理、价值提升策略。
 """
 from typing import Any
-from ..base import SkillAgent, AgentResult
 
+from ..base import AgentResult, SkillAgent
 
 # 会员等级定义
 MEMBER_TIERS = {
@@ -216,7 +216,7 @@ class HighValueMemberAgent(SkillAgent):
                 "preferred_time_slot": preferred_slot,
                 "service_notes": service_notes,
                 "greeting_script": f"欢迎回来，{name}！您常点的{top_dishes[0][0] if top_dishes else '招牌菜'}今天特别新鲜。",
-                "upsell_suggestion": f"根据您的口味，推荐今日主厨特选",
+                "upsell_suggestion": "根据您的口味，推荐今日主厨特选",
             },
             reasoning=f"为 {name} 生成个性化服务方案，含 {len(top_dishes)} 道偏好菜品",
             confidence=0.85,

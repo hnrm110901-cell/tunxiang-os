@@ -1,0 +1,143 @@
+/* 屯象OS 顾客端小程序 — 全局样式 */
+
+/* ─── Design Token ─── */
+page {
+  --tx-primary: #FF6B2C;
+  --tx-primary-active: #E55A28;
+  --tx-primary-light: rgba(255, 107, 44, 0.1);
+  --tx-success: #0F6E56;
+  --tx-warning: #BA7517;
+  --tx-danger: #A32D2D;
+  --tx-info: #185FA5;
+  --tx-bg-1: #0B1A20;
+  --tx-bg-2: #112228;
+  --tx-bg-3: #1a2a33;
+  --tx-text-1: #FFFFFF;
+  --tx-text-2: #CCCCCC;
+  --tx-text-3: #999999;
+  --tx-border: #1a2a33;
+  --tx-radius-sm: 8rpx;
+  --tx-radius-md: 16rpx;
+  --tx-radius-lg: 24rpx;
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", sans-serif;
+  background: var(--tx-bg-1);
+  color: var(--tx-text-1);
+  font-size: 28rpx;
+  line-height: 1.5;
+}
+
+/* ─── 通用 Reset ─── */
+view, text, scroll-view, swiper, input, textarea, button, image {
+  box-sizing: border-box;
+}
+
+button {
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font-size: inherit;
+  line-height: inherit;
+}
+
+button::after {
+  border: none;
+}
+
+/* ─── 通用类 ─── */
+.page-container {
+  min-height: 100vh;
+  background: var(--tx-bg-1);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.section-title {
+  font-size: 36rpx;
+  font-weight: bold;
+  color: var(--tx-text-1);
+  margin-bottom: 24rpx;
+}
+
+.card {
+  background: var(--tx-bg-2);
+  border-radius: var(--tx-radius-lg);
+  padding: 28rpx;
+  margin-bottom: 24rpx;
+}
+
+.btn-primary {
+  background: var(--tx-primary) !important;
+  color: #fff !important;
+  border-radius: 44rpx;
+  font-size: 32rpx;
+  height: 88rpx;
+  line-height: 88rpx;
+  text-align: center;
+}
+
+.btn-primary[disabled] {
+  opacity: 0.5;
+}
+
+.btn-secondary {
+  background: var(--tx-bg-3) !important;
+  color: var(--tx-text-3) !important;
+  border-radius: 44rpx;
+  font-size: 30rpx;
+  height: 80rpx;
+  line-height: 80rpx;
+  text-align: center;
+}
+
+.empty-state {
+  text-align: center;
+  color: var(--tx-text-3);
+  font-size: 28rpx;
+  padding: 120rpx 0;
+}
+
+.divider {
+  height: 1rpx;
+  background: var(--tx-border);
+  margin: 24rpx 0;
+}
+
+/* ─── 价格样式 ─── */
+.price {
+  color: var(--tx-primary);
+  font-weight: bold;
+}
+
+.price-large {
+  font-size: 36rpx;
+  color: var(--tx-primary);
+  font-weight: bold;
+}
+
+/* ─── 标签样式 ─── */
+.tag {
+  display: inline-block;
+  padding: 4rpx 12rpx;
+  border-radius: 6rpx;
+  font-size: 22rpx;
+}
+
+.tag-primary {
+  background: var(--tx-primary-light);
+  color: var(--tx-primary);
+}
+
+.tag-success {
+  background: rgba(15, 110, 86, 0.15);
+  color: var(--tx-success);
+}
+
+.tag-warning {
+  background: rgba(186, 117, 23, 0.15);
+  color: var(--tx-warning);
+}
+
+.tag-danger {
+  background: rgba(163, 45, 45, 0.15);
+  color: var(--tx-danger);
+}

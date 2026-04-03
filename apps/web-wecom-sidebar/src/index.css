@@ -1,0 +1,65 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── 屯象OS Design Tokens（CSS 变量） ─────────────────────────────── */
+:root {
+  --tx-primary:        #FF6B35;
+  --tx-primary-active: #E55A28;
+  --tx-primary-light:  #FFF3ED;
+  --tx-navy:           #1E2A3A;
+  --tx-success:        #0F6E56;
+  --tx-warning:        #BA7517;
+  --tx-danger:         #A32D2D;
+  --tx-info:           #185FA5;
+  --tx-text-1:         #2C2C2A;
+  --tx-text-2:         #5F5E5A;
+  --tx-text-3:         #B4B2A9;
+  --tx-border:         #E8E6E1;
+  --tx-bg-1:           #FFFFFF;
+  --tx-bg-2:           #F8F7F5;
+  --tx-bg-3:           #F0EDE6;
+}
+
+/* ── 全局基础样式 ──────────────────────────────────────────────────── */
+* {
+  -webkit-tap-highlight-color: transparent;
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC",
+               "Helvetica Neue", "Microsoft YaHei", sans-serif;
+  font-size: 14px;
+  color: #2C2C2A;
+  background-color: #F8F7F5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── 移动端安全区适配（底部 Home 指示条） ────────────────────────── */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 16px);
+}
+
+/* ── 行数限制工具类 ────────────────────────────────────────────────── */
+.line-clamp-1 {
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ── 按钮按压动画（Store/H5 终端标准） ──────────────────────────── */
+button:active {
+  transform: scale(0.97);
+  transition: transform 200ms ease;
+}

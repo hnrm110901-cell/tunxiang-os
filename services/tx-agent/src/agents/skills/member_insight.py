@@ -5,9 +5,13 @@
 
 迁移自 tunxiang V2.x private_domain/agent.py + service/agent.py
 """
-from datetime import datetime, timezone
-from typing import Any, Optional
-from ..base import SkillAgent, AgentResult
+from typing import Any
+
+import structlog
+
+from ..base import AgentResult, SkillAgent
+
+logger = structlog.get_logger(__name__)
 
 
 # RFM 分层阈值
@@ -39,6 +43,7 @@ class MemberInsightAgent(SkillAgent):
             "analyze_rfm", "detect_signals", "detect_competitor",
             "trigger_journey", "get_churn_risks", "process_bad_review",
             "monitor_service_quality", "handle_complaint", "collect_feedback",
+            "rfm_analysis", "update_customer_rfm",
         ]
 
     async def execute(self, action: str, params: dict[str, Any]) -> AgentResult:
@@ -52,6 +57,8 @@ class MemberInsightAgent(SkillAgent):
             "detect_competitor": self._detect_competitor,
             "handle_complaint": self._handle_complaint,
             "collect_feedback": self._collect_feedback,
+            "rfm_analysis": self._rfm_analysis,
+            "update_customer_rfm": self._update_customer_rfm,
         }
         handler = dispatch.get(action)
         if not handler:
@@ -181,7 +188,7 @@ class MemberInsightAgent(SkillAgent):
         severity = "high" if rating <= 2 or len(issues) >= 2 else "medium" if rating <= 3 else "low"
 
         # 生成回复模板
-        reply = f"尊敬的顾客，感谢您的反馈。"
+        reply = "尊敬的顾客，感谢您的反馈。"
         if issues:
             reply += f"对于您提到的{'、'.join(issues[:3])}问题，我们深表歉意。"
         reply += "我们会立即改进，期待您再次光临。"
@@ -282,3 +289,194 @@ class MemberInsightAgent(SkillAgent):
                          data={"stored": True, "rating": feedback.get("rating", 0),
                                "category": feedback.get("category", "general")},
                          reasoning="反馈已收集", confidence=0.95)
+
+    # ─── RFM分析（真实DB） ───
+
+    async def _rfm_analysis(self, params: dict) -> AgentResult:
+        store_id = params.get("store_id") or self.store_id
+        top_n = params.get("top_n", 20)
+
+        if self._db:
+            from datetime import datetime, timezone
+
+            from sqlalchemy import text
+
+            now = datetime.now(timezone.utc)
+
+            rows = await self._db.execute(text("""
+                SELECT
+                    o.customer_id,
+                    COUNT(DISTINCT o.id) as frequency,
+                    MAX(o.completed_at) as last_order_at,
+                    COALESCE(SUM(o.final_amount_fen), 0) as monetary_fen,
+                    EXTRACT(DAY FROM NOW() - MAX(o.completed_at)) as recency_days
+                FROM orders o
+                WHERE o.tenant_id = :tenant_id
+                  AND (:store_id::UUID IS NULL OR o.store_id = :store_id::UUID)
+                  AND o.status = 'completed'
+                  AND o.customer_id IS NOT NULL
+                  AND o.completed_at >= NOW() - INTERVAL '90 days'
+                GROUP BY o.customer_id
+                ORDER BY monetary_fen DESC
+                LIMIT :top_n
+            """), {"tenant_id": self.tenant_id, "store_id": store_id, "top_n": top_n})
+
+            members = []
+            for row in rows.mappings():
+                r = dict(row)
+                recency = float(r.get("recency_days") or 90)
+                frequency = int(r.get("frequency") or 1)
+                monetary = int(r.get("monetary_fen") or 0)
+
+                # RFM评分（各1-5分）
+                r_score = 5 if recency <= 7 else (4 if recency <= 14 else (3 if recency <= 30 else (2 if recency <= 60 else 1)))
+                f_score = 5 if frequency >= 10 else (4 if frequency >= 6 else (3 if frequency >= 3 else (2 if frequency >= 2 else 1)))
+                m_score = 5 if monetary >= 50000 else (4 if monetary >= 20000 else (3 if monetary >= 10000 else (2 if monetary >= 5000 else 1)))
+                total = r_score + f_score + m_score
+
+                segment = "高价值" if total >= 13 else ("成长型" if total >= 10 else ("潜在" if total >= 7 else "流失风险"))
+
+                members.append({
+                    "customer_id": str(r["customer_id"]),
+                    "recency_days": round(recency, 1),
+                    "frequency": frequency,
+                    "monetary_fen": monetary,
+                    "rfm_score": total,
+                    "segment": segment,
+                    "r_score": r_score, "f_score": f_score, "m_score": m_score,
+                })
+
+            segments: dict[str, int] = {}
+            for m in members:
+                seg = m["segment"]
+                segments[seg] = segments.get(seg, 0) + 1
+
+            # Claude生成会员运营建议
+            suggestion = ""
+            if self._router and members:
+                try:
+                    seg_summary = "，".join([f"{k}{v}人" for k, v in segments.items()])
+                    suggestion = await self._router.complete(
+                        tenant_id=self.tenant_id,
+                        task_type="standard_analysis",
+                        system="你是餐饮会员运营专家，根据RFM数据给出精准的会员激活和留存建议，100字内，中文。",
+                        messages=[{"role": "user", "content":
+                            f"近90天会员分布：{seg_summary}，共{len(members)}名活跃会员。"
+                            f"高价值均消费{sum(m['monetary_fen'] for m in members if m['segment']=='高价值') // max(1, segments.get('高价值', 1)) / 100:.0f}元。"
+                            f"请给出运营建议。"}],
+                        max_tokens=200,
+                        db=self._db,
+                    )
+                except Exception as exc:  # noqa: BLE001 — Claude不可用时降级
+                    logger.warning("member_insight_llm_fallback", error=str(exc))
+
+            return AgentResult(
+                success=True, action="rfm_analysis",
+                data={
+                    "members": members,
+                    "total_analyzed": len(members),
+                    "segments": segments,
+                    "suggestion": suggestion,
+                },
+                reasoning=f"分析{len(members)}名会员：{dict(segments)}。{suggestion[:40] if suggestion else ''}",
+                confidence=0.9 if suggestion else 0.8,
+                inference_layer="cloud" if suggestion else "edge",
+            )
+
+        # 降级
+        members = params.get("members", [])
+        return AgentResult(
+            success=True, action="rfm_analysis",
+            data={"members": members, "total_analyzed": len(members), "segments": {}},
+            reasoning="无DB连接，返回传入数据",
+            confidence=0.5,
+        )
+
+    # ─── 事件驱动：订单支付后更新会员 RFM 分层 ───
+
+    async def _update_customer_rfm(self, params: dict) -> AgentResult:
+        """trade.order.paid 事件触发：计算并更新单个会员 RFM 分层
+
+        从订单支付事件中提取关键字段，重新计算该会员的 RFM 评分，
+        并返回新的分层结果供上游服务写入 CDP。
+        实际持久化由 tx-member service 负责；Agent 只做分析和建议。
+        """
+        store_id = params.get("store_id") or self.store_id
+        event_data = params.get("event_data", {})
+        customer_id = params.get("customer_id") or event_data.get("customer_id")
+        order_amount_fen = params.get("total_fen") or event_data.get("total_fen", 0)
+
+        if not customer_id:
+            return AgentResult(
+                success=False, action="update_customer_rfm",
+                error="缺少 customer_id，无法更新 RFM",
+            )
+
+        # 若有 DB，从历史订单聚合最新 RFM 指标
+        rfm_data: dict = {}
+        if self._db and customer_id:
+            from sqlalchemy import text
+            row = await self._db.execute(text("""
+                SELECT
+                    COUNT(DISTINCT id) as frequency,
+                    EXTRACT(DAY FROM NOW() - MAX(completed_at)) as recency_days,
+                    COALESCE(SUM(final_amount_fen), 0) as monetary_fen
+                FROM orders
+                WHERE tenant_id = :tenant_id
+                  AND customer_id = :customer_id
+                  AND status = 'completed'
+            """), {"tenant_id": self.tenant_id, "customer_id": customer_id})
+            r = dict(row.mappings().first() or {})
+            rfm_data = {
+                "frequency": int(r.get("frequency") or 1),
+                "recency_days": float(r.get("recency_days") or 0),
+                "monetary_fen": int(r.get("monetary_fen") or 0),
+            }
+        else:
+            # 降级：使用 params 中传入的快照数据
+            rfm_data = {
+                "frequency": params.get("order_count", 1),
+                "recency_days": 0,  # 刚支付，recency=0
+                "monetary_fen": params.get("lifetime_monetary_fen", order_amount_fen),
+            }
+
+        # 计算 RFM 各维度评分
+        r_score = self._score_rfm(rfm_data["recency_days"], RFM_THRESHOLDS["R"], reverse=True)
+        f_score = self._score_rfm(rfm_data["frequency"], RFM_THRESHOLDS["F"], reverse=False)
+        m_score = self._score_rfm(rfm_data["monetary_fen"], RFM_THRESHOLDS["M"], reverse=False)
+        rfm_total = r_score + f_score + m_score
+
+        segment = (
+            "高价值" if rfm_total >= 13 else
+            "成长型" if rfm_total >= 10 else
+            "潜在" if rfm_total >= 7 else
+            "流失风险"
+        )
+
+        logger.info(
+            "member_rfm_updated",
+            customer_id=customer_id,
+            store_id=store_id,
+            segment=segment,
+            rfm_total=rfm_total,
+        )
+
+        return AgentResult(
+            success=True,
+            action="update_customer_rfm",
+            data={
+                "customer_id": customer_id,
+                "store_id": store_id,
+                "r_score": r_score,
+                "f_score": f_score,
+                "m_score": m_score,
+                "rfm_total": rfm_total,
+                "segment": segment,
+                "recency_days": rfm_data["recency_days"],
+                "frequency": rfm_data["frequency"],
+                "monetary_fen": rfm_data["monetary_fen"],
+                "trigger_journey": segment == "流失风险",  # 分层变差时触发唤回旅程
+            },
+            reasoning=f"会员 RFM 更新：R{r_score}F{f_score}M{m_score}={rfm_total}，分层={segment}",
+            confidence=0.9 if self._db else 0.7,
+        )

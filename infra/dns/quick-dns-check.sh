@@ -1,7 +1,7 @@
 #!/bin/bash
 # 验证 DNS 解析是否生效
 SERVER_IP="42.194.229.21"
-DOMAINS="tunxiangos.com www.tunxiangos.com api.tunxiangos.com hub.tunxiangos.com os.tunxiangos.com pos.tunxiangos.com kds.tunxiangos.com m.tunxiangos.com forge.tunxiangos.com ws.tunxiangos.com docs.tunxiangos.com status.tunxiangos.com"
+DOMAINS="tunxiangos.com www.tunxiangos.com api.tunxiangos.com hub.tunxiangos.com os.tunxiangos.com pos.tunxiangos.com kds.tunxiangos.com m.tunxiangos.com forge.tunxiangos.com ws.tunxiangos.com docs.tunxiangos.com gray-pos.tunxiangos.com gray-kds.tunxiangos.com gray-os.tunxiangos.com gray-api.tunxiangos.com gray-m.tunxiangos.com stg-pos.tunxiangos.com stg-os.tunxiangos.com stg-api.tunxiangos.com"
 
 echo "═══════════════════════════════════════"
 echo " DNS 解析验证 (期望 IP: $SERVER_IP)"

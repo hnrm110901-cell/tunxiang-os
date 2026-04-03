@@ -2,26 +2,23 @@
 饿了么开放平台API适配器
 提供订单管理、商品管理、门店管理、配送管理等功能
 
+底层 HTTP 调用委托给 ElemeClient，本类只做业务编排和数据映射。
+
 饿了么开放平台文档: https://open.shop.ele.me
 """
 from decimal import Decimal
 from datetime import datetime
-from typing import Dict, Any, Optional, List
+from typing import Any, Dict, List, Optional
+
 import structlog
-import httpx
-import hashlib
-import json
-import time
+
+from .client import ElemeClient
 
 logger = structlog.get_logger()
 
-# 饿了么API基础URL
-ELEME_PRODUCTION_URL = "https://open-api.shop.ele.me"
-ELEME_SANDBOX_URL = "https://open-api-sandbox.shop.ele.me"
-
 
 class ElemeAdapter:
-    """饿了么开放平台适配器"""
+    """饿了么开放平台适配器（委托 ElemeClient 处理认证/签名/HTTP）"""
 
     def __init__(self, config: Dict[str, Any]):
         """
@@ -31,215 +28,25 @@ class ElemeAdapter:
             config: 配置字典，包含:
                 - app_key: 应用Key
                 - app_secret: 应用密钥
+                - store_id: 门店ID（可选）
                 - sandbox: 是否沙箱环境 (默认False)
                 - timeout: 超时时间（秒）
                 - retry_times: 重试次数
         """
         self.config = config
-        self.app_key = config.get("app_key")
-        self.app_secret = config.get("app_secret")
-        self.sandbox = config.get("sandbox", False)
-        self.timeout = config.get("timeout", 30)
-        self.retry_times = config.get("retry_times", 3)
-
-        self.base_url = ELEME_SANDBOX_URL if self.sandbox else ELEME_PRODUCTION_URL
-
-        if not self.app_key or not self.app_secret:
-            raise ValueError("app_key和app_secret不能为空")
-
-        # OAuth2 token 缓存
-        self._access_token: Optional[str] = None
-        self._token_expires_at: float = 0
-
-        # 初始化HTTP客户端
-        self.client = httpx.AsyncClient(
-            base_url=self.base_url,
-            timeout=self.timeout,
-            follow_redirects=True,
+        self.client = ElemeClient(
+            app_key=config.get("app_key"),
+            app_secret=config.get("app_secret"),
+            store_id=config.get("store_id"),
+            sandbox=config.get("sandbox", False),
+            timeout=config.get("timeout", 30),
+            retry_times=config.get("retry_times", 3),
         )
 
         logger.info(
             "饿了么适配器初始化",
-            base_url=self.base_url,
-            sandbox=self.sandbox,
+            sandbox=config.get("sandbox", False),
         )
-
-    # ==================== 认证管理 ====================
-
-    async def _get_access_token(self) -> str:
-        """
-        获取或刷新 OAuth2 access_token
-
-        Returns:
-            有效的 access_token
-        """
-        now = time.time()
-        # token 有效期内直接返回（提前60秒刷新）
-        if self._access_token and now < self._token_expires_at - 60:
-            return self._access_token
-
-        # 刷新 token
-        await self._refresh_token()
-        return self._access_token
-
-    async def _refresh_token(self) -> None:
-        """
-        通过 client_credentials 模式获取 access_token
-
-        饿了么开放平台 OAuth2 token 端点:
-          POST /token
-          grant_type=client_credentials
-        """
-        timestamp = str(int(time.time()))
-        sign_str = f"{self.app_key}{self.app_secret}{timestamp}"
-        sign = hashlib.sha256(sign_str.encode("utf-8")).hexdigest().upper()
-
-        payload = {
-            "grant_type": "client_credentials",
-            "app_key": self.app_key,
-            "timestamp": timestamp,
-            "sign": sign,
-        }
-
-        try:
-            response = await self.client.post("/token", json=payload)
-            response.raise_for_status()
-            data = response.json()
-
-            if "access_token" not in data:
-                error_msg = data.get("error", data.get("message", "未知错误"))
-                raise Exception(f"饿了么获取token失败: {error_msg}")
-
-            self._access_token = data["access_token"]
-            # expires_in 单位为秒
-            expires_in = int(data.get("expires_in", 86400))
-            self._token_expires_at = time.time() + expires_in
-
-            logger.info("饿了么token刷新成功", expires_in=expires_in)
-
-        except httpx.HTTPStatusError as e:
-            logger.error("饿了么token请求失败", status_code=e.response.status_code)
-            raise Exception(f"饿了么token请求失败: {e.response.status_code}")
-
-    def _generate_sign(self, params: Dict[str, Any]) -> str:
-        """
-        生成API签名（SHA256）
-
-        饿了么签名算法：
-          1. 按key字典序排列参数
-          2. 拼接 app_secret + 排序参数键值对 + app_secret
-          3. SHA256 取大写hex
-
-        Args:
-            params: 请求参数
-
-        Returns:
-            签名字符串
-        """
-        sorted_params = sorted(params.items())
-        sign_str = self.app_secret
-        for k, v in sorted_params:
-            sign_str += f"{k}{v}"
-        sign_str += self.app_secret
-        return hashlib.sha256(sign_str.encode("utf-8")).hexdigest().upper()
-
-    # ==================== 通用请求 ====================
-
-    async def _request(
-        self,
-        method: str,
-        endpoint: str,
-        data: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
-        """
-        发送HTTP请求（带重试和token自动刷新）
-
-        Args:
-            method: HTTP方法 (GET/POST)
-            endpoint: API端点
-            data: 请求数据
-
-        Returns:
-            API响应数据
-
-        Raises:
-            Exception: 请求失败
-        """
-        for attempt in range(self.retry_times):
-            try:
-                access_token = await self._get_access_token()
-                request_data = data or {}
-
-                timestamp = str(int(time.time()))
-                auth_params = {
-                    "app_key": self.app_key,
-                    "access_token": access_token,
-                    "timestamp": timestamp,
-                    **request_data,
-                }
-                auth_params["sign"] = self._generate_sign(auth_params)
-
-                headers = {
-                    "Content-Type": "application/json",
-                    "Authorization": f"Bearer {access_token}",
-                }
-
-                if method.upper() == "GET":
-                    response = await self.client.get(
-                        endpoint, params=auth_params, headers=headers,
-                    )
-                elif method.upper() == "POST":
-                    response = await self.client.post(
-                        endpoint, json=auth_params, headers=headers,
-                    )
-                else:
-                    raise ValueError(f"不支持的HTTP方法: {method}")
-
-                response.raise_for_status()
-                result = response.json()
-                self._handle_error(result)
-                return result
-
-            except httpx.HTTPStatusError as e:
-                logger.error(
-                    "饿了么HTTP请求失败",
-                    endpoint=endpoint,
-                    status_code=e.response.status_code,
-                    attempt=attempt + 1,
-                )
-                # token 过期时清除缓存，下次循环会重新获取
-                if e.response.status_code == 401:
-                    self._access_token = None
-                    self._token_expires_at = 0
-                if attempt == self.retry_times - 1:
-                    raise Exception(f"饿了么HTTP请求失败: {e.response.status_code}")
-
-            except Exception as e:
-                logger.error(
-                    "饿了么请求异常",
-                    endpoint=endpoint,
-                    error=str(e),
-                    attempt=attempt + 1,
-                )
-                if attempt == self.retry_times - 1:
-                    raise
-
-        raise Exception("请求失败，已达到最大重试次数")
-
-    def _handle_error(self, response: Dict[str, Any]) -> None:
-        """
-        处理业务错误
-
-        Args:
-            response: API响应数据
-
-        Raises:
-            Exception: 业务错误
-        """
-        code = response.get("code")
-        if code is not None and code != "200" and code != 200 and code != "ok":
-            message = response.get("message", response.get("msg", "未知错误"))
-            raise Exception(f"饿了么API错误 [{code}]: {message}")
 
     # ==================== 订单管理接口 ====================
 
@@ -276,7 +83,7 @@ class ElemeAdapter:
             data["status"] = status
 
         logger.info("饿了么查询订单列表", page=page, page_size=page_size)
-        response = await self._request("GET", "/api/v1/orders", data=data)
+        response = await self.client.request("GET", "/orders", data=data)
         return response.get("data", {})
 
     async def get_order_detail(self, order_id: str) -> Dict[str, Any]:
@@ -289,10 +96,8 @@ class ElemeAdapter:
         Returns:
             订单详情
         """
-        data = {"order_id": order_id}
         logger.info("饿了么查询订单详情", order_id=order_id)
-        response = await self._request("GET", "/api/v1/order/detail", data=data)
-        return response.get("data", {})
+        return await self.client.query_order(order_id)
 
     async def confirm_order(self, order_id: str) -> Dict[str, Any]:
         """
@@ -304,10 +109,8 @@ class ElemeAdapter:
         Returns:
             确认结果
         """
-        data = {"order_id": order_id}
         logger.info("饿了么确认订单", order_id=order_id)
-        response = await self._request("POST", "/api/v1/order/confirm", data=data)
-        return response.get("data", {})
+        return await self.client.confirm_order(order_id)
 
     async def cancel_order(
         self,
@@ -326,14 +129,8 @@ class ElemeAdapter:
         Returns:
             取消结果
         """
-        data = {
-            "order_id": order_id,
-            "reason_code": reason_code,
-            "reason": reason,
-        }
         logger.info("饿了么取消订单", order_id=order_id, reason=reason)
-        response = await self._request("POST", "/api/v1/order/cancel", data=data)
-        return response.get("data", {})
+        return await self.client.cancel_order(order_id, reason_code, reason)
 
     async def query_refund(self, order_id: str) -> Dict[str, Any]:
         """
@@ -345,9 +142,8 @@ class ElemeAdapter:
         Returns:
             退款详情
         """
-        data = {"order_id": order_id}
         logger.info("饿了么查询退款", order_id=order_id)
-        response = await self._request("GET", "/api/v1/order/refund", data=data)
+        response = await self.client.request("GET", "/order/refund", data={"order_id": order_id})
         return response.get("data", {})
 
     # ==================== 商品管理接口 ====================
@@ -374,7 +170,7 @@ class ElemeAdapter:
             data["category_id"] = category_id
 
         logger.info("饿了么查询商品", page=page)
-        response = await self._request("GET", "/api/v1/foods", data=data)
+        response = await self.client.request("GET", "/foods", data=data)
         return response.get("data", [])
 
     async def update_food_stock(
@@ -392,10 +188,8 @@ class ElemeAdapter:
         Returns:
             更新结果
         """
-        data = {"food_id": food_id, "stock": stock}
         logger.info("饿了么更新库存", food_id=food_id, stock=stock)
-        response = await self._request("POST", "/api/v1/food/stock", data=data)
-        return response.get("data", {})
+        return await self.client.update_food(food_id, {"stock": stock})
 
     async def sold_out_food(self, food_id: str) -> Dict[str, Any]:
         """
@@ -407,9 +201,8 @@ class ElemeAdapter:
         Returns:
             操作结果
         """
-        data = {"food_id": food_id}
         logger.info("饿了么商品售罄", food_id=food_id)
-        response = await self._request("POST", "/api/v1/food/soldout", data=data)
+        response = await self.client.request("POST", "/food/soldout", data={"food_id": food_id})
         return response.get("data", {})
 
     async def on_sale_food(self, food_id: str) -> Dict[str, Any]:
@@ -422,9 +215,8 @@ class ElemeAdapter:
         Returns:
             操作结果
         """
-        data = {"food_id": food_id}
         logger.info("饿了么商品上架", food_id=food_id)
-        response = await self._request("POST", "/api/v1/food/onsale", data=data)
+        response = await self.client.request("POST", "/food/onsale", data={"food_id": food_id})
         return response.get("data", {})
 
     # ==================== 门店管理接口 ====================
@@ -444,7 +236,7 @@ class ElemeAdapter:
             data["shop_id"] = shop_id
 
         logger.info("饿了么查询门店信息", shop_id=shop_id)
-        response = await self._request("GET", "/api/v1/shop/info", data=data)
+        response = await self.client.request("GET", "/shop/info", data=data)
         return response.get("data", {})
 
     async def update_shop_status(
@@ -467,7 +259,7 @@ class ElemeAdapter:
             data["shop_id"] = shop_id
 
         logger.info("饿了么更新门店状态", status=status, shop_id=shop_id)
-        response = await self._request("POST", "/api/v1/shop/status", data=data)
+        response = await self.client.request("POST", "/shop/status", data=data)
         return response.get("data", {})
 
     # ==================== 配送管理接口 ====================
@@ -482,14 +274,12 @@ class ElemeAdapter:
         Returns:
             配送信息（骑手位置、状态、预计到达时间等）
         """
-        data = {"order_id": order_id}
         logger.info("饿了么查询配送状态", order_id=order_id)
-        response = await self._request("GET", "/api/v1/delivery/status", data=data)
-        return response.get("data", {})
+        return await self.client.query_delivery_status(order_id)
 
     # ==================== 标准化数据总线接口 ====================
 
-    def to_order(self, raw: Dict[str, Any], store_id: str, brand_id: str):
+    def to_order(self, raw: Dict[str, Any], store_id: str, brand_id: str) -> Any:
         """
         将饿了么原始订单字段映射到标准 OrderSchema
 
@@ -576,7 +366,7 @@ class ElemeAdapter:
             notes=raw.get("remark", raw.get("caution")),
         )
 
-    async def close(self):
+    async def close(self) -> None:
         """关闭适配器，释放资源"""
         logger.info("关闭饿了么适配器")
-        await self.client.aclose()
+        await self.client.close()

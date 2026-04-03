@@ -1,0 +1,99 @@
+/* 套餐分组内商品行组件样式 */
+.combo-item {
+  display: flex;
+  align-items: center;
+  padding: 24rpx 32rpx;
+  background: #112228;
+  border-bottom: 1rpx solid #1a2a33;
+}
+
+.item-img {
+  width: 120rpx;
+  height: 120rpx;
+  border-radius: 16rpx;
+  flex-shrink: 0;
+  background: #1a2a33;
+}
+
+.item-body {
+  flex: 1;
+  padding: 0 20rpx;
+  min-width: 0;
+}
+
+.item-name {
+  font-size: 28rpx;
+  color: #fff;
+  font-weight: 500;
+  line-height: 1.4;
+  display: block;
+}
+
+.item-price-row {
+  margin-top: 8rpx;
+}
+
+.item-extra-price {
+  font-size: 24rpx;
+  color: #FF6B2C;
+  font-weight: 600;
+}
+
+.item-included {
+  font-size: 24rpx;
+  color: #666;
+}
+
+.item-desc {
+  font-size: 22rpx;
+  color: #666;
+  margin-top: 6rpx;
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 右侧数量控制 */
+.item-actions {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 16rpx;
+}
+
+.qty-btn {
+  width: 52rpx;
+  height: 52rpx;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32rpx;
+  font-weight: bold;
+  line-height: 52rpx;
+  text-align: center;
+}
+
+.qty-btn.minus {
+  background: #1a2a33;
+  color: #999;
+  border: 1rpx solid #2a3a43;
+}
+
+.qty-btn.plus {
+  background: #FF6B2C;
+  color: #fff;
+}
+
+.qty-btn.disabled {
+  opacity: 0.35;
+}
+
+.qty-value {
+  font-size: 28rpx;
+  color: #fff;
+  min-width: 36rpx;
+  text-align: center;
+  font-weight: 600;
+}

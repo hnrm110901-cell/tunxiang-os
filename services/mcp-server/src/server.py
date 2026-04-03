@@ -17,7 +17,6 @@ from pathlib import Path
 from typing import Any
 
 import structlog
-
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
 from mcp.types import TextContent, Tool
@@ -62,18 +61,18 @@ def _init_agents() -> None:
     _ensure_agent_path()
 
     try:
+        from agents.event_bus import EventBus, create_default_event_bus
         from agents.master import MasterAgent
         from agents.planner import DailyPlannerAgent
-        from agents.event_bus import EventBus, create_default_event_bus
         from agents.skills.discount_guard import DiscountGuardAgent
-        from agents.skills.smart_menu import SmartMenuAgent
-        from agents.skills.serve_dispatch import ServeDispatchAgent
-        from agents.skills.member_insight import MemberInsightAgent
-        from agents.skills.inventory_alert import InventoryAlertAgent
         from agents.skills.finance_audit import FinanceAuditAgent
-        from agents.skills.store_inspect import StoreInspectAgent
-        from agents.skills.smart_service import SmartServiceAgent
+        from agents.skills.inventory_alert import InventoryAlertAgent
+        from agents.skills.member_insight import MemberInsightAgent
         from agents.skills.private_ops import PrivateOpsAgent
+        from agents.skills.serve_dispatch import ServeDispatchAgent
+        from agents.skills.smart_menu import SmartMenuAgent
+        from agents.skills.smart_service import SmartServiceAgent
+        from agents.skills.store_inspect import StoreInspectAgent
 
         tenant_id = os.environ.get("TX_TENANT_ID", "default")
         store_id = os.environ.get("TX_STORE_ID", "store_001")

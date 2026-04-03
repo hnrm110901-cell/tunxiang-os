@@ -6,8 +6,14 @@
 全部 8 个 action 已实现。
 """
 import statistics
+from datetime import datetime, timezone
 from typing import Any
-from ..base import SkillAgent, AgentResult
+
+import structlog
+
+from ..base import AgentResult, SkillAgent
+
+logger = structlog.get_logger()
 
 
 # 上市检查清单
@@ -29,6 +35,8 @@ class SmartMenuAgent(SkillAgent):
             "simulate_cost", "recommend_pilot_stores", "run_dish_review",
             "check_launch_readiness", "scan_dish_risks", "inspect_dish_quality",
             "classify_quadrant", "optimize_menu",
+            "suggest_alternatives", "mark_sold_out",
+            "push_expiry_specials", "flag_high_cost_dishes",
         ]
 
     async def execute(self, action: str, params: dict[str, Any]) -> AgentResult:
@@ -41,6 +49,10 @@ class SmartMenuAgent(SkillAgent):
             "inspect_dish_quality": self._inspect_quality,
             "classify_quadrant": self._classify_quadrant,
             "optimize_menu": self._optimize_menu,
+            "suggest_alternatives": self._suggest_alternatives,
+            "mark_sold_out": self._mark_sold_out,
+            "push_expiry_specials": self._push_expiry_specials,
+            "flag_high_cost_dishes": self._flag_high_cost_dishes,
         }
         handler = dispatch.get(action)
         if not handler:
@@ -148,7 +160,7 @@ class SmartMenuAgent(SkillAgent):
             data={"ready": ready, "completed": completed, "missing": missing,
                   "completion_pct": round(len(completed) / len(LAUNCH_CHECKLIST) * 100, 1),
                   "checklist": LAUNCH_CHECKLIST},
-            reasoning=f"就绪度 {len(completed)}/{len(LAUNCH_CHECKLIST)}，{'可上市' if ready else f'缺少: {', '.join(missing[:3])}'}",
+            reasoning=f"就绪度 {len(completed)}/{len(LAUNCH_CHECKLIST)}，{'可上市' if ready else '缺少: ' + ', '.join(missing[:3])}",
             confidence=0.95,
         )
 
@@ -221,25 +233,60 @@ class SmartMenuAgent(SkillAgent):
         )
 
     async def _optimize_menu(self, params: dict) -> AgentResult:
-        """菜单结构优化建议"""
+        """菜单结构优化建议 — 有 DB 时查真实销量，有 model_router 时用 Claude 生成建议"""
+        store_id = params.get("store_id") or self.store_id
         dishes = params.get("dishes", [])
-        if not dishes:
+
+        # 若有 DB 且有 store_id，从 order_items 聚合近30天真实销量数据
+        db_dishes: list[dict] = []
+        if self._db and store_id:
+            from sqlalchemy import text
+            rows = await self._db.execute(
+                text("""
+                    SELECT oi.dish_id, oi.dish_name,
+                           COUNT(*) AS order_count,
+                           SUM(oi.quantity) AS total_qty,
+                           AVG(oi.unit_price_fen) AS avg_price_fen
+                    FROM order_items oi
+                    JOIN orders o ON oi.order_id = o.id
+                    WHERE o.tenant_id = :tenant_id
+                      AND o.store_id = :store_id
+                      AND o.created_at >= NOW() - INTERVAL '30 days'
+                      AND o.status = 'completed'
+                    GROUP BY oi.dish_id, oi.dish_name
+                    ORDER BY total_qty DESC
+                    LIMIT 20
+                """),
+                {"tenant_id": self.tenant_id, "store_id": store_id},
+            )
+            db_dishes = [dict(r) for r in rows.mappings().all()]
+
+        # 合并：DB 数据优先，无 DB 数据时退回 params 中的 dishes
+        working_dishes = db_dishes if db_dishes else dishes
+        if not working_dishes:
             return AgentResult(success=False, action="optimize_menu", error="无菜品数据")
 
-        # 分类统计
-        quadrants = {"star": [], "cash_cow": [], "question": [], "dog": []}
-        for d in dishes:
-            sales = d.get("total_sales", 0)
+        # 规则引擎四象限分类（始终执行）
+        quadrants: dict[str, list[str]] = {"star": [], "cash_cow": [], "question": [], "dog": []}
+        for d in working_dishes:
+            # 兼容 DB 返回（total_qty）和 params 传入（total_sales）两种字段名
+            sales = d.get("total_qty") or d.get("total_sales", 0)
             margin = d.get("margin_rate", 0)
-            avg_s = statistics.mean([x.get("total_sales", 0) for x in dishes]) if dishes else 1
-            avg_m = statistics.mean([x.get("margin_rate", 0) for x in dishes]) if dishes else 0.3
+            name = d.get("dish_name") or d.get("name", "")
+            avg_s = statistics.mean(
+                [(x.get("total_qty") or x.get("total_sales", 0)) for x in working_dishes]
+            ) if working_dishes else 1
+            avg_m = statistics.mean(
+                [x.get("margin_rate", 0) for x in working_dishes]
+            ) if working_dishes else 0.3
 
             q = ("star" if sales >= avg_s and margin >= avg_m else
                  "cash_cow" if sales < avg_s and margin >= avg_m else
                  "question" if sales >= avg_s and margin < avg_m else "dog")
-            quadrants[q].append(d.get("name", ""))
+            quadrants[q].append(name)
 
-        suggestions = []
+        # 规则引擎基础建议
+        suggestions: list[str] = []
         if quadrants["dog"]:
             suggestions.append(f"建议下架/改良: {', '.join(quadrants['dog'][:3])}")
         if quadrants["question"]:
@@ -247,10 +294,418 @@ class SmartMenuAgent(SkillAgent):
         if quadrants["star"]:
             suggestions.append(f"重点推广: {', '.join(quadrants['star'][:3])}")
 
+        llm_suggestions = ""
+        # 若有 model_router，用 Claude 生成更详细的菜单优化建议
+        if self._router:
+            dish_summary = "\n".join(
+                f"- {d.get('dish_name') or d.get('name', '')}: "
+                f"销量{d.get('total_qty') or d.get('total_sales', 0)}份，"
+                f"均价{(d.get('avg_price_fen') or 0) / 100:.1f}元，"
+                f"毛利率{d.get('margin_rate', 0):.1%}"
+                for d in working_dishes[:10]
+            )
+            try:
+                llm_suggestions = await self._router.complete(
+                    tenant_id=self.tenant_id,
+                    task_type="standard_analysis",
+                    system="你是连锁餐饮菜单运营专家，根据近30天销量数据给出菜单优化建议，重点关注盈利改善和客户满意度，用中文回复200字以内。",
+                    messages=[{"role": "user", "content":
+                        f"以下是门店近30天菜品销售数据：\n{dish_summary}\n\n"
+                        f"四象限分布：明星{len(quadrants['star'])}道，现金牛{len(quadrants['cash_cow'])}道，"
+                        f"问题{len(quadrants['question'])}道，瘦狗{len(quadrants['dog'])}道。\n"
+                        f"请给出具体的菜单优化建议。"}],
+                    max_tokens=400,
+                    db=self._db,
+                )
+            except Exception as exc:  # noqa: BLE001 — Claude不可用时降级为规则引擎建议
+                logger.warning("smart_menu_llm_fallback", error=str(exc))
+
+        if llm_suggestions:
+            suggestions.append(f"AI深度分析: {llm_suggestions}")
+
         return AgentResult(
             success=True, action="optimize_menu",
-            data={"quadrant_distribution": {k: len(v) for k, v in quadrants.items()},
-                  "suggestions": suggestions, "total_dishes": len(dishes)},
-            reasoning=f"菜单分析：明星{len(quadrants['star'])}道，瘦狗{len(quadrants['dog'])}道",
-            confidence=0.8,
+            data={
+                "quadrant_distribution": {k: len(v) for k, v in quadrants.items()},
+                "suggestions": suggestions,
+                "total_dishes": len(working_dishes),
+                "data_source": "db_realtime" if db_dishes else "params",
+                "store_id": store_id,
+            },
+            reasoning=f"菜单分析：明星{len(quadrants['star'])}道，瘦狗{len(quadrants['dog'])}道"
+                      f"{'（AI增强）' if llm_suggestions else '（规则引擎）'}",
+            confidence=0.8 if not llm_suggestions else 0.92,
+            inference_layer="cloud" if llm_suggestions else "edge",
+        )
+
+    # ─── 事件驱动：推荐替代菜品 ───
+
+    async def _suggest_alternatives(self, params: dict) -> AgentResult:
+        """supply.stock.low 触发：当某食材库存不足时，推荐可替代菜品给前端展示
+
+        替代策略：
+        1. 同类菜品中不依赖该食材的菜品
+        2. 当日销量/毛利率排名靠前
+        3. 推荐数量控制在 3-5 道
+        """
+        store_id = params.get("store_id") or self.store_id
+        event_data = params.get("event_data", {})
+        ingredient_id = params.get("ingredient_id") or event_data.get("ingredient_id")
+        ingredient_name = params.get("ingredient_name") or event_data.get("ingredient_name", "")
+        affected_dishes = params.get("affected_dishes") or event_data.get("affected_dishes", [])
+        # affected_dishes: [{"dish_id": ..., "dish_name": ..., "category": ...}]
+        all_available_dishes = params.get("all_available_dishes", [])
+        # all_available_dishes: 同类别下所有在售菜品
+
+        # 找出被影响菜品的类别
+        affected_categories = list({d.get("category", "other") for d in affected_dishes})
+        affected_dish_ids = {d.get("dish_id") for d in affected_dishes}
+
+        # 从可用菜品中筛选替代候选
+        candidates = [
+            d for d in all_available_dishes
+            if d.get("dish_id") not in affected_dish_ids
+            and d.get("category") in affected_categories
+            and d.get("is_available", True)
+        ]
+
+        # 若有 DB，从数据库查真实数据
+        db_candidates: list[dict] = []
+        if self._db and store_id and affected_categories:
+            from sqlalchemy import text
+            categories_str = ",".join(f"'{c}'" for c in affected_categories[:5])
+            rows = await self._db.execute(text(f"""
+                SELECT d.id, d.name, d.category, d.sell_price_fen,
+                       COALESCE(d.cost_price_fen, 0) as cost_price_fen,
+                       COUNT(oi.id) as recent_orders
+                FROM dishes d
+                LEFT JOIN order_items oi ON oi.dish_id = d.id
+                    AND oi.created_at >= NOW() - INTERVAL '7 days'
+                WHERE d.tenant_id = :tenant_id
+                  AND d.is_deleted = false
+                  AND d.is_available = true
+                  AND d.category IN ({categories_str})
+                  AND d.id NOT IN (
+                    SELECT unnest(ARRAY[:affected_ids]::UUID[])
+                  )
+                GROUP BY d.id, d.name, d.category, d.sell_price_fen, d.cost_price_fen
+                ORDER BY recent_orders DESC
+                LIMIT 8
+            """), {
+                "tenant_id": self.tenant_id,
+                "affected_ids": list(affected_dish_ids) or ["00000000-0000-0000-0000-000000000000"],
+            })
+            db_candidates = [dict(r) for r in rows.mappings()]
+
+        working = db_candidates if db_candidates else candidates
+
+        # 计算推荐分（销量 + 毛利）
+        def score_dish(d: dict) -> float:
+            price = d.get("sell_price_fen") or d.get("price_fen", 0)
+            cost = d.get("cost_price_fen") or d.get("cost_fen", 0)
+            margin = (price - cost) / price if price > 0 else 0
+            popularity = d.get("recent_orders") or d.get("sales_count", 0)
+            return margin * 0.6 + min(1.0, popularity / 50) * 0.4
+
+        working.sort(key=score_dish, reverse=True)
+        recommendations = working[:5]
+
+        logger.info(
+            "alternatives_suggested",
+            store_id=store_id,
+            ingredient_name=ingredient_name,
+            affected_count=len(affected_dishes),
+            recommendation_count=len(recommendations),
+        )
+
+        return AgentResult(
+            success=True,
+            action="suggest_alternatives",
+            data={
+                "store_id": store_id,
+                "shortage_ingredient": ingredient_name,
+                "affected_dishes": [d.get("dish_name") or d.get("name", "") for d in affected_dishes],
+                "recommendations": [
+                    {
+                        "dish_id": str(d.get("id") or d.get("dish_id", "")),
+                        "dish_name": d.get("name") or d.get("dish_name", ""),
+                        "category": d.get("category", ""),
+                        "price_fen": d.get("sell_price_fen") or d.get("price_fen", 0),
+                    }
+                    for d in recommendations
+                ],
+                "recommendation_count": len(recommendations),
+            },
+            reasoning=(
+                f"替代推荐：{ingredient_name}库存不足影响{len(affected_dishes)}道菜，"
+                f"推荐{len(recommendations)}个替代选项"
+            ),
+            confidence=0.8 if db_candidates else 0.6,
+        )
+
+    # ─── 事件驱动：标记菜品售罄 ───
+
+    async def _mark_sold_out(self, params: dict) -> AgentResult:
+        """supply.stock.zero 触发：将依赖该食材的菜品标记为售罄
+
+        生成需要更新售卖状态的菜品列表（不直接写 DB，
+        由 tx-menu service 消费此结果执行实际更新）。
+        """
+        store_id = params.get("store_id") or self.store_id
+        event_data = params.get("event_data", {})
+        ingredient_id = params.get("ingredient_id") or event_data.get("ingredient_id")
+        ingredient_name = params.get("ingredient_name") or event_data.get("ingredient_name", "")
+        affected_dishes = params.get("affected_dishes") or event_data.get("affected_dishes", [])
+
+        # 若有 DB，查找依赖该食材的所有在售菜品
+        dishes_to_mark: list[dict] = []
+        if self._db and ingredient_id:
+            from sqlalchemy import text
+            rows = await self._db.execute(text("""
+                SELECT DISTINCT d.id, d.name, d.category, d.sell_price_fen
+                FROM dishes d
+                JOIN bom_recipe_items bri ON bri.dish_id = d.id
+                WHERE d.tenant_id = :tenant_id
+                  AND bri.ingredient_id = :ingredient_id
+                  AND d.is_deleted = false
+                  AND d.is_available = true
+            """), {"tenant_id": self.tenant_id, "ingredient_id": ingredient_id})
+            dishes_to_mark = [dict(r) for r in rows.mappings()]
+        else:
+            # 降级：使用 params 传入的数据
+            dishes_to_mark = [
+                {"id": d.get("dish_id", ""), "name": d.get("dish_name", ""),
+                 "category": d.get("category", "")}
+                for d in affected_dishes
+            ]
+
+        marked_count = len(dishes_to_mark)
+
+        logger.info(
+            "dishes_marked_sold_out",
+            store_id=store_id,
+            ingredient_name=ingredient_name,
+            marked_count=marked_count,
+        )
+
+        return AgentResult(
+            success=True,
+            action="mark_sold_out",
+            data={
+                "store_id": store_id,
+                "ingredient_id": ingredient_id,
+                "ingredient_name": ingredient_name,
+                "dishes_to_mark_sold_out": [
+                    {
+                        "dish_id": str(d.get("id") or d.get("dish_id", "")),
+                        "dish_name": d.get("name") or d.get("dish_name", ""),
+                        "category": d.get("category", ""),
+                    }
+                    for d in dishes_to_mark
+                ],
+                "marked_count": marked_count,
+                "action_required": "update_dish_availability",  # 通知 tx-menu service
+                "marked_at": datetime.now(timezone.utc).isoformat(),
+            },
+            reasoning=(
+                f"售罄标记：{ingredient_name} 库存归零，"
+                f"需下架{marked_count}道菜品"
+            ),
+            confidence=0.95 if self._db else 0.75,
+        )
+
+    # ─── 事件驱动：推送临期特价菜 ───
+
+    async def _push_expiry_specials(self, params: dict) -> AgentResult:
+        """supply.ingredient.expiring 触发：基于临期食材生成特价菜推送
+
+        与 inventory_alert.plan_usage 配合：
+        - plan_usage 负责制定内部用料计划
+        - push_expiry_specials 负责对外推送给顾客
+
+        推送渠道：菜单首屏 Banner + 小程序推荐位 + 服务员话术建议
+        """
+        store_id = params.get("store_id") or self.store_id
+        event_data = params.get("event_data", {})
+        ingredient_name = params.get("ingredient_name") or event_data.get("ingredient_name", "")
+        days_to_expiry = params.get("days_to_expiry") or event_data.get("days_to_expiry", 3)
+        related_dishes = params.get("related_dishes") or event_data.get("related_dishes", [])
+        current_qty = params.get("current_qty") or event_data.get("current_qty", 0)
+        unit = params.get("unit") or event_data.get("unit", "")
+
+        # 定价策略（临期越近折扣越大）
+        discount_pct = (
+            30 if days_to_expiry <= 1 else
+            20 if days_to_expiry <= 2 else
+            10
+        )
+
+        # 生成特价菜推送内容
+        specials: list[dict] = []
+        for dish in related_dishes[:4]:
+            original_price_fen = dish.get("sell_price_fen") or dish.get("price_fen", 0)
+            special_price_fen = int(original_price_fen * (1 - discount_pct / 100))
+            specials.append({
+                "dish_id": dish.get("dish_id") or dish.get("id", ""),
+                "dish_name": dish.get("dish_name") or dish.get("name", ""),
+                "original_price_fen": original_price_fen,
+                "special_price_fen": special_price_fen,
+                "discount_pct": discount_pct,
+                "highlight": f"今日特惠 {discount_pct}% OFF",
+            })
+
+        # 服务员推销话术
+        waiter_script = (
+            f"您好，今天我们的{ingredient_name}非常新鲜，"
+            f"特别推出{', '.join([s['dish_name'] for s in specials[:2]] or ['特色菜品'])}，"
+            f"今日优惠{discount_pct}%，非常划算，您要不要来一份？"
+        )
+
+        # 菜单 Banner 文案
+        banner_text = (
+            f"今日{ingredient_name}特鲜特惠！"
+            f"{discount_pct}% OFF 限时优惠"
+        )
+
+        push_channels = [
+            {"channel": "menu_banner", "content": banner_text, "priority": 1},
+            {"channel": "miniapp_recommend", "content": banner_text, "priority": 2},
+            {"channel": "waiter_script", "content": waiter_script, "priority": 3},
+        ]
+
+        logger.info(
+            "expiry_specials_pushed",
+            store_id=store_id,
+            ingredient_name=ingredient_name,
+            days_to_expiry=days_to_expiry,
+            specials_count=len(specials),
+            discount_pct=discount_pct,
+        )
+
+        return AgentResult(
+            success=True,
+            action="push_expiry_specials",
+            data={
+                "store_id": store_id,
+                "ingredient_name": ingredient_name,
+                "days_to_expiry": days_to_expiry,
+                "current_qty": current_qty,
+                "unit": unit,
+                "discount_pct": discount_pct,
+                "specials": specials,
+                "push_channels": push_channels,
+                "valid_until": f"今日{23 if days_to_expiry <= 1 else 22}:00",
+            },
+            reasoning=(
+                f"临期特价推送：{ingredient_name} 还剩{days_to_expiry}天，"
+                f"推出{len(specials)}道特价菜，折扣{discount_pct}%"
+            ),
+            confidence=0.85,
+        )
+
+    # ─── 事件驱动：标记高成本菜品 ───
+
+    async def _flag_high_cost_dishes(self, params: dict) -> AgentResult:
+        """finance.cost_rate.exceeded 触发：识别并标记高成本菜品，辅助成本优化
+
+        配合 finance_audit.root_cause_analysis 工作：
+        - root_cause_analysis 找到成本超标原因（宏观）
+        - flag_high_cost_dishes 定位到具体菜品（微观）
+        """
+        store_id = params.get("store_id") or self.store_id
+        event_data = params.get("event_data", {})
+        target_cost_rate = params.get("target_cost_rate") or event_data.get("target_cost_rate", 0.35)
+        dishes = params.get("dishes") or event_data.get("dishes", [])
+        # dishes: [{"dish_id": ..., "dish_name": ..., "cost_fen": ..., "price_fen": ..., "sales_count": ...}]
+
+        # 若有 DB，从实时数据中计算菜品成本率
+        db_dishes: list[dict] = []
+        if self._db and store_id:
+            from sqlalchemy import text
+            rows = await self._db.execute(text("""
+                SELECT d.id, d.name, d.category,
+                       d.sell_price_fen,
+                       COALESCE(d.cost_price_fen, 0) as cost_fen,
+                       COUNT(oi.id) as sales_count,
+                       CASE WHEN d.sell_price_fen > 0
+                            THEN COALESCE(d.cost_price_fen, 0)::float / d.sell_price_fen
+                            ELSE 0 END as cost_rate
+                FROM dishes d
+                LEFT JOIN order_items oi ON oi.dish_id = d.id
+                    AND oi.created_at >= NOW() - INTERVAL '30 days'
+                WHERE d.tenant_id = :tenant_id
+                  AND d.is_deleted = false
+                  AND d.is_available = true
+                GROUP BY d.id, d.name, d.category, d.sell_price_fen, d.cost_price_fen
+                HAVING CASE WHEN d.sell_price_fen > 0
+                             THEN COALESCE(d.cost_price_fen, 0)::float / d.sell_price_fen
+                             ELSE 0 END > :threshold
+                ORDER BY cost_rate DESC
+                LIMIT 20
+            """), {"tenant_id": self.tenant_id, "threshold": target_cost_rate})
+            db_dishes = [dict(r) for r in rows.mappings()]
+
+        working = db_dishes if db_dishes else [
+            d for d in dishes
+            if d.get("price_fen", 0) > 0
+            and d.get("cost_fen", 0) / d.get("price_fen", 1) > target_cost_rate
+        ]
+
+        # 评分：成本率越高 + 销量越大 = 优化优先级越高
+        flagged: list[dict] = []
+        for d in working:
+            price = d.get("sell_price_fen") or d.get("price_fen", 0)
+            cost = d.get("cost_fen") or d.get("cost_price_fen", 0)
+            cost_rate = cost / price if price > 0 else 0
+            over_target = cost_rate - target_cost_rate
+            sales = d.get("sales_count", 0)
+
+            # 优化建议
+            suggestions = []
+            if cost_rate > 0.55:
+                suggestions.append("考虑提价或调整BOM配方")
+            if over_target > 0.1:
+                suggestions.append(f"成本率偏高{over_target:.1%}，建议重新核价")
+            if sales > 50 and cost_rate > target_cost_rate:
+                suggestions.append("高销量高成本，优化效益最大")
+            if not suggestions:
+                suggestions.append("列入下次菜品成本复盘")
+
+            flagged.append({
+                "dish_id": str(d.get("id") or d.get("dish_id", "")),
+                "dish_name": d.get("name") or d.get("dish_name", ""),
+                "category": d.get("category", ""),
+                "cost_rate": round(cost_rate, 4),
+                "over_target": round(over_target, 4),
+                "sales_count": sales,
+                "optimization_priority": "high" if over_target > 0.1 and sales > 30 else "medium",
+                "suggestions": suggestions,
+            })
+
+        flagged.sort(key=lambda x: (-x["over_target"], -x["sales_count"]))
+
+        logger.info(
+            "high_cost_dishes_flagged",
+            store_id=store_id,
+            flagged_count=len(flagged),
+            target_cost_rate=target_cost_rate,
+        )
+
+        return AgentResult(
+            success=True,
+            action="flag_high_cost_dishes",
+            data={
+                "store_id": store_id,
+                "target_cost_rate": target_cost_rate,
+                "flagged_dishes": flagged,
+                "flagged_count": len(flagged),
+                "high_priority_count": sum(1 for d in flagged if d["optimization_priority"] == "high"),
+                "data_source": "db_realtime" if db_dishes else "params",
+            },
+            reasoning=(
+                f"高成本菜品标记：发现{len(flagged)}道菜成本率超标"
+                f"（目标{target_cost_rate:.0%}），"
+                f"其中{sum(1 for d in flagged if d['optimization_priority'] == 'high')}道高优先级"
+            ),
+            confidence=0.9 if db_dishes else 0.75,
         )

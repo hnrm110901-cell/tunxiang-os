@@ -5,8 +5,7 @@
 """
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Optional
-
+from typing import Optional
 
 # ---------------------------------------------------------------------------
 # 内存存储
@@ -316,6 +315,220 @@ class ContentEngine:
             "call_to_action": "了解更多",
             "recommended_image_tags": ["通用"],
         })
+
+
+# ---------------------------------------------------------------------------
+# PersonalizedContentEngine — 基于 RFM 分层的个性化内容生成
+# ---------------------------------------------------------------------------
+
+import os
+from uuid import UUID
+
+import httpx
+
+
+class PersonalizedContentEngine:
+    """基于模板变量替换 + RFM 分层差异化的个性化内容生成引擎
+
+    职责：
+    - 从 tx-member 获取会员画像（RFM / 偏好菜品 / 最后到店时间）
+    - 按 VIP(S1/S2) / 普通(S3/S4) 选择对应模板变体
+    - 替换模板变量，生成最终推送内容
+    - 缺失变量优雅降级（使用默认值，不报错）
+    """
+
+    TX_MEMBER_URL: str = os.getenv("TX_MEMBER_SERVICE_URL", "http://tx-member:8000")
+
+    # 内置个性化内容模板库
+    CONTENT_TEMPLATES: dict[str, dict] = {
+        # ── 流失召回系列 ──────────────────────────────────────────────
+        "churn_recovery_vip": {
+            "title": "【专属】{display_name}，好久不见！",
+            "description": "您已{days_since_last_order}天未到店，特为您准备{offer_desc}，期待您的归来。",
+            "btntxt": "立即领取",
+        },
+        "churn_recovery_normal": {
+            "title": "想你了！来享受优惠吧",
+            "description": "好久没见到您啦，送您{offer_desc}，快来尝尝我们的{favorite_dish}！",
+            "btntxt": "查看优惠",
+        },
+        # ── 生日系列 ──────────────────────────────────────────────────
+        "birthday_vip": {
+            "title": "🎂 {display_name}，生日快乐！",
+            "description": "感谢您{total_order_count}次的光临与信任，特为您准备生日专属礼遇：{offer_desc}",
+            "btntxt": "查看礼遇",
+        },
+        "birthday_normal": {
+            "title": "生日快乐！送您专属礼物",
+            "description": "祝您生日快乐！凭此消息到店可享受{offer_desc}",
+            "btntxt": "立即使用",
+        },
+        # ── 新品推送 ──────────────────────────────────────────────────
+        "new_dish_vip": {
+            "title": "新品抢先尝 | 专为{rfm_level}会员",
+            "description": "根据您对{favorite_dish}的喜爱，特邀您体验我们的新品，前50位体验者享{offer_desc}",
+            "btntxt": "了解新品",
+        },
+        "new_dish_normal": {
+            "title": "新品上线，快来尝鲜！",
+            "description": "我们推出了新品，和您喜爱的{favorite_dish}同样用心制作，{offer_desc}",
+            "btntxt": "查看新品",
+        },
+        # ── 复购触发 ──────────────────────────────────────────────────
+        "repurchase_cycle": {
+            "title": "您最爱的{favorite_dish}等你来",
+            "description": "距离上次品尝已经{days_since_last_order}天了，{display_name}，是时候犒劳自己了！",
+            "btntxt": "立即预订",
+        },
+        # ── 通用（透传 extra_vars） ────────────────────────────────────
+        "generic": {
+            "title": "{title}",
+            "description": "{description}",
+            "btntxt": "{btntxt}",
+        },
+    }
+
+    async def generate_content(
+        self,
+        template_key: str,
+        customer_id: UUID,
+        tenant_id: UUID,
+        extra_vars: dict | None = None,
+    ) -> dict:
+        """根据模板 key 和会员数据生成个性化内容
+
+        步骤：
+        1. 从 tx-member API 查询会员数据
+        2. 构建模板变量字典（display_name / days_since_last_order / favorite_dish 等）
+        3. 按 RFM 等级选择模板变体（VIP 优先 _vip 版本）
+        4. 替换模板变量（缺失 key 用默认值兜底）
+        5. 返回 {title, description, btntxt}
+
+        Args:
+            template_key:  模板基础 key，如 "churn_recovery" / "birthday" / "generic"
+            customer_id:   会员 UUID
+            tenant_id:     租户 UUID
+            extra_vars:    额外变量（优先级高于会员数据，常用：offer_desc / url）
+
+        Returns:
+            {"title": str, "description": str, "btntxt": str}
+        """
+        customer = await self._fetch_customer(customer_id, tenant_id)
+        vars_dict = self._build_template_vars(customer, extra_vars or {})
+        actual_key = self._select_template_variant(template_key, customer)
+        template = self.CONTENT_TEMPLATES.get(
+            actual_key, self.CONTENT_TEMPLATES["generic"]
+        )
+        return {
+            "title": self._safe_format(template["title"], vars_dict),
+            "description": self._safe_format(template["description"], vars_dict),
+            "btntxt": self._safe_format(template.get("btntxt", "查看详情"), vars_dict),
+        }
+
+    # ------------------------------------------------------------------
+    # 内部方法
+    # ------------------------------------------------------------------
+
+    def _build_template_vars(self, customer: dict, extra: dict) -> dict:
+        """构建模板变量字典，extra 中的同名键覆盖默认值"""
+        from datetime import datetime, timezone
+
+        last_order_at: str | None = customer.get("last_order_at")
+        if last_order_at:
+            try:
+                last_dt = datetime.fromisoformat(last_order_at.replace("Z", "+00:00"))
+                days_since: int = (datetime.now(timezone.utc) - last_dt).days
+            except ValueError:
+                days_since = 999
+        else:
+            days_since = 999
+
+        favorite_dishes: list = customer.get("favorite_dishes", [])
+        favorite: str = (
+            favorite_dishes[0]["name"] if favorite_dishes else "招牌菜"
+        )
+
+        base: dict = {
+            "display_name": customer.get("display_name") or "亲",
+            "days_since_last_order": str(days_since),
+            "favorite_dish": favorite,
+            "rfm_level": customer.get("rfm_level") or "S3",
+            "total_order_count": str(customer.get("total_order_count") or 0),
+            "member_level": customer.get("member_level") or "普通会员",
+            # 以下由 extra_vars 提供，设默认值防止 KeyError
+            "offer_desc": "专属优惠",
+            "title": "",
+            "description": "",
+            "btntxt": "查看详情",
+        }
+        # extra 覆盖 base（extra 优先）
+        base.update(extra)
+        return base
+
+    def _select_template_variant(self, template_key: str, customer: dict) -> str:
+        """按会员 RFM 等级选择模板变体
+
+        优先级：{template_key}_vip > {template_key}_normal > template_key > generic
+        """
+        rfm_level: str = customer.get("rfm_level") or "S3"
+        is_vip: bool = rfm_level in ("S1", "S2")
+
+        vip_key = f"{template_key}_vip"
+        normal_key = f"{template_key}_normal"
+
+        if is_vip and vip_key in self.CONTENT_TEMPLATES:
+            return vip_key
+        if normal_key in self.CONTENT_TEMPLATES:
+            return normal_key
+        if template_key in self.CONTENT_TEMPLATES:
+            return template_key
+        return "generic"
+
+    @staticmethod
+    def _safe_format(template_str: str, vars_dict: dict) -> str:
+        """安全格式化：缺失的 key 用空字符串替换，不抛出 KeyError"""
+        try:
+            return template_str.format(**vars_dict)
+        except KeyError:
+            # 逐个替换，缺失 key 降级为空字符串
+            import re
+            result = template_str
+            for key in re.findall(r"\{(\w+)\}", template_str):
+                result = result.replace(f"{{{key}}}", vars_dict.get(key, ""))
+            return result
+
+    async def _fetch_customer(self, customer_id: UUID, tenant_id: UUID) -> dict:
+        """从 tx-member 获取会员数据
+
+        API: GET /api/v1/member/customers/{customer_id}
+        响应包含：display_name, rfm_level, last_order_at, favorite_dishes,
+                  total_order_count, member_level, wecom_external_userid
+        """
+        import structlog
+        log = structlog.get_logger(__name__)
+
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resp = await client.get(
+                    f"{self.TX_MEMBER_URL}/api/v1/member/customers/{customer_id}",
+                    headers={"X-Tenant-ID": str(tenant_id)},
+                )
+            resp.raise_for_status()
+            return resp.json().get("data", {})
+        except httpx.HTTPStatusError as exc:
+            log.warning(
+                "personalized_content_fetch_customer_http_error",
+                customer_id=str(customer_id),
+                status_code=exc.response.status_code,
+            )
+            return {}
+        except httpx.RequestError as exc:
+            log.warning(
+                "personalized_content_fetch_customer_request_error",
+                customer_id=str(customer_id),
+                error=str(exc),
+            )
+            return {}
 
 
 def record_content_performance(content_id: str, metrics: dict) -> None:

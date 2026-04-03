@@ -14,6 +14,35 @@ export async function fetchKPIAlerts(storeId: string): Promise<{ items: KPIAlert
 
 export interface DecisionSuggestion { decision_id: string; agent_id: string; title: string; description: string; priority: string; confidence: number; }
 export async function fetchTop3Decisions(storeId: string): Promise<DecisionSuggestion[]> { return txFetchData(`/api/v1/agent/decisions/top3?store_id=${encodeURIComponent(storeId)}`); }
+export async function txFetch<T>(path: string, options?: RequestInit): Promise<T> {
+  const resp = await fetch(`${API_BASE}${path}`, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(TENANT_ID ? { 'X-Tenant-ID': TENANT_ID } : {}),
+      ...(options?.headers as Record<string, string> || {}),
+    },
+  });
+  const json = await resp.json();
+  if (!json.ok) throw new Error(json.error?.message || 'API Error');
+  return json.data;
+}
+
+// ─── 各域 API 统一导出 ───
+
+export * from './dashboardApi';
+export * from './storeAnalysisApi';
+export * from './dishAnalysisApi';
+export * from './financeAnalyticsApi';
+export * from './memberAnalyticsApi';
+export * from './reviewApi';
+export * from './regionalApi';
+export * from './dispatchApi';
+export * from './banquetApi';
+export * from './storeHealthApi';
+export * from './hrApi';
+
+// ─── 门店健康 ───
 
 export interface AgentInfo { agent_id: string; agent_name: string; priority: string; status: string; last_run_at: string; }
 export async function fetchAgentList(): Promise<{ items: AgentInfo[]; total: number }> { return txFetchData('/api/v1/agent/agents'); }

@@ -1,0 +1,79 @@
+.tracker {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 24px 16px;
+  position: relative;
+}
+
+.stepWrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  position: relative;
+  z-index: 1;
+}
+
+.line {
+  position: absolute;
+  top: 14px;
+  right: 50%;
+  width: 100%;
+  height: 3px;
+  background: var(--tx-bg-tertiary);
+  z-index: 0;
+  transition: background 0.4s ease;
+}
+
+.lineActive {
+  background: var(--tx-brand);
+}
+
+.dot {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--tx-bg-tertiary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  position: relative;
+  z-index: 2;
+}
+
+.dotCompleted {
+  background: var(--tx-brand);
+}
+
+.dotActive {
+  background: var(--tx-brand);
+  box-shadow: 0 0 0 6px rgba(255, 107, 44, 0.25);
+  animation: tx-pulse 1.5s infinite;
+}
+
+.label {
+  margin-top: 8px;
+  font-size: var(--tx-font-xs);
+  color: var(--tx-text-tertiary);
+  text-align: center;
+  transition: color 0.3s ease;
+}
+
+.labelActive {
+  color: var(--tx-brand);
+  font-weight: 600;
+}
+
+.estimate {
+  margin-top: 4px;
+  font-size: 10px;
+  color: var(--tx-text-secondary);
+  text-align: center;
+}
+
+@keyframes tx-pulse {
+  0%, 100% { box-shadow: 0 0 0 6px rgba(255, 107, 44, 0.25); }
+  50% { box-shadow: 0 0 0 10px rgba(255, 107, 44, 0.08); }
+}

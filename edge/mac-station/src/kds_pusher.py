@@ -4,11 +4,9 @@ KDS 实时推送服务
 """
 from __future__ import annotations
 
-import json
-from typing import Any
-
 import structlog
 from fastapi import WebSocket
+from starlette.websockets import WebSocketState
 
 logger = structlog.get_logger()
 
@@ -75,9 +73,12 @@ class KDSPusher:
 
         for ws in conns:
             try:
+                if ws.client_state != WebSocketState.CONNECTED:
+                    dead.append(ws)
+                    continue
                 await ws.send_json(message)
                 sent += 1
-            except Exception as exc:
+            except (RuntimeError, OSError, ConnectionError) as exc:
                 logger.warning(
                     "kds_ws_send_failed",
                     station_id=station_id,
@@ -134,23 +135,96 @@ class KDSPusher:
             new_status=new_status,
         )
 
-    async def push_rush_order(self, ticket_id: str) -> None:
+    async def push_rush_order(self, ticket_id: str, extra: dict | None = None) -> None:
         """
         催菜推送（高亮+声音提示标记）。
 
-        广播到所有档口，前端收到后高亮对应票据并播放提示音。
+        如果 extra 中包含 station_id，则只推送到对应档口；
+        否则广播到所有档口，前端收到后高亮对应票据并播放提示音。
 
         Args:
             ticket_id: 被催的票据ID
+            extra: 附加信息（dish_name, table_number, station_id 等）
         """
         message = {
             "type": "rush_order",
             "ticket_id": ticket_id,
             "alert": True,
             "sound": "rush",
+            **(extra or {}),
         }
-        await self.broadcast_to_all(message)
-        logger.info("kds_rush_order_pushed", ticket_id=ticket_id)
+        station_id = (extra or {}).get("station_id")
+        if station_id and station_id in self.connections:
+            await self._send_to_station(station_id, message)
+        else:
+            await self.broadcast_to_all(message)
+        logger.info("kds_rush_order_pushed", ticket_id=ticket_id, station_id=station_id)
+
+    async def push_remake_order(
+        self, station_id: str, task_id: str, dish_name: str,
+        reason: str, table_number: str = "", remake_count: int = 1,
+    ) -> None:
+        """
+        重做推送 — 推送到对应档口 KDS 终端。
+
+        Args:
+            station_id: 目标档口ID
+            task_id: 任务ID
+            dish_name: 菜品名称
+            reason: 重做原因
+            table_number: 桌号
+            remake_count: 重做次数
+        """
+        message = {
+            "type": "remake_order",
+            "task_id": task_id,
+            "dish_name": dish_name,
+            "reason": reason,
+            "table_number": table_number,
+            "remake_count": remake_count,
+            "alert": True,
+            "sound": "remake",
+        }
+        if station_id in self.connections:
+            sent = await self._send_to_station(station_id, message)
+        else:
+            # 如果指定档口无连接，广播到所有
+            await self.broadcast_to_all(message)
+            sent = -1
+        logger.info(
+            "kds_remake_order_pushed",
+            station_id=station_id, task_id=task_id,
+            dish_name=dish_name, sent_count=sent,
+        )
+
+    async def push_timeout_alert(
+        self, station_id: str, payload: dict,
+    ) -> None:
+        """
+        超时告警推送 — 推送到对应档口 KDS 终端。
+
+        warning: 标红显示
+        critical: 标红 + 闪烁 + 声音
+
+        Args:
+            station_id: 目标档口ID
+            payload: 超时详情（含 status, dish, wait_minutes 等）
+        """
+        message = {
+            "type": "timeout_alert",
+            "station_id": station_id,
+            "payload": payload,
+        }
+        if station_id in self.connections:
+            await self._send_to_station(station_id, message)
+        else:
+            await self.broadcast_to_all(message)
+        logger.info(
+            "kds_timeout_alert_pushed",
+            station_id=station_id,
+            status=payload.get("status"),
+            dish=payload.get("dish"),
+        )
 
     async def broadcast_to_all(self, message: dict) -> None:
         """

@@ -1,0 +1,4 @@
+# False-positive allowlist for git-secrets
+# setup script defines the patterns it registers — not actual secrets
+scripts/setup-git-secrets\.sh:.*--add.*--literal
+scripts/setup-git-secrets\.sh:.*--add.*\[a-f0-9\]

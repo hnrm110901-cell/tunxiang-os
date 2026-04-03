@@ -26,6 +26,11 @@ export async function txFetch<T>(path: string, options?: RequestInit): Promise<T
 
 export * from './tradeApi';
 export * from './menuApi';
+export * from './enterpriseApi';
+export * from './handoverApi';
+export * from './couponApi';
+export * from './orderExtApi';
+export * from './posOpsApi';
 
 // ─── 排队 ───
 

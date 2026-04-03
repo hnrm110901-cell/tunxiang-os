@@ -1,0 +1,47 @@
+<!-- 自助开票页面 -->
+<view class="page-container">
+  <view class="invoice-form">
+    <!-- 发票类型 -->
+    <view class="form-section">
+      <text class="section-label">发票类型</text>
+      <view class="type-options">
+        <view class="type-option {{invoiceType === 'personal' ? 'active' : ''}}"
+              bindtap="selectType" data-type="personal">个人</view>
+        <view class="type-option {{invoiceType === 'company' ? 'active' : ''}}"
+              bindtap="selectType" data-type="company">企业</view>
+      </view>
+    </view>
+
+    <!-- 发票抬头 -->
+    <view class="form-section">
+      <text class="section-label">发票抬头</text>
+      <input class="form-input" placeholder="{{invoiceType === 'company' ? '请输入公司名称' : '请输入个人姓名'}}"
+             bindinput="onTitleInput" value="{{title}}" />
+    </view>
+
+    <!-- 企业税号（仅企业） -->
+    <view class="form-section" wx:if="{{invoiceType === 'company'}}">
+      <text class="section-label">税号</text>
+      <input class="form-input" placeholder="请输入纳税人识别号" bindinput="onTaxIdInput" value="{{taxId}}" />
+    </view>
+
+    <!-- 邮箱 -->
+    <view class="form-section">
+      <text class="section-label">接收邮箱</text>
+      <input class="form-input" placeholder="电子发票将发送至此邮箱" bindinput="onEmailInput" value="{{email}}" type="text" />
+    </view>
+
+    <!-- 开票金额 -->
+    <view class="form-section">
+      <text class="section-label">开票金额</text>
+      <text class="amount-display">¥{{amountYuan}}</text>
+    </view>
+
+    <!-- 提交 -->
+    <button class="submit-btn" bindtap="submitInvoice" disabled="{{submitting}}">
+      {{submitting ? '提交中...' : '提交开票申请'}}
+    </button>
+
+    <text class="tip-text">电子发票将在1-3个工作日内发送至您的邮箱</text>
+  </view>
+</view>

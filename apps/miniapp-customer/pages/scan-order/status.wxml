@@ -1,0 +1,77 @@
+<!-- 等待出餐页 — 桌号+订单号+实时进度 -->
+<view class="page-container status-page">
+  <!-- 顶部桌号和订单号 -->
+  <view class="status-header">
+    <view class="header-left">
+      <text class="table-no" wx:if="{{tableNo}}">{{tableNo}}号桌</text>
+      <text class="status-order-no">订单号: {{orderNo}}</text>
+    </view>
+    <view class="status-badge status-{{orderStatus}}">
+      <text>{{orderStatusText}}</text>
+    </view>
+  </view>
+
+  <!-- 进度概览 -->
+  <view class="progress-overview" wx:if="{{summary.total > 0}}">
+    <view class="progress-bar-wrap">
+      <view class="progress-bar" style="width: {{summary.total > 0 ? (summary.done / summary.total * 100) : 0}}%"></view>
+    </view>
+    <view class="progress-stats">
+      <view class="stat-item">
+        <text class="stat-value">{{summary.total}}</text>
+        <text class="stat-label">总计</text>
+      </view>
+      <view class="stat-item stat-cooking">
+        <text class="stat-value">{{summary.cooking}}</text>
+        <text class="stat-label">制作中</text>
+      </view>
+      <view class="stat-item stat-done">
+        <text class="stat-value">{{summary.done}}</text>
+        <text class="stat-label">已出餐</text>
+      </view>
+      <view class="stat-item stat-pending">
+        <text class="stat-value">{{summary.pending}}</text>
+        <text class="stat-label">待制作</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 菜品进度列表 -->
+  <view class="items-section" wx:if="{{!loading}}">
+    <text class="section-title">菜品进度</text>
+    <view class="status-item {{item.isDone ? 'done' : ''}} {{item.isCooking ? 'cooking' : ''}}"
+          wx:for="{{items}}" wx:key="itemId">
+      <view class="status-item-left">
+        <text class="status-icon">{{item.kdsIcon}}</text>
+        <view class="status-item-info">
+          <text class="status-item-name">{{item.dishName}}</text>
+          <text class="status-item-qty">x{{item.quantity}}</text>
+        </view>
+      </view>
+      <view class="status-item-right">
+        <text class="status-item-kds {{item.kdsStatus}}">{{item.kdsStatusText}}</text>
+        <text class="status-item-station" wx:if="{{item.kdsStation}}">{{item.kdsStation}}</text>
+      </view>
+    </view>
+
+    <view class="empty-tip" wx:if="{{items.length === 0}}">
+      <text>暂无菜品记录</text>
+    </view>
+  </view>
+
+  <!-- 加载中 -->
+  <view class="loading-wrap" wx:if="{{loading}}">
+    <text class="loading-text">加载中...</text>
+  </view>
+
+  <!-- 全部出餐完毕提示 -->
+  <view class="all-done-banner" wx:if="{{summary.total > 0 && summary.done === summary.total && !loading}}">
+    <text class="all-done-text">所有菜品已出餐，请享用!</text>
+  </view>
+
+  <!-- 底部操作 -->
+  <view class="bottom-actions" wx:if="{{!loading}}">
+    <button class="btn-continue" bindtap="addMoreDishes">加菜</button>
+    <button class="btn-checkout" bindtap="requestCheckout">请求结账</button>
+  </view>
+</view>

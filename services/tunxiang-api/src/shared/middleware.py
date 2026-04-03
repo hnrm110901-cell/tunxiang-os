@@ -2,9 +2,9 @@
 
 与 gateway/src/middleware.py 逻辑一致，适配单体入口。
 """
+import logging
 import time
 import uuid
-import logging
 
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware

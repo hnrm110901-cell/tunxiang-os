@@ -1,3 +1,275 @@
-<view class="container">
-  <text>member 页面</text>
+<!-- 会员中心 -->
+<view class="page-container">
+
+  <!-- 未登录状态 -->
+  <view class="login-section" wx:if="{{!isLoggedIn}}">
+    <view class="login-avatar-placeholder">\ud83d\udc64</view>
+    <text class="login-hint">登录后查看会员权益</text>
+    <button class="login-btn" open-type="getPhoneNumber" bindgetphonenumber="onGetPhoneNumber">
+      手机号快速登录
+    </button>
+  </view>
+
+  <!-- 已登录：会员信息 -->
+  <block wx:if="{{isLoggedIn}}">
+    <!-- 会员卡 -->
+    <view class="member-card member-card-{{profile.level}}">
+      <view class="member-header">
+        <image class="member-avatar" src="{{profile.avatarUrl || '/assets/avatar-default.png'}}" mode="aspectFill" />
+        <view class="member-info">
+          <text class="member-name">{{profile.nickname}}</text>
+          <view class="level-badge level-{{profile.level}}">
+            <text class="level-text">{{profile.levelName}}</text>
+          </view>
+        </view>
+        <view class="edit-btn" bindtap="openProfileEdit">
+          <text class="edit-icon">\u270f\ufe0f</text>
+        </view>
+      </view>
+
+      <!-- 资产区 -->
+      <view class="assets-row">
+        <view class="asset-item" bindtap="showPointsDetail">
+          <text class="asset-value">{{profile.pointsBalance}}</text>
+          <text class="asset-label">积分</text>
+        </view>
+        <view class="asset-divider"></view>
+        <view class="asset-item" bindtap="showBalanceDetail">
+          <text class="asset-value">{{profile.balanceYuan}}</text>
+          <text class="asset-label">余额(元)</text>
+        </view>
+        <view class="asset-divider"></view>
+        <view class="asset-item" bindtap="openCouponPanel">
+          <text class="asset-value">\ud83c\udf9f\ufe0f</text>
+          <text class="asset-label">优惠券</text>
+        </view>
+        <view class="asset-divider"></view>
+        <view class="asset-item">
+          <text class="asset-value">{{profile.orderCount}}</text>
+          <text class="asset-label">订单</text>
+        </view>
+      </view>
+
+      <!-- 等级进度条 -->
+      <view class="level-progress-wrap" wx:if="{{levelProgress.nextLevelName}}">
+        <view class="level-progress-labels">
+          <text class="level-progress-current">{{profile.levelName}}</text>
+          <text class="level-progress-next">距{{levelProgress.nextLevelName}} 还需 {{levelProgress.pointsNeeded}} 积分</text>
+        </view>
+        <view class="level-progress-track">
+          <view class="level-progress-fill" style="width: {{levelProgress.pct}}%"></view>
+        </view>
+        <view class="level-progress-detail" bindtap="showPointsDetail">
+          <text class="level-progress-pts">{{profile.pointsBalance}} / {{levelProgress.nextThreshold}} 积分</text>
+          <text class="level-progress-link">积分明细 ></text>
+        </view>
+      </view>
+      <view class="level-progress-wrap" wx:if="{{!levelProgress.nextLevelName}}">
+        <view class="level-progress-labels">
+          <text class="level-progress-current">{{profile.levelName}} · 最高级别</text>
+        </view>
+        <view class="level-progress-detail" bindtap="showPointsDetail">
+          <text class="level-progress-pts">当前积分 {{profile.pointsBalance}}</text>
+          <text class="level-progress-link">积分明细 ></text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 功能菜单 -->
+    <view class="menu-section">
+      <view class="menu-item" wx:for="{{menuItems}}" wx:key="label"
+            bindtap="goToRoute" data-route="{{item.route}}">
+        <view class="menu-item-left">
+          <text class="menu-icon">{{item.icon}}</text>
+          <text class="menu-label">{{item.label}}</text>
+        </view>
+        <text class="menu-arrow">></text>
+      </view>
+    </view>
+
+    <!-- 储值卡余额 -->
+    <view class="stored-card" wx:if="{{storedValue.hasCard}}" bindtap="showBalanceDetail">
+      <view class="stored-card-left">
+        <text class="stored-card-icon">\ud83d\udcb3</text>
+        <view class="stored-card-info">
+          <text class="stored-card-title">储值卡余额</text>
+          <text class="stored-card-sub">可用于消费抵扣</text>
+        </view>
+      </view>
+      <view class="stored-card-right">
+        <text class="stored-card-amount">\u00a5{{storedValue.balanceYuan}}</text>
+        <text class="stored-card-arrow">></text>
+      </view>
+    </view>
+
+    <!-- 会员专属优惠入口 -->
+    <view class="exclusive-section">
+      <view class="exclusive-header">
+        <text class="exclusive-title">会员专属优惠</text>
+        <text class="exclusive-more" bindtap="openCouponPanel">查看全部 ></text>
+      </view>
+      <view class="exclusive-list">
+        <view class="exclusive-item" bindtap="openCouponPanel">
+          <view class="exclusive-badge">
+            <text class="exclusive-badge-text">{{profile.couponCount || 0}}</text>
+          </view>
+          <text class="exclusive-item-label">优惠券</text>
+        </view>
+        <view class="exclusive-item" bindtap="goToRoute" data-route="/pages/points-mall/points-mall">
+          <view class="exclusive-badge exclusive-badge-orange">
+            <text class="exclusive-badge-icon">\ud83c\udf81</text>
+          </view>
+          <text class="exclusive-item-label">积分兑换</text>
+        </view>
+        <view class="exclusive-item" bindtap="goToRoute" data-route="/pages/premium-card/premium-card">
+          <view class="exclusive-badge exclusive-badge-gold">
+            <text class="exclusive-badge-icon">\u2b50</text>
+          </view>
+          <text class="exclusive-item-label">升级权益</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 消费统计 -->
+    <view class="stats-card" bindtap="showConsumeHistory">
+      <view class="stats-card-header">
+        <text class="stats-title">消费统计(最近30天)</text>
+        <text class="stats-more">查看详情 ></text>
+      </view>
+      <view class="stats-row">
+        <view class="stats-item">
+          <text class="stats-value">\u00a5{{profile.totalSpentYuan}}</text>
+          <text class="stats-label">累计消费</text>
+        </view>
+        <view class="stats-item">
+          <text class="stats-value">{{profile.orderCount}}</text>
+          <text class="stats-label">消费次数</text>
+        </view>
+      </view>
+    </view>
+  </block>
+
+  <!-- 积分明细弹层 -->
+  <view class="popup-mask" wx:if="{{showPointsLog}}" bindtap="closePointsLog"></view>
+  <view class="popup-sheet {{showPointsLog ? 'show' : ''}}">
+    <view class="popup-header">
+      <text class="popup-title">积分明细</text>
+      <view class="popup-close" bindtap="closePointsLog">\u2715</view>
+    </view>
+    <scroll-view scroll-y class="popup-list">
+      <view class="empty-state" wx:if="{{pointsLog.length === 0}}">暂无积分记录</view>
+      <view class="log-item" wx:for="{{pointsLog}}" wx:key="id">
+        <view class="log-left">
+          <text class="log-desc">{{item.description}}</text>
+          <text class="log-time">{{item.createdAt}}</text>
+        </view>
+        <text class="log-amount {{item.points > 0 ? 'income' : 'expense'}}">
+          {{item.points > 0 ? '+' : ''}}{{item.points}}
+        </text>
+      </view>
+    </scroll-view>
+  </view>
+
+  <!-- 余额明细弹层 -->
+  <view class="popup-mask" wx:if="{{showBalanceLog}}" bindtap="closeBalanceLog"></view>
+  <view class="popup-sheet {{showBalanceLog ? 'show' : ''}}">
+    <view class="popup-header">
+      <text class="popup-title">余额明细</text>
+      <view class="popup-close" bindtap="closeBalanceLog">\u2715</view>
+    </view>
+    <scroll-view scroll-y class="popup-list">
+      <view class="empty-state" wx:if="{{balanceLog.length === 0}}">暂无余额记录</view>
+      <view class="log-item" wx:for="{{balanceLog}}" wx:key="id">
+        <view class="log-left">
+          <text class="log-desc">{{item.description}}</text>
+          <text class="log-time">{{item.createdAt}}</text>
+        </view>
+        <text class="log-amount {{item.amountFen > 0 ? 'income' : 'expense'}}">
+          {{item.amountFen > 0 ? '+' : '-'}}\u00a5{{item.amountYuan}}
+        </text>
+      </view>
+    </scroll-view>
+  </view>
+
+  <!-- 优惠券弹层 -->
+  <view class="popup-mask" wx:if="{{showCouponPanel}}" bindtap="closeCouponPanel"></view>
+  <view class="popup-sheet {{showCouponPanel ? 'show' : ''}}">
+    <view class="popup-header">
+      <text class="popup-title">我的优惠券</text>
+      <view class="popup-close" bindtap="closeCouponPanel">\u2715</view>
+    </view>
+    <view class="coupon-tabs">
+      <view class="coupon-tab {{couponTab === 'available' ? 'active' : ''}}"
+            bindtap="switchCouponTab" data-tab="available">可用</view>
+      <view class="coupon-tab {{couponTab === 'used' ? 'active' : ''}}"
+            bindtap="switchCouponTab" data-tab="used">已用</view>
+      <view class="coupon-tab {{couponTab === 'expired' ? 'active' : ''}}"
+            bindtap="switchCouponTab" data-tab="expired">已过期</view>
+    </view>
+    <scroll-view scroll-y class="popup-list">
+      <view class="loading-tip" wx:if="{{loadingCoupons}}">加载中...</view>
+      <view class="empty-state" wx:if="{{!loadingCoupons && coupons.length === 0}}">暂无优惠券</view>
+      <view class="coupon-card {{couponTab !== 'available' ? 'disabled' : ''}}" wx:for="{{coupons}}" wx:key="id">
+        <view class="coupon-left">
+          <text class="coupon-name">{{item.name}}</text>
+          <text class="coupon-desc">{{item.description}}</text>
+          <text class="coupon-expire">有效期至 {{item.expireAt}}</text>
+        </view>
+        <view class="coupon-right">
+          <text class="coupon-discount">{{item.discountText}}</text>
+        </view>
+      </view>
+    </scroll-view>
+  </view>
+
+  <!-- 消费记录弹层 -->
+  <view class="popup-mask" wx:if="{{showConsumeLog}}" bindtap="closeConsumeLog"></view>
+  <view class="popup-sheet {{showConsumeLog ? 'show' : ''}}">
+    <view class="popup-header">
+      <text class="popup-title">消费记录(最近30天)</text>
+      <view class="popup-close" bindtap="closeConsumeLog">\u2715</view>
+    </view>
+    <scroll-view scroll-y class="popup-list">
+      <view class="loading-tip" wx:if="{{loadingConsume}}">加载中...</view>
+      <view class="empty-state" wx:if="{{!loadingConsume && consumeRecords.length === 0}}">暂无消费记录</view>
+      <view class="consume-item" wx:for="{{consumeRecords}}" wx:key="id">
+        <view class="consume-left">
+          <text class="consume-name">{{item.firstDishName}} 等{{item.itemCount}}件</text>
+          <text class="consume-time">{{item.createdAt}}</text>
+        </view>
+        <text class="consume-amount">\u00a5{{item.totalYuan}}</text>
+      </view>
+    </scroll-view>
+  </view>
+
+  <!-- 个人信息编辑弹层 -->
+  <view class="popup-mask" wx:if="{{showProfileEdit}}" bindtap="closeProfileEdit"></view>
+  <view class="popup-sheet {{showProfileEdit ? 'show' : ''}}">
+    <view class="popup-header">
+      <text class="popup-title">编辑个人信息</text>
+      <view class="popup-close" bindtap="closeProfileEdit">\u2715</view>
+    </view>
+    <view class="edit-form">
+      <view class="edit-row">
+        <text class="edit-label">昵称</text>
+        <input class="edit-input" value="{{editNickname}}" bindinput="onEditNickname"
+               placeholder="请输入昵称" placeholderClass="edit-placeholder" />
+      </view>
+      <view class="edit-row">
+        <text class="edit-label">手机号</text>
+        <input class="edit-input" value="{{editPhone}}" bindinput="onEditPhone"
+               type="number" maxlength="11"
+               placeholder="请输入手机号" placeholderClass="edit-placeholder" />
+      </view>
+      <view class="edit-row">
+        <text class="edit-label">生日</text>
+        <picker mode="date" bindchange="onEditBirthday">
+          <view class="edit-input edit-picker">
+            {{editBirthday || '请选择生日'}}
+          </view>
+        </picker>
+      </view>
+      <button class="save-btn" bindtap="saveProfile">保存</button>
+    </view>
+  </view>
 </view>

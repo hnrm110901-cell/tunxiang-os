@@ -96,7 +96,7 @@ class PinzhiAdapter:
                     raise Exception(f"HTTP请求失败: {e.response.status_code}")
                 await asyncio.sleep(0.5 * (2 ** attempt))
 
-            except Exception as e:
+            except (httpx.ConnectError, httpx.TimeoutException, httpx.DecodingError, ValueError) as e:
                 logger.error(
                     "请求异常",
                     endpoint=endpoint,
@@ -107,7 +107,7 @@ class PinzhiAdapter:
                     raise
                 await asyncio.sleep(0.5 * (2 ** attempt))
 
-        raise Exception("请求失败，已达到最大重试次数")
+        raise RuntimeError("请求失败，已达到最大重试次数")
 
     def _add_sign(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -208,7 +208,7 @@ class PinzhiAdapter:
                 else:
                     response = await self._request("POST", path, data=params)
                 return response.get("data", [])
-            except Exception as e:
+            except (httpx.HTTPError, RuntimeError, ValueError) as e:
                 logger.warning("查询菜品失败", method=method, path=path, error=str(e))
         return []
 
@@ -231,8 +231,8 @@ class PinzhiAdapter:
         try:
             response = await self._request("GET", "/pinzhi/queryPractice.do", params=params)
             return response.get("data", [])
-        except Exception as e:
-            logger.warning("查询做法配料失败", error=str(e))
+        except (httpx.HTTPError, RuntimeError, ValueError) as e:
+            logger.warning("查询做法配料失败", error=str(e), exc_info=True)
             return []
 
     async def get_tables(self, ognid: Optional[str] = None) -> List[Dict[str, Any]]:
@@ -254,8 +254,8 @@ class PinzhiAdapter:
         try:
             response = await self._request("GET", "/pinzhi/queryTable.do", params=params)
             return response.get("res", [])
-        except Exception as e:
-            logger.warning("查询桌台失败", error=str(e))
+        except (httpx.HTTPError, RuntimeError, ValueError) as e:
+            logger.warning("查询桌台失败", error=str(e), exc_info=True)
             return []
 
     async def get_employees(self, ognid: Optional[str] = None) -> List[Dict[str, Any]]:
@@ -279,7 +279,7 @@ class PinzhiAdapter:
             try:
                 response = await self._request("GET", path, params=params)
                 return response.get("data", [])
-            except Exception as e:
+            except (httpx.HTTPError, RuntimeError, ValueError) as e:
                 logger.warning("查询员工失败", path=path, error=str(e))
         return []
 
@@ -352,8 +352,8 @@ class PinzhiAdapter:
         try:
             response = await self._request("GET", "/pinzhi/queryOrderSummary.do", params=params)
             return response.get("res", {})
-        except Exception as e:
-            logger.warning("查询收入数据失败", error=str(e))
+        except (httpx.HTTPError, RuntimeError, ValueError) as e:
+            logger.warning("查询收入数据失败", error=str(e), exc_info=True)
             return {}
 
     async def query_store_summary_list(
@@ -375,8 +375,8 @@ class PinzhiAdapter:
         try:
             response = await self._request("GET", "/pinzhi/queryStoreSummaryList.do", params=params)
             return response.get("data", [])
-        except Exception as e:
-            logger.warning("查询门店营业数据失败", error=str(e))
+        except (httpx.HTTPError, RuntimeError, ValueError) as e:
+            logger.warning("查询门店营业数据失败", error=str(e), exc_info=True)
             return []
 
     async def query_cooking_detail(self, business_date: str) -> List[Dict[str, Any]]:
@@ -396,8 +396,8 @@ class PinzhiAdapter:
         try:
             response = await self._request("GET", "/pinzhi/queryCookingDetail.do", params=params)
             return response.get("data", [])
-        except Exception as e:
-            logger.warning("查询出品明细失败", error=str(e))
+        except (httpx.HTTPError, RuntimeError, ValueError) as e:
+            logger.warning("查询出品明细失败", error=str(e), exc_info=True)
             return []
 
     async def get_payment_customer(
@@ -427,8 +427,8 @@ class PinzhiAdapter:
         try:
             response = await self._request("GET", "/pinzhi/paymentCustomer.do", params=params)
             return response.get("data", [])
-        except Exception as e:
-            logger.warning("查询挂账客户失败", error=str(e))
+        except (httpx.HTTPError, RuntimeError, ValueError) as e:
+            logger.warning("查询挂账客户失败", error=str(e), exc_info=True)
             return []
 
     async def query_ogn_daily_biz_data(
@@ -457,8 +457,8 @@ class PinzhiAdapter:
                 "GET", "/pinzhi/queryOgnDailyBizData.do", params=params
             )
             return response.get("res", response.get("data", {}))
-        except Exception as e:
-            logger.warning("查询门店每日经营数据失败", error=str(e))
+        except (httpx.HTTPError, RuntimeError, ValueError) as e:
+            logger.warning("查询门店每日经营数据失败", error=str(e), exc_info=True)
             return {}
 
     async def get_organizations(self) -> List[Dict[str, Any]]:
@@ -474,8 +474,8 @@ class PinzhiAdapter:
         try:
             response = await self._request("GET", "/pinzhi/organizations.do", params=params)
             return response.get("data", response.get("res", []))
-        except Exception as e:
-            logger.warning("查询组织/机构失败", error=str(e))
+        except (httpx.HTTPError, RuntimeError, ValueError) as e:
+            logger.warning("查询组织/机构失败", error=str(e), exc_info=True)
             return []
 
     async def get_pay_types(self) -> List[Dict[str, Any]]:
@@ -492,7 +492,7 @@ class PinzhiAdapter:
             try:
                 response = await self._request("GET", path, params=params)
                 return response.get("data", response.get("res", []))
-            except Exception as e:
+            except (httpx.HTTPError, RuntimeError, ValueError) as e:
                 logger.warning("查询支付方式失败", path=path, error=str(e))
         return []
 
@@ -519,8 +519,8 @@ class PinzhiAdapter:
         try:
             response = await self._request("GET", "/pinzhi/downloadBillData.do", params=params)
             return response.get("data", "")
-        except Exception as e:
-            logger.warning("下载对账单失败", error=str(e))
+        except (httpx.HTTPError, RuntimeError, ValueError) as e:
+            logger.warning("下载对账单失败", error=str(e), exc_info=True)
             return ""
 
     async def run_all_checks(
@@ -593,7 +593,8 @@ class PinzhiAdapter:
                     "message": count or "成功",
                     "required": required,
                 })
-            except Exception as e:
+            except Exception as e:  # 诊断工具：必须捕获所有异常以报告接口状态
+                logger.debug("run_all_checks接口失败", name=name, error=str(e), exc_info=True)
                 results.append({
                     "name": name,
                     "endpoint": endpoint.split("/")[-1],
@@ -666,6 +667,34 @@ class PinzhiAdapter:
         for idx, dish in enumerate(raw.get("dishList", []), start=1):
             unit_price = Decimal(str(dish.get("dishPrice", dish.get("price", 0)))) / 100
             qty = int(dish.get("dishNum", dish.get("quantity", 1)))
+
+            # 原价（折前价）— 品智 dishOriginalPrice / originalPrice
+            orig_price_raw = dish.get("dishOriginalPrice", dish.get("originalPrice"))
+            original_price_fen = int(orig_price_raw) if orig_price_raw is not None else None
+
+            # 单品折扣金额 — 品智 discountPrice / specialPrice
+            disc_raw = dish.get("discountPrice", dish.get("specialPrice"))
+            single_discount_fen = int(disc_raw) if disc_raw is not None else None
+
+            # 做法/口味 → practice_names（逗号拼接）
+            practice_parts = []
+            for p in dish.get("practice", []):
+                name = p.get("name") or p.get("practiceName")
+                if name:
+                    practice_parts.append(str(name))
+            for t in dish.get("taste", []):
+                name = t.get("name") or t.get("tasteName")
+                if name:
+                    practice_parts.append(str(name))
+            practice_names = ",".join(practice_parts) if practice_parts else None
+
+            # 赠菜判断 — 品智 isGift / giftFlag
+            is_gift = bool(dish.get("isGift") or dish.get("giftFlag", False))
+            gift_reason = dish.get("giftReason") if is_gift else None
+
+            # 套餐 — 品智 comboId / packageId
+            combo_id = dish.get("comboId") or dish.get("packageId")
+
             items.append(OrderItemSchema(
                 item_id=str(dish.get("dishId", f"{raw.get('billId', '')}_{idx}")),
                 dish_id=str(dish.get("dishId", "")),
@@ -674,10 +703,33 @@ class PinzhiAdapter:
                 quantity=qty,
                 unit_price=unit_price,
                 subtotal=unit_price * qty,
+                original_price_fen=original_price_fen,
+                single_discount_fen=single_discount_fen,
+                practice_names=practice_names,
+                is_gift=is_gift,
+                gift_reason=gift_reason,
+                combo_id=str(combo_id) if combo_id else None,
             ))
 
-        order_source = raw.get("orderSource", 1)
-        order_type = OrderType.DINE_IN if order_source == 1 else OrderType.DELIVERY
+        order_source_raw = raw.get("orderSource", 1)
+        order_type = OrderType.DINE_IN if order_source_raw == 1 else OrderType.DELIVERY
+
+        # cashier_id — 品智 cashiers 字段（收银员工号）
+        cashier_id_raw = raw.get("cashiers")
+
+        # service_charge_fen — 品智 teaPrice（茶位费/服务费，原始单位分）
+        service_charge_fen = int(raw.get("teaPrice", 0)) or None
+
+        # order_source — 保留品智原始编码字符串
+        order_source_str = str(order_source_raw) if order_source_raw is not None else None
+
+        logger.debug(
+            "pinzhi_to_order",
+            bill_id=raw.get("billId"),
+            order_source=order_source_str,
+            cashier_id=cashier_id_raw,
+            service_charge_fen=service_charge_fen,
+        )
 
         return OrderSchema(
             order_id=str(raw.get("billId", "")),
@@ -696,7 +748,9 @@ class PinzhiAdapter:
             created_at=created_at,
             completed_at=completed_at,
             waiter_id=raw.get("openOrderUser"),
-            cashier_id=raw.get("cashiers"),
+            cashier_id=cashier_id_raw,
+            order_source=order_source_str,
+            service_charge_fen=service_charge_fen,
             notes=raw.get("remark"),
         )
 

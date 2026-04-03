@@ -11,16 +11,15 @@
 - 多门店联合训练模拟
 """
 import math
-import sys
 import os
+import sys
 
 import pytest
 
 # 确保 src/services 可导入
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "services"))
 
-from federated_learning import FederatedLearningService, FEDERATED_MODELS
-
+from federated_learning import FEDERATED_MODELS, FederatedLearningService
 
 # ─── Fixtures ───
 

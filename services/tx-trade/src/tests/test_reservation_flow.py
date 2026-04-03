@@ -1,10 +1,15 @@
 """预订→排队→入座 全链路测试"""
-import sys, os
+import os
+import sys
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from services.reservation_flow import (
-    can_reservation_transition, generate_queue_number, call_next,
-    reservation_to_queue, queue_to_table, compute_queue_stats,
+    call_next,
+    can_reservation_transition,
+    compute_queue_stats,
+    generate_queue_number,
+    queue_to_table,
 )
 
 

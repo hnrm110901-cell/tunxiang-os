@@ -10,15 +10,16 @@
 7. 时段冲突检测
 8. 美团排队同步
 """
-import pytest
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 
+import pytest
+
+from ..services import banquet_lifecycle as bl_mod
 from ..services import queue_service as qs_mod
 from ..services import reservation_service as rs_mod
-from ..services import banquet_lifecycle as bl_mod
+from ..services.banquet_lifecycle import BanquetLifecycleService, can_stage_transition
 from ..services.queue_service import QueueService, _today_str
 from ..services.reservation_service import ReservationService
-from ..services.banquet_lifecycle import BanquetLifecycleService, can_stage_transition
 
 
 @pytest.fixture(autouse=True)

@@ -13,8 +13,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
-
+from typing import Any, Dict, List
 
 # ── 行业基准值（餐饮行业标准） ─────────────────────────────────
 INDUSTRY_BENCHMARKS: Dict[str, Dict[str, Any]] = {

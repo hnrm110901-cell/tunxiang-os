@@ -1,123 +1,139 @@
-"""Sync Engine — 本地 PG ↔ 云端 PG 增量同步
+"""main.py — Sync Engine 入口
+
+启动策略：
+  1. 检查云端连接状态
+  2. 可连接且未曾同步 → 全量同步，切换增量模式
+  3. 可连接已有水位   → 直接增量同步
+  4. 不可连接         → 本地模式（只写 local_change_log，等待重连）
+  5. 重连后           → 先 push 本地变更，再增量同步
 
 设计原则：
-- 每 300 秒增量同步
-- 冲突解决：云端为主
-- 断网自动重连追补
-- 不阻塞业务（异步运行）
+  - 每 SYNC_INTERVAL 秒增量同步（默认 5 分钟）
+  - 冲突解决：云端为主（cloud-wins），保留本地终态
+  - 基于 updated_at 时间戳的增量追踪
+  - 不阻塞业务（异步运行）
 """
+from __future__ import annotations
+
 import asyncio
 import os
-import time
 
+import httpx
 import structlog
+from sync_engine import SyncEngine
+from sync_tracker import SyncTracker
 
 logger = structlog.get_logger()
 
-SYNC_INTERVAL = int(os.getenv("SYNC_INTERVAL_SECONDS", "300"))
-CLOUD_DB_URL = os.getenv("CLOUD_DATABASE_URL", "")
-LOCAL_DB_URL = os.getenv("LOCAL_DATABASE_URL", "postgresql://tunxiang:local@localhost/tunxiang_local")
+# ─── 配置 ──────────────────────────────────────────────────────────────────
 
-# 核心交易表（需要双向同步）
-SYNC_TABLES = [
-    "orders",
-    "order_items",
-    "payments",
-    "refunds",
-    "customers",
-    "dishes",
-    "ingredients",
-    "employees",
-    "settlements",
-]
+SYNC_INTERVAL: int = int(os.getenv("SYNC_INTERVAL_SECONDS", "300"))
+CLOUD_API_URL: str = os.getenv("CLOUD_API_URL", "")
+SYNC_DB_PATH: str = os.getenv("SYNC_DB_PATH", "/var/lib/tunxiang/sync_engine.db")
+TENANT_ID: str = os.getenv("TENANT_ID", "")
+CONNECT_TIMEOUT: float = float(os.getenv("CLOUD_CONNECT_TIMEOUT", "5"))
+
+# ─── 连接状态 ──────────────────────────────────────────────────────────────
+
+_is_connected: bool = False
+_engine: SyncEngine | None = None
 
 
-class SyncEngine:
-    """增量同步引擎"""
+async def _check_cloud_connection() -> bool:
+    """尝试连接云端 /health，返回是否可达"""
+    if not CLOUD_API_URL:
+        logger.warning("main.no_cloud_api_url", msg="CLOUD_API_URL not set")
+        return False
+    try:
+        async with httpx.AsyncClient(timeout=CONNECT_TIMEOUT) as client:
+            resp = await client.get(f"{CLOUD_API_URL}/health")
+            return resp.status_code == 200
+    except (httpx.ConnectError, httpx.TimeoutException, httpx.HTTPError):
+        return False
 
-    def __init__(self):
-        self.last_sync_at: float = 0
-        self.sync_count: int = 0
-        self.is_running: bool = False
-        self.is_connected: bool = False
 
-    async def start(self):
-        """启动同步循环"""
-        self.is_running = True
-        logger.info("sync_engine_started", interval=SYNC_INTERVAL, tables=len(SYNC_TABLES))
+async def _run_sync_loop(engine: SyncEngine, tracker: SyncTracker) -> None:
+    """主同步循环"""
+    global _is_connected
 
-        while self.is_running:
-            try:
-                await self._sync_cycle()
-            except Exception as e:
-                logger.error("sync_error", error=str(e))
-                self.is_connected = False
+    needs_full_sync = True  # 首次运行标记
 
+    while True:
+        connected = await _check_cloud_connection()
+
+        if connected and not _is_connected:
+            # 重新连接：推送离线变更，再做增量同步
+            logger.info("main.cloud_reconnected")
+            _is_connected = True
+            pending = await tracker.get_pending_count()
+            if pending > 0:
+                logger.info("main.flushing_offline_changes", pending=pending)
+                await engine.push_local_changes(TENANT_ID)
+
+        if not connected:
+            _is_connected = False
+            logger.info("main.offline_mode", msg="cloud unreachable, running local-only")
             await asyncio.sleep(SYNC_INTERVAL)
+            continue
 
-    async def stop(self):
-        self.is_running = False
-        logger.info("sync_engine_stopped", total_syncs=self.sync_count)
+        try:
+            if needs_full_sync:
+                # 检查是否已有历史水位（已同步过则跳过全量）
+                watermark = await tracker.get_watermark("orders")
+                if watermark == "1970-01-01T00:00:00+00:00":
+                    logger.info("main.full_sync_triggered", reason="first run or reset")
+                    await engine.full_sync(TENANT_ID)
+                else:
+                    logger.info(
+                        "main.skip_full_sync",
+                        reason="watermark exists",
+                        watermark=watermark,
+                    )
+                needs_full_sync = False
+            else:
+                await engine.incremental_sync(TENANT_ID)
 
-    async def _sync_cycle(self):
-        """单次同步周期"""
-        start = time.perf_counter()
+        except (httpx.ConnectError, httpx.TimeoutException) as exc:
+            logger.error(
+                "main.sync_network_error",
+                error=str(exc),
+                error_type=type(exc).__name__,
+                exc_info=True,
+            )
+            _is_connected = False
+            needs_full_sync = True  # 断线重连后重新判断
 
-        # 1. 上传：本地变更 → 云端
-        local_changes = await self._get_local_changes()
-        if local_changes:
-            await self._push_to_cloud(local_changes)
+        except OSError as exc:
+            logger.error("main.sync_os_error", error=str(exc), exc_info=True)
+            _is_connected = False
 
-        # 2. 下载：云端变更 → 本地
-        cloud_changes = await self._get_cloud_changes()
-        if cloud_changes:
-            await self._apply_to_local(cloud_changes)
-
-        duration_ms = int((time.perf_counter() - start) * 1000)
-        self.last_sync_at = time.time()
-        self.sync_count += 1
-        self.is_connected = True
-
-        logger.info(
-            "sync_completed",
-            cycle=self.sync_count,
-            uploaded=len(local_changes),
-            downloaded=len(cloud_changes),
-            duration_ms=duration_ms,
-        )
-
-    async def _get_local_changes(self) -> list[dict]:
-        """获取本地自上次同步后的变更（基于 updated_at）"""
-        # TODO: 使用 PG logical replication 或 updated_at 比较
-        return []
-
-    async def _push_to_cloud(self, changes: list[dict]):
-        """上传变更到云端"""
-        # TODO: 批量 upsert 到云端 PG
-        logger.info("push_to_cloud", count=len(changes))
-
-    async def _get_cloud_changes(self) -> list[dict]:
-        """获取云端自上次同步后的变更"""
-        # TODO: 查询云端 PG 的增量变更
-        return []
-
-    async def _apply_to_local(self, changes: list[dict]):
-        """应用云端变更到本地（云端为主，冲突覆盖）"""
-        # TODO: 批量 upsert 到本地 PG，冲突时云端优先
-        logger.info("apply_to_local", count=len(changes))
-
-    def get_status(self) -> dict:
-        return {
-            "is_running": self.is_running,
-            "is_connected": self.is_connected,
-            "sync_count": self.sync_count,
-            "last_sync_at": self.last_sync_at,
-            "interval_seconds": SYNC_INTERVAL,
-            "tables": SYNC_TABLES,
-        }
+        await asyncio.sleep(SYNC_INTERVAL)
 
 
-# CLI 入口
+async def main() -> None:
+    """程序入口：初始化并启动同步循环"""
+    logger.info(
+        "main.starting",
+        sync_interval=SYNC_INTERVAL,
+        cloud_api_url=CLOUD_API_URL or "(not set)",
+        sync_db_path=SYNC_DB_PATH,
+        tenant_id=TENANT_ID or "(not set)",
+    )
+
+    tracker = SyncTracker(db_path=SYNC_DB_PATH)
+    engine = SyncEngine(
+        tracker=tracker,
+        cloud_api_url=CLOUD_API_URL,
+    )
+
+    global _engine
+    _engine = engine
+
+    await engine.init()
+    logger.info("main.engine_initialized")
+
+    await _run_sync_loop(engine, tracker)
+
+
 if __name__ == "__main__":
-    engine = SyncEngine()
-    asyncio.run(engine.start())
+    asyncio.run(main())

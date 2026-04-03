@@ -4,8 +4,8 @@
 """
 import uuid
 from typing import Any
-from ..base import SkillAgent, AgentResult
 
+from ..base import AgentResult, SkillAgent
 
 # 24节气+重要节日日历
 SEASONAL_CALENDAR = {

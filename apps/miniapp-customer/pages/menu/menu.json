@@ -1,0 +1,9 @@
+{
+  "navigationBarTitleText": "点餐",
+  "usingComponents": {
+    "dish-card": "/components/dish-card/dish-card",
+    "cart-bar": "/components/cart-bar/cart-bar",
+    "dish-customize": "/components/dish-customize/dish-customize",
+    "ai-recommend": "/components/ai-recommend/ai-recommend"
+  }
+}

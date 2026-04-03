@@ -1,9 +1,12 @@
 """沉睡天数检测测试"""
-import sys, os
+import os
+import sys
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from datetime import datetime, timezone, timedelta
-from services.dormancy_service import compute_dormancy_days, classify_dormancy, scan_dormant_items, suggest_cleanup
+from datetime import datetime, timezone
+
+from services.dormancy_service import classify_dormancy, compute_dormancy_days, scan_dormant_items, suggest_cleanup
 
 
 class TestDormancyDays:

@@ -15,7 +15,6 @@
 """
 from __future__ import annotations
 
-import asyncio
 import os
 import sys
 import time
@@ -34,26 +33,21 @@ for p in (_agent_src, _finance_src, _org_src):
 import pytest
 
 # ── Agent 相关 ────────────────────────────────────────────────
-from agents.base import AgentResult, SkillAgent
 from agents.skills.discount_guard import DiscountGuardAgent
 from services.agent_live_service import (
     AgentLiveService,
-    MIN_ADOPTION_RATE_FOR_UPGRADE,
-    MIN_L1_DECISIONS_FOR_UPGRADE,
+)
+
+# ── 离职结算相关 ──────────────────────────────────────────────
+from services.separation_settlement import (
+    CHANGSHA_AVG_MONTHLY_SALARY_YUAN,
+    SeparationSettlementService,
+    _compute_compensation_tax_fen,
+    _compute_n_years,
 )
 
 # ── P&L 相关 ─────────────────────────────────────────────────
 from services.store_pnl import StorePnLService
-
-# ── 离职结算相关 ──────────────────────────────────────────────
-from services.separation_settlement import (
-    SeparationSettlementService,
-    _compute_n_years,
-    _compute_compensation_tax_fen,
-    CHANGSHA_AVG_MONTHLY_SALARY_YUAN,
-    COMPENSATION_TAX_EXEMPTION_YUAN,
-)
-
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  FIXTURES

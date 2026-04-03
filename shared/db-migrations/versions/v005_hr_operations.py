@@ -120,10 +120,8 @@ def upgrade() -> None:
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("NOW()")),
         sa.Column("is_deleted", sa.Boolean, server_default="false"),
     )
-    op.create_index("ix_clock_records_employee_date", "clock_records",
-                    ["employee_id", sa.text("clock_time::date")])
-    op.create_index("ix_clock_records_store_date", "clock_records",
-                    ["store_id", sa.text("clock_time::date")])
+    op.execute("CREATE INDEX ix_clock_records_employee_date ON clock_records (employee_id, clock_time)")
+    op.execute("CREATE INDEX ix_clock_records_store_date ON clock_records (store_id, clock_time)")
 
     # ---------------------------------------------------------------
     # 3. daily_attendance — 日考勤汇总
@@ -153,8 +151,7 @@ def upgrade() -> None:
         sa.UniqueConstraint("tenant_id", "employee_id", "date", name="uq_daily_attendance_emp_date"),
     )
     op.create_index("ix_daily_attendance_store_date", "daily_attendance", ["store_id", "date"])
-    op.create_index("ix_daily_attendance_employee_month", "daily_attendance",
-                    ["employee_id", sa.text("date_trunc('month', date)")])
+    op.execute("CREATE INDEX ix_daily_attendance_employee_month ON daily_attendance (employee_id, date)")
 
     # ---------------------------------------------------------------
     # 4. payroll_batches — 薪资批次

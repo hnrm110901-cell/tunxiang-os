@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    AndroidManifest.xml — 屯象 POS 安卓壳层
+    商米 T2/V2 专用，全屏 WebView 模式，POS 收银机常驻前台。
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- 网络权限：加载 Mac mini 本地服务 + 云端 API -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <!-- 设备序列号（API 28+ 需要此权限，用于 getDeviceInfo）-->
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+
+    <!-- 商米外设权限（按需启用）-->
+    <!-- <uses-permission android:name="com.sunmi.permission.PRINTER" /> -->
+    <!-- <uses-permission android:name="com.sunmi.permission.SCALE" />   -->
+
+    <application
+        android:label="屯象POS"
+        android:theme="@style/Theme.AppCompat.NoActionBar"
+        android:hardwareAccelerated="true"
+        android:allowBackup="false"
+        android:supportsRtl="false">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:screenOrientation="landscape"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:windowSoftInputMode="adjustResize">
+
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

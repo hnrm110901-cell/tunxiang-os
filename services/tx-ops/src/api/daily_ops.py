@@ -1,5 +1,6 @@
 """日清日结 API"""
 from typing import Optional
+
 from fastapi import APIRouter
 
 router = APIRouter(prefix="/api/v1/ops", tags=["ops"])
@@ -8,7 +9,7 @@ router = APIRouter(prefix="/api/v1/ops", tags=["ops"])
 @router.get("/daily/{store_id}")
 async def get_daily_flow(store_id: str, date: Optional[str] = None):
     """获取门店当日流程状态"""
-    from ..services.daily_ops_service import NODE_DEFINITIONS, compute_flow_progress, get_flow_timeline
+    from ..services.daily_ops_service import compute_flow_progress, get_flow_timeline
     statuses = {f"E{i}": "pending" for i in range(1, 9)}
     progress = compute_flow_progress(statuses)
     timeline = get_flow_timeline(statuses)

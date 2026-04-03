@@ -41,10 +41,52 @@ services:
       TX_TRADE_URL: http://tx-trade:8001
       TX_MENU_URL: http://tx-menu:8002
       TX_AGENT_URL: http://tx-agent:8008
+      WECOM_CORP_ID: ${WECOM_CORP_ID}
+      WECOM_AGENT_ID: ${WECOM_AGENT_ID}
+      WECOM_SECRET: ${WECOM_SECRET}
+      WECOM_CALLBACK_TOKEN: ${WECOM_CALLBACK_TOKEN}
+      TX_MEMBER_SERVICE_URL: http://tx-member:8003
+      TX_GROWTH_SERVICE_URL: http://tx-growth:8004
+      # 等保三级安全认证配置（生产环境必须在 /etc/txos/security.env 中配置真实值）
+      TX_JWT_SECRET_KEY: ${TX_JWT_SECRET_KEY:-dev_jwt_secret_key_CHANGE_IN_PRODUCTION_32chars}
+      TX_MFA_ENCRYPT_KEY: ${TX_MFA_ENCRYPT_KEY:-}
+      TX_FIELD_ENCRYPTION_KEY: ${TX_FIELD_ENCRYPTION_KEY:-}
+      TX_INTEGRITY_SECRET: ${TX_INTEGRITY_SECRET:-}
     depends_on:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+
+  tx-member:
+    build:
+      context: .
+      dockerfile: services/tx-member/Dockerfile
+    ports:
+      - "8003:8003"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://tunxiang:changeme_dev@postgres/tunxiang_os
+      TX_MEMBER_SERVICE_URL: http://tx-member:8003
+      TX_GROWTH_SERVICE_URL: http://tx-growth:8004
+      TX_OPS_SERVICE_URL: http://tx-ops:8005
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  tx-growth:
+    build:
+      context: .
+      dockerfile: services/tx-growth/Dockerfile
+    ports:
+      - "8004:8004"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://tunxiang:changeme_dev@postgres/tunxiang_os
+      TX_MEMBER_SERVICE_URL: http://tx-member:8003
+      TX_GROWTH_SERVICE_URL: http://tx-growth:8004
+      TX_OPS_SERVICE_URL: http://tx-ops:8005
+      MINIAPP_BASE_URL: https://miniapp.tunxiang.com
+    depends_on:
+      postgres:
         condition: service_healthy
 
   tx-trade:
@@ -82,6 +124,103 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+
+  tx-analytics:
+    build:
+      context: .
+      dockerfile: services/tx-analytics/Dockerfile
+    ports:
+      - "8009:8009"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://tunxiang:changeme_dev@postgres/tunxiang_os
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  tx-brain:
+    build:
+      context: .
+      dockerfile: services/tx-brain/Dockerfile
+    ports:
+      - "8010:8010"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://tunxiang:changeme_dev@postgres/tunxiang_os
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  tx-intel:
+    build:
+      context: .
+      dockerfile: services/tx-intel/Dockerfile
+    ports:
+      - "8011:8011"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://tunxiang:changeme_dev@postgres/tunxiang_os
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  tx-org:
+    build:
+      context: .
+      dockerfile: services/tx-org/Dockerfile
+    ports:
+      - "8012:8012"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://tunxiang:changeme_dev@postgres/tunxiang_os
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  tx-supply:
+    build:
+      context: .
+      dockerfile: services/tx-supply/Dockerfile
+    ports:
+      - "8006:8006"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://tunxiang:changeme_dev@postgres/tunxiang_os
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  tx-finance:
+    build:
+      context: .
+      dockerfile: services/tx-finance/Dockerfile
+    ports:
+      - "8007:8007"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://tunxiang:changeme_dev@postgres/tunxiang_os
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ─── 边缘同步引擎（仅本地开发模拟；生产在 Mac mini 通过 launchd 运行）───
+  sync-engine:
+    build:
+      context: .
+      dockerfile: edge/sync-engine/Dockerfile
+    environment:
+      CLOUD_PG_DSN: ${CLOUD_PG_DSN:-postgresql://tunxiang:changeme_dev@postgres/tunxiang_os}
+      LOCAL_PG_DSN: ${LOCAL_PG_DSN:-postgresql://tunxiang:changeme_dev@postgres/tunxiang_os}
+      STORE_ID: ${STORE_ID:-store_dev}
+      TENANT_ID: ${TENANT_ID:-}
+      SYNC_INTERVAL_SECONDS: ${SYNC_INTERVAL_SECONDS:-300}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    profiles:
+      - edge   # docker-compose --profile edge up 时才启动
 
 volumes:
   pg_data:

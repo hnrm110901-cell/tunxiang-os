@@ -1,0 +1,125 @@
+<!-- 积分中心 — 兑换商城 + 积分明细 -->
+<view class="page-container">
+
+  <!-- 顶部积分卡片 -->
+  <view class="points-card">
+    <view class="points-card-main">
+      <view class="points-big-num">{{pointsBalance}}</view>
+      <view class="points-big-label">积分</view>
+    </view>
+    <view class="points-card-stats">
+      <view class="stat-item">
+        <text class="stat-value">{{monthEarned}}</text>
+        <text class="stat-label">本月获得</text>
+      </view>
+      <view class="stat-divider"></view>
+      <view class="stat-item">
+        <text class="stat-value">{{monthUsed}}</text>
+        <text class="stat-label">本月使用</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- Tab切换 -->
+  <view class="tab-bar">
+    <view class="tab-item {{activeTab === 'redeem' ? 'active' : ''}}"
+          bindtap="switchTab" data-tab="redeem">
+      兑换商城
+    </view>
+    <view class="tab-item {{activeTab === 'history' ? 'active' : ''}}"
+          bindtap="switchTab" data-tab="history">
+      积分明细
+    </view>
+  </view>
+
+  <!-- ══ 兑换商城 Tab ══ -->
+  <view wx:if="{{activeTab === 'redeem'}}">
+    <view class="loading-tip" wx:if="{{rewardLoading && rewards.length === 0}}">加载中...</view>
+
+    <view class="reward-grid" wx:if="{{rewards.length > 0}}">
+      <view class="reward-card" wx:for="{{rewards}}" wx:key="id">
+        <image class="reward-img" src="{{item.imageUrl || '/assets/reward-placeholder.png'}}"
+               mode="aspectFill" lazy-load />
+        <view class="reward-body">
+          <text class="reward-name">{{item.name}}</text>
+          <view class="reward-bottom">
+            <view class="reward-cost">
+              <text class="cost-num">{{item.pointsCost}}</text>
+              <text class="cost-unit">积分</text>
+            </view>
+            <button
+              class="redeem-btn {{pointsBalance < item.pointsCost ? 'disabled' : ''}}"
+              disabled="{{pointsBalance < item.pointsCost}}"
+              bindtap="onTapRedeem"
+              data-item="{{item}}">
+              {{pointsBalance < item.pointsCost ? '积分不足' : '兑换'}}
+            </button>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <view class="empty-state" wx:if="{{!rewardLoading && rewards.length === 0}}">
+      <text class="empty-icon">🎁</text>
+      <text class="empty-text">暂无可兑换商品</text>
+    </view>
+  </view>
+
+  <!-- ══ 积分明细 Tab ══ -->
+  <view wx:if="{{activeTab === 'history'}}">
+    <view class="loading-tip" wx:if="{{historyLoading && history.length === 0}}">加载中...</view>
+
+    <view class="history-list" wx:if="{{history.length > 0}}">
+      <view class="history-item" wx:for="{{history}}" wx:key="id">
+        <view class="history-left">
+          <text class="history-desc">{{item.description}}</text>
+          <text class="history-time">{{item.createdAt}}</text>
+        </view>
+        <text class="history-points {{item.points > 0 ? 'earned' : 'used'}}">
+          {{item.points > 0 ? '+' : ''}}{{item.points}}
+        </text>
+      </view>
+      <!-- 加载更多 -->
+      <view class="load-more-tip" wx:if="{{historyHasMore}}">
+        <text>下拉加载更多</text>
+      </view>
+      <view class="load-more-tip" wx:if="{{!historyHasMore && history.length > 0}}">
+        <text>已加载全部记录</text>
+      </view>
+    </view>
+
+    <view class="empty-state" wx:if="{{!historyLoading && history.length === 0}}">
+      <text class="empty-icon">📋</text>
+      <text class="empty-text">暂无积分记录</text>
+    </view>
+  </view>
+
+  <!-- 底部安全区 -->
+  <view class="safe-bottom"></view>
+</view>
+
+<!-- 兑换确认弹层 -->
+<view class="popup-mask" wx:if="{{showConfirm}}" bindtap="closeConfirm"></view>
+<view class="confirm-popup {{showConfirm ? 'show' : ''}}">
+  <view class="popup-header">
+    <text class="popup-title">确认兑换</text>
+    <view class="popup-close" bindtap="closeConfirm">✕</view>
+  </view>
+  <view class="popup-item-name">{{confirmItem.name}}</view>
+  <view class="popup-row">
+    <text class="popup-label">需消耗积分</text>
+    <text class="popup-val cost">{{confirmItem.pointsCost}}</text>
+  </view>
+  <view class="popup-row">
+    <text class="popup-label">当前积分</text>
+    <text class="popup-val">{{pointsBalance}}</text>
+  </view>
+  <view class="popup-row">
+    <text class="popup-label">兑换后剩余</text>
+    <text class="popup-val">{{pointsBalance - confirmItem.pointsCost}}</text>
+  </view>
+  <view class="popup-actions">
+    <button class="btn-cancel" bindtap="closeConfirm">取消</button>
+    <button class="btn-confirm" bindtap="doRedeem">确认兑换</button>
+  </view>
+</view>

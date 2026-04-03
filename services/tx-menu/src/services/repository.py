@@ -6,10 +6,10 @@
 import uuid
 from typing import Optional
 
-from sqlalchemy import select, func, update, text
+from sqlalchemy import func, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from shared.ontology.src.entities import Dish, DishCategory, DishIngredient
+from shared.ontology.src.entities import Dish, DishCategory
 
 
 class DishRepository:

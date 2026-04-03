@@ -4,8 +4,8 @@
 """
 import uuid
 from typing import Any
-from ..base import SkillAgent, AgentResult
 
+from ..base import AgentResult, SkillAgent
 
 # 标准营业时段定义
 TIME_SLOTS = {

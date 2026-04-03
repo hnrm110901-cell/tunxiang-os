@@ -1,350 +1,267 @@
 /**
- * ReviewTopicPage — 口碑主题中心
+ * ReviewTopicPage — 评论话题分析
  * 路由: /hq/market-intel/reviews
- * 主题词云 + 门店对比矩阵 + 待处理问题列表 + 营销亮点
+ * 调用 /api/v1/analytics/reviews/topics（降级至 /api/v1/analysis/dish/negative-reviews）
+ * 话题列表（话题词/频率/情感/门店分布）+ 时间范围筛选 7/30/90 天
  */
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { txFetch } from '../../../api';
 
-const BG_0 = '#0f1923';
-const BG_1 = '#1a2836';
+// ---- 颜色常量 ----
+const BG   = '#0d1e28';
+const BG_1 = '#1a2a33';
 const BG_2 = '#243442';
-const BRAND = '#ff6b2c';
-const GREEN = '#52c41a';
-const RED = '#ff4d4f';
+const BRAND  = '#ff6b2c';
+const GREEN  = '#52c41a';
+const RED    = '#ff4d4f';
 const YELLOW = '#faad14';
-const BLUE = '#1890ff';
-const PURPLE = '#722ed1';
-const CYAN = '#13c2c2';
+const BLUE   = '#1890ff';
 const TEXT_1 = '#ffffff';
 const TEXT_2 = '#cccccc';
 const TEXT_3 = '#999999';
 const TEXT_4 = '#666666';
 
-type TabKey = 'cloud' | 'matrix' | 'issues' | 'highlights';
+// ---- 类型 ----
+type DaysRange = 7 | 30 | 90;
+type Sentiment = 'positive' | 'neutral' | 'negative';
+type SentimentFilter = Sentiment | '全部';
 
 interface TopicItem {
+  id: string;
   keyword: string;
-  category: '好评' | '差评' | '菜品' | '服务' | '卫生' | '等待' | '性价比';
-  sentiment: 'positive' | 'neutral' | 'negative';
+  category: string;
+  sentiment: Sentiment;
   count: number;
   trend: 'up' | 'down' | 'stable';
   trendPct: number;
+  storeDistribution: Array<{ storeName: string; count: number }>;
+  sampleReviews: string[];
 }
 
-interface StoreReviewScore {
-  storeName: string;
-  overall: number;
-  food: number;
-  service: number;
-  environment: number;
-  wait: number;
-  value: number;
-  reviewCount: number;
-  negativeCount: number;
+// 后端评论话题接口数据形状（带降级兼容）
+interface ApiTopicData {
+  topics?: ApiTopicRow[];
+  items?: ApiNegReviewRow[];
+  total?: number;
 }
 
-interface ActionableIssue {
-  id: string;
-  topic: string;
-  storeName: string;
-  severity: 'high' | 'medium' | 'low';
-  sampleReview: string;
-  mentionCount: number;
-  trend: 'up' | 'down' | 'stable';
-  suggestedAction: string;
-  status: '待处理' | '处理中' | '已解决';
+interface ApiTopicRow {
+  topic_id?: string;
+  keyword: string;
+  category?: string;
+  sentiment?: Sentiment;
+  count: number;
+  trend?: string;
+  trend_pct?: number;
+  store_distribution?: Array<{ store_name: string; count: number }>;
+  sample_reviews?: string[];
 }
 
-interface MarketingHighlight {
-  id: string;
-  topic: string;
-  storeName: string;
-  sampleReview: string;
-  positiveCount: number;
-  shareability: number;
-  suggestedUse: string;
+interface ApiNegReviewRow {
+  dish_id: string;
+  dish_name: string;
+  avg_rating: number;
+  review_count: number;
+  negative_count: number;
+  sample_comments?: string[];
 }
 
-const MOCK_TOPICS: TopicItem[] = [
-  { keyword: '辣椒炒肉', category: '好评', sentiment: 'positive', count: 1256, trend: 'up', trendPct: 15 },
-  { keyword: '服务热情', category: '服务', sentiment: 'positive', count: 892, trend: 'up', trendPct: 8 },
-  { keyword: '等位太久', category: '等待', sentiment: 'negative', count: 645, trend: 'up', trendPct: 22 },
-  { keyword: '味道正宗', category: '好评', sentiment: 'positive', count: 1034, trend: 'stable', trendPct: 2 },
-  { keyword: '环境干净', category: '卫生', sentiment: 'positive', count: 567, trend: 'stable', trendPct: 0 },
-  { keyword: '性价比高', category: '性价比', sentiment: 'positive', count: 789, trend: 'up', trendPct: 12 },
-  { keyword: '上菜慢', category: '等待', sentiment: 'negative', count: 423, trend: 'down', trendPct: -5 },
-  { keyword: '分量足', category: '好评', sentiment: 'positive', count: 678, trend: 'stable', trendPct: 3 },
-  { keyword: '菜品偏咸', category: '差评', sentiment: 'negative', count: 234, trend: 'up', trendPct: 18 },
-  { keyword: '服务员态度差', category: '差评', sentiment: 'negative', count: 156, trend: 'down', trendPct: -10 },
-  { keyword: '新品好吃', category: '菜品', sentiment: 'positive', count: 345, trend: 'up', trendPct: 35 },
-  { keyword: '厕所脏', category: '卫生', sentiment: 'negative', count: 89, trend: 'down', trendPct: -15 },
-  { keyword: '装修有特色', category: '好评', sentiment: 'positive', count: 432, trend: 'stable', trendPct: 1 },
-  { keyword: '排队叫号混乱', category: '等待', sentiment: 'negative', count: 178, trend: 'up', trendPct: 25 },
-  { keyword: '酸汤鱼绝了', category: '菜品', sentiment: 'positive', count: 267, trend: 'up', trendPct: 120 },
-  { keyword: '米饭硬', category: '差评', sentiment: 'negative', count: 112, trend: 'stable', trendPct: 0 },
-  { keyword: '适合聚餐', category: '好评', sentiment: 'positive', count: 534, trend: 'up', trendPct: 6 },
-  { keyword: '空调太冷', category: '差评', sentiment: 'negative', count: 67, trend: 'down', trendPct: -20 },
+// ---- 默认离线数据 ----
+const FALLBACK_TOPICS: TopicItem[] = [
+  { id: 't1', keyword: '辣椒炒肉', category: '好评', sentiment: 'positive', count: 1256, trend: 'up', trendPct: 15, storeDistribution: [{ storeName: '芙蓉路店', count: 423 }, { storeName: '梅溪湖店', count: 312 }, { storeName: '万达广场店', count: 289 }], sampleReviews: ['辣椒炒肉太好吃了！肉嫩椒香', '来长沙必吃，味道正宗'] },
+  { id: 't2', keyword: '等位太久', category: '等待', sentiment: 'negative', count: 645, trend: 'up', trendPct: 22, storeDistribution: [{ storeName: '五一广场店', count: 245 }, { storeName: '万达广场店', count: 156 }, { storeName: '芙蓉路店', count: 98 }], sampleReviews: ['周末等了一个半小时，体验很差', '叫号系统混乱，容易错过'] },
+  { id: 't3', keyword: '味道正宗', category: '好评', sentiment: 'positive', count: 1034, trend: 'stable', trendPct: 2, storeDistribution: [{ storeName: '芙蓉路店', count: 345 }, { storeName: '梅溪湖店', count: 278 }], sampleReviews: ['味道很正宗，像妈妈做的家常菜', '湘菜味道到位，辣而不燥'] },
+  { id: 't4', keyword: '性价比高', category: '性价比', sentiment: 'positive', count: 789, trend: 'up', trendPct: 12, storeDistribution: [{ storeName: '河西大学城店', count: 256 }, { storeName: '星沙店', count: 198 }], sampleReviews: ['人均60多，吃得很好，超划算', '4个人200块搞定，太值了'] },
+  { id: 't5', keyword: '上菜慢', category: '等待', sentiment: 'negative', count: 423, trend: 'down', trendPct: -5, storeDistribution: [{ storeName: '河西大学城店', count: 178 }, { storeName: '开福寺店', count: 134 }], sampleReviews: ['等了40分钟才上第一道菜', '午休时间根本来不及等'] },
+  { id: 't6', keyword: '菜品偏咸', category: '差评', sentiment: 'negative', count: 234, trend: 'up', trendPct: 18, storeDistribution: [{ storeName: '全部门店', count: 234 }], sampleReviews: ['辣椒炒肉味道不错但有点太咸了', '希望能调整口味，稍微清淡一点'] },
+  { id: 't7', keyword: '酸汤鱼绝了', category: '好评', sentiment: 'positive', count: 267, trend: 'up', trendPct: 120, storeDistribution: [{ storeName: '梅溪湖店', count: 189 }, { storeName: '芙蓉路店', count: 78 }], sampleReviews: ['新出的酸汤鱼太好吃了！汤鲜鱼嫩', '喝了三碗汤，必须推荐'] },
+  { id: 't8', keyword: '环境干净', category: '卫生', sentiment: 'positive', count: 567, trend: 'stable', trendPct: 0, storeDistribution: [{ storeName: '梅溪湖店', count: 198 }, { storeName: '芙蓉路店', count: 167 }], sampleReviews: ['环境很干净整洁，很放心', '桌椅干净，整体卫生条件好'] },
+  { id: 't9', keyword: '服务热情', category: '服务', sentiment: 'positive', count: 892, trend: 'up', trendPct: 8, storeDistribution: [{ storeName: '芙蓉路店', count: 312 }, { storeName: '梅溪湖店', count: 256 }], sampleReviews: ['服务员很热情，全程笑脸', '主动帮忙推荐菜品，体验很好'] },
+  { id: 't10', keyword: '排队叫号混乱', category: '等待', sentiment: 'negative', count: 178, trend: 'up', trendPct: 25, storeDistribution: [{ storeName: '万达广场店', count: 98 }, { storeName: '五一广场店', count: 80 }], sampleReviews: ['叫到我号的时候没听到，又被跳过了', '叫号系统不完善，需要改进'] },
 ];
 
-const MOCK_STORE_SCORES: StoreReviewScore[] = [
-  { storeName: '芙蓉路店', overall: 4.6, food: 4.7, service: 4.5, environment: 4.6, wait: 4.2, value: 4.5, reviewCount: 3240, negativeCount: 86 },
-  { storeName: '万达广场店', overall: 4.4, food: 4.5, service: 4.3, environment: 4.4, wait: 3.8, value: 4.3, reviewCount: 2860, negativeCount: 124 },
-  { storeName: '梅溪湖店', overall: 4.5, food: 4.6, service: 4.4, environment: 4.7, wait: 4.0, value: 4.4, reviewCount: 2450, negativeCount: 78 },
-  { storeName: '五一广场店', overall: 4.2, food: 4.3, service: 4.0, environment: 4.1, wait: 3.5, value: 4.1, reviewCount: 3560, negativeCount: 215 },
-  { storeName: '星沙店', overall: 4.3, food: 4.4, service: 4.2, environment: 4.3, wait: 3.9, value: 4.4, reviewCount: 1890, negativeCount: 95 },
-  { storeName: '河西大学城店', overall: 4.1, food: 4.2, service: 3.9, environment: 4.0, wait: 3.6, value: 4.5, reviewCount: 2120, negativeCount: 167 },
-  { storeName: '开福寺店', overall: 4.0, food: 4.1, service: 3.8, environment: 3.9, wait: 3.4, value: 4.2, reviewCount: 1670, negativeCount: 143 },
-];
+// ---- API ----
+async function fetchReviewTopics(days: DaysRange): Promise<{ topics: TopicItem[]; isFallback: boolean }> {
+  try {
+    // 优先调用专用话题接口
+    const data = await txFetch<ApiTopicData>(
+      `/api/v1/analytics/reviews/topics?days=${days}`
+    );
+    if (data?.topics?.length) {
+      const topics: TopicItem[] = data.topics.map((t, i) => ({
+        id: t.topic_id || `t${i}`,
+        keyword: t.keyword,
+        category: t.category || '话题',
+        sentiment: t.sentiment || 'neutral',
+        count: t.count,
+        trend: (t.trend as 'up' | 'down' | 'stable') || 'stable',
+        trendPct: t.trend_pct || 0,
+        storeDistribution: (t.store_distribution || []).map((sd) => ({
+          storeName: sd.store_name,
+          count: sd.count,
+        })),
+        sampleReviews: t.sample_reviews || [],
+      }));
+      return { topics, isFallback: false };
+    }
+    throw new Error('empty');
+  } catch {
+    // 降级：调用差评菜品接口转换
+    try {
+      const neg = await txFetch<ApiTopicData>(
+        `/api/v1/analysis/dish/negative-reviews?store_id=hq&days=${days}&limit=10`
+      );
+      if (neg?.items?.length) {
+        const topics: TopicItem[] = neg.items.map((r, i) => ({
+          id: `neg-${i}`,
+          keyword: r.dish_name,
+          category: '差评菜品',
+          sentiment: 'negative',
+          count: r.negative_count,
+          trend: 'stable',
+          trendPct: 0,
+          storeDistribution: [],
+          sampleReviews: r.sample_comments || [],
+        }));
+        return { topics, isFallback: false };
+      }
+    } catch {
+      // 二级降级：使用离线数据
+    }
+    return { topics: FALLBACK_TOPICS, isFallback: true };
+  }
+}
 
-const MOCK_ISSUES: ActionableIssue[] = [
-  { id: 'ai1', topic: '等位太久', storeName: '五一广场店', severity: 'high', sampleReview: '周末等了快一个半小时，叫号系统也乱，体验很差', mentionCount: 245, trend: 'up', suggestedAction: '增加等位管理系统，优化翻台率，增加预约取号渠道', status: '处理中' },
-  { id: 'ai2', topic: '上菜慢', storeName: '河西大学城店', severity: 'high', sampleReview: '点完餐等了40分钟才上第一道菜，午休时间根本来不及', mentionCount: 178, trend: 'stable', suggestedAction: '优化后厨动线，增加午间备菜量，推出午市快速套餐', status: '待处理' },
-  { id: 'ai3', topic: '菜品偏咸', storeName: '全部门店', severity: 'medium', sampleReview: '辣椒炒肉味道不错但有点太咸了，希望能调整下', mentionCount: 234, trend: 'up', suggestedAction: '调研各门店厨师用盐量标准，统一SOP，增加"少盐"选项', status: '待处理' },
-  { id: 'ai4', topic: '排队叫号混乱', storeName: '万达广场店', severity: 'medium', sampleReview: '叫到我号的时候没听到，结果又被跳过了，很不合理', mentionCount: 98, trend: 'up', suggestedAction: '升级叫号系统，增加短信/微信提醒功能', status: '待处理' },
-  { id: 'ai5', topic: '服务员态度差', storeName: '开福寺店', severity: 'medium', sampleReview: '服务员好像不太耐烦，催了两次才给加水', mentionCount: 67, trend: 'down', suggestedAction: '加强服务培训，建立服务质量考核机制', status: '已解决' },
-  { id: 'ai6', topic: '米饭质量', storeName: '星沙店', severity: 'low', sampleReview: '米饭煮得有点硬，不太好吃', mentionCount: 45, trend: 'stable', suggestedAction: '检查米饭设备和米品质量，调整蒸煮参数', status: '待处理' },
-];
+// ---- 子组件 ----
 
-const MOCK_HIGHLIGHTS: MarketingHighlight[] = [
-  { id: 'mh1', topic: '辣椒炒肉', storeName: '芙蓉路店', sampleReview: '来长沙必吃的辣椒炒肉！肉嫩辣椒香，配上米饭简直绝了', positiveCount: 456, shareability: 92, suggestedUse: '小红书/抖音种草内容，突出"来长沙必吃"定位' },
-  { id: 'mh2', topic: '性价比', storeName: '全部门店', sampleReview: '人均60-70就能吃得很好，4个人200多搞定，太划算了', positiveCount: 345, shareability: 85, suggestedUse: '美团/大众点评推广语，强调高性价比聚餐选择' },
-  { id: 'mh3', topic: '酸汤鱼', storeName: '梅溪湖店', sampleReview: '新出的酸汤鱼太好吃了！汤鲜鱼嫩，喝了三碗汤', positiveCount: 267, shareability: 95, suggestedUse: '新品推广素材，用户UGC二次传播' },
-  { id: 'mh4', topic: '适合聚餐', storeName: '全部门店', sampleReview: '朋友聚餐首选，菜品丰富分量大，环境也好拍照', positiveCount: 234, shareability: 78, suggestedUse: '聚餐场景营销，朋友聚会/家庭聚餐推荐' },
-  { id: 'mh5', topic: '装修特色', storeName: '芙蓉路店', sampleReview: '装修很有湖南特色，拍照打卡很好看，适合发朋友圈', positiveCount: 189, shareability: 88, suggestedUse: '打卡营销，鼓励顾客拍照分享' },
-];
+const SENT_COLORS: Record<Sentiment, string> = { positive: GREEN, neutral: TEXT_3, negative: RED };
+const SENT_LABELS: Record<Sentiment, string> = { positive: '正面', neutral: '中性', negative: '负面' };
 
-function TopicCloud({ topics }: { topics: TopicItem[] }) {
-  const sentimentColors: Record<string, string> = { positive: GREEN, neutral: TEXT_3, negative: RED };
-  const [filter, setFilter] = useState<string>('全部');
-  const categories = ['全部', '好评', '差评', '菜品', '服务', '卫生', '等待', '性价比'];
-  const filtered = filter === '全部' ? topics : topics.filter(t => t.category === filter);
-
+function SentimentBadge({ s }: { s: Sentiment }) {
   return (
-    <div style={{
-      background: BG_1, borderRadius: 10, padding: 20,
-      border: `1px solid ${BG_2}`,
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-        <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: TEXT_1 }}>口碑主题词云</h3>
-        {categories.map(c => (
-          <button key={c} onClick={() => setFilter(c)} style={{
-            padding: '3px 10px', borderRadius: 6, border: 'none', cursor: 'pointer',
-            background: filter === c ? BRAND : BG_2, color: filter === c ? '#fff' : TEXT_3,
-            fontSize: 11, fontWeight: 600,
-          }}>{c}</button>
-        ))}
-      </div>
-
-      {/* Word cloud */}
-      <div style={{
-        display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center',
-        padding: 20, minHeight: 200,
-      }}>
-        {filtered.sort((a, b) => b.count - a.count).map((t, i) => {
-          const fontSize = Math.max(12, Math.min(28, t.count / 50 + 8));
-          return (
-            <span key={i} style={{
-              fontSize, fontWeight: t.count > 500 ? 700 : 500,
-              color: sentimentColors[t.sentiment],
-              padding: '4px 10px', borderRadius: 6,
-              background: sentimentColors[t.sentiment] + '11',
-              cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4,
-            }}>
-              {t.keyword}
-              {t.trend === 'up' && <span style={{ fontSize: 10, color: t.sentiment === 'negative' ? RED : GREEN }}>{'\u2191'}{t.trendPct}%</span>}
-              {t.trend === 'down' && <span style={{ fontSize: 10, color: GREEN }}>{'\u2193'}{Math.abs(t.trendPct)}%</span>}
-            </span>
-          );
-        })}
-      </div>
-
-      <div style={{ display: 'flex', justifyContent: 'center', gap: 16, marginTop: 12 }}>
-        <span style={{ fontSize: 11, color: GREEN }}>--- 正面</span>
-        <span style={{ fontSize: 11, color: TEXT_3 }}>--- 中性</span>
-        <span style={{ fontSize: 11, color: RED }}>--- 负面</span>
-      </div>
-
-      {/* Topic detail table */}
-      <div style={{ marginTop: 16 }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-          <thead>
-            <tr style={{ borderBottom: `1px solid ${BG_2}` }}>
-              {['主题词', '分类', '情感', '提及次数', '趋势', '变化'].map(h => (
-                <th key={h} style={{ textAlign: 'left', padding: '8px 10px', color: TEXT_4, fontWeight: 600, fontSize: 11 }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.slice(0, 10).map((t, i) => (
-              <tr key={i} style={{ borderBottom: `1px solid ${BG_2}` }}>
-                <td style={{ padding: '8px 10px', color: TEXT_1, fontWeight: 500 }}>{t.keyword}</td>
-                <td style={{ padding: '8px 10px' }}>
-                  <span style={{
-                    fontSize: 10, padding: '1px 6px', borderRadius: 4,
-                    background: BG_2, color: TEXT_3, fontWeight: 600,
-                  }}>{t.category}</span>
-                </td>
-                <td style={{ padding: '8px 10px' }}>
-                  <span style={{
-                    fontSize: 10, padding: '1px 6px', borderRadius: 4,
-                    background: sentimentColors[t.sentiment] + '22', color: sentimentColors[t.sentiment], fontWeight: 600,
-                  }}>{t.sentiment === 'positive' ? '正面' : t.sentiment === 'negative' ? '负面' : '中性'}</span>
-                </td>
-                <td style={{ padding: '8px 10px', color: TEXT_2, fontWeight: 600 }}>{t.count}</td>
-                <td style={{ padding: '8px 10px', color: t.trend === 'up' ? (t.sentiment === 'negative' ? RED : GREEN) : t.trend === 'down' ? GREEN : TEXT_4 }}>
-                  {t.trend === 'up' ? '\u2191 上升' : t.trend === 'down' ? '\u2193 下降' : '- 稳定'}
-                </td>
-                <td style={{ padding: '8px 10px', color: t.trendPct > 0 ? (t.sentiment === 'negative' ? RED : GREEN) : GREEN }}>
-                  {t.trendPct > 0 ? '+' : ''}{t.trendPct}%
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
+    <span style={{
+      fontSize: 10, padding: '1px 6px', borderRadius: 4,
+      background: SENT_COLORS[s] + '22', color: SENT_COLORS[s], fontWeight: 600,
+    }}>{SENT_LABELS[s]}</span>
   );
 }
 
-function StoreMatrix({ stores }: { stores: StoreReviewScore[] }) {
-  const scoreColor = (v: number) => v >= 4.4 ? GREEN : v >= 4.0 ? YELLOW : RED;
-  const sorted = [...stores].sort((a, b) => b.overall - a.overall);
+function TopicRow({ topic }: { topic: TopicItem }) {
+  const [expanded, setExpanded] = useState(false);
+  const trendColor = topic.trend === 'up'
+    ? (topic.sentiment === 'negative' ? RED : GREEN)
+    : topic.trend === 'down' ? GREEN : TEXT_4;
 
   return (
-    <div style={{
-      background: BG_1, borderRadius: 10, padding: 16,
-      border: `1px solid ${BG_2}`,
-    }}>
-      <h3 style={{ margin: '0 0 14px', fontSize: 15, fontWeight: 700, color: TEXT_1 }}>门店口碑对比矩阵</h3>
-      <div style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-          <thead>
-            <tr style={{ borderBottom: `1px solid ${BG_2}` }}>
-              {['门店', '综合', '菜品', '服务', '环境', '等待', '性价比', '评价数', '差评数'].map(h => (
-                <th key={h} style={{ textAlign: 'left', padding: '8px 10px', color: TEXT_4, fontWeight: 600, fontSize: 11 }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {sorted.map(s => (
-              <tr key={s.storeName} style={{ borderBottom: `1px solid ${BG_2}` }}>
-                <td style={{ padding: '10px', color: TEXT_1, fontWeight: 500 }}>{s.storeName}</td>
-                <td style={{ padding: '10px', color: scoreColor(s.overall), fontWeight: 700, fontSize: 15 }}>{s.overall}</td>
-                <td style={{ padding: '10px', color: scoreColor(s.food) }}>{s.food}</td>
-                <td style={{ padding: '10px', color: scoreColor(s.service) }}>{s.service}</td>
-                <td style={{ padding: '10px', color: scoreColor(s.environment) }}>{s.environment}</td>
-                <td style={{ padding: '10px', color: scoreColor(s.wait) }}>{s.wait}</td>
-                <td style={{ padding: '10px', color: scoreColor(s.value) }}>{s.value}</td>
-                <td style={{ padding: '10px', color: TEXT_2 }}>{s.reviewCount.toLocaleString()}</td>
-                <td style={{ padding: '10px', color: s.negativeCount > 150 ? RED : s.negativeCount > 100 ? YELLOW : TEXT_3 }}>
-                  {s.negativeCount}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+    <div style={{ background: BG_1, borderRadius: 8, border: `1px solid ${BG_2}`, marginBottom: 8 }}>
+      <div
+        style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', cursor: 'pointer' }}
+        onClick={() => setExpanded((e) => !e)}
+      >
+        {/* 情感指示条 */}
+        <div style={{
+          width: 4, height: 40, borderRadius: 2, flexShrink: 0,
+          background: SENT_COLORS[topic.sentiment],
+        }} />
+
+        {/* 话题词 */}
+        <div style={{ minWidth: 120 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: TEXT_1 }}>{topic.keyword}</div>
+          <div style={{ fontSize: 10, color: TEXT_4, marginTop: 2 }}>{topic.category}</div>
+        </div>
+
+        {/* 情感 */}
+        <div style={{ minWidth: 60 }}>
+          <SentimentBadge s={topic.sentiment} />
+        </div>
+
+        {/* 频率 */}
+        <div style={{ minWidth: 80 }}>
+          <div style={{ fontSize: 16, fontWeight: 700, color: TEXT_1 }}>{topic.count.toLocaleString()}</div>
+          <div style={{ fontSize: 10, color: TEXT_4 }}>次提及</div>
+        </div>
+
+        {/* 趋势 */}
+        <div style={{ minWidth: 80 }}>
+          <span style={{ fontSize: 13, fontWeight: 600, color: trendColor }}>
+            {topic.trend === 'up' ? '↑ 上升' : topic.trend === 'down' ? '↓ 下降' : '→ 稳定'}
+          </span>
+          {topic.trendPct !== 0 && (
+            <div style={{ fontSize: 11, color: trendColor }}>
+              {topic.trendPct > 0 ? '+' : ''}{topic.trendPct}%
+            </div>
+          )}
+        </div>
+
+        {/* 门店分布预览 */}
+        <div style={{ flex: 1, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {topic.storeDistribution.slice(0, 3).map((sd) => (
+            <span key={sd.storeName} style={{
+              fontSize: 10, padding: '2px 6px', borderRadius: 4,
+              background: BG_2, color: TEXT_3,
+            }}>{sd.storeName} {sd.count}</span>
+          ))}
+        </div>
+
+        <span style={{ fontSize: 12, color: TEXT_4 }}>{expanded ? '▲' : '▼'}</span>
       </div>
-    </div>
-  );
-}
 
-function IssuesList({ issues }: { issues: ActionableIssue[] }) {
-  const sevColors: Record<string, string> = { high: RED, medium: YELLOW, low: BLUE };
-  const sevLabels: Record<string, string> = { high: '紧急', medium: '一般', low: '低' };
-  const statusColors: Record<string, string> = { '待处理': RED, '处理中': YELLOW, '已解决': GREEN };
-
-  return (
-    <div style={{
-      background: BG_1, borderRadius: 10, padding: 16,
-      border: `1px solid ${BG_2}`,
-    }}>
-      <h3 style={{ margin: '0 0 14px', fontSize: 15, fontWeight: 700, color: TEXT_1 }}>待处理问题列表</h3>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {issues.map(issue => (
-          <div key={issue.id} style={{
-            padding: '14px 16px', background: BG_2, borderRadius: 8,
-            borderLeft: `3px solid ${sevColors[issue.severity]}`,
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{
-                  fontSize: 10, padding: '1px 6px', borderRadius: 4,
-                  background: sevColors[issue.severity] + '22', color: sevColors[issue.severity], fontWeight: 700,
-                }}>{sevLabels[issue.severity]}</span>
-                <span style={{ fontSize: 14, fontWeight: 600, color: TEXT_1 }}>{issue.topic}</span>
-                <span style={{ fontSize: 11, color: TEXT_3 }}>{issue.storeName}</span>
+      {expanded && (
+        <div style={{ borderTop: `1px solid ${BG_2}`, padding: '12px 16px', background: BG_2 + '88' }}>
+          {/* 门店分布详情 */}
+          {topic.storeDistribution.length > 0 && (
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ fontSize: 11, color: TEXT_4, marginBottom: 6 }}>门店分布</div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {topic.storeDistribution.map((sd) => {
+                  const maxCount = Math.max(...topic.storeDistribution.map((x) => x.count));
+                  const pct = Math.round((sd.count / maxCount) * 100);
+                  return (
+                    <div key={sd.storeName} style={{ minWidth: 120 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: TEXT_2, marginBottom: 3 }}>
+                        <span>{sd.storeName}</span>
+                        <span>{sd.count}</span>
+                      </div>
+                      <div style={{ height: 4, borderRadius: 2, background: BG_2 }}>
+                        <div style={{
+                          width: `${pct}%`, height: '100%', borderRadius: 2,
+                          background: SENT_COLORS[topic.sentiment],
+                        }} />
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-              <span style={{
-                fontSize: 10, padding: '2px 8px', borderRadius: 4,
-                background: statusColors[issue.status] + '22', color: statusColors[issue.status], fontWeight: 600,
-              }}>{issue.status}</span>
             </div>
-            <div style={{
-              fontSize: 12, color: TEXT_3, lineHeight: 1.6, marginBottom: 8,
-              padding: '6px 10px', background: BG_1, borderRadius: 4, fontStyle: 'italic',
-            }}>
-              "{issue.sampleReview}"
+          )}
+          {/* 样本评论 */}
+          {topic.sampleReviews.length > 0 && (
+            <div>
+              <div style={{ fontSize: 11, color: TEXT_4, marginBottom: 6 }}>代表性评价</div>
+              {topic.sampleReviews.slice(0, 2).map((review, i) => (
+                <div key={i} style={{
+                  fontSize: 12, color: TEXT_2, lineHeight: 1.6,
+                  padding: '6px 10px', background: BG_1, borderRadius: 4,
+                  borderLeft: `3px solid ${SENT_COLORS[topic.sentiment]}44`,
+                  marginBottom: 6, fontStyle: 'italic',
+                }}>
+                  "{review}"
+                </div>
+              ))}
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-              <span style={{ fontSize: 11, color: TEXT_4 }}>提及 {issue.mentionCount} 次</span>
-              <span style={{ fontSize: 11, color: issue.trend === 'up' ? RED : GREEN }}>
-                趋势 {issue.trend === 'up' ? '\u2191 上升' : issue.trend === 'down' ? '\u2193 下降' : '稳定'}
-              </span>
-            </div>
-            <div style={{
-              fontSize: 11, color: BLUE, padding: '6px 10px',
-              background: BLUE + '11', borderRadius: 4,
-            }}>
-              建议: {issue.suggestedAction}
-            </div>
-          </div>
-        ))}
-      </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
 
-function HighlightsPanel({ highlights }: { highlights: MarketingHighlight[] }) {
+function SummaryKPI({ label, value, color, sub }: { label: string; value: string; color: string; sub?: string }) {
   return (
-    <div style={{
-      background: BG_1, borderRadius: 10, padding: 16,
-      border: `1px solid ${BG_2}`,
-    }}>
-      <h3 style={{ margin: '0 0 14px', fontSize: 15, fontWeight: 700, color: TEXT_1 }}>营销亮点素材</h3>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 12 }}>
-        {highlights.map(h => (
-          <div key={h.id} style={{
-            padding: '14px 16px', background: BG_2, borderRadius: 8,
-            borderTop: `3px solid ${GREEN}`,
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-              <span style={{ fontSize: 14, fontWeight: 600, color: TEXT_1 }}>{h.topic}</span>
-              <span style={{ fontSize: 11, color: TEXT_3 }}>{h.storeName}</span>
-            </div>
-            <div style={{
-              fontSize: 12, color: TEXT_2, lineHeight: 1.6, marginBottom: 10,
-              padding: '8px 10px', background: BG_1, borderRadius: 4,
-              borderLeft: `3px solid ${GREEN}44`,
-            }}>
-              "{h.sampleReview}"
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 11 }}>
-              <span style={{ color: GREEN }}>正面提及: {h.positiveCount}</span>
-              <span style={{ color: BRAND }}>传播力: {h.shareability}/100</span>
-            </div>
-            <div style={{
-              fontSize: 11, color: BLUE, padding: '6px 10px',
-              background: BLUE + '11', borderRadius: 4,
-            }}>
-              推荐用途: {h.suggestedUse}
-            </div>
-            <button style={{
-              marginTop: 8, padding: '4px 14px', borderRadius: 6, border: 'none',
-              background: GREEN + '22', color: GREEN, fontSize: 11, fontWeight: 600, cursor: 'pointer',
-            }}>导出为营销素材</button>
-          </div>
-        ))}
-      </div>
+    <div style={{ background: BG_1, borderRadius: 10, padding: '14px 16px', border: `1px solid ${BG_2}` }}>
+      <div style={{ fontSize: 12, color: TEXT_3, marginBottom: 6 }}>{label}</div>
+      <div style={{ fontSize: 24, fontWeight: 700, color }}>{value}</div>
+      {sub && <div style={{ fontSize: 11, color: TEXT_4, marginTop: 4 }}>{sub}</div>}
     </div>
   );
 }
@@ -352,57 +269,166 @@ function HighlightsPanel({ highlights }: { highlights: MarketingHighlight[] }) {
 // ---- 主页面 ----
 
 export function ReviewTopicPage() {
-  const [activeTab, setActiveTab] = useState<TabKey>('cloud');
-  const tabs: { key: TabKey; label: string }[] = [
-    { key: 'cloud', label: '主题词云' },
-    { key: 'matrix', label: '门店对比' },
-    { key: 'issues', label: '待处理问题' },
-    { key: 'highlights', label: '营销亮点' },
-  ];
+  const [days, setDays] = useState<DaysRange>(30);
+  const [topics, setTopics] = useState<TopicItem[]>([]);
+  const [isFallback, setIsFallback] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [sentFilter, setSentFilter] = useState<SentimentFilter>('全部');
+  const [sortBy, setSortBy] = useState<'count' | 'trend'>('count');
+  const [searchKw, setSearchKw] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    fetchReviewTopics(days).then(({ topics: data, isFallback: fb }) => {
+      if (!cancelled) {
+        setTopics(data);
+        setIsFallback(fb);
+        setLoading(false);
+      }
+    });
+    return () => { cancelled = true; };
+  }, [days]);
+
+  const filtered = topics
+    .filter((t) => sentFilter === '全部' || t.sentiment === sentFilter)
+    .filter((t) => !searchKw || t.keyword.includes(searchKw) || t.category.includes(searchKw))
+    .sort((a, b) => {
+      if (sortBy === 'count') return b.count - a.count;
+      return Math.abs(b.trendPct) - Math.abs(a.trendPct);
+    });
+
+  const posCount = topics.filter((t) => t.sentiment === 'positive').length;
+  const negCount = topics.filter((t) => t.sentiment === 'negative').length;
+  const totalMentions = topics.reduce((s, t) => s + t.count, 0);
+  const posMentions = topics.filter((t) => t.sentiment === 'positive').reduce((s, t) => s + t.count, 0);
+  const posRate = totalMentions > 0 ? ((posMentions / totalMentions) * 100).toFixed(1) : '0';
+
+  const daysOptions: DaysRange[] = [7, 30, 90];
 
   return (
-    <div style={{ maxWidth: 1400, margin: '0 auto' }}>
-      <h2 style={{ margin: '0 0 16px', fontSize: 22, fontWeight: 700 }}>口碑主题中心</h2>
+    <div style={{ maxWidth: 1400, margin: '0 auto', background: BG, minHeight: '100%', padding: '0 0 24px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
+        <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: TEXT_1 }}>评论话题分析</h2>
+        <div style={{ display: 'flex', gap: 6 }}>
+          {daysOptions.map((d) => (
+            <button
+              key={d}
+              onClick={() => setDays(d)}
+              style={{
+                padding: '6px 14px', borderRadius: 8, border: 'none', cursor: 'pointer',
+                background: days === d ? BRAND : BG_1,
+                color: days === d ? '#fff' : TEXT_3,
+                fontSize: 12, fontWeight: 600,
+              }}
+            >近 {d} 天</button>
+          ))}
+        </div>
+      </div>
 
-      {/* KPIs */}
+      {/* 降级提示 */}
+      {isFallback && !loading && (
+        <div style={{
+          marginBottom: 14, padding: '10px 16px',
+          background: BLUE + '11', borderRadius: 8, border: `1px solid ${BLUE}33`,
+          fontSize: 12, color: BLUE,
+        }}>
+          当前展示参考数据。接入评论数据源后将显示真实顾客评论话题。
+        </div>
+      )}
+
+      {/* KPI 汇总 */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12, marginBottom: 16 }}>
-        {[
-          { label: '总评价数', value: '17,790', change: 8.5, color: TEXT_1 },
-          { label: '综合评分', value: '4.3', change: 0.1, color: GREEN },
-          { label: '正面占比', value: '78.2%', change: 2.3, color: GREEN },
-          { label: '负面占比', value: '12.5%', change: -1.2, color: RED },
-          { label: '待处理问题', value: '4', change: 0, color: YELLOW },
-        ].map((kpi, i) => (
-          <div key={i} style={{
-            background: BG_1, borderRadius: 10, padding: '14px 16px',
-            border: `1px solid ${BG_2}`,
-          }}>
-            <div style={{ fontSize: 12, color: TEXT_3, marginBottom: 6 }}>{kpi.label}</div>
-            <div style={{ fontSize: 24, fontWeight: 700, color: kpi.color }}>{kpi.value}</div>
-            {kpi.change !== 0 && (
-              <div style={{ fontSize: 11, color: kpi.label === '负面占比' ? (kpi.change < 0 ? GREEN : RED) : (kpi.change > 0 ? GREEN : RED), marginTop: 4 }}>
-                {kpi.change > 0 ? '+' : ''}{kpi.change}% 较上期
-              </div>
-            )}
-          </div>
-        ))}
+        <SummaryKPI label="话题总数" value={loading ? '...' : String(topics.length)} color={TEXT_1} />
+        <SummaryKPI label="正面话题" value={loading ? '...' : String(posCount)} color={GREEN} />
+        <SummaryKPI label="负面话题" value={loading ? '...' : String(negCount)} color={RED} />
+        <SummaryKPI label="正面占比" value={loading ? '...' : `${posRate}%`} color={GREEN} />
+        <SummaryKPI label="总提及次数" value={loading ? '...' : totalMentions.toLocaleString()} color={BRAND} />
       </div>
 
-      <div style={{ display: 'flex', gap: 4, marginBottom: 16 }}>
-        {tabs.map(t => (
-          <button key={t.key} onClick={() => setActiveTab(t.key)} style={{
-            padding: '8px 18px', borderRadius: 8, border: 'none', cursor: 'pointer',
-            background: activeTab === t.key ? BRAND : BG_1,
-            color: activeTab === t.key ? '#fff' : TEXT_3,
-            fontSize: 13, fontWeight: 600,
-          }}>{t.label}</button>
-        ))}
+      {/* 过滤与搜索栏 */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16,
+        padding: '12px 16px', background: BG_1, borderRadius: 10, border: `1px solid ${BG_2}`,
+        flexWrap: 'wrap',
+      }}>
+        <div style={{ display: 'flex', gap: 4 }}>
+          {(['全部', 'positive', 'neutral', 'negative'] as SentimentFilter[]).map((s) => {
+            const label = s === '全部' ? '全部' : SENT_LABELS[s];
+            const color = s === '全部' ? BRAND : SENT_COLORS[s];
+            return (
+              <button
+                key={s}
+                onClick={() => setSentFilter(s)}
+                style={{
+                  padding: '5px 12px', borderRadius: 6, border: 'none', cursor: 'pointer',
+                  background: sentFilter === s ? color + '22' : BG_2,
+                  color: sentFilter === s ? color : TEXT_3,
+                  fontSize: 12, fontWeight: 600,
+                  outline: sentFilter === s ? `1px solid ${color}44` : 'none',
+                }}
+              >{label}</button>
+            );
+          })}
+        </div>
+        <div style={{ width: 1, height: 20, background: BG_2 }} />
+        <select
+          value={sortBy}
+          onChange={(e) => setSortBy(e.target.value as 'count' | 'trend')}
+          style={{
+            background: BG_2, border: `1px solid ${BG_2}`, borderRadius: 6,
+            color: TEXT_2, padding: '6px 12px', fontSize: 13, outline: 'none', cursor: 'pointer',
+          }}
+        >
+          <option value="count">按提及次数排序</option>
+          <option value="trend">按趋势变化排序</option>
+        </select>
+        <input
+          type="text"
+          placeholder="搜索话题关键词..."
+          value={searchKw}
+          onChange={(e) => setSearchKw(e.target.value)}
+          style={{
+            background: BG_2, border: `1px solid ${BG_2}`, borderRadius: 6,
+            color: TEXT_1, padding: '6px 12px', fontSize: 13, outline: 'none',
+            '::placeholder': { color: TEXT_4 } as React.CSSProperties,
+          } as React.CSSProperties}
+        />
+        <span style={{ fontSize: 12, color: TEXT_4, marginLeft: 'auto' }}>
+          {filtered.length} / {topics.length} 个话题
+        </span>
       </div>
 
-      {activeTab === 'cloud' && <TopicCloud topics={MOCK_TOPICS} />}
-      {activeTab === 'matrix' && <StoreMatrix stores={MOCK_STORE_SCORES} />}
-      {activeTab === 'issues' && <IssuesList issues={MOCK_ISSUES} />}
-      {activeTab === 'highlights' && <HighlightsPanel highlights={MOCK_HIGHLIGHTS} />}
+      {/* 列表表头 */}
+      {!loading && filtered.length > 0 && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 12, padding: '6px 16px',
+          color: TEXT_4, fontSize: 11, fontWeight: 600,
+        }}>
+          <span style={{ width: 4, flexShrink: 0 }} />
+          <span style={{ minWidth: 120 }}>话题词 / 分类</span>
+          <span style={{ minWidth: 60 }}>情感</span>
+          <span style={{ minWidth: 80 }}>提及次数</span>
+          <span style={{ minWidth: 80 }}>趋势变化</span>
+          <span style={{ flex: 1 }}>门店分布</span>
+          <span style={{ width: 20 }} />
+        </div>
+      )}
+
+      {/* 状态 */}
+      {loading && (
+        <div style={{ padding: '48px 0', textAlign: 'center', color: TEXT_4 }}>加载中...</div>
+      )}
+      {!loading && filtered.length === 0 && (
+        <div style={{ padding: '48px 0', textAlign: 'center', color: TEXT_4 }}>
+          {searchKw ? `未找到包含"${searchKw}"的话题` : '暂无话题数据'}
+        </div>
+      )}
+
+      {/* 话题列表 */}
+      {!loading && filtered.map((topic) => (
+        <TopicRow key={topic.id} topic={topic} />
+      ))}
     </div>
   );
 }

@@ -1,0 +1,7 @@
+{
+  "navigationBarTitleText": "屯象点餐",
+  "enablePullDownRefresh": true,
+  "usingComponents": {
+    "ai-recommend": "../../components/ai-recommend/ai-recommend"
+  }
+}

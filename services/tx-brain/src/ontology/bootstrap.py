@@ -4,12 +4,10 @@ Provides realistic restaurant BOM and operational seed data for
 development and testing.
 """
 
-from datetime import datetime
 from typing import Any
 
 import structlog
 
-from .data_sync import PGToNeo4jSync
 from .repository import OntologyRepository
 
 logger = structlog.get_logger()
