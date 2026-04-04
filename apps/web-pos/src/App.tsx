@@ -24,6 +24,7 @@ import { MenuEngineeringPage } from './pages/MenuEngineeringPage';
 import { MenuBoardControlPage } from './pages/MenuBoardControlPage';
 import { MemberPage } from './pages/MemberPage';
 import { RefundPage } from './pages/RefundPage';
+import { LiveSeafoodPage } from './pages/LiveSeafoodPage';
 import { LoginPage } from './pages/LoginPage';
 import { AuthGuard } from './components/AuthGuard';
 import { useAuthStore } from './store/authStore';
@@ -126,6 +127,7 @@ function AppLayout() {
                 <Route path="/menu-board-control" element={<MenuBoardControlPage />} />
                 <Route path="/members" element={<MemberPage />} />
                 <Route path="/refund" element={<RefundPage />} />
+                <Route path="/live-seafood" element={<LiveSeafoodPage />} />
               </Routes>
             </div>
           </AuthGuard>
