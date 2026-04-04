@@ -4,6 +4,29 @@
 
 ---
 
+## 2026-04-04（Round 79 — POS登录鉴权+开班+退款+拆单+KDS+发票全面补齐）
+
+### 今日完成
+- [web-pos] 登录鉴权系统：LoginPage(数字PIN键盘) + AuthGuard路由守卫 + authStore(Zustand会话管理)
+- [web-pos] ShiftPage 完全重建：三态流转(loading→开班备用金→当班KPI仪表盘+60秒自动刷新)
+- [web-pos] RefundPage 退款管理页面：5步流程(查询→类型→原因→授权确认→打印)，>100元需主管PIN
+- [web-pos] TaxInvoicePage：TODO→真实 submitInvoice API，成功显示发票号/PDF链接
+- [tx-trade] split_payment_routes：7个TODO全部替换为真实DB操作(查询/创建/结算分摊+RLS隔离)
+- [web-kds] DeptSelector/StatsPanel/ZoneKitchenBoard：MOCK→API/WebSocket真实数据
+- [web-pos] handoverApi: 新增 openShift() + tradeApi: 新增 fetchCreditAccounts/reverseSettle/submitInvoice
+
+### 数据变化
+- 新增文件：4 个（LoginPage.tsx, AuthGuard.tsx, authStore.ts, RefundPage.tsx）
+- 修改文件：9 个
+- 总变更：+2,208 行
+
+### 遗留问题
+- LiveMenuEditorPage/MenuEngineeringPage/PlanNotificationBar 仍有 MOCK（运营管理工具）
+- web-crew 部分页面有 MOCK fallback（AddDishSheet/MemberPointsPage/ApprovalPage）
+- 营销活动/用户旅程 API 仍为占位
+
+---
+
 ## 2026-04-04（Round 78 — POS全页面消除MOCK + 会员查询API补齐）
 
 ### 今日完成
