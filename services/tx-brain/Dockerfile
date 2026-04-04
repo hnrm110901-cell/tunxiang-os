@@ -4,7 +4,10 @@ WORKDIR /app
 
 # 安装构建依赖，完成后清理缓存
 COPY services/tx-brain/requirements.txt ./requirements.txt
-RUN pip install --no-cache-dir --user -r requirements.txt
+RUN pip install --no-cache-dir --user \
+    -i https://mirrors.aliyun.com/pypi/simple/ \
+    --trusted-host mirrors.aliyun.com \
+    -r requirements.txt
 
 
 FROM python:3.12-slim
