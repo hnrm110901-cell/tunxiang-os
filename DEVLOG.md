@@ -4,6 +4,29 @@
 
 ---
 
+## 2026-04-04（Round 81 — 三大阻塞项清零：拆单/宴会/外卖平台全部交付）
+
+### 今日完成
+- [web-pos] SplitPayPage 拆单结账前端接通后端 split_payment API（init→逐笔settle→全选时整单结算）
+- [web-pos] BanquetPage 宴会管理全流程页面（337行）：7列看板+新建+合同+详情面板+13阶段操作
+- [tx-trade] platform_clients.py 三大外卖平台真实API客户端（602行）：MeituanClient/ElemeClient/DouyinClient
+- [tx-trade] delivery_adapter.py _notify_platform() 从TODO替换为真实平台调用
+
+### 数据变化
+- 新增文件：2 个（BanquetPage.tsx, platform_clients.py）
+- 修改文件：3 个（SplitPayPage.tsx, delivery_adapter.py, App.tsx）
+- 总变更：+973 行
+- **三大P0阻塞项全部清零**
+
+### 系统交付评估更新
+```
+拆单结账前端         ⚠️ TODO → ✅ 已接通（init+settle+整单结算）
+宴会管理前端(POS端)  ⚠️ 缺失  → ✅ 已交付（看板+新建+合同+阶段操作）
+外卖平台对接         ⚠️ stub  → ✅ 已实现（美团/饿了么/抖音签名+HTTP+重试）
+```
+
+---
+
 ## 2026-04-04（Round 80 — 徐记海鲜门店核心业务模块全面补齐）
 
 ### 今日完成
