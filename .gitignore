@@ -1,23 +1,15 @@
-# Dependencies
-node_modules/
 __pycache__/
 *.pyc
 *.pyo
-*.pyd
-.Python
-pip-log.txt
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
 .venv/
 venv/
-ENV/
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# Environment
+env/
+node_modules/
 .env
 .env.*
 !.env.example
@@ -41,15 +33,19 @@ out/
 logs/
 deploy-history.log
 *.log
-npm-debug.log*
-
-# Testing
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
 coverage/
 .coverage
-coverage.xml
-.nyc_output/
-.pytest_cache/
 htmlcov/
+.pytest_cache/
+.mypy_cache/
+package-lock.json
 
 # Temporary files
 *.tmp

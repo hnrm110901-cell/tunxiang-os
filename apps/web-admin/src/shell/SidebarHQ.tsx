@@ -3,6 +3,7 @@
  * 决策4：菜单配置引擎驱动，不写死
  */
 import { useState } from 'react';
+import { getTokenPayload } from '../api/client';
 
 // 菜单配置引擎的数据结构（决策4）
 interface MenuConfig {
@@ -246,15 +247,15 @@ export function SidebarHQ({ activeModule }: SidebarHQProps) {
         ))}
       </div>
 
-      {/* 门店选择器（决策4+实施交付建议：树形选择） */}
+      {/* 门店选择器 — 从 JWT 动态读取商户名 */}
       <div style={{
         padding: 12, borderTop: '1px solid var(--bg-2, #1a2a33)',
         display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer',
       }}>
         <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--green)' }} />
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 12, fontWeight: 600 }}>尝在一起·芙蓉路店</div>
-          <div style={{ fontSize: 10, color: 'var(--text-4)' }}>芙蓉区 · 在线</div>
+          <div style={{ fontSize: 12, fontWeight: 600 }}>{getTokenPayload()?.merchant_name || '屯象OS'}</div>
+          <div style={{ fontSize: 10, color: 'var(--text-4)' }}>在线</div>
         </div>
         <span style={{ color: 'var(--text-4)', fontSize: 12 }}>▼</span>
       </div>

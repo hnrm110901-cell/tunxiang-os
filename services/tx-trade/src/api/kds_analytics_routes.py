@@ -275,12 +275,14 @@ async def get_new_customer_rate(
         total = row.total_orders if row else 0
         new_orders = row.new_orders if row else 0
         rate = round(new_orders / total, 4) if total > 0 else 0.0
+    except (OSError, RuntimeError) as exc:
     except Exception as exc:  # noqa: BLE001 — MLPS3-P0: 最外层HTTP兜底
         logger.error(
             "kds_analytics.new_customer_rate_error",
             store_id=store_id,
             date=date_str,
             error=str(exc),
+            exc_info=True,
         )
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 

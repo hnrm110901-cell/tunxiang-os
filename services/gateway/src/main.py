@@ -7,6 +7,8 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from .middleware import AuthMiddleware, TenantMiddleware, RequestLogMiddleware
+from .proxy import router as proxy_router
 from .api.open_api_routes import router as open_api_router
 from .auth import router as auth_router
 from .growth_intel_relay import router as relay_router
@@ -21,7 +23,18 @@ from .wecom_jssdk import router as wecom_jssdk_router
 from .wecom_notify_routes import router as wecom_notify_router
 from .wecom_routes import router as wecom_router
 from .wecom_scrm_routes import router as wecom_scrm_router
+from .wecom_jssdk import router as wecom_jssdk_router
+from .wecom_internal import router as wecom_internal_router
+from .wecom_group_routes import router as wecom_group_router
+from .gdpr_routes import router as gdpr_router
+from .response import ok
 
+app = FastAPI(title="TunxiangOS Gateway", version="3.0.0", description="AI-Native Restaurant Chain Operating System")
+
+app.add_middleware(RequestLogMiddleware)
+app.add_middleware(TenantMiddleware)
+app.add_middleware(AuthMiddleware)
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 logger = structlog.get_logger(__name__)
 
 app = FastAPI(
@@ -116,8 +129,9 @@ app.add_middleware(
 # 认证 API（必须在 proxy 之前注册，否则被通配路由拦截）
 app.include_router(auth_router)
 
-# Hub 运维管理 API（必须在 proxy 之前注册，否则被通配路由拦截）
+app.include_router(auth_router)
 app.include_router(hub_router)
+app.include_router(relay_router)
 
 # 开放 API（ISV 应用 + OAuth2 client_credentials；依赖 DB 未配置时相关端点返回 503）
 app.include_router(open_api_router)
@@ -140,6 +154,8 @@ app.include_router(wecom_internal_router)
 # 企微群运营 SOP API
 app.include_router(wecom_group_router)
 
+# GDPR 个人信息保护合规 API
+app.include_router(gdpr_router)
 # 企微群管理与通知推送 API（群创建/列表/发消息/通知/状态）
 app.include_router(wecom_notify_router)
 
@@ -154,7 +170,6 @@ async def health():
 
 @app.get("/api/v1/domains")
 async def list_domains():
-    """列出所有域服务及其状态"""
     from .proxy import DOMAIN_ROUTES
     domains = {k: {"configured": bool(v), "url": v or "not configured"} for k, v in DOMAIN_ROUTES.items()}
     return ok(domains)
@@ -162,9 +177,7 @@ async def list_domains():
 
 @app.get("/api/v1/menu-config")
 async def get_menu_config(role: str = "admin"):
-    """决策4：菜单配置引擎 — 根据角色动态生成菜单树"""
     from .menu_config import generate_menu_for_tenant
-    # 全域签约（demo）
     all_domains = ["tx-trade", "tx-menu", "tx-member", "tx-supply", "tx-finance", "tx-org", "tx-analytics", "tx-agent"]
     modules = generate_menu_for_tenant(all_domains, role)
     return ok(modules)

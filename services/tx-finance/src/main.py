@@ -19,6 +19,7 @@ from api.revenue_aggregation_routes import router as revenue_aggregation_router
 from api.revenue_routes import router as revenue_router
 from api.seafood_loss_routes import router as seafood_loss_router
 from api.settlement_routes import router as settlement_router
+from api.fund_settlement_routes import router as fund_settlement_router
 from api.split_routes import router as split_router
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -52,6 +53,7 @@ app.include_router(cost_router,    prefix="/api/v1/costs")
 app.include_router(pl_router,      prefix="/api/v1/pl")
 app.include_router(invoice_router, prefix="/api/v1/invoices")
 app.include_router(settlement_router)
+app.include_router(fund_settlement_router)
 app.include_router(erp_router)
 app.include_router(reconciliation_router, prefix="/api/v1")
 app.include_router(revenue_aggregation_router)

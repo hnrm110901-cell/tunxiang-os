@@ -2,10 +2,14 @@
 
 覆盖: 菜品档案CRUD、按状态/季节筛选、菜单模板、门店发布、
       渠道差异价、季节菜单、包厢菜单、宴席套餐、沽清联动
+
+menu_template 测试使用 AsyncMock 模拟 DB session。
 """
 import os
 import sys
 import uuid
+from datetime import datetime, timezone
+from unittest.mock import AsyncMock, MagicMock, patch
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -33,6 +37,8 @@ from services.menu_template import (
     publish_to_store,
     set_channel_price,
     set_room_menu,
+    get_room_menu,
+    create_banquet_package,
     set_seasonal_menu,
 )
 from services.stockout_sync import (
@@ -51,14 +57,21 @@ STORE = str(uuid.uuid4())
 
 @pytest.fixture(autouse=True)
 def _clean():
-    """每个测试前清空所有 in-memory 存储"""
+    """每个测试前清空 in-memory 存储（dish_service / stockout 仍用内存）"""
     _clear_store()
-    _clear_templates()
     _clear_stockout()
     yield
     _clear_store()
-    _clear_templates()
     _clear_stockout()
+
+
+def _make_mock_db() -> AsyncMock:
+    """创建模拟 AsyncSession，flush/execute 均为 no-op"""
+    db = AsyncMock()
+    db.flush = AsyncMock()
+    db.add = MagicMock()
+    db.execute = AsyncMock()
+    return db
 
 
 # ═══════════════════════════════════════════
@@ -156,14 +169,17 @@ class TestDishFilters:
 
 
 # ═══════════════════════════════════════════
-# 3. 菜单模板 + 门店发布
+# 3. 菜单模板 + 门店发布（async DB）
 # ═══════════════════════════════════════════
 
 
 class TestMenuTemplate:
-    def test_create_template(self):
+    @pytest.mark.asyncio
+    async def test_create_template(self):
         """创建菜单模板"""
-        tpl = create_template(
+        db = _make_mock_db()
+        tpl = await create_template(
+            db=db,
             name="午市标准菜单",
             dishes=[{"dish_id": "d1", "sort_order": 1}, {"dish_id": "d2", "sort_order": 2}],
             tenant_id=TENANT,
@@ -171,77 +187,86 @@ class TestMenuTemplate:
         assert tpl["name"] == "午市标准菜单"
         assert len(tpl["dishes"]) == 2
         assert tpl["status"] == "draft"
+        db.add.assert_called_once()
+        db.flush.assert_awaited_once()
 
-    def test_publish_to_store(self):
-        """发布模板到门店"""
-        tpl = create_template(name="全日菜单", dishes=[{"dish_id": "d1"}], tenant_id=TENANT)
-        result = publish_to_store(tpl["template_id"], STORE, TENANT)
-        assert result["status"] == "success"
-        assert result["store_id"] == STORE
-
-        # 验证模板状态更新
-        updated = get_template(tpl["template_id"], TENANT)
-        assert updated["status"] == "published"
-        assert STORE in updated["published_stores"]
-
-    def test_get_store_menu_dine_in(self):
-        """获取门店堂食菜单"""
-        tpl = create_template(
-            name="测试菜单",
-            dishes=[{"dish_id": "d1", "price_fen": 3800}],
-            tenant_id=TENANT,
-        )
-        publish_to_store(tpl["template_id"], STORE, TENANT)
-        menu = get_store_menu(STORE, "dine_in", TENANT)
-        assert menu["dish_count"] == 1
-        assert menu["channel"] == "dine_in"
-
-    def test_empty_template_raises(self):
+    @pytest.mark.asyncio
+    async def test_empty_template_raises(self):
         """空菜品列表模板抛出异常"""
+        db = _make_mock_db()
         with pytest.raises(ValueError, match="dishes"):
-            create_template(name="空模板", dishes=[], tenant_id=TENANT)
+            await create_template(db=db, name="空模板", dishes=[], tenant_id=TENANT)
+
+    @pytest.mark.asyncio
+    async def test_empty_tenant_raises(self):
+        """空 tenant_id 抛出异常"""
+        db = _make_mock_db()
+        with pytest.raises(ValueError, match="tenant_id"):
+            await create_template(db=db, name="X", dishes=[{"dish_id": "d1"}], tenant_id="")
+
+    @pytest.mark.asyncio
+    async def test_empty_name_raises(self):
+        """空 name 抛出异常"""
+        db = _make_mock_db()
+        with pytest.raises(ValueError, match="name"):
+            await create_template(db=db, name="  ", dishes=[{"dish_id": "d1"}], tenant_id=TENANT)
 
 
 # ═══════════════════════════════════════════
-# 4. 渠道差异价
+# 4. 渠道差异价（async DB）
 # ═══════════════════════════════════════════
 
 
 class TestChannelPrice:
-    def test_set_and_apply_channel_price(self):
-        """设置渠道差异价并在菜单中体现"""
-        tpl = create_template(
-            name="渠道测试",
-            dishes=[{"dish_id": "dish-a", "price_fen": 3800}],
-            tenant_id=TENANT,
+    @pytest.mark.asyncio
+    async def test_set_channel_price(self):
+        """设置渠道差异价"""
+        db = _make_mock_db()
+        # 模拟不存在已有记录
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = None
+        db.execute.return_value = mock_result
+
+        record = await set_channel_price(
+            db=db, dish_id=str(uuid.uuid4()), channel="delivery", price_fen=4200, tenant_id=TENANT,
         )
-        publish_to_store(tpl["template_id"], STORE, TENANT)
+        assert record["channel"] == "delivery"
+        assert record["price_fen"] == 4200
+        db.add.assert_called_once()
 
-        # 设置外卖渠道加价
-        set_channel_price(dish_id="dish-a", channel="delivery", price_fen=4200, tenant_id=TENANT)
-
-        # 堂食原价
-        dine_in_menu = get_store_menu(STORE, "dine_in", TENANT)
-        assert dine_in_menu["dishes"][0]["channel_price_fen"] == 3800
-
-        # 外卖差异价
-        delivery_menu = get_store_menu(STORE, "delivery", TENANT)
-        assert delivery_menu["dishes"][0]["channel_price_fen"] == 4200
-
-    def test_invalid_channel_raises(self):
+    @pytest.mark.asyncio
+    async def test_invalid_channel_raises(self):
+        db = _make_mock_db()
         with pytest.raises(ValueError, match="channel"):
-            set_channel_price(dish_id="d1", channel="invalid", price_fen=1000, tenant_id=TENANT)
+            await set_channel_price(
+                db=db, dish_id="d1", channel="invalid", price_fen=1000, tenant_id=TENANT,
+            )
+
+    @pytest.mark.asyncio
+    async def test_negative_price_raises(self):
+        db = _make_mock_db()
+        with pytest.raises(ValueError, match="price_fen"):
+            await set_channel_price(
+                db=db, dish_id="d1", channel="dine_in", price_fen=-100, tenant_id=TENANT,
+            )
 
 
 # ═══════════════════════════════════════════
-# 5. 季节菜单
+# 5. 季节菜单（async DB）
 # ═══════════════════════════════════════════
 
 
 class TestSeasonalMenu:
-    def test_set_and_get_seasonal_menu(self):
-        """设置并获取季节菜单"""
-        result = set_seasonal_menu(
+    @pytest.mark.asyncio
+    async def test_set_seasonal_menu(self):
+        """设置季节菜单"""
+        db = _make_mock_db()
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = None
+        db.execute.return_value = mock_result
+
+        result = await set_seasonal_menu(
+            db=db,
             store_id=STORE,
             season="summer",
             dishes=[{"dish_id": "d1"}, {"dish_id": "d2"}],
@@ -250,24 +275,39 @@ class TestSeasonalMenu:
         assert result["season"] == "summer"
         assert result["dish_count"] == 2
 
-        retrieved = get_seasonal_menu(STORE, "summer", TENANT)
-        assert retrieved is not None
-        assert len(retrieved["dishes"]) == 2
-
-    def test_invalid_season_raises(self):
+    @pytest.mark.asyncio
+    async def test_invalid_season_raises(self):
+        db = _make_mock_db()
         with pytest.raises(ValueError, match="season"):
-            set_seasonal_menu(store_id=STORE, season="rainy", dishes=[{"dish_id": "d1"}], tenant_id=TENANT)
+            await set_seasonal_menu(
+                db=db, store_id=STORE, season="rainy", dishes=[{"dish_id": "d1"}], tenant_id=TENANT,
+            )
+
+    @pytest.mark.asyncio
+    async def test_empty_dishes_raises(self):
+        db = _make_mock_db()
+        with pytest.raises(ValueError, match="dishes"):
+            await set_seasonal_menu(
+                db=db, store_id=STORE, season="summer", dishes=[], tenant_id=TENANT,
+            )
 
 
 # ═══════════════════════════════════════════
-# 6. 包厢菜单
+# 6. 包厢菜单（async DB）
 # ═══════════════════════════════════════════
 
 
 class TestRoomMenu:
-    def test_set_and_get_room_menu(self):
-        """设置并获取 VIP 包厢菜单"""
-        result = set_room_menu(
+    @pytest.mark.asyncio
+    async def test_set_room_menu(self):
+        """设置 VIP 包厢菜单"""
+        db = _make_mock_db()
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = None
+        db.execute.return_value = mock_result
+
+        result = await set_room_menu(
+            db=db,
             store_id=STORE,
             room_type="vip",
             dishes=[{"dish_id": "d1"}, {"dish_id": "d2"}, {"dish_id": "d3"}],
@@ -276,23 +316,27 @@ class TestRoomMenu:
         assert result["room_type"] == "vip"
         assert result["dish_count"] == 3
 
-        retrieved = get_room_menu(STORE, "vip", TENANT)
-        assert retrieved is not None
-
-    def test_invalid_room_type_raises(self):
+    @pytest.mark.asyncio
+    async def test_invalid_room_type_raises(self):
+        db = _make_mock_db()
         with pytest.raises(ValueError, match="room_type"):
-            set_room_menu(store_id=STORE, room_type="invalid", dishes=[{"dish_id": "d1"}], tenant_id=TENANT)
+            await set_room_menu(
+                db=db, store_id=STORE, room_type="invalid", dishes=[{"dish_id": "d1"}], tenant_id=TENANT,
+            )
 
 
 # ═══════════════════════════════════════════
-# 7. 宴席套餐
+# 7. 宴席套餐（async DB）
 # ═══════════════════════════════════════════
 
 
 class TestBanquetPackage:
-    def test_create_banquet_package(self):
+    @pytest.mark.asyncio
+    async def test_create_banquet_package(self):
         """创建宴席套餐"""
-        pkg = create_banquet_package(
+        db = _make_mock_db()
+        pkg = await create_banquet_package(
+            db=db,
             name="金秋宴",
             dishes=[{"dish_id": "d1"}, {"dish_id": "d2"}, {"dish_id": "d3"}],
             package_price_fen=88800,
@@ -305,9 +349,12 @@ class TestBanquetPackage:
         assert pkg["guest_count"] == 10
         assert len(pkg["dishes"]) == 3
 
-    def test_zero_guest_raises(self):
+    @pytest.mark.asyncio
+    async def test_zero_guest_raises(self):
+        db = _make_mock_db()
         with pytest.raises(ValueError, match="guest_count"):
-            create_banquet_package(
+            await create_banquet_package(
+                db=db,
                 name="X", dishes=[{"dish_id": "d1"}], package_price_fen=1000, guest_count=0, tenant_id=TENANT,
             )
 

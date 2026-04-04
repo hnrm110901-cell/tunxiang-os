@@ -1,0 +1,12 @@
+{
+  "id": "example-plugin",
+  "name": "Example Plugin",
+  "version": "0.1.0",
+  "description": "TODO: Describe what this plugin does.",
+  "author": "TODO: Your Name or Team",
+  "entry": "src/index.js",
+  "permissions": [],
+  "config": {
+    "TODO_SETTING": "TODO_VALUE"
+  }
+}

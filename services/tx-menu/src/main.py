@@ -15,6 +15,7 @@ from .api.live_seafood_query_routes import router as live_seafood_query_router
 # 徐记海鲜专属模块
 from .api.live_seafood_routes import router as live_seafood_router
 from .api.menu_approval_routes import router as menu_approval_router
+from .api.dish_intel_routes import router as dish_intel_router
 from .api.menu_routes import router as menu_center_router
 from .api.menu_version_routes import router as menu_version_router
 from .api.practice_routes import router as practice_router
@@ -34,6 +35,7 @@ app.include_router(dish_lifecycle_router, prefix="/api/v1/dish-lifecycle")
 app.include_router(dish_lifecycle_manage_router)  # /api/v1/menu/lifecycle/* + /api/v1/dishes/{id}/lifecycle/*
 app.include_router(channel_mapping_router)
 app.include_router(menu_approval_router)
+app.include_router(dish_intel_router)
 app.include_router(live_edit_router)
 app.include_router(brand_publish_router)  # 品牌→门店三级发布体系
 app.include_router(live_seafood_router)        # 徐记：活鲜海鲜（称重/条头/鱼缸）

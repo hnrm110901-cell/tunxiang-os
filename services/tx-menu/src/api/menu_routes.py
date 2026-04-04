@@ -35,6 +35,13 @@ from ..services.stockout_sync import (
     restore_dish,
 )
 
+
+# ─── 依赖注入占位 ───
+
+async def get_db() -> AsyncSession:  # type: ignore[override]
+    """数据库会话依赖 — 由 main.py 中 app.dependency_overrides 注入"""
+    raise NotImplementedError("DB session dependency not configured")
+
 log = structlog.get_logger()
 
 router = APIRouter(prefix="/api/v1/menu", tags=["menu-center"])
@@ -269,6 +276,8 @@ async def api_create_template(
 ):
     """创建菜单模板"""
     try:
+        tpl = await create_template(
+            db=db,
         repo = _repo(db, x_tenant_id)
         tpl = await repo.create_template(
             name=req.name,
@@ -287,6 +296,7 @@ async def api_list_templates(
     db: AsyncSession = Depends(get_db),
 ):
     """列出菜单模板"""
+    templates = await list_templates(db=db, tenant_id=x_tenant_id)
     repo = _repo(db, x_tenant_id)
     templates = await repo.list_templates()
     return {"ok": True, "data": {"items": templates, "total": len(templates)}}
@@ -299,6 +309,7 @@ async def api_get_template(
     db: AsyncSession = Depends(get_db),
 ):
     """获取模板详情"""
+    tpl = await get_template(db=db, template_id=template_id, tenant_id=x_tenant_id)
     repo = _repo(db, x_tenant_id)
     tpl = await repo.get_template(template_id)
     if not tpl:
@@ -319,6 +330,12 @@ async def api_publish_to_store(
 ):
     """将模板发布到门店"""
     try:
+        result = await publish_to_store(
+            db=db,
+            template_id=req.template_id,
+            store_id=req.store_id,
+            tenant_id=x_tenant_id,
+        )
         repo = _repo(db, x_tenant_id)
         result = await repo.publish_to_store(req.template_id, req.store_id)
         await db.commit()
@@ -336,6 +353,9 @@ async def api_get_store_menu(
 ):
     """获取门店当前菜单（按渠道）"""
     try:
+        menu = await get_store_menu(
+            db=db, store_id=store_id, channel=channel, tenant_id=x_tenant_id,
+        )
         if channel not in VALID_CHANNELS:
             _err(400, f"channel 必须为 {VALID_CHANNELS} 之一，收到: {channel!r}")
         repo = _repo(db, x_tenant_id)
@@ -358,6 +378,8 @@ async def api_set_channel_price(
 ):
     """设置菜品渠道差异价"""
     try:
+        record = await set_channel_price(
+            db=db,
         if req.channel not in VALID_CHANNELS:
             _err(400, f"channel 必须为 {VALID_CHANNELS} 之一，收到: {req.channel!r}")
         repo = _repo(db, x_tenant_id)
@@ -385,6 +407,8 @@ async def api_set_seasonal_menu(
 ):
     """设置门店季节菜单"""
     try:
+        record = await set_seasonal_menu(
+            db=db,
         if req.season not in VALID_SEASONS:
             _err(400, f"season 必须为 {VALID_SEASONS} 之一，收到: {req.season!r}")
         repo = _repo(db, x_tenant_id)
@@ -408,6 +432,9 @@ async def api_get_seasonal_menu(
 ):
     """获取门店季节菜单"""
     try:
+        menu = await get_seasonal_menu(
+            db=db, store_id=store_id, season=season, tenant_id=x_tenant_id,
+        )
         if season not in VALID_SEASONS:
             _err(400, f"season 必须为 {VALID_SEASONS} 之一，收到: {season!r}")
         repo = _repo(db, x_tenant_id)
@@ -432,6 +459,8 @@ async def api_set_room_menu(
 ):
     """设置门店包厢专属菜单"""
     try:
+        record = await set_room_menu(
+            db=db,
         if req.room_type not in VALID_ROOM_TYPES:
             _err(400, f"room_type 必须为 {VALID_ROOM_TYPES} 之一，收到: {req.room_type!r}")
         repo = _repo(db, x_tenant_id)
@@ -455,6 +484,9 @@ async def api_get_room_menu(
 ):
     """获取门店包厢菜单"""
     try:
+        menu = await get_room_menu(
+            db=db, store_id=store_id, room_type=room_type, tenant_id=x_tenant_id,
+        )
         if room_type not in VALID_ROOM_TYPES:
             _err(400, f"room_type 必须为 {VALID_ROOM_TYPES} 之一，收到: {room_type!r}")
         repo = _repo(db, x_tenant_id)
@@ -479,6 +511,8 @@ async def api_create_banquet_package(
 ):
     """创建宴席套餐"""
     try:
+        pkg = await create_banquet_package(
+            db=db,
         repo = _repo(db, x_tenant_id)
         pkg = await repo.create_banquet_package(
             name=req.name,

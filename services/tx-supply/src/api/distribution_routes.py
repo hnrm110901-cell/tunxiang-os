@@ -15,6 +15,9 @@ from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from services.tx_supply.src.services import distribution
+from shared.ontology.src.database import get_db
+
 from shared.ontology.src.database import get_db
 
 from ..services.distribution_repository import DistributionRepository
@@ -80,6 +83,13 @@ async def create_distribution_plan(
     db: AsyncSession = Depends(get_db),
 ):
     """创建配送计划"""
+    result = await distribution.create_distribution_plan(
+        warehouse_id=body.warehouse_id,
+        store_orders=body.store_orders,
+        tenant_id=x_tenant_id,
+        db=db,
+    )
+    return {"ok": True, "data": result}
     try:
         repo = _repo(db, x_tenant_id)
         result = await repo.create_plan(
@@ -100,6 +110,11 @@ async def optimize_route(
 ):
     """路线优化（按门店距离排序）"""
     try:
+        result = await distribution.optimize_route(
+            plan_id=plan_id,
+            tenant_id=x_tenant_id,
+            db=db,
+        )
         repo = _repo(db, x_tenant_id)
         result = await repo.optimize_route(plan_id=plan_id)
         await db.commit()
@@ -117,6 +132,11 @@ async def dispatch_delivery(
 ):
     """派车"""
     try:
+        result = await distribution.dispatch_delivery(
+            plan_id=plan_id,
+            driver_id=body.driver_id,
+            tenant_id=x_tenant_id,
+            db=db,
         repo = _repo(db, x_tenant_id)
         result = await repo.dispatch_delivery(
             plan_id=plan_id,
@@ -137,6 +157,12 @@ async def confirm_delivery(
 ):
     """门店签收"""
     try:
+        result = await distribution.confirm_delivery(
+            plan_id=plan_id,
+            store_id=body.store_id,
+            received_items=body.received_items,
+            tenant_id=x_tenant_id,
+            db=db,
         repo = _repo(db, x_tenant_id)
         result = await repo.confirm_delivery(
             plan_id=plan_id,
@@ -156,6 +182,12 @@ async def get_distribution_dashboard(
     db: AsyncSession = Depends(get_db),
 ):
     """配送看板"""
+    result = await distribution.get_distribution_dashboard(
+        warehouse_id=warehouse_id,
+        tenant_id=x_tenant_id,
+        db=db,
+    )
+    return {"ok": True, "data": result}
     try:
         repo = _repo(db, x_tenant_id)
         result = await repo.get_dashboard(warehouse_id=warehouse_id)
