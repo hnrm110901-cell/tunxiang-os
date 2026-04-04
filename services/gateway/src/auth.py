@@ -928,14 +928,6 @@ async def mfa_setup(request: Request):
     """
     token = _extract_token(request)
     if not token:
-        return err("未登录或 Token 已过期", code="UNAUTHORIZED", status_code=401)
-    try:
-        payload = decode_jwt_token(token)
-    except jwt.ExpiredSignatureError:
-        return err("Token 已过期", code="TOKEN_EXPIRED", status_code=401)
-    except jwt.InvalidTokenError:
-        return err("Token 无效", code="INVALID_TOKEN", status_code=401)
-    return ok({"username": payload["user_id"], "name": DEMO_USERS.get(payload["user_id"], {}).get("name", payload["user_id"]), "role": payload["role"], "tenant_id": payload["tenant_id"], "merchant": payload["merchant_name"]})
         return err("未登录", code="UNAUTHORIZED", status_code=401)
 
     payload = _jwt_service.verify_access_token(token)
