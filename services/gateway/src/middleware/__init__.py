@@ -85,4 +85,6 @@ class RequestLogMiddleware(BaseHTTPMiddleware):
         return response
 
 
-__all__ = ["TenantMiddleware", "RequestLogMiddleware"]
+from .auth_middleware import AuthMiddleware
+
+__all__ = ["AuthMiddleware", "TenantMiddleware", "RequestLogMiddleware"]
