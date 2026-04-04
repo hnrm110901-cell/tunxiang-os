@@ -88,6 +88,8 @@ class CourseStatus:
     dish_count: int
     fired_count: int
     done_count: int
+    delay_minutes: int
+    scheduled_fire_at: Optional[datetime]
     fired_at: Optional[datetime]
     fired_by: Optional[str]
 
@@ -288,6 +290,292 @@ async def check_fire_suggestion(
     next_course = waiting_courses[0]
     pct = int(completion_rate * 100)
     return f"{latest_fired.course_label}已上齐{pct}%，是否开火{next_course.course_label}？"
+
+
+@dataclass
+class AutoAssignItem:
+    """auto_assign_courses 的输入项"""
+    item_id: str
+    dish_category: str  # 菜品分类（如"凉菜"、"热菜"、"汤"等）
+
+
+async def auto_assign_courses(
+    order_id: str,
+    items: list[AutoAssignItem],
+    tenant_id: str,
+    db: AsyncSession,
+) -> list[OrderCourse]:
+    """根据菜品分类自动为散台/VIP订单分配课程。
+
+    每个菜品按其分类映射到对应课程，创建OrderCourse记录并设置默认延时。
+    未匹配到分类的菜品默认分配到main课程。
+    """
+    tid = uuid.UUID(tenant_id)
+    oid = uuid.UUID(order_id)
+
+    # 按课程聚合items
+    course_items: dict[str, list[uuid.UUID]] = {}
+    for item in items:
+        course_name = CATEGORY_TO_COURSE.get(item.dish_category, "main")
+        course_items.setdefault(course_name, []).append(uuid.UUID(item.item_id))
+
+    created_courses: list[OrderCourse] = []
+
+    for course_name, item_ids in course_items.items():
+        # 检查是否已存在该课程
+        result = await db.execute(
+            select(OrderCourse).where(
+                OrderCourse.tenant_id == tid,
+                OrderCourse.order_id == oid,
+                OrderCourse.course_name == course_name,
+                OrderCourse.is_deleted.is_(False),
+            )
+        )
+        existing = result.scalar_one_or_none()
+
+        if existing is None:
+            delay = COURSE_DEFAULT_DELAY.get(course_name, 0)
+            course = OrderCourse(
+                tenant_id=tid,
+                order_id=oid,
+                course_name=course_name,
+                course_label=COURSE_LABELS[course_name],
+                sort_order=COURSE_SORT[course_name],
+                status="waiting",
+                delay_minutes=delay,
+            )
+            db.add(course)
+            created_courses.append(course)
+
+        # 将对应KDS任务标记为hold并关联课程
+        for iid in item_ids:
+            await db.execute(
+                update(KDSTask)
+                .where(
+                    KDSTask.tenant_id == tid,
+                    KDSTask.order_item_id == iid,
+                    KDSTask.is_deleted.is_(False),
+                )
+                .values(course_name=course_name, course_status="hold")
+            )
+
+    await db.commit()
+
+    logger.info(
+        "course_firing.auto_assign",
+        order_id=order_id,
+        courses_created=len(created_courses),
+        total_items=len(items),
+    )
+
+    return created_courses
+
+
+async def adjust_course_delay(
+    order_id: str,
+    course_name: str,
+    delay_minutes: int,
+    tenant_id: str,
+    db: AsyncSession,
+) -> OrderCourse:
+    """厨师/经理调整某课程的延迟时间（分钟）。
+
+    如果首道课程已开火（有scheduled_fire_at基准），则同步更新scheduled_fire_at。
+    """
+    if course_name not in VALID_COURSES:
+        raise ValueError(f"course_name must be one of {sorted(VALID_COURSES)}")
+    if delay_minutes < 0:
+        raise ValueError("delay_minutes must be non-negative")
+
+    tid = uuid.UUID(tenant_id)
+    oid = uuid.UUID(order_id)
+
+    result = await db.execute(
+        select(OrderCourse).where(
+            OrderCourse.tenant_id == tid,
+            OrderCourse.order_id == oid,
+            OrderCourse.course_name == course_name,
+            OrderCourse.is_deleted.is_(False),
+        )
+    )
+    course = result.scalar_one_or_none()
+    if course is None:
+        raise LookupError(f"order_course not found: order={order_id} course={course_name}")
+    if course.status == "fired":
+        raise ValueError(f"course {course_name} already fired, cannot adjust delay")
+
+    update_values: dict = {
+        "delay_minutes": delay_minutes,
+    }
+
+    # 如果有基准开火时间（首道课程已开火），重新计算scheduled_fire_at
+    base_time = await _get_base_fire_time(oid, tid, db)
+    if base_time is not None:
+        update_values["scheduled_fire_at"] = base_time + timedelta(minutes=delay_minutes)
+
+    await db.execute(
+        update(OrderCourse)
+        .where(OrderCourse.id == course.id)
+        .values(**update_values)
+    )
+    await db.commit()
+    await db.refresh(course)
+
+    logger.info(
+        "course_firing.delay_adjusted",
+        order_id=order_id,
+        course_name=course_name,
+        delay_minutes=delay_minutes,
+    )
+
+    return course
+
+
+async def rush_course(
+    order_id: str,
+    course_name: str,
+    operator_id: str,
+    tenant_id: str,
+    db: AsyncSession,
+) -> OrderCourse:
+    """立即催火一个处于waiting/hold状态的课程，跳过延时等待。"""
+    if course_name not in VALID_COURSES:
+        raise ValueError(f"course_name must be one of {sorted(VALID_COURSES)}")
+
+    tid = uuid.UUID(tenant_id)
+    oid = uuid.UUID(order_id)
+
+    result = await db.execute(
+        select(OrderCourse).where(
+            OrderCourse.tenant_id == tid,
+            OrderCourse.order_id == oid,
+            OrderCourse.course_name == course_name,
+            OrderCourse.is_deleted.is_(False),
+        )
+    )
+    course = result.scalar_one_or_none()
+    if course is None:
+        raise LookupError(f"order_course not found: order={order_id} course={course_name}")
+    if course.status == "fired":
+        raise ValueError(f"course {course_name} already fired")
+    if course.status == "completed":
+        raise ValueError(f"course {course_name} already completed")
+
+    now = datetime.now(timezone.utc)
+
+    # 将关联KDS任务从hold推送到fired
+    await db.execute(
+        update(KDSTask)
+        .where(
+            KDSTask.tenant_id == tid,
+            KDSTask.order_item_id.in_(
+                select(KDSTask.order_item_id).where(
+                    KDSTask.tenant_id == tid,
+                    KDSTask.course_name == course_name,
+                    KDSTask.course_status == "hold",
+                    KDSTask.is_deleted.is_(False),
+                )
+            ),
+            KDSTask.is_deleted.is_(False),
+        )
+        .values(course_status="fired")
+    )
+
+    await db.execute(
+        update(OrderCourse)
+        .where(OrderCourse.id == course.id)
+        .values(
+            status="fired",
+            fired_at=now,
+            fired_by=uuid.UUID(operator_id),
+        )
+    )
+    await db.commit()
+    await db.refresh(course)
+
+    logger.info(
+        "course_firing.rushed",
+        order_id=order_id,
+        course_name=course_name,
+        operator_id=operator_id,
+    )
+
+    await _broadcast_course_fired(order_id, course_name, tenant_id)
+    return course
+
+
+async def hold_course(
+    order_id: str,
+    course_name: str,
+    tenant_id: str,
+    db: AsyncSession,
+) -> OrderCourse:
+    """暂停一个尚未开火的课程，将其状态设为hold。"""
+    if course_name not in VALID_COURSES:
+        raise ValueError(f"course_name must be one of {sorted(VALID_COURSES)}")
+
+    tid = uuid.UUID(tenant_id)
+    oid = uuid.UUID(order_id)
+
+    result = await db.execute(
+        select(OrderCourse).where(
+            OrderCourse.tenant_id == tid,
+            OrderCourse.order_id == oid,
+            OrderCourse.course_name == course_name,
+            OrderCourse.is_deleted.is_(False),
+        )
+    )
+    course = result.scalar_one_or_none()
+    if course is None:
+        raise LookupError(f"order_course not found: order={order_id} course={course_name}")
+    if course.status == "fired":
+        raise ValueError(f"course {course_name} already fired, cannot hold")
+    if course.status == "completed":
+        raise ValueError(f"course {course_name} already completed, cannot hold")
+    if course.status == "hold":
+        raise ValueError(f"course {course_name} is already on hold")
+
+    await db.execute(
+        update(OrderCourse)
+        .where(OrderCourse.id == course.id)
+        .values(status="hold", scheduled_fire_at=None)
+    )
+    await db.commit()
+    await db.refresh(course)
+
+    logger.info(
+        "course_firing.held",
+        order_id=order_id,
+        course_name=course_name,
+    )
+
+    return course
+
+
+async def _get_base_fire_time(
+    order_id: uuid.UUID,
+    tenant_id: uuid.UUID,
+    db: AsyncSession,
+) -> Optional[datetime]:
+    """获取首道课程的开火时间作为基准时间。
+
+    如果首道课程尚未开火，返回None。
+    """
+    result = await db.execute(
+        select(OrderCourse)
+        .where(
+            OrderCourse.tenant_id == tenant_id,
+            OrderCourse.order_id == order_id,
+            OrderCourse.status == "fired",
+            OrderCourse.is_deleted.is_(False),
+        )
+        .order_by(OrderCourse.sort_order.asc())
+        .limit(1)
+    )
+    first_fired = result.scalar_one_or_none()
+    if first_fired is not None and first_fired.fired_at is not None:
+        return first_fired.fired_at
+    return None
 
 
 async def _broadcast_course_fired(

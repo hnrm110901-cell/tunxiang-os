@@ -71,6 +71,7 @@ from .api.printer_routes import router as printer_router
 from .api.proactive_service_routes import router as proactive_service_router
 from .api.production_dept_routes import router as production_dept_router
 from .api.retail_mall_routes import router as retail_mall_router
+from .api.room_routes import router as room_router
 from .api.runner_routes import router as runner_router
 from .api.scan_order_routes import router as scan_order_router
 from .api.scan_pay_routes import router as scan_pay_router
@@ -240,6 +241,7 @@ from .api.kds_banquet_routes import router as kds_banquet_router
 app.include_router(kds_banquet_router)
 app.include_router(print_template_router)
 app.include_router(dish_dept_mapping_router)
+app.include_router(room_router)
 
 
 @app.get("/health")
