@@ -53,6 +53,8 @@ def _serialize_course_status(cs) -> dict:
         "dish_count": cs.dish_count,
         "fired_count": cs.fired_count,
         "done_count": cs.done_count,
+        "delay_minutes": cs.delay_minutes,
+        "scheduled_fire_at": cs.scheduled_fire_at.isoformat() if cs.scheduled_fire_at else None,
         "fired_at": cs.fired_at.isoformat() if cs.fired_at else None,
         "fired_by": cs.fired_by,
     }

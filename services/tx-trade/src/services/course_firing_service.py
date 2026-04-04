@@ -254,6 +254,8 @@ async def get_courses_status(
             dish_count=dish_count,
             fired_count=fired_count,
             done_count=done_count,
+            delay_minutes=course.delay_minutes,
+            scheduled_fire_at=course.scheduled_fire_at,
             fired_at=course.fired_at,
             fired_by=str(course.fired_by) if course.fired_by else None,
         ))
