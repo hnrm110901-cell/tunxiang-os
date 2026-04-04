@@ -5,31 +5,66 @@
 2. 离线查询（断网时收银/KDS/Agent 不停摆）
 3. WebSocket 推送 Agent 决策到安卓 POS
 4. 代理 Core ML 桥接请求
+5. ForgeNode 离线感知决策引擎（读取 SKILL.yaml degradation.offline 配置）
 """
 import asyncio
 import base64
 import json
 import os
+from contextlib import asynccontextmanager
 
 import httpx
 import structlog
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from federated_client import router as federated_router
+from forge_node import ForgeNode
 from heartbeat_routes import router as heartbeat_router
 from offline_routes import router as offline_router
 from ota_routes import router as ota_router
 from vision_service import router as vision_router
 from voice_service import router as voice_router
 
+from api.forge_routes import router as forge_router
+
 logger = structlog.get_logger()
 
 COREML_URL = os.getenv("COREML_BRIDGE_URL", "http://localhost:8100")
 
+
+# ─── ForgeNode 生命周期 ───────────────────────────────────────────────────────
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """FastAPI 应用生命周期：启动时初始化 ForgeNode，关闭时取消后台任务"""
+    # 初始化 ForgeNode（加载所有 SKILL.yaml + 初始化 SQLite 缓冲）
+    forge = ForgeNode()
+    await forge.initialize()
+    app.state.forge_node = forge
+
+    # 启动后台连接状态检测（30秒间隔，非阻塞）
+    connectivity_task = asyncio.create_task(
+        forge.start_connectivity_check(),
+        name="forge_connectivity_check",
+    )
+    logger.info("forge_node_background_task_started")
+
+    yield  # 应用运行期间
+
+    # 关闭时取消后台任务
+    connectivity_task.cancel()
+    try:
+        await connectivity_task
+    except asyncio.CancelledError:
+        pass
+    logger.info("forge_node_background_task_stopped")
+
+
 app = FastAPI(
     title="TunxiangOS Mac Station",
-    version="4.1.0",
-    description="门店本地智能后台 — Mac mini M4 (Voice + Vision + KDS)",
+    version="4.2.0",
+    description="门店本地智能后台 — Mac mini M4 (Voice + Vision + KDS + ForgeNode)",
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -57,11 +92,14 @@ app.include_router(ota_router)
 # ─── 离线查询路由（本地 PG）───
 app.include_router(offline_router)
 
+# ─── ForgeNode 离线感知决策路由 ───
+app.include_router(forge_router)
+
 # ─── 健康检查 ───
 
 @app.get("/health")
 async def health() -> dict:
-    return {"ok": True, "data": {"service": "mac-station", "version": "4.1.0"}}
+    return {"ok": True, "data": {"service": "mac-station", "version": "4.2.0"}}
 
 
 # ─── Core ML 代理 ───

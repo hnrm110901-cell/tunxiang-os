@@ -1,0 +1,60 @@
+meta:
+  name: "campaign"
+  version: "1.0.0"
+  display_name: "营销活动"
+  category: "member"
+  sub_category: "campaign"
+
+triggers:
+  events:
+    - type: "order.checkout.completed"    # 结账时检查可用活动/自动核销
+    - type: "member.tier.changed"         # 升级时推送专属活动
+    - type: "member.birthday.today"       # 生日活动
+    - type: "cron.daily.00:00"            # 检查活动到期
+  api:
+    base_path: "/api/v1/growth/campaigns"
+
+scope:
+  levels: [brand, store]
+  permissions:
+    - role: brand_admin
+      actions: [create, update, activate, deactivate, report]
+    - role: store_manager
+      actions: [view, apply_coupon]
+    - role: regional_manager
+      actions: [view_all, report]
+
+data:
+  owned_entities:
+    - name: Promotion
+      table: promotions
+    - name: PromotionSku
+      table: promotion_skus
+  emitted_events:
+    - type: "campaign.created"
+    - type: "campaign.activated"
+    - type: "campaign.deactivated"
+    - type: "campaign.coupon_applied"
+    - type: "campaign.budget_exhausted"
+
+dependencies:
+  required:
+    - skill: order-core
+      min_version: "2.0.0"
+    - skill: member-core
+      min_version: "1.0.0"
+
+degradation:
+  offline:
+    can_operate: false  # 核销需联网校验券码有效性
+
+observability:
+  metrics:
+    - name: campaign_coupon_redemption_rate
+      type: gauge
+      labels: [campaign_id, store_id]
+    - name: campaign_budget_utilization
+      type: gauge
+      labels: [campaign_id]
+      alert_threshold: 0.9
+      alert_message: "活动预算已使用超过90%，请关注是否需要追加预算或提前结束活动"

@@ -29,6 +29,8 @@ from .api.store_clone_routes import router as store_clone_router
 from .api.store_health_routes import router as store_health_router
 from .api.stream_routes import router as stream_router
 from .api.voice_routes import router as voice_router
+from .api.skill_registry_routes import router as skill_registry_router
+from .api.skill_context_routes import router as skill_context_router
 from .routers.diagnosis_router import router as diagnosis_router
 from .routers.pilot_router import router as pilot_router
 
@@ -61,6 +63,42 @@ async def lifespan(app: FastAPI):
     consumer = DomainEventConsumer(event_bus, master_agent=master)
     consumer_task = asyncio.create_task(consumer.run())
 
+    # ── Skill-aware EventBus（并行运行，与 DomainEventConsumer 互不干扰）──
+    import os as _os2
+    from shared.skill_registry import SkillRegistry
+    from shared.skill_registry.src.skill_event_consumer import SkillEventConsumer
+    from .agents.skill_handlers import (
+        handle_order_skill_events,
+        handle_member_skill_events,
+        handle_inventory_skill_events,
+        handle_safety_skill_events,
+        handle_finance_skill_events,
+        handle_approval_skill_events,
+    )
+
+    # 扫描所有 Skill（services/ 目录）
+    _skills_root = _os2.path.join(
+        _os2.path.dirname(_os2.path.dirname(_os2.path.dirname(_os2.path.dirname(__file__)))),
+        "services",
+    )
+    skill_registry = SkillRegistry([_skills_root])
+    skill_registry.scan()
+
+    redis_url = _os2.getenv("REDIS_URL", "redis://localhost:6379")
+    skill_consumer = SkillEventConsumer(redis_url=redis_url, registry=skill_registry)
+
+    # 注册 handlers（按 Skill 名称注册）
+    skill_consumer.register_handler("order-core", handle_order_skill_events)
+    skill_consumer.register_handler("member-core", handle_member_skill_events)
+    skill_consumer.register_handler("inventory-core", handle_inventory_skill_events)
+    skill_consumer.register_handler("safety-compliance", handle_safety_skill_events)
+    skill_consumer.register_handler("deposit-management", handle_finance_skill_events)
+    skill_consumer.register_handler("wine-storage", handle_finance_skill_events)
+    skill_consumer.register_handler("credit-account", handle_finance_skill_events)
+    skill_consumer.register_handler("approval-flow", handle_approval_skill_events)
+
+    skill_consumer_task = asyncio.create_task(skill_consumer.start())
+
     # ── Phase 2 投影器启动（Event Sourcing → 物化视图）──
     # 从 PROJECTOR_TENANT_IDS 环境变量读取需要运行投影器的租户列表
     # 格式：逗号分隔的 UUID 字符串，如 "uuid1,uuid2"
@@ -82,6 +120,12 @@ async def lifespan(app: FastAPI):
         consumer_task.cancel()
         try:
             await consumer_task
+        except asyncio.CancelledError:
+            pass
+        await skill_consumer.stop()
+        skill_consumer_task.cancel()
+        try:
+            await skill_consumer_task
         except asyncio.CancelledError:
             pass
         # 停止所有投影器
@@ -115,6 +159,8 @@ app.include_router(agent_monitor_router)
 app.include_router(store_health_router)
 app.include_router(master_agent_router)
 app.include_router(projector_router)
+app.include_router(skill_registry_router)
+app.include_router(skill_context_router)
 
 
 @app.get("/health")

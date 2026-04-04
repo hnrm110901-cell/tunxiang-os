@@ -1,0 +1,350 @@
+meta:
+  name: "order-core"
+  version: "2.0.0"
+  display_name: "订单核心"
+  description: |
+    屯象OS 订单生命周期引擎，管理从开台到结账的完整交易流水。
+    覆盖堂食、外卖、自提三种业态的订单状态机。
+    作为 Ontology 层 Level-1 核心，被押金、存酒、挂账、会员、报表等
+    所有业务 skill 强依赖。本模块的状态机是 critical-path，
+    任何变更必须经过完整的状态转换测试。
+    包含：订单、订单明细、桌台、预订、订单时间线五个核心实体。
+  category: "order"
+  sub_category: "dine-in"
+  icon: "receipt"
+  maintainer: "order-team"
+
+triggers:
+  events:
+    # ========== 桌台事件 ==========
+    - type: "terminal.table.scanned"
+      condition: "payload.action == 'open'"
+      priority: 100
+      description: "扫桌台码开台"
+    - type: "terminal.order.item_added"
+      condition: "always"
+      priority: 100
+      description: "加菜"
+    - type: "terminal.checkout.requested"
+      condition: "always"
+      priority: 100
+      description: "发起结账"
+    - type: "payment.completed"
+      condition: "payload.order_id != null"
+      priority: 100
+      description: "支付完成，关闭订单"
+
+    # ========== 外卖事件 ==========
+    - type: "platform.meituan.order_pushed"
+      condition: "always"
+      priority: 90
+      description: "美团外卖推单"
+    - type: "platform.eleme.order_pushed"
+      condition: "always"
+      priority: 90
+      description: "饿了么推单"
+
+    # ========== 预订事件 ==========
+    - type: "terminal.reservation.created"
+      condition: "always"
+      priority: 85
+      description: "创建预订"
+    - type: "cron.every.15min"
+      condition: "always"
+      priority: 40
+      description: "检查即将到达的预订，提前备桌"
+
+  api:
+    base_path: "/api/v1/orders"
+    endpoints:
+      # 订单
+      - { method: "POST",   path: "/",                          description: "创建订单（开台）" }
+      - { method: "GET",    path: "/:id",                       description: "订单详情" }
+      - { method: "GET",    path: "/",                          description: "订单列表（支持多维筛选）" }
+      - { method: "POST",   path: "/:id/items",                 description: "加菜" }
+      - { method: "DELETE", path: "/:id/items/:itemId",         description: "退菜" }
+      - { method: "POST",   path: "/:id/checkout",              description: "发起结账" }
+      - { method: "POST",   path: "/:id/cancel",                description: "取消订单" }
+      - { method: "POST",   path: "/:id/discount",              description: "整单折扣/抹零" }
+      - { method: "GET",    path: "/:id/timeline",              description: "订单时间线（状态变更记录）" }
+      # 桌台
+      - { method: "GET",    path: "/tables",                    description: "桌台状态总览" }
+      - { method: "POST",   path: "/tables/:id/open",           description: "开台" }
+      - { method: "POST",   path: "/tables/:id/merge",          description: "并台" }
+      - { method: "POST",   path: "/tables/:id/transfer",       description: "转台" }
+      - { method: "POST",   path: "/tables/:id/clean",          description: "清台" }
+      # 预订
+      - { method: "POST",   path: "/reservations",              description: "创建预订" }
+      - { method: "GET",    path: "/reservations",              description: "预订列表" }
+      - { method: "PUT",    path: "/reservations/:id",          description: "修改预订" }
+      - { method: "POST",   path: "/reservations/:id/cancel",   description: "取消预订" }
+      - { method: "POST",   path: "/reservations/:id/check-in", description: "预订到店签到" }
+      # 报表
+      - { method: "GET",    path: "/report/daily-summary",      description: "日营业汇总" }
+      - { method: "GET",    path: "/report/hourly-distribution", description: "时段分布" }
+      - { method: "GET",    path: "/report/item-ranking",       description: "菜品销量排行" }
+
+  terminal:
+    - { device: "cashier-pos",   action: "order_checkout",      shortcut_key: "F1",       description: "结账" }
+    - { device: "cashier-pos",   action: "order_cancel",        shortcut_key: "Shift+F1", description: "取消订单" }
+    - { device: "cashier-pos",   action: "table_overview",      shortcut_key: "F2",       description: "桌台总览" }
+    - { device: "waiter-pad",    action: "order_place",         description: "点餐下单" }
+    - { device: "waiter-pad",    action: "order_add_item",      description: "加菜" }
+    - { device: "customer-kiosk",        action: "self_order",  description: "自助点餐机" }
+    - { device: "customer-mini-program", action: "scan_order",  description: "扫码点餐" }
+
+scope:
+  levels: ["brand", "store"]
+  config_inheritance: "override_with_merge"
+  configurable_params:
+    - { name: "order_auto_cancel_minutes",    type: "integer", default: 0,                description: "下单N分钟未支付自动取消（0=不自动取消）", level: "brand" }
+    - { name: "allow_zero_amount_checkout",   type: "boolean", default: false,            description: "是否允许0元结账", level: "brand" }
+    - { name: "require_guest_count",          type: "boolean", default: true,             description: "开台是否必须填写就餐人数", level: "brand" }
+    - { name: "max_discount_rate",            type: "decimal", default: 0.5,             description: "最大折扣比例（0.5=五折）", level: "store" }
+    - { name: "rounding_rule",                type: "enum",    default: "round_down_to_yuan", values: ["none", "round_down_to_jiao", "round_down_to_yuan"], description: "抹零规则", level: "store" }
+    - { name: "table_auto_clean_minutes",     type: "integer", default: 30,              description: "结账后N分钟自动清台", level: "store" }
+    - { name: "table_warning_minutes",        type: "integer", default: 120,             description: "超时未结账告警（分钟）", level: "store" }
+    - { name: "reservation_hold_minutes",     type: "integer", default: 15,              description: "预订保留时间（超时未到自动释放）", level: "store" }
+    - { name: "reservation_deposit_required", type: "boolean", default: false,           description: "预订是否需要押金", level: "store" }
+    - { name: "auto_accept_platform_orders",  type: "boolean", default: false,           description: "自动接单（美团/饿了么）", level: "store" }
+    - { name: "platform_order_prep_minutes",  type: "integer", default: 20,              description: "外卖备餐时间（分钟）", level: "store" }
+  permissions:
+    - { role: "waiter",           actions: ["open_table", "place_order", "add_item", "view_own_tables"] }
+    - { role: "cashier",          actions: ["open_table", "place_order", "add_item", "remove_item", "checkout", "discount_under_limit", "view_all_tables", "reservation_crud"] }
+    - { role: "store_manager",    actions: ["*", "cancel_order", "override_discount", "view_report"] }
+    - { role: "finance_director", actions: ["view_report", "export_data"] }
+
+data:
+  owned_entities:
+    - name: "Order"
+      table: "biz_orders"
+      fields:
+        - { name: "id",              type: "uuid",      required: true }
+        - { name: "store_id",        type: "uuid",      required: true,  ref: "Store.id" }
+        - { name: "brand_id",        type: "uuid",      required: true,  ref: "Brand.id" }
+        - { name: "order_no",        type: "string",    required: true,  description: "订单流水号（日期+门店+序号）" }
+        - { name: "order_type",      type: "enum",      required: true,  values: ["dine_in", "takeout", "pickup", "platform_meituan", "platform_eleme"] }
+        - { name: "table_id",        type: "uuid",      required: false, ref: "Table.id", description: "堂食关联桌台" }
+        - { name: "customer_id",     type: "uuid",      required: false, ref: "Customer.id" }
+        - { name: "guest_count",     type: "integer",   required: false }
+        - { name: "status",          type: "enum",      required: true,  values: ["pending", "confirmed", "preparing", "served", "checkout_requested", "paid", "completed", "cancelled", "refunded"] }
+        - { name: "sub_total",       type: "decimal",   required: true,  precision: [12, 2], description: "菜品小计" }
+        - { name: "discount_amount", type: "decimal",   required: true,  precision: [10, 2] }
+        - { name: "service_charge",  type: "decimal",   required: true,  precision: [10, 2] }
+        - { name: "packing_fee",     type: "decimal",   required: true,  precision: [10, 2] }
+        - { name: "total_amount",    type: "decimal",   required: true,  precision: [12, 2], description: "应收金额" }
+        - { name: "paid_amount",     type: "decimal",   required: true,  precision: [12, 2], description: "实收金额" }
+        - { name: "payment_method",  type: "string",    required: false }
+        - { name: "payment_ref",     type: "string",    required: false }
+        - { name: "remark",          type: "text",      required: false }
+        - { name: "platform_order_id", type: "string",  required: false, description: "外卖平台原始订单号" }
+        - { name: "opened_at",       type: "timestamp", required: true }
+        - { name: "paid_at",         type: "timestamp", required: false }
+        - { name: "completed_at",    type: "timestamp", required: false }
+        - { name: "cancelled_at",    type: "timestamp", required: false }
+        - { name: "cancel_reason",   type: "string",    required: false }
+        - { name: "operator_id",     type: "uuid",      required: true,  ref: "Staff.id" }
+        - { name: "cashier_id",      type: "uuid",      required: false, ref: "Staff.id" }
+
+    - name: "OrderItem"
+      table: "biz_order_items"
+      fields:
+        - { name: "id",              type: "uuid",      required: true }
+        - { name: "order_id",        type: "uuid",      required: true,  ref: "Order.id" }
+        - { name: "menu_item_id",    type: "uuid",      required: true,  ref: "MenuItem.id" }
+        - { name: "name",            type: "string",    required: true,  description: "菜品名称（冗余快照）" }
+        - { name: "spec",            type: "string",    required: false, description: "规格" }
+        - { name: "quantity",        type: "decimal",   required: true,  precision: [8, 2] }
+        - { name: "unit_price",      type: "decimal",   required: true,  precision: [10, 2] }
+        - { name: "amount",          type: "decimal",   required: true,  precision: [10, 2] }
+        - { name: "discount_amount", type: "decimal",   required: true,  precision: [10, 2] }
+        - { name: "final_amount",    type: "decimal",   required: true,  precision: [10, 2] }
+        - { name: "status",          type: "enum",      required: true,  values: ["ordered", "sent_to_kitchen", "preparing", "served", "returned"] }
+        - { name: "remark",          type: "string",    required: false }
+        - { name: "is_gift",         type: "boolean",   required: true }
+        - { name: "operator_id",     type: "uuid",      required: true,  ref: "Staff.id" }
+        - { name: "created_at",      type: "timestamp", required: true }
+        - { name: "served_at",       type: "timestamp", required: false }
+
+    - name: "Table"
+      table: "biz_tables"
+      fields:
+        - { name: "id",               type: "uuid",    required: true }
+        - { name: "store_id",         type: "uuid",    required: true,  ref: "Store.id" }
+        - { name: "code",             type: "string",  required: true,  description: "桌号（如 A01）" }
+        - { name: "zone",             type: "string",  required: false, description: "区域（大厅/包间）" }
+        - { name: "capacity",         type: "integer", required: true }
+        - { name: "min_charge",       type: "decimal", required: false, precision: [10, 2] }
+        - { name: "status",           type: "enum",    required: true,  values: ["free", "reserved", "occupied", "cleaning", "disabled"] }
+        - { name: "current_order_id", type: "uuid",    required: false, ref: "Order.id" }
+        - { name: "qr_code",          type: "string",  required: false }
+        - { name: "sort_order",       type: "integer", required: true }
+
+    - name: "Reservation"
+      table: "biz_reservations"
+      fields:
+        - { name: "id",               type: "uuid",      required: true }
+        - { name: "store_id",         type: "uuid",      required: true,  ref: "Store.id" }
+        - { name: "customer_id",      type: "uuid",      required: false, ref: "Customer.id" }
+        - { name: "customer_name",    type: "string",    required: true }
+        - { name: "customer_phone",   type: "string",    required: true }
+        - { name: "guest_count",      type: "integer",   required: true }
+        - { name: "table_id",         type: "uuid",      required: false, ref: "Table.id" }
+        - { name: "reserved_date",    type: "date",      required: true }
+        - { name: "reserved_time",    type: "time",      required: true }
+        - { name: "status",           type: "enum",      required: true,  values: ["confirmed", "checked_in", "no_show", "cancelled"] }
+        - { name: "deposit_required", type: "boolean",   required: true }
+        - { name: "remark",           type: "text",      required: false }
+        - { name: "source",           type: "enum",      required: true,  values: ["phone", "wechat", "walk_in", "platform"] }
+        - { name: "operator_id",      type: "uuid",      required: true,  ref: "Staff.id" }
+        - { name: "created_at",       type: "timestamp", required: true }
+
+    - name: "OrderTimeline"
+      table: "biz_order_timelines"
+      fields:
+        - { name: "id",          type: "uuid",      required: true }
+        - { name: "order_id",    type: "uuid",      required: true,  ref: "Order.id" }
+        - { name: "action",      type: "string",    required: true }
+        - { name: "from_status", type: "string",    required: false }
+        - { name: "to_status",   type: "string",    required: true }
+        - { name: "operator_id", type: "uuid",      required: true,  ref: "Staff.id" }
+        - { name: "payload",     type: "jsonb",     required: false }
+        - { name: "created_at",  type: "timestamp", required: true }
+
+  referenced_entities:
+    - { entity: "Store",    skill: "org-core",    fields_used: ["id", "name", "brand_id", "region_id", "config"] }
+    - { entity: "Brand",    skill: "org-core",    fields_used: ["id", "name"] }
+    - { entity: "Staff",    skill: "org-core",    fields_used: ["id", "name", "role", "pin_hash"] }
+    - { entity: "Customer", skill: "member-core", fields_used: ["id", "name", "phone", "tier"] }
+    - { entity: "MenuItem", skill: "menu-core",   fields_used: ["id", "name", "price", "category", "status"] }
+
+  emitted_events:
+    - type: "order.created"
+      payload_schema: { order_id: "uuid", store_id: "uuid", order_type: "string", table_id: "uuid" }
+    - type: "order.item_added"
+      payload_schema: { order_id: "uuid", item_id: "uuid", menu_item_id: "uuid", quantity: "decimal", amount: "decimal" }
+    - type: "order.submitted"
+      payload_schema: { order_id: "uuid", store_id: "uuid", item_count: "integer" }
+    - type: "order.paid"
+      payload_schema: { order_id: "uuid", store_id: "uuid", customer_id: "uuid", total_amount: "decimal", paid_amount: "decimal", payment_method: "string" }
+    - type: "order.cancelled"
+      payload_schema: { order_id: "uuid", store_id: "uuid", reason: "string" }
+    - type: "order.checkout.completed"
+      payload_schema: { order_id: "uuid", store_id: "uuid", customer_id: "uuid", total_amount: "decimal", paid_amount: "decimal", payment_method: "string" }
+    - type: "order.table.opened"
+      payload_schema: { table_id: "uuid", order_id: "uuid", store_id: "uuid", customer_id: "uuid", guest_count: "integer" }
+    - type: "order.table.freed"
+      payload_schema: { table_id: "uuid", store_id: "uuid" }
+    - type: "order.reservation.created"
+      payload_schema: { reservation_id: "uuid", store_id: "uuid", customer_id: "uuid", reserved_date: "date", reserved_time: "time", guest_count: "integer" }
+    - type: "order.reservation.cancelled"
+      payload_schema: { reservation_id: "uuid", store_id: "uuid", customer_id: "uuid" }
+    - type: "order.platform.received"
+      payload_schema: { order_id: "uuid", platform: "string", platform_order_id: "string", store_id: "uuid" }
+
+dependencies:
+  required:
+    - { skill: "org-core", min_version: "1.0.0", reason: "订单必须属于某个门店" }
+  optional:
+    - { skill: "member-core",      min_version: "1.0.0", reason: "关联会员享受折扣，缺少时按散客处理" }
+    - { skill: "menu-core",        min_version: "1.0.0", reason: "关联菜单获取价格，缺少时手动输入价格" }
+    - { skill: "payment-gateway",  min_version: "1.5.0", reason: "电子支付，缺少时仅支持现金" }
+
+degradation:
+  offline:
+    can_operate: true
+    capabilities:
+      - { action: "open_table",    mode: "full",    local_storage: "sqlite_wal" }
+      - { action: "place_order",   mode: "full",    local_storage: "sqlite_wal", note: "菜单需预缓存" }
+      - { action: "add_item",      mode: "full",    local_storage: "sqlite_wal" }
+      - { action: "checkout_cash", mode: "full",    local_storage: "sqlite_wal" }
+      - { action: "checkout_scan", mode: "limited", limit: "仅支持离线二维码支付" }
+      - { action: "platform_order", mode: "disabled", fallback_message: "外卖订单需要联网接收" }
+      - { action: "report",        mode: "limited", limit: "仅能查看本机订单" }
+    sync_strategy:
+      on_reconnect: "push_local_then_pull_remote"
+      conflict_resolution: "order_id_dedup_amount_sum"
+      max_offline_hours: 4
+
+  service_down:
+    - { service: "payment-gateway", fallback: "cash_only_mode", alert: "支付通道不可用，仅支持现金收款" }
+    - { service: "menu-core",       fallback: "use_cached_menu", alert: "none" }
+
+  conflict:
+    strategy: "order_id_dedup_with_timeline"
+    manual_review_trigger: "total_amount_diff > 50 || status_conflict"
+    reason: "订单金额以实际操作累加为准，状态冲突需人工核对"
+
+observability:
+  metrics:
+    - { name: "order_created_total",   type: "counter",   labels: ["store_id", "order_type"] }
+    - { name: "order_completed_total", type: "counter",   labels: ["store_id", "order_type"] }
+    - { name: "order_cancelled_total", type: "counter",   labels: ["store_id"], alert_threshold: 20, alert_message: "今日取消订单 {value} 笔，请关注" }
+    - { name: "order_revenue_daily",   type: "gauge",     labels: ["store_id"] }
+    - { name: "order_avg_amount",      type: "gauge",     labels: ["store_id", "order_type"], description: "客单价" }
+    - { name: "table_turnover_rate",   type: "gauge",     labels: ["store_id"], description: "翻台率" }
+    - { name: "table_occupied_count",  type: "gauge",     labels: ["store_id"] }
+    - { name: "order_checkout_duration_seconds", type: "histogram", labels: ["store_id"] }
+  health_check: { endpoint: "/health", interval_seconds: 15, timeout_seconds: 3 }
+  audit:
+    log_all_mutations: true
+    retention_days: 2555
+    fields_to_mask: ["customer_phone"]
+
+ui:
+  surfaces:
+    - terminal: "cashier-pos"
+      entry_point: "main-screen"
+      component: "TableOverviewGrid"
+      layout: "full-screen"
+      features: ["table-grid", "order-detail", "checkout", "discount", "split-bill", "merge-table", "transfer-table"]
+    - terminal: "waiter-pad"
+      entry_point: "main-screen"
+      component: "WaiterOrderPad"
+      layout: "full-screen"
+      features: ["table-list", "place-order", "add-item", "send-to-kitchen", "call-checkout"]
+    - terminal: "customer-kiosk"
+      entry_point: "main-screen"
+      component: "SelfOrderKiosk"
+      layout: "full-screen"
+      features: ["menu-browse", "cart", "pay", "receipt"]
+    - terminal: "customer-mini-program"
+      entry_point: "scan-to-order"
+      component: "ScanOrderPage"
+      layout: "page"
+      features: ["menu-browse", "cart", "pay", "order-status", "call-waiter"]
+    - terminal: "kds"
+      entry_point: "main-screen"
+      component: "KitchenDisplayBoard"
+      layout: "full-screen"
+      features: ["order-queue", "item-status", "bump-complete", "recall"]
+    - terminal: "manager-dashboard"
+      entry_point: "reports.operations"
+      component: "OrderDashboard"
+      layout: "dashboard"
+      features: ["daily-summary", "hourly-chart", "item-ranking", "table-heatmap"]
+
+  print_templates:
+    - { name: "order-receipt",     format: "thermal-58mm", template_file: "assets/templates/order-receipt.xml" }
+    - { name: "kitchen-ticket",    format: "thermal-58mm", template_file: "assets/templates/kitchen-ticket.xml" }
+    - { name: "pre-checkout-bill", format: "thermal-58mm", template_file: "assets/templates/pre-checkout.xml" }
+    - { name: "daily-summary",     format: "thermal-58mm", template_file: "assets/templates/daily-summary.xml" }
+
+compliance:
+  golden_tax:
+    applicable: true
+    tax_category: "餐饮服务"
+    invoice_timing: "on_checkout"
+    note: "结账时可选开票，关联金税四期接口"
+  data_residency: "cn-mainland"
+  pii_fields: ["customer_name", "customer_phone"]
+  retention_policy:
+    financial_records: "7_years"
+    order_details: "3_years"
+    operation_logs: "1_year"
+
+localization:
+  default_locale: "zh-CN"
+  supported_locales: ["zh-CN", "zh-TW"]
+  currency: "CNY"
+  timezone: "Asia/Shanghai"

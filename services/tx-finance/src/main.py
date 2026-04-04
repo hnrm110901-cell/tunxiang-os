@@ -5,8 +5,11 @@ FCT业财税、预算、现金流、月报、成本分析、P&L、凭证生成
 from contextlib import asynccontextmanager
 
 from api.analytics_routes import router as analytics_router
+from api.approval_callback_routes import router as approval_callback_router
 from api.cost_routes import router as cost_router
 from api.cost_routes_v2 import router as cost_v2_router
+from api.credit_account_routes import router as credit_account_router
+from api.deposit_routes import router as deposit_router
 from api.e_invoice_routes import router as invoice_router
 from api.erp_routes import router as erp_router
 from api.finance import router as finance_router
@@ -21,6 +24,7 @@ from api.seafood_loss_routes import router as seafood_loss_router
 from api.settlement_routes import router as settlement_router
 from api.fund_settlement_routes import router as fund_settlement_router
 from api.split_routes import router as split_router
+from api.wine_storage_routes import router as wine_storage_router
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -66,6 +70,12 @@ app.include_router(pnl_router,         prefix="/api/v1/finance")   # /pnl/*
 app.include_router(cost_v2_router,     prefix="/api/v1/finance")   # /costs/* /configs/*
 app.include_router(revenue_router,     prefix="/api/v1/finance")   # /revenue/*
 app.include_router(seafood_loss_router, prefix="/api/v1/finance")  # /seafood-loss/*
+
+# v156 财务应收管理：押金 / 存酒 / 企业挂账
+app.include_router(deposit_router)        # /api/v1/deposits/*
+app.include_router(wine_storage_router)   # /api/v1/wine-storage/*
+app.include_router(credit_account_router)     # /api/v1/credit/*
+app.include_router(approval_callback_router)  # /api/v1/credit/agreements/{id}/approval-callback
 
 
 @app.get("/health")

@@ -211,6 +211,12 @@ DOMAIN_STREAM_MAP: dict[str, str] = {
     # 系统域
     "kds":          "tx_kds_events",
     "agent":        "tx_agent_events",
+    # 财务应收管理域（v156 新增）
+    "deposit":      "tx_deposit_events",
+    "wine_storage": "tx_wine_storage_events",
+    "credit":       "tx_credit_events",
+    # 营销活动域（v157 新增）
+    "campaign":     "tx_campaign_events",
     # 兼容旧域
     "trade":        "trade_events",
     "supply":       "supply_events",
@@ -232,11 +238,16 @@ DOMAIN_STREAM_TYPE_MAP: dict[str, str] = {
     "settlement":   "settlement",
     "safety":       "safety",
     "energy":       "energy",
+    "campaign":     "campaign",
     "opinion":      "opinion",
     "review":       "review",
     "recipe":       "dish",
     "kds":          "order",
     "agent":        "agent",
+    # 财务应收管理域（v156 新增）
+    "deposit":      "deposit",
+    "wine_storage": "wine_storage",
+    "credit":       "credit",
 }
 
 # 所有事件类型枚举（用于校验）
@@ -256,7 +267,71 @@ ALL_EVENT_ENUMS = (
     RecipeEventType,
     KdsEventType,
     AgentEventType,
+    # 财务应收管理域（v156 新增）
+    DepositEventType,
+    WineStorageEventType,
+    CreditEventType,
+    # 食安巡检域（v157 新增）
+    SafetyInspectionEventType,
+    # 营销活动域（v157 新增）
+    CampaignEventType,
 )
+
+
+# ──────────────────────────────────────────────────────────────────────
+# 财务应收管理域（押金 / 存酒 / 企业挂账，v156 新增）
+# ──────────────────────────────────────────────────────────────────────
+
+class DepositEventType(str, Enum):
+    """押金事件"""
+
+    COLLECTED = "deposit.collected"                        # 押金收取
+    APPLIED = "deposit.applied"                            # 押金抵扣
+    REFUNDED = "deposit.refunded"                          # 押金退还
+    CONVERTED_TO_REVENUE = "deposit.converted_to_revenue"  # 转收入
+    EXPIRED = "deposit.expired"                            # 押金过期
+
+
+class WineStorageEventType(str, Enum):
+    """存酒事件"""
+
+    STORED = "wine_storage.stored"                         # 存酒
+    RETRIEVED = "wine_storage.retrieved"                   # 取酒
+    EXPIRING_SOON = "wine_storage.expiring_soon"           # 即将到期
+    EXPIRED = "wine_storage.expired"                       # 已过期
+    TRANSFERRED = "wine_storage.transferred"               # 转赠
+
+
+class CreditEventType(str, Enum):
+    """企业挂账事件"""
+
+    CHARGED = "credit.charged"                             # 挂账消费
+    BILL_GENERATED = "credit.bill_generated"               # 账单生成
+    PAYMENT_RECEIVED = "credit.payment_received"           # 还款到账
+    LIMIT_WARNING = "credit.limit_warning"                 # 额度预警（使用率 >80%）
+    OVERDUE = "credit.overdue"                             # 账单逾期
+
+
+class SafetyInspectionEventType(str, Enum):
+    """食安巡检事件（对标 mv_safety_compliance 物化视图）"""
+
+    INSPECTION_STARTED = "safety.inspection.started"
+    INSPECTION_COMPLETED = "safety.inspection.completed"
+    INSPECTION_FAILED = "safety.inspection.failed"           # 不合格
+    CRITICAL_ITEM_FAILED = "safety.critical_item.failed"    # 关键项不合格（高优先级告警）
+    INGREDIENT_EXPIRED = "safety.ingredient.expired"
+    CORRECTION_OVERDUE = "safety.correction.overdue"        # 整改超期未完成
+
+
+class CampaignEventType(str, Enum):
+    """营销活动事件"""
+
+    CREATED = "campaign.created"
+    ACTIVATED = "campaign.activated"
+    DEACTIVATED = "campaign.deactivated"
+    COUPON_APPLIED = "campaign.coupon_applied"
+    COUPON_EXPIRED = "campaign.coupon_expired"
+    BUDGET_EXHAUSTED = "campaign.budget_exhausted"          # 活动预算耗尽
 
 
 def resolve_stream_key(event_type: str) -> str:

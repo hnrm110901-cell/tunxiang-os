@@ -1,0 +1,262 @@
+# ============================================================
+# Skill: payment-gateway
+# 支付网关 — 统一收银结账与退款核销
+# ============================================================
+
+meta:
+  name: "payment-gateway"
+  version: "1.0.0"
+  display_name: "支付网关"
+  description: |
+    统一管理线上/线下支付渠道（微信/支付宝/现金/银联/储值）的收款、
+    退款、渠道对账全生命周期。
+    触发场景：POS收银结账请求、储值余额核销、退款申请、渠道到账结算。
+  category: "finance"
+  sub_category: "checkout"
+  icon: "credit-card"
+  maintainer: "trade-team"
+  license: "proprietary"
+
+# ============================================================
+# 第二层：触发路由
+# ============================================================
+triggers:
+  events:
+    - type: "terminal.checkout.requested"
+      condition: "always"
+      priority: 100
+      description: "收银台发起结账，进入支付流程"
+    - type: "terminal.stored_value.consume"
+      condition: "payload.amount > 0"
+      priority: 90
+      description: "储值余额核销"
+    - type: "payment.refund.requested"
+      condition: "always"
+      priority: 80
+      description: "退款申请，走支付渠道原路返还"
+
+  api:
+    base_path: "/api/v1/payments"
+    endpoints:
+      - method: "POST"
+        path: "/"
+        description: "发起支付"
+      - method: "POST"
+        path: "/:id/confirm"
+        description: "确认支付到账"
+      - method: "POST"
+        path: "/:id/refund"
+        description: "发起退款"
+      - method: "GET"
+        path: "/channel-settlement"
+        description: "渠道结算查询"
+
+  terminal:
+    - device: "cashier-pos"
+      action: "checkout_pay"
+      shortcut_key: "F1"
+      description: "收银台快捷支付"
+    - device: "cashier-pos"
+      action: "cash_declare"
+      shortcut_key: "F2"
+      description: "现金申报"
+
+# ============================================================
+# 第三层：作用域与权限
+# ============================================================
+scope:
+  levels:
+    - brand
+    - store
+  config_inheritance: "override_with_merge"
+  permissions:
+    - role: "cashier"
+      actions: ["pay", "cash_declare", "refund_under_limit"]
+    - role: "store_manager"
+      actions: ["pay", "refund", "cash_declare", "view_settlement"]
+    - role: "finance_director"
+      actions: ["*"]
+
+# ============================================================
+# 第四层：数据契约
+# ============================================================
+data:
+  owned_entities:
+    - name: "Payment"
+      table: "biz_payments"
+      fields:
+        - { name: "id",             type: "uuid",      required: true }
+        - { name: "tenant_id",      type: "uuid",      required: true }
+        - { name: "store_id",       type: "uuid",      required: true,  ref: "Store.id" }
+        - { name: "order_id",       type: "uuid",      required: true,  ref: "Order.id" }
+        - { name: "amount_fen",     type: "integer",   required: true,  description: "金额（分）" }
+        - { name: "channel",        type: "enum",      required: true,  values: ["wechat", "alipay", "cash", "unionpay", "stored_value"] }
+        - { name: "status",         type: "enum",      required: true,  values: ["initiated", "confirmed", "failed", "refunded"] }
+        - { name: "channel_tx_id",  type: "string",    required: false, description: "渠道流水号" }
+        - { name: "operator_id",    type: "uuid",      required: true,  ref: "Staff.id" }
+        - { name: "paid_at",        type: "timestamp", required: false }
+        - { name: "created_at",     type: "timestamp", required: true }
+        - { name: "updated_at",     type: "timestamp", required: true }
+
+    - name: "Refund"
+      table: "biz_refunds"
+      fields:
+        - { name: "id",             type: "uuid",      required: true }
+        - { name: "tenant_id",      type: "uuid",      required: true }
+        - { name: "payment_id",     type: "uuid",      required: true,  ref: "Payment.id" }
+        - { name: "amount_fen",     type: "integer",   required: true }
+        - { name: "reason",         type: "string",    required: true }
+        - { name: "status",         type: "enum",      required: true,  values: ["pending", "completed", "failed"] }
+        - { name: "operator_id",    type: "uuid",      required: true,  ref: "Staff.id" }
+        - { name: "approved_by",    type: "uuid",      required: false, ref: "Staff.id" }
+        - { name: "refunded_at",    type: "timestamp", required: false }
+        - { name: "created_at",     type: "timestamp", required: true }
+
+  referenced_entities:
+    - entity: "Order"
+      skill: "order-core"
+      fields_used: ["id", "total_amount_fen", "store_id", "status"]
+
+  emitted_events:
+    - type: "payment.initiated"
+      payload_schema: { payment_id: "uuid", order_id: "uuid", amount_fen: "integer", channel: "string", store_id: "uuid" }
+    - type: "payment.confirmed"
+      payload_schema: { payment_id: "uuid", order_id: "uuid", amount_fen: "integer", channel: "string", channel_tx_id: "string" }
+    - type: "payment.failed"
+      payload_schema: { payment_id: "uuid", order_id: "uuid", reason: "string" }
+    - type: "payment.refunded"
+      payload_schema: { refund_id: "uuid", payment_id: "uuid", amount_fen: "integer", reason: "string" }
+    - type: "payment.channel_settled"
+      payload_schema: { channel: "string", settled_amount_fen: "integer", settlement_date: "date", store_id: "uuid" }
+
+# ============================================================
+# 第五层：依赖声明
+# ============================================================
+dependencies:
+  required:
+    - skill: "order-core"
+      min_version: "2.0.0"
+      reason: "支付必须关联订单，校验金额与状态"
+    # infrastructure: postgresql >= 15, redis >= 7
+
+  optional:
+    - skill: "member-core"
+      min_version: "1.0.0"
+      reason: "储值核销需要会员账户，缺少时储值支付不可用"
+    - skill: "approval-flow"
+      min_version: "1.0.0"
+      reason: "大额退款需审批流，缺少时退款上限降为500元"
+
+# ============================================================
+# 第六层：降级策略
+# ============================================================
+degradation:
+  offline:
+    can_operate: true
+    capabilities:
+      - action: "cash_pay"
+        mode: "full"
+        local_storage: "sqlite_wal"
+        note: "现金收款离线完整可用"
+      - action: "wechat_pay"
+        mode: "disabled"
+        fallback_message: "微信/支付宝支付需要联网，请改用现金"
+      - action: "alipay"
+        mode: "disabled"
+        fallback_message: "微信/支付宝支付需要联网，请改用现金"
+      - action: "refund"
+        mode: "limited"
+        limit: "amount_fen <= 50000"
+        note: "离线退款上限500元，大额退款联网后处理"
+    sync_strategy:
+      on_reconnect: "push_local_then_pull_remote"
+      conflict_resolution: "last_write_wins_with_operator_log"
+      max_offline_hours: 4
+
+  service_down:
+    - service: "wechat-pay-gateway"
+      fallback: "queue_payment_for_retry"
+      alert: "通知店长：微信支付网关异常，已切换现金模式"
+    - service: "alipay-gateway"
+      fallback: "queue_payment_for_retry"
+      alert: "通知店长：支付宝网关异常，已切换现金模式"
+
+  conflict:
+    strategy: "lww_with_audit"
+    manual_review_trigger: "amount_diff_fen > 100"
+
+# ============================================================
+# 第七层：可观测性
+# ============================================================
+observability:
+  metrics:
+    - name: "payment_total"
+      type: "counter"
+      labels: ["store_id", "channel", "status"]
+      description: "支付笔数统计"
+    - name: "payment_amount_fen_total"
+      type: "counter"
+      labels: ["store_id", "channel"]
+      description: "支付金额累计（分）"
+    - name: "payment_duration_seconds"
+      type: "histogram"
+      description: "支付处理耗时"
+    - name: "refund_pending_count"
+      type: "gauge"
+      labels: ["store_id"]
+      alert_threshold: 5
+      alert_message: "门店有 {value} 笔退款待处理"
+
+  health_check:
+    endpoint: "/health"
+    interval_seconds: 30
+    timeout_seconds: 5
+
+  audit:
+    log_all_mutations: true
+    retention_days: 365
+    fields_to_mask: []
+
+# ============================================================
+# 第八层：UI 声明
+# ============================================================
+ui:
+  surfaces:
+    - terminal: "cashier-pos"
+      entry_point: "checkout.payment-panel"
+      component: "PaymentPanel"
+      layout: "full-screen"
+    - terminal: "manager-dashboard"
+      entry_point: "reports.finance.payment-settlement"
+      component: "PaymentSettlementReport"
+      layout: "data-table"
+
+  print_templates:
+    - name: "payment-receipt"
+      format: "thermal-58mm"
+      template_file: "assets/templates/payment-receipt.xml"
+    - name: "refund-receipt"
+      format: "thermal-58mm"
+      template_file: "assets/templates/refund-receipt.xml"
+
+# ============================================================
+# 第九层：合规与本地化
+# ============================================================
+compliance:
+  golden_tax:
+    applicable: true
+    tax_category: "销售收入"
+    invoice_timing: "on_payment_confirmed"
+    note: "现金收款需申报，微信/支付宝渠道资金数据纳入日结对账"
+  data_residency: "cn-mainland"
+  pii_fields: []
+  retention_policy:
+    financial_records: "7_years"
+    operation_logs: "1_year"
+
+localization:
+  default_locale: "zh-CN"
+  supported_locales: ["zh-CN", "zh-TW"]
+  currency: "CNY"
+  timezone: "Asia/Shanghai"
+  number_format: "comma_thousands"

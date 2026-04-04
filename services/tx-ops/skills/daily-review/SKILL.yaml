@@ -1,0 +1,254 @@
+# ============================================================
+# Skill: daily-review
+# 营业日清 — E1-E8八步日清日结流程
+# ============================================================
+
+meta:
+  name: "daily-review"
+  version: "1.0.0"
+  display_name: "营业日清"
+  description: |
+    驱动门店每日营业日清的E1-E8八步流程：
+    E1 收款核对 → E2 折扣稽核 → E3 外卖对账 → E4 会员核销 →
+    E5 库存日结 → E6 人效统计 → E7 营业日报 → E8 次日准备。
+    读取 mv_daily_settlement 物化视图汇总数据。
+    触发场景：支付渠道结算到账（E1）、库存日结完成（E5）、每日23:00强制日结。
+  category: "report"
+  sub_category: "operational"
+  icon: "clipboard-list"
+  maintainer: "ops-team"
+  license: "proprietary"
+
+# ============================================================
+# 第二层：触发路由
+# ============================================================
+triggers:
+  events:
+    - type: "payment.channel_settled"
+      condition: "always"
+      priority: 80
+      description: "渠道结算完成，触发E1收款核对"
+    - type: "inventory.daily.settled"
+      condition: "always"
+      priority: 70
+      description: "库存日结完成，触发E5库存统计步骤"
+    - type: "cron.daily.23:00"
+      condition: "always"
+      priority: 100
+      description: "每日23:00强制启动日结流程（无论各步骤是否已触发）"
+
+  api:
+    base_path: "/api/v1/ops/daily-review"
+    endpoints:
+      - method: "GET"
+        path: "/:date"
+        description: "获取指定日期日结状态（读mv_daily_settlement）"
+      - method: "POST"
+        path: "/:date/start"
+        description: "手动启动日结"
+      - method: "POST"
+        path: "/:date/steps/:step/complete"
+        description: "手动标记步骤完成"
+      - method: "GET"
+        path: "/history"
+        description: "日结历史记录"
+
+  terminal:
+    - device: "manager-pad"
+      action: "daily_review_dashboard"
+      description: "日清进度看板"
+
+# ============================================================
+# 第三层：作用域与权限
+# ============================================================
+scope:
+  levels:
+    - brand
+    - store
+  config_inheritance: "override_with_merge"
+  permissions:
+    - role: "cashier"
+      actions: ["view_progress"]
+    - role: "store_manager"
+      actions: ["view_progress", "mark_step_complete", "start_manual", "view_report"]
+    - role: "finance_director"
+      actions: ["*"]
+
+# ============================================================
+# 第四层：数据契约
+# ============================================================
+data:
+  owned_entities:
+    - name: "DailyReviewRecord"
+      table: "biz_daily_review_records"
+      fields:
+        - { name: "id",               type: "uuid",      required: true }
+        - { name: "tenant_id",        type: "uuid",      required: true }
+        - { name: "store_id",         type: "uuid",      required: true,  ref: "Store.id" }
+        - { name: "review_date",      type: "date",      required: true }
+        - { name: "e1_status",        type: "enum",      required: true,  values: ["pending", "completed", "skipped"] }
+        - { name: "e1_completed_at",  type: "timestamp", required: false }
+        - { name: "e2_status",        type: "enum",      required: true,  values: ["pending", "completed", "skipped"] }
+        - { name: "e2_completed_at",  type: "timestamp", required: false }
+        - { name: "e3_status",        type: "enum",      required: true,  values: ["pending", "completed", "skipped"] }
+        - { name: "e3_completed_at",  type: "timestamp", required: false }
+        - { name: "e4_status",        type: "enum",      required: true,  values: ["pending", "completed", "skipped"] }
+        - { name: "e4_completed_at",  type: "timestamp", required: false }
+        - { name: "e5_status",        type: "enum",      required: true,  values: ["pending", "completed", "skipped"] }
+        - { name: "e5_completed_at",  type: "timestamp", required: false }
+        - { name: "e6_status",        type: "enum",      required: true,  values: ["pending", "completed", "skipped"] }
+        - { name: "e6_completed_at",  type: "timestamp", required: false }
+        - { name: "e7_status",        type: "enum",      required: true,  values: ["pending", "completed", "skipped"] }
+        - { name: "e7_completed_at",  type: "timestamp", required: false }
+        - { name: "e8_status",        type: "enum",      required: true,  values: ["pending", "completed", "skipped"] }
+        - { name: "e8_completed_at",  type: "timestamp", required: false }
+        - { name: "all_completed",    type: "boolean",   required: true }
+        - { name: "all_completed_at", type: "timestamp", required: false }
+        - { name: "total_revenue_fen", type: "integer",  required: false }
+        - { name: "operator_id",      type: "uuid",      required: false, ref: "Staff.id" }
+        - { name: "created_at",       type: "timestamp", required: true }
+        - { name: "updated_at",       type: "timestamp", required: true }
+
+  referenced_entities:
+    - entity: "mv_daily_settlement"
+      skill: "order-core"
+      fields_used: ["store_id", "settle_date", "revenue_fen", "order_count", "discount_amount_fen"]
+
+  emitted_events:
+    - type: "daily_review.e1_completed"
+      payload_schema: { review_id: "uuid", store_id: "uuid", review_date: "date" }
+    - type: "daily_review.e2_completed"
+      payload_schema: { review_id: "uuid", store_id: "uuid", review_date: "date" }
+    - type: "daily_review.e3_completed"
+      payload_schema: { review_id: "uuid", store_id: "uuid", review_date: "date" }
+    - type: "daily_review.e4_completed"
+      payload_schema: { review_id: "uuid", store_id: "uuid", review_date: "date" }
+    - type: "daily_review.e5_completed"
+      payload_schema: { review_id: "uuid", store_id: "uuid", review_date: "date" }
+    - type: "daily_review.e6_completed"
+      payload_schema: { review_id: "uuid", store_id: "uuid", review_date: "date" }
+    - type: "daily_review.e7_completed"
+      payload_schema: { review_id: "uuid", store_id: "uuid", review_date: "date" }
+    - type: "daily_review.e8_completed"
+      payload_schema: { review_id: "uuid", store_id: "uuid", review_date: "date" }
+    - type: "daily_review.all_completed"
+      payload_schema: { review_id: "uuid", store_id: "uuid", review_date: "date", total_revenue_fen: "integer" }
+
+# ============================================================
+# 第五层：依赖声明
+# ============================================================
+dependencies:
+  required:
+    - skill: "order-core"
+      min_version: "2.0.0"
+      reason: "E1/E2需要订单与折扣汇总数据"
+    - skill: "inventory-core"
+      min_version: "1.0.0"
+      reason: "E5需要库存日结数据"
+    # infrastructure: postgresql >= 15, redis >= 7
+
+  optional:
+    - skill: "delivery-aggregator"
+      min_version: "1.0.0"
+      reason: "E3外卖对账需要平台订单数据"
+    - skill: "attendance"
+      min_version: "1.0.0"
+      reason: "E6人效统计需要考勤数据"
+
+# ============================================================
+# 第六层：降级策略
+# ============================================================
+degradation:
+  offline:
+    can_operate: true
+    capabilities:
+      - action: "view_progress"
+        mode: "full"
+        note: "可查看本地日结进度"
+      - action: "mark_step_complete"
+        mode: "full"
+        local_storage: "sqlite_wal"
+        note: "手动标记步骤离线可用，联网后同步"
+      - action: "generate_report"
+        mode: "disabled"
+        fallback_message: "日报生成需要联网读取物化视图"
+    sync_strategy:
+      on_reconnect: "push_local_then_pull_remote"
+      max_offline_hours: 4
+
+  conflict:
+    strategy: "lww_with_audit"
+    manual_review_trigger: "step_status_conflict"
+
+# ============================================================
+# 第七层：可观测性
+# ============================================================
+observability:
+  metrics:
+    - name: "daily_review_completion_rate"
+      type: "gauge"
+      labels: ["store_id"]
+      alert_threshold: 0.8
+      alert_message: "门店日清完成率低于80%，请检查流程"
+    - name: "daily_review_duration_minutes"
+      type: "histogram"
+      description: "日清耗时（分钟）"
+    - name: "daily_review_overdue_count"
+      type: "gauge"
+      labels: ["store_id"]
+      alert_threshold: 1
+      alert_message: "门店有 {value} 天日清未完成"
+
+  health_check:
+    endpoint: "/health"
+    interval_seconds: 60
+    timeout_seconds: 10
+
+  audit:
+    log_all_mutations: true
+    retention_days: 365
+    fields_to_mask: []
+
+# ============================================================
+# 第八层：UI 声明
+# ============================================================
+ui:
+  surfaces:
+    - terminal: "manager-pad"
+      entry_point: "ops.daily-review"
+      component: "DailyReviewDashboard"
+      layout: "full-screen"
+    - terminal: "manager-dashboard"
+      entry_point: "reports.ops.daily-review-history"
+      component: "DailyReviewHistoryReport"
+      layout: "data-table"
+
+  print_templates:
+    - name: "daily-report"
+      format: "thermal-58mm"
+      template_file: "assets/templates/daily-report.xml"
+    - name: "daily-report-a4"
+      format: "a4-pdf"
+      template_file: "assets/templates/daily-report.html"
+
+# ============================================================
+# 第九层：合规与本地化
+# ============================================================
+compliance:
+  golden_tax:
+    applicable: true
+    tax_category: "营业收入"
+    invoice_timing: "on_daily_settled"
+    note: "日结数据作为对账依据，需与银行流水/渠道账单三方核对"
+  data_residency: "cn-mainland"
+  pii_fields: []
+  retention_policy:
+    financial_records: "7_years"
+    operation_logs: "1_year"
+
+localization:
+  default_locale: "zh-CN"
+  supported_locales: ["zh-CN"]
+  currency: "CNY"
+  timezone: "Asia/Shanghai"
+  number_format: "comma_thousands"

@@ -1,0 +1,209 @@
+# ============================================================
+# Skill: store-pnl
+# 门店盈亏 — 基于mv_store_pnl的只读P&L分析
+# ============================================================
+
+meta:
+  name: "store-pnl"
+  version: "1.0.0"
+  display_name: "门店盈亏"
+  description: |
+    提供门店/品牌的损益分析（P&L）：收入、成本、毛利、人工、租金、净利润。
+    纯读取分析Skill，消费 mv_store_pnl 物化视图（由投影器从事件流异步生成）。
+    每日日结完成后自动刷新P&L数据。
+    触发场景：日清完成后刷新，支持按日/周/月/年维度查询。
+  category: "report"
+  sub_category: "financial"
+  icon: "trending-up"
+  maintainer: "analytics-team"
+  license: "proprietary"
+
+# ============================================================
+# 第二层：触发路由
+# ============================================================
+triggers:
+  events:
+    - type: "daily_review.all_completed"
+      condition: "always"
+      priority: 60
+      description: "日清全部完成后，刷新mv_store_pnl物化视图"
+
+  api:
+    base_path: "/api/v1/analytics/pnl"
+    endpoints:
+      - method: "GET"
+        path: "/store/:store_id"
+        description: "门店P&L（支持?period=daily|weekly|monthly|yearly&date=）"
+      - method: "GET"
+        path: "/brand"
+        description: "品牌汇总P&L"
+      - method: "GET"
+        path: "/comparison"
+        description: "多门店同比环比对比"
+      - method: "GET"
+        path: "/breakdown/:store_id"
+        description: "成本构成明细"
+      - method: "POST"
+        path: "/refresh"
+        description: "手动触发mv_store_pnl刷新（管理员）"
+
+  terminal:
+    - device: "manager-dashboard"
+      action: "pnl_dashboard"
+      description: "P&L总览看板"
+
+# ============================================================
+# 第三层：作用域与权限
+# ============================================================
+scope:
+  levels:
+    - brand
+    - region
+    - store
+  config_inheritance: "inherit_only"
+  permissions:
+    - role: "store_manager"
+      actions: ["view_own_store"]
+    - role: "region_manager"
+      actions: ["view_region_stores", "compare"]
+    - role: "finance_director"
+      actions: ["view_all", "export", "refresh"]
+    - role: "brand_admin"
+      actions: ["*"]
+
+# ============================================================
+# 第四层：数据契约（只读Skill，无owned_entities）
+# ============================================================
+data:
+  owned_entities: []
+
+  referenced_entities:
+    - entity: "mv_store_pnl"
+      skill: "daily-review"
+      fields_used: ["store_id", "period", "revenue_fen", "cost_fen", "gross_profit_fen", "labor_cost_fen", "rent_fen", "net_profit_fen", "gross_margin_rate"]
+    - entity: "mv_daily_settlement"
+      skill: "daily-review"
+      fields_used: ["store_id", "settle_date", "revenue_fen", "order_count"]
+    - entity: "mv_inventory_bom"
+      skill: "inventory-core"
+      fields_used: ["store_id", "date", "total_cost_fen"]
+
+  emitted_events: []
+
+# ============================================================
+# 第五层：依赖声明
+# ============================================================
+dependencies:
+  required:
+    - skill: "daily-review"
+      min_version: "1.0.0"
+      reason: "P&L数据源自日清完成后的mv_daily_settlement"
+    - skill: "inventory-core"
+      min_version: "1.0.0"
+      reason: "食材成本来自mv_inventory_bom"
+    # infrastructure: postgresql >= 15, redis >= 7
+
+  optional:
+    - skill: "payroll"
+      min_version: "1.0.0"
+      reason: "人工成本精准数据，缺少时使用预估值"
+
+# ============================================================
+# 第六层：降级策略
+# ============================================================
+degradation:
+  offline:
+    can_operate: false
+    capabilities:
+      - action: "view_pnl"
+        mode: "limited"
+        note: "可查看本地缓存的最近一次P&L快照（数据可能不是最新）"
+      - action: "refresh"
+        mode: "disabled"
+        fallback_message: "P&L刷新需要联网读取物化视图"
+    sync_strategy:
+      on_reconnect: "pull_latest_snapshot"
+      max_offline_hours: 24
+
+  service_down:
+    - service: "daily-review"
+      fallback: "use_last_pnl_snapshot"
+      alert: "通知财务：P&L数据可能不是最新，等待日清完成后自动更新"
+
+  conflict:
+    strategy: "lww_with_audit"
+    manual_review_trigger: "revenue_variance_pct > 0.05"
+    reason: "P&L只读，冲突只发生在物化视图刷新时"
+
+# ============================================================
+# 第七层：可观测性
+# ============================================================
+observability:
+  metrics:
+    - name: "pnl_gross_margin_rate"
+      type: "gauge"
+      labels: ["store_id"]
+      alert_threshold: 0.4
+      alert_message: "门店毛利率 {value} 低于40%警戒线，请检查成本"
+    - name: "pnl_net_profit_fen"
+      type: "gauge"
+      labels: ["store_id"]
+      description: "月度净利润（分），负数触发告警"
+      alert_threshold: 0
+      alert_message: "门店本月净利润为负，请关注成本结构"
+    - name: "pnl_view_total"
+      type: "counter"
+      labels: ["role"]
+      description: "P&L报表查看次数"
+    - name: "pnl_refresh_duration_seconds"
+      type: "histogram"
+      description: "物化视图刷新耗时"
+
+  health_check:
+    endpoint: "/health"
+    interval_seconds: 60
+    timeout_seconds: 10
+
+  audit:
+    log_all_mutations: false
+    retention_days: 365
+    fields_to_mask: []
+
+# ============================================================
+# 第八层：UI 声明
+# ============================================================
+ui:
+  surfaces:
+    - terminal: "manager-dashboard"
+      entry_point: "analytics.pnl"
+      component: "StorePnLDashboard"
+      layout: "full-screen"
+    - terminal: "web-hub"
+      entry_point: "brand.pnl-overview"
+      component: "BrandPnLOverview"
+      layout: "full-screen"
+
+  print_templates:
+    - name: "monthly-pnl-report"
+      format: "a4-pdf"
+      template_file: "assets/templates/monthly-pnl-report.html"
+
+# ============================================================
+# 第九层：合规与本地化
+# ============================================================
+compliance:
+  golden_tax:
+    applicable: false
+    note: "P&L为内部分析报表，不作为税务申报依据"
+  data_residency: "cn-mainland"
+  pii_fields: []
+  retention_policy:
+    financial_records: "7_years"
+    operation_logs: "1_year"
+
+localization:
+  default_locale: "zh-CN"
+  supported_locales: ["zh-CN", "zh-TW"]
+  currency: "CNY"
+  timezone: "Asia/Shanghai"
+  number_format: "comma_thousands"

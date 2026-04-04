@@ -1,0 +1,318 @@
+meta:
+  name: "member-core"
+  version: "1.0.0"
+  display_name: "会员核心"
+  description: |
+    屯象OS 会员体系基座，管理客户身份、等级、储值、积分四个核心维度。
+    所有需要识别客户身份的 skill（存酒、押金、挂账、营销）依赖此模块。
+    核心能力：会员注册与识别（手机号/微信/人脸）、等级升降级规则引擎、
+    储值充退、积分累计与消耗、会员画像标签、跨店通用。
+    设计对标：Claude 记忆系统的三段式模型：
+    - 持久化画像 = Customer + MemberProfile（长期不变的属性）
+    - 当前会话 = 本次到店消费上下文（实时）
+    - 历史检索 = 消费记录、积分流水（按需查询）
+  category: "member"
+  sub_category: "membership"
+  icon: "user-circle"
+  maintainer: "member-team"
+
+triggers:
+  events:
+    # 会员识别入口
+    - type: "terminal.member.scanned"
+      condition: "always"
+      priority: 100
+      description: "扫码/刷卡/输入手机号识别会员"
+    - type: "order.checkout.completed"
+      condition: "payload.customer_id != null"
+      priority: 70
+      description: "结账后累计积分、更新消费统计"
+    - type: "order.table.opened"
+      condition: "payload.customer_id != null"
+      priority: 80
+      description: "开台时加载会员信息（等级折扣、存酒、押金）"
+
+    # 储值事件
+    - type: "payment.stored_value.recharged"
+      condition: "always"
+      priority: 100
+      description: "储值充值到账"
+
+    # 等级变动
+    - type: "cron.monthly.first_day.04:00"
+      condition: "always"
+      priority: 60
+      description: "月度等级重新计算（升降级）"
+    - type: "cron.daily.06:00"
+      condition: "always"
+      priority: 40
+      description: "扫描即将过期积分，提前提醒"
+
+    # 生日/纪念日
+    - type: "cron.daily.08:00"
+      condition: "always"
+      priority: 50
+      description: "扫描今日生日会员，推送祝福+券"
+
+  api:
+    base_path: "/api/v1/members"
+    endpoints:
+      # 会员
+      - { method: "POST", path: "/",                           description: "注册会员" }
+      - { method: "GET",  path: "/identify",                   description: "识别会员（手机号/卡号/微信openid）" }
+      - { method: "GET",  path: "/:id",                        description: "会员详情" }
+      - { method: "PUT",  path: "/:id",                        description: "更新会员信息" }
+      - { method: "GET",  path: "/:id/profile",                description: "会员画像（消费偏好、标签）" }
+      - { method: "GET",  path: "/:id/history",                description: "消费历史" }
+      # 储值
+      - { method: "POST", path: "/:id/stored-value/recharge",  description: "储值充值" }
+      - { method: "POST", path: "/:id/stored-value/consume",   description: "储值消费" }
+      - { method: "POST", path: "/:id/stored-value/refund",    description: "储值退款" }
+      - { method: "GET",  path: "/:id/stored-value/balance",   description: "储值余额" }
+      - { method: "GET",  path: "/:id/stored-value/logs",      description: "储值流水" }
+      # 积分
+      - { method: "GET",  path: "/:id/points/balance",         description: "积分余额" }
+      - { method: "POST", path: "/:id/points/consume",         description: "积分消耗" }
+      - { method: "GET",  path: "/:id/points/logs",            description: "积分流水" }
+      # 等级
+      - { method: "GET",  path: "/tiers",                      description: "等级体系配置" }
+      - { method: "PUT",  path: "/tiers",                      description: "更新等级规则" }
+      # 报表
+      - { method: "GET",  path: "/report/growth",              description: "会员增长报表" }
+      - { method: "GET",  path: "/report/tier-distribution",   description: "等级分布" }
+      - { method: "GET",  path: "/report/stored-value-summary", description: "储值汇总" }
+      - { method: "GET",  path: "/report/rfm",                 description: "RFM 分析" }
+      - { method: "GET",  path: "/report/repurchase",          description: "复购率分析" }
+
+  terminal:
+    - { device: "cashier-pos",            action: "member_identify", shortcut_key: "F5", description: "识别会员" }
+    - { device: "cashier-pos",            action: "member_recharge", shortcut_key: "F6", description: "储值充值" }
+    - { device: "waiter-pad",             action: "member_scan",     description: "扫码识别会员" }
+    - { device: "customer-mini-program",  action: "member_center",   description: "会员中心首页" }
+    - { device: "customer-kiosk",         action: "member_scan",     description: "自助机会员扫码" }
+
+scope:
+  levels: ["brand", "store"]
+  config_inheritance: "override_with_merge"
+  configurable_params:
+    - name: "tier_rules"
+      type: "jsonb"
+      level: "brand"
+      description: "等级升降规则"
+      default:
+        tiers:
+          - { name: "普通", code: "normal",   threshold_amount: 0,     discount_rate: 1.0 }
+          - { name: "银卡", code: "silver",   threshold_amount: 2000,  discount_rate: 0.95 }
+          - { name: "金卡", code: "gold",     threshold_amount: 5000,  discount_rate: 0.90 }
+          - { name: "铂金", code: "platinum", threshold_amount: 15000, discount_rate: 0.85 }
+          - { name: "钻石", code: "diamond",  threshold_amount: 50000, discount_rate: 0.80 }
+        evaluation_period: "rolling_12_months"
+        downgrade_protection_months: 3
+    - { name: "points_per_yuan",          type: "integer", default: 1,    description: "每消费1元得N积分", level: "brand" }
+    - { name: "points_expiry_months",     type: "integer", default: 12,   description: "积分有效期（月）", level: "brand" }
+    - { name: "points_to_yuan_rate",      type: "decimal", default: 0.01, description: "积分抵现比例（100积分=1元）", level: "brand" }
+    - { name: "recharge_bonus_rules",     type: "jsonb",   default: [],   description: "储值赠送规则（充500送50）", level: "brand" }
+    - { name: "stored_value_cross_store", type: "boolean", default: true, description: "储值是否跨店通用", level: "brand" }
+    - { name: "stored_value_refundable",  type: "boolean", default: true, description: "储值是否可退", level: "brand" }
+    - { name: "auto_register_on_pay",     type: "boolean", default: false, description: "扫码支付时自动注册会员", level: "store" }
+  permissions:
+    - { role: "waiter",           actions: ["identify", "view_basic"] }
+    - { role: "cashier",          actions: ["identify", "view_basic", "recharge", "points_consume", "stored_value_consume"] }
+    - { role: "store_manager",    actions: ["identify", "view_full", "recharge", "points_consume", "stored_value_consume", "refund_under_limit", "view_report"] }
+    - { role: "brand_admin",      actions: ["*", "tier_config", "export_data"] }
+    - { role: "finance_director", actions: ["view_report", "stored_value_refund", "export_data"] }
+
+data:
+  owned_entities:
+    - name: "Customer"
+      table: "biz_customers"
+      fields:
+        - { name: "id",                   type: "uuid",      required: true }
+        - { name: "brand_id",             type: "uuid",      required: true,  ref: "Brand.id" }
+        - { name: "member_no",            type: "string",    required: true,  description: "会员卡号" }
+        - { name: "name",                 type: "string",    required: false }
+        - { name: "phone",                type: "string",    required: true,  description: "手机号（主键标识）" }
+        - { name: "wechat_openid",        type: "string",    required: false }
+        - { name: "wechat_unionid",       type: "string",    required: false }
+        - { name: "gender",               type: "enum",      required: false, values: ["male", "female", "unknown"] }
+        - { name: "birthday",             type: "date",      required: false }
+        - { name: "tier",                 type: "enum",      required: true,  values: ["normal", "silver", "gold", "platinum", "diamond"] }
+        - { name: "tier_expires_at",      type: "date",      required: false }
+        - { name: "total_spent",          type: "decimal",   required: true,  precision: [12, 2] }
+        - { name: "total_visits",         type: "integer",   required: true }
+        - { name: "points_balance",       type: "integer",   required: true }
+        - { name: "stored_value_balance", type: "decimal",   required: true,  precision: [12, 2] }
+        - { name: "last_visit_at",        type: "timestamp", required: false }
+        - { name: "last_visit_store_id",  type: "uuid",      required: false, ref: "Store.id" }
+        - { name: "tags",                 type: "jsonb",     required: false, description: "画像标签" }
+        - { name: "source",               type: "enum",      required: true,  values: ["pos_register", "wechat_register", "mini_program", "imported", "platform"] }
+        - { name: "status",               type: "enum",      required: true,  values: ["active", "frozen", "blacklisted"] }
+        - { name: "registered_at",        type: "timestamp", required: true }
+
+    - name: "StoredValueLog"
+      table: "biz_stored_value_logs"
+      fields:
+        - { name: "id",               type: "uuid",      required: true }
+        - { name: "customer_id",      type: "uuid",      required: true,  ref: "Customer.id" }
+        - { name: "store_id",         type: "uuid",      required: true,  ref: "Store.id" }
+        - { name: "action",           type: "enum",      required: true,  values: ["recharge", "consume", "refund", "bonus", "adjustment"] }
+        - { name: "amount",           type: "decimal",   required: true,  precision: [10, 2] }
+        - { name: "balance_after",    type: "decimal",   required: true,  precision: [12, 2] }
+        - { name: "related_order_id", type: "uuid",      required: false, ref: "Order.id" }
+        - { name: "payment_method",   type: "string",    required: false }
+        - { name: "payment_ref",      type: "string",    required: false }
+        - { name: "operator_id",      type: "uuid",      required: true,  ref: "Staff.id" }
+        - { name: "remark",           type: "string",    required: false }
+        - { name: "created_at",       type: "timestamp", required: true }
+
+    - name: "PointsLog"
+      table: "biz_points_logs"
+      fields:
+        - { name: "id",               type: "uuid",      required: true }
+        - { name: "customer_id",      type: "uuid",      required: true,  ref: "Customer.id" }
+        - { name: "store_id",         type: "uuid",      required: true,  ref: "Store.id" }
+        - { name: "action",           type: "enum",      required: true,  values: ["earn", "consume", "expire", "adjustment", "bonus"] }
+        - { name: "points",           type: "integer",   required: true }
+        - { name: "balance_after",    type: "integer",   required: true }
+        - { name: "related_order_id", type: "uuid",      required: false, ref: "Order.id" }
+        - { name: "expires_at",       type: "timestamp", required: false }
+        - { name: "operator_id",      type: "uuid",      required: true,  ref: "Staff.id" }
+        - { name: "remark",           type: "string",    required: false }
+        - { name: "created_at",       type: "timestamp", required: true }
+
+    - name: "MemberTierHistory"
+      table: "biz_member_tier_histories"
+      fields:
+        - { name: "id",                type: "uuid",      required: true }
+        - { name: "customer_id",       type: "uuid",      required: true,  ref: "Customer.id" }
+        - { name: "from_tier",         type: "string",    required: true }
+        - { name: "to_tier",           type: "string",    required: true }
+        - { name: "reason",            type: "string",    required: true }
+        - { name: "evaluation_amount", type: "decimal",   required: true,  precision: [12, 2] }
+        - { name: "created_at",        type: "timestamp", required: true }
+
+  referenced_entities:
+    - { entity: "Store",  skill: "org-core",   fields_used: ["id", "name", "brand_id"] }
+    - { entity: "Brand",  skill: "org-core",   fields_used: ["id", "name"] }
+    - { entity: "Staff",  skill: "org-core",   fields_used: ["id", "name"] }
+    - { entity: "Order",  skill: "order-core", fields_used: ["id", "total_amount", "store_id", "paid_at"] }
+
+  emitted_events:
+    - type: "member.registered"
+      payload_schema: { customer_id: "uuid", brand_id: "uuid", phone: "string", source: "string" }
+    - type: "member.identified"
+      payload_schema: { customer_id: "uuid", store_id: "uuid", tier: "string", stored_value_balance: "decimal", points_balance: "integer" }
+    - type: "member.tier.changed"
+      payload_schema: { customer_id: "uuid", old_tier: "string", new_tier: "string", reason: "string" }
+    - type: "member.stored_value.recharged"
+      payload_schema: { customer_id: "uuid", amount: "decimal", bonus: "decimal", balance_after: "decimal" }
+    - type: "member.stored_value.low"
+      payload_schema: { customer_id: "uuid", balance: "decimal", threshold: "decimal" }
+    - type: "member.points.earned"
+      payload_schema: { customer_id: "uuid", points: "integer", order_id: "uuid" }
+    - type: "member.points.expiring"
+      payload_schema: { customer_id: "uuid", points_expiring: "integer", expiry_date: "date" }
+    - type: "member.birthday.today"
+      payload_schema: { customer_id: "uuid", name: "string", tier: "string" }
+    - type: "member.inactive.alert"
+      payload_schema: { customer_id: "uuid", last_visit_days_ago: "integer", tier: "string" }
+
+dependencies:
+  required:
+    - { skill: "org-core", min_version: "1.0.0", reason: "会员归属品牌，消费归属门店" }
+  optional:
+    - { skill: "order-core",          min_version: "2.0.0", reason: "关联消费订单计算积分和等级，缺少时手动录入" }
+    - { skill: "payment-gateway",     min_version: "1.5.0", reason: "储值充值在线支付，缺少时仅支持现金充值" }
+    - { skill: "notification-wechat", min_version: "1.0.0", reason: "生日祝福、积分到期提醒" }
+    - { skill: "notification-sms",    min_version: "1.0.0", reason: "短信提醒备选" }
+
+degradation:
+  offline:
+    can_operate: true
+    capabilities:
+      - { action: "identify",            mode: "full",    local_storage: "sqlite_wal", note: "会员数据在门店端定期全量同步缓存" }
+      - { action: "stored_value_consume", mode: "limited", limit: "单笔消费 <= 本地缓存余额，且离线累计消费 <= 2000", local_storage: "sqlite_wal" }
+      - { action: "recharge",            mode: "limited", limit: "仅现金充值可离线记录" }
+      - { action: "points_earn",         mode: "full",    local_storage: "sqlite_wal" }
+      - { action: "points_consume",      mode: "limited", limit: "积分消耗 <= 本地缓存积分余额" }
+      - { action: "register",            mode: "full",    local_storage: "sqlite_wal", note: "离线注册，联网后去重" }
+      - { action: "report",              mode: "disabled", fallback_message: "会员报表需要联网" }
+    sync_strategy:
+      on_reconnect: "push_local_then_pull_remote"
+      conflict_resolution: "balance_conservative_merge"
+      max_offline_hours: 4
+
+  service_down:
+    - { service: "payment-gateway",     fallback: "cash_recharge_only", alert: "在线充值暂不可用" }
+    - { service: "notification-wechat", fallback: "queue_for_retry",    alert: "none" }
+
+  conflict:
+    strategy: "balance_conservative_merge"
+    manual_review_trigger: "stored_value_diff > 100 || points_diff > 500"
+    reason: "储值是资金，积分是权益，冲突取保守值后人工核对"
+
+observability:
+  metrics:
+    - { name: "member_registered_total",   type: "counter", labels: ["brand_id", "source"] }
+    - { name: "member_active_count",       type: "gauge",   labels: ["brand_id", "tier"] }
+    - { name: "member_stored_value_total", type: "gauge",   labels: ["brand_id"], description: "储值总余额（负债）" }
+    - { name: "member_recharge_daily",     type: "counter", labels: ["store_id"] }
+    - { name: "member_consume_rate",       type: "gauge",   labels: ["brand_id"] }
+    - { name: "member_points_outstanding", type: "gauge",   labels: ["brand_id"] }
+    - { name: "member_churn_risk_count",   type: "gauge",   labels: ["brand_id"], alert_threshold: 50, alert_message: "有 {value} 名高级会员超过60天未到店" }
+    - { name: "member_repurchase_rate",    type: "gauge",   labels: ["brand_id"] }
+  health_check: { endpoint: "/health", interval_seconds: 30, timeout_seconds: 5 }
+  audit:
+    log_all_mutations: true
+    retention_days: 2555
+    fields_to_mask: ["phone", "wechat_openid", "wechat_unionid", "birthday"]
+
+ui:
+  surfaces:
+    - terminal: "cashier-pos"
+      entry_point: "checkout.member-panel"
+      component: "MemberIdentifyPanel"
+      layout: "side-panel"
+      features: ["scan-identify", "phone-lookup", "show-tier-discount", "show-stored-value", "show-points"]
+    - terminal: "waiter-pad"
+      entry_point: "table-detail.member-badge"
+      component: "MemberBadge"
+      layout: "inline-badge"
+    - terminal: "customer-mini-program"
+      entry_point: "member-center"
+      component: "MemberCenterPage"
+      layout: "page"
+      features: ["profile", "tier-progress", "stored-value", "points", "recharge", "consumption-history"]
+    - terminal: "manager-dashboard"
+      entry_point: "reports.member"
+      component: "MemberDashboard"
+      layout: "dashboard"
+      features: ["growth-chart", "tier-funnel", "rfm-matrix", "stored-value-liability", "repurchase-analysis"]
+
+  print_templates:
+    - { name: "member-card",      format: "card-85x54mm", template_file: "assets/templates/member-card.xml" }
+    - { name: "recharge-receipt", format: "thermal-58mm", template_file: "assets/templates/recharge-receipt.xml" }
+    - { name: "points-receipt",   format: "thermal-58mm", template_file: "assets/templates/points-receipt.xml" }
+
+compliance:
+  golden_tax:
+    applicable: true
+    tax_category: "预收款项"
+    invoice_timing: "on_recharge_if_requested"
+    note: "储值充值时客户可选开票（预付卡规定）"
+  data_residency: "cn-mainland"
+  pii_fields: ["name", "phone", "wechat_openid", "wechat_unionid", "birthday", "gender"]
+  retention_policy:
+    financial_records: "7_years"
+    member_profiles: "account_close_plus_3_years"
+    operation_logs: "1_year"
+  regulations:
+    - name: "单用途预付卡管理办法"
+      applicable: true
+      note: "储值卡属于单用途预付卡，需在商务部门备案（品牌层面）"
+
+localization:
+  default_locale: "zh-CN"
+  supported_locales: ["zh-CN", "zh-TW"]
+  currency: "CNY"
+  timezone: "Asia/Shanghai"

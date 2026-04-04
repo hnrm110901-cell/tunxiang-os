@@ -71,3 +71,53 @@ export async function cancelCouponRedemption(
     body: JSON.stringify({ order_id: orderId, coupon_id: couponId }),
   });
 }
+
+// ─── campaign.checkout_eligible ───
+
+export interface EligibleCoupon {
+  id: string;
+  name: string;
+  coupon_type: string;       // 'cash' | 'discount' | 'gift'
+  discount_amount_fen: number;
+  min_order_fen: number;
+  expire_at: string;
+}
+
+export interface CouponEligibilityResult {
+  eligible_coupons: EligibleCoupon[];
+  auto_applicable: boolean;
+  message: string;
+}
+
+/** 结账时检查可用优惠券（触发 campaign.checkout_eligible 逻辑） */
+export async function checkCouponEligibility(params: {
+  order_id: string;
+  store_id: string;
+  customer_id: string;
+  order_amount_fen: number;
+  tenant_id: string;
+}): Promise<CouponEligibilityResult> {
+  return txFetch('/api/v1/growth/campaigns/apply-to-order', {
+    method: 'POST',
+    body: JSON.stringify(params),
+  });
+}
+
+/** 核销优惠券到订单（最终确认） */
+export async function applyCouponToOrder(params: {
+  coupon_id: string;
+  order_id: string;
+  store_id: string;
+  order_amount_fen: number;
+  operator_id: string;
+}): Promise<{ discount_amount_fen: number; coupon_id: string }> {
+  return txFetch(`/api/v1/growth/coupons/${params.coupon_id}/apply`, {
+    method: 'POST',
+    body: JSON.stringify({
+      order_id: params.order_id,
+      store_id: params.store_id,
+      order_amount_fen: params.order_amount_fen,
+      operator_id: params.operator_id,
+    }),
+  });
+}

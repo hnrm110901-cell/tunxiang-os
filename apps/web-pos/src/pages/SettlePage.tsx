@@ -12,6 +12,8 @@ import { useOrderStore } from '../store/orderStore';
 import { settleOrder, createPayment, printReceipt as apiPrintReceipt } from '../api/tradeApi';
 import { printReceipt as bridgePrint, openCashBox } from '../bridge/TXBridge';
 import { DiscountPreviewSheet, type DiscountParams } from '../components/DiscountPreviewSheet';
+import { CouponEligibleSheet } from '../components/CouponEligibleSheet';
+import { useCouponEligibility } from '../hooks/useCouponEligibility';
 
 const fen2yuan = (fen: number) => `¥${(fen / 100).toFixed(2)}`;
 
@@ -47,6 +49,19 @@ export function SettlePage() {
   const [discountParams, setDiscountParams] = useState<DiscountParams | null>(null);
   // 暂存待确认的折扣金额，AI 批准后才真正写入 store
   const [pendingDiscountFen, setPendingDiscountFen] = useState<number>(0);
+
+  // campaign.checkout_eligible 可用券检查
+  // customerId 从 URL search params 中取（会员到店绑定后由收银台写入）
+  const customerId = new URLSearchParams(window.location.search).get('customer_id') ?? '';
+  const coupon = useCouponEligibility({
+    orderId: orderId ?? '',
+    storeId: import.meta.env.VITE_STORE_ID || '',
+    customerId,
+    orderAmountFen: finalFen,
+    tenantId: import.meta.env.VITE_TENANT_ID || '',
+    operatorId: import.meta.env.VITE_OPERATOR_ID || '',
+    onApplied: (discountFenAmount) => applyDiscount(discountFenAmount),
+  });
 
   /** 点击某个折扣档位 → 计算折扣金额 → 打开 AI 分析抽屉 */
   const handleDiscountPress = (preset: typeof DISCOUNT_PRESETS[0]) => {
@@ -249,6 +264,15 @@ export function SettlePage() {
         onClose={() => setDiscountSheetVisible(false)}
         onConfirm={handleDiscountConfirm}
         discountParams={discountParams}
+      />
+
+      {/* campaign.checkout_eligible — 可用券提示底部弹层 */}
+      <CouponEligibleSheet
+        visible={coupon.sheetVisible}
+        coupons={coupon.coupons}
+        applying={coupon.applying}
+        onApply={coupon.apply}
+        onClose={coupon.closeSheet}
       />
     </div>
   );

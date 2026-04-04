@@ -1,0 +1,233 @@
+# ============================================================
+# Skill: delivery-aggregator
+# 外卖聚合器 — 美团/饿了么/抖音多平台订单统一接入
+# ============================================================
+
+meta:
+  name: "delivery-aggregator"
+  version: "1.0.0"
+  display_name: "外卖聚合器"
+  description: |
+    统一接入美团外卖、饿了么、抖音团购等外卖平台的订单推送，
+    自动接单/拒单、状态同步、平台退款处理。
+    触发场景：美团/饿了么/抖音推送新订单、平台状态回调。
+  category: "order"
+  sub_category: "takeout"
+  icon: "truck"
+  maintainer: "trade-team"
+  license: "proprietary"
+
+# ============================================================
+# 第二层：触发路由
+# ============================================================
+triggers:
+  events:
+    - type: "platform.meituan.order_pushed"
+      condition: "always"
+      priority: 100
+      description: "美团外卖推单回调"
+    - type: "platform.eleme.order_pushed"
+      condition: "always"
+      priority: 100
+      description: "饿了么推单回调"
+    - type: "platform.douyin.order_pushed"
+      condition: "always"
+      priority: 100
+      description: "抖音团购推单回调"
+
+  api:
+    base_path: "/api/v1/delivery"
+    endpoints:
+      - method: "POST"
+        path: "/webhook/meituan"
+        description: "美团外卖Webhook接收"
+      - method: "POST"
+        path: "/webhook/eleme"
+        description: "饿了么Webhook接收"
+      - method: "POST"
+        path: "/webhook/douyin"
+        description: "抖音Webhook接收"
+      - method: "GET"
+        path: "/orders"
+        description: "外卖订单列表"
+      - method: "POST"
+        path: "/orders/:id/accept"
+        description: "手动接单"
+      - method: "POST"
+        path: "/orders/:id/reject"
+        description: "拒单（需填写原因）"
+
+  terminal:
+    - device: "cashier-pos"
+      action: "delivery_accept"
+      description: "接单操作"
+    - device: "android-kds"
+      action: "delivery_order_display"
+      description: "外卖订单在KDS展示"
+
+# ============================================================
+# 第三层：作用域与权限
+# ============================================================
+scope:
+  levels:
+    - brand
+    - store
+  config_inheritance: "override_with_merge"
+  permissions:
+    - role: "cashier"
+      actions: ["accept", "reject", "view"]
+    - role: "store_manager"
+      actions: ["accept", "reject", "view", "configure_auto_accept"]
+    - role: "brand_admin"
+      actions: ["*"]
+
+# ============================================================
+# 第四层：数据契约
+# ============================================================
+data:
+  owned_entities:
+    - name: "DeliveryOrder"
+      table: "biz_delivery_orders"
+      fields:
+        - { name: "id",               type: "uuid",      required: true }
+        - { name: "tenant_id",        type: "uuid",      required: true }
+        - { name: "store_id",         type: "uuid",      required: true,  ref: "Store.id" }
+        - { name: "order_id",         type: "uuid",      required: false, ref: "Order.id", description: "关联内部订单" }
+        - { name: "platform",         type: "enum",      required: true,  values: ["meituan", "eleme", "douyin"] }
+        - { name: "platform_order_id", type: "string",   required: true,  description: "平台单号" }
+        - { name: "status",           type: "enum",      required: true,  values: ["received", "auto_accepted", "manually_accepted", "rejected", "cancelled", "completed"] }
+        - { name: "raw_payload",      type: "jsonb",     required: true,  description: "平台原始推单数据" }
+        - { name: "reject_reason",    type: "string",    required: false }
+        - { name: "pushed_at",        type: "timestamp", required: true }
+        - { name: "accepted_at",      type: "timestamp", required: false }
+        - { name: "created_at",       type: "timestamp", required: true }
+        - { name: "updated_at",       type: "timestamp", required: true }
+
+  referenced_entities:
+    - entity: "Order"
+      skill: "order-core"
+      fields_used: ["id", "status", "store_id"]
+
+  emitted_events:
+    - type: "order.platform.received"
+      payload_schema: { delivery_order_id: "uuid", platform: "string", platform_order_id: "string", store_id: "uuid" }
+    - type: "order.platform.auto_accepted"
+      payload_schema: { delivery_order_id: "uuid", platform: "string", order_id: "uuid" }
+    - type: "order.platform.rejected"
+      payload_schema: { delivery_order_id: "uuid", platform: "string", reject_reason: "string" }
+
+# ============================================================
+# 第五层：依赖声明
+# ============================================================
+dependencies:
+  required:
+    - skill: "order-core"
+      min_version: "2.0.0"
+      reason: "外卖订单接入后需要创建内部订单"
+    # infrastructure: postgresql >= 15, redis >= 7
+
+  optional:
+    - skill: "menu-core"
+      min_version: "1.0.0"
+      reason: "菜品映射（平台SKU → 内部菜品ID），缺少时需人工确认"
+
+# ============================================================
+# 第六层：降级策略
+# ============================================================
+degradation:
+  offline:
+    can_operate: false
+    capabilities:
+      - action: "receive_platform_order"
+        mode: "disabled"
+        fallback_message: "外卖平台接单需要联网，断网期间平台订单将积压，联网后自动拉取"
+    sync_strategy:
+      on_reconnect: "pull_pending_platform_orders"
+      conflict_resolution: "platform_timestamp_wins"
+      max_offline_hours: 4
+
+  service_down:
+    - service: "meituan-open-api"
+      fallback: "log_webhook_for_retry"
+      alert: "通知店长：美团推单服务异常，请关注平台后台"
+    - service: "eleme-open-api"
+      fallback: "log_webhook_for_retry"
+      alert: "通知店长：饿了么推单服务异常，请关注平台后台"
+
+  conflict:
+    strategy: "platform_timestamp_wins"
+    manual_review_trigger: "platform_order_id_duplicate"
+
+# ============================================================
+# 第七层：可观测性
+# ============================================================
+observability:
+  metrics:
+    - name: "delivery_order_received_total"
+      type: "counter"
+      labels: ["store_id", "platform"]
+      description: "外卖订单接收总量"
+    - name: "delivery_order_auto_accept_rate"
+      type: "gauge"
+      labels: ["store_id", "platform"]
+      description: "自动接单率"
+    - name: "delivery_order_reject_total"
+      type: "counter"
+      labels: ["store_id", "platform"]
+      description: "拒单次数"
+    - name: "delivery_webhook_latency_seconds"
+      type: "histogram"
+      description: "Webhook接收到处理完成的延迟"
+
+  health_check:
+    endpoint: "/health"
+    interval_seconds: 30
+    timeout_seconds: 5
+
+  audit:
+    log_all_mutations: true
+    retention_days: 180
+    fields_to_mask: []
+
+# ============================================================
+# 第八层：UI 声明
+# ============================================================
+ui:
+  surfaces:
+    - terminal: "cashier-pos"
+      entry_point: "main-menu.delivery"
+      component: "DeliveryOrderPanel"
+      layout: "full-screen"
+    - terminal: "android-kds"
+      entry_point: "kds.delivery-orders"
+      component: "DeliveryKDSView"
+      layout: "full-screen"
+    - terminal: "manager-dashboard"
+      entry_point: "reports.delivery.summary"
+      component: "DeliverySummaryReport"
+      layout: "data-table"
+
+  print_templates:
+    - name: "delivery-receipt"
+      format: "thermal-58mm"
+      template_file: "assets/templates/delivery-receipt.xml"
+
+# ============================================================
+# 第九层：合规与本地化
+# ============================================================
+compliance:
+  golden_tax:
+    applicable: false
+    note: "外卖平台订单收入由平台结算，门店按结算单开票"
+  data_residency: "cn-mainland"
+  pii_fields: ["customer_phone", "delivery_address"]
+  retention_policy:
+    financial_records: "7_years"
+    operation_logs: "1_year"
+
+localization:
+  default_locale: "zh-CN"
+  supported_locales: ["zh-CN"]
+  currency: "CNY"
+  timezone: "Asia/Shanghai"
+  number_format: "comma_thousands"

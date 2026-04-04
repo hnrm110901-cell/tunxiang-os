@@ -1,0 +1,252 @@
+# ============================================================
+# Skill: attendance
+# 考勤管理 — 员工打卡、排班、请假、日结考勤
+# ============================================================
+
+meta:
+  name: "attendance"
+  version: "1.0.0"
+  display_name: "考勤管理"
+  description: |
+    管理员工考勤记录：打卡签到签退、排班匹配、迟到/早退/缺勤检测、请假审批。
+    每日23:50执行日结，汇总当日出勤数据供薪资计算使用。
+    触发场景：员工POS打卡签到/签退、定时日结考勤。
+  category: "hr"
+  sub_category: "attendance"
+  icon: "calendar-check"
+  maintainer: "org-team"
+  license: "proprietary"
+
+# ============================================================
+# 第二层：触发路由
+# ============================================================
+triggers:
+  events:
+    - type: "terminal.staff.clock_in"
+      condition: "always"
+      priority: 100
+      description: "员工签到打卡"
+    - type: "terminal.staff.clock_out"
+      condition: "always"
+      priority: 100
+      description: "员工签退打卡"
+    - type: "cron.daily.23:50"
+      condition: "always"
+      priority: 50
+      description: "每日23:50考勤日结，标记未打卡人员为缺勤"
+
+  api:
+    base_path: "/api/v1/attendance"
+    endpoints:
+      - method: "POST"
+        path: "/clock-in"
+        description: "签到"
+      - method: "POST"
+        path: "/clock-out"
+        description: "签退"
+      - method: "GET"
+        path: "/daily/:date"
+        description: "当日出勤记录"
+      - method: "GET"
+        path: "/monthly/:month"
+        description: "月度出勤汇总"
+      - method: "POST"
+        path: "/leaves"
+        description: "提交请假申请"
+      - method: "POST"
+        path: "/leaves/:id/approve"
+        description: "审批请假"
+
+  terminal:
+    - device: "cashier-pos"
+      action: "staff_clock_in"
+      shortcut_key: "F9"
+      description: "员工签到"
+    - device: "cashier-pos"
+      action: "staff_clock_out"
+      shortcut_key: "F10"
+      description: "员工签退"
+
+# ============================================================
+# 第三层：作用域与权限
+# ============================================================
+scope:
+  levels:
+    - brand
+    - store
+  config_inheritance: "override_with_merge"
+  permissions:
+    - role: "staff"
+      actions: ["clock_in", "clock_out", "apply_leave", "view_own"]
+    - role: "store_manager"
+      actions: ["clock_in", "clock_out", "apply_leave", "approve_leave", "view_all", "manual_fix"]
+    - role: "hr_admin"
+      actions: ["*"]
+
+# ============================================================
+# 第四层：数据契约
+# ============================================================
+data:
+  owned_entities:
+    - name: "DailyAttendance"
+      table: "biz_daily_attendances"
+      fields:
+        - { name: "id",               type: "uuid",      required: true }
+        - { name: "tenant_id",        type: "uuid",      required: true }
+        - { name: "store_id",         type: "uuid",      required: true,  ref: "Store.id" }
+        - { name: "staff_id",         type: "uuid",      required: true,  ref: "Staff.id" }
+        - { name: "work_date",        type: "date",      required: true }
+        - { name: "scheduled_start",  type: "time",      required: false }
+        - { name: "scheduled_end",    type: "time",      required: false }
+        - { name: "actual_clock_in",  type: "timestamp", required: false }
+        - { name: "actual_clock_out", type: "timestamp", required: false }
+        - { name: "status",           type: "enum",      required: true,  values: ["normal", "late", "early_leave", "absent", "leave", "holiday"] }
+        - { name: "late_minutes",     type: "integer",   required: false }
+        - { name: "overtime_minutes", type: "integer",   required: false }
+        - { name: "note",             type: "string",    required: false }
+        - { name: "created_at",       type: "timestamp", required: true }
+        - { name: "updated_at",       type: "timestamp", required: true }
+
+    - name: "LeaveRequest"
+      table: "biz_leave_requests"
+      fields:
+        - { name: "id",               type: "uuid",      required: true }
+        - { name: "tenant_id",        type: "uuid",      required: true }
+        - { name: "store_id",         type: "uuid",      required: true,  ref: "Store.id" }
+        - { name: "staff_id",         type: "uuid",      required: true,  ref: "Staff.id" }
+        - { name: "leave_type",       type: "enum",      required: true,  values: ["annual", "sick", "personal", "overtime_off", "other"] }
+        - { name: "start_date",       type: "date",      required: true }
+        - { name: "end_date",         type: "date",      required: true }
+        - { name: "days",             type: "decimal",   required: true,  precision: [5, 1] }
+        - { name: "reason",           type: "string",    required: true }
+        - { name: "status",           type: "enum",      required: true,  values: ["pending", "approved", "rejected"] }
+        - { name: "approver_id",      type: "uuid",      required: false, ref: "Staff.id" }
+        - { name: "created_at",       type: "timestamp", required: true }
+        - { name: "updated_at",       type: "timestamp", required: true }
+
+  referenced_entities:
+    - entity: "Staff"
+      skill: "org-core"
+      fields_used: ["id", "name", "role", "store_id", "schedule"]
+
+  emitted_events:
+    - type: "attendance.late_detected"
+      payload_schema: { staff_id: "uuid", work_date: "date", late_minutes: "integer", store_id: "uuid" }
+    - type: "attendance.absent_detected"
+      payload_schema: { staff_id: "uuid", work_date: "date", store_id: "uuid" }
+    - type: "attendance.leave.approved"
+      payload_schema: { leave_request_id: "uuid", staff_id: "uuid", leave_type: "string", days: "decimal" }
+    - type: "attendance.daily.settled"
+      payload_schema: { store_id: "uuid", settle_date: "date", present_count: "integer", absent_count: "integer" }
+
+# ============================================================
+# 第五层：依赖声明
+# ============================================================
+dependencies:
+  required:
+    - skill: "org-core"
+      min_version: "1.0.0"
+      reason: "考勤关联员工档案与排班信息"
+    # infrastructure: postgresql >= 15, redis >= 7
+
+  optional:
+    - skill: "approval-flow"
+      min_version: "1.0.0"
+      reason: "请假走审批流，缺少时仅支持店长直接审批"
+
+# ============================================================
+# 第六层：降级策略
+# ============================================================
+degradation:
+  offline:
+    can_operate: true
+    capabilities:
+      - action: "clock_in"
+        mode: "full"
+        local_storage: "sqlite_wal"
+        note: "打卡签到离线完整可用"
+      - action: "clock_out"
+        mode: "full"
+        local_storage: "sqlite_wal"
+        note: "打卡签退离线完整可用"
+      - action: "daily_settle"
+        mode: "limited"
+        note: "日结在本地执行，联网后同步云端"
+      - action: "approve_leave"
+        mode: "disabled"
+        fallback_message: "请假审批需要联网"
+    sync_strategy:
+      on_reconnect: "push_local_then_pull_remote"
+      conflict_resolution: "last_write_wins_with_operator_log"
+      max_offline_hours: 4
+
+  conflict:
+    strategy: "lww_with_audit"
+    manual_review_trigger: "clock_time_diff_minutes > 30"
+
+# ============================================================
+# 第七层：可观测性
+# ============================================================
+observability:
+  metrics:
+    - name: "attendance_absent_count"
+      type: "gauge"
+      labels: ["store_id"]
+      alert_threshold: 2
+      alert_message: "门店今日缺勤 {value} 人，请关注人员配置"
+    - name: "attendance_late_count"
+      type: "counter"
+      labels: ["store_id"]
+      description: "迟到次数统计"
+    - name: "attendance_leave_pending_count"
+      type: "gauge"
+      labels: ["store_id"]
+      alert_threshold: 3
+      alert_message: "门店有 {value} 笔请假待审批"
+
+  health_check:
+    endpoint: "/health"
+    interval_seconds: 30
+    timeout_seconds: 5
+
+  audit:
+    log_all_mutations: true
+    retention_days: 730
+    fields_to_mask: []
+
+# ============================================================
+# 第八层：UI 声明
+# ============================================================
+ui:
+  surfaces:
+    - terminal: "cashier-pos"
+      entry_point: "staff.attendance"
+      component: "AttendanceClockPanel"
+      layout: "modal"
+    - terminal: "manager-pad"
+      entry_point: "hr.attendance-overview"
+      component: "AttendanceOverviewPanel"
+      layout: "full-screen"
+    - terminal: "manager-dashboard"
+      entry_point: "reports.hr.attendance-monthly"
+      component: "AttendanceMonthlyReport"
+      layout: "data-table"
+
+# ============================================================
+# 第九层：合规与本地化
+# ============================================================
+compliance:
+  golden_tax:
+    applicable: false
+  data_residency: "cn-mainland"
+  pii_fields: ["staff_name", "staff_phone"]
+  retention_policy:
+    financial_records: "7_years"
+    operation_logs: "2_years"
+
+localization:
+  default_locale: "zh-CN"
+  supported_locales: ["zh-CN"]
+  currency: "CNY"
+  timezone: "Asia/Shanghai"
+  number_format: "comma_thousands"

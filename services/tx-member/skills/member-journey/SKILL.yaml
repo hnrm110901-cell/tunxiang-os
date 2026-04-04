@@ -1,0 +1,25 @@
+meta:
+  name: "member-journey"
+  version: "1.0.0"
+  display_name: "会员旅程"
+  category: "member"
+  sub_category: "campaign"
+
+# 会员旅程是事件驱动的自动化营销流程
+triggers:
+  events:
+    - type: "member.registered"           # 欢迎旅程
+    - type: "member.inactive.alert"       # 唤回旅程
+    - type: "member.tier.changed"         # 升级祝贺旅程
+    - type: "member.birthday.today"       # 生日旅程
+    - type: "member.stored_value.low"     # 余额不足旅程（提醒充值）
+
+dependencies:
+  required:
+    - skill: member-core
+      min_version: "1.0.0"
+  optional:
+    - skill: campaign
+      min_version: "1.0.0"
+    - skill: notification-hub
+      min_version: "1.0.0"

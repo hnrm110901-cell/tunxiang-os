@@ -1,0 +1,278 @@
+meta:
+  name: "menu-core"
+  version: "1.0.0"
+  display_name: "菜单核心"
+  description: |
+    屯象OS 菜品菜单基座，管理菜品、分类、BOM配方、门店覆盖、价格调整、发布计划。
+    所有需要获取菜品信息的 Skill（订单、库存、报表）引用此模块实体。
+    核心能力：多级分类管理、BOM食材配方、多门店差异化菜单覆盖、
+    时段价格调整规则、菜品发布计划（含节假日菜单）、自动沽清联动。
+    与 inventory-core 弱依赖联动：食材库存预警时触发菜品自动沽清。
+  category: "menu"
+  sub_category: "dish-management"
+  icon: "utensils"
+  maintainer: "menu-team"
+
+triggers:
+  events:
+    - type: "org.store.created"
+      condition: "always"
+      priority: 80
+      description: "新门店创建，克隆品牌基础菜单到门店"
+    - type: "inventory.ingredient.low"
+      condition: "always"
+      priority: 90
+      description: "食材库存预警，触发关联菜品自动沽清"
+    - type: "cron.daily.01:00"
+      condition: "always"
+      priority: 50
+      description: "每日凌晨同步菜品价格，应用当日生效的价格调整规则"
+
+  api:
+    base_path: "/api/v1/menu"
+    endpoints:
+      # 菜品
+      - { method: "POST",   path: "/dishes",                      description: "创建菜品" }
+      - { method: "GET",    path: "/dishes",                      description: "菜品列表（支持分类/状态/关键词筛选）" }
+      - { method: "GET",    path: "/dishes/:id",                  description: "菜品详情" }
+      - { method: "PUT",    path: "/dishes/:id",                  description: "更新菜品" }
+      - { method: "POST",   path: "/dishes/:id/publish",          description: "发布菜品" }
+      - { method: "POST",   path: "/dishes/:id/soldout",          description: "菜品沽清" }
+      - { method: "POST",   path: "/dishes/:id/restore",          description: "恢复菜品可售" }
+      - { method: "DELETE", path: "/dishes/:id",                  description: "下架菜品" }
+      # 分类
+      - { method: "POST",   path: "/categories",                  description: "创建分类" }
+      - { method: "GET",    path: "/categories",                  description: "分类列表" }
+      - { method: "PUT",    path: "/categories/:id",              description: "更新分类" }
+      - { method: "DELETE", path: "/categories/:id",              description: "删除分类" }
+      # BOM
+      - { method: "GET",    path: "/dishes/:id/bom",              description: "菜品 BOM 配方" }
+      - { method: "PUT",    path: "/dishes/:id/bom",              description: "更新 BOM 配方" }
+      # 门店覆盖
+      - { method: "GET",    path: "/stores/:storeId/overrides",   description: "门店菜单差异项" }
+      - { method: "PUT",    path: "/stores/:storeId/overrides",   description: "更新门店菜单差异" }
+      - { method: "GET",    path: "/stores/:storeId/full-menu",   description: "门店完整菜单（品牌菜单 + 门店覆盖）" }
+      # 价格调整
+      - { method: "POST",   path: "/price-rules",                 description: "创建价格调整规则" }
+      - { method: "GET",    path: "/price-rules",                 description: "价格调整规则列表" }
+      - { method: "PUT",    path: "/price-rules/:id",             description: "更新价格调整规则" }
+      - { method: "DELETE", path: "/price-rules/:id",             description: "删除价格调整规则" }
+      # 发布计划
+      - { method: "POST",   path: "/publish-plans",               description: "创建发布计划" }
+      - { method: "GET",    path: "/publish-plans",               description: "发布计划列表" }
+      - { method: "POST",   path: "/publish-plans/:id/execute",   description: "立即执行发布计划" }
+
+  terminal:
+    - { device: "manager-dashboard", action: "menu_manage",    description: "菜品管理" }
+    - { device: "manager-dashboard", action: "price_rules",    description: "价格规则管理" }
+    - { device: "cashier-pos",       action: "quick_soldout",  shortcut_key: "F9", description: "快速沽清菜品" }
+    - { device: "customer-kiosk",    action: "menu_display",   description: "展示当前可售菜单" }
+    - { device: "customer-mini-program", action: "menu_browse", description: "顾客端菜单浏览" }
+
+scope:
+  levels: ["brand", "store"]
+  config_inheritance: "override_with_merge"
+  configurable_params:
+    - { name: "menu_display_mode",    type: "enum",    default: "category_tabs", values: ["category_tabs", "list", "grid"], description: "菜单展示模式", level: "store" }
+    - { name: "soldout_auto_restore", type: "boolean", default: false, description: "次日凌晨是否自动恢复沽清菜品", level: "brand" }
+    - { name: "price_include_tax",    type: "boolean", default: true,  description: "菜品价格是否含税", level: "brand" }
+    - { name: "show_dish_images",     type: "boolean", default: true,  description: "顾客端是否显示菜品图片", level: "store" }
+    - { name: "allow_store_price_override", type: "boolean", default: true, description: "门店是否可覆盖品牌菜品价格", level: "brand" }
+  permissions:
+    - { role: "waiter",        actions: ["menu_view", "soldout_view"] }
+    - { role: "store_manager", actions: ["menu_view", "soldout_manage", "store_override_manage"] }
+    - { role: "brand_admin",   actions: ["*", "price_rules", "publish_plan", "bom_manage"] }
+
+data:
+  owned_entities:
+    - name: "MenuItem"
+      table: "biz_dishes"
+      fields:
+        - { name: "id",              type: "uuid",      required: true }
+        - { name: "brand_id",        type: "uuid",      required: true,  ref: "Brand.id" }
+        - { name: "category_id",     type: "uuid",      required: true,  ref: "DishCategory.id" }
+        - { name: "name",            type: "string",    required: true }
+        - { name: "name_en",         type: "string",    required: false }
+        - { name: "description",     type: "text",      required: false }
+        - { name: "image_url",       type: "string",    required: false }
+        - { name: "base_price",      type: "decimal",   required: true,  precision: [10, 2], description: "品牌基础价格" }
+        - { name: "cost_price",      type: "decimal",   required: false, precision: [10, 2], description: "成本价（BOM计算）" }
+        - { name: "unit",            type: "string",    required: true,  description: "计量单位（份/例/斤）" }
+        - { name: "specs",           type: "jsonb",     required: false, description: "规格列表（大/中/小份）" }
+        - { name: "tags",            type: "jsonb",     required: false, description: "标签（招牌/新品/辣/素）" }
+        - { name: "status",          type: "enum",      required: true,  values: ["draft", "active", "soldout", "discontinued"] }
+        - { name: "tax_rate",        type: "decimal",   required: true,  precision: [5, 4], description: "税率（0.06=6%）" }
+        - { name: "sort_order",      type: "integer",   required: true }
+        - { name: "channel_prices",  type: "jsonb",     required: false, description: "各渠道价格（堂食/外卖/自提）" }
+        - { name: "created_at",      type: "timestamp", required: true }
+        - { name: "updated_at",      type: "timestamp", required: true }
+
+    - name: "DishCategory"
+      table: "biz_dish_categories"
+      fields:
+        - { name: "id",          type: "uuid",    required: true }
+        - { name: "brand_id",    type: "uuid",    required: true,  ref: "Brand.id" }
+        - { name: "name",        type: "string",  required: true }
+        - { name: "icon",        type: "string",  required: false }
+        - { name: "sort_order",  type: "integer", required: true }
+        - { name: "is_active",   type: "boolean", required: true, description: "是否启用" }
+        - { name: "parent_id",   type: "uuid",    required: false, ref: "DishCategory.id", description: "父分类（支持两级）" }
+        - { name: "created_at",  type: "timestamp", required: true }
+
+    - name: "BOMItem"
+      table: "biz_dish_ingredients"
+      fields:
+        - { name: "id",             type: "uuid",    required: true }
+        - { name: "dish_id",        type: "uuid",    required: true,  ref: "MenuItem.id" }
+        - { name: "ingredient_id",  type: "uuid",    required: true,  description: "食材ID（引用 inventory-core.Ingredient）" }
+        - { name: "ingredient_name", type: "string", required: true,  description: "食材名（冗余快照）" }
+        - { name: "quantity",       type: "decimal", required: true,  precision: [10, 4], description: "用量" }
+        - { name: "unit",           type: "string",  required: true,  description: "单位（g/ml/个）" }
+        - { name: "is_main",        type: "boolean", required: true,  description: "是否主料（影响沽清判断）" }
+        - { name: "created_at",     type: "timestamp", required: true }
+
+    - name: "StoreMenuOverride"
+      table: "biz_store_dish_overrides"
+      fields:
+        - { name: "id",           type: "uuid",    required: true }
+        - { name: "store_id",     type: "uuid",    required: true,  ref: "Store.id" }
+        - { name: "dish_id",      type: "uuid",    required: true,  ref: "MenuItem.id" }
+        - { name: "override_price", type: "decimal", required: false, precision: [10, 2], description: "门店覆盖价格（null=沿用品牌价）" }
+        - { name: "is_available", type: "boolean", required: true,  description: "门店是否售卖此菜品" }
+        - { name: "is_soldout",   type: "boolean", required: true,  description: "门店维度沽清" }
+        - { name: "soldout_reason", type: "string", required: false }
+        - { name: "updated_at",   type: "timestamp", required: true }
+
+    - name: "PriceAdjustmentRule"
+      table: "biz_price_adjustment_rules"
+      fields:
+        - { name: "id",          type: "uuid",    required: true }
+        - { name: "brand_id",    type: "uuid",    required: true,  ref: "Brand.id" }
+        - { name: "name",        type: "string",  required: true,  description: "规则名称（如：外卖加价10%）" }
+        - { name: "rule_type",   type: "enum",    required: true,  values: ["percentage", "fixed_amount", "replace_price"] }
+        - { name: "value",       type: "decimal", required: true,  precision: [10, 4] }
+        - { name: "scope",       type: "jsonb",   required: false, description: "适用范围（渠道/分类/菜品/时段）" }
+        - { name: "effective_at", type: "timestamp", required: true }
+        - { name: "expires_at",  type: "timestamp", required: false }
+        - { name: "is_active",   type: "boolean", required: true }
+        - { name: "created_at",  type: "timestamp", required: true }
+
+    - name: "MenuPublishPlan"
+      table: "biz_menu_publish_plans"
+      fields:
+        - { name: "id",          type: "uuid",    required: true }
+        - { name: "brand_id",    type: "uuid",    required: true,  ref: "Brand.id" }
+        - { name: "name",        type: "string",  required: true,  description: "计划名称（如：春节特供菜单）" }
+        - { name: "plan_type",   type: "enum",    required: true,  values: ["full_replace", "append", "price_only"] }
+        - { name: "target_stores", type: "jsonb", required: false, description: "适用门店列表（null=全品牌）" }
+        - { name: "changes",     type: "jsonb",   required: true,  description: "变更内容（新增/下架/价格调整）" }
+        - { name: "scheduled_at", type: "timestamp", required: true }
+        - { name: "executed_at", type: "timestamp", required: false }
+        - { name: "status",      type: "enum",    required: true,  values: ["draft", "scheduled", "executed", "cancelled"] }
+        - { name: "operator_id", type: "uuid",    required: true,  ref: "Staff.id" }
+        - { name: "created_at",  type: "timestamp", required: true }
+
+  referenced_entities:
+    - { entity: "Brand",      skill: "org-core",        fields_used: ["id", "name"] }
+    - { entity: "Store",      skill: "org-core",        fields_used: ["id", "name", "brand_id"] }
+    - { entity: "Staff",      skill: "org-core",        fields_used: ["id", "name"] }
+    - { entity: "Ingredient", skill: "inventory-core",  fields_used: ["id", "name", "stock_qty", "unit"] }
+
+  emitted_events:
+    - type: "menu.dish.created"
+      payload_schema: { dish_id: "uuid", brand_id: "uuid", name: "string", category_id: "uuid" }
+    - type: "menu.dish.published"
+      payload_schema: { dish_id: "uuid", brand_id: "uuid", store_ids: "array" }
+    - type: "menu.dish.soldout"
+      payload_schema: { dish_id: "uuid", store_id: "uuid", reason: "string", auto_triggered: "boolean" }
+    - type: "menu.price.adjusted"
+      payload_schema: { brand_id: "uuid", rule_id: "uuid", affected_dish_count: "integer", effective_at: "timestamp" }
+    - type: "menu.bom.updated"
+      payload_schema: { dish_id: "uuid", brand_id: "uuid", ingredient_count: "integer" }
+
+dependencies:
+  required:
+    - { skill: "org-core", min_version: "1.0.0", reason: "菜品归属品牌，门店菜单覆盖需要门店信息" }
+  optional:
+    - { skill: "inventory-core", min_version: "1.0.0", reason: "BOM 联动食材库存，缺少时无法自动沽清" }
+
+degradation:
+  offline:
+    can_operate: true
+    capabilities:
+      - { action: "menu_read",      mode: "full",    local_storage: "sqlite_wal", note: "菜单全量缓存在终端，可完全离线使用" }
+      - { action: "soldout_manual", mode: "full",    local_storage: "sqlite_wal" }
+      - { action: "price_check",    mode: "full",    local_storage: "sqlite_wal" }
+      - { action: "menu_edit",      mode: "disabled", fallback_message: "菜品编辑需要联网" }
+      - { action: "publish_plan",   mode: "disabled", fallback_message: "发布计划需要联网" }
+    sync_strategy:
+      on_reconnect: "pull_remote_overwrite"
+      conflict_resolution: "remote_wins"
+      max_offline_hours: 24
+
+  service_down:
+    - { service: "inventory-core", fallback: "disable_auto_soldout", alert: "库存联动沽清暂不可用，请手动沽清" }
+
+  conflict:
+    strategy: "remote_wins"
+    manual_review_trigger: "price_diff > 20%"
+    reason: "菜单以品牌后台为主，门店端只读缓存"
+
+observability:
+  metrics:
+    - { name: "menu_dish_active_count",   type: "gauge",   labels: ["brand_id", "category"] }
+    - { name: "menu_soldout_count",       type: "gauge",   labels: ["store_id"], alert_threshold: 10, alert_message: "当前沽清菜品 {value} 个，请检查库存" }
+    - { name: "menu_price_rule_active",   type: "gauge",   labels: ["brand_id"] }
+    - { name: "menu_publish_total",       type: "counter", labels: ["brand_id"] }
+    - { name: "menu_bom_coverage_rate",   type: "gauge",   labels: ["brand_id"], description: "已配置BOM的菜品比例" }
+  health_check: { endpoint: "/health", interval_seconds: 60, timeout_seconds: 5 }
+  audit:
+    log_all_mutations: true
+    retention_days: 1095
+    fields_to_mask: []
+
+ui:
+  surfaces:
+    - terminal: "cashier-pos"
+      entry_point: "order.menu-panel"
+      component: "MenuOrderPanel"
+      layout: "main-panel"
+      features: ["category-tabs", "dish-grid", "soldout-badge", "price-display", "search"]
+    - terminal: "customer-kiosk"
+      entry_point: "main-screen"
+      component: "KioskMenuPage"
+      layout: "full-screen"
+      features: ["category-tabs", "dish-grid", "dish-detail", "add-to-cart"]
+    - terminal: "customer-mini-program"
+      entry_point: "menu"
+      component: "MiniProgramMenuPage"
+      layout: "page"
+      features: ["category-scroll", "dish-list", "dish-detail", "add-to-cart", "favorites"]
+    - terminal: "manager-dashboard"
+      entry_point: "menu.management"
+      component: "MenuManagementPage"
+      layout: "full-page"
+      features: ["dish-crud", "category-manage", "bom-editor", "price-rules", "publish-plan", "store-override"]
+    - terminal: "waiter-pad"
+      entry_point: "order.menu"
+      component: "WaiterMenuPanel"
+      layout: "full-screen"
+      features: ["category-tabs", "dish-grid", "quick-search", "soldout-indicator"]
+
+  print_templates:
+    - { name: "menu-qrcode-card", format: "thermal-58mm", template_file: "assets/templates/menu-qrcode.xml" }
+
+compliance:
+  golden_tax:
+    applicable: false
+  data_residency: "cn-mainland"
+  pii_fields: []
+  retention_policy:
+    operation_logs: "3_years"
+    financial_records: "7_years"
+
+localization:
+  default_locale: "zh-CN"
+  supported_locales: ["zh-CN", "zh-TW", "en"]
+  currency: "CNY"
+  timezone: "Asia/Shanghai"

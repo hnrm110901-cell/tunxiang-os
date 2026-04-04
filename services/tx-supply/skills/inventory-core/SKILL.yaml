@@ -1,0 +1,260 @@
+# ============================================================
+# Skill: inventory-core
+# 库存核心 — 食材库存管理、BOM扣减、预警与日结
+# ============================================================
+
+meta:
+  name: "inventory-core"
+  version: "1.0.0"
+  display_name: "库存核心"
+  description: |
+    管理门店食材原料的入库、出库（BOM推算）、损耗、盘点、效期管理全生命周期。
+    与BOM配方联动，订单支付后自动按BOM扣减食材库存。
+    触发场景：订单支付后BOM扣减、收货完成后入库、每日凌晨库存日结。
+  category: "supply-chain"
+  sub_category: "inventory"
+  icon: "package"
+  maintainer: "supply-team"
+  license: "proprietary"
+
+# ============================================================
+# 第二层：触发路由
+# ============================================================
+triggers:
+  events:
+    - type: "order.paid"
+      condition: "always"
+      priority: 90
+      description: "订单支付后按BOM自动扣减食材库存"
+    - type: "supply.receiving.completed"
+      condition: "always"
+      priority: 80
+      description: "收货完成，增加对应食材库存"
+    - type: "cron.daily.00:30"
+      condition: "always"
+      priority: 50
+      description: "库存日结：核算当日消耗、损耗，刷新mv_inventory_bom"
+
+  api:
+    base_path: "/api/v1/inventory"
+    endpoints:
+      - method: "GET"
+        path: "/ingredients"
+        description: "食材库存列表"
+      - method: "GET"
+        path: "/ingredients/:id"
+        description: "单个食材详情"
+      - method: "POST"
+        path: "/ingredients/:id/adjust"
+        description: "手动盘点调整"
+      - method: "POST"
+        path: "/ingredients/:id/waste"
+        description: "登记损耗"
+      - method: "GET"
+        path: "/transactions"
+        description: "库存流水查询"
+      - method: "GET"
+        path: "/bom-health"
+        description: "BOM健康度（读mv_inventory_bom）"
+
+  terminal:
+    - device: "cashier-pos"
+      action: "inventory_check"
+      description: "快速查询食材库存"
+    - device: "manager-pad"
+      action: "inventory_adjust"
+      description: "盘点调整"
+
+# ============================================================
+# 第三层：作用域与权限
+# ============================================================
+scope:
+  levels:
+    - brand
+    - store
+  config_inheritance: "override_with_merge"
+  permissions:
+    - role: "kitchen_staff"
+      actions: ["view", "waste_register"]
+    - role: "store_manager"
+      actions: ["view", "adjust", "waste_register", "view_report"]
+    - role: "supply_admin"
+      actions: ["*"]
+
+# ============================================================
+# 第四层：数据契约
+# ============================================================
+data:
+  owned_entities:
+    - name: "Ingredient"
+      table: "biz_ingredients"
+      fields:
+        - { name: "id",                type: "uuid",      required: true }
+        - { name: "tenant_id",         type: "uuid",      required: true }
+        - { name: "store_id",          type: "uuid",      required: true,  ref: "Store.id" }
+        - { name: "name",              type: "string",    required: true }
+        - { name: "unit",              type: "string",    required: true,  description: "克/毫升/个" }
+        - { name: "current_stock",     type: "decimal",   required: true,  precision: [12, 3] }
+        - { name: "safety_stock",      type: "decimal",   required: true,  precision: [12, 3], description: "预警阈值" }
+        - { name: "expiry_date",       type: "date",      required: false }
+        - { name: "batch_no",          type: "string",    required: false }
+        - { name: "last_purchase_price_fen", type: "integer", required: false, description: "最近采购价（分/单位）" }
+        - { name: "is_deleted",        type: "boolean",   required: true }
+        - { name: "created_at",        type: "timestamp", required: true }
+        - { name: "updated_at",        type: "timestamp", required: true }
+
+    - name: "IngredientTransaction"
+      table: "biz_ingredient_transactions"
+      fields:
+        - { name: "id",                type: "uuid",      required: true }
+        - { name: "tenant_id",         type: "uuid",      required: true }
+        - { name: "store_id",          type: "uuid",      required: true,  ref: "Store.id" }
+        - { name: "ingredient_id",     type: "uuid",      required: true,  ref: "Ingredient.id" }
+        - { name: "tx_type",           type: "enum",      required: true,  values: ["receive", "consume_bom", "waste", "adjust", "transfer_in", "transfer_out"] }
+        - { name: "quantity",          type: "decimal",   required: true,  precision: [12, 3] }
+        - { name: "reference_id",      type: "uuid",      required: false, description: "关联订单/收货单/调拨单" }
+        - { name: "operator_id",       type: "uuid",      required: false, ref: "Staff.id" }
+        - { name: "note",              type: "string",    required: false }
+        - { name: "occurred_at",       type: "timestamp", required: true }
+        - { name: "created_at",        type: "timestamp", required: true }
+
+  referenced_entities:
+    - entity: "Order"
+      skill: "order-core"
+      fields_used: ["id", "items", "store_id"]
+    - entity: "Dish"
+      skill: "menu-core"
+      fields_used: ["id", "bom_recipe"]
+    - entity: "Store"
+      skill: "org-core"
+      fields_used: ["id", "name", "region_id"]
+
+  emitted_events:
+    - type: "inventory.ingredient.low"
+      payload_schema: { ingredient_id: "uuid", current_stock: "decimal", safety_stock: "decimal", store_id: "uuid" }
+    - type: "inventory.ingredient.expired"
+      payload_schema: { ingredient_id: "uuid", expiry_date: "date", current_stock: "decimal", store_id: "uuid" }
+    - type: "inventory.daily.settled"
+      payload_schema: { store_id: "uuid", settle_date: "date", total_consumed: "decimal", total_wasted: "decimal" }
+
+# ============================================================
+# 第五层：依赖声明
+# ============================================================
+dependencies:
+  required:
+    - skill: "org-core"
+      min_version: "1.0.0"
+      reason: "库存归属门店，需要门店组织信息"
+    - skill: "menu-core"
+      min_version: "1.0.0"
+      reason: "BOM扣减需要菜品配方表"
+    # infrastructure: postgresql >= 15, redis >= 7
+
+  optional:
+    - skill: "supply-receiving"
+      min_version: "1.0.0"
+      reason: "收货模块触发入库，缺少时需手动录入入库"
+
+# ============================================================
+# 第六层：降级策略
+# ============================================================
+degradation:
+  offline:
+    can_operate: true
+    capabilities:
+      - action: "view_stock"
+        mode: "full"
+        local_storage: "sqlite_wal"
+        note: "查看库存离线完整可用（基于本地缓存）"
+      - action: "waste_register"
+        mode: "full"
+        local_storage: "sqlite_wal"
+        note: "损耗登记离线可用，联网后同步"
+      - action: "adjust"
+        mode: "limited"
+        limit: "quantity_diff <= 100"
+        note: "离线盘点调整上限100单位"
+      - action: "bom_deduct"
+        mode: "full"
+        local_storage: "sqlite_wal"
+        note: "BOM自动扣减离线可用"
+    sync_strategy:
+      on_reconnect: "push_local_then_pull_remote"
+      conflict_resolution: "last_write_wins_with_operator_log"
+      max_offline_hours: 4
+
+  service_down:
+    - service: "menu-core"
+      fallback: "use_cached_bom"
+      alert: "none"
+
+  conflict:
+    strategy: "lww_with_audit"
+    manual_review_trigger: "quantity_diff > 50"
+
+# ============================================================
+# 第七层：可观测性
+# ============================================================
+observability:
+  metrics:
+    - name: "inventory_low_stock_count"
+      type: "gauge"
+      labels: ["store_id"]
+      alert_threshold: 3
+      alert_message: "门店有 {value} 种食材低于安全库存"
+    - name: "inventory_waste_amount_total"
+      type: "counter"
+      labels: ["store_id"]
+      description: "食材损耗累计量"
+    - name: "inventory_expired_count"
+      type: "gauge"
+      labels: ["store_id"]
+      alert_threshold: 1
+      alert_message: "门店有 {value} 种食材已过期，请立即处理"
+    - name: "inventory_bom_deduct_latency_seconds"
+      type: "histogram"
+      description: "BOM扣减处理耗时"
+
+  health_check:
+    endpoint: "/health"
+    interval_seconds: 30
+    timeout_seconds: 5
+
+  audit:
+    log_all_mutations: true
+    retention_days: 365
+    fields_to_mask: []
+
+# ============================================================
+# 第八层：UI 声明
+# ============================================================
+ui:
+  surfaces:
+    - terminal: "manager-pad"
+      entry_point: "supply.inventory"
+      component: "InventoryManagePanel"
+      layout: "full-screen"
+    - terminal: "manager-dashboard"
+      entry_point: "reports.supply.inventory-summary"
+      component: "InventorySummaryReport"
+      layout: "data-table"
+
+# ============================================================
+# 第九层：合规与本地化
+# ============================================================
+compliance:
+  golden_tax:
+    applicable: false
+    note: "食材采购发票由supply-receiving管理"
+  data_residency: "cn-mainland"
+  pii_fields: []
+  retention_policy:
+    financial_records: "7_years"
+    operation_logs: "1_year"
+
+localization:
+  default_locale: "zh-CN"
+  supported_locales: ["zh-CN"]
+  currency: "CNY"
+  timezone: "Asia/Shanghai"
+  number_format: "comma_thousands"

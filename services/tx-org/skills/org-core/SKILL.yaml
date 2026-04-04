@@ -1,0 +1,244 @@
+meta:
+  name: "org-core"
+  version: "2.0.0"
+  display_name: "组织架构核心"
+  description: |
+    屯象OS 组织架构基座（Level-0），管理品牌-区域-门店-员工四层组织结构。
+    所有业务 Skill 都依赖此模块获取门店和员工上下文。
+    核心能力：品牌/区域/门店 CRUD、员工档案与角色管理、门店配置继承、
+    License 有效期管理。本模块是整个系统的根基，无任何强依赖。
+  category: "org"
+  sub_category: "foundation"
+  icon: "building"
+  maintainer: "platform-team"
+
+triggers:
+  events:
+    - type: "admin.brand.created"
+      condition: "always"
+      priority: 100
+      description: "新品牌注册，初始化品牌配置"
+    - type: "admin.store.status_changed"
+      condition: "always"
+      priority: 90
+      description: "门店状态变更（开业/停业/装修）"
+    - type: "admin.staff.onboarded"
+      condition: "always"
+      priority: 85
+      description: "员工入职，创建账号与角色"
+    - type: "admin.staff.offboarded"
+      condition: "always"
+      priority: 85
+      description: "员工离职，吊销权限与凭证"
+    - type: "cron.daily.02:00"
+      condition: "always"
+      priority: 40
+      description: "每日凌晨检查 License 有效期，提前告警"
+
+  api:
+    base_path: "/api/v1/org"
+    endpoints:
+      # 品牌
+      - { method: "POST",   path: "/brands",                    description: "创建品牌" }
+      - { method: "GET",    path: "/brands",                    description: "品牌列表" }
+      - { method: "GET",    path: "/brands/:id",                description: "品牌详情" }
+      - { method: "PUT",    path: "/brands/:id",                description: "更新品牌" }
+      # 区域
+      - { method: "POST",   path: "/regions",                   description: "创建区域" }
+      - { method: "GET",    path: "/regions",                   description: "区域列表" }
+      - { method: "GET",    path: "/regions/:id",               description: "区域详情" }
+      - { method: "PUT",    path: "/regions/:id",               description: "更新区域" }
+      # 门店
+      - { method: "POST",   path: "/stores",                    description: "创建门店" }
+      - { method: "GET",    path: "/stores",                    description: "门店列表（支持品牌/区域筛选）" }
+      - { method: "GET",    path: "/stores/:id",                description: "门店详情" }
+      - { method: "PUT",    path: "/stores/:id",                description: "更新门店" }
+      - { method: "POST",   path: "/stores/:id/status",         description: "变更门店状态" }
+      - { method: "GET",    path: "/stores/:id/config",         description: "门店配置（继承链）" }
+      - { method: "PUT",    path: "/stores/:id/config",         description: "更新门店配置" }
+      # 员工
+      - { method: "POST",   path: "/staff",                     description: "创建员工" }
+      - { method: "GET",    path: "/staff",                     description: "员工列表" }
+      - { method: "GET",    path: "/staff/:id",                 description: "员工详情" }
+      - { method: "PUT",    path: "/staff/:id",                 description: "更新员工信息" }
+      - { method: "POST",   path: "/staff/:id/offboard",        description: "员工离职" }
+      - { method: "POST",   path: "/staff/:id/transfer",        description: "员工调岗/调店" }
+      - { method: "POST",   path: "/staff/auth/login",          description: "员工登录（PIN/密码）" }
+      # License
+      - { method: "GET",    path: "/license",                   description: "License 状态" }
+      - { method: "POST",   path: "/license/renew",             description: "License 续期" }
+
+  terminal:
+    - { device: "cashier-pos",   action: "staff_login",      shortcut_key: "F10", description: "员工登录/换班" }
+    - { device: "manager-dashboard", action: "store_config", description: "门店配置管理" }
+    - { device: "manager-dashboard", action: "staff_mgmt",   description: "员工管理" }
+
+scope:
+  levels: ["brand", "region", "store"]
+  config_inheritance: "override_with_merge"
+  configurable_params:
+    - { name: "business_hours_open",   type: "string",  default: "09:00", description: "营业开始时间", level: "store" }
+    - { name: "business_hours_close",  type: "string",  default: "22:00", description: "营业结束时间", level: "store" }
+    - { name: "timezone",              type: "string",  default: "Asia/Shanghai", description: "门店时区", level: "store" }
+    - { name: "currency",              type: "string",  default: "CNY",   description: "结算货币", level: "brand" }
+    - { name: "service_charge_rate",   type: "decimal", default: 0.0,     description: "服务费比例（0=不收）", level: "brand" }
+    - { name: "packing_fee_per_order", type: "decimal", default: 0.0,     description: "每单打包费（外卖）", level: "store" }
+    - { name: "pin_required_ops",      type: "jsonb",   default: [],      description: "需要 PIN 二次确认的操作列表", level: "brand" }
+  permissions:
+    - { role: "staff",          actions: ["self_view", "login"] }
+    - { role: "store_manager",  actions: ["store_view", "staff_view", "staff_onboard", "config_view"] }
+    - { role: "brand_admin",    actions: ["*"] }
+    - { role: "super_admin",    actions: ["*", "license_manage", "brand_create"] }
+
+data:
+  owned_entities:
+    - name: "Brand"
+      table: "sys_brand"
+      fields:
+        - { name: "id",              type: "uuid",      required: true }
+        - { name: "tenant_id",       type: "uuid",      required: true }
+        - { name: "name",            type: "string",    required: true,  description: "品牌名称" }
+        - { name: "logo_url",        type: "string",    required: false }
+        - { name: "status",          type: "enum",      required: true,  values: ["active", "suspended", "closed"] }
+        - { name: "license_expires_at", type: "date",   required: false }
+        - { name: "config",          type: "jsonb",     required: false, description: "品牌级配置" }
+        - { name: "created_at",      type: "timestamp", required: true }
+        - { name: "updated_at",      type: "timestamp", required: true }
+
+    - name: "Region"
+      table: "sys_region"
+      fields:
+        - { name: "id",              type: "uuid",      required: true }
+        - { name: "brand_id",        type: "uuid",      required: true,  ref: "Brand.id" }
+        - { name: "name",            type: "string",    required: true,  description: "区域名称（如：华南区、北京直营区）" }
+        - { name: "code",            type: "string",    required: true,  description: "区域编码" }
+        - { name: "manager_staff_id", type: "uuid",     required: false, ref: "Staff.id" }
+        - { name: "config",          type: "jsonb",     required: false, description: "区域级配置（覆盖品牌配置）" }
+        - { name: "created_at",      type: "timestamp", required: true }
+
+    - name: "Store"
+      table: "sys_stores"
+      fields:
+        - { name: "id",              type: "uuid",      required: true }
+        - { name: "brand_id",        type: "uuid",      required: true,  ref: "Brand.id" }
+        - { name: "region_id",       type: "uuid",      required: false, ref: "Region.id" }
+        - { name: "name",            type: "string",    required: true,  description: "门店名称" }
+        - { name: "code",            type: "string",    required: true,  description: "门店编码（唯一）" }
+        - { name: "address",         type: "string",    required: false }
+        - { name: "city",            type: "string",    required: false }
+        - { name: "province",        type: "string",    required: false }
+        - { name: "phone",           type: "string",    required: false }
+        - { name: "status",          type: "enum",      required: true,  values: ["active", "inactive", "renovating", "preparing", "closed"] }
+        - { name: "store_type",      type: "enum",      required: true,  values: ["dine_in", "takeout_only", "mixed", "flagship"] }
+        - { name: "table_count",     type: "integer",   required: false, description: "桌位数量" }
+        - { name: "config",          type: "jsonb",     required: false, description: "门店级配置（覆盖区域配置）" }
+        - { name: "opened_at",       type: "date",      required: false, description: "开业日期" }
+        - { name: "created_at",      type: "timestamp", required: true }
+        - { name: "updated_at",      type: "timestamp", required: true }
+
+    - name: "Staff"
+      table: "sys_staff"
+      fields:
+        - { name: "id",              type: "uuid",      required: true }
+        - { name: "brand_id",        type: "uuid",      required: true,  ref: "Brand.id" }
+        - { name: "store_id",        type: "uuid",      required: false, ref: "Store.id", description: "主挂门店（调岗时变更）" }
+        - { name: "name",            type: "string",    required: true }
+        - { name: "phone",           type: "string",    required: true }
+        - { name: "role",            type: "enum",      required: true,  values: ["waiter", "cashier", "kitchen", "store_manager", "brand_admin", "finance_director", "super_admin"] }
+        - { name: "pin_hash",        type: "string",    required: false, description: "操作 PIN 哈希（bcrypt）" }
+        - { name: "password_hash",   type: "string",    required: false, description: "登录密码哈希" }
+        - { name: "status",          type: "enum",      required: true,  values: ["active", "inactive", "suspended"] }
+        - { name: "onboarded_at",    type: "date",      required: true }
+        - { name: "offboarded_at",   type: "date",      required: false }
+        - { name: "created_at",      type: "timestamp", required: true }
+        - { name: "updated_at",      type: "timestamp", required: true }
+
+    - name: "StoreConfig"
+      table: "sys_store_configs"
+      fields:
+        - { name: "id",              type: "uuid",      required: true }
+        - { name: "store_id",        type: "uuid",      required: true,  ref: "Store.id" }
+        - { name: "config_key",      type: "string",    required: true,  description: "配置项键名" }
+        - { name: "config_value",    type: "jsonb",     required: true,  description: "配置值（支持任意类型）" }
+        - { name: "level",           type: "enum",      required: true,  values: ["brand", "region", "store"] }
+        - { name: "updated_by",      type: "uuid",      required: true,  ref: "Staff.id" }
+        - { name: "updated_at",      type: "timestamp", required: true }
+
+  referenced_entities: []
+
+  emitted_events:
+    - type: "org.brand.created"
+      payload_schema: { brand_id: "uuid", name: "string", tenant_id: "uuid" }
+    - type: "org.store.created"
+      payload_schema: { store_id: "uuid", brand_id: "uuid", region_id: "uuid", name: "string" }
+    - type: "org.store.status_changed"
+      payload_schema: { store_id: "uuid", old_status: "string", new_status: "string", operator_id: "uuid" }
+    - type: "org.staff.onboarded"
+      payload_schema: { staff_id: "uuid", brand_id: "uuid", store_id: "uuid", role: "string" }
+    - type: "org.staff.offboarded"
+      payload_schema: { staff_id: "uuid", store_id: "uuid", offboarded_at: "date" }
+    - type: "org.staff.transferred"
+      payload_schema: { staff_id: "uuid", from_store_id: "uuid", to_store_id: "uuid", new_role: "string" }
+    - type: "org.store.config_updated"
+      payload_schema: { store_id: "uuid", config_key: "string", level: "string", operator_id: "uuid" }
+    - type: "org.license.expiring"
+      payload_schema: { brand_id: "uuid", expires_at: "date", days_remaining: "integer" }
+
+dependencies:
+  required: []
+  optional: []
+
+degradation:
+  offline:
+    can_operate: true
+    capabilities:
+      - { action: "staff_login",      mode: "full",    local_storage: "sqlite_wal",  note: "员工凭证在本地缓存，可离线登录" }
+      - { action: "store_config_read", mode: "full",   local_storage: "sqlite_wal",  note: "配置全量本地缓存" }
+      - { action: "staff_crud",       mode: "disabled", fallback_message: "员工管理需要联网" }
+      - { action: "store_crud",       mode: "disabled", fallback_message: "门店管理需要联网" }
+    sync_strategy:
+      on_reconnect: "pull_remote_overwrite"
+      conflict_resolution: "remote_wins"
+      max_offline_hours: 24
+
+  service_down: []
+
+  conflict:
+    strategy: "remote_wins"
+    manual_review_trigger: "never"
+    reason: "组织架构数据以云端为主，门店端只读缓存"
+
+observability:
+  metrics:
+    - { name: "store_active_count",       type: "gauge",   labels: ["brand_id"], description: "活跃门店数" }
+    - { name: "staff_active_count",       type: "gauge",   labels: ["brand_id", "store_id"] }
+    - { name: "license_days_remaining",   type: "gauge",   labels: ["brand_id"], alert_threshold: 30, alert_message: "License 还有 {value} 天到期" }
+    - { name: "org_config_update_total",  type: "counter", labels: ["brand_id", "level"] }
+  health_check: { endpoint: "/health", interval_seconds: 60, timeout_seconds: 5 }
+  audit:
+    log_all_mutations: true
+    retention_days: 2555
+    fields_to_mask: ["phone", "pin_hash", "password_hash"]
+
+ui:
+  surfaces:
+    - terminal: "manager-dashboard"
+      entry_point: "settings.org"
+      component: "OrgManagementPage"
+      layout: "full-page"
+      features: ["brand-config", "store-list", "staff-list", "region-manage", "license-status"]
+
+compliance:
+  golden_tax:
+    applicable: false
+  data_residency: "cn-mainland"
+  pii_fields: ["name", "phone", "pin_hash", "password_hash"]
+  retention_policy:
+    financial_records: "7_years"
+    operation_logs: "3_years"
+
+localization:
+  default_locale: "zh-CN"
+  supported_locales: ["zh-CN", "zh-TW"]
+  currency: "CNY"
+  timezone: "Asia/Shanghai"

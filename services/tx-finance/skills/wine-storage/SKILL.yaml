@@ -1,0 +1,155 @@
+meta:
+  name: "wine-storage"
+  version: "1.0.0"
+  display_name: "存酒管理"
+  description: |
+    管理客户存酒的寄存、取用、续存、过期处理全生命周期。
+    核心场景：客户宴请后剩余酒水寄存、下次到店取用消费、
+    存酒到期提醒、VIP客户存酒特权、存酒转赠。
+    与会员系统联动实现存酒绑定会员卡。
+  category: "finance"
+  sub_category: "receivables"
+  icon: "wine"
+  maintainer: "finance-team"
+
+triggers:
+  events:
+    - type: "order.checkout.completed"
+      condition: "payload.remaining_drinks != null"
+      priority: 80
+      description: "结账后检测剩余酒水，提示客户是否存酒"
+    - type: "order.table.opened"
+      condition: "payload.customer_id != null"
+      priority: 85
+      description: "开台时查询该客户是否有存酒，提醒服务员"
+    - type: "member.tier.changed"
+      condition: "payload.new_tier in ['gold','platinum','diamond']"
+      priority: 30
+      description: "高级会员升级时自动延长存酒有效期30天"
+    - type: "cron.daily.10:00"
+      condition: "always"
+      priority: 40
+      description: "扫描7天内到期存酒，发提醒通知"
+  api:
+    base_path: "/api/v1/wine-storage"
+    endpoints:
+      - { method: "POST", path: "/",                         description: "新建存酒记录" }
+      - { method: "POST", path: "/{id}/retrieve",            description: "取酒（部分或全部）" }
+      - { method: "POST", path: "/{id}/extend",              description: "续存（延长有效期）" }
+      - { method: "GET",  path: "/{id}",                     description: "存酒详情" }
+      - { method: "GET",  path: "/customer/{customer_id}",   description: "客户所有存酒" }
+      - { method: "GET",  path: "/store/{store_id}",         description: "门店存酒列表" }
+      - { method: "GET",  path: "/report/expiring",          description: "即将到期清单" }
+      - { method: "GET",  path: "/report/summary",           description: "存酒汇总报表" }
+  terminal:
+    - { device: "cashier-pos",            action: "wine_store",    shortcut_key: "F8" }
+    - { device: "waiter-pad",             action: "wine_retrieve", description: "服务员PAD一键取酒" }
+    - { device: "customer-mini-program",  action: "wine_view",     description: "客户小程序查看存酒" }
+
+scope:
+  levels: [brand, store]
+  config_inheritance: "override_with_merge"
+  configurable_params:
+    - { name: "max_storage_days",      type: "integer",      default: 180,   description: "最长存酒天数",   level: "brand" }
+    - { name: "free_storage_days",     type: "integer",      default: 30,    description: "免费存酒天数",   level: "brand" }
+    - { name: "expiry_reminder_days",  type: "array<int>",   default: [7,3,1], description: "到期前N天提醒", level: "brand" }
+    - { name: "cabinet_positions",     type: "array<string>", default: [],   description: "酒柜位置编号",   level: "store" }
+  permissions:
+    - { role: "waiter",           actions: ["view", "retrieve"] }
+    - { role: "cashier",          actions: ["view", "store", "retrieve"] }
+    - { role: "store_manager",    actions: ["view", "store", "retrieve", "extend", "write_off", "report"] }
+    - { role: "finance_director", actions: ["*"] }
+
+data:
+  owned_entities:
+    - name: "WineStorage"
+      table: "biz_wine_storage"
+      fields:
+        - { name: "id",                    type: "uuid",        required: true }
+        - { name: "store_id",              type: "uuid",        required: true,  ref: "Store.id" }
+        - { name: "customer_id",           type: "uuid",        required: true,  ref: "Customer.id" }
+        - { name: "source_order_id",       type: "uuid",        required: true,  ref: "Order.id" }
+        - { name: "wine_name",             type: "string",      required: true }
+        - { name: "wine_category",         type: "enum",        required: true,  values: ["白酒","红酒","啤酒","洋酒","其他"] }
+        - { name: "quantity",              type: "numeric(10,2)", required: true }
+        - { name: "original_qty",          type: "numeric(10,2)", required: true }
+        - { name: "unit",                  type: "string",      required: true,  default: "瓶" }
+        - { name: "estimated_value_fen",   type: "bigint",      required: false }
+        - { name: "cabinet_position",      type: "string",      required: false }
+        - { name: "status",                type: "enum",        required: true,  values: ["stored","partially_retrieved","fully_retrieved","expired","written_off"] }
+        - { name: "stored_at",             type: "timestamptz", required: true }
+        - { name: "expires_at",            type: "timestamptz", required: true }
+        - { name: "operator_id",           type: "uuid",        required: true,  ref: "Staff.id" }
+    - name: "WineStorageLog"
+      table: "biz_wine_storage_logs"
+      fields:
+        - { name: "id",               type: "uuid",        required: true }
+        - { name: "storage_id",       type: "uuid",        required: true, ref: "WineStorage.id" }
+        - { name: "action",           type: "enum",        required: true, values: ["store","retrieve","extend","expire","write_off"] }
+        - { name: "quantity_change",  type: "numeric(10,2)", required: true }
+        - { name: "related_order_id", type: "uuid",        required: false }
+        - { name: "operator_id",      type: "uuid",        required: true }
+  referenced_entities:
+    - { entity: "Order",    skill: "order-core",  fields_used: ["id", "status", "store_id", "customer_id"] }
+    - { entity: "Customer", skill: "member-core", fields_used: ["id", "name", "phone", "tier"] }
+    - { entity: "Store",    skill: "org-core",    fields_used: ["id", "name"] }
+  emitted_events:
+    - { type: "wine_storage.stored",         payload_schema: { storage_id: "uuid", customer_id: "uuid", wine_name: "string", quantity: "decimal", store_id: "uuid" } }
+    - { type: "wine_storage.retrieved",      payload_schema: { storage_id: "uuid", customer_id: "uuid", quantity_retrieved: "decimal", quantity_remaining: "decimal" } }
+    - { type: "wine_storage.expiring_soon",  payload_schema: { storage_id: "uuid", customer_id: "uuid", expires_at: "timestamptz", days_remaining: "integer" } }
+    - { type: "wine_storage.expired",        payload_schema: { storage_id: "uuid", customer_id: "uuid", wine_name: "string", quantity: "decimal" } }
+
+dependencies:
+  required:
+    - { skill: "order-core",  min_version: "2.0.0", reason: "存酒必须关联来源订单" }
+    - { skill: "member-core", min_version: "1.0.0", reason: "存酒必须绑定会员身份" }
+  optional:
+    - { skill: "notification-hub", min_version: "1.0.0", reason: "到期提醒推送" }
+    - { skill: "inventory-core",   min_version: "1.0.0", reason: "联动实物库存，缺少时仅做台账" }
+
+degradation:
+  offline:
+    can_operate: true
+    capabilities:
+      - { action: "store",    mode: "full",     local_storage: "sqlite_wal" }
+      - { action: "retrieve", mode: "full",     local_storage: "sqlite_wal" }
+      - { action: "extend",   mode: "full",     local_storage: "sqlite_wal" }
+      - { action: "report",   mode: "disabled", fallback_message: "报表需联网" }
+    sync_strategy:
+      on_reconnect: "push_local_then_pull_remote"
+      conflict_resolution: "quantity_min_wins"   # 数量取最小值，防超取
+      max_offline_hours: 4
+  conflict:
+    strategy: "quantity_min_wins_with_audit"
+    manual_review_trigger: "quantity_diff > 0"   # 任何数量不一致都需人工确认
+
+observability:
+  metrics:
+    - { name: "wine_stored_total",        type: "counter", labels: ["store_id", "wine_category"] }
+    - { name: "wine_retrieved_total",     type: "counter", labels: ["store_id"] }
+    - { name: "wine_storage_active_count", type: "gauge",  labels: ["store_id"] }
+    - { name: "wine_expired_total",       type: "counter", labels: ["store_id"], alert_threshold: 5, alert_message: "本月已有 {value} 笔存酒过期未取" }
+  health_check: { endpoint: "/health", interval_seconds: 30, timeout_seconds: 5 }
+  audit:
+    log_all_mutations: true
+    retention_days: 365
+    fields_to_mask: ["customer_phone"]
+
+ui:
+  surfaces:
+    - { terminal: "cashier-pos",           component: "WineStoragePanel",  layout: "full-screen", features: ["store","retrieve","search","photo-capture"] }
+    - { terminal: "waiter-pad",            component: "WineStorageBadge",  layout: "inline-badge" }
+    - { terminal: "manager-dashboard",     component: "WineStorageReport", layout: "data-table" }
+    - { terminal: "customer-mini-program", component: "MyWineList",        layout: "card-list" }
+  print_templates:
+    - { name: "wine-storage-receipt", format: "thermal-58mm", template_file: "assets/templates/wine-storage-receipt.xml" }
+    - { name: "wine-retrieve-receipt", format: "thermal-58mm", template_file: "assets/templates/wine-retrieve-receipt.xml" }
+
+compliance:
+  golden_tax: { applicable: false, note: "酒水收入在原订单结账时已开票" }
+  data_residency: "cn-mainland"
+  pii_fields: ["customer_name", "customer_phone"]
+  retention_policy:
+    financial_records: "7_years"
+    operation_logs: "1_year"
+    photos: "storage_duration_plus_90_days"

@@ -4,6 +4,257 @@
 
 ---
 
+## 2026-04-04（Round 72 — DEV数据库全量迁移完成：v119→v157+全分支heads）
+
+### 今日完成
+- [db-migrations] 修复并运行所有待迁移版本（v120-v157 主链 + v048-v062 并行分支）
+- [db-migrations] 修复 v120 payroll_records 旧表兼容：ADD COLUMN IF NOT EXISTS 补全19个缺失字段
+- [db-migrations] 修复 v121 approval_instances 旧表兼容：ADD COLUMN IF NOT EXISTS 补全14个缺失字段
+- [db-migrations] 修复 v139/v141/v142/v143 `using_clause` NameError（变量名错误）
+- [db-migrations] 修复 v157 中文双引号导致的 SyntaxError
+- [db-migrations] 修复 JSONB server_default `"'[]'"` 产生 `DEFAULT '''[]'''` 的 SQLAlchemy Python3.14 兼容问题（全部改为 `sa.text("'[]'")`）
+- [db-migrations] 修复 v150 `FORCE ROW LEVEL SECURITY` 缺少 `ALTER TABLE` 前缀
+- [db-migrations] 修复 v062/v060 中央厨房/加盟管理旧表缺少 kitchen_id/period_start 等列
+- [db-migrations] 修复 v061 payroll_system btree_gist 扩展缺失（EXCLUDE USING gist + UUID）
+- [db-migrations] 修复 v059/v058/v053/v052 等并行分支旧表兼容 + CREATE POLICY 无 DROP POLICY IF EXISTS
+- [db-migrations] 修复 v056b FOR INSERT USING 语法错误（INSERT 只能用 WITH CHECK）
+- [db-migrations] 统一修复 _apply_safe_rls() 函数：添加 DROP POLICY IF EXISTS + 移动 ENABLE/FORCE RLS 到前面
+
+### 数据变化
+- 迁移版本：v119 → 全量 heads（v048/v049/v050/v051/v052/v053/v054/v056b/v057/v058/v059/v061/v062 + v157主链）
+- 共修复约 20+ 个迁移文件
+- DEV 数据库现已同步到所有 heads（14个分支头全部 current）
+
+### 遗留问题
+- 部分并行分支（v060-v086）的 _apply_safe_rls 函数仍未统一添加 DROP POLICY IF EXISTS（已修复已知问题，但可能还有遗漏）
+
+### 明日计划
+- 验证各服务 API 正常启动（tx-trade/tx-member/tx-ops 等）
+- 继续 ForgeNode Team G 的验证
+
+---
+
+## 2026-04-04（Round 76 — campaign.checkout_eligible 前端弹窗完整实现）
+
+### 今日完成
+- [web-pos/api] `couponApi.ts`：追加 `checkCouponEligibility` + `applyCouponToOrder` 两个 API 函数（含 EligibleCoupon 类型定义）
+- [web-pos/hooks] `useCouponEligibility.ts`（新建）：结账页 hook，挂载时自动查询可用券，有券自动弹出
+- [web-pos/components] `CouponEligibleSheet.tsx`（新建）：底部弹层，展示券列表（减免金额/门槛/有效期）+ 一键核销 + 跳过按钮
+- [web-pos/pages] `SettlePage.tsx`：集成 hook + 组件，customerId 从 URL search params 取（无会员时静默跳过）
+- TypeScript 检查：新增3个文件零新增错误
+
+### 完整 campaign.checkout_eligible 链路
+```
+收银员打开结算页（SettlePage）
+  → useCouponEligibility 自动 POST /campaigns/apply-to-order
+  → 后端查客户未使用券 + 有效活动 → 过滤满足门槛
+  → 返回 eligible_coupons（emit campaign.checkout_eligible 事件）
+  → 前端弹出 CouponEligibleSheet
+  → 收银员点"立即核销"
+  → POST /coupons/{id}/apply → 状态→used → 发射 COUPON_APPLIED
+  → onApplied(discountFen) → applyDiscount 写入 orderStore
+  → finalFen 自动更新，弹层关闭
+```
+
+### 遗留问题
+- 无（本轮所有已知遗留项全部清零）
+
+---
+
+## 2026-04-04（Round 75 — approval.requested 自动化：SkillEventConsumer完整闭环）
+
+### 今日完成
+- [tx-agent] skill_handlers.py：新增 `handle_approval_skill_events`（75行）
+  - 监听 `approval.requested` 事件
+  - 自动 HTTP POST tx-org /api/v1/approval-engine/instances 创建审批实例
+  - httpx 调用失败只记 error 日志，不影响主流程（幂等设计）
+- [tx-agent] main.py：注册 `approval-flow` handler（第8个 Skill handler）
+- 语法验证：skill_handlers.py(425行) + main.py 全部通过
+
+### approval.requested 完整自动化链路
+```
+credit-account 创建协议（≥5万）
+  → emit approval.requested（Redis Stream）
+  → SkillEventConsumer[approval-flow] 接收
+  → handle_approval_skill_events()
+  → POST tx-org/api/v1/approval-engine/instances（自动创建实例）
+  → 审批人在 manager-pad 看到待审批 → approve/reject
+  → _dispatch_on_approved/rejected
+  → POST tx-finance/.../approval-callback
+  → credit-account status active/terminated
+```
+**全链路零人工干预**（从协议创建到审批实例生成）
+
+### SkillEventConsumer 注册的8个 handler
+| # | Skill | Handler |
+|---|-------|---------|
+| 1 | order-core | handle_order_skill_events |
+| 2 | member-core | handle_member_skill_events |
+| 3 | inventory-core | handle_inventory_skill_events |
+| 4 | safety-compliance | handle_safety_skill_events |
+| 5 | deposit-management | handle_finance_skill_events |
+| 6 | wine-storage | handle_finance_skill_events |
+| 7 | credit-account | handle_finance_skill_events |
+| 8 | approval-flow | handle_approval_skill_events |
+
+### 遗留问题
+- ~~campaign.checkout_eligible 前端弹窗组件尚未实现~~（已完成 Round 76）
+- ~~approval.requested 事件的 template_id 字段尚未传递~~（已修复：handler 先 GET /templates?business_type= 查模板，再创建实例）
+
+---
+
+## 2026-04-04（Round 74 — approval-flow ↔ credit-agreement 全链路打通）
+
+### 今日完成
+- [tx-org] Team K：approval_engine.py 新增 credit_agreement 回调分支
+  - `_post_callback` 扩展签名支持可选 body（方案A，不破坏6个已有调用点）
+  - `_dispatch_on_approved`：elif credit_agreement → POST .../approval-callback {decision:approved}
+  - `_dispatch_on_rejected`：if credit_agreement → POST .../approval-callback {decision:rejected}
+  - 语法验证通过
+
+### credit_agreement 审批全链路（现已完整）
+```
+创建协议（≥5万）
+  → status=pending_approval + emit approval.requested
+  → approval_engine 收到 → 创建 ApprovalInstance
+  → 审批人 POST /approve 或 /reject
+  → _dispatch_on_approved/rejected
+  → POST tx-finance/api/v1/credit/agreements/{id}/approval-callback
+  → credit-account status → active / terminated
+  → emit credit.agreement_approved / credit.agreement_rejected
+```
+
+### 遗留问题
+- approval_engine 接收 approval.requested 事件的 SkillEventConsumer handler 尚未注册（目前靠手动 POST 创建实例）
+- campaign.checkout_eligible 前端弹窗组件尚未实现
+
+### 明日计划
+- 为 approval-flow 注册 SkillEventConsumer handler（处理 approval.requested 自动创建实例）
+- 整理本轮 Skill 架构升级完整清单
+
+---
+
+## 2026-04-04（Round 73 — Campaign核销补全 + Credit审批流接入）
+
+### 今日完成
+- [tx-growth] Team I：campaign apply-coupon 结账核销
+  - `coupon_routes.py`：新增 `POST /api/v1/growth/coupons/{id}/apply`（状态/有效期/门槛三重校验 → 更新为used → 发射COUPON_APPLIED）
+  - `growth_campaign_routes.py`：新增 `POST /api/v1/growth/campaigns/apply-to-order`（SkillEventConsumer触发，返回可用券列表，不自动核销）
+  - `main.py`：补注册 coupon_router（此前漏注册）
+- [tx-finance] Team J：credit-account 接入 approval-flow
+  - `credit_account_routes.py`：额度≥50,000元(5,000,000分)时 status→pending_approval + 旁路发射 approval.requested
+  - `approval_callback_routes.py`（新建）：`POST /api/v1/credit/agreements/{id}/approval-callback`（批准→active，拒绝→terminated）
+  - `main.py`：注册 approval_callback_router
+- 验证：v156迁移中 approved_by 字段已存在，无需补迁移
+
+### 数据变化
+- 新增 API 端点：4个（apply_coupon / apply-to-order / approval-callback × 2方向）
+- 修复：coupon_router 此前未注册到 tx-growth main.py（Team I 发现并修复）
+- 事件新增：campaign.checkout_eligible（字符串，未注册枚举，符合渐进式规范）
+
+### 遗留问题
+- approval-flow Skill 本身（tx-org）尚未实现回调机制（当前仅接收 approval.requested 事件，批准/拒绝需手动调用回调接口）
+- campaign.checkout_eligible 事件处理器尚未在前端实现（弹出可用券提示）
+
+### 明日计划
+- tx-org approval-flow：实现审批列表 + 批准/拒绝操作，调用回调 URL
+
+---
+
+## 2026-04-04（Round 72 — Skill架构升级完成：ForgeNode+端到端测试）
+
+### 今日完成
+- [edge/mac-station] Team G：ForgeNode离线感知决策引擎（546行）
+  - `forge_node.py`：5个核心方法（check_online_status / can_execute / buffer_operation / sync_on_reconnect / get_all_skill_status）
+  - `offline_buffer.py`（350行）：SQLite WAL 缓冲队列（write/get_pending/mark_synced/get_stats）
+  - `api/forge_routes.py`：5个端点（/status /skills/{name} /buffer /buffer/stats /sync）
+  - `main.py`集成：ForgeNode初始化 + 30秒后台连接检测任务
+- [shared/skill_registry/tests] Team H（进行中）：Skill架构端到端测试
+
+### 数据变化
+- mac-station 新增模块：3个文件（forge_node/offline_buffer/forge_routes）
+- mac-station 新增 API 端点：5个（/api/v1/forge/*）
+- 离线能力：从硬编码逻辑 → 读取 SKILL.yaml degradation.offline 动态决策
+
+### Skill架构升级四层全部就绪
+| 层 | 组件 | 状态 |
+|---|---|---|
+| Registry | SkillRegistry + OntologyRegistry | ✅ |
+| EventConsumer | SkillEventConsumer + 7个handler | ✅ |
+| MCPBridge | SkillMCPBridge（自动生成工具） | ✅ |
+| ForgeNode | 离线感知决策 + SQLite WAL缓冲 | ✅ |
+
+### 遗留问题
+- credit_account 需要接入 approval-flow 审批大额协议
+- SkillAwareOrchestrator 尚未替换 orchestrator_routes.py 手工维护的83个工具列表
+- Team H 端到端测试结果待确认
+
+### 明日计划
+- 验证 Team H 测试结果，修复失败用例
+- 将 SkillAwareOrchestrator.get_available_tools() 接入 orchestrator_routes.py
+
+---
+
+## 2026-04-04（Round 71 — Skill架构升级：Agent集成+MCP桥接+ForgeNode启动）
+
+### 今日完成
+- [tx-agent] Team E：SkillEventConsumer集成到 lifespan（7个Skill handler并行运行）
+- [tx-agent] Team E：skill_handlers.py（345行，5类事件处理：order/member/inventory/safety/finance）
+- [tx-agent] Team E：skill_registry_routes.py（202行，5个端点：GET /api/v1/skills/*）
+- [shared/skill_registry] Team F：mcp_bridge.py（185行，SkillMCPBridge自动生成MCP工具，工具名格式 `{skill}__{action}`）
+- [tx-agent] Team F：skill_aware_orchestrator.py（224行，按role/offline状态动态过滤工具列表）
+- [tx-agent] Team F：skill_context_routes.py（138行，4个端点：GET /api/v1/agent/skill-context/*）
+- [edge/mac-station] Team G（进行中）：ForgeNode离线自治改造
+
+### 数据变化
+- tx-agent 新增 API 路由：~9个端点（Skill注册 + Skill上下文）
+- 新增模块：5个文件（skill_handlers/skill_aware_orchestrator/mcp_bridge/skill_registry_routes/skill_context_routes）
+- SkillMCPBridge：从22个SKILL.yaml自动生成MCP工具描述，替代手工维护工具列表
+
+### 遗留问题
+- ForgeNode Team G 后台运行中，结果待确认
+- credit_account 需要接入 approval-flow 审批大额协议
+- SkillAwareOrchestrator 的 get_available_tools() 尚未替换 orchestrator_routes.py 中手工维护的83个工具列表
+
+### 明日计划
+- 验证 ForgeNode 完成情况（Team G）
+- 运行端到端测试：SkillEventConsumer 接收 order.paid 事件 → inventory-core handler 触发
+- DEVLOG Round 72
+
+---
+
+## 2026-04-04（Round 70 — Skill架构升级：4团队并行，22个Skill完成）
+
+### 今日完成
+- [shared/skill_registry] Team A：建立 Skill Registry 基础设施（7个模块：schemas/registry/router/ontology/cli/skill_event_consumer/__init__）
+- [shared/db-migrations] Team B：v156_finance_receivables（6张表：biz_deposits/biz_wine_storage/biz_wine_storage_logs/biz_credit_agreements/biz_credit_charges/biz_credit_bills，完整RLS）
+- [shared/db-migrations] Team D：v157_safety_compliance（3张表：biz_food_safety_inspections/biz_food_safety_items/biz_food_safety_templates）
+- [tx-finance] Team B：押金/存酒/挂账三个新Finance Skill API路由（deposit_routes 738行 / wine_storage_routes 731行 / credit_account_routes 793行）
+- [tx-finance] 3个SKILL.yaml（deposit-management / wine-storage / credit-account）
+- [tx-ops] Team D：food_safety_routes（410行）/ safety_inspection_router（698行），食安巡检完整实现
+- [shared/events] Team B/C/D：新增5个事件类型类（DepositEventType/WineStorageEventType/CreditEventType/SafetyInspectionEventType/CampaignEventType）
+- [全服务] Team A/C：22个SKILL.yaml（覆盖tx-trade/tx-member/tx-menu/tx-org/tx-supply/tx-ops/tx-analytics/tx-finance/tx-growth）
+- [tx-growth] Team D：campaign_routes接入promotions表，营销活动Skill骨架完成
+
+### 数据变化
+- 迁移版本：v155 → v157
+- 新增 API 端点：~65个（押金8 / 存酒8 / 挂账8 / 食安8 / 营销8 + 其他）
+- SKILL.yaml：0 → 22个（覆盖所有Level-0/1/2/3 Skill）
+- 事件类型类：15 → 20个
+- 新增Skill Registry模块：7个文件
+
+### 遗留问题
+- Skill Registry 尚未集成到 tx-agent 的 AgentOrchestrator（Phase D中期任务）
+- credit_account 需要接入 approval-flow 审批大额协议（已在SKILL.yaml dependencies声明）
+- SkillEventConsumer 还未在任何服务中启动（需在 gateway 或 tx-agent 中初始化）
+
+### 明日计划
+- 启动 SkillEventConsumer 集成到 tx-agent/gateway
+- AgentOrchestrator 改造：按 SKILL.yaml scope.permissions 过滤可用 MCP 工具
+- tx-growth campaign 补全：apply-coupon 逻辑接入 order.checkout.completed 事件
+
+---
+
 ## 2026-04-04（Round 69 — 测试全绿：94/94 passed）
 
 ### 今日完成

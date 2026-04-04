@@ -1,0 +1,305 @@
+# ============================================================
+# Skill: approval-flow
+# 审批流引擎 — 通用多级审批，支持预置模板与自定义流程
+# ============================================================
+
+meta:
+  name: "approval-flow"
+  version: "1.0.0"
+  display_name: "审批流"
+  description: |
+    通用审批流引擎，支持多级串行/并行审批、超时自动处理、移动端审批。
+    预置4种模板：员工请假审批、薪资确认、高价值退款、营业日报。
+    其他业务Skill（折扣/退款/调拨）可注册审批需求，由本Skill统一驱动。
+    触发场景：任何业务Skill触发的审批请求，均通过本引擎处理。
+  category: "platform"
+  sub_category: "workflow"
+  icon: "git-branch"
+  maintainer: "platform-team"
+  license: "proprietary"
+
+# ============================================================
+# 第二层：触发路由
+# ============================================================
+triggers:
+  events:
+    - type: "approval.request.created"
+      condition: "always"
+      priority: 100
+      description: "任何业务Skill发起审批请求"
+    - type: "approval.action.submitted"
+      condition: "always"
+      priority: 90
+      description: "审批人提交审批意见（通过/拒绝）"
+    - type: "cron.every.10min"
+      condition: "always"
+      priority: 30
+      description: "定时检查超时审批，触发自动处理"
+
+  api:
+    base_path: "/api/v1/approvals"
+    endpoints:
+      - method: "POST"
+        path: "/"
+        description: "创建审批实例"
+      - method: "GET"
+        path: "/pending"
+        description: "待我审批列表"
+      - method: "POST"
+        path: "/:id/approve"
+        description: "审批通过"
+      - method: "POST"
+        path: "/:id/reject"
+        description: "审批拒绝"
+      - method: "GET"
+        path: "/:id"
+        description: "审批详情"
+      - method: "GET"
+        path: "/templates"
+        description: "审批模板列表"
+      - method: "POST"
+        path: "/templates"
+        description: "创建自定义审批模板"
+
+  terminal:
+    - device: "manager-pad"
+      action: "approval_inbox"
+      description: "审批收件箱"
+    - device: "cashier-pos"
+      action: "approval_notify"
+      description: "审批结果通知弹窗"
+
+# ============================================================
+# 第三层：作用域与权限
+# ============================================================
+scope:
+  levels:
+    - brand
+    - region
+    - store
+  config_inheritance: "override_with_merge"
+  permissions:
+    - role: "staff"
+      actions: ["submit_request", "view_own"]
+    - role: "store_manager"
+      actions: ["submit_request", "approve_store_level", "view_store", "configure_template"]
+    - role: "region_manager"
+      actions: ["submit_request", "approve_region_level", "view_region", "configure_template"]
+    - role: "hr_admin"
+      actions: ["*"]
+    - role: "brand_admin"
+      actions: ["*"]
+
+# ============================================================
+# 第四层：数据契约
+# ============================================================
+data:
+  owned_entities:
+    - name: "ApprovalFlowTemplate"
+      table: "biz_approval_flow_templates"
+      fields:
+        - { name: "id",               type: "uuid",      required: true }
+        - { name: "tenant_id",        type: "uuid",      required: true }
+        - { name: "name",             type: "string",    required: true }
+        - { name: "biz_type",         type: "enum",      required: true,  values: ["leave_request", "payroll_confirm", "high_value_refund", "daily_report", "custom"] }
+        - { name: "steps",            type: "jsonb",     required: true,  description: "审批步骤定义（JSON数组）" }
+        - { name: "timeout_hours",    type: "integer",   required: false }
+        - { name: "timeout_action",   type: "enum",      required: false, values: ["auto_approve", "auto_reject", "escalate"] }
+        - { name: "is_active",        type: "boolean",   required: true }
+        - { name: "created_at",       type: "timestamp", required: true }
+        - { name: "updated_at",       type: "timestamp", required: true }
+
+    - name: "ApprovalInstance"
+      table: "biz_approval_instances"
+      fields:
+        - { name: "id",               type: "uuid",      required: true }
+        - { name: "tenant_id",        type: "uuid",      required: true }
+        - { name: "template_id",      type: "uuid",      required: true,  ref: "ApprovalFlowTemplate.id" }
+        - { name: "biz_type",         type: "string",    required: true }
+        - { name: "biz_ref_id",       type: "uuid",      required: true,  description: "关联业务对象ID" }
+        - { name: "applicant_id",     type: "uuid",      required: true,  ref: "Staff.id" }
+        - { name: "current_step",     type: "integer",   required: true }
+        - { name: "status",           type: "enum",      required: true,  values: ["pending", "approved", "rejected", "cancelled", "timeout"] }
+        - { name: "context",          type: "jsonb",     required: false, description: "审批上下文（金额/原因等）" }
+        - { name: "deadline_at",      type: "timestamp", required: false }
+        - { name: "completed_at",     type: "timestamp", required: false }
+        - { name: "created_at",       type: "timestamp", required: true }
+        - { name: "updated_at",       type: "timestamp", required: true }
+
+    - name: "ApprovalAction"
+      table: "biz_approval_actions"
+      fields:
+        - { name: "id",               type: "uuid",      required: true }
+        - { name: "tenant_id",        type: "uuid",      required: true }
+        - { name: "instance_id",      type: "uuid",      required: true,  ref: "ApprovalInstance.id" }
+        - { name: "step",             type: "integer",   required: true }
+        - { name: "approver_id",      type: "uuid",      required: true,  ref: "Staff.id" }
+        - { name: "action",           type: "enum",      required: true,  values: ["approved", "rejected"] }
+        - { name: "comment",          type: "string",    required: false }
+        - { name: "acted_at",         type: "timestamp", required: true }
+        - { name: "created_at",       type: "timestamp", required: true }
+
+  referenced_entities:
+    - entity: "Staff"
+      skill: "org-core"
+      fields_used: ["id", "name", "role", "store_id", "manager_id"]
+
+  emitted_events:
+    - type: "approval.created"
+      payload_schema: { instance_id: "uuid", biz_type: "string", biz_ref_id: "uuid", applicant_id: "uuid" }
+    - type: "approval.approved"
+      payload_schema: { instance_id: "uuid", biz_type: "string", biz_ref_id: "uuid", approver_id: "uuid" }
+    - type: "approval.rejected"
+      payload_schema: { instance_id: "uuid", biz_type: "string", biz_ref_id: "uuid", reject_reason: "string" }
+    - type: "approval.timeout"
+      payload_schema: { instance_id: "uuid", biz_type: "string", biz_ref_id: "uuid", timeout_action: "string" }
+
+# ============================================================
+# 第五层：依赖声明
+# ============================================================
+dependencies:
+  required:
+    - skill: "org-core"
+      min_version: "1.0.0"
+      reason: "审批路由需要员工组织关系（上级/角色）"
+    # infrastructure: postgresql >= 15, redis >= 7
+
+# ============================================================
+# 第六层：降级策略
+# ============================================================
+degradation:
+  offline:
+    can_operate: false
+    capabilities:
+      - action: "approve"
+        mode: "disabled"
+        fallback_message: "审批需要联网，离线期间审批暂停"
+      - action: "view_pending"
+        mode: "limited"
+        note: "可查看本地缓存的待审批列表，无法操作"
+    sync_strategy:
+      on_reconnect: "push_local_then_pull_remote"
+      max_offline_hours: 0
+
+  service_down:
+    - service: "org-core"
+      fallback: "use_cached_org_hierarchy"
+      alert: "none"
+
+  conflict:
+    strategy: "lww_with_audit"
+    manual_review_trigger: "approval_action_conflict"
+
+# ============================================================
+# 第七层：可观测性
+# ============================================================
+observability:
+  metrics:
+    - name: "approval_pending_count"
+      type: "gauge"
+      labels: ["store_id", "biz_type"]
+      alert_threshold: 10
+      alert_message: "审批积压 {value} 笔，请及时处理"
+    - name: "approval_timeout_total"
+      type: "counter"
+      labels: ["biz_type"]
+      description: "审批超时次数"
+    - name: "approval_duration_hours"
+      type: "histogram"
+      description: "审批处理时长（小时）"
+
+  health_check:
+    endpoint: "/health"
+    interval_seconds: 60
+    timeout_seconds: 10
+
+  audit:
+    log_all_mutations: true
+    retention_days: 730
+    fields_to_mask: []
+
+# ============================================================
+# 第八层：UI 声明
+# ============================================================
+ui:
+  surfaces:
+    - terminal: "manager-pad"
+      entry_point: "approval.inbox"
+      component: "ApprovalInboxPanel"
+      layout: "full-screen"
+    - terminal: "cashier-pos"
+      entry_point: "approval.notify"
+      component: "ApprovalNotifyToast"
+      layout: "toast"
+    - terminal: "manager-dashboard"
+      entry_point: "platform.approvals"
+      component: "ApprovalManagePanel"
+      layout: "data-table"
+    - terminal: "customer-mini-program"
+      entry_point: "my.approvals"
+      component: "ApprovalMobilePanel"
+      layout: "card"
+
+# ============================================================
+# 预置审批模板配置
+# ============================================================
+preset_templates:
+  - biz_type: "leave_request"
+    name: "员工请假审批"
+    steps:
+      - step: 1
+        approver_role: "store_manager"
+        timeout_hours: 24
+        timeout_action: "auto_reject"
+    description: "员工提交→店长审批→完成"
+
+  - biz_type: "payroll_confirm"
+    name: "薪资确认审批"
+    steps:
+      - step: 1
+        approver_role: "store_manager"
+        timeout_hours: 48
+        timeout_action: "escalate"
+      - step: 2
+        approver_role: "finance_director"
+        timeout_hours: 24
+        timeout_action: "auto_approve"
+    description: "HR提交→店长确认→财务审批"
+
+  - biz_type: "high_value_refund"
+    name: "高价值退款审批"
+    steps:
+      - step: 1
+        approver_role: "store_manager"
+        timeout_hours: 2
+        timeout_action: "escalate"
+        condition: "amount_fen > 50000"
+    description: "超过500元退款需店长审批"
+
+  - biz_type: "daily_report"
+    name: "营业日报确认"
+    steps:
+      - step: 1
+        approver_role: "store_manager"
+        timeout_hours: 12
+        timeout_action: "auto_approve"
+    description: "每日营业数据店长确认"
+
+# ============================================================
+# 第九层：合规与本地化
+# ============================================================
+compliance:
+  golden_tax:
+    applicable: false
+  data_residency: "cn-mainland"
+  pii_fields: []
+  retention_policy:
+    financial_records: "7_years"
+    operation_logs: "2_years"
+
+localization:
+  default_locale: "zh-CN"
+  supported_locales: ["zh-CN"]
+  currency: "CNY"
+  timezone: "Asia/Shanghai"
+  number_format: "comma_thousands"

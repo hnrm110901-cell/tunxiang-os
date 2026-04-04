@@ -1,0 +1,236 @@
+# ============================================================
+# Skill: store-transfer
+# 门店调拨 — 跨门店食材调拨与异常检测
+# ============================================================
+
+meta:
+  name: "store-transfer"
+  version: "1.0.0"
+  display_name: "门店调拨"
+  description: |
+    管理同品牌门店之间食材调拨的申请、审批、发货、接收全流程。
+    定时检测异常调拨（频繁调拨同一食材、调拨量异常大）。
+    触发场景：POS申请调拨、定时异常检测。
+  category: "supply-chain"
+  sub_category: "inventory"
+  icon: "arrow-left-right"
+  maintainer: "supply-team"
+  license: "proprietary"
+
+# ============================================================
+# 第二层：触发路由
+# ============================================================
+triggers:
+  events:
+    - type: "terminal.transfer.requested"
+      condition: "always"
+      priority: 90
+      description: "门店发起调拨申请"
+    - type: "cron.daily.01:00"
+      condition: "always"
+      priority: 40
+      description: "每日凌晨1点检测异常调拨行为"
+
+  api:
+    base_path: "/api/v1/supply/transfers"
+    endpoints:
+      - method: "POST"
+        path: "/"
+        description: "发起调拨申请"
+      - method: "GET"
+        path: "/"
+        description: "调拨单列表"
+      - method: "POST"
+        path: "/:id/approve"
+        description: "审批通过"
+      - method: "POST"
+        path: "/:id/dispatch"
+        description: "确认发货"
+      - method: "POST"
+        path: "/:id/receive"
+        description: "确认收货"
+      - method: "POST"
+        path: "/:id/reject"
+        description: "驳回调拨"
+
+  terminal:
+    - device: "manager-pad"
+      action: "transfer_apply"
+      description: "申请调拨"
+    - device: "manager-pad"
+      action: "transfer_confirm"
+      description: "确认收货"
+
+# ============================================================
+# 第三层：作用域与权限
+# ============================================================
+scope:
+  levels:
+    - brand
+    - region
+    - store
+  config_inheritance: "override_with_merge"
+  permissions:
+    - role: "store_manager"
+      actions: ["apply", "receive", "view"]
+    - role: "region_manager"
+      actions: ["apply", "approve", "dispatch", "receive", "reject", "view"]
+    - role: "supply_admin"
+      actions: ["*"]
+
+# ============================================================
+# 第四层：数据契约
+# ============================================================
+data:
+  owned_entities:
+    - name: "TransferOrder"
+      table: "biz_transfer_orders"
+      fields:
+        - { name: "id",               type: "uuid",      required: true }
+        - { name: "tenant_id",        type: "uuid",      required: true }
+        - { name: "from_store_id",    type: "uuid",      required: true,  ref: "Store.id" }
+        - { name: "to_store_id",      type: "uuid",      required: true,  ref: "Store.id" }
+        - { name: "status",           type: "enum",      required: true,  values: ["pending", "approved", "dispatched", "completed", "rejected"] }
+        - { name: "applicant_id",     type: "uuid",      required: true,  ref: "Staff.id" }
+        - { name: "approver_id",      type: "uuid",      required: false, ref: "Staff.id" }
+        - { name: "reject_reason",    type: "string",    required: false }
+        - { name: "note",             type: "string",    required: false }
+        - { name: "dispatched_at",    type: "timestamp", required: false }
+        - { name: "completed_at",     type: "timestamp", required: false }
+        - { name: "created_at",       type: "timestamp", required: true }
+        - { name: "updated_at",       type: "timestamp", required: true }
+
+    - name: "TransferItem"
+      table: "biz_transfer_items"
+      fields:
+        - { name: "id",               type: "uuid",      required: true }
+        - { name: "tenant_id",        type: "uuid",      required: true }
+        - { name: "transfer_order_id", type: "uuid",     required: true,  ref: "TransferOrder.id" }
+        - { name: "ingredient_id",    type: "uuid",      required: true,  ref: "Ingredient.id" }
+        - { name: "requested_qty",    type: "decimal",   required: true,  precision: [12, 3] }
+        - { name: "dispatched_qty",   type: "decimal",   required: false, precision: [12, 3] }
+        - { name: "received_qty",     type: "decimal",   required: false, precision: [12, 3] }
+        - { name: "unit",             type: "string",    required: true }
+        - { name: "created_at",       type: "timestamp", required: true }
+
+  referenced_entities:
+    - entity: "Ingredient"
+      skill: "inventory-core"
+      fields_used: ["id", "name", "unit", "current_stock"]
+    - entity: "Store"
+      skill: "org-core"
+      fields_used: ["id", "name", "region_id"]
+
+  emitted_events:
+    - type: "supply.transfer.created"
+      payload_schema: { transfer_id: "uuid", from_store_id: "uuid", to_store_id: "uuid", items_count: "integer" }
+    - type: "supply.transfer.completed"
+      payload_schema: { transfer_id: "uuid", from_store_id: "uuid", to_store_id: "uuid" }
+    - type: "supply.transfer.loss_detected"
+      payload_schema: { transfer_id: "uuid", ingredient_id: "uuid", dispatched_qty: "decimal", received_qty: "decimal", loss_qty: "decimal" }
+
+# ============================================================
+# 第五层：依赖声明
+# ============================================================
+dependencies:
+  required:
+    - skill: "inventory-core"
+      min_version: "1.0.0"
+      reason: "调拨触发库存出库/入库操作"
+    # infrastructure: postgresql >= 15, redis >= 7
+
+  optional:
+    - skill: "approval-flow"
+      min_version: "1.0.0"
+      reason: "大额调拨（超过阈值）走审批流，缺少时需区域经理现场确认"
+
+# ============================================================
+# 第六层：降级策略
+# ============================================================
+degradation:
+  offline:
+    can_operate: true
+    capabilities:
+      - action: "apply_transfer"
+        mode: "full"
+        local_storage: "sqlite_wal"
+        note: "申请调拨离线可用，联网后同步给目标门店"
+      - action: "receive_transfer"
+        mode: "full"
+        local_storage: "sqlite_wal"
+        note: "收货确认离线可用"
+      - action: "approve_transfer"
+        mode: "disabled"
+        fallback_message: "审批操作需要联网，请联网后处理"
+    sync_strategy:
+      on_reconnect: "push_local_then_pull_remote"
+      conflict_resolution: "last_write_wins_with_operator_log"
+      max_offline_hours: 4
+
+  conflict:
+    strategy: "lww_with_audit"
+    manual_review_trigger: "loss_pct > 0.05"
+
+# ============================================================
+# 第七层：可观测性
+# ============================================================
+observability:
+  metrics:
+    - name: "transfer_completed_total"
+      type: "counter"
+      labels: ["from_store_id", "to_store_id"]
+      description: "调拨完成次数"
+    - name: "transfer_loss_rate"
+      type: "gauge"
+      labels: ["from_store_id"]
+      alert_threshold: 0.05
+      alert_message: "门店调拨损耗率 {value}，请检查运输环节"
+    - name: "transfer_pending_count"
+      type: "gauge"
+      labels: ["store_id"]
+      alert_threshold: 10
+      alert_message: "门店有 {value} 笔调拨待处理"
+
+  health_check:
+    endpoint: "/health"
+    interval_seconds: 30
+    timeout_seconds: 5
+
+  audit:
+    log_all_mutations: true
+    retention_days: 365
+    fields_to_mask: []
+
+# ============================================================
+# 第八层：UI 声明
+# ============================================================
+ui:
+  surfaces:
+    - terminal: "manager-pad"
+      entry_point: "supply.transfer"
+      component: "TransferManagePanel"
+      layout: "full-screen"
+    - terminal: "manager-dashboard"
+      entry_point: "reports.supply.transfer-summary"
+      component: "TransferSummaryReport"
+      layout: "data-table"
+
+# ============================================================
+# 第九层：合规与本地化
+# ============================================================
+compliance:
+  golden_tax:
+    applicable: false
+    note: "内部调拨不涉及发票"
+  data_residency: "cn-mainland"
+  pii_fields: []
+  retention_policy:
+    financial_records: "7_years"
+    operation_logs: "1_year"
+
+localization:
+  default_locale: "zh-CN"
+  supported_locales: ["zh-CN"]
+  currency: "CNY"
+  timezone: "Asia/Shanghai"
+  number_format: "comma_thousands"

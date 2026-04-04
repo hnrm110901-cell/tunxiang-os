@@ -1,0 +1,49 @@
+meta:
+  name: "safety-compliance"
+  version: "1.0.0"
+  display_name: "食安巡检"
+  category: "platform"
+  sub_category: "compliance"
+
+triggers:
+  events:
+    - type: "cron.daily.07:00"           # 每日开业前提醒巡检
+    - type: "cron.daily.22:00"           # 每日收摊前提醒巡检
+    - type: "safety.correction.overdue"  # 整改超期自动升级
+  api:
+    base_path: "/api/v1/ops/safety"
+
+scope:
+  levels: [brand, store]
+  permissions:
+    - role: store_manager
+      actions: [start, score, complete, report]
+    - role: regional_manager
+      actions: [view_all, report]
+
+data:
+  owned_entities:
+    - name: FoodSafetyInspection
+      table: biz_food_safety_inspections
+    - name: FoodSafetyItem
+      table: biz_food_safety_items
+    - name: FoodSafetyTemplate
+      table: biz_food_safety_templates
+  emitted_events:
+    - type: "safety.inspection.completed"
+    - type: "safety.inspection.failed"
+    - type: "safety.critical_item.failed"
+
+degradation:
+  offline:
+    can_operate: true  # 巡检可以离线完成，联网后同步
+
+observability:
+  metrics:
+    - name: safety_inspection_pass_rate
+      type: gauge
+      labels: [store_id, inspection_type]
+    - name: safety_critical_failures_total
+      type: counter
+      alert_threshold: 1
+      alert_message: "门店关键食安项目不合格，请立即处理"

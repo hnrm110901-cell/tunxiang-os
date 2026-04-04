@@ -1,0 +1,144 @@
+meta:
+  name: "deposit-management"
+  version: "1.0.0"
+  display_name: "押金管理"
+  description: |
+    管理客户押金的收取、退还、抵扣、转收入全生命周期。
+    核心场景：包间预订押金、宴会预付款、VIP包间保证金。
+    押金可在结账时抵扣消费、客户取消时退还、超期未消费时转收入。
+    与金税四期联动处理押金转收入的开票时点。
+  category: "finance"
+  sub_category: "receivables"
+  icon: "shield-dollar"
+  maintainer: "finance-team"
+
+triggers:
+  events:
+    - type: "order.reservation.created"
+      condition: "payload.deposit_required == true"
+      priority: 100
+      description: "预订时提示收取押金"
+    - type: "order.checkout.completed"
+      condition: "payload.has_deposit == true"
+      priority: 90
+      description: "结账时抵扣押金"
+    - type: "order.reservation.cancelled"
+      condition: "payload.has_deposit == true"
+      priority: 95
+      description: "取消预订时退还押金"
+    - type: "cron.daily.03:00"
+      condition: "always"
+      priority: 50
+      description: "扫描超期押金，触发转收入流程"
+  api:
+    base_path: "/api/v1/deposits"
+    endpoints:
+      - { method: "POST", path: "/",             description: "收取押金" }
+      - { method: "POST", path: "/{id}/apply",   description: "押金抵扣消费" }
+      - { method: "POST", path: "/{id}/refund",  description: "退还押金" }
+      - { method: "POST", path: "/{id}/convert", description: "押金转收入" }
+      - { method: "GET",  path: "/{id}",         description: "押金详情" }
+      - { method: "GET",  path: "/store/{store_id}", description: "门店押金列表" }
+      - { method: "GET",  path: "/report/ledger",    description: "押金台账报表" }
+      - { method: "GET",  path: "/report/aging",     description: "账龄分析" }
+  terminal:
+    - { device: "cashier-pos", action: "deposit_collect", shortcut_key: "F7" }
+    - { device: "cashier-pos", action: "deposit_refund",  shortcut_key: "Shift+F7" }
+
+scope:
+  levels: [brand, region, store]
+  config_inheritance: "override_with_merge"
+  configurable_params:
+    - { name: "expiry_days",                  type: "integer", default: 30,    description: "押金过期天数",         level: "brand" }
+    - { name: "auto_convert",                 type: "boolean", default: false,  description: "过期后自动转收入",     level: "brand" }
+    - { name: "refund_approval_threshold_fen", type: "integer", default: 50000, description: "超此金额退款需审批（分）", level: "region" }
+  permissions:
+    - { role: "cashier",          actions: ["collect", "apply", "refund_under_limit"] }
+    - { role: "store_manager",    actions: ["collect", "apply", "refund", "convert", "report"] }
+    - { role: "finance_director", actions: ["*"] }
+
+data:
+  owned_entities:
+    - name: "Deposit"
+      table: "biz_deposits"
+      fields:
+        - { name: "id",                   type: "uuid",        required: true }
+        - { name: "store_id",             type: "uuid",        required: true,  ref: "Store.id" }
+        - { name: "customer_id",          type: "uuid",        required: false, ref: "Customer.id" }
+        - { name: "reservation_id",       type: "uuid",        required: false, ref: "Reservation.id" }
+        - { name: "order_id",             type: "uuid",        required: false, ref: "Order.id" }
+        - { name: "amount_fen",           type: "bigint",      required: true,  description: "押金金额（分）" }
+        - { name: "applied_amount_fen",   type: "bigint",      required: true,  description: "已抵扣金额" }
+        - { name: "refunded_amount_fen",  type: "bigint",      required: true,  description: "已退还金额" }
+        - { name: "status",               type: "enum",        required: true,  values: ["collected","partially_applied","fully_applied","refunded","converted","written_off"] }
+        - { name: "payment_method",       type: "string",      required: true }
+        - { name: "payment_ref",          type: "string",      required: false }
+        - { name: "collected_at",         type: "timestamptz", required: true }
+        - { name: "expires_at",           type: "timestamptz", required: true }
+        - { name: "operator_id",          type: "uuid",        required: true,  ref: "Staff.id" }
+  referenced_entities:
+    - { entity: "Order",       skill: "order-core",  fields_used: ["id", "status", "total_amount_fen"] }
+    - { entity: "Customer",    skill: "member-core", fields_used: ["id", "name", "phone"] }
+    - { entity: "Store",       skill: "org-core",    fields_used: ["id", "name", "region_id"] }
+  emitted_events:
+    - { type: "deposit.collected",           payload_schema: { deposit_id: "uuid", amount_fen: "bigint", store_id: "uuid" } }
+    - { type: "deposit.applied",             payload_schema: { deposit_id: "uuid", applied_amount_fen: "bigint", order_id: "uuid" } }
+    - { type: "deposit.refunded",            payload_schema: { deposit_id: "uuid", refund_amount_fen: "bigint", reason: "string" } }
+    - { type: "deposit.converted_to_revenue", payload_schema: { deposit_id: "uuid", converted_amount_fen: "bigint" } }
+    - { type: "deposit.expired",             payload_schema: { deposit_id: "uuid", amount_fen: "bigint", store_id: "uuid" } }
+
+dependencies:
+  required:
+    - { skill: "order-core",       min_version: "2.0.0", reason: "押金关联订单" }
+    - { skill: "payment-gateway",  min_version: "1.0.0", reason: "退款走支付通道" }
+  optional:
+    - { skill: "member-core",   min_version: "1.0.0", reason: "关联会员，缺少时按匿名处理" }
+    - { skill: "golden-tax-v4", min_version: "1.0.0", reason: "押金转收入时开票" }
+    - { skill: "approval-flow", min_version: "1.0.0", reason: "大额退款触发审批流" }
+
+degradation:
+  offline:
+    can_operate: true
+    capabilities:
+      - { action: "collect", mode: "full",     local_storage: "sqlite_wal" }
+      - { action: "apply",   mode: "full",     local_storage: "sqlite_wal" }
+      - { action: "refund",  mode: "limited",  limit: "amount_fen <= 50000",  fallback_message: "大额退款需联网审批" }
+      - { action: "convert", mode: "disabled", fallback_message: "押金转收入需联网处理" }
+      - { action: "report",  mode: "disabled", fallback_message: "报表需联网" }
+    sync_strategy:
+      on_reconnect: "push_local_then_pull_remote"
+      conflict_resolution: "last_write_wins_with_operator_log"
+      max_offline_hours: 4
+  service_down:
+    - { service: "payment-gateway", fallback: "record_refund_as_pending", alert: "通知店长：退款已记录，支付网关恢复后自动处理" }
+
+observability:
+  metrics:
+    - { name: "deposit_collected_total",    type: "counter", labels: ["store_id", "payment_method"] }
+    - { name: "deposit_outstanding_amount", type: "gauge",   labels: ["store_id"], description: "未结押金余额（分）" }
+    - { name: "deposit_aging_over_30d",     type: "gauge",   labels: ["store_id"], alert_threshold: 10, alert_message: "门店有 {value} 笔押金超30天未处理" }
+  health_check: { endpoint: "/health", interval_seconds: 30, timeout_seconds: 5 }
+  audit:
+    log_all_mutations: true
+    retention_days: 2555   # 7年，会计档案要求
+    fields_to_mask: ["customer_phone"]
+
+ui:
+  surfaces:
+    - { terminal: "cashier-pos",          component: "DepositPanel",       layout: "full-screen" }
+    - { terminal: "manager-dashboard",    component: "DepositLedgerReport", layout: "data-table" }
+    - { terminal: "customer-mini-program", component: "DepositDetailCard",  layout: "card" }
+  print_templates:
+    - { name: "deposit-receipt", format: "thermal-58mm", template_file: "assets/templates/deposit-receipt.xml" }
+    - { name: "deposit-refund",  format: "thermal-58mm", template_file: "assets/templates/deposit-refund-receipt.xml" }
+
+compliance:
+  golden_tax:
+    applicable: true
+    tax_category: "预收款项"
+    invoice_timing: "on_conversion"    # 押金转收入时才开票，不是收取时
+  data_residency: "cn-mainland"
+  pii_fields: ["customer_name", "customer_phone"]
+  retention_policy:
+    financial_records: "7_years"
+    operation_logs: "1_year"

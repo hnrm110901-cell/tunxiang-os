@@ -269,12 +269,17 @@ _FINANCE_URL = os.getenv("TX_FINANCE_SERVICE_URL", "http://tx-finance:8004")
 _ORG_URL = os.getenv("TX_ORG_SERVICE_URL", "http://tx-org:8005")
 
 
-async def _post_callback(url: str, tenant_id: str, business_id: str) -> None:
+async def _post_callback(
+    url: str,
+    tenant_id: str,
+    business_id: str,
+    body: dict | None = None,
+) -> None:
     """向下游服务发送审批通过回调，失败只记日志不抛异常。"""
     headers = {"X-Tenant-ID": tenant_id, "Content-Type": "application/json"}
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
-            resp = await client.post(url, headers=headers)
+            resp = await client.post(url, headers=headers, json=body)
             if resp.status_code >= 400:
                 log.warning(
                     "approval_callback_http_error",
@@ -331,6 +336,12 @@ async def _dispatch_on_approved(
             f"{_FINANCE_URL}/api/v1/expenses/{business_id}/approve",
             tenant_id, business_id,
         )
+    elif business_type == "credit_agreement":
+        await _post_callback(
+            f"{_FINANCE_URL}/api/v1/credit/agreements/{business_id}/approval-callback",
+            tenant_id, business_id,
+            body={"decision": "approved", "approver_id": summary.get("approver_id", "")},
+        )
     # custom 类型无标准回调
 
 
@@ -346,6 +357,12 @@ async def _dispatch_on_rejected(
         business_id=business_id,
         tenant_id=tenant_id,
     )
+    if business_type == "credit_agreement":
+        await _post_callback(
+            f"{_FINANCE_URL}/api/v1/credit/agreements/{business_id}/approval-callback",
+            tenant_id, business_id,
+            body={"decision": "rejected", "approver_id": ""},
+        )
 
 
 # ── 核心引擎 ──────────────────────────────────────────────────────────────────

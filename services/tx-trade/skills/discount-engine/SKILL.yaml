@@ -1,0 +1,253 @@
+# ============================================================
+# Skill: discount-engine
+# 折扣引擎 — 多规则折扣计算、授权审批、泄漏检测
+# ============================================================
+
+meta:
+  name: "discount-engine"
+  version: "1.0.0"
+  display_name: "折扣引擎"
+  description: |
+    管理收银折扣的申请、授权、应用与异常检测全链路。
+    支持：整单折扣/单品折扣/满减/免单/主管授权。
+    Agent辅助：实时检测折扣泄漏（与mv_discount_health联动）。
+    触发场景：POS申请折扣、加菜时自动检测促销、折扣授权审批。
+  category: "finance"
+  sub_category: "checkout"
+  icon: "tag"
+  maintainer: "trade-team"
+  license: "proprietary"
+
+# ============================================================
+# 第二层：触发路由
+# ============================================================
+triggers:
+  events:
+    - type: "terminal.discount.requested"
+      condition: "always"
+      priority: 100
+      description: "收银台申请折扣"
+    - type: "order.item_added"
+      condition: "always"
+      priority: 60
+      description: "加菜时自动检测是否触发促销折扣规则"
+
+  api:
+    base_path: "/api/v1/discounts"
+    endpoints:
+      - method: "POST"
+        path: "/apply"
+        description: "申请折扣"
+      - method: "POST"
+        path: "/:id/authorize"
+        description: "主管授权折扣"
+      - method: "POST"
+        path: "/:id/revoke"
+        description: "撤销折扣"
+      - method: "GET"
+        path: "/health"
+        description: "折扣健康度（读mv_discount_health）"
+      - method: "GET"
+        path: "/rules"
+        description: "折扣规则配置"
+
+  terminal:
+    - device: "cashier-pos"
+      action: "apply_discount"
+      shortcut_key: "F3"
+      description: "申请折扣"
+    - device: "manager-pad"
+      action: "authorize_discount"
+      description: "主管现场授权折扣"
+
+# ============================================================
+# 第三层：作用域与权限
+# ============================================================
+scope:
+  levels:
+    - brand
+    - region
+    - store
+  config_inheritance: "override_with_merge"
+  permissions:
+    - role: "cashier"
+      actions: ["apply_discount_under_limit", "view"]
+    - role: "store_manager"
+      actions: ["apply_discount", "authorize", "revoke", "view_health"]
+    - role: "region_manager"
+      actions: ["apply_discount", "authorize", "revoke", "view_health", "configure_rules"]
+    - role: "finance_director"
+      actions: ["*"]
+
+# ============================================================
+# 第四层：数据契约
+# ============================================================
+data:
+  owned_entities:
+    - name: "DiscountRecord"
+      table: "biz_discount_records"
+      fields:
+        - { name: "id",              type: "uuid",      required: true }
+        - { name: "tenant_id",       type: "uuid",      required: true }
+        - { name: "store_id",        type: "uuid",      required: true,  ref: "Store.id" }
+        - { name: "order_id",        type: "uuid",      required: true,  ref: "Order.id" }
+        - { name: "discount_type",   type: "enum",      required: true,  values: ["whole_order", "single_item", "fullcut", "free", "manager_override"] }
+        - { name: "amount_fen",      type: "integer",   required: true,  description: "折扣金额（分）" }
+        - { name: "rate",            type: "decimal",   required: false, precision: [5, 4], description: "折扣率（0.8 = 8折）" }
+        - { name: "status",          type: "enum",      required: true,  values: ["applied", "authorized", "revoked", "auto"] }
+        - { name: "applicant_id",    type: "uuid",      required: true,  ref: "Staff.id" }
+        - { name: "authorizer_id",   type: "uuid",      required: false, ref: "Staff.id" }
+        - { name: "reason",          type: "string",    required: false }
+        - { name: "created_at",      type: "timestamp", required: true }
+
+    - name: "DiscountRule"
+      table: "biz_discount_rules"
+      fields:
+        - { name: "id",              type: "uuid",      required: true }
+        - { name: "tenant_id",       type: "uuid",      required: true }
+        - { name: "store_id",        type: "uuid",      required: false, description: "NULL表示品牌级规则" }
+        - { name: "rule_type",       type: "enum",      required: true,  values: ["auto_promotion", "manager_limit", "cashier_limit"] }
+        - { name: "threshold_fen",   type: "integer",   required: false }
+        - { name: "max_rate",        type: "decimal",   required: false, precision: [5, 4] }
+        - { name: "is_active",       type: "boolean",   required: true }
+        - { name: "created_at",      type: "timestamp", required: true }
+        - { name: "updated_at",      type: "timestamp", required: true }
+
+  referenced_entities:
+    - entity: "Order"
+      skill: "order-core"
+      fields_used: ["id", "total_amount_fen", "store_id", "items"]
+    - entity: "Staff"
+      skill: "org-core"
+      fields_used: ["id", "role", "store_id"]
+
+  emitted_events:
+    - type: "discount.applied"
+      payload_schema: { discount_id: "uuid", order_id: "uuid", amount_fen: "integer", discount_type: "string", store_id: "uuid" }
+    - type: "discount.authorized"
+      payload_schema: { discount_id: "uuid", order_id: "uuid", authorizer_id: "uuid" }
+    - type: "discount.threshold_exceeded"
+      payload_schema: { order_id: "uuid", requested_amount_fen: "integer", limit_fen: "integer", store_id: "uuid" }
+    - type: "discount.leak_detected"
+      payload_schema: { store_id: "uuid", period: "string", leak_amount_fen: "integer", anomaly_score: "float" }
+
+# ============================================================
+# 第五层：依赖声明
+# ============================================================
+dependencies:
+  required:
+    - skill: "order-core"
+      min_version: "2.0.0"
+      reason: "折扣必须关联订单，校验毛利底线约束"
+    - skill: "org-core"
+      min_version: "1.0.0"
+      reason: "验证授权人角色与权限"
+    # infrastructure: postgresql >= 15, redis >= 7
+
+  optional:
+    - skill: "approval-flow"
+      min_version: "1.0.0"
+      reason: "大额折扣走审批流，缺少时只能主管现场刷卡授权"
+
+# ============================================================
+# 第六层：降级策略
+# ============================================================
+degradation:
+  offline:
+    can_operate: true
+    capabilities:
+      - action: "apply_discount_under_limit"
+        mode: "full"
+        local_storage: "sqlite_wal"
+        note: "收银员权限内折扣离线完整可用"
+      - action: "manager_authorize"
+        mode: "limited"
+        limit: "amount_fen <= 20000"
+        note: "离线主管授权上限200元，大额折扣需联网"
+      - action: "view_health"
+        mode: "disabled"
+        fallback_message: "折扣健康度报表需要联网"
+    sync_strategy:
+      on_reconnect: "push_local_then_pull_remote"
+      conflict_resolution: "last_write_wins_with_operator_log"
+      max_offline_hours: 4
+
+  service_down:
+    - service: "org-core"
+      fallback: "use_cached_role_permissions"
+      alert: "none"
+
+  conflict:
+    strategy: "lww_with_audit"
+    manual_review_trigger: "amount_diff_fen > 5000"
+
+# ============================================================
+# 第七层：可观测性
+# ============================================================
+observability:
+  metrics:
+    - name: "discount_applied_total"
+      type: "counter"
+      labels: ["store_id", "discount_type"]
+      description: "折扣应用次数"
+    - name: "discount_amount_fen_total"
+      type: "counter"
+      labels: ["store_id", "discount_type"]
+      description: "折扣总金额（分）"
+    - name: "discount_auth_required_rate"
+      type: "gauge"
+      labels: ["store_id"]
+      description: "需要主管授权的折扣比率"
+    - name: "discount_leak_score"
+      type: "gauge"
+      labels: ["store_id"]
+      alert_threshold: 0.7
+      alert_message: "门店折扣泄漏风险评分 {value}，请检查mv_discount_health"
+
+  health_check:
+    endpoint: "/health"
+    interval_seconds: 30
+    timeout_seconds: 5
+
+  audit:
+    log_all_mutations: true
+    retention_days: 365
+    fields_to_mask: []
+
+# ============================================================
+# 第八层：UI 声明
+# ============================================================
+ui:
+  surfaces:
+    - terminal: "cashier-pos"
+      entry_point: "checkout.discount-panel"
+      component: "DiscountPanel"
+      layout: "modal"
+    - terminal: "manager-pad"
+      entry_point: "approval.discount-auth"
+      component: "DiscountAuthPanel"
+      layout: "full-screen"
+    - terminal: "manager-dashboard"
+      entry_point: "reports.finance.discount-health"
+      component: "DiscountHealthReport"
+      layout: "data-table"
+
+# ============================================================
+# 第九层：合规与本地化
+# ============================================================
+compliance:
+  golden_tax:
+    applicable: false
+    note: "折扣属于收入抵减，不单独开票"
+  data_residency: "cn-mainland"
+  pii_fields: []
+  retention_policy:
+    financial_records: "7_years"
+    operation_logs: "1_year"
+
+localization:
+  default_locale: "zh-CN"
+  supported_locales: ["zh-CN", "zh-TW"]
+  currency: "CNY"
+  timezone: "Asia/Shanghai"
+  number_format: "comma_thousands"

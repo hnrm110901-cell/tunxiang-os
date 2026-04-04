@@ -1,0 +1,135 @@
+meta:
+  name: "credit-account"
+  version: "1.0.0"
+  display_name: "企业挂账"
+  description: |
+    管理企业协议客户的赊账消费全生命周期：协议签订、挂账消费、月度账单生成、还款核销。
+    核心场景：机关单位/企事业单位/连锁品牌的协议餐饮消费，月度结算。
+    信用额度在品牌层配置，支持多门店共享额度。超80%使用率自动预警。
+    账单逾期时自动冻结挂账资格，还款后恢复。
+  category: "finance"
+  sub_category: "receivables"
+  icon: "building-bank"
+  maintainer: "finance-team"
+
+triggers:
+  events:
+    - type: "order.checkout.requested"
+      condition: "payload.customer_type == 'corporate'"
+      priority: 95
+      description: "企业客户结账时，检查是否走挂账通道"
+    - type: "cron.monthly.1st.09:00"
+      condition: "always"
+      priority: 80
+      description: "每月1日生成上月账单"
+    - type: "cron.daily.09:00"
+      condition: "always"
+      priority: 40
+      description: "检查逾期账单，发送催款提醒"
+  api:
+    base_path: "/api/v1/credit"
+    endpoints:
+      - { method: "POST", path: "/agreements/",                description: "创建挂账协议" }
+      - { method: "GET",  path: "/agreements/",                description: "协议列表" }
+      - { method: "GET",  path: "/agreements/{id}",            description: "协议详情" }
+      - { method: "POST", path: "/agreements/{id}/charge",     description: "挂账消费" }
+      - { method: "POST", path: "/agreements/{id}/suspend",    description: "暂停协议" }
+      - { method: "GET",  path: "/agreements/{id}/bills",      description: "协议账单列表" }
+      - { method: "POST", path: "/bills/{id}/pay",             description: "还款" }
+      - { method: "GET",  path: "/agreements/{id}/statement",  description: "对账单" }
+
+scope:
+  levels: [brand, store]
+  config_inheritance: "override_with_merge"
+  permissions:
+    - { role: "cashier",          actions: ["charge"] }
+    - { role: "store_manager",    actions: ["charge", "view", "statement"] }
+    - { role: "finance_director", actions: ["*"] }
+    - { role: "brand_admin",      actions: ["*"] }
+
+data:
+  owned_entities:
+    - name: "CreditAgreement"
+      table: "biz_credit_agreements"
+      fields:
+        - { name: "id",                  type: "uuid",        required: true }
+        - { name: "brand_id",            type: "uuid",        required: true,  ref: "Brand.id" }
+        - { name: "company_name",        type: "string",      required: true }
+        - { name: "company_tax_no",      type: "string",      required: false, description: "企业税号，开票用" }
+        - { name: "credit_limit_fen",    type: "bigint",      required: true,  description: "信用额度（分）" }
+        - { name: "used_amount_fen",     type: "bigint",      required: true }
+        - { name: "billing_cycle",       type: "enum",        required: true,  values: ["monthly","weekly","biweekly"], default: "monthly" }
+        - { name: "due_day",             type: "integer",     required: true,  default: 15 }
+        - { name: "status",              type: "enum",        required: true,  values: ["active","suspended","terminated"] }
+        - { name: "created_by",          type: "uuid",        required: true,  ref: "Staff.id" }
+        - { name: "approved_by",         type: "uuid",        required: false, ref: "Staff.id" }
+    - name: "CreditCharge"
+      table: "biz_credit_charges"
+      fields:
+        - { name: "id",                  type: "uuid",        required: true }
+        - { name: "agreement_id",        type: "uuid",        required: true, ref: "CreditAgreement.id" }
+        - { name: "order_id",            type: "uuid",        required: true, ref: "Order.id" }
+        - { name: "store_id",            type: "uuid",        required: true, ref: "Store.id" }
+        - { name: "charged_amount_fen",  type: "bigint",      required: true }
+        - { name: "operator_id",         type: "uuid",        required: true, ref: "Staff.id" }
+    - name: "CreditBill"
+      table: "biz_credit_bills"
+      fields:
+        - { name: "id",                  type: "uuid",        required: true }
+        - { name: "agreement_id",        type: "uuid",        required: true, ref: "CreditAgreement.id" }
+        - { name: "bill_no",             type: "string",      required: true,  description: "BILL-YYYYMM-XXXX" }
+        - { name: "period_start",        type: "date",        required: true }
+        - { name: "period_end",          type: "date",        required: true }
+        - { name: "total_amount_fen",    type: "bigint",      required: true }
+        - { name: "paid_amount_fen",     type: "bigint",      required: true }
+        - { name: "status",              type: "enum",        required: true,  values: ["pending","partial_paid","paid","overdue"] }
+        - { name: "due_date",            type: "date",        required: true }
+  referenced_entities:
+    - { entity: "Order",  skill: "order-core", fields_used: ["id", "status", "total_amount_fen", "store_id"] }
+    - { entity: "Brand",  skill: "org-core",   fields_used: ["id", "name"] }
+    - { entity: "Store",  skill: "org-core",   fields_used: ["id", "name", "region_id"] }
+  emitted_events:
+    - { type: "credit.charged",           payload_schema: { charge_id: "uuid", agreement_id: "uuid", amount_fen: "bigint", store_id: "uuid" } }
+    - { type: "credit.bill_generated",    payload_schema: { bill_id: "uuid", agreement_id: "uuid", total_amount_fen: "bigint", due_date: "date" } }
+    - { type: "credit.payment_received",  payload_schema: { agreement_id: "uuid", amount_fen: "bigint", bill_ids: "array<uuid>" } }
+    - { type: "credit.limit_warning",     payload_schema: { agreement_id: "uuid", used_percent: "decimal", remaining_fen: "bigint" } }
+    - { type: "credit.overdue",           payload_schema: { bill_id: "uuid", agreement_id: "uuid", overdue_days: "integer", outstanding_fen: "bigint" } }
+
+dependencies:
+  required:
+    - { skill: "org-core",    min_version: "1.0.0", reason: "协议绑定品牌层" }
+    - { skill: "order-core",  min_version: "2.0.0", reason: "挂账关联订单" }
+  optional:
+    - { skill: "golden-tax-v4",    min_version: "1.0.0", reason: "月度账单开票" }
+    - { skill: "notification-hub", min_version: "1.0.0", reason: "催款/逾期通知" }
+    - { skill: "approval-flow",    min_version: "1.0.0", reason: "新协议需审批" }
+
+degradation:
+  offline:
+    can_operate: false   # 挂账必须联网：需实时校验信用额度，防止超额
+    capabilities: []
+    fallback_message: "企业挂账需要联网验证信用额度，请使用其他支付方式"
+  service_down:
+    - { service: "golden-tax-v4", fallback: "skip_invoice_mark_for_retry", alert: "none" }
+
+observability:
+  metrics:
+    - { name: "credit_charged_total",        type: "counter", labels: ["brand_id", "store_id"] }
+    - { name: "credit_outstanding_amount",   type: "gauge",   labels: ["brand_id"], description: "未还款总额（分）" }
+    - { name: "credit_overdue_agreements",   type: "gauge",   labels: ["brand_id"], alert_threshold: 1, alert_message: "有 {value} 个协议账单逾期" }
+  health_check: { endpoint: "/health", interval_seconds: 30, timeout_seconds: 5 }
+  audit:
+    log_all_mutations: true
+    retention_days: 2555   # 7年
+    fields_to_mask: []
+
+compliance:
+  golden_tax:
+    applicable: true
+    tax_category: "赊销收入"
+    invoice_timing: "on_bill_payment"   # 还款时开票
+  data_residency: "cn-mainland"
+  pii_fields: ["company_name", "company_tax_no"]
+  retention_policy:
+    financial_records: "7_years"
+    operation_logs: "1_year"

@@ -1,0 +1,235 @@
+# ============================================================
+# Skill: payroll
+# 薪资计算 — 月度薪资核算、确认与发放记录
+# ============================================================
+
+meta:
+  name: "payroll"
+  version: "1.0.0"
+  display_name: "薪资管理"
+  description: |
+    每月25日自动触发薪资计算，基于考勤记录（出勤/请假/加班）
+    和薪资模板（基本工资/提成/扣款）生成薪资单。
+    经店长/HR确认后记录发放状态。
+    触发场景：每月25日定时计算、考勤日结后增量更新、审批通过后确认。
+  category: "hr"
+  sub_category: "payroll"
+  icon: "banknote"
+  maintainer: "org-team"
+  license: "proprietary"
+
+# ============================================================
+# 第二层：触发路由
+# ============================================================
+triggers:
+  events:
+    - type: "cron.monthly.25th.09:00"
+      condition: "always"
+      priority: 80
+      description: "每月25日9:00触发月度薪资计算"
+    - type: "attendance.daily.settled"
+      condition: "always"
+      priority: 50
+      description: "考勤日结后更新当月薪资累计数据"
+    - type: "approval.payroll.approved"
+      condition: "always"
+      priority: 90
+      description: "薪资审批通过，更新状态为已确认"
+
+  api:
+    base_path: "/api/v1/payroll"
+    endpoints:
+      - method: "GET"
+        path: "/:month"
+        description: "获取月度薪资单列表"
+      - method: "GET"
+        path: "/:month/:staff_id"
+        description: "员工薪资单详情"
+      - method: "POST"
+        path: "/:month/calculate"
+        description: "手动触发薪资计算（补算）"
+      - method: "POST"
+        path: "/:month/confirm"
+        description: "确认薪资单（提交审批）"
+      - method: "POST"
+        path: "/:month/:staff_id/adjust"
+        description: "薪资调整（异常项修正）"
+
+# ============================================================
+# 第三层：作用域与权限
+# ============================================================
+scope:
+  levels:
+    - brand
+    - store
+  config_inheritance: "override_with_merge"
+  permissions:
+    - role: "staff"
+      actions: ["view_own"]
+    - role: "store_manager"
+      actions: ["view_all", "confirm", "adjust_minor"]
+    - role: "hr_admin"
+      actions: ["*"]
+    - role: "finance_director"
+      actions: ["view_all", "approve", "export"]
+
+# ============================================================
+# 第四层：数据契约
+# ============================================================
+data:
+  owned_entities:
+    - name: "PayrollRecord"
+      table: "biz_payroll_records"
+      fields:
+        - { name: "id",                  type: "uuid",      required: true }
+        - { name: "tenant_id",           type: "uuid",      required: true }
+        - { name: "store_id",            type: "uuid",      required: true,  ref: "Store.id" }
+        - { name: "staff_id",            type: "uuid",      required: true,  ref: "Staff.id" }
+        - { name: "period_month",        type: "string",    required: true,  description: "格式 YYYY-MM" }
+        - { name: "base_salary_fen",     type: "integer",   required: true }
+        - { name: "attendance_days",     type: "decimal",   required: true,  precision: [5, 1] }
+        - { name: "overtime_hours",      type: "decimal",   required: false, precision: [6, 1] }
+        - { name: "overtime_pay_fen",    type: "integer",   required: false }
+        - { name: "commission_fen",      type: "integer",   required: false }
+        - { name: "deduction_late_fen",  type: "integer",   required: false }
+        - { name: "deduction_absent_fen", type: "integer",  required: false }
+        - { name: "bonus_fen",           type: "integer",   required: false }
+        - { name: "gross_salary_fen",    type: "integer",   required: true }
+        - { name: "tax_fen",             type: "integer",   required: false }
+        - { name: "net_salary_fen",      type: "integer",   required: true }
+        - { name: "status",              type: "enum",      required: true,  values: ["draft", "confirmed", "paid"] }
+        - { name: "confirmed_by",        type: "uuid",      required: false, ref: "Staff.id" }
+        - { name: "paid_at",             type: "timestamp", required: false }
+        - { name: "note",                type: "string",    required: false }
+        - { name: "created_at",          type: "timestamp", required: true }
+        - { name: "updated_at",          type: "timestamp", required: true }
+
+  referenced_entities:
+    - entity: "Staff"
+      skill: "org-core"
+      fields_used: ["id", "name", "role", "store_id", "salary_template"]
+    - entity: "DailyAttendance"
+      skill: "attendance"
+      fields_used: ["staff_id", "work_date", "status", "late_minutes", "overtime_minutes"]
+
+  emitted_events:
+    - type: "payroll.calculated"
+      payload_schema: { payroll_id: "uuid", staff_id: "uuid", period_month: "string", gross_salary_fen: "integer" }
+    - type: "payroll.confirmed"
+      payload_schema: { payroll_id: "uuid", staff_id: "uuid", period_month: "string", net_salary_fen: "integer" }
+    - type: "payroll.paid"
+      payload_schema: { payroll_id: "uuid", staff_id: "uuid", period_month: "string", paid_at: "timestamp" }
+
+# ============================================================
+# 第五层：依赖声明
+# ============================================================
+dependencies:
+  required:
+    - skill: "attendance"
+      min_version: "1.0.0"
+      reason: "薪资计算依赖考勤记录（出勤天数/迟到/加班）"
+    - skill: "org-core"
+      min_version: "1.0.0"
+      reason: "获取员工薪资模板（基本工资/岗位系数）"
+    # infrastructure: postgresql >= 15, redis >= 7
+
+  optional:
+    - skill: "approval-flow"
+      min_version: "1.0.0"
+      reason: "薪资确认走审批流，缺少时仅支持HR直接确认"
+
+# ============================================================
+# 第六层：降级策略
+# ============================================================
+degradation:
+  offline:
+    can_operate: false
+    capabilities:
+      - action: "calculate"
+        mode: "disabled"
+        fallback_message: "薪资计算需要联网访问考勤数据库"
+      - action: "view_own_payroll"
+        mode: "limited"
+        note: "员工可查看已下发的薪资单缓存"
+    sync_strategy:
+      on_reconnect: "pull_then_calculate"
+      max_offline_hours: 0
+
+  service_down:
+    - service: "attendance"
+      fallback: "use_last_settled_data"
+      alert: "通知HR：考勤服务异常，薪资计算将使用上次日结数据"
+
+  conflict:
+    strategy: "lww_with_audit"
+    manual_review_trigger: "net_salary_diff_fen > 10000"
+
+# ============================================================
+# 第七层：可观测性
+# ============================================================
+observability:
+  metrics:
+    - name: "payroll_calculated_total"
+      type: "counter"
+      labels: ["store_id", "period_month"]
+      description: "薪资单生成数量"
+    - name: "payroll_pending_confirm_count"
+      type: "gauge"
+      labels: ["store_id"]
+      alert_threshold: 0
+      alert_message: "门店当月薪资单未确认，请及时处理"
+    - name: "payroll_total_amount_fen"
+      type: "gauge"
+      labels: ["store_id", "period_month"]
+      description: "月度薪资总额（分）"
+
+  health_check:
+    endpoint: "/health"
+    interval_seconds: 60
+    timeout_seconds: 10
+
+  audit:
+    log_all_mutations: true
+    retention_days: 2555
+    fields_to_mask: ["staff_bank_account"]
+
+# ============================================================
+# 第八层：UI 声明
+# ============================================================
+ui:
+  surfaces:
+    - terminal: "manager-dashboard"
+      entry_point: "hr.payroll"
+      component: "PayrollManagePanel"
+      layout: "data-table"
+    - terminal: "customer-mini-program"
+      entry_point: "my.payslip"
+      component: "PayslipCard"
+      layout: "card"
+
+  print_templates:
+    - name: "payslip"
+      format: "a4-pdf"
+      template_file: "assets/templates/payslip.html"
+
+# ============================================================
+# 第九层：合规与本地化
+# ============================================================
+compliance:
+  golden_tax:
+    applicable: true
+    tax_category: "工资薪金所得"
+    invoice_timing: "on_payroll_paid"
+    note: "个税代扣代缴，需接入自然人电子税务局申报接口"
+  data_residency: "cn-mainland"
+  pii_fields: ["staff_name", "staff_id_number", "bank_account"]
+  retention_policy:
+    financial_records: "7_years"
+    operation_logs: "2_years"
+
+localization:
+  default_locale: "zh-CN"
+  supported_locales: ["zh-CN"]
+  currency: "CNY"
+  timezone: "Asia/Shanghai"
+  number_format: "comma_thousands"
