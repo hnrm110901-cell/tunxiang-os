@@ -92,9 +92,49 @@ function kpiColor(val: number, thresholdBad: number): string {
 // ─── Component ───
 
 export function StatsPanel() {
-  const [overall] = useState<OverallStats>(MOCK_OVERALL);
-  const [depts] = useState<DeptStats[]>(MOCK_DEPTS);
-  const [hourly] = useState<HourlyData[]>(MOCK_HOURLY);
+  const [overall, setOverall] = useState<OverallStats | null>(null);
+  const [depts, setDepts] = useState<DeptStats[]>([]);
+  const [hourly, setHourly] = useState<HourlyData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const storeId = getStoreId();
+
+    async function loadStats() {
+      try {
+        setLoading(true);
+        setError(null);
+        const [overallData, deptData, hourlyData] = await Promise.all([
+          fetchOverallStats(storeId),
+          fetchDeptStats(storeId),
+          fetchHourlyStats(storeId),
+        ]);
+        if (!cancelled) {
+          setOverall(overallData);
+          setDepts(deptData);
+          setHourly(hourlyData);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : 'Failed to load stats');
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    loadStats();
+
+    // 每 30 秒自动刷新统计数据
+    const timer = setInterval(loadStats, 30_000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, []);
+
   const maxHourlyCount = Math.max(...hourly.map(h => h.count), 1);
 
   return (
@@ -106,12 +146,39 @@ export function StatsPanel() {
       {/* 顶栏 */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
         <h1 style={{ margin: 0, fontSize: 28, color: '#FF6B35' }}>出品统计</h1>
-        <span style={{ fontSize: 18, color: '#666' }}>
-          今日已完成 <b style={{ color: '#0F6E56', fontSize: 24 }}>{overall.todayCompleted}</b> / {overall.todayTotal} 单
-        </span>
+        {overall && (
+          <span style={{ fontSize: 18, color: '#666' }}>
+            今日已完成 <b style={{ color: '#0F6E56', fontSize: 24 }}>{overall.todayCompleted}</b> / {overall.todayTotal} 单
+          </span>
+        )}
       </div>
 
+      {/* 加载/错误状态 */}
+      {loading && (
+        <div style={{ textAlign: 'center', padding: 60, fontSize: 22, color: '#888' }}>
+          Loading...
+        </div>
+      )}
+      {error && (
+        <div style={{
+          textAlign: 'center', padding: 40, fontSize: 20, color: '#A32D2D',
+          background: '#1a0505', borderRadius: 12, marginBottom: 16,
+        }}>
+          {error}
+          <button
+            onClick={() => window.location.reload()}
+            style={{
+              marginLeft: 16, padding: '8px 20px', background: '#A32D2D', color: '#fff',
+              border: 'none', borderRadius: 8, fontSize: 18, cursor: 'pointer', minHeight: 48,
+            }}
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
       {/* KPI 卡片 */}
+      {!loading && !error && overall && <>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 28 }}>
         <KPICard
           label="平均出餐时长"
@@ -241,6 +308,7 @@ export function StatsPanel() {
           );
         })}
       </div>
+      </>}
     </div>
   );
 }

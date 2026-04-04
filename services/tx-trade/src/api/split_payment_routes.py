@@ -9,15 +9,22 @@
 """
 from __future__ import annotations
 
+import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
 import structlog
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field, field_validator
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from shared.ontology.src.database import get_db
 
 logger = structlog.get_logger()
 router = APIRouter(prefix="/api/v1/orders", tags=["split-payment"])
+
+_SET_TENANT_SQL = text("SELECT set_config('app.tenant_id', :tid, true)")
 
 
 # ─── 工具函数 ─────────────────────────────────────────────────────────────────
@@ -89,6 +96,7 @@ async def init_split_pay(
     order_id: str,
     req: InitSplitPayRequest,
     request: Request,
+    db: AsyncSession = Depends(get_db),
 ) -> dict:
     """
     初始化分摊：按 total_splits 均等分摊订单金额，批量生成 split_payments 记录。
@@ -100,51 +108,71 @@ async def init_split_pay(
       4. 返回各份金额明细
     """
     tenant_id = _get_tenant_id(request)
+    await db.execute(_SET_TENANT_SQL, {"tid": tenant_id})
 
-    # TODO: 从 DB 查询订单，带 tenant_id 过滤
-    # async with get_db_with_tenant(tenant_id) as db:
-    #     order = await db.execute(
-    #         select(Order).where(Order.id == order_id, Order.tenant_id == tenant_id)
-    #     )
-    #     order = order.scalar_one_or_none()
-    # if not order:
-    #     raise HTTPException(status_code=404, detail="订单不存在")
-    # if order.status != "open":
-    #     raise HTTPException(status_code=409, detail=f"订单状态为 {order.status}，无法发起分摊")
+    # 1. 查询订单，验证状态
+    order_row = (
+        await db.execute(
+            text(
+                "SELECT id, status, total_amount_fen "
+                "FROM orders "
+                "WHERE id = :oid AND tenant_id = :tid AND is_deleted = FALSE"
+            ),
+            {"oid": order_id, "tid": tenant_id},
+        )
+    ).mappings().first()
 
-    # TODO: 检查是否已存在分摊记录（防重复初始化）
-    # existing = await db.execute(
-    #     select(SplitPayment).where(
-    #         SplitPayment.order_id == order_id,
-    #         SplitPayment.tenant_id == tenant_id,
-    #         SplitPayment.is_deleted.is_(False),
-    #     )
-    # )
-    # if existing.scalars().first():
-    #     raise HTTPException(status_code=409, detail="该订单已初始化分摊，请勿重复操作")
+    if not order_row:
+        raise HTTPException(status_code=404, detail="订单不存在")
 
-    # TODO: 获取订单总金额（分）
-    # total_fen = order.total_fen
-    total_fen = 0  # placeholder，实际从订单取
+    allowed_statuses = ("pending", "confirmed", "preparing", "ready", "served")
+    if order_row["status"] not in allowed_statuses:
+        raise HTTPException(
+            status_code=409,
+            detail=f"订单状态为 {order_row['status']}，无法发起分摊",
+        )
 
+    # 2. 检查是否已存在分摊记录（防重复初始化）
+    existing = (
+        await db.execute(
+            text(
+                "SELECT id FROM split_payments "
+                "WHERE order_id = :oid AND tenant_id = :tid AND is_deleted = FALSE "
+                "LIMIT 1"
+            ),
+            {"oid": order_id, "tid": tenant_id},
+        )
+    ).first()
+
+    if existing:
+        raise HTTPException(status_code=409, detail="该订单已初始化分摊，请勿重复操作")
+
+    # 3. 计算分摊金额
+    total_fen: int = order_row["total_amount_fen"]
     amounts = _calc_split_amounts(total_fen, req.total_splits)
 
-    # TODO: 批量写入 split_payments 表
-    # records = [
-    #     SplitPayment(
-    #         tenant_id=tenant_id,
-    #         order_id=order_id,
-    #         split_no=i + 1,
-    #         total_splits=req.total_splits,
-    #         amount_fen=amt,
-    #         payment_method="pending",  # 初始化时不指定支付方式
-    #         status="pending",
-    #         created_by=request.state.employee_id,
-    #     )
-    #     for i, amt in enumerate(amounts)
-    # ]
-    # db.add_all(records)
-    # await db.commit()
+    # 4. 批量写入 split_payments 表
+    created_by = getattr(request.state, "employee_id", None)
+    for i, amt in enumerate(amounts):
+        await db.execute(
+            text(
+                "INSERT INTO split_payments "
+                "(id, tenant_id, order_id, split_no, total_splits, amount_fen, "
+                " payment_method, status, created_by) "
+                "VALUES (:id, :tid, :oid, :sno, :ts, :amt, :pm, 'pending', :cb)"
+            ),
+            {
+                "id": str(uuid.uuid4()),
+                "tid": tenant_id,
+                "oid": order_id,
+                "sno": i + 1,
+                "ts": req.total_splits,
+                "amt": amt,
+                "pm": "cash",  # 默认值，结账时更新为实际支付方式
+                "cb": created_by,
+            },
+        )
+    await db.flush()
 
     splits_detail = [
         {
@@ -178,31 +206,44 @@ async def init_split_pay(
 async def get_split_pay_status(
     order_id: str,
     request: Request,
+    db: AsyncSession = Depends(get_db),
 ) -> dict:
     """
     返回该订单的分摊列表及每份状态（pending/paid/cancelled）。
     """
     tenant_id = _get_tenant_id(request)
+    await db.execute(_SET_TENANT_SQL, {"tid": tenant_id})
 
-    # TODO: 从 DB 查询分摊记录，带 tenant_id 过滤
-    # async with get_db_with_tenant(tenant_id) as db:
-    #     result = await db.execute(
-    #         select(SplitPayment)
-    #         .where(
-    #             SplitPayment.order_id == order_id,
-    #             SplitPayment.tenant_id == tenant_id,
-    #             SplitPayment.is_deleted.is_(False),
-    #         )
-    #         .order_by(SplitPayment.split_no)
-    #     )
-    #     splits = result.scalars().all()
-    # if not splits:
-    #     raise HTTPException(status_code=404, detail="该订单无分摊记录")
+    result = await db.execute(
+        text(
+            "SELECT split_no, total_splits, amount_fen, payment_method, "
+            "       member_id, status, paid_at "
+            "FROM split_payments "
+            "WHERE order_id = :oid AND tenant_id = :tid AND is_deleted = FALSE "
+            "ORDER BY split_no"
+        ),
+        {"oid": order_id, "tid": tenant_id},
+    )
+    rows = result.mappings().all()
 
-    # TODO: 替换为真实 DB 数据
-    splits: list[dict] = []  # placeholder
+    if not rows:
+        raise HTTPException(status_code=404, detail="该订单无分摊记录")
 
-    paid_count = sum(1 for s in splits if s.get("status") == "paid")
+    splits = [
+        {
+            "split_no": r["split_no"],
+            "total_splits": r["total_splits"],
+            "amount_fen": r["amount_fen"],
+            "amount_yuan": round(r["amount_fen"] / 100, 2),
+            "payment_method": r["payment_method"],
+            "member_id": str(r["member_id"]) if r["member_id"] else None,
+            "status": r["status"],
+            "paid_at": r["paid_at"].isoformat() if r["paid_at"] else None,
+        }
+        for r in rows
+    ]
+
+    paid_count = sum(1 for s in splits if s["status"] == "paid")
     total_splits = len(splits)
     all_paid = total_splits > 0 and paid_count == total_splits
 
@@ -223,64 +264,95 @@ async def settle_split(
     split_no: int,
     req: SplitSettleRequest,
     request: Request,
+    db: AsyncSession = Depends(get_db),
 ) -> dict:
     """
     对第 split_no 份执行结账：
       1. 更新对应 split_payment 记录 status='paid'，记录支付方式和 paid_at
-      2. 检查该订单所有份是否全部已付 → 若是，更新 order.status='paid'
+      2. 检查该订单所有份是否全部已付 → 若是，更新 order.status='completed'
       3. 返回结果
     """
     tenant_id = _get_tenant_id(request)
+    await db.execute(_SET_TENANT_SQL, {"tid": tenant_id})
 
     if split_no < 1:
         raise HTTPException(status_code=400, detail="split_no 必须 >= 1")
 
-    # TODO: 查询目标 split_payment 记录
-    # async with get_db_with_tenant(tenant_id) as db:
-    #     result = await db.execute(
-    #         select(SplitPayment).where(
-    #             SplitPayment.order_id == order_id,
-    #             SplitPayment.tenant_id == tenant_id,
-    #             SplitPayment.split_no == split_no,
-    #             SplitPayment.is_deleted.is_(False),
-    #         )
-    #     )
-    #     split = result.scalar_one_or_none()
-    # if not split:
-    #     raise HTTPException(status_code=404, detail=f"第 {split_no} 份分摊记录不存在")
-    # if split.status == "paid":
-    #     raise HTTPException(status_code=409, detail=f"第 {split_no} 份已结账")
-    # if split.status == "cancelled":
-    #     raise HTTPException(status_code=409, detail=f"第 {split_no} 份已取消")
+    # 1. 查询目标 split_payment 记录
+    split_row = (
+        await db.execute(
+            text(
+                "SELECT id, status FROM split_payments "
+                "WHERE order_id = :oid AND tenant_id = :tid "
+                "  AND split_no = :sno AND is_deleted = FALSE"
+            ),
+            {"oid": order_id, "tid": tenant_id, "sno": split_no},
+        )
+    ).mappings().first()
+
+    if not split_row:
+        raise HTTPException(
+            status_code=404, detail=f"第 {split_no} 份分摊记录不存在"
+        )
+    if split_row["status"] == "paid":
+        raise HTTPException(
+            status_code=409, detail=f"第 {split_no} 份已结账"
+        )
+    if split_row["status"] == "cancelled":
+        raise HTTPException(
+            status_code=409, detail=f"第 {split_no} 份已取消"
+        )
 
     now = datetime.now(timezone.utc)
 
-    # TODO: 更新 split_payment 状态
-    # split.status = "paid"
-    # split.payment_method = req.payment_method
-    # split.member_id = req.member_id
-    # split.paid_at = now
-    # split.updated_at = now
-    # await db.flush()
+    # 2. 更新 split_payment 状态
+    await db.execute(
+        text(
+            "UPDATE split_payments "
+            "SET status = 'paid', "
+            "    payment_method = :pm, "
+            "    member_id = :mid, "
+            "    paid_at = :now, "
+            "    updated_at = :now "
+            "WHERE id = :sid AND tenant_id = :tid"
+        ),
+        {
+            "pm": req.payment_method,
+            "mid": req.member_id,
+            "now": now,
+            "sid": str(split_row["id"]),
+            "tid": tenant_id,
+        },
+    )
 
-    # TODO: 检查是否全部已付，若是则关闭订单
-    # all_splits = await db.execute(
-    #     select(SplitPayment).where(
-    #         SplitPayment.order_id == order_id,
-    #         SplitPayment.tenant_id == tenant_id,
-    #         SplitPayment.is_deleted.is_(False),
-    #     )
-    # )
-    # all_splits = all_splits.scalars().all()
-    # all_paid = all(s.status == "paid" for s in all_splits)
-    # if all_paid:
-    #     order = await db.get(Order, order_id)
-    #     if order:
-    #         order.status = "paid"
-    #         order.updated_at = now
-    # await db.commit()
+    # 3. 检查是否全部已付
+    unpaid_count_row = (
+        await db.execute(
+            text(
+                "SELECT COUNT(*) AS cnt FROM split_payments "
+                "WHERE order_id = :oid AND tenant_id = :tid "
+                "  AND is_deleted = FALSE AND status != 'paid'"
+            ),
+            {"oid": order_id, "tid": tenant_id},
+        )
+    ).mappings().first()
 
-    all_paid = False  # placeholder
+    all_paid = unpaid_count_row is not None and unpaid_count_row["cnt"] == 0
+
+    # 4. 若全部已付，更新订单状态为 completed
+    if all_paid:
+        await db.execute(
+            text(
+                "UPDATE orders "
+                "SET status = 'completed', "
+                "    completed_at = :now, "
+                "    updated_at = :now "
+                "WHERE id = :oid AND tenant_id = :tid AND is_deleted = FALSE"
+            ),
+            {"now": now, "oid": order_id, "tid": tenant_id},
+        )
+
+    await db.flush()
 
     logger.info(
         "split_pay.settle",

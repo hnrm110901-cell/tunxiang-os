@@ -105,21 +105,6 @@ const TIME_COLORS: Record<TimeLevel, string> = {
   critical: '#A32D2D',
 };
 
-// ─── Mock 数据 ───
-
-const _now = Date.now();
-const _min = (m: number) => m * 60 * 1000;
-
-const MOCK_TICKETS: KDSTicket[] = [
-  { id: 't1', orderNo: '001', tableNo: '包厢3号', items: [{ name: '烤鸭', qty: 1, notes: '' }, { name: '口味虾', qty: 2, notes: '中辣' }], createdAt: _now - _min(8), status: 'pending', priority: 'vip', deptId: 'roast' },
-  { id: 't2', orderNo: '002', tableNo: '包厢1号', items: [{ name: '剁椒鱼头', qty: 1, notes: '少辣' }], createdAt: _now - _min(5), status: 'pending', priority: 'rush', deptId: 'steam' },
-  { id: 't3', orderNo: '003', tableNo: '大厅A05', items: [{ name: '小炒肉', qty: 1, notes: '' }, { name: '炒青菜', qty: 1, notes: '' }], createdAt: _now - _min(12), status: 'cooking', priority: 'normal', deptId: 'wok', startedAt: _now - _min(8) },
-  { id: 't4', orderNo: '004', tableNo: '大厅B02', items: [{ name: '外婆鸡', qty: 1, notes: '' }], createdAt: _now - _min(3), status: 'pending', priority: 'normal', deptId: 'steam' },
-  { id: 't5', orderNo: '005', tableNo: '包厢2号', items: [{ name: '红烧肉', qty: 1, notes: '' }, { name: '蒸鲈鱼', qty: 1, notes: '' }], createdAt: _now - _min(18), status: 'cooking', priority: 'vip', deptId: 'stew', startedAt: _now - _min(12) },
-  { id: 't6', orderNo: '006', tableNo: '大厅C01', items: [{ name: '凉拌黄瓜', qty: 2, notes: '' }], createdAt: _now - _min(2), status: 'pending', priority: 'normal', deptId: 'cold' },
-  { id: 't7', orderNo: '007', tableNo: '大厅A03', items: [{ name: '酸菜鱼', qty: 1, notes: '微辣' }], createdAt: _now - _min(20), status: 'done', priority: 'normal', deptId: 'wok', startedAt: _now - _min(18), completedAt: _now - _min(2) },
-];
-
 // ─── 主组件 ───
 
 export function ZoneKitchenBoard() {
@@ -143,9 +128,7 @@ export function ZoneKitchenBoard() {
     dismissTimeoutAlert,
   } = useKdsWebSocket(config);
 
-  const [tickets, setTickets] = useState<KDSTicket[]>(() =>
-    wsEnabled ? [] : MOCK_TICKETS,
-  );
+  const [tickets, setTickets] = useState<KDSTicket[]>([]);
   const [tick, setTick] = useState(0);
   const [audioWarmed, setAudioWarmed] = useState(false);
 
