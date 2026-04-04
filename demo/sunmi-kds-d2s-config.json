@@ -1,0 +1,56 @@
+{
+  "_comment": "商米KDS D2s 后厨出餐屏 演示配置",
+  "_device": "SUNMI D2s",
+  "_role": "后厨KDS出餐显示屏",
+
+  "device": {
+    "model": "SUNMI D2s (KDS)",
+    "ip": "192.168.10.40",
+    "wifi_ssid": "TunxiangOS-Demo",
+    "store_code": "CZYZ-FRR",
+    "store_name": "尝在一起·芙蓉路店"
+  },
+
+  "webview": {
+    "url": "http://192.168.10.10/kds/",
+    "fullscreen": true,
+    "orientation": "landscape",
+    "user_agent_suffix": "TunxiangOS/3.0 SUNMI-D2s-KDS"
+  },
+
+  "display": {
+    "mode": "zone_board",
+    "columns": 4,
+    "auto_scroll": true,
+    "font_size": "large",
+    "color_scheme": {
+      "new_order": "#FF6B35",
+      "in_progress": "#FFC107",
+      "ready": "#4CAF50",
+      "overdue": "#F44336"
+    },
+    "alert_sound": true,
+    "overdue_threshold_minutes": 15
+  },
+
+  "server": {
+    "api_base_url": "http://192.168.10.10/api",
+    "ws_url": "ws://192.168.10.10/ws/",
+    "health_check_interval_ms": 30000,
+    "reconnect_interval_ms": 5000
+  },
+
+  "setup_steps": [
+    "1. 开机进入商米D2s系统设置",
+    "2. WiFi → 连接 TunxiangOS-Demo（密码: tunxiang2024）",
+    "3. WiFi → 高级设置 → 静态IP → 192.168.10.40 / 255.255.255.0 / 192.168.10.1",
+    "4. 设置 → 显示 → 屏幕方向 → 横屏",
+    "5. 设置 → 显示 → 保持屏幕常亮",
+    "6. 打开Chrome浏览器",
+    "7. 访问 http://192.168.10.10/kds/",
+    "8. 按F11进入全屏模式",
+    "9. Chrome菜单 → 添加到主屏幕 → 命名'屯象KDS'",
+    "10. 设置 → 开机应用 → 选择Chrome",
+    "11. 在KDS设置中选择档口/区域"
+  ]
+}

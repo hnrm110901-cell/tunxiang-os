@@ -1,0 +1,74 @@
+{
+  "_comment": "商米T2 POS收银机 演示配置",
+  "_device": "SUNMI T2",
+  "_role": "POS收银主机",
+
+  "device": {
+    "model": "SUNMI T2",
+    "ip": "192.168.10.30",
+    "wifi_ssid": "TunxiangOS-Demo",
+    "store_code": "CZYZ-FRR",
+    "store_name": "尝在一起·芙蓉路店"
+  },
+
+  "webview": {
+    "url": "http://192.168.10.10/pos/",
+    "fullscreen": true,
+    "hardware_acceleration": true,
+    "allow_mixed_content": true,
+    "cache_mode": "LOAD_DEFAULT",
+    "user_agent_suffix": "TunxiangOS/3.0 SUNMI-T2"
+  },
+
+  "printer": {
+    "mode": "network",
+    "host": "192.168.10.20",
+    "port": 9100,
+    "protocol": "ESC/POS",
+    "paper_width_mm": 80,
+    "auto_cut": true,
+    "print_copies": {
+      "customer_receipt": 1,
+      "kitchen_order": 1,
+      "daily_report": 1
+    }
+  },
+
+  "peripherals": {
+    "cash_box": {
+      "enabled": true,
+      "trigger": "printer_pulse",
+      "pulse_width_ms": 100
+    },
+    "scanner": {
+      "enabled": true,
+      "type": "usb_hid",
+      "prefix": "",
+      "suffix": "\n"
+    },
+    "scale": {
+      "enabled": false,
+      "type": "usb_serial",
+      "baud_rate": 9600
+    }
+  },
+
+  "server": {
+    "api_base_url": "http://192.168.10.10/api",
+    "ws_url": "ws://192.168.10.10/ws/",
+    "health_check_interval_ms": 30000
+  },
+
+  "setup_steps": [
+    "1. 开机进入商米T2系统设置",
+    "2. WiFi → 连接 TunxiangOS-Demo（密码: tunxiang2024）",
+    "3. WiFi → 高级设置 → 静态IP → 192.168.10.30 / 255.255.255.0 / 192.168.10.1",
+    "4. 打开Chrome浏览器",
+    "5. 访问 http://192.168.10.10/pos/",
+    "6. Chrome菜单 → 添加到主屏幕 → 命名'屯象POS'",
+    "7. 设置 → 显示 → 保持屏幕常亮",
+    "8. 设置 → 开机应用 → 选择Chrome（可选）",
+    "9. 登录：czq_admin / czq2024!",
+    "10. 在POS设置中配置打印机: 192.168.10.20:9100"
+  ]
+}

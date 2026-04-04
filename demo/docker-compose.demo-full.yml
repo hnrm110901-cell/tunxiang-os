@@ -1,0 +1,331 @@
+version: "3.9"
+
+# ============================================================
+# 屯象OS 演示环境 — Mac mini M4 完整部署
+# 14个微服务 + PostgreSQL + Redis + Nginx反代
+# 用法: docker compose -f demo/docker-compose.demo-full.yml up -d
+# ============================================================
+
+x-build: &build-defaults
+  context: ..   # tunxiang-os/ 仓库根
+
+x-svc: &svc-defaults
+  restart: unless-stopped
+  networks:
+    - demo-net
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "2"
+
+x-env: &common-env
+  DATABASE_URL: postgresql+asyncpg://tunxiang:tunxiang_demo_2024@postgres:5432/tunxiang_os
+  REDIS_URL: redis://redis:6379/0
+  PYTHONPATH: /app
+  PYTHONUNBUFFERED: "1"
+  TZ: Asia/Shanghai
+  TX_JWT_SECRET_KEY: tunxiang-demo-jwt-secret-2024-mac-mini
+  ENV_NAME: demo
+
+x-python-svc: &python-svc
+  <<: *svc-defaults
+  image: python:3.12-slim
+  working_dir: /app
+  volumes:
+    - ..:/app:ro
+
+x-pip-install: &pip-install >
+  pip install --no-cache-dir -q
+  fastapi>=0.104.0 uvicorn[standard]>=0.24.0 pydantic>=2.4.0
+  sqlalchemy>=2.0.0 asyncpg>=0.29.0 structlog>=23.1.0
+  passlib[bcrypt]>=1.7.4 PyJWT>=2.8.0 httpx>=0.25.0
+  redis>=5.0.0 apscheduler>=3.10.0 python-multipart>=0.0.6
+  aiofiles>=23.0.0
+
+services:
+  # ── 基础设施 ─────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: tunxiang
+      POSTGRES_PASSWORD: tunxiang_demo_2024
+      POSTGRES_DB: tunxiang_os
+      TZ: Asia/Shanghai
+    ports:
+      - "5432:5432"
+    volumes:
+      - demo_pg_data:/var/lib/postgresql/data
+      - ../infra/docker/init-rls.sql:/docker-entrypoint-initdb.d/01-rls.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tunxiang -d tunxiang_os"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - demo-net
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --maxmemory 128mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    volumes:
+      - demo_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+    networks:
+      - demo-net
+
+  # ── API Gateway :8000 ─────────────────────────────────────
+  gateway:
+    <<: *python-svc
+    command: >
+      bash -c "${PIP_INSTALL:-pip install --no-cache-dir -q
+      fastapi>=0.104.0 uvicorn[standard]>=0.24.0 pydantic>=2.4.0
+      sqlalchemy>=2.0.0 asyncpg>=0.29.0 structlog>=23.1.0
+      passlib[bcrypt]>=1.7.4 PyJWT>=2.8.0 httpx>=0.25.0
+      redis>=5.0.0 python-multipart>=0.0.6 aiofiles>=23.0.0}
+      && uvicorn services.gateway.src.main:app --host 0.0.0.0 --port 8000 --workers 2"
+    ports:
+      - "8000:8000"
+    environment:
+      <<: *common-env
+      TX_TRADE_URL:    http://tx-trade:8001
+      TX_MENU_URL:     http://tx-menu:8002
+      TX_MEMBER_URL:   http://tx-member:8003
+      TX_GROWTH_URL:   http://tx-growth:8004
+      TX_OPS_URL:      http://tx-ops:8005
+      TX_SUPPLY_URL:   http://tx-supply:8006
+      TX_FINANCE_URL:  http://tx-finance:8007
+      TX_AGENT_URL:    http://tx-agent:8008
+      TX_ANALYTICS_URL: http://tx-analytics:8009
+      TX_BRAIN_URL:    http://tx-brain:8010
+      TX_INTEL_URL:    http://tx-intel:8011
+      TX_ORG_URL:      http://tx-org:8012
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request;urllib.request.urlopen('http://localhost:8000/health',timeout=5)\""]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # ── 交易履约 :8001 ────────────────────────────────────────
+  tx-trade:
+    <<: *python-svc
+    command: >
+      bash -c "pip install --no-cache-dir -q
+      fastapi>=0.104.0 uvicorn[standard]>=0.24.0 pydantic>=2.4.0
+      sqlalchemy>=2.0.0 asyncpg>=0.29.0 structlog>=23.1.0
+      httpx>=0.25.0 redis>=5.0.0 python-multipart>=0.0.6
+      && uvicorn services.tx_trade.src.main:app --host 0.0.0.0 --port 8001"
+    environment:
+      <<: *common-env
+      # 佳博打印机地址（演示环境）
+      PRINTER_HOST: "192.168.10.20"
+      PRINTER_PORT: "9100"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ── 菜品菜单 :8002 ────────────────────────────────────────
+  tx-menu:
+    <<: *python-svc
+    command: >
+      bash -c "pip install --no-cache-dir -q
+      fastapi>=0.104.0 uvicorn[standard]>=0.24.0 pydantic>=2.4.0
+      sqlalchemy>=2.0.0 asyncpg>=0.29.0 structlog>=23.1.0 httpx>=0.25.0
+      && uvicorn services.tx_menu.src.main:app --host 0.0.0.0 --port 8002"
+    environment:
+      <<: *common-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # ── 会员CDP :8003 ─────────────────────────────────────────
+  tx-member:
+    <<: *python-svc
+    command: >
+      bash -c "pip install --no-cache-dir -q
+      fastapi>=0.104.0 uvicorn[standard]>=0.24.0 pydantic>=2.4.0
+      sqlalchemy>=2.0.0 asyncpg>=0.29.0 structlog>=23.1.0 httpx>=0.25.0 redis>=5.0.0
+      && uvicorn services.tx_member.src.main:app --host 0.0.0.0 --port 8003"
+    environment:
+      <<: *common-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ── 增长营销 :8004 ────────────────────────────────────────
+  tx-growth:
+    <<: *python-svc
+    command: >
+      bash -c "pip install --no-cache-dir -q
+      fastapi>=0.104.0 uvicorn[standard]>=0.24.0 pydantic>=2.4.0
+      sqlalchemy>=2.0.0 asyncpg>=0.29.0 structlog>=23.1.0 httpx>=0.25.0 redis>=5.0.0
+      && uvicorn services.tx_growth.src.main:app --host 0.0.0.0 --port 8004"
+    environment:
+      <<: *common-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ── 运营流程 :8005 ────────────────────────────────────────
+  tx-ops:
+    <<: *python-svc
+    command: >
+      bash -c "pip install --no-cache-dir -q
+      fastapi>=0.104.0 uvicorn[standard]>=0.24.0 pydantic>=2.4.0
+      sqlalchemy>=2.0.0 asyncpg>=0.29.0 structlog>=23.1.0 httpx>=0.25.0 redis>=5.0.0
+      && uvicorn services.tx_ops.src.main:app --host 0.0.0.0 --port 8005"
+    environment:
+      <<: *common-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ── 供应链 :8006 ──────────────────────────────────────────
+  tx-supply:
+    <<: *python-svc
+    command: >
+      bash -c "pip install --no-cache-dir -q
+      fastapi>=0.104.0 uvicorn[standard]>=0.24.0 pydantic>=2.4.0
+      sqlalchemy>=2.0.0 asyncpg>=0.29.0 structlog>=23.1.0 httpx>=0.25.0
+      && uvicorn services.tx_supply.src.main:app --host 0.0.0.0 --port 8006"
+    environment:
+      <<: *common-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # ── 财务结算 :8007 ────────────────────────────────────────
+  tx-finance:
+    <<: *python-svc
+    command: >
+      bash -c "pip install --no-cache-dir -q
+      fastapi>=0.104.0 uvicorn[standard]>=0.24.0 pydantic>=2.4.0
+      sqlalchemy>=2.0.0 asyncpg>=0.29.0 structlog>=23.1.0 httpx>=0.25.0
+      && uvicorn services.tx_finance.src.main:app --host 0.0.0.0 --port 8007"
+    environment:
+      <<: *common-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # ── Agent OS :8008 ────────────────────────────────────────
+  tx-agent:
+    <<: *python-svc
+    command: >
+      bash -c "pip install --no-cache-dir -q
+      fastapi>=0.104.0 uvicorn[standard]>=0.24.0 pydantic>=2.4.0
+      sqlalchemy>=2.0.0 asyncpg>=0.29.0 structlog>=23.1.0 httpx>=0.25.0 redis>=5.0.0
+      && uvicorn services.tx_agent.src.main:app --host 0.0.0.0 --port 8008"
+    environment:
+      <<: *common-env
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ── 经营分析 :8009 ────────────────────────────────────────
+  tx-analytics:
+    <<: *python-svc
+    command: >
+      bash -c "pip install --no-cache-dir -q
+      fastapi>=0.104.0 uvicorn[standard]>=0.24.0 pydantic>=2.4.0
+      sqlalchemy>=2.0.0 asyncpg>=0.29.0 structlog>=23.1.0 httpx>=0.25.0 apscheduler>=3.10.0
+      && uvicorn services.tx_analytics.src.main:app --host 0.0.0.0 --port 8009"
+    environment:
+      <<: *common-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # ── AI决策 :8010 ──────────────────────────────────────────
+  tx-brain:
+    <<: *python-svc
+    command: >
+      bash -c "pip install --no-cache-dir -q
+      fastapi>=0.104.0 uvicorn[standard]>=0.24.0 pydantic>=2.4.0
+      sqlalchemy>=2.0.0 asyncpg>=0.29.0 structlog>=23.1.0 httpx>=0.25.0 redis>=5.0.0
+      && uvicorn services.tx_brain.src.main:app --host 0.0.0.0 --port 8010"
+    environment:
+      <<: *common-env
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ── 商业智能 :8011 ────────────────────────────────────────
+  tx-intel:
+    <<: *python-svc
+    command: >
+      bash -c "pip install --no-cache-dir -q
+      fastapi>=0.104.0 uvicorn[standard]>=0.24.0 pydantic>=2.4.0
+      sqlalchemy>=2.0.0 asyncpg>=0.29.0 structlog>=23.1.0 httpx>=0.25.0
+      && uvicorn services.tx_intel.src.main:app --host 0.0.0.0 --port 8011"
+    environment:
+      <<: *common-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # ── 组织人事 :8012 ────────────────────────────────────────
+  tx-org:
+    <<: *python-svc
+    command: >
+      bash -c "pip install --no-cache-dir -q
+      fastapi>=0.104.0 uvicorn[standard]>=0.24.0 pydantic>=2.4.0
+      sqlalchemy>=2.0.0 asyncpg>=0.29.0 structlog>=23.1.0 httpx>=0.25.0
+      && uvicorn services.tx_org.src.main:app --host 0.0.0.0 --port 8012"
+    environment:
+      <<: *common-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # ── Nginx 反向代理 :80 ────────────────────────────────────
+  nginx:
+    image: nginx:1.25-alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx-demo.conf:/etc/nginx/conf.d/default.conf:ro
+      - demo_frontend_dist:/usr/share/nginx/html:ro
+    depends_on:
+      - gateway
+    restart: unless-stopped
+    networks:
+      - demo-net
+
+volumes:
+  demo_pg_data:
+  demo_redis_data:
+  demo_frontend_dist:
+
+networks:
+  demo-net:
+    driver: bridge

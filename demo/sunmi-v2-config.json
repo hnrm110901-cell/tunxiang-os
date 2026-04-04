@@ -1,0 +1,46 @@
+{
+  "_comment": "商米V2 移动POS 演示配置",
+  "_device": "SUNMI V2",
+  "_role": "服务员移动点餐 / 桌边结账",
+
+  "device": {
+    "model": "SUNMI V2",
+    "ip": "192.168.10.31",
+    "wifi_ssid": "TunxiangOS-Demo",
+    "store_code": "CZYZ-FRR",
+    "store_name": "尝在一起·芙蓉路店"
+  },
+
+  "webview": {
+    "url": "http://192.168.10.10/crew/",
+    "fullscreen": true,
+    "user_agent_suffix": "TunxiangOS/3.0 SUNMI-V2"
+  },
+
+  "printer": {
+    "mode": "builtin",
+    "paper_width_mm": 58,
+    "protocol": "SUNMI-SDK",
+    "auto_cut": false,
+    "description": "V2内置58mm打印机，通过商米SDK调用"
+  },
+
+  "server": {
+    "api_base_url": "http://192.168.10.10/api",
+    "ws_url": "ws://192.168.10.10/ws/",
+    "pos_host_url": "http://192.168.10.30",
+    "health_check_interval_ms": 30000
+  },
+
+  "setup_steps": [
+    "1. 开机进入商米V2系统设置",
+    "2. WiFi → 连接 TunxiangOS-Demo（密码: tunxiang2024）",
+    "3. WiFi → 高级设置 → 静态IP → 192.168.10.31 / 255.255.255.0 / 192.168.10.1",
+    "4. 打开Chrome浏览器",
+    "5. 访问 http://192.168.10.10/crew/（服务员端）",
+    "6. 或访问 http://192.168.10.10/pos/（移动收银）",
+    "7. Chrome菜单 → 添加到主屏幕 → 命名'屯象服务'",
+    "8. 设置 → 显示 → 保持屏幕常亮",
+    "9. 登录：czq_admin / czq2024!"
+  ]
+}

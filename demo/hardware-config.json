@@ -1,0 +1,137 @@
+{
+  "_comment": "屯象OS 演示环境硬件配置文件",
+  "_version": "1.0.0",
+  "_date": "2026-04-04",
+
+  "network": {
+    "router": {
+      "ssid": "TunxiangOS-Demo",
+      "password": "tunxiang2024",
+      "gateway": "192.168.10.1",
+      "subnet": "255.255.255.0",
+      "dhcp_range": "192.168.10.100-192.168.10.200"
+    }
+  },
+
+  "devices": {
+    "mac_mini": {
+      "role": "门店智能后台（服务中枢）",
+      "model": "Mac mini M4 16GB/256GB",
+      "ip": "192.168.10.10",
+      "connection": "ethernet",
+      "services": {
+        "nginx": {"port": 80, "description": "反向代理 + 前端静态资源"},
+        "gateway": {"port": 8000, "description": "API Gateway"},
+        "tx-trade": {"port": 8001, "description": "交易履约"},
+        "tx-menu": {"port": 8002, "description": "菜品菜单"},
+        "tx-member": {"port": 8003, "description": "会员CDP"},
+        "tx-growth": {"port": 8004, "description": "增长营销"},
+        "tx-ops": {"port": 8005, "description": "运营流程"},
+        "tx-supply": {"port": 8006, "description": "供应链"},
+        "tx-finance": {"port": 8007, "description": "财务结算"},
+        "tx-agent": {"port": 8008, "description": "Agent OS"},
+        "tx-analytics": {"port": 8009, "description": "经营分析"},
+        "tx-brain": {"port": 8010, "description": "AI决策"},
+        "tx-intel": {"port": 8011, "description": "商业智能"},
+        "tx-org": {"port": 8012, "description": "组织人事"},
+        "postgres": {"port": 5432, "description": "PostgreSQL 16"},
+        "redis": {"port": 6379, "description": "Redis 7"}
+      }
+    },
+
+    "sunmi_t2": {
+      "role": "POS收银主机",
+      "model": "商米T2",
+      "ip": "192.168.10.30",
+      "connection": "wifi",
+      "web_url": "http://192.168.10.10/pos/",
+      "peripherals": {
+        "printer": {
+          "type": "network",
+          "protocol": "ESC/POS over TCP",
+          "ip": "192.168.10.20",
+          "port": 9100,
+          "model": "佳博网络80",
+          "paper_width": "80mm"
+        },
+        "cash_box": {
+          "type": "usb_rj11",
+          "connection": "USB→RJ11线连接T2",
+          "trigger": "打印机脉冲或TXBridge.openCashBox()"
+        },
+        "scanner": {
+          "type": "usb",
+          "model": "新大陆NLS-HR15（建议）",
+          "connection": "USB连接T2"
+        }
+      }
+    },
+
+    "sunmi_v2": {
+      "role": "移动POS / 服务员点餐",
+      "model": "商米V2",
+      "ip": "192.168.10.31",
+      "connection": "wifi",
+      "web_url": "http://192.168.10.10/crew/",
+      "peripherals": {
+        "printer": {
+          "type": "builtin",
+          "description": "V2内置58mm热敏打印（小票）",
+          "paper_width": "58mm"
+        }
+      }
+    },
+
+    "sunmi_kds_d2s": {
+      "role": "后厨出餐显示屏",
+      "model": "商米KDS D2s",
+      "ip": "192.168.10.40",
+      "connection": "wifi",
+      "web_url": "http://192.168.10.10/kds/",
+      "display": {
+        "orientation": "landscape",
+        "fullscreen": true,
+        "auto_refresh": true
+      }
+    },
+
+    "gainscha_printer": {
+      "role": "网络热敏打印机",
+      "model": "佳博网络80",
+      "ip": "192.168.10.20",
+      "connection": "ethernet",
+      "protocol": "ESC/POS over TCP",
+      "port": 9100,
+      "paper_width": "80mm",
+      "config": {
+        "default_ip": "192.168.123.100",
+        "target_ip": "192.168.10.20",
+        "setup_method": "自检页获取默认IP → 浏览器访问Web管理界面 → 修改IP"
+      }
+    }
+  },
+
+  "demo_tenants": [
+    {
+      "tenant_id": "10000000-0000-0000-0000-000000000001",
+      "name": "尝在一起",
+      "cuisine": "湘菜",
+      "username": "czq_admin",
+      "password": "czq2024!"
+    },
+    {
+      "tenant_id": "10000000-0000-0000-0000-000000000002",
+      "name": "最黔线",
+      "cuisine": "贵州菜",
+      "username": "zqx_admin",
+      "password": "zqx2024!"
+    },
+    {
+      "tenant_id": "10000000-0000-0000-0000-000000000003",
+      "name": "尚宫厨",
+      "cuisine": "韩式料理",
+      "username": "sgc_admin",
+      "password": "sgc2024!"
+    }
+  ]
+}
