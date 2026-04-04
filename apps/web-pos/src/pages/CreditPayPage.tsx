@@ -2,15 +2,15 @@
  * 企业挂账结账页面
  * 搜索企业客户 → 显示额度信息 → 签单人输入 → 确认挂账
  */
-import { useState } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useOrderStore } from '../store/orderStore';
-import { createPayment, settleOrder, printReceipt as apiPrintReceipt } from '../api/tradeApi';
+import { createPayment, settleOrder, printReceipt as apiPrintReceipt, fetchCreditAccounts } from '../api/tradeApi';
 import { printReceipt as bridgePrint } from '../bridge/TXBridge';
 
 const fen2yuan = (fen: number) => `¥${(fen / 100).toFixed(2)}`;
+const STORE_ID = import.meta.env.VITE_STORE_ID || '';
 
-/* ---------- Mock 企业客户数据（后续对接 tx-member API） ---------- */
 interface CreditCustomer {
   id: string;
   name: string;
@@ -19,13 +19,6 @@ interface CreditCustomer {
   usedFen: number;
   status: 'active' | 'frozen';
 }
-
-const MOCK_CUSTOMERS: CreditCustomer[] = [
-  { id: 'ent001', name: '湖南广电集团', contactPerson: '张主任', creditLimitFen: 5000000, usedFen: 1230000, status: 'active' },
-  { id: 'ent002', name: '中建五局第三公司', contactPerson: '李经理', creditLimitFen: 3000000, usedFen: 2850000, status: 'active' },
-  { id: 'ent003', name: '长沙银行总部', contactPerson: '王总', creditLimitFen: 8000000, usedFen: 600000, status: 'active' },
-  { id: 'ent004', name: '湖南大学后勤处', contactPerson: '陈老师', creditLimitFen: 2000000, usedFen: 2000000, status: 'frozen' },
-];
 
 export function CreditPayPage() {
   const { orderId } = useParams();
@@ -39,12 +32,52 @@ export function CreditPayPage() {
   const [submitting, setSubmitting] = useState(false);
   const [step, setStep] = useState<'search' | 'confirm'>('search');
 
-  // 搜索过滤
-  const filtered = searchText.trim()
-    ? MOCK_CUSTOMERS.filter(
-        (c) => c.name.includes(searchText) || c.id.includes(searchText),
-      )
-    : MOCK_CUSTOMERS;
+  const [customers, setCustomers] = useState<CreditCustomer[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const loadCustomers = useCallback(async (keyword: string) => {
+    setLoading(true);
+    setFetchError(null);
+    try {
+      const data = await fetchCreditAccounts(STORE_ID, keyword);
+      setCustomers(
+        data.items.map((item) => ({
+          id: item.id,
+          name: item.name,
+          contactPerson: item.contact_person,
+          creditLimitFen: item.credit_limit_fen,
+          usedFen: item.used_fen,
+          status: item.status,
+        })),
+      );
+    } catch (err) {
+      setFetchError(err instanceof Error ? err.message : '加载企业客户失败');
+      setCustomers([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // 初始加载（无延迟）+ 搜索防抖（300ms）
+  const isFirstRender = useRef(true);
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      loadCustomers('');
+      return;
+    }
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    debounceTimer.current = setTimeout(() => {
+      loadCustomers(searchText.trim());
+    }, 300);
+    return () => {
+      if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    };
+  }, [searchText, loadCustomers]);
+
+  const filtered = customers;
 
   const handleSelectCustomer = (customer: CreditCustomer) => {
     setSelectedCustomer(customer);
@@ -126,7 +159,29 @@ export function CreditPayPage() {
             />
             {/* 企业列表 */}
             <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
-              {filtered.length === 0 && (
+              {loading && (
+                <div style={{ textAlign: 'center', padding: 40 }}>
+                  <div style={{
+                    width: 32, height: 32, border: '3px solid #333', borderTopColor: '#FF6B2C',
+                    borderRadius: '50%', animation: 'spin 0.8s linear infinite',
+                    margin: '0 auto 12px',
+                  }} />
+                  <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+                  <div style={{ color: '#8899A6', fontSize: 16 }}>加载中...</div>
+                </div>
+              )}
+              {!loading && fetchError && (
+                <div style={{ textAlign: 'center', color: '#A32D2D', padding: 40, fontSize: 18 }}>
+                  <div style={{ marginBottom: 12 }}>{fetchError}</div>
+                  <button
+                    onClick={() => loadCustomers(searchText.trim())}
+                    style={{ padding: '8px 20px', border: '1px solid #A32D2D', borderRadius: 8, background: 'transparent', color: '#A32D2D', cursor: 'pointer', fontSize: 16 }}
+                  >
+                    重试
+                  </button>
+                </div>
+              )}
+              {!loading && !fetchError && filtered.length === 0 && (
                 <div style={{ textAlign: 'center', color: '#666', padding: 40, fontSize: 18 }}>
                   未找到匹配的企业客户
                 </div>

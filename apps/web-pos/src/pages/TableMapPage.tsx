@@ -41,21 +41,7 @@ const LEGEND = [
   { color: C.purple, label: 'VIP' },
 ];
 
-/* ─── Mock 数据（离线/开发时使用） ─── */
-const MOCK_TABLES: TableStatus[] = [
-  { table_no: 'A01', area: '大厅', seats: 4, status: 'free', guest_count: 0 },
-  { table_no: 'A02', area: '大厅', seats: 4, status: 'occupied', guest_count: 3, order_id: 'ord_001', order_amount_fen: 36800, dining_minutes: 28, waiter_name: '小王' },
-  { table_no: 'A03', area: '大厅', seats: 6, status: 'overtime', guest_count: 5, order_id: 'ord_002', order_amount_fen: 88600, dining_minutes: 95, waiter_name: '小李' },
-  { table_no: 'A04', area: '大厅', seats: 4, status: 'free', guest_count: 0 },
-  { table_no: 'A05', area: '大厅', seats: 2, status: 'occupied', guest_count: 2, order_id: 'ord_003', order_amount_fen: 15600, dining_minutes: 12, waiter_name: '小王' },
-  { table_no: 'A06', area: '大厅', seats: 4, status: 'reserved', guest_count: 0 },
-  { table_no: 'B01', area: '包间', seats: 8, status: 'vip', guest_count: 6, order_id: 'ord_004', order_amount_fen: 268000, dining_minutes: 45, waiter_name: '小张' },
-  { table_no: 'B02', area: '包间', seats: 10, status: 'free', guest_count: 0 },
-  { table_no: 'B03', area: '包间', seats: 12, status: 'occupied', guest_count: 10, order_id: 'ord_005', order_amount_fen: 158800, dining_minutes: 55, waiter_name: '小李' },
-  { table_no: 'B04', area: '包间', seats: 8, status: 'free', guest_count: 0 },
-  { table_no: 'C01', area: '露台', seats: 4, status: 'occupied', guest_count: 2, order_id: 'ord_006', order_amount_fen: 24200, dining_minutes: 18, waiter_name: '小陈' },
-  { table_no: 'C02', area: '露台', seats: 4, status: 'free', guest_count: 0 },
-];
+/* MOCK_TABLES 已删除 — 桌台数据从 API 加载 */
 
 /* ─── 工具函数 ─── */
 const fen2yuan = (fen: number) => `¥${(fen / 100).toFixed(0)}`;
@@ -67,7 +53,8 @@ const formatMinutes = (min: number) => {
 /* ─── 组件 ─── */
 export function TableMapPage() {
   const navigate = useNavigate();
-  const [tables, setTables] = useState<TableStatus[]>(MOCK_TABLES);
+  const [tables, setTables] = useState<TableStatus[]>([]);
+  const [loading, setLoading] = useState(true);
   const [selectedTable, setSelectedTable] = useState<TableStatus | null>(null);
   const [filterArea, setFilterArea] = useState<string>('全部');
   const [showPanel, setShowPanel] = useState(false);
@@ -77,11 +64,13 @@ export function TableMapPage() {
     try {
       const storeId = import.meta.env.VITE_STORE_ID || '';
       const data = await fetchTableStatus(storeId);
-      if (data.tables && data.tables.length > 0) {
+      if (data.tables) {
         setTables(data.tables);
       }
     } catch {
-      // 离线模式使用 mock 数据
+      // 离线模式：API 不可用时保持当前数据
+    } finally {
+      setLoading(false);
     }
   }, []);
 
@@ -211,6 +200,15 @@ export function TableMapPage() {
 
       {/* 桌台网格 */}
       <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: '0 20px 20px' }}>
+        {loading && tables.length === 0 && (
+          <div style={{ textAlign: 'center', padding: 60, color: C.muted, fontSize: 18 }}>加载桌台数据中...</div>
+        )}
+        {!loading && tables.length === 0 && (
+          <div style={{ textAlign: 'center', padding: 60, color: C.muted, fontSize: 18 }}>
+            暂无桌台数据
+            <button onClick={loadTables} style={{ display: 'block', margin: '16px auto 0', padding: '10px 24px', background: C.accent, color: C.white, border: 'none', borderRadius: 8, fontSize: 16, cursor: 'pointer' }}>重试</button>
+          </div>
+        )}
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',

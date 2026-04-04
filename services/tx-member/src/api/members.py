@@ -27,8 +27,27 @@ class CreateMemberReq(BaseModel):
 
 # Golden ID 会员
 @router.get("/customers")
-async def list_customers(store_id: str, rfm_level: Optional[str] = None, page: int = 1, size: int = 20):
-    return {"ok": True, "data": {"items": [], "total": 0}}
+async def list_customers(
+    store_id: str,
+    rfm_level: Optional[str] = None,
+    page: int = 1,
+    size: int = 20,
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+):
+    log = logger.bind(tenant_id=x_tenant_id, store_id=store_id, rfm_level=rfm_level)
+    log.info("list_customers_start", page=page, size=size)
+
+    async with get_db_with_tenant(x_tenant_id) as db:
+        repo = CustomerRepository(db, x_tenant_id)
+        result = await repo.list_customers(
+            store_id=store_id,
+            rfm_level=rfm_level,
+            page=page,
+            size=size,
+        )
+
+    log.info("list_customers_ok", total=result["total"])
+    return {"ok": True, "data": result}
 
 @router.post("/customers")
 async def create_customer(
@@ -65,24 +84,78 @@ async def create_customer(
     return {"ok": True, "data": {"customer_id": customer_id}}
 
 @router.get("/customers/{customer_id}")
-async def get_customer(customer_id: str):
+async def get_customer(
+    customer_id: str,
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+):
     """Golden ID 360 度画像"""
-    return {"ok": True, "data": None}
+    log = logger.bind(tenant_id=x_tenant_id, customer_id=customer_id)
+    log.info("get_customer_start")
+
+    async with get_db_with_tenant(x_tenant_id) as db:
+        repo = CustomerRepository(db, x_tenant_id)
+        customer = await repo.get_customer(customer_id)
+
+    if customer is None:
+        raise HTTPException(status_code=404, detail="customer_not_found")
+
+    log.info("get_customer_ok")
+    return {"ok": True, "data": customer}
 
 @router.get("/customers/{customer_id}/orders")
-async def get_customer_orders(customer_id: str, page: int = 1, size: int = 20):
-    return {"ok": True, "data": {"items": [], "total": 0}}
+async def get_customer_orders(
+    customer_id: str,
+    page: int = 1,
+    size: int = 20,
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+):
+    log = logger.bind(tenant_id=x_tenant_id, customer_id=customer_id)
+    log.info("get_customer_orders_start", page=page, size=size)
+
+    async with get_db_with_tenant(x_tenant_id) as db:
+        repo = CustomerRepository(db, x_tenant_id)
+        # Verify customer exists first
+        customer = await repo.get_customer(customer_id)
+        if customer is None:
+            raise HTTPException(status_code=404, detail="customer_not_found")
+        result = await repo.get_customer_orders(customer_id, page=page, size=size)
+
+    log.info("get_customer_orders_ok", total=result["total"])
+    return {"ok": True, "data": result}
 
 # RFM 分析
 @router.get("/rfm/segments")
-async def get_rfm_segments(store_id: str):
+async def get_rfm_segments(
+    store_id: str,
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+):
     """RFM 分层分布：S1-S5"""
-    return {"ok": True, "data": {"segments": {}}}
+    log = logger.bind(tenant_id=x_tenant_id, store_id=store_id)
+    log.info("get_rfm_segments_start")
+
+    async with get_db_with_tenant(x_tenant_id) as db:
+        repo = CustomerRepository(db, x_tenant_id)
+        result = await repo.get_rfm_segments(store_id)
+
+    log.info("get_rfm_segments_ok", total=result["total"])
+    return {"ok": True, "data": result}
 
 @router.get("/rfm/at-risk")
-async def get_at_risk_customers(store_id: str, risk_threshold: float = 0.5):
+async def get_at_risk_customers(
+    store_id: str,
+    risk_threshold: float = 0.5,
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+):
     """流失风险客户列表"""
-    return {"ok": True, "data": {"customers": []}}
+    log = logger.bind(tenant_id=x_tenant_id, store_id=store_id, risk_threshold=risk_threshold)
+    log.info("get_at_risk_customers_start")
+
+    async with get_db_with_tenant(x_tenant_id) as db:
+        repo = CustomerRepository(db, x_tenant_id)
+        customers = await repo.get_at_risk(store_id, threshold=risk_threshold)
+
+    log.info("get_at_risk_customers_ok", count=len(customers))
+    return {"ok": True, "data": {"customers": customers}}
 
 # 营销活动
 @router.get("/campaigns")

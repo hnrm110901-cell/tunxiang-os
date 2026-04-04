@@ -54,35 +54,6 @@ const ACTION_TYPE_LABELS: Record<string, string> = {
   coupon: '优惠券',
 };
 
-const MOCK_ITEMS: AuditItem[] = [
-  {
-    id: '1', order_id: 'ORD-001', operator_id: 'op1', operator_name: '张收银',
-    approver_name: '李经理', action_type: 'discount_pct',
-    original_amount: '288.00', final_amount: '180.00', discount_amount: '108.00',
-    discount_pct: 37.5, reason: 'VIP客户', created_at: new Date().toISOString(),
-  },
-  {
-    id: '2', order_id: 'ORD-002', operator_id: 'op2', operator_name: '王服务员',
-    approver_name: null, action_type: 'return_item',
-    original_amount: '68.00', final_amount: '0.00', discount_amount: '68.00',
-    discount_pct: 100, reason: '菜品质量问题', created_at: new Date().toISOString(),
-  },
-  {
-    id: '3', order_id: 'ORD-003', operator_id: 'op1', operator_name: '张收银',
-    approver_name: null, action_type: 'discount_amt',
-    original_amount: '156.00', final_amount: '136.00', discount_amount: '20.00',
-    discount_pct: 12.8, reason: null, created_at: new Date().toISOString(),
-  },
-];
-
-const MOCK_SUMMARY: SummaryData = {
-  period: 'today', total_count: 12, total_discount_amount: 486.5, high_risk_count: 3,
-  by_operator: [
-    { operator_id: 'op1', operator_name: '张收银', high_risk_count: 2, total_discount_amount: '320.00', avg_discount_pct: 38.2, last_action_at: new Date().toISOString() },
-    { operator_id: 'op2', operator_name: '王服务员', high_risk_count: 1, total_discount_amount: '166.50', avg_discount_pct: 22.5, last_action_at: new Date().toISOString() },
-  ],
-};
-
 function formatTime(iso: string | null): string {
   if (!iso) return '—';
   const d = new Date(iso);
@@ -93,7 +64,9 @@ function formatAmount(val: string): string {
   return `¥${parseFloat(val).toFixed(2)}`;
 }
 
-const STORE_ID = (window as Record<string, unknown>).STORE_ID as string | undefined;
+const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
+const TENANT_ID = import.meta.env.VITE_TENANT_ID || '';
+const STORE_ID = import.meta.env.VITE_STORE_ID || '';
 
 export function DiscountAuditPage() {
   const [period, setPeriod] = useState<Period>('today');
@@ -101,45 +74,46 @@ export function DiscountAuditPage() {
   const [selectedAction, setSelectedAction] = useState<ActionType>('');
   const [items, setItems] = useState<AuditItem[]>([]);
   const [summary, setSummary] = useState<SummaryData | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [operatorOptions, setOperatorOptions] = useState<OperatorStat[]>([]);
 
-  const isMock = !STORE_ID;
-
   useEffect(() => {
-    if (isMock) {
-      setItems(MOCK_ITEMS);
-      setSummary(MOCK_SUMMARY);
-      setOperatorOptions(MOCK_SUMMARY.by_operator);
-      return;
-    }
     fetchData();
   }, [period, selectedOperator, selectedAction]);
 
   async function fetchData() {
     setLoading(true);
+    setError(null);
     try {
-      const tenantId = (window as Record<string, unknown>).TENANT_ID as string ?? '';
-      const headers = { 'X-Tenant-ID': tenantId };
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        ...(TENANT_ID ? { 'X-Tenant-ID': TENANT_ID } : {}),
+      };
 
-      const params = new URLSearchParams({ period, store_id: STORE_ID ?? '' });
+      const params = new URLSearchParams({ period, store_id: STORE_ID });
       if (selectedOperator) params.set('operator_id', selectedOperator);
       if (selectedAction) params.set('action_type', selectedAction);
 
       const [logRes, summaryRes] = await Promise.all([
-        fetch(`/api/v1/discount/audit-log?${params}`, { headers }),
-        fetch(`/api/v1/discount/audit-log/summary?${params}`, { headers }),
+        fetch(`${API_BASE}/api/v1/discount/audit-log?${params}`, { headers }),
+        fetch(`${API_BASE}/api/v1/discount/audit-log/summary?${params}`, { headers }),
       ]);
 
-      if (logRes.ok) {
-        const logJson = await logRes.json();
-        setItems(logJson.data?.items ?? []);
-      }
-      if (summaryRes.ok) {
-        const summaryJson = await summaryRes.json();
-        setSummary(summaryJson.data);
-        setOperatorOptions(summaryJson.data?.by_operator ?? []);
-      }
+      if (!logRes.ok) throw new Error(`审计记录加载失败 (${logRes.status})`);
+      if (!summaryRes.ok) throw new Error(`汇总数据加载失败 (${summaryRes.status})`);
+
+      const logJson = await logRes.json();
+      if (!logJson.ok) throw new Error(logJson.error?.message || '审计记录接口异常');
+      setItems(logJson.data?.items ?? []);
+
+      const summaryJson = await summaryRes.json();
+      if (!summaryJson.ok) throw new Error(summaryJson.error?.message || '汇总接口异常');
+      setSummary(summaryJson.data);
+      setOperatorOptions(summaryJson.data?.by_operator ?? []);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : '加载折扣审计数据失败';
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -218,22 +192,29 @@ export function DiscountAuditPage() {
               加载中...
             </div>
           )}
-          {!loading && filteredItems.length === 0 && (
+          {error && !loading && (
+            <div style={{ textAlign: 'center', padding: 32 }}>
+              <div style={{ color: C.danger, fontSize: 14 }}>{error}</div>
+              <button
+                onClick={() => fetchData()}
+                style={{
+                  marginTop: 12, padding: '6px 16px', background: C.primary, color: '#fff',
+                  border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 13,
+                }}
+              >
+                重试
+              </button>
+            </div>
+          )}
+          {!loading && !error && filteredItems.length === 0 && (
             <div style={{ color: C.muted, textAlign: 'center', padding: 32, fontSize: 14 }}>
               暂无记录
             </div>
           )}
-          {!loading && filteredItems.map(item => (
+          {!loading && !error && filteredItems.map(item => (
             <AuditRow key={item.id} item={item} />
           ))}
         </div>
-
-        {/* Mock badge */}
-        {isMock && (
-          <div style={{ textAlign: 'center', color: C.muted, fontSize: 12, paddingTop: 8 }}>
-            演示数据 — 连接门店后显示真实记录
-          </div>
-        )}
       </div>
     </div>
   );

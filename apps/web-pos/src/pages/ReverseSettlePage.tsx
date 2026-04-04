@@ -4,7 +4,7 @@
  */
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getOrder } from '../api/tradeApi';
+import { getOrder, reverseSettle } from '../api/tradeApi';
 
 const fen2yuan = (fen: number) => `¥${(fen / 100).toFixed(2)}`;
 
@@ -15,7 +15,6 @@ const REVERSE_REASONS = [
   { key: 'other', label: '其他原因', desc: '需在备注中说明具体原因' },
 ];
 
-/* ---------- Mock 已结订单（后续对接 tx-trade API） ---------- */
 interface SettledOrder {
   orderId: string;
   orderNo: string;
@@ -27,32 +26,6 @@ interface SettledOrder {
   items: Array<{ name: string; quantity: number; priceFen: number }>;
 }
 
-const MOCK_SETTLED: Record<string, SettledOrder> = {
-  'TX20260327001': {
-    orderId: 'ord_001', orderNo: 'TX20260327001', tableNo: 'A03',
-    settledAt: '2026-03-27 12:35:00', totalFen: 35600, discountFen: 0,
-    paymentMethod: '微信支付',
-    items: [
-      { name: '剁椒鱼头', quantity: 1, priceFen: 8800 },
-      { name: '口味虾', quantity: 1, priceFen: 12800 },
-      { name: '农家小炒肉', quantity: 2, priceFen: 4200 },
-      { name: '米饭', quantity: 4, priceFen: 300 },
-      { name: '酸梅汤', quantity: 4, priceFen: 800 },
-    ],
-  },
-  'TX20260327002': {
-    orderId: 'ord_002', orderNo: 'TX20260327002', tableNo: 'B05',
-    settledAt: '2026-03-27 13:10:00', totalFen: 14700, discountFen: 1000,
-    paymentMethod: '支付宝',
-    items: [
-      { name: '凉拌黄瓜', quantity: 1, priceFen: 900 },
-      { name: '农家小炒肉', quantity: 1, priceFen: 4200 },
-      { name: '剁椒鱼头', quantity: 1, priceFen: 8800 },
-      { name: '米饭', quantity: 2, priceFen: 300 },
-    ],
-  },
-};
-
 type Step = 'search' | 'detail' | 'auth' | 'done';
 
 export function ReverseSettlePage() {
@@ -62,6 +35,7 @@ export function ReverseSettlePage() {
   const [searchInput, setSearchInput] = useState('');
   const [order, setOrder] = useState<SettledOrder | null>(null);
   const [searchError, setSearchError] = useState('');
+  const [searching, setSearching] = useState(false);
 
   const [selectedReason, setSelectedReason] = useState('');
   const [remark, setRemark] = useState('');
@@ -72,64 +46,65 @@ export function ReverseSettlePage() {
 
   // 搜索订单
   const handleSearch = async () => {
-    const input = searchInput.trim().toUpperCase();
+    const input = searchInput.trim();
     if (!input) return;
     setSearchError('');
-
-    // 优先用 Mock，再尝试 API
-    const mockOrder = MOCK_SETTLED[input];
-    if (mockOrder) {
-      setOrder(mockOrder);
-      setStep('detail');
-      return;
-    }
+    setSearching(true);
 
     try {
       const result = await getOrder(input);
-      if (result) {
-        // 将 API 返回转化为本地格式（占位）
-        setOrder({
-          orderId: String(result.order_id || input),
-          orderNo: String(result.order_no || input),
-          tableNo: String(result.table_no || '--'),
-          settledAt: String(result.settled_at || '--'),
-          totalFen: Number(result.total_fen || 0),
-          discountFen: Number(result.discount_fen || 0),
-          paymentMethod: String(result.payment_method || '--'),
-          items: Array.isArray(result.items) ? (result.items as Array<{ name: string; quantity: number; priceFen: number }>) : [],
-        });
-        setStep('detail');
+      if (!result) {
+        setSearchError('未找到该订单，请检查订单号');
         return;
       }
-    } catch {
-      // API 失败继续本地提示
-    }
 
-    setSearchError('未找到该订单，请检查订单号');
+      const items = Array.isArray(result.items)
+        ? (result.items as Array<Record<string, unknown>>).map((it) => ({
+            name: String(it.dish_name ?? it.name ?? ''),
+            quantity: Number(it.quantity ?? 1),
+            priceFen: Number(it.unit_price_fen ?? it.priceFen ?? 0),
+          }))
+        : [];
+
+      setOrder({
+        orderId: String(result.order_id ?? input),
+        orderNo: String(result.order_no ?? input),
+        tableNo: String(result.table_no ?? '--'),
+        settledAt: String(result.settled_at ?? '--'),
+        totalFen: Number(result.total_fen ?? 0),
+        discountFen: Number(result.discount_fen ?? 0),
+        paymentMethod: String(result.payment_method ?? '--'),
+        items,
+      });
+      setStep('detail');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : '查询失败，请稍后重试';
+      setSearchError(message);
+    } finally {
+      setSearching(false);
+    }
   };
 
-  // 店长授权验证
+  // 店长授权验证 + 反结账
   const handleAuth = async () => {
     if (!authCode.trim()) {
       setAuthError('请输入店长授权码');
       return;
     }
+    if (!order) return;
+
     setSubmitting(true);
     setAuthError('');
 
-    // Mock 校验：授权码 888888 通过
-    await new Promise((r) => setTimeout(r, 600));
-    if (authCode === '888888') {
-      // TODO: 调用 tx-trade 反结账 API
-      // await txFetch(`/api/v1/trade/orders/${order!.orderId}/reverse-settle`, {
-      //   method: 'POST',
-      //   body: JSON.stringify({ reason: selectedReason, remark, auth_code: authCode }),
-      // });
+    try {
+      await reverseSettle(order.orderId, selectedReason, remark, authCode.trim());
       setStep('done');
-    } else {
-      setAuthError('授权码错误，请联系店长');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : '反结账失败，请稍后重试';
+      setAuthError(message);
+    } finally {
+      setSubmitting(false);
     }
-    setSubmitting(false);
   };
 
   return (
@@ -194,16 +169,19 @@ export function ReverseSettlePage() {
               />
               <button
                 onClick={handleSearch}
+                disabled={searching}
                 style={{
-                  padding: '16px 32px', background: '#FF6B2C', border: 'none',
-                  borderRadius: 12, color: '#fff', fontSize: 18, cursor: 'pointer',
+                  padding: '16px 32px', border: 'none',
+                  borderRadius: 12, color: '#fff', fontSize: 18,
                   minHeight: 56, fontWeight: 'bold', transition: 'transform 200ms ease',
+                  background: searching ? '#444' : '#FF6B2C',
+                  cursor: searching ? 'not-allowed' : 'pointer',
                 }}
-                onPointerDown={(e) => { e.currentTarget.style.transform = 'scale(0.97)'; }}
+                onPointerDown={(e) => { if (!searching) e.currentTarget.style.transform = 'scale(0.97)'; }}
                 onPointerUp={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
                 onPointerLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
               >
-                查询
+                {searching ? '查询中...' : '查询'}
               </button>
             </div>
             {searchError && (

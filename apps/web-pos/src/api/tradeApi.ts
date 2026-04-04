@@ -104,6 +104,46 @@ export async function printKitchen(orderId: string, station = ''): Promise<Recor
   return txFetch(`/api/v1/trade/orders/${orderId}/print/kitchen?station=${encodeURIComponent(station)}`, { method: 'POST' });
 }
 
+// ─── 反结账 ───
+
+export interface ReverseSettleResult {
+  order_id: string;
+  status: string;
+  reopened_at: string;
+}
+
+export async function reverseSettle(
+  orderId: string,
+  reason: string,
+  remark: string,
+  authCode: string,
+): Promise<ReverseSettleResult> {
+  return txFetch(`/api/v1/trade/orders/${orderId}/reverse-settle`, {
+    method: 'POST',
+    body: JSON.stringify({ reason, remark, auth_code: authCode }),
+  });
+}
+
+// ─── 企业挂账 ───
+
+export interface CreditAccountItem {
+  id: string;
+  name: string;
+  contact_person: string;
+  credit_limit_fen: number;
+  used_fen: number;
+  status: 'active' | 'frozen';
+}
+
+export async function fetchCreditAccounts(
+  storeId: string,
+  keyword = '',
+): Promise<{ items: CreditAccountItem[] }> {
+  const params = new URLSearchParams({ store_id: storeId });
+  if (keyword) params.set('keyword', keyword);
+  return txFetch(`/api/v1/trade/credit-accounts?${params.toString()}`);
+}
+
 // ─── Agent ───
 
 export async function dispatchAgent(agentId: string, action: string, params: Record<string, unknown> = {}): Promise<Record<string, unknown>> {

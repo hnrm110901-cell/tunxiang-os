@@ -1,23 +1,57 @@
 /**
  * 异常中心 — 投诉/退菜/设备故障/缺料 集中处理
  */
+import { useEffect, useState, useCallback } from 'react';
+import { fetchExceptions, resolveException, type ExceptionItem } from '../api';
 
-const MOCK_EXCEPTIONS = [
-  { id: '1', type: 'complaint', title: '客诉: A03桌菜品太咸', severity: 'high', time: '14:25', status: 'pending', table: 'A03' },
-  { id: '2', type: 'return_dish', title: '退菜: 口味虾（不新鲜）', severity: 'high', time: '14:10', status: 'processing', table: 'B01' },
-  { id: '3', type: 'equipment', title: '2号打印机卡纸', severity: 'medium', time: '13:50', status: 'resolved' },
-  { id: '4', type: 'shortage', title: '鲈鱼库存不足(仅剩2kg)', severity: 'high', time: '13:30', status: 'pending' },
-  { id: '5', type: 'discount', title: '异常折扣: A05桌 折扣率65%', severity: 'critical', time: '14:30', status: 'pending', table: 'A05' },
-];
+const STORE_ID = import.meta.env.VITE_STORE_ID || '';
 
 const typeIcon: Record<string, string> = { complaint: '😤', return_dish: '↩️', equipment: '🔧', shortage: '📦', discount: '💰' };
 const severityColor: Record<string, string> = { critical: '#ff4d4f', high: '#faad14', medium: '#1890ff', low: '#52c41a' };
 const statusLabel: Record<string, string> = { pending: '待处理', processing: '处理中', resolved: '已解决' };
 
 export function ExceptionPage() {
-  const pending = MOCK_EXCEPTIONS.filter(e => e.status === 'pending');
-  const processing = MOCK_EXCEPTIONS.filter(e => e.status === 'processing');
-  const resolved = MOCK_EXCEPTIONS.filter(e => e.status === 'resolved');
+  const [exceptions, setExceptions] = useState<ExceptionItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [resolving, setResolving] = useState<string | null>(null);
+
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await fetchExceptions(STORE_ID);
+      setExceptions(data.items);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : '加载异常列表失败';
+      setError(message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const handleResolve = async (id: string) => {
+    setResolving(id);
+    try {
+      await resolveException(id);
+      setExceptions(prev =>
+        prev.map(e => (e.id === id ? { ...e, status: 'processing' as const } : e)),
+      );
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : '处理失败';
+      setError(message);
+    } finally {
+      setResolving(null);
+    }
+  };
+
+  const pending = exceptions.filter(e => e.status === 'pending');
+  const processing = exceptions.filter(e => e.status === 'processing');
+  const resolved = exceptions.filter(e => e.status === 'resolved');
 
   return (
     <div style={{ padding: 16, background: '#0B1A20', minHeight: '100vh', color: '#fff' }}>
@@ -30,7 +64,31 @@ export function ExceptionPage() {
         </div>
       </div>
 
-      {MOCK_EXCEPTIONS.map(e => (
+      {loading && (
+        <div style={{ textAlign: 'center', padding: 48, color: '#888', fontSize: 14 }}>
+          加载中...
+        </div>
+      )}
+
+      {error && !loading && (
+        <div style={{ textAlign: 'center', padding: 48, color: '#ff4d4f', fontSize: 14 }}>
+          <div>{error}</div>
+          <button
+            onClick={loadData}
+            style={{ marginTop: 12, padding: '6px 16px', background: '#FF6B2C', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 13 }}
+          >
+            重试
+          </button>
+        </div>
+      )}
+
+      {!loading && !error && exceptions.length === 0 && (
+        <div style={{ textAlign: 'center', padding: 48, color: '#888', fontSize: 14 }}>
+          暂无异常记录
+        </div>
+      )}
+
+      {!loading && !error && exceptions.map(e => (
         <div key={e.id} style={{
           padding: 14, marginBottom: 8, borderRadius: 8, background: '#112228',
           borderLeft: `4px solid ${severityColor[e.severity]}`,
@@ -52,8 +110,16 @@ export function ExceptionPage() {
               {statusLabel[e.status]}
             </span>
             {e.status === 'pending' && (
-              <button style={{ padding: '4px 12px', background: '#FF6B2C', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
-                处理
+              <button
+                disabled={resolving === e.id}
+                onClick={() => handleResolve(e.id)}
+                style={{
+                  padding: '4px 12px', background: '#FF6B2C', color: '#fff', border: 'none',
+                  borderRadius: 6, cursor: resolving === e.id ? 'not-allowed' : 'pointer', fontSize: 12,
+                  opacity: resolving === e.id ? 0.6 : 1,
+                }}
+              >
+                {resolving === e.id ? '处理中...' : '处理'}
               </button>
             )}
           </div>

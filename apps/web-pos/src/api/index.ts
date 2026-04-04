@@ -73,14 +73,21 @@ export async function fetchDailyReport(storeId: string): Promise<DailyReportData
 // ─── 异常事件 ───
 
 export interface ExceptionItem {
-  exception_id: string;
+  id: string;
   type: string;
+  title: string;
   severity: string;
-  message: string;
-  created_at: string;
-  resolved: boolean;
+  time: string;
+  status: 'pending' | 'processing' | 'resolved';
+  table?: string;
 }
 
-export async function fetchExceptions(storeId: string): Promise<{ items: ExceptionItem[]; total: number }> {
-  return txFetch(`/api/v1/ops/exceptions?store_id=${encodeURIComponent(storeId)}`);
+export async function fetchExceptions(storeId: string): Promise<{ items: ExceptionItem[] }> {
+  return txFetch(`/api/v1/trade/exceptions?store_id=${encodeURIComponent(storeId)}`);
+}
+
+export async function resolveException(exceptionId: string): Promise<void> {
+  await txFetch(`/api/v1/trade/exceptions/${encodeURIComponent(exceptionId)}/resolve`, {
+    method: 'POST',
+  });
 }

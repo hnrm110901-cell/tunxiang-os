@@ -11,7 +11,7 @@ from sqlalchemy import func, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from shared.ontology.src.entities import Customer
+from shared.ontology.src.entities import Customer, Order
 
 logger = structlog.get_logger()
 
@@ -102,6 +102,62 @@ class CustomerRepository:
         self.db.add(customer)
         await self.db.flush()
         return self._customer_to_dict(customer)
+
+    # ─── 会员订单历史 ───
+
+    async def get_customer_orders(
+        self,
+        customer_id: str,
+        page: int = 1,
+        size: int = 20,
+    ) -> dict:
+        """查询会员的订单历史，按下单时间倒序分页"""
+        await self._set_tenant()
+
+        cid = uuid.UUID(customer_id)
+
+        count_q = (
+            select(func.count(Order.id))
+            .where(Order.customer_id == cid)
+            .where(Order.tenant_id == self._tenant_uuid)
+            .where(Order.is_deleted == False)  # noqa: E712
+        )
+        total_result = await self.db.execute(count_q)
+        total = total_result.scalar() or 0
+
+        offset = (page - 1) * size
+        query = (
+            select(Order)
+            .where(Order.customer_id == cid)
+            .where(Order.tenant_id == self._tenant_uuid)
+            .where(Order.is_deleted == False)  # noqa: E712
+            .order_by(Order.order_time.desc())
+            .offset(offset)
+            .limit(size)
+        )
+        result = await self.db.execute(query)
+        rows = result.scalars().all()
+
+        items = [self._order_to_dict(o) for o in rows]
+        return {"items": items, "total": total, "page": page, "size": size}
+
+    @staticmethod
+    def _order_to_dict(o: Order) -> dict:
+        return {
+            "id": str(o.id),
+            "order_no": o.order_no,
+            "store_id": str(o.store_id),
+            "order_type": o.order_type,
+            "sales_channel_id": o.sales_channel_id,
+            "total_amount_fen": o.total_amount_fen,
+            "discount_amount_fen": o.discount_amount_fen,
+            "final_amount_fen": o.final_amount_fen,
+            "status": o.status,
+            "order_time": o.order_time.isoformat() if o.order_time else None,
+            "completed_at": o.completed_at.isoformat() if o.completed_at else None,
+            "table_number": o.table_number,
+            "notes": o.notes,
+        }
 
     # ─── RFM 分析 ───
 

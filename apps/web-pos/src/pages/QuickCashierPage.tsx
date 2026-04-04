@@ -27,29 +27,7 @@ const C = {
   white: '#FFFFFF',
 };
 
-/* ─── Mock 菜品数据（离线/开发用） ─── */
-const MOCK_CATEGORIES = ['热销', '主食', '小吃', '粉面', '饮品', '套餐', '凉菜', '甜品'];
-
-const MOCK_DISHES: DishItem[] = [
-  { id: 'd01', name: '剁椒鱼头', priceFen: 8800, category: '热销', kitchenStation: 'hot', isAvailable: true },
-  { id: 'd02', name: '毛氏红烧肉', priceFen: 5800, category: '热销', kitchenStation: 'hot', isAvailable: true },
-  { id: 'd03', name: '辣椒炒肉', priceFen: 3800, category: '热销', kitchenStation: 'hot', isAvailable: true },
-  { id: 'd04', name: '蒜蓉大虾', priceFen: 6800, category: '热销', kitchenStation: 'hot', isAvailable: true },
-  { id: 'd05', name: '白米饭', priceFen: 300, category: '主食', kitchenStation: 'staple', isAvailable: true },
-  { id: 'd06', name: '蛋炒饭', priceFen: 1800, category: '主食', kitchenStation: 'staple', isAvailable: true },
-  { id: 'd07', name: '酸辣粉', priceFen: 1500, category: '粉面', kitchenStation: 'noodle', isAvailable: true },
-  { id: 'd08', name: '牛肉面', priceFen: 2200, category: '粉面', kitchenStation: 'noodle', isAvailable: true },
-  { id: 'd09', name: '臭豆腐', priceFen: 1200, category: '小吃', kitchenStation: 'cold', isAvailable: true },
-  { id: 'd10', name: '糖油粑粑', priceFen: 800, category: '小吃', kitchenStation: 'cold', isAvailable: true },
-  { id: 'd11', name: '可乐', priceFen: 500, category: '饮品', kitchenStation: 'bar', isAvailable: true },
-  { id: 'd12', name: '雪碧', priceFen: 500, category: '饮品', kitchenStation: 'bar', isAvailable: true },
-  { id: 'd13', name: '凉拌黄瓜', priceFen: 1200, category: '凉菜', kitchenStation: 'cold', isAvailable: true },
-  { id: 'd14', name: '口水鸡', priceFen: 2800, category: '凉菜', kitchenStation: 'cold', isAvailable: true },
-  { id: 'd15', name: '招牌套餐A', priceFen: 3980, category: '套餐', kitchenStation: 'hot', isAvailable: true },
-  { id: 'd16', name: '双人套餐B', priceFen: 6880, category: '套餐', kitchenStation: 'hot', isAvailable: true },
-  { id: 'd17', name: '芒果布丁', priceFen: 1500, category: '甜品', kitchenStation: 'bar', isAvailable: true },
-  { id: 'd18', name: '冰淇淋', priceFen: 1200, category: '甜品', kitchenStation: 'bar', isAvailable: false },
-];
+/* MOCK 数据已删除 — 菜品从 API 加载 */
 
 /* ─── 工具函数 ─── */
 const fen2yuan = (fen: number) => (fen / 100).toFixed(2);
@@ -65,9 +43,10 @@ export function QuickCashierPage() {
   const navigate = useNavigate();
   const scanInputRef = useRef<HTMLInputElement>(null);
 
-  const [categories, setCategories] = useState<string[]>(MOCK_CATEGORIES);
-  const [dishes, setDishes] = useState<DishItem[]>(MOCK_DISHES);
-  const [activeCategory, setActiveCategory] = useState<string>(MOCK_CATEGORIES[0]);
+  const [categories, setCategories] = useState<string[]>([]);
+  const [dishes, setDishes] = useState<DishItem[]>([]);
+  const [activeCategory, setActiveCategory] = useState<string>('');
+  const [menuLoading, setMenuLoading] = useState(true);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [scanValue, setScanValue] = useState('');
   const [paying, setPaying] = useState(false);
@@ -82,11 +61,15 @@ export function QuickCashierPage() {
           fetchCategories(storeId),
           fetchDishes(storeId),
         ]);
-        if (cats.length > 0) setCategories(cats);
+        if (cats.length > 0) {
+          setCategories(cats);
+          setActiveCategory(cats[0]);
+        }
         if (ds.length > 0) setDishes(ds);
-        if (cats.length > 0) setActiveCategory(cats[0]);
       } catch {
-        // 离线模式使用 mock
+        // 离线模式：API 不可用时菜品列表为空
+      } finally {
+        setMenuLoading(false);
       }
     };
     load();
