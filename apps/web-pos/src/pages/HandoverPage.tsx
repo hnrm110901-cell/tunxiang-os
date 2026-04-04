@@ -7,8 +7,13 @@
  * 触屏POS 1024px+, 深色主题, 最小字体16px, 热区>=48px
  * 调用 POST /api/v1/handover/*
  */
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import {
+  fetchShiftSnapshot,
+  submitHandover,
+  type ShiftSnapshot,
+} from '../api/handoverApi';
 
 /* ---------- 样式常量 ---------- */
 const C = {
@@ -26,25 +31,15 @@ const C = {
 
 const fen2yuan = (fen: number) => `¥${(fen / 100).toFixed(2)}`;
 
-/* ---------- Mock 班次数据 ---------- */
-const MOCK_SHIFT = {
-  shiftId: 'SH-20260327-001',
-  cashierName: '王芳',
-  startTime: '2026-03-27 10:00',
-  endTime: '2026-03-27 15:30',
-  totalOrders: 86,
-  totalRevenueFen: 1728000,
-  totalGuests: 258,
-  avgPerGuestFen: 6698,
-  channels: [
-    { name: '微信支付', fen: 892000, color: '#07C160' },
-    { name: '支付宝', fen: 486000, color: '#1677FF' },
-    { name: '现金', fen: 215000, color: '#faad14' },
-    { name: '银联刷卡', fen: 98000, color: '#e6002d' },
-    { name: '企业挂账', fen: 45000, color: '#185FA5' },
-    { name: '退款', fen: -8000, color: '#ff4d4f' },
-  ],
-  systemCashFen: 215000, // 系统记录应有现金
+/* ---------- 配置 ---------- */
+const STORE_ID = import.meta.env.VITE_STORE_ID || '';
+const CASHIER_ID = localStorage.getItem('employeeId') || '';
+
+const CHANNEL_COLORS: Record<string, string> = {
+  wechat: '#07C160', alipay: '#1677FF', cash: '#faad14',
+  unionpay: '#e6002d', credit_account: '#185FA5', refund: '#ff4d4f',
+  微信支付: '#07C160', 支付宝: '#1677FF', 现金: '#faad14',
+  银联刷卡: '#e6002d', 企业挂账: '#185FA5', 退款: '#ff4d4f',
 };
 
 /* ---------- 面额配置 ---------- */
@@ -63,6 +58,12 @@ export function HandoverPage() {
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
 
+  // 班次快照（从 API 加载）
+  const [shift, setShift] = useState<ShiftSnapshot | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
   // Step 2: 现金清点
   const [counts, setCounts] = useState<Record<string, number>>(
     Object.fromEntries(DENOMINATIONS.map(d => [d.label, 0]))
@@ -72,12 +73,31 @@ export function HandoverPage() {
   const [signed, setSigned] = useState(false);
   const [remark, setRemark] = useState('');
 
+  // ── 加载班次快照 ──
+  const loadSnapshot = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const data = await fetchShiftSnapshot(STORE_ID, CASHIER_ID);
+      setShift(data);
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : '加载班次数据失败');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadSnapshot();
+  }, [loadSnapshot]);
+
   // 计算实点现金
   const actualCashFen = useMemo(() => {
     return DENOMINATIONS.reduce((sum, d) => sum + (counts[d.label] || 0) * d.valueFen, 0);
   }, [counts]);
 
-  const diffFen = actualCashFen - MOCK_SHIFT.systemCashFen;
+  const systemCashFen = shift?.system_cash_fen ?? 0;
+  const diffFen = actualCashFen - systemCashFen;
 
   const handleCountChange = (label: string, delta: number) => {
     setCounts(prev => ({
@@ -86,15 +106,37 @@ export function HandoverPage() {
     }));
   };
 
-  const handleSubmit = () => {
-    if (!signed) {
-      alert('请先确认签字');
-      return;
+  const handleSubmit = async () => {
+    if (!signed || !shift) return;
+    setSubmitting(true);
+    try {
+      await submitHandover({
+        shift_id: shift.shift_id,
+        store_id: STORE_ID,
+        cashier_id: shift.cashier_id,
+        cash_counts: DENOMINATIONS
+          .filter(d => (counts[d.label] || 0) > 0)
+          .map(d => ({ denomination: d.label, count: counts[d.label], subtotal_fen: counts[d.label] * d.valueFen })),
+        actual_cash_fen: actualCashFen,
+        diff_fen: diffFen,
+        remark,
+        signed: true,
+      });
+      alert('交班提交成功！');
+      navigate('/dashboard');
+    } catch (err) {
+      alert(`交班提交失败: ${err instanceof Error ? err.message : '未知错误'}`);
+    } finally {
+      setSubmitting(false);
     }
-    // TODO: POST /api/v1/handover/submit
-    alert('交班提交成功！');
-    navigate('/dashboard');
   };
+
+  // 构造渠道展示数据
+  const channels = (shift?.channels ?? []).map(ch => ({
+    name: ch.channel,
+    fen: ch.amount_fen,
+    color: CHANNEL_COLORS[ch.channel] || C.muted,
+  }));
 
   // ---------- 步骤指示器 ----------
   const steps = ['班次快照', '现金清点', '差异确认', '签字提交'];
@@ -116,6 +158,20 @@ export function HandoverPage() {
         </button>
       </div>
 
+      {/* 加载状态 */}
+      {loading && (
+        <div style={{ textAlign: 'center', padding: 60, color: C.muted, fontSize: 18 }}>加载班次数据中...</div>
+      )}
+      {loadError && (
+        <div style={{ textAlign: 'center', padding: 40 }}>
+          <div style={{ color: '#ff4d4f', fontSize: 18, marginBottom: 12 }}>{loadError}</div>
+          <button onClick={loadSnapshot} style={{
+            padding: '10px 24px', background: C.accent, color: C.white,
+            border: 'none', borderRadius: 8, fontSize: 16, cursor: 'pointer',
+          }}>重试</button>
+        </div>
+      )}
+      {!loading && !loadError && shift && (<>
       {/* 步骤指示器 */}
       <div style={{ display: 'flex', gap: 0, marginBottom: 24 }}>
         {steps.map((s, i) => {
@@ -164,21 +220,21 @@ export function HandoverPage() {
             border: `1px solid ${C.border}`,
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
-              <span style={{ fontSize: 16, color: C.muted }}>班次号: {MOCK_SHIFT.shiftId}</span>
-              <span style={{ fontSize: 16, color: C.muted }}>收银员: {MOCK_SHIFT.cashierName}</span>
+              <span style={{ fontSize: 16, color: C.muted }}>班次号: {shift?.shift_id}</span>
+              <span style={{ fontSize: 16, color: C.muted }}>收银员: {shift?.cashier_name}</span>
             </div>
             <div style={{ fontSize: 16, color: C.muted }}>
-              {MOCK_SHIFT.startTime} ~ {MOCK_SHIFT.endTime}
+              {(shift?.start_time ?? '')} ~ {(shift?.end_time ?? '')}
             </div>
           </div>
 
           {/* KPI 卡片 */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 16 }}>
             {[
-              { label: '订单总数', value: `${MOCK_SHIFT.totalOrders}`, sub: '单' },
-              { label: '总营收', value: fen2yuan(MOCK_SHIFT.totalRevenueFen), sub: '' },
-              { label: '客流量', value: `${MOCK_SHIFT.totalGuests}`, sub: '人' },
-              { label: '客单价', value: fen2yuan(MOCK_SHIFT.avgPerGuestFen), sub: '' },
+              { label: '订单总数', value: `${(shift?.total_orders ?? 0)}`, sub: '单' },
+              { label: '总营收', value: fen2yuan((shift?.total_revenue_fen ?? 0)), sub: '' },
+              { label: '客流量', value: `${(shift?.total_guests ?? 0)}`, sub: '人' },
+              { label: '客单价', value: fen2yuan((shift?.avg_per_guest_fen ?? 0)), sub: '' },
             ].map(kpi => (
               <div key={kpi.label} style={{
                 background: C.card, borderRadius: 12, padding: 16, textAlign: 'center',
@@ -200,7 +256,7 @@ export function HandoverPage() {
             border: `1px solid ${C.border}`,
           }}>
             <h3 style={{ margin: '0 0 16px', fontSize: 18 }}>各渠道金额</h3>
-            {MOCK_SHIFT.channels.map(ch => (
+            {channels.map(ch => (
               <div key={ch.name} style={{
                 display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                 padding: '12px 0', borderBottom: `1px solid ${C.border}`,
@@ -226,7 +282,7 @@ export function HandoverPage() {
               fontSize: 20, fontWeight: 'bold',
             }}>
               <span>合计</span>
-              <span style={{ color: C.accent }}>{fen2yuan(MOCK_SHIFT.totalRevenueFen)}</span>
+              <span style={{ color: C.accent }}>{fen2yuan((shift?.total_revenue_fen ?? 0))}</span>
             </div>
           </div>
         </div>
@@ -241,7 +297,7 @@ export function HandoverPage() {
           }}>
             <div style={{ fontSize: 16, color: C.muted, marginBottom: 4 }}>系统记录现金</div>
             <div style={{ fontSize: 32, fontWeight: 'bold', color: C.accent }}>
-              {fen2yuan(MOCK_SHIFT.systemCashFen)}
+              {fen2yuan(systemCashFen)}
             </div>
           </div>
 
@@ -316,7 +372,7 @@ export function HandoverPage() {
             }}>
               <div style={{ fontSize: 16, color: C.muted, marginBottom: 8 }}>系统金额</div>
               <div style={{ fontSize: 28, fontWeight: 'bold', color: C.white }}>
-                {fen2yuan(MOCK_SHIFT.systemCashFen)}
+                {fen2yuan(systemCashFen)}
               </div>
             </div>
             <div style={{
@@ -414,11 +470,11 @@ export function HandoverPage() {
             <h3 style={{ margin: '0 0 16px', fontSize: 18 }}>交班汇总</h3>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               {[
-                { label: '班次号', value: MOCK_SHIFT.shiftId },
-                { label: '收银员', value: MOCK_SHIFT.cashierName },
-                { label: '时间段', value: `${MOCK_SHIFT.startTime.split(' ')[1]} ~ ${MOCK_SHIFT.endTime.split(' ')[1]}` },
-                { label: '总订单', value: `${MOCK_SHIFT.totalOrders} 单` },
-                { label: '总营收', value: fen2yuan(MOCK_SHIFT.totalRevenueFen) },
+                { label: '班次号', value: shift?.shift_id },
+                { label: '收银员', value: shift?.cashier_name },
+                { label: '时间段', value: `${(shift?.start_time ?? '').split(' ')[1]} ~ ${(shift?.end_time ?? '').split(' ')[1]}` },
+                { label: '总订单', value: `${(shift?.total_orders ?? 0)} 单` },
+                { label: '总营收', value: fen2yuan((shift?.total_revenue_fen ?? 0)) },
                 { label: '现金差异', value: diffFen === 0 ? '无差异' : fen2yuan(diffFen) },
               ].map(item => (
                 <div key={item.label} style={{
@@ -470,7 +526,7 @@ export function HandoverPage() {
                 {signed ? '\u2713' : ''}
               </span>
               <span>
-                我确认以上交班数据准确无误，{MOCK_SHIFT.cashierName} 签字确认
+                我确认以上交班数据准确无误，{shift?.cashier_name} 签字确认
               </span>
             </div>
           </div>
@@ -508,21 +564,22 @@ export function HandoverPage() {
         ) : (
           <button
             onClick={handleSubmit}
-            disabled={!signed}
+            disabled={!signed || submitting}
             style={{
               flex: 2, minHeight: 56, borderRadius: 12,
-              background: signed ? C.green : '#1a2a33',
+              background: signed && !submitting ? C.green : '#1a2a33',
               border: 'none',
               color: signed ? C.white : C.muted,
               fontSize: 18, fontWeight: 700,
-              cursor: signed ? 'pointer' : 'not-allowed',
+              cursor: signed && !submitting ? 'pointer' : 'not-allowed',
               opacity: signed ? 1 : 0.5,
             }}
           >
-            提交交班
+            {submitting ? '提交中...' : '提交交班'}
           </button>
         )}
       </div>
+      </>)}
     </div>
   );
 }

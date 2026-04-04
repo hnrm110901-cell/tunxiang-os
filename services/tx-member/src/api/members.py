@@ -1,4 +1,5 @@
 """会员管理 API — Golden ID + RFM + 旅程 + 企微 SCRM 绑定"""
+import asyncio
 from datetime import datetime
 from typing import Optional
 from uuid import UUID
@@ -6,9 +7,11 @@ from uuid import UUID
 import structlog
 from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel
-from services.repository import WecomRepository
+from services.repository import CustomerRepository, WecomRepository
 from sqlalchemy.exc import IntegrityError
 
+from shared.events.src.emitter import emit_event
+from shared.events.src.event_types import MemberEventType
 from shared.ontology.src.database import get_db_with_tenant
 
 logger = structlog.get_logger()
@@ -32,24 +35,34 @@ async def create_customer(
     req: CreateMemberReq,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
 ):
-    # TODO: 实际创建会员逻辑（当前为占位实现，customer_id 待换为真实 UUID）
-    result = {"ok": True, "data": {"customer_id": "new"}}
+    log = logger.bind(tenant_id=x_tenant_id, phone=req.phone)
+    log.info("create_customer_start")
+
+    try:
+        async with get_db_with_tenant(x_tenant_id) as db:
+            repo = CustomerRepository(db, x_tenant_id)
+            customer = await repo.create_customer({
+                "phone": req.phone,
+                "display_name": req.display_name,
+                "source": req.source,
+            })
+    except IntegrityError:
+        log.warning("create_customer_duplicate_phone", phone=req.phone)
+        raise HTTPException(status_code=409, detail="duplicate_phone")
+
+    customer_id = customer["id"]
+    log.info("create_customer_ok", customer_id=customer_id)
 
     # 发布会员注册事件（不阻塞响应）
-    # 注意：当前 customer_id 为占位值，真实实现时替换为实际 UUID
-    try:
-        tenant_uuid = UUID(x_tenant_id)
-        # customer_uuid 在实际实现中应从 DB 插入结果中获取
-        # 此处为占位，真实 UUID 应在会员创建后发布
-        logger.info(
-            "member_registered_event_pending",
-            tenant_id=x_tenant_id,
-            hint="replace customer_id placeholder with real UUID after DB insert",
-        )
-    except ValueError:
-        logger.warning("create_customer_invalid_tenant_id", tenant_id=x_tenant_id)
+    asyncio.create_task(emit_event(
+        event_type=MemberEventType.REGISTERED,
+        tenant_id=x_tenant_id,
+        stream_id=customer_id,
+        payload={"phone": req.phone, "source": req.source},
+        source_service="tx-member",
+    ))
 
-    return result
+    return {"ok": True, "data": {"customer_id": customer_id}}
 
 @router.get("/customers/{customer_id}")
 async def get_customer(customer_id: str):

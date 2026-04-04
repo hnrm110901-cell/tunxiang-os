@@ -3,56 +3,86 @@
  * 每个预订: 客户名/人数/包厢/特殊要求
  * 状态: 待到店/已到店/已入座/已取消
  */
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import {
+  fetchReservations,
+  createReservation,
+  updateReservationStatus,
+  type Reservation,
+  type ReservationStatus,
+  type CreateReservationPayload,
+} from '../api/reservationApi';
 
-type ReservationStatus = 'pending' | 'arrived' | 'seated' | 'cancelled';
-
-interface Reservation {
-  id: string;
-  customerName: string;
-  phone: string;
-  guestCount: number;
-  timeSlot: string;       // "11:30"
-  roomOrTable: string;    // 包厢/桌号
-  specialRequests: string;
-  status: ReservationStatus;
-  isVip: boolean;
-  reservationCode: string;
-}
+const STORE_ID = import.meta.env.VITE_STORE_ID || 'default-store';
 
 const STATUS_MAP: Record<ReservationStatus, { label: string; color: string; bg: string }> = {
   pending:   { label: '待到店', color: 'var(--tx-info)',    bg: '#EBF3FF' },
   arrived:   { label: '已到店', color: 'var(--tx-primary)', bg: 'var(--tx-primary-light)' },
   seated:    { label: '已入座', color: 'var(--tx-success)', bg: '#E8F5F0' },
   cancelled: { label: '已取消', color: 'var(--tx-text-3)',  bg: '#F0F0F0' },
+  no_show:   { label: '未到店', color: 'var(--tx-danger)',  bg: '#FFF5F5' },
 };
 
 const TIME_SLOTS = ['11:00', '11:30', '12:00', '12:30', '13:00', '17:00', '17:30', '18:00', '18:30', '19:00', '19:30', '20:00'];
 
-// 模拟数据
-const MOCK_RESERVATIONS: Reservation[] = [
-  { id: 'R001', customerName: '张总', phone: '138****6789', guestCount: 8, timeSlot: '11:30', roomOrTable: '牡丹厅', specialRequests: '忌辣、准备茅台2瓶', status: 'pending', isVip: true, reservationCode: 'YD20260327001' },
-  { id: 'R002', customerName: '李女士', phone: '139****1234', guestCount: 4, timeSlot: '11:30', roomOrTable: 'A3桌', specialRequests: '儿童椅1把', status: 'arrived', isVip: false, reservationCode: 'YD20260327002' },
-  { id: 'R003', customerName: '王经理', phone: '136****5678', guestCount: 10, timeSlot: '12:00', roomOrTable: '芙蓉厅', specialRequests: '商务接待、提前摆台', status: 'pending', isVip: true, reservationCode: 'YD20260327003' },
-  { id: 'R004', customerName: '刘先生', phone: '158****4321', guestCount: 2, timeSlot: '12:00', roomOrTable: 'B5桌', specialRequests: '', status: 'seated', isVip: false, reservationCode: 'YD20260327004' },
-  { id: 'R005', customerName: '赵女士', phone: '177****8765', guestCount: 6, timeSlot: '17:30', roomOrTable: '梅花厅', specialRequests: '生日聚会、准备蛋糕位', status: 'pending', isVip: false, reservationCode: 'YD20260327005' },
-  { id: 'R006', customerName: '陈总', phone: '135****9999', guestCount: 12, timeSlot: '18:00', roomOrTable: '国宾厅', specialRequests: '忌海鲜、高端宴请', status: 'pending', isVip: true, reservationCode: 'YD20260327006' },
-  { id: 'R007', customerName: '孙先生', phone: '150****3456', guestCount: 3, timeSlot: '18:30', roomOrTable: 'C2桌', specialRequests: '靠窗位', status: 'cancelled', isVip: false, reservationCode: 'YD20260327007' },
-  { id: 'R008', customerName: '周女士', phone: '188****7777', guestCount: 5, timeSlot: '19:00', roomOrTable: '兰花厅', specialRequests: '家庭聚餐', status: 'pending', isVip: false, reservationCode: 'YD20260327008' },
-];
-
 export function ReservationBoard() {
+  const [reservations, setReservations] = useState<Reservation[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<ReservationStatus | 'all'>('all');
   const [periodFilter, setPeriodFilter] = useState<'lunch' | 'dinner' | 'all'>('all');
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
 
-  const filtered = MOCK_RESERVATIONS.filter(r => {
+  const loadReservations = useCallback(async () => {
+    try {
+      setError(null);
+      const result = await fetchReservations(STORE_ID);
+      setReservations(result.items);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '加载预订数据失败');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadReservations();
+  }, [loadReservations]);
+
+  const handleStatusChange = async (reservationId: string, newStatus: ReservationStatus) => {
+    try {
+      setActionLoading(reservationId);
+      await updateReservationStatus(reservationId, newStatus);
+      await loadReservations();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '更新状态失败');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleCreate = async (payload: CreateReservationPayload) => {
+    try {
+      setActionLoading('create');
+      await createReservation(payload);
+      setShowCreateForm(false);
+      await loadReservations();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '新增预订失败');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const filtered = reservations.filter(r => {
     if (statusFilter !== 'all' && r.status !== statusFilter) return false;
     if (periodFilter === 'lunch') {
-      const hour = parseInt(r.timeSlot.split(':')[0]);
+      const hour = parseInt(r.time_slot.split(':')[0]);
       if (hour >= 17) return false;
     }
     if (periodFilter === 'dinner') {
-      const hour = parseInt(r.timeSlot.split(':')[0]);
+      const hour = parseInt(r.time_slot.split(':')[0]);
       if (hour < 17) return false;
     }
     return true;
@@ -60,24 +90,59 @@ export function ReservationBoard() {
 
   // 按时间段分组
   const grouped = TIME_SLOTS.reduce<Record<string, Reservation[]>>((acc, slot) => {
-    const items = filtered.filter(r => r.timeSlot === slot);
+    const items = filtered.filter(r => r.time_slot === slot);
     if (items.length > 0) acc[slot] = items;
     return acc;
   }, {});
 
   const counts = {
-    total: MOCK_RESERVATIONS.length,
-    pending: MOCK_RESERVATIONS.filter(r => r.status === 'pending').length,
-    arrived: MOCK_RESERVATIONS.filter(r => r.status === 'arrived').length,
-    seated: MOCK_RESERVATIONS.filter(r => r.status === 'seated').length,
-    totalGuests: MOCK_RESERVATIONS.filter(r => r.status !== 'cancelled').reduce((s, r) => s + r.guestCount, 0),
+    total: reservations.length,
+    pending: reservations.filter(r => r.status === 'pending').length,
+    arrived: reservations.filter(r => r.status === 'arrived').length,
+    seated: reservations.filter(r => r.status === 'seated').length,
+    totalGuests: reservations.filter(r => r.status !== 'cancelled').reduce((s, r) => s + r.guest_count, 0),
   };
+
+  if (loading) {
+    return (
+      <div style={{ padding: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+        <div style={{ fontSize: 22, color: 'var(--tx-text-3)' }}>加载预订数据中...</div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ padding: 24 }}>
+      {/* 错误提示 */}
+      {error && (
+        <div style={{
+          background: '#FFF5F5', border: '1px solid var(--tx-danger)', borderRadius: 'var(--tx-radius-sm)',
+          padding: '12px 20px', marginBottom: 16, color: 'var(--tx-danger)', fontSize: 18,
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        }}>
+          <span>{error}</span>
+          <button onClick={() => setError(null)} style={{
+            border: 'none', background: 'transparent', color: 'var(--tx-danger)',
+            fontSize: 18, cursor: 'pointer', fontWeight: 700,
+          }}>关闭</button>
+        </div>
+      )}
+
       {/* 顶部标题 + 统计 */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-        <h1 style={{ fontSize: 32, fontWeight: 800 }}>今日预订台账</h1>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          <h1 style={{ fontSize: 32, fontWeight: 800 }}>今日预订台账</h1>
+          <button
+            onClick={() => setShowCreateForm(true)}
+            style={{
+              minWidth: 100, minHeight: 48, borderRadius: 'var(--tx-radius-sm)',
+              border: 'none', background: 'var(--tx-primary)', color: '#fff',
+              fontSize: 18, fontWeight: 700, cursor: 'pointer',
+            }}
+          >
+            新增预订
+          </button>
+        </div>
         <div style={{ display: 'flex', gap: 20 }}>
           <StatBadge label="总预订" value={counts.total} color="var(--tx-text-1)" />
           <StatBadge label="待到店" value={counts.pending} color="var(--tx-info)" />
@@ -173,14 +238,19 @@ export function ReservationBoard() {
                 background: 'var(--tx-border)',
               }} />
               <span style={{ fontSize: 18, color: 'var(--tx-text-3)' }}>
-                {items.length}桌 / {items.reduce((s, r) => s + r.guestCount, 0)}人
+                {items.length}桌 / {items.reduce((s, r) => s + r.guest_count, 0)}人
               </span>
             </div>
 
             {/* 预订卡片 */}
             <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
               {items.map(r => (
-                <ReservationCard key={r.id} reservation={r} />
+                <ReservationCard
+                  key={r.reservation_id}
+                  reservation={r}
+                  onStatusChange={handleStatusChange}
+                  actionLoading={actionLoading}
+                />
               ))}
             </div>
           </div>
@@ -197,12 +267,30 @@ export function ReservationBoard() {
           </div>
         )}
       </div>
+
+      {/* 新增预订弹窗 */}
+      {showCreateForm && (
+        <CreateReservationModal
+          onClose={() => setShowCreateForm(false)}
+          onSubmit={handleCreate}
+          isLoading={actionLoading === 'create'}
+        />
+      )}
     </div>
   );
 }
 
-function ReservationCard({ reservation: r }: { reservation: Reservation }) {
-  const st = STATUS_MAP[r.status];
+function ReservationCard({
+  reservation: r,
+  onStatusChange,
+  actionLoading,
+}: {
+  reservation: Reservation;
+  onStatusChange: (id: string, status: ReservationStatus) => void;
+  actionLoading: string | null;
+}) {
+  const st = STATUS_MAP[r.status] || STATUS_MAP.pending;
+  const isLoading = actionLoading === r.reservation_id;
 
   return (
     <div style={{
@@ -218,7 +306,7 @@ function ReservationCard({ reservation: r }: { reservation: Reservation }) {
       position: 'relative',
     }}>
       {/* VIP标识 */}
-      {r.isVip && (
+      {r.is_vip && (
         <div style={{
           position: 'absolute',
           top: 12,
@@ -236,22 +324,22 @@ function ReservationCard({ reservation: r }: { reservation: Reservation }) {
 
       {/* 客户名 + 人数 */}
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 8 }}>
-        <span style={{ fontSize: 24, fontWeight: 700 }}>{r.customerName}</span>
-        <span style={{ fontSize: 20, color: 'var(--tx-text-2)' }}>{r.guestCount}人</span>
+        <span style={{ fontSize: 24, fontWeight: 700 }}>{r.customer_name}</span>
+        <span style={{ fontSize: 20, color: 'var(--tx-text-2)' }}>{r.guest_count}人</span>
       </div>
 
       {/* 包厢/桌号 */}
       <div style={{ fontSize: 20, fontWeight: 600, color: 'var(--tx-primary)', marginBottom: 8 }}>
-        {r.roomOrTable}
+        {r.room_or_table}
       </div>
 
       {/* 手机号 + 预订号 */}
       <div style={{ fontSize: 16, color: 'var(--tx-text-3)', marginBottom: 8 }}>
-        {r.phone} | {r.reservationCode}
+        {r.phone} | {r.reservation_code}
       </div>
 
       {/* 特殊要求 */}
-      {r.specialRequests && (
+      {r.special_requests && (
         <div style={{
           fontSize: 18,
           color: 'var(--tx-danger)',
@@ -260,22 +348,174 @@ function ReservationCard({ reservation: r }: { reservation: Reservation }) {
           borderRadius: 6,
           marginBottom: 12,
         }}>
-          {r.specialRequests}
+          {r.special_requests}
         </div>
       )}
 
-      {/* 状态标签 */}
-      <div style={{
-        display: 'inline-block',
-        fontSize: 18,
-        fontWeight: 700,
-        color: st.color,
-        background: st.bg,
-        padding: '4px 16px',
-        borderRadius: 6,
-      }}>
-        {st.label}
+      {/* 状态标签 + 操作按钮 */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        <div style={{
+          display: 'inline-block',
+          fontSize: 18,
+          fontWeight: 700,
+          color: st.color,
+          background: st.bg,
+          padding: '4px 16px',
+          borderRadius: 6,
+        }}>
+          {st.label}
+        </div>
+
+        {/* 状态操作按钮 */}
+        {r.status === 'pending' && (
+          <>
+            <button
+              disabled={isLoading}
+              onClick={() => onStatusChange(r.reservation_id, 'arrived')}
+              style={{
+                fontSize: 16, fontWeight: 700, padding: '4px 12px', borderRadius: 6,
+                border: 'none', background: 'var(--tx-primary)', color: '#fff',
+                cursor: isLoading ? 'not-allowed' : 'pointer', opacity: isLoading ? 0.6 : 1,
+              }}
+            >
+              {isLoading ? '...' : '确认到店'}
+            </button>
+            <button
+              disabled={isLoading}
+              onClick={() => onStatusChange(r.reservation_id, 'cancelled')}
+              style={{
+                fontSize: 16, fontWeight: 700, padding: '4px 12px', borderRadius: 6,
+                border: '1px solid var(--tx-border)', background: '#fff', color: 'var(--tx-text-2)',
+                cursor: isLoading ? 'not-allowed' : 'pointer', opacity: isLoading ? 0.6 : 1,
+              }}
+            >
+              {isLoading ? '...' : '取消'}
+            </button>
+          </>
+        )}
+        {r.status === 'arrived' && (
+          <button
+            disabled={isLoading}
+            onClick={() => onStatusChange(r.reservation_id, 'seated')}
+            style={{
+              fontSize: 16, fontWeight: 700, padding: '4px 12px', borderRadius: 6,
+              border: 'none', background: 'var(--tx-success)', color: '#fff',
+              cursor: isLoading ? 'not-allowed' : 'pointer', opacity: isLoading ? 0.6 : 1,
+            }}
+          >
+            {isLoading ? '...' : '确认入座'}
+          </button>
+        )}
       </div>
+    </div>
+  );
+}
+
+function CreateReservationModal({
+  onClose,
+  onSubmit,
+  isLoading,
+}: {
+  onClose: () => void;
+  onSubmit: (payload: CreateReservationPayload) => void;
+  isLoading: boolean;
+}) {
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [guestCount, setGuestCount] = useState(2);
+  const [timeSlot, setTimeSlot] = useState('12:00');
+  const [roomOrTable, setRoomOrTable] = useState('');
+  const [specialRequests, setSpecialRequests] = useState('');
+
+  const handleSubmit = () => {
+    if (!name.trim() || !phone.trim()) return;
+    onSubmit({
+      store_id: STORE_ID,
+      customer_name: name.trim(),
+      phone: phone.trim(),
+      guest_count: guestCount,
+      time_slot: timeSlot,
+      room_or_table: roomOrTable.trim(),
+      special_requests: specialRequests.trim() || undefined,
+    });
+  };
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100,
+    }}>
+      <div style={{
+        background: '#fff', borderRadius: 'var(--tx-radius-lg)',
+        padding: 32, width: 480, boxShadow: 'var(--tx-shadow-md)',
+      }}>
+        <h2 style={{ fontSize: 24, fontWeight: 800, marginBottom: 24 }}>新增预订</h2>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <FormField label="客户称呼" value={name} onChange={setName} placeholder="客户姓名" />
+          <FormField label="手机号" value={phone} onChange={setPhone} placeholder="手机号码" />
+          <div>
+            <div style={{ fontSize: 18, color: 'var(--tx-text-2)', marginBottom: 8 }}>人数</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <button onClick={() => setGuestCount(Math.max(1, guestCount - 1))} style={stepBtnStyle}>-</button>
+              <span style={{ fontSize: 24, fontWeight: 800, minWidth: 32, textAlign: 'center' }}>{guestCount}</span>
+              <button onClick={() => setGuestCount(guestCount + 1)} style={stepBtnStyle}>+</button>
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: 18, color: 'var(--tx-text-2)', marginBottom: 8 }}>时段</div>
+            <select
+              value={timeSlot}
+              onChange={e => setTimeSlot(e.target.value)}
+              style={{
+                width: '100%', height: 48, borderRadius: 'var(--tx-radius-md)',
+                border: '2px solid var(--tx-border)', padding: '0 12px', fontSize: 18, outline: 'none',
+              }}
+            >
+              {TIME_SLOTS.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+          <FormField label="桌台/包厢" value={roomOrTable} onChange={setRoomOrTable} placeholder="如：牡丹厅 / A3桌" />
+          <FormField label="特殊要求" value={specialRequests} onChange={setSpecialRequests} placeholder="忌口、特殊布置等（选填）" />
+        </div>
+
+        <div style={{ display: 'flex', gap: 12, marginTop: 24 }}>
+          <button onClick={onClose} style={{
+            flex: 1, height: 56, borderRadius: 'var(--tx-radius-md)',
+            border: '2px solid var(--tx-border)', background: '#fff',
+            fontSize: 20, fontWeight: 700, cursor: 'pointer', color: 'var(--tx-text-2)',
+          }}>取消</button>
+          <button onClick={handleSubmit} disabled={isLoading} style={{
+            flex: 1, height: 56, borderRadius: 'var(--tx-radius-md)',
+            border: 'none', background: 'var(--tx-primary)', color: '#fff',
+            fontSize: 20, fontWeight: 700, cursor: isLoading ? 'not-allowed' : 'pointer',
+            opacity: isLoading ? 0.6 : 1,
+          }}>{isLoading ? '提交中...' : '确认创建'}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const stepBtnStyle: React.CSSProperties = {
+  width: 48, height: 48, borderRadius: 'var(--tx-radius-md)',
+  border: '2px solid var(--tx-border)', background: '#fff',
+  fontSize: 22, fontWeight: 700, cursor: 'pointer',
+};
+
+function FormField({ label, value, onChange, placeholder }: {
+  label: string; value: string; onChange: (v: string) => void; placeholder: string;
+}) {
+  return (
+    <div>
+      <div style={{ fontSize: 18, color: 'var(--tx-text-2)', marginBottom: 8 }}>{label}</div>
+      <input
+        value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
+        style={{
+          width: '100%', height: 48, borderRadius: 'var(--tx-radius-md)',
+          border: '2px solid var(--tx-border)', padding: '0 16px', fontSize: 18, outline: 'none',
+        }}
+      />
     </div>
   );
 }

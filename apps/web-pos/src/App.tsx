@@ -22,6 +22,7 @@ import { DiscountAuditPage } from './pages/DiscountAuditPage';
 import { LiveMenuEditorPage } from './pages/LiveMenuEditorPage';
 import { MenuEngineeringPage } from './pages/MenuEngineeringPage';
 import { MenuBoardControlPage } from './pages/MenuBoardControlPage';
+import { MemberPage } from './pages/MemberPage';
 
 const STORE_ID: string =
   (window as Record<string, unknown>).__STORE_ID__ as string || '';
@@ -57,6 +58,7 @@ function AppLayout() {
         <Route path="/live-menu" element={<LiveMenuEditorPage />} />
         <Route path="/menu-engineering" element={<MenuEngineeringPage />} />
         <Route path="/menu-board-control" element={<MenuBoardControlPage />} />
+        <Route path="/members" element={<MemberPage />} />
       </Routes>
     </div>
   );

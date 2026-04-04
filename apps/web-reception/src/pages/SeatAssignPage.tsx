@@ -1,22 +1,17 @@
 /**
  * 桌台分配 — 桌台平面图，按区域/状态着色，点击确认入座
  */
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import {
+  fetchTables,
+  seatAtTable,
+  clearTable,
+  type TableInfo,
+  type TableStatus,
+} from '../api/tablesApi';
 
-type TableStatus = 'available' | 'occupied' | 'reserved' | 'cleaning';
-
-interface TableInfo {
-  id: string;
-  name: string;
-  zone: string;        // 区域
-  capacity: number;
-  status: TableStatus;
-  guestName?: string;
-  guestCount?: number;
-  occupiedSince?: string;
-  minSpend?: number;   // 包厢低消
-  isRoom: boolean;     // 是否包厢
-}
+const STORE_ID = import.meta.env.VITE_STORE_ID || 'default-store';
+const POLL_INTERVAL_MS = 30_000; // 30秒轮询刷新桌台状态
 
 const STATUS_CONFIG: Record<TableStatus, { label: string; color: string; bg: string; border: string }> = {
   available: { label: '空闲', color: 'var(--tx-success)', bg: '#DCFCE7', border: 'var(--tx-success)' },
@@ -25,35 +20,40 @@ const STATUS_CONFIG: Record<TableStatus, { label: string; color: string; bg: str
   cleaning:  { label: '清台', color: 'var(--tx-text-2)',  bg: '#E5E7EB', border: 'var(--tx-text-3)' },
 };
 
-const MOCK_TABLES: TableInfo[] = [
-  // 大厅A区
-  { id: 'A1', name: 'A1', zone: '大厅A区', capacity: 4, status: 'occupied', guestName: '刘先生', guestCount: 3, occupiedSince: '11:20', isRoom: false },
-  { id: 'A2', name: 'A2', zone: '大厅A区', capacity: 4, status: 'available', isRoom: false },
-  { id: 'A3', name: 'A3', zone: '大厅A区', capacity: 6, status: 'reserved', guestName: '李女士(预)', isRoom: false },
-  { id: 'A4', name: 'A4', zone: '大厅A区', capacity: 4, status: 'cleaning', isRoom: false },
-  { id: 'A5', name: 'A5', zone: '大厅A区', capacity: 4, status: 'available', isRoom: false },
-  { id: 'A6', name: 'A6', zone: '大厅A区', capacity: 6, status: 'occupied', guestName: '马女士', guestCount: 5, occupiedSince: '11:05', isRoom: false },
-  // 大厅B区
-  { id: 'B1', name: 'B1', zone: '大厅B区', capacity: 4, status: 'available', isRoom: false },
-  { id: 'B2', name: 'B2', zone: '大厅B区', capacity: 4, status: 'occupied', guestName: '周先生', guestCount: 2, occupiedSince: '11:30', isRoom: false },
-  { id: 'B3', name: 'B3', zone: '大厅B区', capacity: 8, status: 'available', isRoom: false },
-  { id: 'B4', name: 'B4', zone: '大厅B区', capacity: 4, status: 'available', isRoom: false },
-  { id: 'B5', name: 'B5', zone: '大厅B区', capacity: 4, status: 'occupied', guestName: '许先生', guestCount: 4, occupiedSince: '10:55', isRoom: false },
-  // 包厢区
-  { id: 'R1', name: '牡丹厅', zone: '包厢区', capacity: 12, status: 'reserved', guestName: '张总(VIP)', minSpend: 3000, isRoom: true },
-  { id: 'R2', name: '芙蓉厅', zone: '包厢区', capacity: 12, status: 'available', minSpend: 2800, isRoom: true },
-  { id: 'R3', name: '兰花厅', zone: '包厢区', capacity: 8, status: 'occupied', guestName: '黄总', guestCount: 6, occupiedSince: '11:00', minSpend: 2000, isRoom: true },
-  { id: 'R4', name: '梅花厅', zone: '包厢区', capacity: 8, status: 'available', minSpend: 2000, isRoom: true },
-  { id: 'R5', name: '国宾厅', zone: '包厢区', capacity: 16, status: 'reserved', guestName: '陈总(VIP)', minSpend: 5000, isRoom: true },
-];
-
 export function SeatAssignPage() {
-  const [tables, setTables] = useState<TableInfo[]>(MOCK_TABLES);
+  const [tables, setTables] = useState<TableInfo[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [selectedTable, setSelectedTable] = useState<TableInfo | null>(null);
   const [zoneFilter, setZoneFilter] = useState<string>('all');
   const [confirmAssign, setConfirmAssign] = useState(false);
   const [assignName, setAssignName] = useState('');
   const [assignCount, setAssignCount] = useState(2);
+  const [actionLoading, setActionLoading] = useState(false);
+
+  const loadTables = useCallback(async (showLoadingSpinner = false) => {
+    try {
+      if (showLoadingSpinner) setLoading(true);
+      setError(null);
+      const result = await fetchTables(STORE_ID);
+      setTables(result.items);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '加载桌台数据失败');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Initial load
+  useEffect(() => {
+    loadTables(true);
+  }, [loadTables]);
+
+  // Polling for auto-refresh
+  useEffect(() => {
+    const timer = setInterval(() => loadTables(false), POLL_INTERVAL_MS);
+    return () => clearInterval(timer);
+  }, [loadTables]);
 
   const zones = ['all', ...Array.from(new Set(tables.map(t => t.zone)))];
 
@@ -70,21 +70,67 @@ export function SeatAssignPage() {
     cleaning: tables.filter(t => t.status === 'cleaning').length,
   };
 
-  const handleAssign = () => {
+  const handleAssign = async () => {
     if (!selectedTable || !assignName.trim()) return;
-    setTables(prev => prev.map(t =>
-      t.id === selectedTable.id
-        ? { ...t, status: 'occupied' as TableStatus, guestName: assignName, guestCount: assignCount, occupiedSince: new Date().toTimeString().slice(0, 5) }
-        : t
-    ));
-    setConfirmAssign(false);
-    setSelectedTable(null);
-    setAssignName('');
-    setAssignCount(2);
+    try {
+      setActionLoading(true);
+      setError(null);
+      await seatAtTable(
+        STORE_ID,
+        selectedTable.table_id,
+        assignCount,
+        assignName.trim(),
+      );
+      setConfirmAssign(false);
+      setSelectedTable(null);
+      setAssignName('');
+      setAssignCount(2);
+      await loadTables(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '入座分配失败');
+    } finally {
+      setActionLoading(false);
+    }
   };
+
+  const handleClearTable = async (tableId: string) => {
+    try {
+      setActionLoading(true);
+      setError(null);
+      await clearTable(STORE_ID, tableId);
+      await loadTables(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '清台失败');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div style={{ padding: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+        <div style={{ fontSize: 22, color: 'var(--tx-text-3)' }}>加载桌台数据中...</div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ padding: 24, height: '100vh', display: 'flex', flexDirection: 'column' }}>
+      {/* 错误提示 */}
+      {error && (
+        <div style={{
+          background: '#FFF5F5', border: '1px solid var(--tx-danger)', borderRadius: 'var(--tx-radius-sm)',
+          padding: '12px 20px', marginBottom: 16, color: 'var(--tx-danger)', fontSize: 18,
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        }}>
+          <span>{error}</span>
+          <button onClick={() => setError(null)} style={{
+            border: 'none', background: 'transparent', color: 'var(--tx-danger)',
+            fontSize: 18, cursor: 'pointer', fontWeight: 700,
+          }}>关闭</button>
+        </div>
+      )}
+
       {/* 顶部 */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
         <h1 style={{ fontSize: 32, fontWeight: 800 }}>桌台分配</h1>
@@ -146,18 +192,30 @@ export function SeatAssignPage() {
             }}>
               {zoneTables.map(table => {
                 const cfg = STATUS_CONFIG[table.status];
-                const isSelected = selectedTable?.id === table.id;
+                const isSelected = selectedTable?.table_id === table.table_id;
                 return (
                   <button
-                    key={table.id}
+                    key={table.table_id}
                     onClick={() => {
                       setSelectedTable(table);
                       if (table.status === 'available' || table.status === 'reserved') {
                         setConfirmAssign(true);
+                        // Pre-fill guest name if table has a reservation
+                        if (table.guest_name) {
+                          setAssignName(table.guest_name);
+                        }
+                        if (table.guest_count) {
+                          setAssignCount(table.guest_count);
+                        }
+                      } else if (table.status === 'occupied') {
+                        // Show option to clear table
+                        if (confirm(`确认清台 ${table.table_name}？`)) {
+                          handleClearTable(table.table_id);
+                        }
                       }
                     }}
                     style={{
-                      minHeight: table.isRoom ? 140 : 120,
+                      minHeight: table.is_room ? 140 : 120,
                       borderRadius: 'var(--tx-radius-md)',
                       border: `3px solid ${isSelected ? 'var(--tx-primary)' : cfg.border}`,
                       background: cfg.bg,
@@ -173,16 +231,16 @@ export function SeatAssignPage() {
                       position: 'relative',
                     }}
                   >
-                    <div style={{ fontSize: table.isRoom ? 22 : 24, fontWeight: 800 }}>{table.name}</div>
+                    <div style={{ fontSize: table.is_room ? 22 : 24, fontWeight: 800 }}>{table.table_name}</div>
                     <div style={{ fontSize: 16, fontWeight: 600 }}>{table.capacity}人桌</div>
-                    {table.guestName && (
-                      <div style={{ fontSize: 16, marginTop: 2 }}>{table.guestName}</div>
+                    {table.guest_name && (
+                      <div style={{ fontSize: 16, marginTop: 2 }}>{table.guest_name}</div>
                     )}
-                    {table.occupiedSince && (
-                      <div style={{ fontSize: 16, opacity: 0.8 }}>入座 {table.occupiedSince}</div>
+                    {table.occupied_since && (
+                      <div style={{ fontSize: 16, opacity: 0.8 }}>入座 {table.occupied_since}</div>
                     )}
-                    {table.minSpend && table.minSpend > 0 && (
-                      <div style={{ fontSize: 16, opacity: 0.8 }}>低消 ￥{table.minSpend}</div>
+                    {table.min_spend_fen != null && table.min_spend_fen > 0 && (
+                      <div style={{ fontSize: 16, opacity: 0.8 }}>低消 ￥{(table.min_spend_fen / 100).toFixed(0)}</div>
                     )}
                   </button>
                 );
@@ -190,6 +248,17 @@ export function SeatAssignPage() {
             </div>
           </div>
         ))}
+
+        {Object.keys(groupedByZone).length === 0 && (
+          <div style={{
+            textAlign: 'center',
+            padding: 80,
+            fontSize: 20,
+            color: 'var(--tx-text-3)',
+          }}>
+            暂无桌台数据
+          </div>
+        )}
       </div>
 
       {/* 入座确认弹层 */}
@@ -209,11 +278,11 @@ export function SeatAssignPage() {
           }}>
             <h2 style={{ fontSize: 24, fontWeight: 800, marginBottom: 8 }}>确认入座</h2>
             <div style={{ fontSize: 20, color: 'var(--tx-text-2)', marginBottom: 24 }}>
-              {selectedTable.name} ({selectedTable.capacity}人{selectedTable.isRoom ? '包厢' : '桌'})
-              {selectedTable.minSpend ? ` | 低消 ￥${selectedTable.minSpend}` : ''}
+              {selectedTable.table_name} ({selectedTable.capacity}人{selectedTable.is_room ? '包厢' : '桌'})
+              {selectedTable.min_spend_fen ? ` | 低消 ￥${(selectedTable.min_spend_fen / 100).toFixed(0)}` : ''}
             </div>
 
-            {selectedTable.status === 'reserved' && selectedTable.guestName && (
+            {selectedTable.status === 'reserved' && selectedTable.guest_name && (
               <div style={{
                 background: '#FEF3C7',
                 padding: 12,
@@ -222,7 +291,7 @@ export function SeatAssignPage() {
                 color: '#6B4E00',
                 marginBottom: 16,
               }}>
-                已预留给: {selectedTable.guestName}
+                已预留给: {selectedTable.guest_name}
               </div>
             )}
 
@@ -257,7 +326,7 @@ export function SeatAssignPage() {
               </div>
             </div>
 
-            {selectedTable.minSpend && selectedTable.minSpend > 0 && (
+            {selectedTable.min_spend_fen != null && selectedTable.min_spend_fen > 0 && (
               <div style={{
                 background: 'var(--tx-primary-light)',
                 padding: 12,
@@ -267,7 +336,7 @@ export function SeatAssignPage() {
                 fontWeight: 600,
                 marginBottom: 16,
               }}>
-                请提醒客户: 本包厢低消 ￥{selectedTable.minSpend}
+                请提醒客户: 本包厢低消 ￥{(selectedTable.min_spend_fen / 100).toFixed(0)}
               </div>
             )}
 
@@ -277,11 +346,13 @@ export function SeatAssignPage() {
                 border: '2px solid var(--tx-border)', background: '#fff',
                 fontSize: 20, fontWeight: 700, cursor: 'pointer', color: 'var(--tx-text-2)',
               }}>取消</button>
-              <button onClick={handleAssign} style={{
+              <button onClick={handleAssign} disabled={actionLoading} style={{
                 flex: 1, height: 56, borderRadius: 'var(--tx-radius-md)',
                 border: 'none', background: 'var(--tx-primary)', color: '#fff',
-                fontSize: 20, fontWeight: 700, cursor: 'pointer',
-              }}>确认入座</button>
+                fontSize: 20, fontWeight: 700,
+                cursor: actionLoading ? 'not-allowed' : 'pointer',
+                opacity: actionLoading ? 0.6 : 1,
+              }}>{actionLoading ? '处理中...' : '确认入座'}</button>
             </div>
           </div>
         </div>

@@ -1,93 +1,137 @@
 /**
  * 到店签到 — 搜索客户 → 确认到店 → 显示客户偏好 → 推荐桌台
  */
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
+import {
+  searchCustomer,
+  checkInCustomer,
+  type CustomerProfile,
+} from '../api/memberDepthApi';
+import {
+  recommendTable,
+} from '../api/tablesApi';
+import {
+  findByCode,
+} from '../api/reservationApi';
 
-interface CustomerProfile {
-  id: string;
-  name: string;
-  phone: string;
-  reservationCode: string;
-  guestCount: number;
-  timeSlot: string;
-  roomOrTable: string;
-  isVip: boolean;
-  vipLevel: string;
-  lastVisit: string;
-  lastSpend: number;
-  totalVisits: number;
-  preferences: string[];    // 口味偏好
-  allergies: string[];      // 忌口
-  favoriteItems: string[];  // 常点菜
-  notes: string;
+const STORE_ID = import.meta.env.VITE_STORE_ID || '';
+
+interface RecommendedTable {
+  table_id: string;
+  table_name: string;
+  zone: string;
+  score: number;
+  reason: string;
 }
-
-// 模拟搜索结果
-const MOCK_CUSTOMERS: CustomerProfile[] = [
-  {
-    id: 'C001', name: '张总', phone: '13812346789', reservationCode: 'YD20260327001',
-    guestCount: 8, timeSlot: '11:30', roomOrTable: '牡丹厅',
-    isVip: true, vipLevel: '至尊VIP',
-    lastVisit: '2026-03-15', lastSpend: 6800, totalVisits: 42,
-    preferences: ['偏清淡', '爱喝茶'], allergies: ['辣椒', '花生'],
-    favoriteItems: ['清蒸东星斑', '松茸炖鸡汤', '荷塘小炒'],
-    notes: '习惯坐主宾位左侧，喜欢安静包厢',
-  },
-  {
-    id: 'C002', name: '李女士', phone: '13912341234', reservationCode: 'YD20260327002',
-    guestCount: 4, timeSlot: '11:30', roomOrTable: 'A3桌',
-    isVip: false, vipLevel: '银卡会员',
-    lastVisit: '2026-03-20', lastSpend: 420, totalVisits: 8,
-    preferences: ['微辣'], allergies: [],
-    favoriteItems: ['酸菜鱼', '蒜蓉西兰花'],
-    notes: '带小孩，需要儿童椅',
-  },
-  {
-    id: 'C003', name: '王经理', phone: '13612345678', reservationCode: 'YD20260327003',
-    guestCount: 10, timeSlot: '12:00', roomOrTable: '芙蓉厅',
-    isVip: true, vipLevel: '黄金VIP',
-    lastVisit: '2026-03-10', lastSpend: 8200, totalVisits: 15,
-    preferences: ['商务宴请风格'], allergies: ['海鲜（甲壳类）'],
-    favoriteItems: ['极品牛排', '佛跳墙', '精品凉菜拼盘'],
-    notes: '多次商务接待，重视摆台和服务节奏',
-  },
-];
-
-const RECOMMENDED_TABLES = [
-  { id: 'T-MuDan', name: '牡丹厅', type: '大包厢', capacity: 12, status: 'reserved', minSpend: 3000 },
-  { id: 'T-FuRong', name: '芙蓉厅', type: '大包厢', capacity: 12, status: 'available', minSpend: 2800 },
-  { id: 'T-A3', name: 'A3桌', type: '大厅', capacity: 6, status: 'reserved', minSpend: 0 },
-  { id: 'T-B1', name: 'B1桌', type: '大厅', capacity: 4, status: 'available', minSpend: 0 },
-];
 
 export function CheckInPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<CustomerProfile[]>([]);
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerProfile | null>(null);
   const [checkedIn, setCheckedIn] = useState(false);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [checkInLoading, setCheckInLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [recommendedTables, setRecommendedTables] = useState<RecommendedTable[]>([]);
+  const [tablesLoading, setTablesLoading] = useState(false);
+  // Track reservation info found via code lookup
+  const [reservationInfo, setReservationInfo] = useState<{
+    reservation_id: string;
+    time_slot: string;
+    guest_count: number;
+    room_or_table: string;
+    reservation_code: string;
+  } | null>(null);
 
-  const handleSearch = () => {
-    if (!searchQuery.trim()) return;
-    const q = searchQuery.trim().toLowerCase();
-    const results = MOCK_CUSTOMERS.filter(c =>
-      c.phone.includes(q) ||
-      c.reservationCode.toLowerCase().includes(q) ||
-      c.name.includes(q)
-    );
-    setSearchResults(results);
-    setSelectedCustomer(null);
-    setCheckedIn(false);
-  };
+  const handleSearch = useCallback(async () => {
+    const q = searchQuery.trim();
+    if (!q) return;
+    try {
+      setSearchLoading(true);
+      setError(null);
+      setSelectedCustomer(null);
+      setCheckedIn(false);
+      setReservationInfo(null);
 
-  const handleCheckIn = () => {
-    setCheckedIn(true);
-  };
+      // Search for customers by keyword (phone/name)
+      const result = await searchCustomer(q);
+      setSearchResults(result.items);
+
+      // If it looks like a reservation code, also try to look it up
+      if (q.toUpperCase().startsWith('YD') || q.length >= 10) {
+        try {
+          const reservation = await findByCode(q);
+          // If we found a reservation, store its info for display
+          setReservationInfo({
+            reservation_id: reservation.reservation_id,
+            time_slot: reservation.time_slot,
+            guest_count: reservation.guest_count,
+            room_or_table: reservation.room_or_table,
+            reservation_code: reservation.reservation_code,
+          });
+        } catch {
+          // Not a valid reservation code, ignore
+        }
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '搜索失败，请重试');
+      setSearchResults([]);
+    } finally {
+      setSearchLoading(false);
+    }
+  }, [searchQuery]);
+
+  const handleCheckIn = useCallback(async () => {
+    if (!selectedCustomer) return;
+    try {
+      setCheckInLoading(true);
+      setError(null);
+      await checkInCustomer(
+        STORE_ID,
+        selectedCustomer.member_id,
+        reservationInfo?.reservation_id,
+      );
+      setCheckedIn(true);
+
+      // After check-in, fetch recommended tables
+      setTablesLoading(true);
+      try {
+        const guestCount = reservationInfo?.guest_count || 2;
+        const result = await recommendTable(STORE_ID, guestCount, selectedCustomer.preferences);
+        setRecommendedTables(result.items);
+      } catch {
+        // Non-critical: table recommendation failed, don't block flow
+        setRecommendedTables([]);
+      } finally {
+        setTablesLoading(false);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '签到失败，请重试');
+    } finally {
+      setCheckInLoading(false);
+    }
+  }, [selectedCustomer, reservationInfo]);
 
   return (
     <div style={{ padding: 24, display: 'flex', gap: 24, height: '100vh' }}>
       {/* 左侧：搜索 + 结果 */}
       <div style={{ flex: '0 0 420px', display: 'flex', flexDirection: 'column', gap: 20 }}>
         <h1 style={{ fontSize: 32, fontWeight: 800 }}>到店签到</h1>
+
+        {/* 错误提示 */}
+        {error && (
+          <div style={{
+            background: '#FFF5F5', border: '1px solid var(--tx-danger)', borderRadius: 'var(--tx-radius-sm)',
+            padding: '12px 20px', color: 'var(--tx-danger)', fontSize: 18,
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          }}>
+            <span>{error}</span>
+            <button onClick={() => setError(null)} style={{
+              border: 'none', background: 'transparent', color: 'var(--tx-danger)',
+              fontSize: 18, cursor: 'pointer', fontWeight: 700,
+            }}>关闭</button>
+          </div>
+        )}
 
         {/* 搜索栏 */}
         <div style={{ display: 'flex', gap: 12 }}>
@@ -108,6 +152,7 @@ export function CheckInPage() {
           />
           <button
             onClick={handleSearch}
+            disabled={searchLoading}
             style={{
               minWidth: 80,
               height: 56,
@@ -117,10 +162,11 @@ export function CheckInPage() {
               color: '#fff',
               fontSize: 20,
               fontWeight: 700,
-              cursor: 'pointer',
+              cursor: searchLoading ? 'not-allowed' : 'pointer',
+              opacity: searchLoading ? 0.6 : 1,
             }}
           >
-            搜索
+            {searchLoading ? '...' : '搜索'}
           </button>
         </div>
 
@@ -133,18 +179,23 @@ export function CheckInPage() {
           flexDirection: 'column',
           gap: 12,
         }}>
-          {searchResults.length === 0 && searchQuery && (
+          {searchLoading && (
+            <div style={{ padding: 40, textAlign: 'center', color: 'var(--tx-text-3)', fontSize: 18 }}>
+              搜索中...
+            </div>
+          )}
+          {!searchLoading && searchResults.length === 0 && searchQuery && (
             <div style={{ padding: 40, textAlign: 'center', color: 'var(--tx-text-3)', fontSize: 18 }}>
               未找到匹配客户，请核实信息
             </div>
           )}
           {searchResults.map(c => (
             <button
-              key={c.id}
-              onClick={() => { setSelectedCustomer(c); setCheckedIn(false); }}
+              key={c.member_id}
+              onClick={() => { setSelectedCustomer(c); setCheckedIn(false); setRecommendedTables([]); }}
               style={{
-                background: selectedCustomer?.id === c.id ? 'var(--tx-primary-light)' : '#fff',
-                border: `2px solid ${selectedCustomer?.id === c.id ? 'var(--tx-primary)' : 'var(--tx-border)'}`,
+                background: selectedCustomer?.member_id === c.member_id ? 'var(--tx-primary-light)' : '#fff',
+                border: `2px solid ${selectedCustomer?.member_id === c.member_id ? 'var(--tx-primary)' : 'var(--tx-border)'}`,
                 borderRadius: 'var(--tx-radius-md)',
                 padding: 16,
                 textAlign: 'left',
@@ -154,15 +205,18 @@ export function CheckInPage() {
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ fontSize: 22, fontWeight: 700 }}>{c.name}</span>
-                {c.isVip && (
+                {c.is_vip && (
                   <span style={{
                     background: '#FFD700', color: '#6B4E00',
                     fontSize: 16, fontWeight: 800, padding: '2px 8px', borderRadius: 4,
                   }}>VIP</span>
                 )}
+                {c.vip_level && (
+                  <span style={{ fontSize: 16, color: 'var(--tx-text-3)' }}>{c.vip_level}</span>
+                )}
               </div>
               <div style={{ fontSize: 18, color: 'var(--tx-text-2)', marginTop: 4 }}>
-                {c.phone} | {c.guestCount}人 | {c.timeSlot} | {c.roomOrTable}
+                {c.phone} | 累计{c.total_visits}次 | {c.favorite_seat || '无常坐位'}
               </div>
             </button>
           ))}
@@ -202,21 +256,22 @@ export function CheckInPage() {
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                   <span style={{ fontSize: 28, fontWeight: 800 }}>{selectedCustomer.name}</span>
-                  {selectedCustomer.isVip && (
+                  {selectedCustomer.is_vip && (
                     <span style={{
                       background: '#FFD700', color: '#6B4E00',
                       fontSize: 18, fontWeight: 800, padding: '4px 12px', borderRadius: 6,
-                    }}>{selectedCustomer.vipLevel}</span>
+                    }}>{selectedCustomer.vip_level}</span>
                   )}
                 </div>
                 <div style={{ fontSize: 18, color: 'var(--tx-text-2)', marginTop: 4 }}>
-                  {selectedCustomer.phone} | 累计到店 {selectedCustomer.totalVisits} 次
+                  {selectedCustomer.phone} | 累计到店 {selectedCustomer.total_visits} 次
                 </div>
               </div>
 
               {!checkedIn ? (
                 <button
                   onClick={handleCheckIn}
+                  disabled={checkInLoading}
                   style={{
                     minWidth: 140,
                     height: 56,
@@ -226,10 +281,11 @@ export function CheckInPage() {
                     color: '#fff',
                     fontSize: 22,
                     fontWeight: 700,
-                    cursor: 'pointer',
+                    cursor: checkInLoading ? 'not-allowed' : 'pointer',
+                    opacity: checkInLoading ? 0.6 : 1,
                   }}
                 >
-                  确认到店
+                  {checkInLoading ? '签到中...' : '确认到店'}
                 </button>
               ) : (
                 <div style={{
@@ -257,12 +313,12 @@ export function CheckInPage() {
               gap: 16,
               marginBottom: 24,
             }}>
-              <InfoCell label="预订时间" value={selectedCustomer.timeSlot} />
-              <InfoCell label="人数" value={`${selectedCustomer.guestCount}人`} />
-              <InfoCell label="桌台/包厢" value={selectedCustomer.roomOrTable} />
-              <InfoCell label="上次到店" value={selectedCustomer.lastVisit} />
-              <InfoCell label="上次消费" value={`￥${selectedCustomer.lastSpend}`} />
-              <InfoCell label="预订号" value={selectedCustomer.reservationCode} />
+              <InfoCell label="预订时间" value={reservationInfo?.time_slot || '-'} />
+              <InfoCell label="人数" value={reservationInfo ? `${reservationInfo.guest_count}人` : '-'} />
+              <InfoCell label="桌台/包厢" value={reservationInfo?.room_or_table || '-'} />
+              <InfoCell label="上次到店" value={selectedCustomer.last_visit || '-'} />
+              <InfoCell label="上次消费" value={selectedCustomer.last_spend_fen ? `￥${(selectedCustomer.last_spend_fen / 100).toFixed(0)}` : '-'} />
+              <InfoCell label="预订号" value={reservationInfo?.reservation_code || '-'} />
             </div>
 
             {/* 口味偏好 */}
@@ -291,9 +347,12 @@ export function CheckInPage() {
             {/* 常点菜品 */}
             <SectionTitle>常点菜品</SectionTitle>
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 24 }}>
-              {selectedCustomer.favoriteItems.map(f => (
+              {selectedCustomer.favorite_items.map(f => (
                 <Tag key={f} color="var(--tx-primary)" bg="var(--tx-primary-light)">{f}</Tag>
               ))}
+              {selectedCustomer.favorite_items.length === 0 && (
+                <span style={{ fontSize: 18, color: 'var(--tx-text-3)' }}>暂无记录</span>
+              )}
             </div>
 
             {/* 备注 */}
@@ -317,34 +376,40 @@ export function CheckInPage() {
             {checkedIn && (
               <>
                 <SectionTitle>推荐桌台</SectionTitle>
-                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                  {RECOMMENDED_TABLES
-                    .filter(t => t.capacity >= selectedCustomer.guestCount)
-                    .map(t => (
-                      <div key={t.id} style={{
-                        background: t.name === selectedCustomer.roomOrTable ? 'var(--tx-primary-light)' : 'var(--tx-bg-2)',
-                        border: `2px solid ${t.name === selectedCustomer.roomOrTable ? 'var(--tx-primary)' : 'var(--tx-border)'}`,
-                        borderRadius: 'var(--tx-radius-md)',
-                        padding: 16,
-                        minWidth: 160,
-                        cursor: 'pointer',
-                      }}>
-                        <div style={{ fontSize: 20, fontWeight: 700 }}>{t.name}</div>
-                        <div style={{ fontSize: 16, color: 'var(--tx-text-2)' }}>{t.type} | {t.capacity}人</div>
-                        {t.minSpend > 0 && (
-                          <div style={{ fontSize: 16, color: 'var(--tx-warning)', marginTop: 4 }}>
-                            低消 ￥{t.minSpend}
-                          </div>
-                        )}
-                        {t.name === selectedCustomer.roomOrTable && (
-                          <div style={{ fontSize: 16, color: 'var(--tx-primary)', fontWeight: 700, marginTop: 4 }}>
-                            已预留
-                          </div>
-                        )}
-                      </div>
-                    ))
-                  }
-                </div>
+                {tablesLoading ? (
+                  <div style={{ fontSize: 18, color: 'var(--tx-text-3)' }}>加载推荐桌台中...</div>
+                ) : recommendedTables.length > 0 ? (
+                  <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                    {recommendedTables.map(t => {
+                      const isReserved = reservationInfo != null && t.table_name === reservationInfo.room_or_table;
+                      return (
+                        <div key={t.table_id} style={{
+                          background: isReserved ? 'var(--tx-primary-light)' : 'var(--tx-bg-2)',
+                          border: `2px solid ${isReserved ? 'var(--tx-primary)' : 'var(--tx-border)'}`,
+                          borderRadius: 'var(--tx-radius-md)',
+                          padding: 16,
+                          minWidth: 160,
+                          cursor: 'pointer',
+                        }}>
+                          <div style={{ fontSize: 20, fontWeight: 700 }}>{t.table_name}</div>
+                          <div style={{ fontSize: 16, color: 'var(--tx-text-2)' }}>{t.zone}</div>
+                          {t.reason && (
+                            <div style={{ fontSize: 16, color: 'var(--tx-primary)', marginTop: 4 }}>
+                              {t.reason}
+                            </div>
+                          )}
+                          {isReserved && (
+                            <div style={{ fontSize: 16, color: 'var(--tx-primary)', fontWeight: 700, marginTop: 4 }}>
+                              已预留
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div style={{ fontSize: 18, color: 'var(--tx-text-3)' }}>暂无推荐桌台</div>
+                )}
               </>
             )}
           </>
