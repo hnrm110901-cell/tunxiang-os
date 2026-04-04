@@ -3,10 +3,14 @@
 8种渠道独立毛利核算。
 金额统一存分（fen），展示时 /100 转元。
 """
+import asyncio
 import math
 from datetime import date
 
 import structlog
+
+from shared.events.src.emitter import emit_event
+from shared.events.src.event_types import ChannelEventType
 
 logger = structlog.get_logger()
 
@@ -131,6 +135,30 @@ class SalesChannelEngine:
             net_profit_fen=net_profit_fen,
             net_margin_rate=round(net_margin_rate, 4),
         )
+
+        # 发射 CHANNEL.COMMISSION_CALC 事件（供 ChannelMarginProjector 更新 mv_channel_margin）
+        tenant_id = order.get("tenant_id", "")
+        store_id = order.get("store_id", "")
+        if tenant_id and store_id:
+            asyncio.create_task(emit_event(
+                event_type=ChannelEventType.COMMISSION_CALC,
+                tenant_id=tenant_id,
+                stream_id=str(order.get("order_id", "")),
+                payload={
+                    "channel": channel,
+                    "gross_revenue_fen": gross_revenue_fen,
+                    "commission_fen": platform_commission_fen,     # ChannelMarginProjector 读取此字段
+                    "platform_commission_fen": platform_commission_fen,  # 保留原名便于审计
+                    "commission_rate": commission_rate,
+                    "payment_fee_fen": payment_fee_fen,
+                    "food_cost_fen": food_cost_fen,
+                    "net_profit_fen": net_profit_fen,
+                    "net_margin_rate": round(net_margin_rate, 4),
+                },
+                store_id=store_id,
+                source_service="tx-trade",
+                metadata={"channel": channel},
+            ))
 
         return result
 

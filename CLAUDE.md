@@ -118,9 +118,17 @@ tunxiang-os/
     sync-engine/                # Python — 本地PG ↔ 云端PG 增量同步（300秒/轮）
   shared/
     ontology/                   # Ontology 实体定义（Pydantic models）
-    db-migrations/              # Alembic 迁移（113 个版本，v001-v104）
+    db-migrations/              # Alembic 迁移（148 个版本，v001-v148）
+      # v147: 统一事件存储表（events + projector_checkpoints）
+      # v148: 8个物化视图（mv_discount_health/mv_channel_margin/mv_inventory_bom
+      #        mv_member_clv/mv_store_pnl/mv_daily_settlement/mv_safety_compliance/mv_energy_efficiency）
     adapters/                   # 10 个旧系统 Adapter（品智/奥琦玮/天财/美团/饿了么/抖音等）
-    events/                     # 事件驱动系统（Redis Streams + PG LISTEN/NOTIFY）
+    events/                     # 统一事件总线（Event Sourcing + CQRS，v147/v148）
+      src/
+        pg_event_store.py       #   PostgreSQL append-only 事件存储写入器
+        emitter.py              #   平行事件发射器（Redis Stream + PG 双写）
+        projector.py            #   投影器基类（事件流 → 物化视图）
+        event_types.py          #   10大域事件类型（订单/折扣/支付/会员/库存/渠道/宴会/结算/食安/能耗）
     hardware/                   # 硬件接口（商米SDK/电子秤/打印机/钱箱/扫码枪）
     vector_store/               # 向量存储（嵌入/相似度搜索）
   infra/
@@ -438,7 +446,65 @@ const printReceipt = async (data: OrderData) => {
 
 ---
 
-## 十五、每日开发日志规范
+## 十五、统一事件总线规范（Event Sourcing + CQRS，v147起）
+
+> 2026-04-04 升级。方案来源：tunxiangos upgrade proposal.docx
+
+### 核心原则
+一切业务动作 = 不可变事件。七条因果链 = 同一事件流的七个视图。
+
+### 事件写入（Phase 1 — 并行写入）
+所有业务写入路径在原有逻辑后，用 `asyncio.create_task(emit_event(...))` 旁路写入事件：
+
+```python
+from shared.events.src.emitter import emit_event
+from shared.events.src.event_types import OrderEventType
+
+# 在业务代码写入路径（完成原有逻辑后）：
+asyncio.create_task(emit_event(
+    event_type=OrderEventType.PAID,
+    tenant_id=tenant_id,
+    stream_id=str(order_id),        # 聚合根ID
+    payload={"total_fen": 8800},    # 金额全部用分（整数）
+    store_id=store_id,
+    source_service="tx-trade",
+    metadata={"operator_id": "..."},
+    causation_id=None,              # 因果链追踪
+))
+```
+
+### 事件类型强制规则
+- 使用 `shared.events.src.event_types` 中已定义的枚举，不硬编码字符串
+- 新事件类型必须先在 `event_types.py` 中注册，再使用
+- payload 中所有金额字段单位为**分（整数）**，不使用浮点
+
+### 物化视图（Phase 2 — 投影器）
+- 8个物化视图（`mv_*`）由投影器从事件流异步生成
+- Agent 和报表**只读物化视图**，不跨服务查询
+- 视图损坏时：`await projector.rebuild()` 从��件流完整重建
+
+### 哪些业务域��要接入 emit_event
+| 域 | 关键事件 | 服务 | 状态 |
+|---|---|---|---|
+| 订单 | ORDER.PAID | tx-trade/cashier_engine.py | ✅ Phase 1 接入 |
+| 折扣 | DISCOUNT.APPLIED | tx-trade/cashier_engine.py | ✅ Phase 1 接入 |
+| 支付 | PAYMENT.CONFIRMED | tx-trade/cashier_engine.py | ✅ Phase 1 接入 |
+| 会员储值 | MEMBER.RECHARGED/CONSUMED | tx-member/stored_value_routes.py | ✅ Phase 1 接入 |
+| 日结 | SETTLEMENT.DAILY_CLOSED | tx-ops/daily_settlement_routes.py | ✅ Phase 1 接入 |
+| 库存 | INVENTORY.RECEIVED/CONSUMED/WASTED/ADJUSTED | tx-supply/inventory.py + deduction_routes.py | ✅ Phase 1 接入 |
+| 渠道 | CHANNEL.ORDER_SYNCED | tx-trade/webhook_routes.py（美团/饿了么/抖音） | ✅ Phase 1 接入 |
+| 食安 | SAFETY.SAMPLE_LOGGED/TEMPERATURE_RECORDED/INSPECTION_DONE/VIOLATION_FOUND | tx-ops/food_safety_routes.py | ✅ Phase 4 接入 |
+| 能耗 | ENERGY.READING_CAPTURED/ANOMALY_DETECTED/BENCHMARK_SET | tx-ops/energy_routes.py | ✅ Phase 4 接入 |
+
+### 迁移阶段时间线
+- **v147 (Phase 1)**：events 表 + projector_checkpoints（并行写入，不影响现有服务）
+- **v148 (Phase 2)**：8个物化视图（投影器消费事件后填充）
+- **Phase 3**：Agent 和报表切换为读物化视图（不再跨服务查询）
+- **Phase 4**：食安/能耗/舆情新模块直接基于事件总线建设
+
+---
+
+## 十六、每日开发日志规范
 
 每次开发结束后，在 `DEVLOG.md` 顶部追加当日记录，格式如下：
 

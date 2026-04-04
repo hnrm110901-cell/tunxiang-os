@@ -3,6 +3,7 @@
 完整实现10个API端点的后端逻辑，覆盖开台→点单→结算全流程。
 所有金额单位：分（fen）。三条硬约束在此层校验。
 """
+import asyncio
 import math
 import uuid
 from datetime import datetime, timezone
@@ -12,6 +13,8 @@ import structlog
 from sqlalchemy import Date, and_, cast, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from shared.events.src.emitter import emit_event
+from shared.events.src.event_types import DiscountEventType, OrderEventType, PaymentEventType
 from shared.ontology.src.entities import Customer, Dish, Order, OrderItem, Store
 from shared.ontology.src.enums import OrderStatus
 
@@ -600,6 +603,27 @@ class CashierEngine:
             new_final=new_final,
         )
 
+        # ─── Phase 1 平行事件写入：折扣应用事件 ───
+        asyncio.create_task(emit_event(
+            event_type=DiscountEventType.APPLIED,
+            tenant_id=self.tenant_id,
+            stream_id=order_id,
+            payload={
+                "discount_type": discount_type,
+                "discount_fen": discount_fen,
+                "original_total_fen": total,
+                "new_total_fen": new_final,
+                "reason": reason,
+                "approval_id": approval_id,
+                "margin_after": margin_check.get("margin"),
+                "margin_passed": margin_check["passed"],
+                "threshold_exceeded": not margin_check["passed"],
+            },
+            store_id=str(order.store_id) if order.store_id else None,
+            source_service="tx-trade",
+            metadata={"order_no": order.order_no},
+        ))
+
         return {
             "applied": True,
             "discount_fen": discount_fen,
@@ -719,6 +743,40 @@ class CashierEngine:
             payments_count=len(payments),
             auto_pay=auto_pay,
         )
+
+        # ─── Phase 1 平行事件写入：订单完成 + 支付确认 ───
+        payment_methods = [p["method"] for p in payments]
+        asyncio.create_task(emit_event(
+            event_type=OrderEventType.PAID,
+            tenant_id=self.tenant_id,
+            stream_id=order_id,
+            payload={
+                "order_no": order.order_no,
+                "final_amount_fen": order.final_amount_fen,
+                "discount_amount_fen": order.discount_amount_fen,
+                "total_amount_fen": order.total_amount_fen,
+                "payment_methods": payment_methods,
+                "customer_id": str(order.customer_id) if order.customer_id else None,
+                "table_number": order.table_number,
+                "change_fen": change_fen,
+            },
+            store_id=str(order.store_id) if order.store_id else None,
+            source_service="tx-trade",
+            metadata={"auto_pay": auto_pay},
+        ))
+        asyncio.create_task(emit_event(
+            event_type=PaymentEventType.CONFIRMED,
+            tenant_id=self.tenant_id,
+            stream_id=order_id,
+            payload={
+                "order_no": order.order_no,
+                "amount_fen": order.final_amount_fen,
+                "payment_records": payment_records,
+                "channel": payment_methods[0] if payment_methods else "unknown",
+            },
+            store_id=str(order.store_id) if order.store_id else None,
+            source_service="tx-trade",
+        ))
 
         # ─── 支付后推券（异步不阻塞） ───
         effective_customer_id = customer_id or (

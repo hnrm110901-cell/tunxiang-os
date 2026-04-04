@@ -14,6 +14,8 @@ from shared.ontology.src.database import get_db_with_tenant
 from .agents.domain_event_consumer import DomainEventConsumer
 from .api.agent_monitor_routes import router as agent_monitor_router
 from .api.daily_review_routes import router as daily_review_router
+from .api.master_agent_routes import router as master_agent_router
+from .api.projector_routes import router as projector_router
 from .api.dashboard_routes import router as dashboard_router
 from .api.health_routes import router as health_router
 from .api.inventory_routes import router as inventory_router
@@ -58,6 +60,21 @@ async def lifespan(app: FastAPI):
 
     consumer = DomainEventConsumer(event_bus, master_agent=master)
     consumer_task = asyncio.create_task(consumer.run())
+
+    # ── Phase 2 投影器启动（Event Sourcing → 物化视图）──
+    # 从 PROJECTOR_TENANT_IDS 环境变量读取需要运行投影器的租户列表
+    # 格式：逗号分隔的 UUID 字符串，如 "uuid1,uuid2"
+    import os as _os
+    from .services.projector_runner import get_runner
+
+    projector_tenant_ids = [
+        t.strip() for t in _os.getenv("PROJECTOR_TENANT_IDS", "").split(",")
+        if t.strip()
+    ]
+    runner = get_runner()
+    if projector_tenant_ids:
+        await runner.start(tenant_ids=projector_tenant_ids)
+
     try:
         yield
     finally:
@@ -67,6 +84,8 @@ async def lifespan(app: FastAPI):
             await consumer_task
         except asyncio.CancelledError:
             pass
+        # 停止所有投影器
+        await runner.stop()
 
 
 app = FastAPI(
@@ -94,6 +113,8 @@ app.include_router(specials_router)
 app.include_router(inventory_router)
 app.include_router(agent_monitor_router)
 app.include_router(store_health_router)
+app.include_router(master_agent_router)
+app.include_router(projector_router)
 
 
 @app.get("/health")

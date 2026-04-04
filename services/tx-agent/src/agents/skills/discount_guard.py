@@ -4,15 +4,18 @@
 能力：折扣异常实时检测、证照扫描、财务报表、凭证解释、对账
 边缘推理：Core ML 异常折扣检测（< 50ms）
 
-全部 6 个 action 已实现。
+Phase 3 升级（2026-04-04）：
+  新增 get_daily_discount_health — 直接读取 mv_discount_health 物化视图
+  替代原有的跨服务查询模式（读视图延迟 < 5ms vs 跨服务拼接 > 100ms）
 """
 import asyncio
 import os
-from datetime import datetime, timezone
-from typing import Any
+from datetime import datetime, date, timezone
+from typing import Any, Optional
 
 import httpx
 import structlog
+from sqlalchemy import text
 
 from ..base import AgentResult, SkillAgent
 
@@ -33,6 +36,7 @@ class DiscountGuardAgent(SkillAgent):
     def get_supported_actions(self) -> list[str]:
         return [
             "detect_discount_anomaly",
+            "get_daily_discount_health",   # Phase 3: 直接读物化视图
             "scan_store_licenses",
             "scan_all_licenses",
             "get_financial_report",
@@ -44,6 +48,7 @@ class DiscountGuardAgent(SkillAgent):
     async def execute(self, action: str, params: dict[str, Any]) -> AgentResult:
         dispatch = {
             "detect_discount_anomaly": self._detect_anomaly,
+            "get_daily_discount_health": self._get_daily_discount_health,
             "scan_store_licenses": self._scan_licenses,
             "scan_all_licenses": self._scan_all,
             "get_financial_report": self._get_report,
@@ -124,6 +129,157 @@ class DiscountGuardAgent(SkillAgent):
             confidence=0.95 if not llm_analysis else 0.99,
             inference_layer="edge" if not llm_analysis else "cloud",
         )
+
+    async def _get_daily_discount_health(self, params: dict) -> AgentResult:
+        """Phase 3 — 直接读 mv_discount_health 物化视图，返回当日折扣健康摘要。
+
+        替代原有的跨服务查询模式。视图由 DiscountHealthProjector 实时维护。
+
+        Params:
+            store_id:   门店 ID（必传）
+            stat_date:  统计日期（YYYY-MM-DD，默认今日）
+            threshold:  折扣率告警阈值（默认 0.3）
+        """
+        store_id = params.get("store_id") or self.store_id
+        stat_date_str = params.get("stat_date")
+        threshold = float(params.get("threshold", 0.3))
+
+        if not store_id:
+            return AgentResult(
+                success=False, action="get_daily_discount_health",
+                error="store_id 必传",
+            )
+
+        if not self._db:
+            return AgentResult(
+                success=False, action="get_daily_discount_health",
+                error="DB 未注入，无法读取物化视图",
+            )
+
+        try:
+            stat_date: date = (
+                date.fromisoformat(stat_date_str)
+                if stat_date_str
+                else date.today()
+            )
+
+            row = await self._db.execute(
+                text("""
+                    SELECT
+                        total_orders,
+                        discounted_orders,
+                        discount_rate,
+                        total_discount_fen,
+                        unauthorized_count,
+                        threshold_breaches,
+                        leak_types,
+                        updated_at
+                    FROM mv_discount_health
+                    WHERE tenant_id = :tid
+                      AND store_id = :sid
+                      AND stat_date = :dt
+                """),
+                {
+                    "tid": self.tenant_id,
+                    "sid": store_id,
+                    "dt": stat_date,
+                },
+            )
+            health = dict((row.mappings().first() or {}))
+
+            if not health:
+                return AgentResult(
+                    success=True, action="get_daily_discount_health",
+                    data={
+                        "store_id": store_id,
+                        "stat_date": stat_date.isoformat(),
+                        "message": "暂无数据（投影器尚未消费到今日事件）",
+                        "discount_rate": 0,
+                        "is_alert": False,
+                    },
+                    reasoning="mv_discount_health 无当日记录",
+                    confidence=0.5,
+                )
+
+            discount_rate = float(health.get("discount_rate", 0))
+            unauthorized = int(health.get("unauthorized_count", 0))
+            threshold_breaches = int(health.get("threshold_breaches", 0))
+            is_alert = (
+                discount_rate > threshold
+                or unauthorized > 0
+                or threshold_breaches > 0
+            )
+
+            # 风险等级
+            if discount_rate > 0.5 or threshold_breaches > 3:
+                risk_level = "critical"
+            elif discount_rate > threshold or unauthorized > 0:
+                risk_level = "high"
+            elif discount_rate > threshold * 0.7:
+                risk_level = "medium"
+            else:
+                risk_level = "low"
+
+            # 若有风险且有 Claude，进行深度分析
+            llm_analysis = ""
+            if is_alert and risk_level in ("critical", "high") and self._router:
+                try:
+                    leak_types = health.get("leak_types") or {}
+                    llm_analysis = await self._router.complete(
+                        tenant_id=self.tenant_id,
+                        task_type="standard_analysis",
+                        system="你是餐饮收银审计专家，分析折扣健康数据并给出处理建议。用中文，80字以内。",
+                        messages=[{"role": "user", "content":
+                            f"今日折扣率{discount_rate:.1%}（阈值{threshold:.1%}），"
+                            f"未授权折扣{unauthorized}次，超毛利底线{threshold_breaches}次，"
+                            f"泄漏类型：{leak_types}。请评估风险并给出具体处理建议。"
+                        }],
+                        max_tokens=150,
+                        db=self._db,
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning("discount_health_llm_fallback", error=str(exc))
+
+            return AgentResult(
+                success=True,
+                action="get_daily_discount_health",
+                data={
+                    "store_id": store_id,
+                    "stat_date": stat_date.isoformat(),
+                    "total_orders": health.get("total_orders", 0),
+                    "discounted_orders": health.get("discounted_orders", 0),
+                    "discount_rate": discount_rate,
+                    "total_discount_yuan": round(int(health.get("total_discount_fen", 0)) / 100, 2),
+                    "unauthorized_count": unauthorized,
+                    "threshold_breaches": threshold_breaches,
+                    "leak_types": health.get("leak_types") or {},
+                    "is_alert": is_alert,
+                    "risk_level": risk_level,
+                    "threshold": threshold,
+                    "llm_analysis": llm_analysis,
+                    "data_freshness": health.get("updated_at", ""),
+                    "source": "mv_discount_health",  # Phase 3 标识
+                },
+                reasoning=(
+                    f"折扣率{discount_rate:.1%}，未授权{unauthorized}次，"
+                    f"超毛利底线{threshold_breaches}次，风险等级={risk_level}。"
+                    + (f"Claude分析：{llm_analysis[:40]}" if llm_analysis else "规则引擎判断")
+                ),
+                confidence=0.99 if llm_analysis else 0.95,
+                inference_layer="cloud" if llm_analysis else "edge",
+            )
+
+        except Exception as exc:  # noqa: BLE001
+            logger.error(
+                "get_daily_discount_health_failed",
+                store_id=store_id,
+                error=str(exc),
+                exc_info=True,
+            )
+            return AgentResult(
+                success=False, action="get_daily_discount_health",
+                error=f"读取物化视图失败: {exc}",
+            )
 
     async def _scan_licenses(self, params: dict) -> AgentResult:
         """单门店证照扫描"""

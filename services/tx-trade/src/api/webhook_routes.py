@@ -2,6 +2,7 @@
 
 接收美团/饿了么/抖音外卖订单推送，验签后解析订单并持久化到数据库。
 """
+import asyncio
 import hashlib
 import hmac as hmac_mod
 import os
@@ -12,6 +13,8 @@ import structlog
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
+from shared.events.src.emitter import emit_event
+from shared.events.src.event_types import ChannelEventType
 from ..services.delivery_adapter import DeliveryPlatformAdapter
 
 logger = structlog.get_logger()
@@ -222,6 +225,23 @@ async def meituan_order_push(request: Request) -> WebhookResp:
         platform_order_id=order_id,
     )
 
+    # ─── Phase 1 平行事件写入：渠道订单同步 ───
+    asyncio.create_task(emit_event(
+        event_type=ChannelEventType.ORDER_SYNCED,
+        tenant_id=tenant_id,
+        stream_id=order_id,
+        payload={
+            "platform_order_id": order_id,
+            "channel": "meituan",
+            "amount_fen": total_fen,
+            "item_count": len(items),
+            "internal_order_id": result.get("order_id"),
+        },
+        store_id=store_id,
+        source_service="tx-trade",
+        metadata={"webhook": "meituan"},
+    ))
+
     return WebhookResp(ok=True, data=result)
 
 
@@ -331,6 +351,23 @@ async def eleme_order_push(request: Request) -> WebhookResp:
         platform_order_id=order_id,
     )
 
+    # ─── Phase 1 平行事件写入：渠道订单同步 ───
+    asyncio.create_task(emit_event(
+        event_type=ChannelEventType.ORDER_SYNCED,
+        tenant_id=tenant_id,
+        stream_id=order_id,
+        payload={
+            "platform_order_id": order_id,
+            "channel": "eleme",
+            "amount_fen": total_fen,
+            "item_count": len(items),
+            "internal_order_id": result.get("order_id"),
+        },
+        store_id=store_id,
+        source_service="tx-trade",
+        metadata={"webhook": "eleme"},
+    ))
+
     return WebhookResp(ok=True, data=result)
 
 
@@ -437,5 +474,21 @@ async def douyin_order_push(request: Request) -> WebhookResp:
         order_id=result["order_id"],
         platform_order_id=order_id,
     )
+
+    asyncio.create_task(emit_event(
+        event_type=ChannelEventType.ORDER_SYNCED,
+        tenant_id=tenant_id,
+        stream_id=order_id,
+        payload={
+            "platform_order_id": order_id,
+            "channel": "douyin",
+            "amount_fen": total_fen,
+            "item_count": len(items),
+            "internal_order_id": result.get("order_id"),
+        },
+        store_id=store_id,
+        source_service="tx-trade",
+        metadata={"webhook": "douyin"},
+    ))
 
     return WebhookResp(ok=True, data=result)

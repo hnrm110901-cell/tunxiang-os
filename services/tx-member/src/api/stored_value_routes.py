@@ -32,12 +32,13 @@
   GET    /api/v1/member/stored-value/{card_no}/balance      余额查询
   GET    /api/v1/member/stored-value/{card_no}/transactions 流水查询
 """
+import asyncio
 import uuid
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, Field
-from services.stored_value_service import (
+from ..services.stored_value_service import (
     CardNotActiveError,
     InsufficientBalanceError,
     PlanNotFoundError,
@@ -46,6 +47,8 @@ from services.stored_value_service import (
 )
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from shared.events.src.emitter import emit_event
+from shared.events.src.event_types import MemberEventType, SettlementEventType
 from shared.ontology.src.database import get_db_with_tenant
 
 router = APIRouter(prefix="/api/v1/member/stored-value", tags=["stored-value"])
@@ -193,6 +196,37 @@ async def account_recharge(
             store_id=req.store_id,
             remark=req.remark,
         )
+        # ─── Phase 1 平行事件写入：储值充值（负债事件） ───
+        asyncio.create_task(emit_event(
+            event_type=MemberEventType.RECHARGED,
+            tenant_id=tenant_id,
+            stream_id=str(card_id),
+            payload={
+                "amount_fen": req.amount_fen,
+                "gift_amount_fen": req.gift_amount_fen or 0,
+                "new_balance_fen": result.get("balance_fen", 0),
+                "operator_id": str(req.operator_id) if req.operator_id else None,
+                "remark": req.remark,
+                "customer_id": result.get("customer_id"),
+            },
+            store_id=str(req.store_id) if req.store_id else None,
+            source_service="tx-member",
+            metadata={"card_id": str(card_id)},
+        ))
+        # 充值同时记录储值负债事件（收入确认视图用）
+        asyncio.create_task(emit_event(
+            event_type=SettlementEventType.STORED_VALUE_DEFERRED,
+            tenant_id=tenant_id,
+            stream_id=str(card_id),
+            payload={
+                "amount_fen": req.amount_fen,
+                "gift_amount_fen": req.gift_amount_fen or 0,
+                "card_id": str(card_id),
+                "customer_id": result.get("customer_id"),
+            },
+            store_id=str(req.store_id) if req.store_id else None,
+            source_service="tx-member",
+        ))
         return {"ok": True, "data": result}
     except (CardNotActiveError, ValueError) as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
@@ -217,6 +251,36 @@ async def account_consume(
             order_id=req.order_id,
             store_id=req.store_id,
         )
+        # ─── Phase 1 平行事件写入：储值消费（收入确认事件） ───
+        asyncio.create_task(emit_event(
+            event_type=MemberEventType.CONSUMED,
+            tenant_id=tenant_id,
+            stream_id=str(card_id),
+            payload={
+                "amount_fen": req.amount_fen,
+                "remaining_balance_fen": result.get("balance_fen", 0),
+                "order_id": str(req.order_id) if req.order_id else None,
+                "customer_id": result.get("customer_id"),
+            },
+            store_id=str(req.store_id) if req.store_id else None,
+            source_service="tx-member",
+            metadata={"card_id": str(card_id)},
+            causation_id=str(req.order_id) if req.order_id else None,
+        ))
+        # 储值消费同时触发收入确认
+        asyncio.create_task(emit_event(
+            event_type=SettlementEventType.ADVANCE_CONSUMED,
+            tenant_id=tenant_id,
+            stream_id=str(card_id),
+            payload={
+                "amount_fen": req.amount_fen,
+                "card_id": str(card_id),
+                "order_id": str(req.order_id) if req.order_id else None,
+                "customer_id": result.get("customer_id"),
+            },
+            store_id=str(req.store_id) if req.store_id else None,
+            source_service="tx-member",
+        ))
         return {"ok": True, "data": result}
     except InsufficientBalanceError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e

@@ -44,6 +44,7 @@ class MemberInsightAgent(SkillAgent):
             "trigger_journey", "get_churn_risks", "process_bad_review",
             "monitor_service_quality", "handle_complaint", "collect_feedback",
             "rfm_analysis", "update_customer_rfm",
+            "get_clv_snapshot",         # Phase 3: 读 mv_member_clv
         ]
 
     async def execute(self, action: str, params: dict[str, Any]) -> AgentResult:
@@ -59,6 +60,7 @@ class MemberInsightAgent(SkillAgent):
             "collect_feedback": self._collect_feedback,
             "rfm_analysis": self._rfm_analysis,
             "update_customer_rfm": self._update_customer_rfm,
+            "get_clv_snapshot": self._get_clv_snapshot,
         }
         handler = dispatch.get(action)
         if not handler:
@@ -479,4 +481,78 @@ class MemberInsightAgent(SkillAgent):
             },
             reasoning=f"会员 RFM 更新：R{r_score}F{f_score}M{m_score}={rfm_total}，分层={segment}",
             confidence=0.9 if self._db else 0.7,
+        )
+
+    # ─── Phase 3: 读 mv_member_clv 物化视图（< 5ms） ───
+
+    async def _get_clv_snapshot(self, params: dict) -> AgentResult:
+        """从 mv_member_clv 读取高价值会员CLV快照（Phase 3）。
+
+        替代原来 tx-member 跨服务查询，响应 < 5ms。
+        支持按 churn_probability 快速筛选流失风险会员。
+
+        注意：mv_member_clv 以 (tenant_id, customer_id) 为主键，
+        CLV 是全租户维度聚合（不按门店分区）。store_id 参数仅作日志记录，不用于过滤。
+        """
+        from sqlalchemy import text
+
+        top_n: int = params.get("top_n", 20)
+        min_clv_fen: int = params.get("min_clv_fen", 0)
+        churn_threshold: float = params.get("churn_threshold", 0.0)
+
+        if not self._db:
+            return AgentResult(
+                success=False, action="get_clv_snapshot",
+                error="无DB连接，无法读取物化视图",
+            )
+
+        rows = await self._db.execute(text("""
+            SELECT
+                customer_id, visit_count,
+                total_spend_fen, clv_fen,
+                stored_value_balance_fen, churn_probability, rfm_segment,
+                last_visit_at, updated_at
+            FROM mv_member_clv
+            WHERE tenant_id = :tenant_id
+              AND clv_fen >= :min_clv_fen
+              AND churn_probability >= :churn_threshold
+            ORDER BY clv_fen DESC
+            LIMIT :top_n
+        """), {
+            "tenant_id": self.tenant_id,
+            "min_clv_fen": min_clv_fen,
+            "churn_threshold": churn_threshold,
+            "top_n": top_n,
+        })
+
+        members = []
+        for r in rows.mappings():
+            item = dict(r)
+            item["customer_id"] = str(item["customer_id"])
+            for key in ("last_visit_at", "updated_at"):
+                if item.get(key):
+                    item[key] = item[key].isoformat()
+            item["clv_yuan"] = round(int(item.get("clv_fen") or 0) / 100, 2)
+            item["total_spend_yuan"] = round(int(item.get("total_spend_fen") or 0) / 100, 2)
+            item["stored_value_balance_yuan"] = round(int(item.get("stored_value_balance_fen") or 0) / 100, 2)
+            members.append(item)
+
+        high_churn = [m for m in members if float(m.get("churn_probability") or 0) > 0.6]
+        total_clv_fen = sum(int(m.get("clv_fen") or 0) for m in members)
+
+        return AgentResult(
+            success=True, action="get_clv_snapshot",
+            data={
+                "members": members,
+                "total_returned": len(members),
+                "total_clv_yuan": round(total_clv_fen / 100, 2),
+                "high_churn_count": len(high_churn),
+                "source": "mv_member_clv",
+            },
+            reasoning=(
+                f"CLV快照：Top{len(members)}会员，总CLV¥{total_clv_fen/100:.0f}，"
+                f"{len(high_churn)}人流失风险>60%"
+            ),
+            confidence=0.95,
+            inference_layer="cloud",
         )

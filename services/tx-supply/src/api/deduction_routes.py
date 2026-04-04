@@ -12,12 +12,16 @@
 """
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from shared.events.src.emitter import emit_event
+from shared.events.src.event_types import InventoryEventType
 from shared.ontology.src.database import get_db
 
 from ..services.auto_deduction import deduct_for_order, rollback_deduction
@@ -30,6 +34,14 @@ from ..services.stocktake_service import (
 from ..services.waste_attribution import analyze_waste, get_top_waste_items
 
 router = APIRouter(prefix="/api/v1/supply", tags=["deduction-stocktake-waste"])
+
+
+async def _set_rls(db: AsyncSession, tenant_id: str) -> None:
+    """设置 RLS 上下文变量 app.tenant_id（路由层防御纵深）。"""
+    await db.execute(
+        text("SELECT set_config('app.tenant_id', :tid, true)"),
+        {"tid": str(tenant_id)},
+    )
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -76,9 +88,28 @@ async def deduct_for_order_route(
     根据每道菜的 BOM 配方扣减门店库存，创建 consume 类型流水。
     库存不足时记录告警但不阻塞。
     """
+    await _set_rls(db, x_tenant_id)
     try:
         order_items = [item.model_dump() for item in body.order_items]
         data = await deduct_for_order(order_id, order_items, body.store_id, x_tenant_id, db)
+        # ─── Phase 1 平行事件写入：BOM扣料（每个食材一条事件）───
+        for deducted in data.get("deducted_items", []):
+            asyncio.create_task(emit_event(
+                event_type=InventoryEventType.CONSUMED,
+                tenant_id=x_tenant_id,
+                stream_id=deducted.get("ingredient_id", order_id),
+                payload={
+                    "ingredient_id": deducted.get("ingredient_id"),
+                    "ingredient_name": deducted.get("ingredient_name", ""),
+                    "quantity_g": deducted.get("quantity", 0),
+                    "theoretical_g": deducted.get("theoretical_quantity", deducted.get("quantity", 0)),
+                    "order_id": order_id,
+                    "bom_deduction": True,
+                },
+                store_id=body.store_id,
+                source_service="tx-supply",
+                causation_id=order_id,
+            ))
         return {"ok": True, "data": data}
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
@@ -94,6 +125,7 @@ async def rollback_deduction_route(
 
     查找该订单产生的所有 consume 流水，逐条反向回补库存。
     """
+    await _set_rls(db, x_tenant_id)
     try:
         data = await rollback_deduction(order_id, x_tenant_id, db)
         return {"ok": True, "data": data}
@@ -113,6 +145,7 @@ async def create_stocktake_route(
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     """创建盘点单，快照当前系统库存"""
+    await _set_rls(db, x_tenant_id)
     try:
         data = await create_stocktake(store_id, x_tenant_id, db)
         return {"ok": True, "data": data}
@@ -128,6 +161,7 @@ async def record_count_route(
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     """录入单条原料的实盘数量"""
+    await _set_rls(db, x_tenant_id)
     try:
         data = await record_count(stocktake_id, body.ingredient_id, body.actual_qty, x_tenant_id, db)
         return {"ok": True, "data": data}
@@ -142,6 +176,7 @@ async def finalize_stocktake_route(
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     """完成盘点：对比系统库存 vs 实盘，生成差异报告"""
+    await _set_rls(db, x_tenant_id)
     try:
         data = await finalize_stocktake(stocktake_id, x_tenant_id, db)
         return {"ok": True, "data": data}
@@ -156,6 +191,7 @@ async def get_stocktake_history_route(
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     """历史盘点列表"""
+    await _set_rls(db, x_tenant_id)
     try:
         data = await get_stocktake_history(store_id, x_tenant_id, db)
         return {"ok": True, "data": data}
@@ -180,6 +216,7 @@ async def get_waste_analysis(
 
     返回 by_type / by_ingredient / by_time_slot 三个维度。
     """
+    await _set_rls(db, x_tenant_id)
     try:
         data = await analyze_waste(store_id, date_from, date_to, x_tenant_id, db)
         return {"ok": True, "data": data}
@@ -196,6 +233,7 @@ async def get_top_waste_items_route(
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     """损耗金额最高的原料排行"""
+    await _set_rls(db, x_tenant_id)
     try:
         data = await get_top_waste_items(store_id, x_tenant_id, db, limit=limit)
         return {"ok": True, "data": data}
