@@ -34,8 +34,6 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-tunxiang}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme_dev}
       POSTGRES_DB: ${POSTGRES_DB:-tunxiang_os}
-    ports:
-      - "${PG_PORT:-5432}:5432"
     volumes:
       - pg_data:/var/lib/postgresql/data
       - ./init-rls.sql:/docker-entrypoint-initdb.d/01-rls.sql
@@ -56,8 +54,6 @@ services:
         --requirepass ${REDIS_PASSWORD:-}
         --maxmemory 256mb
         --maxmemory-policy allkeys-lru
-    ports:
-      - "${REDIS_PORT:-6379}:6379"
     volumes:
       - redis_data:/data
     healthcheck:
