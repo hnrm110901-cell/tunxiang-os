@@ -20,6 +20,7 @@ Create Date: 2026-03-31
 """
 
 from alembic import op
+import sqlalchemy as sa
 
 revision = "v047"
 down_revision = "v046"
@@ -190,7 +191,7 @@ def upgrade() -> None:
     # 5. soldout_records — 沽清记录（全链路同步基础）
     #    后厨在KDS上标记沽清后，同步到POS菜单/小程序菜单/前台显示
     # ─────────────────────────────────────────────────────────────────
-    op.execute("""
+    op.execute(sa.text("""
         CREATE TABLE IF NOT EXISTS soldout_records (
             id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
             tenant_id       UUID        NOT NULL,
@@ -218,7 +219,7 @@ def upgrade() -> None:
             WHERE is_active = TRUE;
         CREATE INDEX IF NOT EXISTS ix_soldout_dish_store
             ON soldout_records (tenant_id, dish_id, store_id);
-    """)
+    """))
 
     # RLS: soldout_records
     op.execute("""
