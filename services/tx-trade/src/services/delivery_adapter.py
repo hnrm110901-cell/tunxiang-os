@@ -10,6 +10,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
+import httpx
 import structlog
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from shared.ontology.src.database import _SET_TENANT_SQL, async_session_factory
 
 from ..models.delivery_order import DeliveryOrder
+from .platform_clients import BasePlatformClient, get_platform_client
 
 logger = structlog.get_logger()
 
@@ -100,6 +102,19 @@ class DeliveryPlatformAdapter:
         self.tenant_id = tenant_id
         self.menu_items = menu_items or []
         self._db_session = db_session
+
+        # 初始化各平台 API 客户端（凭证未配置时为 None，调用时安全跳过）
+        self._platform_clients: dict[str, BasePlatformClient] = {}
+        for platform_key in self.PLATFORMS:
+            client = get_platform_client(platform_key)
+            if client is not None:
+                self._platform_clients[platform_key] = client
+            else:
+                logger.debug(
+                    "platform_client_not_configured",
+                    platform=platform_key,
+                    store_id=store_id,
+                )
 
     async def _get_session(self) -> AsyncSession:
         """获取带 tenant_id 的 DB session"""
@@ -662,16 +677,57 @@ class DeliveryPlatformAdapter:
         return order
 
     async def _notify_platform(self, platform: str, event: str, data: dict) -> None:
-        """通知平台（生产环境替换为真实API调用）
+        """通知外卖平台 -- 调用平台 API 同步订单状态。
 
-        TODO: 注入 MeituanClient / ElemeClient 实现真实通知
+        平台 API 调用失败不阻断订单流程，仅记录日志。
+        平台凭证未配置时安全跳过。
         """
-        logger.info(
-            "platform_notified",
-            platform=platform,
-            event=event,
-            data=data,
-        )
+        client = self._platform_clients.get(platform)
+        if client is None:
+            logger.warning(
+                "platform_notify_skipped",
+                platform=platform,
+                event=event,
+                reason="client_not_configured",
+            )
+            return
+
+        platform_order_id = data.get("platform_order_id", "")
+        log = logger.bind(platform=platform, event=event, platform_order_id=platform_order_id)
+
+        try:
+            if event == "order_confirmed":
+                result = await client.confirm_order(
+                    platform_order_id=platform_order_id,
+                    estimated_minutes=data.get("estimated_ready_min", 30),
+                )
+            elif event == "order_ready":
+                result = await client.mark_ready(
+                    platform_order_id=platform_order_id,
+                )
+            elif event == "order_cancelled":
+                result = await client.cancel_order(
+                    platform_order_id=platform_order_id,
+                    reason_code=data.get("reason_code", 1),
+                    reason=data.get("reason", ""),
+                )
+            else:
+                log.info("platform_notify_unknown_event", data=data)
+                return
+
+            if isinstance(result, dict) and result.get("ok") is False:
+                log.error(
+                    "platform_notify_api_error",
+                    error=result.get("error"),
+                    detail=result.get("detail", ""),
+                )
+            else:
+                log.info("platform_notify_ok", result_keys=list(result.keys()) if isinstance(result, dict) else None)
+
+        except httpx.HTTPError as exc:
+            log.error("platform_notify_http_error", error=str(exc))
+        except ValueError as exc:
+            log.error("platform_notify_value_error", error=str(exc))
 
     @staticmethod
     async def sync_menu_to_platform(
@@ -679,36 +735,55 @@ class DeliveryPlatformAdapter:
         platform: str,
         menu_items: list[dict],
     ) -> dict:
-        """推送门店菜单到外卖平台（静态方法，独立于订单流程）
+        """推送门店菜单/库存到外卖平台 API。
+
+        每个 menu_item 应包含:
+            dish_id          -- 内部菜品 ID
+            name             -- 菜品名称
+            price_fen        -- 单价（分）
+            stock            -- 库存数量（0 表示售罄）
+            platform_dish_id -- 平台侧菜品/SKU ID（用于 API 调用）
 
         Returns:
-            {platform, synced_count, failed_count, details}
+            {platform, synced_count, failed_count, details, api_result}
         """
         if platform not in DeliveryPlatformAdapter.PLATFORMS:
             raise ValueError(f"不支持的平台: {platform}")
 
+        platform_config = DeliveryPlatformAdapter.PLATFORMS[platform]
+
         if not menu_items:
             return {
                 'platform': platform,
-                'platform_name': DeliveryPlatformAdapter.PLATFORMS[platform]['name'],
+                'platform_name': platform_config['name'],
                 'synced_count': 0,
                 'failed_count': 0,
                 'details': [],
                 'message': '菜单为空，无需同步',
             }
 
+        # 构建平台同步载荷并收集明细
         synced: list[dict] = []
         failed: list[dict] = []
+        dish_mappings: list[dict] = []
 
         for item in menu_items:
             try:
-                platform_sku = f"{platform.upper()}_{item.get('dish_id', uuid.uuid4().hex[:8])}"
+                platform_dish_id = item.get(
+                    'platform_dish_id',
+                    f"{platform.upper()}_{item.get('dish_id', uuid.uuid4().hex[:8])}",
+                )
+                stock = item.get('stock', 999)
+                dish_mappings.append({
+                    'platform_dish_id': platform_dish_id,
+                    'stock': stock,
+                })
                 synced.append({
                     'dish_id': item.get('dish_id', ''),
                     'name': item.get('name', ''),
                     'price_fen': item.get('price_fen', 0),
-                    'stock': item.get('stock', 999),
-                    'platform_sku_id': platform_sku,
+                    'stock': stock,
+                    'platform_dish_id': platform_dish_id,
                     'status': 'synced',
                 })
             except (ValueError, RuntimeError) as e:
@@ -719,20 +794,59 @@ class DeliveryPlatformAdapter:
                     'status': 'failed',
                 })
 
+        # 调用平台 API 同步库存（凭证未配置时跳过，不阻断）
+        api_result: dict[str, Any] | None = None
+        client = get_platform_client(platform)
+        if client is not None and dish_mappings:
+            try:
+                api_result = await client.sync_dish_stock(dish_mappings)
+                if isinstance(api_result, dict) and api_result.get("ok") is False:
+                    logger.error(
+                        "menu_sync_api_error",
+                        platform=platform,
+                        store_id=store_id,
+                        error=api_result.get("error"),
+                        detail=api_result.get("detail", ""),
+                    )
+            except httpx.HTTPError as exc:
+                logger.error(
+                    "menu_sync_http_error",
+                    platform=platform,
+                    store_id=store_id,
+                    error=str(exc),
+                )
+                api_result = {"ok": False, "error": str(exc)}
+            except ValueError as exc:
+                logger.error(
+                    "menu_sync_value_error",
+                    platform=platform,
+                    store_id=store_id,
+                    error=str(exc),
+                )
+                api_result = {"ok": False, "error": str(exc)}
+        elif client is None:
+            logger.warning(
+                "menu_sync_client_not_configured",
+                platform=platform,
+                store_id=store_id,
+            )
+
         logger.info(
             "menu_synced_to_platform",
             store_id=store_id,
             platform=platform,
             synced=len(synced),
             failed=len(failed),
+            api_called=client is not None,
         )
 
         return {
             'platform': platform,
-            'platform_name': DeliveryPlatformAdapter.PLATFORMS[platform]['name'],
+            'platform_name': platform_config['name'],
             'store_id': store_id,
             'synced_count': len(synced),
             'failed_count': len(failed),
             'details': synced + failed,
+            'api_result': api_result,
             'synced_at': datetime.now(timezone.utc).isoformat(),
         }
