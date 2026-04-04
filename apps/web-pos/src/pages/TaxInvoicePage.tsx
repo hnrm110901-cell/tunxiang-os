@@ -4,6 +4,7 @@
  */
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { submitInvoice, type SubmitInvoiceResult } from '../api/tradeApi';
 
 const fen2yuan = (fen: number) => `¥${(fen / 100).toFixed(2)}`;
 
@@ -58,6 +59,8 @@ export function TaxInvoicePage() {
   const [step, setStep] = useState<'type' | 'info' | 'confirm' | 'done'>('type');
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [invoiceResult, setInvoiceResult] = useState<SubmitInvoiceResult | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   // Mock 订单金额
   const orderAmountFen = 35600;
@@ -112,29 +115,26 @@ export function TaxInvoicePage() {
   const handleSubmit = async () => {
     if (submitting) return;
     setSubmitting(true);
+    setSubmitError(null);
     try {
-      // TODO: 调用税控接口
-      // await txFetch(`/api/v1/finance/invoice`, {
-      //   method: 'POST',
-      //   body: JSON.stringify({
-      //     order_id: orderId,
-      //     invoice_type: form.type,
-      //     title: form.title,
-      //     tax_no: form.taxNo,
-      //     bank_name: form.bankName,
-      //     bank_account: form.bankAccount,
-      //     company_address: form.companyAddress,
-      //     company_phone: form.companyPhone,
-      //     receiver_email: form.receiverEmail,
-      //     receiver_phone: form.receiverPhone,
-      //     remark: form.remark,
-      //     amount_fen: orderAmountFen,
-      //   }),
-      // });
-      await new Promise((r) => setTimeout(r, 800));
+      const result = await submitInvoice({
+        order_id: orderId || '',
+        invoice_type: form.type,
+        title: form.title,
+        tax_no: form.taxNo,
+        amount_fen: orderAmountFen,
+        bank_name: form.bankName || undefined,
+        bank_account: form.bankAccount || undefined,
+        company_address: form.companyAddress || undefined,
+        company_phone: form.companyPhone || undefined,
+        receiver_email: form.receiverEmail || undefined,
+        receiver_phone: form.receiverPhone || undefined,
+        remark: form.remark || undefined,
+      });
+      setInvoiceResult(result);
       setStep('done');
     } catch (e) {
-      alert(`开票失败: ${e instanceof Error ? e.message : '未知错误'}`);
+      setSubmitError(e instanceof Error ? e.message : '开票请求失败，请重试');
     } finally {
       setSubmitting(false);
     }
@@ -370,9 +370,27 @@ export function TaxInvoicePage() {
               {form.remark && <InfoRow label="备注" value={form.remark} />}
             </div>
 
+            {submitError && (
+              <div style={{
+                background: '#2D1A1A', border: '1px solid #A32D2D', borderRadius: 12,
+                padding: 16, marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              }}>
+                <span style={{ color: '#FF6B6B', fontSize: 16 }}>{submitError}</span>
+                <button
+                  onClick={handleSubmit}
+                  style={{
+                    padding: '8px 20px', background: '#A32D2D', border: 'none', borderRadius: 8,
+                    color: '#fff', fontSize: 14, cursor: 'pointer', whiteSpace: 'nowrap', marginLeft: 12,
+                  }}
+                >
+                  重试
+                </button>
+              </div>
+            )}
+
             <div style={{ display: 'flex', gap: 12 }}>
               <button
-                onClick={() => setStep('info')}
+                onClick={() => { setStep('info'); setSubmitError(null); }}
                 style={{ flex: 1, padding: 16, background: '#333', border: 'none', borderRadius: 12, color: '#fff', fontSize: 18, cursor: 'pointer', minHeight: 56 }}
               >
                 返回修改
@@ -408,6 +426,17 @@ export function TaxInvoicePage() {
               ✓
             </div>
             <h2 style={{ fontSize: 24, marginBottom: 8, color: '#0F6E56' }}>开票请求已提交</h2>
+
+            {invoiceResult && (
+              <div style={{
+                background: '#112B36', borderRadius: 12, padding: 20, marginBottom: 20, textAlign: 'left',
+              }}>
+                <InfoRow label="发票编号" value={invoiceResult.invoice_no} highlight />
+                <InfoRow label="发票状态" value={invoiceResult.status === 'issued' ? '已开具' : invoiceResult.status === 'pending' ? '处理中' : invoiceResult.status} />
+                <InfoRow label="发票金额" value={fen2yuan(orderAmountFen)} />
+              </div>
+            )}
+
             <div style={{ fontSize: 16, color: '#8899A6', marginBottom: 12 }}>
               {form.type === 'electronic'
                 ? `电子发票将发送至 ${form.receiverEmail || form.receiverPhone}`
@@ -416,22 +445,37 @@ export function TaxInvoicePage() {
                   : '增值税专票将在 1-3 个工作日内寄出'
               }
             </div>
-            <div style={{ fontSize: 16, color: '#8899A6', marginBottom: 32 }}>
-              发票金额: <span style={{ color: '#FF6B2C', fontWeight: 'bold' }}>{fen2yuan(orderAmountFen)}</span>
+
+            <div style={{ display: 'flex', gap: 12, marginTop: 24, justifyContent: 'center' }}>
+              {invoiceResult?.pdf_url && (
+                <button
+                  onClick={() => window.open(invoiceResult.pdf_url, '_blank')}
+                  style={{
+                    padding: '16px 32px', background: '#112B36', border: '2px solid #FF6B2C', borderRadius: 12,
+                    color: '#FF6B2C', fontSize: 18, fontWeight: 'bold', cursor: 'pointer', minHeight: 56,
+                    transition: 'transform 200ms ease',
+                  }}
+                  onPointerDown={(e) => { e.currentTarget.style.transform = 'scale(0.97)'; }}
+                  onPointerUp={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+                  onPointerLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+                >
+                  查看/打印发票
+                </button>
+              )}
+              <button
+                onClick={() => navigate(-1)}
+                style={{
+                  padding: '16px 48px', background: '#FF6B2C', border: 'none', borderRadius: 12,
+                  color: '#fff', fontSize: 18, fontWeight: 'bold', cursor: 'pointer', minHeight: 56,
+                  transition: 'transform 200ms ease',
+                }}
+                onPointerDown={(e) => { e.currentTarget.style.transform = 'scale(0.97)'; }}
+                onPointerUp={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+                onPointerLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+              >
+                返回
+              </button>
             </div>
-            <button
-              onClick={() => navigate(-1)}
-              style={{
-                padding: '16px 48px', background: '#FF6B2C', border: 'none', borderRadius: 12,
-                color: '#fff', fontSize: 18, fontWeight: 'bold', cursor: 'pointer', minHeight: 56,
-                transition: 'transform 200ms ease',
-              }}
-              onPointerDown={(e) => { e.currentTarget.style.transform = 'scale(0.97)'; }}
-              onPointerUp={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
-              onPointerLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
-            >
-              返回
-            </button>
           </div>
         )}
       </div>

@@ -7,6 +7,7 @@
  * 深色背景，触控优化（最小48x48按钮，最小16px字体）
  */
 import { useState, useEffect } from 'react';
+import { fetchStations, fetchStationLoads, type KDSStation, type StationLoad } from '../api';
 
 // ─── Types ───
 
@@ -20,18 +21,42 @@ interface Department {
   status: 'online' | 'offline';
 }
 
-// ─── Mock Data ───
+// ─── 档口图标映射 ───
 
-const MOCK_DEPTS: Department[] = [
-  { id: 'hot', name: '炒炉', icon: '🔥', pendingCount: 8, cookingCount: 4, avgWaitMin: 14, status: 'online' },
-  { id: 'cold', name: '凉菜', icon: '🥗', pendingCount: 3, cookingCount: 1, avgWaitMin: 5, status: 'online' },
-  { id: 'steam', name: '蒸菜', icon: '♨️', pendingCount: 5, cookingCount: 3, avgWaitMin: 22, status: 'online' },
-  { id: 'bar', name: '吧台', icon: '🍹', pendingCount: 2, cookingCount: 1, avgWaitMin: 3, status: 'online' },
-  { id: 'floor', name: '楼面', icon: '🍽️', pendingCount: 0, cookingCount: 0, avgWaitMin: 0, status: 'online' },
-  { id: 'staple', name: '主食', icon: '🍚', pendingCount: 6, cookingCount: 2, avgWaitMin: 4, status: 'online' },
-  { id: 'bbq', name: '烧烤', icon: '🍖', pendingCount: 0, cookingCount: 0, avgWaitMin: 0, status: 'offline' },
-  { id: 'dessert', name: '甜品', icon: '🍰', pendingCount: 1, cookingCount: 0, avgWaitMin: 2, status: 'online' },
-];
+const DEPT_ICONS: Record<string, string> = {
+  hot: '\uD83D\uDD25', wok: '\uD83D\uDD25', cold: '\uD83E\uDD57',
+  steam: '\u2668\uFE0F', bar: '\uD83C\uDF79', floor: '\uD83C\uDF7D\uFE0F',
+  staple: '\uD83C\uDF5A', bbq: '\uD83C\uDF56', dessert: '\uD83C\uDF70',
+  roast: '\uD83C\uDF56', stew: '\uD83C\uDF72',
+};
+
+function getDeptIcon(stationId: string, name: string): string {
+  if (DEPT_ICONS[stationId]) return DEPT_ICONS[stationId];
+  if (name.includes('\u7092')) return '\uD83D\uDD25';
+  if (name.includes('\u51C9')) return '\uD83E\uDD57';
+  if (name.includes('\u84B8')) return '\u2668\uFE0F';
+  if (name.includes('\u5427\u53F0')) return '\uD83C\uDF79';
+  if (name.includes('\u4E3B\u98DF')) return '\uD83C\uDF5A';
+  if (name.includes('\u70E7\u70E4')) return '\uD83C\uDF56';
+  if (name.includes('\u751C')) return '\uD83C\uDF70';
+  return '\uD83C\uDF73';
+}
+
+function mergeToDepartments(stations: KDSStation[], loads: StationLoad[]): Department[] {
+  const loadMap = new Map(loads.map(l => [l.station_id, l]));
+  return stations.map(s => {
+    const load = loadMap.get(s.station_id);
+    return {
+      id: s.station_id,
+      name: s.name,
+      icon: getDeptIcon(s.station_id, s.name),
+      pendingCount: load?.pending_count ?? 0,
+      cookingCount: load?.cooking_count ?? 0,
+      avgWaitMin: 0,
+      status: s.status,
+    };
+  });
+}
 
 // ─── 负载等级 ───
 
@@ -60,19 +85,57 @@ const LOAD_LABELS: Record<LoadLevel, string> = {
 // ─── Component ───
 
 export function DeptSelector() {
-  const [depts, setDepts] = useState<Department[]>(MOCK_DEPTS);
+  const [depts, setDepts] = useState<Department[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // 自动刷新（模拟轮询）
+  // 初始加载档口列表 + 负载
   useEffect(() => {
-    const timer = setInterval(() => {
-      // 实际接入时调用 fetchDeptLoad API
-      setDepts(prev => prev.map(d => ({
-        ...d,
-        pendingCount: d.status === 'online'
-          ? Math.max(0, d.pendingCount + Math.floor(Math.random() * 3) - 1)
-          : 0,
-      })));
+    let cancelled = false;
+
+    async function loadDepts() {
+      try {
+        setLoading(true);
+        setError(null);
+        const [stationsRes, loadsRes] = await Promise.all([
+          fetchStations(),
+          fetchStationLoads(),
+        ]);
+        if (!cancelled) {
+          setDepts(mergeToDepartments(stationsRes.items, loadsRes.items));
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : 'Failed to load departments');
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    loadDepts();
+    return () => { cancelled = true; };
+  }, []);
+
+  // 定时轮询负载数据（每 10 秒）
+  useEffect(() => {
+    const timer = setInterval(async () => {
+      try {
+        const loadsRes = await fetchStationLoads();
+        const loadMap = new Map(loadsRes.items.map(l => [l.station_id, l]));
+        setDepts(prev => prev.map(d => {
+          const load = loadMap.get(d.id);
+          if (!load) return d;
+          return {
+            ...d,
+            pendingCount: load.pending_count,
+            cookingCount: load.cooking_count,
+          };
+        }));
+      } catch {
+        // silently ignore polling errors
+      }
     }, 10000);
     return () => clearInterval(timer);
   }, []);
@@ -125,8 +188,32 @@ export function DeptSelector() {
         全部档口看板
       </button>
 
+      {/* 加载/错误状态 */}
+      {loading && (
+        <div style={{ textAlign: 'center', padding: 60, fontSize: 22, color: '#888' }}>
+          Loading...
+        </div>
+      )}
+      {error && (
+        <div style={{
+          textAlign: 'center', padding: 40, fontSize: 20, color: '#A32D2D',
+          background: '#1a0505', borderRadius: 12, marginBottom: 16,
+        }}>
+          {error}
+          <button
+            onClick={() => window.location.reload()}
+            style={{
+              marginLeft: 16, padding: '8px 20px', background: '#A32D2D', color: '#fff',
+              border: 'none', borderRadius: 8, fontSize: 18, cursor: 'pointer', minHeight: 48,
+            }}
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
       {/* 档口网格 */}
-      <div style={{
+      {!loading && !error && <div style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
         gap: 16,
@@ -229,7 +316,7 @@ export function DeptSelector() {
             </button>
           );
         })}
-      </div>
+      </div>}
     </div>
   );
 }

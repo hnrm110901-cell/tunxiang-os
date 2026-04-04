@@ -5,7 +5,8 @@
  * 按档口统计
  * 深色背景，触控优化（最小48x48按钮，最小16px字体）
  */
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { txFetch } from '../api';
 
 // ─── Types ───
 
@@ -41,42 +42,33 @@ interface HourlyData {
   avgTimeSec: number;
 }
 
-// ─── Mock Data ───
+// ─── API helpers ───
 
-const MOCK_OVERALL: OverallStats = {
-  todayTotal: 128,
-  todayCompleted: 112,
-  avgCookTimeSec: 888, // 14.8min
-  overtimeCount: 16,
-  overtimeRate: 12.5,
-  currentPending: 8,
-  currentCooking: 6,
-  peakHour: '12:00-13:00',
-  peakHourCount: 32,
-};
+function getStoreId(): string {
+  try {
+    return localStorage.getItem('kds_store_id') || '';
+  } catch {
+    return '';
+  }
+}
 
-const MOCK_DEPTS: DeptStats[] = [
-  { deptId: 'hot', deptName: '炒炉', totalOrders: 52, completedOrders: 45, avgTimeSec: 1092, overtimeCount: 10, overtimeRate: 19.2, topDish: '剁椒鱼头', topDishCount: 28, fastestTimeSec: 360, slowestTimeSec: 2100 },
-  { deptId: 'cold', deptName: '凉菜', totalOrders: 22, completedOrders: 22, avgTimeSec: 390, overtimeCount: 1, overtimeRate: 4.5, topDish: '凉拌黄瓜', topDishCount: 15, fastestTimeSec: 120, slowestTimeSec: 780 },
-  { deptId: 'steam', deptName: '蒸菜', totalOrders: 18, completedOrders: 15, avgTimeSec: 1350, overtimeCount: 5, overtimeRate: 27.8, topDish: '外婆鸡', topDishCount: 18, fastestTimeSec: 600, slowestTimeSec: 2400 },
-  { deptId: 'staple', deptName: '主食', totalOrders: 58, completedOrders: 58, avgTimeSec: 252, overtimeCount: 0, overtimeRate: 0, topDish: '米饭', topDishCount: 86, fastestTimeSec: 60, slowestTimeSec: 480 },
-  { deptId: 'bar', deptName: '吧台', totalOrders: 15, completedOrders: 14, avgTimeSec: 180, overtimeCount: 0, overtimeRate: 0, topDish: '柠檬茶', topDishCount: 12, fastestTimeSec: 60, slowestTimeSec: 360 },
-];
+async function fetchOverallStats(storeId: string): Promise<OverallStats> {
+  return txFetch<OverallStats>(`/api/v1/kds/stats?store_id=${encodeURIComponent(storeId)}`);
+}
 
-const MOCK_HOURLY: HourlyData[] = [
-  { hour: '10:00', count: 4, avgTimeSec: 600 },
-  { hour: '11:00', count: 18, avgTimeSec: 720 },
-  { hour: '12:00', count: 32, avgTimeSec: 960 },
-  { hour: '13:00', count: 24, avgTimeSec: 900 },
-  { hour: '14:00', count: 8, avgTimeSec: 540 },
-  { hour: '15:00', count: 3, avgTimeSec: 420 },
-  { hour: '16:00', count: 2, avgTimeSec: 360 },
-  { hour: '17:00', count: 12, avgTimeSec: 660 },
-  { hour: '18:00', count: 28, avgTimeSec: 1020 },
-  { hour: '19:00', count: 22, avgTimeSec: 960 },
-  { hour: '20:00', count: 14, avgTimeSec: 780 },
-  { hour: '21:00', count: 5, avgTimeSec: 540 },
-];
+async function fetchDeptStats(storeId: string): Promise<DeptStats[]> {
+  const res = await txFetch<{ items: DeptStats[] }>(
+    `/api/v1/kds/stats/departments?store_id=${encodeURIComponent(storeId)}`,
+  );
+  return res.items;
+}
+
+async function fetchHourlyStats(storeId: string): Promise<HourlyData[]> {
+  const res = await txFetch<{ items: HourlyData[] }>(
+    `/api/v1/kds/stats/hourly?store_id=${encodeURIComponent(storeId)}`,
+  );
+  return res.items;
+}
 
 // ─── Helpers ───
 

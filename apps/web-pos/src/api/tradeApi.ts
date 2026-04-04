@@ -156,3 +156,34 @@ export async function dispatchAgent(agentId: string, action: string, params: Rec
 export async function listAgents(): Promise<Array<{ agent_id: string; agent_name: string; priority: string }>> {
   return txFetch('/api/v1/agent/agents');
 }
+
+// ─── 发票 ───
+
+export interface SubmitInvoiceParams {
+  order_id: string;
+  invoice_type: string;
+  title: string;
+  tax_no: string;
+  amount_fen: number;
+  bank_name?: string;
+  bank_account?: string;
+  company_address?: string;
+  company_phone?: string;
+  receiver_email?: string;
+  receiver_phone?: string;
+  remark?: string;
+}
+
+export interface SubmitInvoiceResult {
+  invoice_id: string;
+  invoice_no: string;
+  status: string;
+  pdf_url?: string;
+}
+
+export async function submitInvoice(params: SubmitInvoiceParams): Promise<SubmitInvoiceResult> {
+  return txFetch('/api/v1/trade/invoices', {
+    method: 'POST',
+    body: JSON.stringify(params),
+  });
+}

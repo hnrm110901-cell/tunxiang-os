@@ -86,6 +86,22 @@ export async function fetchHandoverRecords(
   );
 }
 
+/** 开班 */
+export async function openShift(
+  storeId: string,
+  cashierId: string,
+  initialCashFen: number,
+): Promise<{ shift_id: string; start_time: string }> {
+  return txFetch('/api/v1/handover/open-shift', {
+    method: 'POST',
+    body: JSON.stringify({
+      store_id: storeId,
+      cashier_id: cashierId,
+      initial_cash_fen: initialCashFen,
+    }),
+  });
+}
+
 /** 获取单条交班详情 */
 export async function getHandoverDetail(
   handoverId: string,
