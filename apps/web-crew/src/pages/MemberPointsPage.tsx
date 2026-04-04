@@ -52,55 +52,7 @@ interface ExchangeItem {
   type: 'coupon' | 'dish' | 'gift';
 }
 
-// ─── Mock 数据 ───
-const MOCK_LEVEL: MemberLevel = {
-  level_code: 'gold', level_name: '黄金',
-  current_points: 2580, total_earned: 6200,
-};
-
-const MOCK_CONFIGS: LevelConfig[] = [
-  { id: 'c1', tenant_id: 't1', level_code: 'normal', level_name: '普通', min_points: 0,
-    min_annual_spend_fen: 0, discount_rate: 1, birthday_bonus_multiplier: 1,
-    priority_queue: false, free_delivery: false, sort_order: 0, is_active: true,
-    created_at: '', updated_at: '' },
-  { id: 'c2', tenant_id: 't1', level_code: 'silver', level_name: '白银', min_points: 500,
-    min_annual_spend_fen: 100000, discount_rate: 0.98, birthday_bonus_multiplier: 1.5,
-    priority_queue: false, free_delivery: false, sort_order: 1, is_active: true,
-    created_at: '', updated_at: '' },
-  { id: 'c3', tenant_id: 't1', level_code: 'gold', level_name: '黄金', min_points: 2000,
-    min_annual_spend_fen: 500000, discount_rate: 0.95, birthday_bonus_multiplier: 2,
-    priority_queue: true, free_delivery: false, sort_order: 2, is_active: true,
-    created_at: '', updated_at: '' },
-  { id: 'c4', tenant_id: 't1', level_code: 'diamond', level_name: '钻石', min_points: 5000,
-    min_annual_spend_fen: 1500000, discount_rate: 0.88, birthday_bonus_multiplier: 5,
-    priority_queue: true, free_delivery: true, sort_order: 3, is_active: true,
-    created_at: '', updated_at: '' },
-];
-
-function makeMockTxns(page: number): PointsTransaction[] {
-  const sources: PointsTransaction['source'][] = ['consumption','manual','activity','birthday'];
-  const notes = ['堂食消费得积分','服务员赠送','双11活动积分','生日积分','入会积分','介绍新客'];
-  return Array.from({ length: 20 }, (_, i) => {
-    const idx = (page - 1) * 20 + i;
-    const isPlus = idx % 3 !== 0;
-    const d = new Date(Date.now() - idx * 3600_000 * 8);
-    return {
-      id: `txn-${idx}`,
-      delta: isPlus ? (50 + (idx % 7) * 30) : -(20 + (idx % 5) * 15),
-      source: sources[idx % sources.length],
-      note: notes[idx % notes.length],
-      balance_after: Math.max(0, 2580 - idx * 10),
-      created_at: d.toISOString(),
-    };
-  });
-}
-
-const MOCK_EXCHANGE_ITEMS: ExchangeItem[] = [
-  { id: 'e1', name: '9折消费券', points_required: 500, type: 'coupon' },
-  { id: 'e2', name: '免费饮料一杯', points_required: 300, type: 'dish' },
-  { id: 'e3', name: '精美礼品袋', points_required: 1000, type: 'gift' },
-  { id: 'e4', name: '招牌菜免费品尝', points_required: 800, type: 'dish' },
-];
+// Mock 数据已移除，全部使用真实 API
 
 // ─── 工具函数 ───
 function sourceLabel(src: string): string {
@@ -464,9 +416,9 @@ function ExchangeModal({
   const [doneItem, setDoneItem] = useState<string | null>(null);
 
   useEffect(() => {
-    txFetch<{ items: ExchangeItem[] }>(`/api/v1/member/customers/${memberId}/exchange-items`)
-      .then(d => setItems(d.items))
-      .catch(() => setItems(MOCK_EXCHANGE_ITEMS))
+    txFetch<{ items: ExchangeItem[] }>('/api/v1/member/points/rewards')
+      .then(d => setItems(d.items ?? []))
+      .catch(() => setItems([]))
       .finally(() => setLoading(false));
   }, [memberId]);
 
@@ -474,9 +426,9 @@ function ExchangeModal({
     if (currentPoints < item.points_required) return;
     setExchanging(item.id);
     try {
-      await txFetch(`/api/v1/member/customers/${memberId}/points/adjust`, {
+      await txFetch('/api/v1/member/points/redeem', {
         method: 'POST',
-        body: JSON.stringify({ delta: -item.points_required, reason: `兑换：${item.name}` }),
+        body: JSON.stringify({ member_id: memberId, reward_id: item.id }),
       });
       setDoneItem(item.id);
       setTimeout(() => { onSuccess(); }, 1200);
@@ -593,11 +545,11 @@ export function MemberPointsPage() {
     if (!customerId) { setInitLoading(false); return; }
 
     Promise.all([
-      txFetch<MemberLevel>(`/api/v1/member/customers/${customerId}/level`)
-        .catch(() => { setApiWarn('API暂时不可用，展示示例数据'); return MOCK_LEVEL; }),
+      txFetch<MemberLevel>(`/api/v1/member/points/${customerId}`)
+        .catch(() => { setApiWarn('积分数据加载失败'); return null; }),
       fetchLevelConfigs(import.meta.env.VITE_TENANT_ID || '')
         .then(r => r.items)
-        .catch(() => MOCK_CONFIGS),
+        .catch(() => [] as LevelConfig[]),
     ]).then(([lvl, cfgs]) => {
       setLevelInfo(lvl);
       setLevelConfigs(cfgs);
@@ -611,16 +563,15 @@ export function MemberPointsPage() {
     setLoadingTxns(true);
     try {
       const data = await txFetch<PointsPage>(
-        `/api/v1/member/customers/${customerId}/points?page=${p}&size=20`
+        `/api/v1/member/points/${customerId}/history?page=${p}&size=20`
       );
-      setTxns(prev => p === 1 ? data.items : [...prev, ...data.items]);
-      setTotal(data.total);
+      setTxns(prev => p === 1 ? (data.items ?? []) : [...prev, ...(data.items ?? [])]);
+      setTotal(data.total ?? 0);
       setPage(p);
     } catch {
-      // Mock降级
-      const mock = makeMockTxns(p);
-      setTxns(prev => p === 1 ? mock : [...prev, ...mock]);
-      setTotal(60);
+      // 降级为空列表，不崩溃
+      if (p === 1) setTxns([]);
+      setTotal(0);
       setPage(p);
     } finally {
       setLoadingTxns(false);

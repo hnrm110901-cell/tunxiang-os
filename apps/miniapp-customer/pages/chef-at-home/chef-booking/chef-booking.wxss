@@ -1,0 +1,323 @@
+.container {
+  padding: 0;
+  background: #0B1A20;
+  min-height: 100vh;
+  color: #fff;
+  padding-bottom: 160rpx;
+}
+
+/* ─── 大厨小条 ─── */
+.chef-strip {
+  background: linear-gradient(135deg, #FF6B35, #FF8C5A);
+  padding: 28rpx 32rpx;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.chef-strip-left { display: flex; flex-direction: column; gap: 8rpx; }
+.chef-strip-label { font-size: 22rpx; color: rgba(255,255,255,0.8); }
+.chef-strip-name-row { display: flex; align-items: center; gap: 12rpx; }
+.chef-strip-name { font-size: 34rpx; font-weight: bold; color: #fff; }
+.chef-strip-title {
+  font-size: 22rpx;
+  color: rgba(255,255,255,0.9);
+  background: rgba(255,255,255,0.2);
+  padding: 4rpx 14rpx;
+  border-radius: 8rpx;
+}
+.chef-strip-emoji { font-size: 72rpx; }
+
+/* ─��─ 步骤指示器 ─── */
+.step-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24rpx 32rpx;
+  background: #112228;
+  border-bottom: 1rpx solid #1a2a33;
+}
+.step-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8rpx;
+}
+.step-num {
+  width: 48rpx;
+  height: 48rpx;
+  border-radius: 50%;
+  background: #1a2a33;
+  color: #666;
+  font-size: 24rpx;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.step-item.active .step-num { background: #FF6B35; color: #fff; }
+.step-item.done .step-num { background: rgba(255,107,53,0.3); color: #FF6B35; }
+.step-text { font-size: 22rpx; color: #666; }
+.step-item.active .step-text { color: #FF6B35; font-weight: 600; }
+.step-item.done .step-text { color: #FF6B35; }
+.step-connector {
+  width: 48rpx;
+  height: 4rpx;
+  background: #1a2a33;
+  margin: 0 8rpx;
+  margin-bottom: 28rpx;
+}
+.step-connector.done { background: rgba(255,107,53,0.4); }
+
+/* ─── 表单卡片通用 ─── */
+.form-card {
+  background: #112228;
+  margin: 20rpx 32rpx 0;
+  border-radius: 24rpx;
+  padding: 28rpx;
+}
+.form-card-title {
+  font-size: 30rpx;
+  font-weight: bold;
+  display: block;
+  color: #fff;
+}
+.form-card-hint {
+  font-size: 24rpx;
+  color: #999;
+  display: block;
+  margin-top: 4rpx;
+  margin-bottom: 20rpx;
+}
+.form-row-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 16rpx;
+}
+
+/* ─── 日期选择 ─── */
+.date-scroll { width: 100%; margin-top: 20rpx; }
+.date-list { display: flex; white-space: nowrap; gap: 16rpx; }
+.date-item {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 104rpx;
+  padding: 16rpx 12rpx;
+  background: #1a2a33;
+  border-radius: 16rpx;
+  gap: 6rpx;
+  flex-shrink: 0;
+}
+.date-item.active { background: #FF6B35; }
+.date-item.disabled { opacity: 0.4; }
+.date-weekday { font-size: 22rpx; color: #999; }
+.date-item.active .date-weekday { color: rgba(255,255,255,0.8); }
+.date-day { font-size: 36rpx; font-weight: bold; color: #fff; }
+.date-sub { font-size: 20rpx; color: #666; }
+.date-item.active .date-sub { color: rgba(255,255,255,0.7); }
+
+/* ─── 时段选择 ─── */
+.slot-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16rpx;
+  margin-top: 20rpx;
+}
+.slot-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20rpx 8rpx;
+  background: #1a2a33;
+  border-radius: 16rpx;
+  gap: 8rpx;
+  border: 2rpx solid transparent;
+}
+.slot-item.active {
+  border-color: #FF6B35;
+  background: rgba(255,107,53,0.12);
+}
+.slot-name { font-size: 28rpx; color: #fff; font-weight: 600; }
+.slot-item.active .slot-name { color: #FF6B35; }
+.slot-time { font-size: 22rpx; color: #999; }
+.slot-item.active .slot-time { color: rgba(255,107,53,0.8); }
+
+/* ─── 人数步进 ─── */
+.guest-stepper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 40rpx;
+  margin-top: 24rpx;
+}
+.stepper-btn {
+  width: 88rpx;
+  height: 88rpx;
+  background: #1a2a33;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 48rpx;
+  color: #FF6B35;
+  font-weight: bold;
+}
+.stepper-btn.disabled { opacity: 0.35; }
+.stepper-display {
+  display: flex;
+  align-items: baseline;
+  gap: 8rpx;
+  min-width: 100rpx;
+  justify-content: center;
+}
+.stepper-value { font-size: 56rpx; font-weight: bold; color: #fff; }
+.stepper-unit { font-size: 28rpx; color: #999; }
+
+/* ─── 地址 ─── */
+.address-row {
+  display: flex;
+  gap: 16rpx;
+  align-items: center;
+  margin-top: 20rpx;
+}
+.address-input {
+  flex: 1;
+  background: #1a2a33;
+  padding: 22rpx 24rpx;
+  border-radius: 16rpx;
+  font-size: 28rpx;
+  color: #fff;
+  min-height: 88rpx;
+}
+.placeholder { color: #555; }
+.location-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 96rpx;
+  height: 88rpx;
+  background: rgba(255,107,53,0.15);
+  border: 1rpx solid rgba(255,107,53,0.3);
+  border-radius: 16rpx;
+  gap: 4rpx;
+  flex-shrink: 0;
+}
+.location-btn-icon { font-size: 32rpx; }
+.location-btn-text { font-size: 22rpx; color: #FF6B35; }
+
+/* ─── 特殊要求 ─── */
+.remark-textarea {
+  width: 100%;
+  background: #1a2a33;
+  padding: 20rpx 24rpx;
+  border-radius: 16rpx;
+  font-size: 28rpx;
+  color: #fff;
+  height: 180rpx;
+  box-sizing: border-box;
+  margin-top: 16rpx;
+}
+.char-count {
+  font-size: 22rpx;
+  color: #555;
+  display: block;
+  text-align: right;
+  margin-top: 8rpx;
+}
+
+/* ─── 已选菜单 ─── */
+.edit-menu-btn {
+  font-size: 26rpx;
+  color: #FF6B35;
+  padding: 6rpx 16rpx;
+}
+.dish-row {
+  display: flex;
+  align-items: center;
+  padding: 16rpx 0;
+  border-bottom: 1rpx solid #1a2a33;
+  gap: 12rpx;
+}
+.dish-row:last-child { border-bottom: none; }
+.dish-name { flex: 1; font-size: 28rpx; color: #fff; }
+.dish-qty { font-size: 26rpx; color: #999; flex-shrink: 0; }
+.dish-price { font-size: 28rpx; color: #FF6B35; flex-shrink: 0; }
+
+/* ─── 费用预估 ─── */
+.price-card {
+  background: #112228;
+  margin: 20rpx 32rpx 0;
+  border-radius: 24rpx;
+  padding: 28rpx;
+}
+.price-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14rpx 0;
+}
+.price-label { font-size: 28rpx; color: #999; }
+.price-value { font-size: 28rpx; color: #fff; }
+.price-divider { height: 1rpx; background: #1a2a33; margin: 8rpx 0; }
+.total-row { padding: 16rpx 0 0; }
+.price-total-label { font-size: 30rpx; font-weight: bold; color: #fff; }
+.price-total-value { font-size: 40rpx; font-weight: bold; color: #FF6B35; }
+
+.deposit-tip {
+  background: rgba(255,107,53,0.08);
+  border: 1rpx solid rgba(255,107,53,0.2);
+  border-radius: 16rpx;
+  padding: 20rpx;
+  margin-top: 20rpx;
+}
+.deposit-tip-title {
+  font-size: 26rpx;
+  color: #FF6B35;
+  font-weight: 600;
+  display: block;
+  margin-bottom: 8rpx;
+}
+.deposit-tip-text { font-size: 24rpx; color: #ccc; line-height: 1.6; }
+
+.bottom-spacer { height: 180rpx; }
+
+/* ─── 底部确认栏 ─── */
+.bottom-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #112228;
+  border-top: 1rpx solid #1a2a33;
+  padding: 16rpx 32rpx;
+  display: flex;
+  align-items: center;
+  gap: 24rpx;
+  min-height: 120rpx;
+  z-index: 100;
+}
+.bottom-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4rpx;
+  flex-shrink: 0;
+}
+.bottom-deposit-label { font-size: 22rpx; color: #999; }
+.bottom-deposit-amount { font-size: 40rpx; color: #FF6B35; font-weight: bold; }
+
+.confirm-btn {
+  flex: 1;
+  height: 88rpx;
+  background: #FF6B35;
+  color: #fff;
+  border-radius: 44rpx;
+  font-size: 28rpx;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+.confirm-btn.loading { opacity: 0.7; }

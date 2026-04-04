@@ -19,6 +19,7 @@ import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import select, text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
@@ -179,13 +180,8 @@ async def get_combo_detail(
 ) -> dict:
     """获取套餐N选M完整结构（含分组和可选菜品）
 
-    TODO: 当前返回 Mock 数据，待 combo_groups / combo_group_items 表接入后
-          替换为真实数据库查询：
-          SELECT cg.*, cgi.* FROM combo_groups cg
-          JOIN combo_group_items cgi ON cgi.group_id = cg.id
-          WHERE cg.combo_id = :combo_id AND cg.tenant_id = :tenant_id
-          AND cg.is_deleted = false AND cgi.is_deleted = false
-          ORDER BY cg.sort_order, cgi.sort_order
+    查询 combo_groups + combo_group_items 表，graceful 降级：
+    若表不存在或查询失败，返回空分组列表并记录 warning。
     """
     tenant_id = _get_tenant_id(request)
     tenant_uuid = uuid.UUID(tenant_id)
@@ -202,127 +198,77 @@ async def get_combo_detail(
     if not combo:
         raise HTTPException(status_code=404, detail="套餐不存在")
 
-    # TODO: 替换为真实的 combo_groups + combo_group_items 查询
-    # 当前使用 Mock 分组数据演示N选M结构
-    mock_groups = [
-        {
-            "group_id": f"grp-mock-{combo_id[:8]}-01",
-            "group_name": "主菜（任选1款）",
-            "min_select": 1,
-            "max_select": 1,
-            "is_required": True,
-            "items": [
-                {
-                    "item_id": f"item-mock-{combo_id[:8]}-01a",
-                    "dish_id": "dish-mock-qingluyuye",
-                    "dish_name": "清蒸鲈鱼",
-                    "extra_price_fen": 0,
-                    "is_default": False,
+    # 查询 combo_groups + combo_group_items（v113 已建表）
+    # graceful 降级：若表不存在则返回空分组列表并记录 warning
+    try:
+        groups_result = await db.execute(
+            text("""
+                SELECT
+                    cg.id::TEXT         AS group_id,
+                    cg.group_name,
+                    cg.min_select,
+                    cg.max_select,
+                    cg.is_required,
+                    cg.sort_order       AS group_sort_order,
+                    cgi.id::TEXT        AS item_id,
+                    cgi.dish_id::TEXT   AS dish_id,
+                    cgi.dish_name,
+                    cgi.extra_price_fen,
+                    cgi.is_default,
+                    cgi.sort_order      AS item_sort_order
+                FROM combo_groups cg
+                LEFT JOIN combo_group_items cgi
+                    ON cgi.group_id = cg.id
+                    AND cgi.is_deleted = false
+                WHERE cg.combo_id = :combo_id
+                  AND cg.tenant_id = :tenant_id
+                  AND cg.is_deleted = false
+                ORDER BY cg.sort_order ASC, cgi.sort_order ASC
+            """),
+            {"combo_id": uuid.UUID(combo_id), "tenant_id": tenant_uuid},
+        )
+        rows = list(groups_result.mappings())
+
+        # 合并分组行 → {group_id: {meta, items: []}}
+        groups_map: dict = {}
+        for row in rows:
+            gid = row["group_id"]
+            if gid not in groups_map:
+                groups_map[gid] = {
+                    "group_id": gid,
+                    "group_name": row["group_name"],
+                    "min_select": row["min_select"],
+                    "max_select": row["max_select"],
+                    "is_required": row["is_required"],
+                    "items": [],
+                }
+            if row["item_id"]:
+                groups_map[gid]["items"].append({
+                    "item_id": row["item_id"],
+                    "dish_id": row["dish_id"],
+                    "dish_name": row["dish_name"],
+                    "extra_price_fen": row["extra_price_fen"] or 0,
+                    "is_default": row["is_default"] or False,
                     "image_url": None,
                     "sold_out": False,
-                },
-                {
-                    "item_id": f"item-mock-{combo_id[:8]}-01b",
-                    "dish_id": "dish-mock-hongshaorou",
-                    "dish_name": "红烧肉",
-                    "extra_price_fen": 0,
-                    "is_default": False,
-                    "image_url": None,
-                    "sold_out": False,
-                },
-                {
-                    "item_id": f"item-mock-{combo_id[:8]}-01c",
-                    "dish_id": "dish-mock-baizhuoxia",
-                    "dish_name": "白灼虾",
-                    "extra_price_fen": 1800,
-                    "is_default": False,
-                    "image_url": None,
-                    "sold_out": False,
-                },
-            ],
-        },
-        {
-            "group_id": f"grp-mock-{combo_id[:8]}-02",
-            "group_name": "例汤（固定）",
-            "min_select": 1,
-            "max_select": 1,
-            "is_required": True,
-            "items": [
-                {
-                    "item_id": f"item-mock-{combo_id[:8]}-02a",
-                    "dish_id": "dish-mock-suancaiyu-tang",
-                    "dish_name": "酸菜鱼汤（固定）",
-                    "extra_price_fen": 0,
-                    "is_default": True,
-                    "image_url": None,
-                    "sold_out": False,
-                },
-            ],
-        },
-        {
-            "group_id": f"grp-mock-{combo_id[:8]}-03",
-            "group_name": "主食（任选1款）",
-            "min_select": 1,
-            "max_select": 1,
-            "is_required": True,
-            "items": [
-                {
-                    "item_id": f"item-mock-{combo_id[:8]}-03a",
-                    "dish_id": "dish-mock-baifan",
-                    "dish_name": "白饭",
-                    "extra_price_fen": 0,
-                    "is_default": False,
-                    "image_url": None,
-                    "sold_out": False,
-                },
-                {
-                    "item_id": f"item-mock-{combo_id[:8]}-03b",
-                    "dish_id": "dish-mock-chaofan",
-                    "dish_name": "炒饭",
-                    "extra_price_fen": 0,
-                    "is_default": False,
-                    "image_url": None,
-                    "sold_out": False,
-                },
-            ],
-        },
-        {
-            "group_id": f"grp-mock-{combo_id[:8]}-04",
-            "group_name": "饮料（可选）",
-            "min_select": 0,
-            "max_select": 2,
-            "is_required": False,
-            "items": [
-                {
-                    "item_id": f"item-mock-{combo_id[:8]}-04a",
-                    "dish_id": "dish-mock-kele",
-                    "dish_name": "可乐",
-                    "extra_price_fen": 800,
-                    "is_default": False,
-                    "image_url": None,
-                    "sold_out": False,
-                },
-                {
-                    "item_id": f"item-mock-{combo_id[:8]}-04b",
-                    "dish_id": "dish-mock-xuebi",
-                    "dish_name": "雪碧",
-                    "extra_price_fen": 800,
-                    "is_default": False,
-                    "image_url": None,
-                    "sold_out": False,
-                },
-            ],
-        },
-    ]
+                })
+        groups = list(groups_map.values())
+    except SQLAlchemyError as exc:
+        logger.warning(
+            "combo_groups_db_error_graceful_fallback",
+            combo_id=combo_id,
+            error=str(exc),
+        )
+        groups = []
 
     return _ok({
         "combo_id": str(combo.id),
         "combo_name": combo.combo_name,
         "price_fen": combo.combo_price_fen,
-        "description": combo.description or "",
-        "min_person": None,  # TODO: 从 combo.min_person 读取（v113 新增列）
-        "image_url": combo.image_url,
-        "groups": mock_groups,
+        "description": getattr(combo, "description", None) or "",
+        "min_person": getattr(combo, "min_person", None),
+        "image_url": getattr(combo, "image_url", None),
+        "groups": groups,
     })
 
 

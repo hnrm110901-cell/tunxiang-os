@@ -49,6 +49,7 @@ def upgrade() -> None:
     """)
 
     op.execute("ALTER TABLE payroll_summaries ENABLE ROW LEVEL SECURITY")
+    op.execute("DROP POLICY IF EXISTS payroll_summaries_tenant_isolation ON payroll_summaries;")
     op.execute("""
         CREATE POLICY payroll_summaries_tenant_isolation ON payroll_summaries
         USING (
@@ -83,6 +84,7 @@ def upgrade() -> None:
     """)
 
     op.execute("ALTER TABLE perf_score_items ENABLE ROW LEVEL SECURITY")
+    op.execute("DROP POLICY IF EXISTS perf_score_items_tenant_isolation ON perf_score_items;")
     op.execute("""
         CREATE POLICY perf_score_items_tenant_isolation ON perf_score_items
         USING (
@@ -112,6 +114,7 @@ def upgrade() -> None:
     """)
 
     op.execute("ALTER TABLE payroll_deductions ENABLE ROW LEVEL SECURITY")
+    op.execute("DROP POLICY IF EXISTS payroll_deductions_tenant_isolation ON payroll_deductions;")
     op.execute("""
         CREATE POLICY payroll_deductions_tenant_isolation ON payroll_deductions
         USING (

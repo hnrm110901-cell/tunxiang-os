@@ -35,24 +35,28 @@ _SETTLEMENT_TABLES = [
 
 def _apply_safe_rls(table: str) -> None:
     """创建标准安全 RLS：四操作 PERMISSIVE + NULLIF NULL guard + FORCE。"""
+    op.execute(f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY")
+    op.execute(f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY")
+    op.execute(f"DROP POLICY IF EXISTS {table}_rls_select ON {table}")
     op.execute(
         f"CREATE POLICY {table}_rls_select ON {table} "
         f"FOR SELECT USING ({_SAFE_CONDITION})"
     )
+    op.execute(f"DROP POLICY IF EXISTS {table}_rls_insert ON {table}")
     op.execute(
         f"CREATE POLICY {table}_rls_insert ON {table} "
         f"FOR INSERT WITH CHECK ({_SAFE_CONDITION})"
     )
+    op.execute(f"DROP POLICY IF EXISTS {table}_rls_update ON {table}")
     op.execute(
         f"CREATE POLICY {table}_rls_update ON {table} "
         f"FOR UPDATE USING ({_SAFE_CONDITION}) WITH CHECK ({_SAFE_CONDITION})"
     )
+    op.execute(f"DROP POLICY IF EXISTS {table}_rls_delete ON {table}")
     op.execute(
         f"CREATE POLICY {table}_rls_delete ON {table} "
         f"FOR DELETE USING ({_SAFE_CONDITION})"
     )
-    op.execute(f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY")
-    op.execute(f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY")
 
 
 def upgrade() -> None:

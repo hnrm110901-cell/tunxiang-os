@@ -1,5 +1,6 @@
 // 企业团餐页
 const app = getApp();
+const { txRequest } = require('../../utils/api');
 
 Page({
   data: {
@@ -49,25 +50,21 @@ Page({
 
   async loadAccount() {
     try {
-      const res = await wx.request({
-        url: `${app.globalData.apiBase}/api/v1/corporate/account`,
-        data: { customer_id: app.globalData.customerId },
-        header: { 'X-Tenant-ID': app.globalData.tenantId },
+      const d = await txRequest(
+        '/api/v1/corporate/account?customer_id=' + encodeURIComponent(app.globalData.customerId),
+        'GET',
+      );
+      this.setData({
+        account: {
+          balanceYuan: (d.balance_fen / 100).toFixed(2),
+          companyName: d.company_name || '',
+          monthSpentYuan: (d.month_spent_fen / 100).toFixed(2),
+          monthCount: d.month_count || 0,
+          monthHeadcount: d.month_headcount || 0,
+          dailyQuotaYuan: d.daily_quota_fen ? (d.daily_quota_fen / 100).toFixed(0) : '',
+          todayUsedYuan: d.today_used_fen ? (d.today_used_fen / 100).toFixed(2) : '0.00',
+        },
       });
-      if (res.data.ok) {
-        const d = res.data.data;
-        this.setData({
-          account: {
-            balanceYuan: (d.balance_fen / 100).toFixed(2),
-            companyName: d.company_name || '',
-            monthSpentYuan: (d.month_spent_fen / 100).toFixed(2),
-            monthCount: d.month_count || 0,
-            monthHeadcount: d.month_headcount || 0,
-            dailyQuotaYuan: d.daily_quota_fen ? (d.daily_quota_fen / 100).toFixed(0) : '',
-            todayUsedYuan: d.today_used_fen ? (d.today_used_fen / 100).toFixed(2) : '0.00',
-          },
-        });
-      }
     } catch (err) {
       console.error('loadAccount failed', err);
     }
@@ -75,27 +72,21 @@ Page({
 
   async loadRecords() {
     try {
-      const res = await wx.request({
-        url: `${app.globalData.apiBase}/api/v1/corporate/records`,
-        data: {
-          customer_id: app.globalData.customerId,
-          page: this.data.recordPage,
-          size: 20,
-        },
-        header: { 'X-Tenant-ID': app.globalData.tenantId },
+      const d = await txRequest(
+        '/api/v1/corporate/records?customer_id=' + encodeURIComponent(app.globalData.customerId)
+          + '&page=' + this.data.recordPage + '&size=20',
+        'GET',
+      );
+      const items = (d.items || []).map(r => ({
+        ...r,
+        absAmountYuan: (Math.abs(r.amount_fen) / 100).toFixed(2),
+        amountFen: r.amount_fen,
+        createdAt: r.created_at ? r.created_at.slice(0, 16).replace('T', ' ') : '',
+      }));
+      this.setData({
+        records: [...this.data.records, ...items],
+        hasMoreRecords: items.length >= 20,
       });
-      if (res.data.ok) {
-        const items = (res.data.data.items || []).map(r => ({
-          ...r,
-          absAmountYuan: (Math.abs(r.amount_fen) / 100).toFixed(2),
-          amountFen: r.amount_fen,
-          createdAt: r.created_at ? r.created_at.slice(0, 16).replace('T', ' ') : '',
-        }));
-        this.setData({
-          records: [...this.data.records, ...items],
-          hasMoreRecords: items.length >= 20,
-        });
-      }
     } catch (err) {
       console.error('loadRecords failed', err);
     }
@@ -135,29 +126,20 @@ Page({
 
     this.setData({ submitting: true });
     try {
-      const res = await wx.request({
-        url: `${app.globalData.apiBase}/api/v1/corporate/meal-booking`,
-        method: 'POST',
-        header: { 'X-Tenant-ID': app.globalData.tenantId },
-        data: {
-          customer_id: app.globalData.customerId,
-          store_id: app.globalData.storeId,
-          date: mealDate,
-          meal_type: mealType,
-          headcount: Number(headcount),
-          budget_per_person_fen: budget * 100,
-          remark: mealRemark,
-        },
+      await txRequest('/api/v1/corporate/meal-booking', 'POST', {
+        customer_id: app.globalData.customerId,
+        store_id: app.globalData.storeId,
+        date: mealDate,
+        meal_type: mealType,
+        headcount: Number(headcount),
+        budget_per_person_fen: budget * 100,
+        remark: mealRemark,
       });
-      if (res.data.ok) {
-        wx.showToast({ title: '预订成功', icon: 'success' });
-        this.setData({ mealDate: '', mealType: '', headcount: '', budget: '', mealRemark: '' });
-      } else {
-        wx.showToast({ title: res.data.error?.message || '预订失败', icon: 'none' });
-      }
+      wx.showToast({ title: '预订成功', icon: 'success' });
+      this.setData({ mealDate: '', mealType: '', headcount: '', budget: '', mealRemark: '' });
     } catch (err) {
       console.error('submitMealBooking failed', err);
-      wx.showToast({ title: '网络错误', icon: 'none' });
+      wx.showToast({ title: (err && err.message) || '网络错误', icon: 'none' });
     } finally {
       this.setData({ submitting: false });
     }

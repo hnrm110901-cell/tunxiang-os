@@ -7,9 +7,11 @@ from __future__ import annotations
 from datetime import date
 from typing import Any, Dict, Optional
 
-from fastapi import APIRouter, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from shared.ontology.src.database import get_db
 from ..services import (
     issue_tracker,
     knowledge_base,
@@ -86,6 +88,7 @@ class ApiResponse(BaseModel):
 async def create_weekly_review(
     req: WeeklyReviewRequest,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ) -> ApiResponse:
     """生成周度复盘报告。"""
     try:
@@ -97,7 +100,7 @@ async def create_weekly_review(
         store_id=req.store_id,
         week_start=week_start,
         tenant_id=x_tenant_id,
-        db=None,
+        db=db,
     )
     return ApiResponse(data=result)
 
@@ -111,13 +114,14 @@ async def create_weekly_review(
 async def create_monthly_review(
     req: MonthlyReviewRequest,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ) -> ApiResponse:
     """生成月度复盘报告。"""
     result = await monthly_review.generate_monthly_review(
         store_id=req.store_id,
         month=req.month,
         tenant_id=x_tenant_id,
-        db=None,
+        db=db,
     )
     return ApiResponse(data=result)
 
@@ -131,13 +135,14 @@ async def create_monthly_review(
 async def create_regional_review(
     req: RegionalReviewRequest,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ) -> ApiResponse:
     """生成区域月度汇总报告。"""
     result = await monthly_review.generate_regional_review(
         region_id=req.region_id,
         month=req.month,
         tenant_id=x_tenant_id,
-        db=None,
+        db=db,
     )
     return ApiResponse(data=result)
 
@@ -151,6 +156,7 @@ async def create_regional_review(
 async def create_issue(
     req: CreateIssueRequest,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ) -> ApiResponse:
     """创建门店问题。"""
     result = await issue_tracker.create_issue(
@@ -159,7 +165,7 @@ async def create_issue(
         description=req.description,
         reporter_id=req.reporter_id,
         tenant_id=x_tenant_id,
-        db=None,
+        db=db,
         priority=req.priority,
         deadline=req.deadline,
     )
@@ -175,6 +181,7 @@ async def create_issue(
 async def assign_issue(
     req: AssignIssueRequest,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ) -> ApiResponse:
     """派发问题给责任人。"""
     result = await issue_tracker.assign_issue(
@@ -182,7 +189,7 @@ async def assign_issue(
         assignee_id=req.assignee_id,
         deadline=req.deadline,
         tenant_id=x_tenant_id,
-        db=None,
+        db=db,
     )
     return ApiResponse(data=result)
 
@@ -196,6 +203,7 @@ async def assign_issue(
 async def update_issue_status(
     req: UpdateIssueStatusRequest,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ) -> ApiResponse:
     """更新问题状态。"""
     result = await issue_tracker.update_issue_status(
@@ -203,7 +211,7 @@ async def update_issue_status(
         status=req.status,
         notes=req.notes,
         tenant_id=x_tenant_id,
-        db=None,
+        db=db,
     )
     return ApiResponse(data=result)
 
@@ -217,12 +225,13 @@ async def update_issue_status(
 async def get_issue_board(
     store_id: str,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ) -> ApiResponse:
     """获取门店问题红黄绿看板。"""
     result = await issue_tracker.get_store_issue_board(
         store_id=store_id,
         tenant_id=x_tenant_id,
-        db=None,
+        db=db,
     )
     return ApiResponse(data=result)
 
@@ -236,13 +245,14 @@ async def get_issue_board(
 async def save_case(
     req: SaveCaseRequest,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ) -> ApiResponse:
     """沉淀经营案例。"""
     result = await knowledge_base.save_case(
         store_id=req.store_id,
         case_data=req.case_data,
         tenant_id=x_tenant_id,
-        db=None,
+        db=db,
     )
     return ApiResponse(data=result)
 
@@ -256,12 +266,13 @@ async def save_case(
 async def search_cases(
     req: SearchCaseRequest,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ) -> ApiResponse:
     """搜索案例库。"""
     result = await knowledge_base.search_cases(
         keyword=req.keyword,
         tenant_id=x_tenant_id,
-        db=None,
+        db=db,
         category=req.category,
     )
     return ApiResponse(data=result)
@@ -277,12 +288,13 @@ async def get_sop_suggestions(
     store_id: str,
     issue_type: str,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ) -> ApiResponse:
     """获取 SOP 优化建议。"""
     result = await knowledge_base.get_sop_suggestions(
         store_id=store_id,
         issue_type=issue_type,
         tenant_id=x_tenant_id,
-        db=None,
+        db=db,
     )
     return ApiResponse(data=result)

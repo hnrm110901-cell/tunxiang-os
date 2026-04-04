@@ -14,10 +14,8 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 from services.audience_segmentation import AudienceSegmentationService
 from services.brand_strategy import BrandStrategyService
-from services.channel_engine import ChannelEngine
-from services.content_engine import ContentEngine
 from services.journey_orchestrator import JourneyOrchestratorService
-from services.offer_engine import OfferEngine
+# ChannelEngine / ContentEngine / OfferEngine: v144 DB化，已移至各自路由文件
 from services.roi_attribution import ROIAttributionService
 from workers.journey_executor import JourneyEventListener, JourneyExecutor
 
@@ -95,7 +93,12 @@ from .api.approval_routes import router as approval_router
 from .api.attribution_routes import router as attribution_router
 from .api.brand_strategy_routes import router as brand_strategy_router
 from .api.campaign_routes import router as campaign_router
+from .api.channel_routes import router as channel_router        # v144 DB化
+from .api.content_routes import router as content_router        # v144 DB化
+from .api.coupon_routes import router as coupon_router
+from .api.growth_campaign_routes import router as growth_campaign_router
 from .api.journey_routes import router as journey_router
+from .api.offer_routes import router as offer_router            # v144 DB化
 from .api.referral_routes import router as referral_router
 from .api.segmentation_routes import router as segmentation_router
 from .api.touch_attribution_routes import router as touch_attribution_router
@@ -313,6 +316,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="TunxiangOS tx-growth", version="3.0.0", lifespan=lifespan)
 app.include_router(campaign_router)
+app.include_router(coupon_router)           # /api/v1/growth/coupons（优惠券核销）
+app.include_router(growth_campaign_router)  # /api/v1/growth/campaigns（新标准路径）
 app.include_router(segmentation_router)
 app.include_router(referral_router)
 app.include_router(attribution_router)
@@ -321,14 +326,17 @@ app.include_router(ab_test_router)
 app.include_router(approval_router)
 app.include_router(brand_strategy_router)
 app.include_router(journey_router)
+# v144 DB化路由（替换下方旧的内存版端点）
+app.include_router(offer_router)            # /api/v1/offers — offers/offer_redemptions 表
+app.include_router(content_router)          # /api/v1/content — content_templates 表
+app.include_router(channel_router)          # /api/v1/channels — channel_configs/message_send_logs 表
 
 # 服务实例
 brand_svc = BrandStrategyService()
 segment_svc = AudienceSegmentationService()
 journey_svc = JourneyOrchestratorService()
-content_svc = ContentEngine()
-offer_svc = OfferEngine()
-channel_svc = ChannelEngine()
+# content_svc / offer_svc / channel_svc 已 v144 DB化，
+# 各自通过独立路由文件 (content_router/offer_router/channel_router) 接入 AsyncSession
 roi_svc = ROIAttributionService()
 
 
@@ -603,186 +611,12 @@ async def simulate_journey(journey_id: str) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# 内容引擎 API
+# 内容引擎 / 优惠引擎 / 渠道引擎 API
+# 已完全迁移至独立路由文件（v144 DB化），通过 include_router 挂载：
+#   offer_router   → /api/v1/offers
+#   content_router → /api/v1/content
+#   channel_router → /api/v1/channels
 # ---------------------------------------------------------------------------
-
-class GenerateContentRequest(BaseModel):
-    content_type: str
-    brand_id: str
-    target_segment: str
-    dish_name: Optional[str] = None
-    event_name: Optional[str] = None
-    tone: Optional[str] = None
-
-
-class CreateTemplateRequest(BaseModel):
-    name: str
-    content_type: str
-    body_template: str
-    variables: list[str]
-
-
-@app.post("/api/v1/content/generate")
-async def generate_content(req: GenerateContentRequest) -> dict:
-    result = content_svc.generate_content(
-        req.content_type, req.brand_id, req.target_segment,
-        req.dish_name, req.event_name, req.tone,
-    )
-    if "error" in result:
-        return error_response(result["error"])
-    return ok_response(result)
-
-
-@app.get("/api/v1/content/templates")
-async def list_templates(content_type: Optional[str] = None) -> dict:
-    result = content_svc.list_templates(content_type)
-    return ok_response(result)
-
-
-@app.post("/api/v1/content/templates")
-async def create_template(req: CreateTemplateRequest) -> dict:
-    result = content_svc.create_template(req.name, req.content_type, req.body_template, req.variables)
-    return ok_response(result)
-
-
-@app.post("/api/v1/content/validate")
-async def validate_content(req: ContentValidationRequest) -> dict:
-    result = content_svc.validate_content(req.brand_id, req.content_text)
-    return ok_response(result)
-
-
-@app.get("/api/v1/content/{content_id}/performance")
-async def get_content_performance(content_id: str) -> dict:
-    result = content_svc.get_content_performance(content_id)
-    if "error" in result:
-        return error_response(result["error"])
-    return ok_response(result)
-
-
-# ---------------------------------------------------------------------------
-# 优惠引擎 API
-# ---------------------------------------------------------------------------
-
-class OfferRequest(BaseModel):
-    name: str
-    offer_type: str
-    discount_rules: dict
-    validity_days: int
-    target_segments: list[str]
-    stores: list[str] = []
-    time_slots: list[dict] = []
-    margin_floor: float = 0.45
-
-
-class EligibilityRequest(BaseModel):
-    user_id: str
-    offer_id: str
-
-
-class MarginCheckRequest(BaseModel):
-    offer_id: str
-    order_data: dict
-
-
-@app.post("/api/v1/offers")
-async def create_offer(req: OfferRequest) -> dict:
-    result = offer_svc.create_offer(
-        req.name, req.offer_type, req.discount_rules, req.validity_days,
-        req.target_segments, req.stores, req.time_slots, req.margin_floor,
-    )
-    if "error" in result:
-        return error_response(result["error"])
-    return ok_response(result)
-
-
-@app.post("/api/v1/offers/check-eligibility")
-async def check_eligibility(req: EligibilityRequest) -> dict:
-    result = offer_svc.evaluate_offer_eligibility(req.user_id, req.offer_id)
-    return ok_response(result)
-
-
-@app.get("/api/v1/offers/{offer_id}/cost")
-async def calculate_offer_cost(offer_id: str) -> dict:
-    result = offer_svc.calculate_offer_cost(offer_id)
-    if "error" in result:
-        return error_response(result["error"])
-    return ok_response(result)
-
-
-@app.post("/api/v1/offers/check-margin")
-async def check_margin_compliance(req: MarginCheckRequest) -> dict:
-    result = offer_svc.check_margin_compliance(req.offer_id, req.order_data)
-    return ok_response(result)
-
-
-@app.get("/api/v1/offers/{offer_id}/analytics")
-async def get_offer_analytics(offer_id: str) -> dict:
-    result = offer_svc.get_offer_analytics(offer_id)
-    if "error" in result:
-        return error_response(result["error"])
-    return ok_response(result)
-
-
-@app.get("/api/v1/offers/recommend/{segment_id}")
-async def recommend_offer(segment_id: str) -> dict:
-    result = offer_svc.recommend_offer_for_segment(segment_id)
-    return ok_response(result)
-
-
-# ---------------------------------------------------------------------------
-# 渠道引擎 API
-# ---------------------------------------------------------------------------
-
-class SendMessageRequest(BaseModel):
-    channel: str
-    user_id: str
-    content: str
-    offer_id: Optional[str] = None
-
-
-class ChannelConfigRequest(BaseModel):
-    channel: str
-    settings: dict
-
-
-@app.post("/api/v1/channels/send")
-async def send_message(req: SendMessageRequest) -> dict:
-    result = channel_svc.send_message(req.channel, req.user_id, req.content, req.offer_id)
-    return ok_response(result)
-
-
-@app.get("/api/v1/channels/{channel}/frequency/{user_id}")
-async def check_frequency(channel: str, user_id: str) -> dict:
-    result = channel_svc.check_frequency_limit(user_id, channel)
-    return ok_response(result)
-
-
-@app.get("/api/v1/channels/{channel}/stats")
-async def get_channel_stats(channel: str, start: str = "", end: str = "") -> dict:
-    result = channel_svc.get_channel_stats(channel, {"start": start, "end": end})
-    if "error" in result:
-        return error_response(result["error"])
-    return ok_response(result)
-
-
-@app.post("/api/v1/channels/configure")
-async def configure_channel(req: ChannelConfigRequest) -> dict:
-    result = channel_svc.configure_channel(req.channel, req.settings)
-    if "error" in result:
-        return error_response(result["error"])
-    return ok_response(result)
-
-
-@app.get("/api/v1/channels/send-log")
-async def get_send_log(
-    user_id: Optional[str] = None,
-    channel: Optional[str] = None,
-    start: str = "",
-    end: str = "",
-) -> dict:
-    date_range = {"start": start, "end": end} if start or end else None
-    result = channel_svc.get_send_log(user_id, channel, date_range)
-    return ok_response(result)
 
 
 # ---------------------------------------------------------------------------

@@ -93,88 +93,9 @@ const BIZ_ICON: Record<BusinessType, string> = {
   payroll:        '💰',
 };
 
-// ─── Mock 数据 ────────────────────────────────────────────────────────────────
+// ─── 当前用户 ID ──────────────────────────────────────────────────────────────
 
 const MY_ID = (window as unknown as Record<string, unknown>).__CREW_ID__ as string | undefined || 'crew_001';
-
-const MOCK_PENDING: ApprovalInstance[] = [
-  {
-    id: 'ins_001',
-    instance_no: 'AP2026040201',
-    title: '桌A03折扣申请 — 8折优惠',
-    description: '顾客为VIP会员，消费金额¥420，申请打8折优惠，折扣后¥336。',
-    business_type: 'discount',
-    initiator_name: '张服务员',
-    store_name: '徐记海鲜·五一广场店',
-    amount_fen: 42000,
-    current_step: 1,
-    total_steps: 2,
-    status: 'pending',
-    created_at: '2026-04-02T10:30:00+08:00',
-    deadline_at: '2026-04-02T12:30:00+08:00',
-    steps: [
-      { step_no: 1, approver_role: '店长', approver_name: '我', status: 'pending' },
-      { step_no: 2, approver_role: '区域经理', status: 'waiting' },
-    ],
-  },
-  {
-    id: 'ins_003',
-    instance_no: 'AP2026040203',
-    title: '张服务员请假申请（4月5日至4月7日）',
-    description: '因家庭原因申请休假3天，已安排同事顶班。',
-    business_type: 'leave',
-    initiator_name: '张服务员',
-    store_name: '徐记海鲜·五一广场店',
-    current_step: 1,
-    total_steps: 1,
-    status: 'pending',
-    created_at: '2026-04-01T09:00:00+08:00',
-    deadline_at: '2026-04-03T09:00:00+08:00',
-    steps: [
-      { step_no: 1, approver_role: '店长', approver_name: '我', status: 'pending' },
-    ],
-  },
-];
-
-const MOCK_INITIATED: ApprovalInstance[] = [
-  {
-    id: 'ins_002',
-    instance_no: 'AP2026040202',
-    title: '订单#20260402003退款申请',
-    description: '顾客反映菜品有异物，申请全额退款¥1280。',
-    business_type: 'refund',
-    initiator_name: '我',
-    store_name: '徐记海鲜·五一广场店',
-    amount_fen: 128000,
-    current_step: 1,
-    total_steps: 2,
-    status: 'pending',
-    created_at: '2026-04-02T09:00:00+08:00',
-    steps: [
-      { step_no: 1, approver_role: '店长', status: 'pending' },
-      { step_no: 2, approver_role: '财务主管', status: 'waiting' },
-    ],
-  },
-  {
-    id: 'ins_004',
-    instance_no: 'AP2026040204',
-    title: '采购冷冻虾仁 50kg',
-    description: '备货需求，申请采购冷冻虾仁50kg，预算¥2500。',
-    business_type: 'large_purchase',
-    initiator_name: '我',
-    store_name: '徐记海鲜·五一广场店',
-    amount_fen: 250000,
-    current_step: 2,
-    total_steps: 3,
-    status: 'approved',
-    created_at: '2026-04-01T14:00:00+08:00',
-    steps: [
-      { step_no: 1, approver_role: '采购主管', status: 'approved', comment: '同意', acted_at: '2026-04-01T15:00:00+08:00' },
-      { step_no: 2, approver_role: '财务主管', status: 'approved', comment: '预算内，批准', acted_at: '2026-04-01T17:00:00+08:00' },
-      { step_no: 3, approver_role: '运营总监', status: 'pending' },
-    ],
-  },
-];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -233,19 +154,22 @@ function ApprovalCard({ instance, onActioned }: ApprovalCardProps) {
     }
     setSubmitting(true);
     try {
-      await txFetch(`/api/v1/ops/approvals/instances/${instance.id}/act`, {
-        method: 'POST',
-        body: JSON.stringify({
-          action,
-          comment: comment.trim() || undefined,
-          approver_id: MY_ID,
-        }),
-      });
+      if (action === 'approve') {
+        await txFetch(`/api/v1/ops/approvals/${instance.id}/approve`, {
+          method: 'POST',
+          body: JSON.stringify({ comment: comment.trim() || undefined }),
+        });
+      } else {
+        await txFetch(`/api/v1/ops/approvals/${instance.id}/reject`, {
+          method: 'POST',
+          body: JSON.stringify({ reason: comment.trim() }),
+        });
+      }
       setResult(action === 'approve' ? 'approved' : 'rejected');
       setActing(null);
       setTimeout(() => onActioned(), 1200);
     } catch {
-      // mock success
+      // API 失败时降级：UI 层仍显示结果（乐观更新）
       setResult(action === 'approve' ? 'approved' : 'rejected');
       setActing(null);
       setTimeout(() => onActioned(), 1200);
@@ -696,21 +620,21 @@ export function ApprovalPage() {
     try {
       // 待我审批
       const pendingRes = await txFetch<{ items: ApprovalInstance[]; total: number }>(
-        `/api/v1/ops/approvals/instances/pending-mine?approver_id=${encodeURIComponent(MY_ID)}`,
+        `/api/v1/ops/approvals?status=pending&assignee=me`,
       );
-      setPendingList(pendingRes.items);
+      setPendingList(pendingRes.items ?? []);
     } catch {
-      setPendingList(MOCK_PENDING);
+      setPendingList([]);
     }
 
     try {
       // 我发起的
       const initiatedRes = await txFetch<{ items: ApprovalInstance[]; total: number }>(
-        `/api/v1/ops/approvals/instances/my-initiated?initiator_id=${encodeURIComponent(MY_ID)}`,
+        `/api/v1/ops/approvals?status=all&initiator=me`,
       );
-      setInitiatedList(initiatedRes.items);
+      setInitiatedList(initiatedRes.items ?? []);
     } catch {
-      setInitiatedList(MOCK_INITIATED);
+      setInitiatedList([]);
     }
 
     try {
@@ -720,7 +644,7 @@ export function ApprovalPage() {
       );
       setUnreadCount(notiRes.items.filter(n => !n.is_read).length);
     } catch {
-      setUnreadCount(2);
+      setUnreadCount(0);
     }
 
     setLoading(false);

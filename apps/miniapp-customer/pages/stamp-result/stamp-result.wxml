@@ -1,0 +1,40 @@
+<!-- 盖章成功动画页 -->
+<view class="page-container">
+  <view class="result-body">
+    <!-- 大印章动画 -->
+    <view class="stamp-anim-wrap">
+      <view class="stamp-drop {{animating ? 'animate' : ''}}">
+        <view class="big-stamp">
+          <text class="big-stamp-text">章</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 恭喜文字 -->
+    <view class="congrats-section">
+      <text class="congrats-title">恭喜获得 {{stampCount}} 枚印章！</text>
+      <text class="progress-info">当前进度：{{currentStamps}} / {{totalSlots}}</text>
+    </view>
+
+    <!-- 下一档奖品提示 -->
+    <view class="next-prize" wx:if="{{hasNextPrize}}">
+      <view class="next-prize-card">
+        <text class="next-label">距离下一档奖品</text>
+        <text class="next-name">「{{nextPrizeName}}」</text>
+        <text class="next-gap">还差 <text class="gap-num">{{nextPrizeGap}}</text> 章</text>
+      </view>
+    </view>
+
+    <!-- 集满提示 -->
+    <view class="next-prize" wx:if="{{currentStamps >= totalSlots}}">
+      <view class="next-prize-card full">
+        <text class="full-text">已集满全部印章，快去兑换奖品吧！</text>
+      </view>
+    </view>
+
+    <!-- 返回按钮 -->
+    <view class="back-hint" bindtap="onTapBack">
+      <text>3秒后自动返回 | 点击立即返回</text>
+    </view>
+  </view>
+</view>

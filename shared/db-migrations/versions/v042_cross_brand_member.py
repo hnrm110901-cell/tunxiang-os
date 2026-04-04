@@ -76,7 +76,7 @@ def upgrade() -> None:
             "brands_visited",
             ARRAY(UUID(as_uuid=True)),
             nullable=True,
-            server_default="'{}'",
+            server_default=sa.text("'{}'"),
             comment="访问过的品牌 tenant_id 列表",
         ),
         sa.Column(

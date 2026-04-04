@@ -1,0 +1,88 @@
+<!-- 领券中心 -->
+<view class="page-container">
+
+  <!-- 顶部Banner -->
+  <view class="banner">
+    <view class="banner-bg"></view>
+    <view class="banner-content">
+      <text class="banner-title">领券中心</text>
+      <text class="banner-sub">{{claimableCount}}张优惠券等你领取</text>
+    </view>
+  </view>
+
+  <!-- 分类Tab -->
+  <view class="category-bar">
+    <scroll-view scroll-x class="category-scroll">
+      <view class="category-item {{activeCategory === item.key ? 'active' : ''}}"
+            wx:for="{{categories}}" wx:key="key"
+            bindtap="switchCategory" data-key="{{item.key}}">
+        {{item.label}}
+      </view>
+    </scroll-view>
+  </view>
+
+  <!-- 优惠券列表 -->
+  <view class="loading-tip" wx:if="{{loading}}">加载中...</view>
+
+  <view class="coupon-list" wx:if="{{!loading && filteredList.length > 0}}">
+    <view class="coupon-card" wx:for="{{filteredList}}" wx:key="id">
+      <!-- 左侧金额区 -->
+      <view class="coupon-left">
+        <view class="coupon-amount" wx:if="{{item.couponType === 'reduction' || item.couponType === 'cash'}}">
+          <text class="amount-sym">&#165;</text>
+          <text class="amount-val">{{item.faceValue}}</text>
+        </view>
+        <view class="coupon-amount" wx:if="{{item.couponType === 'discount'}}">
+          <text class="amount-val discount-val">{{item.faceValue}}</text>
+          <text class="amount-sym small">折</text>
+        </view>
+        <view class="coupon-amount" wx:if="{{item.couponType === 'gift'}}">
+          <text class="amount-sym gift-sym">赠</text>
+        </view>
+        <text class="coupon-threshold">{{item.thresholdText}}</text>
+      </view>
+
+      <!-- 右侧信息区 -->
+      <view class="coupon-info">
+        <text class="coupon-name">{{item.name}}</text>
+        <text class="coupon-scope">{{item.scopeText}}</text>
+        <text class="coupon-expire">{{item.validText}}</text>
+        <!-- 限时倒计时 -->
+        <view class="countdown-row" wx:if="{{item.isLimited && item.countdownText}}">
+          <text class="countdown-icon">&#9201;</text>
+          <text class="countdown-text">{{item.countdownText}}</text>
+        </view>
+      </view>
+
+      <!-- 领取按钮 -->
+      <view class="coupon-action">
+        <!-- 可领取 -->
+        <button class="claim-btn" wx:if="{{item.claimStatus === 'available'}}"
+                bindtap="onClaim" data-id="{{item.id}}">
+          立即领取
+        </button>
+        <!-- 领取中 -->
+        <button class="claim-btn claiming" wx:if="{{item.claimStatus === 'claiming'}}" disabled>
+          领取中
+        </button>
+        <!-- 已领取 -->
+        <button class="claim-btn claimed" wx:if="{{item.claimStatus === 'claimed'}}" disabled>
+          &#10003; 已领取
+        </button>
+        <!-- 已抢光 -->
+        <button class="claim-btn soldout" wx:if="{{item.claimStatus === 'soldout'}}" disabled>
+          已抢光
+        </button>
+      </view>
+    </view>
+  </view>
+
+  <!-- 空状态 -->
+  <view class="empty-state" wx:if="{{!loading && filteredList.length === 0}}">
+    <text class="empty-icon">&#127915;</text>
+    <text class="empty-text">暂无可领取的优惠券</text>
+    <text class="empty-sub">稍后再来看看吧</text>
+  </view>
+
+  <view class="safe-bottom"></view>
+</view>

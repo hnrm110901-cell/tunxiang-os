@@ -60,56 +60,6 @@ interface StaffMember {
   table_count: number;
 }
 
-// ---------- Mock Fallback ----------
-
-const MOCK_KPI: KpiData = {
-  revenue: 2845000,
-  revenue_vs_yesterday: 13.2,
-  order_count: 142,
-  avg_check: 20035,
-  table_turns: 3.2,
-  guest_count: 368,
-  labor_cost_pct: 22.4,
-  on_table_count: 8,
-  free_table_count: 5,
-};
-
-const MOCK_ALERTS: Alert[] = [
-  {
-    id: 'alert-001', type: 'overtime_table', severity: 'critical',
-    message: 'A03桌就餐已71分钟，建议催结账', created_at: new Date().toISOString(), is_read: false,
-  },
-  {
-    id: 'alert-002', type: 'low_margin', severity: 'warning',
-    message: '热菜档毛利率跌至43%，低于设定阈值50%', created_at: new Date().toISOString(), is_read: false,
-  },
-  {
-    id: 'alert-003', type: 'complaint', severity: 'critical',
-    message: 'B07桌客诉：等待上菜超过40分钟', created_at: new Date().toISOString(), is_read: false,
-  },
-];
-
-const MOCK_DISCOUNT_REQUESTS: DiscountRequest[] = [
-  {
-    id: 'disc-001', applicant: '李四', applicant_role: '服务员', table: 'A03桌',
-    discount_type: '整单9折', discount_amount: 2850, reason: '顾客等待时间较长，超过30分钟',
-    created_at: new Date().toISOString(), status: 'pending',
-  },
-  {
-    id: 'disc-002', applicant: '王五', applicant_role: '服务员', table: 'C12桌',
-    discount_type: '赠送甜品', discount_amount: 380, reason: '庆生活动，顾客VIP会员',
-    created_at: new Date().toISOString(), status: 'pending',
-  },
-];
-
-const MOCK_STAFF: StaffMember[] = [
-  { id: 'staff-001', name: '张三', role: '服务员', status: 'on_duty', table_count: 3 },
-  { id: 'staff-002', name: '李四', role: '服务员', status: 'on_duty', table_count: 4 },
-  { id: 'staff-003', name: '王五', role: '服务员', status: 'on_duty', table_count: 2 },
-  { id: 'staff-004', name: '赵六', role: '收银员', status: 'on_duty', table_count: 0 },
-  { id: 'staff-005', name: '陈七', role: '传菜员', status: 'on_duty', table_count: 0 },
-];
-
 // ---------- Helpers ----------
 
 function fmtYuan(fen: number): string {
@@ -398,10 +348,10 @@ export function ManagerMobileApp() {
   const storeName = (window as any).__STORE_NAME__ || '尝在一起·万达店';
 
   const [period, setPeriod] = useState<'today' | 'week' | 'month'>('today');
-  const [kpi, setKpi] = useState<KpiData>(MOCK_KPI);
-  const [alerts, setAlerts] = useState<Alert[]>(MOCK_ALERTS);
-  const [staff, setStaff] = useState<StaffMember[]>(MOCK_STAFF);
-  const [discountRequests, setDiscountRequests] = useState<DiscountRequest[]>(MOCK_DISCOUNT_REQUESTS);
+  const [kpi, setKpi] = useState<KpiData | null>(null);
+  const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [staff, setStaff] = useState<StaffMember[]>([]);
+  const [discountRequests, setDiscountRequests] = useState<DiscountRequest[]>([]);
 
   const [pendingApprovalCount, setPendingApprovalCount] = useState(0);
 
@@ -418,7 +368,7 @@ export function ManagerMobileApp() {
         if (json.ok) setKpi(json.data);
       }
     } catch {
-      // mock fallback already set
+      // API 失败时保留上次值（初始为 null，UI 显示 '-'）
     }
   }, [storeId, period]);
 
@@ -427,10 +377,10 @@ export function ManagerMobileApp() {
       const res = await fetch(`${API_BASE}/alerts?store_id=${storeId}`);
       if (res.ok) {
         const json = await res.json();
-        if (json.ok) setAlerts(json.data);
+        if (json.ok) setAlerts(json.data ?? []);
       }
     } catch {
-      // mock fallback
+      // API 失败时保留上次值（初始为 []）
     }
   }, [storeId]);
 
@@ -439,10 +389,10 @@ export function ManagerMobileApp() {
       const res = await fetch(`${API_BASE}/staff-online?store_id=${storeId}`);
       if (res.ok) {
         const json = await res.json();
-        if (json.ok) setStaff(json.data);
+        if (json.ok) setStaff(json.data ?? []);
       }
     } catch {
-      // mock fallback
+      // API 失败时保留上次值（初始为 []）
     }
   }, [storeId]);
 
@@ -451,10 +401,10 @@ export function ManagerMobileApp() {
       const res = await fetch(`${API_BASE}/discount-requests?store_id=${storeId}`);
       if (res.ok) {
         const json = await res.json();
-        if (json.ok) setDiscountRequests(json.data);
+        if (json.ok) setDiscountRequests(json.data ?? []);
       }
     } catch {
-      // mock fallback
+      // API 失败时保留上次值（初始为 []）
     }
   }, [storeId]);
 
@@ -549,8 +499,10 @@ export function ManagerMobileApp() {
   const visibleAlerts = showAllAlerts ? unreadAlerts : unreadAlerts.slice(0, 3);
   const pendingDiscounts = discountRequests.filter(r => r.status === 'pending');
   const complaints = unreadAlerts.filter(a => a.type === 'complaint');
-  const totalTables = kpi.on_table_count + kpi.free_table_count;
-  const pendingCheckout = Math.max(0, Math.round(kpi.on_table_count * 0.2));
+  const onTableCount = kpi?.on_table_count ?? 0;
+  const freeTableCount = kpi?.free_table_count ?? 0;
+  const totalTables = onTableCount + freeTableCount;
+  const pendingCheckout = Math.max(0, Math.round(onTableCount * 0.2));
 
   return (
     <div style={{ minHeight: '100vh', background: MC.bg, color: MC.text, fontFamily: 'system-ui, sans-serif', paddingBottom: 24 }}>
@@ -675,13 +627,13 @@ export function ManagerMobileApp() {
           <div style={{ fontSize: 13, color: MC.muted, marginBottom: 4 }}>营业额</div>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 12 }}>
             <span style={{ fontSize: 32, fontWeight: 700, color: MC.text }}>
-              {fmtYuan(kpi.revenue)}
+              {kpi != null ? fmtYuan(kpi.revenue) : '-'}
             </span>
             <span style={{
               fontSize: 15, fontWeight: 600,
-              color: kpi.revenue_vs_yesterday >= 0 ? MC.success : MC.danger,
+              color: (kpi?.revenue_vs_yesterday ?? 0) >= 0 ? MC.success : MC.danger,
             }}>
-              {kpi.revenue_vs_yesterday >= 0 ? '+' : ''}{kpi.revenue_vs_yesterday.toFixed(1)}%↑
+              {kpi != null ? `${kpi.revenue_vs_yesterday >= 0 ? '+' : ''}${kpi.revenue_vs_yesterday.toFixed(1)}%↑` : ''}
             </span>
           </div>
           <div style={{ fontSize: 13, color: MC.muted, marginBottom: 14 }}>较昨日同期</div>
@@ -691,9 +643,9 @@ export function ManagerMobileApp() {
             border: `1px solid ${MC.border}`, borderRadius: 10, overflow: 'hidden',
           }}>
             {[
-              { label: '客流量', value: kpi.guest_count.toString(), unit: '人' },
-              { label: '客单价', value: fmtYuan(kpi.avg_check), unit: '' },
-              { label: '翻台率', value: kpi.table_turns.toFixed(1) + '×', unit: '' },
+              { label: '客流量', value: kpi != null ? kpi.guest_count.toString() : '-', unit: '人' },
+              { label: '客单价', value: kpi != null ? fmtYuan(kpi.avg_check) : '-', unit: '' },
+              { label: '翻台率', value: kpi != null ? kpi.table_turns.toFixed(1) + '×' : '-', unit: '' },
             ].map((item, idx) => (
               <div key={item.label} style={{
                 textAlign: 'center', padding: '12px 8px',
@@ -713,21 +665,21 @@ export function ManagerMobileApp() {
         }}>
           <div style={{ fontSize: 15, fontWeight: 600, color: MC.text, marginBottom: 10 }}>桌台状态</div>
           <div style={{ fontSize: 13, color: MC.muted, marginBottom: 10 }}>
-            在台 <span style={{ color: MC.warning, fontWeight: 600 }}>{kpi.on_table_count}桌</span>
+            在台 <span style={{ color: MC.warning, fontWeight: 600 }}>{onTableCount}桌</span>
             &nbsp;·&nbsp;
-            空台 <span style={{ color: MC.success, fontWeight: 600 }}>{kpi.free_table_count}桌</span>
+            空台 <span style={{ color: MC.success, fontWeight: 600 }}>{freeTableCount}桌</span>
             &nbsp;·&nbsp;
             待结账 <span style={{ color: MC.danger, fontWeight: 600 }}>{pendingCheckout}桌</span>
           </div>
           <div style={{ height: 12, background: MC.border, borderRadius: 6, overflow: 'hidden' }}>
             <div style={{
               height: '100%', borderRadius: 6,
-              width: `${totalTables > 0 ? (kpi.on_table_count / totalTables) * 100 : 0}%`,
+              width: `${totalTables > 0 ? (onTableCount / totalTables) * 100 : 0}%`,
               background: `linear-gradient(90deg, ${MC.primary}, ${MC.warning})`,
             }} />
           </div>
           <div style={{ fontSize: 12, color: MC.muted, marginTop: 6 }}>
-            {kpi.on_table_count}/{totalTables}桌在用（满座率{totalTables > 0 ? Math.round(kpi.on_table_count / totalTables * 100) : 0}%）
+            {onTableCount}/{totalTables}桌在用（满座率{totalTables > 0 ? Math.round(onTableCount / totalTables * 100) : 0}%）
           </div>
         </div>
 
@@ -890,9 +842,9 @@ export function ManagerMobileApp() {
           <span style={{ fontSize: 14, color: MC.muted }}>人工成本占比</span>
           <span style={{
             fontSize: 16, fontWeight: 700,
-            color: kpi.labor_cost_pct > 30 ? MC.danger : kpi.labor_cost_pct > 25 ? MC.warning : MC.success,
+            color: (kpi?.labor_cost_pct ?? 0) > 30 ? MC.danger : (kpi?.labor_cost_pct ?? 0) > 25 ? MC.warning : MC.success,
           }}>
-            {kpi.labor_cost_pct.toFixed(1)}%
+            {kpi != null ? kpi.labor_cost_pct.toFixed(1) + '%' : '-'}
           </span>
         </div>
 

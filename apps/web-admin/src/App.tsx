@@ -107,8 +107,11 @@ import { MemberTierPage } from './pages/member/MemberTierPage';
 import { PurchaseOrderPage } from './pages/supply/PurchaseOrderPage';
 import { ExpiryAlertPage } from './pages/supply/ExpiryAlertPage';
 import { SupplyDashboardPage } from './pages/supply/SupplyDashboardPage';
+import { BanquetTemplatePage } from './pages/hq/trade/BanquetTemplatePage';
+import { SupplierPortalPage } from './pages/hq/supply/SupplierPortalPage';
 import { ReviewManagePage } from './pages/ops/ReviewManagePage';
 import { StoreManagePage } from './pages/store/StoreManagePage';
+import { AgentDashboardPage } from './pages/agent/AgentDashboardPage';
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(() => {
@@ -119,19 +122,10 @@ function App() {
 
   const handleLogout = () => {
     const token = getToken();
-    if (token) { fetch('/api/v1/auth/logout', { method: 'POST', headers: { Authorization: `Bearer ${token}` } }).catch(() => {}); }
-    clearAuth(); setIsLoggedIn(false);
-    const token = localStorage.getItem('tx_token');
-    // Fire-and-forget logout call
     if (token) {
-      fetch('/api/v1/auth/logout', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-      }).catch(() => {/* ignore */});
+      fetch('/api/v1/auth/logout', { method: 'POST', headers: { Authorization: `Bearer ${token}` } }).catch(() => {});
     }
-    localStorage.removeItem('tx_token');
-    localStorage.removeItem('tx_user');
-    localStorage.removeItem('tx_tenant_id');
+    clearAuth();
     setIsLoggedIn(false);
   };
 
@@ -247,6 +241,9 @@ function App() {
           <Route path="/supply/dashboard" element={<SupplyDashboardPage />} />
           <Route path="/ops/reviews" element={<ReviewManagePage />} />
           <Route path="/store/manage" element={<StoreManagePage />} />
+          <Route path="/hq/trade/banquet-templates" element={<BanquetTemplatePage />} />
+          <Route path="/hq/supply/suppliers" element={<SupplierPortalPage />} />
+          <Route path="/agent/dashboard" element={<AgentDashboardPage />} />
         </Routes>
       </ShellHQ>
     </BrowserRouter>

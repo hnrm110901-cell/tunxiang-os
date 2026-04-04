@@ -74,6 +74,7 @@ def upgrade() -> None:
         ALTER TABLE salary_schemes ENABLE ROW LEVEL SECURITY;
         ALTER TABLE salary_schemes FORCE ROW LEVEL SECURITY;
 
+        DROP POLICY IF EXISTS salary_schemes_tenant_isolation ON salary_schemes;
         CREATE POLICY salary_schemes_tenant_isolation
             ON salary_schemes
             AS PERMISSIVE FOR ALL
@@ -91,6 +92,7 @@ def upgrade() -> None:
     # 2. employee_salary_configs — 员工薪资配置
     #    将员工与薪资方案绑定，支持时间区间，实现调薪历史追踪
     # ─────────────────────────────────────────────────────────────────
+    op.execute("CREATE EXTENSION IF NOT EXISTS btree_gist;")
     op.execute("""
         CREATE TABLE IF NOT EXISTS employee_salary_configs (
             id                      UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -140,6 +142,7 @@ def upgrade() -> None:
         ALTER TABLE employee_salary_configs ENABLE ROW LEVEL SECURITY;
         ALTER TABLE employee_salary_configs FORCE ROW LEVEL SECURITY;
 
+        DROP POLICY IF EXISTS employee_salary_configs_tenant_isolation ON employee_salary_configs;
         CREATE POLICY employee_salary_configs_tenant_isolation
             ON employee_salary_configs
             AS PERMISSIVE FOR ALL
@@ -239,6 +242,7 @@ def upgrade() -> None:
         ALTER TABLE payroll_records_v2 ENABLE ROW LEVEL SECURITY;
         ALTER TABLE payroll_records_v2 FORCE ROW LEVEL SECURITY;
 
+        DROP POLICY IF EXISTS payroll_records_v2_tenant_isolation ON payroll_records_v2;
         CREATE POLICY payroll_records_v2_tenant_isolation
             ON payroll_records_v2
             AS PERMISSIVE FOR ALL
@@ -256,6 +260,10 @@ def upgrade() -> None:
     # 4. attendance_records — 员工考勤打卡记录
     #    每天每员工一条，记录上下班时间和实际工时
     # ─────────────────────────────────────────────────────────────────
+    op.execute("ALTER TABLE attendance_records ADD COLUMN IF NOT EXISTS absence_type VARCHAR(20)")
+    op.execute("ALTER TABLE attendance_records ADD COLUMN IF NOT EXISTS overtime_hours NUMERIC(5,2) NOT NULL DEFAULT 0")
+    op.execute("ALTER TABLE attendance_records ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN NOT NULL DEFAULT FALSE")
+    op.execute("ALTER TABLE attendance_records ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW()")
     op.execute("""
         CREATE TABLE IF NOT EXISTS attendance_records (
             id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -307,6 +315,7 @@ def upgrade() -> None:
         ALTER TABLE attendance_records ENABLE ROW LEVEL SECURITY;
         ALTER TABLE attendance_records FORCE ROW LEVEL SECURITY;
 
+        DROP POLICY IF EXISTS attendance_records_tenant_isolation ON attendance_records;
         CREATE POLICY attendance_records_tenant_isolation
             ON attendance_records
             AS PERMISSIVE FOR ALL
@@ -363,6 +372,7 @@ def upgrade() -> None:
         ALTER TABLE social_insurance_configs ENABLE ROW LEVEL SECURITY;
         ALTER TABLE social_insurance_configs FORCE ROW LEVEL SECURITY;
 
+        DROP POLICY IF EXISTS social_insurance_configs_tenant_isolation ON social_insurance_configs;
         CREATE POLICY social_insurance_configs_tenant_isolation
             ON social_insurance_configs
             AS PERMISSIVE FOR ALL

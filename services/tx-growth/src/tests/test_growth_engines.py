@@ -25,12 +25,9 @@ from services.audience_segmentation import (
 from services.brand_strategy import BrandStrategyService, _brand_strategies
 from services.channel_engine import (
     ChannelEngine,
-    clear_all_channel_data,
 )
 from services.content_engine import (
     ContentEngine,
-    clear_all_content,
-    record_content_performance,
 )
 from services.journey_orchestrator import (
     JourneyOrchestratorService,
@@ -38,15 +35,259 @@ from services.journey_orchestrator import (
 )
 from services.offer_engine import (
     OfferEngine,
-    clear_all_offers,
-    record_redemption,
-    set_offer_issued_count,
 )
+
+# ---------------------------------------------------------------------------
+# v144 DB化兼容存根 — 仅供此测试文件的内存测试使用
+# 生产代码已移至 async DB；以下存根维持旧测试的同步行为
+# ---------------------------------------------------------------------------
+
+# 内存存储（仅测试用）
+_test_offers: dict = {}
+_test_offer_redemptions: dict = {}
+_test_send_logs: list = []
+_test_daily_counts: dict = {}
+_test_templates: dict = {}
+_test_content_perf: dict = {}
+_test_channel_configs: dict = {}
+
+
+def clear_all_offers() -> None:
+    _test_offers.clear()
+    _test_offer_redemptions.clear()
+
+
+def record_redemption(offer_id: str, user_id: str, order_total_fen: int, discount_fen: int) -> None:
+    if offer_id not in _test_offer_redemptions:
+        _test_offer_redemptions[offer_id] = []
+    _test_offer_redemptions[offer_id].append({
+        "user_id": user_id, "order_total_fen": order_total_fen,
+        "discount_fen": discount_fen,
+    })
+    if offer_id in _test_offers:
+        _test_offers[offer_id]["stats"]["redeemed_count"] += 1
+        _test_offers[offer_id]["stats"]["total_discount_fen"] += discount_fen
+        _test_offers[offer_id]["stats"]["total_revenue_fen"] = (
+            _test_offers[offer_id]["stats"].get("total_revenue_fen", 0) + order_total_fen
+        )
+
+
+def set_offer_issued_count(offer_id: str, count: int) -> None:
+    if offer_id in _test_offers:
+        _test_offers[offer_id]["stats"]["issued_count"] = count
+
+
+def clear_all_content() -> None:
+    _test_templates.clear()
+    _test_content_perf.clear()
+
+
+def record_content_performance(content_id: str, metrics: dict) -> None:
+    _test_content_perf[content_id] = {"content_id": content_id, **metrics}
+
+
+def clear_all_channel_data() -> None:
+    _test_send_logs.clear()
+    _test_daily_counts.clear()
+    _test_channel_configs.clear()
+
+
 from services.roi_attribution import (
     ROIAttributionService,
     clear_all_attribution_data,
     set_campaign_cost,
 )
+
+
+# ---------------------------------------------------------------------------
+# 测试专用内存版 Engine（向后兼容旧的同步 API）
+# v144 DB化后，生产 Engine 变为 async；这些内存版本仅供单元测试使用
+# ---------------------------------------------------------------------------
+
+import uuid as _uuid
+from datetime import datetime as _dt, timezone as _tz
+
+
+class _MemOfferEngine(OfferEngine):
+    """内存版优惠引擎（单元测试用），兼容旧的同步 API"""
+
+    def create_offer(self, name, offer_type, discount_rules, validity_days,
+                     target_segments, stores, time_slots, margin_floor, **kw):
+        if offer_type not in self.OFFER_TYPES:
+            return {"error": f"不支持的优惠类型: {offer_type}"}
+        oid = str(_uuid.uuid4())[:8]
+        now = _dt.now(_tz.utc).isoformat()
+        defaults = self._TYPE_DEFAULTS.get(offer_type, {})
+        offer = {
+            "offer_id": oid, "name": name, "offer_type": offer_type,
+            "description": defaults.get("description", ""),
+            "goal": defaults.get("goal", "general"),
+            "discount_rules": discount_rules, "validity_days": validity_days,
+            "target_segments": target_segments, "stores": stores,
+            "time_slots": time_slots, "margin_floor": margin_floor,
+            "max_per_user": kw.get("max_per_user", 1),
+            "status": "active", "created_at": now, "updated_at": now,
+            "stats": {"issued_count": 0, "redeemed_count": 0,
+                      "total_discount_fen": 0, "total_revenue_fen": 0},
+        }
+        _test_offers[oid] = offer
+        return offer
+
+    def evaluate_offer_eligibility(self, user_id, offer_id):
+        offer = _test_offers.get(offer_id)
+        if not offer:
+            return {"eligible": False, "reason": f"优惠不存在: {offer_id}"}
+        if offer["status"] != "active":
+            return {"eligible": False, "reason": f"优惠已{offer['status']}"}
+        redemptions = _test_offer_redemptions.get(offer_id, [])
+        user_count = sum(1 for r in redemptions if r.get("user_id") == user_id)
+        if user_count >= offer.get("max_per_user", 1):
+            return {"eligible": False, "reason": "已达使用上限"}
+        return {"eligible": True, "offer_id": offer_id, "user_id": user_id,
+                "discount_rules": offer["discount_rules"],
+                "validity_days": offer["validity_days"]}
+
+    def calculate_offer_cost(self, offer_id):
+        offer = _test_offers.get(offer_id)
+        if not offer:
+            return {"error": f"优惠不存在: {offer_id}"}
+        return super().calculate_offer_cost(offer["discount_rules"])
+
+    def check_margin_compliance(self, offer_id, order_data):
+        offer = _test_offers.get(offer_id)
+        if not offer:
+            return {"compliant": False, "reason": f"优惠不存在: {offer_id}"}
+        return super().check_margin_compliance(offer["margin_floor"], order_data)
+
+    def get_offer_analytics(self, offer_id):
+        offer = _test_offers.get(offer_id)
+        if not offer:
+            return {"error": f"优惠不存在: {offer_id}"}
+        redemptions = _test_offer_redemptions.get(offer_id, [])
+        stats = offer.get("stats", {})
+        issued = stats.get("issued_count", 0)
+        redeemed = len(redemptions)
+        total_discount_fen = sum(r.get("discount_fen", 0) for r in redemptions)
+        total_revenue_fen = sum(r.get("order_total_fen", 0) for r in redemptions)
+        return {
+            "offer_id": offer_id, "offer_name": offer.get("name", ""),
+            "offer_type": offer.get("offer_type", ""),
+            "issued_count": issued, "redeemed_count": redeemed,
+            "redemption_rate": round(redeemed / max(1, issued), 4),
+            "total_discount_fen": total_discount_fen,
+            "total_discount_yuan": round(total_discount_fen / 100, 2),
+            "total_revenue_fen": total_revenue_fen,
+            "total_revenue_yuan": round(total_revenue_fen / 100, 2),
+            "revenue_per_redemption_fen": total_revenue_fen // max(1, redeemed),
+            "profit_contribution_fen": total_revenue_fen - total_discount_fen,
+            "profit_contribution_yuan": round((total_revenue_fen - total_discount_fen) / 100, 2),
+        }
+
+
+class _MemContentEngine(ContentEngine):
+    """内存版内容引擎（单元测试用），兼容旧的同步 list_templates/create_template API"""
+
+    def list_templates(self, content_type=None):
+        # 调用父类的纯计算 list（不需要 db）
+        items = list(_test_templates.values())
+        if content_type:
+            items = [t for t in items if t.get("content_type") == content_type]
+        return items
+
+    def create_template(self, name, content_type, body_template, variables, **kw):
+        tid = str(_uuid.uuid4())[:8]
+        now = _dt.now(_tz.utc).isoformat()
+        tpl = {
+            "template_id": tid, "name": name, "content_type": content_type,
+            "body_template": body_template, "variables": variables,
+            "is_builtin": False, "created_at": now,
+        }
+        _test_templates[tid] = tpl
+        return tpl
+
+    def get_content_performance(self, content_id):
+        perf = _test_content_perf.get(content_id)
+        if perf:
+            return perf
+        return {
+            "content_id": content_id, "send_count": 0,
+            "open_count": 0, "click_count": 0, "conversion_count": 0,
+            "open_rate": 0.0, "click_rate": 0.0, "conversion_rate": 0.0,
+        }
+
+
+class _MemChannelEngine(ChannelEngine):
+    """内存版渠道引擎（单元测试用），兼容旧的同步 API"""
+
+    def send_message(self, channel, user_id, content, offer_id=None, **kw):
+        if channel not in self.CHANNELS:
+            return {"success": False, "error": f"不支持的渠道: {channel}"}
+        max_daily = _test_channel_configs.get(channel, {}).get(
+            "max_daily", self.CHANNELS[channel]["max_daily"]
+        )
+        sent = _test_daily_counts.get(user_id, {}).get(channel, 0)
+        if sent >= max_daily:
+            return {"success": False, "error": f"频率限制：今日已发送 {sent} 次，上限 {max_daily} 次",
+                    "channel": channel, "user_id": user_id}
+        mid = str(_uuid.uuid4())[:8]
+        now = _dt.now(_tz.utc).isoformat()
+        _test_send_logs.append({
+            "message_id": mid, "channel": channel, "user_id": user_id,
+            "content": content[:200], "offer_id": offer_id,
+            "status": "sent", "sent_at": now,
+        })
+        _test_daily_counts.setdefault(user_id, {})[channel] = sent + 1
+        return {"success": True, "message_id": mid, "channel": channel,
+                "user_id": user_id, "sent_at": now}
+
+    def check_frequency_limit(self, user_id, channel):
+        if channel not in self.CHANNELS:
+            return {"allowed": False, "reason": f"不支持的渠道: {channel}",
+                    "current_count": 0, "max_daily": 0}
+        max_daily = _test_channel_configs.get(channel, {}).get(
+            "max_daily", self.CHANNELS[channel]["max_daily"]
+        )
+        current = _test_daily_counts.get(user_id, {}).get(channel, 0)
+        allowed = current < max_daily
+        return {
+            "allowed": allowed, "current_count": current, "max_daily": max_daily,
+            "channel": channel, "channel_name": self.CHANNELS[channel]["name"],
+            "reason": "" if allowed else f"今日已发送 {current} 次，上限 {max_daily} 次",
+        }
+
+    def get_channel_stats(self, channel, date_range):
+        if channel not in self.CHANNELS:
+            return {"error": f"不支持的渠道: {channel}"}
+        logs = [l for l in _test_send_logs if l["channel"] == channel]
+        total = len(logs)
+        unique = len(set(l["user_id"] for l in logs))
+        with_offer = sum(1 for l in logs if l.get("offer_id"))
+        return {
+            "channel": channel, "channel_name": self.CHANNELS[channel]["name"],
+            "date_range": date_range, "total_sent": total,
+            "unique_users": unique, "with_offer_count": with_offer,
+            "avg_per_user": round(total / max(1, unique), 2),
+        }
+
+    def configure_channel(self, channel, settings):
+        if channel not in self.CHANNELS:
+            return {"error": f"不支持的渠道: {channel}"}
+        cfg = _test_channel_configs.get(channel, {})
+        cfg.update(settings)
+        cfg["channel"] = channel
+        if "max_daily" in settings:
+            self.CHANNELS[channel]["max_daily"] = settings["max_daily"]
+        _test_channel_configs[channel] = cfg
+        return cfg
+
+    def get_send_log(self, user_id=None, channel=None, date_range=None):
+        logs = list(_test_send_logs)
+        if user_id:
+            logs = [l for l in logs if l.get("user_id") == user_id]
+        if channel:
+            logs = [l for l in logs if l.get("channel") == channel]
+        return logs
+
 
 # ===========================================================================
 # Fixtures — 真实中餐连锁数据
@@ -82,17 +323,17 @@ def journey_svc():
 
 @pytest.fixture
 def content_svc():
-    return ContentEngine()
+    return _MemContentEngine()
 
 
 @pytest.fixture
 def offer_svc():
-    return OfferEngine()
+    return _MemOfferEngine()
 
 
 @pytest.fixture
 def channel_svc():
-    return ChannelEngine()
+    return _MemChannelEngine()
 
 
 @pytest.fixture

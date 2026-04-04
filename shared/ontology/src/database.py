@@ -71,18 +71,14 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 
 
 async def get_db_with_tenant(tenant_id: str) -> AsyncGenerator[AsyncSession, None]:
-    validated_tid = _validate_tenant_id(tenant_id)
-    async with async_session_factory() as session:
-        try:
-            await _set_tenant_on_session(session, validated_tid)
     """带租户隔离的 DB session — set_config 与首次业务查询在同一连接上执行。
 
     安全保障：拒绝 None/空/非 UUID 的 tenant_id，防止 RLS NULL 绕过。
     """
-    _validate_tenant_id(tenant_id)
+    validated_tid = _validate_tenant_id(tenant_id)
     async with async_session_factory() as session:
         try:
-            await session.execute(_SET_TENANT_SQL, {"tid": tenant_id})
+            await _set_tenant_on_session(session, validated_tid)
             yield session
             await session.commit()
         except Exception:  # DB session 兜底回滚：必须捕获所有异常以保证回滚后再抛出

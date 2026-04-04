@@ -1,0 +1,300 @@
+<!-- 大厨详情 + 点菜页 — 介绍/服务信息/可制作菜单/浮动菜单栏 -->
+<view class="container">
+
+  <!-- 加载中 -->
+  <view class="loading-wrap" wx:if="{{loading}}">
+    <view class="loading-spinner"></view>
+    <text class="loading-text">加载大厨信息...</text>
+  </view>
+
+  <!-- 加载失败 -->
+  <view class="error-wrap" wx:elif="{{loadError}}">
+    <text class="error-icon">⚠️</text>
+    <text class="error-text">加载失败，请重试</text>
+    <view class="retry-btn" bindtap="reload">重新加载</view>
+  </view>
+
+  <block wx:elif="{{chef}}">
+
+    <!-- 大厨头部横幅 -->
+    <view class="chef-hero">
+      <image class="chef-hero-bg" src="{{chef.cover_image || '/assets/chef-bg-default.jpg'}}"
+             mode="aspectFill" lazy-load />
+      <view class="chef-hero-overlay"></view>
+      <view class="chef-hero-content">
+        <image class="chef-avatar" src="{{chef.avatar || '/assets/chef-default.png'}}"
+               mode="aspectFill" lazy-load />
+        <view class="chef-hero-info">
+          <view class="chef-name-row">
+            <text class="chef-name">{{chef.name}}</text>
+            <text class="chef-title-badge">{{chef.title}}</text>
+          </view>
+          <text class="chef-slogan">{{chef.slogan || '用心烹制，让每一餐都成为记忆'}}</text>
+          <view class="chef-meta-row">
+            <text class="chef-meta-item">⭐ {{chef.rating}} 分</text>
+            <text class="chef-meta-dot">·</text>
+            <text class="chef-meta-item">{{chef.approval_rate || 98}}% 好评</text>
+            <text class="chef-meta-dot">·</text>
+            <text class="chef-meta-item">{{chef.years_experience}}年经验</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 荣誉证书横向滚动 -->
+    <view class="honors-wrap" wx:if="{{chef.honors && chef.honors.length > 0}}">
+      <scroll-view class="honors-scroll" scroll-x>
+        <view class="honors-list">
+          <view class="honor-item" wx:for="{{chef.honors}}" wx:key="*this">
+            <text class="honor-icon">🏆</text>
+            <text class="honor-text">{{item}}</text>
+          </view>
+        </view>
+      </scroll-view>
+    </view>
+
+    <!-- 个人简介（可展开） -->
+    <view class="bio-card" wx:if="{{chef.slogan}}">
+      <text class="card-title">个人简介</text>
+      <view class="bio-content">
+        <text class="bio-text {{bioExpanded ? '' : 'bio-collapsed'}}">{{chef.slogan}}</text>
+        <view class="bio-toggle" bindtap="toggleBio">
+          <text class="bio-toggle-text">{{bioExpanded ? '收起' : '展开'}}</text>
+          <text class="bio-toggle-arrow">{{bioExpanded ? '∧' : '∨'}}</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 擅长菜系标签 -->
+    <view class="cuisine-tags-card" wx:if="{{chef.cuisine_types && chef.cuisine_types.length > 0}}">
+      <text class="card-title">擅长菜系</text>
+      <view class="cuisine-tags-list">
+        <view class="cuisine-tag-item" wx:for="{{chef.cuisine_types}}" wx:key="*this">
+          {{item}}
+        </view>
+      </view>
+    </view>
+
+    <!-- 代表作品（横向滚动卡片） -->
+    <view class="signature-section" wx:if="{{signatureDishes.length > 0}}">
+      <text class="card-title signature-title">代表作品</text>
+      <scroll-view class="signature-scroll" scroll-x scroll-with-animation>
+        <view class="signature-list">
+          <view class="signature-card" wx:for="{{signatureDishes}}" wx:key="id">
+            <image class="signature-image" src="{{item.image || '/assets/dish-default.jpg'}}"
+                   mode="aspectFill" lazy-load />
+            <text class="signature-name">{{item.name}}</text>
+            <text class="signature-price">¥{{item.price_fen / 100}}</text>
+          </view>
+        </view>
+      </scroll-view>
+    </view>
+
+    <!-- 服务范围信息卡片 -->
+    <view class="info-card">
+      <text class="card-title">服务范围</text>
+      <view class="info-grid">
+        <view class="info-cell">
+          <text class="info-label">服务费</text>
+          <text class="info-value primary">¥{{chef.base_fee_fen / 100}}/次</text>
+        </view>
+        <view class="info-cell">
+          <text class="info-label">最低起订</text>
+          <text class="info-value">¥{{chef.min_spend_fen / 100}}</text>
+        </view>
+        <view class="info-cell">
+          <text class="info-label">配送范围</text>
+          <text class="info-value">{{chef.service_radius_km || 15}}km</text>
+        </view>
+        <view class="info-cell">
+          <text class="info-label">服务区域</text>
+          <text class="info-value">{{chef.service_area || '长沙市内'}}</text>
+        </view>
+        <view class="info-cell">
+          <text class="info-label">服务人数</text>
+          <text class="info-value">2~{{chef.max_guests || 30}}人</text>
+        </view>
+        <view class="info-cell">
+          <text class="info-label">服务次数</text>
+          <text class="info-value">{{chef.total_services || 0}}次</text>
+        </view>
+      </view>
+      <view class="time-slots-row">
+        <text class="info-label">可预约时段</text>
+        <view class="slot-tags">
+          <text class="slot-tag" wx:for="{{chef.available_slots || ['上午 10:00-12:00', '下午 14:00-17:00', '晚上 17:00-21:00']}}" wx:key="*this">{{item}}</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 用户评价列表 -->
+    <view class="reviews-section">
+      <view class="reviews-header">
+        <text class="card-title">用户评价</text>
+        <text class="reviews-count" wx:if="{{reviewsTotal > 0}}">{{reviewsTotal}}条评价</text>
+      </view>
+
+      <view class="reviews-loading" wx:if="{{loadingReviews}}">
+        <view class="loading-spinner-sm"></view>
+        <text>加载评价...</text>
+      </view>
+
+      <view class="reviews-empty" wx:elif="{{reviews.length === 0}}">
+        <text class="reviews-empty-text">暂无评价</text>
+      </view>
+
+      <view class="reviews-list" wx:else>
+        <view class="review-item" wx:for="{{reviews}}" wx:key="id">
+          <view class="review-top-row">
+            <view class="review-user">
+              <view class="review-avatar-placeholder">
+                <text>{{item.customer_name[0] || '匿'}}</text>
+              </view>
+              <text class="review-name">{{item.customer_name}}</text>
+            </view>
+            <text class="review-date">{{item.created_at}}</text>
+          </view>
+          <view class="review-stars">
+            <text class="review-star {{item.rating >= 1 ? 'active' : ''}}">★</text>
+            <text class="review-star {{item.rating >= 2 ? 'active' : ''}}">★</text>
+            <text class="review-star {{item.rating >= 3 ? 'active' : ''}}">★</text>
+            <text class="review-star {{item.rating >= 4 ? 'active' : ''}}">★</text>
+            <text class="review-star {{item.rating >= 5 ? 'active' : ''}}">★</text>
+          </view>
+          <text class="review-content">{{item.content}}</text>
+          <view class="review-images" wx:if="{{item.images && item.images.length > 0}}">
+            <image class="review-image" wx:for="{{item.images}}" wx:for-item="img" wx:key="*this"
+                   src="{{img}}" mode="aspectFill" lazy-load />
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 菜系Tab导航 -->
+    <view class="menu-section">
+      <view class="menu-section-header">
+        <text class="section-title">可制作菜单</text>
+        <text class="section-hint">点击菜品加入本次预约套餐</text>
+      </view>
+
+      <!-- 加载菜单中 -->
+      <view class="loading-menu" wx:if="{{loadingMenu}}">
+        <view class="loading-spinner-sm"></view>
+        <text>加载菜单...</text>
+      </view>
+
+      <block wx:else>
+        <!-- 分类Tab -->
+        <scroll-view class="category-tabs" scroll-x scroll-with-animation>
+          <view class="category-tab-list">
+            <view class="category-tab {{selectedCategory === item.id ? 'active' : ''}}"
+                  wx:for="{{menuCategories}}" wx:key="id"
+                  bindtap="selectCategory" data-id="{{item.id}}">
+              {{item.name}}
+              <text class="category-count" wx:if="{{item.count > 0}}">{{item.count}}</text>
+            </view>
+          </view>
+        </scroll-view>
+
+        <!-- 菜品列表 -->
+        <view class="dish-list" wx:if="{{filteredDishes.length > 0}}">
+          <view class="dish-card" wx:for="{{filteredDishes}}" wx:key="id">
+            <image class="dish-image" src="{{item.image || '/assets/dish-default.jpg'}}"
+                   mode="aspectFill" lazy-load />
+            <view class="dish-info">
+              <text class="dish-name">{{item.name}}</text>
+              <text class="dish-desc" wx:if="{{item.description}}">{{item.description}}</text>
+              <view class="dish-tags" wx:if="{{item.tags && item.tags.length > 0}}">
+                <text class="dish-tag" wx:for="{{item.tags}}" wx:for-item="tag" wx:key="*this">{{tag}}</text>
+              </view>
+              <view class="dish-bottom-row">
+                <text class="dish-price">¥{{item.price_fen / 100}}</text>
+                <view class="dish-stepper">
+                  <view class="stepper-minus {{_getDishQty(item.id) <= 0 ? 'hidden' : ''}}"
+                        bindtap="removeDish" data-id="{{item.id}}">
+                    <text>-</text>
+                  </view>
+                  <text class="stepper-num" wx:if="{{_getDishQty(item.id) > 0}}">{{_getDishQty(item.id)}}</text>
+                  <view class="stepper-plus" bindtap="addDish" data-dish="{{item}}">
+                    <text>+</text>
+                  </view>
+                </view>
+              </view>
+            </view>
+          </view>
+        </view>
+
+        <view class="empty-menu" wx:else>
+          <text class="empty-menu-text">该分类暂无菜品</text>
+        </view>
+      </block>
+    </view>
+
+    <!-- 底部安全间距 -->
+    <view class="bottom-spacer"></view>
+
+  </block>
+
+  <!-- ─── 浮动底部栏 ─── -->
+  <block wx:if="{{chef && !loading}}">
+
+    <!-- 有选菜时：展示汇总 + 立即预约 -->
+    <view class="bottom-bar selected" wx:if="{{totalDishCount > 0}}">
+      <view class="cart-summary" bindtap="toggleCartPanel">
+        <view class="cart-badge">
+          <text class="cart-count">{{totalDishCount}}</text>
+        </view>
+        <view class="cart-info">
+          <text class="cart-total">¥{{totalDishPrice}}</text>
+          <text class="cart-hint">{{cartExpanded ? '点击收起' : '点击查看已选'}}</text>
+        </view>
+      </view>
+      <view class="book-btn" bindtap="goToBooking">
+        <text>立即预约</text>
+      </view>
+    </view>
+
+    <!-- 无选菜时：仅展示"立即预约" -->
+    <view class="bottom-bar" wx:else>
+      <view class="bottom-fee-info">
+        <text class="bottom-fee-label">服务费</text>
+        <text class="bottom-fee-price">¥{{chef.base_fee_fen / 100}}起/次</text>
+      </view>
+      <view class="book-btn" bindtap="goToBooking">
+        <text>立即预约</text>
+      </view>
+    </view>
+
+    <!-- 已选菜单展开面板 -->
+    <view class="cart-panel {{cartExpanded ? 'expanded' : ''}}" wx:if="{{cartExpanded && totalDishCount > 0}}">
+      <view class="cart-panel-header">
+        <text class="cart-panel-title">已选菜品</text>
+        <view class="cart-clear-btn" bindtap="clearCart">清空</view>
+      </view>
+      <scroll-view class="cart-panel-list" scroll-y>
+        <view class="cart-item" wx:for="{{selectedDishes}}" wx:key="id">
+          <text class="cart-item-name">{{item.name}}</text>
+          <view class="cart-item-stepper">
+            <view class="stepper-minus" bindtap="removeDish" data-id="{{item.id}}">
+              <text>-</text>
+            </view>
+            <text class="stepper-num">{{item.quantity}}</text>
+            <view class="stepper-plus" bindtap="addDish" data-dish="{{item}}">
+              <text>+</text>
+            </view>
+          </view>
+          <text class="cart-item-price">¥{{item.price_fen * item.quantity / 100}}</text>
+        </view>
+      </scroll-view>
+      <view class="cart-panel-total">
+        <text class="cart-panel-total-label">合计（不含服务费）</text>
+        <text class="cart-panel-total-price">¥{{totalDishPrice}}</text>
+      </view>
+    </view>
+
+    <!-- 遮罩层 -->
+    <view class="cart-mask" wx:if="{{cartExpanded}}" bindtap="toggleCartPanel"></view>
+
+  </block>
+
+</view>

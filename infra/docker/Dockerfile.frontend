@@ -1,0 +1,86 @@
+# ============================================================
+# 屯象OS 前端 Dockerfile（多阶段构建）
+# 用法: docker build --build-arg APP_NAME=web-admin -f Dockerfile.frontend ../..
+# ============================================================
+
+# ── Stage 1: Build ──────────────────────────────────────────
+FROM node:20-alpine AS builder
+
+ARG APP_NAME
+ENV APP_NAME=${APP_NAME}
+
+WORKDIR /build
+
+# 先复制 package.json 利用缓存层
+COPY apps/${APP_NAME}/package.json apps/${APP_NAME}/package-lock.json* ./
+
+# 使用淘宝镜像安装依赖
+RUN npm config set registry https://registry.npmmirror.com && \
+    npm ci --prefer-offline
+
+# 复制源码并构建
+COPY apps/${APP_NAME}/ ./
+RUN npm run build
+
+# ── Stage 2: Serve ──────────────────────────────────────────
+FROM nginx:1.25-alpine AS runtime
+
+ARG APP_NAME
+ENV APP_NAME=${APP_NAME}
+
+# 删除默认配置
+RUN rm /etc/nginx/conf.d/default.conf
+
+# 添加 SPA fallback 配置
+COPY <<'NGINX_CONF' /etc/nginx/conf.d/spa.conf
+server {
+    listen 80;
+    server_name _;
+    root /usr/share/nginx/html;
+    index index.html;
+
+    # SPA fallback：所有非文件请求都返回 index.html
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # 静态资源长缓存（Vite 构建产物带 hash）
+    location ~* \.(js|css|png|jpg|jpeg|gif|svg|ico|webp|avif|woff|woff2|ttf|eot|otf)$ {
+        expires 1y;
+        add_header Cache-Control "public, immutable, max-age=31536000";
+        access_log off;
+    }
+
+    # index.html 不缓存
+    location = /index.html {
+        add_header Cache-Control "no-cache, no-store, must-revalidate" always;
+        add_header Pragma "no-cache" always;
+    }
+
+    # 健康检查
+    location /healthz {
+        access_log off;
+        return 200 'ok';
+        add_header Content-Type text/plain;
+    }
+}
+NGINX_CONF
+
+# 从 builder 阶段复制构建产物
+COPY --from=builder /build/dist /usr/share/nginx/html
+
+# 非 root 运行（nginx alpine 支持）
+RUN chown -R nginx:nginx /usr/share/nginx/html && \
+    chown -R nginx:nginx /var/cache/nginx && \
+    chown -R nginx:nginx /var/log/nginx && \
+    touch /var/run/nginx.pid && \
+    chown -R nginx:nginx /var/run/nginx.pid
+
+USER nginx
+
+EXPOSE 80
+
+HEALTHCHECK --interval=30s --timeout=3s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost/healthz || exit 1
+
+CMD ["nginx", "-g", "daemon off;"]

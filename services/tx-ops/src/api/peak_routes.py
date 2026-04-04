@@ -5,8 +5,11 @@
 """
 from typing import Optional
 
-from fastapi import APIRouter, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from shared.ontology.src.database import get_db
 
 router = APIRouter(prefix="/api/v1/peak", tags=["peak-management"])
 
@@ -33,12 +36,13 @@ def _get_tenant_id(x_tenant_id: str = Header(...)) -> str:
 async def detect_peak(
     store_id: str,
     x_tenant_id: str = Header(...),
+    db: AsyncSession = Depends(get_db),
 ):
     """检测是否进入高峰（基于当前上座率 + 等位数）"""
     from ..services.peak_management import detect_peak as svc
 
     try:
-        result = await svc(store_id=store_id, tenant_id=x_tenant_id, db=None)
+        result = await svc(store_id=store_id, tenant_id=x_tenant_id, db=db)
         return {"ok": True, "data": result}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -51,12 +55,13 @@ async def detect_peak(
 async def get_dept_load_monitor(
     store_id: str,
     x_tenant_id: str = Header(...),
+    db: AsyncSession = Depends(get_db),
 ):
     """档口负载实时监控"""
     from ..services.peak_management import get_dept_load_monitor as svc
 
     try:
-        result = await svc(store_id=store_id, tenant_id=x_tenant_id, db=None)
+        result = await svc(store_id=store_id, tenant_id=x_tenant_id, db=db)
         return {"ok": True, "data": result}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -69,12 +74,13 @@ async def get_dept_load_monitor(
 async def suggest_staff_dispatch(
     store_id: str,
     x_tenant_id: str = Header(...),
+    db: AsyncSession = Depends(get_db),
 ):
     """服务加派建议"""
     from ..services.peak_management import suggest_staff_dispatch as svc
 
     try:
-        result = await svc(store_id=store_id, tenant_id=x_tenant_id, db=None)
+        result = await svc(store_id=store_id, tenant_id=x_tenant_id, db=db)
         return {"ok": True, "data": result}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -87,12 +93,13 @@ async def suggest_staff_dispatch(
 async def get_queue_pressure(
     store_id: str,
     x_tenant_id: str = Header(...),
+    db: AsyncSession = Depends(get_db),
 ):
     """等位拥堵指标"""
     from ..services.peak_management import get_queue_pressure as svc
 
     try:
-        result = await svc(store_id=store_id, tenant_id=x_tenant_id, db=None)
+        result = await svc(store_id=store_id, tenant_id=x_tenant_id, db=db)
         return {"ok": True, "data": result}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -106,6 +113,7 @@ async def handle_peak_event(
     store_id: str,
     body: HandlePeakEventRequest,
     x_tenant_id: str = Header(...),
+    db: AsyncSession = Depends(get_db),
 ):
     """高峰事件处理（临时调菜/调台/快速出餐/分流）"""
     from ..services.peak_management import handle_peak_event as svc
@@ -115,7 +123,7 @@ async def handle_peak_event(
             store_id=store_id,
             event_type=body.event_type,
             tenant_id=x_tenant_id,
-            db=None,
+            db=db,
             params=body.params,
         )
         return {"ok": True, "data": result}

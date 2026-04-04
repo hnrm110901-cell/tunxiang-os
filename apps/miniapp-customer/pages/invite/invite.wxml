@@ -1,0 +1,96 @@
+<!-- 邀请有礼页 -->
+<view class="page">
+
+  <!-- 顶部渐变头部 -->
+  <view class="header">
+    <text class="header-title">邀请好友 赚积分</text>
+    <text class="header-subtitle">每成功邀请1位好友，双方均可获得积分奖励</text>
+  </view>
+
+  <!-- 邀请码区域 -->
+  <view class="card invite-code-card">
+    <text class="section-label">我的邀请码</text>
+    <view class="code-box">
+      <text class="code-text" wx:if="{{inviteCode}}">{{inviteCode}}</text>
+      <text class="code-text code-placeholder" wx:else>加载中...</text>
+    </view>
+    <button class="btn-copy" bindtap="copyCode" disabled="{{!inviteCode}}">复制邀请码</button>
+  </view>
+
+  <!-- 分享卡片预览 -->
+  <view class="card share-card">
+    <text class="section-label">分享卡片预览</text>
+    <view class="share-preview">
+      <!-- 门店 Logo 占位 -->
+      <view class="preview-logo">
+        <text class="preview-logo-text">屯象</text>
+      </view>
+      <view class="preview-body">
+        <text class="preview-headline">{{storeName || '屯象餐厅'}} 邀您来就餐</text>
+        <text class="preview-desc">使用我的邀请码注册，双方各得50积分</text>
+        <!-- 二维码占位 -->
+        <view class="qrcode-placeholder">
+          <text class="qrcode-icon">⬛</text>
+          <text class="qrcode-label">扫码注册</text>
+        </view>
+        <text class="preview-code">邀请码：{{inviteCode || '--------'}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 邀请进度 -->
+  <view class="card progress-card">
+    <text class="section-label">邀请进度</text>
+    <view class="progress-wrap">
+      <!-- CSS 圆形进度模拟（border-radius） -->
+      <view class="circle-wrap">
+        <view class="circle-bg">
+          <view class="circle-inner">
+            <text class="circle-count">{{invitedCount}}</text>
+            <text class="circle-unit">人</text>
+          </view>
+        </view>
+      </view>
+      <view class="progress-info">
+        <text class="progress-label">已成功邀请</text>
+        <text class="progress-value">{{invitedCount}} 位好友</text>
+        <text class="progress-tip">再邀请 {{nextMilestone}} 人可解锁额外奖励</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 奖励规则 -->
+  <view class="card rules-card">
+    <text class="section-label">奖励规则</text>
+    <view class="rule-list">
+      <view
+        class="rule-item"
+        wx:for="{{rewardRules}}"
+        wx:key="id"
+      >
+        <text class="rule-icon">🎁</text>
+        <view class="rule-body">
+          <text class="rule-title">{{item.title}}</text>
+          <text class="rule-desc">{{item.desc}}</text>
+        </view>
+        <view class="rule-badge">
+          <text class="rule-points">+{{item.points}}</text>
+          <text class="rule-points-label">积分</text>
+        </view>
+      </view>
+    </view>
+    <view class="rule-note">
+      <text class="rule-note-text">* 积分将在被邀请好友完成首次消费后自动到账</text>
+    </view>
+  </view>
+
+  <!-- 底部立即分享按钮 -->
+  <view class="bottom-bar">
+    <button class="btn-share" open-type="share">立即分享给好友</button>
+    <view class="btn-records" bindtap="goToRecords">
+      <text class="btn-records-text">查看邀请记录</text>
+      <text class="btn-records-arrow">›</text>
+    </view>
+  </view>
+
+</view>

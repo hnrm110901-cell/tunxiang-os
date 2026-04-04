@@ -1,8 +1,9 @@
 /**
  * 异常中心 — 异常列表(按严重度)、异常详情+处理记录、统计图表
- * 调用 GET /api/v1/dashboard/alerts/*
+ * 调用 GET /api/v1/analytics/alerts/*
  */
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { apiGet, apiPatch } from '../../../api/client';
 
 type AlertSeverity = 'critical' | 'warning' | 'info';
 type AlertCategory = 'cost' | 'quality' | 'efficiency' | 'compliance' | 'equipment';
@@ -19,6 +20,13 @@ interface AlertItem {
   status: AlertStatus;
   handler?: string;
   logs: { time: string; action: string; operator: string }[];
+}
+
+interface AlertSummary {
+  critical: number;
+  warning: number;
+  info: number;
+  by_category: Record<AlertCategory, number>;
 }
 
 const SEVERITY_CONFIG: Record<AlertSeverity, { label: string; color: string }> = {
@@ -41,81 +49,89 @@ const STATUS_CONFIG: Record<AlertStatus, { label: string; color: string }> = {
   resolved: { label: '已解决', color: '#52c41a' },
 };
 
-const MOCK_ALERTS: AlertItem[] = [
-  {
-    id: 'ALT001', severity: 'critical', category: 'cost', store: '河西店',
-    title: '食材成本率超标', detail: '河西店当日食材成本率达到38.5%，超过设定阈值35%。主要原因：鲈鱼损耗¥320、蔬菜类过期报损¥180。',
-    time: '10:32', status: 'open', logs: [
-      { time: '10:32', action: '系统自动检测并生成预警', operator: '系统' },
-    ],
-  },
-  {
-    id: 'ALT002', severity: 'critical', category: 'quality', store: '星沙店',
-    title: '出餐超时连续告警', detail: '星沙店午市出餐超时达12单，占比15.3%。平均超时8.5分钟。后厨报告：煎炸工位一人请假。',
-    time: '12:45', status: 'processing', handler: '陈店长', logs: [
-      { time: '12:45', action: '系统自动检测并生成预警', operator: '系统' },
-      { time: '12:50', action: '已通知店长处理', operator: '系统' },
-      { time: '13:00', action: '调配服务员支援后厨', operator: '陈店长' },
-    ],
-  },
-  {
-    id: 'ALT003', severity: 'warning', category: 'compliance', store: '芙蓉路店',
-    title: '折扣审批超限提醒', detail: '今日折扣总额¥1,280，接近日限额¥1,500（85.3%）。如继续审批需总部授权。',
-    time: '15:20', status: 'open', logs: [
-      { time: '15:20', action: '折扣额度使用超85%预警', operator: '系统' },
-    ],
-  },
-  {
-    id: 'ALT004', severity: 'warning', category: 'efficiency', store: '岳麓店',
-    title: '翻台率持续偏低', detail: '岳麓店近3天翻台率分别为2.1、1.9、2.0，低于目标值2.5。建议分析原因并制定提升方案。',
-    time: '09:00', status: 'open', logs: [
-      { time: '09:00', action: '周期性指标检测预警', operator: '系统' },
-    ],
-  },
-  {
-    id: 'ALT005', severity: 'info', category: 'equipment', store: '开福店',
-    title: 'POS打印机墨量不足', detail: '开福店1号POS打印机墨量低于20%，预计可打印约200张小票。建议提前更换。',
-    time: '08:15', status: 'resolved', handler: '李收银', logs: [
-      { time: '08:15', action: '设备墨量低预警', operator: '系统' },
-      { time: '09:30', action: '已更换打印纸和墨盒', operator: '李收银' },
-      { time: '09:35', action: '确认打印正常，关闭预警', operator: '李收银' },
-    ],
-  },
-  {
-    id: 'ALT006', severity: 'warning', category: 'cost', store: '芙蓉路店',
-    title: '鲈鱼库存临近效期', detail: '芙蓉路店鲈鱼库存5份，其中3份明日到期。建议今日消化或做特价处理。',
-    time: '07:00', status: 'processing', handler: '张厨师长', logs: [
-      { time: '07:00', action: '食材效期预警', operator: '系统' },
-      { time: '07:30', action: '已安排今日推荐菜单增加鲈鱼菜品', operator: '张厨师长' },
-    ],
-  },
-];
-
-// 统计
-const statBySeverity = (severity: AlertSeverity) => MOCK_ALERTS.filter((a) => a.severity === severity).length;
-const statByCategory = (cat: AlertCategory) => MOCK_ALERTS.filter((a) => a.category === cat).length;
-
 export function AlertCenterPage() {
+  const [alerts, setAlerts] = useState<AlertItem[]>([]);
+  const [summary, setSummary] = useState<AlertSummary>({
+    critical: 0,
+    warning: 0,
+    info: 0,
+    by_category: { cost: 0, quality: 0, efficiency: 0, compliance: 0, equipment: 0 },
+  });
+  const [loading, setLoading] = useState(true);
+
   const [sevFilter, setSevFilter] = useState<AlertSeverity | 'all'>('all');
   const [statusFilter, setStatusFilter] = useState<AlertStatus | 'all'>('all');
-  const [selectedId, setSelectedId] = useState<string | null>(MOCK_ALERTS[0]?.id || null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  const filtered = MOCK_ALERTS.filter((a) => {
+  // 加载告警列表
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+
+    const statusParam = statusFilter !== 'all' ? `&status=${statusFilter}` : '';
+    const sevParam = sevFilter !== 'all' ? `&severity=${sevFilter}` : '';
+
+    Promise.all([
+      apiGet<AlertItem[]>(`/api/v1/analytics/alerts?${statusParam}${sevParam}`).catch(() => [] as AlertItem[]),
+      apiGet<AlertSummary>('/api/v1/analytics/alerts/summary').catch(() => null),
+    ]).then(([alertData, summaryData]) => {
+      if (cancelled) return;
+      setAlerts(alertData);
+      if (alertData.length > 0 && selectedId === null) {
+        setSelectedId(alertData[0].id);
+      }
+      if (summaryData) {
+        setSummary(summaryData);
+      } else {
+        // 从列表数据推算 summary
+        setSummary({
+          critical: alertData.filter((a) => a.severity === 'critical').length,
+          warning: alertData.filter((a) => a.severity === 'warning').length,
+          info: alertData.filter((a) => a.severity === 'info').length,
+          by_category: {
+            cost: alertData.filter((a) => a.category === 'cost').length,
+            quality: alertData.filter((a) => a.category === 'quality').length,
+            efficiency: alertData.filter((a) => a.category === 'efficiency').length,
+            compliance: alertData.filter((a) => a.category === 'compliance').length,
+            equipment: alertData.filter((a) => a.category === 'equipment').length,
+          },
+        });
+      }
+      setLoading(false);
+    });
+
+    return () => { cancelled = true; };
+  }, [sevFilter, statusFilter]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 标记已解决
+  const handleResolve = async (id: string) => {
+    try {
+      await apiPatch<AlertItem>(`/api/v1/analytics/alerts/${id}/resolve`, { resolution: '已解决' });
+      // 更新本地状态
+      setAlerts((prev) =>
+        prev.map((a) => (a.id === id ? { ...a, status: 'resolved' as AlertStatus } : a))
+      );
+    } catch {
+      // 静默失败，不影响 UI
+    }
+  };
+
+  const filtered = alerts.filter((a) => {
     if (sevFilter !== 'all' && a.severity !== sevFilter) return false;
     if (statusFilter !== 'all' && a.status !== statusFilter) return false;
     return true;
   });
 
-  const selected = MOCK_ALERTS.find((a) => a.id === selectedId);
+  const selected = alerts.find((a) => a.id === selectedId);
 
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
         <h2 style={{ margin: 0 }}>异常中心</h2>
         <div style={{ display: 'flex', gap: 16, fontSize: 12 }}>
-          <span style={{ color: '#ff4d4f', fontWeight: 600 }}>严重 {statBySeverity('critical')}</span>
-          <span style={{ color: '#faad14', fontWeight: 600 }}>警告 {statBySeverity('warning')}</span>
-          <span style={{ color: '#1890ff', fontWeight: 600 }}>提示 {statBySeverity('info')}</span>
+          <span style={{ color: '#ff4d4f', fontWeight: 600 }}>严重 {summary.critical}</span>
+          <span style={{ color: '#faad14', fontWeight: 600 }}>警告 {summary.warning}</span>
+          <span style={{ color: '#1890ff', fontWeight: 600 }}>提示 {summary.info}</span>
         </div>
       </div>
 
@@ -126,7 +142,7 @@ export function AlertCenterPage() {
             background: '#112228', borderRadius: 8, padding: 14, textAlign: 'center',
           }}>
             <div style={{ fontSize: 20, marginBottom: 4 }}>{CATEGORY_CONFIG[cat].icon}</div>
-            <div style={{ fontSize: 20, fontWeight: 'bold' }}>{statByCategory(cat)}</div>
+            <div style={{ fontSize: 20, fontWeight: 'bold' }}>{summary.by_category[cat]}</div>
             <div style={{ fontSize: 11, color: '#999' }}>{CATEGORY_CONFIG[cat].label}</div>
           </div>
         ))}
@@ -160,41 +176,47 @@ export function AlertCenterPage() {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
         {/* 异常列表 */}
         <div style={{ background: '#112228', borderRadius: 8, padding: 16 }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {filtered.map((a) => (
-              <div
-                key={a.id}
-                onClick={() => setSelectedId(a.id)}
-                style={{
-                  padding: 14, borderRadius: 8, cursor: 'pointer',
-                  background: selectedId === a.id ? 'rgba(255,107,44,0.08)' : '#0B1A20',
-                  border: selectedId === a.id ? '1px solid #FF6B2C' : '1px solid #1a2a33',
-                  borderLeft: `3px solid ${SEVERITY_CONFIG[a.severity].color}`,
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          {loading ? (
+            <div style={{ textAlign: 'center', color: '#666', padding: 40 }}>加载中...</div>
+          ) : filtered.length === 0 ? (
+            <div style={{ textAlign: 'center', color: '#666', padding: 40 }}>暂无异常记录</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {filtered.map((a) => (
+                <div
+                  key={a.id}
+                  onClick={() => setSelectedId(a.id)}
+                  style={{
+                    padding: 14, borderRadius: 8, cursor: 'pointer',
+                    background: selectedId === a.id ? 'rgba(255,107,44,0.08)' : '#0B1A20',
+                    border: selectedId === a.id ? '1px solid #FF6B2C' : '1px solid #1a2a33',
+                    borderLeft: `3px solid ${SEVERITY_CONFIG[a.severity].color}`,
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{
+                        fontSize: 10, padding: '1px 6px', borderRadius: 3, fontWeight: 600,
+                        background: `${SEVERITY_CONFIG[a.severity].color}20`,
+                        color: SEVERITY_CONFIG[a.severity].color,
+                      }}>{SEVERITY_CONFIG[a.severity].label}</span>
+                      <span style={{ fontSize: 12 }}>{CATEGORY_CONFIG[a.category].icon}</span>
+                      <span style={{ fontSize: 13, fontWeight: 600 }}>{a.title}</span>
+                    </div>
                     <span style={{
-                      fontSize: 10, padding: '1px 6px', borderRadius: 3, fontWeight: 600,
-                      background: `${SEVERITY_CONFIG[a.severity].color}20`,
-                      color: SEVERITY_CONFIG[a.severity].color,
-                    }}>{SEVERITY_CONFIG[a.severity].label}</span>
-                    <span style={{ fontSize: 12 }}>{CATEGORY_CONFIG[a.category].icon}</span>
-                    <span style={{ fontSize: 13, fontWeight: 600 }}>{a.title}</span>
+                      fontSize: 10, padding: '1px 6px', borderRadius: 3,
+                      background: `${STATUS_CONFIG[a.status].color}20`,
+                      color: STATUS_CONFIG[a.status].color,
+                    }}>{STATUS_CONFIG[a.status].label}</span>
                   </div>
-                  <span style={{
-                    fontSize: 10, padding: '1px 6px', borderRadius: 3,
-                    background: `${STATUS_CONFIG[a.status].color}20`,
-                    color: STATUS_CONFIG[a.status].color,
-                  }}>{STATUS_CONFIG[a.status].label}</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#666' }}>
+                    <span>{a.store}</span>
+                    <span>{a.time}</span>
+                  </div>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#666' }}>
-                  <span>{a.store}</span>
-                  <span>{a.time}</span>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* 异常详情 + 处理记录 */}
@@ -234,7 +256,6 @@ export function AlertCenterPage() {
                 <div style={{ position: 'relative', paddingLeft: 20 }}>
                   {selected.logs.map((log, i) => (
                     <div key={i} style={{ position: 'relative', paddingBottom: i < selected.logs.length - 1 ? 16 : 0 }}>
-                      {/* 时间线圆点 */}
                       <div style={{
                         position: 'absolute', left: -20, top: 4,
                         width: 8, height: 8, borderRadius: '50%',
@@ -257,11 +278,13 @@ export function AlertCenterPage() {
               </div>
 
               {selected.status !== 'resolved' && (
-                <button style={{
-                  width: '100%', padding: '10px 0', borderRadius: 8, border: 'none',
-                  background: '#FF6B2C', color: '#fff', fontSize: 14, fontWeight: 600,
-                  cursor: 'pointer',
-                }}>标记为已解决</button>
+                <button
+                  onClick={() => handleResolve(selected.id)}
+                  style={{
+                    width: '100%', padding: '10px 0', borderRadius: 8, border: 'none',
+                    background: '#FF6B2C', color: '#fff', fontSize: 14, fontWeight: 600,
+                    cursor: 'pointer',
+                  }}>标记为已解决</button>
               )}
             </>
           ) : (

@@ -4,6 +4,7 @@
  */
 import { useRef, useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { txFetch } from '../api/index';
 
 interface DishMatch {
   dish_id: string;
@@ -15,11 +16,7 @@ interface DishMatch {
 
 type PageState = 'camera' | 'loading' | 'results' | 'no-match' | 'error';
 
-const MOCK_MATCHES: DishMatch[] = [
-  { dish_id: 'mock_1', dish_name: '宫保鸡丁', price: 48, confidence: 92, thumbnail_url: '' },
-  { dish_id: 'mock_2', dish_name: '红烧肉', price: 68, confidence: 75, thumbnail_url: '' },
-  { dish_id: 'mock_3', dish_name: '鱼香茄子', price: 38, confidence: 68, thumbnail_url: '' },
-];
+// Mock 数据已移除，API 失败时返回空结果
 
 export default function DishRecognizePage() {
   const navigate = useNavigate();
@@ -92,19 +89,30 @@ export default function DishRecognizePage() {
       reader.readAsDataURL(file);
     });
 
-  // 调用识别 API
+  // 调用识别 API（formData 方式）
   const recognizeDish = async (base64: string) => {
     setPageState('loading');
     try {
-      const resp = await fetch('/api/v1/vision/recognize-dish', {
+      // 将 base64 转为 Blob 再放入 FormData
+      const byteString = atob(base64);
+      const arr = new Uint8Array(byteString.length);
+      for (let i = 0; i < byteString.length; i++) arr[i] = byteString.charCodeAt(i);
+      const blob = new Blob([arr], { type: 'image/jpeg' });
+      const formData = new FormData();
+      formData.append('image', blob, 'capture.jpg');
+      if (storeId) formData.append('store_id', storeId);
+
+      // 注意：FormData 不能用 txFetch（会覆盖 Content-Type），改用 fetch 手动携带 X-Tenant-ID
+      const tenantId = import.meta.env.VITE_TENANT_ID || '';
+      const resp = await fetch('/api/v1/menu/dish-recognize', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image_base64: base64, store_id: storeId }),
+        headers: { ...(tenantId ? { 'X-Tenant-ID': tenantId } : {}) },
+        body: formData,
         signal: AbortSignal.timeout(15000),
       });
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const json = await resp.json();
-      const resultMatches: DishMatch[] = json?.data?.matches ?? [];
+      const resultMatches: DishMatch[] = json?.data?.matches ?? json?.matches ?? [];
       if (resultMatches.length === 0) {
         setPageState('no-match');
       } else {
@@ -112,9 +120,8 @@ export default function DishRecognizePage() {
         setPageState('results');
       }
     } catch (_err) {
-      // 网络失败或超时 → 使用 mock 结果
-      setMatches(MOCK_MATCHES);
-      setPageState('results');
+      // 网络失败或超时 → 返回未识别
+      setPageState('no-match');
     }
   };
 
@@ -161,11 +168,9 @@ export default function DishRecognizePage() {
     if (!orderId || addedIds.has(dish.dish_id)) return;
     setAddingId(dish.dish_id);
     try {
-      await fetch(`/api/v1/orders/${orderId}/items`, {
+      await txFetch(`/api/v1/trade/orders/${encodeURIComponent(orderId)}/add-items`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dish_id: dish.dish_id, quantity: 1 }),
-        signal: AbortSignal.timeout(8000),
+        body: JSON.stringify({ items: [{ dish_id: dish.dish_id, quantity: 1 }] }),
       });
       setAddedIds(prev => new Set(prev).add(dish.dish_id));
     } catch (_err) {

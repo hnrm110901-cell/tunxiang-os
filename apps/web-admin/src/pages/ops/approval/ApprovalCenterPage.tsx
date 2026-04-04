@@ -81,83 +81,7 @@ const STEP_STATUS_CONFIG: Record<string, { label: string; color: string; dot?: R
   waiting:  { label: '待处理', color: '#999' },
 };
 
-// ─── Mock 数据 ────────────────────────────────────────────────────────────────
-
-const MOCK_INSTANCES: ApprovalInstance[] = [
-  {
-    id: 'ins_001',
-    instance_no: 'AP2026032701',
-    title: '桌A03折扣申请 — 8折优惠',
-    business_type: 'discount',
-    initiator_name: '张服务员',
-    initiator_id: 'emp_001',
-    store_name: '徐记海鲜·五一广场店',
-    amount_fen: 42000,
-    current_step: 1,
-    total_steps: 2,
-    status: 'pending',
-    created_at: '2026-04-02T10:30:00+08:00',
-    deadline_at: '2026-04-02T12:30:00+08:00',
-    steps: [
-      { step_no: 1, approver_role: 'store_manager', approver_name: '李店长', status: 'pending' },
-      { step_no: 2, approver_role: 'regional_manager', approver_name: '王区总', status: 'waiting' },
-    ],
-  },
-  {
-    id: 'ins_002',
-    instance_no: 'AP2026032702',
-    title: '订单#20260327003退款申请',
-    business_type: 'refund',
-    initiator_name: '陈收银',
-    initiator_id: 'emp_002',
-    store_name: '徐记海鲜·解放西店',
-    amount_fen: 128000,
-    current_step: 2,
-    total_steps: 2,
-    status: 'approved',
-    created_at: '2026-04-01T14:20:00+08:00',
-    steps: [
-      { step_no: 1, approver_role: 'store_manager', approver_name: '王店长', status: 'approved', comment: '情况属实，同意', acted_at: '2026-04-01T15:00:00+08:00' },
-      { step_no: 2, approver_role: 'finance_supervisor', approver_name: '刘财务', status: 'approved', comment: '已核实，批准退款', acted_at: '2026-04-01T16:30:00+08:00' },
-    ],
-  },
-  {
-    id: 'ins_003',
-    instance_no: 'AP2026032703',
-    title: '采购冷冻海鲜原料12000元',
-    business_type: 'large_purchase',
-    initiator_name: '采购李',
-    initiator_id: 'emp_003',
-    store_name: '徐记海鲜·五一广场店',
-    amount_fen: 1200000,
-    current_step: 1,
-    total_steps: 3,
-    status: 'rejected',
-    created_at: '2026-03-31T09:00:00+08:00',
-    steps: [
-      { step_no: 1, approver_role: 'purchase_supervisor', approver_name: '采购主管', status: 'rejected', comment: '超过本期预算，请重新申请', acted_at: '2026-03-31T11:00:00+08:00' },
-      { step_no: 2, approver_role: 'finance_supervisor', status: 'waiting' },
-      { step_no: 3, approver_role: 'ops_director', status: 'waiting' },
-    ],
-  },
-  {
-    id: 'ins_004',
-    instance_no: 'AP2026032704',
-    title: '张服务员请假申请（2026-04-05至04-07）',
-    business_type: 'leave',
-    initiator_name: '张服务员',
-    initiator_id: 'emp_004',
-    store_name: '徐记海鲜·五一广场店',
-    current_step: 1,
-    total_steps: 1,
-    status: 'expired',
-    created_at: '2026-03-28T10:00:00+08:00',
-    deadline_at: '2026-03-29T10:00:00+08:00',
-    steps: [
-      { step_no: 1, approver_role: 'store_manager', status: 'pending' },
-    ],
-  },
-];
+// ─── Mock 数据已移除，API 加载失败时回退空列表 ─────────────────────────────────
 
 // ─── 辅助函数 ────────────────────────────────────────────────────────────────
 
@@ -295,17 +219,12 @@ export function ApprovalCenterPage() {
       const res = await txFetch<InstanceListResponse>(
         `/api/v1/ops/approvals/instances?page=${p}&size=20${statusParam}${kwParam}${bizParam}`,
       );
-      setInstances(res.items);
-      setTotal(res.total);
+      setInstances(res.data?.items ?? []);
+      setTotal(res.data?.total ?? 0);
     } catch {
-      // fallback to mock
-      let filtered = [...MOCK_INSTANCES];
-      if (tab === 'pending') filtered = filtered.filter(i => i.status === 'pending');
-      if (tab === 'completed') filtered = filtered.filter(i => i.status !== 'pending');
-      if (kw) filtered = filtered.filter(i => i.title.includes(kw) || i.instance_no.includes(kw));
-      if (biz) filtered = filtered.filter(i => i.business_type === biz);
-      setInstances(filtered);
-      setTotal(filtered.length);
+      // API 失败时保持空列表
+      setInstances([]);
+      setTotal(0);
     } finally {
       setLoading(false);
     }
@@ -340,7 +259,7 @@ export function ApprovalCenterPage() {
     if (!record.steps || record.steps.length === 0) {
       try {
         const full = await txFetch<ApprovalInstance>(`/api/v1/ops/approvals/instances/${record.id}`);
-        setDetailInstance(full);
+        setDetailInstance(full.data ?? record);
       } catch {
         /* 使用列表数据 */
       }

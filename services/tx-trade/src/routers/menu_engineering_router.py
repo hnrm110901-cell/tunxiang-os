@@ -35,20 +35,6 @@ _PERIOD_MAP: dict[str, int] = {
     "month": 30,
 }
 
-# ─── Mock 数据（DB 不可用时降级） ───
-
-_MOCK_DISHES = [
-    {"id": "d01", "name": "宫保鸡丁",   "category": "热菜", "price": 3800,  "cost": 1200, "sales_count": 156},
-    {"id": "d02", "name": "佛跳墙",     "category": "热菜", "price": 18800, "cost": 8000, "sales_count": 18},
-    {"id": "d03", "name": "鱼香肉丝",   "category": "热菜", "price": 3200,  "cost": 1500, "sales_count": 203},
-    {"id": "d04", "name": "口水鸡",     "category": "凉菜", "price": 4800,  "cost": 1800, "sales_count": 87},
-    {"id": "d05", "name": "夫妻肺片",   "category": "凉菜", "price": 4200,  "cost": 1900, "sales_count": 122},
-    {"id": "d06", "name": "凉拌黄瓜",   "category": "凉菜", "price": 1800,  "cost": 400,  "sales_count": 280},
-    {"id": "d07", "name": "小笼包",     "category": "主食", "price": 2200,  "cost": 1100, "sales_count": 195},
-    {"id": "d08", "name": "手工饺子",   "category": "主食", "price": 2800,  "cost": 1500, "sales_count": 43},
-    {"id": "d09", "name": "鲜榨橙汁",   "category": "饮品", "price": 1800,  "cost": 300,  "sales_count": 65},
-    {"id": "d10", "name": "招牌老汤面", "category": "主食", "price": 2600,  "cost": 900,  "sales_count": 31},
-]
 
 
 def _compute_quadrant(sales: int, margin: float, avg_sales: float, avg_margin: float) -> str:
@@ -180,11 +166,11 @@ async def get_engineering_analysis(
                 }
                 raw.append(entry)
 
-    except (ImportError, Exception):  # noqa: BLE001 — 最外层兜底，DB不可用时降级Mock
-        log.info("menu_engineering: DB不可用，降级Mock数据")
-        raw = list(_MOCK_DISHES)
+    except (ImportError, Exception):  # noqa: BLE001 — 最外层兜底，DB不可用时返回空列表
+        log.warning("menu_engineering: DB不可用，返回空列表", exc_info=True)
+        raw = []
 
-    # 分类过滤（Mock数据才有 category 字段，DB已在查询中过滤）
+    # 分类过滤（DB已在查询中过滤，此处兜底处理）
     if category:
         raw = [d for d in raw if d.get("category") == category]
 

@@ -1,0 +1,239 @@
+.page-container { min-height: 100vh; background: #0B1A20; }
+
+/* ──── 商品图轮播 ──── */
+.img-swiper { width: 100%; height: 560rpx; }
+.swiper-img { width: 100%; height: 560rpx; }
+
+/* ──── 积分价格卡片 ──── */
+.price-card {
+  margin: -40rpx 32rpx 0;
+  position: relative;
+  z-index: 10;
+  background: linear-gradient(135deg, #FF6B35, #FF8C42);
+  border-radius: 24rpx;
+  padding: 32rpx;
+  box-shadow: 0 8rpx 24rpx rgba(255, 107, 53, 0.3);
+}
+
+.price-row {
+  display: flex;
+  align-items: baseline;
+  gap: 16rpx;
+}
+
+.price-main {
+  display: flex;
+  align-items: baseline;
+  gap: 6rpx;
+}
+
+.price-num { font-size: 56rpx; font-weight: bold; color: #fff; line-height: 1; }
+.price-unit { font-size: 26rpx; color: rgba(255,255,255,0.85); }
+.price-original { font-size: 26rpx; color: rgba(255,255,255,0.6); text-decoration: line-through; }
+
+.stats-row {
+  display: flex;
+  gap: 24rpx;
+  margin-top: 16rpx;
+}
+
+.stat-tag {
+  font-size: 24rpx;
+  color: rgba(255,255,255,0.8);
+  background: rgba(0,0,0,0.15);
+  border-radius: 16rpx;
+  padding: 6rpx 16rpx;
+}
+
+/* ──── 商品名称 ──── */
+.name-card {
+  margin: 24rpx 32rpx;
+  background: #112228;
+  border-radius: 20rpx;
+  padding: 28rpx;
+}
+
+.item-name {
+  font-size: 34rpx;
+  font-weight: 600;
+  color: #fff;
+  display: block;
+  line-height: 1.5;
+}
+
+.item-category {
+  display: inline-block;
+  margin-top: 12rpx;
+  font-size: 22rpx;
+  color: #FF6B35;
+  background: rgba(255, 107, 53, 0.12);
+  padding: 6rpx 16rpx;
+  border-radius: 8rpx;
+}
+
+/* ──── 详情区块 ──── */
+.section-card {
+  margin: 0 32rpx 24rpx;
+  background: #112228;
+  border-radius: 20rpx;
+  padding: 28rpx;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.section-title {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #fff;
+  display: block;
+  margin-bottom: 20rpx;
+}
+
+.section-header .section-title { margin-bottom: 0; }
+
+.toggle-arrow {
+  font-size: 28rpx;
+  color: #666;
+  transition: transform 0.2s;
+  display: inline-block;
+  transform: rotate(90deg);
+}
+
+.toggle-arrow.open { transform: rotate(-90deg); }
+
+.rich-content { font-size: 28rpx; color: #ccc; line-height: 1.6; }
+.plain-desc { font-size: 28rpx; color: #ccc; line-height: 1.8; display: block; }
+
+.usage-content { margin-top: 20rpx; }
+
+.usage-item {
+  display: flex;
+  gap: 12rpx;
+  padding: 10rpx 0;
+}
+
+.usage-dot { color: #FF6B35; font-size: 28rpx; }
+.usage-text { font-size: 26rpx; color: #999; line-height: 1.6; flex: 1; }
+
+/* ──── 底部固定按钮 ──── */
+.bottom-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 16rpx 32rpx;
+  padding-bottom: calc(16rpx + env(safe-area-inset-bottom));
+  background: #0B1A20;
+  border-top: 1rpx solid rgba(255,255,255,0.06);
+  z-index: 100;
+}
+
+.redeem-action-btn {
+  width: 100%;
+  height: 88rpx;
+  line-height: 88rpx;
+  background: #FF6B35 !important;
+  color: #fff !important;
+  font-size: 32rpx;
+  font-weight: 600;
+  border-radius: 44rpx;
+  text-align: center;
+}
+
+.redeem-action-btn.disabled {
+  background: #333 !important;
+  color: #666 !important;
+}
+
+/* ──── 加载 ──── */
+.loading-page {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  background: #0B1A20;
+}
+.loading-text { color: #666; font-size: 28rpx; }
+
+/* ──── 兑换确认弹窗 ──── */
+.popup-mask {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.65);
+  z-index: 200;
+}
+
+.confirm-popup {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  background: #112228;
+  border-radius: 32rpx 32rpx 0 0;
+  padding: 40rpx 32rpx;
+  padding-bottom: calc(40rpx + env(safe-area-inset-bottom));
+  z-index: 201;
+  transform: translateY(100%);
+  transition: transform 300ms ease-out;
+}
+
+.confirm-popup.show { transform: translateY(0); }
+
+.popup-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 28rpx;
+}
+
+.popup-title { font-size: 34rpx; font-weight: bold; color: #fff; }
+.popup-close { font-size: 32rpx; color: #666; padding: 8rpx; }
+
+.confirm-item-name {
+  font-size: 30rpx;
+  color: #ccc;
+  text-align: center;
+  margin-bottom: 28rpx;
+}
+
+.confirm-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20rpx 0;
+  border-bottom: 1rpx solid rgba(255,255,255,0.06);
+}
+
+.confirm-label { font-size: 28rpx; color: #999; }
+.confirm-val { font-size: 28rpx; color: #fff; font-weight: 600; }
+.confirm-val.cost { color: #FF6B35; font-size: 32rpx; }
+.confirm-val.remain { color: #0F6E56; }
+
+.confirm-actions {
+  display: flex;
+  gap: 20rpx;
+  margin-top: 40rpx;
+}
+
+.btn-cancel {
+  flex: 1;
+  background: #1a2a33 !important;
+  color: #999 !important;
+  border-radius: 44rpx;
+  height: 88rpx;
+  line-height: 88rpx;
+  font-size: 30rpx;
+}
+
+.btn-confirm {
+  flex: 1;
+  background: #FF6B35 !important;
+  color: #fff !important;
+  border-radius: 44rpx;
+  height: 88rpx;
+  line-height: 88rpx;
+  font-size: 30rpx;
+  font-weight: 600;
+}

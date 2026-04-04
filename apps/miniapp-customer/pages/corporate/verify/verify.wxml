@@ -1,0 +1,94 @@
+<!-- 企业员工身份认证页 -->
+<view class="page-container">
+
+  <!-- 顶部说明 -->
+  <view class="intro-block">
+    <view class="intro-icon-wrap">
+      <text class="intro-icon">🏢</text>
+    </view>
+    <text class="intro-title">企业身份认证</text>
+    <text class="intro-desc">认证后可使用企业挂账用餐，享受企业协议价格</text>
+  </view>
+
+  <!-- 认证表单 -->
+  <view class="form-card">
+
+    <!-- 企业码 -->
+    <view class="form-item">
+      <view class="form-label-row">
+        <text class="form-label">企业码</text>
+        <text class="form-required">*</text>
+      </view>
+      <input
+        class="form-input {{corpCodeError ? 'input-error' : ''}}"
+        type="number"
+        maxlength="10"
+        placeholder="请输入6-10位企业码"
+        placeholderClass="placeholder"
+        value="{{corpCode}}"
+        bindinput="onCorpCodeInput"
+      />
+      <text class="field-error" wx:if="{{corpCodeError}}">{{corpCodeError}}</text>
+      <text class="field-hint">企业码由HR或企业管理员提供</text>
+    </view>
+
+    <!-- 员工工号 -->
+    <view class="form-item">
+      <view class="form-label-row">
+        <text class="form-label">员工工号</text>
+        <text class="form-required">*</text>
+      </view>
+      <input
+        class="form-input {{empNoError ? 'input-error' : ''}}"
+        type="text"
+        maxlength="20"
+        placeholder="请输入员工工号"
+        placeholderClass="placeholder"
+        value="{{empNo}}"
+        bindinput="onEmpNoInput"
+      />
+      <text class="field-error" wx:if="{{empNoError}}">{{empNoError}}</text>
+    </view>
+
+    <!-- 在职证明（可选） -->
+    <view class="form-item">
+      <view class="form-label-row">
+        <text class="form-label">在职证明</text>
+        <text class="form-optional">（可选）</text>
+      </view>
+      <view class="upload-area" bindtap="chooseProofImage" wx:if="{{!proofImageUrl}}">
+        <text class="upload-icon">+</text>
+        <text class="upload-text">上传在职证明图片</text>
+        <text class="upload-hint">支持 JPG / PNG，最大 5MB</text>
+      </view>
+      <view class="proof-preview" wx:if="{{proofImageUrl}}">
+        <image class="proof-image" src="{{proofImageUrl}}" mode="aspectFill" />
+        <view class="proof-remove" bindtap="removeProofImage">
+          <text class="proof-remove-text">×</text>
+        </view>
+      </view>
+    </view>
+
+  </view>
+
+  <!-- 认证须知 -->
+  <view class="notice-block">
+    <text class="notice-title">认证须知</text>
+    <text class="notice-item">· 企业码与工号需与企业HR系统一致</text>
+    <text class="notice-item">· 认证信息仅用于企业挂账核验</text>
+    <text class="notice-item">· 如认证失败，请联系HR确认信息</text>
+  </view>
+
+  <!-- 提交按钮 -->
+  <view class="submit-area">
+    <button
+      class="submit-btn {{submitting ? 'disabled' : ''}}"
+      bindtap="submitVerify"
+      disabled="{{submitting}}"
+    >
+      <text wx:if="{{!submitting}}">提交认证</text>
+      <text wx:if="{{submitting}}">认证中...</text>
+    </button>
+  </view>
+
+</view>

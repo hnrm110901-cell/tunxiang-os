@@ -7,7 +7,7 @@
  * 刷新: 30秒自动刷新
  */
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Select, DatePicker } from 'antd';
+import { Select, DatePicker, Spin } from 'antd';
 import dayjs, { Dayjs } from 'dayjs';
 import { useNavigate } from 'react-router-dom';
 
@@ -45,48 +45,19 @@ interface Alert {
   created_at: string;
 }
 
-// ─── Mock 数据（API 失败时降级）────────────────────────────────────
-const MOCK_OVERVIEW: OverviewData = {
-  total_revenue: 128743.5,
-  revenue_change: 8.3,
-  total_orders: 2341,
-  orders_change: 5.1,
-  avg_turnover_rate: 3.8,
-  turnover_change: -0.2,
-  avg_spend_per_customer: 189.5,
-  spend_change: 2.7,
-  online_stores: 12,
-  total_stores: 14,
+// ─── 空状态常量（仅用于类型安全的空数组/对象，不用于渲染） ────────────────────
+const EMPTY_OVERVIEW: OverviewData = {
+  total_revenue: 0,
+  revenue_change: 0,
+  total_orders: 0,
+  orders_change: 0,
+  avg_turnover_rate: 0,
+  turnover_change: 0,
+  avg_spend_per_customer: 0,
+  spend_change: 0,
+  online_stores: 0,
+  total_stores: 0,
 };
-
-const MOCK_RANKING: StoreRanking[] = [
-  { store_id: '1', store_name: '芙蓉路旗舰店', revenue: 28743 },
-  { store_id: '2', store_name: '五一广场店', revenue: 24512 },
-  { store_id: '3', store_name: '梅溪湖店', revenue: 19834 },
-  { store_id: '4', store_name: '万达广场店', revenue: 16290 },
-  { store_id: '5', store_name: '解放路店', revenue: 13480 },
-  { store_id: '6', store_name: '湘江世纪城店', revenue: 11230 },
-  { store_id: '7', store_name: '天心阁店', revenue: 8960 },
-  { store_id: '8', store_name: '岳麓山店', revenue: 5694 },
-];
-
-const MOCK_CATEGORY: CategorySales[] = [
-  { category: '海鲜类', amount: 48320, percentage: 37.5 },
-  { category: '肉禽类', amount: 31240, percentage: 24.3 },
-  { category: '蔬菜类', amount: 22180, percentage: 17.2 },
-  { category: '主食类', amount: 16450, percentage: 12.8 },
-  { category: '饮品类', amount: 10553, percentage: 8.2 },
-];
-
-const MOCK_ALERTS: Alert[] = [
-  { id: '1', level: 'critical', store_name: '万达广场店', content: '翻台率骤降52%，今日仅完成日均1.8次，建议立即排查', created_at: '10:23' },
-  { id: '2', level: 'warn', store_name: '梅溪湖店', content: '库存预警：鲈鱼存货仅剩2条，预计午市高峰前售罄', created_at: '10:18' },
-  { id: '3', level: 'critical', store_name: '解放路店', content: '折扣守护触发：发现折扣组合使毛利低于30%阈值', created_at: '10:05' },
-  { id: '4', level: 'warn', store_name: '五一广场店', content: '出餐超时预警：3桌等待超过设定上限25分钟', created_at: '09:52' },
-  { id: '5', level: 'info', store_name: 'AI 建议', content: '周五晚高峰将至，建议芙蓉路旗舰店提前备货虾类30%', created_at: '09:40' },
-  { id: '6', level: 'info', store_name: '岳麓山店', content: '今日天气晴好，预测客流量较昨日增加18%', created_at: '09:30' },
-  { id: '7', level: 'warn', store_name: '湘江世纪城店', content: '员工考勤异常：午班缺勤2人，可能影响出餐效率', created_at: '09:15' },
-];
 
 // 品牌列表
 const BRAND_OPTIONS = [
@@ -446,20 +417,22 @@ function AlertList({ alerts }: AlertListProps) {
 export function AnalyticsDashboardPage() {
   const [selectedBrand, setSelectedBrand] = useState<string>('all');
   const [selectedDate, setSelectedDate] = useState<Dayjs>(dayjs());
-  const [overview, setOverview] = useState<OverviewData>(MOCK_OVERVIEW);
-  const [ranking, setRanking] = useState<StoreRanking[]>(MOCK_RANKING);
-  const [categorySales, setCategorySales] = useState<CategorySales[]>(MOCK_CATEGORY);
-  const [alerts, setAlerts] = useState<Alert[]>(MOCK_ALERTS);
+  const [overview, setOverview] = useState<OverviewData>(EMPTY_OVERVIEW);
+  const [ranking, setRanking] = useState<StoreRanking[]>([]);
+  const [categorySales, setCategorySales] = useState<CategorySales[]>([]);
+  const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [loading, setLoading] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date());
 
   const containerRef = useRef<HTMLDivElement>(null);
 
   const fetchData = useCallback(async () => {
+    setLoading(true);
     const dateStr = selectedDate.format('YYYY-MM-DD');
     const headers = getAuthHeaders();
 
-    // 并发请求，任一失败降级 mock
+    // 并发请求，失败时保留空状态
     const [overviewRes, rankingRes, categoryRes, alertsRes] = await Promise.allSettled([
       fetch(`/api/v1/analytics/overview?date=${dateStr}&brand_id=${selectedBrand}`, { headers }),
       fetch(`/api/v1/analytics/store-ranking?date=${dateStr}&limit=10`, { headers }),
@@ -471,31 +444,44 @@ export function AnalyticsDashboardPage() {
       try {
         const json = await overviewRes.value.json();
         if (json?.ok && json.data) setOverview(json.data);
-      } catch { /* 降级 mock */ }
+        else setOverview(EMPTY_OVERVIEW);
+      } catch { setOverview(EMPTY_OVERVIEW); }
+    } else {
+      setOverview(EMPTY_OVERVIEW);
     }
 
     if (rankingRes.status === 'fulfilled' && rankingRes.value.ok) {
       try {
         const json = await rankingRes.value.json();
         if (json?.ok && Array.isArray(json.data)) setRanking(json.data);
-      } catch { /* 降级 mock */ }
+        else setRanking([]);
+      } catch { setRanking([]); }
+    } else {
+      setRanking([]);
     }
 
     if (categoryRes.status === 'fulfilled' && categoryRes.value.ok) {
       try {
         const json = await categoryRes.value.json();
         if (json?.ok && Array.isArray(json.data)) setCategorySales(json.data);
-      } catch { /* 降级 mock */ }
+        else setCategorySales([]);
+      } catch { setCategorySales([]); }
+    } else {
+      setCategorySales([]);
     }
 
     if (alertsRes.status === 'fulfilled' && alertsRes.value.ok) {
       try {
         const json = await alertsRes.value.json();
         if (json?.ok && Array.isArray(json.data)) setAlerts(json.data);
-      } catch { /* 降级 mock */ }
+        else setAlerts([]);
+      } catch { setAlerts([]); }
+    } else {
+      setAlerts([]);
     }
 
     setLastRefreshed(new Date());
+    setLoading(false);
   }, [selectedBrand, selectedDate]);
 
   // 初始加载
@@ -546,6 +532,7 @@ export function AnalyticsDashboardPage() {
         }
       `}</style>
 
+      <Spin spinning={loading} tip="加载中..." style={{ color: '#FF6B35' }}>
       <div
         ref={containerRef}
         style={{
@@ -816,6 +803,7 @@ export function AnalyticsDashboardPage() {
           </div>
         </div>
       </div>
+      </Spin>
     </>
   );
 }

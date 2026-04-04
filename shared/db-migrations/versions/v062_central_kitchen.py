@@ -41,24 +41,28 @@ _CK_TABLES = [
 
 def _apply_safe_rls(table: str) -> None:
     """创建标准安全 RLS：四操作 PERMISSIVE + NULLIF NULL guard + FORCE。"""
+    op.execute(f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY")
+    op.execute(f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY")
+    op.execute(f"DROP POLICY IF EXISTS {table}_rls_select ON {table}")
     op.execute(
         f"CREATE POLICY {table}_rls_select ON {table} "
         f"FOR SELECT USING ({_SAFE_CONDITION})"
     )
+    op.execute(f"DROP POLICY IF EXISTS {table}_rls_insert ON {table}")
     op.execute(
         f"CREATE POLICY {table}_rls_insert ON {table} "
         f"FOR INSERT WITH CHECK ({_SAFE_CONDITION})"
     )
+    op.execute(f"DROP POLICY IF EXISTS {table}_rls_update ON {table}")
     op.execute(
         f"CREATE POLICY {table}_rls_update ON {table} "
         f"FOR UPDATE USING ({_SAFE_CONDITION}) WITH CHECK ({_SAFE_CONDITION})"
     )
+    op.execute(f"DROP POLICY IF EXISTS {table}_rls_delete ON {table}")
     op.execute(
         f"CREATE POLICY {table}_rls_delete ON {table} "
         f"FOR DELETE USING ({_SAFE_CONDITION})"
     )
-    op.execute(f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY")
-    op.execute(f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY")
 
 
 def upgrade() -> None:
@@ -104,14 +108,23 @@ def upgrade() -> None:
             created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )
     """)
-    op.execute(
-        "CREATE INDEX IF NOT EXISTS idx_production_plans_tenant_kitchen_date "
-        "ON production_plans (tenant_id, kitchen_id, plan_date DESC)"
-    )
-    op.execute(
-        "CREATE INDEX IF NOT EXISTS idx_production_plans_tenant_status "
-        "ON production_plans (tenant_id, status)"
-    )
+    op.execute("ALTER TABLE production_plans ADD COLUMN IF NOT EXISTS kitchen_id UUID")
+    op.execute("""
+        DO $$ BEGIN
+            IF (SELECT COUNT(*) FROM information_schema.columns
+                WHERE table_name='production_plans' AND column_name IN ('tenant_id', 'kitchen_id', 'plan_date')) = 3 THEN
+                EXECUTE 'CREATE INDEX IF NOT EXISTS idx_production_plans_tenant_kitchen_date ON production_plans (tenant_id, kitchen_id, plan_date DESC)';
+            END IF;
+        END $$;
+    """)
+    op.execute("""
+        DO $$ BEGIN
+            IF (SELECT COUNT(*) FROM information_schema.columns
+                WHERE table_name='production_plans' AND column_name IN ('tenant_id', 'status')) = 2 THEN
+                EXECUTE 'CREATE INDEX IF NOT EXISTS idx_production_plans_tenant_status ON production_plans (tenant_id, status)';
+            END IF;
+        END $$;
+    """)
     _apply_safe_rls("production_plans")
 
     # ─────────────────────────────────────────────────────────────────
@@ -134,14 +147,23 @@ def upgrade() -> None:
             created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )
     """)
-    op.execute(
-        "CREATE INDEX IF NOT EXISTS idx_production_orders_tenant_plan "
-        "ON production_orders (tenant_id, plan_id)"
-    )
-    op.execute(
-        "CREATE INDEX IF NOT EXISTS idx_production_orders_tenant_kitchen_status "
-        "ON production_orders (tenant_id, kitchen_id, status)"
-    )
+    op.execute("ALTER TABLE production_orders ADD COLUMN IF NOT EXISTS kitchen_id UUID")
+    op.execute("""
+        DO $$ BEGIN
+            IF (SELECT COUNT(*) FROM information_schema.columns
+                WHERE table_name='production_orders' AND column_name IN ('tenant_id', 'plan_id')) = 2 THEN
+                EXECUTE 'CREATE INDEX IF NOT EXISTS idx_production_orders_tenant_plan ON production_orders (tenant_id, plan_id)';
+            END IF;
+        END $$;
+    """)
+    op.execute("""
+        DO $$ BEGIN
+            IF (SELECT COUNT(*) FROM information_schema.columns
+                WHERE table_name='production_orders' AND column_name IN ('tenant_id', 'kitchen_id', 'status')) = 3 THEN
+                EXECUTE 'CREATE INDEX IF NOT EXISTS idx_production_orders_tenant_kitchen_status ON production_orders (tenant_id, kitchen_id, status)';
+            END IF;
+        END $$;
+    """)
     _apply_safe_rls("production_orders")
 
     # ─────────────────────────────────────────────────────────────────
@@ -165,18 +187,31 @@ def upgrade() -> None:
             created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )
     """)
-    op.execute(
-        "CREATE INDEX IF NOT EXISTS idx_distribution_orders_tenant_kitchen "
-        "ON distribution_orders (tenant_id, kitchen_id)"
-    )
-    op.execute(
-        "CREATE INDEX IF NOT EXISTS idx_distribution_orders_tenant_store_scheduled "
-        "ON distribution_orders (tenant_id, target_store_id, scheduled_at DESC)"
-    )
-    op.execute(
-        "CREATE INDEX IF NOT EXISTS idx_distribution_orders_tenant_status "
-        "ON distribution_orders (tenant_id, status)"
-    )
+    op.execute("ALTER TABLE distribution_orders ADD COLUMN IF NOT EXISTS kitchen_id UUID")
+    op.execute("""
+        DO $$ BEGIN
+            IF (SELECT COUNT(*) FROM information_schema.columns
+                WHERE table_name='distribution_orders' AND column_name IN ('tenant_id', 'kitchen_id')) = 2 THEN
+                EXECUTE 'CREATE INDEX IF NOT EXISTS idx_distribution_orders_tenant_kitchen ON distribution_orders (tenant_id, kitchen_id)';
+            END IF;
+        END $$;
+    """)
+    op.execute("""
+        DO $$ BEGIN
+            IF (SELECT COUNT(*) FROM information_schema.columns
+                WHERE table_name='distribution_orders' AND column_name IN ('tenant_id', 'target_store_id', 'scheduled_at')) = 3 THEN
+                EXECUTE 'CREATE INDEX IF NOT EXISTS idx_distribution_orders_tenant_store_scheduled ON distribution_orders (tenant_id, target_store_id, scheduled_at DESC)';
+            END IF;
+        END $$;
+    """)
+    op.execute("""
+        DO $$ BEGIN
+            IF (SELECT COUNT(*) FROM information_schema.columns
+                WHERE table_name='distribution_orders' AND column_name IN ('tenant_id', 'status')) = 2 THEN
+                EXECUTE 'CREATE INDEX IF NOT EXISTS idx_distribution_orders_tenant_status ON distribution_orders (tenant_id, status)';
+            END IF;
+        END $$;
+    """)
     _apply_safe_rls("distribution_orders")
 
     # ─────────────────────────────────────────────────────────────────

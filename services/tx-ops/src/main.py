@@ -23,6 +23,8 @@ from .api.store_clone import router as clone_router
 from .api.food_safety_routes import router as food_safety_router
 from .api.energy_routes import router as energy_router
 from .api.public_opinion_routes import router as public_opinion_router
+from .api.safety_inspection_router import router as safety_inspection_router
+from .api.haccp_routes import router as haccp_router
 
 app = FastAPI(title="TunxiangOS tx-ops", version="3.0.0", description="日清日结操作层")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -45,9 +47,11 @@ app.include_router(approval_router)
 app.include_router(approval_center_router)
 app.include_router(notification_center_router)
 app.include_router(notification_template_router)
-app.include_router(food_safety_router)       # Phase 4: 食安合规
+app.include_router(food_safety_router)        # Phase 4: 食安合规（事件驱动）
+app.include_router(safety_inspection_router) # Phase 4: 食安巡检（结构化DB）
 app.include_router(energy_router)            # Phase 4: 能耗管理
 app.include_router(public_opinion_router)    # Phase 4: 舆情监控
+app.include_router(haccp_router)             # Phase 4: HACCP检查计划数字化
 
 
 @app.get("/health")

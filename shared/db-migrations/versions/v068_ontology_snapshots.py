@@ -64,12 +64,16 @@ def upgrade() -> None:
         ALTER TABLE ontology_snapshots ENABLE ROW LEVEL SECURITY;
         ALTER TABLE ontology_snapshots FORCE ROW LEVEL SECURITY;
 
+        DROP POLICY IF EXISTS onto_snap_select ON ontology_snapshots;
         CREATE POLICY onto_snap_select ON ontology_snapshots FOR SELECT
             USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::UUID);
+        DROP POLICY IF EXISTS onto_snap_insert ON ontology_snapshots;
         CREATE POLICY onto_snap_insert ON ontology_snapshots FOR INSERT
             WITH CHECK (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::UUID);
+        DROP POLICY IF EXISTS onto_snap_update ON ontology_snapshots;
         CREATE POLICY onto_snap_update ON ontology_snapshots FOR UPDATE
             USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::UUID);
+        DROP POLICY IF EXISTS onto_snap_delete ON ontology_snapshots;
         CREATE POLICY onto_snap_delete ON ontology_snapshots FOR DELETE
             USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::UUID);
     """)

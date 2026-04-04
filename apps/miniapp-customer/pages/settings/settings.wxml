@@ -1,0 +1,33 @@
+<!-- 设置页 — 语言切换 / 清除缓存 / 关于 -->
+<view class="settings-page">
+
+  <!-- 语言选择 -->
+  <view class="section">
+    <view class="section-title">{{txt.language}}</view>
+    <view class="lang-grid">
+      <view class="lang-btn {{currentLang === item.code ? 'active' : ''}}"
+            wx:for="{{langs}}" wx:key="code"
+            bindtap="onSelectLang" data-code="{{item.code}}">
+        <text class="lang-label">{{item.labelNative}}</text>
+        <view class="lang-check" wx:if="{{currentLang === item.code}}">&#10003;</view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 其他设置 -->
+  <view class="section">
+    <view class="cell" bindtap="onClearCache">
+      <text class="cell-label">{{txt.clear_cache}}</text>
+      <text class="cell-arrow">></text>
+    </view>
+    <view class="cell" bindtap="onAbout">
+      <text class="cell-label">{{txt.about}}</text>
+      <text class="cell-arrow">></text>
+    </view>
+    <view class="cell">
+      <text class="cell-label">{{txt.version}}</text>
+      <text class="cell-value">v{{version}}</text>
+    </view>
+  </view>
+
+</view>

@@ -1,0 +1,113 @@
+<!-- 搜索页 — 搜索框 + 搜索历史 + 热门搜索 + 结果Tab(菜品/门店) -->
+<view class="search-page">
+
+  <!-- 顶部搜索栏 -->
+  <view class="search-top">
+    <view class="search-input-wrap">
+      <text class="search-input-icon">&#xe604;</text>
+      <input class="search-input"
+             placeholder="搜菜品、搜门店"
+             placeholder-class="search-input-placeholder"
+             value="{{keyword}}"
+             bindinput="onInput"
+             focus="{{true}}"
+             confirm-type="search"
+             bindconfirm="doSearch" />
+      <view class="search-clear" wx:if="{{keyword}}" bindtap="clearKeyword">
+        <text class="search-clear-icon">x</text>
+      </view>
+    </view>
+    <text class="search-cancel" bindtap="goBack">取消</text>
+  </view>
+
+  <!-- 搜索前：历史 + 热门 -->
+  <view class="search-before" wx:if="{{!hasSearched}}">
+
+    <!-- 搜索历史 -->
+    <view class="history-section" wx:if="{{historyList.length > 0}}">
+      <view class="history-header">
+        <text class="history-title">搜索历史</text>
+        <text class="history-clear" bindtap="clearHistory">清空</text>
+      </view>
+      <view class="tag-list">
+        <view class="tag-item" wx:for="{{historyList}}" wx:key="*this"
+              bindtap="onTagTap" data-word="{{item}}">
+          <text>{{item}}</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 热门搜索 -->
+    <view class="hot-section">
+      <text class="hot-title">热门搜索</text>
+      <view class="tag-list">
+        <view class="tag-item hot" wx:for="{{hotWords}}" wx:key="*this"
+              bindtap="onTagTap" data-word="{{item}}">
+          <text>{{item}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 搜索结果 -->
+  <view class="search-result" wx:if="{{hasSearched}}">
+
+    <!-- Tab切换: 菜品 / 门店 -->
+    <view class="result-tabs">
+      <view class="result-tab {{resultTab === 'dish' ? 'active' : ''}}" bindtap="switchTab" data-tab="dish">
+        <text>菜品</text>
+        <text class="result-tab-count" wx:if="{{dishResults.length > 0}}"> ({{dishResults.length}})</text>
+      </view>
+      <view class="result-tab {{resultTab === 'store' ? 'active' : ''}}" bindtap="switchTab" data-tab="store">
+        <text>门店</text>
+        <text class="result-tab-count" wx:if="{{storeResults.length > 0}}"> ({{storeResults.length}})</text>
+      </view>
+    </view>
+
+    <!-- 加载中 -->
+    <view class="loading-tip" wx:if="{{searching}}">
+      <text>搜索中...</text>
+    </view>
+
+    <!-- 菜品结果 -->
+    <view class="result-list" wx:if="{{!searching && resultTab === 'dish'}}">
+      <view class="empty-result" wx:if="{{dishResults.length === 0}}">
+        <image class="empty-img" src="/assets/empty-search.png" mode="aspectFit" />
+        <text class="empty-text">未找到相关菜品</text>
+        <text class="empty-hint">换个关键词试试</text>
+      </view>
+
+      <view class="dish-result-item" wx:for="{{dishResults}}" wx:key="id"
+            bindtap="goToDish" data-id="{{item.id}}">
+        <image class="dish-result-img" src="{{item.imageUrl || '/assets/default-dish.png'}}" mode="aspectFill" />
+        <view class="dish-result-info">
+          <text class="dish-result-name">{{item.name}}</text>
+          <text class="dish-result-store" wx:if="{{item.storeName}}">{{item.storeName}}</text>
+          <text class="dish-result-price">{{item.priceYuan}}</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 门店结果 -->
+    <view class="result-list" wx:if="{{!searching && resultTab === 'store'}}">
+      <view class="empty-result" wx:if="{{storeResults.length === 0}}">
+        <image class="empty-img" src="/assets/empty-search.png" mode="aspectFit" />
+        <text class="empty-text">未找到相关门店</text>
+        <text class="empty-hint">换个关键词试试</text>
+      </view>
+
+      <view class="store-result-item" wx:for="{{storeResults}}" wx:key="id"
+            bindtap="goToStore" data-id="{{item.id}}">
+        <view class="store-result-info">
+          <text class="store-result-name">{{item.name}}</text>
+          <view class="store-result-meta">
+            <text class="store-result-rating" wx:if="{{item.rating}}">{{item.rating}}分</text>
+            <text class="store-result-distance" wx:if="{{item.distance}}">{{item.distance}}</text>
+          </view>
+          <text class="store-result-address" wx:if="{{item.address}}">{{item.address}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+</view>

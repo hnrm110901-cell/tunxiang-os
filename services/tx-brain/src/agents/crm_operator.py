@@ -13,6 +13,8 @@ import re
 
 import anthropic
 import structlog
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 
 logger = structlog.get_logger()
 client = anthropic.AsyncAnthropic()  # 从环境变量 ANTHROPIC_API_KEY 读取
@@ -259,6 +261,130 @@ class CRMOperator:
                 "experience_ok": True,
             },
         }
+
+
+    async def analyze_from_mv(self, tenant_id: str, store_id: str | None = None) -> dict:
+        """Phase 3 快速路径：从 mv_member_clv 物化视图读取，<5ms。
+
+        字段：tenant_id, store_id, total_members, active_members,
+              avg_clv, churn_risk_count, top_segments
+
+        无数据时 fallback 到 generate_campaign()；DB 异常也 graceful fallback。
+        """
+        from ..db import get_db  # 延迟导入避免循环依赖
+
+        try:
+            async with get_db() as db:
+                await db.execute(
+                    text("SELECT set_config('app.tenant_id', :tid, true)"),
+                    {"tid": tenant_id},
+                )
+
+                if store_id:
+                    result = await db.execute(
+                        text("""
+                            SELECT tenant_id, store_id, total_members, active_members,
+                                   avg_clv, churn_risk_count, top_segments
+                            FROM mv_member_clv
+                            WHERE tenant_id = :tid
+                              AND store_id = :sid
+                            LIMIT 1
+                        """),
+                        {"tid": tenant_id, "sid": store_id},
+                    )
+                else:
+                    result = await db.execute(
+                        text("""
+                            SELECT tenant_id, store_id, total_members, active_members,
+                                   avg_clv, churn_risk_count, top_segments
+                            FROM mv_member_clv
+                            WHERE tenant_id = :tid
+                            LIMIT 1
+                        """),
+                        {"tid": tenant_id},
+                    )
+
+                row = result.fetchone()
+                if not row:
+                    logger.info(
+                        "crm_operator_mv_empty_fallback",
+                        tenant_id=tenant_id,
+                        store_id=store_id,
+                    )
+                    return await self.generate_campaign(
+                        {"tenant_id": tenant_id, "store_id": store_id}
+                    )
+
+                return {
+                    "inference_layer": "mv_fast_path",
+                    "data": dict(row._mapping),
+                    "agent": self.__class__.__name__,
+                }
+
+        except SQLAlchemyError as exc:
+            logger.warning(
+                "crm_operator_mv_db_error",
+                tenant_id=tenant_id,
+                store_id=store_id,
+                error=str(exc),
+            )
+            return await self.generate_campaign(
+                {"tenant_id": tenant_id, "store_id": store_id}
+            )
+
+    async def get_clv_context(self, tenant_id: str, store_id: str, db) -> dict:
+        """从 mv_member_clv 读取高流失风险会员数、平均CLV、总储值余额。
+
+        供 generate_campaign() 调用时，通过 analyze_with_clv() 附加到活动决策背景。
+        无数据或查询失败时返回 {}。
+        """
+        from sqlalchemy import text
+        from sqlalchemy.exc import SQLAlchemyError
+
+        try:
+            result = await db.execute(
+                text("""
+                    SELECT
+                        COUNT(*) FILTER (WHERE churn_probability > 0.7) AS high_churn_count,
+                        AVG(clv_score) AS avg_clv,
+                        SUM(stored_value_balance_fen) AS total_stored_value_fen
+                    FROM mv_member_clv
+                    WHERE tenant_id = :tenant_id AND store_id = :store_id
+                """),
+                {"tenant_id": tenant_id, "store_id": store_id},
+            )
+            row = result.mappings().one_or_none()
+            if not row or row["avg_clv"] is None:
+                return {}
+
+            return {
+                "high_churn_count": int(row["high_churn_count"] or 0),
+                "avg_clv": round(float(row["avg_clv"]), 2) if row["avg_clv"] is not None else None,
+                "total_stored_value_fen": int(row["total_stored_value_fen"] or 0),
+            }
+        except SQLAlchemyError as exc:
+            logger.warning(
+                "crm_operator_clv_ctx_error",
+                tenant_id=tenant_id,
+                store_id=store_id,
+                error=str(exc),
+            )
+            return {}
+
+    async def generate_campaign_with_clv(self, payload: dict, db) -> dict:
+        """带 CLV 背景数据的活动方案生成入口。
+
+        从 mv_member_clv 读取 CLV 上下文并附加到 payload，再调用 generate_campaign()。
+        """
+        tenant_id = payload.get("tenant_id", "")
+        store_id = payload.get("store_id", "")
+
+        clv_ctx = await self.get_clv_context(tenant_id, store_id, db)
+
+        enriched_payload = dict(payload)
+        enriched_payload["clv_context"] = clv_ctx
+
+        return await self.generate_campaign(enriched_payload)
 
 
 crm_operator = CRMOperator()

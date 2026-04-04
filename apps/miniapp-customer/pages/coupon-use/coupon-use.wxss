@@ -1,0 +1,240 @@
+/* 优惠券核销页 */
+
+.page-container {
+  min-height: 100vh;
+  background: #0B1A20;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* ── 核销成功动画 ── */
+.success-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: #0B1A20;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 24rpx;
+  opacity: 0;
+  animation: fadeIn 0.5s ease forwards;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0.9); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.success-icon {
+  font-size: 160rpx;
+  animation: bounceIn 0.6s ease;
+}
+
+@keyframes bounceIn {
+  0% { transform: scale(0); }
+  50% { transform: scale(1.2); }
+  100% { transform: scale(1); }
+}
+
+.success-title {
+  font-size: 44rpx;
+  font-weight: bold;
+  color: #2D8B4D;
+}
+
+.success-amount {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  margin-top: 16rpx;
+}
+
+.success-amount-old {
+  font-size: 48rpx;
+  font-weight: bold;
+  color: #FF6B35;
+  text-decoration: line-through;
+  text-decoration-color: #E53E3E;
+  text-decoration-thickness: 4rpx;
+}
+
+.success-amount-label {
+  font-size: 28rpx;
+  color: #2D8B4D;
+}
+
+.success-hint {
+  font-size: 26rpx;
+  color: #666;
+  margin-top: 24rpx;
+}
+
+.success-btn {
+  margin-top: 60rpx;
+  width: 400rpx;
+  height: 80rpx;
+  line-height: 80rpx;
+  background: #2D8B4D !important;
+  color: #fff !important;
+  font-size: 30rpx;
+  border-radius: 40rpx;
+  border: none;
+}
+
+.success-btn::after {
+  border: none;
+}
+
+/* ── 倒计时条 ── */
+.countdown-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16rpx;
+  padding: 24rpx 0;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.countdown-label {
+  font-size: 26rpx;
+  color: #999;
+}
+
+.countdown-time {
+  font-size: 36rpx;
+  font-weight: bold;
+  color: #FF6B35;
+  font-family: monospace;
+}
+
+.countdown-time.urgent {
+  color: #E53E3E;
+  animation: blink 1s ease infinite;
+}
+
+@keyframes blink {
+  50% { opacity: 0.5; }
+}
+
+/* ── 条形码区域 ── */
+.barcode-area {
+  padding: 48rpx 48rpx 32rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.barcode-container {
+  background: #fff;
+  border-radius: 16rpx;
+  padding: 40rpx 32rpx 24rpx;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.barcode-lines {
+  display: flex;
+  align-items: stretch;
+  height: 160rpx;
+  justify-content: center;
+}
+
+.bar-line {
+  height: 100%;
+  flex-shrink: 0;
+}
+
+.barcode-text {
+  font-size: 32rpx;
+  color: #333;
+  font-family: monospace;
+  letter-spacing: 8rpx;
+  margin-top: 16rpx;
+  font-weight: 600;
+}
+
+.barcode-hint {
+  font-size: 24rpx;
+  color: #666;
+  margin-top: 20rpx;
+}
+
+/* ── 券面信息 ── */
+.coupon-info-card {
+  margin: 32rpx;
+  background: #112228;
+  border-radius: 20rpx;
+  padding: 32rpx;
+}
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16rpx 0;
+  border-bottom: 1rpx solid rgba(255, 255, 255, 0.04);
+}
+
+.info-row:last-child {
+  border-bottom: none;
+}
+
+.info-label {
+  font-size: 26rpx;
+  color: #999;
+  flex-shrink: 0;
+}
+
+.info-value {
+  font-size: 26rpx;
+  color: #ccc;
+  text-align: right;
+}
+
+.info-value.highlight {
+  color: #FF6B35;
+  font-weight: bold;
+  font-size: 32rpx;
+}
+
+/* ── 核销按钮 ── */
+.manual-verify {
+  padding: 32rpx 48rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16rpx;
+}
+
+.verify-btn {
+  width: 100%;
+  height: 88rpx;
+  line-height: 88rpx;
+  background: #FF6B35 !important;
+  color: #fff !important;
+  font-size: 32rpx;
+  font-weight: 600;
+  border-radius: 44rpx;
+  border: none;
+}
+
+.verify-btn::after {
+  border: none;
+}
+
+.verify-btn[disabled] {
+  background: #1a2a33 !important;
+  color: #555 !important;
+}
+
+.verify-hint {
+  font-size: 22rpx;
+  color: #555;
+}
+
+.safe-bottom {
+  height: 40rpx;
+}

@@ -64,7 +64,7 @@ def upgrade() -> None:
         sa.Column("combo_name", sa.String(100), nullable=False, comment="套餐名称"),
         sa.Column("combo_price_fen", sa.Integer, nullable=False, comment="套餐售价(分)"),
         sa.Column("original_price_fen", sa.Integer, nullable=False, comment="原价合计(分)"),
-        sa.Column("items_json", JSON, nullable=False, server_default="'[]'::jsonb",
+        sa.Column("items_json", JSON, nullable=False, server_default=sa.text("'[]'::jsonb"),
                   comment='[{"dish_id":"..","dish_name":"..","qty":1,"price_fen":1800}]'),
         sa.Column("description", sa.Text, comment="套餐描述"),
         sa.Column("image_url", sa.String(500), comment="套餐图片"),

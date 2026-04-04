@@ -1,0 +1,204 @@
+/* 退款申请页 */
+.page-container {
+  min-height: 100vh;
+  background: #0B1A20;
+  color: #fff;
+  padding: 24rpx 32rpx;
+  padding-bottom: 200rpx;
+}
+
+/* 通用段落标题 */
+.section-title {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 20rpx;
+  display: block;
+}
+
+/* 退款类型 */
+.type-section {
+  background: #112228;
+  border-radius: 24rpx;
+  padding: 28rpx;
+  margin-bottom: 24rpx;
+}
+.type-options { display: flex; gap: 24rpx; }
+.type-option {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12rpx;
+  padding: 24rpx;
+  background: #1a2a33;
+  border-radius: 16rpx;
+  border: 2rpx solid transparent;
+}
+.type-option.active { border-color: #FF6B2C; }
+.type-radio { font-size: 28rpx; color: #FF6B2C; }
+.type-label { font-size: 28rpx; color: #ccc; }
+.type-option.active .type-label { color: #FF6B2C; }
+
+/* 菜品勾选 */
+.items-section {
+  background: #112228;
+  border-radius: 24rpx;
+  padding: 28rpx;
+  margin-bottom: 24rpx;
+}
+.refund-item {
+  display: flex;
+  align-items: center;
+  padding: 16rpx 0;
+  border-bottom: 1rpx solid rgba(255,255,255,0.06);
+  gap: 16rpx;
+}
+.refund-item:last-child { border-bottom: none; }
+.refund-item-check { padding: 8rpx; }
+.check-icon { font-size: 36rpx; color: #FF6B2C; }
+.refund-item-info { flex: 1; display: flex; flex-direction: column; gap: 4rpx; }
+.refund-item-name { font-size: 28rpx; color: #fff; }
+.refund-item-price { font-size: 24rpx; color: #999; }
+
+/* 数量控制 */
+.refund-qty-ctrl {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+}
+.qty-btn {
+  width: 48rpx;
+  height: 48rpx;
+  border-radius: 50%;
+  background: #1a2a33;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1rpx solid rgba(255,255,255,0.2);
+}
+.qty-btn-text { font-size: 28rpx; color: #fff; }
+.qty-num { font-size: 28rpx; color: #fff; min-width: 32rpx; text-align: center; }
+
+/* 退款原因 */
+.reason-section {
+  background: #112228;
+  border-radius: 24rpx;
+  padding: 28rpx;
+  margin-bottom: 24rpx;
+}
+.reason-tags { display: flex; flex-wrap: wrap; gap: 16rpx; }
+.reason-tag {
+  padding: 14rpx 28rpx;
+  background: #1a2a33;
+  border-radius: 32rpx;
+  font-size: 26rpx;
+  color: #999;
+  border: 2rpx solid transparent;
+}
+.reason-tag.active {
+  border-color: #FF6B2C;
+  color: #FF6B2C;
+  background: rgba(255,107,44,0.1);
+}
+
+/* 补充说明 */
+.desc-section {
+  background: #112228;
+  border-radius: 24rpx;
+  padding: 28rpx;
+  margin-bottom: 24rpx;
+}
+.desc-input {
+  width: 100%;
+  height: 160rpx;
+  background: #1a2a33;
+  border-radius: 12rpx;
+  padding: 20rpx 24rpx;
+  font-size: 28rpx;
+  color: #fff;
+  box-sizing: border-box;
+}
+.desc-placeholder { color: #666; }
+
+/* 图片上传 */
+.image-section {
+  background: #112228;
+  border-radius: 24rpx;
+  padding: 28rpx;
+  margin-bottom: 24rpx;
+}
+.image-list { display: flex; flex-wrap: wrap; gap: 16rpx; }
+.image-item {
+  position: relative;
+  width: 180rpx;
+  height: 180rpx;
+}
+.upload-img {
+  width: 100%;
+  height: 100%;
+  border-radius: 12rpx;
+}
+.remove-img {
+  position: absolute;
+  top: -12rpx;
+  right: -12rpx;
+  width: 40rpx;
+  height: 40rpx;
+  border-radius: 50%;
+  background: #ff4444;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.remove-icon { font-size: 24rpx; color: #fff; font-weight: bold; }
+.image-add {
+  width: 180rpx;
+  height: 180rpx;
+  border-radius: 12rpx;
+  border: 2rpx dashed rgba(255,255,255,0.2);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8rpx;
+}
+.add-icon { font-size: 48rpx; color: #999; }
+.add-text { font-size: 22rpx; color: #999; }
+
+/* 退款金额汇总 */
+.refund-summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #112228;
+  border-radius: 24rpx;
+  padding: 28rpx;
+  margin-bottom: 24rpx;
+}
+.summary-label { font-size: 30rpx; color: #fff; font-weight: 600; }
+.summary-amount { font-size: 40rpx; color: #FF6B2C; font-weight: bold; }
+
+/* 提交按钮 */
+.submit-section {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 20rpx 32rpx;
+  padding-bottom: calc(20rpx + env(safe-area-inset-bottom));
+  background: #0B1A20;
+}
+.submit-btn {
+  background: #FF6B2C !important;
+  color: #fff !important;
+  border-radius: 44rpx;
+  font-size: 32rpx;
+  height: 88rpx;
+  line-height: 88rpx;
+  font-weight: 600;
+}
+.submit-btn[disabled] { opacity: 0.5; }
+
+/* 安全区 */
+.safe-area-bottom { height: calc(40rpx + env(safe-area-inset-bottom)); }

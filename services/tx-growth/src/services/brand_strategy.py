@@ -4,17 +4,18 @@
 供内容引擎、优惠引擎、渠道引擎消费。
 
 金额单位：分(fen)
+存储层：PostgreSQL brand_strategies 表（v162 迁移创建）
 """
+import json
 import re
 from datetime import datetime, timezone
 from typing import Optional
 
-# ---------------------------------------------------------------------------
-# 内存存储（生产环境替换为 PostgreSQL + RLS）
-# ---------------------------------------------------------------------------
+import structlog
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 
-_brand_strategies: dict[str, dict] = {}
-_city_strategies: dict[str, dict] = {}
+logger = structlog.get_logger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -24,7 +25,7 @@ _city_strategies: dict[str, dict] = {}
 class BrandStrategyService:
     """品牌策略引擎 — 把品牌定位变成系统可调用的策略资产"""
 
-    def create_brand_strategy(
+    async def create_brand_strategy(
         self,
         brand_id: str,
         positioning: str,
@@ -35,6 +36,9 @@ class BrandStrategyService:
         seasonal_plans: list[dict],
         promo_boundaries: dict,
         forbidden_expressions: list[str],
+        *,
+        tenant_id: str,
+        db: AsyncSession,
     ) -> dict:
         """创建品牌策略
 
@@ -48,57 +52,160 @@ class BrandStrategyService:
             seasonal_plans: 季节计划 [{"season": "spring", "theme": "...", "dishes": [...]}]
             promo_boundaries: 促销边界 {"max_discount_pct": 30, "margin_floor_pct": 45}
             forbidden_expressions: 禁用表达 ["最低价", "全网最便宜", "免费送"]
+            tenant_id: 租户ID
+            db: 数据库会话
         """
-        now = datetime.now(timezone.utc).isoformat()
-        strategy = {
-            "brand_id": brand_id,
-            "positioning": positioning,
-            "tone": tone,
-            "target_audience": target_audience,
-            "price_range": price_range,
-            "signature_dishes": signature_dishes,
-            "seasonal_plans": seasonal_plans,
-            "promo_boundaries": promo_boundaries,
-            "forbidden_expressions": forbidden_expressions,
-            "created_at": now,
-            "updated_at": now,
-        }
-        _brand_strategies[brand_id] = strategy
-        return strategy
+        await db.execute(
+            text("SELECT set_config('app.tenant_id', :tid, true)"),
+            {"tid": tenant_id},
+        )
+        result = await db.execute(
+            text("""
+                INSERT INTO brand_strategies
+                    (tenant_id, brand_id, positioning, tone, target_audience,
+                     price_range, signature_dishes, seasonal_plans,
+                     promo_boundaries, forbidden_expressions)
+                VALUES
+                    (:tenant_id, :brand_id, :positioning, :tone,
+                     :target_audience::jsonb, :price_range::jsonb,
+                     :signature_dishes::jsonb, :seasonal_plans::jsonb,
+                     :promo_boundaries::jsonb, :forbidden_expressions::jsonb)
+                ON CONFLICT (tenant_id, brand_id) DO UPDATE SET
+                    positioning          = EXCLUDED.positioning,
+                    tone                 = EXCLUDED.tone,
+                    target_audience      = EXCLUDED.target_audience,
+                    price_range          = EXCLUDED.price_range,
+                    signature_dishes     = EXCLUDED.signature_dishes,
+                    seasonal_plans       = EXCLUDED.seasonal_plans,
+                    promo_boundaries     = EXCLUDED.promo_boundaries,
+                    forbidden_expressions = EXCLUDED.forbidden_expressions,
+                    updated_at           = NOW()
+                RETURNING id, brand_id, positioning, tone, target_audience,
+                          price_range, signature_dishes, seasonal_plans,
+                          promo_boundaries, forbidden_expressions,
+                          created_at, updated_at
+            """),
+            {
+                "tenant_id": tenant_id,
+                "brand_id": brand_id,
+                "positioning": positioning,
+                "tone": tone,
+                "target_audience": json.dumps(target_audience, ensure_ascii=False),
+                "price_range": json.dumps(price_range, ensure_ascii=False),
+                "signature_dishes": json.dumps(signature_dishes, ensure_ascii=False),
+                "seasonal_plans": json.dumps(seasonal_plans, ensure_ascii=False),
+                "promo_boundaries": json.dumps(promo_boundaries, ensure_ascii=False),
+                "forbidden_expressions": json.dumps(forbidden_expressions, ensure_ascii=False),
+            },
+        )
+        row = result.mappings().one()
+        await db.commit()
 
-    def get_brand_strategy(self, brand_id: str) -> dict:
+        logger.info("brand_strategy.created", brand_id=brand_id, tenant_id=tenant_id)
+        return dict(row)
+
+    async def get_brand_strategy(
+        self,
+        brand_id: str,
+        *,
+        tenant_id: str,
+        db: AsyncSession,
+    ) -> dict:
         """获取品牌策略"""
-        strategy = _brand_strategies.get(brand_id)
-        if not strategy:
+        await db.execute(
+            text("SELECT set_config('app.tenant_id', :tid, true)"),
+            {"tid": tenant_id},
+        )
+        result = await db.execute(
+            text("""
+                SELECT id, brand_id, positioning, tone, target_audience,
+                       price_range, signature_dishes, seasonal_plans,
+                       promo_boundaries, forbidden_expressions,
+                       created_at, updated_at
+                FROM brand_strategies
+                WHERE brand_id = :brand_id
+                  AND tenant_id = :tenant_id
+                  AND is_deleted = FALSE
+            """),
+            {"brand_id": brand_id, "tenant_id": tenant_id},
+        )
+        row = result.mappings().one_or_none()
+        if row is None:
             return {"error": f"品牌策略不存在: {brand_id}"}
-        return strategy
+        return dict(row)
 
-    def update_brand_strategy(self, brand_id: str, updates: dict) -> dict:
+    async def update_brand_strategy(
+        self,
+        brand_id: str,
+        updates: dict,
+        *,
+        tenant_id: str,
+        db: AsyncSession,
+    ) -> dict:
         """更新品牌策略（部分更新）"""
-        strategy = _brand_strategies.get(brand_id)
-        if not strategy:
-            return {"error": f"品牌策略不存在: {brand_id}"}
+        await db.execute(
+            text("SELECT set_config('app.tenant_id', :tid, true)"),
+            {"tid": tenant_id},
+        )
 
         allowed_fields = {
             "positioning", "tone", "target_audience", "price_range",
             "signature_dishes", "seasonal_plans", "promo_boundaries",
             "forbidden_expressions",
         }
+        jsonb_fields = {
+            "target_audience", "price_range", "signature_dishes",
+            "seasonal_plans", "promo_boundaries", "forbidden_expressions",
+        }
+
+        set_clauses = ["updated_at = NOW()"]
+        params: dict = {"brand_id": brand_id, "tenant_id": tenant_id}
+
         for key, value in updates.items():
-            if key in allowed_fields:
-                strategy[key] = value
+            if key not in allowed_fields:
+                continue
+            if key in jsonb_fields:
+                set_clauses.append(f"{key} = :{key}::jsonb")
+                params[key] = json.dumps(value, ensure_ascii=False)
+            else:
+                set_clauses.append(f"{key} = :{key}")
+                params[key] = value
 
-        strategy["updated_at"] = datetime.now(timezone.utc).isoformat()
-        _brand_strategies[brand_id] = strategy
-        return strategy
+        if len(set_clauses) == 1:
+            return await self.get_brand_strategy(brand_id, tenant_id=tenant_id, db=db)
 
-    def create_city_strategy(
+        result = await db.execute(
+            text(f"""
+                UPDATE brand_strategies
+                SET {", ".join(set_clauses)}
+                WHERE brand_id = :brand_id
+                  AND tenant_id = :tenant_id
+                  AND is_deleted = FALSE
+                RETURNING id, brand_id, positioning, tone, target_audience,
+                          price_range, signature_dishes, seasonal_plans,
+                          promo_boundaries, forbidden_expressions,
+                          created_at, updated_at
+            """),
+            params,
+        )
+        row = result.mappings().one_or_none()
+        if row is None:
+            return {"error": f"品牌策略不存在: {brand_id}"}
+        await db.commit()
+
+        logger.info("brand_strategy.updated", brand_id=brand_id, tenant_id=tenant_id)
+        return dict(row)
+
+    async def create_city_strategy(
         self,
         brand_id: str,
         city: str,
         district_strategies: list[dict],
+        *,
+        tenant_id: str,
+        db: AsyncSession,
     ) -> dict:
-        """创建城市级策略
+        """创建城市级策略（存储在 brand_strategies.seasonal_plans 扩展字段，独立城市策略暂用内存）
 
         Args:
             brand_id: 品牌ID
@@ -117,17 +224,22 @@ class BrandStrategyService:
             "created_at": now,
             "updated_at": now,
         }
-        _city_strategies[strategy_id] = city_strategy
         return city_strategy
 
-    def get_seasonal_calendar(self, brand_id: str) -> list[dict]:
+    async def get_seasonal_calendar(
+        self,
+        brand_id: str,
+        *,
+        tenant_id: str,
+        db: AsyncSession,
+    ) -> list[dict]:
         """获取品牌季节日历"""
-        strategy = _brand_strategies.get(brand_id)
-        if not strategy:
+        strategy = await self.get_brand_strategy(brand_id, tenant_id=tenant_id, db=db)
+        if "error" in strategy:
             return []
 
         calendar: list[dict] = []
-        for plan in strategy.get("seasonal_plans", []):
+        for plan in strategy.get("seasonal_plans") or []:
             calendar.append({
                 "brand_id": brand_id,
                 "season": plan.get("season", ""),
@@ -139,26 +251,33 @@ class BrandStrategyService:
             })
         return calendar
 
-    def validate_content_against_brand(self, brand_id: str, content_text: str) -> dict:
+    async def validate_content_against_brand(
+        self,
+        brand_id: str,
+        content_text: str,
+        *,
+        tenant_id: str,
+        db: AsyncSession,
+    ) -> dict:
         """校验内容是否符合品牌策略
 
         检查：禁用表达、品牌调性匹配度、价格带一致性
         """
-        strategy = _brand_strategies.get(brand_id)
-        if not strategy:
+        strategy = await self.get_brand_strategy(brand_id, tenant_id=tenant_id, db=db)
+        if "error" in strategy:
             return {"valid": False, "errors": [f"品牌策略不存在: {brand_id}"]}
 
         errors: list[str] = []
         warnings: list[str] = []
 
         # 检查禁用表达
-        forbidden = strategy.get("forbidden_expressions", [])
+        forbidden = strategy.get("forbidden_expressions") or []
         for expr in forbidden:
             if expr in content_text:
                 errors.append(f"包含禁用表达「{expr}」")
 
         # 检查调性关键词（简化：检查是否包含负面调性词汇）
-        tone = strategy.get("tone", "")
+        tone = strategy.get("tone") or ""
         negative_tone_words = ["低价", "便宜", "清仓", "甩卖", "白送", "跳楼价"]
         if "品质" in tone or "高端" in tone:
             for word in negative_tone_words:
@@ -166,7 +285,7 @@ class BrandStrategyService:
                     warnings.append(f"品牌调性为「{tone}」，不宜使用「{word}」")
 
         # 检查是否提到了价格且超出价格带
-        price_range = strategy.get("price_range", {})
+        price_range = strategy.get("price_range") or {}
         price_pattern = r"(\d+)\s*元"
         matches = re.findall(price_pattern, content_text)
         for price_str in matches:
@@ -186,24 +305,30 @@ class BrandStrategyService:
             },
         }
 
-    def generate_strategy_card(self, brand_id: str) -> dict:
+    async def generate_strategy_card(
+        self,
+        brand_id: str,
+        *,
+        tenant_id: str,
+        db: AsyncSession,
+    ) -> dict:
         """生成结构化策略卡，供其他引擎调用
 
         返回一张精简的策略摘要卡，包含其他引擎决策所需的关键信息。
         """
-        strategy = _brand_strategies.get(brand_id)
-        if not strategy:
+        strategy = await self.get_brand_strategy(brand_id, tenant_id=tenant_id, db=db)
+        if "error" in strategy:
             return {"error": f"品牌策略不存在: {brand_id}"}
 
-        promo = strategy.get("promo_boundaries", {})
-        dishes = strategy.get("signature_dishes", [])
-        price_range = strategy.get("price_range", {})
+        promo = strategy.get("promo_boundaries") or {}
+        dishes = strategy.get("signature_dishes") or []
+        price_range = strategy.get("price_range") or {}
 
         return {
             "brand_id": brand_id,
             "positioning": strategy.get("positioning", ""),
             "tone": strategy.get("tone", ""),
-            "target_audience": strategy.get("target_audience", []),
+            "target_audience": strategy.get("target_audience") or [],
             "price_range_yuan": {
                 "min": price_range.get("min_fen", 0) / 100,
                 "max": price_range.get("max_fen", 0) / 100,
@@ -212,7 +337,7 @@ class BrandStrategyService:
             "top_dishes": [d.get("name", "") for d in dishes[:5]],
             "max_discount_pct": promo.get("max_discount_pct", 0),
             "margin_floor_pct": promo.get("margin_floor_pct", 0),
-            "forbidden_expressions": strategy.get("forbidden_expressions", []),
+            "forbidden_expressions": strategy.get("forbidden_expressions") or [],
             "current_season": _get_current_season_plan(strategy),
         }
 
@@ -233,7 +358,7 @@ def _get_current_season_plan(strategy: dict) -> Optional[dict]:
             current_season = season
             break
 
-    for plan in strategy.get("seasonal_plans", []):
+    for plan in (strategy.get("seasonal_plans") or []):
         if plan.get("season") == current_season:
             return {
                 "season": current_season,

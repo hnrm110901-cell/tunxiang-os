@@ -11,7 +11,7 @@ from typing import Optional
 import structlog
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
-from sqlalchemy.exc import ProgrammingError
+from sqlalchemy.exc import IntegrityError, ProgrammingError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db_no_rls
@@ -49,18 +49,50 @@ async def list_merchants(
         raise _pg_unavailable(e) from e
 
 
+class CreateMerchantBody(BaseModel):
+    name: str = Field(..., min_length=1, max_length=100)
+    plan_template: str = Field(..., pattern="^(lite|standard|pro)$")
+    merchant_code: Optional[str] = Field(None, max_length=32)
+    subscription_expires_at: Optional[str] = Field(None, description="YYYY-MM-DD")
+
+
+class UpdateMerchantBody(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=100)
+    plan_template: Optional[str] = Field(None, pattern="^(lite|standard|pro)$")
+    status: Optional[str] = Field(None, pattern="^(active|trial|suspended|churned)$")
+    subscription_expires_at: Optional[str] = Field(None, description="YYYY-MM-DD")
+
+
 @router.post("/merchants")
-async def create_merchant(data: dict):
-    """新建商户（开户）— 占位，后续 INSERT platform_tenants"""
-    _ = data
-    return {"ok": True, "data": {"merchant_id": "new", "status": "created"}}
+async def create_merchant(
+    body: CreateMerchantBody,
+    db: AsyncSession = Depends(get_db_no_rls),
+):
+    """新建商户（开户）— INSERT platform_tenants"""
+    try:
+        merchant_id = await hub_service.hub_create_merchant(db, body.model_dump())
+        return {"ok": True, "data": {"merchant_id": merchant_id, "status": "created"}}
+    except IntegrityError as e:
+        logger.warning("hub.create_merchant.conflict", error=str(e))
+        raise HTTPException(status_code=409, detail="商户编码或名称已存在") from e
+    except ProgrammingError as e:
+        raise _pg_unavailable(e) from e
 
 
 @router.patch("/merchants/{merchant_id}")
-async def update_merchant(merchant_id: str, data: dict):
-    """更新商户（续费/升级/停用）— 占位"""
-    _ = (merchant_id, data)
-    return {"ok": True, "data": {"merchant_id": merchant_id, "updated": True}}
+async def update_merchant(
+    merchant_id: str,
+    body: UpdateMerchantBody,
+    db: AsyncSession = Depends(get_db_no_rls),
+):
+    """更新商户（续费/升级/停用）— UPDATE platform_tenants"""
+    try:
+        updated = await hub_service.hub_update_merchant(db, merchant_id, body.model_dump(exclude_none=True))
+        if not updated:
+            raise HTTPException(status_code=404, detail=f"商户 {merchant_id} 不存在")
+        return {"ok": True, "data": {"merchant_id": merchant_id, "updated": True}}
+    except ProgrammingError as e:
+        raise _pg_unavailable(e) from e
 
 
 # ─── 全局门店 ───
@@ -94,9 +126,21 @@ async def list_templates():
 
 
 @router.post("/merchants/{merchant_id}/template")
-async def assign_template(merchant_id: str, template_id: str):
-    """为商户分配模板 — 占位"""
-    return {"ok": True, "data": {"merchant_id": merchant_id, "template": template_id}}
+async def assign_template(
+    merchant_id: str,
+    template_id: str,
+    db: AsyncSession = Depends(get_db_no_rls),
+):
+    """为商户分配模板 — UPDATE platform_tenants.plan_template"""
+    try:
+        updated = await hub_service.hub_update_merchant(
+            db, merchant_id, {"plan_template": template_id}
+        )
+        if not updated:
+            raise HTTPException(status_code=404, detail=f"商户 {merchant_id} 不存在")
+        return {"ok": True, "data": {"merchant_id": merchant_id, "template": template_id}}
+    except ProgrammingError as e:
+        raise _pg_unavailable(e) from e
 
 
 # ─── Adapter 监控 ───
@@ -157,9 +201,22 @@ class PushUpdateBody(BaseModel):
 
 
 @router.post("/deployment/push-update")
-async def push_update(body: PushUpdateBody):
-    """远程推送软件更新 — 占位"""
-    return {"ok": True, "data": {"pushed": len(body.store_ids), "target_version": body.target_version}}
+async def push_update(
+    body: PushUpdateBody,
+    db: AsyncSession = Depends(get_db_no_rls),
+):
+    """远程推送软件更新 — 更新 hub_edge_devices.client_version 目标版本并记录操作"""
+    try:
+        pushed = await hub_service.hub_push_update(db, body.store_ids, body.target_version)
+        logger.info(
+            "hub.push_update",
+            store_count=len(body.store_ids),
+            target_version=body.target_version,
+            matched=pushed,
+        )
+        return {"ok": True, "data": {"pushed": pushed, "target_version": body.target_version}}
+    except ProgrammingError as e:
+        raise _pg_unavailable(e) from e
 
 
 # ─── 工单系统 ───
@@ -175,9 +232,25 @@ async def list_tickets(status: Optional[str] = None, db: AsyncSession = Depends(
         raise _pg_unavailable(e) from e
 
 
+class CreateTicketBody(BaseModel):
+    merchant_name: str = Field(..., min_length=1, max_length=100)
+    title: str = Field(..., min_length=1, max_length=255)
+    priority: str = Field(..., pattern="^(low|medium|high|urgent)$")
+    assignee: Optional[str] = Field(None, max_length=64)
+    tenant_id: Optional[str] = Field(None, description="UUID 字符串，可选")
+
+
 @router.post("/tickets")
-async def create_ticket(data: dict):
-    return {"ok": True, "data": {"ticket_id": "T003"}}
+async def create_ticket(
+    body: CreateTicketBody,
+    db: AsyncSession = Depends(get_db_no_rls),
+):
+    """新建工单 — INSERT hub_tickets"""
+    try:
+        ticket_id = await hub_service.hub_create_ticket(db, body.model_dump())
+        return {"ok": True, "data": {"ticket_id": ticket_id}}
+    except ProgrammingError as e:
+        raise _pg_unavailable(e) from e
 
 
 # ─── 平台数据 ───

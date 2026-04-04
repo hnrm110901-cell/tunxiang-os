@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { txFetch } from '../api/index';
 
 interface CourseStatus {
   course_name: string;
@@ -17,14 +18,6 @@ interface Props {
   onFire?: (courseName: string) => void;
 }
 
-const MOCK_COURSES: CourseStatus[] = [
-  { course_name: 'appetizer', course_label: '前菜', sort_order: 1, status: 'completed', dish_count: 4, fired_count: 4, done_count: 4, fired_at: null, fired_by: null },
-  { course_name: 'main', course_label: '主菜', sort_order: 2, status: 'fired', dish_count: 6, fired_count: 6, done_count: 3, fired_at: null, fired_by: null },
-  { course_name: 'dessert', course_label: '甜品', sort_order: 3, status: 'waiting', dish_count: 2, fired_count: 0, done_count: 0, fired_at: null, fired_by: null },
-  { course_name: 'drink', course_label: '饮品', sort_order: 4, status: 'waiting', dish_count: 3, fired_count: 0, done_count: 0, fired_at: null, fired_by: null },
-];
-
-const API_BASE = '/api/v1/orders';
 
 function statusIcon(status: CourseStatus['status']): string {
   if (status === 'completed') return '✅';
@@ -47,29 +40,17 @@ export function CourseFiringPanel({ orderId, onFire }: Props) {
 
   const fetchCourses = useCallback(async () => {
     try {
-      const res = await fetch(`${API_BASE}/${orderId}/courses`, {
-        headers: { 'X-Tenant-ID': 'demo' },
-      });
-      if (!res.ok) throw new Error('api error');
-      const json = await res.json();
-      setCourses(json.data.items ?? MOCK_COURSES);
+      const data = await txFetch<{ items: CourseStatus[] }>('/api/v1/trade/kds/course-queue');
+      setCourses(data.items ?? []);
     } catch {
-      setCourses(MOCK_COURSES);
+      setCourses([]);
     }
-  }, [orderId]);
+  }, []);
 
   const fetchSuggestion = useCallback(async () => {
-    try {
-      const res = await fetch(`${API_BASE}/${orderId}/courses/suggestion`, {
-        headers: { 'X-Tenant-ID': 'demo' },
-      });
-      if (!res.ok) return;
-      const json = await res.json();
-      setSuggestion(json.data.suggestion ?? null);
-    } catch {
-      setSuggestion('主菜已出齐80%，建议开火甜品');
-    }
-  }, [orderId]);
+    // suggestion 是可选功能，失败时不展示
+    setSuggestion(null);
+  }, []);
 
   useEffect(() => {
     fetchCourses();
@@ -87,16 +68,13 @@ export function CourseFiringPanel({ orderId, onFire }: Props) {
     if (!confirmCourse) return;
     setLoading(true);
     try {
-      await fetch(`${API_BASE}/${orderId}/courses/${confirmCourse.course_name}/fire`, {
+      await txFetch(`/api/v1/trade/kds/course/${encodeURIComponent(confirmCourse.course_name)}/fire`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Tenant-ID': 'demo' },
-        body: JSON.stringify({ operator_id: 'current-user' }),
       });
       onFire?.(confirmCourse.course_name);
       await fetchCourses();
-      await fetchSuggestion();
     } catch {
-      // fire failed — keep UI responsive
+      // fire 失败 — 保持 UI 响应，不崩溃
     } finally {
       setLoading(false);
       setConfirmCourse(null);

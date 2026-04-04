@@ -51,18 +51,6 @@ interface PointsAdjustPayload {
   operator_id?: string;
 }
 
-// ─── Mock 数据 ───
-const MOCK_MEMBER: MemberSearchResult = {
-  id: 'mock-001',
-  name: '张小明',
-  phone: '13800138000',
-  level_code: 'gold',
-  level_name: '黄金',
-  points_balance: 2580,
-  monthly_spend_fen: 128000,
-  total_spend_fen: 980000,
-};
-
 // ─── 手机号脱敏 ───
 function maskPhone(phone: string): string {
   if (phone.length < 7) return phone;
@@ -311,14 +299,11 @@ export function MemberLookupPage() {
       );
       setMember(result);
     } catch (e: unknown) {
-      // API失败降级到Mock
       const msg = e instanceof Error ? e.message : '';
       if (msg.includes('404') || msg.toLowerCase().includes('not found')) {
         setNotFound(true);
       } else {
-        // 网络/服务不可用时使用Mock
-        setMember({ ...MOCK_MEMBER, phone });
-        setErrorMsg('API暂时不可用，展示示例数据');
+        setErrorMsg('网络异常，请检查网络连接后重试');
       }
     } finally {
       setLoading(false);

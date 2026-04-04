@@ -1,0 +1,97 @@
+<!-- 退款申请页 -->
+<view class="page-container">
+
+  <!-- 退款类型 -->
+  <view class="type-section">
+    <text class="section-title">退款类型</text>
+    <view class="type-options">
+      <view class="type-option {{refundType === 'full' ? 'active' : ''}}"
+            bindtap="switchRefundType" data-type="full">
+        <text class="type-radio">{{refundType === 'full' ? '●' : '○'}}</text>
+        <text class="type-label">全额退款</text>
+      </view>
+      <view class="type-option {{refundType === 'partial' ? 'active' : ''}}"
+            bindtap="switchRefundType" data-type="partial">
+        <text class="type-radio">{{refundType === 'partial' ? '●' : '○'}}</text>
+        <text class="type-label">部分退款</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 部分退款：菜品勾选 -->
+  <view class="items-section" wx:if="{{refundType === 'partial'}}">
+    <text class="section-title">选择退款菜品</text>
+    <view class="refund-item" wx:for="{{items}}" wx:key="id">
+      <view class="refund-item-check" bindtap="toggleItem" data-idx="{{index}}">
+        <text class="check-icon">{{item.checked ? '☑' : '☐'}}</text>
+      </view>
+      <view class="refund-item-info">
+        <text class="refund-item-name">{{item.name}}</text>
+        <text class="refund-item-price">¥{{item.unitPriceYuan}} x {{item.quantity}}</text>
+      </view>
+      <view class="refund-qty-ctrl" wx:if="{{item.checked}}">
+        <view class="qty-btn" bindtap="changeRefundQty" data-idx="{{index}}" data-delta="{{-1}}">
+          <text class="qty-btn-text">-</text>
+        </view>
+        <text class="qty-num">{{item.refundQty}}</text>
+        <view class="qty-btn" bindtap="changeRefundQty" data-idx="{{index}}" data-delta="{{1}}">
+          <text class="qty-btn-text">+</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 退款原因 -->
+  <view class="reason-section">
+    <text class="section-title">退款原因</text>
+    <view class="reason-tags">
+      <view class="reason-tag {{selectedReasons.indexOf(item.key) >= 0 ? 'active' : ''}}"
+            wx:for="{{reasonOptions}}" wx:key="key"
+            bindtap="toggleReason" data-key="{{item.key}}">
+        {{item.label}}
+      </view>
+    </view>
+  </view>
+
+  <!-- 补充说明 -->
+  <view class="desc-section">
+    <text class="section-title">补充说明</text>
+    <textarea class="desc-input" placeholder="请描述您遇到的问题（选填）"
+              placeholderClass="desc-placeholder"
+              bindinput="onDescInput" value="{{description}}"
+              maxlength="200" />
+  </view>
+
+  <!-- 图片凭证 -->
+  <view class="image-section">
+    <text class="section-title">图片凭证（最多{{maxImages}}张）</text>
+    <view class="image-list">
+      <view class="image-item" wx:for="{{images}}" wx:key="*this">
+        <image class="upload-img" src="{{item}}" mode="aspectFill" />
+        <view class="remove-img" catchtap="removeImage" data-idx="{{index}}">
+          <text class="remove-icon">×</text>
+        </view>
+      </view>
+      <view class="image-add" wx:if="{{images.length < maxImages}}" bindtap="chooseImage">
+        <text class="add-icon">+</text>
+        <text class="add-text">上传</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 预计退款金额 -->
+  <view class="refund-summary">
+    <text class="summary-label">预计退款</text>
+    <text class="summary-amount">¥{{refundAmountYuan}}</text>
+  </view>
+
+  <!-- 提交按钮 -->
+  <view class="submit-section">
+    <button class="submit-btn" bindtap="submitRefund" disabled="{{submitting}}">
+      {{submitting ? '提交中...' : '提交退款申请'}}
+    </button>
+  </view>
+
+  <!-- 底部安全区 -->
+  <view class="safe-area-bottom"></view>
+</view>

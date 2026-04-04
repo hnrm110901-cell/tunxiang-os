@@ -128,6 +128,9 @@ class SafetyEventType(str, Enum):
     EXPIRY_ALERT = "safety.expiry_alert"                # 临期预警
     CERTIFICATE_UPDATED = "safety.certificate_updated"  # 证件更新
     TRAINING_COMPLETED = "safety.training_completed"    # 食安培训完成
+    # HACCP 检查计划专属事件（v163 新增）
+    HACCP_CHECK_COMPLETED = "safety.haccp_check_completed"    # HACCP检查执行完成
+    HACCP_CRITICAL_FAILURE = "safety.haccp_critical_failure"  # HACCP关键控制点失控
 
 
 class EnergyEventType(str, Enum):
@@ -250,34 +253,6 @@ DOMAIN_STREAM_TYPE_MAP: dict[str, str] = {
     "credit":       "credit",
 }
 
-# 所有事件类型枚举（用于校验）
-ALL_EVENT_ENUMS = (
-    OrderEventType,
-    DiscountEventType,
-    PaymentEventType,
-    MemberEventType,
-    InventoryEventType,
-    ChannelEventType,
-    ReservationEventType,
-    SettlementEventType,
-    SafetyEventType,
-    EnergyEventType,
-    ReviewEventType,
-    OpinionEventType,
-    RecipeEventType,
-    KdsEventType,
-    AgentEventType,
-    # 财务应收管理域（v156 新增）
-    DepositEventType,
-    WineStorageEventType,
-    CreditEventType,
-    # 食安巡检域（v157 新增）
-    SafetyInspectionEventType,
-    # 营销活动域（v157 新增）
-    CampaignEventType,
-)
-
-
 # ──────────────────────────────────────────────────────────────────────
 # 财务应收管理域（押金 / 存酒 / 企业挂账，v156 新增）
 # ──────────────────────────────────────────────────────────────────────
@@ -348,3 +323,31 @@ def resolve_stream_type(event_type: str) -> str:
     """根据事件类型字符串解析 PG events 表的 stream_type。"""
     domain = event_type.split(".")[0]
     return DOMAIN_STREAM_TYPE_MAP.get(domain, domain)
+
+
+# 所有事件类型枚举（用于校验）— 放在所有类定义之后，避免 forward reference
+ALL_EVENT_ENUMS = (
+    OrderEventType,
+    DiscountEventType,
+    PaymentEventType,
+    MemberEventType,
+    InventoryEventType,
+    ChannelEventType,
+    ReservationEventType,
+    SettlementEventType,
+    SafetyEventType,
+    EnergyEventType,
+    ReviewEventType,
+    OpinionEventType,
+    RecipeEventType,
+    KdsEventType,
+    AgentEventType,
+    # 财务应收管理域（v156 新增）
+    DepositEventType,
+    WineStorageEventType,
+    CreditEventType,
+    # 食安巡检域（v157 新增）
+    SafetyInspectionEventType,
+    # 营销活动域（v157 新增）
+    CampaignEventType,
+)

@@ -1,0 +1,75 @@
+<!-- 我的团购记录页 -->
+<view class="page-container">
+
+  <!-- 顶部 Tab 栏 -->
+  <view class="tab-bar">
+    <view class="tab-item {{currentTab === 'active' ? 'active' : ''}}"
+          bindtap="switchTab" data-tab="active">
+      <text>进行中</text>
+      <view class="tab-line" wx:if="{{currentTab === 'active'}}"></view>
+    </view>
+    <view class="tab-item {{currentTab === 'completed' ? 'active' : ''}}"
+          bindtap="switchTab" data-tab="completed">
+      <text>已完成</text>
+      <view class="tab-line" wx:if="{{currentTab === 'completed'}}"></view>
+    </view>
+    <view class="tab-item {{currentTab === 'cancelled' ? 'active' : ''}}"
+          bindtap="switchTab" data-tab="cancelled">
+      <text>已取消</text>
+      <view class="tab-line" wx:if="{{currentTab === 'cancelled'}}"></view>
+    </view>
+  </view>
+
+  <!-- 卡片列表 -->
+  <view class="order-list" wx:if="{{orders.length > 0}}">
+    <view class="order-card" wx:for="{{orders}}" wx:key="id"
+          bindtap="goDetail" data-id="{{item.campaign_id}}">
+      <!-- 左侧菜品图 -->
+      <image class="dish-img" src="{{item.image_url || '/assets/placeholder-1.png'}}" mode="aspectFill"></image>
+      <!-- 右侧信息 -->
+      <view class="order-info">
+        <text class="dish-name">{{item.name}}</text>
+        <view class="order-price-row">
+          <text class="order-price">¥{{item.group_price_fen / 100}}</text>
+          <text class="order-status {{item.status}}">
+            {{item.status === 'active' ? '拼团中' : item.status === 'completed' ? '拼团成功' : '已取消'}}
+          </text>
+        </view>
+        <!-- 进度条 -->
+        <view class="progress-section">
+          <view class="progress-bar">
+            <view class="progress-fill" style="width: {{(item.current_size / item.target_size) * 100}}%"></view>
+          </view>
+          <text class="progress-text">{{item.current_size}}/{{item.target_size}}人</text>
+        </view>
+        <!-- 操作按钮 -->
+        <view class="action-row">
+          <button class="action-btn invite-btn" wx:if="{{item.status === 'active'}}"
+                  open-type="share" data-id="{{item.campaign_id}}">邀请好友</button>
+          <button class="action-btn again-btn" wx:if="{{item.status === 'completed'}}"
+                  catchtap="reorder" data-id="{{item.campaign_id}}">再来一单</button>
+          <button class="action-btn rejoin-btn" wx:if="{{item.status === 'cancelled'}}"
+                  catchtap="rejoin" data-id="{{item.campaign_id}}">重新参团</button>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 加载更多提示 -->
+  <view class="loading-more" wx:if="{{loadingMore}}">
+    <text>加载中...</text>
+  </view>
+  <view class="no-more" wx:if="{{noMore && orders.length > 0}}">
+    <text>没有更多了</text>
+  </view>
+
+  <!-- 空状态 -->
+  <view class="empty-state" wx:if="{{orders.length === 0 && !loading}}">
+    <view class="empty-icon-box">
+      <text class="empty-icon-text">&#128230;</text>
+    </view>
+    <text class="empty-text">暂无团购记录</text>
+    <button class="empty-btn" bindtap="goGroupBuy">去看看</button>
+  </view>
+
+</view>

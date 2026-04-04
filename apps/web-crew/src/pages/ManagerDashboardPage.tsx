@@ -5,6 +5,7 @@
  */
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { txFetch } from '../api/index';
 
 /* ---------- Design Token ---------- */
 const C = {
@@ -143,116 +144,33 @@ function formatRevenue(yuan: number): string {
   return yuan.toFixed(0) + '元';
 }
 
-/* ---------- Mock 数据（API失败时降级使用） ---------- */
-const MOCK_SUMMARY: DailySummary = {
-  date: getToday(),
-  revenue: 38600,
-  order_count: 87,
-  table_turn_rate: 2.3,
-  avg_check: 444,
-  guest_count: 268,
-  gross_margin: 0.41,
-};
+// Mock 数据已全部移除，API 失败时降级为空数据
 
-const MOCK_PNL: PnlData = {
-  revenue: 38600,
-  food_cost: 15440,
-  labor_cost: 7720,
-  gross_profit: 23160,
-  gross_margin: 0.60,
-};
+/* ---------- API 调用函数（使用 txFetch，自动携带 X-Tenant-ID）---------- */
 
-const MOCK_TABLES: TableInfo[] = [
-  { table_id: 't1', table_no: 'A1', status: 'dining', pax: 4, elapsed_min: 45 },
-  { table_id: 't2', table_no: 'A2', status: 'empty' },
-  { table_id: 't3', table_no: 'A3', status: 'dirty' },
-  { table_id: 't4', table_no: 'A4', status: 'dining', pax: 2, elapsed_min: 20 },
-  { table_id: 't5', table_no: 'A5', status: 'reserved' },
-  { table_id: 't6', table_no: 'B1', status: 'empty' },
-  { table_id: 't7', table_no: 'B2', status: 'dining', pax: 6, elapsed_min: 60 },
-  { table_id: 't8', table_no: 'B3', status: 'empty' },
-  { table_id: 't9', table_no: 'B4', status: 'dining', pax: 3, elapsed_min: 15 },
-  { table_id: 't10', table_no: 'B5', status: 'dirty' },
-  { table_id: 't11', table_no: 'C1', status: 'empty' },
-  { table_id: 't12', table_no: 'C2', status: 'dining', pax: 5, elapsed_min: 35 },
-];
-
-const MOCK_CHECKLIST: ChecklistItem[] = [
-  { id: 'e1', code: 'E1', name: '收银对账', status: 'completed' },
-  { id: 'e2', code: 'E2', name: '厨余处理', status: 'completed' },
-  { id: 'e3', code: 'E3', name: '库存盘点', status: 'completed' },
-  { id: 'e4', code: 'E4', name: '食安检查', status: 'in_progress' },
-  { id: 'e5', code: 'E5', name: '设备检查', status: 'pending' },
-  { id: 'e6', code: 'E6', name: '卫生检查', status: 'pending' },
-  { id: 'e7', code: 'E7', name: '人员签到', status: 'completed' },
-  { id: 'e8', code: 'E8', name: '日结汇总', status: 'pending' },
-];
-
-const MOCK_INVENTORY: InventoryAnalysis = {
-  high_risk_count: 3,
-  alerts: [
-    { ingredient_id: 'i1', name: '鲜虾', days_remaining: 1, suggested_purchase: 5, unit: 'kg', risk_level: 'high' },
-    { ingredient_id: 'i2', name: '豆腐', days_remaining: 2, suggested_purchase: 10, unit: '盒', risk_level: 'high' },
-    { ingredient_id: 'i3', name: '生蚝', days_remaining: 1, suggested_purchase: 3, unit: 'kg', risk_level: 'high' },
-    { ingredient_id: 'i4', name: '猪肉', days_remaining: 4, suggested_purchase: 8, unit: 'kg', risk_level: 'medium' },
-  ],
-  summary: 'AI分析：3种食材效期<3天，建议今日采购',
-};
-
-const MOCK_STAFF: StaffMember[] = [
-  { id: 's1', name: '张三', role: '服务员', status: 'on_duty' },
-  { id: 's2', name: '李四', role: '服务员', status: 'on_duty' },
-  { id: 's3', name: '王五', role: '服务员', status: 'break' },
-  { id: 's4', name: '赵六', role: '收银', status: 'on_duty' },
-  { id: 's5', name: '陈七', role: '厨师', status: 'on_duty' },
-  { id: 's6', name: '刘八', role: '厨师', status: 'on_duty' },
-  { id: 's7', name: '周九', role: '传菜', status: 'break' },
-];
-
-/* ---------- API 调用函数 ---------- */
-async function fetchDailySummary(): Promise<DailySummary> {
-  const res = await fetch(
-    `/api/v1/ops/daily-summary?store_id=${getStoreId()}&date=${getToday()}`,
-    { headers: getHeaders() }
-  );
-  if (!res.ok) throw new Error(`daily-summary ${res.status}`);
-  const json = await res.json();
-  return (json.data ?? json) as DailySummary;
+async function fetchKpi(): Promise<DailySummary> {
+  return txFetch<DailySummary>('/api/v1/trade/store/kpi?date=today');
 }
 
-async function fetchPnl(): Promise<PnlData> {
-  const res = await fetch(
-    `/api/v1/finance/pnl/calculate?store_id=${getStoreId()}&date=${getToday()}`,
-    { headers: getHeaders() }
-  );
-  if (!res.ok) throw new Error(`pnl ${res.status}`);
-  const json = await res.json();
-  return (json.data ?? json) as PnlData;
+async function fetchAlerts(): Promise<InventoryAnalysis> {
+  return txFetch<InventoryAnalysis>('/api/v1/analytics/alerts?status=active');
+}
+
+async function fetchStaffOnDuty(): Promise<StaffMember[]> {
+  const res = await txFetch<{ items: StaffMember[] }>('/api/v1/org/employees/on-duty');
+  return res.items ?? [];
 }
 
 async function fetchTables(): Promise<TableInfo[]> {
-  const res = await fetch('/api/v1/trade/tables/status', { headers: getHeaders() });
-  if (!res.ok) throw new Error(`tables ${res.status}`);
-  const json = await res.json();
-  return (json.data ?? json) as TableInfo[];
+  const res = await txFetch<{ items: TableInfo[] }>('/api/v1/trade/tables?store_id=' + getStoreId());
+  return res.items ?? [];
 }
 
 async function fetchChecklist(): Promise<ChecklistItem[]> {
-  const res = await fetch(
-    `/api/v1/ops/settlement/checklist?store_id=${getStoreId()}`,
-    { headers: getHeaders() }
+  const res = await txFetch<{ checklist: ChecklistItem[] }>(
+    `/api/v1/ops/settlement/checklist?store_id=${getStoreId()}`
   );
-  if (!res.ok) throw new Error(`checklist ${res.status}`);
-  const json = await res.json();
-  const d = json.data ?? json;
-  return (d.checklist ?? d) as ChecklistItem[];
-}
-
-async function fetchInventoryAnalysis(): Promise<InventoryAnalysis> {
-  const res = await fetch('/api/v1/brain/inventory/analyze', { headers: getHeaders() });
-  if (!res.ok) throw new Error(`inventory ${res.status}`);
-  const json = await res.json();
-  return (json.data ?? json) as InventoryAnalysis;
+  return res.checklist ?? [];
 }
 
 
@@ -438,29 +356,26 @@ export function ManagerDashboardPage() {
     if (isManual) setRefreshing(true);
 
     const [
-      summaryResult,
-      pnlResult,
+      kpiResult,
+      alertsResult,
+      staffResult,
       tablesResult,
       checklistResult,
-      inventoryResult,
-      staffResult,
     ] = await Promise.allSettled([
-      fetchDailySummary(),
-      fetchPnl(),
+      fetchKpi(),
+      fetchAlerts(),
+      fetchStaffOnDuty(),
       fetchTables(),
       fetchChecklist(),
-      fetchInventoryAnalysis(),
-      // Staff API not yet available, use mock
-      Promise.reject(new Error('staff-api-not-implemented')),
     ]);
 
     const newData: DashboardData = {
-      summary: summaryResult.status === 'fulfilled' ? summaryResult.value : MOCK_SUMMARY,
-      pnl: pnlResult.status === 'fulfilled' ? pnlResult.value : MOCK_PNL,
-      tables: tablesResult.status === 'fulfilled' ? tablesResult.value : MOCK_TABLES,
-      checklist: checklistResult.status === 'fulfilled' ? checklistResult.value : MOCK_CHECKLIST,
-      inventory: inventoryResult.status === 'fulfilled' ? inventoryResult.value : MOCK_INVENTORY,
-      staff: staffResult.status === 'fulfilled' ? (staffResult.value as StaffMember[]) : MOCK_STAFF,
+      summary: kpiResult.status === 'fulfilled' ? kpiResult.value : null,
+      pnl: null,  // 由 KPI 接口覆盖，暂不单独请求
+      tables: tablesResult.status === 'fulfilled' ? tablesResult.value : [],
+      checklist: checklistResult.status === 'fulfilled' ? checklistResult.value : [],
+      inventory: alertsResult.status === 'fulfilled' ? alertsResult.value : null,
+      staff: staffResult.status === 'fulfilled' ? staffResult.value : [],
     };
 
     setData(newData);

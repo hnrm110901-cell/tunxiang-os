@@ -1,0 +1,88 @@
+<!-- 企业订餐历史 — 月度汇总 + 按日分组 -->
+<view class="page-container">
+
+  <!-- 月份切换器 -->
+  <view class="month-bar">
+    <view class="month-arrow" bindtap="prevMonth">
+      <text class="arrow-text">&#8249;</text>
+    </view>
+    <picker mode="date" fields="month" value="{{currentMonth}}" bindchange="onMonthChange">
+      <view class="month-picker">
+        <text class="month-label">{{currentMonthDisplay}}</text>
+        <text class="month-icon">&#x25BC;</text>
+      </view>
+    </picker>
+    <view class="month-arrow {{isCurrentMonth ? 'disabled' : ''}}" bindtap="nextMonth">
+      <text class="arrow-text">&#8250;</text>
+    </view>
+  </view>
+
+  <!-- 月度汇总卡 -->
+  <view class="summary-card">
+    <view class="summary-row">
+      <view class="summary-item">
+        <text class="s-value count">{{orderCount}}</text>
+        <text class="s-label">订餐次数</text>
+      </view>
+      <view class="summary-divider"></view>
+      <view class="summary-item">
+        <text class="s-value spent">¥{{monthSpentYuan}}</text>
+        <text class="s-label">本月消费</text>
+      </view>
+      <view class="summary-divider"></view>
+      <view class="summary-item">
+        <text class="s-value remain">¥{{remainingYuan}}</text>
+        <text class="s-label">剩余额度</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 加载中 -->
+  <view class="loading-wrap" wx:if="{{loading && allOrders.length === 0}}">
+    <view class="skeleton-item" wx:for="{{[1,2,3,4,5]}}" wx:key="*this"></view>
+  </view>
+
+  <!-- 按日分组订单列表 -->
+  <view class="orders-wrap" wx:if="{{!loading || allOrders.length > 0}}">
+
+    <!-- 空状态 -->
+    <view class="empty-wrap" wx:if="{{groupedOrders.length === 0 && !loading}}">
+      <text class="empty-icon">📭</text>
+      <text class="empty-text">{{currentMonthDisplay}} 暂无订餐记录</text>
+    </view>
+
+    <!-- 日期分组 -->
+    <view class="date-group" wx:for="{{groupedOrders}}" wx:key="date">
+      <view class="date-header">
+        <text class="date-label">{{item.dateDisplay}}</text>
+        <text class="date-count">{{item.orders.length}}单</text>
+      </view>
+
+      <!-- 订单卡片 -->
+      <view class="order-card" wx:for="{{item.orders}}" wx:for-item="order" wx:key="id">
+        <view class="order-top">
+          <view class="order-meal-badge {{order.meal_type === 'dinner' ? 'dinner' : 'lunch'}}">
+            <text>{{order.mealLabel}}</text>
+          </view>
+          <text class="order-dishes">{{order.dishText}}</text>
+          <text class="order-amount">¥{{order.amountYuan}}</text>
+        </view>
+        <view class="order-bottom">
+          <text class="order-time">{{order.timeDisplay}}</text>
+          <view class="delivery-badge {{order.status === 'delivered' ? 'done' : 'pending'}}">
+            <text>{{order.delivery_status || '配送中'}}</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 加载更多 -->
+    <view class="load-more" wx:if="{{hasMore}}">
+      <text class="load-more-text">上拉加载更多</text>
+    </view>
+    <view class="no-more" wx:if="{{!hasMore && allOrders.length > 0}}">
+      <text class="no-more-text">— 已显示全部记录 —</text>
+    </view>
+  </view>
+
+</view>

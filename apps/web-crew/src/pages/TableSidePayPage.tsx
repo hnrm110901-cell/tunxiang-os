@@ -25,12 +25,29 @@ interface MemberInfo {
 
 type PayMethod = 'wechat' | 'alipay' | 'cash' | 'credit' | 'tab';
 
-const MOCK_ORDER: OrderSummary = {
-  order_id: '',
-  total_amount: 28800,
-  item_count: 8,
-  duration_min: 45,
-};
+// ─── API 工具 ───
+
+const TENANT_ID = (): string =>
+  (typeof window !== 'undefined' && (window as unknown as Record<string, string>).__TENANT_ID__) || '';
+
+async function txFetch<T = unknown>(
+  path: string,
+  options: RequestInit = {},
+): Promise<T> {
+  const res = await fetch(path, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Tenant-ID': TENANT_ID(),
+      ...(options.headers || {}),
+    },
+  });
+  const json = await res.json();
+  if (!res.ok || json.ok === false) {
+    throw new Error(json.error?.message || json.detail || `HTTP ${res.status}`);
+  }
+  return json.data ?? json;
+}
 
 // ─── 工具函数 ───
 
@@ -73,29 +90,22 @@ export default function TableSidePayPage() {
   // ─── 加载订单 ───
   useEffect(() => {
     if (!orderId) {
-      setOrder({ ...MOCK_ORDER, order_id: 'mock-001' });
+      setOrder(null);
       setLoading(false);
       return;
     }
-    fetch(`/api/v1/orders/${orderId}`, {
-      headers: { 'X-Tenant-ID': (window as any).__TENANT_ID__ || '' },
-    })
-      .then((r) => r.json())
-      .then((res) => {
-        if (res.ok && res.data) {
-          const d = res.data;
-          setOrder({
-            order_id: d.id || orderId,
-            total_amount: d.final_amount_fen ?? d.total_amount_fen ?? MOCK_ORDER.total_amount,
-            item_count: d.item_count ?? MOCK_ORDER.item_count,
-            duration_min: d.dining_duration_min ?? MOCK_ORDER.duration_min,
-          });
-        } else {
-          setOrder({ ...MOCK_ORDER, order_id: orderId });
-        }
+    setLoading(true);
+    txFetch<Record<string, unknown>>(`/api/v1/trade/orders/${encodeURIComponent(orderId)}`)
+      .then((d) => {
+        setOrder({
+          order_id: (d.id ?? d.order_id ?? orderId) as string,
+          total_amount: (d.final_amount_fen ?? d.total_amount_fen ?? 0) as number,
+          item_count: (d.item_count ?? 0) as number,
+          duration_min: (d.dining_duration_min ?? 0) as number,
+        });
       })
       .catch(() => {
-        setOrder({ ...MOCK_ORDER, order_id: orderId });
+        setOrder(null);
       })
       .finally(() => setLoading(false));
   }, [orderId]);
@@ -142,31 +152,22 @@ export default function TableSidePayPage() {
     setSettling(true);
     setSettleError('');
     try {
-      const body: Record<string, unknown> = {
-        method: selectedMethod,
-        member_id: memberInfo?.member_id ?? null,
-        remark: selectedMethod === 'tab' ? tabUnit.trim() : null,
-        amount: memberInfo && memberInfo.discount_rate < 1
-          ? calcDiscountedAmount(order.total_amount, memberInfo.discount_rate)
-          : order.total_amount,
-      };
-      const res = await fetch(`/api/v1/orders/${order.order_id}/settle`, {
+      const amount_fen = memberInfo && memberInfo.discount_rate < 1
+        ? calcDiscountedAmount(order.total_amount, memberInfo.discount_rate)
+        : order.total_amount;
+      await txFetch(`/api/v1/trade/orders/${encodeURIComponent(order.order_id)}/settle`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Tenant-ID': (window as any).__TENANT_ID__ || '',
-        },
-        body: JSON.stringify(body),
+        body: JSON.stringify({
+          method: selectedMethod,
+          amount_fen,
+          member_id: memberInfo?.member_id ?? null,
+          remark: selectedMethod === 'tab' ? tabUnit.trim() : null,
+        }),
       });
-      const json = await res.json();
-      if (json.ok) {
-        setSettled(true);
-        setTimeout(() => navigate('/tables'), 3000);
-      } else {
-        setSettleError(json.error?.message || '结账失败，请重试');
-      }
-    } catch {
-      setSettleError('网络错误，请重试');
+      setSettled(true);
+      setTimeout(() => navigate('/tables'), 3000);
+    } catch (err: unknown) {
+      setSettleError(err instanceof Error ? err.message : '结账失败，请重试');
     } finally {
       setSettling(false);
     }
@@ -186,6 +187,43 @@ export default function TableSidePayPage() {
   const discountItems: DiscountInputItem[] = memberInfo && memberInfo.discount_rate < 1
     ? [{ type: 'member_discount', member_id: memberInfo.member_id, rate: memberInfo.discount_rate }]
     : [];
+
+  // ─── 加载失败空状态 ───
+  if (!loading && !order) {
+    return (
+      <div
+        style={{
+          minHeight: '100vh',
+          background: '#0B1A20',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 16,
+          color: '#9DB4B2',
+          fontSize: 16,
+        }}
+      >
+        <div style={{ fontSize: 40 }}>📋</div>
+        <div>暂无订单数据</div>
+        <button
+          onClick={() => navigate(-1)}
+          style={{
+            minHeight: 48,
+            padding: '0 24px',
+            background: '#FF6B35',
+            color: '#fff',
+            border: 'none',
+            borderRadius: 10,
+            fontSize: 16,
+            cursor: 'pointer',
+          }}
+        >
+          返回
+        </button>
+      </div>
+    );
+  }
 
   // ─── 成功全屏 ───
   if (settled) {

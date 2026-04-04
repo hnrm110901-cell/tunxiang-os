@@ -8,8 +8,11 @@ from __future__ import annotations
 from datetime import date
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from shared.ontology.src.database import get_db
 
 router = APIRouter(prefix="/api/v1/daily-ops", tags=["daily-ops"])
 
@@ -97,12 +100,13 @@ class SignOffRequest(BaseModel):
 async def create_opening_checklist(
     store_id: str,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """E1: 生成当日开店检查单"""
     from ..services.store_opening import create_opening_checklist as svc
 
     try:
-        result = await svc(store_id, date.today(), x_tenant_id, db=None)
+        result = await svc(store_id, date.today(), x_tenant_id, db=db)
         return {"ok": True, "data": result}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -115,6 +119,7 @@ async def check_opening_item(
     item_id: str,
     body: CheckItemRequest,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """E1: 逐项打勾"""
     from ..services.store_opening import check_item as svc
@@ -122,7 +127,7 @@ async def check_opening_item(
     try:
         result = await svc(
             checklist_id, item_id, body.status, body.result,
-            db=None, result=body.result, note=body.note, tenant_id=x_tenant_id,
+            db=db, result=body.result, note=body.note, tenant_id=x_tenant_id,
         )
         return {"ok": True, "data": result}
     except ValueError as e:
@@ -133,11 +138,12 @@ async def check_opening_item(
 async def get_opening_status(
     store_id: str,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """E1: 开店检查进度"""
     from ..services.store_opening import get_opening_status as svc
 
-    result = svc(store_id, date.today(), x_tenant_id, db=None)
+    result = svc(store_id, date.today(), x_tenant_id, db=db)
     return {"ok": True, "data": result}
 
 
@@ -146,12 +152,13 @@ async def approve_opening(
     store_id: str,
     body: ApproveOpeningRequest,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """E1: 店长确认开店放行"""
     from ..services.store_opening import approve_opening as svc
 
     try:
-        result = await svc(store_id, body.manager_id, x_tenant_id, db=None)
+        result = await svc(store_id, body.manager_id, x_tenant_id, db=db)
         return {"ok": True, "data": result}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -166,11 +173,12 @@ async def approve_opening(
 async def get_cruise_dashboard(
     store_id: str,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """E2: 实时经营看板"""
     from ..services.cruise_monitor import get_realtime_dashboard as svc
 
-    result = await svc(store_id, x_tenant_id, db=None)
+    result = await svc(store_id, x_tenant_id, db=db)
     return {"ok": True, "data": result}
 
 
@@ -179,11 +187,12 @@ async def record_patrol(
     store_id: str,
     body: PatrolRequest,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """E2: 记录巡台发现"""
     from ..services.cruise_monitor import record_patrol as svc
 
-    result = await svc(store_id, body.operator_id, body.findings, x_tenant_id, db=None)
+    result = await svc(store_id, body.operator_id, body.findings, x_tenant_id, db=db)
     return {"ok": True, "data": result}
 
 
@@ -197,12 +206,13 @@ async def report_exception(
     store_id: str,
     body: ExceptionReportRequest,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """E4: 上报异常"""
     from ..services.exception_workflow import report_exception as svc
 
     try:
-        result = await svc(store_id, body.type, body.detail, body.reporter_id, x_tenant_id, db=None)
+        result = await svc(store_id, body.type, body.detail, body.reporter_id, x_tenant_id, db=db)
         return {"ok": True, "data": result}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -213,12 +223,13 @@ async def escalate_exception(
     exception_id: str,
     body: EscalateRequest,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """E4: 升级异常"""
     from ..services.exception_workflow import escalate_exception as svc
 
     try:
-        result = await svc(exception_id, body.to_level, x_tenant_id, db=None)
+        result = await svc(exception_id, body.to_level, x_tenant_id, db=db)
         return {"ok": True, "data": result}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -229,12 +240,13 @@ async def resolve_exception(
     exception_id: str,
     body: ResolveRequest,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """E4: 关闭异常"""
     from ..services.exception_workflow import resolve_exception as svc
 
     try:
-        result = await svc(exception_id, body.resolution, body.resolver_id, x_tenant_id, db=None)
+        result = await svc(exception_id, body.resolution, body.resolver_id, x_tenant_id, db=db)
         return {"ok": True, "data": result}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -244,11 +256,12 @@ async def resolve_exception(
 async def get_open_exceptions(
     store_id: str,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """E4: 未关闭异常列表"""
     from ..services.exception_workflow import get_open_exceptions as svc
 
-    result = await svc(store_id, x_tenant_id, db=None)
+    result = await svc(store_id, x_tenant_id, db=db)
     return {"ok": True, "data": result}
 
 
@@ -261,12 +274,13 @@ async def get_open_exceptions(
 async def create_closing_checklist(
     store_id: str,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """E5: 生成闭店检查单"""
     from ..services.store_closing import create_closing_checklist as svc
 
     try:
-        result = await svc(store_id, date.today(), x_tenant_id, db=None)
+        result = await svc(store_id, date.today(), x_tenant_id, db=db)
         return {"ok": True, "data": result}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -277,11 +291,12 @@ async def record_stocktake(
     store_id: str,
     items: List[StocktakeItem],
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """E5: 原料盘点"""
     from ..services.store_closing import record_closing_stocktake as svc
 
-    result = await svc(store_id, [i.model_dump() for i in items], x_tenant_id, db=None)
+    result = await svc(store_id, [i.model_dump() for i in items], x_tenant_id, db=db)
     return {"ok": True, "data": result}
 
 
@@ -290,11 +305,12 @@ async def record_waste(
     store_id: str,
     items: List[WasteItem],
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """E5: 损耗上报"""
     from ..services.store_closing import record_waste_report as svc
 
-    result = await svc(store_id, [i.model_dump() for i in items], x_tenant_id, db=None)
+    result = await svc(store_id, [i.model_dump() for i in items], x_tenant_id, db=db)
     return {"ok": True, "data": result}
 
 
@@ -303,12 +319,13 @@ async def finalize_closing(
     store_id: str,
     body: FinalizeClosingRequest,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """E5: 闭店放行"""
     from ..services.store_closing import finalize_closing as svc
 
     try:
-        result = await svc(store_id, body.manager_id, x_tenant_id, db=None)
+        result = await svc(store_id, body.manager_id, x_tenant_id, db=db)
         return {"ok": True, "data": result}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -324,12 +341,13 @@ async def get_daily_review(
     store_id: str,
     review_date: str,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """E7: 生成日度复盘"""
     from ..services.daily_review import generate_daily_review as svc
 
     d = date.fromisoformat(review_date)
-    result = await svc(store_id, d, x_tenant_id, db=None)
+    result = await svc(store_id, d, x_tenant_id, db=db)
     return {"ok": True, "data": result}
 
 
@@ -339,6 +357,7 @@ async def submit_action_items(
     review_date: str,
     body: SubmitActionItemsRequest,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """E7: 提交次日行动项"""
     from ..services.daily_review import submit_action_items as svc
@@ -348,7 +367,7 @@ async def submit_action_items(
         [i.model_dump() for i in body.items],
         body.manager_id,
         x_tenant_id,
-        db=None,
+        db=db,
     )
     return {"ok": True, "data": result}
 
@@ -358,11 +377,12 @@ async def get_review_history(
     store_id: str,
     days: int = 7,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """E7: 历史复盘列表"""
     from ..services.daily_review import get_review_history as svc
 
-    result = await svc(store_id, days, x_tenant_id, db=None)
+    result = await svc(store_id, days, x_tenant_id, db=db)
     return {"ok": True, "data": result}
 
 
@@ -372,10 +392,11 @@ async def sign_off_review(
     review_date: str,
     body: SignOffRequest,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """E7: 店长签发复盘"""
     from ..services.daily_review import sign_off_review as svc
 
     d = date.fromisoformat(review_date)
-    result = await svc(store_id, d, body.manager_id, x_tenant_id, db=None)
+    result = await svc(store_id, d, body.manager_id, x_tenant_id, db=db)
     return {"ok": True, "data": result}

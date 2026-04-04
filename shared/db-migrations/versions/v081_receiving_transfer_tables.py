@@ -83,7 +83,7 @@ def upgrade() -> None:
         sa.Column("production_date", sa.Date, nullable=True),
         sa.Column("expiry_date", sa.Date, nullable=True),
         sa.Column("rejection_reason", sa.String(500), nullable=True),
-        sa.Column("quality_photos", JSONB, nullable=True, server_default="'[]'::jsonb"),
+        sa.Column("quality_photos", JSONB, nullable=True, server_default=sa.text("'[]'::jsonb")),
         sa.Column("status", sa.String(20), nullable=False, server_default="pending"),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),

@@ -1,0 +1,137 @@
+.page-container { min-height: 100vh; background: #0B1A20; color: #fff; padding: 24rpx; padding-bottom: 60rpx; }
+
+.section-title { font-size: 28rpx; color: #999; display: block; margin-bottom: 20rpx; }
+
+/* 反馈类型 */
+.type-section { margin-bottom: 36rpx; }
+
+.type-tags { display: flex; gap: 16rpx; }
+
+.type-tag {
+  padding: 16rpx 36rpx;
+  background: #112228;
+  border-radius: 32rpx;
+  border: 2rpx solid transparent;
+}
+.type-tag.active { border-color: #FF6B2C; background: rgba(255, 107, 44, 0.1); }
+.type-tag-text { font-size: 26rpx; color: #999; }
+.type-tag.active .type-tag-text { color: #FF6B2C; }
+
+/* 内容输入 */
+.content-section { margin-bottom: 36rpx; }
+
+.textarea-wrap { position: relative; }
+
+.content-textarea {
+  background: #112228;
+  border-radius: 16rpx;
+  padding: 24rpx;
+  font-size: 28rpx;
+  color: #fff;
+  width: 100%;
+  height: 280rpx;
+  box-sizing: border-box;
+}
+
+.placeholder-text { color: #666; }
+
+.char-count {
+  position: absolute;
+  bottom: 16rpx;
+  right: 16rpx;
+  font-size: 22rpx;
+  color: #666;
+}
+.char-count.warn { color: #e53e3e; }
+
+/* 图片上传 */
+.image-section { margin-bottom: 36rpx; }
+
+.image-grid { display: flex; flex-wrap: wrap; gap: 16rpx; }
+
+.image-item { position: relative; width: 160rpx; height: 160rpx; }
+
+.upload-image { width: 100%; height: 100%; border-radius: 12rpx; }
+
+.image-remove {
+  position: absolute;
+  top: -12rpx;
+  right: -12rpx;
+  width: 40rpx;
+  height: 40rpx;
+  background: rgba(163, 45, 45, 0.9);
+  color: #fff;
+  border-radius: 50%;
+  font-size: 22rpx;
+  text-align: center;
+  line-height: 40rpx;
+}
+
+.image-add {
+  width: 160rpx;
+  height: 160rpx;
+  background: #112228;
+  border: 2rpx dashed #333;
+  border-radius: 12rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8rpx;
+}
+.add-icon { font-size: 48rpx; color: #666; }
+.add-text { font-size: 22rpx; color: #666; }
+
+/* 联系方式 */
+.contact-section { margin-bottom: 48rpx; }
+
+.contact-input {
+  background: #112228;
+  border-radius: 12rpx;
+  padding: 20rpx 24rpx;
+  font-size: 28rpx;
+  color: #fff;
+}
+
+/* 提交按钮 */
+.submit-btn {
+  background: #FF6B2C !important;
+  color: #fff !important;
+  border-radius: 44rpx;
+  font-size: 32rpx;
+  height: 88rpx;
+  line-height: 88rpx;
+}
+.submit-btn[disabled] { opacity: 0.6; }
+
+/* 成功动画 */
+.success-mask {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+}
+
+.success-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20rpx;
+}
+
+.success-icon {
+  width: 120rpx;
+  height: 120rpx;
+  background: #48bb78;
+  border-radius: 50%;
+  font-size: 60rpx;
+  color: #fff;
+  text-align: center;
+  line-height: 120rpx;
+}
+
+.success-title { font-size: 36rpx; color: #fff; font-weight: bold; }
+.success-desc { font-size: 26rpx; color: #999; }

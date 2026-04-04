@@ -56,7 +56,8 @@ const { Title, Text } = Typography;
 
 // ─── 常量 ─────────────────────────────────────────────────────────────────────
 
-const MOCK_STORE_ID = 'store-001';
+// 从当前登录上下文获取门店ID，fallback 为空字符串（API 侧将返回当前用户所属门店数据）
+const CURRENT_STORE_ID = localStorage.getItem('tx_store_id') ?? '';
 
 const ROLE_LABEL: Record<string, string> = {
   waiter: '服务员',
@@ -129,85 +130,7 @@ interface PayrollConfig {
   effective_to: string | null;
 }
 
-// ─── Mock 数据（API 失败时降级）────────────────────────────────────────────────
-
-const MOCK_RECORDS: PayrollRecord[] = [
-  {
-    id: 'pr-001', employee_id: 'e-001', employee_name: '张伟', employee_role: 'chef',
-    store_id: MOCK_STORE_ID, period_year: 2026, period_month: 3,
-    base_salary_fen: 500000, commission_amount_fen: 12000, piece_amount_fen: 8000,
-    piece_count: 160, perf_bonus_fen: 20000, perf_score: 4.2,
-    deductions_fen: 5000, commission_base_fen: 240000, total_salary_fen: 535000,
-    status: 'draft',
-    breakdown: [
-      { label: '基本工资', type: 'base', amount_fen: 500000 },
-      { label: '计件奖励', type: 'piece', amount_fen: 8000, remark: '160件×0.5元' },
-      { label: '销售提成', type: 'commission', amount_fen: 12000, remark: '营业额2400元×5%' },
-      { label: '绩效奖金', type: 'perf', amount_fen: 20000, remark: '评分4.2/5.0' },
-      { label: '迟到扣款', type: 'deduction', amount_fen: -5000, remark: '3次×16.67元' },
-    ],
-  },
-  {
-    id: 'pr-002', employee_id: 'e-002', employee_name: '李娟', employee_role: 'waiter',
-    store_id: MOCK_STORE_ID, period_year: 2026, period_month: 3,
-    base_salary_fen: 350000, commission_amount_fen: 8500, piece_amount_fen: 0,
-    piece_count: 0, perf_bonus_fen: 15000, perf_score: 4.5,
-    deductions_fen: 0, commission_base_fen: 170000, total_salary_fen: 373500,
-    status: 'approved',
-    breakdown: [
-      { label: '基本工资', type: 'base', amount_fen: 350000 },
-      { label: '销售提成', type: 'commission', amount_fen: 8500, remark: '营业额1700元×5%' },
-      { label: '绩效奖金', type: 'perf', amount_fen: 15000, remark: '评分4.5/5.0' },
-    ],
-  },
-  {
-    id: 'pr-003', employee_id: 'e-003', employee_name: '王强', employee_role: 'manager',
-    store_id: MOCK_STORE_ID, period_year: 2026, period_month: 3,
-    base_salary_fen: 800000, commission_amount_fen: 24000, piece_amount_fen: 0,
-    piece_count: 0, perf_bonus_fen: 50000, perf_score: 4.8,
-    deductions_fen: 0, commission_base_fen: 480000, total_salary_fen: 874000,
-    status: 'paid',
-    breakdown: [
-      { label: '基本工资', type: 'base', amount_fen: 800000 },
-      { label: '门店提成', type: 'commission', amount_fen: 24000, remark: '营业额4800元×5%' },
-      { label: '绩效奖金', type: 'perf', amount_fen: 50000, remark: '评分4.8/5.0' },
-    ],
-  },
-];
-
-const MOCK_SUMMARY: PayrollSummary = {
-  store_id: MOCK_STORE_ID,
-  year: 2026,
-  month: 3,
-  employee_count: 12,
-  total_salary_fen: 4820000,
-  avg_salary_fen: 401667,
-  mom_ratio: 3.2,
-};
-
-const MOCK_CONFIGS: PayrollConfig[] = [
-  {
-    id: 'cfg-001', employee_role: 'chef', salary_type: 'monthly',
-    base_salary_fen: 500000, hourly_rate_fen: 0, piece_rate_fen: 50,
-    piece_rate_enabled: true, commission_rate: 0.05, commission_base: 'revenue',
-    perf_bonus_enabled: true, perf_bonus_cap_fen: 50000,
-    effective_from: '2026-01-01', effective_to: null,
-  },
-  {
-    id: 'cfg-002', employee_role: 'waiter', salary_type: 'monthly',
-    base_salary_fen: 350000, hourly_rate_fen: 0, piece_rate_fen: 0,
-    piece_rate_enabled: false, commission_rate: 0.05, commission_base: 'revenue',
-    perf_bonus_enabled: true, perf_bonus_cap_fen: 30000,
-    effective_from: '2026-01-01', effective_to: null,
-  },
-  {
-    id: 'cfg-003', employee_role: 'manager', salary_type: 'monthly',
-    base_salary_fen: 800000, hourly_rate_fen: 0, piece_rate_fen: 0,
-    piece_rate_enabled: false, commission_rate: 0.05, commission_base: 'revenue',
-    perf_bonus_enabled: true, perf_bonus_cap_fen: 100000,
-    effective_from: '2026-01-01', effective_to: null,
-  },
-];
+// ─── 注：MOCK_RECORDS / MOCK_SUMMARY / MOCK_CONFIGS 已移除，API 失败时使用空状态 ─
 
 // ─── 工具函数 ──────────────────────────────────────────────────────────────────
 
@@ -362,11 +285,11 @@ export function PayrollManagePage() {
       const year = selectedMonth.year();
       const month = selectedMonth.month() + 1;
       const data = await txFetch<{ items: PayrollRecord[] }>(
-        `/api/v1/org/payroll/records?store_id=${MOCK_STORE_ID}&year=${year}&month=${month}`,
+        `/api/v1/org/payroll/records?store_id=${CURRENT_STORE_ID}&year=${year}&month=${month}`,
       );
       setRecords(data.items);
     } catch {
-      setRecords(MOCK_RECORDS);
+      setRecords([]);
     } finally {
       setLoading(false);
     }
@@ -378,11 +301,11 @@ export function PayrollManagePage() {
     const month = selectedMonth.month() + 1;
     try {
       const data = await txFetch<PayrollSummary>(
-        `/api/v1/org/payroll/summary?store_id=${MOCK_STORE_ID}&year=${year}&month=${month}`,
+        `/api/v1/org/payroll/summary?store_id=${CURRENT_STORE_ID}&year=${year}&month=${month}`,
       );
       setSummary(data);
     } catch {
-      setSummary({ ...MOCK_SUMMARY, year, month });
+      setSummary(null);
     }
   }, [selectedMonth]);
 
@@ -391,11 +314,11 @@ export function PayrollManagePage() {
     setConfigLoading(true);
     try {
       const data = await txFetch<{ items: PayrollConfig[] }>(
-        `/api/v1/org/payroll/configs?store_id=${MOCK_STORE_ID}`,
+        `/api/v1/org/payroll/configs?store_id=${CURRENT_STORE_ID}`,
       );
       setConfigs(data.items);
     } catch {
-      setConfigs(MOCK_CONFIGS);
+      setConfigs([]);
     } finally {
       setConfigLoading(false);
     }
@@ -437,7 +360,7 @@ export function PayrollManagePage() {
         '/api/v1/org/payroll/batch-calculate',
         {
           method: 'POST',
-          body: JSON.stringify({ store_id: MOCK_STORE_ID, year, month }),
+          body: JSON.stringify({ store_id: CURRENT_STORE_ID, year, month }),
         },
       );
       setRecords(result.records);
@@ -445,10 +368,7 @@ export function PayrollManagePage() {
       setBatchModalOpen(false);
       batchForm.resetFields();
     } catch {
-      // 降级：模拟批量计算结果
-      const draftRecords = MOCK_RECORDS.map(r => ({ ...r, status: 'draft' as const }));
-      setRecords(draftRecords);
-      messageApi.success('批量计算完成（离线模拟），共 3 人');
+      messageApi.error('批量计算失败，请检查网络后重试');
       setBatchModalOpen(false);
     } finally {
       setBatchLoading(false);
@@ -476,12 +396,12 @@ export function PayrollManagePage() {
       if (editingConfig?.id) {
         await txFetch(`/api/v1/org/payroll/configs/${editingConfig.id}`, {
           method: 'PUT',
-          body: JSON.stringify({ store_id: MOCK_STORE_ID, ...payload }),
+          body: JSON.stringify({ store_id: CURRENT_STORE_ID, ...payload }),
         });
       } else {
         await txFetch('/api/v1/org/payroll/configs', {
           method: 'POST',
-          body: JSON.stringify({ store_id: MOCK_STORE_ID, ...payload }),
+          body: JSON.stringify({ store_id: CURRENT_STORE_ID, ...payload }),
         });
       }
       messageApi.success('薪资配置已保存');
@@ -712,8 +632,8 @@ export function PayrollManagePage() {
                         allowClear
                         placeholder="门店"
                         style={{ width: 120 }}
-                        defaultValue={MOCK_STORE_ID}
-                        options={[{ value: MOCK_STORE_ID, label: '总店' }]}
+                        defaultValue={CURRENT_STORE_ID}
+                        options={CURRENT_STORE_ID ? [{ value: CURRENT_STORE_ID, label: '当前门店' }] : []}
                       />
                     </Col>
                     <Col>
@@ -1016,8 +936,8 @@ export function PayrollManagePage() {
           >
             <DatePicker picker="month" style={{ width: '100%' }} />
           </Form.Item>
-          <Form.Item label="门店" name="store_id" initialValue={MOCK_STORE_ID}>
-            <Select options={[{ value: MOCK_STORE_ID, label: '总店' }]} />
+          <Form.Item label="门店" name="store_id" initialValue={CURRENT_STORE_ID}>
+            <Select options={CURRENT_STORE_ID ? [{ value: CURRENT_STORE_ID, label: '当前门店' }] : []} />
           </Form.Item>
           <Alert
             type="warning"

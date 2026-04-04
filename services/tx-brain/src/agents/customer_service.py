@@ -14,6 +14,8 @@ import re
 
 import anthropic
 import structlog
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 
 logger = structlog.get_logger()
 client = anthropic.AsyncAnthropic()  # 从环境变量 ANTHROPIC_API_KEY 读取
@@ -148,6 +150,75 @@ class CustomerServiceAgent:
         )
 
         return result
+
+    async def analyze_from_mv(self, tenant_id: str, store_id: str | None = None) -> dict:
+        """Phase 3 快速路径：从 mv_public_opinion 物化视图读取，<5ms。
+
+        字段：tenant_id, store_id, total_mentions, positive_rate, negative_rate,
+              top_complaints, unresolved_count
+
+        无数据时 fallback 到 handle()；DB 异常也 graceful fallback。
+        """
+        from ..db import get_db  # 延迟导入避免循环依赖
+
+        try:
+            async with get_db() as db:
+                await db.execute(
+                    text("SELECT set_config('app.tenant_id', :tid, true)"),
+                    {"tid": tenant_id},
+                )
+
+                if store_id:
+                    result = await db.execute(
+                        text("""
+                            SELECT tenant_id, store_id, total_mentions, positive_rate,
+                                   negative_rate, top_complaints, unresolved_count
+                            FROM mv_public_opinion
+                            WHERE tenant_id = :tid
+                              AND store_id = :sid
+                            LIMIT 1
+                        """),
+                        {"tid": tenant_id, "sid": store_id},
+                    )
+                else:
+                    result = await db.execute(
+                        text("""
+                            SELECT tenant_id, store_id, total_mentions, positive_rate,
+                                   negative_rate, top_complaints, unresolved_count
+                            FROM mv_public_opinion
+                            WHERE tenant_id = :tid
+                            LIMIT 1
+                        """),
+                        {"tid": tenant_id},
+                    )
+
+                row = result.fetchone()
+                if not row:
+                    logger.info(
+                        "customer_service_mv_empty_fallback",
+                        tenant_id=tenant_id,
+                        store_id=store_id,
+                    )
+                    return await self.handle(
+                        {"tenant_id": tenant_id, "store_id": store_id, "message": ""}
+                    )
+
+                return {
+                    "inference_layer": "mv_fast_path",
+                    "data": dict(row._mapping),
+                    "agent": self.__class__.__name__,
+                }
+
+        except SQLAlchemyError as exc:
+            logger.warning(
+                "customer_service_mv_db_error",
+                tenant_id=tenant_id,
+                store_id=store_id,
+                error=str(exc),
+            )
+            return await self.handle(
+                {"tenant_id": tenant_id, "store_id": store_id, "message": ""}
+            )
 
     def _pre_check(self, payload: dict) -> dict:
         """Python预处理：业务规则前置判断，不依赖Claude。"""

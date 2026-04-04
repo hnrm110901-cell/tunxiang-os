@@ -72,11 +72,11 @@ def upgrade() -> None:
             comment="审批流名称，如：大额优惠审批流",
         ),
         sa.Column(
-            "trigger_conditions", JSONB, nullable=False, server_default="'{}'",
+            "trigger_conditions", JSONB, nullable=False, server_default=sa.text("'{}'"),
             comment="触发条件 JSONB: {type, conditions:[{field, op, value}]}",
         ),
         sa.Column(
-            "steps", JSONB, nullable=False, server_default="'[]'",
+            "steps", JSONB, nullable=False, server_default=sa.text("'[]'"),
             comment="审批步骤列表 JSONB: [{step, role, timeout_hours, auto_approve_on_timeout}]",
         ),
         sa.Column(
@@ -145,7 +145,7 @@ def upgrade() -> None:
             comment="被审批对象 ID",
         ),
         sa.Column(
-            "object_summary", JSONB, nullable=False, server_default="'{}'",
+            "object_summary", JSONB, nullable=False, server_default=sa.text("'{}'"),
             comment="审批内容摘要 JSONB，冗余存储减少关联查询",
         ),
 
@@ -171,7 +171,7 @@ def upgrade() -> None:
 
         # 审批历史（追加写，永不更新）
         sa.Column(
-            "approval_history", JSONB, nullable=False, server_default="'[]'",
+            "approval_history", JSONB, nullable=False, server_default=sa.text("'[]'"),
             comment="审批操作历史列表 JSONB",
         ),
 

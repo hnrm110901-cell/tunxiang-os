@@ -63,6 +63,7 @@ def upgrade() -> None:
         ALTER TABLE delivery_platform_configs ENABLE ROW LEVEL SECURITY;
         ALTER TABLE delivery_platform_configs FORCE ROW LEVEL SECURITY;
 
+        DROP POLICY IF EXISTS delivery_platform_configs_tenant_isolation ON delivery_platform_configs;
         CREATE POLICY delivery_platform_configs_tenant_isolation
             ON delivery_platform_configs
             AS PERMISSIVE FOR ALL
@@ -80,6 +81,18 @@ def upgrade() -> None:
     # 2. delivery_orders — 外卖平台订单（统一格式）
     #    所有平台的外卖订单统一写入此表，同时保留原始 payload 用于对账
     # ─────────────────────────────────────────────────────────────────
+    op.execute("ALTER TABLE delivery_orders ADD COLUMN IF NOT EXISTS items JSONB DEFAULT '[]'")
+    op.execute("ALTER TABLE delivery_orders ADD COLUMN IF NOT EXISTS delivery_fee_fen INTEGER DEFAULT 0")
+    op.execute("ALTER TABLE delivery_orders ADD COLUMN IF NOT EXISTS commission_fen INTEGER DEFAULT 0")
+    op.execute("ALTER TABLE delivery_orders ADD COLUMN IF NOT EXISTS customer_name VARCHAR(50)")
+    op.execute("ALTER TABLE delivery_orders ADD COLUMN IF NOT EXISTS customer_phone VARCHAR(20)")
+    op.execute("ALTER TABLE delivery_orders ADD COLUMN IF NOT EXISTS delivery_address TEXT")
+    op.execute("ALTER TABLE delivery_orders ADD COLUMN IF NOT EXISTS estimated_delivery_at TIMESTAMPTZ")
+    op.execute("ALTER TABLE delivery_orders ADD COLUMN IF NOT EXISTS actual_delivery_at TIMESTAMPTZ")
+    op.execute("ALTER TABLE delivery_orders ADD COLUMN IF NOT EXISTS internal_order_id UUID")
+    op.execute("ALTER TABLE delivery_orders ADD COLUMN IF NOT EXISTS raw_payload JSONB DEFAULT '{}'")
+    op.execute("ALTER TABLE delivery_orders ADD COLUMN IF NOT EXISTS reject_reason TEXT")
+    op.execute("ALTER TABLE delivery_orders ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE")
     op.execute("""
         CREATE TABLE IF NOT EXISTS delivery_orders (
             id                   UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -154,6 +167,7 @@ def upgrade() -> None:
         ALTER TABLE delivery_orders ENABLE ROW LEVEL SECURITY;
         ALTER TABLE delivery_orders FORCE ROW LEVEL SECURITY;
 
+        DROP POLICY IF EXISTS delivery_orders_tenant_isolation ON delivery_orders;
         CREATE POLICY delivery_orders_tenant_isolation
             ON delivery_orders
             AS PERMISSIVE FOR ALL
@@ -210,6 +224,7 @@ def upgrade() -> None:
         ALTER TABLE delivery_platform_items ENABLE ROW LEVEL SECURITY;
         ALTER TABLE delivery_platform_items FORCE ROW LEVEL SECURITY;
 
+        DROP POLICY IF EXISTS delivery_platform_items_tenant_isolation ON delivery_platform_items;
         CREATE POLICY delivery_platform_items_tenant_isolation
             ON delivery_platform_items
             AS PERMISSIVE FOR ALL

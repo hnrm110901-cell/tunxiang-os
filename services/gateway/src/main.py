@@ -27,6 +27,7 @@ from .wecom_jssdk import router as wecom_jssdk_router
 from .wecom_internal import router as wecom_internal_router
 from .wecom_group_routes import router as wecom_group_router
 from .gdpr_routes import router as gdpr_router
+from .sync_scheduler import create_sync_scheduler, sync_router as sync_health_router
 from .response import ok
 
 app = FastAPI(title="TunxiangOS Gateway", version="3.0.0", description="AI-Native Restaurant Chain Operating System")
@@ -105,8 +106,29 @@ async def _startup() -> None:
         id="wecom_group_daily_sop",
         replace_existing=True,
     )
+
+    # 品智POS 三商户数据同步调度（czyz/zqx/sgc）
+    _sync_scheduler = create_sync_scheduler()
+    for job in _sync_scheduler.get_jobs():
+        _scheduler.add_job(
+            job.func,
+            trigger=job.trigger,
+            id=job.id,
+            replace_existing=True,
+            misfire_grace_time=getattr(job, "misfire_grace_time", None),
+        )
+
     _scheduler.start()
-    logger.info("gateway_scheduler_started", jobs=["wecom_group_daily_sop @ 09:00 Asia/Shanghai"])
+    logger.info(
+        "gateway_scheduler_started",
+        jobs=[
+            "wecom_group_daily_sop @ 09:00 Asia/Shanghai",
+            "daily_dishes_sync @ 02:00 Asia/Shanghai",
+            "daily_master_data_sync @ 03:00 Asia/Shanghai",
+            "hourly_orders_incremental_sync",
+            "quarter_members_incremental_sync",
+        ],
+    )
 
 
 @app.on_event("shutdown")
@@ -158,6 +180,8 @@ app.include_router(wecom_group_router)
 app.include_router(gdpr_router)
 # 企微群管理与通知推送 API（群创建/列表/发消息/通知/状态）
 app.include_router(wecom_notify_router)
+# 品智POS 同步健康检查 API（GET /api/v1/sync/health）
+app.include_router(sync_health_router)
 
 # 域路由代理（通配路由 /api/v1/{domain}/{path}，放最后）
 app.include_router(proxy_router)

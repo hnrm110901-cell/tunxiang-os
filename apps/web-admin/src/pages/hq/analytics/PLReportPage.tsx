@@ -147,45 +147,7 @@ function SVGPieChart({ slices, size = 160 }: { slices: PieSlice[]; size?: number
   );
 }
 
-// ---------- Mock数据（后端未就绪时使用） ----------
-
-const MOCK_PL: PLReport = {
-  store_id: 'store_001',
-  period_start: '2024-04-01',
-  period_end: '2024-04-30',
-  revenue: {
-    dine_in_fen: 12850000,
-    delivery_fen: 4520000,
-    other_fen: 230000,
-    total_fen: 17600000,
-  },
-  costs: {
-    food_cost_fen: 5632000,
-    food_cost_rate: 32.0,
-    labor_cost_fen: 3520000,
-    rent_fen: 1500000,
-    utilities_fen: 420000,
-    other_fen: 350000,
-    total_fen: 11422000,
-  },
-  gross_profit_fen: 11968000,
-  gross_margin_rate: 68.0,
-  net_profit_fen: 6178000,
-  net_margin_rate: 35.1,
-};
-
-const MOCK_BREAKDOWN: CostBreakdownItem[] = [
-  { dish_name: '招牌红烧肉', food_cost_fen: 3200, sale_price_fen: 6800, cost_rate: 47.1 },
-  { dish_name: '清蒸鲈鱼', food_cost_fen: 5800, sale_price_fen: 9800, cost_rate: 59.2 },
-  { dish_name: '麻婆豆腐', food_cost_fen: 800, sale_price_fen: 3200, cost_rate: 25.0 },
-  { dish_name: '剁椒鱼头', food_cost_fen: 6200, sale_price_fen: 12800, cost_rate: 48.4 },
-  { dish_name: '农家小炒肉', food_cost_fen: 2400, sale_price_fen: 4200, cost_rate: 57.1 },
-  { dish_name: '口水鸡', food_cost_fen: 2800, sale_price_fen: 5800, cost_rate: 48.3 },
-  { dish_name: '蒜蓉炒芥兰', food_cost_fen: 600, sale_price_fen: 2800, cost_rate: 21.4 },
-  { dish_name: '干锅花菜', food_cost_fen: 900, sale_price_fen: 3600, cost_rate: 25.0 },
-  { dish_name: '东坡肘子', food_cost_fen: 8800, sale_price_fen: 15800, cost_rate: 55.7 },
-  { dish_name: '水煮牛肉', food_cost_fen: 3600, sale_price_fen: 5800, cost_rate: 62.1 },
-];
+// ---------- Mock数据已移除，初始状态为 null，点击生成后加载真实API ----------
 
 // ---------- 门店列表（mock） ----------
 
@@ -204,9 +166,9 @@ export function PLReportPage() {
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
   const [loading, setLoading] = useState(false);
-  const [report, setReport] = useState<PLReport>(MOCK_PL);
-  const [breakdown, setBreakdown] = useState<CostBreakdownItem[]>(MOCK_BREAKDOWN);
-  const [hasGenerated, setHasGenerated] = useState(true); // 默认展示mock数据
+  const [report, setReport] = useState<PLReport | null>(null);
+  const [breakdown, setBreakdown] = useState<CostBreakdownItem[]>([]);
+  const [hasGenerated, setHasGenerated] = useState(false);
 
   // 计算实际日期范围
   const getDateRange = useCallback((): { start: string; end: string } => {
@@ -224,16 +186,17 @@ export function PLReportPage() {
     setLoading(true);
     const { start, end } = getDateRange();
     try {
-      const [pl, cb] = await Promise.all([
-        txFetch<PLReport>(`/api/v1/finance/pl/store?store_id=${encodeURIComponent(storeId)}&start_date=${start}&end_date=${end}`),
+      const [plRes, cbRes] = await Promise.allSettled([
+        txFetch<PLReport>(`/api/v1/analytics/pl-report?store_id=${encodeURIComponent(storeId)}&start=${start}&end=${end}`),
         txFetch<{ items: CostBreakdownItem[] }>(`/api/v1/finance/cost/breakdown?store_id=${encodeURIComponent(storeId)}&start_date=${start}&end_date=${end}&top_n=10`),
       ]);
-      setReport(pl);
-      setBreakdown(cb.items ?? []);
+      if (plRes.status === 'fulfilled' && plRes.value.data) setReport(plRes.value.data);
+      else setReport(null);
+      if (cbRes.status === 'fulfilled' && cbRes.value.data) setBreakdown(cbRes.value.data.items ?? []);
+      else setBreakdown([]);
     } catch {
-      // 后端未就绪时继续展示mock数据
-      setReport(MOCK_PL);
-      setBreakdown(MOCK_BREAKDOWN);
+      setReport(null);
+      setBreakdown([]);
     } finally {
       setLoading(false);
       setHasGenerated(true);
@@ -242,6 +205,7 @@ export function PLReportPage() {
 
   // CSV导出
   const exportCSV = useCallback(() => {
+    if (!report) return;
     const { start, end } = getDateRange();
     const storeName = STORE_OPTIONS.find((s) => s.id === storeId)?.name ?? storeId;
     const r = report;

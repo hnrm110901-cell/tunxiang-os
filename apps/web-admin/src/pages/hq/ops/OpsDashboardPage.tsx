@@ -6,13 +6,40 @@
  */
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { TxLineChart } from '../../../components/charts';
-import {
-  fetchDashboardOverview,
-  fetchStoreRanking,
-  fetchTop3Decisions,
-} from '../../../api';
-import type { OverviewKPI, StoreRankItem } from '../../../api/dashboardApi';
-import type { DecisionSuggestion } from '../../../api';
+import { txFetch } from '../../../api';
+
+// ---------- 类型定义 ----------
+interface OverviewKPI {
+  label: string;
+  value: number;
+  formatted: string;
+  trend_percent: number;
+  trend_up: boolean;
+}
+
+interface StoreRankItem {
+  rank: number;
+  store_id: string;
+  store_name: string;
+  revenue_fen: number;
+  order_count: number;
+  turnover_rate: number;
+  health_score: number;
+}
+
+interface DecisionSuggestion {
+  decision_id: string;
+  agent_id: string;
+  title: string;
+  description: string;
+  priority: string;
+  confidence: number;
+}
+
+interface HourlyTrend {
+  today: number[];
+  yesterday: number[];
+}
 
 // ---------- 门店排名维度 ----------
 type RankDimension = 'revenue' | 'avg_ticket' | 'turnover';
@@ -21,43 +48,6 @@ const RANK_LABELS: Record<RankDimension, string> = {
   avg_ticket: '客单价',
   turnover: '翻台率',
 };
-
-// ---------- Mock fallback ----------
-const MOCK_KPI: OverviewKPI[] = [
-  { label: '今日营收', value: 2856000, formatted: '\u00A528,560', trend_percent: 12.3, trend_up: true },
-  { label: '订单数', value: 426, formatted: '426', trend_percent: 8.1, trend_up: true },
-  { label: '客单价', value: 6700, formatted: '\u00A567.0', trend_percent: 3.2, trend_up: true },
-  { label: '翻台率', value: 2.8, formatted: '2.8', trend_percent: -7.1, trend_up: false },
-];
-
-const MOCK_HOURLY_TODAY = [0, 0, 0, 0, 0, 0, 0, 0, 0, 1200, 2800, 5600, 12800, 18500, 19200, 20100, 21000, 23400, 26000, 27800, 28560, 0, 0, 0];
-const MOCK_HOURLY_YESTERDAY = [0, 0, 0, 0, 0, 0, 0, 0, 0, 1000, 2400, 4800, 11200, 16200, 17000, 17800, 18500, 20100, 22800, 24200, 25420, 0, 0, 0];
-
-const MOCK_STORES: StoreRankItem[] = [
-  { rank: 1, store_id: 's1', store_name: '芙蓉路店', revenue_fen: 8560000, order_count: 128, turnover_rate: 3.2, health_score: 92 },
-  { rank: 2, store_id: 's2', store_name: '岳麓店', revenue_fen: 6400000, order_count: 96, turnover_rate: 2.8, health_score: 78 },
-  { rank: 3, store_id: 's3', store_name: '星沙店', revenue_fen: 5200000, order_count: 78, turnover_rate: 2.4, health_score: 65 },
-  { rank: 4, store_id: 's4', store_name: '河西店', revenue_fen: 3800000, order_count: 57, turnover_rate: 1.9, health_score: 45 },
-  { rank: 5, store_id: 's5', store_name: '开福店', revenue_fen: 3420000, order_count: 51, turnover_rate: 2.1, health_score: 58 },
-];
-
-const MOCK_DECISIONS: DecisionSuggestion[] = [
-  {
-    decision_id: 'd1', agent_id: 'discount-guard', title: '河西店折扣异常',
-    description: '河西店午市折扣率达38%，超过安全阈值30%。建议暂停"午市满100减40"活动，改为满150减30。',
-    priority: 'critical', confidence: 0.92,
-  },
-  {
-    decision_id: 'd2', agent_id: 'inventory-alert', title: '鲈鱼备货不足',
-    description: '岳麓店鲈鱼库存仅剩2份，预计今日需求12份。建议紧急补货或标记临时沽清。',
-    priority: 'warning', confidence: 0.87,
-  },
-  {
-    decision_id: 'd3', agent_id: 'smart-menu', title: '推荐上架新品',
-    description: '根据近7天客户搜索数据，"酸菜鱼"搜索量上升46%，建议芙蓉路店/岳麓店上架试销。',
-    priority: 'info', confidence: 0.78,
-  },
-];
 
 // ---------- 工具 ----------
 const scoreColor = (s: number) => s >= 80 ? '#0F6E56' : s >= 60 ? '#BA7517' : '#A32D2D';
@@ -69,27 +59,36 @@ const POLL_INTERVAL = 30_000;
 // ---------- 组件 ----------
 export function OpsDashboardPage() {
   const [dateRange, setDateRange] = useState<'today' | 'week' | 'month'>('today');
-  const [kpis, setKpis] = useState<OverviewKPI[]>(MOCK_KPI);
-  const [stores, setStores] = useState<StoreRankItem[]>(MOCK_STORES);
-  const [decisions, setDecisions] = useState<DecisionSuggestion[]>(MOCK_DECISIONS);
+  const [kpis, setKpis] = useState<OverviewKPI[]>([]);
+  const [stores, setStores] = useState<StoreRankItem[]>([]);
+  const [decisions, setDecisions] = useState<DecisionSuggestion[]>([]);
+  const [hourlyTrend, setHourlyTrend] = useState<HourlyTrend>({ today: Array(13).fill(0), yesterday: Array(13).fill(0) });
   const [rankDimension, setRankDimension] = useState<RankDimension>('revenue');
   const [lastRefresh, setLastRefresh] = useState(new Date());
+  const [loading, setLoading] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval>>();
 
   // 数据拉取
   const loadData = useCallback(async () => {
+    setLoading(true);
+    const period = dateRange === 'today' ? 'day' : dateRange === 'week' ? 'week' : 'month';
     try {
-      const [overviewRes, storeRes, decRes] = await Promise.allSettled([
-        fetchDashboardOverview(),
-        fetchStoreRanking(dateRange === 'today' ? 'day' : dateRange === 'week' ? 'week' : 'month'),
-        fetchTop3Decisions('all'),
+      const [kpiRes, alertsRes, agentRes, rankRes, trendRes] = await Promise.allSettled([
+        txFetch<{ items: OverviewKPI[] }>(`/api/v1/ops/dashboard/kpi?period=${period}`),
+        txFetch<{ items: StoreRankItem[] }>(`/api/v1/ops/dashboard/store-ranking?period=${period}`),
+        txFetch<{ items: DecisionSuggestion[] }>('/api/v1/brain/decisions/recent?limit=10'),
+        txFetch<{ items: StoreRankItem[] }>(`/api/v1/analytics/alerts?status=active&level=critical&period=${period}`),
+        txFetch<HourlyTrend>('/api/v1/ops/dashboard/hourly-trend'),
       ]);
-      if (overviewRes.status === 'fulfilled') setKpis(overviewRes.value.items);
-      if (storeRes.status === 'fulfilled') setStores(storeRes.value.items);
-      if (decRes.status === 'fulfilled') setDecisions(decRes.value);
+      if (kpiRes.status === 'fulfilled') setKpis(kpiRes.value.data?.items ?? []);
+      if (alertsRes.status === 'fulfilled') setStores(alertsRes.value.data?.items ?? []);
+      if (agentRes.status === 'fulfilled') setDecisions(agentRes.value.data?.items ?? []);
+      if (rankRes.status === 'fulfilled') setStores(rankRes.value.data?.items ?? []);
+      if (trendRes.status === 'fulfilled' && trendRes.value.data) setHourlyTrend(trendRes.value.data);
     } catch {
-      // keep mock data on failure
+      // 保持空数据
     }
+    setLoading(false);
     setLastRefresh(new Date());
   }, [dateRange]);
 
@@ -109,8 +108,8 @@ export function OpsDashboardPage() {
 
   // 小时标签 09:00-21:00
   const hourLabels = Array.from({ length: 13 }, (_, i) => `${(i + 9).toString().padStart(2, '0')}:00`);
-  const todaySlice = MOCK_HOURLY_TODAY.slice(9, 22);
-  const yesterdaySlice = MOCK_HOURLY_YESTERDAY.slice(9, 22);
+  const todaySlice = hourlyTrend.today.length >= 13 ? hourlyTrend.today.slice(0, 13) : hourlyTrend.today;
+  const yesterdaySlice = hourlyTrend.yesterday.length >= 13 ? hourlyTrend.yesterday.slice(0, 13) : hourlyTrend.yesterday;
 
   const dateLabels: Record<string, string> = { today: '今日', week: '本周', month: '本月' };
 

@@ -1,0 +1,141 @@
+<!-- 菜品详情页 — 大图 + 信息 + 规格 + 加入购物车 + 相关推荐 -->
+<view class="detail-page">
+
+  <!-- 顶部大图 -->
+  <view class="hero-wrap">
+    <image
+      wx:if="{{dish.imageUrl || dish.image_url}}"
+      class="hero-img"
+      src="{{dish.imageUrl || dish.image_url}}"
+      mode="aspectFill"
+      lazy-load
+    />
+    <view wx:else class="hero-placeholder">
+      <text class="hero-placeholder-text">{{dish.name ? dish.name[0] : '菜'}}</text>
+    </view>
+    <!-- 标签浮层 -->
+    <view class="hero-tags">
+      <text class="tag tag-recommend" wx:if="{{dish.is_recommended || dish.recommendReason}}">荐</text>
+      <text class="tag tag-new" wx:if="{{dish.is_new}}">新</text>
+      <text class="tag tag-spicy" wx:if="{{dish.spicy_level > 0}}">辣{{dish.spicy_level}}</text>
+    </view>
+    <!-- 沽清遮罩 -->
+    <view class="soldout-mask" wx:if="{{dish.is_soldout}}">
+      <text class="soldout-text">今日沽清</text>
+    </view>
+    <!-- 返回按钮 -->
+    <view class="back-btn" bindtap="goBack">
+      <text class="back-icon">‹</text>
+    </view>
+  </view>
+
+  <!-- 基础信息 -->
+  <view class="info-section">
+    <view class="info-top">
+      <text class="dish-name">{{dish.name || dish.dish_name}}</text>
+      <view class="price-row">
+        <text class="dish-price">¥{{priceYuan}}</text>
+        <text class="original-price" wx:if="{{originalPriceYuan}}">¥{{originalPriceYuan}}</text>
+      </view>
+    </view>
+    <!-- 月销量 -->
+    <text class="sales-hint" wx:if="{{dish.monthly_sales > 0}}">月售 {{dish.monthly_sales}} 份</text>
+    <!-- 推荐理由 -->
+    <view class="recommend-reason" wx:if="{{dish.recommendReason}}">
+      <text class="recommend-icon">AI</text>
+      <text class="recommend-text">{{dish.recommendReason}}</text>
+    </view>
+  </view>
+
+  <!-- 分割线 -->
+  <view class="divider"></view>
+
+  <!-- 菜品描述 -->
+  <view class="desc-section" wx:if="{{dish.description}}">
+    <text class="section-title">菜品介绍</text>
+    <text class="desc-text">{{dish.description}}</text>
+  </view>
+
+  <!-- 食材/过敏原（展开收起） -->
+  <view class="allergen-section" wx:if="{{dish.allergens || dish.ingredients}}">
+    <view class="allergen-header" bindtap="toggleAllergen">
+      <text class="section-title">食材 &amp; 过敏原</text>
+      <text class="toggle-icon">{{showAllergen ? '∧' : '∨'}}</text>
+    </view>
+    <view class="allergen-body" wx:if="{{showAllergen}}">
+      <text class="allergen-text" wx:if="{{dish.ingredients}}">食材：{{dish.ingredients}}</text>
+      <text class="allergen-text" wx:if="{{dish.allergens}}">过敏原：{{dish.allergens}}</text>
+    </view>
+  </view>
+
+  <!-- 规格选择 -->
+  <view class="spec-section" wx:if="{{specs.length > 0}}">
+    <view class="divider"></view>
+    <text class="section-title">规格</text>
+    <view class="spec-list">
+      <view
+        class="spec-item {{selectedSpec === item.key ? 'active' : ''}}"
+        wx:for="{{specs}}"
+        wx:key="key"
+        bindtap="selectSpec"
+        data-key="{{item.key}}"
+        data-price="{{item.priceFen}}"
+      >
+        <text class="spec-name">{{item.name}}</text>
+        <text class="spec-price" wx:if="{{item.priceFen !== dish.priceFen}}">
+          {{item.priceFen > dish.priceFen ? '+' : ''}}¥{{(item.priceFen / 100).toFixed(0)}}
+        </text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 数量选择 -->
+  <view class="qty-section" wx:if="{{!dish.is_soldout}}">
+    <view class="divider"></view>
+    <view class="qty-row">
+      <text class="qty-label">数量</text>
+      <view class="qty-ctrl">
+        <view class="qty-btn minus {{qty <= 1 ? 'disabled' : ''}}" bindtap="decreaseQty">－</view>
+        <text class="qty-num">{{qty}}</text>
+        <view class="qty-btn plus" bindtap="increaseQty">＋</view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 相关推荐（横向滑动） -->
+  <view class="related-section" wx:if="{{related.length > 0}}">
+    <view class="divider"></view>
+    <text class="section-title">相关推荐</text>
+    <scroll-view scroll-x class="related-scroll" enable-flex>
+      <view class="related-card" wx:for="{{related}}" wx:key="id" bindtap="goRelated" data-id="{{item.id || item.dish_id}}">
+        <image
+          class="related-img"
+          src="{{item.imageUrl || item.image_url || '/assets/dish-placeholder.png'}}"
+          mode="aspectFill"
+          lazy-load
+        />
+        <text class="related-name">{{item.name || item.dish_name}}</text>
+        <text class="related-price">¥{{item.priceYuan || (item.priceFen ? (item.priceFen / 100).toFixed(0) : (item.price_fen ? (item.price_fen / 100).toFixed(0) : '0'))}}</text>
+      </view>
+    </scroll-view>
+  </view>
+
+  <!-- 底部占位，防被结算栏遮挡 -->
+  <view class="bottom-placeholder"></view>
+</view>
+
+<!-- 底部加入购物车栏（固定） -->
+<view class="add-bar" wx:if="{{!dish.is_soldout}}">
+  <view class="add-price">
+    <text class="add-price-label">小计</text>
+    <text class="add-price-value">¥{{subtotalYuan}}</text>
+  </view>
+  <view class="add-btn {{adding ? 'adding' : ''}}" bindtap="addToCart">
+    <text class="add-btn-text">{{adding ? '已加入' : '加入购物车'}}</text>
+  </view>
+</view>
+
+<!-- 沽清状态底部提示 -->
+<view class="soldout-bar" wx:if="{{dish.is_soldout}}">
+  <text class="soldout-bar-text">该菜品今日已沽清，无法加入购物车</text>
+</view>

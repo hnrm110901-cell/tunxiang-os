@@ -1,0 +1,14 @@
+{
+  "name": "@tunxiang/e2e",
+  "private": true,
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:admin": "playwright test --project=web-admin",
+    "test:pos": "playwright test --project=web-pos",
+    "report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.40.0"
+  }
+}

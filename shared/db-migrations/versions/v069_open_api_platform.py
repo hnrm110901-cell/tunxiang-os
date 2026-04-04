@@ -56,12 +56,16 @@ def upgrade() -> None:
         ALTER TABLE api_applications ENABLE ROW LEVEL SECURITY;
         ALTER TABLE api_applications FORCE ROW LEVEL SECURITY;
 
+        DROP POLICY IF EXISTS api_apps_select ON api_applications;
         CREATE POLICY api_apps_select ON api_applications FOR SELECT
             USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::UUID);
+        DROP POLICY IF EXISTS api_apps_insert ON api_applications;
         CREATE POLICY api_apps_insert ON api_applications FOR INSERT
             WITH CHECK (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::UUID);
+        DROP POLICY IF EXISTS api_apps_update ON api_applications;
         CREATE POLICY api_apps_update ON api_applications FOR UPDATE
             USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::UUID);
+        DROP POLICY IF EXISTS api_apps_delete ON api_applications;
         CREATE POLICY api_apps_delete ON api_applications FOR DELETE
             USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::UUID);
     """)
@@ -99,12 +103,16 @@ def upgrade() -> None:
         ALTER TABLE api_access_tokens ENABLE ROW LEVEL SECURITY;
         ALTER TABLE api_access_tokens FORCE ROW LEVEL SECURITY;
 
+        DROP POLICY IF EXISTS api_tokens_select ON api_access_tokens;
         CREATE POLICY api_tokens_select ON api_access_tokens FOR SELECT
             USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::UUID);
+        DROP POLICY IF EXISTS api_tokens_insert ON api_access_tokens;
         CREATE POLICY api_tokens_insert ON api_access_tokens FOR INSERT
             WITH CHECK (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::UUID);
+        DROP POLICY IF EXISTS api_tokens_update ON api_access_tokens;
         CREATE POLICY api_tokens_update ON api_access_tokens FOR UPDATE
             USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::UUID);
+        DROP POLICY IF EXISTS api_tokens_delete ON api_access_tokens;
         CREATE POLICY api_tokens_delete ON api_access_tokens FOR DELETE
             USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::UUID);
     """)
@@ -145,12 +153,16 @@ def upgrade() -> None:
         ALTER TABLE api_request_logs ENABLE ROW LEVEL SECURITY;
         ALTER TABLE api_request_logs FORCE ROW LEVEL SECURITY;
 
+        DROP POLICY IF EXISTS api_logs_select ON api_request_logs;
         CREATE POLICY api_logs_select ON api_request_logs FOR SELECT
             USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::UUID);
+        DROP POLICY IF EXISTS api_logs_insert ON api_request_logs;
         CREATE POLICY api_logs_insert ON api_request_logs FOR INSERT
             WITH CHECK (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::UUID);
+        DROP POLICY IF EXISTS api_logs_update ON api_request_logs;
         CREATE POLICY api_logs_update ON api_request_logs FOR UPDATE
             USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::UUID);
+        DROP POLICY IF EXISTS api_logs_delete ON api_request_logs;
         CREATE POLICY api_logs_delete ON api_request_logs FOR DELETE
             USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::UUID);
     """)
@@ -191,12 +203,16 @@ def upgrade() -> None:
         ALTER TABLE api_webhooks ENABLE ROW LEVEL SECURITY;
         ALTER TABLE api_webhooks FORCE ROW LEVEL SECURITY;
 
+        DROP POLICY IF EXISTS api_webhooks_select ON api_webhooks;
         CREATE POLICY api_webhooks_select ON api_webhooks FOR SELECT
             USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::UUID);
+        DROP POLICY IF EXISTS api_webhooks_insert ON api_webhooks;
         CREATE POLICY api_webhooks_insert ON api_webhooks FOR INSERT
             WITH CHECK (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::UUID);
+        DROP POLICY IF EXISTS api_webhooks_update ON api_webhooks;
         CREATE POLICY api_webhooks_update ON api_webhooks FOR UPDATE
             USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::UUID);
+        DROP POLICY IF EXISTS api_webhooks_delete ON api_webhooks;
         CREATE POLICY api_webhooks_delete ON api_webhooks FOR DELETE
             USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::UUID);
     """)

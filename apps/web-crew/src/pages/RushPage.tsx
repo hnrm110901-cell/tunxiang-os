@@ -34,35 +34,8 @@ interface RushTask {
   rushed: boolean;
 }
 
-/* ---------- Mock 数据 ---------- */
-const MOCK_TABLES_WITH_TASKS: { tableNo: string; orderId: string; tasks: RushTask[] }[] = [
-  {
-    tableNo: 'A01', orderId: 'ord-001',
-    tasks: [
-      { id: 't1', dishName: '剁椒鱼头', qty: 1, spec: '双色', status: 'cooking', elapsedMin: 18, rushed: false },
-      { id: 't2', dishName: '小炒黄牛肉', qty: 1, status: 'pending', elapsedMin: 18, rushed: false },
-      { id: 't3', dishName: '凉拌黄瓜', qty: 1, status: 'done', elapsedMin: 18, rushed: false },
-      { id: 't4', dishName: '米饭', qty: 3, status: 'done', elapsedMin: 18, rushed: false },
-    ],
-  },
-  {
-    tableNo: 'A03', orderId: 'ord-002',
-    tasks: [
-      { id: 't5', dishName: '酸菜鱼', qty: 1, spec: '黑鱼', status: 'cooking', elapsedMin: 25, rushed: true },
-      { id: 't6', dishName: '红烧肉', qty: 1, status: 'pending', elapsedMin: 25, rushed: false },
-      { id: 't7', dishName: '蒜蓉蒸虾', qty: 1, status: 'pending', elapsedMin: 25, rushed: false },
-      { id: 't8', dishName: '老鸭汤', qty: 1, status: 'done', elapsedMin: 25, rushed: false },
-      { id: 't9', dishName: '酸梅汤', qty: 2, status: 'done', elapsedMin: 25, rushed: false },
-    ],
-  },
-  {
-    tableNo: 'B01', orderId: 'ord-003',
-    tasks: [
-      { id: 't10', dishName: '波士顿龙虾', qty: 1, spec: '蒜蓉蒸', status: 'cooking', elapsedMin: 35, rushed: false },
-      { id: 't11', dishName: '剁椒鱼头', qty: 2, spec: '红剁椒', status: 'pending', elapsedMin: 35, rushed: false },
-    ],
-  },
-];
+/* ---------- 桌台任务类型 ---------- */
+type TableWithTasks = { tableNo: string; orderId: string; tasks: RushTask[] };
 
 function statusLabel(s: TaskStatus): string {
   const map: Record<TaskStatus, string> = { pending: '待制作', cooking: '制作中', done: '已出品' };
@@ -80,7 +53,7 @@ export function RushPage() {
   const filterTable = params.get('table') || '';
   const storeId = (window as any).__STORE_ID__ || 'store_001';
 
-  const [tables, setTables] = useState(MOCK_TABLES_WITH_TASKS);
+  const [tables, setTables] = useState<TableWithTasks[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -91,7 +64,7 @@ export function RushPage() {
     txFetch<{ items: Array<{ task_id: string; order_id: string; table_no: string; dish_name: string; quantity: number; spec?: string; status: string; created_at: string }> }>(url)
       .then(res => {
         // 按桌台分组
-        const grouped: Record<string, typeof MOCK_TABLES_WITH_TASKS[0]> = {};
+        const grouped: Record<string, TableWithTasks> = {};
         for (const item of res.items) {
           if (!grouped[item.table_no]) {
             grouped[item.table_no] = { tableNo: item.table_no, orderId: item.order_id, tasks: [] };
@@ -109,7 +82,7 @@ export function RushPage() {
         }
         setTables(Object.values(grouped));
       })
-      .catch(() => { /* 保留 mock 数据 */ })
+      .catch(() => { /* API不可用，显示空态 */ })
       .finally(() => setLoading(false));
   }, [storeId, filterTable]);
 

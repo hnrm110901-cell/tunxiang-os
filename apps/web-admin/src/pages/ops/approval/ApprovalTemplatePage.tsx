@@ -84,47 +84,7 @@ const APPROVAL_TYPE_OPTIONS = [
   { label: '全部审批', value: 'all' },
 ];
 
-// ─── Mock 数据（后端未连通时展示） ────────────────────────────────────────────
-
-const MOCK_TEMPLATES: ApprovalTemplate[] = [
-  {
-    id: 'tpl_001',
-    name: '折扣审批流程',
-    business_type: 'discount',
-    is_enabled: true,
-    created_at: '2026-03-01T10:00:00+08:00',
-    updated_at: '2026-03-27T15:00:00+08:00',
-    steps: [
-      { step_no: 1, approver_role: 'store_manager', approval_type: 'single', amount_min: 0, amount_max: 500 },
-      { step_no: 2, approver_role: 'regional_manager', approval_type: 'single', amount_min: 500 },
-    ],
-  },
-  {
-    id: 'tpl_002',
-    name: '退款审批流程',
-    business_type: 'refund',
-    is_enabled: true,
-    created_at: '2026-03-01T10:00:00+08:00',
-    updated_at: '2026-03-27T15:00:00+08:00',
-    steps: [
-      { step_no: 1, approver_role: 'store_manager', approval_type: 'single' },
-      { step_no: 2, approver_role: 'finance_supervisor', approval_type: 'single', amount_min: 1000 },
-    ],
-  },
-  {
-    id: 'tpl_003',
-    name: '大额采购审批',
-    business_type: 'large_purchase',
-    is_enabled: false,
-    created_at: '2026-03-10T09:00:00+08:00',
-    updated_at: '2026-03-20T12:00:00+08:00',
-    steps: [
-      { step_no: 1, approver_role: 'purchase_supervisor', approval_type: 'single' },
-      { step_no: 2, approver_role: 'finance_supervisor', approval_type: 'single' },
-      { step_no: 3, approver_role: 'ops_director', approval_type: 'single', amount_min: 5000 },
-    ],
-  },
-];
+// ─── Mock 数据已移除，API 加载失败时回退空列表 ─────────────────────────────────
 
 // ─── 步骤配置子表单 ────────────────────────────────────────────────────────────
 
@@ -256,14 +216,14 @@ export function ApprovalTemplatePage() {
     setLoading(true);
     try {
       const res = await txFetch<TemplateListResponse>(
-        `/api/v1/ops/approvals/templates?page=${p}&size=20`,
+        `/api/v1/ops/approval-templates?page=${p}&size=20`,
       );
-      setTemplates(res.items);
-      setTotal(res.total);
+      setTemplates(res.data?.items ?? []);
+      setTotal(res.data?.total ?? 0);
     } catch {
-      // 后端未连通时使用 mock 数据
-      setTemplates(MOCK_TEMPLATES);
-      setTotal(MOCK_TEMPLATES.length);
+      // API 失败时保持空列表
+      setTemplates([]);
+      setTotal(0);
     } finally {
       setLoading(false);
     }
@@ -302,17 +262,16 @@ export function ApprovalTemplatePage() {
     try {
       const payload = { ...values, steps };
       if (editTarget) {
-        // 编辑: PUT（后端提供则调用，否则降级 mock）
-        await txFetch(`/api/v1/ops/approvals/templates/${editTarget.id}`, {
-          method: 'PUT',
+        await txFetch(`/api/v1/ops/approval-templates/${editTarget.id}`, {
+          method: 'PATCH',
           body: JSON.stringify(payload),
-        }).catch(() => null);
+        });
         message.success('模板已更新');
       } else {
-        await txFetch('/api/v1/ops/approvals/templates', {
+        await txFetch('/api/v1/ops/approval-templates', {
           method: 'POST',
           body: JSON.stringify(payload),
-        }).catch(() => null);
+        });
         message.success('模板已创建');
       }
       setDrawerOpen(false);
@@ -325,10 +284,10 @@ export function ApprovalTemplatePage() {
   // ── 切换启用状态 ──
   const handleToggle = async (template: ApprovalTemplate, enabled: boolean) => {
     try {
-      await txFetch(`/api/v1/ops/approvals/templates/${template.id}`, {
+      await txFetch(`/api/v1/ops/approval-templates/${template.id}`, {
         method: 'PATCH',
         body: JSON.stringify({ is_enabled: enabled }),
-      }).catch(() => null);
+      });
       setTemplates(prev => prev.map(t => (t.id === template.id ? { ...t, is_enabled: enabled } : t)));
       message.success(enabled ? '已启用' : '已禁用');
     } catch {
@@ -339,9 +298,9 @@ export function ApprovalTemplatePage() {
   // ── 删除 ──
   const handleDelete = async (templateId: string) => {
     try {
-      await txFetch(`/api/v1/ops/approvals/templates/${templateId}`, {
+      await txFetch(`/api/v1/ops/approval-templates/${templateId}`, {
         method: 'DELETE',
-      }).catch(() => null);
+      });
       message.success('已删除');
       loadTemplates(page);
     } catch {

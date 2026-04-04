@@ -1,0 +1,50 @@
+<!-- 催单结果页 — 成功动画 + 预计时间 + 自动返回 -->
+<view class="page-container">
+
+  <block wx:if="{{success}}">
+    <!-- 成功动画区 -->
+    <view class="result-section">
+      <view class="anim-icon" style="transform: scale({{animScale}}); transition: transform 0.3s ease;">
+        <text class="anim-emoji">🔥</text>
+      </view>
+      <text class="result-title">催单成功！</text>
+      <text class="result-msg">{{message}}</text>
+    </view>
+
+    <!-- 预计出餐时间 -->
+    <view class="info-card">
+      <view class="info-row">
+        <text class="info-icon">⏱</text>
+        <text class="info-text">预计{{estimatedMinutes}}分钟后出餐</text>
+      </view>
+      <view class="info-row" wx:if="{{rushCount > 1}}">
+        <text class="info-icon">📢</text>
+        <text class="info-text">您已催了{{rushCount}}次，厨房正在加急</text>
+      </view>
+      <view class="info-row" wx:if="{{rushCount <= 1}}">
+        <text class="info-icon">👨‍🍳</text>
+        <text class="info-text">厨房已收到催单通知</text>
+      </view>
+    </view>
+
+    <!-- 自动返回倒计时 -->
+    <view class="countdown-section">
+      <text class="countdown-text">{{countdown}}秒后自动返回</text>
+    </view>
+
+    <!-- 返回按钮 -->
+    <view class="action-section">
+      <view class="action-btn" bindtap="goBack">
+        <text class="action-btn-text">返回订单</text>
+      </view>
+    </view>
+  </block>
+
+  <!-- 加载中 -->
+  <block wx:if="{{!success}}">
+    <view class="loading-section">
+      <text class="loading-text">正在催单...</text>
+    </view>
+  </block>
+
+</view>

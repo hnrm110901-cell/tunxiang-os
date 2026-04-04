@@ -1,0 +1,61 @@
+<!-- 储值明细 -->
+<view class="page-container">
+
+  <!-- 顶部余额小卡 -->
+  <view class="balance-card-mini">
+    <view class="mini-label">储值余额(元)</view>
+    <view class="mini-amount">{{balanceYuan}}</view>
+  </view>
+
+  <!-- Tab 切换 -->
+  <view class="tab-bar">
+    <view
+      class="tab-item {{activeTab === 'all' ? 'tab-active' : ''}}"
+      bindtap="switchTab" data-tab="all"
+    >全部</view>
+    <view
+      class="tab-item {{activeTab === 'recharge' ? 'tab-active' : ''}}"
+      bindtap="switchTab" data-tab="recharge"
+    >充值</view>
+    <view
+      class="tab-item {{activeTab === 'consume' ? 'tab-active' : ''}}"
+      bindtap="switchTab" data-tab="consume"
+    >消费</view>
+    <view
+      class="tab-item {{activeTab === 'refund' ? 'tab-active' : ''}}"
+      bindtap="switchTab" data-tab="refund"
+    >退款</view>
+  </view>
+
+  <!-- 明细列表 -->
+  <view class="list-wrap">
+    <view class="list-empty" wx:if="{{!loading && records.length === 0}}">
+      <text class="empty-icon">📋</text>
+      <text class="empty-text">暂无记录</text>
+    </view>
+
+    <view class="record-item" wx:for="{{records}}" wx:key="id">
+      <view class="record-icon record-icon-{{item.type}}">
+        <text wx:if="{{item.type === 'recharge'}}">💰</text>
+        <text wx:if="{{item.type === 'consume'}}">🛒</text>
+        <text wx:if="{{item.type === 'refund'}}">↩️</text>
+        <text wx:if="{{item.type === 'bonus'}}">🎁</text>
+      </view>
+      <view class="record-info">
+        <view class="record-desc">{{item.description}}</view>
+        <view class="record-time">{{item.timeStr}}</view>
+      </view>
+      <view class="record-amount {{item.amountClass}}">
+        {{item.amountPrefix}}¥{{item.amountYuan}}
+      </view>
+    </view>
+
+    <view class="list-loading" wx:if="{{loading}}">
+      <text>加载中...</text>
+    </view>
+    <view class="list-end" wx:if="{{noMore && records.length > 0}}">
+      <text>— 没有更多了 —</text>
+    </view>
+  </view>
+
+</view>

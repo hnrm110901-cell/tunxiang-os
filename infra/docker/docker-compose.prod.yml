@@ -1,0 +1,421 @@
+# ============================================================
+# 屯象OS 生产环境 Docker Compose
+# 用法: docker compose -f docker-compose.prod.yml up -d
+# 特点: 主从PG、Redis Sentinel占位、健康检查、资源限制、JSON日志、SSL
+# ============================================================
+
+x-service-common: &service-common
+  restart: always
+  env_file: .env
+  environment: &common-env
+    DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres-primary:5432/${POSTGRES_DB}
+    DATABASE_READ_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres-replica:5432/${POSTGRES_DB}
+    REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+    TX_ENV: prod
+    TX_AUTH_ENABLED: "true"
+    TX_RATE_LIMIT_ENABLED: "true"
+    LOG_LEVEL: INFO
+    PYTHONPATH: /app
+    PYTHONUNBUFFERED: "1"
+  depends_on:
+    postgres-primary:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+  networks:
+    - txos-prod
+  logging: &json-logging
+    driver: json-file
+    options:
+      max-size: "50m"
+      max-file: "5"
+      tag: "{{.Name}}"
+
+x-build-python: &build-python
+  context: ../..
+  dockerfile: infra/docker/Dockerfile.python
+
+x-resource-limits: &resource-limits
+  deploy:
+    resources:
+      limits:
+        cpus: "1.0"
+        memory: 512M
+      reservations:
+        cpus: "0.25"
+        memory: 128M
+
+x-resource-limits-heavy: &resource-limits-heavy
+  deploy:
+    resources:
+      limits:
+        cpus: "2.0"
+        memory: 1G
+      reservations:
+        cpus: "0.5"
+        memory: 256M
+
+services:
+  # ── PostgreSQL 主从（读写分离占位）─────────────────────────
+  postgres-primary:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      # 主从复制参数（占位，启用时取消注释）
+      # POSTGRES_INITDB_ARGS: "--data-checksums"
+    command: >
+      postgres
+        -c wal_level=replica
+        -c max_wal_senders=5
+        -c max_replication_slots=5
+        -c hot_standby=on
+        -c shared_buffers=256MB
+        -c effective_cache_size=768MB
+        -c maintenance_work_mem=128MB
+        -c work_mem=4MB
+        -c max_connections=200
+        -c log_min_duration_statement=1000
+        -c log_checkpoints=on
+        -c log_connections=on
+        -c log_disconnections=on
+    volumes:
+      - pg_prod_primary:/var/lib/postgresql/data
+      - ./init-rls.sql:/docker-entrypoint-initdb.d/01-rls.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: "4.0"
+          memory: 2G
+        reservations:
+          cpus: "1.0"
+          memory: 512M
+    logging:
+      <<: *json-logging
+    networks:
+      - txos-prod
+
+  # PostgreSQL 只读副本（占位，按需启用）
+  postgres-replica:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      # 占位：实际主从需要配置 pg_basebackup + recovery.conf
+      # 当前作为独立 PG 实例运行，后续切换为真正的 streaming replication
+    command: >
+      postgres
+        -c hot_standby=on
+        -c shared_buffers=128MB
+        -c max_connections=200
+    volumes:
+      - pg_prod_replica:/var/lib/postgresql/data
+      - ./init-rls.sql:/docker-entrypoint-initdb.d/01-rls.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 1G
+        reservations:
+          cpus: "0.5"
+          memory: 256M
+    logging:
+      <<: *json-logging
+    networks:
+      - txos-prod
+
+  # ── Redis + Sentinel 占位 ──────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    command: >
+      redis-server
+        --requirepass ${REDIS_PASSWORD}
+        --maxmemory 256mb
+        --maxmemory-policy allkeys-lru
+        --appendonly yes
+        --appendfsync everysec
+    volumes:
+      - redis_prod_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 128M
+    logging:
+      <<: *json-logging
+    networks:
+      - txos-prod
+
+  # Redis Sentinel 占位（按需启用，需要3个节点）
+  # redis-sentinel:
+  #   image: redis:7-alpine
+  #   command: redis-sentinel /etc/redis/sentinel.conf
+  #   volumes:
+  #     - ./redis-sentinel.conf:/etc/redis/sentinel.conf
+  #   depends_on:
+  #     - redis
+  #   networks:
+  #     - txos-prod
+
+  # ── Nginx + SSL (Let's Encrypt) ────────────────────────────
+  nginx:
+    image: nginx:1.25-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ../nginx/nginx.conf:/etc/nginx/conf.d/tunxiang.conf:ro
+      - ../nginx/nginx-tls-hardened.conf:/etc/nginx/conf.d/tls-hardened.conf:ro
+      - ssl_certs:/etc/nginx/ssl:ro
+      - certbot_webroot:/var/www/certbot:ro
+      - nginx_prod_logs:/var/log/nginx
+    depends_on:
+      - gateway
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 256M
+        reservations:
+          cpus: "0.25"
+          memory: 64M
+    logging:
+      <<: *json-logging
+    networks:
+      - txos-prod
+
+  # Let's Encrypt 证书自动续签
+  certbot:
+    image: certbot/certbot:latest
+    volumes:
+      - ssl_certs:/etc/letsencrypt
+      - certbot_webroot:/var/www/certbot
+    entrypoint: /bin/sh -c 'trap exit TERM; while :; do certbot renew --webroot --webroot-path=/var/www/certbot --quiet; sleep 12h & wait $${!}; done'
+    restart: always
+    logging:
+      <<: *json-logging
+    networks:
+      - txos-prod
+
+  # ── 16 微服务 ─────────────────────────────────────────────
+  gateway:
+    <<: *service-common
+    <<: *resource-limits-heavy
+    build:
+      <<: *build-python
+      args:
+        SERVICE_NAME: gateway
+        SERVICE_PORT: "8000"
+
+  tx-trade:
+    <<: *service-common
+    <<: *resource-limits-heavy
+    build:
+      <<: *build-python
+      args:
+        SERVICE_NAME: tx-trade
+        SERVICE_PORT: "8001"
+
+  tx-menu:
+    <<: *service-common
+    <<: *resource-limits
+    build:
+      <<: *build-python
+      args:
+        SERVICE_NAME: tx-menu
+        SERVICE_PORT: "8002"
+
+  tx-member:
+    <<: *service-common
+    <<: *resource-limits
+    build:
+      <<: *build-python
+      args:
+        SERVICE_NAME: tx-member
+        SERVICE_PORT: "8003"
+
+  tx-growth:
+    <<: *service-common
+    <<: *resource-limits
+    build:
+      <<: *build-python
+      args:
+        SERVICE_NAME: tx-growth
+        SERVICE_PORT: "8004"
+
+  tx-ops:
+    <<: *service-common
+    <<: *resource-limits
+    build:
+      <<: *build-python
+      args:
+        SERVICE_NAME: tx-ops
+        SERVICE_PORT: "8005"
+
+  tx-supply:
+    <<: *service-common
+    <<: *resource-limits
+    build:
+      <<: *build-python
+      args:
+        SERVICE_NAME: tx-supply
+        SERVICE_PORT: "8006"
+
+  tx-finance:
+    <<: *service-common
+    <<: *resource-limits
+    build:
+      <<: *build-python
+      args:
+        SERVICE_NAME: tx-finance
+        SERVICE_PORT: "8007"
+
+  tx-agent:
+    <<: *service-common
+    <<: *resource-limits-heavy
+    build:
+      <<: *build-python
+      args:
+        SERVICE_NAME: tx-agent
+        SERVICE_PORT: "8008"
+
+  tx-analytics:
+    <<: *service-common
+    <<: *resource-limits
+    build:
+      <<: *build-python
+      args:
+        SERVICE_NAME: tx-analytics
+        SERVICE_PORT: "8009"
+
+  tx-brain:
+    <<: *service-common
+    <<: *resource-limits-heavy
+    build:
+      <<: *build-python
+      args:
+        SERVICE_NAME: tx-brain
+        SERVICE_PORT: "8010"
+
+  tx-intel:
+    <<: *service-common
+    <<: *resource-limits
+    build:
+      <<: *build-python
+      args:
+        SERVICE_NAME: tx-intel
+        SERVICE_PORT: "8011"
+
+  tx-org:
+    <<: *service-common
+    <<: *resource-limits
+    build:
+      <<: *build-python
+      args:
+        SERVICE_NAME: tx-org
+        SERVICE_PORT: "8012"
+
+  tunxiang-api:
+    <<: *service-common
+    <<: *resource-limits
+    build:
+      <<: *build-python
+      args:
+        SERVICE_NAME: tunxiang-api
+        SERVICE_PORT: "8013"
+
+  mcp-server:
+    <<: *service-common
+    <<: *resource-limits
+    build:
+      <<: *build-python
+      args:
+        SERVICE_NAME: mcp-server
+        SERVICE_PORT: "8014"
+
+  # ── 前端应用 ──────────────────────────────────────────────
+  web-admin:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.frontend
+      args:
+        APP_NAME: web-admin
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 128M
+    logging:
+      <<: *json-logging
+    networks:
+      - txos-prod
+
+  web-pos:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.frontend
+      args:
+        APP_NAME: web-pos
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 128M
+    logging:
+      <<: *json-logging
+    networks:
+      - txos-prod
+
+  web-kds:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.frontend
+      args:
+        APP_NAME: web-kds
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 128M
+    logging:
+      <<: *json-logging
+    networks:
+      - txos-prod
+
+volumes:
+  pg_prod_primary:
+  pg_prod_replica:
+  redis_prod_data:
+  ssl_certs:
+  certbot_webroot:
+  nginx_prod_logs:
+
+networks:
+  txos-prod:
+    driver: bridge

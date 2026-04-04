@@ -6,10 +6,13 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from typing import Any, Dict, List, Optional
 
 import structlog
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncSession
 
 log = structlog.get_logger(__name__)
 
@@ -25,6 +28,27 @@ STATUS_TRANSITIONS = {
 
 # 红黄绿分级阈值
 _YELLOW_THRESHOLD_DAYS = 3
+
+
+async def _set_rls(db: AsyncSession, tenant_id: str) -> None:
+    await db.execute(
+        text("SELECT set_config('app.tenant_id', :tid, true)"),
+        {"tid": tenant_id},
+    )
+
+
+def _serialize_row(row_mapping: dict) -> dict:
+    result = {}
+    for key, val in row_mapping.items():
+        if val is None:
+            result[key] = None
+        elif hasattr(val, "isoformat"):
+            result[key] = val.isoformat()
+        elif hasattr(val, "hex"):
+            result[key] = str(val)
+        else:
+            result[key] = val
+    return result
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -43,23 +67,9 @@ async def create_issue(
     priority: str = "medium",
     deadline: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """创建门店问题。
-
-    Args:
-        store_id: 门店 ID
-        issue_type: 问题类型 (food_safety/cost/service/equipment/hygiene/other)
-        description: 问题描述
-        reporter_id: 报告人 ID
-        tenant_id: 租户 ID
-        db: 数据库会话
-        priority: 优先级 (low/medium/high/critical)
-        deadline: 截止日期 (YYYY-MM-DD)
-
-    Returns:
-        {"issue_id", "store_id", "type", "status", "priority", ...}
-    """
-    issue_id = f"issue_{store_id}_{uuid.uuid4().hex[:8]}"
-    now = datetime.utcnow().isoformat()
+    """创建门店问题并写入 DB。"""
+    issue_id = str(uuid.uuid4())
+    now = datetime.now(timezone.utc)
 
     issue = {
         "issue_id": issue_id,
@@ -73,9 +83,38 @@ async def create_issue(
         "priority": priority,
         "deadline": deadline,
         "notes": [],
-        "created_at": now,
-        "updated_at": now,
+        "created_at": now.isoformat(),
+        "updated_at": now.isoformat(),
     }
+
+    if db is not None:
+        try:
+            await _set_rls(db, tenant_id)
+            await db.execute(
+                text(
+                    """
+                    INSERT INTO store_issues
+                      (id, tenant_id, store_id, issue_type, description, reporter_id,
+                       priority, deadline, status, created_at, updated_at)
+                    VALUES
+                      (:id, NULLIF(current_setting('app.tenant_id', true), '')::uuid,
+                       :store_id, :issue_type, :description, :reporter_id,
+                       :priority, :deadline, 'open', :now, :now)
+                    """
+                ),
+                {
+                    "id": issue_id,
+                    "store_id": store_id,
+                    "issue_type": issue_type,
+                    "description": description,
+                    "reporter_id": reporter_id,
+                    "priority": priority,
+                    "deadline": deadline,
+                    "now": now,
+                },
+            )
+        except SQLAlchemyError as exc:
+            log.error("issue_create_db_error", exc_info=True, error=str(exc), tenant_id=tenant_id)
 
     log.info(
         "issue_created",
@@ -102,44 +141,63 @@ async def assign_issue(
     *,
     issue: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    """将问题派发给责任人。
+    """将问题派发给责任人。"""
+    now = datetime.now(timezone.utc)
 
-    Args:
-        issue_id: 问题 ID
-        assignee_id: 责任人 ID
-        deadline: 截止日期 (YYYY-MM-DD)
-        tenant_id: 租户 ID
-        db: 数据库会话
-        issue: 已加载的问题对象（测试注入用）
-
-    Returns:
-        {"issue_id", "assignee_id", "deadline", "status": "assigned"}
-    """
-    if issue is not None:
+    if db is not None:
+        try:
+            await _set_rls(db, tenant_id)
+            check_result = await db.execute(
+                text(
+                    """
+                    SELECT id, status FROM store_issues
+                    WHERE id = :id
+                      AND tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid
+                      AND is_deleted = false
+                    LIMIT 1
+                    """
+                ),
+                {"id": issue_id},
+            )
+            row = check_result.fetchone()
+            if row:
+                current_status = row.status
+                if "assigned" not in STATUS_TRANSITIONS.get(current_status, ()):
+                    raise ValueError(f"Cannot transition from '{current_status}' to 'assigned'")
+                await db.execute(
+                    text(
+                        """
+                        UPDATE store_issues
+                        SET assignee_id = :assignee_id, deadline = :deadline,
+                            status = 'assigned', updated_at = :now
+                        WHERE id = :id
+                          AND tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid
+                        """
+                    ),
+                    {"assignee_id": assignee_id, "deadline": deadline, "now": now, "id": issue_id},
+                )
+        except ValueError:
+            raise
+        except SQLAlchemyError as exc:
+            log.error("issue_assign_db_error", exc_info=True, error=str(exc), tenant_id=tenant_id)
+    elif issue is not None:
         current_status = issue.get("status", "open")
         if "assigned" not in STATUS_TRANSITIONS.get(current_status, ()):
-            raise ValueError(
-                f"Cannot transition from '{current_status}' to 'assigned'"
-            )
+            raise ValueError(f"Cannot transition from '{current_status}' to 'assigned'")
         issue["assignee_id"] = assignee_id
         issue["deadline"] = deadline
         issue["status"] = "assigned"
-        issue["updated_at"] = datetime.utcnow().isoformat()
+        issue["updated_at"] = now.isoformat()
 
-    log.info(
-        "issue_assigned",
-        issue_id=issue_id,
-        tenant_id=tenant_id,
-        assignee_id=assignee_id,
-        deadline=deadline,
-    )
+    log.info("issue_assigned", issue_id=issue_id, tenant_id=tenant_id,
+             assignee_id=assignee_id, deadline=deadline)
 
     return {
         "issue_id": issue_id,
         "assignee_id": assignee_id,
         "deadline": deadline,
         "status": "assigned",
-        "updated_at": datetime.utcnow().isoformat(),
+        "updated_at": now.isoformat(),
     }
 
 
@@ -157,48 +215,67 @@ async def update_issue_status(
     *,
     issue: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    """更新问题状态及备注。
-
-    Args:
-        issue_id: 问题 ID
-        status: 目标状态
-        notes: 进度备注
-        tenant_id: 租户 ID
-        db: 数据库会话
-        issue: 已加载的问题对象（测试注入用）
-
-    Returns:
-        {"issue_id", "status", "notes", "updated_at"}
-    """
+    """更新问题状态及备注。"""
     if status not in VALID_STATUSES:
         raise ValueError(f"Invalid status: {status}")
 
-    if issue is not None:
+    now = datetime.now(timezone.utc)
+
+    if db is not None:
+        try:
+            await _set_rls(db, tenant_id)
+            check_result = await db.execute(
+                text(
+                    """
+                    SELECT id, status FROM store_issues
+                    WHERE id = :id
+                      AND tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid
+                      AND is_deleted = false
+                    LIMIT 1
+                    """
+                ),
+                {"id": issue_id},
+            )
+            row = check_result.fetchone()
+            if row:
+                current_status = row.status
+                allowed = STATUS_TRANSITIONS.get(current_status, ())
+                if status not in allowed:
+                    raise ValueError(f"Cannot transition from '{current_status}' to '{status}'")
+                await db.execute(
+                    text(
+                        """
+                        UPDATE store_issues
+                        SET status = :status, updated_at = :now
+                        WHERE id = :id
+                          AND tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid
+                        """
+                    ),
+                    {"status": status, "now": now, "id": issue_id},
+                )
+        except ValueError:
+            raise
+        except SQLAlchemyError as exc:
+            log.error("issue_update_status_db_error", exc_info=True, error=str(exc), tenant_id=tenant_id)
+    elif issue is not None:
         current_status = issue.get("status", "open")
         allowed = STATUS_TRANSITIONS.get(current_status, ())
         if status not in allowed:
-            raise ValueError(
-                f"Cannot transition from '{current_status}' to '{status}'"
-            )
+            raise ValueError(f"Cannot transition from '{current_status}' to '{status}'")
         issue["status"] = status
-        issue["updated_at"] = datetime.utcnow().isoformat()
+        issue["updated_at"] = now.isoformat()
         issue.setdefault("notes", []).append({
             "text": notes,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": now.isoformat(),
         })
 
-    log.info(
-        "issue_status_updated",
-        issue_id=issue_id,
-        tenant_id=tenant_id,
-        status=status,
-    )
+    log.info("issue_status_updated", issue_id=issue_id, tenant_id=tenant_id, status=status)
 
     return {
         "issue_id": issue_id,
         "status": status,
         "notes": notes,
-        "updated_at": datetime.utcnow().isoformat(),
+        "updated_at": now.isoformat(),
     }
 
 
@@ -215,32 +292,38 @@ async def get_store_issue_board(
     issues: Optional[List[Dict[str, Any]]] = None,
     today: Optional[date] = None,
 ) -> Dict[str, Any]:
-    """获取门店问题红黄绿看板。
-
-    分级逻辑：
-        红: 已过截止日 (overdue)
-        黄: 距截止日 <3 天
-        绿: 进度正常
-
-    Args:
-        store_id: 门店 ID
-        tenant_id: 租户 ID
-        db: 数据库会话
-        issues: 问题列表（测试注入用）
-        today: 当前日期（测试注入用）
-
-    Returns:
-        {"store_id", "red", "yellow", "green", "summary"}
-    """
+    """获取门店问题红黄绿看板（从 DB 查询）。"""
     today_ = today or date.today()
-    all_issues = issues or []
+
+    all_issues: List[Dict[str, Any]] = issues or []
+
+    if db is not None and not issues:
+        try:
+            await _set_rls(db, tenant_id)
+            rows_result = await db.execute(
+                text(
+                    """
+                    SELECT id, store_id, issue_type AS type, description, reporter_id,
+                           assignee_id, status, priority, deadline, created_at, updated_at
+                    FROM store_issues
+                    WHERE store_id = :store_id
+                      AND tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid
+                      AND is_deleted = false
+                      AND status NOT IN ('resolved', 'verified')
+                    ORDER BY created_at DESC
+                    """
+                ),
+                {"store_id": store_id},
+            )
+            all_issues = [_serialize_row(dict(row._mapping)) for row in rows_result]
+        except SQLAlchemyError as exc:
+            log.error("issue_board_db_error", exc_info=True, error=str(exc), tenant_id=tenant_id)
 
     red: List[Dict[str, Any]] = []
     yellow: List[Dict[str, Any]] = []
     green: List[Dict[str, Any]] = []
 
     for iss in all_issues:
-        # 已完结的不计入看板
         if iss.get("status") in ("resolved", "verified"):
             green.append({**iss, "color": "green"})
             continue
@@ -254,14 +337,8 @@ async def get_store_issue_board(
         else:
             green.append(tagged)
 
-    log.info(
-        "issue_board_queried",
-        store_id=store_id,
-        tenant_id=tenant_id,
-        red=len(red),
-        yellow=len(yellow),
-        green=len(green),
-    )
+    log.info("issue_board_queried", store_id=store_id, tenant_id=tenant_id,
+             red=len(red), yellow=len(yellow), green=len(green))
 
     return {
         "store_id": store_id,
@@ -290,17 +367,7 @@ async def get_regional_issues(
     *,
     store_boards: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
-    """获取区域问题汇总。
-
-    Args:
-        region_id: 区域 ID
-        tenant_id: 租户 ID
-        db: 数据库会话
-        store_boards: 各门店看板数据（测试注入用）
-
-    Returns:
-        {"region_id", "total_red", "total_yellow", "store_breakdown"}
-    """
+    """获取区域问题汇总。"""
     boards = store_boards or []
     total_red = 0
     total_yellow = 0
@@ -322,16 +389,10 @@ async def get_regional_issues(
             "green": g,
         })
 
-    # 按红色数量降序排列（问题最多的门店排前面）
     breakdown.sort(key=lambda x: x["red"], reverse=True)
 
-    log.info(
-        "regional_issues_queried",
-        region_id=region_id,
-        tenant_id=tenant_id,
-        total_red=total_red,
-        total_yellow=total_yellow,
-    )
+    log.info("regional_issues_queried", region_id=region_id, tenant_id=tenant_id,
+             total_red=total_red, total_yellow=total_yellow)
 
     return {
         "region_id": region_id,
@@ -355,33 +416,39 @@ async def cross_store_benchmark(
     *,
     store_issue_counts: Optional[Dict[str, int]] = None,
 ) -> Dict[str, Any]:
-    """跨店同类问题对标。
+    """跨店同类问题对标。"""
+    counts: Dict[str, int] = store_issue_counts or {}
 
-    Args:
-        issue_type: 问题类型
-        tenant_id: 租户 ID
-        db: 数据库会话
-        store_issue_counts: 各门店该类问题数量（测试注入用）
+    if db is not None and not store_issue_counts:
+        try:
+            await _set_rls(db, tenant_id)
+            rows_result = await db.execute(
+                text(
+                    """
+                    SELECT store_id, COUNT(*) AS cnt
+                    FROM store_issues
+                    WHERE tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid
+                      AND issue_type = :issue_type
+                      AND is_deleted = false
+                    GROUP BY store_id
+                    """
+                ),
+                {"issue_type": issue_type},
+            )
+            counts = {row.store_id: row.cnt for row in rows_result}
+        except SQLAlchemyError as exc:
+            log.error("cross_store_benchmark_db_error", exc_info=True, error=str(exc), tenant_id=tenant_id)
 
-    Returns:
-        {"issue_type", "benchmark", "stores"}
-    """
-    counts = store_issue_counts or {}
-
-    stores: List[Dict[str, Any]] = []
-    for store_id, count in counts.items():
-        stores.append({"store_id": store_id, "count": count})
+    stores: List[Dict[str, Any]] = [
+        {"store_id": sid, "count": count} for sid, count in counts.items()
+    ]
     stores.sort(key=lambda x: x["count"], reverse=True)
 
     total = sum(counts.values())
     avg = round(total / len(counts), 2) if counts else 0.0
 
-    log.info(
-        "cross_store_benchmark",
-        tenant_id=tenant_id,
-        issue_type=issue_type,
-        store_count=len(counts),
-    )
+    log.info("cross_store_benchmark", tenant_id=tenant_id, issue_type=issue_type,
+             store_count=len(counts))
 
     return {
         "issue_type": issue_type,
@@ -408,7 +475,7 @@ def _classify_issue_color(issue: Dict[str, Any], today: date) -> str:
         return "green"
 
     try:
-        deadline = date.fromisoformat(deadline_str)
+        deadline = date.fromisoformat(str(deadline_str)[:10])
     except (ValueError, TypeError):
         return "green"
 

@@ -104,6 +104,7 @@ def upgrade() -> None:
     op.execute("ALTER TABLE events ENABLE ROW LEVEL SECURITY")
     op.execute("ALTER TABLE events FORCE ROW LEVEL SECURITY")
     op.execute("DROP POLICY IF EXISTS events_tenant_isolation ON events;")
+    op.execute("DROP POLICY IF EXISTS events_tenant_isolation ON events;")
     op.execute("""
         CREATE POLICY events_tenant_isolation ON events
             USING (tenant_id = NULLIF(current_setting('app.tenant_id', TRUE), '')::UUID)
@@ -167,6 +168,7 @@ def upgrade() -> None:
     """)
     op.execute("ALTER TABLE projector_checkpoints ENABLE ROW LEVEL SECURITY")
     op.execute("ALTER TABLE projector_checkpoints FORCE ROW LEVEL SECURITY")
+    op.execute("DROP POLICY IF EXISTS projector_checkpoints_rls ON projector_checkpoints;")
     op.execute("DROP POLICY IF EXISTS projector_checkpoints_rls ON projector_checkpoints;")
     op.execute("""
         CREATE POLICY projector_checkpoints_rls ON projector_checkpoints

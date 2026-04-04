@@ -1,8 +1,9 @@
 /**
  * 移动盘点 — 实时录入实盘数量，完成后汇总差异并更新库存
  */
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { txFetch } from '../api/index';
 
 const C = {
   bg: '#0B1A20',
@@ -26,16 +27,13 @@ interface StocktakeItem {
   unit_cost: number;
 }
 
-const MOCK_ITEMS: StocktakeItem[] = [
-  { id: '1', ingredient_name: '鲈鱼（活）', unit: 'kg', system_qty: 18, actual_qty: null, unit_cost: 48 },
-  { id: '2', ingredient_name: '土豆', unit: 'kg', system_qty: 48, actual_qty: 45, unit_cost: 3.5 },
-  { id: '3', ingredient_name: '鸡蛋', unit: '个', system_qty: 120, actual_qty: null, unit_cost: 0.8 },
-  { id: '4', ingredient_name: '猪里脊', unit: 'kg', system_qty: 12, actual_qty: 12, unit_cost: 35 },
-  { id: '5', ingredient_name: '生姜', unit: 'kg', system_qty: 5, actual_qty: 6, unit_cost: 8 },
-  { id: '6', ingredient_name: '葱', unit: 'kg', system_qty: 8, actual_qty: null, unit_cost: 5 },
-  { id: '7', ingredient_name: '菜籽油', unit: 'L', system_qty: 20, actual_qty: 19, unit_cost: 12 },
-  { id: '8', ingredient_name: '花椒', unit: 'kg', system_qty: 2, actual_qty: 2, unit_cost: 60 },
-];
+// API 返回的盘点单结构
+interface StocktakeSession {
+  id: string;
+  store_id: string;
+  status: 'open' | 'completed';
+  items: StocktakeItem[];
+}
 
 function varianceInfo(item: StocktakeItem) {
   if (item.actual_qty === null) return null;
@@ -142,10 +140,34 @@ function SummaryModal({ items, onConfirm, onCancel, submitting }: SummaryModalPr
 
 export function StocktakePage() {
   const navigate = useNavigate();
-  const [items, setItems] = useState<StocktakeItem[]>(MOCK_ITEMS);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [items, setItems] = useState<StocktakeItem[]>([]);
   const [search, setSearch] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  const storeId: string = (window as unknown as Record<string, string>).__STORE_ID__ || localStorage.getItem('store_id') || '';
+
+  // 开始盘点会话
+  const startSession = useCallback(async () => {
+    setLoading(true);
+    try {
+      const session = await txFetch<StocktakeSession>('/api/v1/supply/stocktake/start', {
+        method: 'POST',
+        body: JSON.stringify({ store_id: storeId }),
+      });
+      setSessionId(session.id);
+      setItems((session.items ?? []).map(i => ({ ...i, actual_qty: null })));
+    } catch {
+      // 失败降级：空列表，让用户知道
+      setItems([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [storeId]);
+
+  useEffect(() => { void startSession(); }, [startSession]);
 
   const filteredItems = useMemo(
     () => items.filter(i => i.ingredient_name.includes(search)),
@@ -155,22 +177,44 @@ export function StocktakePage() {
   const countedCount = items.filter(i => i.actual_qty !== null).length;
 
   const updateActual = (id: string, val: string) => {
+    const newQty = val === '' ? null : Number(val);
     setItems(prev => prev.map(i =>
-      i.id === id ? { ...i, actual_qty: val === '' ? null : Number(val) } : i
+      i.id === id ? { ...i, actual_qty: newQty } : i
     ));
+    // 实时提交单项数量到后端（fire-and-forget）
+    if (sessionId && val !== '') {
+      const item = items.find(i => i.id === id);
+      if (item) {
+        void txFetch(`/api/v1/supply/stocktake/${sessionId}/count`, {
+          method: 'POST',
+          body: JSON.stringify({ ingredient_id: id, actual_qty: Number(val), unit: item.unit }),
+        }).catch(() => { /* 静默失败 */ });
+      }
+    }
   };
 
   const handleComplete = async () => {
+    if (!sessionId) return;
     setSubmitting(true);
     try {
-      await new Promise(r => setTimeout(r, 900));
+      await txFetch(`/api/v1/supply/stocktake/${sessionId}/complete`, { method: 'POST' });
       alert('盘点完成！库存已更新。');
       navigate(-1);
+    } catch {
+      alert('提交失败，请重试');
     } finally {
       setSubmitting(false);
       setShowModal(false);
     }
   };
+
+  if (loading) {
+    return (
+      <div style={{ background: C.bg, minHeight: '100vh', color: C.white, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>
+        <span style={{ color: C.muted }}>正在开启盘点...</span>
+      </div>
+    );
+  }
 
   return (
     <div style={{ background: C.bg, minHeight: '100vh', color: C.white }}>

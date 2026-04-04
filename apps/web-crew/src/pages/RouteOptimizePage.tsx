@@ -36,14 +36,6 @@ interface ScoredTask extends PendingTask {
   reason: string;
 }
 
-// ─── Mock 数据（无 API 时使用） ───
-
-const MOCK_TASKS: PendingTask[] = [
-  { id: 't1', table: 'A03', dishes: ['红烧肉', '米饭×2'], wait_minutes: 14, pos: { x: 2, y: 1 } },
-  { id: 't2', table: 'B01', dishes: ['清蒸鱼'], wait_minutes: 8, pos: { x: 1, y: 3 } },
-  { id: 't3', table: 'A01', dishes: ['可乐×3', '果汁'], wait_minutes: 5, pos: { x: 3, y: 1 } },
-];
-
 // ─── API ───
 
 async function fetchPendingTasks(): Promise<PendingTask[]> {
@@ -55,7 +47,7 @@ async function fetchPendingTasks(): Promise<PendingTask[]> {
     const data = await resp.json();
     return data?.data ?? data ?? [];
   } catch {
-    return MOCK_TASKS;
+    return [];
   }
 }
 

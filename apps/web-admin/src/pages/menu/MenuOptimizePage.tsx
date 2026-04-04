@@ -3,7 +3,7 @@
  * 调用 POST /api/v1/brain/menu/optimize，展示AI排菜方案
  */
 import { useState } from 'react';
-import { txFetch } from '../../api';
+import { txFetch, txFetchData } from '../../api';
 
 // ─── 类型定义 ───
 
@@ -38,56 +38,13 @@ interface MenuOptimizeResult {
   hard_constraints: HardConstraint[];
 }
 
-// ─── Mock 数据 ───
-
-const MOCK_STORES = [
-  { id: 'store-001', name: '尝在一起·芙蓉路店' },
-  { id: 'store-002', name: '尝在一起·五一广场店' },
-  { id: 'store-003', name: '最黔线·解放西路店' },
-];
+// ─── 餐段常量（固定配置，无需 API） ───
 
 const MEAL_PERIODS = [
   { value: 'breakfast', label: '早市' },
   { value: 'lunch', label: '午市' },
   { value: 'dinner', label: '晚市' },
 ];
-
-function buildMockPayload(storeId: string, mealPeriod: string, date: string) {
-  return {
-    store_id: storeId,
-    meal_period: mealPeriod,
-    date,
-    inventory: [
-      { ingredient_id: 'ing-001', name: '猪五花', qty: 8.5, unit: 'kg', expiry_days: 1 },
-      { ingredient_id: 'ing-002', name: '草鱼', qty: 12, unit: 'kg', expiry_days: 2 },
-      { ingredient_id: 'ing-003', name: '豆腐', qty: 20, unit: '块', expiry_days: 2 },
-      { ingredient_id: 'ing-004', name: '香菇', qty: 6, unit: 'kg', expiry_days: 5 },
-      { ingredient_id: 'ing-005', name: '莴笋', qty: 15, unit: 'kg', expiry_days: 3 },
-      { ingredient_id: 'ing-006', name: '腊肉', qty: 4, unit: 'kg', expiry_days: 30 },
-      { ingredient_id: 'ing-007', name: '土鸡', qty: 5, unit: '只', expiry_days: 1 },
-      { ingredient_id: 'ing-008', name: '青椒', qty: 10, unit: 'kg', expiry_days: 4 },
-      { ingredient_id: 'ing-009', name: '红薯粉', qty: 25, unit: 'kg', expiry_days: 90 },
-      { ingredient_id: 'ing-010', name: '小白菜', qty: 18, unit: 'kg', expiry_days: 2 },
-    ],
-    dish_performance: [
-      { dish_id: 'd-001', name: '红烧五花肉', sales_7d: 142, margin_rate: 0.62, rank: 1 },
-      { dish_id: 'd-002', name: '剁椒鱼头', sales_7d: 98, margin_rate: 0.58, rank: 2 },
-      { dish_id: 'd-003', name: '麻婆豆腐', sales_7d: 87, margin_rate: 0.71, rank: 3 },
-      { dish_id: 'd-004', name: '香菇炒肉', sales_7d: 76, margin_rate: 0.65, rank: 4 },
-      { dish_id: 'd-005', name: '莴笋炒腊肉', sales_7d: 65, margin_rate: 0.60, rank: 5 },
-      { dish_id: 'd-006', name: '土鸡汤', sales_7d: 54, margin_rate: 0.55, rank: 6 },
-      { dish_id: 'd-007', name: '青椒炒蛋', sales_7d: 112, margin_rate: 0.74, rank: 7 },
-      { dish_id: 'd-008', name: '红薯粉汤', sales_7d: 93, margin_rate: 0.69, rank: 8 },
-      { dish_id: 'd-009', name: '白灼小白菜', sales_7d: 48, margin_rate: 0.72, rank: 9 },
-      { dish_id: 'd-010', name: '腊肉炒饭', sales_7d: 131, margin_rate: 0.66, rank: 10 },
-      { dish_id: 'd-011', name: '清蒸草鱼', sales_7d: 44, margin_rate: 0.52, rank: 11 },
-      { dish_id: 'd-012', name: '糖醋排骨', sales_7d: 69, margin_rate: 0.57, rank: 12 },
-      { dish_id: 'd-013', name: '土豆丝', sales_7d: 104, margin_rate: 0.76, rank: 13 },
-      { dish_id: 'd-014', name: '辣椒炒肉', sales_7d: 89, margin_rate: 0.63, rank: 14 },
-      { dish_id: 'd-015', name: '豆角焖饭', sales_7d: 72, margin_rate: 0.68, rank: 15 },
-    ],
-  };
-}
 
 // ─── 工具函数 ───
 
@@ -145,7 +102,8 @@ function formatResultAsText(result: MenuOptimizeResult): string {
 export function MenuOptimizePage() {
   const today = new Date().toISOString().slice(0, 10);
 
-  const [storeId, setStoreId] = useState(MOCK_STORES[0].id);
+  const [storeId, setStoreId] = useState('');
+  const [stores, setStores] = useState<{ id: string; name: string }[]>([]);
   const [mealPeriod, setMealPeriod] = useState<string>('lunch');
   const [date, setDate] = useState(today);
   const [loading, setLoading] = useState(false);
@@ -154,17 +112,30 @@ export function MenuOptimizePage() {
   const [copyToast, setCopyToast] = useState(false);
   const [sendToast, setSendToast] = useState(false);
 
+  useEffect(() => {
+    txFetchData<{ items: { id: string; name: string }[] }>('/api/v1/org/stores?page=1&size=100')
+      .then((data) => {
+        if (data?.items?.length) {
+          setStores(data.items);
+          setStoreId(data.items[0].id);
+        }
+      })
+      .catch(() => setStores([]));
+  }, []);
+
   const handleGetAdvice = async () => {
     setLoading(true);
     setError(null);
     setResult(null);
     try {
-      const payload = buildMockPayload(storeId, mealPeriod, date);
-      const data = await txFetch<MenuOptimizeResult>('/api/v1/brain/menu/optimize', {
+      const resp = await txFetch<MenuOptimizeResult>('/api/v1/brain/menu-optimizer', {
         method: 'POST',
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ store_id: storeId, date, meal_period: mealPeriod }),
       });
-      setResult(data);
+      setResult(resp.data ?? null);
+      if (!resp.data) {
+        setError('AI 返回数据为空，请重试');
+      }
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : '获取建议失败，请重试');
     } finally {
@@ -197,7 +168,7 @@ export function MenuOptimizePage() {
     });
   };
 
-  const storeName = MOCK_STORES.find((s) => s.id === storeId)?.name ?? storeId;
+  const storeName = stores.find((s) => s.id === storeId)?.name ?? storeId;
   const mealLabel = MEAL_PERIODS.find((m) => m.value === mealPeriod)?.label ?? mealPeriod;
 
   return (
@@ -224,7 +195,7 @@ export function MenuOptimizePage() {
               onChange={(e) => setStoreId(e.target.value)}
               style={selectStyle}
             >
-              {MOCK_STORES.map((s) => (
+              {stores.map((s) => (
                 <option key={s.id} value={s.id}>{s.name}</option>
               ))}
             </select>

@@ -1,0 +1,230 @@
+/* 企业员工身份认证页样式 */
+
+.page-container {
+  min-height: 100vh;
+  background: #0B1A20;
+  padding: 0 0 120rpx;
+}
+
+/* ─── 顶部说明 ─── */
+.intro-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 64rpx 40rpx 48rpx;
+}
+
+.intro-icon-wrap {
+  width: 120rpx;
+  height: 120rpx;
+  background: rgba(255, 107, 44, 0.15);
+  border-radius: 60rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 28rpx;
+}
+
+.intro-icon {
+  font-size: 60rpx;
+}
+
+.intro-title {
+  font-size: 40rpx;
+  font-weight: bold;
+  color: #fff;
+  margin-bottom: 16rpx;
+}
+
+.intro-desc {
+  font-size: 26rpx;
+  color: #999;
+  text-align: center;
+  line-height: 1.6;
+}
+
+/* ─── 表单卡片 ─── */
+.form-card {
+  margin: 0 32rpx 24rpx;
+  background: #112228;
+  border-radius: 24rpx;
+  padding: 40rpx 32rpx;
+}
+
+.form-item {
+  margin-bottom: 40rpx;
+}
+
+.form-item:last-child {
+  margin-bottom: 0;
+}
+
+.form-label-row {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  margin-bottom: 16rpx;
+}
+
+.form-label {
+  font-size: 28rpx;
+  color: #ccc;
+  font-weight: 500;
+}
+
+.form-required {
+  font-size: 28rpx;
+  color: #FF6B2C;
+}
+
+.form-optional {
+  font-size: 24rpx;
+  color: #666;
+}
+
+.form-input {
+  width: 100%;
+  height: 88rpx;
+  background: #1A3040;
+  border: 1rpx solid #1E3A4A;
+  border-radius: 16rpx;
+  padding: 0 24rpx;
+  font-size: 30rpx;
+  color: #fff;
+  box-sizing: border-box;
+}
+
+.form-input.input-error {
+  border-color: #A32D2D;
+}
+
+.placeholder {
+  color: #555;
+}
+
+.field-error {
+  display: block;
+  font-size: 24rpx;
+  color: #A32D2D;
+  margin-top: 8rpx;
+}
+
+.field-hint {
+  display: block;
+  font-size: 22rpx;
+  color: #555;
+  margin-top: 8rpx;
+}
+
+/* ─── 上传区域 ─── */
+.upload-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 200rpx;
+  background: #1A3040;
+  border: 2rpx dashed #2E4A5A;
+  border-radius: 16rpx;
+  gap: 8rpx;
+}
+
+.upload-icon {
+  font-size: 64rpx;
+  color: #FF6B2C;
+  line-height: 1;
+}
+
+.upload-text {
+  font-size: 28rpx;
+  color: #ccc;
+}
+
+.upload-hint {
+  font-size: 22rpx;
+  color: #666;
+}
+
+/* ─── 证明图预览 ─── */
+.proof-preview {
+  position: relative;
+  width: 100%;
+  height: 300rpx;
+  border-radius: 16rpx;
+  overflow: hidden;
+}
+
+.proof-image {
+  width: 100%;
+  height: 100%;
+}
+
+.proof-remove {
+  position: absolute;
+  top: 16rpx;
+  right: 16rpx;
+  width: 56rpx;
+  height: 56rpx;
+  background: rgba(0, 0, 0, 0.6);
+  border-radius: 28rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.proof-remove-text {
+  color: #fff;
+  font-size: 36rpx;
+  line-height: 1;
+}
+
+/* ─── 认证须知 ─── */
+.notice-block {
+  margin: 0 32rpx 32rpx;
+  background: rgba(255, 107, 44, 0.08);
+  border: 1rpx solid rgba(255, 107, 44, 0.2);
+  border-radius: 16rpx;
+  padding: 28rpx;
+}
+
+.notice-title {
+  font-size: 26rpx;
+  color: #FF6B2C;
+  font-weight: 500;
+  display: block;
+  margin-bottom: 16rpx;
+}
+
+.notice-item {
+  font-size: 24rpx;
+  color: #888;
+  display: block;
+  line-height: 1.8;
+}
+
+/* ─── 提交按钮 ─── */
+.submit-area {
+  padding: 0 32rpx;
+}
+
+.submit-btn {
+  width: 100%;
+  height: 96rpx;
+  background: #FF6B2C !important;
+  color: #fff !important;
+  border-radius: 48rpx;
+  font-size: 32rpx;
+  font-weight: bold;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.submit-btn.disabled {
+  opacity: 0.6;
+}
+
+.submit-btn::after {
+  border: none;
+}

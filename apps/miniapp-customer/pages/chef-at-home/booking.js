@@ -165,52 +165,35 @@ Page({
   // ─── 微信支付封装 ───
 
   _requestWxPayment: function (bookingId, totalFen) {
-    return new Promise(function (resolve, reject) {
-      // 实际场景：先向后端获取预支付参数（timeStamp/nonceStr/package/signType/paySign）
-      // 这里示意调用方式，后端需实现 /api/v1/chef-at-home/bookings/:id/prepay
-      var app = getApp();
-      var baseUrl = app.globalData.apiBase || '';
-      var token = wx.getStorageSync('tx_token') || '';
-      var tenantId = app.globalData.tenantId || '';
-
-      wx.request({
-        url: baseUrl + '/api/v1/chef-at-home/bookings/' + encodeURIComponent(bookingId) + '/prepay',
-        method: 'POST',
-        data: { amount_fen: totalFen },
-        header: {
-          'X-Tenant-ID': tenantId,
-          'Content-Type': 'application/json',
-          'Authorization': token ? 'Bearer ' + token : '',
-        },
-        success: function (res) {
-          if (!res.data || !res.data.ok) {
-            // 开发模式降级：模拟支付成功
-            console.warn('[booking] prepay failed, using mock payment');
-            resolve('mock_payment_' + Date.now());
-            return;
-          }
-          var payParams = res.data.data;
+    // 向后端获取预支付参数（timeStamp/nonceStr/package/signType/paySign）
+    // 后端需实现 /api/v1/chef-at-home/bookings/:id/prepay
+    return api.txRequest(
+      '/api/v1/chef-at-home/bookings/' + encodeURIComponent(bookingId) + '/prepay',
+      'POST',
+      { amount_fen: totalFen }
+    )
+      .then(function (payParams) {
+        return new Promise(function (resolve, reject) {
           wx.requestPayment({
             timeStamp: payParams.timeStamp,
             nonceStr: payParams.nonceStr,
             package: payParams.package,
             signType: payParams.signType || 'MD5',
             paySign: payParams.paySign,
-            success: function (payRes) {
+            success: function () {
               resolve(payParams.payment_id || bookingId);
             },
             fail: function (payErr) {
               reject(new Error(payErr.errMsg || '支付失败'));
             },
           });
-        },
-        fail: function (err) {
-          // 网络失败降级：模拟支付
-          console.warn('[booking] prepay request failed, using mock payment', err);
-          resolve('mock_payment_' + Date.now());
-        },
+        });
+      })
+      .catch(function (err) {
+        // 开发模式降级：模拟支付成功
+        console.warn('[booking] prepay failed, using mock payment', err);
+        return Promise.resolve('mock_payment_' + Date.now());
       });
-    });
   },
 
   // ─── 支付成功后操作 ───

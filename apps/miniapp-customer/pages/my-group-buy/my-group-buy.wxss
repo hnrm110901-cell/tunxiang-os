@@ -1,0 +1,192 @@
+.page-container {
+  min-height: 100vh;
+  background: #f5f5f5;
+}
+
+/* Tab 栏 */
+.tab-bar {
+  display: flex;
+  background: #fff;
+  padding: 0 32rpx;
+  border-bottom: 1rpx solid #eee;
+}
+.tab-item {
+  flex: 1;
+  text-align: center;
+  padding: 28rpx 0 20rpx;
+  font-size: 28rpx;
+  color: #999;
+  position: relative;
+}
+.tab-item.active {
+  color: #333;
+  font-weight: 600;
+}
+.tab-line {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 48rpx;
+  height: 6rpx;
+  background: #FF6B35;
+  border-radius: 3rpx;
+}
+
+/* 订单卡片列表 */
+.order-list {
+  padding: 16rpx 32rpx;
+}
+.order-card {
+  display: flex;
+  background: #fff;
+  border-radius: 16rpx;
+  padding: 24rpx;
+  margin-bottom: 16rpx;
+  gap: 20rpx;
+}
+.dish-img {
+  width: 160rpx;
+  height: 160rpx;
+  border-radius: 12rpx;
+  background: #eee;
+  flex-shrink: 0;
+}
+.order-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+.dish-name {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #333;
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.order-price-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 8rpx;
+}
+.order-price {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #FF3B30;
+}
+.order-status {
+  font-size: 22rpx;
+  padding: 4rpx 12rpx;
+  border-radius: 8rpx;
+}
+.order-status.active {
+  color: #FF6B35;
+  background: rgba(255,107,53,0.1);
+}
+.order-status.completed {
+  color: #52c41a;
+  background: rgba(82,196,26,0.1);
+}
+.order-status.cancelled {
+  color: #999;
+  background: rgba(0,0,0,0.04);
+}
+
+/* 进度条 */
+.progress-section {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  margin-top: 12rpx;
+}
+.progress-bar {
+  flex: 1;
+  height: 10rpx;
+  background: #eee;
+  border-radius: 5rpx;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  background: #FF6B35;
+  border-radius: 5rpx;
+  transition: width 0.3s;
+}
+.progress-text {
+  font-size: 22rpx;
+  color: #999;
+  flex-shrink: 0;
+}
+
+/* 操作按钮 */
+.action-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 12rpx;
+}
+.action-btn {
+  font-size: 24rpx;
+  padding: 0 24rpx;
+  height: 56rpx;
+  line-height: 56rpx;
+  border-radius: 28rpx;
+  border: none;
+  min-width: 0;
+}
+.invite-btn {
+  background: #FF6B35 !important;
+  color: #fff !important;
+}
+.again-btn {
+  background: #fff !important;
+  color: #FF6B35 !important;
+  border: 2rpx solid #FF6B35 !important;
+}
+.rejoin-btn {
+  background: #fff !important;
+  color: #666 !important;
+  border: 2rpx solid #ddd !important;
+}
+
+/* 加载更多 & 没有更多 */
+.loading-more, .no-more {
+  text-align: center;
+  padding: 32rpx 0;
+  font-size: 24rpx;
+  color: #999;
+}
+
+/* 空状态 */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 160rpx 0;
+}
+.empty-icon-box {
+  font-size: 80rpx;
+  margin-bottom: 24rpx;
+}
+.empty-icon-text {
+  font-size: 80rpx;
+}
+.empty-text {
+  font-size: 30rpx;
+  color: #999;
+  margin-bottom: 32rpx;
+}
+.empty-btn {
+  width: 240rpx !important;
+  height: 72rpx;
+  line-height: 72rpx;
+  background: #FF6B35 !important;
+  color: #fff !important;
+  border-radius: 36rpx;
+  font-size: 28rpx;
+  font-weight: 600;
+  border: none;
+}

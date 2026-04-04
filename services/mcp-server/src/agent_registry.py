@@ -1700,6 +1700,425 @@ _register("event_bus__get_all_event_types", _entry(
 ))
 
 
+# ===========================================================================
+# TX-BRAIN AGENT TOOLS — 直接调用 tx-brain agents（不经过 tx-agent 体系）
+# ===========================================================================
+# 这些工具对应 services/tx-brain/src/agents/ 下的新版 Agent 实现。
+# 命名规则：{agent_name}__{method_name}
+# ===========================================================================
+
+# ---------------------------------------------------------------------------
+# tx-brain: discount_guardian (1 action)
+# ---------------------------------------------------------------------------
+
+_register("discount_guardian__analyze", _entry(
+    agent_id="discount_guardian",
+    action="analyze",
+    description="折扣守护分析 - 分析折扣事件是否合规，校验毛利底线/权限/行为模式三条硬约束",
+    input_schema={
+        "properties": {
+            "event": {
+                "type": "object",
+                "description": "折扣事件，包含 operator_id/operator_role/dish_name/original_price_fen/discount_type/discount_rate/table_no/order_id/store_id/margin_rate",
+                "properties": {
+                    "operator_id": {"type": "string", "description": "操作员ID"},
+                    "operator_role": {"type": "string", "description": "操作员角色（employee/manager/gm）"},
+                    "dish_name": {"type": "string", "description": "菜品名称"},
+                    "original_price_fen": {"type": "integer", "description": "原价（分）"},
+                    "discount_type": {"type": "string", "description": "折扣类型"},
+                    "discount_rate": {"type": "number", "description": "折扣率（0.0-1.0，如0.9=九折）"},
+                    "table_no": {"type": "string", "description": "桌号"},
+                    "order_id": {"type": "string", "description": "订单ID"},
+                    "store_id": {"type": "string", "description": "门店ID"},
+                    "margin_rate": {"type": "number", "description": "菜品毛利率（可选）"},
+                },
+                "required": ["operator_id", "operator_role", "discount_rate"],
+            },
+            "history": {
+                "type": "array",
+                "description": "近30条同操作员的折扣记录",
+                "items": {"type": "object"},
+            },
+        },
+        "required": ["event", "history"],
+    },
+))
+
+# ---------------------------------------------------------------------------
+# tx-brain: finance_auditor (1 action)
+# ---------------------------------------------------------------------------
+
+_register("finance_auditor__analyze", _entry(
+    agent_id="finance_auditor",
+    action="analyze",
+    description="财务稽核分析 - 检测门店财务异常，输出风险评级与审计建议（校验毛利/作废率/现金差异）",
+    input_schema={
+        "properties": {
+            "payload": {
+                "type": "object",
+                "description": "门店财务数据快照",
+                "properties": {
+                    "tenant_id": {"type": "string", "description": "租户ID"},
+                    "store_id": {"type": "string", "description": "门店ID"},
+                    "date": {"type": "string", "description": "日期（YYYY-MM-DD）"},
+                    "revenue_fen": {"type": "integer", "description": "当日营收（分）"},
+                    "cost_fen": {"type": "integer", "description": "当日成本（分）"},
+                    "discount_total_fen": {"type": "integer", "description": "当日折扣合计（分）"},
+                    "void_count": {"type": "integer", "description": "当日作废单数"},
+                    "void_amount_fen": {"type": "integer", "description": "当日作废金额（分）"},
+                    "cash_actual_fen": {"type": "integer", "description": "实际现金盘点（分）"},
+                    "cash_expected_fen": {"type": "integer", "description": "系统预期现金（分）"},
+                    "high_discount_orders": {"type": "array", "description": "高折扣订单列表", "items": {"type": "object"}},
+                },
+                "required": ["tenant_id", "store_id", "date", "revenue_fen", "cost_fen"],
+            },
+        },
+        "required": ["payload"],
+    },
+))
+
+# ---------------------------------------------------------------------------
+# tx-brain: inventory_sentinel (1 action)
+# ---------------------------------------------------------------------------
+
+_register("inventory_sentinel__analyze", _entry(
+    agent_id="inventory_sentinel",
+    action="analyze",
+    description="库存预警分析 - 预测食材缺货风险，生成采购建议（食安合规硬约束：临期食材强制预警）",
+    input_schema={
+        "properties": {
+            "store_id": {"type": "string", "description": "门店ID"},
+            "tenant_id": {"type": "string", "description": "租户ID"},
+            "inventory": {
+                "type": "array",
+                "description": "当前库存列表",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "ingredient_name": {"type": "string"},
+                        "current_qty": {"type": "number"},
+                        "unit": {"type": "string"},
+                        "min_qty": {"type": "number"},
+                        "expiry_date": {"type": "string", "description": "效期（ISO格式）"},
+                        "unit_cost_fen": {"type": "integer"},
+                    },
+                },
+            },
+            "sales_history": {
+                "type": "array",
+                "description": "近7天每日消耗量",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "date": {"type": "string"},
+                        "ingredient_name": {"type": "string"},
+                        "consumed_qty": {"type": "number"},
+                    },
+                },
+            },
+        },
+        "required": ["store_id", "tenant_id", "inventory", "sales_history"],
+    },
+))
+
+# ---------------------------------------------------------------------------
+# tx-brain: member_insight (1 action)
+# ---------------------------------------------------------------------------
+
+_register("member_insight__analyze_member", _entry(
+    agent_id="member_insight",
+    action="analyze",
+    description="会员洞察分析 - 分析会员消费行为，生成个性化洞察、推荐菜品和回访预测",
+    input_schema={
+        "properties": {
+            "member": {
+                "type": "object",
+                "description": "会员信息",
+                "properties": {
+                    "id": {"type": "string"},
+                    "name": {"type": "string"},
+                    "phone_masked": {"type": "string"},
+                    "level": {"type": "string"},
+                    "total_spend_fen": {"type": "integer", "description": "累计消费（分）"},
+                    "visit_count": {"type": "integer"},
+                    "last_visit_date": {"type": "string"},
+                    "points": {"type": "integer"},
+                },
+                "required": ["id"],
+            },
+            "orders": {
+                "type": "array",
+                "description": "近12个月订单列表（含 items 菜品明细）",
+                "items": {"type": "object"},
+            },
+        },
+        "required": ["member", "orders"],
+    },
+))
+
+# ---------------------------------------------------------------------------
+# tx-brain: patrol_inspector (3 actions)
+# ---------------------------------------------------------------------------
+
+_register("patrol_inspector__analyze", _entry(
+    agent_id="patrol_inspector",
+    action="analyze",
+    description="巡店质检分析 - 分析门店巡检数据，识别违规项，生成整改建议（食安/消防违规强制标critical）",
+    input_schema={
+        "properties": {
+            "payload": {
+                "type": "object",
+                "description": "巡店数据",
+                "properties": {
+                    "tenant_id": {"type": "string"},
+                    "store_id": {"type": "string"},
+                    "patrol_date": {"type": "string", "description": "巡检日期（YYYY-MM-DD）"},
+                    "inspector_name": {"type": "string"},
+                    "checklist_items": {
+                        "type": "array",
+                        "description": "检查清单列表，每项含 category/item_name/result(pass/fail/na)/score/notes",
+                        "items": {"type": "object"},
+                    },
+                    "overall_score": {"type": "number", "description": "本次综合评分（0-100）"},
+                    "previous_score": {"type": "number", "description": "上次综合评分"},
+                },
+                "required": ["tenant_id", "store_id", "patrol_date", "checklist_items", "overall_score"],
+            },
+        },
+        "required": ["payload"],
+    },
+))
+
+_register("patrol_inspector__analyze_from_mv", _entry(
+    agent_id="patrol_inspector",
+    action="analyze_from_mv",
+    description="巡店质检增强分析 - 从 mv_public_opinion 读取近4周舆情上下文，丰富巡店分析背景",
+    input_schema={
+        "properties": {
+            "payload": {
+                "type": "object",
+                "description": "巡店数据（同 patrol_inspector__analyze 的 payload 结构）",
+            },
+        },
+        "required": ["payload"],
+    },
+))
+
+_register("patrol_inspector__get_opinion_context", _entry(
+    agent_id="patrol_inspector",
+    action="get_opinion_context",
+    description="获取舆情上下文 - 从 mv_public_opinion 读取门店近4周舆情摘要（负面数/最差平台/平均情感分）",
+    input_schema={
+        "properties": {
+            "tenant_id": {"type": "string", "description": "租户ID"},
+            "store_id": {"type": "string", "description": "门店ID"},
+        },
+        "required": ["tenant_id", "store_id"],
+    },
+))
+
+# ---------------------------------------------------------------------------
+# tx-brain: menu_optimizer (1 action)
+# ---------------------------------------------------------------------------
+
+_register("menu_optimizer__optimize", _entry(
+    agent_id="menu_optimizer",
+    action="optimize",
+    description="智能排菜优化 - 根据库存/销量/利润推荐最优排菜方案（临期食材消耗/高毛利推广/套餐建议）",
+    input_schema={
+        "properties": {
+            "payload": {
+                "type": "object",
+                "description": "排菜请求数据",
+                "properties": {
+                    "tenant_id": {"type": "string"},
+                    "store_id": {"type": "string"},
+                    "date": {"type": "string", "description": "日期（YYYY-MM-DD）"},
+                    "meal_period": {"type": "string", "description": "餐段（breakfast/lunch/dinner）"},
+                    "current_inventory": {
+                        "type": "array",
+                        "description": "当前库存列表，含 ingredient_id/name/quantity/unit/expiry_days/cost_per_unit_fen",
+                        "items": {"type": "object"},
+                    },
+                    "dish_performance": {
+                        "type": "array",
+                        "description": "菜品表现数据，含 dish_id/dish_name/category/avg_daily_orders/margin_rate/prep_time_minutes/is_available",
+                        "items": {"type": "object"},
+                    },
+                    "weather": {"type": "string", "description": "天气（可选）"},
+                    "day_type": {"type": "string", "description": "日期类型（weekday/weekend/holiday）"},
+                },
+                "required": ["tenant_id", "store_id", "date", "meal_period"],
+            },
+        },
+        "required": ["payload"],
+    },
+))
+
+# ---------------------------------------------------------------------------
+# tx-brain: crm_operator (2 actions)
+# ---------------------------------------------------------------------------
+
+_register("crm_operator__generate_campaign", _entry(
+    agent_id="crm_operator",
+    action="generate_campaign",
+    description="私域运营活动生成 - 生成微信群/朋友圈/小程序推送文案和活动方案",
+    input_schema={
+        "properties": {
+            "payload": {
+                "type": "object",
+                "description": "活动请求数据",
+                "properties": {
+                    "tenant_id": {"type": "string"},
+                    "store_id": {"type": "string"},
+                    "brand_name": {"type": "string", "description": "品牌名称"},
+                    "campaign_type": {
+                        "type": "string",
+                        "description": "活动类型",
+                        "enum": ["retention", "reactivation", "upsell", "event", "holiday"],
+                    },
+                    "target_segment": {
+                        "type": "string",
+                        "description": "目标用户群",
+                        "enum": ["vip", "regular", "at_risk", "new"],
+                    },
+                    "target_count": {"type": "integer", "description": "目标用户数量"},
+                    "budget_fen": {"type": "integer", "description": "活动预算（分）"},
+                    "key_dishes": {"type": "array", "items": {"type": "string"}, "description": "重点推广菜品名列表"},
+                    "discount_limit": {"type": "number", "description": "最大折扣率（如0.2=8折）"},
+                    "special_occasion": {"type": "string", "description": "特殊场合（如'母亲节'）"},
+                },
+                "required": ["tenant_id", "brand_name", "campaign_type"],
+            },
+        },
+        "required": ["payload"],
+    },
+))
+
+_register("crm_operator__analyze_from_mv", _entry(
+    agent_id="crm_operator",
+    action="analyze_from_mv",
+    description="会员CLV快速分析 - 从 mv_member_clv 物化视图快速读取会员生命周期价值数据（<5ms）",
+    input_schema={
+        "properties": {
+            "tenant_id": {"type": "string", "description": "租户ID"},
+            "store_id": {"type": "string", "description": "门店ID（可选，不传则取租户级别数据）"},
+        },
+        "required": ["tenant_id"],
+    },
+))
+
+# ---------------------------------------------------------------------------
+# tx-brain: customer_service (2 actions)
+# ---------------------------------------------------------------------------
+
+_register("customer_service__handle", _entry(
+    agent_id="customer_service",
+    action="handle",
+    description="智能客服处理 - 处理顾客投诉/询问/反馈，生成建议回复及处置动作（VIP投诉/食安关键词强制升级）",
+    input_schema={
+        "properties": {
+            "payload": {
+                "type": "object",
+                "description": "客服请求数据",
+                "properties": {
+                    "tenant_id": {"type": "string"},
+                    "store_id": {"type": "string"},
+                    "customer_id": {"type": "string", "description": "顾客ID（可选）"},
+                    "channel": {
+                        "type": "string",
+                        "description": "渠道",
+                        "enum": ["wechat_mp", "miniapp", "review", "call", "in_store"],
+                    },
+                    "message": {"type": "string", "description": "顾客原文"},
+                    "order_id": {"type": "string", "description": "关联订单ID（可选）"},
+                    "message_type": {
+                        "type": "string",
+                        "description": "消息类型",
+                        "enum": ["complaint", "inquiry", "feedback", "praise"],
+                    },
+                    "context_history": {
+                        "type": "array",
+                        "description": "历史对话 [{role, content}]",
+                        "items": {"type": "object"},
+                    },
+                    "customer_tier": {
+                        "type": "string",
+                        "description": "顾客等级",
+                        "enum": ["vip", "regular", "new"],
+                    },
+                },
+                "required": ["tenant_id", "store_id", "message", "message_type"],
+            },
+        },
+        "required": ["payload"],
+    },
+))
+
+_register("customer_service__analyze_from_mv", _entry(
+    agent_id="customer_service",
+    action="analyze_from_mv",
+    description="客服舆情快速分析 - 从 mv_public_opinion 物化视图快速读取门店舆情数据（<5ms）",
+    input_schema={
+        "properties": {
+            "tenant_id": {"type": "string", "description": "租户ID"},
+            "store_id": {"type": "string", "description": "门店ID（可选，不传则取租户级别数据）"},
+        },
+        "required": ["tenant_id"],
+    },
+))
+
+# ---------------------------------------------------------------------------
+# tx-brain: energy_monitor (2 actions)
+# ---------------------------------------------------------------------------
+
+_register("energy_monitor__analyze", _entry(
+    agent_id="energy_monitor",
+    action="analyze",
+    description="能耗分析 - 分析门店能耗效率，识别异常消耗，给出节能建议（能耗/营收比分级：优秀≤5%/良好≤8%/警告≤12%/超标）",
+    input_schema={
+        "properties": {
+            "payload": {
+                "type": "object",
+                "description": "能耗数据",
+                "properties": {
+                    "tenant_id": {"type": "string"},
+                    "store_id": {"type": "string"},
+                    "stat_date": {"type": "string", "description": "统计日期（YYYY-MM-DD）"},
+                    "electricity_kwh": {"type": "number", "description": "当日用电量（kWh）"},
+                    "gas_m3": {"type": "number", "description": "当日用气量（m³）"},
+                    "water_ton": {"type": "number", "description": "当日用水量（吨）"},
+                    "energy_cost_fen": {"type": "integer", "description": "能耗总费用（分）"},
+                    "revenue_fen": {"type": "integer", "description": "当日营业收入（分）"},
+                    "energy_revenue_ratio": {"type": "number", "description": "能耗/营收比"},
+                    "anomaly_count": {"type": "integer", "description": "异常次数"},
+                    "off_hours_anomalies": {
+                        "type": "array",
+                        "description": "非营业时段异常列表",
+                        "items": {"type": "string"},
+                    },
+                },
+                "required": ["tenant_id", "store_id", "stat_date"],
+            },
+        },
+        "required": ["payload"],
+    },
+))
+
+_register("energy_monitor__analyze_from_mv", _entry(
+    agent_id="energy_monitor",
+    action="analyze_from_mv",
+    description="能耗快速分析 - 从 mv_energy_efficiency 物化视图快速读取最新能耗效率数据（<5ms）",
+    input_schema={
+        "properties": {
+            "tenant_id": {"type": "string", "description": "租户ID"},
+            "store_id": {"type": "string", "description": "门店ID（可选，不传则取最新门店数据）"},
+        },
+        "required": ["tenant_id"],
+    },
+))
+
+
 # ---------------------------------------------------------------------------
 # Convenience accessors
 # ---------------------------------------------------------------------------

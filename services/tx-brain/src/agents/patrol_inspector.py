@@ -260,6 +260,18 @@ class PatrolInspector:
 
         warnings_str = "\n".join(pre_warnings) if pre_warnings else "无自动预警触发"
 
+        # 附加舆情摘要（由 analyze_from_mv 注入）
+        opinion_ctx = payload.get("public_opinion", {})
+        if opinion_ctx:
+            opinion_lines = [
+                f"- 近4周负面评价总数：{opinion_ctx.get('total_negative', 0)}条",
+                f"- 最差平台：{opinion_ctx.get('worst_platform', '未知')}",
+                f"- 平均情感评分：{opinion_ctx.get('avg_sentiment', 'N/A')}",
+            ]
+            opinion_section = "\n舆情背景（近4周）：\n" + "\n".join(opinion_lines)
+        else:
+            opinion_section = ""
+
         return f"""门店巡检报告分析请求：
 
 基本信息：
@@ -278,7 +290,7 @@ class PatrolInspector:
 {chr(10).join(fail_lines)}
 
 系统预警：
-{warnings_str}
+{warnings_str}{opinion_section}
 
 请根据以上不合格项，分析每项违规的严重程度，给出具体整改建议。食安和消防违规必须标记为critical。"""
 
@@ -381,6 +393,80 @@ class PatrolInspector:
             hygiene_ok=result.get("constraints_check", {}).get("hygiene_ok"),
             source=result.get("source"),
         )
+
+
+    async def analyze_from_mv(self, payload: dict, db) -> dict:
+        """基于物化视图的增强分析入口。
+
+        在调用标准 analyze() 之前，从 mv_public_opinion 读取近4周舆情摘要，
+        附加到 input_context 中，丰富 Claude 的分析背景。
+        """
+        tenant_id = payload.get("tenant_id", "")
+        store_id = payload.get("store_id", "")
+
+        opinion_ctx = await self.get_opinion_context(tenant_id, store_id, db)
+
+        # 将舆情数据附加到 payload，供 _build_context 使用
+        enriched_payload = dict(payload)
+        enriched_payload["public_opinion"] = opinion_ctx
+
+        return await self.analyze(enriched_payload)
+
+    async def get_opinion_context(self, tenant_id: str, store_id: str, db) -> dict:
+        """从 mv_public_opinion 读取近4周舆情摘要，供 analyze_from_mv() 增强上下文。
+
+        查询 mv_public_opinion 最近4周，按 platform 聚合。
+        无数据或查询失败时返回 {}。
+        """
+        from sqlalchemy import text
+        from sqlalchemy.exc import SQLAlchemyError
+
+        try:
+            result = await db.execute(
+                text("""
+                    SELECT platform,
+                           SUM(total_mentions) as total,
+                           SUM(negative_count) as negative,
+                           AVG(avg_sentiment_score) as avg_sentiment
+                    FROM mv_public_opinion
+                    WHERE tenant_id = :tenant_id AND store_id = :store_id
+                      AND stat_week >= (CURRENT_DATE - INTERVAL '28 days')::DATE
+                    GROUP BY platform
+                    ORDER BY negative DESC
+                """),
+                {"tenant_id": tenant_id, "store_id": store_id},
+            )
+            rows = result.mappings().all()
+            if not rows:
+                return {}
+
+            total_negative = sum(int(r["negative"] or 0) for r in rows)
+            worst_platform = rows[0]["platform"] if rows else None
+            avg_sentiments = [float(r["avg_sentiment"]) for r in rows if r["avg_sentiment"] is not None]
+            avg_sentiment = round(sum(avg_sentiments) / len(avg_sentiments), 4) if avg_sentiments else None
+
+            return {
+                "total_negative": total_negative,
+                "worst_platform": worst_platform,
+                "avg_sentiment": avg_sentiment,
+                "platform_breakdown": [
+                    {
+                        "platform": r["platform"],
+                        "total": int(r["total"] or 0),
+                        "negative": int(r["negative"] or 0),
+                        "avg_sentiment": float(r["avg_sentiment"]) if r["avg_sentiment"] is not None else None,
+                    }
+                    for r in rows
+                ],
+            }
+        except SQLAlchemyError as exc:
+            logger.warning(
+                "patrol_inspector_opinion_ctx_error",
+                tenant_id=tenant_id,
+                store_id=store_id,
+                error=str(exc),
+            )
+            return {}
 
 
 patrol_inspector = PatrolInspector()

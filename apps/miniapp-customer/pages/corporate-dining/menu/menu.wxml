@@ -1,0 +1,142 @@
+<!-- 企业专属菜单 — 协议价格 + 企业挂账结算 -->
+<view class="page-wrapper">
+
+  <!-- 企业账户信息条 -->
+  <view class="account-bar">
+    <view class="account-info">
+      <text class="company-name">{{companyName}}</text>
+      <view class="account-nums">
+        <view class="account-num-item">
+          <text class="num-label">账户余额</text>
+          <text class="num-value balance">¥{{balanceYuan}}</text>
+        </view>
+        <view class="divider-v"></view>
+        <view class="account-num-item">
+          <text class="num-label">本月消费</text>
+          <text class="num-value">¥{{monthSpentYuan}}</text>
+        </view>
+      </view>
+    </view>
+    <view class="balance-warning" wx:if="{{balanceLow}}">
+      <text class="warning-text">余额不足，请联系财务充值</text>
+    </view>
+  </view>
+
+  <!-- 加载骨架 -->
+  <view class="loading-wrap" wx:if="{{loading}}">
+    <view class="loading-skeleton" wx:for="{{[1,2,3,4]}}" wx:key="*this"></view>
+  </view>
+
+  <!-- 菜单主体：左侧分类 + 右侧菜品 -->
+  <view class="menu-body" wx:if="{{!loading}}">
+
+    <!-- 左侧分类导航 -->
+    <scroll-view class="category-nav" scroll-y scroll-with-animation>
+      <view
+        class="cat-item {{currentCatId === item.id ? 'active' : ''}}"
+        wx:for="{{categories}}"
+        wx:key="id"
+        bindtap="switchCategory"
+        data-id="{{item.id}}"
+      >
+        <text class="cat-name">{{item.name}}</text>
+        <text class="cat-count" wx:if="{{item.count > 0}}">{{item.count}}</text>
+      </view>
+    </scroll-view>
+
+    <!-- 右侧菜品列表 -->
+    <scroll-view class="dish-scroll" scroll-y scroll-with-animation>
+      <view class="dish-list">
+
+        <!-- 分类标题 -->
+        <view class="cat-title-row" wx:if="{{currentCatName}}">
+          <text class="cat-title-text">{{currentCatName}}</text>
+        </view>
+
+        <!-- 菜品卡片 -->
+        <view
+          class="dish-card"
+          wx:for="{{filteredDishes}}"
+          wx:key="id"
+        >
+          <image class="dish-image" src="{{item.image || '/assets/dish-placeholder.png'}}" mode="aspectFill" lazy-load />
+          <view class="dish-info">
+            <text class="dish-name">{{item.name}}</text>
+            <text class="dish-desc" wx:if="{{item.description}}">{{item.description}}</text>
+            <view class="price-row">
+              <!-- 企业协议价 -->
+              <view class="enterprise-price-wrap">
+                <text class="enterprise-tag">企业专享价</text>
+                <text class="enterprise-price">¥{{item.enterprise_price_yuan}}</text>
+              </view>
+              <!-- 划线原价 -->
+              <text class="origin-price" wx:if="{{item.origin_price_yuan}}">¥{{item.origin_price_yuan}}</text>
+            </view>
+          </view>
+          <!-- 加减控件 -->
+          <view class="qty-control">
+            <view class="qty-btn minus {{item.qty > 0 ? '' : 'hidden'}}" bindtap="minusDish" data-id="{{item.id}}">
+              <text>-</text>
+            </view>
+            <text class="qty-num" wx:if="{{item.qty > 0}}">{{item.qty}}</text>
+            <view class="qty-btn plus" bindtap="addDish" data-id="{{item.id}}" data-dish="{{item}}">
+              <text>+</text>
+            </view>
+          </view>
+        </view>
+
+        <!-- 空状态 -->
+        <view class="empty-tip" wx:if="{{!filteredDishes.length && !loading}}">
+          <text>该分类暂无菜品</text>
+        </view>
+
+      </view>
+    </scroll-view>
+
+  </view>
+
+  <!-- 底部购物车结算栏 -->
+  <view class="cart-bar" wx:if="{{cartCount > 0}}">
+    <view class="cart-left" bindtap="showCartDetail">
+      <view class="cart-icon-wrap">
+        <text class="cart-icon">🛒</text>
+        <view class="cart-badge">
+          <text class="badge-num">{{cartCount}}</text>
+        </view>
+      </view>
+      <view class="cart-total-wrap">
+        <text class="cart-total">¥{{cartTotalYuan}}</text>
+        <text class="cart-saving" wx:if="{{cartSavingYuan !== '0.00'}}">省¥{{cartSavingYuan}}</text>
+      </view>
+    </view>
+    <view class="checkout-btn {{balanceTooLow ? 'disabled' : ''}}" bindtap="goCheckout">
+      <text wx:if="{{!balanceTooLow}}">企业挂账结算</text>
+      <text wx:if="{{balanceTooLow}}">余额不足</text>
+    </view>
+  </view>
+
+  <!-- 购物车明细弹层 -->
+  <view class="cart-mask" wx:if="{{showCart}}" bindtap="hideCartDetail"></view>
+  <view class="cart-popup {{showCart ? 'show' : ''}}">
+    <view class="popup-header">
+      <text class="popup-title">已选菜品</text>
+      <view class="clear-btn" bindtap="clearCart">
+        <text class="clear-text">清空</text>
+      </view>
+    </view>
+    <scroll-view class="cart-items-scroll" scroll-y>
+      <view class="cart-item" wx:for="{{cartItems}}" wx:key="id">
+        <text class="ci-name">{{item.name}}</text>
+        <view class="ci-right">
+          <text class="ci-price">¥{{item.enterprise_price_yuan}}</text>
+          <view class="ci-qty-ctrl">
+            <view class="ci-btn" bindtap="minusDish" data-id="{{item.id}}"><text>-</text></view>
+            <text class="ci-qty">{{item.qty}}</text>
+            <view class="ci-btn" bindtap="addDish" data-id="{{item.id}}" data-dish="{{item}}"><text>+</text></view>
+          </view>
+        </view>
+      </view>
+    </scroll-view>
+  </view>
+
+</view>

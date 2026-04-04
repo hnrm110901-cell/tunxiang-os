@@ -206,6 +206,111 @@ async def get_board_config(
     return {"ok": True, "data": config}
 
 
+@router.get("/digital-menu/dishes", response_model=dict)
+async def get_digital_menu_dishes(
+    store_id: str,
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """数字菜单屏菜品列表 — 原生 SQL 查询，按分类+排序字段排序。"""
+    from sqlalchemy.exc import SQLAlchemyError
+
+    logger.info("digital_menu_dishes_requested", store_id=store_id, tenant_id=x_tenant_id)
+
+    await db.execute(
+        text("SELECT set_config('app.tenant_id', :tid, true)"),
+        {"tid": x_tenant_id},
+    )
+
+    try:
+        result = await db.execute(
+            text("""
+                SELECT id, name, category_id, price_fen, description, image_url, is_available
+                FROM dishes
+                WHERE tenant_id = NULLIF(current_setting('app.tenant_id', true),'')::UUID
+                  AND store_id = :store_id AND is_deleted = false AND is_available = true
+                ORDER BY category_id, sort_order
+            """),
+            {"store_id": store_id},
+        )
+        rows = result.mappings().all()
+        dishes = [
+            {
+                "id": str(row["id"]),
+                "name": row["name"],
+                "category_id": str(row["category_id"]) if row["category_id"] else None,
+                "price_fen": row["price_fen"],
+                "description": row["description"],
+                "image_url": row["image_url"],
+                "is_available": row["is_available"],
+            }
+            for row in rows
+        ]
+        return {"ok": True, "data": {"store_id": store_id, "dishes": dishes}}
+    except SQLAlchemyError as exc:
+        logger.warning("digital_menu_dishes_db_error", error=str(exc), store_id=store_id)
+        return {"ok": True, "data": {"store_id": store_id, "dishes": []}}
+
+
+@router.get("/digital-menu/config", response_model=dict)
+async def get_digital_menu_config(
+    store_id: str,
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """数字菜单屏门店配置 — 从 stores 表读取名称/logo/公告/主题色。"""
+    from sqlalchemy.exc import SQLAlchemyError
+
+    logger.info("digital_menu_config_requested", store_id=store_id, tenant_id=x_tenant_id)
+
+    await db.execute(
+        text("SELECT set_config('app.tenant_id', :tid, true)"),
+        {"tid": x_tenant_id},
+    )
+
+    try:
+        result = await db.execute(
+            text("""
+                SELECT id, name, logo_url, announcement_text, theme_color
+                FROM stores
+                WHERE tenant_id = NULLIF(current_setting('app.tenant_id', true),'')::UUID
+                  AND id = :store_id
+                LIMIT 1
+            """),
+            {"store_id": store_id},
+        )
+        row = result.mappings().one_or_none()
+        if row:
+            config = {
+                "store_id": str(row["id"]),
+                "store_name": row["name"],
+                "logo_url": row["logo_url"],
+                "announcement_text": row["announcement_text"] or "",
+                "theme_color": row["theme_color"] or "#FF6B35",
+            }
+        else:
+            config = {
+                "store_id": store_id,
+                "store_name": "屯象餐厅",
+                "logo_url": None,
+                "announcement_text": "",
+                "theme_color": "#FF6B35",
+            }
+        return {"ok": True, "data": config}
+    except SQLAlchemyError as exc:
+        logger.warning("digital_menu_config_db_error", error=str(exc), store_id=store_id)
+        return {
+            "ok": True,
+            "data": {
+                "store_id": store_id,
+                "store_name": "屯象餐厅",
+                "logo_url": None,
+                "announcement_text": "",
+                "theme_color": "#FF6B35",
+            },
+        }
+
+
 @router.post("/board-announcement", response_model=dict)
 async def update_board_announcement(
     body: UpdateAnnouncementRequest,

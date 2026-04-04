@@ -1,0 +1,11 @@
+// English language pack
+module.exports = {
+  common: { confirm: 'Confirm', cancel: 'Cancel', loading: 'Loading...', save: 'Save', delete: 'Delete', search: 'Search', more: 'More', back: 'Back', done: 'Done', retry: 'Retry' },
+  tab: { home: 'Home', order: 'Menu', orders: 'Orders', member: 'Me' },
+  home: { search_placeholder: 'Search dishes, stores', nearby_stores: 'Nearby Stores', recommend: 'Recommended', activities: 'Promotions', loading: 'Loading...', no_stores: 'No nearby stores. Please enable location.', no_dishes: 'No recommended dishes', dine_in: 'Dine In', takeaway: 'Takeaway', chef_home: 'Chef at Home', start_order: 'Start Ordering', start_takeaway: 'Order Takeaway', more_activities: 'More promotions coming soon', monthly_sales: 'Monthly', view_detail: 'View Details >', open: 'Open', closed: 'Closed', estimated_min: 'min', preparing_label: 'Preparing', order_accepted: 'Accepted', order_cooking: 'Cooking', order_plating: 'Plating', order_ready: 'Ready', scan_order: 'Scan to Order', reservation: 'Reserve', takeaway_order: 'Takeaway', chef_at_home: 'Chef at Home', group_buy: 'Group Buy', stored_value: 'Top Up', points_mall: 'Points Mall' },
+  menu: { category: 'Category', add_to_cart: 'Add to Cart', sold_out: 'Sold Out', spicy: 'Spicy', spec_select: 'Select Specs', cart: 'Cart', checkout: 'Checkout', min_order: 'Min. Order' },
+  order: { my_orders: 'My Orders', pending_pay: 'Pending', preparing: 'Preparing', delivering: 'Delivering', completed: 'Completed', cancelled: 'Cancelled', order_detail: 'Order Details', pay_now: 'Pay Now', cancel_order: 'Cancel Order', reorder: 'Reorder', rush: 'Rush' },
+  member: { my_page: 'My Account', balance: 'Balance', points: 'Points', coupons: 'Coupons', level: 'VIP Level', settings: 'Settings', address: 'Addresses', invoice: 'Invoices', feedback: 'Feedback' },
+  payment: { total: 'Total', discount: 'Discount', actual_pay: 'Pay', wechat_pay: 'WeChat Pay', stored_value: 'Stored Value', pay_success: 'Payment Successful', pay_failed: 'Payment Failed' },
+  settings: { title: 'Settings', language: 'Language', current_lang: 'Current Language', clear_cache: 'Clear Cache', clear_cache_confirm: 'Clear cache?', clear_success: 'Cache cleared', about: 'About Us', version: 'Version', switch_lang_confirm: 'Switching language will reload the app' }
+};

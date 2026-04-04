@@ -1,5 +1,6 @@
 // 在线预订页
 const app = getApp();
+const { txRequest } = require('../../utils/api');
 
 Page({
   data: {
@@ -70,30 +71,21 @@ Page({
 
     this.setData({ submitting: true });
     try {
-      const res = await wx.request({
-        url: `${app.globalData.apiBase}/api/v1/booking/create`,
-        method: 'POST',
-        header: { 'X-Tenant-ID': app.globalData.tenantId },
-        data: {
-          store_id: app.globalData.storeId,
-          customer_id: app.globalData.customerId,
-          date,
-          time_slot: selectedSlot,
-          guests,
-          room_preference: selectedRoom,
-          remark,
-        },
+      await txRequest('/api/v1/booking/create', 'POST', {
+        store_id: app.globalData.storeId,
+        customer_id: app.globalData.customerId,
+        date,
+        time_slot: selectedSlot,
+        guests,
+        room_preference: selectedRoom,
+        remark,
       });
-      if (res.data.ok) {
-        wx.showToast({ title: '预订成功', icon: 'success' });
-        this.setData({ date: '', selectedSlot: '', guests: 2, selectedRoom: 'any', remark: '', activeTab: 'list' });
-        this.loadBookings();
-      } else {
-        wx.showToast({ title: res.data.error?.message || '预订失败', icon: 'none' });
-      }
+      wx.showToast({ title: '预订成功', icon: 'success' });
+      this.setData({ date: '', selectedSlot: '', guests: 2, selectedRoom: 'any', remark: '', activeTab: 'list' });
+      this.loadBookings();
     } catch (err) {
       console.error('submitBooking failed', err);
-      wx.showToast({ title: '网络错误', icon: 'none' });
+      wx.showToast({ title: (err && err.message) || '预订失败', icon: 'none' });
     } finally {
       this.setData({ submitting: false });
     }
@@ -101,24 +93,19 @@ Page({
 
   async loadBookings() {
     try {
-      const res = await wx.request({
-        url: `${app.globalData.apiBase}/api/v1/booking/list`,
-        data: {
-          store_id: app.globalData.storeId,
-          customer_id: app.globalData.customerId,
-        },
-        header: { 'X-Tenant-ID': app.globalData.tenantId },
-      });
-      if (res.data.ok) {
-        const statusMap = { confirmed: '已确认', pending: '待确认', cancelled: '已取消', completed: '已完成' };
-        const roomMap = { any: '不限', hall: '大厅', small: '小包间', large: '大包间' };
-        const bookings = (res.data.data.items || []).map(b => ({
-          ...b,
-          statusText: statusMap[b.status] || b.status,
-          roomLabel: roomMap[b.room_preference] || b.room_preference,
-        }));
-        this.setData({ bookings });
-      }
+      const d = await txRequest(
+        '/api/v1/booking/list?store_id=' + encodeURIComponent(app.globalData.storeId)
+          + '&customer_id=' + encodeURIComponent(app.globalData.customerId),
+        'GET',
+      );
+      const statusMap = { confirmed: '已确认', pending: '待确认', cancelled: '已取消', completed: '已完成' };
+      const roomMap = { any: '不限', hall: '大厅', small: '小包间', large: '大包间' };
+      const bookings = (d.items || []).map(b => ({
+        ...b,
+        statusText: statusMap[b.status] || b.status,
+        roomLabel: roomMap[b.room_preference] || b.room_preference,
+      }));
+      this.setData({ bookings });
     } catch (err) {
       console.error('loadBookings failed', err);
     }
@@ -132,15 +119,9 @@ Page({
     if (!confirmRes.confirm) return;
 
     try {
-      const res = await wx.request({
-        url: `${app.globalData.apiBase}/api/v1/booking/${id}/cancel`,
-        method: 'POST',
-        header: { 'X-Tenant-ID': app.globalData.tenantId },
-      });
-      if (res.data.ok) {
-        wx.showToast({ title: '已取消', icon: 'success' });
-        this.loadBookings();
-      }
+      await txRequest('/api/v1/booking/' + encodeURIComponent(id) + '/cancel', 'POST');
+      wx.showToast({ title: '已取消', icon: 'success' });
+      this.loadBookings();
     } catch (err) {
       console.error('cancelBooking failed', err);
       wx.showToast({ title: '取消失败', icon: 'none' });

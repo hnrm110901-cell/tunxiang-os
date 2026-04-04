@@ -1,0 +1,29 @@
+# 边缘同步引擎依赖
+# 运行：pip install -r requirements.txt
+
+# 异步 PostgreSQL 驱动（顶层 sync_engine.py 直连双PG）
+asyncpg==0.29.0
+
+# HTTP 客户端（src/sync_engine.py 访问云端 API）
+httpx==0.27.0
+
+# 结构化日志
+structlog==24.1.0
+
+# 配置管理（顶层 config.py）
+pydantic-settings==2.2.1
+python-dotenv==1.0.1
+
+# 数据库 ORM（src/sync_engine.py 本地PG操作）
+sqlalchemy[asyncio]==2.0.30
+
+# SQLite 异步驱动（src/sync_tracker.py 本地状态持久化）
+aiosqlite==0.20.0
+
+# FastAPI HTTP API 服务（src/api_main.py）
+fastapi==0.111.0
+uvicorn[standard]==0.29.0
+
+# 开发 / 测试
+pytest==8.2.0
+pytest-asyncio==0.23.6

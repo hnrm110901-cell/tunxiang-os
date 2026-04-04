@@ -138,101 +138,7 @@ function conversionRate(stats: JourneyStats): string {
   return ((stats.completions_today / stats.triggers_today) * 100).toFixed(0) + '%';
 }
 
-// ---- Mock 数据（当 API 不可用时的 fallback）----
-
-const MOCK_JOURNEYS: JourneyDefinition[] = [
-  {
-    id: 'j-birthday',
-    name: '生日VIP旅程',
-    status: 'active',
-    trigger_event: 'birthday',
-    steps: [
-      { step_id: 's1', type: 'trigger', name: '生日触发', execution_count: 180 },
-      { step_id: 's2', type: 'message', name: '发送生日祝福', execution_count: 176 },
-      { step_id: 's3', type: 'coupon', name: '发送生日优惠券', execution_count: 156, active_count: 23 },
-      { step_id: 's4', type: 'wait', name: '等待3天', execution_count: 134 },
-      { step_id: 's5', type: 'condition', name: '是否消费', execution_count: 48 },
-    ],
-    stats: { total_enrollments: 180, active_enrollments: 23, completions_today: 8, triggers_today: 24 },
-    last_triggered_at: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
-    created_at: '2026-02-15T00:00:00Z',
-  },
-  {
-    id: 'j-dormant',
-    name: '沉睡客唤醒旅程',
-    status: 'active',
-    trigger_event: 'dormant_60d',
-    steps: [
-      { step_id: 's1', type: 'trigger', name: '沉睡60天触发', execution_count: 520 },
-      { step_id: 's2', type: 'message', name: '发送唤醒消息', execution_count: 518 },
-      { step_id: 's3', type: 'wait', name: '等待7天', execution_count: 490 },
-      { step_id: 's4', type: 'coupon', name: '发送专属折扣', execution_count: 312, active_count: 87 },
-      { step_id: 's5', type: 'condition', name: '是否复购', execution_count: 98 },
-      { step_id: 's6', type: 'message', name: '深度唤醒消息', execution_count: 214 },
-      { step_id: 's7', type: 'end', name: '流程结束', execution_count: 87 },
-    ],
-    stats: { total_enrollments: 520, active_enrollments: 87, completions_today: 15, triggers_today: 42 },
-    last_triggered_at: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
-    created_at: '2026-01-10T00:00:00Z',
-  },
-  {
-    id: 'j-welcome',
-    name: '首次到访欢迎旅程',
-    status: 'active',
-    trigger_event: 'first_visit',
-    steps: [
-      { step_id: 's1', type: 'trigger', name: 'first_visit 触发', execution_count: 730 },
-      { step_id: 's2', type: 'message', name: '发送欢迎消息', execution_count: 728, active_count: 156 },
-      { step_id: 's3', type: 'wait', name: '等待3天', execution_count: 512 },
-      { step_id: 's4', type: 'coupon', name: '发送复购券', execution_count: 301 },
-      { step_id: 's5', type: 'condition', name: '检查是否复购', execution_count: 156 },
-    ],
-    stats: { total_enrollments: 730, active_enrollments: 156, completions_today: 31, triggers_today: 67 },
-    last_triggered_at: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
-    created_at: '2026-01-05T00:00:00Z',
-  },
-  {
-    id: 'j-banquet',
-    name: '宴席后关怀旅程',
-    status: 'paused',
-    trigger_event: 'post_banquet',
-    steps: [
-      { step_id: 's1', type: 'trigger', name: '宴席完成触发', execution_count: 64 },
-      { step_id: 's2', type: 'message', name: '发送感谢消息', execution_count: 62 },
-      { step_id: 's3', type: 'wait', name: '等待7天', execution_count: 58 },
-      { step_id: 's4', type: 'message', name: '邀请再次预订', execution_count: 20 },
-    ],
-    stats: { total_enrollments: 64, active_enrollments: 0, completions_today: 0, triggers_today: 0 },
-    last_triggered_at: new Date(Date.now() - 3 * 24 * 3600 * 1000).toISOString(),
-    created_at: '2026-02-01T00:00:00Z',
-  },
-  {
-    id: 'j-highvalue',
-    name: '高价值客户培育',
-    status: 'draft',
-    trigger_event: 'high_value_threshold',
-    steps: [
-      { step_id: 's1', type: 'trigger', name: '消费达标触发', execution_count: 0 },
-      { step_id: 's2', type: 'tag', name: '打VIP标签', execution_count: 0 },
-      { step_id: 's3', type: 'message', name: '专属权益通知', execution_count: 0 },
-    ],
-    stats: { total_enrollments: 0, active_enrollments: 0, completions_today: 0, triggers_today: 0 },
-    created_at: '2026-03-20T00:00:00Z',
-  },
-];
-
-const MOCK_ENROLLMENTS: JourneyEnrollment[] = [
-  { enrollment_id: 'e1', customer_id: 'C10023', entered_at: new Date(Date.now() - 3600000).toISOString(), current_step: '发送欢迎消息', status: 'active' },
-  { enrollment_id: 'e2', customer_id: 'C20156', entered_at: new Date(Date.now() - 7200000).toISOString(), current_step: '等待3天', status: 'active' },
-  { enrollment_id: 'e3', customer_id: 'C30871', entered_at: new Date(Date.now() - 14400000).toISOString(), current_step: '发送复购券', status: 'active' },
-  { enrollment_id: 'e4', customer_id: 'C11045', entered_at: new Date(Date.now() - 86400000).toISOString(), current_step: '检查是否复购', status: 'completed' },
-  { enrollment_id: 'e5', customer_id: 'C40023', entered_at: new Date(Date.now() - 172800000).toISOString(), current_step: '流程结束', status: 'completed' },
-  { enrollment_id: 'e6', customer_id: 'C50392', entered_at: new Date(Date.now() - 260000000).toISOString(), current_step: '发送复购券', status: 'active' },
-  { enrollment_id: 'e7', customer_id: 'C60114', entered_at: new Date(Date.now() - 300000000).toISOString(), current_step: '等待3天', status: 'active' },
-  { enrollment_id: 'e8', customer_id: 'C70088', entered_at: new Date(Date.now() - 350000000).toISOString(), current_step: '流程结束', status: 'completed' },
-  { enrollment_id: 'e9', customer_id: 'C80234', entered_at: new Date(Date.now() - 400000000).toISOString(), current_step: '检查是否复购', status: 'active' },
-  { enrollment_id: 'e10', customer_id: 'C90567', entered_at: new Date(Date.now() - 450000000).toISOString(), current_step: '流程结束', status: 'completed' },
-];
+// ---- Mock 数据已移除，API 失败时 fallback 空数据 ----
 
 // ---- 主页面 ----
 
@@ -245,28 +151,29 @@ export function JourneyMonitorPage() {
   const [importingTemplate, setImportingTemplate] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
-  // 加载旅程列表
+  // 加载旅程列表（旅程执行状态监控）
   const loadJourneys = useCallback(async () => {
     try {
-      const data = await txFetch<{ items: JourneyDefinition[] }>('/api/v1/journey/definitions');
-      setJourneys(data.items);
+      const data = await txFetch<{ items: JourneyDefinition[] }>('/api/v1/growth/journeys');
+      setJourneys(data.items ?? []);
     } catch {
-      // API 不可用时使用 mock 数据
-      setJourneys(MOCK_JOURNEYS);
+      // API 不可用时 fallback 空列表，显示"暂无数据"
+      setJourneys([]);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  // 加载参与记录
+  // 加载节点执行历史
   const loadEnrollments = useCallback(async (journeyId: string) => {
     try {
       const data = await txFetch<{ items: JourneyEnrollment[] }>(
-        `/api/v1/journey/enrollments?journey_id=${encodeURIComponent(journeyId)}&page=1&size=10`,
+        `/api/v1/growth/journeys/${encodeURIComponent(journeyId)}/executions?limit=20`,
       );
-      setEnrollments(data.items);
+      setEnrollments(data.items ?? []);
     } catch {
-      setEnrollments(MOCK_ENROLLMENTS);
+      // API 失败时 fallback 空列表
+      setEnrollments([]);
     }
   }, []);
 
@@ -287,12 +194,11 @@ export function JourneyMonitorPage() {
   // 激活/暂停旅程
   const toggleJourneyStatus = useCallback(async (j: JourneyDefinition) => {
     const isActive = j.status === 'active';
-    const endpoint = isActive
-      ? `/api/v1/journey/definitions/${j.id}/deactivate`
-      : `/api/v1/journey/definitions/${j.id}/activate`;
+    const endpoint = `/api/v1/growth/journeys/${encodeURIComponent(j.id)}`;
 
     // 乐观更新
     const newStatus: JourneyDefinition['status'] = isActive ? 'paused' : 'active';
+    const newStatusVal = newStatus;
     setJourneys(prev => prev.map(item =>
       item.id === j.id ? { ...item, status: newStatus } : item,
     ));
@@ -302,7 +208,10 @@ export function JourneyMonitorPage() {
 
     setActionLoading(j.id);
     try {
-      await txFetch(endpoint, { method: 'POST' });
+      await txFetch(endpoint, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: newStatusVal }),
+      });
     } catch {
       // 回滚乐观更新
       setJourneys(prev => prev.map(item =>
@@ -320,7 +229,7 @@ export function JourneyMonitorPage() {
   const importTemplate = useCallback(async (templateId: string) => {
     setImportingTemplate(templateId);
     try {
-      await txFetch('/api/v1/journey/trigger', {
+      await txFetch('/api/v1/growth/journeys/from-template', {
         method: 'POST',
         body: JSON.stringify({ template_id: templateId }),
       });
@@ -363,6 +272,14 @@ export function JourneyMonitorPage() {
         {loading && (
           <div style={{ textAlign: 'center', padding: 40, color: TEXT_3, fontSize: 13 }}>
             加载中...
+          </div>
+        )}
+        {!loading && journeys.length === 0 && (
+          <div style={{
+            textAlign: 'center', padding: 40, color: TEXT_3, fontSize: 13,
+            background: BG_1, borderRadius: 10, border: `1px solid ${BG_2}`,
+          }}>
+            暂无数据
           </div>
         )}
         {!loading && journeys.map(j => (

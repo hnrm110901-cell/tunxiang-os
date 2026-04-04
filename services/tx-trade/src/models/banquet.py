@@ -1,10 +1,11 @@
-"""宴会ORM模型 — 映射v004+v013迁移表"""
+"""宴会ORM模型 — 映射v004+v013+v160迁移表"""
 import uuid
 from datetime import date, datetime
+from decimal import Decimal
 
-from sqlalchemy import BigInteger, Boolean, Date, Float, Integer, String, Text
+from sqlalchemy import BigInteger, Boolean, Date, Float, ForeignKey, Integer, Numeric, String, Text
 from sqlalchemy.dialects.postgresql import JSON, UUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from shared.ontology.src.base import TenantBase
 
@@ -153,3 +154,59 @@ class BanquetCase(TenantBase):
     highlights: Mapped[list | None] = mapped_column(JSON, nullable=True)
     menu_items: Mapped[list | None] = mapped_column(JSON, nullable=True)
     archived_at: Mapped[datetime | None] = mapped_column(nullable=True)
+
+
+# ─── v160: 宴席套餐模板引擎 ───────────────────────────────────────────────
+
+
+class BanquetMenuTemplate(TenantBase):
+    """宴席套餐模板主表 — 映射v160迁移"""
+    __tablename__ = "banquet_menu_templates"
+
+    store_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), nullable=True, index=True,
+        comment="NULL=集团通用，非NULL=门店专属"
+    )
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    category: Mapped[str] = mapped_column(
+        String(50), nullable=False,
+        comment="wedding/business/birthday/festival/other"
+    )
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    guest_count_min: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    guest_count_max: Mapped[int] = mapped_column(Integer, nullable=False, default=999)
+    price_per_table_fen: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    price_per_person_fen: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    min_table_count: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    deposit_rate: Mapped[Decimal] = mapped_column(Numeric(5, 4), nullable=False, default=Decimal("0.3"))
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+    items: Mapped[list["BanquetTemplateItem"]] = relationship(
+        back_populates="template", lazy="selectin"
+    )
+
+
+class BanquetTemplateItem(TenantBase):
+    """套餐模板菜品明细 — 映射v160迁移"""
+    __tablename__ = "banquet_template_items"
+
+    template_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("banquet_menu_templates.id"),
+        nullable=False,
+        index=True,
+    )
+    dish_name: Mapped[str] = mapped_column(String(200), nullable=False)
+    dish_category: Mapped[str | None] = mapped_column(
+        String(50), nullable=True,
+        comment="cold/hot/soup/staple/dessert/drink"
+    )
+    quantity: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False, default=Decimal("1"))
+    unit: Mapped[str] = mapped_column(String(20), nullable=False, default="道")
+    is_signature: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    is_optional: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+    template: Mapped["BanquetMenuTemplate"] = relationship(back_populates="items")

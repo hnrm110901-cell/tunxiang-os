@@ -133,74 +133,14 @@ const BILL_STATUS: Record<string, { color: string; text: string }> = {
   overdue: { color: 'error', text: '逾期' },
 };
 
-// ─── Mock 数据 ──────────────────────────────────────────────────────────────────
+// ─── 注：MOCK 数据已移除，API 失败时各状态重置为 null/[] ───────────────────────
 
-const MOCK_STATS: DashboardStats = {
-  total_franchisees: 28,
-  active_stores: 64,
-  monthly_royalty_total_fen: 18640000,
-  royalty_collection_rate: 94.2,
+const EMPTY_STATS: DashboardStats = {
+  total_franchisees: 0,
+  active_stores: 0,
+  monthly_royalty_total_fen: 0,
+  royalty_collection_rate: 0,
 };
-
-const MOCK_FRANCHISEES: Franchisee[] = [
-  {
-    id: 'fr-001', brand_name: '尝在一起·湖南区', legal_name: '长沙味道科技有限公司',
-    contact_name: '陈总', contact_phone: '138-0001-0001', city: '长沙',
-    tier: 'flagship', store_count: 8, monthly_revenue_fen: 3840000,
-    monthly_royalty_fen: 192000, overall_score: 4.8,
-    status: 'active', contract_start: '2024-01-01', contract_end: '2027-12-31',
-    royalty_rate: 0.05,
-  },
-  {
-    id: 'fr-002', brand_name: '最黔线·贵州区', legal_name: '贵州黔味餐饮管理有限公司',
-    contact_name: '黄总', contact_phone: '139-0002-0002', city: '贵阳',
-    tier: 'premium', store_count: 5, monthly_revenue_fen: 2250000,
-    monthly_royalty_fen: 112500, overall_score: 4.3,
-    status: 'active', contract_start: '2024-06-01', contract_end: '2027-05-31',
-    royalty_rate: 0.05,
-  },
-  {
-    id: 'fr-003', brand_name: '尚宫厨·武汉区', legal_name: '武汉宫廷味道餐饮有限公司',
-    contact_name: '刘总', contact_phone: '136-0003-0003', city: '武汉',
-    tier: 'premium', store_count: 4, monthly_revenue_fen: 1800000,
-    monthly_royalty_fen: 90000, overall_score: 4.1,
-    status: 'active', contract_start: '2025-01-01', contract_end: '2028-12-31',
-    royalty_rate: 0.05,
-  },
-  {
-    id: 'fr-004', brand_name: '标准加盟商·成都', legal_name: '成都餐饮运营有限公司',
-    contact_name: '罗总', contact_phone: '135-0004-0004', city: '成都',
-    tier: 'standard', store_count: 2, monthly_revenue_fen: 760000,
-    monthly_royalty_fen: 38000, overall_score: 3.7,
-    status: 'suspended', contract_start: '2025-03-01', contract_end: '2028-02-28',
-    royalty_rate: 0.05,
-  },
-];
-
-const MOCK_KPI_TREND: KpiMonth[] = [
-  { month: '2026-01', revenue_target_fen: 3200000, revenue_actual_fen: 3120000, completion_rate: 97.5 },
-  { month: '2026-02', revenue_target_fen: 2800000, revenue_actual_fen: 2960000, completion_rate: 105.7 },
-  { month: '2026-03', revenue_target_fen: 3500000, revenue_actual_fen: 3840000, completion_rate: 109.7 },
-  { month: '2026-04', revenue_target_fen: 3800000, revenue_actual_fen: 3600000, completion_rate: 94.7 },
-  { month: '2026-05', revenue_target_fen: 4000000, revenue_actual_fen: 4200000, completion_rate: 105.0 },
-  { month: '2026-06', revenue_target_fen: 4200000, revenue_actual_fen: 3900000, completion_rate: 92.9 },
-];
-
-const MOCK_ROYALTY_BILLS: RoyaltyBill[] = [
-  { id: 'rb-001', period: '2025-10', revenue_fen: 3500000, royalty_fen: 175000, status: 'paid', due_date: '2025-11-15', paid_date: '2025-11-10' },
-  { id: 'rb-002', period: '2025-11', revenue_fen: 3200000, royalty_fen: 160000, status: 'paid', due_date: '2025-12-15', paid_date: '2025-12-12' },
-  { id: 'rb-003', period: '2025-12', revenue_fen: 3600000, royalty_fen: 180000, status: 'paid', due_date: '2026-01-15', paid_date: '2026-01-14' },
-  { id: 'rb-004', period: '2026-01', revenue_fen: 3120000, royalty_fen: 156000, status: 'paid', due_date: '2026-02-15', paid_date: '2026-02-15' },
-  { id: 'rb-005', period: '2026-02', revenue_fen: 2960000, royalty_fen: 148000, status: 'paid', due_date: '2026-03-15', paid_date: '2026-03-13' },
-  { id: 'rb-006', period: '2026-03', revenue_fen: 3840000, royalty_fen: 192000, status: 'pending', due_date: '2026-04-15', paid_date: null },
-];
-
-const MOCK_STORES: StoreCloneItem[] = [
-  { id: 's-001', name: '五一广场旗舰店', city: '长沙', open_date: '2024-03-01', clone_status: 'completed', monthly_revenue_fen: 680000 },
-  { id: 's-002', name: '解放西路店', city: '长沙', open_date: '2024-07-15', clone_status: 'completed', monthly_revenue_fen: 420000 },
-  { id: 's-003', name: '梅溪湖店', city: '长沙', open_date: '2025-01-20', clone_status: 'completed', monthly_revenue_fen: 380000 },
-  { id: 's-004', name: '湘江新区店', city: '长沙', open_date: '2026-06-01', clone_status: 'in_progress', monthly_revenue_fen: 0 },
-];
 
 // ─── 工具函数 ──────────────────────────────────────────────────────────────────
 
@@ -295,55 +235,67 @@ export function FranchiseDashboardPage() {
   const [createLoading, setCreateLoading] = useState(false);
   const [createForm] = Form.useForm();
 
+  const [overdueBills, setOverdueBills] = useState<RoyaltyBill[]>([]);
   const [messageApi, contextHolder] = message.useMessage();
 
-  // ── API：加载统计数据 ─────────────────────────────────────────────────────
-  const loadStats = useCallback(async () => {
+  // ── API：并发加载统计、逾期费用、活跃加盟商 ────────────────────────────────
+  const loadDashboard = useCallback(async () => {
     setStatsLoading(true);
-    try {
-      const data = await txFetch<DashboardStats>('/api/v1/org/franchise/stats');
-      setStats(data);
-    } catch {
-      setStats(MOCK_STATS);
-    } finally {
-      setStatsLoading(false);
+    setLoading(true);
+    const [statsRes, feesRes, franchiseeRes] = await Promise.allSettled([
+      txFetch<DashboardStats>('/api/v1/org/franchisees/stats'),
+      txFetch<{ items: RoyaltyBill[] }>('/api/v1/org/fees?status=overdue'),
+      txFetch<{ items: Franchisee[] }>('/api/v1/org/franchisees?status=active&page_size=5'),
+    ]);
+
+    if (statsRes.status === 'fulfilled') {
+      setStats(statsRes.value ?? EMPTY_STATS);
+    } else {
+      setStats(EMPTY_STATS);
     }
+
+    if (franchiseeRes.status === 'fulfilled') {
+      setFranchisees(franchiseeRes.value?.items ?? []);
+    } else {
+      setFranchisees([]);
+    }
+
+    // feesRes 用于更新逾期分润账单（如果 Drawer 已打开则刷新）
+    if (feesRes.status === 'fulfilled' && feesRes.value?.items?.length) {
+      // 逾期账单数据暂存，Drawer 打开时展示
+      setOverdueBills(feesRes.value.items);
+    }
+
+    setStatsLoading(false);
+    setLoading(false);
   }, []);
 
-  // ── API：加载加盟商列表 ────────────────────────────────────────────────────
-  const loadFranchisees = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await txFetch<{ items: Franchisee[] }>('/api/v1/org/franchise/franchisees');
-      setFranchisees(data.items);
-    } catch {
-      setFranchisees(MOCK_FRANCHISEES);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  // 兼容旧调用保留
+  const loadStats = loadDashboard;
+  const loadFranchisees = loadDashboard;
 
   // ── API：加载加盟商详情 ────────────────────────────────────────────────────
   const loadDetail = async (id: string) => {
     setDrawerLoading(true);
-    try {
-      const [detail, kpiData, bills] = await Promise.all([
-        txFetch<FranchiseeDetail>(`/api/v1/org/franchise/franchisees/${id}`),
-        txFetch<{ items: KpiMonth[] }>(`/api/v1/org/franchise/kpi-dashboard?franchisee_id=${id}`),
-        txFetch<{ items: RoyaltyBill[] }>(`/api/v1/org/franchise/royalty-bills?franchisee_id=${id}`),
-      ]);
-      setDrawerDetail(detail);
-      setKpiTrend(kpiData.items);
-      setRoyaltyBills(bills.items);
-    } catch {
-      // 降级：使用 Mock 数据
-      const base = franchisees.find(f => f.id === id) || MOCK_FRANCHISEES[0];
-      setDrawerDetail({ ...base, stores: MOCK_STORES, kpi_trend: MOCK_KPI_TREND });
-      setKpiTrend(MOCK_KPI_TREND);
-      setRoyaltyBills(MOCK_ROYALTY_BILLS);
-    } finally {
-      setDrawerLoading(false);
-    }
+    const [detailRes, kpiRes, billsRes] = await Promise.allSettled([
+      txFetch<FranchiseeDetail>(`/api/v1/org/franchisees/${id}`),
+      txFetch<{ items: KpiMonth[] }>(`/api/v1/org/franchisees/${id}/kpi`),
+      txFetch<{ items: RoyaltyBill[] }>(`/api/v1/org/fees?franchisee_id=${id}`),
+    ]);
+
+    const base = franchisees.find(f => f.id === id) ?? null;
+    setDrawerDetail(
+      detailRes.status === 'fulfilled' && detailRes.value
+        ? detailRes.value
+        : base ? { ...base, stores: [], kpi_trend: [] } : null,
+    );
+    setKpiTrend(
+      kpiRes.status === 'fulfilled' ? (kpiRes.value?.items ?? []) : [],
+    );
+    setRoyaltyBills(
+      billsRes.status === 'fulfilled' ? (billsRes.value?.items ?? []) : [],
+    );
+    setDrawerLoading(false);
   };
 
   // ── 点击行打开 Drawer ──────────────────────────────────────────────────────
@@ -358,7 +310,7 @@ export function FranchiseDashboardPage() {
     setCreateLoading(true);
     try {
       const values = await createForm.validateFields();
-      await txFetch('/api/v1/org/franchise/franchisees', {
+      await txFetch('/api/v1/org/franchisees', {
         method: 'POST',
         body: JSON.stringify({
           ...values,
@@ -369,8 +321,7 @@ export function FranchiseDashboardPage() {
       messageApi.success('加盟商创建成功');
       setCreateModalOpen(false);
       createForm.resetFields();
-      loadFranchisees();
-      loadStats();
+      loadDashboard();
     } catch (err: unknown) {
       if (err && typeof err === 'object' && 'errorFields' in err) return;
       // API 失败降级
@@ -383,9 +334,8 @@ export function FranchiseDashboardPage() {
   };
 
   useEffect(() => {
-    loadStats();
-    loadFranchisees();
-  }, [loadStats, loadFranchisees]);
+    loadDashboard();
+  }, [loadDashboard]);
 
   // ── 加盟商列表 columns ────────────────────────────────────────────────────
   const columns: ColumnsType<Franchisee> = [
@@ -503,7 +453,7 @@ export function FranchiseDashboardPage() {
           <Space>
             <Button
               icon={<ReloadOutlined />}
-              onClick={() => { loadStats(); loadFranchisees(); }}
+              onClick={() => loadDashboard()}
               loading={loading || statsLoading}
             >
               刷新
@@ -697,7 +647,7 @@ export function FranchiseDashboardPage() {
               <Table<StoreCloneItem>
                 rowKey="id"
                 columns={storeColumns}
-                dataSource={drawerDetail.stores || MOCK_STORES}
+                dataSource={drawerDetail.stores ?? []}
                 pagination={false}
                 size="small"
               />

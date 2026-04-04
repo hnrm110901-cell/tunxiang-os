@@ -1,0 +1,117 @@
+<!-- 门店顾客评价列表页 -->
+<view class="page">
+
+  <!-- 顶部：综合评分概览 -->
+  <view class="score-header">
+    <view class="score-main">
+      <text class="score-big">{{avgScore}}</text>
+      <view class="score-stars">
+        <text
+          class="score-star {{avgScore >= item ? 'filled' : (avgScore >= item - 0.5 ? 'half' : '')}}"
+          wx:for="{{[1,2,3,4,5]}}"
+          wx:key="*this"
+        >★</text>
+      </view>
+      <text class="score-count">{{totalCount}}条评价</text>
+    </view>
+    <text class="store-title">{{storeName}}</text>
+
+    <!-- 评分分布条 -->
+    <view class="dist-row" wx:for="{{ratingDist}}" wx:key="star">
+      <text class="dist-label">{{item.star}}星</text>
+      <view class="dist-bar-bg">
+        <view class="dist-bar-fill" style="width:{{item.percent}}%"></view>
+      </view>
+      <text class="dist-pct">{{item.percent}}%</text>
+    </view>
+
+    <!-- 分项评分 -->
+    <view class="sub-scores">
+      <view class="sub-score-item" wx:for="{{subScores}}" wx:key="label">
+        <text class="sub-score-label">{{item.label}}</text>
+        <text class="sub-score-val">{{item.value}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 筛选 Tab -->
+  <view class="filter-tabs">
+    <view
+      class="filter-tab {{activeFilter === item.key ? 'active' : ''}}"
+      wx:for="{{filterTabs}}"
+      wx:key="key"
+      bindtap="switchFilter"
+      data-key="{{item.key}}"
+    >{{item.label}}</view>
+  </view>
+
+  <!-- 评价列表 -->
+  <view class="review-list">
+    <view class="review-item" wx:for="{{filteredReviews}}" wx:key="id">
+
+      <!-- 用户行 -->
+      <view class="user-row">
+        <image
+          class="avatar"
+          src="{{item.avatarUrl || '/assets/avatar-default.png'}}"
+          mode="aspectFill"
+        />
+        <view class="user-info">
+          <text class="nickname">{{item.isAnonymous ? '匿名用户' : item.nickname}}</text>
+          <text class="review-date">{{item.createdAt}}</text>
+        </view>
+        <view class="item-stars">
+          <text
+            class="item-star {{item.overallRating >= s ? 'filled' : ''}}"
+            wx:for="{{[1,2,3,4,5]}}"
+            wx:for-item="s"
+            wx:key="*this"
+          >★</text>
+        </view>
+      </view>
+
+      <!-- 标签 Chips -->
+      <view class="tag-chips" wx:if="{{item.tags && item.tags.length > 0}}">
+        <text class="tag-chip" wx:for="{{item.tags}}" wx:key="*this">{{item}}</text>
+      </view>
+
+      <!-- 评价文字 -->
+      <text class="review-content" wx:if="{{item.content}}">{{item.content}}</text>
+
+      <!-- 评价图片 -->
+      <view class="review-images" wx:if="{{item.imageUrls && item.imageUrls.length > 0}}">
+        <image
+          class="review-img"
+          wx:for="{{item.imageUrls}}"
+          wx:key="*this"
+          src="{{item}}"
+          mode="aspectFill"
+          bindtap="previewImage"
+          data-src="{{item}}"
+          data-list="{{item.imageUrls}}"
+        />
+      </view>
+
+      <!-- 商家回复 -->
+      <view class="merchant-reply" wx:if="{{item.merchantReply}}">
+        <text class="reply-label">商家回复：</text>
+        <text class="reply-text">{{item.merchantReply}}</text>
+      </view>
+    </view>
+
+    <!-- 空状态 -->
+    <view class="empty-state" wx:if="{{filteredReviews.length === 0}}">
+      <text class="empty-icon">💬</text>
+      <text class="empty-text">暂无该类型评价</text>
+    </view>
+
+    <!-- 加载更多 -->
+    <view class="load-more" wx:if="{{hasMore && filteredReviews.length > 0}}" bindtap="loadMore">
+      <text class="load-more-text">{{loading ? '加载中...' : '加载更多'}}</text>
+    </view>
+    <view class="no-more" wx:if="{{!hasMore && filteredReviews.length > 0}}">
+      <text class="no-more-text">已显示全部评价</text>
+    </view>
+  </view>
+
+</view>

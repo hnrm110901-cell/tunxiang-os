@@ -1,0 +1,96 @@
+<view class="page">
+  <!-- 订单信息头 -->
+  <view class="order-header">
+    <text class="header-title">评价订单</text>
+    <text class="order-no">订单 #{{orderNo}}</text>
+    <text class="store-name">{{storeName}}</text>
+  </view>
+
+  <!-- 整体评分 -->
+  <view class="section">
+    <text class="section-title">整体体验</text>
+    <view class="star-row">
+      <view
+        class="star {{overallRating >= item ? 'filled' : ''}}"
+        wx:for="{{[1,2,3,4,5]}}"
+        wx:key="*this"
+        bindtap="setOverallRating"
+        data-rating="{{item}}"
+      >★</view>
+    </view>
+    <text class="rating-label">{{ratingLabels[overallRating-1] || '请打分'}}</text>
+  </view>
+
+  <!-- 分项评分 -->
+  <view class="section">
+    <text class="section-title">细项评价</text>
+    <view class="sub-rating" wx:for="{{subRatings}}" wx:key="key">
+      <text class="sub-label">{{item.label}}</text>
+      <view class="sub-stars">
+        <view
+          class="sub-star {{item.value >= star ? 'filled' : ''}}"
+          wx:for="{{[1,2,3,4,5]}}"
+          wx:for-item="star"
+          wx:key="*this"
+          catchtap="setSubRating"
+          data-key="{{item.key}}"
+          data-star="{{star}}"
+        >★</view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 图文评价 -->
+  <view class="section">
+    <text class="section-title">图文评价</text>
+    <textarea
+      class="review-text"
+      placeholder="分享你的用餐体验，帮助更多人做决定..."
+      value="{{reviewText}}"
+      bindinput="onTextInput"
+      maxlength="300"
+    />
+    <text class="word-count">{{reviewText.length}}/300</text>
+
+    <!-- 图片上传 -->
+    <view class="image-area">
+      <view class="img-item" wx:for="{{images}}" wx:key="*this">
+        <image src="{{item}}" mode="aspectFill" class="preview"/>
+        <view class="del-img" catchtap="removeImage" data-index="{{index}}">×</view>
+      </view>
+      <view class="add-img" wx:if="{{images.length < 6}}" bindtap="addImage">
+        <text class="add-icon">📷</text>
+        <text class="add-text">添加图片</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 快速标签 -->
+  <view class="section">
+    <text class="section-title">快速评价</text>
+    <view class="tags-area">
+      <view
+        class="quick-tag {{selectedTags.includes(item) ? 'selected' : ''}}"
+        wx:for="{{quickTags}}"
+        wx:key="*this"
+        bindtap="toggleTag"
+        data-tag="{{item}}"
+      >{{item}}</view>
+    </view>
+  </view>
+
+  <!-- 是否匿名 -->
+  <view class="section anon-section">
+    <text>匿名评价</text>
+    <switch checked="{{isAnonymous}}" bindchange="toggleAnonymous" color="#FF6B35"/>
+  </view>
+
+  <!-- 提交 -->
+  <view class="submit-area">
+    <button
+      class="submit-btn {{submitting ? 'disabled' : ''}}"
+      bindtap="submit"
+      disabled="{{submitting}}"
+    >{{submitting ? '提交中...' : '提交评价'}}</button>
+  </view>
+</view>

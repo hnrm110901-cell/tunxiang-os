@@ -29,6 +29,7 @@ def upgrade() -> None:
         )
     """)
     op.execute("ALTER TABLE employee_point_logs ENABLE ROW LEVEL SECURITY")
+    op.execute("DROP POLICY IF EXISTS employee_point_logs_rls ON employee_point_logs;")
     op.execute("""
         CREATE POLICY employee_point_logs_rls ON employee_point_logs
             AS PERMISSIVE FOR ALL TO PUBLIC

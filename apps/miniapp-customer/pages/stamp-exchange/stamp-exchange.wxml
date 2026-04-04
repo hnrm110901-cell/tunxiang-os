@@ -1,0 +1,88 @@
+<!-- 兑换确认页 -->
+<view class="page-container">
+
+  <!-- ========== 未兑换状态 ========== -->
+  <view wx:if="{{!exchangeSuccess}}" class="exchange-body">
+    <!-- 奖品信息卡 -->
+    <view class="prize-info-card">
+      <view class="prize-icon-large">
+        <text class="prize-emoji">🎁</text>
+      </view>
+      <text class="prize-name-lg">{{prizeName}}</text>
+      <text class="prize-desc-lg">{{prizeDesc}}</text>
+      <view class="prize-cost">
+        <text class="cost-label">需消耗</text>
+        <text class="cost-num">{{stampsRequired}}</text>
+        <text class="cost-unit">枚印章</text>
+      </view>
+      <view class="prize-current">
+        <text>当前持有 <text class="current-num">{{currentStamps}}</text> 枚印章</text>
+      </view>
+    </view>
+
+    <!-- 兑换按钮 -->
+    <view class="action-area">
+      <view class="exchange-main-btn" bindtap="onShowConfirm">
+        <text>确认兑换</text>
+      </view>
+      <view class="cancel-link" bindtap="onGoBack">
+        <text>暂不兑换</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- ========== 兑换成功 ========== -->
+  <view wx:if="{{exchangeSuccess}}" class="success-body">
+    <view class="success-icon-wrap">
+      <view class="success-circle">
+        <text class="success-check">✓</text>
+      </view>
+    </view>
+    <text class="success-title">兑换成功！</text>
+    <text class="success-prize">{{prizeName}}</text>
+
+    <!-- 核销码 -->
+    <view class="code-card">
+      <text class="code-label">核销码</text>
+      <text class="code-value">{{redeemCode}}</text>
+      <view class="code-expire">
+        <text>有效期至 {{redeemExpire}}</text>
+      </view>
+      <view class="copy-btn" bindtap="onCopyCode">
+        <text>复制核销码</text>
+      </view>
+    </view>
+
+    <!-- 使用说明 -->
+    <view class="instructions">
+      <text class="inst-title">使用说明</text>
+      <view class="inst-list">
+        <view class="inst-item" wx:for="{{redeemInstructions}}" wx:key="*this">
+          <text class="inst-dot">·</text>
+          <text class="inst-text">{{item}}</text>
+        </view>
+      </view>
+    </view>
+
+    <view class="back-btn" bindtap="onGoBack">
+      <text>返回集章卡</text>
+    </view>
+  </view>
+
+  <!-- ========== 确认弹窗 ========== -->
+  <view class="modal-mask {{showConfirm ? 'show' : ''}}" bindtap="onHideConfirm">
+    <view class="modal-content" catchtap="">
+      <text class="modal-title">确认兑换</text>
+      <text class="modal-desc">兑换后将消耗 {{stampsRequired}} 枚印章</text>
+      <text class="modal-sub">消耗后不可恢复，确定兑换吗？</text>
+      <view class="modal-actions">
+        <view class="modal-cancel" bindtap="onHideConfirm">
+          <text>取消</text>
+        </view>
+        <view class="modal-confirm {{exchanging ? 'disabled' : ''}}" bindtap="onConfirmExchange">
+          <text>{{exchanging ? '兑换中...' : '确定兑换'}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+</view>

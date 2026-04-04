@@ -1,0 +1,106 @@
+<!-- 拼团详情页 -->
+<view class="page-container">
+
+  <!-- 顶部大图轮播 -->
+  <swiper class="hero-swiper" indicator-dots autoplay circular>
+    <swiper-item wx:for="{{banners}}" wx:key="index">
+      <image class="hero-img" src="{{item}}" mode="aspectFill"></image>
+    </swiper-item>
+  </swiper>
+
+  <!-- 价格区 -->
+  <view class="price-card">
+    <view class="price-row">
+      <text class="group-price">¥{{groupPriceYuan}}</text>
+      <text class="original-price">¥{{originalPriceYuan}}</text>
+      <view class="save-tag">省¥{{savedYuan}}</view>
+    </view>
+    <text class="campaign-name">{{detail.name}}</text>
+  </view>
+
+  <!-- 倒计时 -->
+  <view class="countdown-bar" wx:if="{{detail.status === 'active'}}">
+    <text class="countdown-label">距活动结束</text>
+    <view class="countdown-nums">
+      <text class="countdown-block">{{countdown.hours}}</text>
+      <text class="countdown-sep">:</text>
+      <text class="countdown-block">{{countdown.minutes}}</text>
+      <text class="countdown-sep">:</text>
+      <text class="countdown-block">{{countdown.seconds}}</text>
+    </view>
+  </view>
+
+  <!-- 参团头像列表 -->
+  <view class="members-card">
+    <view class="members-header">
+      <text class="section-title">参团成员</text>
+      <text class="members-hint" wx:if="{{detail.target_size > detail.current_size}}">还差{{detail.target_size - detail.current_size}}人成团</text>
+      <text class="members-hint success" wx:else>已成团</text>
+    </view>
+    <view class="avatar-row">
+      <view class="avatar-item" wx:for="{{displayMembers}}" wx:key="index">
+        <image class="avatar-img" wx:if="{{item.avatar_url}}" src="{{item.avatar_url}}" mode="aspectFill"></image>
+        <view class="avatar-placeholder" wx:else>
+          <text>{{item.nickname ? item.nickname[0] : '?'}}</text>
+        </view>
+      </view>
+      <view class="avatar-item avatar-more" wx:if="{{detail.current_size > 5}}" bindtap="viewAllMembers">
+        <view class="avatar-placeholder more">
+          <text>+{{detail.current_size - 5}}</text>
+        </view>
+      </view>
+      <!-- 空位 -->
+      <view class="avatar-item" wx:for="{{emptySlots}}" wx:key="index">
+        <view class="avatar-placeholder empty">
+          <text>?</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 活动规则（可展开收起） -->
+  <view class="rules-card">
+    <view class="rules-header" bindtap="toggleRules">
+      <text class="section-title">活动规则</text>
+      <text class="rules-arrow">{{rulesExpanded ? '收起' : '展开'}}</text>
+    </view>
+    <view class="rules-body" wx:if="{{rulesExpanded}}">
+      <view class="rule-item" wx:for="{{rules}}" wx:key="index">
+        <text class="rule-dot"></text>
+        <text class="rule-text">{{item}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 菜品介绍 -->
+  <view class="dish-intro-card">
+    <text class="section-title">菜品介绍</text>
+    <view class="dish-desc">
+      <rich-text nodes="{{detail.description || '暂无介绍'}}"></rich-text>
+    </view>
+    <image class="dish-detail-img" wx:for="{{detail.detail_images}}" wx:key="index"
+           src="{{item}}" mode="widthFix"></image>
+  </view>
+
+  <!-- 底部占位 -->
+  <view class="bottom-spacer"></view>
+
+  <!-- 底部固定栏 -->
+  <view class="bottom-bar">
+    <button class="btn-share" open-type="share">分享给好友</button>
+    <button class="btn-join" bindtap="joinGroup" disabled="{{joining}}">
+      {{joining ? '参团中...' : '立即参团'}}
+    </button>
+  </view>
+
+  <!-- 成功弹层 -->
+  <view class="modal-mask" wx:if="{{showSuccess}}" bindtap="closeSuccess">
+    <view class="modal-content" catchtap="">
+      <view class="modal-icon">&#10004;</view>
+      <text class="modal-title">参团成功</text>
+      <text class="modal-desc">邀请好友一起拼，更快成团</text>
+      <button class="modal-share-btn" open-type="share">邀请好友</button>
+      <text class="modal-close" bindtap="closeSuccess">关闭</text>
+    </view>
+  </view>
+</view>

@@ -1,0 +1,175 @@
+<!-- 预约表单页 — 步骤式：选菜→选时间→填地址→确认支付 -->
+<view class="container">
+
+  <!-- 大厨信息小条 -->
+  <view class="chef-strip">
+    <view class="chef-strip-left">
+      <text class="chef-strip-label">预约大厨</text>
+      <view class="chef-strip-name-row">
+        <text class="chef-strip-name">{{chefName}}</text>
+        <text class="chef-strip-title">{{chefTitle}}</text>
+      </view>
+    </view>
+    <text class="chef-strip-emoji">👨‍🍳</text>
+  </view>
+
+  <!-- 步骤指示器 -->
+  <view class="step-indicator">
+    <view class="step-item {{dishes.length > 0 ? 'done' : 'active'}}">
+      <view class="step-num">1</view>
+      <text class="step-text">选菜</text>
+    </view>
+    <view class="step-connector {{selectedDate && selectedSlot ? 'done' : ''}}"></view>
+    <view class="step-item {{selectedDate && selectedSlot ? 'done' : (dishes.length > 0 ? 'active' : '')}}">
+      <view class="step-num">2</view>
+      <text class="step-text">选时间</text>
+    </view>
+    <view class="step-connector {{serviceAddress ? 'done' : ''}}"></view>
+    <view class="step-item {{serviceAddress ? 'done' : (selectedDate && selectedSlot ? 'active' : '')}}">
+      <view class="step-num">3</view>
+      <text class="step-text">填地址</text>
+    </view>
+    <view class="step-connector"></view>
+    <view class="step-item {{serviceAddress && selectedDate && selectedSlot ? 'active' : ''}}">
+      <view class="step-num">4</view>
+      <text class="step-text">确认</text>
+    </view>
+  </view>
+
+  <!-- 服务日期 -->
+  <view class="form-card">
+    <text class="form-card-title">服务日期</text>
+    <text class="form-card-hint">最早明日起，7天内可选</text>
+
+    <scroll-view class="date-scroll" scroll-x scroll-with-animation>
+      <view class="date-list">
+        <view class="date-item {{selectedDate === item.value ? 'active' : ''}} {{item.disabled ? 'disabled' : ''}}"
+              wx:for="{{dateList}}" wx:key="value"
+              bindtap="selectDate" data-value="{{item.value}}" data-disabled="{{item.disabled}}">
+          <text class="date-weekday">{{item.weekday}}</text>
+          <text class="date-day">{{item.day}}</text>
+          <text class="date-sub">{{item.isToday ? '今天' : item.month + '月'}}</text>
+        </view>
+      </view>
+    </scroll-view>
+  </view>
+
+  <!-- 服务时段 -->
+  <view class="form-card">
+    <text class="form-card-title">服务时段</text>
+    <view class="slot-grid">
+      <view class="slot-item {{selectedSlot === item.value ? 'active' : ''}}"
+            wx:for="{{timeSlots}}" wx:key="value"
+            bindtap="selectSlot" data-value="{{item.value}}">
+        <text class="slot-name">{{item.label}}</text>
+        <text class="slot-time">{{item.time}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 用餐人数 -->
+  <view class="form-card">
+    <view class="form-row-header">
+      <text class="form-card-title">用餐人数</text>
+      <text class="form-card-hint">2~50人</text>
+    </view>
+    <view class="guest-stepper">
+      <view class="stepper-btn {{guestCount <= 2 ? 'disabled' : ''}}"
+            bindtap="changeGuests" data-delta="{{-1}}">
+        <text>-</text>
+      </view>
+      <view class="stepper-display">
+        <text class="stepper-value">{{guestCount}}</text>
+        <text class="stepper-unit">人</text>
+      </view>
+      <view class="stepper-btn {{guestCount >= 50 ? 'disabled' : ''}}"
+            bindtap="changeGuests" data-delta="{{1}}">
+        <text>+</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 服务地址 -->
+  <view class="form-card">
+    <text class="form-card-title">服务地址</text>
+    <view class="address-row">
+      <input class="address-input" value="{{serviceAddress}}"
+             bindinput="onAddressInput"
+             placeholder="请输入详细地址"
+             placeholder-class="placeholder" />
+      <view class="location-btn" bindtap="chooseLocation">
+        <text class="location-btn-icon">📍</text>
+        <text class="location-btn-text">定位</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 特殊要求 -->
+  <view class="form-card">
+    <view class="form-row-header">
+      <text class="form-card-title">特殊要求</text>
+      <text class="form-card-hint">选填</text>
+    </view>
+    <textarea class="remark-textarea"
+              value="{{remark}}"
+              bindinput="onRemarkInput"
+              placeholder="过敏信息、忌口食材、特殊饮食要求、口味偏好等"
+              placeholder-class="placeholder"
+              maxlength="200" />
+    <text class="char-count">{{remark.length}}/200</text>
+  </view>
+
+  <!-- 已选菜单回显 -->
+  <view class="form-card" wx:if="{{dishes && dishes.length > 0}}">
+    <view class="form-row-header">
+      <text class="form-card-title">已选菜品</text>
+      <view class="edit-menu-btn" bindtap="goBackToMenu">修改菜单</view>
+    </view>
+    <view class="dish-row" wx:for="{{dishes}}" wx:key="id">
+      <text class="dish-name">{{item.name}}</text>
+      <text class="dish-qty">x{{item.quantity}}</text>
+      <text class="dish-price">¥{{item.price_fen * item.quantity / 100}}</text>
+    </view>
+  </view>
+
+  <!-- 费用预估 -->
+  <view class="price-card">
+    <text class="form-card-title">预估费用</text>
+    <view class="price-row">
+      <text class="price-label">厨师服务费</text>
+      <text class="price-value">¥{{baseFeeYuan}}</text>
+    </view>
+    <view class="price-row" wx:if="{{dishTotalYuan > 0}}">
+      <text class="price-label">食材费（约）</text>
+      <text class="price-value">¥{{dishTotalYuan}}</text>
+    </view>
+    <view class="price-row" wx:if="{{guestCount > 10}}">
+      <text class="price-label">人数附加费</text>
+      <text class="price-value">按实际结算</text>
+    </view>
+    <view class="price-divider"></view>
+    <view class="price-row total-row">
+      <text class="price-total-label">预估总价</text>
+      <text class="price-total-value">¥{{estimatedTotal}}</text>
+    </view>
+    <!-- 定金说明 -->
+    <view class="deposit-tip">
+      <text class="deposit-tip-title">定金说明</text>
+      <text class="deposit-tip-text">现需支付预估总价的 20% 作为定金（¥{{depositAmount}}），余款服务当天结清</text>
+    </view>
+  </view>
+
+  <view class="bottom-spacer"></view>
+
+  <!-- 底部确认栏 -->
+  <view class="bottom-bar">
+    <view class="bottom-info">
+      <text class="bottom-deposit-label">需支付定金</text>
+      <text class="bottom-deposit-amount">¥{{depositAmount}}</text>
+    </view>
+    <view class="confirm-btn {{submitting ? 'loading' : ''}}" bindtap="submitBooking">
+      <text>{{submitting ? '提交中...' : '确认预约并支付定金'}}</text>
+    </view>
+  </view>
+
+</view>

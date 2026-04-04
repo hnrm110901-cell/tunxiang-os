@@ -1,0 +1,305 @@
+/* 我的卡包 */
+
+.page-container {
+  min-height: 100vh;
+  background: #0B1A20;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* ── Tab栏 ── */
+.tab-bar {
+  display: flex;
+  padding: 24rpx 32rpx 16rpx;
+  gap: 0;
+  border-bottom: 1rpx solid rgba(255, 255, 255, 0.06);
+}
+
+.tab-item {
+  flex: 1;
+  text-align: center;
+  padding: 16rpx 0;
+  font-size: 28rpx;
+  color: #777;
+  position: relative;
+}
+
+.tab-item.active {
+  color: #FF6B35;
+  font-weight: 600;
+}
+
+.tab-item.active::after {
+  content: '';
+  position: absolute;
+  bottom: -1rpx;
+  left: 25%;
+  right: 25%;
+  height: 4rpx;
+  background: #FF6B35;
+  border-radius: 2rpx;
+}
+
+.tab-badge {
+  display: inline-block;
+  min-width: 32rpx;
+  height: 32rpx;
+  line-height: 32rpx;
+  text-align: center;
+  background: #E53E3E;
+  color: #fff;
+  font-size: 20rpx;
+  border-radius: 16rpx;
+  padding: 0 8rpx;
+  margin-left: 8rpx;
+  vertical-align: middle;
+}
+
+/* ── 优惠券列表 ── */
+.coupon-list {
+  padding: 24rpx 32rpx;
+}
+
+/* ── 票样卡片 ── */
+.ticket-card {
+  background: #112228;
+  border-radius: 20rpx;
+  margin-bottom: 24rpx;
+  overflow: hidden;
+}
+
+.ticket-card.disabled {
+  opacity: 0.5;
+}
+
+.ticket-body {
+  display: flex;
+  align-items: stretch;
+  min-height: 180rpx;
+}
+
+/* 左侧锯齿+金额 */
+.ticket-left {
+  width: 200rpx;
+  min-height: 180rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: rgba(255, 107, 53, 0.15);
+  position: relative;
+}
+
+.ticket-left.gray {
+  background: rgba(100, 100, 100, 0.1);
+}
+
+/* 锯齿边效果 */
+.ticket-serrated {
+  position: absolute;
+  right: -8rpx;
+  top: 0;
+  bottom: 0;
+  width: 16rpx;
+  background: radial-gradient(circle at 8rpx 12rpx, #0B1A20 8rpx, transparent 8rpx);
+  background-size: 16rpx 24rpx;
+}
+
+.ticket-face {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.face-amount {
+  display: flex;
+  align-items: baseline;
+  gap: 2rpx;
+}
+
+.face-sym {
+  font-size: 26rpx;
+  color: #FF6B35;
+  font-weight: 600;
+}
+
+.face-sym.small {
+  font-size: 22rpx;
+}
+
+.face-sym.gift {
+  font-size: 44rpx;
+}
+
+.face-val {
+  font-size: 60rpx;
+  font-weight: bold;
+  color: #FF6B35;
+}
+
+.face-val.discount {
+  font-size: 52rpx;
+}
+
+.ticket-left.gray .face-sym,
+.ticket-left.gray .face-val {
+  color: #666;
+}
+
+.face-threshold {
+  font-size: 22rpx;
+  color: #999;
+  margin-top: 8rpx;
+  text-align: center;
+}
+
+/* 右侧信息 */
+.ticket-right {
+  flex: 1;
+  padding: 24rpx 16rpx;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8rpx;
+  overflow: hidden;
+}
+
+.ticket-name {
+  font-size: 28rpx;
+  font-weight: bold;
+  color: #fff;
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ticket-condition {
+  font-size: 22rpx;
+  color: #FF6B35;
+  display: block;
+}
+
+.ticket-expire {
+  font-size: 22rpx;
+  color: #666;
+  display: block;
+}
+
+.ticket-expire.warn {
+  color: #E53E3E;
+}
+
+.ticket-store {
+  font-size: 20rpx;
+  color: #555;
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 使用按钮 */
+.ticket-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 20rpx;
+  flex-shrink: 0;
+}
+
+.use-btn {
+  font-size: 24rpx !important;
+  background: #FF6B35 !important;
+  color: #fff !important;
+  border-radius: 32rpx;
+  padding: 0 28rpx;
+  height: 64rpx;
+  line-height: 64rpx;
+  min-width: 0;
+  white-space: nowrap;
+  border: none;
+}
+
+.use-btn::after {
+  border: none;
+}
+
+/* 水印 */
+.watermark {
+  font-size: 28rpx;
+  color: rgba(255, 255, 255, 0.15);
+  font-weight: bold;
+  transform: rotate(-15deg);
+  white-space: nowrap;
+}
+
+/* ── 展开详情 ── */
+.ticket-detail {
+  padding: 0 32rpx 24rpx;
+}
+
+.detail-divider {
+  height: 1rpx;
+  background: repeating-linear-gradient(
+    to right,
+    transparent 0,
+    transparent 8rpx,
+    rgba(255, 255, 255, 0.08) 8rpx,
+    rgba(255, 255, 255, 0.08) 16rpx
+  );
+  margin-bottom: 20rpx;
+}
+
+.detail-section {
+  margin-bottom: 16rpx;
+}
+
+.detail-title {
+  font-size: 24rpx;
+  color: #999;
+  display: block;
+  margin-bottom: 6rpx;
+}
+
+.detail-text {
+  font-size: 24rpx;
+  color: #ccc;
+  display: block;
+  line-height: 1.6;
+}
+
+/* ── 通用状态 ── */
+.loading-tip {
+  text-align: center;
+  padding: 100rpx 0;
+  color: #666;
+  font-size: 28rpx;
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 160rpx 0 80rpx;
+  gap: 16rpx;
+}
+
+.empty-icon {
+  font-size: 80rpx;
+}
+
+.empty-text {
+  font-size: 30rpx;
+  color: #666;
+}
+
+.empty-link {
+  font-size: 26rpx;
+  color: #FF6B35;
+  margin-top: 8rpx;
+}
+
+.safe-bottom {
+  height: 40rpx;
+}

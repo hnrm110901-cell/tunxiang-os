@@ -1,7 +1,7 @@
 /**
  * 移动收货 — 3步向导：基本信息 → 货品录入 → 确认提交
  */
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 const C = {
@@ -25,10 +25,6 @@ interface ReceivingItem {
   discrepancy_note: string;
 }
 
-const MOCK_ITEMS: ReceivingItem[] = [
-  { ingredient_name: '鲈鱼（活）', unit: 'kg', ordered_qty: 20, received_qty: 18, unit_price: 48, discrepancy_note: '' },
-  { ingredient_name: '土豆', unit: 'kg', ordered_qty: 50, received_qty: 50, unit_price: 3.5, discrepancy_note: '' },
-];
 
 function NavBar({ title, step, onBack }: { title: string; step: string; onBack: () => void }) {
   return (
@@ -337,9 +333,41 @@ export function ReceivingPage() {
   const [step, setStep] = useState(1);
   const [supplierName, setSupplierName] = useState('');
   const [notes, setNotes] = useState('');
-  const [items, setItems] = useState<ReceivingItem[]>(MOCK_ITEMS);
+  const [items, setItems] = useState<ReceivingItem[]>([]);
   const [photoCount, setPhotoCount] = useState(0);
   const [submitting, setSubmitting] = useState(false);
+  const [loadError, setLoadError] = useState('');
+
+  useEffect(() => {
+    const storeId = (window as any).__STORE_ID__ || '';
+    fetch(`/api/v1/supply/receiving/orders?store_id=${encodeURIComponent(storeId)}&status=pending`, {
+      headers: { 'X-Tenant-ID': localStorage.getItem('tenant_id') ?? '' },
+    })
+      .then(res => {
+        if (!res.ok) throw new Error(`获取收货单失败: ${res.status}`);
+        return res.json();
+      })
+      .then(json => {
+        const raw: Array<{
+          ingredient_name: string;
+          unit: string;
+          ordered_qty: number | null;
+          received_qty?: number | null;
+          unit_price: number | null;
+        }> = json?.data?.items ?? json?.items ?? [];
+        setItems(raw.map(i => ({
+          ingredient_name: i.ingredient_name,
+          unit: i.unit,
+          ordered_qty: i.ordered_qty,
+          received_qty: i.received_qty ?? null,
+          unit_price: i.unit_price,
+          discrepancy_note: '',
+        })));
+      })
+      .catch(err => {
+        setLoadError(err instanceof Error ? err.message : '收货单加载失败');
+      });
+  }, []);
 
   const handleBack = () => {
     if (step === 1) navigate(-1);
@@ -368,9 +396,25 @@ export function ReceivingPage() {
   const handleSubmit = async () => {
     setSubmitting(true);
     try {
-      await new Promise(r => setTimeout(r, 800));
+      const storeId = (window as any).__STORE_ID__ || '';
+      const res = await fetch('/api/v1/supply/receiving/orders', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Tenant-ID': localStorage.getItem('tenant_id') ?? '',
+        },
+        body: JSON.stringify({
+          store_id: storeId,
+          supplier_name: supplierName,
+          notes,
+          items,
+        }),
+      });
+      if (!res.ok) throw new Error(`提交失败: ${res.status}`);
       alert('收货成功！库存已更新。');
       navigate(-1);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : '提交收货单失败，请重试');
     } finally {
       setSubmitting(false);
     }
@@ -382,6 +426,15 @@ export function ReceivingPage() {
   return (
     <div style={{ background: C.bg, minHeight: '100vh', color: C.white }}>
       <NavBar title={titles[step - 1]} step={stepLabels[step - 1]} onBack={handleBack} />
+      {loadError && (
+        <div style={{
+          margin: '12px 16px 0', padding: '10px 14px',
+          background: 'rgba(186,117,23,0.12)', border: '1px solid #BA7517',
+          borderRadius: 10, fontSize: 14, color: '#BA7517',
+        }}>
+          {loadError}
+        </div>
+      )}
       {step === 1 && (
         <Step1
           supplierName={supplierName} setSupplierName={setSupplierName}

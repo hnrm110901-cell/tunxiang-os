@@ -1,0 +1,546 @@
+/* 企业订餐首页样式 */
+
+.page-wrapper {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: #0B1A20;
+  overflow: hidden;
+}
+
+/* ─── 企业信息卡 ─── */
+.account-card {
+  background: linear-gradient(135deg, #1A3040, #112228);
+  padding: 24rpx 32rpx;
+  margin: 16rpx 24rpx 0;
+  border-radius: 16rpx;
+  flex-shrink: 0;
+}
+
+.account-top {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+}
+
+.company-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.company-name {
+  font-size: 28rpx;
+  color: #fff;
+  font-weight: bold;
+}
+
+.member-name {
+  font-size: 22rpx;
+  color: rgba(255, 255, 255, 0.6);
+  margin-top: 4rpx;
+}
+
+.balance-label {
+  font-size: 20rpx;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.balance-value {
+  font-size: 36rpx;
+  color: #FF6B2C;
+  font-weight: bold;
+  margin-left: 8rpx;
+}
+
+.budget-row {
+  margin-top: 16rpx;
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+}
+
+.budget-text {
+  flex-shrink: 0;
+}
+
+.budget-label {
+  font-size: 22rpx;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.budget-limit {
+  font-size: 20rpx;
+  color: rgba(255, 255, 255, 0.4);
+  margin-left: 6rpx;
+}
+
+.progress-bar {
+  flex: 1;
+  height: 12rpx;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 6rpx;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #0F6E56, #FF6B2C);
+  border-radius: 6rpx;
+  transition: width 0.3s;
+}
+
+.budget-pct {
+  font-size: 22rpx;
+  color: rgba(255, 255, 255, 0.6);
+  flex-shrink: 0;
+  min-width: 60rpx;
+  text-align: right;
+}
+
+/* ─── 快捷操作栏 ─── */
+.quick-actions {
+  display: flex;
+  padding: 20rpx 24rpx;
+  gap: 16rpx;
+  flex-shrink: 0;
+}
+
+.action-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6rpx;
+  padding: 16rpx 0;
+  background: #112228;
+  border-radius: 12rpx;
+}
+
+.action-icon {
+  font-size: 40rpx;
+}
+
+.action-text {
+  font-size: 22rpx;
+  color: #ccc;
+}
+
+/* ─── 日期Tab ─── */
+.date-tabs {
+  white-space: nowrap;
+  padding: 0 24rpx 16rpx;
+  flex-shrink: 0;
+}
+
+.date-tab {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12rpx 24rpx;
+  margin-right: 12rpx;
+  background: #112228;
+  border-radius: 12rpx;
+  border: 2rpx solid transparent;
+  position: relative;
+}
+
+.date-tab.active {
+  border-color: #FF6B2C;
+  background: rgba(255, 107, 44, 0.1);
+}
+
+.date-tab.today .tab-day {
+  color: #FF6B2C;
+}
+
+.tab-day {
+  font-size: 26rpx;
+  color: #ccc;
+  font-weight: 500;
+}
+
+.date-tab.active .tab-day {
+  color: #FF6B2C;
+}
+
+.tab-date {
+  font-size: 22rpx;
+  color: #666;
+  margin-top: 2rpx;
+}
+
+.date-tab.active .tab-date {
+  color: rgba(255, 107, 44, 0.7);
+}
+
+.tab-today-tag {
+  font-size: 16rpx;
+  color: #fff;
+  background: #FF6B2C;
+  padding: 0 8rpx;
+  border-radius: 6rpx;
+  position: absolute;
+  top: -6rpx;
+  right: -6rpx;
+}
+
+/* ─── 加载骨架 ─── */
+.loading-wrap {
+  flex: 1;
+  padding: 32rpx;
+}
+
+.loading-skeleton {
+  height: 140rpx;
+  background: #112228;
+  border-radius: 16rpx;
+  margin-bottom: 16rpx;
+  animation: skeleton-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes skeleton-pulse {
+  0% { opacity: 0.5; }
+  50% { opacity: 0.9; }
+  100% { opacity: 0.5; }
+}
+
+/* ─── 菜品区域 ─── */
+.menu-scroll {
+  flex: 1;
+  overflow: hidden;
+}
+
+.meal-section {
+  padding: 0 24rpx;
+  margin-bottom: 16rpx;
+}
+
+.meal-header {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  padding: 16rpx 0;
+}
+
+.meal-tag {
+  font-size: 22rpx;
+  color: #fff;
+  padding: 4rpx 16rpx;
+  border-radius: 8rpx;
+  font-weight: 500;
+}
+
+.lunch-tag {
+  background: #D4840A;
+}
+
+.dinner-tag {
+  background: #6B3FA0;
+}
+
+.meal-title {
+  font-size: 26rpx;
+  color: #ccc;
+}
+
+/* 菜品卡片 */
+.dish-card {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  padding: 20rpx 0;
+  border-bottom: 1rpx solid #112228;
+}
+
+.dish-image {
+  width: 140rpx;
+  height: 112rpx;
+  border-radius: 12rpx;
+  flex-shrink: 0;
+  background: #112228;
+}
+
+.dish-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.dish-name {
+  font-size: 28rpx;
+  color: #fff;
+  font-weight: 500;
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.price-row {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  margin-top: 12rpx;
+}
+
+.enterprise-price-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+}
+
+.enterprise-tag {
+  font-size: 20rpx;
+  color: #0F6E56;
+  background: rgba(15, 110, 86, 0.15);
+  padding: 2rpx 10rpx;
+  border-radius: 8rpx;
+}
+
+.enterprise-price {
+  font-size: 30rpx;
+  color: #0F6E56;
+  font-weight: bold;
+}
+
+.origin-price {
+  font-size: 22rpx;
+  color: #555;
+  text-decoration: line-through;
+}
+
+/* 加减控件 */
+.qty-control {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  flex-shrink: 0;
+}
+
+.qty-btn {
+  width: 56rpx;
+  height: 56rpx;
+  border-radius: 28rpx;
+  background: #FF6B2C;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.qty-btn.minus {
+  background: #1A3040;
+}
+
+.qty-btn.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.qty-btn text {
+  font-size: 32rpx;
+  color: #fff;
+  line-height: 1;
+}
+
+.qty-num {
+  font-size: 28rpx;
+  color: #fff;
+  min-width: 32rpx;
+  text-align: center;
+}
+
+/* 空状态 */
+.empty-tip {
+  text-align: center;
+  padding: 80rpx 0;
+}
+
+.empty-text {
+  font-size: 26rpx;
+  color: #555;
+}
+
+/* ─── 底部购物车栏 ─── */
+.cart-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 120rpx;
+  background: #112228;
+  display: flex;
+  align-items: center;
+  padding: 0 24rpx;
+  padding-bottom: env(safe-area-inset-bottom);
+  z-index: 50;
+  box-shadow: 0 -4rpx 16rpx rgba(0, 0, 0, 0.3);
+}
+
+.cart-left {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+}
+
+.cart-icon-wrap {
+  position: relative;
+  width: 72rpx;
+  height: 72rpx;
+}
+
+.cart-icon {
+  font-size: 52rpx;
+  line-height: 72rpx;
+}
+
+.cart-badge {
+  position: absolute;
+  top: -4rpx;
+  right: -4rpx;
+  min-width: 36rpx;
+  height: 36rpx;
+  background: #FF6B2C;
+  border-radius: 18rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 6rpx;
+}
+
+.badge-num {
+  font-size: 20rpx;
+  color: #fff;
+  font-weight: bold;
+}
+
+.cart-total-wrap {
+  display: flex;
+  flex-direction: column;
+}
+
+.cart-total {
+  font-size: 32rpx;
+  color: #fff;
+  font-weight: bold;
+}
+
+.checkout-btn {
+  height: 88rpx;
+  padding: 0 48rpx;
+  background: #FF6B2C;
+  border-radius: 44rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.checkout-btn text {
+  font-size: 28rpx;
+  color: #fff;
+  font-weight: bold;
+}
+
+/* ─── 购物车弹层 ─── */
+.cart-mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 60;
+}
+
+.cart-popup {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #112228;
+  border-radius: 24rpx 24rpx 0 0;
+  z-index: 61;
+  transform: translateY(100%);
+  transition: transform 0.3s ease-out;
+  padding-bottom: env(safe-area-inset-bottom);
+  max-height: 60vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.cart-popup.show {
+  transform: translateY(0);
+}
+
+.popup-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 32rpx 32rpx 20rpx;
+  border-bottom: 1rpx solid #1A3040;
+  flex-shrink: 0;
+}
+
+.popup-title {
+  font-size: 32rpx;
+  color: #fff;
+  font-weight: 500;
+}
+
+.clear-btn {
+  padding: 8rpx 16rpx;
+}
+
+.clear-text {
+  font-size: 26rpx;
+  color: #999;
+}
+
+.cart-items-scroll {
+  flex: 1;
+  padding: 0 32rpx;
+}
+
+.cart-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24rpx 0;
+  border-bottom: 1rpx solid #1A3040;
+}
+
+.ci-left {
+  flex: 1;
+  margin-right: 16rpx;
+}
+
+.ci-name {
+  font-size: 28rpx;
+  color: #fff;
+  display: block;
+}
+
+.ci-date {
+  font-size: 22rpx;
+  color: #666;
+  margin-top: 4rpx;
+  display: block;
+}
+
+.ci-right {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  flex-shrink: 0;
+}
+
+.ci-price {
+  font-size: 28rpx;
+  color: #0F6E56;
+  font-weight: 500;
+}
+
+.ci-qty {
+  font-size: 26rpx;
+  color: #999;
+}

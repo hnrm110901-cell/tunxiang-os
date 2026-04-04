@@ -1,9 +1,12 @@
 /**
  * 高峰提醒页 — 服务员端高峰状态 + 待催菜 + 加派响应
  * 移动端竖屏, 最小字体16px, 热区>=48px
- * 调用 GET /api/v1/peak-monitor/crew/*
+ * API: GET /api/v1/ops/peak/stores/{storeId}/detect
+ *      GET /api/v1/ops/peak/stores/{storeId}/dept-load
+ * 30秒自动刷新
  */
-import { useState } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { txFetch } from '../api';
 
 /* ---------- 样式常量 ---------- */
 const C = {
@@ -23,6 +26,21 @@ const C = {
 /* ---------- 类型 ---------- */
 type PeakLevel = 'normal' | 'busy' | 'peak' | 'extreme';
 
+interface PeakDetectData {
+  level: PeakLevel;
+  current_diners: number;
+  waiting_count: number;
+  avg_serve_time_sec: number;
+}
+
+interface DeptLoad {
+  id: string;
+  area: string;
+  reason: string;
+  urgency: 'normal' | 'urgent' | 'critical';
+  accepted: boolean;
+}
+
 interface RushDish {
   id: string;
   tableNo: string;
@@ -33,17 +51,7 @@ interface RushDish {
   isOvertime: boolean;
 }
 
-interface DispatchRequest {
-  id: string;
-  area: string;
-  reason: string;
-  urgency: 'normal' | 'urgent' | 'critical';
-  accepted: boolean;
-}
-
-/* ---------- Mock 数据 ---------- */
-const MOCK_LEVEL: PeakLevel = 'peak';
-
+/* ---------- 配置 ---------- */
 const PEAK_CFG: Record<PeakLevel, { label: string; color: string; icon: string }> = {
   normal:  { label: '正常', color: C.green, icon: '~' },
   busy:    { label: '繁忙', color: C.warning, icon: '!' },
@@ -51,46 +59,102 @@ const PEAK_CFG: Record<PeakLevel, { label: string; color: string; icon: string }
   extreme: { label: '极端高峰', color: C.danger, icon: '!!!' },
 };
 
-const MOCK_RUSH_DISHES: RushDish[] = [
-  { id: 'r1', tableNo: 'A03', dishName: '剁椒鱼头', qty: 1, elapsedMin: 28, rushCount: 2, isOvertime: true },
-  { id: 'r2', tableNo: 'B01', dishName: '波士顿龙虾', qty: 1, elapsedMin: 32, rushCount: 1, isOvertime: true },
-  { id: 'r3', tableNo: 'A05', dishName: '红烧肉', qty: 1, elapsedMin: 22, rushCount: 1, isOvertime: true },
-  { id: 'r4', tableNo: 'C02', dishName: '蒜蓉蒸虾', qty: 2, elapsedMin: 18, rushCount: 0, isOvertime: false },
-  { id: 'r5', tableNo: 'A01', dishName: '酸菜鱼', qty: 1, elapsedMin: 15, rushCount: 0, isOvertime: false },
-  { id: 'r6', tableNo: 'B03', dishName: '清蒸鲈鱼', qty: 1, elapsedMin: 12, rushCount: 0, isOvertime: false },
-];
-
-const MOCK_DISPATCHES: DispatchRequest[] = [
-  { id: 'dp1', area: 'A区 (大厅南)', reason: '3桌同时催菜，服务压力大', urgency: 'critical', accepted: false },
-  { id: 'dp2', area: 'B区 (大厅北)', reason: '2桌新到客人需引导', urgency: 'normal', accepted: false },
-];
+/* ---------- 工具 ---------- */
+function getStoreId(): string {
+  return localStorage.getItem('tx_store_id') || '';
+}
 
 /* ---------- 组件 ---------- */
 export function PeakAlertPage() {
-  const [level] = useState<PeakLevel>(MOCK_LEVEL);
+  const [peakData, setPeakData] = useState<PeakDetectData | null>(null);
+  const [deptLoads, setDeptLoads] = useState<DeptLoad[]>([]);
+  const [rushDishes, setRushDishes] = useState<RushDish[]>([]);
+  const [loading, setLoading] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const storeId = getStoreId();
+
+  const loadData = useCallback(async () => {
+    if (!storeId) return;
+    setLoading(true);
+    try {
+      const [detect, deptRes] = await Promise.allSettled([
+        txFetch<PeakDetectData>(`/api/v1/ops/peak/stores/${encodeURIComponent(storeId)}/detect`),
+        txFetch<{ items: DeptLoad[] }>(`/api/v1/ops/peak/stores/${encodeURIComponent(storeId)}/dept-load`),
+      ]);
+
+      if (detect.status === 'fulfilled') {
+        setPeakData(detect.value);
+      }
+      if (deptRes.status === 'fulfilled') {
+        setDeptLoads(deptRes.value?.items ?? []);
+      }
+
+      // 催菜数据来自已有 rushDishes API
+      try {
+        const rushRes = await txFetch<{ items: RushDish[] }>(
+          `/api/v1/ops/peak/stores/${encodeURIComponent(storeId)}/rush-dishes`
+        );
+        setRushDishes(rushRes?.items ?? []);
+      } catch {
+        // 静默失败，保留旧数据
+      }
+    } catch {
+      // 全局失败，不崩溃
+    } finally {
+      setLoading(false);
+    }
+  }, [storeId]);
+
+  useEffect(() => {
+    loadData();
+    timerRef.current = setInterval(loadData, 30_000);
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [loadData]);
+
+  const level: PeakLevel = peakData?.level ?? 'normal';
   const cfg = PEAK_CFG[level];
-
-  const [rushDishes, setRushDishes] = useState(MOCK_RUSH_DISHES);
-  const [dispatches, setDispatches] = useState(MOCK_DISPATCHES);
-
   const overtimeCount = rushDishes.filter(d => d.isOvertime).length;
 
-  const handleRush = (id: string) => {
+  const handleRush = async (id: string) => {
     setRushDishes(prev => prev.map(d =>
       d.id === id ? { ...d, rushCount: d.rushCount + 1 } : d
     ));
-    // TODO: POST /api/v1/orders/{orderId}/rush
+    try {
+      await txFetch(`/api/v1/ops/rush-items/${encodeURIComponent(id)}`, { method: 'POST' });
+    } catch {
+      // 静默失败，计数已乐观更新
+    }
   };
 
-  const handleAcceptDispatch = (id: string) => {
-    setDispatches(prev => prev.map(d =>
+  const handleAcceptDispatch = async (id: string) => {
+    setDeptLoads(prev => prev.map(d =>
       d.id === id ? { ...d, accepted: true } : d
     ));
-    // TODO: POST /api/v1/peak-monitor/dispatch/{id}/accept
+    try {
+      await txFetch(`/api/v1/ops/peak/dispatches/${encodeURIComponent(id)}/accept`, { method: 'POST' });
+    } catch {
+      // 静默失败，状态已乐观更新
+    }
   };
+
+  if (!storeId && !loading) {
+    return (
+      <div style={{ padding: '40px 16px', background: C.bg, minHeight: '100vh', textAlign: 'center', color: C.muted, fontSize: 16 }}>
+        未找到门店信息，请重新登录
+      </div>
+    );
+  }
 
   return (
     <div style={{ padding: '16px 12px 80px', background: C.bg, minHeight: '100vh' }}>
+      {/* 刷新状态指示 */}
+      {loading && (
+        <div style={{ textAlign: 'right', fontSize: 12, color: C.muted, marginBottom: 8 }}>刷新中...</div>
+      )}
+
       {/* 高峰状态提示 */}
       <div style={{
         background: `${cfg.color}20`,
@@ -113,6 +177,11 @@ export function PeakAlertPage() {
           {level === 'peak' && '高峰时段，留意催菜和等位'}
           {level === 'extreme' && '极端高峰，全员加速！'}
         </div>
+        {peakData && (
+          <div style={{ fontSize: 13, color: C.muted, marginTop: 6 }}>
+            在场 {peakData.current_diners} 人 · 候位 {peakData.waiting_count} 组 · 均出餐 {Math.round(peakData.avg_serve_time_sec / 60)} 分钟
+          </div>
+        )}
       </div>
 
       {/* 快速统计 */}
@@ -120,7 +189,7 @@ export function PeakAlertPage() {
         {[
           { label: '待催菜', value: rushDishes.length, color: rushDishes.length > 4 ? C.danger : C.warning },
           { label: '已超时', value: overtimeCount, color: overtimeCount > 0 ? C.danger : C.green },
-          { label: '待加派', value: dispatches.filter(d => !d.accepted).length, color: C.info },
+          { label: '待加派', value: deptLoads.filter(d => !d.accepted).length, color: C.info },
         ].map(stat => (
           <div key={stat.label} style={{
             background: C.card, borderRadius: 8, padding: 12, textAlign: 'center',
@@ -133,12 +202,12 @@ export function PeakAlertPage() {
       </div>
 
       {/* 加派区域提示 */}
-      {dispatches.some(d => !d.accepted) && (
+      {deptLoads.some(d => !d.accepted) && (
         <div style={{ marginBottom: 16 }}>
           <h2 style={{ fontSize: 18, fontWeight: 700, color: C.white, margin: '0 0 8px' }}>
             需要加派
           </h2>
-          {dispatches.filter(d => !d.accepted).map(dp => (
+          {deptLoads.filter(d => !d.accepted).map(dp => (
             <div key={dp.id} style={{
               background: C.card, borderRadius: 12, padding: 16, marginBottom: 8,
               border: `1px solid ${dp.urgency === 'critical' ? C.danger : C.border}`,
@@ -171,7 +240,7 @@ export function PeakAlertPage() {
             </div>
           ))}
           {/* 已接受的加派 */}
-          {dispatches.filter(d => d.accepted).map(dp => (
+          {deptLoads.filter(d => d.accepted).map(dp => (
             <div key={dp.id} style={{
               background: C.card, borderRadius: 12, padding: 16, marginBottom: 8,
               border: `1px solid ${C.green}40`,

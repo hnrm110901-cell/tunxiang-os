@@ -1,0 +1,131 @@
+name: Frontend CI
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'apps/web-*/**'
+      - 'apps/h5-*/**'
+      - 'shared/api-types/**'
+      - 'shared/adapters/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - '.github/workflows/frontend-ci.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'apps/web-*/**'
+      - 'apps/h5-*/**'
+      - 'shared/api-types/**'
+      - 'shared/adapters/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+
+permissions:
+  contents: read
+
+jobs:
+  typecheck:
+    name: TypeScript Check
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [web-pos, web-admin, web-kds, web-crew, web-hub, web-forge]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 8
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: TypeScript check
+        run: |
+          cd "apps/${{ matrix.app }}"
+          if [ -f "tsconfig.json" ]; then
+            npx tsc --noEmit
+          else
+            echo "::notice::No tsconfig.json in ${{ matrix.app }}, skipping"
+          fi
+
+  lint:
+    name: ESLint
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [web-pos, web-admin, web-kds, web-crew, web-hub, web-forge]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 8
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: ESLint
+        run: |
+          cd "apps/${{ matrix.app }}"
+          if [ -f "package.json" ] && grep -q '"lint"' package.json; then
+            pnpm lint
+          else
+            echo "::notice::No lint script in ${{ matrix.app }}, skipping"
+          fi
+
+  build:
+    name: Build (${{ matrix.app }})
+    runs-on: ubuntu-latest
+    needs: [typecheck, lint]
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [web-pos, web-admin, web-kds, web-crew, web-hub, web-forge]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 8
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: |
+          cd "apps/${{ matrix.app }}"
+          if [ -f "package.json" ] && grep -q '"build"' package.json; then
+            pnpm build
+          else
+            echo "::notice::No build script in ${{ matrix.app }}, skipping"
+          fi
+
+      - name: Upload build artifacts
+        if: github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-${{ matrix.app }}
+          path: apps/${{ matrix.app }}/dist/
+          if-no-files-found: ignore
+          retention-days: 7

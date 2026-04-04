@@ -5,12 +5,36 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 import structlog
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncSession
 
 log = structlog.get_logger(__name__)
+
+
+async def _set_rls(db: AsyncSession, tenant_id: str) -> None:
+    await db.execute(
+        text("SELECT set_config('app.tenant_id', :tid, true)"),
+        {"tid": tenant_id},
+    )
+
+
+def _serialize_row(row_mapping: dict) -> dict:
+    result = {}
+    for key, val in row_mapping.items():
+        if val is None:
+            result[key] = None
+        elif hasattr(val, "isoformat"):
+            result[key] = val.isoformat()
+        elif hasattr(val, "hex"):
+            result[key] = str(val)
+        else:
+            result[key] = val
+    return result
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -24,21 +48,9 @@ async def save_case(
     tenant_id: str,
     db: Any,
 ) -> Dict[str, Any]:
-    """沉淀一条经营案例。
-
-    Args:
-        store_id: 门店 ID
-        case_data: 案例数据，包含:
-            {"title": str, "category": str, "problem": str, "solution": str,
-             "result": str, "tags": list, "author_id": str}
-        tenant_id: 租户 ID
-        db: 数据库会话
-
-    Returns:
-        {"case_id", "store_id", "title", "category", ...}
-    """
-    case_id = f"case_{store_id}_{uuid.uuid4().hex[:8]}"
-    now = datetime.utcnow().isoformat()
+    """沉淀一条经营案例并写入 DB。"""
+    case_id = str(uuid.uuid4())
+    now = datetime.now(timezone.utc)
 
     case = {
         "case_id": case_id,
@@ -54,17 +66,43 @@ async def save_case(
         "status": "active",
         "views": 0,
         "likes": 0,
-        "created_at": now,
-        "updated_at": now,
+        "created_at": now.isoformat(),
+        "updated_at": now.isoformat(),
     }
 
-    log.info(
-        "case_saved",
-        case_id=case_id,
-        store_id=store_id,
-        tenant_id=tenant_id,
-        category=case["category"],
-    )
+    if db is not None:
+        try:
+            await _set_rls(db, tenant_id)
+            await db.execute(
+                text(
+                    """
+                    INSERT INTO knowledge_cases
+                      (id, tenant_id, store_id, title, category, problem, solution,
+                       result, tags, author_id, status, views, likes, created_at, updated_at)
+                    VALUES
+                      (:id, NULLIF(current_setting('app.tenant_id', true), '')::uuid,
+                       :store_id, :title, :category, :problem, :solution,
+                       :result, :tags::jsonb, :author_id, 'active', 0, 0, :now, :now)
+                    """
+                ),
+                {
+                    "id": case_id,
+                    "store_id": store_id,
+                    "title": case["title"],
+                    "category": case["category"],
+                    "problem": case["problem"],
+                    "solution": case["solution"],
+                    "result": case["result"],
+                    "tags": str(case["tags"]).replace("'", '"'),
+                    "author_id": case["author_id"],
+                    "now": now,
+                },
+            )
+        except SQLAlchemyError as exc:
+            log.error("case_save_db_error", exc_info=True, error=str(exc), tenant_id=tenant_id)
+
+    log.info("case_saved", case_id=case_id, store_id=store_id,
+             tenant_id=tenant_id, category=case["category"])
     return case
 
 
@@ -81,46 +119,61 @@ async def search_cases(
     category: Optional[str] = None,
     cases: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
-    """搜索案例库。
-
-    支持关键词匹配标题、问题描述、解决方案、标签。
-
-    Args:
-        keyword: 搜索关键词
-        tenant_id: 租户 ID
-        db: 数据库会话
-        category: 可选分类过滤
-        cases: 案例列表（测试注入用，实际从 DB 查询）
-
-    Returns:
-        {"keyword", "results", "total"}
-    """
-    all_cases = cases or []
-    keyword_lower = keyword.lower()
-
+    """搜索案例库（优先从 DB 查询）。"""
     results: List[Dict[str, Any]] = []
-    for c in all_cases:
-        if c.get("tenant_id") != tenant_id:
-            continue
-        if category and c.get("category") != category:
-            continue
 
-        searchable = " ".join([
-            c.get("title", ""),
-            c.get("problem", ""),
-            c.get("solution", ""),
-            " ".join(c.get("tags", [])),
-        ]).lower()
+    if db is not None and not cases:
+        try:
+            await _set_rls(db, tenant_id)
+            where_clauses = [
+                "tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid",
+                "status = 'active'",
+                "is_deleted = false",
+                "(title ILIKE :kw OR problem ILIKE :kw OR solution ILIKE :kw OR tags::text ILIKE :kw)",
+            ]
+            params: dict = {"kw": f"%{keyword}%"}
 
-        if keyword_lower in searchable:
-            results.append(c)
+            if category:
+                where_clauses.append("category = :category")
+                params["category"] = category
 
-    log.info(
-        "cases_searched",
-        tenant_id=tenant_id,
-        keyword=keyword,
-        result_count=len(results),
-    )
+            where_sql = " AND ".join(where_clauses)
+
+            rows_result = await db.execute(
+                text(
+                    f"""
+                    SELECT id AS case_id, store_id, title, category, problem,
+                           solution, result, tags, author_id, status, views, likes,
+                           created_at, updated_at
+                    FROM knowledge_cases
+                    WHERE {where_sql}
+                    ORDER BY created_at DESC
+                    LIMIT 50
+                    """
+                ),
+                params,
+            )
+            results = [_serialize_row(dict(row._mapping)) for row in rows_result]
+        except SQLAlchemyError as exc:
+            log.error("case_search_db_error", exc_info=True, error=str(exc), tenant_id=tenant_id)
+    else:
+        all_cases = cases or []
+        keyword_lower = keyword.lower()
+        for c in all_cases:
+            if c.get("tenant_id") != tenant_id:
+                continue
+            if category and c.get("category") != category:
+                continue
+            searchable = " ".join([
+                c.get("title", ""),
+                c.get("problem", ""),
+                c.get("solution", ""),
+                " ".join(c.get("tags", [])),
+            ]).lower()
+            if keyword_lower in searchable:
+                results.append(c)
+
+    log.info("cases_searched", tenant_id=tenant_id, keyword=keyword, result_count=len(results))
 
     return {
         "keyword": keyword,
@@ -186,28 +239,12 @@ async def get_sop_suggestions(
     *,
     custom_templates: Optional[Dict[str, List[Dict[str, Any]]]] = None,
 ) -> Dict[str, Any]:
-    """根据问题类型获取 SOP 优化建议。
-
-    Args:
-        store_id: 门店 ID
-        issue_type: 问题类型
-        tenant_id: 租户 ID
-        db: 数据库会话
-        custom_templates: 自定义模板（测试注入用）
-
-    Returns:
-        {"store_id", "issue_type", "suggestions"}
-    """
+    """根据问题类型获取 SOP 优化建议。"""
     templates = custom_templates or _SOP_TEMPLATES
     suggestions = templates.get(issue_type, [])
 
-    log.info(
-        "sop_suggestions_queried",
-        store_id=store_id,
-        tenant_id=tenant_id,
-        issue_type=issue_type,
-        suggestion_count=len(suggestions),
-    )
+    log.info("sop_suggestions_queried", store_id=store_id, tenant_id=tenant_id,
+             issue_type=issue_type, suggestion_count=len(suggestions))
 
     return {
         "store_id": store_id,
@@ -230,47 +267,22 @@ async def get_best_practices(
     store_metrics: Optional[List[Dict[str, Any]]] = None,
     cases: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
-    """根据指标推荐最佳实践。
-
-    从高绩效门店中提取可复用的经验和案例。
-
-    Args:
-        metric: 指标名称 (gross_margin/waste_ratio/customer_satisfaction/staff_efficiency)
-        tenant_id: 租户 ID
-        db: 数据库会话
-        store_metrics: 各门店指标数据（测试注入用）
-        cases: 案例库（测试注入用）
-
-    Returns:
-        {"metric", "top_stores", "related_cases", "recommendations"}
-    """
+    """根据指标推荐最佳实践。"""
     metrics = store_metrics or []
     all_cases = cases or []
 
-    # 按指标排序找 TOP 门店
-    sorted_stores = sorted(
-        metrics,
-        key=lambda x: x.get("value", 0),
-        reverse=True,
-    )
+    sorted_stores = sorted(metrics, key=lambda x: x.get("value", 0), reverse=True)
     top_stores = sorted_stores[:3]
 
-    # 筛选相关案例
     related_cases = [
         c for c in all_cases
         if c.get("tenant_id") == tenant_id and metric in c.get("tags", [])
     ]
 
-    # 生成推荐
     recommendations = _build_recommendations(metric, top_stores)
 
-    log.info(
-        "best_practices_queried",
-        tenant_id=tenant_id,
-        metric=metric,
-        top_store_count=len(top_stores),
-        related_case_count=len(related_cases),
-    )
+    log.info("best_practices_queried", tenant_id=tenant_id, metric=metric,
+             top_store_count=len(top_stores), related_case_count=len(related_cases))
 
     return {
         "metric": metric,

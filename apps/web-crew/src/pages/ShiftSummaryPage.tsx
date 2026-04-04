@@ -39,27 +39,6 @@ interface SummaryHistory {
   created_at: string;
 }
 
-/* ---------- Mock 数据 ---------- */
-const MOCK_STATS: ShiftStats = {
-  table_count: 12,
-  revenue: 368000,
-  turnover_rate: 2.4,
-  satisfaction: 96,
-};
-
-const MOCK_PENDING: PendingItem[] = [
-  { id: 'p1', table_no: '8号桌', desc: '顾客反映空调温度过低，已告知但未处理', type: 'unfinished' },
-  { id: 'p2', table_no: '3号桌', desc: '顾客投诉上菜速度较慢', type: 'complaint' },
-  { id: 'p3', table_no: '12号桌', desc: '顾客表扬服务热情周到', type: 'praise' },
-  { id: 'p4', table_no: '备餐区', desc: '保温灯2号故障，需维修', type: 'equipment' },
-  { id: 'p5', table_no: '仓库', desc: '湿纸巾库存不足，约50包', type: 'material' },
-];
-
-const MOCK_HISTORY: SummaryHistory[] = [
-  { id: 'h1', summary: '上午班共接待9桌，营业额2,140元，翻台率2.1，整体运营平稳。', created_at: '今日 11:58' },
-  { id: 'h2', summary: '昨日晚班接待15桌，营业额4,520元，高峰期出现短暂等位，服务质量良好。', created_at: '昨日 22:05' },
-];
-
 /* ---------- 工具函数 ---------- */
 function formatRevenue(fen: number): string {
   return (fen / 100).toFixed(0);
@@ -192,6 +171,9 @@ export function ShiftSummaryPage() {
   const [generating, setGenerating] = useState(false);
   const [speaking, setSpeaking] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [stats, setStats] = useState<ShiftStats | null>(null);
+  const [pendingItems, setPendingItems] = useState<PendingItem[]>([]);
+  const [history, setHistory] = useState<SummaryHistory[]>([]);
   const esRef = useRef<EventSource | null>(null);
   const charIndexRef = useRef(0);
   const typeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -213,7 +195,7 @@ export function ShiftSummaryPage() {
   }
 
   /* SSE 流式请求 */
-  function fetchSummarySSE(crewId: string) {
+  function fetchSummarySSE(crewId: string, currentStats: ShiftStats | null, currentPending: PendingItem[]) {
     setLoading(true);
     setGenerating(true);
     setSummary('');
@@ -228,12 +210,12 @@ export function ShiftSummaryPage() {
     // 用 POST + SSE 的方式：先 POST 拿到 stream URL，再 EventSource
     // 由于 EventSource 不支持 POST body，改用 fetch + ReadableStream 模拟
     const SHIFT_DATA = {
-      table_count: MOCK_STATS.table_count,
-      revenue_fen: MOCK_STATS.revenue,
-      turnover_rate: MOCK_STATS.turnover_rate,
-      satisfaction: MOCK_STATS.satisfaction,
-      pending_count: MOCK_PENDING.filter(p => p.type === 'unfinished').length,
-      complaint_count: MOCK_PENDING.filter(p => p.type === 'complaint').length,
+      table_count: currentStats?.table_count ?? 0,
+      revenue_fen: currentStats?.revenue ?? 0,
+      turnover_rate: currentStats?.turnover_rate ?? 0,
+      satisfaction: currentStats?.satisfaction ?? 0,
+      pending_count: currentPending.filter(p => p.type === 'unfinished').length,
+      complaint_count: currentPending.filter(p => p.type === 'complaint').length,
     };
 
     let accumulated = '';
@@ -279,33 +261,63 @@ export function ShiftSummaryPage() {
           });
           read();
         }).catch(_err => {
-          fallbackMock();
+          fallbackMock(currentStats, currentPending);
         });
       }
       read();
     }).catch(_err => {
-      fallbackMock();
+      fallbackMock(currentStats, currentPending);
     });
   }
 
-  /* 后端不可用时的 Mock 回退 */
-  function fallbackMock() {
-    const mockText = `本班共接待${MOCK_STATS.table_count}桌，营业额${formatRevenue(MOCK_STATS.revenue)}元，翻台率${MOCK_STATS.turnover_rate.toFixed(1)}次，高于昨日均值15%。服务满意度${MOCK_STATS.satisfaction}%，收到1次投诉和1次表扬，整体运营稳定。需重点关注备餐区保温灯故障及湿纸巾库存不足问题，请下班同事及时跟进处理。`;
-    setSummary(mockText);
+  /* 后端不可用时的降级回退（基于真实 stats 数据或空安全占位） */
+  function fallbackMock(currentStats: ShiftStats | null, currentPending: PendingItem[]) {
+    const tableCount = currentStats?.table_count ?? '-';
+    const revenue = currentStats != null ? formatRevenue(currentStats.revenue) : '-';
+    const turnover = currentStats != null ? currentStats.turnover_rate.toFixed(1) : '-';
+    const satisfaction = currentStats?.satisfaction ?? '-';
+    const pendingCount = currentPending.filter(p => p.type === 'unfinished').length;
+    const complaintCount = currentPending.filter(p => p.type === 'complaint').length;
+    const fallbackText = `本班共接待${tableCount}桌，营业额${revenue}元，翻台率${turnover}次。服务满意度${satisfaction}%，收到${complaintCount}次投诉，有${pendingCount}项待办事项，请下班同事及时跟进处理。`;
+    setSummary(fallbackText);
     setLoading(false);
     setGenerating(false);
-    startTypewriter(mockText);
+    startTypewriter(fallbackText);
   }
 
-  /* 初始化加载 */
+  /* 初始化加载：先拉取班次数据，再生成摘要 */
   useEffect(() => {
     const crewId = (window as any).__CREW_ID__ || 'crew-001';
-    // 模拟500ms后开始生成（生产环境直接调用）
-    const t = setTimeout(() => {
-      fetchSummarySSE(crewId);
-    }, 500);
+    let cancelled = false;
+
+    async function loadData() {
+      try {
+        const res = await fetch('/api/v1/trade/shift/summary?date=today');
+        if (!cancelled && res.ok) {
+          const json = await res.json();
+          if (json.ok) {
+            const loadedStats: ShiftStats | null = json.data?.stats ?? null;
+            const loadedPending: PendingItem[] = json.data?.pending_items ?? [];
+            const loadedHistory: SummaryHistory[] = json.data?.history ?? [];
+            setStats(loadedStats);
+            setPendingItems(loadedPending);
+            setHistory(loadedHistory);
+            fetchSummarySSE(crewId, loadedStats, loadedPending);
+            return;
+          }
+        }
+      } catch {
+        // 网络失败，继续降级
+      }
+      if (!cancelled) {
+        fetchSummarySSE(crewId, null, []);
+      }
+    }
+
+    loadData();
+
     return () => {
-      clearTimeout(t);
+      cancelled = true;
       if (esRef.current) esRef.current.close();
       if (typeTimerRef.current) clearTimeout(typeTimerRef.current);
       window.speechSynthesis?.cancel();
@@ -334,7 +346,7 @@ export function ShiftSummaryPage() {
     window.speechSynthesis?.cancel();
     setSpeaking(false);
     const crewId = (window as any).__CREW_ID__ || 'crew-001';
-    fetchSummarySSE(crewId);
+    fetchSummarySSE(crewId, stats, pendingItems);
   }
 
   return (
@@ -470,10 +482,10 @@ export function ShiftSummaryPage() {
         {/* ── 2. 本班数据卡片 2×2 ── */}
         <h2 style={{ fontSize: 16, fontWeight: 600, margin: '0 0 12px', color: C.text }}>本班数据</h2>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
-          <StatCard label="接待桌次" value={MOCK_STATS.table_count} unit="桌" />
-          <StatCard label="营业额" value={`¥${formatRevenue(MOCK_STATS.revenue)}`} />
-          <StatCard label="翻台率" value={MOCK_STATS.turnover_rate.toFixed(1)} unit="次" />
-          <StatCard label="员工满意度" value={`${MOCK_STATS.satisfaction}%`} />
+          <StatCard label="接待桌次" value={stats?.table_count ?? '-'} unit="桌" />
+          <StatCard label="营业额" value={stats != null ? `¥${formatRevenue(stats.revenue)}` : '-'} />
+          <StatCard label="翻台率" value={stats != null ? stats.turnover_rate.toFixed(1) : '-'} unit="次" />
+          <StatCard label="员工满意度" value={stats != null ? `${stats.satisfaction}%` : '-'} />
         </div>
 
         {/* ── 3. 重要交接事项 ── */}
@@ -490,26 +502,38 @@ export function ShiftSummaryPage() {
           padding: '0 16px',
           marginBottom: 16,
         }}>
-          {MOCK_PENDING.map((item, i) => (
-            <div key={item.id} style={{ borderBottom: i < MOCK_PENDING.length - 1 ? `1px solid ${C.border}` : 'none' }}>
-              <PendingRow item={item} />
+          {pendingItems.length === 0 ? (
+            <div style={{ padding: '20px 0', fontSize: 15, color: C.muted, textAlign: 'center' }}>
+              暂无待交接事项
             </div>
-          ))}
+          ) : (
+            pendingItems.map((item, i) => (
+              <div key={item.id} style={{ borderBottom: i < pendingItems.length - 1 ? `1px solid ${C.border}` : 'none' }}>
+                <PendingRow item={item} />
+              </div>
+            ))
+          )}
         </div>
 
         {/* ── 历史摘要（折叠） ── */}
         {showHistory && (
           <div style={{ marginBottom: 16 }}>
             <h2 style={{ fontSize: 16, fontWeight: 600, margin: '0 0 12px', color: C.text }}>历史摘要</h2>
-            {MOCK_HISTORY.map(h => (
-              <div key={h.id} style={{
-                background: C.card, border: `1px solid ${C.border}`,
-                borderRadius: 12, padding: 14, marginBottom: 10,
-              }}>
-                <p style={{ margin: '0 0 6px', fontSize: 15, color: C.text, lineHeight: 1.6 }}>{h.summary}</p>
-                <span style={{ fontSize: 12, color: C.muted }}>{h.created_at}</span>
+            {history.length === 0 ? (
+              <div style={{ fontSize: 15, color: C.muted, textAlign: 'center', padding: '16px 0' }}>
+                暂无历史摘要
               </div>
-            ))}
+            ) : (
+              history.map(h => (
+                <div key={h.id} style={{
+                  background: C.card, border: `1px solid ${C.border}`,
+                  borderRadius: 12, padding: 14, marginBottom: 10,
+                }}>
+                  <p style={{ margin: '0 0 6px', fontSize: 15, color: C.text, lineHeight: 1.6 }}>{h.summary}</p>
+                  <span style={{ fontSize: 12, color: C.muted }}>{h.created_at}</span>
+                </div>
+              ))
+            )}
           </div>
         )}
       </div>

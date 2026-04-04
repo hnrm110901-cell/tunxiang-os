@@ -1,0 +1,52 @@
+<view class="page">
+  <!-- 图片上传区 -->
+  <view class="image-section">
+    <view class="image-grid">
+      <block wx:for="{{images}}" wx:key="*this">
+        <view class="image-item">
+          <image src="{{item}}" mode="aspectFill" class="preview-img"/>
+          <view class="del-btn" catchtap="removeImage" data-index="{{index}}">×</view>
+        </view>
+      </block>
+      <view class="add-image" wx:if="{{images.length < 9}}" bindtap="chooseImages">
+        <text class="add-icon">+</text>
+        <text class="add-text">{{images.length}}/9</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 标题输入 -->
+  <view class="section">
+    <input class="title-input" placeholder="填写标题，让更多人看到..." value="{{title}}" bindinput="onTitleInput" maxlength="30"/>
+  </view>
+
+  <!-- 内容输入 -->
+  <view class="section content-section">
+    <textarea class="content-input" placeholder="分享你的美食故事..." value="{{content}}" bindinput="onContentInput" maxlength="500" auto-height/>
+    <text class="word-count">{{content.length}}/500</text>
+  </view>
+
+  <!-- 标签选择 -->
+  <view class="section">
+    <text class="section-label">话题标签</text>
+    <view class="tags-row">
+      <view class="tag-chip {{selectedTags.includes(tag) ? 'selected' : ''}}" wx:for="{{availableTags}}" wx:key="*this" bindtap="toggleTag" data-tag="{{item}}">
+        #{{item}}
+      </view>
+    </view>
+  </view>
+
+  <!-- 关联门店 -->
+  <view class="section link-store" bindtap="selectStore">
+    <text class="section-label">📍 关联门店</text>
+    <text class="store-name">{{selectedStore ? selectedStore.name : '选择打卡门店（选填）'}}</text>
+    <text class="arrow">›</text>
+  </view>
+
+  <!-- 提交按钮 -->
+  <view class="submit-area">
+    <button class="submit-btn {{submitting ? 'disabled' : ''}}" bindtap="submit" disabled="{{submitting}}">
+      {{submitting ? '发布中...' : '发布'}}
+    </button>
+  </view>
+</view>

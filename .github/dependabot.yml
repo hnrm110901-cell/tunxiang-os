@@ -1,0 +1,59 @@
+version: 2
+
+updates:
+  # Python 依赖（各服务的 requirements.txt）
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Asia/Shanghai"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "backend"
+    commit-message:
+      prefix: "deps(py):"
+    reviewers:
+      - "lichun"
+
+  # npm 依赖（pnpm workspace）
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Asia/Shanghai"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "frontend"
+    commit-message:
+      prefix: "deps(npm):"
+    reviewers:
+      - "lichun"
+    # 忽略 major 版本升级（手动处理）
+    ignore:
+      - dependency-name: "react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react-dom"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "antd"
+        update-types: ["version-update:semver-major"]
+
+  # GitHub Actions 版本更新
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Asia/Shanghai"
+    open-pull-requests-limit: 3
+    labels:
+      - "dependencies"
+      - "infra"
+    commit-message:
+      prefix: "deps(actions):"

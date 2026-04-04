@@ -46,25 +46,6 @@ interface ShiftSwap {
   createdAt: string;
 }
 
-/* ---------- Mock 数据 ---------- */
-const MOCK_WEEK_SCHEDULE: DaySchedule[] = [
-  { date: '03-25', weekday: '周二', shift: '午班', timeRange: '11:00-17:00', status: 'present', isToday: false },
-  { date: '03-26', weekday: '周三', shift: '晚班', timeRange: '17:00-22:00', status: 'present', isToday: false },
-  { date: '03-27', weekday: '周四', shift: '',     timeRange: '',             status: 'pending', isToday: false },
-  { date: '03-28', weekday: '周五', shift: '早班', timeRange: '09:00-14:00', status: 'absent',  isToday: false },
-  { date: '03-29', weekday: '周六', shift: '午班', timeRange: '11:00-17:00', status: 'present', isToday: false },
-  { date: '03-30', weekday: '周日', shift: '晚班', timeRange: '17:00-22:00', status: 'present', isToday: false },
-  { date: '03-31', weekday: '周一', shift: '午班', timeRange: '11:00-17:00', status: 'today',   isToday: true  },
-];
-
-const MOCK_SWAPS: ShiftSwap[] = [
-  { id: 'sw-001', fromDate: '03-28', toCrew: '李四', reason: '家里有事', status: 'approved',  createdAt: '03-27 10:20' },
-  { id: 'sw-002', fromDate: '04-02', toCrew: '王五', reason: '看病',     status: 'pending',  createdAt: '03-30 14:05' },
-  { id: 'sw-003', fromDate: '03-20', toCrew: '赵六', reason: '约好了',   status: 'rejected', createdAt: '03-19 09:00' },
-];
-
-const MOCK_CREW_LIST = ['李四', '王五', '赵六', '孙七', '周八'];
-
 /* ---------- 工具函数 ---------- */
 function formatTime(d: Date): string {
   const hh = String(d.getHours()).padStart(2, '0');
@@ -296,19 +277,33 @@ function CheckinTab() {
 
 /* ---------- Tab 2 — 本周排班 ---------- */
 function ScheduleTab() {
-  const schedule = MOCK_WEEK_SCHEDULE;
-  const [selectedIdx, setSelectedIdx] = useState(
-    MOCK_WEEK_SCHEDULE.findIndex(d => d.isToday) ?? 0,
-  );
+  const [schedule, setSchedule] = useState<DaySchedule[]>([]);
+  const [scheduleLoading, setScheduleLoading] = useState(true);
+  const [selectedIdx, setSelectedIdx] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // 实际调用: GET /api/v1/crew/schedule?week=current
-    // setSchedule(apiData)
-    void schedule; // suppress lint: using mock
+    async function loadSchedule() {
+      setScheduleLoading(true);
+      try {
+        const res = await fetch('/api/v1/org/schedules?week=current');
+        if (res.ok) {
+          const json = await res.json();
+          if (json.ok) {
+            const loaded: DaySchedule[] = json.data?.schedule ?? [];
+            setSchedule(loaded);
+            const todayIdx = loaded.findIndex(d => d.isToday);
+            setSelectedIdx(todayIdx >= 0 ? todayIdx : 0);
+          }
+        }
+      } catch {
+        // API 失败，schedule 保持空数组，UI 显示暂无数据
+      } finally {
+        setScheduleLoading(false);
+      }
+    }
+    loadSchedule();
   }, []);
-
-  const selected = schedule[selectedIdx];
 
   function statusIcon(s: DaySchedule['status']): string {
     if (s === 'present') return '✓';
@@ -329,6 +324,24 @@ function ScheduleTab() {
     '午班': '#7c3aed',
     '晚班': '#b45309',
   };
+
+  if (scheduleLoading) {
+    return (
+      <div style={{ padding: '40px 16px', textAlign: 'center', color: C.muted, fontSize: 15 }}>
+        加载中...
+      </div>
+    );
+  }
+
+  if (schedule.length === 0) {
+    return (
+      <div style={{ padding: '40px 16px', textAlign: 'center', color: C.muted, fontSize: 15 }}>
+        暂无排班数据
+      </div>
+    );
+  }
+
+  const selected = schedule[selectedIdx] ?? schedule[0];
 
   return (
     <div style={{ padding: '16px 0 0' }}>
@@ -458,13 +471,42 @@ function ScheduleTab() {
 
 /* ---------- Tab 3 — 换班申请 ---------- */
 function ShiftSwapTab() {
-  const [swaps, setSwaps]             = useState<ShiftSwap[]>(MOCK_SWAPS);
+  const [swaps, setSwaps]             = useState<ShiftSwap[]>([]);
+  const [crewList, setCrewList]       = useState<string[]>([]);
   const [showModal, setShowModal]     = useState(false);
   const [fromDate, setFromDate]       = useState('');
   const [toCrew, setToCrew]           = useState('');
   const [reason, setReason]           = useState('');
   const [submitting, setSubmitting]   = useState(false);
   const [toast, setToast]             = useState('');
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const storeId = (window as any).__STORE_ID__ || '';
+        const [swapsRes, crewRes] = await Promise.allSettled([
+          fetch('/api/v1/org/shift-swaps?scope=mine'),
+          fetch(`/api/v1/org/employees?store_id=${storeId}&on_duty=true`),
+        ]);
+        if (swapsRes.status === 'fulfilled' && swapsRes.value.ok) {
+          const json = await swapsRes.value.json();
+          if (json.ok) setSwaps(json.data ?? []);
+        }
+        if (crewRes.status === 'fulfilled' && crewRes.value.ok) {
+          const json = await crewRes.value.json();
+          if (json.ok) {
+            const names: string[] = (json.data?.items ?? json.data ?? []).map(
+              (e: { name: string }) => e.name,
+            );
+            setCrewList(names);
+          }
+        }
+      } catch {
+        // 网络失败时 swaps/crewList 保持空数组
+      }
+    }
+    loadData();
+  }, []);
 
   function showToast(msg: string) {
     setToast(msg);
@@ -631,9 +673,13 @@ function ShiftSwapTab() {
                 }}
               >
                 <option value="" disabled>请选择同事</option>
-                {MOCK_CREW_LIST.map(name => (
-                  <option key={name} value={name}>{name}</option>
-                ))}
+                {crewList.length === 0 ? (
+                  <option value="" disabled>暂无在班同事</option>
+                ) : (
+                  crewList.map(name => (
+                    <option key={name} value={name}>{name}</option>
+                  ))
+                )}
               </select>
             </div>
 

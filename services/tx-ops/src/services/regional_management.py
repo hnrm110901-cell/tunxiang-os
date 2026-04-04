@@ -10,6 +10,8 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 import structlog
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 
 log = structlog.get_logger(__name__)
 
@@ -42,6 +44,27 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+async def _set_rls(db: Any, tenant_id: str) -> None:
+    await db.execute(
+        text("SELECT set_config('app.tenant_id', :tid, true)"),
+        {"tid": tenant_id},
+    )
+
+
+def _serialize_row(row_mapping: dict) -> dict:
+    result = {}
+    for key, val in row_mapping.items():
+        if val is None:
+            result[key] = None
+        elif hasattr(val, "isoformat"):
+            result[key] = val.isoformat()
+        elif hasattr(val, "hex"):
+            result[key] = str(val)
+        else:
+            result[key] = val
+    return result
+
+
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  1. 区域整改派发
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -56,21 +79,8 @@ async def dispatch_rectification(
     tenant_id: str,
     db: Any,
 ) -> Dict[str, Any]:
-    """派发一条整改任务给指定责任人。
-
-    Args:
-        region_id: 区域 ID
-        store_id: 门店 ID
-        issue_id: 关联问题 ID
-        assignee_id: 责任人 ID
-        deadline: 整改截止日期 (YYYY-MM-DD)
-        tenant_id: 租户 ID
-        db: 数据库会话
-
-    Returns:
-        整改单字典，含 rectification_id 和初始状态 dispatched
-    """
-    rectification_id = f"rect_{region_id}_{uuid.uuid4().hex[:8]}"
+    """派发一条整改任务给指定责任人，写入 DB。"""
+    rectification_id = str(uuid.uuid4())
     now = _now_iso()
 
     record: Dict[str, Any] = {
@@ -88,14 +98,37 @@ async def dispatch_rectification(
         "updated_at": now,
     }
 
-    log.info(
-        "rectification_dispatched",
-        rectification_id=rectification_id,
-        region_id=region_id,
-        store_id=store_id,
-        tenant_id=tenant_id,
-        assignee_id=assignee_id,
-    )
+    if db is not None:
+        try:
+            await _set_rls(db, tenant_id)
+            await db.execute(
+                text(
+                    """
+                    INSERT INTO regional_rectifications
+                      (id, tenant_id, region_id, store_id, issue_id, assignee_id,
+                       deadline, status, created_at, updated_at)
+                    VALUES
+                      (:id, NULLIF(current_setting('app.tenant_id', true), '')::uuid,
+                       :region_id, :store_id, :issue_id, :assignee_id,
+                       :deadline, 'dispatched', NOW(), NOW())
+                    """
+                ),
+                {
+                    "id": rectification_id,
+                    "region_id": region_id,
+                    "store_id": store_id,
+                    "issue_id": issue_id,
+                    "assignee_id": assignee_id,
+                    "deadline": deadline,
+                },
+            )
+        except SQLAlchemyError as exc:
+            log.error("dispatch_rectification_db_error", exc_info=True,
+                      error=str(exc), tenant_id=tenant_id)
+
+    log.info("rectification_dispatched", rectification_id=rectification_id,
+             region_id=region_id, store_id=store_id, tenant_id=tenant_id,
+             assignee_id=assignee_id)
     return record
 
 
@@ -113,28 +146,50 @@ async def track_rectification(
     new_status: Optional[str] = None,
     note: str = "",
 ) -> Dict[str, Any]:
-    """更新整改进度。
-
-    Args:
-        rectification_id: 整改单 ID
-        tenant_id: 租户 ID
-        db: 数据库会话
-        record: 已加载整改记录（测试注入用）
-        new_status: 目标状态
-        note: 进度备注
-
-    Returns:
-        更新后的整改记录
-    """
+    """更新整改进度。"""
     if new_status and new_status not in RECTIFICATION_STATUSES:
         raise ValueError(f"Invalid rectification status: {new_status}")
 
-    if record is not None and new_status:
+    if db is not None and new_status:
+        try:
+            await _set_rls(db, tenant_id)
+            check_result = await db.execute(
+                text(
+                    """
+                    SELECT id, status FROM regional_rectifications
+                    WHERE id = :id
+                      AND tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid
+                      AND is_deleted = false
+                    LIMIT 1
+                    """
+                ),
+                {"id": rectification_id},
+            )
+            row = check_result.fetchone()
+            if row:
+                current = row.status
+                if not _can_transition(current, new_status):
+                    raise ValueError(f"Cannot transition from '{current}' to '{new_status}'")
+                await db.execute(
+                    text(
+                        """
+                        UPDATE regional_rectifications
+                        SET status = :status, updated_at = NOW()
+                        WHERE id = :id
+                          AND tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid
+                        """
+                    ),
+                    {"status": new_status, "id": rectification_id},
+                )
+        except ValueError:
+            raise
+        except SQLAlchemyError as exc:
+            log.error("track_rectification_db_error", exc_info=True,
+                      error=str(exc), tenant_id=tenant_id)
+    elif record is not None and new_status:
         current = record.get("status", "dispatched")
         if not _can_transition(current, new_status):
-            raise ValueError(
-                f"Cannot transition from '{current}' to '{new_status}'"
-            )
+            raise ValueError(f"Cannot transition from '{current}' to '{new_status}'")
         record["status"] = new_status
         record["updated_at"] = _now_iso()
         if note:
@@ -144,12 +199,8 @@ async def track_rectification(
                 "timestamp": _now_iso(),
             })
 
-    log.info(
-        "rectification_tracked",
-        rectification_id=rectification_id,
-        tenant_id=tenant_id,
-        new_status=new_status,
-    )
+    log.info("rectification_tracked", rectification_id=rectification_id,
+             tenant_id=tenant_id, new_status=new_status)
 
     return {
         "rectification_id": rectification_id,
@@ -174,58 +225,77 @@ async def submit_review(
     record: Optional[Dict[str, Any]] = None,
     comment: str = "",
 ) -> Dict[str, Any]:
-    """提交整改复查结果。
-
-    Args:
-        rectification_id: 整改单 ID
-        reviewer_id: 复查人 ID
-        result: 复查结果 (pass / fail)
-        tenant_id: 租户 ID
-        db: 数据库会话
-        record: 已加载整改记录（测试注入用）
-        comment: 复查意见
-
-    Returns:
-        复查结果字典
-    """
+    """提交整改复查结果。"""
     if result not in ("pass", "fail"):
         raise ValueError(f"Review result must be 'pass' or 'fail', got '{result}'")
 
     now = _now_iso()
+    final_status = "closed" if result == "pass" else "reviewed"
 
-    if record is not None:
-        current = record.get("status", "dispatched")
-        # 复查只能在 submitted 状态进行
-        if current != "submitted":
-            raise ValueError(
-                f"Review requires status 'submitted', current is '{current}'"
+    if db is not None:
+        try:
+            await _set_rls(db, tenant_id)
+            check_result = await db.execute(
+                text(
+                    """
+                    SELECT id, status FROM regional_rectifications
+                    WHERE id = :id
+                      AND tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid
+                      AND is_deleted = false
+                    LIMIT 1
+                    """
+                ),
+                {"id": rectification_id},
             )
-        record["status"] = "reviewed"
+            row = check_result.fetchone()
+            if row:
+                current = row.status
+                if current != "submitted":
+                    raise ValueError(f"Review requires status 'submitted', current is '{current}'")
+                await db.execute(
+                    text(
+                        """
+                        UPDATE regional_rectifications
+                        SET status = :status, reviewer_id = :reviewer_id,
+                            review_result = :review_result, review_comment = :comment,
+                            reviewed_at = NOW(), updated_at = NOW()
+                        WHERE id = :id
+                          AND tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid
+                        """
+                    ),
+                    {
+                        "status": final_status,
+                        "reviewer_id": reviewer_id,
+                        "review_result": result,
+                        "comment": comment,
+                        "id": rectification_id,
+                    },
+                )
+        except ValueError:
+            raise
+        except SQLAlchemyError as exc:
+            log.error("submit_review_db_error", exc_info=True,
+                      error=str(exc), tenant_id=tenant_id)
+    elif record is not None:
+        current = record.get("status", "dispatched")
+        if current != "submitted":
+            raise ValueError(f"Review requires status 'submitted', current is '{current}'")
+        record["status"] = final_status
         record["review_result"] = result
         record["reviewer_id"] = reviewer_id
         record["review_comment"] = comment
         record["reviewed_at"] = now
         record["updated_at"] = now
 
-        # 如果通过，自动关闭
-        if result == "pass":
-            record["status"] = "closed"
-            record["closed_at"] = now
-
-    log.info(
-        "rectification_reviewed",
-        rectification_id=rectification_id,
-        tenant_id=tenant_id,
-        reviewer_id=reviewer_id,
-        result=result,
-    )
+    log.info("rectification_reviewed", rectification_id=rectification_id,
+             tenant_id=tenant_id, reviewer_id=reviewer_id, result=result)
 
     return {
         "rectification_id": rectification_id,
         "reviewer_id": reviewer_id,
         "result": result,
         "comment": comment,
-        "status": "closed" if result == "pass" else "reviewed",
+        "status": final_status,
         "reviewed_at": now,
     }
 
@@ -251,18 +321,32 @@ async def get_regional_scorecard(
     *,
     store_scores: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
-    """获取区域门店红黄绿评分卡。
+    """获取区域门店红黄绿评分卡（从 DB 查询）。"""
+    scores: List[Dict[str, Any]] = store_scores or []
 
-    Args:
-        region_id: 区域 ID
-        tenant_id: 租户 ID
-        db: 数据库会话
-        store_scores: [{store_id, score}] 各门店分数（测试注入用）
+    if db is not None and not store_scores:
+        try:
+            await _set_rls(db, tenant_id)
+            rows_result = await db.execute(
+                text(
+                    """
+                    SELECT store_id,
+                           COALESCE(AVG(score), 0) AS score
+                    FROM store_inspection_scores
+                    WHERE region_id = :region_id
+                      AND tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid
+                      AND is_deleted = false
+                      AND scored_at >= NOW() - INTERVAL '30 days'
+                    GROUP BY store_id
+                    """
+                ),
+                {"region_id": region_id},
+            )
+            scores = [{"store_id": row.store_id, "score": float(row.score)} for row in rows_result]
+        except SQLAlchemyError as exc:
+            log.error("regional_scorecard_db_error", exc_info=True,
+                      error=str(exc), tenant_id=tenant_id)
 
-    Returns:
-        评分卡字典，包含各门店颜色及汇总
-    """
-    scores = store_scores or []
     cards: List[Dict[str, Any]] = []
     color_counts = {"green": 0, "yellow": 0, "red": 0}
 
@@ -276,20 +360,14 @@ async def get_regional_scorecard(
             "color": color,
         })
 
-    # 按分数升序，最差排前面
     cards.sort(key=lambda c: c["score"])
 
     avg_score = round(
         sum(e.get("score", 0) for e in scores) / len(scores), 1
     ) if scores else 0.0
 
-    log.info(
-        "regional_scorecard_generated",
-        region_id=region_id,
-        tenant_id=tenant_id,
-        store_count=len(scores),
-        avg_score=avg_score,
-    )
+    log.info("regional_scorecard_generated", region_id=region_id, tenant_id=tenant_id,
+             store_count=len(scores), avg_score=avg_score)
 
     return {
         "region_id": region_id,
@@ -313,26 +391,37 @@ async def cross_store_benchmark(
     *,
     store_metrics: Optional[Dict[str, float]] = None,
 ) -> Dict[str, Any]:
-    """跨店同指标对标。
+    """跨店同指标对标（从 DB 查询）。"""
+    data: Dict[str, float] = store_metrics or {}
 
-    Args:
-        metric: 对标指标名称 (如 food_safety_score / hygiene_score)
-        region_id: 区域 ID
-        tenant_id: 租户 ID
-        db: 数据库会话
-        store_metrics: {store_id: value} 各门店指标值（测试注入用）
-
-    Returns:
-        对标结果，含排名和统计
-    """
-    data = store_metrics or {}
+    if db is not None and not store_metrics:
+        try:
+            await _set_rls(db, tenant_id)
+            rows_result = await db.execute(
+                text(
+                    """
+                    SELECT store_id, AVG(metric_value) AS avg_val
+                    FROM store_metrics_daily
+                    WHERE region_id = :region_id
+                      AND metric_name = :metric
+                      AND tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid
+                      AND is_deleted = false
+                      AND metric_date >= NOW() - INTERVAL '30 days'
+                    GROUP BY store_id
+                    """
+                ),
+                {"region_id": region_id, "metric": metric},
+            )
+            data = {row.store_id: float(row.avg_val) for row in rows_result}
+        except SQLAlchemyError as exc:
+            log.error("cross_store_benchmark_db_error", exc_info=True,
+                      error=str(exc), tenant_id=tenant_id)
 
     ranked: List[Dict[str, Any]] = [
         {"store_id": sid, "value": val} for sid, val in data.items()
     ]
     ranked.sort(key=lambda x: x["value"], reverse=True)
 
-    # 添加排名
     for idx, item in enumerate(ranked, 1):
         item["rank"] = idx
 
@@ -340,13 +429,8 @@ async def cross_store_benchmark(
     total = sum(values) if values else 0.0
     avg = round(total / len(values), 2) if values else 0.0
 
-    log.info(
-        "cross_store_benchmark",
-        metric=metric,
-        region_id=region_id,
-        tenant_id=tenant_id,
-        store_count=len(data),
-    )
+    log.info("cross_store_benchmark", metric=metric, region_id=region_id,
+             tenant_id=tenant_id, store_count=len(data))
 
     return {
         "metric": metric,
@@ -376,43 +460,65 @@ async def generate_regional_report(
     rectifications: Optional[List[Dict[str, Any]]] = None,
     store_scores: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
-    """生成区域月报。
+    """生成区域月报（从 DB 查询整改记录和评分）。"""
+    rects: List[Dict[str, Any]] = rectifications or []
+    scores: List[Dict[str, Any]] = store_scores or []
 
-    Args:
-        region_id: 区域 ID
-        month: 月份 (YYYY-MM)
-        tenant_id: 租户 ID
-        db: 数据库会话
-        rectifications: 整改记录列表（测试注入用）
-        store_scores: 门店分数列表（测试注入用）
+    if db is not None and not rectifications:
+        try:
+            await _set_rls(db, tenant_id)
+            rows_result = await db.execute(
+                text(
+                    """
+                    SELECT id, status, review_result
+                    FROM regional_rectifications
+                    WHERE region_id = :region_id
+                      AND tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid
+                      AND is_deleted = false
+                      AND TO_CHAR(created_at, 'YYYY-MM') = :month
+                    """
+                ),
+                {"region_id": region_id, "month": month},
+            )
+            rects = [_serialize_row(dict(row._mapping)) for row in rows_result]
+        except SQLAlchemyError as exc:
+            log.error("regional_report_rects_db_error", exc_info=True,
+                      error=str(exc), tenant_id=tenant_id)
 
-    Returns:
-        月报字典，含整改统计和评分汇总
-    """
-    rects = rectifications or []
-    scores = store_scores or []
+    if db is not None and not store_scores:
+        try:
+            await _set_rls(db, tenant_id)
+            rows_result = await db.execute(
+                text(
+                    """
+                    SELECT store_id, AVG(score) AS score
+                    FROM store_inspection_scores
+                    WHERE region_id = :region_id
+                      AND tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid
+                      AND is_deleted = false
+                      AND TO_CHAR(scored_at, 'YYYY-MM') = :month
+                    GROUP BY store_id
+                    """
+                ),
+                {"region_id": region_id, "month": month},
+            )
+            scores = [{"store_id": row.store_id, "score": float(row.score)} for row in rows_result]
+        except SQLAlchemyError as exc:
+            log.error("regional_report_scores_db_error", exc_info=True,
+                      error=str(exc), tenant_id=tenant_id)
 
-    # 整改统计
     total_rects = len(rects)
     closed = sum(1 for r in rects if r.get("status") == "closed")
     in_progress = sum(1 for r in rects if r.get("status") in ("dispatched", "in_progress", "submitted"))
     reviewed_fail = sum(1 for r in rects if r.get("status") == "reviewed" and r.get("review_result") == "fail")
-
     closure_rate = round(closed / total_rects * 100, 1) if total_rects else 0.0
 
-    # 评分汇总
     avg_score = round(
         sum(s.get("score", 0) for s in scores) / len(scores), 1
     ) if scores else 0.0
 
-    log.info(
-        "regional_report_generated",
-        region_id=region_id,
-        month=month,
-        tenant_id=tenant_id,
-        total_rects=total_rects,
-        closure_rate=closure_rate,
-    )
+    log.info("regional_report_generated", region_id=region_id, month=month,
+             tenant_id=tenant_id, total_rects=total_rects, closure_rate=closure_rate)
 
     return {
         "region_id": region_id,
@@ -445,28 +551,37 @@ async def get_rectification_archive(
     *,
     rectifications: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
-    """获取区域整改归档（已关闭的整改记录）。
+    """获取区域整改归档（从 DB 查询已关闭和进行中的整改记录）。"""
+    all_rects: List[Dict[str, Any]] = rectifications or []
 
-    Args:
-        region_id: 区域 ID
-        tenant_id: 租户 ID
-        db: 数据库会话
-        rectifications: 全部整改记录（测试注入用）
+    if db is not None and not rectifications:
+        try:
+            await _set_rls(db, tenant_id)
+            rows_result = await db.execute(
+                text(
+                    """
+                    SELECT id AS rectification_id, region_id, store_id, issue_id,
+                           assignee_id, deadline, status, review_result,
+                           reviewer_id, review_comment, created_at, updated_at
+                    FROM regional_rectifications
+                    WHERE region_id = :region_id
+                      AND tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid
+                      AND is_deleted = false
+                    ORDER BY created_at DESC
+                    """
+                ),
+                {"region_id": region_id},
+            )
+            all_rects = [_serialize_row(dict(row._mapping)) for row in rows_result]
+        except SQLAlchemyError as exc:
+            log.error("rectification_archive_db_error", exc_info=True,
+                      error=str(exc), tenant_id=tenant_id)
 
-    Returns:
-        归档字典，含已关闭整改列表及统计
-    """
-    all_rects = rectifications or []
     archived = [r for r in all_rects if r.get("status") == "closed"]
     pending = [r for r in all_rects if r.get("status") != "closed"]
 
-    log.info(
-        "rectification_archive_queried",
-        region_id=region_id,
-        tenant_id=tenant_id,
-        archived_count=len(archived),
-        pending_count=len(pending),
-    )
+    log.info("rectification_archive_queried", region_id=region_id, tenant_id=tenant_id,
+             archived_count=len(archived), pending_count=len(pending))
 
     return {
         "region_id": region_id,

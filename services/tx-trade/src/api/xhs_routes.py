@@ -17,13 +17,11 @@ from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from shared.ontology.src.database import get_db
+
 logger = structlog.get_logger(__name__)
 
 router = APIRouter(tags=["xiaohongshu"])
-
-
-async def get_db() -> AsyncSession:  # type: ignore[override]
-    raise NotImplementedError("DB session dependency not configured")
 
 
 def ok_response(data: Any) -> dict:

@@ -2,33 +2,30 @@
 
 统一管理企微、短信、小程序、App Push 等渠道的消息发送，
 强制频率限制防止用户骚扰，记录发送日志用于归因。
+
+v144 DB 化：移除内存存储，改为 async SQLAlchemy
+  - channel_configs 表存储渠道配置（替换 _channel_configs dict）
+  - message_send_logs 表存储发送日志（替换 _send_logs + _daily_send_counts）
 """
+import json
 import os
 import uuid
-from collections import defaultdict
 from datetime import date, datetime, timezone
 from typing import Optional
 from uuid import UUID
 
 import httpx
 import structlog
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncSession
 
-# ---------------------------------------------------------------------------
-# 内存存储
-# ---------------------------------------------------------------------------
-
-_channel_configs: dict[str, dict] = {}
-_send_logs: list[dict] = []
-_daily_send_counts: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
-# _daily_send_counts[user_id][channel] = count_today
+_logger = structlog.get_logger(__name__)
 
 
 # ---------------------------------------------------------------------------
 # ChannelEngine
 # ---------------------------------------------------------------------------
-
-_logger = structlog.get_logger(__name__)
-
 
 class ChannelEngine:
     """渠道触达引擎 — 统一渠道配置、发送能力和合规频控"""
@@ -36,14 +33,396 @@ class ChannelEngine:
     GATEWAY_URL: str = os.getenv("GATEWAY_SERVICE_URL", "http://gateway:8000")
 
     CHANNELS = {
-        "wecom": {"name": "企业微信", "max_daily": 3},
-        "sms": {"name": "短信", "max_daily": 2},
-        "miniapp": {"name": "小程序订阅消息", "max_daily": 5},
-        "app_push": {"name": "App Push", "max_daily": 3},
-        "pos_receipt": {"name": "POS小票二维码", "max_daily": 999},
-        "reservation_page": {"name": "预订确认页", "max_daily": 1},
-        "store_task": {"name": "门店人工任务", "max_daily": 1},
+        "wecom":            {"name": "企业微信",     "max_daily": 3},
+        "sms":              {"name": "短信",          "max_daily": 2},
+        "miniapp":          {"name": "小程序订阅消息", "max_daily": 5},
+        "app_push":         {"name": "App Push",      "max_daily": 3},
+        "pos_receipt":      {"name": "POS小票二维码",  "max_daily": 999},
+        "reservation_page": {"name": "预订确认页",     "max_daily": 1},
+        "store_task":       {"name": "门店人工任务",   "max_daily": 1},
     }
+
+    # ------------------------------------------------------------------
+    # 内部工具
+    # ------------------------------------------------------------------
+
+    async def _set_tenant(self, db: AsyncSession, tenant_id: str) -> None:
+        await db.execute(
+            text("SELECT set_config('app.tenant_id', :tid, true)"),
+            {"tid": tenant_id},
+        )
+
+    # ------------------------------------------------------------------
+    # 渠道配置
+    # ------------------------------------------------------------------
+
+    async def get_channel_config(
+        self,
+        channel_name: str,
+        *,
+        tenant_id: str,
+        db: AsyncSession,
+    ) -> dict:
+        """查询渠道配置，SELECT from channel_configs
+
+        若 DB 中无配置则返回内置默认值。
+        """
+        await self._set_tenant(db, tenant_id)
+        tid = uuid.UUID(tenant_id)
+
+        result = await db.execute(
+            text("""
+                SELECT id, channel, max_daily_per_user, settings, is_enabled,
+                       created_at, updated_at
+                FROM channel_configs
+                WHERE tenant_id = :tid AND channel = :channel AND is_deleted = false
+                LIMIT 1
+            """),
+            {"tid": tid, "channel": channel_name},
+        )
+        row = result.fetchone()
+
+        channel_defaults = self.CHANNELS.get(channel_name, {})
+
+        if not row:
+            return {
+                "channel": channel_name,
+                "channel_name": channel_defaults.get("name", channel_name),
+                "max_daily_per_user": channel_defaults.get("max_daily", 3),
+                "settings": {},
+                "is_enabled": True,
+                "source": "default",
+            }
+
+        return {
+            "channel": row.channel,
+            "channel_name": channel_defaults.get("name", row.channel),
+            "max_daily_per_user": row.max_daily_per_user,
+            "settings": row.settings if isinstance(row.settings, dict) else {},
+            "is_enabled": row.is_enabled,
+            "created_at": row.created_at.isoformat() if row.created_at else None,
+            "updated_at": row.updated_at.isoformat() if row.updated_at else None,
+            "source": "db",
+        }
+
+    async def update_channel_config(
+        self,
+        channel_name: str,
+        updates: dict,
+        *,
+        tenant_id: str,
+        db: AsyncSession,
+    ) -> dict:
+        """更新渠道配置，UPSERT into channel_configs
+
+        Args:
+            channel_name: 渠道名称
+            updates: 更新内容，支持 max_daily_per_user / settings / is_enabled
+            tenant_id: 租户ID
+            db: 数据库会话
+        """
+        if channel_name not in self.CHANNELS:
+            return {"error": f"不支持的渠道: {channel_name}"}
+
+        await self._set_tenant(db, tenant_id)
+        tid = uuid.UUID(tenant_id)
+        now = datetime.now(timezone.utc)
+
+        channel_defaults = self.CHANNELS[channel_name]
+        max_daily = updates.get("max_daily_per_user", channel_defaults.get("max_daily", 3))
+        settings = updates.get("settings", {})
+        is_enabled = updates.get("is_enabled", True)
+
+        await db.execute(
+            text("""
+                INSERT INTO channel_configs
+                    (id, tenant_id, channel, max_daily_per_user, settings, is_enabled, created_at, updated_at)
+                VALUES
+                    (gen_random_uuid(), :tid, :channel, :max_daily, :settings::jsonb, :is_enabled, :now, :now)
+                ON CONFLICT ON CONSTRAINT uq_channel_configs_tenant_channel DO UPDATE
+                SET max_daily_per_user = EXCLUDED.max_daily_per_user,
+                    settings = EXCLUDED.settings,
+                    is_enabled = EXCLUDED.is_enabled,
+                    updated_at = EXCLUDED.updated_at
+            """),
+            {
+                "tid": tid,
+                "channel": channel_name,
+                "max_daily": max_daily,
+                "settings": json.dumps(settings),
+                "is_enabled": is_enabled,
+                "now": now,
+            },
+        )
+        await db.commit()
+
+        _logger.info(
+            "channel_engine.update_channel_config",
+            channel=channel_name,
+            max_daily=max_daily,
+            tenant_id=tenant_id,
+        )
+        return {
+            "channel": channel_name,
+            "channel_name": channel_defaults.get("name", channel_name),
+            "max_daily_per_user": max_daily,
+            "settings": settings,
+            "is_enabled": is_enabled,
+            "updated_at": now.isoformat(),
+        }
+
+    # ------------------------------------------------------------------
+    # 消息发送
+    # ------------------------------------------------------------------
+
+    async def send_message(
+        self,
+        channel: str,
+        recipient_id: str,
+        content: str,
+        message_type: str = "notification",
+        *,
+        tenant_id: str,
+        db: AsyncSession,
+        offer_id: Optional[str] = None,
+        campaign_id: Optional[str] = None,
+        customer_id: Optional[str] = None,
+    ) -> dict:
+        """模拟发送消息，记录到 message_send_logs
+
+        核心逻辑：
+        1. 从 channel_configs 查询该渠道今日频率配置
+        2. 检查今日已发送次数（频率控制）
+        3. 未超限则 INSERT into message_send_logs（模拟发送）
+
+        Args:
+            channel: 渠道名称
+            recipient_id: 外部 user_id（企微 external_userid 或手机号）
+            content: 消息内容
+            message_type: 消息类型（notification/promotion/transactional）
+            tenant_id: 租户ID
+            db: 数据库会话
+            offer_id: 关联优惠 ID（可选）
+            campaign_id: 关联活动 ID（可选）
+            customer_id: 内部 customer UUID（可选）
+        """
+        if channel not in self.CHANNELS:
+            return {"success": False, "error": f"不支持的渠道: {channel}"}
+
+        await self._set_tenant(db, tenant_id)
+        tid = uuid.UUID(tenant_id)
+
+        # 查询渠道频率配置（DB 优先，fallback 使用内置默认）
+        max_daily = self.CHANNELS[channel]["max_daily"]
+        try:
+            cfg_result = await db.execute(
+                text("""
+                    SELECT max_daily_per_user, is_enabled FROM channel_configs
+                    WHERE tenant_id = :tid AND channel = :channel AND is_deleted = false
+                    LIMIT 1
+                """),
+                {"tid": tid, "channel": channel},
+            )
+            cfg = cfg_result.fetchone()
+            if cfg:
+                max_daily = cfg.max_daily_per_user
+                if not cfg.is_enabled:
+                    return {
+                        "success": False,
+                        "error": f"渠道 {channel} 已禁用",
+                        "channel": channel,
+                        "status": "blocked",
+                    }
+        except SQLAlchemyError:
+            pass  # 表不存在时使用默认值
+
+        # 频率检查：查今日已发送数
+        today = datetime.now(timezone.utc).date()
+        sent_today = 0
+        try:
+            count_result = await db.execute(
+                text("""
+                    SELECT COUNT(*) FROM message_send_logs
+                    WHERE tenant_id = :tid
+                      AND channel = :channel
+                      AND external_user_id = :uid
+                      AND sent_at::date = :today
+                      AND status = 'sent'
+                      AND is_deleted = false
+                """),
+                {"tid": tid, "channel": channel, "uid": recipient_id, "today": today},
+            )
+            sent_today = count_result.scalar() or 0
+        except SQLAlchemyError:
+            sent_today = 0
+
+        if sent_today >= max_daily:
+            return {
+                "success": False,
+                "error": f"频率限制：今日已发送 {sent_today} 次，上限 {max_daily} 次",
+                "channel": channel,
+                "status": "blocked",
+                "sent_today": int(sent_today),
+                "daily_limit": max_daily,
+            }
+
+        # 解析可选 UUID 参数
+        customer_uuid: Optional[uuid.UUID] = None
+        if customer_id:
+            try:
+                customer_uuid = uuid.UUID(customer_id)
+            except ValueError:
+                pass
+
+        offer_uuid: Optional[uuid.UUID] = None
+        if offer_id:
+            try:
+                offer_uuid = uuid.UUID(offer_id)
+            except ValueError:
+                pass
+
+        campaign_uuid: Optional[uuid.UUID] = None
+        if campaign_id:
+            try:
+                campaign_uuid = uuid.UUID(campaign_id)
+            except ValueError:
+                pass
+
+        now = datetime.now(timezone.utc)
+        log_id = uuid.uuid4()
+
+        await db.execute(
+            text("""
+                INSERT INTO message_send_logs
+                    (id, tenant_id, channel, customer_id, external_user_id,
+                     content_summary, offer_id, campaign_id, status, sent_at, created_at)
+                VALUES
+                    (:id, :tid, :channel, :customer_id, :uid,
+                     :content, :offer_id, :campaign_id, 'sent', :now, :now)
+            """),
+            {
+                "id": log_id,
+                "tid": tid,
+                "channel": channel,
+                "customer_id": customer_uuid,
+                "uid": recipient_id,
+                "content": content[:200],
+                "offer_id": offer_uuid,
+                "campaign_id": campaign_uuid,
+                "now": now,
+            },
+        )
+        await db.commit()
+
+        _logger.info(
+            "channel_engine.send_message",
+            log_id=str(log_id),
+            channel=channel,
+            recipient_id=recipient_id,
+            message_type=message_type,
+            tenant_id=tenant_id,
+        )
+        return {
+            "success": True,
+            "log_id": str(log_id),
+            "channel": channel,
+            "status": "sent",
+            "sent_at": now.isoformat(),
+            "sent_today_after": int(sent_today) + 1,
+            "daily_limit": max_daily,
+        }
+
+    # ------------------------------------------------------------------
+    # 统计查询
+    # ------------------------------------------------------------------
+
+    async def get_send_stats(
+        self,
+        channel: Optional[str] = None,
+        days: int = 7,
+        *,
+        tenant_id: str,
+        db: AsyncSession,
+    ) -> dict:
+        """聚合统计消息发送效果，SELECT from message_send_logs
+
+        Args:
+            channel: 按渠道过滤（None 表示全渠道）
+            days: 统计最近 N 天（默认7天）
+            tenant_id: 租户ID
+            db: 数据库会话
+        """
+        await self._set_tenant(db, tenant_id)
+        tid = uuid.UUID(tenant_id)
+        today = datetime.now(timezone.utc).date()
+
+        where_parts = [
+            "tenant_id = :tid",
+            "sent_at::date > (CURRENT_DATE - :days)",
+            "is_deleted = false",
+        ]
+        params: dict = {"tid": tid, "days": days}
+
+        if channel:
+            if channel not in self.CHANNELS:
+                return {"error": f"不支持的渠道: {channel}"}
+            where_parts.append("channel = :channel")
+            params["channel"] = channel
+
+        where_clause = " AND ".join(where_parts)
+
+        try:
+            result = await db.execute(
+                text(f"""
+                    SELECT
+                        channel,
+                        COUNT(*) AS total,
+                        COUNT(*) FILTER (WHERE status = 'sent')    AS sent_count,
+                        COUNT(*) FILTER (WHERE status = 'failed')  AS failed_count,
+                        COUNT(*) FILTER (WHERE status = 'blocked') AS blocked_count,
+                        COUNT(DISTINCT external_user_id)           AS unique_users
+                    FROM message_send_logs
+                    WHERE {where_clause}
+                    GROUP BY channel
+                    ORDER BY total DESC
+                """),
+                params,
+            )
+            rows = result.fetchall()
+        except SQLAlchemyError as exc:
+            _logger.warning("channel_engine.get_send_stats_db_error", error=str(exc))
+            return {
+                "channel": channel,
+                "days": days,
+                "stats": [],
+                "_note": "DB_ERROR",
+            }
+
+        channel_stats = [
+            {
+                "channel": r.channel,
+                "channel_name": self.CHANNELS.get(r.channel, {}).get("name", r.channel),
+                "total": int(r.total),
+                "sent_count": int(r.sent_count),
+                "failed_count": int(r.failed_count),
+                "blocked_count": int(r.blocked_count),
+                "unique_users": int(r.unique_users),
+                "daily_avg": round(int(r.total) / max(1, days), 1),
+            }
+            for r in rows
+        ]
+
+        return {
+            "channel": channel,
+            "days": days,
+            "period_start": str(today),
+            "stats": channel_stats,
+            "total_sent": sum(s["sent_count"] for s in channel_stats),
+        }
+
+    # ------------------------------------------------------------------
+    # 企微专用发送（保留原有外部服务调用逻辑）
+    # ------------------------------------------------------------------
 
     async def send_wecom_message(
         self,
@@ -51,6 +430,7 @@ class ChannelEngine:
         content: dict,
         tenant_id: UUID,
         offer_id: Optional[str] = None,
+        db: Optional[AsyncSession] = None,
     ) -> dict:
         """通过 gateway 内部 API 向企微用户发送个性化消息
 
@@ -62,23 +442,31 @@ class ChannelEngine:
             content:   {"title", "description", "url"(可选), "btntxt"(可选)}
             tenant_id: 租户 UUID（用于 X-Tenant-ID header）
             offer_id:  关联优惠 ID（可选，用于发送日志）
-
-        Returns:
-            {"channel": "wecom", "status": "sent"|"placeholder", ...}
+            db:        数据库会话（可选；传入则记录发送日志）
         """
         log = _logger.bind(channel="wecom", user_id=user_id, tenant_id=str(tenant_id))
 
-        # 频控检查（用 user_id 作为频控 key）
-        freq_check = self.check_frequency_limit(user_id, "wecom")
-        if not freq_check["allowed"]:
-            log.warning("wecom_send_frequency_limited", reason=freq_check["reason"])
-            return {
-                "channel": "wecom",
-                "status": "blocked",
-                "reason": freq_check["reason"],
-            }
+        # 若有 db，先做频控检查
+        if db:
+            tid_str = str(tenant_id)
+            freq_result = await self.send_message(
+                channel="wecom",
+                recipient_id=user_id,
+                content=f"{content.get('title', '')} | {content.get('description', '')}",
+                message_type="notification",
+                tenant_id=tid_str,
+                db=db,
+                offer_id=offer_id,
+            )
+            if not freq_result.get("success"):
+                log.warning("wecom_send_frequency_limited", reason=freq_result.get("error"))
+                return {
+                    "channel": "wecom",
+                    "status": "blocked",
+                    "reason": freq_result.get("error"),
+                }
 
-        # 判断消息类型：有 url 则发 text_card，否则发 text
+        # 判断消息类型
         message_type = "text_card" if content.get("url") else "text"
 
         try:
@@ -97,213 +485,44 @@ class ChannelEngine:
                 )
             resp.raise_for_status()
         except httpx.HTTPStatusError as exc:
-            log.warning(
-                "wecom_send_gateway_http_error",
-                status_code=exc.response.status_code,
-            )
+            log.warning("wecom_send_gateway_http_error", status_code=exc.response.status_code)
             return {"channel": "wecom", "status": "failed", "error": f"http_{exc.response.status_code}"}
         except httpx.RequestError as exc:
             log.warning("wecom_send_gateway_request_error", error=str(exc))
             return {"channel": "wecom", "status": "failed", "error": str(exc)}
 
-        # 更新频控计数 + 发送日志
-        message_id = str(uuid.uuid4())[:8]
-        now = datetime.now(timezone.utc).isoformat()
-        today = date.today().isoformat()
+        log.info("wecom_send_success", message_type=message_type)
+        return {"channel": "wecom", "status": "sent"}
 
-        log_entry = {
-            "message_id": message_id,
-            "channel": "wecom",
-            "user_id": user_id,
-            "content": f"{content.get('title', '')} | {content.get('description', '')}",
-            "offer_id": offer_id,
-            "status": "sent",
-            "sent_at": now,
-            "date": today,
-        }
-        _send_logs.append(log_entry)
-        _daily_send_counts[user_id]["wecom"] += 1
+    # ------------------------------------------------------------------
+    # 纯计算（不读写 DB，保留原有业务逻辑）
+    # ------------------------------------------------------------------
 
-        log.info("wecom_send_success", message_id=message_id, message_type=message_type)
-        return {"channel": "wecom", "status": "sent", "message_id": message_id}
-
-    def send_message(
+    def check_frequency_limit_sync(
         self,
+        sent_today: int,
         channel: str,
-        user_id: str,
-        content: str,
-        offer_id: Optional[str] = None,
+        max_daily_override: Optional[int] = None,
     ) -> dict:
-        """发送消息
+        """同步频率限制检查（纯计算，已从 DB 取出 sent_today）
 
         Args:
+            sent_today: 今日已发送次数（从 DB 查出）
             channel: 渠道名称
-            user_id: 用户ID
-            content: 消息内容
-            offer_id: 关联优惠ID（可选）
-
-        Returns:
-            发送结果
-        """
-        if channel not in self.CHANNELS:
-            return {"success": False, "error": f"不支持的渠道: {channel}"}
-
-        # 频控检查
-        freq_check = self.check_frequency_limit(user_id, channel)
-        if not freq_check["allowed"]:
-            return {
-                "success": False,
-                "error": f"频率限制：{freq_check['reason']}",
-                "channel": channel,
-                "user_id": user_id,
-            }
-
-        # 模拟发送
-        message_id = str(uuid.uuid4())[:8]
-        now = datetime.now(timezone.utc).isoformat()
-        today = date.today().isoformat()
-
-        log_entry = {
-            "message_id": message_id,
-            "channel": channel,
-            "user_id": user_id,
-            "content": content[:200],  # 截断存储
-            "offer_id": offer_id,
-            "status": "sent",
-            "sent_at": now,
-            "date": today,
-        }
-        _send_logs.append(log_entry)
-
-        # 更新每日计数
-        _daily_send_counts[user_id][channel] += 1
-
-        return {
-            "success": True,
-            "message_id": message_id,
-            "channel": channel,
-            "user_id": user_id,
-            "sent_at": now,
-        }
-
-    def check_frequency_limit(self, user_id: str, channel: str) -> dict:
-        """检查频率限制
-
-        Returns:
-            {"allowed": bool, "reason": str, "current_count": int, "max_daily": int}
+            max_daily_override: DB 中配置的日上限（None 则使用内置默认）
         """
         if channel not in self.CHANNELS:
             return {"allowed": False, "reason": f"不支持的渠道: {channel}", "current_count": 0, "max_daily": 0}
 
-        max_daily = self.CHANNELS[channel]["max_daily"]
-        current_count = _daily_send_counts.get(user_id, {}).get(channel, 0)
-
-        allowed = current_count < max_daily
-        reason = "" if allowed else f"今日已发送 {current_count} 次，上限 {max_daily} 次"
+        max_daily = max_daily_override if max_daily_override is not None else self.CHANNELS[channel]["max_daily"]
+        allowed = sent_today < max_daily
+        reason = "" if allowed else f"今日已发送 {sent_today} 次，上限 {max_daily} 次"
 
         return {
             "allowed": allowed,
             "reason": reason,
-            "current_count": current_count,
+            "current_count": sent_today,
             "max_daily": max_daily,
             "channel": channel,
             "channel_name": self.CHANNELS[channel]["name"],
         }
-
-    def get_channel_stats(self, channel: str, date_range: dict) -> dict:
-        """获取渠道统计
-
-        Args:
-            channel: 渠道名称
-            date_range: {"start": "2026-03-01", "end": "2026-03-26"}
-        """
-        if channel not in self.CHANNELS:
-            return {"error": f"不支持的渠道: {channel}"}
-
-        start = date_range.get("start", "")
-        end = date_range.get("end", "")
-
-        channel_logs = [
-            log for log in _send_logs
-            if log["channel"] == channel
-            and (not start or log.get("date", "") >= start)
-            and (not end or log.get("date", "") <= end)
-        ]
-
-        total_sent = len(channel_logs)
-        unique_users = len(set(log["user_id"] for log in channel_logs))
-        with_offer = sum(1 for log in channel_logs if log.get("offer_id"))
-
-        return {
-            "channel": channel,
-            "channel_name": self.CHANNELS[channel]["name"],
-            "date_range": date_range,
-            "total_sent": total_sent,
-            "unique_users": unique_users,
-            "with_offer_count": with_offer,
-            "avg_per_user": round(total_sent / max(1, unique_users), 2),
-        }
-
-    def configure_channel(self, channel: str, settings: dict) -> dict:
-        """配置渠道参数
-
-        Args:
-            channel: 渠道名称
-            settings: 配置项
-                {"max_daily": 5, "enabled": True, "template_id": "..."}
-        """
-        if channel not in self.CHANNELS:
-            return {"error": f"不支持的渠道: {channel}"}
-
-        config = _channel_configs.get(channel, {})
-        config.update(settings)
-        config["channel"] = channel
-        config["updated_at"] = datetime.now(timezone.utc).isoformat()
-
-        # 更新全局频率限制
-        if "max_daily" in settings:
-            self.CHANNELS[channel]["max_daily"] = settings["max_daily"]
-
-        _channel_configs[channel] = config
-        return config
-
-    def get_send_log(
-        self,
-        user_id: Optional[str] = None,
-        channel: Optional[str] = None,
-        date_range: Optional[dict] = None,
-    ) -> list[dict]:
-        """查询发送日志
-
-        Args:
-            user_id: 按用户过滤（可选）
-            channel: 按渠道过滤（可选）
-            date_range: 按日期过滤（可选）
-        """
-        logs = _send_logs.copy()
-
-        if user_id:
-            logs = [l for l in logs if l["user_id"] == user_id]
-        if channel:
-            logs = [l for l in logs if l["channel"] == channel]
-        if date_range:
-            start = date_range.get("start", "")
-            end = date_range.get("end", "")
-            if start:
-                logs = [l for l in logs if l.get("date", "") >= start]
-            if end:
-                logs = [l for l in logs if l.get("date", "") <= end]
-
-        return logs
-
-
-def reset_daily_counts() -> None:
-    """重置每日发送计数（辅助函数，用于测试）"""
-    _daily_send_counts.clear()
-
-
-def clear_all_channel_data() -> None:
-    """清空所有渠道数据（仅测试用）"""
-    _channel_configs.clear()
-    _send_logs.clear()
-    _daily_send_counts.clear()

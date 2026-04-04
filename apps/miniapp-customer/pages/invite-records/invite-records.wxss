@@ -1,0 +1,242 @@
+/* 我的邀请记录页样式 */
+
+/* ─── 页面容器 ─── */
+.page {
+  min-height: 100vh;
+  background: #f5f5f5;
+  padding-bottom: 40rpx;
+}
+
+/* ─── 顶部统计栏 ─── */
+.stats-bar {
+  display: flex;
+  align-items: center;
+  background: linear-gradient(135deg, #FF6B35 0%, #FF8C42 100%);
+  padding: 40rpx 0 48rpx;
+}
+
+.stat-item {
+  flex: 1;
+  text-align: center;
+}
+
+.stat-value {
+  display: block;
+  font-size: 48rpx;
+  font-weight: 700;
+  color: #ffffff;
+  line-height: 1.2;
+  margin-bottom: 8rpx;
+}
+
+.stat-value.orange {
+  color: #fff3b0;
+}
+
+.stat-value.gray {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.stat-label {
+  display: block;
+  font-size: 24rpx;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.stat-divider {
+  width: 1rpx;
+  height: 56rpx;
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* ─── 列表区域 ─── */
+.list-wrap {
+  background: #ffffff;
+  margin: -24rpx 24rpx 0;
+  border-radius: 24rpx;
+  overflow: hidden;
+  box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.06);
+}
+
+/* ─── 单条记录 ─── */
+.record-item {
+  display: flex;
+  align-items: center;
+  padding: 28rpx 32rpx;
+  border-bottom: 1rpx solid #f5f5f5;
+}
+
+.record-item:last-child {
+  border-bottom: none;
+}
+
+/* ─── 头像占位圆 ─── */
+.avatar-wrap {
+  flex-shrink: 0;
+  margin-right: 24rpx;
+}
+
+.avatar-placeholder {
+  width: 80rpx;
+  height: 80rpx;
+  border-radius: 50%;
+  background: #e8e8e8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.avatar-initial {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #999999;
+}
+
+/* ─── 记录信息 ─── */
+.record-info {
+  flex: 1;
+}
+
+.record-nickname {
+  display: block;
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #333333;
+  margin-bottom: 8rpx;
+}
+
+.record-time {
+  display: block;
+  font-size: 24rpx;
+  color: #999999;
+}
+
+/* ─── 积分状态 ─── */
+.points-status {
+  flex-shrink: 0;
+  text-align: right;
+}
+
+.points-value {
+  display: block;
+  font-size: 28rpx;
+  font-weight: 700;
+  color: #FF6B35;
+  margin-bottom: 8rpx;
+}
+
+.status-badge {
+  display: inline-block;
+}
+
+.status-text {
+  font-size: 22rpx;
+  font-weight: 600;
+  padding: 4rpx 12rpx;
+  border-radius: 8rpx;
+}
+
+.status-text.credited {
+  color: #0f6e56;
+  background: #e6f7f2;
+}
+
+.status-text.pending {
+  color: #ba7517;
+  background: #fff8e6;
+}
+
+.status-text.expired {
+  color: #999999;
+  background: #f0f0f0;
+}
+
+/* ─── 加载更多 ─── */
+.load-more {
+  padding: 32rpx;
+  text-align: center;
+}
+
+.load-more-text {
+  font-size: 26rpx;
+  color: #FF6B35;
+}
+
+.no-more {
+  padding: 32rpx;
+  text-align: center;
+}
+
+.no-more-text {
+  font-size: 24rpx;
+  color: #bbbbbb;
+}
+
+/* ─── 空状态 ─── */
+.empty-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 120rpx 40rpx 60rpx;
+  text-align: center;
+}
+
+.empty-illustration {
+  width: 160rpx;
+  height: 160rpx;
+  background: #fff3ed;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 40rpx;
+}
+
+.empty-icon {
+  font-size: 72rpx;
+}
+
+.empty-title {
+  display: block;
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #333333;
+  margin-bottom: 16rpx;
+}
+
+.empty-desc {
+  display: block;
+  font-size: 26rpx;
+  color: #999999;
+  margin-bottom: 48rpx;
+}
+
+.btn-go-invite {
+  width: 320rpx;
+  height: 88rpx;
+  line-height: 88rpx;
+  background: #FF6B35;
+  color: #ffffff;
+  font-size: 30rpx;
+  font-weight: 600;
+  border-radius: 44rpx;
+  border: none;
+  text-align: center;
+}
+
+.btn-go-invite::after {
+  border: none;
+}
+
+/* ─── 初始加载 ─── */
+.loading-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 120rpx 40rpx;
+}
+
+.loading-text {
+  font-size: 28rpx;
+  color: #999999;
+}

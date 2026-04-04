@@ -1,0 +1,218 @@
+<!-- 门店详情页 -->
+<view class="page-container">
+
+  <!-- 加载中 -->
+  <view class="loading-wrap" wx:if="{{loading}}">
+    <text class="loading-text">加载中...</text>
+  </view>
+
+  <view wx:else>
+    <!-- ── 封面图 / Logo 区 ── -->
+    <view class="cover-section">
+      <image
+        class="cover-image"
+        src="{{store.coverImage || '/assets/store-placeholder.png'}}"
+        mode="aspectFill"
+        lazy-load
+        bindtap="previewImage"
+        data-index="0"
+      />
+      <!-- 状态标签 -->
+      <view class="status-badge {{store.isOpen ? 'open' : 'closed'}}">
+        <text>{{store.isOpen ? '营业中' : '已打烊'}}</text>
+      </view>
+      <!-- 多图指示 -->
+      <view class="image-count" wx:if="{{store.images.length > 1}}">
+        <text class="image-count-text">{{store.images.length}}图</text>
+      </view>
+    </view>
+
+    <!-- ── 门店基础信息 ── -->
+    <view class="info-card">
+      <view class="info-header">
+        <view class="info-header-left">
+          <text class="store-name">{{store.name}}</text>
+          <!-- 标签 -->
+          <scroll-view class="tags-scroll" scroll-x>
+            <view class="tags-row">
+              <text class="tag-item" wx:for="{{store.tags}}" wx:key="*this">{{item}}</text>
+            </view>
+          </scroll-view>
+        </view>
+        <!-- Logo -->
+        <image
+          class="store-logo"
+          wx:if="{{store.logo}}"
+          src="{{store.logo}}"
+          mode="aspectFill"
+        />
+      </view>
+
+      <!-- 评分 & 月销 -->
+      <view class="store-stats">
+        <view class="stat-item">
+          <text class="stat-star">★</text>
+          <text class="stat-value">{{store.rating}}</text>
+          <text class="stat-label">评分</text>
+        </view>
+        <view class="stat-divider"></view>
+        <view class="stat-item" bindtap="goToReviews">
+          <text class="stat-value">{{store.reviewCount}}</text>
+          <text class="stat-label">评价</text>
+          <text class="stat-arrow">›</text>
+        </view>
+        <view class="stat-divider" wx:if="{{store.monthlyOrders > 0}}"></view>
+        <view class="stat-item" wx:if="{{store.monthlyOrders > 0}}">
+          <text class="stat-value">{{store.monthlyOrders}}</text>
+          <text class="stat-label">月销</text>
+        </view>
+      </view>
+
+      <!-- 排队情况 -->
+      <view class="queue-row" wx:if="{{queueSummary}}">
+        <text class="queue-icon">⏱</text>
+        <text class="queue-text" wx:if="{{queueSummary.waitingCount > 0}}">
+          当前等位 {{queueSummary.waitingCount}} 桌 · 预计等待 {{queueSummary.estimatedWait}} 分钟
+        </text>
+        <text class="queue-text" wx:elif="{{queueSummary.waitingCount === 0}}">
+          当前无需等位，立即入座
+        </text>
+      </view>
+    </view>
+
+    <!-- ── 操作按钮区 ── -->
+    <view class="action-row">
+      <view class="action-btn" bindtap="callPhone">
+        <text class="action-icon">📞</text>
+        <text class="action-label">电话</text>
+      </view>
+      <view class="action-btn" bindtap="openNavPopup">
+        <text class="action-icon">📍</text>
+        <text class="action-label">导航</text>
+      </view>
+      <view class="action-btn" bindtap="goToQueue">
+        <text class="action-icon">🎫</text>
+        <text class="action-label">排队</text>
+      </view>
+      <view class="action-btn" bindtap="goToReservation">
+        <text class="action-icon">📅</text>
+        <text class="action-label">预约
+          <text class="slot-badge" wx:if="{{availableSlots > 0}}">{{availableSlots}}</text>
+        </text>
+      </view>
+    </view>
+
+    <!-- ── 地址 / 营业时间 ── -->
+    <view class="detail-section">
+      <!-- 地址 -->
+      <view class="detail-row" bindtap="copyAddress">
+        <text class="detail-icon-text">📍</text>
+        <view class="detail-content">
+          <text class="detail-title-text">门店地址</text>
+          <text class="detail-body-text">{{store.address}}</text>
+          <text class="detail-distance" wx:if="{{store.distance}}">距您 {{store.distance}}</text>
+        </view>
+        <text class="detail-arrow-right">›</text>
+      </view>
+
+      <view class="detail-divider"></view>
+
+      <!-- 电话 -->
+      <view class="detail-row" bindtap="callPhone">
+        <text class="detail-icon-text">📞</text>
+        <view class="detail-content">
+          <text class="detail-title-text">联系电话</text>
+          <text class="detail-body-text">{{store.phone || '暂无'}}</text>
+        </view>
+        <text class="detail-arrow-right call-arrow">拨打</text>
+      </view>
+
+      <view class="detail-divider"></view>
+
+      <!-- 营业时间 -->
+      <view class="detail-row hours-row">
+        <text class="detail-icon-text">🕐</text>
+        <view class="detail-content">
+          <text class="detail-title-text">营业时间</text>
+          <view wx:for="{{store.businessHours}}" wx:key="days" class="hours-item">
+            <text class="hours-days">{{item.days}}</text>
+            <text class="hours-time">{{item.hours}}</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- ── 设施服务 ── -->
+    <view class="facilities-section" wx:if="{{store.facilities.length > 0}}">
+      <text class="section-title">设施服务</text>
+      <view class="facilities-grid">
+        <view class="facility-item" wx:for="{{store.facilities}}" wx:key="label">
+          <text class="facility-label">{{item.label}}</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- ── 门店公告 ── -->
+    <view class="notice-section" wx:if="{{store.notice}}">
+      <text class="section-title">门店公告</text>
+      <view class="notice-body">
+        <text class="notice-icon">📢</text>
+        <text class="notice-text">{{store.notice}}</text>
+      </view>
+    </view>
+
+    <!-- ── 图片展示 ── -->
+    <view class="gallery-section" wx:if="{{store.images.length > 1}}">
+      <text class="section-title">门店图片</text>
+      <scroll-view class="gallery-scroll" scroll-x>
+        <view class="gallery-row">
+          <image
+            class="gallery-img"
+            wx:for="{{store.images}}"
+            wx:key="index"
+            src="{{item}}"
+            mode="aspectFill"
+            lazy-load
+            bindtap="previewImage"
+            data-index="{{index}}"
+          />
+        </view>
+      </scroll-view>
+    </view>
+
+    <!-- 底部占位 -->
+    <view class="bottom-placeholder"></view>
+  </view>
+
+</view>
+
+<!-- ── 底部固定：立即点餐 ── -->
+<view class="bottom-bar" wx:if="{{!loading}}">
+  <view class="bottom-bar-left">
+    <text class="bottom-store-name">{{store.name}}</text>
+    <text class="bottom-open-status {{store.isOpen ? 'open' : 'closed'}}">
+      {{store.isOpen ? '营业中' : '已打烊'}}
+    </text>
+  </view>
+  <button class="order-btn {{store.isOpen ? '' : 'disabled'}}"
+          disabled="{{!store.isOpen}}"
+          bindtap="goToMenu">
+    {{store.isOpen ? '立即点餐' : '暂停营业'}}
+  </button>
+</view>
+
+<!-- ── 导航方式弹窗 ── -->
+<view class="popup-mask" wx:if="{{showNavPopup}}" bindtap="closeNavPopup"></view>
+<view class="nav-popup {{showNavPopup ? 'show' : ''}}">
+  <view class="popup-header">
+    <text class="popup-title">前往门店</text>
+    <view class="popup-close" bindtap="closeNavPopup">✕</view>
+  </view>
+  <view class="nav-address">
+    <text class="nav-address-text">{{store.address}}</text>
+  </view>
+  <view class="nav-actions">
+    <button class="nav-btn wechat-map" bindtap="openMap">微信地图导航</button>
+    <button class="nav-btn copy-addr" bindtap="copyAddress">复制地址</button>
+  </view>
+</view>

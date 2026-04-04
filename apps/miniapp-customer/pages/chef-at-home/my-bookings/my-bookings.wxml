@@ -1,0 +1,141 @@
+<!-- 我的预约列表 — Tab: 待确认/已确认/已完成/已取消 -->
+<view class="container">
+
+  <!-- 状态Tab -->
+  <view class="tab-bar">
+    <view class="tab-item {{activeTab === item.key ? 'active' : ''}}"
+          wx:for="{{tabs}}" wx:key="key"
+          bindtap="switchTab" data-key="{{item.key}}">
+      <text>{{item.label}}</text>
+      <view class="tab-badge" wx:if="{{item.key === 'pending' && pendingCount > 0}}">
+        <text class="tab-badge-text">{{pendingCount}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 列表区域 -->
+  <view class="list-wrap">
+
+    <!-- 加载中 -->
+    <view class="loading-wrap" wx:if="{{loading}}">
+      <view class="loading-spinner"></view>
+      <text class="loading-text">加载中...</text>
+    </view>
+
+    <!-- 空状态 -->
+    <view class="empty-wrap" wx:elif="{{filteredBookings.length === 0}}">
+      <text class="empty-icon">📋</text>
+      <text class="empty-title">暂无{{currentTabLabel}}预约</text>
+      <text class="empty-sub" wx:if="{{activeTab === 'pending' || activeTab === 'confirmed'}}">快去预约一位大厨吧！</text>
+      <view class="go-book-btn" bindtap="goToChefList" wx:if="{{activeTab === 'pending'}}">
+        <text>浏览大厨</text>
+      </view>
+    </view>
+
+    <!-- 预约卡片列表 -->
+    <view wx:elif="{{filteredBookings.length > 0}}">
+
+      <!-- 待确认状态黄色提示 -->
+      <view class="pending-notice" wx:if="{{activeTab === 'pending'}}">
+        <text class="notice-icon">⏳</text>
+        <text class="notice-text">等待餐厅确认，将在24小时内回复</text>
+      </view>
+
+      <view class="booking-card" wx:for="{{filteredBookings}}" wx:key="id">
+
+        <!-- 卡片头部：状态标签 -->
+        <view class="card-header">
+          <view class="status-tag status-{{item.status}}">
+            <text>{{item.status_label}}</text>
+          </view>
+          <text class="booking-id">#{{item.id.substring(0, 8)}}</text>
+        </view>
+
+        <!-- 大厨信息 -->
+        <view class="chef-row">
+          <view class="chef-avatar-wrap">
+            <text class="chef-avatar-emoji">👨‍🍳</text>
+          </view>
+          <view class="chef-info">
+            <text class="chef-name">{{item.chef_name}}</text>
+            <text class="chef-title">{{item.chef_title}}</text>
+          </view>
+          <view class="contact-btn" bindtap="callChef" data-phone="{{item.chef_phone}}"
+                wx:if="{{item.status !== 'cancelled' && item.status !== 'completed'}}">
+            <text class="contact-btn-icon">📞</text>
+            <text class="contact-btn-text">联系</text>
+          </view>
+        </view>
+
+        <!-- 预约详情 -->
+        <view class="booking-detail">
+          <view class="detail-row">
+            <text class="detail-icon">📅</text>
+            <text class="detail-text">{{item.service_date_display}}</text>
+          </view>
+          <view class="detail-row">
+            <text class="detail-icon">👥</text>
+            <text class="detail-text">{{item.guest_count}}人</text>
+          </view>
+          <view class="detail-row">
+            <text class="detail-icon">📍</text>
+            <text class="detail-text address-text">{{item.address}}</text>
+          </view>
+        </view>
+
+        <!-- 金额 -->
+        <view class="amount-row">
+          <view class="amount-info">
+            <text class="amount-label">预估总价</text>
+            <text class="amount-total">¥{{item.estimated_total_fen / 100}}</text>
+          </view>
+          <view class="deposit-info">
+            <text class="deposit-label">已付定金</text>
+            <text class="deposit-paid">¥{{item.deposit_fen / 100}}</text>
+          </view>
+        </view>
+
+        <!-- 操作按钮 -->
+        <view class="card-actions" wx:if="{{item.status === 'pending'}}">
+          <view class="cancel-btn" bindtap="showCancelConfirm" data-id="{{item.id}}" data-index="{{index}}">
+            <text>取消预约</text>
+          </view>
+        </view>
+
+        <view class="card-actions" wx:elif="{{item.status === 'confirmed' || item.status === 'in_service'}}">
+          <view class="track-btn" bindtap="goToOrderTracking" data-id="{{item.id}}">
+            <text>跟踪订单</text>
+          </view>
+        </view>
+
+        <view class="card-actions" wx:elif="{{item.status === 'completed'}}">
+          <view class="track-btn" bindtap="goToOrderTracking" data-id="{{item.id}}">
+            <text>查看详情</text>
+          </view>
+        </view>
+
+        <!-- 取消确认弹层 -->
+        <view class="cancel-confirm-layer" wx:if="{{cancelConfirmId === item.id}}">
+          <view class="cancel-confirm-box">
+            <text class="cancel-confirm-title">确认取消预约？</text>
+            <text class="cancel-confirm-sub">取消后定金原路退回（1-3个工作日）</text>
+            <view class="cancel-confirm-btns">
+              <view class="cancel-confirm-no" bindtap="hideCancelConfirm">
+                <text>再想想</text>
+              </view>
+              <view class="cancel-confirm-yes {{cancelling ? 'loading' : ''}}"
+                    bindtap="confirmCancel" data-id="{{item.id}}">
+                <text>{{cancelling ? '取消中...' : '确认取消'}}</text>
+              </view>
+            </view>
+          </view>
+        </view>
+
+      </view>
+    </view>
+  </view>
+
+  <!-- 底部留白 -->
+  <view class="bottom-spacer"></view>
+
+</view>

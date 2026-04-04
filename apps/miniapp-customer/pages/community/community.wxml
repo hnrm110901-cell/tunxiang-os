@@ -1,0 +1,72 @@
+<!-- 美食社区主页 -->
+<view class="page">
+  <!-- 顶部Tab -->
+  <view class="tab-bar">
+    <view class="tab-item {{activeTab==='recommend' ? 'active' : ''}}" bindtap="switchTab" data-tab="recommend">推荐</view>
+    <view class="tab-item {{activeTab==='following' ? 'active' : ''}}" bindtap="switchTab" data-tab="following">关注</view>
+    <view class="tab-item {{activeTab==='nearby' ? 'active' : ''}}" bindtap="switchTab" data-tab="nearby">附近</view>
+  </view>
+
+  <!-- 瀑布流帖子列表（用两列实现） -->
+  <scroll-view scroll-y class="feed-scroll" bindscrolltolower="loadMore">
+    <view class="masonry">
+      <!-- 左列 -->
+      <view class="masonry-col">
+        <block wx:for="{{leftPosts}}" wx:key="id">
+          <view class="post-card" bindtap="goDetail" data-id="{{item.id}}">
+            <!-- 图片区（高度随内容变化） -->
+            <image class="post-image" src="{{item.cover_url || '/assets/placeholder.png'}}" mode="widthFix" lazy-load/>
+            <!-- 内容 -->
+            <view class="post-content">
+              <text class="post-title">{{item.title}}</text>
+              <!-- 标签 -->
+              <view class="post-tags" wx:if="{{item.tags && item.tags.length}}">
+                <text class="tag" wx:for="{{item.tags}}" wx:for-item="tag" wx:key="*this">#{{tag}}</text>
+              </view>
+              <!-- 作者行 -->
+              <view class="post-author">
+                <image class="avatar" src="{{item.author_avatar || '/assets/default-avatar.png'}}" mode="aspectFill"/>
+                <text class="author-name">{{item.author_name}}</text>
+                <view class="like-btn {{item.liked ? 'liked' : ''}}" catchtap="toggleLike" data-id="{{item.id}}" data-col="left" data-index="{{index}}">
+                  <text class="like-icon">♥</text>
+                  <text class="like-count">{{item.like_count}}</text>
+                </view>
+              </view>
+            </view>
+          </view>
+        </block>
+      </view>
+      <!-- 右列 -->
+      <view class="masonry-col">
+        <block wx:for="{{rightPosts}}" wx:key="id">
+          <view class="post-card" bindtap="goDetail" data-id="{{item.id}}">
+            <image class="post-image" src="{{item.cover_url || '/assets/placeholder.png'}}" mode="widthFix" lazy-load/>
+            <view class="post-content">
+              <text class="post-title">{{item.title}}</text>
+              <view class="post-tags" wx:if="{{item.tags && item.tags.length}}">
+                <text class="tag" wx:for="{{item.tags}}" wx:for-item="tag" wx:key="*this">#{{tag}}</text>
+              </view>
+              <view class="post-author">
+                <image class="avatar" src="{{item.author_avatar || '/assets/default-avatar.png'}}" mode="aspectFill"/>
+                <text class="author-name">{{item.author_name}}</text>
+                <view class="like-btn {{item.liked ? 'liked' : ''}}" catchtap="toggleLike" data-id="{{item.id}}" data-col="right" data-index="{{index}}">
+                  <text class="like-icon">♥</text>
+                  <text class="like-count">{{item.like_count}}</text>
+                </view>
+              </view>
+            </view>
+          </view>
+        </block>
+      </view>
+    </view>
+
+    <!-- 加载更多 -->
+    <view class="load-more" wx:if="{{loading}}"><text>加载中...</text></view>
+    <view class="no-more" wx:if="{{noMore}}"><text>— 已经到底啦 —</text></view>
+  </scroll-view>
+
+  <!-- 发布按钮（右下角悬浮） -->
+  <view class="fab" bindtap="goPublish">
+    <text class="fab-icon">+</text>
+  </view>
+</view>

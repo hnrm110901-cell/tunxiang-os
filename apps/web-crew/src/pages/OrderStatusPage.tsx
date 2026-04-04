@@ -45,7 +45,7 @@ interface OrderCompletionPrediction {
   pending_count: number;
 }
 
-/* ---------- Mock KDS 数据 ---------- */
+/* ---------- KDS 数据类型 ---------- */
 interface KdsItem {
   taskId: string;
   dishName: string;
@@ -59,15 +59,6 @@ interface KdsItem {
   estimatedMinutes?: number;
   estimatedConfidence?: 'high' | 'medium' | 'low';
 }
-
-const MOCK_KDS: KdsItem[] = [
-  { taskId: 'k1', dishName: '剁椒鱼头', qty: 1, spec: '双色', status: 'done', createdAt: '12:03', isOvertime: false, rushCount: 0 },
-  { taskId: 'k2', dishName: '小炒黄牛肉', qty: 1, spec: '中辣', status: 'cooking', createdAt: '12:05', isOvertime: false, rushCount: 0 },
-  { taskId: 'k3', dishName: '红烧肉', qty: 2, status: 'cooking', createdAt: '12:05', isOvertime: true, rushCount: 1 },
-  { taskId: 'k4', dishName: '凉拌黄瓜', qty: 1, status: 'pending', createdAt: '12:06', isOvertime: false, rushCount: 0 },
-  { taskId: 'k5', dishName: '老鸭汤', qty: 1, status: 'pending', createdAt: '12:06', isOvertime: false, rushCount: 0 },
-  { taskId: 'k6', dishName: '米饭', qty: 4, status: 'done', createdAt: '12:03', isOvertime: false, rushCount: 0 },
-];
 
 /* ---------- 辅助函数 ---------- */
 const statusColor = (status: string, isOvertime: boolean) => {
@@ -92,19 +83,79 @@ const statusBg = (status: string, isOvertime: boolean) => {
 };
 
 /* ---------- 组件 ---------- */
+function buildKdsUrl(tableNo: string, orderId: string): string {
+  const params = new URLSearchParams();
+  if (tableNo) params.set('table_no', tableNo);
+  if (orderId) params.set('order_id', orderId);
+  return `/api/v1/trade/orders/status?${params.toString()}`;
+}
+
+function mapApiItem(raw: {
+  task_id?: string;
+  id?: string;
+  dish_name: string;
+  quantity?: number;
+  qty?: number;
+  spec?: string;
+  status: string;
+  created_at?: string;
+  overtime_threshold_min?: number;
+  rush_count?: number;
+}): KdsItem {
+  const createdAt = raw.created_at
+    ? new Date(raw.created_at).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+    : '';
+  const elapsedMin = raw.created_at
+    ? Math.floor((Date.now() - new Date(raw.created_at).getTime()) / 60000)
+    : 0;
+  const threshold = raw.overtime_threshold_min ?? 20;
+  return {
+    taskId: raw.task_id ?? raw.id ?? String(Math.random()),
+    dishName: raw.dish_name,
+    qty: raw.quantity ?? raw.qty ?? 1,
+    spec: raw.spec,
+    status: (raw.status as KdsItem['status']) ?? 'pending',
+    createdAt,
+    isOvertime: raw.status !== 'done' && elapsedMin > threshold,
+    rushCount: raw.rush_count ?? 0,
+  };
+}
+
 export function OrderStatusPage() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const tableNo = params.get('table') || '';
   const orderId = params.get('order_id') || '';
 
-  const [items, setItems] = useState<KdsItem[]>(MOCK_KDS);
+  const [items, setItems] = useState<KdsItem[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState('');
   const [orderPrediction, setOrderPrediction] = useState<OrderCompletionPrediction | null>(null);
 
   const doneCount = items.filter(i => i.status === 'done').length;
   const totalCount = items.length;
   const hasOvertime = items.some(i => i.isOvertime);
+
+  async function fetchKdsItems() {
+    try {
+      const res = await fetch(`${API_BASE}${buildKdsUrl(tableNo, orderId)}`, {
+        headers: { 'X-Tenant-ID': localStorage.getItem('tenant_id') ?? '' },
+      });
+      if (!res.ok) throw new Error(`获取出餐状态失败: ${res.status}`);
+      const json = await res.json();
+      const raw = json?.data?.items ?? json?.items ?? [];
+      setItems(raw.map(mapApiItem));
+      setLoadError('');
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : '出餐状态加载失败');
+    }
+  }
+
+  // 挂载时拉取 KDS 数据
+  useEffect(() => {
+    fetchKdsItems();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tableNo, orderId]);
 
   // Phase 3-A: 挂载时拉取订单预测数据
   useEffect(() => {
@@ -126,22 +177,38 @@ export function OrderStatusPage() {
 
   const handleRefresh = () => {
     setRefreshing(true);
-    // TODO: 调用 getOrderKdsStatus API
-    setTimeout(() => setRefreshing(false), 500);
+    fetchKdsItems().finally(() => setRefreshing(false));
   };
 
-  const handleRush = (taskId: string) => {
-    // TODO: 调用 rushKdsTask API
+  const handleRush = async (taskId: string) => {
+    // 乐观更新
     setItems(prev => prev.map(i =>
       i.taskId === taskId ? { ...i, rushCount: i.rushCount + 1 } : i
     ));
+    try {
+      await fetch(`${API_BASE}/api/v1/kds/tasks/${encodeURIComponent(taskId)}/rush`, {
+        method: 'POST',
+        headers: { 'X-Tenant-ID': localStorage.getItem('tenant_id') ?? '' },
+      });
+    } catch {
+      // 催菜失败静默处理，乐观更新不回滚
+    }
   };
 
-  const handleRushAll = () => {
-    // 催全部未完成菜品
+  const handleRushAll = async () => {
+    // 乐观更新全部未完成菜品
     setItems(prev => prev.map(i =>
       i.status !== 'done' ? { ...i, rushCount: i.rushCount + 1 } : i
     ));
+    const pending = items.filter(i => i.status !== 'done');
+    await Promise.allSettled(
+      pending.map(i =>
+        fetch(`${API_BASE}/api/v1/kds/tasks/${encodeURIComponent(i.taskId)}/rush`, {
+          method: 'POST',
+          headers: { 'X-Tenant-ID': localStorage.getItem('tenant_id') ?? '' },
+        })
+      )
+    );
   };
 
   // 排序: 超时 > 制作中 > 待制作 > 已出
@@ -195,6 +262,17 @@ export function OrderStatusPage() {
           {refreshing ? '...' : '刷新'}
         </button>
       </div>
+
+      {/* 错误提示 */}
+      {loadError && (
+        <div style={{
+          padding: '10px 16px',
+          background: 'rgba(186,117,23,0.12)', borderBottom: `1px solid ${C.border}`,
+          fontSize: 14, color: C.warning,
+        }}>
+          {loadError}
+        </div>
+      )}
 
       {/* 汇总条 */}
       <div style={{

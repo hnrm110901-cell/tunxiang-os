@@ -119,7 +119,7 @@ def upgrade() -> None:
             "completed_nodes",
             JSONB,
             nullable=False,
-            server_default="'[]'::jsonb",
+            server_default=sa.text("'[]'::jsonb"),
             comment="已成功执行的节点 ID 列表（JSONB array of str）",
         ),
 

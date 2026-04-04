@@ -68,7 +68,7 @@ def upgrade() -> None:
             "brand_tenant_ids",
             JSONB(),
             nullable=False,
-            server_default="'[]'::jsonb",
+            server_default=sa.text("'[]'::jsonb"),
             comment="旗下品牌 tenant_id 列表（UUID 字符串数组）",
         ),
         sa.Column(

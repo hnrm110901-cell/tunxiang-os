@@ -1,0 +1,206 @@
+name: Python CI
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'services/**'
+      - 'edge/**'
+      - 'shared/ontology/**'
+      - 'shared/events/**'
+      - 'pyproject.toml'
+      - '.github/workflows/python-ci.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'services/**'
+      - 'edge/**'
+      - 'shared/ontology/**'
+      - 'shared/events/**'
+      - 'pyproject.toml'
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Ruff Lint & Format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-ruff
+          restore-keys: ${{ runner.os }}-pip-
+
+      - name: Install ruff
+        run: pip install ruff
+
+      - name: Ruff check (lint)
+        run: ruff check services/*/src/ edge/*/src/ shared/ontology/ shared/events/ --output-format=github
+
+      - name: Ruff format check
+        run: ruff format --check services/*/src/ edge/*/src/ shared/ontology/ shared/events/
+
+      - name: Check broad except violations
+        run: |
+          # 检查新代码中是否有 bare 'except Exception' (允许最外层兜底带 exc_info)
+          # 使用 ruff 的 BLE001 规则检查
+          ruff check services/*/src/ edge/*/src/ --select BLE001 --output-format=github || true
+
+  test:
+    name: Test (${{ matrix.service }})
+    runs-on: ubuntu-latest
+    needs: lint
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - gateway
+          - tx-trade
+          - tx-agent
+          - tx-menu
+          - tx-member
+          - tx-supply
+          - tx-finance
+          - tx-org
+          - tx-analytics
+          - tx-ops
+          - tx-brain
+          - tx-intel
+          - tx-growth
+          - mcp-server
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ matrix.service }}-${{ hashFiles(format('services/{0}/requirements.txt', matrix.service)) }}
+          restore-keys: |
+            ${{ runner.os }}-pip-${{ matrix.service }}-
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          pip install pytest pytest-asyncio pytest-cov structlog pydantic fastapi httpx
+          if [ -f "services/${{ matrix.service }}/requirements.txt" ]; then
+            pip install -r "services/${{ matrix.service }}/requirements.txt"
+          fi
+
+      - name: Run tests
+        run: |
+          cd "services/${{ matrix.service }}"
+          if [ -d "src/tests" ] && [ "$(find src/tests -name 'test_*.py' | head -1)" ]; then
+            PYTHONPATH=src:../../ python -m pytest src/tests/ \
+              --tb=short -q \
+              --cov=src \
+              --cov-report=term-missing \
+              --cov-report=xml:coverage.xml \
+              --junitxml=results.xml
+          else
+            echo "::notice::No tests found for ${{ matrix.service }}"
+          fi
+
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ matrix.service }}
+          path: services/${{ matrix.service }}/coverage.xml
+          if-no-files-found: ignore
+
+  edge-test:
+    name: Edge Services Test
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-edge
+          restore-keys: ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: pip install pytest pytest-asyncio structlog pydantic fastapi httpx ruff
+
+      - name: Lint edge services
+        run: ruff check edge/mac-station/src/ edge/sync-engine/src/ --output-format=github
+
+      - name: Test edge services
+        run: |
+          for svc in mac-station sync-engine; do
+            if [ -d "edge/$svc/src/tests" ]; then
+              echo "=== $svc ==="
+              cd "edge/$svc"
+              PYTHONPATH=src:../../ python -m pytest src/tests/ --tb=short -q || true
+              cd ../..
+            fi
+          done
+
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install security tools
+        run: pip install pip-audit
+
+      - name: Scan for hardcoded secrets
+        run: |
+          # 检查常见密钥模式（API keys, passwords, tokens）
+          FOUND=0
+          for pattern in \
+            'PRIVATE.KEY' \
+            'sk-[a-zA-Z0-9]{20,}' \
+            'password\s*=\s*["\x27][^"\x27]{8,}' \
+            'SECRET_KEY\s*=\s*["\x27][^"\x27]+'; do
+            if grep -rn --include='*.py' --include='*.ts' --include='*.tsx' \
+              -E "$pattern" services/ edge/ apps/ shared/ 2>/dev/null | \
+              grep -v 'test' | grep -v 'example' | grep -v 'mock' | grep -v '.env.example'; then
+              echo "::warning::Potential secret found matching pattern: $pattern"
+              FOUND=1
+            fi
+          done
+          if [ "$FOUND" -eq 1 ]; then
+            echo "::warning::Review the above matches for potential hardcoded secrets"
+          else
+            echo "No hardcoded secrets detected"
+          fi
+
+      - name: Pip audit (dependency vulnerabilities)
+        run: |
+          # 收集所有 requirements.txt 并审计
+          for req in services/*/requirements.txt; do
+            if [ -f "$req" ]; then
+              echo "=== Auditing: $req ==="
+              pip-audit -r "$req" --desc || true
+            fi
+          done

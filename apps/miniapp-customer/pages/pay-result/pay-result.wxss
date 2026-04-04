@@ -1,0 +1,178 @@
+/* 支付结果页 */
+.result-page {
+  min-height: 100vh;
+  background: #0B1A20;
+  color: #fff;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+}
+
+.result-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 100rpx 48rpx 60rpx;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* ─── 结果图标 ─── */
+.result-icon {
+  width: 160rpx;
+  height: 160rpx;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 32rpx;
+}
+
+.success-circle {
+  background: rgba(7, 193, 96, 0.15);
+  border: 4rpx solid #07C160;
+}
+
+.fail-circle {
+  background: rgba(255, 77, 79, 0.15);
+  border: 4rpx solid #FF4D4F;
+}
+
+.check-mark {
+  font-size: 72rpx;
+  color: #07C160;
+  font-weight: bold;
+  line-height: 1;
+}
+
+.cross-mark {
+  font-size: 72rpx;
+  color: #FF4D4F;
+  font-weight: bold;
+  line-height: 1;
+}
+
+/* ─── 文字信息 ─── */
+.result-title {
+  font-size: 36rpx;
+  font-weight: bold;
+  color: #fff;
+  margin-bottom: 16rpx;
+}
+
+.result-title.fail {
+  color: #FF4D4F;
+}
+
+.result-amount {
+  font-size: 56rpx;
+  font-weight: bold;
+  color: #fff;
+  margin-bottom: 8rpx;
+}
+
+.result-method {
+  font-size: 26rpx;
+  color: #999;
+  margin-bottom: 32rpx;
+}
+
+.result-reason {
+  font-size: 28rpx;
+  color: #999;
+  text-align: center;
+  margin-bottom: 40rpx;
+  padding: 0 40rpx;
+}
+
+/* ─── 积分奖励 ─── */
+.points-reward {
+  margin-bottom: 28rpx;
+}
+
+.points-badge {
+  display: inline-block;
+  padding: 10rpx 32rpx;
+  background: rgba(255, 107, 53, 0.12);
+  border: 1rpx solid rgba(255, 107, 53, 0.3);
+  border-radius: 32rpx;
+  font-size: 28rpx;
+  color: #FF6B35;
+  font-weight: 600;
+}
+
+/* ─── 出餐提示 ─── */
+.cook-tip {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  padding: 20rpx 36rpx;
+  background: rgba(255,255,255,0.05);
+  border-radius: 16rpx;
+  margin-bottom: 20rpx;
+}
+
+.cook-tip-icon {
+  font-size: 32rpx;
+}
+
+.cook-tip-text {
+  font-size: 28rpx;
+  color: #ccc;
+}
+
+/* ─── 出餐进度提示 ─── */
+.progress-hint {
+  margin-bottom: 40rpx;
+  animation: fadeIn 600ms ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10rpx); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.hint-text {
+  font-size: 28rpx;
+  color: #FF6B35;
+  font-weight: 500;
+}
+
+/* ─── 按钮组 ─── */
+.btn-group {
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+  width: 100%;
+  margin-top: 20rpx;
+}
+
+.result-btn {
+  width: 100%;
+  height: 88rpx;
+  border-radius: 44rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+.result-btn.primary {
+  background: #FF6B35;
+}
+
+.result-btn.secondary {
+  background: transparent;
+  border: 2rpx solid rgba(255,255,255,0.2);
+}
+
+.result-btn-text {
+  font-size: 32rpx;
+  color: #fff;
+  font-weight: 600;
+}
+
+.result-btn.secondary .result-btn-text {
+  color: #ccc;
+  font-weight: normal;
+}

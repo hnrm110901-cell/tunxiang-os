@@ -39,24 +39,28 @@ _FRANCHISE_TABLES = [
 
 def _apply_safe_rls(table: str) -> None:
     """创建标准安全 RLS：四操作 PERMISSIVE + NULLIF NULL guard + FORCE。"""
+    op.execute(f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY")
+    op.execute(f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY")
+    op.execute(f"DROP POLICY IF EXISTS {table}_rls_select ON {table}")
     op.execute(
         f"CREATE POLICY {table}_rls_select ON {table} "
         f"FOR SELECT USING ({_SAFE_CONDITION})"
     )
+    op.execute(f"DROP POLICY IF EXISTS {table}_rls_insert ON {table}")
     op.execute(
         f"CREATE POLICY {table}_rls_insert ON {table} "
         f"FOR INSERT WITH CHECK ({_SAFE_CONDITION})"
     )
+    op.execute(f"DROP POLICY IF EXISTS {table}_rls_update ON {table}")
     op.execute(
         f"CREATE POLICY {table}_rls_update ON {table} "
         f"FOR UPDATE USING ({_SAFE_CONDITION}) WITH CHECK ({_SAFE_CONDITION})"
     )
+    op.execute(f"DROP POLICY IF EXISTS {table}_rls_delete ON {table}")
     op.execute(
         f"CREATE POLICY {table}_rls_delete ON {table} "
         f"FOR DELETE USING ({_SAFE_CONDITION})"
     )
-    op.execute(f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY")
-    op.execute(f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY")
 
 
 def upgrade() -> None:
@@ -139,18 +143,40 @@ def upgrade() -> None:
             created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )
     """)
-    op.execute(
-        "CREATE INDEX IF NOT EXISTS idx_royalty_bills_tenant_franchisee "
-        "ON royalty_bills (tenant_id, franchisee_id)"
-    )
-    op.execute(
-        "CREATE INDEX IF NOT EXISTS idx_royalty_bills_tenant_period "
-        "ON royalty_bills (tenant_id, period_start, period_end)"
-    )
-    op.execute(
-        "CREATE INDEX IF NOT EXISTS idx_royalty_bills_status "
-        "ON royalty_bills (tenant_id, status)"
-    )
+    op.execute("ALTER TABLE royalty_bills ADD COLUMN IF NOT EXISTS franchisee_id UUID")
+    op.execute("ALTER TABLE royalty_bills ADD COLUMN IF NOT EXISTS period_start DATE")
+    op.execute("ALTER TABLE royalty_bills ADD COLUMN IF NOT EXISTS period_end DATE")
+    op.execute("ALTER TABLE royalty_bills ADD COLUMN IF NOT EXISTS revenue_fen BIGINT DEFAULT 0")
+    op.execute("ALTER TABLE royalty_bills ADD COLUMN IF NOT EXISTS royalty_rate NUMERIC(5,4)")
+    op.execute("ALTER TABLE royalty_bills ADD COLUMN IF NOT EXISTS royalty_amount_fen BIGINT DEFAULT 0")
+    op.execute("ALTER TABLE royalty_bills ADD COLUMN IF NOT EXISTS management_fee_fen BIGINT DEFAULT 0")
+    op.execute("ALTER TABLE royalty_bills ADD COLUMN IF NOT EXISTS total_due_fen BIGINT DEFAULT 0")
+    op.execute("ALTER TABLE royalty_bills ADD COLUMN IF NOT EXISTS due_date DATE")
+    op.execute("ALTER TABLE royalty_bills ADD COLUMN IF NOT EXISTS paid_at TIMESTAMPTZ")
+    op.execute("""
+        DO $$ BEGIN
+            IF (SELECT COUNT(*) FROM information_schema.columns
+                WHERE table_name='royalty_bills' AND column_name IN ('tenant_id', 'franchisee_id')) = 2 THEN
+                EXECUTE 'CREATE INDEX IF NOT EXISTS idx_royalty_bills_tenant_franchisee ON royalty_bills (tenant_id, franchisee_id)';
+            END IF;
+        END $$;
+    """)
+    op.execute("""
+        DO $$ BEGIN
+            IF (SELECT COUNT(*) FROM information_schema.columns
+                WHERE table_name='royalty_bills' AND column_name IN ('tenant_id', 'period_start', 'period_end')) = 3 THEN
+                EXECUTE 'CREATE INDEX IF NOT EXISTS idx_royalty_bills_tenant_period ON royalty_bills (tenant_id, period_start, period_end)';
+            END IF;
+        END $$;
+    """)
+    op.execute("""
+        DO $$ BEGIN
+            IF (SELECT COUNT(*) FROM information_schema.columns
+                WHERE table_name='royalty_bills' AND column_name IN ('tenant_id', 'status')) = 2 THEN
+                EXECUTE 'CREATE INDEX IF NOT EXISTS idx_royalty_bills_status ON royalty_bills (tenant_id, status)';
+            END IF;
+        END $$;
+    """)
     _apply_safe_rls("royalty_bills")
 
     # ─────────────────────────────────────────────────────────────────

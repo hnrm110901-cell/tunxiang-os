@@ -1,0 +1,218 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deploy target environment'
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: deploy-${{ github.event.inputs.environment || 'staging' }}
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ghcr.io/${{ github.repository }}
+
+jobs:
+  # ─── 测试关卡 ───
+  pre-deploy-check:
+    name: Pre-deploy Verification
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-deploy
+          restore-keys: ${{ runner.os }}-pip-
+
+      - name: Install test deps
+        run: pip install pytest pytest-asyncio structlog pydantic fastapi httpx ruff
+
+      - name: Ruff lint
+        run: ruff check services/*/src/ edge/*/src/ --output-format=github
+
+      - name: Run critical tests
+        run: |
+          for svc in gateway tx-trade tx-menu tx-member tx-agent; do
+            echo "=== Testing $svc ==="
+            cd "services/$svc"
+            if [ -d "src/tests" ] && [ "$(find src/tests -name 'test_*.py' | head -1)" ]; then
+              PYTHONPATH=src:../../ python -m pytest src/tests/ --tb=short -q || exit 1
+            fi
+            cd ../..
+          done
+
+  # ─── Staging 部署 ───
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: pre-deploy-check
+    if: >-
+      github.event_name == 'push' ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'staging')
+    environment:
+      name: staging
+      url: ${{ vars.STAGING_URL }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker images
+        run: |
+          TAG="${{ github.sha }}"
+          SHORT_SHA="${TAG:0:7}"
+
+          # 构建各服务镜像
+          for svc in gateway tx-trade tx-menu tx-member tx-agent tx-analytics tx-ops tx-supply tx-finance tx-org; do
+            if [ -f "services/$svc/Dockerfile" ]; then
+              echo "Building $svc..."
+              docker build -t "${{ env.IMAGE_PREFIX }}/$svc:$SHORT_SHA" \
+                           -t "${{ env.IMAGE_PREFIX }}/$svc:staging" \
+                           -f "services/$svc/Dockerfile" .
+              docker push "${{ env.IMAGE_PREFIX }}/$svc:$SHORT_SHA"
+              docker push "${{ env.IMAGE_PREFIX }}/$svc:staging"
+            fi
+          done
+
+      - name: Deploy to staging server
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.STAGING_HOST }}
+          username: ${{ secrets.STAGING_USER }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          script: |
+            cd /opt/tunxiang-os
+            git pull origin main
+            docker-compose -f docker-compose.staging.yml --env-file .env.staging pull
+            docker-compose -f docker-compose.staging.yml --env-file .env.staging up -d
+            echo "Staging deploy completed at $(date)"
+
+      - name: Health check (staging)
+        run: |
+          echo "Waiting for services to start..."
+          sleep 15
+          STAGING_URL="${{ vars.STAGING_URL }}"
+          if [ -n "$STAGING_URL" ]; then
+            for i in 1 2 3 4 5; do
+              STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$STAGING_URL/health" || echo "000")
+              if [ "$STATUS" = "200" ]; then
+                echo "Staging health check passed"
+                exit 0
+              fi
+              echo "Attempt $i: status=$STATUS, retrying in 10s..."
+              sleep 10
+            done
+            echo "::warning::Staging health check did not return 200 after 5 attempts"
+          else
+            echo "::notice::No STAGING_URL configured, skipping health check"
+          fi
+
+  # ─── Production 部署 ───
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: deploy-staging
+    if: >-
+      github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'production'
+    environment:
+      name: production
+      url: ${{ vars.PRODUCTION_URL }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker images (production)
+        run: |
+          TAG="${{ github.sha }}"
+          SHORT_SHA="${TAG:0:7}"
+
+          for svc in gateway tx-trade tx-menu tx-member tx-agent tx-analytics tx-ops tx-supply tx-finance tx-org; do
+            if [ -f "services/$svc/Dockerfile" ]; then
+              echo "Building $svc for production..."
+              docker build -t "${{ env.IMAGE_PREFIX }}/$svc:$SHORT_SHA" \
+                           -t "${{ env.IMAGE_PREFIX }}/$svc:production" \
+                           -t "${{ env.IMAGE_PREFIX }}/$svc:latest" \
+                           -f "services/$svc/Dockerfile" .
+              docker push "${{ env.IMAGE_PREFIX }}/$svc:$SHORT_SHA"
+              docker push "${{ env.IMAGE_PREFIX }}/$svc:production"
+              docker push "${{ env.IMAGE_PREFIX }}/$svc:latest"
+            fi
+          done
+
+      - name: Deploy to production server
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.PROD_HOST }}
+          username: ${{ secrets.PROD_USER }}
+          key: ${{ secrets.PROD_SSH_KEY }}
+          script: |
+            cd /opt/tunxiang-os
+            git pull origin main
+
+            # 数据库迁移（含备份）
+            ./scripts/migrate.sh up
+
+            # 拉取新镜像并滚动重启
+            docker-compose -f docker-compose.prod.yml pull
+            docker-compose -f docker-compose.prod.yml up -d --remove-orphans
+
+            echo "Production deploy completed at $(date)"
+
+      - name: Health check (production)
+        run: |
+          echo "Waiting for production services to start..."
+          sleep 20
+          PROD_URL="${{ vars.PRODUCTION_URL }}"
+          if [ -n "$PROD_URL" ]; then
+            for i in 1 2 3 4 5 6; do
+              STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$PROD_URL/health" || echo "000")
+              if [ "$STATUS" = "200" ]; then
+                echo "Production health check passed"
+                exit 0
+              fi
+              echo "Attempt $i: status=$STATUS, retrying in 15s..."
+              sleep 15
+            done
+            echo "::error::Production health check FAILED after 6 attempts"
+            exit 1
+          else
+            echo "::notice::No PRODUCTION_URL configured, skipping health check"
+          fi
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "::error::Production deployment failed! Manual intervention required."
+          echo "Commit: ${{ github.sha }}"
+          echo "Actor: ${{ github.actor }}"

@@ -27,35 +27,6 @@ interface PurchaseRequest {
   status: 'pending' | 'approved' | 'rejected';
 }
 
-const MOCK_REQUESTS: PurchaseRequest[] = [
-  {
-    id: 'po_001',
-    requester_name: '张厨师长',
-    items_summary: '鲈鱼 20kg / 土豆 50kg / 猪里脊 15kg',
-    estimated_amount: 1280,
-    created_at: '2026-03-31T08:30:00+08:00',
-    notes: '明日宴席备货，请尽快审批',
-    status: 'pending',
-  },
-  {
-    id: 'po_002',
-    requester_name: '李仓管',
-    items_summary: '鸡蛋 200个',
-    estimated_amount: 160,
-    created_at: '2026-03-31T09:15:00+08:00',
-    notes: null,
-    status: 'pending',
-  },
-  {
-    id: 'po_003',
-    requester_name: '王采购',
-    items_summary: '菜籽油 20L / 生抽 10瓶',
-    estimated_amount: 380,
-    created_at: '2026-03-30T14:20:00+08:00',
-    notes: null,
-    status: 'approved',
-  },
-];
 
 interface RejectModalProps {
   onConfirm: (comment: string) => void;
@@ -128,7 +99,7 @@ function statusBadge(status: PurchaseRequest['status']) {
 export function PurchaseApprovalPage() {
   const navigate = useNavigate();
   const storeId = (window as any).__STORE_ID__ || 'store_001';
-  const [requests, setRequests] = useState<PurchaseRequest[]>(MOCK_REQUESTS);
+  const [requests, setRequests] = useState<PurchaseRequest[]>([]);
   const [rejectTarget, setRejectTarget] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionError, setActionError] = useState('');
@@ -140,7 +111,7 @@ export function PurchaseApprovalPage() {
       `/api/v1/supply/purchase-requests?store_id=${encodeURIComponent(storeId)}&status=pending`,
     )
       .then(res => setRequests(res.items))
-      .catch(() => { /* 保留 mock 数据作为兜底 */ })
+      .catch(() => { /* API不可用，保持空列表，错误已隐式显示 */ })
       .finally(() => setLoading(false));
   }, [storeId]);
 

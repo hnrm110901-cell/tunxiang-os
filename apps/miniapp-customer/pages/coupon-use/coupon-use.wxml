@@ -1,0 +1,79 @@
+<!-- 优惠券核销页 -->
+<view class="page-container">
+
+  <!-- 核销成功动画覆盖层 -->
+  <view class="success-overlay {{verified ? 'show' : ''}}" wx:if="{{verified}}">
+    <view class="success-icon">&#9989;</view>
+    <text class="success-title">核销成功</text>
+    <view class="success-amount">
+      <text class="success-amount-old">&#165;{{coupon.faceValue}}</text>
+      <text class="success-amount-label">已抵扣</text>
+    </view>
+    <text class="success-hint">优惠已生效，祝您用餐愉快</text>
+    <button class="success-btn" bindtap="goBack">返回</button>
+  </view>
+
+  <!-- 核销码主区域 -->
+  <view class="verify-section" wx:if="{{!verified}}">
+
+    <!-- 倒计时 -->
+    <view class="countdown-bar">
+      <text class="countdown-label">核销码有效时间</text>
+      <text class="countdown-time {{remainSeconds <= 60 ? 'urgent' : ''}}">{{countdownText}}</text>
+    </view>
+
+    <!-- 核销码（条形码模拟） -->
+    <view class="barcode-area">
+      <view class="barcode-container">
+        <!-- 条形码模拟：用竖线条 -->
+        <view class="barcode-lines">
+          <view class="bar-line" wx:for="{{barLines}}" wx:key="index"
+                style="width: {{item.w}}rpx; margin-right: {{item.g}}rpx; background: {{item.dark ? '#fff' : 'transparent'}};"></view>
+        </view>
+        <text class="barcode-text">{{verifyCode}}</text>
+      </view>
+
+      <!-- 提示 -->
+      <text class="barcode-hint">请将此核销码出示给收银员</text>
+    </view>
+
+    <!-- 券面信息 -->
+    <view class="coupon-info-card">
+      <view class="info-row">
+        <text class="info-label">优惠券</text>
+        <text class="info-value">{{coupon.name}}</text>
+      </view>
+      <view class="info-row">
+        <text class="info-label">面值</text>
+        <text class="info-value highlight" wx:if="{{coupon.couponType === 'reduction' || coupon.couponType === 'cash'}}">
+          &#165;{{coupon.faceValue}}
+        </text>
+        <text class="info-value highlight" wx:if="{{coupon.couponType === 'discount'}}">
+          {{coupon.faceValue}}折
+        </text>
+      </view>
+      <view class="info-row">
+        <text class="info-label">使用条件</text>
+        <text class="info-value">{{coupon.thresholdText}}</text>
+      </view>
+      <view class="info-row">
+        <text class="info-label">有效期</text>
+        <text class="info-value">{{coupon.expireText}}</text>
+      </view>
+      <view class="info-row" wx:if="{{coupon.condition}}">
+        <text class="info-label">适用范围</text>
+        <text class="info-value">{{coupon.condition}}</text>
+      </view>
+    </view>
+
+    <!-- 手动核销按钮（给收银员用） -->
+    <view class="manual-verify">
+      <button class="verify-btn" bindtap="onVerify" disabled="{{verifying}}">
+        {{verifying ? '核销中...' : '确认核销'}}
+      </button>
+      <text class="verify-hint">或由收银员扫描上方核销码</text>
+    </view>
+  </view>
+
+  <view class="safe-bottom"></view>
+</view>

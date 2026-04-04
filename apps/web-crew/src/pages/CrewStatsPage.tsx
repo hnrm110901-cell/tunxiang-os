@@ -1,8 +1,9 @@
 /**
  * W6 服务员绩效实时看板
  */
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { txFetch } from '../api/index';
 
 /* ---------- 颜色常量 ---------- */
 const C = {
@@ -19,43 +20,46 @@ const C = {
   warning: '#FF9F0A',
 };
 
-/* ---------- Mock 数据 ---------- */
-const MOCK_STATS = {
-  operator_name: '张三',
-  rank: 2,
-  total_staff: 5,
-  table_turns: 3,
-  revenue_contributed: 428000,
-  avg_check: 20000,
-  upsell_rate: 22,
-  bell_response_avg_sec: 45,
-  complaint_count: 0,
-  rush_handled: 3,
-};
+/* ---------- API 类型 ---------- */
+interface CrewStats {
+  operator_name: string;
+  rank: number;
+  total_staff: number;
+  table_turns: number;
+  revenue_contributed: number;
+  avg_check: number;
+  upsell_rate: number;
+  bell_response_avg_sec: number;
+  complaint_count: number;
+  rush_handled: number;
+}
 
-const MOCK_LEADERBOARD: {
+interface LeaderboardRow {
   rank: number;
   operator_name: string;
   value: number;
   badge: 'gold' | 'silver' | 'bronze' | null;
   is_me?: boolean;
-}[] = [
-  { rank: 1, operator_name: '李四',      value: 682000, badge: 'gold' },
-  { rank: 2, operator_name: '张三（你）', value: 428000, badge: 'silver', is_me: true },
-  { rank: 3, operator_name: '王五',      value: 392000, badge: 'bronze' },
-  { rank: 4, operator_name: '赵六',      value: 210000, badge: null },
-  { rank: 5, operator_name: '孙七',      value: 156000, badge: null },
-];
+}
 
-const MOCK_TREND = [
-  { date: '03-25', table_turns: 2 },
-  { date: '03-26', table_turns: 4 },
-  { date: '03-27', table_turns: 3 },
-  { date: '03-28', table_turns: 5 },
-  { date: '03-29', table_turns: 2 },
-  { date: '03-30', table_turns: 4 },
-  { date: '03-31', table_turns: 3 },
-];
+interface TrendPoint {
+  date: string;
+  table_turns: number;
+}
+
+/* ---------- 空白降级数据 ---------- */
+const EMPTY_STATS: CrewStats = {
+  operator_name: '—',
+  rank: 0,
+  total_staff: 0,
+  table_turns: 0,
+  revenue_contributed: 0,
+  avg_check: 0,
+  upsell_rate: 0,
+  bell_response_avg_sec: 0,
+  complaint_count: 0,
+  rush_handled: 0,
+};
 
 /* ---------- 工具函数 ---------- */
 function formatRevenue(val: number): string {
@@ -103,7 +107,7 @@ const METRIC_LABELS: Record<LeaderMetric, string> = {
 };
 
 /* ---------- 趋势柱状图 ---------- */
-function TrendBar({ data, todayLabel }: { data: typeof MOCK_TREND; todayLabel: string }) {
+function TrendBar({ data, todayLabel }: { data: TrendPoint[]; todayLabel: string }) {
   const maxVal = Math.max(...data.map(d => d.table_turns), 1);
   return (
     <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: 80, paddingBottom: 0 }}>
@@ -143,21 +147,59 @@ export function CrewStatsPage() {
   const [period, setPeriod] = useState<Period>('today');
   const [metric, setMetric] = useState<LeaderMetric>('revenue');
 
-  const stats = MOCK_STATS;
-  const leaderboard = MOCK_LEADERBOARD;
-  const trend = MOCK_TREND;
+  const [stats, setStats] = useState<CrewStats>(EMPTY_STATS);
+  const [leaderboard, setLeaderboard] = useState<LeaderboardRow[]>([]);
+  const [trend, setTrend] = useState<TrendPoint[]>([]);
+  const [loadingStats, setLoadingStats] = useState(true);
+  const [loadingLeader, setLoadingLeader] = useState(true);
 
-  // 激励文案：rank 2 → 比排名昨天 rank 3 提升了
-  const motivationTrend: 'up' | 'down' | 'same' = 'up';
+  const today = new Date().toISOString().slice(0, 10);
+
+  // 加载个人绩效 + 趋势
+  const loadStats = useCallback(async () => {
+    setLoadingStats(true);
+    try {
+      const [statsData, trendData] = await Promise.allSettled([
+        txFetch<CrewStats>(`/api/v1/trade/crew/stats/me?date=${today}`),
+        txFetch<{ items: TrendPoint[] }>('/api/v1/trade/crew/stats/trend?days=7'),
+      ]);
+      if (statsData.status === 'fulfilled') setStats(statsData.value);
+      if (trendData.status === 'fulfilled') setTrend(trendData.value.items ?? []);
+    } catch {
+      // 降级到空数据，不崩溃
+    } finally {
+      setLoadingStats(false);
+    }
+  }, [today]);
+
+  // 加载排行榜
+  const loadLeaderboard = useCallback(async () => {
+    setLoadingLeader(true);
+    try {
+      const data = await txFetch<{ items: LeaderboardRow[] }>(
+        `/api/v1/trade/crew/stats/leaderboard?date=${today}&metric=${metric}`
+      );
+      setLeaderboard(data.items ?? []);
+    } catch {
+      setLeaderboard([]);
+    } finally {
+      setLoadingLeader(false);
+    }
+  }, [today, metric]);
+
+  useEffect(() => { void loadStats(); }, [loadStats]);
+  useEffect(() => { void loadLeaderboard(); }, [loadLeaderboard]);
+
+  const motivationTrend: 'up' | 'down' | 'same' = 'same';
   const motivation = getMotivation(stats.rank, stats.total_staff, motivationTrend);
 
   const coreMetrics = [
-    { label: '翻台数',   value: `${stats.table_turns}次`,                  color: C.text },
-    { label: '贡献营收', value: formatRevenue(stats.revenue_contributed),   color: C.success },
-    { label: '人均客单', value: formatRevenue(stats.avg_check),             color: C.text },
-    { label: '加菜转化', value: `${stats.upsell_rate}%`,                   color: C.warning },
-    { label: '铃响应速', value: `${stats.bell_response_avg_sec}秒`,         color: stats.bell_response_avg_sec <= 60 ? C.success : C.warning },
-    { label: '投诉数',   value: `${stats.complaint_count}次`,               color: stats.complaint_count === 0 ? C.success : '#ef4444' },
+    { label: '翻台数',   value: loadingStats ? '...' : `${stats.table_turns}次`,                  color: C.text },
+    { label: '贡献营收', value: loadingStats ? '...' : formatRevenue(stats.revenue_contributed),   color: C.success },
+    { label: '人均客单', value: loadingStats ? '...' : formatRevenue(stats.avg_check),             color: C.text },
+    { label: '加菜转化', value: loadingStats ? '...' : `${stats.upsell_rate}%`,                   color: C.warning },
+    { label: '铃响应速', value: loadingStats ? '...' : `${stats.bell_response_avg_sec}秒`,         color: stats.bell_response_avg_sec <= 60 ? C.success : C.warning },
+    { label: '投诉数',   value: loadingStats ? '...' : `${stats.complaint_count}次`,               color: stats.complaint_count === 0 ? C.success : '#ef4444' },
   ];
 
   return (
@@ -282,6 +324,16 @@ export function CrewStatsPage() {
           background: C.card, borderRadius: 12, border: `1px solid ${C.border}`,
           overflow: 'hidden', marginBottom: 16,
         }}>
+          {loadingLeader && (
+            <div style={{ padding: '20px', textAlign: 'center', color: C.muted, fontSize: 16 }}>
+              加载排行榜...
+            </div>
+          )}
+          {!loadingLeader && leaderboard.length === 0 && (
+            <div style={{ padding: '20px', textAlign: 'center', color: C.muted, fontSize: 16 }}>
+              暂无排行榜数据
+            </div>
+          )}
           {leaderboard.map((row, idx) => (
             <div
               key={row.rank}

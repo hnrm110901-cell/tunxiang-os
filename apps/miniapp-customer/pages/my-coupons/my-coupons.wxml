@@ -1,0 +1,155 @@
+<!-- 我的卡包 -->
+<view class="page-container">
+
+  <!-- Tab栏 -->
+  <view class="tab-bar">
+    <view class="tab-item {{activeTab === 'unused' ? 'active' : ''}}"
+          bindtap="switchTab" data-tab="unused">
+      可使用
+      <text class="tab-badge" wx:if="{{unusedCount > 0}}">{{unusedCount}}</text>
+    </view>
+    <view class="tab-item {{activeTab === 'used' ? 'active' : ''}}"
+          bindtap="switchTab" data-tab="used">已使用</view>
+    <view class="tab-item {{activeTab === 'expired' ? 'active' : ''}}"
+          bindtap="switchTab" data-tab="expired">已过期</view>
+  </view>
+
+  <!-- 可使用列表 -->
+  <view wx:if="{{activeTab === 'unused'}}">
+    <view class="loading-tip" wx:if="{{loading}}">加载中...</view>
+
+    <view class="coupon-list" wx:if="{{!loading && unusedList.length > 0}}">
+      <view class="ticket-card {{expandedId === item.id ? 'expanded' : ''}}"
+            wx:for="{{unusedList}}" wx:key="id">
+        <!-- 票面主体 -->
+        <view class="ticket-body" bindtap="toggleExpand" data-id="{{item.id}}">
+          <!-- 左侧锯齿+金额 -->
+          <view class="ticket-left">
+            <view class="ticket-serrated"></view>
+            <view class="ticket-face">
+              <view class="face-amount" wx:if="{{item.couponType === 'reduction' || item.couponType === 'cash'}}">
+                <text class="face-sym">&#165;</text>
+                <text class="face-val">{{item.faceValue}}</text>
+              </view>
+              <view class="face-amount" wx:if="{{item.couponType === 'discount'}}">
+                <text class="face-val discount">{{item.faceValue}}</text>
+                <text class="face-sym small">折</text>
+              </view>
+              <view class="face-amount" wx:if="{{item.couponType === 'gift'}}">
+                <text class="face-sym gift">赠</text>
+              </view>
+              <text class="face-threshold">{{item.thresholdText}}</text>
+            </view>
+          </view>
+
+          <!-- 右侧信息 -->
+          <view class="ticket-right">
+            <text class="ticket-name">{{item.name}}</text>
+            <text class="ticket-condition" wx:if="{{item.condition}}">{{item.condition}}</text>
+            <text class="ticket-expire {{item.expireSoon ? 'warn' : ''}}">{{item.expireText}}</text>
+            <text class="ticket-store" wx:if="{{item.storeText}}">{{item.storeText}}</text>
+          </view>
+
+          <!-- 使用按钮 -->
+          <view class="ticket-action">
+            <button class="use-btn" catchtap="onUse" data-id="{{item.id}}">去使用</button>
+          </view>
+        </view>
+
+        <!-- 展开详情 -->
+        <view class="ticket-detail" wx:if="{{expandedId === item.id}}">
+          <view class="detail-divider"></view>
+          <view class="detail-section">
+            <text class="detail-title">使用规则</text>
+            <text class="detail-text">{{item.ruleText || '本券在有效期内可在适用门店使用，不可与其他优惠叠加'}}</text>
+          </view>
+          <view class="detail-section" wx:if="{{item.applicableDishes}}">
+            <text class="detail-title">适用菜品</text>
+            <text class="detail-text">{{item.applicableDishes}}</text>
+          </view>
+          <view class="detail-section">
+            <text class="detail-title">券码</text>
+            <text class="detail-text">{{item.couponCode || item.id}}</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 空状态 -->
+    <view class="empty-state" wx:if="{{!loading && unusedList.length === 0}}">
+      <text class="empty-icon">&#127903;</text>
+      <text class="empty-text">暂无优惠券</text>
+      <text class="empty-link" bindtap="goToCouponCenter">去领券中心看看</text>
+    </view>
+  </view>
+
+  <!-- 已使用列表 -->
+  <view wx:if="{{activeTab === 'used'}}">
+    <view class="loading-tip" wx:if="{{usedLoading}}">加载中...</view>
+
+    <view class="coupon-list" wx:if="{{!usedLoading && usedList.length > 0}}">
+      <view class="ticket-card disabled" wx:for="{{usedList}}" wx:key="id">
+        <view class="ticket-body">
+          <view class="ticket-left gray">
+            <view class="ticket-serrated"></view>
+            <view class="ticket-face">
+              <view class="face-amount">
+                <text class="face-sym">&#165;</text>
+                <text class="face-val">{{item.faceValue}}</text>
+              </view>
+              <text class="face-threshold">{{item.thresholdText}}</text>
+            </view>
+          </view>
+          <view class="ticket-right">
+            <text class="ticket-name">{{item.name}}</text>
+            <text class="ticket-expire">{{item.expireText}}</text>
+          </view>
+          <view class="ticket-action">
+            <view class="watermark">已使用</view>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <view class="empty-state" wx:if="{{!usedLoading && usedList.length === 0}}">
+      <text class="empty-icon">&#128203;</text>
+      <text class="empty-text">暂无已使用的优惠券</text>
+    </view>
+  </view>
+
+  <!-- 已过期列表 -->
+  <view wx:if="{{activeTab === 'expired'}}">
+    <view class="loading-tip" wx:if="{{expiredLoading}}">加载中...</view>
+
+    <view class="coupon-list" wx:if="{{!expiredLoading && expiredList.length > 0}}">
+      <view class="ticket-card disabled" wx:for="{{expiredList}}" wx:key="id">
+        <view class="ticket-body">
+          <view class="ticket-left gray">
+            <view class="ticket-serrated"></view>
+            <view class="ticket-face">
+              <view class="face-amount">
+                <text class="face-sym">&#165;</text>
+                <text class="face-val">{{item.faceValue}}</text>
+              </view>
+              <text class="face-threshold">{{item.thresholdText}}</text>
+            </view>
+          </view>
+          <view class="ticket-right">
+            <text class="ticket-name">{{item.name}}</text>
+            <text class="ticket-expire">{{item.expireText}}</text>
+          </view>
+          <view class="ticket-action">
+            <view class="watermark">已过期</view>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <view class="empty-state" wx:if="{{!expiredLoading && expiredList.length === 0}}">
+      <text class="empty-icon">&#128203;</text>
+      <text class="empty-text">暂无已过期的优惠券</text>
+    </view>
+  </view>
+
+  <view class="safe-bottom"></view>
+</view>

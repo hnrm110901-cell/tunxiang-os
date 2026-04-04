@@ -1,0 +1,59 @@
+<!-- 支付结果页 -->
+<view class="result-page">
+
+  <!-- 成功状态 -->
+  <view class="result-content" wx:if="{{status === 'success'}}">
+    <view class="result-icon success-circle">
+      <text class="check-mark">✓</text>
+    </view>
+    <text class="result-title">支付成功</text>
+    <text class="result-amount">¥{{amountYuan}}</text>
+    <text class="result-method">{{methodLabel}}</text>
+
+    <!-- 积分奖励 -->
+    <view class="points-reward" wx:if="{{earnedPoints > 0}}">
+      <text class="points-badge">+{{earnedPoints}}积分</text>
+    </view>
+
+    <!-- 出餐提示 -->
+    <view class="cook-tip" wx:if="{{showCookTip}}">
+      <text class="cook-tip-icon">🍳</text>
+      <text class="cook-tip-text">预计 {{estimatedMinutes}} 分钟出餐</text>
+    </view>
+
+    <!-- 查看进度提示 -->
+    <view class="progress-hint" wx:if="{{showProgressHint}}">
+      <text class="hint-text">查看出餐进度 →</text>
+    </view>
+
+    <!-- 按钮组 -->
+    <view class="btn-group">
+      <view class="result-btn primary" bindtap="goOrderDetail">
+        <text class="result-btn-text">查看订单</text>
+      </view>
+      <view class="result-btn secondary" bindtap="goHome">
+        <text class="result-btn-text">返回首页</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 失败状态 -->
+  <view class="result-content" wx:if="{{status === 'fail'}}">
+    <view class="result-icon fail-circle">
+      <text class="cross-mark">✕</text>
+    </view>
+    <text class="result-title fail">支付失败</text>
+    <text class="result-reason">{{reason}}</text>
+
+    <!-- 按钮组 -->
+    <view class="btn-group">
+      <view class="result-btn primary" bindtap="goRetryPay">
+        <text class="result-btn-text">重新支付</text>
+      </view>
+      <view class="result-btn secondary" bindtap="goBack">
+        <text class="result-btn-text">返回修改</text>
+      </view>
+    </view>
+  </view>
+
+</view>

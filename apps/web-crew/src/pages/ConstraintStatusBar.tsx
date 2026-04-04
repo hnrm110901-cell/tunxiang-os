@@ -9,6 +9,7 @@
  * 每30秒自动刷新
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { txFetch } from '../api/index';
 
 // ─── 类型 ───
 
@@ -60,17 +61,10 @@ const LOADING_STATUS: ConstraintStatusData = {
 
 // ─── API ───
 
-const API_BASE = import.meta.env.VITE_API_URL || '';
-
-async function fetchConstraintStatus(orderId: string): Promise<ConstraintStatusData> {
+async function fetchConstraintStatus(_orderId: string): Promise<ConstraintStatusData> {
   try {
-    const res = await fetch(`${API_BASE}/api/v1/orders/${orderId}/constraint-status`, {
-      headers: { 'X-Tenant-ID': 'demo-tenant' },
-      signal: AbortSignal.timeout(5000),
-    });
-    if (!res.ok) return MOCK_STATUS;
-    const json = await res.json();
-    return json.data ?? MOCK_STATUS;
+    const data = await txFetch<ConstraintStatusData>('/api/v1/brain/constraints/status');
+    return data ?? MOCK_STATUS;
   } catch {
     return MOCK_STATUS;
   }

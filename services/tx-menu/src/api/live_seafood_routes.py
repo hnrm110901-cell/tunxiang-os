@@ -109,23 +109,6 @@ class UpdateStockReq(BaseModel):
     notes: Optional[str] = None
 
 
-# ─── Mock 数据（接入数据库前使用）────────────────────────────────────────────────
-
-# 有效 dish_id 集合（mock 阶段），key=dish_id, value=菜品名
-# TODO: 替换为真实DB查询 SELECT id FROM dishes WHERE id=$dish_id AND tenant_id=$tenant_id AND is_deleted=FALSE
-_MOCK_DISH_IDS: dict[str, str] = {
-    "d-sf-001": "石斑鱼",
-    "d-sf-002": "对虾",
-    "d-sf-003": "波士顿龙虾",
-    "d-sf-004": "澳洲龙虾",
-    "d-sf-005": "花蟹",
-}
-
-# 有效鱼缸 zone_code 集合（mock 阶段）
-# TODO: 替换为真实DB查询 SELECT zone_code FROM fish_tank_zones WHERE store_id=$store_id AND tenant_id=$tenant_id AND is_deleted=FALSE
-_MOCK_VALID_ZONE_CODES: set[str] = {"A1", "B2", "C1", "D1"}
-
-
 # ─── 鱼缸区域管理 ─────────────────────────────────────────────────────────────
 
 @router.get("/tank-zones", summary="查询门店鱼缸区域列表")
@@ -211,7 +194,7 @@ async def list_live_seafood(
         conditions.append("(d.live_stock_count > 0 OR d.live_stock_weight_g > 0)")
 
     where_clause = " AND ".join(conditions)
-    result = await db.execute(text(f"""  # noqa: S608 — mock SQL, not user input
+    result = await db.execute(text(f"""  # noqa: S608 — dynamic WHERE built from validated params only
         SELECT
             d.id, d.dish_name, d.pricing_method,
             d.weight_unit, d.price_per_unit_fen, d.min_order_qty, d.display_unit,
@@ -310,7 +293,7 @@ async def update_live_stock(
         set_clauses.append("live_stock_weight_g = GREATEST(0, live_stock_weight_g + :dw)")
         params["dw"] = req.delta_weight_g
 
-    result = await db.execute(text(f"""  # noqa: S608 — mock SQL, not user input
+    result = await db.execute(text(f"""  # noqa: S608 — dynamic SET built from validated params only
         UPDATE dishes SET {', '.join(set_clauses)}
         WHERE id = :did AND tenant_id = :tid AND is_deleted = false
         RETURNING id, dish_name, live_stock_count, live_stock_weight_g

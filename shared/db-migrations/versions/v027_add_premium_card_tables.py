@@ -131,7 +131,7 @@ def upgrade() -> None:
         #        {"type":"free_dish","dish_id":"xxx","quota_per_period":1},
         #        {"type":"priority_queue"},{"type":"free_parking"}]
         sa.Column(
-            "benefits", JSONB(), nullable=False, server_default="'[]'::jsonb",
+            "benefits", JSONB(), nullable=False, server_default=sa.text("'[]'::jsonb"),
             comment="权益配置列表（JSONB）",
         ),
 
@@ -195,7 +195,7 @@ def upgrade() -> None:
         # 当前周期已用权益（JSONB）
         # 示例：{"free_dish_used": 1, "parking_used": 0}
         sa.Column(
-            "period_used_benefits", JSONB(), nullable=False, server_default="'{}'::jsonb",
+            "period_used_benefits", JSONB(), nullable=False, server_default=sa.text("'{}'::jsonb"),
             comment="当前周期已用权益计数（JSONB）",
         ),
 

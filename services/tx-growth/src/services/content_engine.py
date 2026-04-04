@@ -2,22 +2,26 @@
 
 为不同渠道、不同人群生成品牌调性一致的营销内容，
 包括企微话术、朋友圈文案、短信、菜品故事等。
+
+v144 DB 化：移除内存存储，改为 async SQLAlchemy + content_templates 表
 """
+import json
+import os
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
+from uuid import UUID
+
+import httpx
+import structlog
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
+
+logger = structlog.get_logger(__name__)
+
 
 # ---------------------------------------------------------------------------
-# 内存存储
-# ---------------------------------------------------------------------------
-
-_templates: dict[str, dict] = {}
-_generated_contents: dict[str, dict] = {}
-_content_performance: dict[str, dict] = {}
-
-
-# ---------------------------------------------------------------------------
-# 内容模板库（预置）
+# 内置模板定义（首次使用时 UPSERT 到 DB，绑定 tenant_id）
 # ---------------------------------------------------------------------------
 
 _BUILTIN_TEMPLATES: dict[str, dict] = {
@@ -91,19 +95,282 @@ class ContentEngine:
         "referral_invite", "store_manager_script", "banquet_invite",
     ]
 
-    def __init__(self) -> None:
-        self._ensure_builtin_templates()
+    # ------------------------------------------------------------------
+    # 内部工具
+    # ------------------------------------------------------------------
 
-    def _ensure_builtin_templates(self) -> None:
-        """加载内置模板"""
-        for tpl_id, tpl in _BUILTIN_TEMPLATES.items():
-            if tpl_id not in _templates:
-                _templates[tpl_id] = {
-                    "template_id": tpl_id,
-                    **tpl,
-                    "is_builtin": True,
-                    "created_at": datetime.now(timezone.utc).isoformat(),
-                }
+    async def _set_tenant(self, db: AsyncSession, tenant_id: str) -> None:
+        await db.execute(
+            text("SELECT set_config('app.tenant_id', :tid, true)"),
+            {"tid": tenant_id},
+        )
+
+    async def _ensure_builtin_templates(self, db: AsyncSession, tid: uuid.UUID) -> None:
+        """为当前租户 UPSERT 内置模板（幂等，首次调用时初始化）"""
+        now = datetime.now(timezone.utc)
+        for key, tpl in _BUILTIN_TEMPLATES.items():
+            await db.execute(
+                text("""
+                    INSERT INTO content_templates
+                        (id, tenant_id, template_key, name, content_type,
+                         body_template, variables, is_builtin, is_active,
+                         usage_count, created_at, updated_at)
+                    VALUES
+                        (gen_random_uuid(), :tid, :key, :name, :content_type,
+                         :body, :variables::jsonb, true, true,
+                         0, :now, :now)
+                    ON CONFLICT ON CONSTRAINT uq_content_templates_tenant_key DO NOTHING
+                """),
+                {
+                    "tid": tid,
+                    "key": key,
+                    "name": tpl["name"],
+                    "content_type": tpl["content_type"],
+                    "body": tpl["body_template"],
+                    "variables": json.dumps(tpl["variables"]),
+                    "now": now,
+                },
+            )
+
+    # ------------------------------------------------------------------
+    # CRUD
+    # ------------------------------------------------------------------
+
+    async def create_template(
+        self,
+        name: str,
+        content_type: str,
+        template_body: str,
+        target_channels: list[str],
+        variables: list[str],
+        *,
+        tenant_id: str,
+        db: AsyncSession,
+    ) -> dict:
+        """创建自定义内容模板，INSERT into content_templates
+
+        Args:
+            name: 模板名称
+            content_type: 内容类型（CONTENT_TYPES 之一）
+            template_body: 模板正文（使用 {variable_name} 标记变量）
+            target_channels: 目标渠道列表（信息字段，不约束入库）
+            variables: 模板变量名列表
+            tenant_id: 租户ID
+            db: 数据库会话
+        """
+        if content_type not in self.CONTENT_TYPES:
+            return {"error": f"不支持的内容类型: {content_type}"}
+
+        await self._set_tenant(db, tenant_id)
+        tid = uuid.UUID(tenant_id)
+        now = datetime.now(timezone.utc)
+        new_id = uuid.uuid4()
+
+        await db.execute(
+            text("""
+                INSERT INTO content_templates
+                    (id, tenant_id, template_key, name, content_type,
+                     body_template, variables, is_builtin, is_active,
+                     usage_count, created_at, updated_at)
+                VALUES
+                    (:id, :tid, null, :name, :content_type,
+                     :body, :variables::jsonb, false, true,
+                     0, :now, :now)
+            """),
+            {
+                "id": new_id,
+                "tid": tid,
+                "name": name,
+                "content_type": content_type,
+                "body": template_body,
+                "variables": json.dumps(variables),
+                "now": now,
+            },
+        )
+        await db.commit()
+
+        logger.info(
+            "content_engine.create_template",
+            template_id=str(new_id),
+            content_type=content_type,
+            tenant_id=tenant_id,
+        )
+        return {
+            "template_id": str(new_id),
+            "name": name,
+            "content_type": content_type,
+            "body_template": template_body,
+            "target_channels": target_channels,
+            "variables": variables,
+            "is_builtin": False,
+            "is_active": True,
+            "usage_count": 0,
+            "created_at": now.isoformat(),
+        }
+
+    async def get_template(
+        self,
+        template_id: str,
+        *,
+        tenant_id: str,
+        db: AsyncSession,
+    ) -> dict:
+        """查询单条内容模板，SELECT from content_templates"""
+        await self._set_tenant(db, tenant_id)
+        tid = uuid.UUID(tenant_id)
+        tpl_id = uuid.UUID(template_id)
+
+        result = await db.execute(
+            text("""
+                SELECT id, template_key, name, content_type, body_template,
+                       variables, is_builtin, is_active, usage_count,
+                       created_at, updated_at
+                FROM content_templates
+                WHERE id = :tpl_id AND tenant_id = :tid
+                  AND is_active = true AND is_deleted = false
+                LIMIT 1
+            """),
+            {"tpl_id": tpl_id, "tid": tid},
+        )
+        row = result.fetchone()
+        if not row:
+            return {"error": f"模板不存在: {template_id}"}
+
+        return {
+            "template_id": str(row.id),
+            "template_key": row.template_key,
+            "name": row.name,
+            "content_type": row.content_type,
+            "body_template": row.body_template,
+            "variables": row.variables if isinstance(row.variables, list) else [],
+            "is_builtin": row.is_builtin,
+            "is_active": row.is_active,
+            "usage_count": row.usage_count,
+            "created_at": row.created_at.isoformat() if row.created_at else None,
+            "updated_at": row.updated_at.isoformat() if row.updated_at else None,
+        }
+
+    async def list_templates(
+        self,
+        content_type: Optional[str] = None,
+        *,
+        tenant_id: str,
+        db: AsyncSession,
+    ) -> list[dict]:
+        """查询内容模板列表，SELECT from content_templates（支持 content_type 过滤）
+
+        首次调用时自动初始化该租户的内置模板。
+        """
+        await self._set_tenant(db, tenant_id)
+        tid = uuid.UUID(tenant_id)
+
+        # 确保内置模板已初始化
+        await self._ensure_builtin_templates(db, tid)
+        await db.commit()
+
+        where_parts = ["tenant_id = :tid", "is_active = true", "is_deleted = false"]
+        params: dict = {"tid": tid}
+
+        if content_type:
+            where_parts.append("content_type = :content_type")
+            params["content_type"] = content_type
+
+        where_clause = " AND ".join(where_parts)
+        result = await db.execute(
+            text(f"""
+                SELECT id, template_key, name, content_type, body_template,
+                       variables, is_builtin, usage_count, created_at, updated_at
+                FROM content_templates
+                WHERE {where_clause}
+                ORDER BY is_builtin DESC, usage_count DESC, created_at DESC
+            """),
+            params,
+        )
+        rows = result.fetchall()
+        return [
+            {
+                "template_id": str(r.id),
+                "template_key": r.template_key,
+                "name": r.name,
+                "content_type": r.content_type,
+                "body_template": r.body_template,
+                "variables": r.variables if isinstance(r.variables, list) else [],
+                "is_builtin": r.is_builtin,
+                "usage_count": r.usage_count,
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+                "updated_at": r.updated_at.isoformat() if r.updated_at else None,
+            }
+            for r in rows
+        ]
+
+    async def render_template(
+        self,
+        template_id: str,
+        context: dict,
+        *,
+        tenant_id: str,
+        db: AsyncSession,
+    ) -> str:
+        """读取模板并替换变量，递增 usage_count，返回渲染后的文本
+
+        Args:
+            template_id: 模板 UUID
+            context: 变量值字典，如 {"customer_name": "张三", "dish_name": "佛跳墙"}
+            tenant_id: 租户ID
+            db: 数据库会话
+
+        Returns:
+            渲染后的文本字符串；若模板不存在返回空字符串
+        """
+        await self._set_tenant(db, tenant_id)
+        tid = uuid.UUID(tenant_id)
+        tpl_id = uuid.UUID(template_id)
+
+        result = await db.execute(
+            text("""
+                SELECT id, body_template, variables
+                FROM content_templates
+                WHERE id = :tpl_id AND tenant_id = :tid
+                  AND is_active = true AND is_deleted = false
+                LIMIT 1
+            """),
+            {"tpl_id": tpl_id, "tid": tid},
+        )
+        row = result.fetchone()
+        if not row:
+            logger.warning(
+                "content_engine.render_template_not_found",
+                template_id=template_id,
+                tenant_id=tenant_id,
+            )
+            return ""
+
+        body: str = row.body_template
+        declared_vars: list[str] = row.variables if isinstance(row.variables, list) else []
+        for var in declared_vars:
+            placeholder = f"{{{var}}}"
+            if placeholder in body and var in context:
+                body = body.replace(placeholder, str(context[var]))
+
+        # 递增使用次数（fire-and-forget：失败不影响主流程）
+        try:
+            await db.execute(
+                text("""
+                    UPDATE content_templates
+                    SET usage_count = usage_count + 1, updated_at = NOW()
+                    WHERE id = :tpl_id AND tenant_id = :tid
+                """),
+                {"tpl_id": tpl_id, "tid": tid},
+            )
+            await db.commit()
+        except Exception:
+            await db.rollback()
+
+        return body
+
+    # ------------------------------------------------------------------
+    # 纯业务逻辑（不依赖存储，保留原有算法）
+    # ------------------------------------------------------------------
 
     def generate_content(
         self,
@@ -114,17 +381,9 @@ class ContentEngine:
         event_name: Optional[str] = None,
         tone: Optional[str] = None,
     ) -> dict:
-        """生成营销内容
+        """生成营销内容（纯计算，不读写 DB）
 
         基于内容类型、品牌策略、目标人群自动生成内容。
-
-        Args:
-            content_type: 内容类型（CONTENT_TYPES 之一）
-            brand_id: 品牌ID（用于获取品牌策略卡）
-            target_segment: 目标分群名称
-            dish_name: 菜品名称（可选）
-            event_name: 活动名称（可选）
-            tone: 覆盖品牌调性（可选）
         """
         if content_type not in self.CONTENT_TYPES:
             return {"error": f"不支持的内容类型: {content_type}"}
@@ -133,12 +392,11 @@ class ContentEngine:
         now = datetime.now(timezone.utc).isoformat()
         effective_tone = tone or "温暖亲切"
 
-        # 按内容类型 + 目标人群生成
         generated = self._generate_by_type(
             content_type, brand_id, target_segment, dish_name, event_name, effective_tone
         )
 
-        content = {
+        return {
             "content_id": content_id,
             "content_type": content_type,
             "brand_id": brand_id,
@@ -150,54 +408,18 @@ class ContentEngine:
             "recommended_image_tags": generated["recommended_image_tags"],
             "created_at": now,
         }
-        _generated_contents[content_id] = content
-        return content
-
-    def list_templates(self, content_type: Optional[str] = None) -> list[dict]:
-        """列出模板"""
-        templates = list(_templates.values())
-        if content_type:
-            templates = [t for t in templates if t.get("content_type") == content_type]
-        return templates
-
-    def create_template(
-        self,
-        name: str,
-        content_type: str,
-        body_template: str,
-        variables: list[str],
-    ) -> dict:
-        """创建自定义模板"""
-        template_id = str(uuid.uuid4())[:8]
-        now = datetime.now(timezone.utc).isoformat()
-        template = {
-            "template_id": template_id,
-            "name": name,
-            "content_type": content_type,
-            "body_template": body_template,
-            "variables": variables,
-            "is_builtin": False,
-            "created_at": now,
-        }
-        _templates[template_id] = template
-        return template
 
     def validate_content(self, brand_id: str, content_text: str) -> dict:
-        """品牌合规性校验（委托给 BrandStrategyService）
-
-        此处做基础校验，完整校验由 BrandStrategyService.validate_content_against_brand 完成。
-        """
+        """品牌合规性校验（纯计算，不读写 DB）"""
         errors: list[str] = []
         warnings: list[str] = []
 
-        # 基础校验
         if len(content_text) > 2000:
             warnings.append("内容超过2000字符，建议精简")
 
         if len(content_text) < 10:
             errors.append("内容过短，不足10字符")
 
-        # 通用禁忌词
         general_forbidden = ["最低价", "保证", "100%", "绝对", "第一名", "全网最"]
         for word in general_forbidden:
             if word in content_text:
@@ -208,29 +430,6 @@ class ContentEngine:
             "errors": errors,
             "warnings": warnings,
             "brand_id": brand_id,
-        }
-
-    def get_content_performance(self, content_id: str) -> dict:
-        """获取内容效果数据"""
-        perf = _content_performance.get(content_id)
-        if perf:
-            return perf
-
-        # 默认返回零值
-        content = _generated_contents.get(content_id)
-        if not content:
-            return {"error": f"内容不存在: {content_id}"}
-
-        return {
-            "content_id": content_id,
-            "content_type": content.get("content_type", ""),
-            "send_count": 0,
-            "open_count": 0,
-            "click_count": 0,
-            "conversion_count": 0,
-            "open_rate": 0.0,
-            "click_rate": 0.0,
-            "conversion_rate": 0.0,
         }
 
     def _generate_by_type(
@@ -321,11 +520,6 @@ class ContentEngine:
 # PersonalizedContentEngine — 基于 RFM 分层的个性化内容生成
 # ---------------------------------------------------------------------------
 
-import os
-from uuid import UUID
-
-import httpx
-
 
 class PersonalizedContentEngine:
     """基于模板变量替换 + RFM 分层差异化的个性化内容生成引擎
@@ -403,15 +597,6 @@ class PersonalizedContentEngine:
         3. 按 RFM 等级选择模板变体（VIP 优先 _vip 版本）
         4. 替换模板变量（缺失 key 用默认值兜底）
         5. 返回 {title, description, btntxt}
-
-        Args:
-            template_key:  模板基础 key，如 "churn_recovery" / "birthday" / "generic"
-            customer_id:   会员 UUID
-            tenant_id:     租户 UUID
-            extra_vars:    额外变量（优先级高于会员数据，常用：offer_desc / url）
-
-        Returns:
-            {"title": str, "description": str, "btntxt": str}
         """
         customer = await self._fetch_customer(customer_id, tenant_id)
         vars_dict = self._build_template_vars(customer, extra_vars or {})
@@ -455,21 +640,16 @@ class PersonalizedContentEngine:
             "rfm_level": customer.get("rfm_level") or "S3",
             "total_order_count": str(customer.get("total_order_count") or 0),
             "member_level": customer.get("member_level") or "普通会员",
-            # 以下由 extra_vars 提供，设默认值防止 KeyError
             "offer_desc": "专属优惠",
             "title": "",
             "description": "",
             "btntxt": "查看详情",
         }
-        # extra 覆盖 base（extra 优先）
         base.update(extra)
         return base
 
     def _select_template_variant(self, template_key: str, customer: dict) -> str:
-        """按会员 RFM 等级选择模板变体
-
-        优先级：{template_key}_vip > {template_key}_normal > template_key > generic
-        """
+        """按会员 RFM 等级选择模板变体"""
         rfm_level: str = customer.get("rfm_level") or "S3"
         is_vip: bool = rfm_level in ("S1", "S2")
 
@@ -490,7 +670,6 @@ class PersonalizedContentEngine:
         try:
             return template_str.format(**vars_dict)
         except KeyError:
-            # 逐个替换，缺失 key 降级为空字符串
             import re
             result = template_str
             for key in re.findall(r"\{(\w+)\}", template_str):
@@ -498,13 +677,7 @@ class PersonalizedContentEngine:
             return result
 
     async def _fetch_customer(self, customer_id: UUID, tenant_id: UUID) -> dict:
-        """从 tx-member 获取会员数据
-
-        API: GET /api/v1/member/customers/{customer_id}
-        响应包含：display_name, rfm_level, last_order_at, favorite_dishes,
-                  total_order_count, member_level, wecom_external_userid
-        """
-        import structlog
+        """从 tx-member 获取会员数据"""
         log = structlog.get_logger(__name__)
 
         try:
@@ -529,18 +702,3 @@ class PersonalizedContentEngine:
                 error=str(exc),
             )
             return {}
-
-
-def record_content_performance(content_id: str, metrics: dict) -> None:
-    """记录内容效果数据（辅助函数，用于测试和数据写入）"""
-    _content_performance[content_id] = {
-        "content_id": content_id,
-        **metrics,
-    }
-
-
-def clear_all_content() -> None:
-    """清空所有内容数据（仅测试用）"""
-    _templates.clear()
-    _generated_contents.clear()
-    _content_performance.clear()

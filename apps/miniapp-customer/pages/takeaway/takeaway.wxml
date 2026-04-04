@@ -1,0 +1,102 @@
+<!-- 外卖点餐首页 -->
+<view class="takeaway-page">
+  <!-- 顶部：配送地址 + 预计送达 -->
+  <view class="delivery-header" bindtap="chooseAddress">
+    <view class="address-row">
+      <text class="addr-icon">&#128205;</text>
+      <view class="addr-info" wx:if="{{selectedAddress}}">
+        <text class="addr-name">{{selectedAddress.name}} {{selectedAddress.phone}}</text>
+        <text class="addr-detail">{{selectedAddress.region}} {{selectedAddress.detail}}</text>
+      </view>
+      <view class="addr-info" wx:else>
+        <text class="addr-placeholder">请选择配送地址</text>
+      </view>
+      <text class="addr-arrow">&#9654;</text>
+    </view>
+    <view class="eta-row" wx:if="{{estimatedTime}}">
+      <text class="eta-label">预计送达</text>
+      <text class="eta-value">{{estimatedTime}}</text>
+    </view>
+  </view>
+
+  <!-- 分类Tab横向滚动 -->
+  <scroll-view scroll-x class="category-tabs" enhanced show-scrollbar="{{false}}">
+    <view class="tab-item {{activeCategoryId === item.id ? 'active' : ''}}"
+          wx:for="{{categories}}" wx:key="id"
+          bindtap="selectCategory" data-id="{{item.id}}">
+      <text>{{item.name}}</text>
+    </view>
+  </scroll-view>
+
+  <!-- 加载中 -->
+  <view class="loading-wrap" wx:if="{{loading}}">
+    <text class="loading-text">菜单加载中...</text>
+  </view>
+
+  <!-- 菜品列表 -->
+  <scroll-view scroll-y class="dish-scroll" wx:if="{{!loading}}">
+    <view class="empty-state" wx:if="{{filteredDishes.length === 0}}">
+      <text>暂无菜品</text>
+    </view>
+
+    <view class="dish-item" wx:for="{{filteredDishes}}" wx:key="id">
+      <image class="dish-img"
+             src="{{item.imageUrl || item.image_url || '/assets/dish-placeholder.png'}}"
+             mode="aspectFill" lazy-load />
+      <view class="dish-body">
+        <text class="dish-name">{{item.name || item.dish_name}}</text>
+        <text class="dish-desc" wx:if="{{item.description}}">{{item.description}}</text>
+        <view class="dish-bottom">
+          <text class="dish-price">¥{{item.displayPrice}}</text>
+          <text class="dish-sales" wx:if="{{item.monthlySales}}">月售{{item.monthlySales}}</text>
+          <view class="dish-counter">
+            <view class="counter-btn minus" wx:if="{{item.quantity > 0}}"
+                  catchtap="minusDish" data-id="{{item.id}}">-</view>
+            <text class="counter-num" wx:if="{{item.quantity > 0}}">{{item.quantity}}</text>
+            <view class="counter-btn plus" catchtap="plusDish" data-id="{{item.id}}">+</view>
+          </view>
+        </view>
+      </view>
+    </view>
+  </scroll-view>
+
+  <!-- 浮动购物车栏 -->
+  <view class="cart-float-bar" wx:if="{{cartCount > 0 || true}}">
+    <view class="cart-left" bindtap="toggleCartPopup">
+      <view class="cart-icon-wrap">
+        <text class="cart-icon-text">&#128722;</text>
+        <view class="cart-badge" wx:if="{{cartCount > 0}}">{{cartCount}}</view>
+      </view>
+      <view class="cart-amount-wrap">
+        <text class="cart-total" wx:if="{{cartTotalFen > 0}}">¥{{cartTotalYuan}}</text>
+        <text class="cart-total dim" wx:else>未选购商品</text>
+        <text class="min-delivery-tip" wx:if="{{!reachedMinAmount && minDeliveryFen > 0}}">
+          还差¥{{remainMinYuan}}起送
+        </text>
+      </view>
+    </view>
+    <view class="cart-checkout-btn {{reachedMinAmount ? '' : 'disabled'}}" bindtap="goCheckout">
+      <text>去结算</text>
+    </view>
+  </view>
+
+  <!-- 购物车弹层 -->
+  <view class="cart-popup-mask" wx:if="{{showCartPopup}}" bindtap="toggleCartPopup"></view>
+  <view class="cart-popup" wx:if="{{showCartPopup}}">
+    <view class="cart-popup-header">
+      <text class="cart-popup-title">已选商品</text>
+      <text class="cart-popup-clear" bindtap="clearCart">清空</text>
+    </view>
+    <scroll-view scroll-y class="cart-popup-list">
+      <view class="cart-popup-item" wx:for="{{cartItems}}" wx:key="id">
+        <text class="popup-item-name">{{item.name}}</text>
+        <text class="popup-item-price">¥{{item.displayPrice}}</text>
+        <view class="dish-counter">
+          <view class="counter-btn minus" catchtap="minusDish" data-id="{{item.id}}">-</view>
+          <text class="counter-num">{{item.quantity}}</text>
+          <view class="counter-btn plus" catchtap="plusDish" data-id="{{item.id}}">+</view>
+        </view>
+      </view>
+    </scroll-view>
+  </view>
+</view>

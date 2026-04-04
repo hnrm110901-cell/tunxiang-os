@@ -1,0 +1,68 @@
+<!-- 签到打卡页 -->
+<view class="page">
+
+  <!-- 顶部签到区 -->
+  <view class="checkin-hero">
+    <view class="streak-info">
+      <text class="streak-num">{{streakDays}}</text>
+      <text class="streak-label">天</text>
+    </view>
+    <text class="streak-desc">{{streakDays > 0 ? '已连续签到' + streakDays + '天' : '开始第一次签到吧'}}</text>
+
+    <!-- 大圆形签到按钮 -->
+    <view class="checkin-btn-wrap" bindtap="doCheckin">
+      <view class="checkin-btn {{checkedToday ? 'checked' : ''}}">
+        <text class="checkin-btn-icon">{{checkedToday ? '✓' : '📍'}}</text>
+        <text class="checkin-btn-text">{{checkedToday ? '今日已签到' : '立即签到'}}</text>
+        <text class="checkin-btn-sub">{{checkedToday ? '+5积分已到账' : '签到得5积分'}}</text>
+      </view>
+    </view>
+
+    <!-- 今日累计获得 -->
+    <text class="today-points">今日已获 <text class="today-points-num">{{todayPoints}}</text> 积分</text>
+  </view>
+
+  <!-- 连续签到奖励说明 -->
+  <view class="section">
+    <text class="section-title">连续签到奖励</text>
+    <view class="reward-list">
+      <view class="reward-item {{streakDays >= item.days ? 'reached' : ''}}"
+            wx:for="{{rewardMilestones}}" wx:key="days">
+        <view class="reward-icon-wrap">
+          <text class="reward-icon">{{item.icon}}</text>
+          <view class="reward-check" wx:if="{{streakDays >= item.days}}">✓</view>
+        </view>
+        <text class="reward-days">{{item.days}}天</text>
+        <text class="reward-desc">{{item.desc}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 本月签到日历 -->
+  <view class="section">
+    <view class="calendar-header">
+      <text class="section-title">{{calendarTitle}}</text>
+      <text class="calendar-stats">本月已签 {{monthCheckinCount}} 天</text>
+    </view>
+    <view class="calendar-weekdays">
+      <text wx:for="{{weekdays}}" wx:key="*this" class="weekday">{{item}}</text>
+    </view>
+    <view class="calendar-grid">
+      <!-- 月份开头空白占位 -->
+      <view class="calendar-cell empty" wx:for="{{monthStartOffset}}" wx:key="*this"></view>
+      <!-- 日期格子 -->
+      <view class="calendar-cell {{item.checked ? 'checked' : ''}} {{item.isToday ? 'today' : ''}} {{item.isFuture ? 'future' : ''}}"
+            wx:for="{{calendarDays}}" wx:key="day">
+        <text class="calendar-day">{{item.day}}</text>
+        <text class="calendar-dot" wx:if="{{item.checked}}">✓</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 积分记录入口 -->
+  <view class="section link-row" bindtap="goPointsDetail">
+    <text class="link-label">查看积分明细</text>
+    <text class="link-arrow">›</text>
+  </view>
+
+</view>

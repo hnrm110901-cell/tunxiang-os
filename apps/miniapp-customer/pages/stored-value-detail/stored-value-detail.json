@@ -1,0 +1,7 @@
+{
+  "navigationBarTitleText": "储值明细",
+  "navigationBarBackgroundColor": "#0B1A20",
+  "navigationBarTextStyle": "white",
+  "enablePullDownRefresh": true,
+  "onReachBottomDistance": 100
+}

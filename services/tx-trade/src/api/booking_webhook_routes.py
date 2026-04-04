@@ -525,13 +525,9 @@ async def webhook_wechat(
 
 # ─── Mock 生成端点 ────────────────────────────────────────────────────────────
 
-_MOCK_NAMES = ["王先生", "李女士", "张先生", "陈小姐", "刘先生", "赵女士", "吴先生", "周小姐"]
-_MOCK_PHONES = [
-    "13800138001", "13912345678", "15912345678",
-    "18612345678", "17612345678", "13612345678",
-]
-_MOCK_TABLE_TYPES = ["大厅", "包厢", "靠窗"]
-_MOCK_SPECIAL_REQUESTS = [
+_MOCK_CHANNELS = ["meituan", "dianping"]
+_VALID_TABLE_TYPES = ["大厅", "包厢", "靠窗"]
+_SPECIAL_REQUESTS_POOL = [
     "忌辣，庆生，需要蛋糕",
     "对海鲜过敏",
     "需要婴儿椅",
@@ -540,7 +536,37 @@ _MOCK_SPECIAL_REQUESTS = [
     "不吃香菜",
     "安静包厢",
 ]
-_MOCK_CHANNELS = ["meituan", "dianping"]
+
+
+async def _sample_customer_from_reservations(
+    store_id: str,
+    tenant_id: str,
+    db: AsyncSession,
+) -> tuple[str, str]:
+    """从 reservations 历史中随机取一条预订的客户名/手机。
+    若无历史数据，使用匿名占位符。
+    """
+    from sqlalchemy import text as _text  # noqa: PLC0415
+
+    try:
+        sql = _text("""
+            SELECT customer_name, phone
+            FROM reservations
+            WHERE store_id = :store_id
+              AND tenant_id = :tenant_id
+              AND customer_name IS NOT NULL
+              AND phone IS NOT NULL
+            ORDER BY RANDOM()
+            LIMIT 1
+        """)
+        result = await db.execute(sql, {"store_id": store_id, "tenant_id": tenant_id})
+        row = result.fetchone()
+        if row:
+            return row.customer_name, row.phone
+    except Exception as exc:  # noqa: BLE001 — 查询失败时使用占位符
+        _structlog.warning("booking_mock.customer_fetch_failed", error=str(exc))
+
+    return "测试客户", "138****" + str(random.randint(1000, 9999))  # noqa: S311
 
 
 @router.post("/mock/new-reservation")
@@ -552,6 +578,7 @@ async def mock_new_reservation(
     """生成一条 Mock 预订（美团/大众点评随机），供开发测试用
 
     不需要签名，不会触发真实外部请求。
+    客户名/手机从该门店历史预订中随机取样（无历史时使用匿名占位符）。
     直接写入数据库并返回创建结果。
     """
     tenant_id = _get_tenant_id(request)
@@ -565,40 +592,25 @@ async def mock_new_reservation(
     minute = random.choice([0, 15, 30, 45])  # noqa: S311 — mock data generator
     arrive_dt = arrive_date.replace(hour=hour, minute=minute)
 
-    name = random.choice(_MOCK_NAMES)  # noqa: S311 — mock data generator
-    phone = random.choice(_MOCK_PHONES)  # noqa: S311 — mock data generator
+    # 客户信息从 DB 历史取样
+    name, phone = await _sample_customer_from_reservations(store_id, tenant_id, db)
     party_size = random.randint(2, 8)  # noqa: S311 — mock data generator
-    table_type = random.choice(_MOCK_TABLE_TYPES)  # noqa: S311 — mock data generator
-    special_req = random.choice(_MOCK_SPECIAL_REQUESTS)  # noqa: S311 — mock data generator
+    table_type = random.choice(_VALID_TABLE_TYPES)  # noqa: S311 — mock data generator
+    special_req = random.choice(_SPECIAL_REQUESTS_POOL)  # noqa: S311 — mock data generator
     mock_order_id = f"mock_{channel}_{uuid.uuid4().hex[:12]}"
 
-    normalized: dict
-    if channel == "meituan":
-        normalized = {
-            "source_channel": "meituan",
-            "platform_order_id": mock_order_id,
-            "customer_name": name,
-            "phone": phone,
-            "party_size": party_size,
-            "date": arrive_dt.strftime("%Y-%m-%d"),
-            "time": arrive_dt.strftime("%H:%M"),
-            "room_name": table_type if table_type != "大厅" else None,
-            "special_requests": special_req or None,
-            "status_raw": "confirmed",
-        }
-    else:
-        normalized = {
-            "source_channel": "dianping",
-            "platform_order_id": mock_order_id,
-            "customer_name": name,
-            "phone": phone,
-            "party_size": party_size,
-            "date": arrive_dt.strftime("%Y-%m-%d"),
-            "time": arrive_dt.strftime("%H:%M"),
-            "room_name": table_type if table_type != "大厅" else None,
-            "special_requests": special_req or None,
-            "status_raw": "confirmed",
-        }
+    normalized: dict = {
+        "source_channel": channel,
+        "platform_order_id": mock_order_id,
+        "customer_name": name,
+        "phone": phone,
+        "party_size": party_size,
+        "date": arrive_dt.strftime("%Y-%m-%d"),
+        "time": arrive_dt.strftime("%H:%M"),
+        "room_name": table_type if table_type != "大厅" else None,
+        "special_requests": special_req or None,
+        "status_raw": "confirmed",
+    }
 
     result = await _upsert_reservation(normalized, store_id, db, tenant_id)
 

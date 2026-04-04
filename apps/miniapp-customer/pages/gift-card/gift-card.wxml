@@ -1,0 +1,114 @@
+<!-- 礼品卡 -->
+<view class="page-container">
+
+  <!-- 顶部 Tab -->
+  <view class="main-tab-bar">
+    <view class="main-tab {{mainTab === 'buy' ? 'main-tab-active' : ''}}" bindtap="switchMainTab" data-tab="buy">购买礼品卡</view>
+    <view class="main-tab {{mainTab === 'mine' ? 'main-tab-active' : ''}}" bindtap="switchMainTab" data-tab="mine">我的礼品卡</view>
+  </view>
+
+  <!-- ===== 购买礼品卡 ===== -->
+  <block wx:if="{{mainTab === 'buy'}}">
+
+    <!-- 面额选择 -->
+    <view class="section">
+      <view class="section-title">选择面额</view>
+      <view class="amount-grid">
+        <view
+          class="amount-item {{selectedAmount === item ? 'amount-active' : ''}}"
+          wx:for="{{amounts}}"
+          wx:key="*this"
+          bindtap="selectAmount"
+          data-val="{{item}}"
+        >¥{{item}}</view>
+      </view>
+    </view>
+
+    <!-- 卡面样式选择 -->
+    <view class="section">
+      <view class="section-title">选择卡面</view>
+      <scroll-view class="theme-scroll" scroll-x="true" enhanced="true" show-scrollbar="false">
+        <view class="theme-list">
+          <view
+            class="theme-card theme-{{item.id}} {{selectedTheme === item.id ? 'theme-active' : ''}}"
+            wx:for="{{themes}}"
+            wx:key="id"
+            bindtap="selectTheme"
+            data-id="{{item.id}}"
+          >
+            <view class="theme-icon">{{item.icon}}</view>
+            <view class="theme-name">{{item.name}}</view>
+          </view>
+        </view>
+      </scroll-view>
+    </view>
+
+    <!-- 祝福语 -->
+    <view class="section">
+      <view class="section-title">祝福语</view>
+      <textarea
+        class="bless-input"
+        placeholder="写一句祝福语吧（最多50字）"
+        maxlength="50"
+        value="{{blessMsg}}"
+        bindinput="onBlessInput"
+      />
+      <view class="bless-count">{{blessMsg.length}}/50</view>
+    </view>
+
+    <!-- 收礼人手机号 -->
+    <view class="section">
+      <view class="section-title">收礼人手机号</view>
+      <input
+        class="phone-input"
+        type="number"
+        maxlength="11"
+        placeholder="请输入收礼人手机号"
+        value="{{recipientPhone}}"
+        bindinput="onPhoneInput"
+      />
+    </view>
+
+    <!-- 底部占位 -->
+    <view class="bottom-placeholder"></view>
+
+    <!-- 购买按钮 -->
+    <view class="bottom-bar">
+      <button class="buy-btn" bindtap="doBuy" disabled="{{!canBuy}}">
+        购买礼品卡 ¥{{selectedAmount || 0}}
+      </button>
+    </view>
+  </block>
+
+  <!-- ===== 我的礼品卡 ===== -->
+  <block wx:if="{{mainTab === 'mine'}}">
+
+    <!-- 子 Tab -->
+    <view class="sub-tab-bar">
+      <view class="sub-tab {{mineTab === 'received' ? 'sub-tab-active' : ''}}" bindtap="switchMineTab" data-tab="received">已收到</view>
+      <view class="sub-tab {{mineTab === 'sent' ? 'sub-tab-active' : ''}}" bindtap="switchMineTab" data-tab="sent">已发出</view>
+    </view>
+
+    <!-- 卡片列表 -->
+    <view class="card-list">
+      <view class="list-empty" wx:if="{{myCards.length === 0}}">
+        <text class="empty-icon">🎁</text>
+        <text class="empty-text">暂无礼品卡</text>
+      </view>
+
+      <view class="gift-card-item theme-bg-{{item.theme}}" wx:for="{{myCards}}" wx:key="id">
+        <view class="gc-header">
+          <view class="gc-amount">¥{{item.amountYuan}}</view>
+          <view class="gc-status gc-status-{{item.status}}">{{item.statusText}}</view>
+        </view>
+        <view class="gc-bless" wx:if="{{item.blessMsg}}">{{item.blessMsg}}</view>
+        <view class="gc-footer">
+          <text class="gc-from" wx:if="{{mineTab === 'received'}}">来自 {{item.senderName || item.senderPhone}}</text>
+          <text class="gc-from" wx:if="{{mineTab === 'sent'}}">赠予 {{item.recipientPhone}}</text>
+          <text class="gc-time">{{item.timeStr}}</text>
+        </view>
+      </view>
+    </view>
+  </block>
+
+</view>

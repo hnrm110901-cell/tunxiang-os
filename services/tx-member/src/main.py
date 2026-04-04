@@ -87,6 +87,11 @@ async def lifespan(app: FastAPI):
 
     await init_db()
 
+    # 注入 stamp_card_routes 的 get_db（避免 NotImplementedError stub）
+    import api.stamp_card_routes as _stamp_mod
+    from shared.ontology.src.database import get_db as _shared_get_db
+    _stamp_mod.get_db = _shared_get_db
+
     # 注册 RFM 每日凌晨2点定时任务（Asia/Shanghai）
     _scheduler.add_job(
         lambda: asyncio.create_task(_run_rfm_update()),

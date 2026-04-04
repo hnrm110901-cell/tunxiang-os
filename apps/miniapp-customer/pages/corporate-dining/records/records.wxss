@@ -1,0 +1,309 @@
+/* 企业挂账记录页样式 */
+
+.page-container {
+  min-height: 100vh;
+  background: #0B1A20;
+  padding-bottom: 60rpx;
+}
+
+/* ─── 月份切换器 ─── */
+.month-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24rpx 32rpx;
+  background: #112228;
+  gap: 32rpx;
+}
+
+.month-arrow {
+  width: 64rpx;
+  height: 64rpx;
+  background: #1A3040;
+  border-radius: 32rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.month-arrow.disabled {
+  opacity: 0.3;
+}
+
+.arrow-text {
+  font-size: 40rpx;
+  color: #FF6B2C;
+  line-height: 1;
+}
+
+.month-picker {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
+
+.month-label {
+  font-size: 34rpx;
+  color: #fff;
+  font-weight: bold;
+  min-width: 200rpx;
+  text-align: center;
+}
+
+.month-icon {
+  font-size: 20rpx;
+  color: #FF6B2C;
+}
+
+/* ─── 月度汇总卡片 ─── */
+.summary-card {
+  margin: 24rpx 32rpx 0;
+  background: linear-gradient(135deg, #FF6B2C, #FF8F5E);
+  border-radius: 24rpx;
+  padding: 32rpx;
+}
+
+.summary-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+}
+
+.summary-item {
+  flex: 1;
+  text-align: center;
+}
+
+.s-value {
+  font-size: 36rpx;
+  font-weight: bold;
+  color: #fff;
+  display: block;
+}
+
+.s-value.total {
+  font-size: 40rpx;
+}
+
+.s-value.settled {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.s-value.pending {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.s-label {
+  font-size: 22rpx;
+  color: rgba(255, 255, 255, 0.7);
+  display: block;
+  margin-top: 8rpx;
+}
+
+.summary-divider {
+  width: 1rpx;
+  height: 60rpx;
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.summary-count {
+  margin-top: 20rpx;
+  padding-top: 16rpx;
+  border-top: 1rpx solid rgba(255, 255, 255, 0.2);
+  text-align: center;
+}
+
+.s-count-text {
+  font-size: 22rpx;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+/* ─── 导出按钮 ─── */
+.export-row {
+  display: flex;
+  justify-content: flex-end;
+  padding: 20rpx 32rpx;
+}
+
+.export-btn {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  background: #112228;
+  border: 1rpx solid #1E3A4A;
+  border-radius: 32rpx;
+  padding: 12rpx 28rpx;
+}
+
+.export-icon {
+  font-size: 28rpx;
+}
+
+.export-text {
+  font-size: 24rpx;
+  color: #FF6B2C;
+}
+
+/* ─── 加载骨架 ─── */
+.loading-wrap {
+  padding: 0 32rpx;
+}
+
+.skeleton-item {
+  height: 160rpx;
+  background: #112228;
+  border-radius: 16rpx;
+  margin-bottom: 16rpx;
+  animation: skeleton-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes skeleton-pulse {
+  0% { opacity: 0.5; }
+  50% { opacity: 0.9; }
+  100% { opacity: 0.5; }
+}
+
+/* ─── 记录列表 ─── */
+.records-list {
+  padding: 0 32rpx;
+}
+
+/* 空状态 */
+.empty-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 100rpx 0;
+  gap: 20rpx;
+}
+
+.empty-icon {
+  font-size: 80rpx;
+}
+
+.empty-text {
+  font-size: 28rpx;
+  color: #666;
+}
+
+/* 记录卡片 */
+.record-card {
+  background: #112228;
+  border-radius: 16rpx;
+  padding: 28rpx;
+  margin-bottom: 16rpx;
+}
+
+.record-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16rpx;
+}
+
+.record-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  flex: 1;
+  min-width: 0;
+}
+
+.record-title {
+  font-size: 28rpx;
+  color: #fff;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.status-badge {
+  padding: 4rpx 14rpx;
+  border-radius: 12rpx;
+  flex-shrink: 0;
+}
+
+.status-badge.settled {
+  background: rgba(15, 110, 86, 0.2);
+}
+
+.status-badge.pending {
+  background: rgba(186, 117, 23, 0.2);
+}
+
+.status-text {
+  font-size: 20rpx;
+  color: inherit;
+}
+
+.status-badge.settled .status-text {
+  color: #0F6E56;
+}
+
+.status-badge.pending .status-text {
+  color: #BA7517;
+}
+
+.record-amount {
+  font-size: 32rpx;
+  color: #FF6B2C;
+  font-weight: bold;
+  flex-shrink: 0;
+}
+
+/* 菜品明细 */
+.dish-detail {
+  margin-top: 12rpx;
+  padding: 12rpx 0;
+  border-top: 1rpx solid #1A3040;
+  border-bottom: 1rpx solid #1A3040;
+}
+
+.dish-item-text {
+  font-size: 22rpx;
+  color: #888;
+}
+
+.dish-more {
+  font-size: 22rpx;
+  color: #666;
+}
+
+/* 底部信息 */
+.record-bottom {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 12rpx;
+}
+
+.record-date {
+  font-size: 22rpx;
+  color: #666;
+}
+
+.record-no {
+  font-size: 22rpx;
+  color: #555;
+}
+
+/* 加载更多 */
+.load-more {
+  text-align: center;
+  padding: 36rpx;
+}
+
+.load-more-text {
+  font-size: 26rpx;
+  color: #FF6B2C;
+}
+
+.no-more {
+  text-align: center;
+  padding: 32rpx;
+}
+
+.no-more-text {
+  font-size: 22rpx;
+  color: #444;
+}

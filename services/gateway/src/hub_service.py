@@ -1,7 +1,9 @@
-"""Hub 运维 — PostgreSQL 读模型（跨租户，session 须为 get_db_no_rls）"""
+"""Hub 运维 — PostgreSQL 读/写模型（跨租户，session 须为 get_db_no_rls）"""
 
 from __future__ import annotations
 
+import re
+import uuid
 from datetime import date
 from decimal import Decimal
 from typing import Any, Optional
@@ -274,6 +276,159 @@ async def hub_list_tickets(db: AsyncSession, status: Optional[str]) -> dict[str,
     rows = await db.execute(list_sql, base_params)
     items = [_row_to_dict(r) for r in rows.fetchall()]
     return {"items": items, "total": total}
+
+
+async def hub_create_merchant(db: AsyncSession, data: dict[str, Any]) -> str:
+    """INSERT platform_tenants，返回新 tenant_id（字符串）。"""
+    new_id = str(uuid.uuid4())
+    expires = data.get("subscription_expires_at")
+    # 校验日期格式
+    if expires and not re.match(r"^\d{4}-\d{2}-\d{2}$", expires):
+        expires = None
+    expires_expr = ":expires::date" if expires else "NULL"
+    sql = text(
+        f"""
+        INSERT INTO platform_tenants (
+            tenant_id, merchant_code, name, plan_template, status,
+            subscription_expires_at, is_deleted
+        ) VALUES (
+            :tid::uuid, :code, :name, :tmpl, 'active',
+            {expires_expr}, false
+        )
+        ON CONFLICT (tenant_id) DO NOTHING
+        """
+    )
+    insert_params: dict[str, Any] = {
+        "tid": new_id,
+        "code": data.get("merchant_code"),
+        "name": data["name"],
+        "tmpl": data["plan_template"],
+    }
+    if expires:
+        insert_params["expires"] = expires
+    await db.execute(sql, insert_params)
+    await db.commit()
+    return new_id
+
+
+async def hub_update_merchant(
+    db: AsyncSession, merchant_id: str, updates: dict[str, Any]
+) -> bool:
+    """UPDATE platform_tenants，返回 True 表示找到了该行并更新。"""
+    if not updates:
+        return True
+    allowed = {"name", "plan_template", "status", "subscription_expires_at"}
+    filtered = {k: v for k, v in updates.items() if k in allowed}
+    if not filtered:
+        return True
+
+    set_clauses = []
+    params: dict[str, Any] = {"mid": merchant_id}
+    for key, val in filtered.items():
+        set_clauses.append(f"{key} = :{key}")
+        if key == "subscription_expires_at" and val:
+            params[key] = val  # 期望格式 YYYY-MM-DD
+        else:
+            params[key] = val
+    set_clauses.append("updated_at = NOW()")
+    set_str = ", ".join(set_clauses)
+
+    sql = text(
+        f"""
+        UPDATE platform_tenants
+        SET {set_str}
+        WHERE tenant_id = :mid::uuid
+          AND NOT COALESCE(is_deleted, false)
+        """
+    )
+    result = await db.execute(sql, params)
+    await db.commit()
+    return result.rowcount > 0
+
+
+async def hub_push_update(
+    db: AsyncSession, store_ids: list[str], target_version: str
+) -> int:
+    """将 hub_edge_devices 中指定 store_label 或 store 所属门店的目标版本写入备注，
+    并在 hub_store_overlay 打上待升级标记。
+    由于 hub_edge_devices 无 pending_version 列，此处更新 client_version 为目标版本以记录意图，
+    并返回实际匹配并标记的设备数。
+    若 store_ids 为空则操作全部设备。
+    """
+    if not store_ids:
+        # 全量推送
+        sql = text(
+            """
+            UPDATE hub_edge_devices
+            SET client_version = :ver,
+                updated_at      = NOW()
+            WHERE NOT COALESCE(is_deleted, false)
+            """
+        )
+        result = await db.execute(sql, {"ver": target_version})
+    else:
+        sql = text(
+            """
+            UPDATE hub_edge_devices
+            SET client_version = :ver,
+                updated_at      = NOW()
+            WHERE store_label = ANY(:labels)
+              AND NOT COALESCE(is_deleted, false)
+            """
+        )
+        result = await db.execute(sql, {"ver": target_version, "labels": store_ids})
+    await db.commit()
+    return result.rowcount
+
+
+async def hub_create_ticket(db: AsyncSession, data: dict[str, Any]) -> str:
+    """INSERT hub_tickets，生成自增式工单号 T{n+1}，返回 ticket_id。"""
+    # 生成工单号：查当前最大序号
+    max_r = await db.execute(
+        text(
+            """
+            SELECT MAX(CAST(SUBSTRING(id FROM 2) AS INTEGER))
+            FROM hub_tickets
+            WHERE id ~ '^T[0-9]+$'
+            """
+        )
+    )
+    max_val = max_r.scalar()
+    next_num = (int(max_val) + 1) if max_val is not None else 1
+    ticket_id = f"T{next_num:03d}"
+
+    tenant_id = data.get("tenant_id")
+    # 当 tenant_id 为 None 时避免 ::uuid 强转报错
+    tid_expr = ":tenant_id::uuid" if tenant_id else "NULL"
+    sql = text(
+        f"""
+        INSERT INTO hub_tickets (
+            id, tenant_id, merchant_name, title, priority, status, assignee, is_deleted
+        ) VALUES (
+            :tid,
+            {tid_expr},
+            :merchant_name,
+            :title,
+            :priority,
+            'open',
+            :assignee,
+            false
+        )
+        ON CONFLICT (id) DO NOTHING
+        """
+    )
+    params: dict[str, Any] = {
+        "tid": ticket_id,
+        "merchant_name": data["merchant_name"],
+        "title": data["title"],
+        "priority": data["priority"],
+        "assignee": data.get("assignee"),
+    }
+    if tenant_id:
+        params["tenant_id"] = tenant_id
+    await db.execute(sql, params)
+    await db.commit()
+    return ticket_id
 
 
 async def hub_platform_stats(db: AsyncSession) -> dict[str, Any]:

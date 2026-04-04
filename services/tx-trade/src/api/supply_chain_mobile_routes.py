@@ -4,7 +4,7 @@ from decimal import Decimal
 from typing import Optional
 
 import structlog
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -28,18 +28,6 @@ from ..services.supply_chain_mobile_service import (
 router = APIRouter(prefix="/api/v1/supply", tags=["supply-chain-mobile"])
 log = structlog.get_logger(__name__)
 
-MOCK_TENANT = "00000000-0000-0000-0000-000000000001"
-MOCK_STORE = "00000000-0000-0000-0000-000000000002"
-MOCK_STAFF = "00000000-0000-0000-0000-000000000003"
-
-
-def _tenant(tenant_id: Optional[str] = Query(None)) -> str:
-    return tenant_id or MOCK_TENANT
-
-
-def _store(store_id: Optional[str] = Query(None)) -> str:
-    return store_id or MOCK_STORE
-
 
 class ReceivingItemIn(BaseModel):
     ingredient_id: Optional[str] = None
@@ -61,14 +49,17 @@ class CreateReceivingIn(BaseModel):
 
 
 @router.post("/receiving")
-async def api_create_receiving(body: CreateReceivingIn, db: AsyncSession = Depends(get_db)):
-    tenant_id = MOCK_TENANT
+async def api_create_receiving(
+    body: CreateReceivingIn,
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
+):
     items_dicts = [i.model_dump() for i in body.items]
     result = await create_receiving_order(
         store_id=body.store_id,
         supplier_name=body.supplier_name,
         items=items_dicts,
-        tenant_id=tenant_id,
+        tenant_id=x_tenant_id,
         db=db,
         receiver_id=body.receiver_id,
         notes=body.notes,
@@ -76,7 +67,7 @@ async def api_create_receiving(body: CreateReceivingIn, db: AsyncSession = Depen
     confirmed = await confirm_receiving(
         order_id=result["order_id"],
         received_items=items_dicts,
-        tenant_id=tenant_id,
+        tenant_id=x_tenant_id,
         db=db,
         photo_urls=body.photo_urls,
     )
@@ -85,12 +76,12 @@ async def api_create_receiving(body: CreateReceivingIn, db: AsyncSession = Depen
 
 @router.get("/receiving/history")
 async def api_receiving_history(
-    store_id: str = Query(MOCK_STORE),
+    store_id: str = Query(..., description="门店 ID"),
     days: int = Query(7, ge=1, le=90),
-    tenant_id: str = Depends(_tenant),
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
     db: AsyncSession = Depends(get_db),
 ):
-    history = await get_receiving_history(store_id=store_id, tenant_id=tenant_id, db=db, days=days)
+    history = await get_receiving_history(store_id=store_id, tenant_id=x_tenant_id, db=db, days=days)
     return {"ok": True, "data": history}
 
 
@@ -101,11 +92,14 @@ class StartStocktakeIn(BaseModel):
 
 
 @router.post("/stocktake/start")
-async def api_start_stocktake(body: StartStocktakeIn, db: AsyncSession = Depends(get_db)):
-    tenant_id = MOCK_TENANT
+async def api_start_stocktake(
+    body: StartStocktakeIn,
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
+):
     result = await start_stocktake(
         store_id=body.store_id,
-        tenant_id=tenant_id,
+        tenant_id=x_tenant_id,
         db=db,
         category=body.category,
         initiated_by=body.initiated_by,
@@ -127,15 +121,15 @@ class RecordCountIn(BaseModel):
 async def api_record_count(
     session_id: str,
     body: RecordCountIn,
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
     db: AsyncSession = Depends(get_db),
 ):
-    tenant_id = MOCK_TENANT
     try:
         result = await record_count(
             session_id=session_id,
             ingredient_name=body.ingredient_name,
             actual_qty=body.actual_qty,
-            tenant_id=tenant_id,
+            tenant_id=x_tenant_id,
             db=db,
             ingredient_id=body.ingredient_id,
             unit=body.unit,
@@ -151,10 +145,13 @@ async def api_record_count(
 
 
 @router.post("/stocktake/{session_id}/complete")
-async def api_complete_stocktake(session_id: str, db: AsyncSession = Depends(get_db)):
-    tenant_id = MOCK_TENANT
+async def api_complete_stocktake(
+    session_id: str,
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
+):
     try:
-        report = await complete_stocktake(session_id=session_id, tenant_id=tenant_id, db=db)
+        report = await complete_stocktake(session_id=session_id, tenant_id=x_tenant_id, db=db)
     except StocktakeSessionNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except StocktakeAlreadyCompletedError as e:
@@ -163,22 +160,25 @@ async def api_complete_stocktake(session_id: str, db: AsyncSession = Depends(get
 
 
 @router.get("/stocktake/{session_id}/report")
-async def api_stocktake_report(session_id: str, db: AsyncSession = Depends(get_db)):
-    tenant_id = MOCK_TENANT
-    report = await get_stocktake_report(session_id=session_id, tenant_id=tenant_id, db=db)
+async def api_stocktake_report(
+    session_id: str,
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
+):
+    report = await get_stocktake_report(session_id=session_id, tenant_id=x_tenant_id, db=db)
     return {"ok": True, "data": report}
 
 
 @router.get("/purchase/pending-approvals")
 async def api_pending_approvals(
-    store_id: str = Query(MOCK_STORE),
-    tenant_id: str = Depends(_tenant),
+    store_id: str = Query(..., description="门店 ID"),
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    x_staff_id: str = Header(..., alias="X-Staff-ID"),
     db: AsyncSession = Depends(get_db),
 ):
-    approver_id = MOCK_STAFF
     try:
         result = await get_pending_approvals(
-            approver_id=approver_id, store_id=store_id, tenant_id=tenant_id, db=db
+            approver_id=x_staff_id, store_id=store_id, tenant_id=x_tenant_id, db=db
         )
     except Exception as e:  # noqa: BLE001 — MLPS3-P0: 审批列表获取失败降级为空，最外层兜底
         log.warning("pending_approvals_fallback", error=str(e))
@@ -195,16 +195,16 @@ class ApproveIn(BaseModel):
 async def api_approve_purchase(
     purchase_id: str,
     body: ApproveIn,
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    x_staff_id: str = Header(..., alias="X-Staff-ID"),
     db: AsyncSession = Depends(get_db),
 ):
-    tenant_id = MOCK_TENANT
-    approver_id = MOCK_STAFF
     try:
         result = await approve_purchase(
             purchase_id=purchase_id,
             approved=body.approved,
-            approver_id=approver_id,
-            tenant_id=tenant_id,
+            approver_id=x_staff_id,
+            tenant_id=x_tenant_id,
             db=db,
             comment=body.comment,
         )

@@ -1,0 +1,205 @@
+.page-container {
+  min-height: 100vh;
+  background: #0B1A20;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* ──── 顶部积分卡片 ──── */
+.balance-card {
+  margin: 32rpx;
+  background: linear-gradient(135deg, #FF6B35 0%, #FF8C42 60%, #FFB347 100%);
+  border-radius: 28rpx;
+  padding: 48rpx 40rpx 40rpx;
+  text-align: center;
+  box-shadow: 0 12rpx 40rpx rgba(255,107,53,0.35);
+  position: relative;
+  overflow: hidden;
+}
+/* 装饰圆 */
+.balance-card::before {
+  content: '';
+  position: absolute;
+  top: -60rpx;
+  right: -60rpx;
+  width: 240rpx;
+  height: 240rpx;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.08);
+}
+.balance-card::after {
+  content: '';
+  position: absolute;
+  bottom: -40rpx;
+  left: -40rpx;
+  width: 160rpx;
+  height: 160rpx;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.06);
+}
+
+.balance-label {
+  display: block;
+  font-size: 26rpx;
+  color: rgba(255,255,255,0.85);
+  margin-bottom: 16rpx;
+  position: relative;
+  z-index: 1;
+}
+
+.balance-num {
+  display: block;
+  font-size: 80rpx;
+  font-weight: 800;
+  color: #fff;
+  line-height: 1;
+  letter-spacing: -2rpx;
+  position: relative;
+  z-index: 1;
+}
+
+/* ──── 明细列表 ──── */
+.detail-list {
+  padding: 0 24rpx;
+}
+
+.month-group {
+  margin-bottom: 16rpx;
+}
+
+.month-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24rpx 8rpx 16rpx;
+}
+
+.month-label {
+  font-size: 26rpx;
+  font-weight: 600;
+  color: rgba(255,255,255,0.55);
+  text-transform: uppercase;
+  letter-spacing: 1rpx;
+}
+
+.month-summary {
+  display: flex;
+  gap: 20rpx;
+}
+
+.month-earn {
+  font-size: 22rpx;
+  color: #0F6E56;
+  font-weight: 500;
+}
+.month-spend {
+  font-size: 22rpx;
+  color: #E55A28;
+  font-weight: 500;
+}
+
+.detail-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24rpx;
+  background: #112228;
+  border-radius: 16rpx;
+  margin-bottom: 10rpx;
+  transition: background 150ms;
+}
+.detail-item:active {
+  background: #162d36;
+}
+
+.detail-left {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  flex: 1;
+  min-width: 0;
+}
+
+.detail-icon {
+  width: 60rpx;
+  height: 60rpx;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28rpx;
+  font-weight: 700;
+  flex-shrink: 0;
+  line-height: 60rpx;
+  text-align: center;
+}
+
+.detail-icon.earn {
+  background: rgba(15,110,86,0.18);
+  color: #0F6E56;
+}
+
+.detail-icon.spend {
+  background: rgba(229,90,40,0.14);
+  color: #E55A28;
+}
+
+.detail-info {
+  display: flex;
+  flex-direction: column;
+  gap: 6rpx;
+  flex: 1;
+  min-width: 0;
+}
+
+.detail-desc {
+  font-size: 28rpx;
+  color: #FFFFFF;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.detail-time {
+  font-size: 22rpx;
+  color: rgba(255,255,255,0.3);
+}
+
+.detail-points {
+  font-size: 32rpx;
+  font-weight: 700;
+  min-width: 120rpx;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.detail-points.earn { color: #0F6E56; }
+.detail-points.spend { color: #E55A28; }
+
+/* ──── 状态提示 ──── */
+.loading-tip {
+  text-align: center;
+  padding: 80rpx 0;
+  color: rgba(255,255,255,0.3);
+  font-size: 28rpx;
+}
+.load-more-tip {
+  text-align: center;
+  padding: 40rpx;
+  font-size: 24rpx;
+  color: rgba(255,255,255,0.2);
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 120rpx 0;
+  gap: 16rpx;
+}
+.empty-icon { font-size: 80rpx; }
+.empty-text {
+  font-size: 28rpx;
+  color: rgba(255,255,255,0.3);
+}
+
+.safe-bottom { height: 48rpx; }

@@ -1,5 +1,6 @@
 // 优惠券页
 const app = getApp();
+const { txRequest } = require('../../utils/api');
 
 Page({
   data: {
@@ -29,18 +30,13 @@ Page({
 
   async loadCoupons() {
     try {
-      const res = await wx.request({
-        url: `${app.globalData.apiBase}/api/v1/coupon/my-list`,
-        data: {
-          customer_id: app.globalData.customerId,
-          status: this.data.filter,
-        },
-        header: { 'X-Tenant-ID': app.globalData.tenantId },
-      });
-      if (res.data.ok) {
-        const coupons = (res.data.data.items || []).map(c => this.formatCoupon(c));
-        this.setData({ coupons });
-      }
+      const d = await txRequest(
+        '/api/v1/coupon/my-list?customer_id=' + encodeURIComponent(app.globalData.customerId)
+          + '&status=' + encodeURIComponent(this.data.filter),
+        'GET',
+      );
+      const coupons = (d.items || []).map(c => this.formatCoupon(c));
+      this.setData({ coupons });
     } catch (err) {
       console.error('loadCoupons failed', err);
     }

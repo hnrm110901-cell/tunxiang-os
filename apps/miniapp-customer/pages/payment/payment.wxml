@@ -1,0 +1,170 @@
+<!-- 支付选择页 -->
+<view class="payment-page">
+
+  <!-- 订单摘要卡 -->
+  <view class="order-summary-card">
+    <view class="summary-icon">🛒</view>
+    <view class="summary-body">
+      <text class="summary-title">订单摘要</text>
+      <text class="summary-desc">共 {{totalCount}} 件商品</text>
+    </view>
+    <text class="summary-amount">¥{{totalYuan}}</text>
+  </view>
+
+  <!-- 支付方式 -->
+  <view class="section">
+    <text class="section-title">支付方式</text>
+    <view class="pay-method-list">
+
+      <!-- 微信支付 -->
+      <view class="pay-method-item {{payMethod === 'wechat' ? 'selected' : ''}}"
+            bindtap="onSelectMethod" data-method="wechat">
+        <view class="method-icon wechat-icon">
+          <text class="icon-text">微</text>
+        </view>
+        <view class="method-info">
+          <text class="method-name">微信支付</text>
+        </view>
+        <view class="method-check">
+          <text wx:if="{{payMethod === 'wechat'}}">✓</text>
+        </view>
+      </view>
+
+      <!-- 储值卡支付 -->
+      <view class="pay-method-item {{payMethod === 'stored_value' ? 'selected' : ''}} {{storedValueBalance < finalTotalFen ? 'disabled' : ''}}"
+            bindtap="onSelectMethod" data-method="stored_value">
+        <view class="method-icon sv-icon">
+          <text class="icon-text">储</text>
+        </view>
+        <view class="method-info">
+          <text class="method-name">储值卡支付</text>
+          <text class="method-balance">余额 ¥{{svBalanceYuan}}</text>
+        </view>
+        <view class="method-check">
+          <text wx:if="{{payMethod === 'stored_value'}}">✓</text>
+          <text wx:if="{{storedValueBalance < finalTotalFen && payMethod !== 'stored_value'}}" class="insufficient">余额不足</text>
+        </view>
+      </view>
+
+      <!-- 混合支付 -->
+      <view class="pay-method-item {{payMethod === 'mixed' ? 'selected' : ''}}"
+            bindtap="onSelectMethod" data-method="mixed"
+            wx:if="{{storedValueBalance > 0 && storedValueBalance < finalTotalFen}}">
+        <view class="method-icon mix-icon">
+          <text class="icon-text">混</text>
+        </view>
+        <view class="method-info">
+          <text class="method-name">混合支付</text>
+          <text class="method-balance">储值卡¥{{svBalanceYuan}} + 微信补¥{{mixWechatYuan}}</text>
+        </view>
+        <view class="method-check">
+          <text wx:if="{{payMethod === 'mixed'}}">✓</text>
+        </view>
+      </view>
+
+    </view>
+  </view>
+
+  <!-- 优惠券 -->
+  <view class="section">
+    <text class="section-title">优惠券</text>
+    <view class="coupon-select-area">
+
+      <!-- 已选优惠券 -->
+      <view class="coupon-selected-item" wx:if="{{selectedCoupon}}" bindtap="onChangeCoupon">
+        <view class="coupon-tag">券</view>
+        <view class="coupon-sel-info">
+          <text class="coupon-sel-name">{{selectedCoupon.name || selectedCoupon.title}}</text>
+          <text class="coupon-sel-value">-¥{{couponDiscountYuan}}</text>
+        </view>
+        <text class="coupon-change-btn">更换</text>
+      </view>
+
+      <!-- 无优惠券 -->
+      <view class="coupon-selected-item" wx:if="{{!selectedCoupon && availableCoupons.length > 0}}" bindtap="onChangeCoupon">
+        <view class="coupon-tag">券</view>
+        <text class="coupon-sel-name">{{availableCoupons.length}}张可用</text>
+        <text class="coupon-change-btn">去选择</text>
+      </view>
+
+      <view class="coupon-selected-item no-coupon" wx:if="{{availableCoupons.length === 0}}">
+        <view class="coupon-tag off">券</view>
+        <text class="coupon-sel-name muted">暂无可用优惠券</text>
+      </view>
+
+      <!-- 不使用优惠券 -->
+      <view class="no-coupon-opt {{!selectedCoupon ? 'active' : ''}}" bindtap="onClearCoupon"
+            wx:if="{{availableCoupons.length > 0}}">
+        <text>不使用优惠券</text>
+      </view>
+    </view>
+
+    <!-- 优惠券列表弹层 -->
+    <view class="coupon-popup-mask" wx:if="{{showCouponPopup}}" bindtap="onCloseCouponPopup"></view>
+    <view class="coupon-popup {{showCouponPopup ? 'visible' : ''}}">
+      <view class="popup-header">
+        <text class="popup-title">选择优惠券</text>
+        <text class="popup-close" bindtap="onCloseCouponPopup">关闭</text>
+      </view>
+      <scroll-view scroll-y class="coupon-scroll">
+        <view class="popup-coupon-item {{selectedCoupon && selectedCoupon.id === item.id ? 'selected' : ''}}"
+              wx:for="{{availableCoupons}}" wx:key="id"
+              bindtap="onPickCoupon" data-index="{{index}}">
+          <view class="popup-coupon-value">
+            <text class="popup-coupon-amount">¥{{item.discount_fen ? (item.discount_fen / 100).toFixed(0) : (item.amount_fen / 100).toFixed(0)}}</text>
+          </view>
+          <view class="popup-coupon-info">
+            <text class="popup-coupon-name">{{item.name || item.title}}</text>
+            <text class="popup-coupon-cond">满¥{{(item.min_amount_fen || 0) / 100}}可用</text>
+          </view>
+          <text class="popup-coupon-check" wx:if="{{selectedCoupon && selectedCoupon.id === item.id}}">✓</text>
+        </view>
+      </scroll-view>
+    </view>
+  </view>
+
+  <!-- 积分抵扣 -->
+  <view class="section" wx:if="{{availablePoints > 0}}">
+    <view class="points-row">
+      <view class="points-info">
+        <text class="section-title" style="margin-bottom:0">积分抵扣</text>
+        <text class="points-desc">可用 {{availablePoints}} 积分，抵扣 ¥{{pointsDeductYuan}}</text>
+      </view>
+      <switch checked="{{usePoints}}" bindchange="onTogglePoints" color="#FF6B35" />
+    </view>
+  </view>
+
+  <!-- 金额明细 -->
+  <view class="section amount-detail">
+    <text class="section-title">金额明细</text>
+    <view class="detail-row">
+      <text class="detail-label">菜品合计</text>
+      <text class="detail-value">¥{{totalYuan}}</text>
+    </view>
+    <view class="detail-row" wx:if="{{couponDiscountFen > 0}}">
+      <text class="detail-label">优惠券</text>
+      <text class="detail-value green">-¥{{couponDiscountYuan}}</text>
+    </view>
+    <view class="detail-row" wx:if="{{usePoints && pointsDeductFen > 0}}">
+      <text class="detail-label">积分抵扣</text>
+      <text class="detail-value green">-¥{{pointsDeductYuan}}</text>
+    </view>
+    <view class="detail-divider"></view>
+    <view class="detail-row final">
+      <text class="detail-label">实付金额</text>
+      <text class="detail-value final-price">¥{{payAmountYuan}}</text>
+    </view>
+  </view>
+
+  <!-- 底部占位 -->
+  <view class="bottom-spacer"></view>
+
+  <!-- 确认支付按钮 -->
+  <view class="pay-bar">
+    <view class="pay-btn {{submitting ? 'disabled' : ''}}" bindtap="onConfirmPay">
+      <text class="pay-btn-text">确认支付 ¥{{payAmountYuan}}</text>
+    </view>
+    <view class="pay-safe-area"></view>
+  </view>
+
+</view>

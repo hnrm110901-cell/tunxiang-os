@@ -75,6 +75,32 @@ export async function txFetchData<T>(path: string, options?: RequestInit): Promi
   return resp.data as T;
 }
 
+/** 便捷方法：GET，返回 data 字段 */
+export async function apiGet<T>(path: string): Promise<T> {
+  return txFetchData<T>(path);
+}
+
+/** 便捷方法：POST，返回 data 字段 */
+export async function apiPost<T>(path: string, body?: unknown): Promise<T> {
+  return txFetchData<T>(path, {
+    method: 'POST',
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
+}
+
+/** 便捷方法：PATCH，返回 data 字段 */
+export async function apiPatch<T>(path: string, body?: unknown): Promise<T> {
+  return txFetchData<T>(path, {
+    method: 'PATCH',
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
+}
+
+/** 通用请求（兼容旧调用），返回完整 TxResponse */
+export async function apiRequest<T>(path: string, options?: RequestInit): Promise<TxResponse<T>> {
+  return txFetch<T>(path, options);
+}
+
 interface UseTxAPIResult<T> { data: T | null; loading: boolean; error: string | null; refetch: () => void; }
 
 export function useTxAPI<T>(path: string, deps: unknown[] = []): UseTxAPIResult<T> {

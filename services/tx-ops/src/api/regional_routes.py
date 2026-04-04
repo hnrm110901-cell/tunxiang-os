@@ -4,8 +4,11 @@
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from shared.ontology.src.database import get_db
 
 router = APIRouter(prefix="/api/v1/regional", tags=["regional"])
 
@@ -47,6 +50,7 @@ async def dispatch_rectification(
     region_id: str,
     body: DispatchRectificationRequest,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """E8: 派发区域整改任务"""
     from ..services.regional_management import dispatch_rectification as svc
@@ -54,7 +58,7 @@ async def dispatch_rectification(
     try:
         result = await svc(
             region_id, body.store_id, body.issue_id,
-            body.assignee_id, body.deadline, x_tenant_id, db=None,
+            body.assignee_id, body.deadline, x_tenant_id, db=db,
         )
         return {"ok": True, "data": result}
     except ValueError as e:
@@ -71,13 +75,14 @@ async def track_rectification(
     rectification_id: str,
     body: TrackRectificationRequest,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """E8: 更新整改进度"""
     from ..services.regional_management import track_rectification as svc
 
     try:
         result = await svc(
-            rectification_id, x_tenant_id, db=None,
+            rectification_id, x_tenant_id, db=db,
             new_status=body.new_status, note=body.note,
         )
         return {"ok": True, "data": result}
@@ -95,6 +100,7 @@ async def submit_review(
     rectification_id: str,
     body: SubmitReviewRequest,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """E8: 提交整改复查"""
     from ..services.regional_management import submit_review as svc
@@ -102,7 +108,7 @@ async def submit_review(
     try:
         result = await svc(
             rectification_id, body.reviewer_id, body.result,
-            x_tenant_id, db=None, comment=body.comment,
+            x_tenant_id, db=db, comment=body.comment,
         )
         return {"ok": True, "data": result}
     except ValueError as e:
@@ -118,11 +124,12 @@ async def submit_review(
 async def get_regional_scorecard(
     region_id: str,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """E8: 区域红黄绿评分卡"""
     from ..services.regional_management import get_regional_scorecard as svc
 
-    result = await svc(region_id, x_tenant_id, db=None)
+    result = await svc(region_id, x_tenant_id, db=db)
     return {"ok": True, "data": result}
 
 
@@ -136,11 +143,12 @@ async def cross_store_benchmark(
     region_id: str,
     metric: str,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """E8: 跨店对标"""
     from ..services.regional_management import cross_store_benchmark as svc
 
-    result = await svc(metric, region_id, x_tenant_id, db=None)
+    result = await svc(metric, region_id, x_tenant_id, db=db)
     return {"ok": True, "data": result}
 
 
@@ -154,11 +162,12 @@ async def generate_regional_report(
     region_id: str,
     month: str,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """E8: 区域月报"""
     from ..services.regional_management import generate_regional_report as svc
 
-    result = await svc(region_id, month, x_tenant_id, db=None)
+    result = await svc(region_id, month, x_tenant_id, db=db)
     return {"ok": True, "data": result}
 
 
@@ -171,9 +180,10 @@ async def generate_regional_report(
 async def get_rectification_archive(
     region_id: str,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """E8: 整改归档"""
     from ..services.regional_management import get_rectification_archive as svc
 
-    result = await svc(region_id, x_tenant_id, db=None)
+    result = await svc(region_id, x_tenant_id, db=db)
     return {"ok": True, "data": result}

@@ -127,12 +127,12 @@ async function fetchCatalogDishes(storeId: string, keyword?: string): Promise<{ 
   return txFetch(`/api/v1/menu/dishes?${params.toString()}`);
 }
 
-// ─── 常量 ─────────────────────────────────────────────────────────────────────
+// ─── 门店选项类型 ────────────────────────────────────────────────────────────
 
-const MOCK_STORES = [
-  { id: 'store_001', name: '尝在一起·芙蓉路店' },
-  { id: 'store_002', name: '尝在一起·解放西路店' },
-];
+interface StoreOption {
+  id: string;
+  name: string;
+}
 
 // ─── 批量导入 Modal ───────────────────────────────────────────────────────────
 
@@ -330,10 +330,20 @@ const BatchImportModal: React.FC<BatchImportModalProps> = ({
   );
 };
 
+async function fetchStores(): Promise<StoreOption[]> {
+  try {
+    const res = await txFetch<{ items: StoreOption[] }>('/api/v1/menu/dish-dept-mappings/stores');
+    return res?.items ?? [];
+  } catch {
+    return [];
+  }
+}
+
 // ─── 主页面 ───────────────────────────────────────────────────────────────────
 
 export function DishDeptMappingPage() {
-  const [storeId, setStoreId] = useState(MOCK_STORES[0].id);
+  const [stores, setStores] = useState<StoreOption[]>([]);
+  const [storeId, setStoreId] = useState('');
   const [departments, setDepartments] = useState<KdsDepartment[]>([]);
   const [selectedDeptId, setSelectedDeptId] = useState<string>('');
   const [mappings, setMappings] = useState<DishDeptMapping[]>([]);
@@ -386,7 +396,18 @@ export function DishDeptMappingPage() {
     }
   }, [storeId]);
 
+  // 加载门店列表
   useEffect(() => {
+    fetchStores().then((list) => {
+      setStores(list);
+      if (list.length > 0 && !storeId) {
+        setStoreId(list[0].id);
+      }
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!storeId) return;
     loadDepartments();
     loadUnassigned();
   }, [storeId]);
@@ -553,7 +574,8 @@ export function DishDeptMappingPage() {
             value={storeId}
             onChange={handleStoreChange}
             style={{ width: 200 }}
-            options={MOCK_STORES.map((s) => ({ label: s.name, value: s.id }))}
+            options={stores.map((s) => ({ label: s.name, value: s.id }))}
+            placeholder="选择门店"
           />
           <Button
             icon={<ReloadOutlined />}

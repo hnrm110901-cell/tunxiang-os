@@ -1,0 +1,72 @@
+<!-- 储值卡充值 -->
+<view class="page-container">
+
+  <!-- 会员卡样式区域 -->
+  <view class="balance-card">
+    <view class="balance-card-inner">
+      <view class="balance-label">当前余额(元)</view>
+      <view class="balance-amount">{{balanceYuan}}</view>
+      <view class="balance-level">{{levelName}}</view>
+    </view>
+    <view class="balance-detail-link" bindtap="goDetail">
+      <text>充值明细</text>
+      <text class="arrow-right">></text>
+    </view>
+  </view>
+
+  <!-- 充值面额选择 -->
+  <view class="section">
+    <view class="section-title">选择充值金额</view>
+    <view class="plan-grid">
+      <view
+        class="plan-item {{selectedIndex === index ? 'plan-active' : ''}}"
+        wx:for="{{plans}}"
+        wx:key="index"
+        bindtap="selectPlan"
+        data-index="{{index}}"
+      >
+        <view class="plan-amount">¥{{item.amountYuan}}</view>
+        <view class="plan-bonus" wx:if="{{item.bonusYuan > 0}}">送¥{{item.bonusYuan}}</view>
+        <view class="plan-bonus plan-bonus-none" wx:if="{{item.isCustom}}">自定义</view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 自定义金额输入 -->
+  <view class="custom-input-wrap" wx:if="{{showCustomInput}}">
+    <view class="custom-input-label">输入充值金额(元)</view>
+    <input
+      class="custom-input"
+      type="digit"
+      placeholder="最低10元"
+      value="{{customAmount}}"
+      bindinput="onCustomInput"
+    />
+  </view>
+
+  <!-- 充值说明 -->
+  <view class="section rules-section">
+    <view class="rules-header" bindtap="toggleRules">
+      <text class="section-title">充值说明</text>
+      <text class="rules-arrow {{showRules ? 'rules-arrow-open' : ''}}">></text>
+    </view>
+    <view class="rules-body" wx:if="{{showRules}}">
+      <view class="rule-item">1. 充值金额实时到账，可用于门店消费</view>
+      <view class="rule-item">2. 赠送金额与充值金额同时到账</view>
+      <view class="rule-item">3. 储值余额不可提现、不可转让</view>
+      <view class="rule-item">4. 储值卡有效期为充值之日起3年</view>
+      <view class="rule-item">5. 如需退款请联系门店客服</view>
+    </view>
+  </view>
+
+  <!-- 底部占位 -->
+  <view class="bottom-placeholder"></view>
+
+  <!-- 底部固定按钮 -->
+  <view class="bottom-bar">
+    <button class="recharge-btn" bindtap="doRecharge" disabled="{{!canRecharge}}">
+      立即充值 ¥{{rechargeAmountYuan}}
+    </button>
+  </view>
+
+</view>

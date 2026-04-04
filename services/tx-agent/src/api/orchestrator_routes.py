@@ -125,6 +125,23 @@ async def start_orchestration(
     }
 
 
+@router.get("/skill-summary")
+async def get_skill_summary() -> dict[str, Any]:
+    """
+    返回当前 Skill 注册状态摘要（不需要 X-Tenant-ID，元数据是全局的）。
+
+    附加信息，不影响 AgentOrchestrator 核心编排逻辑。
+    """
+    from ..agents.skill_aware_orchestrator import SkillAwareOrchestrator
+
+    summary = SkillAwareOrchestrator.get_ontology_summary()
+    logger.info(
+        "orchestrator_skill_summary_queried",
+        total_skills=summary["total_skills"],
+    )
+    return {"ok": True, "data": summary}
+
+
 @router.get("/{plan_id}")
 async def get_plan_history(plan_id: str) -> dict[str, Any]:
     """查询执行计划历史（预留接口，待接入 AgentDecisionLog 持久化后实现）"""

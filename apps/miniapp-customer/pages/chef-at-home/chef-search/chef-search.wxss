@@ -1,0 +1,268 @@
+/* 大厨搜索页样式 */
+
+page {
+  background: #FFFFFF;
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", "Microsoft YaHei", sans-serif;
+}
+
+.page {
+  min-height: 100vh;
+  background: #FFFFFF;
+}
+
+/* ─── 顶部搜索栏 ─── */
+
+.top-bar {
+  display: flex;
+  align-items: center;
+  padding: 20rpx 24rpx;
+  background: #FFFFFF;
+  gap: 16rpx;
+  border-bottom: 2rpx solid #E8E6E1;
+}
+
+.back-btn {
+  width: 64rpx;
+  height: 64rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.back-icon {
+  font-size: 48rpx;
+  color: #2C2C2A;
+  font-weight: 300;
+}
+
+.search-wrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  height: 72rpx;
+  background: #F8F7F5;
+  border-radius: 36rpx;
+  padding: 0 24rpx;
+  gap: 12rpx;
+  min-width: 0;
+}
+
+.search-icon {
+  font-size: 30rpx;
+  color: #B4B2A9;
+  flex-shrink: 0;
+}
+
+.search-input {
+  flex: 1;
+  font-size: 28rpx;
+  color: #2C2C2A;
+  background: transparent;
+  min-width: 0;
+  height: 72rpx;
+  line-height: 72rpx;
+}
+
+.search-input-placeholder {
+  color: #B4B2A9;
+  font-size: 28rpx;
+}
+
+.clear-btn {
+  width: 44rpx;
+  height: 44rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.clear-icon {
+  font-size: 28rpx;
+  color: #B4B2A9;
+}
+
+.cancel-btn {
+  flex-shrink: 0;
+  padding: 0 8rpx;
+  font-size: 28rpx;
+  color: #5F5E5A;
+}
+
+/* ─── 搜索结果 Header ─── */
+
+.result-header {
+  padding: 24rpx 32rpx 8rpx;
+}
+
+.result-count {
+  font-size: 26rpx;
+  color: #B4B2A9;
+}
+
+/* ─── 厨师卡片（与首页一致） ─── */
+
+.chef-card {
+  display: flex;
+  align-items: flex-start;
+  background: #FFFFFF;
+  margin: 16rpx 24rpx;
+  border-radius: 24rpx;
+  padding: 28rpx 24rpx;
+  box-shadow: 0 2rpx 12rpx rgba(0, 0, 0, 0.05);
+  gap: 24rpx;
+  border: 2rpx solid #E8E6E1;
+}
+
+.chef-avatar {
+  width: 120rpx;
+  height: 120rpx;
+  border-radius: 60rpx;
+  background: #F0EDE6;
+  flex-shrink: 0;
+}
+
+.chef-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10rpx;
+}
+
+.chef-name-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10rpx;
+}
+
+.chef-name {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #2C2C2A;
+}
+
+.badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8rpx;
+}
+
+.badge {
+  font-size: 20rpx;
+  color: #0F6E56;
+  background: #E8F5F0;
+  padding: 4rpx 12rpx;
+  border-radius: 8rpx;
+}
+
+.chef-specialty {
+  font-size: 26rpx;
+  color: #5F5E5A;
+}
+
+.chef-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12rpx;
+}
+
+.chef-rating {
+  font-size: 24rpx;
+  color: #5F5E5A;
+}
+
+.price-book {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+}
+
+.chef-price {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #FF6B35;
+}
+
+.book-btn {
+  height: 60rpx;
+  padding: 0 28rpx;
+  background: #FFF3ED;
+  border-radius: 30rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26rpx;
+  color: #FF6B35;
+  font-weight: 500;
+  flex-shrink: 0;
+  border: 2rpx solid #FF6B35;
+}
+
+/* ─── 历史搜索 ─── */
+
+.history-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 32rpx 32rpx 16rpx;
+}
+
+.history-title {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #2C2C2A;
+}
+
+.clear-history {
+  padding: 8rpx 16rpx;
+}
+
+.clear-history-text {
+  font-size: 26rpx;
+  color: #B4B2A9;
+}
+
+.history-tags {
+  display: flex;
+  flex-wrap: wrap;
+  padding: 0 24rpx;
+  gap: 16rpx;
+}
+
+.history-tag {
+  padding: 12rpx 28rpx;
+  background: #F8F7F5;
+  border-radius: 32rpx;
+  font-size: 26rpx;
+  color: #5F5E5A;
+}
+
+/* ─── 状态提示 ─── */
+
+.state-tip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 100rpx 32rpx;
+  gap: 16rpx;
+}
+
+.state-icon {
+  font-size: 80rpx;
+}
+
+.state-text {
+  font-size: 28rpx;
+  color: #B4B2A9;
+}
+
+.state-sub {
+  font-size: 24rpx;
+  color: #B4B2A9;
+}

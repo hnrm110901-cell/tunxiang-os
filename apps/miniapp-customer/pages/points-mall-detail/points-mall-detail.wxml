@@ -1,0 +1,99 @@
+<!-- 积分商城 — 商品详情页 -->
+<view class="page-container" wx:if="{{!pageLoading}}">
+
+  <!-- 商品大图轮播 -->
+  <swiper class="img-swiper"
+          indicator-dots="{{images.length > 1}}"
+          indicator-color="rgba(255,255,255,0.3)"
+          indicator-active-color="#FF6B35"
+          autoplay circular>
+    <swiper-item wx:for="{{images}}" wx:key="*this">
+      <image class="swiper-img" src="{{item}}" mode="aspectFill" />
+    </swiper-item>
+  </swiper>
+
+  <!-- 积分价格 + 库存 -->
+  <view class="price-card">
+    <view class="price-row">
+      <view class="price-main">
+        <text class="price-num">{{detail.pointsCost}}</text>
+        <text class="price-unit">积分</text>
+      </view>
+      <text class="price-original" wx:if="{{detail.originalPrice}}">¥{{detail.originalPrice}}</text>
+    </view>
+    <view class="stats-row">
+      <text class="stat-tag">剩余 {{detail.stock}} 件</text>
+      <text class="stat-tag">已兑换 {{detail.exchangedCount}} 人</text>
+    </view>
+  </view>
+
+  <!-- 商品名称 -->
+  <view class="name-card">
+    <text class="item-name">{{detail.name}}</text>
+    <text class="item-category">{{detail.categoryLabel}}</text>
+  </view>
+
+  <!-- 商品详情 -->
+  <view class="section-card">
+    <text class="section-title">商品详情</text>
+    <rich-text class="rich-content" nodes="{{detail.richContent}}"></rich-text>
+    <text class="plain-desc" wx:if="{{!detail.richContent}}">{{detail.description}}</text>
+  </view>
+
+  <!-- 使用说明（折叠区） -->
+  <view class="section-card">
+    <view class="section-header" bindtap="toggleUsage">
+      <text class="section-title">使用说明</text>
+      <text class="toggle-arrow {{showUsage ? 'open' : ''}}">></text>
+    </view>
+    <view class="usage-content" wx:if="{{showUsage}}">
+      <view class="usage-item" wx:for="{{usageRules}}" wx:key="*this">
+        <text class="usage-dot">·</text>
+        <text class="usage-text">{{item}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 底部安全区占位 -->
+  <view style="height: 140rpx;"></view>
+</view>
+
+<!-- 加载中 -->
+<view class="loading-page" wx:if="{{pageLoading}}">
+  <text class="loading-text">加载中...</text>
+</view>
+
+<!-- 底部固定按钮 -->
+<view class="bottom-bar">
+  <button class="redeem-action-btn {{canRedeem ? '' : 'disabled'}}"
+          bindtap="onTapRedeem"
+          disabled="{{!canRedeem}}">
+    {{detail.stock <= 0 ? '已售罄' : (pointsBalance < detail.pointsCost ? '积分不足' : '立即兑换 ' + detail.pointsCost + '积分')}}
+  </button>
+</view>
+
+<!-- 兑换确认弹窗 -->
+<view class="popup-mask" wx:if="{{showConfirm}}" bindtap="closeConfirm"></view>
+<view class="confirm-popup {{showConfirm ? 'show' : ''}}">
+  <view class="popup-header">
+    <text class="popup-title">确认兑换</text>
+    <view class="popup-close" bindtap="closeConfirm">✕</view>
+  </view>
+  <view class="confirm-item-name">{{detail.name}}</view>
+  <view class="confirm-row">
+    <text class="confirm-label">消耗积分</text>
+    <text class="confirm-val cost">-{{detail.pointsCost}}</text>
+  </view>
+  <view class="confirm-row">
+    <text class="confirm-label">当前积分</text>
+    <text class="confirm-val">{{pointsBalance}}</text>
+  </view>
+  <view class="confirm-row">
+    <text class="confirm-label">兑换后剩余</text>
+    <text class="confirm-val remain">{{pointsBalance - detail.pointsCost}}</text>
+  </view>
+  <view class="confirm-actions">
+    <button class="btn-cancel" bindtap="closeConfirm">取消</button>
+    <button class="btn-confirm" bindtap="doRedeem">确认兑换</button>
+  </view>
+</view>

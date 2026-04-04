@@ -3,12 +3,16 @@
  *
  * 非模态浮动提示，无建议时 height=0 不占空间。
  * 每90秒自动刷新。支持逐条忽略。
+ * API: GET /api/v1/brain/service-suggestions?table_id={tableId}
+ *      POST /api/v1/brain/service-suggestions/{id}/feedback  { useful }
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { txFetch } from '../api';
 
 // ─── 类型 ───
 
 export interface ServiceSuggestion {
+  id?: string;
   type: 'upsell' | 'refill' | 'dessert' | 'checkout_hint';
   message: string;
   urgency: 'info' | 'suggest' | 'urgent';
@@ -17,54 +21,34 @@ export interface ServiceSuggestion {
 }
 
 interface Props {
-  orderId: string;
+  tableId: string;
+  orderId?: string;
   onAction: (suggestion: ServiceSuggestion) => void;
 }
 
 // ─── API ───
 
-const API_BASE = import.meta.env.VITE_API_URL || '';
-
-async function fetchSuggestions(orderId: string): Promise<ServiceSuggestion[]> {
+async function fetchSuggestions(tableId: string): Promise<ServiceSuggestion[]> {
   try {
-    const res = await fetch(`${API_BASE}/api/v1/service/suggestions/${orderId}`, {
-      headers: { 'X-Tenant-ID': 'demo-tenant' },
-    });
-    if (!res.ok) return MOCK_SUGGESTIONS;
-    const json = await res.json();
-    return json.data ?? [];
-  } catch {
-    return MOCK_SUGGESTIONS;
-  }
-}
-
-async function dismissSuggestion(orderId: string, suggestionType: string): Promise<void> {
-  try {
-    await fetch(
-      `${API_BASE}/api/v1/service/suggestions/${orderId}/${suggestionType}/dismiss`,
-      { method: 'POST', headers: { 'X-Tenant-ID': 'demo-tenant' } }
+    const res = await txFetch<{ items: ServiceSuggestion[] }>(
+      `/api/v1/brain/service-suggestions?table_id=${encodeURIComponent(tableId)}`
     );
+    return res?.items ?? [];
   } catch {
-    // 忽略网络错误，前端本地也记录
+    return [];
   }
 }
 
-// ─── Mock 降级数据 ───
-
-const MOCK_SUGGESTIONS: ServiceSuggestion[] = [
-  {
-    type: 'upsell',
-    message: '用餐42分钟，人均¥65，建议推荐加菜',
-    urgency: 'suggest',
-    action_label: '查看推荐',
-  },
-  {
-    type: 'refill',
-    message: '可乐已上桌23分钟，可询问是否续杯',
-    urgency: 'info',
-    action_label: '加菜',
-  },
-];
+async function submitFeedback(suggestionId: string, useful: boolean): Promise<void> {
+  try {
+    await txFetch(`/api/v1/brain/service-suggestions/${encodeURIComponent(suggestionId)}/feedback`, {
+      method: 'POST',
+      body: JSON.stringify({ useful }),
+    });
+  } catch {
+    // 静默处理，不影响前端体验
+  }
+}
 
 // ─── 样式工具 ───
 
@@ -165,16 +149,16 @@ function SuggestionRow({ suggestion, onAction, onDismiss }: SuggestionRowProps) 
 
 // ─── 主组件 ───
 
-export function ServiceSuggestionCard({ orderId, onAction }: Props) {
+export function ServiceSuggestionCard({ tableId, onAction }: Props) {
   const [suggestions, setSuggestions] = useState<ServiceSuggestion[]>([]);
   // 本地已忽略集合（避免等待 API 往返产生闪烁）
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const load = useCallback(async () => {
-    const list = await fetchSuggestions(orderId);
+    const list = await fetchSuggestions(tableId);
     setSuggestions(list);
-  }, [orderId]);
+  }, [tableId]);
 
   useEffect(() => {
     load();
@@ -185,15 +169,19 @@ export function ServiceSuggestionCard({ orderId, onAction }: Props) {
   }, [load]);
 
   const handleDismiss = useCallback(
-    async (type: string) => {
-      setDismissed((prev) => new Set([...prev, type]));
-      await dismissSuggestion(orderId, type);
+    async (suggestion: ServiceSuggestion) => {
+      const key = suggestion.id ?? suggestion.type;
+      setDismissed((prev) => new Set([...prev, key]));
+      // 反馈无用
+      if (suggestion.id) {
+        await submitFeedback(suggestion.id, false);
+      }
     },
-    [orderId]
+    []
   );
 
-  // 过滤已本地忽略的建议
-  const visible = suggestions.filter((s) => !dismissed.has(s.type));
+  // 过滤已本地忽略的建议（支持按 id 或 type 忽略）
+  const visible = suggestions.filter((s) => !dismissed.has(s.id ?? s.type));
 
   if (visible.length === 0) return null;
 
@@ -241,8 +229,11 @@ export function ServiceSuggestionCard({ orderId, onAction }: Props) {
         <SuggestionRow
           key={s.type}
           suggestion={s}
-          onAction={() => onAction(s)}
-          onDismiss={() => handleDismiss(s.type)}
+          onAction={() => {
+            if (s.id) submitFeedback(s.id, true);
+            onAction(s);
+          }}
+          onDismiss={() => handleDismiss(s)}
         />
       ))}
     </div>

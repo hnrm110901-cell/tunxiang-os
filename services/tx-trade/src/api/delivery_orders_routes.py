@@ -278,7 +278,7 @@ async def webhook_eleme_mock(request: Request):
 
 # ─── Mock 订单生成（开发调试） ──────────────────────────────────────────────────
 
-_MOCK_PLATFORMS = ["meituan", "eleme", "douyin", "wechat"]
+_VALID_PLATFORMS = ["meituan", "eleme", "douyin", "wechat"]
 _PLATFORM_NAMES = {
     "meituan": "美团外卖",
     "eleme": "饿了么",
@@ -286,20 +286,14 @@ _PLATFORM_NAMES = {
     "wechat": "微信外卖",
 }
 
-_MOCK_DISHES: list[dict] = [
-    {"name": "糖醋里脊", "price_fen": 3800, "spec": ""},
-    {"name": "扁豆炒肉", "price_fen": 2800, "spec": ""},
-    {"name": "夫妻肺片", "price_fen": 3200, "spec": ""},
-    {"name": "麻婆豆腐", "price_fen": 2200, "spec": "微辣"},
-    {"name": "红烧肉", "price_fen": 4200, "spec": ""},
-    {"name": "番茄炒蛋", "price_fen": 1800, "spec": ""},
-    {"name": "米饭", "price_fen": 200, "spec": ""},
-    {"name": "可乐", "price_fen": 600, "spec": "冰"},
-    {"name": "老干妈炒饭", "price_fen": 1600, "spec": ""},
-    {"name": "酸辣土豆丝", "price_fen": 1400, "spec": ""},
-]
+_PLATFORM_SHORT_PREFIXES = {
+    "meituan": "MT",
+    "eleme": "EL",
+    "douyin": "DY",
+    "wechat": "WX",
+}
 
-_MOCK_NOTES = [
+_NOTES_POOL = [
     "",
     "不要香菜",
     "少辣",
@@ -311,43 +305,96 @@ _MOCK_NOTES = [
     "",
 ]
 
-_MOCK_ADDRESSES = [
-    "湖南省长沙市雨花区某某大厦 1201",
-    "湖南省长沙市天心区五一广场附近写字楼 8F",
-    "湖南省长沙市岳麓区麓谷创业基地 C栋",
-]
-
-_MOCK_CUSTOMER_NAMES = ["张**", "李**", "王**", "陈**", "赵**"]
-
-_MOCK_SHORT_PREFIXES = {
-    "meituan": "MT",
-    "eleme": "EL",
-    "douyin": "DY",
-    "wechat": "WX",
-}
-
 
 def _random_order_no(platform: str) -> str:
     suffix = "".join(random.choices(string.digits, k=8))
-    return f"{_MOCK_SHORT_PREFIXES.get(platform, 'XX')}{suffix}"
+    return f"{_PLATFORM_SHORT_PREFIXES.get(platform, 'XX')}{suffix}"
 
 
-def _build_mock_items() -> tuple[list[dict], int]:
-    """随机选 2-4 个菜品，计算合计金额"""
-    count = random.randint(2, 4)
-    dishes = random.sample(_MOCK_DISHES, k=min(count, len(_MOCK_DISHES)))
+async def _fetch_dish_items_from_db(
+    store_id: uuid.UUID,
+    tenant_id: uuid.UUID,
+    db: AsyncSession,
+) -> tuple[list[dict], int]:
+    """从 delivery_orders 历史中提取该门店实际存在的菜品，随机选 2-4 个组合。
+    若 DB 查询失败或无历史数据，返回空列表+0。
+    """
+    from sqlalchemy import text as _text  # noqa: PLC0415
+
+    try:
+        sql = _text("""
+            SELECT DISTINCT elem->>'name' AS name,
+                   (elem->>'price_fen')::int AS price_fen,
+                   COALESCE(elem->>'spec', '') AS spec
+            FROM delivery_orders,
+                 jsonb_array_elements(items_json::jsonb) AS elem
+            WHERE store_id = :store_id
+              AND tenant_id = :tenant_id
+              AND items_json IS NOT NULL
+              AND jsonb_typeof(items_json::jsonb) = 'array'
+              AND elem->>'name' IS NOT NULL
+              AND (elem->>'price_fen')::int > 0
+            LIMIT 50
+        """)
+        result = await db.execute(sql, {"store_id": store_id, "tenant_id": tenant_id})
+        rows = result.fetchall()
+    except Exception as exc:  # noqa: BLE001 — 菜品查询失败时生成空订单
+        logger.warning("delivery_order.mock_dish_fetch_failed", error=str(exc))
+        return [], 0
+
+    if not rows:
+        return [], 0
+
+    count = random.randint(2, min(4, len(rows)))
+    chosen = random.sample(rows, k=count)
     items = []
     subtotal = 0
-    for dish in dishes:
+    for row in chosen:
         qty = random.randint(1, 2)
-        subtotal += dish["price_fen"] * qty
+        price_fen = row.price_fen or 1000
+        subtotal += price_fen * qty
         items.append({
-            "name": dish["name"],
+            "name": row.name,
             "qty": qty,
-            "price_fen": dish["price_fen"],
-            "spec": dish["spec"],
+            "price_fen": price_fen,
+            "spec": row.spec or "",
         })
     return items, subtotal
+
+
+async def _fetch_customer_sample_from_db(
+    store_id: uuid.UUID,
+    tenant_id: uuid.UUID,
+    db: AsyncSession,
+) -> tuple[str, str, str]:
+    """从 delivery_orders 历史中随机取一条订单的客户名/手机/地址。
+    若无历史数据，使用通用占位符（不暴露真实 PII）。
+    """
+    from sqlalchemy import text as _text  # noqa: PLC0415
+
+    try:
+        sql = _text("""
+            SELECT customer_name, customer_phone, delivery_address
+            FROM delivery_orders
+            WHERE store_id = :store_id
+              AND tenant_id = :tenant_id
+              AND customer_name IS NOT NULL
+            ORDER BY RANDOM()
+            LIMIT 1
+        """)
+        result = await db.execute(sql, {"store_id": store_id, "tenant_id": tenant_id})
+        row = result.fetchone()
+        if row:
+            return (
+                row.customer_name,
+                row.customer_phone or "138****0000",
+                row.delivery_address or "",
+            )
+    except Exception as exc:  # noqa: BLE001 — 客户信息查询失败时使用占位符
+        logger.warning("delivery_order.mock_customer_fetch_failed", error=str(exc))
+
+    # 无历史数据时使用匿名占位符
+    return "测试用户", "138****" + "".join(random.choices(string.digits, k=4)), "（调试地址）"
 
 
 @router.post("/mock/new-order", summary="生成 mock 外卖新订单（开发调试）")
@@ -361,7 +408,8 @@ async def mock_new_order(
     生成一条 mock 外卖新订单（状态为 pending_accept），供开发/演示使用。
 
     - 随机选择平台（或指定 platform 参数）
-    - 随机菜品 2-4 个
+    - 菜品数据从该门店 delivery_orders 历史中取样（无历史时返回错误提示）
+    - 客户信息从历史订单中随机取样（无历史时使用匿名占位符）
     - 配送费 0 或 500 分
     - 平台补贴 0-200 分
 
@@ -375,15 +423,30 @@ async def mock_new_order(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=f"tenant_id 格式错误: {exc}") from exc
 
-    valid_platforms = set(_MOCK_PLATFORMS)
+    valid_platforms = set(_VALID_PLATFORMS)
     if platform and platform not in valid_platforms:
         raise HTTPException(
             status_code=400,
             detail=f"platform 无效，允许值: {sorted(valid_platforms)}",
         )
 
-    chosen_platform = platform or random.choice(_MOCK_PLATFORMS)
-    items, subtotal_fen = _build_mock_items()
+    chosen_platform = platform or random.choice(_VALID_PLATFORMS)
+
+    # 从 DB 历史取样真实菜品和客户信息
+    items, subtotal_fen = await _fetch_dish_items_from_db(store_id, tenant_id, db)
+    customer_name, customer_phone, delivery_address = await _fetch_customer_sample_from_db(
+        store_id, tenant_id, db
+    )
+
+    if not items:
+        log.warning("delivery_order.mock_no_dish_history", store_id=str(store_id))
+        return {
+            "ok": False,
+            "error": {
+                "code": "NO_DISH_HISTORY",
+                "message": "该门店暂无历史外卖菜品数据，无法生成 mock 订单。请先通过 Webhook 接收至少一条真实订单。",
+            },
+        }
 
     delivery_fee_fen = random.choice([0, 500])
     platform_discount_fen = random.choice([0, 100, 200])
@@ -414,10 +477,10 @@ async def mock_new_order(
             commission_fen=commission_fen,
             merchant_receive_fen=merchant_receive_fen,
             actual_revenue_fen=merchant_receive_fen,
-            customer_name=random.choice(_MOCK_CUSTOMER_NAMES),
-            customer_phone="138****" + "".join(random.choices(string.digits, k=4)),
-            delivery_address=random.choice(_MOCK_ADDRESSES),
-            special_request=random.choice(_MOCK_NOTES),
+            customer_name=customer_name,
+            customer_phone=customer_phone,
+            delivery_address=delivery_address,
+            special_request=random.choice(_NOTES_POOL),
             estimated_prep_time=random.randint(15, 35),
             estimated_delivery_min=random.randint(20, 45),
             auto_accepted=False,

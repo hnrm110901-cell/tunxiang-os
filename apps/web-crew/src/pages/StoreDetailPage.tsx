@@ -23,45 +23,53 @@ const C = {
   yellow: '#eab308',
 };
 
-/* ---------- Mock 数据（小时营收 & 今日告警） ---------- */
-// TODO: 替换为真实 API 数据
-//   小时营收: SELECT EXTRACT(hour FROM created_at) as hr, SUM(pay_fen)
-//             FROM orders WHERE store_id=:store_id AND DATE(created_at)=today
-//             GROUP BY hr ORDER BY hr
-//   今日告警: SELECT * FROM analytics_alerts WHERE store_id=:store_id AND DATE(created_at)=today
+/* ---------- 类型定义 ---------- */
 
-const MOCK_HOURLY_REVENUE: { hour: number; revenue_fen: number }[] = [
-  { hour: 9,  revenue_fen: 1800 },
-  { hour: 10, revenue_fen: 3200 },
-  { hour: 11, revenue_fen: 8500 },
-  { hour: 12, revenue_fen: 15000 },
-  { hour: 13, revenue_fen: 12000 },
-  { hour: 14, revenue_fen: 4200 },
-  { hour: 15, revenue_fen: 1600 },
-  { hour: 16, revenue_fen: 2800 },
-  { hour: 17, revenue_fen: 5500 },
-  { hour: 18, revenue_fen: 18000 },
-  { hour: 19, revenue_fen: 22000 },
-  { hour: 20, revenue_fen: 16000 },
-  { hour: 21, revenue_fen: 8000 },
-  { hour: 22, revenue_fen: 2500 },
-];
+interface StoreStats {
+  revenue_fen: number;
+  order_count: number;
+  table_turnover: number;
+  current_diners: number;
+  avg_serve_time_min: number;
+  occupied_tables: number;
+  total_tables: number;
+}
 
-const MOCK_ALERTS = [
-  { severity: 'warning' as const, title: '出餐超时2单', body: '12号桌/17号桌出餐超过55分钟', time: '19:42' },
-  { severity: 'warning' as const, title: '折扣率偏高', body: '今日折扣总额¥1,280，较日均高出3.2倍', time: '18:30' },
-  { severity: 'info' as const, title: '满座提醒', body: '19:15达到100%上座率，等位8人', time: '19:15' },
-];
+interface HourlyRevenue {
+  hour: number;
+  revenue_fen: number;
+}
 
-const MOCK_STORE_STATS = {
-  revenue_fen: 38000,
-  order_count: 22,
-  table_turnover: 2.8,
-  current_diners: 72,
-  avg_serve_time_min: 38,
-  occupied_tables: 18,
-  total_tables: 24,
-};
+interface StoreAlert {
+  severity: 'danger' | 'warning' | 'info';
+  title: string;
+  body: string;
+  time: string;
+}
+
+/* ---------- API 工具 ---------- */
+
+const TENANT_ID = (): string =>
+  (typeof window !== 'undefined' && (window as unknown as Record<string, string>).__TENANT_ID__) || '';
+
+async function txFetch<T = unknown>(
+  path: string,
+  options: RequestInit = {},
+): Promise<T> {
+  const res = await fetch(path, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Tenant-ID': TENANT_ID(),
+      ...(options.headers || {}),
+    },
+  });
+  const json = await res.json();
+  if (!res.ok || json.ok === false) {
+    throw new Error(json.error?.message || json.detail || `HTTP ${res.status}`);
+  }
+  return json.data ?? json;
+}
 
 /* ---------- 工具 ---------- */
 function fenToYuan(fen: number): string {
@@ -89,15 +97,21 @@ function tableStatusLabel(status: TableInfo['status']): string {
 }
 
 /* ---------- 子组件：3宫格指标 ---------- */
-function StatsGrid() {
-  const stats = MOCK_STORE_STATS;
-  const items = [
+function StatsGrid({ stats }: { stats: StoreStats | null }) {
+  const items = stats ? [
     { label: '今日营收', value: `¥${fenToYuan(stats.revenue_fen)}`, color: C.accent },
     { label: '订单数',   value: `${stats.order_count}单`,          color: C.white },
     { label: '翻台率',   value: `${stats.table_turnover}次`,       color: C.white },
     { label: '在餐人数', value: `${stats.current_diners}人`,       color: C.white },
     { label: '平均服务', value: `${stats.avg_serve_time_min}分钟`, color: C.white },
     { label: '桌台占用', value: `${stats.occupied_tables}/${stats.total_tables}`, color: C.white },
+  ] : [
+    { label: '今日营收', value: '-', color: C.muted },
+    { label: '订单数',   value: '-', color: C.muted },
+    { label: '翻台率',   value: '-', color: C.muted },
+    { label: '在餐人数', value: '-', color: C.muted },
+    { label: '平均服务', value: '-', color: C.muted },
+    { label: '桌台占用', value: '-', color: C.muted },
   ];
 
   return (
@@ -120,8 +134,23 @@ function StatsGrid() {
 }
 
 /* ---------- 子组件：小时营收 CSS Bar ---------- */
-function HourlyChart() {
-  const data = MOCK_HOURLY_REVENUE;
+function HourlyChart({ data }: { data: HourlyRevenue[] }) {
+  if (data.length === 0) {
+    return (
+      <div style={{ marginBottom: 14 }}>
+        <div style={{ fontSize: 14, fontWeight: 600, color: C.muted, marginBottom: 8 }}>
+          今日小时营收分布
+        </div>
+        <div style={{
+          background: C.card, borderRadius: 12,
+          padding: '20px 10px', border: `1px solid ${C.border}`,
+          textAlign: 'center', color: C.muted, fontSize: 14,
+        }}>
+          暂无数据
+        </div>
+      </div>
+    );
+  }
   const maxRev = Math.max(...data.map(d => d.revenue_fen));
   const currentHour = new Date().getHours();
 
@@ -250,7 +279,7 @@ function TablesSection({ tables, loading }: { tables: TableInfo[]; loading: bool
 }
 
 /* ---------- 子组件：今日告警 ---------- */
-function AlertsSection() {
+function AlertsSection({ alerts }: { alerts: StoreAlert[] }) {
   function severityColor(s: 'danger' | 'warning' | 'info'): string {
     if (s === 'danger')  return C.red;
     if (s === 'warning') return C.orange;
@@ -262,23 +291,33 @@ function AlertsSection() {
       <div style={{ fontSize: 14, fontWeight: 600, color: C.muted, marginBottom: 8 }}>
         今日告警
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {MOCK_ALERTS.map((a, i) => (
-          <div key={i} style={{
-            background: C.card, borderRadius: 10,
-            padding: '10px 12px',
-            border: `1px solid ${C.border}`,
-            borderLeftWidth: 4,
-            borderLeftColor: severityColor(a.severity),
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
-              <span style={{ fontSize: 14, fontWeight: 700, color: C.white }}>{a.title}</span>
-              <span style={{ fontSize: 12, color: C.muted }}>{a.time}</span>
+      {alerts.length === 0 ? (
+        <div style={{
+          background: C.card, borderRadius: 10, padding: '14px 12px',
+          border: `1px solid ${C.border}`, textAlign: 'center',
+          fontSize: 14, color: C.muted,
+        }}>
+          暂无告警
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {alerts.map((a, i) => (
+            <div key={i} style={{
+              background: C.card, borderRadius: 10,
+              padding: '10px 12px',
+              border: `1px solid ${C.border}`,
+              borderLeftWidth: 4,
+              borderLeftColor: severityColor(a.severity),
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
+                <span style={{ fontSize: 14, fontWeight: 700, color: C.white }}>{a.title}</span>
+                <span style={{ fontSize: 12, color: C.muted }}>{a.time}</span>
+              </div>
+              <div style={{ fontSize: 13, color: C.muted }}>{a.body}</div>
             </div>
-            <div style={{ fontSize: 13, color: C.muted }}>{a.body}</div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -293,6 +332,11 @@ export function StoreDetailPage() {
   const [tables, setTables] = useState<TableInfo[]>([]);
   const [tablesLoading, setTablesLoading] = useState(true);
   const [tablesError, setTablesError] = useState<string | null>(null);
+
+  // ── 门店综合数据 state ──
+  const [stats, setStats] = useState<StoreStats | null>(null);
+  const [hourlyRevenue, setHourlyRevenue] = useState<HourlyRevenue[]>([]);
+  const [alerts, setAlerts] = useState<StoreAlert[]>([]);
 
   const loadTables = useCallback(async () => {
     if (!storeId) return;
@@ -309,9 +353,27 @@ export function StoreDetailPage() {
     }
   }, [storeId]);
 
+  // ── 加载门店今日综合数据 ──
+  const loadStoreInfo = useCallback(async () => {
+    if (!storeId) return;
+    try {
+      const res = await txFetch<Record<string, unknown>>(
+        `/api/v1/trade/store/info?store_id=${encodeURIComponent(storeId)}&date=today`,
+      );
+      setStats((res.stats ?? null) as StoreStats | null);
+      setHourlyRevenue((res.hourly_revenue ?? []) as HourlyRevenue[]);
+      setAlerts((res.alerts ?? []) as StoreAlert[]);
+    } catch {
+      setStats(null);
+      setHourlyRevenue([]);
+      setAlerts([]);
+    }
+  }, [storeId]);
+
   useEffect(() => {
     loadTables();
-  }, [loadTables]);
+    loadStoreInfo();
+  }, [loadTables, loadStoreInfo]);
 
   return (
     <div style={{
@@ -344,10 +406,10 @@ export function StoreDetailPage() {
       </div>
 
       {/* Section 1: 3宫格 */}
-      <StatsGrid />
+      <StatsGrid stats={stats} />
 
       {/* Section 2: 小时营收 */}
-      <HourlyChart />
+      <HourlyChart data={hourlyRevenue} />
 
       {/* Section 3: 桌台状态 */}
       {tablesError ? (
@@ -363,7 +425,7 @@ export function StoreDetailPage() {
       )}
 
       {/* Section 4: 今日告警 */}
-      <AlertsSection />
+      <AlertsSection alerts={alerts} />
     </div>
   );
 }

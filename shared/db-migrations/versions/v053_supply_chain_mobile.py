@@ -164,6 +164,7 @@ def upgrade() -> None:
             );
     """)
 
+    op.execute("ALTER TABLE stocktake_items ADD COLUMN IF NOT EXISTS session_id UUID")
     op.execute("""
         CREATE TABLE IF NOT EXISTS stocktake_items (
             id              UUID          PRIMARY KEY DEFAULT gen_random_uuid(),

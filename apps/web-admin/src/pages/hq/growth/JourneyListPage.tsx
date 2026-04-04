@@ -1,9 +1,12 @@
 /**
  * JourneyListPage — 客户旅程列表
  * 展示所有旅程的状态、数据和管理操作
+ * API: GET /api/v1/growth/journeys
+ *      PATCH /api/v1/growth/journeys/{id}  { status }
  */
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { txFetch } from '../../../api';
 
 // ---- 颜色常量 ----
 const BG_1 = '#112228';
@@ -36,45 +39,23 @@ interface Journey {
   creator: string;
 }
 
-// ---- Mock 数据 ----
+// ---- API ----
 
-const MOCK_JOURNEYS: Journey[] = [
-  {
-    id: 'j1', name: '新客首单转复购旅程', description: '针对首单客户，通过多触点引导完成第二次消费',
-    status: '运行中', targetSegment: '首单未复购', targetCount: 4231, executedCount: 3876,
-    conversionRate: 18.4, nodeCount: 7, createdAt: '2026-03-10', updatedAt: '2026-03-25', creator: '运营小王',
-  },
-  {
-    id: 'j2', name: '沉睡客唤醒旅程', description: '60天未到店客户的分阶段唤醒策略',
-    status: '运行中', targetSegment: '沉睡客', targetCount: 8945, executedCount: 6234,
-    conversionRate: 12.7, nodeCount: 9, createdAt: '2026-03-05', updatedAt: '2026-03-24', creator: '运营小李',
-  },
-  {
-    id: 'j3', name: '高价值客户维护旅程', description: 'VIP客户的专属权益和关怀触达',
-    status: '运行中', targetSegment: '高价值', targetCount: 1823, executedCount: 1823,
-    conversionRate: 45.2, nodeCount: 5, createdAt: '2026-02-20', updatedAt: '2026-03-26', creator: '运营小王',
-  },
-  {
-    id: 'j4', name: '老带新裂变旅程', description: '社交活跃用户的裂变分享激励',
-    status: '已暂停', targetSegment: '社交活跃', targetCount: 1567, executedCount: 980,
-    conversionRate: 8.9, nodeCount: 6, createdAt: '2026-03-01', updatedAt: '2026-03-20', creator: '运营小张',
-  },
-  {
-    id: 'j5', name: '流失预警挽回旅程', description: '消费频率下降客户的精准挽回',
-    status: '草稿', targetSegment: '流失风险', targetCount: 2134, executedCount: 0,
-    conversionRate: 0, nodeCount: 8, createdAt: '2026-03-24', updatedAt: '2026-03-26', creator: '运营小李',
-  },
-  {
-    id: 'j6', name: '周末特惠推送旅程', description: '周末客群的定向优惠触达',
-    status: '已结束', targetSegment: '周末客群', targetCount: 6234, executedCount: 5870,
-    conversionRate: 22.3, nodeCount: 4, createdAt: '2026-02-15', updatedAt: '2026-03-15', creator: '运营小王',
-  },
-  {
-    id: 'j7', name: '家庭套餐推广旅程', description: '家庭客群的套餐优惠和亲子活动推送',
-    status: '草稿', targetSegment: '家庭客群', targetCount: 3890, executedCount: 0,
-    conversionRate: 0, nodeCount: 5, createdAt: '2026-03-25', updatedAt: '2026-03-26', creator: '运营小张',
-  },
-];
+async function apiFetchJourneys(): Promise<Journey[]> {
+  try {
+    const res = await txFetch<{ items: Journey[] }>('/api/v1/growth/journeys');
+    return res?.items ?? [];
+  } catch {
+    return [];
+  }
+}
+
+async function apiPatchJourney(id: string, status: JourneyStatus): Promise<void> {
+  await txFetch(`/api/v1/growth/journeys/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
+  });
+}
 
 // ---- 主页面 ----
 
@@ -82,8 +63,32 @@ export function JourneyListPage() {
   const navigate = useNavigate();
   const [filterStatus, setFilterStatus] = useState<JourneyStatus | '全部'>('全部');
   const [searchQuery, setSearchQuery] = useState('');
+  const [journeys, setJourneys] = useState<Journey[]>([]);
+  const [loading, setLoading] = useState(false);
 
-  const filteredJourneys = MOCK_JOURNEYS.filter(j => {
+  const loadJourneys = useCallback(async () => {
+    setLoading(true);
+    const list = await apiFetchJourneys();
+    setJourneys(list);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { loadJourneys(); }, [loadJourneys]);
+
+  const handleToggleStatus = useCallback(async (j: Journey, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const newStatus: JourneyStatus = j.status === '运行中' ? '已暂停' : '运行中';
+    // 乐观更新
+    setJourneys((prev) => prev.map((item) => item.id === j.id ? { ...item, status: newStatus } : item));
+    try {
+      await apiPatchJourney(j.id, newStatus);
+    } catch {
+      // 回滚
+      setJourneys((prev) => prev.map((item) => item.id === j.id ? { ...item, status: j.status } : item));
+    }
+  }, []);
+
+  const filteredJourneys = journeys.filter(j => {
     if (filterStatus !== '全部' && j.status !== filterStatus) return false;
     if (searchQuery && !j.name.includes(searchQuery) && !j.description.includes(searchQuery)) return false;
     return true;
@@ -97,11 +102,11 @@ export function JourneyListPage() {
   };
 
   const statusCounts = {
-    '全部': MOCK_JOURNEYS.length,
-    '运行中': MOCK_JOURNEYS.filter(j => j.status === '运行中').length,
-    '草稿': MOCK_JOURNEYS.filter(j => j.status === '草稿').length,
-    '已暂停': MOCK_JOURNEYS.filter(j => j.status === '已暂停').length,
-    '已结束': MOCK_JOURNEYS.filter(j => j.status === '已结束').length,
+    '全部': journeys.length,
+    '运行中': journeys.filter(j => j.status === '运行中').length,
+    '草稿': journeys.filter(j => j.status === '草稿').length,
+    '已暂停': journeys.filter(j => j.status === '已暂停').length,
+    '已结束': journeys.filter(j => j.status === '已结束').length,
   };
 
   return (
@@ -163,14 +168,14 @@ export function JourneyListPage() {
         <div style={{ background: BG_1, borderRadius: 10, padding: '14px 18px', border: `1px solid ${BG_2}` }}>
           <div style={{ fontSize: 11, color: TEXT_4, marginBottom: 4 }}>总触达人次</div>
           <div style={{ fontSize: 24, fontWeight: 700, color: TEXT_1 }}>
-            {MOCK_JOURNEYS.reduce((s, j) => s + j.executedCount, 0).toLocaleString()}
+            {journeys.reduce((s, j) => s + j.executedCount, 0).toLocaleString()}
           </div>
         </div>
         <div style={{ background: BG_1, borderRadius: 10, padding: '14px 18px', border: `1px solid ${BG_2}` }}>
           <div style={{ fontSize: 11, color: TEXT_4, marginBottom: 4 }}>平均转化率</div>
           <div style={{ fontSize: 24, fontWeight: 700, color: BRAND }}>
-            {(MOCK_JOURNEYS.filter(j => j.conversionRate > 0).reduce((s, j) => s + j.conversionRate, 0) /
-              MOCK_JOURNEYS.filter(j => j.conversionRate > 0).length).toFixed(1)}%
+            {(journeys.filter(j => j.conversionRate > 0).reduce((s, j) => s + j.conversionRate, 0) /
+              journeys.filter(j => j.conversionRate > 0).length).toFixed(1)}%
           </div>
         </div>
         <div style={{ background: BG_1, borderRadius: 10, padding: '14px 18px', border: `1px solid ${BG_2}` }}>
@@ -180,6 +185,14 @@ export function JourneyListPage() {
       </div>
 
       {/* 旅程列表 */}
+      {loading && (
+        <div style={{ textAlign: 'center', color: TEXT_4, padding: 24, fontSize: 13 }}>加载中...</div>
+      )}
+      {!loading && filteredJourneys.length === 0 && (
+        <div style={{ textAlign: 'center', color: TEXT_4, padding: 40, fontSize: 13, background: BG_1, borderRadius: 10 }}>
+          暂无旅程数据
+        </div>
+      )}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         {filteredJourneys.map(j => (
           <div
@@ -203,13 +216,26 @@ export function JourneyListPage() {
                 </div>
                 <div style={{ fontSize: 12, color: TEXT_3 }}>{j.description}</div>
               </div>
-              <button
-                onClick={e => { e.stopPropagation(); navigate(`/hq/growth/journeys/${j.id}/canvas`); }}
-                style={{
-                  padding: '6px 14px', borderRadius: 6, border: `1px solid ${BG_2}`,
-                  background: BG_2, color: TEXT_2, fontSize: 12, cursor: 'pointer',
-                }}
-              >编辑画布</button>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {(j.status === '运行中' || j.status === '已暂停') && (
+                  <button
+                    onClick={e => handleToggleStatus(j, e)}
+                    style={{
+                      padding: '6px 14px', borderRadius: 6, border: `1px solid ${j.status === '运行中' ? YELLOW : GREEN}`,
+                      background: 'transparent',
+                      color: j.status === '运行中' ? YELLOW : GREEN,
+                      fontSize: 12, cursor: 'pointer',
+                    }}
+                  >{j.status === '运行中' ? '暂停' : '激活'}</button>
+                )}
+                <button
+                  onClick={e => { e.stopPropagation(); navigate(`/hq/growth/journeys/${j.id}/canvas`); }}
+                  style={{
+                    padding: '6px 14px', borderRadius: 6, border: `1px solid ${BG_2}`,
+                    background: BG_2, color: TEXT_2, fontSize: 12, cursor: 'pointer',
+                  }}
+                >编辑画布</button>
+              </div>
             </div>
             <div style={{
               display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 12,

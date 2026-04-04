@@ -216,65 +216,43 @@ async def set_energy_benchmark(
 @router.get("/snapshot")
 async def get_energy_snapshot(
     store_id: str = Query(..., description="门店ID"),
-    stat_date: Optional[date] = Query(None, description="统计日期，默认今日"),
+    stat_date: Optional[date] = Query(None, description="统计日期，默认今日（agent路径忽略此参数，读最新行）"),
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
 ):
-    """读取 mv_energy_efficiency 物化视图，返回当日能耗快照（Phase 3）。
+    """读取 mv_energy_efficiency 物化视图，返回最新能耗快照（Phase 3）。
 
-    直接读取投影视图，< 5ms，替代原来跨服务聚合模式。
+    通过 EnergyMonitorAgent.analyze_from_mv() 读取，< 5ms 快速路径。
+    视图无数据时 Agent 自动 fallback 到 Claude Haiku 推理。
     用于能耗仪表盘和 Agent 决策。
     """
-    import os
+    from services.tx_brain.src.agents.energy_monitor import energy_monitor
 
-    import asyncpg
+    result = await energy_monitor.analyze_from_mv(x_tenant_id, store_id)
 
-    today = stat_date or date.today()
-    db_url = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/tunxiang")
+    # mv_fast_path：直接返回视图数据，附加格式化字段
+    if result.get("inference_layer") == "mv_fast_path":
+        data = dict(result["data"])
 
-    try:
-        conn = await asyncpg.connect(db_url)
-        try:
-            await conn.execute("SELECT set_config('app.tenant_id', $1, TRUE)", x_tenant_id)
-            row = await conn.fetchrow("""
-                SELECT
-                    electricity_kwh, gas_m3, water_m3,
-                    total_energy_cost_fen, revenue_fen,
-                    energy_revenue_ratio, anomaly_count,
-                    updated_at
-                FROM mv_energy_efficiency
-                WHERE tenant_id = $1 AND store_id = $2 AND stat_date = $3
-            """, x_tenant_id, store_id, today)
-        finally:
-            await conn.close()
-    except Exception as exc:  # noqa: BLE001 — DB不可用时降级
-        log.warning("energy_snapshot_db_error", error=str(exc))
-        raise HTTPException(status_code=500, detail=f"读取能耗数据失败: {exc}")
+        # 序列化特殊类型
+        if data.get("updated_at") and hasattr(data["updated_at"], "isoformat"):
+            data["updated_at"] = data["updated_at"].isoformat()
+        if data.get("stat_date") and hasattr(data["stat_date"], "isoformat"):
+            data["stat_date"] = data["stat_date"].isoformat()
 
-    if not row:
-        return {
-            "ok": True,
-            "data": {
-                "store_id": store_id,
-                "stat_date": today.isoformat(),
-                "message": "当日暂无能耗数据",
-                "source": "mv_energy_efficiency",
-            },
-        }
+        data["source"] = "mv_energy_efficiency"
+        data["energy_cost_yuan"] = round(int(data.get("energy_cost_fen") or 0) / 100, 2)
 
-    data = dict(row)
-    if data.get("updated_at"):
-        data["updated_at"] = data["updated_at"].isoformat()
-    data["store_id"] = store_id
-    data["stat_date"] = today.isoformat()
-    data["source"] = "mv_energy_efficiency"
-    data["total_energy_cost_yuan"] = round(int(data.get("total_energy_cost_fen") or 0) / 100, 2)
+        ratio = float(data.get("energy_revenue_ratio") or 0)
+        data["efficiency_level"] = (
+            "优秀" if ratio <= 0.05 else
+            "良好" if ratio <= 0.08 else
+            "警告" if ratio <= 0.12 else
+            "超标"
+        )
+        return {"ok": True, "data": data}
 
-    ratio = float(data.get("energy_revenue_ratio") or 0)
-    data["efficiency_level"] = (
-        "优秀" if ratio <= 0.05 else
-        "良好" if ratio <= 0.08 else
-        "警告" if ratio <= 0.12 else
-        "超标"
-    )
-
-    return {"ok": True, "data": data}
+    # fallback 路径：Agent 已通过 Claude 推理，直接返回分析结果
+    result["store_id"] = store_id
+    result["stat_date"] = (stat_date or date.today()).isoformat()
+    result["source"] = "agent_analysis"
+    return {"ok": True, "data": result}

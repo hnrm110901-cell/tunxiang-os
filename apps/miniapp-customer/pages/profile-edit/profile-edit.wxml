@@ -1,0 +1,98 @@
+<!-- 个人资料编辑 -->
+<view class="page-container">
+
+  <!-- 头像 -->
+  <view class="avatar-section" bindtap="chooseAvatar">
+    <view class="avatar-wrap">
+      <image class="avatar-img"
+             src="{{avatarUrl || '/assets/avatar-default.png'}}"
+             mode="aspectFill" />
+      <view class="avatar-overlay">
+        <text class="avatar-overlay-text">更换</text>
+      </view>
+    </view>
+    <text class="avatar-hint">点击更换头像</text>
+  </view>
+
+  <!-- 表单 -->
+  <view class="form-section">
+
+    <!-- 昵称 -->
+    <view class="form-row">
+      <text class="form-label">昵称</text>
+      <input class="form-input"
+             value="{{nickname}}"
+             bindinput="onNicknameInput"
+             placeholder="请输入昵称"
+             placeholderClass="form-placeholder"
+             maxlength="20" />
+    </view>
+
+    <!-- 性别 -->
+    <view class="form-row">
+      <text class="form-label">性别</text>
+      <picker mode="selector" range="{{genderOptions}}" value="{{gender}}" bindchange="onGenderChange">
+        <view class="form-picker">
+          <text class="form-picker-text">{{genderOptions[gender]}}</text>
+          <text class="form-arrow">></text>
+        </view>
+      </picker>
+    </view>
+
+    <!-- 生日 -->
+    <view class="form-row">
+      <text class="form-label">生日</text>
+      <picker mode="date" value="{{birthday}}" start="1950-01-01" end="2010-12-31" bindchange="onBirthdayChange">
+        <view class="form-picker">
+          <text class="form-picker-text {{birthday ? '' : 'form-placeholder'}}">{{birthday || '请选择生日'}}</text>
+          <text class="form-arrow">></text>
+        </view>
+      </picker>
+    </view>
+
+    <!-- 手机号 -->
+    <view class="form-row">
+      <text class="form-label">手机号</text>
+      <view class="form-phone-row">
+        <text class="form-phone-text">{{phoneMasked || '未绑定'}}</text>
+        <view class="form-phone-btn" bindtap="changePhone">
+          <text class="form-phone-btn-text">更换</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 口味偏好 -->
+  <view class="tags-section">
+    <text class="tags-title">口味偏好</text>
+    <text class="tags-hint">选择您的口味偏好，我们为您推荐更合适的菜品</text>
+    <view class="tags-wrap">
+      <view class="tag-item {{selectedFlavors.indexOf(item) >= 0 ? 'tag-selected' : ''}}"
+            wx:for="{{flavorTags}}" wx:key="*this"
+            bindtap="toggleFlavor" data-tag="{{item}}">
+        <text class="tag-text">{{item}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 过敏原 -->
+  <view class="tags-section">
+    <text class="tags-title">过敏原</text>
+    <text class="tags-hint">标注过敏原，点餐时自动提醒</text>
+    <view class="tags-wrap">
+      <view class="tag-item tag-allergen {{selectedAllergens.indexOf(item) >= 0 ? 'tag-selected-warn' : ''}}"
+            wx:for="{{allergenTags}}" wx:key="*this"
+            bindtap="toggleAllergen" data-tag="{{item}}">
+        <text class="tag-text">{{item}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 保存按钮 -->
+  <view class="save-section">
+    <button class="save-btn {{saving ? 'save-btn-disabled' : ''}}"
+            bindtap="saveProfile" disabled="{{saving}}">
+      {{saving ? '保存中...' : '保存'}}
+    </button>
+  </view>
+</view>

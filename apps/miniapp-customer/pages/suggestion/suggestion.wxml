@@ -1,0 +1,65 @@
+<!-- 意见反馈 — 类型选择+内容+图片+联系方式 -->
+<view class="page-container">
+
+  <!-- 反馈类型 -->
+  <view class="type-section">
+    <text class="section-title">反馈类型</text>
+    <view class="type-tags">
+      <view class="type-tag {{feedbackType === item.key ? 'active' : ''}}"
+            wx:for="{{typeOptions}}" wx:key="key"
+            bindtap="selectType" data-key="{{item.key}}">
+        <text class="type-tag-text">{{item.label}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 反馈内容 -->
+  <view class="content-section">
+    <text class="section-title">反馈内容</text>
+    <view class="textarea-wrap">
+      <textarea class="content-textarea" placeholder="请详细描述您的反馈（最少10个字）"
+                placeholderClass="placeholder-text"
+                maxlength="500"
+                bindinput="onContentInput"
+                value="{{content}}" />
+      <text class="char-count {{content.length < 10 ? 'warn' : ''}}">{{content.length}}/500</text>
+    </view>
+  </view>
+
+  <!-- 图片上传 -->
+  <view class="image-section">
+    <text class="section-title">上传图片（最多4张，可选）</text>
+    <view class="image-grid">
+      <view class="image-item" wx:for="{{images}}" wx:key="*this">
+        <image class="upload-image" src="{{item}}" mode="aspectFill"
+               bindtap="previewImage" data-url="{{item}}" />
+        <view class="image-remove" catchtap="removeImage" data-index="{{index}}">✕</view>
+      </view>
+      <view class="image-add" wx:if="{{images.length < 4}}" bindtap="chooseImage">
+        <text class="add-icon">+</text>
+        <text class="add-text">添加</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 联系方式 -->
+  <view class="contact-section">
+    <text class="section-title">联系方式（可选）</text>
+    <input class="contact-input" placeholder="手机号，方便我们回复您" type="number"
+           value="{{contactPhone}}" bindinput="onPhoneInput" maxlength="11" />
+  </view>
+
+  <!-- 提交按钮 -->
+  <button class="submit-btn" bindtap="submitSuggestion" disabled="{{submitting}}">
+    {{submitting ? '提交中...' : '提交反馈'}}
+  </button>
+
+  <!-- 提交成功遮罩 -->
+  <view class="success-mask" wx:if="{{showSuccess}}">
+    <view class="success-box">
+      <text class="success-icon">✓</text>
+      <text class="success-title">提交成功</text>
+      <text class="success-desc">感谢您的反馈，我们会认真处理</text>
+    </view>
+  </view>
+</view>

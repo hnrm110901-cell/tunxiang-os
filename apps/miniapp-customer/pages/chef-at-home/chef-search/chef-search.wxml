@@ -1,0 +1,111 @@
+<!-- 大厨搜索页 — 历史记录 + 实时搜索结果 -->
+<view class="page">
+
+  <!-- 顶部搜索区 -->
+  <view class="top-bar">
+    <view class="back-btn" bindtap="goBack">
+      <text class="back-icon">‹</text>
+    </view>
+    <view class="search-wrap">
+      <text class="search-icon">🔍</text>
+      <input
+        class="search-input"
+        placeholder="搜索厨师名称/擅长菜系"
+        placeholder-class="search-input-placeholder"
+        value="{{keyword}}"
+        bindinput="onInput"
+        bindconfirm="doSearch"
+        focus="{{autoFocus}}"
+        confirm-type="search"
+        maxlength="30"
+      />
+      <view class="clear-btn" wx:if="{{keyword}}" bindtap="clearKeyword">
+        <text class="clear-icon">✕</text>
+      </view>
+    </view>
+    <view class="cancel-btn" bindtap="goBack">
+      <text>取消</text>
+    </view>
+  </view>
+
+  <!-- 搜索中 -->
+  <view class="state-tip" wx:if="{{searching}}">
+    <text class="state-text">搜索中...</text>
+  </view>
+
+  <!-- 搜索结果 -->
+  <view wx:elif="{{hasSearched && results.length > 0}}">
+    <view class="result-header">
+      <text class="result-count">找到 {{results.length}} 位厨师</text>
+    </view>
+    <view
+      class="chef-card"
+      wx:for="{{results}}"
+      wx:key="id"
+    >
+      <image
+        class="chef-avatar"
+        src="{{item.avatar || '/assets/chef-default.png'}}"
+        mode="aspectFill"
+        lazy-load
+        bindtap="goDetail"
+        data-id="{{item.id}}"
+      />
+      <view class="chef-info" bindtap="goDetail" data-id="{{item.id}}">
+        <view class="chef-name-row">
+          <text class="chef-name">{{item.name}}</text>
+          <view class="badges">
+            <text
+              class="badge"
+              wx:for="{{item.badges}}"
+              wx:for-item="b"
+              wx:key="*this"
+            >{{b}}</text>
+          </view>
+        </view>
+        <text class="chef-specialty">擅长：{{item.specialty}}菜</text>
+        <view class="chef-bottom">
+          <text class="chef-rating">⭐ {{item.rating}} ({{item.orders}}单)</text>
+          <view class="price-book">
+            <text class="chef-price">¥{{item.priceYuan}}起</text>
+            <view class="book-btn" catchtap="goDetail" data-id="{{item.id}}">查看详情</view>
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 搜索无结果 -->
+  <view class="state-tip" wx:elif="{{hasSearched && results.length === 0}}">
+    <text class="state-icon">🔍</text>
+    <text class="state-text">未找到"{{keyword}}"相关厨师</text>
+    <text class="state-sub">换个关键词试试</text>
+  </view>
+
+  <!-- 历史搜索（未搜索时展示） -->
+  <view wx:elif="{{history.length > 0}}">
+    <view class="history-header">
+      <text class="history-title">搜索历史</text>
+      <view class="clear-history" bindtap="clearHistory">
+        <text class="clear-history-text">清除</text>
+      </view>
+    </view>
+    <view class="history-tags">
+      <view
+        class="history-tag"
+        wx:for="{{history}}"
+        wx:key="*this"
+        bindtap="searchFromHistory"
+        data-keyword="{{item}}"
+      >{{item}}</view>
+    </view>
+  </view>
+
+  <!-- 无历史时的引导 -->
+  <view class="state-tip" wx:elif="{{!hasSearched}}">
+    <text class="state-icon">👨‍🍳</text>
+    <text class="state-text">搜索厨师姓名或擅长菜系</text>
+    <text class="state-sub">如：湘菜、粤菜、李大厨</text>
+  </view>
+
+</view>

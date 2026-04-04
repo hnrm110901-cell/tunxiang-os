@@ -1,0 +1,384 @@
+/* 邀请有礼页样式 */
+
+/* ─── 页面容器 ─── */
+.page {
+  min-height: 100vh;
+  background: #f5f5f5;
+  padding-bottom: 160rpx;
+}
+
+/* ─── 渐变头部 ─── */
+.header {
+  background: linear-gradient(135deg, #FF6B35 0%, #FF8C42 100%);
+  padding: 56rpx 40rpx 80rpx;
+  text-align: center;
+  position: relative;
+}
+
+.header-title {
+  display: block;
+  font-size: 48rpx;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: 2rpx;
+  margin-bottom: 16rpx;
+}
+
+.header-subtitle {
+  display: block;
+  font-size: 26rpx;
+  color: rgba(255, 255, 255, 0.88);
+  line-height: 1.5;
+}
+
+/* ─── 通用卡片 ─── */
+.card {
+  background: #ffffff;
+  border-radius: 24rpx;
+  margin: -40rpx 24rpx 24rpx;
+  padding: 32rpx;
+  box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.06);
+  position: relative;
+}
+
+.card + .card {
+  margin-top: 0;
+}
+
+/* ─── 区域标签 ─── */
+.section-label {
+  display: block;
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #333333;
+  margin-bottom: 24rpx;
+}
+
+/* ─── 邀请码卡片 ─── */
+.invite-code-card {
+  text-align: center;
+}
+
+.code-box {
+  border: 2rpx dashed #FF6B35;
+  border-radius: 16rpx;
+  padding: 28rpx 40rpx;
+  margin-bottom: 32rpx;
+  background: #fff8f5;
+}
+
+.code-text {
+  font-size: 56rpx;
+  font-weight: 700;
+  color: #FF6B35;
+  letter-spacing: 8rpx;
+  font-family: 'Courier New', Courier, monospace;
+}
+
+.code-placeholder {
+  font-size: 36rpx;
+  color: #cccccc;
+  letter-spacing: 4rpx;
+}
+
+.btn-copy {
+  width: 100%;
+  height: 88rpx;
+  line-height: 88rpx;
+  background: #FF6B35;
+  color: #ffffff;
+  font-size: 30rpx;
+  font-weight: 600;
+  border-radius: 44rpx;
+  border: none;
+  text-align: center;
+}
+
+.btn-copy[disabled] {
+  background: #cccccc;
+  color: #ffffff;
+}
+
+.btn-copy::after {
+  border: none;
+}
+
+/* ─── 分享卡片预览 ─── */
+.share-card {
+  margin-top: 0;
+}
+
+.share-preview {
+  display: flex;
+  align-items: flex-start;
+  background: #fff8f5;
+  border-radius: 16rpx;
+  padding: 24rpx;
+  border: 1rpx solid #ffe0d0;
+}
+
+.preview-logo {
+  width: 80rpx;
+  height: 80rpx;
+  background: #FF6B35;
+  border-radius: 16rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-right: 20rpx;
+}
+
+.preview-logo-text {
+  color: #ffffff;
+  font-size: 24rpx;
+  font-weight: 700;
+}
+
+.preview-body {
+  flex: 1;
+}
+
+.preview-headline {
+  display: block;
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #333333;
+  margin-bottom: 8rpx;
+}
+
+.preview-desc {
+  display: block;
+  font-size: 24rpx;
+  color: #999999;
+  margin-bottom: 16rpx;
+}
+
+.qrcode-placeholder {
+  display: flex;
+  align-items: center;
+  margin-bottom: 12rpx;
+}
+
+.qrcode-icon {
+  font-size: 48rpx;
+  margin-right: 12rpx;
+  opacity: 0.3;
+}
+
+.qrcode-label {
+  font-size: 22rpx;
+  color: #999999;
+}
+
+.preview-code {
+  display: block;
+  font-size: 24rpx;
+  color: #FF6B35;
+  font-weight: 600;
+  font-family: 'Courier New', Courier, monospace;
+}
+
+/* ─── 邀请进度卡片 ─── */
+.progress-card {
+  margin-top: 0;
+}
+
+.progress-wrap {
+  display: flex;
+  align-items: center;
+}
+
+.circle-wrap {
+  flex-shrink: 0;
+  margin-right: 32rpx;
+}
+
+.circle-bg {
+  width: 140rpx;
+  height: 140rpx;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #FF6B35 0%, #FF8C42 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.circle-inner {
+  width: 110rpx;
+  height: 110rpx;
+  border-radius: 50%;
+  background: #ffffff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.circle-count {
+  font-size: 48rpx;
+  font-weight: 700;
+  color: #FF6B35;
+  line-height: 1;
+}
+
+.circle-unit {
+  font-size: 22rpx;
+  color: #999999;
+  margin-top: 2rpx;
+}
+
+.progress-info {
+  flex: 1;
+}
+
+.progress-label {
+  display: block;
+  font-size: 24rpx;
+  color: #999999;
+  margin-bottom: 8rpx;
+}
+
+.progress-value {
+  display: block;
+  font-size: 36rpx;
+  font-weight: 700;
+  color: #333333;
+  margin-bottom: 12rpx;
+}
+
+.progress-tip {
+  display: block;
+  font-size: 24rpx;
+  color: #FF6B35;
+  background: #fff3ed;
+  padding: 8rpx 16rpx;
+  border-radius: 8rpx;
+}
+
+/* ─── 奖励规则卡片 ─── */
+.rules-card {
+  margin-top: 0;
+}
+
+.rule-list {
+  border-radius: 12rpx;
+  overflow: hidden;
+  border: 1rpx solid #f0ede6;
+}
+
+.rule-item {
+  display: flex;
+  align-items: center;
+  padding: 24rpx 20rpx;
+  background: #ffffff;
+}
+
+.rule-item + .rule-item {
+  border-top: 1rpx solid #f5f5f5;
+}
+
+.rule-icon {
+  font-size: 40rpx;
+  margin-right: 20rpx;
+  flex-shrink: 0;
+}
+
+.rule-body {
+  flex: 1;
+}
+
+.rule-title {
+  display: block;
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #333333;
+  margin-bottom: 6rpx;
+}
+
+.rule-desc {
+  display: block;
+  font-size: 24rpx;
+  color: #999999;
+}
+
+.rule-badge {
+  flex-shrink: 0;
+  text-align: center;
+  background: #fff3ed;
+  border-radius: 12rpx;
+  padding: 8rpx 16rpx;
+  min-width: 80rpx;
+}
+
+.rule-points {
+  display: block;
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #FF6B35;
+  line-height: 1.2;
+}
+
+.rule-points-label {
+  display: block;
+  font-size: 20rpx;
+  color: #FF6B35;
+}
+
+.rule-note {
+  margin-top: 20rpx;
+}
+
+.rule-note-text {
+  font-size: 22rpx;
+  color: #bbbbbb;
+  line-height: 1.6;
+}
+
+/* ─── 底部按钮栏 ─── */
+.bottom-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #ffffff;
+  padding: 16rpx 32rpx;
+  padding-bottom: calc(16rpx + env(safe-area-inset-bottom));
+  box-shadow: 0 -2rpx 16rpx rgba(0, 0, 0, 0.08);
+}
+
+.btn-share {
+  width: 100%;
+  height: 88rpx;
+  line-height: 88rpx;
+  background: linear-gradient(90deg, #FF6B35 0%, #FF8C42 100%);
+  color: #ffffff;
+  font-size: 32rpx;
+  font-weight: 700;
+  border-radius: 44rpx;
+  border: none;
+  text-align: center;
+  margin-bottom: 16rpx;
+}
+
+.btn-share::after {
+  border: none;
+}
+
+.btn-records {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8rpx 0;
+}
+
+.btn-records-text {
+  font-size: 26rpx;
+  color: #999999;
+}
+
+.btn-records-arrow {
+  font-size: 30rpx;
+  color: #999999;
+  margin-left: 4rpx;
+}

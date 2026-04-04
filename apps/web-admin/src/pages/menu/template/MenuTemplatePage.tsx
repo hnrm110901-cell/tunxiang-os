@@ -178,138 +178,41 @@ interface VersionHistory {
   store_count: number;
 }
 
-// ─── Mock 数据（API 未就绪时的降级数据） ──────────────────────────────────────
+// ─── 空数据 fallback（API 不可用时）──────────────────────────────────────────
 
-const MOCK_TEMPLATES: MenuTemplate[] = [
-  {
-    id: 'tpl_001',
-    name: '标准大店菜单',
-    business_type: 'large',
-    description: '适用于200座以上大型门店',
-    store_count: 8,
-    updated_at: '2026-03-28T10:00:00Z',
-    version: 5,
-  },
-  {
-    id: 'tpl_002',
-    name: '小店精简版',
-    business_type: 'small',
-    description: '80座以下精简门店',
-    store_count: 12,
-    updated_at: '2026-03-25T14:30:00Z',
-    version: 3,
-  },
-  {
-    id: 'tpl_003',
-    name: '宴席专属模板',
-    business_type: 'banquet',
-    description: '宴会厅专用，含桌菜套餐',
-    store_count: 3,
-    updated_at: '2026-03-20T09:15:00Z',
-    version: 2,
-  },
-  {
-    id: 'tpl_004',
-    name: '外卖专线菜单',
-    business_type: 'delivery',
-    description: '外卖平台专属，含包装费配置',
-    store_count: 15,
-    updated_at: '2026-03-30T16:45:00Z',
-    version: 7,
-  },
-];
-
-const MOCK_SECTIONS: MenuSection[] = [
-  {
-    id: 'sec_001',
-    name: '招牌菜',
-    sort_order: 1,
-    is_enabled: true,
-    dish_count: 6,
-    dishes: [
-      { id: 'di_001', dish_id: 'dish_001', dish_name: '招牌红烧肉', sort_order: 1, is_enabled: true, template_price_fen: null, actual_price_fen: 6800, category: '招牌菜' },
-      { id: 'di_002', dish_id: 'dish_002', dish_name: '剁椒鱼头', sort_order: 2, is_enabled: true, template_price_fen: 8800, actual_price_fen: 8500, category: '招牌菜' },
-      { id: 'di_003', dish_id: 'dish_003', dish_name: '霸王蟹', sort_order: 3, is_enabled: true, template_price_fen: null, actual_price_fen: 19800, category: '招牌菜' },
-    ],
-  },
-  {
-    id: 'sec_002',
-    name: '热炒',
-    sort_order: 2,
-    is_enabled: true,
-    dish_count: 12,
-    dishes: [
-      { id: 'di_004', dish_id: 'dish_004', dish_name: '农家小炒肉', sort_order: 1, is_enabled: true, template_price_fen: null, actual_price_fen: 3800, category: '热炒' },
-      { id: 'di_005', dish_id: 'dish_005', dish_name: '辣椒炒牛肉', sort_order: 2, is_enabled: false, template_price_fen: 4500, actual_price_fen: 4200, category: '热炒' },
-    ],
-  },
-  {
-    id: 'sec_003',
-    name: '汤类',
-    sort_order: 3,
-    is_enabled: false,
-    dish_count: 4,
-    dishes: [
-      { id: 'di_006', dish_id: 'dish_006', dish_name: '老火靓汤', sort_order: 1, is_enabled: true, template_price_fen: null, actual_price_fen: 2800, category: '汤类' },
-    ],
-  },
-];
-
-const MOCK_STORES: StoreOption[] = [
-  { id: 'store_001', name: '尝在一起·芙蓉路店', business_type: 'large' },
-  { id: 'store_002', name: '尝在一起·解放西路店', business_type: 'large' },
-  { id: 'store_003', name: '尝在一起·五一广场店', business_type: 'small' },
-  { id: 'store_004', name: '最黔线·湘江路店', business_type: 'small' },
-  { id: 'store_005', name: '最黔线·梅溪湖店', business_type: 'banquet' },
-];
-
-const MOCK_PUBLISH_RECORDS: PublishRecord[] = [
-  {
-    id: 'pub_001',
-    published_at: '2026-03-28T14:00:00Z',
-    operator: '李淳',
-    target_stores: ['store_001', 'store_002'],
-    target_store_names: ['芙蓉路店', '解放西路店'],
-    status: 'success',
-    template_version: 5,
-    summary: '新增招牌菜3道，调整热炒价格',
-  },
-  {
-    id: 'pub_002',
-    published_at: '2026-03-20T10:30:00Z',
-    operator: '王明',
-    target_stores: ['store_003'],
-    target_store_names: ['五一广场店'],
-    status: 'partial',
-    template_version: 4,
-    summary: '更新外卖专线定价',
-  },
-];
-
-const MOCK_VERSIONS: VersionHistory[] = [
-  { id: 'ver_005', version: 5, published_at: '2026-03-28T14:00:00Z', operator: '李淳', change_summary: '新增3道招牌菜，调整热炒价格区间', store_count: 8 },
-  { id: 'ver_004', version: 4, published_at: '2026-03-15T09:00:00Z', operator: '王明', change_summary: '下架2道汤类，更新宴席套餐配置', store_count: 6 },
-  { id: 'ver_003', version: 3, published_at: '2026-03-01T11:30:00Z', operator: '李淳', change_summary: '春季菜单更新，新增时令菜品', store_count: 8 },
-  { id: 'ver_002', version: 2, published_at: '2026-02-10T16:00:00Z', operator: '陈芳', change_summary: '新年特别版，调整部分套餐价格', store_count: 5 },
-  { id: 'ver_001', version: 1, published_at: '2026-01-01T00:00:00Z', operator: '李淳', change_summary: '初始版本发布', store_count: 3 },
-];
+const EMPTY_TEMPLATES: MenuTemplate[] = [];
+const EMPTY_SECTIONS: MenuSection[] = [];
+const EMPTY_STORES: StoreOption[] = [];
+const EMPTY_PUBLISH_RECORDS: PublishRecord[] = [];
+const EMPTY_VERSIONS: VersionHistory[] = [];
 
 // ─── API 函数 ────────────────────────────────────────────────────────────────
 
 async function fetchTemplates(): Promise<{ items: MenuTemplate[]; total: number }> {
   try {
-    return await txFetch('/api/v1/menu/templates');
-  } catch {
-    return { items: MOCK_TEMPLATES, total: MOCK_TEMPLATES.length };
+    const res = await txFetch<{ items: MenuTemplate[]; total: number }>('/api/v1/menu/templates');
+    return res.data ?? { items: EMPTY_TEMPLATES, total: 0 };
+  } catch (err) {
+    console.error('[MenuTemplatePage] fetchTemplates 失败:', err);
+    return { items: EMPTY_TEMPLATES, total: 0 };
   }
 }
 
 async function fetchTemplateSections(templateId: string): Promise<MenuSection[]> {
   try {
-    return await txFetch(`/api/v1/menu/templates/${templateId}/sections`);
-  } catch {
-    return MOCK_SECTIONS;
+    const res = await txFetch<MenuSection[]>(`/api/v1/menu/templates/${templateId}/sections`);
+    return res.data ?? EMPTY_SECTIONS;
+  } catch (err) {
+    console.error('[MenuTemplatePage] fetchTemplateSections 失败:', err);
+    return EMPTY_SECTIONS;
   }
+}
+
+async function applyTemplate(templateId: string, storeId: string): Promise<void> {
+  await txFetch<void>(`/api/v1/menu/templates/${templateId}/apply`, {
+    method: 'POST',
+    body: JSON.stringify({ store_id: storeId }),
+  });
 }
 
 async function createTemplate(payload: {
@@ -318,27 +221,31 @@ async function createTemplate(payload: {
   description: string;
   copy_from_id?: string;
 }): Promise<MenuTemplate> {
-  return txFetch('/api/v1/menu/templates', {
+  const res = await txFetch<MenuTemplate>('/api/v1/menu/templates', {
     method: 'POST',
     body: JSON.stringify(payload),
   });
+  if (!res.data) throw new Error('创建模板失败');
+  return res.data;
 }
 
 async function updateTemplate(
   id: string,
   payload: Partial<Pick<MenuTemplate, 'name' | 'business_type' | 'description'>>,
 ): Promise<MenuTemplate> {
-  return txFetch(`/api/v1/menu/templates/${id}`, {
+  const res = await txFetch<MenuTemplate>(`/api/v1/menu/templates/${id}`, {
     method: 'PUT',
     body: JSON.stringify(payload),
   });
+  if (!res.data) throw new Error('更新模板失败');
+  return res.data;
 }
 
 async function updateSectionOrder(
   templateId: string,
   sections: Array<{ id: string; sort_order: number }>,
 ): Promise<void> {
-  return txFetch(`/api/v1/menu/templates/${templateId}/sections/reorder`, {
+  await txFetch<void>(`/api/v1/menu/templates/${templateId}/sections/reorder`, {
     method: 'PUT',
     body: JSON.stringify({ sections }),
   });
@@ -349,7 +256,7 @@ async function toggleSectionEnabled(
   sectionId: string,
   is_enabled: boolean,
 ): Promise<void> {
-  return txFetch(`/api/v1/menu/templates/${templateId}/sections/${sectionId}`, {
+  await txFetch<void>(`/api/v1/menu/templates/${templateId}/sections/${sectionId}`, {
     method: 'PATCH',
     body: JSON.stringify({ is_enabled }),
   });
@@ -361,7 +268,7 @@ async function updateDishInSection(
   dishItemId: string,
   payload: { is_enabled?: boolean; template_price_fen?: number | null; sort_order?: number },
 ): Promise<void> {
-  return txFetch(`/api/v1/menu/templates/${templateId}/sections/${sectionId}/dishes/${dishItemId}`, {
+  await txFetch<void>(`/api/v1/menu/templates/${templateId}/sections/${sectionId}/dishes/${dishItemId}`, {
     method: 'PATCH',
     body: JSON.stringify(payload),
   });
@@ -372,30 +279,35 @@ async function publishToStores(payload: {
   store_ids: string[];
   diff_configs: StoreDiffConfig[];
 }): Promise<{ publish_id: string; status: string }> {
-  return txFetch('/api/v1/menu/brand/publish', {
+  const res = await txFetch<{ publish_id: string; status: string }>('/api/v1/menu/brand/publish', {
     method: 'POST',
     body: JSON.stringify(payload),
   });
+  return res.data ?? { publish_id: '', status: 'unknown' };
 }
 
 async function fetchPublishStatus(templateId: string): Promise<PublishRecord[]> {
   try {
-    return await txFetch(`/api/v1/menu/publish-status?template_id=${templateId}`);
-  } catch {
-    return MOCK_PUBLISH_RECORDS;
+    const res = await txFetch<PublishRecord[]>(`/api/v1/menu/publish-status?template_id=${templateId}`);
+    return res.data ?? EMPTY_PUBLISH_RECORDS;
+  } catch (err) {
+    console.error('[MenuTemplatePage] fetchPublishStatus 失败:', err);
+    return EMPTY_PUBLISH_RECORDS;
   }
 }
 
 async function fetchVersionHistory(templateId: string): Promise<VersionHistory[]> {
   try {
-    return await txFetch(`/api/v1/menu/templates/${templateId}/versions`);
-  } catch {
-    return MOCK_VERSIONS;
+    const res = await txFetch<VersionHistory[]>(`/api/v1/menu/templates/${templateId}/versions`);
+    return res.data ?? EMPTY_VERSIONS;
+  } catch (err) {
+    console.error('[MenuTemplatePage] fetchVersionHistory 失败:', err);
+    return EMPTY_VERSIONS;
   }
 }
 
 async function rollbackToVersion(templateId: string, versionId: string): Promise<void> {
-  return txFetch(`/api/v1/menu/templates/${templateId}/rollback`, {
+  await txFetch<void>(`/api/v1/menu/templates/${templateId}/rollback`, {
     method: 'POST',
     body: JSON.stringify({ version_id: versionId }),
   });
@@ -945,7 +857,14 @@ const PublishTab: React.FC<PublishTabProps> = ({ template }) => {
   const [publishRecords, setPublishRecords] = useState<PublishRecord[]>([]);
   const [recordsLoading, setRecordsLoading] = useState(false);
   const [publishLoading, setPublishLoading] = useState(false);
-  const [stores] = useState<StoreOption[]>(MOCK_STORES);
+  const [stores, setStores] = useState<StoreOption[]>(EMPTY_STORES);
+
+  // 加载门店列表
+  useEffect(() => {
+    txFetch<{ items: StoreOption[] }>('/api/v1/system/stores?size=200')
+      .then((res) => setStores(res.data?.items ?? EMPTY_STORES))
+      .catch((err) => console.error('[PublishTab] 加载门店失败:', err));
+  }, []);
   const [diffModalOpen, setDiffModalOpen] = useState(false);
   const [diffStoreId, setDiffStoreId] = useState<string>('');
   const [diffForm] = Form.useForm();

@@ -1,0 +1,54 @@
+<!-- 积分明细 — 按月分组 -->
+<view class="page-container">
+
+  <!-- 顶部当前积分 -->
+  <view class="balance-card">
+    <text class="balance-label">当前积分</text>
+    <text class="balance-num">{{pointsBalance}}</text>
+  </view>
+
+  <!-- 明细列表（按月分组） -->
+  <view class="loading-tip" wx:if="{{loading && groups.length === 0}}">加载中...</view>
+
+  <view class="detail-list" wx:if="{{groups.length > 0}}">
+    <view class="month-group" wx:for="{{groups}}" wx:key="month">
+      <view class="month-header">
+        <text class="month-label">{{item.month}}</text>
+        <view class="month-summary">
+          <text class="month-earn">收入 +{{item.totalEarn}}</text>
+          <text class="month-spend">支出 -{{item.totalSpend}}</text>
+        </view>
+      </view>
+      <view class="detail-item" wx:for="{{item.items}}" wx:for-item="record" wx:key="id">
+        <view class="detail-left">
+          <view class="detail-icon {{record.points > 0 ? 'earn' : 'spend'}}">
+            <text>{{record.points > 0 ? '+' : '-'}}</text>
+          </view>
+          <view class="detail-info">
+            <text class="detail-desc">{{record.description}}</text>
+            <text class="detail-time">{{record.time}}</text>
+          </view>
+        </view>
+        <text class="detail-points {{record.points > 0 ? 'earn' : 'spend'}}">
+          {{record.points > 0 ? '+' : ''}}{{record.points}}
+        </text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 加载更多 -->
+  <view class="load-more-tip" wx:if="{{groups.length > 0 && hasMore}}">
+    <text>上拉加载更多</text>
+  </view>
+  <view class="load-more-tip" wx:if="{{groups.length > 0 && !hasMore && !loading}}">
+    <text>已加载全部记录</text>
+  </view>
+
+  <!-- 空状态 -->
+  <view class="empty-state" wx:if="{{!loading && groups.length === 0}}">
+    <text class="empty-icon">📋</text>
+    <text class="empty-text">暂无积分记录</text>
+  </view>
+
+  <view class="safe-bottom"></view>
+</view>

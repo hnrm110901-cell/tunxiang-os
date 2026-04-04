@@ -1,0 +1,180 @@
+<!-- 企业订餐首页 — 周菜单 + 企业账户 + 购物车 -->
+<view class="page-wrapper">
+
+  <!-- 企业信息卡 -->
+  <view class="account-card">
+    <view class="account-top">
+      <view class="company-info">
+        <text class="company-name">{{companyName}}</text>
+        <text class="member-name" wx:if="{{memberName}}">{{memberName}}</text>
+      </view>
+      <text class="balance-label">账户余额</text>
+      <text class="balance-value">¥{{balanceYuan}}</text>
+    </view>
+    <view class="budget-row">
+      <view class="budget-text">
+        <text class="budget-label">本月已用 ¥{{monthSpentYuan}}</text>
+        <text class="budget-limit">/ 预算 ¥{{monthBudgetYuan}}</text>
+      </view>
+      <view class="progress-bar">
+        <view class="progress-fill" style="width: {{budgetPercent}}%;"></view>
+      </view>
+      <text class="budget-pct">{{budgetPercent}}%</text>
+    </view>
+  </view>
+
+  <!-- 快捷操作栏 -->
+  <view class="quick-actions">
+    <view class="action-btn" bindtap="goTodayLunch">
+      <text class="action-icon">🍱</text>
+      <text class="action-text">今日午餐</text>
+    </view>
+    <view class="action-btn" bindtap="goTodayDinner">
+      <text class="action-icon">🍲</text>
+      <text class="action-text">今日晚餐</text>
+    </view>
+    <view class="action-btn" bindtap="goTomorrow">
+      <text class="action-icon">📅</text>
+      <text class="action-text">预约明日</text>
+    </view>
+    <view class="action-btn" bindtap="goOrders">
+      <text class="action-icon">📋</text>
+      <text class="action-text">查看订单</text>
+    </view>
+  </view>
+
+  <!-- 日期横滚Tab -->
+  <scroll-view class="date-tabs" scroll-x>
+    <view
+      class="date-tab {{selectedDate === item.date ? 'active' : ''}} {{item.isToday ? 'today' : ''}}"
+      wx:for="{{weekDates}}"
+      wx:key="date"
+      bindtap="selectDate"
+      data-date="{{item.date}}"
+      data-label="{{item.label}}"
+    >
+      <text class="tab-day">{{item.label}}</text>
+      <text class="tab-date">{{item.display}}</text>
+      <text class="tab-today-tag" wx:if="{{item.isToday}}">今天</text>
+    </view>
+  </scroll-view>
+
+  <!-- 加载骨架 -->
+  <view class="loading-wrap" wx:if="{{loading}}">
+    <view class="loading-skeleton" wx:for="{{[1,2,3,4]}}" wx:key="*this"></view>
+  </view>
+
+  <!-- 菜品列表 -->
+  <scroll-view class="menu-scroll" scroll-y wx:if="{{!loading}}">
+
+    <!-- 午餐区 -->
+    <view class="meal-section" wx:if="{{lunchDishes.length > 0}}">
+      <view class="meal-header">
+        <view class="meal-tag lunch-tag">午餐</view>
+        <text class="meal-title">{{selectedDateLabel}} 午餐菜单</text>
+      </view>
+      <view class="dish-card" wx:for="{{lunchDishes}}" wx:key="id">
+        <image class="dish-image" src="{{item.image || '/assets/dish-placeholder.png'}}" mode="aspectFill" lazy-load />
+        <view class="dish-info">
+          <text class="dish-name">{{item.name}}</text>
+          <view class="price-row">
+            <view class="enterprise-price-wrap">
+              <text class="enterprise-tag">补贴价</text>
+              <text class="enterprise-price">¥{{item.enterprise_price_yuan}}</text>
+            </view>
+            <text class="origin-price" wx:if="{{item.origin_price_yuan}}">¥{{item.origin_price_yuan}}</text>
+          </view>
+        </view>
+        <view class="qty-control">
+          <view class="qty-btn minus {{item.qty > 0 ? '' : 'hidden'}}" bindtap="minusDish" data-id="{{item.id}}" data-mealtype="lunch">
+            <text>-</text>
+          </view>
+          <text class="qty-num" wx:if="{{item.qty > 0}}">{{item.qty}}</text>
+          <view class="qty-btn plus" bindtap="addDish" data-id="{{item.id}}" data-mealtype="lunch">
+            <text>+</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 晚餐区 -->
+    <view class="meal-section" wx:if="{{dinnerDishes.length > 0}}">
+      <view class="meal-header">
+        <view class="meal-tag dinner-tag">晚餐</view>
+        <text class="meal-title">{{selectedDateLabel}} 晚餐菜单</text>
+      </view>
+      <view class="dish-card" wx:for="{{dinnerDishes}}" wx:key="id">
+        <image class="dish-image" src="{{item.image || '/assets/dish-placeholder.png'}}" mode="aspectFill" lazy-load />
+        <view class="dish-info">
+          <text class="dish-name">{{item.name}}</text>
+          <view class="price-row">
+            <view class="enterprise-price-wrap">
+              <text class="enterprise-tag">补贴价</text>
+              <text class="enterprise-price">¥{{item.enterprise_price_yuan}}</text>
+            </view>
+            <text class="origin-price" wx:if="{{item.origin_price_yuan}}">¥{{item.origin_price_yuan}}</text>
+          </view>
+        </view>
+        <view class="qty-control">
+          <view class="qty-btn minus {{item.qty > 0 ? '' : 'hidden'}}" bindtap="minusDish" data-id="{{item.id}}" data-mealtype="dinner">
+            <text>-</text>
+          </view>
+          <text class="qty-num" wx:if="{{item.qty > 0}}">{{item.qty}}</text>
+          <view class="qty-btn plus" bindtap="addDish" data-id="{{item.id}}" data-mealtype="dinner">
+            <text>+</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 空状态 -->
+    <view class="empty-tip" wx:if="{{!lunchDishes.length && !dinnerDishes.length && !loading}}">
+      <text class="empty-text">该日暂无菜单安排</text>
+    </view>
+
+    <!-- 底部占位 -->
+    <view style="height: 200rpx;"></view>
+  </scroll-view>
+
+  <!-- 底部购物车栏 -->
+  <view class="cart-bar" wx:if="{{cartCount > 0}}">
+    <view class="cart-left" bindtap="showCartDetail">
+      <view class="cart-icon-wrap">
+        <text class="cart-icon">🛒</text>
+        <view class="cart-badge">
+          <text class="badge-num">{{cartCount}}</text>
+        </view>
+      </view>
+      <view class="cart-total-wrap">
+        <text class="cart-total">¥{{cartTotalYuan}}</text>
+      </view>
+    </view>
+    <view class="checkout-btn" bindtap="goCheckout">
+      <text>去结算</text>
+    </view>
+  </view>
+
+  <!-- 购物车明细弹层 -->
+  <view class="cart-mask" wx:if="{{showCart}}" bindtap="hideCartDetail"></view>
+  <view class="cart-popup {{showCart ? 'show' : ''}}">
+    <view class="popup-header">
+      <text class="popup-title">已选菜品</text>
+      <view class="clear-btn" bindtap="clearCart">
+        <text class="clear-text">清空</text>
+      </view>
+    </view>
+    <scroll-view class="cart-items-scroll" scroll-y>
+      <view class="cart-item" wx:for="{{cartItems}}" wx:key="id">
+        <view class="ci-left">
+          <text class="ci-name">{{item.name}}</text>
+          <text class="ci-date">{{item.date}} {{item.meal_type === 'lunch' ? '午餐' : '晚餐'}}</text>
+        </view>
+        <view class="ci-right">
+          <text class="ci-price">¥{{item.enterprise_price_yuan}}</text>
+          <text class="ci-qty">x{{item.qty}}</text>
+        </view>
+      </view>
+    </scroll-view>
+  </view>
+
+</view>

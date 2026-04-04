@@ -1,9 +1,12 @@
 /**
- * AI 财务稽核页面 — Finance Audit (tx-brain Agent)
- * 调用 POST /api/v1/brain/finance/audit
- * 功能: 搜索触发区 + 稽核结果展示区 + 历史记录区
+ * AI 财务稽核页面 — Finance Audit
+ * 功能: 加载稽核报告 + 异常列表 + 标记已处理
+ * API:
+ *   GET  /api/v1/analytics/audit?store_id=&date=
+ *   GET  /api/v1/analytics/alerts?store_id=&status=active
+ *   PATCH /api/v1/analytics/alerts/{id}/resolve
  */
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   Alert,
   Badge,
@@ -17,36 +20,23 @@ import {
   Row,
   Select,
   Space,
+  Spin,
   Table,
   Tag,
   Typography,
+  message,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { txFetch } from '../../api';
+import { txFetch, txFetchData } from '../../api';
 
 const { Title, Text, Paragraph } = Typography;
 
-// ─── 常量 ───
+// ─── 类型定义：门店 ───
 
-const MOCK_STORES = [
-  { value: 'store_001', label: '尝在一起·芙蓉路店' },
-  { value: 'store_002', label: '尝在一起·五一广场店' },
-  { value: 'store_003', label: '最黔线·解放西路店' },
-  { value: 'store_004', label: '尚宫厨·麓谷店' },
-];
-
-// Mock 财务数据 payload（后续接真实 API）
-const MOCK_FINANCE_PAYLOAD = {
-  revenue_fen: 120000000,       // 120万
-  cost_fen: 72000000,           // 72万
-  discount_total_fen: 8000000,  // 8万
-  void_count: 3,
-  void_amount_fen: 150000,
-  cash_actual_fen: 5000000,
-  cash_expected_fen: 5050000,
-  high_discount_orders: [],
-  total_order_count: 280,
-};
+interface StoreOption {
+  value: string;
+  label: string;
+}
 
 // ─── 类型定义 ───
 
@@ -77,6 +67,18 @@ interface AuditResult {
   store_id?: string;
   store_name?: string;
   audited_at?: string;
+}
+
+interface AlertRecord {
+  id: string;
+  store_id: string;
+  store_name?: string;
+  alert_type: string;
+  description: string;
+  severity: AnomalySeverity;
+  amount_fen?: number;
+  status: 'active' | 'resolved';
+  created_at: string;
 }
 
 interface HistoryRecord {
@@ -287,12 +289,43 @@ export function FinanceAuditPage() {
   const [storeId, setStoreId] = useState<string | undefined>(undefined);
   const [auditDate, setAuditDate] = useState<string | undefined>(undefined);
   const [loading, setLoading] = useState(false);
+  const [alertsLoading, setAlertsLoading] = useState(false);
   const [result, setResult] = useState<AuditResult | null>(null);
+  const [alerts, setAlerts] = useState<AlertRecord[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [history, setHistory] = useState<HistoryRecord[]>(loadHistory);
   const [detailRecord, setDetailRecord] = useState<HistoryRecord | null>(null);
+  const [stores, setStores] = useState<StoreOption[]>([]);
 
-  // 提交稽核
+  // 一次性加载门店列表
+  useEffect(() => {
+    txFetchData<{ items: Array<{ id: string; name: string }> }>('/api/v1/org/stores?status=active')
+      .then((data) => {
+        setStores((data.items ?? []).map((s) => ({ value: s.id, label: s.name })));
+      })
+      .catch(() => {
+        // API 失败时保持空列表，不阻断页面
+        setStores([]);
+      });
+  }, []);
+
+  // 加载异常列表
+  const loadAlerts = useCallback(async (sid: string) => {
+    setAlertsLoading(true);
+    try {
+      const data = await txFetchData<{ items: AlertRecord[] }>(
+        `/api/v1/analytics/alerts?store_id=${sid}&status=active`,
+      );
+      setAlerts(data.items ?? []);
+    } catch (err) {
+      console.error('[FinanceAuditPage] load alerts error', err);
+      setAlerts([]);
+    } finally {
+      setAlertsLoading(false);
+    }
+  }, []);
+
+  // 发起稽核：加载稽核报告
   const handleAudit = async () => {
     if (!storeId) {
       setError('请先选择门店');
@@ -302,32 +335,27 @@ export function FinanceAuditPage() {
     setError(null);
     setResult(null);
 
-    try {
-      const payload = {
-        store_id: storeId,
-        audit_date: auditDate || new Date().toISOString().slice(0, 10),
-        ...MOCK_FINANCE_PAYLOAD,
-      };
+    const date = auditDate || new Date().toISOString().slice(0, 10);
 
-      const data = await txFetch<AuditResult>('/api/v1/brain/finance/audit', {
-        method: 'POST',
-        body: JSON.stringify(payload),
-      });
+    try {
+      const data = await txFetchData<AuditResult>(
+        `/api/v1/analytics/audit?store_id=${storeId}&date=${date}`,
+      );
 
       const enriched: AuditResult = {
         ...data,
         store_id: storeId,
-        store_name: MOCK_STORES.find((s) => s.value === storeId)?.label || storeId,
-        audit_date: payload.audit_date,
+        store_name: stores.find((s) => s.value === storeId)?.label || storeId,
+        audit_date: date,
         audited_at: new Date().toISOString(),
       };
 
       setResult(enriched);
 
-      // 存入 localStorage
+      // 存入 localStorage 历史
       const record: HistoryRecord = {
         id: `audit_${Date.now()}`,
-        audit_date: payload.audit_date,
+        audit_date: date,
         store_id: storeId,
         store_name: enriched.store_name || storeId,
         risk_level: enriched.risk_level,
@@ -336,12 +364,27 @@ export function FinanceAuditPage() {
       };
       saveHistory(record);
       setHistory(loadHistory());
+
+      // 同步加载异常列表
+      void loadAlerts(storeId);
     } catch (err) {
-      setError(err instanceof Error ? err.message : '稽核请求失败，请稍后重试');
+      setError(err instanceof Error ? err.message : '稽核数据加载失败，请稍后重试');
     } finally {
       setLoading(false);
     }
   };
+
+  // 标记异常已处理
+  const handleResolveAlert = useCallback(async (alertId: string) => {
+    try {
+      await txFetchData(`/api/v1/analytics/alerts/${alertId}/resolve`, { method: 'PATCH' });
+      message.success('已标记为处理完成');
+      if (storeId) void loadAlerts(storeId);
+    } catch (err) {
+      console.error('[FinanceAuditPage] resolve alert error', err);
+      message.error('标记失败，请重试');
+    }
+  }, [storeId, loadAlerts]);
 
   // 历史记录 Table 列
   const historyColumns: ColumnsType<HistoryRecord> = [
@@ -409,7 +452,7 @@ export function FinanceAuditPage() {
         <Space size={12} wrap>
           <Select
             placeholder="选择门店"
-            options={MOCK_STORES}
+            options={stores}
             value={storeId}
             onChange={setStoreId}
             style={{ width: 220 }}
@@ -498,7 +541,61 @@ export function FinanceAuditPage() {
         </Card>
       )}
 
-      {/* 3. 历史记录区 */}
+      {/* 3. 活跃异常列表区 */}
+      {(alerts.length > 0 || alertsLoading) && (
+        <Card
+          title={
+            <Space>
+              <span>活跃异常列表</span>
+              {alerts.length > 0 && <Tag color="red">{alerts.length} 条</Tag>}
+            </Space>
+          }
+          style={{ marginBottom: 24 }}
+        >
+          <Spin spinning={alertsLoading}>
+            <Table<AlertRecord>
+              dataSource={alerts}
+              rowKey="id"
+              size="small"
+              pagination={false}
+              columns={[
+                { title: '类型', dataIndex: 'alert_type', width: 120 },
+                { title: '描述', dataIndex: 'description' },
+                {
+                  title: '严重程度',
+                  dataIndex: 'severity',
+                  width: 100,
+                  render: (sev: AnomalySeverity) => (
+                    <Tag color={SEVERITY_COLOR[sev]}>{SEVERITY_LABEL[sev]}</Tag>
+                  ),
+                },
+                {
+                  title: '涉及金额',
+                  dataIndex: 'amount_fen',
+                  width: 120,
+                  render: (val?: number) => val != null ? `¥${fenToYuan(val)}` : '-',
+                },
+                { title: '发生时间', dataIndex: 'created_at', width: 160 },
+                {
+                  title: '操作',
+                  width: 100,
+                  render: (_: unknown, record: AlertRecord) => (
+                    <Button
+                      size="small"
+                      type="link"
+                      onClick={() => handleResolveAlert(record.id)}
+                    >
+                      标记已处理
+                    </Button>
+                  ),
+                },
+              ]}
+            />
+          </Spin>
+        </Card>
+      )}
+
+      {/* 4. 历史记录区 */}
       <Card title="历史稽核记录">
         {history.length === 0 ? (
           <Empty description="暂无历史记录" image={Empty.PRESENTED_IMAGE_SIMPLE} />

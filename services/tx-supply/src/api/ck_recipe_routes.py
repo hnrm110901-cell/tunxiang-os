@@ -15,6 +15,7 @@
 """
 from __future__ import annotations
 
+import asyncio
 import uuid
 from datetime import date, datetime
 from typing import Any, Dict, List, Optional
@@ -22,6 +23,8 @@ from typing import Any, Dict, List, Optional
 import structlog
 from fastapi import APIRouter, Header, HTTPException, Query
 from pydantic import BaseModel, Field
+
+from shared.events.src.emitter import emit_event
 
 log = structlog.get_logger(__name__)
 
@@ -245,6 +248,21 @@ async def create_recipe(
     _RECIPE_INGREDIENTS[recipe_id] = ingredients
 
     log.info("recipe.created", recipe_id=recipe_id, tenant_id=x_tenant_id)
+
+    asyncio.create_task(emit_event(
+        tenant_id=x_tenant_id,
+        store_id=None,
+        event_type="supply.bom_updated",
+        stream_id=str(recipe_id),
+        payload={
+            "recipe_id": str(recipe_id),
+            "dish_id": body.dish_id,
+            "action": "created",
+            "ingredient_count": len(body.ingredients),
+        },
+        source_service="tx-supply",
+    ))
+
     result = dict(recipe)
     result["ingredients"] = ingredients
     return {"ok": True, "data": result}
@@ -313,6 +331,19 @@ async def update_recipe(
             }
             ingredients.append(ing_row)
         _RECIPE_INGREDIENTS[recipe_id] = ingredients
+
+    asyncio.create_task(emit_event(
+        tenant_id=x_tenant_id,
+        store_id=None,
+        event_type="supply.bom_updated",
+        stream_id=recipe_id,
+        payload={
+            "recipe_id": recipe_id,
+            "dish_id": recipe["dish_id"],
+            "action": "updated",
+        },
+        source_service="tx-supply",
+    ))
 
     result = dict(recipe)
     result["ingredients"] = _RECIPE_INGREDIENTS.get(recipe_id, [])

@@ -1,0 +1,122 @@
+.page-container { min-height: 100vh; background: #0B1A20; color: #fff; padding-bottom: 140rpx; }
+
+.form-wrap { padding: 24rpx; }
+
+.form-section {
+  background: #112228;
+  border-radius: 16rpx;
+  padding: 28rpx;
+  margin-bottom: 20rpx;
+}
+
+.form-label { font-size: 26rpx; color: #999; display: block; margin-bottom: 16rpx; }
+
+.form-input {
+  background: #1a2a33;
+  border-radius: 12rpx;
+  padding: 20rpx 24rpx;
+  font-size: 28rpx;
+  color: #fff;
+}
+
+.form-picker {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.placeholder-text { color: #666; }
+.picker-arrow { color: #666; font-size: 28rpx; }
+
+.form-textarea {
+  background: #1a2a33;
+  border-radius: 12rpx;
+  padding: 20rpx 24rpx;
+  font-size: 28rpx;
+  color: #fff;
+  width: 100%;
+  height: 160rpx;
+  box-sizing: border-box;
+}
+
+/* 地图选点 */
+.map-section {
+  background: #112228;
+  border-radius: 16rpx;
+  padding: 28rpx;
+  margin-bottom: 20rpx;
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+}
+.map-icon { font-size: 36rpx; }
+.map-text { flex: 1; font-size: 28rpx; color: #999; }
+.map-arrow { font-size: 28rpx; color: #666; }
+
+/* 标签 */
+.tag-list { display: flex; gap: 16rpx; flex-wrap: wrap; }
+
+.tag-item {
+  padding: 12rpx 32rpx;
+  background: #1a2a33;
+  border-radius: 32rpx;
+  border: 2rpx solid transparent;
+}
+.tag-item.active { border-color: #FF6B2C; background: rgba(255, 107, 44, 0.1); }
+.tag-item-text { font-size: 26rpx; color: #999; }
+.tag-item.active .tag-item-text { color: #FF6B2C; }
+
+/* 默认开关 */
+.default-section {
+  background: #112228;
+  border-radius: 16rpx;
+  padding: 28rpx;
+  margin-bottom: 20rpx;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.default-label { font-size: 28rpx; color: #fff; }
+
+.default-switch {
+  width: 96rpx;
+  height: 52rpx;
+  background: #1a2a33;
+  border-radius: 26rpx;
+  position: relative;
+  transition: background 200ms;
+}
+.default-switch.on { background: #FF6B2C; }
+
+.switch-dot {
+  width: 44rpx;
+  height: 44rpx;
+  background: #fff;
+  border-radius: 50%;
+  position: absolute;
+  top: 4rpx;
+  left: 4rpx;
+  transition: left 200ms;
+}
+.default-switch.on .switch-dot { left: 48rpx; }
+
+/* 底部保存 */
+.bottom-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 20rpx 32rpx;
+  padding-bottom: calc(20rpx + env(safe-area-inset-bottom));
+  background: #0B1A20;
+}
+
+.save-btn {
+  background: #FF6B2C !important;
+  color: #fff !important;
+  border-radius: 44rpx;
+  font-size: 32rpx;
+  height: 88rpx;
+  line-height: 88rpx;
+}
+.save-btn[disabled] { opacity: 0.6; }

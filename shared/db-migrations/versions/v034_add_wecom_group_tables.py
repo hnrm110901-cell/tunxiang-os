@@ -93,7 +93,7 @@ def upgrade() -> None:
             "target_store_ids",
             JSONB,
             nullable=False,
-            server_default="'[]'",
+            server_default=sa.text("'[]'"),
             comment="目标门店 UUID 列表（空数组=全部门店）",
         ),
 
@@ -118,7 +118,7 @@ def upgrade() -> None:
             "sop_calendar",
             JSONB,
             nullable=False,
-            server_default="'[]'",
+            server_default=sa.text("'[]'"),
             comment=(
                 "SOP 内容日历，JSONB 数组，支持 daily/weekly/holiday/new_dish 类型\n"
                 "示例：[{\"type\":\"daily\",\"time\":\"09:00\",\"content\":\"早安...\"}]"

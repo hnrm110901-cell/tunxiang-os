@@ -1,0 +1,525 @@
+/* 门店详情页 */
+
+/* ── 颜色变量 ── */
+/* $tx-primary: #FF6B35 */
+/* $tx-bg: #0B1A20 */
+/* $tx-card: #112228 */
+/* $tx-border: rgba(255,255,255,0.08) */
+
+.page-container {
+  min-height: 100vh;
+  background: #0B1A20;
+  padding-bottom: 140rpx;
+}
+
+/* ── 加载中 ── */
+.loading-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 400rpx;
+}
+.loading-text {
+  font-size: 28rpx;
+  color: rgba(255,255,255,0.4);
+}
+
+/* ── 封面图 ── */
+.cover-section {
+  position: relative;
+  height: 420rpx;
+  overflow: hidden;
+}
+.cover-image {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.status-badge {
+  position: absolute;
+  top: 24rpx;
+  left: 24rpx;
+  padding: 8rpx 20rpx;
+  border-radius: 24rpx;
+  font-size: 24rpx;
+  font-weight: 600;
+}
+.status-badge.open {
+  background: rgba(15, 110, 86, 0.85);
+  color: #8BFFDA;
+}
+.status-badge.closed {
+  background: rgba(80, 80, 80, 0.85);
+  color: rgba(255,255,255,0.6);
+}
+.image-count {
+  position: absolute;
+  bottom: 20rpx;
+  right: 24rpx;
+  background: rgba(0,0,0,0.55);
+  padding: 6rpx 16rpx;
+  border-radius: 20rpx;
+}
+.image-count-text {
+  font-size: 22rpx;
+  color: rgba(255,255,255,0.85);
+}
+
+/* ── 基础信息卡片 ── */
+.info-card {
+  margin: 0 24rpx;
+  margin-top: -40rpx;
+  background: #112228;
+  border-radius: 24rpx;
+  padding: 32rpx;
+  position: relative;
+  z-index: 2;
+  box-shadow: 0 8rpx 32rpx rgba(0,0,0,0.3);
+}
+.info-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+.info-header-left {
+  flex: 1;
+  margin-right: 16rpx;
+}
+.store-name {
+  font-size: 36rpx;
+  font-weight: 700;
+  color: #FFFFFF;
+  display: block;
+  margin-bottom: 16rpx;
+  line-height: 1.3;
+}
+.store-logo {
+  width: 80rpx;
+  height: 80rpx;
+  border-radius: 16rpx;
+  flex-shrink: 0;
+}
+
+/* ── 标签横向滚动 ── */
+.tags-scroll {
+  white-space: nowrap;
+  margin-bottom: 24rpx;
+}
+.tags-row {
+  display: inline-flex;
+  gap: 12rpx;
+}
+.tag-item {
+  display: inline-block;
+  font-size: 22rpx;
+  color: #FF6B35;
+  background: rgba(255,107,53,0.12);
+  padding: 6rpx 18rpx;
+  border-radius: 20rpx;
+  border: 1rpx solid rgba(255,107,53,0.3);
+  white-space: nowrap;
+}
+
+/* ── 评分统计 ── */
+.store-stats {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 16rpx 0 0;
+  border-top: 1rpx solid rgba(255,255,255,0.07);
+}
+.stat-item {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6rpx;
+}
+.stat-star {
+  color: #FFB800;
+  font-size: 28rpx;
+}
+.stat-value {
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #FFFFFF;
+}
+.stat-label {
+  font-size: 22rpx;
+  color: rgba(255,255,255,0.5);
+}
+.stat-arrow {
+  font-size: 28rpx;
+  color: rgba(255,255,255,0.35);
+  margin-left: 4rpx;
+}
+.stat-divider {
+  width: 1rpx;
+  height: 36rpx;
+  background: rgba(255,255,255,0.1);
+}
+
+/* ── 排队状态 ── */
+.queue-row {
+  display: flex;
+  align-items: center;
+  margin-top: 20rpx;
+  padding: 16rpx 20rpx;
+  background: rgba(255,107,53,0.08);
+  border-radius: 12rpx;
+  border: 1rpx solid rgba(255,107,53,0.2);
+  gap: 12rpx;
+}
+.queue-icon {
+  font-size: 28rpx;
+}
+.queue-text {
+  font-size: 24rpx;
+  color: rgba(255,255,255,0.8);
+  flex: 1;
+}
+
+/* ── 操作按钮行 ── */
+.action-row {
+  display: flex;
+  margin: 24rpx;
+  background: #112228;
+  border-radius: 20rpx;
+  overflow: hidden;
+}
+.action-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 28rpx 0;
+  gap: 8rpx;
+  position: relative;
+}
+.action-btn:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 20%;
+  height: 60%;
+  width: 1rpx;
+  background: rgba(255,255,255,0.08);
+}
+.action-icon {
+  font-size: 44rpx;
+}
+.action-label {
+  font-size: 22rpx;
+  color: rgba(255,255,255,0.75);
+  position: relative;
+}
+.slot-badge {
+  position: absolute;
+  top: -12rpx;
+  right: -20rpx;
+  background: #FF6B35;
+  color: #FFFFFF;
+  font-size: 18rpx;
+  padding: 2rpx 8rpx;
+  border-radius: 12rpx;
+  min-width: 28rpx;
+  text-align: center;
+}
+
+/* ── 详情行：地址/电话/营业时间 ── */
+.detail-section {
+  margin: 0 24rpx 24rpx;
+  background: #112228;
+  border-radius: 20rpx;
+  overflow: hidden;
+}
+.detail-row {
+  display: flex;
+  align-items: flex-start;
+  padding: 28rpx 24rpx;
+  gap: 20rpx;
+}
+.detail-icon-text {
+  font-size: 32rpx;
+  flex-shrink: 0;
+  margin-top: 4rpx;
+}
+.detail-content {
+  flex: 1;
+  min-width: 0;
+}
+.detail-title-text {
+  font-size: 24rpx;
+  color: rgba(255,255,255,0.45);
+  display: block;
+  margin-bottom: 8rpx;
+}
+.detail-body-text {
+  font-size: 28rpx;
+  color: #FFFFFF;
+  display: block;
+  line-height: 1.5;
+  word-break: break-all;
+}
+.detail-distance {
+  font-size: 22rpx;
+  color: #FF6B35;
+  display: block;
+  margin-top: 4rpx;
+}
+.detail-arrow-right {
+  font-size: 36rpx;
+  color: rgba(255,255,255,0.25);
+  flex-shrink: 0;
+  align-self: center;
+}
+.call-arrow {
+  font-size: 24rpx;
+  color: #FF6B35;
+}
+.detail-divider {
+  height: 1rpx;
+  background: rgba(255,255,255,0.06);
+  margin: 0 24rpx;
+}
+
+/* 营业时间多行 */
+.hours-row {
+  align-items: flex-start;
+}
+.hours-item {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  margin-bottom: 8rpx;
+}
+.hours-item:last-child {
+  margin-bottom: 0;
+}
+.hours-days {
+  font-size: 26rpx;
+  color: rgba(255,255,255,0.55);
+  min-width: 160rpx;
+}
+.hours-time {
+  font-size: 26rpx;
+  color: #FFFFFF;
+}
+
+/* ── 设施服务 ── */
+.facilities-section {
+  margin: 0 24rpx 24rpx;
+  background: #112228;
+  border-radius: 20rpx;
+  padding: 28rpx 24rpx;
+}
+.section-title {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: rgba(255,255,255,0.6);
+  display: block;
+  margin-bottom: 20rpx;
+}
+.facilities-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+}
+.facility-item {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  padding: 10rpx 20rpx;
+  background: rgba(255,255,255,0.06);
+  border-radius: 12rpx;
+}
+.facility-label {
+  font-size: 24rpx;
+  color: rgba(255,255,255,0.75);
+}
+
+/* ── 公告 ── */
+.notice-section {
+  margin: 0 24rpx 24rpx;
+  background: #112228;
+  border-radius: 20rpx;
+  padding: 28rpx 24rpx;
+}
+.notice-body {
+  display: flex;
+  gap: 16rpx;
+  align-items: flex-start;
+  margin-top: 4rpx;
+}
+.notice-icon {
+  font-size: 28rpx;
+  flex-shrink: 0;
+}
+.notice-text {
+  font-size: 26rpx;
+  color: rgba(255,255,255,0.65);
+  line-height: 1.6;
+}
+
+/* ── 图片画廊 ── */
+.gallery-section {
+  margin: 0 24rpx 24rpx;
+  background: #112228;
+  border-radius: 20rpx;
+  padding: 28rpx 24rpx;
+}
+.gallery-scroll {
+  white-space: nowrap;
+  margin-top: 8rpx;
+}
+.gallery-row {
+  display: inline-flex;
+  gap: 16rpx;
+}
+.gallery-img {
+  width: 240rpx;
+  height: 180rpx;
+  border-radius: 12rpx;
+  flex-shrink: 0;
+  display: inline-block;
+}
+
+/* ── 底部占位 ── */
+.bottom-placeholder {
+  height: 32rpx;
+}
+
+/* ── 底部固定栏 ── */
+.bottom-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  padding: 20rpx 32rpx;
+  padding-bottom: calc(20rpx + env(safe-area-inset-bottom));
+  background: #0D2030;
+  border-top: 1rpx solid rgba(255,255,255,0.06);
+}
+.bottom-bar-left {
+  flex: 1;
+  min-width: 0;
+}
+.bottom-store-name {
+  display: block;
+  font-size: 26rpx;
+  font-weight: 600;
+  color: #FFFFFF;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bottom-open-status {
+  font-size: 22rpx;
+  display: block;
+  margin-top: 4rpx;
+}
+.bottom-open-status.open {
+  color: #0F6E56;
+}
+.bottom-open-status.closed {
+  color: rgba(255,255,255,0.35);
+}
+.order-btn {
+  background: #FF6B35;
+  color: #FFFFFF;
+  font-size: 30rpx;
+  font-weight: 700;
+  padding: 0 56rpx;
+  height: 88rpx;
+  line-height: 88rpx;
+  border-radius: 44rpx;
+  border: none;
+}
+.order-btn.disabled {
+  background: rgba(255,255,255,0.15);
+  color: rgba(255,255,255,0.4);
+}
+.order-btn::after {
+  border: none;
+}
+
+/* ── 导航弹窗 ── */
+.popup-mask {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.55);
+  z-index: 100;
+}
+.nav-popup {
+  position: fixed;
+  bottom: -600rpx;
+  left: 0;
+  right: 0;
+  background: #112228;
+  border-radius: 32rpx 32rpx 0 0;
+  padding: 32rpx 32rpx;
+  padding-bottom: calc(32rpx + env(safe-area-inset-bottom));
+  z-index: 101;
+  transition: bottom 300ms ease-out;
+}
+.nav-popup.show {
+  bottom: 0;
+}
+.popup-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24rpx;
+}
+.popup-title {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #FFFFFF;
+}
+.popup-close {
+  width: 56rpx;
+  height: 56rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28rpx;
+  color: rgba(255,255,255,0.4);
+}
+.nav-address {
+  background: rgba(255,255,255,0.05);
+  padding: 20rpx 24rpx;
+  border-radius: 12rpx;
+  margin-bottom: 24rpx;
+}
+.nav-address-text {
+  font-size: 26rpx;
+  color: rgba(255,255,255,0.75);
+  line-height: 1.5;
+}
+.nav-actions {
+  display: flex;
+  gap: 16rpx;
+}
+.nav-btn {
+  flex: 1;
+  height: 88rpx;
+  line-height: 88rpx;
+  border-radius: 44rpx;
+  font-size: 28rpx;
+  font-weight: 600;
+  border: none;
+}
+.nav-btn::after {
+  border: none;
+}
+.wechat-map {
+  background: #FF6B35;
+  color: #FFFFFF;
+}
+.copy-addr {
+  background: rgba(255,255,255,0.1);
+  color: rgba(255,255,255,0.8);
+}

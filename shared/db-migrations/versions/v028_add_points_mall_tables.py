@@ -86,7 +86,7 @@ def upgrade() -> None:
                   comment="累计已兑换数量"),
 
         # 商品内容（JSONB）
-        sa.Column("product_content", JSONB(), nullable=False, server_default="'{}'::jsonb",
+        sa.Column("product_content", JSONB(), nullable=False, server_default=sa.text("'{}'::jsonb"),
                   comment="商品内容详情，结构因 product_type 不同"),
 
         # 兑换限制

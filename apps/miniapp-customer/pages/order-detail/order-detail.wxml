@@ -1,0 +1,134 @@
+<!-- 订单详情页 — 状态 + 信息 + 菜品 + 金额 + 操作 -->
+<view class="page-container">
+
+  <!-- 加载中 -->
+  <view class="loading-wrap" wx:if="{{loading}}">
+    <text class="loading-text">加载中...</text>
+  </view>
+
+  <block wx:if="{{!loading}}">
+
+    <!-- 状态大图标区 -->
+    <view class="status-section" style="background: {{statusColor}}22;">
+      <text class="status-icon">{{statusIcon}}</text>
+      <text class="status-text" style="color: {{statusColor}};">{{statusText}}</text>
+    </view>
+
+    <!-- 订单信息卡 -->
+    <view class="info-card">
+      <text class="card-title">订单信息</text>
+      <view class="info-row">
+        <text class="info-label">订单号</text>
+        <view class="info-value-wrap">
+          <text class="info-value selectable">{{orderNo}}</text>
+          <text class="copy-btn" bindtap="copyOrderNo">复制</text>
+        </view>
+      </view>
+      <view class="info-row">
+        <text class="info-label">下单时间</text>
+        <text class="info-value">{{createdAt}}</text>
+      </view>
+      <view class="info-row">
+        <text class="info-label">门店</text>
+        <text class="info-value">{{storeName}}</text>
+      </view>
+      <view class="info-row" wx:if="{{tableNo}}">
+        <text class="info-label">桌号</text>
+        <text class="info-value">{{tableNo}}号桌</text>
+      </view>
+      <view class="info-row" wx:if="{{address}}">
+        <text class="info-label">配送地址</text>
+        <text class="info-value">{{address}}</text>
+      </view>
+    </view>
+
+    <!-- 菜品列表 -->
+    <view class="items-card">
+      <text class="card-title">菜品详情</text>
+      <view class="dish-item" wx:for="{{items}}" wx:key="id">
+        <image class="dish-img" wx:if="{{item.imageUrl}}" src="{{item.imageUrl}}" mode="aspectFill" lazy-load />
+        <view class="dish-placeholder" wx:if="{{!item.imageUrl}}">
+          <text class="dish-placeholder-text">🍽</text>
+        </view>
+        <view class="dish-info">
+          <text class="dish-name">{{item.name}}</text>
+          <text class="dish-spec" wx:if="{{item.spec}}">{{item.spec}}</text>
+          <text class="dish-qty">x{{item.quantity}}</text>
+        </view>
+        <text class="dish-price">¥{{item.subtotalYuan}}</text>
+      </view>
+    </view>
+
+    <!-- 金额明细 -->
+    <view class="amount-card">
+      <text class="card-title">金额明细</text>
+      <view class="amount-row">
+        <text class="amount-label">菜品合计</text>
+        <text class="amount-value">¥{{itemsTotalYuan}}</text>
+      </view>
+      <view class="amount-row" wx:if="{{discountYuan !== '0.00'}}">
+        <text class="amount-label">优惠</text>
+        <text class="amount-value discount">-¥{{discountYuan}}</text>
+      </view>
+      <view class="amount-row" wx:if="{{deliveryFeeYuan !== '0.00'}}">
+        <text class="amount-label">配送费</text>
+        <text class="amount-value">¥{{deliveryFeeYuan}}</text>
+      </view>
+      <view class="amount-total-row">
+        <text class="amount-total-label">实付</text>
+        <text class="amount-total-value">¥{{finalTotalYuan}}</text>
+      </view>
+    </view>
+
+    <!-- 操作按钮区 -->
+    <view class="action-section">
+      <!-- 待支付 -->
+      <block wx:if="{{showPay}}">
+        <view class="action-btn primary" bindtap="goPay">
+          <text class="action-btn-text">去支付</text>
+        </view>
+        <view class="action-btn outline" bindtap="cancelOrder">
+          <text class="action-btn-text">取消订单</text>
+        </view>
+      </block>
+
+      <!-- 制作中 -->
+      <block wx:if="{{showRush}}">
+        <view class="action-btn primary" bindtap="rushOrder">
+          <text class="action-btn-text">催一下</text>
+        </view>
+      </block>
+
+      <!-- 配送中 -->
+      <block wx:if="{{showContactRider}}">
+        <view class="action-btn primary" bindtap="contactRider">
+          <text class="action-btn-text">联系骑手</text>
+        </view>
+      </block>
+
+      <!-- 已完成 -->
+      <block wx:if="{{showReorder}}">
+        <view class="action-btn primary" bindtap="reorder">
+          <text class="action-btn-text">再来一单</text>
+        </view>
+        <view class="action-btn outline" bindtap="goReview">
+          <text class="action-btn-text">去评价</text>
+        </view>
+        <view class="action-btn outline-warn" bindtap="goRefund">
+          <text class="action-btn-text">申请退款</text>
+        </view>
+      </block>
+
+      <!-- 已取消 -->
+      <block wx:if="{{showResubmit}}">
+        <view class="action-btn primary" bindtap="resubmit">
+          <text class="action-btn-text">重新下单</text>
+        </view>
+      </block>
+    </view>
+
+    <!-- 底部安全区 -->
+    <view class="safe-area-bottom"></view>
+
+  </block>
+</view>

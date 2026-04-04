@@ -1,0 +1,90 @@
+<view class="page">
+  <!-- 顶部会员卡 -->
+  <view class="member-card {{tierClass}}">
+    <view class="card-bg-decoration"/>
+    <view class="card-top">
+      <image class="avatar" src="{{userInfo.avatar || '/assets/default-avatar.png'}}" mode="aspectFill"/>
+      <view class="member-info">
+        <text class="member-name">{{userInfo.name || '未登录'}}</text>
+        <view class="tier-badge">
+          <text class="tier-icon">{{tier.icon}}</text>
+          <text class="tier-name">{{tier.name}}</text>
+        </view>
+      </view>
+      <view class="points-box">
+        <text class="points-num">{{points}}</text>
+        <text class="points-label">积分</text>
+      </view>
+    </view>
+    <!-- 升级进度条 -->
+    <view class="upgrade-progress" wx:if="{{nextTier}}">
+      <text class="progress-label">距 {{nextTier.name}} 还差 {{pointsGap}} 积分</text>
+      <view class="progress-bar">
+        <view class="progress-fill" style="width: {{progressPct}}%"/>
+      </view>
+    </view>
+    <view class="top-tier-badge" wx:else>
+      <text>🏆 您已是最高等级会员</text>
+    </view>
+  </view>
+
+  <!-- 本月专属权益 -->
+  <view class="section">
+    <text class="section-title">本月专属权益</text>
+    <view class="benefits-grid">
+      <view class="benefit-item" wx:for="{{benefits}}" wx:key="id">
+        <view class="benefit-icon">{{item.icon}}</view>
+        <text class="benefit-name">{{item.name}}</text>
+        <text class="benefit-value">{{item.value}}</text>
+        <text class="benefit-status {{item.used ? 'used' : ''}}">{{item.used ? '已使用' : '未使用'}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 等级对比 -->
+  <view class="section">
+    <text class="section-title">等级权益对比</text>
+    <scroll-view scroll-x class="tier-compare-scroll">
+      <view class="tier-compare-table">
+        <!-- 表头 -->
+        <view class="compare-col header">
+          <text class="col-header">权益</text>
+          <text class="compare-row-label">折扣</text>
+          <text class="compare-row-label">积分倍率</text>
+          <text class="compare-row-label">生日红包</text>
+          <text class="compare-row-label">免配送费</text>
+          <text class="compare-row-label">优先预订</text>
+        </view>
+        <view class="compare-col {{tier.level >= col.level ? 'current' : ''}}" wx:for="{{allTiers}}" wx:for-item="col" wx:key="level">
+          <view class="col-header-cell">
+            <text class="col-icon">{{col.icon}}</text>
+            <text class="col-name">{{col.name}}</text>
+          </view>
+          <text class="compare-cell {{tier.level >= col.level ? 'highlight' : ''}}">{{col.level <= tier.level ? col.discount : '🔒'}}</text>
+          <text class="compare-cell">{{col.level <= tier.level ? col.multiplier+'x' : '🔒'}}</text>
+          <text class="compare-cell">{{col.level <= tier.level ? '¥'+col.birthday : '🔒'}}</text>
+          <text class="compare-cell">{{col.level <= tier.level ? col.delivery : '🔒'}}</text>
+          <text class="compare-cell">{{col.level >= 2 ? '✓' : '—'}}</text>
+        </view>
+      </view>
+    </scroll-view>
+  </view>
+
+  <!-- 获取更多积分 -->
+  <view class="section">
+    <text class="section-title">获取更多积分</text>
+    <view class="earn-list">
+      <view class="earn-item" wx:for="{{earnMethods}}" wx:key="id" bindtap="goEarn" data-action="{{item.action}}">
+        <text class="earn-icon">{{item.icon}}</text>
+        <view class="earn-info">
+          <text class="earn-name">{{item.name}}</text>
+          <text class="earn-desc">{{item.desc}}</text>
+        </view>
+        <view class="earn-points">
+          <text>+{{item.points}}分</text>
+        </view>
+        <text class="earn-arrow">›</text>
+      </view>
+    </view>
+  </view>
+</view>

@@ -80,6 +80,7 @@ def upgrade() -> None:
         ALTER TABLE approval_workflow_templates ENABLE ROW LEVEL SECURITY;
         ALTER TABLE approval_workflow_templates FORCE ROW LEVEL SECURITY;
 
+        DROP POLICY IF EXISTS approval_workflow_templates_tenant_isolation ON approval_workflow_templates;
         CREATE POLICY approval_workflow_templates_tenant_isolation
             ON approval_workflow_templates
             AS PERMISSIVE FOR ALL
@@ -97,6 +98,9 @@ def upgrade() -> None:
     # 2. approval_instances — 审批实例
     #    每次发起审批创建一条记录，关联模板和业务单据
     # ─────────────────────────────────────────────────────────────────
+    op.execute("ALTER TABLE approval_instances ADD COLUMN IF NOT EXISTS context_data JSONB DEFAULT '{}'")
+    op.execute("ALTER TABLE approval_instances ADD COLUMN IF NOT EXISTS completed_at TIMESTAMPTZ")
+    op.execute("ALTER TABLE approval_instances ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE")
     op.execute("""
         CREATE TABLE IF NOT EXISTS approval_instances (
             id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -153,6 +157,7 @@ def upgrade() -> None:
         ALTER TABLE approval_instances ENABLE ROW LEVEL SECURITY;
         ALTER TABLE approval_instances FORCE ROW LEVEL SECURITY;
 
+        DROP POLICY IF EXISTS approval_instances_tenant_isolation ON approval_instances;
         CREATE POLICY approval_instances_tenant_isolation
             ON approval_instances
             AS PERMISSIVE FOR ALL
@@ -208,6 +213,7 @@ def upgrade() -> None:
         ALTER TABLE approval_step_records ENABLE ROW LEVEL SECURITY;
         ALTER TABLE approval_step_records FORCE ROW LEVEL SECURITY;
 
+        DROP POLICY IF EXISTS approval_step_records_tenant_isolation ON approval_step_records;
         CREATE POLICY approval_step_records_tenant_isolation
             ON approval_step_records
             AS PERMISSIVE FOR ALL

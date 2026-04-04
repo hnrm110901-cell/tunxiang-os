@@ -56,7 +56,7 @@ def upgrade() -> None:
             "selected_items",
             JSONB,
             nullable=False,
-            server_default="'[]'",
+            server_default=sa.text("'[]'"),
             comment="用户勾选的配置项列表",
         ),
         sa.Column(

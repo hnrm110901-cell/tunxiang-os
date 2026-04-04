@@ -1,0 +1,95 @@
+<!-- 外卖订单跟踪页 -->
+<view class="track-page">
+  <!-- 加载中 -->
+  <view class="loading-wrap" wx:if="{{loading}}">
+    <text class="loading-text">加载订单中...</text>
+  </view>
+
+  <scroll-view scroll-y class="track-scroll" wx:if="{{!loading}}">
+    <!-- 订单状态大卡片 -->
+    <view class="status-card">
+      <view class="status-icon-wrap">
+        <text class="status-icon">{{statusIcon}}</text>
+      </view>
+      <text class="status-text">{{statusText}}</text>
+      <text class="status-desc">{{statusDesc}}</text>
+
+      <!-- 倒计时 -->
+      <view class="countdown-row" wx:if="{{showCountdown}}">
+        <text class="countdown-label">预计送达</text>
+        <text class="countdown-value">{{countdownText}}</text>
+      </view>
+    </view>
+
+    <!-- 骑手信息 -->
+    <view class="rider-card" wx:if="{{rider}}">
+      <view class="rider-info">
+        <view class="rider-avatar-wrap">
+          <text class="rider-avatar-text">&#128692;</text>
+        </view>
+        <view class="rider-detail">
+          <text class="rider-name">{{rider.name}}</text>
+          <text class="rider-distance" wx:if="{{rider.distance}}">骑手距您约{{rider.distance}}</text>
+        </view>
+      </view>
+      <view class="rider-call" bindtap="callRider">
+        <text class="call-icon">&#128222;</text>
+        <text class="call-text">联系骑手</text>
+      </view>
+    </view>
+
+    <!-- 订单进度时间线 -->
+    <view class="timeline-card">
+      <view class="timeline-title">订单进度</view>
+      <view class="timeline-item {{item.active ? 'active' : ''}} {{item.done ? 'done' : ''}}"
+            wx:for="{{timeline}}" wx:key="step">
+        <view class="timeline-dot"></view>
+        <view class="timeline-line" wx:if="{{index < timeline.length - 1}}"></view>
+        <view class="timeline-content">
+          <text class="timeline-step">{{item.label}}</text>
+          <text class="timeline-time" wx:if="{{item.time}}">{{item.time}}</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 订单详情折叠 -->
+    <view class="detail-card">
+      <view class="detail-header" bindtap="toggleDetail">
+        <text class="detail-title">订单详情</text>
+        <text class="detail-toggle">{{showDetail ? '收起' : '展开'}}</text>
+      </view>
+      <view class="detail-body" wx:if="{{showDetail}}">
+        <view class="detail-row">
+          <text class="detail-label">订单编号</text>
+          <text class="detail-value" bindtap="copyOrderNo" data-text="{{orderNo}}">{{orderNo}}</text>
+        </view>
+        <view class="detail-row">
+          <text class="detail-label">下单时间</text>
+          <text class="detail-value">{{orderTime}}</text>
+        </view>
+        <view class="detail-row">
+          <text class="detail-label">配送地址</text>
+          <text class="detail-value addr-val">{{deliveryAddress}}</text>
+        </view>
+        <view class="detail-divider"></view>
+        <view class="detail-item" wx:for="{{orderItems}}" wx:key="id">
+          <text class="detail-item-name">{{item.name}} x{{item.quantity}}</text>
+          <text class="detail-item-price">¥{{item.subtotalYuan}}</text>
+        </view>
+        <view class="detail-divider"></view>
+        <view class="detail-row">
+          <text class="detail-label">配送费</text>
+          <text class="detail-value">¥{{deliveryFeeYuan}}</text>
+        </view>
+        <view class="detail-row">
+          <text class="detail-label">包装费</text>
+          <text class="detail-value">¥{{packFeeYuan}}</text>
+        </view>
+        <view class="detail-row total">
+          <text class="detail-label">实付金额</text>
+          <text class="detail-value total-val">¥{{payTotalYuan}}</text>
+        </view>
+      </view>
+    </view>
+  </scroll-view>
+</view>

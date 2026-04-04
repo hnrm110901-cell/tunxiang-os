@@ -102,18 +102,6 @@ function formatDuration(minutes: number): string {
   return h > 0 ? `${h}小时${m}分钟` : `${m}分钟`;
 }
 
-/* ---------- Mock 数据 ---------- */
-const MOCK_SHIFT: ShiftSummary = {
-  shift_id: 'mock-shift-001',
-  shift_type: '早班',
-  start_time: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
-  employee_name: '张三',
-  employee_id: 'EMP001',
-  revenue_preview: 328500,
-  table_count: 12,
-  order_count: 18,
-};
-
 /* ---------- 步骤指示器 ---------- */
 function StepIndicator({ current, total }: { current: number; total: number }) {
   return (
@@ -165,9 +153,8 @@ export function ShiftHandoverPage() {
       const data = await fetchCurrentShift();
       setShift(data);
     } catch (err) {
-      setShift(MOCK_SHIFT);
       const msg = err instanceof Error ? err.message : '未知错误';
-      setLoadError(`班次数据加载失败（示例数据）：${msg}`);
+      setLoadError(`班次数据加载失败：${msg}`);
     }
   }, []);
 

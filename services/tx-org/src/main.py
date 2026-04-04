@@ -20,6 +20,7 @@ from api.im_sync_routes import router as im_sync_router
 from api.leave_routes import router as leave_router
 from api.ota_routes import router as ota_router
 from api.patrol_routes import router as patrol_router
+import api.payroll_engine_routes as _payroll_engine_mod
 from api.payroll_engine_routes import router as payroll_engine_v3_router
 from api.payroll_router import router as payroll_v2_router
 from api.payroll_routes import router as payroll_router
@@ -30,12 +31,23 @@ from api.permission_routes import router as permission_router
 from api.role_api import router as role_router
 from api.salary_items import router as salary_items_router
 from api.schedule import router as schedule_router
+from api.franchise_v4_routes import router as franchise_v4_router
 from api.schedule_routes import router as schedule_v2_router
 from api.store_clone_routes import router as store_clone_router
 from api.transfers import router as transfer_router
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
+from shared.ontology.src.database import get_db as _shared_get_db
 
-app = FastAPI(title="TunxiangOS tx-org", version="3.0.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # 将真实 get_db 注入到 payroll_engine_routes 模块（覆盖其 stub）
+    _payroll_engine_mod.get_db = _shared_get_db
+    yield
+
+
+app = FastAPI(title="TunxiangOS tx-org", version="3.0.0", lifespan=lifespan)
 app.include_router(emp_router)
 app.include_router(schedule_router)
 app.include_router(role_router)
@@ -66,6 +78,7 @@ app.include_router(performance_router)
 app.include_router(payroll_engine_v3_router)  # 薪资计算引擎 V3（v119 表）
 app.include_router(franchise_mgmt_router)     # 加盟管理完整版（v125 表）
 app.include_router(schedule_v2_router)        # 排班管理完整版（work_schedules 表）
+app.include_router(franchise_v4_router)       # 加盟管理 V4（v060/v135/v155 表，DB版）
 
 @app.get("/health")
 async def health():

@@ -1,0 +1,55 @@
+<!-- 我的预约页 -->
+<view class="container">
+  <!-- Tab栏 -->
+  <view class="tab-bar">
+    <view class="tab-item {{activeTab === item.key ? 'active' : ''}}"
+          wx:for="{{tabs}}" wx:key="key"
+          bindtap="switchTab" data-tab="{{item.key}}">
+      {{item.label}}
+    </view>
+  </view>
+
+  <!-- 列表 -->
+  <view class="list-section">
+    <!-- 加载中 -->
+    <view class="loading-tip" wx:if="{{loading}}">加载中...</view>
+
+    <!-- 空状态 -->
+    <view class="empty-section" wx:if="{{!loading && bookings.length === 0}}">
+      <text class="empty-icon">&#x1F4CB;</text>
+      <text class="empty-text">暂无预约记录</text>
+    </view>
+
+    <!-- 预约卡片 -->
+    <view class="booking-card" wx:for="{{bookings}}" wx:key="id">
+      <!-- 头部：门店+状态 -->
+      <view class="card-header">
+        <text class="card-store">{{item.storeName}}</text>
+        <text class="card-status status-{{item.status}}">{{item.statusText}}</text>
+      </view>
+
+      <!-- 主体信息 -->
+      <view class="card-body">
+        <view class="card-row">
+          <text class="card-icon">&#x1F4C5;</text>
+          <text class="card-text">{{item.date}} {{item.timeSlot}}</text>
+        </view>
+        <view class="card-row">
+          <text class="card-icon">&#x1F465;</text>
+          <text class="card-text">{{item.guests}}人</text>
+          <text class="card-divider">|</text>
+          <text class="card-text">{{item.roomLabel}}</text>
+        </view>
+        <view class="card-row" wx:if="{{item.remark}}">
+          <text class="card-icon">&#x1F4DD;</text>
+          <text class="card-text card-remark">{{item.remark}}</text>
+        </view>
+      </view>
+
+      <!-- 操作栏：即将到来可取消 -->
+      <view class="card-footer" wx:if="{{activeTab === 'upcoming'}}">
+        <button class="cancel-btn" bindtap="cancelBooking" data-id="{{item.id}}">取消预约</button>
+      </view>
+    </view>
+  </view>
+</view>

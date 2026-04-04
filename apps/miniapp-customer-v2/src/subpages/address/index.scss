@@ -1,0 +1,288 @@
+.address-page {
+  min-height: 100vh;
+  background: #0B1A20;
+  padding-bottom: 140rpx;
+}
+
+// ─── Loading ─────────────────────────────────────────────────────────────────
+
+.loading-tip {
+  display: flex;
+  justify-content: center;
+  padding-top: 200rpx;
+}
+
+.loading-text {
+  color: #9EB5C0;
+  font-size: 28rpx;
+}
+
+// ─── Empty ───────────────────────────────────────────────────────────────────
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 240rpx;
+}
+
+.empty-icon {
+  font-size: 80rpx;
+  margin-bottom: 24rpx;
+}
+
+.empty-text {
+  color: #E8F4F8;
+  font-size: 32rpx;
+  font-weight: 600;
+  margin-bottom: 12rpx;
+}
+
+.empty-hint {
+  color: #9EB5C0;
+  font-size: 26rpx;
+}
+
+// ─── Address List ────────────────────────────────────────────────────────────
+
+.address-list {
+  padding: 24rpx;
+}
+
+.address-card {
+  background: #132029;
+  border-radius: 16rpx;
+  margin-bottom: 20rpx;
+  overflow: hidden;
+  border: 2rpx solid #1E3340;
+
+  &.is-default {
+    border-color: rgba(255, 107, 44, 0.3);
+  }
+}
+
+.address-main {
+  padding: 28rpx;
+}
+
+.address-top {
+  display: flex;
+  align-items: center;
+  margin-bottom: 12rpx;
+  flex-wrap: wrap;
+  gap: 12rpx;
+}
+
+.address-name {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #E8F4F8;
+}
+
+.address-phone {
+  font-size: 28rpx;
+  color: #9EB5C0;
+  margin-left: 16rpx;
+}
+
+.address-tag {
+  background: rgba(255, 107, 44, 0.12);
+  border-radius: 6rpx;
+  padding: 4rpx 12rpx;
+}
+
+.tag-text {
+  color: #FF6B2C;
+  font-size: 22rpx;
+}
+
+.default-badge {
+  background: rgba(52, 199, 89, 0.12);
+  border-radius: 6rpx;
+  padding: 4rpx 12rpx;
+}
+
+.default-text {
+  color: #34C759;
+  font-size: 22rpx;
+}
+
+.address-detail {
+  font-size: 26rpx;
+  color: #9EB5C0;
+  line-height: 1.5;
+  display: block;
+}
+
+// ─── Actions row ─────────────────────────────────────────────────────────────
+
+.address-actions {
+  display: flex;
+  border-top: 1rpx solid rgba(255, 255, 255, 0.06);
+}
+
+.action-btn {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20rpx 0;
+  border-right: 1rpx solid rgba(255, 255, 255, 0.06);
+
+  &:last-child {
+    border-right: none;
+  }
+}
+
+.action-text {
+  color: #9EB5C0;
+  font-size: 24rpx;
+}
+
+.action-danger .action-text-danger {
+  color: #FF3B30;
+}
+
+.action-text-danger {
+  color: #FF3B30;
+  font-size: 24rpx;
+}
+
+// ─── Bottom Bar ──────────────────────────────────────────────────────────────
+
+.bottom-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 20rpx 32rpx;
+  padding-bottom: calc(20rpx + env(safe-area-inset-bottom));
+  background: #0D2030;
+  border-top: 1rpx solid rgba(255, 255, 255, 0.06);
+}
+
+.add-btn {
+  height: 88rpx;
+  background: #FF6B2C;
+  border-radius: 44rpx;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.add-btn-text {
+  color: #fff;
+  font-size: 30rpx;
+  font-weight: 600;
+}
+
+// ─── Form ────────────────────────────────────────────────────────────────────
+
+.form-section {
+  padding: 24rpx;
+}
+
+.form-item {
+  display: flex;
+  align-items: center;
+  padding: 28rpx 0;
+  border-bottom: 1rpx solid rgba(255, 255, 255, 0.06);
+}
+
+.form-label {
+  width: 160rpx;
+  font-size: 28rpx;
+  color: #9EB5C0;
+  flex-shrink: 0;
+}
+
+.form-input {
+  flex: 1;
+  font-size: 28rpx;
+  color: #E8F4F8;
+  background: transparent;
+}
+
+.form-value {
+  flex: 1;
+  font-size: 28rpx;
+  color: #E8F4F8;
+
+  &.placeholder {
+    color: #5A7A88;
+  }
+}
+
+.placeholder {
+  color: #5A7A88;
+}
+
+.form-item-tags {
+  padding: 28rpx 0;
+}
+
+.tag-options {
+  display: flex;
+  gap: 16rpx;
+  margin-top: 16rpx;
+}
+
+.tag-option {
+  padding: 12rpx 28rpx;
+  border: 2rpx solid #1E3340;
+  border-radius: 8rpx;
+  background: #132029;
+
+  &.active {
+    border-color: #FF6B2C;
+    background: rgba(255, 107, 44, 0.1);
+  }
+}
+
+.tag-option-text {
+  font-size: 26rpx;
+  color: #E8F4F8;
+}
+
+// ─── Form Actions ────────────────────────────────────────────────────────────
+
+.form-actions {
+  display: flex;
+  gap: 24rpx;
+  padding: 40rpx 32rpx;
+}
+
+.btn-cancel {
+  flex: 1;
+  height: 88rpx;
+  border: 2rpx solid #1E3340;
+  border-radius: 44rpx;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.btn-cancel-text {
+  color: #9EB5C0;
+  font-size: 30rpx;
+}
+
+.btn-save {
+  flex: 2;
+  height: 88rpx;
+  background: #FF6B2C;
+  border-radius: 44rpx;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+
+  &.disabled {
+    opacity: 0.6;
+  }
+}
+
+.btn-save-text {
+  color: #fff;
+  font-size: 30rpx;
+  font-weight: 600;
+}

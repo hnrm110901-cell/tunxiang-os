@@ -1,0 +1,90 @@
+<!-- 我的兑换记录 -->
+<view class="page-container">
+
+  <!-- 状态Tab -->
+  <view class="tab-bar">
+    <view class="tab-item {{activeTab === 'pending' ? 'active' : ''}}"
+          bindtap="switchTab" data-tab="pending">
+      待使用
+    </view>
+    <view class="tab-item {{activeTab === 'used' ? 'active' : ''}}"
+          bindtap="switchTab" data-tab="used">
+      已使用
+    </view>
+    <view class="tab-item {{activeTab === 'expired' ? 'active' : ''}}"
+          bindtap="switchTab" data-tab="expired">
+      已过期
+    </view>
+  </view>
+
+  <!-- 兑换记录列表 -->
+  <view class="loading-tip" wx:if="{{loading && records.length === 0}}">加载中...</view>
+
+  <view class="record-list" wx:if="{{records.length > 0}}">
+    <view class="record-card {{item.status}}" wx:for="{{records}}" wx:key="id">
+      <view class="card-main">
+        <image class="record-img" src="{{item.imageUrl || '/assets/dish-placeholder.png'}}" mode="aspectFill" />
+        <view class="record-info">
+          <text class="record-name">{{item.name}}</text>
+          <view class="record-meta">
+            <text class="meta-cost">{{item.pointsCost}}积分</text>
+            <text class="meta-time">{{item.redeemTime}}</text>
+          </view>
+          <view class="record-status-row">
+            <text class="status-badge {{item.status}}">{{item.statusText}}</text>
+          </view>
+        </view>
+      </view>
+
+      <!-- 待使用：显示核销码 -->
+      <view class="code-section" wx:if="{{item.status === 'pending'}}">
+        <view class="code-divider"></view>
+        <view class="code-area" bindtap="showCodePopup" data-record="{{item}}">
+          <view class="code-left">
+            <text class="code-label">核销码</text>
+            <text class="code-value">{{item.verifyCode}}</text>
+          </view>
+          <text class="code-arrow">查看二维码 ></text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 加载更多 -->
+  <view class="load-more-tip" wx:if="{{records.length > 0 && hasMore}}">
+    <text>上拉加载更多</text>
+  </view>
+  <view class="load-more-tip" wx:if="{{records.length > 0 && !hasMore && !loading}}">
+    <text>已加载全部</text>
+  </view>
+
+  <!-- 空状态 -->
+  <view class="empty-state" wx:if="{{!loading && records.length === 0}}">
+    <text class="empty-icon">📋</text>
+    <text class="empty-text" wx:if="{{activeTab === 'pending'}}">暂无待使用的兑换</text>
+    <text class="empty-text" wx:if="{{activeTab === 'used'}}">暂无已使用的记录</text>
+    <text class="empty-text" wx:if="{{activeTab === 'expired'}}">暂无过期记录</text>
+    <button class="go-mall-btn" bindtap="goMall">去商城看看</button>
+  </view>
+
+  <view class="safe-bottom"></view>
+</view>
+
+<!-- 核销码弹窗 -->
+<view class="popup-mask" wx:if="{{showCode}}" bindtap="closeCodePopup"></view>
+<view class="code-popup {{showCode ? 'show' : ''}}">
+  <view class="popup-header">
+    <text class="popup-title">核销码</text>
+    <view class="popup-close" bindtap="closeCodePopup">✕</view>
+  </view>
+  <text class="popup-item-name">{{codeRecord.name}}</text>
+  <view class="qr-area">
+    <canvas canvas-id="qrCanvas" class="qr-canvas"></canvas>
+    <text class="qr-tip">请出示此码给店员扫描</text>
+  </view>
+  <view class="code-display">
+    <text class="code-number">{{codeRecord.verifyCode}}</text>
+    <text class="code-copy" bindtap="copyCode">复制</text>
+  </view>
+  <text class="code-expire">有效期至 {{codeRecord.expireTime}}</text>
+</view>

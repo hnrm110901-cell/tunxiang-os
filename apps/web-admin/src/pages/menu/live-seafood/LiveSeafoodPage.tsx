@@ -41,7 +41,7 @@ import {
   SettingOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
-import { txFetch } from '../../../api';
+import { txFetch, txFetchData } from '../../../api';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -94,41 +94,73 @@ async function fetchLiveSeafood(
 ): Promise<{ items: LiveSeafoodDish[]; total: number }> {
   const params = new URLSearchParams({ store_id: storeId });
   if (inStockOnly) params.set('in_stock_only', 'true');
-  return txFetch(`/api/v1/menu/live-seafood?${params.toString()}`);
+  const res = await txFetch<{ items: LiveSeafoodDish[]; total: number }>(
+    `/api/v1/menu/live-seafood?${params.toString()}`,
+  );
+  return res.data ?? { items: [], total: 0 };
 }
 
 async function fetchLiveSeafoodStats(storeId: string): Promise<LiveSeafoodStats> {
-  return txFetch(`/api/v1/menu/live-seafood/stats?store_id=${storeId}`);
+  const res = await txFetch<LiveSeafoodStats>(
+    `/api/v1/menu/live-seafood/stats?store_id=${storeId}`,
+  );
+  return res.data ?? { total_species: 0, today_sales_fen: 0, avg_survival_rate: 0, low_stock_count: 0 };
+}
+
+async function fetchTankZoneList(): Promise<{ items: TankZone[]; total: number }> {
+  const res = await txFetch<{ items: TankZone[]; total: number }>(
+    '/api/v1/menu/live-seafood/tanks',
+  );
+  return res.data ?? { items: [], total: 0 };
+}
+
+async function fetchTankDishes(zoneCode: string): Promise<LiveSeafoodDish[]> {
+  const res = await txFetch<{ items: LiveSeafoodDish[] }>(
+    `/api/v1/menu/live-seafood/tanks/${encodeURIComponent(zoneCode)}/dishes`,
+  );
+  return res.data?.items ?? [];
 }
 
 async function patchLiveSeafood(
   dishId: string,
   payload: Partial<Omit<LiveSeafoodDish, 'dish_id' | 'dish_name' | 'tank_zone_name' | 'current_stock'>>,
-): Promise<LiveSeafoodDish> {
-  return txFetch(`/api/v1/menu/live-seafood/${dishId}`, {
+): Promise<void> {
+  await txFetch<LiveSeafoodDish>(`/api/v1/menu/live-seafood/${dishId}`, {
     method: 'PATCH',
     body: JSON.stringify(payload),
   });
 }
 
-async function adjustStock(dishId: string, qty: number, note?: string): Promise<void> {
-  return txFetch(`/api/v1/menu/live-seafood/${dishId}/stock`, {
-    method: 'POST',
-    body: JSON.stringify({ qty, note }),
+async function adjustStock(
+  dishId: string,
+  deltaCount: number,
+  deltaWeightG: number,
+  reason: string,
+): Promise<void> {
+  await txFetch<void>(`/api/v1/menu/live-seafood/stocks/${dishId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ delta_count: deltaCount, delta_weight_g: deltaWeightG, reason }),
   });
 }
 
+/** 旧的 tank-zones 接口 fallback（Drawer 仍使用） */
 async function fetchTankZones(): Promise<{ items: TankZone[]; total: number }> {
-  return txFetch('/api/v1/menu/tank-zones');
+  try {
+    return await fetchTankZoneList();
+  } catch {
+    return { items: [], total: 0 };
+  }
 }
 
 async function createTankZone(
   payload: Omit<TankZone, 'id'>,
 ): Promise<TankZone> {
-  return txFetch('/api/v1/menu/tank-zones', {
+  const res = await txFetch<TankZone>('/api/v1/menu/tank-zones', {
     method: 'POST',
     body: JSON.stringify(payload),
   });
+  if (!res.data) throw new Error('创建失败');
+  return res.data;
 }
 
 // ─── 常量 ────────────────────────────────────────────────────────────────────
@@ -145,10 +177,7 @@ const PRICING_METHOD_COLORS: Record<PricingMethod, string> = {
   per_piece: 'purple',
 };
 
-const MOCK_STORES = [
-  { id: 'store_001', name: '尝在一起·芙蓉路店' },
-  { id: 'store_002', name: '尝在一起·解放西路店' },
-];
+// 门店列表从 API 加载，初始为空
 
 // ─── 子组件：统计卡片 ────────────────────────────────────────────────────────
 
@@ -234,15 +263,16 @@ const StockAdjustPopover: React.FC<StockAdjustPopoverProps> = ({ dish, onSuccess
       message.warning('请输入调整后的库存数量');
       return;
     }
+    const delta = newQty - dish.current_stock;
     setLoading(true);
     try {
-      await adjustStock(dish.dish_id, newQty, note);
+      await adjustStock(dish.dish_id, delta, 0, note || '手动调整');
       message.success('库存调整成功');
       setOpen(false);
       setNewQty(null);
       setNote('');
       onSuccess();
-    } catch (e) {
+    } catch {
       message.error('库存调整失败，请重试');
     } finally {
       setLoading(false);
@@ -549,7 +579,8 @@ const TankZoneDrawer: React.FC<TankZoneDrawerProps> = ({ open, onClose }) => {
 // ─── 主页面 ──────────────────────────────────────────────────────────────────
 
 export function LiveSeafoodPage() {
-  const [storeId, setStoreId] = useState(MOCK_STORES[0].id);
+  const [storeId, setStoreId] = useState('');
+  const [storeList, setStoreList] = useState<{ id: string; name: string }[]>([]);
   const [dishes, setDishes] = useState<LiveSeafoodDish[]>([]);
   const [stats, setStats] = useState<LiveSeafoodStats | null>(null);
   const [tankZones, setTankZones] = useState<TankZone[]>([]);
@@ -600,11 +631,32 @@ export function LiveSeafoodPage() {
     }
   }, []);
 
+  // 加载门店列表
+  useEffect(() => {
+    txFetchData<{ items: { id: string; name: string }[] }>('/api/v1/org/stores?page=1&size=100')
+      .then((data) => {
+        if (data?.items?.length) {
+          setStoreList(data.items);
+          setStoreId((prev) => prev || data.items[0].id);
+        }
+      })
+      .catch(() => setStoreList([]));
+  }, []);
+
   useEffect(() => {
     loadDishes();
     loadStats();
     loadTankZones();
   }, [loadDishes, loadStats, loadTankZones]);
+
+  // 30 秒自动刷新水缸状态
+  useEffect(() => {
+    const timer = setInterval(() => {
+      loadDishes();
+      loadStats();
+    }, 30_000);
+    return () => clearInterval(timer);
+  }, [loadDishes, loadStats]);
 
   const handleToggleAvailable = async (dish: LiveSeafoodDish, checked: boolean) => {
     try {
@@ -726,7 +778,7 @@ export function LiveSeafoodPage() {
             value={storeId}
             onChange={setStoreId}
             style={{ width: 200 }}
-            options={MOCK_STORES.map((s) => ({ label: s.name, value: s.id }))}
+            options={storeList.map((s) => ({ label: s.name, value: s.id }))}
           />
           <Button
             icon={<SettingOutlined />}

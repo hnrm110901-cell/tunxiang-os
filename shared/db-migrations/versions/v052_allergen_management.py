@@ -32,12 +32,12 @@ def upgrade() -> None:
     # 1. members 表：新增 allergens + diet_notes 字段
     # ─────────────────────────────────────────────────────────────────
     op.execute("""
-        ALTER TABLE members
-            ADD COLUMN IF NOT EXISTS allergens  JSONB NOT NULL DEFAULT '[]',
-            ADD COLUMN IF NOT EXISTS diet_notes TEXT  DEFAULT NULL;
-
-        COMMENT ON COLUMN members.allergens   IS '过敏原代码列表，格式：["peanut","shellfish","spicy"]';
-        COMMENT ON COLUMN members.diet_notes  IS '自由文字忌口备注，如：少盐、不加香菜';
+        DO $$ BEGIN
+            IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'members') THEN
+                ALTER TABLE members ADD COLUMN IF NOT EXISTS allergens JSONB NOT NULL DEFAULT '[]';
+                ALTER TABLE members ADD COLUMN IF NOT EXISTS diet_notes TEXT DEFAULT NULL;
+            END IF;
+        END $$;
     """)
 
     # ─────────────────────────────────────────────────────────────────

@@ -5,10 +5,12 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 import structlog
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 
 log = structlog.get_logger(__name__)
 
@@ -158,7 +160,43 @@ async def _fetch_last_week_summary(
     tenant_id: str,
     db: Any,
 ) -> Dict[str, Any]:
-    """获取上周周汇总（实际从 DB 查询，此处返回骨架）。"""
+    """获取上周周汇总（从 DB 的 weekly_reviews 表查询）。"""
+    last_week_start = current_week_start - timedelta(days=7)
+
+    if db is not None:
+        try:
+            from sqlalchemy.ext.asyncio import AsyncSession
+            await db.execute(
+                text("SELECT set_config('app.tenant_id', :tid, true)"),
+                {"tid": tenant_id},
+            )
+            result = await db.execute(
+                text(
+                    """
+                    SELECT total_revenue_fen, total_orders, avg_margin_pct, total_waste_fen
+                    FROM weekly_reviews
+                    WHERE store_id = :store_id
+                      AND week_start = :week_start
+                      AND tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid
+                      AND is_deleted = false
+                    ORDER BY created_at DESC
+                    LIMIT 1
+                    """
+                ),
+                {"store_id": store_id, "week_start": last_week_start},
+            )
+            row = result.fetchone()
+            if row:
+                return {
+                    "total_revenue_fen": row.total_revenue_fen or 0,
+                    "total_orders": row.total_orders or 0,
+                    "avg_margin_pct": float(row.avg_margin_pct or 0.0),
+                    "total_waste_fen": row.total_waste_fen or 0,
+                }
+        except SQLAlchemyError as exc:
+            log.error("fetch_last_week_summary_db_error", exc_info=True,
+                      error=str(exc), store_id=store_id, tenant_id=tenant_id)
+
     return {
         "total_revenue_fen": 0,
         "total_orders": 0,

@@ -103,85 +103,10 @@ interface Store {
   store_name: string;
 }
 
-// ─── Mock 数据 ───
+// ─── Mock 数据已移除，所有数据通过 API 加载 ───
 
-const MOCK_STORES: Store[] = [
-  { store_id: 's1', store_name: '芙蓉路店' },
-  { store_id: 's2', store_name: '岳麓店' },
-  { store_id: 's3', store_name: '星沙店' },
-  { store_id: 's4', store_name: '河西店' },
-  { store_id: 's5', store_name: '开福店' },
-];
-
-const MOCK_PNL: PnlData = {
-  revenue_fen: 2856000,
-  cost_fen: 1542240,
-  gross_profit_fen: 1313760,
-  gross_margin: 46.0,
-};
-
-const MOCK_YESTERDAY_PNL: PnlData = {
-  revenue_fen: 2541000,
-  cost_fen: 1397550,
-  gross_profit_fen: 1143450,
-  gross_margin: 45.0,
-};
-
-const MOCK_SUMMARY: DailySummary = {
-  order_count: 426,
-  table_turnover: 2.8,
-  channel_breakdown: [
-    { name: '堂食', amount_fen: 1584000, ratio: 55.5, mom: 3.2, color: '#FF6B35' },
-    { name: '外卖', amount_fen: 742560, ratio: 26.0, mom: -1.4, color: '#185FA5' },
-    { name: '宴席', amount_fen: 342720, ratio: 12.0, mom: 5.8, color: '#0F6E56' },
-    { name: '零售', amount_fen: 114240, ratio: 4.0, mom: -0.3, color: '#BA7517' },
-    { name: '小程序', amount_fen: 72480, ratio: 2.5, mom: 12.1, color: '#8B5CF6' },
-  ],
-};
-
-const MOCK_YESTERDAY_ORDERS = 394;
-const MOCK_LAST_WEEK_TURNOVER = 2.6;
-
-// 30天趋势（模拟）
-function buildTrendMock(): TrendPoint[] {
-  const result: TrendPoint[] = [];
-  const base = new Date();
-  for (let i = 29; i >= 0; i--) {
-    const d = new Date(base);
-    d.setDate(d.getDate() - i);
-    const dateStr = d.toISOString().slice(0, 10);
-    const target = 260_0000 + Math.round(Math.random() * 20_0000);
-    const revenue = target + Math.round((Math.random() - 0.4) * 30_0000);
-    result.push({ date: dateStr, revenue_fen: Math.max(revenue, 0), target_fen: target });
-  }
-  return result;
-}
-
-const MOCK_TREND: TrendPoint[] = buildTrendMock();
-
-const MOCK_STORE_PNL: StorePnl[] = [
-  { store_id: 's1', store_name: '芙蓉路店', revenue_fen: 856000, cost_fen: 419440, gross_profit_fen: 436560, gross_margin: 51.0, rank: 1 },
-  { store_id: 's2', store_name: '岳麓店', revenue_fen: 723000, cost_fen: 360096, gross_profit_fen: 362904, gross_margin: 50.2, rank: 2 },
-  { store_id: 's3', store_name: '星沙店', revenue_fen: 645000, cost_fen: 341085, gross_profit_fen: 303915, gross_margin: 47.1, rank: 3 },
-  { store_id: 's4', store_name: '河西店', revenue_fen: 382000, cost_fen: 214362, gross_profit_fen: 167638, gross_margin: 43.9, rank: 4 },
-  { store_id: 's5', store_name: '开福店', revenue_fen: 250000, cost_fen: 167500, gross_profit_fen: 82500, gross_margin: 33.0, rank: 5 },
-];
-
-const E_NAMES = ['营业开始确认', '备料核验', '价格策略生效', '备餐完成', '高峰期总结', '营业结束确认', '收银对账', '日志归档'];
-
-const MOCK_CHECKLIST: ChecklistStore[] = MOCK_STORES.map((s, si) => {
-  const completed = [8, 7, 6, 5, 3][si];
-  return {
-    store_id: s.store_id,
-    store_name: s.store_name,
-    completed,
-    items: E_NAMES.map((name, idx) => ({
-      code: `E${idx + 1}`,
-      name,
-      done: idx < completed,
-    })),
-  };
-});
+const EMPTY_PNL: PnlData = { revenue_fen: 0, cost_fen: 0, gross_profit_fen: 0, gross_margin: 0 };
+const EMPTY_SUMMARY: DailySummary = { order_count: 0, table_turnover: 0, channel_breakdown: [] };
 
 // ─── 子组件：指标卡片 ───
 
@@ -357,13 +282,14 @@ export function OperationsDashboardPage() {
   const [loading, setLoading] = useState(false);
   const [lastRefresh, setLastRefresh] = useState(new Date());
 
-  // 数据 state（用mock兜底）
-  const [pnl, setPnl] = useState<PnlData>(MOCK_PNL);
-  const [yesterdayPnl, setYesterdayPnl] = useState<PnlData>(MOCK_YESTERDAY_PNL);
-  const [summary, setSummary] = useState<DailySummary>(MOCK_SUMMARY);
-  const [trend, setTrend] = useState<TrendPoint[]>(MOCK_TREND);
-  const [storePnl, setStorePnl] = useState<StorePnl[]>(MOCK_STORE_PNL);
-  const [checklist, setChecklist] = useState<ChecklistStore[]>(MOCK_CHECKLIST);
+  // 数据 state（初始为空，由 API 填充）
+  const [pnl, setPnl] = useState<PnlData>(EMPTY_PNL);
+  const [yesterdayPnl, setYesterdayPnl] = useState<PnlData>(EMPTY_PNL);
+  const [summary, setSummary] = useState<DailySummary>(EMPTY_SUMMARY);
+  const [trend, setTrend] = useState<TrendPoint[]>([]);
+  const [storePnl, setStorePnl] = useState<StorePnl[]>([]);
+  const [checklist, setChecklist] = useState<ChecklistStore[]>([]);
+  const [stores, setStores] = useState<Store[]>([]);
   const [sortByMargin, setSortByMargin] = useState(false);
 
   // 数据加载
@@ -377,23 +303,25 @@ export function OperationsDashboardPage() {
     const yesterday = d.toISOString().slice(0, 10);
 
     try {
-      const [pnlRes, yPnlRes, summaryRes, trendRes, compareRes, checklistRes] = await Promise.allSettled([
+      const [storesRes, pnlRes, yPnlRes, summaryRes, trendRes, compareRes, checklistRes] = await Promise.allSettled([
+        txFetch<{ items: Store[] }>('/api/v1/trade/stores/realtime-status'),
         txFetch<PnlData>(`/api/v1/finance/pnl/calculate?store_id=${storeParam}&date=${selectedDate}`),
         txFetch<PnlData>(`/api/v1/finance/pnl/calculate?store_id=${storeParam}&date=${yesterday}`),
         txFetch<DailySummary>(`/api/v1/ops/daily-summary?store_id=${storeParam}&date=${selectedDate}`),
         txFetch<{ items: TrendPoint[] }>(`/api/v1/finance/pnl/trend?store_id=${storeParam}&days=30`),
-        txFetch<{ items: StorePnl[] }>(`/api/v1/finance/pnl/compare?store_ids=${MOCK_STORES.map(s => s.store_id).join(',')}&date=${selectedDate}`),
+        txFetch<{ items: StorePnl[] }>(`/api/v1/ops/dashboard`),
         txFetch<{ items: ChecklistStore[] }>(`/api/v1/ops/settlement/checklist?date=${selectedDate}`),
       ]);
 
-      if (pnlRes.status === 'fulfilled') setPnl(pnlRes.value);
-      if (yPnlRes.status === 'fulfilled') setYesterdayPnl(yPnlRes.value);
-      if (summaryRes.status === 'fulfilled') setSummary(summaryRes.value);
-      if (trendRes.status === 'fulfilled') setTrend(trendRes.value.items);
-      if (compareRes.status === 'fulfilled') setStorePnl(compareRes.value.items);
-      if (checklistRes.status === 'fulfilled') setChecklist(checklistRes.value.items);
+      if (storesRes.status === 'fulfilled' && storesRes.value.data?.items) setStores(storesRes.value.data.items);
+      if (pnlRes.status === 'fulfilled' && pnlRes.value.data) setPnl(pnlRes.value.data);
+      if (yPnlRes.status === 'fulfilled' && yPnlRes.value.data) setYesterdayPnl(yPnlRes.value.data);
+      if (summaryRes.status === 'fulfilled' && summaryRes.value.data) setSummary(summaryRes.value.data);
+      if (trendRes.status === 'fulfilled' && trendRes.value.data?.items) setTrend(trendRes.value.data.items);
+      if (compareRes.status === 'fulfilled' && compareRes.value.data?.items) setStorePnl(compareRes.value.data.items);
+      if (checklistRes.status === 'fulfilled' && checklistRes.value.data?.items) setChecklist(checklistRes.value.data.items);
     } catch {
-      // 保持 mock 数据
+      // 保持空数据
     }
 
     setLastRefresh(new Date());
@@ -427,15 +355,13 @@ export function OperationsDashboardPage() {
     : 0;
   const marginTarget = 45;
   const marginDiff = pnl.gross_margin - marginTarget;
-  const orderTrend = MOCK_YESTERDAY_ORDERS > 0
-    ? ((summary.order_count - MOCK_YESTERDAY_ORDERS) / MOCK_YESTERDAY_ORDERS) * 100
-    : 0;
-  const turnoverTrend = MOCK_LAST_WEEK_TURNOVER > 0
-    ? ((summary.table_turnover - MOCK_LAST_WEEK_TURNOVER) / MOCK_LAST_WEEK_TURNOVER) * 100
-    : 0;
+  // 订单环比：yesterdayPnl 暂无 order_count，用 0 表示
+  const orderTrend = 0;
+  // turnover 环比暂用 0，后续可从 API 返回
+  const turnoverTrend = 0;
 
   // 门店选择器（受控）
-  const allStores = MOCK_STORES;
+  const allStores = stores;
   const storeLabel = selectedStores.length === 0
     ? '全部门店'
     : selectedStores.map((id) => allStores.find(s => s.store_id === id)?.store_name || id).join('、');

@@ -16,98 +16,116 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.create_table(
-        "platform_tenants",
-        sa.Column("tenant_id", UUID(as_uuid=True), primary_key=True),
-        sa.Column("merchant_code", sa.String(32)),
-        sa.Column("name", sa.String(100), nullable=False),
-        sa.Column("plan_template", sa.String(32), nullable=False),
-        sa.Column("status", sa.String(32), nullable=False),
-        sa.Column("subscription_expires_at", sa.Date()),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
-        sa.Column("is_deleted", sa.Boolean(), server_default="false"),
-    )
-    op.create_index("ix_platform_tenants_status", "platform_tenants", ["status"])
+    _bind = op.get_bind()
+    _inspector = sa.inspect(_bind)
+    _existing = set(_inspector.get_table_names())
 
-    op.create_table(
-        "hub_store_overlay",
-        sa.Column("store_id", UUID(as_uuid=True), sa.ForeignKey("stores.id", ondelete="CASCADE"), primary_key=True),
-        sa.Column("tenant_id", UUID(as_uuid=True), nullable=False, index=True),
-        sa.Column("edge_online", sa.Boolean(), server_default="false"),
-        sa.Column("last_sync_at", sa.DateTime(timezone=True)),
-        sa.Column("client_version", sa.String(32)),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
-    )
+    if "platform_tenants" not in _existing:
+        op.create_table(
+            "platform_tenants",
+            sa.Column("tenant_id", UUID(as_uuid=True), primary_key=True),
+            sa.Column("merchant_code", sa.String(32)),
+            sa.Column("name", sa.String(100), nullable=False),
+            sa.Column("plan_template", sa.String(32), nullable=False),
+            sa.Column("status", sa.String(32), nullable=False),
+            sa.Column("subscription_expires_at", sa.Date()),
+            sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
+            sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
+            sa.Column("is_deleted", sa.Boolean(), server_default="false"),
+        )
+    op.execute("""
+        DO $$ BEGIN
+            IF (SELECT COUNT(*) FROM information_schema.columns 
+                WHERE table_name='platform_tenants' AND (column_name = 'status')) = 1 THEN
+                EXECUTE 'CREATE INDEX IF NOT EXISTS ix_platform_tenants_status ON platform_tenants (status)';
+            END IF;
+        END $$;
+    """)
 
-    op.create_table(
-        "hub_adapter_connections",
-        sa.Column("id", UUID(as_uuid=True), primary_key=True),
-        sa.Column("tenant_id", UUID(as_uuid=True), nullable=True, index=True),
-        sa.Column("adapter_key", sa.String(64), nullable=False),
-        sa.Column("merchant_name", sa.String(100), nullable=False),
-        sa.Column("status", sa.String(32), nullable=False),
-        sa.Column("last_sync_at", sa.DateTime(timezone=True)),
-        sa.Column("success_rate", sa.Numeric(6, 2)),
-        sa.Column("error_message", sa.Text()),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
-        sa.Column("is_deleted", sa.Boolean(), server_default="false"),
-    )
+    if "hub_store_overlay" not in _existing:
+        op.create_table(
+            "hub_store_overlay",
+            sa.Column("store_id", UUID(as_uuid=True), sa.ForeignKey("stores.id", ondelete="CASCADE"), primary_key=True),
+            sa.Column("tenant_id", UUID(as_uuid=True), nullable=False, index=True),
+            sa.Column("edge_online", sa.Boolean(), server_default="false"),
+            sa.Column("last_sync_at", sa.DateTime(timezone=True)),
+            sa.Column("client_version", sa.String(32)),
+            sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
+        )
 
-    op.create_table(
-        "hub_edge_devices",
-        sa.Column("id", UUID(as_uuid=True), primary_key=True),
-        sa.Column("tenant_id", UUID(as_uuid=True), nullable=True, index=True),
-        sa.Column("store_label", sa.String(120), nullable=False),
-        sa.Column("ip", sa.String(64), nullable=False),
-        sa.Column("tailscale_status", sa.String(32), nullable=False),
-        sa.Column("client_version", sa.String(32)),
-        sa.Column("last_heartbeat", sa.DateTime(timezone=True)),
-        sa.Column("cpu_pct", sa.Integer(), server_default="0"),
-        sa.Column("mem_pct", sa.Integer(), server_default="0"),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
-        sa.Column("is_deleted", sa.Boolean(), server_default="false"),
-    )
+    if "hub_adapter_connections" not in _existing:
+        op.create_table(
+            "hub_adapter_connections",
+            sa.Column("id", UUID(as_uuid=True), primary_key=True),
+            sa.Column("tenant_id", UUID(as_uuid=True), nullable=True, index=True),
+            sa.Column("adapter_key", sa.String(64), nullable=False),
+            sa.Column("merchant_name", sa.String(100), nullable=False),
+            sa.Column("status", sa.String(32), nullable=False),
+            sa.Column("last_sync_at", sa.DateTime(timezone=True)),
+            sa.Column("success_rate", sa.Numeric(6, 2)),
+            sa.Column("error_message", sa.Text()),
+            sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
+            sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
+            sa.Column("is_deleted", sa.Boolean(), server_default="false"),
+        )
 
-    op.create_table(
-        "hub_tickets",
-        sa.Column("id", sa.String(32), primary_key=True),
-        sa.Column("tenant_id", UUID(as_uuid=True), nullable=True, index=True),
-        sa.Column("merchant_name", sa.String(100), nullable=False),
-        sa.Column("title", sa.String(255), nullable=False),
-        sa.Column("priority", sa.String(16), nullable=False),
-        sa.Column("status", sa.String(32), nullable=False),
-        sa.Column("assignee", sa.String(64)),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
-        sa.Column("is_deleted", sa.Boolean(), server_default="false"),
-    )
+    if "hub_edge_devices" not in _existing:
+        op.create_table(
+            "hub_edge_devices",
+            sa.Column("id", UUID(as_uuid=True), primary_key=True),
+            sa.Column("tenant_id", UUID(as_uuid=True), nullable=True, index=True),
+            sa.Column("store_label", sa.String(120), nullable=False),
+            sa.Column("ip", sa.String(64), nullable=False),
+            sa.Column("tailscale_status", sa.String(32), nullable=False),
+            sa.Column("client_version", sa.String(32)),
+            sa.Column("last_heartbeat", sa.DateTime(timezone=True)),
+            sa.Column("cpu_pct", sa.Integer(), server_default="0"),
+            sa.Column("mem_pct", sa.Integer(), server_default="0"),
+            sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
+            sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
+            sa.Column("is_deleted", sa.Boolean(), server_default="false"),
+        )
 
-    op.create_table(
-        "hub_billing_monthly",
-        sa.Column("month", sa.String(7), primary_key=True),
-        sa.Column("total_revenue_yuan", sa.BigInteger(), nullable=False),
-        sa.Column("haas_yuan", sa.BigInteger(), nullable=False),
-        sa.Column("saas_yuan", sa.BigInteger(), nullable=False),
-        sa.Column("ai_yuan", sa.BigInteger(), nullable=False),
-        sa.Column("merchants_count", sa.Integer(), nullable=False),
-        sa.Column("active_stores", sa.Integer(), nullable=False),
-        sa.Column("arr_yuan", sa.BigInteger(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
-    )
+    if "hub_tickets" not in _existing:
+        op.create_table(
+            "hub_tickets",
+            sa.Column("id", sa.String(32), primary_key=True),
+            sa.Column("tenant_id", UUID(as_uuid=True), nullable=True, index=True),
+            sa.Column("merchant_name", sa.String(100), nullable=False),
+            sa.Column("title", sa.String(255), nullable=False),
+            sa.Column("priority", sa.String(16), nullable=False),
+            sa.Column("status", sa.String(32), nullable=False),
+            sa.Column("assignee", sa.String(64)),
+            sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
+            sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
+            sa.Column("is_deleted", sa.Boolean(), server_default="false"),
+        )
 
-    op.create_table(
-        "hub_agent_metrics_daily",
-        sa.Column("stat_date", sa.Date(), primary_key=True),
-        sa.Column("total_executions", sa.BigInteger(), nullable=False),
-        sa.Column("success_rate", sa.Numeric(6, 2), nullable=False),
-        sa.Column("constraint_violations", sa.Integer(), nullable=False),
-        sa.Column("top_agents", JSONB(), nullable=False),
-        sa.Column("avg_response_ms", sa.Integer(), server_default="45"),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
-    )
+    if "hub_billing_monthly" not in _existing:
+        op.create_table(
+            "hub_billing_monthly",
+            sa.Column("month", sa.String(7), primary_key=True),
+            sa.Column("total_revenue_yuan", sa.BigInteger(), nullable=False),
+            sa.Column("haas_yuan", sa.BigInteger(), nullable=False),
+            sa.Column("saas_yuan", sa.BigInteger(), nullable=False),
+            sa.Column("ai_yuan", sa.BigInteger(), nullable=False),
+            sa.Column("merchants_count", sa.Integer(), nullable=False),
+            sa.Column("active_stores", sa.Integer(), nullable=False),
+            sa.Column("arr_yuan", sa.BigInteger(), nullable=False),
+            sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
+        )
+
+    if "hub_agent_metrics_daily" not in _existing:
+        op.create_table(
+            "hub_agent_metrics_daily",
+            sa.Column("stat_date", sa.Date(), primary_key=True),
+            sa.Column("total_executions", sa.BigInteger(), nullable=False),
+            sa.Column("success_rate", sa.Numeric(6, 2), nullable=False),
+            sa.Column("constraint_violations", sa.Integer(), nullable=False),
+            sa.Column("top_agents", JSONB(), nullable=False),
+            sa.Column("avg_response_ms", sa.Integer(), server_default="45"),
+            sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
+        )
 
     op.execute(
         text("""

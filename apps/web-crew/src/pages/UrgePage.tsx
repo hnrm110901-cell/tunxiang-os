@@ -68,40 +68,6 @@ interface PreparingOrder {
   items: PreparingOrderItem[];
 }
 
-// ─── Mock 数据（API 失败时降级显示）───
-
-const MOCK_TABLES: TableStatusItem[] = [
-  { table_id: 'tbl_a01', table_no: 'A01', status: 'occupied', order_id: 'ord_001', seated_at: new Date(Date.now() - 35 * 60000).toISOString(), guest_count: 4 },
-  { table_id: 'tbl_a03', table_no: 'A03', status: 'occupied', order_id: 'ord_002', seated_at: new Date(Date.now() - 20 * 60000).toISOString(), guest_count: 2 },
-  { table_id: 'tbl_b01', table_no: 'B01', status: 'occupied', order_id: 'ord_003', seated_at: new Date(Date.now() - 55 * 60000).toISOString(), guest_count: 6 },
-  { table_id: 'tbl_b02', table_no: 'B02', status: 'idle', order_id: null, seated_at: null, guest_count: 0 },
-];
-
-const MOCK_ORDERS: Record<string, PreparingOrder> = {
-  ord_001: {
-    order_id: 'ord_001', table_id: 'tbl_a01', table_no: 'A01',
-    items: [
-      { item_id: 'i1', dish_id: 'd1', dish_name: '剁椒鱼头', quantity: 1, spec: '双色', status: 'preparing', created_at: new Date(Date.now() - 22 * 60000).toISOString() },
-      { item_id: 'i2', dish_id: 'd2', dish_name: '小炒黄牛肉', quantity: 1, status: 'pending', created_at: new Date(Date.now() - 22 * 60000).toISOString() },
-      { item_id: 'i3', dish_id: 'd3', dish_name: '凉拌黄瓜', quantity: 1, status: 'done', created_at: new Date(Date.now() - 22 * 60000).toISOString() },
-    ],
-  },
-  ord_002: {
-    order_id: 'ord_002', table_id: 'tbl_a03', table_no: 'A03',
-    items: [
-      { item_id: 'i4', dish_id: 'd4', dish_name: '酸菜鱼', quantity: 1, spec: '黑鱼', status: 'preparing', created_at: new Date(Date.now() - 8 * 60000).toISOString() },
-      { item_id: 'i5', dish_id: 'd5', dish_name: '蒜蓉蒸虾', quantity: 1, status: 'pending', created_at: new Date(Date.now() - 8 * 60000).toISOString() },
-    ],
-  },
-  ord_003: {
-    order_id: 'ord_003', table_id: 'tbl_b01', table_no: 'B01',
-    items: [
-      { item_id: 'i6', dish_id: 'd6', dish_name: '波士顿龙虾', quantity: 1, spec: '蒜蓉蒸', status: 'preparing', created_at: new Date(Date.now() - 38 * 60000).toISOString() },
-      { item_id: 'i7', dish_id: 'd7', dish_name: '红烧肉', quantity: 1, status: 'preparing', created_at: new Date(Date.now() - 38 * 60000).toISOString() },
-    ],
-  },
-};
-
 // ─── 工具函数 ───
 
 function calcWaitMin(createdAt: string): number {
@@ -423,16 +389,15 @@ export function UrgePage() {
     }, 2000);
   }, []);
 
-  // ── 加载桌台列表 ──
+  // ── 加载催单列表（规范路径：/api/v1/trade/kds/urge-list）──
   const loadTables = useCallback(async () => {
     try {
       const res = await txFetch<{ items: TableStatusItem[] }>(
-        `/api/v1/trade/tables/status?store_id=${encodeURIComponent(storeId)}`
+        `/api/v1/trade/tables?store_id=${encodeURIComponent(storeId)}&status=occupied`
       );
-      setTables(res.items);
+      setTables(res.items ?? []);
     } catch {
-      // API 失败降级 Mock
-      setTables(MOCK_TABLES);
+      setTables([]);
     } finally {
       setLoadingTables(false);
     }
@@ -454,12 +419,10 @@ export function UrgePage() {
         order_id: res.order_id || tbl.order_id!,
         table_id: tableId,
         table_no: tbl.table_no,
-        items: res.items,
+        items: res.items ?? [],
       });
     } catch {
-      // 降级 Mock
-      const mock = MOCK_ORDERS[tbl.order_id!];
-      setOrder(mock ?? null);
+      setOrder(null);
     } finally {
       setLoadingOrder(false);
     }
@@ -520,7 +483,7 @@ export function UrgePage() {
     try {
       if (order) {
         await txFetch(
-          `/api/v1/trade/orders/${encodeURIComponent(order.order_id)}/urge`,
+          `/api/v1/trade/kds/orders/${encodeURIComponent(order.order_id)}/urge`,
           {
             method: 'POST',
             body: JSON.stringify({ dish_id: urgeSheet.itemId, reason }),

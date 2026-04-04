@@ -4,6 +4,65 @@
 
 ---
 
+## 2026-04-04（Round 73 — 西贝/徐记海鲜上线冲刺：5支团队并行，P0-P2全面推进）
+
+### 今日完成
+
+**Team A (P0) — 供应商门户完整实现（徐记海鲜阻塞项）**
+- [tx-supply/migrations] v159：创建 supplier_accounts / supplier_quotations / supplier_reconciliations 3张表 + RLS（12条策略）
+- [tx-supply/services] supplier_portal_service.py：完全重写（原文件为ORM+raw SQL合并冲突，破损状态），纯 async ORM，12个无状态方法
+- [tx-supply/api] supplier_portal_routes.py：新建，10个端点（CRUD+RFQ询价+比价+接受+交付记录+风险评估）
+- [tx-supply] main.py：注册 supplier_portal_router
+
+**Team B (P1) — 宴席套餐模板引擎（徐记海鲜）**
+- [tx-trade/migrations] v160：创建 banquet_menu_templates / banquet_template_items 2张表 + RLS
+- [tx-trade/models] banquet.py：追加 BanquetMenuTemplate + BanquetTemplateItem ORM 类
+- [tx-trade/services] banquet_template_service.py：新建，6个 async 方法（list支持集团通用+门店专属混合，build_quote不落库）
+- [tx-trade/api] banquet_routes.py：追加6个端点（含 build-quote 模板报价生成）
+
+**Team C (P1) — tx-growth 营销引擎接入 v144 数据库**
+- [tx-growth/services] offer_engine.py：移除 _offers/_offer_redemptions 内存dict，接入 offers/offer_redemptions 表（v144）
+- [tx-growth/services] content_engine.py：移除 _templates/_generated_contents 内存dict，接入 content_templates 表，首次调用自动UPSERT内置模板
+- [tx-growth/services] channel_engine.py：移除 _channel_configs/_send_logs，接入 channel_configs/message_send_logs，send_message内置频控
+- [tx-growth] main.py：注册3个路由，移除旧内联端点约190行
+- [tx-growth/tests] test_growth_engines.py：内存子类覆写保持测试向后兼容
+
+**Team D (P2) — tx-growth 策略/横幅/旅程 DB化**
+- [db-migrations] v162：创建 brand_strategies / banners / journeys / journey_executions 4张表 + RLS
+- [tx-growth/services] brand_strategy.py：移除 _brand_strategies/_city_strategies，upsert写入 brand_strategies 表
+- [tx-growth/services] banner_manager.py：移除 _banners/_banner_clicks，原子+1更新 impression_count/click_count
+- [tx-growth/services] journey_orchestrator.py：移除 _journeys/_journey_executions，完整状态机（draft→active→paused）
+
+**Team E (UI) — Admin 前端两个新页面**
+- [web-admin/api] supplierApi.ts：新建，7个API函数+完整类型定义
+- [web-admin/pages] hq/supply/SupplierPortalPage.tsx：新建，Tab1供应商档案（ProTable+ModalForm）/ Tab2询价RFQ（比价Drawer）/ Tab3风险评估
+- [web-admin/pages] hq/trade/BanquetTemplatePage.tsx：新建，ProTable+DrawerForm（可编辑菜品Table）+BuildQuoteModal（实时计算）
+- [web-admin] App.tsx：注册 /hq/supply/suppliers + /hq/trade/banquet-templates 路由
+
+**修复**
+- v160 down_revision 从 "v158" 修正为 "v159"（原分叉，现已修复）
+
+### 数据变化
+- 迁移版本：v158 → v159 → v160 → v161 → v162（连续主链，无分叉）
+- 新增迁移：4个（v159/v160/v162，v161为既有）
+- 新增 API 端点：16个（供应商门户10 + 宴席套餐6）
+- 新增前端页面：2个 + 1个API模块
+- 内存服务 DB化：6个（offer/content/channel/brand_strategy/banner/journey）
+
+### 遗留问题
+- v161 (sync_improvements) 是既有迁移，需确认与 v159/v160 无冲突（应无问题，仅同步日志相关）
+- Team D 创建的 v162 `down_revision="v161"` 正确，链完整
+- 各新路由需推送至服务器触发自动迁移+重启（auto-sync.sh 每5分钟执行）
+
+### 明日计划
+- push 代码到 GitHub，等待服务器自动同步（最多5分钟）
+- 验证 /api/v1/suppliers 端点（curl测试）
+- 验证 /api/v1/banquets/templates 端点
+- 徐记海鲜：确认供应商门户+宴席套餐模板满足23套系统替换中供应链模块要求
+- 西贝：确认营销引擎（offer/journey）DB化后业务流程完整性
+
+---
+
 ## 2026-04-04（Round 72 — DEV数据库全量迁移完成：v119→v157+全分支heads）
 
 ### 今日完成

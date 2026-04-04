@@ -76,24 +76,29 @@ type ActiveModal =
   | 'pay-transfer'   // 转账
   | 'print-confirm'; // 打印客单确认
 
-// ─── Mock 数据 ───
+// ─── API 工具 ───
 
-const MOCK_ORDER: OrderDetail = {
-  order_id: 'o-mock-001',
-  table_no: 'A1',
-  guest_count: 4,
-  total_fen: 24800,
-  waiter_name: '张服务员',
-  created_at: new Date(Date.now() - 45 * 60 * 1000).toISOString(),
-  items: [
-    { item_id: 'i1', dish_id: 'd10', dish_name: '米饭+茶水', qty: 4, price_fen: 100, is_served: true, served_qty: 4, is_gift: false },
-    { item_id: 'i2', dish_id: 'd2', dish_name: '小炒黄牛吊龙', qty: 1, price_fen: 5500, is_served: true, served_qty: 1, is_gift: false },
-    { item_id: 'i3', dish_id: 'd7', dish_name: '十五生腌傍', qty: 1, price_fen: 3500, is_served: false, served_qty: 0, is_gift: false },
-    { item_id: 'i4', dish_id: 'd1', dish_name: '剁椒鱼头（黄剁椒）', qty: 1, price_fen: 8800, is_served: false, served_qty: 0, is_gift: false },
-    { item_id: 'i5', dish_id: 'd9', dish_name: '老鸭汤', qty: 1, price_fen: 4800, is_served: false, served_qty: 0, is_gift: false },
-    { item_id: 'i6', dish_id: 'd11', dish_name: '酸梅汤', qty: 2, price_fen: 800, is_served: true, served_qty: 2, is_gift: false },
-  ],
-};
+const TENANT_ID = (): string =>
+  (typeof window !== 'undefined' && (window as unknown as Record<string, string>).__TENANT_ID__) || '';
+
+async function txFetch<T = unknown>(
+  path: string,
+  options: RequestInit = {},
+): Promise<T> {
+  const res = await fetch(path, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Tenant-ID': TENANT_ID(),
+      ...(options.headers || {}),
+    },
+  });
+  const json = await res.json();
+  if (!res.ok || json.ok === false) {
+    throw new Error(json.error?.message || json.detail || `HTTP ${res.status}`);
+  }
+  return json.data ?? json;
+}
 
 // ─── Design Token（Store终端白色模式，对标天财商龙） ───
 
@@ -757,52 +762,41 @@ export function TableDetailPage() {
     setTimeout(() => setToast(null), 2500);
   }, []);
 
-  // ── 加载真实订单数据 ──
+  // ── 加载订单数据 ──
   useEffect(() => {
     if (!orderId) {
-      // 无 order_id 时使用 MOCK_ORDER（开发 fallback）
-      setOrder(MOCK_ORDER);
+      setOrder(null);
       setOrderLoading(false);
       return;
     }
     setOrderLoading(true);
-    fetch(`/api/v1/orders/${orderId}`, {
-      headers: {
-        'X-Tenant-ID': (window as any).__TENANT_ID__ || '',
-      },
-    })
-      .then((res) => res.json())
-      .then((json) => {
-        if (json.ok && json.data) {
-          const d = json.data;
-          setOrder({
-            order_id: d.id ?? d.order_id ?? orderId,
-            table_no: d.table_no ?? tableNo,
-            guest_count: d.guest_count ?? 0,
-            total_fen: d.final_amount_fen ?? d.total_fen ?? 0,
-            waiter_name: d.waiter_name,
-            created_at: d.created_at,
-            items: (d.items ?? []).map((item: any) => ({
-              item_id: item.item_id,
-              dish_id: item.dish_id,
-              dish_name: item.dish_name,
-              qty: item.qty ?? item.quantity ?? 0,
-              price_fen: item.price_fen ?? item.unit_price_fen ?? 0,
-              spec: item.spec,
-              note: item.note,
-              is_served: item.is_served ?? false,
-              served_qty: item.served_qty ?? 0,
-              is_gift: item.is_gift ?? false,
-            })),
-          });
-        } else {
-          // API 返回非 ok 时 fallback 到 MOCK_ORDER（开发模式）
-          setOrder(MOCK_ORDER);
-        }
+    txFetch<Record<string, unknown>>(`/api/v1/trade/tables/${tableNo}?order_id=${encodeURIComponent(orderId)}`)
+      .then((d) => {
+        const table = (d.table ?? d) as Record<string, unknown>;
+        const orderData = (d.current_order ?? d) as Record<string, unknown>;
+        setOrder({
+          order_id: (orderData.id ?? orderData.order_id ?? orderId) as string,
+          table_no: (table.table_no ?? orderData.table_no ?? tableNo) as string,
+          guest_count: (orderData.guest_count ?? 0) as number,
+          total_fen: (orderData.final_amount_fen ?? orderData.total_fen ?? 0) as number,
+          waiter_name: orderData.waiter_name as string | undefined,
+          created_at: (orderData.created_at ?? '') as string,
+          items: ((orderData.items ?? []) as Record<string, unknown>[]).map((item) => ({
+            item_id: item.item_id as string,
+            dish_id: item.dish_id as string,
+            dish_name: item.dish_name as string,
+            qty: (item.qty ?? item.quantity ?? 0) as number,
+            price_fen: (item.price_fen ?? item.unit_price_fen ?? 0) as number,
+            spec: item.spec as string | undefined,
+            note: item.note as string | undefined,
+            is_served: (item.is_served ?? false) as boolean,
+            served_qty: (item.served_qty ?? 0) as number,
+            is_gift: (item.is_gift ?? false) as boolean,
+          })),
+        });
       })
       .catch(() => {
-        // 请求失败时 fallback 到 MOCK_ORDER（开发模式）
-        setOrder(MOCK_ORDER);
+        setOrder(null);
       })
       .finally(() => {
         setOrderLoading(false);
@@ -925,6 +919,43 @@ export function TableDetailPage() {
     }
   }, [navigate, showToast, closeModal]);
 
+  // API 失败后 order 为 null（非加载中）：显示空状态
+  if (!orderLoading && !order) {
+    return (
+      <div
+        style={{
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: T.bg,
+          flexDirection: 'column',
+          gap: 16,
+          fontSize: 16,
+          color: T.text2,
+        }}
+      >
+        <div style={{ fontSize: 40 }}>📋</div>
+        <div>暂无订单数据</div>
+        <button
+          onClick={() => navigate(-1)}
+          style={{
+            padding: '12px 24px',
+            background: T.primary,
+            color: '#fff',
+            border: 'none',
+            borderRadius: 10,
+            fontSize: 16,
+            cursor: 'pointer',
+            minHeight: 48,
+          }}
+        >
+          返回
+        </button>
+      </div>
+    );
+  }
+
   // 订单数据加载中：显示全屏 spinner
   if (orderLoading || !order) {
     return (
@@ -957,7 +988,7 @@ export function TableDetailPage() {
     );
   }
 
-  const displayNo = `${order.table_no}(${order.guest_count}人)`;
+  const displayNo = `${order?.table_no ?? tableNo}(${order?.guest_count ?? 0}人)`;
 
   return (
     <div
@@ -1074,7 +1105,7 @@ export function TableDetailPage() {
       >
         {activeTab === 'detail' ? (
           <OrderDetailTab
-            items={order.items}
+            items={order?.items ?? []}
             editMode={editMode}
             onToggleEdit={() => setEditMode((v) => !v)}
             onGift={(id) => {
@@ -1087,7 +1118,7 @@ export function TableDetailPage() {
             }}
           />
         ) : (
-          <VerifyTab items={order.items} />
+          <VerifyTab items={order?.items ?? []} />
         )}
       </div>
 
@@ -1211,7 +1242,7 @@ export function TableDetailPage() {
       {/* ── 弹窗区域 ── */}
       {modal === 'gift' && (
         <GiftModal
-          items={order.items.filter((i) => !i.is_gift)}
+          items={(order?.items ?? []).filter((i) => !i.is_gift)}
           onConfirm={handleGift}
           onCancel={closeModal}
         />

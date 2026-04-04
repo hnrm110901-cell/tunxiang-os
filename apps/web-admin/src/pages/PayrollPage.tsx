@@ -42,7 +42,8 @@ const { Title, Text } = Typography;
 
 // ─── 常量 ───────────────────────────────────────────────────────────────────
 
-const MOCK_STORE_ID = 'store-001';
+// 从当前登录上下文获取门店ID，fallback 为空字符串（API 侧将返回当前用户所属门店数据）
+const CURRENT_STORE_ID = localStorage.getItem('tx_store_id') ?? '';
 const ROLE_LABEL: Record<string, string> = {
   waiter: '服务员',
   chef: '厨师',
@@ -141,7 +142,7 @@ export function PayrollPage() {
       // WHERE ps.tenant_id = :tid AND ps.period_year = :year AND ps.period_month = :month
       // AND ps.store_id = :store_id AND ps.is_deleted = false ORDER BY e.name
       const data = await txFetch<{ items: PayrollSummaryRow[]; total: number }>(
-        `/api/v1/org/payroll/summaries?year=${year}&month=${month}&store_id=${MOCK_STORE_ID}`,
+        `/api/v1/org/payroll/summaries?year=${year}&month=${month}&store_id=${CURRENT_STORE_ID}`,
       );
       setSummaries(data.items);
     } catch {
@@ -158,7 +159,7 @@ export function PayrollPage() {
       // TODO: SELECT * FROM payroll_configs WHERE tenant_id = :tid
       //       AND store_id = :store_id AND is_deleted = false ORDER BY employee_role
       const data = await txFetch<{ items: PayrollConfig[]; total: number }>(
-        `/api/v1/org/payroll/config?store_id=${MOCK_STORE_ID}`,
+        `/api/v1/org/payroll/config?store_id=${CURRENT_STORE_ID}`,
       );
       setConfigs(data.items);
     } catch {
@@ -180,7 +181,7 @@ export function PayrollPage() {
       // TODO: 遍历 employees 表所有在职员工，调用薪资引擎计算，写入 payroll_summaries 表
       const result = await txFetch<BatchCalcResult>('/api/v1/org/payroll/calculate-batch', {
         method: 'POST',
-        body: JSON.stringify({ store_id: MOCK_STORE_ID, year, month }),
+        body: JSON.stringify({ store_id: CURRENT_STORE_ID, year, month }),
       });
       setBatchResult(result);
       setSummaries(result.records);
@@ -241,7 +242,7 @@ export function PayrollPage() {
       await txFetch('/api/v1/org/payroll/config', {
         method: 'POST',
         body: JSON.stringify({
-          store_id: MOCK_STORE_ID,
+          store_id: CURRENT_STORE_ID,
           employee_role: editingConfig.employee_role,
           base_salary_fen: Math.round(values.base_salary_yuan * 100),
           piece_rate_enabled: values.piece_rate_enabled,
@@ -375,7 +376,7 @@ export function PayrollPage() {
           employee_id: '__total__',
           employee_name: '合计',
           employee_role: '',
-          store_id: MOCK_STORE_ID,
+          store_id: CURRENT_STORE_ID,
           period_year: selectedMonth.year(),
           period_month: selectedMonth.month() + 1,
           base_salary_fen: summaries.reduce((s, r) => s + r.base_salary_fen, 0),

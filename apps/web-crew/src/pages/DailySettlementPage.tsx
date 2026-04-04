@@ -5,6 +5,7 @@
  */
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { txFetch } from '../api/index';
 
 /* ---------- 颜色常量（Design Token）---------- */
 const C = {
@@ -50,30 +51,21 @@ interface DailySummaryData {
   all_completed: boolean;
 }
 
-/* ---------- API 调用 ---------- */
-function getTenantId(): string {
-  return localStorage.getItem('tenant_id') ?? '';
-}
+/* ---------- API 调用（使用 txFetch，自动携带 X-Tenant-ID）---------- */
 
 async function fetchChecklist(): Promise<DailySummaryData> {
-  const res = await fetch('/api/v1/ops/settlement/checklist', {
-    headers: { 'X-Tenant-ID': getTenantId() },
-  });
-  if (!res.ok) throw new Error(`获取清单失败: ${res.status}`);
-  const json = await res.json();
-  return json.data as DailySummaryData;
+  return txFetch<DailySummaryData>('/api/v1/trade/settlement/today');
 }
 
-async function submitDailySettlement(): Promise<void> {
-  const res = await fetch('/api/v1/ops/settlement/close', {
+async function submitDailySettlement(actualCashFen?: number, notes?: string): Promise<void> {
+  await txFetch('/api/v1/trade/settlement/close', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Tenant-ID': getTenantId(),
-    },
-    body: JSON.stringify({ closed_at: new Date().toISOString() }),
+    body: JSON.stringify({
+      actual_cash_fen: actualCashFen ?? 0,
+      notes: notes ?? '',
+      closed_at: new Date().toISOString(),
+    }),
   });
-  if (!res.ok) throw new Error(`日结提交失败: ${res.status}`);
 }
 
 /* ---------- 工具函数 ---------- */
@@ -97,26 +89,11 @@ function formatTime(iso: string): string {
   }
 }
 
-/* ---------- 默认 Mock（API 未就绪时的骨架数据）---------- */
-const MOCK_DATA: DailySummaryData = {
+/* ---------- 空白降级数据（API 失败时显示，不崩溃）---------- */
+const EMPTY_DATA: DailySummaryData = {
   date: new Date().toISOString().slice(0, 10),
-  shift_info: {
-    shift_id: 'mock-001',
-    shift_type: '早班',
-    start_time: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
-    duration_minutes: 240,
-    employee_name: '服务员',
-  },
-  checklist: [
-    { id: 'e1', code: 'E1', name: '换班交接', status: 'pending' },
-    { id: 'e2', code: 'E2', name: '日汇总确认', status: 'pending' },
-    { id: 'e3', code: 'E3', name: '收银核对', status: 'pending' },
-    { id: 'e4', code: 'E4', name: '库存盘点', status: 'pending' },
-    { id: 'e5', code: 'E5', name: '问题上报', status: 'pending' },
-    { id: 'e6', code: 'E6', name: '整改跟踪', status: 'pending' },
-    { id: 'e7', code: 'E7', name: '员工绩效', status: 'pending' },
-    { id: 'e8', code: 'E8', name: '巡店报告', status: 'pending' },
-  ],
+  shift_info: null,
+  checklist: [],
   all_completed: false,
 };
 
@@ -285,10 +262,10 @@ export function DailySettlementPage() {
       const result = await fetchChecklist();
       setData(result);
     } catch (err) {
-      // 网络/API 未就绪时降级到 mock 数据
-      setData(MOCK_DATA);
+      // 网络/API 不可用时降级到空数据，不崩溃
+      setData(EMPTY_DATA);
       const msg = err instanceof Error ? err.message : '未知错误';
-      setError(`数据加载失败（已显示示例数据）：${msg}`);
+      setError(`数据加载失败：${msg}`);
     } finally {
       setLoading(false);
     }
@@ -312,7 +289,7 @@ export function DailySettlementPage() {
     if (!data?.all_completed) return;
     setSubmitting(true);
     try {
-      await submitDailySettlement();
+      await submitDailySettlement();  // actual_cash_fen 可扩展传入
       setSettled(true);
     } catch (err) {
       const msg = err instanceof Error ? err.message : '未知错误';

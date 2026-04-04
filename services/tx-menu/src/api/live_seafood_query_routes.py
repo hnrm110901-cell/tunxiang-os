@@ -13,6 +13,7 @@ from typing import Optional
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
@@ -50,132 +51,6 @@ def _price_display(price_per_unit_fen: Optional[int], display_unit: Optional[str
     return f"¥{price_str}/{display_unit or '份'}"
 
 
-# ─── Mock 数据（数据库接入前使用）──────────────────────────────────────────────
-
-_MOCK_TANKS = [
-    {
-        "zone_id": "00000000-0000-0000-0000-000000000001",
-        "zone_code": "A1",
-        "zone_name": "石斑鱼缸",
-        "current_stock_count": 12,
-        "current_stock_weight_g": 18500,
-        "is_active": True,
-        "featured_dish": "石斑鱼",
-        "price_display": "¥128/斤",
-        "pricing_method": "weight",
-    },
-    {
-        "zone_id": "00000000-0000-0000-0000-000000000002",
-        "zone_code": "B2",
-        "zone_name": "对虾缸",
-        "current_stock_count": 0,
-        "current_stock_weight_g": 3500,
-        "is_active": True,
-        "featured_dish": "对虾",
-        "price_display": "¥68/斤",
-        "pricing_method": "weight",
-    },
-    {
-        "zone_id": "00000000-0000-0000-0000-000000000003",
-        "zone_code": "C1",
-        "zone_name": "龙虾缸",
-        "current_stock_count": 5,
-        "current_stock_weight_g": 12000,
-        "is_active": True,
-        "featured_dish": "波士顿龙虾",
-        "price_display": "¥298/头",
-        "pricing_method": "count",
-    },
-    {
-        "zone_id": "00000000-0000-0000-0000-000000000004",
-        "zone_code": "D1",
-        "zone_name": "蟹池",
-        "current_stock_count": 0,
-        "current_stock_weight_g": 0,
-        "is_active": True,
-        "featured_dish": "花蟹",
-        "price_display": "¥88/斤",
-        "pricing_method": "weight",
-    },
-]
-
-_MOCK_DISHES: dict[str, list[dict]] = {
-    "A1": [
-        {
-            "dish_id": "d-sf-001",
-            "dish_name": "石斑鱼",
-            "pricing_method": "weight",
-            "price_per_unit_fen": 12800,
-            "display_unit": "斤",
-            "weight_unit": "jin",
-            "live_stock_count": 12,
-            "live_stock_weight_g": 18500,
-            "min_order_qty": 0.5,
-            "image_url": None,
-            "price_display": "¥128/斤",
-        },
-    ],
-    "B2": [
-        {
-            "dish_id": "d-sf-002",
-            "dish_name": "对虾",
-            "pricing_method": "weight",
-            "price_per_unit_fen": 6800,
-            "display_unit": "斤",
-            "weight_unit": "jin",
-            "live_stock_count": 0,
-            "live_stock_weight_g": 3500,
-            "min_order_qty": 0.5,
-            "image_url": None,
-            "price_display": "¥68/斤",
-        },
-    ],
-    "C1": [
-        {
-            "dish_id": "d-sf-003",
-            "dish_name": "波士顿龙虾",
-            "pricing_method": "count",
-            "price_per_unit_fen": 29800,
-            "display_unit": "头",
-            "weight_unit": None,
-            "live_stock_count": 5,
-            "live_stock_weight_g": 12000,
-            "min_order_qty": 1.0,
-            "image_url": None,
-            "price_display": "¥298/头",
-        },
-        {
-            "dish_id": "d-sf-004",
-            "dish_name": "澳洲龙虾",
-            "pricing_method": "weight",
-            "price_per_unit_fen": 48000,
-            "display_unit": "斤",
-            "weight_unit": "jin",
-            "live_stock_count": 2,
-            "live_stock_weight_g": 4000,
-            "min_order_qty": 1.0,
-            "image_url": None,
-            "price_display": "¥480/斤",
-        },
-    ],
-    "D1": [
-        {
-            "dish_id": "d-sf-005",
-            "dish_name": "花蟹",
-            "pricing_method": "weight",
-            "price_per_unit_fen": 8800,
-            "display_unit": "斤",
-            "weight_unit": "jin",
-            "live_stock_count": 0,
-            "live_stock_weight_g": 0,
-            "min_order_qty": 0.5,
-            "image_url": None,
-            "price_display": "¥88/斤",
-        },
-    ],
-}
-
-
 # ─── Endpoints ───────────────────────────────────────────────────────────────
 
 @router.get("/tanks", summary="门店鱼缸区域列表（含库存摘要）")
@@ -186,40 +61,72 @@ async def list_tanks(
 ) -> dict:
     """
     返回门店所有鱼缸区域及其库存摘要，供前端绘制鱼缸选品卡片列表。
-
-    TODO: 替换 Mock 数据为真实数据库查询：
-    ```sql
-    SELECT
-        tz.id AS zone_id,
-        tz.zone_code,
-        tz.zone_name,
-        tz.is_active,
-        COALESCE(SUM(d.live_stock_count), 0) AS current_stock_count,
-        COALESCE(SUM(d.live_stock_weight_g), 0) AS current_stock_weight_g,
-        (SELECT dish_name FROM dishes
-         WHERE tank_zone_id = tz.id AND is_deleted = false
-         ORDER BY live_stock_count DESC LIMIT 1) AS featured_dish,
-        (SELECT price_per_unit_fen FROM dishes
-         WHERE tank_zone_id = tz.id AND is_deleted = false
-         ORDER BY live_stock_count DESC LIMIT 1) AS featured_price,
-        (SELECT display_unit FROM dishes
-         WHERE tank_zone_id = tz.id AND is_deleted = false
-         ORDER BY live_stock_count DESC LIMIT 1) AS featured_unit,
-        (SELECT pricing_method FROM dishes
-         WHERE tank_zone_id = tz.id AND is_deleted = false
-         ORDER BY live_stock_count DESC LIMIT 1) AS pricing_method
-    FROM fish_tank_zones tz
-    LEFT JOIN dishes d ON d.tank_zone_id = tz.id AND d.is_deleted = false
-    WHERE tz.store_id = :store_id
-      AND tz.tenant_id = :tenant_id
-      AND tz.is_deleted = false
-    GROUP BY tz.id, tz.zone_code, tz.zone_name, tz.is_active
-    ORDER BY tz.sort_order, tz.zone_code
-    ```
     """
-    # ── Mock 数据（接入数据库后移除） ──────────────────────
-    log.info("live_seafood.list_tanks.mock", store_id=store_id)
-    return _ok({"tanks": _MOCK_TANKS})
+    tenant_id = _tenant(request)
+    await _set_rls(db, tenant_id)
+
+    try:
+        result = await db.execute(
+            text("""
+                SELECT
+                    tz.id::TEXT         AS zone_id,
+                    tz.zone_code,
+                    tz.zone_name,
+                    tz.is_active,
+                    COALESCE(SUM(d.live_stock_count), 0)    AS current_stock_count,
+                    COALESCE(SUM(d.live_stock_weight_g), 0) AS current_stock_weight_g,
+                    (
+                        SELECT dish_name FROM dishes
+                        WHERE tank_zone_id = tz.id AND is_deleted = false
+                        ORDER BY live_stock_count DESC LIMIT 1
+                    ) AS featured_dish,
+                    (
+                        SELECT price_per_unit_fen FROM dishes
+                        WHERE tank_zone_id = tz.id AND is_deleted = false
+                        ORDER BY live_stock_count DESC LIMIT 1
+                    ) AS featured_price,
+                    (
+                        SELECT display_unit FROM dishes
+                        WHERE tank_zone_id = tz.id AND is_deleted = false
+                        ORDER BY live_stock_count DESC LIMIT 1
+                    ) AS featured_unit,
+                    (
+                        SELECT pricing_method FROM dishes
+                        WHERE tank_zone_id = tz.id AND is_deleted = false
+                        ORDER BY live_stock_count DESC LIMIT 1
+                    ) AS pricing_method
+                FROM fish_tank_zones tz
+                LEFT JOIN dishes d ON d.tank_zone_id = tz.id AND d.is_deleted = false
+                WHERE tz.store_id  = :store_id
+                  AND tz.tenant_id = :tenant_id
+                  AND tz.is_deleted = false
+                GROUP BY tz.id, tz.zone_code, tz.zone_name, tz.is_active
+                ORDER BY tz.sort_order, tz.zone_code
+            """),
+            {"store_id": store_id, "tenant_id": tenant_id},
+        )
+        rows = result.fetchall()
+    except SQLAlchemyError as exc:
+        log.error("live_seafood.list_tanks.db_error", store_id=store_id, error=str(exc))
+        return _ok({"tanks": []})
+
+    tanks = [
+        {
+            "zone_id": r[0],
+            "zone_code": r[1],
+            "zone_name": r[2],
+            "is_active": r[3],
+            "current_stock_count": int(r[4]),
+            "current_stock_weight_g": int(r[5]),
+            "featured_dish": r[6],
+            "price_display": _price_display(r[7], r[8]),
+            "pricing_method": r[9],
+        }
+        for r in rows
+    ]
+
+    log.info("live_seafood.list_tanks", store_id=store_id, count=len(tanks))
+    return _ok({"tanks": tanks})
 
 
 @router.get("/tanks/{zone_code}/dishes", summary="指定鱼缸区域的可点活鲜菜品")
@@ -232,45 +139,87 @@ async def list_tank_dishes(
     """
     返回指定鱼缸区域当前可点的活鲜菜品（含实时库存）。
     服务员扫描鱼缸QR码后跳转到此接口获取菜品列表。
-
-    TODO: 替换 Mock 数据为真实数据库查询：
-    ```sql
-    SELECT
-        d.id AS dish_id,
-        d.dish_name,
-        d.pricing_method,
-        d.price_per_unit_fen,
-        d.display_unit,
-        d.weight_unit,
-        d.live_stock_count,
-        d.live_stock_weight_g,
-        d.min_order_qty,
-        d.image_url
-    FROM dishes d
-    JOIN fish_tank_zones tz ON tz.id = d.tank_zone_id
-    WHERE tz.zone_code = :zone_code
-      AND tz.store_id = :store_id
-      AND tz.tenant_id = :tenant_id
-      AND tz.is_deleted = false
-      AND d.is_deleted = false
-      AND d.pricing_method IN ('weight', 'count')
-    ORDER BY d.live_stock_count DESC, d.dish_name
-    ```
     """
+    tenant_id = _tenant(request)
+    await _set_rls(db, tenant_id)
     zone_code_upper = zone_code.upper()
 
-    # ── Mock 数据（接入数据库后移除） ──────────────────────
-    log.info("live_seafood.list_tank_dishes.mock", zone_code=zone_code, store_id=store_id)
+    try:
+        # 查鱼缸区域元数据
+        zone_result = await db.execute(
+            text("""
+                SELECT id::TEXT, zone_code, zone_name
+                FROM fish_tank_zones
+                WHERE zone_code  = :zone_code
+                  AND store_id   = :store_id
+                  AND tenant_id  = :tenant_id
+                  AND is_deleted = false
+                LIMIT 1
+            """),
+            {"zone_code": zone_code_upper, "store_id": store_id, "tenant_id": tenant_id},
+        )
+        zone_row = zone_result.fetchone()
+    except SQLAlchemyError as exc:
+        log.error("live_seafood.list_tank_dishes.db_error",
+                  zone_code=zone_code, store_id=store_id, error=str(exc))
+        raise HTTPException(status_code=500, detail="数据库查询失败") from exc
 
-    # 查找 zone 元数据
-    tank = next((t for t in _MOCK_TANKS if t["zone_code"] == zone_code_upper), None)
-    if not tank:
+    if not zone_row:
         raise HTTPException(status_code=404, detail=f"鱼缸区域 {zone_code} 不存在")
 
-    dishes = _MOCK_DISHES.get(zone_code_upper, [])
+    zone_id = zone_row[0]
+    zone_name = zone_row[2]
 
+    try:
+        dishes_result = await db.execute(
+            text("""
+                SELECT
+                    d.id::TEXT          AS dish_id,
+                    d.dish_name,
+                    d.pricing_method,
+                    d.price_per_unit_fen,
+                    d.display_unit,
+                    d.weight_unit,
+                    d.live_stock_count,
+                    d.live_stock_weight_g,
+                    d.min_order_qty,
+                    d.image_url
+                FROM dishes d
+                WHERE d.tank_zone_id = :zone_id
+                  AND d.tenant_id    = :tenant_id
+                  AND d.is_deleted   = false
+                  AND d.pricing_method IN ('weight', 'count')
+                ORDER BY d.live_stock_count DESC, d.dish_name
+            """),
+            {"zone_id": zone_id, "tenant_id": tenant_id},
+        )
+        dish_rows = dishes_result.fetchall()
+    except SQLAlchemyError as exc:
+        log.error("live_seafood.list_tank_dishes.dishes_db_error",
+                  zone_id=zone_id, error=str(exc))
+        dish_rows = []
+
+    dishes = [
+        {
+            "dish_id": r[0],
+            "dish_name": r[1],
+            "pricing_method": r[2],
+            "price_per_unit_fen": r[3],
+            "display_unit": r[4],
+            "weight_unit": r[5],
+            "live_stock_count": r[6],
+            "live_stock_weight_g": r[7],
+            "min_order_qty": float(r[8]) if r[8] else 1.0,
+            "image_url": r[9],
+            "price_display": _price_display(r[3], r[4]),
+        }
+        for r in dish_rows
+    ]
+
+    log.info("live_seafood.list_tank_dishes",
+             zone_code=zone_code_upper, store_id=store_id, dish_count=len(dishes))
     return _ok({
         "zone_code": zone_code_upper,
-        "zone_name": tank["zone_name"],
+        "zone_name": zone_name,
         "dishes": dishes,
     })

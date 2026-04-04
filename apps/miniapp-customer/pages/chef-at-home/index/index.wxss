@@ -1,0 +1,401 @@
+/* 大厨到家首页样式 */
+/* Design Tokens: primary #FF6B35, text1 #2C2C2A, text2 #5F5E5A, bg2 #F8F7F5, border #E8E6E1 */
+
+page {
+  background: #F8F7F5;
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", "Microsoft YaHei", sans-serif;
+}
+
+.page {
+  min-height: 100vh;
+  background: #F8F7F5;
+}
+
+/* ─── 顶部搜索栏 ─── */
+
+.search-bar {
+  display: flex;
+  align-items: center;
+  padding: 20rpx 32rpx;
+  background: #FFFFFF;
+  gap: 20rpx;
+}
+
+.search-input-wrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  height: 72rpx;
+  background: #F8F7F5;
+  border-radius: 36rpx;
+  padding: 0 28rpx;
+  gap: 12rpx;
+}
+
+.search-icon {
+  font-size: 32rpx;
+  color: #B4B2A9;
+}
+
+.search-placeholder {
+  font-size: 28rpx;
+  color: #B4B2A9;
+}
+
+.filter-btn {
+  display: flex;
+  align-items: center;
+  gap: 6rpx;
+  padding: 16rpx 24rpx;
+  background: #FFF3ED;
+  border-radius: 36rpx;
+  flex-shrink: 0;
+}
+
+.filter-icon {
+  font-size: 28rpx;
+  color: #FF6B35;
+}
+
+.filter-text {
+  font-size: 26rpx;
+  color: #FF6B35;
+  font-weight: 500;
+}
+
+/* ─── Banner 轮播 ─── */
+
+.banner {
+  width: 100%;
+  height: 300rpx;
+  display: block;
+}
+
+.banner-slide {
+  width: 100%;
+  height: 300rpx;
+  display: flex;
+  align-items: center;
+  padding: 0 48rpx;
+  box-sizing: border-box;
+}
+
+.banner-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+}
+
+.banner-title {
+  font-size: 40rpx;
+  font-weight: 700;
+  color: #FFFFFF;
+  line-height: 1.2;
+}
+
+.banner-sub {
+  font-size: 26rpx;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.banner-cta {
+  margin-top: 16rpx;
+  display: inline-flex;
+  align-items: center;
+  padding: 12rpx 28rpx;
+  background: rgba(255, 255, 255, 0.25);
+  border: 2rpx solid rgba(255, 255, 255, 0.6);
+  border-radius: 32rpx;
+  align-self: flex-start;
+}
+
+.banner-cta-text {
+  font-size: 24rpx;
+  color: #FFFFFF;
+  font-weight: 500;
+}
+
+/* ─── 菜系筛选 Tab ─── */
+
+.cuisine-tabs {
+  width: 100%;
+  background: #FFFFFF;
+  white-space: nowrap;
+  margin-top: 16rpx;
+}
+
+.cuisine-list {
+  display: inline-flex;
+  align-items: center;
+  padding: 20rpx 24rpx;
+  gap: 16rpx;
+}
+
+.cuisine-item {
+  display: inline-flex;
+  align-items: center;
+  height: 60rpx;
+  padding: 0 28rpx;
+  font-size: 26rpx;
+  color: #5F5E5A;
+  background: #F8F7F5;
+  border-radius: 30rpx;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: all 0.2s;
+}
+
+.cuisine-item.active {
+  color: #FF6B35;
+  background: #FFF3ED;
+  font-weight: 600;
+}
+
+/* ─── 区块标题 ─── */
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 32rpx 32rpx 16rpx;
+}
+
+.section-title {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #2C2C2A;
+}
+
+.section-more {
+  font-size: 26rpx;
+  color: #FF6B35;
+}
+
+.chef-count {
+  font-size: 24rpx;
+  color: #B4B2A9;
+}
+
+/* ─── 主厨推荐横向滚动 ─── */
+
+.featured-scroll {
+  width: 100%;
+  white-space: nowrap;
+  padding-bottom: 8rpx;
+}
+
+.featured-list {
+  display: inline-flex;
+  padding: 0 24rpx 16rpx;
+  gap: 20rpx;
+}
+
+.featured-card {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  width: 220rpx;
+  background: #FFFFFF;
+  border-radius: 24rpx;
+  padding: 28rpx 20rpx 24rpx;
+  box-shadow: 0 2rpx 16rpx rgba(0, 0, 0, 0.06);
+  position: relative;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.featured-badge {
+  position: absolute;
+  top: 0;
+  left: 0;
+  background: #FF6B35;
+  color: #FFFFFF;
+  font-size: 20rpx;
+  font-weight: 500;
+  padding: 6rpx 16rpx;
+  border-radius: 24rpx 0 16rpx 0;
+}
+
+.featured-avatar {
+  width: 100rpx;
+  height: 100rpx;
+  border-radius: 50rpx;
+  background: #F0EDE6;
+  margin-top: 16rpx;
+  margin-bottom: 16rpx;
+}
+
+.featured-name {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #2C2C2A;
+  margin-bottom: 6rpx;
+}
+
+.featured-specialty {
+  font-size: 22rpx;
+  color: #FF6B35;
+  background: #FFF3ED;
+  padding: 4rpx 12rpx;
+  border-radius: 8rpx;
+  margin-bottom: 12rpx;
+}
+
+.featured-stats {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  margin-bottom: 8rpx;
+}
+
+.featured-rating {
+  font-size: 22rpx;
+  color: #2C2C2A;
+}
+
+.featured-orders {
+  font-size: 22rpx;
+  color: #B4B2A9;
+}
+
+.featured-price {
+  font-size: 26rpx;
+  font-weight: 600;
+  color: #FF6B35;
+}
+
+/* ─── 全部厨师列表卡片 ─── */
+
+.chef-card {
+  display: flex;
+  align-items: flex-start;
+  background: #FFFFFF;
+  margin: 0 24rpx 20rpx;
+  border-radius: 24rpx;
+  padding: 28rpx 24rpx;
+  box-shadow: 0 2rpx 12rpx rgba(0, 0, 0, 0.05);
+  gap: 24rpx;
+}
+
+.chef-avatar {
+  width: 120rpx;
+  height: 120rpx;
+  border-radius: 60rpx;
+  background: #F0EDE6;
+  flex-shrink: 0;
+}
+
+.chef-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10rpx;
+}
+
+.chef-name-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10rpx;
+}
+
+.chef-name {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #2C2C2A;
+}
+
+.badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8rpx;
+}
+
+.badge {
+  font-size: 20rpx;
+  color: #0F6E56;
+  background: #E8F5F0;
+  padding: 4rpx 12rpx;
+  border-radius: 8rpx;
+}
+
+.chef-specialty {
+  font-size: 26rpx;
+  color: #5F5E5A;
+}
+
+.chef-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12rpx;
+}
+
+.chef-rating {
+  font-size: 24rpx;
+  color: #5F5E5A;
+}
+
+.price-book {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+}
+
+.chef-price {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #FF6B35;
+}
+
+.book-btn {
+  height: 60rpx;
+  padding: 0 28rpx;
+  background: #FF6B35;
+  border-radius: 30rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26rpx;
+  color: #FFFFFF;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+/* ─── 状态提示 ─── */
+
+.state-tip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80rpx 32rpx;
+  gap: 16rpx;
+}
+
+.state-icon {
+  font-size: 80rpx;
+}
+
+.state-text {
+  font-size: 28rpx;
+  color: #B4B2A9;
+}
+
+/* ─── 加载更多 / 没有更多 ─── */
+
+.loading-more,
+.no-more {
+  text-align: center;
+  padding: 32rpx;
+  font-size: 26rpx;
+  color: #B4B2A9;
+}
+
+/* ─── 底部留白 ─── */
+
+.bottom-spacer {
+  height: 64rpx;
+}

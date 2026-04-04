@@ -1,26 +1,22 @@
 """营销Banner管理 — 创建/上下线/点击追踪/效果分析
 
-支持位置: home_top(首页顶部) / member_center(会员中心) / menu_top(菜单顶部)
-支持链接: activity(活动页) / product(商品) / coupon_pack(券包) / url(外部URL)
+支持 banner_type: hero / promotion / announcement / campaign
+存储层：PostgreSQL banners 表（v162 迁移创建）
+计数器直接在 banners 表内维护（impression_count / click_count）
 """
 from __future__ import annotations
 
-import uuid
+import json
 from datetime import datetime, timezone
 from typing import Any, Optional
 
 import structlog
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = structlog.get_logger(__name__)
 
-# ── 内存存储 ──────────────────────────────────────────────────
-
-_banners: dict[str, dict] = {}
-_banner_clicks: dict[str, list[dict]] = {}  # banner_id -> [click_record]
-_banner_impressions: dict[str, int] = {}  # banner_id -> impression_count
-
-VALID_POSITIONS = ("home_top", "member_center", "menu_top")
-VALID_LINK_TYPES = ("activity", "product", "coupon_pack", "url")
+VALID_BANNER_TYPES = ("hero", "promotion", "announcement", "campaign")
 
 
 # ── 工具函数 ──────────────────────────────────────────────────
@@ -29,25 +25,288 @@ def _now_utc() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def _is_banner_active(banner: dict, now: datetime) -> bool:
-    """判断Banner在当前时间是否有效"""
-    if banner.get("is_deleted", False):
-        return False
-    if banner.get("status") != "active":
-        return False
-    start = banner.get("start_date")
-    end = banner.get("end_date")
-    if start and now < start:
-        return False
-    if end and now > end:
-        return False
-    return True
+def _row_to_dict(row: Any) -> dict:
+    """将 SQLAlchemy RowMapping 转为普通 dict，处理 datetime 序列化"""
+    d = dict(row)
+    for k, v in d.items():
+        if isinstance(v, datetime):
+            d[k] = v.isoformat()
+    return d
 
 
 # ── 服务函数 ──────────────────────────────────────────────────
 
 
 async def create_banner(
+    title: str,
+    banner_type: str,
+    image_url: Optional[str],
+    link_url: Optional[str],
+    target_segment: Optional[dict],
+    display_order: int,
+    start_at: Optional[datetime],
+    end_at: Optional[datetime],
+    *,
+    tenant_id: str,
+    db: AsyncSession,
+) -> dict[str, Any]:
+    """创建Banner
+
+    Args:
+        title: Banner标题
+        banner_type: 类型 (hero/promotion/announcement/campaign)
+        image_url: 图片URL
+        link_url: 跳转URL
+        target_segment: 目标客群条件（JSONB）
+        display_order: 显示顺序（数值越小越靠前）
+        start_at: 上线时间 (None=立即生效)
+        end_at: 下线时间 (None=永久有效)
+        tenant_id: 租户ID
+        db: 数据库会话
+
+    Returns:
+        {"id", "title", "banner_type", "is_active", "created_at", ...}
+    """
+    if banner_type not in VALID_BANNER_TYPES:
+        raise ValueError(f"invalid_banner_type:{banner_type}, must be one of {VALID_BANNER_TYPES}")
+
+    await db.execute(
+        text("SELECT set_config('app.tenant_id', :tid, true)"),
+        {"tid": tenant_id},
+    )
+
+    result = await db.execute(
+        text("""
+            INSERT INTO banners
+                (tenant_id, title, banner_type, image_url, link_url,
+                 target_segment, display_order, start_at, end_at,
+                 is_active, impression_count, click_count)
+            VALUES
+                (:tenant_id, :title, :banner_type, :image_url, :link_url,
+                 :target_segment::jsonb, :display_order, :start_at, :end_at,
+                 TRUE, 0, 0)
+            RETURNING id, tenant_id, title, banner_type, image_url, link_url,
+                      target_segment, display_order, start_at, end_at,
+                      is_active, impression_count, click_count, created_at, updated_at
+        """),
+        {
+            "tenant_id": tenant_id,
+            "title": title,
+            "banner_type": banner_type,
+            "image_url": image_url,
+            "link_url": link_url,
+            "target_segment": json.dumps(target_segment, ensure_ascii=False) if target_segment else "null",
+            "display_order": display_order,
+            "start_at": start_at,
+            "end_at": end_at,
+        },
+    )
+    row = result.mappings().one()
+    await db.commit()
+
+    banner = _row_to_dict(row)
+    logger.info(
+        "banner.created",
+        banner_id=str(banner["id"]),
+        title=title,
+        banner_type=banner_type,
+        tenant_id=tenant_id,
+    )
+    return banner
+
+
+async def list_banners(
+    is_active: bool = True,
+    *,
+    tenant_id: str,
+    db: AsyncSession,
+) -> list[dict[str, Any]]:
+    """获取Banner列表（按 display_order 排序）
+
+    Args:
+        is_active: 是否只返回激活的 Banner
+        tenant_id: 租户ID
+        db: 数据库会话
+
+    Returns:
+        Banner 列表，按 display_order 升序
+    """
+    await db.execute(
+        text("SELECT set_config('app.tenant_id', :tid, true)"),
+        {"tid": tenant_id},
+    )
+
+    conditions = ["tenant_id = :tenant_id", "is_deleted = FALSE"]
+    params: dict[str, Any] = {"tenant_id": tenant_id}
+
+    if is_active:
+        conditions.append("is_active = TRUE")
+        conditions.append("(start_at IS NULL OR start_at <= NOW())")
+        conditions.append("(end_at IS NULL OR end_at >= NOW())")
+
+    where = " AND ".join(conditions)
+    result = await db.execute(
+        text(f"""
+            SELECT id, title, banner_type, image_url, link_url,
+                   target_segment, display_order, start_at, end_at,
+                   is_active, impression_count, click_count, created_at, updated_at
+            FROM banners
+            WHERE {where}
+            ORDER BY display_order ASC, created_at DESC
+        """),
+        params,
+    )
+    rows = result.mappings().all()
+
+    return [_row_to_dict(row) for row in rows]
+
+
+async def record_impression(
+    banner_id: str,
+    *,
+    tenant_id: str,
+    db: AsyncSession,
+) -> None:
+    """记录展示次数（原子递增）
+
+    Args:
+        banner_id: Banner ID
+        tenant_id: 租户ID
+        db: 数据库会话
+    """
+    await db.execute(
+        text("SELECT set_config('app.tenant_id', :tid, true)"),
+        {"tid": tenant_id},
+    )
+    await db.execute(
+        text("""
+            UPDATE banners
+            SET impression_count = impression_count + 1,
+                updated_at = NOW()
+            WHERE id = :banner_id
+              AND tenant_id = :tenant_id
+              AND is_deleted = FALSE
+        """),
+        {"banner_id": banner_id, "tenant_id": tenant_id},
+    )
+    await db.commit()
+
+
+async def record_click(
+    banner_id: str,
+    *,
+    tenant_id: str,
+    db: AsyncSession,
+) -> None:
+    """记录点击次数（原子递增）
+
+    Args:
+        banner_id: Banner ID
+        tenant_id: 租户ID
+        db: 数据库会话
+    """
+    await db.execute(
+        text("SELECT set_config('app.tenant_id', :tid, true)"),
+        {"tid": tenant_id},
+    )
+    await db.execute(
+        text("""
+            UPDATE banners
+            SET click_count = click_count + 1,
+                updated_at = NOW()
+            WHERE id = :banner_id
+              AND tenant_id = :tenant_id
+              AND is_deleted = FALSE
+        """),
+        {"banner_id": banner_id, "tenant_id": tenant_id},
+    )
+    await db.commit()
+
+
+async def get_banner_stats(
+    banner_id: str,
+    *,
+    tenant_id: str,
+    db: AsyncSession,
+) -> dict[str, Any]:
+    """获取Banner效果统计（展示/点击/CTR）
+
+    Args:
+        banner_id: Banner ID
+        tenant_id: 租户ID
+        db: 数据库会话
+
+    Returns:
+        {"banner_id", "title", "impression_count", "click_count", "ctr"}
+    """
+    await db.execute(
+        text("SELECT set_config('app.tenant_id', :tid, true)"),
+        {"tid": tenant_id},
+    )
+    result = await db.execute(
+        text("""
+            SELECT id, title, banner_type, impression_count, click_count,
+                   is_active, created_at, updated_at
+            FROM banners
+            WHERE id = :banner_id
+              AND tenant_id = :tenant_id
+              AND is_deleted = FALSE
+        """),
+        {"banner_id": banner_id, "tenant_id": tenant_id},
+    )
+    row = result.mappings().one_or_none()
+    if row is None:
+        raise ValueError(f"banner_not_found:{banner_id}")
+
+    impression_count = row["impression_count"] or 0
+    click_count = row["click_count"] or 0
+    ctr = round(click_count / max(impression_count, 1), 4)
+
+    return {
+        "banner_id": str(row["id"]),
+        "title": row["title"],
+        "banner_type": row["banner_type"],
+        "impression_count": impression_count,
+        "click_count": click_count,
+        "ctr": ctr,
+        "is_active": row["is_active"],
+        "created_at": row["created_at"].isoformat() if row["created_at"] else None,
+    }
+
+
+async def disable_banner(
+    banner_id: str,
+    *,
+    tenant_id: str,
+    db: AsyncSession,
+) -> dict[str, Any]:
+    """下线Banner（is_active=FALSE）"""
+    await db.execute(
+        text("SELECT set_config('app.tenant_id', :tid, true)"),
+        {"tid": tenant_id},
+    )
+    result = await db.execute(
+        text("""
+            UPDATE banners
+            SET is_active = FALSE, updated_at = NOW()
+            WHERE id = :banner_id
+              AND tenant_id = :tenant_id
+              AND is_deleted = FALSE
+            RETURNING id
+        """),
+        {"banner_id": banner_id, "tenant_id": tenant_id},
+    )
+    row = result.fetchone()
+    if not row:
+        raise ValueError(f"banner_not_found:{banner_id}")
+    await db.commit()
+
+    logger.info("banner.disabled", banner_id=banner_id, tenant_id=tenant_id)
+    return {"banner_id": banner_id, "is_active": False}
+
+
+# 保留旧接口别名以兼容现有路由（已 async 化）
+async def create_banner_legacy(
     title: str,
     image_url: str,
     link_type: str,
@@ -59,258 +318,18 @@ async def create_banner(
     tenant_id: str,
     db: Any = None,
 ) -> dict[str, Any]:
-    """创建Banner
-
-    Args:
-        title: Banner标题
-        image_url: 图片URL
-        link_type: 链接类型 (activity/product/coupon_pack/url)
-        link_target: 链接目标 (活动ID/商品ID/券包ID/URL)
-        position: 展示位置 (home_top/member_center/menu_top)
-        priority: 优先级 (数值越大越靠前)
-        start_date: 上线时间 (None=立即生效)
-        end_date: 下线时间 (None=永久有效)
-        tenant_id: 租户ID
-        db: 数据库会话
-
-    Returns:
-        {"banner_id", "title", "position", "status", "created_at"}
-    """
-    if position not in VALID_POSITIONS:
-        raise ValueError(f"invalid_position:{position}, must be one of {VALID_POSITIONS}")
-    if link_type not in VALID_LINK_TYPES:
-        raise ValueError(f"invalid_link_type:{link_type}, must be one of {VALID_LINK_TYPES}")
-
-    banner_id = str(uuid.uuid4())
-    now = _now_utc()
-
-    banner = {
-        "banner_id": banner_id,
-        "tenant_id": tenant_id,
-        "title": title,
-        "image_url": image_url,
-        "link_type": link_type,
-        "link_target": link_target,
-        "position": position,
-        "priority": priority,
-        "start_date": start_date,
-        "end_date": end_date,
-        "status": "active",
-        "is_deleted": False,
-        "created_at": now,
-        "updated_at": now,
-    }
-    _banners[banner_id] = banner
-    _banner_clicks[banner_id] = []
-    _banner_impressions[banner_id] = 0
-
-    logger.info(
-        "banner.created",
-        banner_id=banner_id,
+    """兼容旧路由签名 → 转发到新 create_banner（banner_type 默认 promotion）"""
+    if db is None:
+        raise ValueError("db session required")
+    return await create_banner(
         title=title,
-        position=position,
+        banner_type="promotion",
+        image_url=image_url,
+        link_url=link_target,
+        target_segment={"link_type": link_type},
+        display_order=priority,
+        start_at=start_date,
+        end_at=end_date,
         tenant_id=tenant_id,
+        db=db,
     )
-
-    return {
-        "banner_id": banner_id,
-        "title": title,
-        "image_url": image_url,
-        "link_type": link_type,
-        "link_target": link_target,
-        "position": position,
-        "priority": priority,
-        "status": "active",
-        "start_date": start_date.isoformat() if start_date else None,
-        "end_date": end_date.isoformat() if end_date else None,
-        "created_at": now.isoformat(),
-    }
-
-
-async def list_active_banners(
-    position: str,
-    store_id: Optional[str],
-    tenant_id: str,
-    db: Any = None,
-) -> list[dict[str, Any]]:
-    """获取当前有效Banner列表（按优先级排序+时间过滤）
-
-    Args:
-        position: 展示位置
-        store_id: 门店ID (可选, 用于门店级别过滤)
-        tenant_id: 租户ID
-        db: 数据库会话
-
-    Returns:
-        有效Banner列表, 按priority降序
-    """
-    if position not in VALID_POSITIONS:
-        raise ValueError(f"invalid_position:{position}")
-
-    now = _now_utc()
-    active = []
-
-    for banner in _banners.values():
-        if banner["tenant_id"] != tenant_id:
-            continue
-        if banner["position"] != position:
-            continue
-        if not _is_banner_active(banner, now):
-            continue
-        # 门店级过滤
-        target_stores = banner.get("target_stores")
-        if target_stores and store_id and store_id not in target_stores:
-            continue
-
-        # 记录展示次数
-        _banner_impressions[banner["banner_id"]] = (
-            _banner_impressions.get(banner["banner_id"], 0) + 1
-        )
-
-        active.append({
-            "banner_id": banner["banner_id"],
-            "title": banner["title"],
-            "image_url": banner["image_url"],
-            "link_type": banner["link_type"],
-            "link_target": banner["link_target"],
-            "priority": banner["priority"],
-        })
-
-    active.sort(key=lambda b: b["priority"], reverse=True)
-
-    logger.info(
-        "banner.list_active",
-        position=position,
-        store_id=store_id,
-        count=len(active),
-        tenant_id=tenant_id,
-    )
-
-    return active
-
-
-async def track_banner_click(
-    banner_id: str,
-    customer_id: str,
-    tenant_id: str,
-    db: Any = None,
-) -> dict[str, Any]:
-    """点击追踪
-
-    Args:
-        banner_id: Banner ID
-        customer_id: 客户ID
-        tenant_id: 租户ID
-        db: 数据库会话
-
-    Returns:
-        {"banner_id", "customer_id", "clicked_at", "link_type", "link_target"}
-    """
-    banner = _banners.get(banner_id)
-    if not banner:
-        raise ValueError(f"banner_not_found:{banner_id}")
-    if banner["tenant_id"] != tenant_id:
-        raise ValueError("tenant_mismatch")
-
-    now = _now_utc()
-    click_record = {
-        "banner_id": banner_id,
-        "customer_id": customer_id,
-        "clicked_at": now.isoformat(),
-    }
-    _banner_clicks.setdefault(banner_id, []).append(click_record)
-
-    logger.info(
-        "banner.clicked",
-        banner_id=banner_id,
-        customer_id=customer_id,
-        tenant_id=tenant_id,
-    )
-
-    return {
-        "banner_id": banner_id,
-        "customer_id": customer_id,
-        "clicked_at": now.isoformat(),
-        "link_type": banner["link_type"],
-        "link_target": banner["link_target"],
-    }
-
-
-async def get_banner_analytics(
-    banner_id: str,
-    tenant_id: str,
-    db: Any = None,
-) -> dict[str, Any]:
-    """Banner效果分析（展示次数/点击率/转化）
-
-    Args:
-        banner_id: Banner ID
-        tenant_id: 租户ID
-        db: 数据库会话
-
-    Returns:
-        {"banner_id", "title", "impressions", "clicks", "ctr",
-         "unique_clickers", "click_details"}
-    """
-    banner = _banners.get(banner_id)
-    if not banner:
-        raise ValueError(f"banner_not_found:{banner_id}")
-    if banner["tenant_id"] != tenant_id:
-        raise ValueError("tenant_mismatch")
-
-    impressions = _banner_impressions.get(banner_id, 0)
-    clicks = _banner_clicks.get(banner_id, [])
-    click_count = len(clicks)
-    unique_clickers = len(set(c["customer_id"] for c in clicks))
-    ctr = round(click_count / max(impressions, 1), 4)
-
-    logger.info(
-        "banner.analytics",
-        banner_id=banner_id,
-        impressions=impressions,
-        clicks=click_count,
-        ctr=ctr,
-        tenant_id=tenant_id,
-    )
-
-    return {
-        "banner_id": banner_id,
-        "title": banner["title"],
-        "position": banner["position"],
-        "impressions": impressions,
-        "clicks": click_count,
-        "ctr": ctr,
-        "unique_clickers": unique_clickers,
-        "status": banner["status"],
-        "start_date": banner["start_date"].isoformat() if banner["start_date"] else None,
-        "end_date": banner["end_date"].isoformat() if banner["end_date"] else None,
-    }
-
-
-# ── 管理函数 ──────────────────────────────────────────────────
-
-
-async def disable_banner(
-    banner_id: str,
-    tenant_id: str,
-    db: Any = None,
-) -> dict[str, Any]:
-    """下线Banner"""
-    banner = _banners.get(banner_id)
-    if not banner:
-        raise ValueError(f"banner_not_found:{banner_id}")
-    if banner["tenant_id"] != tenant_id:
-        raise ValueError("tenant_mismatch")
-
-    banner["status"] = "disabled"
-    banner["updated_at"] = _now_utc()
-
-    logger.info("banner.disabled", banner_id=banner_id, tenant_id=tenant_id)
-    return {"banner_id": banner_id, "status": "disabled"}
-
-
-def clear_all_banners() -> None:
-    """清空所有Banner数据 (仅测试用)"""
-    _banners.clear()
-    _banner_clicks.clear()
-    _banner_impressions.clear()

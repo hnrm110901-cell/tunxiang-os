@@ -1,0 +1,142 @@
+<!-- 大厨到家首页 — 搜索 + Banner + 菜系筛选 + 主厨推荐 + 全部厨师 -->
+<view class="page">
+
+  <!-- 顶部搜索栏 -->
+  <view class="search-bar">
+    <view class="search-input-wrap" bindtap="goSearch">
+      <text class="search-icon">🔍</text>
+      <text class="search-placeholder">搜索厨师名称/擅长菜系</text>
+    </view>
+    <view class="filter-btn" bindtap="showFilter">
+      <text class="filter-icon">⚙</text>
+      <text class="filter-text">筛选</text>
+    </view>
+  </view>
+
+  <!-- Banner 轮播 -->
+  <swiper class="banner" autoplay interval="3000" circular indicator-dots indicator-color="rgba(255,255,255,0.5)" indicator-active-color="#FFFFFF">
+    <swiper-item wx:for="{{banners}}" wx:key="id">
+      <view class="banner-slide" style="background: {{item.bg}};">
+        <view class="banner-content">
+          <text class="banner-title">{{item.title}}</text>
+          <text class="banner-sub">{{item.subtitle}}</text>
+          <view class="banner-cta">
+            <text class="banner-cta-text">立即预约</text>
+          </view>
+        </view>
+      </view>
+    </swiper-item>
+  </swiper>
+
+  <!-- 菜系筛选 Tab -->
+  <scroll-view scroll-x class="cuisine-tabs" scroll-with-animation>
+    <view class="cuisine-list">
+      <view
+        class="cuisine-item {{activeCuisine === item ? 'active' : ''}}"
+        wx:for="{{cuisines}}"
+        wx:key="*this"
+        bindtap="selectCuisine"
+        data-cuisine="{{item}}"
+      >{{item}}</view>
+    </view>
+  </scroll-view>
+
+  <!-- 主厨推荐 -->
+  <view class="section-header">
+    <text class="section-title">主厨推荐</text>
+    <text class="section-more" bindtap="goSearch">查看更多 ›</text>
+  </view>
+  <scroll-view scroll-x class="featured-scroll" scroll-with-animation>
+    <view class="featured-list">
+      <view
+        class="featured-card"
+        wx:for="{{featuredChefs}}"
+        wx:key="id"
+        bindtap="goDetail"
+        data-id="{{item.id}}"
+      >
+        <view class="featured-badge">主厨推荐</view>
+        <image
+          class="featured-avatar"
+          src="{{item.avatar || '/assets/chef-default.png'}}"
+          mode="aspectFill"
+          lazy-load
+        />
+        <text class="featured-name">{{item.name}}</text>
+        <text class="featured-specialty">{{item.specialty}}菜</text>
+        <view class="featured-stats">
+          <text class="featured-rating">⭐ {{item.rating}}</text>
+          <text class="featured-orders">{{item.orders}}单</text>
+        </view>
+        <text class="featured-price">¥{{item.priceYuan}}起</text>
+      </view>
+    </view>
+  </scroll-view>
+
+  <!-- 全部厨师 -->
+  <view class="section-header">
+    <text class="section-title">全部厨师</text>
+    <text class="chef-count">共{{chefs.length}}位</text>
+  </view>
+
+  <!-- 加载中 -->
+  <view class="state-tip" wx:if="{{loadingChefs && chefs.length === 0}}">
+    <text class="state-text">正在加载厨师...</text>
+  </view>
+
+  <!-- 空状态 -->
+  <view class="state-tip" wx:elif="{{!loadingChefs && chefs.length === 0}}">
+    <text class="state-icon">🍳</text>
+    <text class="state-text">暂无可用厨师，换个菜系试试</text>
+  </view>
+
+  <!-- 厨师卡片列表（无限滚动用外层 scroll-view） -->
+  <view wx:else>
+    <view
+      class="chef-card"
+      wx:for="{{chefs}}"
+      wx:key="id"
+    >
+      <image
+        class="chef-avatar"
+        src="{{item.avatar || '/assets/chef-default.png'}}"
+        mode="aspectFill"
+        lazy-load
+        bindtap="goDetail"
+        data-id="{{item.id}}"
+      />
+      <view class="chef-info" bindtap="goDetail" data-id="{{item.id}}">
+        <view class="chef-name-row">
+          <text class="chef-name">{{item.name}}</text>
+          <view class="badges">
+            <text
+              class="badge"
+              wx:for="{{item.badges}}"
+              wx:for-item="b"
+              wx:key="*this"
+            >{{b}}</text>
+          </view>
+        </view>
+        <text class="chef-specialty">擅长：{{item.specialty}}菜</text>
+        <view class="chef-bottom">
+          <text class="chef-rating">⭐ {{item.rating}} ({{item.orders}}单)</text>
+          <view class="price-book">
+            <text class="chef-price">¥{{item.priceYuan}}起</text>
+            <view class="book-btn" catchtap="goBook" data-id="{{item.id}}">立即预约</view>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 加载更多指示 -->
+    <view class="loading-more" wx:if="{{loadingMore}}">
+      <text>加载中...</text>
+    </view>
+    <view class="no-more" wx:if="{{noMore && chefs.length > 0}}">
+      <text>— 已是全部厨师 —</text>
+    </view>
+  </view>
+
+  <!-- 底部留白 -->
+  <view class="bottom-spacer"></view>
+</view>
