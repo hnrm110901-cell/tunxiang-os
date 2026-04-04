@@ -5,7 +5,7 @@
 import { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useOrderStore, type OrderItem } from '../store/orderStore';
-import { createPayment } from '../api/tradeApi';
+import { createPayment, settleOrder } from '../api/tradeApi';
 
 const fen2yuan = (fen: number) => `¥${(fen / 100).toFixed(2)}`;
 
@@ -109,14 +109,43 @@ export function SplitPayPage() {
     if (submitting || remainingFen !== 0) return;
     setSubmitting(true);
     try {
-      // 逐笔创建支付记录
       if (orderId) {
-        for (const p of payments) {
+        // 1. 初始化拆单分摊
+        const BASE = import.meta.env.VITE_API_BASE_URL || '';
+        const TENANT = import.meta.env.VITE_TENANT_ID || '';
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (TENANT) headers['X-Tenant-ID'] = TENANT;
+
+        await fetch(`${BASE}/api/v1/trade/orders/${orderId}/split-pay/init`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            splits: payments.map((p, idx) => ({
+              split_no: idx + 1,
+              amount_fen: p.amountFen,
+              payment_method: p.method,
+              label: p.methodLabel,
+            })),
+            item_ids: Array.from(selectedItemIds),
+          }),
+        });
+
+        // 2. 逐笔创建支付并结算分摊
+        for (let i = 0; i < payments.length; i++) {
+          const p = payments[i];
           await createPayment(orderId, p.method, p.amountFen);
+          await fetch(`${BASE}/api/v1/trade/orders/${orderId}/split-pay/${i + 1}/settle`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ payment_method: p.method }),
+          });
+        }
+
+        // 3. 若全部菜品都已选中（全额拆单），结算整单
+        if (selectedItemIds.size === items.length) {
+          await settleOrder(orderId);
         }
       }
-      // TODO: 调用部分结算 API，标记哪些菜品已结
-      // 未选中的菜品保留在订单中
       navigate('/tables');
     } catch (e) {
       alert(`结账失败: ${e instanceof Error ? e.message : '未知错误'}`);
