@@ -4,6 +4,30 @@
 
 ---
 
+## 2026-04-04（Round 78 — POS全页面消除MOCK + 会员查询API补齐）
+
+### 今日完成
+- [web-pos] TableMapPage/QuickCashierPage 去除 MOCK 初始值，改为空状态+loading+纯API加载
+- [web-pos] ReservationPage 从 97 行 MOCK 重建为 300+ 行完整预订管理页（CRUD+状态流转）
+- [web-pos] CreditPayPage MOCK→API 搜索企业挂账客户（300ms debounce）
+- [web-pos] ExceptionPage MOCK→API 异常记录看板+解决操作
+- [web-pos] DiscountAuditPage 去除 MOCK fallback，API 失败显示错误
+- [web-pos] ReverseSettlePage MOCK→getOrder+reverseSettle 真实 API
+- [web-pos] tradeApi.ts 新增 fetchCreditAccounts/reverseSettle
+- [tx-member] 5 个核心 stub 端点补齐真实实现：list/get/orders/rfm-segments/at-risk
+- [tx-member] repository.py 新增 get_customer_orders + _order_to_dict
+
+### 数据变化
+- 修改文件：11 个
+- 总变更：+737 / -261 行
+- MOCK 数据消除：7 个前端页面 + 2 个后端 stub
+
+### 遗留问题
+- LiveMenuEditorPage、MenuEngineeringPage、PlanNotificationBar 仍有 MOCK（运营管理工具，非日常核心）
+- 营销活动/用户旅程 API 仍为占位（P2 优先级）
+
+---
+
 ## 2026-04-04（Round 77 — 门店核心流程P0/P1/P2全面补齐）
 
 ### 今日完成
