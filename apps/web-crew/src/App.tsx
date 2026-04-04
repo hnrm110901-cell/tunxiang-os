@@ -6,6 +6,7 @@ import { TablesView } from './pages/TablesView';
 import { QuickOrderView } from './pages/QuickOrderView';
 import { ActiveOrdersView } from './pages/ActiveOrdersView';
 import { DailyCruisePage } from './pages/DailyCruisePage';
+import { FoodSafetyPage } from './pages/FoodSafetyPage';
 import { ReviewPage } from './pages/ReviewPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { OpenTablePage } from './pages/OpenTablePage';
@@ -126,6 +127,7 @@ export default function App() {
           <Route path="/order" element={<QuickOrderView />} />
           <Route path="/active" element={<ActiveOrdersView />} />
           <Route path="/cruise" element={<DailyCruisePage />} />
+          <Route path="/food-safety" element={<FoodSafetyPage />} />
           <Route path="/delivery" element={<DeliveryDashboardPage />} />
           <Route path="/review" element={<ReviewPage />} />
           <Route path="/profile" element={<ProfilePage />} />
