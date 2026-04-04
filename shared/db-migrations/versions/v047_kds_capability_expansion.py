@@ -205,7 +205,7 @@ def upgrade() -> None:
             reported_by     UUID,
             source          VARCHAR(20) NOT NULL DEFAULT 'kds'
                 CHECK (source IN ('kds', 'pos', 'admin', 'supply')),
-            sync_status     JSONB       NOT NULL DEFAULT '{"pos":false,"miniapp":false,"kds":false}',
+            sync_status     JSONB       NOT NULL DEFAULT '{"pos"\:false,"miniapp"\:false,"kds"\:false}',
             created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             is_deleted      BOOLEAN     NOT NULL DEFAULT FALSE
