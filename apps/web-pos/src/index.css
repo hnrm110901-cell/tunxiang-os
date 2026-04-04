@@ -1,0 +1,33 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* TX Design Token layer - shared component classes */
+@layer components {
+  .tx-page {
+    @apply bg-tx-bg min-h-screen text-tx-text-1 font-tx;
+  }
+  .tx-card {
+    @apply bg-tx-card rounded-tx p-5;
+  }
+  .tx-btn {
+    @apply min-h-touch rounded-tx-sm font-semibold cursor-pointer border-none font-tx;
+  }
+  .tx-btn-accent {
+    @apply tx-btn bg-tx-accent text-white;
+  }
+  .tx-btn-ghost {
+    @apply tx-btn bg-tx-card text-tx-text-1 border border-tx-border;
+  }
+  .tx-tag {
+    @apply px-2.5 py-1 rounded-md text-sm font-semibold;
+  }
+  .tx-divider {
+    @apply border-tx-border;
+  }
+}
+
+/* Spinner animation for loading states */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}

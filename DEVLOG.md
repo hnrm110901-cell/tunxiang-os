@@ -4,6 +4,35 @@
 
 ---
 
+## 2026-04-04（Round 77 — 门店核心流程P0/P1/P2全面补齐）
+
+### 今日完成
+- [tx-member] 会员创建 API 从 stub 改为真实 DB 写入（CustomerRepository），发布 REGISTERED 事件，409 处理重复手机号
+- [tx-member] 积分路由全部 9 个端点接入已有 PointsEngine，替换硬编码 0 返回值
+- [web-pos] OrderPage 从 23 行 TODO 重建为 270 行完整订单详情页，接入 tx-trade getOrder API
+- [web-reception] 4 个页面（预订/签到/桌台分配/VIP接待）全部替换 MOCK 硬编码为真实 API 调用
+- [web-pos] 新增 3 个 Zustand store（tableStore/menuStore/memberStore）补齐前端状态管理
+- [web-pos] 新增 MemberPage 会员查询/开卡/充值入口页面，注册到 App 路由
+- [web-pos] HandoverPage 交班页面从 MOCK_SHIFT 改为调用 fetchShiftSnapshot/submitHandover 真实 API
+- [web-pos] Tailwind CSS + PostCSS + Design Token 基础设施搭建，OrderPage 完成迁移示范
+
+### 数据变化
+- 新增文件：7 个（MemberPage.tsx, tableStore.ts, menuStore.ts, memberStore.ts, tailwind.config.js, postcss.config.js, index.css）
+- 修改文件：9 个（members.py, points_routes.py, OrderPage.tsx, HandoverPage.tsx, ReservationBoard.tsx, CheckInPage.tsx, SeatAssignPage.tsx, VIPAlertPage.tsx, App.tsx）
+- 总变更：+2500 行代码
+
+### 遗留问题
+- web-pos 其他页面待迁移到 Tailwind（CashierPage/SettlePage/TableMapPage 等仍用 inline style）
+- QueuePage（web-pos 内）仍有本地 mock 数据，需接入排队后端 API
+- tx-member list_customers / get_customer 等查询端点仍为占位实现
+
+### 明日计划
+- 继续迁移高频页面到 Tailwind（CashierPage, SettlePage, TableMapPage）
+- 接入 web-pos QueuePage 到排队 API
+- 完善 tx-member 客户查询/360度画像 API
+
+---
+
 ## 2026-04-04（Round 72 — DEV数据库全量迁移完成：v119→v157+全分支heads）
 
 ### 今日完成

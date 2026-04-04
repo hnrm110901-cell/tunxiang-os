@@ -121,10 +121,10 @@ export function OrderPage() {
 
   if (loading) {
     return (
-      <div style={pageStyle}>
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', gap: 16 }}>
-          <div style={spinnerStyle} />
-          <span style={{ color: '#8A94A4', fontSize: 17 }}>加载订单中...</span>
+      <div className="tx-page">
+        <div className="flex flex-col items-center justify-center h-screen gap-4">
+          <div className="w-10 h-10 border-[3px] border-tx-border border-t-tx-accent rounded-full animate-spin" />
+          <span className="text-tx-muted text-[17px]">加载订单中...</span>
         </div>
       </div>
     );
@@ -134,15 +134,23 @@ export function OrderPage() {
 
   if (error || !order) {
     return (
-      <div style={pageStyle}>
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', gap: 16 }}>
-          <div style={{ fontSize: 48 }}>!</div>
-          <span style={{ color: '#ff4d4f', fontSize: 18 }}>{error || '订单不存在'}</span>
-          <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
-            <button type="button" onClick={loadOrder} style={{ ...btnBase, background: '#1a2a33', color: '#fff' }}>
+      <div className="tx-page">
+        <div className="flex flex-col items-center justify-center h-screen gap-4">
+          <div className="text-5xl">!</div>
+          <span className="text-tx-danger text-lg">{error || '订单不存在'}</span>
+          <div className="flex gap-3 mt-2">
+            <button
+              type="button"
+              onClick={loadOrder}
+              className="px-6 py-2.5 border-none rounded-tx-sm text-base cursor-pointer font-tx bg-tx-border text-white"
+            >
               重试
             </button>
-            <button type="button" onClick={() => navigate('/tables')} style={{ ...btnBase, background: '#333', color: '#999' }}>
+            <button
+              type="button"
+              onClick={() => navigate('/tables')}
+              className="px-6 py-2.5 border-none rounded-tx-sm text-base cursor-pointer font-tx bg-[#333] text-tx-text-3"
+            >
               返回桌台
             </button>
           </div>
@@ -157,98 +165,93 @@ export function OrderPage() {
   const isActive = order.status === 'pending' || order.status === 'confirmed' || order.status === 'cooking';
 
   return (
-    <div style={pageStyle}>
-      <div style={{ maxWidth: 800, margin: '0 auto', padding: 20 }}>
+    <div className="tx-page">
+      <div className="max-w-[800px] mx-auto p-5">
 
         {/* ── 顶部导航栏 ── */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+        <div className="flex justify-between items-center mb-5">
           <button
             type="button"
             onClick={() => navigate('/tables')}
-            style={{ background: 'none', border: 'none', color: '#8A94A4', fontSize: 16, cursor: 'pointer', padding: '8px 0', fontFamily: 'inherit' }}
+            className="bg-transparent border-none text-tx-muted text-base cursor-pointer py-2 font-tx"
           >
             &larr; 返回桌台
           </button>
-          <span style={{ color: '#8A94A4', fontSize: 14 }}>{formatTime(order.created_at)}</span>
+          <span className="text-tx-muted text-sm">{formatTime(order.created_at)}</span>
         </div>
 
         {/* ── 订单头部卡片 ── */}
-        <div style={cardStyle}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
+        <div className="tx-card">
+          <div className="flex justify-between items-start flex-wrap gap-3">
             <div>
-              <div style={{ fontSize: 22, fontWeight: 700, color: '#fff', marginBottom: 6 }}>
+              <div className="text-[22px] font-bold text-white mb-1.5">
                 {order.order_no}
               </div>
-              <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+              <div className="flex gap-3 items-center flex-wrap">
                 {/* 桌号 */}
-                <span style={tagStyle}>桌 {order.table_no}</span>
+                <span className="tx-tag bg-tx-accent-light text-tx-accent">桌 {order.table_no}</span>
                 {/* 订单类型 */}
-                <span style={{ ...tagStyle, background: 'rgba(24,144,255,0.15)', color: '#1890ff' }}>
+                <span className="tx-tag bg-[rgba(24,144,255,0.15)] text-tx-blue">
                   {ORDER_TYPE_LABEL[order.order_type] || order.order_type}
                 </span>
                 {/* 人数 */}
                 {order.customer_count != null && order.customer_count > 0 && (
-                  <span style={{ ...tagStyle, background: 'rgba(82,196,26,0.15)', color: '#52c41a' }}>
+                  <span className="tx-tag bg-[rgba(82,196,26,0.15)] text-tx-green">
                     {order.customer_count}人
                   </span>
                 )}
               </div>
             </div>
             {/* 状态徽章 */}
-            <div style={{
-              padding: '6px 16px',
-              borderRadius: 20,
-              background: statusCfg.bg,
-              color: statusCfg.color,
-              fontSize: 15,
-              fontWeight: 600,
-              whiteSpace: 'nowrap',
-            }}>
+            <div
+              className="px-4 py-1.5 rounded-[20px] text-[15px] font-semibold whitespace-nowrap"
+              style={{ background: statusCfg.bg, color: statusCfg.color }}
+            >
               {statusCfg.label}
             </div>
           </div>
 
           {order.remark && (
-            <div style={{ marginTop: 12, padding: '8px 12px', borderRadius: 6, background: 'rgba(250,173,20,0.1)', color: '#faad14', fontSize: 14 }}>
+            <div className="mt-3 px-3 py-2 rounded-md bg-[rgba(250,173,20,0.1)] text-tx-warning text-sm">
               备注: {order.remark}
             </div>
           )}
         </div>
 
         {/* ── 菜品明细 ── */}
-        <div style={{ ...cardStyle, marginTop: 12 }}>
-          <div style={{ fontSize: 17, fontWeight: 600, marginBottom: 12, color: '#8A94A4' }}>
+        <div className="tx-card mt-3">
+          <div className="text-[17px] font-semibold mb-3 text-tx-muted">
             菜品明细 ({order.items?.length || 0})
           </div>
 
           {(!order.items || order.items.length === 0) ? (
-            <div style={{ color: '#555', textAlign: 'center', padding: '20px 0' }}>暂无菜品</div>
+            <div className="text-tx-text-4 text-center py-5">暂无菜品</div>
           ) : (
             <div>
               {/* 表头 */}
-              <div style={{ display: 'flex', padding: '8px 0', borderBottom: '1px solid #1a2a33', color: '#8A94A4', fontSize: 14 }}>
-                <div style={{ flex: 1 }}>菜品</div>
-                <div style={{ width: 60, textAlign: 'center' }}>数量</div>
-                <div style={{ width: 90, textAlign: 'right' }}>单价</div>
-                <div style={{ width: 90, textAlign: 'right' }}>小计</div>
+              <div className="flex py-2 border-b border-tx-border text-tx-muted text-sm">
+                <div className="flex-1">菜品</div>
+                <div className="w-[60px] text-center">数量</div>
+                <div className="w-[90px] text-right">单价</div>
+                <div className="w-[90px] text-right">小计</div>
               </div>
 
               {/* 菜品行 */}
               {order.items.map((item) => (
-                <div key={item.item_id} style={{ display: 'flex', alignItems: 'flex-start', padding: '12px 0', borderBottom: '1px solid #1a2a33' }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 16, fontWeight: 500, color: '#fff' }}>{item.dish_name}</div>
+                <div key={item.item_id} className="flex items-start py-3 border-b border-tx-border">
+                  <div className="flex-1 min-w-0">
+                    <div className="text-base font-medium text-white">{item.dish_name}</div>
                     {item.notes && (
-                      <div style={{ fontSize: 13, color: '#faad14', marginTop: 4 }}>{item.notes}</div>
+                      <div className="text-[13px] text-tx-warning mt-1">{item.notes}</div>
                     )}
                   </div>
-                  <div style={{ width: 60, textAlign: 'center', fontSize: 16, color: '#ccc' }}>
+                  <div className="w-[60px] text-center text-base text-tx-text-2">
                     x{item.quantity}
                   </div>
-                  <div style={{ width: 90, textAlign: 'right', fontSize: 15, color: '#999' }}>
+                  <div className="w-[90px] text-right text-[15px] text-tx-text-3">
                     {fen2yuan(item.unit_price_fen)}
                   </div>
-                  <div style={{ width: 90, textAlign: 'right', fontSize: 16, fontWeight: 600, color: '#fff' }}>
+                  <div className="w-[90px] text-right text-base font-semibold text-white">
                     {fen2yuan(item.subtotal_fen || item.unit_price_fen * item.quantity)}
                   </div>
                 </div>
@@ -258,41 +261,39 @@ export function OrderPage() {
         </div>
 
         {/* ── 价格汇总 ── */}
-        <div style={{ ...cardStyle, marginTop: 12 }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, color: '#ccc' }}>
+        <div className="tx-card mt-3">
+          <div className="flex flex-col gap-2.5">
+            <div className="flex justify-between text-base text-tx-text-2">
               <span>菜品合计</span>
               <span>{fen2yuan(order.total_amount_fen)}</span>
             </div>
 
             {order.discount_amount_fen > 0 && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, color: '#FF6B2C' }}>
+              <div className="flex justify-between text-base text-tx-accent">
                 <span>优惠</span>
                 <span>-{fen2yuan(order.discount_amount_fen)}</span>
               </div>
             )}
 
-            <div style={{ borderTop: '1px solid #1a2a33', paddingTop: 12, display: 'flex', justifyContent: 'space-between', fontSize: 22, fontWeight: 700 }}>
-              <span style={{ color: '#fff' }}>应付金额</span>
-              <span style={{ color: '#FF6B2C' }}>{fen2yuan(order.final_amount_fen)}</span>
+            <div className="border-t border-tx-border pt-3 flex justify-between text-[22px] font-bold">
+              <span className="text-white">应付金额</span>
+              <span className="text-tx-accent">{fen2yuan(order.final_amount_fen)}</span>
             </div>
           </div>
         </div>
 
         {/* ── 操作按钮 ── */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 20 }}>
+        <div className="grid grid-cols-2 gap-2.5 mt-5">
           {/* 加菜 */}
           <button
             type="button"
             onClick={() => navigate(`/cashier/${order.table_no}`)}
             disabled={!isActive}
-            style={{
-              ...actionBtnStyle,
-              background: isActive ? '#1a2a33' : '#111c22',
-              color: isActive ? '#fff' : '#555',
-              border: isActive ? '1.5px solid #FF6B2C' : '1.5px solid #333',
-              cursor: isActive ? 'pointer' : 'not-allowed',
-            }}
+            className={`py-4 rounded-[10px] text-lg font-semibold font-tx ${
+              isActive
+                ? 'bg-tx-border text-white border-[1.5px] border-tx-accent cursor-pointer'
+                : 'bg-[#111c22] text-tx-text-4 border-[1.5px] border-[#333] cursor-not-allowed'
+            }`}
           >
             加菜
           </button>
@@ -302,13 +303,11 @@ export function OrderPage() {
             type="button"
             onClick={() => navigate(`/settle/${orderId}`)}
             disabled={!isActive}
-            style={{
-              ...actionBtnStyle,
-              background: isActive ? '#FF6B2C' : '#444',
-              color: '#fff',
-              border: 'none',
-              cursor: isActive ? 'pointer' : 'not-allowed',
-            }}
+            className={`py-4 rounded-[10px] text-lg font-semibold font-tx border-none ${
+              isActive
+                ? 'bg-tx-accent text-white cursor-pointer'
+                : 'bg-[#444] text-white cursor-not-allowed'
+            }`}
           >
             结账
           </button>
@@ -318,13 +317,11 @@ export function OrderPage() {
             type="button"
             onClick={handlePrint}
             disabled={printing}
-            style={{
-              ...actionBtnStyle,
-              background: '#1a2a33',
-              color: printing ? '#666' : '#fff',
-              border: '1.5px solid #333',
-              cursor: printing ? 'not-allowed' : 'pointer',
-            }}
+            className={`py-4 rounded-[10px] text-lg font-semibold font-tx border-[1.5px] border-[#333] bg-tx-border ${
+              printing
+                ? 'text-tx-text-4 cursor-not-allowed'
+                : 'text-white cursor-pointer'
+            }`}
           >
             {printing ? '打印中...' : '打印小票'}
           </button>
@@ -333,13 +330,7 @@ export function OrderPage() {
           <button
             type="button"
             onClick={() => navigate('/tables')}
-            style={{
-              ...actionBtnStyle,
-              background: '#1a2a33',
-              color: '#8A94A4',
-              border: '1.5px solid #333',
-              cursor: 'pointer',
-            }}
+            className="py-4 rounded-[10px] text-lg font-semibold font-tx bg-tx-border text-tx-muted border-[1.5px] border-[#333] cursor-pointer"
           >
             返回桌台
           </button>
@@ -347,62 +338,4 @@ export function OrderPage() {
       </div>
     </div>
   );
-}
-
-// ─── 样式常量 ─────────────────────────────────────────────────────────────────
-
-const pageStyle: React.CSSProperties = {
-  background: '#0B1A20',
-  minHeight: '100vh',
-  color: '#fff',
-  fontFamily: '-apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", sans-serif',
-};
-
-const cardStyle: React.CSSProperties = {
-  background: '#112228',
-  borderRadius: 12,
-  padding: 20,
-};
-
-const tagStyle: React.CSSProperties = {
-  padding: '4px 10px',
-  borderRadius: 6,
-  background: 'rgba(255,107,44,0.15)',
-  color: '#FF6B2C',
-  fontSize: 14,
-  fontWeight: 600,
-};
-
-const btnBase: React.CSSProperties = {
-  padding: '10px 24px',
-  border: 'none',
-  borderRadius: 8,
-  fontSize: 16,
-  cursor: 'pointer',
-  fontFamily: 'inherit',
-};
-
-const actionBtnStyle: React.CSSProperties = {
-  padding: '16px 0',
-  borderRadius: 10,
-  fontSize: 18,
-  fontWeight: 600,
-  fontFamily: 'inherit',
-};
-
-const spinnerStyle: React.CSSProperties = {
-  width: 40,
-  height: 40,
-  border: '3px solid #1a2a33',
-  borderTop: '3px solid #FF6B2C',
-  borderRadius: '50%',
-  animation: 'spin 0.8s linear infinite',
-};
-
-// Inject spinner keyframes
-if (typeof document !== 'undefined' && !document.getElementById('tx-spinner-keyframes')) {
-  const style = document.createElement('style');
-  style.id = 'tx-spinner-keyframes';
-  style.textContent = '@keyframes spin { to { transform: rotate(360deg); } }';
-  document.head.appendChild(style);
 }
