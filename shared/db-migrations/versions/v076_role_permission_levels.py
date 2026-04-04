@@ -52,21 +52,25 @@ def upgrade() -> None:
     """)
     op.execute("ALTER TABLE role_configs ENABLE ROW LEVEL SECURITY")
     op.execute("ALTER TABLE role_configs FORCE ROW LEVEL SECURITY")
+    op.execute("DROP POLICY IF EXISTS role_configs_rls_select ON role_configs")
     op.execute("""
-        CREATE POLICY IF NOT EXISTS role_configs_rls_select ON role_configs
+        CREATE POLICY role_configs_rls_select ON role_configs
             FOR SELECT USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::UUID)
     """)
+    op.execute("DROP POLICY IF EXISTS role_configs_rls_insert ON role_configs")
     op.execute("""
-        CREATE POLICY IF NOT EXISTS role_configs_rls_insert ON role_configs
+        CREATE POLICY role_configs_rls_insert ON role_configs
             FOR INSERT WITH CHECK (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::UUID)
     """)
+    op.execute("DROP POLICY IF EXISTS role_configs_rls_update ON role_configs")
     op.execute("""
-        CREATE POLICY IF NOT EXISTS role_configs_rls_update ON role_configs
+        CREATE POLICY role_configs_rls_update ON role_configs
             FOR UPDATE USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::UUID)
             WITH CHECK (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::UUID)
     """)
+    op.execute("DROP POLICY IF EXISTS role_configs_rls_delete ON role_configs")
     op.execute("""
-        CREATE POLICY IF NOT EXISTS role_configs_rls_delete ON role_configs
+        CREATE POLICY role_configs_rls_delete ON role_configs
             FOR DELETE USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::UUID)
     """)
 
