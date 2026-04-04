@@ -1,8 +1,13 @@
-"""Course Firing Service — 打菜时机控制"""
+"""Course Firing Service — 上菜节奏控制（宴席 + 散台/VIP）
+
+支持两种模式：
+- 宴席模式：厨师长手动推进各课程（fire_course）
+- 散台/VIP模式：自动按菜品分类分配课程，按预设延时自动开火或手动调整
+"""
 import os
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import httpx
@@ -18,17 +23,57 @@ logger = structlog.get_logger()
 MAC_STATION_URL = os.getenv("MAC_STATION_URL", "http://localhost:8000")
 
 COURSE_SORT = {
+    "drink": 0,
     "appetizer": 1,
     "main": 2,
-    "dessert": 3,
-    "drink": 4,
+    "soup": 3,
+    "staple": 4,
+    "dessert": 5,
 }
 
 COURSE_LABELS = {
+    "drink": "饮品",
     "appetizer": "前菜",
     "main": "主菜",
+    "soup": "汤品",
+    "staple": "主食",
     "dessert": "甜品",
-    "drink": "饮品",
+}
+
+# 散台/VIP默认延时（分钟），相对首道课程开火时间
+COURSE_DEFAULT_DELAY = {
+    "drink": 0,
+    "appetizer": 0,
+    "main": 10,
+    "soup": 20,
+    "staple": 25,
+    "dessert": 30,
+}
+
+# 菜品分类 → 课程名称映射
+CATEGORY_TO_COURSE: dict[str, str] = {
+    "凉菜": "appetizer",
+    "冷菜": "appetizer",
+    "前菜": "appetizer",
+    "热菜": "main",
+    "海鲜": "main",
+    "炒菜": "main",
+    "蒸菜": "main",
+    "烧烤": "main",
+    "汤": "soup",
+    "汤品": "soup",
+    "煲汤": "soup",
+    "主食": "staple",
+    "粉面": "staple",
+    "米饭": "staple",
+    "面点": "staple",
+    "甜品": "dessert",
+    "甜点": "dessert",
+    "水果": "dessert",
+    "果盘": "dessert",
+    "饮品": "drink",
+    "饮料": "drink",
+    "酒水": "drink",
 }
 
 VALID_COURSES = set(COURSE_SORT.keys())

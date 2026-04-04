@@ -1,4 +1,9 @@
-"""订单课程模型 — Course Firing 上菜节奏控制"""
+"""订单课程模型 — Course Firing 上菜节奏控制
+
+支持宴席和散台两种场景的上菜节奏控制：
+- 宴席：由厨师长手动推进各课程（fire_course）
+- 散台/VIP：自动按菜品分类分配课程，按预设延时自动开火或手动调整
+"""
 import uuid
 from datetime import datetime
 from typing import Optional
@@ -20,11 +25,11 @@ class OrderCourse(TenantBase):
     )
     course_name: Mapped[str] = mapped_column(
         String(50), nullable=False,
-        comment="课程名称: appetizer/main/dessert/drink"
+        comment="课程名称: drink/appetizer/main/soup/staple/dessert"
     )
     course_label: Mapped[str] = mapped_column(
         String(50), nullable=False,
-        comment="课程显示名称: 前菜/主菜/甜品/饮品"
+        comment="课程显示名称: 饮品/前菜/主菜/汤品/主食/甜品"
     )
     sort_order: Mapped[int] = mapped_column(
         Integer, nullable=False, default=1,
@@ -32,10 +37,17 @@ class OrderCourse(TenantBase):
     )
     status: Mapped[str] = mapped_column(
         String(20), nullable=False, default="waiting",
-        comment="课程状态: waiting/fired/completed"
+        comment="课程状态: waiting/hold/fired/completed"
+    )
+    delay_minutes: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0,
+        comment="相对首道课程的延迟分钟数（散台自动节奏控制）"
+    )
+    scheduled_fire_at: Mapped[Optional[datetime]] = mapped_column(
+        comment="计划开火时间（首道课程开火时间 + delay_minutes）"
     )
     fired_at: Mapped[Optional[datetime]] = mapped_column(
-        comment="开火时间"
+        comment="实际开火时间"
     )
     fired_by: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True),
