@@ -1,47 +1,280 @@
 version: "3.9"
 
+# ============================================================
+# 屯象OS Docker Compose — 单机生产部署
+# build context = 仓库根目录（infra/docker/ 的上两级）
+# 用法: docker compose up -d --build
+# ============================================================
+
+x-build: &build-defaults
+  context: ../..   # tunxiang-os/ 仓库根
+
+x-svc: &svc-defaults
+  restart: unless-stopped
+  networks:
+    - txos-net
+  logging:
+    driver: json-file
+    options:
+      max-size: "20m"
+      max-file: "3"
+
+x-env: &common-env
+  DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://tunxiang:changeme_dev@postgres:5432/tunxiang_os}
+  REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+  PYTHONPATH: /app
+  PYTHONUNBUFFERED: "1"
+  TZ: Asia/Shanghai
+
 services:
+  # ── 基础设施 ─────────────────────────────────────────────
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: tunxiang
-      POSTGRES_PASSWORD: changeme_dev
-      POSTGRES_DB: tunxiang_os
+      POSTGRES_USER: ${POSTGRES_USER:-tunxiang}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme_dev}
+      POSTGRES_DB: ${POSTGRES_DB:-tunxiang_os}
     ports:
-      - "5432:5432"
+      - "${PG_PORT:-5432}:5432"
     volumes:
       - pg_data:/var/lib/postgresql/data
       - ./init-rls.sql:/docker-entrypoint-initdb.d/01-rls.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U tunxiang"]
-      interval: 5s
-      timeout: 3s
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-tunxiang}"]
+      interval: 10s
+      timeout: 5s
       retries: 5
+      start_period: 20s
+    restart: unless-stopped
+    networks:
+      - txos-net
 
   redis:
     image: redis:7-alpine
+    command: >
+      redis-server
+        --requirepass ${REDIS_PASSWORD:-}
+        --maxmemory 256mb
+        --maxmemory-policy allkeys-lru
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
+      interval: 10s
+      timeout: 5s
       retries: 5
+    restart: unless-stopped
+    networks:
+      - txos-net
 
+  # ── API Gateway :8000 ─────────────────────────────────────
   gateway:
+    <<: *svc-defaults
     build:
-      context: ../../services/gateway
-      dockerfile: Dockerfile
+      <<: *build-defaults
+      dockerfile: services/gateway/Dockerfile
     ports:
-      - "8000:8000"
+      - "${GATEWAY_PORT:-8000}:8000"
     environment:
-      DATABASE_URL: postgresql+asyncpg://tunxiang:changeme_dev@postgres/tunxiang_os
-      REDIS_URL: redis://redis:6379/0
+      <<: *common-env
+      TX_TRADE_URL:    http://tx-trade:8001
+      TX_MENU_URL:     http://tx-menu:8002
+      TX_MEMBER_URL:   http://tx-member:8003
+      TX_GROWTH_URL:   http://tx-growth:8004
+      TX_OPS_URL:      http://tx-ops:8005
+      TX_SUPPLY_URL:   http://tx-supply:8006
+      TX_FINANCE_URL:  http://tx-finance:8007
+      TX_AGENT_URL:    http://tx-agent:8008
+      TX_ANALYTICS_URL: http://tx-analytics:8009
+      TX_BRAIN_URL:    http://tx-brain:8010
+      TX_INTEL_URL:    http://tx-intel:8011
+      TX_ORG_URL:      http://tx-org:8012
+      WECOM_CORP_ID:   ${WECOM_CORP_ID:-}
+      WECOM_AGENT_ID:  ${WECOM_AGENT_ID:-}
+      WECOM_SECRET:    ${WECOM_SECRET:-}
+      WECOM_CALLBACK_TOKEN: ${WECOM_CALLBACK_TOKEN:-}
+      TX_JWT_SECRET_KEY: ${TX_JWT_SECRET_KEY:-dev_jwt_secret_CHANGE_ME_32chars__}
+      TX_MFA_ENCRYPT_KEY: ${TX_MFA_ENCRYPT_KEY:-}
+      TX_FIELD_ENCRYPTION_KEY: ${TX_FIELD_ENCRYPTION_KEY:-}
+      TX_INTEGRITY_SECRET: ${TX_INTEGRITY_SECRET:-}
+      ENV_NAME: ${ENV_NAME:-prod}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request,sys;sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health',timeout=5).status==200 else 1)\""]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ── 交易履约 :8001 ────────────────────────────────────────
+  tx-trade:
+    <<: *svc-defaults
+    build:
+      <<: *build-defaults
+      dockerfile: services/tx-trade/Dockerfile
+    environment:
+      <<: *common-env
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
 
+  # ── 菜品菜单 :8002 ────────────────────────────────────────
+  tx-menu:
+    <<: *svc-defaults
+    build:
+      <<: *build-defaults
+      dockerfile: services/tx-menu/Dockerfile
+    environment:
+      <<: *common-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # ── 会员CDP :8003 ─────────────────────────────────────────
+  tx-member:
+    <<: *svc-defaults
+    build:
+      <<: *build-defaults
+      dockerfile: services/tx-member/Dockerfile
+    environment:
+      <<: *common-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ── 增长营销 :8004 ────────────────────────────────────────
+  tx-growth:
+    <<: *svc-defaults
+    build:
+      <<: *build-defaults
+      dockerfile: services/tx-growth/Dockerfile
+    environment:
+      <<: *common-env
+      MINIAPP_BASE_URL: ${MINIAPP_BASE_URL:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ── 运营流程 :8005 ────────────────────────────────────────
+  tx-ops:
+    <<: *svc-defaults
+    build:
+      <<: *build-defaults
+      dockerfile: services/tx-ops/Dockerfile
+    environment:
+      <<: *common-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ── 供应链 :8006 ──────────────────────────────────────────
+  tx-supply:
+    <<: *svc-defaults
+    build:
+      <<: *build-defaults
+      dockerfile: services/tx-supply/Dockerfile
+    environment:
+      <<: *common-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # ── 财务结算 :8007 ────────────────────────────────────────
+  tx-finance:
+    <<: *svc-defaults
+    build:
+      <<: *build-defaults
+      dockerfile: services/tx-finance/Dockerfile
+    environment:
+      <<: *common-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # ── Agent OS :8008 ────────────────────────────────────────
+  tx-agent:
+    <<: *svc-defaults
+    build:
+      <<: *build-defaults
+      dockerfile: services/tx-agent/Dockerfile
+    environment:
+      <<: *common-env
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ── 经营分析 :8009 ────────────────────────────────────────
+  tx-analytics:
+    <<: *svc-defaults
+    build:
+      <<: *build-defaults
+      dockerfile: services/tx-analytics/Dockerfile
+    environment:
+      <<: *common-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # ── AI决策 :8010 ──────────────────────────────────────────
+  tx-brain:
+    <<: *svc-defaults
+    build:
+      <<: *build-defaults
+      dockerfile: services/tx-brain/Dockerfile
+    environment:
+      <<: *common-env
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ── 商业智能 :8011 ────────────────────────────────────────
+  tx-intel:
+    <<: *svc-defaults
+    build:
+      <<: *build-defaults
+      dockerfile: services/tx-intel/Dockerfile
+    environment:
+      <<: *common-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # ── 组织人事 :8012 ────────────────────────────────────────
+  tx-org:
+    <<: *svc-defaults
+    build:
+      <<: *build-defaults
+      dockerfile: services/tx-org/Dockerfile
+    environment:
+      <<: *common-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+
 volumes:
   pg_data:
+  redis_data:
+
+networks:
+  txos-net:
+    driver: bridge
