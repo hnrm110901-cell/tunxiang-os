@@ -82,7 +82,15 @@ def upgrade() -> None:
     op.execute("ALTER TABLE journey_definitions ENABLE ROW LEVEL SECURITY")
     op.execute("ALTER TABLE journey_definitions FORCE ROW LEVEL SECURITY")
     for action in ("SELECT", "INSERT", "UPDATE", "DELETE"):
-        op.execute(f"""
+        if action == "INSERT":
+            op.execute(f"""
+            CREATE POLICY journey_definitions_{action.lower()}_tenant
+            ON journey_definitions
+            FOR {action}
+            WITH CHECK ({_RLS_COND})
+        """)
+        else:
+            op.execute(f"""
             CREATE POLICY journey_definitions_{action.lower()}_tenant
             ON journey_definitions
             FOR {action}
@@ -126,7 +134,15 @@ def upgrade() -> None:
     op.execute("ALTER TABLE journey_enrollments ENABLE ROW LEVEL SECURITY")
     op.execute("ALTER TABLE journey_enrollments FORCE ROW LEVEL SECURITY")
     for action in ("SELECT", "INSERT", "UPDATE", "DELETE"):
-        op.execute(f"""
+        if action == "INSERT":
+            op.execute(f"""
+            CREATE POLICY journey_enrollments_{action.lower()}_tenant
+            ON journey_enrollments
+            FOR {action}
+            WITH CHECK ({_RLS_COND})
+        """)
+        else:
+            op.execute(f"""
             CREATE POLICY journey_enrollments_{action.lower()}_tenant
             ON journey_enrollments
             FOR {action}
@@ -172,7 +188,15 @@ def upgrade() -> None:
     op.execute("ALTER TABLE journey_step_executions ENABLE ROW LEVEL SECURITY")
     op.execute("ALTER TABLE journey_step_executions FORCE ROW LEVEL SECURITY")
     for action in ("SELECT", "INSERT", "UPDATE", "DELETE"):
-        op.execute(f"""
+        if action == "INSERT":
+            op.execute(f"""
+            CREATE POLICY journey_step_executions_{action.lower()}_tenant
+            ON journey_step_executions
+            FOR {action}
+            WITH CHECK ({_RLS_COND})
+        """)
+        else:
+            op.execute(f"""
             CREATE POLICY journey_step_executions_{action.lower()}_tenant
             ON journey_step_executions
             FOR {action}

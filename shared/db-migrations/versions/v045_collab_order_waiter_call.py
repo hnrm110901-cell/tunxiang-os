@@ -47,7 +47,19 @@ def upgrade() -> None:
     op.execute("ALTER TABLE table_sessions ENABLE ROW LEVEL SECURITY;")
     op.execute("ALTER TABLE table_sessions FORCE ROW LEVEL SECURITY;")
     for action in ("SELECT", "INSERT", "UPDATE", "DELETE"):
-        op.execute(f"""
+        if action == "INSERT":
+            op.execute(f"""
+            CREATE POLICY table_sessions_{action.lower()}_tenant ON table_sessions
+            AS RESTRICTIVE FOR {action}
+            WITH CHECK (
+                current_setting('app.tenant_id', TRUE) IS NOT NULL
+                AND current_setting('app.tenant_id', TRUE) <> ''
+                AND tenant_id = NULLIF(current_setting('app.tenant_id', TRUE), '')::UUID
+            );
+
+            """)
+        else:
+            op.execute(f"""
             CREATE POLICY table_sessions_{action.lower()}_tenant ON table_sessions
             AS RESTRICTIVE FOR {action}
             USING (
@@ -55,7 +67,8 @@ def upgrade() -> None:
                 AND current_setting('app.tenant_id', TRUE) <> ''
                 AND tenant_id = NULLIF(current_setting('app.tenant_id', TRUE), '')::UUID
             );
-        """)
+
+            """)
     op.execute("""
         CREATE INDEX IF NOT EXISTS ix_table_sessions_tenant_store
             ON table_sessions (tenant_id, store_id);
@@ -99,7 +112,19 @@ def upgrade() -> None:
     op.execute("ALTER TABLE waiter_calls ENABLE ROW LEVEL SECURITY;")
     op.execute("ALTER TABLE waiter_calls FORCE ROW LEVEL SECURITY;")
     for action in ("SELECT", "INSERT", "UPDATE", "DELETE"):
-        op.execute(f"""
+        if action == "INSERT":
+            op.execute(f"""
+            CREATE POLICY waiter_calls_{action.lower()}_tenant ON waiter_calls
+            AS RESTRICTIVE FOR {action}
+            WITH CHECK (
+                current_setting('app.tenant_id', TRUE) IS NOT NULL
+                AND current_setting('app.tenant_id', TRUE) <> ''
+                AND tenant_id = NULLIF(current_setting('app.tenant_id', TRUE), '')::UUID
+            );
+
+            """)
+        else:
+            op.execute(f"""
             CREATE POLICY waiter_calls_{action.lower()}_tenant ON waiter_calls
             AS RESTRICTIVE FOR {action}
             USING (
@@ -107,7 +132,8 @@ def upgrade() -> None:
                 AND current_setting('app.tenant_id', TRUE) <> ''
                 AND tenant_id = NULLIF(current_setting('app.tenant_id', TRUE), '')::UUID
             );
-        """)
+
+            """)
     op.execute("""
         CREATE INDEX IF NOT EXISTS ix_waiter_calls_tenant_store_status
             ON waiter_calls (tenant_id, store_id, status);
