@@ -23,6 +23,7 @@ import { LiveMenuEditorPage } from './pages/LiveMenuEditorPage';
 import { MenuEngineeringPage } from './pages/MenuEngineeringPage';
 import { MenuBoardControlPage } from './pages/MenuBoardControlPage';
 import { MemberPage } from './pages/MemberPage';
+import { RefundPage } from './pages/RefundPage';
 import { LoginPage } from './pages/LoginPage';
 import { AuthGuard } from './components/AuthGuard';
 import { useAuthStore } from './store/authStore';
@@ -124,6 +125,7 @@ function AppLayout() {
                 <Route path="/menu-engineering" element={<MenuEngineeringPage />} />
                 <Route path="/menu-board-control" element={<MenuBoardControlPage />} />
                 <Route path="/members" element={<MemberPage />} />
+                <Route path="/refund" element={<RefundPage />} />
               </Routes>
             </div>
           </AuthGuard>
