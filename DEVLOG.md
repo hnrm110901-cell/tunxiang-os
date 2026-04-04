@@ -4,6 +4,29 @@
 
 ---
 
+## 2026-04-04（Round 80 — 徐记海鲜门店核心业务模块全面补齐）
+
+### 今日完成
+- [web-pos] LiveSeafoodPage 活鲜存养管理：鱼缸总览看板/品种库存/温度记录/损耗登记/到货入缸/调价（820行）
+- [web-pos] ReceivingPage 食材收货模块：按采购单收货+快速收货+逐项验收+签收确认+今日记录（471行）
+- [tx-trade] course_firing 上菜节奏增强：auto_assign_courses 普通订单自动分轮/adjust_delay 动态调速/rush+hold 催菜暂停
+- [tx-trade] room_rules 包间智能管理：服务费计算/超时检测/时段可用性/低消强制校验
+- [tx-trade] room_routes.py 4个新API路由 + main.py 注册
+- [web-pos] supplyApi.ts 供应链前端API客户端（193行）
+- [web-crew] FoodSafetyPage 食安巡检执行页面（进行中）
+
+### 数据变化
+- 新增文件：5 个（LiveSeafoodPage.tsx, ReceivingPage.tsx, room_routes.py, supplyApi.ts, FoodSafetyPage.tsx）
+- 修改文件：6 个（course_firing_service/routes, room_rules, order_course, main.py, App.tsx）
+- 总变更：+3,000 行
+
+### 遗留问题
+- 活鲜管理内存存储需迁移至 PostgreSQL 持久化
+- 微信支付 JSAPI 宴会场景仍为 mock
+- web-admin 端包间/活鲜/食安管理页面待开发
+
+---
+
 ## 2026-04-04（Round 79 — POS登录鉴权+开班+退款+拆单+KDS+发票全面补齐）
 
 ### 今日完成
