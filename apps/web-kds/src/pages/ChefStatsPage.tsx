@@ -29,7 +29,6 @@ type Period = 'today' | 'week' | 'month';
 // ─── Constants ───
 
 const API_BASE = (window as any).__STORE_API_BASE__ || '';
-const TENANT_ID = (window as any).__TENANT_ID__ || '';
 const STORE_ID = (window as any).__STORE_ID__ || '';
 
 const PERIOD_LABELS: Record<Period, string> = {
@@ -37,13 +36,6 @@ const PERIOD_LABELS: Record<Period, string> = {
   week: '本周',
   month: '本月',
 };
-
-const MOCK_DATA: ChefStat[] = [
-  { operator_id: 'c1', operator_name: '张大厨', total_dishes: 87, total_amount: 4320, avg_cook_sec: 780, rush_handled: 5, remake_count: 1 },
-  { operator_id: 'c2', operator_name: '李厨师', total_dishes: 74, total_amount: 3580, avg_cook_sec: 840, rush_handled: 3, remake_count: 0 },
-  { operator_id: 'c3', operator_name: '王帅', total_dishes: 61, total_amount: 2980, avg_cook_sec: 920, rush_handled: 2, remake_count: 2 },
-  { operator_id: 'c4', operator_name: '赵小厨', total_dishes: 43, total_amount: 2100, avg_cook_sec: 1020, rush_handled: 1, remake_count: 1 },
-];
 
 // ─── Helpers ───
 
@@ -86,22 +78,18 @@ export function ChefStatsPage() {
   const [error, setError] = useState<string | null>(null);
 
   const fetchStats = useCallback(async (p: Period) => {
-    setLoading(true);
     if (!STORE_ID) {
-      setStats(MOCK_DATA);
       setLoading(false);
+      setError('未配置门店信息（STORE_ID）');
       return;
     }
+    setLoading(true);
     try {
-      const res = await txFetch(
+      const res = await txFetch<{ items: ChefStat[] }>(
         `${API_BASE}/api/v1/kds/chef-stats/leaderboard?store_id=${STORE_ID}&period=${p}`,
-        undefined,
-        TENANT_ID,
       );
-      if (res.ok) {
-        setStats(res.data.items as ChefStat[]);
-        setError(null);
-      }
+      setStats(res.items);
+      setError(null);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : '加载失败');
     } finally {

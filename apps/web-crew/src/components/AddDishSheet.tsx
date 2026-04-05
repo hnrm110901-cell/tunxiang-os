@@ -62,7 +62,7 @@ interface DishInfo {
   description?: string;
 }
 
-// ─── (Mock data removed — API is the sole data source) ───
+// ─── No mock data — API is the sole data source ───
 
 // ─── 工具函数 ───
 

@@ -102,10 +102,8 @@ export function KitchenBoard() {
     dismissTimeoutAlert,
   } = useKdsWebSocket(config);
 
-  // 本地 tickets state（无 WS 时用 mock 数据，有 WS 时同步 WS 数据）
-  const [tickets, setTickets] = useState<KDSTicket[]>(() =>
-    wsEnabled ? [] : MOCK_TICKETS,
-  );
+  // 本地 tickets state（WS 数据同步到此）
+  const [tickets, setTickets] = useState<KDSTicket[]>([]);
 
   // 当 WS 数据更新时同步到本地
   useEffect(() => {
@@ -723,19 +721,3 @@ function DoneCard({ ticket: t }: { ticket: KDSTicket }) {
   );
 }
 
-// ─── Mock Data（离线/未配置时使用） ───
-
-const now = Date.now();
-const min = (m: number) => m * 60 * 1000;
-
-const MOCK_TICKETS: KDSTicket[] = [
-  { id: 't1', orderNo: '001', tableNo: 'A01', items: [{ name: '剁椒鱼头', qty: 1, notes: '少辣' }, { name: '小炒肉', qty: 1, notes: '' }], createdAt: now - min(8), status: 'pending', priority: 'rush', deptId: 'hot' },
-  { id: 't2', orderNo: '002', tableNo: 'A03', items: [{ name: '口味虾', qty: 2, notes: '中辣' }, { name: '炒青菜', qty: 1, notes: '' }], createdAt: now - min(5), status: 'pending', priority: 'normal', deptId: 'hot' },
-  { id: 't3', orderNo: '003', tableNo: 'B01', items: [{ name: '鱼头', qty: 2, notes: '' }, { name: '米饭', qty: 6, notes: '' }], createdAt: now - min(18), status: 'cooking', priority: 'vip', deptId: 'hot', startedAt: now - min(10) },
-  { id: 't4', orderNo: '004', tableNo: 'B02', items: [{ name: '外婆鸡', qty: 1, notes: '多放辣' }], createdAt: now - min(3), status: 'pending', priority: 'normal', deptId: 'steam' },
-  { id: 't5', orderNo: '005', tableNo: 'A05', items: [{ name: '凉拌黄瓜', qty: 2, notes: '' }], createdAt: now - min(32), status: 'cooking', priority: 'rush', deptId: 'cold', startedAt: now - min(28) },
-  { id: 't6', orderNo: '006', tableNo: 'C01', items: [{ name: '蒜蓉西兰花', qty: 1, notes: '' }], createdAt: now - min(12), status: 'cooking', priority: 'normal', deptId: 'hot', startedAt: now - min(8) },
-  { id: 't7', orderNo: '007', tableNo: 'A02', items: [{ name: '酸菜鱼', qty: 1, notes: '微辣' }, { name: '辣椒炒肉', qty: 1, notes: '' }], createdAt: now - min(2), status: 'pending', priority: 'vip', deptId: 'hot' },
-  { id: 't8', orderNo: '008', tableNo: 'B03', items: [{ name: '红烧肉', qty: 1, notes: '' }], createdAt: now - min(1), status: 'done', priority: 'normal', deptId: 'hot', startedAt: now - min(15), completedAt: now - min(1) },
-  { id: 't9', orderNo: '009', tableNo: 'C02', items: [{ name: '蒸鲈鱼', qty: 1, notes: '' }], createdAt: now - min(20), status: 'done', priority: 'normal', deptId: 'steam', startedAt: now - min(18), completedAt: now - min(2) },
-];
