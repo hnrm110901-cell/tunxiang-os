@@ -7,6 +7,13 @@ from pydantic import BaseModel
 router = APIRouter(prefix="/api/v1/menu", tags=["menu"])
 
 
+class DishSpecItem(BaseModel):
+    spec_id: str
+    name: str
+    price_fen: int
+    is_half: bool = False
+
+
 class CreateDishReq(BaseModel):
     dish_name: str
     dish_code: str
@@ -14,6 +21,7 @@ class CreateDishReq(BaseModel):
     category_id: Optional[str] = None
     kitchen_station: Optional[str] = None
     preparation_time: Optional[int] = None
+    specifications: Optional[list[DishSpecItem]] = None
 
 
 class BOMItemReq(BaseModel):
@@ -29,7 +37,7 @@ async def list_dishes(store_id: str, category_id: Optional[str] = None, page: in
 
 @router.post("/dishes")
 async def create_dish(req: CreateDishReq):
-    return {"ok": True, "data": {"dish_id": "new", "dish_code": req.dish_code}}
+    return {"ok": True, "data": {"dish_id": "new", "dish_code": req.dish_code, "specifications": [s.model_dump() for s in req.specifications] if req.specifications else []}}
 
 @router.get("/dishes/{dish_id}")
 async def get_dish(dish_id: str):

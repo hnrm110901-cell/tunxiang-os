@@ -257,6 +257,9 @@ class Dish(TenantBase):
     rating: Mapped[float | None] = mapped_column(Numeric(3, 2))
     review_count: Mapped[int] = mapped_column(Integer, default=0)
 
+    # 多规格（大份/中份/小份/半份等）
+    specifications: Mapped[list | None] = mapped_column(JSON, default=list, comment="规格列表[{spec_id,name,price_fen,is_half}]")
+
     # 备注与扩展
     notes: Mapped[str | None] = mapped_column(Text, comment="菜品备注")
     dish_metadata: Mapped[dict | None] = mapped_column(JSON, default=dict, comment="扩展字段")

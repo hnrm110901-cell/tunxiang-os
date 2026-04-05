@@ -14,6 +14,13 @@ async function txFetch<T>(path: string): Promise<T> {
   return json.data;
 }
 
+export interface DishSpecification {
+  spec_id: string;
+  name: string;
+  price_fen: number;
+  is_half?: boolean;
+}
+
 export interface DishItem {
   id: string;
   name: string;
@@ -21,6 +28,7 @@ export interface DishItem {
   category: string;
   kitchenStation: string;
   isAvailable: boolean;
+  specifications?: DishSpecification[];
 }
 
 export async function fetchDishes(storeId: string): Promise<DishItem[]> {
@@ -33,6 +41,7 @@ export async function fetchDishes(storeId: string): Promise<DishItem[]> {
       category: d.category || '',
       kitchenStation: d.kitchen_station || 'default',
       isAvailable: d.is_available !== false,
+      specifications: d.specifications || [],
     }));
   } catch {
     return []; // 离线模式返回空

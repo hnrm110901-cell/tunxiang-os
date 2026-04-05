@@ -44,6 +44,10 @@ export function SettlePage() {
   const finalFen = totalFen - discountFen;
   const [paying, setPaying] = useState(false);
 
+  // 现金找零状态
+  const [selectedMethod, setSelectedMethod] = useState<string | null>(null);
+  const [receivedYuan, setReceivedYuan] = useState<string>('');
+
   // 折扣 AI 分析抽屉状态
   const [discountSheetVisible, setDiscountSheetVisible] = useState(false);
   const [discountParams, setDiscountParams] = useState<DiscountParams | null>(null);
@@ -95,8 +99,15 @@ export function SettlePage() {
     applyDiscount(pendingDiscountFen);
   };
 
+  // 现金找零计算
+  const receivedFen = Math.round(parseFloat(receivedYuan || '0') * 100);
+  const changeFen = receivedFen - finalFen;
+  const cashReady = receivedFen >= finalFen;
+
   const handlePay = async (method: string) => {
     if (paying) return;
+    // 现金支付时必须收款金额 >= 应付金额
+    if (method === 'cash' && !cashReady) return;
     setPaying(true);
 
     try {
@@ -213,22 +224,83 @@ export function SettlePage() {
       </div>
 
       {/* 右侧 — 支付方式 */}
-      <div style={{ width: 320, background: '#112228', padding: 24, display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ width: 320, background: '#112228', padding: 24, display: 'flex', flexDirection: 'column', gap: 12, overflowY: 'auto' }}>
         <h3>选择支付方式</h3>
         {PAYMENT_METHODS.map((m) => (
           <button
             key={m.key}
-            onClick={() => handlePay(m.key)}
+            onClick={() => {
+              if (m.key === 'cash') {
+                setSelectedMethod('cash');
+              } else {
+                setSelectedMethod(null);
+                handlePay(m.key);
+              }
+            }}
             disabled={paying}
             style={{
               padding: 16, border: 'none', borderRadius: 8,
-              background: paying ? '#444' : m.color, color: '#fff', fontSize: 18,
+              background: paying ? '#444' : selectedMethod === m.key ? '#b8860b' : m.color,
+              color: '#fff', fontSize: 18,
               cursor: paying ? 'not-allowed' : 'pointer',
+              outline: selectedMethod === m.key ? '2px solid #fff' : 'none',
             }}
           >
             {paying ? '处理中...' : m.label}
           </button>
         ))}
+
+        {/* 现金找零区域 */}
+        {selectedMethod === 'cash' && (
+          <div style={{
+            background: '#1a2e2e', borderRadius: 8, padding: 16,
+            border: '1px solid #faad14',
+          }}>
+            <div style={{ fontSize: 16, color: '#faad14', marginBottom: 10, fontWeight: 600 }}>
+              现金收款
+            </div>
+            <div style={{ fontSize: 14, color: '#999', marginBottom: 6 }}>应收: {fen2yuan(finalFen)}</div>
+            <input
+              type="number"
+              inputMode="decimal"
+              placeholder="收款金额（元）"
+              value={receivedYuan}
+              onChange={(e) => setReceivedYuan(e.target.value)}
+              autoFocus
+              style={{
+                width: '100%', height: 56, borderRadius: 8,
+                border: '2px solid #faad14', background: '#0B1A20',
+                color: '#fff', fontSize: 24, fontWeight: 700,
+                padding: '0 12px', outline: 'none',
+                boxSizing: 'border-box',
+              }}
+            />
+            {receivedFen > 0 && (
+              <div style={{
+                marginTop: 10, fontSize: 28, fontWeight: 800,
+                color: cashReady ? '#52c41a' : '#ff4d4f',
+                textAlign: 'center',
+              }}>
+                {cashReady
+                  ? `找零: ${fen2yuan(changeFen)}`
+                  : `还差: ${fen2yuan(finalFen - receivedFen)}`}
+              </div>
+            )}
+            <button
+              onClick={() => handlePay('cash')}
+              disabled={paying || !cashReady}
+              style={{
+                width: '100%', height: 56, marginTop: 12,
+                borderRadius: 8, border: 'none',
+                background: cashReady ? '#52c41a' : '#444',
+                color: '#fff', fontSize: 20, fontWeight: 700,
+                cursor: cashReady && !paying ? 'pointer' : 'not-allowed',
+              }}
+            >
+              {paying ? '处理中...' : '确认收款'}
+            </button>
+          </div>
+        )}
         {/* 高级结算入口 */}
         <div style={{ borderTop: '1px solid #333', paddingTop: 12, marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
           <button

@@ -13,8 +13,10 @@ import { createOrder, addItem as apiAddItem } from '../api/tradeApi';
 import { fetchDishes, type DishItem } from '../api/menuApi';
 import { LiveSeafoodOrderSheet } from '../components/LiveSeafoodOrderSheet';
 import { ComboSelectorSheet } from '../components/ComboSelectorSheet';
+import { SpecSelectorSheet } from '../components/SpecSelectorSheet';
 import type { LiveSeafoodOrderSheetProps } from '../components/LiveSeafoodOrderSheet';
 import type { ComboSelectorSheetProps } from '../components/ComboSelectorSheet';
+import type { DishSpecification } from '../api/menuApi';
 
 // ─── 扩展菜品类型（增加活鲜/套餐字段）────────────────────────────────────────
 
@@ -31,6 +33,9 @@ interface ExtendedDishItem extends DishItem {
   comboPriceFen?: number;
   originalPriceFen?: number;
   comboGroups?: ComboSelectorSheetProps['combo']['groups'];
+  /** 多规格（大份/中份/小份/半份） */
+  specifications?: DishSpecification[];
+  imageUrl?: string;
 }
 
 // ─── 扩展 fallback 菜品数据 ───────────────────────────────────────────────────
@@ -59,6 +64,16 @@ const FALLBACK_DISHES: ExtendedDishItem[] = [
   {
     id: 'd6', name: '酸梅汤', priceFen: 800, category: '饮品',
     kitchenStation: 'default', isAvailable: true, pricingMethod: 'normal',
+  },
+  // 多规格示例
+  {
+    id: 'sp1', name: '水煮鱼', priceFen: 6800, category: '热菜',
+    kitchenStation: '热菜档', isAvailable: true, pricingMethod: 'normal',
+    specifications: [
+      { spec_id: 'sp1-l', name: '大份', price_fen: 8800 },
+      { spec_id: 'sp1-m', name: '中份', price_fen: 6800 },
+      { spec_id: 'sp1-s', name: '小份/半份', price_fen: 3800, is_half: true },
+    ],
   },
   // 活鲜示例
   {
@@ -152,6 +167,12 @@ export function CashierPage() {
     dish: ExtendedDishItem | null;
   }>({ visible: false, dish: null });
 
+  // 多规格弹层状态
+  const [specSheet, setSpecSheet] = useState<{
+    visible: boolean;
+    dish: ExtendedDishItem | null;
+  }>({ visible: false, dish: null });
+
   // 加载菜品（API优先，失败回退 mock）+ 自动开单
   useEffect(() => {
     setLoading(true);
@@ -185,6 +206,12 @@ export function CashierPage() {
     // N选M套餐 → 套餐选择弹层
     if (dish.comboType === 'flexible' && dish.comboGroups) {
       setComboSheet({ visible: true, dish });
+      return;
+    }
+
+    // 多规格菜品 → 规格选择弹层
+    if (dish.specifications && dish.specifications.length > 0) {
+      setSpecSheet({ visible: true, dish });
       return;
     }
 
@@ -270,6 +297,34 @@ export function CashierPage() {
     }
   };
 
+  // ── 多规格确认回调 ───────────────────────────────────────────────────────────
+
+  const handleSpecConfirm = (specId: string, specName: string, priceFen: number, quantity: number) => {
+    const dish = specSheet.dish;
+    if (!dish) return;
+
+    const cartKey = `${dish.id}__${specId}`;
+    const displayName = `${dish.name}（${specName}）`;
+
+    const existing = items.find((i) => i.dishId === cartKey);
+    if (existing) {
+      store.updateQuantity(existing.id, existing.quantity + quantity);
+    } else {
+      store.addItem({
+        dishId: cartKey,
+        name: displayName,
+        quantity,
+        priceFen,
+        notes: `规格:${specName}`,
+        kitchenStation: dish.kitchenStation,
+      });
+    }
+
+    if (orderId) {
+      apiAddItem(orderId, dish.id, displayName, quantity, priceFen).catch(() => {});
+    }
+  };
+
   // ── 菜品分类颜色 ─────────────────────────────────────────────────────────────
 
   const categoryTagColor = (cat: string): string => {
@@ -285,7 +340,7 @@ export function CashierPage() {
   };
 
   const isDishSpecial = (d: ExtendedDishItem) =>
-    d.pricingMethod === 'weight' || d.pricingMethod === 'count' || d.comboType === 'flexible';
+    d.pricingMethod === 'weight' || d.pricingMethod === 'count' || d.comboType === 'flexible' || (d.specifications && d.specifications.length > 0);
 
   // ── 渲染 ─────────────────────────────────────────────────────────────────────
 
@@ -365,6 +420,9 @@ export function CashierPage() {
                 )}
                 {d.comboType === 'flexible' && (
                   <div style={{ fontSize: 12, color: '#1890ff', marginTop: 2 }}>📋 套餐</div>
+                )}
+                {d.specifications && d.specifications.length > 0 && (
+                  <div style={{ fontSize: 12, color: '#faad14', marginTop: 2 }}>多规格</div>
                 )}
                 {!d.isAvailable && (
                   <div style={{
@@ -503,6 +561,22 @@ export function CashierPage() {
           }}
           onConfirm={handleComboConfirm}
           onClose={() => setComboSheet({ visible: false, dish: null })}
+        />
+      )}
+
+      {/* ── 多规格选择弹层 ── */}
+      {specSheet.dish && specSheet.dish.specifications && specSheet.dish.specifications.length > 0 && (
+        <SpecSelectorSheet
+          visible={specSheet.visible}
+          dish={{
+            id:             specSheet.dish.id,
+            name:           specSheet.dish.name,
+            imageUrl:       specSheet.dish.imageUrl,
+            priceFen:       specSheet.dish.priceFen,
+            specifications: specSheet.dish.specifications,
+          }}
+          onConfirm={handleSpecConfirm}
+          onClose={() => setSpecSheet({ visible: false, dish: null })}
         />
       )}
     </div>
