@@ -102,11 +102,12 @@ def upgrade() -> None:
     op.execute("ALTER TABLE touch_events FORCE ROW LEVEL SECURITY;")
     for op_name in ("select", "insert", "update", "delete"):
         check = f"WITH CHECK ({_RLS_COND})" if op_name in ("insert", "update") else ""
+        using = f"USING ({_RLS_COND})" if op_name != "insert" else ""
         op.execute(f"""
             CREATE POLICY rls_te_{op_name}
                 ON touch_events
                 FOR {op_name.upper()}
-                USING ({_RLS_COND})
+                {using}
                 {check};
         """)
 
@@ -176,11 +177,12 @@ def upgrade() -> None:
     op.execute("ALTER TABLE attribution_conversions FORCE ROW LEVEL SECURITY;")
     for op_name in ("select", "insert", "update", "delete"):
         check = f"WITH CHECK ({_RLS_COND})" if op_name in ("insert", "update") else ""
+        using = f"USING ({_RLS_COND})" if op_name != "insert" else ""
         op.execute(f"""
             CREATE POLICY rls_ac_{op_name}
                 ON attribution_conversions
                 FOR {op_name.upper()}
-                USING ({_RLS_COND})
+                {using}
                 {check};
         """)
 
@@ -253,11 +255,12 @@ def upgrade() -> None:
     op.execute("ALTER TABLE campaign_summaries FORCE ROW LEVEL SECURITY;")
     for op_name in ("select", "insert", "update", "delete"):
         check = f"WITH CHECK ({_RLS_COND})" if op_name in ("insert", "update") else ""
+        using = f"USING ({_RLS_COND})" if op_name != "insert" else ""
         op.execute(f"""
             CREATE POLICY rls_cs_{op_name}
                 ON campaign_summaries
                 FOR {op_name.upper()}
-                USING ({_RLS_COND})
+                {using}
                 {check};
         """)
 

@@ -56,6 +56,11 @@ def upgrade() -> None:
             tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid
         )
     """)
+    # Ensure is_deleted column exists (table may predate this migration)
+    op.execute("""
+        ALTER TABLE payroll_summaries
+            ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN NOT NULL DEFAULT FALSE
+    """)
     op.execute("""
         CREATE INDEX IF NOT EXISTS idx_payroll_summaries_tenant_period
         ON payroll_summaries(tenant_id, store_id, period_year, period_month)

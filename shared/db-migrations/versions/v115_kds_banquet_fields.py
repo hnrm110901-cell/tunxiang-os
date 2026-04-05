@@ -39,33 +39,37 @@ def upgrade() -> None:
 
     # ── dish_dept_mappings 菜品→档口映射表（若不存在则创建）────────────
     # 该表决定每道菜分到哪个KDS档口
-    op.create_table(
-        "dish_dept_mappings",
-        sa.Column("id", UUID(as_uuid=True), primary_key=True,
-                  server_default=sa.text("gen_random_uuid()")),
-        sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
-        sa.Column("store_id", UUID(as_uuid=True), nullable=True,
-                  comment="NULL=集团通用映射 / 有值=门店专属覆盖"),
-        sa.Column("dish_id", UUID(as_uuid=True), nullable=False),
-        sa.Column("dept_id", UUID(as_uuid=True), nullable=False,
-                  comment="档口ID（凉菜/热菜/海鲜/点心/主食档口）"),
-        sa.Column("dept_name", sa.String(50), nullable=False,
-                  comment="档口名称快照，便于KDS展示"),
-        sa.Column("is_primary", sa.Boolean, nullable=False, server_default="true",
-                  comment="主档口（一道菜有时需要多档口协同，如半成品在备菜档，成品在热菜档）"),
-        sa.Column("priority", sa.Integer, nullable=False, server_default="0"),
-        sa.Column("created_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()")),
-        sa.Column("updated_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()")),
-        sa.Column("is_deleted", sa.Boolean, nullable=False, server_default="false"),
-        sa.UniqueConstraint("tenant_id", "dish_id", "dept_id",
-                            name="uq_dish_dept_mapping"),
-    )
+    op.execute("""
+        CREATE TABLE IF NOT EXISTS dish_dept_mappings (
+            id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            tenant_id   UUID NOT NULL,
+            store_id    UUID,
+            dish_id     UUID NOT NULL,
+            dept_id     UUID NOT NULL,
+            dept_name   VARCHAR(50) NOT NULL,
+            is_primary  BOOLEAN NOT NULL DEFAULT TRUE,
+            priority    INTEGER NOT NULL DEFAULT 0,
+            created_at  TIMESTAMPTZ DEFAULT now(),
+            updated_at  TIMESTAMPTZ DEFAULT now(),
+            is_deleted  BOOLEAN NOT NULL DEFAULT FALSE,
+            CONSTRAINT uq_dish_dept_mapping UNIQUE (tenant_id, dish_id, dept_id)
+        )
+    """)
+
+    # ── dish_dept_mappings: add new columns if missing ───────────────
+    op.execute("""
+        ALTER TABLE dish_dept_mappings
+            ADD COLUMN IF NOT EXISTS dept_id     UUID,
+            ADD COLUMN IF NOT EXISTS dept_name   VARCHAR(50),
+            ADD COLUMN IF NOT EXISTS store_id    UUID,
+            ADD COLUMN IF NOT EXISTS priority    INTEGER NOT NULL DEFAULT 0
+    """)
 
     # ── 索引 ────────────────────────────────────────────────────────
-    op.create_index("ix_kds_tasks_banquet_session", "kds_tasks", ["banquet_session_id"])
-    op.create_index("ix_kds_tasks_banquet_section", "kds_tasks", ["banquet_section_id"])
-    op.create_index("ix_dish_dept_mappings_dish", "dish_dept_mappings", ["dish_id", "tenant_id"])
-    op.create_index("ix_dish_dept_mappings_dept", "dish_dept_mappings", ["dept_id"])
+    op.execute("CREATE INDEX IF NOT EXISTS ix_kds_tasks_banquet_session ON kds_tasks (banquet_session_id)")
+    op.execute("CREATE INDEX IF NOT EXISTS ix_kds_tasks_banquet_section ON kds_tasks (banquet_section_id)")
+    op.execute("CREATE INDEX IF NOT EXISTS ix_dish_dept_mappings_dish ON dish_dept_mappings (dish_id, tenant_id)")
+    op.execute("CREATE INDEX IF NOT EXISTS ix_dish_dept_mappings_dept ON dish_dept_mappings (dept_id) WHERE dept_id IS NOT NULL")
 
     # ── RLS ─────────────────────────────────────────────────────────
     op.execute("ALTER TABLE dish_dept_mappings ENABLE ROW LEVEL SECURITY;")
