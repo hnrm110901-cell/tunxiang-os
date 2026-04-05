@@ -83,6 +83,7 @@ from services.tx_analytics.src.reports import (
     scm_yield_comparison,
     store_anomaly,
     table_stats,
+    target_achievement,
 )
 
 # P0 每日必看报表模块列表

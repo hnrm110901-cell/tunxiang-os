@@ -612,3 +612,61 @@ async def api_coupon_consumption(
         raise HTTPException(status_code=503, detail=str(exc))
 
     return {"ok": True, "data": {"items": result.rows, "summary": result.summary}}
+
+
+# ──────────────────────────────────────────────
+# DB 依赖（目标达成报表需要真实 session）
+# ──────────────────────────────────────────────
+
+async def _get_tenant_session(
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+):
+    async for session in get_db_with_tenant(x_tenant_id):
+        yield session
+
+
+# ──────────────────────────────────────────────
+# 18. 门店经营目标达成
+# ──────────────────────────────────────────────
+
+@router.get("/api/v1/analytics/reports/target-achievement")
+async def api_target_achievement(
+    store_id: str = Query(..., description="门店ID（必填）"),
+    date: Optional[str] = Query(None, description="基准日期 YYYY-MM-DD，默认今日"),
+    period: str = Query("month", description="汇总粒度 day|week|month（默认 month）"),
+    x_tenant_id: Optional[str] = Header(None, alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(_get_tenant_session),
+):
+    """门店经营目标达成报表
+
+    比对门店经营目标（7 个 target 字段）与实际经营数据。
+    返回 6 项 KPI 的目标值、实际值、达成率、趋势，以及综合达成率。
+
+    KPI 列表：
+      1. 营收目标 — 完成订单金额 vs monthly_revenue_target_fen
+      2. 日客流目标 — 日均订单数 vs daily_customer_target
+      3. 成本率 — 采购成本/营收 vs cost_ratio_target
+      4. 人工成本率 — 人工成本/营收 vs labor_cost_ratio_target
+      5. 翻台率 — 订单数/桌数/天数 vs turnover_rate_target
+      6. 损耗率 — 报废金额/采购金额 vs waste_rate_target
+    """
+    tenant_id = _require_tenant(x_tenant_id)
+    base_date = _parse_date(date)
+
+    if period not in ("day", "week", "month"):
+        raise HTTPException(status_code=422, detail="period must be day, week, or month")
+
+    try:
+        result = await target_achievement_report(
+            store_id=store_id,
+            period=period,
+            tenant_id=tenant_id,
+            db=db,
+            base_date=base_date,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+
+    return {"ok": True, "data": result}
