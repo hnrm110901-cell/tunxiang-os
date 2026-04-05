@@ -51,11 +51,6 @@ def upgrade() -> None:
         ALTER TABLE xhs_poi_mappings
             ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN NOT NULL DEFAULT FALSE
     """)
-    # Ensure is_deleted column exists (table may predate this migration)
-    op.execute("""
-        ALTER TABLE xhs_coupon_verifications
-            ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN NOT NULL DEFAULT FALSE
-    """)
     op.execute("""
         CREATE INDEX IF NOT EXISTS idx_xhs_poi_tenant_store
             ON xhs_poi_mappings(tenant_id, store_id)
