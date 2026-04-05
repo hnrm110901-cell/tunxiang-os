@@ -40,11 +40,6 @@ def upgrade() -> None:
         )
     """)
 
-    # Ensure is_deleted column exists (table may predate this migration)
-    op.execute("""
-        ALTER TABLE employee_transfers
-            ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN NOT NULL DEFAULT FALSE
-    """)
     op.execute("""
         CREATE INDEX IF NOT EXISTS idx_employee_transfers_tenant_employee
             ON employee_transfers (tenant_id, employee_id)

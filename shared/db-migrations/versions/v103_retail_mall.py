@@ -60,16 +60,6 @@ def upgrade() -> None:
             USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid)
             WITH CHECK (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid)
     """)
-    # Ensure is_deleted column exists (table may predate this migration)
-    op.execute("""
-        ALTER TABLE retail_products
-            ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN NOT NULL DEFAULT FALSE
-    """)
-    # Ensure is_deleted column exists (table may predate this migration)
-    op.execute("""
-        ALTER TABLE retail_orders
-            ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN NOT NULL DEFAULT FALSE
-    """)
     op.execute("""
         CREATE INDEX IF NOT EXISTS idx_retail_products_tenant_cat
             ON retail_products(tenant_id, category, status)
