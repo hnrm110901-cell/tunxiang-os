@@ -14,6 +14,8 @@ from services.tx_analytics.src.reports import (
     audit_log,
     audit_summary,
     bill_audit,
+    # P0 新增报表 (8个)
+    cash_drawer_log,
     # P1 每周分析报表
     combo_sales,
     commission_cashier,
@@ -25,11 +27,15 @@ from services.tx_analytics.src.reports import (
     commission_summary,
     commission_waiter,
     cooking_speed,
+    coupon_consumption,
+    credit_account_stats,
     daily_cashflow,
     # P0 每日必看报表
     daily_revenue,
     daily_revenue_by_day,
     daily_store_collection,
+    delivery_order_stats,
+    delivery_reconciliation,
     deposit_stats,
     dept_sales_ratio,
     discount_detail,
@@ -50,8 +56,11 @@ from services.tx_analytics.src.reports import (
     margin_operation,
     margin_per_order,
     margin_total_order,
+    member_consumption,
+    min_spend_supplement,
     payment_discount,
     realtime_stats,
+    reservation_detail,
     return_analysis,
     revenue_structure,
     sales_channel,
@@ -86,6 +95,15 @@ _P0_REPORTS = [
     dish_sales_stats,
     bill_audit,
     realtime_stats,
+    # 新增 8 个 P0 报表
+    min_spend_supplement,
+    cash_drawer_log,
+    reservation_detail,
+    delivery_order_stats,
+    delivery_reconciliation,
+    credit_account_stats,
+    member_consumption,
+    coupon_consumption,
 ]
 
 # 其他报表模块列表

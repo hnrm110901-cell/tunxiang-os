@@ -14,6 +14,7 @@ import { fetchDishes, type DishItem } from '../api/menuApi';
 import { LiveSeafoodOrderSheet } from '../components/LiveSeafoodOrderSheet';
 import { ComboSelectorSheet } from '../components/ComboSelectorSheet';
 import { SpecSelectorSheet } from '../components/SpecSelectorSheet';
+import { getCurrentMealPeriod, MEAL_PERIOD_LABELS, MEAL_PERIOD_COLORS } from '../utils/mealPeriod';
 import type { LiveSeafoodOrderSheetProps } from '../components/LiveSeafoodOrderSheet';
 import type { ComboSelectorSheetProps } from '../components/ComboSelectorSheet';
 import type { DishSpecification } from '../api/menuApi';
@@ -350,9 +351,28 @@ export function CashierPage() {
       {/* ── 左侧 — 菜品区 ── */}
       <div style={{ flex: 1, padding: 16, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <h3 style={{ margin: 0, fontSize: 20 }}>桌号: {tableNo}</h3>
-          {loading && <span style={{ color: '#faad14', fontSize: 16 }}>开单中...</span>}
-          {store.orderNo && <span style={{ color: '#52c41a', fontSize: 16 }}>{store.orderNo}</span>}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <h3 style={{ margin: 0, fontSize: 20 }}>桌号: {tableNo}</h3>
+            {(() => {
+              const period = getCurrentMealPeriod();
+              return (
+                <span style={{
+                  fontSize: 14,
+                  fontWeight: 700,
+                  padding: '3px 10px',
+                  borderRadius: 6,
+                  background: MEAL_PERIOD_COLORS[period] ?? '#555',
+                  color: '#fff',
+                }}>
+                  {MEAL_PERIOD_LABELS[period] ?? period}
+                </span>
+              );
+            })()}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {loading && <span style={{ color: '#faad14', fontSize: 16 }}>开单中...</span>}
+            {store.orderNo && <span style={{ color: '#52c41a', fontSize: 16 }}>{store.orderNo}</span>}
+          </div>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(148px, 1fr))', gap: 10 }}>
