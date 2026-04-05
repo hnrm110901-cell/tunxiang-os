@@ -253,6 +253,57 @@ export function QueuePage() {
               </div>
             </div>
 
+            {/* 手机号 + 会员识别 */}
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 18, color: 'var(--tx-text-2)', marginBottom: 8 }}>手机号</div>
+              <input
+                value={newPhone}
+                onChange={e => handlePhoneChange(e.target.value)}
+                placeholder="输入手机号自动识别会员"
+                inputMode="tel"
+                maxLength={11}
+                style={{
+                  width: '100%',
+                  height: 56,
+                  borderRadius: 'var(--tx-radius-md)',
+                  border: `2px solid ${memberMatch ? 'var(--tx-primary)' : 'var(--tx-border)'}`,
+                  padding: '0 16px',
+                  fontSize: 20,
+                  outline: 'none',
+                  boxSizing: 'border-box',
+                }}
+              />
+              {memberSearching && (
+                <div style={{ fontSize: 16, color: 'var(--tx-text-3)', marginTop: 6 }}>
+                  查询会员中...
+                </div>
+              )}
+              {memberMatch && (
+                <div style={{
+                  marginTop: 8,
+                  padding: '10px 14px',
+                  borderRadius: 'var(--tx-radius-sm)',
+                  background: memberMatch.is_vip ? '#FFF8E1' : '#E8F5F0',
+                  border: `1px solid ${memberMatch.is_vip ? '#FFD700' : 'var(--tx-success)'}`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                }}>
+                  {memberMatch.is_vip && (
+                    <span style={{
+                      background: '#FFD700', color: '#6B4E00',
+                      fontSize: 14, fontWeight: 800, padding: '2px 8px', borderRadius: 4,
+                    }}>VIP</span>
+                  )}
+                  <span style={{ fontSize: 18, fontWeight: 700 }}>{memberMatch.name}</span>
+                  <span style={{ fontSize: 16, color: 'var(--tx-text-3)' }}>
+                    {memberMatch.vip_level ? memberMatch.vip_level + ' | ' : ''}
+                    累计{memberMatch.total_visits}次到店
+                  </span>
+                </div>
+              )}
+            </div>
+
             {/* 称呼 */}
             <div style={{ marginBottom: 24 }}>
               <div style={{ fontSize: 18, color: 'var(--tx-text-2)', marginBottom: 8 }}>称呼</div>
@@ -268,6 +319,7 @@ export function QueuePage() {
                   padding: '0 16px',
                   fontSize: 20,
                   outline: 'none',
+                  boxSizing: 'border-box',
                 }}
               />
             </div>

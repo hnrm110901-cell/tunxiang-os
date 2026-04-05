@@ -328,3 +328,283 @@ async def api_daily_summary(
         raise HTTPException(status_code=503, detail=str(exc))
 
     return {"ok": True, "data": result}
+
+
+# ──────────────────────────────────────────────
+# 9. 最低消费补齐报表
+# ──────────────────────────────────────────────
+
+@router.get("/api/v1/analytics/reports/min-spend-supplement")
+async def api_min_spend_supplement(
+    store_id: Optional[str] = Query(None, description="门店ID"),
+    date_from: Optional[str] = Query(None, description="起始日期 YYYY-MM-DD，默认今日"),
+    date_to: Optional[str] = Query(None, description="截止日期 YYYY-MM-DD，默认今日"),
+    x_tenant_id: Optional[str] = Header(None, alias="X-Tenant-ID"),
+):
+    """最低消费补齐报表（P0）
+
+    - 统计设有最低消费的桌台订单，计算实际消费与最低消费差额
+    - 字段：门店/桌台/最低消费/实际消费/补齐金额/日期
+    """
+    tenant_id = _require_tenant(x_tenant_id)
+    start = _parse_date(date_from)
+    end = _parse_date(date_to)
+
+    try:
+        result = await _engine.execute_report(
+            report_id="min_spend_supplement",
+            params={"store_id": store_id, "start_date": str(start), "end_date": str(end)},
+            tenant_id=tenant_id,
+            db=None,
+        )
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Report min_spend_supplement not found")
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+
+    return {"ok": True, "data": {"items": result.rows, "summary": result.summary}}
+
+
+# ──────────────────────────────────────────────
+# 10. 开钱箱统计
+# ──────────────────────────────────────────────
+
+@router.get("/api/v1/analytics/reports/cash-drawer-log")
+async def api_cash_drawer_log(
+    store_id: Optional[str] = Query(None, description="门店ID"),
+    date_from: Optional[str] = Query(None, description="起始日期 YYYY-MM-DD，默认今日"),
+    date_to: Optional[str] = Query(None, description="截止日期 YYYY-MM-DD，默认今日"),
+    x_tenant_id: Optional[str] = Header(None, alias="X-Tenant-ID"),
+):
+    """开钱箱统计（P0）
+
+    - 按门店按收银员统计每日开钱箱次数及时段分布
+    - 字段：门店/收银员/开箱次数/首次/末次/时段分布
+    """
+    tenant_id = _require_tenant(x_tenant_id)
+    start = _parse_date(date_from)
+    end = _parse_date(date_to)
+
+    try:
+        result = await _engine.execute_report(
+            report_id="cash_drawer_log",
+            params={"store_id": store_id, "start_date": str(start), "end_date": str(end)},
+            tenant_id=tenant_id,
+            db=None,
+        )
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Report cash_drawer_log not found")
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+
+    return {"ok": True, "data": {"items": result.rows, "summary": result.summary}}
+
+
+# ──────────────────────────────────────────────
+# 11. 预定明细统计
+# ──────────────────────────────────────────────
+
+@router.get("/api/v1/analytics/reports/reservation-detail")
+async def api_reservation_detail(
+    store_id: Optional[str] = Query(None, description="门店ID"),
+    date_from: Optional[str] = Query(None, description="起始日期 YYYY-MM-DD，默认今日"),
+    date_to: Optional[str] = Query(None, description="截止日期 YYYY-MM-DD，默认今日"),
+    x_tenant_id: Optional[str] = Header(None, alias="X-Tenant-ID"),
+):
+    """预定明细统计（P0）
+
+    - 按门店按日期统计预定量，按状态和时段分布
+    - 字段：门店/日期/总量/已确认/已入座/已取消/未到店/到店率/时段分布
+    """
+    tenant_id = _require_tenant(x_tenant_id)
+    start = _parse_date(date_from)
+    end = _parse_date(date_to)
+
+    try:
+        result = await _engine.execute_report(
+            report_id="reservation_detail",
+            params={"store_id": store_id, "start_date": str(start), "end_date": str(end)},
+            tenant_id=tenant_id,
+            db=None,
+        )
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Report reservation_detail not found")
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+
+    return {"ok": True, "data": {"items": result.rows, "summary": result.summary}}
+
+
+# ──────────────────────────────────────────────
+# 12. 外卖单统计
+# ──────────────────────────────────────────────
+
+@router.get("/api/v1/analytics/reports/delivery-stats")
+async def api_delivery_order_stats(
+    store_id: Optional[str] = Query(None, description="门店ID"),
+    date_from: Optional[str] = Query(None, description="起始日期 YYYY-MM-DD，默认今日"),
+    date_to: Optional[str] = Query(None, description="截止日期 YYYY-MM-DD，默认今日"),
+    x_tenant_id: Optional[str] = Header(None, alias="X-Tenant-ID"),
+):
+    """外卖单统计（P0）
+
+    - 按门店按外卖平台统计订单量、营收、佣金、净收入
+    - 字段：门店/平台/订单数/完成数/取消数/退款数/营收/佣金/配送费/净收入/客单价/佣金率
+    """
+    tenant_id = _require_tenant(x_tenant_id)
+    start = _parse_date(date_from)
+    end = _parse_date(date_to)
+
+    try:
+        result = await _engine.execute_report(
+            report_id="delivery_order_stats",
+            params={"store_id": store_id, "start_date": str(start), "end_date": str(end)},
+            tenant_id=tenant_id,
+            db=None,
+        )
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Report delivery_order_stats not found")
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+
+    return {"ok": True, "data": {"items": result.rows, "summary": result.summary}}
+
+
+# ──────────────────────────────────────────────
+# 13. 平台外卖对账表
+# ──────────────────────────────────────────────
+
+@router.get("/api/v1/analytics/reports/delivery-reconciliation")
+async def api_delivery_reconciliation(
+    store_id: Optional[str] = Query(None, description="门店ID"),
+    date_from: Optional[str] = Query(None, description="起始日期 YYYY-MM-DD，默认今日"),
+    date_to: Optional[str] = Query(None, description="截止日期 YYYY-MM-DD，默认今日"),
+    x_tenant_id: Optional[str] = Header(None, alias="X-Tenant-ID"),
+):
+    """平台外卖对账表（P0）
+
+    - 对比系统内外卖订单金额与平台结算金额，识别差异单据
+    - 字段：门店/日期/平台/平台单号/系统金额/平台金额/差额/对账状态
+    """
+    tenant_id = _require_tenant(x_tenant_id)
+    start = _parse_date(date_from)
+    end = _parse_date(date_to)
+
+    try:
+        result = await _engine.execute_report(
+            report_id="delivery_reconciliation",
+            params={"store_id": store_id, "start_date": str(start), "end_date": str(end)},
+            tenant_id=tenant_id,
+            db=None,
+        )
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Report delivery_reconciliation not found")
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+
+    return {"ok": True, "data": {"items": result.rows, "summary": result.summary}}
+
+
+# ──────────────────────────────────────────────
+# 14. 挂账统计
+# ──────────────────────────────────────────────
+
+@router.get("/api/v1/analytics/reports/credit-account-stats")
+async def api_credit_account_stats(
+    store_id: Optional[str] = Query(None, description="门店ID"),
+    date_from: Optional[str] = Query(None, description="起始日期 YYYY-MM-DD，默认今日"),
+    date_to: Optional[str] = Query(None, description="截止日期 YYYY-MM-DD，默认今日"),
+    x_tenant_id: Optional[str] = Header(None, alias="X-Tenant-ID"),
+):
+    """挂账统计（P0）
+
+    - 按门店统计企业挂账客户的信用额度使用情况
+    - 字段：门店/客户名/公司/额度/已用/余额/使用率/期间消费/期间还款/最后交易时间
+    """
+    tenant_id = _require_tenant(x_tenant_id)
+    start = _parse_date(date_from)
+    end = _parse_date(date_to)
+
+    try:
+        result = await _engine.execute_report(
+            report_id="credit_account_stats",
+            params={"store_id": store_id, "start_date": str(start), "end_date": str(end)},
+            tenant_id=tenant_id,
+            db=None,
+        )
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Report credit_account_stats not found")
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+
+    return {"ok": True, "data": {"items": result.rows, "summary": result.summary}}
+
+
+# ──────────────────────────────────────────────
+# 15. 会员消费分析
+# ──────────────────────────────────────────────
+
+@router.get("/api/v1/analytics/reports/member-consumption")
+async def api_member_consumption(
+    store_id: Optional[str] = Query(None, description="门店ID"),
+    date_from: Optional[str] = Query(None, description="起始日期 YYYY-MM-DD，默认今日"),
+    date_to: Optional[str] = Query(None, description="截止日期 YYYY-MM-DD，默认今日"),
+    x_tenant_id: Optional[str] = Header(None, alias="X-Tenant-ID"),
+):
+    """会员消费分析（P0）
+
+    - 按会员维度汇总消费频次、总消费额、客单价、最近到店日期
+    - 字段：门店/会员ID/会员号/姓名/手机/等级/到店次数/总消费/客均/折扣总额/首次/末次/消费频率
+    """
+    tenant_id = _require_tenant(x_tenant_id)
+    start = _parse_date(date_from)
+    end = _parse_date(date_to)
+
+    try:
+        result = await _engine.execute_report(
+            report_id="member_consumption",
+            params={"store_id": store_id, "start_date": str(start), "end_date": str(end)},
+            tenant_id=tenant_id,
+            db=None,
+        )
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Report member_consumption not found")
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+
+    return {"ok": True, "data": {"items": result.rows, "summary": result.summary}}
+
+
+# ──────────────────────────────────────────────
+# 16. 团购券消费分析
+# ──────────────────────────────────────────────
+
+@router.get("/api/v1/analytics/reports/coupon-consumption")
+async def api_coupon_consumption(
+    store_id: Optional[str] = Query(None, description="门店ID"),
+    date_from: Optional[str] = Query(None, description="起始日期 YYYY-MM-DD，默认今日"),
+    date_to: Optional[str] = Query(None, description="截止日期 YYYY-MM-DD，默认今日"),
+    x_tenant_id: Optional[str] = Header(None, alias="X-Tenant-ID"),
+):
+    """团购券消费分析（P0）
+
+    - 按团购券类型和来源平台统计核销量、面值总额、实际成本、盈亏
+    - 字段：门店/日期/券类型/平台/核销量/面值总额/实际成本/结算额/盈亏/核销率/均面值/均结算价
+    """
+    tenant_id = _require_tenant(x_tenant_id)
+    start = _parse_date(date_from)
+    end = _parse_date(date_to)
+
+    try:
+        result = await _engine.execute_report(
+            report_id="coupon_consumption",
+            params={"store_id": store_id, "start_date": str(start), "end_date": str(end)},
+            tenant_id=tenant_id,
+            db=None,
+        )
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Report coupon_consumption not found")
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+
+    return {"ok": True, "data": {"items": result.rows, "summary": result.summary}}
