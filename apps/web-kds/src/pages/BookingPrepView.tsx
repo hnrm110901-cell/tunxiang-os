@@ -127,57 +127,13 @@ function formatTime(iso: string | undefined): string {
   }
 }
 
-// ─── Mock 数据（离线/未配置时使用） ───
+// ─── 空初始状态 ───
 
-const now = new Date();
-const MOCK_SUMMARY: TodaySummary = {
-  today_count: 7,
-  week_count: 38,
-  top_dishes: [
-    { dish_name: '口味虾', total_qty: 14, booking_count: 5 },
-    { dish_name: '烤鸭', total_qty: 12, booking_count: 4 },
-    { dish_name: '剁椒鱼头', total_qty: 10, booking_count: 4 },
-    { dish_name: '小炒肉', total_qty: 9, booking_count: 3 },
-    { dish_name: '红烧肉', total_qty: 8, booking_count: 3 },
-    { dish_name: '清蒸鲈鱼', total_qty: 7, booking_count: 3 },
-    { dish_name: '外婆鸡', total_qty: 6, booking_count: 2 },
-    { dish_name: '炒青菜', total_qty: 5, booking_count: 2 },
-    { dish_name: '凉拌黄瓜', total_qty: 4, booking_count: 2 },
-    { dish_name: '蒸蛋', total_qty: 3, booking_count: 1 },
-  ],
+const EMPTY_SUMMARY: TodaySummary = {
+  today_count: 0,
+  week_count: 0,
+  top_dishes: [],
 };
-
-const MOCK_TASKS: PrepTask[] = [
-  {
-    id: 'task-001', booking_id: 'book-001', store_id: 'store-1',
-    dish_id: 'd1', dish_name: '口味虾', quantity: 2, dept_id: 'wok',
-    prep_start_at: null, status: 'pending', created_at: now.toISOString(),
-    table_no: '包厢3号', dining_at: new Date(now.getTime() + 90 * 60000).toISOString(),
-    booking_time: now.toISOString(),
-  },
-  {
-    id: 'task-002', booking_id: 'book-001', store_id: 'store-1',
-    dish_id: 'd2', dish_name: '烤鸭', quantity: 1, dept_id: 'roast',
-    prep_start_at: null, status: 'pending', created_at: now.toISOString(),
-    table_no: '包厢3号', dining_at: new Date(now.getTime() + 90 * 60000).toISOString(),
-    booking_time: now.toISOString(),
-  },
-  {
-    id: 'task-003', booking_id: 'book-002', store_id: 'store-1',
-    dish_id: 'd3', dish_name: '剁椒鱼头', quantity: 1, dept_id: 'steam',
-    prep_start_at: new Date(now.getTime() - 10 * 60000).toISOString(), status: 'started', created_at: now.toISOString(),
-    table_no: '大厅A05', dining_at: new Date(now.getTime() + 30 * 60000).toISOString(),
-    booking_time: now.toISOString(),
-  },
-  {
-    id: 'task-004', booking_id: 'book-003', store_id: 'store-1',
-    dish_id: 'd4', dish_name: '红烧肉', quantity: 1, dept_id: 'stew',
-    prep_start_at: new Date(now.getTime() - 15 * 60000).toISOString(),
-    status: 'done', created_at: now.toISOString(),
-    table_no: '包厢1号', dining_at: new Date(now.getTime() - 5 * 60000).toISOString(),
-    booking_time: now.toISOString(),
-  },
-];
 
 // ─── 主组件 ───
 
@@ -185,12 +141,13 @@ export function BookingPrepView() {
   const storeId = getStoreId();
   const isOffline = !getApiBase() || !getTenantId();
 
-  const [summary, setSummary] = useState<TodaySummary>(MOCK_SUMMARY);
-  const [allTasks, setAllTasks] = useState<PrepTask[]>(MOCK_TASKS);
+  const [summary, setSummary] = useState<TodaySummary>(EMPTY_SUMMARY);
+  const [allTasks, setAllTasks] = useState<PrepTask[]>([]);
   const [tab, setTab] = useState<'pending' | 'done'>('pending');
   const [deptFilter, setDeptFilter] = useState<string>('all');
   const [tick, setTick] = useState(0);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // 每秒刷新倒计时
   useEffect(() => {
@@ -200,15 +157,25 @@ export function BookingPrepView() {
 
   // 轮询数据（每30秒）
   const fetchData = useCallback(async () => {
-    if (isOffline) return;
+    if (isOffline) {
+      setLoading(false);
+      setError('未配置 Mac mini 地址或租户信息');
+      return;
+    }
     setLoading(true);
-    const [s, t] = await Promise.all([
-      apiGet<TodaySummary>(`/api/v1/booking-prep/today-summary/${storeId}`),
-      apiGet<{ items: PrepTask[] }>(`/api/v1/booking-prep/pending/${storeId}`),
-    ]);
-    if (s) setSummary(s);
-    if (t) setAllTasks(t.items);
-    setLoading(false);
+    try {
+      const [s, t] = await Promise.all([
+        apiGet<TodaySummary>(`/api/v1/booking-prep/today-summary/${storeId}`),
+        apiGet<{ items: PrepTask[] }>(`/api/v1/booking-prep/pending/${storeId}`),
+      ]);
+      if (s) setSummary(s);
+      if (t) setAllTasks(t.items);
+      setError(null);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : '加载失败');
+    } finally {
+      setLoading(false);
+    }
   }, [isOffline, storeId]);
 
   useEffect(() => {
@@ -219,12 +186,7 @@ export function BookingPrepView() {
 
   // 操作处理
   const handleStart = useCallback(async (taskId: string) => {
-    if (isOffline) {
-      setAllTasks(prev => prev.map(t =>
-        t.id === taskId ? { ...t, status: 'started', prep_start_at: new Date().toISOString() } : t
-      ));
-      return;
-    }
+    if (isOffline) return;
     const result = await apiPost<PrepTask>(`/api/v1/booking-prep/task/${taskId}/start`);
     if (result) {
       setAllTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...result } : t));
@@ -232,12 +194,7 @@ export function BookingPrepView() {
   }, [isOffline]);
 
   const handleDone = useCallback(async (taskId: string) => {
-    if (isOffline) {
-      setAllTasks(prev => prev.map(t =>
-        t.id === taskId ? { ...t, status: 'done' } : t
-      ));
-      return;
-    }
+    if (isOffline) return;
     const result = await apiPost<PrepTask>(`/api/v1/booking-prep/task/${taskId}/done`);
     if (result) {
       setAllTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...result } : t));
@@ -281,8 +238,11 @@ export function BookingPrepView() {
         <span style={{ fontWeight: 'bold', fontSize: 24, color: '#FF6B35' }}>预订备餐</span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           {loading && <span style={{ fontSize: 16, color: '#666' }}>更新中…</span>}
+          {error && (
+            <span style={{ fontSize: 16, color: '#A32D2D' }}>{error}</span>
+          )}
           {isOffline && (
-            <span style={{ fontSize: 16, color: '#BA7517' }}>离线模式</span>
+            <span style={{ fontSize: 16, color: '#BA7517' }}>未连接</span>
           )}
         </div>
       </header>

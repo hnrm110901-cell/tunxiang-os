@@ -14,6 +14,8 @@ import { WeighDishSheet } from './WeighDishSheet';
 import { ComboSelectionSheet } from './ComboSelectionSheet';
 import { fetchComboDetail } from '../api/comboApi';
 import type { ComboDetail, ComboSelection } from '../api/comboApi';
+import { fetchKdsTasks } from '../api/kdsApi';
+import type { KdsTask } from '../api/kdsApi';
 
 /* ---------- API 工具函数 ---------- */
 const API_BASE = (): string =>
@@ -65,23 +67,24 @@ const C = {
   info: '#185FA5',
 };
 
-/* ---------- Mock AI 推荐 & KDS(保持 mock，待后续接真实 API) ---------- */
+/* ---------- AI 推荐 & KDS 类型 ---------- */
 
-/* Mock AI 推荐 */
-const MOCK_AI_RECS = [
-  { id: 'd3', name: '红烧肉', priceFen: 5800, reason: '本桌常点', tag: '回头客推荐' },
-  { id: 'd1', name: '剁椒鱼头', priceFen: 8800, reason: '今日必点TOP1', tag: '招牌热销' },
-  { id: 'd12', name: '杨枝甘露', priceFen: 2800, reason: '甜品搭配率82%', tag: 'AI搭配' },
-  { id: 'd5', name: '蒜蓉蒸虾', priceFen: 12800, reason: '新品好评率95%', tag: '新品推荐' },
-];
+interface AIRecommendation {
+  id: string;
+  name: string;
+  priceFen: number;
+  reason: string;
+  tag: string;
+}
 
-/* Mock 出餐进度 */
-const MOCK_KDS_STATUS = [
-  { taskId: 'k1', dishName: '剁椒鱼头', qty: 1, status: 'done' as const, isOvertime: false, rushCount: 0 },
-  { taskId: 'k2', dishName: '小炒黄牛肉', qty: 1, status: 'cooking' as const, isOvertime: false, rushCount: 0 },
-  { taskId: 'k3', dishName: '红烧肉', qty: 2, status: 'pending' as const, isOvertime: false, rushCount: 0 },
-  { taskId: 'k4', dishName: '凉拌黄瓜', qty: 1, status: 'pending' as const, isOvertime: true, rushCount: 1 },
-];
+interface KdsStatusItem {
+  taskId: string;
+  dishName: string;
+  qty: number;
+  status: 'pending' | 'cooking' | 'done';
+  isOvertime: boolean;
+  rushCount: number;
+}
 
 /* ---------- 类型 ---------- */
 interface CartItem {
@@ -174,8 +177,13 @@ export function OrderPage() {
   // 修改点菜员
   const [newWaiterId, setNewWaiterId] = useState('');
 
+  // AI 推荐
+  const [aiRecs, setAiRecs] = useState<AIRecommendation[]>([]);
+  const [aiRecsLoading, setAiRecsLoading] = useState(false);
+
   // 出餐进度
-  const [kdsItems] = useState(MOCK_KDS_STATUS);
+  const [kdsItems, setKdsItems] = useState<KdsStatusItem[]>([]);
+  const [kdsLoading, setKdsLoading] = useState(false);
 
   // 结账
   const [checkoutProcessing, setCheckoutProcessing] = useState(false);
@@ -252,6 +260,54 @@ export function OrderPage() {
       .finally(() => setMenuLoading(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storeId, activeCat]);
+
+  /* ---------- 加载 AI 推荐 ---------- */
+  useEffect(() => {
+    setAiRecsLoading(true);
+    txFetch<{ items: { dish_id: string; dish_name: string; price_fen: number; reason: string; tag: string }[] }>(
+      `/api/v1/menu/recommendations?store_id=${encodeURIComponent(storeId)}&limit=4`
+    )
+      .then(res => {
+        setAiRecs(
+          res.items.map(item => ({
+            id: item.dish_id,
+            name: item.dish_name,
+            priceFen: item.price_fen,
+            reason: item.reason,
+            tag: item.tag,
+          }))
+        );
+      })
+      .catch(() => {
+        setAiRecs([]);
+      })
+      .finally(() => setAiRecsLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storeId]);
+
+  /* ---------- 加载 KDS 出餐进度 ---------- */
+  useEffect(() => {
+    if (!orderId || orderId === 'mock-order-001') return;
+    setKdsLoading(true);
+    fetchKdsTasks(storeId, orderId)
+      .then(res => {
+        setKdsItems(
+          res.items.map(task => ({
+            taskId: task.task_id,
+            dishName: task.dish_name,
+            qty: task.quantity,
+            status: task.status,
+            isOvertime: task.is_overtime,
+            rushCount: task.rush_count,
+          }))
+        );
+      })
+      .catch(() => {
+        setKdsItems([]);
+      })
+      .finally(() => setKdsLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storeId, orderId]);
 
   const cartTotal = cart.reduce((sum, item) => {
     const weight = item.weight || 1;
@@ -378,7 +434,7 @@ export function OrderPage() {
     cart.filter(i => i.dishId === dishId).reduce((s, i) => s + i.qty, 0);
 
   /* AI推荐: 一键加入 */
-  const addAIRecToCart = useCallback((rec: typeof MOCK_AI_RECS[0]) => {
+  const addAIRecToCart = useCallback((rec: AIRecommendation) => {
     const dish = dishes.find(d => d.dish_id === rec.id);
     if (dish) {
       handleDishPress(dish);
@@ -638,7 +694,11 @@ export function OrderPage() {
             WebkitOverflowScrolling: 'touch' as any,
             padding: '0 12px 12px',
           }}>
-            {MOCK_AI_RECS.map(rec => (
+            {aiRecsLoading ? (
+              <div style={{ padding: '12px 0', color: C.muted, fontSize: 16 }}>加载推荐中...</div>
+            ) : aiRecs.length === 0 ? (
+              <div style={{ padding: '12px 0', color: C.muted, fontSize: 16 }}>暂无推荐</div>
+            ) : aiRecs.map(rec => (
               <button
                 key={rec.id}
                 onClick={() => addAIRecToCart(rec)}
@@ -1626,7 +1686,15 @@ export function OrderPage() {
             出餐进度
           </h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {kdsItems.map(item => (
+            {kdsLoading ? (
+              <div style={{ textAlign: 'center', padding: '20px 0', color: C.muted, fontSize: 16 }}>
+                加载出餐进度...
+              </div>
+            ) : kdsItems.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '20px 0', color: C.muted, fontSize: 16 }}>
+                暂无出餐任务
+              </div>
+            ) : kdsItems.map(item => (
               <div
                 key={item.taskId}
                 style={{

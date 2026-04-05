@@ -1,7 +1,7 @@
 /**
  * 店长实时经营看板
  * 路由：/manager-dashboard
- * 15秒自动刷新，Promise.allSettled 并行加载，API失败降级Mock
+ * 15秒自动刷新，Promise.allSettled 并行加载，API失败显示错误状态
  */
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -143,72 +143,6 @@ function formatRevenue(yuan: number): string {
   return yuan.toFixed(0) + '元';
 }
 
-/* ---------- Mock 数据（API失败时降级使用） ---------- */
-const MOCK_SUMMARY: DailySummary = {
-  date: getToday(),
-  revenue: 38600,
-  order_count: 87,
-  table_turn_rate: 2.3,
-  avg_check: 444,
-  guest_count: 268,
-  gross_margin: 0.41,
-};
-
-const MOCK_PNL: PnlData = {
-  revenue: 38600,
-  food_cost: 15440,
-  labor_cost: 7720,
-  gross_profit: 23160,
-  gross_margin: 0.60,
-};
-
-const MOCK_TABLES: TableInfo[] = [
-  { table_id: 't1', table_no: 'A1', status: 'dining', pax: 4, elapsed_min: 45 },
-  { table_id: 't2', table_no: 'A2', status: 'empty' },
-  { table_id: 't3', table_no: 'A3', status: 'dirty' },
-  { table_id: 't4', table_no: 'A4', status: 'dining', pax: 2, elapsed_min: 20 },
-  { table_id: 't5', table_no: 'A5', status: 'reserved' },
-  { table_id: 't6', table_no: 'B1', status: 'empty' },
-  { table_id: 't7', table_no: 'B2', status: 'dining', pax: 6, elapsed_min: 60 },
-  { table_id: 't8', table_no: 'B3', status: 'empty' },
-  { table_id: 't9', table_no: 'B4', status: 'dining', pax: 3, elapsed_min: 15 },
-  { table_id: 't10', table_no: 'B5', status: 'dirty' },
-  { table_id: 't11', table_no: 'C1', status: 'empty' },
-  { table_id: 't12', table_no: 'C2', status: 'dining', pax: 5, elapsed_min: 35 },
-];
-
-const MOCK_CHECKLIST: ChecklistItem[] = [
-  { id: 'e1', code: 'E1', name: '收银对账', status: 'completed' },
-  { id: 'e2', code: 'E2', name: '厨余处理', status: 'completed' },
-  { id: 'e3', code: 'E3', name: '库存盘点', status: 'completed' },
-  { id: 'e4', code: 'E4', name: '食安检查', status: 'in_progress' },
-  { id: 'e5', code: 'E5', name: '设备检查', status: 'pending' },
-  { id: 'e6', code: 'E6', name: '卫生检查', status: 'pending' },
-  { id: 'e7', code: 'E7', name: '人员签到', status: 'completed' },
-  { id: 'e8', code: 'E8', name: '日结汇总', status: 'pending' },
-];
-
-const MOCK_INVENTORY: InventoryAnalysis = {
-  high_risk_count: 3,
-  alerts: [
-    { ingredient_id: 'i1', name: '鲜虾', days_remaining: 1, suggested_purchase: 5, unit: 'kg', risk_level: 'high' },
-    { ingredient_id: 'i2', name: '豆腐', days_remaining: 2, suggested_purchase: 10, unit: '盒', risk_level: 'high' },
-    { ingredient_id: 'i3', name: '生蚝', days_remaining: 1, suggested_purchase: 3, unit: 'kg', risk_level: 'high' },
-    { ingredient_id: 'i4', name: '猪肉', days_remaining: 4, suggested_purchase: 8, unit: 'kg', risk_level: 'medium' },
-  ],
-  summary: 'AI分析：3种食材效期<3天，建议今日采购',
-};
-
-const MOCK_STAFF: StaffMember[] = [
-  { id: 's1', name: '张三', role: '服务员', status: 'on_duty' },
-  { id: 's2', name: '李四', role: '服务员', status: 'on_duty' },
-  { id: 's3', name: '王五', role: '服务员', status: 'break' },
-  { id: 's4', name: '赵六', role: '收银', status: 'on_duty' },
-  { id: 's5', name: '陈七', role: '厨师', status: 'on_duty' },
-  { id: 's6', name: '刘八', role: '厨师', status: 'on_duty' },
-  { id: 's7', name: '周九', role: '传菜', status: 'break' },
-];
-
 /* ---------- API 调用函数 ---------- */
 async function fetchDailySummary(): Promise<DailySummary> {
   const res = await fetch(
@@ -255,6 +189,16 @@ async function fetchInventoryAnalysis(): Promise<InventoryAnalysis> {
   return (json.data ?? json) as InventoryAnalysis;
 }
 
+async function fetchStaff(): Promise<StaffMember[]> {
+  const res = await fetch(
+    `/api/v1/org/staff/on-duty?store_id=${getStoreId()}`,
+    { headers: getHeaders() }
+  );
+  if (!res.ok) throw new Error(`staff ${res.status}`);
+  const json = await res.json();
+  const d = json.data ?? json;
+  return (d.items ?? d) as StaffMember[];
+}
 
 /* ---------- 子组件 ---------- */
 
@@ -432,6 +376,7 @@ export function ManagerDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const loadData = useCallback(async (isManual = false) => {
@@ -450,18 +395,26 @@ export function ManagerDashboardPage() {
       fetchTables(),
       fetchChecklist(),
       fetchInventoryAnalysis(),
-      // Staff API not yet available, use mock
-      Promise.reject(new Error('staff-api-not-implemented')),
+      fetchStaff(),
     ]);
 
+    const failedCount = [summaryResult, pnlResult, tablesResult, checklistResult, inventoryResult, staffResult]
+      .filter(r => r.status === 'rejected').length;
+
     const newData: DashboardData = {
-      summary: summaryResult.status === 'fulfilled' ? summaryResult.value : MOCK_SUMMARY,
-      pnl: pnlResult.status === 'fulfilled' ? pnlResult.value : MOCK_PNL,
-      tables: tablesResult.status === 'fulfilled' ? tablesResult.value : MOCK_TABLES,
-      checklist: checklistResult.status === 'fulfilled' ? checklistResult.value : MOCK_CHECKLIST,
-      inventory: inventoryResult.status === 'fulfilled' ? inventoryResult.value : MOCK_INVENTORY,
-      staff: staffResult.status === 'fulfilled' ? (staffResult.value as StaffMember[]) : MOCK_STAFF,
+      summary: summaryResult.status === 'fulfilled' ? summaryResult.value : null,
+      pnl: pnlResult.status === 'fulfilled' ? pnlResult.value : null,
+      tables: tablesResult.status === 'fulfilled' ? tablesResult.value : [],
+      checklist: checklistResult.status === 'fulfilled' ? checklistResult.value : [],
+      inventory: inventoryResult.status === 'fulfilled' ? inventoryResult.value : null,
+      staff: staffResult.status === 'fulfilled' ? (staffResult.value as StaffMember[]) : [],
     };
+
+    if (failedCount > 0) {
+      setErrorMsg(failedCount === 6 ? '数据加载失败，请检查网络后重试' : `${failedCount}项数据加载失败，部分模块暂不可用`);
+    } else {
+      setErrorMsg('');
+    }
 
     setData(newData);
     setLastUpdated(new Date());
@@ -622,6 +575,37 @@ export function ManagerDashboardPage() {
       </header>
 
       <div style={{ padding: '0 16px' }}>
+
+        {/* ===== 错误提示 ===== */}
+        {errorMsg && (
+          <div style={{
+            marginTop: 16,
+            background: C.dangerBg,
+            border: `1px solid ${C.danger}`,
+            borderRadius: 10,
+            padding: '12px 16px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}>
+            <span style={{ fontSize: 15, color: C.dangerText }}>{errorMsg}</span>
+            <button
+              onClick={() => loadData(true)}
+              style={{
+                background: C.danger,
+                color: '#fff',
+                border: 'none',
+                borderRadius: 8,
+                padding: '6px 16px',
+                fontSize: 14,
+                fontWeight: 600,
+                cursor: 'pointer',
+                minHeight: 36,
+                minWidth: 60,
+              }}
+            >重试</button>
+          </div>
+        )}
 
         {/* ===== 2. 今日关键指标卡片行（横向滚动） ===== */}
         <section style={{ marginTop: 20 }}>

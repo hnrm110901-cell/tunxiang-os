@@ -5,7 +5,9 @@
  * 确认重做（调用 POST /kds/task/{id}/remake）
  * 深色背景，触控优化（最小48x48按钮，最小16px字体）
  */
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { fetchTicketQueue, remakeTicket } from '../api/kdsOpsApi';
+import { txFetch } from '../api/index';
 
 // ─── Types ───
 
@@ -50,56 +52,104 @@ const REASONS: RemakeReasonOption[] = [
   { id: 'other', label: '其他', description: '其他需要重做的原因', color: '#666' },
 ];
 
-// ─── Mock Data ───
+// ─── Config ───
 
-const MOCK_TICKETS: RemakeTicket[] = [
-  { id: 'rt1', orderNo: '003', tableNo: 'B01', dishName: '剁椒鱼头', qty: 1, originalChef: '王师傅', dept: '炒炉' },
-  { id: 'rt2', orderNo: '005', tableNo: 'A05', dishName: '口味虾', qty: 2, originalChef: '李师傅', dept: '炒炉' },
-  { id: 'rt3', orderNo: '008', tableNo: 'B01', dishName: '外婆鸡', qty: 1, originalChef: '张师傅', dept: '蒸菜' },
-  { id: 'rt4', orderNo: '012', tableNo: 'A02', dishName: '酸菜鱼', qty: 1, originalChef: '李师傅', dept: '炒炉' },
-];
-
-const MOCK_RECORDS: RemakeRecord[] = [
-  { id: 'rr1', ticketId: 'rt0', tableNo: 'A03', dishName: '小炒肉', reason: 'complaint', reasonText: '客诉退回', notes: '顾客说太咸', createdAt: Date.now() - 3600000, status: 'completed' },
-  { id: 'rr2', ticketId: 'rt0', tableNo: 'C01', dishName: '蒜蓉虾', reason: 'quality', reasonText: '品质问题', notes: '虾不新鲜', createdAt: Date.now() - 7200000, status: 'completed' },
-];
+const STATION_ID = localStorage.getItem('kds_station_id') || '';
 
 // ─── Component ───
 
 export function RemakeModal() {
-  const [tickets] = useState<RemakeTicket[]>(MOCK_TICKETS);
-  const [records, setRecords] = useState<RemakeRecord[]>(MOCK_RECORDS);
+  const [tickets, setTickets] = useState<RemakeTicket[]>([]);
+  const [records, setRecords] = useState<RemakeRecord[]>([]);
   const [selectedTicket, setSelectedTicket] = useState<RemakeTicket | null>(null);
   const [selectedReason, setSelectedReason] = useState<RemakeReason | null>(null);
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<'remake' | 'history'>('remake');
+
+  // 加载可重做的工单（cooking 状态的票据）
+  const loadTickets = useCallback(async () => {
+    if (!STATION_ID) {
+      setLoading(false);
+      setError('未配置档口信息');
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await fetchTicketQueue(STATION_ID, 'cooking');
+      const mapped: RemakeTicket[] = res.items.map(t => ({
+        id: t.ticket_id,
+        orderNo: t.order_no,
+        tableNo: t.table_no,
+        dishName: t.items.map(i => i.dish_name).join('/'),
+        qty: t.items.reduce((sum, i) => sum + i.quantity, 0),
+        originalChef: '',
+        dept: t.dept_id,
+      }));
+      setTickets(mapped);
+      setError(null);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : '加载工单失败');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // 加载重做记录
+  const loadRecords = useCallback(async () => {
+    if (!STATION_ID) return;
+    try {
+      const res = await txFetch<{ items: RemakeRecord[] }>(
+        `/api/v1/kds/remake-records?station_id=${encodeURIComponent(STATION_ID)}`,
+      );
+      setRecords(res.items || []);
+    } catch {
+      // 重做记录加载失败不阻塞主流程
+    }
+  }, []);
+
+  useEffect(() => {
+    loadTickets();
+    loadRecords();
+  }, [loadTickets, loadRecords]);
 
   const handleConfirmRemake = async () => {
     if (!selectedTicket || !selectedReason) return;
     setSubmitting(true);
 
-    // 实际调用 POST /api/v1/kds/task/{id}/remake
-    await new Promise(r => setTimeout(r, 800));
+    try {
+      await remakeTicket({
+        ticket_id: selectedTicket.id,
+        reason: selectedReason,
+        note: notes,
+      });
 
-    const reason = REASONS.find(r => r.id === selectedReason)!;
-    const newRecord: RemakeRecord = {
-      id: `rr${Date.now()}`,
-      ticketId: selectedTicket.id,
-      tableNo: selectedTicket.tableNo,
-      dishName: selectedTicket.dishName,
-      reason: selectedReason,
-      reasonText: reason.label,
-      notes,
-      createdAt: Date.now(),
-      status: 'remaking',
-    };
+      const reason = REASONS.find(r => r.id === selectedReason)!;
+      const newRecord: RemakeRecord = {
+        id: `rr${Date.now()}`,
+        ticketId: selectedTicket.id,
+        tableNo: selectedTicket.tableNo,
+        dishName: selectedTicket.dishName,
+        reason: selectedReason,
+        reasonText: reason.label,
+        notes,
+        createdAt: Date.now(),
+        status: 'remaking',
+      };
 
-    setRecords(prev => [newRecord, ...prev]);
-    setSelectedTicket(null);
-    setSelectedReason(null);
-    setNotes('');
-    setSubmitting(false);
+      setRecords(prev => [newRecord, ...prev]);
+      // 从可重做列表中移除已提交的工单
+      setTickets(prev => prev.filter(t => t.id !== selectedTicket.id));
+      setSelectedTicket(null);
+      setSelectedReason(null);
+      setNotes('');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : '重做提交失败');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleCancel = () => {

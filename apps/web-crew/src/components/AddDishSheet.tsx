@@ -62,31 +62,7 @@ interface DishInfo {
   description?: string;
 }
 
-// ─── Mock 数据 ───
-
-const MOCK_CATEGORIES: DishCategory[] = [
-  { category_id: 'all', category_name: '全部' },
-  { category_id: 'c1', category_name: '招牌热菜' },
-  { category_id: 'c2', category_name: '海鲜水产' },
-  { category_id: 'c3', category_name: '凉菜小吃' },
-  { category_id: 'c4', category_name: '汤品' },
-  { category_id: 'c5', category_name: '主食酒水' },
-];
-
-const MOCK_DISHES: DishInfo[] = [
-  { dish_id: 'd1', dish_name: '剁椒鱼头', category_id: 'c1', price_fen: 9800, sold_out: false, tags: ['招牌'] },
-  { dish_id: 'd2', dish_name: '小炒黄牛肉', category_id: 'c1', price_fen: 6800, sold_out: false },
-  { dish_id: 'd3', dish_name: '红烧肉', category_id: 'c1', price_fen: 5800, sold_out: false, tags: ['热销'] },
-  { dish_id: 'd4', dish_name: '酸菜鱼', category_id: 'c1', price_fen: 7800, sold_out: false, tags: ['新品'] },
-  { dish_id: 'd5', dish_name: '波士顿龙虾', category_id: 'c2', price_fen: 28800, sold_out: false, tags: ['时价'] },
-  { dish_id: 'd6', dish_name: '蒜蓉蒸虾', category_id: 'c2', price_fen: 8800, sold_out: false },
-  { dish_id: 'd7', dish_name: '清蒸鱼', category_id: 'c2', price_fen: 12800, sold_out: true },
-  { dish_id: 'd8', dish_name: '凉拌黄瓜', category_id: 'c3', price_fen: 1800, sold_out: false },
-  { dish_id: 'd9', dish_name: '夫妻肺片', category_id: 'c3', price_fen: 3800, sold_out: false, tags: ['招牌'] },
-  { dish_id: 'd10', dish_name: '老鸭汤', category_id: 'c4', price_fen: 4800, sold_out: false },
-  { dish_id: 'd11', dish_name: '米饭', category_id: 'c5', price_fen: 200, sold_out: false },
-  { dish_id: 'd12', dish_name: '啤酒', category_id: 'c5', price_fen: 1500, sold_out: false },
-];
+// ─── (Mock data removed — API is the sole data source) ───
 
 // ─── 工具函数 ───
 
@@ -374,9 +350,10 @@ export function AddDishSheet({ visible, onClose, orderId, storeId, onSuccess }: 
       setCategories([{ category_id: 'all', category_name: '全部' }, ...catRes.items]);
       setDishes(dishRes.items);
     } catch {
-      // 降级 Mock
-      setCategories(MOCK_CATEGORIES);
-      setDishes(MOCK_DISHES);
+      // API 失败：设空数组 + 提示用户
+      setCategories([{ category_id: 'all', category_name: '全部' }]);
+      setDishes([]);
+      showToast('加载菜品失败，请重试', 'error');
     } finally {
       setLoading(false);
     }

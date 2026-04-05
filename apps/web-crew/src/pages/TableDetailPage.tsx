@@ -76,25 +76,6 @@ type ActiveModal =
   | 'pay-transfer'   // 转账
   | 'print-confirm'; // 打印客单确认
 
-// ─── Mock 数据 ───
-
-const MOCK_ORDER: OrderDetail = {
-  order_id: 'o-mock-001',
-  table_no: 'A1',
-  guest_count: 4,
-  total_fen: 24800,
-  waiter_name: '张服务员',
-  created_at: new Date(Date.now() - 45 * 60 * 1000).toISOString(),
-  items: [
-    { item_id: 'i1', dish_id: 'd10', dish_name: '米饭+茶水', qty: 4, price_fen: 100, is_served: true, served_qty: 4, is_gift: false },
-    { item_id: 'i2', dish_id: 'd2', dish_name: '小炒黄牛吊龙', qty: 1, price_fen: 5500, is_served: true, served_qty: 1, is_gift: false },
-    { item_id: 'i3', dish_id: 'd7', dish_name: '十五生腌傍', qty: 1, price_fen: 3500, is_served: false, served_qty: 0, is_gift: false },
-    { item_id: 'i4', dish_id: 'd1', dish_name: '剁椒鱼头（黄剁椒）', qty: 1, price_fen: 8800, is_served: false, served_qty: 0, is_gift: false },
-    { item_id: 'i5', dish_id: 'd9', dish_name: '老鸭汤', qty: 1, price_fen: 4800, is_served: false, served_qty: 0, is_gift: false },
-    { item_id: 'i6', dish_id: 'd11', dish_name: '酸梅汤', qty: 2, price_fen: 800, is_served: true, served_qty: 2, is_gift: false },
-  ],
-};
-
 // ─── Design Token（Store终端白色模式，对标天财商龙） ───
 
 const T = {
@@ -750,6 +731,7 @@ export function TableDetailPage() {
   const [modal, setModal] = useState<ActiveModal>('none');
   const [loading, setLoading] = useState(false);
   const [orderLoading, setOrderLoading] = useState(true);
+  const [orderError, setOrderError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
   const showToast = useCallback((msg: string) => {
@@ -758,14 +740,15 @@ export function TableDetailPage() {
   }, []);
 
   // ── 加载真实订单数据 ──
-  useEffect(() => {
+  const loadOrder = useCallback(() => {
     if (!orderId) {
-      // 无 order_id 时使用 MOCK_ORDER（开发 fallback）
-      setOrder(MOCK_ORDER);
+      setOrder(null);
       setOrderLoading(false);
+      setOrderError(null);
       return;
     }
     setOrderLoading(true);
+    setOrderError(null);
     fetch(`/api/v1/orders/${orderId}`, {
       headers: {
         'X-Tenant-ID': (window as any).__TENANT_ID__ || '',
@@ -796,18 +779,22 @@ export function TableDetailPage() {
             })),
           });
         } else {
-          // API 返回非 ok 时 fallback 到 MOCK_ORDER（开发模式）
-          setOrder(MOCK_ORDER);
+          setOrder(null);
+          setOrderError(json.error?.message ?? '订单数据加载失败');
         }
       })
-      .catch(() => {
-        // 请求失败时 fallback 到 MOCK_ORDER（开发模式）
-        setOrder(MOCK_ORDER);
+      .catch((err: TypeError) => {
+        setOrder(null);
+        setOrderError(err.message || '网络请求失败，请检查网络连接');
       })
       .finally(() => {
         setOrderLoading(false);
       });
   }, [orderId, tableNo]);
+
+  useEffect(() => {
+    loadOrder();
+  }, [loadOrder]);
 
   const closeModal = useCallback(() => setModal('none'), []);
 
@@ -926,7 +913,7 @@ export function TableDetailPage() {
   }, [navigate, showToast, closeModal]);
 
   // 订单数据加载中：显示全屏 spinner
-  if (orderLoading || !order) {
+  if (orderLoading) {
     return (
       <div
         style={{
@@ -953,6 +940,72 @@ export function TableDetailPage() {
         />
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
         加载中…
+      </div>
+    );
+  }
+
+  // 无活动订单或加载失败
+  if (!order) {
+    const isNoOrder = !orderId && !orderError;
+    return (
+      <div
+        style={{
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: T.bg,
+          flexDirection: 'column',
+          gap: 16,
+          fontSize: 16,
+          color: T.text2,
+          padding: '0 32px',
+          textAlign: 'center',
+        }}
+      >
+        <span style={{ fontSize: 40 }}>{isNoOrder ? '📋' : '⚠️'}</span>
+        <span style={{ fontSize: 18, fontWeight: 600, color: T.text1 }}>
+          {isNoOrder ? '无活动订单' : '订单加载失败'}
+        </span>
+        <span style={{ fontSize: 14, color: T.text2 }}>
+          {isNoOrder
+            ? `桌台 ${tableNo} 当前没有进行中的订单`
+            : orderError || '请稍后重试'}
+        </span>
+        <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
+          <button
+            onClick={() => navigate(-1)}
+            style={{
+              padding: '12px 24px',
+              background: T.white,
+              border: `1px solid ${T.border}`,
+              borderRadius: 8,
+              fontSize: 16,
+              color: T.text1,
+              cursor: 'pointer',
+              minHeight: 48,
+            }}
+          >
+            返回
+          </button>
+          {!isNoOrder && (
+            <button
+              onClick={loadOrder}
+              style={{
+                padding: '12px 24px',
+                background: T.tabActive,
+                border: 'none',
+                borderRadius: 8,
+                fontSize: 16,
+                color: '#fff',
+                cursor: 'pointer',
+                minHeight: 48,
+              }}
+            >
+              重试
+            </button>
+          )}
+        </div>
       </div>
     );
   }

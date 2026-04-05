@@ -6,13 +6,17 @@ FastAPI router for smart table card endpoints.
 Handles context resolution, learning, and statistics.
 """
 
+import uuid
 import logging
 from typing import Any, Dict, List, Optional
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, Query, HTTPException, Body
+from fastapi import APIRouter, Depends, Header, Query, HTTPException, Body
 from pydantic import BaseModel, Field, ConfigDict
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from shared.ontology.src.database import get_db
 
 logger = logging.getLogger(__name__)
 

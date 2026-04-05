@@ -93,88 +93,7 @@ const BIZ_ICON: Record<BusinessType, string> = {
   payroll:        '💰',
 };
 
-// ─── Mock 数据 ────────────────────────────────────────────────────────────────
-
 const MY_ID = (window as unknown as Record<string, unknown>).__CREW_ID__ as string | undefined || 'crew_001';
-
-const MOCK_PENDING: ApprovalInstance[] = [
-  {
-    id: 'ins_001',
-    instance_no: 'AP2026040201',
-    title: '桌A03折扣申请 — 8折优惠',
-    description: '顾客为VIP会员，消费金额¥420，申请打8折优惠，折扣后¥336。',
-    business_type: 'discount',
-    initiator_name: '张服务员',
-    store_name: '徐记海鲜·五一广场店',
-    amount_fen: 42000,
-    current_step: 1,
-    total_steps: 2,
-    status: 'pending',
-    created_at: '2026-04-02T10:30:00+08:00',
-    deadline_at: '2026-04-02T12:30:00+08:00',
-    steps: [
-      { step_no: 1, approver_role: '店长', approver_name: '我', status: 'pending' },
-      { step_no: 2, approver_role: '区域经理', status: 'waiting' },
-    ],
-  },
-  {
-    id: 'ins_003',
-    instance_no: 'AP2026040203',
-    title: '张服务员请假申请（4月5日至4月7日）',
-    description: '因家庭原因申请休假3天，已安排同事顶班。',
-    business_type: 'leave',
-    initiator_name: '张服务员',
-    store_name: '徐记海鲜·五一广场店',
-    current_step: 1,
-    total_steps: 1,
-    status: 'pending',
-    created_at: '2026-04-01T09:00:00+08:00',
-    deadline_at: '2026-04-03T09:00:00+08:00',
-    steps: [
-      { step_no: 1, approver_role: '店长', approver_name: '我', status: 'pending' },
-    ],
-  },
-];
-
-const MOCK_INITIATED: ApprovalInstance[] = [
-  {
-    id: 'ins_002',
-    instance_no: 'AP2026040202',
-    title: '订单#20260402003退款申请',
-    description: '顾客反映菜品有异物，申请全额退款¥1280。',
-    business_type: 'refund',
-    initiator_name: '我',
-    store_name: '徐记海鲜·五一广场店',
-    amount_fen: 128000,
-    current_step: 1,
-    total_steps: 2,
-    status: 'pending',
-    created_at: '2026-04-02T09:00:00+08:00',
-    steps: [
-      { step_no: 1, approver_role: '店长', status: 'pending' },
-      { step_no: 2, approver_role: '财务主管', status: 'waiting' },
-    ],
-  },
-  {
-    id: 'ins_004',
-    instance_no: 'AP2026040204',
-    title: '采购冷冻虾仁 50kg',
-    description: '备货需求，申请采购冷冻虾仁50kg，预算¥2500。',
-    business_type: 'large_purchase',
-    initiator_name: '我',
-    store_name: '徐记海鲜·五一广场店',
-    amount_fen: 250000,
-    current_step: 2,
-    total_steps: 3,
-    status: 'approved',
-    created_at: '2026-04-01T14:00:00+08:00',
-    steps: [
-      { step_no: 1, approver_role: '采购主管', status: 'approved', comment: '同意', acted_at: '2026-04-01T15:00:00+08:00' },
-      { step_no: 2, approver_role: '财务主管', status: 'approved', comment: '预算内，批准', acted_at: '2026-04-01T17:00:00+08:00' },
-      { step_no: 3, approver_role: '运营总监', status: 'pending' },
-    ],
-  },
-];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -245,10 +164,7 @@ function ApprovalCard({ instance, onActioned }: ApprovalCardProps) {
       setActing(null);
       setTimeout(() => onActioned(), 1200);
     } catch {
-      // mock success
-      setResult(action === 'approve' ? 'approved' : 'rejected');
-      setActing(null);
-      setTimeout(() => onActioned(), 1200);
+      alert('操作失败，请检查网络后重试');
     } finally {
       setSubmitting(false);
     }
@@ -690,9 +606,13 @@ export function ApprovalPage() {
   const [initiatedList, setInitiatedList] = useState<ApprovalInstance[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
 
   const loadData = useCallback(async () => {
     setLoading(true);
+    setErrorMsg('');
+    let hasError = false;
+
     try {
       // 待我审批
       const pendingRes = await txFetch<{ items: ApprovalInstance[]; total: number }>(
@@ -700,7 +620,8 @@ export function ApprovalPage() {
       );
       setPendingList(pendingRes.items);
     } catch {
-      setPendingList(MOCK_PENDING);
+      setPendingList([]);
+      hasError = true;
     }
 
     try {
@@ -710,7 +631,8 @@ export function ApprovalPage() {
       );
       setInitiatedList(initiatedRes.items);
     } catch {
-      setInitiatedList(MOCK_INITIATED);
+      setInitiatedList([]);
+      hasError = true;
     }
 
     try {
@@ -720,7 +642,12 @@ export function ApprovalPage() {
       );
       setUnreadCount(notiRes.items.filter(n => !n.is_read).length);
     } catch {
-      setUnreadCount(2);
+      setUnreadCount(0);
+      hasError = true;
+    }
+
+    if (hasError) {
+      setErrorMsg('部分数据加载失败，请点击重试');
     }
 
     setLoading(false);
@@ -869,8 +796,46 @@ export function ApprovalPage() {
 
       {/* 内容区 */}
       <div style={{ padding: '16px' }}>
+        {errorMsg && (
+          <div style={{
+            background: C.redBg,
+            border: `1px solid ${C.red}`,
+            borderRadius: 10,
+            padding: '12px 16px',
+            marginBottom: 12,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}>
+            <span style={{ fontSize: 15, color: C.red }}>{errorMsg}</span>
+            <button
+              onClick={() => loadData()}
+              style={{
+                background: C.red,
+                color: C.white,
+                border: 'none',
+                borderRadius: 8,
+                padding: '6px 16px',
+                fontSize: 14,
+                fontWeight: 600,
+                cursor: 'pointer',
+                minHeight: 36,
+                minWidth: 60,
+              }}
+            >重试</button>
+          </div>
+        )}
         {loading ? (
           <div style={{ textAlign: 'center', padding: '48px 0', color: C.subtext, fontSize: 16 }}>
+            <div style={{
+              width: 32, height: 32,
+              border: `3px solid ${C.border}`,
+              borderTopColor: C.accent,
+              borderRadius: '50%',
+              animation: 'spin 0.8s linear infinite',
+              margin: '0 auto 12px',
+            }} />
+            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
             加载中...
           </div>
         ) : activeTab === 'pending' ? (
