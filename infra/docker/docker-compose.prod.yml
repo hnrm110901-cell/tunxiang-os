@@ -325,21 +325,9 @@ services:
         SERVICE_NAME: tx-org
         SERVICE_PORT: "8012"
 
-  tunxiang-api:
-    <<: [*service-common, *resource-limits]
-    build:
-      <<: *build-python
-      args:
-        SERVICE_NAME: tunxiang-api
-        SERVICE_PORT: "8013"
-
-  mcp-server:
-    <<: [*service-common, *resource-limits]
-    build:
-      <<: *build-python
-      args:
-        SERVICE_NAME: mcp-server
-        SERVICE_PORT: "8014"
+  # tunxiang-api 和 mcp-server 尚无 requirements.txt，暂不部署
+  # tunxiang-api: ...
+  # mcp-server: ...
 
   # ── 前端应用 ──────────────────────────────────────────────
   web-admin:
