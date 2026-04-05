@@ -329,57 +329,8 @@ services:
   # tunxiang-api: ...
   # mcp-server: ...
 
-  # ── 前端应用 ──────────────────────────────────────────────
-  web-admin:
-    build:
-      context: ../..
-      dockerfile: infra/docker/Dockerfile.frontend
-      args:
-        APP_NAME: web-admin
-    restart: always
-    deploy:
-      resources:
-        limits:
-          cpus: "0.5"
-          memory: 128M
-    logging:
-      <<: *json-logging
-    networks:
-      - txos-prod
-
-  web-pos:
-    build:
-      context: ../..
-      dockerfile: infra/docker/Dockerfile.frontend
-      args:
-        APP_NAME: web-pos
-    restart: always
-    deploy:
-      resources:
-        limits:
-          cpus: "0.5"
-          memory: 128M
-    logging:
-      <<: *json-logging
-    networks:
-      - txos-prod
-
-  web-kds:
-    build:
-      context: ../..
-      dockerfile: infra/docker/Dockerfile.frontend
-      args:
-        APP_NAME: web-kds
-    restart: always
-    deploy:
-      resources:
-        limits:
-          cpus: "0.5"
-          memory: 128M
-    logging:
-      <<: *json-logging
-    networks:
-      - txos-prod
+  # ── 前端应用（apps/ 目录独立部署，暂不包含在此 compose）──────
+  # web-admin/web-pos/web-kds: 待 apps/ 目录就绪后启用
 
 volumes:
   pg_prod_primary:
