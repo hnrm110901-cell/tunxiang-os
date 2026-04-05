@@ -80,6 +80,8 @@ services:
         -c log_checkpoints=on
         -c log_connections=on
         -c log_disconnections=on
+    ports:
+      - "5433:5432"
     volumes:
       - pg_prod_primary:/var/lib/postgresql/data
       - ./init-rls.sql:/docker-entrypoint-initdb.d/01-rls.sql
