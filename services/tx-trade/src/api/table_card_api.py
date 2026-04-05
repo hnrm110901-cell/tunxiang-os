@@ -13,12 +13,25 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, Header, Query, HTTPException, Body
 from pydantic import BaseModel, Field, ConfigDict
-from sqlalchemy import text
+from sqlalchemy import func, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+from ..models.tables import Table
+from ..models.table_card_click_log import TableCardClickLog
 
 logger = logging.getLogger(__name__)
+
+# Status mapping: DB enum values → API display values
+_DB_STATUS_TO_API = {
+    "free": "empty",
+    "occupied": "dining",
+    "reserved": "reserved",
+    "cleaning": "pending_cleanup",
+}
+_API_STATUS_TO_DB = {v: k for k, v in _DB_STATUS_TO_API.items()}
+
+VALID_API_STATUSES = {"empty", "dining", "reserved", "pending_checkout", "pending_cleanup"}
 
 
 # ============================================================================
@@ -148,8 +161,7 @@ def create_table_card_router(
         meal_period: Optional[str] = Query(None, description="Meal period"),
         limit: int = Query(100, le=500),
         offset: int = Query(0, ge=0),
-        # Dependency injection (would use actual auth/tenant in production)
-        db: AsyncSession = Depends(lambda: None),
+        db: AsyncSession = Depends(get_db),
         tenant_id: str = Query(description="Tenant ID"),
     ):
         """
@@ -165,31 +177,101 @@ def create_table_card_router(
         - limit: Max results (1-500)
         - offset: Pagination offset
         """
-        try:
-            # TODO: Implement actual table list logic
-            # - Query tables from database
-            # - Filter by area, status as requested
-            # - Resolve fields using context_resolver
-            # - Apply business_type preset rules
-            # - Sort by priority
-            # - Return paginated results
+        # Set RLS tenant context
+        await db.execute(
+            text("SELECT set_config('app.tenant_id', :tid, true)"),
+            {"tid": tenant_id},
+        )
+        tid = uuid.UUID(tenant_id)
+        sid = uuid.UUID(store_id)
 
-            return TablesListResponse(
-                summary={
-                    "empty": 8,
-                    "dining": 12,
-                    "reserved": 3,
-                    "pending_checkout": 2,
-                    "pending_cleanup": 1,
-                },
-                meal_period=meal_period or "dinner",
-                tables=[],
-                total_count=0,
+        # Build query with filters
+        query = select(Table).where(
+            Table.tenant_id == tid,
+            Table.store_id == sid,
+            Table.is_active.is_(True),
+            Table.is_deleted.is_(False),
+        )
+        if area:
+            query = query.where(Table.area == area)
+        if status:
+            db_status = _API_STATUS_TO_DB.get(status, status)
+            query = query.where(Table.status == db_status)
+
+        # Get total count (before pagination)
+        count_query = select(func.count()).select_from(query.subquery())
+        total_count = (await db.execute(count_query)).scalar() or 0
+
+        # Summary: count tables by status
+        summary_query = (
+            select(Table.status, func.count())
+            .where(
+                Table.tenant_id == tid,
+                Table.store_id == sid,
+                Table.is_active.is_(True),
+                Table.is_deleted.is_(False),
+            )
+            .group_by(Table.status)
+        )
+        summary_rows = (await db.execute(summary_query)).all()
+        summary: Dict[str, int] = {
+            "empty": 0, "dining": 0, "reserved": 0,
+            "pending_checkout": 0, "pending_cleanup": 0,
+        }
+        for db_stat, cnt in summary_rows:
+            api_stat = _DB_STATUS_TO_API.get(db_stat, db_stat)
+            summary[api_stat] = cnt
+
+        # Fetch paginated tables
+        query = query.order_by(Table.sort_order, Table.table_no).offset(offset).limit(limit)
+        result = await db.execute(query)
+        rows = result.scalars().all()
+
+        # Resolve card fields via context_resolver if available
+        tables_out: List[TableCardResponse] = []
+        for tbl in rows:
+            card_fields: List[TableCardFieldResponse] = []
+            if context_resolver:
+                try:
+                    resolved = await context_resolver.resolve(
+                        table=tbl,
+                        business_type=business_type,
+                        meal_period=meal_period,
+                    )
+                    card_fields = [
+                        TableCardFieldResponse(
+                            key=f.get("key", ""),
+                            label=f.get("label", ""),
+                            value=f.get("value"),
+                            priority=f.get("priority", 50),
+                            alert=f.get("alert", "normal"),
+                            render_hint=f.get("render_hint"),
+                        )
+                        for f in (resolved or [])
+                    ]
+                except (KeyError, ValueError, AttributeError) as exc:
+                    logger.warning("context_resolver failed for table %s: %s", tbl.id, exc)
+
+            api_status = _DB_STATUS_TO_API.get(tbl.status, tbl.status)
+            tables_out.append(
+                TableCardResponse(
+                    table_id=str(tbl.id),
+                    table_no=tbl.table_no,
+                    area=tbl.area or "大厅",
+                    seats=tbl.seats,
+                    status=api_status,
+                    layout=tbl.config.get("layout") if tbl.config else None,
+                    card_fields=card_fields,
+                    updated_at=tbl.updated_at,
+                )
             )
 
-        except Exception as e:
-            logger.error(f"Failed to list tables: {e}")
-            raise HTTPException(status_code=500, detail=str(e))
+        return TablesListResponse(
+            summary=summary,
+            meal_period=meal_period or "dinner",
+            tables=tables_out,
+            total_count=total_count,
+        )
 
     @router.get(
         "/{table_id}",
