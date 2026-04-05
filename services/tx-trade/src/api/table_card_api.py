@@ -22,7 +22,7 @@ from ..models.table_card_click_log import TableCardClickLog
 
 logger = logging.getLogger(__name__)
 
-# Status mapping: DB enum values → API display values
+# Status mapping: DB enum values <-> API display values
 _DB_STATUS_TO_API = {
     "free": "empty",
     "occupied": "dining",
@@ -257,7 +257,7 @@ def create_table_card_router(
                 TableCardResponse(
                     table_id=str(tbl.id),
                     table_no=tbl.table_no,
-                    area=tbl.area or "大厅",
+                    area=tbl.area or "",
                     seats=tbl.seats,
                     status=api_status,
                     layout=tbl.config.get("layout") if tbl.config else None,
@@ -282,7 +282,7 @@ def create_table_card_router(
     async def get_table_detail(
         table_id: str,
         store_id: str = Query(description="Store ID"),
-        db: AsyncSession = Depends(lambda: None),
+        db: AsyncSession = Depends(get_db),
         tenant_id: str = Query(description="Tenant ID"),
     ):
         """
@@ -290,26 +290,54 @@ def create_table_card_router(
 
         Returns full card fields plus related order and customer data.
         """
-        try:
-            # TODO: Implement actual table detail logic
-            # - Query table by ID
-            # - Load related orders, customers, reservations
-            # - Resolve all card fields
-            # - Return detailed response
+        await db.execute(
+            text("SELECT set_config('app.tenant_id', :tid, true)"),
+            {"tid": tenant_id},
+        )
+        tid = uuid.UUID(tenant_id)
+        table_uuid = uuid.UUID(table_id)
 
-            return TableCardResponse(
-                table_id=table_id,
-                table_no="A01",
-                area="å¤§å",
-                seats=4,
-                status="dining",
-                card_fields=[],
-                updated_at=datetime.utcnow(),
+        result = await db.execute(
+            select(Table).where(
+                Table.id == table_uuid,
+                Table.tenant_id == tid,
+                Table.is_deleted.is_(False),
             )
+        )
+        tbl = result.scalar_one_or_none()
+        if not tbl:
+            raise HTTPException(status_code=404, detail=f"Table {table_id} not found")
 
-        except Exception as e:
-            logger.error(f"Failed to get table detail: {e}")
-            raise HTTPException(status_code=500, detail=str(e))
+        # Resolve card fields via context_resolver if available
+        card_fields: List[TableCardFieldResponse] = []
+        if context_resolver:
+            try:
+                resolved = await context_resolver.resolve(table=tbl)
+                card_fields = [
+                    TableCardFieldResponse(
+                        key=f.get("key", ""),
+                        label=f.get("label", ""),
+                        value=f.get("value"),
+                        priority=f.get("priority", 50),
+                        alert=f.get("alert", "normal"),
+                        render_hint=f.get("render_hint"),
+                    )
+                    for f in (resolved or [])
+                ]
+            except (KeyError, ValueError, AttributeError) as exc:
+                logger.warning("context_resolver failed for table %s: %s", table_id, exc)
+
+        api_status = _DB_STATUS_TO_API.get(tbl.status, tbl.status)
+        return TableCardResponse(
+            table_id=str(tbl.id),
+            table_no=tbl.table_no,
+            area=tbl.area or "",
+            seats=tbl.seats,
+            status=api_status,
+            layout=tbl.config.get("layout") if tbl.config else None,
+            card_fields=card_fields,
+            updated_at=tbl.updated_at,
+        )
 
     @router.get(
         "/statistics",
@@ -319,7 +347,7 @@ def create_table_card_router(
     )
     async def get_statistics(
         store_id: str = Query(description="Store ID"),
-        db: AsyncSession = Depends(lambda: None),
+        db: AsyncSession = Depends(get_db),
         tenant_id: str = Query(description="Tenant ID"),
     ):
         """
@@ -327,26 +355,48 @@ def create_table_card_router(
 
         Returns counts of tables in each status (empty, dining, reserved, etc.)
         """
-        try:
-            # TODO: Implement actual statistics query
-            # - Count tables by status
-            # - Calculate occupancy rate
-            # - Return aggregate stats
+        await db.execute(
+            text("SELECT set_config('app.tenant_id', :tid, true)"),
+            {"tid": tenant_id},
+        )
+        tid = uuid.UUID(tenant_id)
+        sid = uuid.UUID(store_id)
 
-            return StatisticsResponse(
-                empty_count=8,
-                dining_count=12,
-                reserved_count=3,
-                pending_checkout_count=2,
-                pending_cleanup_count=1,
-                total_occupied=18,
-                total_available=8,
-                timestamp=datetime.utcnow(),
+        # Count tables grouped by status
+        result = await db.execute(
+            select(Table.status, func.count())
+            .where(
+                Table.tenant_id == tid,
+                Table.store_id == sid,
+                Table.is_active.is_(True),
+                Table.is_deleted.is_(False),
             )
+            .group_by(Table.status)
+        )
+        counts: Dict[str, int] = {}
+        for db_stat, cnt in result.all():
+            api_stat = _DB_STATUS_TO_API.get(db_stat, db_stat)
+            counts[api_stat] = cnt
 
-        except Exception as e:
-            logger.error(f"Failed to get statistics: {e}")
-            raise HTTPException(status_code=500, detail=str(e))
+        empty = counts.get("empty", 0)
+        dining = counts.get("dining", 0)
+        reserved = counts.get("reserved", 0)
+        pending_checkout = counts.get("pending_checkout", 0)
+        pending_cleanup = counts.get("pending_cleanup", 0)
+
+        total_occupied = dining + reserved + pending_checkout + pending_cleanup
+        total_available = empty
+
+        return StatisticsResponse(
+            empty_count=empty,
+            dining_count=dining,
+            reserved_count=reserved,
+            pending_checkout_count=pending_checkout,
+            pending_cleanup_count=pending_cleanup,
+            total_occupied=total_occupied,
+            total_available=total_available,
+            timestamp=datetime.utcnow(),
+        )
 
     @router.get(
         "/field-rankings",
@@ -358,7 +408,7 @@ def create_table_card_router(
         store_id: str = Query(description="Store ID"),
         meal_period: Optional[str] = Query(None, description="Meal period filter"),
         limit: int = Query(10, le=50),
-        db: AsyncSession = Depends(lambda: None),
+        db: AsyncSession = Depends(get_db),
         tenant_id: str = Query(description="Tenant ID"),
     ):
         """
@@ -367,35 +417,56 @@ def create_table_card_router(
         Returns fields sorted by how often staff have clicked them,
         with exponential decay applied to older clicks.
         """
-        try:
-            if not learning_engine:
-                return []
+        if not learning_engine:
+            return []
 
-            # TODO: Implement field ranking logic
-            # - Get click history from learning_engine
-            # - Apply decay algorithm
-            # - Sort by score
-            # - Return top N fields
+        rankings = await learning_engine.get_field_rankings(
+            store_id=store_id,
+            meal_period=meal_period,
+            tenant_id=tenant_id,
+            limit=limit,
+        )
 
-            rankings = await learning_engine.get_field_rankings(
-                store_id=store_id,
-                meal_period=meal_period,
-                tenant_id=tenant_id,
-                limit=limit,
+        # Query actual click counts from the DB for each ranked field
+        await db.execute(
+            text("SELECT set_config('app.tenant_id', :tid, true)"),
+            {"tid": tenant_id},
+        )
+        tid = uuid.UUID(tenant_id)
+        sid = uuid.UUID(store_id)
+
+        click_count_query = (
+            select(
+                TableCardClickLog.field_key,
+                func.count().label("click_count"),
+                func.max(TableCardClickLog.clicked_at).label("last_clicked"),
             )
+            .where(
+                TableCardClickLog.tenant_id == tid,
+                TableCardClickLog.store_id == sid,
+                TableCardClickLog.is_deleted.is_(False),
+            )
+            .group_by(TableCardClickLog.field_key)
+        )
+        if meal_period:
+            click_count_query = click_count_query.where(
+                TableCardClickLog.meal_period == meal_period
+            )
+        click_rows = (await db.execute(click_count_query)).all()
+        click_map: Dict[str, tuple] = {
+            row.field_key: (row.click_count, row.last_clicked)
+            for row in click_rows
+        }
 
-            return [
-                FieldRankingResponse(
-                    field_key=k,
-                    score=v,
-                    click_count=0,  # TODO: Get actual count
-                )
-                for k, v in rankings.items()
-            ]
-
-        except Exception as e:
-            logger.error(f"Failed to get field rankings: {e}")
-            raise HTTPException(status_code=500, detail=str(e))
+        return [
+            FieldRankingResponse(
+                field_key=k,
+                score=v,
+                click_count=click_map.get(k, (0, None))[0],
+                last_clicked_at=click_map.get(k, (0, None))[1],
+            )
+            for k, v in rankings.items()
+        ]
 
     # ========== POST Endpoints ==========
 
@@ -408,7 +479,7 @@ def create_table_card_router(
     async def record_click(
         request: FieldClickRequest = Body(description="Click event details"),
         store_id: str = Query(description="Store ID"),
-        db: AsyncSession = Depends(lambda: None),
+        db: AsyncSession = Depends(get_db),
         tenant_id: str = Query(description="Tenant ID"),
         user_id: Optional[str] = Query(None, description="User ID who clicked"),
     ):
@@ -418,12 +489,30 @@ def create_table_card_router(
         Click events are tracked per field, store, and meal period,
         then aggregated to learn field importance patterns.
         """
-        try:
-            if not learning_engine:
-                return {"recorded": False}
+        await db.execute(
+            text("SELECT set_config('app.tenant_id', :tid, true)"),
+            {"tid": tenant_id},
+        )
+        tid = uuid.UUID(tenant_id)
+        sid = uuid.UUID(store_id)
 
-            # TODO: Implement click recording logic
-            success = await learning_engine.record_click(
+        # Persist click log to database
+        click_log = TableCardClickLog(
+            tenant_id=tid,
+            store_id=sid,
+            table_no=request.table_no,
+            field_key=request.field_key,
+            clicked_at=datetime.utcnow(),
+            meal_period=request.meal_period,
+            score=100.0,
+            metadata=request.metadata or {"user_id": user_id},
+        )
+        db.add(click_log)
+        await db.commit()
+
+        # Also forward to learning engine if available
+        if learning_engine:
+            await learning_engine.record_click(
                 field_key=request.field_key,
                 store_id=store_id,
                 table_no=request.table_no,
@@ -433,15 +522,11 @@ def create_table_card_router(
                 metadata=request.metadata,
             )
 
-            return {
-                "recorded": success,
-                "field_key": request.field_key,
-                "timestamp": datetime.utcnow(),
-            }
-
-        except Exception as e:
-            logger.error(f"Failed to record click: {e}")
-            raise HTTPException(status_code=500, detail=str(e))
+        return {
+            "recorded": True,
+            "field_key": request.field_key,
+            "timestamp": datetime.utcnow(),
+        }
 
     # ========== PUT Endpoints ==========
 
@@ -454,7 +539,7 @@ def create_table_card_router(
         table_id: str,
         new_status: str = Body(description="New status value"),
         store_id: str = Query(description="Store ID"),
-        db: AsyncSession = Depends(lambda: None),
+        db: AsyncSession = Depends(get_db),
         tenant_id: str = Query(description="Tenant ID"),
     ):
         """
@@ -462,22 +547,42 @@ def create_table_card_router(
 
         Valid status values: empty, dining, reserved, pending_checkout, pending_cleanup
         """
-        try:
-            # TODO: Implement status update logic
-            # - Validate new_status value
-            # - Update table in database
-            # - Trigger any state-specific actions
-            # - Return updated table
+        if new_status not in VALID_API_STATUSES:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Invalid status '{new_status}'. Must be one of: {sorted(VALID_API_STATUSES)}",
+            )
 
-            return {
-                "table_id": table_id,
-                "new_status": new_status,
-                "updated_at": datetime.utcnow(),
-            }
+        await db.execute(
+            text("SELECT set_config('app.tenant_id', :tid, true)"),
+            {"tid": tenant_id},
+        )
+        tid = uuid.UUID(tenant_id)
+        table_uuid = uuid.UUID(table_id)
 
-        except Exception as e:
-            logger.error(f"Failed to update table status: {e}")
-            raise HTTPException(status_code=500, detail=str(e))
+        # Map API status back to DB enum value
+        db_status = _API_STATUS_TO_DB.get(new_status, new_status)
+
+        result = await db.execute(
+            select(Table).where(
+                Table.id == table_uuid,
+                Table.tenant_id == tid,
+                Table.is_deleted.is_(False),
+            )
+        )
+        tbl = result.scalar_one_or_none()
+        if not tbl:
+            raise HTTPException(status_code=404, detail=f"Table {table_id} not found")
+
+        tbl.status = db_status
+        await db.commit()
+        await db.refresh(tbl)
+
+        return {
+            "table_id": str(tbl.id),
+            "new_status": new_status,
+            "updated_at": tbl.updated_at,
+        }
 
     # ========== Learning Endpoints ==========
 
@@ -490,7 +595,7 @@ def create_table_card_router(
     async def get_learning_stats(
         store_id: str = Query(description="Store ID"),
         meal_period: Optional[str] = Query(None, description="Meal period filter"),
-        db: AsyncSession = Depends(lambda: None),
+        db: AsyncSession = Depends(get_db),
         tenant_id: str = Query(description="Tenant ID"),
     ):
         """
@@ -498,29 +603,24 @@ def create_table_card_router(
 
         Useful for understanding which fields staff prioritize.
         """
-        try:
-            if not learning_engine:
-                return LearningStatsResponse(
-                    store_id=store_id,
-                    meal_period=meal_period,
-                    total_clicks=0,
-                    unique_fields=0,
-                    field_clicks={},
-                    days_active=0,
-                    avg_clicks_per_field=0.0,
-                )
-
-            stats = await learning_engine.get_learning_stats(
+        if not learning_engine:
+            return LearningStatsResponse(
                 store_id=store_id,
-                tenant_id=tenant_id,
                 meal_period=meal_period,
+                total_clicks=0,
+                unique_fields=0,
+                field_clicks={},
+                days_active=0,
+                avg_clicks_per_field=0.0,
             )
 
-            return LearningStatsResponse(**stats)
+        stats = await learning_engine.get_learning_stats(
+            store_id=store_id,
+            tenant_id=tenant_id,
+            meal_period=meal_period,
+        )
 
-        except Exception as e:
-            logger.error(f"Failed to get learning stats: {e}")
-            raise HTTPException(status_code=500, detail=str(e))
+        return LearningStatsResponse(**stats)
 
     @router.post(
         "/learning/reset",
@@ -530,7 +630,7 @@ def create_table_card_router(
     async def reset_learning(
         store_id: str = Query(description="Store ID"),
         meal_period: Optional[str] = Query(None, description="Meal period to reset (None=all)"),
-        db: AsyncSession = Depends(lambda: None),
+        db: AsyncSession = Depends(get_db),
         tenant_id: str = Query(description="Tenant ID"),
     ):
         """
@@ -539,26 +639,21 @@ def create_table_card_router(
         Clears all click history and learned rankings.
         Use with caution - typically only for testing or migration.
         """
-        try:
-            if not learning_engine:
-                return {"reset_count": 0}
+        if not learning_engine:
+            return {"reset_count": 0}
 
-            count = await learning_engine.reset_learning(
-                store_id=store_id,
-                tenant_id=tenant_id,
-                meal_period=meal_period,
-            )
+        count = await learning_engine.reset_learning(
+            store_id=store_id,
+            tenant_id=tenant_id,
+            meal_period=meal_period,
+        )
 
-            return {
-                "reset_count": count,
-                "store_id": store_id,
-                "meal_period": meal_period,
-                "timestamp": datetime.utcnow(),
-            }
-
-        except Exception as e:
-            logger.error(f"Failed to reset learning: {e}")
-            raise HTTPException(status_code=500, detail=str(e))
+        return {
+            "reset_count": count,
+            "store_id": store_id,
+            "meal_period": meal_period,
+            "timestamp": datetime.utcnow(),
+        }
 
     return router
 
