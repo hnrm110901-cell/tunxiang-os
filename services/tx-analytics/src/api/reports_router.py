@@ -25,10 +25,14 @@ import structlog
 from fastapi import APIRouter, Header, HTTPException, Query
 
 from ..reports.p0_reports import P0Reports
+from ..services.report_engine import ReportEngine
+from ..services.report_registry import create_default_registry
 
 log = structlog.get_logger()
 router = APIRouter(tags=["p0-reports"])
 _p0 = P0Reports()
+_registry = create_default_registry()
+_engine = ReportEngine(registry=_registry)
 
 
 # ──────────────────────────────────────────────

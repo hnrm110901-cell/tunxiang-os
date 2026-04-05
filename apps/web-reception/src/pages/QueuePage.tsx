@@ -1,7 +1,9 @@
 /**
  * 排队叫号 — 大桌/小桌分开排队，取号/叫号/过号
+ * 2026-04-05: 取号时输入手机号自动查询会员，显示VIP标识
  */
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
+import { searchCustomer, type CustomerProfile } from '../api/memberDepthApi';
 
 type QueueStatus = 'waiting' | 'called' | 'seated' | 'skipped';
 
@@ -41,6 +43,33 @@ export function QueuePage() {
   const [newType, setNewType] = useState<'large' | 'small'>('small');
   const [newCount, setNewCount] = useState(2);
   const [newName, setNewName] = useState('');
+  const [newPhone, setNewPhone] = useState('');
+  const [memberMatch, setMemberMatch] = useState<CustomerProfile | null>(null);
+  const [memberSearching, setMemberSearching] = useState(false);
+
+  // Auto-lookup member when phone has 11 digits
+  const handlePhoneChange = useCallback(async (phone: string) => {
+    setNewPhone(phone);
+    setMemberMatch(null);
+    const digits = phone.replace(/\D/g, '');
+    if (digits.length === 11) {
+      setMemberSearching(true);
+      try {
+        const result = await searchCustomer(digits);
+        if (result.items.length > 0) {
+          setMemberMatch(result.items[0]);
+          // Auto-fill name if empty
+          if (!newName.trim()) {
+            setNewName(result.items[0].name);
+          }
+        }
+      } catch {
+        // Member lookup is non-critical, don't block queue flow
+      } finally {
+        setMemberSearching(false);
+      }
+    }
+  }, [newName]);
 
   const largeQueue = queue.filter(q => q.type === 'large');
   const smallQueue = queue.filter(q => q.type === 'small');
@@ -70,8 +99,8 @@ export function QueuePage() {
       number: `${typePrefix}${nextNum}`,
       type: newType,
       guestCount: newCount,
-      customerName: newName.trim(),
-      phone: '',
+      customerName: memberMatch?.is_vip ? `${newName.trim()} [VIP]` : newName.trim(),
+      phone: newPhone,
       status: 'waiting',
       takenAt: new Date().toTimeString().slice(0, 5),
       estimatedWait: (newType === 'large' ? largeWaiting : smallWaiting) * 20 + 15,
@@ -79,7 +108,9 @@ export function QueuePage() {
     setQueue(prev => [...prev, newItem]);
     setShowTakeNumber(false);
     setNewName('');
+    setNewPhone('');
     setNewCount(2);
+    setMemberMatch(null);
   };
 
   return (
