@@ -8,6 +8,7 @@ GET /api/v1/analytics/reports/billing-audit      账单稽核
 GET /api/v1/analytics/reports/realtime           实时营业统计
 GET /api/v1/analytics/reports/daily-cashflow     日现金流
 GET /api/v1/analytics/daily-summary              日汇总（供经营诊断 Agent 调用）
+GET /api/v1/analytics/reports/target-achievement 门店经营目标达成
 
 公共参数：
   ?store_id=<UUID>          门店ID（部分接口必填）

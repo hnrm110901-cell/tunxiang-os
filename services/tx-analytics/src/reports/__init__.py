@@ -120,6 +120,7 @@ _OTHER_REPORTS = [
     revenue_structure,
     sales_channel,
     table_stats,
+    target_achievement,
 ]
 
 # P1 每周分析报表模块列表
