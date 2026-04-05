@@ -222,8 +222,7 @@ services:
 
   # ── 16 微服务 ─────────────────────────────────────────────
   gateway:
-    <<: *service-common
-    <<: *resource-limits-heavy
+    <<: [*service-common, *resource-limits-heavy]
     build:
       <<: *build-python
       args:
@@ -231,8 +230,7 @@ services:
         SERVICE_PORT: "8000"
 
   tx-trade:
-    <<: *service-common
-    <<: *resource-limits-heavy
+    <<: [*service-common, *resource-limits-heavy]
     build:
       <<: *build-python
       args:
@@ -240,8 +238,7 @@ services:
         SERVICE_PORT: "8001"
 
   tx-menu:
-    <<: *service-common
-    <<: *resource-limits
+    <<: [*service-common, *resource-limits]
     build:
       <<: *build-python
       args:
@@ -249,8 +246,7 @@ services:
         SERVICE_PORT: "8002"
 
   tx-member:
-    <<: *service-common
-    <<: *resource-limits
+    <<: [*service-common, *resource-limits]
     build:
       <<: *build-python
       args:
@@ -258,8 +254,7 @@ services:
         SERVICE_PORT: "8003"
 
   tx-growth:
-    <<: *service-common
-    <<: *resource-limits
+    <<: [*service-common, *resource-limits]
     build:
       <<: *build-python
       args:
@@ -267,8 +262,7 @@ services:
         SERVICE_PORT: "8004"
 
   tx-ops:
-    <<: *service-common
-    <<: *resource-limits
+    <<: [*service-common, *resource-limits]
     build:
       <<: *build-python
       args:
@@ -276,8 +270,7 @@ services:
         SERVICE_PORT: "8005"
 
   tx-supply:
-    <<: *service-common
-    <<: *resource-limits
+    <<: [*service-common, *resource-limits]
     build:
       <<: *build-python
       args:
@@ -285,8 +278,7 @@ services:
         SERVICE_PORT: "8006"
 
   tx-finance:
-    <<: *service-common
-    <<: *resource-limits
+    <<: [*service-common, *resource-limits]
     build:
       <<: *build-python
       args:
@@ -294,8 +286,7 @@ services:
         SERVICE_PORT: "8007"
 
   tx-agent:
-    <<: *service-common
-    <<: *resource-limits-heavy
+    <<: [*service-common, *resource-limits-heavy]
     build:
       <<: *build-python
       args:
@@ -303,8 +294,7 @@ services:
         SERVICE_PORT: "8008"
 
   tx-analytics:
-    <<: *service-common
-    <<: *resource-limits
+    <<: [*service-common, *resource-limits]
     build:
       <<: *build-python
       args:
@@ -312,8 +302,7 @@ services:
         SERVICE_PORT: "8009"
 
   tx-brain:
-    <<: *service-common
-    <<: *resource-limits-heavy
+    <<: [*service-common, *resource-limits-heavy]
     build:
       <<: *build-python
       args:
@@ -321,8 +310,7 @@ services:
         SERVICE_PORT: "8010"
 
   tx-intel:
-    <<: *service-common
-    <<: *resource-limits
+    <<: [*service-common, *resource-limits]
     build:
       <<: *build-python
       args:
@@ -330,8 +318,7 @@ services:
         SERVICE_PORT: "8011"
 
   tx-org:
-    <<: *service-common
-    <<: *resource-limits
+    <<: [*service-common, *resource-limits]
     build:
       <<: *build-python
       args:
@@ -339,8 +326,7 @@ services:
         SERVICE_PORT: "8012"
 
   tunxiang-api:
-    <<: *service-common
-    <<: *resource-limits
+    <<: [*service-common, *resource-limits]
     build:
       <<: *build-python
       args:
@@ -348,8 +334,7 @@ services:
         SERVICE_PORT: "8013"
 
   mcp-server:
-    <<: *service-common
-    <<: *resource-limits
+    <<: [*service-common, *resource-limits]
     build:
       <<: *build-python
       args:
