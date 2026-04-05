@@ -824,6 +824,343 @@ def _build_builtin_reports() -> list[ReportDefinition]:
         permissions=["admin", "store_manager"],
     ))
 
+    # ════════════ P0 新增报表 (8个) ════════════
+
+    reports.append(ReportDefinition(
+        report_id="min_spend_supplement",
+        name="最低消费补齐报表",
+        category=ReportCategory.REVENUE,
+        description="统计设有最低消费的桌台订单，计算实际消费与最低消费差额补齐情况",
+        sql_template="""
+            SELECT s.store_name, s.store_code,
+                   COALESCE(o.biz_date, DATE(o.created_at)) AS biz_date,
+                   t.table_label, t.table_type, t.min_consume_fen, o.order_no,
+                   COALESCE(o.final_amount_fen, o.total_amount_fen - COALESCE(o.discount_amount_fen, 0)) AS actual_fen,
+                   GREATEST(t.min_consume_fen - COALESCE(o.final_amount_fen, o.total_amount_fen - COALESCE(o.discount_amount_fen, 0)), 0) AS supplement_fen,
+                   CASE WHEN COALESCE(o.final_amount_fen, o.total_amount_fen - COALESCE(o.discount_amount_fen, 0)) >= t.min_consume_fen THEN 'met' ELSE 'supplemented' END AS status
+            FROM orders o
+            JOIN stores s ON o.store_id = s.id AND s.tenant_id = o.tenant_id
+            JOIN tables t ON o.table_id = t.id AND t.tenant_id = o.tenant_id
+            WHERE o.tenant_id = :tenant_id AND o.is_deleted = FALSE
+              AND o.status IN ('paid', 'completed')
+              AND t.min_consume_fen > 0 AND t.is_deleted = FALSE
+              AND COALESCE(o.biz_date, DATE(o.created_at)) BETWEEN :start_date AND :end_date
+              AND (:store_id IS NULL OR o.store_id = :store_id::UUID)
+            ORDER BY biz_date DESC, supplement_fen DESC
+        """,
+        dimensions=[
+            DIM_STORE_NAME,
+            DimensionDef(name="store_code", label="门店编码"),
+            DIM_DATE,
+            DimensionDef(name="table_label", label="桌台"),
+            DimensionDef(name="order_no", label="订单号"),
+        ],
+        metrics=[
+            MetricDef(name="min_consume_fen", label="最低消费(分)", unit="yuan", is_money_fen=True),
+            MetricDef(name="actual_fen", label="实际消费(分)", unit="yuan", is_money_fen=True),
+            MetricDef(name="supplement_fen", label="补齐金额(分)", unit="yuan", is_money_fen=True),
+        ],
+        filters=[FILTER_STORE, FILTER_DATE_START, FILTER_DATE_END],
+        default_sort="supplement_fen",
+        permissions=["admin", "store_manager", "finance"],
+    ))
+
+    reports.append(ReportDefinition(
+        report_id="cash_drawer_log",
+        name="开钱箱统计",
+        category=ReportCategory.AUDIT,
+        description="按门店按收银员统计每日开钱箱次数及时段分布，用于现金管理稽核",
+        sql_template="""
+            WITH drawer_events AS (
+                SELECT p.store_id, p.operator_id, p.created_at,
+                       COALESCE(DATE(p.biz_date), DATE(p.created_at)) AS biz_date
+                FROM payment_records p
+                WHERE p.tenant_id = :tenant_id AND p.is_deleted = FALSE
+                  AND p.payment_method = 'cash'
+                  AND COALESCE(DATE(p.biz_date), DATE(p.created_at)) BETWEEN :start_date AND :end_date
+                  AND (:store_id IS NULL OR p.store_id = :store_id::UUID)
+            )
+            SELECT s.store_name, s.store_code, de.biz_date,
+                   e.employee_name AS cashier_name,
+                   COUNT(*) AS open_count,
+                   MIN(de.created_at) AS first_open_at,
+                   MAX(de.created_at) AS last_open_at,
+                   COUNT(*) FILTER (WHERE EXTRACT(HOUR FROM de.created_at) BETWEEN 10 AND 13) AS lunch_count,
+                   COUNT(*) FILTER (WHERE EXTRACT(HOUR FROM de.created_at) BETWEEN 17 AND 21) AS dinner_count,
+                   COUNT(*) FILTER (WHERE EXTRACT(HOUR FROM de.created_at) < 10 OR EXTRACT(HOUR FROM de.created_at) > 21) AS off_peak_count
+            FROM drawer_events de
+            JOIN stores s ON de.store_id = s.id AND s.tenant_id = :tenant_id
+            LEFT JOIN employees e ON de.operator_id = e.id AND e.tenant_id = :tenant_id
+            GROUP BY s.store_name, s.store_code, de.biz_date, e.employee_name
+            ORDER BY de.biz_date DESC, open_count DESC
+        """,
+        dimensions=[
+            DIM_STORE_NAME,
+            DimensionDef(name="store_code", label="门店编码"),
+            DIM_DATE,
+            DimensionDef(name="cashier_name", label="收银员"),
+        ],
+        metrics=[
+            MetricDef(name="open_count", label="开箱次数", unit="count"),
+            MetricDef(name="lunch_count", label="午餐时段", unit="count"),
+            MetricDef(name="dinner_count", label="晚餐时段", unit="count"),
+            MetricDef(name="off_peak_count", label="非高峰时段", unit="count"),
+        ],
+        filters=[FILTER_STORE, FILTER_DATE_START, FILTER_DATE_END],
+        default_sort="open_count",
+        permissions=["admin", "finance"],
+    ))
+
+    reports.append(ReportDefinition(
+        report_id="reservation_detail",
+        name="预定明细统计",
+        category=ReportCategory.OPERATION,
+        description="按门店按日期统计预定量，按状态和时段分布",
+        sql_template="""
+            SELECT s.store_name, s.store_code,
+                   DATE(r.reservation_date) AS biz_date,
+                   COUNT(*) AS total_reservations,
+                   COUNT(*) FILTER (WHERE r.status = 'confirmed') AS confirmed_count,
+                   COUNT(*) FILTER (WHERE r.status = 'seated') AS seated_count,
+                   COUNT(*) FILTER (WHERE r.status = 'cancelled') AS cancelled_count,
+                   COUNT(*) FILTER (WHERE r.status = 'no_show') AS no_show_count,
+                   CASE WHEN COUNT(*) > 0 THEN ROUND(COUNT(*) FILTER (WHERE r.status = 'seated')::NUMERIC / COUNT(*) * 100, 2) ELSE 0 END AS seated_pct,
+                   COUNT(*) FILTER (WHERE r.time_slot = 'lunch') AS lunch_count,
+                   COUNT(*) FILTER (WHERE r.time_slot = 'dinner') AS dinner_count,
+                   COALESCE(SUM(r.guest_count), 0) AS total_guests
+            FROM reservations r
+            JOIN stores s ON r.store_id = s.id AND s.tenant_id = r.tenant_id
+            WHERE r.tenant_id = :tenant_id AND r.is_deleted = FALSE
+              AND DATE(r.reservation_date) BETWEEN :start_date AND :end_date
+              AND (:store_id IS NULL OR r.store_id = :store_id::UUID)
+            GROUP BY s.store_name, s.store_code, DATE(r.reservation_date)
+            ORDER BY biz_date DESC, total_reservations DESC
+        """,
+        dimensions=[
+            DIM_STORE_NAME,
+            DimensionDef(name="store_code", label="门店编码"),
+            DIM_DATE,
+        ],
+        metrics=[
+            MetricDef(name="total_reservations", label="预定总数", unit="count"),
+            MetricDef(name="confirmed_count", label="已确认", unit="count"),
+            MetricDef(name="seated_count", label="已入座", unit="count"),
+            MetricDef(name="cancelled_count", label="已取消", unit="count"),
+            MetricDef(name="no_show_count", label="未到店", unit="count"),
+            MetricDef(name="seated_pct", label="到店率(%)", unit="percent"),
+            MetricDef(name="total_guests", label="总人数", unit="count"),
+        ],
+        filters=[FILTER_STORE, FILTER_DATE_START, FILTER_DATE_END],
+        default_sort="biz_date",
+        default_sort_direction=SortDirection.DESC,
+        permissions=["admin", "store_manager"],
+    ))
+
+    reports.append(ReportDefinition(
+        report_id="delivery_order_stats",
+        name="外卖单统计",
+        category=ReportCategory.REVENUE,
+        description="按门店按外卖平台统计外卖订单量、营收、平台佣金、净收入",
+        sql_template="""
+            SELECT s.store_name, s.store_code,
+                   COALESCE(d.biz_date, DATE(d.created_at)) AS biz_date,
+                   d.platform,
+                   COUNT(*) AS order_count,
+                   COUNT(*) FILTER (WHERE d.status = 'completed') AS completed_count,
+                   COUNT(*) FILTER (WHERE d.status = 'cancelled') AS cancelled_count,
+                   COUNT(*) FILTER (WHERE d.status = 'refunded') AS refunded_count,
+                   SUM(COALESCE(d.order_amount_fen, 0)) AS revenue_fen,
+                   SUM(COALESCE(d.commission_fen, 0)) AS commission_fen,
+                   SUM(COALESCE(d.delivery_fee_fen, 0)) AS delivery_fee_fen,
+                   SUM(COALESCE(d.order_amount_fen, 0)) - SUM(COALESCE(d.commission_fen, 0)) - SUM(COALESCE(d.delivery_fee_fen, 0)) AS net_fen,
+                   CASE WHEN COUNT(*) FILTER (WHERE d.status = 'completed') > 0 THEN SUM(COALESCE(d.order_amount_fen, 0)) / COUNT(*) FILTER (WHERE d.status = 'completed') ELSE 0 END AS avg_ticket_fen,
+                   CASE WHEN SUM(COALESCE(d.order_amount_fen, 0)) > 0 THEN ROUND(SUM(COALESCE(d.commission_fen, 0))::NUMERIC / SUM(COALESCE(d.order_amount_fen, 0)) * 100, 2) ELSE 0 END AS commission_rate_pct
+            FROM delivery_orders d
+            JOIN stores s ON d.store_id = s.id AND s.tenant_id = d.tenant_id
+            WHERE d.tenant_id = :tenant_id AND d.is_deleted = FALSE
+              AND COALESCE(d.biz_date, DATE(d.created_at)) BETWEEN :start_date AND :end_date
+              AND (:store_id IS NULL OR d.store_id = :store_id::UUID)
+            GROUP BY s.store_name, s.store_code, COALESCE(d.biz_date, DATE(d.created_at)), d.platform
+            ORDER BY biz_date DESC, revenue_fen DESC
+        """,
+        dimensions=[
+            DIM_STORE_NAME,
+            DimensionDef(name="store_code", label="门店编码"),
+            DIM_DATE,
+            DimensionDef(name="platform", label="外卖平台"),
+        ],
+        metrics=[
+            MetricDef(name="order_count", label="订单数", unit="count"),
+            MetricDef(name="completed_count", label="完成数", unit="count"),
+            MetricDef(name="cancelled_count", label="取消数", unit="count"),
+            MetricDef(name="revenue_fen", label="营收(分)", unit="yuan", is_money_fen=True),
+            MetricDef(name="commission_fen", label="佣金(分)", unit="yuan", is_money_fen=True),
+            MetricDef(name="net_fen", label="净收入(分)", unit="yuan", is_money_fen=True),
+            MetricDef(name="commission_rate_pct", label="佣金率(%)", unit="percent"),
+        ],
+        filters=[FILTER_STORE, FILTER_DATE_START, FILTER_DATE_END],
+        default_sort="revenue_fen",
+        permissions=["admin", "store_manager", "finance"],
+    ))
+
+    reports.append(ReportDefinition(
+        report_id="delivery_reconciliation",
+        name="平台外卖对账表",
+        category=ReportCategory.AUDIT,
+        description="对比系统内外卖订单金额与平台结算金额，发现差异单据",
+        sql_template="""
+            WITH system_orders AS (
+                SELECT d.id AS delivery_order_id, d.platform, d.platform_order_no, d.store_id,
+                       d.order_amount_fen AS system_amount_fen, d.commission_fen AS system_commission_fen,
+                       d.status AS system_status,
+                       COALESCE(d.biz_date, DATE(d.created_at)) AS biz_date
+                FROM delivery_orders d
+                WHERE d.tenant_id = :tenant_id AND d.is_deleted = FALSE
+                  AND COALESCE(d.biz_date, DATE(d.created_at)) BETWEEN :start_date AND :end_date
+                  AND (:store_id IS NULL OR d.store_id = :store_id::UUID)
+            ),
+            platform_data AS (
+                SELECT dr.platform_order_no, dr.platform,
+                       dr.platform_amount_fen, dr.platform_commission_fen, dr.settlement_status
+                FROM delivery_reconciliations dr
+                WHERE dr.tenant_id = :tenant_id AND dr.is_deleted = FALSE
+                  AND dr.biz_date BETWEEN :start_date AND :end_date
+                  AND (:store_id IS NULL OR dr.store_id = :store_id::UUID)
+            )
+            SELECT s.store_name, so.biz_date, so.platform, so.platform_order_no,
+                   so.system_amount_fen, COALESCE(pd.platform_amount_fen, 0) AS platform_amount_fen,
+                   so.system_amount_fen - COALESCE(pd.platform_amount_fen, 0) AS amount_diff_fen,
+                   so.system_commission_fen, COALESCE(pd.platform_commission_fen, 0) AS platform_commission_fen,
+                   so.system_commission_fen - COALESCE(pd.platform_commission_fen, 0) AS commission_diff_fen,
+                   so.system_status, COALESCE(pd.settlement_status, 'missing') AS platform_status,
+                   CASE WHEN pd.platform_order_no IS NULL THEN 'platform_missing'
+                        WHEN ABS(so.system_amount_fen - pd.platform_amount_fen) > 0 THEN 'amount_mismatch'
+                        WHEN ABS(so.system_commission_fen - COALESCE(pd.platform_commission_fen, 0)) > 0 THEN 'commission_mismatch'
+                        ELSE 'matched' END AS reconciliation_status
+            FROM system_orders so
+            JOIN stores s ON so.store_id = s.id AND s.tenant_id = :tenant_id
+            LEFT JOIN platform_data pd ON so.platform_order_no = pd.platform_order_no AND so.platform = pd.platform
+            ORDER BY so.biz_date DESC,
+                CASE WHEN pd.platform_order_no IS NULL THEN 0 WHEN ABS(so.system_amount_fen - COALESCE(pd.platform_amount_fen, 0)) > 0 THEN 1 ELSE 2 END,
+                ABS(so.system_amount_fen - COALESCE(pd.platform_amount_fen, 0)) DESC
+        """,
+        dimensions=[
+            DIM_STORE_NAME,
+            DIM_DATE,
+            DimensionDef(name="platform", label="外卖平台"),
+            DimensionDef(name="platform_order_no", label="平台单号"),
+        ],
+        metrics=[
+            MetricDef(name="system_amount_fen", label="系统金额(分)", unit="yuan", is_money_fen=True),
+            MetricDef(name="platform_amount_fen", label="平台金额(分)", unit="yuan", is_money_fen=True),
+            MetricDef(name="amount_diff_fen", label="金额差异(分)", unit="yuan", is_money_fen=True),
+            MetricDef(name="reconciliation_status", label="对账状态", unit="text"),
+        ],
+        filters=[FILTER_STORE, FILTER_DATE_START, FILTER_DATE_END],
+        default_sort="amount_diff_fen",
+        permissions=["admin", "finance"],
+    ))
+
+    reports.append(ReportDefinition(
+        report_id="credit_account_stats",
+        name="挂账统计",
+        category=ReportCategory.AUDIT,
+        description="按门店统计企业挂账客户的信用额度使用情况",
+        sql_template="""
+            WITH latest_txn AS (
+                SELECT ct.credit_account_id, MAX(ct.created_at) AS last_transaction_at
+                FROM credit_transactions ct
+                WHERE ct.tenant_id = :tenant_id AND ct.is_deleted = FALSE
+                GROUP BY ct.credit_account_id
+            ),
+            period_usage AS (
+                SELECT ct.credit_account_id,
+                       SUM(CASE WHEN ct.transaction_type = 'charge' THEN ct.amount_fen ELSE 0 END) AS period_charged_fen,
+                       SUM(CASE WHEN ct.transaction_type = 'payment' THEN ct.amount_fen ELSE 0 END) AS period_paid_fen,
+                       COUNT(*) AS period_txn_count
+                FROM credit_transactions ct
+                WHERE ct.tenant_id = :tenant_id AND ct.is_deleted = FALSE
+                  AND DATE(ct.created_at) BETWEEN :start_date AND :end_date
+                  AND (:store_id IS NULL OR ct.store_id = :store_id::UUID)
+                GROUP BY ct.credit_account_id
+            )
+            SELECT s.store_name, s.store_code, ca.customer_name, ca.company_name,
+                   ca.credit_limit_fen, ca.used_fen, ca.credit_limit_fen - ca.used_fen AS balance_fen,
+                   CASE WHEN ca.credit_limit_fen > 0 THEN ROUND(ca.used_fen::NUMERIC / ca.credit_limit_fen * 100, 2) ELSE 0 END AS usage_rate_pct,
+                   COALESCE(pu.period_charged_fen, 0) AS period_charged_fen,
+                   COALESCE(pu.period_paid_fen, 0) AS period_paid_fen,
+                   COALESCE(pu.period_txn_count, 0) AS period_txn_count,
+                   lt.last_transaction_at
+            FROM credit_accounts ca
+            JOIN stores s ON ca.store_id = s.id AND s.tenant_id = ca.tenant_id
+            LEFT JOIN latest_txn lt ON lt.credit_account_id = ca.id
+            LEFT JOIN period_usage pu ON pu.credit_account_id = ca.id
+            WHERE ca.tenant_id = :tenant_id AND ca.is_deleted = FALSE AND ca.is_active = TRUE
+              AND (:store_id IS NULL OR ca.store_id = :store_id::UUID)
+            ORDER BY ca.used_fen DESC, usage_rate_pct DESC
+        """,
+        dimensions=[
+            DIM_STORE_NAME,
+            DimensionDef(name="store_code", label="门店编码"),
+            DimensionDef(name="customer_name", label="客户名称"),
+            DimensionDef(name="company_name", label="公司名称"),
+        ],
+        metrics=[
+            MetricDef(name="credit_limit_fen", label="信用额度(分)", unit="yuan", is_money_fen=True),
+            MetricDef(name="used_fen", label="已用额度(分)", unit="yuan", is_money_fen=True),
+            MetricDef(name="balance_fen", label="可用余额(分)", unit="yuan", is_money_fen=True),
+            MetricDef(name="usage_rate_pct", label="使用率(%)", unit="percent"),
+            MetricDef(name="period_charged_fen", label="期间挂账(分)", unit="yuan", is_money_fen=True),
+            MetricDef(name="period_paid_fen", label="期间还款(分)", unit="yuan", is_money_fen=True),
+        ],
+        filters=[FILTER_STORE, FILTER_DATE_START, FILTER_DATE_END],
+        default_sort="used_fen",
+        permissions=["admin", "finance"],
+    ))
+
+    reports.append(ReportDefinition(
+        report_id="coupon_consumption",
+        name="团购券消费分析",
+        category=ReportCategory.REVENUE,
+        description="按团购券类型和来源平台统计核销量、面值总额、实际成本、盈亏",
+        sql_template="""
+            SELECT s.store_name, s.store_code,
+                   COALESCE(cr.biz_date, DATE(cr.created_at)) AS biz_date,
+                   cr.coupon_type, cr.platform,
+                   COUNT(*) AS redeemed_count,
+                   SUM(COALESCE(cr.face_value_fen, 0)) AS face_value_total_fen,
+                   SUM(COALESCE(cr.actual_cost_fen, 0)) AS actual_cost_total_fen,
+                   SUM(COALESCE(cr.settlement_fen, 0)) AS settlement_total_fen,
+                   SUM(COALESCE(cr.settlement_fen, 0)) - SUM(COALESCE(cr.actual_cost_fen, 0)) AS profit_loss_fen,
+                   CASE WHEN COUNT(*) > 0 THEN SUM(COALESCE(cr.face_value_fen, 0)) / COUNT(*) ELSE 0 END AS avg_face_value_fen,
+                   CASE WHEN COUNT(*) > 0 THEN SUM(COALESCE(cr.settlement_fen, 0)) / COUNT(*) ELSE 0 END AS avg_settlement_fen
+            FROM coupon_redemptions cr
+            JOIN stores s ON cr.store_id = s.id AND s.tenant_id = cr.tenant_id
+            WHERE cr.tenant_id = :tenant_id AND cr.is_deleted = FALSE
+              AND COALESCE(cr.biz_date, DATE(cr.created_at)) BETWEEN :start_date AND :end_date
+              AND (:store_id IS NULL OR cr.store_id = :store_id::UUID)
+            GROUP BY s.store_name, s.store_code, COALESCE(cr.biz_date, DATE(cr.created_at)), cr.coupon_type, cr.platform
+            ORDER BY biz_date DESC, redeemed_count DESC
+        """,
+        dimensions=[
+            DIM_STORE_NAME,
+            DimensionDef(name="store_code", label="门店编码"),
+            DIM_DATE,
+            DimensionDef(name="coupon_type", label="团购券类型"),
+            DimensionDef(name="platform", label="来源平台"),
+        ],
+        metrics=[
+            MetricDef(name="redeemed_count", label="核销量", unit="count"),
+            MetricDef(name="face_value_total_fen", label="面值总额(分)", unit="yuan", is_money_fen=True),
+            MetricDef(name="actual_cost_total_fen", label="实际成本(分)", unit="yuan", is_money_fen=True),
+            MetricDef(name="settlement_total_fen", label="结算总额(分)", unit="yuan", is_money_fen=True),
+            MetricDef(name="profit_loss_fen", label="盈亏(分)", unit="yuan", is_money_fen=True),
+        ],
+        filters=[FILTER_STORE, FILTER_DATE_START, FILTER_DATE_END],
+        default_sort="redeemed_count",
+        permissions=["admin", "store_manager", "finance"],
+    ))
+
     return reports
 
 

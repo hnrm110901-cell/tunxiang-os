@@ -22,9 +22,13 @@ from datetime import date, timedelta
 from typing import Optional
 
 import structlog
-from fastapi import APIRouter, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from shared.ontology.src.database import get_db_with_tenant
 
 from ..reports.p0_reports import P0Reports
+from ..reports.target_achievement import target_achievement_report
 from ..services.report_engine import ReportEngine
 from ..services.report_registry import create_default_registry
 
