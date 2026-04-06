@@ -30,10 +30,18 @@ class TableStatus(str, enum.Enum):
 
 
 class OrderType(str, enum.Enum):
-    dine_in = "dine_in"
-    takeout = "takeout"
-    delivery = "delivery"
-    banquet = "banquet"
+    dine_in = "dine_in"       # 堂食（桌台就餐）
+    takeout = "takeout"       # 外带（到店自取，柜台即点即付）
+    delivery = "delivery"     # 外卖（平台配送：美团/饿了么/抖音）
+    banquet = "banquet"       # 宴席（包场预订）
+    self_pickup = "self_pickup"  # 自提（线上下单，到店自提，凭取餐码提货）
+    retail = "retail"         # 零售（商品零售，非餐饮，如伴手礼/预制菜）
+
+
+class PayMode(str, enum.Enum):
+    """支付时序模式 — 区域/会话级别"""
+    prepay = "prepay"    # 先付后餐（快餐/外带/自提默认）
+    postpay = "postpay"  # 先餐后付（堂食默认）
 
 
 class SettlementType(str, enum.Enum):
