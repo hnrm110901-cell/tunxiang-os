@@ -231,3 +231,53 @@ export const fetchJourneyTemplateAttribution = (days = 7) =>
 
 export const fetchRepairEffectiveness = (days = 30) =>
   txFetchData<RepairEffectiveness>(`/api/v1/growth/attribution/repair-effectiveness?days=${days}`);
+
+// ---- Segment Rules & Tag Distribution (P0 补齐) ----
+
+export interface SegmentPreset {
+  id: string;
+  name: string;
+  description: string;
+  tag_type: string;
+  conditions: { field: string; op: string; value: unknown }[];
+  matched_count: number;
+  recommended_action: string;
+  priority: string;
+}
+
+export interface TagDistribution {
+  repurchase_stage: { stage: string; count: number }[];
+  reactivation_priority: { priority: string; count: number }[];
+  service_repair_status: { status: string; count: number }[];
+}
+
+export const fetchSegmentPresets = () =>
+  txFetchData<{ presets: SegmentPreset[] }>('/api/v1/growth/segment-rules/presets');
+
+export const fetchTagDistribution = () =>
+  txFetchData<TagDistribution>('/api/v1/growth/segment-rules/tag-distribution');
+
+// ---- Offer Packs (P0 权益包) ----
+
+export interface OfferPackItem {
+  type: string;
+  name: string;
+  description: string;
+  cost_fen: number;
+}
+
+export interface OfferPack {
+  code: string;
+  name: string;
+  pack_type: string;
+  mechanism_type: string;
+  description: string;
+  items: OfferPackItem[];
+  budget_limit_fen: number;
+  valid_days: number;
+}
+
+export const fetchOfferPacks = (params?: { pack_type?: string; mechanism_type?: string }) => {
+  const qs = params ? '?' + new URLSearchParams(Object.entries(params).filter(([, v]) => v != null) as [string, string][]).toString() : '';
+  return txFetchData<{ items: OfferPack[]; total: number }>(`/api/v1/growth/offer-packs${qs}`);
+};

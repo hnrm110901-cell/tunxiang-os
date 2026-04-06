@@ -88,6 +88,7 @@ const MENU_CONFIGS: Record<string, MenuConfig> = {
       ]},
       { label: '人群标签', items: [
         { id: 'segments', label: '规则分群', icon: '🎯', path: '/hq/growth/segments' },
+        { id: 'segment-tags', label: '增长标签', icon: '🏷️', path: '/hq/growth/segment-tags' },
       ]},
       { label: '旅程编排', items: [
         { id: 'journey-templates', label: '旅程模板', icon: '📋', path: '/hq/growth/journey-templates' },

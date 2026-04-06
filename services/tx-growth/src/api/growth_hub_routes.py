@@ -1,4 +1,4 @@
-"""增长中枢 V2 API — 31 个端点
+"""增长中枢 V2 API — 34 个端点
 
 端点：
   # Customer Growth Profile
@@ -45,6 +45,11 @@
   GET    /api/v1/growth/attribution/by-journey-template        → 按旅程模板归因统计
   GET    /api/v1/growth/attribution/repair-effectiveness       → 服务修复效果归因
   GET    /api/v1/growth/customers/funnel-stats                 → 客户增长漏斗
+
+  # Segment Rules & Tag Distribution (P0补齐)
+  GET    /api/v1/growth/segment-rules/presets                  → P0预置分群规则模板+实时命中人数
+  GET    /api/v1/growth/segment-rules/tag-distribution         → 增长标签分布统计
+  GET    /api/v1/growth/offer-packs                            → P0权益包模板列表
 
 所有端点必须携带 X-Tenant-ID Header（UUID 格式）。
 """
@@ -1226,3 +1231,154 @@ async def get_repair_effectiveness(
             })
         except (ValueError, RuntimeError, OSError) as exc:
             return err(str(exc))
+
+
+# ---------------------------------------------------------------------------
+# Segment Rules & Tag Distribution (P0 补齐)
+# ---------------------------------------------------------------------------
+
+
+@router.get("/segment-rules/presets")
+async def get_segment_rule_presets(
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+) -> dict:
+    """P0 预置分群规则模板 + 实时命中人数。"""
+    tenant_id = _parse_tenant(x_tenant_id)
+    async with async_session_factory() as db:
+        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        try:
+            presets = []
+
+            # 规则1: 首单后7天未二访
+            r1 = await db.execute(text("""
+                SELECT COUNT(*) FROM customer_growth_profiles
+                WHERE is_deleted = FALSE
+                  AND repurchase_stage = 'first_order_done'
+                  AND first_order_at < NOW() - INTERVAL '7 days'
+                  AND second_order_at IS NULL
+            """))
+            presets.append({
+                "id": "preset_no_second_visit_7d",
+                "name": "首单后7天未二访",
+                "description": "完成首单超过7天但未产生第二笔订单的客户",
+                "tag_type": "first_to_second",
+                "conditions": [
+                    {"field": "repurchase_stage", "op": "eq", "value": "first_order_done"},
+                    {"field": "first_order_at", "op": "lt", "value": "NOW() - 7 days"},
+                    {"field": "second_order_at", "op": "is_null", "value": True},
+                ],
+                "matched_count": r1.scalar() or 0,
+                "recommended_action": "触发首单转二访旅程V2",
+                "priority": "high",
+            })
+
+            # 规则2: 近30天沉默+有已拥有权益
+            r2 = await db.execute(text("""
+                SELECT COUNT(*) FROM customer_growth_profiles
+                WHERE is_deleted = FALSE
+                  AND reactivation_priority IN ('high', 'critical')
+                  AND has_active_owned_benefit = TRUE
+                  AND owned_benefit_expire_at > NOW()
+            """))
+            presets.append({
+                "id": "preset_silent_with_benefit",
+                "name": "沉默客·有权益未使用",
+                "description": "30天+未到店且持有未过期权益的客户，适合损失厌恶召回",
+                "tag_type": "reactivation",
+                "conditions": [
+                    {"field": "reactivation_priority", "op": "in", "value": ["high", "critical"]},
+                    {"field": "has_active_owned_benefit", "op": "eq", "value": True},
+                    {"field": "owned_benefit_expire_at", "op": "gt", "value": "NOW()"},
+                ],
+                "matched_count": r2.scalar() or 0,
+                "recommended_action": "触发沉默召回·权益到期型旅程V2",
+                "priority": "critical",
+            })
+
+            # 规则3: 投诉关闭后待修复
+            r3 = await db.execute(text("""
+                SELECT COUNT(*) FROM customer_growth_profiles
+                WHERE is_deleted = FALSE
+                  AND service_repair_status = 'complaint_closed_pending_repair'
+            """))
+            presets.append({
+                "id": "preset_pending_repair",
+                "name": "投诉关闭·待修复",
+                "description": "投诉已结案但关系未修复的客户，需启动服务修复旅程",
+                "tag_type": "service_repair",
+                "conditions": [
+                    {"field": "service_repair_status", "op": "eq", "value": "complaint_closed_pending_repair"},
+                ],
+                "matched_count": r3.scalar() or 0,
+                "recommended_action": "触发服务修复·四阶协议旅程V2",
+                "priority": "critical",
+            })
+
+            return ok({"presets": presets})
+        except (ValueError, RuntimeError, OSError) as exc:
+            return err(str(exc))
+
+
+@router.get("/segment-rules/tag-distribution")
+async def get_tag_distribution(
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+) -> dict:
+    """增长标签分布统计。"""
+    tenant_id = _parse_tenant(x_tenant_id)
+    async with async_session_factory() as db:
+        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        try:
+            # 复购阶段分布
+            r1 = await db.execute(text("""
+                SELECT repurchase_stage, COUNT(*) FROM customer_growth_profiles
+                WHERE is_deleted = FALSE GROUP BY repurchase_stage ORDER BY COUNT(*) DESC
+            """))
+            repurchase = [{"stage": row[0], "count": row[1]} for row in r1.fetchall()]
+
+            # 召回优先级分布
+            r2 = await db.execute(text("""
+                SELECT reactivation_priority, COUNT(*) FROM customer_growth_profiles
+                WHERE is_deleted = FALSE GROUP BY reactivation_priority ORDER BY COUNT(*) DESC
+            """))
+            reactivation = [{"priority": row[0], "count": row[1]} for row in r2.fetchall()]
+
+            # 修复状态分布
+            r3 = await db.execute(text("""
+                SELECT service_repair_status, COUNT(*) FROM customer_growth_profiles
+                WHERE is_deleted = FALSE AND service_repair_status != 'none'
+                GROUP BY service_repair_status ORDER BY COUNT(*) DESC
+            """))
+            repair = [{"status": row[0], "count": row[1]} for row in r3.fetchall()]
+
+            return ok({
+                "repurchase_stage": repurchase,
+                "reactivation_priority": reactivation,
+                "service_repair_status": repair,
+            })
+        except (ValueError, RuntimeError, OSError) as exc:
+            return err(str(exc))
+
+
+# ---------------------------------------------------------------------------
+# Offer Packs (P0 权益包模板)
+# ---------------------------------------------------------------------------
+
+
+@router.get("/offer-packs")
+async def list_offer_packs(
+    pack_type: Optional[str] = Query(None, description="按类型筛选: first_to_second / reactivation / service_repair"),
+    mechanism_type: Optional[str] = Query(None, description="按机制筛选: micro_commitment / loss_aversion / ..."),
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+) -> dict:
+    """查询 P0 权益包模板（当前从内存种子数据返回）。"""
+    _parse_tenant(x_tenant_id)  # 验证 tenant 格式
+    try:
+        from seeds.growth_offer_seeds import GROWTH_OFFER_PACKS
+        items = list(GROWTH_OFFER_PACKS)
+        if pack_type:
+            items = [p for p in items if p["pack_type"] == pack_type]
+        if mechanism_type:
+            items = [p for p in items if p["mechanism_type"] == mechanism_type]
+        return ok({"items": items, "total": len(items)})
+    except (ImportError, KeyError, ValueError) as exc:
+        return err(str(exc))
