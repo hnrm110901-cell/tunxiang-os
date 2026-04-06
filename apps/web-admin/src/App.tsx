@@ -100,6 +100,12 @@ import { DishSpecPage } from './pages/menu/DishSpecPage';
 import { DishSortPage } from './pages/menu/DishSortPage';
 import { DishBatchPage } from './pages/menu/DishBatchPage';
 import { CRMCampaignPage } from './pages/growth/CRMCampaignPage';
+import { CustomerPoolPage } from './pages/hq/growth/CustomerPoolPage';
+import { Customer360Page } from './pages/hq/growth/Customer360Page';
+import { GrowthJourneyTemplatePage } from './pages/hq/growth/GrowthJourneyTemplatePage';
+import { GrowthJourneyRunsPage } from './pages/hq/growth/GrowthJourneyRunsPage';
+import { AgentWorkbenchPage } from './pages/hq/growth/AgentWorkbenchPage';
+import { JourneyAttributionPage } from './pages/hq/growth/JourneyAttributionPage';
 import { CampaignManagePage } from './pages/growth/CampaignManagePage';
 import { AttendancePage } from './pages/org/AttendancePage';
 import { PerformancePage } from './pages/org/PerformancePage';
@@ -263,6 +269,13 @@ function App() {
           <Route path="/hq/growth/xhs" element={<XHSIntegrationPage />} />
           <Route path="/hq/growth/retail-mall" element={<RetailMallPage />} />
           <Route path="/hq/growth/journey-monitor" element={<JourneyMonitorPage />} />
+          {/* 增长中枢V2新增路由 */}
+          <Route path="/hq/growth/customers" element={<CustomerPoolPage />} />
+          <Route path="/hq/growth/customers/:customerId" element={<Customer360Page />} />
+          <Route path="/hq/growth/journey-templates" element={<GrowthJourneyTemplatePage />} />
+          <Route path="/hq/growth/journey-runs" element={<GrowthJourneyRunsPage />} />
+          <Route path="/hq/growth/agent-workbench" element={<AgentWorkbenchPage />} />
+          <Route path="/hq/growth/journey-attribution" element={<JourneyAttributionPage />} />
           <Route path="/hq/trade/delivery" element={<DeliveryPage />} />
           <Route path="/hq/supply/inventory-intel" element={<InventoryIntelPage />} />
           <Route path="/hq/supply/chain" element={<SupplyChainPage />} />

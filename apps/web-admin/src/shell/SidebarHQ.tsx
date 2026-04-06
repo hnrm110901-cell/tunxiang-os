@@ -80,31 +80,37 @@ const MENU_CONFIGS: Record<string, MenuConfig> = {
   },
   growth: {
     moduleId: 'growth', groups: [
-      { label: '增长概览', items: [
+      { label: '增长中枢', items: [
         { id: 'growth-dashboard', label: '增长驾驶舱', icon: '🚀', path: '/hq/growth/dashboard' },
-        { id: 'growth-roi', label: 'ROI总览', icon: '💰', path: '/hq/growth/roi' },
       ]},
-      { label: '会员运营', items: [
-        { id: 'segments', label: '人群分层', icon: '👥', path: '/hq/growth/segments' },
-        { id: 'journeys', label: '旅程管理', icon: '📍', path: '/hq/growth/journeys' },
+      { label: '客户资产', items: [
+        { id: 'customer-pool', label: '客户总池', icon: '👥', path: '/hq/growth/customers' },
+      ]},
+      { label: '人群标签', items: [
+        { id: 'segments', label: '规则分群', icon: '🎯', path: '/hq/growth/segments' },
+      ]},
+      { label: '旅程编排', items: [
+        { id: 'journey-templates', label: '旅程模板', icon: '📋', path: '/hq/growth/journey-templates' },
+        { id: 'journey-runs', label: '运行中心', icon: '▶️', path: '/hq/growth/journey-runs' },
         { id: 'journey-monitor', label: '旅程执行监控', icon: '🗺️', path: '/hq/growth/journey-monitor' },
-        { id: 'member-cards', label: '储值卡与积分', icon: '💳', path: '/hq/growth/member-cards' },
+      ]},
+      { label: '触达与权益', items: [
+        { id: 'offers', label: '优惠中心', icon: '🎫', path: '/hq/growth/offers' },
+        { id: 'channels', label: '渠道触达', icon: '📡', path: '/hq/growth/channels' },
+        { id: 'content', label: '内容中心', icon: '📝', path: '/hq/growth/content' },
+      ]},
+      { label: '私域复购Agent', items: [
+        { id: 'agent-workbench', label: 'Agent工作台', icon: '🤖', path: '/hq/growth/agent-workbench' },
+      ]},
+      { label: '归因复盘', items: [
+        { id: 'growth-roi', label: 'ROI总览', icon: '💰', path: '/hq/growth/roi' },
+        { id: 'journey-attribution', label: '旅程归因', icon: '📊', path: '/hq/growth/journey-attribution' },
       ]},
       { label: '营销工具', items: [
-        { id: 'offers', label: '优惠中心', icon: '🎫', path: '/hq/growth/offers' },
-        { id: 'content', label: '内容中心', icon: '📝', path: '/hq/growth/content' },
-        { id: 'channels', label: '渠道中心', icon: '📡', path: '/hq/growth/channels' },
         { id: 'referral', label: '裂变中心', icon: '🔗', path: '/hq/growth/referral' },
         { id: 'group-buy', label: '团购管理', icon: '🛒', path: '/hq/growth/group-buy' },
         { id: 'stamp-card', label: '集章卡', icon: '🎴', path: '/hq/growth/stamp-card' },
-      ]},
-      { label: '渠道拓展', items: [
-        { id: 'xhs', label: '小红书运营', icon: '📕', path: '/hq/growth/xhs' },
-        { id: 'retail-mall', label: '零售商城', icon: '🏪', path: '/hq/growth/retail-mall' },
-        { id: 'execution', label: '门店执行', icon: '📋', path: '/hq/growth/execution' },
-      ]},
-      { label: 'AI 运营', items: [
-        { id: 'crm-campaign', label: '私域运营生成', icon: '📢', path: '/growth/crm-campaign' },
+        { id: 'member-cards', label: '储值卡与积分', icon: '💳', path: '/hq/growth/member-cards' },
       ]},
     ],
   },

@@ -101,6 +101,7 @@ from .api.journey_routes import router as journey_router
 from .api.offer_routes import router as offer_router            # v144 DB化
 from .api.referral_routes import router as referral_router
 from .api.segmentation_routes import router as segmentation_router
+from .api.growth_hub_routes import router as growth_hub_router
 from .api.touch_attribution_routes import router as touch_attribution_router
 
 _approval_service = _ApprovalService()
@@ -215,6 +216,85 @@ def _on_approval_expiry_done(task: asyncio.Task) -> None:
         )
 
 
+# ---------------------------------------------------------------------------
+# APScheduler — Growth Journey V2 tick（每60秒）
+# ---------------------------------------------------------------------------
+
+from services.growth_journey_service import GrowthJourneyService as _GrowthJourneyService
+
+_growth_journey_svc = _GrowthJourneyService()
+
+
+async def _run_growth_journey_tick() -> None:
+    """定时任务：每分钟推进到期的增长中枢V2旅程。"""
+    logger.info("growth_journey_v2_tick_started")
+    async with async_session_factory() as db:
+        try:
+            result = await _growth_journey_svc.process_pending(tenant_id=None, db=db)
+            await db.commit()
+            logger.info("growth_journey_v2_tick_done", **result)
+        except (OSError, RuntimeError, ValueError) as exc:
+            await db.rollback()
+            logger.error("growth_journey_v2_tick_error", error=str(exc), exc_info=True)
+
+
+def _schedule_growth_journey_tick() -> None:
+    task = asyncio.create_task(_run_growth_journey_tick())
+    task.add_done_callback(_on_growth_journey_tick_done)
+
+
+def _on_growth_journey_tick_done(task: asyncio.Task) -> None:
+    exc = task.exception() if not task.cancelled() else None
+    if exc is not None:
+        logger.error("growth_journey_v2_tick_unhandled", error=str(exc), exc_info=exc)
+
+
+# ---------------------------------------------------------------------------
+# APScheduler — Silent Detection（每日凌晨2点）
+# ---------------------------------------------------------------------------
+
+from services.growth_profile_service import GrowthProfileService as _GrowthProfileService
+
+_growth_profile_svc = _GrowthProfileService()
+
+
+async def _run_silent_detection() -> None:
+    """每日凌晨2点：扫描沉默客户，更新召回优先级。"""
+    logger.info("growth_silent_detection_started")
+    from sqlalchemy import text as _text
+    async with async_session_factory() as probe_db:
+        try:
+            result = await probe_db.execute(
+                _text("SELECT DISTINCT tenant_id FROM stores WHERE is_active = true")
+            )
+            tenant_ids = [str(row[0]) for row in result.fetchall()]
+        except (OSError, RuntimeError, ValueError) as exc:
+            logger.error("silent_detection_fetch_tenants_error", error=str(exc), exc_info=True)
+            return
+    for tid in tenant_ids:
+        async with async_session_factory() as db:
+            try:
+                await db.execute(_text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": tid})
+                result = await _growth_profile_svc.batch_detect_silent(tid, db)
+                await db.commit()
+                logger.info("silent_detection_tenant_done", tenant_id=tid, **result)
+            except (OSError, RuntimeError, ValueError) as exc:
+                await db.rollback()
+                logger.error("silent_detection_tenant_error", tenant_id=tid, error=str(exc), exc_info=True)
+    logger.info("growth_silent_detection_finished", tenant_count=len(tenant_ids))
+
+
+def _schedule_silent_detection() -> None:
+    task = asyncio.create_task(_run_silent_detection())
+    task.add_done_callback(_on_silent_detection_done)
+
+
+def _on_silent_detection_done(task: asyncio.Task) -> None:
+    exc = task.exception() if not task.cancelled() else None
+    if exc is not None:
+        logger.error("silent_detection_unhandled", error=str(exc), exc_info=exc)
+
+
 async def _run_journey_event_listener() -> None:
     """旅程事件监听后台任务：订阅 Redis Stream，实时触发旅程。
 
@@ -272,10 +352,34 @@ async def lifespan(app: FastAPI):
         misfire_grace_time=30,
     )
 
+    # Growth Journey V2 tick — 每分钟推进到期的增长中枢V2旅程
+    _scheduler.add_job(
+        _schedule_growth_journey_tick,
+        trigger="interval",
+        seconds=60,
+        id="growth_journey_v2_tick",
+        replace_existing=True,
+        max_instances=1,
+        misfire_grace_time=30,
+    )
+
+    # Silent Detection — 每日凌晨2点
+    _scheduler.add_job(
+        _schedule_silent_detection,
+        trigger="cron",
+        hour=2,
+        id="growth_silent_detection",
+        replace_existing=True,
+        max_instances=1,
+        misfire_grace_time=300,
+    )
+
     _scheduler.start()
     logger.info("journey_executor_scheduler_started", interval_seconds=60)
     logger.info("approval_expiry_scheduler_started", interval_hours=1)
     logger.info("journey_engine_scheduler_started", interval_seconds=60)
+    logger.info("growth_journey_v2_scheduler_started", interval_seconds=60)
+    logger.info("growth_silent_detection_scheduler_started", trigger="cron_02:00")
 
     # 启动 EventBridge（桥接业务事件 → JourneyEngine）
     _bridge = _get_event_bridge(
@@ -330,6 +434,7 @@ app.include_router(journey_router)
 app.include_router(offer_router)            # /api/v1/offers — offers/offer_redemptions 表
 app.include_router(content_router)          # /api/v1/content — content_templates 表
 app.include_router(channel_router)          # /api/v1/channels — channel_configs/message_send_logs 表
+app.include_router(growth_hub_router)       # /api/v1/growth — 增长中枢V2
 
 # 服务实例
 brand_svc = BrandStrategyService()

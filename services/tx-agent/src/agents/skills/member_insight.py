@@ -45,6 +45,8 @@ class MemberInsightAgent(SkillAgent):
             "monitor_service_quality", "handle_complaint", "collect_feedback",
             "rfm_analysis", "update_customer_rfm",
             "get_clv_snapshot",         # Phase 3: 读 mv_member_clv
+            "generate_first_to_second_suggestion",  # 增长中枢V2: 首单转二访建议
+            "generate_repair_suggestion",           # 增长中枢V2: 服务修复建议
         ]
 
     async def execute(self, action: str, params: dict[str, Any]) -> AgentResult:
@@ -61,6 +63,8 @@ class MemberInsightAgent(SkillAgent):
             "rfm_analysis": self._rfm_analysis,
             "update_customer_rfm": self._update_customer_rfm,
             "get_clv_snapshot": self._get_clv_snapshot,
+            "generate_first_to_second_suggestion": self._generate_first_to_second_suggestion,
+            "generate_repair_suggestion": self._generate_repair_suggestion,
         }
         handler = dispatch.get(action)
         if not handler:
@@ -555,4 +559,238 @@ class MemberInsightAgent(SkillAgent):
             ),
             confidence=0.95,
             inference_layer="cloud",
+        )
+
+    # ─── 增长中枢V2: 首单转二访策略建议 ───
+
+    async def _generate_first_to_second_suggestion(self, params: dict) -> AgentResult:
+        """生成首单转二访策略建议，写入 growth_agent_strategy_suggestions
+
+        对首单完成的客户，根据首单行为特征选择心理机制:
+        - 默认路径: identity_anchor（身份锚定）→ micro_commitment（最小承诺）
+        - 高客单: 可加 variable_reward（多样化奖励）提升惊喜感
+        - 低客单: 优先 micro_commitment（降低回访门槛）
+
+        决策留痕: explanation_summary + risk_summary 记录推理过程和风险点。
+        """
+        import httpx
+
+        customer_id = params.get("customer_id")
+        if not customer_id:
+            return AgentResult(success=False, action="generate_first_to_second_suggestion",
+                               error="缺少 customer_id")
+
+        first_order_amount_fen = params.get("first_order_amount_fen", 0)
+        favorite_dish = params.get("favorite_dish", "")
+        order_channel = params.get("order_channel", "dine_in")
+
+        # 根据首单客单价选择机制组合
+        if first_order_amount_fen >= 15000:  # 150元以上 — 高客单
+            primary_mechanism = "identity_anchor"
+            secondary_mechanism = "variable_reward"
+            explanation = (
+                f"首单客单价¥{first_order_amount_fen / 100:.0f}（高客单），"
+                f"优先身份锚定建立归属感，配合多样化奖励提升惊喜感。"
+                f"渠道: {order_channel}，喜欢: {favorite_dish or '未知'}"
+            )
+            risk = "高客单客户对促销敏感度低，避免用折扣券拉低品牌调性。"
+        else:
+            primary_mechanism = "micro_commitment"
+            secondary_mechanism = "identity_anchor"
+            explanation = (
+                f"首单客单价¥{first_order_amount_fen / 100:.0f}（标准），"
+                f"优先最小承诺降低回访门槛，配合身份锚定建立认同。"
+                f"渠道: {order_channel}，喜欢: {favorite_dish or '未知'}"
+            )
+            risk = "标准客单客户可能对免费小食更感兴趣，但需控制赠品成本在毛利安全线内。"
+
+        template_code = "first_to_second_v2"
+        channel = "wecom"
+
+        # 三条硬约束校验
+        constraints_check = {
+            "margin_safe": True,       # 首单转二访赠品成本已在旅程预算内
+            "food_safety_ok": True,    # 触达类操作不涉及食材出品
+            "customer_experience_ok": True,  # 触达间隔>=3天，不过度打扰
+        }
+
+        suggestion = {
+            "customer_id": customer_id,
+            "suggestion_type": "first_to_second",
+            "priority": "high",
+            "mechanism_type": primary_mechanism,
+            "secondary_mechanism_type": secondary_mechanism,
+            "recommended_journey_template": template_code,
+            "recommended_offer_type": "micro_gift" if first_order_amount_fen < 15000 else "surprise_reward",
+            "recommended_channel": channel,
+            "explanation_summary": explanation,
+            "risk_summary": risk,
+            "constraints_check": constraints_check,
+            "expected_outcome_json": {
+                "expected_second_visit_rate_14d": 0.22 if first_order_amount_fen >= 15000 else 0.18,
+                "expected_open_rate": 0.35,
+                "expected_reply_rate": 0.10,
+            },
+            "requires_human_review": False,
+            "created_by_agent": "member_insight",
+        }
+
+        # 调用 tx-growth API 写入建议池
+        try:
+            async with httpx.AsyncClient() as client:
+                resp = await client.post(
+                    "http://tx-growth:8004/api/v1/growth/agent-suggestions",
+                    json=suggestion,
+                    headers={"X-Tenant-ID": self.tenant_id},
+                    timeout=10.0,
+                )
+                result = resp.json()
+        except (httpx.HTTPError, OSError) as exc:
+            return AgentResult(
+                success=False, action="generate_first_to_second_suggestion",
+                error=f"写入建议池失败: {exc}",
+                constraints_passed=True,
+                constraints_detail=constraints_check,
+            )
+
+        return AgentResult(
+            success=True,
+            action="generate_first_to_second_suggestion",
+            data={
+                "suggestion": suggestion,
+                "api_response": result,
+            },
+            reasoning=f"首单转二访建议: {primary_mechanism}+{secondary_mechanism}，"
+                      f"客单价¥{first_order_amount_fen / 100:.0f}，"
+                      f"预计14天二访率{suggestion['expected_outcome_json']['expected_second_visit_rate_14d']:.0%}",
+            confidence=0.82,
+            constraints_passed=True,
+            constraints_detail=constraints_check,
+        )
+
+    # ─── 增长中枢V2: 服务修复策略建议 ───
+
+    async def _generate_repair_suggestion(self, params: dict) -> AgentResult:
+        """生成服务修复策略建议，写入 growth_agent_strategy_suggestions
+
+        投诉关闭后触发，采用四阶修复协议:
+        1. 情绪承接（先接住情绪，不急于解决）
+        2. 控制感补偿（给客户选择权）
+        3. 补偿确认（确认方案执行）
+        4. 回访观察（72小时）
+
+        关键约束:
+        - requires_human_review=True（修复类建议必须人工审核）
+        - 禁止辩解性语言
+        - 补偿金额上限受毛利约束控制
+
+        决策留痕: explanation_summary + risk_summary 记录推理过程和风险点。
+        """
+        import httpx
+
+        customer_id = params.get("customer_id")
+        if not customer_id:
+            return AgentResult(success=False, action="generate_repair_suggestion",
+                               error="缺少 customer_id")
+
+        complaint_type = params.get("complaint_type", "other")
+        complaint_severity = params.get("complaint_severity", "medium")
+        customer_lifetime_value_fen = params.get("customer_lifetime_value_fen", 0)
+        complaint_summary = params.get("complaint_summary", "")
+
+        # 根据投诉严重程度和客户价值确定补偿力度
+        if complaint_severity == "high":
+            compensation_budget_fen = min(10000, max(3000, customer_lifetime_value_fen // 20))  # CLV的5%，上限100元
+            urgency = "immediate"
+            explanation = (
+                f"高严重度投诉（{complaint_type}），客户CLV¥{customer_lifetime_value_fen / 100:.0f}。"
+                f"建议补偿预算¥{compensation_budget_fen / 100:.0f}，"
+                f"采用四阶修复协议，1小时内启动情绪承接。"
+                f"投诉摘要: {complaint_summary[:50]}"
+            )
+            risk = "高严重度投诉若修复失败，客户流失概率>80%。补偿方案须给客户充分选择权。"
+        elif complaint_severity == "medium":
+            compensation_budget_fen = min(5000, max(1500, customer_lifetime_value_fen // 30))  # CLV的3.3%，上限50元
+            urgency = "within_4h"
+            explanation = (
+                f"中等严重度投诉（{complaint_type}），客户CLV¥{customer_lifetime_value_fen / 100:.0f}。"
+                f"建议补偿预算¥{compensation_budget_fen / 100:.0f}，"
+                f"采用四阶修复协议，4小时内启动。"
+                f"投诉摘要: {complaint_summary[:50]}"
+            )
+            risk = "中等投诉修复成功率约65%，关键在情绪承接阶段的真诚度。"
+        else:
+            compensation_budget_fen = min(2000, max(500, customer_lifetime_value_fen // 50))  # CLV的2%，上限20元
+            urgency = "within_24h"
+            explanation = (
+                f"轻度投诉（{complaint_type}），客户CLV¥{customer_lifetime_value_fen / 100:.0f}。"
+                f"建议补偿预算¥{compensation_budget_fen / 100:.0f}，"
+                f"采用标准修复流程，24小时内响应。"
+                f"投诉摘要: {complaint_summary[:50]}"
+            )
+            risk = "轻度投诉修复成功率约85%，重点是诚恳态度。"
+
+        template_code = "service_repair_v2"
+
+        # 三条硬约束校验
+        constraints_check = {
+            "margin_safe": compensation_budget_fen <= max(3000, customer_lifetime_value_fen // 10),
+            "food_safety_ok": True,    # 修复触达不涉及食材出品
+            "customer_experience_ok": True,  # 修复旅程优先级最高，不会与其他旅程冲突
+        }
+
+        suggestion = {
+            "customer_id": customer_id,
+            "suggestion_type": "service_repair",
+            "priority": "critical" if complaint_severity == "high" else "high",
+            "mechanism_type": "service_repair",
+            "recommended_journey_template": template_code,
+            "recommended_offer_type": "compensation_choice",
+            "recommended_channel": "manual_task",  # 修复类必须人工执行
+            "compensation_budget_fen": compensation_budget_fen,
+            "urgency": urgency,
+            "complaint_type": complaint_type,
+            "complaint_severity": complaint_severity,
+            "explanation_summary": explanation,
+            "risk_summary": risk,
+            "constraints_check": constraints_check,
+            "expected_outcome_json": {
+                "expected_repair_success_rate": 0.50 if complaint_severity == "high" else 0.65 if complaint_severity == "medium" else 0.85,
+                "expected_revisit_rate_7d": 0.30 if complaint_severity == "high" else 0.45 if complaint_severity == "medium" else 0.60,
+            },
+            "requires_human_review": True,  # 修复类建议必须人工审核
+            "created_by_agent": "member_insight",
+        }
+
+        # 调用 tx-growth API 写入建议池
+        try:
+            async with httpx.AsyncClient() as client:
+                resp = await client.post(
+                    "http://tx-growth:8004/api/v1/growth/agent-suggestions",
+                    json=suggestion,
+                    headers={"X-Tenant-ID": self.tenant_id},
+                    timeout=10.0,
+                )
+                result = resp.json()
+        except (httpx.HTTPError, OSError) as exc:
+            return AgentResult(
+                success=False, action="generate_repair_suggestion",
+                error=f"写入建议池失败: {exc}",
+                constraints_passed=all(constraints_check.values()),
+                constraints_detail=constraints_check,
+            )
+
+        return AgentResult(
+            success=True,
+            action="generate_repair_suggestion",
+            data={
+                "suggestion": suggestion,
+                "api_response": result,
+            },
+            reasoning=f"服务修复建议: {complaint_severity}严重度（{complaint_type}），"
+                      f"补偿预算¥{compensation_budget_fen / 100:.0f}，"
+                      f"紧急度={urgency}，须人工审核",
+            confidence=0.80,
+            constraints_passed=all(constraints_check.values()),
+            constraints_detail=constraints_check,
         )

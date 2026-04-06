@@ -140,6 +140,8 @@ class EnergyEventType(str, Enum):
     ANOMALY_DETECTED = "energy.anomaly_detected"        # 异常能耗
     ALERT_SENT = "energy.alert_sent"                    # 告警推送
     BENCHMARK_SET = "energy.benchmark_set"              # 基准线设置
+    BUDGET_SET = "energy.budget_set"                    # 月度预算配置（v164 新增）
+    ALERT_RULE_CREATED = "energy.alert_rule_created"    # 告警规则创建（v164 新增）
 
 
 class ReviewEventType(str, Enum):
@@ -220,6 +222,8 @@ DOMAIN_STREAM_MAP: dict[str, str] = {
     "credit":       "tx_credit_events",
     # 营销活动域（v157 新增）
     "campaign":     "tx_campaign_events",
+    # 增长中枢域（v184 新增）
+    "growth":       "tx_growth_events",
     # 兼容旧域
     "trade":        "trade_events",
     "supply":       "supply_events",
@@ -251,6 +255,8 @@ DOMAIN_STREAM_TYPE_MAP: dict[str, str] = {
     "deposit":      "deposit",
     "wine_storage": "wine_storage",
     "credit":       "credit",
+    # 增长中枢域（v184 新增）
+    "growth":       "growth",
 }
 
 # ──────────────────────────────────────────────────────────────────────
@@ -309,6 +315,23 @@ class CampaignEventType(str, Enum):
     BUDGET_EXHAUSTED = "campaign.budget_exhausted"          # 活动预算耗尽
 
 
+# ──────────────────────────────────────────────────────────────────────
+# 增长中枢域（私域复购链路，v184 新增）
+# ──────────────────────────────────────────────────────────────────────
+
+class GrowthEventType(str, Enum):
+    """增长中枢事件 — 私域复购链路"""
+
+    FIRST_ORDER_COMPLETED = "growth.first_order_completed"
+    SILENT_DETECTED = "growth.silent_detected"
+    COMPLAINT_CLOSED = "growth.complaint_closed"
+    TOUCH_DELIVERED = "growth.touch_delivered"
+    ORDER_ATTRIBUTED = "growth.order_attributed"
+    SUGGESTION_PUBLISHED = "growth.agent_suggestion_published"
+    REPAIR_STATE_CHANGED = "growth.repair_state_changed"
+    ENROLLMENT_STATE_CHANGED = "growth.enrollment_state_changed"
+
+
 def resolve_stream_key(event_type: str) -> str:
     """根据事件类型字符串解析目标 Redis Stream key。
 
@@ -350,4 +373,6 @@ ALL_EVENT_ENUMS = (
     SafetyInspectionEventType,
     # 营销活动域（v157 新增）
     CampaignEventType,
+    # 增长中枢域（v184 新增）
+    GrowthEventType,
 )
