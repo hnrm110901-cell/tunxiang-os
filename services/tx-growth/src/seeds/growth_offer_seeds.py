@@ -9,6 +9,11 @@ P1三类权益包：
 6. 超级用户关系权益包 — 非折扣型专属体验
 7. 里程碑庆祝权益包 — 按等级递进的权益
 8. 裂变场景激励包 — 推荐人+被推荐人双向激励
+
+P2三类权益包 (V2.1 Sprint A):
+9. 储值续航包 — 激活沉睡储值余额
+10. 宴席复购包 — 高价值宴席客户关系维护
+11. 渠道回流包 — 平台客转品牌客激励
 """
 from __future__ import annotations
 
@@ -130,5 +135,53 @@ GROWTH_OFFER_PACKS: list[dict[str, Any]] = [
         ],
         "budget_limit_fen": 4500,
         "valid_days": 30,
+    },
+
+    # ══════════════════════════════════════════════════════════
+    # P2 场景权益包 (V2.1 Sprint A)
+    # ══════════════════════════════════════════════════════════
+
+    {
+        "code": "pack_stored_value_renewal",
+        "name": "储值续航·余额唤醒包",
+        "pack_type": "stored_value",
+        "mechanism_type": "loss_aversion",
+        "description": "激活沉睡储值余额，通过体验邀请和优先通道引导到店使用",
+        "items": [
+            {"type": "reminder", "name": "储值余额使用提醒", "description": "提醒客户储值卡剩余余额及使用方式", "cost_fen": 0},
+            {"type": "experience", "name": "专属品鉴体验", "description": "储值贵宾专属品鉴体验一次，直接从储值卡扣款", "cost_fen": 1500},
+            {"type": "privilege", "name": "优先预订通道", "description": "储值客户专属快捷预订入口，免排队", "cost_fen": 0},
+        ],
+        "budget_limit_fen": 1500,
+        "valid_days": 14,
+    },
+    {
+        "code": "pack_banquet_repurchase",
+        "name": "宴席复购·关系维护包",
+        "pack_type": "banquet",
+        "mechanism_type": "relationship",
+        "description": "通过服务升级和体验增值维护高价值宴席客户关系，驱动复购",
+        "items": [
+            {"type": "privilege", "name": "包厢优先预订", "description": "宴席客户可优先预订VIP包厢，节假日也不排队", "cost_fen": 0},
+            {"type": "privilege", "name": "定制菜单服务", "description": "根据宴请场景和口味偏好定制专属菜单", "cost_fen": 0},
+            {"type": "experience", "name": "宴席布置升级", "description": "免费升级宴席桌面布置和氛围装饰", "cost_fen": 3000},
+            {"type": "gift", "name": "赠送招牌甜品", "description": "宴席结束赠送招牌甜品拼盘一份", "cost_fen": 1500},
+        ],
+        "budget_limit_fen": 5000,
+        "valid_days": 30,
+    },
+    {
+        "code": "pack_channel_reflow",
+        "name": "渠道回流·平台客转化包",
+        "pack_type": "channel_reflow",
+        "mechanism_type": "hook",
+        "description": "通过到店专属权益和储值体验金，将平台客户转化为品牌自有会员",
+        "items": [
+            {"type": "gift", "name": "品牌会员礼", "description": "首次到店领取精美伴手小礼品一份", "cost_fen": 500},
+            {"type": "experience", "name": "首次到店专属菜品", "description": "到店专享品牌招牌菜一道，平台渠道不提供", "cost_fen": 1200},
+            {"type": "stored_value", "name": "储值体验金", "description": "充100送20元体验金，感受储值便利", "cost_fen": 2000},
+        ],
+        "budget_limit_fen": 3700,
+        "valid_days": 14,
     },
 ]

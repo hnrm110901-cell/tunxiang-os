@@ -143,6 +143,20 @@ interface GrowthDashboardStats {
     open_rate: number;
     attribution_rate: number;
   }[];
+  core_metrics?: {
+    identifiable_rate: number;
+    first_order_join_rate: number;
+    second_visit_rate: number;
+    thirty_day_repeat_rate: number;
+    recall_success_rate: number;
+    channel_reflow_rate: number;
+    stored_value_conversion_rate: number;
+    banquet_reorder_rate: number;
+    repair_revisit_rate: number;
+    per_customer_profit_fen: number;
+    journey_roi: number;
+    private_gmv_ratio: number;
+  };
 }
 
 // ---- 工具函数 ----
@@ -1205,6 +1219,49 @@ export function GrowthDashboardPage() {
                 {renderDimension('成长里程碑', p1Dist?.milestones, msLabels, BLUE)}
                 {renderDimension('裂变场景', p1Dist?.referral, rfLabels, PURPLE)}
               </>
+            );
+          })()}
+        </div>
+
+        {/* ---- 增长核心指标（12维） ---- */}
+        <div style={{ background: BG_1, borderRadius: 8, padding: 16, marginTop: 16 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: TEXT_1, marginBottom: 12 }}>
+            增长核心指标（12维）
+          </div>
+          {(() => {
+            const cm = growthStats?.core_metrics;
+            const items: { label: string; value: number | null | undefined; suffix: string; isPct: boolean }[] = [
+              { label: '可识别客户占比', value: cm?.identifiable_rate, suffix: '%', isPct: true },
+              { label: '首单入会率', value: cm?.first_order_join_rate, suffix: '%', isPct: true },
+              { label: '二访率', value: cm?.second_visit_rate, suffix: '%', isPct: true },
+              { label: '30天复购率', value: cm?.thirty_day_repeat_rate, suffix: '%', isPct: true },
+              { label: '召回成功率', value: cm?.recall_success_rate, suffix: '%', isPct: true },
+              { label: '渠道回流率', value: cm?.channel_reflow_rate, suffix: '%', isPct: true },
+              { label: '储值转化率', value: cm?.stored_value_conversion_rate, suffix: '%', isPct: true },
+              { label: '宴席复订率', value: cm?.banquet_reorder_rate, suffix: '%', isPct: true },
+              { label: '修复回访率', value: cm?.repair_revisit_rate, suffix: '%', isPct: true },
+              { label: '单客触达毛利', value: cm?.per_customer_profit_fen != null ? cm.per_customer_profit_fen / 100 : null, suffix: '元', isPct: false },
+              { label: '旅程ROI', value: cm?.journey_roi, suffix: '%', isPct: true },
+              { label: '私域GMV占比', value: cm?.private_gmv_ratio, suffix: '%', isPct: true },
+            ];
+            return (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
+                {items.map((item) => {
+                  const hasData = item.value != null && item.value !== 0;
+                  return (
+                    <div key={item.label} style={{
+                      background: BG_2, borderRadius: 6, padding: '10px 12px', textAlign: 'center',
+                    }}>
+                      <div style={{ fontSize: 11, color: TEXT_3, marginBottom: 4 }}>{item.label}</div>
+                      <div style={{ fontSize: 20, fontWeight: 700, color: hasData ? BRAND : TEXT_4 }}>
+                        {hasData
+                          ? item.isPct ? `${item.value}${item.suffix}` : `${item.value?.toFixed(1)}${item.suffix}`
+                          : '\u2014'}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             );
           })()}
         </div>

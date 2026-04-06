@@ -750,6 +750,85 @@ class GrowthProfileService:
         results["super_user"] = await self.batch_compute_super_user(tenant_id, db)
         results["milestones"] = await self.batch_compute_milestones(tenant_id, db)
         results["referral_scenario"] = await self.batch_compute_referral_scenario(tenant_id, db)
+        results["stored_value"] = await self.batch_sync_stored_value(tenant_id, db)
+        results["banquet"] = await self.batch_sync_banquet_info(tenant_id, db)
+        results["channel"] = await self.batch_sync_channel_info(tenant_id, db)
 
         logger.info("batch_p1_fields_all_done", tenant_id=tenant_id, results=results)
         return results
+
+    # ------------------------------------------------------------------
+    # V2.1: 储值/宴席/渠道画像同步
+    # ------------------------------------------------------------------
+
+    async def batch_sync_stored_value(self, tenant_id: str, db: AsyncSession) -> dict:
+        """同步储值卡余额到增长画像（从stored_value_cards表）"""
+        await self._set_tenant(db, tenant_id)
+        result = await db.execute(text("""
+            UPDATE customer_growth_profiles cgp SET
+                stored_value_balance_fen = COALESCE(svc.total_balance, 0),
+                updated_at = NOW()
+            FROM (
+                SELECT customer_id, SUM(balance_fen) AS total_balance
+                FROM stored_value_cards
+                WHERE status = 'active' AND is_deleted = FALSE
+                GROUP BY customer_id
+            ) svc
+            WHERE cgp.customer_id = svc.customer_id AND cgp.is_deleted = FALSE
+            RETURNING cgp.customer_id
+        """))
+        count = len(result.fetchall())
+        logger.info("batch_sync_stored_value_done", tenant_id=tenant_id, updated=count)
+        return {"updated": count}
+
+    async def batch_sync_banquet_info(self, tenant_id: str, db: AsyncSession) -> dict:
+        """同步宴席消费信息到增长画像（从orders表判断高客单包厢消费）"""
+        await self._set_tenant(db, tenant_id)
+        # 简化方案：客单价>=50000分(500元)且状态paid的订单视为宴席
+        result = await db.execute(text("""
+            UPDATE customer_growth_profiles cgp SET
+                last_banquet_at = banquet.last_at,
+                last_banquet_store_id = banquet.last_store,
+                updated_at = NOW()
+            FROM (
+                SELECT customer_id,
+                       MAX(created_at) AS last_at,
+                       (ARRAY_AGG(store_id ORDER BY created_at DESC))[1] AS last_store
+                FROM orders
+                WHERE is_deleted = FALSE
+                  AND total_amount_fen >= 50000
+                  AND status = 'paid'
+                GROUP BY customer_id
+            ) banquet
+            WHERE cgp.customer_id = banquet.customer_id AND cgp.is_deleted = FALSE
+            RETURNING cgp.customer_id
+        """))
+        count = len(result.fetchall())
+        logger.info("batch_sync_banquet_done", tenant_id=tenant_id, updated=count)
+        return {"updated": count}
+
+    async def batch_sync_channel_info(self, tenant_id: str, db: AsyncSession) -> dict:
+        """同步渠道来源信息到增长画像（统计各渠道订单占比）"""
+        await self._set_tenant(db, tenant_id)
+        result = await db.execute(text("""
+            UPDATE customer_growth_profiles cgp SET
+                primary_channel = ch.primary_ch,
+                channel_order_count = ch.ch_count,
+                brand_order_count = ch.brand_count,
+                updated_at = NOW()
+            FROM (
+                SELECT
+                    customer_id,
+                    MODE() WITHIN GROUP (ORDER BY COALESCE(source, 'dine_in')) AS primary_ch,
+                    COUNT(*) FILTER (WHERE source IN ('meituan', 'douyin', 'eleme')) AS ch_count,
+                    COUNT(*) FILTER (WHERE source NOT IN ('meituan', 'douyin', 'eleme') OR source IS NULL) AS brand_count
+                FROM orders
+                WHERE is_deleted = FALSE AND status = 'paid'
+                GROUP BY customer_id
+            ) ch
+            WHERE cgp.customer_id = ch.customer_id AND cgp.is_deleted = FALSE
+            RETURNING cgp.customer_id
+        """))
+        count = len(result.fetchall())
+        logger.info("batch_sync_channel_done", tenant_id=tenant_id, updated=count)
+        return {"updated": count}

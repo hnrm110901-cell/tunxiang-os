@@ -17,6 +17,11 @@ P1 — 11个扩展模板:
 - psych_bridge x2          心理距离修复（轻触达/关系重建）
 - milestone_celebration x2 里程碑庆祝（恭喜/进度可见性）
 - referral_activation x3   裂变激活（生日/家庭/通用）
+
+P2 — 7个场景模板 (V2.1 Sprint A):
+- stored_value x2          储值续航（余额提醒/专属体验）
+- banquet x3               宴席复购（宴后感谢/节庆提醒/再预订）
+- channel_reflow x2        渠道回流（入会邀请/品牌权益）
 """
 from typing import Any
 
@@ -551,6 +556,214 @@ SYSTEM_TOUCH_TEMPLATES: list[dict[str, Any]] = [
             {"name": "share_link", "type": "string", "required": True},
         ],
         "forbidden_phrases_json": ["群发", "不限", "所有人"],
+        "requires_human_review": False,
+        "is_system": True,
+    },
+
+    # ══════════════════════════════════════════════════════════
+    # P2 场景模板 (V2.1 Sprint A)
+    # ══════════════════════════════════════════════════════════
+
+    # ──────────────────────────────────────────────────────────
+    # 20. 储值余额提醒
+    # 心理机制: 损失厌恶（提醒已有储值资金，激发使用动力）
+    # 禁止: 续费/再充值类语言（此刻目的是唤醒使用，不是追加充值）
+    # ──────────────────────────────────────────────────────────
+    {
+        "code": "tmpl_stored_value_balance_reminder",
+        "name": "储值余额·到期提醒",
+        "template_family": "stored_value",
+        "mechanism_type": "loss_aversion",
+        "channel": "wecom",
+        "tone": "urgent",
+        "content_template": (
+            "{customer_name}，温馨提醒：您在{brand_name}的储值卡还有{balance_yuan}元余额。"
+            "这是您之前充值获得的专属资金，建议尽早使用。"
+            "到店直接出示会员码即可抵扣。"
+        ),
+        "variables_schema_json": [
+            {"name": "customer_name", "type": "string", "required": True},
+            {"name": "brand_name", "type": "string", "required": True},
+            {"name": "balance_yuan", "type": "string", "required": True},
+        ],
+        "forbidden_phrases_json": ["再充值", "续费", "新活动"],
+        "requires_human_review": False,
+        "is_system": True,
+    },
+
+    # ──────────────────────────────────────────────────────────
+    # 21. 储值专属体验
+    # 心理机制: 最小承诺（储值余额直接抵扣，零额外支付门槛）
+    # 禁止: 优惠券/打折/限时（用体验感驱动，不用促销驱动）
+    # ──────────────────────────────────────────────────────────
+    {
+        "code": "tmpl_stored_value_experience_invite",
+        "name": "储值专属·体验邀请",
+        "template_family": "stored_value",
+        "mechanism_type": "micro_commitment",
+        "channel": "wecom",
+        "tone": "warm",
+        "content_template": (
+            "{customer_name}，作为{brand_name}的储值贵宾，"
+            "我们为您准备了一次专属体验：{experience_desc}。"
+            "到店时直接从储值卡扣款，无需额外支付。"
+            "回复'预订'即可安排。"
+        ),
+        "variables_schema_json": [
+            {"name": "customer_name", "type": "string", "required": True},
+            {"name": "brand_name", "type": "string", "required": True},
+            {"name": "experience_desc", "type": "string", "required": True},
+        ],
+        "forbidden_phrases_json": ["优惠券", "打折", "限时"],
+        "requires_human_review": False,
+        "is_system": True,
+    },
+
+    # ──────────────────────────────────────────────────────────
+    # 22. 宴后感谢
+    # 心理机制: 身份锚定（强化"尊贵宴请主人"身份，建立长期关系）
+    # 渠道: 企微（由店长/经理发送，确保温度和真诚感）
+    # 禁止: 下次优惠/折扣/再消费（此刻目的是感谢，不是促销）
+    # 关键: requires_human_review=True，宴席类触达必须人工审核
+    # ──────────────────────────────────────────────────────────
+    {
+        "code": "tmpl_banquet_thankyou",
+        "name": "宴席·宴后感谢",
+        "template_family": "banquet",
+        "mechanism_type": "identity_anchor",
+        "channel": "wecom",
+        "tone": "warm",
+        "content_template": (
+            "{customer_name}您好，感谢您选择{brand_name}{store_name}举办{event_type}。"
+            "希望{guest_count}位宾客都度过了愉快的时光。"
+            "我们的{manager_name}亲自跟进了您的用餐体验，"
+            "如有任何建议，请随时告知。"
+        ),
+        "variables_schema_json": [
+            {"name": "customer_name", "type": "string", "required": True},
+            {"name": "brand_name", "type": "string", "required": True},
+            {"name": "store_name", "type": "string", "required": True},
+            {"name": "event_type", "type": "string", "required": True},
+            {"name": "guest_count", "type": "string", "required": True},
+            {"name": "manager_name", "type": "string", "required": True},
+        ],
+        "forbidden_phrases_json": ["下次优惠", "折扣", "再消费"],
+        "requires_human_review": True,
+        "is_system": True,
+    },
+
+    # ──────────────────────────────────────────────────────────
+    # 23. 节庆再订台
+    # 心理机制: 多样化奖励（季节限定体验+场景化唤醒记忆）
+    # 禁止: 促销/清仓/限时抢（用情感和场景驱动，不用价格驱动）
+    # ──────────────────────────────────────────────────────────
+    {
+        "code": "tmpl_banquet_holiday_remind",
+        "name": "宴席·节庆再订台",
+        "template_family": "banquet",
+        "mechanism_type": "variable_reward",
+        "channel": "wecom",
+        "tone": "warm",
+        "content_template": (
+            "{customer_name}，{holiday_name}即将到来。"
+            "去年这个时候您在{brand_name}的聚餐令我们印象深刻。"
+            "今年我们准备了{seasonal_special}，想为您预留最佳席位。"
+            "如需预订，回复'订台'或直接联系{manager_name}。"
+        ),
+        "variables_schema_json": [
+            {"name": "customer_name", "type": "string", "required": True},
+            {"name": "brand_name", "type": "string", "required": True},
+            {"name": "holiday_name", "type": "string", "required": True},
+            {"name": "seasonal_special", "type": "string", "required": True},
+            {"name": "manager_name", "type": "string", "required": True},
+        ],
+        "forbidden_phrases_json": ["促销", "清仓", "限时抢"],
+        "requires_human_review": False,
+        "is_system": True,
+    },
+
+    # ──────────────────────────────────────────────────────────
+    # 24. 宴席再预订引导
+    # 心理机制: 最小行动（一键预订包厢/大桌，降低行动门槛）
+    # 渠道: 小程序（直达预订页面）
+    # ──────────────────────────────────────────────────────────
+    {
+        "code": "tmpl_banquet_rebook",
+        "name": "宴席·再预订引导",
+        "template_family": "banquet",
+        "mechanism_type": "minimal_action",
+        "channel": "miniapp",
+        "tone": "neutral",
+        "content_template": (
+            "{customer_name}，{brand_name}为您保留了快捷预订通道。"
+            "一键即可预订包厢或大桌：{booking_link}。"
+            "如需定制菜单或特殊布置，我们随时为您安排。"
+        ),
+        "variables_schema_json": [
+            {"name": "customer_name", "type": "string", "required": True},
+            {"name": "brand_name", "type": "string", "required": True},
+            {"name": "booking_link", "type": "string", "required": True},
+        ],
+        "forbidden_phrases_json": ["赶快", "马上", "错过"],
+        "requires_human_review": False,
+        "is_system": True,
+    },
+
+    # ──────────────────────────────────────────────────────────
+    # 25. 渠道客入会邀请
+    # 心理机制: 身份锚定（赋予"品牌会员"身份，区别于平台用户）
+    # 渠道: 短信（平台客户可能尚未添加企微）
+    # 禁止: 外卖/配送费/平台（避免唤起平台消费习惯）
+    # ──────────────────────────────────────────────────────────
+    {
+        "code": "tmpl_channel_reflow_welcome",
+        "name": "渠道回流·入会邀请",
+        "template_family": "channel_reflow",
+        "mechanism_type": "identity_anchor",
+        "channel": "sms",
+        "tone": "warm",
+        "content_template": (
+            "{customer_name}，感谢通过{platform_name}体验{brand_name}！"
+            "成为品牌会员可享更多到店专属权益（平台上没有哦）。"
+            "点击加入 \u2192 {join_link}"
+        ),
+        "variables_schema_json": [
+            {"name": "customer_name", "type": "string", "required": True},
+            {"name": "brand_name", "type": "string", "required": True},
+            {"name": "platform_name", "type": "string", "required": True},
+            {"name": "join_link", "type": "string", "required": True},
+        ],
+        "forbidden_phrases_json": ["外卖", "配送费", "平台"],
+        "requires_human_review": False,
+        "is_system": True,
+    },
+
+    # ──────────────────────────────────────────────────────────
+    # 26. 品牌专属权益
+    # 心理机制: 最小承诺（引导到店体验品牌专属权益，建立品牌直连）
+    # 渠道: 小程序（直达权益展示页）
+    # 禁止: 外卖下单/平台优惠（引导到店，不是引导回平台）
+    # ──────────────────────────────────────────────────────────
+    {
+        "code": "tmpl_channel_reflow_brand_benefit",
+        "name": "渠道回流·品牌专属权益",
+        "template_family": "channel_reflow",
+        "mechanism_type": "micro_commitment",
+        "channel": "miniapp",
+        "tone": "warm",
+        "content_template": (
+            "{customer_name}，欢迎成为{brand_name}品牌会员！"
+            "到店用餐专享：{benefit_desc}。"
+            "这些权益只有品牌会员才有，平台渠道不提供。"
+            "首次到店即可使用 \u2192 {store_link}"
+        ),
+        "variables_schema_json": [
+            {"name": "customer_name", "type": "string", "required": True},
+            {"name": "brand_name", "type": "string", "required": True},
+            {"name": "benefit_desc", "type": "string", "required": True},
+            {"name": "store_link", "type": "string", "required": True},
+        ],
+        "forbidden_phrases_json": ["外卖下单", "平台优惠"],
         "requires_human_review": False,
         "is_system": True,
     },

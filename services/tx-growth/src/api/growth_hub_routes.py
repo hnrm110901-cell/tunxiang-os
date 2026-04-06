@@ -984,6 +984,78 @@ async def get_dashboard_stats(
                     "attribution_rate": round((mr[3] or 0) / total_m * 100, 1) if total_m > 0 else 0,
                 })
 
+            # 8. 可识别客户占比
+            identifiable = await db.execute(text("""
+                SELECT
+                    COUNT(*) AS total,
+                    COUNT(*) FILTER (WHERE primary_phone IS NOT NULL OR wechat_openid IS NOT NULL) AS identifiable
+                FROM customers WHERE is_deleted = FALSE
+            """))
+            id_row = identifiable.fetchone()
+
+            # 9. 首单入会率
+            first_join = await db.execute(text("""
+                SELECT
+                    COUNT(*) FILTER (WHERE first_order_at IS NOT NULL) AS first_orders,
+                    COUNT(*) FILTER (WHERE first_order_at IS NOT NULL AND repurchase_stage != 'not_started') AS joined
+                FROM customer_growth_profiles WHERE is_deleted = FALSE
+            """))
+            fj_row = first_join.fetchone()
+
+            # 10. 30天复购率
+            thirty_day = await db.execute(text("""
+                SELECT
+                    COUNT(*) FILTER (WHERE last_order_at >= NOW() - INTERVAL '90 days') AS active_90d,
+                    COUNT(*) FILTER (WHERE last_order_at >= NOW() - INTERVAL '30 days'
+                        AND repurchase_stage IN ('second_order_done','stable_repeat')) AS repeat_30d
+                FROM customer_growth_profiles WHERE is_deleted = FALSE
+            """))
+            td_row = thirty_day.fetchone()
+
+            # 11. 召回成功率
+            recall = await db.execute(text("""
+                SELECT
+                    COUNT(*) AS total_reactivation,
+                    COUNT(*) FILTER (WHERE gje.journey_state = 'completed') AS completed
+                FROM growth_journey_enrollments gje
+                JOIN growth_journey_templates gjt ON gjt.id = gje.journey_template_id
+                WHERE gje.is_deleted = FALSE AND gjt.journey_type = 'reactivation'
+            """))
+            rc_row = recall.fetchone()
+
+            # 12. 单客触达毛利贡献
+            per_customer = await db.execute(text("""
+                SELECT
+                    COUNT(DISTINCT customer_id) AS unique_customers,
+                    COALESCE(SUM(attributed_revenue_fen), 0) AS total_revenue,
+                    COALESCE(SUM(attributed_gross_profit_fen), 0) AS total_profit
+                FROM growth_touch_executions
+                WHERE is_deleted = FALSE AND attributed_order_id IS NOT NULL
+            """))
+            pc_row = per_customer.fetchone()
+
+            # 组装core_metrics
+            id_total = (id_row[0] if id_row else 0) or 1
+            fo_total = (fj_row[0] if fj_row else 0) or 1
+            active_90 = (td_row[0] if td_row else 0) or 1
+            recall_total = (rc_row[0] if rc_row else 0) or 1
+            unique_cust = (pc_row[0] if pc_row else 0) or 1
+
+            core_metrics = {
+                "identifiable_rate": round((id_row[1] if id_row else 0) / id_total * 100, 1),
+                "first_order_join_rate": round((fj_row[1] if fj_row else 0) / fo_total * 100, 1),
+                "second_visit_rate": conversion_rates.get("second_visit_rate", 0),
+                "thirty_day_repeat_rate": round((td_row[1] if td_row else 0) / active_90 * 100, 1),
+                "recall_success_rate": round((rc_row[1] if rc_row else 0) / recall_total * 100, 1),
+                "channel_reflow_rate": 0,
+                "stored_value_conversion_rate": 0,
+                "banquet_reorder_rate": 0,
+                "repair_revisit_rate": conversion_rates.get("repair_recovery_rate", 0) if "repair_recovery_rate" in conversion_rates else 0,
+                "per_customer_profit_fen": round((pc_row[2] if pc_row else 0) / unique_cust),
+                "journey_roi": 0,
+                "private_gmv_ratio": 0,
+            }
+
             return {"ok": True, "data": {
                 "profiles": {
                     "total": total_profiles,
@@ -1018,6 +1090,117 @@ async def get_dashboard_stats(
                 "funnel": funnel,
                 "conversion_rates": conversion_rates,
                 "mechanism_summary": mechanism_summary,
+                "core_metrics": core_metrics,
+            }}
+        except (ValueError, RuntimeError, OSError) as exc:
+            return {"ok": False, "error": {"message": str(exc)}}
+
+
+# ---------------------------------------------------------------------------
+# Agent Suggestion Metrics 端点（Agent决策仪表盘用）
+# ---------------------------------------------------------------------------
+
+@router.get("/agent-suggestions/metrics")
+async def get_agent_suggestion_metrics(
+    days: int = Query(7, ge=1, le=90),
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+) -> dict:
+    """Agent建议决策指标 -- 通过率/发布率/命中率/趋势/分布"""
+    tenant_uuid = _parse_tenant(x_tenant_id)
+    tenant_id = str(tenant_uuid)
+
+    async with async_session_factory() as db:
+        try:
+            await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": tenant_id})
+
+            # 建议总体统计
+            result = await db.execute(text("""
+                SELECT
+                    COUNT(*) AS total,
+                    COUNT(*) FILTER (WHERE review_state = 'approved') AS approved,
+                    COUNT(*) FILTER (WHERE review_state = 'rejected') AS rejected,
+                    COUNT(*) FILTER (WHERE review_state = 'published') AS published,
+                    COUNT(*) FILTER (WHERE review_state = 'pending_review') AS pending,
+                    COUNT(*) FILTER (WHERE review_state = 'expired') AS expired,
+                    COUNT(*) FILTER (WHERE suggestion_type = 'reactivation') AS reactivation_count,
+                    COUNT(*) FILTER (WHERE suggestion_type = 'first_to_second') AS first_to_second_count,
+                    COUNT(*) FILTER (WHERE suggestion_type = 'service_repair') AS repair_count,
+                    COUNT(*) FILTER (WHERE mechanism_type = 'loss_aversion') AS loss_aversion_count,
+                    COUNT(*) FILTER (WHERE mechanism_type = 'relationship_warmup') AS warmup_count,
+                    COUNT(*) FILTER (WHERE mechanism_type = 'identity_anchor') AS anchor_count,
+                    COUNT(*) FILTER (WHERE mechanism_type = 'service_repair') AS repair_mech_count
+                FROM growth_agent_strategy_suggestions
+                WHERE is_deleted = FALSE AND created_at >= NOW() - make_interval(days => :days)
+            """), {"days": days})
+            r = result.fetchone()
+
+            total = r[0] or 0
+            approved = r[1] or 0
+            published = r[3] or 0
+
+            # 每日趋势
+            trend = await db.execute(text("""
+                SELECT
+                    created_at::date AS day,
+                    COUNT(*) AS total,
+                    COUNT(*) FILTER (WHERE review_state = 'approved') AS approved,
+                    COUNT(*) FILTER (WHERE review_state = 'published') AS published,
+                    COUNT(*) FILTER (WHERE review_state = 'rejected') AS rejected
+                FROM growth_agent_strategy_suggestions
+                WHERE is_deleted = FALSE AND created_at >= NOW() - make_interval(days => :days)
+                GROUP BY created_at::date
+                ORDER BY day
+            """), {"days": days})
+            daily_trend = [
+                {"day": str(row[0]), "total": row[1], "approved": row[2], "published": row[3], "rejected": row[4]}
+                for row in trend.fetchall()
+            ]
+
+            # 发布后命中率
+            hit_result = await db.execute(text("""
+                SELECT
+                    COUNT(*) AS total_published,
+                    COUNT(*) FILTER (WHERE gje.journey_state = 'completed') AS hit_count
+                FROM growth_agent_strategy_suggestions gass
+                LEFT JOIN growth_journey_enrollments gje
+                    ON gje.id = gass.published_enrollment_id AND gje.is_deleted = FALSE
+                WHERE gass.is_deleted = FALSE
+                  AND gass.review_state = 'published'
+                  AND gass.created_at >= NOW() - make_interval(days => :days)
+            """), {"days": days})
+            hr = hit_result.fetchone()
+            total_pub = hr[0] or 0
+            hit_count = hr[1] or 0
+
+            return {"ok": True, "data": {
+                "period_days": days,
+                "overview": {
+                    "total": total,
+                    "approved": approved,
+                    "rejected": r[2] or 0,
+                    "published": published,
+                    "pending": r[4] or 0,
+                    "expired": r[5] or 0,
+                    "approval_rate": round(approved / total * 100, 1) if total > 0 else 0,
+                    "publish_rate": round(published / total * 100, 1) if total > 0 else 0,
+                    "hit_rate": round(hit_count / total_pub * 100, 1) if total_pub > 0 else 0,
+                },
+                "by_type": {
+                    "reactivation": r[6] or 0,
+                    "first_to_second": r[7] or 0,
+                    "service_repair": r[8] or 0,
+                },
+                "by_mechanism": {
+                    "loss_aversion": r[9] or 0,
+                    "relationship_warmup": r[10] or 0,
+                    "identity_anchor": r[11] or 0,
+                    "service_repair": r[12] or 0,
+                },
+                "daily_trend": daily_trend,
+                "hit_rate_detail": {
+                    "total_published": total_pub,
+                    "hit_count": hit_count,
+                },
             }}
         except (ValueError, RuntimeError, OSError) as exc:
             return {"ok": False, "error": {"message": str(exc)}}

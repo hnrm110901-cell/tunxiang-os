@@ -526,3 +526,117 @@ class ChannelEngine:
             "channel": channel,
             "channel_name": self.CHANNELS[channel]["name"],
         }
+
+    # ------------------------------------------------------------------
+    # 企微深度协同（Sprint C）
+    # ------------------------------------------------------------------
+
+    async def send_wecom_group_message(
+        self,
+        group_chat_id: str,
+        content: str,
+        content_type: str,
+        tenant_id: str,
+        db: AsyncSession,
+    ) -> dict:
+        """企微群发消息 -- 发送到企微客户群"""
+        _logger.info("wecom_group_send", group_chat_id=group_chat_id, tenant_id=tenant_id)
+        try:
+            async with httpx.AsyncClient() as client:
+                resp = await client.post(
+                    f"{self.GATEWAY_URL}/internal/wecom/group-send",
+                    json={
+                        "chat_id": group_chat_id,
+                        "content": content,
+                        "msg_type": content_type,
+                    },
+                    headers={"X-Tenant-ID": tenant_id},
+                    timeout=10.0,
+                )
+                result = resp.json()
+                # 记录发送日志
+                await db.execute(text("""
+                    INSERT INTO message_send_logs
+                        (tenant_id, channel, external_user_id, content_summary, status, sent_at)
+                    VALUES (:tid, 'wecom_group', :gid, :content, :status, NOW())
+                """), {
+                    "tid": tenant_id,
+                    "gid": group_chat_id,
+                    "content": content[:200],
+                    "status": "sent" if result.get("ok") else "failed",
+                })
+                return result
+        except (httpx.HTTPError, OSError) as exc:
+            _logger.error("wecom_group_send_error", error=str(exc), exc_info=True)
+            return {"ok": False, "error": str(exc)}
+
+    async def create_store_manager_task(
+        self,
+        store_id: str,
+        customer_id: str,
+        task_type: str,
+        task_title: str,
+        task_description: str,
+        due_hours: int,
+        tenant_id: str,
+        db: AsyncSession,
+    ) -> dict:
+        """创建门店店长待办任务 -- 用于服务修复/高价值客户跟进"""
+        _logger.info("create_store_task", store_id=store_id, task_type=task_type, tenant_id=tenant_id)
+        result = await db.execute(text("""
+            INSERT INTO message_send_logs
+                (tenant_id, channel, external_user_id, content_summary, status, sent_at)
+            VALUES (:tid, 'store_task', :store_id, :summary, 'pending', NOW())
+            RETURNING id
+        """), {
+            "tid": tenant_id,
+            "store_id": store_id,
+            "summary": f"[{task_type}] {task_title}: {task_description[:100]}",
+        })
+        row = result.fetchone()
+        task_id = str(row[0]) if row else None
+
+        # 同时通过企微通知店长
+        try:
+            async with httpx.AsyncClient() as client:
+                await client.post(
+                    f"{self.GATEWAY_URL}/internal/wecom/send",
+                    json={
+                        "store_id": store_id,
+                        "role": "store_manager",
+                        "content": f"新待办: {task_title}\n{task_description}\n请在{due_hours}小时内处理",
+                    },
+                    headers={"X-Tenant-ID": tenant_id},
+                    timeout=10.0,
+                )
+        except (httpx.HTTPError, OSError) as exc:
+            _logger.warning("store_task_notify_failed", error=str(exc))
+
+        return {"ok": True, "task_id": task_id}
+
+    async def send_department_targeted(
+        self,
+        department_id: str,
+        content: str,
+        target_role: str,
+        tenant_id: str,
+        db: AsyncSession,
+    ) -> dict:
+        """企微部门定向消息 -- 按部门+角色发送"""
+        _logger.info("wecom_dept_send", department_id=department_id, role=target_role, tenant_id=tenant_id)
+        try:
+            async with httpx.AsyncClient() as client:
+                resp = await client.post(
+                    f"{self.GATEWAY_URL}/internal/wecom/department-send",
+                    json={
+                        "department_id": department_id,
+                        "target_role": target_role,
+                        "content": content,
+                    },
+                    headers={"X-Tenant-ID": tenant_id},
+                    timeout=10.0,
+                )
+                return resp.json()
+        except (httpx.HTTPError, OSError) as exc:
+            _logger.error("wecom_dept_send_error", error=str(exc), exc_info=True)
+            return {"ok": False, "error": str(exc)}

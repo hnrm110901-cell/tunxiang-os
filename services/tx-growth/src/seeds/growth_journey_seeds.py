@@ -10,6 +10,11 @@ P1 四条扩展旅程:
 5. 心理距离·关系修复旅程
 6. 成长里程碑·进阶庆祝旅程
 7. 裂变场景·社交激活旅程
+
+P2 三条场景旅程 (V2.1 Sprint A):
+8. 储值续航·余额唤醒旅程
+9. 宴席复购·高质量复访旅程
+10. 渠道回流·平台客转品牌客旅程
 """
 from typing import Any
 
@@ -645,6 +650,295 @@ SYSTEM_JOURNEY_TEMPLATES: list[dict[str, Any]] = [
             {
                 # Step8: 旅程结束
                 "step_no": 8,
+                "step_type": "exit",
+            },
+        ],
+    },
+
+    # ══════════════════════════════════════════════════════════
+    # P2 场景旅程 (V2.1 Sprint A)
+    # ══════════════════════════════════════════════════════════
+
+    # ──────────────────────────────────────────────────────────
+    # 旅程8: 储值续航·余额唤醒旅程
+    # 目的: 对持有储值卡且开始沉默的客户，利用损失厌恶提醒余额使用，
+    #       避免储值资金沉睡导致客户流失
+    # ──────────────────────────────────────────────────────────
+    {
+        "code": "stored_value_renewal_v1",
+        "name": "储值续航·余额唤醒旅程",
+        "journey_type": "stored_value",
+        "mechanism_family": "loss_aversion",
+        "entry_rule_json": {
+            "conditions": [
+                {"field": "has_active_owned_benefit", "op": "eq", "value": True},
+                {"field": "reactivation_priority", "op": "in", "value": ["medium", "high", "critical"]},
+            ],
+            "description": "持有储值卡且开始沉默的客户",
+        },
+        "exit_rule_json": {
+            "conditions": [
+                {"field": "reactivation_priority", "op": "eq", "value": "none"}
+            ]
+        },
+        "pause_rule_json": {
+            "conditions": [
+                {"field": "service_repair_status", "op": "eq", "value": "complaint_open"}
+            ]
+        },
+        "priority": 75,
+        "is_system": True,
+        "steps": [
+            {
+                # Step1: 余额提醒（"您还有XXX元未使用，别让它过期"）
+                # 心理机制: 损失厌恶（提醒已有资产，激发使用动力）
+                "step_no": 1,
+                "step_type": "touch",
+                "mechanism_type": "loss_aversion",
+                "touch_template_code": "tmpl_stored_value_balance_reminder",
+            },
+            {
+                # Step2: 等待3天
+                "step_no": 2,
+                "step_type": "wait",
+                "wait_minutes": 4320,  # 3天
+            },
+            {
+                # Step3: 判断余额提醒是否被打开
+                "step_no": 3,
+                "step_type": "decision",
+                "decision_rule_json": {
+                    "check": "touch_opened",
+                    "touch_step_no": 1,
+                    "true_next": 4,   # 打开了 → 专属体验邀请
+                    "false_next": 5,  # 没打开 → 换渠道再触达一次
+                },
+            },
+            {
+                # Step4: 打开了 → 储值专属体验邀请
+                # 心理机制: 最小承诺（用储值余额直接抵扣，零额外支付）
+                "step_no": 4,
+                "step_type": "touch",
+                "mechanism_type": "micro_commitment",
+                "touch_template_code": "tmpl_stored_value_experience_invite",
+                "success_next_step_no": 6,
+            },
+            {
+                # Step5: 没打开 → 换渠道再触达一次（最小行动）
+                "step_no": 5,
+                "step_type": "touch",
+                "mechanism_type": "minimal_action",
+                "touch_template_code": "tmpl_minimal_action_simple",
+                "success_next_step_no": 6,
+            },
+            {
+                # Step6: 7天观察期
+                "step_no": 6,
+                "step_type": "observe",
+                "observe_window_hours": 168,  # 7天
+            },
+            {
+                # Step7: 旅程结束
+                "step_no": 7,
+                "step_type": "exit",
+            },
+        ],
+    },
+
+    # ──────────────────────────────────────────────────────────
+    # 旅程9: 宴席复购·高质量复访旅程
+    # 目的: 对有宴席/包厢消费历史的高价值客户，通过关系经营驱动复购，
+    #       按场景（生日/节庆/企业）差异化触达
+    # ──────────────────────────────────────────────────────────
+    {
+        "code": "banquet_repurchase_v1",
+        "name": "宴席复购·高质量复访旅程",
+        "journey_type": "banquet",
+        "mechanism_family": "relationship",
+        "entry_rule_json": {
+            "conditions": [
+                {"field": "referral_scenario", "op": "in", "value": ["corporate_host", "family_host", "birthday_organizer"]}
+            ],
+            "description": "有宴席/包厢消费历史的高价值客户",
+        },
+        "exit_rule_json": {
+            "conditions": [
+                {"field": "reactivation_priority", "op": "eq", "value": "none"}
+            ]
+        },
+        "pause_rule_json": {
+            "conditions": [
+                {"field": "service_repair_status", "op": "eq", "value": "complaint_open"},
+                {"field": "growth_opt_out", "op": "eq", "value": True},
+            ]
+        },
+        "priority": 72,
+        "is_system": True,
+        "steps": [
+            {
+                # Step1: 宴后感谢（消费完成后第2天）
+                # 心理机制: 身份锚定（强化"尊贵宴请主人"身份）
+                "step_no": 1,
+                "step_type": "touch",
+                "mechanism_type": "identity_anchor",
+                "touch_template_code": "tmpl_banquet_thankyou",
+            },
+            {
+                # Step2: 等待7天
+                "step_no": 2,
+                "step_type": "wait",
+                "wait_minutes": 10080,  # 7天
+            },
+            {
+                # Step3: 满意度回访（不带促销）
+                # 心理机制: 关系升温（展示关怀，收集反馈）
+                "step_no": 3,
+                "step_type": "touch",
+                "mechanism_type": "relationship_warmup",
+                "touch_template_code": "tmpl_relationship_warmup",
+            },
+            {
+                # Step4: 等待30天
+                "step_no": 4,
+                "step_type": "wait",
+                "wait_minutes": 43200,  # 30天
+            },
+            {
+                # Step5: 分支决策 — 是否是生日组织者
+                "step_no": 5,
+                "step_type": "decision",
+                "decision_rule_json": {
+                    "check": "field_value",
+                    "field": "referral_scenario",
+                    "op": "eq",
+                    "value": "birthday_organizer",
+                    "true_next": 6,   # 生日组织者 → 节庆提醒
+                    "false_next": 7,  # 非生日 → 通用再订台
+                },
+            },
+            {
+                # Step6: 生日组织者 → 节庆再订台
+                # 心理机制: 多样化奖励（季节限定体验）
+                "step_no": 6,
+                "step_type": "touch",
+                "mechanism_type": "variable_reward",
+                "touch_template_code": "tmpl_banquet_holiday_remind",
+                "success_next_step_no": 8,
+            },
+            {
+                # Step7: 非生日 → 通用再订台
+                # 心理机制: 最小行动（一键预订包厢）
+                "step_no": 7,
+                "step_type": "touch",
+                "mechanism_type": "minimal_action",
+                "touch_template_code": "tmpl_banquet_rebook",
+                "success_next_step_no": 8,
+            },
+            {
+                # Step8: 14天观察期
+                "step_no": 8,
+                "step_type": "observe",
+                "observe_window_hours": 336,  # 14天
+            },
+            {
+                # Step9: 旅程结束
+                "step_no": 9,
+                "step_type": "exit",
+            },
+        ],
+    },
+
+    # ──────────────────────────────────────────────────────────
+    # 旅程10: 渠道回流·平台客转品牌客旅程
+    # 目的: 将通过美团/抖音/饿了么等平台首次消费的客户，
+    #       转化为品牌自有会员，降低平台依赖
+    # ──────────────────────────────────────────────────────────
+    {
+        "code": "channel_reflow_v1",
+        "name": "渠道回流·平台客转品牌客旅程",
+        "journey_type": "channel_reflow",
+        "mechanism_family": "hook",
+        "entry_rule_json": {
+            "conditions": [
+                {"field": "repurchase_stage", "op": "eq", "value": "first_order_done"},
+                {"field": "first_order_channel", "op": "in", "value": ["meituan", "douyin", "eleme"]},
+            ],
+            "description": "通过外卖/团购平台首次消费的客户",
+        },
+        "exit_rule_json": {
+            "conditions": [
+                {"field": "repurchase_stage", "op": "in", "value": ["second_order_done", "stable_repeat"]}
+            ]
+        },
+        "priority": 68,
+        "is_system": True,
+        "steps": [
+            {
+                # Step1: 入会邀请（完单后立即）
+                # 心理机制: 身份锚定（赋予"品牌会员"身份）
+                "step_no": 1,
+                "step_type": "touch",
+                "mechanism_type": "identity_anchor",
+                "touch_template_code": "tmpl_channel_reflow_welcome",
+            },
+            {
+                # Step2: 等待1天
+                "step_no": 2,
+                "step_type": "wait",
+                "wait_minutes": 1440,  # 1天
+            },
+            {
+                # Step3: 品牌专属权益（"到店享平台没有的XXX"）
+                # 心理机制: 最小承诺（引导到店体验品牌专属）
+                "step_no": 3,
+                "step_type": "touch",
+                "mechanism_type": "micro_commitment",
+                "touch_template_code": "tmpl_channel_reflow_brand_benefit",
+            },
+            {
+                # Step4: 等待7天
+                "step_no": 4,
+                "step_type": "wait",
+                "wait_minutes": 10080,  # 7天
+            },
+            {
+                # Step5: 判断品牌权益消息是否被打开
+                "step_no": 5,
+                "step_type": "decision",
+                "decision_rule_json": {
+                    "check": "touch_opened",
+                    "touch_step_no": 3,
+                    "true_next": 6,   # 打开了 → 惊喜奖励加速到店
+                    "false_next": 7,  # 没打开 → 权益到期提醒
+                },
+            },
+            {
+                # Step6: 打开了 → 惊喜奖励加速到店
+                # 心理机制: 多样化奖励（不确定性奖励驱动到店）
+                "step_no": 6,
+                "step_type": "touch",
+                "mechanism_type": "variable_reward",
+                "touch_template_code": "tmpl_variable_reward_surprise",
+                "success_next_step_no": 8,
+            },
+            {
+                # Step7: 没打开 → 权益到期提醒
+                # 心理机制: 损失厌恶（"您的品牌会员权益即将过期"）
+                "step_no": 7,
+                "step_type": "touch",
+                "mechanism_type": "loss_aversion",
+                "touch_template_code": "tmpl_loss_aversion_benefit_expiring",
+                "success_next_step_no": 8,
+            },
+            {
+                # Step8: 7天观察期
+                "step_no": 8,
+                "step_type": "observe",
+                "observe_window_hours": 168,  # 7天
+            },
+            {
+                # Step9: 旅程结束
+                "step_no": 9,
                 "step_type": "exit",
             },
         ],

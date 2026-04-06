@@ -113,6 +113,35 @@ export function AgentWorkbenchPage() {
 
   const constraints = useMemo(() => getConstraintStatus(), []);
 
+  // ---- Agent决策指标 ----
+  interface MetricsData {
+    period_days: number;
+    overview: {
+      total: number; approved: number; rejected: number; published: number;
+      pending: number; expired: number; approval_rate: number; publish_rate: number; hit_rate: number;
+    };
+    by_type: { reactivation: number; first_to_second: number; service_repair: number };
+    by_mechanism: Record<string, number>;
+    daily_trend: { day: string; total: number; approved: number; published: number; rejected: number }[];
+    hit_rate_detail: { total_published: number; hit_count: number };
+  }
+  const [metrics, setMetrics] = useState<MetricsData | null>(null);
+  const [metricsLoading, setMetricsLoading] = useState(false);
+
+  const fetchMetrics = useCallback(async () => {
+    setMetricsLoading(true);
+    try {
+      const resp = await txFetch<MetricsData>('/api/v1/growth/agent-suggestions/metrics?days=7');
+      if (resp.data) setMetrics(resp.data);
+    } catch (err) {
+      console.error('fetch metrics error', err);
+    } finally {
+      setMetricsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchMetrics(); }, [fetchMetrics]);
+
   const handleApprove = async () => {
     if (!selected) return;
     setActionLoading(true);
@@ -198,6 +227,101 @@ export function AgentWorkbenchPage() {
           </Col>
         ))}
       </Row>
+
+      {/* Agent决策指标 */}
+      {metricsLoading ? (
+        <Card style={{ background: CARD_BG, border: `1px solid ${BORDER}`, marginBottom: 16, textAlign: 'center' }}>
+          <Spin />
+        </Card>
+      ) : metrics ? (
+        <Card
+          title={<span style={{ color: TEXT_PRIMARY }}>Agent决策指标（近7天）</span>}
+          style={{ background: CARD_BG, border: `1px solid ${BORDER}`, marginBottom: 16 }}
+          styles={{ header: { borderBottom: `1px solid ${BORDER}` } }}
+        >
+          {/* 三个核心率 */}
+          <Row gutter={16} style={{ marginBottom: 16 }}>
+            <Col span={8}>
+              <Card style={{ background: 'rgba(82,196,26,0.08)', border: '1px solid rgba(82,196,26,0.2)' }}>
+                <Statistic
+                  title={<span style={{ color: TEXT_SECONDARY }}>通过率</span>}
+                  value={metrics.overview.approval_rate}
+                  suffix="%"
+                  valueStyle={{ color: SUCCESS_GREEN, fontSize: 28 }}
+                />
+              </Card>
+            </Col>
+            <Col span={8}>
+              <Card style={{ background: 'rgba(24,144,255,0.08)', border: '1px solid rgba(24,144,255,0.2)' }}>
+                <Statistic
+                  title={<span style={{ color: TEXT_SECONDARY }}>发布率</span>}
+                  value={metrics.overview.publish_rate}
+                  suffix="%"
+                  valueStyle={{ color: INFO_BLUE, fontSize: 28 }}
+                />
+              </Card>
+            </Col>
+            <Col span={8}>
+              <Card style={{ background: 'rgba(255,107,53,0.08)', border: '1px solid rgba(255,107,53,0.2)' }}>
+                <Statistic
+                  title={<span style={{ color: TEXT_SECONDARY }}>命中率</span>}
+                  value={metrics.overview.hit_rate}
+                  suffix="%"
+                  valueStyle={{ color: BRAND_ORANGE, fontSize: 28 }}
+                />
+              </Card>
+            </Col>
+          </Row>
+
+          {/* 7日趋势 + 类型分布 */}
+          <Row gutter={16}>
+            <Col span={16}>
+              <div style={{ color: TEXT_SECONDARY, fontSize: 12, marginBottom: 8, fontWeight: 600 }}>7日趋势</div>
+              <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, height: 80 }}>
+                {metrics.daily_trend.map((d) => {
+                  const maxVal = Math.max(...metrics.daily_trend.map((t) => t.total), 1);
+                  const h = Math.max((d.total / maxVal) * 70, 2);
+                  return (
+                    <div key={d.day} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                      <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+                        <div style={{ width: '60%', height: h * (d.published / (d.total || 1)), background: INFO_BLUE, borderRadius: 2 }} />
+                        <div style={{ width: '60%', height: h * (d.approved / (d.total || 1)), background: SUCCESS_GREEN, borderRadius: 2 }} />
+                        <div style={{ width: '60%', height: Math.max(h - h * ((d.approved + d.published) / (d.total || 1)), 1), background: BORDER, borderRadius: 2 }} />
+                      </div>
+                      <span style={{ fontSize: 9, color: TEXT_SECONDARY }}>{d.day.slice(5)}</span>
+                    </div>
+                  );
+                })}
+              </div>
+              <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
+                <Space size={4}><span style={{ width: 8, height: 8, borderRadius: 2, background: SUCCESS_GREEN, display: 'inline-block' }} /><span style={{ fontSize: 10, color: TEXT_SECONDARY }}>通过</span></Space>
+                <Space size={4}><span style={{ width: 8, height: 8, borderRadius: 2, background: INFO_BLUE, display: 'inline-block' }} /><span style={{ fontSize: 10, color: TEXT_SECONDARY }}>发布</span></Space>
+                <Space size={4}><span style={{ width: 8, height: 8, borderRadius: 2, background: BORDER, display: 'inline-block' }} /><span style={{ fontSize: 10, color: TEXT_SECONDARY }}>其他</span></Space>
+              </div>
+            </Col>
+            <Col span={8}>
+              <div style={{ color: TEXT_SECONDARY, fontSize: 12, marginBottom: 8, fontWeight: 600 }}>按建议类型分布</div>
+              {[
+                { label: '沉默激活', value: metrics.by_type.reactivation, color: BRAND_ORANGE },
+                { label: '首转二', value: metrics.by_type.first_to_second, color: INFO_BLUE },
+                { label: '服务修复', value: metrics.by_type.service_repair, color: DANGER_RED },
+              ].map((item) => {
+                const total = metrics.by_type.reactivation + metrics.by_type.first_to_second + metrics.by_type.service_repair || 1;
+                const pct = (item.value / total * 100).toFixed(0);
+                return (
+                  <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                    <span style={{ fontSize: 11, color: TEXT_SECONDARY, width: 60, flexShrink: 0 }}>{item.label}</span>
+                    <div style={{ flex: 1, height: 12, borderRadius: 3, background: BORDER, overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: `${pct}%`, background: item.color, borderRadius: 3, transition: 'width 0.4s' }} />
+                    </div>
+                    <span style={{ fontSize: 11, color: TEXT_SECONDARY, width: 30, textAlign: 'right' }}>{item.value}</span>
+                  </div>
+                );
+              })}
+            </Col>
+          </Row>
+        </Card>
+      ) : null}
 
       {/* 主从布局 */}
       <Row gutter={16}>

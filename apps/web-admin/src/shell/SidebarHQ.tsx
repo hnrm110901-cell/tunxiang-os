@@ -108,6 +108,9 @@ const MENU_CONFIGS: Record<string, MenuConfig> = {
         { id: 'growth-roi', label: 'ROI总览', icon: '💰', path: '/hq/growth/roi' },
         { id: 'journey-attribution', label: '旅程归因', icon: '📊', path: '/hq/growth/journey-attribution' },
       ]},
+      { label: '配置', items: [
+        { id: 'growth-settings', label: '配置治理', icon: '⚙️', path: '/hq/growth/settings' },
+      ]},
       { label: '营销工具', items: [
         { id: 'referral', label: '裂变中心', icon: '🔗', path: '/hq/growth/referral' },
         { id: 'group-buy', label: '团购管理', icon: '🛒', path: '/hq/growth/group-buy' },

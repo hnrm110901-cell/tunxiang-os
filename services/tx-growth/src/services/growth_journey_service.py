@@ -7,6 +7,7 @@ growth_journey_enrollments 三张表。
 """
 import asyncio
 import json
+import uuid as uuid_module
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 from uuid import UUID, uuid4
@@ -476,18 +477,52 @@ class GrowthJourneyService:
                 f"Customer {customer_id} already has an active enrollment for template {template_id}"
             )
 
+        # ── A/B测试分组（如果模板关联了ab_test） ──
+        ab_test_id = None
+        ab_variant = None
+
+        template_ab = await db.execute(text("""
+            SELECT ab_test_id FROM growth_journey_templates
+            WHERE id = :tid AND is_deleted = FALSE
+        """), {"tid": str(template_id)})
+        ab_row = template_ab.fetchone()
+        if ab_row and ab_row[0]:
+            ab_test_id = str(ab_row[0])
+            try:
+                from services.ab_test_service import ABTestService
+                ab_svc = ABTestService()
+                ab_variant = await ab_svc.assign_variant(
+                    test_id=uuid_module.UUID(ab_test_id),
+                    customer_id=customer_id,
+                    customer_data={},
+                    tenant_id=uuid_module.UUID(tenant_id),
+                    db=db,
+                )
+                logger.info("ab_test_assigned",
+                            enrollment_customer=str(customer_id),
+                            ab_test_id=ab_test_id,
+                            variant=ab_variant)
+            except (ValueError, RuntimeError, OSError) as exc:
+                logger.warning("ab_test_assignment_failed",
+                               error=str(exc),
+                               ab_test_id=ab_test_id)
+                ab_variant = "control"  # 分组失败默认走control
+
         enrollment_id = str(uuid4())
         result = await db.execute(
             text("""
                 INSERT INTO growth_journey_enrollments
                     (id, tenant_id, customer_id, template_id, journey_state,
                      current_step_no, enrollment_source, source_event_type,
-                     source_event_id, suggestion_id)
+                     source_event_id, suggestion_id,
+                     ab_test_id, ab_variant)
                 VALUES
                     (:id, :tenant_id, :customer_id, :template_id, 'eligible',
-                     1, :source, :event_type, :event_id, :suggestion_id)
+                     1, :source, :event_type, :event_id, :suggestion_id,
+                     :ab_test_id, :ab_variant)
                 RETURNING id, tenant_id, customer_id, template_id, journey_state,
                           current_step_no, enrollment_source, suggestion_id,
+                          ab_test_id, ab_variant,
                           created_at, updated_at
             """),
             {
@@ -499,6 +534,8 @@ class GrowthJourneyService:
                 "event_type": event_type,
                 "event_id": event_id,
                 "suggestion_id": str(suggestion_id) if suggestion_id else None,
+                "ab_test_id": ab_test_id,
+                "ab_variant": ab_variant,
             },
         )
         enrollment = dict(result.fetchone()._mapping)
@@ -675,6 +712,18 @@ class GrowthJourneyService:
                     trow = touch_result.fetchone()
                     opened = trow is not None and trow[0] in ("opened", "clicked", "replied")
                     goto_step = decision_rule.get("true_next") if opened else decision_rule.get("false_next")
+
+            elif check_type == "ab_variant":
+                # A/B测试变体分支
+                enr_ab = await db.execute(text("""
+                    SELECT ab_variant FROM growth_journey_enrollments
+                    WHERE id = :eid AND is_deleted = FALSE
+                """), {"eid": str(enrollment_id)})
+                ab_row = enr_ab.fetchone()
+                enrollment_variant = ab_row[0] if ab_row and ab_row[0] else "control"
+                expected_variant = decision_rule.get("value", "control")
+                matched = (enrollment_variant == expected_variant)
+                goto_step = decision_rule.get("true_next") if matched else decision_rule.get("false_next")
 
             elif check_type == "has_revisited":
                 # 查客户是否在旅程期间有新订单

@@ -105,6 +105,7 @@ import { Customer360Page } from './pages/hq/growth/Customer360Page';
 import { GrowthJourneyTemplatePage } from './pages/hq/growth/GrowthJourneyTemplatePage';
 import { GrowthJourneyRunsPage } from './pages/hq/growth/GrowthJourneyRunsPage';
 import { AgentWorkbenchPage } from './pages/hq/growth/AgentWorkbenchPage';
+import { GrowthSettingsPage } from './pages/hq/growth/GrowthSettingsPage';
 import { JourneyAttributionPage } from './pages/hq/growth/JourneyAttributionPage';
 import { GrowthSegmentTagsPage } from './pages/hq/growth/GrowthSegmentTagsPage';
 import { GrowthOfferPacksPage } from './pages/hq/growth/GrowthOfferPacksPage';
@@ -120,6 +121,7 @@ import { SupplyDashboardPage } from './pages/supply/SupplyDashboardPage';
 import { BanquetTemplatePage } from './pages/hq/trade/BanquetTemplatePage';
 import { SupplierPortalPage } from './pages/hq/supply/SupplierPortalPage';
 import { ReviewManagePage } from './pages/ops/ReviewManagePage';
+import { SettlementMonitorPage } from './pages/ops/SettlementMonitorPage';
 import { StoreManagePage } from './pages/store/StoreManagePage';
 import { AgentDashboardPage } from './pages/agent/AgentDashboardPage';
 // ─── Phase1-4 新增页面 ───────────────────────────────────────────────────────
@@ -277,6 +279,7 @@ function App() {
           <Route path="/hq/growth/journey-templates" element={<GrowthJourneyTemplatePage />} />
           <Route path="/hq/growth/journey-runs" element={<GrowthJourneyRunsPage />} />
           <Route path="/hq/growth/agent-workbench" element={<AgentWorkbenchPage />} />
+          <Route path="/hq/growth/settings" element={<GrowthSettingsPage />} />
           <Route path="/hq/growth/journey-attribution" element={<JourneyAttributionPage />} />
           <Route path="/hq/growth/segment-tags" element={<GrowthSegmentTagsPage />} />
           <Route path="/hq/growth/offer-packs" element={<GrowthOfferPacksPage />} />
@@ -328,6 +331,7 @@ function App() {
           <Route path="/supply/expiry-alerts" element={<ExpiryAlertPage />} />
           <Route path="/supply/dashboard" element={<SupplyDashboardPage />} />
           <Route path="/ops/reviews" element={<ReviewManagePage />} />
+          <Route path="/ops/settlement-monitor" element={<SettlementMonitorPage />} />
           <Route path="/store/manage" element={<StoreManagePage />} />
           <Route path="/hq/trade/banquet-templates" element={<BanquetTemplatePage />} />
           <Route path="/hq/supply/suppliers" element={<SupplierPortalPage />} />
