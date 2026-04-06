@@ -3,7 +3,19 @@
 库存管理、采购、供应商、损耗追踪、需求预测、BOM管理、理论成本计算
 来源：12 个 service 文件迁移自 tunxiang V2.x
 """
+import structlog
 from fastapi import FastAPI
+
+# Feature Flag SDK（try/except 保护，SDK不可用时自动降级为全量开启）
+try:
+    from shared.feature_flags import is_enabled, FlagContext
+    from shared.feature_flags.flag_names import SupplyFlags
+    _FLAG_SDK_AVAILABLE = True
+except ImportError:
+    _FLAG_SDK_AVAILABLE = False
+    def is_enabled(flag, context=None): return True  # noqa: E731
+
+logger = structlog.get_logger(__name__)
 
 from .api.bom_routes import router as bom_router
 from .api.central_kitchen_routes import router as ck_router
@@ -34,6 +46,31 @@ app = FastAPI(title="TunxiangOS tx-supply", version="3.0.0")
 
 from prometheus_fastapi_instrumentator import Instrumentator
 Instrumentator().instrument(app).expose(app)
+
+# ── Feature Flag 启动检查 ──────────────────────────────────────────
+# SupplyFlags.RECEIVING_INSPECTION: 收货验收功能（入库加权均价计算）
+if is_enabled(SupplyFlags.RECEIVING_INSPECTION):
+    logger.info("feature_flag_enabled", flag=SupplyFlags.RECEIVING_INSPECTION,
+                note="收货验收功能已激活，receiving_routes将执行入库加权均价计算")
+else:
+    logger.warning("feature_flag_disabled", flag=SupplyFlags.RECEIVING_INSPECTION,
+                   note="收货验收功能已关闭，入库加权均价计算将跳过（供应链核心功能，建议开启）")
+
+# SupplyFlags.TRANSFER_LOSS_DETECTION: 门店调拨运输损耗检测
+if is_enabled(SupplyFlags.TRANSFER_LOSS_DETECTION):
+    logger.info("feature_flag_enabled", flag=SupplyFlags.TRANSFER_LOSS_DETECTION,
+                note="调拨损耗检测已激活")
+else:
+    logger.info("feature_flag_disabled", flag=SupplyFlags.TRANSFER_LOSS_DETECTION,
+                note="调拨损耗检测已关闭")
+
+# SupplyFlags.SMART_REORDER: AI智能补货（依赖tx-brain）
+if is_enabled(SupplyFlags.SMART_REORDER):
+    logger.info("feature_flag_enabled", flag=SupplyFlags.SMART_REORDER,
+                note="AI智能补货已激活，smart_replenishment_router将使用tx-brain推理")
+else:
+    logger.info("feature_flag_disabled", flag=SupplyFlags.SMART_REORDER,
+                note="AI智能补货已关闭，smart_replenishment使用规则引擎降级模式")
 
 app.include_router(inv_router)
 app.include_router(bom_router)

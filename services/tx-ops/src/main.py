@@ -40,6 +40,23 @@ from .api.haccp_routes import router as haccp_router
 
 app = FastAPI(title="TunxiangOS tx-ops", version="3.0.0", description="日清日结操作层")
 
+# ── Feature Flag 启动检查 ──────────────────────────────────────────
+# AgentFlags.OPS_DAILY_REVIEW: 日清E1-E8全流程追踪Agent
+if is_enabled(AgentFlags.OPS_DAILY_REVIEW):
+    logger.info("feature_flag_enabled", flag=AgentFlags.OPS_DAILY_REVIEW,
+                note="日清E1-E8追踪Agent已激活")
+else:
+    logger.info("feature_flag_disabled", flag=AgentFlags.OPS_DAILY_REVIEW,
+                note="日清追踪Agent已关闭，仅提供基础日结功能")
+
+# AgentFlags.TRADE_DISCOUNT_ALERT: 食安合规+折扣健康预警（P0级）
+if is_enabled(AgentFlags.TRADE_DISCOUNT_ALERT):
+    logger.info("feature_flag_enabled", flag=AgentFlags.TRADE_DISCOUNT_ALERT,
+                note="折扣健康预警Agent已激活（P0级安全功能）")
+else:
+    logger.warning("feature_flag_disabled", flag=AgentFlags.TRADE_DISCOUNT_ALERT,
+                   note="折扣预警Agent已关闭，食安合规调度任务将跳过预警推送")
+
 from prometheus_fastapi_instrumentator import Instrumentator
 Instrumentator().instrument(app).expose(app)
 

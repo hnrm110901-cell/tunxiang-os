@@ -142,3 +142,16 @@ class EdgeFlags:
 
     # Edge节点自动更新
     AUTO_UPDATE = "edge.mac_station.auto_update.enable"
+
+
+class SupplyFlags:
+    """供应链域 Flag 名称。"""
+
+    # 收货验收功能（入库加权均价计算）
+    RECEIVING_INSPECTION = "supply.receiving.inspection.enable"
+
+    # 门店调拨运输损耗检测
+    TRANSFER_LOSS_DETECTION = "supply.transfer.loss_detection.enable"
+
+    # AI智能补货计划（需要tx-brain支持）
+    SMART_REORDER = "supply.intel.smart_reorder.enable"

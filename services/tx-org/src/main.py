@@ -5,6 +5,15 @@
 """
 import asyncio
 
+# Feature Flag SDK（try/except 保护，SDK不可用时自动降级为全量开启）
+try:
+    from shared.feature_flags import is_enabled, FlagContext
+    from shared.feature_flags.flag_names import OrgFlags
+    _FLAG_SDK_AVAILABLE = True
+except ImportError:
+    _FLAG_SDK_AVAILABLE = False
+    def is_enabled(flag, context=None): return True  # noqa: E731
+
 from api.admin_routes import router as admin_router
 from api.approval_engine_routes import router as approval_engine_router
 from api.approval_router import router as approval_router
@@ -57,6 +66,34 @@ from shared.ontology.src.database import get_db as _shared_get_db
 async def lifespan(app: FastAPI):
     # 将真实 get_db 注入到 payroll_engine_routes 模块（覆盖其 stub）
     _payroll_engine_mod.get_db = _shared_get_db
+
+    # ── Feature Flag 启动检查 ────────────────────────────────────────
+    import structlog as _structlog
+    _flag_logger = _structlog.get_logger(__name__)
+
+    # OrgFlags.HR_REVENUE_SCHEDULE: 营收驱动智能排班
+    if is_enabled(OrgFlags.HR_REVENUE_SCHEDULE):
+        _flag_logger.info("feature_flag_enabled", flag=OrgFlags.HR_REVENUE_SCHEDULE,
+                          note="营收驱动智能排班已激活，HRAgentScheduler将运行排班优化任务")
+    else:
+        _flag_logger.info("feature_flag_disabled", flag=OrgFlags.HR_REVENUE_SCHEDULE,
+                          note="营收驱动排班已关闭，排班优化任务将跳过")
+
+    # OrgFlags.HR_CONTRIBUTION_SCORE: 员工贡献度评分
+    if is_enabled(OrgFlags.HR_CONTRIBUTION_SCORE):
+        _flag_logger.info("feature_flag_enabled", flag=OrgFlags.HR_CONTRIBUTION_SCORE,
+                          note="员工贡献度评分已激活，HRAgentScheduler将运行贡献度重算任务")
+    else:
+        _flag_logger.info("feature_flag_disabled", flag=OrgFlags.HR_CONTRIBUTION_SCORE,
+                          note="员工贡献度评分已关闭，贡献度重算任务将跳过")
+
+    # OrgFlags.HR_ATTRITION_MODEL: 7维离职预警模型
+    if is_enabled(OrgFlags.HR_ATTRITION_MODEL):
+        _flag_logger.info("feature_flag_enabled", flag=OrgFlags.HR_ATTRITION_MODEL,
+                          note="离职预警模型已激活，HRAgentScheduler将运行离职风险扫描")
+    else:
+        _flag_logger.info("feature_flag_disabled", flag=OrgFlags.HR_ATTRITION_MODEL,
+                          note="离职预警模型已关闭，离职风险扫描任务将跳过")
 
     # 启动 HR Agent 调度器（定时任务：合规扫描/离职风险/排班优化/贡献度重算）
     from services.hr_agent_scheduler import HRAgentScheduler

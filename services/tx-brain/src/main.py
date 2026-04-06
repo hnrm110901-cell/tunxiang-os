@@ -15,6 +15,15 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+# Feature Flag SDK（try/except 保护，SDK不可用时自动降级为全量开启）
+try:
+    from shared.feature_flags import is_enabled, FlagContext
+    from shared.feature_flags.flag_names import AgentFlags
+    _FLAG_SDK_AVAILABLE = True
+except ImportError:
+    _FLAG_SDK_AVAILABLE = False
+    def is_enabled(flag, context=None): return True  # noqa: E731
+
 from .api.brain_routes import router as brain_router
 from .api.voice_api import router as voice_router
 from .services.cfo_dashboard import CFODashboardService
@@ -43,6 +52,17 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         "discount_guardian",
         "member_insight",
     ])
+
+    # ── Feature Flag 启动检查 ────────────────────────────────────────
+    # AgentFlags.FINANCE_PNL_SUMMARY: P&L AI摘要功能
+    # Flag关闭时：ModelRouter应使用轻量模型或返回占位结果，避免不必要的LLM调用
+    if is_enabled(AgentFlags.FINANCE_PNL_SUMMARY):
+        logger.info("feature_flag_enabled", flag=AgentFlags.FINANCE_PNL_SUMMARY,
+                    note="P&L AI摘要已激活，ModelRouter将使用完整推理链路")
+    else:
+        logger.info("feature_flag_disabled", flag=AgentFlags.FINANCE_PNL_SUMMARY,
+                    note="P&L AI摘要已关闭，ModelRouter降级为轻量模型或占位结果")
+
     yield
     logger.info("tx_brain_shutting_down")
 
