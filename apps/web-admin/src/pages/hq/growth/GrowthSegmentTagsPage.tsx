@@ -13,8 +13,10 @@ import { TagsOutlined, TeamOutlined, RocketOutlined, EyeOutlined } from '@ant-de
 import {
   fetchSegmentPresets,
   fetchTagDistribution,
+  fetchP1Distribution,
   type SegmentPreset,
   type TagDistribution,
+  type P1Distribution,
 } from '../../../api/growthHubApi';
 
 // ---- 颜色常量（深色主题） ----
@@ -67,6 +69,26 @@ const TAG_DICTIONARY: TagDictEntry[] = [
   { category: '修复状态', value: 'complaint_closed_pending_repair', label: '投诉关闭待修复', trigger: '投诉结案但未修复', action: '服务修复旅程' },
   { category: '修复状态', value: 'repair_in_progress', label: '修复进行中', trigger: '已启动修复旅程', action: '持续跟进' },
   { category: '修复状态', value: 'recovered', label: '已修复', trigger: '修复成功，客户回访', action: '转入正常运营' },
+  // P1 标签
+  { category: '心理距离', value: 'near', label: '亲近', trigger: '近期到店且互动良好', action: '维护关系' },
+  { category: '心理距离', value: 'habit_break', label: '习惯中断', trigger: '消费习惯出现断裂信号', action: '轻触达提醒' },
+  { category: '心理距离', value: 'fading', label: '渐远', trigger: '心理距离开始变远，还有关系记忆', action: '心理距离修复旅程' },
+  { category: '心理距离', value: 'abstracted', label: '疏离', trigger: '心理距离已远，品牌印象模糊', action: '轻触达修复旅程' },
+  { category: '心理距离', value: 'lost', label: '失联', trigger: '完全失去联系', action: '放弃或极轻触达' },
+  { category: '超级用户', value: 'none', label: '普通', trigger: '未达到超级用户标准', action: '无' },
+  { category: '超级用户', value: 'potential', label: '潜在', trigger: 'RFM高分但未激活', action: '培养激活' },
+  { category: '超级用户', value: 'active', label: '活跃', trigger: '高频高额且有互动', action: '关系经营旅程' },
+  { category: '超级用户', value: 'advocate', label: '品牌大使', trigger: '主动推荐且有裂变行为', action: '赋能推荐' },
+  { category: '成长里程碑', value: 'newcomer', label: '新客', trigger: '首次到店', action: '首单转二访' },
+  { category: '成长里程碑', value: 'regular', label: '常客', trigger: '累计3+笔订单', action: '里程碑庆祝' },
+  { category: '成长里程碑', value: 'loyal', label: '忠诚客', trigger: '累计10+笔订单', action: '里程碑庆祝' },
+  { category: '成长里程碑', value: 'vip', label: 'VIP', trigger: '累计消费达VIP阈值', action: '里程碑庆祝' },
+  { category: '成长里程碑', value: 'legend', label: '传奇', trigger: '累计消费达传奇阈值', action: '里程碑庆祝' },
+  { category: '裂变场景', value: 'none', label: '无', trigger: '无裂变行为', action: '无' },
+  { category: '裂变场景', value: 'birthday_organizer', label: '生日组织者', trigger: '多次组织生日聚餐', action: '生日裂变旅程' },
+  { category: '裂变场景', value: 'family_host', label: '家庭聚餐达人', trigger: '高频家庭聚餐', action: '家庭裂变旅程' },
+  { category: '裂变场景', value: 'corporate_host', label: '企业宴请', trigger: '企业宴请场景', action: '企业裂变旅程' },
+  { category: '裂变场景', value: 'super_referrer', label: '超级推荐者', trigger: '推荐多位新客', action: '推荐赋能旅程' },
 ];
 
 const dictColumns = [
@@ -158,6 +180,19 @@ const REPAIR_LABELS: Record<string, string> = {
   complaint_opened: '投诉处理中', complaint_closed_pending_repair: '投诉关闭待修复',
   repair_in_progress: '修复进行中', recovered: '已修复',
 };
+const PSYCH_DISTANCE_LABELS: Record<string, string> = {
+  near: '亲近', habit_break: '习惯中断', fading: '渐远', abstracted: '疏离', lost: '失联',
+};
+const SUPER_USER_LABELS: Record<string, string> = {
+  none: '普通', potential: '潜在', active: '活跃', advocate: '品牌大使',
+};
+const MILESTONE_LABELS: Record<string, string> = {
+  newcomer: '新客', regular: '常客', loyal: '忠诚客', vip: 'VIP', legend: '传奇',
+};
+const REFERRAL_LABELS: Record<string, string> = {
+  none: '无', birthday_organizer: '生日组织者', family_host: '家庭聚餐达人',
+  corporate_host: '企业宴请', super_referrer: '超级推荐者',
+};
 
 // ---- 主组件 ----
 export function GrowthSegmentTagsPage() {
@@ -165,19 +200,22 @@ export function GrowthSegmentTagsPage() {
   const [loading, setLoading] = useState(true);
   const [presets, setPresets] = useState<SegmentPreset[]>([]);
   const [distribution, setDistribution] = useState<TagDistribution | null>(null);
+  const [p1Dist, setP1Dist] = useState<P1Distribution | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       setLoading(true);
       try {
-        const [presetsRes, distRes] = await Promise.all([
+        const [presetsRes, distRes, p1Res] = await Promise.all([
           fetchSegmentPresets(),
           fetchTagDistribution(),
+          fetchP1Distribution().catch(() => null),
         ]);
         if (cancelled) return;
         setPresets(presetsRes.presets);
         setDistribution(distRes);
+        if (p1Res) setP1Dist(p1Res);
       } catch (e: unknown) {
         if (!cancelled) message.error('加载标签数据失败');
       } finally {
@@ -196,7 +234,7 @@ export function GrowthSegmentTagsPage() {
           增长标签中心
         </h2>
         <div style={{ color: TEXT_SECONDARY, fontSize: 13, marginTop: 4 }}>
-          可运营标签分布总览 / P0规则模板 / 标签字典
+          可运营标签分布总览 / P0+P1规则模板 / 标签字典
         </div>
       </div>
 
@@ -236,6 +274,47 @@ export function GrowthSegmentTagsPage() {
               />
             </Col>
           </Row>
+          {/* P1 标签分布 */}
+          {p1Dist && (
+            <Row gutter={24} style={{ marginTop: 24 }}>
+              <Col span={6}>
+                <MiniPie
+                  title="心理距离分布"
+                  data={(p1Dist.psych_distance || []).map((d) => ({
+                    label: PSYCH_DISTANCE_LABELS[d.level] || d.level,
+                    value: d.count,
+                  }))}
+                />
+              </Col>
+              <Col span={6}>
+                <MiniPie
+                  title="超级用户分布"
+                  data={(p1Dist.super_user || []).map((d) => ({
+                    label: SUPER_USER_LABELS[d.level] || d.level,
+                    value: d.count,
+                  }))}
+                />
+              </Col>
+              <Col span={6}>
+                <MiniPie
+                  title="成长里程碑分布"
+                  data={(p1Dist.milestones || []).map((d) => ({
+                    label: MILESTONE_LABELS[d.stage] || d.stage,
+                    value: d.count,
+                  }))}
+                />
+              </Col>
+              <Col span={6}>
+                <MiniPie
+                  title="裂变场景分布"
+                  data={(p1Dist.referral || []).map((d) => ({
+                    label: REFERRAL_LABELS[d.scenario] || d.scenario,
+                    value: d.count,
+                  }))}
+                />
+              </Col>
+            </Row>
+          )}
         </Card>
 
         {/* 区域2: P0预置规则模板 */}

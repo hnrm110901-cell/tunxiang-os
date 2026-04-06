@@ -4,6 +4,12 @@ P0 三条核心旅程:
 1. 首单转二访·Hook化旅程 V2
 2. 沉默召回·权益到期型 V2
 3. 服务修复·四阶协议 V2
+
+P1 四条扩展旅程:
+4. 超级用户·关系经营旅程
+5. 心理距离·关系修复旅程
+6. 成长里程碑·进阶庆祝旅程
+7. 裂变场景·社交激活旅程
 """
 from typing import Any
 
@@ -313,6 +319,332 @@ SYSTEM_JOURNEY_TEMPLATES: list[dict[str, Any]] = [
             {
                 # Step9: 旅程结束（无论是否回访）
                 "step_no": 9,
+                "step_type": "exit",
+            },
+        ],
+    },
+
+    # ──────────────────────────────────────────────────────────
+    # 旅程4: 超级用户·关系经营旅程
+    # 目的: 对active/advocate超级用户进行关系深化经营，
+    #       通过身份仪式→特权体验→裂变赋能/季节专属的路径维护高价值关系
+    # ──────────────────────────────────────────────────────────
+    {
+        "code": "super_user_relationship_v1",
+        "name": "超级用户·关系经营旅程",
+        "journey_type": "super_user",
+        "mechanism_family": "relationship",
+        "entry_rule_json": {
+            "conditions": [
+                {"field": "super_user_level", "op": "in", "value": ["active", "advocate"]}
+            ]
+        },
+        "exit_rule_json": {
+            "conditions": [
+                {"field": "super_user_level", "op": "eq", "value": "none"}
+            ]
+        },
+        "pause_rule_json": {
+            "conditions": [
+                {"field": "service_repair_status", "op": "eq", "value": "complaint_open"}
+            ]
+        },
+        "priority": 70,
+        "is_system": True,
+        "steps": [
+            {
+                # Step1: 身份仪式 — 恭喜成为超级用户+专属权益说明
+                "step_no": 1,
+                "step_type": "touch",
+                "mechanism_type": "super_user_exclusive",
+                "touch_template_code": "tmpl_super_user_welcome",
+            },
+            {
+                # Step2: 等待7天
+                "step_no": 2,
+                "step_type": "wait",
+                "wait_minutes": 10080,  # 7天
+            },
+            {
+                # Step3: 特权体验 — 新品试菜/主厨晚宴邀请
+                "step_no": 3,
+                "step_type": "touch",
+                "mechanism_type": "super_user_exclusive",
+                "touch_template_code": "tmpl_super_user_privilege",
+            },
+            {
+                # Step4: 等待14天
+                "step_no": 4,
+                "step_type": "wait",
+                "wait_minutes": 20160,  # 14天
+            },
+            {
+                # Step5: 分支决策 — 是否有裂变潜力
+                "step_no": 5,
+                "step_type": "decision",
+                "decision_rule_json": {
+                    "check": "field_value",
+                    "field": "referral_scenario",
+                    "op": "in",
+                    "value": ["super_referrer", "birthday_organizer", "family_host"],
+                    "true_next": 6,   # 有裂变潜力 → 赋能推荐
+                    "false_next": 7,  # 无裂变潜力 → 季节性专属体验
+                },
+            },
+            {
+                # Step6: 有裂变潜力 → 赋能推荐（"您的好友可享专属待遇"）
+                "step_no": 6,
+                "step_type": "touch",
+                "mechanism_type": "referral_empowerment",
+                "touch_template_code": "tmpl_super_user_referral_invite",
+                "success_next_step_no": 8,
+            },
+            {
+                # Step7: 无裂变潜力 → 季节性专属体验
+                "step_no": 7,
+                "step_type": "touch",
+                "mechanism_type": "super_user_exclusive",
+                "touch_template_code": "tmpl_super_user_seasonal",
+                "success_next_step_no": 8,
+            },
+            {
+                # Step8: 14天观察期
+                "step_no": 8,
+                "step_type": "observe",
+                "observe_window_hours": 336,  # 14天
+            },
+            {
+                # Step9: 旅程结束
+                "step_no": 9,
+                "step_type": "exit",
+            },
+        ],
+    },
+
+    # ──────────────────────────────────────────────────────────
+    # 旅程5: 心理距离·关系修复旅程
+    # 目的: 对fading/abstracted客户，通过轻触达或关系唤醒修复心理距离，
+    #       避免直接促销造成反感
+    # ──────────────────────────────────────────────────────────
+    {
+        "code": "psych_distance_bridge_v1",
+        "name": "心理距离·关系修复旅程",
+        "journey_type": "psych_distance",
+        "mechanism_family": "relationship",
+        "entry_rule_json": {
+            "conditions": [
+                {"field": "psych_distance_level", "op": "in", "value": ["fading", "abstracted"]}
+            ]
+        },
+        "exit_rule_json": {
+            "conditions": [
+                {"field": "psych_distance_level", "op": "in", "value": ["near", "habit_break"]}
+            ]
+        },
+        "priority": 65,
+        "is_system": True,
+        "steps": [
+            {
+                # Step1: 分支决策 — abstracted vs fading
+                "step_no": 1,
+                "step_type": "decision",
+                "decision_rule_json": {
+                    "check": "field_value",
+                    "field": "psych_distance_level",
+                    "op": "eq",
+                    "value": "abstracted",
+                    "true_next": 2,   # abstracted → 更轻触达
+                    "false_next": 3,  # fading → 关系唤醒
+                },
+            },
+            {
+                # Step2: abstracted → 轻触达（低侵入性信息分享）
+                "step_no": 2,
+                "step_type": "touch",
+                "mechanism_type": "psych_bridge",
+                "touch_template_code": "tmpl_psych_bridge_gentle",
+                "success_next_step_no": 4,
+            },
+            {
+                # Step3: fading → 关系唤醒（有温度的问候）
+                "step_no": 3,
+                "step_type": "touch",
+                "mechanism_type": "psych_bridge",
+                "touch_template_code": "tmpl_psych_bridge_warmup",
+                "success_next_step_no": 4,
+            },
+            {
+                # Step4: 等待5天
+                "step_no": 4,
+                "step_type": "wait",
+                "wait_minutes": 7200,  # 5天
+            },
+            {
+                # Step5: 判断触达是否被打开
+                "step_no": 5,
+                "step_type": "decision",
+                "decision_rule_json": {
+                    "check": "touch_opened",
+                    "touch_step_no": 2,
+                    "true_next": 6,   # 已打开 → 给最小承诺
+                    "false_next": 7,  # 未打开 → 进入观察期
+                },
+            },
+            {
+                # Step6: 打开了 → 给最小承诺引导回归
+                "step_no": 6,
+                "step_type": "touch",
+                "mechanism_type": "micro_commitment",
+                "touch_template_code": "tmpl_micro_commitment_return",
+            },
+            {
+                # Step7: 7天观察期
+                "step_no": 7,
+                "step_type": "observe",
+                "observe_window_hours": 168,  # 7天
+            },
+            {
+                # Step8: 旅程结束
+                "step_no": 8,
+                "step_type": "exit",
+            },
+        ],
+    },
+
+    # ──────────────────────────────────────────────────────────
+    # 旅程6: 成长里程碑·进阶庆祝旅程
+    # 目的: 客户达到新里程碑时，及时庆祝+展示下一级进度，
+    #       增强粘性与进度可见性
+    # ──────────────────────────────────────────────────────────
+    {
+        "code": "milestone_celebration_v1",
+        "name": "成长里程碑·进阶庆祝旅程",
+        "journey_type": "milestone",
+        "mechanism_family": "milestone",
+        "entry_rule_json": {
+            "conditions": [
+                {"field": "growth_milestone_stage", "op": "in", "value": ["regular", "loyal", "vip", "legend"]}
+            ]
+        },
+        "priority": 60,
+        "is_system": True,
+        "steps": [
+            {
+                # Step1: 进阶恭喜+解锁了什么权益
+                "step_no": 1,
+                "step_type": "touch",
+                "mechanism_type": "milestone_celebration",
+                "touch_template_code": "tmpl_milestone_congrats",
+            },
+            {
+                # Step2: 等待1天
+                "step_no": 2,
+                "step_type": "wait",
+                "wait_minutes": 1440,  # 1天
+            },
+            {
+                # Step3: 告知距离下一个里程碑还差多少（进度可见性）
+                "step_no": 3,
+                "step_type": "touch",
+                "mechanism_type": "milestone_celebration",
+                "touch_template_code": "tmpl_milestone_next_goal",
+            },
+            {
+                # Step4: 7天观察期
+                "step_no": 4,
+                "step_type": "observe",
+                "observe_window_hours": 168,
+            },
+            {
+                # Step5: 旅程结束
+                "step_no": 5,
+                "step_type": "exit",
+            },
+        ],
+    },
+
+    # ──────────────────────────────────────────────────────────
+    # 旅程7: 裂变场景·社交激活旅程
+    # 目的: 识别具备裂变潜力的客户场景（生日组织者/家庭聚餐/企业宴请/超级推荐者），
+    #       按场景匹配差异化的裂变激活触达
+    # ──────────────────────────────────────────────────────────
+    {
+        "code": "referral_activation_v1",
+        "name": "裂变场景·社交激活旅程",
+        "journey_type": "referral",
+        "mechanism_family": "referral",
+        "entry_rule_json": {
+            "conditions": [
+                {"field": "referral_scenario", "op": "in", "value": ["birthday_organizer", "family_host", "corporate_host", "super_referrer"]}
+            ]
+        },
+        "priority": 55,
+        "is_system": True,
+        "steps": [
+            {
+                # Step1: 分支决策 — 是否是生日组织者
+                "step_no": 1,
+                "step_type": "decision",
+                "decision_rule_json": {
+                    "check": "field_value",
+                    "field": "referral_scenario",
+                    "op": "eq",
+                    "value": "birthday_organizer",
+                    "true_next": 2,   # 生日组织者 → 生日裂变
+                    "false_next": 3,  # 其他 → 继续判断
+                },
+            },
+            {
+                # Step2: 生日组织者 → 生日专属裂变
+                "step_no": 2,
+                "step_type": "touch",
+                "mechanism_type": "referral_activation",
+                "touch_template_code": "tmpl_referral_birthday",
+                "success_next_step_no": 5,
+            },
+            {
+                # Step3: 继续判断 — 是否是家庭聚餐达人
+                "step_no": 3,
+                "step_type": "decision",
+                "decision_rule_json": {
+                    "check": "field_value",
+                    "field": "referral_scenario",
+                    "op": "eq",
+                    "value": "family_host",
+                    "true_next": 4,   # 家庭聚餐 → 家庭裂变
+                    "false_next": 6,  # 其他 → 通用裂变
+                },
+            },
+            {
+                # Step4: 家庭聚餐达人 → 家庭裂变
+                "step_no": 4,
+                "step_type": "touch",
+                "mechanism_type": "referral_activation",
+                "touch_template_code": "tmpl_referral_family",
+                "success_next_step_no": 5,
+            },
+            {
+                # Step5: 14天观察期
+                "step_no": 5,
+                "step_type": "observe",
+                "observe_window_hours": 336,  # 14天
+            },
+            {
+                # Step6: 通用裂变
+                "step_no": 6,
+                "step_type": "touch",
+                "mechanism_type": "referral_activation",
+                "touch_template_code": "tmpl_referral_generic",
+            },
+            {
+                # Step7: 14天观察期
+                "step_no": 7,
+                "step_type": "observe",
+                "observe_window_hours": 336,
+            },
+            {
+                # Step8: 旅程结束
+                "step_no": 8,
                 "step_type": "exit",
             },
         ],

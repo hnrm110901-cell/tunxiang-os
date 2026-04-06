@@ -1,4 +1,4 @@
-"""增长中枢 V2 API — 34 个端点
+"""增长中枢 V2 API — 36 个端点
 
 端点：
   # Customer Growth Profile
@@ -50,6 +50,10 @@
   GET    /api/v1/growth/segment-rules/presets                  → P0预置分群规则模板+实时命中人数
   GET    /api/v1/growth/segment-rules/tag-distribution         → 增长标签分布统计
   GET    /api/v1/growth/offer-packs                            → P0权益包模板列表
+
+  # P1 Distribution & Recompute
+  GET    /api/v1/growth/p1/distribution                       → P1四维分布统计
+  POST   /api/v1/growth/p1/recompute                          → 手动触发P1字段重算
 
 所有端点必须携带 X-Tenant-ID Header（UUID 格式）。
 """
@@ -117,6 +121,11 @@ class GrowthProfileUpdate(BaseModel):
     service_repair_status: Optional[str] = None
     growth_opt_out: Optional[bool] = None
     marketing_pause_until: Optional[datetime] = None
+    # P1 字段
+    psych_distance_level: Optional[str] = None
+    super_user_level: Optional[str] = None
+    growth_milestone_stage: Optional[str] = None
+    referral_scenario: Optional[str] = None
 
 
 # --- Journey Template ---
@@ -1382,3 +1391,75 @@ async def list_offer_packs(
         return ok({"items": items, "total": len(items)})
     except (ImportError, KeyError, ValueError) as exc:
         return err(str(exc))
+
+
+# ---------------------------------------------------------------------------
+# P1 Distribution & Recompute 端点
+# ---------------------------------------------------------------------------
+
+
+@router.get("/p1/distribution")
+async def get_p1_distribution(
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+) -> dict:
+    """P1四维分布统计（心理距离/超级用户/里程碑/裂变场景）。"""
+    tenant_id = _parse_tenant(x_tenant_id)
+    async with async_session_factory() as db:
+        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        try:
+            # 心理距离分布
+            r1 = await db.execute(text("""
+                SELECT psych_distance_level, COUNT(*) FROM customer_growth_profiles
+                WHERE is_deleted = FALSE AND psych_distance_level IS NOT NULL
+                GROUP BY psych_distance_level ORDER BY COUNT(*) DESC
+            """))
+            psych_distance = [{"level": row[0], "count": row[1]} for row in r1.fetchall()]
+
+            # 超级用户分布
+            r2 = await db.execute(text("""
+                SELECT super_user_level, COUNT(*) FROM customer_growth_profiles
+                WHERE is_deleted = FALSE AND super_user_level IS NOT NULL
+                GROUP BY super_user_level ORDER BY COUNT(*) DESC
+            """))
+            super_user = [{"level": row[0], "count": row[1]} for row in r2.fetchall()]
+
+            # 成长里程碑分布
+            r3 = await db.execute(text("""
+                SELECT growth_milestone_stage, COUNT(*) FROM customer_growth_profiles
+                WHERE is_deleted = FALSE AND growth_milestone_stage IS NOT NULL
+                GROUP BY growth_milestone_stage ORDER BY COUNT(*) DESC
+            """))
+            milestones = [{"stage": row[0], "count": row[1]} for row in r3.fetchall()]
+
+            # 裂变场景分布
+            r4 = await db.execute(text("""
+                SELECT referral_scenario, COUNT(*) FROM customer_growth_profiles
+                WHERE is_deleted = FALSE AND referral_scenario IS NOT NULL AND referral_scenario != 'none'
+                GROUP BY referral_scenario ORDER BY COUNT(*) DESC
+            """))
+            referral = [{"scenario": row[0], "count": row[1]} for row in r4.fetchall()]
+
+            return ok({
+                "psych_distance": psych_distance,
+                "super_user": super_user,
+                "milestones": milestones,
+                "referral": referral,
+            })
+        except (ValueError, RuntimeError, OSError) as exc:
+            return err(str(exc))
+
+
+@router.post("/p1/recompute")
+async def trigger_p1_recompute(
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+) -> dict:
+    """手动触发P1字段重算（心理距离/超级用户/里程碑/裂变场景）。"""
+    tenant_id = _parse_tenant(x_tenant_id)
+    async with async_session_factory() as db:
+        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        try:
+            result = await _profile_svc.batch_compute_p1_fields(str(tenant_id), db)
+            await db.commit()
+            return ok(result)
+        except (ValueError, RuntimeError, OSError) as exc:
+            return err(str(exc))

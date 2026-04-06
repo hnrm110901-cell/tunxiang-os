@@ -4,6 +4,11 @@ P0三类权益包：
 1. 首单二访轻权益包 — 不发大额券，用轻体验引导回访
 2. 召回权益分层包 — 按机制分3类（到期提醒/关系唤醒/最小行动）
 3. 服务修复补偿包 — 给客户选择权的多选项补偿
+
+P1三类权益包：
+6. 超级用户关系权益包 — 非折扣型专属体验
+7. 里程碑庆祝权益包 — 按等级递进的权益
+8. 裂变场景激励包 — 推荐人+被推荐人双向激励
 """
 from __future__ import annotations
 
@@ -74,6 +79,56 @@ GROWTH_OFFER_PACKS: list[dict[str, Any]] = [
             {"type": "gift", "name": "赠送招牌菜", "description": "下次到店赠送一道招牌菜", "cost_fen": 3000},
         ],
         "budget_limit_fen": 5000,
+        "valid_days": 30,
+    },
+
+    # ══════════════════════════════════════════════════════════
+    # P1 扩展权益包
+    # ══════════════════════════════════════════════════════════
+
+    {
+        "code": "pack_super_user_relationship",
+        "name": "超级用户·关系权益包",
+        "pack_type": "super_user",
+        "mechanism_type": "super_user_exclusive",
+        "description": "非折扣型专属体验权益，通过稀缺性与尊贵感维护超级用户关系",
+        "items": [
+            {"type": "privilege", "name": "专属包厢优先预订", "description": "超级用户可优先预订VIP包厢，无需排队", "cost_fen": 0},
+            {"type": "experience", "name": "新品试菜资格", "description": "主厨新品上市前优先品鉴，提供反馈即可", "cost_fen": 2000},
+            {"type": "experience", "name": "主厨定制菜单", "description": "主厨根据超级用户口味偏好定制专属菜单", "cost_fen": 5000},
+            {"type": "experience", "name": "年度感谢晚宴邀请", "description": "每年一次品牌感谢晚宴，仅限超级用户参加", "cost_fen": 15000},
+        ],
+        "budget_limit_fen": 22000,
+        "valid_days": 365,
+    },
+    {
+        "code": "pack_milestone_celebration",
+        "name": "里程碑·庆祝权益包",
+        "pack_type": "milestone",
+        "mechanism_type": "milestone_celebration",
+        "description": "按里程碑等级递进的权益，每达到新里程碑解锁对应权益",
+        "items": [
+            {"type": "gift", "name": "regular·专属甜品", "description": "达成常客里程碑，赠送招牌甜品一份", "cost_fen": 800},
+            {"type": "privilege", "name": "loyal·免排队特权", "description": "达成忠诚客里程碑，享30天免排队特权", "cost_fen": 0},
+            {"type": "experience", "name": "vip·主厨私房菜", "description": "达成VIP里程碑，赠送主厨私房菜品鉴一次", "cost_fen": 3000},
+            {"type": "experience", "name": "legend·专属晚宴席位", "description": "达成传奇里程碑，获年度感谢晚宴永久席位", "cost_fen": 8000},
+            {"type": "privilege", "name": "全等级·进度徽章", "description": "每个里程碑对应专属电子徽章，在小程序展示", "cost_fen": 0},
+        ],
+        "budget_limit_fen": 12000,
+        "valid_days": 90,
+    },
+    {
+        "code": "pack_referral_incentive",
+        "name": "裂变场景·激励权益包",
+        "pack_type": "referral",
+        "mechanism_type": "referral_activation",
+        "description": "推荐人与被推荐人双向激励，鼓励优质客户的社交裂变",
+        "items": [
+            {"type": "reward", "name": "推荐人奖励·感谢礼遇", "description": "每成功推荐1位新客，推荐人获得主厨小食一份", "cost_fen": 800},
+            {"type": "gift", "name": "被推荐人·首次专属礼", "description": "被推荐新客首次到店享专属欢迎小食+饮品", "cost_fen": 1200},
+            {"type": "experience", "name": "双方·专属聚餐优惠", "description": "推荐人与被推荐人同桌用餐，赠送招牌菜一道", "cost_fen": 2500},
+        ],
+        "budget_limit_fen": 4500,
         "valid_days": 30,
     },
 ]

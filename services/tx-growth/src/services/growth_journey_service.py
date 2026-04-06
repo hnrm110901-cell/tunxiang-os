@@ -614,15 +614,96 @@ class GrowthJourneyService:
 
         elif step_type == "decision":
             # 决策步骤：评估decision_rule_json
-            # P0简化: 默认走success分支
             decision_rule = step.get("decision_rule_json") or {}
             if isinstance(decision_rule, str):
                 decision_rule = json.loads(decision_rule) if decision_rule else {}
-            goto_step = step.get("on_success_goto")
+
+            check_type = decision_rule.get("check", "")
+            goto_step = None
+
+            if check_type == "field_value":
+                # P1: 查询客户画像字段做分支
+                field_name = decision_rule.get("field", "")
+                expected_value = decision_rule.get("value")
+                op = decision_rule.get("op", "eq")
+
+                # 安全：只允许查询白名单字段
+                _ALLOWED_FIELDS = {
+                    "psych_distance_level", "super_user_level", "growth_milestone_stage",
+                    "referral_scenario", "repurchase_stage", "reactivation_priority",
+                    "service_repair_status", "has_active_owned_benefit",
+                }
+                if field_name in _ALLOWED_FIELDS:
+                    profile_result = await db.execute(text(
+                        f"SELECT {field_name} FROM customer_growth_profiles"  # noqa: S608
+                        " WHERE customer_id = :cid AND is_deleted = FALSE"
+                    ), {"cid": str(customer_id)})
+                    row = profile_result.fetchone()
+                    actual_value = row[0] if row else None
+
+                    matched = False
+                    if op == "eq":
+                        matched = (actual_value == expected_value)
+                    elif op == "ne":
+                        matched = (actual_value != expected_value)
+                    elif op == "in":
+                        matched = (actual_value in (expected_value if isinstance(expected_value, list) else [expected_value]))
+                    elif op == "not_in":
+                        matched = (actual_value not in (expected_value if isinstance(expected_value, list) else [expected_value]))
+
+                    goto_step = decision_rule.get("true_next") if matched else decision_rule.get("false_next")
+
+            elif check_type == "has_active_owned_benefit":
+                # 检查客户是否持有有效权益
+                profile_result = await db.execute(text("""
+                    SELECT has_active_owned_benefit FROM customer_growth_profiles
+                    WHERE customer_id = :cid AND is_deleted = FALSE
+                """), {"cid": str(customer_id)})
+                row = profile_result.fetchone()
+                has_benefit = row[0] if row else False
+                goto_step = decision_rule.get("true_next") if has_benefit else decision_rule.get("false_next")
+
+            elif check_type == "touch_opened":
+                # 检查某步骤的触达是否已被打开
+                touch_step = decision_rule.get("touch_step_no")
+                if touch_step and enrollment_id:
+                    touch_result = await db.execute(text("""
+                        SELECT execution_state FROM growth_touch_executions
+                        WHERE journey_enrollment_id = :eid AND step_no = :sno AND is_deleted = FALSE
+                        ORDER BY created_at DESC LIMIT 1
+                    """), {"eid": str(enrollment_id), "sno": touch_step})
+                    trow = touch_result.fetchone()
+                    opened = trow is not None and trow[0] in ("opened", "clicked", "replied")
+                    goto_step = decision_rule.get("true_next") if opened else decision_rule.get("false_next")
+
+            elif check_type == "has_revisited":
+                # 查客户是否在旅程期间有新订单
+                profile_result = await db.execute(text("""
+                    SELECT last_order_at FROM customer_growth_profiles
+                    WHERE customer_id = :cid AND is_deleted = FALSE
+                """), {"cid": str(customer_id)})
+                row = profile_result.fetchone()
+                # 读enrollment的entered_at作为基准
+                enr_entered = await db.execute(text("""
+                    SELECT entered_at FROM growth_journey_enrollments
+                    WHERE id = :eid AND is_deleted = FALSE
+                """), {"eid": str(enrollment_id)})
+                enr_row = enr_entered.fetchone()
+                entered_at = enr_row[0] if enr_row else None
+                revisited = (row is not None and row[0] is not None
+                             and entered_at is not None and row[0] > entered_at)
+                goto_step = decision_rule.get("true_next") if revisited else decision_rule.get("false_next")
+
+            # 如果没有匹配的check_type，走默认success分支
             if goto_step is not None:
                 new_step_no = goto_step
             else:
-                new_step_no = current_step_no + 1
+                # P0 fallback: 默认走success分支
+                fallback_goto = step.get("on_success_goto")
+                if fallback_goto is not None:
+                    new_step_no = fallback_goto
+                else:
+                    new_step_no = current_step_no + 1
             if new_step_no > total_steps:
                 new_state = "completed"
                 new_step_no = current_step_no

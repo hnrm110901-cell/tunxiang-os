@@ -17,6 +17,13 @@ export interface GrowthProfile {
   growth_opt_out: boolean;
   marketing_pause_until: string | null;
   last_order_at: string | null;
+  // P1 fields
+  psych_distance_level: string | null;
+  super_user_level: string | null;
+  growth_milestone_stage: string | null;
+  growth_milestone_progress: number | null;
+  growth_milestone_next: string | null;
+  referral_scenario: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -281,3 +288,18 @@ export const fetchOfferPacks = (params?: { pack_type?: string; mechanism_type?: 
   const qs = params ? '?' + new URLSearchParams(Object.entries(params).filter(([, v]) => v != null) as [string, string][]).toString() : '';
   return txFetchData<{ items: OfferPack[]; total: number }>(`/api/v1/growth/offer-packs${qs}`);
 };
+
+// ---- P1 Distribution Types & APIs ----
+
+export interface P1Distribution {
+  psych_distance: { level: string; count: number }[];
+  super_user: { level: string; count: number }[];
+  milestones: { stage: string; count: number }[];
+  referral: { scenario: string; count: number }[];
+}
+
+export const fetchP1Distribution = () =>
+  txFetchData<P1Distribution>('/api/v1/growth/p1/distribution');
+
+export const triggerP1Recompute = () =>
+  txFetch<{ ok: boolean }>('/api/v1/growth/p1/recompute', { method: 'POST' });

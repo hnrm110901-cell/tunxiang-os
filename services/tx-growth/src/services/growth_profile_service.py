@@ -28,6 +28,32 @@ logger = structlog.get_logger(__name__)
 class GrowthProfileService:
     """客户增长画像服务 — customer_growth_profiles 表 CRUD + 状态流转"""
 
+    # ── P1 心理距离分层 ──
+    VALID_PSYCH_DISTANCE = ("near", "habit_break", "fading", "abstracted", "lost")
+    # near: 近距离，最近7天内有互动(消费/打开触达/回复)
+    # habit_break: 习惯中断，7-21天无互动但有历史高频
+    # fading: 渐远，21-45天无互动
+    # abstracted: 抽象化，45-90天无互动
+    # lost: 失联，90天+无互动
+
+    # ── P1 超级用户分层 ──
+    VALID_SUPER_USER = ("none", "potential", "active", "advocate")
+    # none: 普通客户
+    # potential: 潜在超级用户 (CLV top 10% 且 复购>=3次)
+    # active: 活跃超级用户 (CLV top 5% 且 复购>=6次 且 有推荐行为)
+    # advocate: 品牌代言人 (CLV top 3% 且 有成功推荐>=2人)
+
+    # ── P1 成长里程碑 ──
+    VALID_MILESTONES = ("newcomer", "regular", "loyal", "vip", "legend")
+    # newcomer: 新客(1-2次消费)
+    # regular: 常客(3-5次)
+    # loyal: 忠实客(6-11次)
+    # vip: VIP客(12-23次)
+    # legend: 传奇客(24次+)
+
+    # ── P1 裂变场景 ──
+    VALID_REFERRAL_SCENARIOS = ("none", "birthday_organizer", "family_host", "corporate_host", "super_referrer")
+
     VALID_REPURCHASE_STAGES = (
         "not_started",
         "first_order_done",
@@ -510,3 +536,220 @@ class GrowthProfileService:
             "high_benefit_expiring": count_21d,
             "medium_no_second_visit": count_7d,
         }
+
+    # ------------------------------------------------------------------
+    # P1: 心理距离分层计算
+    # ------------------------------------------------------------------
+
+    async def batch_compute_psych_distance(
+        self, tenant_id: str, db: AsyncSession
+    ) -> dict:
+        """批量计算客户心理距离分层
+
+        规则（基于最后互动时间，互动=消费/触达打开/触达回复）:
+        - near: last_interaction <= 7天
+        - habit_break: 7天 < last_interaction <= 21天
+        - fading: 21天 < last_interaction <= 45天
+        - abstracted: 45天 < last_interaction <= 90天
+        - lost: last_interaction > 90天
+        """
+        await self._set_tenant(db, tenant_id)
+
+        # 计算最后互动时间 = MAX(last_order_at, last_growth_touch_at, 最后打开触达时间)
+        result = await db.execute(text("""
+            WITH last_interaction AS (
+                SELECT
+                    cgp.customer_id,
+                    GREATEST(
+                        cgp.last_order_at,
+                        cgp.last_growth_touch_at,
+                        (SELECT MAX(gte.opened_at) FROM growth_touch_executions gte
+                         WHERE gte.customer_id = cgp.customer_id
+                           AND gte.is_deleted = FALSE AND gte.opened_at IS NOT NULL)
+                    ) AS last_at
+                FROM customer_growth_profiles cgp
+                WHERE cgp.is_deleted = FALSE
+            )
+            UPDATE customer_growth_profiles cgp SET
+                psych_distance_level = CASE
+                    WHEN li.last_at >= NOW() - INTERVAL '7 days' THEN 'near'
+                    WHEN li.last_at >= NOW() - INTERVAL '21 days' THEN 'habit_break'
+                    WHEN li.last_at >= NOW() - INTERVAL '45 days' THEN 'fading'
+                    WHEN li.last_at >= NOW() - INTERVAL '90 days' THEN 'abstracted'
+                    WHEN li.last_at IS NOT NULL THEN 'lost'
+                    ELSE 'lost'
+                END,
+                updated_at = NOW()
+            FROM last_interaction li
+            WHERE cgp.customer_id = li.customer_id AND cgp.is_deleted = FALSE
+            RETURNING cgp.customer_id, cgp.psych_distance_level
+        """))
+        rows = result.fetchall()
+
+        dist: dict[str, int] = {}
+        for r in rows:
+            level = r[1]
+            dist[level] = dist.get(level, 0) + 1
+
+        logger.info("batch_psych_distance_done", tenant_id=tenant_id, total=len(rows), distribution=dist)
+        return {"total_updated": len(rows), "distribution": dist}
+
+    # ------------------------------------------------------------------
+    # P1: 超级用户分层计算
+    # ------------------------------------------------------------------
+
+    async def batch_compute_super_user(
+        self, tenant_id: str, db: AsyncSession
+    ) -> dict:
+        """批量计算超级用户分层
+
+        规则:
+        - advocate: CLV top 3% 且 消费>=24次
+        - active: CLV top 5% 且 复购>=6次
+        - potential: CLV top 10% 且 复购>=3次
+        - none: 其余
+        """
+        await self._set_tenant(db, tenant_id)
+
+        # 先算CLV百分位阈值
+        percentiles = await db.execute(text("""
+            SELECT
+                PERCENTILE_CONT(0.97) WITHIN GROUP (ORDER BY c.total_order_amount_fen) AS p97,
+                PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY c.total_order_amount_fen) AS p95,
+                PERCENTILE_CONT(0.90) WITHIN GROUP (ORDER BY c.total_order_amount_fen) AS p90
+            FROM customers c
+            WHERE c.is_deleted = FALSE AND c.total_order_count > 0
+        """))
+        p = percentiles.fetchone()
+        if not p or p[0] is None:
+            return {"total_updated": 0, "distribution": {}}
+
+        p97, p95, p90 = int(p[0] or 0), int(p[1] or 0), int(p[2] or 0)
+
+        result = await db.execute(text("""
+            UPDATE customer_growth_profiles cgp SET
+                super_user_level = CASE
+                    WHEN c.total_order_amount_fen >= :p97 AND c.total_order_count >= 24 THEN 'advocate'
+                    WHEN c.total_order_amount_fen >= :p95 AND c.total_order_count >= 6 THEN 'active'
+                    WHEN c.total_order_amount_fen >= :p90 AND c.total_order_count >= 3 THEN 'potential'
+                    ELSE 'none'
+                END,
+                updated_at = NOW()
+            FROM customers c
+            WHERE c.id = cgp.customer_id AND cgp.is_deleted = FALSE AND c.is_deleted = FALSE
+            RETURNING cgp.customer_id, cgp.super_user_level
+        """), {"p97": p97, "p95": p95, "p90": p90})
+
+        rows = result.fetchall()
+        dist: dict[str, int] = {}
+        for r in rows:
+            level = r[1]
+            dist[level] = dist.get(level, 0) + 1
+
+        logger.info("batch_super_user_done", tenant_id=tenant_id, total=len(rows), distribution=dist)
+        return {"total_updated": len(rows), "distribution": dist}
+
+    # ------------------------------------------------------------------
+    # P1: 成长里程碑计算
+    # ------------------------------------------------------------------
+
+    async def batch_compute_milestones(
+        self, tenant_id: str, db: AsyncSession
+    ) -> dict:
+        """批量计算成长里程碑
+
+        规则基于消费次数:
+        - newcomer: 1-2次
+        - regular: 3-5次
+        - loyal: 6-11次
+        - vip: 12-23次
+        - legend: 24次+
+        """
+        await self._set_tenant(db, tenant_id)
+
+        result = await db.execute(text("""
+            UPDATE customer_growth_profiles cgp SET
+                growth_milestone_stage = CASE
+                    WHEN c.total_order_count >= 24 THEN 'legend'
+                    WHEN c.total_order_count >= 12 THEN 'vip'
+                    WHEN c.total_order_count >= 6 THEN 'loyal'
+                    WHEN c.total_order_count >= 3 THEN 'regular'
+                    WHEN c.total_order_count >= 1 THEN 'newcomer'
+                    ELSE NULL
+                END,
+                updated_at = NOW()
+            FROM customers c
+            WHERE c.id = cgp.customer_id AND cgp.is_deleted = FALSE AND c.is_deleted = FALSE
+            RETURNING cgp.customer_id, cgp.growth_milestone_stage
+        """))
+        rows = result.fetchall()
+        dist: dict[str, int] = {}
+        for r in rows:
+            stage = r[1]
+            if stage:
+                dist[stage] = dist.get(stage, 0) + 1
+
+        logger.info("batch_milestones_done", tenant_id=tenant_id, total=len(rows), distribution=dist)
+        return {"total_updated": len(rows), "distribution": dist}
+
+    # ------------------------------------------------------------------
+    # P1: 裂变场景识别
+    # ------------------------------------------------------------------
+
+    async def batch_compute_referral_scenario(
+        self, tenant_id: str, db: AsyncSession
+    ) -> dict:
+        """批量识别裂变场景
+
+        P1简化版：基于消费金额和频次粗判
+        - super_referrer: super_user_level in (active, advocate)
+        - corporate_host: 消费>=6次 且 客单价>=500元
+        - family_host: 消费>=4次 且 客单价>=300元
+        - birthday_organizer: 消费>=3次 且 客单价>=200元
+        - none: 其余
+        """
+        await self._set_tenant(db, tenant_id)
+
+        result = await db.execute(text("""
+            UPDATE customer_growth_profiles cgp SET
+                referral_scenario = CASE
+                    WHEN cgp.super_user_level IN ('active', 'advocate') THEN 'super_referrer'
+                    WHEN c.total_order_count >= 6 AND c.total_order_amount_fen / GREATEST(c.total_order_count, 1) >= 50000
+                        THEN 'corporate_host'
+                    WHEN c.total_order_count >= 4 AND c.total_order_amount_fen / GREATEST(c.total_order_count, 1) >= 30000
+                        THEN 'family_host'
+                    WHEN c.total_order_count >= 3 AND c.total_order_amount_fen / GREATEST(c.total_order_count, 1) >= 20000
+                        THEN 'birthday_organizer'
+                    ELSE 'none'
+                END,
+                updated_at = NOW()
+            FROM customers c
+            WHERE c.id = cgp.customer_id AND cgp.is_deleted = FALSE AND c.is_deleted = FALSE
+            RETURNING cgp.customer_id, cgp.referral_scenario
+        """))
+        rows = result.fetchall()
+        dist: dict[str, int] = {}
+        for r in rows:
+            scenario = r[1]
+            if scenario and scenario != 'none':
+                dist[scenario] = dist.get(scenario, 0) + 1
+
+        logger.info("batch_referral_scenario_done", tenant_id=tenant_id, total=len(rows), distribution=dist)
+        return {"total_updated": len(rows), "distribution": dist}
+
+    # ------------------------------------------------------------------
+    # P1: 统一批量计算入口
+    # ------------------------------------------------------------------
+
+    async def batch_compute_p1_fields(
+        self, tenant_id: str, db: AsyncSession
+    ) -> dict:
+        """P1字段统一批量计算（每日定时调用）"""
+        results: dict[str, dict] = {}
+        results["psych_distance"] = await self.batch_compute_psych_distance(tenant_id, db)
+        results["super_user"] = await self.batch_compute_super_user(tenant_id, db)
+        results["milestones"] = await self.batch_compute_milestones(tenant_id, db)
+        results["referral_scenario"] = await self.batch_compute_referral_scenario(tenant_id, db)
+
+        logger.info("batch_p1_fields_all_done", tenant_id=tenant_id, results=results)
+        return results

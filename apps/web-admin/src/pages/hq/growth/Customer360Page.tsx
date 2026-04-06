@@ -5,11 +5,11 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-  Card, Tag, Button, Space, Row, Col, Statistic, Table, Timeline, Spin, Descriptions, message,
+  Card, Tag, Button, Space, Row, Col, Statistic, Table, Timeline, Spin, Descriptions, Progress, message,
 } from 'antd';
 import {
   ArrowLeftOutlined, RocketOutlined, RobotOutlined, StarOutlined,
-  PhoneOutlined, ShopOutlined,
+  PhoneOutlined, ShopOutlined, CrownOutlined, HeartOutlined, TrophyOutlined, ShareAltOutlined,
 } from '@ant-design/icons';
 import ReactEChartsCore from 'echarts-for-react/lib/core';
 import * as echarts from 'echarts/core';
@@ -72,6 +72,32 @@ const PRIORITY_COLORS: Record<string, string> = {
 const EXEC_STATE_COLORS: Record<string, string> = {
   sent: 'blue', delivered: 'cyan', opened: 'green', clicked: 'green',
   bounced: 'red', failed: 'red', pending: 'default',
+};
+
+// ---- P1 标签颜色映射 ----
+const PSYCH_DISTANCE_TAG: Record<string, { color: string; label: string }> = {
+  near: { color: 'green', label: '亲近' },
+  habit_break: { color: 'blue', label: '习惯中断' },
+  fading: { color: 'orange', label: '渐远' },
+  abstracted: { color: 'red', label: '疏离' },
+  lost: { color: 'default', label: '失联' },
+};
+
+const SUPER_USER_TAG: Record<string, { color: string; label: string }> = {
+  potential: { color: 'blue', label: '潜在超级用户' },
+  active: { color: 'gold', label: '超级用户' },
+  advocate: { color: 'purple', label: '品牌大使' },
+};
+
+const MILESTONE_LABELS: Record<string, string> = {
+  newcomer: '新客', regular: '常客', loyal: '忠诚客', vip: 'VIP', legend: '传奇',
+};
+
+const REFERRAL_TAG: Record<string, { color: string; label: string }> = {
+  birthday_organizer: { color: 'magenta', label: '生日组织者' },
+  family_host: { color: 'volcano', label: '家庭聚餐达人' },
+  corporate_host: { color: 'geekblue', label: '企业宴请' },
+  super_referrer: { color: 'gold', label: '超级推荐者' },
 };
 
 // ---- 组件 ----
@@ -182,6 +208,43 @@ export function Customer360Page() {
                 </Tag>
               )}
               {cust?.rfm_tag && <Tag color="purple" style={{ marginLeft: 4 }}>{cust.rfm_tag}</Tag>}
+            </div>
+            {/* P1 标签行 */}
+            <div style={{ marginTop: 6, display: 'flex', flexWrap: 'wrap', gap: 4, alignItems: 'center' }}>
+              {growthProfile?.psych_distance_level && PSYCH_DISTANCE_TAG[growthProfile.psych_distance_level] && (
+                <Tag icon={<HeartOutlined />} color={PSYCH_DISTANCE_TAG[growthProfile.psych_distance_level].color}>
+                  {PSYCH_DISTANCE_TAG[growthProfile.psych_distance_level].label}
+                </Tag>
+              )}
+              {growthProfile?.super_user_level && SUPER_USER_TAG[growthProfile.super_user_level] && (
+                <Tag icon={<CrownOutlined />} color={SUPER_USER_TAG[growthProfile.super_user_level].color}>
+                  {SUPER_USER_TAG[growthProfile.super_user_level].label}
+                </Tag>
+              )}
+              {growthProfile?.growth_milestone_stage && growthProfile.growth_milestone_stage !== 'newcomer' && (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  <Tag icon={<TrophyOutlined />} color="cyan">
+                    {MILESTONE_LABELS[growthProfile.growth_milestone_stage] || growthProfile.growth_milestone_stage}
+                  </Tag>
+                  {growthProfile.growth_milestone_progress != null && growthProfile.growth_milestone_next && (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, color: TEXT_SECONDARY }}>
+                      <Progress
+                        percent={growthProfile.growth_milestone_progress}
+                        size="small"
+                        style={{ width: 80, margin: 0 }}
+                        strokeColor={BRAND_ORANGE}
+                        showInfo={false}
+                      />
+                      <span>{growthProfile.growth_milestone_progress}% &rarr; {MILESTONE_LABELS[growthProfile.growth_milestone_next] || growthProfile.growth_milestone_next}</span>
+                    </span>
+                  )}
+                </span>
+              )}
+              {growthProfile?.referral_scenario && growthProfile.referral_scenario !== 'none' && REFERRAL_TAG[growthProfile.referral_scenario] && (
+                <Tag icon={<ShareAltOutlined />} color={REFERRAL_TAG[growthProfile.referral_scenario].color}>
+                  {REFERRAL_TAG[growthProfile.referral_scenario].label}
+                </Tag>
+              )}
             </div>
             <Space style={{ marginTop: 8, color: TEXT_SECONDARY, fontSize: 13 }}>
               {cust?.primary_phone && <span><PhoneOutlined /> {cust.primary_phone}</span>}

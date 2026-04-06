@@ -222,11 +222,30 @@ def _on_approval_expiry_done(task: asyncio.Task) -> None:
 
 from services.growth_journey_service import GrowthJourneyService as _GrowthJourneyService
 
+# Feature Flag SDK — 控制 Growth Journey V2 / 沉默召回 等 cron 任务
+try:
+    from shared.feature_flags import FlagContext, is_enabled as _ff_is_enabled
+    from shared.feature_flags.flag_names import GrowthFlags as _GrowthFlags
+    _FEATURE_FLAGS_AVAILABLE = True
+except ImportError:
+    _FEATURE_FLAGS_AVAILABLE = False
+    logger.warning("feature_flags_sdk_not_available", reason="import failed, all flags default to enabled")
+
 _growth_journey_svc = _GrowthJourneyService()
 
 
 async def _run_growth_journey_tick() -> None:
     """定时任务：每分钟推进所有租户到期的增长中枢V2旅程。"""
+    # Feature Flag 检查：growth.hub.journey_v2.enable
+    # 关闭时跳过整个 V2 tick，降级依赖 V1 旅程执行器（_run_journey_tick）继续工作
+    if _FEATURE_FLAGS_AVAILABLE and not _ff_is_enabled(_GrowthFlags.JOURNEY_V2):
+        logger.info(
+            "growth_journey_v2_tick_skipped",
+            reason="feature_flag_disabled",
+            flag=_GrowthFlags.JOURNEY_V2,
+        )
+        return
+
     logger.info("growth_journey_v2_tick_started")
     from sqlalchemy import text as _text
 
@@ -287,6 +306,16 @@ _growth_profile_svc = _GrowthProfileService()
 
 async def _run_silent_detection() -> None:
     """每日凌晨2点：扫描沉默客户，更新召回优先级。"""
+    # Feature Flag 检查：growth.member.recall_v2.enable
+    # 关闭时跳过 V2 沉默召回检测（V1 召回逻辑不受影响）
+    if _FEATURE_FLAGS_AVAILABLE and not _ff_is_enabled(_GrowthFlags.RECALL_V2):
+        logger.info(
+            "growth_silent_detection_skipped",
+            reason="feature_flag_disabled",
+            flag=_GrowthFlags.RECALL_V2,
+        )
+        return
+
     logger.info("growth_silent_detection_started")
     from sqlalchemy import text as _text
     async with async_session_factory() as probe_db:
@@ -320,6 +349,61 @@ def _on_silent_detection_done(task: asyncio.Task) -> None:
     exc = task.exception() if not task.cancelled() else None
     if exc is not None:
         logger.error("silent_detection_unhandled", error=str(exc), exc_info=exc)
+
+
+# ---------------------------------------------------------------------------
+# APScheduler — P1 Field Computation（每日凌晨3点）
+# ---------------------------------------------------------------------------
+
+
+async def _run_p1_field_computation() -> None:
+    """每日凌晨3点：计算P1字段（心理距离/超级用户/里程碑/裂变场景）"""
+    # Feature Flag 检查
+    if _FEATURE_FLAGS_AVAILABLE and not _ff_is_enabled(_GrowthFlags.RECALL_V2):
+        logger.info(
+            "p1_field_computation_skipped",
+            reason="feature_flag_disabled",
+        )
+        return
+
+    logger.info("p1_field_computation_started")
+    from sqlalchemy import text as _text
+    async with async_session_factory() as probe_db:
+        try:
+            result = await probe_db.execute(
+                _text("SELECT DISTINCT tenant_id FROM stores WHERE is_active = true")
+            )
+            tenant_ids = [str(row[0]) for row in result.fetchall()]
+        except (OSError, RuntimeError, ValueError) as exc:
+            logger.error("p1_computation_fetch_tenants_error", error=str(exc), exc_info=True)
+            return
+
+    for tid in tenant_ids:
+        async with async_session_factory() as db:
+            try:
+                await db.execute(_text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": tid})
+                result = await _growth_profile_svc.batch_compute_p1_fields(tid, db)
+                await db.commit()
+                logger.info(
+                    "p1_computation_tenant_done",
+                    tenant_id=tid,
+                    **{k: v.get("total_updated", 0) for k, v in result.items()},
+                )
+            except (OSError, RuntimeError, ValueError) as exc:
+                await db.rollback()
+                logger.error("p1_computation_tenant_error", tenant_id=tid, error=str(exc), exc_info=True)
+    logger.info("p1_field_computation_finished", tenant_count=len(tenant_ids))
+
+
+def _schedule_p1_computation() -> None:
+    task = asyncio.create_task(_run_p1_field_computation())
+    task.add_done_callback(_on_p1_computation_done)
+
+
+def _on_p1_computation_done(task: asyncio.Task) -> None:
+    exc = task.exception() if not task.cancelled() else None
+    if exc is not None:
+        logger.error("p1_computation_unhandled", error=str(exc), exc_info=exc)
 
 
 async def _run_journey_event_listener() -> None:
@@ -401,12 +485,24 @@ async def lifespan(app: FastAPI):
         misfire_grace_time=300,
     )
 
+    # P1 Field Computation — 每日凌晨3点（心理距离/超级用户/里程碑/裂变场景）
+    _scheduler.add_job(
+        _schedule_p1_computation,
+        trigger="cron",
+        hour=3,
+        id="growth_p1_computation",
+        replace_existing=True,
+        max_instances=1,
+        misfire_grace_time=300,
+    )
+
     _scheduler.start()
     logger.info("journey_executor_scheduler_started", interval_seconds=60)
     logger.info("approval_expiry_scheduler_started", interval_hours=1)
     logger.info("journey_engine_scheduler_started", interval_seconds=60)
     logger.info("growth_journey_v2_scheduler_started", interval_seconds=60)
     logger.info("growth_silent_detection_scheduler_started", trigger="cron_02:00")
+    logger.info("growth_p1_computation_scheduler_started", trigger="cron_03:00")
 
     # 启动 EventBridge（桥接业务事件 → JourneyEngine）
     _bridge = _get_event_bridge(

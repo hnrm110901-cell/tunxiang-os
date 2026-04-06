@@ -28,6 +28,11 @@ JOURNEY_TEMPLATES = {
     "reactivation": {"name": "流失召回", "steps": ["温馨提醒", "召回优惠券", "二次提醒", "人工跟进"]},
     "review_repair": {"name": "差评修复", "steps": ["致歉回复", "补偿方案", "回访确认"]},
     "birthday": {"name": "生日关怀", "steps": ["生日祝福", "专属折扣", "到店惊喜"]},
+    # P1 旅程
+    "super_user": {"name": "超级用户关系经营", "steps": ["身份仪式", "特权体验", "裂变赋能/季节专属", "观察"]},
+    "psych_distance": {"name": "心理距离修复", "steps": ["轻触达/关系唤醒", "等待", "最小承诺", "观察"]},
+    "milestone": {"name": "里程碑庆祝", "steps": ["进阶恭喜", "进度展示", "观察"]},
+    "referral": {"name": "裂变场景激活", "steps": ["场景判断", "场景化触达", "观察"]},
 }
 
 
@@ -47,6 +52,11 @@ class MemberInsightAgent(SkillAgent):
             "get_clv_snapshot",         # Phase 3: 读 mv_member_clv
             "generate_first_to_second_suggestion",  # 增长中枢V2: 首单转二访建议
             "generate_repair_suggestion",           # 增长中枢V2: 服务修复建议
+            # P1 扩展
+            "generate_super_user_suggestion",       # P1: 超级用户关系经营建议
+            "generate_psych_bridge_suggestion",     # P1: 心理距离修复建议
+            "generate_milestone_suggestion",        # P1: 里程碑庆祝建议
+            "generate_referral_suggestion",         # P1: 裂变场景激活建议
         ]
 
     async def execute(self, action: str, params: dict[str, Any]) -> AgentResult:
@@ -65,6 +75,11 @@ class MemberInsightAgent(SkillAgent):
             "get_clv_snapshot": self._get_clv_snapshot,
             "generate_first_to_second_suggestion": self._generate_first_to_second_suggestion,
             "generate_repair_suggestion": self._generate_repair_suggestion,
+            # P1 扩展
+            "generate_super_user_suggestion": self._generate_super_user_suggestion,
+            "generate_psych_bridge_suggestion": self._generate_psych_bridge_suggestion,
+            "generate_milestone_suggestion": self._generate_milestone_suggestion,
+            "generate_referral_suggestion": self._generate_referral_suggestion,
         }
         handler = dispatch.get(action)
         if not handler:
@@ -792,5 +807,394 @@ class MemberInsightAgent(SkillAgent):
                       f"紧急度={urgency}，须人工审核",
             confidence=0.80,
             constraints_passed=all(constraints_check.values()),
+            constraints_detail=constraints_check,
+        )
+
+    # ─── P1: 超级用户关系经营建议 ───
+
+    async def _generate_super_user_suggestion(self, params: dict) -> AgentResult:
+        """为超级用户(active/advocate)生成关系经营建议。
+
+        根据超级用户等级和裂变潜力选择触达策略:
+        - advocate: 赋能推荐（分享专属邀请）
+        - active: 特权体验（新品试菜/主厨晚宴）
+        - 有裂变潜力: 推荐赋能路径
+        - 无裂变潜力: 季节性专属体验
+        """
+        import httpx
+
+        customer_id = params.get("customer_id")
+        if not customer_id:
+            return AgentResult(success=False, action="generate_super_user_suggestion",
+                               error="缺少 customer_id")
+
+        super_level = params.get("super_user_level", "active")
+        referral_scenario = params.get("referral_scenario", "none")
+        lifetime_value_fen = params.get("customer_lifetime_value_fen", 0)
+
+        has_referral_potential = referral_scenario in ("super_referrer", "birthday_organizer", "family_host")
+
+        if super_level == "advocate":
+            mechanism = "referral_empowerment"
+            channel = "miniapp"
+            explanation = (
+                f"品牌大使级超级用户，CLV¥{lifetime_value_fen / 100:.0f}。"
+                f"裂变场景: {referral_scenario}。赋能推荐路径，激活社交裂变。"
+            )
+        elif has_referral_potential:
+            mechanism = "referral_empowerment"
+            channel = "miniapp"
+            explanation = (
+                f"活跃超级用户，有裂变潜力（{referral_scenario}），CLV¥{lifetime_value_fen / 100:.0f}。"
+                f"建议赋能推荐，让超级用户成为品牌传播节点。"
+            )
+        else:
+            mechanism = "super_user_exclusive"
+            channel = "wecom"
+            explanation = (
+                f"活跃超级用户，无明显裂变潜力，CLV¥{lifetime_value_fen / 100:.0f}。"
+                f"建议特权体验路径，维护高价值关系。"
+            )
+
+        constraints_check = {
+            "margin_safe": True,
+            "food_safety_ok": True,
+            "customer_experience_ok": True,
+        }
+
+        suggestion = {
+            "customer_id": customer_id,
+            "suggestion_type": "super_user_relationship",
+            "priority": "high",
+            "mechanism_type": mechanism,
+            "recommended_journey_template": "super_user_relationship_v1",
+            "recommended_offer_type": "exclusive_experience",
+            "recommended_channel": channel,
+            "explanation_summary": explanation,
+            "risk_summary": "超级用户触达频率须控制，避免因过度打扰导致关系疲劳。",
+            "constraints_check": constraints_check,
+            "expected_outcome_json": {
+                "expected_engagement_rate": 0.55 if super_level == "advocate" else 0.40,
+                "expected_referral_rate": 0.25 if has_referral_potential else 0.05,
+            },
+            "requires_human_review": False,
+            "created_by_agent": "member_insight",
+        }
+
+        try:
+            async with httpx.AsyncClient() as client:
+                resp = await client.post(
+                    "http://tx-growth:8004/api/v1/growth/agent-suggestions",
+                    json=suggestion,
+                    headers={"X-Tenant-ID": self.tenant_id},
+                    timeout=10.0,
+                )
+                result = resp.json()
+        except (httpx.HTTPError, OSError) as exc:
+            return AgentResult(
+                success=False, action="generate_super_user_suggestion",
+                error=f"写入建议池失败: {exc}",
+                constraints_passed=True,
+                constraints_detail=constraints_check,
+            )
+
+        return AgentResult(
+            success=True,
+            action="generate_super_user_suggestion",
+            data={"suggestion": suggestion, "api_response": result},
+            reasoning=f"超级用户建议: {super_level}级，机制={mechanism}，"
+                      f"裂变潜力={'有' if has_referral_potential else '无'}",
+            confidence=0.85,
+            constraints_passed=True,
+            constraints_detail=constraints_check,
+        )
+
+    # ─── P1: 心理距离修复建议 ───
+
+    async def _generate_psych_bridge_suggestion(self, params: dict) -> AgentResult:
+        """为fading/abstracted客户生成心理距离修复建议。
+
+        根据心理距离级别选择触达策略:
+        - abstracted: 极轻触达（SMS，纯信息分享，不施压）
+        - fading: 有温度的关系唤醒（企微，店员问候）
+        """
+        import httpx
+
+        customer_id = params.get("customer_id")
+        if not customer_id:
+            return AgentResult(success=False, action="generate_psych_bridge_suggestion",
+                               error="缺少 customer_id")
+
+        psych_level = params.get("psych_distance_level", "fading")
+        lifetime_value_fen = params.get("customer_lifetime_value_fen", 0)
+        days_since_last = params.get("days_since_last_visit", 0)
+
+        if psych_level == "abstracted":
+            mechanism = "psych_bridge"
+            template = "tmpl_psych_bridge_gentle"
+            channel = "sms"
+            explanation = (
+                f"疏离客户（{days_since_last}天未到店），CLV¥{lifetime_value_fen / 100:.0f}。"
+                f"心理距离已远，采用SMS极轻触达，纯信息分享，避免任何促销或亲密语言。"
+            )
+            risk = "疏离客户对品牌已模糊，触达可能被忽视。关键是不造成反感。"
+        else:
+            mechanism = "psych_bridge"
+            template = "tmpl_psych_bridge_warmup"
+            channel = "wecom"
+            explanation = (
+                f"渐远客户（{days_since_last}天未到店），CLV¥{lifetime_value_fen / 100:.0f}。"
+                f"还有关系记忆，采用企微有温度的店员问候，重建人际连接。"
+            )
+            risk = "渐远客户仍有关系基础，但触达语气过于促销会加速疏远。"
+
+        constraints_check = {
+            "margin_safe": True,
+            "food_safety_ok": True,
+            "customer_experience_ok": True,
+        }
+
+        suggestion = {
+            "customer_id": customer_id,
+            "suggestion_type": "psych_distance_bridge",
+            "priority": "medium",
+            "mechanism_type": mechanism,
+            "recommended_journey_template": "psych_distance_bridge_v1",
+            "recommended_touch_template": template,
+            "recommended_channel": channel,
+            "explanation_summary": explanation,
+            "risk_summary": risk,
+            "constraints_check": constraints_check,
+            "expected_outcome_json": {
+                "expected_open_rate": 0.15 if psych_level == "abstracted" else 0.30,
+                "expected_return_rate_14d": 0.08 if psych_level == "abstracted" else 0.18,
+            },
+            "requires_human_review": False,
+            "created_by_agent": "member_insight",
+        }
+
+        try:
+            async with httpx.AsyncClient() as client:
+                resp = await client.post(
+                    "http://tx-growth:8004/api/v1/growth/agent-suggestions",
+                    json=suggestion,
+                    headers={"X-Tenant-ID": self.tenant_id},
+                    timeout=10.0,
+                )
+                result = resp.json()
+        except (httpx.HTTPError, OSError) as exc:
+            return AgentResult(
+                success=False, action="generate_psych_bridge_suggestion",
+                error=f"写入建议池失败: {exc}",
+                constraints_passed=True,
+                constraints_detail=constraints_check,
+            )
+
+        return AgentResult(
+            success=True,
+            action="generate_psych_bridge_suggestion",
+            data={"suggestion": suggestion, "api_response": result},
+            reasoning=f"心理距离修复建议: {psych_level}级，{days_since_last}天未到，"
+                      f"渠道={channel}，模板={template}",
+            confidence=0.78,
+            constraints_passed=True,
+            constraints_detail=constraints_check,
+        )
+
+    # ─── P1: 里程碑庆祝建议 ───
+
+    async def _generate_milestone_suggestion(self, params: dict) -> AgentResult:
+        """为达成新里程碑的客户生成庆祝建议。
+
+        里程碑等级: newcomer → regular → loyal → vip → legend
+        触发时机: 客户里程碑等级变更时。
+        """
+        import httpx
+
+        customer_id = params.get("customer_id")
+        if not customer_id:
+            return AgentResult(success=False, action="generate_milestone_suggestion",
+                               error="缺少 customer_id")
+
+        milestone_stage = params.get("growth_milestone_stage", "regular")
+        order_count = params.get("order_count", 0)
+        lifetime_value_fen = params.get("customer_lifetime_value_fen", 0)
+
+        milestone_names = {
+            "regular": "常客",
+            "loyal": "忠诚客",
+            "vip": "VIP",
+            "legend": "传奇",
+        }
+        milestone_name = milestone_names.get(milestone_stage, milestone_stage)
+
+        explanation = (
+            f"客户达成「{milestone_name}」里程碑（累计{order_count}笔，"
+            f"CLV¥{lifetime_value_fen / 100:.0f}）。"
+            f"建议立即发送庆祝通知+解锁权益说明，次日跟进下一级进度展示。"
+        )
+
+        constraints_check = {
+            "margin_safe": True,
+            "food_safety_ok": True,
+            "customer_experience_ok": True,
+        }
+
+        suggestion = {
+            "customer_id": customer_id,
+            "suggestion_type": "milestone_celebration",
+            "priority": "high" if milestone_stage in ("vip", "legend") else "medium",
+            "mechanism_type": "milestone_celebration",
+            "recommended_journey_template": "milestone_celebration_v1",
+            "recommended_channel": "miniapp",
+            "milestone_stage": milestone_stage,
+            "explanation_summary": explanation,
+            "risk_summary": "里程碑庆祝为正向激励，风险极低。注意勿与其他触达撞期。",
+            "constraints_check": constraints_check,
+            "expected_outcome_json": {
+                "expected_engagement_rate": 0.60,
+                "expected_share_rate": 0.15 if milestone_stage in ("vip", "legend") else 0.05,
+            },
+            "requires_human_review": False,
+            "created_by_agent": "member_insight",
+        }
+
+        try:
+            async with httpx.AsyncClient() as client:
+                resp = await client.post(
+                    "http://tx-growth:8004/api/v1/growth/agent-suggestions",
+                    json=suggestion,
+                    headers={"X-Tenant-ID": self.tenant_id},
+                    timeout=10.0,
+                )
+                result = resp.json()
+        except (httpx.HTTPError, OSError) as exc:
+            return AgentResult(
+                success=False, action="generate_milestone_suggestion",
+                error=f"写入建议池失败: {exc}",
+                constraints_passed=True,
+                constraints_detail=constraints_check,
+            )
+
+        return AgentResult(
+            success=True,
+            action="generate_milestone_suggestion",
+            data={"suggestion": suggestion, "api_response": result},
+            reasoning=f"里程碑庆祝建议: {milestone_name}，累计{order_count}笔",
+            confidence=0.90,
+            constraints_passed=True,
+            constraints_detail=constraints_check,
+        )
+
+    # ─── P1: 裂变场景激活建议 ───
+
+    async def _generate_referral_suggestion(self, params: dict) -> AgentResult:
+        """为有裂变潜力的客户生成场景化激活建议。
+
+        裂变场景: birthday_organizer / family_host / corporate_host / super_referrer
+        按场景匹配差异化触达模板和权益包。
+        """
+        import httpx
+
+        customer_id = params.get("customer_id")
+        if not customer_id:
+            return AgentResult(success=False, action="generate_referral_suggestion",
+                               error="缺少 customer_id")
+
+        referral_scenario = params.get("referral_scenario", "none")
+        lifetime_value_fen = params.get("customer_lifetime_value_fen", 0)
+        past_referral_count = params.get("past_referral_count", 0)
+
+        scenario_config = {
+            "birthday_organizer": {
+                "template": "tmpl_referral_birthday",
+                "channel": "wecom",
+                "desc": "生日组织者",
+                "expected_referral": 0.35,
+            },
+            "family_host": {
+                "template": "tmpl_referral_family",
+                "channel": "wecom",
+                "desc": "家庭聚餐达人",
+                "expected_referral": 0.30,
+            },
+            "corporate_host": {
+                "template": "tmpl_referral_generic",
+                "channel": "wecom",
+                "desc": "企业宴请组织者",
+                "expected_referral": 0.20,
+            },
+            "super_referrer": {
+                "template": "tmpl_referral_generic",
+                "channel": "miniapp",
+                "desc": "超级推荐者",
+                "expected_referral": 0.45,
+            },
+        }
+
+        config = scenario_config.get(referral_scenario, {
+            "template": "tmpl_referral_generic",
+            "channel": "miniapp",
+            "desc": referral_scenario,
+            "expected_referral": 0.10,
+        })
+
+        explanation = (
+            f"裂变场景: {config['desc']}，CLV¥{lifetime_value_fen / 100:.0f}，"
+            f"历史推荐{past_referral_count}次。"
+            f"建议通过{config['channel']}触达，使用{config['template']}模板激活裂变。"
+        )
+
+        constraints_check = {
+            "margin_safe": True,
+            "food_safety_ok": True,
+            "customer_experience_ok": True,
+        }
+
+        suggestion = {
+            "customer_id": customer_id,
+            "suggestion_type": "referral_activation",
+            "priority": "high" if past_referral_count >= 3 else "medium",
+            "mechanism_type": "referral_activation",
+            "recommended_journey_template": "referral_activation_v1",
+            "recommended_touch_template": config["template"],
+            "recommended_channel": config["channel"],
+            "referral_scenario": referral_scenario,
+            "explanation_summary": explanation,
+            "risk_summary": "裂变激活需注意分享链接有效期管理，避免过期链接影响体验。",
+            "constraints_check": constraints_check,
+            "expected_outcome_json": {
+                "expected_share_rate": config["expected_referral"],
+                "expected_new_customer_per_share": 0.8,
+            },
+            "requires_human_review": False,
+            "created_by_agent": "member_insight",
+        }
+
+        try:
+            async with httpx.AsyncClient() as client:
+                resp = await client.post(
+                    "http://tx-growth:8004/api/v1/growth/agent-suggestions",
+                    json=suggestion,
+                    headers={"X-Tenant-ID": self.tenant_id},
+                    timeout=10.0,
+                )
+                result = resp.json()
+        except (httpx.HTTPError, OSError) as exc:
+            return AgentResult(
+                success=False, action="generate_referral_suggestion",
+                error=f"写入建议池失败: {exc}",
+                constraints_passed=True,
+                constraints_detail=constraints_check,
+            )
+
+        return AgentResult(
+            success=True,
+            action="generate_referral_suggestion",
+            data={"suggestion": suggestion, "api_response": result},
+            reasoning=f"裂变激活建议: {config['desc']}，历史推荐{past_referral_count}次，"
+                      f"预期分享率{config['expected_referral']:.0%}",
+            confidence=0.82,
+            constraints_passed=True,
             constraints_detail=constraints_check,
         )
