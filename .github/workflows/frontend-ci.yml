@@ -35,7 +35,7 @@ jobs:
       matrix:
         app: [web-pos, web-admin, web-kds, web-crew, web-hub, web-forge]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - uses: pnpm/action-setup@v4
         with:
@@ -66,7 +66,7 @@ jobs:
       matrix:
         app: [web-pos, web-admin, web-kds, web-crew, web-hub, web-forge]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - uses: pnpm/action-setup@v4
         with:
@@ -98,7 +98,7 @@ jobs:
       matrix:
         app: [web-pos, web-admin, web-kds, web-crew, web-hub, web-forge]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - uses: pnpm/action-setup@v4
         with:
