@@ -1,0 +1,102 @@
+# 人力组织域 Feature Flags
+# 域：org
+# 命名格式：org.{module}.{feature}.{action}
+
+flags:
+  - identifier: org_hr_revenue_schedule_enable
+    name: org.hr.revenue_schedule.enable
+    description: >
+      营收驱动智能排班（根据历史营收/客流预测/节假日因素，
+      动态生成最优人员排班方案，最大化人效）。
+      联动 agent.hr.shift_suggest.enable。
+    defaultValue: false
+    environments:
+      dev: true
+      test: true
+      uat: true
+      pilot: false
+      prod: false
+    targeting_rules:
+      pilot:
+        - dimension: brand_id
+          values: [pilot_brand_001]
+      prod:
+        - dimension: role_code
+          values: [L2, L3]
+    tags: [org, hr, revenue, schedule]
+
+  - identifier: org_hr_contribution_score_enable
+    name: org.hr.contribution_score.enable
+    description: >
+      员工贡献度评分（综合出勤/翻台速度/顾客评价/技能等级/销售额等维度，
+      生成可视化员工贡献度报告，用于绩效参考）。
+    defaultValue: false
+    environments:
+      dev: true
+      test: true
+      uat: true
+      pilot: false
+      prod: false
+    targeting_rules:
+      pilot:
+        - dimension: brand_id
+          values: [pilot_brand_001]
+    tags: [org, hr, contribution, score]
+
+  - identifier: org_hr_attrition_model_enable
+    name: org.hr.attrition_model.enable
+    description: >
+      7维离职预警模型（考勤异常/收入变化/晋升停滞/任务量异常/
+      团队冲突/绩效下滑/情绪信号）。
+      依赖 agent.org.attrition_risk.enable 触发自动预警。
+    defaultValue: false
+    environments:
+      dev: true
+      test: true
+      uat: true
+      pilot: false
+      prod: false
+    targeting_rules:
+      pilot:
+        - dimension: brand_id
+          values: [pilot_brand_001]
+      prod:
+        - dimension: role_code
+          values: [L2, L3]
+    tags: [org, hr, attrition, model, 7dim]
+
+  - identifier: org_hr_labor_margin_enable
+    name: org.hr.labor_margin.enable
+    description: >
+      实时人力毛利仪表盘（计算每小时/每日人力成本对毛利的影响，
+      超出阈值时自动提醒优化排班）。
+    defaultValue: false
+    environments:
+      dev: true
+      test: true
+      uat: true
+      pilot: true
+      prod: false
+    targeting_rules:
+      prod:
+        - dimension: role_code
+          values: [L2, L3]
+    tags: [org, hr, labor, margin, dashboard]
+
+  - identifier: org_hr_skill_match_enable
+    name: org.hr.skill_match.enable
+    description: >
+      菜品技能匹配（根据菜单变化和菜品复杂度，自动识别人员技能缺口，
+      生成培训建议）。依赖 Dish Ontology 的技能标签体系。
+    defaultValue: false
+    environments:
+      dev: true
+      test: true
+      uat: false
+      pilot: false
+      prod: false
+    targeting_rules:
+      pilot:
+        - dimension: brand_id
+          values: [pilot_brand_001]
+    tags: [org, hr, skill, match, training]

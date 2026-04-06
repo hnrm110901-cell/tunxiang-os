@@ -1,0 +1,33 @@
+# tx-trade prod环境覆盖配置
+# 由Harness CD流水线自动合并，禁止手动修改image.tag
+
+replicaCount: 3
+
+image:
+  tag: ${IMAGE_TAG}  # 由Harness CD流水线注入，禁止手动修改
+
+env:
+  TUNXIANG_ENV: prod
+  LOG_LEVEL: info
+  # 生产环境强制开启SELECT_FOR_UPDATE，防止并发超卖
+  TX_TRADE_MODE: production
+  SELECT_FOR_UPDATE_ENABLED: "true"
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 200m
+    memory: 256Mi
+
+# HPA：交易高峰期（午市/晚市）自动扩容，最多10实例
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+podAntiAffinity:
+  enabled: true

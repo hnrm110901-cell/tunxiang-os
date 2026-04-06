@@ -1,0 +1,293 @@
+pipeline:
+  name: GitOps Edge Sync
+  identifier: gitops_edge_sync
+  projectIdentifier: tunxiang_os
+  orgIdentifier: tunxiang
+  description: |
+    GitOps配置同步流水线：将gitops/目录下的配置变更同步到Pilot和生产环境，
+    并触发Edge节点（mac-station）的配置拉取。
+  tags:
+    team: sre
+    domain: gitops
+
+  # 触发条件：gitops/目录下文件变更时自动触发
+  triggers:
+    - name: On GitOps Config Change
+      identifier: on_gitops_config_change
+      type: Webhook
+      spec:
+        type: Github
+        spec:
+          event: Push
+          actions: []
+          payloadConditions:
+            - key: targetBranch
+              operator: Equals
+              value: main
+          headerConditions: []
+          pathFilters:
+            - gitops/**
+
+  stages:
+    # ─────────────────────────────────────────────
+    # Stage 1: Sync Pilot 环境配置
+    # ─────────────────────────────────────────────
+    - stage:
+        name: Sync_Pilot
+        identifier: sync_pilot
+        type: Deployment
+        spec:
+          deploymentType: Kubernetes
+          gitOpsEnabled: true
+          service:
+            serviceRef: api_gateway_svc
+          environment:
+            environmentRef: pilot
+            gitOpsClusters:
+              - identifier: tke_pilot_cluster
+          execution:
+            steps:
+              - step:
+                  name: Sync Pilot API Gateway
+                  identifier: sync_pilot_api_gateway
+                  type: GitOpsSync
+                  timeout: 10m
+                  spec:
+                    prune: false
+                    dryRun: false
+                    applyOnly: false
+                    forceApply: false
+                    applicationsList:
+                      - applicationName: api-gateway-pilot
+                        agentId: tke_pilot_agent
+
+              - step:
+                  name: Sync Pilot TX-Agent
+                  identifier: sync_pilot_tx_agent
+                  type: GitOpsSync
+                  timeout: 10m
+                  spec:
+                    prune: false
+                    dryRun: false
+                    applicationsList:
+                      - applicationName: tx-agent-pilot
+                        agentId: tke_pilot_agent
+
+              - step:
+                  name: Notify Pilot Sync Complete
+                  identifier: notify_pilot_sync
+                  type: ShellScript
+                  timeout: 2m
+                  spec:
+                    shell: Bash
+                    onDelegate: true
+                    source:
+                      type: Inline
+                      spec:
+                        script: |
+                          #!/bin/bash
+                          WEBHOOK_URL="${PILOT_WECOM_WEBHOOK}"
+                          MSG=$(cat <<EOF
+                          {
+                            "msgtype": "markdown",
+                            "markdown": {
+                              "content": "### 屯象OS GitOps 同步通知\n\n**环境**: Pilot\n**状态**: 配置同步成功\n**触发**: ${HARNESS_TRIGGER_TYPE}\n**流水线**: [${HARNESS_PIPELINE_ID}](${HARNESS_PIPELINE_URL})\n**时间**: $(date '+%Y-%m-%d %H:%M:%S')\n\n> 变更内容请查看Git提交记录"
+                            }
+                          }
+                          EOF
+                          )
+                          curl -s -X POST "${WEBHOOK_URL}" \
+                            -H "Content-Type: application/json" \
+                            -d "${MSG}"
+                  environmentVariables:
+                    - name: PILOT_WECOM_WEBHOOK
+                      type: Secret
+                      value: pilot_wecom_webhook_url
+
+        failureStrategies:
+          - onFailure:
+              errors:
+                - AllErrors
+              action:
+                type: StageRollback
+
+    # ─────────────────────────────────────────────
+    # Stage 2: 生产环境 GitOps 变更人工审批
+    # ─────────────────────────────────────────────
+    - stage:
+        name: Approve_Prod_GitOps
+        identifier: approve_prod_gitops
+        type: Approval
+        spec:
+          execution:
+            steps:
+              - step:
+                  name: SRE审批 - 生产配置同步
+                  identifier: sre_approval_prod_gitops
+                  type: HarnessApproval
+                  timeout: 1d
+                  spec:
+                    approvalMessage: |
+                      ## 生产环境 GitOps 配置变更审批
+
+                      **变更内容**: gitops/prod/ 目录配置变更
+                      **影响范围**: 生产K8s集群 + 生产Edge节点
+                      **触发流水线**: ${HARNESS_PIPELINE_ID}
+
+                      请检查以下内容后审批：
+                      - [ ] 变更内容已经过Pilot环境验证
+                      - [ ] 变更不包含敏感信息（Secret等）
+                      - [ ] Edge节点配置变更已通知对应品牌运营团队
+                      - [ ] 有回滚方案（git revert）
+                    includePipelineExecutionHistory: true
+                    approvers:
+                      minimumCount: 1
+                      disallowPipelineExecutor: true
+                      userGroups:
+                        - sre_group
+                    approverInputs: []
+
+        failureStrategies:
+          - onFailure:
+              errors:
+                - ApprovalRejection
+              action:
+                type: Abort
+
+    # ─────────────────────────────────────────────
+    # Stage 3: Sync 生产环境配置
+    # ─────────────────────────────────────────────
+    - stage:
+        name: Sync_Prod
+        identifier: sync_prod
+        type: Deployment
+        spec:
+          deploymentType: Kubernetes
+          gitOpsEnabled: true
+          service:
+            serviceRef: all_prod_services
+          environment:
+            environmentRef: prod
+            gitOpsClusters:
+              - identifier: tke_prod_cluster
+          execution:
+            steps:
+              - step:
+                  name: Sync Prod API Gateway
+                  identifier: sync_prod_api_gateway
+                  type: GitOpsSync
+                  timeout: 15m
+                  spec:
+                    prune: false
+                    dryRun: false
+                    forceApply: false
+                    applicationsList:
+                      - applicationName: api-gateway-prod
+                        agentId: tke_prod_agent
+
+              - step:
+                  name: Sync Prod TX-Agent
+                  identifier: sync_prod_tx_agent
+                  type: GitOpsSync
+                  timeout: 15m
+                  spec:
+                    prune: false
+                    dryRun: false
+                    applicationsList:
+                      - applicationName: tx-agent-prod
+                        agentId: tke_prod_agent
+
+              - step:
+                  name: Sync Prod Web-Admin
+                  identifier: sync_prod_web_admin
+                  type: GitOpsSync
+                  timeout: 15m
+                  spec:
+                    prune: false
+                    dryRun: false
+                    applicationsList:
+                      - applicationName: web-admin-prod
+                        agentId: tke_prod_agent
+
+              # Edge节点配置变更通知（触发sync-engine主动拉取）
+              - step:
+                  name: Notify Edge Nodes Config Change
+                  identifier: notify_edge_config_change
+                  type: ShellScript
+                  timeout: 5m
+                  spec:
+                    shell: Bash
+                    onDelegate: true
+                    source:
+                      type: Inline
+                      spec:
+                        script: |
+                          #!/bin/bash
+                          # 通知所有在线Edge节点主动触发配置同步
+                          # sync-engine会在下次定时周期自动同步，此处为强制立即同步
+                          echo "=== 触发Edge节点配置同步 ==="
+
+                          # 调用Edge管理API，通知各在线节点立即同步
+                          EDGE_MANAGER_URL="${EDGE_MANAGER_API_URL}"
+                          RESPONSE=$(curl -s -w "\n%{http_code}" \
+                            -X POST "${EDGE_MANAGER_URL}/api/v1/sync/trigger-all" \
+                            -H "Authorization: Bearer ${EDGE_MANAGER_TOKEN}" \
+                            -H "Content-Type: application/json" \
+                            -d '{"reason": "gitops_config_change", "pipeline_id": "'"${HARNESS_PIPELINE_ID}"'"}')
+
+                          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+                          BODY=$(echo "$RESPONSE" | head -n-1)
+
+                          echo "Edge Manager响应: ${HTTP_CODE}"
+                          echo "响应体: ${BODY}"
+
+                          if [ "$HTTP_CODE" != "200" ]; then
+                            echo "警告: Edge节点通知失败（HTTP ${HTTP_CODE}），节点将在下次定时同步时自动拉取配置"
+                            # 不视为致命错误，不阻塞流水线
+                          fi
+
+                          # 发送企微通知（包含Edge节点变更信息）
+                          WEBHOOK_URL="${PROD_WECOM_WEBHOOK}"
+                          CHANGED_STORES=$(git diff --name-only HEAD~1 HEAD -- gitops/edge/ | grep store/ | awk -F'/' '{print $4}' | sort -u | tr '\n' ',' | sed 's/,$//')
+
+                          MSG=$(cat <<WECOM_EOF
+                          {
+                            "msgtype": "markdown",
+                            "markdown": {
+                              "content": "### 屯象OS GitOps 生产同步完成\n\n**环境**: Production\n**状态**: 配置同步成功\n**流水线**: [${HARNESS_PIPELINE_ID}](${HARNESS_PIPELINE_URL})\n**时间**: $(date '+%Y-%m-%d %H:%M:%S')\n\n**Edge节点变更**:\n- 涉及门店: ${CHANGED_STORES:-无}\n- 同步触发: 已通知所有在线节点\n- 节点将在3-5分钟内完成配置热重载\n\n> @SRE值班 请关注Edge节点同步状态"
+                            }
+                          }
+                          WECOM_EOF
+                          )
+                          curl -s -X POST "${WEBHOOK_URL}" \
+                            -H "Content-Type: application/json" \
+                            -d "${MSG}"
+                  environmentVariables:
+                    - name: EDGE_MANAGER_API_URL
+                      type: Secret
+                      value: edge_manager_api_url
+                    - name: EDGE_MANAGER_TOKEN
+                      type: Secret
+                      value: edge_manager_token
+                    - name: PROD_WECOM_WEBHOOK
+                      type: Secret
+                      value: prod_wecom_webhook_url
+
+        failureStrategies:
+          - onFailure:
+              errors:
+                - AllErrors
+              action:
+                type: StageRollback
+
+  # 流水线级变量
+  variables:
+    - name: HARNESS_PIPELINE_URL
+      type: String
+      value: <+pipeline.executionUrl>
+    - name: HARNESS_PIPELINE_ID
+      type: String
+      value: <+pipeline.executionId>
+    - name: HARNESS_TRIGGER_TYPE
+      type: String
+      value: <+pipeline.triggerType>

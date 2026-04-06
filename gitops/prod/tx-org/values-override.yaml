@@ -1,0 +1,31 @@
+# tx-org prod环境覆盖配置
+# 由Harness CD流水线自动合并，禁止手动修改image.tag
+
+replicaCount: 2
+
+image:
+  tag: ${IMAGE_TAG}  # 由Harness CD流水线注入，禁止手动修改
+
+env:
+  TUNXIANG_ENV: prod
+  LOG_LEVEL: info
+  # HR Agent调度器：生产环境启用，自动处理排班/绩效/薪资计算任务
+  HR_AGENT_SCHEDULER_ENABLED: "true"
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 200m
+    memory: 256Mi
+
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 6
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+podAntiAffinity:
+  enabled: true

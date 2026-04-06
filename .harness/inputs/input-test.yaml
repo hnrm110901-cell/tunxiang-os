@@ -1,0 +1,59 @@
+inputSet:
+  name: input-test
+  identifier: input_test
+  projectIdentifier: TunXiangOS
+  orgIdentifier: default
+  description: "Test 环境输入集"
+  tags:
+    env: test
+
+  pipeline:
+    identifier: cd_api_gateway
+    variables:
+      - name: imageTag
+        type: String
+        value: <+input>
+
+    stages:
+      - stage:
+          identifier: Deploy_Test
+          type: Deployment
+          spec:
+            environment:
+              environmentRef: env_test
+              infrastructureDefinitions:
+                - identifier: k8s_test_shared
+                  inputs:
+                    identifier: k8s_test_shared
+                    type: KubernetesDirect
+                    spec:
+                      namespace: tunxiang-test
+
+# ── 环境参数 ──────────────────────────────────────────────────
+# namespace:      tunxiang-test
+# replicaCount:   1
+# healthUrl:      https://test-api.tunxiangos.cn/health
+# valuesFile:     gitops/test/values.yaml
+# ─────────────────────────────────────────────────────────────
+
+envOverrides:
+  namespace: tunxiang-test
+  replicaCount: 1
+  healthUrl: https://test-api.tunxiangos.cn/health
+  valuesFile: gitops/test/values.yaml
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "256Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+  autoscaling:
+    enabled: false
+  ingress:
+    host: test-api.tunxiangos.cn
+    tls: true
+  logLevel: INFO
+  integrationTests:
+    enabled: true
+    timeout: 15m

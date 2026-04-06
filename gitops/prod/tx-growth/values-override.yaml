@@ -1,0 +1,35 @@
+# tx-growth prod环境覆盖配置
+# 由Harness CD流水线自动合并，禁止手动修改image.tag
+#
+# !! replicaCount 强制为 1 !!
+# V2旅程tick和沉默检测cron不幂等，多Pod并发会导致重复触达，见values.yaml顶部说明
+
+replicaCount: 1
+
+image:
+  tag: ${IMAGE_TAG}  # 由Harness CD流水线注入，禁止手动修改
+
+env:
+  TUNXIANG_ENV: prod
+  LOG_LEVEL: info
+  # 生产环境开启V2旅程引擎（Flag: GrowthFlags.JOURNEY_V2）
+  # 配合Feature Flag服务精确控制哪些品牌/门店开启V2，不全量放量
+  GROWTH_V2_ENABLED: "true"
+  JOURNEY_TICK_INTERVAL: "60"
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 200m
+    memory: 256Mi
+
+# HPA禁止开启，单实例是硬约束
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 1
+
+podAntiAffinity:
+  enabled: false

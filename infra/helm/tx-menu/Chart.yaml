@@ -1,0 +1,6 @@
+apiVersion: v2
+name: tx-menu
+description: 屯象OS 菜品菜单微服务 — 三级发布/五级价格优先级/KDS路由
+type: application
+version: 1.0.0
+appVersion: "latest"

@@ -1,0 +1,6 @@
+apiVersion: v2
+name: tx-org
+description: 屯象OS 组织人事微服务 — 排班/贡献度/离职预警/人效
+type: application
+version: 1.0.0
+appVersion: "latest"

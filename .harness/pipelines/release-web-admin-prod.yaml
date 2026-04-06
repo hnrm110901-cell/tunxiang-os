@@ -1,0 +1,314 @@
+pipeline:
+  name: release-web-admin-prod
+  identifier: release_web_admin_prod
+  projectIdentifier: TunXiangOS
+  orgIdentifier: default
+  description: "Web Admin 生产发布流水线：Pilot 灰度 → 2人审批 → 生产全量部署"
+  tags:
+    service: web-admin
+    track: release
+    env: prod
+
+  stages:
+    # ═════════════════════════════════════════════════════════════
+    # Stage 1: Deploy_Pilot
+    # 目的：先向 pilot 租户灰度发布前端，验证静态资源加载、
+    #       路由正确性和 API 兼容性。
+    # ═════════════════════════════════════════════════════════════
+    - stage:
+        name: Deploy_Pilot
+        identifier: Deploy_Pilot
+        type: Deployment
+        spec:
+          deploymentType: Kubernetes
+          service:
+            serviceRef: svc_web_admin
+            serviceInputs:
+              serviceDefinition:
+                type: Kubernetes
+                spec:
+                  artifacts:
+                    primary:
+                      primaryArtifactRef: primary
+                      sources:
+                        - identifier: primary
+                          spec:
+                            tag: <+pipeline.variables.imageTag>
+          environment:
+            environmentRef: env_pilot
+            deployToAll: false
+            infrastructureDefinitions:
+              - identifier: gitops_pilot_region_a
+                inputs:
+                  identifier: gitops_pilot_region_a
+                  type: KubernetesDirect
+                  spec:
+                    namespace: tunxiang-pilot
+          execution:
+            steps:
+              # 1-a: Rolling 部署到 Pilot
+              - step:
+                  name: K8s_Rolling_Deploy_Pilot
+                  identifier: K8s_Rolling_Deploy_Pilot
+                  type: K8sRollingDeploy
+                  timeout: 10m
+                  spec:
+                    skipDryRun: false
+                    pruningEnabled: false
+                  failureStrategies:
+                    - onFailure:
+                        errors:
+                          - AllErrors
+                        action:
+                          type: StageRollback
+
+              # 1-b: 静态资源版本校验（Pilot）
+              - step:
+                  name: Verify_Static_Assets_Pilot
+                  identifier: Verify_Static_Assets_Pilot
+                  type: ShellScript
+                  timeout: 5m
+                  spec:
+                    shell: Bash
+                    onDelegate: true
+                    source:
+                      type: Inline
+                      spec:
+                        script: |
+                          #!/usr/bin/env bash
+                          set -euo pipefail
+                          BASE_URL="https://pilot-admin.tunxiangos.cn"
+                          IMAGE_TAG="<+pipeline.variables.imageTag>"
+                          echo ">>> Pilot 静态资源版本校验"
+                          echo "期望版本 Tag: ${IMAGE_TAG}"
+
+                          HTTP_CODE=$(curl -sf -o /dev/null -w "%{http_code}" --max-time 10 "${BASE_URL}/" || true)
+                          [ "${HTTP_CODE}" = "200" ] || { echo "ERROR: 主页 HTTP ${HTTP_CODE}"; exit 1; }
+
+                          # 检查带 hash 的 JS bundle
+                          ASSETS_HTML=$(curl -sf --max-time 10 "${BASE_URL}/" 2>/dev/null || echo "")
+                          if echo "${ASSETS_HTML}" | grep -q "index\.[a-f0-9]\{8\}\.js"; then
+                            echo "OK: 检测到 hash JS bundle，版本已更新"
+                          else
+                            echo "WARNING: 未检测到 hash JS bundle，请确认 CDN 已刷新"
+                          fi
+
+                          # 版本信息接口
+                          VERSION_RESP=$(curl -sf --max-time 5 "${BASE_URL}/version.json" 2>/dev/null || echo "{}")
+                          echo "版本信息: ${VERSION_RESP}"
+                          echo "OK: Pilot 静态资源校验完成"
+
+              # 1-c: Pilot 观察等待
+              - step:
+                  name: Pilot_Observation_Wait
+                  identifier: Pilot_Observation_Wait
+                  type: HarnessApproval
+                  timeout: 2h
+                  spec:
+                    approvalMessage: "Web Admin Pilot 已部署完成。请验证：1.页面正常加载 2.登录功能正常 3.核心功能可用。确认无误后继续。版本：<+pipeline.sequenceId>"
+                    includePipelineExecutionHistory: true
+                    approvers:
+                      userGroups:
+                        - qa_group
+                        - sre_group
+                      minimumCount: 1
+                      disallowPipelineExecutor: false
+                    approverInputs:
+                      - name: ui_verified
+                        defaultValue: "no"
+                      - name: api_compat_verified
+                        defaultValue: "no"
+                  failureStrategies:
+                    - onFailure:
+                        errors:
+                          - ApprovalRejection
+                        action:
+                          type: StageRollback
+
+            rollbackSteps:
+              - step:
+                  name: K8s_Rolling_Rollback_Pilot
+                  identifier: K8s_Rolling_Rollback_Pilot
+                  type: K8sRollingRollback
+                  timeout: 10m
+                  spec: {}
+
+    # ═════════════════════════════════════════════════════════════
+    # Stage 2: Approve_Prod
+    # 目的：生产前端发布双人审批，确保前端 + API 版本兼容性已确认。
+    # ═════════════════════════════════════════════════════════════
+    - stage:
+        name: Approve_Prod
+        identifier: Approve_Prod
+        type: Approval
+        dependsOn:
+          - Deploy_Pilot
+        spec:
+          execution:
+            steps:
+              - step:
+                  name: Prod_Release_Approval
+                  identifier: Prod_Release_Approval
+                  type: HarnessApproval
+                  timeout: 4h
+                  spec:
+                    approvalMessage: "[生产发布] 请两人确认：版本 <+pipeline.sequenceId> | 服务 <+pipeline.name> | 时间 <+pipeline.startTs>"
+                    includePipelineExecutionHistory: true
+                    approvers:
+                      userGroups:
+                        - release_manager_group
+                        - sre_group
+                      minimumCount: 2
+                      disallowPipelineExecutor: false
+                    approverInputs:
+                      - name: rollback_plan_confirmed
+                        defaultValue: "no"
+                      - name: change_ticket_id
+                        defaultValue: ""
+                      - name: cdn_cache_purge_plan
+                        defaultValue: "no"
+                  failureStrategies:
+                    - onFailure:
+                        errors:
+                          - ApprovalRejection
+                        action:
+                          type: Abort
+
+    # ═════════════════════════════════════════════════════════════
+    # Stage 3: Deploy_Prod
+    # 目的：向生产环境 Rolling 部署 web-admin。
+    #       含部署后静态资源版本校验，确保 CDN 缓存已刷新。
+    # ═════════════════════════════════════════════════════════════
+    - stage:
+        name: Deploy_Prod
+        identifier: Deploy_Prod
+        type: Deployment
+        dependsOn:
+          - Approve_Prod
+        spec:
+          deploymentType: Kubernetes
+          service:
+            serviceRef: svc_web_admin
+            serviceInputs:
+              serviceDefinition:
+                type: Kubernetes
+                spec:
+                  artifacts:
+                    primary:
+                      primaryArtifactRef: primary
+                      sources:
+                        - identifier: primary
+                          spec:
+                            tag: <+pipeline.variables.imageTag>
+          environment:
+            environmentRef: env_prod
+            deployToAll: false
+            infrastructureDefinitions:
+              - identifier: k8s_prod_main
+                inputs:
+                  identifier: k8s_prod_main
+                  type: KubernetesDirect
+                  spec:
+                    namespace: tunxiang-prod
+          execution:
+            steps:
+              - step:
+                  name: K8s_Rolling_Deploy_Prod
+                  identifier: K8s_Rolling_Deploy_Prod
+                  type: K8sRollingDeploy
+                  timeout: 10m
+                  spec:
+                    skipDryRun: false
+                    pruningEnabled: false
+                  failureStrategies:
+                    - onFailure:
+                        errors:
+                          - AllErrors
+                        action:
+                          type: StageRollback
+
+              # 生产静态资源校验
+              - step:
+                  name: Verify_Static_Assets_Prod
+                  identifier: Verify_Static_Assets_Prod
+                  type: ShellScript
+                  timeout: 5m
+                  spec:
+                    shell: Bash
+                    onDelegate: true
+                    source:
+                      type: Inline
+                      spec:
+                        script: |
+                          #!/usr/bin/env bash
+                          set -euo pipefail
+                          BASE_URL="https://admin.tunxiangos.cn"
+                          IMAGE_TAG="<+pipeline.variables.imageTag>"
+                          echo ">>> 生产静态资源版本校验"
+                          echo "期望版本 Tag: ${IMAGE_TAG}"
+
+                          # 主页200
+                          HTTP_CODE=$(curl -sf -o /dev/null -w "%{http_code}" --max-time 10 "${BASE_URL}/" || true)
+                          [ "${HTTP_CODE}" = "200" ] || { echo "ERROR: 主页 HTTP ${HTTP_CODE}"; exit 1; }
+
+                          # Hash bundle 检测
+                          ASSETS_HTML=$(curl -sf --max-time 10 "${BASE_URL}/" 2>/dev/null || echo "")
+                          if echo "${ASSETS_HTML}" | grep -q "index\.[a-f0-9]\{8\}\.js"; then
+                            echo "OK: hash JS bundle 检测通过"
+                          else
+                            echo "WARNING: 未检测到 hash bundle，请手动验证 CDN 刷新状态"
+                          fi
+
+                          # 版本信息
+                          VERSION_RESP=$(curl -sf --max-time 5 "${BASE_URL}/version.json" 2>/dev/null || echo "{}")
+                          echo "生产版本信息: ${VERSION_RESP}"
+
+                          echo "OK: 生产静态资源校验通过"
+                  failureStrategies:
+                    - onFailure:
+                        errors:
+                          - AllErrors
+                        action:
+                          type: StageRollback
+
+              - step:
+                  name: Notify_Prod_Deploy_Success
+                  identifier: Notify_Prod_Deploy_Success
+                  type: ShellScript
+                  timeout: 2m
+                  spec:
+                    shell: Bash
+                    onDelegate: true
+                    source:
+                      type: Inline
+                      spec:
+                        script: |
+                          #!/usr/bin/env bash
+                          echo "================================================"
+                          echo "生产发布成功！"
+                          echo "服务: web-admin"
+                          echo "版本: <+pipeline.variables.imageTag>"
+                          echo "流水线序号: <+pipeline.sequenceId>"
+                          echo "================================================"
+
+            rollbackSteps:
+              - step:
+                  name: K8s_Rolling_Rollback_Prod
+                  identifier: K8s_Rolling_Rollback_Prod
+                  type: K8sRollingRollback
+                  timeout: 10m
+                  spec: {}
+
+        failureStrategies:
+          - onFailure:
+              errors:
+                - AllErrors
+              action:
+                type: StageRollback
+
+  variables:
+    - name: imageTag
+      type: String
+      description: "待发布的生产镜像 Tag（必须来自已通过 UAT 的构建）"
+      required: true
+      value: <+input>

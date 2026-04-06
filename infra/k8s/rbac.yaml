@@ -1,0 +1,149 @@
+# 屯象OS K8s RBAC 配置
+# Harness Delegate所需的最小权限集合
+# 首次部署：kubectl apply -f rbac.yaml
+---
+# Harness Delegate ServiceAccount（在每个业务namespace中创建）
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: harness-delegate
+  namespace: tunxiang-dev
+  labels:
+    app.kubernetes.io/part-of: tunxiang-os
+    managed-by: harness
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: harness-delegate
+  namespace: tunxiang-test
+  labels:
+    app.kubernetes.io/part-of: tunxiang-os
+    managed-by: harness
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: harness-delegate
+  namespace: tunxiang-uat
+  labels:
+    app.kubernetes.io/part-of: tunxiang-os
+    managed-by: harness
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: harness-delegate
+  namespace: tunxiang-pilot
+  labels:
+    app.kubernetes.io/part-of: tunxiang-os
+    managed-by: harness
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: harness-delegate
+  namespace: tunxiang-prod
+  labels:
+    app.kubernetes.io/part-of: tunxiang-os
+    managed-by: harness
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: harness-delegate
+  namespace: tunxiang-demo
+  labels:
+    app.kubernetes.io/part-of: tunxiang-os
+    managed-by: harness
+---
+# ClusterRole：Harness Delegate所需的集群级权限
+# 遵循最小权限原则，仅授予部署和监控所需的资源访问权
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: harness-delegate-cluster-role
+  labels:
+    app.kubernetes.io/part-of: tunxiang-os
+    managed-by: harness
+rules:
+  # Pod管理：Harness Delegate需要创建/更新/删除Pod以执行部署
+  - apiGroups: [""]
+    resources: ["pods", "pods/log", "pods/exec"]
+    verbs: ["list", "get", "watch", "create", "update", "delete"]
+  # Deployment/ReplicaSet管理：Helm Chart部署核心操作
+  - apiGroups: ["apps"]
+    resources: ["deployments", "replicasets", "statefulsets", "daemonsets"]
+    verbs: ["list", "get", "watch", "create", "update", "patch", "delete"]
+  # Service管理：ClusterIP/NodePort/LoadBalancer服务注册
+  - apiGroups: [""]
+    resources: ["services", "endpoints"]
+    verbs: ["list", "get", "watch", "create", "update", "patch", "delete"]
+  # ConfigMap管理：Helm values配置注入
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["list", "get", "watch", "create", "update", "patch", "delete"]
+  # Secret管理：由Harness Secret Manager动态注入（读取权限）
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["list", "get", "watch", "create", "update", "patch"]
+  # Ingress管理：Nginx Ingress路由规则
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["ingresses", "ingressclasses"]
+    verbs: ["list", "get", "watch", "create", "update", "patch", "delete"]
+  # HPA管理：自动扩缩容策略
+  - apiGroups: ["autoscaling"]
+    resources: ["horizontalpodautoscalers"]
+    verbs: ["list", "get", "watch", "create", "update", "patch", "delete"]
+  # Namespace查询：Harness需要查询namespace状态
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["list", "get", "watch"]
+  # Events查询：部署状态监控
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["list", "get", "watch"]
+  # ServiceAccount查询：Harness Delegate自身权限校验
+  - apiGroups: [""]
+    resources: ["serviceaccounts"]
+    verbs: ["list", "get", "watch"]
+  # NetworkPolicy管理：网络隔离策略
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["networkpolicies"]
+    verbs: ["list", "get", "watch", "create", "update", "patch", "delete"]
+  # ResourceQuota查询：资源配额监控
+  - apiGroups: [""]
+    resources: ["resourcequotas", "limitranges"]
+    verbs: ["list", "get", "watch"]
+---
+# ClusterRoleBinding：将所有业务namespace的harness-delegate绑定到ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: harness-delegate-cluster-role-binding
+  labels:
+    app.kubernetes.io/part-of: tunxiang-os
+    managed-by: harness
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: harness-delegate-cluster-role
+subjects:
+  - kind: ServiceAccount
+    name: harness-delegate
+    namespace: tunxiang-dev
+  - kind: ServiceAccount
+    name: harness-delegate
+    namespace: tunxiang-test
+  - kind: ServiceAccount
+    name: harness-delegate
+    namespace: tunxiang-uat
+  - kind: ServiceAccount
+    name: harness-delegate
+    namespace: tunxiang-pilot
+  - kind: ServiceAccount
+    name: harness-delegate
+    namespace: tunxiang-prod
+  - kind: ServiceAccount
+    name: harness-delegate
+    namespace: tunxiang-demo

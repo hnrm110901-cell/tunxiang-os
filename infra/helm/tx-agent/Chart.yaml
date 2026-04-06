@@ -1,0 +1,6 @@
+apiVersion: v2
+name: tx-agent
+description: 屯象OS TX-Agent LLM调度服务
+type: application
+version: 1.0.0
+appVersion: "latest"

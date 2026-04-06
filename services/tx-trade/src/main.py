@@ -125,6 +125,29 @@ async def lifespan(app: FastAPI):
     await init_db()
     asyncio.create_task(start_daily_scheduler(async_session_factory))
     asyncio.create_task(start_group_buy_expiry_scheduler(async_session_factory))
+
+    # Feature Flag 检查：TradeFlags.DELIVERY_AUTO_ACCEPT（外卖自动接单）
+    # 关闭时跳过自动接单初始化，外卖订单须人工在接单面板手动接单
+    # 用 try/except ImportError 保护，SDK不可用时降级为开启（不影响现有逻辑）
+    try:
+        from shared.feature_flags import is_enabled as _ff_is_enabled
+        from shared.feature_flags.flag_names import TradeFlags as _TradeFlags
+        if not _ff_is_enabled(_TradeFlags.DELIVERY_AUTO_ACCEPT):
+            import structlog as _structlog
+            _structlog.get_logger(__name__).info(
+                "delivery_auto_accept_disabled",
+                reason="feature_flag_disabled",
+                flag=_TradeFlags.DELIVERY_AUTO_ACCEPT,
+            )
+        else:
+            import structlog as _structlog
+            _structlog.get_logger(__name__).info(
+                "delivery_auto_accept_enabled",
+                flag=_TradeFlags.DELIVERY_AUTO_ACCEPT,
+            )
+    except ImportError:
+        pass  # feature_flags SDK不可用，外卖自动接单状态由环境变量控制
+
     yield
 
 

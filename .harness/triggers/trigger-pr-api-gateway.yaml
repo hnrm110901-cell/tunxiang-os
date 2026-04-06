@@ -1,0 +1,41 @@
+trigger:
+  name: trigger-pr-api-gateway
+  identifier: trigger_pr_api_gateway
+  projectIdentifier: TunXiangOS
+  orgIdentifier: default
+  description: "gateway 服务 PR 触发器。PR opened/synchronize 时触发 ci_api_gateway 流水线。"
+  tags:
+    service: api-gateway
+    event: pr
+  enabled: true
+  pipelineIdentifier: ci_api_gateway
+  source:
+    type: Webhook
+    spec:
+      type: Github
+      spec:
+        type: PullRequest
+        spec:
+          connectorRef: github_connector
+          repoName: tunxiang-os
+          autoAbortPreviousExecutions: true
+          payloadConditions:
+            - key: targetBranch
+              operator: In
+              value: main,develop
+          headerConditions: []
+          jexlCondition: ""
+          actions:
+            - opened
+            - synchronize
+            - reopened
+  inputYaml: |
+    pipeline:
+      identifier: ci_api_gateway
+      properties:
+        ci:
+          codebase:
+            build:
+              type: PR
+              spec:
+                number: <+trigger.prNumber>

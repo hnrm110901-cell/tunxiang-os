@@ -1,0 +1,50 @@
+pipeline:
+  name: ci-web-kds
+  identifier: ci_web_kds
+  projectIdentifier: TunXiangOS
+  orgIdentifier: default
+  description: "web-kds Kitchen Display System前端 CI 流水线。PR 或 main 分支推送时自动触发，执行类型检查/Lint/构建/镜像推送。"
+  tags:
+    service: web-kds
+    type: ci
+  properties:
+    ci:
+      codebase:
+        connectorRef: github_connector
+        repoName: tunxiang-os
+        build: <+input>
+  stages:
+    - stage:
+        name: CI
+        identifier: CI
+        type: CI
+        variables:
+          - name: servicePath
+            type: String
+            value: apps/web-kds
+          - name: imageRepo
+            type: String
+            value: tunxiang/web-kds
+          - name: dockerfile
+            type: String
+            value: apps/web-kds/Dockerfile
+        spec:
+          cloneCodebase: true
+          infrastructure:
+            type: KubernetesDirect
+            spec:
+              connectorRef: k8s_connector
+              namespace: harness-ci
+              automountServiceAccountToken: true
+              nodeSelector: {}
+              os: Linux
+          execution:
+            steps:
+              - step:
+                  name: CI_Steps
+                  identifier: CI_Steps
+                  template:
+                    templateRef: tpl_ci_node_service
+                    versionLabel: v1
+                    templateInputs:
+                      type: StepGroup

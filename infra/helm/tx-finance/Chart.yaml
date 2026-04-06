@@ -1,0 +1,6 @@
+apiVersion: v2
+name: tx-finance
+description: 屯象OS 财务结算微服务 — VAT计算/分账/P&L/日结
+type: application
+version: 1.0.0
+appVersion: "latest"
