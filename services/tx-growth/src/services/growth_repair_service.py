@@ -497,6 +497,42 @@ class GrowthRepairService:
         return updated
 
     # ------------------------------------------------------------------
+    # 通用状态转换分派器
+    # ------------------------------------------------------------------
+
+    async def transition_state(
+        self,
+        case_id: UUID,
+        target_state: str,
+        tenant_id: str,
+        db: AsyncSession,
+        extra_data: Optional[dict] = None,
+    ) -> dict:
+        """通用状态转换分派器 — 根据target_state调用对应方法"""
+        if target_state == "acknowledged":
+            return await self.acknowledge(case_id, tenant_id, db)
+        elif target_state == "compensating":
+            ed = extra_data or {}
+            plan_json = ed.get("compensation_plan_json", {})
+            selected = ed.get("compensation_selected", "")
+            return await self.submit_compensation(case_id, plan_json, selected, tenant_id, db)
+        elif target_state == "observing":
+            ed = extra_data or {}
+            window_hours = ed.get("window_hours", 168)
+            return await self.start_observe(case_id, window_hours, tenant_id, db)
+        elif target_state == "recovered":
+            return await self.mark_recovered(case_id, tenant_id, db)
+        elif target_state == "failed":
+            return await self.mark_failed(case_id, tenant_id, db)
+        elif target_state == "closed":
+            return await self.close_case(case_id, tenant_id, db)
+        else:
+            raise ValueError(
+                f"Unsupported target_state: '{target_state}'. "
+                f"Valid targets: acknowledged, compensating, observing, recovered, failed, closed"
+            )
+
+    # ------------------------------------------------------------------
     # 查询
     # ------------------------------------------------------------------
 

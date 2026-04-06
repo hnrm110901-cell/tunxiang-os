@@ -48,7 +48,7 @@ from typing import Any, Optional
 from uuid import UUID
 
 import structlog
-from fastapi import APIRouter, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 
@@ -254,10 +254,10 @@ async def update_growth_profile(
     async with async_session_factory() as db:
         await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
         try:
-            result = await _profile_svc.update_profile(
+            result = await _profile_svc.upsert_profile(
                 UUID(customer_id),
-                str(tenant_id),
                 body.model_dump(exclude_unset=True),
+                str(tenant_id),
                 db,
             )
             await db.commit()
@@ -284,11 +284,10 @@ async def list_journey_templates(
         await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
         try:
             result = await _journey_svc.list_templates(
-                str(tenant_id), db,
                 journey_type=journey_type,
                 is_active=is_active,
-                page=page,
-                size=size,
+                tenant_id=str(tenant_id),
+                db=db,
             )
             return ok(result)
         except ValueError as exc:
@@ -306,7 +305,7 @@ async def create_journey_template(
         await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
         try:
             result = await _journey_svc.create_template(
-                str(tenant_id), body.model_dump(), db,
+                body.model_dump(), str(tenant_id), db,
             )
             await db.commit()
             return ok(result)
@@ -324,7 +323,7 @@ async def get_journey_template(
     async with async_session_factory() as db:
         await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
         try:
-            result = await _journey_svc.get_template(template_id, str(tenant_id), db)
+            result = await _journey_svc.get_template(UUID(template_id), str(tenant_id), db)
             if result is None:
                 return err("Journey template not found")
             return ok(result)
@@ -344,7 +343,7 @@ async def update_journey_template(
         await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
         try:
             result = await _journey_svc.update_template(
-                template_id, str(tenant_id), body.model_dump(), db,
+                UUID(template_id), body.model_dump(), str(tenant_id), db,
             )
             await db.commit()
             return ok(result)
@@ -362,7 +361,7 @@ async def activate_journey_template(
     async with async_session_factory() as db:
         await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
         try:
-            result = await _journey_svc.activate_template(template_id, str(tenant_id), db)
+            result = await _journey_svc.activate_template(UUID(template_id), str(tenant_id), db)
             await db.commit()
             return ok(result)
         except ValueError as exc:
@@ -379,7 +378,7 @@ async def deactivate_journey_template(
     async with async_session_factory() as db:
         await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
         try:
-            result = await _journey_svc.deactivate_template(template_id, str(tenant_id), db)
+            result = await _journey_svc.deactivate_template(UUID(template_id), str(tenant_id), db)
             await db.commit()
             return ok(result)
         except ValueError as exc:
@@ -425,8 +424,15 @@ async def create_journey_enrollment(
     async with async_session_factory() as db:
         await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
         try:
-            result = await _journey_svc.create_enrollment(
-                str(tenant_id), body.model_dump(), db,
+            result = await _journey_svc.enroll_customer(
+                customer_id=UUID(body.customer_id),
+                template_id=UUID(body.journey_template_id),
+                source=body.enrollment_source,
+                event_type=body.source_event_type,
+                event_id=body.source_event_id,
+                suggestion_id=UUID(body.assigned_agent_suggestion_id) if body.assigned_agent_suggestion_id else None,
+                tenant_id=str(tenant_id),
+                db=db,
             )
             await db.commit()
             return ok(result)
@@ -444,7 +450,7 @@ async def get_journey_enrollment(
     async with async_session_factory() as db:
         await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
         try:
-            result = await _journey_svc.get_enrollment(enrollment_id, str(tenant_id), db)
+            result = await _journey_svc.get_enrollment(UUID(enrollment_id), str(tenant_id), db)
             if result is None:
                 return err("Enrollment not found")
             return ok(result)
@@ -463,9 +469,22 @@ async def update_enrollment_state(
     async with async_session_factory() as db:
         await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
         try:
-            result = await _journey_svc.update_enrollment_state(
-                enrollment_id, str(tenant_id), body.model_dump(), db,
-            )
+            target = body.journey_state
+            eid = UUID(enrollment_id)
+            if target == "paused":
+                result = await _journey_svc.pause_enrollment(
+                    eid, body.pause_reason or "", str(tenant_id), db,
+                )
+            elif target == "active":
+                result = await _journey_svc.resume_enrollment(
+                    eid, str(tenant_id), db,
+                )
+            elif target == "cancelled":
+                result = await _journey_svc.cancel_enrollment(
+                    eid, str(tenant_id), db,
+                )
+            else:
+                return err(f"Unsupported target journey_state: {target}")
             await db.commit()
             return ok(result)
         except ValueError as exc:
@@ -491,10 +510,10 @@ async def list_touch_executions(
         await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
         try:
             result = await _touch_svc.list_executions(
-                str(tenant_id), db,
+                tenant_id=str(tenant_id),
+                db=db,
                 customer_id=customer_id,
-                channel=channel,
-                execution_state=execution_state,
+                enrollment_id=None,
                 page=page,
                 size=size,
             )
@@ -513,8 +532,16 @@ async def create_touch_execution(
     async with async_session_factory() as db:
         await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
         try:
-            result = await _touch_svc.create_execution(
-                str(tenant_id), body.model_dump(), db,
+            result = await _touch_svc.execute_touch(
+                customer_id=UUID(body.customer_id),
+                enrollment_id=UUID(body.journey_enrollment_id) if body.journey_enrollment_id else None,
+                template_id=UUID(body.touch_template_code),
+                step_no=None,
+                channel=body.channel,
+                mechanism_type=body.mechanism_type,
+                variables=body.variables,
+                tenant_id=str(tenant_id),
+                db=db,
             )
             await db.commit()
             return ok(result)
@@ -534,7 +561,7 @@ async def update_touch_execution_state(
         await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
         try:
             result = await _touch_svc.update_execution_state(
-                execution_id, str(tenant_id), body.model_dump(), db,
+                UUID(execution_id), body.execution_state, str(tenant_id), db,
             )
             await db.commit()
             return ok(result)
@@ -553,8 +580,13 @@ async def update_touch_attribution(
     async with async_session_factory() as db:
         await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
         try:
-            result = await _touch_svc.update_attribution(
-                execution_id, str(tenant_id), body.model_dump(), db,
+            result = await _touch_svc.update_attribution_by_execution(
+                execution_id=UUID(execution_id),
+                order_id=UUID(body.attributed_order_id),
+                revenue_fen=body.attributed_revenue_fen,
+                profit_fen=body.attributed_gross_profit_fen,
+                tenant_id=str(tenant_id),
+                db=db,
             )
             await db.commit()
             return ok(result)
@@ -581,12 +613,12 @@ async def list_repair_cases(
         await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
         try:
             result = await _repair_svc.list_cases(
-                str(tenant_id), db,
-                customer_id=customer_id,
+                customer_id=UUID(customer_id) if customer_id else None,
                 repair_state=repair_state,
-                severity=severity,
+                tenant_id=str(tenant_id),
                 page=page,
                 size=size,
+                db=db,
             )
             return ok(result)
         except ValueError as exc:
@@ -604,7 +636,14 @@ async def create_repair_case(
         await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
         try:
             result = await _repair_svc.create_case(
-                str(tenant_id), body.model_dump(), db,
+                customer_id=UUID(body.customer_id),
+                source_type=body.source_type,
+                source_ref_id=body.source_ref_id,
+                severity=body.severity,
+                summary=body.summary,
+                owner_type=body.owner_type,
+                tenant_id=str(tenant_id),
+                db=db,
             )
             await db.commit()
             return ok(result)
@@ -622,7 +661,7 @@ async def get_repair_case(
     async with async_session_factory() as db:
         await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
         try:
-            result = await _repair_svc.get_case(case_id, str(tenant_id), db)
+            result = await _repair_svc.get_case(UUID(case_id), str(tenant_id), db)
             if result is None:
                 return err("Repair case not found")
             return ok(result)
@@ -641,8 +680,11 @@ async def update_repair_case_state(
     async with async_session_factory() as db:
         await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
         try:
-            result = await _repair_svc.update_case_state(
-                case_id, str(tenant_id), body.model_dump(), db,
+            result = await _repair_svc.transition_state(
+                case_id=UUID(case_id),
+                target_state=body.repair_state,
+                tenant_id=str(tenant_id),
+                db=db,
             )
             await db.commit()
             return ok(result)
@@ -661,8 +703,12 @@ async def update_repair_compensation(
     async with async_session_factory() as db:
         await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
         try:
-            result = await _repair_svc.update_compensation(
-                case_id, str(tenant_id), body.model_dump(), db,
+            result = await _repair_svc.submit_compensation(
+                case_id=UUID(case_id),
+                plan_json=body.compensation_plan_json,
+                selected=body.compensation_selected,
+                tenant_id=str(tenant_id),
+                db=db,
             )
             await db.commit()
             return ok(result)
@@ -689,12 +735,13 @@ async def list_agent_suggestions(
         await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
         try:
             result = await _suggestion_svc.list_suggestions(
-                str(tenant_id), db,
-                customer_id=customer_id,
-                suggestion_type=suggestion_type,
                 review_state=review_state,
+                suggestion_type=suggestion_type,
+                customer_id=UUID(customer_id) if customer_id else None,
+                tenant_id=str(tenant_id),
                 page=page,
                 size=size,
+                db=db,
             )
             return ok(result)
         except ValueError as exc:
@@ -712,7 +759,7 @@ async def create_agent_suggestion(
         await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
         try:
             result = await _suggestion_svc.create_suggestion(
-                str(tenant_id), body.model_dump(), db,
+                body.model_dump(), str(tenant_id), db,
             )
             await db.commit()
             return ok(result)
@@ -730,7 +777,7 @@ async def get_agent_suggestion(
     async with async_session_factory() as db:
         await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
         try:
-            result = await _suggestion_svc.get_suggestion(suggestion_id, str(tenant_id), db)
+            result = await _suggestion_svc.get_suggestion(UUID(suggestion_id), str(tenant_id), db)
             if result is None:
                 return err("Suggestion not found")
             return ok(result)
@@ -749,8 +796,23 @@ async def review_agent_suggestion(
     async with async_session_factory() as db:
         await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
         try:
+            revised_data = None
+            if body.review_result == "revised":
+                revised_data = {}
+                if body.revised_offer_type is not None:
+                    revised_data["offer"] = body.revised_offer_type
+                if body.revised_channel is not None:
+                    revised_data["channel"] = body.revised_channel
+                if body.revised_template_id is not None:
+                    revised_data["template_id"] = body.revised_template_id
             result = await _suggestion_svc.review_suggestion(
-                suggestion_id, str(tenant_id), body.model_dump(), db,
+                suggestion_id=UUID(suggestion_id),
+                result_action=body.review_result,
+                reviewer_id=UUID(body.reviewer_id),
+                note=body.reviewer_note,
+                revised_data=revised_data,
+                tenant_id=str(tenant_id),
+                db=db,
             )
             await db.commit()
             return ok(result)
@@ -769,9 +831,213 @@ async def publish_agent_suggestion(
         await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
         try:
             result = await _suggestion_svc.publish_suggestion(
-                suggestion_id, str(tenant_id), db,
+                UUID(suggestion_id), str(tenant_id), db,
             )
             await db.commit()
             return ok(result)
         except ValueError as exc:
+            return err(str(exc))
+
+
+# ---------------------------------------------------------------------------
+# Dashboard Stats 聚合端点
+# ---------------------------------------------------------------------------
+
+@router.get("/dashboard-stats")
+async def get_dashboard_stats(
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+) -> dict:
+    """增长驾驶舱KPI聚合 — 一次请求返回所有关键指标"""
+    tenant_uuid = _parse_tenant(x_tenant_id)
+    tenant_id = str(tenant_uuid)
+
+    async with async_session_factory() as db:
+        try:
+            await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": tenant_id})
+
+            # 1. 客户增长画像统计
+            profile_stats = await db.execute(text("""
+                SELECT
+                    COUNT(*) AS total_profiles,
+                    COUNT(*) FILTER (WHERE repurchase_stage = 'first_order_done') AS first_order_only,
+                    COUNT(*) FILTER (WHERE repurchase_stage = 'second_order_done') AS second_order_done,
+                    COUNT(*) FILTER (WHERE repurchase_stage = 'stable_repeat') AS stable_repeat,
+                    COUNT(*) FILTER (WHERE reactivation_priority IN ('high', 'critical')) AS high_priority_reactivation,
+                    COUNT(*) FILTER (WHERE service_repair_status NOT IN ('none', 'repair_completed')) AS active_repairs
+                FROM customer_growth_profiles
+                WHERE is_deleted = FALSE
+            """))
+            ps = profile_stats.fetchone()
+
+            # 2. 旅程enrollment统计
+            enrollment_stats = await db.execute(text("""
+                SELECT
+                    COUNT(*) AS total_enrollments,
+                    COUNT(*) FILTER (WHERE journey_state = 'active') AS active_enrollments,
+                    COUNT(*) FILTER (WHERE journey_state = 'paused') AS paused_enrollments,
+                    COUNT(*) FILTER (WHERE journey_state = 'completed') AS completed_enrollments,
+                    COUNT(*) FILTER (WHERE journey_state = 'waiting_observe') AS observing_enrollments
+                FROM growth_journey_enrollments
+                WHERE is_deleted = FALSE
+            """))
+            es = enrollment_stats.fetchone()
+
+            # 3. 触达执行统计（近7天）
+            touch_stats = await db.execute(text("""
+                SELECT
+                    COUNT(*) AS total_touches_7d,
+                    COUNT(*) FILTER (WHERE execution_state = 'delivered') AS delivered_7d,
+                    COUNT(*) FILTER (WHERE execution_state = 'opened') AS opened_7d,
+                    COUNT(*) FILTER (WHERE execution_state = 'clicked') AS clicked_7d,
+                    COUNT(*) FILTER (WHERE attributed_order_id IS NOT NULL) AS attributed_7d,
+                    COALESCE(SUM(attributed_revenue_fen) FILTER (WHERE attributed_order_id IS NOT NULL), 0) AS attributed_revenue_fen_7d
+                FROM growth_touch_executions
+                WHERE is_deleted = FALSE AND created_at >= NOW() - INTERVAL '7 days'
+            """))
+            ts = touch_stats.fetchone()
+
+            # 4. Agent建议统计
+            suggestion_stats = await db.execute(text("""
+                SELECT
+                    COUNT(*) AS total_suggestions,
+                    COUNT(*) FILTER (WHERE review_state = 'pending_review') AS pending_review,
+                    COUNT(*) FILTER (WHERE review_state = 'approved') AS approved,
+                    COUNT(*) FILTER (WHERE review_state = 'published') AS published,
+                    COUNT(*) FILTER (WHERE review_state = 'rejected') AS rejected
+                FROM growth_agent_strategy_suggestions
+                WHERE is_deleted = FALSE AND created_at >= NOW() - INTERVAL '7 days'
+            """))
+            ss = suggestion_stats.fetchone()
+
+            # 5. 增长漏斗（首单→入会→触达→到店→复购）
+            total_profiles = ps[0] if ps else 0
+            first_order = ps[1] if ps else 0
+            second_order = ps[2] if ps else 0
+            stable = ps[3] if ps else 0
+
+            delivered = ts[1] if ts else 0
+            attributed = ts[4] if ts else 0
+
+            funnel = {
+                "first_order": first_order + second_order + stable,
+                "touched": delivered,
+                "revisited": attributed,
+                "repeat_customer": second_order + stable,
+                "stable_repeat": stable,
+            }
+
+            # 6. 二访率和召回率
+            conversion_rates: dict = {}
+            if first_order + second_order + stable > 0:
+                conversion_rates["second_visit_rate"] = round((second_order + stable) / (first_order + second_order + stable) * 100, 1)
+            else:
+                conversion_rates["second_visit_rate"] = 0.0
+
+            if delivered > 0:
+                conversion_rates["touch_open_rate"] = round((ts[2] if ts else 0) / delivered * 100, 1)
+                conversion_rates["touch_attribution_rate"] = round(attributed / delivered * 100, 1)
+            else:
+                conversion_rates["touch_open_rate"] = 0.0
+                conversion_rates["touch_attribution_rate"] = 0.0
+
+            return {"ok": True, "data": {
+                "profiles": {
+                    "total": total_profiles,
+                    "first_order_only": first_order,
+                    "second_order_done": second_order,
+                    "stable_repeat": stable,
+                    "high_priority_reactivation": ps[4] if ps else 0,
+                    "active_repairs": ps[5] if ps else 0,
+                },
+                "enrollments": {
+                    "total": es[0] if es else 0,
+                    "active": es[1] if es else 0,
+                    "paused": es[2] if es else 0,
+                    "completed": es[3] if es else 0,
+                    "observing": es[4] if es else 0,
+                },
+                "touches_7d": {
+                    "total": ts[0] if ts else 0,
+                    "delivered": delivered,
+                    "opened": ts[2] if ts else 0,
+                    "clicked": ts[3] if ts else 0,
+                    "attributed": attributed,
+                    "attributed_revenue_fen": ts[5] if ts else 0,
+                },
+                "suggestions_7d": {
+                    "total": ss[0] if ss else 0,
+                    "pending_review": ss[1] if ss else 0,
+                    "approved": ss[2] if ss else 0,
+                    "published": ss[3] if ss else 0,
+                    "rejected": ss[4] if ss else 0,
+                },
+                "funnel": funnel,
+                "conversion_rates": conversion_rates,
+            }}
+        except (ValueError, RuntimeError, OSError) as exc:
+            return {"ok": False, "error": {"message": str(exc)}}
+
+
+# ---------------------------------------------------------------------------
+# Customer Funnel Stats 端点（客户总池页面用）
+# ---------------------------------------------------------------------------
+
+@router.get("/customers/funnel-stats")
+async def get_funnel_stats(
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+) -> dict:
+    """客户增长漏斗统计 — 与 dashboard-stats 中 funnel 数据一致，供客户总池页面独立调用。"""
+    tenant_uuid = _parse_tenant(x_tenant_id)
+    tenant_id = str(tenant_uuid)
+
+    async with async_session_factory() as db:
+        try:
+            await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": tenant_id})
+
+            profile_stats = await db.execute(text("""
+                SELECT
+                    COUNT(*) AS total_profiles,
+                    COUNT(*) FILTER (WHERE repurchase_stage = 'first_order_done') AS first_order_only,
+                    COUNT(*) FILTER (WHERE repurchase_stage = 'second_order_done') AS second_order_done,
+                    COUNT(*) FILTER (WHERE repurchase_stage = 'stable_repeat') AS stable_repeat,
+                    COUNT(*) FILTER (WHERE reactivation_priority IN ('high', 'critical')) AS high_priority_reactivation
+                FROM customer_growth_profiles
+                WHERE is_deleted = FALSE
+            """))
+            ps = profile_stats.fetchone()
+
+            touch_stats = await db.execute(text("""
+                SELECT
+                    COUNT(*) FILTER (WHERE execution_state = 'delivered') AS delivered_7d,
+                    COUNT(*) FILTER (WHERE attributed_order_id IS NOT NULL) AS attributed_7d
+                FROM growth_touch_executions
+                WHERE is_deleted = FALSE AND created_at >= NOW() - INTERVAL '7 days'
+            """))
+            ts = touch_stats.fetchone()
+
+            total = ps[0] if ps else 0
+            first_order = ps[1] if ps else 0
+            second_order = ps[2] if ps else 0
+            stable = ps[3] if ps else 0
+            delivered = ts[0] if ts else 0
+            attributed = ts[1] if ts else 0
+
+            funnel = {
+                "total_profiles": total,
+                "first_order": first_order + second_order + stable,
+                "touched": delivered,
+                "revisited": attributed,
+                "repeat_customer": second_order + stable,
+                "stable_repeat": stable,
+                "high_priority_reactivation": ps[4] if ps else 0,
+            }
+
+            conversion_rates: dict = {}
+            if first_order + second_order + stable > 0:
+                conversion_rates["second_visit_rate"] = round((second_order + stable) / (first_order + second_order + stable) * 100, 1)
+            else:
+                conversion_rates["second_visit_rate"] = 0.0
+
+            return ok({"funnel": funnel, "conversion_rates": conversion_rates})
+        except (ValueError, RuntimeError, OSError) as exc:
             return err(str(exc))

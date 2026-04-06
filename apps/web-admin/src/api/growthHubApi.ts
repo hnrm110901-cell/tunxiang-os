@@ -5,96 +5,129 @@ import { txFetchData, txFetch } from './client';
 
 // ---- Types ----
 export interface GrowthProfile {
+  id: string;
+  tenant_id: string;
   customer_id: string;
   repurchase_stage: string;
   reactivation_priority: string;
   reactivation_reason: string | null;
-  has_active_owned_benefit: boolean;
-  owned_benefit_type: string | null;
-  owned_benefit_expire_at: string | null;
   service_repair_status: string;
+  service_repair_case_id: string | null;
+  has_active_owned_benefit: boolean;
   growth_opt_out: boolean;
-  last_growth_touch_at: string | null;
-  last_growth_touch_channel: string | null;
-  first_order_at: string | null;
-  second_order_at: string | null;
+  marketing_pause_until: string | null;
   last_order_at: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface JourneyTemplate {
   id: string;
-  code: string;
+  tenant_id: string;
   name: string;
   journey_type: string;
-  mechanism_family: string;
+  description: string | null;
+  trigger_rule_json: Record<string, unknown> | null;
+  total_steps: number;
   is_active: boolean;
-  is_system: boolean;
-  priority: number;
   steps?: JourneyStep[];
   created_at: string;
+  updated_at: string;
 }
 
 export interface JourneyStep {
-  id: string;
   step_no: number;
   step_type: string;
-  mechanism_type: string | null;
+  touch_template_code: string | null;
   wait_minutes: number | null;
+  decision_rule_json: Record<string, unknown> | null;
   observe_window_hours: number | null;
+  offer_type: string | null;
+  on_success_goto: number | null;
+  on_fail_goto: number | null;
+  on_skip_goto: number | null;
 }
 
 export interface JourneyEnrollment {
   id: string;
+  tenant_id: string;
   customer_id: string;
-  journey_template_id: string;
+  template_id: string;
   journey_state: string;
   current_step_no: number | null;
   enrollment_source: string;
+  source_event_type: string | null;
+  source_event_id: string | null;
+  suggestion_id: string | null;
   entered_at: string;
   activated_at: string | null;
+  paused_at: string | null;
+  completed_at: string | null;
+  exited_at: string | null;
   exit_reason: string | null;
   pause_reason: string | null;
+  next_execute_at: string | null;
+  template_name: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface TouchExecution {
   id: string;
   customer_id: string;
+  journey_enrollment_id: string | null;
+  journey_template_id: string | null;
+  step_no: number | null;
+  touch_template_id: string | null;
   channel: string;
   mechanism_type: string | null;
   execution_state: string;
+  blocked_reason: string | null;
   rendered_content: string | null;
-  sent_at: string | null;
-  opened_at: string | null;
+  attributed_order_id: string | null;
   attributed_revenue_fen: number | null;
+  attributed_gross_profit_fen: number | null;
   created_at: string;
+  updated_at: string;
 }
 
 export interface ServiceRepairCase {
   id: string;
+  tenant_id: string;
   customer_id: string;
   source_type: string;
+  source_ref_id: string | null;
   severity: string;
-  repair_state: string;
   summary: string | null;
   owner_type: string;
+  repair_state: string;
+  emotion_ack_at: string | null;
+  compensation_plan_json: Record<string, unknown> | null;
+  selected_compensation: string | null;
+  observe_until: string | null;
   created_at: string;
+  updated_at: string;
 }
 
 export interface AgentSuggestion {
   id: string;
+  tenant_id: string;
   customer_id: string | null;
   suggestion_type: string;
-  priority: string;
-  mechanism_type: string | null;
-  recommended_offer_type: string | null;
-  recommended_channel: string | null;
-  explanation_summary: string;
-  risk_summary: string | null;
-  expected_outcome_json: Record<string, number> | null;
+  template_id: string | null;
+  agent_id: string | null;
+  confidence_score: number;
+  reasoning: string | null;
+  suggested_channel: string | null;
+  suggested_timing: string | null;
+  suggested_message: string | null;
   review_state: string;
-  requires_human_review: boolean;
-  created_by_agent: string | null;
+  reviewer_id: string | null;
+  reviewer_note: string | null;
+  published_at: string | null;
+  published_enrollment_id: string | null;
   created_at: string;
+  updated_at: string;
 }
 
 // ---- API Functions ----

@@ -9,7 +9,9 @@
  *   GET /api/v1/dashboard/summary            — 私域健康/门店排行/Agent决策
  */
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { txFetch } from '../../../api';
+import { useApi } from '../../../hooks/useApi';
 
 // ---- 颜色常量（深色主题）----
 const BG_0   = '#0d1e28';
@@ -85,6 +87,53 @@ interface DashboardSummary {
     confidence: number | null;
     created_at: string | null;
   }[];
+}
+
+// ---- 增长中枢V2 类型 ----
+
+interface GrowthDashboardStats {
+  profiles: {
+    total: number;
+    first_order_only: number;
+    second_order_done: number;
+    stable_repeat: number;
+    high_priority_reactivation: number;
+    active_repairs: number;
+  };
+  enrollments: {
+    total: number;
+    active: number;
+    paused: number;
+    completed: number;
+    observing: number;
+  };
+  touches_7d: {
+    total: number;
+    delivered: number;
+    opened: number;
+    clicked: number;
+    attributed: number;
+    attributed_revenue_fen: number;
+  };
+  suggestions_7d: {
+    total: number;
+    pending_review: number;
+    approved: number;
+    published: number;
+    rejected: number;
+  };
+  funnel: {
+    first_order: number;
+    touched: number;
+    revisited: number;
+    repeat_customer: number;
+    stable_repeat: number;
+  };
+  conversion_rates: {
+    second_visit_rate: number;
+    touch_open_rate: number;
+    touch_attribution_rate: number;
+  };
 }
 
 // ---- 工具函数 ----
@@ -572,9 +621,16 @@ function StoreRankSection({ stores, loading, error }: {
 // ---- 主页面 ----
 
 export function GrowthDashboardPage() {
+  const navigate = useNavigate();
   const [brand, setBrand]         = useState<Brand>('全部品牌');
   const [timeRange, setTimeRange] = useState<TimeRange>('近30天');
   const [region, setRegion]       = useState<Region>('全部区域');
+
+  // 增长中枢V2数据
+  const { data: growthStats, loading: loadingGrowthV2 } = useApi<GrowthDashboardStats>(
+    '/api/v1/growth/dashboard-stats',
+    { cacheMs: 15_000 },
+  );
 
   const [growthData,    setGrowthData]    = useState<GrowthData | null>(null);
   const [activityData,  setActivityData]  = useState<ActivityData | null>(null);
@@ -749,6 +805,154 @@ export function GrowthDashboardPage() {
         {/* 门店排行 */}
         <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
           <StoreRankSection stores={dashboardData?.stores ?? []} loading={loadingDashboard} error={errorDashboard} />
+        </div>
+
+        {/* ========== 增长中枢 V2 ========== */}
+
+        <div style={{ borderTop: `1px solid ${BG_2}`, margin: '24px 0 16px', paddingTop: 20 }}>
+          <h3 style={{ margin: '0 0 16px', fontSize: 18, fontWeight: 700, color: TEXT_1 }}>增长中枢 V2</h3>
+        </div>
+
+        {/* 区域1: 增长中枢V2 KPI行（6卡）*/}
+        {loadingGrowthV2 ? (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 12, marginBottom: 16 }}>
+            {[0,1,2,3,4,5].map(i => (
+              <div key={i} style={{ background: '#142833', borderRadius: 10, padding: '16px 14px', border: '1px solid #1e3a4a' }}>
+                <SectionSkeleton height={60} />
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 12, marginBottom: 16 }}>
+            {[
+              { label: '二访率', value: growthStats?.conversion_rates.second_visit_rate, suffix: '%', format: (v: number) => (v * 100).toFixed(1), color: BRAND },
+              { label: '高优先召回', value: growthStats?.profiles.high_priority_reactivation, suffix: ' 人', format: (v: number) => v.toLocaleString(), color: '#ff4d4f' },
+              { label: '活跃旅程', value: growthStats?.enrollments.active, suffix: ' 条', format: (v: number) => v.toLocaleString(), color: TEAL },
+              { label: '7日触达', value: growthStats?.touches_7d.delivered, suffix: ' 次', format: (v: number) => v.toLocaleString(), color: BLUE },
+              { label: '触达打开率', value: growthStats?.conversion_rates.touch_open_rate, suffix: '%', format: (v: number) => (v * 100).toFixed(1), color: '#52c41a' },
+              { label: '待审核建议', value: growthStats?.suggestions_7d.pending_review, suffix: ' 条', format: (v: number) => v.toLocaleString(), color: YELLOW },
+            ].map((kpi, i) => (
+              <div key={i} style={{
+                background: '#142833', borderRadius: 10, padding: '16px 14px',
+                border: '1px solid #1e3a4a', borderTop: `2px solid ${kpi.color}`,
+              }}>
+                <div style={{ fontSize: 12, color: TEXT_3, marginBottom: 6 }}>{kpi.label}</div>
+                <div style={{ fontSize: 24, fontWeight: 700, color: '#e8e8e8' }}>
+                  {kpi.value != null ? kpi.format(kpi.value) : '--'}{kpi.value != null ? kpi.suffix : ''}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* 区域2: 增长漏斗 + Agent待办（左右两栏）*/}
+        <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
+          {/* 左栏 — 增长漏斗 */}
+          <div style={{ background: '#142833', borderRadius: 10, padding: 20, border: '1px solid #1e3a4a', flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 15, fontWeight: 700, color: TEXT_1, marginBottom: 16 }}>增长漏斗</div>
+            {loadingGrowthV2 ? <SectionSkeleton height={140} /> : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {[
+                  { label: '首单客户', value: growthStats?.funnel.first_order, color: BRAND },
+                  { label: '已触达', value: growthStats?.funnel.touched, color: BLUE },
+                  { label: '已回访', value: growthStats?.funnel.revisited, color: TEAL },
+                  { label: '复购客户', value: growthStats?.funnel.repeat_customer, color: '#52c41a' },
+                  { label: '稳定复购', value: growthStats?.funnel.stable_repeat, color: PURPLE },
+                ].map((step, idx) => {
+                  const maxVal = growthStats?.funnel.first_order || 1;
+                  const pct = step.value != null ? Math.max((step.value / maxVal) * 100, 2) : 0;
+                  return (
+                    <div key={idx}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, fontSize: 12 }}>
+                        <span style={{ color: TEXT_2 }}>{step.label}</span>
+                        <span style={{ color: step.color, fontWeight: 600 }}>{step.value?.toLocaleString() ?? '--'}</span>
+                      </div>
+                      <div style={{ height: 14, borderRadius: 4, background: BG_2 }}>
+                        <div style={{
+                          height: '100%', borderRadius: 4, background: step.color,
+                          width: `${pct.toFixed(1)}%`, transition: 'width 0.6s ease',
+                          display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: 6,
+                          fontSize: 9, color: '#fff', fontWeight: 600,
+                        }}>
+                          {step.value != null && pct > 15 ? `${pct.toFixed(0)}%` : ''}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* 右栏 — Agent待办速览 */}
+          <div style={{ background: '#142833', borderRadius: 10, padding: 20, border: '1px solid #1e3a4a', minWidth: 280 }}>
+            <div style={{ fontSize: 15, fontWeight: 700, color: TEXT_1, marginBottom: 16 }}>Agent 待办速览</div>
+            {loadingGrowthV2 ? <SectionSkeleton height={140} /> : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 10px', borderRadius: 6, background: BG_2 }}>
+                  <span style={{ fontSize: 12, color: TEXT_3 }}>待审核</span>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: YELLOW }}>{growthStats?.suggestions_7d.pending_review ?? '--'} 条</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 10px', borderRadius: 6, background: BG_2 }}>
+                  <span style={{ fontSize: 12, color: TEXT_3 }}>已发布</span>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: '#52c41a' }}>{growthStats?.suggestions_7d.published ?? '--'} 条</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 10px', borderRadius: 6, background: BG_2 }}>
+                  <span style={{ fontSize: 12, color: TEXT_3 }}>活跃修复</span>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: BRAND }}>{growthStats?.profiles.active_repairs ?? '--'} 条</span>
+                </div>
+                <button
+                  onClick={() => navigate('/hq/growth/agent-workbench')}
+                  style={{
+                    marginTop: 8, padding: '10px 0', borderRadius: 6,
+                    background: BRAND, border: 'none', color: '#fff',
+                    fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                    transition: 'opacity 0.2s',
+                  }}
+                  onMouseEnter={e => (e.currentTarget.style.opacity = '0.85')}
+                  onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
+                >
+                  进入 Agent 工作台
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* 区域3: 旅程运行状态速览 */}
+        <div style={{ background: '#142833', borderRadius: 10, padding: 20, border: '1px solid #1e3a4a', marginBottom: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+            <span style={{ fontSize: 15, fontWeight: 700, color: TEXT_1 }}>旅程运行状态</span>
+            <a
+              onClick={() => navigate('/hq/growth/journey-runs')}
+              style={{ fontSize: 12, color: TEAL, cursor: 'pointer', textDecoration: 'none' }}
+            >
+              查看全部 &rarr;
+            </a>
+          </div>
+          {loadingGrowthV2 ? <SectionSkeleton height={60} /> : (
+            <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+              {[
+                { label: '活跃', value: growthStats?.enrollments.active, color: '#52c41a', bg: '#52c41a22' },
+                { label: '暂停', value: growthStats?.enrollments.paused, color: '#fa8c16', bg: '#fa8c1622' },
+                { label: '观察中', value: growthStats?.enrollments.observing, color: TEAL, bg: `${TEAL}22` },
+                { label: '已完成', value: growthStats?.enrollments.completed, color: TEXT_3, bg: BG_2 },
+              ].map((item, idx) => (
+                <div key={idx} style={{
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  padding: '8px 16px', borderRadius: 8, background: item.bg,
+                }}>
+                  <span style={{
+                    width: 8, height: 8, borderRadius: '50%', background: item.color, flexShrink: 0,
+                  }} />
+                  <span style={{ fontSize: 13, color: item.color, fontWeight: 600 }}>{item.label}</span>
+                  <span style={{ fontSize: 18, fontWeight: 700, color: '#e8e8e8' }}>
+                    {item.value?.toLocaleString() ?? '--'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
       </div>

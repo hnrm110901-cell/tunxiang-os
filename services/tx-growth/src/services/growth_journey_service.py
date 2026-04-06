@@ -361,6 +361,89 @@ class GrowthJourneyService:
     # B. Enrollment 生命周期
     # ==================================================================
 
+    async def list_enrollments(
+        self,
+        tenant_id: str,
+        db: AsyncSession,
+        customer_id: Optional[str] = None,
+        journey_state: Optional[str] = None,
+        page: int = 1,
+        size: int = 20,
+    ) -> dict:
+        """分页列出旅程enrollment"""
+        await self._set_tenant(db, tenant_id)
+
+        where_clauses = ["e.tenant_id = :tid", "e.is_deleted = false"]
+        params: dict = {"tid": tenant_id}
+
+        if customer_id is not None:
+            where_clauses.append("e.customer_id = :cid")
+            params["cid"] = customer_id
+        if journey_state is not None:
+            where_clauses.append("e.journey_state = :state")
+            params["state"] = journey_state
+
+        where_sql = " AND ".join(where_clauses)
+        offset = (page - 1) * size
+
+        count_result = await db.execute(
+            text(f"SELECT COUNT(*) FROM growth_journey_enrollments e WHERE {where_sql}"),
+            params,
+        )
+        total = count_result.scalar() or 0
+
+        params["lim"] = size
+        params["off"] = offset
+        rows_result = await db.execute(
+            text(f"""
+                SELECT e.id, e.tenant_id, e.customer_id, e.journey_template_id AS template_id,
+                       e.journey_state, e.current_step_no, e.enrollment_source,
+                       e.source_event_type, e.source_event_id,
+                       e.assigned_agent_suggestion_id AS suggestion_id,
+                       e.entered_at, e.activated_at, e.paused_at, e.completed_at,
+                       e.exited_at, e.exit_reason, e.pause_reason,
+                       e.next_execute_at, e.created_at, e.updated_at,
+                       t.name AS template_name
+                FROM growth_journey_enrollments e
+                LEFT JOIN growth_journey_templates t
+                  ON t.id = e.journey_template_id AND t.tenant_id = e.tenant_id
+                WHERE {where_sql}
+                ORDER BY e.created_at DESC
+                LIMIT :lim OFFSET :off
+            """),
+            params,
+        )
+        items = [dict(r._mapping) for r in rows_result.fetchall()]
+        return {"items": items, "total": total}
+
+    async def get_enrollment(
+        self, enrollment_id: UUID, tenant_id: str, db: AsyncSession
+    ) -> Optional[dict]:
+        """获取单个enrollment详情"""
+        await self._set_tenant(db, tenant_id)
+
+        result = await db.execute(
+            text("""
+                SELECT e.id, e.tenant_id, e.customer_id, e.journey_template_id AS template_id,
+                       e.journey_state, e.current_step_no, e.enrollment_source,
+                       e.source_event_type, e.source_event_id,
+                       e.assigned_agent_suggestion_id AS suggestion_id,
+                       e.entered_at, e.activated_at, e.paused_at, e.completed_at,
+                       e.exited_at, e.exit_reason, e.pause_reason,
+                       e.next_execute_at, e.created_at, e.updated_at,
+                       t.name AS template_name
+                FROM growth_journey_enrollments e
+                LEFT JOIN growth_journey_templates t
+                  ON t.id = e.journey_template_id AND t.tenant_id = e.tenant_id
+                WHERE e.tenant_id = :tid AND e.id = :eid AND e.is_deleted = false
+            """),
+            {"tid": tenant_id, "eid": str(enrollment_id)},
+        )
+        row = result.fetchone()
+        if row is None:
+            return None
+        return dict(row._mapping)
+
     async def enroll_customer(
         self,
         customer_id: UUID,

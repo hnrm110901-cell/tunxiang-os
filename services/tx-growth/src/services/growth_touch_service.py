@@ -426,6 +426,138 @@ class GrowthTouchService:
     # 分页查询触达历史
     # ------------------------------------------------------------------
 
+    async def list_executions(
+        self,
+        tenant_id: str,
+        db: AsyncSession,
+        customer_id: Optional[str] = None,
+        enrollment_id: Optional[str] = None,
+        page: int = 1,
+        size: int = 20,
+    ) -> dict:
+        """分页列出触达执行记录（通用，支持按customer_id或enrollment_id筛选）"""
+        await self._set_tenant(db, tenant_id)
+
+        where_clauses = ["tenant_id = :tid", "is_deleted = false"]
+        params: dict = {"tid": tenant_id}
+
+        if customer_id is not None:
+            where_clauses.append("customer_id = :cid")
+            params["cid"] = customer_id
+        if enrollment_id is not None:
+            where_clauses.append("journey_enrollment_id = :eid")
+            params["eid"] = enrollment_id
+
+        where_sql = " AND ".join(where_clauses)
+        offset = (page - 1) * size
+
+        count_result = await db.execute(
+            text(f"SELECT COUNT(*) FROM growth_touch_executions WHERE {where_sql}"),
+            params,
+        )
+        total = count_result.scalar() or 0
+
+        params["lim"] = size
+        params["off"] = offset
+        rows_result = await db.execute(
+            text(f"""
+                SELECT id, customer_id, journey_enrollment_id, journey_template_id,
+                       step_no, touch_template_id, channel, mechanism_type,
+                       execution_state, blocked_reason, rendered_content,
+                       attributed_order_id, attributed_revenue_fen,
+                       attributed_gross_profit_fen,
+                       created_at, updated_at
+                FROM growth_touch_executions
+                WHERE {where_sql}
+                ORDER BY created_at DESC
+                LIMIT :lim OFFSET :off
+            """),
+            params,
+        )
+        items = [dict(r._mapping) for r in rows_result.fetchall()]
+        return {"items": items, "total": total}
+
+    async def update_attribution_by_execution(
+        self,
+        execution_id: UUID,
+        order_id: UUID,
+        revenue_fen: int,
+        profit_fen: int,
+        tenant_id: str,
+        db: AsyncSession,
+    ) -> dict:
+        """通过execution_id回写归因（先查customer_id再调attribute_order）"""
+        await self._set_tenant(db, tenant_id)
+
+        # 查execution获取customer_id
+        exec_result = await db.execute(
+            text("""
+                SELECT id, customer_id, channel, journey_template_id, journey_enrollment_id
+                FROM growth_touch_executions
+                WHERE tenant_id = :tid AND id = :eid AND is_deleted = false
+            """),
+            {"tid": tenant_id, "eid": str(execution_id)},
+        )
+        exec_row = exec_result.fetchone()
+        if exec_row is None:
+            raise ValueError(f"Touch execution {execution_id} not found")
+
+        execution = exec_row._mapping
+        customer_id = UUID(str(execution["customer_id"]))
+
+        # 直接更新该execution的归因
+        await db.execute(
+            text("""
+                UPDATE growth_touch_executions
+                SET attributed_order_id = :order_id,
+                    attributed_revenue_fen = :revenue_fen,
+                    attributed_gross_profit_fen = :profit_fen,
+                    updated_at = NOW()
+                WHERE tenant_id = :tid AND id = :eid
+            """),
+            {
+                "tid": tenant_id,
+                "eid": str(execution_id),
+                "order_id": str(order_id),
+                "revenue_fen": revenue_fen,
+                "profit_fen": profit_fen,
+            },
+        )
+
+        asyncio.create_task(
+            emit_event(
+                event_type=f"{GROWTH_EVT_PREFIX}.touch.attributed",
+                tenant_id=tenant_id,
+                stream_id=str(execution_id),
+                payload={
+                    "execution_id": str(execution_id),
+                    "customer_id": str(customer_id),
+                    "order_id": str(order_id),
+                    "revenue_fen": revenue_fen,
+                    "profit_fen": profit_fen,
+                    "channel": execution["channel"],
+                },
+                source_service="tx-growth",
+            )
+        )
+        logger.info(
+            "touch_attributed_by_execution",
+            execution_id=str(execution_id),
+            customer_id=str(customer_id),
+            order_id=str(order_id),
+            revenue_fen=revenue_fen,
+            tenant_id=tenant_id,
+        )
+        return {
+            "attributed": True,
+            "execution_id": str(execution_id),
+            "customer_id": str(customer_id),
+            "order_id": str(order_id),
+            "channel": execution["channel"],
+            "revenue_fen": revenue_fen,
+            "profit_fen": profit_fen,
+        }
+
     async def list_by_customer(
         self,
         customer_id: UUID,

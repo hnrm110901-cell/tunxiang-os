@@ -226,16 +226,43 @@ _growth_journey_svc = _GrowthJourneyService()
 
 
 async def _run_growth_journey_tick() -> None:
-    """定时任务：每分钟推进到期的增长中枢V2旅程。"""
+    """定时任务：每分钟推进所有租户到期的增长中枢V2旅程。"""
     logger.info("growth_journey_v2_tick_started")
-    async with async_session_factory() as db:
+    from sqlalchemy import text as _text
+
+    # 查出所有活跃租户
+    async with async_session_factory() as probe_db:
         try:
-            result = await _growth_journey_svc.process_pending(tenant_id=None, db=db)
-            await db.commit()
-            logger.info("growth_journey_v2_tick_done", **result)
+            result = await probe_db.execute(
+                _text("SELECT DISTINCT tenant_id FROM stores WHERE is_active = true")
+            )
+            tenant_ids = [str(row[0]) for row in result.fetchall()]
         except (OSError, RuntimeError, ValueError) as exc:
-            await db.rollback()
-            logger.error("growth_journey_v2_tick_error", error=str(exc), exc_info=True)
+            logger.error("growth_journey_v2_fetch_tenants_error", error=str(exc), exc_info=True)
+            return
+
+    total_scanned = 0
+    total_advanced = 0
+    total_failed = 0
+
+    for tid in tenant_ids:
+        async with async_session_factory() as db:
+            try:
+                await db.execute(_text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": tid})
+                result = await _growth_journey_svc.process_pending(tenant_id=tid, db=db)
+                await db.commit()
+                total_scanned += result.get("scanned", 0)
+                total_advanced += result.get("advanced", 0)
+                total_failed += result.get("failed", 0)
+            except (OSError, RuntimeError, ValueError) as exc:
+                await db.rollback()
+                logger.error("growth_journey_v2_tick_tenant_error", tenant_id=tid, error=str(exc), exc_info=True)
+
+    logger.info("growth_journey_v2_tick_done",
+                tenant_count=len(tenant_ids),
+                scanned=total_scanned,
+                advanced=total_advanced,
+                failed=total_failed)
 
 
 def _schedule_growth_journey_tick() -> None:
