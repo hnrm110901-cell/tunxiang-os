@@ -83,9 +83,10 @@ from .api.split_payment_routes import router as split_payment_router
 from .api.stored_value_routes import router as stored_value_router
 from .api.supply_chain_mobile_routes import router as supply_chain_mobile_router
 from .api.table_layout_routes import router as table_layout_router
-# v149 桌台中心化架构：堂食会话 + 服务呼叫
+# v149 桌台中心化架构：堂食会话 + 服务呼叫 + KDS桌台聚合
 from .api.dining_session_routes import router as dining_session_router
 from .api.service_call_routes import router as service_call_router
+from .api.kds_by_session_routes import router as kds_by_session_router
 from .api.chef_at_home_routes import router as chef_at_home_router
 from .api.omni_channel_routes import router as omni_channel_router
 from .api.scan_order_api import router as scan_order_ext_router
@@ -147,6 +148,7 @@ app.include_router(handover_router)
 app.include_router(table_router)
 app.include_router(dining_session_router)    # v149 堂食会话（桌台中心化核心）
 app.include_router(service_call_router)      # v149 服务呼叫（催菜/呼叫服务员）
+app.include_router(kds_by_session_router)    # v149 KDS桌台维度出餐看板
 app.include_router(enterprise_router)
 app.include_router(order_ext_router)
 app.include_router(coupon_router)
