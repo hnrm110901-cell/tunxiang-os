@@ -144,15 +144,28 @@ class DiningSessionService:
                 f"请先清台再开台"
             )
 
-        # 获取桌台信息（桌号快照、store_code）
+        # 获取桌台信息（桌号快照、低消配置）
         table_row = await self._db.execute(
-            text("SELECT table_no, config FROM tables WHERE id = :id AND tenant_id = :tid"),
+            text("""
+                SELECT table_no, config, min_consume_fen, area, seats, table_type
+                FROM tables WHERE id = :id AND tenant_id = :tid
+            """),
             {"id": table_id, "tid": self._tenant_id},
         )
         table_info = table_row.mappings().one_or_none()
         if table_info is None:
             raise ValueError(f"桌台 {table_id} 不存在")
         table_no_snapshot = table_info["table_no"]
+
+        # 构建 room_config：包间低消、桌型等元数据
+        min_consume_fen: int = int(table_info["min_consume_fen"] or 0)
+        room_config: dict = {}
+        if min_consume_fen > 0:
+            room_config["min_spend_fen"] = min_consume_fen
+        # 继承桌台额外配置（如服务费率、包间收费等）
+        extra_config = table_info["config"] or {}
+        if isinstance(extra_config, dict):
+            room_config.update({k: v for k, v in extra_config.items() if k not in room_config})
 
         # 获取门店 store_code（用于生成 session_no）
         store_row = await self._db.execute(
@@ -186,7 +199,7 @@ class DiningSessionService:
                     :guest_count, :vip_customer_id, :booking_id,
                     'seated', :lead_waiter_id, :zone_id, :session_type,
                     :now, :table_no_snapshot,
-                    0, 0, 0, 0, 0, 0, 0, '{}',
+                    0, 0, 0, 0, 0, 0, 0, :room_config,
                     :now, :now, FALSE
                 )
             """),
@@ -204,6 +217,7 @@ class DiningSessionService:
                 "session_type": session_type,
                 "now": now,
                 "table_no_snapshot": table_no_snapshot,
+                "room_config": room_config,
             },
         )
 
@@ -227,6 +241,7 @@ class DiningSessionService:
                 "session_type": session_type,
                 "table_no": table_no_snapshot,
                 "booking_id": str(booking_id) if booking_id else None,
+                "min_spend_fen": min_consume_fen,
             },
             operator_id=lead_waiter_id,
             operator_type="employee",
@@ -592,9 +607,12 @@ class DiningSessionService:
                 f"目标桌台 {target_table_id} 已有活跃会话 {target_existing['session_no']}，无法转台"
             )
 
-        # 获取目标桌台桌号
+        # 获取目标桌台信息（桌号 + 低消配置）
         target_row = await self._db.execute(
-            text("SELECT table_no FROM tables WHERE id = :id AND tenant_id = :tid"),
+            text("""
+                SELECT table_no, min_consume_fen, config
+                FROM tables WHERE id = :id AND tenant_id = :tid
+            """),
             {"id": target_table_id, "tid": self._tenant_id},
         )
         target_info = target_row.mappings().one_or_none()
@@ -602,20 +620,37 @@ class DiningSessionService:
             raise ValueError(f"目标桌台 {target_table_id} 不存在")
         new_table_no = target_info["table_no"]
 
+        # 更新 room_config：新桌台的低消覆盖旧桌台低消
+        new_min_consume_fen = int(target_info["min_consume_fen"] or 0)
+        existing_room_config: dict = dict(session.get("room_config") or {})
+        if new_min_consume_fen > 0:
+            existing_room_config["min_spend_fen"] = new_min_consume_fen
+        elif "min_spend_fen" in existing_room_config:
+            # 新桌台无低消要求，移除低消限制
+            del existing_room_config["min_spend_fen"]
+        # 合并新桌台额外配置
+        extra_config = target_info["config"] or {}
+        if isinstance(extra_config, dict):
+            existing_room_config.update(
+                {k: v for k, v in extra_config.items() if k not in ("min_spend_fen",)}
+            )
+
         now = _now_utc()
 
-        # 更新会话的 table_id 和桌号快照
+        # 更新会话的 table_id、桌号快照和 room_config
         await self._db.execute(
             text("""
                 UPDATE dining_sessions
                 SET table_id          = :target_table_id,
                     table_no_snapshot = :new_table_no,
+                    room_config       = :room_config,
                     updated_at        = :now
                 WHERE id = :session_id AND tenant_id = :tenant_id
             """),
             {
                 "target_table_id": target_table_id,
                 "new_table_no": new_table_no,
+                "room_config": existing_room_config,
                 "now": now,
                 "session_id": session_id,
                 "tenant_id": self._tenant_id,
@@ -808,10 +843,95 @@ class DiningSessionService:
         session_id: uuid.UUID,
         operator_id: Optional[uuid.UUID] = None,
     ) -> dict:
-        """请求买单：状态迁移到 billing，记录 bill_requested_at。"""
+        """请求买单：校验低消后状态迁移到 billing，记录 bill_requested_at。
+
+        低消校验规则：
+          - room_config.min_spend_fen > 0 时强制校验
+          - total_amount_fen < min_spend_fen → 抛出 ValueError，提示差额
+          - 管理员可通过 override_min_spend=True 豁免（在 API 层处理，此处强制校验）
+        """
+        await self._set_tenant()
+        session = await self.get_session(session_id)
+        if session is None:
+            raise ValueError(f"堂食会话 {session_id} 不存在")
+
+        # ── 低消校验 ──────────────────────────────────────────────────────────
+        room_config = session.get("room_config") or {}
+        min_spend_fen: int = int(room_config.get("min_spend_fen", 0))
+        min_spend_override: bool = bool(session.get("min_spend_override", False))
+        if min_spend_fen > 0 and not min_spend_override:
+            total_amount_fen: int = int(session.get("total_amount_fen") or 0)
+            if total_amount_fen < min_spend_fen:
+                shortfall_fen = min_spend_fen - total_amount_fen
+                shortfall_yuan = shortfall_fen / 100
+                min_yuan = min_spend_fen / 100
+                raise ValueError(
+                    f"未达到包间最低消费 ¥{min_yuan:.0f}，"
+                    f"当前消费 ¥{total_amount_fen / 100:.0f}，"
+                    f"还差 ¥{shortfall_yuan:.0f}，"
+                    f"如需豁免请联系管理员审批"
+                )
+
         return await self.transition_status(
             session_id, "billing", operator_id=operator_id
         )
+
+    async def override_min_spend(
+        self,
+        session_id: uuid.UUID,
+        approver_id: uuid.UUID,
+    ) -> dict:
+        """管理员豁免低消：设置 min_spend_override=true，记录审批人。
+
+        豁免后下次 request_bill() 不再检查低消。
+        须配合审批日志（approval_logs 表）记录审批意图。
+        """
+        await self._set_tenant()
+        session = await self.get_session(session_id)
+        if session is None:
+            raise ValueError(f"堂食会话 {session_id} 不存在")
+
+        now = _now_utc()
+        await self._db.execute(
+            text("""
+                UPDATE dining_sessions
+                SET min_spend_override    = true,
+                    min_spend_override_by = :approver_id,
+                    min_spend_override_at = :now,
+                    updated_at            = :now
+                WHERE id = :session_id AND tenant_id = :tenant_id
+            """),
+            {
+                "approver_id": approver_id,
+                "now": now,
+                "session_id": session_id,
+                "tenant_id": self._tenant_id,
+            },
+        )
+
+        store_id = uuid.UUID(str(session["store_id"]))
+        room_config = session.get("room_config") or {}
+        await self._append_session_event(
+            session_id=session_id,
+            store_id=store_id,
+            event_type=TableEventType.BILL_REQUESTED,  # 复用审批事件，payload区分
+            payload={
+                "action": "min_spend_override",
+                "approver_id": str(approver_id),
+                "original_min_spend_fen": room_config.get("min_spend_fen", 0),
+                "current_amount_fen": session.get("total_amount_fen", 0),
+            },
+            operator_id=approver_id,
+        )
+
+        logger.info(
+            "dining_session_min_spend_overridden",
+            session_id=str(session_id),
+            approver_id=str(approver_id),
+            min_spend_fen=room_config.get("min_spend_fen", 0),
+            tenant_id=self._tid_str,
+        )
+        return await self.get_session(session_id)  # type: ignore[return-value]
 
     async def complete_payment(
         self,

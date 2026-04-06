@@ -384,3 +384,75 @@ async def update_guest_count(
 
     updated = await svc.get_session(session_id)
     return _ok(updated)
+
+
+# ─── 低消豁免 ────────────────────────────────────────────────────────────────
+
+
+class OverrideMinSpendReq(BaseModel):
+    approver_id: uuid.UUID = Field(..., description="审批人（管理员）ID")
+
+
+@router.post("/{session_id}/override-min-spend", summary="管理员豁免包间低消")
+async def override_min_spend(
+    session_id: uuid.UUID,
+    body: OverrideMinSpendReq,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """管理员审批后豁免低消限制，允许未达低消桌台买单。
+
+    需配合 approval_logs 表记录审批意图（前端负责写审批记录）。
+    设置后 request_bill() 不再检查 min_spend_fen。
+    """
+    tid = _get_tenant_id(request)
+    svc = _svc(db, tid)
+    try:
+        result = await svc.override_min_spend(session_id, body.approver_id)
+        await db.commit()
+        return _ok(result)
+    except ValueError as exc:
+        _err(str(exc))
+
+
+# ─── 宴席场次关联 ────────────────────────────────────────────────────────────
+
+
+class LinkBanquetSessionReq(BaseModel):
+    banquet_session_id: uuid.UUID = Field(..., description="宴席场次ID")
+
+
+@router.post("/{session_id}/link-banquet", summary="关联宴席场次")
+async def link_banquet_session(
+    session_id: uuid.UUID,
+    body: LinkBanquetSessionReq,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """将堂食会话关联到宴席场次，用于宴席多桌统一调度和结账。"""
+    tid = _get_tenant_id(request)
+    from sqlalchemy import text
+    session_result = await db.execute(
+        text("SELECT id FROM dining_sessions WHERE id = :sid AND tenant_id = :tid AND is_deleted = false"),
+        {"sid": session_id, "tid": str(tid)},
+    )
+    if session_result.one_or_none() is None:
+        _err("会话不存在", code=404)
+
+    await db.execute(
+        text("""
+            UPDATE dining_sessions
+            SET banquet_session_id = :banquet_session_id, updated_at = NOW()
+            WHERE id = :session_id AND tenant_id = :tenant_id
+        """),
+        {
+            "banquet_session_id": body.banquet_session_id,
+            "session_id": session_id,
+            "tenant_id": str(tid),
+        },
+    )
+    await db.commit()
+
+    svc = _svc(db, tid)
+    updated = await svc.get_session(session_id)
+    return _ok(updated)
