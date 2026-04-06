@@ -167,6 +167,17 @@ class DiningSessionService:
         if isinstance(extra_config, dict):
             room_config.update({k: v for k, v in extra_config.items() if k not in room_config})
 
+        # 获取区域支付模式（先付/后付），默认后付
+        zone_pay_mode: str = "postpay"
+        if zone_id:
+            zone_row = await self._db.execute(
+                text("SELECT pay_mode FROM table_zones WHERE id = :zid AND tenant_id = :tid"),
+                {"zid": zone_id, "tid": self._tenant_id},
+            )
+            zone_info = zone_row.mappings().one_or_none()
+            if zone_info:
+                zone_pay_mode = zone_info["pay_mode"] or "postpay"
+
         # 获取门店 store_code（用于生成 session_no）
         store_row = await self._db.execute(
             text("SELECT store_code FROM stores WHERE id = :id AND tenant_id = :tid"),
@@ -182,6 +193,10 @@ class DiningSessionService:
         session_id = uuid.uuid4()
         now = _now_utc()
 
+        # 先付（prepay）模式：直接进入 ordering 状态（已付款，直接点单）
+        # 后付（postpay）模式：从 seated 开始（传统堂食流程）
+        initial_status = "ordering" if zone_pay_mode == "prepay" else "seated"
+
         # 插入 dining_sessions
         await self._db.execute(
             text("""
@@ -192,14 +207,14 @@ class DiningSessionService:
                     opened_at, table_no_snapshot,
                     total_orders, total_items, total_amount_fen,
                     discount_amount_fen, final_amount_fen, per_capita_fen,
-                    service_call_count, room_config,
+                    service_call_count, room_config, pay_mode, order_type,
                     created_at, updated_at, is_deleted
                 ) VALUES (
                     :id, :tenant_id, :store_id, :table_id, :session_no,
                     :guest_count, :vip_customer_id, :booking_id,
-                    'seated', :lead_waiter_id, :zone_id, :session_type,
+                    :initial_status, :lead_waiter_id, :zone_id, :session_type,
                     :now, :table_no_snapshot,
-                    0, 0, 0, 0, 0, 0, 0, :room_config,
+                    0, 0, 0, 0, 0, 0, 0, :room_config, :pay_mode, :order_type,
                     :now, :now, FALSE
                 )
             """),
@@ -218,6 +233,9 @@ class DiningSessionService:
                 "now": now,
                 "table_no_snapshot": table_no_snapshot,
                 "room_config": room_config,
+                "pay_mode": zone_pay_mode,
+                "order_type": session_type,   # 从 session_type 推导渠道类型
+                "initial_status": initial_status,
             },
         )
 
@@ -242,6 +260,7 @@ class DiningSessionService:
                 "table_no": table_no_snapshot,
                 "booking_id": str(booking_id) if booking_id else None,
                 "min_spend_fen": min_consume_fen,
+                "pay_mode": zone_pay_mode,
             },
             operator_id=lead_waiter_id,
             operator_type="employee",
@@ -855,7 +874,13 @@ class DiningSessionService:
         if session is None:
             raise ValueError(f"堂食会话 {session_id} 不存在")
 
-        # ── 低消校验 ──────────────────────────────────────────────────────────
+        # ── 先付模式：已付款，直接进入 paid 而不是 billing ─────────────────────
+        pay_mode: str = session.get("pay_mode") or "postpay"
+        if pay_mode == "prepay":
+            # 先付区域：点单即付，此时调用 request_bill 直接标记为 paid
+            return await self.transition_status(session_id, "paid", operator_id=operator_id)
+
+        # ── 低消校验（仅后付模式） ─────────────────────────────────────────────
         room_config = session.get("room_config") or {}
         min_spend_fen: int = int(room_config.get("min_spend_fen", 0))
         min_spend_override: bool = bool(session.get("min_spend_override", False))
