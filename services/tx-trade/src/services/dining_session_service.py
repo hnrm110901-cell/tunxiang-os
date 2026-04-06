@@ -350,6 +350,7 @@ class DiningSessionService:
         用于 POS 桌台大板实时展示。
         """
         await self._set_tenant()
+        # 用 LEFT JOIN + GROUP BY 替代相关子查询，避免 N+1 问题（P2 性能修复）
         result = await self._db.execute(
             text("""
                 SELECT
@@ -358,21 +359,24 @@ class DiningSessionService:
                     ds.bill_requested_at, ds.total_amount_fen,
                     ds.final_amount_fen, ds.per_capita_fen,
                     ds.service_call_count, ds.total_orders,
-                    ds.vip_customer_id,
+                    ds.vip_customer_id, ds.pay_mode,
                     t.id       AS table_id,
                     t.table_no, t.area, t.floor, t.seats,
                     tz.zone_name, tz.zone_type,
                     e.emp_name AS lead_waiter_name,
-                    -- 用餐时长（分钟）
                     EXTRACT(EPOCH FROM (NOW() - ds.opened_at)) / 60 AS dining_minutes,
-                    -- 待处理服务呼叫数
-                    (SELECT COUNT(*) FROM service_calls sc
-                     WHERE sc.table_session_id = ds.id
-                       AND sc.status = 'pending') AS pending_calls
+                    -- LEFT JOIN 聚合取代相关子查询，单次扫描 service_calls
+                    COALESCE(sc_agg.pending_calls, 0) AS pending_calls
                 FROM dining_sessions ds
                 JOIN tables    t  ON t.id  = ds.table_id
                 LEFT JOIN table_zones  tz ON tz.id = ds.zone_id
                 LEFT JOIN employees    e  ON e.id  = ds.lead_waiter_id
+                LEFT JOIN (
+                    SELECT table_session_id, COUNT(*) AS pending_calls
+                    FROM service_calls
+                    WHERE status = 'pending'
+                    GROUP BY table_session_id
+                ) sc_agg ON sc_agg.table_session_id = ds.id
                 WHERE ds.store_id  = :store_id
                   AND ds.tenant_id = :tenant_id
                   AND ds.is_deleted = FALSE
@@ -676,6 +680,25 @@ class DiningSessionService:
             },
         )
 
+        # KDS 待出品任务：同步更新桌号（厨师和传菜员屏幕显示新桌号）
+        await self._db.execute(
+            text("""
+                UPDATE kds_tasks
+                SET table_number = :new_table_no,
+                    updated_at   = :now
+                WHERE dining_session_id = :session_id
+                  AND tenant_id         = :tenant_id
+                  AND status IN ('pending', 'cooking')
+                  AND is_deleted = false
+            """),
+            {
+                "new_table_no": new_table_no,
+                "now": now,
+                "session_id": session_id,
+                "tenant_id": self._tenant_id,
+            },
+        )
+
         # 旧桌台 → free，新桌台 → occupied
         await self._db.execute(
             text("""
@@ -874,10 +897,13 @@ class DiningSessionService:
         if session is None:
             raise ValueError(f"堂食会话 {session_id} 不存在")
 
-        # ── 先付模式：已付款，直接进入 paid 而不是 billing ─────────────────────
+        # ── 先付模式：已付款，快速过 billing→paid ──────────────────────────────
+        # 先付区域的会话处于 ordering/dining/add_ordering 状态时，
+        # 状态机不允许直接跳到 paid（需经过 billing）。
+        # 走 billing→paid 两步，逻辑上无副作用，只是快速穿越。
         pay_mode: str = session.get("pay_mode") or "postpay"
         if pay_mode == "prepay":
-            # 先付区域：点单即付，此时调用 request_bill 直接标记为 paid
+            await self.transition_status(session_id, "billing", operator_id=operator_id)
             return await self.transition_status(session_id, "paid", operator_id=operator_id)
 
         # ── 低消校验（仅后付模式） ─────────────────────────────────────────────
