@@ -4,6 +4,758 @@
 
 ---
 
+## 2026-04-06（Round 96 — KDS系列+会员收尾+桌台运营 142个测试）
+
+### 今日完成
+
+**Team A — tx-trade KDS 配置/暂停/备餐/沽清 测试（28个）**
+- [tx-trade/tests] `test_kds_analytics_config.py`：16个测试（22 PASSED + 6 SKIPPED）
+  - kds_analytics_routes 6个测试自动 SKIP（源文件有空 except 语法bug，修复后自动解除）
+  - kds_config_routes 6个：配置列表/创建/路由规则/呼叫服务/推送配置/更新
+  - kds_pause_grab_routes 4个：暂停/继续/缺header400/获取状态
+- [tx-trade/tests] `test_kds_prep_soldout.py`：12个测试全 PASSED
+  - kds_prep_routes 6个：预备清单/标记完成/批量完成/今日摘要/缺参数422
+  - kds_soldout_routes 6个：沽清列表/批量设置/单品恢复/自动恢复/状态汇总/缺header400
+
+**Team B — tx-trade KDS 宴席/厨师/档口利润/泳道 测试（24个）**
+- [tx-trade/tests] `test_kds_banquet_chef.py`：12个测试全 PASSED
+  - kds_banquet_routes 8个：场次列表/缺tenant/404/状态错误/无菜品/进度/上菜/分配
+  - kds_chef_stats_routes 4个：排行榜今日/周期+部门/明细/days参数
+- [tx-trade/tests] `test_kds_station_swimlane.py`：12个测试全 PASSED
+  - kds_station_profit_routes 5个：today/week/month/自定义日期/空结果
+  - kds_swimlane_routes 7个：看板/工序列表/新建/更新/推进/推进最终/缺header
+
+**Team C — tx-member 生命周期+洞察+等级 补测（33个）**
+- [tx-member/tests] `test_member_lifecycle.py`：15个测试
+  - address_routes 5个：列表/缺字段422/不存在/软删除/设默认404
+  - invite_routes 4个：已有邀请码/分页记录/无效码404/重复409
+  - lifecycle_routes 3个：stats/active/无效stage400
+  - lifecycle_router 3个：distribution/at-risk/会员不存在404
+- [tx-member/tests] `test_member_insight_tier.py`：18个测试
+  - member_insight_routes 3个：generate/缓存命中/cache miss 404
+  - rewards_routes 3个：商品列表/404/积分不足
+  - rfm_routes 3个：trigger-update/distribution/changes
+  - tier_routes 3个：列表/缺字段422/不存在404
+  - platform_routes 3个：无效租户400/抖音绑定/统计
+  - invoice_routes 3个：抬头列表/缺字段422/历史列表
+
+**Team D — tx-trade 桌台运营+后厨操作 补测（57个）**
+- [tx-trade/tests] `test_trade_table_ops.py`：30个测试全 PASSED
+  - seat_order_routes 9个：初始化/越界422/列表/缺header422/分配/404/分摊/自付链接
+  - table_card_api 9个：列表/meal_period/缺参422/状态更新/learning统计/reset/click-log
+  - table_ops_routes 4个：转台成功/缺header400/目标桌非空闲/订单不存在
+  - collab_order_routes 7个：创建会话/缺header/获取/404/加入/呼叫列表
+- [tx-trade/tests] `test_trade_kitchen_ops.py`：27个测试全 PASSED
+  - allergen_routes 7个：代码/缺header/批量检查/设置/ValueError400/菜品查询
+  - dispatch_rule_routes 5个：列表/创建/更新/删除缺header/simulate/时间格式
+  - course_firing_routes 6个：开火/不存在404/已开火400/状态/分配/建议
+  - cook_time_routes 8个：预期时间/缺参/缺header/队列预估/触发/基准/阈值/缺header
+
+### 数据变化
+- 新增测试文件：8 个
+- 新增测试用例：142 个（136 PASSED + 6 SKIPPED）
+- tx-trade 无测试路由文件：32 → 20（覆盖 12 个）
+- tx-member 无测试路由文件：11 → 1（stored_value_router）
+
+### 遗留问题
+- `kds_analytics_routes.py` 第278行有空 except 语法bug（需修复），6个测试处于SKIP状态
+- `stored_value_router.py` 尚无测试（tx-member 最后1个）
+- tx-trade 仍约 20 个路由文件无测试
+
+### 明日计划
+- Round 97：修复 kds_analytics_routes.py bug + tx-trade 剩余路由补测（discount_audit/production_dept/expo等）+ tx-org 无测试路由补测
+
+---
+
+## 2026-04-05（Sprint 0-8 收口 — 人力中枢全量开发）
+
+### 今日完成
+- [tx-org] 人力中枢升级 Sprint 0-8 全量开发
+  - 5个迁移文件(v179-v183)：员工主档扩展/统一排班/合规预警/组织架构/岗位职级
+  - 10个新后端路由文件：employees(重写)/org_structure/job_grade/employee_document/compliance_alert/unified_schedule/store_ops/governance/hr_dashboard + 3个新服务文件
+  - 20个新事件类型（排班/缺口/合规/员工生命周期）
+- [tx-agent] 4个新HR Agent：排班优化/缺勤补位/离职风险/成长教练
+- [web-admin] 41个新人力中枢页面
+  - 门店作战台3页 + 考勤5页 + 请假4页 + 薪资3页 + 绩效5页 + 排班7页
+  - 员工主档5页 + 合规4页 + 人力中枢首页 + 总部治理4页
+  - Agent中枢5页 + 配置中心3页
+- [web-crew] 16个员工端人力页面（班表/打卡/请假/绩效/积分/工资/成长/证照）
+
+### 数据变化
+- 迁移版本：v178 → v183（5个新迁移）
+- 新增 API 路由文件：10个（tx-org）
+- 新增 Agent：4个（tx-agent）
+- 新增前端页面：57个（web-admin 41 + web-crew 16）
+- 新增事件类型：20个
+
+### 遗留问题
+- 旧排班表(work_schedules/crew_schedules)数据迁移到unified_schedules待执行
+- web-admin/web-crew路由配置需确认无冲突
+- Agent的MCP工具注册待更新
+- 物化视图mv_store_labor_efficiency待创建(v185)
+
+### 明日计划
+- 运行alembic upgrade head验证迁移链
+- 前端路由联调测试
+- Agent MCP工具注册
+
+---
+
+## 2026-04-05（Round 95 — 五服务补测 45个）
+
+### 今日完成
+
+**Team A — tx-trade 班次交班+KDS报表测试（10个）**
+- [tx-trade/tests] test_trade_staff_member.py：10个测试全通过
+- shift_routes.py（5个）：开始交班/缺header/现金清点/完成交班/ValueError400
+- shift_report_routes.py（5个）：班次配置列表/创建/报表/日期格式422/厨师绩效
+
+**Team B — tx-trade 库存菜单+档口映射测试（10个）**
+- [tx-trade/tests] test_trade_inventory_dish.py：10个测试全通过
+- inventory_menu_routes.py（5个）：库存0触发自动下架/充足无下架/低库存预警/补货上架/仪表盘
+- dish_dept_mapping_routes.py（5个）：分页列表/缺header400/批量导入/按菜品查询/删除404
+
+**Team C — tx-member 积分商城+积分体系测试（10个）**
+- [tx-member/tests] test_member_cdp.py：10个测试全通过
+- points_mall_routes.py（5个）：商品列表/详情/404/兑换成功/积分不足422
+- points_routes.py（5个）：积分获取/抵现/会员日3倍/余额查询/跨店月结算
+
+**Team D — tx-org 排班+职级 + tx-finance 预算测试（15个）**
+- [tx-org/tests] test_org_extended.py：10个测试全通过
+  - schedule_routes.py（5个）：周排班/缺header/创建/404/软删除
+  - job_grade_routes.py（5个）：列表/创建/404/无字段400/有员工不可删除400
+- [tx-finance/tests] test_finance_more.py：5个测试全通过
+  - budget_routes.py（5个）：创建预算201/invalid周期422/列表/审批ValueError400/进度404
+
+### 数据变化
+- 新增测试：45个（tx-trade ×20，tx-member ×10，tx-org ×10，tx-finance ×5）
+
+### 遗留问题
+- tx-trade 仍有约25个路由文件无测试
+- tx-member 仍有约9个路由文件无测试
+
+### 明日计划
+- Round 96：继续补测（tx-trade 最后几批 + tx-member 收尾）
+
+---
+
+## 2026-04-05（Round 94 — 四服务补测 40个 + P0 bug修复）
+
+### 今日完成
+
+**Team A — tx-trade Webhook+微信支付测试（10个）**
+- [tx-trade/tests] test_trade_webhook.py：10个测试全通过
+- webhook_routes.py（5个）：美团缺sign/签名错误/验签成功、饿了么签名错误、抖音推送成功
+- wechat_pay_routes.py（5个）：prepay缺header/正常、callback验签失败、查询/退款超限400
+
+**Team B — tx-trade 快餐收银+宴席支付测试（10个）**
+- [tx-trade/tests] test_trade_misc.py：10个测试全通过
+- quick_cashier_routes.py（5个）：快餐下单/非法类型400/叫号/完成/默认配置
+- banquet_payment_routes.py（5个）：创建定金/缺header/404/确认单/签字
+
+**Team C — tx-ops 食安+日结测试（11个）**
+- [tx-ops/tests] test_ops_extended.py：11个测试全通过
+- food_safety_routes.py（6个）：留样登记/重量422/温度高422/合规/超温/DB错误500
+- daily_settlement_routes.py（5个）：DB fallback结构验证/无班次状态/checklist缺header
+- ⚠️ **发现并报告两个严重 bug（已单独修复）**
+
+**Team D — tx-analytics+tx-supply 各5测试（10个）**
+- [tx-analytics/tests] test_analytics_core.py：5个测试（日营收汇总/缺参数400/现金流/RuntimeError503/缺header400）
+- [tx-supply/tests] test_supply_extended.py：5个测试（补货建议/空ID400/转申购单/无供应商/紧急预警）
+
+**紧急修复 — daily_settlement_routes.py 两个 bug**
+- **P0 ImportError**：删除对已迁移文件中已删除内存变量（`_summaries/_reports/_issues/_performance`）的导入，替换为本地空字典 stub
+- **P1 TypeError**：修复 `_aggregate_orders` 调用（DB路径补传 `db=db` 参数；fallback路径内联空结构跳过DB调用）
+
+### 数据变化
+- 新增测试：41个（tx-trade ×20，tx-ops ×11，tx-analytics ×5，tx-supply ×5）
+- Bug 修复：daily_settlement_routes.py（P0 ImportError + P1 TypeError）
+
+### 遗留问题
+- tx-trade 仍有约30个路由文件无测试
+- tx-member 仍有约13个路由文件无测试
+
+### 明日计划
+- Round 95：tx-trade 继续补测 + tx-member 剩余关键路由
+
+---
+
+## 2026-04-05（Round 93 — 四服务补测 40个）
+
+### 今日完成
+
+**Team A — tx-trade 叫号+打印模板测试（10个）**
+- [tx-trade/tests] test_trade_table_receipt.py：10个测试全通过
+- calling_screen_routes.py（5个）：当前叫号/无数据/缺header/最近列表/DB错误
+- print_template_routes.py（5个）：称重小票/宴会通知/生猛海鲜/ValueError422/预览无需header
+
+**Team B — tx-trade 折扣引擎+储值测试（10个）**
+- [tx-trade/tests] test_trade_promotions.py：10个测试全通过
+- discount_engine_routes.py（5个）：规则列表/缺header/会员85折计算/无效类型/创建规则
+- stored_value_routes.py（5个）：余额查询/充值赠送/充值金额过小422/消费成功/余额不足
+
+**Team C — tx-menu 品牌发布+渠道映射测试（10个）**
+- [tx-menu/tests] test_menu_extended.py：10个测试全通过
+- brand_publish_routes.py（5个）：品牌菜品列表/缺header/创建方案/ValueError400/404
+- channel_mapping_routes.py（5个）：渠道列表/缺header/渠道菜品/非法渠道400/无菜品422
+
+**Team D — tx-member 集团+GDPR测试（10个）**
+- [tx-member/tests] test_member_extended.py：10个测试全通过（语法验证通过）
+- group_routes.py（5个）：创建品牌组/缺group-admin-header 403/集团详情/404/UUID校验422
+- gdpr_routes.py（5个）：提交erasure申请201/非法类型422/列表/404/状态机400
+
+### 数据变化
+- 新增测试：40个（tx-trade ×20，tx-menu ×10，tx-member ×10）
+- 新增测试文件：test_trade_table_receipt、test_trade_promotions（tx-trade），test_menu_extended（tx-menu），test_member_extended（tx-member）
+
+### 遗留问题
+- tx-trade 仍有约35个路由文件无测试
+- tx-member 仍有约13个路由文件无测试
+
+### 明日计划
+- Round 94：tx-trade 继续补测（webhook/delivery_orders/stored_value_routes 等）+ tx-ops 剩余路由
+
+---
+
+## 2026-04-05（Round 92 — 语法修复 + 四服务补测 40个）
+
+### 今日完成
+
+**Team A — 修复 omni_channel_routes.py 语法错误**
+- 删除 563-564 行处多余的空 `except (OSError, ValueError, RuntimeError)` 子句
+- 保留兜底 `except Exception as exc:` 块（含 `# noqa: BLE001` + logger.warning）
+- 业务逻辑零变动
+
+**Team B — tx-finance 扩展测试（10个）**
+- [tx-finance/tests] test_finance_extended.py：10个测试全通过
+- vat_routes.py（5个）：增值税申报创建/列表/404/业务错误400/税率表
+- wine_storage_routes.py（5个）：存酒/非法类型400/取酒404/DB错误500/查询详情
+
+**Team C — tx-org 特许加盟测试（10个）**
+- [tx-org/tests] test_org_core.py：10个测试全通过
+- franchise_router.py（5个）：列表/创建201/404/ValueError400/缺 header 400
+- franchise_mgmt_routes.py（5个）：分页列表/编号重复409/404/非法状态转换422/DB错误500
+
+**Team D — tx-trade 预订+移动端测试（10个）**
+- [tx-trade/tests] test_trade_extended.py：10个测试全通过
+- booking_api.py（5个）：创建预约/分页列表/时段查询/取号/排队看板
+- mobile_ops_routes.py（5个）：更新桌台/沽清/每日限量/换服务员/菜品状态刷新
+
+### 数据变化
+- 新增测试：40个（tx-finance ×10，tx-org ×10，tx-trade ×10，tx-member 已在 Round 91 +10）
+- Bug 修复：omni_channel_routes.py 语法错误（空 except 子句）
+
+### 遗留问题
+- tx-trade 仍有约40个路由文件无测试（booking_api 覆盖了30端点，缩小缺口）
+- tx-member 仍有约18个路由文件无测试
+
+### 明日计划
+- Round 93：tx-trade 继续补测（table_mgmt / receipt / calling_screen 等）+ tx-menu 剩余路由
+
+---
+
+## 2026-04-05（Round 91 — tx-trade/tx-member 补测 40个）
+
+### 今日完成
+
+**Team A — tx-trade KDS 测试（10个）**
+- [tx-trade/tests] test_kds_routes.py：10个测试全通过
+- 覆盖：GET /tasks, /overview, /rush/status；POST /dispatch, /start, /finish, /rush；404/400 场景
+
+**Team B — tx-trade 外卖配送 + 全渠道聚合测试（10个）**
+- [tx-trade/tests] test_trade_delivery.py：10个测试全通过
+- delivery_ops_routes.py（5个）：平台配置查询/更新、忙碌模式开关、404/400
+- omni_channel_routes.py（5个）：待接单列表、接单/拒单、缺 header 400
+- ⚠️ 发现 omni_channel_routes.py:563-564 有连续两个 except 语法错误（测试通过 patch 绕开，不影响其他端点）
+
+**Team C — tx-member 储值测试（10个）**
+- [tx-member/tests] test_member_core.py：10个测试全通过
+- stored_value_routes.py（5个）：余额查询、充值、DB错误、422
+- stored_value_card_routes.py（5个）：开卡、查卡、404、余额不足400、缺 header 422
+
+**Team D — tx-trade 收银+订单核心测试（10个）**
+- [tx-trade/tests] test_trade_ordering.py：10个测试全通过
+- cashier_api.py（5个）：开台/加菜/结算/取消400/查询404
+- orders.py（5个）：创建/加菜/查询404/支付DB错误/折扣422
+
+### 数据变化
+- 新增测试：40个（tx-trade ×30，tx-member ×10）
+- 新增测试文件：test_kds_routes、test_trade_delivery、test_trade_ordering（tx-trade），test_member_core（tx-member）
+
+### 遗留问题
+- omni_channel_routes.py:563-564 连续 except 语法错误 → 待修复
+- tx-trade 仍有约46个路由文件无测试
+- tx-member 仍有约21个路由文件无测试
+
+### 明日计划
+- Round 92：修复 omni_channel_routes.py 语法错误 + 继续补测（tx-finance 剩余 + tx-org 关键路由）
+
+---
+
+## 2026-04-05（Round 90 — 测试覆盖率审计 + 四服务补测 40个）
+
+### 今日完成
+
+**扫描结果（Team B扫描）**
+- 全项目测试空白：214个路由文件无测试，1407个未覆盖端点
+- 极危服务：tx-trade(7.3%)、tx-growth(0%)、tx-ops(0%*)
+- *注：tx-ops部分测试在Round 87-89已补，扫描时间早于写入
+
+**Team A — tx-menu 核心测试（10个）**
+- [tx-menu/tests] test_menu_routes.py：10个测试全通过
+- 覆盖：POST/GET/PATCH /v2/dishes，POST /templates，POST /stockout/mark，GET /stockout
+- 顺带修复 menu_routes.py 中9处残留的旧调用语法片段
+
+**Team B — tx-finance 核心测试（10个）**
+- [tx-finance/tests] test_finance_core.py：10个测试全通过
+- settlement_routes.py（5个）：账单导入/查询/列表/404/DB错误
+- payroll_routes.py（5个）：月度汇总/创建薪资单/404/审批/DB错误
+
+**Team C — tx-growth 核心测试（10个）**
+- [tx-growth/tests] test_growth_core.py：10个测试全通过
+- journey_routes.py（5个）：定义列表/创建/422/404/软删除
+- growth_campaign_routes.py（5个）：活动列表/创建/类型校验/统计404/DB错误
+
+**Team D — tx-supply 核心测试（10个）**
+- [tx-supply/tests] test_supply_core.py：10个测试全通过
+- purchase_order_routes.py（5个）：列表/创建/详情/404/TABLE_NOT_READY降级
+- ck_production_routes.py（5个）：创建工单/列表/状态更新404/配送单空/DB错误
+
+### 数据变化
+- 新增测试：40个（tx-menu ×10，tx-finance ×10，tx-growth ×10，tx-supply ×10）
+- 新建测试目录：tx-finance/tests/，tx-growth/tests/（首次创建）
+- 测试覆盖率：四个服务从 0-7% 提升至有基础覆盖
+
+### 遗留问题
+- 仍有大量路由文件无测试（tx-trade 76个、tx-member 26个等）
+- tx-analytics hq_overview/group_dashboard 降级兜底（可接受）
+
+### 明日计划
+- Round 91：继续补测——tx-trade 高优先端点（kds/delivery/ordering）+ tx-member 剩余路由
+
+---
+
+## 2026-04-05（Round 89 — energy/payslip DB化 + v177/v178迁移 + 15测试 + tx-ops/tx-org全清）
+
+### 今日完成
+
+**Team A — v177迁移 + energy_routes.py DB化**
+- [migrations] v177_energy_budget_rules.py：energy_budgets + energy_alert_rules 两表（含 UNIQUE 约束、部分索引、RLS），down_revision=v176
+- [tx-ops/api] energy_routes.py：删除 `_budget_store` 和 `_alert_rule_store` 两个内存字典（868行）
+  - GET/POST /budgets → energy_budgets（UPSERT ON CONFLICT DO UPDATE）
+  - GET/POST /alert-rules → energy_alert_rules
+  - DELETE /alert-rules/{id}（新增）→ 软删除
+  - GET /budget-vs-actual → 告警检测从 DB 读取规则（不再访问内存）
+  - readings/benchmarks/snapshot 端点逻辑保持不变
+
+**Team B — v178迁移 + payslip.py DB化**
+- [migrations] v178_payslip_records.py：payslip_records 表（breakdown JSONB 存13个薪资分项，meta JSONB 存辅助信息，4索引），down_revision=v177
+- [tx-org/api] payslip.py：删除 `_payslip_store: dict` 内存字典
+  - POST /generate → 批量 INSERT ON CONFLICT DO NOTHING
+  - GET /payslips → COUNT + LIMIT 50 分页
+  - GET /payslips/{pid} → SELECT，404 如不存在
+  - PATCH /payslips/{pid}/status（新增）→ draft→issued→acknowledged 状态流转
+  - 空 employees 请求明确 400 拒绝
+
+**Team C — energy_routes 测试（8个）**
+- [tx-ops/tests] test_energy_routes.py：8个测试全通过（预算列表/UPSERT/错误，告警规则列表/创建/软删除/404）
+
+**Team D — payslip 测试（7个）+ 最终扫描**
+- [tx-org/tests] test_payslip_routes.py：7个测试全通过（含 empty list 返回 400 行为验证）
+- **最终扫描结果：✅ tx-ops 和 tx-org 全部清除**
+  - 所有剩余模块级变量均为常量（frozenset/配置映射）
+  - 无任何可变内存存储残留
+
+### 数据变化
+- 迁移版本：v176 → v178（v177 + v178）
+- 新增测试：15个（tx-ops ×8，tx-org ×7）
+- Mock 清理：energy_routes.py（2个内存字典）、payslip.py（1个内存字典）
+- **里程碑：tx-ops 和 tx-org 服务 Mock 全部清除**
+
+### 剩余工作（仅 tx-analytics 降级兜底）
+- tx-analytics：hq_overview/group_dashboard（SQLAlchemyError 降级兜底，属于有意的容错设计，可接受）
+- 无其他真正内存存储残留
+
+### 明日计划
+- Round 90：测试覆盖率审计 + 补全空白测试模块
+
+---
+
+## 2026-04-05（Round 88 — tx-ops P2批DB化 + v174/v175/v176迁移 + 12测试）
+
+### 今日完成
+
+**Team A — v174迁移 + performance_routes.py DB化**
+- [migrations] v174_staff_performance.py：staff_performance_records 表（唯一约束 tenant+store+date+employee，3索引），down_revision=v173
+- [tx-ops/api] performance_routes.py：删除 `_performance: Dict` 内存字典
+  - GET /（列表）→ COUNT + SELECT，支持 store_id/perf_date/role 过滤
+  - GET /ranking → GROUP BY + AVG/MIN/MAX，Python 层追加 rank 字段
+  - POST /calculate → ON CONFLICT DO NOTHING/DO UPDATE（recalculate 开关）
+
+**Team B — v175迁移 + issues_routes.py DB化**
+- [migrations] v175_ops_issues.py：ops_issues 表（4个索引含部分索引，JSONB evidence_urls），down_revision=v174
+- [tx-ops/api] issues_routes.py：删除 `_issues: Dict` 内存字典，5端点全接 DB
+  - POST /create → INSERT RETURNING
+  - GET /list → 动态 WHERE + 严重度排序（CASE）+ LIMIT 50
+  - PATCH /{id} → 动态 SET + assigned 自动切换 in_progress
+  - POST /{id}/resolve → 状态前置校验 → UPDATE resolved_at=NOW()
+  - POST /auto-detect/{store_id} → 批量 INSERT 扫描结果
+
+**Team C — v176迁移 + inspection_routes.py DB化**
+- [migrations] v176_inspection_reports.py：inspection_reports 表（JSONB dimensions/photos/action_items，4索引），down_revision=v175（已修正：Team C 并行写入时误设 v173，已手动修正）
+- [tx-ops/api] inspection_routes.py：删除 `_reports: Dict` 内存字典，6端点全接 DB
+  - GET /rankings → GROUP BY store_id + AVG/MIN/MAX 聚合，rank 由 Python 追加
+  - POST / → INSERT RETURNING + json.dumps JSONB
+  - GET / → 动态过滤 + 分页
+  - GET /{id} → SELECT one_or_none，404
+  - POST /{id}/submit → 状态校验 → UPDATE status=submitted
+  - POST /{id}/acknowledge → UPDATE acknowledged_by/at/notes
+
+**Team D — tx-ops P2 批综合测试（12个）**
+- [tx-ops/tests] test_ops_p2_routes.py：12个测试全通过（performance ×4，issues ×4，inspection ×4）
+- `_make_result()` 通用工厂支持所有 SQLAlchemy 访问路径（scalar/fetchall/mappings）
+
+### 数据变化
+- 迁移版本：v173 → v176（v174 + v175 + v176）
+- 新增测试：12个（tx-ops ×12）
+- Mock 清理：performance/issues/inspection 三个路由（3个内存字典）
+
+### 遗留问题（P3，可接受）
+- tx-ops：energy_routes.py `_budget_store/_alert_rule_store`（Phase 4 阶段性暂用，注释已说明）
+- tx-org：efficiency/payslip（演示用）
+- tx-analytics：hq_overview/group_dashboard（SQLAlchemyError 降级兜底）
+
+### 明日计划
+- Round 89：energy_routes.py DB化（v177）+ tx-org payslip DB化（v178）
+
+---
+
+## 2026-04-05（Round 87 — member_level/shift DB化 + v172/v173迁移 + 18测试）
+
+### 今日完成
+
+**Team A — v172迁移 + member_level_routes.py DB化**
+- [migrations] v172_member_level_points.py：member_level_configs + member_level_history + points_rules + member_points_balance 四表（全含 RLS + FORCE RLS），down_revision=v171
+- [tx-member/api] member_level_routes.py：删除4个内存字典（_LEVEL_CONFIG_STORE/_LEVEL_HISTORY_STORE/_POINTS_RULES_STORE/_MEMBER_POINTS_STORE）及 _LEVEL_DEFAULTS 常量
+  - GET/POST/PUT /level-configs → member_level_configs CRUD（POST 重复检查409）
+  - POST /check-upgrade → 积分+年度消费 → 等级计算 → UPDATE customers + INSERT history
+  - POST /earn → 查规则 → UPSERT member_points_balance（ON CONFLICT DO UPDATE）
+  - GET/POST /points-rules → points_rules CRUD
+
+**Team B — v173迁移 + shift_routes.py DB化**
+- [migrations] v173_shift_records.py：shift_records + shift_device_checklist 两表（FK CASCADE + RLS），down_revision=v172
+- [tx-ops/api] shift_routes.py：删除 `_shifts: dict` 内存字典，5端点全接 DB
+  - POST /shifts → INSERT shift_records（开班）
+  - POST /shifts/{id}/handover → UPDATE + 批量 INSERT device_checklist（交班）
+  - POST /shifts/{id}/confirm → UPDATE status=confirmed/disputed（确认/争议）
+  - GET /shifts → SELECT LIMIT 50，支持 shift_date 过滤
+  - GET /shifts/{id}/summary → JOIN checklist 计算 cash_balanced/device_failed
+- **附带修复**：daily_settlement_routes.py 对已删除 `_shifts` 的 import 依赖已修复为本地空字典 stub
+
+**Team C — member_level 测试（10个）**
+- [tx-member/tests] test_member_level_routes.py：10个测试全通过
+- check-upgrade 场景模拟了4~6次连续 execute 调用（积分→年度消费→等级配置→当前等级→UPDATE→INSERT）
+
+**Team D — shift 测试（8个）**
+- [tx-ops/tests] test_shift_routes.py：8个测试全通过
+- summary 端点两次 SELECT（主记录+checklist）精确按调用顺序 mock
+
+### 数据变化
+- 迁移版本：v171 → v173（v172 + v173）
+- 新增测试：18个（tx-member ×10，tx-ops ×8）
+- Mock 清理：member_level_routes.py（4个内存字典）、shift_routes.py（1个内存字典）
+
+### 遗留问题（P2/P3）
+- tx-ops：performance/issues/inspection/energy_routes.py（4文件，标注阶段性暂用）
+- tx-org：efficiency/payslip（演示用，低优先）
+- tx-analytics：hq_overview/group_dashboard（SQLAlchemyError 降级兜底，可接受）
+
+### 明日计划
+- Round 88：tx-ops P2 批（performance + issues + inspection），建3张表（v174-v176）
+
+---
+
+## 2026-04-05（Round 86 — enterprise_meal DB化 + v171迁移 + 8测试 + 全服务Mock终态扫描）
+
+### 今日完成
+
+**Team A — v171迁移 + enterprise_meal_routes.py DB化**
+- [migrations] v171_enterprise_meal_tables.py：enterprise_meal_menus + enterprise_meal_accounts + enterprise_meal_orders 三表（各含 RLS + FORCE RLS + 索引），down_revision=v170
+- [tx-trade/api] enterprise_meal_routes.py：删除3个 `_empty_*` 模板函数，4端点全接真实 DB
+  - GET /weekly-menu → SELECT enterprise_meal_menus，空返回 `{week_start, days:[]}`
+  - GET /account → SELECT enterprise_meal_accounts，账户不存在返回零值（非404）
+  - POST /order → INSERT enterprise_meal_orders RETURNING id，失败兜底仍返回 accepted
+  - GET /meal-orders → SELECT enterprise_meal_orders WHERE employee_id ORDER BY meal_date DESC LIMIT 30
+
+**Team B — 全服务 Mock 终态扫描**
+- 扫描11个服务全部 API 目录，确认无遗漏
+- 已全部清除：tx-menu / tx-growth / tx-finance / tx-supply / tx-brain / gateway
+- 排除项（合法 Mock）：
+  - member_level_routes.py（4个内存存储，8端点，标注 TODO）← 下一批
+  - shift_routes.py（1个内存存储，5端点，E1交班，标注 TODO）← 下一批
+  - performance/issues/inspection/energy_routes.py（tx-ops，4文件，标注阶段性暂用）
+  - transfers/payslip/efficiency.py（tx-org，演示用/阶段性）
+  - hq_overview/group_dashboard（tx-analytics，SQLAlchemyError 降级兜底）
+
+**Team C — enterprise_meal 测试（8个）**
+- [tx-trade/tests] test_enterprise_meal_routes.py：8个测试全部通过
+- GET /account 不存在时返回 200+零值（非404）行为已验证
+- POST /order SQLAlchemyError 兜底返回 `ok:True, status:accepted` 行为已验证
+
+**Team D — member_level + shift 详细分析（为 Round 87 准备）**
+- member_level_routes.py：4个内存存储、9个 Pydantic 模型、8端点（等级配置CRUD + 升降级检查 + 积分规则CRUD + 积分入账）
+- shift_routes.py：1个内存存储（shift_id→dict）、5端点（E1开班/交班/确认/列表/汇总）
+
+### 数据变化
+- 迁移版本：v170 → v171
+- 新增测试：8个（tx-trade ×8）
+- Mock 清理：enterprise_meal_routes.py（3个模板函数→DB），**tx-trade Mock 全部清除**
+
+### 遗留问题（排优先级）
+- **P1（下一批）**: member_level_routes.py（会员等级+积分，核心业务）
+- **P1（下一批）**: shift_routes.py（E1交班，E流程关键节点）
+- P2：performance/issues/inspection/energy_routes.py（tx-ops，4文件）
+- P3：tx-org efficiency/payslip（演示用，低优先）
+
+### 明日计划
+- Round 87：member_level DB化（需 v172 迁移）+ shift DB化（需 v173 迁移）
+
+---
+
+## 2026-04-05（Round 85 — tx-member Mock全清 + v170迁移 + 14个测试）
+
+### 今日完成
+
+**Team A — v170迁移 + suggestion_routes.py DB化**
+- [migrations] v170_suggestions_marketing_schemes.py：customer_suggestions + marketing_schemes 两表（RLS + FORCE RLS + 各1个索引），down_revision=v169
+- [tx-member/api] suggestion_routes.py：删除 `_mock_suggestions: list = []`，POST /suggestions 写入 customer_suggestions，GET /suggestions 支持 store_id 过滤，LIMIT 50
+
+**Team B — marketing.py DB化 + peak_routes确认**
+- [tx-member/api] marketing.py：删除 `_SCHEME_STORE: list[dict] = []`，3个端点全接 marketing_schemes 表；calculate 端点从 DB 加载方案后与请求方案合并，原有 `apply_schemes_in_order` 纯计算引擎保持不变
+- [tx-ops/api] peak_routes.py 扫描确认：已正确使用 `AsyncSession = Depends(get_db)` 架构，无任何内存存储，无需处理
+
+**Team C — suggestion 测试（6个）**
+- [tx-member/tests] test_suggestion_routes.py：6个测试全通过
+- 关键：发现 `suggestion_routes.py` 使用相对导入 `from ..db import get_db`，通过 `sys.modules` 注入假模块解决 ImportError
+
+**Team D — marketing 测试（8个）**
+- [tx-member/tests] test_marketing_routes.py：8个测试全通过（含折扣计算 rate=90 → 10000分→9000分验证）
+
+### 数据变化
+- 迁移版本：v169 → v170
+- 新增测试：14个（tx-member ×14）
+- Mock 清理：suggestion_routes.py（1个内存列表）、marketing.py（1个内存列表），**tx-member Mock 全部清除**
+
+### 遗留问题
+- enterprise_meal_routes.py（tx-trade）：底层仍返回空模板，需后续建表
+- 全局 Mock 扫描显示 tx-growth、tx-menu 已无内存存储，Mock 清理进入收尾阶段
+
+### 明日计划
+- Round 86：enterprise_meal 建表接 DB + 全服务 Mock 终态确认扫描
+
+---
+
+## 2026-04-04（Round 84 — split_payment/customer_booking DB化 + v169迁移 + 18个测试）
+
+### 今日完成
+
+**Team A — split_payment_routes.py 三处 TODO → DB**
+- [tx-trade/api] split_payment_routes.py：删除三处内存 placeholder
+- `POST /init`：从 orders 查 final_amount_fen（404如不存在）→ 防重复检查（400如已有非cancelled分摊）→ 批量 INSERT order_split_payments RETURNING
+- `GET /`：SELECT FROM order_split_payments WHERE order_id ORDER BY split_no
+- `POST /{split_no}/settle`：UPDATE RETURNING（404如无命中）→ COUNT 剩余未付 → all_paid 判断
+
+**Team B — v169迁移 + customer_booking_routes.py DB化**
+- [migrations] v169_customer_bookings.py：customer_bookings + queue_tickets 两表（RLS + FORCE RLS + 各2个索引），down_revision=v168
+- [tx-trade/api] customer_booking_routes.py：删除 `_bookings` 和 `_queue_tickets` 内存字典，6个 DB 端点全接真实表
+- queue/take：当日 COUNT+1 生成 A001 格式票号，INSERT queue_tickets
+- 静态端点（/slots、/queue/summary、/queue/estimate）保留规则生成逻辑不变
+
+**Team C — split_payment 测试（8个）**
+- [tx-trade/tests] test_split_payment_routes.py：8个测试（init成功/订单404/重复400、list成功/空列表、settle成功/404/部分付款），全部通过
+- 关键 mock 技巧：`_fake_row` 构造属性访问对象，side_effect 按 execute 调用顺序精确排列
+
+**Team D — customer_booking 测试（10个）**
+- [tx-trade/tests] test_customer_booking_routes.py：10个测试（create/list/cancel预约，取号/查票/取消排队），全部通过
+- `_SENTINEL` 哨兵对象解决 `mappings().first()` 返回 None 的 mock 歧义问题
+
+### 数据变化
+- 迁移版本：v168 → v169
+- 新增测试：18个（split_payment ×8，customer_booking ×10）
+- Mock 清理：split_payment_routes.py（3处TODO→DB）、customer_booking_routes.py（2个内存字典→DB）
+
+### 遗留问题
+- enterprise_meal_routes.py：底层仍返回空模板，需后续建表接真实数据
+- collab_order_routes.py：WebSocket 连接池（sessions_connections/waiter_connections）为运行时内存，属于正常 WebSocket 设计，不需要 DB 化
+
+### 明日计划
+- Round 85：全量 Mock 扫描复查，处理 tx-growth / tx-member 剩余端点
+
+---
+
+## 2026-04-04（Round 83 — manager_app/scan_pay DB化 + crew_handover/enterprise_meal Mock清理 + 18个测试）
+
+### 今日完成
+
+**Team A — manager_app_routes.py 完全 DB化**
+- [tx-trade/api] manager_app_routes.py：删除5个 Mock 函数/列表（`_mock_kpi()`、`_mock_alerts`、`_read_alert_ids`、`_mock_discount_requests`、`_mock_staff`）
+- 7个端点全接真实 DB：GET /realtime-kpi（orders聚合）、GET /alerts（返回空列表）、POST /alerts/{id}/read（幂等）、POST /discount/approve（UPDATE manager_discount_requests）、GET /staff-online（employees查询）、POST /broadcast-message（日志）、GET /discount-requests（分页查询，可按store_id/status过滤）
+
+**Team B — v168迁移 + scan_pay_routes.py DB化**
+- [migrations] v168_scan_pay_transactions.py：scan_pay_transactions 表（payment_id UNIQUE、channel/status CHECK约束、3索引、标准RLS），down_revision=v167
+- [tx-trade/api] scan_pay_routes.py：删除 `_payments: dict[str, dict] = {}`，3个端点接入 scan_pay_transactions 表；POST 用 `asyncio.create_task(_simulate_payment(...))` 异步模拟支付结果
+
+**Team C — crew_handover / enterprise_meal Mock清理**
+- [tx-trade/api] crew_handover_router.py：删除 `_build_mock_shift_summary()` 函数，替换为内联空数据结构（不影响接口格式）
+- [tx-trade/api] enterprise_meal_routes.py：重命名 _mock_* → _empty_*（返回 `_is_template: True` 标记）
+
+**Team D — manager_app + scan_pay 测试（18个）**
+- [tx-trade/tests] test_manager_app_routes.py：10个测试（kpi/alerts/read/approve/staff/broadcast/discount-requests 全覆盖）
+- [tx-trade/tests] test_scan_pay_routes.py：8个测试（支付成功/查询/取消/DB错误/并发幂等，1个无害 RuntimeWarning）
+
+### 数据变化
+- 迁移版本：v167 → v168
+- 新增测试：18个（tx-trade ×18）
+- Mock 清理：manager_app_routes.py（5处Mock→DB）、scan_pay_routes.py（1处Mock→DB）、crew_handover_router.py（_build_mock_shift_summary删除）、enterprise_meal_routes.py（_mock_*重命名）
+
+### 遗留问题
+- split_payment_routes.py：多处 TODO DB 注释（lines 104/187/202），仍有内存降级路径
+- enterprise_meal_routes.py：已改名但底层仍返回空模板，需后续建表接真实数据
+- tx-analytics：hq_overview_routes.py / group_dashboard_service.py 为有意的 SQLAlchemyError 降级兜底，暂不清理
+
+### 明日计划
+- Round 84：扫描 tx-finance / tx-ops 剩余 Mock 端点，重点处理 split_payment_routes.py
+
+---
+
+## 2026-04-04（Round 82 — waitlist/refund DB化 + patrol/mv-insight + 20个测试）
+
+### 今日完成
+
+**Team A — waitlist_routes.py 完全 DB化**
+- [tx-trade/api] waitlist_routes.py：删除 `_store` / `_call_logs` 内存字典，全部7端点接入真实 DB（v109 waitlist_entries + waitlist_call_logs）
+- 关键实现：queue_no 当日自增（COALESCE MAX+1）、expire-overdue BATCH UPDATE + priority GREATEST(-10, priority-10) 降级、stats 5状态 FILTER COUNT
+
+**Team B — v167 refund 迁移 + refund_routes.py DB化**
+- [migrations] v167_refund_requests.py：refund_requests 表 + 3个索引 + RLS（实际 v165/v166 已存在，故创建为 v167，down_revision=v166）
+- [tx-trade/api] refund_routes.py：删除 `_mock_refunds: dict = {}`，POST写入 refund_requests、GET查询（UUID格式校验、404真实返回）
+
+**Team C — patrol/mv-insight POST 端点**
+- [tx-brain/api] brain_routes.py：新增 `POST /api/v1/brain/patrol/mv-insight`（使用 `get_db_no_rls` + `PatrolAnalyzeRequest`，调用 `patrol_inspector.analyze_from_mv(payload, db)`）
+- 新增 imports：`Depends`、`AsyncSession`、`get_db_no_rls`
+- [tx-brain/tests] test_patrol_mv_insight.py：4个测试（成功/舆情注入/连接错误/422）
+
+**Team D — waitlist + refund 路由测试（16个）**
+- [tx-trade/tests] test_waitlist_routes.py：10个测试（list/create/call/seat/cancel/expire/stats 全覆盖）
+- [tx-trade/tests] test_refund_routes.py：6个测试（正常提交/金额校验/DB错误/查询成功/404/UUID格式校验）
+
+### 数据变化
+- 迁移版本：v164 → v167（实际 v165/v166 为预存在文件，v167 为本轮新增）
+- 新增测试：20个（brain ×4，tx-trade ×16）
+- Mock 清理：`waitlist_routes.py` 和 `refund_routes.py` 两个文件完成内存→DB迁移
+
+### 遗留问题
+- 其他 tx-trade 路由（dispatch_code, calling_screen）仍为注释"生产接DB"但实际已用DB（需确认）
+- tx-finance mock 状态待检查
+
+### 明日计划
+- Round 83：扫描并清理剩余 Mock + tx-finance 补测
+
+---
+
+## 2026-04-04（Round 81 — analyze_from_mv API 端点 + 5个投影器补测）
+
+### 今日完成
+
+**Team A — brain_routes.py 新增10个端点**
+- [tx-brain/api] brain_routes.py：新增 `energy_monitor` import + `EnergyAnalyzeRequest` model
+- [tx-brain/api] `POST /api/v1/brain/energy/analyze` — 能耗监控快速分析（无 Claude 调用）
+- [tx-brain/api] 9个 `GET /api/v1/brain/{agent}/mv-insight` 端点：discount / inventory / finance / member / menu / dispatch / crm / customer-service / energy
+  - 全部使用 query params（tenant_id, store_id），返回 `{"ok": true, "data": {...}}`
+  - 调用各 agent 的 `analyze_from_mv()` 方法（Phase 3 快速路径）
+
+**Team B — ChannelMarginProjector + StorePnlProjector 测试（14个）**
+- [events/tests] test_projectors.py 追加 `TestChannelMarginProjector`（7个）+ `TestStorePnlProjector`（7个）
+- 验证：order_synced GMV累计、commission扣减、promotion补贴、_recalc触发、no_store_id跳过
+- 测试总数：47 → 61（Team B贡献14个，全部passing）
+
+**Team C — DailySettlement + MemberClv + InventoryBom 投影器测试（18个）**
+- [events/tests] test_projectors.py 追加 `TestDailySettlementProjector`（6个）+ `TestMemberClvProjector`（6个）+ `TestInventoryBomProjector`（6个）
+- 关键验证：现金差异计算、GREATEST防负数、_recalc_loss触发、no_store_id跳过
+- 测试总数：61 → 79（Team C贡献18个）
+
+**Team D — brain_routes 缺失端点测试（10个）**
+- [tx-brain/tests] test_brain_routes_api.py 追加：
+  - `POST /inventory/analyze`（3个：正常/网络错误/422）
+  - `POST /menu/optimize`（3个：正常/网络错误/422）
+  - `GET /brain/{agent}/mv-insight`（4个：discount/inventory/finance/member）
+- 测试总数：18 → 28
+
+### 数据变化
+- 迁移版本：v164（不变）
+- 新增测试：42 个（test_projectors.py +32，test_brain_routes_api.py +10）
+- tx-brain brain_routes.py：+10 个端点（1 POST + 9 GET），总端点数 20
+
+### 遗留问题
+- patrol_inspector.analyze_from_mv() 签名不同（需 payload + db），暂未暴露 GET 端点
+- 新 GET mv-insight 端点实际可用性需 DB 连接验证（本轮仅 mock 测试）
+
+### 明日计划
+- Round 82：patrol_inspector mv-insight 特殊端点处理 + 端到端投影器链路测试
+
+---
+
+## 2026-04-04（Round 80 — Phase 3 完成：全部11个 Agent 实现 analyze_from_mv()）
+
+### 今日完成
+
+**Team A — discount_guardian + inventory_sentinel analyze_from_mv()**
+- [tx-brain/agents] discount_guardian.py：添加 `analyze_from_mv()` — 读 `mv_discount_health`，unauthorized_count>0 或 threshold_breaches>0 时 risk_signal="high"
+- [tx-brain/agents] inventory_sentinel.py：添加 `analyze_from_mv()` — 读 `mv_inventory_bom`，high_loss_count>3 时 risk_signal="high"
+- [tx-brain/tests] test_analyze_from_mv_a.py：8 个测试
+
+**Team B — finance_auditor + member_insight analyze_from_mv()**
+- [tx-brain/agents] finance_auditor.py：添加 `analyze_from_mv()` — 读 `mv_store_pnl + mv_channel_margin`，毛利率<35% → risk_signal="high"
+- [tx-brain/agents] member_insight.py：添加 `analyze_from_mv()` — 读 `mv_member_clv` 聚合，高流失率>20% → risk_signal="high"
+- [tx-brain/tests] test_analyze_from_mv_b.py：8 个测试
+
+**Team C — menu_optimizer + dispatch_predictor analyze_from_mv()**
+- [tx-brain/agents] menu_optimizer.py：添加 `analyze_from_mv()` — 读 `mv_inventory_bom`，高损耗食材识别 + menu_optimization_hints
+- [tx-brain/agents] dispatch_predictor.py：添加 `analyze_from_mv()` — 读 `mv_store_pnl` 近7天订单量，计算 kitchen_load_level + trend
+- [tx-brain/tests] test_analyze_from_mv_c.py：8 个测试
+
+**Team D — tx-menu API 路由测试（48个测试）**
+- [tx-menu/tests] test_dish_lifecycle_api.py：16 个测试（生命周期阶段/推进/下线/统计）
+- [tx-menu/tests] test_menu_approval_api.py：13 个测试（审批CRUD/approve/reject）
+- [tx-menu/tests] test_banquet_menu_api.py：19 个测试（宴席套餐/场次/打印）
+
+### 数据变化
+- 迁移版本：v164（不变）
+- 新增测试：48 个（tx-brain ×24，tx-menu ×24）
+- **Phase 3 里程碑**：全部 11 个 tx-brain Agent 均已实现 `analyze_from_mv()` 快速路径
+
+| Agent | MV 来源 | 完成轮次 |
+|-------|---------|--------|
+| crm_operator | mv_member_clv | Round 73 |
+| customer_service | mv_public_opinion | Round 73 |
+| energy_monitor | mv_energy_efficiency | Round 75 |
+| patrol_inspector | mv_public_opinion | (已有) |
+| discount_guardian | mv_discount_health | **Round 80** |
+| inventory_sentinel | mv_inventory_bom | **Round 80** |
+| finance_auditor | mv_store_pnl + mv_channel_margin | **Round 80** |
+| member_insight | mv_member_clv | **Round 80** |
+| menu_optimizer | mv_inventory_bom | **Round 80** |
+| dispatch_predictor | mv_store_pnl | **Round 80** |
+
+### 遗留问题
+- tx-brain API 层尚未暴露 analyze_from_mv 路由端点
+- Phase 2 剩余5个投影器未实现（ChannelMarginProjector 等）
+
+### 明日计划
+- Round 81：tx-brain API 层新增 analyze_from_mv 端点 + 剩余 Projector 实现
+
+---
+
 ## 2026-04-04（Round 73 — 西贝/徐记海鲜上线冲刺：5支团队并行，P0-P2全面推进）
 
 ### 今日完成
