@@ -16,7 +16,7 @@ import { GridComponent, TooltipComponent, LegendComponent } from 'echarts/compon
 import { CanvasRenderer } from 'echarts/renderers';
 import { txFetch } from '../../../api';
 import { useApi } from '../../../hooks/useApi';
-import type { TouchExecution, MechanismAttribution, RepairEffectiveness, JourneyTemplateAttribution, JourneyEnrollmentDetail } from '../../../api/growthHubApi';
+import type { TouchExecution, MechanismAttribution, RepairEffectiveness, JourneyTemplateAttribution, JourneyEnrollmentDetail, StoreAttribution } from '../../../api/growthHubApi';
 
 echarts.use([BarChart, PieChart, GridComponent, TooltipComponent, LegendComponent, CanvasRenderer]);
 
@@ -116,6 +116,12 @@ export function JourneyAttributionPage() {
   // 缺口1: 模板框架归因Tab数据
   const { data: templateAttrData } = useApi<{ items: JourneyTemplateAttribution[]; days: number }>(
     `/api/v1/growth/attribution/by-journey-template?days=${days}`,
+    { cacheMs: 15_000 },
+  );
+
+  // Sprint G: 门店归因Tab数据
+  const { data: storeAttrData } = useApi<{ items: StoreAttribution[]; days: number }>(
+    `/api/v1/growth/attribution/by-store?days=${days}`,
     { cacheMs: 15_000 },
   );
 
@@ -810,6 +816,108 @@ export function JourneyAttributionPage() {
                     </Col>
                   )}
                 </Row>
+              );
+            })(),
+          },
+          {
+            key: 'by-store',
+            label: <span style={{ color: TEXT_PRIMARY }}>门店归因</span>,
+            children: (() => {
+              const storeItems = storeAttrData?.items || [];
+              const storeColumns = [
+                { title: '门店', dataIndex: 'store_name', key: 'store_name', width: 140,
+                  render: (val: string, record: StoreAttribution) => <span style={{ color: TEXT_PRIMARY, fontWeight: 500 }}>{val || (record.store_id ? record.store_id.slice(0, 10) : '--')}</span> },
+                { title: '触达数', dataIndex: 'total_touches', key: 'total_touches', width: 90,
+                  sorter: (a: StoreAttribution, b: StoreAttribution) => (a.total_touches ?? 0) - (b.total_touches ?? 0),
+                  render: (val: number) => <span style={{ color: TEXT_PRIMARY }}>{val ?? 0}</span> },
+                { title: '打开数', dataIndex: 'opened', key: 'opened', width: 90,
+                  sorter: (a: StoreAttribution, b: StoreAttribution) => (a.opened ?? 0) - (b.opened ?? 0),
+                  render: (val: number) => <span style={{ color: SUCCESS_GREEN }}>{val ?? 0}</span> },
+                { title: '打开率', dataIndex: 'open_rate', key: 'open_rate', width: 80,
+                  sorter: (a: StoreAttribution, b: StoreAttribution) => (a.open_rate ?? 0) - (b.open_rate ?? 0),
+                  render: (val: number) => (
+                    <span style={{ color: (val ?? 0) >= 20 ? SUCCESS_GREEN : (val ?? 0) >= 10 ? WARNING_ORANGE : DANGER_RED, fontWeight: 600 }}>
+                      {(val ?? 0).toFixed(1)}%
+                    </span>
+                  ) },
+                { title: '归因订单', dataIndex: 'attributed_orders', key: 'attributed_orders', width: 90,
+                  sorter: (a: StoreAttribution, b: StoreAttribution) => (a.attributed_orders ?? 0) - (b.attributed_orders ?? 0),
+                  render: (val: number) => <span style={{ color: BRAND_ORANGE, fontWeight: 600 }}>{val ?? 0}</span> },
+                { title: '归因率', dataIndex: 'attribution_rate', key: 'attribution_rate', width: 80,
+                  sorter: (a: StoreAttribution, b: StoreAttribution) => (a.attribution_rate ?? 0) - (b.attribution_rate ?? 0),
+                  render: (val: number) => (
+                    <span style={{ color: (val ?? 0) >= 5 ? SUCCESS_GREEN : (val ?? 0) >= 2 ? WARNING_ORANGE : DANGER_RED, fontWeight: 600 }}>
+                      {(val ?? 0).toFixed(1)}%
+                    </span>
+                  ) },
+                { title: '归因GMV', dataIndex: 'attributed_gmv_fen', key: 'attributed_gmv_fen', width: 110,
+                  sorter: (a: StoreAttribution, b: StoreAttribution) => (a.attributed_gmv_fen ?? 0) - (b.attributed_gmv_fen ?? 0),
+                  render: (val: number) => <span style={{ color: BRAND_ORANGE, fontWeight: 600 }}>¥{((val ?? 0) / 100).toFixed(0)}</span> },
+              ];
+
+              const storeChartOption = (() => {
+                if (storeItems.length === 0) return {};
+                const sorted = [...storeItems]
+                  .sort((a, b) => (b.attributed_gmv_fen ?? 0) - (a.attributed_gmv_fen ?? 0))
+                  .slice(0, 10);
+                return {
+                  tooltip: { trigger: 'axis' as const },
+                  grid: { left: 120, right: 40, top: 40, bottom: 30 },
+                  xAxis: {
+                    type: 'value' as const,
+                    name: '归因GMV(元)',
+                    axisLabel: { color: TEXT_SECONDARY, formatter: (v: number) => `¥${(v / 100).toFixed(0)}` },
+                    splitLine: { lineStyle: { color: BORDER, type: 'dashed' as const } },
+                  },
+                  yAxis: {
+                    type: 'category' as const,
+                    data: [...sorted].reverse().map(s => s.store_name || (s.store_id ? s.store_id.slice(0, 8) : '--')),
+                    axisLabel: { color: TEXT_SECONDARY, fontSize: 11 },
+                    axisLine: { lineStyle: { color: BORDER } },
+                  },
+                  series: [{
+                    name: '归因GMV',
+                    type: 'bar',
+                    data: [...sorted].reverse().map(s => s.attributed_gmv_fen ?? 0),
+                    itemStyle: { color: BRAND_ORANGE },
+                    label: {
+                      show: true, position: 'right', color: TEXT_SECONDARY, fontSize: 11,
+                      formatter: (p: { value: number }) => `¥${(p.value / 100).toFixed(0)}`,
+                    },
+                  }],
+                };
+              })();
+
+              return (
+                <>
+                  <Card
+                    title={<span style={{ color: TEXT_PRIMARY }}>按门店归因明细（近{days}天）</span>}
+                    style={{ background: CARD_BG, border: `1px solid ${BORDER}`, marginBottom: 16 }}
+                    styles={{ header: { borderBottom: `1px solid ${BORDER}` } }}
+                    bodyStyle={{ padding: 0 }}
+                  >
+                    <Table
+                      dataSource={storeItems}
+                      columns={storeColumns}
+                      rowKey="store_id"
+                      size="small"
+                      pagination={false}
+                      scroll={{ x: 700 }}
+                      locale={{ emptyText: <span style={{ color: TEXT_SECONDARY }}>暂无门店归因数据</span> }}
+                    />
+                  </Card>
+                  <Card
+                    title={<span style={{ color: TEXT_PRIMARY }}>Top 10 门店归因GMV排名</span>}
+                    style={{ background: CARD_BG, border: `1px solid ${BORDER}` }}
+                    styles={{ header: { borderBottom: `1px solid ${BORDER}` } }}
+                  >
+                    {storeItems.length > 0 ? (
+                      <ReactEChartsCore echarts={echarts} option={storeChartOption} style={{ height: 400 }} />
+                    ) : (
+                      <div style={{ textAlign: 'center', padding: 60, color: TEXT_SECONDARY }}>暂无门店数据</div>
+                    )}
+                  </Card>
+                </>
               );
             })(),
           },

@@ -1,4 +1,4 @@
-"""增长中枢 V2 API — 36 个端点
+"""增长中枢 V2 API — 43 个端点（含V2.2多品牌架构）
 
 端点：
   # Customer Growth Profile
@@ -55,6 +55,22 @@
   GET    /api/v1/growth/p1/distribution                       → P1四维分布统计
   POST   /api/v1/growth/p1/recompute                          → 手动触发P1字段重算
 
+  # Brand Configs (V2.2)
+  GET    /api/v1/growth/brand-configs                          → 品牌增长配置列表
+  POST   /api/v1/growth/brand-configs                          → 创建/更新品牌配置
+  GET    /api/v1/growth/brand-configs/{brand_id}               → 品牌配置详情
+  GET    /api/v1/growth/brand-configs/{brand_id}/budget-check  → 品牌预算检查
+  GET    /api/v1/growth/brand-configs/{brand_id}/frequency-check/{customer_id} → 品牌频控检查
+
+  # Brand Dashboard & Store Attribution (V2.2)
+  GET    /api/v1/growth/dashboard-stats/by-brand               → 按品牌分组的驾驶舱KPI
+  GET    /api/v1/growth/attribution/by-store                   → 按门店归因统计
+
+  # Experiment Engine (V2.2 Sprint I)
+  GET    /api/v1/growth/experiments/{template_id}/summary        → 实验摘要
+  GET    /api/v1/growth/experiments/{template_id}/select-variant → Thompson Sampling选择
+  GET    /api/v1/growth/experiments/{template_id}/auto-pause-check → 自动暂停检查
+
 所有端点必须携带 X-Tenant-ID Header（UUID 格式）。
 """
 from __future__ import annotations
@@ -73,6 +89,8 @@ from services.growth_journey_service import GrowthJourneyService
 from services.growth_touch_service import GrowthTouchService
 from services.growth_repair_service import GrowthRepairService
 from services.growth_suggestion_service import GrowthSuggestionService
+from services.growth_brand_service import GrowthBrandService
+from services.growth_experiment_service import GrowthExperimentService
 from shared.ontology.src.database import async_session_factory
 
 logger = structlog.get_logger(__name__)
@@ -84,6 +102,8 @@ _journey_svc = GrowthJourneyService()
 _touch_svc = GrowthTouchService()
 _repair_svc = GrowthRepairService()
 _suggestion_svc = GrowthSuggestionService()
+_brand_svc = GrowthBrandService()
+_experiment_svc = GrowthExperimentService()
 
 
 # ---------------------------------------------------------------------------
@@ -1643,6 +1663,338 @@ async def trigger_p1_recompute(
         try:
             result = await _profile_svc.batch_compute_p1_fields(str(tenant_id), db)
             await db.commit()
+            return ok(result)
+        except (ValueError, RuntimeError, OSError) as exc:
+            return err(str(exc))
+
+
+# ---------------------------------------------------------------------------
+# V2.2 — Brand Config 端点
+# ---------------------------------------------------------------------------
+
+class BrandConfigUpsert(BaseModel):
+    brand_name: str
+    growth_enabled: bool = True
+    daily_touch_budget: int = 100
+    monthly_offer_budget_fen: int = 1000000
+    max_touch_per_customer_day: int = 2
+    max_touch_per_customer_week: int = 5
+    enabled_channels: list[str] = Field(
+        default_factory=lambda: ["wecom", "miniapp", "sms"]
+    )
+    enabled_journey_types: list[str] = Field(
+        default_factory=lambda: [
+            "first_to_second", "reactivation", "service_repair",
+            "stored_value", "banquet", "channel_reflow",
+        ]
+    )
+    auto_approve_low_risk: bool = False
+    auto_approve_medium_risk: bool = False
+    margin_floor_pct: int = 30
+
+
+@router.get("/brand-configs")
+async def list_brand_configs(
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+) -> dict:
+    """列出所有品牌增长配置。"""
+    tenant_id = _parse_tenant(x_tenant_id)
+    async with async_session_factory() as db:
+        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        try:
+            result = await _brand_svc.list_brand_configs(str(tenant_id), db)
+            return ok(result)
+        except (ValueError, RuntimeError, OSError) as exc:
+            return err(str(exc))
+
+
+@router.post("/brand-configs")
+async def upsert_brand_config(
+    body: BrandConfigUpsert,
+    brand_id: UUID = Query(..., description="品牌ID"),
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+) -> dict:
+    """创建或更新品牌配置。"""
+    tenant_id = _parse_tenant(x_tenant_id)
+    async with async_session_factory() as db:
+        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        try:
+            result = await _brand_svc.upsert_brand_config(
+                brand_id=brand_id,
+                data=body.model_dump(),
+                tenant_id=str(tenant_id),
+                db=db,
+            )
+            return ok(result)
+        except (ValueError, RuntimeError, OSError) as exc:
+            return err(str(exc))
+
+
+@router.get("/brand-configs/{brand_id}")
+async def get_brand_config(
+    brand_id: UUID,
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+) -> dict:
+    """获取品牌增长配置详情。"""
+    tenant_id = _parse_tenant(x_tenant_id)
+    async with async_session_factory() as db:
+        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        try:
+            result = await _brand_svc.get_brand_config(brand_id, str(tenant_id), db)
+            if result is None:
+                raise HTTPException(status_code=404, detail="品牌配置不存在")
+            return ok(result)
+        except (ValueError, RuntimeError, OSError) as exc:
+            return err(str(exc))
+
+
+@router.get("/brand-configs/{brand_id}/budget-check")
+async def check_brand_budget(
+    brand_id: UUID,
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+) -> dict:
+    """检查品牌预算使用情况（今日触达量/本月offer金额）。"""
+    tenant_id = _parse_tenant(x_tenant_id)
+    async with async_session_factory() as db:
+        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        try:
+            result = await _brand_svc.check_brand_budget(brand_id, str(tenant_id), db)
+            return ok(result)
+        except (ValueError, RuntimeError, OSError) as exc:
+            return err(str(exc))
+
+
+@router.get("/brand-configs/{brand_id}/frequency-check/{customer_id}")
+async def check_brand_frequency(
+    brand_id: UUID,
+    customer_id: UUID,
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+) -> dict:
+    """检查品牌级客户频控（日/周触达次数 vs 上限）。"""
+    tenant_id = _parse_tenant(x_tenant_id)
+    async with async_session_factory() as db:
+        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        try:
+            result = await _brand_svc.check_brand_frequency(
+                brand_id, customer_id, str(tenant_id), db,
+            )
+            return ok(result)
+        except (ValueError, RuntimeError, OSError) as exc:
+            return err(str(exc))
+
+
+# ---------------------------------------------------------------------------
+# V2.2 — Brand Dashboard 端点
+# ---------------------------------------------------------------------------
+
+
+@router.get("/dashboard-stats/by-brand")
+async def get_dashboard_stats_by_brand(
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+) -> dict:
+    """按品牌分组的驾驶舱KPI（画像/旅程/触达/建议）。"""
+    tenant_id = _parse_tenant(x_tenant_id)
+    async with async_session_factory() as db:
+        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        try:
+            # 1) 画像按品牌
+            r_profiles = await db.execute(text("""
+                SELECT
+                    brand_id,
+                    COUNT(*) AS total_profiles,
+                    COUNT(*) FILTER (WHERE repurchase_stage = 'stable_repeat') AS stable_repeat,
+                    COUNT(*) FILTER (WHERE reactivation_priority IN ('high','critical')) AS high_priority
+                FROM customer_growth_profiles
+                WHERE is_deleted = FALSE AND brand_id IS NOT NULL
+                GROUP BY brand_id
+            """))
+            profiles_by_brand = [
+                {
+                    "brand_id": str(row[0]),
+                    "total_profiles": row[1],
+                    "stable_repeat": row[2],
+                    "high_priority": row[3],
+                }
+                for row in r_profiles.fetchall()
+            ]
+
+            # 2) 旅程参与按品牌
+            r_enrollments = await db.execute(text("""
+                SELECT
+                    brand_id,
+                    COUNT(*) AS total_enrollments,
+                    COUNT(*) FILTER (WHERE journey_state = 'active') AS active,
+                    COUNT(*) FILTER (WHERE journey_state = 'completed') AS completed
+                FROM growth_journey_enrollments
+                WHERE is_deleted = FALSE AND brand_id IS NOT NULL
+                GROUP BY brand_id
+            """))
+            enrollments_by_brand = [
+                {
+                    "brand_id": str(row[0]),
+                    "total_enrollments": row[1],
+                    "active": row[2],
+                    "completed": row[3],
+                }
+                for row in r_enrollments.fetchall()
+            ]
+
+            # 3) 触达按品牌
+            r_touches = await db.execute(text("""
+                SELECT
+                    brand_id,
+                    COUNT(*) AS total_touches,
+                    COUNT(*) FILTER (WHERE execution_state IN ('opened','clicked')) AS engaged,
+                    COUNT(*) FILTER (WHERE attributed_order_id IS NOT NULL) AS attributed,
+                    COALESCE(SUM(attributed_revenue_fen) FILTER (WHERE attributed_order_id IS NOT NULL), 0) AS revenue_fen
+                FROM growth_touch_executions
+                WHERE is_deleted = FALSE AND brand_id IS NOT NULL
+                GROUP BY brand_id
+            """))
+            touches_by_brand = [
+                {
+                    "brand_id": str(row[0]),
+                    "total_touches": row[1],
+                    "engaged": row[2],
+                    "attributed": row[3],
+                    "revenue_fen": row[4],
+                }
+                for row in r_touches.fetchall()
+            ]
+
+            # 4) 建议按品牌
+            r_suggestions = await db.execute(text("""
+                SELECT
+                    brand_id,
+                    COUNT(*) AS total_suggestions,
+                    COUNT(*) FILTER (WHERE review_state = 'approved') AS approved,
+                    COUNT(*) FILTER (WHERE review_state = 'pending') AS pending
+                FROM growth_agent_strategy_suggestions
+                WHERE is_deleted = FALSE AND brand_id IS NOT NULL
+                GROUP BY brand_id
+            """))
+            suggestions_by_brand = [
+                {
+                    "brand_id": str(row[0]),
+                    "total_suggestions": row[1],
+                    "approved": row[2],
+                    "pending": row[3],
+                }
+                for row in r_suggestions.fetchall()
+            ]
+
+            return ok({
+                "profiles_by_brand": profiles_by_brand,
+                "enrollments_by_brand": enrollments_by_brand,
+                "touches_by_brand": touches_by_brand,
+                "suggestions_by_brand": suggestions_by_brand,
+            })
+        except (ValueError, RuntimeError, OSError) as exc:
+            return err(str(exc))
+
+
+# ---------------------------------------------------------------------------
+# V2.2 — Store Attribution 端点
+# ---------------------------------------------------------------------------
+
+
+@router.get("/attribution/by-store")
+async def get_attribution_by_store(
+    days: int = Query(default=7, ge=1, le=365, description="回溯天数"),
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+) -> dict:
+    """按门店分组的触达归因统计。"""
+    tenant_id = _parse_tenant(x_tenant_id)
+    async with async_session_factory() as db:
+        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        try:
+            result = await db.execute(
+                text("""
+                    SELECT
+                        gte.store_id,
+                        COUNT(*) AS total_touches,
+                        COUNT(*) FILTER (WHERE execution_state IN ('opened','clicked')) AS opened,
+                        COUNT(*) FILTER (WHERE attributed_order_id IS NOT NULL) AS attributed,
+                        COALESCE(SUM(attributed_revenue_fen)
+                            FILTER (WHERE attributed_order_id IS NOT NULL), 0) AS revenue_fen
+                    FROM growth_touch_executions gte
+                    WHERE gte.is_deleted = FALSE
+                      AND gte.store_id IS NOT NULL
+                      AND gte.created_at >= NOW() - make_interval(days => :days)
+                    GROUP BY gte.store_id
+                    ORDER BY attributed DESC
+                """),
+                {"days": days},
+            )
+            items = [
+                {
+                    "store_id": str(row[0]),
+                    "total_touches": row[1],
+                    "opened": row[2],
+                    "attributed": row[3],
+                    "revenue_fen": row[4],
+                }
+                for row in result.fetchall()
+            ]
+            return ok({"items": items, "total": len(items), "days": days})
+        except (ValueError, RuntimeError, OSError) as exc:
+            return err(str(exc))
+
+
+# ---------------------------------------------------------------------------
+# Experiment Engine 端点 (Sprint I)
+# ---------------------------------------------------------------------------
+
+@router.get("/experiments/{template_id}/summary")
+async def get_experiment_summary(
+    template_id: str,
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+) -> dict:
+    """获取旅程模板的A/B实验摘要。"""
+    tenant_id = _parse_tenant(x_tenant_id)
+    async with async_session_factory() as db:
+        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        try:
+            result = await _experiment_svc.get_experiment_summary(
+                UUID(template_id), str(tenant_id), db,
+            )
+            return ok(result)
+        except (ValueError, RuntimeError, OSError) as exc:
+            return err(str(exc))
+
+
+@router.get("/experiments/{template_id}/select-variant")
+async def select_variant(
+    template_id: str,
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+) -> dict:
+    """Thompson Sampling选择最优variant。"""
+    tenant_id = _parse_tenant(x_tenant_id)
+    async with async_session_factory() as db:
+        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        try:
+            result = await _experiment_svc.select_variant(
+                UUID(template_id), str(tenant_id), db,
+            )
+            return ok(result)
+        except (ValueError, RuntimeError, OSError) as exc:
+            return err(str(exc))
+
+
+@router.get("/experiments/{template_id}/auto-pause-check")
+async def auto_pause_check(
+    template_id: str,
+    min_samples: int = Query(30, ge=1),
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+) -> dict:
+    """检查是否应自动暂停低效variant。"""
+    tenant_id = _parse_tenant(x_tenant_id)
+    async with async_session_factory() as db:
+        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        try:
+            result = await _experiment_svc.should_auto_pause(
+                UUID(template_id), min_samples, str(tenant_id), db,
+            )
             return ok(result)
         except (ValueError, RuntimeError, OSError) as exc:
             return err(str(exc))

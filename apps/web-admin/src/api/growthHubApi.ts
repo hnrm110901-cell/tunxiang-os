@@ -354,3 +354,95 @@ export const fetchJourneyEnrollmentsByTemplate = (templateId: string, size = 20)
   txFetchData<{ items: JourneyEnrollmentDetail[]; total: number }>(
     `/api/v1/growth/journey-enrollments?journey_template_id=${templateId}&size=${size}`,
   );
+
+// ---- Sprint G/H: Store & Brand Attribution Types ----
+
+export interface StoreAttribution {
+  store_id: string;
+  store_name: string;
+  brand_name: string;
+  active_journeys: number;
+  total_touches: number;
+  opened: number;
+  open_rate: number;
+  attributed_orders: number;
+  attribution_rate: number;
+  attributed_gmv_fen: number;
+  second_visit_rate: number;
+  recall_rate: number;
+  stored_value_rate: number;
+  journey_roi: number;
+}
+
+export interface BrandDashboardStats {
+  brand_name: string;
+  total_customers: number;
+  active_journeys: number;
+  touches_7d: number;
+  open_rate: number;
+  attribution_rate: number;
+  stable_repurchase: number;
+  high_priority_recall: number;
+  second_visit_rate: number;
+  recall_rate: number;
+  active_rate: number;
+}
+
+export const fetchStoreAttribution = (days = 7) =>
+  txFetchData<{ items: StoreAttribution[]; days: number }>(
+    `/api/v1/growth/attribution/by-store?days=${days}`,
+  );
+
+export const fetchBrandDashboardStats = (days = 7) =>
+  txFetchData<{ items: BrandDashboardStats[]; days: number }>(
+    `/api/v1/growth/dashboard-stats/by-brand?days=${days}`,
+  );
+
+// ---- Sprint I: Experiment Types ----
+
+export interface ExperimentVariant {
+  variant: string;
+  total: number;
+  completed: number;
+  exited: number;
+  active: number;
+  completion_rate: number;
+  avg_duration_hours: number | null;
+  // Thompson Sampling fields (in select-variant response)
+  successes?: number;
+  failures?: number;
+  alpha?: number;
+  beta?: number;
+  sample?: number;
+  expected_rate?: number;
+}
+
+export interface ExperimentSummary {
+  template_id: string;
+  variants: ExperimentVariant[];
+}
+
+export interface ExperimentSelectResult {
+  selected: string;
+  reason: string;
+  variants: ExperimentVariant[];
+}
+
+export interface ExperimentAutoPauseResult {
+  action: string;
+  reason: string;
+  best_rate?: number;
+  pause_variants?: string[];
+  variants: { variant: string; successes: number; total: number; success_rate: number }[];
+}
+
+export const fetchExperimentSummary = (templateId: string) =>
+  txFetchData<ExperimentSummary>(`/api/v1/growth/experiments/${templateId}/summary`);
+
+export const fetchExperimentSelectVariant = (templateId: string) =>
+  txFetchData<ExperimentSelectResult>(`/api/v1/growth/experiments/${templateId}/select-variant`);
+
+export const fetchExperimentAutoPause = (templateId: string, minSamples = 30) =>
+  txFetchData<ExperimentAutoPauseResult>(
+    `/api/v1/growth/experiments/${templateId}/auto-pause-check?min_samples=${minSamples}`,
+  );

@@ -107,6 +107,8 @@ import { GrowthJourneyRunsPage } from './pages/hq/growth/GrowthJourneyRunsPage';
 import { AgentWorkbenchPage } from './pages/hq/growth/AgentWorkbenchPage';
 import { GrowthSettingsPage } from './pages/hq/growth/GrowthSettingsPage';
 import { JourneyAttributionPage } from './pages/hq/growth/JourneyAttributionPage';
+import { StoreGrowthRankPage } from './pages/hq/growth/StoreGrowthRankPage';
+import { BrandComparisonPage } from './pages/hq/growth/BrandComparisonPage';
 import { GrowthSegmentTagsPage } from './pages/hq/growth/GrowthSegmentTagsPage';
 import { GrowthOfferPacksPage } from './pages/hq/growth/GrowthOfferPacksPage';
 import { CampaignManagePage } from './pages/growth/CampaignManagePage';
@@ -123,6 +125,7 @@ import { SupplierPortalPage } from './pages/hq/supply/SupplierPortalPage';
 import { ReviewManagePage } from './pages/ops/ReviewManagePage';
 import { SettlementMonitorPage } from './pages/ops/SettlementMonitorPage';
 import { StoreManagePage } from './pages/store/StoreManagePage';
+import { MarketSessionPage } from './pages/store/MarketSessionPage';  // v186 营业市别
 import { AgentDashboardPage } from './pages/agent/AgentDashboardPage';
 // ─── Phase1-4 新增页面 ───────────────────────────────────────────────────────
 import MenuSchemePage from './pages/menu/MenuSchemePage';
@@ -191,6 +194,12 @@ import { SettingsAuditLogsPage } from './pages/hr/SettingsAuditLogsPage';
 import { LaborMarginDashboardPage } from './pages/hr/LaborMarginDashboardPage';
 import { BudgetRecommendationPage } from './pages/hr/BudgetRecommendationPage';
 import { MenuSkillMatchPage } from './pages/hr/MenuSkillMatchPage';
+// ─── TC-P1-11: 试营业数据清除 ────────────────────────────────────────────────
+import { TrialDataClearPage } from './pages/settings/TrialDataClearPage';
+// ─── TC-P1-07: 移动端管理直通车 ─────────────────────────────────────────────
+import { MobileDashboard } from './pages/mobile/MobileDashboard';
+import { MobileAnomalyPage } from './pages/mobile/MobileAnomalyPage';
+import { MobileTableStatusPage } from './pages/mobile/MobileTableStatusPage';
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(() => {
@@ -283,6 +292,8 @@ function App() {
           <Route path="/hq/growth/journey-attribution" element={<JourneyAttributionPage />} />
           <Route path="/hq/growth/segment-tags" element={<GrowthSegmentTagsPage />} />
           <Route path="/hq/growth/offer-packs" element={<GrowthOfferPacksPage />} />
+          <Route path="/hq/growth/brand-comparison" element={<BrandComparisonPage />} />
+          <Route path="/hq/growth/store-ranking" element={<StoreGrowthRankPage />} />
           <Route path="/hq/trade/delivery" element={<DeliveryPage />} />
           <Route path="/hq/supply/inventory-intel" element={<InventoryIntelPage />} />
           <Route path="/hq/supply/chain" element={<SupplyChainPage />} />
@@ -333,6 +344,7 @@ function App() {
           <Route path="/ops/reviews" element={<ReviewManagePage />} />
           <Route path="/ops/settlement-monitor" element={<SettlementMonitorPage />} />
           <Route path="/store/manage" element={<StoreManagePage />} />
+          <Route path="/store/market-sessions" element={<MarketSessionPage />} />  {/* v186 营业市别 */}
           <Route path="/hq/trade/banquet-templates" element={<BanquetTemplatePage />} />
           <Route path="/hq/supply/suppliers" element={<SupplierPortalPage />} />
           <Route path="/agent/dashboard" element={<AgentDashboardPage />} />
@@ -418,6 +430,13 @@ function App() {
           <Route path="/hr/settings/roles" element={<SettingsRolesPage />} />
           <Route path="/hr/settings/approval-workflows" element={<SettingsApprovalWorkflowsPage />} />
           <Route path="/hr/settings/audit-logs" element={<SettingsAuditLogsPage />} />
+          {/* ─── TC-P1-07: 移动端管理直通车（/m/* 前缀） ─── */}
+          <Route path="/m/dashboard" element={<MobileDashboard />} />
+          <Route path="/m/anomaly" element={<MobileAnomalyPage />} />
+          <Route path="/m/tables" element={<MobileTableStatusPage />} />
+          <Route path="/m" element={<Navigate to="/m/dashboard" replace />} />
+          {/* ─── TC-P1-11: 试营业数据清除 ─── */}
+          <Route path="/settings/trial-data-clear" element={<TrialDataClearPage />} />
         </Routes>
       </ShellHQ>
     </BrowserRouter>

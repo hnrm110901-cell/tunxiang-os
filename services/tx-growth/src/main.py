@@ -221,6 +221,7 @@ def _on_approval_expiry_done(task: asyncio.Task) -> None:
 # ---------------------------------------------------------------------------
 
 from services.growth_journey_service import GrowthJourneyService as _GrowthJourneyService
+from services.growth_brand_service import GrowthBrandService as _GrowthBrandService
 
 # Feature Flag SDK — 控制 Growth Journey V2 / 沉默召回 等 cron 任务
 try:
@@ -232,6 +233,7 @@ except ImportError:
     logger.warning("feature_flags_sdk_not_available", reason="import failed, all flags default to enabled")
 
 _growth_journey_svc = _GrowthJourneyService()
+_growth_brand_svc = _GrowthBrandService()
 
 
 async def _run_growth_journey_tick() -> None:

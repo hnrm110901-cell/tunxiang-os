@@ -108,6 +108,10 @@ const MENU_CONFIGS: Record<string, MenuConfig> = {
         { id: 'growth-roi', label: 'ROI总览', icon: '💰', path: '/hq/growth/roi' },
         { id: 'journey-attribution', label: '旅程归因', icon: '📊', path: '/hq/growth/journey-attribution' },
       ]},
+      { label: '集团视图', items: [
+        { id: 'brand-comparison', label: '品牌对比', icon: '🏢', path: '/hq/growth/brand-comparison' },
+        { id: 'store-ranking', label: '门店排行', icon: '🏪', path: '/hq/growth/store-ranking' },
+      ]},
       { label: '配置', items: [
         { id: 'growth-settings', label: '配置治理', icon: '⚙️', path: '/hq/growth/settings' },
       ]},
