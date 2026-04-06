@@ -71,6 +71,12 @@
   GET    /api/v1/growth/experiments/{template_id}/select-variant → Thompson Sampling选择
   GET    /api/v1/growth/experiments/{template_id}/auto-pause-check → 自动暂停检查
 
+  # Cross-Brand (V2.3)
+  GET    /api/v1/growth/cross-brand/customers/{customer_id}/profile    → 跨品牌统一画像
+  GET    /api/v1/growth/cross-brand/customers/{customer_id}/frequency  → 跨品牌频控检查
+  GET    /api/v1/growth/cross-brand/opportunities                      → 跨品牌增长机会
+  GET    /api/v1/growth/cross-brand/recommendation                     → 跨品牌推荐策略
+
 所有端点必须携带 X-Tenant-ID Header（UUID 格式）。
 """
 from __future__ import annotations
@@ -91,6 +97,7 @@ from services.growth_repair_service import GrowthRepairService
 from services.growth_suggestion_service import GrowthSuggestionService
 from services.growth_brand_service import GrowthBrandService
 from services.growth_experiment_service import GrowthExperimentService
+from services.growth_cross_brand_service import GrowthCrossBrandService
 from shared.ontology.src.database import async_session_factory
 
 logger = structlog.get_logger(__name__)
@@ -104,6 +111,7 @@ _repair_svc = GrowthRepairService()
 _suggestion_svc = GrowthSuggestionService()
 _brand_svc = GrowthBrandService()
 _experiment_svc = GrowthExperimentService()
+_cross_brand_svc = GrowthCrossBrandService()
 
 
 # ---------------------------------------------------------------------------
@@ -186,6 +194,8 @@ class EnrollmentCreate(BaseModel):
     source_event_type: Optional[str] = None
     source_event_id: Optional[str] = None
     assigned_agent_suggestion_id: Optional[str] = None
+    store_id: Optional[str] = None   # V2.3 门店能力过滤
+    brand_id: Optional[str] = None   # V2.3 品牌级归属
 
 
 class EnrollmentStateUpdate(BaseModel):
@@ -474,6 +484,8 @@ async def create_journey_enrollment(
                 suggestion_id=UUID(body.assigned_agent_suggestion_id) if body.assigned_agent_suggestion_id else None,
                 tenant_id=str(tenant_id),
                 db=db,
+                store_id=UUID(body.store_id) if body.store_id else None,
+                brand_id=UUID(body.brand_id) if body.brand_id else None,
             )
             await db.commit()
             return ok(result)
@@ -1994,6 +2006,126 @@ async def auto_pause_check(
         try:
             result = await _experiment_svc.should_auto_pause(
                 UUID(template_id), min_samples, str(tenant_id), db,
+            )
+            return ok(result)
+        except (ValueError, RuntimeError, OSError) as exc:
+            return err(str(exc))
+
+
+# ---------------------------------------------------------------------------
+# Cross-Brand 端点 (V2.3)
+# ---------------------------------------------------------------------------
+
+@router.get("/cross-brand/customers/{customer_id}/profile")
+async def get_cross_brand_profile(
+    customer_id: str,
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+) -> dict:
+    """获取客户跨品牌统一画像。"""
+    tenant_id = _parse_tenant(x_tenant_id)
+    async with async_session_factory() as db:
+        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        try:
+            result = await _cross_brand_svc.get_customer_cross_brand_profile(
+                UUID(customer_id), str(tenant_id), db,
+            )
+            return ok(result)
+        except (ValueError, RuntimeError, OSError) as exc:
+            return err(str(exc))
+
+
+@router.get("/cross-brand/customers/{customer_id}/frequency")
+async def check_cross_brand_frequency(
+    customer_id: str,
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+) -> dict:
+    """跨品牌频控检查。"""
+    tenant_id = _parse_tenant(x_tenant_id)
+    async with async_session_factory() as db:
+        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        try:
+            result = await _cross_brand_svc.check_cross_brand_frequency(
+                UUID(customer_id), str(tenant_id), db,
+            )
+            return ok(result)
+        except (ValueError, RuntimeError, OSError) as exc:
+            return err(str(exc))
+
+
+@router.get("/cross-brand/opportunities")
+async def list_cross_brand_opportunities(
+    min_brands: int = Query(2, ge=1),
+    page: int = Query(1, ge=1),
+    size: int = Query(20, ge=1, le=100),
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+) -> dict:
+    """发现跨品牌增长机会。"""
+    tenant_id = _parse_tenant(x_tenant_id)
+    async with async_session_factory() as db:
+        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        try:
+            result = await _cross_brand_svc.find_cross_brand_opportunities(
+                str(tenant_id), db, min_brands=min_brands, page=page, size=size,
+            )
+            return ok(result)
+        except (ValueError, RuntimeError, OSError) as exc:
+            return err(str(exc))
+
+
+# ---------------------------------------------------------------------------
+# Experiment Auto-Iterate 端点 (2)
+# ---------------------------------------------------------------------------
+
+
+@router.post("/experiments/auto-iterate")
+async def trigger_auto_iterate(
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+) -> dict:
+    """手动触发自动迭代 — 暂停低效variant，调整流量分配。"""
+    tenant_id = _parse_tenant(x_tenant_id)
+    async with async_session_factory() as db:
+        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        try:
+            result = await _experiment_svc.auto_iterate(str(tenant_id), db)
+            await db.commit()
+            return ok(result)
+        except (ValueError, RuntimeError, OSError) as exc:
+            return err(str(exc))
+
+
+@router.get("/experiments/adjustments")
+async def get_experiment_adjustments(
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+) -> dict:
+    """获取最近的自动调整建议 — 低效mechanism/旅程分析。"""
+    tenant_id = _parse_tenant(x_tenant_id)
+    async with async_session_factory() as db:
+        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        try:
+            result = await _experiment_svc.auto_adjust_journey_params(str(tenant_id), db)
+            return ok(result)
+        except (ValueError, RuntimeError, OSError) as exc:
+            return err(str(exc))
+
+
+@router.get("/cross-brand/recommendation")
+async def get_cross_brand_recommendation(
+    customer_id: str = Query(...),
+    source_brand_id: str = Query(...),
+    target_brand_id: str = Query(...),
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+) -> dict:
+    """为特定客户生成跨品牌推荐策略。"""
+    tenant_id = _parse_tenant(x_tenant_id)
+    async with async_session_factory() as db:
+        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        try:
+            result = await _cross_brand_svc.get_cross_brand_recommendation(
+                customer_id=UUID(customer_id),
+                source_brand_id=UUID(source_brand_id),
+                target_brand_id=UUID(target_brand_id),
+                tenant_id=str(tenant_id),
+                db=db,
             )
             return ok(result)
         except (ValueError, RuntimeError, OSError) as exc:

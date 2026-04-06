@@ -455,9 +455,37 @@ class GrowthJourneyService:
         suggestion_id: Optional[UUID],
         tenant_id: str,
         db: AsyncSession,
+        store_id: Optional[UUID] = None,
+        brand_id: Optional[UUID] = None,
     ) -> dict:
         """创建enrollment（去重检查后INSERT）"""
         await self._set_tenant(db, tenant_id)
+
+        # ── 门店能力校验（V2.3）──
+        # 如果指定了store_id，检查门店是否存在且活跃
+        if store_id:
+            store_check = await db.execute(text("""
+                SELECT id, is_active FROM stores
+                WHERE id = :sid AND tenant_id = :tid AND is_deleted = FALSE
+            """), {"sid": str(store_id), "tid": tenant_id})
+            store_row = store_check.fetchone()
+            if not store_row:
+                raise ValueError(f"Store {store_id} not found")
+            if not store_row[1]:
+                raise ValueError(f"Store {store_id} is inactive")
+
+        # 如果模板有brand_scope=specific，校验brand_id在allowed_brand_ids中
+        template_scope = await db.execute(text("""
+            SELECT brand_scope, allowed_brand_ids
+            FROM growth_journey_templates
+            WHERE id = :tid AND is_deleted = FALSE
+        """), {"tid": str(template_id)})
+        scope_row = template_scope.fetchone()
+        if scope_row and scope_row[0] == "specific":
+            allowed_raw = scope_row[1] or []
+            allowed = allowed_raw if isinstance(allowed_raw, list) else json.loads(allowed_raw) if allowed_raw else []
+            if brand_id and str(brand_id) not in [str(b) for b in allowed]:
+                raise ValueError(f"Template not available for brand {brand_id}")
 
         # 去重: 同一template+customer如果已有活跃enrollment，拒绝
         dup = await db.execute(
@@ -515,14 +543,17 @@ class GrowthJourneyService:
                     (id, tenant_id, customer_id, template_id, journey_state,
                      current_step_no, enrollment_source, source_event_type,
                      source_event_id, suggestion_id,
-                     ab_test_id, ab_variant)
+                     ab_test_id, ab_variant,
+                     store_id, brand_id)
                 VALUES
                     (:id, :tenant_id, :customer_id, :template_id, 'eligible',
                      1, :source, :event_type, :event_id, :suggestion_id,
-                     :ab_test_id, :ab_variant)
+                     :ab_test_id, :ab_variant,
+                     :store_id, :brand_id)
                 RETURNING id, tenant_id, customer_id, template_id, journey_state,
                           current_step_no, enrollment_source, suggestion_id,
                           ab_test_id, ab_variant,
+                          store_id, brand_id,
                           created_at, updated_at
             """),
             {
@@ -536,6 +567,8 @@ class GrowthJourneyService:
                 "suggestion_id": str(suggestion_id) if suggestion_id else None,
                 "ab_test_id": ab_test_id,
                 "ab_variant": ab_variant,
+                "store_id": str(store_id) if store_id else None,
+                "brand_id": str(brand_id) if brand_id else None,
             },
         )
         enrollment = dict(result.fetchone()._mapping)

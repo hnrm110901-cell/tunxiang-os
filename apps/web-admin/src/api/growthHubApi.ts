@@ -446,3 +446,56 @@ export const fetchExperimentAutoPause = (templateId: string, minSamples = 30) =>
   txFetchData<ExperimentAutoPauseResult>(
     `/api/v1/growth/experiments/${templateId}/auto-pause-check?min_samples=${minSamples}`,
   );
+
+// ---- V2.3: Cross-Brand & Auto-Iterate Types ----
+
+export interface CrossBrandProfile {
+  customer_id: string;
+  brand_profiles: {
+    brand_id: string;
+    brand_name: string;
+    repurchase_stage: string;
+    reactivation_priority: string;
+    super_user_level: string;
+    psych_distance_level: string;
+  }[];
+  brand_count: number;
+  cross_brand_touch_total: number;
+  cross_brand_touch_today: number;
+  cross_brand_touch_week: number;
+}
+
+export interface CrossBrandOpportunity {
+  customer_id: string;
+  brand_count: number;
+  brands: { brand_id: string; brand_name: string; repurchase_stage: string; reactivation_priority: string }[];
+  opportunity: { type: string; description: string; recommended_action: string } | null;
+}
+
+export interface ExperimentAdjustment {
+  type: string;
+  mechanism_type?: string;
+  channel?: string;
+  journey_code?: string;
+  journey_name?: string;
+  open_rate?: number;
+  completion_rate?: number;
+  recommendation: string;
+}
+
+// ---- V2.3: Cross-Brand API Functions ----
+
+export const fetchCrossBrandOpportunities = (page = 1, size = 20) =>
+  txFetchData<{ items: CrossBrandOpportunity[]; total: number }>(`/api/v1/growth/cross-brand/opportunities?page=${page}&size=${size}`);
+
+export const fetchCrossBrandProfile = (customerId: string) =>
+  txFetchData<CrossBrandProfile>(`/api/v1/growth/cross-brand/customers/${customerId}/profile`);
+
+export const fetchCrossBrandFrequency = (customerId: string) =>
+  txFetchData<{ can_touch: boolean; today_count: number; week_count: number }>(`/api/v1/growth/cross-brand/customers/${customerId}/frequency`);
+
+export const triggerAutoIterate = () =>
+  txFetch<{ ok: boolean }>('/api/v1/growth/experiments/auto-iterate', { method: 'POST' });
+
+export const fetchExperimentAdjustments = () =>
+  txFetchData<{ adjustments: ExperimentAdjustment[] }>('/api/v1/growth/experiments/adjustments');

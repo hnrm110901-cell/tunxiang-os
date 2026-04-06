@@ -111,6 +111,7 @@ const MENU_CONFIGS: Record<string, MenuConfig> = {
       { label: '集团视图', items: [
         { id: 'brand-comparison', label: '品牌对比', icon: '🏢', path: '/hq/growth/brand-comparison' },
         { id: 'store-ranking', label: '门店排行', icon: '🏪', path: '/hq/growth/store-ranking' },
+        { id: 'cross-brand', label: '跨品牌增长', icon: '🔗', path: '/hq/growth/cross-brand' },
       ]},
       { label: '配置', items: [
         { id: 'growth-settings', label: '配置治理', icon: '⚙️', path: '/hq/growth/settings' },

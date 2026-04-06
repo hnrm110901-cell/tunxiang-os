@@ -16,6 +16,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.events.src.emitter import emit_event
+from services.growth_cross_brand_service import GrowthCrossBrandService
 
 GROWTH_EVT_PREFIX = "growth"
 ATTRIBUTION_WINDOW_HOURS = 168  # 7天归因窗口
@@ -106,6 +107,8 @@ class GrowthTouchService:
         variables: dict,
         tenant_id: str,
         db: AsyncSession,
+        brand_id: Optional[UUID] = None,
+        store_id: Optional[UUID] = None,
     ) -> dict:
         """执行触达: 渲染 -> 频控检查 -> 投诉检查 -> 发送 -> 记录"""
         await self._set_tenant(db, tenant_id)
@@ -178,6 +181,60 @@ class GrowthTouchService:
                 execution_state = "blocked"
                 block_reason = "complaint_open"
 
+        # ── 跨品牌频控（V2.3）──
+        if execution_state == "pending":
+            cross_brand_svc = GrowthCrossBrandService()
+            cross_check = await cross_brand_svc.check_cross_brand_frequency(
+                customer_id, tenant_id, db,
+            )
+            if not cross_check["can_touch"]:
+                execution_state = "blocked"
+                block_reason = cross_check["block_reason"]
+
+        # ── 品牌级频控（V2.3）──
+        if execution_state == "pending" and brand_id:
+            brand_config = await db.execute(text("""
+                SELECT max_touch_per_customer_day, max_touch_per_customer_week, daily_touch_budget
+                FROM growth_brand_configs
+                WHERE brand_id = :bid AND tenant_id = :tid AND is_deleted = FALSE
+            """), {"bid": str(brand_id), "tid": tenant_id})
+            bc = brand_config.fetchone()
+
+            if bc:
+                max_day = bc[0] or 2
+                max_week = bc[1] or 5
+                daily_budget = bc[2] or 100
+
+                # 检查该客户在该品牌下今日触达次数
+                today_count_result = await db.execute(text("""
+                    SELECT COUNT(*) FROM growth_touch_executions
+                    WHERE customer_id = :cid AND brand_id = :bid AND is_deleted = FALSE
+                      AND created_at::date = CURRENT_DATE
+                      AND execution_state NOT IN ('blocked', 'skipped')
+                """), {"cid": str(customer_id), "bid": str(brand_id)})
+                tc = today_count_result.scalar() or 0
+
+                if tc >= max_day:
+                    execution_state = "blocked"
+                    block_reason = "brand_frequency_day_limit"
+                    logger.info("touch_blocked_brand_frequency",
+                                customer_id=str(customer_id), brand_id=str(brand_id))
+
+                # 检查该品牌今日总触达预算
+                if execution_state == "pending":
+                    brand_today_result = await db.execute(text("""
+                        SELECT COUNT(*) FROM growth_touch_executions
+                        WHERE brand_id = :bid AND is_deleted = FALSE
+                          AND created_at::date = CURRENT_DATE
+                          AND execution_state NOT IN ('blocked', 'skipped')
+                    """), {"bid": str(brand_id)})
+                    bt = brand_today_result.scalar() or 0
+
+                    if bt >= daily_budget:
+                        execution_state = "blocked"
+                        block_reason = "brand_daily_budget_exhausted"
+                        logger.info("touch_blocked_brand_budget", brand_id=str(brand_id))
+
         # 4. 实际发送（如果未被阻止）
         send_result_data: Optional[dict] = None
         if execution_state == "pending":
@@ -214,13 +271,16 @@ class GrowthTouchService:
                 INSERT INTO growth_touch_executions
                     (id, tenant_id, customer_id, enrollment_id, template_id,
                      step_no, channel, mechanism_type, rendered_content,
-                     execution_state, block_reason)
+                     execution_state, block_reason,
+                     brand_id, store_id)
                 VALUES
                     (:id, :tenant_id, :customer_id, :enrollment_id, :template_id,
                      :step_no, :channel, :mechanism_type, :rendered_content,
-                     :execution_state, :block_reason)
+                     :execution_state, :block_reason,
+                     :brand_id, :store_id)
                 RETURNING id, tenant_id, customer_id, enrollment_id, template_id,
                           step_no, channel, execution_state, block_reason,
+                          brand_id, store_id,
                           created_at
             """),
             {
@@ -235,6 +295,8 @@ class GrowthTouchService:
                 "rendered_content": rendered_content,
                 "execution_state": execution_state,
                 "block_reason": block_reason,
+                "brand_id": str(brand_id) if brand_id else None,
+                "store_id": str(store_id) if store_id else None,
             },
         )
         execution = dict(result.fetchone()._mapping)

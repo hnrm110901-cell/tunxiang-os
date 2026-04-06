@@ -99,6 +99,7 @@ from .api.coupon_routes import router as coupon_router
 from .api.growth_campaign_routes import router as growth_campaign_router
 from .api.journey_routes import router as journey_router
 from .api.offer_routes import router as offer_router            # v144 DB化
+from .api.distribution_routes import router as distribution_router  # v191 三级分销
 from .api.referral_routes import router as referral_router
 from .api.segmentation_routes import router as segmentation_router
 from .api.growth_hub_routes import router as growth_hub_router
@@ -301,8 +302,10 @@ def _on_growth_journey_tick_done(task: asyncio.Task) -> None:
 # APScheduler — Silent Detection（每日凌晨2点）
 # ---------------------------------------------------------------------------
 
+from services.growth_experiment_service import GrowthExperimentService as _GrowthExperimentService
 from services.growth_profile_service import GrowthProfileService as _GrowthProfileService
 
+_growth_experiment_svc = _GrowthExperimentService()
 _growth_profile_svc = _GrowthProfileService()
 
 
@@ -408,6 +411,57 @@ def _on_p1_computation_done(task: asyncio.Task) -> None:
         logger.error("p1_computation_unhandled", error=str(exc), exc_info=exc)
 
 
+# ---------------------------------------------------------------------------
+# APScheduler — Auto Iterate Experiments（每6小时）
+# ---------------------------------------------------------------------------
+
+
+async def _run_auto_iterate() -> None:
+    """每6小时：自动迭代实验 + 调整旅程参数"""
+    logger.info("auto_iterate_started")
+    from sqlalchemy import text as _text
+
+    async with async_session_factory() as probe_db:
+        try:
+            result = await probe_db.execute(
+                _text("SELECT DISTINCT tenant_id FROM stores WHERE is_active = true")
+            )
+            tenant_ids = [str(row[0]) for row in result.fetchall()]
+        except (OSError, RuntimeError, ValueError) as exc:
+            logger.error("auto_iterate_fetch_tenants_error", error=str(exc), exc_info=True)
+            return
+
+    for tid in tenant_ids:
+        async with async_session_factory() as db:
+            try:
+                await db.execute(_text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": tid})
+                iter_result = await _growth_experiment_svc.auto_iterate(tid, db)
+                adjust_result = await _growth_experiment_svc.auto_adjust_journey_params(tid, db)
+                await db.commit()
+                logger.info(
+                    "auto_iterate_tenant_done",
+                    tenant_id=tid,
+                    actions=len(iter_result.get("actions_taken", [])),
+                    adjustments=len(adjust_result.get("adjustments", [])),
+                )
+            except (OSError, RuntimeError, ValueError) as exc:
+                await db.rollback()
+                logger.error("auto_iterate_tenant_error", tenant_id=tid, error=str(exc), exc_info=True)
+
+    logger.info("auto_iterate_finished", tenant_count=len(tenant_ids))
+
+
+def _schedule_auto_iterate() -> None:
+    task = asyncio.create_task(_run_auto_iterate())
+    task.add_done_callback(_on_auto_iterate_done)
+
+
+def _on_auto_iterate_done(task: asyncio.Task) -> None:
+    exc = task.exception() if not task.cancelled() else None
+    if exc is not None:
+        logger.error("auto_iterate_unhandled", error=str(exc), exc_info=exc)
+
+
 async def _run_journey_event_listener() -> None:
     """旅程事件监听后台任务：订阅 Redis Stream，实时触发旅程。
 
@@ -498,6 +552,17 @@ async def lifespan(app: FastAPI):
         misfire_grace_time=300,
     )
 
+    # Auto Iterate Experiments — 每6小时自动迭代实验 + 调整旅程参数
+    _scheduler.add_job(
+        _schedule_auto_iterate,
+        trigger="interval",
+        hours=6,
+        id="growth_auto_iterate",
+        replace_existing=True,
+        max_instances=1,
+        misfire_grace_time=600,
+    )
+
     _scheduler.start()
     logger.info("journey_executor_scheduler_started", interval_seconds=60)
     logger.info("approval_expiry_scheduler_started", interval_hours=1)
@@ -505,6 +570,7 @@ async def lifespan(app: FastAPI):
     logger.info("growth_journey_v2_scheduler_started", interval_seconds=60)
     logger.info("growth_silent_detection_scheduler_started", trigger="cron_02:00")
     logger.info("growth_p1_computation_scheduler_started", trigger="cron_03:00")
+    logger.info("growth_auto_iterate_scheduler_started", interval_hours=6)
 
     # 启动 EventBridge（桥接业务事件 → JourneyEngine）
     _bridge = _get_event_bridge(
@@ -553,6 +619,7 @@ app.include_router(coupon_router)           # /api/v1/growth/coupons（优惠券
 app.include_router(growth_campaign_router)  # /api/v1/growth/campaigns（新标准路径）
 app.include_router(segmentation_router)
 app.include_router(referral_router)
+app.include_router(distribution_router)  # v191 三级分销 /api/v1/growth/referral/*
 app.include_router(attribution_router)
 app.include_router(touch_attribution_router)
 app.include_router(ab_test_router)

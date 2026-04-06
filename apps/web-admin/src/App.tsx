@@ -84,6 +84,7 @@ import { ApprovalCenterPage as ApprovalCenterPageNew } from './pages/ops/approva
 import { PayrollManagePage } from './pages/org/payroll/PayrollManagePage';
 import { FranchiseDashboardPage } from './pages/org/franchise/FranchiseDashboardPage';
 import { FranchisePage } from './pages/franchise/FranchisePage';
+import FranchiseContractPage from './pages/franchise/FranchiseContractPage';
 import { PayrollConfigPage } from './pages/org/PayrollConfigPage';
 import { PayrollRecordsPage } from './pages/org/PayrollRecordsPage';
 import { FinanceAuditPage } from './pages/finance/FinanceAuditPage';
@@ -109,11 +110,14 @@ import { GrowthSettingsPage } from './pages/hq/growth/GrowthSettingsPage';
 import { JourneyAttributionPage } from './pages/hq/growth/JourneyAttributionPage';
 import { StoreGrowthRankPage } from './pages/hq/growth/StoreGrowthRankPage';
 import { BrandComparisonPage } from './pages/hq/growth/BrandComparisonPage';
+import { CrossBrandPage } from './pages/hq/growth/CrossBrandPage';
 import { GrowthSegmentTagsPage } from './pages/hq/growth/GrowthSegmentTagsPage';
 import { GrowthOfferPacksPage } from './pages/hq/growth/GrowthOfferPacksPage';
 import { CampaignManagePage } from './pages/growth/CampaignManagePage';
+import ReferralManagePage from './pages/growth/ReferralManagePage';  // v191 三级分销
 import { AttendancePage } from './pages/org/AttendancePage';
 import { PerformancePage } from './pages/org/PerformancePage';
+import { PieceworkPage } from './pages/org/PieceworkPage';  // v187 计件提成3.0
 import { MemberInsightPage } from './pages/member/MemberInsightPage';
 import { CustomerServicePage } from './pages/member/CustomerServicePage';
 import { MemberTierPage } from './pages/member/MemberTierPage';
@@ -126,6 +130,7 @@ import { ReviewManagePage } from './pages/ops/ReviewManagePage';
 import { SettlementMonitorPage } from './pages/ops/SettlementMonitorPage';
 import { StoreManagePage } from './pages/store/StoreManagePage';
 import { MarketSessionPage } from './pages/store/MarketSessionPage';  // v186 营业市别
+import FoodCourtManagePage from './pages/store/FoodCourtManagePage';  // TC-P2-12 智慧商街档口管理
 import { AgentDashboardPage } from './pages/agent/AgentDashboardPage';
 // ─── Phase1-4 新增页面 ───────────────────────────────────────────────────────
 import MenuSchemePage from './pages/menu/MenuSchemePage';
@@ -133,6 +138,7 @@ import { WineStoragePage } from './pages/finance/WineStoragePage';
 import { DepositManagePage } from './pages/finance/DepositManagePage';
 import { CostManagePage } from './pages/finance/CostManagePage';
 import { BudgetManagePage } from './pages/finance/BudgetManagePage';
+import { AgreementUnitPage } from './pages/finance/AgreementUnitPage';  // TC-P1-09
 import { EnterprisePage } from './pages/trade/EnterprisePage';
 import { ServiceChargeConfigPage } from './pages/trade/ServiceChargeConfigPage';
 import { DispatchRuleConfigPage } from './pages/kds/DispatchRuleConfigPage';
@@ -294,6 +300,7 @@ function App() {
           <Route path="/hq/growth/offer-packs" element={<GrowthOfferPacksPage />} />
           <Route path="/hq/growth/brand-comparison" element={<BrandComparisonPage />} />
           <Route path="/hq/growth/store-ranking" element={<StoreGrowthRankPage />} />
+          <Route path="/hq/growth/cross-brand" element={<CrossBrandPage />} />
           <Route path="/hq/trade/delivery" element={<DeliveryPage />} />
           <Route path="/hq/supply/inventory-intel" element={<InventoryIntelPage />} />
           <Route path="/hq/supply/chain" element={<SupplyChainPage />} />
@@ -316,6 +323,7 @@ function App() {
           <Route path="/payroll-manage" element={<PayrollManagePage />} />
           <Route path="/franchise-dashboard" element={<FranchiseDashboardPage />} />
           <Route path="/franchise" element={<FranchisePage />} />
+          <Route path="/franchise/contracts" element={<FranchiseContractPage />} />
           <Route path="/org/payroll-configs" element={<PayrollConfigPage />} />
           <Route path="/org/payroll-records" element={<PayrollRecordsPage />} />
           <Route path="/finance/audit" element={<FinanceAuditPage />} />
@@ -332,9 +340,11 @@ function App() {
           <Route path="/menu/sort" element={<DishSortPage />} />
           <Route path="/menu/batch" element={<DishBatchPage />} />
           <Route path="/growth/crm-campaign" element={<CRMCampaignPage />} />
+          <Route path="/growth/referral-distribution" element={<ReferralManagePage />} />  {/* v191 三级分销 */}
           <Route path="/growth/campaigns" element={<CampaignManagePage />} />
           <Route path="/org/attendance" element={<AttendancePage />} />
           <Route path="/org/performance" element={<PerformancePage />} />
+          <Route path="/org/piecework" element={<PieceworkPage />} />  {/* v187 计件提成3.0 */}
           <Route path="/member/insight" element={<MemberInsightPage />} />
           <Route path="/member/customer-service" element={<CustomerServicePage />} />
           <Route path="/member/tiers" element={<MemberTierPage />} />
@@ -345,6 +355,7 @@ function App() {
           <Route path="/ops/settlement-monitor" element={<SettlementMonitorPage />} />
           <Route path="/store/manage" element={<StoreManagePage />} />
           <Route path="/store/market-sessions" element={<MarketSessionPage />} />  {/* v186 营业市别 */}
+          <Route path="/store/food-court" element={<FoodCourtManagePage />} />  {/* TC-P2-12 智慧商街档口管理 */}
           <Route path="/hq/trade/banquet-templates" element={<BanquetTemplatePage />} />
           <Route path="/hq/supply/suppliers" element={<SupplierPortalPage />} />
           <Route path="/agent/dashboard" element={<AgentDashboardPage />} />
@@ -353,6 +364,7 @@ function App() {
           <Route path="/finance/deposits" element={<DepositManagePage />} />
           <Route path="/finance/costs" element={<CostManagePage />} />
           <Route path="/finance/budgets" element={<BudgetManagePage />} />
+          <Route path="/finance/agreement-units" element={<AgreementUnitPage />} />  {/* TC-P1-09 协议单位 */}
           {/* ─── Phase1: 交易配置 ─── */}
           <Route path="/trade/enterprise" element={<EnterprisePage />} />
           <Route path="/trade/service-charge" element={<ServiceChargeConfigPage />} />
