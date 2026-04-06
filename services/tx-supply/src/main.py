@@ -31,6 +31,10 @@ from .api.transfer_routes import router as transfer_router
 from .api.warehouse_ops_routes import router as warehouse_ops_router
 
 app = FastAPI(title="TunxiangOS tx-supply", version="3.0.0")
+
+from prometheus_fastapi_instrumentator import Instrumentator
+Instrumentator().instrument(app).expose(app)
+
 app.include_router(inv_router)
 app.include_router(bom_router)
 app.include_router(deduction_router)

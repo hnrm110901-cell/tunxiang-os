@@ -24,6 +24,10 @@ from .api.publish import router as publish_router
 from .api.scheme_routes import router as scheme_router
 
 app = FastAPI(title="TunxiangOS tx-menu", version="3.0.0")
+
+from prometheus_fastapi_instrumentator import Instrumentator
+Instrumentator().instrument(app).expose(app)
+
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 app.include_router(dish_router)
 app.include_router(publish_router)

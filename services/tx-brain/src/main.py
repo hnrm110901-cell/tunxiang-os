@@ -56,6 +56,12 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+from prometheus_fastapi_instrumentator import Instrumentator
+from prometheus_client import Counter, Histogram
+llm_requests_total = Counter('llm_api_requests_total', 'Total LLM API requests', ['model', 'status'])
+llm_request_duration = Histogram('llm_request_duration_seconds', 'LLM API request duration')
+Instrumentator().instrument(app).expose(app)
+
 # CORS
 app.add_middleware(
     CORSMiddleware,

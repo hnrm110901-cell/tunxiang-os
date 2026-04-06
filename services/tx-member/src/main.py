@@ -5,6 +5,15 @@ Golden ID 全渠道画像、RFM 分层、营销活动、用户旅程、私域运
 import asyncio
 from contextlib import asynccontextmanager
 
+# Feature Flag SDK（try/except 保护，SDK不可用时自动降级为全量开启）
+try:
+    from shared.feature_flags import is_enabled, FlagContext
+    from shared.feature_flags.flag_names import MemberFlags
+    _FLAG_SDK_AVAILABLE = True
+except ImportError:
+    _FLAG_SDK_AVAILABLE = False
+    def is_enabled(flag, context=None): return True  # noqa: E731
+
 import structlog
 from api.analytics_routes import router as analytics_router
 from api.card_routes import router as card_router
@@ -92,6 +101,29 @@ async def lifespan(app: FastAPI):
     from shared.ontology.src.database import get_db as _shared_get_db
     _stamp_mod.get_db = _shared_get_db
 
+    # ── Feature Flag 启动检查 ──────────────────────────────────────
+    # MemberFlags.INSIGHT_360: 客户360页面功能
+    if is_enabled(MemberFlags.INSIGHT_360):
+        logger.info("feature_flag_enabled", flag=MemberFlags.INSIGHT_360)
+    else:
+        logger.info("feature_flag_disabled", flag=MemberFlags.INSIGHT_360,
+                    note="客户360画像路由已注册但Flag关闭，接口将返回功能未开启提示")
+
+    # MemberFlags.CLV_ENGINE: CLV生命周期价值引擎
+    if is_enabled(MemberFlags.CLV_ENGINE):
+        logger.info("feature_flag_enabled", flag=MemberFlags.CLV_ENGINE)
+    else:
+        logger.info("feature_flag_disabled", flag=MemberFlags.CLV_ENGINE,
+                    note="CLV引擎已跳过初始化，相关API将返回功能未开启")
+
+    # MemberFlags.GDPR_ANONYMIZE: GDPR匿名化（等保三级合规）
+    if is_enabled(MemberFlags.GDPR_ANONYMIZE):
+        logger.info("feature_flag_enabled", flag=MemberFlags.GDPR_ANONYMIZE,
+                    note="GDPR匿名化合规功能已激活")
+    else:
+        logger.warning("feature_flag_disabled", flag=MemberFlags.GDPR_ANONYMIZE,
+                       note="GDPR匿名化未启用，等保三级合规可能不满足")
+
     # 注册 RFM 每日凌晨2点定时任务（Asia/Shanghai）
     _scheduler.add_job(
         lambda: asyncio.create_task(_run_rfm_update()),
@@ -127,6 +159,9 @@ app = FastAPI(
     description="会员CDP — 储值卡/积分商城/付费会员/营销/优惠券",
     lifespan=lifespan,
 )
+
+from prometheus_fastapi_instrumentator import Instrumentator
+Instrumentator().instrument(app).expose(app)
 
 app.add_middleware(
     CORSMiddleware,

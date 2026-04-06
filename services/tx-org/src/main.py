@@ -77,6 +77,10 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="TunxiangOS tx-org", version="3.0.0", lifespan=lifespan)
+
+from prometheus_fastapi_instrumentator import Instrumentator
+Instrumentator().instrument(app).expose(app)
+
 app.include_router(emp_router)
 app.include_router(schedule_router)
 app.include_router(role_router)

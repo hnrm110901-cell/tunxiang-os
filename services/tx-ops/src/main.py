@@ -1,6 +1,18 @@
 """tx-ops — 日清日结操作层微服务 (E1-E8)"""
+import structlog
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
+# Feature Flag SDK（try/except 保护，SDK不可用时自动降级为全量开启）
+try:
+    from shared.feature_flags import is_enabled, FlagContext
+    from shared.feature_flags.flag_names import AgentFlags
+    _FLAG_SDK_AVAILABLE = True
+except ImportError:
+    _FLAG_SDK_AVAILABLE = False
+    def is_enabled(flag, context=None): return True  # noqa: E731
+
+logger = structlog.get_logger(__name__)
 
 from .api.approval_center_routes import router as approval_center_router
 from .api.approval_workflow_routes import router as approval_router
@@ -27,6 +39,10 @@ from .api.safety_inspection_router import router as safety_inspection_router
 from .api.haccp_routes import router as haccp_router
 
 app = FastAPI(title="TunxiangOS tx-ops", version="3.0.0", description="日清日结操作层")
+
+from prometheus_fastapi_instrumentator import Instrumentator
+Instrumentator().instrument(app).expose(app)
+
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 app.include_router(router)
 app.include_router(clone_router)

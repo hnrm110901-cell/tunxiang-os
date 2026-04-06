@@ -20,6 +20,9 @@ app = FastAPI(
     version="1.0.0",
 )
 
+from prometheus_fastapi_instrumentator import Instrumentator
+Instrumentator().instrument(app).expose(app)
+
 # ─── 服务实例 ───
 
 competitor_svc = CompetitorMonitorService()

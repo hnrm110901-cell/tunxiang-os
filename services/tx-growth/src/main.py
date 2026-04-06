@@ -542,6 +542,10 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="TunxiangOS tx-growth", version="3.0.0", lifespan=lifespan)
+
+from prometheus_fastapi_instrumentator import Instrumentator
+Instrumentator().instrument(app).expose(app)
+
 app.include_router(campaign_router)
 app.include_router(coupon_router)           # /api/v1/growth/coupons（优惠券核销）
 app.include_router(growth_campaign_router)  # /api/v1/growth/campaigns（新标准路径）
