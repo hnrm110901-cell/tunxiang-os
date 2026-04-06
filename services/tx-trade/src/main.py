@@ -241,6 +241,13 @@ app.include_router(kds_banquet_router)
 app.include_router(print_template_router)
 app.include_router(dish_dept_mapping_router)
 
+# ── 快餐模式：快餐收银 + 叫号屏 ──
+from .api.quick_cashier_routes import router as quick_cashier_router
+from .api.calling_screen_routes import router as calling_screen_router
+
+app.include_router(quick_cashier_router)
+app.include_router(calling_screen_router)
+
 
 @app.get("/health")
 async def health():

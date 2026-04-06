@@ -6,17 +6,18 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Card, Table, Tag, Space, Row, Col, Statistic, Select, DatePicker,
-  Spin,
+  Spin, Tabs,
 } from 'antd';
 import ReactEChartsCore from 'echarts-for-react/lib/core';
 import * as echarts from 'echarts/core';
-import { BarChart } from 'echarts/charts';
+import { BarChart, PieChart } from 'echarts/charts';
 import { GridComponent, TooltipComponent, LegendComponent } from 'echarts/components';
 import { CanvasRenderer } from 'echarts/renderers';
 import { txFetch } from '../../../api';
-import type { TouchExecution } from '../../../api/growthHubApi';
+import { useApi } from '../../../hooks/useApi';
+import type { TouchExecution, MechanismAttribution, RepairEffectiveness } from '../../../api/growthHubApi';
 
-echarts.use([BarChart, GridComponent, TooltipComponent, LegendComponent, CanvasRenderer]);
+echarts.use([BarChart, PieChart, GridComponent, TooltipComponent, LegendComponent, CanvasRenderer]);
 
 const { RangePicker } = DatePicker;
 
@@ -71,11 +72,35 @@ interface AttributionRow {
   roi: number;
 }
 
+// ---- 机制类型中文映射 ----
+const MECHANISM_LABELS: Record<string, string> = {
+  hook: '钩子吸引',
+  loss_aversion: '损失规避',
+  repair: '服务修复',
+  mixed: '混合机制',
+  social_proof: '社会认同',
+  scarcity: '稀缺效应',
+  reciprocity: '互惠心理',
+  authority: '权威背书',
+  commitment: '承诺一致',
+};
+
 // ---- 组件 ----
 export function JourneyAttributionPage() {
   const [loading, setLoading] = useState(false);
   const [executions, setExecutions] = useState<TouchExecution[]>([]);
   const [filterType, setFilterType] = useState<string | undefined>();
+  const [activeTab, setActiveTab] = useState('overview');
+
+  // 新增数据源
+  const { data: mechData } = useApi<{ items: MechanismAttribution[]; days: number }>(
+    '/api/v1/growth/attribution/by-mechanism?days=7',
+    { cacheMs: 15_000 },
+  );
+  const { data: repairData } = useApi<RepairEffectiveness>(
+    '/api/v1/growth/attribution/repair-effectiveness?days=30',
+    { cacheMs: 15_000 },
+  );
 
   const fetchExecutions = useCallback(async () => {
     setLoading(true);
@@ -246,6 +271,130 @@ export function JourneyAttributionPage() {
     },
   ];
 
+  // ---- 按机制归因Tab的列定义 ----
+  const mechColumns = [
+    {
+      title: '机制类型', dataIndex: 'mechanism_type', key: 'mechanism_type', width: 140,
+      render: (val: string) => (
+        <Tag color={MECHANISM_COLORS[val] || 'default'}>{MECHANISM_LABELS[val] || val}</Tag>
+      ),
+    },
+    {
+      title: '触达数', dataIndex: 'total_touches', key: 'total_touches', width: 90,
+      sorter: (a: MechanismAttribution, b: MechanismAttribution) => a.total_touches - b.total_touches,
+      render: (val: number) => <span style={{ color: TEXT_PRIMARY }}>{val}</span>,
+    },
+    {
+      title: '打开数', dataIndex: 'opened', key: 'opened', width: 90,
+      sorter: (a: MechanismAttribution, b: MechanismAttribution) => a.opened - b.opened,
+      render: (val: number) => <span style={{ color: SUCCESS_GREEN }}>{val}</span>,
+    },
+    {
+      title: '打开率', dataIndex: 'open_rate', key: 'open_rate', width: 90,
+      sorter: (a: MechanismAttribution, b: MechanismAttribution) => a.open_rate - b.open_rate,
+      render: (val: number) => (
+        <span style={{ color: val >= 20 ? SUCCESS_GREEN : val >= 10 ? WARNING_ORANGE : DANGER_RED, fontWeight: 600 }}>
+          {val.toFixed(1)}%
+        </span>
+      ),
+    },
+    {
+      title: '归因订单', dataIndex: 'attributed', key: 'attributed', width: 100,
+      sorter: (a: MechanismAttribution, b: MechanismAttribution) => a.attributed - b.attributed,
+      render: (val: number) => <span style={{ color: BRAND_ORANGE, fontWeight: 600 }}>{val}</span>,
+    },
+    {
+      title: '归因率', dataIndex: 'attribution_rate', key: 'attribution_rate', width: 90,
+      sorter: (a: MechanismAttribution, b: MechanismAttribution) => a.attribution_rate - b.attribution_rate,
+      render: (val: number) => (
+        <span style={{ color: val >= 5 ? SUCCESS_GREEN : val >= 2 ? WARNING_ORANGE : DANGER_RED, fontWeight: 600 }}>
+          {val.toFixed(1)}%
+        </span>
+      ),
+    },
+    {
+      title: '归因GMV', dataIndex: 'revenue_fen', key: 'revenue_fen', width: 120,
+      sorter: (a: MechanismAttribution, b: MechanismAttribution) => a.revenue_fen - b.revenue_fen,
+      render: (val: number) => (
+        <span style={{ color: BRAND_ORANGE, fontWeight: 600 }}>
+          ¥{(val / 100).toFixed(0)}
+        </span>
+      ),
+    },
+  ];
+
+  // ---- 按机制归因的ECharts对比图 ----
+  const mechChartOption = useMemo(() => {
+    const items = mechData?.items || [];
+    if (items.length === 0) return {};
+    const sorted = [...items].sort((a, b) => b.revenue_fen - a.revenue_fen);
+    return {
+      tooltip: { trigger: 'axis' as const },
+      grid: { left: 100, right: 40, top: 40, bottom: 40 },
+      xAxis: {
+        type: 'category' as const,
+        data: sorted.map((r) => MECHANISM_LABELS[r.mechanism_type] || r.mechanism_type),
+        axisLabel: { color: TEXT_SECONDARY, rotate: 15 },
+        axisLine: { lineStyle: { color: BORDER } },
+      },
+      yAxis: [
+        {
+          type: 'value' as const, name: '打开率/归因率(%)',
+          axisLabel: { color: TEXT_SECONDARY },
+          splitLine: { lineStyle: { color: BORDER, type: 'dashed' as const } },
+        },
+        {
+          type: 'value' as const, name: '归因GMV(元)',
+          axisLabel: { color: TEXT_SECONDARY, formatter: (v: number) => `¥${(v / 100).toFixed(0)}` },
+          splitLine: { show: false },
+        },
+      ],
+      legend: {
+        data: ['打开率', '归因率', '归因GMV'],
+        textStyle: { color: TEXT_SECONDARY },
+      },
+      series: [
+        {
+          name: '打开率', type: 'bar', yAxisIndex: 0,
+          data: sorted.map((r) => r.open_rate),
+          itemStyle: { color: INFO_BLUE },
+        },
+        {
+          name: '归因率', type: 'bar', yAxisIndex: 0,
+          data: sorted.map((r) => r.attribution_rate),
+          itemStyle: { color: SUCCESS_GREEN },
+        },
+        {
+          name: '归因GMV', type: 'bar', yAxisIndex: 1,
+          data: sorted.map((r) => r.revenue_fen),
+          itemStyle: { color: BRAND_ORANGE },
+        },
+      ],
+    };
+  }, [mechData]);
+
+  // ---- 修复效果饼图 ----
+  const repairPieOption = useMemo(() => {
+    if (!repairData) return {};
+    return {
+      tooltip: { trigger: 'item' as const, formatter: '{b}: {c} ({d}%)' },
+      legend: {
+        orient: 'vertical' as const, right: 20, top: 'center',
+        textStyle: { color: TEXT_SECONDARY },
+      },
+      series: [{
+        type: 'pie', radius: ['40%', '70%'], center: ['40%', '50%'],
+        label: { color: TEXT_SECONDARY },
+        data: [
+          { value: repairData.recovered, name: '已修复', itemStyle: { color: SUCCESS_GREEN } },
+          { value: repairData.failed, name: '失败', itemStyle: { color: DANGER_RED } },
+          { value: repairData.in_progress, name: '进行中', itemStyle: { color: WARNING_ORANGE } },
+          { value: repairData.closed, name: '已关闭', itemStyle: { color: TEXT_SECONDARY } },
+        ].filter((d) => d.value > 0),
+      }],
+    };
+  }, [repairData]);
+
   return (
     <div style={{ padding: 24, background: PAGE_BG, minHeight: '100vh' }}>
       {/* 顶部 */}
@@ -288,36 +437,131 @@ export function JourneyAttributionPage() {
         ))}
       </Row>
 
-      {/* 归因表 */}
-      <Card
-        title={<span style={{ color: TEXT_PRIMARY }}>归因明细</span>}
-        style={{ background: CARD_BG, border: `1px solid ${BORDER}`, marginBottom: 16 }}
-        styles={{ header: { borderBottom: `1px solid ${BORDER}` } }}
-        bodyStyle={{ padding: 0 }}
-      >
-        <Table
-          loading={loading}
-          dataSource={aggregated}
-          columns={columns}
-          rowKey="mechanism_family"
-          size="small"
-          pagination={false}
-          scroll={{ x: 800 }}
-        />
-      </Card>
+      {/* Tabs: 总览 / 按机制归因 / 修复效果 */}
+      <Tabs
+        activeKey={activeTab}
+        onChange={setActiveTab}
+        style={{ marginBottom: 16 }}
+        items={[
+          {
+            key: 'overview',
+            label: <span style={{ color: TEXT_PRIMARY }}>总览</span>,
+            children: (
+              <>
+                {/* 归因表 */}
+                <Card
+                  title={<span style={{ color: TEXT_PRIMARY }}>归因明细</span>}
+                  style={{ background: CARD_BG, border: `1px solid ${BORDER}`, marginBottom: 16 }}
+                  styles={{ header: { borderBottom: `1px solid ${BORDER}` } }}
+                  bodyStyle={{ padding: 0 }}
+                >
+                  <Table
+                    loading={loading}
+                    dataSource={aggregated}
+                    columns={columns}
+                    rowKey="mechanism_family"
+                    size="small"
+                    pagination={false}
+                    scroll={{ x: 800 }}
+                  />
+                </Card>
 
-      {/* 效果对比图 */}
-      <Card
-        title={<span style={{ color: TEXT_PRIMARY }}>按机制类型效果对比</span>}
-        style={{ background: CARD_BG, border: `1px solid ${BORDER}` }}
-        styles={{ header: { borderBottom: `1px solid ${BORDER}` } }}
-      >
-        {aggregated.length > 0 ? (
-          <ReactEChartsCore echarts={echarts} option={chartOption} style={{ height: 350 }} />
-        ) : (
-          <div style={{ textAlign: 'center', padding: 60, color: TEXT_SECONDARY }}>暂无数据</div>
-        )}
-      </Card>
+                {/* 效果对比图 */}
+                <Card
+                  title={<span style={{ color: TEXT_PRIMARY }}>按机制类型效果对比</span>}
+                  style={{ background: CARD_BG, border: `1px solid ${BORDER}` }}
+                  styles={{ header: { borderBottom: `1px solid ${BORDER}` } }}
+                >
+                  {aggregated.length > 0 ? (
+                    <ReactEChartsCore echarts={echarts} option={chartOption} style={{ height: 350 }} />
+                  ) : (
+                    <div style={{ textAlign: 'center', padding: 60, color: TEXT_SECONDARY }}>暂无数据</div>
+                  )}
+                </Card>
+              </>
+            ),
+          },
+          {
+            key: 'by-mechanism',
+            label: <span style={{ color: TEXT_PRIMARY }}>按机制归因</span>,
+            children: (
+              <>
+                {/* 机制归因表格 */}
+                <Card
+                  title={<span style={{ color: TEXT_PRIMARY }}>按心理机制维度归因（近7天）</span>}
+                  style={{ background: CARD_BG, border: `1px solid ${BORDER}`, marginBottom: 16 }}
+                  styles={{ header: { borderBottom: `1px solid ${BORDER}` } }}
+                  bodyStyle={{ padding: 0 }}
+                >
+                  <Table
+                    dataSource={mechData?.items || []}
+                    columns={mechColumns}
+                    rowKey="mechanism_type"
+                    size="small"
+                    pagination={false}
+                    scroll={{ x: 800 }}
+                    locale={{ emptyText: <span style={{ color: TEXT_SECONDARY }}>暂无机制归因数据</span> }}
+                  />
+                </Card>
+
+                {/* 机制对比图：打开率 vs 归因率 vs GMV */}
+                <Card
+                  title={<span style={{ color: TEXT_PRIMARY }}>模板框架效果对比（打开率/归因率/GMV）</span>}
+                  style={{ background: CARD_BG, border: `1px solid ${BORDER}` }}
+                  styles={{ header: { borderBottom: `1px solid ${BORDER}` } }}
+                >
+                  {(mechData?.items || []).length > 0 ? (
+                    <ReactEChartsCore echarts={echarts} option={mechChartOption} style={{ height: 380 }} />
+                  ) : (
+                    <div style={{ textAlign: 'center', padding: 60, color: TEXT_SECONDARY }}>暂无数据</div>
+                  )}
+                </Card>
+              </>
+            ),
+          },
+          {
+            key: 'repair',
+            label: <span style={{ color: TEXT_PRIMARY }}>修复效果</span>,
+            children: (
+              <>
+                {/* 修复KPI卡片 */}
+                <Row gutter={16} style={{ marginBottom: 16 }}>
+                  {[
+                    { title: '总案例数', value: repairData?.total_cases ?? '--', color: INFO_BLUE, suffix: '' },
+                    { title: '修复率', value: repairData?.recovery_rate != null ? `${repairData.recovery_rate}` : '--', color: SUCCESS_GREEN, suffix: '%' },
+                    { title: '平均修复时长', value: repairData?.avg_recovery_hours != null ? `${repairData.avg_recovery_hours}` : '--', color: WARNING_ORANGE, suffix: 'h' },
+                    { title: '平均响应时长', value: repairData?.avg_ack_minutes != null ? `${repairData.avg_ack_minutes}` : '--', color: BRAND_ORANGE, suffix: 'min' },
+                  ].map((item) => (
+                    <Col span={6} key={item.title}>
+                      <Card style={{ background: CARD_BG, border: `1px solid ${BORDER}` }}>
+                        <Statistic
+                          title={<span style={{ color: TEXT_SECONDARY }}>{item.title}</span>}
+                          value={item.value}
+                          suffix={item.suffix}
+                          valueStyle={{ color: item.color, fontSize: 28 }}
+                        />
+                      </Card>
+                    </Col>
+                  ))}
+                </Row>
+
+                {/* 修复状态分布饼图 */}
+                <Card
+                  title={<span style={{ color: TEXT_PRIMARY }}>修复状态分布（近30天）</span>}
+                  style={{ background: CARD_BG, border: `1px solid ${BORDER}` }}
+                  styles={{ header: { borderBottom: `1px solid ${BORDER}` } }}
+                >
+                  {repairData && repairData.total_cases > 0 ? (
+                    <ReactEChartsCore echarts={echarts} option={repairPieOption} style={{ height: 350 }} />
+                  ) : (
+                    <div style={{ textAlign: 'center', padding: 60, color: TEXT_SECONDARY }}>暂无修复案例数据</div>
+                  )}
+                </Card>
+              </>
+            ),
+          },
+        ]}
+      />
     </div>
   );
 }

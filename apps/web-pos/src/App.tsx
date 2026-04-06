@@ -18,6 +18,9 @@ import { SplitPayPage } from './pages/SplitPayPage';
 import { TaxInvoicePage } from './pages/TaxInvoicePage';
 import { HandoverPage } from './pages/HandoverPage';
 import { QuickCashierPage } from './pages/QuickCashierPage';
+import { WineStoragePosPage } from './pages/WineStoragePosPage';
+import { DepositPosPage } from './pages/DepositPosPage';
+import { CallingScreenPage } from './pages/CallingScreenPage';
 import { DiscountAuditPage } from './pages/DiscountAuditPage';
 import { LiveMenuEditorPage } from './pages/LiveMenuEditorPage';
 import { MenuEngineeringPage } from './pages/MenuEngineeringPage';
@@ -53,6 +56,11 @@ function AppLayout() {
         <Route path="/reports" element={<POSReportsPage />} />
         <Route path="/handover" element={<HandoverPage />} />
         <Route path="/quick-cashier" element={<QuickCashierPage />} />
+        {/* ─── Phase1: 存酒 / 押金 门店操作端 ─── */}
+        <Route path="/wine-storage" element={<WineStoragePosPage />} />
+        <Route path="/deposits" element={<DepositPosPage />} />
+        {/* ─── Phase4: 快餐叫号屏 ─── */}
+        <Route path="/calling-screen" element={<CallingScreenPage />} />
         <Route path="/discount-audit" element={<DiscountAuditPage />} />
         <Route path="/live-menu" element={<LiveMenuEditorPage />} />
         <Route path="/menu-engineering" element={<MenuEngineeringPage />} />

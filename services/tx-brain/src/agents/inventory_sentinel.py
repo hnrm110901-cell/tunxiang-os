@@ -287,4 +287,87 @@ class InventorySentinelAgent:
         }
 
 
+    async def analyze_from_mv(self, tenant_id: str, store_id: str | None = None) -> dict:
+        """从 mv_inventory_bom 快速读取 BOM 损耗数据，<5ms，无 Claude 调用。
+
+        数据来源：因果链③投影视图（InventoryBomProjector）
+        返回高损耗率食材列表（loss_rate > 10%）。
+        """
+        from sqlalchemy import text
+        from sqlalchemy.exc import SQLAlchemyError
+        from shared.ontology.src.database import get_db
+
+        try:
+            async for db in get_db():
+                await db.execute(
+                    text("SELECT set_config('app.tenant_id', :tid, true)"),
+                    {"tid": str(tenant_id)},
+                )
+                params: dict = {"tenant_id": tenant_id}
+                store_clause = ""
+                if store_id:
+                    store_clause = "AND store_id = :store_id"
+                    params["store_id"] = store_id
+
+                result = await db.execute(
+                    text(f"""
+                        SELECT
+                            ingredient_id,
+                            ingredient_name,
+                            theoretical_usage_g,
+                            actual_usage_g,
+                            waste_g,
+                            unexplained_loss_g,
+                            loss_rate,
+                            stat_date
+                        FROM mv_inventory_bom
+                        WHERE tenant_id = :tenant_id
+                        {store_clause}
+                        AND stat_date = (
+                            SELECT MAX(stat_date) FROM mv_inventory_bom
+                            WHERE tenant_id = :tenant_id {store_clause}
+                        )
+                        ORDER BY loss_rate DESC
+                        LIMIT 20
+                    """),
+                    params,
+                )
+                rows = result.mappings().all()
+                items = []
+                for r in rows:
+                    item = dict(r._mapping)
+                    if item.get("loss_rate") is not None:
+                        item["loss_rate"] = float(item["loss_rate"])
+                    for g_field in ("theoretical_usage_g", "actual_usage_g", "waste_g", "unexplained_loss_g"):
+                        if item.get(g_field) is not None:
+                            item[g_field] = float(item[g_field])
+                    items.append(item)
+
+                high_loss_items = [i for i in items if i.get("loss_rate", 0) > 0.10]
+                return {
+                    "inference_layer": "mv_fast_path",
+                    "data": {
+                        "total_ingredients": len(items),
+                        "high_loss_count": len(high_loss_items),
+                        "high_loss_items": high_loss_items[:5],
+                        "all_items": items,
+                    },
+                    "agent": self.__class__.__name__,
+                    "risk_signal": "high" if len(high_loss_items) > 3 else ("medium" if high_loss_items else "normal"),
+                }
+        except SQLAlchemyError as exc:
+            logger.warning(
+                "inventory_sentinel_mv_db_error",
+                tenant_id=tenant_id,
+                store_id=store_id,
+                error=str(exc),
+            )
+            return {
+                "inference_layer": "mv_fast_path_error",
+                "data": {},
+                "agent": self.__class__.__name__,
+                "error": "数据库查询失败，请使用实时分析",
+            }
+
+
 inventory_sentinel = InventorySentinelAgent()

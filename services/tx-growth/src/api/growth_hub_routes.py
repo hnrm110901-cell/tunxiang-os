@@ -1,4 +1,4 @@
-"""增长中枢 V2 API — 25 个端点
+"""增长中枢 V2 API — 31 个端点
 
 端点：
   # Customer Growth Profile
@@ -38,6 +38,13 @@
   GET    /api/v1/growth/agent-suggestions/{suggestion_id}      → 建议详情
   POST   /api/v1/growth/agent-suggestions/{suggestion_id}/review  → 审核建议
   POST   /api/v1/growth/agent-suggestions/{suggestion_id}/publish → 发布建议
+
+  # Dashboard & Attribution
+  GET    /api/v1/growth/dashboard-stats                        → 增长驾驶舱KPI聚合(含mechanism_summary)
+  GET    /api/v1/growth/attribution/by-mechanism               → 按心理机制归因统计
+  GET    /api/v1/growth/attribution/by-journey-template        → 按旅程模板归因统计
+  GET    /api/v1/growth/attribution/repair-effectiveness       → 服务修复效果归因
+  GET    /api/v1/growth/customers/funnel-stats                 → 客户增长漏斗
 
 所有端点必须携带 X-Tenant-ID Header（UUID 格式）。
 """
@@ -940,6 +947,29 @@ async def get_dashboard_stats(
                 conversion_rates["touch_open_rate"] = 0.0
                 conversion_rates["touch_attribution_rate"] = 0.0
 
+            # 7. mechanism_type 分组摘要（近7天）
+            mech_stats = await db.execute(text("""
+                SELECT mechanism_type, COUNT(*),
+                       COUNT(*) FILTER (WHERE execution_state IN ('opened','clicked','replied')),
+                       COUNT(*) FILTER (WHERE attributed_order_id IS NOT NULL)
+                FROM growth_touch_executions
+                WHERE is_deleted = FALSE AND created_at >= NOW() - INTERVAL '7 days'
+                  AND mechanism_type IS NOT NULL
+                GROUP BY mechanism_type
+            """))
+            mech_rows = mech_stats.fetchall()
+            mechanism_summary = []
+            for mr in mech_rows:
+                total_m = mr[1] or 0
+                mechanism_summary.append({
+                    "mechanism_type": mr[0],
+                    "total": total_m,
+                    "opened": mr[2] or 0,
+                    "attributed": mr[3] or 0,
+                    "open_rate": round((mr[2] or 0) / total_m * 100, 1) if total_m > 0 else 0,
+                    "attribution_rate": round((mr[3] or 0) / total_m * 100, 1) if total_m > 0 else 0,
+                })
+
             return {"ok": True, "data": {
                 "profiles": {
                     "total": total_profiles,
@@ -973,6 +1003,7 @@ async def get_dashboard_stats(
                 },
                 "funnel": funnel,
                 "conversion_rates": conversion_rates,
+                "mechanism_summary": mechanism_summary,
             }}
         except (ValueError, RuntimeError, OSError) as exc:
             return {"ok": False, "error": {"message": str(exc)}}
@@ -1039,5 +1070,159 @@ async def get_funnel_stats(
                 conversion_rates["second_visit_rate"] = 0.0
 
             return ok({"funnel": funnel, "conversion_rates": conversion_rates})
+        except (ValueError, RuntimeError, OSError) as exc:
+            return err(str(exc))
+
+
+# ---------------------------------------------------------------------------
+# Attribution 归因端点 (3)
+# ---------------------------------------------------------------------------
+
+@router.get("/attribution/by-mechanism")
+async def get_attribution_by_mechanism(
+    days: int = Query(7, ge=1, le=90),
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+) -> dict:
+    """按心理机制分组的触达归因统计。"""
+    tenant_id = str(_parse_tenant(x_tenant_id))
+    async with async_session_factory() as db:
+        try:
+            await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": tenant_id})
+
+            result = await db.execute(text("""
+                SELECT
+                    mechanism_type,
+                    COUNT(*) AS total_touches,
+                    COUNT(*) FILTER (WHERE execution_state IN ('delivered','opened','clicked','replied')) AS delivered,
+                    COUNT(*) FILTER (WHERE execution_state IN ('opened','clicked','replied')) AS opened,
+                    COUNT(*) FILTER (WHERE execution_state IN ('clicked','replied')) AS clicked,
+                    COUNT(*) FILTER (WHERE attributed_order_id IS NOT NULL) AS attributed,
+                    COALESCE(SUM(attributed_revenue_fen) FILTER (WHERE attributed_order_id IS NOT NULL), 0) AS revenue_fen,
+                    COALESCE(SUM(attributed_gross_profit_fen) FILTER (WHERE attributed_order_id IS NOT NULL), 0) AS profit_fen
+                FROM growth_touch_executions
+                WHERE is_deleted = FALSE
+                  AND created_at >= NOW() - make_interval(days => :days)
+                  AND mechanism_type IS NOT NULL
+                GROUP BY mechanism_type
+                ORDER BY attributed DESC
+            """), {"days": days})
+
+            rows = result.fetchall()
+            items = []
+            for r in rows:
+                delivered = r[2] or 0
+                items.append({
+                    "mechanism_type": r[0],
+                    "total_touches": r[1],
+                    "delivered": delivered,
+                    "opened": r[3] or 0,
+                    "clicked": r[4] or 0,
+                    "attributed": r[5] or 0,
+                    "revenue_fen": r[6] or 0,
+                    "profit_fen": r[7] or 0,
+                    "open_rate": round((r[3] or 0) / delivered * 100, 1) if delivered > 0 else 0,
+                    "attribution_rate": round((r[5] or 0) / delivered * 100, 1) if delivered > 0 else 0,
+                })
+            return ok({"items": items, "days": days})
+        except (ValueError, RuntimeError, OSError) as exc:
+            return err(str(exc))
+
+
+@router.get("/attribution/by-journey-template")
+async def get_attribution_by_journey_template(
+    days: int = Query(7, ge=1, le=90),
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+) -> dict:
+    """按旅程模板分组的归因统计。"""
+    tenant_id = str(_parse_tenant(x_tenant_id))
+    async with async_session_factory() as db:
+        try:
+            await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": tenant_id})
+
+            result = await db.execute(text("""
+                SELECT
+                    gjt.name AS template_name,
+                    gjt.journey_type,
+                    gjt.mechanism_family,
+                    COUNT(DISTINCT gje.id) AS total_enrollments,
+                    COUNT(DISTINCT gje.id) FILTER (WHERE gje.journey_state = 'completed') AS completed,
+                    COUNT(DISTINCT gje.id) FILTER (WHERE gje.journey_state = 'exited') AS exited,
+                    COUNT(gte.id) AS total_touches,
+                    COUNT(gte.id) FILTER (WHERE gte.execution_state IN ('opened','clicked','replied')) AS opened,
+                    COUNT(gte.id) FILTER (WHERE gte.attributed_order_id IS NOT NULL) AS attributed,
+                    COALESCE(SUM(gte.attributed_revenue_fen) FILTER (WHERE gte.attributed_order_id IS NOT NULL), 0) AS revenue_fen
+                FROM growth_journey_templates gjt
+                LEFT JOIN growth_journey_enrollments gje
+                    ON gje.journey_template_id = gjt.id AND gje.is_deleted = FALSE
+                    AND gje.created_at >= NOW() - make_interval(days => :days)
+                LEFT JOIN growth_touch_executions gte
+                    ON gte.journey_enrollment_id = gje.id AND gte.is_deleted = FALSE
+                WHERE gjt.is_deleted = FALSE AND gjt.is_active = TRUE
+                GROUP BY gjt.id, gjt.name, gjt.journey_type, gjt.mechanism_family
+                ORDER BY attributed DESC
+            """), {"days": days})
+
+            rows = result.fetchall()
+            items = []
+            for r in rows:
+                total_enroll = r[3] or 0
+                items.append({
+                    "template_name": r[0],
+                    "journey_type": r[1],
+                    "mechanism_family": r[2],
+                    "total_enrollments": total_enroll,
+                    "completed": r[4] or 0,
+                    "exited": r[5] or 0,
+                    "completion_rate": round((r[4] or 0) / total_enroll * 100, 1) if total_enroll > 0 else 0,
+                    "total_touches": r[6] or 0,
+                    "opened": r[7] or 0,
+                    "attributed": r[8] or 0,
+                    "revenue_fen": r[9] or 0,
+                })
+            return ok({"items": items, "days": days})
+        except (ValueError, RuntimeError, OSError) as exc:
+            return err(str(exc))
+
+
+@router.get("/attribution/repair-effectiveness")
+async def get_repair_effectiveness(
+    days: int = Query(30, ge=1, le=365),
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+) -> dict:
+    """服务修复效果归因。"""
+    tenant_id = str(_parse_tenant(x_tenant_id))
+    async with async_session_factory() as db:
+        try:
+            await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": tenant_id})
+
+            result = await db.execute(text("""
+                SELECT
+                    COUNT(*) AS total_cases,
+                    COUNT(*) FILTER (WHERE repair_state = 'recovered') AS recovered,
+                    COUNT(*) FILTER (WHERE repair_state = 'failed') AS failed,
+                    COUNT(*) FILTER (WHERE repair_state = 'closed') AS closed,
+                    COUNT(*) FILTER (WHERE repair_state IN ('opened','acknowledged','compensating','observing')) AS in_progress,
+                    AVG(EXTRACT(EPOCH FROM (recovered_at - created_at))/3600)
+                        FILTER (WHERE recovered_at IS NOT NULL) AS avg_recovery_hours,
+                    AVG(EXTRACT(EPOCH FROM (emotion_ack_at - created_at))/60)
+                        FILTER (WHERE emotion_ack_at IS NOT NULL) AS avg_ack_minutes
+                FROM growth_service_repair_cases
+                WHERE is_deleted = FALSE
+                  AND created_at >= NOW() - make_interval(days => :days)
+            """), {"days": days})
+
+            r = result.fetchone()
+            total = r[0] if r else 0
+            return ok({
+                "total_cases": total,
+                "recovered": r[1] or 0 if r else 0,
+                "failed": r[2] or 0 if r else 0,
+                "closed": r[3] or 0 if r else 0,
+                "in_progress": r[4] or 0 if r else 0,
+                "recovery_rate": round((r[1] or 0) / total * 100, 1) if r and total > 0 else 0,
+                "avg_recovery_hours": round(r[5], 1) if r and r[5] else None,
+                "avg_ack_minutes": round(r[6], 1) if r and r[6] else None,
+                "days": days,
+            })
         except (ValueError, RuntimeError, OSError) as exc:
             return err(str(exc))

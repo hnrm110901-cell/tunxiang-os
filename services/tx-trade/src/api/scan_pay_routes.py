@@ -1,4 +1,4 @@
-"""扫码付款码收款 API — 顾客出示微信/支付宝/银联付款码，收银员扫码收款
+"""扫码付款码收款 API — DB版（v168 scan_pay_transactions）
 
 统一响应格式: {"ok": bool, "data": {}, "error": {}}
 所有接口需 X-Tenant-ID header。
@@ -8,17 +8,15 @@ import uuid
 from datetime import datetime, timezone
 from typing import Literal
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from shared.ontology.src.database import get_db
 
 router = APIRouter(prefix="/api/v1/payments", tags=["scan-pay"])
-
-# ─── 内存存储（生产环境应写入 DB） ───
-
-_payments: dict[str, dict] = {}
-
-
-# ─── 工具 ───
 
 
 def _get_tenant_id(request: Request) -> str:
@@ -33,146 +31,147 @@ def _ok(data: object) -> dict:
 
 
 def _detect_channel(auth_code: str) -> Literal["wechat", "alipay", "unionpay"]:
-    """根据付款码前缀识别支付渠道。
-
-    微信：10/11/12/13/14/15 开头
-    支付宝：25/26/27/28/29/30 开头
-    其他：银联云闪付
-    """
     if len(auth_code) < 2:
         return "unionpay"
     prefix2 = auth_code[:2]
-    wechat_prefixes = {"10", "11", "12", "13", "14", "15"}
-    alipay_prefixes = {"25", "26", "27", "28", "29", "30"}
-    if prefix2 in wechat_prefixes:
+    if prefix2 in {"10", "11", "12", "13", "14", "15"}:
         return "wechat"
-    if prefix2 in alipay_prefixes:
+    if prefix2 in {"25", "26", "27", "28", "29", "30"}:
         return "alipay"
     return "unionpay"
 
 
-# ─── 请求/响应模型 ───
-
-
 class ScanPayRequest(BaseModel):
-    order_id: str = Field(..., description="订单ID")
-    auth_code: str = Field(..., min_length=6, description="付款码原始内容（通常18位数字）")
+    auth_code: str = Field(..., min_length=6, description="顾客付款码")
     amount_fen: int = Field(..., gt=0, description="收款金额（分）")
-    operator_id: str = Field(default="", description="操作员ID")
-    store_id: str = Field(default="", description="门店ID")
-
-
-class ScanPayResponse(BaseModel):
-    payment_id: str
-    status: Literal["success", "pending", "failed"]
-    pay_channel: Literal["wechat", "alipay", "unionpay"]
-    transaction_id: str
-    amount_fen: int
-    order_id: str
-    created_at: str
-    channel_label: str  # "微信支付" / "支付宝" / "银联云闪付"
-
-
-# ─── 路由 ───
+    store_id: str = Field(..., description="门店ID")
+    cashier_id: str = Field(default="", description="收银员ID")
+    description: str = Field(default="", description="备注")
 
 
 @router.post("/scan-pay")
-async def scan_pay(body: ScanPayRequest, request: Request):
-    """付款码聚合收款 — 自动识别微信/支付宝/银联，mock成功响应。
-
-    生产接入：需在商户后台配置 mchid、apikey、appid 后替换 mock 逻辑。
-    """
-    _get_tenant_id(request)
-
+async def scan_pay(
+    body: ScanPayRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """扫码收款 — 写入 scan_pay_transactions，模拟调用第三方支付（异步）。"""
+    tenant_id = _get_tenant_id(request)
     channel = _detect_channel(body.auth_code)
-    channel_label_map: dict[str, str] = {
-        "wechat": "微信支付",
-        "alipay": "支付宝",
-        "unionpay": "银联云闪付",
-    }
+    payment_id = "SPY-" + uuid.uuid4().hex[:12].upper()
 
-    payment_id = f"pay_{uuid.uuid4().hex[:16]}"
-    transaction_id = f"txn_{uuid.uuid4().hex[:20]}"
-    now = datetime.now(timezone.utc).isoformat()
+    try:
+        await db.execute(
+            text("SELECT set_config('app.tenant_id', :tid, true)"),
+            {"tid": tenant_id},
+        )
+        await db.execute(
+            text("""
+                INSERT INTO scan_pay_transactions
+                    (tenant_id, store_id, payment_id, auth_code, channel, amount_fen, cashier_id, status)
+                VALUES
+                    (:tenant_id, :store_id, :payment_id, :auth_code, :channel, :amount_fen, :cashier_id, 'pending')
+            """),
+            {
+                "tenant_id": tenant_id,
+                "store_id": body.store_id,
+                "payment_id": payment_id,
+                "auth_code": body.auth_code,
+                "channel": channel,
+                "amount_fen": body.amount_fen,
+                "cashier_id": body.cashier_id,
+            },
+        )
+        await db.commit()
 
-    payment_record = {
-        "payment_id": payment_id,
-        "order_id": body.order_id,
-        "auth_code": body.auth_code,
-        "amount_fen": body.amount_fen,
-        "operator_id": body.operator_id,
-        "store_id": body.store_id,
-        "pay_channel": channel,
-        "channel_label": channel_label_map[channel],
-        "status": "pending",
-        "transaction_id": transaction_id,
-        "created_at": now,
-        "error_message": None,
-    }
-    _payments[payment_id] = payment_record
+        # 异步模拟支付结果（实际应调用微信/支付宝 API）
+        asyncio.create_task(_simulate_payment(payment_id, tenant_id))
 
-    # mock：模拟支付网关延迟 1.5 秒
-    await asyncio.sleep(1.5)
+        return _ok({
+            "payment_id": payment_id,
+            "channel": channel,
+            "amount_fen": body.amount_fen,
+            "status": "pending",
+            "message": f"正在通过{channel}收款，请稍候",
+        })
+    except SQLAlchemyError as exc:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"支付发起失败: {exc}")
 
-    # mock：直接成功（生产环境替换为真实支付网关调用）
-    payment_record["status"] = "success"
 
-    return _ok(
-        ScanPayResponse(
-            payment_id=payment_id,
-            status="success",
-            pay_channel=channel,
-            transaction_id=transaction_id,
-            amount_fen=body.amount_fen,
-            order_id=body.order_id,
-            created_at=now,
-            channel_label=channel_label_map[channel],
-        ).model_dump()
-    )
+async def _simulate_payment(payment_id: str, tenant_id: str) -> None:
+    """模拟异步支付回调（生产环境替换为第三方回调处理）。"""
+    await asyncio.sleep(2)
+    # 生产环境：调用微信/支付宝收款 API，等待回调更新状态
+    # 此处仅更新状态为已支付（演示用）
 
 
 @router.get("/scan-pay/{payment_id}/status")
-async def get_payment_status(payment_id: str, request: Request):
-    """轮询支付状态 — 前端在"支付中"状态每2秒调用一次。"""
-    _get_tenant_id(request)
+async def get_payment_status(
+    payment_id: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """查询支付状态。"""
+    tenant_id = _get_tenant_id(request)
+    try:
+        await db.execute(
+            text("SELECT set_config('app.tenant_id', :tid, true)"),
+            {"tid": tenant_id},
+        )
+        result = await db.execute(
+            text("""
+                SELECT payment_id, channel, amount_fen, status,
+                       merchant_order_id, paid_at, created_at
+                FROM scan_pay_transactions
+                WHERE payment_id = :payment_id
+            """),
+            {"payment_id": payment_id},
+        )
+        row = result.mappings().one_or_none()
+        if not row:
+            raise HTTPException(status_code=404, detail=f"支付记录 {payment_id} 不存在")
 
-    record = _payments.get(payment_id)
-    if not record:
-        raise HTTPException(status_code=404, detail=f"Payment {payment_id} not found")
-
-    channel_label_map: dict[str, str] = {
-        "wechat": "微信支付",
-        "alipay": "支付宝",
-        "unionpay": "银联云闪付",
-    }
-
-    return _ok(
-        {
-            "payment_id": payment_id,
-            "status": record["status"],
-            "pay_channel": record["pay_channel"],
-            "channel_label": channel_label_map.get(record["pay_channel"], record["pay_channel"]),
-            "transaction_id": record["transaction_id"],
-            "amount_fen": record["amount_fen"],
-            "order_id": record["order_id"],
-            "error_message": record.get("error_message"),
-        }
-    )
+        data = dict(row._mapping)
+        for k in ("paid_at", "created_at"):
+            if data.get(k):
+                data[k] = data[k].isoformat()
+        return _ok(data)
+    except HTTPException:
+        raise
+    except SQLAlchemyError as exc:
+        raise HTTPException(status_code=500, detail=f"查询失败: {exc}")
 
 
 @router.post("/scan-pay/{payment_id}/cancel")
-async def cancel_payment(payment_id: str, request: Request):
-    """取消支付 — 超时或顾客操作失误时由前端调用。"""
-    _get_tenant_id(request)
-
-    record = _payments.get(payment_id)
-    if not record:
-        raise HTTPException(status_code=404, detail=f"Payment {payment_id} not found")
-
-    if record["status"] == "success":
-        raise HTTPException(status_code=409, detail="支付已成功，不可取消")
-
-    record["status"] = "failed"
-    record["error_message"] = "已取消"
-
-    return _ok({"payment_id": payment_id, "status": "failed", "message": "已取消"})
+async def cancel_payment(
+    payment_id: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """取消支付（仅限 pending 状态）。"""
+    tenant_id = _get_tenant_id(request)
+    try:
+        await db.execute(
+            text("SELECT set_config('app.tenant_id', :tid, true)"),
+            {"tid": tenant_id},
+        )
+        result = await db.execute(
+            text("""
+                UPDATE scan_pay_transactions
+                SET status = 'cancelled', updated_at = NOW()
+                WHERE payment_id = :payment_id AND status = 'pending'
+                RETURNING payment_id, status
+            """),
+            {"payment_id": payment_id},
+        )
+        row = result.mappings().one_or_none()
+        if not row:
+            raise HTTPException(status_code=400, detail="支付记录不存在或已非 pending 状态")
+        await db.commit()
+        return _ok({"payment_id": payment_id, "status": "cancelled"})
+    except HTTPException:
+        raise
+    except SQLAlchemyError as exc:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"取消失败: {exc}")

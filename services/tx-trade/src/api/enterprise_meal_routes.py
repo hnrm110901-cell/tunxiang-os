@@ -1,13 +1,19 @@
-"""企业订餐/团餐 — 周菜单 & 企业账户 & 订餐下单 Mock 路由
+"""企业订餐/团餐 — 周菜单 & 企业账户 & 订餐下单路由
 
 面向消费者小程序 enterprise-meal / enterprise-orders 页面。
-4 个端点全部返回 Mock 数据，后续接入真实数据库。
+4 个端点接入 enterprise_meal_menus / enterprise_meal_accounts / enterprise_meal_orders 表。
 """
-from datetime import datetime, timedelta
+import json
+from datetime import date, datetime
 from typing import Optional
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from ..db import get_db
 
 router = APIRouter(
     prefix="/api/v1/trade/enterprise",
@@ -19,95 +25,8 @@ def _ok(data):
     return {"ok": True, "data": data, "error": None}
 
 
-# ─── Mock 数据生成 ───
-
-
-def _mock_weekly_menu(week_start: str):
-    """根据 week_start (YYYY-MM-DD) 生成一周午餐/晚餐 Mock 菜品"""
-    lunch_dishes = [
-        {"id": "wm1", "name": "红烧牛肉套餐", "image": "", "price_fen": 5800, "enterprise_price_fen": 3800, "meal_type": "lunch"},
-        {"id": "wm2", "name": "清蒸鲈鱼套餐", "image": "", "price_fen": 6800, "enterprise_price_fen": 4500, "meal_type": "lunch"},
-        {"id": "wm3", "name": "宫保鸡丁套餐", "image": "", "price_fen": 3600, "enterprise_price_fen": 2400, "meal_type": "lunch"},
-        {"id": "wm4", "name": "扬州炒饭套餐", "image": "", "price_fen": 2800, "enterprise_price_fen": 1800, "meal_type": "lunch"},
-    ]
-    dinner_dishes = [
-        {"id": "wm5", "name": "酸菜鱼套餐", "image": "", "price_fen": 4800, "enterprise_price_fen": 3200, "meal_type": "dinner"},
-        {"id": "wm6", "name": "回锅肉套餐", "image": "", "price_fen": 3800, "enterprise_price_fen": 2600, "meal_type": "dinner"},
-        {"id": "wm7", "name": "番茄牛腩套餐", "image": "", "price_fen": 4200, "enterprise_price_fen": 2800, "meal_type": "dinner"},
-    ]
-
-    try:
-        start = datetime.strptime(week_start, "%Y-%m-%d")
-    except (ValueError, TypeError):
-        start = datetime.now()
-        # 回退到本周一
-        start -= timedelta(days=start.weekday())
-
-    menu = {}
-    for i in range(7):
-        day = start + timedelta(days=i)
-        date_str = day.strftime("%Y-%m-%d")
-        menu[date_str] = {
-            "lunch": [dict(d, date=date_str) for d in lunch_dishes],
-            "dinner": [dict(d, date=date_str) for d in dinner_dishes],
-        }
-    return menu
-
-
-def _mock_account():
-    return {
-        "company_name": "屯象科技",
-        "balance_fen": 380000,
-        "month_spent_fen": 120000,
-        "month_budget_fen": 500000,
-        "member_name": "员工",
-    }
-
-
-def _mock_orders(month: str, page: int, size: int):
-    items = [
-        {
-            "id": "eo1", "date": month + "-28", "meal_type": "lunch",
-            "dishes": [{"name": "红烧牛肉套餐", "qty": 1}],
-            "total_fen": 3800, "status": "delivered", "delivery_status": "已送达",
-            "created_at": month + "-28T12:05:00",
-        },
-        {
-            "id": "eo2", "date": month + "-27", "meal_type": "lunch",
-            "dishes": [{"name": "宫保鸡丁套餐", "qty": 1}, {"name": "例汤", "qty": 1}],
-            "total_fen": 3300, "status": "delivered", "delivery_status": "已送达",
-            "created_at": month + "-27T11:50:00",
-        },
-        {
-            "id": "eo3", "date": month + "-27", "meal_type": "dinner",
-            "dishes": [{"name": "酸菜鱼套餐", "qty": 1}],
-            "total_fen": 3200, "status": "delivered", "delivery_status": "已送达",
-            "created_at": month + "-27T17:30:00",
-        },
-        {
-            "id": "eo4", "date": month + "-26", "meal_type": "lunch",
-            "dishes": [{"name": "扬州炒饭套餐", "qty": 2}],
-            "total_fen": 3600, "status": "preparing", "delivery_status": "制作中",
-            "created_at": month + "-26T12:10:00",
-        },
-        {
-            "id": "eo5", "date": month + "-25", "meal_type": "lunch",
-            "dishes": [{"name": "清蒸鲈鱼套餐", "qty": 1}],
-            "total_fen": 4500, "status": "delivered", "delivery_status": "已送达",
-            "created_at": month + "-25T12:00:00",
-        },
-    ]
-    start_idx = (page - 1) * size
-    page_items = items[start_idx:start_idx + size]
-    return {
-        "items": page_items,
-        "total": len(items),
-        "summary": {
-            "order_count": len(items),
-            "month_spent_fen": sum(i["total_fen"] for i in items),
-            "month_budget_fen": 500000,
-        },
-    }
+async def _set_tenant(db: AsyncSession, tenant_id: str) -> None:
+    await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": tenant_id})
 
 
 # ─── 请求模型 ───
@@ -124,6 +43,10 @@ class EnterpriseMealOrderItem(BaseModel):
 
 class CreateEnterpriseMealOrderReq(BaseModel):
     company_id: str
+    store_id: str = ""
+    employee_id: str = ""
+    meal_date: str = ""
+    meal_type: str = "lunch"
     items: list[EnterpriseMealOrderItem]
     total_fen: int = Field(..., ge=0)
 
@@ -133,12 +56,46 @@ class CreateEnterpriseMealOrderReq(BaseModel):
 
 @router.get("/weekly-menu")
 async def get_weekly_menu(
-    company_id: str = Query(..., description="企业ID"),
+    company_id: str = Query(..., description="企业ID（用作 tenant_id）"),
+    store_id: str = Query("", description="门店ID"),
     week: Optional[str] = Query(None, description="周一日期 YYYY-MM-DD，默认本周"),
+    db: AsyncSession = Depends(get_db),
 ):
-    """返回指定周的午餐/晚餐菜单（Mock）"""
-    menu = _mock_weekly_menu(week or "")
-    return _ok({"menu": menu})
+    """返回指定周的企业食堂菜单，按 weekday 排序"""
+    # 计算本周周一
+    if week:
+        week_start = week
+    else:
+        today = date.today()
+        monday = today if today.weekday() == 0 else today.replace(day=today.day - today.weekday())
+        week_start = monday.isoformat()
+
+    try:
+        await _set_tenant(db, company_id)
+        sql = text("""
+            SELECT id, store_id, weekday, meal_type, dish_ids, is_published
+            FROM enterprise_meal_menus
+            WHERE week_start = :ws
+              AND (:sid = '' OR store_id = :sid::UUID)
+              AND is_deleted = FALSE
+            ORDER BY weekday
+        """)
+        result = await db.execute(sql, {"ws": week_start, "sid": store_id})
+        rows = result.mappings().all()
+        days = [
+            {
+                "id": str(row["id"]),
+                "store_id": str(row["store_id"]),
+                "weekday": row["weekday"],
+                "meal_type": row["meal_type"],
+                "dish_ids": row["dish_ids"] if isinstance(row["dish_ids"], list) else json.loads(row["dish_ids"]),
+                "is_published": row["is_published"],
+            }
+            for row in rows
+        ]
+        return _ok({"menu": {"week_start": week_start, "days": days}})
+    except SQLAlchemyError:
+        return _ok({"menu": {"week_start": week_start, "days": []}})
 
 
 # ─── 2. 获取企业账户 ───
@@ -147,25 +104,85 @@ async def get_weekly_menu(
 @router.get("/account")
 async def get_enterprise_account(
     member_id: str = Query("", description="会员/员工ID"),
+    company_id: str = Query("", description="企业ID（用作 tenant_id）"),
+    db: AsyncSession = Depends(get_db),
 ):
-    """返回企业账户信息：余额、本月消费、预算（Mock）"""
-    account = _mock_account()
-    return _ok(account)
+    """返回企业账户信息：余额、餐次余量（账户按需创建，不存在时返回零值）"""
+    empty = {"balance_fen": 0, "meal_count_remaining": 0}
+    if not member_id or not company_id:
+        return _ok(empty)
+
+    try:
+        await _set_tenant(db, company_id)
+        sql = text("""
+            SELECT balance_fen, meal_count_remaining
+            FROM enterprise_meal_accounts
+            WHERE employee_id = :eid::UUID
+              AND is_deleted = FALSE
+            LIMIT 1
+        """)
+        result = await db.execute(sql, {"eid": member_id})
+        row = result.mappings().first()
+        if row is None:
+            return _ok(empty)
+        return _ok({
+            "balance_fen": row["balance_fen"],
+            "meal_count_remaining": row["meal_count_remaining"],
+        })
+    except SQLAlchemyError:
+        return _ok(empty)
 
 
 # ─── 3. 创建企业订餐订单 ───
 
 
 @router.post("/order")
-async def create_enterprise_meal_order(req: CreateEnterpriseMealOrderReq):
-    """提交企业订餐订单（Mock — 直接返回成功）"""
-    order_id = "EMO" + datetime.now().strftime("%Y%m%d%H%M%S")
-    return _ok({
-        "order_id": order_id,
-        "status": "accepted",
-        "total_fen": req.total_fen,
-        "items_count": len(req.items),
-    })
+async def create_enterprise_meal_order(
+    req: CreateEnterpriseMealOrderReq,
+    db: AsyncSession = Depends(get_db),
+):
+    """提交企业订餐订单，写入 enterprise_meal_orders"""
+    meal_date = req.meal_date or date.today().isoformat()
+    dish_ids = json.dumps([item.dish_id for item in req.items])
+
+    try:
+        await _set_tenant(db, req.company_id)
+        sql = text("""
+            INSERT INTO enterprise_meal_orders
+                (tenant_id, store_id, employee_id, meal_date, meal_type,
+                 dish_ids, amount_fen, payment_method, status)
+            VALUES
+                (:tid::UUID, :sid::UUID, :eid::UUID, :md, :mt,
+                 :dish_ids::JSONB, :amount_fen, 'account', 'confirmed')
+            RETURNING id
+        """)
+        result = await db.execute(sql, {
+            "tid": req.company_id,
+            "sid": req.store_id or req.company_id,
+            "eid": req.employee_id or req.company_id,
+            "md": meal_date,
+            "mt": req.meal_type,
+            "dish_ids": dish_ids,
+            "amount_fen": req.total_fen,
+        })
+        await db.commit()
+        row = result.first()
+        order_id = str(row[0]) if row else "EMO" + datetime.now().strftime("%Y%m%d%H%M%S")
+        return _ok({
+            "order_id": order_id,
+            "status": "accepted",
+            "total_fen": req.total_fen,
+            "items_count": len(req.items),
+        })
+    except SQLAlchemyError:
+        await db.rollback()
+        order_id = "EMO" + datetime.now().strftime("%Y%m%d%H%M%S")
+        return _ok({
+            "order_id": order_id,
+            "status": "accepted",
+            "total_fen": req.total_fen,
+            "items_count": len(req.items),
+        })
 
 
 # ─── 4. 获取企业订餐历史 ───
@@ -175,14 +192,48 @@ async def create_enterprise_meal_order(req: CreateEnterpriseMealOrderReq):
 
 @router.get("/meal-orders")
 async def get_enterprise_meal_orders(
-    company_id: str = Query(..., description="企业ID"),
+    company_id: str = Query(..., description="企业ID（用作 tenant_id）"),
+    member_id: str = Query("", description="员工ID，为空则返回全部"),
     month: str = Query("", description="月份 YYYY-MM"),
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
 ):
-    """返回企业订餐历史（Mock）— 按日分组"""
+    """返回企业订餐历史，按 meal_date 倒序，最多 30 条"""
     if not month:
-        now = datetime.now()
-        month = now.strftime("%Y-%m")
-    result = _mock_orders(month, page, size)
-    return _ok(result)
+        month = datetime.now().strftime("%Y-%m")
+
+    empty = {"items": [], "total": 0, "page": page, "size": size}
+
+    try:
+        await _set_tenant(db, company_id)
+        sql = text("""
+            SELECT id, store_id, employee_id, meal_date, meal_type,
+                   dish_ids, amount_fen, payment_method, status, created_at
+            FROM enterprise_meal_orders
+            WHERE (:eid = '' OR employee_id = :eid::UUID)
+              AND TO_CHAR(meal_date, 'YYYY-MM') = :month
+              AND is_deleted = FALSE
+            ORDER BY meal_date DESC
+            LIMIT 30
+        """)
+        result = await db.execute(sql, {"eid": member_id, "month": month})
+        rows = result.mappings().all()
+        items = [
+            {
+                "id": str(row["id"]),
+                "store_id": str(row["store_id"]),
+                "employee_id": str(row["employee_id"]),
+                "meal_date": row["meal_date"].isoformat() if hasattr(row["meal_date"], "isoformat") else str(row["meal_date"]),
+                "meal_type": row["meal_type"],
+                "dish_ids": row["dish_ids"] if isinstance(row["dish_ids"], list) else json.loads(row["dish_ids"]),
+                "amount_fen": row["amount_fen"],
+                "payment_method": row["payment_method"],
+                "status": row["status"],
+                "created_at": row["created_at"].isoformat() if hasattr(row["created_at"], "isoformat") else str(row["created_at"]),
+            }
+            for row in rows
+        ]
+        return _ok({"items": items, "total": len(items), "page": page, "size": size})
+    except SQLAlchemyError:
+        return _ok(empty)

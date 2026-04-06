@@ -285,4 +285,97 @@ class MenuOptimizer:
         }
 
 
+    async def analyze_from_mv(self, tenant_id: str, store_id: str | None = None) -> dict:
+        """从 mv_inventory_bom 快速读取 BOM 损耗数据，辅助菜单优化，<5ms，无 Claude 调用。
+
+        数据来源：因果链③投影视图（InventoryBomProjector）
+        菜单优化视角：高损耗食材 → 建议控制相关菜品推广；临期关联菜品 → 需加速消耗
+        """
+        from sqlalchemy import text
+        from sqlalchemy.exc import SQLAlchemyError
+        from shared.ontology.src.database import get_db
+
+        try:
+            async for db in get_db():
+                await db.execute(
+                    text("SELECT set_config('app.tenant_id', :tid, true)"),
+                    {"tid": str(tenant_id)},
+                )
+                params: dict = {"tenant_id": tenant_id}
+                store_clause = ""
+                if store_id:
+                    store_clause = "AND store_id = :store_id"
+                    params["store_id"] = store_id
+
+                result = await db.execute(
+                    text(f"""
+                        SELECT
+                            ingredient_id,
+                            ingredient_name,
+                            loss_rate,
+                            unexplained_loss_g,
+                            waste_g,
+                            theoretical_usage_g,
+                            actual_usage_g
+                        FROM mv_inventory_bom
+                        WHERE tenant_id = :tenant_id
+                        {store_clause}
+                        AND stat_date = (
+                            SELECT MAX(stat_date) FROM mv_inventory_bom
+                            WHERE tenant_id = :tenant_id {store_clause}
+                        )
+                        ORDER BY loss_rate DESC
+                        LIMIT 10
+                    """),
+                    params,
+                )
+                rows = result.mappings().all()
+
+                high_loss: list[dict] = []
+                normal_loss: list[dict] = []
+                for r in rows:
+                    item = {
+                        "ingredient_id": str(r["ingredient_id"]),
+                        "ingredient_name": r["ingredient_name"] or "",
+                        "loss_rate": float(r["loss_rate"] or 0),
+                        "unexplained_loss_g": float(r["unexplained_loss_g"] or 0),
+                    }
+                    if item["loss_rate"] > 0.10:
+                        high_loss.append(item)
+                    else:
+                        normal_loss.append(item)
+
+                menu_hints: list[str] = []
+                if len(high_loss) > 3:
+                    names = [i["ingredient_name"] for i in high_loss[:3]]
+                    menu_hints.append(f"食材损耗异常：{'/'.join(names)}，建议减少相关菜品推广")
+                if high_loss:
+                    menu_hints.append(f"发现{len(high_loss)}种高损耗食材，建议优先安排含这些食材的套餐加速消耗")
+
+                return {
+                    "inference_layer": "mv_fast_path",
+                    "data": {
+                        "high_loss_ingredients": high_loss,
+                        "normal_ingredients": normal_loss,
+                        "high_loss_count": len(high_loss),
+                        "menu_optimization_hints": menu_hints,
+                    },
+                    "agent": self.__class__.__name__,
+                    "risk_signal": "high" if len(high_loss) > 3 else ("medium" if high_loss else "normal"),
+                }
+        except SQLAlchemyError as exc:
+            logger.warning(
+                "menu_optimizer_mv_db_error",
+                tenant_id=tenant_id,
+                store_id=store_id,
+                error=str(exc),
+            )
+            return {
+                "inference_layer": "mv_fast_path_error",
+                "data": {},
+                "agent": self.__class__.__name__,
+                "error": "数据库查询失败，请使用实时分析",
+            }
+
+
 menu_optimizer = MenuOptimizer()

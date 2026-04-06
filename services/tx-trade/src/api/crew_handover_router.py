@@ -2,7 +2,6 @@
 
 提供本班数据摘要查询与交班记录保存功能。
 """
-import random
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -36,23 +35,6 @@ class HandoverRequest(BaseModel):
     shift_summary_data: ShiftSummaryData
 
 
-# ---------- Mock 数据构建 ----------
-
-def _build_mock_shift_summary(crew_id: str) -> dict:
-    """构建本班数据摘要 Mock 数据。"""
-    return {
-        "crew_id": crew_id,
-        "shift_start": "09:00",
-        "table_count": random.randint(6, 12),
-        "order_count": random.randint(10, 20),
-        "revenue": random.randint(200000, 600000),
-        "bell_responses": random.randint(10, 40),
-        "complaints": random.randint(0, 2),
-        "good_reviews": random.randint(2, 8),
-        "generated_at": datetime.now(timezone.utc).isoformat(),
-    }
-
-
 # ---------- 路由 ----------
 
 @router.get("/shift-summary")
@@ -64,11 +46,21 @@ async def get_shift_summary(
     """获取当前服务员本班数据摘要。
 
     返回接待桌次、点单笔数、营业额、服务铃响应次数、投诉件数、好评数。
-    当前实现使用 Mock 数据，生产环境需接入 crew_shifts / orders 表查询。
+    待接入 crew_shifts / orders 表查询，当前返回空数据结构。
     """
     log = logger.bind(operator_id=x_operator_id, store_id=store_id)
     try:
-        summary = _build_mock_shift_summary(x_operator_id)
+        summary = {
+            "crew_id": x_operator_id,
+            "shift_start": None,
+            "table_count": 0,
+            "order_count": 0,
+            "revenue": 0,
+            "bell_responses": 0,
+            "complaints": 0,
+            "good_reviews": 0,
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+        }
         log.info("crew_shift_summary_ok", table_count=summary["table_count"])
         return {"ok": True, "data": summary}
     except ValueError as e:

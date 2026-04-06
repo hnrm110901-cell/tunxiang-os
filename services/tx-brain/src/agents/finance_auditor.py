@@ -393,4 +393,116 @@ class FinanceAuditor:
         }
 
 
+    async def analyze_from_mv(self, tenant_id: str, store_id: str | None = None) -> dict:
+        """从 mv_store_pnl + mv_channel_margin 快速读取财务健康数据，<5ms，无 Claude 调用。
+
+        数据来源：因果链④投影视图（StorePnlProjector）+ 因果链②（ChannelMarginProjector）
+        返回：P&L摘要 + 渠道毛利分布 + 风险信号
+        """
+        from sqlalchemy import text
+        from sqlalchemy.exc import SQLAlchemyError
+        from shared.ontology.src.database import get_db
+
+        try:
+            async for db in get_db():
+                await db.execute(
+                    text("SELECT set_config('app.tenant_id', :tid, true)"),
+                    {"tid": str(tenant_id)},
+                )
+                params: dict = {"tenant_id": tenant_id}
+                store_clause = ""
+                if store_id:
+                    store_clause = "AND store_id = :store_id"
+                    params["store_id"] = store_id
+
+                # 查询最新 P&L
+                pnl_result = await db.execute(
+                    text(f"""
+                        SELECT
+                            store_id,
+                            stat_date,
+                            gross_revenue_fen,
+                            net_revenue_fen,
+                            cogs_fen,
+                            gross_profit_fen,
+                            gross_margin_rate,
+                            labor_cost_fen,
+                            net_profit_fen,
+                            order_count,
+                            avg_check_fen
+                        FROM mv_store_pnl
+                        WHERE tenant_id = :tenant_id
+                        {store_clause}
+                        ORDER BY stat_date DESC
+                        LIMIT 1
+                    """),
+                    params,
+                )
+                pnl_row = pnl_result.mappings().one_or_none()
+
+                # 查询渠道毛利（最新日期）
+                channel_result = await db.execute(
+                    text(f"""
+                        SELECT
+                            channel,
+                            gross_margin_rate,
+                            net_revenue_fen,
+                            order_count
+                        FROM mv_channel_margin
+                        WHERE tenant_id = :tenant_id
+                        {store_clause}
+                        AND stat_date = (
+                            SELECT MAX(stat_date) FROM mv_channel_margin
+                            WHERE tenant_id = :tenant_id {store_clause}
+                        )
+                        ORDER BY net_revenue_fen DESC
+                    """),
+                    params,
+                )
+                channel_rows = channel_result.mappings().all()
+
+                pnl_data: dict = {}
+                risk_signal = "normal"
+                if pnl_row:
+                    pnl_data = dict(pnl_row._mapping)
+                    gm = pnl_data.get("gross_margin_rate")
+                    if gm is not None:
+                        pnl_data["gross_margin_rate"] = float(gm)
+                        # 毛利率 < 35% 触发风险
+                        if float(gm) < 0.35:
+                            risk_signal = "high"
+                        elif float(gm) < 0.45:
+                            risk_signal = "medium"
+
+                channels = []
+                for r in channel_rows:
+                    ch = dict(r._mapping)
+                    if ch.get("gross_margin_rate") is not None:
+                        ch["gross_margin_rate"] = float(ch["gross_margin_rate"])
+                    channels.append(ch)
+
+                return {
+                    "inference_layer": "mv_fast_path",
+                    "data": {
+                        "pnl": pnl_data,
+                        "channel_margins": channels,
+                    },
+                    "agent": self.__class__.__name__,
+                    "risk_signal": risk_signal,
+                }
+        except SQLAlchemyError as exc:
+            logger.warning(
+                "finance_auditor_mv_db_error",
+                tenant_id=tenant_id,
+                store_id=store_id,
+                error=str(exc),
+            )
+            return {
+                "inference_layer": "mv_fast_path_error",
+                "data": {},
+                "agent": self.__class__.__name__,
+                "error": "数据库查询失败，请使用实时分析",
+            }
+
+
 finance_auditor = FinanceAuditor()

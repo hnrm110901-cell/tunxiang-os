@@ -6,6 +6,8 @@
   safety.violation_found       → 违规+1，写入违规详情
   safety.expiry_alert          → 临期/过期食材预警
   safety.certificate_updated   → 证件更新（清除过期状态）
+  safety.haccp_check_completed → HACCP检查完成，更新合格率统计
+  safety.haccp_critical_failure→ HACCP关键控制点失控，记录critical告警
 
 维护视图：mv_safety_compliance（按周聚合）
 """
@@ -35,6 +37,8 @@ class SafetyComplianceProjector(ProjectorBase):
         "safety.violation_found",
         "safety.expiry_alert",
         "safety.certificate_updated",
+        "safety.haccp_check_completed",
+        "safety.haccp_critical_failure",
     }
 
     async def handle(self, event: dict[str, Any], conn: object) -> None:
@@ -131,6 +135,98 @@ class SafetyComplianceProjector(ProjectorBase):
                 self.tenant_id, UUID(str(store_id)), stat_week,
                 json.dumps([alert]), UUID(str(event["event_id"])),
             )
+
+        elif event_type == "safety.haccp_check_completed":
+            await self._handle_haccp_check_completed(
+                event, conn, stat_week, UUID(str(store_id))
+            )
+
+        elif event_type == "safety.haccp_critical_failure":
+            await self._handle_haccp_critical_failure(
+                event, conn, stat_week, UUID(str(store_id))
+            )
+
+
+    async def _handle_haccp_check_completed(
+        self,
+        event: dict[str, Any],
+        conn: object,
+        stat_week: Any,
+        store_id: UUID,
+    ) -> None:
+        """更新 mv_safety_compliance 中的 HACCP 合格率统计。
+
+        从 payload 中读取本次检查结果，用增量方式更新当周的
+        haccp_pass_rate（通过 overall_passed 标志）和
+        haccp_critical_failures（累加 critical_failures 字段）。
+        """
+        payload = event.get("payload") or {}
+        overall_passed: bool = bool(payload.get("overall_passed", False))
+        critical_failures: int = int(payload.get("critical_failures", 0))
+        pass_delta: int = 1 if overall_passed else 0
+
+        await conn.execute(  # type: ignore[union-attr]
+            """
+            UPDATE mv_safety_compliance
+            SET haccp_total_checks       = haccp_total_checks + 1,
+                haccp_passed_checks      = haccp_passed_checks + $4,
+                haccp_critical_failures  = haccp_critical_failures + $5,
+                haccp_pass_rate          = CASE
+                    WHEN (haccp_total_checks + 1) > 0
+                    THEN ROUND(
+                        (haccp_passed_checks + $4)::NUMERIC
+                        / (haccp_total_checks + 1) * 100,
+                        2
+                    )
+                    ELSE 0
+                END,
+                last_event_id            = $6,
+                updated_at               = NOW()
+            WHERE tenant_id = $1 AND store_id = $2 AND stat_week = $3
+            """,
+            self.tenant_id, store_id, stat_week,
+            pass_delta, critical_failures,
+            UUID(str(event["event_id"])),
+        )
+
+    async def _handle_haccp_critical_failure(
+        self,
+        event: dict[str, Any],
+        conn: object,
+        stat_week: Any,
+        store_id: UUID,
+    ) -> None:
+        """记录 HACCP 关键控制点失控事件到合规视图。
+
+        额外递增 haccp_critical_alert_count（严重失控告警次数），
+        同时将本次检查标记为未通过（haccp_passed_checks 不递增）。
+        """
+        payload = event.get("payload") or {}
+        critical_failures: int = int(payload.get("critical_failures", 1))
+
+        await conn.execute(  # type: ignore[union-attr]
+            """
+            UPDATE mv_safety_compliance
+            SET haccp_total_checks          = haccp_total_checks + 1,
+                haccp_critical_failures     = haccp_critical_failures + $4,
+                haccp_critical_alert_count  = haccp_critical_alert_count + 1,
+                haccp_pass_rate             = CASE
+                    WHEN (haccp_total_checks + 1) > 0
+                    THEN ROUND(
+                        haccp_passed_checks::NUMERIC
+                        / (haccp_total_checks + 1) * 100,
+                        2
+                    )
+                    ELSE 0
+                END,
+                last_event_id               = $5,
+                updated_at                  = NOW()
+            WHERE tenant_id = $1 AND store_id = $2 AND stat_week = $3
+            """,
+            self.tenant_id, store_id, stat_week,
+            critical_failures,
+            UUID(str(event["event_id"])),
+        )
 
 
 async def _recalc_compliance_score(conn: object, tenant_id: UUID, store_id: UUID, stat_week) -> None:

@@ -170,3 +170,64 @@ export const reviewSuggestion = (id: string, body: { review_result: string; revi
 
 export const publishSuggestion = (id: string) =>
   txFetch<{ ok: boolean }>(`/api/v1/growth/agent-suggestions/${id}/publish`, { method: 'POST' });
+
+// ---- Attribution Types ----
+
+export interface MechanismAttribution {
+  mechanism_type: string;
+  total_touches: number;
+  delivered: number;
+  opened: number;
+  clicked: number;
+  attributed: number;
+  revenue_fen: number;
+  profit_fen: number;
+  open_rate: number;
+  attribution_rate: number;
+}
+
+export interface JourneyTemplateAttribution {
+  template_name: string;
+  journey_type: string;
+  mechanism_family: string;
+  total_enrollments: number;
+  completed: number;
+  exited: number;
+  completion_rate: number;
+  total_touches: number;
+  opened: number;
+  attributed: number;
+  revenue_fen: number;
+}
+
+export interface RepairEffectiveness {
+  total_cases: number;
+  recovered: number;
+  failed: number;
+  closed: number;
+  in_progress: number;
+  recovery_rate: number;
+  avg_recovery_hours: number | null;
+  avg_ack_minutes: number | null;
+  days: number;
+}
+
+export interface MechanismSummaryItem {
+  mechanism_type: string;
+  total: number;
+  opened: number;
+  attributed: number;
+  open_rate: number;
+  attribution_rate: number;
+}
+
+// ---- Attribution API Functions ----
+
+export const fetchMechanismAttribution = (days = 7) =>
+  txFetchData<{ items: MechanismAttribution[]; days: number }>(`/api/v1/growth/attribution/by-mechanism?days=${days}`);
+
+export const fetchJourneyTemplateAttribution = (days = 7) =>
+  txFetchData<{ items: JourneyTemplateAttribution[]; days: number }>(`/api/v1/growth/attribution/by-journey-template?days=${days}`);
+
+export const fetchRepairEffectiveness = (days = 30) =>
+  txFetchData<RepairEffectiveness>(`/api/v1/growth/attribution/repair-effectiveness?days=${days}`);

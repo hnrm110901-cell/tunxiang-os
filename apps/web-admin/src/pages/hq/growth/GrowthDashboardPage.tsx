@@ -134,6 +134,14 @@ interface GrowthDashboardStats {
     touch_open_rate: number;
     touch_attribution_rate: number;
   };
+  mechanism_summary?: {
+    mechanism_type: string;
+    total: number;
+    opened: number;
+    attributed: number;
+    open_rate: number;
+    attribution_rate: number;
+  }[];
 }
 
 // ---- 工具函数 ----
@@ -918,6 +926,52 @@ export function GrowthDashboardPage() {
             )}
           </div>
         </div>
+
+        {/* 区域X: 机制效果速览 */}
+        {growthStats?.mechanism_summary && growthStats.mechanism_summary.length > 0 && (
+          <div style={{ background: '#142833', borderRadius: 10, padding: 20, border: '1px solid #1e3a4a', marginBottom: 16 }}>
+            <div style={{ fontSize: 15, fontWeight: 700, color: TEXT_1, marginBottom: 16 }}>机制效果速览（近7天）</div>
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+              {growthStats.mechanism_summary.map((m) => {
+                const mechColors: Record<string, string> = {
+                  hook: TEAL, loss_aversion: BRAND, repair: RED, mixed: PURPLE,
+                  social_proof: BLUE, scarcity: YELLOW, reciprocity: '#52c41a',
+                };
+                const mechLabels: Record<string, string> = {
+                  hook: '钩子吸引', loss_aversion: '损失规避', repair: '服务修复',
+                  mixed: '混合机制', social_proof: '社会认同', scarcity: '稀缺效应',
+                  reciprocity: '互惠心理', authority: '权威背书', commitment: '承诺一致',
+                };
+                const color = mechColors[m.mechanism_type] || TEXT_3;
+                return (
+                  <div key={m.mechanism_type} style={{
+                    flex: '1 1 180px', maxWidth: 220, padding: '12px 16px',
+                    borderRadius: 8, background: BG_2, borderLeft: `3px solid ${color}`,
+                  }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color, marginBottom: 8 }}>
+                      {mechLabels[m.mechanism_type] || m.mechanism_type}
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: TEXT_3, marginBottom: 4 }}>
+                      <span>打开率</span>
+                      <span style={{ fontWeight: 700, color: m.open_rate >= 20 ? '#52c41a' : m.open_rate >= 10 ? YELLOW : '#ff4d4f' }}>
+                        {m.open_rate.toFixed(1)}%
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: TEXT_3 }}>
+                      <span>归因率</span>
+                      <span style={{ fontWeight: 700, color: m.attribution_rate >= 5 ? '#52c41a' : m.attribution_rate >= 2 ? YELLOW : '#ff4d4f' }}>
+                        {m.attribution_rate.toFixed(1)}%
+                      </span>
+                    </div>
+                    <div style={{ fontSize: 10, color: TEXT_4, marginTop: 4 }}>
+                      触达 {m.total} / 打开 {m.opened} / 归因 {m.attributed}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* 区域3: 旅程运行状态速览 */}
         <div style={{ background: '#142833', borderRadius: 10, padding: 20, border: '1px solid #1e3a4a', marginBottom: 16 }}>
