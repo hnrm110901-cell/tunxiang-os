@@ -107,6 +107,7 @@ import { GrowthJourneyRunsPage } from './pages/hq/growth/GrowthJourneyRunsPage';
 import { AgentWorkbenchPage } from './pages/hq/growth/AgentWorkbenchPage';
 import { JourneyAttributionPage } from './pages/hq/growth/JourneyAttributionPage';
 import { GrowthSegmentTagsPage } from './pages/hq/growth/GrowthSegmentTagsPage';
+import { GrowthOfferPacksPage } from './pages/hq/growth/GrowthOfferPacksPage';
 import { CampaignManagePage } from './pages/growth/CampaignManagePage';
 import { AttendancePage } from './pages/org/AttendancePage';
 import { PerformancePage } from './pages/org/PerformancePage';
@@ -278,6 +279,7 @@ function App() {
           <Route path="/hq/growth/agent-workbench" element={<AgentWorkbenchPage />} />
           <Route path="/hq/growth/journey-attribution" element={<JourneyAttributionPage />} />
           <Route path="/hq/growth/segment-tags" element={<GrowthSegmentTagsPage />} />
+          <Route path="/hq/growth/offer-packs" element={<GrowthOfferPacksPage />} />
           <Route path="/hq/trade/delivery" element={<DeliveryPage />} />
           <Route path="/hq/supply/inventory-intel" element={<InventoryIntelPage />} />
           <Route path="/hq/supply/chain" element={<SupplyChainPage />} />

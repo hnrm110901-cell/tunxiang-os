@@ -96,6 +96,7 @@ const MENU_CONFIGS: Record<string, MenuConfig> = {
         { id: 'journey-monitor', label: '旅程执行监控', icon: '🗺️', path: '/hq/growth/journey-monitor' },
       ]},
       { label: '触达与权益', items: [
+        { id: 'offer-packs', label: '权益策略台', icon: '🎁', path: '/hq/growth/offer-packs' },
         { id: 'offers', label: '优惠中心', icon: '🎫', path: '/hq/growth/offers' },
         { id: 'channels', label: '渠道触达', icon: '📡', path: '/hq/growth/channels' },
         { id: 'content', label: '内容中心', icon: '📝', path: '/hq/growth/content' },

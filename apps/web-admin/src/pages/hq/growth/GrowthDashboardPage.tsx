@@ -12,6 +12,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { txFetch } from '../../../api';
 import { useApi } from '../../../hooks/useApi';
+import type { JourneyTemplateAttribution, AgentSuggestionDetail, P1Distribution } from '../../../api/growthHubApi';
 
 // ---- 颜色常量（深色主题）----
 const BG_0   = '#0d1e28';
@@ -640,6 +641,24 @@ export function GrowthDashboardPage() {
     { cacheMs: 15_000 },
   );
 
+  // 缺口1: 模板框架效果对比
+  const { data: templateAttrData, loading: loadingTemplateAttr } = useApi<{ items: JourneyTemplateAttribution[]; days: number }>(
+    '/api/v1/growth/attribution/by-journey-template?days=7',
+    { cacheMs: 15_000 },
+  );
+
+  // 缺口2: Agent高优先建议TOP3
+  const { data: topSuggestions, loading: loadingTopSuggestions } = useApi<{ items: AgentSuggestionDetail[]; total: number }>(
+    '/api/v1/growth/agent-suggestions?review_state=pending_review&size=3',
+    { cacheMs: 15_000 },
+  );
+
+  // 缺口3: P1四维分布
+  const { data: p1Dist, loading: loadingP1Dist } = useApi<P1Distribution>(
+    '/api/v1/growth/p1/distribution',
+    { cacheMs: 15_000 },
+  );
+
   const [growthData,    setGrowthData]    = useState<GrowthData | null>(null);
   const [activityData,  setActivityData]  = useState<ActivityData | null>(null);
   const [repurchaseData,setRepurchaseData]= useState<RepurchaseData | null>(null);
@@ -922,6 +941,54 @@ export function GrowthDashboardPage() {
                 >
                   进入 Agent 工作台
                 </button>
+
+                {/* 缺口2: Agent高优先建议TOP3 */}
+                {!loadingTopSuggestions && topSuggestions && topSuggestions.items.length > 0 && (
+                  <div style={{ marginTop: 12 }}>
+                    <div style={{ fontSize: 12, color: TEXT_3, marginBottom: 8, fontWeight: 600 }}>TOP 3 待审建议</div>
+                    {topSuggestions.items.slice(0, 3).map((s) => {
+                      const priorityColors: Record<string, string> = { high: '#ff4d4f', medium: YELLOW, low: '#52c41a' };
+                      const priorityLabels: Record<string, string> = { high: '高优', medium: '中优', low: '低优' };
+                      const typeLabels: Record<string, string> = {
+                        reactivation: '召回', first_to_second: '首转二', service_repair: '修复',
+                        retention: '留存', upsell: '提频', referral: '裂变',
+                      };
+                      const pColor = priorityColors[s.priority ?? ''] || TEXT_3;
+                      const pLabel = priorityLabels[s.priority ?? ''] || (s.priority ?? '--');
+                      const tLabel = typeLabels[s.suggestion_type] || s.suggestion_type;
+                      const summary = s.explanation_summary || s.reasoning || '';
+                      const truncated = summary.length > 50 ? summary.slice(0, 50) + '...' : summary;
+                      return (
+                        <div key={s.id} style={{
+                          padding: '8px 10px', borderRadius: 6, background: BG_2, marginBottom: 6,
+                          cursor: 'pointer', transition: 'opacity 0.2s',
+                        }}
+                          onClick={() => navigate('/hq/growth/agent-workbench')}
+                          onMouseEnter={e => (e.currentTarget.style.opacity = '0.8')}
+                          onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
+                        >
+                          <div style={{ display: 'flex', gap: 6, marginBottom: 4 }}>
+                            <span style={{
+                              fontSize: 10, padding: '1px 6px', borderRadius: 3,
+                              background: pColor + '22', color: pColor, fontWeight: 600,
+                            }}>{pLabel}</span>
+                            <span style={{
+                              fontSize: 10, padding: '1px 6px', borderRadius: 3,
+                              background: TEAL + '22', color: TEAL,
+                            }}>{tLabel}</span>
+                            {s.mechanism_type && (
+                              <span style={{
+                                fontSize: 10, padding: '1px 6px', borderRadius: 3,
+                                background: PURPLE + '22', color: PURPLE,
+                              }}>{s.mechanism_type}</span>
+                            )}
+                          </div>
+                          <div style={{ fontSize: 11, color: TEXT_3, lineHeight: 1.4 }}>{truncated || '暂无摘要'}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -973,6 +1040,73 @@ export function GrowthDashboardPage() {
           </div>
         )}
 
+        {/* 缺口1: 模板框架效果对比 */}
+        <div style={{ background: '#142833', borderRadius: 10, padding: 20, border: '1px solid #1e3a4a', marginBottom: 16 }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: TEXT_1, marginBottom: 16 }}>模板框架对比（近7天）</div>
+          {loadingTemplateAttr ? <SectionSkeleton height={120} /> : (() => {
+            const items = templateAttrData?.items || [];
+            const groups: Record<string, { enrollments: number; completed: number; completionRate: number; touches: number; opened: number; attributed: number; openRate: number; attrRate: number }> = {};
+            const typeMap: Record<string, { label: string; color: string }> = {
+              first_to_second: { label: '首单转二访', color: '#52c41a' },
+              reactivation: { label: '沉默召回', color: BRAND },
+              service_repair: { label: '服务修复', color: '#ff4d4f' },
+            };
+            for (const it of items) {
+              const jt = it.journey_type;
+              if (!typeMap[jt]) continue;
+              if (!groups[jt]) groups[jt] = { enrollments: 0, completed: 0, completionRate: 0, touches: 0, opened: 0, attributed: 0, openRate: 0, attrRate: 0 };
+              const g = groups[jt];
+              g.enrollments += it.total_enrollments;
+              g.completed += it.completed;
+              g.touches += it.total_touches;
+              g.opened += it.opened;
+              g.attributed += it.attributed;
+            }
+            for (const key of Object.keys(groups)) {
+              const g = groups[key];
+              g.completionRate = g.enrollments > 0 ? (g.completed / g.enrollments) * 100 : 0;
+              g.openRate = g.touches > 0 ? (g.opened / g.touches) * 100 : 0;
+              g.attrRate = g.touches > 0 ? (g.attributed / g.touches) * 100 : 0;
+            }
+            const keys = ['first_to_second', 'reactivation', 'service_repair'];
+            return (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+                {keys.map((jt) => {
+                  const cfg = typeMap[jt];
+                  const g = groups[jt];
+                  return (
+                    <div key={jt} style={{ padding: '14px 16px', borderRadius: 8, background: BG_2, borderTop: `3px solid ${cfg.color}` }}>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: cfg.color, marginBottom: 10 }}>{cfg.label}</div>
+                      {g ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                            <span style={{ color: TEXT_3 }}>活跃enrollment</span>
+                            <span style={{ color: '#e8e8e8', fontWeight: 600 }}>{g.enrollments}</span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                            <span style={{ color: TEXT_3 }}>完成率</span>
+                            <span style={{ color: g.completionRate >= 30 ? '#52c41a' : g.completionRate >= 15 ? YELLOW : '#ff4d4f', fontWeight: 600 }}>{g.completionRate.toFixed(1)}%</span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                            <span style={{ color: TEXT_3 }}>触达打开率</span>
+                            <span style={{ color: g.openRate >= 20 ? '#52c41a' : g.openRate >= 10 ? YELLOW : '#ff4d4f', fontWeight: 600 }}>{g.openRate.toFixed(1)}%</span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                            <span style={{ color: TEXT_3 }}>归因到店率</span>
+                            <span style={{ color: g.attrRate >= 5 ? '#52c41a' : g.attrRate >= 2 ? YELLOW : '#ff4d4f', fontWeight: 600 }}>{g.attrRate.toFixed(1)}%</span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: 12, color: TEXT_4, textAlign: 'center', padding: 16 }}>暂无数据</div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
+        </div>
+
         {/* 区域3: 旅程运行状态速览 */}
         <div style={{ background: '#142833', borderRadius: 10, padding: 20, border: '1px solid #1e3a4a', marginBottom: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
@@ -1007,6 +1141,72 @@ export function GrowthDashboardPage() {
               ))}
             </div>
           )}
+        </div>
+
+        {/* 缺口3: P1客户分层概览 */}
+        <div style={{ background: '#142833', borderRadius: 10, padding: 20, border: '1px solid #1e3a4a', marginBottom: 16 }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: TEXT_1, marginBottom: 16 }}>P1 客户分层概览</div>
+          {loadingP1Dist ? <SectionSkeleton height={160} /> : (() => {
+            const psyLabels: Record<string, string> = { near: '亲近', habit_break: '习惯断裂', fading: '淡化', abstracted: '疏远', lost: '失联' };
+            const suLabels: Record<string, string> = { none: '无', potential: '潜力', active: '活跃', advocate: '倡导者' };
+            const msLabels: Record<string, string> = { newcomer: '新客', regular: '常客', loyal: '忠实', vip: 'VIP', legend: '传奇' };
+            const rfLabels: Record<string, string> = { none: '无', birthday_organizer: '生日组织者', family_host: '家庭聚餐', corporate_host: '商务宴请', super_referrer: '超级推荐人' };
+
+            const renderDimension = (
+              title: string,
+              data: { level?: string; stage?: string; scenario?: string; count: number }[] | undefined,
+              labels: Record<string, string>,
+              barColor: string,
+            ) => {
+              if (!data || data.length === 0) return (
+                <div style={{ marginBottom: 12 }}>
+                  <div style={{ fontSize: 12, color: TEXT_3, marginBottom: 6 }}>{title}</div>
+                  <div style={{ fontSize: 11, color: TEXT_4 }}>暂无数据</div>
+                </div>
+              );
+              const total = data.reduce((s, d) => s + d.count, 0) || 1;
+              return (
+                <div style={{ marginBottom: 14 }}>
+                  <div style={{ fontSize: 12, color: TEXT_3, marginBottom: 6, fontWeight: 600 }}>{title}</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                    {data.map((d) => {
+                      const key = d.level || d.stage || d.scenario || 'unknown';
+                      const pct = (d.count / total) * 100;
+                      return (
+                        <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ fontSize: 11, color: TEXT_3, width: 80, textAlign: 'right', flexShrink: 0 }}>
+                            {labels[key] || key}
+                          </span>
+                          <div style={{ flex: 1, height: 14, borderRadius: 3, background: BG_2, overflow: 'hidden' }}>
+                            <div style={{
+                              height: '100%', borderRadius: 3, background: barColor,
+                              width: `${Math.max(pct, 1).toFixed(1)}%`, transition: 'width 0.6s ease',
+                              display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: 4,
+                              fontSize: 9, color: '#fff', fontWeight: 600, minWidth: 18,
+                            }}>
+                              {pct >= 8 ? `${pct.toFixed(0)}%` : ''}
+                            </div>
+                          </div>
+                          <span style={{ fontSize: 11, color: TEXT_4, width: 50, textAlign: 'right', flexShrink: 0 }}>
+                            {d.count}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            };
+
+            return (
+              <>
+                {renderDimension('心理距离', p1Dist?.psych_distance, psyLabels, TEAL)}
+                {renderDimension('超级用户', p1Dist?.super_user, suLabels, BRAND)}
+                {renderDimension('成长里程碑', p1Dist?.milestones, msLabels, BLUE)}
+                {renderDimension('裂变场景', p1Dist?.referral, rfLabels, PURPLE)}
+              </>
+            );
+          })()}
         </div>
 
       </div>

@@ -6,6 +6,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Card, Tag, Button, Space, Row, Col, Statistic, Table, Timeline, Spin, Descriptions, Progress, message,
+  Modal, Select, Radio,
 } from 'antd';
 import {
   ArrowLeftOutlined, RocketOutlined, RobotOutlined, StarOutlined,
@@ -17,7 +18,7 @@ import { LineChart } from 'echarts/charts';
 import { GridComponent, TooltipComponent, LegendComponent } from 'echarts/components';
 import { CanvasRenderer } from 'echarts/renderers';
 import { txFetch } from '../../../api';
-import type { GrowthProfile, TouchExecution, AgentSuggestion } from '../../../api/growthHubApi';
+import type { GrowthProfile, TouchExecution, AgentSuggestion, ServiceRepairCase, JourneyTemplate } from '../../../api/growthHubApi';
 
 echarts.use([LineChart, GridComponent, TooltipComponent, LegendComponent, CanvasRenderer]);
 
@@ -110,21 +111,35 @@ export function Customer360Page() {
   const [growthProfile, setGrowthProfile] = useState<GrowthProfile | null>(null);
   const [touches, setTouches] = useState<TouchExecution[]>([]);
   const [suggestions, setSuggestions] = useState<AgentSuggestion[]>([]);
+  const [repairCases, setRepairCases] = useState<ServiceRepairCase[]>([]);
+
+  // 发起旅程 Modal
+  const [journeyModalOpen, setJourneyModalOpen] = useState(false);
+  const [journeyTemplates, setJourneyTemplates] = useState<JourneyTemplate[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | undefined>();
+  const [journeySubmitting, setJourneySubmitting] = useState(false);
+
+  // 交给Agent Modal
+  const [agentModalOpen, setAgentModalOpen] = useState(false);
+  const [agentSuggestionType, setAgentSuggestionType] = useState<string>('reactivation');
+  const [agentSubmitting, setAgentSubmitting] = useState(false);
 
   const fetchAll = useCallback(async () => {
     if (!customerId) return;
     setLoading(true);
     try {
-      const [custResp, profileResp, touchResp, suggResp] = await Promise.allSettled([
+      const [custResp, profileResp, touchResp, suggResp, repairResp] = await Promise.allSettled([
         txFetch<CustomerDetail>(`/api/v1/member/customers/${customerId}`),
         txFetch<GrowthProfile>(`/api/v1/growth/customers/${customerId}/profile`),
         txFetch<{ items: TouchExecution[] }>(`/api/v1/growth/touch-executions?customer_id=${customerId}`),
         txFetch<{ items: AgentSuggestion[] }>(`/api/v1/growth/agent-suggestions?customer_id=${customerId}`),
+        txFetch<{ items: ServiceRepairCase[] }>(`/api/v1/growth/service-repair-cases?customer_id=${customerId}`),
       ]);
       if (custResp.status === 'fulfilled' && custResp.value.data) setCustomer(custResp.value.data);
       if (profileResp.status === 'fulfilled' && profileResp.value.data) setGrowthProfile(profileResp.value.data);
       if (touchResp.status === 'fulfilled' && touchResp.value.data) setTouches(touchResp.value.data.items);
       if (suggResp.status === 'fulfilled' && suggResp.value.data) setSuggestions(suggResp.value.data.items);
+      if (repairResp.status === 'fulfilled' && repairResp.value.data) setRepairCases(repairResp.value.data.items);
     } catch (err) {
       console.error('Customer360 fetch error', err);
     } finally {
@@ -133,6 +148,67 @@ export function Customer360Page() {
   }, [customerId]);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
+
+  // 打开"发起旅程"Modal时加载模板
+  const handleOpenJourneyModal = useCallback(async () => {
+    setJourneyModalOpen(true);
+    try {
+      const resp = await txFetch<{ items: JourneyTemplate[] }>('/api/v1/growth/journey-templates?is_active=true');
+      if (resp.data) setJourneyTemplates(resp.data.items);
+    } catch (err) {
+      console.error('fetch journey templates error', err);
+    }
+  }, []);
+
+  const handleCreateJourney = useCallback(async () => {
+    if (!customerId || !selectedTemplateId) return;
+    setJourneySubmitting(true);
+    try {
+      await txFetch('/api/v1/growth/journey-enrollments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customer_id: customerId,
+          journey_template_id: selectedTemplateId,
+          enrollment_source: 'manual',
+        }),
+      });
+      message.success('旅程已创建');
+      setJourneyModalOpen(false);
+      setSelectedTemplateId(undefined);
+    } catch (err) {
+      console.error('create journey error', err);
+      message.error('旅程创建失败');
+    } finally {
+      setJourneySubmitting(false);
+    }
+  }, [customerId, selectedTemplateId]);
+
+  const handleCreateAgentSuggestion = useCallback(async () => {
+    if (!customerId) return;
+    setAgentSubmitting(true);
+    try {
+      await txFetch('/api/v1/growth/agent-suggestions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customer_id: customerId,
+          suggestion_type: agentSuggestionType,
+          priority: 'medium',
+          explanation_summary: '手动触发',
+          created_by_agent: 'manual',
+        }),
+      });
+      message.success('Agent建议已生成');
+      setAgentModalOpen(false);
+      navigate('/hq/growth/agent-workbench');
+    } catch (err) {
+      console.error('create agent suggestion error', err);
+      message.error('Agent建议创建失败');
+    } finally {
+      setAgentSubmitting(false);
+    }
+  }, [customerId, agentSuggestionType, navigate]);
 
   const chartOption = useMemo(() => {
     if (!customer?.spend_trend) return {};
@@ -163,6 +239,48 @@ export function Customer360Page() {
       }],
     };
   }, [customer]);
+
+  // 经营行动时间轴：合并所有事件
+  const timelineEvents = useMemo(() => {
+    const events: { time: string; label: string; color: string }[] = [];
+
+    // 首单时间
+    if (growthProfile?.first_order_at) {
+      events.push({ time: growthProfile.first_order_at, label: '\uD83D\uDED2 首单完成', color: SUCCESS_GREEN });
+    }
+    // 二访时间
+    if (growthProfile?.second_order_at) {
+      events.push({ time: growthProfile.second_order_at, label: '\uD83D\uDD04 二次到店', color: INFO_BLUE });
+    }
+    // 投诉记录
+    repairCases.forEach((rc) => {
+      events.push({ time: rc.created_at, label: `\u26A0\uFE0F 投诉: ${rc.summary || '无摘要'}`, color: DANGER_RED });
+      if (rc.recovered_at) {
+        events.push({ time: rc.recovered_at, label: '\u2705 修复完成', color: SUCCESS_GREEN });
+      }
+    });
+    // 触达记录
+    touches.forEach((t) => {
+      events.push({ time: t.created_at, label: `\uD83D\uDCE8 触达: ${t.channel} (${t.mechanism_type || '通用'})`, color: INFO_BLUE });
+      if (t.attributed_order_id) {
+        events.push({ time: t.updated_at || t.created_at, label: '\uD83D\uDCB0 归因回店', color: SUCCESS_GREEN });
+      }
+    });
+    // Agent建议
+    suggestions.forEach((s) => {
+      events.push({ time: s.created_at, label: `\uD83E\uDD16 Agent建议: ${s.suggestion_type}`, color: WARNING_ORANGE });
+    });
+
+    // 按时间正序排列
+    events.sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime());
+    return events;
+  }, [growthProfile, repairCases, touches, suggestions]);
+
+  // 选中模板的详情
+  const selectedTemplate = useMemo(
+    () => journeyTemplates.find((t) => t.id === selectedTemplateId),
+    [journeyTemplates, selectedTemplateId],
+  );
 
   if (loading) {
     return (
@@ -255,10 +373,10 @@ export function Customer360Page() {
           </Col>
           <Col>
             <Space>
-              <Button type="primary" icon={<RocketOutlined />} style={{ background: BRAND_ORANGE, borderColor: BRAND_ORANGE }}>
+              <Button type="primary" icon={<RocketOutlined />} style={{ background: BRAND_ORANGE, borderColor: BRAND_ORANGE }} onClick={handleOpenJourneyModal}>
                 发起旅程
               </Button>
-              <Button icon={<RobotOutlined />} style={{ borderColor: INFO_BLUE, color: INFO_BLUE }}>
+              <Button icon={<RobotOutlined />} style={{ borderColor: INFO_BLUE, color: INFO_BLUE }} onClick={() => setAgentModalOpen(true)}>
                 交给Agent
               </Button>
               <Button icon={<StarOutlined />} style={{ borderColor: WARNING_ORANGE, color: WARNING_ORANGE }}>
@@ -450,38 +568,86 @@ export function Customer360Page() {
         style={{ background: CARD_BG, border: `1px solid ${BORDER}` }}
         styles={{ header: { borderBottom: `1px solid ${BORDER}` } }}
       >
-        {touches.length === 0 && suggestions.length === 0 ? (
+        {timelineEvents.length === 0 ? (
           <div style={{ textAlign: 'center', padding: 40, color: TEXT_SECONDARY }}>暂无行动记录</div>
         ) : (
           <Timeline
-            items={[
-              ...touches.slice(0, 5).map((t) => ({
-                color: EXEC_STATE_COLORS[t.execution_state] === 'green' ? SUCCESS_GREEN :
-                       EXEC_STATE_COLORS[t.execution_state] === 'red' ? DANGER_RED : INFO_BLUE,
-                children: (
-                  <div>
-                    <div style={{ color: TEXT_PRIMARY, fontSize: 13 }}>
-                      触达 [{t.channel}] {t.mechanism_type || '通用'} — {t.execution_state}
-                    </div>
-                    <div style={{ color: TEXT_SECONDARY, fontSize: 11 }}>{t.created_at?.slice(0, 16)}</div>
-                  </div>
-                ),
-              })),
-              ...suggestions.slice(0, 3).map((s) => ({
-                color: WARNING_ORANGE,
-                children: (
-                  <div>
-                    <div style={{ color: TEXT_PRIMARY, fontSize: 13 }}>
-                      Agent建议: {s.explanation_summary.slice(0, 50)}
-                    </div>
-                    <div style={{ color: TEXT_SECONDARY, fontSize: 11 }}>{s.created_at?.slice(0, 16)}</div>
-                  </div>
-                ),
-              })),
-            ]}
+            items={timelineEvents.map((evt) => ({
+              color: evt.color,
+              children: (
+                <div>
+                  <div style={{ color: TEXT_PRIMARY, fontSize: 13 }}>{evt.label}</div>
+                  <div style={{ color: TEXT_SECONDARY, fontSize: 11 }}>{evt.time?.slice(0, 16).replace('T', ' ')}</div>
+                </div>
+              ),
+            }))}
           />
         )}
       </Card>
+
+      {/* 发起旅程 Modal */}
+      <Modal
+        title={`为 ${cust?.display_name || '客户'} 发起旅程`}
+        open={journeyModalOpen}
+        onCancel={() => { setJourneyModalOpen(false); setSelectedTemplateId(undefined); }}
+        onOk={handleCreateJourney}
+        okText="确认"
+        cancelText="取消"
+        confirmLoading={journeySubmitting}
+        okButtonProps={{ disabled: !selectedTemplateId }}
+      >
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ marginBottom: 8, fontWeight: 500 }}>选择旅程模板</div>
+          <Select
+            placeholder="请选择旅程模板"
+            style={{ width: '100%' }}
+            value={selectedTemplateId}
+            onChange={(v) => setSelectedTemplateId(v)}
+            options={journeyTemplates.map((t) => ({
+              value: t.id,
+              label: `${t.name} (${t.journey_type})`,
+            }))}
+          />
+        </div>
+        {selectedTemplate && (
+          <div style={{ padding: 12, background: '#f5f5f5', borderRadius: 6 }}>
+            <div style={{ marginBottom: 4 }}>
+              <span style={{ fontWeight: 500 }}>机制族：</span>
+              <Tag color="blue">{selectedTemplate.mechanism_family || '-'}</Tag>
+            </div>
+            <div>
+              <span style={{ fontWeight: 500 }}>旅程类型：</span>
+              <Tag color="cyan">{selectedTemplate.journey_type}</Tag>
+            </div>
+            {selectedTemplate.description && (
+              <div style={{ marginTop: 8, color: '#666', fontSize: 12 }}>{selectedTemplate.description}</div>
+            )}
+          </div>
+        )}
+      </Modal>
+
+      {/* 交给Agent Modal */}
+      <Modal
+        title={`为 ${cust?.display_name || '客户'} 生成Agent建议`}
+        open={agentModalOpen}
+        onCancel={() => setAgentModalOpen(false)}
+        onOk={handleCreateAgentSuggestion}
+        okText="生成建议"
+        cancelText="取消"
+        confirmLoading={agentSubmitting}
+      >
+        <div style={{ marginBottom: 8, fontWeight: 500 }}>选择目标</div>
+        <Radio.Group
+          value={agentSuggestionType}
+          onChange={(e) => setAgentSuggestionType(e.target.value)}
+          style={{ display: 'flex', flexDirection: 'column', gap: 12 }}
+        >
+          <Radio value="reactivation">复购召回</Radio>
+          <Radio value="stored_value">储值续航</Radio>
+          <Radio value="booking">订台推荐</Radio>
+          <Radio value="service_repair">服务修复</Radio>
+        </Radio.Group>
+      </Modal>
     </div>
   );
 }

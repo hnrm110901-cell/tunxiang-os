@@ -4,9 +4,10 @@
  * 日期筛选 + KPI卡 + 归因表 + 效果对比柱状图
  */
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import dayjs, { type Dayjs } from 'dayjs';
 import {
   Card, Table, Tag, Space, Row, Col, Statistic, Select, DatePicker,
-  Spin, Tabs,
+  Spin, Tabs, Drawer, Collapse,
 } from 'antd';
 import ReactEChartsCore from 'echarts-for-react/lib/core';
 import * as echarts from 'echarts/core';
@@ -15,7 +16,7 @@ import { GridComponent, TooltipComponent, LegendComponent } from 'echarts/compon
 import { CanvasRenderer } from 'echarts/renderers';
 import { txFetch } from '../../../api';
 import { useApi } from '../../../hooks/useApi';
-import type { TouchExecution, MechanismAttribution, RepairEffectiveness } from '../../../api/growthHubApi';
+import type { TouchExecution, MechanismAttribution, RepairEffectiveness, JourneyTemplateAttribution, JourneyEnrollmentDetail } from '../../../api/growthHubApi';
 
 echarts.use([BarChart, PieChart, GridComponent, TooltipComponent, LegendComponent, CanvasRenderer]);
 
@@ -92,13 +93,29 @@ export function JourneyAttributionPage() {
   const [filterType, setFilterType] = useState<string | undefined>();
   const [activeTab, setActiveTab] = useState('overview');
 
-  // 新增数据源
+  // 缺口3: 日期范围状态
+  const [dateRange, setDateRange] = useState<[Dayjs, Dayjs]>([dayjs().subtract(7, 'day'), dayjs()]);
+  const days = useMemo(() => Math.max(1, dateRange[1].diff(dateRange[0], 'day')), [dateRange]);
+
+  // 缺口4: 下钻Drawer状态
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerTemplateId, setDrawerTemplateId] = useState<string | null>(null);
+  const [drawerData, setDrawerData] = useState<JourneyEnrollmentDetail[]>([]);
+  const [drawerLoading, setDrawerLoading] = useState(false);
+
+  // 数据源 — 使用days驱动刷新
   const { data: mechData } = useApi<{ items: MechanismAttribution[]; days: number }>(
-    '/api/v1/growth/attribution/by-mechanism?days=7',
+    `/api/v1/growth/attribution/by-mechanism?days=${days}`,
     { cacheMs: 15_000 },
   );
   const { data: repairData } = useApi<RepairEffectiveness>(
-    '/api/v1/growth/attribution/repair-effectiveness?days=30',
+    `/api/v1/growth/attribution/repair-effectiveness?days=${Math.max(days, 30)}`,
+    { cacheMs: 15_000 },
+  );
+
+  // 缺口1: 模板框架归因Tab数据
+  const { data: templateAttrData } = useApi<{ items: JourneyTemplateAttribution[]; days: number }>(
+    `/api/v1/growth/attribution/by-journey-template?days=${days}`,
     { cacheMs: 15_000 },
   );
 
@@ -120,6 +137,24 @@ export function JourneyAttributionPage() {
   }, [filterType]);
 
   useEffect(() => { fetchExecutions(); }, [fetchExecutions]);
+
+  // 缺口4: 打开下钻drawer
+  const openEnrollmentDrawer = useCallback(async (templateId: string) => {
+    setDrawerTemplateId(templateId);
+    setDrawerOpen(true);
+    setDrawerLoading(true);
+    try {
+      const resp = await txFetch<{ items: JourneyEnrollmentDetail[]; total: number }>(
+        `/api/v1/growth/journey-enrollments?journey_template_id=${templateId}&size=20`
+      );
+      if (resp.data) setDrawerData(resp.data.items);
+    } catch (err) {
+      console.error('fetch enrollment detail error', err);
+      setDrawerData([]);
+    } finally {
+      setDrawerLoading(false);
+    }
+  }, []);
 
   // 前端聚合
   const aggregated = useMemo(() => {
@@ -269,6 +304,17 @@ export function JourneyAttributionPage() {
         );
       },
     },
+    {
+      title: '操作', key: 'action', width: 90,
+      render: (_: unknown, record: AttributionRow) => (
+        <a
+          style={{ color: INFO_BLUE, cursor: 'pointer', fontSize: 12 }}
+          onClick={() => openEnrollmentDrawer(record.mechanism_family)}
+        >
+          查看详情
+        </a>
+      ),
+    },
   ];
 
   // ---- 按机制归因Tab的列定义 ----
@@ -403,7 +449,13 @@ export function JourneyAttributionPage() {
         <Space>
           <RangePicker
             style={{ background: CARD_BG, borderColor: BORDER }}
-            onChange={() => fetchExecutions()}
+            value={dateRange}
+            onChange={(dates) => {
+              if (dates && dates[0] && dates[1]) {
+                setDateRange([dates[0], dates[1]]);
+                fetchExecutions();
+              }
+            }}
           />
           <Select
             placeholder="旅程类型"
@@ -516,6 +568,55 @@ export function JourneyAttributionPage() {
                     <div style={{ textAlign: 'center', padding: 60, color: TEXT_SECONDARY }}>暂无数据</div>
                   )}
                 </Card>
+
+                {/* 缺口5: P1客户分层归因折叠区域 */}
+                <Collapse
+                  style={{ marginTop: 16, background: CARD_BG, border: `1px solid ${BORDER}` }}
+                  items={[{
+                    key: 'p1-segmentation',
+                    label: <span style={{ color: TEXT_PRIMARY }}>按客户分层交叉分析</span>,
+                    children: (() => {
+                      const mechItems = mechData?.items || [];
+                      if (mechItems.length === 0) return <div style={{ color: TEXT_SECONDARY, padding: 16 }}>暂无机制归因数据</div>;
+                      const psychLevels = ['near', 'habit_break', 'fading', 'abstracted', 'lost'];
+                      const psychLabels: Record<string, string> = { near: '亲近', habit_break: '习惯断裂', fading: '淡化', abstracted: '疏远', lost: '失联' };
+                      return (
+                        <div style={{ overflowX: 'auto' }}>
+                          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                            <thead>
+                              <tr>
+                                <th style={{ textAlign: 'left', padding: '8px 10px', color: TEXT_SECONDARY, borderBottom: `1px solid ${BORDER}` }}>心理距离 \ 机制</th>
+                                {mechItems.map(m => (
+                                  <th key={m.mechanism_type} style={{ textAlign: 'center', padding: '8px 6px', color: TEXT_SECONDARY, borderBottom: `1px solid ${BORDER}` }}>
+                                    {MECHANISM_LABELS[m.mechanism_type] || m.mechanism_type}
+                                  </th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {psychLevels.map(level => (
+                                <tr key={level}>
+                                  <td style={{ padding: '6px 10px', color: TEXT_PRIMARY, borderBottom: `1px solid ${BORDER}` }}>
+                                    {psychLabels[level]}
+                                  </td>
+                                  {mechItems.map(m => (
+                                    <td key={m.mechanism_type} style={{ textAlign: 'center', padding: '6px', color: TEXT_SECONDARY, borderBottom: `1px solid ${BORDER}` }}>
+                                      <span style={{ color: INFO_BLUE, fontSize: 11 }}>P2</span>
+                                    </td>
+                                  ))}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                          <div style={{ marginTop: 12, padding: '10px 12px', background: `${INFO_BLUE}11`, borderRadius: 6, fontSize: 11, color: TEXT_SECONDARY }}>
+                            交叉分析将在 P2 阶段接入后端聚合端点，当前为结构占位。
+                            预期可回答 &quot;哪种机制对 fading 客户最有效&quot; 等问题。
+                          </div>
+                        </div>
+                      );
+                    })(),
+                  }]}
+                />
               </>
             ),
           },
@@ -560,8 +661,208 @@ export function JourneyAttributionPage() {
               </>
             ),
           },
+          {
+            key: 'by-template',
+            label: <span style={{ color: TEXT_PRIMARY }}>按模板框架归因</span>,
+            children: (() => {
+              const items = templateAttrData?.items || [];
+              const templateColumns = [
+                { title: '模板名称', dataIndex: 'template_name', key: 'template_name', width: 160,
+                  render: (val: string) => <span style={{ color: TEXT_PRIMARY, fontWeight: 500 }}>{val}</span> },
+                { title: '旅程类型', dataIndex: 'journey_type', key: 'journey_type', width: 100,
+                  render: (val: string) => <Tag color={JOURNEY_TYPE_COLORS[val] || 'default'}>{JOURNEY_TYPE_LABELS[val] || val}</Tag> },
+                { title: '机制框架', dataIndex: 'mechanism_family', key: 'mechanism_family', width: 100,
+                  render: (val: string) => <Tag color={MECHANISM_COLORS[val] || 'default'}>{MECHANISM_LABELS[val] || val}</Tag> },
+                { title: 'enrollment数', dataIndex: 'total_enrollments', key: 'total_enrollments', width: 100,
+                  sorter: (a: JourneyTemplateAttribution, b: JourneyTemplateAttribution) => a.total_enrollments - b.total_enrollments,
+                  render: (val: number) => <span style={{ color: TEXT_PRIMARY }}>{val}</span> },
+                { title: '完成率', dataIndex: 'completion_rate', key: 'completion_rate', width: 80,
+                  sorter: (a: JourneyTemplateAttribution, b: JourneyTemplateAttribution) => a.completion_rate - b.completion_rate,
+                  render: (val: number) => <span style={{ color: val >= 30 ? SUCCESS_GREEN : val >= 15 ? WARNING_ORANGE : DANGER_RED, fontWeight: 600 }}>{val.toFixed(1)}%</span> },
+                { title: '触达数', dataIndex: 'total_touches', key: 'total_touches', width: 80,
+                  render: (val: number) => <span style={{ color: TEXT_PRIMARY }}>{val}</span> },
+                { title: '打开数', dataIndex: 'opened', key: 'opened', width: 80,
+                  render: (val: number) => <span style={{ color: SUCCESS_GREEN }}>{val}</span> },
+                { title: '归因订单', dataIndex: 'attributed', key: 'attributed', width: 80,
+                  sorter: (a: JourneyTemplateAttribution, b: JourneyTemplateAttribution) => a.attributed - b.attributed,
+                  render: (val: number) => <span style={{ color: BRAND_ORANGE, fontWeight: 600 }}>{val}</span> },
+                { title: '归因GMV', dataIndex: 'revenue_fen', key: 'revenue_fen', width: 100,
+                  sorter: (a: JourneyTemplateAttribution, b: JourneyTemplateAttribution) => a.revenue_fen - b.revenue_fen,
+                  render: (val: number) => <span style={{ color: BRAND_ORANGE, fontWeight: 600 }}>¥{(val / 100).toFixed(0)}</span> },
+              ];
+
+              const templateChartOption = (() => {
+                if (items.length === 0) return {};
+                const sorted = [...items].sort((a, b) => b.revenue_fen - a.revenue_fen).slice(0, 10);
+                return {
+                  tooltip: { trigger: 'axis' as const },
+                  grid: { left: 100, right: 40, top: 40, bottom: 60 },
+                  xAxis: {
+                    type: 'category' as const,
+                    data: sorted.map(r => r.template_name.length > 8 ? r.template_name.slice(0, 8) + '..' : r.template_name),
+                    axisLabel: { color: TEXT_SECONDARY, rotate: 20 },
+                    axisLine: { lineStyle: { color: BORDER } },
+                  },
+                  yAxis: {
+                    type: 'value' as const, name: '百分比(%)',
+                    axisLabel: { color: TEXT_SECONDARY },
+                    splitLine: { lineStyle: { color: BORDER, type: 'dashed' as const } },
+                  },
+                  legend: {
+                    data: ['完成率', '打开率', '归因率'],
+                    textStyle: { color: TEXT_SECONDARY },
+                  },
+                  series: [
+                    { name: '完成率', type: 'bar', data: sorted.map(r => r.completion_rate), itemStyle: { color: INFO_BLUE } },
+                    { name: '打开率', type: 'bar', data: sorted.map(r => r.total_touches > 0 ? +(r.opened / r.total_touches * 100).toFixed(1) : 0), itemStyle: { color: SUCCESS_GREEN } },
+                    { name: '归因率', type: 'bar', data: sorted.map(r => r.total_touches > 0 ? +(r.attributed / r.total_touches * 100).toFixed(1) : 0), itemStyle: { color: BRAND_ORANGE } },
+                  ],
+                };
+              })();
+
+              return (
+                <>
+                  <Card
+                    title={<span style={{ color: TEXT_PRIMARY }}>按模板框架归因明细（近{days}天）</span>}
+                    style={{ background: CARD_BG, border: `1px solid ${BORDER}`, marginBottom: 16 }}
+                    styles={{ header: { borderBottom: `1px solid ${BORDER}` } }}
+                    bodyStyle={{ padding: 0 }}
+                  >
+                    <Table
+                      dataSource={items}
+                      columns={templateColumns}
+                      rowKey="template_name"
+                      size="small"
+                      pagination={false}
+                      scroll={{ x: 900 }}
+                      locale={{ emptyText: <span style={{ color: TEXT_SECONDARY }}>暂无模板归因数据</span> }}
+                    />
+                  </Card>
+                  <Card
+                    title={<span style={{ color: TEXT_PRIMARY }}>模板框架效果对比（完成率/打开率/归因率）</span>}
+                    style={{ background: CARD_BG, border: `1px solid ${BORDER}` }}
+                    styles={{ header: { borderBottom: `1px solid ${BORDER}` } }}
+                  >
+                    {items.length > 0 ? (
+                      <ReactEChartsCore echarts={echarts} option={templateChartOption} style={{ height: 380 }} />
+                    ) : (
+                      <div style={{ textAlign: 'center', padding: 60, color: TEXT_SECONDARY }}>暂无数据</div>
+                    )}
+                  </Card>
+                </>
+              );
+            })(),
+          },
+          {
+            key: 'recall-comparison',
+            label: <span style={{ color: TEXT_PRIMARY }}>召回框架对比</span>,
+            children: (() => {
+              const mechItems = mechData?.items || [];
+              const recallMechanisms: Record<string, { label: string; color: string }> = {
+                loss_aversion: { label: '权益到期型', color: WARNING_ORANGE },
+                relationship_warmup: { label: '关系唤醒型', color: INFO_BLUE },
+                minimal_action: { label: '最小行动型', color: SUCCESS_GREEN },
+              };
+              // Filter reactivation-related mechanisms; fallback to all loss_aversion type items
+              const recallKeys = Object.keys(recallMechanisms);
+              const recallItems = mechItems.filter(m => recallKeys.includes(m.mechanism_type));
+              // If no exact matches, show the first 3 mechanisms as fallback
+              const displayItems = recallItems.length > 0 ? recallItems : mechItems.slice(0, 3);
+
+              return (
+                <Row gutter={16}>
+                  {displayItems.map((m) => {
+                    const cfg = recallMechanisms[m.mechanism_type] || { label: MECHANISM_LABELS[m.mechanism_type] || m.mechanism_type, color: TEXT_SECONDARY };
+                    const openRate = m.total_touches > 0 ? (m.opened / m.total_touches * 100) : 0;
+                    const attrRate = m.total_touches > 0 ? (m.attributed / m.total_touches * 100) : 0;
+                    return (
+                      <Col span={8} key={m.mechanism_type}>
+                        <Card
+                          style={{ background: CARD_BG, border: `1px solid ${BORDER}`, borderTop: `3px solid ${cfg.color}` }}
+                          styles={{ header: { borderBottom: `1px solid ${BORDER}` } }}
+                          title={<span style={{ color: cfg.color, fontWeight: 700 }}>{cfg.label}</span>}
+                        >
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                              <span style={{ color: TEXT_SECONDARY, fontSize: 13 }}>触达数</span>
+                              <span style={{ color: TEXT_PRIMARY, fontSize: 16, fontWeight: 700 }}>{m.total_touches}</span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                              <span style={{ color: TEXT_SECONDARY, fontSize: 13 }}>打开率</span>
+                              <span style={{ color: openRate >= 20 ? SUCCESS_GREEN : openRate >= 10 ? WARNING_ORANGE : DANGER_RED, fontSize: 16, fontWeight: 700 }}>{openRate.toFixed(1)}%</span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                              <span style={{ color: TEXT_SECONDARY, fontSize: 13 }}>归因到店率</span>
+                              <span style={{ color: attrRate >= 5 ? SUCCESS_GREEN : attrRate >= 2 ? WARNING_ORANGE : DANGER_RED, fontSize: 16, fontWeight: 700 }}>{attrRate.toFixed(1)}%</span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                              <span style={{ color: TEXT_SECONDARY, fontSize: 13 }}>归因GMV</span>
+                              <span style={{ color: BRAND_ORANGE, fontSize: 16, fontWeight: 700 }}>¥{(m.revenue_fen / 100).toFixed(0)}</span>
+                            </div>
+                          </div>
+                        </Card>
+                      </Col>
+                    );
+                  })}
+                  {displayItems.length === 0 && (
+                    <Col span={24}>
+                      <div style={{ textAlign: 'center', padding: 60, color: TEXT_SECONDARY }}>暂无召回机制归因数据</div>
+                    </Col>
+                  )}
+                </Row>
+              );
+            })(),
+          },
         ]}
       />
+
+      {/* 缺口4: 个体客户旅程下钻Drawer */}
+      <Drawer
+        title={<span style={{ color: TEXT_PRIMARY }}>旅程enrollment详情</span>}
+        open={drawerOpen}
+        onClose={() => { setDrawerOpen(false); setDrawerData([]); setDrawerTemplateId(null); }}
+        width={700}
+        styles={{
+          header: { background: CARD_BG, borderBottom: `1px solid ${BORDER}` },
+          body: { background: PAGE_BG, padding: 16 },
+        }}
+      >
+        {drawerTemplateId && (
+          <div style={{ marginBottom: 12, fontSize: 12, color: TEXT_SECONDARY }}>
+            模板/机制: <Tag color="blue">{drawerTemplateId}</Tag>
+          </div>
+        )}
+        {drawerLoading ? (
+          <div style={{ textAlign: 'center', padding: 60 }}><Spin /></div>
+        ) : (
+          <Table
+            dataSource={drawerData}
+            rowKey="id"
+            size="small"
+            pagination={false}
+            scroll={{ x: 600 }}
+            locale={{ emptyText: <span style={{ color: TEXT_SECONDARY }}>暂无enrollment数据</span> }}
+            columns={[
+              { title: '客户ID', dataIndex: 'customer_id', key: 'customer_id', width: 140,
+                render: (val: string) => <span style={{ color: TEXT_PRIMARY, fontSize: 11 }}>{val.slice(0, 12)}...</span> },
+              { title: '状态', dataIndex: 'journey_state', key: 'journey_state', width: 80,
+                render: (val: string) => {
+                  const stateColors: Record<string, string> = { active: 'green', completed: 'blue', paused: 'orange', exited: 'red', observing: 'cyan' };
+                  return <Tag color={stateColors[val] || 'default'}>{val}</Tag>;
+                }},
+              { title: '当前步骤', dataIndex: 'current_step_no', key: 'current_step_no', width: 80,
+                render: (val: number | null) => <span style={{ color: TEXT_PRIMARY }}>{val ?? '--'}</span> },
+              { title: '进入时间', dataIndex: 'entered_at', key: 'entered_at', width: 140,
+                render: (val: string) => <span style={{ color: TEXT_SECONDARY, fontSize: 11 }}>{val ? dayjs(val).format('YYYY-MM-DD HH:mm') : '--'}</span> },
+              { title: '完成/退出时间', key: 'end_time', width: 140,
+                render: (_: unknown, record: JourneyEnrollmentDetail) => {
+                  const t = record.completed_at || record.exited_at;
+                  return <span style={{ color: TEXT_SECONDARY, fontSize: 11 }}>{t ? dayjs(t).format('YYYY-MM-DD HH:mm') : '--'}</span>;
+                }},
+            ]}
+          />
+        )}
+      </Drawer>
     </div>
   );
 }

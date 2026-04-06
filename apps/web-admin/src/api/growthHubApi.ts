@@ -14,9 +14,15 @@ export interface GrowthProfile {
   service_repair_status: string;
   service_repair_case_id: string | null;
   has_active_owned_benefit: boolean;
+  owned_benefit_type: string | null;
+  owned_benefit_expire_at: string | null;
   growth_opt_out: boolean;
   marketing_pause_until: string | null;
+  first_order_at: string | null;
+  second_order_at: string | null;
   last_order_at: string | null;
+  last_growth_touch_at: string | null;
+  last_growth_touch_channel: string | null;
   // P1 fields
   psych_distance_level: string | null;
   super_user_level: string | null;
@@ -33,6 +39,7 @@ export interface JourneyTemplate {
   tenant_id: string;
   name: string;
   journey_type: string;
+  mechanism_family: string | null;
   description: string | null;
   trigger_rule_json: Record<string, unknown> | null;
   total_steps: number;
@@ -112,6 +119,7 @@ export interface ServiceRepairCase {
   compensation_plan_json: Record<string, unknown> | null;
   selected_compensation: string | null;
   observe_until: string | null;
+  recovered_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -121,10 +129,16 @@ export interface AgentSuggestion {
   tenant_id: string;
   customer_id: string | null;
   suggestion_type: string;
+  priority: string;
   template_id: string | null;
   agent_id: string | null;
+  created_by_agent: string | null;
   confidence_score: number;
   reasoning: string | null;
+  explanation_summary: string;
+  mechanism_type: string | null;
+  recommended_channel: string | null;
+  recommended_offer_type: string | null;
   suggested_channel: string | null;
   suggested_timing: string | null;
   suggested_message: string | null;
@@ -303,3 +317,40 @@ export const fetchP1Distribution = () =>
 
 export const triggerP1Recompute = () =>
   txFetch<{ ok: boolean }>('/api/v1/growth/p1/recompute', { method: 'POST' });
+
+// ---- Agent Suggestion with explanation (for dashboard TOP3) ----
+
+export interface AgentSuggestionDetail {
+  id: string;
+  suggestion_type: string;
+  confidence_score: number;
+  reasoning: string | null;
+  review_state: string;
+  mechanism_type?: string | null;
+  explanation_summary?: string | null;
+  priority?: string | null;
+  created_at: string;
+}
+
+export const fetchTopAgentSuggestions = (size = 3) =>
+  txFetchData<{ items: AgentSuggestionDetail[]; total: number }>(
+    `/api/v1/growth/agent-suggestions?review_state=pending_review&size=${size}`,
+  );
+
+// ---- Journey Enrollment Detail (for drill-down drawer) ----
+
+export interface JourneyEnrollmentDetail {
+  id: string;
+  customer_id: string;
+  journey_state: string;
+  current_step_no: number | null;
+  entered_at: string;
+  completed_at: string | null;
+  exited_at: string | null;
+  exit_reason: string | null;
+}
+
+export const fetchJourneyEnrollmentsByTemplate = (templateId: string, size = 20) =>
+  txFetchData<{ items: JourneyEnrollmentDetail[]; total: number }>(
+    `/api/v1/growth/journey-enrollments?journey_template_id=${templateId}&size=${size}`,
+  );

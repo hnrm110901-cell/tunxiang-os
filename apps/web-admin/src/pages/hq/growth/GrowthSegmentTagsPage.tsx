@@ -2,21 +2,30 @@
  * GrowthSegmentTagsPage — 增长标签中心
  * 路由: /hq/growth/segment-tags
  *
- * 区域1: 标签分布概览（3个饼图）
- * 区域2: P0预置规则模板（3张卡片）
- * 区域3: 标签字典（静态表格）
+ * 区域1: 标签分布概览（3+4个饼图）
+ * 区域2: P0预置规则模板（3张卡片）+ 批量入列旅程Modal
+ * 区域3: 自定义分群规则构建器 + 动态人群包概念
+ * 区域4: 标签字典（静态表格）
  */
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, Table, Tag, Button, Space, Row, Col, Spin, message } from 'antd';
-import { TagsOutlined, TeamOutlined, RocketOutlined, EyeOutlined } from '@ant-design/icons';
+import {
+  Card, Table, Tag, Button, Space, Row, Col, Spin, message,
+  Modal, Select, Form, Input, Switch, Divider,
+} from 'antd';
+import {
+  TagsOutlined, TeamOutlined, RocketOutlined, EyeOutlined,
+  PlusOutlined, SearchOutlined, SaveOutlined, DeleteOutlined,
+} from '@ant-design/icons';
 import {
   fetchSegmentPresets,
   fetchTagDistribution,
   fetchP1Distribution,
+  fetchJourneyTemplates,
   type SegmentPreset,
   type TagDistribution,
   type P1Distribution,
+  type JourneyTemplate,
 } from '../../../api/growthHubApi';
 
 // ---- 颜色常量（深色主题） ----
@@ -194,6 +203,78 @@ const REFERRAL_LABELS: Record<string, string> = {
   corporate_host: '企业宴请', super_referrer: '超级推荐者',
 };
 
+// ---- 推荐旅程映射 ----
+const RECOMMENDED_JOURNEY: Record<string, string> = {
+  first_to_second: 'first_to_second_v2',
+  reactivation: 'reactivation_loss_aversion_v2',
+  service_repair: 'service_repair_v2',
+};
+
+// ---- 自定义分群字段枚举 ----
+const FIELD_OPTIONS: Record<string, { label: string; values: { value: string; label: string }[] }> = {
+  repurchase_stage: { label: '复购阶段', values: [
+    { value: 'not_started', label: '未开始' },
+    { value: 'first_order_done', label: '首单完成' },
+    { value: 'second_order_done', label: '已二访' },
+    { value: 'stable_repeat', label: '稳定复购' },
+  ]},
+  reactivation_priority: { label: '召回优先级', values: [
+    { value: 'none', label: '无' },
+    { value: 'low', label: '低' },
+    { value: 'medium', label: '中' },
+    { value: 'high', label: '高' },
+    { value: 'critical', label: '紧急' },
+  ]},
+  service_repair_status: { label: '修复状态', values: [
+    { value: 'none', label: '无' },
+    { value: 'complaint_open', label: '投诉中' },
+    { value: 'complaint_closed_pending_repair', label: '待修复' },
+    { value: 'repair_in_progress', label: '修复中' },
+    { value: 'repair_observing', label: '观察中' },
+    { value: 'repair_completed', label: '已修复' },
+  ]},
+  psych_distance_level: { label: '心理距离', values: [
+    { value: 'near', label: '近距离' },
+    { value: 'habit_break', label: '习惯中断' },
+    { value: 'fading', label: '渐远' },
+    { value: 'abstracted', label: '抽象化' },
+    { value: 'lost', label: '失联' },
+  ]},
+  super_user_level: { label: '超级用户', values: [
+    { value: 'none', label: '普通' },
+    { value: 'potential', label: '潜在' },
+    { value: 'active', label: '活跃' },
+    { value: 'advocate', label: '代言人' },
+  ]},
+  growth_milestone_stage: { label: '成长里程碑', values: [
+    { value: 'newcomer', label: '新客' },
+    { value: 'regular', label: '常客' },
+    { value: 'loyal', label: '忠实客' },
+    { value: 'vip', label: 'VIP' },
+    { value: 'legend', label: '传奇' },
+  ]},
+  referral_scenario: { label: '裂变场景', values: [
+    { value: 'none', label: '无' },
+    { value: 'birthday_organizer', label: '生日组织者' },
+    { value: 'family_host', label: '家庭聚餐达人' },
+    { value: 'corporate_host', label: '商务宴请' },
+    { value: 'super_referrer', label: '超级推荐官' },
+  ]},
+};
+
+const OPERATOR_OPTIONS = [
+  { value: 'eq', label: '等于' },
+  { value: 'ne', label: '不等于' },
+  { value: 'in', label: '包含' },
+];
+
+const REFRESH_FREQ_OPTIONS = [
+  { value: 'realtime', label: '实时' },
+  { value: 'hourly', label: '每小时' },
+  { value: 'daily', label: '每日' },
+  { value: 'weekly', label: '每周' },
+];
+
 // ---- 主组件 ----
 export function GrowthSegmentTagsPage() {
   const navigate = useNavigate();
@@ -201,6 +282,39 @@ export function GrowthSegmentTagsPage() {
   const [presets, setPresets] = useState<SegmentPreset[]>([]);
   const [distribution, setDistribution] = useState<TagDistribution | null>(null);
   const [p1Dist, setP1Dist] = useState<P1Distribution | null>(null);
+
+  // 缺口1: 批量入列旅程Modal
+  const [enrollModalOpen, setEnrollModalOpen] = useState(false);
+  const [enrollPreset, setEnrollPreset] = useState<SegmentPreset | null>(null);
+  const [journeyTemplates, setJourneyTemplates] = useState<JourneyTemplate[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+  const [loadingTemplates, setLoadingTemplates] = useState(false);
+
+  // 缺口3: 动态包控制
+  const [isDynamic, setIsDynamic] = useState(false);
+  const [refreshFreq, setRefreshFreq] = useState('daily');
+
+  const [customForm] = Form.useForm();
+
+  const openEnrollModal = async (preset: SegmentPreset) => {
+    setEnrollPreset(preset);
+    setEnrollModalOpen(true);
+    setLoadingTemplates(true);
+    try {
+      const res = await fetchJourneyTemplates({ is_active: 'true' });
+      setJourneyTemplates(res.items);
+      // 自动选择推荐旅程
+      const recommended = RECOMMENDED_JOURNEY[preset.tag_type];
+      if (recommended) {
+        const match = res.items.find((t) => t.name.includes(recommended.replace(/_v2$/, '').replace(/_/g, ' ')) || t.journey_type === preset.tag_type);
+        if (match) setSelectedTemplateId(match.id);
+      }
+    } catch {
+      message.error('加载旅程模板失败');
+    } finally {
+      setLoadingTemplates(false);
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -367,7 +481,7 @@ export function GrowthSegmentTagsPage() {
                       type="primary"
                       icon={<RocketOutlined />}
                       style={{ background: BRAND_ORANGE, borderColor: BRAND_ORANGE }}
-                      onClick={() => navigate('/hq/growth/journey-templates')}
+                      onClick={() => openEnrollModal(p)}
                     >
                       发起旅程
                     </Button>
@@ -383,7 +497,132 @@ export function GrowthSegmentTagsPage() {
           </Row>
         </Card>
 
-        {/* 区域3: 标签字典 */}
+        {/* 区域3: 自定义分群规则构建器 */}
+        <Card
+          title={<span style={{ color: TEXT_PRIMARY }}>自定义分群规则</span>}
+          style={{ background: CARD_BG, border: `1px solid ${BORDER}`, marginBottom: 24 }}
+          styles={{ header: { background: CARD_BG, borderBottom: `1px solid ${BORDER}`, color: TEXT_PRIMARY }, body: { background: CARD_BG } }}
+        >
+          <Form form={customForm} layout="vertical">
+            <Form.List name="conditions">
+              {(fields, { add, remove }) => (
+                <>
+                  {fields.map(({ key, name, ...restField }) => (
+                    <Row key={key} gutter={12} align="middle" style={{ marginBottom: 12 }}>
+                      <Col span={7}>
+                        <Form.Item {...restField} name={[name, 'field']} style={{ margin: 0 }}>
+                          <Select
+                            placeholder="选择字段"
+                            options={Object.entries(FIELD_OPTIONS).map(([k, v]) => ({ value: k, label: v.label }))}
+                            onChange={() => {
+                              // 清空值选择
+                              const conditions = customForm.getFieldValue('conditions');
+                              if (conditions[name]) {
+                                conditions[name].value = undefined;
+                                customForm.setFieldsValue({ conditions });
+                              }
+                            }}
+                          />
+                        </Form.Item>
+                      </Col>
+                      <Col span={5}>
+                        <Form.Item {...restField} name={[name, 'op']} style={{ margin: 0 }}>
+                          <Select placeholder="操作符" options={OPERATOR_OPTIONS} />
+                        </Form.Item>
+                      </Col>
+                      <Col span={9}>
+                        <Form.Item noStyle shouldUpdate={(prev, cur) =>
+                          prev?.conditions?.[name]?.field !== cur?.conditions?.[name]?.field ||
+                          prev?.conditions?.[name]?.op !== cur?.conditions?.[name]?.op
+                        }>
+                          {() => {
+                            const conditions = customForm.getFieldValue('conditions') || [];
+                            const fieldKey = conditions[name]?.field;
+                            const op = conditions[name]?.op;
+                            const fieldDef = fieldKey ? FIELD_OPTIONS[fieldKey] : null;
+                            if (!fieldDef) return (
+                              <Form.Item {...restField} name={[name, 'value']} style={{ margin: 0 }}>
+                                <Input placeholder="先选择字段" disabled />
+                              </Form.Item>
+                            );
+                            return (
+                              <Form.Item {...restField} name={[name, 'value']} style={{ margin: 0 }}>
+                                <Select
+                                  placeholder="选择值"
+                                  mode={op === 'in' ? 'multiple' : undefined}
+                                  options={fieldDef.values}
+                                />
+                              </Form.Item>
+                            );
+                          }}
+                        </Form.Item>
+                      </Col>
+                      <Col span={3}>
+                        <Button
+                          type="text"
+                          danger
+                          icon={<DeleteOutlined />}
+                          onClick={() => remove(name)}
+                        />
+                      </Col>
+                    </Row>
+                  ))}
+                  <Button
+                    type="dashed"
+                    onClick={() => add()}
+                    icon={<PlusOutlined />}
+                    style={{ width: '100%', marginBottom: 16 }}
+                  >
+                    添加条件
+                  </Button>
+                </>
+              )}
+            </Form.List>
+          </Form>
+
+          <Divider style={{ borderColor: BORDER, margin: '12px 0' }} />
+
+          {/* 动态包控制（缺口3） */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16 }}>
+            <span style={{ color: TEXT_SECONDARY, fontSize: 13 }}>自动更新（动态包）</span>
+            <Switch
+              checked={isDynamic}
+              onChange={setIsDynamic}
+              checkedChildren="开"
+              unCheckedChildren="关"
+            />
+            {isDynamic && (
+              <Select
+                value={refreshFreq}
+                onChange={setRefreshFreq}
+                style={{ width: 120 }}
+                options={REFRESH_FREQ_OPTIONS}
+              />
+            )}
+            <span style={{ color: TEXT_SECONDARY, fontSize: 12 }}>
+              {isDynamic ? '符合条件的客户将自动进出人群包' : '保存时的客户快照，不再变化'}
+            </span>
+          </div>
+
+          <Space>
+            <Button
+              icon={<SearchOutlined />}
+              onClick={() => message.info('实时预览开发中')}
+            >
+              预览人数
+            </Button>
+            <Button
+              type="primary"
+              icon={<SaveOutlined />}
+              style={{ background: BRAND_ORANGE, borderColor: BRAND_ORANGE }}
+              onClick={() => message.info('保存功能开发中')}
+            >
+              保存为人群包
+            </Button>
+          </Space>
+        </Card>
+
+        {/* 区域4: 标签字典 */}
         <Card
           title={<span style={{ color: TEXT_PRIMARY }}>标签字典</span>}
           style={{ background: CARD_BG, border: `1px solid ${BORDER}` }}
@@ -399,6 +638,72 @@ export function GrowthSegmentTagsPage() {
           />
         </Card>
       </Spin>
+
+      {/* 批量入列旅程Modal（缺口1） */}
+      <Modal
+        title={`批量入列旅程 — ${enrollPreset?.name || ''}`}
+        open={enrollModalOpen}
+        onCancel={() => { setEnrollModalOpen(false); setEnrollPreset(null); setSelectedTemplateId(null); }}
+        footer={[
+          <Button key="cancel" onClick={() => { setEnrollModalOpen(false); setEnrollPreset(null); }}>
+            取消
+          </Button>,
+          <Button
+            key="confirm"
+            type="primary"
+            style={{ background: BRAND_ORANGE, borderColor: BRAND_ORANGE }}
+            onClick={() => {
+              message.info('批量入列功能开发中，请到旅程管理手动操作');
+              setEnrollModalOpen(false);
+              setEnrollPreset(null);
+              setSelectedTemplateId(null);
+            }}
+          >
+            确认批量入列
+          </Button>,
+        ]}
+      >
+        <Spin spinning={loadingTemplates}>
+          {enrollPreset && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div style={{
+                background: PAGE_BG, borderRadius: 8, padding: 16,
+                border: `1px solid ${BORDER}`, textAlign: 'center',
+              }}>
+                <div style={{ fontSize: 36, fontWeight: 700, color: BRAND_ORANGE }}>
+                  {enrollPreset.matched_count.toLocaleString()}
+                </div>
+                <div style={{ fontSize: 13, color: TEXT_SECONDARY }}>命中客户数</div>
+              </div>
+
+              <div>
+                <div style={{ marginBottom: 8, color: TEXT_PRIMARY, fontWeight: 600 }}>选择旅程模板</div>
+                <Select
+                  style={{ width: '100%' }}
+                  placeholder="选择要入列的旅程模板"
+                  value={selectedTemplateId}
+                  onChange={setSelectedTemplateId}
+                  options={journeyTemplates.map((t) => ({
+                    value: t.id,
+                    label: `${t.name}${t.journey_type === enrollPreset.tag_type ? ' (推荐)' : ''}`,
+                  }))}
+                  notFoundContent="暂无可用旅程模板"
+                />
+                {enrollPreset.tag_type && RECOMMENDED_JOURNEY[enrollPreset.tag_type] && (
+                  <div style={{ fontSize: 12, color: SUCCESS_GREEN, marginTop: 4 }}>
+                    <RocketOutlined /> 系统推荐: {RECOMMENDED_JOURNEY[enrollPreset.tag_type]}
+                  </div>
+                )}
+              </div>
+
+              <div style={{ fontSize: 12, color: TEXT_SECONDARY, lineHeight: 1.6 }}>
+                确认后将把 {enrollPreset.matched_count.toLocaleString()} 位命中客户批量入列到所选旅程。
+                入列后客户将按旅程步骤自动触达。
+              </div>
+            </div>
+          )}
+        </Spin>
+      </Modal>
     </div>
   );
 }

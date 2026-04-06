@@ -36,6 +36,8 @@ interface CustomerRow {
   stored_value_balance_fen: number;
   repurchase_stage: string | null;
   recommended_action: string | null;
+  reactivation_reason: string | null;
+  service_repair_status: string | null;
 }
 
 interface CustomerListResp {
@@ -64,6 +66,22 @@ const STAGE_TAG_MAP: Record<string, { color: string; label: string }> = {
 
 const LEVEL_COLORS: Record<string, string> = {
   S1: 'gold', S2: 'purple', S3: 'blue', S4: 'cyan', S5: 'default',
+};
+
+const REACTIVATION_REASON_MAP: Record<string, { color: string; label: string }> = {
+  benefit_expiring: { color: 'orange', label: '权益将到期' },
+  no_second_visit: { color: 'blue', label: '首单未二访' },
+  silent_30d: { color: 'gold', label: '30天沉默' },
+  silent_45d: { color: 'red', label: '45天沉默' },
+  post_repair_followup: { color: 'purple', label: '修复后待观察' },
+};
+
+const REPAIR_STATUS_MAP: Record<string, { color: string; label: string }> = {
+  complaint_open: { color: 'red', label: '投诉中' },
+  complaint_closed_pending_repair: { color: 'orange', label: '待修复' },
+  repair_in_progress: { color: 'blue', label: '修复中' },
+  repair_observing: { color: 'cyan', label: '观察中' },
+  repair_completed: { color: 'green', label: '已修复' },
 };
 
 // ---- 组件 ----
@@ -167,6 +185,22 @@ export function CustomerPoolPage() {
       render: (val: string | null) =>
         val ? <Tag color="orange">{val}</Tag> : <span style={{ color: TEXT_SECONDARY }}>-</span>,
     },
+    {
+      title: '召回原因', dataIndex: 'reactivation_reason', key: 'reactivation_reason', width: 120,
+      render: (val: string | null) => {
+        if (!val) return null;
+        const cfg = REACTIVATION_REASON_MAP[val];
+        return cfg ? <Tag color={cfg.color}>{cfg.label}</Tag> : <Tag>{val}</Tag>;
+      },
+    },
+    {
+      title: '修复状态', dataIndex: 'service_repair_status', key: 'service_repair_status', width: 100,
+      render: (val: string | null) => {
+        if (!val || val === 'none') return null;
+        const cfg = REPAIR_STATUS_MAP[val];
+        return cfg ? <Tag color={cfg.color}>{cfg.label}</Tag> : <Tag>{val}</Tag>;
+      },
+    },
   ];
 
   return (
@@ -267,7 +301,7 @@ export function CustomerPoolPage() {
                 showTotal: (t) => `共 ${t} 位客户`,
                 size: 'small',
               }}
-              scroll={{ x: 1100 }}
+              scroll={{ x: 1320 }}
             />
           </Card>
 
