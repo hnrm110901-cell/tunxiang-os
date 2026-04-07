@@ -207,7 +207,7 @@ class WeChatDeliveryAdapter(DeliveryPlatformAdapter):
         }
 
         new_status = status_map.get(event_type, "unknown")
-        logger.info("wechat_delivery_callback", order_id=order_id, event=event_type, new_status=new_status)
+        logger.info("wechat_delivery_callback", order_id=order_id, event_type=event_type, new_status=new_status)
 
         return {"ok": True, "order_id": order_id, "status": new_status}
 

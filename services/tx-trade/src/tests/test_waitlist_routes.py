@@ -270,7 +270,7 @@ def test_seat_entry_success():
     db = _make_mock_db()
 
     set_cfg     = MagicMock()
-    entry_row   = _fake_row({"id": ENTRY_ID, "status": "called"})
+    entry_row   = _fake_row({"id": ENTRY_ID, "status": "called", "pre_order_items": None, "pre_order_total_fen": 0})
     find_result = _mappings_one_or_none(entry_row)
     update_res  = MagicMock()
 
@@ -383,3 +383,284 @@ def test_get_stats_success():
     assert data["data"]["waiting_count"] == 5
     assert data["data"]["total_today"] == 18
     assert "estimated_wait_min" in data["data"]
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# 排队预点菜功能测试（9 个场景）
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+# ── 场景 11: POST /{entry_id}/pre-order — 正常添加预点菜 ──
+
+def test_add_pre_order_ok():
+    """正常添加预点菜，返回 ok=True 及合并后的 items。"""
+    db = _make_mock_db()
+
+    set_cfg     = MagicMock()
+    entry_row   = _fake_row({"id": ENTRY_ID, "status": "waiting", "pre_order_items": None})
+    find_result = _mappings_one_or_none(entry_row)
+    update_res  = MagicMock()
+
+    db.execute = AsyncMock(side_effect=[set_cfg, find_result, update_res])
+
+    client = TestClient(_make_app_with_db(db))
+    resp = client.post(
+        f"/api/v1/waitlist/{ENTRY_ID}/pre-order",
+        json={
+            "items": [
+                {"dish_id": "d1", "dish_name": "烤鸭", "quantity": 1, "unit_price_fen": 16800},
+                {"dish_id": "d2", "dish_name": "啤酒", "quantity": 2, "unit_price_fen": 1500},
+            ]
+        },
+        headers=HEADERS,
+    )
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["ok"] is True
+    assert data["data"]["items_count"] == 2
+    assert data["data"]["pre_order_total_fen"] == 16800 + 1500 * 2
+    db.commit.assert_awaited_once()
+
+
+# ── 场景 12: POST /{entry_id}/pre-order — 排队条目不存在 → 404 ──
+
+def test_add_pre_order_entry_not_found():
+    """排队条目不存在时应返回 404。"""
+    db = _make_mock_db()
+
+    set_cfg     = MagicMock()
+    find_result = _mappings_one_or_none(None)
+
+    db.execute = AsyncMock(side_effect=[set_cfg, find_result])
+
+    client = TestClient(_make_app_with_db(db))
+    resp = client.post(
+        f"/api/v1/waitlist/{ENTRY_ID}/pre-order",
+        json={"items": [{"dish_id": "d1", "dish_name": "菜", "quantity": 1, "unit_price_fen": 1000}]},
+        headers=HEADERS,
+    )
+
+    assert resp.status_code == 404
+
+
+# ── 场景 13: POST /{entry_id}/pre-order — 非 waiting/called 状态 → 400 ──
+
+def test_add_pre_order_wrong_status():
+    """非 waiting/called 状态不允许预点菜，应返回 400。"""
+    db = _make_mock_db()
+
+    set_cfg     = MagicMock()
+    entry_row   = _fake_row({"id": ENTRY_ID, "status": "seated", "pre_order_items": None})
+    find_result = _mappings_one_or_none(entry_row)
+
+    db.execute = AsyncMock(side_effect=[set_cfg, find_result])
+
+    client = TestClient(_make_app_with_db(db))
+    resp = client.post(
+        f"/api/v1/waitlist/{ENTRY_ID}/pre-order",
+        json={"items": [{"dish_id": "d1", "dish_name": "菜", "quantity": 1, "unit_price_fen": 1000}]},
+        headers=HEADERS,
+    )
+
+    assert resp.status_code == 400
+
+
+# ── 场景 14: GET /{entry_id}/pre-order — 查看预点菜列表 ──
+
+def test_get_pre_order_ok():
+    """查看预点菜列表应返回 items 及 total_fen。"""
+    db = _make_mock_db()
+
+    set_cfg     = MagicMock()
+    items_data  = [{"dish_id": "d1", "dish_name": "烤鸭", "quantity": 1, "unit_price_fen": 16800, "modifiers": [], "notes": ""}]
+    entry_row   = _fake_row({
+        "id": ENTRY_ID, "status": "waiting",
+        "pre_order_items": items_data,
+        "pre_order_total_fen": 16800,
+    })
+    find_result = _mappings_one_or_none(entry_row)
+
+    db.execute = AsyncMock(side_effect=[set_cfg, find_result])
+
+    client = TestClient(_make_app_with_db(db))
+    resp = client.get(
+        f"/api/v1/waitlist/{ENTRY_ID}/pre-order",
+        headers=HEADERS,
+    )
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["ok"] is True
+    assert data["data"]["items_count"] == 1
+    assert data["data"]["pre_order_total_fen"] == 16800
+    assert data["data"]["pre_order_items"][0]["dish_id"] == "d1"
+
+
+# ── 场景 15: GET /{entry_id}/pre-order — 无预点菜返回空列表 ──
+
+def test_get_pre_order_empty():
+    """无预点菜时应返回空列表及 total_fen=0。"""
+    db = _make_mock_db()
+
+    set_cfg     = MagicMock()
+    entry_row   = _fake_row({
+        "id": ENTRY_ID, "status": "waiting",
+        "pre_order_items": None,
+        "pre_order_total_fen": 0,
+    })
+    find_result = _mappings_one_or_none(entry_row)
+
+    db.execute = AsyncMock(side_effect=[set_cfg, find_result])
+
+    client = TestClient(_make_app_with_db(db))
+    resp = client.get(
+        f"/api/v1/waitlist/{ENTRY_ID}/pre-order",
+        headers=HEADERS,
+    )
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["ok"] is True
+    assert data["data"]["pre_order_items"] == []
+    assert data["data"]["pre_order_total_fen"] == 0
+    assert data["data"]["items_count"] == 0
+
+
+# ── 场景 16: DELETE /{entry_id}/pre-order/{dish_id} — 删除预点的某道菜 ──
+
+def test_remove_pre_order_item():
+    """删除预点的某道菜，菜品应从列表中移除，total_fen 重算。"""
+    db = _make_mock_db()
+
+    set_cfg     = MagicMock()
+    items_data  = [
+        {"dish_id": "d1", "dish_name": "烤鸭", "quantity": 1, "unit_price_fen": 16800, "modifiers": [], "notes": ""},
+        {"dish_id": "d2", "dish_name": "啤酒", "quantity": 2, "unit_price_fen": 1500, "modifiers": [], "notes": ""},
+    ]
+    entry_row   = _fake_row({"id": ENTRY_ID, "status": "waiting", "pre_order_items": items_data})
+    find_result = _mappings_one_or_none(entry_row)
+    update_res  = MagicMock()
+
+    db.execute = AsyncMock(side_effect=[set_cfg, find_result, update_res])
+
+    client = TestClient(_make_app_with_db(db))
+    resp = client.delete(
+        f"/api/v1/waitlist/{ENTRY_ID}/pre-order/d1",
+        headers=HEADERS,
+    )
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["ok"] is True
+    assert data["data"]["removed_dish_id"] == "d1"
+    assert data["data"]["removed_count"] == 1
+    assert data["data"]["items_count"] == 1
+    assert data["data"]["pre_order_total_fen"] == 1500 * 2
+    db.commit.assert_awaited_once()
+
+
+# ── 场景 17: 预点菜总价计算（含做法加价）──
+
+def test_pre_order_total_calculation():
+    """预点菜总价应包含做法加价。"""
+    db = _make_mock_db()
+
+    set_cfg     = MagicMock()
+    entry_row   = _fake_row({"id": ENTRY_ID, "status": "waiting", "pre_order_items": None})
+    find_result = _mappings_one_or_none(entry_row)
+    update_res  = MagicMock()
+
+    db.execute = AsyncMock(side_effect=[set_cfg, find_result, update_res])
+
+    client = TestClient(_make_app_with_db(db))
+    resp = client.post(
+        f"/api/v1/waitlist/{ENTRY_ID}/pre-order",
+        json={
+            "items": [
+                {
+                    "dish_id": "d1",
+                    "dish_name": "烤鸭",
+                    "quantity": 1,
+                    "unit_price_fen": 16800,
+                    "modifiers": [{"name": "加葱", "extra_fen": 300}],
+                },
+            ]
+        },
+        headers=HEADERS,
+    )
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["ok"] is True
+    # 总价 = (16800 + 300) * 1 = 17100
+    assert data["data"]["pre_order_total_fen"] == 17100
+
+
+# ── 场景 18: 入座时自动合并预点菜 ──
+
+def test_seat_merges_pre_order():
+    """入座时应自动合并预点菜，返回 pre_order_merged=True。"""
+    db = _make_mock_db()
+
+    set_cfg     = MagicMock()
+    items_data  = [{"dish_id": "d1", "dish_name": "烤鸭", "quantity": 1, "unit_price_fen": 16800, "modifiers": [], "notes": ""}]
+    entry_row   = _fake_row({
+        "id": ENTRY_ID, "status": "called",
+        "pre_order_items": items_data,
+        "pre_order_total_fen": 16800,
+    })
+    find_result = _mappings_one_or_none(entry_row)
+    update_res  = MagicMock()
+
+    db.execute = AsyncMock(side_effect=[set_cfg, find_result, update_res])
+
+    client = TestClient(_make_app_with_db(db))
+    resp = client.post(
+        f"/api/v1/waitlist/{ENTRY_ID}/seat",
+        json={},
+        headers=HEADERS,
+    )
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["ok"] is True
+    assert data["data"]["status"] == "seated"
+    assert data["data"]["pre_order_merged"] is True
+    assert data["data"]["pre_order_items_count"] == 1
+    db.commit.assert_awaited_once()
+
+
+# ── 场景 19: 重复菜品智能合并数量 ──
+
+def test_pre_order_duplicate_merge():
+    """已有预点菜的条目再次添加相同菜品时，数量应合并而非重复。"""
+    db = _make_mock_db()
+
+    existing = [{"dish_id": "d1", "dish_name": "烤鸭", "quantity": 1, "unit_price_fen": 16800, "modifiers": [], "notes": ""}]
+
+    set_cfg     = MagicMock()
+    entry_row   = _fake_row({"id": ENTRY_ID, "status": "waiting", "pre_order_items": existing})
+    find_result = _mappings_one_or_none(entry_row)
+    update_res  = MagicMock()
+
+    db.execute = AsyncMock(side_effect=[set_cfg, find_result, update_res])
+
+    client = TestClient(_make_app_with_db(db))
+    resp = client.post(
+        f"/api/v1/waitlist/{ENTRY_ID}/pre-order",
+        json={
+            "items": [
+                {"dish_id": "d1", "dish_name": "烤鸭", "quantity": 2, "unit_price_fen": 16800},
+            ]
+        },
+        headers=HEADERS,
+    )
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["ok"] is True
+    # 原有 1 只 + 新增 2 只 = 3 只，应合并为同一条
+    assert data["data"]["items_count"] == 1
+    assert data["data"]["pre_order_items"][0]["quantity"] == 3
+    assert data["data"]["pre_order_total_fen"] == 16800 * 3
+    db.commit.assert_awaited_once()
