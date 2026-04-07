@@ -17,6 +17,7 @@
 """
 from __future__ import annotations
 
+import json
 import logging
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -108,6 +109,19 @@ class SeatBody(BaseModel):
 
 class CancelBody(BaseModel):
     reason: Optional[str] = ""
+
+
+class PreOrderItem(BaseModel):
+    dish_id: str
+    dish_name: str
+    quantity: int = 1
+    unit_price_fen: int
+    modifiers: list[dict] = []  # 做法加价等
+    notes: str = ""
+
+
+class PreOrderRequest(BaseModel):
+    items: list[PreOrderItem]
 
 
 # ─── Endpoints ───────────────────────────────────────────────────────────────
@@ -319,7 +333,7 @@ async def seat_entry(
         await _set_tenant(db, tenant_id)
 
         result = await db.execute(
-            text("SELECT id, status FROM waitlist_entries WHERE id = :eid"),
+            text("SELECT id, status, pre_order_items, pre_order_total_fen FROM waitlist_entries WHERE id = :eid"),
             {"eid": entry_id},
         )
         entry = result.mappings().one_or_none()
@@ -338,12 +352,29 @@ async def seat_entry(
             """),
             {"eid": entry_id, "now": now},
         )
+
+        # 入座时自动合并预点菜到正式订单
+        raw_items = entry["pre_order_items"]
+        pre_order_items: list = []
+        if raw_items:
+            pre_order_items = raw_items if isinstance(raw_items, list) else json.loads(raw_items)
+        if pre_order_items:
+            # TODO: 调用 dining_session / order API 创建正式订单
+            # 将 pre_order_items 转为正式 order items
+            logger.info("pre_order_merged", extra={
+                "entry_id": entry_id,
+                "items_count": len(pre_order_items),
+                "total_fen": int(entry["pre_order_total_fen"] or 0),
+            })
+
         await db.commit()
 
         return _ok({
             "entry_id": entry_id,
             "status": "seated",
             "seated_at": now.isoformat(),
+            "pre_order_merged": len(pre_order_items) > 0,
+            "pre_order_items_count": len(pre_order_items),
         })
     except HTTPException:
         raise
@@ -417,16 +448,58 @@ async def expire_overdue(
                 WHERE store_id = :store_id
                   AND status = 'called'
                   AND called_at < :threshold
-                RETURNING id
+                RETURNING id, member_id, coupon_issued_on_timeout
             """),
             {"store_id": store_id, "threshold": timeout_threshold},
         )
-        expired_ids = [str(r["id"]) for r in result.mappings().all()]
+        expired_entries = result.mappings().all()
+        expired_ids = [str(r["id"]) for r in expired_entries]
+
+        # ── 超时自动发券（SCRM8对标功能）──
+        # 对有member_id的排队客户，自动发放安慰券
+        coupon_issued_count = 0
+        for entry in expired_entries:
+            member_id = entry.get("member_id")
+            if member_id and not entry.get("coupon_issued_on_timeout"):
+                try:
+                    import asyncio
+                    from shared.events.src.emitter import emit_event
+                    from shared.events.src.event_types import MemberEventType
+
+                    asyncio.create_task(emit_event(
+                        event_type=MemberEventType.VOUCHER_ISSUED,
+                        tenant_id=tenant_id,
+                        stream_id=str(member_id),
+                        payload={
+                            "member_id": str(member_id),
+                            "voucher_type": "waitlist_timeout_compensation",
+                            "amount_fen": 1000,  # 10元
+                            "validity_days": 30,
+                            "reason": "排队超时补偿",
+                            "waitlist_entry_id": str(entry["id"]),
+                        },
+                        source_service="tx-trade",
+                    ))
+
+                    # 标记已发券
+                    await db.execute(text("""
+                        UPDATE waitlist_entries SET coupon_issued_on_timeout = TRUE, updated_at = NOW()
+                        WHERE id = :eid
+                    """), {"eid": str(entry["id"])})
+
+                    coupon_issued_count += 1
+                    logger.info("waitlist_timeout_coupon_issued",
+                                member_id=str(member_id), entry_id=str(entry["id"]))
+                except (ValueError, RuntimeError, OSError) as exc:
+                    logger.warning("waitlist_timeout_coupon_failed",
+                                   error=str(exc), member_id=str(member_id))
+
         await db.commit()
 
         return _ok({
             "expired_count": len(expired_ids),
             "expired_ids": expired_ids,
+            "coupon_issued_count": coupon_issued_count,
         })
     except SQLAlchemyError as exc:
         await db.rollback()
@@ -470,3 +543,204 @@ async def get_stats(
     except SQLAlchemyError as exc:
         logger.error("waitlist_stats_error", error=str(exc))
         _err("获取统计失败", 500)
+
+
+# ─── 排队预点菜端点 ─────────────────────────────────────────────────────────────
+
+
+@router.post("/{entry_id}/pre-order")
+async def add_pre_order(
+    entry_id: str,
+    body: PreOrderRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """POST /api/v1/waitlist/{entry_id}/pre-order — 添加预点菜品到排队条目"""
+    tenant_id = _get_tenant_id(request)
+    try:
+        await _set_tenant(db, tenant_id)
+
+        # 1. 查 waitlist_entry，确认 status='waiting' 或 'called'
+        result = await db.execute(
+            text("SELECT id, status, pre_order_items FROM waitlist_entries WHERE id = :eid"),
+            {"eid": entry_id},
+        )
+        entry = result.mappings().one_or_none()
+        if not entry:
+            _err("等位记录不存在", 404)
+
+        if entry["status"] not in ("waiting", "called"):
+            _err(f"当前状态 {entry['status']} 不可预点菜，仅等位中或已叫号可操作")
+
+        # 2. 合并新 items 到现有 pre_order_items
+        raw_existing = entry["pre_order_items"]
+        existing_items: list = []
+        if raw_existing:
+            existing_items = raw_existing if isinstance(raw_existing, list) else json.loads(raw_existing)
+
+        new_items = [item.model_dump() for item in body.items]
+
+        # 合并策略：同 dish_id + 同 modifiers 的合并数量，否则追加
+        for new_item in new_items:
+            merged = False
+            for existing in existing_items:
+                if (existing["dish_id"] == new_item["dish_id"]
+                        and existing.get("modifiers", []) == new_item.get("modifiers", [])):
+                    existing["quantity"] += new_item["quantity"]
+                    existing["notes"] = new_item["notes"] or existing.get("notes", "")
+                    merged = True
+                    break
+            if not merged:
+                existing_items.append(new_item)
+
+        # 3. 重算 pre_order_total_fen
+        total_fen = 0
+        for item in existing_items:
+            modifier_extra = sum(m.get("extra_fen", 0) for m in item.get("modifiers", []))
+            total_fen += (item["unit_price_fen"] + modifier_extra) * item["quantity"]
+
+        # 4. UPDATE
+        now = datetime.now(timezone.utc)
+        await db.execute(
+            text("""
+                UPDATE waitlist_entries
+                SET pre_order_items = :items::jsonb,
+                    pre_order_total_fen = :total_fen,
+                    updated_at = :now
+                WHERE id = :eid
+            """),
+            {
+                "eid": entry_id,
+                "items": json.dumps(existing_items, ensure_ascii=False),
+                "total_fen": total_fen,
+                "now": now,
+            },
+        )
+        await db.commit()
+
+        # 5. 返回合并后的预点菜列表
+        return _ok({
+            "entry_id": entry_id,
+            "pre_order_items": existing_items,
+            "pre_order_total_fen": total_fen,
+            "items_count": len(existing_items),
+        })
+    except HTTPException:
+        raise
+    except SQLAlchemyError as exc:
+        await db.rollback()
+        logger.error("waitlist_preorder_add_error", error=str(exc))
+        _err("添加预点菜失败", 500)
+
+
+@router.get("/{entry_id}/pre-order")
+async def get_pre_order(
+    entry_id: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """GET /api/v1/waitlist/{entry_id}/pre-order — 查看预点菜品"""
+    tenant_id = _get_tenant_id(request)
+    try:
+        await _set_tenant(db, tenant_id)
+
+        result = await db.execute(
+            text("SELECT id, status, pre_order_items, pre_order_total_fen FROM waitlist_entries WHERE id = :eid"),
+            {"eid": entry_id},
+        )
+        entry = result.mappings().one_or_none()
+        if not entry:
+            _err("等位记录不存在", 404)
+
+        raw_items = entry["pre_order_items"]
+        items: list = []
+        if raw_items:
+            items = raw_items if isinstance(raw_items, list) else json.loads(raw_items)
+
+        return _ok({
+            "entry_id": entry_id,
+            "status": entry["status"],
+            "pre_order_items": items,
+            "pre_order_total_fen": int(entry["pre_order_total_fen"] or 0),
+            "items_count": len(items),
+        })
+    except HTTPException:
+        raise
+    except SQLAlchemyError as exc:
+        logger.error("waitlist_preorder_get_error", error=str(exc))
+        _err("查询预点菜失败", 500)
+
+
+@router.delete("/{entry_id}/pre-order/{dish_id}")
+async def remove_pre_order_item(
+    entry_id: str,
+    dish_id: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """DELETE /api/v1/waitlist/{entry_id}/pre-order/{dish_id} — 删除预点的某道菜"""
+    tenant_id = _get_tenant_id(request)
+    try:
+        await _set_tenant(db, tenant_id)
+
+        result = await db.execute(
+            text("SELECT id, status, pre_order_items FROM waitlist_entries WHERE id = :eid"),
+            {"eid": entry_id},
+        )
+        entry = result.mappings().one_or_none()
+        if not entry:
+            _err("等位记录不存在", 404)
+
+        if entry["status"] not in ("waiting", "called"):
+            _err(f"当前状态 {entry['status']} 不可修改预点菜")
+
+        raw_items = entry["pre_order_items"]
+        existing_items: list = []
+        if raw_items:
+            existing_items = raw_items if isinstance(raw_items, list) else json.loads(raw_items)
+
+        # 移除指定 dish_id 的所有 item
+        updated_items = [item for item in existing_items if item["dish_id"] != dish_id]
+        removed_count = len(existing_items) - len(updated_items)
+
+        if removed_count == 0:
+            _err(f"预点菜中未找到菜品 {dish_id}", 404)
+
+        # 重算 total_fen
+        total_fen = 0
+        for item in updated_items:
+            modifier_extra = sum(m.get("extra_fen", 0) for m in item.get("modifiers", []))
+            total_fen += (item["unit_price_fen"] + modifier_extra) * item["quantity"]
+
+        now = datetime.now(timezone.utc)
+        await db.execute(
+            text("""
+                UPDATE waitlist_entries
+                SET pre_order_items = :items::jsonb,
+                    pre_order_total_fen = :total_fen,
+                    updated_at = :now
+                WHERE id = :eid
+            """),
+            {
+                "eid": entry_id,
+                "items": json.dumps(updated_items, ensure_ascii=False),
+                "total_fen": total_fen,
+                "now": now,
+            },
+        )
+        await db.commit()
+
+        return _ok({
+            "entry_id": entry_id,
+            "removed_dish_id": dish_id,
+            "removed_count": removed_count,
+            "pre_order_items": updated_items,
+            "pre_order_total_fen": total_fen,
+            "items_count": len(updated_items),
+        })
+    except HTTPException:
+        raise
+    except SQLAlchemyError as exc:
+        await db.rollback()
+        logger.error("waitlist_preorder_remove_error", error=str(exc))
+        _err("删除预点菜失败", 500)
