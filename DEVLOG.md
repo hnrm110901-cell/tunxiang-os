@@ -4,6 +4,38 @@
 
 ---
 
+## 2026-04-07
+
+### 今日完成：SCRM8差距补齐 + 全量测试覆盖
+
+**天财商龙SCRM8对标分析:**
+- 50个功能逐项比对，补齐前覆盖79%(37/50)
+- 补齐6个缺失功能，补齐后覆盖93%(43/46，排除4个不适用)
+
+**新增功能:**
+- 排队预点菜: v187迁移+3端点+H5页面(QueuePreOrderPage)
+- 消费返现: consumption_cashback.py campaign (阶梯返现到储值卡/优惠券)
+- 第N份M折: nth_item_discount.py campaign (烤鸭第二份半价/饮品第三杯3折)
+- 排队超时自动发券: expire_overdue+emit VOUCHER_ISSUED+防重复
+- 微信自有外卖: wechat_delivery_adapter.py (0%抽成+达达/顺丰/闪送/自配送)
+
+**测试覆盖:**
+- 44个新测试(排队9+返现8+折扣9+微信外卖18)
+- 增长中枢总测试: 103+44=147个
+
+### 数据变化
+- 迁移版本: v186 → v187
+- Campaign模板: 25 → 27 (+consumption_cashback, nth_item_discount)
+- 外卖平台: 3 → 4 (+wechat)
+- 测试文件: +2个新建(test_consumption_cashback, test_nth_item_discount)
+- 新增代码: +2,163行(功能1,347+测试816)
+
+### 遗留问题
+- 微信自有外卖适配器当前为Mock模式，需接入微信支付+达达配送真实API
+- 消费返现的频次限制（每客每天N次）需在调用方(campaign_engine)实现DB查询校验
+
+---
+
 ## 2026-04-06 ~ 2026-04-07
 
 ### 今日完成：增长中枢V2.0→V3.0全版本线（单次会话完成）
@@ -44,6 +76,145 @@
 ### 明日计划
 - 端到端集成测试：创建测试租户→种子数据→触发旅程→Agent建议→审核发布→归因回写
 - 演示环境部署验证
+
+---
+
+## Round 115 — 2026-04-07（🟡/🟠 差距清零 Wave 2：v202→v204，边缘AI+合规+税务+分账收官）
+
+### 今日完成
+
+**Y-K1 断网收银（edge/mac-station）**
+- `offline_cashier.py`（5端点：health/下单/列表/撤单/同步统计，sync_status=pending/synced/conflict/voided）
+- `sync_conflict_resolver.py`（三策略：cloud_wins默认/local_wins需人工审核/newer_wins时差<1s降级人工）
+- mac-station main.py 注册离线路由
+
+**Y-L6 数据脱敏（v202 + shared/security）**
+- v202 迁移：`gdpr_requests` + `data_retention_policies`，RLS正确使用`app.tenant_id`
+- `shared/security/data_masking.py`：phone/email/身份证/银行卡/姓名/openid自动脱敏，`mask_dict()` 递归，`hash_pii()` SHA256去标识化
+- `tx-member/gdpr_routes.py`（11端点：deletion/export/rectification请求工作流+保留期策略UPSERT）
+- 5个测试
+
+**Y-K3 边缘AI（edge/coreml-bridge）**
+- `dish_time_predictor.py`：CoreML优先→规则降级，5因子（菜品类别/复杂度/队列深度/时段/并发），最少3分钟，p95=estimated×1.5
+- `rule_fallback.py`：`RuleBasedDiscountRisk`（三档+高峰期加权）+ `RuleBasedTrafficPredict`（时段负载+周末1.25系数）
+- coreml-bridge main.py：5端点（dish-time/discount-risk/traffic predict + model-status + health）
+- 12个测试全部通过
+
+**Y-A14 语音点餐稳定性（tx-brain）**
+- `voice_command_cache.py`：LRU缓存(maxsize=50) + difflib模糊匹配(阈值0.6) + JSON持久化
+- `voice_order_stable_routes.py`（5端点：`asyncio.wait_for(3s)`超时降级，缓存命中跳过AI，埋点聚合）
+- 11个测试全部通过
+
+**Y-A5 外卖聚合深度（tx-trade）**
+- `delivery_aggregator_routes.py`（8端点，美团/饿了么/抖音Webhook验签+幂等落库+`asyncio.create_task`触发对账，`_RETRY_QUEUE`不丢失，`_METRICS_STORE` p99延迟）
+- `aggregator_reconcile_routes.py`（5端点，三类差异：local_only/platform_only/amount_mismatch，`discrepancy_amount_fen`强制int）
+- `DeliveryAggregatorPage.tsx`（3 Tab：聚合订单/平台状态KPI/对账管理）
+- 15个测试（含integer类型断言）
+
+**Y-F9 税务管理（v203 + tx-finance）**
+- v203 迁移：`vat_output_records`（销项） + `vat_input_records`（进项） + `pl_account_mappings`（P&L科目映射）
+- `vat_ledger_routes.py`（9端点，月度汇总`net_payable_fen=output-input`，诺诺POC mock+注释生产替换方式）
+- `TaxManagePage.tsx`（3 Tab：销项台账/进项台账/科目映射，应缴>0时红色`#A32D2D`）
+- 8个测试
+
+**Y-B2 聚合支付/分账（v204 + tx-finance）**
+- v204 迁移：`split_payment_orders` + `split_payment_records`（idempotency_key唯一索引） + `split_adjustment_logs`
+- `split_payment_routes.py`（8端点，幂等键sha256双重保障，验签mock注释生产替换，分润试算整数除法余数归第一方，差错账单事务调账）
+- `SplitPaymentPage.tsx`（3 Tab：分账订单/差错账/分润试算）
+- 8个测试
+
+### 数据变化
+- 迁移版本：v201 → v204（3个新迁移）
+- 新增 API 路由文件：8个（tx-trade×2 / tx-finance×2 / tx-member×1 / tx-brain×1 / coreml-bridge×1 / mac-station×1）
+- 新增前端页面：3个（DeliveryAggregatorPage / TaxManagePage / SplitPaymentPage）
+- 新增共享工具：`shared/security/data_masking.py`
+- Wave 2 新增测试：~60个（全部通过）
+- **累计迁移版本：v001→v204（204个迁移，全链完整）**
+
+### 两份开发计划完成度
+
+**天财商龙差距计划（development-plan-tiancai-gaps-2026Q2.md）：**
+- Sprint 1-6（v187-v192）：✅ 全部完成（计件工资/协议单位/美食广场/加盟合同/分销/自定义报表）
+- P3 护城河：✅ 折扣守护深化/菜品排名引擎/企微SCRM
+
+**🟡/🟠差距计划（development-plan-yellow-orange-gaps-2026Q2.md）：**
+- Wave 0（v193-v194）：✅ 营销活动DB化/宴席支付/全渠道订单/叙事分析
+- Wave 1（v195-v201）：✅ 培训绩效/多渠道菜单/付费会员卡/供应商门户/抖音团购/多品牌/多区域/团餐/自配送/PWA/电子发票/Golden ID打通
+- Wave 2（v202-v204）：✅ 断网收银/数据脱敏/边缘AI/语音稳定/外卖聚合/税务管理/聚合支付分账
+
+### 关键里程碑
+- **v200**：第200个Alembic迁移，PWA三端覆盖（web-crew/web-pos/web-kds）
+- **v204**：两份Q2开发计划全部收官
+
+---
+
+## Round 114 — 2026-04-07（🟡/🟠 差距清零 Wave 0+1：v193→v201，钱账渠道+供应链+会员一致化）
+
+### 今日完成
+
+**Wave 0 — 钱账渠道 + 宴席支付（v193~v194）**
+- [tx-growth] `campaign_engine_db_routes.py`（OR-01，10端点，prefix `/api/v1/growth/campaigns-v2`，ADD COLUMN到现有campaigns表，VALID_TRANSITIONS状态机，5个测试）
+- [tx-trade] `banquet_order_routes.py`（Y-A8，10端点，宴席定金/尾款状态机 unpaid→deposit_paid→fully_paid，18个测试）
+- [miniapp-customer] banquet-booking + banquet-pay 分包（4文件/分包，JSAPI支付完整流程）
+- [tx-analytics] `narrative_enhanced_routes.py`（3端点：对比叙事/异常洞察/日报，hash seed可复现叙事）
+- [tx-trade] `omni_order_center_routes.py`（Y-A12，5端点，5渠道统一视图）
+- [web-admin] `OmniOrderCenterPage.tsx`（渠道Tab+Badge+Drawer详情）
+
+**Wave 1 批次1 — 员工体系 + 绩效（v195）**
+- [tx-org] `employee_training_routes.py`（OR-02，8端点，食安证书高风险标记，4个测试）
+- [tx-org] `performance_scoring_routes.py`（Y-G8，6端点，KPI权重按角色分层，缺失维度自动填75分）
+- [web-admin] `EmployeeTrainingPage.tsx`（3 Tab：课程/记录/证书过期色阶）
+
+**Wave 1 批次2 — 菜单+会员产品化（v196）**
+- [tx-menu] `channel_menu_override_routes.py`（Y-C4，7端点，UPSERT ON CONFLICT，渠道冲突检测）
+- [tx-member] `premium_membership_card_routes.py`（Y-D7，8端点，prefix `/api/v1/member/premium-memberships`，退款按天比例精算）
+- [web-admin] `ChannelMenuPage.tsx`（3 Tab：门店覆盖/冲突检测/发布统计）
+- [web-admin] `PremiumCardPage.tsx`（3 Tab：档案/配置/销售统计）
+
+**Wave 1 批次3 — 供应链+增长（v197）**
+- [tx-supply] `supplier_portal_v2_routes.py`（Y-E10，10端点，DB不可用→严格503，无静默降级，13个测试）
+- [tx-trade] `douyin_voucher_routes.py`（Y-I2，10端点，核销失败必入`_RETRY_QUEUE`不丢，16个测试）
+- [web-admin] `DouyinVoucherPage.tsx`（3 Tab：核销记录/对账报表/重试队列）
+
+**Wave 1 批次4 — 集团管控（v198）**
+- [tx-org] `brand_management_routes.py`（Y-H1，7端点，strategy_config全走DB JSONB，废弃内存路径）
+- [tx-org] `region_management_routes.py`（Y-H2，7端点，`tree=true`返回三层嵌套，区域税率可配）
+- [web-admin] `BrandRegionPage.tsx`（2 Tab：品牌卡片/区域树形，策略JSON编辑器）
+
+**Wave 1 批次5 — 团餐+自配送（v199）**
+- [tx-trade] `corporate_order_routes.py`（Y-A9，8端点，企业授信/折扣/白名单三重校验，授信超限400）
+- [tx-trade] `self_delivery_routes.py`（Y-M4，9端点，6状态配送状态机，预计送达时间计算）
+- [web-admin] `DeliveryDispatchPage.tsx`（3 Tab：4列Kanban/配送员工作量/今日KPI）
+- [web-admin] `CorporateCustomerPage.tsx`（2 Tab：企业档案+授信/订单台账+CSV导出）
+
+**Wave 1 批次6 — PWA离线+电子发票（v200 里程碑）**
+- [web-pos/web-kds] SW全量重写：IndexedDB离线队列，POST失败→202 Queued，ONLINE_RESTORED自动drain
+- [web-pos] `manifest.json`升级（屯象POS收银，主题色`#1E2A3A`），新增`offline.html`
+- [web-kds] `manifest.json`升级（屯象KDS后厨屏，主题色`#0D1117`）
+- [tx-finance] `e_invoice_routes.py`（Y-B3，v200迁移，e_invoices表，幂等hash，红冲/重开）
+- [web-admin] `EInvoicePage.tsx`（3 Tab：发票列表/申请表单/税务台账）
+
+**Wave 1 批次7 — 全渠道会员打通（v201）**
+- [tx-member] `golden_id_routes.py`（Y-D9，8端点，sha256 phone_hash隐私保护，手机号优先合并，多匹配标记conflict，幂等重复绑定）
+- [web-admin] `GoldenIDManagePage.tsx`（2 Tab：绑定概览渠道卡片+柱状图/冲突解决Modal）
+
+### 数据变化
+- 迁移版本：v192 → v201（**9个新迁移，含v200里程碑**）
+- 新增 API 路由文件：21个（覆盖 tx-trade/tx-org/tx-growth/tx-member/tx-supply/tx-finance/tx-analytics）
+- 新增前端页面：14个（web-admin + miniapp-customer）
+- 累计测试用例：~7,250+（Wave 0/1 新增 ~150个测试）
+- PWA 覆盖：web-crew ✅ → web-pos/web-kds ✅（3个应用全部支持离线队列）
+
+### 关键架构决策
+- OR-01 campaigns：ADD COLUMN到现有表（无破坏性变更），prefix `/campaigns-v2`避免路由冲突
+- Y-E10 供应商门户：DB不可用→严格503（`readonly_mode: True`），彻底废弃静默内存降级
+- Y-H1 品牌策略：`strategy_config` JSONB全量DB化，内存路径注释废弃
+- Y-D9 全渠道绑定：`sha256(phone+PHONE_HASH_SALT)`，盐从环境变量注入，不明文存电话
+
+### 遗留问题
+- e_invoice_routes.py 需接入真实诺诺API（当前mock）
+- 分账路由（v204）进行中，需微信/支付宝子商户配置
+- 税务台账（v203）诺诺同步为POC，生产需商务对接
 
 ---
 
