@@ -170,7 +170,7 @@ export function CrewContributionScore() {
   const navigate = useNavigate();
   const [data, setData] = useState<ScoreData | null>(null);
   const [trend, setTrend] = useState<TrendPoint[]>([]);
-  const [rank, setRank] = useState<{ rank: number; total: number } | null>(null);
+  const [rank, _setRank] = useState<{ rank: number; total: number } | null>(null);
   const [loading, setLoading] = useState(true);
 
   const employeeId = localStorage.getItem('employeeId') ?? '';

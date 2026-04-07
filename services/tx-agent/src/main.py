@@ -32,6 +32,7 @@ from .api.voice_routes import router as voice_router
 from .api.skill_registry_routes import router as skill_registry_router
 from .api.skill_context_routes import router as skill_context_router
 from .api.discount_guard_enhanced_routes import router as discount_guard_enhanced_router
+from .api.agent_hub_routes import router as agent_hub_router
 from .routers.diagnosis_router import router as diagnosis_router
 from .routers.pilot_router import router as pilot_router
 
@@ -166,6 +167,7 @@ app.include_router(projector_router)
 app.include_router(skill_registry_router)
 app.include_router(skill_context_router)
 app.include_router(discount_guard_enhanced_router)
+app.include_router(agent_hub_router)
 
 
 @app.get("/health")

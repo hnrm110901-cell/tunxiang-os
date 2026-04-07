@@ -25,9 +25,12 @@ import { DiscountAuditPage } from './pages/DiscountAuditPage';
 import { LiveMenuEditorPage } from './pages/LiveMenuEditorPage';
 import { MenuEngineeringPage } from './pages/MenuEngineeringPage';
 import { MenuBoardControlPage } from './pages/MenuBoardControlPage';
+import { BarCounterPage } from './pages/BarCounterPage';
+import { QuickShiftReportPage } from './pages/QuickShiftReportPage';
+import FoodCourtPage from './pages/FoodCourtPage';  // TC-P2-12 智慧商街档口收银
 
 const STORE_ID: string =
-  (window as Record<string, unknown>).__STORE_ID__ as string || '';
+  (window as unknown as Record<string, unknown>).__STORE_ID__ as string || '';
 
 /** 内层布局组件（必须在 BrowserRouter 内，InventoryAlertBanner 需要 useNavigate） */
 function AppLayout() {
@@ -65,6 +68,12 @@ function AppLayout() {
         <Route path="/live-menu" element={<LiveMenuEditorPage />} />
         <Route path="/menu-engineering" element={<MenuEngineeringPage />} />
         <Route path="/menu-board-control" element={<MenuBoardControlPage />} />
+        {/* ─── TC-P0-02: 吧台盘点 ─── */}
+        <Route path="/bar-counter" element={<BarCounterPage />} />
+        {/* ─── TC-P1-10: 快餐结班报表 ─── */}
+        <Route path="/quick/shift-report" element={<QuickShiftReportPage />} />
+        {/* ─── TC-P2-12: 美食广场档口收银 ─── */}
+        <Route path="/food-court" element={<FoodCourtPage />} />
       </Routes>
     </div>
   );

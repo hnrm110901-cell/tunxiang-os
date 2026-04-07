@@ -289,8 +289,26 @@ export function FloorMapPage() {
     fontSize: 16, fontWeight: 700,
   };
 
+  /* ─── AgentCommandPanel mock 数据 ─── */
+  const agentActions = [
+    { level: 'critical', title: 'B01桌 剁椒鱼头超时8分钟', desc: '该桌已等32分钟，已自动催单，预计5分钟', action: '告知客人' },
+    { level: 'warning',  title: 'A07空台 → 建议叫A027号',  desc: '赵先生4人，等38分钟，A07(4人台)就绪', action: '立即叫号' },
+    { level: 'purple',   title: 'D04桌·王总结账识别',       desc: '钻石会员，建议推荐存酒续存或预约',     action: '推荐服务' },
+    { level: 'info',     title: '美团新单 MT-5891 已自动接单', desc: '¥128，厨房负载60%，预计准时出餐',   action: '查看详情' },
+    { level: 'warning',  title: '椒盐皮皮虾库存告急',        desc: '剩余2份，供应链卫士建议临时沽清',     action: '立即沽清' },
+  ];
+
+  const levelDot = (level: string) => {
+    if (level === 'critical') return '🔴';
+    if (level === 'warning')  return '🟡';
+    if (level === 'purple')   return '🟣';
+    return '🔵';
+  };
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: C.bg, color: C.text }}>
+    <div style={{ display: 'flex', height: '100vh', background: C.bg, color: C.text }}>
+      {/* 主体左侧（原有全部内容） */}
+      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
       {/* 顶部导航 */}
       <div style={{
         padding: '12px 20px', display: 'flex', justifyContent: 'space-between',
@@ -621,6 +639,49 @@ export function FloorMapPage() {
           </div>
         </div>
       )}
+      </div>{/* end 主体左侧 */}
+
+      {/* ─── 右侧 AgentCommandPanel ─── */}
+      <div style={{
+        width: 280, background: 'rgba(0,0,0,.3)', borderLeft: '1px solid rgba(255,255,255,.08)',
+        padding: 12, overflowY: 'auto', flexShrink: 0,
+      }}>
+        {/* 头部 */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+          <span style={{ fontSize: 14, fontWeight: 700, color: C.white }}>🎯 运营指挥官</span>
+          <span style={{ fontSize: 12, color: C.green }}>● 在线</span>
+        </div>
+
+        {/* 行动卡片列表 */}
+        {agentActions.map((item, idx) => (
+          <div key={idx} style={{
+            background: 'rgba(255,255,255,.04)', borderRadius: 8,
+            border: '1px solid rgba(255,255,255,.08)', padding: '10px 10px 8px', marginBottom: 8,
+          }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6, marginBottom: 4 }}>
+              <span style={{ fontSize: 14, flexShrink: 0 }}>{levelDot(item.level)}</span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: C.white, lineHeight: 1.4 }}>{item.title}</span>
+            </div>
+            <div style={{ fontSize: 12, color: C.muted, marginBottom: 8, paddingLeft: 20 }}>
+              {item.desc}
+            </div>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button style={{
+                flex: 1, minHeight: 36, border: 'none', borderRadius: 6, cursor: 'pointer',
+                background: '#FF6B35', color: '#fff', fontWeight: 600, fontSize: 12,
+              }}>
+                {item.action}
+              </button>
+              <button style={{
+                flex: 1, minHeight: 36, border: 'none', borderRadius: 6, cursor: 'pointer',
+                background: 'rgba(255,255,255,.08)', color: C.muted, fontSize: 12,
+              }}>
+                忽略
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

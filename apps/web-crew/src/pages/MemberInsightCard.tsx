@@ -318,6 +318,26 @@ export function MemberInsightCard({
                 {insight.service_tips}
               </div>
             )}
+
+            {/* AI 推荐话术 */}
+            <div style={{
+              marginTop: 12, padding: '10px 12px',
+              background: 'rgba(24,95,165,.08)', borderRadius: 8,
+              borderLeft: '3px solid #185FA5',
+            }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#185FA5', marginBottom: 6 }}>
+                🤖 客户大脑 · 服务建议
+              </div>
+              {[
+                '王总喜欢靠窗位，建议安排 B 区靠窗桌台',
+                '上次消费偏好少辣，点餐时主动询问口味',
+                '有存酒国窖1573，餐中可主动提醒取用',
+              ].map((tip, i) => (
+                <div key={i} style={{ fontSize: 12, color: '#374151', marginBottom: 4 }}>
+                  · {tip}
+                </div>
+              ))}
+            </div>
           </>
         )}
       </div>
