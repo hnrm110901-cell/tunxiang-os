@@ -22,6 +22,7 @@ from .api.central_kitchen_routes import router as ck_router
 from .api.ck_production_routes import router as ck_production_router
 from .api.ck_recipe_routes import router as ck_recipe_router
 from .api.supplier_portal_routes import router as supplier_portal_router
+from .api.supplier_portal_v2_routes import router as supplier_portal_v2_router
 from .api.craft_routes import router as craft_router
 from .api.deduction_routes import router as deduction_router
 from .api.delivery_route_routes import router as delivery_route_router
@@ -96,6 +97,7 @@ app.include_router(transfer_router)
 app.include_router(ck_production_router)
 app.include_router(ck_recipe_router)
 app.include_router(supplier_portal_router)
+app.include_router(supplier_portal_v2_router)   # Y-E10 去除静默内存降级
 
 @app.get("/health")
 async def health():

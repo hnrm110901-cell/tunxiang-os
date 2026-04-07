@@ -16,6 +16,7 @@ except ImportError:
 
 import structlog
 from api.analytics_routes import router as analytics_router
+from api.gdpr_routes import router as gdpr_router
 from api.card_routes import router as card_router
 from api.coupon_engine_routes import router as coupon_engine_router
 from api.customer_depth_routes import router as customer_depth_router
@@ -35,6 +36,8 @@ from workers.rfm_updater import RFMUpdater, RFMEventListener
 from api.points_mall_routes import router as points_mall_router
 from api.points_routes import router as points_router
 from api.premium_card_routes import router as premium_card_router
+from api.premium_membership_card_routes import router as premium_membership_router  # Y-D7 付费会员卡产品化
+from api.golden_id_routes import router as golden_id_router  # Y-D9 全渠道 Golden ID 映射
 from api.rfm_routes import router as rfm_router
 from api.smart_dispatch_routes import router as smart_dispatch_router
 from api.stamp_card_routes import router as stamp_card_router
@@ -183,6 +186,7 @@ app.include_router(stored_value_router)
 app.include_router(stored_value_v2_router)
 app.include_router(stored_value_card_router)
 app.include_router(premium_card_router)
+app.include_router(premium_membership_router)  # Y-D7 付费会员卡产品化
 app.include_router(points_mall_router)
 app.include_router(rfm_router)
 app.include_router(group_router)
@@ -194,6 +198,8 @@ app.include_router(social_router)
 app.include_router(stamp_card_router)
 app.include_router(member_level_router)
 app.include_router(member_insight_router)
+app.include_router(gdpr_router)  # Y-L6 GDPR 删除/导出请求工作流
+app.include_router(golden_id_router)  # Y-D9 全渠道 Golden ID 映射
 
 
 @app.get("/health")

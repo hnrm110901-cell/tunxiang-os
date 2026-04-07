@@ -26,6 +26,7 @@ except ImportError:
 
 from .api.brain_routes import router as brain_router
 from .api.voice_api import router as voice_router
+from .api.voice_order_stable_routes import router as voice_stable_router
 from .services.cfo_dashboard import CFODashboardService
 from .services.evolution_2030 import Evolution2030Service
 from .services.voice_orchestrator import VoiceOrchestrator
@@ -95,6 +96,7 @@ app.add_middleware(
 
 app.include_router(voice_router)
 app.include_router(brain_router)
+app.include_router(voice_stable_router)
 
 
 # ─── Health & Info ───────────────────────────────────────────────

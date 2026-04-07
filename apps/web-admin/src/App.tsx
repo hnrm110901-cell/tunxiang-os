@@ -72,6 +72,7 @@ import { BudgetTrackerPage } from './pages/hq/analytics/BudgetTrackerPage';
 import { MemberCardPage } from './pages/hq/growth/MemberCardPage';
 import { LiveSeafoodPage } from './pages/menu/live-seafood/LiveSeafoodPage';
 import { BanquetMenuPage } from './pages/trade/banquet-menu/BanquetMenuPage';
+import BanquetManagePage from './pages/trade/BanquetManagePage'; // Y-A8 宴席支付闭环
 import { DishDeptMappingPage } from './pages/trade/kds-mapping/DishDeptMappingPage';
 import { OperationsDashboardPage } from './pages/OperationsDashboardPage';
 import { MenuTemplatePage } from './pages/menu/template/MenuTemplatePage';
@@ -211,6 +212,37 @@ import { MobileTableStatusPage } from './pages/mobile/MobileTableStatusPage';
 // ─── P3-04/P3-05: 菜品排名 + 企微SCRM ────────────────────────────────────────
 import DishRankingPage from './pages/menu/DishRankingPage';
 import SCRMAgentPage from './pages/growth/SCRMAgentPage';
+// ─── Y-A12: 全渠道订单中心 ────────────────────────────────────────────────────
+import OmniOrderCenterPage from './pages/trade/OmniOrderCenterPage';
+// ─── OR-02: 员工培训管理 ───────────────────────────────────────────────────────
+import EmployeeTrainingPage from './pages/org/EmployeeTrainingPage';
+// ─── Y-H1/Y-H2: 多品牌管理统一 + 多区域管理 ────────────────────────────────────
+import BrandRegionPage from './pages/org/BrandRegionPage';
+// ─── Y-I2: 抖音团购管理 ───────────────────────────────────────────────────────
+import DouyinVoucherPage from './pages/trade/DouyinVoucherPage';
+// ─── Sprint 1: AI 中枢 ────────────────────────────────────────────────────────
+import { AgentHubPage as HQAgentHubPage } from './pages/hq/agent/AgentHubPage';
+import { AgentCommandCenterPage } from './pages/hq/agent/AgentCommandCenterPage';
+// ─── Sprint 3: 经营分析师 + 收益优化师 ──────────────────────────────────────────
+import { NLQueryPage } from './pages/hq/analytics/NLQueryPage';
+import { AIDailyBriefPage } from './pages/hq/analytics/AIDailyBriefPage';
+import { RevenueOptimizePage } from './pages/hq/analytics/RevenueOptimizePage';
+import { CustomerBrainPage } from './pages/hq/growth/CustomerBrainPage';
+// ─── Sprint 4: 供应链卫士 + Agent市场 + 异常检测 + 菜品智能体 ─────────────────
+import { ProcurementSuggestionPage } from './pages/hq/supply/ProcurementSuggestionPage';
+import { WastageAnalysisPage } from './pages/hq/supply/WastageAnalysisPage';
+import { DemandForecastPage } from './pages/hq/supply/DemandForecastPage';
+import { AgentMarketplacePage } from './pages/hq/agent/AgentMarketplacePage';
+import { AgentSettingsPage } from './pages/hq/agent/AgentSettingsPage';
+import { AnomalyDetectionPage } from './pages/hq/analytics/AnomalyDetectionPage';
+import { TableTurnoverPage } from './pages/hq/analytics/TableTurnoverPage';
+import { DishAgentDashboardPage } from './pages/hq/menu/DishAgentDashboardPage';
+// ─── Y-C4: 多渠道菜单发布完善 + Y-D7: 付费会员卡产品化 ────────────────────────
+import ChannelMenuPage from './pages/menu/ChannelMenuPage';
+import PremiumCardPage from './pages/member/PremiumCardPage';
+// ─── Y-M4: 外卖自营配送调度 + Y-A9: 企业客户管理 ──────────────────────────────
+import DeliveryDispatchPage from './pages/trade/DeliveryDispatchPage';
+import CorporateCustomerPage from './pages/trade/CorporateCustomerPage';
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(() => {
@@ -317,6 +349,7 @@ function App() {
           <Route path="/hq/growth/member-cards" element={<MemberCardPage />} />
           <Route path="/hq/menu/live-seafood" element={<LiveSeafoodPage />} />
           <Route path="/hq/trade/banquet-menu" element={<BanquetMenuPage />} />
+          <Route path="/trade/banquet" element={<BanquetManagePage />} />
           <Route path="/hq/kds/dish-dept-mapping" element={<DishDeptMappingPage />} />
           <Route path="/menu-templates" element={<MenuTemplatePage />} />
           <Route path="/central-kitchen" element={<CentralKitchenPage />} />
@@ -459,8 +492,44 @@ function App() {
           <Route path="/settings/trial-data-clear" element={<TrialDataClearPage />} />
           {/* ─── P3-04: 菜品5因子动态排名 ─── */}
           <Route path="/menu/ranking" element={<DishRankingPage />} />
+          {/* ─── Sprint 1: AI 中枢 ─── */}
+          <Route path="/hq/agent/hub"      element={<HQAgentHubPage />} />
+          <Route path="/hq/agent/command"  element={<AgentCommandCenterPage />} />
+          <Route path="/hq/agent/log"      element={<AgentCommandCenterPage />} />
+          {/* ─── Sprint 4: 供应链卫士 + Agent市场 + 异常检测 + 菜品智能体 ─── */}
+          <Route path="/hq/supply/procurement-ai"  element={<ProcurementSuggestionPage />} />
+          <Route path="/hq/supply/wastage"         element={<WastageAnalysisPage />} />
+          <Route path="/hq/supply/demand-forecast" element={<DemandForecastPage />} />
+          <Route path="/hq/agent/market"           element={<AgentMarketplacePage />} />
+          <Route path="/hq/agent/settings"         element={<AgentSettingsPage />} />
+          <Route path="/hq/analytics/anomaly"      element={<AnomalyDetectionPage />} />
+          <Route path="/hq/analytics/table-turnover" element={<TableTurnoverPage />} />
+          <Route path="/hq/menu/dish-agent"        element={<DishAgentDashboardPage />} />
+          <Route path="/hq/menu/kitchen-schedule"  element={<DishAgentDashboardPage />} />
           {/* ─── P3-05: 企微SCRM私域Agent ─── */}
           <Route path="/growth/scrm-agent" element={<SCRMAgentPage />} />
+          {/* ─── Y-A12: 全渠道订单中心 ─── */}
+          <Route path="/trade/omni-orders" element={<OmniOrderCenterPage />} />
+          {/* ─── OR-02: 员工培训管理 ─── */}
+          <Route path="/org/training" element={<EmployeeTrainingPage />} />
+          {/* ─── Y-H1/Y-H2: 多品牌管理统一 + 多区域管理 ─── */}
+          <Route path="/org/brands" element={<BrandRegionPage />} />
+          {/* ─── Y-I2: 抖音团购管理 ─── */}
+          <Route path="/trade/douyin-voucher" element={<DouyinVoucherPage />} />
+          {/* ─── Sprint 3: 经营分析师 + 收益优化师 ─── */}
+          <Route path="/hq/analytics/nlq"              element={<NLQueryPage />} />
+          <Route path="/hq/analytics/daily-brief"      element={<AIDailyBriefPage />} />
+          <Route path="/hq/analytics/revenue-optimize" element={<RevenueOptimizePage />} />
+          {/* /hq/analytics/table-turnover handled in Sprint 4 routes above */}
+          <Route path="/hq/growth/customer-brain"      element={<CustomerBrainPage />} />
+          {/* ─── Y-C4: 多渠道菜单发布完善 ─── */}
+          <Route path="/menu/channels" element={<ChannelMenuPage />} />
+          {/* ─── Y-D7: 付费会员卡产品化 ─── */}
+          <Route path="/member/premium-cards" element={<PremiumCardPage />} />
+          {/* ─── Y-M4: 外卖自营配送调度台 ─── */}
+          <Route path="/trade/delivery" element={<DeliveryDispatchPage />} />
+          {/* ─── Y-A9: 企业客户管理（团餐） ─── */}
+          <Route path="/trade/corporate" element={<CorporateCustomerPage />} />
         </Routes>
       </ShellHQ>
     </BrowserRouter>

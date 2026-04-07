@@ -49,7 +49,9 @@ const MENU_CONFIGS: Record<string, MenuConfig> = {
         { id: 'pricing', label: '定价仿真', icon: '💲', path: '/menu/pricing' },
       ]},
       { label: 'AI 决策', items: [
-        { id: 'menu-optimize', label: 'AI排菜建议', icon: '🧠', path: '/menu/optimize' },
+        { id: 'menu-optimize',    label: 'AI排菜建议',    icon: '🧠', path: '/menu/optimize'          },
+        { id: 'dish-agent',       label: '菜品智能体看板', icon: '🍳', path: '/hq/menu/dish-agent'     },
+        { id: 'kitchen-schedule', label: '厨房排班建议',   icon: '👨‍🍳', path: '/hq/menu/kitchen-schedule' },
       ]},
       { label: '研发', items: [
         { id: 'new-dish', label: '新菜研发', icon: '🧪', path: '/menu/rd' },
@@ -75,6 +77,11 @@ const MENU_CONFIGS: Record<string, MenuConfig> = {
       { label: '决策', items: [
         { id: 'decisions', label: 'AI 决策', icon: '🧠', count: 5, path: '/analytics/decisions' },
         { id: 'scenarios', label: '场景识别', icon: '🔍', path: '/analytics/scenarios' },
+      ]},
+      { label: 'AI 经营', items: [
+        { id: 'nlq',              label: 'AI 自然语言问数',  icon: '🔍', path: '/hq/analytics/nlq'              },
+        { id: 'revenue-optimize', label: '收益优化看板',      icon: '💡', path: '/hq/analytics/revenue-optimize' },
+        { id: 'table-turnover',   label: '翻台率分析',        icon: '🔄', path: '/hq/analytics/table-turnover'   },
       ]},
     ],
   },
@@ -106,6 +113,7 @@ const MENU_CONFIGS: Record<string, MenuConfig> = {
       ]},
       { label: '私域复购Agent', items: [
         { id: 'agent-workbench', label: 'Agent工作台', icon: '🤖', path: '/hq/growth/agent-workbench' },
+        { id: 'customer-brain',  label: '客户大脑工作台', icon: '🧠', path: '/hq/growth/customer-brain' },
       ]},
       { label: '归因复盘', items: [
         { id: 'growth-roi', label: 'ROI总览', icon: '💰', path: '/hq/growth/roi' },
@@ -133,6 +141,9 @@ const MENU_CONFIGS: Record<string, MenuConfig> = {
         { id: 'finance-analysis', label: '财务分析', icon: '💹', path: '/hq/analytics/finance' },
         { id: 'pl-report', label: '损益表 P&L', icon: '📊', path: '/hq/analytics/pl-report' },
         { id: 'budget-tracker', label: '预算追踪', icon: '🎯', path: '/hq/analytics/budget' },
+      ]},
+      { label: '发票管理', items: [
+        { id: 'e-invoice', label: '电子发票', icon: '🧾', path: '/finance/invoices' },
       ]},
       { label: 'AI 稽核', items: [
         { id: 'finance-audit', label: 'AI 财务稽核', icon: '🔍', path: '/finance/audit' },
@@ -178,14 +189,32 @@ const MENU_CONFIGS: Record<string, MenuConfig> = {
         { id: 'hr-dashboard', label: '人力管理', icon: '👥', path: '/hq/org/hr' },
       ]},
       { label: '供应链', items: [
-        { id: 'inventory-intel', label: '智能补货', icon: '📦', path: '/hq/supply/inventory-intel' },
-        { id: 'supply-chain', label: '收货与调拨', icon: '🚛', path: '/hq/supply/chain' },
+        { id: 'inventory-intel',  label: '智能补货',   icon: '📦', path: '/hq/supply/inventory-intel' },
+        { id: 'supply-chain',     label: '收货与调拨', icon: '🚛', path: '/hq/supply/chain'           },
+        { id: 'procurement-ai',   label: 'AI 采购建议', icon: '🤖', path: '/hq/supply/procurement-ai'  },
+        { id: 'wastage',          label: '损耗分析',    icon: '♻️', path: '/hq/supply/wastage'          },
+        { id: 'demand-forecast',  label: '需求预测',    icon: '📈', path: '/hq/supply/demand-forecast'  },
       ]},
       { label: '配置', items: [
         { id: 'settings', label: '模板配置', icon: '⚙️', path: '/hq/ops/settings' },
         { id: 'receipt-editor', label: '小票模板', icon: '🧾', path: '/receipt-editor' },
         { id: 'event-bus-health', label: '事件总线监控', icon: '🔄', path: '/hq/ops/event-bus-health' },
         { id: 'store-clone', label: '快速开店', icon: '🏪', path: '/hq/ops/store-clone' },
+      ]},
+    ],
+  },
+  agent: {
+    moduleId: 'agent', groups: [
+      { label: 'AI 中枢', items: [
+        { id: 'agent-hub',      label: 'AI 中枢首页',  icon: '🤖', path: '/hq/agent/hub'      },
+        { id: 'agent-command',  label: '运营大盘',      icon: '🎯', path: '/hq/agent/command'  },
+        { id: 'agent-log',      label: '行动日志',      icon: '📋', path: '/hq/agent/log'      },
+        { id: 'agent-market',   label: 'Agent 市场',   icon: '🏪', path: '/hq/agent/market'   },
+        { id: 'agent-settings', label: '权限与授权',    icon: '⚙️', path: '/hq/agent/settings' },
+      ]},
+      { label: '分析工具', items: [
+        { id: 'daily-brief', label: 'AI 经营简报',  icon: '📰', path: '/hq/analytics/daily-brief' },
+        { id: 'anomaly',     label: '经营异常检测', icon: '🚨', path: '/hq/analytics/anomaly'     },
       ]},
     ],
   },

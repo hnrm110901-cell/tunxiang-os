@@ -12,6 +12,7 @@ from shared.ontology.src.database import init_db
 
 from .api.allergen_routes import router as allergen_router
 from .api.approval_routes import router as approval_router
+from .api.banquet_order_routes import router as banquet_order_router  # Y-A8 宴席支付闭环
 from .api.banquet_payment_routes import router as banquet_payment_router
 from .api.banquet_routes import router as banquet_router
 from .api.booking_api import router as booking_router
@@ -85,11 +86,10 @@ from .api.supply_chain_mobile_routes import router as supply_chain_mobile_router
 from .api.table_layout_routes import router as table_layout_router
 # v149 桌台中心化架构：堂食会话 + 服务呼叫 + KDS桌台聚合
 from .api.dining_session_routes import router as dining_session_router
+from .api.market_session_routes import router as market_session_router  # v186 营业市别
 from .api.service_call_routes import router as service_call_router
 from .api.kds_by_session_routes import router as kds_by_session_router
 from .api.self_pickup_routes import router as self_pickup_router  # v169 自提渠道
-from .api.chef_at_home_routes import router as chef_at_home_router
-from .api.omni_channel_routes import router as omni_channel_router
 from .api.scan_order_api import router as scan_order_ext_router
 from .api.self_order_routes import router as self_order_router
 from .api.kds_analytics_routes import router as kds_analytics_router
@@ -174,6 +174,7 @@ app.include_router(kds_router)
 app.include_router(handover_router)
 app.include_router(table_router)
 app.include_router(dining_session_router)    # v149 堂食会话（桌台中心化核心）
+app.include_router(market_session_router)    # v186 营业市别（早/午/晚市别管理）
 app.include_router(service_call_router)      # v149 服务呼叫（催菜/呼叫服务员）
 app.include_router(kds_by_session_router)    # v149 KDS桌台维度出餐看板
 app.include_router(self_pickup_router)       # v169 自提渠道（取餐码+叫号）
@@ -212,6 +213,7 @@ app.include_router(booking_prep_router,    prefix="/api/v1/booking-prep")
 app.include_router(delivery_ops_router)
 app.include_router(omni_channel_router, prefix="/api/v1")
 app.include_router(banquet_payment_router)
+app.include_router(banquet_order_router)   # Y-A8 /api/v1/trade/banquet — 定金/尾款状态机
 app.include_router(collab_order_router)
 app.include_router(table_layout_router)
 app.include_router(chef_at_home_router)
@@ -282,6 +284,38 @@ from .api.calling_screen_routes import router as calling_screen_router
 
 app.include_router(quick_cashier_router)
 app.include_router(calling_screen_router)
+
+# ── TC-P2-12: 智慧商街/档口管理（美食广场多档口并行收银+独立核算）──
+from .api.food_court_routes import router as food_court_router
+
+app.include_router(food_court_router)
+
+# ── Y-A12: 全渠道订单中心统一视图 ──
+from .api.omni_order_center_routes import router as omni_order_center_router
+
+app.include_router(omni_order_center_router)
+
+
+# ── Y-I2: 抖音团购核销适配器深化 ──
+from .api.douyin_voucher_routes import router as douyin_voucher_router
+
+app.include_router(douyin_voucher_router)
+
+
+# ── Y-A9: 团餐/企业客户 + Y-M4: 外卖自营配送调度MVP ──
+from .api.corporate_order_routes import router as corporate_order_router
+from .api.self_delivery_routes import router as self_delivery_router
+
+app.include_router(corporate_order_router)
+app.include_router(self_delivery_router)
+
+
+# ── Y-A5: 外卖聚合深度（美团/饿了么/抖音聚合落库 + 异常补偿 + 对账指标）──
+from .api.delivery_aggregator_routes import router as delivery_aggregator_router
+from .api.aggregator_reconcile_routes import router as aggregator_reconcile_router
+
+app.include_router(delivery_aggregator_router)
+app.include_router(aggregator_reconcile_router)
 
 
 @app.get("/health")

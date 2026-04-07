@@ -57,6 +57,12 @@ from api.contribution_routes import router as contribution_router
 from api.labor_margin_routes import router as labor_margin_router
 from api.revenue_schedule_routes import router as revenue_schedule_router
 from api.unified_schedule_routes import router as unified_schedule_router
+from api.piecework_routes import router as piecework_router
+from api.franchise_contract_routes import router as franchise_contract_router
+from api.employee_training_routes import router as employee_training_router
+from api.performance_scoring_routes import router as performance_scoring_router
+from api.brand_management_routes import router as brand_management_router
+from api.region_management_routes import router as region_management_router
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from shared.ontology.src.database import get_db as _shared_get_db
@@ -160,6 +166,12 @@ app.include_router(hr_dashboard_router)       # 人力中枢首页 BFF（Sprint 
 app.include_router(contribution_router)        # 员工经营贡献度排名（POS数据→实时评分）
 app.include_router(revenue_schedule_router)   # 营收驱动排班（POS数据→最优排班）
 app.include_router(labor_margin_router)       # 人力成本实时毛利仪表盘（P2-5）
+app.include_router(piecework_router)          # 计件提成3.0（厨师/传菜员按品项计件，v187表）
+app.include_router(franchise_contract_router)  # 加盟商合同+收费管理（v190表）
+app.include_router(employee_training_router)   # 员工培训管理DB持久化（v195表）OR-02
+app.include_router(performance_scoring_router) # 绩效考核周期与评级扩展（Y-G8）
+app.include_router(brand_management_router)    # 多品牌管理DB统一（v198表，废弃内存双轨）Y-H1
+app.include_router(region_management_router)   # 多区域主数据CRUD（v198表，树形结构）Y-H2
 
 @app.get("/health")
 async def health():

@@ -99,6 +99,7 @@ from .api.coupon_routes import router as coupon_router
 from .api.growth_campaign_routes import router as growth_campaign_router
 from .api.journey_routes import router as journey_router
 from .api.offer_routes import router as offer_router            # v144 DB化
+from .api.campaign_engine_db_routes import router as campaign_engine_db_router  # v193 活动引擎持久化
 from .api.distribution_routes import router as distribution_router  # v191 三级分销
 from .api.referral_routes import router as referral_router
 from .api.segmentation_routes import router as segmentation_router
@@ -674,7 +675,8 @@ Instrumentator().instrument(app).expose(app)
 
 app.include_router(campaign_router)
 app.include_router(coupon_router)           # /api/v1/growth/coupons（优惠券核销）
-app.include_router(growth_campaign_router)  # /api/v1/growth/campaigns（新标准路径）
+app.include_router(growth_campaign_router)      # /api/v1/growth/campaigns（新标准路径）
+app.include_router(campaign_engine_db_router)  # /api/v1/growth/campaigns-v2（v193 持久化引擎）
 app.include_router(segmentation_router)
 app.include_router(referral_router)
 app.include_router(distribution_router)  # v191 三级分销 /api/v1/growth/referral/*

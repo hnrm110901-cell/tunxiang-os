@@ -88,6 +88,18 @@
         "order",
         "checkout"
       ]
+    },
+    {
+      "root": "pages/banquet-booking",
+      "pages": [
+        "index"
+      ]
+    },
+    {
+      "root": "pages/banquet-pay",
+      "pages": [
+        "index"
+      ]
     }
   ],
   "window": {
