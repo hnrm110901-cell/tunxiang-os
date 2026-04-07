@@ -363,6 +363,10 @@ class GrowthEventType(str, Enum):
     SUGGESTION_PUBLISHED = "growth.agent_suggestion_published"
     REPAIR_STATE_CHANGED = "growth.repair_state_changed"
     ENROLLMENT_STATE_CHANGED = "growth.enrollment_state_changed"
+    # V3.0 外部信号触发
+    CALENDAR_TRIGGER_FIRED = "growth.calendar_trigger_fired"
+    WEATHER_SIGNAL_RECEIVED = "growth.weather_signal_received"
+    STORE_READINESS_EVALUATED = "growth.store_readiness_evaluated"
 
 
 def resolve_stream_key(event_type: str) -> str:

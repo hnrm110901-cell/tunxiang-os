@@ -104,6 +104,7 @@ from .api.referral_routes import router as referral_router
 from .api.segmentation_routes import router as segmentation_router
 from .api.growth_hub_routes import router as growth_hub_router
 from .api.touch_attribution_routes import router as touch_attribution_router
+from .api.wecom_scrm_agent_routes import router as wecom_scrm_agent_router  # P3-05 企微SCRM私域Agent
 
 _approval_service = _ApprovalService()
 
@@ -462,6 +463,51 @@ def _on_auto_iterate_done(task: asyncio.Task) -> None:
         logger.error("auto_iterate_unhandled", error=str(exc), exc_info=exc)
 
 
+# ---------------------------------------------------------------------------
+# APScheduler — Calendar Trigger Check（每日08:00 节庆信号检测）
+# ---------------------------------------------------------------------------
+
+from services.calendar_signal_proxy import CalendarSignalService as _CalendarSignalService
+
+_calendar_signal_svc = _CalendarSignalService()
+
+
+async def _run_calendar_trigger_check() -> None:
+    """每日早8点：检查是否有节庆信号需要触发增长旅程。"""
+    logger.info("calendar_trigger_check_started")
+    try:
+        triggers = _calendar_signal_svc.get_growth_triggers()
+    except (ValueError, RuntimeError, OSError) as exc:
+        logger.error("calendar_trigger_check_error", error=str(exc), exc_info=True)
+        return
+
+    if not triggers:
+        logger.info("calendar_trigger_check_no_triggers")
+        return
+
+    logger.info("calendar_trigger_check_found", count=len(triggers))
+    for trigger in triggers:
+        # 生成Agent建议（不直接执行旅程，走审核流）
+        logger.info(
+            "calendar_trigger_suggestion",
+            event=trigger["event_name"],
+            action=trigger.get("action"),
+            description=trigger.get("description"),
+        )
+        # 后续接入：调用 growth_suggestion_service.create_suggestion()
+
+
+def _schedule_calendar_trigger() -> None:
+    task = asyncio.create_task(_run_calendar_trigger_check())
+    task.add_done_callback(_on_calendar_trigger_done)
+
+
+def _on_calendar_trigger_done(task: asyncio.Task) -> None:
+    exc = task.exception() if not task.cancelled() else None
+    if exc is not None:
+        logger.error("calendar_trigger_check_unhandled", error=str(exc), exc_info=exc)
+
+
 async def _run_journey_event_listener() -> None:
     """旅程事件监听后台任务：订阅 Redis Stream，实时触发旅程。
 
@@ -563,6 +609,17 @@ async def lifespan(app: FastAPI):
         misfire_grace_time=600,
     )
 
+    # Calendar Trigger Check — 每日08:00 节庆信号检测
+    _scheduler.add_job(
+        _schedule_calendar_trigger,
+        trigger="cron",
+        hour=8,
+        id="growth_calendar_trigger",
+        replace_existing=True,
+        max_instances=1,
+        misfire_grace_time=300,
+    )
+
     _scheduler.start()
     logger.info("journey_executor_scheduler_started", interval_seconds=60)
     logger.info("approval_expiry_scheduler_started", interval_hours=1)
@@ -571,6 +628,7 @@ async def lifespan(app: FastAPI):
     logger.info("growth_silent_detection_scheduler_started", trigger="cron_02:00")
     logger.info("growth_p1_computation_scheduler_started", trigger="cron_03:00")
     logger.info("growth_auto_iterate_scheduler_started", interval_hours=6)
+    logger.info("growth_calendar_trigger_scheduler_started", trigger="cron_08:00")
 
     # 启动 EventBridge（桥接业务事件 → JourneyEngine）
     _bridge = _get_event_bridge(
@@ -631,6 +689,7 @@ app.include_router(offer_router)            # /api/v1/offers — offers/offer_re
 app.include_router(content_router)          # /api/v1/content — content_templates 表
 app.include_router(channel_router)          # /api/v1/channels — channel_configs/message_send_logs 表
 app.include_router(growth_hub_router)       # /api/v1/growth — 增长中枢V2
+app.include_router(wecom_scrm_agent_router)  # P3-05 企微SCRM私域Agent（生日/沉睡/回访）
 
 # 服务实例
 brand_svc = BrandStrategyService()

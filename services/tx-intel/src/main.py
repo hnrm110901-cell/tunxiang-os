@@ -13,11 +13,13 @@ from services.new_product_radar import NewProductRadar
 from services.pilot_suggestion import PilotSuggestionService
 from services.pricing_insight import PricingInsightService
 from services.review_topic_engine import ReviewTopicEngine
+from services.weather_signal import WeatherSignalService
+from services.calendar_signal import CalendarSignalService
 
 app = FastAPI(
     title="屯象OS — 市场情报中枢",
-    description="Market Intelligence Hub: 竞对监测、消费洞察、口碑分析、新品雷达、价格洞察、情报报告、试点建议",
-    version="1.0.0",
+    description="Market Intelligence Hub: 竞对监测、消费洞察、口碑分析、新品雷达、价格洞察、情报报告、试点建议、天气信号、节庆日历",
+    version="1.1.0",
 )
 
 from prometheus_fastapi_instrumentator import Instrumentator
@@ -32,6 +34,8 @@ product_radar = NewProductRadar()
 pricing_svc = PricingInsightService()
 report_engine = IntelReportEngine()
 pilot_svc = PilotSuggestionService()
+weather_svc = WeatherSignalService()
+calendar_svc = CalendarSignalService()
 
 
 # ─── 通用响应 ───
@@ -566,13 +570,55 @@ def get_pilot_portfolio() -> dict:
     return ok(pilot_svc.get_pilot_portfolio())
 
 
+# ═══════════════════════════════════════
+# 天气信号 API（V3.0 新增）
+# ═══════════════════════════════════════
+
+
+@app.get("/api/v1/intel/weather/signal")
+async def get_weather_signal(city: str, target_date: Optional[str] = None) -> dict:
+    from datetime import date as _date
+    td = _date.fromisoformat(target_date) if target_date else None
+    result = await weather_svc.get_weather_signal(city, td)
+    return ok(result)
+
+
+@app.get("/api/v1/intel/weather/forecast")
+async def get_weather_forecast(city: str) -> dict:
+    result = await weather_svc.get_weekly_forecast_signals(city)
+    return ok(result)
+
+
+# ═══════════════════════════════════════
+# 节庆日历 API（V3.0 新增）
+# ═══════��══════════════════════��════════
+
+
+@app.get("/api/v1/intel/calendar/upcoming")
+def get_upcoming_events(days: int = 14) -> dict:
+    return ok(calendar_svc.get_upcoming_events(days_ahead=days))
+
+
+@app.get("/api/v1/intel/calendar/triggers")
+def get_growth_triggers() -> dict:
+    return ok(calendar_svc.get_growth_triggers())
+
+
+@app.get("/api/v1/intel/calendar/event")
+def get_event_by_date(target_date: str) -> dict:
+    result = calendar_svc.get_event_by_date(target_date)
+    if result is None:
+        err("Event not found", 404)
+    return ok(result)
+
+
 # ─── 健康检查 ───
 
 @app.get("/health")
 def health_check() -> dict:
     return ok({
         "service": "tx-intel",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "engines": [
             "competitor_monitor",
             "consumer_insight",
@@ -581,5 +627,7 @@ def health_check() -> dict:
             "pricing_insight",
             "intel_report_engine",
             "pilot_suggestion",
+            "weather_signal",
+            "calendar_signal",
         ],
     })

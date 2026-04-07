@@ -111,6 +111,7 @@ import { JourneyAttributionPage } from './pages/hq/growth/JourneyAttributionPage
 import { StoreGrowthRankPage } from './pages/hq/growth/StoreGrowthRankPage';
 import { BrandComparisonPage } from './pages/hq/growth/BrandComparisonPage';
 import { CrossBrandPage } from './pages/hq/growth/CrossBrandPage';
+import { ExternalSignalsPage } from './pages/hq/growth/ExternalSignalsPage';
 import { GrowthSegmentTagsPage } from './pages/hq/growth/GrowthSegmentTagsPage';
 import { GrowthOfferPacksPage } from './pages/hq/growth/GrowthOfferPacksPage';
 import { CampaignManagePage } from './pages/growth/CampaignManagePage';
@@ -146,6 +147,7 @@ import { DispatchCodePage } from './pages/kds/DispatchCodePage';
 import { KDSCallSettingsPage } from './pages/kds/KDSCallSettingsPage';
 import { ManagerDashboardPage } from './pages/analytics/ManagerDashboardPage';
 import { WineDepositReportPage } from './pages/analytics/WineDepositReportPage';
+import ReportCenterPage from './pages/analytics/ReportCenterPage';  // TC-P2-15 品牌自定义报表框架
 // ─── Sprint 0-8: 人力中枢页面 ──────────────────────────────────────────────────
 import { HRHubPage } from './pages/hr/HRHubPage';
 import { EmployeeListPage } from './pages/hr/EmployeeListPage';
@@ -206,6 +208,9 @@ import { TrialDataClearPage } from './pages/settings/TrialDataClearPage';
 import { MobileDashboard } from './pages/mobile/MobileDashboard';
 import { MobileAnomalyPage } from './pages/mobile/MobileAnomalyPage';
 import { MobileTableStatusPage } from './pages/mobile/MobileTableStatusPage';
+// ─── P3-04/P3-05: 菜品排名 + 企微SCRM ────────────────────────────────────────
+import DishRankingPage from './pages/menu/DishRankingPage';
+import SCRMAgentPage from './pages/growth/SCRMAgentPage';
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(() => {
@@ -301,6 +306,7 @@ function App() {
           <Route path="/hq/growth/brand-comparison" element={<BrandComparisonPage />} />
           <Route path="/hq/growth/store-ranking" element={<StoreGrowthRankPage />} />
           <Route path="/hq/growth/cross-brand" element={<CrossBrandPage />} />
+          <Route path="/hq/growth/external-signals" element={<ExternalSignalsPage />} />
           <Route path="/hq/trade/delivery" element={<DeliveryPage />} />
           <Route path="/hq/supply/inventory-intel" element={<InventoryIntelPage />} />
           <Route path="/hq/supply/chain" element={<SupplyChainPage />} />
@@ -375,6 +381,8 @@ function App() {
           {/* ─── Phase3: 管理直通车 + 专项报表 ─── */}
           <Route path="/analytics/manager-dashboard" element={<ManagerDashboardPage />} />
           <Route path="/analytics/wine-deposit-report" element={<WineDepositReportPage />} />
+          {/* ─── TC-P2-15: 品牌自定义报表框架 ─── */}
+          <Route path="/analytics/reports" element={<ReportCenterPage />} />
           {/* ─── Phase4: 菜谱方案 ─── */}
           <Route path="/menu/schemes" element={<MenuSchemePage />} />
           {/* ─── Sprint 0-8: 人力中枢 ─── */}
@@ -449,6 +457,10 @@ function App() {
           <Route path="/m" element={<Navigate to="/m/dashboard" replace />} />
           {/* ─── TC-P1-11: 试营业数据清除 ─── */}
           <Route path="/settings/trial-data-clear" element={<TrialDataClearPage />} />
+          {/* ─── P3-04: 菜品5因子动态排名 ─── */}
+          <Route path="/menu/ranking" element={<DishRankingPage />} />
+          {/* ─── P3-05: 企微SCRM私域Agent ─── */}
+          <Route path="/growth/scrm-agent" element={<SCRMAgentPage />} />
         </Routes>
       </ShellHQ>
     </BrowserRouter>

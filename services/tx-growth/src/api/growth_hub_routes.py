@@ -1,4 +1,4 @@
-"""增长中枢 V2 API — 43 个端点（含V2.2多品牌架构）
+"""增长中枢 V3.0 API — 51 个端点（含V2.2多品牌架构 + V3.0外部信号/门店供给联动）
 
 端点：
   # Customer Growth Profile
@@ -77,6 +77,18 @@
   GET    /api/v1/growth/cross-brand/opportunities                      → 跨品牌增长机会
   GET    /api/v1/growth/cross-brand/recommendation                     → 跨品牌推荐策略
 
+  # External Signals (V3.0)
+  GET    /api/v1/growth/signals/weather?city=长沙                      → 天气信号
+  GET    /api/v1/growth/signals/weather/forecast?city=长沙             → 7天天气预报信号
+  GET    /api/v1/growth/signals/calendar/upcoming?days=14              → 节庆日历事件
+  GET    /api/v1/growth/signals/calendar/triggers                      → 节庆增长触发器
+
+  # Store Capability (V3.0)
+  GET    /api/v1/growth/stores/{store_id}/capabilities                 → 门店能力标签
+  GET    /api/v1/growth/stores/{store_id}/growth-readiness             → 门店增长就绪度
+  GET    /api/v1/growth/stores/readiness-ranking                       → 门店就绪度排行
+  GET    /api/v1/growth/stores/match-journey/{journey_code}            → 旅程门店匹配
+
 所有端点必须携带 X-Tenant-ID Header（UUID 格式）。
 """
 from __future__ import annotations
@@ -98,6 +110,7 @@ from services.growth_suggestion_service import GrowthSuggestionService
 from services.growth_brand_service import GrowthBrandService
 from services.growth_experiment_service import GrowthExperimentService
 from services.growth_cross_brand_service import GrowthCrossBrandService
+from services.growth_store_capability_service import GrowthStoreCapabilityService
 from shared.ontology.src.database import async_session_factory
 
 logger = structlog.get_logger(__name__)
@@ -112,6 +125,13 @@ _suggestion_svc = GrowthSuggestionService()
 _brand_svc = GrowthBrandService()
 _experiment_svc = GrowthExperimentService()
 _cross_brand_svc = GrowthCrossBrandService()
+_store_cap_svc = GrowthStoreCapabilityService()
+
+# 天气/日历信号服务（无状态纯计算，直接在 growth 中实例化）
+from services.weather_signal_proxy import WeatherSignalService as _WeatherSvc
+from services.calendar_signal_proxy import CalendarSignalService as _CalendarSvc
+_weather_svc = _WeatherSvc()
+_calendar_svc = _CalendarSvc()
 
 
 # ---------------------------------------------------------------------------
@@ -2126,6 +2146,140 @@ async def get_cross_brand_recommendation(
                 target_brand_id=UUID(target_brand_id),
                 tenant_id=str(tenant_id),
                 db=db,
+            )
+            return ok(result)
+        except (ValueError, RuntimeError, OSError) as exc:
+            return err(str(exc))
+
+
+# ===========================================================================
+# External Signals — 天气信号 + 节庆日历（V3.0 新增）
+# ===========================================================================
+
+
+@router.get("/signals/weather")
+async def get_weather_signal(
+    city: str = Query(..., description="城市名称，如: 长沙"),
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+) -> dict:
+    """获取指定城市当天天气信号及增长策略建议。"""
+    _parse_tenant(x_tenant_id)
+    try:
+        result = await _weather_svc.get_weather_signal(city)
+        return ok(result)
+    except (ValueError, RuntimeError, OSError) as exc:
+        return err(str(exc))
+
+
+@router.get("/signals/weather/forecast")
+async def get_weather_forecast(
+    city: str = Query(..., description="城市名称，如: 长沙"),
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+) -> dict:
+    """获取指定城市未来7天天气信号预测。"""
+    _parse_tenant(x_tenant_id)
+    try:
+        result = await _weather_svc.get_weekly_forecast_signals(city)
+        return ok(result)
+    except (ValueError, RuntimeError, OSError) as exc:
+        return err(str(exc))
+
+
+@router.get("/signals/calendar/upcoming")
+async def get_upcoming_calendar_events(
+    days: int = Query(14, ge=1, le=90, description="未来天数"),
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+) -> dict:
+    """获取未来N天内的节庆事件列表。"""
+    _parse_tenant(x_tenant_id)
+    try:
+        result = _calendar_svc.get_upcoming_events(days_ahead=days)
+        return ok(result)
+    except (ValueError, RuntimeError, OSError) as exc:
+        return err(str(exc))
+
+
+@router.get("/signals/calendar/triggers")
+async def get_calendar_growth_triggers(
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+) -> dict:
+    """获取当前应触发的节庆增长动作。"""
+    _parse_tenant(x_tenant_id)
+    try:
+        result = _calendar_svc.get_growth_triggers()
+        return ok(result)
+    except (ValueError, RuntimeError, OSError) as exc:
+        return err(str(exc))
+
+
+# ===========================================================================
+# Store Capability — 门店供给联动（V3.0 新增）
+# ===========================================================================
+
+
+@router.get("/stores/{store_id}/capabilities")
+async def get_store_capabilities(
+    store_id: str,
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+) -> dict:
+    """获取门店能力标签（包厢/活鲜/外卖/储值等）。"""
+    tenant_id = _parse_tenant(x_tenant_id)
+    async with async_session_factory() as db:
+        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        try:
+            result = await _store_cap_svc.get_store_capabilities(
+                UUID(store_id), str(tenant_id), db,
+            )
+            return ok(result)
+        except (ValueError, RuntimeError, OSError) as exc:
+            return err(str(exc))
+
+
+@router.get("/stores/{store_id}/growth-readiness")
+async def get_store_growth_readiness(
+    store_id: str,
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+) -> dict:
+    """门店增长就绪度评估 — 支撑旅程比例。"""
+    tenant_id = _parse_tenant(x_tenant_id)
+    async with async_session_factory() as db:
+        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        try:
+            result = await _store_cap_svc.get_store_growth_readiness(
+                UUID(store_id), str(tenant_id), db,
+            )
+            return ok(result)
+        except (ValueError, RuntimeError, OSError) as exc:
+            return err(str(exc))
+
+
+@router.get("/stores/readiness-ranking")
+async def get_stores_readiness_ranking(
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+) -> dict:
+    """所有门店增长就绪度排行。"""
+    tenant_id = _parse_tenant(x_tenant_id)
+    async with async_session_factory() as db:
+        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        try:
+            result = await _store_cap_svc.get_all_stores_readiness(str(tenant_id), db)
+            return ok(result)
+        except (ValueError, RuntimeError, OSError) as exc:
+            return err(str(exc))
+
+
+@router.get("/stores/match-journey/{journey_code}")
+async def match_journey_to_stores(
+    journey_code: str,
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+) -> dict:
+    """查找支持特定旅程的所有门店。"""
+    tenant_id = _parse_tenant(x_tenant_id)
+    async with async_session_factory() as db:
+        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        try:
+            result = await _store_cap_svc.match_journey_to_stores(
+                journey_code, str(tenant_id), db,
             )
             return ok(result)
         except (ValueError, RuntimeError, OSError) as exc:

@@ -101,6 +101,9 @@ const MENU_CONFIGS: Record<string, MenuConfig> = {
         { id: 'channels', label: '渠道触达', icon: '📡', path: '/hq/growth/channels' },
         { id: 'content', label: '内容中心', icon: '📝', path: '/hq/growth/content' },
       ]},
+      { label: '外部信号', items: [
+        { id: 'external-signals', label: '信号中心', icon: '📡', path: '/hq/growth/external-signals' },
+      ]},
       { label: '私域复购Agent', items: [
         { id: 'agent-workbench', label: 'Agent工作台', icon: '🤖', path: '/hq/growth/agent-workbench' },
       ]},

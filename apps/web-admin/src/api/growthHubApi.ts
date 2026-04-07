@@ -499,3 +499,134 @@ export const triggerAutoIterate = () =>
 
 export const fetchExperimentAdjustments = () =>
   txFetchData<{ adjustments: ExperimentAdjustment[] }>('/api/v1/growth/experiments/adjustments');
+
+
+// ===========================================================================
+// V3.0: External Signals + Store Capability
+// ===========================================================================
+
+// ---- Weather Signal Types ----
+export interface WeatherImpact {
+  traffic_impact: number;
+  delivery_boost: number;
+  indoor_preference?: number;
+  outdoor_preference?: number;
+}
+
+export interface WeatherRecommendation {
+  type: string;
+  description: string;
+  suggested_journey: string | null;
+  suggested_channel: string;
+  date?: string;
+}
+
+export interface WeatherSignal {
+  city: string;
+  date: string;
+  weather_type: string;
+  temperature_high: number;
+  temperature_low: number;
+  impact: WeatherImpact;
+  growth_recommendations: WeatherRecommendation[];
+}
+
+export interface WeatherForecast {
+  city: string;
+  period: string;
+  daily_signals: WeatherSignal[];
+  aggregated_recommendations: WeatherRecommendation[];
+}
+
+// ---- Calendar Signal Types ----
+export interface CalendarEvent {
+  date: string;
+  name: string;
+  type: 'national' | 'consumer' | 'industry';
+  impact: 'low' | 'medium' | 'high';
+  days_before_push: number;
+  target_segment?: string;
+  suggested_journey?: string;
+  seasonal_dish?: string;
+  push_start_date: string;
+  days_until: number;
+  should_push_now: boolean;
+}
+
+export interface CalendarTrigger {
+  event_name: string;
+  event_date: string;
+  event_type: string;
+  impact: string;
+  days_until: number;
+  action?: string;
+  target_segment?: string;
+  suggested_journey?: string;
+  seasonal_dish?: string;
+  description?: string;
+}
+
+// ---- Store Capability Types ----
+export interface StoreCapability {
+  store_id: string;
+  store_name: string;
+  city: string;
+  district: string;
+  seats: number;
+  status: string;
+  has_private_room: boolean;
+  has_live_seafood: boolean;
+  has_outdoor_seating: boolean;
+  has_delivery: boolean;
+  has_stored_value: boolean;
+  peak_capacity: number;
+  supported_journey_types: string[];
+}
+
+export interface StoreReadiness {
+  store_id: string;
+  store_name: string;
+  readiness_pct: number;
+  supported_journeys: number;
+  total_journeys: number;
+  capabilities: Record<string, boolean>;
+  missing_capabilities: { capability: string; blocked_journey: string; recommendation: string }[];
+}
+
+export interface StoreReadinessRankItem {
+  store_id: string;
+  store_name: string;
+  city: string;
+  seats: number;
+  supported_journeys: number;
+  readiness_pct: number;
+}
+
+// ---- Weather Signal API ----
+export const fetchWeatherSignal = (city: string) =>
+  txFetchData<WeatherSignal>(`/api/v1/growth/signals/weather?city=${encodeURIComponent(city)}`);
+
+export const fetchWeatherForecast = (city: string) =>
+  txFetchData<WeatherForecast>(`/api/v1/growth/signals/weather/forecast?city=${encodeURIComponent(city)}`);
+
+// ---- Calendar Signal API ----
+export const fetchCalendarUpcoming = (days = 14) =>
+  txFetchData<CalendarEvent[]>(`/api/v1/growth/signals/calendar/upcoming?days=${days}`);
+
+export const fetchCalendarTriggers = () =>
+  txFetchData<CalendarTrigger[]>('/api/v1/growth/signals/calendar/triggers');
+
+// ---- Store Capability API ----
+export const fetchStoreCapabilities = (storeId: string) =>
+  txFetchData<StoreCapability>(`/api/v1/growth/stores/${storeId}/capabilities`);
+
+export const fetchStoreGrowthReadiness = (storeId: string) =>
+  txFetchData<StoreReadiness>(`/api/v1/growth/stores/${storeId}/growth-readiness`);
+
+export const fetchStoresReadinessRanking = () =>
+  txFetchData<{ stores: StoreReadinessRankItem[]; total: number }>('/api/v1/growth/stores/readiness-ranking');
+
+export const fetchMatchJourneyStores = (journeyCode: string) =>
+  txFetchData<{ journey_code: string; required_capabilities: string[]; matching_stores: StoreReadinessRankItem[]; total: number }>(
+    `/api/v1/growth/stores/match-journey/${encodeURIComponent(journeyCode)}`
+  );
