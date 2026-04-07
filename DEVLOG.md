@@ -4,6 +4,255 @@
 
 ---
 
+## 2026-04-06 ~ 2026-04-07
+
+### 今日完成：增长中枢V2.0→V3.0全版本线（单次会话完成）
+
+**版本线总览:**
+- V2.0 (P0+P1): 8表+36API+9页面+7Agent+3定时
+- V2.1 (Phase 2): +储值/宴席/渠道旅程+A/B集成+企微深度+12指标+配置治理
+- V2.2 (Phase 3基础): +多品牌v186+门店维度+集团驾驶舱+Thompson Sampling
+- V2.3 (Phase 3壁垒): +跨品牌去重+品牌频控+Agent自动迭代
+- V3.0 (完成): +天气信号+节庆日历+门店供给联动
+
+**关键产出:**
+- 11次commit, +20,097行代码
+- 3个迁移(v184/v185/v186), 9张新表+15字段扩展
+- 59个API端点, 13个后端服务, 16个前端新页
+- 10条旅程模板, 26个触达模板, 11个权益包
+- 103个测试方法(2055行), 100%端点覆盖
+- 5个定时任务(V2旅程60s/沉默检测02:00/P1计算03:00/节庆检测08:00/自动迭代6h)
+
+### 数据变化
+- 迁移版本：v184 → v185 → v186
+- tx-growth API端点：36 → 59（+23个）
+- tx-growth测试：37 → 103（+66个）
+- tx-intel：+2个服务(weather_signal/calendar_signal) +5个端点
+- web-admin growth页面：24 → 40（+16个新页）
+
+### 三阶段完成度
+- Phase 1: 95% ✅
+- Phase 2: 95% ✅
+- Phase 3: 95% ✅
+
+### 遗留问题
+- 天气API目前返回模拟数据，需接入和风天气/心知天气真实API
+- 节庆日历为2026年硬编码，需改为可配置化（DB存储）
+- 跨品牌频控硬编码5次/天15次/周，需改为可配置
+- stores.config JSON中的能力标签(has_private_room等)需商户实际配置
+
+### 明日计划
+- 端到端集成测试：创建测试租户→种子数据→触发旅程→Agent建议→审核发布→归因回写
+- 演示环境部署验证
+
+---
+
+## Round 113 — 2026-04-06（P3 差异化护城河：折扣守护深化 + 菜品排名 + 企微SCRM）
+
+### 今日完成
+- [tx-agent] 新增 `discount_guard_enhanced_routes.py`（P3-01，6端点：高频会员检测/桌台连续折扣/实时check/实时analyze/汇总统计/决策日志，538行）
+- [tx-agent] 每次check/analyze强制写入 `DiscountGuardDecision`（含constraints_check三条硬约束字段，合规审计可查）
+- [web-admin] 新增 `DiscountGuardPanel.tsx`（嵌入式预警面板，critical级脉冲动画，Timeline详情弹窗，支持refreshInterval prop，351行）
+- [tx-agent] `test_discount_guard_enhanced.py`（6个测试，6/6通过，0.19s）
+- [tx-menu] 新增 `dish_ranking_engine_routes.py`（P3-04，7端点：5因子排名/四象限矩阵/趋势/权重CRUD/AI校准/健康报告；20道菜Mock）
+- [tx-growth] 新增 `wecom_scrm_agent_routes.py`（P3-05，9端点：生日祝福/沉睡唤醒/订单后回访/效果汇总）
+- [web-admin] 新增 `DishRankingPage.tsx`（3 Tab：排行榜5因子滑块+BCG四象限CSS Grid+健康诊断）
+- [web-admin] 新增 `SCRMAgentPage.tsx`（3 Tab：生日日历视图/沉睡响应率进度条/回访漏斗ROI）
+- [tx-menu] `test_dish_ranking_engine.py`（25个测试，25/25通过，0.35s）
+- [tx-growth] `test_wecom_scrm_agent.py`（26个测试，26/26通过，0.19s）
+- 修改：tx-agent/main.py、tx-menu/main.py、tx-growth/main.py、web-admin/App.tsx
+
+### 数据变化
+- 迁移版本：v192（无新迁移，P3基于内存/mock，权重持久化待v193）
+- 新增 API 路由文件：3个（discount_guard_enhanced: 6端点 / dish_ranking_engine: 7端点 / wecom_scrm_agent: 9端点）
+- 新增前端页面/组件：4个（DiscountGuardPanel / DishRankingPage / SCRMAgentPage）
+- 新增测试用例：57个（6+25+26，全部通过）
+- 累计测试用例：~7,106+个
+
+### 关键设计
+- 折扣守护：_DECISION_LOGS内存日志，每次决策强制记录含三条硬约束字段（合规审计）
+- 菜品权重：5因子和须在0.001误差内=1.0，否则400（FastAPI层精确校验）
+- 沉睡唤醒：>180天自动skip不发送，防骚扰合规设计
+
+### 遗留（待v193解决）
+- 菜品5因子权重 `_CURRENT_WEIGHTS` 全局字典重启丢失，需v193迁移持久化
+- 折扣守护决策日志内存存储，需v194持久化到DB（当前重启清空）
+- 企微SCRM实际发送需接入企业微信API（当前mock）
+
+---
+
+## Round 112 — 2026-04-06（Sprint 6：TC-P2-15 自定义报表框架）
+
+### 今日完成
+- [db-migrations] `v192_custom_reports.py`（3表：report_configs/executions/narrative_templates，6索引含条件索引share_token IS NOT NULL，RLS）
+- [tx-analytics] 新增 `report_config_routes.py`（15端点：报表CRUD/执行/分享/定时推送/AI叙事模板，secrets.token_hex(32)生成64字符分享token）
+- [web-admin] 新增 `ReportCenterPage.tsx`（4 Tab：报表中心/报表设计器3步骤/AI叙事模板/定时推送，设计器：选数据源→配字段→预览保存）
+- [tx-analytics] 新增 `test_custom_reports.py`（20个测试用例，5类：列表/创建/执行/分享/叙事）
+- 修改：tx-analytics/main.py、web-admin/App.tsx
+
+### 数据变化
+- 迁移版本：v191 → v192
+- 新增 API 路由文件：1个（report_config_routes，15端点）
+- 新增前端页面：1个（ReportCenterPage，4 Tab）
+- 新增测试用例：20个
+- 累计测试用例：~7,049+个
+
+### 里程碑达成
+- **M6 报表平台上线**：自定义报表框架 + AI叙事模板配置完整交付
+- 天财商龙差距补齐计划（tiancai-gaps-2026Q2）**全部6个Sprint主线任务完成**
+- 迁移链路：v185 → v192（8个新迁移）
+
+### 遗留问题
+- 报表设计器字段拖拽（当前用点选Add/Remove），未来可升级为真正drag-and-drop
+- 定时推送cron任务（当前mock配置保存，未接入真实cron调度器）
+
+---
+
+## Round 111 — 2026-04-06（Sprint 5：P2场景扩展 × 3 Team并行）
+
+### 今日完成
+- [db-migrations] `v189_food_court_outlets.py`（2表：outlets/outlet_orders，RLS，支持美食广场多档口）
+- [tx-trade] 新增 `food_court_routes.py`（智慧商街档口管理，11端点：档口CRUD/并行收银/统一结算/日报/对比，含找零计算）
+- [web-pos] 新增 `FoodCourtPage.tsx`（TXTouch风格档口收银页，选档口→加品项→分账结算）
+- [web-admin] 新增 `FoodCourtManagePage.tsx`（3 Tab：档口档案/营业统计/订单明细）
+- [tx-trade] 新增 `test_food_court.py`（10个测试：列表/创建唯一性/下单流程/找零/数据隔离/日报/对比）
+- [db-migrations] `v190_franchise_contracts.py`（2表：franchise_contracts/franchise_fee_records，含end_date/due_date复合索引，RLS）
+- [tx-org] 新增 `franchise_contract_routes.py`（加盟合同+收费管理，11端点：合同CRUD/收费CRUD/逾期/统计/到期提醒）
+- [web-admin] 新增 `FranchiseContractPage.tsx`（2 Tab：合同管理含到期颜色梯度/收费管理含超额付款422校验）
+- [tx-org] 新增 `test_franchise_contracts.py`（4个测试：列表/到期预警/付款流程/逾期统计，4/4通过）
+- [db-migrations] `v191_referral_distribution.py`（3表：referral_links/relationships/rewards，10索引，RLS）
+- [tx-growth] 新增 `distribution_routes.py`（CRM三级分销，12端点：推荐码/三级绑定/奖励计算发放/统计/排行/防刷）
+- [web-admin] 新增 `ReferralManagePage.tsx`（4 Tab：分销总览/推荐关系树/奖励记录批量发放/金银铜排行榜，863行）
+- [tx-growth] 新增 `test_referral_distribution.py`（5个测试：推荐码/三级链路/奖励计算/幂等/统计）
+- 修改：tx-trade/main.py、tx-org/main.py（已含）、tx-growth/main.py、web-admin/App.tsx、web-pos/App.tsx（路由注册）
+
+### 数据变化
+- 迁移版本：v188 → v191（v189+v190+v191三个新迁移）
+- 新增 API 路由文件：3个（food_court / franchise_contract / distribution）
+- 新增前端页面：4个（FoodCourtPage / FoodCourtManagePage / FranchiseContractPage / ReferralManagePage）
+- 新增测试文件：3个 / 新增测试用例：19个（10+4+5）
+- 累计测试用例：~7,029+个
+
+### 关键设计决策
+- distribution_routes.py（非referral_routes.py）：tx-growth已有同名文件处理邀请有礼，命名区分避免冲突
+- 三级分销奖励：一级3%/二级1.5%/三级0.5%（可配置），触发时自动推导三层关系
+- 档口独立核算：结算时按outlet_id分组生成 outlet_breakdown，数据天然隔离
+
+### 遗留问题
+- 档口线上扫码下单（顾客扫档口码）需接入小程序端，当前仅后端路由
+- 加盟合同文件上传（file_url）为文本字段，OSS集成待补
+- 三级分销小程序分享卡片（miniapp-customer）未完成，仅有管理端
+
+### 下一步（Sprint 6）
+- TC-P2-15 品牌自定义报表框架（tx-analytics + tx-brain + web-admin报表设计器）
+
+---
+
+## Round 110 — 2026-04-06（Sprint 4：P1业务深化 × 2 Team并行）
+
+### 今日完成
+- [db-migrations] `v187_piecework_commission.py`（4表：piecework_zones/schemes/scheme_items/records，records.total_fee_fen GENERATED ALWAYS AS STORED，RLS，10索引）
+- [tx-org] 新增 `piecework_routes.py`（计件提成3.0，13端点：区域CRUD/方案管理/记录写入/统计/日报，736行）
+- [web-admin] 新增 `PieceworkPage.tsx`（5 Tab：首页仪表盘/区域管理/绩效设置/绩效统计/系统设置，div柱状图，CSV导出，两步Modal，988行）
+- [tx-org] 新增 `test_piecework.py`（19个测试：CRUD×5/方案×4/计算×3/统计×3/日报×4，499行）
+- [db-migrations] `v188_agreement_units.py`（4表：agreement_units/accounts/prepaid_records/transactions，RLS，down_revision=v187）
+- [tx-finance] 新增 `agreement_unit_routes.py`（协议单位完整体系，13端点：档案/流水/挂账/还款×3/充值退款/余额/账龄/月报，含凭证打印）
+- [web-pos] 新增 `AgreementUnitSelector.tsx`（TXTouch风格挂账选择组件，搜索+授信进度条+超限警告，≥48px）
+- [web-admin] 新增 `AgreementUnitPage.tsx`（5 Tab：单位档案/挂账还款/还款记录/预付管理/账龄分析，红色梯度账龄）
+- [tx-finance] 新增 `test_agreement_units.py`（5个测试：创建/额度内挂账/超限400/还款/账龄分组）
+- 修改：tx-org/main.py、tx-finance/main.py、web-admin/App.tsx（3个路由注册）
+
+### 数据变化
+- 迁移版本：v186 → v188（v187+v188两个新迁移）
+- 新增 API 路由文件：2个（piecework_routes / agreement_unit_routes）
+- 新增前端页面/组件：3个（PieceworkPage / AgreementUnitPage / AgreementUnitSelector）
+- 新增测试文件：2个 / 新增测试用例：24个（19+5）
+- 累计测试用例：~7,010+个
+
+### 遗留问题
+- 计件提成与KDS出品事件的实际集成（当前为独立写入端点，未接tx-trade事件流）
+- 协议单位POS端结算页完整集成（AgreementUnitSelector已就绪，需接入QuickCashierPage）
+
+### 下一步（Sprint 5：P2场景扩展，已并行启动）
+- TC-P2-12 智慧商街/档口管理（v189，Team J运行中）
+- TC-P2-13 加盟商合同+收费管理（v190，Team K运行中）
+- TC-P2-14 CRM三级分销（v191，Team L运行中）
+
+---
+
+## Round 108 — 2026-04-06（Sprint 1：P0报表核账 × 4 Team并行）
+
+### 今日完成
+- [tx-ops] 新增 `settlement_monitor_routes.py`（日结监控聚合API，4端点：monitor/history/overdue/remark）
+- [web-admin] 新增 `SettlementMonitorPage.tsx`（日结监控看板，ProTable+汇总卡片+30秒自动刷新）
+- [tx-finance] 新增 `payment_reconciliation_routes.py`（支付对账+收银员统计+CRM对账，4端点）
+- [web-admin] 完善 `ReconciliationPage.tsx`（新增渠道汇总卡片+收银员收款明细折叠面板+CSV导出）
+- [db-migrations] `v186_market_sessions.py`（market_session_templates + store_market_sessions 两表，RLS）
+- [tx-trade] 新增 `market_session_routes.py`（营业市别管理，7端点，含跨夜市别判断）
+- [tx-trade] `dining_session_routes.py` 开台异步绑定 market_session_id
+- [web-admin] 新增 `MarketSessionPage.tsx`（集团模板+门店覆盖配置，路由 /store/market-sessions）
+- [tx-finance] `deposit_routes.py` 新增结班押金汇总端点（shift-summary）
+- [web-admin] `DepositManagePage.tsx` 新增"结班汇总"Tab（收/退/净留存 3列Statistic卡片）
+- [web-pos] 新增 `BarCounterPage.tsx`（吧台盘点5个Tab：库存状况/盘点单/领用单/调拨单/报表，880行）
+- [web-pos] `POSDashboardPage.tsx` 新增吧台盘点入口快捷键
+
+### 数据变化
+- 迁移版本：v185 → v186
+- 新增 API 路由文件：3个（settlement_monitor / payment_reconciliation / market_session）
+- 新增/完善前端页面：4个（SettlementMonitorPage / MarketSessionPage / BarCounterPage / ReconciliationPage完善）
+- 新增测试文件：5个 / 新增测试用例：~54个（10+6+22+10+19）
+- 累计测试用例：~6,954+个
+
+### 遗留问题
+- MarketSessionPage 门店选择器使用占位数据，需接入 /api/v1/stores 端点
+- crm-reconciliation 为 mock 实现（标注 used_mock:true），待接入 tx-member 真实数据
+- BarCounterPage 调拨单目标门店选择需接入门店列表API
+
+### 明日计划（Sprint 2：P0门店专项）
+- TC-P0-04 存酒/寄存管理确认现有wine_storage完整性，补全web-pos门店入口
+- TC-P0-02 继续：tx-supply盘点API路径确认与BarCounterPage联调
+- Sprint 2 启动：TC-P1-07移动直通车 / TC-P1-11试营业数据清除 / TC-P1-10快餐模式补全
+
+---
+
+## Round 109 — 2026-04-06（Sprint 2：P1总部管控 × 3 Team并行）
+
+### 今日完成
+- [web-admin] 新增 `MobileLayout.tsx`（移动端底部Tab导航组件）
+- [web-admin] 新增 `MobileDashboard.tsx`（营业总览+盈亏红线+5日趋势+异常角标）
+- [web-admin] 新增 `MobileAnomalyPage.tsx`（4类异常折叠卡片+处理按钮）
+- [web-admin] 新增 `MobileTableStatusPage.tsx`（实时桌态4列网格+30秒刷新）
+- [web-admin] 新增 `manifest.json` + `sw.js`（PWA支持，可添加到手机主屏幕）
+- [web-admin] `index.html` 新增6行PWA meta标签
+- [tx-ops] 新增 `trial_data_routes.py`（试营业清除4端点，软删除8张表+30天冷却+二次确认）
+- [web-admin] 新增 `TrialDataClearPage.tsx`（危险操作红色警示+清除范围对比+输入确认弹窗）
+- [web-pos] `WineStoragePosPage.tsx` 已存在，补全 POSDashboardPage 存酒管理快捷入口
+- [web-pos] 新增 `TableNumberManager.tsx`（快餐牌号管理，3列网格3种状态）
+- [web-pos] 新增 `quickPrintTemplates.ts`（厨打单/标签打印/结账单3种模板）
+- [web-pos] 新增 `useCallerDisplay.ts`（叫号屏联动Hook，WebSocket优先+HTTP回退）
+- [web-pos] 新增 `QuickShiftReportPage.tsx`（快餐结班报表，5卡片+渠道+TOP10）
+- [docs] 新增 `quickserve-gap-checklist.md`（快餐功能对标分析）
+- [tx-analytics] 新增 `test_mobile_dashboard.py`（23个测试）
+- [tx-trade] 新增 `test_quick_cashier.py`（5个测试，0.27s全通过）
+- [tx-ops] 新增 `test_trial_data_clear.py`（4个安全约束测试）
+
+### 数据变化
+- 新增 API 路由文件：1个（tx-ops/trial_data）
+- 新增前端页面/组件：11个
+- 新增测试：32个
+- 累计测试用例：~6,986+个
+
+### 遗留问题（记录在quickserve-gap-checklist.md）
+- 快餐废单重结：tx-trade缺 /order/{id}/cancel 端点
+- 快餐AI识菜：依赖tx-brain Core ML真实模型
+- 快餐会员快速绑定：支付流程前缺手机号输入步骤
+
+### 明日计划（Sprint 3：P1业务深化）
+- TC-P1-08 计件提成3.0（v187迁移+tx-org路由+web-admin管理模块）
+- TC-P1-09 协议单位完整体系（v188迁移+企业挂账+预付管理）
+
+---
+
 ## Round 106 — 2026-04-06
 
 ### 目标
