@@ -18,6 +18,7 @@ interface OrderState {
   storeName: string;
   tableNo: string;
   tenantId: string;
+  templateType: 'hotpot' | 'quick' | 'tea' | 'default';
 
   // 购物车
   cart: CartItem[];
@@ -30,7 +31,7 @@ interface OrderState {
   phone: string;
 
   // Actions
-  setStoreInfo: (info: { storeId: string; storeName: string; tableNo: string; tenantId: string }) => void;
+  setStoreInfo: (info: { storeId: string; storeName: string; tableNo: string; tenantId: string; templateType?: 'hotpot' | 'quick' | 'tea' | 'default' }) => void;
   addToCart: (dish: DishItem, quantity: number, customSelections: Record<string, string[]>) => void;
   updateQuantity: (cartKey: string, quantity: number) => void;
   removeFromCart: (cartKey: string) => void;
@@ -72,12 +73,13 @@ export const useOrderStore = create<OrderState>((set, get) => ({
   storeName: '',
   tableNo: '',
   tenantId: '',
+  templateType: 'default',
   cart: [],
   remark: '',
   aaPeople: 1,
   phone: '',
 
-  setStoreInfo: (info) => set(info),
+  setStoreInfo: (info) => set({ ...info, templateType: info.templateType ?? 'default' }),
 
   addToCart: (dish, quantity, customSelections) => {
     const key = buildCartKey(dish.id, customSelections);

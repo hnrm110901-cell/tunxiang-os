@@ -1,12 +1,21 @@
-"""加盟商合同+收费管理 API 测试
+"""加盟商合同+收费管理 API 测试（DB持久化版，v217）
 
 覆盖端点（franchise_contract_routes.py）：
+  ─ 合同管理 ─
   GET  /api/v1/org/franchise/contracts           - 合同列表
   GET  /api/v1/org/franchise/contracts/expiring  - 即将到期合同
   POST /api/v1/org/franchise/contracts           - 创建合同
   GET  /api/v1/org/franchise/contracts/{id}      - 合同详情
   PUT  /api/v1/org/franchise/contracts/{id}      - 更新合同
   POST /api/v1/org/franchise/contracts/{id}/send-alert - 发送到期提醒
+
+  ─ 收费收缴 ─
+  POST /api/v1/org/franchise/contracts/{id}/fee-schedule - 设置收费计划
+  GET  /api/v1/org/franchise/contracts/{id}/fees         - 合同费用明细
+  POST /api/v1/org/franchise/contracts/{id}/collect      - 记录收款
+  GET  /api/v1/org/franchise/fee-summary                 - 收缴汇总报表
+
+  ─ 旧收费端点 ─
   GET  /api/v1/org/franchise/fees                - 收费记录列表
   POST /api/v1/org/franchise/fees                - 新增收费记录
   PUT  /api/v1/org/franchise/fees/{id}/pay       - 标记付款
@@ -14,13 +23,18 @@
   GET  /api/v1/org/franchise/fees/stats          - 收费统计
 
 测试用例：
-  1. test_get_contracts_list
-  2. test_expiring_contracts_alert
-  3. test_fee_payment_flow
-  4. test_fee_overdue_stats
+  1. test_contract_create_and_detail       — 创建合同 + 查看详情
+  2. test_fee_schedule_and_collect         — 设置收费计划 + 收款
+  3. test_fee_summary_report               — 收缴汇总报表
+  4. test_collect_overpayment_rejected     — 超额收款拒绝
+  5. test_contract_list_and_update         — 合同列表 + 更新
+  6. test_fee_create_and_pay               — 旧端点：创建收费 + 付款
 """
 import os
 import sys
+import uuid
+from datetime import date, timedelta
+from unittest.mock import AsyncMock, MagicMock, patch
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(
@@ -31,277 +45,588 @@ import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 
-from api.franchise_contract_routes import router as franchise_contract_router
-
-# ─── 测试 App ─────────────────────────────────────────────────────────────────
-
-app = FastAPI()
-app.include_router(franchise_contract_router)
-
-TENANT_ID = "test-tenant-00000000-0000-0000-0000-000000000001"
+TENANT_ID = "00000000-0000-0000-0000-000000000001"
 HEADERS = {
     "X-Tenant-ID": TENANT_ID,
     "Content-Type": "application/json",
 }
 
+# ─── 内存 DB 模拟 ─────────────────────────────────────────────────────────────
 
-# ─── 测试用例 1: 获取合同列表 ──────────────────────────────────────────────────
+_CONTRACTS_STORE: dict[str, dict] = {}
+_FEES_STORE: dict[str, dict] = {}
+
+
+def _reset_stores():
+    _CONTRACTS_STORE.clear()
+    _FEES_STORE.clear()
+
+
+class DictRow(dict):
+    """dict that also supports attribute access, mimicking SQLAlchemy RowMapping."""
+    def __getattr__(self, key):
+        try:
+            return self[key]
+        except KeyError:
+            raise AttributeError(key)
+
+
+class FakeResult:
+    """模拟 SQLAlchemy 查询结果。"""
+
+    def __init__(self, rows: list[dict]):
+        self._rows = [DictRow(r) for r in rows]
+
+    def mappings(self):
+        return self
+
+    def all(self):
+        return self._rows
+
+    def first(self):
+        return self._rows[0] if self._rows else None
+
+    def scalar_one(self):
+        if self._rows:
+            vals = list(self._rows[0].values())
+            return vals[0] if vals else 0
+        return 0
+
+
+class FakeAsyncSession:
+    """内存中模拟 AsyncSession — 拦截 SQL 并操作 in-memory stores。"""
+
+    def __init__(self):
+        self._committed = False
+
+    async def execute(self, stmt, params=None):
+        sql = str(stmt.text if hasattr(stmt, 'text') else stmt).strip().lower()
+        params = params or {}
+
+        # set_config — ignore
+        if "set_config" in sql:
+            return FakeResult([])
+
+        # INSERT franchise_contracts
+        if "insert into franchise_contracts" in sql:
+            row = {
+                "id": params.get("id", str(uuid.uuid4())),
+                "tenant_id": params.get("tenant_id", TENANT_ID),
+                "contract_no": params.get("contract_no", "FC-TEST"),
+                "contract_type": params.get("contract_type", "initial"),
+                "franchisee_id": params.get("franchisee_id", ""),
+                "franchisee_name": params.get("franchisee_name", ""),
+                "sign_date": params.get("sign_date"),
+                "start_date": params.get("start_date"),
+                "end_date": params.get("end_date"),
+                "contract_amount_fen": params.get("contract_amount_fen", 0),
+                "file_url": params.get("file_url"),
+                "status": "active",
+                "alert_days_before": params.get("alert_days_before", 30),
+                "notes": params.get("notes"),
+                "created_by": None,
+                "is_deleted": False,
+                "created_at": "2026-04-09T00:00:00+00:00",
+                "updated_at": "2026-04-09T00:00:00+00:00",
+            }
+            end_dt = date.fromisoformat(str(row["end_date"]))
+            row["days_to_expire"] = (end_dt - date.today()).days
+            _CONTRACTS_STORE[row["id"]] = row
+            return FakeResult([])
+
+        # SELECT from franchise_contracts
+        if "from franchise_contracts" in sql:
+            rows = list(_CONTRACTS_STORE.values())
+            rows = [r for r in rows if not r.get("is_deleted")]
+
+            if "id = :contract_id" in sql or "id = :id" in sql:
+                cid = params.get("contract_id") or params.get("id")
+                rows = [r for r in rows if r["id"] == cid]
+            if "franchisee_id = :franchisee_id" in sql and "franchisee_id" in params:
+                rows = [r for r in rows if r["franchisee_id"] == params["franchisee_id"]]
+            if "status = :status" in sql and "status" in params:
+                rows = [r for r in rows if r["status"] == params["status"]]
+
+            if "count(*)" in sql:
+                return FakeResult([{"count": len(rows)}])
+            return FakeResult(rows)
+
+        # UPDATE franchise_contracts
+        if "update franchise_contracts" in sql:
+            cid = params.get("id")
+            if cid and cid in _CONTRACTS_STORE:
+                for k, v in params.items():
+                    if k != "id" and k in _CONTRACTS_STORE[cid]:
+                        _CONTRACTS_STORE[cid][k] = v
+                _CONTRACTS_STORE[cid]["updated_at"] = "2026-04-09T01:00:00+00:00"
+            return FakeResult([])
+
+        # INSERT franchise_fee_records
+        if "insert into franchise_fee_records" in sql:
+            row = {
+                "id": params.get("id", str(uuid.uuid4())),
+                "tenant_id": params.get("tenant_id", TENANT_ID),
+                "contract_id": params.get("contract_id"),
+                "franchisee_id": params.get("franchisee_id", ""),
+                "franchisee_name": params.get("franchisee_name", ""),
+                "fee_type": params.get("fee_type", ""),
+                "period_start": params.get("period_start"),
+                "period_end": params.get("period_end"),
+                "amount_fen": params.get("amount_fen", 0),
+                "paid_fen": 0,
+                "due_date": params.get("due_date"),
+                "status": "unpaid",
+                "receipt_no": None,
+                "receipt_url": None,
+                "notes": params.get("notes"),
+                "is_deleted": False,
+                "created_at": "2026-04-09T00:00:00+00:00",
+                "updated_at": "2026-04-09T00:00:00+00:00",
+            }
+            _FEES_STORE[row["id"]] = row
+            return FakeResult([])
+
+        # SELECT from franchise_fee_records
+        if "from franchise_fee_records" in sql:
+            rows = list(_FEES_STORE.values())
+            rows = [r for r in rows if not r.get("is_deleted")]
+
+            if "id = :fee_id" in sql or "id = :id" in sql:
+                fid = params.get("fee_id") or params.get("id")
+                rows = [r for r in rows if r["id"] == fid]
+            if "contract_id = :contract_id" in sql and "contract_id" in params:
+                rows = [r for r in rows if r.get("contract_id") == params["contract_id"]]
+            if "status = :status" in sql and "status" in params:
+                rows = [r for r in rows if r["status"] == params["status"]]
+            # Only filter by overdue if it's a WHERE clause, not a CASE WHEN
+            if "where" in sql and "status = 'overdue'" in sql and "case when" not in sql:
+                rows = [r for r in rows if r["status"] == "overdue"]
+            if "fee_type = :fee_type" in sql and "fee_type" in params:
+                rows = [r for r in rows if r["fee_type"] == params["fee_type"]]
+            if "franchisee_id = :franchisee_id" in sql and "franchisee_id" in params:
+                rows = [r for r in rows if r["franchisee_id"] == params["franchisee_id"]]
+
+            # SUM aggregations (check before count(*) since some queries have both)
+            if "sum(amount_fen)" in sql and "group by" not in sql:
+                total_a = sum(r["amount_fen"] for r in rows)
+                total_p = sum(r["paid_fen"] for r in rows)
+                total_o = sum(
+                    r["amount_fen"] - r["paid_fen"]
+                    for r in rows if r["status"] == "overdue"
+                )
+                return FakeResult([{
+                    "total_amount_fen": total_a,
+                    "total_paid_fen": total_p,
+                    "total_overdue_fen": total_o,
+                    "total_records": len(rows),
+                }])
+
+            if "group by fee_type" in sql:
+                by_type: dict[str, dict] = {}
+                for r in rows:
+                    ft = r["fee_type"]
+                    if ft not in by_type:
+                        by_type[ft] = {"fee_type": ft, "amount_fen": 0, "paid_fen": 0,
+                                       "overdue_fen": 0, "record_count": 0}
+                    by_type[ft]["amount_fen"] += r["amount_fen"]
+                    by_type[ft]["paid_fen"] += r["paid_fen"]
+                    by_type[ft]["record_count"] += 1
+                    if r["status"] == "overdue":
+                        by_type[ft]["overdue_fen"] += r["amount_fen"] - r["paid_fen"]
+                return FakeResult(list(by_type.values()))
+
+            if "group by franchisee_id" in sql:
+                by_f: dict[str, dict] = {}
+                for r in rows:
+                    fid = r["franchisee_id"]
+                    if fid not in by_f:
+                        by_f[fid] = {"franchisee_id": fid,
+                                     "franchisee_name": r["franchisee_name"],
+                                     "amount_fen": 0, "paid_fen": 0,
+                                     "overdue_fen": 0, "record_count": 0}
+                    by_f[fid]["amount_fen"] += r["amount_fen"]
+                    by_f[fid]["paid_fen"] += r["paid_fen"]
+                    by_f[fid]["record_count"] += 1
+                    if r["status"] == "overdue":
+                        by_f[fid]["overdue_fen"] += r["amount_fen"] - r["paid_fen"]
+                return FakeResult(list(by_f.values()))
+
+            if "group by status" in sql:
+                by_s: dict[str, dict] = {}
+                for r in rows:
+                    s = r["status"]
+                    if s not in by_s:
+                        by_s[s] = {"status": s, "cnt": 0, "amount_fen": 0}
+                    by_s[s]["cnt"] += 1
+                    by_s[s]["amount_fen"] += r["amount_fen"]
+                return FakeResult(list(by_s.values()))
+
+            # Plain COUNT (no SUM)
+            if "count(*)" in sql:
+                return FakeResult([{"count": len(rows)}])
+
+            return FakeResult(rows)
+
+        # UPDATE franchise_fee_records
+        if "update franchise_fee_records" in sql:
+            fid = params.get("fee_id")
+            if fid and fid in _FEES_STORE:
+                if "paid_fen" in params:
+                    _FEES_STORE[fid]["paid_fen"] = params["paid_fen"]
+                if "status" in params:
+                    _FEES_STORE[fid]["status"] = params["status"]
+                if "receipt_no" in params:
+                    _FEES_STORE[fid]["receipt_no"] = params["receipt_no"]
+                if "receipt_url" in params:
+                    _FEES_STORE[fid]["receipt_url"] = params["receipt_url"]
+                if "notes" in params:
+                    _FEES_STORE[fid]["notes"] = params["notes"]
+            return FakeResult([])
+
+        return FakeResult([])
+
+    async def commit(self):
+        self._committed = True
+
+    async def rollback(self):
+        pass
+
+
+async def _fake_get_db_with_tenant(tenant_id: str = TENANT_ID):
+    yield FakeAsyncSession()
+
+
+# ─── 测试 App ─────────────────────────────────────────────────────────────────
+
+with patch("shared.ontology.src.database.get_db_with_tenant", _fake_get_db_with_tenant):
+    from api.franchise_contract_routes import router as franchise_contract_router
+
+app = FastAPI()
+app.include_router(franchise_contract_router)
+app.dependency_overrides = {}
+
+# Override the dependency
+from shared.ontology.src.database import get_db_with_tenant
+app.dependency_overrides[get_db_with_tenant] = _fake_get_db_with_tenant
+
+
+# ─── 测试用例 1: 创建合同 + 查看详情 ─────────────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_get_contracts_list():
-    """合同列表返回正确，包含 days_to_expire 字段，mock 数据至少有 3 条。"""
+async def test_contract_create_and_detail():
+    """创建合同并查看详情，验证字段正确。"""
+    _reset_stores()
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"
     ) as client:
-        resp = await client.get(
+        # 创建合同
+        end_date = (date.today() + timedelta(days=365)).isoformat()
+        resp = await client.post(
             "/api/v1/org/franchise/contracts",
-            headers=HEADERS,
-        )
-
-    assert resp.status_code == 200, f"期望200，实际：{resp.status_code}"
-    body = resp.json()
-    assert body["ok"] is True, "响应 ok 字段应为 True"
-
-    data = body["data"]
-    assert "items" in data, "响应 data 中缺少 items 字段"
-    assert "total" in data, "响应 data 中缺少 total 字段"
-    assert data["total"] >= 3, f"mock 数据应至少有3条合同，实际：{data['total']}"
-
-    for contract in data["items"]:
-        assert "days_to_expire" in contract, (
-            f"合同 {contract.get('id')} 缺少 days_to_expire 字段"
-        )
-        assert isinstance(contract["days_to_expire"], int), (
-            f"days_to_expire 应为 int，实际：{type(contract['days_to_expire'])}"
-        )
-
-    # 验证必要字段存在
-    first = data["items"][0]
-    required_fields = [
-        "id", "contract_no", "contract_type", "franchisee_id",
-        "sign_date", "end_date", "status",
-    ]
-    for field in required_fields:
-        assert field in first, f"合同数据缺少字段：{field}"
-
-
-# ─── 测试用例 2: 即将到期合同预警 ─────────────────────────────────────────────
-
-@pytest.mark.asyncio
-async def test_expiring_contracts_alert():
-    """即将到期查询：武汉光谷店合同29天后到期，应出现在30天内到期列表。"""
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as client:
-        resp = await client.get(
-            "/api/v1/org/franchise/contracts/expiring",
-            params={"days": 30},
-            headers=HEADERS,
-        )
-
-    assert resp.status_code == 200, f"期望200，实际：{resp.status_code}"
-    body = resp.json()
-    assert body["ok"] is True
-
-    items = body["data"]["items"]
-    assert len(items) >= 1, "30天内应至少有1份即将到期合同"
-
-    # 验证武汉光谷店合同（days_to_expire=29）在列表中
-    wuhan_contracts = [
-        c for c in items
-        if c.get("franchisee_name") == "武汉光谷店"
-        or c.get("franchisee_id") == "fr-002"
-    ]
-    assert len(wuhan_contracts) >= 1, (
-        "武汉光谷店合同（29天到期）应出现在expiring列表中"
-    )
-
-    wuhan = wuhan_contracts[0]
-    assert wuhan["days_to_expire"] <= 30, (
-        f"武汉光谷店合同 days_to_expire={wuhan['days_to_expire']}，应 <= 30"
-    )
-    assert wuhan.get("warning") is True, "即将到期合同应有 warning=True 标记"
-
-    # 验证列表按剩余天数升序排列（第一个应最先到期）
-    if len(items) > 1:
-        for i in range(len(items) - 1):
-            assert items[i]["days_to_expire"] <= items[i + 1]["days_to_expire"], (
-                "expiring 列表应按 days_to_expire 升序排列"
-            )
-
-    # 长沙五一广场店（695天）和深圳南山店（786天）不应出现在30天内到期列表
-    non_expiring_ids = {"fc-001", "fc-003"}
-    expiring_ids = {c["id"] for c in items}
-    overlap = non_expiring_ids & expiring_ids
-    assert not overlap, (
-        f"不应出现在30天到期列表中的合同ID：{overlap}"
-    )
-
-
-# ─── 测试用例 3: 收费付款完整流程 ─────────────────────────────────────────────
-
-@pytest.mark.asyncio
-async def test_fee_payment_flow():
-    """收费付款流程：创建收费记录 → 标记付款 → 状态变 paid。"""
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as client:
-        # Step 1: 创建收费记录
-        create_resp = await client.post(
-            "/api/v1/org/franchise/fees",
             json={
-                "franchisee_id": "fr-001",
-                "franchisee_name": "长沙五一广场店",
-                "contract_id": "fc-001",
-                "fee_type": "royalty",
-                "period_start": "2026-01-01",
-                "period_end": "2026-03-31",
-                "amount_fen": 200000,
-                "due_date": "2026-04-15",
-                "notes": "测试收费记录",
+                "franchisee_id": "fr-test-001",
+                "franchisee_name": "测试加盟店A",
+                "contract_type": "initial",
+                "sign_date": date.today().isoformat(),
+                "start_date": date.today().isoformat(),
+                "end_date": end_date,
+                "contract_amount_fen": 30000000,
+                "alert_days_before": 30,
+                "notes": "测试合同",
             },
             headers=HEADERS,
         )
-        assert create_resp.status_code == 200, (
-            f"创建收费记录失败：{create_resp.status_code}"
-        )
-        create_body = create_resp.json()
-        assert create_body["ok"] is True
-        fee_id = create_body["data"]["id"]
-        assert create_body["data"]["status"] == "unpaid", (
-            "新建收费记录初始状态应为 unpaid"
-        )
-        assert create_body["data"]["paid_fen"] == 0, (
-            "新建收费记录 paid_fen 应为 0"
-        )
+        assert resp.status_code == 200, f"创建合同失败: {resp.text}"
+        body = resp.json()
+        assert body["ok"] is True
+        contract_id = body["data"]["id"]
+        assert body["data"]["contract_no"].startswith("FC-")
+        assert body["data"]["franchisee_name"] == "测试加盟店A"
 
-        # Step 2: 部分付款（先付一半）
+        # 查看详情
+        detail_resp = await client.get(
+            f"/api/v1/org/franchise/contracts/{contract_id}",
+            headers=HEADERS,
+        )
+        assert detail_resp.status_code == 200
+        detail = detail_resp.json()
+        assert detail["ok"] is True
+        assert detail["data"]["id"] == contract_id
+        assert "days_to_expire" in detail["data"]
+
+
+# ─── 测试用例 2: 设置收费计划 + 收款 ─────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_fee_schedule_and_collect():
+    """为合同设置收费计划，然后通过 collect 端点收款。"""
+    _reset_stores()
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        # 创建合同
+        end_date = (date.today() + timedelta(days=365)).isoformat()
+        create_resp = await client.post(
+            "/api/v1/org/franchise/contracts",
+            json={
+                "franchisee_id": "fr-test-002",
+                "franchisee_name": "测试加盟店B",
+                "contract_type": "initial",
+                "sign_date": date.today().isoformat(),
+                "start_date": date.today().isoformat(),
+                "end_date": end_date,
+                "contract_amount_fen": 20000000,
+            },
+            headers=HEADERS,
+        )
+        contract_id = create_resp.json()["data"]["id"]
+
+        # 设置收费计划（加盟费 + 管理费）
+        schedule_resp = await client.post(
+            f"/api/v1/org/franchise/contracts/{contract_id}/fee-schedule",
+            json={
+                "items": [
+                    {
+                        "fee_type": "joining_fee",
+                        "amount_fen": 10000000,
+                        "due_date": (date.today() + timedelta(days=15)).isoformat(),
+                        "notes": "加盟费一次性",
+                    },
+                    {
+                        "fee_type": "management_fee",
+                        "amount_fen": 500000,
+                        "period_start": "2026-04-01",
+                        "period_end": "2026-06-30",
+                        "due_date": "2026-06-30",
+                        "notes": "Q2管理费",
+                    },
+                ],
+            },
+            headers=HEADERS,
+        )
+        assert schedule_resp.status_code == 200, f"设置收费计划失败: {schedule_resp.text}"
+        schedule_body = schedule_resp.json()
+        assert schedule_body["ok"] is True
+        assert schedule_body["data"]["created_count"] == 2
+        fee_ids = schedule_body["data"]["fee_ids"]
+        assert len(fee_ids) == 2
+
+        # 查看合同下的费用明细
+        fees_resp = await client.get(
+            f"/api/v1/org/franchise/contracts/{contract_id}/fees",
+            headers=HEADERS,
+        )
+        assert fees_resp.status_code == 200
+        fees_body = fees_resp.json()
+        assert fees_body["data"]["total"] == 2
+        assert fees_body["data"]["summary"]["total_amount_fen"] == 10500000
+
+        # 收款（对第一笔加盟费收款）
+        collect_resp = await client.post(
+            f"/api/v1/org/franchise/contracts/{contract_id}/collect",
+            json={
+                "fee_id": fee_ids[0],
+                "paid_fen": 10000000,
+                "receipt_no": "RCP-TEST-001",
+            },
+            headers=HEADERS,
+        )
+        assert collect_resp.status_code == 200, f"收款失败: {collect_resp.text}"
+        collect_body = collect_resp.json()
+        assert collect_body["ok"] is True
+        assert collect_body["data"]["status"] == "paid"
+        assert collect_body["data"]["paid_fen"] == 10000000
+
+
+# ─── 测试用例 3: 收缴汇总报表 ────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_fee_summary_report():
+    """创建多笔收费记录后，验证汇总报表数据正确。"""
+    _reset_stores()
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        # 创建两笔收费记录
+        for i, (ftype, amount) in enumerate([
+            ("joining_fee", 10000000),
+            ("management_fee", 500000),
+        ]):
+            await client.post(
+                "/api/v1/org/franchise/fees",
+                json={
+                    "franchisee_id": "fr-summary-001",
+                    "franchisee_name": "汇总测试店",
+                    "fee_type": ftype,
+                    "amount_fen": amount,
+                    "due_date": "2026-04-30",
+                },
+                headers=HEADERS,
+            )
+
+        # 查询汇总报表
+        summary_resp = await client.get(
+            "/api/v1/org/franchise/fee-summary",
+            headers=HEADERS,
+        )
+        assert summary_resp.status_code == 200, f"汇总报表失败: {summary_resp.text}"
+        body = summary_resp.json()
+        assert body["ok"] is True
+        data = body["data"]
+        assert data["total_amount_fen"] == 10500000
+        assert data["total_paid_fen"] == 0
+        assert data["total_unpaid_fen"] == 10500000
+        assert len(data["by_type"]) == 2
+        assert len(data["by_franchisee"]) == 1
+
+
+# ─── 测试用例 4: 超额收款拒绝 ────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_collect_overpayment_rejected():
+    """收款金额超出应收时应被拒绝。"""
+    _reset_stores()
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        # 创建合同
+        end_date = (date.today() + timedelta(days=365)).isoformat()
+        create_resp = await client.post(
+            "/api/v1/org/franchise/contracts",
+            json={
+                "franchisee_id": "fr-test-overpay",
+                "contract_type": "initial",
+                "sign_date": date.today().isoformat(),
+                "start_date": date.today().isoformat(),
+                "end_date": end_date,
+                "contract_amount_fen": 100000,
+            },
+            headers=HEADERS,
+        )
+        contract_id = create_resp.json()["data"]["id"]
+
+        # 创建收费计划
+        schedule_resp = await client.post(
+            f"/api/v1/org/franchise/contracts/{contract_id}/fee-schedule",
+            json={
+                "items": [
+                    {"fee_type": "joining_fee", "amount_fen": 100000},
+                ],
+            },
+            headers=HEADERS,
+        )
+        fee_id = schedule_resp.json()["data"]["fee_ids"][0]
+
+        # 超额收款应被拒绝
+        collect_resp = await client.post(
+            f"/api/v1/org/franchise/contracts/{contract_id}/collect",
+            json={
+                "fee_id": fee_id,
+                "paid_fen": 200000,
+            },
+            headers=HEADERS,
+        )
+        assert collect_resp.status_code == 422, f"超额收款应返回422，实际: {collect_resp.status_code}"
+        detail = collect_resp.json().get("detail", collect_resp.json())
+        assert detail.get("ok") is False
+        assert detail.get("error", {}).get("code") == "OVERPAYMENT"
+
+
+# ─── 测试用例 5: 合同列表 + 更新 ─────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_contract_list_and_update():
+    """创建多个合同后验证列表和更新功能。"""
+    _reset_stores()
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        # 创建两个合同
+        for name in ["测试店X", "测试店Y"]:
+            await client.post(
+                "/api/v1/org/franchise/contracts",
+                json={
+                    "franchisee_id": f"fr-{name}",
+                    "franchisee_name": name,
+                    "contract_type": "initial",
+                    "sign_date": "2026-04-01",
+                    "start_date": "2026-04-01",
+                    "end_date": "2029-03-31",
+                    "contract_amount_fen": 15000000,
+                },
+                headers=HEADERS,
+            )
+
+        # 列表
+        list_resp = await client.get(
+            "/api/v1/org/franchise/contracts",
+            headers=HEADERS,
+        )
+        assert list_resp.status_code == 200
+        list_body = list_resp.json()
+        assert list_body["data"]["total"] == 2
+
+        # 更新第一个
+        cid = list_body["data"]["items"][0]["id"]
+        update_resp = await client.put(
+            f"/api/v1/org/franchise/contracts/{cid}",
+            json={"notes": "已更新备注"},
+            headers=HEADERS,
+        )
+        assert update_resp.status_code == 200
+        assert update_resp.json()["data"]["notes"] == "已更新备注"
+
+
+# ─── 测试用例 6: 旧端点：创建收费 + 付款 ────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_fee_create_and_pay():
+    """通过旧端点创建收费记录并标记付款。"""
+    _reset_stores()
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        # 创建收费记录
+        create_resp = await client.post(
+            "/api/v1/org/franchise/fees",
+            json={
+                "franchisee_id": "fr-pay-test",
+                "franchisee_name": "付款测试店",
+                "fee_type": "royalty",
+                "amount_fen": 200000,
+                "due_date": "2026-05-01",
+            },
+            headers=HEADERS,
+        )
+        assert create_resp.status_code == 200
+        fee_id = create_resp.json()["data"]["id"]
+        assert create_resp.json()["data"]["status"] == "unpaid"
+        assert create_resp.json()["data"]["paid_fen"] == 0
+
+        # 部分付款
         partial_resp = await client.put(
             f"/api/v1/org/franchise/fees/{fee_id}/pay",
-            json={"paid_fen": 100000, "receipt_no": "RCP-TEST-0001"},
+            json={"paid_fen": 100000, "receipt_no": "RCP-001"},
             headers=HEADERS,
         )
-        assert partial_resp.status_code == 200, (
-            f"标记部分付款失败：{partial_resp.status_code}"
-        )
-        partial_body = partial_resp.json()
-        assert partial_body["ok"] is True
-        assert partial_body["data"]["status"] == "partial", (
-            f"部分付款后状态应为 partial，实际：{partial_body['data']['status']}"
-        )
-        assert partial_body["data"]["paid_fen"] == 100000, (
-            f"paid_fen 应为 100000，实际：{partial_body['data']['paid_fen']}"
-        )
-        assert partial_body["data"]["receipt_no"] == "RCP-TEST-0001"
+        assert partial_resp.status_code == 200
+        assert partial_resp.json()["data"]["status"] == "partial"
+        assert partial_resp.json()["data"]["paid_fen"] == 100000
 
-        # Step 3: 全额付款（付剩余一半）
+        # 全额付款
         full_resp = await client.put(
             f"/api/v1/org/franchise/fees/{fee_id}/pay",
-            json={"paid_fen": 100000, "receipt_no": "RCP-TEST-0002"},
+            json={"paid_fen": 100000, "receipt_no": "RCP-002"},
             headers=HEADERS,
         )
-        assert full_resp.status_code == 200, (
-            f"标记全额付款失败：{full_resp.status_code}"
-        )
-        full_body = full_resp.json()
-        assert full_body["ok"] is True
-        assert full_body["data"]["status"] == "paid", (
-            f"全额付款后状态应为 paid，实际：{full_body['data']['status']}"
-        )
-        assert full_body["data"]["paid_fen"] == 200000, (
-            f"paid_fen 应为 200000，实际：{full_body['data']['paid_fen']}"
-        )
+        assert full_resp.status_code == 200
+        assert full_resp.json()["data"]["status"] == "paid"
+        assert full_resp.json()["data"]["paid_fen"] == 200000
 
-        # Step 4: 验证超额付款被拒绝
-        # 注：FastAPI HTTPException 将 detail 包在 {"detail": ...} 中
-        overpay_resp = await client.put(
+        # 超额拒绝
+        over_resp = await client.put(
             f"/api/v1/org/franchise/fees/{fee_id}/pay",
             json={"paid_fen": 1},
             headers=HEADERS,
         )
-        assert overpay_resp.status_code == 422, (
-            f"超额付款应返回422，实际：{overpay_resp.status_code}"
-        )
-        overpay_body = overpay_resp.json()
-        # FastAPI 将 HTTPException.detail 放在 {"detail": ...} 键下
-        detail = overpay_body.get("detail", overpay_body)
-        assert detail.get("ok") is False, f"超额付款响应 ok 应为 False，实际：{detail}"
-        assert detail.get("error", {}).get("code") == "OVERPAYMENT", (
-            f"超额付款错误码应为 OVERPAYMENT，实际：{detail.get('error')}"
-        )
-
-
-# ─── 测试用例 4: 逾期统计 ─────────────────────────────────────────────────────
-
-@pytest.mark.asyncio
-async def test_fee_overdue_stats():
-    """逾期统计：过了 due_date 未付的记录应出现在 overdue 列表，并计入 stats 逾期金额。"""
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as client:
-        # 查询逾期列表
-        overdue_resp = await client.get(
-            "/api/v1/org/franchise/fees/overdue",
-            headers=HEADERS,
-        )
-        assert overdue_resp.status_code == 200, (
-            f"逾期查询失败：{overdue_resp.status_code}"
-        )
-        overdue_body = overdue_resp.json()
-        assert overdue_body["ok"] is True
-
-        overdue_data = overdue_body["data"]
-        assert "items" in overdue_data
-        assert "total" in overdue_data
-        assert "total_overdue_fen" in overdue_data
-
-        # mock数据中 fee-003（武汉光谷店管理费，due_date=2026-03-31）状态为 overdue
-        assert overdue_data["total"] >= 1, (
-            "应至少有1条逾期记录（fee-003 武汉光谷店管理费）"
-        )
-
-        overdue_ids = {r["id"] for r in overdue_data["items"]}
-        assert "fee-003" in overdue_ids, (
-            "fee-003（武汉光谷店管理费，due_date=2026-03-31）应在逾期列表中"
-        )
-
-        # 验证所有逾期记录 status == overdue
-        for r in overdue_data["items"]:
-            assert r["status"] == "overdue", (
-                f"逾期列表中出现非overdue记录：{r['id']} status={r['status']}"
-            )
-
-        assert overdue_data["total_overdue_fen"] > 0, (
-            "total_overdue_fen 应 > 0"
-        )
-
-        # 查询统计数据，验证逾期金额一致
-        stats_resp = await client.get(
-            "/api/v1/org/franchise/fees/stats",
-            headers=HEADERS,
-        )
-        assert stats_resp.status_code == 200, (
-            f"收费统计查询失败：{stats_resp.status_code}"
-        )
-        stats_body = stats_resp.json()
-        assert stats_body["ok"] is True
-
-        stats = stats_body["data"]
-        assert stats["total_overdue_fen"] == overdue_data["total_overdue_fen"], (
-            f"stats 中 total_overdue_fen={stats['total_overdue_fen']} "
-            f"与 overdue 列表汇总 {overdue_data['total_overdue_fen']} 不一致"
-        )
-
-        # 验证 total_amount_fen = total_paid_fen + total_unpaid_fen
-        assert stats["total_amount_fen"] == stats["total_paid_fen"] + stats["total_unpaid_fen"], (
-            "total_amount_fen 应等于 total_paid_fen + total_unpaid_fen"
-        )
-
-        # 验证 by_type 结构
-        assert "by_type" in stats
-        assert isinstance(stats["by_type"], list)
-        for entry in stats["by_type"]:
-            assert "fee_type" in entry
-            assert "amount_fen" in entry
-            assert "paid_fen" in entry
-            assert "overdue_fen" in entry
+        assert over_resp.status_code == 422

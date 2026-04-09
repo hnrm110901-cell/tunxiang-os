@@ -142,6 +142,10 @@ export const MENU_CONFIGS: Record<string, MenuConfig> = {
         { id: 'revenue-optimize', label: '收益优化看板', icon: '💡', path: '/hq/analytics/revenue-optimize' },
         { id: 'table-turnover', label: '翻台率分析', icon: '🔄', path: '/hq/analytics/table-turnover' },
       ]},
+      { label: '经营洞察', items: [
+        { id: 'store-insights', label: '门店经营洞察', icon: '🏪', path: '/hq/insights/stores' },
+        { id: 'period-analysis', label: '餐段分析', icon: '🕐', path: '/hq/insights/periods' },
+      ]},
     ],
   },
   growth: {

@@ -27,11 +27,19 @@ from .api.report_config_routes import router as report_config_router
 from .api.narrative_enhanced_routes import router as narrative_enhanced_router  # P3-02
 from .api.nlq_routes import router as nlq_router
 from .api.anomaly_routes import router as anomaly_router
+from .api.seed_loader import load_p0_seeds
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     scheduler = get_etl_scheduler()
     scheduler.start()
+    # 幂等加载 P0 报表种子数据
+    try:
+        await load_p0_seeds()
+    except ConnectionRefusedError:
+        logger.warning("p0_seed_load_skipped", reason="DB not available")
+    except OSError as exc:
+        logger.warning("p0_seed_load_skipped", reason=str(exc))
     logger.info("tx_analytics_started", etl_scheduler="running")
     yield
     scheduler.shutdown()

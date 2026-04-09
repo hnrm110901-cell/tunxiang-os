@@ -76,6 +76,7 @@ import { CrewMyCompliancePage } from './pages/hr/CrewMyCompliancePage';
 // ─── Phase 3: 店长工作台 ─────────────────────────────────────────────────────
 import { OpeningChecklistPage } from './pages/manager/OpeningChecklistPage';
 import { ClosingChecklistPage } from './pages/manager/ClosingChecklistPage';
+import { DailyBriefPage } from './pages/manager/DailyBriefPage';
 
 const tabs = [
   { path: '/tables',   label: '桌台',   icon: 'T' },
@@ -198,6 +199,7 @@ export default function App() {
           {/* ─── Phase 3: 店长工作台 ─── */}
           <Route path="/manager/opening-checklist" element={<OpeningChecklistPage />} />
           <Route path="/manager/closing-checklist" element={<ClosingChecklistPage />} />
+          <Route path="/manager/daily-brief" element={<DailyBriefPage />} />
           {/* 催菜/加菜流程 */}
           <Route path="/urge" element={<UrgePage />} />
           {/* 排班查看（Tab页） */}

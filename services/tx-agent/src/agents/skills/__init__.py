@@ -33,6 +33,12 @@ from .smart_service import SmartServiceAgent
 from .store_inspect import StoreInspectAgent
 from .trend_discovery import TrendDiscoveryAgent
 
+# 专项运营Agent (Phase 6)
+from .billing_anomaly import BillingAnomalyAgent
+from .closing_agent import ClosingAgent
+from .kitchen_overtime import KitchenOvertimeAgent
+from .queue_seating import QueueSeatingAgent
+
 # 语音点菜 + AI服务员
 from .voice_order import VoiceOrderAgent
 
@@ -71,4 +77,9 @@ ALL_SKILL_AGENTS = [
     # HR Agent (人力Agent)
     ComplianceAlertAgent,
     SalaryAdvisorAgent,
+    # 专项运营Agent (Phase 6)
+    QueueSeatingAgent,
+    KitchenOvertimeAgent,
+    BillingAnomalyAgent,
+    ClosingAgent,
 ]
