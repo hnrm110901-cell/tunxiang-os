@@ -304,10 +304,12 @@ async def list_calling(
     """获取待叫号/叫号中列表，按创建时间升序排列。"""
     tenant_id = _get_tenant_id(request)  # type: ignore[arg-type]
 
+    params: dict = {"tenant_id": tenant_id, "store_id": store_id, "limit": limit}
     if status == "all":
         where_status = "status IN ('pending', 'calling')"
     elif status in ("pending", "calling"):
-        where_status = f"status = '{status}'"
+        where_status = "status = :status"
+        params["status"] = status
     else:
         _err("status 参数必须是 pending / calling / all")
         return {}
@@ -324,7 +326,7 @@ async def list_calling(
             LIMIT :limit
             """
         ),
-        {"tenant_id": tenant_id, "store_id": store_id, "limit": limit},
+        params,
     )
     items = [dict(row) for row in rows.mappings()]
 
