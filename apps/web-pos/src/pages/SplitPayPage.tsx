@@ -4,7 +4,7 @@
  */
 import { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useOrderStore, type OrderItem } from '../store/orderStore';
+import { useOrderStore } from '../store/orderStore';
 import { createPayment } from '../api/tradeApi';
 
 const fen2yuan = (fen: number) => `¥${(fen / 100).toFixed(2)}`;

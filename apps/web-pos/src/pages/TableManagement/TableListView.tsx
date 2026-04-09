@@ -5,8 +5,8 @@
  */
 
 import React, { useMemo, useCallback } from 'react';
-import { Table, Tag, Collapse, Row, Col, Spin } from 'antd';
-import type { ColumnsType, TableProps } from 'antd/es/table';
+import { Table, Tag, Collapse, Spin } from 'antd';
+import type { ColumnsType } from 'antd/es/table';
 import {
   CardField,
   TableCardData,

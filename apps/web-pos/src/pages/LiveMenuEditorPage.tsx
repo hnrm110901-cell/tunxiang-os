@@ -26,6 +26,7 @@ interface InventoryWatchItem {
   dish_id: string;
   dish_name: string;
   ingredient_name: string;
+  ingredient_id?: string;
   estimated_servings: number;
   is_auto_soldout: boolean;
   is_low_stock: boolean;
@@ -41,9 +42,9 @@ interface EditState {
 
 // ─── 常量 ───
 
-const API_BASE: string = (window as Record<string, unknown>).__STORE_API_BASE__ as string || '';
-const STORE_ID: string = (window as Record<string, unknown>).__STORE_ID__ as string || '';
-const TENANT_ID: string = (window as Record<string, unknown>).__TENANT_ID__ as string || '';
+const API_BASE: string = (window as unknown as Record<string, unknown>).__STORE_API_BASE__ as string || '';
+const STORE_ID: string = (window as unknown as Record<string, unknown>).__STORE_ID__ as string || '';
+const TENANT_ID: string = (window as unknown as Record<string, unknown>).__TENANT_ID__ as string || '';
 
 const CATEGORIES = ['全部', '热菜', '凉菜', '主食', '饮品'];
 
@@ -358,7 +359,7 @@ interface DishRowProps {
   onRestoreFromInventory: (dishId: string) => Promise<void>;
 }
 
-function DishRow({ dish, selected, onSelect, expanded, onEdit, onQuickToggle, onSave, saving, inventoryItem, loadingInventory, onRestoreFromInventory }: DishRowProps) {
+function DishRow({ dish, selected, onSelect, expanded, onEdit, onQuickToggle, onSave, saving, inventoryItem, loadingInventory, onRestoreFromInventory: _onRestoreFromInventory }: DishRowProps) {
   const remaining = dish.daily_limit !== null ? dish.daily_limit - dish.sold_today : null;
 
   // 判断是否因缺货自动下架（仅显示"等待食材"而非普通恢复按钮）

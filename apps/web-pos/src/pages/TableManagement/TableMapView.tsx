@@ -9,7 +9,6 @@ import { Spin, Tag } from 'antd';
 import {
   TableCardData,
   TableStatus,
-  TableLayout,
   CardField,
 } from '../../types/table-card';
 import { useTableStore } from '../../stores/tableStore';
@@ -65,7 +64,7 @@ const MapCanvas: React.FC<{
   width: number;
   height: number;
   onTableClick: (table: TableCardData, field: CardField) => void;
-}> = ({ tables, storeId, width, height, onTableClick }) => {
+}> = ({ tables, storeId: _storeId, width, height, onTableClick }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
 
@@ -74,10 +73,10 @@ const MapCanvas: React.FC<{
   const [tooltipPos, setTooltipPos] = React.useState<{ x: number; y: number } | null>(null);
 
   // è®¡ç®ç¼©æ¾å å­ï¼å°ç¾åæ¯åæ è½¬æ¢ä¸ºåç´ ï¼
-  const scale = {
+  const _scale = {
     x: width / 100,
     y: height / 100,
-  };
+  }; void _scale;
 
   const padding = 40;
   const drawableWidth = width - padding * 2;

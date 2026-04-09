@@ -6,6 +6,41 @@
 
 ## 2026-04-07
 
+### 今日完成
+- [web-admin] Sprint 1 运营指挥官基础层：AgentHubPage、AgentCommandCenterPage、AgentActionLog、FloorMapPage右侧面板、QueuePage AI叫号、TablesView脉冲动画+催单badge、AgentAlertBar、SidebarHQ agent模块、App.tsx路由
+- [web-pos] Sprint 2 菜品智能体+客户大脑：DishRecommendBanner、CustomerBrainPanel、MemberQuickCard、DishTimePrediction、OrderPage/SettlePage/OmniChannelOrders/MemberInsightCard增强
+- [web-admin] Sprint 3 经营分析师+收益优化师：NLQueryPage、AIDailyBriefPage、RevenueOptimizePage、CustomerBrainPage、NLQChatPanel、AskAgentFloat、OpsDashboardPage预警、Customer360 AI洞察Tab
+- [web-admin] Sprint 4 供应链卫士+Agent市场：ProcurementSuggestionPage、WastageAnalysisPage、DemandForecastPage、AgentMarketplacePage、AgentSettingsPage、AnomalyDetectionPage、TableTurnoverPage、DishAgentDashboardPage
+- [tx-agent] 新增 agent_hub_routes.py（6核心Agent状态BFF，5端点：status/actions/confirm/dismiss/log）
+- [tx-analytics] 新增 nlq_routes.py（自然语言问数骨架）、anomaly_routes.py（经营异常检测分级）
+- [gateway] 新增15个子域路由映射（agent-hub/nlq/anomaly/store-analysis/procurement-recommend等）
+- [db-migrations] v205_agent_decision_logs_status：agent_decision_logs 补充 status + action 列
+- [web-admin/web-pos/web-crew] TypeScript 编译：web-admin 417→4错误（已知遗留）；web-pos 168→0；web-crew 20→0
+- [web-admin] AgentHubPage + AgentActionLog 接入真实 /api/v1/agent-hub/* API
+
+### 数据变化
+- 迁移版本：v204 → v205
+- 新增 API 模块：5个（agent-hub×5端点、nlq×3端点、anomaly×4端点）
+- 新增前端页面：19个（Admin×15 + POS组件×4）
+- 新增前端组件：7个（NLQChatPanel/AskAgentFloat/AgentActionLog/AgentAlertBar/DishRecommendBanner/CustomerBrainPanel/MemberQuickCard/DishTimePrediction）
+- Admin页面总数：237 → 256
+
+### 遗留问题
+- web-admin LoginPage（2错误）+ CampaignPage（2错误）预存语法错误待修复
+- NLQueryPage / AIDailyBriefPage / CustomerBrainPage 前端仍使用 mock 数据，待接入真实 API
+- nlq_routes.py 骨架待 tx-brain reasoning_engine 完整集成
+
+### 明日计划
+- 接入 AIDailyBriefPage → /api/v1/daily-review/today
+- 接入 CustomerBrainPage → /api/v1/segmentation（RFM数据）
+- 接入 ProcurementSuggestionPage → /api/v1/procurement-recommend/recommend/{store_id}
+- 接入 AnomalyDetectionPage → /api/v1/anomaly/today
+- 完善 nlq_routes.py → 集成 tx-brain reasoning_engine
+
+---
+
+## 2026-04-07
+
 ### 今日完成：SCRM8差距补齐 + 全量测试覆盖
 
 **天财商龙SCRM8对标分析:**

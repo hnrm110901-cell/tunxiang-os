@@ -5,6 +5,7 @@
  * 30秒自动轮询
  */
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { Alert, Button } from 'antd';
 import { TxLineChart } from '../../../components/charts';
 import { txFetch } from '../../../api';
 
@@ -115,6 +116,16 @@ export function OpsDashboardPage() {
 
   return (
     <div>
+      {/* AI 预警条 */}
+      <Alert
+        type="warning"
+        showIcon
+        banner
+        message="🤖 tx-ops 运营指挥官：福田中心店午市翻台率低于目标 23%，建议立即查看并调整排班"
+        action={<Button size="small" type="primary" style={{ background: '#FF6B35', border: 'none' }}>查看建议</Button>}
+        style={{ marginBottom: 16 }}
+        closable
+      />
       {/* 标题行 */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>

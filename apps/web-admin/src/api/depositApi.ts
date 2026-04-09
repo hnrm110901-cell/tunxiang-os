@@ -177,3 +177,23 @@ export async function getDepositAging(storeId: string): Promise<DepositAgingItem
     `/api/v1/deposits/report/aging?store_id=${encodeURIComponent(storeId)}`,
   );
 }
+
+export interface DepositShiftSummary {
+  store_id: string;
+  shift_date: string;
+  received_count: number;
+  received_fen: number;
+  refunded_count: number;
+  refunded_fen: number;
+  net_fen: number;
+}
+
+/** 获取结班押金汇总 */
+export async function getDepositShiftSummary(
+  storeId: string,
+  shiftDate: string,
+): Promise<DepositShiftSummary> {
+  return txFetchData<DepositShiftSummary>(
+    `/api/v1/deposits/report/shift-summary?store_id=${encodeURIComponent(storeId)}&shift_date=${encodeURIComponent(shiftDate)}`,
+  );
+}

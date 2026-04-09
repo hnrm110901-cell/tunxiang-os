@@ -33,6 +33,7 @@ class ReportCategory(str, Enum):
     MEMBER = "member"
     SUPPLY = "supply"
     OPERATION = "operation"
+    HR = "hr"
 
 
 class ExportFormat(str, Enum):

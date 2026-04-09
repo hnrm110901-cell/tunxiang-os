@@ -88,7 +88,7 @@ const fenToYuan = (fen: number): string => (fen / 100).toFixed(2);
 const getTenantId = (): string =>
   localStorage.getItem('tx_tenant_id') ?? '';
 
-const apiRequest = async <T>(
+const apiRequest = async <T,>(
   path: string,
   options: RequestInit = {},
 ): Promise<T> => {

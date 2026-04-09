@@ -147,7 +147,7 @@ const MOCK_ORDERS: Order[] = Array.from({ length: 20 }, (_, i) => ({
 /* ─────────────────────────────────────────
    打印工具
 ───────────────────────────────────────── */
-const TENANT_ID = (window as Record<string, unknown>).__TENANT_ID__ as string | undefined || '';
+const TENANT_ID = (window as unknown as Record<string, unknown>).__TENANT_ID__ as string | undefined || '';
 
 function buildPrintText(shift: ShiftInfo, report: ShiftReport, orders: Order[]): string {
   const line  = (s = '')   => s.padEnd(40, ' ');
@@ -219,7 +219,7 @@ function buildPrintText(shift: ShiftInfo, report: ShiftReport, orders: Order[]):
 }
 
 async function callPrint(content: string): Promise<void> {
-  const w = window as Record<string, unknown>;
+  const w = window as unknown as Record<string, unknown>;
   if (typeof w.TXBridge === 'object' && w.TXBridge !== null) {
     const bridge = w.TXBridge as { print?: (s: string) => void };
     if (typeof bridge.print === 'function') {

@@ -7,12 +7,13 @@ const MODULES = [
   { id: 'dashboard', icon: '📊', label: '驾驶舱' },
   { id: 'trade', icon: '💰', label: '交易' },
   { id: 'menu', icon: '🍽️', label: '菜品' },
+  { id: 'store', icon: '🏬', label: '门店' },
   { id: 'member', icon: '👥', label: '会员' },
-  { id: 'supply', icon: '📦', label: '供应链' },
+  { id: 'growth', icon: '🚀', label: '增长' },
+  { id: 'ops', icon: '🎯', label: '经营' },
+  { id: 'analytics', icon: '📈', label: '分析' },
   { id: 'finance', icon: '💹', label: '财务' },
   { id: 'org', icon: '🏢', label: '组织' },
-  { id: 'analytics', icon: '📈', label: '分析' },
-  { id: 'ops', icon: '🎯', label: '经营' },
   { id: 'agent', icon: '🤖', label: 'Agent' },
 ];
 

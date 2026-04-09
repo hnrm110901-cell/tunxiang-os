@@ -28,14 +28,28 @@ import { MenuBoardControlPage } from './pages/MenuBoardControlPage';
 import { BarCounterPage } from './pages/BarCounterPage';
 import { QuickShiftReportPage } from './pages/QuickShiftReportPage';
 import FoodCourtPage from './pages/FoodCourtPage';  // TC-P2-12 智慧商街档口收银
+import { OmniChannelOrders } from './pages/OmniChannelOrders';  // 外卖聚合接单
+import { TrainingModePage } from './pages/TrainingModePage';
+import { TrainingModeBanner } from './components/TrainingModeBanner';
+import { useTrainingMode } from './hooks/useTrainingMode';
 
 const STORE_ID: string =
   (window as unknown as Record<string, unknown>).__STORE_ID__ as string || '';
 
 /** 内层布局组件（必须在 BrowserRouter 内，InventoryAlertBanner 需要 useNavigate） */
 function AppLayout() {
+  const { isTrainingMode, currentScenario, startedAt, exitTrainingMode } = useTrainingMode();
+
   return (
     <div style={{ minHeight: '100vh', background: '#111827' }}>
+      {/* 训练模式橙色横幅 — 训练模式激活时固定在顶部 */}
+      {isTrainingMode && (
+        <TrainingModeBanner
+          scenarioLabel={currentScenario?.label ?? null}
+          startedAt={startedAt}
+          onExit={exitTrainingMode}
+        />
+      )}
       {/* 全局库存预警横幅 — 每60秒轮询，有预警才显示 */}
       <InventoryAlertBanner storeId={STORE_ID} />
 
@@ -74,6 +88,10 @@ function AppLayout() {
         <Route path="/quick/shift-report" element={<QuickShiftReportPage />} />
         {/* ─── TC-P2-12: 美食广场档口收银 ─── */}
         <Route path="/food-court" element={<FoodCourtPage />} />
+        {/* ─── Phase 2B: 外卖聚合接单 ─── */}
+        <Route path="/delivery" element={<OmniChannelOrders />} />
+        {/* ─── 训练/演示模式入口 ─── */}
+        <Route path="/training" element={<TrainingModePage />} />
       </Routes>
     </div>
   );

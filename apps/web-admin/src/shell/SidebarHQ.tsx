@@ -3,19 +3,12 @@
  * 决策4：菜单配置引擎驱动，不写死
  */
 import { useState } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { getTokenPayload } from '../api/client';
+import { MENU_CONFIGS } from '../config/menuConfigs';
 
-// 菜单配置引擎的数据结构（决策4）
-interface MenuConfig {
-  moduleId: string;
-  groups: {
-    label: string;
-    items: { id: string; label: string; icon: string; count?: number; path: string }[];
-  }[];
-}
-
-// 动态菜单配置（从后端加载，此处 demo 数据）
-const MENU_CONFIGS: Record<string, MenuConfig> = {
+// ─── MENU_CONFIGS 已提取到 config/menuConfigs.ts ───
+const _UNUSED = {
   dashboard: {
     moduleId: 'dashboard', groups: [
       { label: '总览', items: [
@@ -29,33 +22,88 @@ const MENU_CONFIGS: Record<string, MenuConfig> = {
   trade: {
     moduleId: 'trade', groups: [
       { label: '交易管理', items: [
-        { id: 'orders', label: '订单列表', icon: '📋', count: 12, path: '/trade/orders' },
-        { id: 'payments', label: '支付记录', icon: '💳', path: '/trade/payments' },
-        { id: 'settlements', label: '日结/班结', icon: '📑', path: '/trade/settlements' },
-        { id: 'refunds', label: '退款管理', icon: '↩️', path: '/trade/refunds' },
+        { id: 'orders', label: '订单列表', icon: '📋', count: 12, path: '/hq/trade/orders' },
+        { id: 'payments', label: '支付记录', icon: '💳', path: '/hq/trade/payments' },
+        { id: 'settlements', label: '日结/班结', icon: '📑', path: '/hq/trade/settlements' },
+        { id: 'refunds', label: '退款管理', icon: '↩️', path: '/hq/trade/refunds' },
       ]},
       { label: '外卖', items: [
         { id: 'delivery', label: '外卖聚合', icon: '🛵', count: 0, path: '/hq/trade/delivery' },
+      ]},
+      { label: '预定/宴席', items: [
+        { id: 'reservations', label: '预定管理', icon: '📅', path: '/hq/reservations' },
+        { id: 'banquets', label: '宴席管理', icon: '🥂', path: '/hq/trade/banquets' },
       ]},
     ],
   },
   menu: {
     moduleId: 'menu', groups: [
-      { label: '菜品', items: [
-        { id: 'dish-list', label: '菜品列表', icon: '🍜', path: '/menu/dishes' },
-        { id: 'categories', label: '分类管理', icon: '📂', path: '/menu/categories' },
-        { id: 'bom', label: 'BOM 配方', icon: '📐', path: '/menu/bom' },
-        { id: 'ranking', label: '菜单排名', icon: '🏆', path: '/menu/ranking' },
-        { id: 'pricing', label: '定价仿真', icon: '💲', path: '/menu/pricing' },
+      { label: '菜品管理', items: [
+        { id: 'dish-list', label: '菜品列表', icon: '🍜', path: '/hq/menu/dishes' },
+        { id: 'categories', label: '分类管理', icon: '📂', path: '/hq/menu/categories' },
+        { id: 'specs', label: '规格/做法', icon: '🔧', path: '/hq/menu/specs' },
+        { id: 'packages', label: '套餐组合', icon: '📦', path: '/hq/menu/packages' },
+        { id: 'pricing', label: '价格版本', icon: '💲', path: '/hq/menu/pricing' },
+      ]},
+      { label: '菜品分析', items: [
+        { id: 'ranking', label: '菜品排名', icon: '🏆', path: '/hq/menu/ranking' },
+        { id: 'bom', label: 'BOM 配方', icon: '📐', path: '/hq/menu/bom' },
       ]},
       { label: 'AI 决策', items: [
-        { id: 'menu-optimize',    label: 'AI排菜建议',    icon: '🧠', path: '/menu/optimize'          },
+        { id: 'menu-optimize',    label: 'AI排菜建议',    icon: '🧠', path: '/hq/menu/optimize'          },
         { id: 'dish-agent',       label: '菜品智能体看板', icon: '🍳', path: '/hq/menu/dish-agent'     },
         { id: 'kitchen-schedule', label: '厨房排班建议',   icon: '👨‍🍳', path: '/hq/menu/kitchen-schedule' },
       ]},
       { label: '研发', items: [
-        { id: 'new-dish', label: '新菜研发', icon: '🧪', path: '/menu/rd' },
-        { id: 'quality', label: '质量检测', icon: '✅', path: '/menu/quality' },
+        { id: 'new-dish', label: '新菜研发', icon: '🧪', path: '/hq/menu/rd' },
+        { id: 'quality', label: '质量检测', icon: '✅', path: '/hq/menu/quality' },
+      ]},
+    ],
+  },
+  store: {
+    moduleId: 'store', groups: [
+      { label: '组织与主体', items: [
+        { id: 'stores', label: '门店管理', icon: '🏪', path: '/hq/org/stores' },
+        { id: 'brands', label: '品牌管理', icon: '🏷️', path: '/hq/org/brands' },
+        { id: 'regions', label: '区域管理', icon: '🗺️', path: '/hq/org/regions' },
+      ]},
+      { label: '桌台与出品', items: [
+        { id: 'floor-tables', label: '桌台配置', icon: '🪑', path: '/hq/floor/tables' },
+        { id: 'kitchen-stations', label: '档口配置', icon: '👨‍🍳', path: '/hq/kitchen/stations' },
+        { id: 'print-rules', label: '打印方案', icon: '🖨️', path: '/hq/print/rules' },
+        { id: 'kds-dispatch', label: '出品路由', icon: '🔀', path: '/hq/kds/dispatch' },
+      ]},
+      { label: '营业规则', items: [
+        { id: 'business-day', label: '营业日配置', icon: '📅', path: '/hq/business-day/config' },
+        { id: 'shifts', label: '班次配置', icon: '🕐', path: '/hq/shifts/config' },
+        { id: 'payment-channels', label: '支付渠道', icon: '💳', path: '/hq/payments/channels' },
+        { id: 'billing-rules', label: '折扣/抹零规则', icon: '🧮', path: '/hq/billing/rules' },
+        { id: 'invoice-rules', label: '发票规则', icon: '🧾', path: '/hq/invoice/rules' },
+      ]},
+      { label: '人员与权限', items: [
+        { id: 'roles', label: '角色权限', icon: '🔐', path: '/hq/iam/roles' },
+        { id: 'staff', label: '员工档案', icon: '👤', path: '/hq/iam/staff' },
+      ]},
+      { label: '事件与任务', items: [
+        { id: 'tasks', label: '任务中心', icon: '📋', path: '/hq/tasks' },
+        { id: 'events', label: '事件中心', icon: '🔔', path: '/hq/events' },
+        { id: 'audit-logs', label: '审计日志', icon: '📜', path: '/hq/audit/logs' },
+      ]},
+    ],
+  },
+  member: {
+    moduleId: 'member', groups: [
+      { label: '会员管理', items: [
+        { id: 'member-list', label: '会员档案', icon: '👥', path: '/hq/members' },
+        { id: 'member-tags', label: '偏好标签', icon: '🏷️', path: '/hq/members/tags' },
+        { id: 'consumption', label: '消费记录', icon: '📊', path: '/hq/members/consumption' },
+      ]},
+      { label: '企业客户', items: [
+        { id: 'corporate', label: '协议单位', icon: '🏢', path: '/hq/corporate-accounts' },
+      ]},
+      { label: '轻营销', items: [
+        { id: 'coupons', label: '券核销', icon: '🎫', path: '/hq/members/coupons' },
+        { id: 'campaigns', label: '营销活动', icon: '📣', path: '/hq/members/campaigns' },
       ]},
     ],
   },
@@ -153,14 +201,14 @@ const MENU_CONFIGS: Record<string, MenuConfig> = {
   org: {
     moduleId: 'org', groups: [
       { label: '组织管理', items: [
-        { id: 'hr-dashboard', label: '人力管理',     icon: '👥', path: '/hq/org/hr'          },
-        { id: 'franchise',    label: '加盟管理',     icon: '🏪', path: '/franchise-dashboard' },
+        { id: 'hr-dashboard', label: '人力中枢',     icon: '👥', path: '/hq/org/hr'          },
+        { id: 'franchise',    label: '加盟管理',     icon: '🏪', path: '/hq/org/franchise' },
       ]},
       { label: '人事管理', items: [
-        { id: 'payroll-configs',  label: '薪资方案配置', icon: '⚙️', path: '/org/payroll-configs'  },
-        { id: 'payroll-records',  label: '月度薪资管理', icon: '💴', path: '/org/payroll-records'  },
-        { id: 'payroll-manage',   label: '薪资总览',     icon: '📋', path: '/payroll-manage'        },
-        { id: 'attendance',       label: '考勤管理',     icon: '🕐', path: '/org/attendance'        },
+        { id: 'payroll-configs',  label: '薪资方案配置', icon: '⚙️', path: '/hq/org/payroll-configs'  },
+        { id: 'payroll-records',  label: '月度薪资管理', icon: '💴', path: '/hq/org/payroll-records'  },
+        { id: 'payroll-manage',   label: '薪资总览',     icon: '📋', path: '/hq/org/payroll-manage'   },
+        { id: 'attendance',       label: '考勤管理',     icon: '🕐', path: '/hq/org/attendance'       },
       ]},
     ],
   },
@@ -226,6 +274,8 @@ interface SidebarHQProps {
 
 export function SidebarHQ({ activeModule }: SidebarHQProps) {
   const [search, setSearch] = useState('');
+  const navigate = useNavigate();
+  const location = useLocation();
   const config = MENU_CONFIGS[activeModule] || MENU_CONFIGS.dashboard;
 
   return (
@@ -266,31 +316,38 @@ export function SidebarHQ({ activeModule }: SidebarHQProps) {
             </div>
             {group.items
               .filter((item) => !search || item.label.includes(search))
-              .map((item) => (
-                <div
-                  key={item.id}
-                  style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    padding: '7px 10px', borderRadius: 8, cursor: 'pointer', fontSize: 13,
-                    transition: 'background var(--duration-fast, .15s)',
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-2, #1a2a33)')}
-                  onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-                >
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 14 }}>{item.icon}</span>
-                    {item.label}
-                  </span>
-                  {item.count != null && (
-                    <span style={{
-                      fontSize: 10, padding: '1px 6px', borderRadius: 10,
-                      background: 'var(--brand-bg)', color: 'var(--brand)',
-                    }}>
-                      {item.count}
+              .map((item) => {
+                const isActive = location.pathname === item.path || location.pathname.startsWith(item.path + '/');
+                return (
+                  <div
+                    key={item.id}
+                    onClick={() => navigate(item.path)}
+                    style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      padding: '7px 10px', borderRadius: 8, cursor: 'pointer', fontSize: 13,
+                      transition: 'background var(--duration-fast, .15s)',
+                      background: isActive ? 'var(--brand-bg, rgba(255,107,44,0.12))' : 'transparent',
+                      color: isActive ? 'var(--brand, #FF6B35)' : 'inherit',
+                      fontWeight: isActive ? 600 : 400,
+                    }}
+                    onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.background = 'var(--bg-2, #1a2a33)'; }}
+                    onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.background = 'transparent'; }}
+                  >
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: 14 }}>{item.icon}</span>
+                      {item.label}
                     </span>
-                  )}
-                </div>
-              ))}
+                    {item.count != null && (
+                      <span style={{
+                        fontSize: 10, padding: '1px 6px', borderRadius: 10,
+                        background: 'var(--brand-bg)', color: 'var(--brand)',
+                      }}>
+                        {item.count}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
           </div>
         ))}
       </div>

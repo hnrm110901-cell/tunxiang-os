@@ -40,7 +40,7 @@ const INITIAL_DISHES: Dish[] = [
 const ALL_CATEGORIES = ['全部', '海鲜', '家常菜', '汤品', '主食', '甜品'] as const;
 
 // ── API（乐观更新，失败时Mock成功）──────────────────────────
-const STORE_ID = (window as Record<string, unknown>).__STORE_ID__ as string || 'demo';
+const STORE_ID = (window as unknown as Record<string, unknown>).__STORE_ID__ as string || 'demo';
 
 async function apiMarkSoldout(id: string, reason: string): Promise<void> {
   try {

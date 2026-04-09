@@ -4,6 +4,7 @@
  * 深色主题，与 EventBusHealthPage 风格一致
  */
 import { useEffect, useState, useCallback } from 'react';
+import { Alert, Button } from 'antd';
 import { txFetch } from '../../../api';
 
 // ─── 类型定义 ───
@@ -280,6 +281,15 @@ export function InventoryIntelPage() {
 
   return (
     <div style={{ padding: 24, minHeight: '100vh', background: '#0d1e28', color: '#fff' }}>
+      <Alert
+        type="warning"
+        showIcon
+        banner
+        message="🛡️ tx-supply 供应链卫士：濑尿虾库存异常消耗，预计今日14:30沽清；鲍鱼临期3天，建议优先出餐"
+        action={<Button size="small" style={{background:'#FF6B35',color:'white',border:'none'}}>查看采购建议</Button>}
+        style={{marginBottom: 16}}
+        closable
+      />
 
       {/* ── 页头 ── */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>

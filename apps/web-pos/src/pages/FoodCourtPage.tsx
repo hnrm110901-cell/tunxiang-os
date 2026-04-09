@@ -544,7 +544,7 @@ export default function FoodCourtPage() {
     });
   }, [selectedOutletId, selectedOutlet]);
 
-  const handleCheckout = useCallback((method: string, tendered?: number) => {
+  const handleCheckout = useCallback((method: string, _tendered?: number) => {
     if (totalFen === 0) return;
     const orderId = `FC-${Date.now().toString().slice(-6)}`;
     setPaidOrders((prev) => [{

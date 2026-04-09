@@ -44,9 +44,9 @@ interface AnalysisData {
 
 // ─── 常量 ───
 
-const API_BASE: string = (window as Record<string, unknown>).__STORE_API_BASE__ as string || '';
-const STORE_ID: string = (window as Record<string, unknown>).__STORE_ID__ as string || '';
-const TENANT_ID: string = (window as Record<string, unknown>).__TENANT_ID__ as string || '';
+const API_BASE: string = (window as unknown as Record<string, unknown>).__STORE_API_BASE__ as string || '';
+const STORE_ID: string = (window as unknown as Record<string, unknown>).__STORE_ID__ as string || '';
+const TENANT_ID: string = (window as unknown as Record<string, unknown>).__TENANT_ID__ as string || '';
 
 const PERIOD_LABELS: Record<Period, string> = {
   today: '今天',

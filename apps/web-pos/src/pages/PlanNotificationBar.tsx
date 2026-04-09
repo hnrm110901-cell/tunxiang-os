@@ -12,7 +12,7 @@ const BG_EXPAND = '#0B1A20';
 const TEXT_1 = '#ffffff';
 const TEXT_2 = '#cccccc';
 const TEXT_3 = '#999999';
-const GREEN = '#52c41a';
+// const GREEN = '#52c41a'; // reserved for future use
 const YELLOW = '#faad14';
 const RED = '#ff4d4f';
 
