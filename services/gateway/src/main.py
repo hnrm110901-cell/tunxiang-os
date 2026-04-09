@@ -155,15 +155,11 @@ app.add_middleware(
 # 认证 API（必须在 proxy 之前注册，否则被通配路由拦截）
 app.include_router(auth_router)
 
-app.include_router(auth_router)
 app.include_router(hub_router)
 app.include_router(relay_router)
 
 # 开放 API（ISV 应用 + OAuth2 client_credentials；依赖 DB 未配置时相关端点返回 503）
 app.include_router(open_api_router)
-
-# 情报→增长自动接力 API
-app.include_router(relay_router)
 
 # 企业微信回调 API
 app.include_router(wecom_router)
