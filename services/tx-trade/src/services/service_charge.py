@@ -2,20 +2,17 @@
 
 服务费计入订单总额但不算菜品收入。
 支持总部模板下发到门店。
+全部走真实DB（service_charge_configs / service_charge_templates 表）。
 """
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
 import structlog
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = structlog.get_logger()
-
-# ─── 内存存储（mock） ───
-
-_charge_configs: dict[str, dict] = {}  # key: f"{store_id}:{tenant_id}"
-_charge_templates: dict[str, dict] = {}  # key: template_id
-_charge_records: dict[str, dict] = {}  # key: charge_id
 
 
 class ChargeMode:
@@ -28,55 +25,90 @@ class ChargeMode:
 async def get_charge_config(
     store_id: str,
     tenant_id: str,
-    db=None,
+    db: Optional[AsyncSession] = None,
 ) -> Optional[dict]:
     """获取门店服务费配置"""
-    key = f"{store_id}:{tenant_id}"
-    config = _charge_configs.get(key)
-    logger.info(
-        "charge_config_queried",
-        store_id=store_id,
-        tenant_id=tenant_id,
-        found=config is not None,
+    if db is None:
+        return None
+
+    result = await db.execute(
+        text("""
+            SELECT id, store_id, mode, config, enabled, source_template_id,
+                   created_at, updated_at
+            FROM service_charge_configs
+            WHERE tenant_id = :tenant_id AND store_id = :store_id::UUID
+              AND is_deleted = FALSE
+        """),
+        {"tenant_id": tenant_id, "store_id": store_id},
     )
-    return config
+    row = result.mappings().first()
+    if not row:
+        logger.info("charge_config_not_found", store_id=store_id, tenant_id=tenant_id)
+        return None
+
+    config_record = {
+        "id": str(row["id"]),
+        "store_id": str(row["store_id"]),
+        "tenant_id": tenant_id,
+        "config": {**row["config"], "mode": row["mode"], "enabled": row["enabled"]},
+        "updated_at": row["updated_at"].isoformat() if row["updated_at"] else None,
+    }
+    logger.info("charge_config_queried", store_id=store_id, tenant_id=tenant_id, found=True)
+    return config_record
 
 
 async def set_charge_config(
     store_id: str,
     config: dict,
     tenant_id: str,
-    db=None,
+    db: Optional[AsyncSession] = None,
 ) -> dict:
-    """设置门店服务费配置
+    """设置门店服务费配置（UPSERT）"""
+    if db is None:
+        raise ValueError("DB session required")
 
-    config 示例:
-    {
-        "mode": "by_person",           # by_person / by_table / by_time / by_amount
-        "charge_per_person_fen": 500,   # 按人: 每人5元
-        "room_charge_fen": 8800,        # 按桌: 包厢费88元
-        "time_unit_minutes": 30,        # 按时: 每30分钟
-        "charge_per_unit_fen": 2000,    # 按时: 每单位20元
-        "free_minutes": 120,            # 按时: 免费时长
-        "waive_above_fen": 50000,       # 按金额: 满500免服务费
-        "enabled": true
-    }
-    """
-    key = f"{store_id}:{tenant_id}"
+    now = datetime.now(timezone.utc)
+    mode = config.get("mode", ChargeMode.BY_PERSON)
+    enabled = config.get("enabled", True)
+    source_template_id = config.get("source_template_id")
+
+    result = await db.execute(
+        text("""
+            INSERT INTO service_charge_configs
+                (tenant_id, store_id, mode, config, enabled, source_template_id, updated_at)
+            VALUES
+                (:tenant_id::UUID, :store_id::UUID, :mode, :config::JSONB,
+                 :enabled, :source_template_id, :updated_at)
+            ON CONFLICT (tenant_id, store_id) WHERE is_deleted = FALSE
+            DO UPDATE SET
+                mode = EXCLUDED.mode,
+                config = EXCLUDED.config,
+                enabled = EXCLUDED.enabled,
+                source_template_id = EXCLUDED.source_template_id,
+                updated_at = EXCLUDED.updated_at
+            RETURNING id, created_at, updated_at
+        """),
+        {
+            "tenant_id": tenant_id,
+            "store_id": store_id,
+            "mode": mode,
+            "config": config,
+            "enabled": enabled,
+            "source_template_id": source_template_id,
+            "updated_at": now,
+        },
+    )
+    row = result.mappings().first()
+    await db.commit()
+
     config_record = {
-        "id": str(uuid.uuid4()),
+        "id": str(row["id"]) if row else str(uuid.uuid4()),
         "store_id": store_id,
         "tenant_id": tenant_id,
         "config": config,
-        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": now.isoformat(),
     }
-    _charge_configs[key] = config_record
-    logger.info(
-        "charge_config_set",
-        store_id=store_id,
-        tenant_id=tenant_id,
-        mode=config.get("mode"),
-    )
+    logger.info("charge_config_set", store_id=store_id, tenant_id=tenant_id, mode=mode)
     return config_record
 
 
@@ -84,25 +116,14 @@ async def calculate_service_charge(
     order_id: str,
     store_id: str,
     tenant_id: str,
-    db=None,
+    db: Optional[AsyncSession] = None,
     *,
     guest_count: int = 1,
     room_type: Optional[str] = None,
     duration_minutes: int = 0,
     order_amount_fen: int = 0,
 ) -> dict:
-    """根据门店配置自动计算服务费
-
-    返回:
-    {
-        "charge_id": str,
-        "order_id": str,
-        "mode": str,
-        "amount_fen": int,
-        "waived": bool,
-        "detail": dict
-    }
-    """
+    """根据门店配置自动计算服务费"""
     config_record = await get_charge_config(store_id, tenant_id, db)
     if not config_record or not config_record.get("config", {}).get("enabled", False):
         return {
@@ -123,10 +144,7 @@ async def calculate_service_charge(
     if mode == ChargeMode.BY_PERSON:
         charge_per_person = cfg.get("charge_per_person_fen", 0)
         amount_fen = guest_count * charge_per_person
-        detail = {
-            "guest_count": guest_count,
-            "charge_per_person_fen": charge_per_person,
-        }
+        detail = {"guest_count": guest_count, "charge_per_person_fen": charge_per_person}
 
     elif mode == ChargeMode.BY_TABLE:
         amount_fen = cfg.get("room_charge_fen", 0)
@@ -170,16 +188,11 @@ async def calculate_service_charge(
         "waived": waived,
         "detail": detail,
     }
-    _charge_records[charge_id] = result
 
     logger.info(
         "service_charge_calculated",
-        order_id=order_id,
-        store_id=store_id,
-        tenant_id=tenant_id,
-        mode=mode,
-        amount_fen=amount_fen,
-        waived=waived,
+        order_id=order_id, store_id=store_id, tenant_id=tenant_id,
+        mode=mode, amount_fen=amount_fen, waived=waived,
     )
     return result
 
@@ -188,25 +201,32 @@ async def create_charge_template(
     name: str,
     rules: dict,
     tenant_id: str,
-    db=None,
+    db: Optional[AsyncSession] = None,
 ) -> dict:
     """创建总部服务费模板"""
-    template_id = str(uuid.uuid4())
+    if db is None:
+        raise ValueError("DB session required")
+
+    result = await db.execute(
+        text("""
+            INSERT INTO service_charge_templates (tenant_id, name, rules, status)
+            VALUES (:tenant_id::UUID, :name, :rules::JSONB, 'active')
+            RETURNING id, created_at
+        """),
+        {"tenant_id": tenant_id, "name": name, "rules": rules},
+    )
+    row = result.mappings().first()
+    await db.commit()
+
     template = {
-        "id": template_id,
+        "id": str(row["id"]),
         "name": name,
         "rules": rules,
         "tenant_id": tenant_id,
-        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_at": row["created_at"].isoformat(),
         "status": "active",
     }
-    _charge_templates[template_id] = template
-    logger.info(
-        "charge_template_created",
-        template_id=template_id,
-        name=name,
-        tenant_id=tenant_id,
-    )
+    logger.info("charge_template_created", template_id=template["id"], name=name, tenant_id=tenant_id)
     return template
 
 
@@ -214,13 +234,25 @@ async def publish_template(
     template_id: str,
     store_ids: list[str],
     tenant_id: str,
-    db=None,
+    db: Optional[AsyncSession] = None,
 ) -> dict:
     """将总部模板下发到指定门店"""
-    template = _charge_templates.get(template_id)
+    if db is None:
+        raise ValueError("DB session required")
+
+    # 查模板
+    result = await db.execute(
+        text("""
+            SELECT id, name, rules, tenant_id
+            FROM service_charge_templates
+            WHERE id = :template_id::UUID AND is_deleted = FALSE
+        """),
+        {"template_id": template_id},
+    )
+    template = result.mappings().first()
     if not template:
         raise ValueError(f"Template not found: {template_id}")
-    if template["tenant_id"] != tenant_id:
+    if str(template["tenant_id"]) != tenant_id:
         raise PermissionError("Template does not belong to this tenant")
 
     published: list[str] = []
@@ -233,9 +265,7 @@ async def publish_template(
 
     logger.info(
         "charge_template_published",
-        template_id=template_id,
-        tenant_id=tenant_id,
-        store_count=len(published),
+        template_id=template_id, tenant_id=tenant_id, store_count=len(published),
     )
     return {
         "template_id": template_id,

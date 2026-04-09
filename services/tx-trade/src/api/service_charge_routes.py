@@ -5,9 +5,11 @@
 """
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from shared.ontology.src.database import get_db_with_tenant
 from ..services.service_charge import (
     calculate_service_charge,
     create_charge_template,
@@ -24,6 +26,12 @@ def _get_tenant_id(request: Request) -> str:
     if not tid:
         raise HTTPException(status_code=400, detail="X-Tenant-ID header required")
     return tid
+
+
+async def _get_tenant_db(request: Request):
+    tid = _get_tenant_id(request)
+    async for session in get_db_with_tenant(tid):
+        yield session
 
 
 def _ok(data) -> dict:
@@ -61,29 +69,42 @@ class PublishTemplateReq(BaseModel):
 
 
 @router.get("/config/{store_id}")
-async def api_get_charge_config(store_id: str, request: Request):
+async def api_get_charge_config(
+    store_id: str,
+    request: Request,
+    db: AsyncSession = Depends(_get_tenant_db),
+):
     """获取门店服务费配置"""
     tenant_id = _get_tenant_id(request)
-    config = await get_charge_config(store_id, tenant_id)
+    config = await get_charge_config(store_id, tenant_id, db)
     return _ok(config)
 
 
 @router.post("/config")
-async def api_set_charge_config(body: SetChargeConfigReq, request: Request):
+async def api_set_charge_config(
+    body: SetChargeConfigReq,
+    request: Request,
+    db: AsyncSession = Depends(_get_tenant_db),
+):
     """设置门店服务费配置"""
     tenant_id = _get_tenant_id(request)
-    result = await set_charge_config(body.store_id, body.config, tenant_id)
+    result = await set_charge_config(body.store_id, body.config, tenant_id, db)
     return _ok(result)
 
 
 @router.post("/calculate")
-async def api_calculate_charge(body: CalculateChargeReq, request: Request):
+async def api_calculate_charge(
+    body: CalculateChargeReq,
+    request: Request,
+    db: AsyncSession = Depends(_get_tenant_db),
+):
     """计算订单服务费"""
     tenant_id = _get_tenant_id(request)
     result = await calculate_service_charge(
         order_id=body.order_id,
         store_id=body.store_id,
         tenant_id=tenant_id,
+        db=db,
         guest_count=body.guest_count,
         room_type=body.room_type,
         duration_minutes=body.duration_minutes,
@@ -93,19 +114,27 @@ async def api_calculate_charge(body: CalculateChargeReq, request: Request):
 
 
 @router.post("/template")
-async def api_create_template(body: CreateTemplateReq, request: Request):
+async def api_create_template(
+    body: CreateTemplateReq,
+    request: Request,
+    db: AsyncSession = Depends(_get_tenant_db),
+):
     """创建总部服务费模板"""
     tenant_id = _get_tenant_id(request)
-    result = await create_charge_template(body.name, body.rules, tenant_id)
+    result = await create_charge_template(body.name, body.rules, tenant_id, db)
     return _ok(result)
 
 
 @router.post("/template/publish")
-async def api_publish_template(body: PublishTemplateReq, request: Request):
+async def api_publish_template(
+    body: PublishTemplateReq,
+    request: Request,
+    db: AsyncSession = Depends(_get_tenant_db),
+):
     """下发模板到门店"""
     tenant_id = _get_tenant_id(request)
     try:
-        result = await publish_template(body.template_id, body.store_ids, tenant_id)
+        result = await publish_template(body.template_id, body.store_ids, tenant_id, db)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except PermissionError as e:

@@ -1,0 +1,40 @@
+{
+  "name": "屯象OS管理直通车",
+  "short_name": "屯象直通车",
+  "description": "屯象OS移动端管理直通车 — 营业总览/门店管理/报表/设置",
+  "start_url": "/m/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#1a56db",
+  "lang": "zh-CN",
+  "icons": [
+    { "src": "/favicon.ico", "sizes": "64x64", "type": "image/x-icon" },
+    { "src": "/logo192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/logo512.png", "sizes": "512x512", "type": "image/png" }
+  ],
+  "categories": ["business", "productivity"],
+  "shortcuts": [
+    {
+      "name": "经营总览",
+      "short_name": "首页",
+      "description": "查看今日营业数据",
+      "url": "/m/home",
+      "icons": [{ "src": "/logo192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "门店管理",
+      "short_name": "门店",
+      "description": "查看门店状态和营业数据",
+      "url": "/m/stores",
+      "icons": [{ "src": "/logo192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "异常汇总",
+      "short_name": "异常",
+      "description": "查看今日异常情况",
+      "url": "/m/anomaly",
+      "icons": [{ "src": "/logo192.png", "sizes": "192x192" }]
+    }
+  ]
+}
