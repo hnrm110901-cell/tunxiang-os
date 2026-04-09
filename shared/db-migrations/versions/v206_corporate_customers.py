@@ -47,10 +47,8 @@ def upgrade() -> None:
     op.execute("ALTER TABLE corporate_customers FORCE ROW LEVEL SECURITY;")
     op.execute("""
         CREATE POLICY corporate_customers_tenant ON corporate_customers
-        USING (
-            current_setting('app.current_tenant', TRUE) IS NOT NULL
-            AND tenant_id = current_setting('app.current_tenant', TRUE)
-        );
+        USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), ''))
+        WITH CHECK (tenant_id = NULLIF(current_setting('app.tenant_id', true), ''));
     """)
 
     # ── corporate_orders（企业订单）──
@@ -78,10 +76,8 @@ def upgrade() -> None:
     op.execute("ALTER TABLE corporate_orders FORCE ROW LEVEL SECURITY;")
     op.execute("""
         CREATE POLICY corporate_orders_tenant ON corporate_orders
-        USING (
-            current_setting('app.current_tenant', TRUE) IS NOT NULL
-            AND tenant_id = current_setting('app.current_tenant', TRUE)
-        );
+        USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), ''))
+        WITH CHECK (tenant_id = NULLIF(current_setting('app.tenant_id', true), ''));
     """)
 
     # ── corporate_bills（企业账单）──
@@ -106,10 +102,8 @@ def upgrade() -> None:
     op.execute("ALTER TABLE corporate_bills FORCE ROW LEVEL SECURITY;")
     op.execute("""
         CREATE POLICY corporate_bills_tenant ON corporate_bills
-        USING (
-            current_setting('app.current_tenant', TRUE) IS NOT NULL
-            AND tenant_id = current_setting('app.current_tenant', TRUE)
-        );
+        USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), ''))
+        WITH CHECK (tenant_id = NULLIF(current_setting('app.tenant_id', true), ''));
     """)
 
 

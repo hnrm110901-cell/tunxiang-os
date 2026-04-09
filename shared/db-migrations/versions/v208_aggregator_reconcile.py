@@ -41,8 +41,8 @@ def upgrade() -> None:
     op.execute("ALTER TABLE aggregator_reconcile_results FORCE ROW LEVEL SECURITY;")
     op.execute("""
         CREATE POLICY arr_tenant ON aggregator_reconcile_results
-        USING (current_setting('app.current_tenant', TRUE) IS NOT NULL
-               AND tenant_id = current_setting('app.current_tenant', TRUE));
+        USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), ''))
+        WITH CHECK (tenant_id = NULLIF(current_setting('app.tenant_id', true), ''));
     """)
 
     # ── aggregator_discrepancies（差异单）──
@@ -70,8 +70,8 @@ def upgrade() -> None:
     op.execute("ALTER TABLE aggregator_discrepancies FORCE ROW LEVEL SECURITY;")
     op.execute("""
         CREATE POLICY ad_tenant ON aggregator_discrepancies
-        USING (current_setting('app.current_tenant', TRUE) IS NOT NULL
-               AND tenant_id = current_setting('app.current_tenant', TRUE));
+        USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), ''))
+        WITH CHECK (tenant_id = NULLIF(current_setting('app.tenant_id', true), ''));
     """)
 
 

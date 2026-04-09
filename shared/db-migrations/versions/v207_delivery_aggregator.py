@@ -45,10 +45,8 @@ def upgrade() -> None:
     op.execute("ALTER TABLE aggregator_orders FORCE ROW LEVEL SECURITY;")
     op.execute("""
         CREATE POLICY aggregator_orders_tenant ON aggregator_orders
-        USING (
-            current_setting('app.current_tenant', TRUE) IS NOT NULL
-            AND tenant_id = current_setting('app.current_tenant', TRUE)
-        );
+        USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), ''))
+        WITH CHECK (tenant_id = NULLIF(current_setting('app.tenant_id', true), ''));
     """)
 
     # ── aggregator_metrics（Webhook处理指标）──
