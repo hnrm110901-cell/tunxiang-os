@@ -4,6 +4,26 @@
 
 ---
 
+## 2026-04-09 (Round 2)
+
+### 今日完成
+- [tx-agent] Agent自治等级控制器 autonomy_controller_routes.py — L1/L2/L3分级自治 + 自动执行规则引擎（9个Agent覆盖）
+- [tx-agent] Agent效果量化仪表盘 agent_roi_routes.py — ROI汇总/单Agent明细/效能排行（对标Yum Byte效果量化）
+- [db] v221迁移 — agent_autonomy_configs + agent_auto_executions + agent_roi_metrics（3表+RLS+6索引）
+- [tests] 11个测试用例全部通过 — 规则引擎纯函数测试7个 + ROI定义完整性测试4个
+
+### 数据变化
+- 迁移版本：v220 → v221
+- 新增 API 模块：2个（autonomy_controller_routes / agent_roi_routes）
+- 新增测试：11个
+- 新增端点：7个（autonomy config/actions/pending + roi summary/detail/leaderboard）
+
+### 遗留问题
+- Agent自动执行写入逻辑待接入各Agent execute()
+- ROI指标采集任务待创建（定时从物化视图聚合写入agent_roi_metrics）
+
+---
+
 ## 2026-04-09
 
 ### 今日完成

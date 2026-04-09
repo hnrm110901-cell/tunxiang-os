@@ -27,6 +27,8 @@ from .api.report_config_routes import router as report_config_router
 from .api.narrative_enhanced_routes import router as narrative_enhanced_router  # P3-02
 from .api.nlq_routes import router as nlq_router
 from .api.anomaly_routes import router as anomaly_router
+from .api.insights_routes import router as insights_router
+from .api.daily_brief_routes import router as daily_brief_router
 from .api.seed_loader import load_p0_seeds
 
 @asynccontextmanager
@@ -70,6 +72,8 @@ app.include_router(report_config_router)
 app.include_router(narrative_enhanced_router)  # P3-02 对比叙事+异常叙事
 app.include_router(nlq_router)
 app.include_router(anomaly_router)
+app.include_router(insights_router)
+app.include_router(daily_brief_router)
 
 @app.get("/health")
 async def health():
