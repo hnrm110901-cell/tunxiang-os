@@ -2,7 +2,7 @@
  * 人力行政路由 — /hr/*, /hq/org/*
  */
 import { Route } from 'react-router-dom';
-import { HRHubPage } from '../pages/hr/HRHubPage';
+import HRHubPage from '../pages/hr/HRHub';
 import { EmployeeListPage } from '../pages/hr/EmployeeListPage';
 import { EmployeeCreatePage } from '../pages/hr/EmployeeCreatePage';
 import { EmployeeDetailPage } from '../pages/hr/EmployeeDetailPage';
