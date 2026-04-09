@@ -19,6 +19,7 @@ from typing import Literal
 import structlog
 from fastapi import APIRouter, Depends, Header, Query
 from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db_with_tenant
@@ -136,7 +137,7 @@ async def get_roi_summary(
             ORDER BY agent_id, metric_type
         """), {"tenant_id": x_tenant_id})
         rows = result.mappings().all()
-    except Exception:
+    except (SQLAlchemyError, ConnectionError):
         rows = []
 
     # 按 agent_id 聚合
@@ -227,7 +228,7 @@ async def get_agent_roi_detail(
             LIMIT :limit OFFSET :offset
         """), {**params, "trunc": trunc})
         rows = result.mappings().all()
-    except Exception:
+    except (SQLAlchemyError, ConnectionError):
         rows = []
 
     return {"ok": True, "data": {
@@ -267,7 +268,7 @@ async def get_agent_leaderboard(
             ORDER BY total_value DESC
         """), {"tenant_id": x_tenant_id})
         rows = result.mappings().all()
-    except Exception:
+    except (SQLAlchemyError, ConnectionError):
         rows = []
 
     leaderboard = []

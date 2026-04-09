@@ -25,6 +25,7 @@ import structlog
 from fastapi import APIRouter, Depends, Header, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db_with_tenant
@@ -845,7 +846,7 @@ async def _execute_sql_query(
         columns = list(result.keys())
         rows = [dict(zip(columns, row)) for row in result.fetchall()]
         return rows
-    except Exception as exc:
+    except (SQLAlchemyError, ConnectionError) as exc:
         logger.error("nlq.sql_exec_error", error=str(exc), sql=sql_str[:200])
         return []
 
@@ -1300,7 +1301,7 @@ async def get_query_history(
                     row[k] = str(v)
 
         return {"ok": True, "data": rows, "total": len(rows)}
-    except Exception as exc:
+    except (SQLAlchemyError, ConnectionError) as exc:
         logger.warning("nlq.history_read_error", error=str(exc))
         return {"ok": True, "data": [], "total": 0}
 
@@ -1456,6 +1457,6 @@ async def _save_message(
             {"sid": session_id, "tid": tenant_id, "content": answer, "intent": intent},
         )
         await db.flush()
-    except Exception as exc:
+    except (SQLAlchemyError, ConnectionError) as exc:
         logger.warning("nlq.save_message_error", error=str(exc))
         # best-effort: 不影响主流程

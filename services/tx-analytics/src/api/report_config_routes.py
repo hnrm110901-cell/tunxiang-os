@@ -29,6 +29,7 @@ import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db_with_tenant
@@ -408,7 +409,7 @@ async def execute_report(
     try:
         query_result = await db.execute(text(limited_sql), merged_params)
         rows = [dict(r) for r in query_result.mappings().all()]
-    except Exception as exc:
+    except (SQLAlchemyError, ConnectionError) as exc:
         logger.error("report_execute_failed", report_id=report_id, error=str(exc))
         raise HTTPException(status_code=400, detail=f"SQL执行失败: {exc}") from exc
 

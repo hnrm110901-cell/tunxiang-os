@@ -20,6 +20,7 @@ import structlog
 from fastapi import APIRouter, Depends, Header, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db_with_tenant
@@ -121,7 +122,7 @@ async def get_autonomy_configs(
             ORDER BY agent_id
         """), {"tenant_id": x_tenant_id})
         rows = result.mappings().all()
-    except Exception:
+    except (SQLAlchemyError, ConnectionError):
         # 表可能尚未创建，返回默认配置
         rows = []
 
@@ -240,7 +241,7 @@ async def get_auto_execution_log(
             LIMIT :limit OFFSET :offset
         """), params)
         rows = result.mappings().all()
-    except Exception:
+    except (SQLAlchemyError, ConnectionError):
         return {"ok": True, "data": {"items": [], "total": 0}}
 
     return {"ok": True, "data": {
@@ -273,7 +274,7 @@ async def get_pending_actions(
             LIMIT :limit OFFSET :offset
         """), {"tenant_id": x_tenant_id, "limit": size, "offset": offset})
         rows = result.mappings().all()
-    except Exception:
+    except (SQLAlchemyError, ConnectionError):
         return {"ok": True, "data": {"items": [], "total": 0}}
 
     return {"ok": True, "data": {

@@ -125,7 +125,7 @@ class KitchenOvertimeAgent(SkillAgent):
                 )
                 if resp:
                     ai_suggestion = resp.strip()
-            except Exception:
+            except (ValueError, RuntimeError, ConnectionError, TimeoutError):
                 pass
 
         return AgentResult(

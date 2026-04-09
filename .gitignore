@@ -14,10 +14,6 @@ node_modules/
 .env.*
 !.env.example
 !.env.*.example
-.env.local
-.env.*.local
-.env.staging
-.env.production
 
 # Merchant configs (sensitive)
 config/merchants/

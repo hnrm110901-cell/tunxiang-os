@@ -237,7 +237,7 @@ class ClosingAgent(SkillAgent):
                 )
                 if resp:
                     ai_summary = resp.strip()
-            except Exception:
+            except (ValueError, RuntimeError, ConnectionError, TimeoutError):
                 pass
 
         return AgentResult(

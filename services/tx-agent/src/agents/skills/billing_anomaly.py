@@ -87,7 +87,7 @@ class BillingAnomalyAgent(SkillAgent):
                 )
                 if resp:
                     ai_analysis = resp.strip()
-            except Exception:
+            except (ValueError, RuntimeError, ConnectionError, TimeoutError):
                 pass
 
         if risk_level == "high":

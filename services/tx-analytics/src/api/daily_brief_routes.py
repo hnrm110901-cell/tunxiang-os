@@ -23,6 +23,7 @@ import structlog
 from fastapi import APIRouter, Depends, Header, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db_with_tenant
@@ -76,7 +77,7 @@ async def _fetch_revenue_metrics(
             revenue = float(row[0] or 0)
             count = int(row[1] or 0)
             avg_ticket = float(row[2] or 0)
-        except Exception as exc:
+        except (SQLAlchemyError, ConnectionError) as exc:
             logger.warning("daily_brief_revenue_query_fail", date=str(d), error=str(exc))
             return {"revenue": 0, "order_count": 0, "avg_ticket": 0, "margin_rate": 0}
 
@@ -92,7 +93,7 @@ async def _fetch_revenue_metrics(
                 """), {"tid": tenant_id, "sid": store_id, "start": start, "end": end})
                 cost = float(cr.scalar() or 0)
                 margin_rate = round((revenue - cost) / revenue, 4) if revenue > 0 else 0
-            except Exception:
+            except (SQLAlchemyError, ConnectionError):
                 margin_rate = 0
         return {"revenue": revenue, "order_count": count, "avg_ticket": avg_ticket, "margin_rate": margin_rate}
 
@@ -150,7 +151,7 @@ async def _fetch_anomaly_summary(
         discount_anomaly = int(r2.scalar() or 0)
         if discount_anomaly > 0:
             anomalies.append({"type": "discount_anomaly", "description": f"折扣异常{discount_anomaly}次", "count": discount_anomaly})
-    except Exception as exc:
+    except (SQLAlchemyError, ConnectionError) as exc:
         logger.warning("daily_brief_anomaly_query_fail", error=str(exc))
 
     return anomalies
@@ -180,7 +181,7 @@ async def _fetch_agent_summary(
             }
             for row in rows
         ]
-    except Exception as exc:
+    except (SQLAlchemyError, ConnectionError) as exc:
         logger.warning("daily_brief_agent_query_fail", error=str(exc))
         return []
 
@@ -209,7 +210,7 @@ async def _fetch_dish_rankings(
             top5.append({"rank": i + 1, "dish_name": row[0], "quantity": int(row[1]), "revenue": float(row[2] or 0)})
         for i, row in enumerate(reversed(rows[-5:])) if len(rows) >= 5 else enumerate(reversed(rows)):
             bottom5.append({"rank": i + 1, "dish_name": row[0], "quantity": int(row[1]), "revenue": float(row[2] or 0)})
-    except Exception as exc:
+    except (SQLAlchemyError, ConnectionError) as exc:
         logger.warning("daily_brief_dish_ranking_fail", error=str(exc))
 
     return {"top5_hot": top5, "top5_slow": bottom5}
@@ -336,7 +337,7 @@ async def get_brief_history(
             for row in rows
         ]
         return {"ok": True, "data": {"items": items, "total": total, "page": page, "size": size}}
-    except Exception as exc:
+    except (SQLAlchemyError, ConnectionError) as exc:
         logger.warning("daily_brief_history_query_fail", error=str(exc))
         return {"ok": True, "data": {"items": [], "total": 0, "page": page, "size": size, "_is_mock": True}}
 
@@ -357,7 +358,7 @@ async def get_group_brief(
             WHERE tenant_id = :tid AND is_deleted = FALSE
         """), {"tid": x_tenant_id})
         stores = r.fetchall()
-    except Exception as exc:
+    except (SQLAlchemyError, ConnectionError) as exc:
         logger.warning("group_brief_stores_query_fail", error=str(exc))
         stores = []
 
@@ -434,7 +435,7 @@ async def configure_schedule(
             "config": f'{{"schedule": true, "push_time": "{body.push_time}", "channels": {body.channels}, "enabled": {str(body.enabled).lower()}}}',
         })
         await db.commit()
-    except Exception as exc:
+    except (SQLAlchemyError, ConnectionError) as exc:
         logger.warning("daily_brief_schedule_save_fail", error=str(exc))
 
     return {
@@ -494,11 +495,11 @@ async def get_store_daily_brief(
                 "content": json.dumps(brief, ensure_ascii=False, default=str),
             })
             await db.commit()
-        except Exception as persist_exc:
+        except (SQLAlchemyError, ConnectionError) as persist_exc:
             logger.warning("daily_brief_persist_fail", error=str(persist_exc))
 
         return {"ok": True, "data": brief}
 
-    except Exception as exc:
-        logger.warning("daily_brief_generation_fallback", store_id=store_id, error=str(exc))
+    except (SQLAlchemyError, ConnectionError, ValueError, RuntimeError) as exc:
+        logger.warning("daily_brief_generation_fallback", store_id=store_id, error=str(exc), exc_info=True)
         return {"ok": True, "data": _mock_daily_brief(store_id, d)}

@@ -272,7 +272,7 @@ class QueueSeatingAgent(SkillAgent):
                 )
                 if resp:
                     suggestions.append(f"AI建议: {resp}")
-            except Exception:
+            except (ValueError, RuntimeError, ConnectionError, TimeoutError):
                 pass
 
         return AgentResult(
