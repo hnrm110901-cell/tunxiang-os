@@ -58,11 +58,6 @@ const TABLE_TYPE_COLORS: Record<TableType, { color: string; bg: string }> = {
   vip:          { color: '#D97706', bg: '#D9770618' },
 };
 
-const STATUS_LABELS: Record<TableStatus, string> = {
-  idle: '空闲', reserved: '已预定', opened: '已开台', ordered: '已点餐',
-  serving: '上菜中', dining: '用餐中', pending_payment: '待结账', cleaning: '清台中',
-};
-
 // ─── 降级数据 ──────────────────────────────────────────────────────────────────
 
 const FALLBACK_STORES: StoreOption[] = [

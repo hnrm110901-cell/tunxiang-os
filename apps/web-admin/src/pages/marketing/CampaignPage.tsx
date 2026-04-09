@@ -770,8 +770,9 @@ export function CampaignPage() {
                         }),
                       });
                       message.success('优惠券创建成功');
-                    couponTableRef.current?.reload();
-                    return true;
+                      couponTableRef.current?.reload();
+                      return true;
+                    } catch { /* handled */ }
                   }}
                 >
                   <ProFormText name="name" label="券名" placeholder="如：满100减20" rules={[{ required: true }]} />

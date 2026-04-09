@@ -37,6 +37,10 @@ INTENT_KEYWORDS: dict[str, list[str]] = {
     "customer_service": ["投诉", "服务", "反馈", "客诉"],
     "menu": ["菜品", "排菜", "菜单", "推荐"],
     "crm": ["营销", "推广", "活动", "私域"],
+    "queue": ["排队", "等位", "叫号", "排位", "候位"],
+    "kitchen_overtime": ["超时", "出餐", "催菜", "后厨"],
+    "billing": ["反结账", "漏单", "收银", "现金差异", "挂账"],
+    "closing": ["闭店", "日结", "检查单", "收档"],
 }
 
 # tx-brain 端点映射（每个意图对应的 AI 决策中枢接口）
@@ -50,6 +54,10 @@ AGENT_ENDPOINTS: dict[str, str] = {
     "customer_service": "http://tx-brain:8010/api/v1/brain/customer-service/handle",
     "menu": "http://tx-brain:8010/api/v1/brain/menu/optimize",
     "crm": "http://tx-brain:8010/api/v1/brain/crm/campaign",
+    "queue": "http://localhost:8008/api/v1/agent/ops/queue/predict-wait",
+    "kitchen_overtime": "http://localhost:8008/api/v1/agent/ops/kitchen/scan-overtime",
+    "billing": "http://localhost:8008/api/v1/agent/ops/billing/risk-summary",
+    "closing": "http://localhost:8008/api/v1/agent/ops/closing/pre-check",
 }
 
 # 意图 → Agent 友好名称（用于日志/回复）
@@ -63,6 +71,10 @@ INTENT_AGENT_NAME: dict[str, str] = {
     "customer_service": "智能客服",
     "menu": "智能排菜",
     "crm": "私域运营",
+    "queue": "排位智能",
+    "kitchen_overtime": "后厨超时监控",
+    "billing": "收银异常检测",
+    "closing": "闭店守护",
 }
 
 # 内存任务存储（异步模式；生产环境可替换为 Redis）

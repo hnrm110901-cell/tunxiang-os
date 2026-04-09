@@ -6,7 +6,7 @@
  *      POST /api/v1/agent/tasks/{id}/actions/assign
  *      POST /api/v1/agent/tasks/{id}/actions/close
  */
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { apiGet, apiPost } from '../../api/client';
 
 // ─── 类型 ──────────────────────────────────────────────────────────────────────

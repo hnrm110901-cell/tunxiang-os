@@ -94,7 +94,7 @@ export function PeriodAnalysisPage() {
 
   useEffect(() => {
     apiGet<{ items: StoreOption[] }>('/api/v1/trade/stores')
-      .then(res => { if (res.ok && res.data?.items?.length) { setStores(res.data.items); setSelectedStore(res.data.items[0].id); } else { setSelectedStore(FALLBACK_STORES[0].id); } })
+      .then(res => { if (res?.items?.length) { setStores(res.items); setSelectedStore(res.items[0].id); } else { setSelectedStore(FALLBACK_STORES[0].id); } })
       .catch(() => { setSelectedStore(FALLBACK_STORES[0].id); });
   }, []);
 
@@ -102,7 +102,7 @@ export function PeriodAnalysisPage() {
     if (!selectedStore) return;
     setLoading(true);
     apiGet<{ periods: PeriodData[] }>(`/api/v1/analytics/period-analysis?store_id=${selectedStore}&date=${selectedDate}`)
-      .then(res => { if (res.ok && res.data?.periods?.length) setPeriods(res.data.periods); })
+      .then(res => { if (res?.periods?.length) setPeriods(res.periods); })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [selectedStore, selectedDate]);

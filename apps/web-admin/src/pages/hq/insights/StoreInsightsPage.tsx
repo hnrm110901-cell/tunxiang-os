@@ -66,7 +66,7 @@ export function StoreInsightsPage() {
   useEffect(() => {
     setLoading(true);
     apiGet<{ items: StoreMetric[] }>(`/api/v1/analytics/store-insights?period=${period}`)
-      .then(res => { if (res.ok && res.data?.items?.length) setStores(res.data.items); })
+      .then(res => { if (res?.items?.length) setStores(res.items); })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [period]);

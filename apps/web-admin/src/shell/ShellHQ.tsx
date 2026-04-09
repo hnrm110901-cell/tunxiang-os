@@ -30,6 +30,12 @@ function deriveModuleFromPath(pathname: string): string {
       growth: 'growth', supply: 'ops', ops: 'ops',
       org: 'org', agent: 'agent', floor: 'store',
       store: 'store', iam: 'org', kds: 'store',
+      insights: 'analytics', members: 'member', member: 'member',
+      reservations: 'trade', banquet: 'trade',
+      tasks: 'store', events: 'store', audit: 'store',
+      kitchen: 'store', print: 'store', shifts: 'store',
+      payments: 'store', billing: 'store', invoice: 'store',
+      corporate: 'trade', business: 'store',
     };
     return map[seg] || 'dashboard';
   }

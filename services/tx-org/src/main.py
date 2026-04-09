@@ -63,6 +63,7 @@ from api.employee_training_routes import router as employee_training_router
 from api.performance_scoring_routes import router as performance_scoring_router
 from api.brand_management_routes import router as brand_management_router
 from api.region_management_routes import router as region_management_router
+from api.smart_scheduling_routes import router as smart_scheduling_router
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from shared.ontology.src.database import get_db as _shared_get_db
@@ -172,6 +173,7 @@ app.include_router(employee_training_router)   # 员工培训管理DB持久化�
 app.include_router(performance_scoring_router) # 绩效考核周期与评级扩展（Y-G8）
 app.include_router(brand_management_router)    # 多品牌管理DB统一（v198表，废弃内存双轨）Y-H1
 app.include_router(region_management_router)   # 多区域主数据CRUD（v198表，树形结构）Y-H2
+app.include_router(smart_scheduling_router)    # 预测驱动智能排班（v219表，对标Fourth iQ）
 
 @app.get("/health")
 async def health():

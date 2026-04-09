@@ -134,7 +134,7 @@ export function ReservationManagePage() {
   const loadStores = useCallback(async () => {
     try {
       const res = await apiGet<{ items: StoreOption[] }>('/api/v1/trade/stores');
-      if (res.ok && res.data?.items?.length) { setStores(res.data.items); setSelectedStore(res.data.items[0].id); }
+      if (res?.items?.length) { setStores(res.items); setSelectedStore(res.items[0].id); }
       else { setStores(FALLBACK_STORES); setSelectedStore(FALLBACK_STORES[0].id); }
     } catch { setStores(FALLBACK_STORES); setSelectedStore(FALLBACK_STORES[0].id); }
   }, []);
@@ -146,7 +146,7 @@ export function ReservationManagePage() {
       const params = new URLSearchParams({ store_id: selectedStore, date: selectedDate, size: '200' });
       if (selectedStatus) params.set('status', selectedStatus);
       const res = await apiGet<{ items: ReservationItem[] }>(`/api/v1/reservations?${params}`);
-      if (res.ok && res.data?.items) { setReservations(res.data.items); }
+      if (res?.items) { setReservations(res.items); }
       else { setReservations(FALLBACK_RESERVATIONS); }
     } catch { setReservations(FALLBACK_RESERVATIONS); }
     setLoading(false);
@@ -156,7 +156,7 @@ export function ReservationManagePage() {
     if (!selectedStore) return;
     try {
       const res = await apiGet<ReservationStats>(`/api/v1/reservations/stats?store_id=${selectedStore}&date=${selectedDate}`);
-      if (res.ok && res.data) setStats(res.data);
+      if (res) setStats(res);
       else setStats({ total: 6, pending: 2, confirmed: 1, arrived: 1, seated: 1, completed: 0, cancelled: 0, no_show: 1 });
     } catch { setStats({ total: 6, pending: 2, confirmed: 1, arrived: 1, seated: 1, completed: 0, cancelled: 0, no_show: 1 }); }
   }, [selectedStore, selectedDate]);
@@ -168,8 +168,8 @@ export function ReservationManagePage() {
 
   const handleStatusAction = async (reservationId: string, action: string, extra?: Record<string, unknown>) => {
     try {
-      const res = await apiPost<null>(`/api/v1/reservations/${reservationId}/status`, { action, ...extra });
-      if (res.ok) { loadReservations(); loadStats(); setShowActionModal(false); setShowDetailDrawer(false); }
+      await apiPost<null>(`/api/v1/reservations/${reservationId}/status`, { action, ...extra });
+      loadReservations(); loadStats(); setShowActionModal(false); setShowDetailDrawer(false);
     } catch { /* handled by apiPost */ }
   };
 
@@ -541,8 +541,8 @@ function CreateModal({ storeId, onSuccess, onCancel }: { storeId: string; onSucc
     if (!form.customer_name || !form.phone) return;
     setSubmitting(true);
     try {
-      const res = await apiPost<null>('/api/v1/reservations', { ...form, store_id: storeId });
-      if (res.ok) onSuccess();
+      await apiPost<null>('/api/v1/reservations', { ...form, store_id: storeId });
+      onSuccess();
     } catch { /* handled */ }
     setSubmitting(false);
   };

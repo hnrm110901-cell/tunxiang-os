@@ -5,7 +5,7 @@
  *      GET/POST /api/v1/ops/shifts/*
  */
 import { useEffect, useState, useCallback } from 'react';
-import { apiGet, apiPost, apiPatch } from '../../api/client';
+import { apiGet, apiPost } from '../../api/client';
 
 // ─── 类型 ──────────────────────────────────────────────────────────────────────
 
@@ -68,7 +68,7 @@ const FALLBACK_CONFIG: BusinessDayConfig = {
 export function BusinessDayConfigPage() {
   const [stores, setStores] = useState<StoreOption[]>([]);
   const [selectedStoreId, setSelectedStoreId] = useState('');
-  const [config, setConfig] = useState<BusinessDayConfig>(FALLBACK_CONFIG);
+  const [, setConfig] = useState<BusinessDayConfig>(FALLBACK_CONFIG);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<'overview' | 'meals' | 'shifts'>('overview');
