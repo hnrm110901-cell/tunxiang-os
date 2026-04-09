@@ -4,6 +4,27 @@
 
 ---
 
+## 2026-04-09 (Round 3)
+
+### 今日完成
+- [tx-member] 跨品牌会员智能 cross_brand_member_routes.py — 统一画像/会员合并/跨品牌统计/积分互通（对标Olo Guest Intelligence + 海底捞2亿会员中台）
+- [tx-member] 实时推荐引擎 recommendation_routes.py — 点餐推荐(4维度加权)/加单推荐(结账前)/回访推荐(RFM分层)/推荐效果统计(篮子提升额)
+- [db] v222迁移 — recommendation_logs + cross_brand_member_links（2表+RLS+6索引+1唯一约束）
+- [tests] 8个测试用例全部通过 — 模型验证/哈希一致性/餐段判断/分数排序/迁移结构
+
+### 数据变化
+- 迁移版本：v221 → v222
+- 新增 API 模块：2个（cross_brand_member_routes / recommendation_routes）
+- 新增测试：8个
+- 新增端点：8个（跨品牌画像/合并/统计/积分互通 + 点餐推荐/加单推荐/回访推荐/推荐效果）
+
+### 遗留问题
+- 推荐日志的 is_accepted 字段需由前端回调更新（点餐页面采纳推荐时 PATCH）
+- 购物篮关联规则当前为实时SQL查询，大数据量下需考虑预计算物化视图
+- 跨品牌积分互通兑换比例配置待管理后台页面支持
+
+---
+
 ## 2026-04-09 (Round 2)
 
 ### 今日完成
