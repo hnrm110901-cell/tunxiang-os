@@ -6,68 +6,68 @@ import { Route } from 'react-router-dom';
 // HR Hub
 import HRHubPage from '../pages/hr/HRHub';
 // 员工
-import { EmployeeList as EmployeeListPage } from '../pages/hr/employees/EmployeeList';
-import { EmployeeCreate as EmployeeCreatePage } from '../pages/hr/employees/EmployeeCreate';
-import { EmployeeDetail as EmployeeDetailPage } from '../pages/hr/employees/EmployeeDetail';
-import { OrgStructure as OrgStructurePage } from '../pages/hr/employees/OrgStructure';
-import { JobGrades as JobGradesPage } from '../pages/hr/employees/JobGrades';
+import EmployeeListPage from '../pages/hr/employees/EmployeeList';
+import EmployeeCreatePage from '../pages/hr/employees/EmployeeCreate';
+import EmployeeDetailPage from '../pages/hr/employees/EmployeeDetail';
+import OrgStructurePage from '../pages/hr/employees/OrgStructure';
+import JobGradesPage from '../pages/hr/employees/JobGrades';
 // 排班
-import { ScheduleCenter as ScheduleCenterPage } from '../pages/hr/schedules/ScheduleCenter';
-import { ScheduleStoreWeek as ScheduleStoreWeekPage } from '../pages/hr/schedules/ScheduleStoreWeek';
-import { ScheduleBatch as ScheduleBatchPage } from '../pages/hr/schedules/ScheduleBatch';
-import { ScheduleAdjustments as ScheduleAdjustmentsPage } from '../pages/hr/schedules/ScheduleAdjustments';
-import { ScheduleConflicts as ScheduleConflictsPage } from '../pages/hr/schedules/ScheduleConflicts';
-import { ScheduleGaps as ScheduleGapsPage } from '../pages/hr/schedules/ScheduleGaps';
-import { ScheduleTemplates as ScheduleTemplatesPage } from '../pages/hr/schedules/ScheduleTemplates';
+import ScheduleCenterPage from '../pages/hr/schedules/ScheduleCenter';
+import ScheduleStoreWeekPage from '../pages/hr/schedules/ScheduleStoreWeek';
+import ScheduleBatchPage from '../pages/hr/schedules/ScheduleBatch';
+import ScheduleAdjustmentsPage from '../pages/hr/schedules/ScheduleAdjustments';
+import ScheduleConflictsPage from '../pages/hr/schedules/ScheduleConflicts';
+import ScheduleGapsPage from '../pages/hr/schedules/ScheduleGaps';
+import ScheduleTemplatesPage from '../pages/hr/schedules/ScheduleTemplates';
 // 考勤
-import { AttendanceToday as AttendanceTodayPage } from '../pages/hr/attendance/AttendanceToday';
-import { AttendanceDaily as AttendanceDailyPage } from '../pages/hr/attendance/AttendanceDaily';
-import { AttendanceMonthly as AttendanceMonthlyPage } from '../pages/hr/attendance/AttendanceMonthly';
-import { AttendanceAnomalies as AttendanceAnomaliesPage } from '../pages/hr/attendance/AttendanceAnomalies';
-import { AttendanceAdjustments as AttendanceAdjustmentsPage } from '../pages/hr/attendance/AttendanceAdjustments';
+import AttendanceTodayPage from '../pages/hr/attendance/AttendanceToday';
+import AttendanceDailyPage from '../pages/hr/attendance/AttendanceDaily';
+import AttendanceMonthlyPage from '../pages/hr/attendance/AttendanceMonthly';
+import AttendanceAnomaliesPage from '../pages/hr/attendance/AttendanceAnomalies';
+import AttendanceAdjustmentsPage from '../pages/hr/attendance/AttendanceAdjustments';
 // 请假
-import { LeaveRequests as LeaveRequestsPage } from '../pages/hr/leave/LeaveRequests';
-import { LeaveDetail as LeaveDetailPage } from '../pages/hr/leave/LeaveDetail';
-import { LeaveBalances as LeaveBalancesPage } from '../pages/hr/leave/LeaveBalances';
-import { LeaveApprovalBoard as LeaveApprovalBoardPage } from '../pages/hr/leave/LeaveApprovalBoard';
+import LeaveRequestsPage from '../pages/hr/leave/LeaveRequests';
+import LeaveDetailPage from '../pages/hr/leave/LeaveDetail';
+import LeaveBalancesPage from '../pages/hr/leave/LeaveBalances';
+import LeaveApprovalBoardPage from '../pages/hr/leave/LeaveApprovalBoard';
 // 绩效
-import { PerformanceScores as PerformanceScoresPage } from '../pages/hr/performance/PerformanceScores';
-import { PerformanceRankings as PerformanceRankingsPage } from '../pages/hr/performance/PerformanceRankings';
-import { PerformanceHorseRace as PerformanceHorseRacePage } from '../pages/hr/performance/PerformanceHorseRace';
-import { PerformancePoints as PerformancePointsPage } from '../pages/hr/performance/PerformancePoints';
-import { PerformancePointDetail as PerformancePointDetailPage } from '../pages/hr/performance/PerformancePointDetail';
+import PerformanceScoresPage from '../pages/hr/performance/PerformanceScores';
+import PerformanceRankingsPage from '../pages/hr/performance/PerformanceRankings';
+import PerformanceHorseRacePage from '../pages/hr/performance/PerformanceHorseRace';
+import PerformancePointsPage from '../pages/hr/performance/PerformancePoints';
+import PerformancePointDetailPage from '../pages/hr/performance/PerformancePointDetail';
 // 薪资
-import { PayrollLaborCost as PayrollLaborCostPage } from '../pages/hr/payroll/PayrollLaborCost';
-import { PayrollApproval as PayrollApprovalPage } from '../pages/hr/payroll/PayrollApproval';
-import { PayrollSummary as PayrollSummaryPage } from '../pages/hr/payroll/PayrollSummary';
+import PayrollLaborCostPage from '../pages/hr/payroll/PayrollLaborCost';
+import PayrollApprovalPage from '../pages/hr/payroll/PayrollApproval';
+import PayrollSummaryPage from '../pages/hr/payroll/PayrollSummary';
 // 合规
-import { ComplianceDashboard as ComplianceDashboardPage } from '../pages/hr/compliance/ComplianceDashboard';
-import { ComplianceAlerts as ComplianceAlertsPage } from '../pages/hr/compliance/ComplianceAlerts';
-import { ComplianceDocExpiring as ComplianceDocExpiringPage } from '../pages/hr/compliance/ComplianceDocExpiring';
-import { ComplianceTasks as ComplianceTasksPage } from '../pages/hr/compliance/ComplianceTasks';
+import ComplianceDashboardPage from '../pages/hr/compliance/ComplianceDashboard';
+import ComplianceAlertsPage from '../pages/hr/compliance/ComplianceAlerts';
+import ComplianceDocExpiringPage from '../pages/hr/compliance/ComplianceDocExpiring';
+import ComplianceTasksPage from '../pages/hr/compliance/ComplianceTasks';
 // 门店作战台
-import { StoreOpsToday as StoreOpsTodayPage } from '../pages/hr/store-ops/StoreOpsToday';
-import { StoreOpsFillGaps as StoreOpsFillGapsPage } from '../pages/hr/store-ops/StoreOpsFillGaps';
-import { StoreOpsExceptions as StoreOpsExceptionsPage } from '../pages/hr/store-ops/StoreOpsExceptions';
+import StoreOpsTodayPage from '../pages/hr/store-ops/StoreOpsToday';
+import StoreOpsFillGapsPage from '../pages/hr/store-ops/StoreOpsFillGaps';
+import StoreOpsExceptionsPage from '../pages/hr/store-ops/StoreOpsExceptions';
 // 治理
-import { GovernanceDashboard as GovernanceDashboardPage } from '../pages/hr/governance/GovernanceDashboard';
-import { GovernanceBenchmark as GovernanceBenchmarkPage } from '../pages/hr/governance/GovernanceBenchmark';
-import { GovernanceStaffing as GovernanceStaffingPage } from '../pages/hr/governance/GovernanceStaffing';
-import { GovernanceRiskStores as GovernanceRiskStoresPage } from '../pages/hr/governance/GovernanceRiskStores';
+import GovernanceDashboardPage from '../pages/hr/governance/GovernanceDashboard';
+import GovernanceBenchmarkPage from '../pages/hr/governance/GovernanceBenchmark';
+import GovernanceStaffingPage from '../pages/hr/governance/GovernanceStaffing';
+import GovernanceRiskStoresPage from '../pages/hr/governance/GovernanceRiskStores';
 // Agent
-import { AgentHub as AgentHubPage } from '../pages/hr/agents/AgentHub';
-import { AgentComplianceAlert as AgentComplianceAlertPage } from '../pages/hr/agents/AgentComplianceAlert';
-import { AgentSalaryAdvisor as AgentSalaryAdvisorPage } from '../pages/hr/agents/AgentSalaryAdvisor';
-import { AgentWorkforcePlanner as AgentWorkforcePlannerPage } from '../pages/hr/agents/AgentWorkforcePlanner';
-import { AgentTurnoverRisk as AgentTurnoverRiskPage } from '../pages/hr/agents/AgentTurnoverRisk';
+import AgentHubPage from '../pages/hr/agents/AgentHub';
+import AgentComplianceAlertPage from '../pages/hr/agents/AgentComplianceAlert';
+import AgentSalaryAdvisorPage from '../pages/hr/agents/AgentSalaryAdvisor';
+import AgentWorkforcePlannerPage from '../pages/hr/agents/AgentWorkforcePlanner';
+import AgentTurnoverRiskPage from '../pages/hr/agents/AgentTurnoverRisk';
 // 配置
-import { SettingsRoles as SettingsRolesPage } from '../pages/hr/settings/SettingsRoles';
-import { SettingsApprovalWorkflows as SettingsApprovalWorkflowsPage } from '../pages/hr/settings/SettingsApprovalWorkflows';
-import { SettingsAuditLogs as SettingsAuditLogsPage } from '../pages/hr/settings/SettingsAuditLogs';
+import SettingsRolesPage from '../pages/hr/settings/SettingsRoles';
+import SettingsApprovalWorkflowsPage from '../pages/hr/settings/SettingsApprovalWorkflows';
+import SettingsAuditLogsPage from '../pages/hr/settings/SettingsAuditLogs';
 // 分析
-import { LaborMarginDashboard as LaborMarginDashboardPage } from '../pages/hr/analytics/LaborMarginDashboard';
-import { BudgetRecommendation as BudgetRecommendationPage } from '../pages/hr/analytics/BudgetRecommendation';
-import { MenuSkillMatch as MenuSkillMatchPage } from '../pages/hr/analytics/MenuSkillMatch';
+import LaborMarginDashboardPage from '../pages/hr/analytics/LaborMarginDashboard';
+import BudgetRecommendationPage from '../pages/hr/analytics/BudgetRecommendation';
+import MenuSkillMatchPage from '../pages/hr/analytics/MenuSkillMatch';
 // 外部页面
 import { HRDashboardPage } from '../pages/hq/org/HRDashboardPage';
 import { AttendancePage } from '../pages/org/AttendancePage';
