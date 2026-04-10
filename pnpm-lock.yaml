@@ -48,8 +48,8 @@ importers:
         specifier: ^10.2.0
         version: 10.2.0
       typescript:
-        specifier: ^5.3.0
-        version: 5.9.3
+        specifier: ^6.0.2
+        version: 6.0.2
       vite:
         specifier: ^8.0.3
         version: 8.0.3(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)
@@ -94,8 +94,8 @@ importers:
         specifier: ^10.2.0
         version: 10.2.0
       typescript:
-        specifier: ^5.3.0
-        version: 5.9.3
+        specifier: ^6.0.2
+        version: 6.0.2
       vite:
         specifier: ^8.0.3
         version: 8.0.3(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)
@@ -140,8 +140,8 @@ importers:
         specifier: ^10.2.0
         version: 10.2.0
       typescript:
-        specifier: ^5.3.0
-        version: 5.9.3
+        specifier: ^6.0.2
+        version: 6.0.2
       vite:
         specifier: ^8.0.3
         version: 8.0.3(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)
@@ -186,8 +186,8 @@ importers:
         specifier: ^10.2.0
         version: 10.2.0
       typescript:
-        specifier: ^5.3.0
-        version: 5.9.3
+        specifier: ^6.0.2
+        version: 6.0.2
       vite:
         specifier: ^8.0.3
         version: 8.0.3(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)
@@ -232,8 +232,8 @@ importers:
         specifier: ^10.2.0
         version: 10.2.0
       typescript:
-        specifier: ^5.3.0
-        version: 5.9.3
+        specifier: ^6.0.2
+        version: 6.0.2
       vite:
         specifier: ^8.0.3
         version: 8.0.3(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)
