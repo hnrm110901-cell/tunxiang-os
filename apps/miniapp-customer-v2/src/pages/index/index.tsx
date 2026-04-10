@@ -28,6 +28,7 @@ import { getActivities } from '../../api/growth'
 import { CartBar } from '../../components/CartBar'
 import { AiRecommend } from '../../components/AiRecommend'
 import { DishCard } from '../../components/DishCard'
+import { ReorderBanner } from '../../components/ReorderBanner'
 import type { Dish } from '../../api/menu'
 import type { Activity } from '../../api/growth'
 
@@ -227,6 +228,9 @@ export default function IndexPage() {
             </Text>
           </View>
         </View>
+
+        {/* ─── 智能复购提醒 ─── */}
+        <ReorderBanner storeId={storeId} />
 
         {/* ─── Banner carousel ─── */}
         {loading ? (
