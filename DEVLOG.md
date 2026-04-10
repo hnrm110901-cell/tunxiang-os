@@ -4,6 +4,23 @@
 
 ---
 
+## 2026-04-10
+
+### 今日完成
+- [miniapp-v2] Wave 1-4小程序全量升级: 10新文件/2386行（brand-picker/pre-order/AiChatAssistant/subscription/taste-profile/ReorderBanner/group-order/cross-brand/insights/i18n）
+- [tx-member] subscription_routes: 付费会员订阅4端点
+- [tx-trade] group_order_routes: 拼单5端点
+- [web-admin] 构建修复: pro-components+ahooks+antd-theme+HR路由→3终端Vite构建通过
+
+### 数据变化
+- miniapp-v2: 89→99文件, 38922→41381行, 30→55页面, 13→16组件
+- 新增后端API: 9端点
+
+### 遗留问题
+- miniapp Taro编译待验证; git push需手动
+
+---
+
 ## 2026-04-09 (Round 4)
 
 ### 今日完成
