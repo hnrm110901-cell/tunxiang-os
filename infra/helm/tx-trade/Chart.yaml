@@ -1,0 +1,6 @@
+apiVersion: v2
+name: tx-trade
+description: 屯象OS 交易履约微服务 — 收银/外卖聚合/零售商城
+type: application
+version: 1.0.0
+appVersion: "latest"

@@ -1,0 +1,30 @@
+replicaCount: 3
+
+image:
+  tag: ${IMAGE_TAG}  # 由Harness CD流水线注入，禁止手动修改
+
+ingress:
+  host: api.tunxiangos.cn
+  tls: true
+
+env:
+  TUNXIANG_ENV: prod
+  LOG_LEVEL: info
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 200m
+    memory: 256Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+podAntiAffinity:
+  enabled: true

@@ -1,0 +1,41 @@
+trigger:
+  name: trigger-pr-tx-analytics
+  identifier: trigger_pr_tx_analytics
+  projectIdentifier: TunXiangOS
+  orgIdentifier: default
+  description: "tx-analytics 服务 PR 触发器。PR opened/synchronize 时触发 ci_tx_analytics 流水线。"
+  tags:
+    service: tx-analytics
+    event: pr
+  enabled: true
+  pipelineIdentifier: ci_tx_analytics
+  source:
+    type: Webhook
+    spec:
+      type: Github
+      spec:
+        type: PullRequest
+        spec:
+          connectorRef: github_connector
+          repoName: tunxiang-os
+          autoAbortPreviousExecutions: true
+          payloadConditions:
+            - key: targetBranch
+              operator: In
+              value: main,develop
+          headerConditions: []
+          jexlCondition: ""
+          actions:
+            - opened
+            - synchronize
+            - reopened
+  inputYaml: |
+    pipeline:
+      identifier: ci_tx_analytics
+      properties:
+        ci:
+          codebase:
+            build:
+              type: PR
+              spec:
+                number: <+trigger.prNumber>

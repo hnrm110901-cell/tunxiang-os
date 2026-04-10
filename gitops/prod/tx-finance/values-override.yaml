@@ -1,0 +1,31 @@
+# tx-finance prod环境覆盖配置
+# 由Harness CD流水线自动合并，禁止手动修改image.tag
+
+replicaCount: 2
+
+image:
+  tag: ${IMAGE_TAG}  # 由Harness CD流水线注入，禁止手动修改
+
+env:
+  TUNXIANG_ENV: prod
+  LOG_LEVEL: info
+  # VAT计税引擎：生产环境强制开启，符合中国增值税合规要求
+  VAT_CALCULATION_ENABLED: "true"
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 200m
+    memory: 256Mi
+
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 6
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+podAntiAffinity:
+  enabled: true

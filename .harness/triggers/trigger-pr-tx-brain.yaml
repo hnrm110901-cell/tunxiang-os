@@ -1,0 +1,41 @@
+trigger:
+  name: trigger-pr-tx-brain
+  identifier: trigger_pr_tx_brain
+  projectIdentifier: TunXiangOS
+  orgIdentifier: default
+  description: "tx-brain 服务 PR 触发器。PR opened/synchronize 时触发 ci_tx_brain 流水线。注意：CI 阶段通过 SKIP_LLM_TESTS=true 跳过 LLM 集成测试（成本控制）。"
+  tags:
+    service: tx-brain
+    event: pr
+  enabled: true
+  pipelineIdentifier: ci_tx_brain
+  source:
+    type: Webhook
+    spec:
+      type: Github
+      spec:
+        type: PullRequest
+        spec:
+          connectorRef: github_connector
+          repoName: tunxiang-os
+          autoAbortPreviousExecutions: true
+          payloadConditions:
+            - key: targetBranch
+              operator: In
+              value: main,develop
+          headerConditions: []
+          jexlCondition: ""
+          actions:
+            - opened
+            - synchronize
+            - reopened
+  inputYaml: |
+    pipeline:
+      identifier: ci_tx_brain
+      properties:
+        ci:
+          codebase:
+            build:
+              type: PR
+              spec:
+                number: <+trigger.prNumber>

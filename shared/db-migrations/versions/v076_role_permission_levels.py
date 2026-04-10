@@ -36,6 +36,45 @@ depends_on = None
 
 def upgrade() -> None:
     # ─────────────────────────────────────────────────────────────────
+    # 0. 确保 role_configs 表存在（未在前序迁移中建立）
+    # ─────────────────────────────────────────────────────────────────
+    op.execute("""
+        CREATE TABLE IF NOT EXISTS role_configs (
+            id          UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+            tenant_id   UUID         NOT NULL,
+            name        VARCHAR(50)  NOT NULL,
+            description TEXT,
+            is_deleted  BOOLEAN      NOT NULL DEFAULT FALSE,
+            created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+            updated_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+            CONSTRAINT uq_role_configs_tenant_name UNIQUE (tenant_id, name)
+        )
+    """)
+    op.execute("ALTER TABLE role_configs ENABLE ROW LEVEL SECURITY")
+    op.execute("ALTER TABLE role_configs FORCE ROW LEVEL SECURITY")
+    op.execute("DROP POLICY IF EXISTS role_configs_rls_select ON role_configs")
+    op.execute("""
+        CREATE POLICY role_configs_rls_select ON role_configs
+            FOR SELECT USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::UUID)
+    """)
+    op.execute("DROP POLICY IF EXISTS role_configs_rls_insert ON role_configs")
+    op.execute("""
+        CREATE POLICY role_configs_rls_insert ON role_configs
+            FOR INSERT WITH CHECK (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::UUID)
+    """)
+    op.execute("DROP POLICY IF EXISTS role_configs_rls_update ON role_configs")
+    op.execute("""
+        CREATE POLICY role_configs_rls_update ON role_configs
+            FOR UPDATE USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::UUID)
+            WITH CHECK (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::UUID)
+    """)
+    op.execute("DROP POLICY IF EXISTS role_configs_rls_delete ON role_configs")
+    op.execute("""
+        CREATE POLICY role_configs_rls_delete ON role_configs
+            FOR DELETE USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::UUID)
+    """)
+
+    # ─────────────────────────────────────────────────────────────────
     # 1. 扩展 role_configs 表（如已有字段则跳过）
     # ─────────────────────────────────────────────────────────────────
     op.execute("""

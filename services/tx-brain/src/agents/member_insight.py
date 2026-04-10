@@ -141,4 +141,85 @@ class MemberInsightAgent:
         }
 
 
+    async def analyze_from_mv(self, tenant_id: str, store_id: str | None = None) -> dict:
+        """从 mv_member_clv 快速读取会员 CLV 聚合数据，<5ms，无 Claude 调用。
+
+        数据来源：因果链⑤投影视图（MemberClvProjector）
+        返回：高流失风险会员数 + 平均CLV + 分层分布 + 储值余额合计
+        """
+        from sqlalchemy import text
+        from sqlalchemy.exc import SQLAlchemyError
+        from shared.ontology.src.database import get_db
+
+        try:
+            async for db in get_db():
+                await db.execute(
+                    text("SELECT set_config('app.tenant_id', :tid, true)"),
+                    {"tid": str(tenant_id)},
+                )
+                params: dict = {"tenant_id": tenant_id}
+
+                result = await db.execute(
+                    text("""
+                        SELECT
+                            COUNT(*) AS total_members,
+                            COUNT(*) FILTER (WHERE churn_probability > 0.7) AS high_churn_count,
+                            COUNT(*) FILTER (WHERE churn_probability BETWEEN 0.4 AND 0.7) AS medium_churn_count,
+                            AVG(clv_fen) AS avg_clv_fen,
+                            SUM(stored_value_balance_fen) AS total_stored_value_fen,
+                            COUNT(*) FILTER (WHERE rfm_segment = 'champions') AS champions_count,
+                            COUNT(*) FILTER (WHERE rfm_segment = 'at_risk') AS at_risk_count,
+                            AVG(visit_count) AS avg_visit_count
+                        FROM mv_member_clv
+                        WHERE tenant_id = :tenant_id
+                    """),
+                    params,
+                )
+                row = result.mappings().one_or_none()
+
+                if not row or row["total_members"] == 0:
+                    return {
+                        "inference_layer": "mv_fast_path",
+                        "data": {},
+                        "agent": self.__class__.__name__,
+                        "note": "暂无会员 CLV 数据",
+                    }
+
+                data = {
+                    "total_members": int(row["total_members"] or 0),
+                    "high_churn_count": int(row["high_churn_count"] or 0),
+                    "medium_churn_count": int(row["medium_churn_count"] or 0),
+                    "avg_clv_fen": round(float(row["avg_clv_fen"]), 2) if row["avg_clv_fen"] else 0.0,
+                    "total_stored_value_fen": int(row["total_stored_value_fen"] or 0),
+                    "champions_count": int(row["champions_count"] or 0),
+                    "at_risk_count": int(row["at_risk_count"] or 0),
+                    "avg_visit_count": round(float(row["avg_visit_count"]), 1) if row["avg_visit_count"] else 0.0,
+                }
+
+                # 流失风险高于20%触发预警
+                churn_rate = data["high_churn_count"] / max(data["total_members"], 1)
+                risk_signal = "high" if churn_rate > 0.20 else ("medium" if churn_rate > 0.10 else "normal")
+
+                return {
+                    "inference_layer": "mv_fast_path",
+                    "data": data,
+                    "agent": self.__class__.__name__,
+                    "risk_signal": risk_signal,
+                    "churn_rate": round(churn_rate, 4),
+                }
+        except SQLAlchemyError as exc:
+            logger.warning(
+                "member_insight_mv_db_error",
+                tenant_id=tenant_id,
+                store_id=store_id,
+                error=str(exc),
+            )
+            return {
+                "inference_layer": "mv_fast_path_error",
+                "data": {},
+                "agent": self.__class__.__name__,
+                "error": "数据库查询失败，请使用实时分析",
+            }
+
+
 member_insight = MemberInsightAgent()

@@ -1,0 +1,83 @@
+# 会员域 Feature Flags
+# 域：member
+# 命名格式：member.{module}.{feature}.{action}
+
+flags:
+  - identifier: member_insight_360_page_enable
+    name: member.insight.360_page.enable
+    description: >
+      客户360页面（整合消费记录/偏好标签/生命周期状态/CLV预测/召回历史/
+      服务评价/互动记录，提供一站式客户全貌视图）。
+      依赖 member.clv.engine.enable，建议同步开启。
+    defaultValue: false
+    environments:
+      dev: true
+      test: true
+      uat: true
+      pilot: true
+      prod: false
+    targeting_rules:
+      prod:
+        - dimension: role_code
+          values: [L2, L3]
+    tags: [member, insight, 360, page]
+
+  - identifier: member_clv_engine_enable
+    name: member.clv.engine.enable
+    description: >
+      CLV计算引擎（基于RFM+消费频次+品类偏好预测客户生命周期价值，
+      支持按月/季/年维度滚动计算）。
+      是客户360页面和智能营销的基础依赖。
+    defaultValue: false
+    environments:
+      dev: true
+      test: true
+      uat: true
+      pilot: true
+      prod: false
+    targeting_rules:
+      prod:
+        - dimension: brand_id
+          values: []
+    tags: [member, clv, engine, rfm]
+
+  - identifier: member_gdpr_anonymize_enable
+    name: member.gdpr.anonymize.enable
+    description: >
+      GDPR匿名化（客户删除账号或请求数据删除时，自动对PII字段进行哈希处理，
+      保留统计意义数据，满足GDPR/个人信息保护法合规要求）。
+      建议所有租户开启（等保三级合规要求）。
+    defaultValue: false
+    environments:
+      dev: false
+      test: true
+      uat: true
+      pilot: true
+      prod: false
+    targeting_rules:
+      prod:
+        - dimension: tenant_id
+          values: []   # 逐步推进，需按租户开启
+    tags: [member, gdpr, anonymize, compliance, mlps3]
+
+  - identifier: member_lifecycle_auto_segment_enable
+    name: member.lifecycle.auto_segment.enable
+    description: >
+      自动分群（基于生命周期状态变化自动将客户迁移到对应分群：
+      新客/成长/成熟/忠诚/沉默/流失，触发对应营销旅程）。
+      依赖 member.clv.engine.enable。
+    defaultValue: false
+    environments:
+      dev: true
+      test: true
+      uat: true
+      pilot: false
+      prod: false
+    targeting_rules:
+      pilot:
+        - dimension: brand_id
+          values: [pilot_brand_001, pilot_brand_002]
+      prod:
+        - dimension: brand_id
+          values: []
+    tags: [member, lifecycle, auto, segment]

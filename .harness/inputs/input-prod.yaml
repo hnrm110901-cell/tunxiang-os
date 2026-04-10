@@ -1,0 +1,69 @@
+inputSet:
+  name: input-prod
+  identifier: input_prod
+  projectIdentifier: TunXiangOS
+  orgIdentifier: default
+  description: "生产环境输入集"
+  tags:
+    env: prod
+
+  pipeline:
+    identifier: release_api_gateway_prod
+    variables:
+      - name: imageTag
+        type: String
+        value: <+input>
+
+    stages:
+      - stage:
+          identifier: Deploy_Prod
+          type: Deployment
+          spec:
+            environment:
+              environmentRef: env_prod
+              infrastructureDefinitions:
+                - identifier: k8s_prod_main
+                  inputs:
+                    identifier: k8s_prod_main
+                    type: KubernetesDirect
+                    spec:
+                      namespace: tunxiang-prod
+
+# ── 环境参数 ──────────────────────────────────────────────────
+# namespace:      tunxiang-prod
+# replicaCount:   3
+# healthUrl:      https://api.tunxiangos.cn/health
+# valuesFile:     gitops/prod/values.yaml
+# ─────────────────────────────────────────────────────────────
+
+envOverrides:
+  namespace: tunxiang-prod
+  replicaCount: 3
+  healthUrl: https://api.tunxiangos.cn/health
+  valuesFile: gitops/prod/values.yaml
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "1Gi"
+    limits:
+      cpu: "2000m"
+      memory: "2Gi"
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+  ingress:
+    host: api.tunxiangos.cn
+    tls: true
+    annotations:
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"
+  logLevel: WARN
+  approval:
+    groups:
+      - release_manager_group
+      - sre_group
+    minimumCount: 2
+  rollback:
+    enabled: true
+    strategy: K8sRollingRollback

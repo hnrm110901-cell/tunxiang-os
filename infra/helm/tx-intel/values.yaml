@@ -1,0 +1,83 @@
+# tx-intel — 商业智能微服务
+# 低频BI分析服务：replicaCount=1，资源保守配置，变更频率低
+
+replicaCount: 1
+
+image:
+  repository: tunxiang/tx-intel
+  pullPolicy: IfNotPresent
+  tag: latest
+
+service:
+  type: ClusterIP
+  port: 8011
+  targetPort: 8011
+
+ingress:
+  enabled: false
+  className: nginx
+  host: ""
+  tls: false
+  tlsSecretName: ""
+
+# BI分析为低频查询服务，保守资源配置
+resources:
+  limits:
+    cpu: 200m
+    memory: 256Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+env:
+  TUNXIANG_ENV: prod
+  LOG_LEVEL: info
+  # 报表缓存TTL：3600秒（1小时），降低DB查询压力
+  REPORT_CACHE_TTL: "3600"
+  # 分析批次大小：每次批量处理1000条记录，防止内存溢出
+  ANALYTICS_BATCH_SIZE: "1000"
+
+# Secret中存放的敏感环境变量（由外部Secret Manager注入）
+secretRef:
+  name: tx-intel-secret
+  # 包含: DB_URL, REDIS_URL, JWT_SECRET, SUPABASE_SERVICE_KEY
+
+# BI服务不启用HPA，低频低负载无扩容需求
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 2
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 8011
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  failureThreshold: 3
+  timeoutSeconds: 5
+
+readinessProbe:
+  httpGet:
+    path: /health
+    port: 8011
+  initialDelaySeconds: 5
+  periodSeconds: 5
+  failureThreshold: 3
+  timeoutSeconds: 3
+
+# 单实例服务无需反亲和
+podAntiAffinity:
+  enabled: false
+
+serviceAccount:
+  create: false
+  name: ""
+
+podAnnotations: {}
+
+nodeSelector: {}
+
+tolerations: []

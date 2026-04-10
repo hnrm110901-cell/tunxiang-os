@@ -1,0 +1,91 @@
+template:
+  name: tpl-migration-gate
+  identifier: tpl_migration_gate
+  versionLabel: "1.0.0"
+  type: Step
+  projectIdentifier: TunXiangOS
+  orgIdentifier: default
+  description: "DB 迁移门禁：检测是否有新 alembic migration，有则根据 MIGRATION_APPROVAL_REQUIRED 变量决定是否阻断流水线"
+  tags:
+    team: platform
+    phase: gate
+
+  spec:
+    type: ShellScript
+    timeout: 5m
+    spec:
+      shell: Bash
+      onDelegate: true
+      source:
+        type: Inline
+        spec:
+          script: |
+            #!/usr/bin/env bash
+            set -uo pipefail
+
+            # ---------------------------------------------------------------
+            # 迁移门禁检测脚本
+            # 环境变量：
+            #   MIGRATION_APPROVAL_REQUIRED  "true" 时有新迁移文件则以退出码1阻断
+            #                                "false"(默认) 仅告警，不阻断
+            #   REPO_PATH                    仓库根目录，默认 /harness
+            # ---------------------------------------------------------------
+
+            REPO_PATH="${REPO_PATH:-/harness}"
+            MIGRATION_APPROVAL_REQUIRED="${MIGRATION_APPROVAL_REQUIRED:-false}"
+            VERSIONS_DIR="${REPO_PATH}/s/alembic/versions"
+
+            echo "========================================="
+            echo "DB 迁移门禁检测"
+            echo "MIGRATION_APPROVAL_REQUIRED=${MIGRATION_APPROVAL_REQUIRED}"
+            echo "VERSIONS_DIR=${VERSIONS_DIR}"
+            echo "========================================="
+
+            if [ ! -d "${VERSIONS_DIR}" ]; then
+              echo "WARNING: 未找到 alembic versions 目录: ${VERSIONS_DIR}，跳过检测"
+              exit 0
+            fi
+
+            cd "${REPO_PATH}"
+
+            # 获取 HEAD~1 相对于当前 HEAD 新增的迁移文件
+            NEW_MIGRATIONS=$(git diff --name-only HEAD~1 HEAD -- "s/alembic/versions/*.py" 2>/dev/null | grep -E '\.py$' || true)
+
+            if [ -z "${NEW_MIGRATIONS}" ]; then
+              echo "OK: 未检测到新的 alembic migration 文件，可安全部署"
+              exit 0
+            fi
+
+            echo ""
+            echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+            echo "WARNING: 检测到以下新增 alembic migration 文件："
+            echo "-----------------------------------------"
+            echo "${NEW_MIGRATIONS}"
+            echo "-----------------------------------------"
+            echo "请在部署前确认："
+            echo "  1. migration 已在 dev/test 环境执行并验证无误"
+            echo "  2. 已准备好回滚 SQL（downgrade 脚本）"
+            echo "  3. 生产数据库已备份"
+            echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+            echo ""
+
+            # 输出 Harness 变量供后续步骤引用
+            echo "HAS_NEW_MIGRATIONS=true" >> "$HARNESS_OUTPUT_SECRET_VARIABLES" 2>/dev/null || true
+            export HAS_NEW_MIGRATIONS=true
+
+            if [ "${MIGRATION_APPROVAL_REQUIRED}" = "true" ]; then
+              echo "ERROR: MIGRATION_APPROVAL_REQUIRED=true，检测到新迁移文件，阻断流水线。请人工审核后重新触发。"
+              exit 1
+            else
+              echo "INFO: MIGRATION_APPROVAL_REQUIRED=false，仅告警不阻断，请人工确认后继续。"
+              exit 0
+            fi
+      environmentVariables:
+        - name: MIGRATION_APPROVAL_REQUIRED
+          type: String
+          value: <+input>
+        - name: REPO_PATH
+          type: String
+          value: /harness
+      outputVariables:
+        - name: HAS_NEW_MIGRATIONS

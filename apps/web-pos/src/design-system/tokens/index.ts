@@ -14,9 +14,8 @@ export { spacing, breakpoint, layout } from './spacing';
 export { radius, shadow, zIndex, motion } from './elevation';
 
 import { brand, warm, neutral, semantic, dark, navy } from './colors';
-import { fontFamily, fontSize } from './typography';
 import { spacing } from './spacing';
-import { radius, shadow, zIndex, motion } from './elevation';
+import { radius, shadow, motion } from './elevation';
 import { lightTheme } from '../themes/light';
 import { darkTheme } from '../themes/dark';
 

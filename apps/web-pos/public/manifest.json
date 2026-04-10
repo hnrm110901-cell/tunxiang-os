@@ -1,14 +1,40 @@
 {
-  "name": "屯象OS POS",
-  "short_name": "屯象POS",
-  "description": "屯象OS 收银点餐系统",
+  "name": "屯象POS收银",
+  "short_name": "TX收银",
+  "description": "屯象OS门店收银终端 — 支持离线收银、桌台管理、出餐协同",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0B1A20",
-  "theme_color": "#FF6B2C",
+  "background_color": "#1E2A3A",
+  "theme_color": "#1E2A3A",
   "orientation": "landscape",
+  "lang": "zh-CN",
   "icons": [
+    { "src": "/icons/pos-icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icons/pos-icon-512.png", "sizes": "512x512", "type": "image/png" },
     { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
     { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ],
+  "categories": ["business", "productivity"],
+  "screenshots": [
+    {
+      "src": "/screenshots/pos-main.png",
+      "sizes": "1024x768",
+      "type": "image/png",
+      "form_factor": "wide"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "快速收银",
+      "short_name": "收银",
+      "description": "进入收银界面",
+      "url": "/cashier"
+    },
+    {
+      "name": "桌台管理",
+      "short_name": "桌台",
+      "description": "查看桌台状态",
+      "url": "/tables"
+    }
   ]
 }

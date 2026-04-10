@@ -1,0 +1,30 @@
+replicaCount: 2
+
+image:
+  tag: v0.9.0  # pilot使用指定稳定版本
+
+ingress:
+  host: pilot-api.tunxiangos.cn
+  tls: true
+
+env:
+  TUNXIANG_ENV: pilot
+  LOG_LEVEL: info
+  # pilot专属功能开关
+  FEATURE_GROWTH_HUB_JOURNEY_V2_ENABLE: "true"  # pilot开启V2功能验证
+  FEATURE_AGENT_L3_AUTONOMY_ENABLE: "false"
+  PILOT_BRAND_ID: pilot_brand_001
+
+resources:
+  limits:
+    cpu: 400m
+    memory: 512Mi
+  requests:
+    cpu: 150m
+    memory: 256Mi
+
+autoscaling:
+  enabled: false
+
+podAntiAffinity:
+  enabled: true

@@ -1,0 +1,190 @@
+{
+  "__inputs": [],
+  "__requires": [
+    { "type": "grafana", "id": "grafana", "name": "Grafana", "version": "10.2.0" },
+    { "type": "datasource", "id": "prometheus", "name": "Prometheus", "version": "1.0.0" }
+  ],
+  "annotations": { "list": [] },
+  "description": "屯象OS 服务总览仪表板",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "id": 1,
+      "title": "服务 UP/DOWN 状态矩阵",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 0 },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "horizontal",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "options": { "0": { "color": "red", "text": "DOWN" }, "1": { "color": "green", "text": "UP" } }, "type": "value" }
+          ],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }] }
+        },
+        "overrides": []
+      },
+      "targets": [
+        { "expr": "up{job=~\"tunxiang-.*\"}", "legendFormat": "{{job}}", "refId": "A" }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "请求 QPS 趋势（按服务）",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
+      "options": { "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom" } },
+      "fieldConfig": {
+        "defaults": { "unit": "reqps", "custom": { "lineWidth": 2 } },
+        "overrides": []
+      },
+      "targets": [
+        { "expr": "sum by (job) (rate(http_requests_total{job=~\"tunxiang-.*\"}[1m]))", "legendFormat": "{{job}}", "refId": "A" }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "P99 延迟趋势（ms）",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
+      "options": { "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom" } },
+      "fieldConfig": {
+        "defaults": { "unit": "ms", "custom": { "lineWidth": 2 } },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.99, sum by (job, le) (rate(http_request_duration_seconds_bucket{job=~\"tunxiang-.*\"}[5m]))) * 1000",
+          "legendFormat": "{{job}} P99",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "错误率趋势（5xx）",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 14 },
+      "options": { "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom" } },
+      "fieldConfig": {
+        "defaults": { "unit": "percentunit", "custom": { "lineWidth": 2 }, "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 0.05 }] } },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum by (job) (rate(http_requests_total{job=~\"tunxiang-.*\",status=~\"5..\"}[5m])) / sum by (job) (rate(http_requests_total{job=~\"tunxiang-.*\"}[5m]))",
+          "legendFormat": "{{job}} 错误率",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "PostgreSQL 连接数",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 14 },
+      "options": { "legend": { "calcs": ["mean", "max"], "displayMode": "list", "placement": "bottom" } },
+      "fieldConfig": {
+        "defaults": { "unit": "short", "custom": { "lineWidth": 2 } },
+        "overrides": []
+      },
+      "targets": [
+        { "expr": "pg_stat_activity_count", "legendFormat": "活跃连接数", "refId": "A" },
+        { "expr": "pg_settings_max_connections", "legendFormat": "最大连接数", "refId": "B" }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Redis 内存使用率",
+      "type": "gauge",
+      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 22 },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "showThresholdLabels": false, "showThresholdMarkers": true },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 0.7 }, { "color": "red", "value": 0.85 }] }
+        },
+        "overrides": []
+      },
+      "targets": [
+        { "expr": "redis_memory_used_bytes / redis_memory_max_bytes", "legendFormat": "Redis内存使用率", "refId": "A" }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "Redis 内存使用趋势",
+      "type": "timeseries",
+      "gridPos": { "h": 6, "w": 9, "x": 6, "y": 22 },
+      "options": { "legend": { "calcs": ["mean", "max"], "displayMode": "list", "placement": "bottom" } },
+      "fieldConfig": {
+        "defaults": { "unit": "bytes", "custom": { "lineWidth": 2 } },
+        "overrides": []
+      },
+      "targets": [
+        { "expr": "redis_memory_used_bytes", "legendFormat": "已用内存", "refId": "A" },
+        { "expr": "redis_memory_max_bytes", "legendFormat": "最大内存", "refId": "B" }
+      ]
+    },
+    {
+      "id": 8,
+      "title": "LLM API 调用次数（tx-brain）",
+      "type": "timeseries",
+      "gridPos": { "h": 6, "w": 9, "x": 15, "y": 22 },
+      "options": { "legend": { "calcs": ["sum"], "displayMode": "table", "placement": "bottom" } },
+      "fieldConfig": {
+        "defaults": { "unit": "short", "custom": { "lineWidth": 2 } },
+        "overrides": []
+      },
+      "targets": [
+        { "expr": "rate(llm_api_calls_total{job=\"tunxiang-tx-brain\"}[1m]) * 60", "legendFormat": "API调用次数/min", "refId": "A" },
+        { "expr": "rate(llm_api_errors_total{job=\"tunxiang-tx-brain\"}[1m]) * 60", "legendFormat": "API失败次数/min", "refId": "B" }
+      ]
+    },
+    {
+      "id": 9,
+      "title": "LLM Token 消耗与成本估算（tx-brain）",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 28 },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "horizontal",
+        "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false },
+        "textMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": { "unit": "short" },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "成本估算 (USD)" }, "properties": [{ "id": "unit", "value": "currencyUSD" }] }
+        ]
+      },
+      "targets": [
+        { "expr": "increase(llm_tokens_total{job=\"tunxiang-tx-brain\",type=\"input\"}[24h])", "legendFormat": "输入Token (24h)", "refId": "A" },
+        { "expr": "increase(llm_tokens_total{job=\"tunxiang-tx-brain\",type=\"output\"}[24h])", "legendFormat": "输出Token (24h)", "refId": "B" },
+        { "expr": "(increase(llm_tokens_total{job=\"tunxiang-tx-brain\",type=\"input\"}[24h]) * 0.000003) + (increase(llm_tokens_total{job=\"tunxiang-tx-brain\",type=\"output\"}[24h]) * 0.000015)", "legendFormat": "成本估算 (USD)", "refId": "C" }
+      ]
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 38,
+  "tags": ["tunxiang", "overview"],
+  "time": { "from": "now-3h", "to": "now" },
+  "timepicker": {},
+  "timezone": "Asia/Shanghai",
+  "title": "屯象OS 服务总览",
+  "uid": "tunxiang-overview-v1",
+  "version": 1
+}

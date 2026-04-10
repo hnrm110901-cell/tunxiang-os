@@ -1,0 +1,521 @@
+pipeline:
+  name: release-tx-brain-prod
+  identifier: release_tx_brain_prod
+  projectIdentifier: TunXiangOS
+  orgIdentifier: default
+  description: "tx-brain AI 智能决策服务生产发布流水线：LLM API Key 验证 → ModelRouter 降级策略检查 → Pilot 灰度 → 2人审批 → 生产全量 → 健康验证 → 自动回滚兜底。生产环境才接入真实 Claude API。"
+  tags:
+    service: tx-brain
+    track: release
+    env: prod
+
+  stages:
+    # ═════════════════════════════════════════════════════════════
+    # Stage 0: Pre_Release_LLM_Validation
+    # 目的：生产发布前验证 Claude API 密钥有效性和 ModelRouter
+    #       降级策略配置，确保 LLM 集成就绪。
+    # ═════════════════════════════════════════════════════════════
+    - stage:
+        name: Pre_Release_LLM_Validation
+        identifier: Pre_Release_LLM_Validation
+        type: Custom
+        spec:
+          execution:
+            steps:
+              # LLM_API_KEY 验证步骤：确认 Claude API 密钥有效
+              - step:
+                  name: Verify_LLM_API_Key
+                  identifier: Verify_LLM_API_Key
+                  type: ShellScript
+                  timeout: 5m
+                  spec:
+                    shell: Bash
+                    onDelegate: true
+                    source:
+                      type: Inline
+                      spec:
+                        script: |
+                          #!/usr/bin/env bash
+                          set -euo pipefail
+                          echo ">>> 验证 Claude API 密钥有效性（生产发布前必检）"
+
+                          # 从 Harness Secret Manager 获取密钥（不在日志中打印）
+                          if [ -z "${ANTHROPIC_API_KEY:-}" ]; then
+                            echo "ERROR: ANTHROPIC_API_KEY 未配置，请在 Harness Secret Manager 中设置"
+                            exit 1
+                          fi
+
+                          # 调用 Claude API 模型列表接口验证密钥有效性
+                          HTTP_CODE=$(curl -sf -o /tmp/llm_check_resp.json -w "%{http_code}" \
+                            --max-time 15 \
+                            -H "x-api-key: ${ANTHROPIC_API_KEY}" \
+                            -H "anthropic-version: 2023-06-01" \
+                            "https://api.anthropic.com/v1/models" || true)
+
+                          if [ "${HTTP_CODE}" = "200" ]; then
+                            echo "OK: Claude API 密钥有效，HTTP ${HTTP_CODE}"
+                          elif [ "${HTTP_CODE}" = "401" ]; then
+                            echo "ERROR: Claude API 密钥无效（HTTP 401 Unauthorized），请更新 ANTHROPIC_API_KEY"
+                            exit 1
+                          elif [ "${HTTP_CODE}" = "403" ]; then
+                            echo "ERROR: Claude API 密钥权限不足（HTTP 403 Forbidden）"
+                            exit 1
+                          else
+                            echo "WARNING: Claude API 返回 HTTP ${HTTP_CODE}，请检查网络或 API 状态"
+                            # 非鉴权错误不阻断发布，记录警告
+                          fi
+
+                          echo "OK: LLM API Key 验证完成"
+                    environmentVariables:
+                      - name: ANTHROPIC_API_KEY
+                        type: Secret
+                        value: anthropic_api_key_prod
+
+              # ModelRouter 降级策略检查
+              - step:
+                  name: Check_ModelRouter_Fallback_Strategy
+                  identifier: Check_ModelRouter_Fallback_Strategy
+                  type: ShellScript
+                  timeout: 5m
+                  spec:
+                    shell: Bash
+                    onDelegate: true
+                    source:
+                      type: Inline
+                      spec:
+                        script: |
+                          #!/usr/bin/env bash
+                          set -euo pipefail
+                          echo ">>> ModelRouter 降级策略检查（生产环境）"
+
+                          # 通过 tx-brain 的配置接口验证 ModelRouter 降级策略配置
+                          # 所有模型调用必须通过 ModelRouter，不直接调用 API（CLAUDE.md 规范）
+                          CONFIG_URL="https://uat-api.tunxiangos.cn/tx-brain/api/v1/model-router/config"
+                          HTTP_CODE=$(curl -sf -o /tmp/router_config.json -w "%{http_code}" \
+                            --max-time 10 "${CONFIG_URL}" || true)
+
+                          if [ "${HTTP_CODE}" = "200" ]; then
+                            echo "OK: ModelRouter 配置接口可达"
+
+                            # 检查降级策略是否已配置
+                            FALLBACK_CONFIGURED=$(python3 -c "
+import sys, json
+try:
+    d = json.load(open('/tmp/router_config.json'))
+    fb = d.get('fallback_strategy', {})
+    print('configured' if fb else 'not_configured')
+except Exception as e:
+    print('error')
+" 2>/dev/null || echo "unknown")
+
+                            echo "降级策略状态: ${FALLBACK_CONFIGURED}"
+                            if [ "${FALLBACK_CONFIGURED}" = "not_configured" ]; then
+                              echo "WARNING: ModelRouter 降级策略未配置，生产环境建议配置降级策略"
+                              echo "提示：当 Claude API 不可用时，降级策略可切换到备用模型或返回 fallback 响应"
+                            fi
+                          else
+                            echo "WARNING: 无法获取 ModelRouter 配置 (HTTP ${HTTP_CODE})，跳过降级策略检查"
+                          fi
+
+                          echo "OK: ModelRouter 降级策略检查完成"
+                  failureStrategies:
+                    - onFailure:
+                        errors:
+                          - AllErrors
+                        action:
+                          type: Abort
+
+    # ═════════════════════════════════════════════════════════════
+    # Stage 1: Deploy_Pilot
+    # ═════════════════════════════════════════════════════════════
+    - stage:
+        name: Deploy_Pilot
+        identifier: Deploy_Pilot
+        type: Deployment
+        dependsOn:
+          - Pre_Release_LLM_Validation
+        spec:
+          deploymentType: Kubernetes
+          service:
+            serviceRef: svc_tx_brain
+            serviceInputs:
+              serviceDefinition:
+                type: Kubernetes
+                spec:
+                  artifacts:
+                    primary:
+                      primaryArtifactRef: primary
+                      sources:
+                        - identifier: primary
+                          spec:
+                            tag: <+pipeline.variables.imageTag>
+          environment:
+            environmentRef: env_pilot
+            deployToAll: false
+            infrastructureDefinitions:
+              - identifier: gitops_pilot_region_a
+                inputs:
+                  identifier: gitops_pilot_region_a
+                  type: KubernetesDirect
+                  spec:
+                    namespace: tunxiang-pilot
+          execution:
+            steps:
+              - step:
+                  name: K8s_Rolling_Deploy_Pilot
+                  identifier: K8s_Rolling_Deploy_Pilot
+                  type: K8sRollingDeploy
+                  timeout: 10m
+                  spec:
+                    skipDryRun: false
+                    pruningEnabled: false
+                  failureStrategies:
+                    - onFailure:
+                        errors:
+                          - AllErrors
+                        action:
+                          type: StageRollback
+
+              - step:
+                  name: Healthcheck_Pilot
+                  identifier: Healthcheck_Pilot
+                  type: ShellScript
+                  timeout: 5m
+                  spec:
+                    shell: Bash
+                    onDelegate: true
+                    source:
+                      type: Inline
+                      spec:
+                        script: |
+                          #!/usr/bin/env bash
+                          set -euo pipefail
+                          HEALTH_URL="https://pilot-api.tunxiangos.cn/tx-brain/health"
+                          MAX_RETRY=10; SLEEP_SEC=15
+                          echo ">>> Pilot 健康检查: ${HEALTH_URL}"
+                          for i in $(seq 1 ${MAX_RETRY}); do
+                            HTTP_CODE=$(curl -sf -o /dev/null -w "%{http_code}" --max-time 10 "${HEALTH_URL}" || true)
+                            if [ "${HTTP_CODE}" = "200" ]; then echo "OK"; exit 0; fi
+                            echo "HTTP ${HTTP_CODE}，等待 ${SLEEP_SEC}s..."; sleep ${SLEEP_SEC}
+                          done
+                          echo "ERROR: Pilot 健康检查超时"; exit 1
+
+              - step:
+                  name: Pilot_Observation_Wait
+                  identifier: Pilot_Observation_Wait
+                  type: HarnessApproval
+                  timeout: 2h
+                  spec:
+                    approvalMessage: "tx-brain Pilot 已部署完成（真实 Claude API 接入，非 Mock 模式）。请观察 Pilot 监控指标（LLM 调用成功率、延迟、费用）至少 10 分钟后确认继续。版本：<+pipeline.sequenceId>"
+                    includePipelineExecutionHistory: true
+                    approvers:
+                      userGroups:
+                        - sre_group
+                      minimumCount: 1
+                      disallowPipelineExecutor: false
+                    approverInputs:
+                      - name: error_rate_ok
+                        defaultValue: "no"
+                      - name: latency_ok
+                        defaultValue: "no"
+                      - name: llm_cost_ok
+                        defaultValue: "no"
+                  failureStrategies:
+                    - onFailure:
+                        errors:
+                          - ApprovalRejection
+                        action:
+                          type: StageRollback
+
+            rollbackSteps:
+              - step:
+                  name: K8s_Rolling_Rollback_Pilot
+                  identifier: K8s_Rolling_Rollback_Pilot
+                  type: K8sRollingRollback
+                  timeout: 10m
+                  spec: {}
+
+    # ═════════════════════════════════════════════════════════════
+    # Stage 2: Approve_Prod（双人审批）
+    # ═════════════════════════════════════════════════════════════
+    - stage:
+        name: Approve_Prod
+        identifier: Approve_Prod
+        type: Approval
+        dependsOn:
+          - Deploy_Pilot
+        spec:
+          execution:
+            steps:
+              - step:
+                  name: Prod_Release_Approval
+                  identifier: Prod_Release_Approval
+                  type: HarnessApproval
+                  timeout: 4h
+                  spec:
+                    approvalMessage: "[生产发布] 请两人确认：版本 <+pipeline.sequenceId> | 服务 tx-brain（AI 决策，真实 Claude API）| 时间 <+pipeline.startTs>。注意：本次发布将在生产环境接入真实 Claude API，请确认费用预算和降级策略。"
+                    includePipelineExecutionHistory: true
+                    approvers:
+                      userGroups:
+                        - release_manager_group
+                        - sre_group
+                      minimumCount: 2
+                      disallowPipelineExecutor: false
+                    approverInputs:
+                      - name: rollback_plan_confirmed
+                        defaultValue: "no"
+                      - name: change_ticket_id
+                        defaultValue: ""
+                      - name: db_migration_verified
+                        defaultValue: "no"
+                      - name: llm_budget_confirmed
+                        defaultValue: "no"
+                  failureStrategies:
+                    - onFailure:
+                        errors:
+                          - ApprovalRejection
+                        action:
+                          type: Abort
+
+    # ═════════════════════════════════════════════════════════════
+    # Stage 3: Deploy_Prod
+    # ═════════════════════════════════════════════════════════════
+    - stage:
+        name: Deploy_Prod
+        identifier: Deploy_Prod
+        type: Deployment
+        dependsOn:
+          - Approve_Prod
+        spec:
+          deploymentType: Kubernetes
+          service:
+            serviceRef: svc_tx_brain
+            serviceInputs:
+              serviceDefinition:
+                type: Kubernetes
+                spec:
+                  artifacts:
+                    primary:
+                      primaryArtifactRef: primary
+                      sources:
+                        - identifier: primary
+                          spec:
+                            tag: <+pipeline.variables.imageTag>
+          environment:
+            environmentRef: env_prod
+            deployToAll: false
+            infrastructureDefinitions:
+              - identifier: k8s_prod_main
+                inputs:
+                  identifier: k8s_prod_main
+                  type: KubernetesDirect
+                  spec:
+                    namespace: tunxiang-prod
+          execution:
+            steps:
+              - step:
+                  name: K8s_Rolling_Deploy_Prod
+                  identifier: K8s_Rolling_Deploy_Prod
+                  type: K8sRollingDeploy
+                  timeout: 10m
+                  spec:
+                    skipDryRun: false
+                    pruningEnabled: false
+                  failureStrategies:
+                    - onFailure:
+                        errors:
+                          - AllErrors
+                        action:
+                          type: StageRollback
+
+            rollbackSteps:
+              - step:
+                  name: K8s_Rolling_Rollback_Prod
+                  identifier: K8s_Rolling_Rollback_Prod
+                  type: K8sRollingRollback
+                  timeout: 10m
+                  spec: {}
+
+        failureStrategies:
+          - onFailure:
+              errors:
+                - AllErrors
+              action:
+                type: StageRollback
+
+    # ═════════════════════════════════════════════════════════════
+    # Stage 4: Post_Deploy_Verify
+    # ═════════════════════════════════════════════════════════════
+    - stage:
+        name: Post_Deploy_Verify
+        identifier: Post_Deploy_Verify
+        type: Custom
+        dependsOn:
+          - Deploy_Prod
+        spec:
+          execution:
+            steps:
+              - step:
+                  name: Prod_Healthcheck
+                  identifier: Prod_Healthcheck
+                  type: ShellScript
+                  timeout: 5m
+                  spec:
+                    shell: Bash
+                    onDelegate: true
+                    source:
+                      type: Inline
+                      spec:
+                        script: |
+                          #!/usr/bin/env bash
+                          set -euo pipefail
+                          HEALTH_URL="https://api.tunxiangos.cn/tx-brain/health"
+                          MAX_RETRY=12; SLEEP_SEC=15
+                          echo ">>> 生产健康检查: ${HEALTH_URL}"
+                          for i in $(seq 1 ${MAX_RETRY}); do
+                            echo "第 ${i}/${MAX_RETRY} 次..."
+                            HTTP_CODE=$(curl -sf -o /dev/null -w "%{http_code}" --max-time 10 "${HEALTH_URL}" || true)
+                            if [ "${HTTP_CODE}" = "200" ]; then echo "OK: 健康检查通过"; exit 0; fi
+                            echo "HTTP ${HTTP_CODE}，等待 ${SLEEP_SEC}s..."
+                            sleep ${SLEEP_SEC}
+                          done
+                          echo "ERROR: 生产健康检查在 $((MAX_RETRY * SLEEP_SEC))s 内未通过"
+                          exit 1
+                  failureStrategies:
+                    - onFailure:
+                        errors:
+                          - AllErrors
+                        action:
+                          type: Abort
+
+              - step:
+                  name: Core_API_Smoke_Test
+                  identifier: Core_API_Smoke_Test
+                  type: ShellScript
+                  timeout: 5m
+                  spec:
+                    shell: Bash
+                    onDelegate: true
+                    source:
+                      type: Inline
+                      spec:
+                        script: |
+                          #!/usr/bin/env bash
+                          set -euo pipefail
+                          BASE_URL="https://api.tunxiangos.cn"
+                          echo ">>> tx-brain 核心接口冒烟验证（真实 Claude API 模式）"
+
+                          check_api() {
+                            local NAME="$1" URL="$2" EXPECT_CODE="${3:-200}"
+                            HTTP_CODE=$(curl -sf -o /tmp/api_resp.json -w "%{http_code}" \
+                              --max-time 15 -H "Content-Type: application/json" "${URL}" || true)
+                            if [ "${HTTP_CODE}" = "${EXPECT_CODE}" ]; then
+                              echo "  OK  [${HTTP_CODE}] ${NAME}"
+                            else
+                              echo "  FAIL [${HTTP_CODE}] ${NAME} (期望 ${EXPECT_CODE})"
+                              return 1
+                            fi
+                          }
+
+                          FAILED=0
+                          check_api "Health"                "${BASE_URL}/tx-brain/health"                            200 || FAILED=1
+                          check_api "ModelRouter Health"    "${BASE_URL}/tx-brain/api/v1/model-router/health"        200 || FAILED=1
+                          check_api "Agent Status"          "${BASE_URL}/tx-brain/api/v1/agents/status"              200 || FAILED=1
+
+                          if [ ${FAILED} -eq 1 ]; then
+                            echo "ERROR: tx-brain 部分核心接口验证失败，请立即查看生产日志"
+                            exit 1
+                          fi
+                          echo "OK: tx-brain 所有核心接口验证通过（真实 Claude API 模式）"
+                  failureStrategies:
+                    - onFailure:
+                        errors:
+                          - AllErrors
+                        action:
+                          type: Abort
+
+              - step:
+                  name: Notify_Deploy_Success
+                  identifier: Notify_Deploy_Success
+                  type: ShellScript
+                  timeout: 2m
+                  spec:
+                    shell: Bash
+                    onDelegate: true
+                    source:
+                      type: Inline
+                      spec:
+                        script: |
+                          #!/usr/bin/env bash
+                          echo "================================================"
+                          echo "生产发布成功！"
+                          echo "服务: tx-brain（AI 智能决策，真实 Claude API）"
+                          echo "版本: <+pipeline.variables.imageTag>"
+                          echo "流水线序号: <+pipeline.sequenceId>"
+                          echo "================================================"
+                          # curl -X POST "${NOTIFY_WEBHOOK}" -d '{"msg": "tx-brain prod deployed"}'
+
+    # ═════════════════════════════════════════════════════════════
+    # Stage 5: Auto_Rollback_On_Failure
+    # ═════════════════════════════════════════════════════════════
+    - stage:
+        name: Auto_Rollback_On_Failure
+        identifier: Auto_Rollback_On_Failure
+        type: Deployment
+        dependsOn:
+          - Post_Deploy_Verify
+        when:
+          pipelineStatus: Failure
+        spec:
+          deploymentType: Kubernetes
+          service:
+            serviceRef: svc_tx_brain
+          environment:
+            environmentRef: env_prod
+            deployToAll: false
+            infrastructureDefinitions:
+              - identifier: k8s_prod_main
+          execution:
+            steps:
+              - step:
+                  name: Emergency_Rollback_Prod
+                  identifier: Emergency_Rollback_Prod
+                  type: K8sRollingRollback
+                  timeout: 10m
+                  spec: {}
+
+              - step:
+                  name: Notify_Rollback
+                  identifier: Notify_Rollback
+                  type: ShellScript
+                  timeout: 2m
+                  spec:
+                    shell: Bash
+                    onDelegate: true
+                    source:
+                      type: Inline
+                      spec:
+                        script: |
+                          #!/usr/bin/env bash
+                          echo "================================================"
+                          echo "紧急回滚已执行！"
+                          echo "服务: tx-brain（AI 智能决策）"
+                          echo "失败版本: <+pipeline.variables.imageTag>"
+                          echo "流水线: <+pipeline.sequenceId>"
+                          echo "请 SRE 立即介入排查（注意检查 LLM API 调用费用和错误日志）"
+                          echo "================================================"
+                          # curl -X POST "${ALERT_WEBHOOK}" -d '{"alert": "tx-brain prod rollback triggered"}'
+
+        failureStrategies:
+          - onFailure:
+              errors:
+                - AllErrors
+              action:
+                type: Abort
+
+  variables:
+    - name: imageTag
+      type: String
+      description: "待发布的生产镜像 Tag（必须来自已通过 UAT 的构建）"
+      required: true
+      value: <+input>

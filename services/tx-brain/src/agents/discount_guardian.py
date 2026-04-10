@@ -157,4 +157,80 @@ class DiscountGuardianAgent:
         }
 
 
+    async def analyze_from_mv(self, tenant_id: str, store_id: str | None = None) -> dict:
+        """从 mv_discount_health 快速读取最近折扣健康数据，<5ms，无 Claude 调用。
+
+        数据来源：因果链①投影视图（DiscountHealthProjector）
+        无数据时返回空 data + note（调用方按需处理）。
+        """
+        from sqlalchemy import text
+        from sqlalchemy.exc import SQLAlchemyError
+        from shared.ontology.src.database import get_db
+
+        try:
+            async for db in get_db():
+                await db.execute(
+                    text("SELECT set_config('app.tenant_id', :tid, true)"),
+                    {"tid": str(tenant_id)},
+                )
+                params: dict = {"tenant_id": tenant_id}
+                store_clause = ""
+                if store_id:
+                    store_clause = "AND store_id = :store_id"
+                    params["store_id"] = store_id
+
+                result = await db.execute(
+                    text(f"""
+                        SELECT
+                            store_id,
+                            stat_date,
+                            total_orders,
+                            discounted_orders,
+                            discount_rate,
+                            total_discount_fen,
+                            unauthorized_count,
+                            leak_types,
+                            top_operators,
+                            threshold_breaches
+                        FROM mv_discount_health
+                        WHERE tenant_id = :tenant_id
+                        {store_clause}
+                        ORDER BY stat_date DESC
+                        LIMIT 1
+                    """),
+                    params,
+                )
+                row = result.mappings().one_or_none()
+                if not row:
+                    return {
+                        "inference_layer": "mv_fast_path",
+                        "data": {},
+                        "agent": self.__class__.__name__,
+                        "note": "暂无折扣健康数据",
+                    }
+                data = dict(row._mapping)
+                # 转换 Decimal 类型到 float
+                if data.get("discount_rate") is not None:
+                    data["discount_rate"] = float(data["discount_rate"])
+                return {
+                    "inference_layer": "mv_fast_path",
+                    "data": data,
+                    "agent": self.__class__.__name__,
+                    "risk_signal": "high" if data.get("unauthorized_count", 0) > 0 or data.get("threshold_breaches", 0) > 0 else "normal",
+                }
+        except SQLAlchemyError as exc:
+            logger.warning(
+                "discount_guardian_mv_db_error",
+                tenant_id=tenant_id,
+                store_id=store_id,
+                error=str(exc),
+            )
+            return {
+                "inference_layer": "mv_fast_path_error",
+                "data": {},
+                "agent": self.__class__.__name__,
+                "error": "数据库查询失败，请使用实时分析",
+            }
+
+
 discount_guardian = DiscountGuardianAgent()

@@ -42,6 +42,10 @@ def upgrade() -> None:
         COMMENT ON TABLE manager_discount_requests IS
             '经理端折扣审批申请：服务员在 POS 发起折扣/赠品申请，经理 App 审批';
 
+        -- Ensure is_deleted exists if table was created by an earlier migration
+        ALTER TABLE manager_discount_requests
+            ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN NOT NULL DEFAULT FALSE;
+
         CREATE INDEX IF NOT EXISTS ix_mdr_tenant_store
             ON manager_discount_requests (tenant_id, store_id);
         CREATE INDEX IF NOT EXISTS ix_mdr_status

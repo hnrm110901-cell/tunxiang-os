@@ -51,7 +51,7 @@ const OpsTimeline: React.FC<OpsTimelineProps> = ({
       {phases.map((phase, i) => {
         const isPast    = i < currentIndex;
         const isCurrent = i === currentIndex;
-        const isFuture  = i > currentIndex;
+        const _isFuture  = i > currentIndex; void _isFuture;
 
         const dotColor  = isCurrent ? phase.color : isPast ? '#d9d9d9' : '#d9d9d9';
         const lineColor = i < phases.length - 1

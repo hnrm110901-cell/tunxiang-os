@@ -1,0 +1,88 @@
+template:
+  name: tpl-cd-k8s-rolling
+  identifier: tpl_cd_k8s_rolling
+  versionLabel: "1.0.0"
+  type: Stage
+  projectIdentifier: TunXiangOS
+  orgIdentifier: default
+  description: "通用 K8s Rolling 部署模板，含部署后健康检查"
+  tags:
+    team: platform
+    phase: cd
+
+  spec:
+    type: Deployment
+    spec:
+      deploymentType: Kubernetes
+      service:
+        serviceRef: <+input>
+        serviceInputs: <+input>
+      environment:
+        environmentRef: <+input>
+        deployToAll: false
+        infrastructureDefinitions:
+          - identifier: <+input>
+      execution:
+        steps:
+          - step:
+              name: K8s_Rolling_Deploy
+              identifier: K8s_Rolling_Deploy
+              type: K8sRollingDeploy
+              timeout: 10m
+              spec:
+                skipDryRun: false
+                pruningEnabled: false
+              failureStrategies:
+                - onFailure:
+                    errors:
+                      - AllErrors
+                    action:
+                      type: StageRollback
+
+          - step:
+              name: Post_Deploy_Healthcheck
+              identifier: Post_Deploy_Healthcheck
+              type: ShellScript
+              timeout: 5m
+              spec:
+                shell: Bash
+                onDelegate: true
+                source:
+                  type: Inline
+                  spec:
+                    script: |
+                      #!/usr/bin/env bash
+                      set -euo pipefail
+
+                      HEALTH_URL="<+input>"
+                      MAX_RETRY=10
+                      SLEEP_SEC=15
+
+                      echo ">>> 开始健康检查: ${HEALTH_URL}"
+                      for i in $(seq 1 ${MAX_RETRY}); do
+                        echo "第 ${i}/${MAX_RETRY} 次探测..."
+                        HTTP_CODE=$(curl -sf -o /dev/null -w "%{http_code}" --max-time 10 "${HEALTH_URL}" || true)
+                        if [ "${HTTP_CODE}" = "200" ]; then
+                          echo "健康检查通过 (HTTP 200)"
+                          exit 0
+                        fi
+                        echo "HTTP ${HTTP_CODE}，等待 ${SLEEP_SEC}s 后重试..."
+                        sleep ${SLEEP_SEC}
+                      done
+
+                      echo "ERROR: 健康检查在 $((MAX_RETRY * SLEEP_SEC))s 内未通过，最后状态码: ${HTTP_CODE}"
+                      exit 1
+              failureStrategies:
+                - onFailure:
+                    errors:
+                      - AllErrors
+                    action:
+                      type: StageRollback
+
+        rollbackSteps:
+          - step:
+              name: K8s_Rolling_Rollback
+              identifier: K8s_Rolling_Rollback
+              type: K8sRollingRollback
+              timeout: 10m
+              spec: {}

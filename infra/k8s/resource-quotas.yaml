@@ -1,0 +1,154 @@
+# 屯象OS K8s ResourceQuota 配置
+# 各namespace资源配额，防止单环境资源耗尽影响其他环境
+# 首次部署：kubectl apply -f resource-quotas.yaml
+#
+# 配额策略说明：
+#   dev/test：轻量配额，仅需跑通基础冒烟测试
+#   uat：中等配额，支持完整集成测试（13个服务全量运行）
+#   pilot：高配额，接近生产规模，用于小批量真实门店灰度
+#   prod：生产满配，支持13个服务高峰期HPA扩容
+---
+# tunxiang-dev：开发环境轻量配额
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: tunxiang-dev-quota
+  namespace: tunxiang-dev
+  labels:
+    app.kubernetes.io/part-of: tunxiang-os
+spec:
+  hard:
+    requests.cpu: "2"
+    limits.cpu: "4"
+    requests.memory: 4Gi
+    limits.memory: 8Gi
+    pods: "20"
+    services: "20"
+    persistentvolumeclaims: "5"
+    secrets: "20"
+    configmaps: "20"
+---
+# tunxiang-test：测试环境与dev同级配额
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: tunxiang-test-quota
+  namespace: tunxiang-test
+  labels:
+    app.kubernetes.io/part-of: tunxiang-os
+spec:
+  hard:
+    requests.cpu: "2"
+    limits.cpu: "4"
+    requests.memory: 4Gi
+    limits.memory: 8Gi
+    pods: "20"
+    services: "20"
+    persistentvolumeclaims: "5"
+    secrets: "20"
+    configmaps: "20"
+---
+# tunxiang-uat：UAT环境中等配额，支持13个服务全量启动
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: tunxiang-uat-quota
+  namespace: tunxiang-uat
+  labels:
+    app.kubernetes.io/part-of: tunxiang-os
+spec:
+  hard:
+    requests.cpu: "4"
+    limits.cpu: "8"
+    requests.memory: 8Gi
+    limits.memory: 16Gi
+    pods: "30"
+    services: "30"
+    persistentvolumeclaims: "10"
+    secrets: "30"
+    configmaps: "30"
+---
+# tunxiang-pilot：灰度环境高配额，接近生产规模（徐记海鲜等标杆门店）
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: tunxiang-pilot-quota
+  namespace: tunxiang-pilot
+  labels:
+    app.kubernetes.io/part-of: tunxiang-os
+spec:
+  hard:
+    requests.cpu: "8"
+    limits.cpu: "16"
+    requests.memory: 16Gi
+    limits.memory: 32Gi
+    pods: "50"
+    services: "50"
+    persistentvolumeclaims: "20"
+    secrets: "50"
+    configmaps: "50"
+---
+# tunxiang-prod：生产环境满配，支持HPA高峰扩容（tx-trade最多10实例）
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: tunxiang-prod-quota
+  namespace: tunxiang-prod
+  labels:
+    app.kubernetes.io/part-of: tunxiang-os
+spec:
+  hard:
+    requests.cpu: "16"
+    limits.cpu: "32"
+    requests.memory: 32Gi
+    limits.memory: 64Gi
+    pods: "100"
+    services: "50"
+    persistentvolumeclaims: "30"
+    secrets: "50"
+    configmaps: "50"
+---
+# tunxiang-demo：演示环境，与uat同级（客户POC演示用）
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: tunxiang-demo-quota
+  namespace: tunxiang-demo
+  labels:
+    app.kubernetes.io/part-of: tunxiang-os
+spec:
+  hard:
+    requests.cpu: "4"
+    limits.cpu: "8"
+    requests.memory: 8Gi
+    limits.memory: 16Gi
+    pods: "30"
+    services: "30"
+    persistentvolumeclaims: "10"
+    secrets: "30"
+    configmaps: "30"
+---
+# LimitRange：各namespace的容器默认资源限制
+# 防止未指定resources的容器无限制消耗资源
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: tunxiang-prod-limit-range
+  namespace: tunxiang-prod
+  labels:
+    app.kubernetes.io/part-of: tunxiang-os
+spec:
+  limits:
+    - type: Container
+      default:
+        cpu: 500m
+        memory: 512Mi
+      defaultRequest:
+        cpu: 100m
+        memory: 128Mi
+      max:
+        cpu: "2"
+        memory: 2Gi
+      min:
+        cpu: 50m
+        memory: 64Mi

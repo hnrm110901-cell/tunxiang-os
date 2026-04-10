@@ -48,7 +48,19 @@ def upgrade() -> None:
     op.execute("ALTER TABLE offline_order_queue FORCE ROW LEVEL SECURITY;")
 
     for action in ("SELECT", "INSERT", "UPDATE", "DELETE"):
-        op.execute(f"""
+        if action == "INSERT":
+            op.execute(f"""
+            CREATE POLICY offline_order_queue_{action.lower()}_tenant ON offline_order_queue
+            AS RESTRICTIVE FOR {action}
+            WITH CHECK (
+                current_setting('app.tenant_id', TRUE) IS NOT NULL
+                AND current_setting('app.tenant_id', TRUE) <> ''
+                AND tenant_id = NULLIF(current_setting('app.tenant_id', TRUE), '')::UUID
+            );
+
+            """)
+        else:
+            op.execute(f"""
             CREATE POLICY offline_order_queue_{action.lower()}_tenant ON offline_order_queue
             AS RESTRICTIVE FOR {action}
             USING (
@@ -56,7 +68,8 @@ def upgrade() -> None:
                 AND current_setting('app.tenant_id', TRUE) <> ''
                 AND tenant_id = NULLIF(current_setting('app.tenant_id', TRUE), '')::UUID
             );
-        """)
+
+            """)
 
     op.execute("""
         CREATE INDEX IF NOT EXISTS ix_offline_order_queue_tenant_store
@@ -92,7 +105,19 @@ def upgrade() -> None:
     op.execute("ALTER TABLE sync_checkpoints FORCE ROW LEVEL SECURITY;")
 
     for action in ("SELECT", "INSERT", "UPDATE", "DELETE"):
-        op.execute(f"""
+        if action == "INSERT":
+            op.execute(f"""
+            CREATE POLICY sync_checkpoints_{action.lower()}_tenant ON sync_checkpoints
+            AS RESTRICTIVE FOR {action}
+            WITH CHECK (
+                current_setting('app.tenant_id', TRUE) IS NOT NULL
+                AND current_setting('app.tenant_id', TRUE) <> ''
+                AND tenant_id = NULLIF(current_setting('app.tenant_id', TRUE), '')::UUID
+            );
+
+            """)
+        else:
+            op.execute(f"""
             CREATE POLICY sync_checkpoints_{action.lower()}_tenant ON sync_checkpoints
             AS RESTRICTIVE FOR {action}
             USING (
@@ -100,7 +125,8 @@ def upgrade() -> None:
                 AND current_setting('app.tenant_id', TRUE) <> ''
                 AND tenant_id = NULLIF(current_setting('app.tenant_id', TRUE), '')::UUID
             );
-        """)
+
+            """)
 
     op.execute("""
         CREATE INDEX IF NOT EXISTS ix_sync_checkpoints_tenant_store_device

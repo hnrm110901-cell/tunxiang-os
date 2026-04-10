@@ -1,0 +1,96 @@
+# tx-brain — AI智能决策中枢
+#
+# !! replicaCount 强制为 1，LLM单实例运行 !!
+# 原因：
+#   1. Claude API调用链路有会话上下文，多实例可能导致上下文分裂
+#   2. LLM推理内存占用高（1Gi），多实例成本倍增
+#   3. Agent决策留痕需要串行写入，多实例并发写会产生竞态
+
+replicaCount: 1
+
+image:
+  repository: tunxiang/tx-brain
+  pullPolicy: IfNotPresent
+  tag: latest
+
+service:
+  type: ClusterIP
+  port: 8010
+  targetPort: 8010
+
+ingress:
+  enabled: false
+  className: nginx
+  host: ""
+  tls: false
+  tlsSecretName: ""
+
+resources:
+  limits:
+    # CPU增加到1000m：LLM调用的token解析和上下文处理需要更多CPU
+    cpu: 1000m
+    # 内存增加到1Gi：LLM上下文缓存 + Claude响应缓冲区需要更大内存
+    memory: 1Gi
+  requests:
+    cpu: 400m
+    memory: 512Mi
+
+env:
+  TUNXIANG_ENV: prod
+  LOG_LEVEL: info
+  # 模型后端：claude-haiku（速度快/成本低），复杂推理可切换到claude-sonnet
+  MODEL_BACKEND: claude-haiku
+  # MOCK_LLM：生产环境强制false，禁止使用mock响应
+  # 开发/测试环境可设为true节省API费用
+  MOCK_LLM: "false"
+
+# Secret中存放的敏感环境变量（由外部Secret Manager注入）
+secretRef:
+  name: tx-brain-secret
+  # 包含: DB_URL, REDIS_URL, JWT_SECRET, SUPABASE_SERVICE_KEY
+
+# Anthropic API Key：从Harness Secret管理器注入，挂载为环境变量
+# 禁止硬编码！必须通过Harness Secret或K8s Secret注入
+extraSecretRef:
+  name: tx-brain-anthropic-secret
+  # 包含: ANTHROPIC_API_KEY（anthropic_api_key）
+
+autoscaling:
+  # !! 禁止开启HPA，LLM服务单实例运行，见顶部说明 !!
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 1
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 8010
+  initialDelaySeconds: 45
+  periodSeconds: 10
+  failureThreshold: 3
+  timeoutSeconds: 10
+
+readinessProbe:
+  httpGet:
+    path: /health
+    port: 8010
+  initialDelaySeconds: 15
+  periodSeconds: 5
+  failureThreshold: 3
+  timeoutSeconds: 5
+
+# 单实例无需反亲和
+podAntiAffinity:
+  enabled: false
+
+serviceAccount:
+  create: false
+  name: ""
+
+podAnnotations: {}
+
+nodeSelector: {}
+
+tolerations: []

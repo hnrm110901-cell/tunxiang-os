@@ -9,7 +9,10 @@
  *   GET /api/v1/dashboard/summary            — 私域健康/门店排行/Agent决策
  */
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { txFetch } from '../../../api';
+import { useApi } from '../../../hooks/useApi';
+import type { JourneyTemplateAttribution, AgentSuggestionDetail, P1Distribution } from '../../../api/growthHubApi';
 
 // ---- 颜色常量（深色主题）----
 const BG_0   = '#0d1e28';
@@ -85,6 +88,75 @@ interface DashboardSummary {
     confidence: number | null;
     created_at: string | null;
   }[];
+}
+
+// ---- 增长中枢V2 类型 ----
+
+interface GrowthDashboardStats {
+  profiles: {
+    total: number;
+    first_order_only: number;
+    second_order_done: number;
+    stable_repeat: number;
+    high_priority_reactivation: number;
+    active_repairs: number;
+  };
+  enrollments: {
+    total: number;
+    active: number;
+    paused: number;
+    completed: number;
+    observing: number;
+  };
+  touches_7d: {
+    total: number;
+    delivered: number;
+    opened: number;
+    clicked: number;
+    attributed: number;
+    attributed_revenue_fen: number;
+  };
+  suggestions_7d: {
+    total: number;
+    pending_review: number;
+    approved: number;
+    published: number;
+    rejected: number;
+  };
+  funnel: {
+    first_order: number;
+    touched: number;
+    revisited: number;
+    repeat_customer: number;
+    stable_repeat: number;
+  };
+  conversion_rates: {
+    second_visit_rate: number;
+    touch_open_rate: number;
+    touch_attribution_rate: number;
+  };
+  mechanism_summary?: {
+    mechanism_type: string;
+    total: number;
+    opened: number;
+    attributed: number;
+    open_rate: number;
+    attribution_rate: number;
+  }[];
+  core_metrics?: {
+    identifiable_rate: number;
+    first_order_join_rate: number;
+    second_visit_rate: number;
+    thirty_day_repeat_rate: number;
+    recall_success_rate: number;
+    channel_reflow_rate: number;
+    stored_value_conversion_rate: number;
+    banquet_reorder_rate: number;
+    repair_revisit_rate: number;
+    per_customer_profit_fen: number;
+    journey_roi: number;
+    private_gmv_ratio: number;
+  };
 }
 
 // ---- 工具函数 ----
@@ -572,9 +644,34 @@ function StoreRankSection({ stores, loading, error }: {
 // ---- 主页面 ----
 
 export function GrowthDashboardPage() {
+  const navigate = useNavigate();
   const [brand, setBrand]         = useState<Brand>('全部品牌');
   const [timeRange, setTimeRange] = useState<TimeRange>('近30天');
   const [region, setRegion]       = useState<Region>('全部区域');
+
+  // 增长中枢V2数据
+  const { data: growthStats, loading: loadingGrowthV2 } = useApi<GrowthDashboardStats>(
+    '/api/v1/growth/dashboard-stats',
+    { cacheMs: 15_000 },
+  );
+
+  // 缺口1: 模板框架效果对比
+  const { data: templateAttrData, loading: loadingTemplateAttr } = useApi<{ items: JourneyTemplateAttribution[]; days: number }>(
+    '/api/v1/growth/attribution/by-journey-template?days=7',
+    { cacheMs: 15_000 },
+  );
+
+  // 缺口2: Agent高优先建议TOP3
+  const { data: topSuggestions, loading: loadingTopSuggestions } = useApi<{ items: AgentSuggestionDetail[]; total: number }>(
+    '/api/v1/growth/agent-suggestions?review_state=pending_review&size=3',
+    { cacheMs: 15_000 },
+  );
+
+  // 缺口3: P1四维分布
+  const { data: p1Dist, loading: loadingP1Dist } = useApi<P1Distribution>(
+    '/api/v1/growth/p1/distribution',
+    { cacheMs: 15_000 },
+  );
 
   const [growthData,    setGrowthData]    = useState<GrowthData | null>(null);
   const [activityData,  setActivityData]  = useState<ActivityData | null>(null);
@@ -749,6 +846,424 @@ export function GrowthDashboardPage() {
         {/* 门店排行 */}
         <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
           <StoreRankSection stores={dashboardData?.stores ?? []} loading={loadingDashboard} error={errorDashboard} />
+        </div>
+
+        {/* ========== 增长中枢 V2 ========== */}
+
+        <div style={{ borderTop: `1px solid ${BG_2}`, margin: '24px 0 16px', paddingTop: 20 }}>
+          <h3 style={{ margin: '0 0 16px', fontSize: 18, fontWeight: 700, color: TEXT_1 }}>增长中枢 V2</h3>
+        </div>
+
+        {/* 区域1: 增长中枢V2 KPI行（6卡）*/}
+        {loadingGrowthV2 ? (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 12, marginBottom: 16 }}>
+            {[0,1,2,3,4,5].map(i => (
+              <div key={i} style={{ background: '#142833', borderRadius: 10, padding: '16px 14px', border: '1px solid #1e3a4a' }}>
+                <SectionSkeleton height={60} />
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 12, marginBottom: 16 }}>
+            {[
+              { label: '二访率', value: growthStats?.conversion_rates.second_visit_rate, suffix: '%', format: (v: number) => (v * 100).toFixed(1), color: BRAND },
+              { label: '高优先召回', value: growthStats?.profiles.high_priority_reactivation, suffix: ' 人', format: (v: number) => v.toLocaleString(), color: '#ff4d4f' },
+              { label: '活跃旅程', value: growthStats?.enrollments.active, suffix: ' 条', format: (v: number) => v.toLocaleString(), color: TEAL },
+              { label: '7日触达', value: growthStats?.touches_7d.delivered, suffix: ' 次', format: (v: number) => v.toLocaleString(), color: BLUE },
+              { label: '触达打开率', value: growthStats?.conversion_rates.touch_open_rate, suffix: '%', format: (v: number) => (v * 100).toFixed(1), color: '#52c41a' },
+              { label: '待审核建议', value: growthStats?.suggestions_7d.pending_review, suffix: ' 条', format: (v: number) => v.toLocaleString(), color: YELLOW },
+            ].map((kpi, i) => (
+              <div key={i} style={{
+                background: '#142833', borderRadius: 10, padding: '16px 14px',
+                border: '1px solid #1e3a4a', borderTop: `2px solid ${kpi.color}`,
+              }}>
+                <div style={{ fontSize: 12, color: TEXT_3, marginBottom: 6 }}>{kpi.label}</div>
+                <div style={{ fontSize: 24, fontWeight: 700, color: '#e8e8e8' }}>
+                  {kpi.value != null ? kpi.format(kpi.value) : '--'}{kpi.value != null ? kpi.suffix : ''}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* 区域2: 增长漏斗 + Agent待办（左右两栏）*/}
+        <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
+          {/* 左栏 — 增长漏斗 */}
+          <div style={{ background: '#142833', borderRadius: 10, padding: 20, border: '1px solid #1e3a4a', flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 15, fontWeight: 700, color: TEXT_1, marginBottom: 16 }}>增长漏斗</div>
+            {loadingGrowthV2 ? <SectionSkeleton height={140} /> : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {[
+                  { label: '首单客户', value: growthStats?.funnel.first_order, color: BRAND },
+                  { label: '已触达', value: growthStats?.funnel.touched, color: BLUE },
+                  { label: '已回访', value: growthStats?.funnel.revisited, color: TEAL },
+                  { label: '复购客户', value: growthStats?.funnel.repeat_customer, color: '#52c41a' },
+                  { label: '稳定复购', value: growthStats?.funnel.stable_repeat, color: PURPLE },
+                ].map((step, idx) => {
+                  const maxVal = growthStats?.funnel.first_order || 1;
+                  const pct = step.value != null ? Math.max((step.value / maxVal) * 100, 2) : 0;
+                  return (
+                    <div key={idx}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, fontSize: 12 }}>
+                        <span style={{ color: TEXT_2 }}>{step.label}</span>
+                        <span style={{ color: step.color, fontWeight: 600 }}>{step.value?.toLocaleString() ?? '--'}</span>
+                      </div>
+                      <div style={{ height: 14, borderRadius: 4, background: BG_2 }}>
+                        <div style={{
+                          height: '100%', borderRadius: 4, background: step.color,
+                          width: `${pct.toFixed(1)}%`, transition: 'width 0.6s ease',
+                          display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: 6,
+                          fontSize: 9, color: '#fff', fontWeight: 600,
+                        }}>
+                          {step.value != null && pct > 15 ? `${pct.toFixed(0)}%` : ''}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* 右栏 — Agent待办速览 */}
+          <div style={{ background: '#142833', borderRadius: 10, padding: 20, border: '1px solid #1e3a4a', minWidth: 280 }}>
+            <div style={{ fontSize: 15, fontWeight: 700, color: TEXT_1, marginBottom: 16 }}>Agent 待办速览</div>
+            {loadingGrowthV2 ? <SectionSkeleton height={140} /> : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 10px', borderRadius: 6, background: BG_2 }}>
+                  <span style={{ fontSize: 12, color: TEXT_3 }}>待审核</span>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: YELLOW }}>{growthStats?.suggestions_7d.pending_review ?? '--'} 条</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 10px', borderRadius: 6, background: BG_2 }}>
+                  <span style={{ fontSize: 12, color: TEXT_3 }}>已发布</span>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: '#52c41a' }}>{growthStats?.suggestions_7d.published ?? '--'} 条</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 10px', borderRadius: 6, background: BG_2 }}>
+                  <span style={{ fontSize: 12, color: TEXT_3 }}>活跃修复</span>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: BRAND }}>{growthStats?.profiles.active_repairs ?? '--'} 条</span>
+                </div>
+                <button
+                  onClick={() => navigate('/hq/growth/agent-workbench')}
+                  style={{
+                    marginTop: 8, padding: '10px 0', borderRadius: 6,
+                    background: BRAND, border: 'none', color: '#fff',
+                    fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                    transition: 'opacity 0.2s',
+                  }}
+                  onMouseEnter={e => (e.currentTarget.style.opacity = '0.85')}
+                  onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
+                >
+                  进入 Agent 工作台
+                </button>
+
+                {/* 缺口2: Agent高优先建议TOP3 */}
+                {!loadingTopSuggestions && topSuggestions && topSuggestions.items.length > 0 && (
+                  <div style={{ marginTop: 12 }}>
+                    <div style={{ fontSize: 12, color: TEXT_3, marginBottom: 8, fontWeight: 600 }}>TOP 3 待审建议</div>
+                    {topSuggestions.items.slice(0, 3).map((s) => {
+                      const priorityColors: Record<string, string> = { high: '#ff4d4f', medium: YELLOW, low: '#52c41a' };
+                      const priorityLabels: Record<string, string> = { high: '高优', medium: '中优', low: '低优' };
+                      const typeLabels: Record<string, string> = {
+                        reactivation: '召回', first_to_second: '首转二', service_repair: '修复',
+                        retention: '留存', upsell: '提频', referral: '裂变',
+                      };
+                      const pColor = priorityColors[s.priority ?? ''] || TEXT_3;
+                      const pLabel = priorityLabels[s.priority ?? ''] || (s.priority ?? '--');
+                      const tLabel = typeLabels[s.suggestion_type] || s.suggestion_type;
+                      const summary = s.explanation_summary || s.reasoning || '';
+                      const truncated = summary.length > 50 ? summary.slice(0, 50) + '...' : summary;
+                      return (
+                        <div key={s.id} style={{
+                          padding: '8px 10px', borderRadius: 6, background: BG_2, marginBottom: 6,
+                          cursor: 'pointer', transition: 'opacity 0.2s',
+                        }}
+                          onClick={() => navigate('/hq/growth/agent-workbench')}
+                          onMouseEnter={e => (e.currentTarget.style.opacity = '0.8')}
+                          onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
+                        >
+                          <div style={{ display: 'flex', gap: 6, marginBottom: 4 }}>
+                            <span style={{
+                              fontSize: 10, padding: '1px 6px', borderRadius: 3,
+                              background: pColor + '22', color: pColor, fontWeight: 600,
+                            }}>{pLabel}</span>
+                            <span style={{
+                              fontSize: 10, padding: '1px 6px', borderRadius: 3,
+                              background: TEAL + '22', color: TEAL,
+                            }}>{tLabel}</span>
+                            {s.mechanism_type && (
+                              <span style={{
+                                fontSize: 10, padding: '1px 6px', borderRadius: 3,
+                                background: PURPLE + '22', color: PURPLE,
+                              }}>{s.mechanism_type}</span>
+                            )}
+                          </div>
+                          <div style={{ fontSize: 11, color: TEXT_3, lineHeight: 1.4 }}>{truncated || '暂无摘要'}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* 区域X: 机制效果速览 */}
+        {growthStats?.mechanism_summary && growthStats.mechanism_summary.length > 0 && (
+          <div style={{ background: '#142833', borderRadius: 10, padding: 20, border: '1px solid #1e3a4a', marginBottom: 16 }}>
+            <div style={{ fontSize: 15, fontWeight: 700, color: TEXT_1, marginBottom: 16 }}>机制效果速览（近7天）</div>
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+              {growthStats.mechanism_summary.map((m) => {
+                const mechColors: Record<string, string> = {
+                  hook: TEAL, loss_aversion: BRAND, repair: RED, mixed: PURPLE,
+                  social_proof: BLUE, scarcity: YELLOW, reciprocity: '#52c41a',
+                };
+                const mechLabels: Record<string, string> = {
+                  hook: '钩子吸引', loss_aversion: '损失规避', repair: '服务修复',
+                  mixed: '混合机制', social_proof: '社会认同', scarcity: '稀缺效应',
+                  reciprocity: '互惠心理', authority: '权威背书', commitment: '承诺一致',
+                };
+                const color = mechColors[m.mechanism_type] || TEXT_3;
+                return (
+                  <div key={m.mechanism_type} style={{
+                    flex: '1 1 180px', maxWidth: 220, padding: '12px 16px',
+                    borderRadius: 8, background: BG_2, borderLeft: `3px solid ${color}`,
+                  }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color, marginBottom: 8 }}>
+                      {mechLabels[m.mechanism_type] || m.mechanism_type}
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: TEXT_3, marginBottom: 4 }}>
+                      <span>打开率</span>
+                      <span style={{ fontWeight: 700, color: m.open_rate >= 20 ? '#52c41a' : m.open_rate >= 10 ? YELLOW : '#ff4d4f' }}>
+                        {m.open_rate.toFixed(1)}%
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: TEXT_3 }}>
+                      <span>归因率</span>
+                      <span style={{ fontWeight: 700, color: m.attribution_rate >= 5 ? '#52c41a' : m.attribution_rate >= 2 ? YELLOW : '#ff4d4f' }}>
+                        {m.attribution_rate.toFixed(1)}%
+                      </span>
+                    </div>
+                    <div style={{ fontSize: 10, color: TEXT_4, marginTop: 4 }}>
+                      触达 {m.total} / 打开 {m.opened} / 归因 {m.attributed}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* 缺口1: 模板框架效果对比 */}
+        <div style={{ background: '#142833', borderRadius: 10, padding: 20, border: '1px solid #1e3a4a', marginBottom: 16 }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: TEXT_1, marginBottom: 16 }}>模板框架对比（近7天）</div>
+          {loadingTemplateAttr ? <SectionSkeleton height={120} /> : (() => {
+            const items = templateAttrData?.items || [];
+            const groups: Record<string, { enrollments: number; completed: number; completionRate: number; touches: number; opened: number; attributed: number; openRate: number; attrRate: number }> = {};
+            const typeMap: Record<string, { label: string; color: string }> = {
+              first_to_second: { label: '首单转二访', color: '#52c41a' },
+              reactivation: { label: '沉默召回', color: BRAND },
+              service_repair: { label: '服务修复', color: '#ff4d4f' },
+            };
+            for (const it of items) {
+              const jt = it.journey_type;
+              if (!typeMap[jt]) continue;
+              if (!groups[jt]) groups[jt] = { enrollments: 0, completed: 0, completionRate: 0, touches: 0, opened: 0, attributed: 0, openRate: 0, attrRate: 0 };
+              const g = groups[jt];
+              g.enrollments += it.total_enrollments;
+              g.completed += it.completed;
+              g.touches += it.total_touches;
+              g.opened += it.opened;
+              g.attributed += it.attributed;
+            }
+            for (const key of Object.keys(groups)) {
+              const g = groups[key];
+              g.completionRate = g.enrollments > 0 ? (g.completed / g.enrollments) * 100 : 0;
+              g.openRate = g.touches > 0 ? (g.opened / g.touches) * 100 : 0;
+              g.attrRate = g.touches > 0 ? (g.attributed / g.touches) * 100 : 0;
+            }
+            const keys = ['first_to_second', 'reactivation', 'service_repair'];
+            return (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+                {keys.map((jt) => {
+                  const cfg = typeMap[jt];
+                  const g = groups[jt];
+                  return (
+                    <div key={jt} style={{ padding: '14px 16px', borderRadius: 8, background: BG_2, borderTop: `3px solid ${cfg.color}` }}>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: cfg.color, marginBottom: 10 }}>{cfg.label}</div>
+                      {g ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                            <span style={{ color: TEXT_3 }}>活跃enrollment</span>
+                            <span style={{ color: '#e8e8e8', fontWeight: 600 }}>{g.enrollments}</span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                            <span style={{ color: TEXT_3 }}>完成率</span>
+                            <span style={{ color: g.completionRate >= 30 ? '#52c41a' : g.completionRate >= 15 ? YELLOW : '#ff4d4f', fontWeight: 600 }}>{g.completionRate.toFixed(1)}%</span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                            <span style={{ color: TEXT_3 }}>触达打开率</span>
+                            <span style={{ color: g.openRate >= 20 ? '#52c41a' : g.openRate >= 10 ? YELLOW : '#ff4d4f', fontWeight: 600 }}>{g.openRate.toFixed(1)}%</span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                            <span style={{ color: TEXT_3 }}>归因到店率</span>
+                            <span style={{ color: g.attrRate >= 5 ? '#52c41a' : g.attrRate >= 2 ? YELLOW : '#ff4d4f', fontWeight: 600 }}>{g.attrRate.toFixed(1)}%</span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: 12, color: TEXT_4, textAlign: 'center', padding: 16 }}>暂无数据</div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
+        </div>
+
+        {/* 区域3: 旅程运行状态速览 */}
+        <div style={{ background: '#142833', borderRadius: 10, padding: 20, border: '1px solid #1e3a4a', marginBottom: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+            <span style={{ fontSize: 15, fontWeight: 700, color: TEXT_1 }}>旅程运行状态</span>
+            <a
+              onClick={() => navigate('/hq/growth/journey-runs')}
+              style={{ fontSize: 12, color: TEAL, cursor: 'pointer', textDecoration: 'none' }}
+            >
+              查看全部 &rarr;
+            </a>
+          </div>
+          {loadingGrowthV2 ? <SectionSkeleton height={60} /> : (
+            <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+              {[
+                { label: '活跃', value: growthStats?.enrollments.active, color: '#52c41a', bg: '#52c41a22' },
+                { label: '暂停', value: growthStats?.enrollments.paused, color: '#fa8c16', bg: '#fa8c1622' },
+                { label: '观察中', value: growthStats?.enrollments.observing, color: TEAL, bg: `${TEAL}22` },
+                { label: '已完成', value: growthStats?.enrollments.completed, color: TEXT_3, bg: BG_2 },
+              ].map((item, idx) => (
+                <div key={idx} style={{
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  padding: '8px 16px', borderRadius: 8, background: item.bg,
+                }}>
+                  <span style={{
+                    width: 8, height: 8, borderRadius: '50%', background: item.color, flexShrink: 0,
+                  }} />
+                  <span style={{ fontSize: 13, color: item.color, fontWeight: 600 }}>{item.label}</span>
+                  <span style={{ fontSize: 18, fontWeight: 700, color: '#e8e8e8' }}>
+                    {item.value?.toLocaleString() ?? '--'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* 缺口3: P1客户分层概览 */}
+        <div style={{ background: '#142833', borderRadius: 10, padding: 20, border: '1px solid #1e3a4a', marginBottom: 16 }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: TEXT_1, marginBottom: 16 }}>P1 客户分层概览</div>
+          {loadingP1Dist ? <SectionSkeleton height={160} /> : (() => {
+            const psyLabels: Record<string, string> = { near: '亲近', habit_break: '习惯断裂', fading: '淡化', abstracted: '疏远', lost: '失联' };
+            const suLabels: Record<string, string> = { none: '无', potential: '潜力', active: '活跃', advocate: '倡导者' };
+            const msLabels: Record<string, string> = { newcomer: '新客', regular: '常客', loyal: '忠实', vip: 'VIP', legend: '传奇' };
+            const rfLabels: Record<string, string> = { none: '无', birthday_organizer: '生日组织者', family_host: '家庭聚餐', corporate_host: '商务宴请', super_referrer: '超级推荐人' };
+
+            const renderDimension = (
+              title: string,
+              data: { level?: string; stage?: string; scenario?: string; count: number }[] | undefined,
+              labels: Record<string, string>,
+              barColor: string,
+            ) => {
+              if (!data || data.length === 0) return (
+                <div style={{ marginBottom: 12 }}>
+                  <div style={{ fontSize: 12, color: TEXT_3, marginBottom: 6 }}>{title}</div>
+                  <div style={{ fontSize: 11, color: TEXT_4 }}>暂无数据</div>
+                </div>
+              );
+              const total = data.reduce((s, d) => s + d.count, 0) || 1;
+              return (
+                <div style={{ marginBottom: 14 }}>
+                  <div style={{ fontSize: 12, color: TEXT_3, marginBottom: 6, fontWeight: 600 }}>{title}</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                    {data.map((d) => {
+                      const key = d.level || d.stage || d.scenario || 'unknown';
+                      const pct = (d.count / total) * 100;
+                      return (
+                        <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ fontSize: 11, color: TEXT_3, width: 80, textAlign: 'right', flexShrink: 0 }}>
+                            {labels[key] || key}
+                          </span>
+                          <div style={{ flex: 1, height: 14, borderRadius: 3, background: BG_2, overflow: 'hidden' }}>
+                            <div style={{
+                              height: '100%', borderRadius: 3, background: barColor,
+                              width: `${Math.max(pct, 1).toFixed(1)}%`, transition: 'width 0.6s ease',
+                              display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: 4,
+                              fontSize: 9, color: '#fff', fontWeight: 600, minWidth: 18,
+                            }}>
+                              {pct >= 8 ? `${pct.toFixed(0)}%` : ''}
+                            </div>
+                          </div>
+                          <span style={{ fontSize: 11, color: TEXT_4, width: 50, textAlign: 'right', flexShrink: 0 }}>
+                            {d.count}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            };
+
+            return (
+              <>
+                {renderDimension('心理距离', p1Dist?.psych_distance, psyLabels, TEAL)}
+                {renderDimension('超级用户', p1Dist?.super_user, suLabels, BRAND)}
+                {renderDimension('成长里程碑', p1Dist?.milestones, msLabels, BLUE)}
+                {renderDimension('裂变场景', p1Dist?.referral, rfLabels, PURPLE)}
+              </>
+            );
+          })()}
+        </div>
+
+        {/* ---- 增长核心指标（12维） ---- */}
+        <div style={{ background: BG_1, borderRadius: 8, padding: 16, marginTop: 16 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: TEXT_1, marginBottom: 12 }}>
+            增长核心指标（12维）
+          </div>
+          {(() => {
+            const cm = growthStats?.core_metrics;
+            const items: { label: string; value: number | null | undefined; suffix: string; isPct: boolean }[] = [
+              { label: '可识别客户占比', value: cm?.identifiable_rate, suffix: '%', isPct: true },
+              { label: '首单入会率', value: cm?.first_order_join_rate, suffix: '%', isPct: true },
+              { label: '二访率', value: cm?.second_visit_rate, suffix: '%', isPct: true },
+              { label: '30天复购率', value: cm?.thirty_day_repeat_rate, suffix: '%', isPct: true },
+              { label: '召回成功率', value: cm?.recall_success_rate, suffix: '%', isPct: true },
+              { label: '渠道回流率', value: cm?.channel_reflow_rate, suffix: '%', isPct: true },
+              { label: '储值转化率', value: cm?.stored_value_conversion_rate, suffix: '%', isPct: true },
+              { label: '宴席复订率', value: cm?.banquet_reorder_rate, suffix: '%', isPct: true },
+              { label: '修复回访率', value: cm?.repair_revisit_rate, suffix: '%', isPct: true },
+              { label: '单客触达毛利', value: cm?.per_customer_profit_fen != null ? cm.per_customer_profit_fen / 100 : null, suffix: '元', isPct: false },
+              { label: '旅程ROI', value: cm?.journey_roi, suffix: '%', isPct: true },
+              { label: '私域GMV占比', value: cm?.private_gmv_ratio, suffix: '%', isPct: true },
+            ];
+            return (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
+                {items.map((item) => {
+                  const hasData = item.value != null && item.value !== 0;
+                  return (
+                    <div key={item.label} style={{
+                      background: BG_2, borderRadius: 6, padding: '10px 12px', textAlign: 'center',
+                    }}>
+                      <div style={{ fontSize: 11, color: TEXT_3, marginBottom: 4 }}>{item.label}</div>
+                      <div style={{ fontSize: 20, fontWeight: 700, color: hasData ? BRAND : TEXT_4 }}>
+                        {hasData
+                          ? item.isPct ? `${item.value}${item.suffix}` : `${item.value?.toFixed(1)}${item.suffix}`
+                          : '\u2014'}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
         </div>
 
       </div>

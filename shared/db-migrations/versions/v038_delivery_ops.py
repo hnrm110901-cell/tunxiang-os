@@ -52,7 +52,19 @@ def upgrade() -> None:
     op.execute("ALTER TABLE delivery_store_configs FORCE ROW LEVEL SECURITY;")
 
     for action in ("SELECT", "INSERT", "UPDATE", "DELETE"):
-        op.execute(f"""
+        if action == "INSERT":
+            op.execute(f"""
+            CREATE POLICY delivery_store_configs_{action.lower()}_tenant
+                ON delivery_store_configs
+                AS RESTRICTIVE FOR {action}
+                WITH CHECK (
+                    current_setting('app.tenant_id', TRUE) IS NOT NULL
+                    AND current_setting('app.tenant_id', TRUE) <> ''
+                    AND tenant_id = NULLIF(current_setting('app.tenant_id', TRUE), '')::UUID
+                );
+        """)
+        else:
+            op.execute(f"""
             CREATE POLICY delivery_store_configs_{action.lower()}_tenant
                 ON delivery_store_configs
                 AS RESTRICTIVE FOR {action}
@@ -103,7 +115,19 @@ def upgrade() -> None:
     op.execute("ALTER TABLE delivery_reviews FORCE ROW LEVEL SECURITY;")
 
     for action in ("SELECT", "INSERT", "UPDATE", "DELETE"):
-        op.execute(f"""
+        if action == "INSERT":
+            op.execute(f"""
+            CREATE POLICY delivery_reviews_{action.lower()}_tenant
+                ON delivery_reviews
+                AS RESTRICTIVE FOR {action}
+                WITH CHECK (
+                    current_setting('app.tenant_id', TRUE) IS NOT NULL
+                    AND current_setting('app.tenant_id', TRUE) <> ''
+                    AND tenant_id = NULLIF(current_setting('app.tenant_id', TRUE), '')::UUID
+                );
+        """)
+        else:
+            op.execute(f"""
             CREATE POLICY delivery_reviews_{action.lower()}_tenant
                 ON delivery_reviews
                 AS RESTRICTIVE FOR {action}
@@ -160,7 +184,19 @@ def upgrade() -> None:
     op.execute("ALTER TABLE platform_health_snapshots FORCE ROW LEVEL SECURITY;")
 
     for action in ("SELECT", "INSERT", "UPDATE", "DELETE"):
-        op.execute(f"""
+        if action == "INSERT":
+            op.execute(f"""
+            CREATE POLICY platform_health_snapshots_{action.lower()}_tenant
+                ON platform_health_snapshots
+                AS RESTRICTIVE FOR {action}
+                WITH CHECK (
+                    current_setting('app.tenant_id', TRUE) IS NOT NULL
+                    AND current_setting('app.tenant_id', TRUE) <> ''
+                    AND tenant_id = NULLIF(current_setting('app.tenant_id', TRUE), '')::UUID
+                );
+        """)
+        else:
+            op.execute(f"""
             CREATE POLICY platform_health_snapshots_{action.lower()}_tenant
                 ON platform_health_snapshots
                 AS RESTRICTIVE FOR {action}

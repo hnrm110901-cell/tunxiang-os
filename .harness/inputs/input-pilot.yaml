@@ -1,0 +1,66 @@
+inputSet:
+  name: input-pilot
+  identifier: input_pilot
+  projectIdentifier: TunXiangOS
+  orgIdentifier: default
+  description: "Pilot 灰度环境输入集（指定试点品牌）"
+  tags:
+    env: pilot
+
+  pipeline:
+    identifier: release_api_gateway_prod
+    variables:
+      - name: imageTag
+        type: String
+        value: <+input>
+
+    stages:
+      - stage:
+          identifier: Deploy_Pilot
+          type: Deployment
+          spec:
+            environment:
+              environmentRef: env_pilot
+              infrastructureDefinitions:
+                - identifier: gitops_pilot_region_a
+                  inputs:
+                    identifier: gitops_pilot_region_a
+                    type: KubernetesDirect
+                    spec:
+                      namespace: tunxiang-pilot
+
+# ── 环境参数 ──────────────────────────────────────────────────
+# namespace:        tunxiang-pilot
+# replicaCount:     2
+# pilotBrandId:     pilot_brand_001
+# valuesFile:       gitops/pilot/values.yaml
+# ─────────────────────────────────────────────────────────────
+
+envOverrides:
+  namespace: tunxiang-pilot
+  replicaCount: 2
+  pilotBrandId: pilot_brand_001
+  healthUrl: https://pilot-api.tunxiangos.cn/health
+  valuesFile: gitops/pilot/values.yaml
+  resources:
+    requests:
+      cpu: "200m"
+      memory: "512Mi"
+    limits:
+      cpu: "1000m"
+      memory: "1Gi"
+  autoscaling:
+    enabled: false
+  ingress:
+    host: pilot-api.tunxiangos.cn
+    tls: true
+  logLevel: INFO
+  pilot:
+    # 灰度范围：仅对 pilot_brand_001 开放
+    brandIds:
+      - pilot_brand_001
+    trafficWeight: 100
+    observationMinutes: 10
+    alertThresholds:
+      errorRatePercent: 1.0
+      p99LatencyMs: 500

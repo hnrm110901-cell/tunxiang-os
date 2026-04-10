@@ -1,0 +1,99 @@
+# 交易域 Feature Flags
+# 域：trade
+# 命名格式：trade.{module}.{feature}.{action}
+
+flags:
+  - identifier: trade_delivery_auto_accept_enable
+    name: trade.delivery.auto_accept.enable
+    description: >
+      外卖自动接单（美团/饿了么/抖音订单到达后自动确认接单，无需人工点击）。
+      依赖 trade.delivery.aggregator_panel.enable，建议配合使用。
+      注意：自动接单后如需取消，可能产生平台罚款。
+    defaultValue: false
+    environments:
+      dev: true
+      test: true
+      uat: true
+      pilot: false
+      prod: false
+    targeting_rules:
+      pilot:
+        - dimension: store_id
+          values: []
+      prod:
+        - dimension: store_id
+          values: []
+    tags: [trade, delivery, auto-accept]
+
+  - identifier: trade_delivery_aggregator_panel_enable
+    name: trade.delivery.aggregator_panel.enable
+    description: >
+      外卖聚合接单面板（将美团/饿了么/抖音/自有外卖订单汇聚到一个界面统一处理）。
+      替代每个平台单独登录管理的模式。
+    defaultValue: false
+    environments:
+      dev: true
+      test: true
+      uat: true
+      pilot: true
+      prod: false
+    targeting_rules:
+      prod:
+        - dimension: brand_id
+          values: []
+    tags: [trade, delivery, aggregator, panel]
+
+  - identifier: trade_discount_health_engine_enable
+    name: trade.discount.health_engine.enable
+    description: >
+      折扣健康引擎（实时计算每笔折扣对毛利的影响，超出阈值自动拦截或预警）。
+      联动三条硬约束的毛利底线校验。建议与 agent.trade.discount_alert.enable 同步开启。
+    defaultValue: false
+    environments:
+      dev: true
+      test: true
+      uat: true
+      pilot: true
+      prod: false
+    targeting_rules:
+      prod:
+        - dimension: role_code
+          values: [L1, L2, L3]
+    tags: [trade, discount, health, engine]
+
+  - identifier: trade_voice_order_enable
+    name: trade.voice_order.enable
+    description: >
+      语音下单（通过Mac mini M4 Neural Engine进行本地语音识别，
+      将语音指令转换为点餐操作）。
+      依赖 edge.coreml.inference.enable，需Mac mini在线。
+    defaultValue: false
+    environments:
+      dev: false
+      test: false
+      uat: false
+      pilot: false
+      prod: false
+    targeting_rules:
+      pilot:
+        - dimension: edge_node_group
+          values: [mac_mini_m4_pilot]
+    tags: [trade, voice, order, coreml]
+
+  - identifier: trade_split_payment_enable
+    name: trade.split_payment.enable
+    description: >
+      分账引擎（多人AA付款、平台分账、加盟商分润等）。
+      需要与支付渠道（微信/支付宝）提前签约分账协议。
+    defaultValue: false
+    environments:
+      dev: true
+      test: true
+      uat: false
+      pilot: false
+      prod: false
+    targeting_rules:
+      pilot:
+        - dimension: tenant_id
+          values: []
+    tags: [trade, split, payment, settlement]

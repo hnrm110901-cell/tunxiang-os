@@ -2,7 +2,7 @@
 外卖平台适配器工厂
 
 通过平台标识获取对应的 DeliveryPlatformAdapter 实例。
-支持平台：meituan, eleme, douyin
+支持平台：meituan, eleme, douyin, wechat
 """
 from typing import Dict, Optional
 
@@ -12,6 +12,7 @@ from .delivery_platform_base import DeliveryPlatformAdapter
 from .meituan_adapter import MeituanDeliveryAdapter
 from .eleme_adapter import ElemeDeliveryAdapter
 from .douyin_adapter import DouyinDeliveryAdapter
+from .wechat_delivery_adapter import WeChatDeliveryAdapter
 
 logger = structlog.get_logger()
 
@@ -20,6 +21,7 @@ _PLATFORM_REGISTRY: Dict[str, type] = {
     "meituan": MeituanDeliveryAdapter,
     "eleme": ElemeDeliveryAdapter,
     "douyin": DouyinDeliveryAdapter,
+    "wechat": WeChatDeliveryAdapter,
 }
 
 

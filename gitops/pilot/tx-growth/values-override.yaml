@@ -1,0 +1,39 @@
+# tx-growth pilot环境覆盖配置（试点品牌灰度）
+# pilot环境：在指定品牌/门店开启V2旅程，验证效果后再全量推prod
+#
+# !! replicaCount 强制为 1，同prod，不幂等cron不允许多实例 !!
+
+replicaCount: 1
+
+image:
+  tag: ${IMAGE_TAG}  # 由Harness CD流水线注入，禁止手动修改
+
+env:
+  TUNXIANG_ENV: pilot
+  LOG_LEVEL: info
+  # pilot环境开启V2旅程引擎，配合Feature Flag精确控制试点品牌范围
+  GROWTH_V2_ENABLED: "true"
+  JOURNEY_TICK_INTERVAL: "60"
+  # Feature Flag：GrowthFlags.JOURNEY_V2 在pilot环境对指定品牌开启
+  # 通过Feature Flag服务的brand_id上下文注入，只有pilot_brand_id列表内的品牌生效
+  FEATURE_GROWTH_HUB_JOURNEY_V2_ENABLE: "true"
+  # 试点品牌ID：由Harness流水线从pilot环境变量注入
+  # 格式：逗号分隔的brand_id列表，如 "brand_001,brand_002"
+  # 禁止硬编码！通过 ${PILOT_BRAND_IDS} 环境变量在流水线中设定
+  PILOT_BRAND_IDS: ${PILOT_BRAND_IDS}
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 200m
+    memory: 256Mi
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 1
+
+podAntiAffinity:
+  enabled: false

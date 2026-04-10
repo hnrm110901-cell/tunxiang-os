@@ -1,0 +1,66 @@
+pipeline:
+  name: ci-tx-brain
+  identifier: ci_tx_brain
+  projectIdentifier: TunXiangOS
+  orgIdentifier: default
+  description: "tx-brain AI 智能决策服务 CI 流水线。PR 或 main 分支推送时自动触发，执行 Lint/安全扫描/测试/镜像构建。注意：CI 阶段跳过 LLM 集成测试（成本控制，避免调用真实 Claude API 产生费用）。"
+  tags:
+    service: tx-brain
+    type: ci
+  properties:
+    ci:
+      codebase:
+        connectorRef: github_connector
+        repoName: tunxiang-os
+        build: <+input>
+  stages:
+    - stage:
+        name: CI
+        identifier: CI
+        type: CI
+        variables:
+          - name: servicePath
+            type: String
+            value: services/tx-brain
+          - name: imageRepo
+            type: String
+            value: tunxiang/tx-brain
+          - name: dockerfile
+            type: String
+            value: services/tx-brain/Dockerfile
+        spec:
+          cloneCodebase: true
+          infrastructure:
+            type: KubernetesDirect
+            spec:
+              connectorRef: k8s_connector
+              namespace: harness-ci
+              automountServiceAccountToken: true
+              nodeSelector: {}
+              os: Linux
+          execution:
+            steps:
+              # ──────────────────────────────────────────────────────────
+              # 注意：Unit_Test 步骤中设置 SKIP_LLM_TESTS=true
+              # 原因（成本控制）：CI 阶段每次 PR 都会触发，若执行真实
+              # Claude API 调用会产生不可控费用。LLM 集成测试仅在 CD
+              # 阶段的 Test 环境（Mock LLM）和生产发布前验证（真实 API）
+              # 中执行，形成分层测试策略。
+              # ──────────────────────────────────────────────────────────
+              - step:
+                  name: CI_Steps
+                  identifier: CI_Steps
+                  template:
+                    templateRef: tpl_ci_python_service
+                    versionLabel: v1
+                    templateInputs:
+                      type: StepGroup
+                      spec:
+                        steps:
+                          - step:
+                              identifier: Unit_Test
+                              type: Run
+                              spec:
+                                envVariables:
+                                  # 成本控制：跳过 LLM 集成测试，避免 CI 阶段调用真实 Claude API 产生费用
+                                  SKIP_LLM_TESTS: "true"

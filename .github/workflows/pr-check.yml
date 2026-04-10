@@ -13,7 +13,7 @@ jobs:
     name: Analyze Changes & Label
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -77,7 +77,7 @@ jobs:
           echo "changed_apps=$CHANGED_APPS" >> "$GITHUB_OUTPUT"
 
       - name: Add labels
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const labels = [];
@@ -152,7 +152,7 @@ jobs:
             }
 
       - name: Post impact summary
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const services = '${{ steps.changes.outputs.changed_services }}'.trim();
@@ -209,7 +209,7 @@ jobs:
     needs: label-and-analyze
     if: needs.label-and-analyze.outputs.has_backend == 'true' || needs.label-and-analyze.outputs.has_edge == 'true'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 

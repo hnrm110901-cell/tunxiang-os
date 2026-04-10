@@ -1,0 +1,42 @@
+# Python字节码
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+
+# 虚拟环境
+.venv/
+venv/
+env/
+.env*
+!.env.example
+
+# 测试和覆盖率
+tests/
+.pytest_cache/
+.coverage
+htmlcov/
+.ruff_cache/
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 开发工具
+Makefile
+*.md
+docs/
+
+# 日志
+*.log
+logs/
+
+# CI/CD（不需要进镜像）
+.harness/
+.github/

@@ -1,0 +1,56 @@
+inputSet:
+  name: input-dev
+  identifier: input_dev
+  projectIdentifier: TunXiangOS
+  orgIdentifier: default
+  description: "Dev 环境输入集"
+  tags:
+    env: dev
+
+  pipeline:
+    identifier: cd_api_gateway
+    variables:
+      - name: imageTag
+        type: String
+        value: <+input>
+
+    stages:
+      - stage:
+          identifier: Deploy_Dev
+          type: Deployment
+          spec:
+            environment:
+              environmentRef: env_dev
+              infrastructureDefinitions:
+                - identifier: k8s_dev_shared
+                  inputs:
+                    identifier: k8s_dev_shared
+                    type: KubernetesDirect
+                    spec:
+                      namespace: tunxiang-dev
+
+# ── 环境参数 ──────────────────────────────────────────────────
+# namespace:      tunxiang-dev
+# replicaCount:   1
+# healthUrl:      https://dev-api.tunxiangos.cn/health
+# valuesFile:     gitops/dev/values.yaml
+# ─────────────────────────────────────────────────────────────
+
+envOverrides:
+  namespace: tunxiang-dev
+  replicaCount: 1
+  healthUrl: https://dev-api.tunxiangos.cn/health
+  valuesFile: gitops/dev/values.yaml
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "256Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+  autoscaling:
+    enabled: false
+  ingress:
+    host: dev-api.tunxiangos.cn
+    tls: false
+  logLevel: DEBUG

@@ -1,0 +1,151 @@
+# 增长中枢 Feature Flags
+# 域：growth
+# 命名格式：growth.{module}.{feature}.{action}
+
+flags:
+  - identifier: growth_hub_journey_v2_enable
+    name: growth.hub.journey_v2.enable
+    description: 增长中枢V2旅程模板（首单转二访/沉默召回/服务修复），替代V1静态营销流
+    defaultValue: false
+    environments:
+      dev: true
+      test: true
+      uat: true
+      pilot: false   # 需通过 targeting_rules 定向开启
+      prod: false
+    targeting_rules:
+      pilot:
+        - dimension: brand_id
+          values: [pilot_brand_001]
+      prod:
+        - dimension: brand_id
+          values: []   # 生产暂不定向，需手动配置
+    tags: [growth, journey, v2]
+
+  - identifier: growth_member_recall_v2_enable
+    name: growth.member.recall_v2.enable
+    description: >
+      沉默召回V2（loss_aversion + relationship_warmup策略自动选择）。
+      根据客户档案自动选择最优召回话术，替代V1单一模板触达。
+    defaultValue: false
+    environments:
+      dev: true
+      test: true
+      uat: true
+      pilot: false
+      prod: false
+    targeting_rules:
+      pilot:
+        - dimension: brand_id
+          values: [pilot_brand_001, pilot_brand_002]
+    tags: [growth, member, recall, v2]
+
+  - identifier: growth_agent_auto_publish_enable
+    name: growth.agent.suggestion.auto_publish
+    description: >
+      Agent建议自动发布（无需人工审核）。
+      高风险Flag：仅允许角色为L3的门店启用。
+      默认关闭，启用前需通过审批流。
+    defaultValue: false
+    risk_level: HIGH
+    environments:
+      dev: false
+      test: false
+      uat: false
+      pilot: false
+      prod: false
+    targeting_rules:
+      pilot:
+        - dimension: role_code
+          values: [L3]
+    tags: [growth, agent, auto-publish, high-risk]
+
+  - identifier: growth_touch_frequency_control_enable
+    name: growth.touch.frequency_control.enable
+    description: >
+      触达频控引擎。防止同一客户在短时间内收到多条营销消息，
+      支持按天/周/月维度配置最大触达次数。
+    defaultValue: false
+    environments:
+      dev: true
+      test: true
+      uat: true
+      pilot: true
+      prod: false
+    targeting_rules:
+      prod:
+        - dimension: brand_id
+          values: []
+    tags: [growth, touch, frequency-control]
+
+  - identifier: growth_member_customer_360_enable
+    name: growth.member.customer_360.enable
+    description: >
+      客户360页面（整合消费记录/偏好标签/生命周期/CLV/召回历史）。
+      依赖 member.clv.engine.enable，建议同步开启。
+    defaultValue: false
+    environments:
+      dev: true
+      test: true
+      uat: true
+      pilot: true
+      prod: false
+    targeting_rules:
+      prod:
+        - dimension: role_code
+          values: [L2, L3]
+    tags: [growth, member, 360, insight]
+
+  - identifier: growth_service_repair_7state_enable
+    name: growth.service.repair_7state.enable
+    description: >
+      服务修复7态管理（投诉→受理→处理中→补偿→跟进→已解决→已关闭）。
+      自动触发服务修复旅程，联动增长中枢V2。
+    defaultValue: false
+    environments:
+      dev: true
+      test: true
+      uat: true
+      pilot: false
+      prod: false
+    targeting_rules:
+      pilot:
+        - dimension: brand_id
+          values: [pilot_brand_001]
+    tags: [growth, service, repair, 7state]
+
+  - identifier: growth_ab_test_auto_winner_enable
+    name: growth.ab_test.auto_winner.enable
+    description: >
+      A/B测试自动选胜组（达到统计显著性后自动将流量切换到最优方案）。
+      依赖置信度阈值配置（默认95%）。
+    defaultValue: false
+    environments:
+      dev: true
+      test: true
+      uat: false
+      pilot: false
+      prod: false
+    targeting_rules: {}
+    tags: [growth, ab-test, automation]
+
+  - identifier: growth_coupon_intelligent_issue_enable
+    name: growth.coupon.intelligent_issue.enable
+    description: >
+      智能优惠券发放（基于CLV和RFM分层动态选择券面额和有效期）。
+      替代固定规则发券，提升核销率和毛利保护。
+    defaultValue: false
+    environments:
+      dev: true
+      test: true
+      uat: true
+      pilot: false
+      prod: false
+    targeting_rules:
+      pilot:
+        - dimension: brand_id
+          values: [pilot_brand_001]
+      prod:
+        - dimension: store_id
+          values: []
+    tags: [growth, coupon, intelligent, clv]

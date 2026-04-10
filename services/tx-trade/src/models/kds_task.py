@@ -16,6 +16,9 @@ v076 新增冗余字段（方便KDS展示，避免联表查询）：
   table_number  — 桌号
   order_no      — 订单号
   notes         — 菜品备注
+
+v167 新增桌台中心化关联字段：
+  dining_session_id — 堂食会话ID（finish_cooking后回调record_dish_served）
 """
 import uuid
 from datetime import datetime
@@ -44,6 +47,10 @@ class KDSTask(TenantBase):
     order_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True), index=True,
         comment="关联订单ID（冗余存储，方便按订单聚合查询所有档口任务）"
+    )
+    dining_session_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), index=True,
+        comment="关联堂食会话ID（v167）— finish_cooking后回调record_dish_served"
     )
     dept_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True), index=True,

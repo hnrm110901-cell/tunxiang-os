@@ -57,6 +57,22 @@ import { ManagerDashboardPage } from './pages/ManagerDashboardPage';
 import { UrgePage } from './pages/UrgePage';
 import { SchedulePage } from './pages/SchedulePage';
 import { ClockInPage } from './pages/ClockInPage';
+// ─── Sprint 0-8: 员工端人力页面 ────────────────────────────────────────────────
+import { CrewWorkbenchPage } from './pages/hr/CrewWorkbenchPage';
+import { CrewMySchedulePage } from './pages/hr/CrewMySchedulePage';
+import { CrewSwapRequestPage } from './pages/hr/CrewSwapRequestPage';
+import { CrewOpenShiftsPage } from './pages/hr/CrewOpenShiftsPage';
+import { CrewMyAttendancePage } from './pages/hr/CrewMyAttendancePage';
+import { CrewAttendanceExceptionsPage } from './pages/hr/CrewAttendanceExceptionsPage';
+import { CrewMyLeavePage } from './pages/hr/CrewMyLeavePage';
+import { CrewLeaveNewPage } from './pages/hr/CrewLeaveNewPage';
+import { CrewLeaveBalancePage } from './pages/hr/CrewLeaveBalancePage';
+import { CrewMyPerformancePage } from './pages/hr/CrewMyPerformancePage';
+import { CrewMyPointsPage } from './pages/hr/CrewMyPointsPage';
+import { CrewPointsHistoryPage } from './pages/hr/CrewPointsHistoryPage';
+import { CrewMyPayrollPage } from './pages/hr/CrewMyPayrollPage';
+import { CrewMyGrowthPage } from './pages/hr/CrewMyGrowthPage';
+import { CrewMyCompliancePage } from './pages/hr/CrewMyCompliancePage';
 
 const tabs = [
   { path: '/tables',   label: '桌台',   icon: 'T' },
@@ -71,7 +87,7 @@ const tabs = [
 function BottomTab() {
   const loc = useLocation();
   // 在全屏子页面中隐藏底栏
-  const hiddenPaths = ['/open-table', '/order-full', '/rush', '/table-ops', '/member', '/complaint', '/service-confirm', '/peak-alert', '/order-status', '/table-detail', '/table-side-pay', '/seat-split', '/crew-stats', '/manager-app', '/receiving', '/stocktake', '/handover', '/route-optimize', '/shift-schedule', '/dish-recognize', '/shift-summary', '/self-pay-link', '/discount-request', '/scan-pay', '/stored-value-recharge', '/printer-settings', '/waitlist', '/member-level-config', '/group-dashboard', '/store-detail', '/live-seafood', '/reservations', '/daily-settlement', '/shift-handover', '/issue-report', '/member-lookup', '/member-points', '/member/', '/approvals', '/manager-dashboard', '/urge', '/schedule-clock'];
+  const hiddenPaths = ['/open-table', '/order-full', '/rush', '/table-ops', '/member', '/complaint', '/service-confirm', '/peak-alert', '/order-status', '/table-detail', '/table-side-pay', '/seat-split', '/crew-stats', '/manager-app', '/receiving', '/stocktake', '/handover', '/route-optimize', '/shift-schedule', '/dish-recognize', '/shift-summary', '/self-pay-link', '/discount-request', '/scan-pay', '/stored-value-recharge', '/printer-settings', '/waitlist', '/member-level-config', '/group-dashboard', '/store-detail', '/live-seafood', '/reservations', '/daily-settlement', '/shift-handover', '/issue-report', '/member-lookup', '/member-points', '/member/', '/approvals', '/manager-dashboard', '/urge', '/schedule-clock', '/me'];
   const shouldHide = hiddenPaths.some(p => loc.pathname.startsWith(p));
   if (shouldHide) return null;
 
@@ -182,6 +198,22 @@ export default function App() {
           <Route path="/schedule" element={<SchedulePage />} />
           {/* 打卡全屏页 */}
           <Route path="/schedule-clock" element={<ClockInPage />} />
+          {/* ─── Sprint 0-8: 员工端人力页面 ─── */}
+          <Route path="/me" element={<CrewWorkbenchPage />} />
+          <Route path="/me/schedule" element={<CrewMySchedulePage />} />
+          <Route path="/me/schedule/swap" element={<CrewSwapRequestPage />} />
+          <Route path="/me/schedule/open-shifts" element={<CrewOpenShiftsPage />} />
+          <Route path="/me/attendance" element={<CrewMyAttendancePage />} />
+          <Route path="/me/attendance/exceptions" element={<CrewAttendanceExceptionsPage />} />
+          <Route path="/me/leave" element={<CrewMyLeavePage />} />
+          <Route path="/me/leave/new" element={<CrewLeaveNewPage />} />
+          <Route path="/me/leave/balance" element={<CrewLeaveBalancePage />} />
+          <Route path="/me/performance" element={<CrewMyPerformancePage />} />
+          <Route path="/me/points" element={<CrewMyPointsPage />} />
+          <Route path="/me/points/history" element={<CrewPointsHistoryPage />} />
+          <Route path="/me/payroll" element={<CrewMyPayrollPage />} />
+          <Route path="/me/growth" element={<CrewMyGrowthPage />} />
+          <Route path="/me/compliance" element={<CrewMyCompliancePage />} />
         </Routes>
         <BottomTab />
       </div>
