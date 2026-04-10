@@ -27,6 +27,7 @@ def _add_rls(table_name: str) -> None:
     """为表启用 RLS 并创建策略 — 使用 app.tenant_id，禁止 NULL 绕过。"""
     op.execute(f"ALTER TABLE {table_name} ENABLE ROW LEVEL SECURITY")
     op.execute(f"ALTER TABLE {table_name} FORCE ROW LEVEL SECURITY")
+    op.execute(f"DROP POLICY IF EXISTS tenant_isolation ON {table_name}")
     op.execute(
         f"CREATE POLICY tenant_isolation ON {table_name} "
         f"USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid) "

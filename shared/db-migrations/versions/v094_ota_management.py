@@ -72,11 +72,13 @@ def upgrade() -> None:
     op.execute("ALTER TABLE app_versions ENABLE ROW LEVEL SECURITY")
     op.execute("ALTER TABLE app_versions FORCE ROW LEVEL SECURITY")
     for action in ("SELECT", "INSERT", "UPDATE", "DELETE"):
+        using_clause = f"USING ({_VERSIONS_RLS_COND})" if action != "INSERT" else ""
+        check_clause = f"WITH CHECK ({_VERSIONS_RLS_COND})" if action in ("INSERT", "UPDATE") else ""
         op.execute(
             f"CREATE POLICY app_versions_{action.lower()}_tenant "
             f"ON app_versions FOR {action} "
-            f"USING ({_VERSIONS_RLS_COND}) "
-            f"WITH CHECK ({_VERSIONS_RLS_COND})"
+            f"{using_clause} "
+            f"{check_clause}"
         )
 
     op.execute("""
@@ -102,11 +104,13 @@ def upgrade() -> None:
     op.execute("ALTER TABLE ota_check_logs ENABLE ROW LEVEL SECURITY")
     op.execute("ALTER TABLE ota_check_logs FORCE ROW LEVEL SECURITY")
     for action in ("SELECT", "INSERT", "UPDATE", "DELETE"):
+        using_clause = f"USING ({_RLS_COND})" if action != "INSERT" else ""
+        check_clause = f"WITH CHECK ({_RLS_COND})" if action in ("INSERT", "UPDATE") else ""
         op.execute(
             f"CREATE POLICY ota_check_logs_{action.lower()}_tenant "
             f"ON ota_check_logs FOR {action} "
-            f"USING ({_RLS_COND}) "
-            f"WITH CHECK ({_RLS_COND})"
+            f"{using_clause} "
+            f"{check_clause}"
         )
 
 

@@ -1,0 +1,139 @@
+template:
+  name: tpl-ci-python-service
+  identifier: tpl_ci_python_service
+  versionLabel: v1
+  type: StepGroup
+  projectIdentifier: TunXiangOS
+  orgIdentifier: default
+  description: "Python/FastAPI 服务通用 CI 模板。包含依赖安装、Lint、安全扫描、单元测试、Migration检查、镜像构建推送。"
+  tags:
+    service-type: python
+    phase: ci
+  spec:
+    stageType: CI
+    steps:
+      - step:
+          type: Run
+          name: Install_Dependencies
+          identifier: Install_Dependencies
+          spec:
+            connectorRef: harbor_connector
+            image: python:3.11-slim
+            shell: Sh
+            command: |
+              cd <+stage.variables.servicePath>
+              pip install --upgrade pip
+              pip install -r requirements.txt
+
+      - step:
+          type: Run
+          name: Lint
+          identifier: Lint
+          spec:
+            connectorRef: harbor_connector
+            image: python:3.11-slim
+            shell: Sh
+            command: |
+              pip install ruff
+              cd <+stage.variables.servicePath>
+              ruff check .
+          failureStrategies:
+            - onFailure:
+                errors:
+                  - AllErrors
+                action:
+                  type: Abort
+
+      - step:
+          type: Run
+          name: Git_Secrets_Scan
+          identifier: Git_Secrets_Scan
+          spec:
+            connectorRef: harbor_connector
+            image: python:3.11-slim
+            shell: Sh
+            command: |
+              apt-get update -qq && apt-get install -y -qq git awscli 2>/dev/null || true
+              if ! command -v git-secrets &>/dev/null; then
+                git clone --depth 1 https://github.com/awslabs/git-secrets.git /tmp/git-secrets
+                cd /tmp/git-secrets && make install
+              fi
+              cd <+stage.variables.servicePath>
+              git secrets --register-aws || true
+              git secrets --scan
+          failureStrategies:
+            - onFailure:
+                errors:
+                  - AllErrors
+                action:
+                  type: Abort
+
+      - step:
+          type: Run
+          name: Unit_Test
+          identifier: Unit_Test
+          spec:
+            connectorRef: harbor_connector
+            image: python:3.11-slim
+            shell: Sh
+            command: |
+              cd <+stage.variables.servicePath>
+              pip install --upgrade pip
+              pip install -r requirements.txt
+              pip install pytest pytest-cov
+              python -m pytest tests/ -v --tb=short
+          reports:
+            type: JUnit
+            spec:
+              paths:
+                - "**/*test_results.xml"
+          failureStrategies:
+            - onFailure:
+                errors:
+                  - AllErrors
+                action:
+                  type: Abort
+
+      - step:
+          type: Run
+          name: Migration_Check
+          identifier: Migration_Check
+          spec:
+            connectorRef: harbor_connector
+            image: python:3.11-slim
+            shell: Sh
+            command: |
+              cd <+stage.variables.servicePath>
+              echo "=== Alembic Migration Check ==="
+              echo "Checking for new migration files since last merge..."
+              NEW_MIGRATIONS=$(find . -path "*/versions/*.py" -newer .git/ORIG_HEAD 2>/dev/null | head -20)
+              if [ -n "$NEW_MIGRATIONS" ]; then
+                echo "[INFO] New migration files detected:"
+                echo "$NEW_MIGRATIONS"
+                echo ""
+                echo "[WARN] Please ensure migrations have been reviewed and tested in staging."
+              else
+                echo "[OK] No new migration files detected."
+              fi
+              echo "=== Migration Check Complete ==="
+
+      - step:
+          type: BuildAndPushDockerRegistry
+          name: Build_And_Push_Image
+          identifier: Build_And_Push_Image
+          spec:
+            connectorRef: harbor_connector
+            repo: <+stage.variables.imageRepo>
+            tags:
+              - <+codebase.shortCommitSha>
+              - <+pipeline.sequenceId>
+            dockerfile: <+stage.variables.dockerfile>
+            context: .
+            buildArgs: {}
+            labels: {}
+          failureStrategies:
+            - onFailure:
+                errors:
+                  - AllErrors
+                action:
+                  type: Abort

@@ -293,6 +293,14 @@ function OrderCard({
             <span style={{ fontSize: 16, color: '#5F5E5A' }}>
               #{order.platform_order_id.slice(-6)}
             </span>
+            {/* 出餐可行性 - 仅新单显示 */}
+            {isPending && (
+              <span style={{
+                display: 'inline-block', fontSize: 11, padding: '1px 6px', borderRadius: 4,
+                background: 'rgba(15,110,86,.15)', color: '#0F6E56',
+                fontWeight: 600, marginLeft: 6,
+              }}>✓ 可准时出餐</span>
+            )}
           </div>
           <span style={{ fontSize: 16, color: '#B4B2A9' }}>{formatTime(order.created_at)}</span>
         </div>
@@ -467,6 +475,7 @@ function ColumnHeader({
 export function OmniChannelOrders() {
   const [orders, setOrders] = useState<OmniOrder[]>([]);
   const [wsConnected, setWsConnected] = useState(false);
+  const [autoAccept, setAutoAccept] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -636,6 +645,27 @@ export function OmniChannelOrders() {
           <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: '#2C2C2A' }}>
             外卖统一接单
           </h1>
+
+          {/* 高峰期自动接单开关 */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0' }}>
+            <span style={{ fontSize: 13, color: '#5F5E5A' }}>高峰期自动接单</span>
+            <div
+              onClick={() => setAutoAccept(!autoAccept)}
+              style={{
+                width: 44, height: 24, borderRadius: 12, cursor: 'pointer',
+                background: autoAccept ? '#FF6B35' : '#ccc',
+                position: 'relative', transition: 'background .2s',
+              }}
+            >
+              <div style={{
+                position: 'absolute', top: 2,
+                left: autoAccept ? 22 : 2,
+                width: 20, height: 20, borderRadius: '50%',
+                background: '#fff', transition: 'left .2s',
+              }} />
+            </div>
+            {autoAccept && <span style={{ fontSize: 11, color: '#0F6E56' }}>🤖 运营指挥官代理中</span>}
+          </div>
 
           {/* 连接状态指示器（右上角） */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>

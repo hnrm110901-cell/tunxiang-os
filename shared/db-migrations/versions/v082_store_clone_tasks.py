@@ -122,11 +122,18 @@ def upgrade() -> None:
     op.execute(f"ALTER TABLE {TABLE} ENABLE ROW LEVEL SECURITY;")
     op.execute(f"ALTER TABLE {TABLE} FORCE ROW LEVEL SECURITY;")
     for action in ("SELECT", "INSERT", "UPDATE", "DELETE"):
-        op.execute(
-            f"CREATE POLICY {TABLE}_{action.lower()}_tenant ON {TABLE} "
-            f"AS RESTRICTIVE FOR {action} "
-            f"USING ({_SAFE_CONDITION});"
-        )
+        if action == "INSERT":
+            op.execute(
+                f"CREATE POLICY {TABLE}_{action.lower()}_tenant ON {TABLE} "
+                f"AS RESTRICTIVE FOR {action} "
+                f"WITH CHECK ({_SAFE_CONDITION});"
+            )
+        else:
+            op.execute(
+                f"CREATE POLICY {TABLE}_{action.lower()}_tenant ON {TABLE} "
+                f"AS RESTRICTIVE FOR {action} "
+                f"USING ({_SAFE_CONDITION});"
+            )
 
 
 def downgrade() -> None:

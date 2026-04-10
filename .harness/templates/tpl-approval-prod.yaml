@@ -1,0 +1,42 @@
+template:
+  name: tpl-approval-prod
+  identifier: tpl_approval_prod
+  versionLabel: "1.0.0"
+  type: Stage
+  projectIdentifier: TunXiangOS
+  orgIdentifier: default
+  description: "生产发布审批模板，需要发布经理 + SRE 至少2人联署确认"
+  tags:
+    team: platform
+    phase: approval
+
+  spec:
+    type: Approval
+    spec:
+      execution:
+        steps:
+          - step:
+              name: Prod_Approval
+              identifier: Prod_Approval
+              type: HarnessApproval
+              timeout: 4h
+              spec:
+                approvalMessage: "[生产发布] 请两人确认：版本 <+pipeline.sequenceId> | 服务 <+pipeline.name> | 时间 <+pipeline.startTs>"
+                includePipelineExecutionHistory: true
+                approvers:
+                  userGroups:
+                    - release_manager_group
+                    - sre_group
+                  minimumCount: 2
+                  disallowPipelineExecutor: false
+                approverInputs:
+                  - name: rollback_plan_confirmed
+                    defaultValue: "no"
+                  - name: change_ticket_id
+                    defaultValue: ""
+              failureStrategies:
+                - onFailure:
+                    errors:
+                      - ApprovalRejection
+                    action:
+                      type: Abort

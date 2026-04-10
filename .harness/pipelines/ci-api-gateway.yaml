@@ -1,0 +1,50 @@
+pipeline:
+  name: ci-api-gateway
+  identifier: ci_api_gateway
+  projectIdentifier: TunXiangOS
+  orgIdentifier: default
+  description: "gateway 服务 CI 流水线。PR 或 main 分支推送时自动触发，执行 Lint/安全扫描/测试/镜像构建。"
+  tags:
+    service: api-gateway
+    type: ci
+  properties:
+    ci:
+      codebase:
+        connectorRef: github_connector
+        repoName: tunxiang-os
+        build: <+input>
+  stages:
+    - stage:
+        name: CI
+        identifier: CI
+        type: CI
+        variables:
+          - name: servicePath
+            type: String
+            value: services/gateway
+          - name: imageRepo
+            type: String
+            value: tunxiang/api-gateway
+          - name: dockerfile
+            type: String
+            value: services/gateway/Dockerfile
+        spec:
+          cloneCodebase: true
+          infrastructure:
+            type: KubernetesDirect
+            spec:
+              connectorRef: k8s_connector
+              namespace: harness-ci
+              automountServiceAccountToken: true
+              nodeSelector: {}
+              os: Linux
+          execution:
+            steps:
+              - step:
+                  name: CI_Steps
+                  identifier: CI_Steps
+                  template:
+                    templateRef: tpl_ci_python_service
+                    versionLabel: v1
+                    templateInputs:
+                      type: StepGroup

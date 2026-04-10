@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>离线模式 — 屯象POS</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #1E2A3A;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+    .card {
+      background: #2A3A4A;
+      padding: 48px 40px;
+      border-radius: 16px;
+      text-align: center;
+      max-width: 420px;
+      width: 90%;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.32);
+    }
+    .icon {
+      font-size: 72px;
+      margin-bottom: 20px;
+      display: block;
+    }
+    h1 {
+      font-size: 22px;
+      font-weight: 700;
+      margin-bottom: 12px;
+      color: #FFFFFF;
+    }
+    p {
+      font-size: 15px;
+      color: #8899A6;
+      line-height: 1.7;
+      margin-bottom: 24px;
+    }
+    .status-box {
+      padding: 14px 16px;
+      background: rgba(255, 107, 53, 0.12);
+      border: 1px solid rgba(255, 107, 53, 0.4);
+      border-radius: 10px;
+      color: #FF8555;
+      font-size: 14px;
+      margin-bottom: 20px;
+      text-align: left;
+    }
+    .status-box .status-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #FF6B35;
+      flex-shrink: 0;
+      animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+    .retry-btn {
+      display: inline-block;
+      padding: 12px 32px;
+      background: #FF6B35;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+      width: 100%;
+    }
+    .retry-btn:hover { background: #E55A28; }
+    .queue-info {
+      margin-top: 16px;
+      font-size: 13px;
+      color: #5F7585;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <span class="icon">📡</span>
+    <h1>网络连接中断</h1>
+    <p>
+      POS 系统已切换至离线模式。<br>
+      已缓存的菜单与桌台数据仍可访问，<br>
+      新订单将在恢复网络后自动同步。
+    </p>
+    <div class="status-box">
+      <div class="status-row">
+        <div class="status-dot"></div>
+        <span>离线队列已就绪 — 操作不会丢失</span>
+      </div>
+    </div>
+    <button class="retry-btn" onclick="retryConnection()">重新连接</button>
+    <div class="queue-info" id="queue-info"></div>
+  </div>
+
+  <script>
+    function retryConnection() {
+      if (navigator.onLine) {
+        location.reload();
+      } else {
+        const btn = document.querySelector('.retry-btn');
+        btn.textContent = '仍在离线中...';
+        setTimeout(() => { btn.textContent = '重新连接'; }, 2000);
+      }
+    }
+
+    // 监听恢复在线
+    window.addEventListener('online', () => {
+      // 通知 Service Worker 刷新离线队列
+      if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage({ type: 'ONLINE_RESTORED' });
+      }
+      setTimeout(() => location.reload(), 500);
+    });
+
+    // 显示队列信息
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('message', (e) => {
+        if (e.data && e.data.type === 'OFFLINE_QUEUE_DRAINED') {
+          const info = document.getElementById('queue-info');
+          info.textContent = `已同步 ${e.data.count} 条待处理操作`;
+        }
+      });
+    }
+  </script>
+</body>
+</html>

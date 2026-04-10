@@ -1,0 +1,41 @@
+trigger:
+  name: trigger-pr-web-pos
+  identifier: trigger_pr_web_pos
+  projectIdentifier: TunXiangOS
+  orgIdentifier: default
+  description: "web-pos POS收银前端 PR 触发器。PR opened/synchronize 时触发 ci_web_pos 流水线。"
+  tags:
+    service: web-pos
+    event: pr
+  enabled: true
+  pipelineIdentifier: ci_web_pos
+  source:
+    type: Webhook
+    spec:
+      type: Github
+      spec:
+        type: PullRequest
+        spec:
+          connectorRef: github_connector
+          repoName: tunxiang-os
+          autoAbortPreviousExecutions: true
+          payloadConditions:
+            - key: targetBranch
+              operator: In
+              value: main,develop
+          headerConditions: []
+          jexlCondition: ""
+          actions:
+            - opened
+            - synchronize
+            - reopened
+  inputYaml: |
+    pipeline:
+      identifier: ci_web_pos
+      properties:
+        ci:
+          codebase:
+            build:
+              type: PR
+              spec:
+                number: <+trigger.prNumber>

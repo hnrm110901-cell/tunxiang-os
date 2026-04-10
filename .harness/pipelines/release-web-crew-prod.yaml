@@ -1,0 +1,399 @@
+pipeline:
+  name: release-web-crew-prod
+  identifier: release_web_crew_prod
+  projectIdentifier: TunXiangOS
+  orgIdentifier: default
+  description: "Web Crew 服务员端生产发布流水线：Pilot 灰度 → 1人审批 → 生产全量部署（相对低风险，需确保不影响进行中的服务）"
+  tags:
+    service: web-crew
+    track: release
+    env: prod
+
+  stages:
+    # ═════════════════════════════════════════════════════════════
+    # Stage 1: Deploy_Pilot
+    # 目的：先向 pilot 租户灰度发布服务员端，验证界面加载、
+    #       点餐/呼叫/服务流程正常，确保不影响正在进行的服务。
+    # ═════════════════════════════════════════════════════════════
+    - stage:
+        name: Deploy_Pilot
+        identifier: Deploy_Pilot
+        type: Deployment
+        spec:
+          deploymentType: Kubernetes
+          service:
+            serviceRef: svc_web_crew
+            serviceInputs:
+              serviceDefinition:
+                type: Kubernetes
+                spec:
+                  artifacts:
+                    primary:
+                      primaryArtifactRef: primary
+                      sources:
+                        - identifier: primary
+                          spec:
+                            tag: <+pipeline.variables.imageTag>
+          environment:
+            environmentRef: env_pilot
+            deployToAll: false
+            infrastructureDefinitions:
+              - identifier: gitops_pilot_region_a
+                inputs:
+                  identifier: gitops_pilot_region_a
+                  type: KubernetesDirect
+                  spec:
+                    namespace: tunxiang-pilot
+          execution:
+            steps:
+              # 1-a: Rolling 部署到 Pilot
+              - step:
+                  name: K8s_Rolling_Deploy_Pilot
+                  identifier: K8s_Rolling_Deploy_Pilot
+                  type: K8sRollingDeploy
+                  timeout: 10m
+                  spec:
+                    skipDryRun: false
+                    pruningEnabled: false
+                  failureStrategies:
+                    - onFailure:
+                        errors:
+                          - AllErrors
+                        action:
+                          type: StageRollback
+
+              # 1-b: 静态资源版本校验（Pilot）
+              - step:
+                  name: Verify_Static_Assets_Pilot
+                  identifier: Verify_Static_Assets_Pilot
+                  type: ShellScript
+                  timeout: 5m
+                  spec:
+                    shell: Bash
+                    onDelegate: true
+                    source:
+                      type: Inline
+                      spec:
+                        script: |
+                          #!/usr/bin/env bash
+                          set -euo pipefail
+                          BASE_URL="https://pilot-crew.tunxiangos.cn"
+                          IMAGE_TAG="<+pipeline.variables.imageTag>"
+                          echo ">>> Pilot 静态资源版本校验 (Crew)"
+                          echo "期望版本 Tag: ${IMAGE_TAG}"
+
+                          HTTP_CODE=$(curl -sf -o /dev/null -w "%{http_code}" --max-time 10 "${BASE_URL}/" || true)
+                          [ "${HTTP_CODE}" = "200" ] || { echo "ERROR: 主页 HTTP ${HTTP_CODE}"; exit 1; }
+
+                          # 检查带 hash 的 JS bundle
+                          ASSETS_HTML=$(curl -sf --max-time 10 "${BASE_URL}/" 2>/dev/null || echo "")
+                          if echo "${ASSETS_HTML}" | grep -q "index\.[a-f0-9]\{8\}\.js"; then
+                            echo "OK: 检测到 hash JS bundle，版本已更新"
+                          else
+                            echo "WARNING: 未检测到 hash JS bundle，请确认 CDN 已刷新"
+                          fi
+
+                          # 版本信息接口
+                          VERSION_RESP=$(curl -sf --max-time 5 "${BASE_URL}/version.json" 2>/dev/null || echo "{}")
+                          echo "版本信息: ${VERSION_RESP}"
+                          echo "OK: Pilot 静态资源校验完成"
+
+              # 1-c: 服务员端功能冒烟（主界面 + 核心 Tab 加载）
+              - step:
+                  name: Crew_Smoke_Test_Pilot
+                  identifier: Crew_Smoke_Test_Pilot
+                  type: ShellScript
+                  timeout: 5m
+                  spec:
+                    shell: Bash
+                    onDelegate: true
+                    source:
+                      type: Inline
+                      spec:
+                        script: |
+                          #!/usr/bin/env bash
+                          set -euo pipefail
+                          BASE_URL="https://pilot-crew.tunxiangos.cn"
+                          API_URL="https://pilot-api.tunxiangos.cn"
+                          echo ">>> 服务员端冒烟测试"
+
+                          # 主界面加载
+                          HTTP_CODE=$(curl -sf -o /dev/null -w "%{http_code}" --max-time 15 "${BASE_URL}/" || true)
+                          [ "${HTTP_CODE}" = "200" ] || { echo "ERROR: 服务员端主页 HTTP ${HTTP_CODE}"; exit 1; }
+                          echo "OK: 服务员端主界面加载正常"
+
+                          # 后端服务可达性
+                          HTTP_CODE=$(curl -sf -o /dev/null -w "%{http_code}" --max-time 10 "${API_URL}/health" || true)
+                          if [ "${HTTP_CODE}" = "200" ]; then
+                            echo "OK: 后端服务健康"
+                          else
+                            echo "WARNING: 后端服务响应 HTTP ${HTTP_CODE}"
+                          fi
+
+                          echo "OK: 服务员端冒烟测试完成"
+                  failureStrategies:
+                    - onFailure:
+                        errors:
+                          - AllErrors
+                        action:
+                          type: StageRollback
+
+              # 1-d: Pilot 观察等待
+              - step:
+                  name: Pilot_Observation_Wait
+                  identifier: Pilot_Observation_Wait
+                  type: HarnessApproval
+                  timeout: 2h
+                  spec:
+                    approvalMessage: "Web Crew Pilot 已部署完成。请验证：1.服务员端主界面正常 2.点餐功能可用 3.呼叫/服务流程正常 4.确保不影响正在进行的服务。确认无误后继续。版本：<+pipeline.sequenceId>"
+                    includePipelineExecutionHistory: true
+                    approvers:
+                      userGroups:
+                        - qa_group
+                        - sre_group
+                      minimumCount: 1
+                      disallowPipelineExecutor: false
+                    approverInputs:
+                      - name: crew_ui_verified
+                        defaultValue: "no"
+                      - name: service_continuity_confirmed
+                        defaultValue: "no"
+                  failureStrategies:
+                    - onFailure:
+                        errors:
+                          - ApprovalRejection
+                        action:
+                          type: StageRollback
+
+            rollbackSteps:
+              - step:
+                  name: K8s_Rolling_Rollback_Pilot
+                  identifier: K8s_Rolling_Rollback_Pilot
+                  type: K8sRollingRollback
+                  timeout: 10m
+                  spec: {}
+
+    # ═════════════════════════════════════════════════════════════
+    # Stage 2: Approve_Prod
+    # 目的：服务员端生产发布单人审批（相对低风险，minimumCount: 1）。
+    #       需确保不影响正在进行的服务流程。
+    # ═════════════════════════════════════════════════════════════
+    - stage:
+        name: Approve_Prod
+        identifier: Approve_Prod
+        type: Approval
+        dependsOn:
+          - Deploy_Pilot
+        spec:
+          execution:
+            steps:
+              - step:
+                  name: Prod_Release_Approval
+                  identifier: Prod_Release_Approval
+                  type: HarnessApproval
+                  timeout: 4h
+                  spec:
+                    approvalMessage: "[生产发布 - 服务员端] 请确认：版本 <+pipeline.sequenceId> | 服务 <+pipeline.name> | 时间 <+pipeline.startTs> | 请确保不影响正在进行中的服务"
+                    includePipelineExecutionHistory: true
+                    approvers:
+                      userGroups:
+                        - release_manager_group
+                        - sre_group
+                      minimumCount: 1
+                      disallowPipelineExecutor: false
+                    approverInputs:
+                      - name: rollback_plan_confirmed
+                        defaultValue: "no"
+                      - name: change_ticket_id
+                        defaultValue: ""
+                      - name: cdn_cache_purge_plan
+                        defaultValue: "no"
+                  failureStrategies:
+                    - onFailure:
+                        errors:
+                          - ApprovalRejection
+                        action:
+                          type: Abort
+
+    # ═════════════════════════════════════════════════════════════
+    # Stage 3: Deploy_Prod
+    # 目的：向生产环境 Rolling 部署 web-crew。
+    #       含部署后健康验证，确保服务员端可正常使用。
+    # ═════════════════════════════════════════════════════════════
+    - stage:
+        name: Deploy_Prod
+        identifier: Deploy_Prod
+        type: Deployment
+        dependsOn:
+          - Approve_Prod
+        spec:
+          deploymentType: Kubernetes
+          service:
+            serviceRef: svc_web_crew
+            serviceInputs:
+              serviceDefinition:
+                type: Kubernetes
+                spec:
+                  artifacts:
+                    primary:
+                      primaryArtifactRef: primary
+                      sources:
+                        - identifier: primary
+                          spec:
+                            tag: <+pipeline.variables.imageTag>
+          environment:
+            environmentRef: env_prod
+            deployToAll: false
+            infrastructureDefinitions:
+              - identifier: k8s_prod_main
+                inputs:
+                  identifier: k8s_prod_main
+                  type: KubernetesDirect
+                  spec:
+                    namespace: tunxiang-prod
+          execution:
+            steps:
+              - step:
+                  name: K8s_Rolling_Deploy_Prod
+                  identifier: K8s_Rolling_Deploy_Prod
+                  type: K8sRollingDeploy
+                  timeout: 10m
+                  spec:
+                    skipDryRun: false
+                    pruningEnabled: false
+                  failureStrategies:
+                    - onFailure:
+                        errors:
+                          - AllErrors
+                        action:
+                          type: StageRollback
+
+              # 生产静态资源校验
+              - step:
+                  name: Verify_Static_Assets_Prod
+                  identifier: Verify_Static_Assets_Prod
+                  type: ShellScript
+                  timeout: 5m
+                  spec:
+                    shell: Bash
+                    onDelegate: true
+                    source:
+                      type: Inline
+                      spec:
+                        script: |
+                          #!/usr/bin/env bash
+                          set -euo pipefail
+                          BASE_URL="https://crew.tunxiangos.cn"
+                          IMAGE_TAG="<+pipeline.variables.imageTag>"
+                          echo ">>> 生产静态资源版本校验 (Crew)"
+                          echo "期望版本 Tag: ${IMAGE_TAG}"
+
+                          # 主页200
+                          HTTP_CODE=$(curl -sf -o /dev/null -w "%{http_code}" --max-time 10 "${BASE_URL}/" || true)
+                          [ "${HTTP_CODE}" = "200" ] || { echo "ERROR: 主页 HTTP ${HTTP_CODE}"; exit 1; }
+
+                          # Hash bundle 检测
+                          ASSETS_HTML=$(curl -sf --max-time 10 "${BASE_URL}/" 2>/dev/null || echo "")
+                          if echo "${ASSETS_HTML}" | grep -q "index\.[a-f0-9]\{8\}\.js"; then
+                            echo "OK: hash JS bundle 检测通过"
+                          else
+                            echo "WARNING: 未检测到 hash bundle，请手动验证 CDN 刷新状态"
+                          fi
+
+                          # 版本信息
+                          VERSION_RESP=$(curl -sf --max-time 5 "${BASE_URL}/version.json" 2>/dev/null || echo "{}")
+                          echo "生产版本信息: ${VERSION_RESP}"
+                          echo "OK: 生产静态资源校验通过"
+                  failureStrategies:
+                    - onFailure:
+                        errors:
+                          - AllErrors
+                        action:
+                          type: StageRollback
+
+              # Post Deploy 验证
+              - step:
+                  name: Post_Deploy_Verify
+                  identifier: Post_Deploy_Verify
+                  type: ShellScript
+                  timeout: 5m
+                  spec:
+                    shell: Bash
+                    onDelegate: true
+                    source:
+                      type: Inline
+                      spec:
+                        script: |
+                          #!/usr/bin/env bash
+                          set -euo pipefail
+                          BASE_URL="https://crew.tunxiangos.cn"
+                          API_URL="https://api.tunxiangos.cn"
+                          echo ">>> Post Deploy 验证 (Crew)"
+
+                          # 验证服务员端主页 200
+                          HTTP_CODE=$(curl -sf -o /dev/null -w "%{http_code}" --max-time 10 "${BASE_URL}/" || true)
+                          [ "${HTTP_CODE}" = "200" ] || { echo "ERROR: Crew 主页 HTTP ${HTTP_CODE}"; exit 1; }
+                          echo "OK: 服务员端主页 200"
+
+                          # 验证 /health 端点
+                          MAX_RETRY=6; SLEEP_SEC=10
+                          for i in $(seq 1 ${MAX_RETRY}); do
+                            HTTP_CODE=$(curl -sf -o /dev/null -w "%{http_code}" --max-time 10 "${API_URL}/health" || true)
+                            if [ "${HTTP_CODE}" = "200" ]; then
+                              echo "OK: /health 端点正常"
+                              break
+                            fi
+                            echo "HTTP ${HTTP_CODE}，等待 ${SLEEP_SEC}s... (${i}/${MAX_RETRY})"
+                            sleep ${SLEEP_SEC}
+                            if [ "${i}" = "${MAX_RETRY}" ]; then
+                              echo "ERROR: /health 端点超时"; exit 1
+                            fi
+                          done
+                  failureStrategies:
+                    - onFailure:
+                        errors:
+                          - AllErrors
+                        action:
+                          type: StageRollback
+
+              - step:
+                  name: Notify_Prod_Deploy_Success
+                  identifier: Notify_Prod_Deploy_Success
+                  type: ShellScript
+                  timeout: 2m
+                  spec:
+                    shell: Bash
+                    onDelegate: true
+                    source:
+                      type: Inline
+                      spec:
+                        script: |
+                          #!/usr/bin/env bash
+                          echo "================================================"
+                          echo "生产发布成功！"
+                          echo "服务: web-crew (服务员端)"
+                          echo "版本: <+pipeline.variables.imageTag>"
+                          echo "流水线序号: <+pipeline.sequenceId>"
+                          echo "================================================"
+
+            rollbackSteps:
+              - step:
+                  name: K8s_Rolling_Rollback_Prod
+                  identifier: K8s_Rolling_Rollback_Prod
+                  type: K8sRollingRollback
+                  timeout: 10m
+                  spec: {}
+
+        failureStrategies:
+          - onFailure:
+              errors:
+                - AllErrors
+              action:
+                type: StageRollback
+
+  variables:
+    - name: imageTag
+      type: String
+      description: "待发布的生产镜像 Tag（必须来自已通过 UAT 的构建）"
+      required: true
+      value: <+input>

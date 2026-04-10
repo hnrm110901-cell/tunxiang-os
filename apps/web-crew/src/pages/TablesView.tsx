@@ -119,6 +119,13 @@ function TableCard({ table, onTap, member }: TableCardProps) {
   const color = STATUS_COLOR[table.status] || '#8c8c8c';
   const label = STATUS_LABEL[table.status] || table.status;
 
+  // 超时判断：在座超过45分钟视为超时（可根据实际阈值调整）
+  const isOvertime = table.status === 'occupied' && mins > 45;
+  // 催单判断：在座超过30分钟视为催单场景
+  const needsUrge = table.status === 'occupied' && mins > 30;
+  // 推荐甜品：正常用餐但超过30分钟
+  const suggestDessert = table.status === 'occupied' && mins > 30 && !isOvertime;
+
   return (
     <div
       onClick={() => onTap(table)}
@@ -126,6 +133,7 @@ function TableCard({ table, onTap, member }: TableCardProps) {
       onPointerUp={() => setPressed(false)}
       onPointerCancel={() => setPressed(false)}
       style={{
+        position: 'relative',
         borderRadius: 10,
         background: '#112228',
         borderLeft: `4px solid ${color}`,
@@ -139,8 +147,18 @@ function TableCard({ table, onTap, member }: TableCardProps) {
         display: 'flex',
         flexDirection: 'column',
         gap: 6,
+        ...(isOvertime ? { animation: 'txPulse 1.8s ease-in-out infinite' } : {}),
       }}
     >
+      {/* 催单角标 */}
+      {needsUrge && (
+        <span style={{
+          position: 'absolute', top: 4, right: 4,
+          background: 'rgba(15,110,86,.2)', color: '#0F6E56',
+          fontSize: 10, padding: '1px 5px', borderRadius: 3, fontWeight: 700,
+        }}>🤖 已催单</span>
+      )}
+
       {/* 行1：桌号 + 状态 tag */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <span style={{ fontSize: 18, fontWeight: 700, color: '#fff' }}>{table.table_no}</span>
@@ -184,6 +202,20 @@ function TableCard({ table, onTap, member }: TableCardProps) {
       {/* 行4：空闲提示 或 占座金额占位（金额需订单详情API，此处展示在座标记） */}
       {table.status === 'idle' && (
         <div style={{ fontSize: 14, color: STATUS_COLOR.idle }}>空闲 &rsaquo;</div>
+      )}
+
+      {/* AI 状态行：超时提示 */}
+      {isOvertime && (
+        <div style={{ fontSize: 12, color: '#A32D2D', fontWeight: 600, marginTop: 2 }}>
+          ⏰ 预计5分钟出品
+        </div>
+      )}
+
+      {/* AI 状态行：建议推荐甜品 */}
+      {suggestDessert && (
+        <div style={{ fontSize: 12, color: '#6D3EA8', fontWeight: 600, marginTop: 2 }}>
+          🍮 建议推荐甜品
+        </div>
       )}
     </div>
   );
@@ -357,11 +389,15 @@ export function TablesView() {
 
   return (
     <div style={{ padding: 16, paddingBottom: 32 }}>
-      {/* shimmer 动画 */}
+      {/* shimmer 动画 + txPulse 脉冲动画 */}
       <style>{`
         @keyframes shimmer {
           0%   { background-position: 200% 0; }
           100% { background-position: -200% 0; }
+        }
+        @keyframes txPulse {
+          0%, 100% { box-shadow: 0 0 0 0 rgba(163,45,45,.4); }
+          50%       { box-shadow: 0 0 0 6px rgba(163,45,45,.0); }
         }
       `}</style>
 

@@ -1,0 +1,6 @@
+apiVersion: v2
+name: tx-member
+description: 屯象OS 会员CDP微服务 — 全渠道会员画像/CLV/GDPR合规
+type: application
+version: 1.0.0
+appVersion: "latest"

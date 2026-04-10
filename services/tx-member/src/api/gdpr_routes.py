@@ -1,13 +1,17 @@
-"""GDPR 合规 API — 7 个端点（v103）
+"""GDPR 合规 API — 11 个端点（v202 扩展）
 
 端点：
-1. POST /api/v1/member/gdpr/requests          提交权利申请
-2. GET  /api/v1/member/gdpr/requests          查询请求列表
-3. GET  /api/v1/member/gdpr/requests/{id}     请求详情
-4. POST /api/v1/member/gdpr/requests/{id}/review   审核（批准/拒绝）
-5. POST /api/v1/member/gdpr/requests/{id}/execute  执行匿名化（erasure）
-6. GET  /api/v1/member/gdpr/export/{customer_id}   数据导出（portability）
-7. GET  /api/v1/member/gdpr/pending-count     待处理请求数量（运营看板）
+1.  POST /api/v1/member/gdpr/requests                           提交权利申请
+2.  GET  /api/v1/member/gdpr/requests                           查询请求列表
+3.  GET  /api/v1/member/gdpr/requests/{id}                      请求详情
+4.  POST /api/v1/member/gdpr/requests/{id}/review               审核（批准/拒绝）
+5.  POST /api/v1/member/gdpr/requests/{id}/execute              执行匿名化（erasure）
+6.  GET  /api/v1/member/gdpr/export/{customer_id}               数据导出（portability）
+7.  GET  /api/v1/member/gdpr/pending-count                      待处理请求数量（运营看板）
+8.  POST /api/v1/member/gdpr/requests/{id}/process              统一处理端点（approve/reject）
+9.  GET  /api/v1/member/gdpr/retention-policies                 列出数据保留期策略
+10. PUT  /api/v1/member/gdpr/retention-policies/{category}      更新某类数据保留期
+11. GET  /api/v1/member/gdpr/export/{customer_id}               生成顾客数据导出（兼容旧路径）
 """
 from typing import Any, Dict, Optional
 
@@ -224,5 +228,183 @@ async def get_pending_count(
             "executed": counts.get("executed", 0),
             "rejected": counts.get("rejected", 0),
             "total_active": counts.get("pending", 0) + counts.get("reviewing", 0),
+        },
+    }
+
+
+# ─── 8. 统一处理端点（approve/reject）— v202 新增 ─────────────────────────────
+
+import uuid as _uuid_mod
+import structlog as _structlog
+from datetime import datetime, timezone
+from sqlalchemy import text as _sa_text
+
+_log = _structlog.get_logger(__name__)
+
+
+class ProcessRequestModel(BaseModel):
+    action: str = Field(..., description="操作: approve 或 reject")
+    operator_id: str = Field(..., description="操作人员工 ID")
+    reason: Optional[str] = Field(None, description="拒绝原因（action=reject 时必填）")
+
+    @field_validator("action")
+    @classmethod
+    def check_action(cls, v: str) -> str:
+        if v not in ("approve", "reject"):
+            raise ValueError("action 必须是 approve 或 reject")
+        return v
+
+
+@router.post("/requests/{request_id}/process", summary="处理 GDPR 请求（approve/reject）")
+async def process_gdpr_request(
+    request_id: str = Path(..., description="请求 ID"),
+    body: ProcessRequestModel = ...,
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(_get_tenant_db),
+) -> Dict[str, Any]:
+    """统一处理端点：批准或拒绝一条 GDPR 请求。
+
+    - action=approve：将请求置为 processing 状态，等待执行
+    - action=reject：拒绝请求，需提供 reason
+    """
+    svc = GDPRService(db, x_tenant_id)
+    try:
+        req = await svc.review_request(
+            request_id=request_id,
+            approved=(body.action == "approve"),
+            reviewed_by=body.operator_id,
+            rejection_reason=body.reason,
+        )
+        await db.commit()
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    _log.info(
+        "gdpr_request_processed",
+        request_id=request_id,
+        action=body.action,
+        operator_id=body.operator_id,
+        tenant_id=x_tenant_id,
+    )
+    return {"ok": True, "data": req}
+
+
+# ─── 9. 列出数据保留期策略 — v202 新增 ────────────────────────────────────────
+
+@router.get("/retention-policies", summary="列出数据保留期策略")
+async def list_retention_policies(
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(_get_tenant_db),
+) -> Dict[str, Any]:
+    """列出当前租户所有数据类别的保留期配置。
+
+    数据类别：orders / members / logs / payments
+    """
+    result = await db.execute(
+        _sa_text("""
+            SELECT id, tenant_id, data_category, retention_days,
+                   anonymize_after_days, legal_basis, is_active,
+                   created_at, updated_at
+            FROM data_retention_policies
+            WHERE tenant_id = :tid AND is_active = TRUE
+            ORDER BY data_category
+        """),
+        {"tid": x_tenant_id},
+    )
+    rows = result.fetchall()
+    items = [
+        {
+            "id": str(r.id),
+            "data_category": r.data_category,
+            "retention_days": r.retention_days,
+            "anonymize_after_days": r.anonymize_after_days,
+            "legal_basis": r.legal_basis,
+            "is_active": r.is_active,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+            "updated_at": r.updated_at.isoformat() if r.updated_at else None,
+        }
+        for r in rows
+    ]
+    return {"ok": True, "data": {"items": items, "total": len(items)}}
+
+
+# ─── 10. 更新数据保留期策略 — v202 新增 ───────────────────────────────────────
+
+_VALID_CATEGORIES = frozenset(["orders", "members", "logs", "payments"])
+
+
+class RetentionPolicyUpdateModel(BaseModel):
+    retention_days: int = Field(..., ge=1, le=3650, description="保留天数（1-3650）")
+    anonymize_after_days: Optional[int] = Field(None, ge=1, description="匿名化天数（可选）")
+    legal_basis: Optional[str] = Field(None, max_length=100, description="GDPR 合法依据")
+    is_active: bool = Field(True, description="是否启用")
+
+
+@router.put(
+    "/retention-policies/{category}",
+    summary="更新某类数据保留期策略",
+)
+async def update_retention_policy(
+    category: str = Path(..., description="数据类别: orders/members/logs/payments"),
+    body: RetentionPolicyUpdateModel = ...,
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(_get_tenant_db),
+) -> Dict[str, Any]:
+    """更新指定数据类别的保留期策略（不存在则自动创建）。
+
+    合规说明：变更保留期策略须有合法依据（GDPR Art.5(1)(e)）。
+    """
+    if category not in _VALID_CATEGORIES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"category 必须是: {', '.join(sorted(_VALID_CATEGORIES))}",
+        )
+
+    now = datetime.now(timezone.utc)
+    # UPSERT：若存在则更新，否则插入
+    await db.execute(
+        _sa_text("""
+            INSERT INTO data_retention_policies
+                (id, tenant_id, data_category, retention_days,
+                 anonymize_after_days, legal_basis, is_active,
+                 created_at, updated_at)
+            VALUES
+                (gen_random_uuid(), :tid, :cat, :days,
+                 :anon_days, :basis, :active,
+                 :now, :now)
+            ON CONFLICT (tenant_id, data_category)
+            DO UPDATE SET
+                retention_days        = EXCLUDED.retention_days,
+                anonymize_after_days  = EXCLUDED.anonymize_after_days,
+                legal_basis           = EXCLUDED.legal_basis,
+                is_active             = EXCLUDED.is_active,
+                updated_at            = EXCLUDED.updated_at
+        """),
+        {
+            "tid": x_tenant_id,
+            "cat": category,
+            "days": body.retention_days,
+            "anon_days": body.anonymize_after_days,
+            "basis": body.legal_basis,
+            "active": body.is_active,
+            "now": now,
+        },
+    )
+    await db.commit()
+    _log.info(
+        "retention_policy_updated",
+        tenant_id=x_tenant_id,
+        category=category,
+        retention_days=body.retention_days,
+    )
+    return {
+        "ok": True,
+        "data": {
+            "tenant_id": x_tenant_id,
+            "data_category": category,
+            "retention_days": body.retention_days,
+            "anonymize_after_days": body.anonymize_after_days,
+            "legal_basis": body.legal_basis,
+            "is_active": body.is_active,
+            "updated_at": now.isoformat(),
         },
     }

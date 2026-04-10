@@ -24,18 +24,20 @@ from shared.ontology.src.database import get_db
 
 from ..repositories.ops_repository import OpsRepository
 
-# 从同包路由复用内存 fallback 存储
-from .daily_summary_routes import _aggregate_orders, _summaries
-from .inspection_routes import _reports
-from .issues_routes import _issues
+# 从同包路由复用聚合函数（内存变量已迁移至真实DB，不再导入）
+from .daily_summary_routes import _aggregate_orders
 from .performance_routes import (
     _aggregate_cashier_performance,
     _aggregate_chef_performance,
     _aggregate_waiter_performance,
     _calc_commission_fen,
-    _performance,
 )
-from .shift_routes import _shifts
+# 以下路由均已迁移至真实DB，此处保留本地空字典供各 fallback 降级使用
+_shifts: dict = {}
+_local_summaries: dict = {}
+_local_issues: dict = {}
+_local_reports: dict = {}
+_local_performance: dict = {}
 
 router = APIRouter(prefix="/api/v1/ops/settlement", tags=["ops-settlement"])
 log = structlog.get_logger(__name__)
@@ -117,7 +119,7 @@ async def _check_e2_status_db(
 
 def _check_e2_status_fallback(store_id: str, date_str: str, tenant_id: str) -> Dict[str, Any]:
     key = f"{tenant_id}:{store_id}:{date_str}"
-    summary = _summaries.get(key)
+    summary = _local_summaries.get(key)
     if not summary:
         return {"completed": False, "message": "日汇总未生成", "detail": None}
     if summary["status"] == "locked":
@@ -140,7 +142,7 @@ async def _check_e5_status_db(
 
 def _check_e5_status_fallback(store_id: str, date_str: str, tenant_id: str) -> Dict[str, Any]:
     day_issues = [
-        i for i in _issues.values()
+        i for i in _local_issues.values()
         if i["tenant_id"] == tenant_id and i["store_id"] == store_id
         and i["issue_date"] == date_str and not i.get("is_deleted", False)
     ]
@@ -159,7 +161,7 @@ def _check_e5_status_fallback(store_id: str, date_str: str, tenant_id: str) -> D
 
 def _check_e7_status_fallback(store_id: str, date_str: str, tenant_id: str) -> Dict[str, Any]:
     day_perfs = [
-        p for p in _performance.values()
+        p for p in _local_performance.values()
         if p["tenant_id"] == tenant_id and p["store_id"] == store_id and p["perf_date"] == date_str
     ]
     completed = len(day_perfs) > 0
@@ -172,7 +174,7 @@ def _check_e7_status_fallback(store_id: str, date_str: str, tenant_id: str) -> D
 
 def _check_e8_status_fallback(store_id: str, date_str: str, tenant_id: str) -> Dict[str, Any]:
     day_reports = [
-        r for r in _reports.values()
+        r for r in _local_reports.values()
         if r["tenant_id"] == tenant_id and r["store_id"] == store_id
         and r["inspection_date"] == date_str and not r.get("is_deleted", False)
     ]
@@ -278,7 +280,7 @@ async def run_daily_settlement(
     if use_db and repo:
         existing_summary = await repo.get_daily_summary(body.store_id, body.settlement_date)
         if not existing_summary or (body.force_regenerate and existing_summary["status"] != "locked"):
-            aggregated = await _aggregate_orders(body.store_id, body.settlement_date, x_tenant_id)
+            aggregated = await _aggregate_orders(body.store_id, body.settlement_date, x_tenant_id, db=db)
             record = await repo.upsert_daily_summary(body.store_id, body.settlement_date, aggregated)
             steps.append({"node": "E2_日营业汇总", "action": "generated", "completed": True,
                           "message": "日汇总已自动生成（草稿状态，需手动确认锁定）",
@@ -288,10 +290,16 @@ async def run_daily_settlement(
             steps.append({"node": "E2_日营业汇总", "action": "check", **e2})
     else:
         e2_key = f"{x_tenant_id}:{body.store_id}:{date_str}"
-        e2_existing = _summaries.get(e2_key)
+        e2_existing = _local_summaries.get(e2_key)
         if not e2_existing or (body.force_regenerate and e2_existing["status"] != "locked"):
             import uuid as _uuid
-            aggregated = await _aggregate_orders(body.store_id, body.settlement_date, x_tenant_id)
+            # fallback 路径无 DB 连接，返回空聚合结构
+            aggregated = {
+                "total_orders": 0, "dine_in_orders": 0, "takeaway_orders": 0,
+                "banquet_orders": 0, "total_revenue_fen": 0, "actual_revenue_fen": 0,
+                "total_discount_fen": 0, "max_discount_pct": None,
+                "abnormal_discounts": 0, "avg_table_value_fen": None,
+            }
             summary_id = e2_existing["id"] if e2_existing else str(_uuid.uuid4())
             record = {
                 "id": summary_id, "tenant_id": x_tenant_id, "store_id": body.store_id,
@@ -300,7 +308,7 @@ async def run_daily_settlement(
                 "created_at": e2_existing["created_at"] if e2_existing else now.isoformat(),
                 "updated_at": now.isoformat(), "is_deleted": False,
             }
-            _summaries[e2_key] = record
+            _local_summaries[e2_key] = record
             steps.append({"node": "E2_日营业汇总", "action": "generated", "completed": True,
                           "message": "日汇总已自动生成（草稿状态，需手动确认锁定）",
                           "summary_id": summary_id})
@@ -355,10 +363,10 @@ async def run_daily_settlement(
             for emp in emp_list:
                 emp_id = emp["employee_id"]
                 key = f"{x_tenant_id}:{body.store_id}:{date_str}:{emp_id}"
-                if key not in _performance or body.force_regenerate:
+                if key not in _local_performance or body.force_regenerate:
                     commission = _calc_commission_fen(role, emp)
-                    existing = _performance.get(key)
-                    _performance[key] = {
+                    existing = _local_performance.get(key)
+                    _local_performance[key] = {
                         "id": existing["id"] if existing else str(_uuid2.uuid4()),
                         "tenant_id": x_tenant_id, "store_id": body.store_id,
                         "perf_date": date_str, "employee_id": emp_id,

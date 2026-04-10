@@ -46,7 +46,19 @@ def upgrade() -> None:
     op.execute("ALTER TABLE table_layouts FORCE ROW LEVEL SECURITY;")
 
     for action in ("SELECT", "INSERT", "UPDATE", "DELETE"):
-        op.execute(f"""
+        if action == "INSERT":
+            op.execute(f"""
+            CREATE POLICY table_layouts_{action.lower()}_tenant ON table_layouts
+            AS RESTRICTIVE FOR {action}
+            WITH CHECK (
+                current_setting('app.tenant_id', TRUE) IS NOT NULL
+                AND current_setting('app.tenant_id', TRUE) <> ''
+                AND tenant_id = NULLIF(current_setting('app.tenant_id', TRUE), '')::UUID
+            );
+
+            """)
+        else:
+            op.execute(f"""
             CREATE POLICY table_layouts_{action.lower()}_tenant ON table_layouts
             AS RESTRICTIVE FOR {action}
             USING (
@@ -54,7 +66,8 @@ def upgrade() -> None:
                 AND current_setting('app.tenant_id', TRUE) <> ''
                 AND tenant_id = NULLIF(current_setting('app.tenant_id', TRUE), '')::UUID
             );
-        """)
+
+            """)
 
     op.execute("""
         CREATE INDEX IF NOT EXISTS ix_table_layouts_tenant_store

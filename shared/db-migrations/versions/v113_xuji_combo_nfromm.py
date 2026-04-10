@@ -15,31 +15,17 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # ── 1. dish_combos 表扩展 ─────────────────────────────────────
-    op.add_column("dish_combos", sa.Column(
-        "combo_type", sa.String(20), nullable=False, server_default="fixed",
-        comment="fixed=固定套餐 / flexible=N选M灵活套餐"
-    ))
-    op.add_column("dish_combos", sa.Column(
-        "description", sa.Text, nullable=True,
-        comment="套餐说明，如：包含主菜2选1 + 例汤 + 米饭"
-    ))
-    op.add_column("dish_combos", sa.Column(
-        "min_person", sa.Integer, nullable=True,
-        comment="最少人数（双人套餐=2）"
-    ))
-    op.add_column("dish_combos", sa.Column(
-        "is_active", sa.Boolean, nullable=False, server_default="true"
-    ))
-    op.add_column("dish_combos", sa.Column(
-        "available_from", sa.Time, nullable=True, comment="可供时段开始（午市套餐）"
-    ))
-    op.add_column("dish_combos", sa.Column(
-        "available_until", sa.Time, nullable=True, comment="可供时段结束"
-    ))
-    op.add_column("dish_combos", sa.Column(
-        "image_url", sa.String(512), nullable=True
-    ))
+    # ── 1. dish_combos 表扩展（IF NOT EXISTS 保证幂等）──────────────
+    op.execute("""
+        ALTER TABLE dish_combos
+            ADD COLUMN IF NOT EXISTS combo_type      VARCHAR(20)  NOT NULL DEFAULT 'fixed',
+            ADD COLUMN IF NOT EXISTS description     TEXT,
+            ADD COLUMN IF NOT EXISTS min_person      INTEGER,
+            ADD COLUMN IF NOT EXISTS is_active       BOOLEAN      NOT NULL DEFAULT TRUE,
+            ADD COLUMN IF NOT EXISTS available_from  TIME,
+            ADD COLUMN IF NOT EXISTS available_until TIME,
+            ADD COLUMN IF NOT EXISTS image_url       VARCHAR(512)
+    """)
 
     # ── 2. combo_groups — N选M分组表 ─────────────────────────────
     op.create_table(

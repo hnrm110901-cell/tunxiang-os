@@ -50,6 +50,13 @@ def upgrade() -> None:
     """)
 
     # 索引：按租户 + agent + 时间倒序查询（最常见访问模式）
+    # Ensure new columns exist (table may have been created by an earlier migration)
+    op.execute("""
+        ALTER TABLE agent_decision_logs
+            ADD COLUMN IF NOT EXISTS plan_id     VARCHAR(100),
+            ADD COLUMN IF NOT EXISTS is_deleted  BOOLEAN NOT NULL DEFAULT FALSE
+    """)
+
     op.execute("""
         CREATE INDEX IF NOT EXISTS idx_agent_decision_logs_tenant_agent_time
             ON agent_decision_logs(tenant_id, agent_id, decided_at DESC)

@@ -28,6 +28,12 @@ export * from './dispatchApi';
 export * from './banquetApi';
 export * from './storeHealthApi';
 export * from './hrApi';
+export * from './enterpriseAdminApi';
+export * from './serviceChargeApi';
+export * from './kdsManageApi';
+export * from './costApi';
+export * from './budgetApi';
+export * from './managerDashboardApi';
 
 // ─── 门店健康 ───
 
@@ -61,3 +67,8 @@ export async function fetchDailyOpsFlow(storeId: string, date?: string): Promise
 
 export interface EfficiencyData { store_id: string; avg_serve_time_sec: number; table_turnover_rate: number; labor_efficiency: number; peak_hour_orders: number; }
 export async function fetchEfficiency(storeId: string): Promise<EfficiencyData> { return txFetchData(`/api/v1/analytics/efficiency?store_id=${encodeURIComponent(storeId)}`); }
+
+export * from './wineStorageApi';
+export * from './depositApi';
+export * from './menuSchemeApi';
+export * from './growthHubApi';

@@ -1,4 +1,3 @@
-import React from 'react';
 import ZBadge from './ZBadge';
 
 interface UrgencyItem {

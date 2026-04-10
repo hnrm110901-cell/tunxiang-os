@@ -1,0 +1,91 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: tunxiang-prod
+    env: prod
+
+rule_files:
+  - /etc/prometheus/rules/*.yml
+
+scrape_configs:
+  # 屯象OS 后端服务 metrics
+  - job_name: 'tunxiang-gateway'
+    static_configs:
+      - targets: ['gateway:8000']
+    metrics_path: '/metrics'
+
+  - job_name: 'tunxiang-tx-trade'
+    static_configs:
+      - targets: ['tx-trade:8001']
+    metrics_path: '/metrics'
+
+  - job_name: 'tunxiang-tx-member'
+    static_configs:
+      - targets: ['tx-member:8002']
+    metrics_path: '/metrics'
+
+  - job_name: 'tunxiang-tx-growth'
+    static_configs:
+      - targets: ['tx-growth:8003']
+    metrics_path: '/metrics'
+
+  - job_name: 'tunxiang-tx-org'
+    static_configs:
+      - targets: ['tx-org:8004']
+    metrics_path: '/metrics'
+
+  - job_name: 'tunxiang-tx-ops'
+    static_configs:
+      - targets: ['tx-ops:8005']
+    metrics_path: '/metrics'
+
+  - job_name: 'tunxiang-tx-finance'
+    static_configs:
+      - targets: ['tx-finance:8006']
+    metrics_path: '/metrics'
+
+  - job_name: 'tunxiang-tx-analytics'
+    static_configs:
+      - targets: ['tx-analytics:8007']
+    metrics_path: '/metrics'
+
+  - job_name: 'tunxiang-tx-agent'
+    static_configs:
+      - targets: ['tx-agent:8008']
+    metrics_path: '/metrics'
+
+  - job_name: 'tunxiang-tx-menu'
+    static_configs:
+      - targets: ['tx-menu:8009']
+    metrics_path: '/metrics'
+
+  - job_name: 'tunxiang-tx-supply'
+    static_configs:
+      - targets: ['tx-supply:8010']
+    metrics_path: '/metrics'
+
+  - job_name: 'tunxiang-tx-intel'
+    static_configs:
+      - targets: ['tx-intel:8011']
+    metrics_path: '/metrics'
+
+  - job_name: 'tunxiang-tx-brain'
+    static_configs:
+      - targets: ['tx-brain:8012']
+    metrics_path: '/metrics'
+
+  # Redis metrics
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis-exporter:9121']
+
+  # PostgreSQL metrics
+  - job_name: 'postgresql'
+    static_configs:
+      - targets: ['postgres-exporter:9187']
+
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']

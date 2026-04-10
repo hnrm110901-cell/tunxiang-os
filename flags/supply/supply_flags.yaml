@@ -1,0 +1,33 @@
+flags:
+  - identifier: supply_receiving_inspection_enable
+    name: supply.receiving.inspection.enable
+    description: 收货验收功能（入库加权均价计算）
+    defaultValue: true  # 供应链核心功能，默认开启
+    environments:
+      dev: true
+      test: true
+      uat: true
+      pilot: true
+      prod: true
+
+  - identifier: supply_transfer_loss_detection_enable
+    name: supply.transfer.loss_detection.enable
+    description: 门店调拨运输损耗检测
+    defaultValue: true
+    environments:
+      dev: true
+      test: true
+      uat: true
+      pilot: true
+      prod: true
+
+  - identifier: supply_smart_reorder_enable
+    name: supply.intel.smart_reorder.enable
+    description: AI智能补货计划（需要tx-brain支持）
+    defaultValue: false
+    environments:
+      dev: false
+      test: false
+      uat: false
+      pilot: false
+      prod: false  # 等AI补货验证后开启

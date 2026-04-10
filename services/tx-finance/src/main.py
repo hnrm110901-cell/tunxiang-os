@@ -4,6 +4,7 @@ FCT业财税、预算、现金流、月报、成本分析、P&L、凭证生成
 """
 from contextlib import asynccontextmanager
 
+from api.agreement_unit_routes import router as agreement_unit_router
 from api.analytics_routes import router as analytics_router
 from api.approval_callback_routes import router as approval_callback_router
 from api.cost_routes import router as cost_router
@@ -11,12 +12,15 @@ from api.cost_routes_v2 import router as cost_v2_router
 from api.credit_account_routes import router as credit_account_router
 from api.deposit_routes import router as deposit_router
 from api.e_invoice_routes import router as invoice_router
+from api.vat_ledger_routes import router as vat_ledger_router
+from api.split_payment_routes import router as split_payment_router
 from api.erp_routes import router as erp_router
 from api.finance import router as finance_router
 from api.finance_cost_routes import router as finance_cost_router
 from api.finance_pl_routes import router as finance_pl_router
 from api.pl_routes import router as pl_router
 from api.pnl_routes import router as pnl_router
+from api.payment_reconciliation_routes import router as payment_reconciliation_router
 from api.reconciliation_routes import router as reconciliation_router
 from api.revenue_aggregation_routes import router as revenue_aggregation_router
 from api.revenue_routes import router as revenue_router
@@ -43,6 +47,9 @@ app = FastAPI(
     description="财务结算微服务 — 营收/成本/P&L/凭证/预算",
     lifespan=lifespan,
 )
+
+from prometheus_fastapi_instrumentator import Instrumentator
+Instrumentator().instrument(app).expose(app)
 
 app.add_middleware(
     CORSMiddleware,
@@ -76,6 +83,18 @@ app.include_router(deposit_router)        # /api/v1/deposits/*
 app.include_router(wine_storage_router)   # /api/v1/wine-storage/*
 app.include_router(credit_account_router)     # /api/v1/credit/*
 app.include_router(approval_callback_router)  # /api/v1/credit/agreements/{id}/approval-callback
+
+# TC-P1-09 协议单位体系（企业挂账/预付管理）
+app.include_router(agreement_unit_router)  # /api/v1/agreement-units/*
+
+# TC-P0-06 支付对账报表
+app.include_router(payment_reconciliation_router)  # /api/v1/finance/payment-reconciliation etc.
+
+# Y-F9 税务管理：增值税销项/进项台账 + 诺诺/税局接口 POC + P&L 科目映射
+app.include_router(vat_ledger_router)   # /api/v1/finance/vat/*
+
+# Y-B2 聚合支付/分账：微信/支付宝分账 + 幂等通知 + SplitEngine + 调账
+app.include_router(split_payment_router)  # /api/v1/finance/split/*
 
 
 @app.get("/health")

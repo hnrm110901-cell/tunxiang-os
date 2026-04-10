@@ -58,7 +58,19 @@ def upgrade() -> None:
     op.execute("ALTER TABLE platform_bills FORCE ROW LEVEL SECURITY;")
 
     for action in ("SELECT", "INSERT", "UPDATE", "DELETE"):
-        op.execute(f"""
+        if action == "INSERT":
+            op.execute(f"""
+            CREATE POLICY platform_bills_{action.lower()}_tenant
+                ON platform_bills
+                AS RESTRICTIVE FOR {action}
+                WITH CHECK (
+                    current_setting('app.tenant_id', TRUE) IS NOT NULL
+                    AND current_setting('app.tenant_id', TRUE) <> ''
+                    AND tenant_id = NULLIF(current_setting('app.tenant_id', TRUE), '')::UUID
+                );
+        """)
+        else:
+            op.execute(f"""
             CREATE POLICY platform_bills_{action.lower()}_tenant
                 ON platform_bills
                 AS RESTRICTIVE FOR {action}
@@ -121,7 +133,19 @@ def upgrade() -> None:
     op.execute("ALTER TABLE settlement_discrepancies FORCE ROW LEVEL SECURITY;")
 
     for action in ("SELECT", "INSERT", "UPDATE", "DELETE"):
-        op.execute(f"""
+        if action == "INSERT":
+            op.execute(f"""
+            CREATE POLICY settlement_discrepancies_{action.lower()}_tenant
+                ON settlement_discrepancies
+                AS RESTRICTIVE FOR {action}
+                WITH CHECK (
+                    current_setting('app.tenant_id', TRUE) IS NOT NULL
+                    AND current_setting('app.tenant_id', TRUE) <> ''
+                    AND tenant_id = NULLIF(current_setting('app.tenant_id', TRUE), '')::UUID
+                );
+        """)
+        else:
+            op.execute(f"""
             CREATE POLICY settlement_discrepancies_{action.lower()}_tenant
                 ON settlement_discrepancies
                 AS RESTRICTIVE FOR {action}
@@ -177,7 +201,19 @@ def upgrade() -> None:
     op.execute("ALTER TABLE receivable_forecasts FORCE ROW LEVEL SECURITY;")
 
     for action in ("SELECT", "INSERT", "UPDATE", "DELETE"):
-        op.execute(f"""
+        if action == "INSERT":
+            op.execute(f"""
+            CREATE POLICY receivable_forecasts_{action.lower()}_tenant
+                ON receivable_forecasts
+                AS RESTRICTIVE FOR {action}
+                WITH CHECK (
+                    current_setting('app.tenant_id', TRUE) IS NOT NULL
+                    AND current_setting('app.tenant_id', TRUE) <> ''
+                    AND tenant_id = NULLIF(current_setting('app.tenant_id', TRUE), '')::UUID
+                );
+        """)
+        else:
+            op.execute(f"""
             CREATE POLICY receivable_forecasts_{action.lower()}_tenant
                 ON receivable_forecasts
                 AS RESTRICTIVE FOR {action}

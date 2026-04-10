@@ -31,7 +31,7 @@ function statusColor(status: CourseStatus['status']): string {
   return '#64748b';
 }
 
-export function CourseFiringPanel({ orderId, onFire }: Props) {
+export function CourseFiringPanel({ orderId: _orderId, onFire }: Props) {
   const [courses, setCourses] = useState<CourseStatus[]>([]);
   const [suggestion, setSuggestion] = useState<string | null>(null);
   const [confirmCourse, setConfirmCourse] = useState<CourseStatus | null>(null);

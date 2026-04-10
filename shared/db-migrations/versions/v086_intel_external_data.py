@@ -74,11 +74,12 @@ def upgrade() -> None:
     op.execute("ALTER TABLE competitor_brands FORCE ROW LEVEL SECURITY;")
     for op_name in ("select", "insert", "update", "delete"):
         check = f"WITH CHECK ({_RLS_COND})" if op_name in ("insert", "update") else ""
+        using = f"USING ({_RLS_COND})" if op_name != "insert" else ""
         op.execute(f"""
             CREATE POLICY rls_cb_{op_name}
                 ON competitor_brands
                 FOR {op_name.upper()}
-                USING ({_RLS_COND})
+                {using}
                 {check};
         """)
 
@@ -119,11 +120,12 @@ def upgrade() -> None:
     op.execute("ALTER TABLE competitor_snapshots FORCE ROW LEVEL SECURITY;")
     for op_name in ("select", "insert", "update", "delete"):
         check = f"WITH CHECK ({_RLS_COND})" if op_name in ("insert", "update") else ""
+        using = f"USING ({_RLS_COND})" if op_name != "insert" else ""
         op.execute(f"""
             CREATE POLICY rls_cs_{op_name}
                 ON competitor_snapshots
                 FOR {op_name.upper()}
-                USING ({_RLS_COND})
+                {using}
                 {check};
         """)
 
@@ -169,11 +171,12 @@ def upgrade() -> None:
     op.execute("ALTER TABLE review_intel FORCE ROW LEVEL SECURITY;")
     for op_name in ("select", "insert", "update", "delete"):
         check = f"WITH CHECK ({_RLS_COND})" if op_name in ("insert", "update") else ""
+        using = f"USING ({_RLS_COND})" if op_name != "insert" else ""
         op.execute(f"""
             CREATE POLICY rls_ri_{op_name}
                 ON review_intel
                 FOR {op_name.upper()}
-                USING ({_RLS_COND})
+                {using}
                 {check};
         """)
 
@@ -227,11 +230,12 @@ def upgrade() -> None:
     op.execute("ALTER TABLE market_trend_signals FORCE ROW LEVEL SECURITY;")
     for op_name in ("select", "insert", "update", "delete"):
         check = f"WITH CHECK ({_RLS_COND})" if op_name in ("insert", "update") else ""
+        using = f"USING ({_RLS_COND})" if op_name != "insert" else ""
         op.execute(f"""
             CREATE POLICY rls_mts_{op_name}
                 ON market_trend_signals
                 FOR {op_name.upper()}
-                USING ({_RLS_COND})
+                {using}
                 {check};
         """)
 
@@ -281,11 +285,12 @@ def upgrade() -> None:
     op.execute("ALTER TABLE intel_crawl_tasks FORCE ROW LEVEL SECURITY;")
     for op_name in ("select", "insert", "update", "delete"):
         check = f"WITH CHECK ({_RLS_COND})" if op_name in ("insert", "update") else ""
+        using = f"USING ({_RLS_COND})" if op_name != "insert" else ""
         op.execute(f"""
             CREATE POLICY rls_ict_{op_name}
                 ON intel_crawl_tasks
                 FOR {op_name.upper()}
-                USING ({_RLS_COND})
+                {using}
                 {check};
         """)
 

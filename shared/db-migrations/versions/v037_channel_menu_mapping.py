@@ -44,7 +44,19 @@ def upgrade() -> None:
     op.execute("ALTER TABLE platform_dish_mappings ENABLE ROW LEVEL SECURITY;")
     op.execute("ALTER TABLE platform_dish_mappings FORCE ROW LEVEL SECURITY;")
     for action in ("SELECT", "INSERT", "UPDATE", "DELETE"):
-        op.execute(f"""
+        if action == "INSERT":
+            op.execute(f"""
+            CREATE POLICY platform_dish_mappings_{action.lower()}_tenant ON platform_dish_mappings
+            AS RESTRICTIVE FOR {action}
+            WITH CHECK (
+                current_setting('app.tenant_id', TRUE) IS NOT NULL
+                AND current_setting('app.tenant_id', TRUE) <> ''
+                AND tenant_id = NULLIF(current_setting('app.tenant_id', TRUE), '')::UUID
+            );
+
+            """)
+        else:
+            op.execute(f"""
             CREATE POLICY platform_dish_mappings_{action.lower()}_tenant ON platform_dish_mappings
             AS RESTRICTIVE FOR {action}
             USING (
@@ -52,7 +64,8 @@ def upgrade() -> None:
                 AND current_setting('app.tenant_id', TRUE) <> ''
                 AND tenant_id = NULLIF(current_setting('app.tenant_id', TRUE), '')::UUID
             );
-        """)
+
+            """)
     op.execute("""
         CREATE INDEX IF NOT EXISTS ix_platform_dish_mappings_store_platform
             ON platform_dish_mappings (tenant_id, store_id, platform);
@@ -89,7 +102,19 @@ def upgrade() -> None:
     op.execute("ALTER TABLE channel_menu_versions ENABLE ROW LEVEL SECURITY;")
     op.execute("ALTER TABLE channel_menu_versions FORCE ROW LEVEL SECURITY;")
     for action in ("SELECT", "INSERT", "UPDATE", "DELETE"):
-        op.execute(f"""
+        if action == "INSERT":
+            op.execute(f"""
+            CREATE POLICY channel_menu_versions_{action.lower()}_tenant ON channel_menu_versions
+            AS RESTRICTIVE FOR {action}
+            WITH CHECK (
+                current_setting('app.tenant_id', TRUE) IS NOT NULL
+                AND current_setting('app.tenant_id', TRUE) <> ''
+                AND tenant_id = NULLIF(current_setting('app.tenant_id', TRUE), '')::UUID
+            );
+
+            """)
+        else:
+            op.execute(f"""
             CREATE POLICY channel_menu_versions_{action.lower()}_tenant ON channel_menu_versions
             AS RESTRICTIVE FOR {action}
             USING (
@@ -97,7 +122,8 @@ def upgrade() -> None:
                 AND current_setting('app.tenant_id', TRUE) <> ''
                 AND tenant_id = NULLIF(current_setting('app.tenant_id', TRUE), '')::UUID
             );
-        """)
+
+            """)
     op.execute("""
         CREATE INDEX IF NOT EXISTS ix_channel_menu_versions_store_channel
             ON channel_menu_versions (tenant_id, store_id, channel_id);

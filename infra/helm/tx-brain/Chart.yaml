@@ -1,0 +1,6 @@
+apiVersion: v2
+name: tx-brain
+description: 屯象OS AI智能决策中枢 — Claude API调用/LLM推理/Agent决策
+type: application
+version: 1.0.0
+appVersion: "latest"

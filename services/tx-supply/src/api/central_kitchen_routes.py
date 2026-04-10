@@ -39,9 +39,6 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 import structlog
-from fastapi import APIRouter, Depends, Header, HTTPException, Query
-from pydantic import BaseModel, Field
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
 
@@ -231,7 +228,6 @@ async def list_production_plans(
 async def create_production_plan(
     body: CreateProductionPlanRequest,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
-    db: AsyncSession = Depends(_get_db),
     db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
     """创建生产计划草稿。
@@ -263,7 +259,6 @@ async def create_production_plan(
 async def get_production_plan(
     plan_id: str,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
-    db: AsyncSession = Depends(_get_db),
     db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
     """查询单个生产计划详情（含菜品清单）。"""
@@ -271,11 +266,6 @@ async def get_production_plan(
 
     svc = CentralKitchenService(db, x_tenant_id)
     try:
-        results = await svc.list_plans(
-            kitchen_id=kitchen_id,
-            plan_date=date,
-            tenant_id=x_tenant_id,
-            db=db,
         plan = await svc.get_production_plan(plan_id=plan_id)
         return {"ok": True, "data": plan.model_dump()}
     except ValueError as exc:
@@ -308,7 +298,6 @@ async def confirm_production_plan(
 async def start_production(
     plan_id: str,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
-    db: AsyncSession = Depends(_get_db),
     db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
     """开始生产：将已确认计划状态更新为 in_progress，所有 pending 工单同步开始。
@@ -319,8 +308,6 @@ async def start_production(
 
     svc = CentralKitchenService(db, x_tenant_id)
     try:
-        result = await svc.confirm_plan(plan_id=plan_id, tenant_id=x_tenant_id, db=db)
-        return {"ok": True, "data": result}
         plan = await svc.start_production(plan_id=plan_id)
         await db.commit()
         return {"ok": True, "data": plan.model_dump()}
@@ -339,7 +326,6 @@ async def list_production_orders(
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
-    db: AsyncSession = Depends(_get_db),
     db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
     """查询生产工单列表，支持按厨房/计划/状态过滤。"""
@@ -347,11 +333,6 @@ async def list_production_orders(
 
     svc = CentralKitchenService(db, x_tenant_id)
     try:
-        result = await svc.complete_task(
-            task_id=task_id,
-            actual_qty=body.actual_qty,
-            tenant_id=x_tenant_id,
-            db=db,
         result = await svc.list_production_orders(
             kitchen_id=kitchen_id,
             plan_id=plan_id,
@@ -367,9 +348,8 @@ async def list_production_orders(
 @router.put("/orders/{order_id}/complete", summary="完成生产工单")
 async def complete_production_order(
     order_id: str,
-    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
-    db: AsyncSession = Depends(_get_db),
     actual_qty: float = Query(..., ge=0, description="实际产量"),
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
     db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
     """完成单个生产工单，记录实际产量。
@@ -380,10 +360,6 @@ async def complete_production_order(
 
     svc = CentralKitchenService(db, x_tenant_id)
     try:
-        trips = await svc.generate_delivery_trips(
-            plan_id=plan_id, tenant_id=x_tenant_id, db=db,
-        )
-        return {"ok": True, "data": {"trips": trips, "trip_count": len(trips)}}
         order = await svc.complete_production_order(
             order_id=order_id,
             actual_qty=actual_qty,
@@ -402,17 +378,6 @@ async def update_production_progress(
     order_id: str,
     body: UpdateProgressRequest,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
-    db: AsyncSession = Depends(_get_db),
-) -> Dict[str, Any]:
-    """查询配送单详情（含路线顺序和配送明细）"""
-    from ..services.production_plan_service import ProductionPlanService
-
-    svc = ProductionPlanService()
-    try:
-        result = await svc.get_trip(trip_id=trip_id, tenant_id=x_tenant_id, db=db)
-        return {"ok": True, "data": result}
-    except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
     db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
     """更新工单状态（pending→in_progress→completed / cancelled）。
@@ -445,7 +410,6 @@ async def list_distribution_orders(
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
-    db: AsyncSession = Depends(_get_db),
     db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
     """查询配送单列表，支持按厨房/门店/状态过滤。"""
@@ -453,12 +417,6 @@ async def list_distribution_orders(
 
     svc = CentralKitchenService(db, x_tenant_id)
     try:
-        result = await svc.sign_receipt(
-            delivery_item_id=item_id,
-            actual_qty=body.actual_qty,
-            operator_id=body.operator_id,
-            tenant_id=x_tenant_id,
-            db=db,
         result = await svc.list_distribution_orders(
             kitchen_id=kitchen_id,
             store_id=store_id,
@@ -575,7 +533,6 @@ async def plan_distribute(
     plan_id: str,
     body: PlanDistributeRequest,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
-    db: AsyncSession = Depends(_get_db),
     db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
     """从已确认/进行中的生产计划批量创建各门店配送单。
@@ -586,10 +543,6 @@ async def plan_distribute(
 
     svc = CentralKitchenService(db, x_tenant_id)
     try:
-        report = await svc.get_variance_report(
-            plan_id=plan_id, tenant_id=x_tenant_id, db=db,
-        )
-        return {"ok": True, "data": report}
         # 先校验计划存在且属于当前租户
         plan = await svc.get_production_plan(plan_id=plan_id)
         if plan.status not in ("confirmed", "in_progress"):

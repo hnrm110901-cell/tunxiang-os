@@ -1,0 +1,209 @@
+# 屯象OS Harness 治理策略（Policy as Code）
+# 基于 OPA（Open Policy Agent）+ Harness Policy Engine
+# 最后更新: 2026-04-06
+# 维护人: 李淳（屯象OS创始人）
+#
+# 参考文档: https://developer.harness.io/docs/platform/governance/policy-as-code/overview
+# 策略语言: Rego
+# 适用范围: Pipeline / Connector / Service
+
+policies:
+
+  # ──────────────────────────────────────────────
+  # P1: 生产发布必须通过DB迁移审批
+  # ──────────────────────────────────────────────
+  - name: require-migration-approval
+    identifier: require_migration_approval
+    description: 生产发布流水线若涉及DB迁移文件变更，必须包含Migration_Approval人工审批阶段
+    type: Pipeline
+    severity: ERROR     # 违反则阻止流水线执行
+    enabled: true
+    rego: |
+      package pipeline
+
+      import future.keywords.if
+      import future.keywords.in
+
+      # 检查是否包含Migration_Approval阶段
+      has_migration_approval if {
+        some stage in input.pipeline.stages
+        stage.identifier == "Migration_Approval"
+      }
+
+      deny[msg] if {
+        # 仅对生产发布流水线生效
+        input.pipeline.tags.env == "prod"
+        # 如果流水线标记了涉及migration变更
+        input.pipeline.variables.has_db_migration == "true"
+        # 但没有Migration_Approval阶段
+        not has_migration_approval
+        msg := "生产发布流水线涉及DB迁移时，必须包含 Migration_Approval 人工审批阶段。请在流水线中添加审批步骤。"
+      }
+
+      deny[msg] if {
+        input.pipeline.tags.env == "prod"
+        input.pipeline.variables.has_db_migration == "true"
+        has_migration_approval
+        not input.pipeline.variables.migration_approved == "true"
+        msg := "Migration_Approval 阶段存在，但迁移尚未通过审批（migration_approved != true）。"
+      }
+
+  # ──────────────────────────────────────────────
+  # P2: 禁止周五晚间生产发布
+  # ──────────────────────────────────────────────
+  - name: no-prod-deploy-friday-night
+    identifier: no_prod_deploy_friday_night
+    description: 禁止周五18:00后发起生产发布，避免周末无人值守时出现故障
+    type: Pipeline
+    severity: WARNING   # 警告，仍允许执行但需要确认
+    enabled: true
+    rego: |
+      package pipeline
+
+      import future.keywords.if
+
+      # 说明：Harness Pipeline 触发时会注入 input.trigger.scheduledTime（UTC时间戳）
+      # 此 Rego 策略配合 Harness Trigger 的时间窗口条件共同使用
+      # 时间窗口由 Trigger 层面的 cron 条件控制，此 Rego 做二次确认
+
+      warn[msg] if {
+        input.pipeline.tags.env == "prod"
+        # 如果流水线没有 emergency_deploy=true 的豁免标记
+        not input.pipeline.variables.emergency_deploy == "true"
+        # 依赖 Harness Trigger 注入的 day_of_week 变量
+        input.pipeline.variables.day_of_week == "Friday"
+        to_number(input.pipeline.variables.hour_of_day) >= 18
+        msg := "警告：检测到周五18点后生产发布。如非紧急故障修复，建议推迟至下周一。如确需发布，请在 Pipeline Variables 中设置 emergency_deploy=true 并知会SRE。"
+      }
+
+      deny[msg] if {
+        input.pipeline.tags.env == "prod"
+        not input.pipeline.variables.emergency_deploy == "true"
+        input.pipeline.variables.day_of_week == "Saturday"
+        msg := "禁止在周六发起生产发布。如确为紧急故障修复，请设置 emergency_deploy=true 并由创始人确认。"
+      }
+
+      deny[msg] if {
+        input.pipeline.tags.env == "prod"
+        not input.pipeline.variables.emergency_deploy == "true"
+        input.pipeline.variables.day_of_week == "Sunday"
+        msg := "禁止在周日发起生产发布。如确为紧急故障修复，请设置 emergency_deploy=true 并由创始人确认。"
+      }
+
+  # ──────────────────────────────────────────────
+  # P3: 生产发布必须指定明确镜像版本（禁止latest）
+  # ──────────────────────────────────────────────
+  - name: require-image-tag
+    identifier: require_image_tag
+    description: 生产环境发布必须使用明确的语义化版本镜像标签，禁止使用 latest / dev / main
+    type: Pipeline
+    severity: ERROR
+    enabled: true
+    rego: |
+      package pipeline
+
+      import future.keywords.if
+      import future.keywords.in
+
+      # 禁止使用的模糊标签列表
+      forbidden_tags := {"latest", "dev", "main", "master", "HEAD", "snapshot", "SNAPSHOT"}
+
+      deny[msg] if {
+        input.pipeline.tags.env == "prod"
+        # 检查 imageTag pipeline variable
+        tag := input.pipeline.variables.imageTag
+        tag in forbidden_tags
+        msg := sprintf("生产发布禁止使用模糊镜像标签 '%v'。请使用形如 v1.2.3 的语义化版本标签。", [tag])
+      }
+
+      deny[msg] if {
+        input.pipeline.tags.env == "prod"
+        # 如果没有设置 imageTag 变量
+        not input.pipeline.variables.imageTag
+        msg := "生产发布必须明确设置 imageTag pipeline variable，且不能为空。"
+      }
+
+      # 同时对 pilot 环境生效
+      deny[msg] if {
+        input.pipeline.tags.env == "pilot"
+        tag := input.pipeline.variables.imageTag
+        tag in forbidden_tags
+        msg := sprintf("Pilot发布禁止使用模糊镜像标签 '%v'。", [tag])
+      }
+
+  # ──────────────────────────────────────────────
+  # P4: RLS策略变更必须额外安全审查
+  # ──────────────────────────────────────────────
+  - name: rls-change-requires-security-review
+    identifier: rls_change_requires_security_review
+    description: 涉及RLS（Row Level Security）策略的DB迁移文件，必须经过创始人安全审查
+    type: Pipeline
+    severity: ERROR
+    enabled: true
+    rego: |
+      package pipeline
+
+      import future.keywords.if
+
+      # 背景：v063之前曾发现3张表RLS策略使用错误session变量导致策略不生效
+      # 此规则防止类似安全漏洞再次流入生产
+      deny[msg] if {
+        # 任何环境（包括非生产）的RLS变更都需要安全审查
+        input.pipeline.variables.has_rls_migration == "true"
+        not input.pipeline.variables.security_approved == "true"
+        msg := "检测到RLS策略变更！此类变更可能影响多租户数据隔离安全性。必须在 pipeline variables 中设置 security_approved=true（由创始人审核后在 Harness 中确认）后才能继续。"
+      }
+
+      # 对生产环境额外要求：RLS变更需要在非生产环境充分测试
+      deny[msg] if {
+        input.pipeline.tags.env == "prod"
+        input.pipeline.variables.has_rls_migration == "true"
+        not input.pipeline.variables.rls_tested_in_uat == "true"
+        msg := "生产环境RLS策略变更额外要求：必须设置 rls_tested_in_uat=true，证明已在UAT环境完整验证多租户数据隔离。"
+      }
+
+  # ──────────────────────────────────────────────
+  # P5: Service必须声明资源限制（防止OOM）
+  # ──────────────────────────────────────────────
+  - name: require-resource-limits
+    identifier: require_resource_limits
+    description: 所有服务的K8s部署必须声明resources.limits，防止单个服务OOM影响整个节点
+    type: Service
+    severity: WARNING
+    enabled: true
+    rego: |
+      package service
+
+      import future.keywords.if
+
+      warn[msg] if {
+        # 检查 K8s manifest 中是否缺少 resources.limits
+        container := input.service.spec.manifests[_].spec.template.spec.containers[_]
+        not container.resources.limits
+        msg := sprintf("服务 '%v' 的容器 '%v' 未声明 resources.limits，建议添加 CPU/Memory 上限以防止资源争抢。", [input.service.name, container.name])
+      }
+
+  # ──────────────────────────────────────────────
+  # P6: 禁止生产Connector使用明文密码
+  # ──────────────────────────────────────────────
+  - name: no-plaintext-secrets-in-prod
+    identifier: no_plaintext_secrets_in_prod
+    description: 生产环境Connector配置中禁止使用明文密码，必须引用Harness Secret
+    type: Connector
+    severity: ERROR
+    enabled: true
+    rego: |
+      package connector
+
+      import future.keywords.if
+
+      deny[msg] if {
+        input.connector.tags.env == "prod"
+        # 检查 spec 中是否有 passwordRef 字段（应引用Secret，而非明文）
+        password := input.connector.spec.auth.credentials.passwordRef
+        # 如果值不是以 account. 或 org. 或 project. 开头，说明不是Secret引用
+        not startswith(password, "account.")
+        not startswith(password, "org.")
+        not startswith(password, "project.")
+        msg := "生产环境Connector必须使用 Harness Secret 引用（account./org./project. 前缀），禁止明文密码。"
+      }

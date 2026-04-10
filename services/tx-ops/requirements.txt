@@ -4,3 +4,4 @@ pydantic>=2.4.0
 sqlalchemy>=2.0.0
 asyncpg>=0.29.0
 structlog>=23.1.0
+prometheus-fastapi-instrumentator>=6.1.0

@@ -18,13 +18,19 @@ import { SplitPayPage } from './pages/SplitPayPage';
 import { TaxInvoicePage } from './pages/TaxInvoicePage';
 import { HandoverPage } from './pages/HandoverPage';
 import { QuickCashierPage } from './pages/QuickCashierPage';
+import { WineStoragePosPage } from './pages/WineStoragePosPage';
+import { DepositPosPage } from './pages/DepositPosPage';
+import { CallingScreenPage } from './pages/CallingScreenPage';
 import { DiscountAuditPage } from './pages/DiscountAuditPage';
 import { LiveMenuEditorPage } from './pages/LiveMenuEditorPage';
 import { MenuEngineeringPage } from './pages/MenuEngineeringPage';
 import { MenuBoardControlPage } from './pages/MenuBoardControlPage';
+import { BarCounterPage } from './pages/BarCounterPage';
+import { QuickShiftReportPage } from './pages/QuickShiftReportPage';
+import FoodCourtPage from './pages/FoodCourtPage';  // TC-P2-12 智慧商街档口收银
 
 const STORE_ID: string =
-  (window as Record<string, unknown>).__STORE_ID__ as string || '';
+  (window as unknown as Record<string, unknown>).__STORE_ID__ as string || '';
 
 /** 内层布局组件（必须在 BrowserRouter 内，InventoryAlertBanner 需要 useNavigate） */
 function AppLayout() {
@@ -53,10 +59,21 @@ function AppLayout() {
         <Route path="/reports" element={<POSReportsPage />} />
         <Route path="/handover" element={<HandoverPage />} />
         <Route path="/quick-cashier" element={<QuickCashierPage />} />
+        {/* ─── Phase1: 存酒 / 押金 门店操作端 ─── */}
+        <Route path="/wine-storage" element={<WineStoragePosPage />} />
+        <Route path="/deposits" element={<DepositPosPage />} />
+        {/* ─── Phase4: 快餐叫号屏 ─── */}
+        <Route path="/calling-screen" element={<CallingScreenPage />} />
         <Route path="/discount-audit" element={<DiscountAuditPage />} />
         <Route path="/live-menu" element={<LiveMenuEditorPage />} />
         <Route path="/menu-engineering" element={<MenuEngineeringPage />} />
         <Route path="/menu-board-control" element={<MenuBoardControlPage />} />
+        {/* ─── TC-P0-02: 吧台盘点 ─── */}
+        <Route path="/bar-counter" element={<BarCounterPage />} />
+        {/* ─── TC-P1-10: 快餐结班报表 ─── */}
+        <Route path="/quick/shift-report" element={<QuickShiftReportPage />} />
+        {/* ─── TC-P2-12: 美食广场档口收银 ─── */}
+        <Route path="/food-court" element={<FoodCourtPage />} />
       </Routes>
     </div>
   );
