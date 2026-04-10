@@ -35,7 +35,7 @@ app = FastAPI(title="TunxiangOS Gateway", version="3.0.0", description="AI-Nativ
 app.add_middleware(RequestLogMiddleware)
 app.add_middleware(TenantMiddleware)
 app.add_middleware(AuthMiddleware)
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(CORSMiddleware, allow_origins=os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:5176,http://localhost:5180").split(","), allow_methods=["*"], allow_headers=["*"])
 logger = structlog.get_logger(__name__)
 
 app = FastAPI(

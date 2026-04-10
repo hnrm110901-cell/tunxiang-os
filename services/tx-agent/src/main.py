@@ -3,6 +3,7 @@
 Master Agent 编排 + 9 个 Skill Agent + 三条硬约束
 """
 import asyncio
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, Header
@@ -144,7 +145,7 @@ app = FastAPI(
 from prometheus_fastapi_instrumentator import Instrumentator
 Instrumentator().instrument(app).expose(app)
 
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(CORSMiddleware, allow_origins=os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:5176,http://localhost:5180").split(","), allow_methods=["*"], allow_headers=["*"])
 app.include_router(planner_router)
 app.include_router(observability_router)
 app.include_router(voice_router)

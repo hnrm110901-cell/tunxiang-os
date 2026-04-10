@@ -1,6 +1,5 @@
 packages:
-  - "apps/web-pos"
-  - "apps/web-kds"
-  - "apps/web-crew"
-  - "apps/web-admin"
-  - "apps/web-hub"
+  - 'apps/*'
+  - 'shared/api-types'
+  - 'shared/adapters/*'
+  - 'e2e'

@@ -7,6 +7,7 @@
 """
 from __future__ import annotations
 
+import os
 from contextlib import asynccontextmanager
 from typing import Any, AsyncGenerator
 
@@ -86,7 +87,7 @@ Instrumentator().instrument(app).expose(app)
 # CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:5176,http://localhost:5180").split(","),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -5,16 +5,16 @@ services:
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: tunxiang
-      POSTGRES_PASSWORD: changeme_dev
-      POSTGRES_DB: tunxiang_os
+      POSTGRES_USER: ${DB_USER:?DB_USER required}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD required}
+      POSTGRES_DB: ${DB_NAME:-tunxiang_os}
     ports:
       - "5432:5432"
     volumes:
       - pg_data:/var/lib/postgresql/data
       - ./infra/docker/init-rls.sql:/docker-entrypoint-initdb.d/01-rls.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U tunxiang"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER}"]
       interval: 5s
       timeout: 3s
       retries: 5
@@ -36,7 +36,7 @@ services:
     ports:
       - "8000:8000"
     environment:
-      DATABASE_URL: postgresql+asyncpg://tunxiang:changeme_dev@postgres/tunxiang_os
+      DATABASE_URL: postgresql+asyncpg://${DB_USER:?DB_USER required}:${DB_PASSWORD:?DB_PASSWORD required}@${DB_HOST:-postgres}/${DB_NAME:-tunxiang_os}
       REDIS_URL: redis://redis:6379/0
       TX_TRADE_URL: http://tx-trade:8001
       TX_MENU_URL: http://tx-menu:8002
@@ -48,7 +48,7 @@ services:
       TX_MEMBER_SERVICE_URL: http://tx-member:8003
       TX_GROWTH_SERVICE_URL: http://tx-growth:8004
       # 等保三级安全认证配置（生产环境必须在 /etc/txos/security.env 中配置真实值）
-      TX_JWT_SECRET_KEY: ${TX_JWT_SECRET_KEY:-dev_jwt_secret_key_CHANGE_IN_PRODUCTION_32chars}
+      TX_JWT_SECRET_KEY: ${TX_JWT_SECRET_KEY:?TX_JWT_SECRET_KEY required}
       TX_MFA_ENCRYPT_KEY: ${TX_MFA_ENCRYPT_KEY:-}
       TX_FIELD_ENCRYPTION_KEY: ${TX_FIELD_ENCRYPTION_KEY:-}
       TX_INTEGRITY_SECRET: ${TX_INTEGRITY_SECRET:-}
@@ -65,7 +65,7 @@ services:
     ports:
       - "8003:8003"
     environment:
-      DATABASE_URL: postgresql+asyncpg://tunxiang:changeme_dev@postgres/tunxiang_os
+      DATABASE_URL: postgresql+asyncpg://${DB_USER:?DB_USER required}:${DB_PASSWORD:?DB_PASSWORD required}@${DB_HOST:-postgres}/${DB_NAME:-tunxiang_os}
       TX_MEMBER_SERVICE_URL: http://tx-member:8003
       TX_GROWTH_SERVICE_URL: http://tx-growth:8004
       TX_OPS_SERVICE_URL: http://tx-ops:8005
@@ -80,7 +80,7 @@ services:
     ports:
       - "8004:8004"
     environment:
-      DATABASE_URL: postgresql+asyncpg://tunxiang:changeme_dev@postgres/tunxiang_os
+      DATABASE_URL: postgresql+asyncpg://${DB_USER:?DB_USER required}:${DB_PASSWORD:?DB_PASSWORD required}@${DB_HOST:-postgres}/${DB_NAME:-tunxiang_os}
       TX_MEMBER_SERVICE_URL: http://tx-member:8003
       TX_GROWTH_SERVICE_URL: http://tx-growth:8004
       TX_OPS_SERVICE_URL: http://tx-ops:8005
@@ -96,7 +96,7 @@ services:
     ports:
       - "8001:8001"
     environment:
-      DATABASE_URL: postgresql+asyncpg://tunxiang:changeme_dev@postgres/tunxiang_os
+      DATABASE_URL: postgresql+asyncpg://${DB_USER:?DB_USER required}:${DB_PASSWORD:?DB_PASSWORD required}@${DB_HOST:-postgres}/${DB_NAME:-tunxiang_os}
     depends_on:
       postgres:
         condition: service_healthy
@@ -108,7 +108,7 @@ services:
     ports:
       - "8002:8002"
     environment:
-      DATABASE_URL: postgresql+asyncpg://tunxiang:changeme_dev@postgres/tunxiang_os
+      DATABASE_URL: postgresql+asyncpg://${DB_USER:?DB_USER required}:${DB_PASSWORD:?DB_PASSWORD required}@${DB_HOST:-postgres}/${DB_NAME:-tunxiang_os}
     depends_on:
       postgres:
         condition: service_healthy
@@ -120,7 +120,7 @@ services:
     ports:
       - "8008:8008"
     environment:
-      DATABASE_URL: postgresql+asyncpg://tunxiang:changeme_dev@postgres/tunxiang_os
+      DATABASE_URL: postgresql+asyncpg://${DB_USER:?DB_USER required}:${DB_PASSWORD:?DB_PASSWORD required}@${DB_HOST:-postgres}/${DB_NAME:-tunxiang_os}
     depends_on:
       postgres:
         condition: service_healthy
@@ -132,7 +132,7 @@ services:
     ports:
       - "8009:8009"
     environment:
-      DATABASE_URL: postgresql+asyncpg://tunxiang:changeme_dev@postgres/tunxiang_os
+      DATABASE_URL: postgresql+asyncpg://${DB_USER:?DB_USER required}:${DB_PASSWORD:?DB_PASSWORD required}@${DB_HOST:-postgres}/${DB_NAME:-tunxiang_os}
     depends_on:
       postgres:
         condition: service_healthy
@@ -145,7 +145,7 @@ services:
     ports:
       - "8010:8010"
     environment:
-      DATABASE_URL: postgresql+asyncpg://tunxiang:changeme_dev@postgres/tunxiang_os
+      DATABASE_URL: postgresql+asyncpg://${DB_USER:?DB_USER required}:${DB_PASSWORD:?DB_PASSWORD required}@${DB_HOST:-postgres}/${DB_NAME:-tunxiang_os}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
     depends_on:
       postgres:
@@ -159,7 +159,7 @@ services:
     ports:
       - "8011:8011"
     environment:
-      DATABASE_URL: postgresql+asyncpg://tunxiang:changeme_dev@postgres/tunxiang_os
+      DATABASE_URL: postgresql+asyncpg://${DB_USER:?DB_USER required}:${DB_PASSWORD:?DB_PASSWORD required}@${DB_HOST:-postgres}/${DB_NAME:-tunxiang_os}
     depends_on:
       postgres:
         condition: service_healthy
@@ -172,7 +172,7 @@ services:
     ports:
       - "8012:8012"
     environment:
-      DATABASE_URL: postgresql+asyncpg://tunxiang:changeme_dev@postgres/tunxiang_os
+      DATABASE_URL: postgresql+asyncpg://${DB_USER:?DB_USER required}:${DB_PASSWORD:?DB_PASSWORD required}@${DB_HOST:-postgres}/${DB_NAME:-tunxiang_os}
     depends_on:
       postgres:
         condition: service_healthy
@@ -185,7 +185,7 @@ services:
     ports:
       - "8006:8006"
     environment:
-      DATABASE_URL: postgresql+asyncpg://tunxiang:changeme_dev@postgres/tunxiang_os
+      DATABASE_URL: postgresql+asyncpg://${DB_USER:?DB_USER required}:${DB_PASSWORD:?DB_PASSWORD required}@${DB_HOST:-postgres}/${DB_NAME:-tunxiang_os}
     depends_on:
       postgres:
         condition: service_healthy
@@ -198,7 +198,7 @@ services:
     ports:
       - "8007:8007"
     environment:
-      DATABASE_URL: postgresql+asyncpg://tunxiang:changeme_dev@postgres/tunxiang_os
+      DATABASE_URL: postgresql+asyncpg://${DB_USER:?DB_USER required}:${DB_PASSWORD:?DB_PASSWORD required}@${DB_HOST:-postgres}/${DB_NAME:-tunxiang_os}
     depends_on:
       postgres:
         condition: service_healthy
@@ -210,8 +210,8 @@ services:
       context: .
       dockerfile: edge/sync-engine/Dockerfile
     environment:
-      CLOUD_PG_DSN: ${CLOUD_PG_DSN:-postgresql://tunxiang:changeme_dev@postgres/tunxiang_os}
-      LOCAL_PG_DSN: ${LOCAL_PG_DSN:-postgresql://tunxiang:changeme_dev@postgres/tunxiang_os}
+      CLOUD_PG_DSN: ${CLOUD_PG_DSN:?CLOUD_PG_DSN required}
+      LOCAL_PG_DSN: ${LOCAL_PG_DSN:?LOCAL_PG_DSN required}
       STORE_ID: ${STORE_ID:-store_dev}
       TENANT_ID: ${TENANT_ID:-}
       SYNC_INTERVAL_SECONDS: ${SYNC_INTERVAL_SECONDS:-300}

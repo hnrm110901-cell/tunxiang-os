@@ -62,6 +62,31 @@ class TenantMiddleware(BaseHTTPMiddleware):
             )
 
         request.state.tenant_id = tenant_id
+
+        # 双重验证：JWT token 中的 tenant_id 必须与 header 一致
+        # TODO(security): AuthMiddleware 当前未注册到主 app（仅存在于 main.py 顶部的
+        #   废弃 app 实例）。待 AuthMiddleware 正式接入主 app 后，AuthMiddleware 会在
+        #   TenantMiddleware 之前执行并将 JWT payload 中的 tenant_id 写入
+        #   request.state.tenant_id（覆盖）。届时需确认：
+        #   1. AuthMiddleware 额外写入 request.state.tenant_id_from_token
+        #   2. 下方校验逻辑生效，防止 header 伪造租户 ID
+        token_tenant = getattr(request.state, "tenant_id_from_token", None)
+        if token_tenant and token_tenant != tenant_id:
+            logger.warning(
+                "tenant_id_mismatch",
+                path=path,
+                header_tenant=tenant_id,
+                token_tenant=token_tenant,
+            )
+            return JSONResponse(
+                status_code=403,
+                content={
+                    "ok": False,
+                    "data": None,
+                    "error": {"code": "TENANT_MISMATCH", "message": "Tenant ID mismatch between header and token"},
+                },
+            )
+
         response = await call_next(request)
         return response
 
