@@ -1,0 +1,30 @@
+# tx-agent 生产环境保持单实例（避免LLM任务重复调度）
+replicaCount: 1
+
+image:
+  tag: ${IMAGE_TAG}  # 由Harness CD注入
+
+env:
+  TUNXIANG_ENV: prod
+  LOG_LEVEL: info
+  MODEL_ROUTER_BACKEND: claude-haiku
+  AGENT_AUTONOMY_LEVEL: L1
+  MAX_CONCURRENT_TASKS: "10"
+  TASK_TIMEOUT_SECONDS: "180"
+
+resources:
+  limits:
+    cpu: 1000m
+    memory: 2Gi
+  requests:
+    cpu: 300m
+    memory: 512Mi
+
+# 生产环境不开自动扩缩容，避免多实例重复调度
+autoscaling:
+  enabled: false
+
+agentStrategies:
+  enabled: true
+  configMapName: tx-agent-strategies-prod
+  mountPath: /app/config/strategies

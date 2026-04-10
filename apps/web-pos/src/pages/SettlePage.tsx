@@ -12,6 +12,7 @@ import { useOrderStore } from '../store/orderStore';
 import { settleOrder, createPayment, printReceipt as apiPrintReceipt } from '../api/tradeApi';
 import { printReceipt as bridgePrint, openCashBox } from '../bridge/TXBridge';
 import { DiscountPreviewSheet, type DiscountParams } from '../components/DiscountPreviewSheet';
+import CustomerBrainPanel from '../components/CustomerBrainPanel';
 import { CouponEligibleSheet } from '../components/CouponEligibleSheet';
 import { useCouponEligibility } from '../hooks/useCouponEligibility';
 
@@ -138,6 +139,9 @@ export function SettlePage() {
     <div style={{ display: 'flex', height: '100vh', background: '#0B1A20', color: '#fff' }}>
       {/* 左侧 — 订单摘要 */}
       <div style={{ flex: 1, padding: 24, overflowY: 'auto' }}>
+        {/* 客户大脑面板 - 有会员时显示 */}
+        <CustomerBrainPanel />
+
         <h2>结算 · 桌号 {tableNo}</h2>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
@@ -250,6 +254,21 @@ export function SettlePage() {
             开具发票
           </button>
         </div>
+        {/* 收益优化师建议 */}
+        <div style={{
+          background: 'rgba(249,115,22,.06)', border: '1px solid rgba(249,115,22,.15)',
+          borderRadius: 10, padding: '10px 14px', margin: '12px 0',
+        }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#FF6B35', marginBottom: 8 }}>
+            💡 收益优化师 · 结账建议
+          </div>
+          {['存酒余800ml，建议推荐续存享9折', '企业客户，发票已自动准备', '五一包间有档期，可推荐预约'].map((tip, i) => (
+            <div key={i} style={{ fontSize: 12, color: '#5F5E5A', marginBottom: 4, display: 'flex', gap: 6 }}>
+              <span style={{ color: '#FF6B35' }}>◆</span>{tip}
+            </div>
+          ))}
+        </div>
+
         <button
           onClick={() => navigate(-1)}
           style={{ padding: 12, border: '1px solid #444', borderRadius: 8, background: 'transparent', color: '#999', cursor: 'pointer', marginTop: 12 }}

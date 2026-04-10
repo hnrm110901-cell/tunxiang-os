@@ -3,7 +3,7 @@
  * 基于 v2 prototype workspace.html 设计规范
  * 深色主题：#0B1A20 深青色背景 + #0AAF9A mint 主色
  */
-import { brand, dark as darkColors, semantic } from '../tokens/colors';
+import { brand, dark as darkColors } from '../tokens/colors';
 
 export const darkTheme = {
   // Backgrounds (v2 prototype)

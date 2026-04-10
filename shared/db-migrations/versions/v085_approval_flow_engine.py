@@ -87,11 +87,12 @@ def upgrade() -> None:
     op.execute("ALTER TABLE approval_flow_templates FORCE ROW LEVEL SECURITY;")
     for op_name in ("select", "insert", "update", "delete"):
         check = f"WITH CHECK ({_RLS_COND})" if op_name in ("insert", "update") else ""
+        using = f"USING ({_RLS_COND})" if op_name != "insert" else ""
         op.execute(f"""
             CREATE POLICY rls_aft_{op_name}
                 ON approval_flow_templates
                 FOR {op_name.upper()}
-                USING ({_RLS_COND})
+                {using}
                 {check};
         """)
 
@@ -160,11 +161,12 @@ def upgrade() -> None:
     op.execute("ALTER TABLE approval_flow_nodes FORCE ROW LEVEL SECURITY;")
     for op_name in ("select", "insert", "update", "delete"):
         check = f"WITH CHECK ({_RLS_COND})" if op_name in ("insert", "update") else ""
+        using = f"USING ({_RLS_COND})" if op_name != "insert" else ""
         op.execute(f"""
             CREATE POLICY rls_afn_{op_name}
                 ON approval_flow_nodes
                 FOR {op_name.upper()}
-                USING ({_RLS_COND})
+                {using}
                 {check};
         """)
 
@@ -172,6 +174,12 @@ def upgrade() -> None:
     # 3. approval_instances — 审批单实例（重用 v059 同名表，扩展字段）
     #    注意：v059 已建了 approval_instances，这里 ADD COLUMN 扩展
     # ─────────────────────────────────────────────────────────────────
+    # Ensure is_deleted column exists (table may predate this migration)
+    op.execute("""
+        ALTER TABLE approval_instances
+            ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN NOT NULL DEFAULT FALSE
+    """)
+
     op.execute("""
         -- 新增字段（幂等 ADD COLUMN IF NOT EXISTS）
         ALTER TABLE approval_instances
@@ -180,7 +188,8 @@ def upgrade() -> None:
             ADD COLUMN IF NOT EXISTS store_id            UUID,
             ADD COLUMN IF NOT EXISTS current_node_order  INTEGER DEFAULT 1,
             ADD COLUMN IF NOT EXISTS summary             JSONB   DEFAULT '{}',
-            ADD COLUMN IF NOT EXISTS completed_at        TIMESTAMPTZ;
+            ADD COLUMN IF NOT EXISTS completed_at        TIMESTAMPTZ,
+            ADD COLUMN IF NOT EXISTS is_deleted          BOOLEAN NOT NULL DEFAULT FALSE;
 
         COMMENT ON COLUMN approval_instances.flow_template_id IS
             '关联的新式审批流模板 ID（approval_flow_templates），NULL 表示使用旧式工作流';
@@ -243,11 +252,12 @@ def upgrade() -> None:
     op.execute("ALTER TABLE approval_node_instances FORCE ROW LEVEL SECURITY;")
     for op_name in ("select", "insert", "update", "delete"):
         check = f"WITH CHECK ({_RLS_COND})" if op_name in ("insert", "update") else ""
+        using = f"USING ({_RLS_COND})" if op_name != "insert" else ""
         op.execute(f"""
             CREATE POLICY rls_ani_{op_name}
                 ON approval_node_instances
                 FOR {op_name.upper()}
-                USING ({_RLS_COND})
+                {using}
                 {check};
         """)
 

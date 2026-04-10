@@ -1,0 +1,6 @@
+apiVersion: v2
+name: tx-growth
+description: 屯象OS 增长中枢微服务 — 旅程编排/分群/触达/ROI归因
+type: application
+version: 1.0.0
+appVersion: "latest"

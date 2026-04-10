@@ -1,0 +1,34 @@
+# tx-intel prod环境覆盖配置
+# BI分析低频服务：单实例保守资源配置，由Harness CD流水线自动合并
+
+replicaCount: 1
+
+image:
+  tag: ${IMAGE_TAG}  # 由Harness CD流水线注入，禁止手动修改
+
+env:
+  TUNXIANG_ENV: prod
+  LOG_LEVEL: info
+  REPORT_CACHE_TTL: "3600"
+  ANALYTICS_BATCH_SIZE: "1000"
+
+# BI分析低频服务保守资源配置，防止与交易链路争抢资源
+resources:
+  limits:
+    cpu: 200m
+    memory: 256Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+# 低频低负载，不启用HPA
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 2
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+# 单实例无需反亲和
+podAntiAffinity:
+  enabled: false

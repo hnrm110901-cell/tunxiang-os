@@ -1,0 +1,67 @@
+# 屯象OS K8s Namespace 定义
+# 每个环境独立Namespace，强隔离
+# 首次部署：kubectl apply -f namespaces.yaml
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: tunxiang-dev
+  labels:
+    environment: dev
+    managed-by: harness
+    app.kubernetes.io/part-of: tunxiang-os
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: tunxiang-test
+  labels:
+    environment: test
+    managed-by: harness
+    app.kubernetes.io/part-of: tunxiang-os
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: tunxiang-uat
+  labels:
+    environment: uat
+    managed-by: harness
+    app.kubernetes.io/part-of: tunxiang-os
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: tunxiang-pilot
+  labels:
+    environment: pilot
+    managed-by: harness
+    app.kubernetes.io/part-of: tunxiang-os
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: tunxiang-prod
+  labels:
+    environment: prod
+    managed-by: harness
+    app.kubernetes.io/part-of: tunxiang-os
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: tunxiang-demo
+  labels:
+    environment: demo
+    managed-by: harness
+    app.kubernetes.io/part-of: tunxiang-os
+---
+# monitoring namespace：Prometheus/Grafana/Alertmanager专用，独立隔离
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring
+  labels:
+    environment: monitoring
+    managed-by: harness
+    app.kubernetes.io/part-of: tunxiang-os

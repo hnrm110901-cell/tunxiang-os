@@ -1,4 +1,3 @@
-import React from 'react';
 
 interface HealthRingProps {
   score: number;       // 0-100

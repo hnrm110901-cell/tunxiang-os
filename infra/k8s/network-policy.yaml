@@ -1,0 +1,310 @@
+# 屯象OS K8s NetworkPolicy 配置
+# 实现namespace间强隔离 + 白名单式访问控制
+# 首次部署：kubectl apply -f network-policy.yaml
+#
+# 访问规则总览：
+#   - 默认：同namespace内Pod互通，跨namespace全拒绝
+#   - 例外1：api-gateway可访问所有业务服务
+#   - 例外2：tx-agent可访问tx-brain（LLM调用链路）
+#   - 例外3：monitoring namespace可采集所有namespace的metrics
+---
+# ============================================================
+# tunxiang-prod 默认拒绝所有入站流量
+# 各业务服务只允许被明确授权的来源访问
+# ============================================================
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: tunxiang-prod
+  labels:
+    app.kubernetes.io/part-of: tunxiang-os
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+---
+# 允许tunxiang-prod内Pod间相互通信（同namespace白名单）
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-same-namespace
+  namespace: tunxiang-prod
+  labels:
+    app.kubernetes.io/part-of: tunxiang-os
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector: {}
+---
+# 允许api-gateway访问所有backend service
+# api-gateway是唯一的南北向入口，所有外部流量经此转发
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-from-api-gateway
+  namespace: tunxiang-prod
+  labels:
+    app.kubernetes.io/part-of: tunxiang-os
+spec:
+  podSelector: {}  # 适用于所有Pod（即所有backend service均可被gateway访问）
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: tunxiang-prod
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: api-gateway
+---
+# 允许tx-agent访问tx-brain（Agent → LLM调用链路）
+# tx-agent是唯一需要调用Claude API的客户端
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-agent-to-brain
+  namespace: tunxiang-prod
+  labels:
+    app.kubernetes.io/part-of: tunxiang-os
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: tx-brain
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: tx-agent
+---
+# 允许monitoring namespace采集所有namespace的metrics（Prometheus抓取）
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-monitoring-scrape
+  namespace: tunxiang-prod
+  labels:
+    app.kubernetes.io/part-of: tunxiang-os
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - port: 9090
+          protocol: TCP
+        - port: 8000
+          protocol: TCP
+        - port: 8001
+          protocol: TCP
+        - port: 8002
+          protocol: TCP
+        - port: 8003
+          protocol: TCP
+        - port: 8004
+          protocol: TCP
+        - port: 8005
+          protocol: TCP
+        - port: 8006
+          protocol: TCP
+        - port: 8007
+          protocol: TCP
+        - port: 8008
+          protocol: TCP
+        - port: 8009
+          protocol: TCP
+        - port: 8010
+          protocol: TCP
+        - port: 8011
+          protocol: TCP
+        - port: 8012
+          protocol: TCP
+---
+# ============================================================
+# tunxiang-dev/test/uat/pilot 复用相同策略（仅隔离跨环境访问）
+# ============================================================
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: tunxiang-dev
+  labels:
+    app.kubernetes.io/part-of: tunxiang-os
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-same-namespace
+  namespace: tunxiang-dev
+  labels:
+    app.kubernetes.io/part-of: tunxiang-os
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector: {}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-monitoring-scrape
+  namespace: tunxiang-dev
+  labels:
+    app.kubernetes.io/part-of: tunxiang-os
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: tunxiang-test
+  labels:
+    app.kubernetes.io/part-of: tunxiang-os
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-same-namespace
+  namespace: tunxiang-test
+  labels:
+    app.kubernetes.io/part-of: tunxiang-os
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector: {}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-monitoring-scrape
+  namespace: tunxiang-test
+  labels:
+    app.kubernetes.io/part-of: tunxiang-os
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: tunxiang-uat
+  labels:
+    app.kubernetes.io/part-of: tunxiang-os
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-same-namespace
+  namespace: tunxiang-uat
+  labels:
+    app.kubernetes.io/part-of: tunxiang-os
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector: {}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-monitoring-scrape
+  namespace: tunxiang-uat
+  labels:
+    app.kubernetes.io/part-of: tunxiang-os
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: tunxiang-pilot
+  labels:
+    app.kubernetes.io/part-of: tunxiang-os
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-same-namespace
+  namespace: tunxiang-pilot
+  labels:
+    app.kubernetes.io/part-of: tunxiang-os
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector: {}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-monitoring-scrape
+  namespace: tunxiang-pilot
+  labels:
+    app.kubernetes.io/part-of: tunxiang-os
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring

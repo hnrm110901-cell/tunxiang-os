@@ -21,8 +21,15 @@ from .api.menu_version_routes import router as menu_version_router
 from .api.practice_routes import router as practice_router
 from .api.pricing_routes import router as pricing_router
 from .api.publish import router as publish_router
+from .api.scheme_routes import router as scheme_router
+from .api.dish_ranking_engine_routes import router as dish_ranking_engine_router  # P3-04 5因子动态排名
+from .api.channel_menu_override_routes import router as channel_menu_override_router  # Y-C4 多渠道菜单发布完善
 
 app = FastAPI(title="TunxiangOS tx-menu", version="3.0.0")
+
+from prometheus_fastapi_instrumentator import Instrumentator
+Instrumentator().instrument(app).expose(app)
+
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 app.include_router(dish_router)
 app.include_router(publish_router)
@@ -41,6 +48,9 @@ app.include_router(brand_publish_router)  # 品牌→门店三级发布体系
 app.include_router(live_seafood_router)        # 徐记：活鲜海鲜（称重/条头/鱼缸）
 app.include_router(live_seafood_query_router)  # 徐记：活鲜查询（前端点单专用）
 app.include_router(banquet_menu_router)   # 徐记：宴席菜单（多档次/分节/场次管理）
+app.include_router(scheme_router)         # 菜谱方案批量下发（集团→门店）
+app.include_router(dish_ranking_engine_router)  # P3-04 5因子动态排名引擎
+app.include_router(channel_menu_override_router)  # Y-C4 多渠道菜单发布完善（门店差异价/上下架覆盖）
 
 @app.get("/health")
 async def health():

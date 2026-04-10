@@ -27,6 +27,19 @@ depends_on = None
 
 def upgrade() -> None:
     # ── 1. 储值账户表 ──────────────────────────────────────────────────
+    # Drop old incompatible schema (customer_id/numeric) to allow new schema (member_id/BIGINT)
+    op.execute("""
+        DO $$
+        BEGIN
+            IF EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name = 'stored_value_accounts' AND column_name = 'customer_id'
+            ) THEN
+                DROP TABLE stored_value_accounts CASCADE;
+            END IF;
+        END $$
+    """)
+
     op.execute("""
         CREATE TABLE IF NOT EXISTS stored_value_accounts (
             id                   UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -44,6 +57,11 @@ def upgrade() -> None:
             CONSTRAINT stored_value_accounts_frozen_nonneg
                 CHECK (frozen_fen >= 0)
         )
+    """)
+    # Ensure is_deleted exists (table may have been created by an earlier migration)
+    op.execute("""
+        ALTER TABLE stored_value_accounts
+            ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN NOT NULL DEFAULT FALSE
     """)
     op.execute("ALTER TABLE stored_value_accounts ENABLE ROW LEVEL SECURITY")
     op.execute("""
@@ -63,6 +81,19 @@ def upgrade() -> None:
     """)
 
     # ── 2. 交易流水表 ──────────────────────────────────────────────────
+    # Drop old incompatible schema (card_id) to allow new schema (account_id)
+    op.execute("""
+        DO $$
+        BEGIN
+            IF EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name = 'stored_value_transactions' AND column_name = 'card_id'
+            ) THEN
+                DROP TABLE stored_value_transactions CASCADE;
+            END IF;
+        END $$
+    """)
+
     op.execute("""
         CREATE TABLE IF NOT EXISTS stored_value_transactions (
             id                   UUID        PRIMARY KEY DEFAULT gen_random_uuid(),

@@ -1,0 +1,257 @@
+{
+  "__inputs": [],
+  "__requires": [
+    { "type": "grafana", "id": "grafana", "name": "Grafana", "version": "10.2.0" },
+    { "type": "datasource", "id": "prometheus", "name": "Prometheus", "version": "1.0.0" }
+  ],
+  "annotations": { "list": [] },
+  "description": "屯象OS Agent体系专用仪表板 - 监控L1/L2/L3自治Agent运行状态",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "id": 1,
+      "title": "各 Agent 触发次数（按类型，24h汇总）",
+      "type": "barchart",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "options": {
+        "barWidth": 0.6,
+        "groupWidth": 0.7,
+        "legend": { "calcs": ["sum"], "displayMode": "table", "placement": "bottom" },
+        "orientation": "auto",
+        "xTickLabelRotation": -30
+      },
+      "fieldConfig": {
+        "defaults": { "unit": "short", "custom": { "lineWidth": 1 } },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum by (agent_type) (increase(agent_executions_total[24h]))",
+          "legendFormat": "{{agent_type}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Agent 执行成功率（按类型）",
+      "type": "gauge",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": true },
+        "showThresholdLabels": true,
+        "showThresholdMarkers": true
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 0.9 },
+              { "color": "green", "value": 0.98 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum by (agent_type) (rate(agent_executions_total{status=\"success\"}[5m])) / sum by (agent_type) (rate(agent_executions_total[5m]))",
+          "legendFormat": "{{agent_type}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "L1/L2/L3 自治级别触发分布（实时）",
+      "type": "piechart",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 8 },
+      "options": {
+        "legend": { "calcs": ["sum"], "displayMode": "table", "placement": "right" },
+        "pieType": "donut",
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "fieldConfig": {
+        "defaults": { "unit": "short" },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "L1" }, "properties": [{ "id": "color", "value": { "fixedColor": "#73BF69", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "L2" }, "properties": [{ "id": "color", "value": { "fixedColor": "#F2CC0C", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "L3" }, "properties": [{ "id": "color", "value": { "fixedColor": "#FF9830", "mode": "fixed" } }] }
+        ]
+      },
+      "targets": [
+        { "expr": "sum by (autonomy_level) (increase(agent_executions_total[1h]))", "legendFormat": "{{autonomy_level}}", "refId": "A" }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "L1/L2/L3 自治级别趋势（按小时）",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 16, "x": 8, "y": 8 },
+      "options": {
+        "legend": { "calcs": ["mean", "sum"], "displayMode": "table", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      },
+      "fieldConfig": {
+        "defaults": { "unit": "short", "custom": { "lineWidth": 2, "fillOpacity": 10 } },
+        "overrides": []
+      },
+      "targets": [
+        { "expr": "sum by (autonomy_level) (rate(agent_executions_total[5m])) * 300", "legendFormat": "{{autonomy_level}} 触发次数/5min", "refId": "A" }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "LLM Token 消耗趋势（tx-brain）",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "options": {
+        "legend": { "calcs": ["mean", "sum"], "displayMode": "table", "placement": "bottom" }
+      },
+      "fieldConfig": {
+        "defaults": { "unit": "short", "custom": { "lineWidth": 2 } },
+        "overrides": []
+      },
+      "targets": [
+        { "expr": "rate(llm_tokens_total{job=\"tunxiang-tx-brain\",type=\"input\"}[5m]) * 60", "legendFormat": "输入Token/min", "refId": "A" },
+        { "expr": "rate(llm_tokens_total{job=\"tunxiang-tx-brain\",type=\"output\"}[5m]) * 60", "legendFormat": "输出Token/min", "refId": "B" }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Agent 决策延迟 P50/P99",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "options": {
+        "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom" }
+      },
+      "fieldConfig": {
+        "defaults": { "unit": "ms", "custom": { "lineWidth": 2 } },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum by (agent_type, le) (rate(agent_decision_duration_seconds_bucket[5m]))) * 1000",
+          "legendFormat": "{{agent_type}} P50",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by (agent_type, le) (rate(agent_decision_duration_seconds_bucket[5m]))) * 1000",
+          "legendFormat": "{{agent_type}} P99",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "Feature Flag 开启状态（当前值）",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 24 },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "horizontal",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": true },
+        "textMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "options": {
+                "0": { "color": "red", "text": "OFF" },
+                "1": { "color": "green", "text": "ON" }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "feature_flag_enabled",
+          "legendFormat": "{{flag_name}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "title": "Agent 执行成功率趋势（总体）",
+      "type": "timeseries",
+      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 30 },
+      "options": { "legend": { "calcs": ["mean"], "displayMode": "list", "placement": "bottom" } },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "custom": { "lineWidth": 2 },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "yellow", "value": 0.9 }, { "color": "green", "value": 0.98 }] }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(agent_executions_total{status=\"success\"}[5m])) / sum(rate(agent_executions_total[5m]))",
+          "legendFormat": "整体成功率",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "title": "LLM API 调用成本估算（Claude 3.5 Sonnet 计价）",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 30 },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "horizontal",
+        "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false },
+        "textMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": { "unit": "currencyUSD" },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "(increase(llm_tokens_total{job=\"tunxiang-tx-brain\",type=\"input\"}[1h]) * 0.000003) + (increase(llm_tokens_total{job=\"tunxiang-tx-brain\",type=\"output\"}[1h]) * 0.000015)",
+          "legendFormat": "过去1小时成本",
+          "refId": "A"
+        },
+        {
+          "expr": "(increase(llm_tokens_total{job=\"tunxiang-tx-brain\",type=\"input\"}[24h]) * 0.000003) + (increase(llm_tokens_total{job=\"tunxiang-tx-brain\",type=\"output\"}[24h]) * 0.000015)",
+          "legendFormat": "过去24小时成本",
+          "refId": "B"
+        }
+      ]
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 38,
+  "tags": ["tunxiang", "agents", "llm"],
+  "time": { "from": "now-6h", "to": "now" },
+  "timepicker": {},
+  "timezone": "Asia/Shanghai",
+  "title": "屯象OS Agent体系监控",
+  "uid": "tunxiang-agents-v1",
+  "version": 1
+}

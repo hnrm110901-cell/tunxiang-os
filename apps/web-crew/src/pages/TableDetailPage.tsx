@@ -1124,6 +1124,7 @@ export function TableDetailPage() {
 
       {/* ── 主动服务建议（Phase 3-B） ── */}
       <ServiceSuggestionCard
+        tableId={tableNo || ''}
         orderId={orderId || order?.order_id || ''}
         onAction={(suggestion: ServiceSuggestion) => {
           if (suggestion.type === 'upsell' || suggestion.type === 'refill' || suggestion.type === 'dessert') {

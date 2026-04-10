@@ -3,8 +3,15 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
-    <meta name="theme-color" content="#1A2E3B" />
+    <meta name="theme-color" content="#0D1117" />
     <link rel="manifest" href="/manifest.json" />
+    <!-- PWA / Apple Web App -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="TX后厨" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="application-name" content="TX后厨" />
+    <meta name="description" content="屯象OS后厨出餐显示屏" />
     <title>屯象KDS</title>
   </head>
   <body>
@@ -12,7 +19,18 @@
     <script type="module" src="/src/main.tsx"></script>
     <script>
       if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('/sw.js');
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then((reg) => {
+              console.log('[TX-KDS] SW registered:', reg.scope);
+              window.addEventListener('online', () => {
+                if (reg.active) {
+                  reg.active.postMessage({ type: 'ONLINE_RESTORED' });
+                }
+              });
+            })
+            .catch((err) => console.warn('[TX-KDS] SW registration failed:', err));
+        });
       }
     </script>
   </body>

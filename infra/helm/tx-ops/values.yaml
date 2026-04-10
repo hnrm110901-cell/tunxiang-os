@@ -1,0 +1,83 @@
+# tx-ops — 运营核心微服务
+# 高可用配置：replicaCount=2，含日结/食安/调度等核心运营流程
+
+replicaCount: 2
+
+image:
+  repository: tunxiang/tx-ops
+  pullPolicy: IfNotPresent
+  tag: latest
+
+service:
+  type: ClusterIP
+  port: 8005
+  targetPort: 8005
+
+ingress:
+  enabled: false
+  className: nginx
+  host: ""
+  tls: false
+  tlsSecretName: ""
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 200m
+    memory: 256Mi
+
+env:
+  TUNXIANG_ENV: prod
+  LOG_LEVEL: info
+  # 食品安全检查：生产环境强制开启，违规自动拦截
+  FOOD_SAFETY_CHECK_ENABLED: "true"
+  # 日清日结自动化：E1-E8全流程自动执行
+  DAILY_SETTLEMENT_AUTO: "true"
+  # 调度引擎：出餐/配送智能调度开关
+  DISPATCH_ENABLED: "true"
+
+# Secret中存放的敏感环境变量（由外部Secret Manager注入）
+secretRef:
+  name: tx-ops-secret
+  # 包含: DB_URL, REDIS_URL, JWT_SECRET, SUPABASE_SERVICE_KEY
+
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 6
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 8005
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  failureThreshold: 3
+  timeoutSeconds: 5
+
+readinessProbe:
+  httpGet:
+    path: /health
+    port: 8005
+  initialDelaySeconds: 5
+  periodSeconds: 5
+  failureThreshold: 3
+  timeoutSeconds: 3
+
+# Pod反亲和：运营服务Pod分散到不同节点，防止单节点故障影响日结
+podAntiAffinity:
+  enabled: true
+
+serviceAccount:
+  create: false
+  name: ""
+
+podAnnotations: {}
+
+nodeSelector: {}
+
+tolerations: []

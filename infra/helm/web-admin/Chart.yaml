@@ -1,0 +1,6 @@
+apiVersion: v2
+name: web-admin
+description: 屯象OS Web Admin 前端静态服务（nginx容器）
+type: application
+version: 1.0.0
+appVersion: "latest"

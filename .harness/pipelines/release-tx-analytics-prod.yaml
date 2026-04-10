@@ -1,0 +1,356 @@
+pipeline:
+  name: release-tx-analytics-prod
+  identifier: release_tx_analytics_prod
+  projectIdentifier: TunXiangOS
+  orgIdentifier: default
+  description: "tx-analytics（经营分析）生产发布流水线：Pilot 灰度 → 2人审批 → 生产全量 → 健康验证 → 自动回滚兜底"
+  tags:
+    service: tx-analytics
+    track: release
+    env: prod
+
+  stages:
+    - stage:
+        name: Deploy_Pilot
+        identifier: Deploy_Pilot
+        type: Deployment
+        spec:
+          deploymentType: Kubernetes
+          service:
+            serviceRef: svc_tx_analytics
+            serviceInputs:
+              serviceDefinition:
+                type: Kubernetes
+                spec:
+                  artifacts:
+                    primary:
+                      primaryArtifactRef: primary
+                      sources:
+                        - identifier: primary
+                          spec:
+                            tag: <+pipeline.variables.imageTag>
+          environment:
+            environmentRef: env_pilot
+            deployToAll: false
+            infrastructureDefinitions:
+              - identifier: gitops_pilot_region_a
+                inputs:
+                  identifier: gitops_pilot_region_a
+                  type: KubernetesDirect
+                  spec:
+                    namespace: tunxiang-pilot
+          execution:
+            steps:
+              - step:
+                  name: K8s_Rolling_Deploy_Pilot
+                  identifier: K8s_Rolling_Deploy_Pilot
+                  type: K8sRollingDeploy
+                  timeout: 10m
+                  spec:
+                    skipDryRun: false
+                    pruningEnabled: false
+                  failureStrategies:
+                    - onFailure:
+                        errors:
+                          - AllErrors
+                        action:
+                          type: StageRollback
+
+              - step:
+                  name: Healthcheck_Pilot
+                  identifier: Healthcheck_Pilot
+                  type: ShellScript
+                  timeout: 5m
+                  spec:
+                    shell: Bash
+                    onDelegate: true
+                    source:
+                      type: Inline
+                      spec:
+                        script: |
+                          #!/usr/bin/env bash
+                          set -euo pipefail
+                          HEALTH_URL="https://pilot-api.tunxiangos.cn/tx-analytics/health"
+                          MAX_RETRY=10; SLEEP_SEC=15
+                          echo ">>> Pilot 健康检查: ${HEALTH_URL}"
+                          for i in $(seq 1 ${MAX_RETRY}); do
+                            HTTP_CODE=$(curl -sf -o /dev/null -w "%{http_code}" --max-time 10 "${HEALTH_URL}" || true)
+                            if [ "${HTTP_CODE}" = "200" ]; then echo "OK"; exit 0; fi
+                            echo "HTTP ${HTTP_CODE}，等待 ${SLEEP_SEC}s..."; sleep ${SLEEP_SEC}
+                          done
+                          echo "ERROR: Pilot 健康检查超时"; exit 1
+
+              - step:
+                  name: Pilot_Observation_Wait
+                  identifier: Pilot_Observation_Wait
+                  type: HarnessApproval
+                  timeout: 2h
+                  spec:
+                    approvalMessage: "Pilot 已部署完成。请观察 Pilot 监控指标（错误率、P99延迟、日志）至少 10 分钟后确认继续，或拒绝以触发回滚。版本：<+pipeline.sequenceId>"
+                    includePipelineExecutionHistory: true
+                    approvers:
+                      userGroups:
+                        - sre_group
+                      minimumCount: 1
+                      disallowPipelineExecutor: false
+                    approverInputs:
+                      - name: error_rate_ok
+                        defaultValue: "no"
+                      - name: latency_ok
+                        defaultValue: "no"
+                  failureStrategies:
+                    - onFailure:
+                        errors:
+                          - ApprovalRejection
+                        action:
+                          type: StageRollback
+
+            rollbackSteps:
+              - step:
+                  name: K8s_Rolling_Rollback_Pilot
+                  identifier: K8s_Rolling_Rollback_Pilot
+                  type: K8sRollingRollback
+                  timeout: 10m
+                  spec: {}
+
+    - stage:
+        name: Approve_Prod
+        identifier: Approve_Prod
+        type: Approval
+        dependsOn:
+          - Deploy_Pilot
+        spec:
+          execution:
+            steps:
+              - step:
+                  name: Prod_Release_Approval
+                  identifier: Prod_Release_Approval
+                  type: HarnessApproval
+                  timeout: 4h
+                  spec:
+                    approvalMessage: "[生产发布] 请两人确认：版本 <+pipeline.sequenceId> | 服务 <+pipeline.name> | 时间 <+pipeline.startTs>"
+                    includePipelineExecutionHistory: true
+                    approvers:
+                      userGroups:
+                        - release_manager_group
+                        - sre_group
+                      minimumCount: 2
+                      disallowPipelineExecutor: false
+                    approverInputs:
+                      - name: rollback_plan_confirmed
+                        defaultValue: "no"
+                      - name: change_ticket_id
+                        defaultValue: ""
+                      - name: db_migration_verified
+                        defaultValue: "no"
+                  failureStrategies:
+                    - onFailure:
+                        errors:
+                          - ApprovalRejection
+                        action:
+                          type: Abort
+
+    - stage:
+        name: Deploy_Prod
+        identifier: Deploy_Prod
+        type: Deployment
+        dependsOn:
+          - Approve_Prod
+        spec:
+          deploymentType: Kubernetes
+          service:
+            serviceRef: svc_tx_analytics
+            serviceInputs:
+              serviceDefinition:
+                type: Kubernetes
+                spec:
+                  artifacts:
+                    primary:
+                      primaryArtifactRef: primary
+                      sources:
+                        - identifier: primary
+                          spec:
+                            tag: <+pipeline.variables.imageTag>
+          environment:
+            environmentRef: env_prod
+            deployToAll: false
+            infrastructureDefinitions:
+              - identifier: k8s_prod_main
+                inputs:
+                  identifier: k8s_prod_main
+                  type: KubernetesDirect
+                  spec:
+                    namespace: tunxiang-prod
+          execution:
+            steps:
+              - step:
+                  name: K8s_Rolling_Deploy_Prod
+                  identifier: K8s_Rolling_Deploy_Prod
+                  type: K8sRollingDeploy
+                  timeout: 10m
+                  spec:
+                    skipDryRun: false
+                    pruningEnabled: false
+                  failureStrategies:
+                    - onFailure:
+                        errors:
+                          - AllErrors
+                        action:
+                          type: StageRollback
+
+            rollbackSteps:
+              - step:
+                  name: K8s_Rolling_Rollback_Prod
+                  identifier: K8s_Rolling_Rollback_Prod
+                  type: K8sRollingRollback
+                  timeout: 10m
+                  spec: {}
+
+        failureStrategies:
+          - onFailure:
+              errors:
+                - AllErrors
+              action:
+                type: StageRollback
+
+    - stage:
+        name: Post_Deploy_Verify
+        identifier: Post_Deploy_Verify
+        type: Custom
+        dependsOn:
+          - Deploy_Prod
+        spec:
+          execution:
+            steps:
+              - step:
+                  name: Prod_Healthcheck
+                  identifier: Prod_Healthcheck
+                  type: ShellScript
+                  timeout: 5m
+                  spec:
+                    shell: Bash
+                    onDelegate: true
+                    source:
+                      type: Inline
+                      spec:
+                        script: |
+                          #!/usr/bin/env bash
+                          set -euo pipefail
+                          HEALTH_URL="https://api.tunxiangos.cn/tx-analytics/health"
+                          MAX_RETRY=12; SLEEP_SEC=15
+                          echo ">>> 生产健康检查: ${HEALTH_URL}"
+                          for i in $(seq 1 ${MAX_RETRY}); do
+                            echo "第 ${i}/${MAX_RETRY} 次..."
+                            HTTP_CODE=$(curl -sf -o /dev/null -w "%{http_code}" --max-time 10 "${HEALTH_URL}" || true)
+                            if [ "${HTTP_CODE}" = "200" ]; then echo "OK: 健康检查通过"; exit 0; fi
+                            echo "HTTP ${HTTP_CODE}，等待 ${SLEEP_SEC}s..."; sleep ${SLEEP_SEC}
+                          done
+                          echo "ERROR: 生产健康检查在 $((MAX_RETRY * SLEEP_SEC))s 内未通过"; exit 1
+                  failureStrategies:
+                    - onFailure:
+                        errors:
+                          - AllErrors
+                        action:
+                          type: Abort
+
+              - step:
+                  name: Core_API_Smoke_Test
+                  identifier: Core_API_Smoke_Test
+                  type: ShellScript
+                  timeout: 5m
+                  spec:
+                    shell: Bash
+                    onDelegate: true
+                    source:
+                      type: Inline
+                      spec:
+                        script: |
+                          #!/usr/bin/env bash
+                          set -euo pipefail
+                          BASE_URL="https://api.tunxiangos.cn/tx-analytics"
+                          check_api() {
+                            local NAME="$1" URL="$2" EXPECT_CODE="${3:-200}"
+                            HTTP_CODE=$(curl -sf -o /tmp/api_resp.json -w "%{http_code}" --max-time 10 -H "Content-Type: application/json" "${URL}" || true)
+                            [ "${HTTP_CODE}" = "${EXPECT_CODE}" ] && echo "  OK  [${HTTP_CODE}] ${NAME}" || { echo "  FAIL [${HTTP_CODE}] ${NAME}"; return 1; }
+                          }
+                          FAILED=0
+                          check_api "Health"      "${BASE_URL}/health"         200 || FAILED=1
+                          check_api "API Version" "${BASE_URL}/api/v1/version" 200 || FAILED=1
+                          [ ${FAILED} -eq 1 ] && { echo "ERROR: 核心接口验证失败"; exit 1; }
+                          echo "OK: 所有核心接口验证通过"
+                  failureStrategies:
+                    - onFailure:
+                        errors:
+                          - AllErrors
+                        action:
+                          type: Abort
+
+              - step:
+                  name: Notify_Deploy_Success
+                  identifier: Notify_Deploy_Success
+                  type: ShellScript
+                  timeout: 2m
+                  spec:
+                    shell: Bash
+                    onDelegate: true
+                    source:
+                      type: Inline
+                      spec:
+                        script: |
+                          #!/usr/bin/env bash
+                          echo "生产发布成功！服务: tx-analytics | 版本: <+pipeline.variables.imageTag> | 序号: <+pipeline.sequenceId>"
+
+    - stage:
+        name: Auto_Rollback_On_Failure
+        identifier: Auto_Rollback_On_Failure
+        type: Deployment
+        dependsOn:
+          - Post_Deploy_Verify
+        when:
+          pipelineStatus: Failure
+        spec:
+          deploymentType: Kubernetes
+          service:
+            serviceRef: svc_tx_analytics
+          environment:
+            environmentRef: env_prod
+            deployToAll: false
+            infrastructureDefinitions:
+              - identifier: k8s_prod_main
+          execution:
+            steps:
+              - step:
+                  name: Emergency_Rollback_Prod
+                  identifier: Emergency_Rollback_Prod
+                  type: K8sRollingRollback
+                  timeout: 10m
+                  spec: {}
+
+              - step:
+                  name: Notify_Rollback
+                  identifier: Notify_Rollback
+                  type: ShellScript
+                  timeout: 2m
+                  spec:
+                    shell: Bash
+                    onDelegate: true
+                    source:
+                      type: Inline
+                      spec:
+                        script: |
+                          #!/usr/bin/env bash
+                          echo "紧急回滚已执行！服务: tx-analytics | 失败版本: <+pipeline.variables.imageTag> | 请 SRE 立即介入"
+
+        failureStrategies:
+          - onFailure:
+              errors:
+                - AllErrors
+              action:
+                type: Abort
+
+  variables:
+    - name: imageTag
+      type: String
+      description: "待发布的生产镜像 Tag（必须来自已通过 UAT 的构建）"
+      required: true
+      value: <+input>

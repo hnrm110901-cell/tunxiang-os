@@ -11,7 +11,10 @@ structlog>=24.0.0
 lxml>=5.0.0            # 企微回调 XML 解析（wecom_routes.py）
 # ── 认证 Phase 1a: JWT + TOTP 双因素 ──
 python-jose[cryptography]>=3.3.0  # JWT 签发与验证
+PyJWT>=2.8.0                      # jwt 模块（auth.py 直接 import jwt）
+passlib[bcrypt]>=1.7.4            # CryptContext 密码哈希
 pyotp>=2.9.0                      # TOTP 双因素认证
-bcrypt>=4.0.0                     # 密码哈希（生产环境DB查询用）
+bcrypt>=3.2.0,<4.0.0              # 密码哈希（passlib 不兼容 bcrypt>=4.0.0）
 cryptography>=41.0.0              # AES-256-GCM 字段加密（Phase 2 PII）
 qrcode[pil]>=7.4.0                # MFA 二维码生成（可选，供前端展示）
+prometheus-fastapi-instrumentator>=6.1.0

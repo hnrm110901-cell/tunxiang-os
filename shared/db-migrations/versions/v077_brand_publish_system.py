@@ -36,7 +36,7 @@ def _rls(table: str) -> None:
     op.execute(f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY")
     op.execute(
         f"CREATE POLICY tenant_isolation_{table} ON {table} "
-        f"USING ({_SAFE})"
+        f"FOR SELECT USING ({_SAFE})"
     )
     op.execute(
         f"CREATE POLICY tenant_insert_{table} ON {table} "

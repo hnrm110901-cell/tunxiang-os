@@ -72,18 +72,22 @@ class OrderService:
         is_offline: bool = False,
         items_data: Optional[list[dict]] = None,
         payments_data: Optional[list[dict]] = None,
+        dining_session_id: Optional[str] = None,
+        order_sequence: int = 1,
     ) -> dict:
-        """开单 — 创建订单并锁定桌台
+        """开单 — 创建订单并关联桌台会话（v150+）
 
         Args:
-            store_id:       门店 ID
-            order_type:     订单类型（dine_in/takeaway/...）
-            table_no:       桌号（堂食场景）
-            customer_id:    会员 ID（可选）
-            waiter_id:      服务员 ID（可选）
-            is_offline:     True = 断网模式，将订单写入离线队列并返回 local_order_id
-            items_data:     离线模式下的订单明细快照列表
-            payments_data:  离线模式下的支付数据快照列表
+            store_id:           门店 ID
+            order_type:         订单类型（dine_in/takeaway/...）
+            table_no:           桌号（兼容旧接口，v150 后优先用 dining_session_id）
+            customer_id:        会员 ID（可选）
+            waiter_id:          服务员 ID（可选）
+            is_offline:         True = 断网模式，将订单写入离线队列并返回 local_order_id
+            items_data:         离线模式下的订单明细快照列表
+            payments_data:      离线模式下的支付数据快照列表
+            dining_session_id:  堂食会话ID（v150新增，堂食场景必传）
+            order_sequence:     会话内点单序号（1=主单，2+=加菜单）
 
         Returns:
             在线模式：{"order_id": str, "order_no": str}
@@ -140,11 +144,73 @@ class OrderService:
 
         # ── 在线正常路径 ──────────────────────────────────────────────────
         order_no = _gen_order_no()
-        order = Order(id=uuid.uuid4(), tenant_id=self.tenant_id, order_no=order_no, store_id=uuid.UUID(store_id), table_number=table_no, customer_id=uuid.UUID(customer_id) if customer_id else None, waiter_id=waiter_id, sales_channel=order_type, total_amount_fen=0, discount_amount_fen=0, final_amount_fen=0, status=OrderStatus.pending.value)
+        is_add_order = order_sequence > 1
+
+        # 若传入 dining_session_id，从会话中补全 table_no（向后兼容打印等场景）
+        _resolved_table_no = table_no
+        if dining_session_id and not table_no:
+            _snap = await self.db.execute(
+                text("SELECT table_no_snapshot FROM dining_sessions WHERE id = :sid AND tenant_id = :tid"),
+                {"sid": uuid.UUID(dining_session_id), "tid": self.tenant_id},
+            )
+            _snap_row = _snap.mappings().one_or_none()
+            if _snap_row:
+                _resolved_table_no = _snap_row["table_no_snapshot"]
+
+        order = Order(
+            id=uuid.uuid4(),
+            tenant_id=self.tenant_id,
+            order_no=order_no,
+            store_id=uuid.UUID(store_id),
+            table_number=_resolved_table_no,
+            customer_id=uuid.UUID(customer_id) if customer_id else None,
+            waiter_id=waiter_id,
+            sales_channel=order_type,
+            total_amount_fen=0,
+            discount_amount_fen=0,
+            final_amount_fen=0,
+            status=OrderStatus.pending.value,
+        )
+
+        # v150：写入 dining_session_id / order_sequence / is_add_order
+        if dining_session_id:
+            await self.db.execute(
+                text("""
+                    UPDATE orders SET
+                        dining_session_id = :dsid,
+                        order_sequence    = :seq,
+                        is_add_order      = :is_add
+                    WHERE id = :oid AND tenant_id = :tid
+                """),
+                {
+                    "dsid": uuid.UUID(dining_session_id),
+                    "seq": order_sequence,
+                    "is_add": is_add_order,
+                    "oid": order.id,
+                    "tid": self.tenant_id,
+                },
+            )
+
         self.db.add(order)
-        if table_no and order_type == OrderType.dine_in.value:
-            await self._lock_table(store_id, table_no, order.id)
+        if _resolved_table_no and order_type == OrderType.dine_in.value and not dining_session_id:
+            # 旧逻辑：无 dining_session_id 时才用旧的 _lock_table（兼容期）
+            await self._lock_table(store_id, _resolved_table_no, order.id)
         await self.db.flush()
+
+        # v149：回调 DiningSessionService，更新会话汇总 + 推进状态
+        if dining_session_id:
+            import asyncio
+            from .dining_session_service import DiningSessionService
+            asyncio.create_task(
+                DiningSessionService(self.db, str(self.tenant_id)).record_order_placed(
+                    session_id=uuid.UUID(dining_session_id),
+                    order_id=order.id,
+                    is_add_order=is_add_order,
+                    order_amount_fen=0,   # 下单时金额为0，加菜后由 cashier_engine 更新
+                    item_count=0,
+                )
+            )
+
         return {"order_id": str(order.id), "order_no": order_no}
 
     async def add_item(self, order_id: str, dish_id: str, dish_name: str, quantity: int, unit_price_fen: int, notes: Optional[str] = None, customizations: Optional[dict] = None) -> dict:

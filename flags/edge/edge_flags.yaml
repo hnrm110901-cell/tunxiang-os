@@ -1,0 +1,93 @@
+# 边缘计算域 Feature Flags
+# 域：edge
+# 命名格式：edge.{module}.{feature}.{action}
+# 适用设备：Mac mini M4 边缘节点
+
+flags:
+  - identifier: edge_sync_delta_sync_enable
+    name: edge.sync.delta_sync.enable
+    description: >
+      增量同步策略（sync-engine从全量同步切换为增量同步，
+      仅传输上次同步后变化的数据，减少带宽消耗和同步延迟）。
+      依赖 updated_at 字段的索引，迁移前确认数据完整性。
+    defaultValue: false
+    environments:
+      dev: true
+      test: true
+      uat: true
+      pilot: false
+      prod: false
+    targeting_rules:
+      pilot:
+        - dimension: edge_node_group
+          values: [mac_mini_m4_pilot]
+      prod:
+        - dimension: edge_node_group
+          values: []
+    tags: [edge, sync, delta, bandwidth]
+
+  - identifier: edge_coreml_inference_enable
+    name: edge.coreml.inference.enable
+    description: >
+      CoreML本地推理（启用Mac mini M4 Neural Engine进行本地AI推理，
+      包括出餐时间预测/折扣异常检测/客流预测/语音识别）。
+      依赖 coreml-bridge Swift服务在port 8100运行。
+      关闭时降级为云端Claude API推理。
+    defaultValue: false
+    environments:
+      dev: false
+      test: false
+      uat: false
+      pilot: false
+      prod: false
+    targeting_rules:
+      pilot:
+        - dimension: edge_node_group
+          values: [mac_mini_m4_pilot]
+    tags: [edge, coreml, inference, neural-engine, m4]
+
+  - identifier: edge_offline_full_mode_enable
+    name: edge.offline.full_mode.enable
+    description: >
+      完全离线模式（断网时Mac mini提供全量本地API服务，
+      包括收银/点餐/出餐，不依赖云端）。
+      高风险Flag：开启前必须确认本地PG数据完整性和同步状态。
+      仅在网络不稳定场景（如活动现场/地下室）定向开启。
+    defaultValue: false
+    risk_level: HIGH
+    environments:
+      dev: false
+      test: false
+      uat: false
+      pilot: false
+      prod: false
+    targeting_rules:
+      pilot:
+        - dimension: edge_node_group
+          values: [mac_mini_m4_offline_test]
+      prod:
+        - dimension: store_id
+          values: []   # 需单独审批后填入
+    tags: [edge, offline, full-mode, high-risk]
+
+  - identifier: edge_mac_station_auto_update_enable
+    name: edge.mac_station.auto_update.enable
+    description: >
+      Edge节点自动更新（mac-station服务在低峰时段（凌晨2-4点）
+      自动拉取最新版本并重启，无需人工登录SSH操作）。
+      依赖 launchd 自动重启策略，更新失败时自动回滚。
+    defaultValue: false
+    environments:
+      dev: false
+      test: true
+      uat: true
+      pilot: false
+      prod: false
+    targeting_rules:
+      pilot:
+        - dimension: edge_node_group
+          values: [mac_mini_m4_pilot]
+      prod:
+        - dimension: edge_node_group
+          values: []
+    tags: [edge, mac-station, auto-update, launchd]

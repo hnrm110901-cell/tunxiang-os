@@ -207,4 +207,101 @@ class DispatchPredictorAgent:
         }
 
 
+    async def analyze_from_mv(self, tenant_id: str, store_id: str | None = None) -> dict:
+        """从 mv_store_pnl 快速读取出餐压力背景数据，<5ms，无 Claude 调用。
+
+        数据来源：因果链④投影视图（StorePnlProjector）
+        出餐调度视角：近7天订单量/客单数趋势 → 估算厨房基准负载
+        """
+        from sqlalchemy import text
+        from sqlalchemy.exc import SQLAlchemyError
+        from shared.ontology.src.database import get_db
+
+        try:
+            async for db in get_db():
+                await db.execute(
+                    text("SELECT set_config('app.tenant_id', :tid, true)"),
+                    {"tid": str(tenant_id)},
+                )
+                params: dict = {"tenant_id": tenant_id}
+                store_clause = ""
+                if store_id:
+                    store_clause = "AND store_id = :store_id"
+                    params["store_id"] = store_id
+
+                result = await db.execute(
+                    text(f"""
+                        SELECT
+                            stat_date,
+                            order_count,
+                            customer_count,
+                            avg_check_fen,
+                            gross_margin_rate
+                        FROM mv_store_pnl
+                        WHERE tenant_id = :tenant_id
+                        {store_clause}
+                        ORDER BY stat_date DESC
+                        LIMIT 7
+                    """),
+                    params,
+                )
+                rows = result.mappings().all()
+
+                if not rows:
+                    return {
+                        "inference_layer": "mv_fast_path",
+                        "data": {},
+                        "agent": self.__class__.__name__,
+                        "note": "暂无历史订单量数据",
+                    }
+
+                daily_orders = [int(r["order_count"] or 0) for r in rows]
+                avg_daily_orders = sum(daily_orders) / len(daily_orders) if daily_orders else 0
+                max_daily_orders = max(daily_orders) if daily_orders else 0
+                avg_check = float(rows[0]["avg_check_fen"] or 0) if rows else 0.0
+
+                # 推算厨房压力等级
+                load_level = "normal"
+                if avg_daily_orders > 300:
+                    load_level = "high"
+                elif avg_daily_orders > 150:
+                    load_level = "medium"
+
+                trend = "stable"
+                if len(daily_orders) >= 3:
+                    recent_3 = sum(daily_orders[:3]) / 3
+                    older_3 = sum(daily_orders[-3:]) / 3
+                    if recent_3 > older_3 * 1.15:
+                        trend = "rising"
+                    elif recent_3 < older_3 * 0.85:
+                        trend = "declining"
+
+                return {
+                    "inference_layer": "mv_fast_path",
+                    "data": {
+                        "avg_daily_orders": round(avg_daily_orders, 1),
+                        "max_daily_orders": max_daily_orders,
+                        "avg_check_fen": avg_check,
+                        "recent_7d_trend": trend,
+                        "kitchen_load_level": load_level,
+                        "daily_orders_history": daily_orders,
+                    },
+                    "agent": self.__class__.__name__,
+                    "risk_signal": "high" if load_level == "high" and trend == "rising" else "normal",
+                }
+        except SQLAlchemyError as exc:
+            logger.warning(
+                "dispatch_predictor_mv_db_error",
+                tenant_id=tenant_id,
+                store_id=store_id,
+                error=str(exc),
+            )
+            return {
+                "inference_layer": "mv_fast_path_error",
+                "data": {},
+                "agent": self.__class__.__name__,
+                "error": "数据库查询失败，请使用实时分析",
+            }
+
+
 dispatch_predictor = DispatchPredictorAgent()

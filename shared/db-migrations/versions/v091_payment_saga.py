@@ -45,11 +45,13 @@ def _enable_rls(table: str) -> None:
     op.execute(f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY")
     for action in ("SELECT", "INSERT", "UPDATE", "DELETE"):
         policy_name = f"{table}_{action.lower()}_tenant"
+        using_clause = f"USING ({_RLS_COND})" if action != "INSERT" else ""
+        check_clause = f"WITH CHECK ({_RLS_COND})" if action in ("INSERT", "UPDATE") else ""
         op.execute(
             f"CREATE POLICY {policy_name} "
             f"ON {table} FOR {action} "
-            f"USING ({_RLS_COND}) "
-            f"WITH CHECK ({_RLS_COND})"
+            f"{using_clause} "
+            f"{check_clause}"
         )
 
 

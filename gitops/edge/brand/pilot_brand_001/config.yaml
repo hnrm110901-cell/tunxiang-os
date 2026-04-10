@@ -1,0 +1,61 @@
+brand_id: pilot_brand_001
+brand_name: 试点品牌
+description: 屯象OS Pilot阶段试点品牌，用于新功能小流量验证
+
+edge_nodes:
+  - node_id: mac_station_001
+    store_id: store_001
+    sync_interval: 300  # 5分钟同步一次
+    features:
+      delta_sync: true           # 启用增量同步，减少带宽消耗
+      coreml_inference: true     # 启用CoreML本地推理（M系芯片加速）
+      offline_mode: false        # 暂不启用完全离线模式（pilot阶段保持联网）
+      auto_update: true          # 允许sync-engine自动应用配置更新
+      metrics_report: true       # 上报Edge节点指标到云端监控
+
+    services:
+      mac_station:
+        version: "1.2.0"
+        port: 8050
+        config:
+          max_concurrent_orders: 50
+          order_push_timeout_seconds: 10
+          local_cache_ttl_seconds: 3600
+
+      coreml_bridge:
+        version: "1.0.0"
+        port: 8100
+        config:
+          model_cache_dir: /var/tunxiang/models
+          max_model_memory_mb: 2048
+          inference_timeout_seconds: 30
+
+      sync_engine:
+        version: "1.1.0"
+        sync_interval_seconds: 300
+        config:
+          git_repo: https://github.com/tunxiang/tunxiang-os
+          git_branch: main
+          config_path: gitops/edge
+          auth_method: deploy_key  # 使用部署密钥（只读权限）
+
+    pg_replica:
+      max_lag_seconds: 30       # 允许最大复制延迟30秒
+      auto_retry: true          # 复制中断后自动重试
+      retry_interval_seconds: 60
+      max_retry_count: 5
+      fallback_to_local: true   # 超过延迟阈值时自动切换本地读
+
+# 品牌级功能开关（适用于该品牌所有门店）
+feature_flags:
+  agent_recommendation: true    # 开启AI推荐功能
+  smart_scheduling: true        # 开启智能排班
+  journey_v2: true              # pilot品牌启用Journey V2
+  growth_hub: false             # 暂不开启增长中台
+
+# 通知配置
+notification:
+  wecom_webhook_env: PILOT_BRAND_001_WECOM_WEBHOOK  # webhook URL存储在环境变量
+  notify_on_config_change: true
+  notify_on_sync_failure: true
+  notify_on_lag_breach: true    # PG复制延迟超阈值时通知

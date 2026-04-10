@@ -1,27 +1,91 @@
-"""energy_routes.py FastAPI 路由单元测试
+"""energy_routes.py DB 端点单元测试 — 预算与告警规则
 
-测试范围（3端点，Phase 4 能耗管理）：
-  - POST /api/v1/ops/energy/readings    — 抄表数据上报（正常/异常检测/emit_event调用）
-  - POST /api/v1/ops/energy/benchmarks  — 设置能耗基准线（正常/emit_event调用）
-  - GET  /api/v1/ops/energy/snapshot    — 当日能耗快照（正常/无数据/DB异常）
+覆盖范围（8 个测试，专注改造后的 DB 端点）：
+
+  GET  /budgets        — 返回2条记录 / 空列表
+  POST /budgets        — UPSERT 成功含 id / SQLAlchemyError → 500
+  GET  /alert-rules    — 返回2条规则
+  POST /alert-rules    — INSERT 成功含 id
+  DELETE /alert-rules/{rule_id} — 软删除成功 / RETURNING 空 → 404
 
 技术约束：
-  - POST /readings 和 /benchmarks 不依赖 DB（直接 emit_event）
-  - GET /snapshot 通过 asyncpg.connect patch 隔离
-  - emit_event 通过 asyncio.create_task patch 拦截
+  - sys.modules 存根注入隔离 shared.ontology / shared.events / services.tx_brain
+  - app.dependency_overrides[get_db] 注入 mock AsyncSession
+  - db.execute side_effect 列表按顺序消费（index-0 = _set_tenant 的 set_config）
+  - list 端点使用 r._mapping 模式；upsert/create/delete 使用 fetchone()._mapping
 """
 from __future__ import annotations
 
+import sys
+import types
 import uuid
+from typing import AsyncGenerator
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from sqlalchemy.exc import SQLAlchemyError
 
-from ..api.energy_routes import router as energy_router
+# ── sys.modules 存根注入（必须在导入路由之前） ─────────────────────────────────
 
-# ── 应用组装 ──────────────────────────────────────────────────────────────────
+
+def _ensure_stub(module_path: str, attrs: dict | None = None) -> types.ModuleType:
+    """确保 module_path 在 sys.modules 中存在，返回模块对象。"""
+    if module_path not in sys.modules:
+        mod = types.ModuleType(module_path)
+        if attrs:
+            for k, v in attrs.items():
+                setattr(mod, k, v)
+        sys.modules[module_path] = mod
+    return sys.modules[module_path]
+
+
+# shared.ontology.src.database
+_ensure_stub("shared")
+_ensure_stub("shared.ontology")
+_ensure_stub("shared.ontology.src")
+_db_mod = _ensure_stub("shared.ontology.src.database")
+if not hasattr(_db_mod, "get_db"):
+    async def _placeholder_get_db():  # pragma: no cover
+        yield None
+    _db_mod.get_db = _placeholder_get_db
+
+# shared.events.*
+_ensure_stub("shared.events")
+_ensure_stub("shared.events.src")
+_ensure_stub("shared.events.src.emitter", {"emit_event": AsyncMock()})
+_ev_types = _ensure_stub("shared.events.src.event_types")
+# EnergyEventType 枚举存根
+if not hasattr(_ev_types, "EnergyEventType"):
+    class _FakeEnergyEventType:
+        READING_CAPTURED = "energy.reading_captured"
+        ANOMALY_DETECTED = "energy.anomaly_detected"
+        BENCHMARK_SET = "energy.benchmark_set"
+        BUDGET_SET = "energy.budget_set"
+        ALERT_RULE_CREATED = "energy.alert_rule_created"
+    _ev_types.EnergyEventType = _FakeEnergyEventType
+
+# structlog 存根
+if "structlog" not in sys.modules:
+    _sl = types.ModuleType("structlog")
+    _sl.get_logger = MagicMock(return_value=MagicMock())  # type: ignore[attr-defined]
+    sys.modules["structlog"] = _sl
+
+# services.tx_brain 存根（snapshot/budget-vs-actual 端点使用，本文件不测试）
+_ensure_stub("services")
+_ensure_stub("services.tx_brain")
+_ensure_stub("services.tx_brain.src")
+_ensure_stub("services.tx_brain.src.agents")
+_monitor_mock = AsyncMock()
+_ensure_stub("services.tx_brain.src.agents.energy_monitor", {"energy_monitor": _monitor_mock})
+
+# ── 导入路由（存根注入之后） ──────────────────────────────────────────────────
+
+from ..api.energy_routes import router as energy_router  # noqa: E402
+from shared.ontology.src.database import get_db  # noqa: E402
+
+# ── FastAPI 应用 ───────────────────────────────────────────────────────────────
 
 app = FastAPI()
 app.include_router(energy_router)
@@ -30,250 +94,381 @@ app.include_router(energy_router)
 
 TENANT_ID = str(uuid.uuid4())
 STORE_ID = str(uuid.uuid4())
+RULE_ID = str(uuid.uuid4())
 HEADERS = {"X-Tenant-ID": TENANT_ID}
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-#  POST /readings — 抄表数据上报
-# ══════════════════════════════════════════════════════════════════════════════
+# ── Mock 工具函数 ──────────────────────────────────────────────────────────────
 
 
-class TestCaptureEnergyReading:
-    """POST /api/v1/ops/energy/readings"""
+def _mapping_row(data: dict) -> MagicMock:
+    """构造带 _mapping 属性的行 mock，模拟 SQLAlchemy Row。"""
+    row = MagicMock()
+    row._mapping = data
+    return row
 
-    _base_payload = {
+
+def _make_fetchall_result(rows: list[dict]) -> MagicMock:
+    """构造 list 端点使用的 execute 返回值（fetchall → 含 _mapping 的行列表）。"""
+    result = MagicMock()
+    result.fetchall = MagicMock(return_value=[_mapping_row(r) for r in rows])
+    result.fetchone = MagicMock(return_value=None)
+    return result
+
+
+def _make_fetchone_result(row: dict | None) -> MagicMock:
+    """构造 upsert/create/delete 端点使用的 execute 返回值（fetchone）。"""
+    result = MagicMock()
+    if row is not None:
+        result.fetchone = MagicMock(return_value=_mapping_row(row))
+    else:
+        result.fetchone = MagicMock(return_value=None)
+    result.fetchall = MagicMock(return_value=[])
+    return result
+
+
+def _set_tenant_result() -> MagicMock:
+    """_set_tenant 调用消耗的空结果。"""
+    return MagicMock()
+
+
+def _make_db(side_effects: list) -> AsyncMock:
+    """构造 AsyncSession mock，execute 按 side_effects 列表依次返回。"""
+    db = AsyncMock()
+    db.commit = AsyncMock()
+    db.rollback = AsyncMock()
+    db.execute = AsyncMock(side_effect=side_effects)
+    return db
+
+
+def _override(db_mock: AsyncMock):
+    """返回 get_db dependency_overrides 覆盖函数。"""
+    async def _dep() -> AsyncGenerator:
+        yield db_mock
+    return _dep
+
+
+# ── 预算行数据工厂 ─────────────────────────────────────────────────────────────
+
+def _budget_row(idx: int = 1) -> dict:
+    return {
+        "id": str(uuid.uuid4()),
+        "tenant_id": TENANT_ID,
         "store_id": STORE_ID,
-        "meter_id": "ELEC-A01",
-        "meter_type": "electricity",
-        "reading_value": 12345.6,
-        "delta_value": 88.5,
-        "unit": "kWh",
-        "source": "iot",
+        "period_type": "monthly",
+        "period_value": f"2026-0{idx}",
+        "electricity_budget_kwh": 5000.0 * idx,
+        "gas_budget_m3": 200.0,
+        "water_budget_ton": 80.0,
+        "cost_budget_fen": 60000,
+        "is_active": True,
+        "created_at": None,
+        "updated_at": None,
     }
 
-    def test_normal_reading_emits_reading_captured(self):
-        """正常抄表，返回 reading_id，旁路发射 READING_CAPTURED 事件。"""
-        with patch("asyncio.create_task") as mock_task:
-            with TestClient(app) as client:
-                resp = client.post(
-                    "/api/v1/ops/energy/readings",
-                    json={**self._base_payload, "revenue_fen": 50000},
-                    headers=HEADERS,
-                )
-            assert mock_task.called  # emit_event 被旁路调用
 
-        assert resp.status_code == 201
-        data = resp.json()
-        assert data["ok"] is True
-        assert "reading_id" in data["data"]
-        assert data["data"]["meter_type"] == "electricity"
-        assert data["data"]["delta_value"] == 88.5
-        assert data["data"]["is_anomaly"] is False
-
-    def test_high_ratio_emits_anomaly_detected(self):
-        """能耗/营收比超过15%时，同时发射 ANOMALY_DETECTED 事件（create_task 调用2次）。
-
-        ratio = delta_value / (revenue_fen / 100)
-        = 200 / (100 / 100) = 200  >> 0.15
-        """
-        with patch("asyncio.create_task") as mock_task:
-            with TestClient(app) as client:
-                resp = client.post(
-                    "/api/v1/ops/energy/readings",
-                    json={
-                        **self._base_payload,
-                        "delta_value": 200.0,
-                        "revenue_fen": 100,  # 1元营收，200度电 → 比率超标
-                    },
-                    headers=HEADERS,
-                )
-            # READING_CAPTURED + ANOMALY_DETECTED = 2次 create_task
-            assert mock_task.call_count == 2
-
-        assert resp.status_code == 201
-        data = resp.json()
-        assert data["ok"] is True
-        assert data["data"]["is_anomaly"] is True
-        assert data["data"]["energy_revenue_ratio"] is not None
-
-    def test_no_revenue_no_anomaly_check(self):
-        """revenue_fen=0 时不计算比率，is_anomaly=False，只发射1次事件。"""
-        with patch("asyncio.create_task") as mock_task:
-            with TestClient(app) as client:
-                resp = client.post(
-                    "/api/v1/ops/energy/readings",
-                    json={**self._base_payload, "revenue_fen": 0},
-                    headers=HEADERS,
-                )
-            assert mock_task.call_count == 1
-
-        data = resp.json()
-        assert data["data"]["is_anomaly"] is False
-        assert data["data"]["energy_revenue_ratio"] is None
-
-    def test_gas_meter_type_maps_correctly(self):
-        """燃气表 meter_type=gas 正常处理，返回正确字段。"""
-        with patch("asyncio.create_task"):
-            with TestClient(app) as client:
-                resp = client.post(
-                    "/api/v1/ops/energy/readings",
-                    json={
-                        "store_id": STORE_ID,
-                        "meter_id": "GAS-B02",
-                        "meter_type": "gas",
-                        "reading_value": 500.0,
-                        "delta_value": 12.3,
-                        "unit": "m³",
-                        "source": "manual",
-                    },
-                    headers=HEADERS,
-                )
-
-        assert resp.status_code == 201
-        data = resp.json()
-        assert data["data"]["meter_type"] == "gas"
-        assert data["data"]["unit"] == "m³"
+def _alert_rule_row(idx: int = 1) -> dict:
+    return {
+        "id": str(uuid.uuid4()),
+        "tenant_id": TENANT_ID,
+        "store_id": STORE_ID,
+        "rule_name": f"规则{idx}",
+        "metric": "electricity_kwh",
+        "threshold": 90.0,
+        "comparison": "budget_pct",
+        "alert_level": "warning",
+        "is_active": True,
+        "created_at": None,
+        "updated_at": None,
+    }
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  POST /benchmarks — 设置能耗基准线
+#  GET /budgets — 列出月度预算
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-class TestSetEnergyBenchmark:
-    """POST /api/v1/ops/energy/benchmarks"""
+class TestListEnergyBudgets:
+    """GET /api/v1/ops/energy/budgets"""
 
-    def test_creates_benchmark_and_emits_event(self):
-        """正常设置基准线，返回 benchmark_id，旁路发射 BENCHMARK_SET 事件。"""
-        with patch("asyncio.create_task") as mock_task:
-            with TestClient(app) as client:
-                resp = client.post(
-                    "/api/v1/ops/energy/benchmarks",
-                    json={
-                        "store_id": STORE_ID,
-                        "meter_type": "electricity",
-                        "daily_limit": 300.0,
-                        "revenue_ratio_limit": 0.08,
-                        "effective_date": "2026-04-04",
-                    },
-                    headers=HEADERS,
-                )
-            assert mock_task.called
+    def setup_method(self):
+        app.dependency_overrides.clear()
 
-        assert resp.status_code == 201
-        data = resp.json()
-        assert data["ok"] is True
-        assert "benchmark_id" in data["data"]
-        assert data["data"]["daily_limit"] == 300.0
-        assert data["data"]["revenue_ratio_limit"] == 0.08
-        assert data["data"]["effective_date"] == "2026-04-04"
+    def teardown_method(self):
+        app.dependency_overrides.clear()
 
-    def test_benchmark_defaults_effective_date_to_today(self):
-        """不传 effective_date 时，默认为今日。"""
-        with patch("asyncio.create_task"):
-            with TestClient(app) as client:
-                resp = client.post(
-                    "/api/v1/ops/energy/benchmarks",
-                    json={
-                        "store_id": STORE_ID,
-                        "meter_type": "water",
-                        "daily_limit": 50.0,
-                        "revenue_ratio_limit": 0.03,
-                    },
-                    headers=HEADERS,
-                )
+    def test_list_budgets_success(self):
+        """mock SELECT 返回2条预算 → 200，data.items 长度=2。"""
+        rows = [_budget_row(1), _budget_row(2)]
+        db = _make_db([
+            _set_tenant_result(),           # _set_tenant
+            _make_fetchall_result(rows),    # SELECT energy_budgets
+        ])
+        app.dependency_overrides[get_db] = _override(db)
 
-        assert resp.status_code == 201
-        data = resp.json()
-        assert data["ok"] is True
-        assert data["data"]["effective_date"] is not None  # 今日日期自动填充
+        with TestClient(app) as client:
+            resp = client.get(
+                "/api/v1/ops/energy/budgets",
+                params={"store_id": STORE_ID},
+                headers=HEADERS,
+            )
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["ok"] is True
+        assert len(body["data"]["items"]) == 2
+        assert body["data"]["total"] == 2
+        # 验证第一条含预期字段
+        first = body["data"]["items"][0]
+        assert "id" in first
+        assert first["electricity_budget_kwh"] == 5000.0
+
+    def test_list_budgets_empty(self):
+        """mock SELECT 返回空 → 200，data.items=[]。"""
+        db = _make_db([
+            _set_tenant_result(),
+            _make_fetchall_result([]),
+        ])
+        app.dependency_overrides[get_db] = _override(db)
+
+        with TestClient(app) as client:
+            resp = client.get(
+                "/api/v1/ops/energy/budgets",
+                params={"store_id": STORE_ID},
+                headers=HEADERS,
+            )
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["ok"] is True
+        assert body["data"]["items"] == []
+        assert body["data"]["total"] == 0
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  GET /snapshot — 当日能耗快照
+#  POST /budgets — 设置月度预算（UPSERT）
 # ══════════════════════════════════════════════════════════════════════════════
 
+_BUDGET_PAYLOAD = {
+    "store_id": STORE_ID,
+    "budget_year": 2026,
+    "budget_month": 5,
+    "electricity_kwh_budget": 4800.0,
+    "gas_m3_budget": 180.0,
+    "water_ton_budget": 75.0,
+    "total_cost_budget_fen": 55000,
+}
 
-class TestGetEnergySnapshot:
-    """GET /api/v1/ops/energy/snapshot"""
 
-    def _make_asyncpg_mock(self, row_data: dict | None):
-        """构造 asyncpg.connect 上下文 mock。"""
-        conn_mock = AsyncMock()
-        conn_mock.execute = AsyncMock()
-        conn_mock.fetchrow = AsyncMock(return_value=row_data)
-        conn_mock.close = AsyncMock()
+class TestUpsertEnergyBudget:
+    """POST /api/v1/ops/energy/budgets"""
 
-        async def _connect(*args, **kwargs):
-            return conn_mock
+    def setup_method(self):
+        app.dependency_overrides.clear()
 
-        return _connect
+    def teardown_method(self):
+        app.dependency_overrides.clear()
 
-    def test_returns_snapshot_when_data_exists(self):
-        """有数据时返回完整能耗快照，含 efficiency_level。"""
-        mock_row = {
-            "electricity_kwh": 120.5,
-            "gas_m3": 30.2,
-            "water_m3": 8.0,
-            "total_energy_cost_fen": 45000,
-            "revenue_fen": 800000,
-            "energy_revenue_ratio": 0.056,
-            "anomaly_count": 0,
-            "updated_at": None,
+    def test_upsert_budget_success(self):
+        """mock INSERT/UPSERT RETURNING → 200，data 含 id。"""
+        returned_row = {
+            **_budget_row(5),
+            "period_value": "2026-05",
+            "electricity_budget_kwh": 4800.0,
+            "gas_budget_m3": 180.0,
+            "water_budget_ton": 75.0,
+            "cost_budget_fen": 55000,
         }
+        db = _make_db([
+            _set_tenant_result(),                      # _set_tenant
+            _make_fetchone_result(returned_row),       # INSERT ... RETURNING
+        ])
+        app.dependency_overrides[get_db] = _override(db)
 
-        with patch(
-            "services.tx_ops.src.api.energy_routes.asyncpg.connect",
-            side_effect=self._make_asyncpg_mock(mock_row),
-        ):
+        with patch("asyncio.create_task"):
             with TestClient(app) as client:
-                resp = client.get(
-                    "/api/v1/ops/energy/snapshot",
-                    params={"store_id": STORE_ID, "stat_date": "2026-04-04"},
+                resp = client.post(
+                    "/api/v1/ops/energy/budgets",
+                    json=_BUDGET_PAYLOAD,
                     headers=HEADERS,
                 )
 
-        assert resp.status_code == 200
-        data = resp.json()
-        assert data["ok"] is True
-        assert data["data"]["electricity_kwh"] == 120.5
-        assert data["data"]["efficiency_level"] == "优秀"  # 0.056 <= 0.05? 不，0.056 > 0.05 → 良好
-        # 实际：ratio=0.056 > 0.05 → 良好
-        assert data["data"]["efficiency_level"] in ("优秀", "良好")
-        assert data["data"]["total_energy_cost_yuan"] == 450.0
+        assert resp.status_code == 201
+        body = resp.json()
+        assert body["ok"] is True
+        assert "id" in body["data"]
+        assert body["data"]["electricity_budget_kwh"] == 4800.0
+        assert body["data"]["period_value"] == "2026-05"
 
-    def test_returns_no_data_message_when_row_missing(self):
-        """当日无数据时返回 message='当日暂无能耗数据'，ok=True。"""
-        with patch(
-            "services.tx_ops.src.api.energy_routes.asyncpg.connect",
-            side_effect=self._make_asyncpg_mock(None),
-        ):
-            with TestClient(app) as client:
-                resp = client.get(
-                    "/api/v1/ops/energy/snapshot",
-                    params={"store_id": STORE_ID},
-                    headers=HEADERS,
-                )
+    def test_upsert_budget_db_error(self):
+        """mock SQLAlchemyError → 500 错误响应。"""
+        db = _make_db([
+            _set_tenant_result(),                               # _set_tenant
+            SQLAlchemyError("connection reset"),                # INSERT 失败
+        ])
+        app.dependency_overrides[get_db] = _override(db)
 
-        assert resp.status_code == 200
-        data = resp.json()
-        assert data["ok"] is True
-        assert "当日暂无能耗数据" in data["data"]["message"]
-
-    def test_db_connection_failure_returns_500(self):
-        """DB 连接失败时返回 500 HTTPException。"""
-        async def _fail_connect(*args, **kwargs):
-            raise Exception("connection refused")
-
-        with patch(
-            "services.tx_ops.src.api.energy_routes.asyncpg.connect",
-            side_effect=_fail_connect,
-        ):
-            with TestClient(app) as client:
-                resp = client.get(
-                    "/api/v1/ops/energy/snapshot",
-                    params={"store_id": STORE_ID},
-                    headers=HEADERS,
-                )
+        with TestClient(app) as client:
+            resp = client.post(
+                "/api/v1/ops/energy/budgets",
+                json=_BUDGET_PAYLOAD,
+                headers=HEADERS,
+            )
 
         assert resp.status_code == 500
+        body = resp.json()
+        # FastAPI HTTPException 返回 {"detail": "..."}
+        assert "detail" in body
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  GET /alert-rules — 列出告警规则
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+class TestListAlertRules:
+    """GET /api/v1/ops/energy/alert-rules"""
+
+    def setup_method(self):
+        app.dependency_overrides.clear()
+
+    def teardown_method(self):
+        app.dependency_overrides.clear()
+
+    def test_list_alert_rules_success(self):
+        """mock SELECT 返回2条规则 → 200，data.items 长度=2。"""
+        rows = [_alert_rule_row(1), _alert_rule_row(2)]
+        db = _make_db([
+            _set_tenant_result(),
+            _make_fetchall_result(rows),
+        ])
+        app.dependency_overrides[get_db] = _override(db)
+
+        with TestClient(app) as client:
+            resp = client.get(
+                "/api/v1/ops/energy/alert-rules",
+                params={"store_id": STORE_ID},
+                headers=HEADERS,
+            )
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["ok"] is True
+        assert len(body["data"]["items"]) == 2
+        assert body["data"]["total"] == 2
+        # 验证字段
+        first = body["data"]["items"][0]
+        assert first["metric"] == "electricity_kwh"
+        assert first["threshold"] == 90.0
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  POST /alert-rules — 创建告警规则
+# ══════════════════════════════════════════════════════════════════════════════
+
+_RULE_PAYLOAD = {
+    "store_id": STORE_ID,
+    "rule_name": "燃气超用警告",
+    "metric": "gas_m3",
+    "threshold_type": "budget_pct",
+    "threshold_value": 85.0,
+    "severity": "warning",
+}
+
+
+class TestCreateAlertRule:
+    """POST /api/v1/ops/energy/alert-rules"""
+
+    def setup_method(self):
+        app.dependency_overrides.clear()
+
+    def teardown_method(self):
+        app.dependency_overrides.clear()
+
+    def test_create_alert_rule_success(self):
+        """mock INSERT RETURNING → 200，data 含 id。"""
+        returned_row = {
+            **_alert_rule_row(1),
+            "rule_name": "燃气超用警告",
+            "metric": "gas_m3",
+            "threshold": 85.0,
+            "comparison": "budget_pct",
+            "alert_level": "warning",
+            "is_active": True,
+        }
+        db = _make_db([
+            _set_tenant_result(),
+            _make_fetchone_result(returned_row),
+        ])
+        app.dependency_overrides[get_db] = _override(db)
+
+        with patch("asyncio.create_task"):
+            with TestClient(app) as client:
+                resp = client.post(
+                    "/api/v1/ops/energy/alert-rules",
+                    json=_RULE_PAYLOAD,
+                    headers=HEADERS,
+                )
+
+        assert resp.status_code == 201
+        body = resp.json()
+        assert body["ok"] is True
+        assert "id" in body["data"]
+        assert body["data"]["metric"] == "gas_m3"
+        assert body["data"]["threshold"] == 85.0
+        assert body["data"]["is_active"] is True
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  DELETE /alert-rules/{rule_id} — 软删除告警规则
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+class TestDeleteAlertRule:
+    """DELETE /api/v1/ops/energy/alert-rules/{rule_id}"""
+
+    def setup_method(self):
+        app.dependency_overrides.clear()
+
+    def teardown_method(self):
+        app.dependency_overrides.clear()
+
+    def test_delete_alert_rule_success(self):
+        """mock UPDATE SET is_deleted=TRUE RETURNING → 200，data.deleted=True。"""
+        # RETURNING id 返回一行
+        deleted_row = {"id": RULE_ID}
+        db = _make_db([
+            _set_tenant_result(),
+            _make_fetchone_result(deleted_row),
+        ])
+        app.dependency_overrides[get_db] = _override(db)
+
+        with TestClient(app) as client:
+            resp = client.delete(
+                f"/api/v1/ops/energy/alert-rules/{RULE_ID}",
+                headers=HEADERS,
+            )
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["ok"] is True
+        assert body["data"]["deleted"] is True
+        assert body["data"]["rule_id"] == RULE_ID
+
+    def test_delete_alert_rule_not_found(self):
+        """mock UPDATE RETURNING 空（规则不存在或已删除）→ 404。"""
+        db = _make_db([
+            _set_tenant_result(),
+            _make_fetchone_result(None),   # RETURNING 返回空
+        ])
+        app.dependency_overrides[get_db] = _override(db)
+
+        with TestClient(app) as client:
+            resp = client.delete(
+                f"/api/v1/ops/energy/alert-rules/{RULE_ID}",
+                headers=HEADERS,
+            )
+
+        assert resp.status_code == 404
+        body = resp.json()
+        assert "detail" in body

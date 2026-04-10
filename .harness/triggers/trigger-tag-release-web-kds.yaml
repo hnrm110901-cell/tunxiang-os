@@ -1,0 +1,38 @@
+trigger:
+  name: trigger-tag-release-web-kds
+  identifier: trigger_tag_release_web_kds
+  projectIdentifier: TunXiangOS
+  orgIdentifier: default
+  description: "web-kds KDS出餐屏前端 Tag 发版触发器。匹配 v*.*.* 格式的 tag 推送时触发 release_web_kds_prod 流水线（生产发版）。"
+  tags:
+    service: web-kds
+    event: tag-release
+  enabled: true
+  pipelineIdentifier: release_web_kds_prod
+  source:
+    type: Webhook
+    spec:
+      type: Github
+      spec:
+        type: Push
+        spec:
+          connectorRef: github_connector
+          repoName: tunxiang-os
+          autoAbortPreviousExecutions: false
+          payloadConditions:
+            - key: <+trigger.payload.ref>
+              operator: Regex
+              value: "^refs/tags/v\\d+\\.\\d+\\.\\d+$"
+          headerConditions: []
+          jexlCondition: ""
+          actions: []
+  inputYaml: |
+    pipeline:
+      identifier: release_web_kds_prod
+      properties:
+        ci:
+          codebase:
+            build:
+              type: tag
+              spec:
+                tag: <+trigger.tag>

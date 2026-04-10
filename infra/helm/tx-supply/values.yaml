@@ -1,0 +1,83 @@
+# tx-supply — 供应链微服务
+# 高可用配置：replicaCount=2，收货验收+门店调拨+加权均价成本核算
+
+replicaCount: 2
+
+image:
+  repository: tunxiang/tx-supply
+  pullPolicy: IfNotPresent
+  tag: latest
+
+service:
+  type: ClusterIP
+  port: 8006
+  targetPort: 8006
+
+ingress:
+  enabled: false
+  className: nginx
+  host: ""
+  tls: false
+  tlsSecretName: ""
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 200m
+    memory: 256Mi
+
+env:
+  TUNXIANG_ENV: prod
+  LOG_LEVEL: info
+  # 收货验收：入库时自动触发品质/重量/效期三重检验
+  RECEIVING_INSPECTION_ENABLED: "true"
+  # 调拨损耗检测：门店间调拨自动计算损耗率并预警
+  TRANSFER_LOSS_DETECTION: "true"
+  # 加权均价成本：多批次成本按加权均价法核算，符合会计准则
+  WEIGHTED_AVG_COST: "true"
+
+# Secret中存放的敏感环境变量（由外部Secret Manager注入）
+secretRef:
+  name: tx-supply-secret
+  # 包含: DB_URL, REDIS_URL, JWT_SECRET, SUPABASE_SERVICE_KEY
+
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 6
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 8006
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  failureThreshold: 3
+  timeoutSeconds: 5
+
+readinessProbe:
+  httpGet:
+    path: /health
+    port: 8006
+  initialDelaySeconds: 5
+  periodSeconds: 5
+  failureThreshold: 3
+  timeoutSeconds: 3
+
+# Pod反亲和：供应链服务Pod分散到不同节点，防止库存数据单点写入风险
+podAntiAffinity:
+  enabled: true
+
+serviceAccount:
+  create: false
+  name: ""
+
+podAnnotations: {}
+
+nodeSelector: {}
+
+tolerations: []

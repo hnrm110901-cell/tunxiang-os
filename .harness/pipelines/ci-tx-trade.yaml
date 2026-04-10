@@ -1,0 +1,50 @@
+pipeline:
+  name: ci-tx-trade
+  identifier: ci_tx_trade
+  projectIdentifier: TunXiangOS
+  orgIdentifier: default
+  description: "tx-trade 服务 CI 流水线（端口8001）。PR 或 main 分支推送时自动触发，执行 Lint/安全扫描/测试/镜像构建。"
+  tags:
+    service: tx-trade
+    type: ci
+  properties:
+    ci:
+      codebase:
+        connectorRef: github_connector
+        repoName: tunxiang-os
+        build: <+input>
+  stages:
+    - stage:
+        name: CI
+        identifier: CI
+        type: CI
+        variables:
+          - name: servicePath
+            type: String
+            value: services/tx-trade
+          - name: imageRepo
+            type: String
+            value: tunxiang/tx-trade
+          - name: dockerfile
+            type: String
+            value: services/tx-trade/Dockerfile
+        spec:
+          cloneCodebase: true
+          infrastructure:
+            type: KubernetesDirect
+            spec:
+              connectorRef: k8s_connector
+              namespace: harness-ci
+              automountServiceAccountToken: true
+              nodeSelector: {}
+              os: Linux
+          execution:
+            steps:
+              - step:
+                  name: CI_Steps
+                  identifier: CI_Steps
+                  template:
+                    templateRef: tpl_ci_python_service
+                    versionLabel: v1
+                    templateInputs:
+                      type: StepGroup

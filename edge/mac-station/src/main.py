@@ -21,6 +21,7 @@ from federated_client import router as federated_router
 from forge_node import ForgeNode
 from heartbeat_routes import router as heartbeat_router
 from offline_routes import router as offline_router
+from offline_cashier import router as offline_cashier_router
 from ota_routes import router as ota_router
 from vision_service import router as vision_router
 from voice_service import router as voice_router
@@ -91,6 +92,9 @@ app.include_router(ota_router)
 
 # ─── 离线查询路由（本地 PG）───
 app.include_router(offline_router)
+
+# ─── 离线收银路由（Y-K1 断网优先写入）───
+app.include_router(offline_cashier_router)
 
 # ─── ForgeNode 离线感知决策路由 ───
 app.include_router(forge_router)

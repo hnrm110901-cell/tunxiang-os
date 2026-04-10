@@ -1,0 +1,33 @@
+template:
+  name: tpl-approval-uat
+  identifier: tpl_approval_uat
+  versionLabel: "1.0.0"
+  type: Stage
+  projectIdentifier: TunXiangOS
+  orgIdentifier: default
+  description: "UAT 环境发布审批模板，需要 QA 或产品经理至少1人确认"
+  tags:
+    team: platform
+    phase: approval
+
+  spec:
+    type: Approval
+    spec:
+      execution:
+        steps:
+          - step:
+              name: UAT_Approval
+              identifier: UAT_Approval
+              type: HarnessApproval
+              timeout: 1d
+              spec:
+                approvalMessage: "请确认是否允许进入 UAT 验收环境，发布版本：<+pipeline.sequenceId>"
+                includePipelineExecutionHistory: true
+                approvers:
+                  userGroups:
+                    - qa_group
+                    - product_group
+                  minimumCount: 1
+                  disallowPipelineExecutor: false
+                approverInputs: []
+              failureStrategies: []

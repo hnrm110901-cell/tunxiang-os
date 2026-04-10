@@ -5,8 +5,18 @@ Golden ID 全渠道画像、RFM 分层、营销活动、用户旅程、私域运
 import asyncio
 from contextlib import asynccontextmanager
 
+# Feature Flag SDK（try/except 保护，SDK不可用时自动降级为全量开启）
+try:
+    from shared.feature_flags import is_enabled, FlagContext
+    from shared.feature_flags.flag_names import MemberFlags
+    _FLAG_SDK_AVAILABLE = True
+except ImportError:
+    _FLAG_SDK_AVAILABLE = False
+    def is_enabled(flag, context=None): return True  # noqa: E731
+
 import structlog
 from api.analytics_routes import router as analytics_router
+from api.gdpr_routes import router as gdpr_router
 from api.card_routes import router as card_router
 from api.coupon_engine_routes import router as coupon_engine_router
 from api.customer_depth_routes import router as customer_depth_router
@@ -26,6 +36,8 @@ from workers.rfm_updater import RFMUpdater, RFMEventListener
 from api.points_mall_routes import router as points_mall_router
 from api.points_routes import router as points_router
 from api.premium_card_routes import router as premium_card_router
+from api.premium_membership_card_routes import router as premium_membership_router  # Y-D7 付费会员卡产品化
+from api.golden_id_routes import router as golden_id_router  # Y-D9 全渠道 Golden ID 映射
 from api.rfm_routes import router as rfm_router
 from api.smart_dispatch_routes import router as smart_dispatch_router
 from api.stamp_card_routes import router as stamp_card_router
@@ -92,6 +104,29 @@ async def lifespan(app: FastAPI):
     from shared.ontology.src.database import get_db as _shared_get_db
     _stamp_mod.get_db = _shared_get_db
 
+    # ── Feature Flag 启动检查 ──────────────────────────────────────
+    # MemberFlags.INSIGHT_360: 客户360页面功能
+    if is_enabled(MemberFlags.INSIGHT_360):
+        logger.info("feature_flag_enabled", flag=MemberFlags.INSIGHT_360)
+    else:
+        logger.info("feature_flag_disabled", flag=MemberFlags.INSIGHT_360,
+                    note="客户360画像路由已注册但Flag关闭，接口将返回功能未开启提示")
+
+    # MemberFlags.CLV_ENGINE: CLV生命周期价值引擎
+    if is_enabled(MemberFlags.CLV_ENGINE):
+        logger.info("feature_flag_enabled", flag=MemberFlags.CLV_ENGINE)
+    else:
+        logger.info("feature_flag_disabled", flag=MemberFlags.CLV_ENGINE,
+                    note="CLV引擎已跳过初始化，相关API将返回功能未开启")
+
+    # MemberFlags.GDPR_ANONYMIZE: GDPR匿名化（等保三级合规）
+    if is_enabled(MemberFlags.GDPR_ANONYMIZE):
+        logger.info("feature_flag_enabled", flag=MemberFlags.GDPR_ANONYMIZE,
+                    note="GDPR匿名化合规功能已激活")
+    else:
+        logger.warning("feature_flag_disabled", flag=MemberFlags.GDPR_ANONYMIZE,
+                       note="GDPR匿名化未启用，等保三级合规可能不满足")
+
     # 注册 RFM 每日凌晨2点定时任务（Asia/Shanghai）
     _scheduler.add_job(
         lambda: asyncio.create_task(_run_rfm_update()),
@@ -128,6 +163,9 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+from prometheus_fastapi_instrumentator import Instrumentator
+Instrumentator().instrument(app).expose(app)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -148,6 +186,7 @@ app.include_router(stored_value_router)
 app.include_router(stored_value_v2_router)
 app.include_router(stored_value_card_router)
 app.include_router(premium_card_router)
+app.include_router(premium_membership_router)  # Y-D7 付费会员卡产品化
 app.include_router(points_mall_router)
 app.include_router(rfm_router)
 app.include_router(group_router)
@@ -159,6 +198,8 @@ app.include_router(social_router)
 app.include_router(stamp_card_router)
 app.include_router(member_level_router)
 app.include_router(member_insight_router)
+app.include_router(gdpr_router)  # Y-L6 GDPR 删除/导出请求工作流
+app.include_router(golden_id_router)  # Y-D9 全渠道 Golden ID 映射
 
 
 @app.get("/health")

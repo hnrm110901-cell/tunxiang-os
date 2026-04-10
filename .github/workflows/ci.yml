@@ -13,7 +13,7 @@ jobs:
       matrix:
         service: [gateway, tx-trade, tx-agent, tx-menu, tx-member, tx-supply, tx-finance, tx-org, tx-analytics]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
@@ -33,8 +33,8 @@ jobs:
   frontend-build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v2
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v5
         with:
           version: 8
       - uses: actions/setup-node@v4
@@ -47,7 +47,7 @@ jobs:
   edge-mac-station:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'

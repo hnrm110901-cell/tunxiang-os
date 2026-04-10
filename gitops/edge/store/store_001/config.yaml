@@ -1,0 +1,70 @@
+# 门店级配置 - 继承品牌配置并覆盖门店特定字段
+# 继承自: brand/pilot_brand_001/config.yaml
+store_id: store_001
+store_name: 试点品牌一号店
+brand_id: pilot_brand_001
+address: 广东省深圳市南山区某商业综合体B1-103
+timezone: Asia/Shanghai
+locale: zh-CN
+
+# 覆盖品牌默认配置的同步策略（门店网络较稳定，可以缩短同步间隔）
+sync_interval: 180  # 3分钟同步（覆盖品牌级的300秒）
+
+# 硬件配置（门店特定）
+hardware:
+  printer_count: 2
+  printers:
+    - id: printer_main
+      type: receipt
+      model: EPSON TM-T82III
+      ip: 192.168.1.201
+      is_primary: true
+    - id: printer_kitchen
+      type: kitchen
+      model: EPSON TM-U220D
+      ip: 192.168.1.202
+  kds_count: 1
+  kds:
+    - id: kds_main
+      type: kitchen_display
+      model: FEC AerPOS
+      ip: 192.168.1.210
+      station: main_kitchen
+  pos_terminal_count: 2
+
+# POS适配配置（覆盖品牌默认）
+pos_adapter:
+  type: pinzhi          # 品智POS系统
+  version: "3.5.2"
+  api_base_url: http://192.168.1.100:8080/api
+  api_key_env: STORE_001_PINZHI_API_KEY  # API Key存储在环境变量
+  sync_menu_interval_seconds: 1800        # 每30分钟同步菜单
+  push_order_retry_count: 3
+  push_order_retry_interval_ms: 1000
+
+# 门店级服务配置覆盖
+services:
+  mac_station:
+    config:
+      max_concurrent_orders: 30    # 覆盖品牌配置的50（该门店规模较小）
+      local_cache_ttl_seconds: 1800
+
+# 门店特定功能开关（在品牌级开关基础上进一步细化）
+feature_flags:
+  kds_auto_bump: true              # 启用KDS自动出餐确认
+  receipt_qr_reorder: true         # 小票二维码复购
+  table_map_enabled: false         # 暂不启用桌台图（外卖为主）
+
+# 网络配置（门店本地网络）
+network:
+  local_subnet: 192.168.1.0/24
+  gateway_ip: 192.168.1.1
+  dns_servers:
+    - 8.8.8.8
+    - 114.114.114.114
+  # 4G备用网络（主网络断开时自动切换）
+  backup_network:
+    type: 4g_usb
+    enabled: true
+    auto_failover: true
+    failover_check_interval_seconds: 30

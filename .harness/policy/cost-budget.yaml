@@ -1,0 +1,115 @@
+# 屯象OS 云成本预算策略 V1
+# 最后更新: 2026-04-06
+# 维护人: 李淳（屯象OS创始人）
+#
+# 说明：
+#   - 月度总预算按实际服务器费用+LLM API费用综合估算
+#   - 告警通道：企微机器人（wecom）/ 邮件（email）/ 电话（phone）
+#   - 货币单位统一为 CNY（人民币）
+
+budgets:
+
+  # ──────────────────────────────────────────────
+  # 月度总预算（含所有环境、所有服务）
+  # ──────────────────────────────────────────────
+  - name: tunxiang-monthly-total
+    identifier: tunxiang_monthly_total
+    description: 屯象OS月度云总预算，含服务器、存储、网络及LLM API
+    amount: 3000         # 月度总预算上限（元）
+    currency: CNY
+    period: MONTHLY
+    reset_day: 1         # 每月1日重置
+    alerts:
+      - threshold: 60    # 达到60%（1800元）预警
+        type: PERCENTAGE
+        channels: [wecom]
+        message: "本月云成本已达预算60%（约1800元），请关注非生产环境空跑情况"
+      - threshold: 80    # 达到80%（2400元）告警
+        type: PERCENTAGE
+        channels: [wecom, email]
+        message: "本月云成本已达预算80%（约2400元），请停止非必要非生产环境"
+      - threshold: 100   # 达到100%（3000元）紧急告警
+        type: PERCENTAGE
+        channels: [wecom, email, phone]
+        message: "CRITICAL: 本月云成本已触达预算上限3000元！请立即停止所有非生产环境"
+    breakdown:
+      # 生产环境（7x24运行，优先保障）
+      - environment: env_prod
+        allocation: 60%            # 生产环境分配60% = 1800元/月
+        description: 生产环境含K8s节点、PG主从、对象存储、CDN
+      # Pilot环境（7x24，仅首批试点商户）
+      - environment: env_pilot
+        allocation: 20%            # Pilot分配20% = 600元/月
+        description: Pilot环境用于首批商户灰度验证
+      # 非生产环境合计（dev+test+uat+demo 合计不超过20%）
+      - environment: [env_dev, env_test, env_uat, env_demo]
+        allocation: 20%            # 非生产合计20% = 600元/月
+        description: 非生产环境通过AutoStopping降低空跑，实际应低于此上限
+
+  # ──────────────────────────────────────────────
+  # LLM API 专项预算（tx-brain / Agent体系）
+  # ──────────────────────────────────────────────
+  - name: llm-api-monthly
+    identifier: llm_api_monthly
+    description: LLM/AI API调用月度预算（OpenAI、Anthropic、国内模型API等）
+    amount: 500          # LLM API月预算上限（元）
+    currency: CNY
+    period: MONTHLY
+    scope: tag
+    tag_filter: cost_center=ai
+    alerts:
+      - threshold: 70    # 达到70%（350元）预警
+        type: PERCENTAGE
+        channels: [wecom]
+        message: "LLM API本月已消耗350元，请检查是否有异常调用或循环请求"
+      - threshold: 90    # 达到90%（450元）告警
+        type: PERCENTAGE
+        channels: [wecom, email]
+        message: "LLM API本月已消耗450元，接近预算上限，请暂停非关键AI功能测试"
+      - threshold: 100
+        type: PERCENTAGE
+        channels: [wecom, email]
+        message: "CRITICAL: LLM API月度预算已耗尽！Agent实验环境将被强制暂停"
+    breakdown:
+      - service: tx-brain
+        allocation: 50%  # tx-brain（主模型调用）占50% = 250元
+      - service: agent-experiments
+        allocation: 30%  # Agent实验 = 150元
+      - service: other-services
+        allocation: 20%  # 其他服务辅助AI调用 = 100元
+
+  # ──────────────────────────────────────────────
+  # 非生产环境专项预算（额外独立监控）
+  # ──────────────────────────────────────────────
+  - name: nonprod-monthly
+    identifier: nonprod_monthly
+    description: 非生产环境（dev+test+uat+demo）合计月度预算
+    amount: 600          # 非生产合计月预算上限（元）
+    currency: CNY
+    period: MONTHLY
+    scope: environment
+    environment_filter: [env_dev, env_test, env_uat, env_demo]
+    alerts:
+      - threshold: 80
+        type: PERCENTAGE
+        channels: [wecom]
+        message: "非生产环境本月已消耗480元，请检查是否有遗忘停机的环境"
+      - threshold: 100
+        type: PERCENTAGE
+        channels: [wecom, email]
+        message: "非生产环境月度预算已触上限！请立即审查并停止不必要的非生产实例"
+
+# ──────────────────────────────────────────────
+# 成本分摊标签规范（所有资源必须打标）
+# ──────────────────────────────────────────────
+costAllocationTags:
+  required:
+    - key: environment
+      allowed_values: [dev, test, uat, pilot, prod, demo]
+    - key: service
+      description: 对应的微服务名称（如 api-gateway, tx-brain）
+  optional:
+    - key: cost_center
+      description: 成本中心（ai / core / infra）
+    - key: team
+      description: 负责团队（founder / agent / ops）

@@ -126,6 +126,7 @@ export function QueuePage() {
             display: 'grid', gridTemplateColumns: '80px 60px 80px 100px 1fr',
             padding: '12px 16px', borderBottom: '1px solid #1A3A48', alignItems: 'center',
             background: item.status === 'called' ? '#1A2A3A' : 'transparent',
+            ...(item.waitTime > 30 ? { borderLeft: '3px solid #A32D2D', background: 'rgba(163,45,45,.05)' } : {}),
           }}>
             <span style={{ fontSize: 16, fontWeight: 'bold', color: '#fff' }}>{item.number}</span>
             <span>{item.partySize}人</span>
@@ -151,6 +152,35 @@ export function QueuePage() {
                 }}>放弃</button>
               )}
             </div>
+          </div>
+        ))}
+      </div>
+
+      {/* 🤖 AI叫号建议区块 */}
+      <div style={{
+        margin: '16px 0', padding: 14, borderRadius: 10,
+        background: 'rgba(24,95,165,.08)', border: '1px solid rgba(24,95,165,.25)',
+      }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: '#185FA5', marginBottom: 10 }}>
+          🤖 运营指挥官 · 叫号建议
+        </div>
+        {[
+          { no: 'A027', name: '赵先生', pax: 4, wait: 38, table: 'A07', tableSize: 4, desc: '4人台已空闲，完美匹配' },
+          { no: 'A028', name: '钱女士', pax: 4, wait: 22, table: 'C03', tableSize: 4, desc: 'C03清台中，预计3分钟可用' },
+        ].map((s) => (
+          <div key={s.no} style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            padding: '8px 0', borderBottom: '1px solid rgba(24,95,165,.12)',
+          }}>
+            <div>
+              <span style={{ fontWeight: 600, fontSize: 14 }}>{s.no} {s.name}</span>
+              <span style={{ fontSize: 12, color: '#999', marginLeft: 8 }}>{s.pax}人 · 已等{s.wait}分钟</span>
+              <div style={{ fontSize: 12, color: '#185FA5', marginTop: 2 }}>→ 推荐 {s.table}台({s.tableSize}人) · {s.desc}</div>
+            </div>
+            <button style={{
+              padding: '8px 16px', borderRadius: 8, border: 'none', cursor: 'pointer',
+              background: '#FF6B35', color: '#fff', fontWeight: 600, fontSize: 13, minHeight: 44,
+            }}>立即叫号</button>
           </div>
         ))}
       </div>

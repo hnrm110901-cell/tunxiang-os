@@ -9,6 +9,25 @@ from typing import List
 from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel, Field
 
+try:
+    # 作为包导入时（FastAPI 运行时），使用相对导入
+    from ..services.receiving_service import (
+        confirm_transfer,
+        create_receiving,
+        create_transfer,
+        get_central_warehouse_stock,
+        reject_item,
+    )
+except ImportError:
+    # sys.path 直接指向 src/ 时（测试环境），使用绝对导入
+    from services.receiving_service import (  # type: ignore[no-redef]
+        confirm_transfer,
+        create_receiving,
+        create_transfer,
+        get_central_warehouse_stock,
+        reject_item,
+    )
+
 router = APIRouter(prefix="/api/v1/supply", tags=["receiving"])
 
 
@@ -67,10 +86,8 @@ async def create_receiving(
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
 ):
     """C5: 创建收货验收单"""
-    from ..services.receiving_service import create_receiving as svc
-
     try:
-        result = await svc(
+        result = await create_receiving(
             body.purchase_order_id,
             [i.model_dump() for i in body.items],
             body.receiver_id,
@@ -94,10 +111,8 @@ async def reject_item(
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
 ):
     """C5: 退货"""
-    from ..services.receiving_service import reject_item as svc
-
     try:
-        result = await svc(
+        result = await reject_item(
             receiving_id, body.item_id, body.reason,
             body.quantity, x_tenant_id, db=None,
         )
@@ -117,10 +132,8 @@ async def create_transfer(
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
 ):
     """C5: 发起门店调拨"""
-    from ..services.receiving_service import create_transfer as svc
-
     try:
-        result = await svc(
+        result = await create_transfer(
             body.from_store_id, body.to_store_id,
             [i.model_dump() for i in body.items],
             x_tenant_id, db=None,
@@ -142,10 +155,8 @@ async def confirm_transfer(
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
 ):
     """C5: 确认调拨（发方/收方）"""
-    from ..services.receiving_service import confirm_transfer as svc
-
     try:
-        result = await svc(
+        result = await confirm_transfer(
             transfer_id, body.confirmed_by, x_tenant_id,
             db=None, role=body.role,
         )
@@ -164,7 +175,5 @@ async def get_central_warehouse_stock(
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
 ):
     """C5: 中央仓库存查询"""
-    from ..services.receiving_service import get_central_warehouse_stock as svc
-
-    result = await svc(x_tenant_id, db=None)
+    result = await get_central_warehouse_stock(x_tenant_id, db=None)
     return {"ok": True, "data": result}

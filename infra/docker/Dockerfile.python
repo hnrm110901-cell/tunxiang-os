@@ -50,9 +50,21 @@ COPY --from=builder /install /usr/local
 # 创建非 root 用户
 RUN groupadd -r txos && useradd -r -g txos -d /app -s /sbin/nologin txos
 
-# 复制共享模块 + 服务代码
+# 复制共享模块
 COPY shared/ ./shared/
-COPY services/${SERVICE_NAME}/src/ ./services/${SERVICE_NAME}/src/
+
+# 复制服务代码到带下划线的 Python 模块路径（hyphen → underscore）
+COPY services/${SERVICE_NAME}/src/ /tmp/service-src/
+RUN SERVICE_MODULE=$(echo "${SERVICE_NAME}" | tr '-' '_') && \
+    mkdir -p ./services/${SERVICE_MODULE}/src && \
+    cp -r /tmp/service-src/. ./services/${SERVICE_MODULE}/src/ && \
+    rm -rf /tmp/service-src
+
+# tx-trade 额外依赖：permission_service.py（来自 tx-org，模块顶层导入）
+COPY services/tx-org/src/services/permission_service.py /tmp/permission_service.py
+RUN if [ "${SERVICE_NAME}" = "tx-trade" ]; then \
+        cp /tmp/permission_service.py ./services/permission_service.py; \
+    fi && rm -f /tmp/permission_service.py
 
 # 设置文件权限
 RUN chown -R txos:txos /app
@@ -66,4 +78,4 @@ EXPOSE ${SERVICE_PORT}
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD curl -f http://localhost:${SERVICE_PORT}/health || exit 1
 
-CMD ["sh", "-c", "uvicorn services.${SERVICE_NAME}.src.main:app --host 0.0.0.0 --port ${SERVICE_PORT}"]
+CMD ["sh", "-c", "MODULE=$(echo ${SERVICE_NAME} | tr '-' '_'); uvicorn services.${MODULE}.src.main:app --host 0.0.0.0 --port ${SERVICE_PORT}"]

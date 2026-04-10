@@ -23,6 +23,10 @@ from .api.report_routes import router as report_router
 from .api.reports_router import router as p0_reports_router
 from .api.store_analysis_routes import router as store_analysis_router
 from .api.stream_report_routes import router as stream_report_router
+from .api.report_config_routes import router as report_config_router
+from .api.narrative_enhanced_routes import router as narrative_enhanced_router  # P3-02
+from .api.nlq_routes import router as nlq_router
+from .api.anomaly_routes import router as anomaly_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
@@ -35,6 +39,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 
 app = FastAPI(title="TunxiangOS tx-analytics", version="3.0.0", lifespan=lifespan)
+
+from prometheus_fastapi_instrumentator import Instrumentator
+Instrumentator().instrument(app).expose(app)
+
 app.include_router(analytics_router)
 app.include_router(etl_router)
 
@@ -50,6 +58,10 @@ app.include_router(cost_health_router)
 app.include_router(boss_bi_router)
 app.include_router(stream_report_router)
 app.include_router(group_dashboard_router)
+app.include_router(report_config_router)
+app.include_router(narrative_enhanced_router)  # P3-02 对比叙事+异常叙事
+app.include_router(nlq_router)
+app.include_router(anomaly_router)
 
 @app.get("/health")
 async def health():

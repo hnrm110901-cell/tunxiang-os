@@ -1,0 +1,38 @@
+trigger:
+  name: trigger-main-tx-supply
+  identifier: trigger_main_tx_supply
+  projectIdentifier: TunXiangOS
+  orgIdentifier: default
+  description: "tx-supply 服务 main 分支推送触发器。push to main 时触发 cd_tx_supply 流水线（部署到 staging）。"
+  tags:
+    service: tx-supply
+    event: push-main
+  enabled: true
+  pipelineIdentifier: cd_tx_supply
+  source:
+    type: Webhook
+    spec:
+      type: Github
+      spec:
+        type: Push
+        spec:
+          connectorRef: github_connector
+          repoName: tunxiang-os
+          autoAbortPreviousExecutions: false
+          payloadConditions:
+            - key: targetBranch
+              operator: Equals
+              value: main
+          headerConditions: []
+          jexlCondition: ""
+          actions: []
+  inputYaml: |
+    pipeline:
+      identifier: cd_tx_supply
+      properties:
+        ci:
+          codebase:
+            build:
+              type: branch
+              spec:
+                branch: main

@@ -1,0 +1,94 @@
+groups:
+  - name: tunxiang-service-alerts
+    rules:
+      # 服务宕机
+      - alert: ServiceDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "服务 {{ $labels.job }} 宕机"
+          description: "服务 {{ $labels.job }} (实例 {{ $labels.instance }}) 已宕机超过1分钟，请立即处理。"
+
+      # API响应时间过高
+      - alert: HighResponseTime
+        expr: http_request_duration_seconds_p99 > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.job }} P99延迟超过2秒"
+          description: "服务 {{ $labels.job }} P99延迟为 {{ $value }}s，超过2秒阈值，持续5分钟。"
+
+      # 错误率过高
+      - alert: HighErrorRate
+        expr: rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.job }} 错误率超过5%"
+          description: "服务 {{ $labels.job }} 5xx错误率为 {{ $value | humanizePercentage }}，超过5%阈值。"
+
+      # DB连接池耗尽
+      - alert: DBPoolExhausted
+        expr: db_pool_available_connections == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.job }} 数据库连接池耗尽"
+          description: "服务 {{ $labels.job }} 的DB连接池可用连接数为0，已持续2分钟，可能导致请求堆积。"
+
+      # LLM API调用失败（tx-brain）
+      - alert: LLMAPIFailure
+        expr: rate(llm_api_errors_total[5m]) > 0.1
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Claude API调用失败率过高，ModelRouter降级策略已触发"
+          description: "tx-brain LLM API错误率为 {{ $value }}/s，超过0.1/s阈值，ModelRouter已自动降级。"
+
+      # Redis内存过高
+      - alert: RedisHighMemory
+        expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Redis内存使用率超过85%"
+          description: "Redis内存使用率为 {{ $value | humanizePercentage }}，超过85%阈值，请检查缓存策略或扩容。"
+
+  - name: tunxiang-business-alerts
+    rules:
+      # 订单处理延迟过高
+      - alert: OrderProcessingDelay
+        expr: histogram_quantile(0.99, rate(order_processing_duration_seconds_bucket[5m])) > 5
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "订单处理P99延迟超过5秒"
+          description: "tx-trade 订单处理P99延迟为 {{ $value }}s，超过5秒阈值。"
+
+      # PostgreSQL连接数过高
+      - alert: PostgreSQLHighConnections
+        expr: pg_stat_activity_count > 150
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "PostgreSQL连接数超过150"
+          description: "当前PostgreSQL活跃连接数为 {{ $value }}，接近连接上限。"
+
+      # Agent执行失败率过高
+      - alert: AgentHighFailureRate
+        expr: rate(agent_executions_total{status="failed"}[5m]) / rate(agent_executions_total[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Agent执行失败率超过10%"
+          description: "Agent类型 {{ $labels.agent_type }} 失败率为 {{ $value | humanizePercentage }}。"

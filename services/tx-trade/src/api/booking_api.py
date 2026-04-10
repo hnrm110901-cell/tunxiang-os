@@ -132,6 +132,60 @@ async def update_reservation_status(
             if not req.table_no:
                 _err("table_no is required for seating")
             result = await svc.seat_reservation(reservation_id, req.table_no)  # type: ignore[arg-type]
+
+            # v149：预订入座 → 自动开台（创建 dining_session）
+            # 异步执行，不阻断预订流程
+            import asyncio
+            from ..services.dining_session_service import DiningSessionService
+            from sqlalchemy import text as _text
+
+            async def _auto_open_from_booking() -> None:
+                try:
+                    # 查询预订详情（桌台ID、guest_count、waiter_id）
+                    bk = await db.execute(
+                        _text("""
+                            SELECT r.store_id, r.guest_count, r.waiter_id,
+                                   t.id AS table_id, t.zone_id
+                            FROM reservations r
+                            LEFT JOIN tables t ON t.table_no = r.table_no
+                                               AND t.store_id = r.store_id
+                                               AND t.tenant_id = :tid
+                            WHERE r.id        = :rid
+                              AND r.tenant_id = :tid
+                        """),
+                        {"rid": reservation_id, "tid": tenant_id},
+                    )
+                    bk_row = bk.mappings().one_or_none()
+                    if not bk_row or not bk_row["table_id"]:
+                        return
+
+                    ds_svc = DiningSessionService(db, tenant_id)
+                    # 检查是否已有活跃会话（避免重复开台）
+                    existing = await ds_svc.get_active_session_by_table(
+                        bk_row["store_id"], bk_row["table_id"]
+                    )
+                    if existing:
+                        return
+
+                    await ds_svc.open_table(
+                        store_id=bk_row["store_id"],
+                        table_id=bk_row["table_id"],
+                        guest_count=bk_row["guest_count"] or 1,
+                        lead_waiter_id=bk_row["waiter_id"] or bk_row["store_id"],
+                        zone_id=bk_row["zone_id"],
+                        booking_id=reservation_id,
+                        session_type="dine_in",
+                    )
+                except Exception:  # noqa: BLE001 — 异步后台任务，捕获所有异常防止崩溃
+                    import structlog
+                    structlog.get_logger().warning(
+                        "booking_auto_open_table_failed",
+                        reservation_id=reservation_id,
+                        tenant_id=tenant_id,
+                        exc_info=True,
+                    )
+
+            asyncio.create_task(_auto_open_from_booking())
         elif req.action == "complete":
             result = await svc.complete_reservation(reservation_id)
         elif req.action == "cancel":

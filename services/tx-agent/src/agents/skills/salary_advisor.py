@@ -445,6 +445,7 @@ class SalaryAdvisorAgent(SkillAgent):
             "recommend_salary",
             "predict_turnover_risk",
             "optimize_raise_plan",
+            "budget_recommendation",
         ]
 
     async def execute(self, action: str, params: dict[str, Any]) -> AgentResult:
@@ -454,6 +455,8 @@ class SalaryAdvisorAgent(SkillAgent):
             return await self._predict_turnover_risk(params)
         if action == "optimize_raise_plan":
             return await self._optimize_raise_plan(params)
+        if action == "budget_recommendation":
+            return await self._budget_recommendation(params)
         return AgentResult(
             success=False,
             action=action,
@@ -641,3 +644,244 @@ class SalaryAdvisorAgent(SkillAgent):
             reasoning=f"{month} 在预算 {budget_fen} 分内完成 {len(plans)} 人调薪分配，已用 {allocated} 分",
             confidence=0.70,
         )
+
+    # ── 功能6：门店健康度人力预算建议 ─────────────────────────────────────────
+
+    # 行业基准：不同业态的人力成本率范围
+    _LABOR_RATE_BENCHMARKS: dict[str, dict[str, float]] = {
+        "正餐": {"p25": 0.25, "p50": 0.28, "p75": 0.30},
+        "快餐": {"p25": 0.20, "p50": 0.22, "p75": 0.25},
+        "火锅": {"p25": 0.22, "p50": 0.25, "p75": 0.28},
+        "宴会": {"p25": 0.28, "p50": 0.30, "p75": 0.35},
+        "default": {"p25": 0.23, "p50": 0.27, "p75": 0.32},
+    }
+
+    _POSITION_SALARY_BASELINE: dict[str, int] = {
+        "manager": 800000,   # 8000元/月
+        "chef": 650000,      # 6500元/月
+        "waiter": 420000,    # 4200元/月
+        "cashier": 400000,   # 4000元/月
+        "head_chef": 1000000,  # 10000元/月
+        "cleaner": 350000,   # 3500元/月
+    }
+
+    async def _budget_recommendation(self, params: dict[str, Any]) -> AgentResult:
+        """门店人力预算建议
+
+        基于门店P&L健康度自动计算最优人力预算：
+        1. 从mv_store_pnl读取门店月P&L趋势
+        2. 计算当前人力成本率 vs 行业基准
+        3. 结合营收趋势预测下月人力预算
+        4. 输出建议编制、薪资总额上限、差异与理由
+        """
+        store_id = params.get("store_id")
+        month = params.get("month")
+        cuisine_type = params.get("cuisine_type", "default")
+        if not store_id or not month:
+            return AgentResult(
+                success=False,
+                action="budget_recommendation",
+                error="缺少参数: store_id / month",
+            )
+
+        # 读取P&L数据
+        pnl_data = await self._load_store_pnl(store_id, month)
+        current_staff = await self._load_current_staffing(store_id)
+
+        # 行业基准
+        bench = self._LABOR_RATE_BENCHMARKS.get(
+            cuisine_type, self._LABOR_RATE_BENCHMARKS["default"]
+        )
+
+        # 计算当前人力成本率
+        current_revenue = pnl_data.get("avg_monthly_revenue_fen", 0)
+        current_labor = pnl_data.get("avg_monthly_labor_fen", 0)
+        current_rate = current_labor / current_revenue if current_revenue > 0 else 0.0
+        revenue_trend = pnl_data.get("revenue_trend", "stable")
+
+        # 预测下月营收
+        if revenue_trend == "rising":
+            predicted_revenue = int(current_revenue * 1.05)
+        elif revenue_trend == "declining":
+            predicted_revenue = int(current_revenue * 0.95)
+        else:
+            predicted_revenue = current_revenue
+
+        # 计算建议人力预算上限（按P50基准）
+        target_rate = bench["p50"]
+        suggested_budget_fen = int(predicted_revenue * target_rate)
+
+        # 按岗位分解建议编制
+        position_plan = self._compute_position_plan(
+            suggested_budget_fen, current_staff, predicted_revenue
+        )
+
+        # 生成差异和理由
+        budget_diff = suggested_budget_fen - current_labor
+        headcount_diff = sum(p["suggested_count"] for p in position_plan) - sum(
+            p["current_count"] for p in position_plan
+        )
+
+        reasons: list[str] = []
+        if current_rate > bench["p75"]:
+            reasons.append(
+                f"当前人力成本率{current_rate:.1%}超过行业P75({bench['p75']:.1%})，"
+                f"建议控制人力支出"
+            )
+        elif current_rate < bench["p25"]:
+            reasons.append(
+                f"当前人力成本率{current_rate:.1%}低于行业P25({bench['p25']:.1%})，"
+                f"可能存在人手不足风险"
+            )
+        else:
+            reasons.append(
+                f"当前人力成本率{current_rate:.1%}处于行业合理区间"
+                f"({bench['p25']:.1%}-{bench['p75']:.1%})"
+            )
+
+        if revenue_trend == "rising":
+            reasons.append("营收呈上升趋势，建议适当增加编制以保障服务质量")
+        elif revenue_trend == "declining":
+            reasons.append("营收呈下降趋势，建议优化排班减少闲时人力")
+
+        data = {
+            "store_id": store_id,
+            "month": month,
+            "cuisine_type": cuisine_type,
+            "current_status": {
+                "monthly_revenue_fen": current_revenue,
+                "monthly_labor_fen": current_labor,
+                "labor_cost_rate": round(current_rate, 4),
+                "revenue_trend": revenue_trend,
+            },
+            "industry_benchmark": bench,
+            "suggestion": {
+                "target_labor_rate": target_rate,
+                "suggested_budget_fen": suggested_budget_fen,
+                "predicted_revenue_fen": predicted_revenue,
+                "budget_diff_fen": budget_diff,
+                "headcount_diff": headcount_diff,
+                "action": "增编" if headcount_diff > 0 else "减编" if headcount_diff < 0 else "持平",
+            },
+            "position_plan": position_plan,
+            "reasons": reasons,
+            "ai_tag": "AI建议",
+        }
+
+        return AgentResult(
+            success=True,
+            action="budget_recommendation",
+            data=data,
+            reasoning="；".join(reasons),
+            confidence=0.72,
+        )
+
+    async def _load_store_pnl(self, store_id: str, month: str) -> dict[str, Any]:
+        """从mv_store_pnl加载P&L数据，降级为mock"""
+        if self._db is not None:
+            q = text("""
+                SELECT COALESCE(AVG(revenue_fen), 0)::bigint AS avg_monthly_revenue_fen,
+                       COALESCE(AVG(labor_cost_fen), 0)::bigint AS avg_monthly_labor_fen,
+                       CASE
+                         WHEN COUNT(*) >= 2 THEN
+                           CASE WHEN (ARRAY_AGG(revenue_fen ORDER BY pnl_date DESC))[1]
+                                   > (ARRAY_AGG(revenue_fen ORDER BY pnl_date DESC))[2]
+                                THEN 'rising' ELSE 'declining' END
+                         ELSE 'stable'
+                       END AS revenue_trend
+                FROM mv_store_pnl
+                WHERE tenant_id = CAST(:tenant_id AS uuid)
+                  AND store_id = CAST(:store_id AS uuid)
+                  AND to_char(pnl_date, 'YYYY-MM') <= :month
+                ORDER BY pnl_date DESC
+                LIMIT 3
+            """)
+            try:
+                result = await self._db.execute(q, {
+                    "tenant_id": self.tenant_id,
+                    "store_id": store_id,
+                    "month": month,
+                })
+                row = result.mappings().first()
+                if row:
+                    return dict(row)
+            except (OperationalError, ProgrammingError) as exc:
+                logger.warning("budget_pnl_fallback", error=str(exc))
+
+        # Mock降级
+        return {
+            "avg_monthly_revenue_fen": 35000000,  # 35万元
+            "avg_monthly_labor_fen": 9800000,     # 9.8万元
+            "revenue_trend": "stable",
+        }
+
+    async def _load_current_staffing(self, store_id: str) -> list[dict[str, Any]]:
+        """加载当前门店编制情况，降级为mock"""
+        if self._db is not None:
+            q = text("""
+                SELECT LOWER(COALESCE(role, 'waiter')) AS role,
+                       COUNT(*) AS count
+                FROM employees
+                WHERE tenant_id = CAST(:tenant_id AS uuid)
+                  AND store_id = CAST(:store_id AS uuid)
+                  AND is_deleted = false
+                  AND COALESCE(is_active, true) = true
+                GROUP BY LOWER(COALESCE(role, 'waiter'))
+            """)
+            try:
+                result = await self._db.execute(q, {
+                    "tenant_id": self.tenant_id,
+                    "store_id": store_id,
+                })
+                return [dict(r) for r in result.mappings()]
+            except (OperationalError, ProgrammingError) as exc:
+                logger.warning("budget_staffing_fallback", error=str(exc))
+
+        return [
+            {"role": "manager", "count": 1},
+            {"role": "chef", "count": 4},
+            {"role": "waiter", "count": 6},
+            {"role": "cashier", "count": 2},
+        ]
+
+    def _compute_position_plan(
+        self,
+        budget_fen: int,
+        current_staff: list[dict[str, Any]],
+        predicted_revenue: int,
+    ) -> list[dict[str, Any]]:
+        """根据预算计算各岗位建议编制"""
+        current_map: dict[str, int] = {}
+        for s in current_staff:
+            role = str(s.get("role", "waiter")).lower()
+            current_map[role] = int(s.get("count", 0))
+
+        # 按岗位比例分配预算
+        role_weights = {
+            "manager": 0.12,
+            "head_chef": 0.15,
+            "chef": 0.30,
+            "waiter": 0.28,
+            "cashier": 0.10,
+            "cleaner": 0.05,
+        }
+
+        plan: list[dict[str, Any]] = []
+        for role, weight in role_weights.items():
+            role_budget = int(budget_fen * weight)
+            baseline = self._POSITION_SALARY_BASELINE.get(role, 420000)
+            suggested_count = max(1, role_budget // baseline) if role_budget > 0 else 0
+            current_count = current_map.get(role, 0)
+            diff = suggested_count - current_count
+
+            plan.append({
+                "role": role,
+                "role_label": _POSITION_LABEL.get(role, role),
+                "current_count": current_count,
+                "suggested_count": suggested_count,
+                "current_salary_fen": current_count * baseline,
+                "suggested_salary_fen": suggested_count * baseline,
+                "diff": diff,
+                "action": "增编" if diff > 0 else "减编" if diff < 0 else "持平",
+            })
+        return plan

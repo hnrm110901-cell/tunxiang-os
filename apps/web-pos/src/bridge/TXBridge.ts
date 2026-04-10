@@ -8,6 +8,12 @@
  *   4. 兜底：HTTP → 安卓 POS 转发
  */
 
+// Bluetooth Web API type stubs（浏览器标准类型库未包含时兜底）
+interface BluetoothDevice { name?: string; gatt?: BluetoothRemoteGATTServer; }
+interface BluetoothRemoteGATTServer { connected: boolean; connect(): Promise<BluetoothRemoteGATTServer>; disconnect(): void; getPrimaryService(uuid: string): Promise<BluetoothRemoteGATTService>; }
+interface BluetoothRemoteGATTService { getCharacteristic(uuid: string): Promise<BluetoothRemoteGATTCharacteristic>; }
+interface BluetoothRemoteGATTCharacteristic { writeValue(value: BufferSource): Promise<void>; writeValueWithResponse(value: BufferSource): Promise<void>; }
+
 /** 安卓 Kotlin 层注入的原生接口 */
 interface NativeTXBridge {
   print(content: string): void;
@@ -65,7 +71,7 @@ export const connectBLEPrinter = async (): Promise<boolean> => {
 
   try {
     // 扫描 ESC/POS 打印机（通用串口服务 UUID）
-    _bleDevice = await navigator.bluetooth.requestDevice({
+    _bleDevice = await (navigator as unknown as { bluetooth: { requestDevice(opts: unknown): Promise<BluetoothDevice> } }).bluetooth.requestDevice({
       filters: [
         { services: ['000018f0-0000-1000-8000-00805f9b34fb'] },  // 通用 ESC/POS 打印机
         { namePrefix: 'GP-' },   // 佳博
@@ -182,8 +188,8 @@ export const startScan = (): Promise<string> => {
   return new Promise((resolve) => {
     if (isAndroidPOS() && window.TXBridge) {
       const callbackName = `__txScanCb_${Date.now()}`;
-      (window as Record<string, unknown>)[callbackName] = (result: string) => {
-        delete (window as Record<string, unknown>)[callbackName];
+      (window as unknown as Record<string, unknown>)[callbackName] = (result: string) => {
+        delete (window as unknown as Record<string, unknown>)[callbackName];
         resolve(result);
       };
       window.TXBridge.scan();

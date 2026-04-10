@@ -315,6 +315,76 @@ class TestSafetyComplianceProjector:
         assert monday == date(2026, 3, 30)
         assert monday.weekday() == 0  # 0 = 周一
 
+    @pytest.mark.asyncio
+    async def test_safety_projector_handles_haccp_completed(self):
+        """safety.haccp_check_completed 应触发 UPSERT 初始化行
+        + UPDATE haccp_total_checks/haccp_passed_checks/haccp_pass_rate。
+        overall_passed=True 时 pass_delta=1，critical_failures=0。
+        """
+        conn = _mock_conn()
+        event = _make_event("safety.haccp_check_completed", {
+            "check_id": str(uuid.uuid4()),
+            "overall_passed": True,
+            "critical_failures": 0,
+            "control_points_checked": 12,
+            "control_points_passed": 12,
+        })
+
+        await self.proj.handle(event, conn)
+
+        # 2次 execute：INSERT ON CONFLICT DO NOTHING + HACCP UPDATE
+        assert conn.execute.call_count == 2
+
+        sqls = [c[0][0] for c in conn.execute.call_args_list]
+        # 第1次：行初始化 UPSERT
+        assert any("INSERT INTO mv_safety_compliance" in s for s in sqls)
+        # 第2次：HACCP 合格率更新，包含关键字段
+        assert any("haccp_total_checks" in s for s in sqls)
+        assert any("haccp_passed_checks" in s for s in sqls)
+        assert any("haccp_pass_rate" in s for s in sqls)
+
+        # 验证传入参数：pass_delta=1，critical_failures=0
+        update_call = conn.execute.call_args_list[1]
+        args = update_call[0]
+        # args: (sql, tenant_id, store_id, stat_week, pass_delta, critical_failures, event_id)
+        assert args[4] == 1   # pass_delta（overall_passed=True）
+        assert args[5] == 0   # critical_failures
+
+    @pytest.mark.asyncio
+    async def test_safety_projector_handles_haccp_critical(self):
+        """safety.haccp_critical_failure 应触发 UPSERT 初始化行
+        + UPDATE haccp_critical_failures / haccp_critical_alert_count。
+        passed_checks 不递增（本次未通过）。
+        """
+        conn = _mock_conn()
+        event = _make_event("safety.haccp_critical_failure", {
+            "check_id": str(uuid.uuid4()),
+            "control_point": "冷链温度",
+            "critical_failures": 2,
+            "corrective_action_required": True,
+        })
+
+        await self.proj.handle(event, conn)
+
+        # 2次 execute：INSERT ON CONFLICT DO NOTHING + critical UPDATE
+        assert conn.execute.call_count == 2
+
+        sqls = [c[0][0] for c in conn.execute.call_args_list]
+        assert any("INSERT INTO mv_safety_compliance" in s for s in sqls)
+        # critical UPDATE 包含关键字段
+        assert any("haccp_critical_failures" in s for s in sqls)
+        assert any("haccp_critical_alert_count" in s for s in sqls)
+        # haccp_passed_checks 不递增（不加分）——SET 子句中不含 "haccp_passed_checks +"
+        update_sql = conn.execute.call_args_list[1][0][0]
+        assert "haccp_passed_checks      =" not in update_sql
+        assert "haccp_passed_checks =" not in update_sql
+
+        # 验证传入参数：critical_failures=2
+        update_call = conn.execute.call_args_list[1]
+        args = update_call[0]
+        # args: (sql, tenant_id, store_id, stat_week, critical_failures, event_id)
+        assert args[4] == 2   # critical_failures 来自 payload
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  C. EnergyEfficiencyProjector
@@ -714,3 +784,525 @@ class TestEventTypeCoverage:
         from shared.events.src.event_types import ChannelEventType
         assert ChannelEventType.COMMISSION_CALC.value == "channel.commission_calc"
         assert "channel.commission_calc" in ChannelMarginProjector.event_types
+
+    def test_safety_projector_covers_haccp_events(self):
+        """SafetyComplianceProjector 应包含 HACCP 两个事件类型。"""
+        from shared.events.src.event_types import SafetyEventType
+        assert SafetyEventType.HACCP_CHECK_COMPLETED.value == "safety.haccp_check_completed"
+        assert SafetyEventType.HACCP_CRITICAL_FAILURE.value == "safety.haccp_critical_failure"
+        assert "safety.haccp_check_completed" in SafetyComplianceProjector.event_types
+        assert "safety.haccp_critical_failure" in SafetyComplianceProjector.event_types
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  G. ChannelMarginProjector
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+class TestChannelMarginProjector:
+
+    @pytest.fixture
+    def projector(self):
+        from shared.events.src.projectors.channel_margin import ChannelMarginProjector
+        return ChannelMarginProjector(tenant_id="11111111-1111-1111-1111-111111111111")
+
+    def _make_conn(self):
+        conn = MagicMock()
+        conn.execute = AsyncMock()
+        return conn
+
+    def _make_event(self, event_type: str, payload: dict, store_id="22222222-2222-2222-2222-222222222222"):
+        return {
+            "event_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+            "event_type": event_type,
+            "tenant_id": "11111111-1111-1111-1111-111111111111",
+            "store_id": store_id,
+            "occurred_at": "2026-04-04T10:00:00+00:00",
+            "payload": payload,
+        }
+
+    @pytest.mark.asyncio
+    async def test_order_synced_increments_gross_revenue(self, projector):
+        """channel.order_synced 累计 GMV 和订单数"""
+        conn = self._make_conn()
+        event = self._make_event("channel.order_synced", {"channel": "meituan", "amount_fen": 5000})
+        await projector.handle(event, conn)
+        # INSERT + UPDATE + _recalc = 至少3次 execute
+        assert conn.execute.call_count >= 3
+        # 验证 UPDATE 调用包含 gross_revenue_fen + order_count
+        calls_sql = [str(c.args[0]) for c in conn.execute.call_args_list]
+        assert any("gross_revenue_fen" in sql for sql in calls_sql)
+
+    @pytest.mark.asyncio
+    async def test_commission_calc_increments_commission(self, projector):
+        """channel.commission_calc 累计佣金"""
+        conn = self._make_conn()
+        event = self._make_event("channel.commission_calc", {"channel": "eleme", "commission_fen": 200})
+        await projector.handle(event, conn)
+        calls_sql = [str(c.args[0]) for c in conn.execute.call_args_list]
+        assert any("commission_fen" in sql for sql in calls_sql)
+
+    @pytest.mark.asyncio
+    async def test_promotion_applied_increments_subsidy(self, projector):
+        """channel.promotion_applied 累计平台补贴"""
+        conn = self._make_conn()
+        event = self._make_event("channel.promotion_applied", {"channel": "douyin", "subsidy_fen": 300})
+        await projector.handle(event, conn)
+        calls_sql = [str(c.args[0]) for c in conn.execute.call_args_list]
+        assert any("promotion_subsidy_fen" in sql for sql in calls_sql)
+
+    @pytest.mark.asyncio
+    async def test_recalc_called_after_update(self, projector):
+        """每次事件处理后都调用 _recalc_margin（更新 net_revenue_fen / gross_margin_rate）"""
+        conn = self._make_conn()
+        event = self._make_event("channel.order_synced", {"channel": "meituan", "amount_fen": 1000})
+        await projector.handle(event, conn)
+        calls_sql = [str(c.args[0]) for c in conn.execute.call_args_list]
+        assert any("net_revenue_fen" in sql for sql in calls_sql)
+        assert any("gross_margin_rate" in sql for sql in calls_sql)
+
+    @pytest.mark.asyncio
+    async def test_no_store_id_skips_event(self, projector):
+        """缺少 store_id 时跳过，不执行任何 DB 操作"""
+        conn = self._make_conn()
+        event = self._make_event("channel.order_synced", {"channel": "meituan", "amount_fen": 1000}, store_id=None)
+        event.pop("store_id")
+        await projector.handle(event, conn)
+        conn.execute.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_string_occurred_at_parsed(self, projector):
+        """ISO 字符串格式的 occurred_at 能正确解析为 date"""
+        conn = self._make_conn()
+        event = self._make_event("channel.order_synced", {"channel": "meituan", "amount_fen": 100})
+        event["occurred_at"] = "2026-04-04T08:30:00+08:00"
+        await projector.handle(event, conn)
+        assert conn.execute.call_count >= 1
+
+    @pytest.mark.asyncio
+    async def test_unknown_channel_uses_unknown_string(self, projector):
+        """payload 中无 channel 字段时，默认 channel='unknown'"""
+        conn = self._make_conn()
+        event = self._make_event("channel.order_synced", {"amount_fen": 500})  # 无 channel 字段
+        await projector.handle(event, conn)
+        # 验证 INSERT 调用包含 'unknown'（channel 参数）
+        call_args_list = conn.execute.call_args_list
+        assert any("unknown" in str(c) for c in call_args_list)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  H. StorePnlProjector
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+from shared.events.src.projectors.store_pnl import StorePnlProjector
+
+
+class TestStorePnlProjector:
+
+    def setup_method(self):
+        self.proj = StorePnlProjector(tenant_id=TENANT_ID)
+
+    @pytest.mark.asyncio
+    async def test_order_paid_increments_revenue(self):
+        """order.paid 应累计 gross_revenue_fen 和 order_count。"""
+        conn = _mock_conn()
+        event = _make_event("order.paid", {"final_amount_fen": 8800})
+        await self.proj.handle(event, conn)
+        # INSERT + UPDATE order_count/revenue + _recalc = 3次
+        assert conn.execute.call_count == 3
+        sqls = [c[0][0] for c in conn.execute.call_args_list]
+        assert any("gross_revenue_fen" in s for s in sqls)
+        assert any("order_count" in s for s in sqls)
+
+    @pytest.mark.asyncio
+    async def test_order_paid_with_customer_id_increments_customer_count(self):
+        """order.paid 含 customer_id 时，customer_count 增量参数应为 1。"""
+        conn = _mock_conn()
+        event = _make_event("order.paid", {
+            "final_amount_fen": 5000,
+            "customer_id": str(uuid.uuid4()),
+        })
+        await self.proj.handle(event, conn)
+        # 找 UPDATE mv_store_pnl ... order_count 的调用，验证 customer_count delta=1
+        update_call = None
+        for c in conn.execute.call_args_list:
+            if "customer_count" in c[0][0]:
+                update_call = c
+                break
+        assert update_call is not None
+        # args: (sql, tenant_id, store_id, stat_date, final_fen, customer_delta, event_id)
+        args = update_call[0]
+        assert args[5] == 1  # customer_count delta
+
+    @pytest.mark.asyncio
+    async def test_order_paid_triggers_recalc(self):
+        """order.paid 后应调用 _recalc_pnl_rates（avg_check_fen 和 gross_margin_rate 出现在 SQL 中）。"""
+        conn = _mock_conn()
+        event = _make_event("order.paid", {"final_amount_fen": 12000})
+        await self.proj.handle(event, conn)
+        sqls = [c[0][0] for c in conn.execute.call_args_list]
+        assert any("avg_check_fen" in s for s in sqls)
+        assert any("gross_margin_rate" in s for s in sqls)
+
+    @pytest.mark.asyncio
+    async def test_member_recharged_increments_stored_value(self):
+        """member.recharged 应累计 stored_value_new_fen（amount + gift）。"""
+        conn = _mock_conn()
+        event = _make_event("member.recharged", {
+            "amount_fen": 10000,
+            "gift_amount_fen": 500,
+        })
+        await self.proj.handle(event, conn)
+        sqls = [c[0][0] for c in conn.execute.call_args_list]
+        assert any("stored_value_new_fen" in s for s in sqls)
+        # 验证 amount 参数 = 10000 + 500 = 10500
+        update_call = None
+        for c in conn.execute.call_args_list:
+            if "stored_value_new_fen" in c[0][0]:
+                update_call = c
+                break
+        assert update_call is not None
+        args = update_call[0]
+        assert args[4] == 10500  # amount_fen + gift_amount_fen
+
+    @pytest.mark.asyncio
+    async def test_channel_commission_reduces_net_revenue(self):
+        """channel.commission_calc 应使 net_revenue_fen 减少（SQL 含减法操作）。"""
+        conn = _mock_conn()
+        event = _make_event("channel.commission_calc", {"commission_fen": 300})
+        await self.proj.handle(event, conn)
+        sqls = [c[0][0] for c in conn.execute.call_args_list]
+        # UPDATE 中 net_revenue_fen 减去佣金
+        assert any("net_revenue_fen  = net_revenue_fen - $4" in s for s in sqls)
+        # channel.commission_calc 也触发 _recalc
+        assert any("gross_margin_rate" in s for s in sqls)
+
+    @pytest.mark.asyncio
+    async def test_no_store_id_skips_event(self):
+        """缺少 store_id 的事件不应触发任何 execute。"""
+        conn = _mock_conn()
+        event = _make_event("order.paid", {"final_amount_fen": 5000})
+        event["store_id"] = None
+        await self.proj.handle(event, conn)
+        conn.execute.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_settlement_advance_consumed(self):
+        """settlement.advance_consumed 应累计 stored_value_consumed_fen。"""
+        conn = _mock_conn()
+        event = _make_event("settlement.advance_consumed", {"amount_fen": 2000})
+        await self.proj.handle(event, conn)
+        # INSERT + UPDATE stored_value_consumed_fen = 2次
+        assert conn.execute.call_count == 2
+        sqls = [c[0][0] for c in conn.execute.call_args_list]
+        assert any("stored_value_consumed_fen" in s for s in sqls)
+        # 验证金额参数
+        update_call = None
+        for c in conn.execute.call_args_list:
+            if "stored_value_consumed_fen" in c[0][0]:
+                update_call = c
+                break
+        assert update_call is not None
+        args = update_call[0]
+        assert args[4] == 2000
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  I. DailySettlementProjector（Team C）
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+class TestDailySettlementProjector:
+
+    @pytest.fixture
+    def projector(self):
+        from shared.events.src.projectors.daily_settlement import DailySettlementProjector
+        return DailySettlementProjector(tenant_id="11111111-1111-1111-1111-111111111111")
+
+    def _make_conn(self):
+        conn = MagicMock()
+        conn.execute = AsyncMock()
+        return conn
+
+    def _make_event(self, event_type: str, payload: dict, store_id="22222222-2222-2222-2222-222222222222"):
+        return {
+            "event_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+            "event_type": event_type,
+            "tenant_id": "11111111-1111-1111-1111-111111111111",
+            "store_id": store_id,
+            "occurred_at": "2026-04-04T23:00:00+00:00",
+            "payload": payload,
+        }
+
+    @pytest.mark.asyncio
+    async def test_payment_confirmed_wechat_increments_wechat_fen(self, projector):
+        """payment.confirmed wechat 渠道 → wechat_received_fen++ 且 total_revenue_fen++"""
+        conn = self._make_conn()
+        event = self._make_event("payment.confirmed", {"channel": "wechat", "amount_fen": 8800})
+        await projector.handle(event, conn)
+        calls_sql = [str(c.args[0]) for c in conn.execute.call_args_list]
+        assert any("total_revenue_fen" in sql for sql in calls_sql)
+
+    @pytest.mark.asyncio
+    async def test_cash_declared_calculates_discrepancy(self, projector):
+        """payment.cash_declared 记录现金差异 = declared - system"""
+        conn = self._make_conn()
+        event = self._make_event("payment.cash_declared", {"declared_fen": 50000, "system_fen": 49000})
+        await projector.handle(event, conn)
+        calls_sql = [str(c.args[0]) for c in conn.execute.call_args_list]
+        assert any("cash_discrepancy_fen" in sql for sql in calls_sql)
+        # 差异值 1000 应出现在某次 execute 调用的参数中
+        all_args = [str(c) for c in conn.execute.call_args_list]
+        assert any("1000" in s for s in all_args)
+
+    @pytest.mark.asyncio
+    async def test_daily_closed_sets_status_closed(self, projector):
+        """settlement.daily_closed → status='closed'"""
+        conn = self._make_conn()
+        event = self._make_event("settlement.daily_closed", {"operator_id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"})
+        await projector.handle(event, conn)
+        calls_sql = [str(c.args[0]) for c in conn.execute.call_args_list]
+        assert any("'closed'" in sql or "closed" in sql for sql in calls_sql)
+
+    @pytest.mark.asyncio
+    async def test_discrepancy_found_appends_pending_items(self, projector):
+        """settlement.discrepancy_found → pending_items jsonb concat"""
+        conn = self._make_conn()
+        event = self._make_event("settlement.discrepancy_found", {
+            "discrepancy_type": "cash_short",
+            "amount_fen": 500,
+            "description": "现金少500",
+        })
+        await projector.handle(event, conn)
+        calls_sql = [str(c.args[0]) for c in conn.execute.call_args_list]
+        assert any("pending_items" in sql for sql in calls_sql)
+
+    @pytest.mark.asyncio
+    async def test_advance_consumed_increments_stored_value(self, projector):
+        """settlement.advance_consumed → stored_value_consumed_fen++"""
+        conn = self._make_conn()
+        event = self._make_event("settlement.advance_consumed", {"amount_fen": 3000})
+        await projector.handle(event, conn)
+        calls_sql = [str(c.args[0]) for c in conn.execute.call_args_list]
+        assert any("stored_value_consumed_fen" in sql for sql in calls_sql)
+
+    @pytest.mark.asyncio
+    async def test_no_store_id_skips_event(self, projector):
+        """缺少 store_id 时跳过，不触发任何 execute"""
+        conn = self._make_conn()
+        event = self._make_event("payment.confirmed", {"channel": "wechat", "amount_fen": 100})
+        event.pop("store_id")
+        await projector.handle(event, conn)
+        conn.execute.assert_not_called()
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  J. MemberClvProjector（Team C）
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+class TestMemberClvProjector:
+
+    @pytest.fixture
+    def projector(self):
+        from shared.events.src.projectors.member_clv import MemberClvProjector
+        return MemberClvProjector(tenant_id="11111111-1111-1111-1111-111111111111")
+
+    def _make_conn(self):
+        conn = MagicMock()
+        conn.execute = AsyncMock()
+        return conn
+
+    def _make_event(self, event_type: str, payload: dict):
+        return {
+            "event_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+            "event_type": event_type,
+            "tenant_id": "11111111-1111-1111-1111-111111111111",
+            "store_id": "22222222-2222-2222-2222-222222222222",
+            "occurred_at": "2026-04-04T23:00:00+00:00",
+            "payload": payload,
+        }
+
+    @pytest.mark.asyncio
+    async def test_order_paid_increments_visit_and_spend(self, projector):
+        """order.paid → visit_count+1 且 total_spend_fen += amount"""
+        conn = self._make_conn()
+        event = self._make_event("order.paid", {
+            "customer_id": "cccccccc-cccc-cccc-cccc-cccccccccccc",
+            "final_amount_fen": 9900,
+        })
+        await projector.handle(event, conn)
+        calls_sql = [str(c.args[0]) for c in conn.execute.call_args_list]
+        assert any("visit_count" in sql for sql in calls_sql)
+        assert any("total_spend_fen" in sql for sql in calls_sql)
+
+    @pytest.mark.asyncio
+    async def test_order_paid_no_customer_id_skips(self, projector):
+        """order.paid payload 无 customer_id → 0 execute"""
+        conn = self._make_conn()
+        event = self._make_event("order.paid", {"final_amount_fen": 9900})
+        await projector.handle(event, conn)
+        conn.execute.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_recharged_increments_stored_value(self, projector):
+        """member.recharged → stored_value_balance_fen += amount + gift"""
+        conn = self._make_conn()
+        event = self._make_event("member.recharged", {
+            "customer_id": "cccccccc-cccc-cccc-cccc-cccccccccccc",
+            "amount_fen": 10000,
+            "gift_amount_fen": 500,
+        })
+        await projector.handle(event, conn)
+        calls_sql = [str(c.args[0]) for c in conn.execute.call_args_list]
+        assert any("stored_value_balance_fen" in sql for sql in calls_sql)
+        # 总计 10500 应出现在参数中
+        all_args = [str(c) for c in conn.execute.call_args_list]
+        assert any("10500" in s for s in all_args)
+
+    @pytest.mark.asyncio
+    async def test_consumed_decreases_stored_value(self, projector):
+        """member.consumed → stored_value_balance_fen -= amount（GREATEST 防负数）"""
+        conn = self._make_conn()
+        event = self._make_event("member.consumed", {
+            "customer_id": "cccccccc-cccc-cccc-cccc-cccccccccccc",
+            "amount_fen": 3000,
+        })
+        await projector.handle(event, conn)
+        calls_sql = [str(c.args[0]) for c in conn.execute.call_args_list]
+        assert any("stored_value_balance_fen" in sql for sql in calls_sql)
+        # SQL 应包含 GREATEST 防止余额为负
+        assert any("GREATEST" in sql for sql in calls_sql)
+
+    @pytest.mark.asyncio
+    async def test_voucher_used_increments_count(self, projector):
+        """member.voucher_used → voucher_used_count+1"""
+        conn = self._make_conn()
+        event = self._make_event("member.voucher_used", {
+            "customer_id": "cccccccc-cccc-cccc-cccc-cccccccccccc",
+            "face_value_fen": 2000,
+        })
+        await projector.handle(event, conn)
+        calls_sql = [str(c.args[0]) for c in conn.execute.call_args_list]
+        assert any("voucher_used_count" in sql for sql in calls_sql)
+
+    @pytest.mark.asyncio
+    async def test_churn_predicted_sets_probability(self, projector):
+        """member.churn_predicted → churn_probability=0.85"""
+        conn = self._make_conn()
+        event = self._make_event("member.churn_predicted", {
+            "customer_id": "cccccccc-cccc-cccc-cccc-cccccccccccc",
+            "churn_probability": 0.85,
+            "next_visit_days": 30,
+        })
+        await projector.handle(event, conn)
+        calls_sql = [str(c.args[0]) for c in conn.execute.call_args_list]
+        assert any("churn_probability" in sql for sql in calls_sql)
+        # 概率值 0.85 应出现在参数中
+        all_args = [str(c) for c in conn.execute.call_args_list]
+        assert any("0.85" in s for s in all_args)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  K. InventoryBomProjector（Team C）
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+class TestInventoryBomProjector:
+
+    @pytest.fixture
+    def projector(self):
+        from shared.events.src.projectors.inventory_bom import InventoryBomProjector
+        return InventoryBomProjector(tenant_id="11111111-1111-1111-1111-111111111111")
+
+    def _make_conn(self):
+        conn = MagicMock()
+        conn.execute = AsyncMock()
+        return conn
+
+    def _make_event(self, event_type: str, payload: dict, store_id="22222222-2222-2222-2222-222222222222"):
+        return {
+            "event_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+            "event_type": event_type,
+            "tenant_id": "11111111-1111-1111-1111-111111111111",
+            "store_id": store_id,
+            "occurred_at": "2026-04-04T23:00:00+00:00",
+            "payload": payload,
+        }
+
+    @pytest.mark.asyncio
+    async def test_consumed_increments_theoretical_and_actual(self, projector):
+        """inventory.consumed → theoretical_usage_g++ 且 actual_usage_g++"""
+        conn = self._make_conn()
+        event = self._make_event("inventory.consumed", {
+            "ingredient_id": "dddddddd-dddd-dddd-dddd-dddddddddddd",
+            "ingredient_name": "猪肉",
+            "quantity_g": 200.0,
+            "theoretical_g": 190.0,
+        })
+        await projector.handle(event, conn)
+        calls_sql = [str(c.args[0]) for c in conn.execute.call_args_list]
+        assert any("theoretical_usage_g" in sql for sql in calls_sql)
+        assert any("actual_usage_g" in sql for sql in calls_sql)
+
+    @pytest.mark.asyncio
+    async def test_consumed_no_ingredient_id_skips(self, projector):
+        """payload 无 ingredient_id → 0 execute"""
+        conn = self._make_conn()
+        event = self._make_event("inventory.consumed", {
+            "ingredient_name": "猪肉",
+            "quantity_g": 200.0,
+        })
+        await projector.handle(event, conn)
+        conn.execute.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_wasted_increments_waste_g(self, projector):
+        """inventory.wasted → waste_g++"""
+        conn = self._make_conn()
+        event = self._make_event("inventory.wasted", {
+            "ingredient_id": "dddddddd-dddd-dddd-dddd-dddddddddddd",
+            "ingredient_name": "鸡蛋",
+            "quantity_g": 50.0,
+        })
+        await projector.handle(event, conn)
+        calls_sql = [str(c.args[0]) for c in conn.execute.call_args_list]
+        assert any("waste_g" in sql for sql in calls_sql)
+
+    @pytest.mark.asyncio
+    async def test_recalc_called_after_consumed(self, projector):
+        """inventory.consumed 后调用 _recalc_loss（SQL 包含 unexplained_loss_g 或 loss_rate）"""
+        conn = self._make_conn()
+        event = self._make_event("inventory.consumed", {
+            "ingredient_id": "dddddddd-dddd-dddd-dddd-dddddddddddd",
+            "ingredient_name": "面粉",
+            "quantity_g": 300.0,
+        })
+        await projector.handle(event, conn)
+        calls_sql = [str(c.args[0]) for c in conn.execute.call_args_list]
+        assert any("unexplained_loss_g" in sql or "loss_rate" in sql for sql in calls_sql)
+
+    @pytest.mark.asyncio
+    async def test_recalc_called_after_wasted(self, projector):
+        """inventory.wasted 后也调用 _recalc_loss"""
+        conn = self._make_conn()
+        event = self._make_event("inventory.wasted", {
+            "ingredient_id": "dddddddd-dddd-dddd-dddd-dddddddddddd",
+            "ingredient_name": "油",
+            "quantity_g": 100.0,
+        })
+        await projector.handle(event, conn)
+        calls_sql = [str(c.args[0]) for c in conn.execute.call_args_list]
+        assert any("unexplained_loss_g" in sql or "loss_rate" in sql for sql in calls_sql)
+
+    @pytest.mark.asyncio
+    async def test_no_store_id_skips_event(self, projector):
+        """无 store_id → 跳过，不触发任何 execute"""
+        conn = self._make_conn()
+        event = self._make_event("inventory.consumed", {
+            "ingredient_id": "dddddddd-dddd-dddd-dddd-dddddddddddd",
+            "quantity_g": 100.0,
+        })
+        event.pop("store_id")
+        await projector.handle(event, conn)
+        conn.execute.assert_not_called()

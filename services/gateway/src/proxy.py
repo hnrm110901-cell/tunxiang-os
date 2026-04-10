@@ -37,6 +37,20 @@ DOMAIN_ROUTES = {
     # 别名路由：print/* 和 kds/* 均转发到 tx-trade
     "print": os.getenv("TX_TRADE_URL", "http://localhost:8001"),
     "kds": os.getenv("TX_TRADE_URL", "http://localhost:8001"),
+    # Agent 子域路由（tx-agent:8008）
+    "agent-hub": os.getenv("TX_AGENT_URL", "http://localhost:8008"),
+    "agent-monitor": os.getenv("TX_AGENT_URL", "http://localhost:8008"),
+    "stream": os.getenv("TX_AGENT_URL", "http://localhost:8008"),
+    "daily-review": os.getenv("TX_AGENT_URL", "http://localhost:8008"),
+    "master-agent": os.getenv("TX_AGENT_URL", "http://localhost:8008"),
+    # Analytics 子域路由（tx-analytics:8009）
+    "nlq": os.getenv("TX_ANALYTICS_URL", "http://localhost:8009"),
+    "anomaly": os.getenv("TX_ANALYTICS_URL", "http://localhost:8009"),
+    "store-analysis": os.getenv("TX_ANALYTICS_URL", "http://localhost:8009"),
+    "knowledge-query": os.getenv("TX_ANALYTICS_URL", "http://localhost:8009"),
+    "narrative": os.getenv("TX_ANALYTICS_URL", "http://localhost:8009"),
+    # Supply 子域路由（tx-supply:8006）
+    "procurement-recommend": os.getenv("TX_SUPPLY_URL", "http://localhost:8006"),
 }
 
 # 旧单体回退（M4a 后可移除）

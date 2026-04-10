@@ -1,0 +1,4 @@
+interface:
+  display_name: "TX WeChat Pay"
+  short_description: "屯象OS微信支付接入流程、联调步骤与上线清单完整指引"
+  default_prompt: "请基于屯象OS现有代码，输出微信支付对接改造计划与实施清单。"

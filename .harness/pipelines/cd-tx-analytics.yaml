@@ -1,0 +1,419 @@
+pipeline:
+  name: cd-tx-analytics
+  identifier: cd_tx_analytics
+  projectIdentifier: TunXiangOS
+  orgIdentifier: default
+  description: "tx-analytics（经营分析）Dev / Test / UAT 持续交付流水线"
+  tags:
+    service: tx-analytics
+    track: cd
+
+  properties:
+    ci:
+      codebase:
+        connectorRef: github_tunxiang
+        repoName: tunxiang-os
+        build: <+input>
+
+  stages:
+    # ─────────────────────────────────────────────
+    # Stage 1: 部署到 Dev 环境
+    # ─────────────────────────────────────────────
+    - stage:
+        name: Deploy_Dev
+        identifier: Deploy_Dev
+        type: Deployment
+        spec:
+          deploymentType: Kubernetes
+          service:
+            serviceRef: svc_tx_analytics
+            serviceInputs:
+              serviceDefinition:
+                type: Kubernetes
+                spec:
+                  artifacts:
+                    primary:
+                      primaryArtifactRef: primary
+                      sources:
+                        - identifier: primary
+                          spec:
+                            tag: <+pipeline.variables.imageTag>
+          environment:
+            environmentRef: env_dev
+            deployToAll: false
+            infrastructureDefinitions:
+              - identifier: k8s_dev_shared
+                inputs:
+                  identifier: k8s_dev_shared
+                  type: KubernetesDirect
+                  spec:
+                    namespace: tunxiang-dev
+          execution:
+            steps:
+              - step:
+                  name: K8s_Rolling_Deploy_Dev
+                  identifier: K8s_Rolling_Deploy_Dev
+                  type: K8sRollingDeploy
+                  timeout: 10m
+                  spec:
+                    skipDryRun: false
+                    pruningEnabled: false
+                  failureStrategies:
+                    - onFailure:
+                        errors:
+                          - AllErrors
+                        action:
+                          type: StageRollback
+
+              - step:
+                  name: Post_Deploy_Healthcheck_Dev
+                  identifier: Post_Deploy_Healthcheck_Dev
+                  type: ShellScript
+                  timeout: 5m
+                  spec:
+                    shell: Bash
+                    onDelegate: true
+                    source:
+                      type: Inline
+                      spec:
+                        script: |
+                          #!/usr/bin/env bash
+                          set -euo pipefail
+                          HEALTH_URL="https://dev-api.tunxiangos.cn/tx-analytics/health"
+                          MAX_RETRY=10
+                          SLEEP_SEC=15
+                          echo ">>> 开始 Dev 健康检查: ${HEALTH_URL}"
+                          for i in $(seq 1 ${MAX_RETRY}); do
+                            echo "第 ${i}/${MAX_RETRY} 次探测..."
+                            HTTP_CODE=$(curl -sf -o /dev/null -w "%{http_code}" --max-time 10 "${HEALTH_URL}" || true)
+                            if [ "${HTTP_CODE}" = "200" ]; then
+                              echo "健康检查通过 (HTTP 200)"
+                              exit 0
+                            fi
+                            echo "HTTP ${HTTP_CODE}，等待 ${SLEEP_SEC}s..."
+                            sleep ${SLEEP_SEC}
+                          done
+                          echo "ERROR: 健康检查超时"
+                          exit 1
+
+            rollbackSteps:
+              - step:
+                  name: K8s_Rolling_Rollback_Dev
+                  identifier: K8s_Rolling_Rollback_Dev
+                  type: K8sRollingRollback
+                  timeout: 10m
+                  spec: {}
+
+    # ─────────────────────────────────────────────
+    # Stage 2: 部署到 Test 环境 + 集成测试
+    # ─────────────────────────────────────────────
+    - stage:
+        name: Deploy_Test
+        identifier: Deploy_Test
+        type: Deployment
+        dependsOn:
+          - Deploy_Dev
+        spec:
+          deploymentType: Kubernetes
+          service:
+            serviceRef: svc_tx_analytics
+            serviceInputs:
+              serviceDefinition:
+                type: Kubernetes
+                spec:
+                  artifacts:
+                    primary:
+                      primaryArtifactRef: primary
+                      sources:
+                        - identifier: primary
+                          spec:
+                            tag: <+pipeline.variables.imageTag>
+          environment:
+            environmentRef: env_test
+            deployToAll: false
+            infrastructureDefinitions:
+              - identifier: k8s_test_shared
+                inputs:
+                  identifier: k8s_test_shared
+                  type: KubernetesDirect
+                  spec:
+                    namespace: tunxiang-test
+          execution:
+            steps:
+              - step:
+                  name: K8s_Rolling_Deploy_Test
+                  identifier: K8s_Rolling_Deploy_Test
+                  type: K8sRollingDeploy
+                  timeout: 10m
+                  spec:
+                    skipDryRun: false
+                    pruningEnabled: false
+                  failureStrategies:
+                    - onFailure:
+                        errors:
+                          - AllErrors
+                        action:
+                          type: StageRollback
+
+              - step:
+                  name: Post_Deploy_Healthcheck_Test
+                  identifier: Post_Deploy_Healthcheck_Test
+                  type: ShellScript
+                  timeout: 5m
+                  spec:
+                    shell: Bash
+                    onDelegate: true
+                    source:
+                      type: Inline
+                      spec:
+                        script: |
+                          #!/usr/bin/env bash
+                          set -euo pipefail
+                          HEALTH_URL="https://test-api.tunxiangos.cn/tx-analytics/health"
+                          MAX_RETRY=10
+                          SLEEP_SEC=15
+                          echo ">>> 开始 Test 健康检查: ${HEALTH_URL}"
+                          for i in $(seq 1 ${MAX_RETRY}); do
+                            HTTP_CODE=$(curl -sf -o /dev/null -w "%{http_code}" --max-time 10 "${HEALTH_URL}" || true)
+                            if [ "${HTTP_CODE}" = "200" ]; then echo "健康检查通过"; exit 0; fi
+                            echo "HTTP ${HTTP_CODE}，等待 ${SLEEP_SEC}s..."
+                            sleep ${SLEEP_SEC}
+                          done
+                          echo "ERROR: 健康检查超时"; exit 1
+
+              - step:
+                  name: Run_Integration_Tests
+                  identifier: Run_Integration_Tests
+                  type: ShellScript
+                  timeout: 15m
+                  spec:
+                    shell: Bash
+                    onDelegate: true
+                    source:
+                      type: Inline
+                      spec:
+                        script: |
+                          #!/usr/bin/env bash
+                          set -euo pipefail
+                          echo ">>> 运行集成测试 (pytest) — tx-analytics"
+                          cd /harness
+                          export TEST_BASE_URL="https://test-api.tunxiangos.cn/tx-analytics"
+                          export PYTEST_OPTS="-v --tb=short --junitxml=test-results/integration.xml"
+
+                          if ! python -c "import pytest" 2>/dev/null; then
+                            pip install pytest pytest-asyncio httpx --quiet
+                          fi
+
+                          python -m pytest services/tx-analytics/tests/integration/ ${PYTEST_OPTS} || {
+                            echo "ERROR: 集成测试失败，请查看上方日志"
+                            exit 1
+                          }
+                          echo ">>> 集成测试全部通过"
+                    environmentVariables:
+                      - name: TEST_BASE_URL
+                        type: String
+                        value: https://test-api.tunxiangos.cn/tx-analytics
+                  failureStrategies:
+                    - onFailure:
+                        errors:
+                          - AllErrors
+                        action:
+                          type: Abort
+
+            rollbackSteps:
+              - step:
+                  name: K8s_Rolling_Rollback_Test
+                  identifier: K8s_Rolling_Rollback_Test
+                  type: K8sRollingRollback
+                  timeout: 10m
+                  spec: {}
+
+    # ─────────────────────────────────────────────
+    # Stage 3: DB 迁移门禁检测
+    # ─────────────────────────────────────────────
+    - stage:
+        name: Migration_Gate
+        identifier: Migration_Gate
+        type: Custom
+        dependsOn:
+          - Deploy_Test
+        spec:
+          execution:
+            steps:
+              - step:
+                  name: Check_Alembic_Migrations
+                  identifier: Check_Alembic_Migrations
+                  type: ShellScript
+                  timeout: 5m
+                  spec:
+                    shell: Bash
+                    onDelegate: true
+                    source:
+                      type: Inline
+                      spec:
+                        script: |
+                          #!/usr/bin/env bash
+                          set -uo pipefail
+                          REPO_PATH="${REPO_PATH:-/harness}"
+                          MIGRATION_APPROVAL_REQUIRED="${MIGRATION_APPROVAL_REQUIRED:-false}"
+                          VERSIONS_DIR="${REPO_PATH}/services/tx-analytics/alembic/versions"
+
+                          echo "========================================="
+                          echo "DB 迁移门禁 - tx-analytics"
+                          echo "========================================="
+
+                          if [ ! -d "${VERSIONS_DIR}" ]; then
+                            echo "WARNING: 未找到 alembic versions 目录，跳过"
+                            exit 0
+                          fi
+
+                          cd "${REPO_PATH}"
+                          NEW_MIGRATIONS=$(git diff --name-only HEAD~1 HEAD -- "services/tx-analytics/alembic/versions/*.py" 2>/dev/null | grep -E '\.py$' || true)
+
+                          if [ -z "${NEW_MIGRATIONS}" ]; then
+                            echo "OK: 未检测到新 migration 文件"
+                            exit 0
+                          fi
+
+                          echo "WARNING: 新增 migration 文件："
+                          echo "${NEW_MIGRATIONS}"
+                          echo "-----------------------------------------"
+                          echo "请确认：1.已在 dev/test 验证  2.已准备回滚 SQL  3.DB 已备份"
+
+                          if [ "${MIGRATION_APPROVAL_REQUIRED}" = "true" ]; then
+                            echo "ERROR: 检测到新迁移，MIGRATION_APPROVAL_REQUIRED=true，阻断流水线"
+                            exit 1
+                          fi
+                    environmentVariables:
+                      - name: MIGRATION_APPROVAL_REQUIRED
+                        type: String
+                        value: "false"
+                      - name: REPO_PATH
+                        type: String
+                        value: /harness
+
+    # ─────────────────────────────────────────────
+    # Stage 4: UAT 审批
+    # ─────────────────────────────────────────────
+    - stage:
+        name: Approve_UAT
+        identifier: Approve_UAT
+        type: Approval
+        dependsOn:
+          - Migration_Gate
+        spec:
+          execution:
+            steps:
+              - step:
+                  name: UAT_Approval
+                  identifier: UAT_Approval
+                  type: HarnessApproval
+                  timeout: 1d
+                  spec:
+                    approvalMessage: "请确认是否允许进入 UAT 验收环境，发布版本：<+pipeline.sequenceId>"
+                    includePipelineExecutionHistory: true
+                    approvers:
+                      userGroups:
+                        - qa_group
+                        - product_group
+                      minimumCount: 1
+                      disallowPipelineExecutor: false
+                    approverInputs: []
+                  failureStrategies:
+                    - onFailure:
+                        errors:
+                          - ApprovalRejection
+                        action:
+                          type: Abort
+
+    # ─────────────────────────────────────────────
+    # Stage 5: 部署到 UAT 环境
+    # ─────────────────────────────────────────────
+    - stage:
+        name: Deploy_UAT
+        identifier: Deploy_UAT
+        type: Deployment
+        dependsOn:
+          - Approve_UAT
+        spec:
+          deploymentType: Kubernetes
+          service:
+            serviceRef: svc_tx_analytics
+            serviceInputs:
+              serviceDefinition:
+                type: Kubernetes
+                spec:
+                  artifacts:
+                    primary:
+                      primaryArtifactRef: primary
+                      sources:
+                        - identifier: primary
+                          spec:
+                            tag: <+pipeline.variables.imageTag>
+          environment:
+            environmentRef: env_uat
+            deployToAll: false
+            infrastructureDefinitions:
+              - identifier: k8s_uat_shared
+                inputs:
+                  identifier: k8s_uat_shared
+                  type: KubernetesDirect
+                  spec:
+                    namespace: tunxiang-uat
+          execution:
+            steps:
+              - step:
+                  name: K8s_Rolling_Deploy_UAT
+                  identifier: K8s_Rolling_Deploy_UAT
+                  type: K8sRollingDeploy
+                  timeout: 10m
+                  spec:
+                    skipDryRun: false
+                    pruningEnabled: false
+                  failureStrategies:
+                    - onFailure:
+                        errors:
+                          - AllErrors
+                        action:
+                          type: StageRollback
+
+              - step:
+                  name: Post_Deploy_Healthcheck_UAT
+                  identifier: Post_Deploy_Healthcheck_UAT
+                  type: ShellScript
+                  timeout: 5m
+                  spec:
+                    shell: Bash
+                    onDelegate: true
+                    source:
+                      type: Inline
+                      spec:
+                        script: |
+                          #!/usr/bin/env bash
+                          set -euo pipefail
+                          HEALTH_URL="https://uat-api.tunxiangos.cn/tx-analytics/health"
+                          MAX_RETRY=10
+                          SLEEP_SEC=15
+                          echo ">>> UAT 健康检查: ${HEALTH_URL}"
+                          for i in $(seq 1 ${MAX_RETRY}); do
+                            HTTP_CODE=$(curl -sf -o /dev/null -w "%{http_code}" --max-time 10 "${HEALTH_URL}" || true)
+                            if [ "${HTTP_CODE}" = "200" ]; then echo "健康检查通过"; exit 0; fi
+                            echo "HTTP ${HTTP_CODE}，等待 ${SLEEP_SEC}s..."
+                            sleep ${SLEEP_SEC}
+                          done
+                          echo "ERROR: 健康检查超时"; exit 1
+
+            rollbackSteps:
+              - step:
+                  name: K8s_Rolling_Rollback_UAT
+                  identifier: K8s_Rolling_Rollback_UAT
+                  type: K8sRollingRollback
+                  timeout: 10m
+                  spec: {}
+
+  variables:
+    - name: imageTag
+      type: String
+      description: "待部署的镜像 Tag（通常由 CI 流水线传入）"
+      required: true
+      value: <+input>

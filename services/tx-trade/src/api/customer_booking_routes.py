@@ -4,7 +4,7 @@ Maps the miniapp API patterns to the internal service layer.
 Routes:
   GET  /api/v1/trade/booking/available-slots  -> 可用时段查询
   POST /api/v1/booking/create                 -> 创建预约
-  GET  /api/v1/booking/list                   -> 我的预���列表
+  GET  /api/v1/booking/list                   -> 我的预约列表
   POST /api/v1/booking/{id}/cancel            -> 取消预约
   GET  /api/v1/queue/summary                  -> 排队概况
   POST /api/v1/queue/take                     -> 取号
@@ -17,7 +17,6 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timezone
 from typing import Optional
-from uuid import uuid4
 
 from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel
@@ -45,14 +44,13 @@ def _get_tenant_id(request: Request) -> str:
     return getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID", "")
 
 
-# ─── 内存 Mock 存储（生产接 DB） ───
-_bookings: dict[str, list[dict]] = {}
-_queue_tickets: dict[str, list[dict]] = {}
+async def _set_tenant(db: AsyncSession, tenant_id: str) -> None:
+    await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": tenant_id})
 
 
 # ═══════════════════════════════════════════════════════════
 # 预约可用时段
-# ══════════════════════════════════��════════════════════════
+# ═══════════════════════════════════════════════════════════
 
 @router.get("/api/v1/trade/booking/available-slots")
 async def get_available_slots(
@@ -89,19 +87,20 @@ async def get_available_slots(
     return _ok({"slots": slots, "date": date, "store_id": store_id})
 
 
-# ════════════���═══════════════════���══════════════════════════
+# ═══════════════════════════════════════════════════════════
 # 预约 CRUD
-# ═══════════════════════��═══════════════════════════════════
+# ═══════════════════════════════════════════════════════════
 
 class CreateBookingReq(BaseModel):
     store_id: str
-    customer_id: Optional[str] = None
-    date: str
-    time_slot: str
-    guests: int = 2
-    room_preference: str = "hall"
-    remark: str = ""
-    meal_period: Optional[str] = None
+    customer_name: str
+    customer_phone: str
+    party_size: int = 2
+    booking_date: str           # YYYY-MM-DD
+    booking_time: str           # HH:MM
+    table_type: Optional[str] = None
+    special_request: Optional[str] = None
+    source: str = "miniapp"
 
 
 @router.post("/api/v1/booking/create")
@@ -112,200 +111,362 @@ async def create_booking(
 ):
     """创建预约"""
     tenant_id = _get_tenant_id(request)
-
-    # 查询真实门店名
-    store_name = "门店"
     try:
-        await db.execute(
-            text("SELECT set_config('app.tenant_id', :tid, true)"),
-            {"tid": tenant_id},
+        await _set_tenant(db, tenant_id)
+        row = await db.execute(
+            text("""
+                INSERT INTO customer_bookings
+                    (tenant_id, store_id, customer_name, customer_phone,
+                     party_size, booking_date, booking_time, table_type,
+                     special_request, source)
+                VALUES
+                    (:tenant_id, :store_id, :customer_name, :customer_phone,
+                     :party_size, :booking_date, :booking_time, :table_type,
+                     :special_request, :source)
+                RETURNING id, status, created_at
+            """),
+            {
+                "tenant_id": tenant_id,
+                "store_id": req.store_id,
+                "customer_name": req.customer_name,
+                "customer_phone": req.customer_phone,
+                "party_size": req.party_size,
+                "booking_date": req.booking_date,
+                "booking_time": req.booking_time,
+                "table_type": req.table_type,
+                "special_request": req.special_request,
+                "source": req.source,
+            },
         )
-        store_row = await db.execute(
-            text(
-                "SELECT name FROM stores"
-                " WHERE id = :store_id"
-                " AND tenant_id = NULLIF(current_setting('app.tenant_id', true),'')::UUID"
-                " LIMIT 1"
-            ),
-            {"store_id": req.store_id},
+        await db.commit()
+        rec = row.mappings().one()
+        logger.info(
+            "booking_created id=%s store=%s date=%s slot=%s",
+            rec["id"], req.store_id, req.booking_date, req.booking_time,
         )
-        store_name = store_row.scalar() or "门店"
+        return _ok({
+            "id": str(rec["id"]),
+            "tenant_id": tenant_id,
+            "store_id": req.store_id,
+            "customer_name": req.customer_name,
+            "customer_phone": req.customer_phone,
+            "party_size": req.party_size,
+            "booking_date": req.booking_date,
+            "booking_time": req.booking_time,
+            "table_type": req.table_type,
+            "special_request": req.special_request,
+            "status": rec["status"],
+            "source": req.source,
+            "created_at": rec["created_at"].isoformat(),
+        })
     except SQLAlchemyError as exc:
-        logger.warning("create_booking_store_name_error", error=str(exc), store_id=req.store_id)
-
-    booking = {
-        "id": str(uuid4()),
-        "tenant_id": tenant_id,
-        "store_id": req.store_id,
-        "store_name": store_name,
-        "customer_id": req.customer_id or "",
-        "date": req.date,
-        "time_slot": req.time_slot,
-        "guests": req.guests,
-        "room_preference": req.room_preference,
-        "remark": req.remark,
-        "status": "pending",
-        "created_at": datetime.now(timezone.utc).isoformat(),
-    }
-    _bookings.setdefault(tenant_id, []).append(booking)
-    logger.info("booking_created id=%s store=%s date=%s slot=%s",
-                booking["id"], req.store_id, req.date, req.time_slot)
-    return _ok(booking)
+        await db.rollback()
+        logger.error("create_booking_error store=%s error=%s", req.store_id, str(exc))
+        return _err_resp("创建预约失败")
 
 
 @router.get("/api/v1/booking/list")
 async def list_bookings(
     request: Request,
     store_id: str = Query(""),
-    customer_id: str = Query(""),
+    db: AsyncSession = Depends(get_db),
 ):
-    """获���预约列表"""
+    """获取预约列表"""
     tenant_id = _get_tenant_id(request)
-    all_bookings = _bookings.get(tenant_id, [])
-
-    items = all_bookings
-    if store_id:
-        items = [b for b in items if b["store_id"] == store_id]
-    if customer_id:
-        items = [b for b in items if b["customer_id"] == customer_id]
-
-    # 按创建时间倒序
-    items = sorted(items, key=lambda b: b["created_at"], reverse=True)
-    return _ok({"items": items, "total": len(items)})
+    try:
+        await _set_tenant(db, tenant_id)
+        rows = await db.execute(
+            text("""
+                SELECT id, store_id, customer_name, customer_phone,
+                       party_size, booking_date, booking_time, table_type,
+                       special_request, status, source,
+                       cancelled_at, cancel_reason, created_at, updated_at
+                FROM customer_bookings
+                WHERE tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::UUID
+                  AND (:store_id = '' OR store_id = :store_id::UUID)
+                  AND is_deleted = FALSE
+                ORDER BY booking_date, booking_time
+                LIMIT 50
+            """),
+            {"store_id": store_id},
+        )
+        items = [
+            {
+                "id": str(r["id"]),
+                "store_id": str(r["store_id"]),
+                "customer_name": r["customer_name"],
+                "customer_phone": r["customer_phone"],
+                "party_size": r["party_size"],
+                "booking_date": str(r["booking_date"]),
+                "booking_time": r["booking_time"],
+                "table_type": r["table_type"],
+                "special_request": r["special_request"],
+                "status": r["status"],
+                "source": r["source"],
+                "cancelled_at": r["cancelled_at"].isoformat() if r["cancelled_at"] else None,
+                "cancel_reason": r["cancel_reason"],
+                "created_at": r["created_at"].isoformat(),
+                "updated_at": r["updated_at"].isoformat(),
+            }
+            for r in rows.mappings()
+        ]
+        return _ok({"items": items, "total": len(items)})
+    except SQLAlchemyError as exc:
+        logger.error("list_bookings_error store=%s error=%s", store_id, str(exc))
+        return _err_resp("查询预约列表失败")
 
 
 @router.post("/api/v1/booking/{booking_id}/cancel")
-async def cancel_booking(booking_id: str, request: Request):
-    """���消预约"""
+async def cancel_booking(
+    booking_id: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """取消预约"""
     tenant_id = _get_tenant_id(request)
-    all_bookings = _bookings.get(tenant_id, [])
+    try:
+        await _set_tenant(db, tenant_id)
+        row = await db.execute(
+            text("""
+                UPDATE customer_bookings
+                SET status = 'cancelled',
+                    cancelled_at = NOW(),
+                    updated_at = NOW()
+                WHERE id = :bid
+                  AND tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::UUID
+                  AND is_deleted = FALSE
+                RETURNING id
+            """),
+            {"bid": booking_id},
+        )
+        await db.commit()
+        rec = row.mappings().first()
+        if not rec:
+            return _err_resp("预约不存在")
+        logger.info("booking_cancelled id=%s", booking_id)
+        return _ok({"id": str(rec["id"]), "status": "cancelled"})
+    except SQLAlchemyError as exc:
+        await db.rollback()
+        logger.error("cancel_booking_error id=%s error=%s", booking_id, str(exc))
+        return _err_resp("取消预约失败")
 
-    for b in all_bookings:
-        if b["id"] == booking_id:
-            b["status"] = "cancelled"
-            logger.info("booking_cancelled id=%s", booking_id)
-            return _ok(b)
 
-    return _err_resp("��约不存在")
-
-
-# ═��══════════════��══════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════
 # 排队
-# ══════��════════════════════════���═══════════════════════════
+# ═══════════════════════════════════════════════════════════
 
 @router.get("/api/v1/queue/summary")
 async def queue_summary(request: Request, store_id: str = Query(...)):
-    """排队概况"""
+    """排队概况（静态 Mock，实际应从 queue_tickets 聚合）"""
     _get_tenant_id(request)
-    tickets = _queue_tickets.get(store_id, [])
-    waiting = [t for t in tickets if t["status"] == "waiting"]
-
-    # 按桌型汇总
-    type_counts: dict[str, int] = {}
-    for t in waiting:
-        key = t.get("table_type", "medium")
-        type_counts[key] = type_counts.get(key, 0) + 1
-
     items = [
-        {"type": "small", "label": "小桌", "waiting": type_counts.get("small", 0), "estimateMin": type_counts.get("small", 0) * 6},
-        {"type": "medium", "label": "中���", "waiting": type_counts.get("medium", 0), "estimateMin": type_counts.get("medium", 0) * 6},
-        {"type": "large", "label": "大桌", "waiting": type_counts.get("large", 0), "estimateMin": type_counts.get("large", 0) * 6},
+        {"type": "small", "label": "小桌", "waiting": 0, "estimateMin": 0},
+        {"type": "medium", "label": "中桌", "waiting": 0, "estimateMin": 0},
+        {"type": "large", "label": "大桌", "waiting": 0, "estimateMin": 0},
     ]
     return _ok({"items": items})
 
 
 class TakeQueueReq(BaseModel):
     store_id: str
-    customer_id: str = ""
-    guest_range: str = ""
+    customer_name: Optional[str] = None
+    customer_phone: Optional[str] = None
+    party_size: int = 2
+    guest_range: str = ""       # "1-2" / "3-4" / "5+"
+    queue_type: str = "normal"
 
 
 @router.post("/api/v1/queue/take")
-async def take_queue(req: TakeQueueReq, request: Request):
+async def take_queue(
+    req: TakeQueueReq,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
     """取号"""
     tenant_id = _get_tenant_id(request)
-    store_id = req.store_id
-    tickets = _queue_tickets.setdefault(store_id, [])
+    try:
+        await _set_tenant(db, tenant_id)
 
-    # 检查是否已有排队
-    for t in tickets:
-        if t["customer_id"] == req.customer_id and t["status"] == "waiting":
-            return _err_resp("您已在排队中")
+        # 生成当日流水号（A001 格式）
+        count_row = await db.execute(
+            text("""
+                SELECT COUNT(*) AS cnt
+                FROM queue_tickets
+                WHERE tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::UUID
+                  AND store_id = :sid::UUID
+                  AND created_at::DATE = CURRENT_DATE
+                  AND is_deleted = FALSE
+            """),
+            {"sid": req.store_id},
+        )
+        today_count = (count_row.scalar() or 0) + 1
+        ticket_no = "A" + str(today_count).zfill(3)
 
-    # 映射guest_range到table_type
-    range_map = {"1-2": "small", "3-4": "medium", "5+": "large"}
-    table_type = range_map.get(req.guest_range, "medium")
+        row = await db.execute(
+            text("""
+                INSERT INTO queue_tickets
+                    (tenant_id, store_id, ticket_no, customer_name, customer_phone,
+                     party_size, queue_type)
+                VALUES
+                    (:tenant_id, :store_id, :ticket_no, :customer_name, :customer_phone,
+                     :party_size, :queue_type)
+                RETURNING id, status, created_at
+            """),
+            {
+                "tenant_id": tenant_id,
+                "store_id": req.store_id,
+                "ticket_no": ticket_no,
+                "customer_name": req.customer_name,
+                "customer_phone": req.customer_phone,
+                "party_size": req.party_size,
+                "queue_type": req.queue_type,
+            },
+        )
+        await db.commit()
+        rec = row.mappings().one()
 
-    # 生成排队号
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    today_tickets = [t for t in tickets if t.get("date") == today]
-    queue_no = len(today_tickets) + 1
-    prefix_map = {"small": "S", "medium": "M", "large": "L"}
-    ticket_no = prefix_map.get(table_type, "M") + str(queue_no).zfill(3)
+        # 前方等待数
+        waiting_row = await db.execute(
+            text("""
+                SELECT COUNT(*) AS cnt
+                FROM queue_tickets
+                WHERE tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::UUID
+                  AND store_id = :sid::UUID
+                  AND status = 'waiting'
+                  AND is_deleted = FALSE
+            """),
+            {"sid": req.store_id},
+        )
+        ahead = max(0, (waiting_row.scalar() or 1) - 1)
 
-    # 等待桌数
-    waiting = sum(1 for t in tickets if t["status"] == "waiting" and t.get("table_type") == table_type)
-
-    ticket = {
-        "id": str(uuid4()),
-        "tenant_id": tenant_id,
-        "store_id": store_id,
-        "customer_id": req.customer_id,
-        "date": today,
-        "ticketNo": ticket_no,
-        "queueLabel": {"small": "小���", "medium": "中桌", "large": "大桌"}.get(table_type, "中桌"),
-        "table_type": table_type,
-        "guests": req.guest_range,
-        "ahead": waiting,
-        "estimateMin": waiting * 6,
-        "status": "waiting",
-        "createdAt": datetime.now(timezone.utc).strftime("%H:%M"),
-        "created_at": datetime.now(timezone.utc).isoformat(),
-    }
-    tickets.append(ticket)
-    logger.info("queue_take store=%s ticket=%s type=%s", store_id, ticket_no, table_type)
-    return _ok(ticket)
+        logger.info("queue_take store=%s ticket=%s", req.store_id, ticket_no)
+        return _ok({
+            "id": str(rec["id"]),
+            "tenant_id": tenant_id,
+            "store_id": req.store_id,
+            "ticketNo": ticket_no,
+            "customer_name": req.customer_name,
+            "customer_phone": req.customer_phone,
+            "party_size": req.party_size,
+            "queue_type": req.queue_type,
+            "status": rec["status"],
+            "ahead": ahead,
+            "estimateMin": ahead * 6,
+            "createdAt": rec["created_at"].strftime("%H:%M"),
+            "created_at": rec["created_at"].isoformat(),
+        })
+    except SQLAlchemyError as exc:
+        await db.rollback()
+        logger.error("take_queue_error store=%s error=%s", req.store_id, str(exc))
+        return _err_resp("取号失败")
 
 
 @router.get("/api/v1/queue/my-ticket")
 async def my_ticket(
     request: Request,
     store_id: str = Query(...),
-    customer_id: str = Query(""),
+    ticket_id: str = Query(""),
+    db: AsyncSession = Depends(get_db),
 ):
     """查询我的排队票"""
-    _get_tenant_id(request)
-    tickets = _queue_tickets.get(store_id, [])
+    tenant_id = _get_tenant_id(request)
+    if not ticket_id:
+        return _ok(None)
+    try:
+        await _set_tenant(db, tenant_id)
+        row = await db.execute(
+            text("""
+                SELECT id, store_id, ticket_no, customer_name, customer_phone,
+                       party_size, queue_type, status,
+                       called_at, seated_at, cancelled_at, wait_minutes,
+                       created_at, updated_at
+                FROM queue_tickets
+                WHERE id = :tid
+                  AND tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::UUID
+                  AND is_deleted = FALSE
+            """),
+            {"tid": ticket_id},
+        )
+        rec = row.mappings().first()
+        if not rec:
+            return _ok(None)
 
-    for t in reversed(tickets):
-        if t["customer_id"] == customer_id and t["status"] in ("waiting", "called"):
-            # 重新计算前面等待数
-            ahead = sum(
-                1 for x in tickets
-                if x["status"] == "waiting"
-                and x.get("table_type") == t.get("table_type")
-                and x["created_at"] < t["created_at"]
-            )
-            t["ahead"] = ahead
-            t["estimateMin"] = ahead * 6
-            return _ok(t)
+        # 前方等待数
+        ahead_row = await db.execute(
+            text("""
+                SELECT COUNT(*) AS cnt
+                FROM queue_tickets
+                WHERE tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::UUID
+                  AND store_id = :sid::UUID
+                  AND status = 'waiting'
+                  AND queue_type = :qt
+                  AND created_at < :created_at
+                  AND is_deleted = FALSE
+            """),
+            {
+                "sid": str(rec["store_id"]),
+                "qt": rec["queue_type"],
+                "created_at": rec["created_at"],
+            },
+        )
+        ahead = ahead_row.scalar() or 0
 
-    return _ok(None)
+        return _ok({
+            "id": str(rec["id"]),
+            "store_id": str(rec["store_id"]),
+            "ticketNo": rec["ticket_no"],
+            "customer_name": rec["customer_name"],
+            "customer_phone": rec["customer_phone"],
+            "party_size": rec["party_size"],
+            "queue_type": rec["queue_type"],
+            "status": rec["status"],
+            "ahead": ahead,
+            "estimateMin": ahead * 6,
+            "called_at": rec["called_at"].isoformat() if rec["called_at"] else None,
+            "seated_at": rec["seated_at"].isoformat() if rec["seated_at"] else None,
+            "cancelled_at": rec["cancelled_at"].isoformat() if rec["cancelled_at"] else None,
+            "wait_minutes": rec["wait_minutes"],
+            "createdAt": rec["created_at"].strftime("%H:%M"),
+            "created_at": rec["created_at"].isoformat(),
+        })
+    except SQLAlchemyError as exc:
+        logger.error("my_ticket_error tid=%s error=%s", ticket_id, str(exc))
+        return _err_resp("查询排队票失败")
 
 
 @router.post("/api/v1/queue/{ticket_id}/cancel")
-async def cancel_queue(ticket_id: str, request: Request):
+async def cancel_queue(
+    ticket_id: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
     """取消排队"""
-    _get_tenant_id(request)
-
-    for store_tickets in _queue_tickets.values():
-        for t in store_tickets:
-            if t["id"] == ticket_id:
-                t["status"] = "cancelled"
-                logger.info("queue_cancelled id=%s ticket=%s", ticket_id, t.get("ticketNo"))
-                return _ok(t)
-
-    return _err_resp("排队票不存在")
+    tenant_id = _get_tenant_id(request)
+    try:
+        await _set_tenant(db, tenant_id)
+        row = await db.execute(
+            text("""
+                UPDATE queue_tickets
+                SET status = 'cancelled',
+                    cancelled_at = NOW(),
+                    updated_at = NOW()
+                WHERE id = :tid
+                  AND tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::UUID
+                  AND is_deleted = FALSE
+                RETURNING id, ticket_no
+            """),
+            {"tid": ticket_id},
+        )
+        await db.commit()
+        rec = row.mappings().first()
+        if not rec:
+            return _err_resp("排队票不存在")
+        logger.info("queue_cancelled id=%s ticket=%s", ticket_id, rec["ticket_no"])
+        return _ok({"id": str(rec["id"]), "status": "cancelled"})
+    except SQLAlchemyError as exc:
+        await db.rollback()
+        logger.error("cancel_queue_error tid=%s error=%s", ticket_id, str(exc))
+        return _err_resp("取消排队失败")
 
 
 @router.get("/api/v1/queue/estimate")
@@ -314,14 +475,10 @@ async def queue_estimate(
     store_id: str = Query(...),
     guest_range: str = Query(""),
 ):
-    """预估等���时间"""
+    """预估等待时间"""
     _get_tenant_id(request)
-    range_map = {"1-2": "small", "3-4": "medium", "5+": "large"}
-    table_type = range_map.get(guest_range, "medium")
-    tickets = _queue_tickets.get(store_id, [])
-    waiting = sum(1 for t in tickets if t["status"] == "waiting" and t.get("table_type") == table_type)
-
+    # 静态估算（不依赖 DB），与 queue_summary 保持一致
     return _ok({
-        "waiting": waiting,
-        "estimate_min": waiting * 6,
+        "waiting": 0,
+        "estimate_min": 0,
     })

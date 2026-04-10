@@ -1,0 +1,66 @@
+replicaCount: 2
+
+image:
+  repository: tunxiang/web-admin
+  pullPolicy: IfNotPresent
+  tag: latest
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 80
+
+ingress:
+  enabled: true
+  className: nginx
+  host: admin.tunxiangos.cn
+  tls: true
+  tlsSecretName: admin-tunxiangos-cn-tls
+
+resources:
+  limits:
+    cpu: 200m
+    memory: 128Mi
+  requests:
+    cpu: 50m
+    memory: 64Mi
+
+# 前端构建时注入的环境变量（写入nginx env配置）
+configMap:
+  name: web-admin-config
+  data:
+    VITE_API_BASE_URL: https://api.tunxiangos.cn
+    VITE_APP_ENV: prod
+    VITE_WS_BASE_URL: wss://api.tunxiangos.cn
+
+# nginx配置文件挂载
+nginxConfig:
+  configMapName: web-admin-nginx-conf
+  mountPath: /etc/nginx/conf.d
+
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 70
+
+livenessProbe:
+  httpGet:
+    path: /
+    port: 80
+  initialDelaySeconds: 10
+  periodSeconds: 15
+
+readinessProbe:
+  httpGet:
+    path: /
+    port: 80
+  initialDelaySeconds: 5
+  periodSeconds: 5
+
+podAntiAffinity:
+  enabled: true
+
+podAnnotations: {}
+nodeSelector: {}
+tolerations: []

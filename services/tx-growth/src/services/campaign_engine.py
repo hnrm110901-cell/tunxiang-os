@@ -50,6 +50,7 @@ class CampaignEngine:
         "profile_reward", "coupon_return", "sign_in", "lottery",
         "red_packet", "report_draw",
         "group_buy", "stamp_card",
+        "consumption_cashback", "nth_item_discount",
     ]
 
     async def create_campaign(
@@ -350,6 +351,7 @@ class TriggerEngine:
         consume_types = {
             "spend_reward", "cumulative_amount", "cumulative_count",
             "coupon_return", "fixed_dish",
+            "consumption_cashback", "nth_item_discount",
         }
         active_campaigns = await repo.get_active_by_types(consume_types)
 
@@ -372,6 +374,14 @@ class TriggerEngine:
             elif campaign_type == "fixed_dish":
                 target_dishes = config.get("target_dish_ids", [])
                 if set(target_dishes) & set(order.get("dish_ids", [])):
+                    triggered = True
+            elif campaign_type == "consumption_cashback":
+                # 消费返现：有消费金额即触发（execute内部做门槛判断）
+                if order.get("total_fen", 0) > 0:
+                    triggered = True
+            elif campaign_type == "nth_item_discount":
+                # 第N份M折：有菜品明细即触发（execute内部做匹配判断）
+                if order.get("items") or order.get("dish_ids"):
                     triggered = True
 
             if triggered:

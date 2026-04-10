@@ -1,0 +1,127 @@
+# 屯象OS 非生产环境成本治理策略 V1
+# 参考 Harness CCM AutoStopping 文档格式
+# 最后更新: 2026-04-06
+# 维护人: 李淳（屯象OS创始人）
+#
+# 生效环境: dev / test / uat / demo
+# 不适用: pilot / prod（7x24 运行，不做自动停机）
+
+autoStoppingRules:
+
+  # ──────────────────────────────────────────────
+  # DEV 环境：工作日夜间自动停机
+  # ──────────────────────────────────────────────
+  - name: dev-nightly-shutdown
+    identifier: dev_nightly_shutdown
+    description: dev环境工作日夜间自动停机，降低空跑成本
+    environments: [env_dev]
+    schedule:
+      shutdown:
+        timezone: Asia/Shanghai
+        weekdays: "Mon-Fri"
+        time: "22:00"   # 晚10点停机
+      startup:
+        timezone: Asia/Shanghai
+        weekdays: "Mon-Fri"
+        time: "08:30"   # 早8:30自动启动
+    idle_detection:
+      enabled: true
+      idle_threshold_minutes: 30    # 30分钟无请求活动自动提前停
+      exclude_health_checks: true   # 排除健康检查心跳
+    exclude_from_shutdown:
+      - namespace: tunxiang-dev
+        selector: critical=true     # 标记 critical=true 的 Pod 不参与停机
+    notifications:
+      pre_shutdown_warning_minutes: 10
+      channels: [wecom]
+
+  # ──────────────────────────────────────────────
+  # TEST 环境：工作日运行，周末全停
+  # ──────────────────────────────────────────────
+  - name: test-weekend-shutdown
+    identifier: test_weekend_shutdown
+    description: test环境工作日运行，周末全量停机
+    environments: [env_test]
+    schedule:
+      shutdown:
+        timezone: Asia/Shanghai
+        weekdays: "Mon-Fri"
+        time: "23:00"
+      startup:
+        timezone: Asia/Shanghai
+        weekdays: "Mon-Fri"
+        time: "08:00"
+      weekend: shutdown_all         # 周六00:00起全停，周一08:00恢复
+    idle_detection:
+      enabled: true
+      idle_threshold_minutes: 60    # 工作日1小时无活动提前停
+    notifications:
+      pre_shutdown_warning_minutes: 15
+      channels: [wecom]
+
+  # ──────────────────────────────────────────────
+  # UAT 环境：按需使用，4小时无活动自动停
+  # ──────────────────────────────────────────────
+  - name: uat-idle-shutdown
+    identifier: uat_idle_shutdown
+    description: UAT环境按需使用，4小时无活动自动停机
+    environments: [env_uat]
+    idle_detection:
+      enabled: true
+      idle_threshold_minutes: 240   # 4小时无活动自动停
+      exclude_health_checks: true
+    startup:
+      # 收到请求时自动冷启动（AutoStopping热启动）
+      auto_warmup_on_request: true
+      warmup_timeout_seconds: 120
+    notifications:
+      pre_shutdown_warning_minutes: 20
+      channels: [wecom]
+
+  # ──────────────────────────────────────────────
+  # DEMO 环境：7天未访问自动回收
+  # ──────────────────────────────────────────────
+  - name: demo-7day-cleanup
+    identifier: demo_7day_cleanup
+    description: demo环境7天未访问自动停机回收，售前演示结束后清理资源
+    environments: [env_demo]
+    idle_detection:
+      enabled: true
+      idle_threshold_minutes: 10080   # 7天 = 7 × 24 × 60
+    cleanup:
+      # 停机后额外执行清理：删除该 demo tenant 的 DB schema
+      on_shutdown_hook: scripts/cleanup-demo-env.sh
+      delete_pvcs: true
+      retain_logs_days: 30
+    notifications:
+      pre_shutdown_warning_minutes: 60
+      channels: [wecom, email]
+      warning_message: "Demo环境即将因7天未访问而回收，如需保留请联系销售团队续期"
+
+  # ──────────────────────────────────────────────
+  # Pilot / Prod 声明（仅注释，不配置停机）
+  # ──────────────────────────────────────────────
+  # env_pilot: 7x24 运行，Harness CCM 仅做监控，不做 AutoStopping
+  # env_prod:  7x24 运行，Harness CCM 仅做监控，不做 AutoStopping
+
+# ──────────────────────────────────────────────
+# GPU / 大内存资源（Agent实验环境）按需管理
+# ──────────────────────────────────────────────
+gpuResources:
+  - name: agent-test-on-demand
+    identifier: agent_test_on_demand
+    description: tx-brain / Agent实验环境（含GPU/大内存）按需启动，最长4小时
+    environments: [env_test]
+    selector:
+      labels:
+        workload: agent-experiment
+    default_state: stopped          # 默认停止，必须手动/流水线触发启动
+    startup_on_request: true
+    max_runtime_hours: 4            # 最长连续运行4小时后强制停机
+    notifications:
+      pre_shutdown_warning_minutes: 30
+      channels: [wecom]
+      warning_message: "Agent实验环境将在30分钟后自动停机（已达4小时上限）"
+    cost_tags:
+      cost_center: ai
+      team: agent

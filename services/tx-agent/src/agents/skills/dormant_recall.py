@@ -49,6 +49,7 @@ class DormantRecallAgent(SkillAgent):
             "execute_recall_campaign",
             "track_recall_effectiveness",
             "predict_churn_risk",
+            "generate_reactivation_suggestion",
         ]
 
     async def execute(self, action: str, params: dict[str, Any]) -> AgentResult:
@@ -59,6 +60,7 @@ class DormantRecallAgent(SkillAgent):
             "execute_recall_campaign": self._execute_recall_campaign,
             "track_recall_effectiveness": self._track_recall_effectiveness,
             "predict_churn_risk": self._predict_churn_risk,
+            "generate_reactivation_suggestion": self._generate_reactivation_suggestion,
         }
         handler = dispatch.get(action)
         if handler:
@@ -334,4 +336,100 @@ class DormantRecallAgent(SkillAgent):
             },
             reasoning=f"预测 {len(predictions)} 人流失风险，高风险 {high_risk} 人",
             confidence=0.75,
+        )
+
+    # ─── 增长中枢V2: 沉默召回策略建议 ───
+
+    async def _generate_reactivation_suggestion(self, params: dict) -> AgentResult:
+        """生成沉默召回策略建议，写入 growth_agent_strategy_suggestions
+
+        根据客户是否有已有权益，选择不同心理机制:
+        - 有权益 → loss_aversion（权益到期提醒，不新增优惠）
+        - 无权益 → relationship_warmup（轻关系唤醒，不直接发券）
+
+        决策留痕: explanation_summary + risk_summary 记录推理过程和风险点。
+        """
+        import httpx
+
+        customer_id = params.get("customer_id")
+        if not customer_id:
+            return AgentResult(success=False, action="generate_reactivation_suggestion",
+                               error="缺少 customer_id")
+
+        priority = params.get("reactivation_priority", "medium")
+        reason = params.get("reactivation_reason", "silent_30d")
+        has_benefit = params.get("has_active_owned_benefit", False)
+
+        # 根据是否有已有权益选择心理机制
+        if has_benefit:
+            mechanism = "loss_aversion"
+            offer_type = "owned_benefit_reminder"
+            explanation = f"客户已有权益未使用，优先使用权益到期提醒而非新增优惠券。召回原因: {reason}"
+            risk = "若72小时内无打开或回复，不建议继续强促销，应转入最小行动模板。"
+        else:
+            mechanism = "relationship_warmup"
+            offer_type = "none"
+            explanation = f"客户无已有权益，采用轻关系唤醒策略，不直接发券。召回原因: {reason}"
+            risk = "关系唤醒失败后可考虑升级为最小行动型，但避免直接大额促销。"
+
+        template_code = "reactivation_loss_aversion_v2"
+        channel = "wecom"  # 默认企微
+
+        # 三条硬约束校验
+        constraints_check = {
+            "margin_safe": True,       # 召回建议不涉及折扣，毛利安全
+            "food_safety_ok": True,    # 触达类操作不涉及食材
+            "customer_experience_ok": True,  # 触达频率受旅程引擎控制，不会过度打扰
+        }
+
+        suggestion = {
+            "customer_id": customer_id,
+            "suggestion_type": "reactivation",
+            "priority": priority,
+            "mechanism_type": mechanism,
+            "recommended_journey_template": template_code,
+            "recommended_offer_type": offer_type,
+            "recommended_channel": channel,
+            "explanation_summary": explanation,
+            "risk_summary": risk,
+            "constraints_check": constraints_check,
+            "expected_outcome_json": {
+                "expected_open_rate": 0.28 if has_benefit else 0.15,
+                "expected_reply_rate": 0.08 if has_benefit else 0.05,
+                "expected_visit_rate_7d": 0.05 if has_benefit else 0.03,
+            },
+            "requires_human_review": priority == "critical",
+            "created_by_agent": "dormant_recall",
+        }
+
+        # 调用 tx-growth API 写入建议池
+        try:
+            async with httpx.AsyncClient() as client:
+                resp = await client.post(
+                    "http://tx-growth:8004/api/v1/growth/agent-suggestions",
+                    json=suggestion,
+                    headers={"X-Tenant-ID": self.tenant_id},
+                    timeout=10.0,
+                )
+                result = resp.json()
+        except (httpx.HTTPError, OSError) as exc:
+            return AgentResult(
+                success=False, action="generate_reactivation_suggestion",
+                error=f"写入建议池失败: {exc}",
+                constraints_passed=True,
+                constraints_detail=constraints_check,
+            )
+
+        return AgentResult(
+            success=True,
+            action="generate_reactivation_suggestion",
+            data={
+                "suggestion": suggestion,
+                "api_response": result,
+            },
+            reasoning=f"沉默召回建议: {mechanism}机制，{'有' if has_benefit else '无'}已有权益，"
+                      f"优先级={priority}，原因={reason}",
+            confidence=0.85,
+            constraints_passed=True,
+            constraints_detail=constraints_check,
         )

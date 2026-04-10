@@ -18,6 +18,28 @@ import structlog
 
 logger = structlog.get_logger()
 
+# ─── Feature Flag SDK（可选依赖，ImportError时全部Flag默认为enabled）───
+try:
+    from shared.feature_flags import is_enabled as _ff_is_enabled
+    from shared.feature_flags.flag_names import AgentFlags as _AgentFlags
+    _FEATURE_FLAGS_AVAILABLE = True
+except ImportError:
+    _FEATURE_FLAGS_AVAILABLE = False
+    logger.warning(
+        "feature_flags_sdk_not_available",
+        reason="import failed, all agent flags default to enabled",
+    )
+
+
+def _agent_flag_enabled(flag: str) -> bool:
+    """检查Agent Feature Flag是否开启。
+    SDK不可用时返回True（降级为全部开启），不影响现有逻辑。
+    """
+    if not _FEATURE_FLAGS_AVAILABLE:
+        return True
+    return _ff_is_enabled(flag)
+
+
 # ─── 调度配置 ───
 
 AGENT_SCHEDULES: dict[str, dict[str, Any]] = {
@@ -138,6 +160,16 @@ def generate_daily_plans_for_all_stores(
     Returns:
         每个门店的计划生成结果列表
     """
+    # Feature Flag 检查：AgentFlags.HR_SHIFT_SUGGEST
+    # 关闭时跳过排班建议生成，降级为仅记录日志，不影响其他计划生成逻辑
+    if not _agent_flag_enabled(_AgentFlags.HR_SHIFT_SUGGEST if _FEATURE_FLAGS_AVAILABLE else "agent.hr.shift_suggest.enable"):
+        logger.info(
+            "hr_shift_suggest_agent_disabled",
+            reason="feature_flag_disabled",
+            flag="agent.hr.shift_suggest.enable",
+        )
+        return []
+
     results = []
     for store_id in active_store_ids:
         plan_id = f"PLAN_{time.strftime('%Y%m%d')}_{store_id}"
@@ -188,6 +220,18 @@ def auto_execute_approved_plans(
     Returns:
         状态变更结果列表
     """
+    # Feature Flag 检查：AgentFlags.HR_SHIFT_AUTO_EXECUTE（高风险 — L2自治级别）
+    # 关闭时跳过自动执行，计划停留在 approved 状态等待人工处理
+    # 注意：此Flag默认关闭，仅L2级别门店经三级审批后方可开启
+    if not _agent_flag_enabled(_AgentFlags.HR_SHIFT_AUTO_EXECUTE if _FEATURE_FLAGS_AVAILABLE else "agent.hr.shift_suggest.auto_execute"):
+        logger.info(
+            "hr_shift_auto_execute_disabled",
+            reason="feature_flag_disabled",
+            flag="agent.hr.shift_suggest.auto_execute",
+            pending_plans=len(approved_plans),
+        )
+        return []
+
     results = []
     for plan in approved_plans:
         if plan.get("status") == "approved":

@@ -1,0 +1,82 @@
+# tx-org — 组织人事微服务
+
+replicaCount: 2
+
+image:
+  repository: tunxiang/tx-org
+  pullPolicy: IfNotPresent
+  tag: latest
+
+service:
+  type: ClusterIP
+  port: 8012
+  targetPort: 8012
+
+ingress:
+  enabled: false
+  className: nginx
+  host: ""
+  tls: false
+  tlsSecretName: ""
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 200m
+    memory: 256Mi
+
+env:
+  TUNXIANG_ENV: prod
+  LOG_LEVEL: info
+  # HR Agent调度器：控制智能排班建议Agent的定时调度是否启动
+  # 对应 AgentFlags.HR_SHIFT_SUGGEST，生产环境默认开启
+  HR_AGENT_SCHEDULER_ENABLED: "true"
+  # 员工贡献度评分：计算各员工多维度贡献分（销售/效率/协作/培训）
+  # 对应 OrgFlags.HR_CONTRIBUTION_SCORE
+  CONTRIBUTION_SCORE_ENABLED: "true"
+
+# Secret中存放的敏感环境变量（由外部Secret Manager注入）
+secretRef:
+  name: tx-org-secret
+  # 包含: DB_URL, REDIS_URL, JWT_SECRET, SUPABASE_SERVICE_KEY
+
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 8012
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  failureThreshold: 3
+  timeoutSeconds: 5
+
+readinessProbe:
+  httpGet:
+    path: /health
+    port: 8012
+  initialDelaySeconds: 5
+  periodSeconds: 5
+  failureThreshold: 3
+  timeoutSeconds: 3
+
+# Pod反亲和：组织人事服务Pod分散到不同节点
+podAntiAffinity:
+  enabled: true
+
+serviceAccount:
+  create: false
+  name: ""
+
+podAnnotations: {}
+
+nodeSelector: {}
+
+tolerations: []

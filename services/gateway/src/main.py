@@ -44,6 +44,9 @@ app = FastAPI(
     description="AI-Native Restaurant Chain Operating System",
 )
 
+from prometheus_fastapi_instrumentator import Instrumentator
+Instrumentator().instrument(app).expose(app)
+
 # ── APScheduler 定时任务 ──────────────────────────────────────────
 
 _scheduler = AsyncIOScheduler(timezone="Asia/Shanghai")

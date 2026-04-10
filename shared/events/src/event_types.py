@@ -140,6 +140,8 @@ class EnergyEventType(str, Enum):
     ANOMALY_DETECTED = "energy.anomaly_detected"        # 异常能耗
     ALERT_SENT = "energy.alert_sent"                    # 告警推送
     BENCHMARK_SET = "energy.benchmark_set"              # 基准线设置
+    BUDGET_SET = "energy.budget_set"                    # 月度预算配置（v164 新增）
+    ALERT_RULE_CREATED = "energy.alert_rule_created"    # 告警规则创建（v164 新增）
 
 
 class ReviewEventType(str, Enum):
@@ -173,6 +175,36 @@ class RecipeEventType(str, Enum):
 # 屯象OS系统级域
 # ──────────────────────────────────────────────────────────────────────
 
+class TableEventType(str, Enum):
+    """桌台会话事件 — 桌台中心化架构核心事件流（v149新增）
+
+    桌台会话是门店业务聚合根，以下事件覆盖一次完整就餐旅程：
+      开台 → 点菜 → 用餐 → (加菜) → 买单 → 结账 → 清台
+
+    Agent 订阅此流可感知每张桌台的实时状态，支持：
+      - 折扣守护：感知同会话折扣叠加，防绕过单笔上限
+      - 出餐调度：按会话综合优先级（VIP/等待时长/催菜次数）排序
+      - 会员洞察：VIP_IDENTIFIED 触发时实时推送个性化服务建议
+      - 翻台率 Agent：OVERSTAY_ALERT 触发后主动干预
+    """
+
+    OPENED = "table.opened"                    # 开台（创建 TableSession）
+    ORDER_PLACED = "table.order_placed"        # 首次点菜完成（主单提交）
+    ADD_ORDERED = "table.add_ordered"          # 加菜（追加点单，order_sequence >= 2）
+    DISH_SERVED = "table.dish_served"          # 菜品上桌确认（KDS 出餐扫描/手动确认）
+    SERVICE_CALLED = "table.service_called"    # 服务呼叫（催菜/呼叫服务员/需要物品）
+    BILL_REQUESTED = "table.bill_requested"    # 请求买单（买单按钮/扫码自助买单）
+    PAID = "table.paid"                        # 结账完成（支付成功）
+    CLEARED = "table.cleared"                  # 清台完成（桌台归还为空闲状态）
+    TRANSFERRED = "table.transferred"          # 转台（会话迁移到新桌台）
+    MERGED = "table.merged"                    # 并台（多会话合并为主会话）
+    SPLIT = "table.split"                      # 拆台（主会话拆分为独立会话）
+    VIP_IDENTIFIED = "table.vip_identified"    # VIP 识别（开台/中途扫码/人脸识别）
+    OVERSTAY_ALERT = "table.overstay_alert"    # 超时预警（Agent 触发，超过门店设定翻台上限）
+    WAITER_CHANGED = "table.waiter_changed"    # 换服务员（责任服务员变更）
+    GUEST_COUNT_UPDATED = "table.guest_count_updated"  # 就餐人数修改
+
+
 class KdsEventType(str, Enum):
     """厨房 KDS 事件"""
 
@@ -196,6 +228,8 @@ class AgentEventType(str, Enum):
 
 # 域名 -> Redis Stream key 映射（投影器消费用）
 DOMAIN_STREAM_MAP: dict[str, str] = {
+    # 桌台会话域（v149新增，桌台中心化核心）
+    "table":        "tx_dining_session_events",  # 桌台堂食会话域（v149，dining_sessions表）
     # 核心业务域
     "order":        "tx_order_events",
     "discount":     "tx_discount_events",
@@ -220,6 +254,8 @@ DOMAIN_STREAM_MAP: dict[str, str] = {
     "credit":       "tx_credit_events",
     # 营销活动域（v157 新增）
     "campaign":     "tx_campaign_events",
+    # 增长中枢域（v184 新增）
+    "growth":       "tx_growth_events",
     # 兼容旧域
     "trade":        "trade_events",
     "supply":       "supply_events",
@@ -231,6 +267,7 @@ DOMAIN_STREAM_MAP: dict[str, str] = {
 
 # 域名 -> stream_type 映射（PG events 表 stream_type 字段）
 DOMAIN_STREAM_TYPE_MAP: dict[str, str] = {
+    "table":        "dining_session",   # 桌台堂食会话域（v149，dining_sessions表）
     "order":        "order",
     "discount":     "order",        # 折扣是订单聚合根的一部分
     "payment":      "payment",
@@ -251,6 +288,8 @@ DOMAIN_STREAM_TYPE_MAP: dict[str, str] = {
     "deposit":      "deposit",
     "wine_storage": "wine_storage",
     "credit":       "credit",
+    # 增长中枢域（v184 新增）
+    "growth":       "growth",
 }
 
 # ──────────────────────────────────────────────────────────────────────
@@ -309,6 +348,27 @@ class CampaignEventType(str, Enum):
     BUDGET_EXHAUSTED = "campaign.budget_exhausted"          # 活动预算耗尽
 
 
+# ──────────────────────────────────────────────────────────────────────
+# 增长中枢域（私域复购链路，v184 新增）
+# ──────────────────────────────────────────────────────────────────────
+
+class GrowthEventType(str, Enum):
+    """增长中枢事件 — 私域复购链路"""
+
+    FIRST_ORDER_COMPLETED = "growth.first_order_completed"
+    SILENT_DETECTED = "growth.silent_detected"
+    COMPLAINT_CLOSED = "growth.complaint_closed"
+    TOUCH_DELIVERED = "growth.touch_delivered"
+    ORDER_ATTRIBUTED = "growth.order_attributed"
+    SUGGESTION_PUBLISHED = "growth.agent_suggestion_published"
+    REPAIR_STATE_CHANGED = "growth.repair_state_changed"
+    ENROLLMENT_STATE_CHANGED = "growth.enrollment_state_changed"
+    # V3.0 外部信号触发
+    CALENDAR_TRIGGER_FIRED = "growth.calendar_trigger_fired"
+    WEATHER_SIGNAL_RECEIVED = "growth.weather_signal_received"
+    STORE_READINESS_EVALUATED = "growth.store_readiness_evaluated"
+
+
 def resolve_stream_key(event_type: str) -> str:
     """根据事件类型字符串解析目标 Redis Stream key。
 
@@ -327,6 +387,7 @@ def resolve_stream_type(event_type: str) -> str:
 
 # 所有事件类型枚举（用于校验）— 放在所有类定义之后，避免 forward reference
 ALL_EVENT_ENUMS = (
+    TableEventType,       # 桌台会话域（v149）
     OrderEventType,
     DiscountEventType,
     PaymentEventType,
@@ -350,4 +411,6 @@ ALL_EVENT_ENUMS = (
     SafetyInspectionEventType,
     # 营销活动域（v157 新增）
     CampaignEventType,
+    # 增长中枢域（v184 新增）
+    GrowthEventType,
 )

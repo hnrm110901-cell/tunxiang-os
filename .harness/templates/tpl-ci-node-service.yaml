@@ -1,0 +1,114 @@
+template:
+  name: tpl-ci-node-service
+  identifier: tpl_ci_node_service
+  versionLabel: v1
+  type: StepGroup
+  projectIdentifier: TunXiangOS
+  orgIdentifier: default
+  description: "Node/React 前端服务通用 CI 模板（pnpm monorepo）。包含依赖安装、类型检查、Lint、构建、镜像构建推送。"
+  tags:
+    service-type: node
+    phase: ci
+  spec:
+    stageType: CI
+    steps:
+      - step:
+          type: Run
+          name: Install
+          identifier: Install
+          spec:
+            connectorRef: harbor_connector
+            image: node:20-slim
+            shell: Sh
+            command: |
+              corepack enable
+              corepack prepare pnpm@latest --activate
+              cd <+stage.variables.servicePath>
+              pnpm install --frozen-lockfile
+          failureStrategies:
+            - onFailure:
+                errors:
+                  - AllErrors
+                action:
+                  type: Abort
+
+      - step:
+          type: Run
+          name: Type_Check
+          identifier: Type_Check
+          spec:
+            connectorRef: harbor_connector
+            image: node:20-slim
+            shell: Sh
+            command: |
+              corepack enable
+              corepack prepare pnpm@latest --activate
+              cd <+stage.variables.servicePath>
+              pnpm tsc --noEmit
+          failureStrategies:
+            - onFailure:
+                errors:
+                  - AllErrors
+                action:
+                  type: Abort
+
+      - step:
+          type: Run
+          name: Lint
+          identifier: Lint
+          spec:
+            connectorRef: harbor_connector
+            image: node:20-slim
+            shell: Sh
+            command: |
+              corepack enable
+              corepack prepare pnpm@latest --activate
+              cd <+stage.variables.servicePath>
+              pnpm lint
+          failureStrategies:
+            - onFailure:
+                errors:
+                  - AllErrors
+                action:
+                  type: Abort
+
+      - step:
+          type: Run
+          name: Build
+          identifier: Build
+          spec:
+            connectorRef: harbor_connector
+            image: node:20-slim
+            shell: Sh
+            command: |
+              corepack enable
+              corepack prepare pnpm@latest --activate
+              cd <+stage.variables.servicePath>
+              pnpm build
+          failureStrategies:
+            - onFailure:
+                errors:
+                  - AllErrors
+                action:
+                  type: Abort
+
+      - step:
+          type: BuildAndPushDockerRegistry
+          name: Build_And_Push_Image
+          identifier: Build_And_Push_Image
+          spec:
+            connectorRef: harbor_connector
+            repo: <+stage.variables.imageRepo>
+            tags:
+              - <+codebase.shortCommitSha>
+              - <+pipeline.sequenceId>
+            dockerfile: <+stage.variables.dockerfile>
+            context: .
+            buildArgs: {}
+            labels: {}
+          failureStrategies:
+            - onFailure:
+                errors:
+                  - AllErrors
+                action:
+                  type: Abort

@@ -1,0 +1,91 @@
+# tx-growth — 增长中枢微服务
+#
+# !! 重要：replicaCount 强制为 1，禁止扩展到多实例 !!
+# 原因：
+#   1. V2旅程tick（_run_growth_journey_tick）不幂等，多实例并发tick会导致
+#      同一旅程enrollment被重复推进，造成重复触达客户
+#   2. 沉默检测cron（_run_silent_detection）不幂等，多实例并发会导致
+#      同一批客户被重复标记沉默/触发召回
+#   3. APScheduler max_instances=1 仅防止单进程内并发，不能防止多Pod并发
+# 如需水平扩展，必须先将cron任务迁移到外部分布式调度器（如Celery Beat + Redis）
+
+replicaCount: 1
+
+image:
+  repository: tunxiang/tx-growth
+  pullPolicy: IfNotPresent
+  tag: latest
+
+service:
+  type: ClusterIP
+  port: 8004
+  targetPort: 8004
+
+ingress:
+  enabled: false
+  className: nginx
+  host: ""
+  tls: false
+  tlsSecretName: ""
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 200m
+    memory: 256Mi
+
+env:
+  TUNXIANG_ENV: prod
+  LOG_LEVEL: info
+  # GROWTH_V2_ENABLED：控制增长中枢V2旅程引擎，默认关闭（false），
+  # 生产环境通过Feature Flag（GrowthFlags.JOURNEY_V2）动态开启，避免默认全量放量
+  GROWTH_V2_ENABLED: "false"
+  # JOURNEY_TICK_INTERVAL：旅程tick间隔（秒），默认60s，不建议低于30s
+  JOURNEY_TICK_INTERVAL: "60"
+
+# Secret中存放的敏感环境变量（由外部Secret Manager注入）
+secretRef:
+  name: tx-growth-secret
+  # 包含: DB_URL, REDIS_URL, JWT_SECRET, SUPABASE_SERVICE_KEY
+
+autoscaling:
+  # !! 禁止开启HPA，见顶部说明 !!
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 1
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 8004
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  failureThreshold: 3
+  timeoutSeconds: 5
+
+readinessProbe:
+  httpGet:
+    path: /health
+    port: 8004
+  initialDelaySeconds: 5
+  periodSeconds: 5
+  failureThreshold: 3
+  timeoutSeconds: 3
+
+# Pod反亲和：单实例无需反亲和，但保留配置便于未来切换
+podAntiAffinity:
+  enabled: false
+
+serviceAccount:
+  create: false
+  name: ""
+
+podAnnotations: {}
+
+nodeSelector: {}
+
+tolerations: []
