@@ -1014,7 +1014,7 @@ async def prepaid_recharge(
             {"id": str(uid), "tenant_id": str(tid)},
         )
         unit = fetch.mappings().first()
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — 最外层HTTP兜底，返回500错误响应
         logger.error("prepaid_recharge.fetch_failed", error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="查询协议单位失败") from exc
 
@@ -1062,7 +1062,7 @@ async def prepaid_recharge(
                     "tenant_id": str(tid),
                 },
             )
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — 最外层HTTP兜底，返回500错误响应
         logger.error("prepaid_recharge.failed", unit_id=unit_id, error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="预付充值失败") from exc
 
@@ -1107,7 +1107,7 @@ async def prepaid_refund(
             {"id": str(uid), "tenant_id": str(tid)},
         )
         unit = fetch.mappings().first()
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — 最外层HTTP兜底，返回500错误响应
         logger.error("prepaid_refund.fetch_failed", error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="查询协议单位失败") from exc
 
@@ -1160,7 +1160,7 @@ async def prepaid_refund(
                     "tenant_id": str(tid),
                 },
             )
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — 最外层HTTP兜底，返回500错误响应
         logger.error("prepaid_refund.failed", unit_id=unit_id, error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="预付退款失败") from exc
 
@@ -1211,7 +1211,7 @@ async def prepaid_balance(
             {"id": str(uid), "tenant_id": str(tid)},
         )
         row = result.mappings().first()
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — 最外层HTTP兜底，返回500错误响应
         logger.error("prepaid_balance.failed", unit_id=unit_id, error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="查询预付余额失败") from exc
 
