@@ -223,7 +223,7 @@ async def list_units(
             params,
         )
         items = [_serialize_row(dict(row)) for row in items_result.mappings().all()]
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — 最外层HTTP兜底，DB不可用时降级mock
         logger.warning("list_units.db_unavailable", error=str(exc))
         # DB不可用时返回mock数据
         return {
@@ -294,7 +294,7 @@ async def create_unit(
                 """),
                 {"tenant_id": str(tid), "unit_id": unit_id},
             )
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — 最外层HTTP兜底，返回500错误响应
         logger.error("create_unit.failed", name=body.name, error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="创建协议单位失败") from exc
 
@@ -362,7 +362,7 @@ async def aging_report(
             {"tenant_id": str(tid)},
         )
         items = [_serialize_row(dict(row)) for row in result.mappings().all()]
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — 最外层HTTP兜底，DB不可用时降级mock
         logger.warning("aging_report.db_unavailable", error=str(exc))
         # mock
         items = [
@@ -430,7 +430,7 @@ async def monthly_statement(
         total_repaid = sum(abs(t["amount_fen"]) for t in transactions if t["type"] == "repay")
     except HTTPException:
         raise
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — 最外层HTTP兜底，返回500错误响应
         logger.error("monthly_statement.failed", unit_id=unit_id, error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="对账单查询失败") from exc
 
@@ -483,7 +483,7 @@ async def get_unit(
             {"id": str(uid), "tenant_id": str(tid)},
         )
         row = result.mappings().first()
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — 最外层HTTP兜底，返回500错误响应
         logger.error("get_unit.failed", unit_id=unit_id, error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="查询协议单位失败") from exc
 
@@ -542,7 +542,7 @@ async def update_unit(
         )
         row = result.mappings().first()
         await db.commit()
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — 最外层HTTP兜底，返回500错误响应
         logger.error("update_unit.failed", unit_id=unit_id, error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="更新协议单位失败") from exc
 
@@ -592,7 +592,7 @@ async def toggle_suspend(
         )
         row = result.mappings().first()
         await db.commit()
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — 最外层HTTP兜底，返回500错误响应
         logger.error("toggle_suspend.failed", unit_id=unit_id, error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="操作失败") from exc
 
@@ -667,7 +667,7 @@ async def list_transactions(
             params,
         )
         items = [_serialize_row(dict(row)) for row in items_result.mappings().all()]
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — 最外层HTTP兜底，DB不可用时降级空列表
         logger.warning("list_transactions.db_unavailable", error=str(exc))
         return {
             "ok": True,
@@ -710,7 +710,7 @@ async def manual_charge(
             {"id": str(uid), "tenant_id": str(tid)},
         )
         unit = fetch.mappings().first()
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — 最外层HTTP兜底，返回500错误响应
         logger.error("manual_charge.fetch_failed", unit_id=unit_id, error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="查询协议单位失败") from exc
 

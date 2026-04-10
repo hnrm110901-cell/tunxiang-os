@@ -15,7 +15,7 @@
 
 技术约束：
   - 全部 unittest.mock，不连真实 DB 或 LLM
-  - 使用 patch 直接替换模块级 client.messages.create
+  - 使用 patch 直接替换模块级 model_chat 调用
   - AsyncMock 替代 AsyncSession
 """
 from __future__ import annotations
