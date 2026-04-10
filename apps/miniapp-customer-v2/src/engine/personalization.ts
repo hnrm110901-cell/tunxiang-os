@@ -90,15 +90,19 @@ const ALL_ENTRIES: Record<string, QuickEntry> = {
   groupbuy:  { id: 'groupbuy',  icon: '👥', label: '拼单',      path: '/subpages/social/group-order/index' },
   subscribe: { id: 'subscribe', icon: '👑', label: '开通会员',  path: '/subpages/member/subscription/index', badge: '省' },
   points:    { id: 'points',    icon: '⭐', label: '积分兑换',  path: '/subpages/marketing/points-mall/index' },
+  game:      { id: 'game',      icon: '🎮', label: '等位乐园',  path: '/subpages/queue-game/index', badge: '玩' },
+  review:    { id: 'review',    icon: '📝', label: '写评价',    path: '/subpages/review-reward/index' },
+  family:    { id: 'family',    icon: '👶', label: '家庭服务',  path: '/subpages/family-mode/index' },
+  video:     { id: 'video',     icon: '🎬', label: '视频探店',  path: '/subpages/dish-detail/index' },
 }
 
 const SEGMENT_ENTRIES: Record<UserSegment, string[]> = {
-  S1: ['scan', 'preorder', 'reserve', 'banquet', 'chef', 'points'],      // VIP: 高端服务
-  S2: ['scan', 'preorder', 'reserve', 'coupon', 'points', 'delivery'],    // 高价值: 留存+权益
-  S3: ['scan', 'preorder', 'coupon', 'delivery', 'queue', 'groupbuy'],    // 中间: 性价比
-  S4: ['scan', 'coupon', 'groupbuy', 'subscribe', 'delivery', 'preorder'],// 低频: 拉回
-  S5: ['coupon', 'scan', 'subscribe', 'groupbuy', 'delivery', 'preorder'],// 沉默: 召回券优先
-  guest: ['scan', 'delivery', 'queue', 'coupon', 'reserve', 'subscribe'], // 游客: 基础入口
+  S1: ['scan', 'preorder', 'reserve', 'banquet', 'chef', 'family'],       // VIP: 高端+家庭
+  S2: ['scan', 'preorder', 'reserve', 'coupon', 'points', 'review'],      // 高价值: 留存+UGC
+  S3: ['scan', 'preorder', 'coupon', 'delivery', 'game', 'groupbuy'],     // 中间: 性价比+游戏
+  S4: ['scan', 'coupon', 'groupbuy', 'subscribe', 'video', 'preorder'],   // 低频: 拉回+视频
+  S5: ['coupon', 'scan', 'subscribe', 'groupbuy', 'video', 'review'],     // 沉默: 召回+UGC
+  guest: ['scan', 'delivery', 'queue', 'coupon', 'game', 'family'],       // 游客: 基础+体验
 }
 
 // ─── Banner by Segment ────────────────────────────────────────────────────────
