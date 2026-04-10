@@ -324,8 +324,10 @@ app.include_router(delivery_platform_sync_router)
 
 # ── v212: 最低消费规则引擎 ──
 from .api.minimum_consumption_routes import router as min_consumption_router
+from .api.group_order_routes import router as group_order_router
 
 app.include_router(min_consumption_router)
+app.include_router(group_order_router)
 
 
 @app.get("/health")

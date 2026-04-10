@@ -4,7 +4,19 @@ import { create } from 'zustand'
 
 export type ScanMode = 'dine-in' | 'takeaway' | 'self-order'
 
+export interface BrandInfo {
+  id: string
+  name: string
+  logo_url: string
+  theme_color: string
+}
+
 interface StoreInfoState {
+  // 集团多品牌
+  brandId: string
+  brandName: string
+  brands: BrandInfo[]
+  // 门店
   storeId: string
   storeName: string
   tableId: string
@@ -15,6 +27,8 @@ interface StoreInfoState {
 }
 
 interface StoreInfoActions {
+  setBrand: (brandId: string, brandName: string) => void
+  setBrands: (brands: BrandInfo[]) => void
   setStore: (storeId: string, name: string) => void
   setTable: (tableId: string, tableNo: string) => void
   setScanMode: (mode: ScanMode) => void
@@ -68,6 +82,9 @@ function parseQRCode(qrData: string): {
 
 export const useStoreInfo = create<StoreInfoStore>((set) => ({
   // state
+  brandId: '',
+  brandName: '',
+  brands: [],
   storeId: '',
   storeName: '',
   tableId: '',
@@ -77,6 +94,12 @@ export const useStoreInfo = create<StoreInfoStore>((set) => ({
   announcements: [],
 
   // actions
+  setBrand(brandId, brandName) {
+    set({ brandId, brandName })
+  },
+  setBrands(brands) {
+    set({ brands })
+  },
   setStore(storeId, name) {
     set({ storeId, storeName: name })
   },

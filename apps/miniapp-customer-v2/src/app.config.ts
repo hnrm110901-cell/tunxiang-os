@@ -9,33 +9,40 @@ export default defineAppConfig({
   ],
   subPackages: [
     {
-      root: 'subpackages/order-flow',
+      root: 'subpages/order-flow',
       pages: [
         'cart/index',
         'checkout/index',
         'pay-result/index',
         'scan-order/index',
+        'payment/index',
+        'refund/index',
       ],
     },
     {
-      root: 'subpackages/order-detail',
+      root: 'subpages/order-detail',
       pages: [
         'detail/index',
         'track/index',
         'review/index',
+        'invoice/index',
       ],
     },
     {
-      root: 'subpackages/member',
+      root: 'subpages/member',
       pages: [
         'level/index',
         'points/index',
         'stored-value/index',
         'preferences/index',
+        'subscription/index',
+        'taste-profile/index',
+        'cross-brand/index',
+        'insights/index',
       ],
     },
     {
-      root: 'subpackages/marketing',
+      root: 'subpages/marketing',
       pages: [
         'coupon/index',
         'stamp-card/index',
@@ -44,19 +51,19 @@ export default defineAppConfig({
       ],
     },
     {
-      root: 'subpackages/queue',
+      root: 'subpages/queue',
       pages: [
         'index/index',
       ],
     },
     {
-      root: 'subpackages/reservation',
+      root: 'subpages/reservation',
       pages: [
         'index/index',
       ],
     },
     {
-      root: 'subpackages/special',
+      root: 'subpages/special',
       pages: [
         'chef-at-home/index',
         'corporate/index',
@@ -65,12 +72,55 @@ export default defineAppConfig({
       ],
     },
     {
-      root: 'subpackages/social',
+      root: 'subpages/social',
       pages: [
         'invite/index',
         'share/index',
         'gift-card/index',
+        'group-order/index',
       ],
+    },
+    // ─── Wave 1C: 已开发未注册分包 ───
+    {
+      root: 'subpages/address',
+      pages: ['index'],
+    },
+    {
+      root: 'subpages/city-picker',
+      pages: ['index'],
+    },
+    {
+      root: 'subpages/dish-detail',
+      pages: ['index'],
+    },
+    {
+      root: 'subpages/feedback',
+      pages: ['index'],
+    },
+    {
+      root: 'subpages/search',
+      pages: ['index'],
+    },
+    {
+      root: 'subpages/settings',
+      pages: ['index'],
+    },
+    {
+      root: 'subpages/takeaway',
+      pages: ['index'],
+    },
+    {
+      root: 'subpages/retail-mall',
+      pages: ['index'],
+    },
+    // ─── Wave 1A/1B: 集团化+预点餐 ───
+    {
+      root: 'subpages/brand-picker',
+      pages: ['index'],
+    },
+    {
+      root: 'subpages/pre-order',
+      pages: ['index'],
     },
   ],
   tabBar: {
