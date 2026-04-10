@@ -487,7 +487,7 @@ async def resolve_discrepancy(
         )
         row = result.mappings().first()
         await db.commit()
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — 最外层HTTP兜底，返回500错误响应
         logger.error("resolve_discrepancy.failed", discrepancy_id=discrepancy_id, error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="标记处理失败") from exc
 
@@ -525,7 +525,7 @@ async def get_discrepancy_summary(
             platform=platform,
             db=db,
         )
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — 最外层HTTP兜底，返回500错误响应
         logger.error("get_discrepancy_summary.failed", store_id=store_id, error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="差异汇总统计失败") from exc
 
@@ -552,7 +552,7 @@ async def get_receivable_forecast(
             days_ahead=days_ahead,
             db=db,
         )
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — 最外层HTTP兜底，返回500错误响应
         logger.error("get_receivable_forecast.failed", store_id=store_id, error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="到账预测生成失败") from exc
 
