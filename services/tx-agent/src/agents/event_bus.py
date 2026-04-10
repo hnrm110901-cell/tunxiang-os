@@ -350,6 +350,14 @@ DEFAULT_EVENT_HANDLERS: dict[str, list[tuple[str, str]]] = {
         ("finance_audit", "check_pl_anomaly"),           # P&L异常检测
     ],
 
+    # ── 千人千面Agent事件驱动 ────────────────────────────────────────
+    "member.profile_updated": [
+        ("personalization", "generate_batch_reasons"),    # 用户画像更新→重新生成推荐理由
+    ],
+    "trade.order.paid": [
+        ("personalization", "generate_reorder_prompt"),   # 消费后→生成复购提醒文案
+    ],
+
     # ── 排位Agent事件驱动 ────────────────────────────────────────────
     "trade.table.freed": [
         ("queue_seating", "auto_call_next"),              # 桌台空出自动叫号

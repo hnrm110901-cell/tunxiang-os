@@ -33,7 +33,10 @@ from .response import ok
 
 app = FastAPI(title="TunxiangOS Gateway", version="3.0.0", description="AI-Native Restaurant Chain Operating System")
 
+from .personalization_middleware import PersonalizationMiddleware
+
 app.add_middleware(RequestLogMiddleware)
+app.add_middleware(PersonalizationMiddleware)  # 千人千面：注入X-User-Segment/Prefs/Subscription
 app.add_middleware(TenantMiddleware)
 app.add_middleware(AuthMiddleware)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
