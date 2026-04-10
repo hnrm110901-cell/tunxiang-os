@@ -113,6 +113,19 @@ export default defineAppConfig({
       root: 'subpages/retail-mall',
       pages: ['index'],
     },
+    // ─── 体验创新模块 ───
+    {
+      root: 'subpages/queue-game',
+      pages: ['index'],
+    },
+    {
+      root: 'subpages/review-reward',
+      pages: ['index'],
+    },
+    {
+      root: 'subpages/family-mode',
+      pages: ['index'],
+    },
     // ─── Wave 1A/1B: 集团化+预点餐 ───
     {
       root: 'subpages/brand-picker',
