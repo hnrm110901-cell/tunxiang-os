@@ -18,7 +18,7 @@ def run():
     conn = psycopg2.connect(DB_URL)
     conn.autocommit = False
     cur = conn.cursor()
-    cur.execute(f"SET app.tenant_id = '{TENANT_ID}'")
+    cur.execute("SELECT set_config('app.tenant_id', %s, false)", (TENANT_ID,))
 
     try:
         # ── 1. 租户 ──────────────────────────────────────────────────────

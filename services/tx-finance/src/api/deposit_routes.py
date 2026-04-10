@@ -663,7 +663,7 @@ async def ledger_report(
             },
         )
         row = result.mappings().first()
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — 最外层HTTP兜底，返回500错误响应
         logger.error("deposit_ledger_report.failed", store_id=store_id,
                      error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="押金台账报表生成失败") from exc
@@ -718,7 +718,7 @@ async def aging_report(
             {"tenant_id": str(tid), "store_id": str(sid)},
         )
         row = result.mappings().first()
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — 最外层HTTP兜底，返回500错误响应
         logger.error("deposit_aging_report.failed", store_id=store_id,
                      error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="押金账龄分析失败") from exc

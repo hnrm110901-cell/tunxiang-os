@@ -30,7 +30,7 @@ def _get_tenant_id(request: Request) -> str:
 
 def _set_rls(db: AsyncSession, tenant_id: str):
     """设置 RLS 上下文变量。"""
-    return db.execute(text(f"SET LOCAL app.tenant_id = '{tenant_id}'"))
+    return db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": tenant_id})
 
 
 # ─── Pydantic 模型 ────────────────────────────────────────────────────────────

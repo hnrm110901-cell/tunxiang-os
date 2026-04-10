@@ -31,7 +31,7 @@ async def migrate(source_url: str, target_url: str, tenant_id: str):
     logger.info("migration_started", source=source_url.split("@")[-1], tenant_id=tenant_id)
 
     # 设置目标库的 tenant context
-    await tgt.execute(f"SELECT set_tenant_id('{tid}')")
+    await tgt.execute("SELECT set_tenant_id($1)", tid)
 
     # ─── 1. 迁移门店 ───
     stores = await src.fetch("SELECT * FROM stores WHERE is_active = true")

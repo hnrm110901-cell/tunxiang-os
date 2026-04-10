@@ -42,7 +42,7 @@ def _period_to_date_range(period: str) -> tuple[date, date]:
 
 
 async def _set_rls(db: AsyncSession, tenant_id: str) -> None:
-    await db.execute(text(f"SET LOCAL app.tenant_id = '{tenant_id}'"))
+    await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": tenant_id})
 
 
 # ---------- 路由 ----------
