@@ -148,7 +148,7 @@ async def import_bill(
         )
         row = result.mappings().first()
         await db.commit()
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — 最外层HTTP兜底，返回500错误响应
         logger.error("import_bill.failed", store_id=body.store_id, platform=body.platform, error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="账单导入失败") from exc
 
@@ -222,7 +222,7 @@ async def list_bills(
             params,
         )
         items = [dict(row) for row in items_result.mappings().all()]
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — 最外层HTTP兜底，返回500错误响应
         logger.error("list_bills.failed", error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="查询账单列表失败") from exc
 
@@ -262,7 +262,7 @@ async def get_bill(
             {"bill_id": str(bid), "tenant_id": str(tid)},
         )
         row = result.mappings().first()
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — 最外层HTTP兜底，返回500错误响应
         logger.error("get_bill.failed", bill_id=bill_id, error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="查询账单失败") from exc
 
@@ -295,7 +295,7 @@ async def reconcile_bill(
         result = await _calculator.reconcile_bill(bid, tid, db)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — 最外层HTTP兜底，返回500错误响应
         logger.error("reconcile_bill.failed", bill_id=bill_id, error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="账单核对失败") from exc
 
@@ -331,7 +331,7 @@ async def get_channel_pl(
             channel_id=channel_id,
             db=db,
         )
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — 最外层HTTP兜底，返回500错误响应
         logger.error("get_channel_pl.failed", store_id=store_id, error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="渠道P&L计算失败") from exc
 
@@ -366,7 +366,7 @@ async def get_pl_summary(
             channel_id=None,
             db=db,
         )
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — 最外层HTTP兜底，返回500错误响应
         logger.error("get_pl_summary.failed", store_id=store_id, error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="P&L汇总计算失败") from exc
 
@@ -440,7 +440,7 @@ async def list_discrepancies(
             params,
         )
         items = [dict(row) for row in items_result.mappings().all()]
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — 最外层HTTP兜底，返回500错误响应
         logger.error("list_discrepancies.failed", store_id=store_id, error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="查询差异清单失败") from exc
 

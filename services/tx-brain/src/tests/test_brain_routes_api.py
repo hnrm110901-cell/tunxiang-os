@@ -550,9 +550,6 @@ async def test_brain_health_claude_reachable(client, headers):
     mock_msg = AsyncMock()
     mock_msg.content = [{"type": "text", "text": "pong"}]
 
-    mock_client_instance = AsyncMock()
-    mock_client_instance.messages.create = AsyncMock(return_value=mock_msg)
-
     with patch("services.tx_brain.src.services.model_router.chat", new=AsyncMock(return_value=mock_msg)):
         resp = await client.get("/api/v1/brain/health", headers=headers)
 
