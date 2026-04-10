@@ -23,12 +23,14 @@ import {
 } from '@tarojs/components'
 import { useCartStore } from '../../store/useCartStore'
 import { useStoreInfo } from '../../store/useStoreInfo'
+import { useUserStore } from '../../store/useUserStore'
 import { getDishes } from '../../api/menu'
 import { getActivities } from '../../api/growth'
 import { CartBar } from '../../components/CartBar'
 import { AiRecommend } from '../../components/AiRecommend'
 import { DishCard } from '../../components/DishCard'
 import { ReorderBanner } from '../../components/ReorderBanner'
+import { getPersonalizedLayout, type PersonalizedLayout } from '../../engine/personalization'
 import type { Dish } from '../../api/menu'
 import type { Activity } from '../../api/growth'
 
@@ -135,6 +137,21 @@ export default function IndexPage() {
   const [loading,    setLoading]    = useState(true)
   const [error,      setError]      = useState<string | null>(null)
 
+  // ── 千人千面布局引擎 ───────────────────────────────────────────────────────
+  const { memberLevel, pointsBalance, nickname } = useUserStore()
+  const [layout, setLayout] = useState<PersonalizedLayout | null>(null)
+
+  useEffect(() => {
+    const l = getPersonalizedLayout({
+      memberLevel: memberLevel || 'none',
+      pointsBalance: pointsBalance || 0,
+      isSubscriber: false, // TODO: 从订阅状态读取
+      daysSinceLastVisit: 3,
+      nickname: nickname || '',
+    })
+    setLayout(l)
+  }, [memberLevel, pointsBalance, nickname])
+
   // ── Load ───────────────────────────────────────────────────────────────────
   useEffect(() => {
     let cancelled = false
@@ -183,13 +200,18 @@ export default function IndexPage() {
   const handleRemove = useCallback((id: string) => removeItem(id), [removeItem])
 
   // ── Navigation ─────────────────────────────────────────────────────────────
-  const goEntry = (entry: typeof QUICK_ENTRIES[0]) => {
-    if (entry.tabPath) {
-      Taro.switchTab({ url: entry.tabPath }).catch(() =>
-        Taro.showToast({ title: '页面开发中', icon: 'none' }),
+  const goEntry = (entry: Record<string, unknown>) => {
+    const path = (entry.tabPath || entry.navPath || entry.path || '') as string
+    if (!path) return
+    // TabBar页面用switchTab，其他用navigateTo
+    if (path.startsWith('/pages/')) {
+      Taro.switchTab({ url: path }).catch(() =>
+        Taro.navigateTo({ url: path }).catch(() =>
+          Taro.showToast({ title: '页面开发中', icon: 'none' }),
+        ),
       )
-    } else if (entry.navPath) {
-      Taro.navigateTo({ url: entry.navPath }).catch(() =>
+    } else {
+      Taro.navigateTo({ url: path }).catch(() =>
         Taro.showToast({ title: '页面开发中', icon: 'none' }),
       )
     }
@@ -302,7 +324,7 @@ export default function IndexPage() {
               gap: '16rpx',
             }}
           >
-            {QUICK_ENTRIES.map((e) => (
+            {(layout?.quickEntries ?? QUICK_ENTRIES).map((e) => (
               <View
                 key={e.id}
                 style={{
