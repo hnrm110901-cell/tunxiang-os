@@ -146,7 +146,7 @@ async def collect_deposit(
         )
         row = result.mappings().first()
         await db.commit()
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — 最外层HTTP兜底，返回500错误响应
         logger.error("collect_deposit.failed", store_id=str(body.store_id),
                      error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="押金收取失败") from exc
@@ -213,7 +213,7 @@ async def apply_deposit(
             {"id": str(did), "tenant_id": str(tid)},
         )
         deposit = fetch.mappings().first()
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — 最外层HTTP兜底，返回500错误响应
         logger.error("apply_deposit.fetch_failed", deposit_id=deposit_id,
                      error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="查询押金失败") from exc
@@ -263,7 +263,7 @@ async def apply_deposit(
         )
         row = result.mappings().first()
         await db.commit()
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — 最外层HTTP兜底，返回500错误响应
         logger.error("apply_deposit.update_failed", deposit_id=deposit_id,
                      error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="押金抵扣失败") from exc
@@ -331,7 +331,7 @@ async def refund_deposit(
             {"id": str(did), "tenant_id": str(tid)},
         )
         deposit = fetch.mappings().first()
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — 最外层HTTP兜底，返回500错误响应
         logger.error("refund_deposit.fetch_failed", deposit_id=deposit_id,
                      error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="查询押金失败") from exc
@@ -379,7 +379,7 @@ async def refund_deposit(
         )
         row = result.mappings().first()
         await db.commit()
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — 最外层HTTP兜底，返回500错误响应
         logger.error("refund_deposit.update_failed", deposit_id=deposit_id,
                      error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="押金退还失败") from exc
@@ -444,7 +444,7 @@ async def convert_deposit(
             {"id": str(did), "tenant_id": str(tid)},
         )
         deposit = fetch.mappings().first()
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — 最外层HTTP兜底，返回500错误响应
         logger.error("convert_deposit.fetch_failed", deposit_id=deposit_id,
                      error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="查询押金失败") from exc
@@ -479,7 +479,7 @@ async def convert_deposit(
         )
         row = result.mappings().first()
         await db.commit()
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — 最外层HTTP兜底，返回500错误响应
         logger.error("convert_deposit.update_failed", deposit_id=deposit_id,
                      error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="押金转收入失败") from exc
@@ -537,7 +537,7 @@ async def get_deposit(
             {"id": str(did), "tenant_id": str(tid)},
         )
         row = result.mappings().first()
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — 最外层HTTP兜底，返回500错误响应
         logger.error("get_deposit.failed", deposit_id=deposit_id,
                      error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="查询押金失败") from exc
@@ -605,7 +605,7 @@ async def list_by_store(
             params,
         )
         items = [_serialize_row(dict(row)) for row in items_result.mappings().all()]
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — 最外层HTTP兜底，返回500错误响应
         logger.error("list_deposits_by_store.failed", store_id=store_id,
                      error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="查询门店押金列表失败") from exc

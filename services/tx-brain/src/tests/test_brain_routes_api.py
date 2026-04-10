@@ -553,7 +553,7 @@ async def test_brain_health_claude_reachable(client, headers):
     mock_client_instance = AsyncMock()
     mock_client_instance.messages.create = AsyncMock(return_value=mock_msg)
 
-    with patch("anthropic.AsyncAnthropic", return_value=mock_client_instance):
+    with patch("services.tx_brain.src.services.model_router.chat", new=AsyncMock(return_value=mock_msg)):
         resp = await client.get("/api/v1/brain/health", headers=headers)
 
     assert resp.status_code == 200
@@ -569,12 +569,10 @@ async def test_brain_health_claude_reachable(client, headers):
 @pytest.mark.asyncio
 async def test_brain_health_claude_unreachable(client, headers):
     """健康检查：Claude API 不可达 → ok=False + connection_error 状态。"""
-    mock_client_instance = AsyncMock()
-    mock_client_instance.messages.create = AsyncMock(
-        side_effect=anthropic.APIConnectionError(request=None)  # type: ignore[arg-type]
-    )
-
-    with patch("anthropic.AsyncAnthropic", return_value=mock_client_instance):
+    with patch(
+        "services.tx_brain.src.services.model_router.chat",
+        new=AsyncMock(side_effect=anthropic.APIConnectionError(request=None)),  # type: ignore[arg-type]
+    ):
         resp = await client.get("/api/v1/brain/health", headers=headers)
 
     assert resp.status_code == 200

@@ -36,9 +36,9 @@ from ..agents.finance_auditor import FinanceAuditor
 TENANT_ID = str(uuid.uuid4())
 STORE_ID = str(uuid.uuid4())
 
-# patch 路径（对应模块内 client = anthropic.AsyncAnthropic() 的 messages.create）
-_DG_CREATE = "services.tx_brain.src.agents.discount_guardian.client.messages.create"
-_FA_CREATE = "services.tx_brain.src.agents.finance_auditor.client.messages.create"
+# patch 路径（对应模块内 model_chat 调用）
+_DG_CREATE = "services.tx_brain.src.agents.discount_guardian.model_chat"
+_FA_CREATE = "services.tx_brain.src.agents.finance_auditor.model_chat"
 
 
 # ── 工厂函数 ───────────────────────────────────────────────────────────────────
