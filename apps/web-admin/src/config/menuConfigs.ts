@@ -132,6 +132,7 @@ export const MENU_CONFIGS: Record<string, MenuConfig> = {
         { id: 'analytics-dashboard', label: '经营驾驶舱', icon: '🖥️', path: '/analytics/dashboard' },
       ]},
       { label: '分析', items: [
+        { id: 'region-overview', label: '区域经营总览', icon: '🗺️', path: '/hq/analytics/region-overview' },
         { id: 'finance-analysis', label: '财务分析', icon: '💹', path: '/hq/analytics/finance' },
         { id: 'pl-report', label: '损益表P&L', icon: '💹', path: '/hq/analytics/pl-report' },
         { id: 'member-analysis', label: '会员分析', icon: '👥', path: '/hq/analytics/member' },
@@ -152,6 +153,12 @@ export const MENU_CONFIGS: Record<string, MenuConfig> = {
     moduleId: 'growth', groups: [
       { label: '增长中枢', items: [
         { id: 'growth-dashboard', label: '增长驾驶舱', icon: '🚀', path: '/hq/growth/dashboard' },
+      ]},
+      { label: '会员中枢', items: [
+        { id: 'member-dashboard', label: '会员驾驶舱', icon: '📊', path: '/hq/growth/member-dashboard' },
+        { id: 'member-segments', label: 'RFM分层', icon: '🎯', path: '/hq/growth/member-segments' },
+        { id: 'coupon-benefits', label: '券权益中心', icon: '🎟️', path: '/hq/growth/coupon-benefits' },
+        { id: 'journey-designer', label: '旅程编排', icon: '🗺️', path: '/hq/growth/journey-designer' },
       ]},
       { label: '客户资产', items: [
         { id: 'customer-pool', label: '客户总池', icon: '👥', path: '/hq/growth/customers' },
@@ -243,9 +250,14 @@ export const MENU_CONFIGS: Record<string, MenuConfig> = {
       { label: '管控', items: [
         { id: 'approvals', label: '审批中心', icon: '✅', count: 4, path: '/hq/ops/approvals' },
         { id: 'operation-plans', label: '高风险待确认', icon: '⚡', path: '/hq/ops/operation-plans' },
-        { id: 'alerts', label: '异常中心', icon: '🚨', count: 5, path: '/hq/ops/alerts' },
+        { id: 'alerts', label: '预警中心', icon: '🚨', count: 5, path: '/hq/ops/alerts' },
+        { id: 'rectification', label: '整改指挥', icon: '🎯', count: 0, path: '/hq/ops/rectification' },
+        { id: 'store-health-radar', label: '健康度雷达', icon: '📡', path: '/hq/store-health' },
         { id: 'review', label: '复盘中心', icon: '📋', path: '/hq/ops/review' },
         { id: 'regional', label: '区域追踪', icon: '🗺️', count: 3, path: '/hq/ops/regional' },
+        { id: 'briefings', label: '经营简报', icon: '📰', path: '/hq/ops/briefings' },
+        { id: 'alert-rules', label: '预警规则', icon: '⚙️', path: '/hq/ops/alert-rules' },
+        { id: 'integrations', label: '集成健康', icon: '🔌', path: '/hq/ops/integrations' },
       ]},
       { label: '供应链', items: [
         { id: 'inventory-intel', label: '智能补货', icon: '📦', path: '/hq/supply/inventory-intel' },

@@ -19,6 +19,7 @@ import { DishAnalyticsPage } from '../pages/analytics/DishAnalyticsPage';
 import { ManagerDashboardPage } from '../pages/analytics/ManagerDashboardPage';
 import { WineDepositReportPage } from '../pages/analytics/WineDepositReportPage';
 import ReportCenterPage from '../pages/analytics/ReportCenterPage';
+import { RegionOverviewPage } from '../pages/hq/analytics/RegionOverviewPage';
 import { StoreInsightsPage } from '../pages/hq/insights/StoreInsightsPage';
 import { PeriodAnalysisPage } from '../pages/hq/insights/PeriodAnalysisPage';
 
@@ -35,6 +36,7 @@ export const analyticsRoutes = (
     <Route path="/hq/analytics/revenue-optimize" element={<RevenueOptimizePage />} />
     <Route path="/hq/analytics/anomaly" element={<AnomalyDetectionPage />} />
     <Route path="/hq/analytics/table-turnover" element={<TableTurnoverPage />} />
+    <Route path="/hq/analytics/region-overview" element={<RegionOverviewPage />} />
     {/* P1: 经营洞察 */}
     <Route path="/hq/insights/stores" element={<StoreInsightsPage />} />
     <Route path="/hq/insights/periods" element={<PeriodAnalysisPage />} />

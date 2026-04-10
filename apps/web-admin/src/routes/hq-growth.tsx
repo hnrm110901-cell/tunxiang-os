@@ -33,6 +33,10 @@ import { ExternalSignalsPage } from '../pages/hq/growth/ExternalSignalsPage';
 import { GrowthSegmentTagsPage } from '../pages/hq/growth/GrowthSegmentTagsPage';
 import { GrowthOfferPacksPage } from '../pages/hq/growth/GrowthOfferPacksPage';
 import { CustomerBrainPage } from '../pages/hq/growth/CustomerBrainPage';
+import { MemberDashboardPage } from '../pages/hq/growth/MemberDashboardPage';
+import { MemberSegmentPage } from '../pages/hq/growth/MemberSegmentPage';
+import { CouponBenefitPage } from '../pages/hq/growth/CouponBenefitPage';
+import { JourneyDesignerPage } from '../pages/hq/growth/JourneyDesignerPage';
 import { CRMCampaignPage } from '../pages/growth/CRMCampaignPage';
 import { CampaignManagePage } from '../pages/growth/CampaignManagePage';
 import ReferralManagePage from '../pages/growth/ReferralManagePage';
@@ -81,6 +85,11 @@ export const growthRoutes = (
     <Route path="/hq/growth/cross-brand" element={<CrossBrandPage />} />
     <Route path="/hq/growth/external-signals" element={<ExternalSignalsPage />} />
     <Route path="/hq/growth/customer-brain" element={<CustomerBrainPage />} />
+    {/* P1: 会员增长中枢 */}
+    <Route path="/hq/growth/member-dashboard" element={<MemberDashboardPage />} />
+    <Route path="/hq/growth/member-segments" element={<MemberSegmentPage />} />
+    <Route path="/hq/growth/coupon-benefits" element={<CouponBenefitPage />} />
+    <Route path="/hq/growth/journey-designer" element={<JourneyDesignerPage />} />
     {/* Legacy paths */}
     <Route path="/growth/crm-campaign" element={<CRMCampaignPage />} />
     <Route path="/growth/referral-distribution" element={<ReferralManagePage />} />

@@ -17,6 +17,11 @@ import { EventBusHealthPage } from '../pages/hq/ops/EventBusHealthPage';
 import { StoreClonePage } from '../pages/hq/ops/StoreClonePage';
 import { DailyReviewPage } from '../pages/hq/ops/DailyReviewPage';
 import { SmartSpecialsPage } from '../pages/hq/ops/SmartSpecialsPage';
+import { RectificationCenterPage } from '../pages/hq/ops/RectificationCenterPage';
+import { StoreHealthRadarPage } from '../pages/hq/ops/StoreHealthRadarPage';
+import { BriefingCenterPage } from '../pages/hq/ops/BriefingCenterPage';
+import { AlertRuleConfigPage } from '../pages/hq/ops/AlertRuleConfigPage';
+import { IntegrationHealthPage } from '../pages/hq/ops/IntegrationHealthPage';
 import { OperationsPage } from '../pages/OperationsPage';
 import { OperationsDashboardPage } from '../pages/OperationsDashboardPage';
 import { ApprovalTemplatePage } from '../pages/ops/approval/ApprovalTemplatePage';
@@ -45,6 +50,11 @@ export const opsRoutes = (
     <Route path="/hq/ops/store-clone" element={<StoreClonePage />} />
     <Route path="/hq/ops/daily-review" element={<DailyReviewPage />} />
     <Route path="/hq/ops/smart-specials" element={<SmartSpecialsPage />} />
+    <Route path="/hq/ops/rectification" element={<RectificationCenterPage />} />
+    <Route path="/hq/store-health" element={<StoreHealthRadarPage />} />
+    <Route path="/hq/ops/briefings" element={<BriefingCenterPage />} />
+    <Route path="/hq/ops/alert-rules" element={<AlertRuleConfigPage />} />
+    <Route path="/hq/ops/integrations" element={<IntegrationHealthPage />} />
     <Route path="/hq/tasks" element={<TaskCenterPage />} />
     <Route path="/hq/events" element={<EventBusHealthPage />} />
     {/* Legacy */}

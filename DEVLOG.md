@@ -7,6 +7,60 @@
 ## 2026-04-10
 
 ### 今日完成
+
+**第一波：P0 经营闭环（Sprint 1-3）**
+- [web-admin] S1-T1 整改指挥中心 — RectificationCenterPage.tsx + rectificationApi.ts
+- [web-admin] S1-T2 门店健康度雷达 — StoreHealthRadarPage.tsx + storeHealthRadarApi.ts（含SVG雷达图、30秒自动刷新）
+- [web-admin] S1-T3 区域经营总览 — RegionOverviewPage.tsx + regionOverviewApi.ts（含Sparkline、下钻）
+- [web-crew] S2-T1 营业中控台 — StoreLivePage.tsx（慢菜预警、退菜投诉流、等位队列、30秒轮询）
+- [web-crew] S2-T2 门店异常事件中心 — StoreIncidentsCenterPage.tsx（6类异常、快速上报FAB、时间线）
+- [web-crew] S2-T3 巡检整改执行 — PatrolExecutionPage.tsx + patrolApi.ts（5类巡检、不合格自动生成整改）
+- [web-admin] S3-T1 经营简报中心 — BriefingCenterPage.tsx + briefingApi.ts（AI叙事日报/周报、订阅设置）
+- [web-admin] S3-T2 预警规则配置中心 — AlertRuleConfigPage.tsx + alertRuleApi.ts（5域规则、阈值编辑、规则测试）
+- [web-admin] S3-T3 集成健康中心 — IntegrationHealthPage.tsx + integrationHealthApi.ts（10适配器监控、Webhook日志）
+
+**第二波：P1 会员增长中枢**
+- [web-admin] P1-01 会员驾驶舱 — MemberDashboardPage.tsx（6 KPI、RFM饼图、生命周期漏斗、30天趋势）
+- [web-admin] P1-01 RFM分层中心 — MemberSegmentPage.tsx（4×2矩阵、会员列表、标签管理、人群包）
+- [web-admin] P1-02 券权益中心 — CouponBenefitPage.tsx + couponBenefitApi.ts（优惠券/积分/储值/礼品卡）
+- [web-admin] P1-02 客户旅程编排 — JourneyDesignerPage.tsx（可视化流程图、5种节点类型）
+
+**第三波：后端API端点**
+- [tx-ops] 7个新路由文件：rectification/store_live/incident/briefing/alert_rule/integration_health/inspection
+- [tx-analytics] 2个新路由文件：store_health_radar/region_overview
+- [tx-member] 2个新路由文件：member_dashboard/coupon_benefit
+- [tx-growth] 1个新路由文件：journey_designer
+
+**基础设施**
+- [战略] 完成屯象OS战略升级方案V2 + P0开发计划明细
+- [路由] 注册13条新前端路由
+- [菜单] 注册11条新菜单项
+
+### 数据变化
+- 新增前端页面组件：13 个
+- 新增前端API模块：10 个
+- 新增后端路由文件：12 个
+- 新增前端路由：13 条
+- 新增菜单项：11 条
+- 修改文件：6 个（hq-ops.tsx, hq-analytics.tsx, hq-growth.tsx, web-crew/App.tsx, menuConfigs.ts, api/index.ts）
+
+### 遗留问题
+- 后端路由文件需注册到各服务main.py
+- 跨终端联动（预警→整改→执行→闭环）需要端到端测试验证
+- P1 组织人效中枢（排班/考勤/绩效）待开发
+- P1 业财结算中枢（营收对账/成本毛利/P&L）待开发
+
+### 明日计划
+- 后端路由注册到各微服务main.py
+- P1 组织人效中枢页面开发
+- P1 业财结算中枢页面开发
+- 前端TypeScript编译验证
+
+---
+
+## 2026-04-10
+
+### 今日完成
 - [miniapp-v2] Wave 1-4小程序全量升级: 10新文件/2386行（brand-picker/pre-order/AiChatAssistant/subscription/taste-profile/ReorderBanner/group-order/cross-brand/insights/i18n）
 - [tx-member] subscription_routes: 付费会员订阅4端点
 - [tx-trade] group_order_routes: 拼单5端点
