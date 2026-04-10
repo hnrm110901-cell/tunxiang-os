@@ -37,6 +37,27 @@ class OrgEventType(str, Enum):
     # ── 员工类 ─────────────────────────────────────────────────────
     EMPLOYEE_ONBOARDED = "org.employee.onboarded"       # 员工入职
     EMPLOYEE_OFFBOARDED = "org.employee.offboarded"     # 员工离职
+    EMPLOYEE_PROFILE_UPDATED = "org.employee.profile_updated"         # 员工档案更新
+    EMPLOYEE_DEPARTMENT_CHANGED = "org.employee.department_changed"   # 员工部门调动
+    EMPLOYEE_GRADE_CHANGED = "org.employee.grade_changed"             # 员工职级变更
+    EMPLOYEE_CONTRACT_EXPIRING = "org.employee.contract_expiring"     # 合同即将到期
+    EMPLOYEE_TRANSFERRED = "org.employee.transferred"                 # 员工调店
+
+    # ── 排班类 ─────────────────────────────────────────────────────
+    SCHEDULE_CREATED = "org.schedule.created"             # 排班创建
+    SCHEDULE_UPDATED = "org.schedule.updated"             # 排班修改
+    SCHEDULE_CANCELLED = "org.schedule.cancelled"         # 排班取消
+    SCHEDULE_SWAPPED = "org.schedule.swapped"             # 调班换班
+    SCHEDULE_BATCH_CREATED = "org.schedule.batch_created" # 批量排班
+
+    # ── 缺口类 ─────────────────────────────────────────────────────
+    SHIFT_GAP_OPENED = "org.shift_gap.opened"             # 缺口产生
+    SHIFT_GAP_CLAIMED = "org.shift_gap.claimed"           # 员工认领缺口
+    SHIFT_GAP_FILLED = "org.shift_gap.filled"             # 缺口已填补
+
+    # ── 合规类 ─────────────────────────────────────────────────────
+    COMPLIANCE_ALERT_CREATED = "org.compliance.alert_created"     # 合规预警
+    COMPLIANCE_ALERT_RESOLVED = "org.compliance.alert_resolved"   # 合规预警解除
 
 
 @dataclass

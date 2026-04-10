@@ -1,0 +1,32 @@
+replicaCount: 2
+
+image:
+  tag: ${IMAGE_TAG}  # 由Harness CD注入
+
+ingress:
+  host: admin.tunxiangos.cn
+  tls: true
+
+configMap:
+  name: web-admin-config-prod
+  data:
+    VITE_API_BASE_URL: https://api.tunxiangos.cn
+    VITE_APP_ENV: prod
+    VITE_WS_BASE_URL: wss://api.tunxiangos.cn
+
+resources:
+  limits:
+    cpu: 200m
+    memory: 128Mi
+  requests:
+    cpu: 50m
+    memory: 64Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 70
+
+podAntiAffinity:
+  enabled: true

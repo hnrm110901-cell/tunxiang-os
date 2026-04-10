@@ -36,6 +36,7 @@ Create Date: 2026-03-31
 from typing import Sequence, Union
 
 from alembic import op
+import sqlalchemy as sa
 
 revision: str = "v056"
 down_revision: Union[str, None] = "v047"
@@ -110,6 +111,15 @@ LEGACY_CONDITION_TABLES = [
 ]
 
 
+def _table_exists(table: str) -> bool:
+    conn = op.get_bind()
+    result = conn.execute(sa.text(
+        "SELECT EXISTS (SELECT FROM information_schema.tables "
+        "WHERE table_schema = 'public' AND table_name = :t)"
+    ), {"t": table})
+    return result.scalar()
+
+
 def _drop_all_known_policies(table: str) -> None:
     """删除该表所有已知命名模式的 RLS 策略，确保无残留冲突策略。"""
     # v001-v005 / v013 命名模式（两个策略）
@@ -160,16 +170,22 @@ def upgrade() -> None:
 
     # 组1：修复 v012 漏洞（缺少 NULL guard + 四操作不完整）
     for table in V012_TABLES:
+        if not _table_exists(table):
+            continue
         _drop_all_known_policies(table)
         _apply_safe_rls(table)
 
     # 组2：修复 v032 漏洞（缺少 NULL guard + 仅有 SELECT 策略）
     for table in V032_TABLES:
+        if not _table_exists(table):
+            continue
         _drop_all_known_policies(table)
         _apply_safe_rls(table)
 
     # 组3：统一升级旧三段条件至 NULLIF 模式（幂等操作，DROP IF EXISTS 安全）
     for table in LEGACY_CONDITION_TABLES:
+        if not _table_exists(table):
+            continue
         _drop_all_known_policies(table)
         _apply_safe_rls(table)
 

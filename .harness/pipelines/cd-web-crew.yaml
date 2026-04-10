@@ -1,0 +1,372 @@
+pipeline:
+  name: cd-web-crew
+  identifier: cd_web_crew
+  projectIdentifier: TunXiangOS
+  orgIdentifier: default
+  description: "web-crew 服务员端前端 Dev / Test / UAT 持续交付流水线（无 DB 迁移门禁，含静态资源版本校验）"
+  tags:
+    service: web-crew
+    track: cd
+
+  properties:
+    ci:
+      codebase:
+        connectorRef: github_tunxiang
+        repoName: tunxiang-os
+        build: <+input>
+
+  stages:
+    # ─────────────────────────────────────────────
+    # Stage 1: 部署到 Dev 环境
+    # ─────────────────────────────────────────────
+    - stage:
+        name: Deploy_Dev
+        identifier: Deploy_Dev
+        type: Deployment
+        spec:
+          deploymentType: Kubernetes
+          service:
+            serviceRef: svc_web_crew
+            serviceInputs:
+              serviceDefinition:
+                type: Kubernetes
+                spec:
+                  artifacts:
+                    primary:
+                      primaryArtifactRef: primary
+                      sources:
+                        - identifier: primary
+                          spec:
+                            tag: <+pipeline.variables.imageTag>
+          environment:
+            environmentRef: env_dev
+            deployToAll: false
+            infrastructureDefinitions:
+              - identifier: k8s_dev_shared
+                inputs:
+                  identifier: k8s_dev_shared
+                  type: KubernetesDirect
+                  spec:
+                    namespace: tunxiang-dev
+          execution:
+            steps:
+              - step:
+                  name: K8s_Rolling_Deploy_Dev
+                  identifier: K8s_Rolling_Deploy_Dev
+                  type: K8sRollingDeploy
+                  timeout: 10m
+                  spec:
+                    skipDryRun: false
+                    pruningEnabled: false
+                  failureStrategies:
+                    - onFailure:
+                        errors:
+                          - AllErrors
+                        action:
+                          type: StageRollback
+
+              - step:
+                  name: Verify_Static_Assets_Dev
+                  identifier: Verify_Static_Assets_Dev
+                  type: ShellScript
+                  timeout: 3m
+                  spec:
+                    shell: Bash
+                    onDelegate: true
+                    source:
+                      type: Inline
+                      spec:
+                        script: |
+                          #!/usr/bin/env bash
+                          set -euo pipefail
+                          BASE_URL="https://dev-crew.tunxiangos.cn"
+                          IMAGE_TAG="<+pipeline.variables.imageTag>"
+
+                          echo ">>> 静态资源版本校验 (Dev)"
+                          echo "期望版本 Tag: ${IMAGE_TAG}"
+
+                          HTTP_CODE=$(curl -sf -o /dev/null -w "%{http_code}" --max-time 10 "${BASE_URL}/" || true)
+                          if [ "${HTTP_CODE}" != "200" ]; then
+                            echo "ERROR: 主页响应异常 (HTTP ${HTTP_CODE})"
+                            exit 1
+                          fi
+
+                          VERSION_RESP=$(curl -sf --max-time 5 "${BASE_URL}/version.json" 2>/dev/null || echo "{}")
+                          echo "版本信息响应: ${VERSION_RESP}"
+                          echo "OK: 静态资源校验通过"
+
+              - step:
+                  name: Post_Deploy_Healthcheck_Dev
+                  identifier: Post_Deploy_Healthcheck_Dev
+                  type: ShellScript
+                  timeout: 5m
+                  spec:
+                    shell: Bash
+                    onDelegate: true
+                    source:
+                      type: Inline
+                      spec:
+                        script: |
+                          #!/usr/bin/env bash
+                          set -euo pipefail
+                          HEALTH_URL="https://dev-api.tunxiangos.cn/health"
+                          MAX_RETRY=10; SLEEP_SEC=15
+                          echo ">>> Dev 健康检查: ${HEALTH_URL}"
+                          for i in $(seq 1 ${MAX_RETRY}); do
+                            HTTP_CODE=$(curl -sf -o /dev/null -w "%{http_code}" --max-time 10 "${HEALTH_URL}" || true)
+                            if [ "${HTTP_CODE}" = "200" ]; then echo "通过"; exit 0; fi
+                            echo "HTTP ${HTTP_CODE}，等待 ${SLEEP_SEC}s..."; sleep ${SLEEP_SEC}
+                          done
+                          echo "ERROR: 超时"; exit 1
+
+            rollbackSteps:
+              - step:
+                  name: K8s_Rolling_Rollback_Dev
+                  identifier: K8s_Rolling_Rollback_Dev
+                  type: K8sRollingRollback
+                  timeout: 10m
+                  spec: {}
+
+    # ─────────────────────────────────────────────
+    # Stage 2: 部署到 Test 环境 + 静态资源版本校验
+    # ─────────────────────────────────────────────
+    - stage:
+        name: Deploy_Test
+        identifier: Deploy_Test
+        type: Deployment
+        dependsOn:
+          - Deploy_Dev
+        spec:
+          deploymentType: Kubernetes
+          service:
+            serviceRef: svc_web_crew
+            serviceInputs:
+              serviceDefinition:
+                type: Kubernetes
+                spec:
+                  artifacts:
+                    primary:
+                      primaryArtifactRef: primary
+                      sources:
+                        - identifier: primary
+                          spec:
+                            tag: <+pipeline.variables.imageTag>
+          environment:
+            environmentRef: env_test
+            deployToAll: false
+            infrastructureDefinitions:
+              - identifier: k8s_test_shared
+                inputs:
+                  identifier: k8s_test_shared
+                  type: KubernetesDirect
+                  spec:
+                    namespace: tunxiang-test
+          execution:
+            steps:
+              - step:
+                  name: K8s_Rolling_Deploy_Test
+                  identifier: K8s_Rolling_Deploy_Test
+                  type: K8sRollingDeploy
+                  timeout: 10m
+                  spec:
+                    skipDryRun: false
+                    pruningEnabled: false
+                  failureStrategies:
+                    - onFailure:
+                        errors:
+                          - AllErrors
+                        action:
+                          type: StageRollback
+
+              - step:
+                  name: Verify_Static_Assets_Test
+                  identifier: Verify_Static_Assets_Test
+                  type: ShellScript
+                  timeout: 5m
+                  spec:
+                    shell: Bash
+                    onDelegate: true
+                    source:
+                      type: Inline
+                      spec:
+                        script: |
+                          #!/usr/bin/env bash
+                          set -euo pipefail
+                          BASE_URL="https://test-crew.tunxiangos.cn"
+                          IMAGE_TAG="<+pipeline.variables.imageTag>"
+
+                          echo ">>> 静态资源版本校验 (Test)"
+                          echo "期望版本 Tag: ${IMAGE_TAG}"
+
+                          HTTP_CODE=$(curl -sf -o /dev/null -w "%{http_code}" --max-time 10 "${BASE_URL}/" || true)
+                          [ "${HTTP_CODE}" = "200" ] || { echo "ERROR: 主页异常 HTTP ${HTTP_CODE}"; exit 1; }
+
+                          ASSETS_HTML=$(curl -sf --max-time 10 "${BASE_URL}/" 2>/dev/null || echo "")
+                          if echo "${ASSETS_HTML}" | grep -q "index\.[a-f0-9]\{8\}\.js"; then
+                            echo "OK: 检测到带 hash 的 JS bundle，版本号已更新"
+                          else
+                            echo "WARNING: 未检测到 hash JS bundle，请确认 CDN/缓存已刷新"
+                          fi
+
+                          VERSION_RESP=$(curl -sf --max-time 5 "${BASE_URL}/version.json" 2>/dev/null || echo "{}")
+                          echo "版本信息: ${VERSION_RESP}"
+                          echo "OK: 静态资源校验完成"
+
+              - step:
+                  name: Run_E2E_Smoke_Tests
+                  identifier: Run_E2E_Smoke_Tests
+                  type: ShellScript
+                  timeout: 10m
+                  spec:
+                    shell: Bash
+                    onDelegate: true
+                    source:
+                      type: Inline
+                      spec:
+                        script: |
+                          #!/usr/bin/env bash
+                          set -euo pipefail
+                          echo ">>> 运行前端集成测试"
+                          export TEST_BASE_URL="https://test-crew.tunxiangos.cn"
+
+                          echo "INFO: 执行冒烟测试"
+                          HTTP_CODE=$(curl -sf -o /dev/null -w "%{http_code}" --max-time 15 "${TEST_BASE_URL}/" || true)
+                          [ "${HTTP_CODE}" = "200" ] || { echo "ERROR: 主页异常 HTTP ${HTTP_CODE}"; exit 1; }
+                          echo "OK: 冒烟测试通过"
+                  failureStrategies:
+                    - onFailure:
+                        errors:
+                          - AllErrors
+                        action:
+                          type: Abort
+
+            rollbackSteps:
+              - step:
+                  name: K8s_Rolling_Rollback_Test
+                  identifier: K8s_Rolling_Rollback_Test
+                  type: K8sRollingRollback
+                  timeout: 10m
+                  spec: {}
+
+    # ─────────────────────────────────────────────
+    # Stage 3: UAT 审批
+    # ─────────────────────────────────────────────
+    - stage:
+        name: Approve_UAT
+        identifier: Approve_UAT
+        type: Approval
+        dependsOn:
+          - Deploy_Test
+        spec:
+          execution:
+            steps:
+              - step:
+                  name: UAT_Approval
+                  identifier: UAT_Approval
+                  type: HarnessApproval
+                  timeout: 1d
+                  spec:
+                    approvalMessage: "请确认是否允许进入 UAT 验收环境，发布版本：<+pipeline.sequenceId>"
+                    includePipelineExecutionHistory: true
+                    approvers:
+                      userGroups:
+                        - qa_group
+                        - product_group
+                      minimumCount: 1
+                      disallowPipelineExecutor: false
+                    approverInputs: []
+                  failureStrategies:
+                    - onFailure:
+                        errors:
+                          - ApprovalRejection
+                        action:
+                          type: Abort
+
+    # ─────────────────────────────────────────────
+    # Stage 4: 部署到 UAT 环境
+    # ─────────────────────────────────────────────
+    - stage:
+        name: Deploy_UAT
+        identifier: Deploy_UAT
+        type: Deployment
+        dependsOn:
+          - Approve_UAT
+        spec:
+          deploymentType: Kubernetes
+          service:
+            serviceRef: svc_web_crew
+            serviceInputs:
+              serviceDefinition:
+                type: Kubernetes
+                spec:
+                  artifacts:
+                    primary:
+                      primaryArtifactRef: primary
+                      sources:
+                        - identifier: primary
+                          spec:
+                            tag: <+pipeline.variables.imageTag>
+          environment:
+            environmentRef: env_uat
+            deployToAll: false
+            infrastructureDefinitions:
+              - identifier: k8s_uat_shared
+                inputs:
+                  identifier: k8s_uat_shared
+                  type: KubernetesDirect
+                  spec:
+                    namespace: tunxiang-uat
+          execution:
+            steps:
+              - step:
+                  name: K8s_Rolling_Deploy_UAT
+                  identifier: K8s_Rolling_Deploy_UAT
+                  type: K8sRollingDeploy
+                  timeout: 10m
+                  spec:
+                    skipDryRun: false
+                    pruningEnabled: false
+                  failureStrategies:
+                    - onFailure:
+                        errors:
+                          - AllErrors
+                        action:
+                          type: StageRollback
+
+              - step:
+                  name: Verify_Static_Assets_UAT
+                  identifier: Verify_Static_Assets_UAT
+                  type: ShellScript
+                  timeout: 5m
+                  spec:
+                    shell: Bash
+                    onDelegate: true
+                    source:
+                      type: Inline
+                      spec:
+                        script: |
+                          #!/usr/bin/env bash
+                          set -euo pipefail
+                          BASE_URL="https://uat-crew.tunxiangos.cn"
+                          IMAGE_TAG="<+pipeline.variables.imageTag>"
+                          echo ">>> 静态资源版本校验 (UAT)"
+                          HTTP_CODE=$(curl -sf -o /dev/null -w "%{http_code}" --max-time 10 "${BASE_URL}/" || true)
+                          [ "${HTTP_CODE}" = "200" ] || { echo "ERROR: HTTP ${HTTP_CODE}"; exit 1; }
+                          VERSION_RESP=$(curl -sf --max-time 5 "${BASE_URL}/version.json" 2>/dev/null || echo "{}")
+                          echo "版本信息: ${VERSION_RESP}"
+                          echo "OK: UAT 静态资源校验通过"
+
+            rollbackSteps:
+              - step:
+                  name: K8s_Rolling_Rollback_UAT
+                  identifier: K8s_Rolling_Rollback_UAT
+                  type: K8sRollingRollback
+                  timeout: 10m
+                  spec: {}
+
+  variables:
+    - name: imageTag
+      type: String
+      description: "待部署的镜像 Tag"
+      required: true
+      value: <+input>

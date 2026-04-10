@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+# 在服务器上生成生产环境 .env 文件
+# 用法: bash /opt/tunxiang-os/scripts/create-prod-env.sh
+set -e
+TARGET=/opt/tunxiang-os/infra/docker/.env
+cat > "$TARGET" <<ENVEOF
+TX_ENV=prod
+POSTGRES_USER=tunxiang
+POSTGRES_PASSWORD=Lichun849299
+POSTGRES_DB=tunxiang_os
+POSTGRES_PORT=5432
+DATABASE_URL=postgresql+asyncpg://tunxiang:Lichun849299@postgres-primary:5432/tunxiang_os
+REDIS_PASSWORD=txos_redis_2024
+REDIS_URL=redis://:txos_redis_2024@redis:6379/0
+TX_JWT_SECRET=tunxiang_jwt_prod_secret_2024_abc
+TX_JWT_ALGORITHM=HS256
+TX_JWT_EXPIRE_MINUTES=1440
+TX_AUTH_ENABLED=true
+TX_RATE_LIMIT_ENABLED=true
+LOG_LEVEL=INFO
+TENCENT_SECRET_ID=CHANGE_ME
+TENCENT_SECRET_KEY=CHANGE_ME
+TENCENT_COS_BUCKET=CHANGE_ME
+TENCENT_COS_REGION=ap-guangzhou
+TENCENT_SMS_SDK_APP_ID=CHANGE_ME
+TENCENT_SMS_SIGN_NAME=屯象科技
+ANTHROPIC_API_KEY=CHANGE_ME
+ANTHROPIC_MODEL=claude-sonnet-4-20250514
+WECHAT_APP_ID=CHANGE_ME
+WECHAT_APP_SECRET=CHANGE_ME
+WECHAT_MCH_ID=CHANGE_ME
+WECHAT_API_KEY=CHANGE_ME
+DOUYIN_APP_ID=CHANGE_ME
+DOUYIN_APP_SECRET=CHANGE_ME
+TX_DOMAIN=tunxiangos.com
+SSL_CERT_PATH=/etc/nginx/ssl/fullchain.pem
+SSL_KEY_PATH=/etc/nginx/ssl/privkey.pem
+CERTBOT_EMAIL=CHANGE_ME
+TAILSCALE_AUTH_KEY=CHANGE_ME
+ENVEOF
+echo ".env created at $TARGET"

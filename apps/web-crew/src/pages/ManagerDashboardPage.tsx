@@ -108,23 +108,8 @@ interface DashboardData {
 }
 
 /* ---------- 工具函数 ---------- */
-function getTenantId(): string {
-  return localStorage.getItem('tenant_id') ?? '';
-}
-
 function getStoreId(): string {
   return (window as any).__STORE_ID__ || localStorage.getItem('store_id') || '1';
-}
-
-function getHeaders(): HeadersInit {
-  return {
-    'Content-Type': 'application/json',
-    'X-Tenant-ID': getTenantId(),
-  };
-}
-
-function getToday(): string {
-  return new Date().toISOString().slice(0, 10);
 }
 
 function getBusinessPeriod(): string {

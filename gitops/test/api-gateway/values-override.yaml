@@ -1,0 +1,28 @@
+replicaCount: 1
+
+image:
+  tag: latest  # test环境用latest
+
+ingress:
+  host: test-api.tunxiangos.cn
+  tls: false
+
+env:
+  TUNXIANG_ENV: test
+  LOG_LEVEL: debug
+  FEATURE_AGENT_L3_AUTONOMY_ENABLE: "false"
+  FEATURE_GROWTH_HUB_JOURNEY_V2_ENABLE: "false"
+
+resources:
+  limits:
+    cpu: 200m
+    memory: 256Mi
+  requests:
+    cpu: 50m
+    memory: 128Mi
+
+autoscaling:
+  enabled: false
+
+podAntiAffinity:
+  enabled: false

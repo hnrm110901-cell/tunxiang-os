@@ -1,0 +1,38 @@
+trigger:
+  name: trigger-main-tx-analytics
+  identifier: trigger_main_tx_analytics
+  projectIdentifier: TunXiangOS
+  orgIdentifier: default
+  description: "tx-analytics 服务 main 分支推送触发器。push to main 时触发 cd_tx_analytics 流水线（部署到 dev/test/uat）。"
+  tags:
+    service: tx-analytics
+    event: push-main
+  enabled: true
+  pipelineIdentifier: cd_tx_analytics
+  source:
+    type: Webhook
+    spec:
+      type: Github
+      spec:
+        type: Push
+        spec:
+          connectorRef: github_connector
+          repoName: tunxiang-os
+          autoAbortPreviousExecutions: false
+          payloadConditions:
+            - key: targetBranch
+              operator: Equals
+              value: main
+          headerConditions: []
+          jexlCondition: ""
+          actions: []
+  inputYaml: |
+    pipeline:
+      identifier: cd_tx_analytics
+      properties:
+        ci:
+          codebase:
+            build:
+              type: branch
+              spec:
+                branch: main

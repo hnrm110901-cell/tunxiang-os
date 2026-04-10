@@ -1,0 +1,197 @@
+<!-- 宴席支付闭环页 — 定金 / 尾款状态机 -->
+<!-- 从 banquet-booking 或"我的预订"跳转，携带 orderId -->
+<view class="page">
+
+  <!-- 加载中 -->
+  <view class="loading-wrap" wx:if="{{loading}}">
+    <view class="loading-spinner"></view>
+    <text class="loading-text">加载中…</text>
+  </view>
+
+  <!-- 主内容 -->
+  <block wx:elif="{{order}}">
+
+    <!-- ── 订单信息卡片 ────────────────────────────────────── -->
+    <view class="card order-card">
+      <view class="card-header">
+        <text class="card-title">宴席预订单</text>
+        <view class="status-badge status-{{order.payment_status}}">
+          <text>{{paymentStatusLabel}}</text>
+        </view>
+      </view>
+      <view class="info-row">
+        <text class="info-label">预订人</text>
+        <text class="info-value">{{order.contact_name}}</text>
+      </view>
+      <view class="info-row">
+        <text class="info-label">联系电话</text>
+        <text class="info-value">{{order.contact_phone}}</text>
+      </view>
+      <view class="info-row">
+        <text class="info-label">宴席日期</text>
+        <text class="info-value">{{order.banquet_date}} {{order.banquet_time}}</text>
+      </view>
+      <view class="info-row">
+        <text class="info-label">宾客人数</text>
+        <text class="info-value">{{order.guest_count}} 人</text>
+      </view>
+      <view class="divider"></view>
+      <view class="amount-row">
+        <text class="amount-label">宴席总额</text>
+        <text class="amount-value">¥{{totalYuan}}</text>
+      </view>
+      <view class="amount-row">
+        <text class="amount-label">应付定金（{{depositRatePct}}%）</text>
+        <text class="amount-value accent">¥{{depositYuan}}</text>
+      </view>
+      <view class="amount-row">
+        <text class="amount-label">应付尾款</text>
+        <text class="amount-value">¥{{balanceYuan}}</text>
+      </view>
+      <view class="info-row" wx:if="{{order.notes}}">
+        <text class="info-label">备注</text>
+        <text class="info-value notes">{{order.notes}}</text>
+      </view>
+    </view>
+
+    <!-- ── 支付进度 ──────────────────────────────────────── -->
+    <view class="card progress-card">
+      <text class="card-title">支付进度</text>
+      <view class="progress-steps">
+        <!-- 定金 -->
+        <view class="step">
+          <view class="step-dot {{order.deposit_status === 'paid' ? 'dot-done' : 'dot-pending'}}">
+            <text wx:if="{{order.deposit_status === 'paid'}}">✓</text>
+            <text wx:else>1</text>
+          </view>
+          <view class="step-info">
+            <text class="step-name">定金</text>
+            <text class="step-amount">¥{{depositYuan}}</text>
+            <text class="step-status {{order.deposit_status === 'paid' ? 'status-done' : 'status-pending'}}">
+              {{order.deposit_status === 'paid' ? '已支付' : '待支付'}}
+            </text>
+          </view>
+        </view>
+
+        <!-- 连接线 -->
+        <view class="step-line {{order.deposit_status === 'paid' ? 'line-done' : ''}}"></view>
+
+        <!-- 尾款 -->
+        <view class="step">
+          <view class="step-dot {{order.balance_status === 'paid' ? 'dot-done' : (order.deposit_status === 'paid' ? 'dot-ready' : 'dot-locked')}}">
+            <text wx:if="{{order.balance_status === 'paid'}}">✓</text>
+            <text wx:elif="{{order.deposit_status !== 'paid'}}">🔒</text>
+            <text wx:else>2</text>
+          </view>
+          <view class="step-info">
+            <text class="step-name">尾款</text>
+            <text class="step-amount">¥{{balanceYuan}}</text>
+            <text class="step-status {{order.balance_status === 'paid' ? 'status-done' : (order.deposit_status === 'paid' ? 'status-pending' : 'status-locked')}}">
+              {{order.balance_status === 'paid' ? '已支付' : (order.deposit_status === 'paid' ? '待支付' : '待定金付清')}}
+            </text>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- ── 支付记录 ─────────────────────────────────────── -->
+    <view class="card" wx:if="{{payments.length > 0}}">
+      <text class="card-title">支付记录</text>
+      <view class="pay-record" wx:for="{{payments}}" wx:key="id">
+        <view class="pay-record-left">
+          <view class="pay-stage-tag tag-{{item.payment_stage}}">
+            {{item.payment_stage === 'deposit' ? '定金' : (item.payment_stage === 'balance' ? '尾款' : '全额')}}
+          </view>
+          <view class="pay-record-info">
+            <text class="pay-method">{{methodLabels[item.payment_method] || item.payment_method}}</text>
+            <text class="pay-time" wx:if="{{item.paid_at}}">{{item.paid_at.slice(0, 16).replace('T', ' ')}}</text>
+          </view>
+        </view>
+        <view class="pay-record-right">
+          <text class="pay-amount">¥{{(item.amount_fen / 100).toFixed(2)}}</text>
+          <text class="pay-status-text pay-{{item.payment_status}}">
+            {{item.payment_status === 'paid' ? '已支付' : (item.payment_status === 'refunded' ? '已退款' : item.payment_status)}}
+          </text>
+        </view>
+      </view>
+    </view>
+
+    <!-- ── 选择支付方式（定金/尾款未支付时显示） ────────── -->
+    <view class="card" wx:if="{{showPaySection}}">
+      <text class="card-title">支付方式</text>
+      <view class="method-list">
+        <view
+          class="method-item {{selectedMethod === 'wechat' ? 'method-selected' : ''}}"
+          bindtap="selectMethod" data-method="wechat"
+        >
+          <view class="method-icon-wrap">
+            <text class="method-icon">💚</text>
+          </view>
+          <text class="method-name">微信支付</text>
+          <view class="method-check" wx:if="{{selectedMethod === 'wechat'}}">✓</view>
+        </view>
+        <view
+          class="method-item {{selectedMethod === 'alipay' ? 'method-selected' : ''}}"
+          bindtap="selectMethod" data-method="alipay"
+        >
+          <view class="method-icon-wrap">
+            <text class="method-icon">🔵</text>
+          </view>
+          <text class="method-name">支付宝</text>
+          <view class="method-check" wx:if="{{selectedMethod === 'alipay'}}">✓</view>
+        </view>
+      </view>
+    </view>
+
+    <!-- ── 底部操作按钮 ─────────────────────────────────── -->
+    <view class="bottom-bar">
+      <!-- 未支付任何款项 → 支付定金 -->
+      <view
+        class="pay-btn pay-btn-deposit"
+        wx:if="{{order.deposit_status === 'unpaid' && order.status !== 'cancelled'}}"
+        bindtap="onPayDeposit"
+        hover-class="btn-hover"
+      >
+        <view class="pay-btn-inner">
+          <text class="pay-btn-label">支付定金</text>
+          <text class="pay-btn-amount">¥{{depositYuan}}</text>
+        </view>
+      </view>
+
+      <!-- 定金已付、尾款未付 → 支付尾款 -->
+      <view
+        class="pay-btn pay-btn-balance"
+        wx:elif="{{order.deposit_status === 'paid' && order.balance_status === 'unpaid' && order.status !== 'cancelled'}}"
+        bindtap="onPayBalance"
+        hover-class="btn-hover"
+      >
+        <view class="pay-btn-inner">
+          <text class="pay-btn-label">支付尾款</text>
+          <text class="pay-btn-amount">¥{{balanceYuan}}</text>
+        </view>
+      </view>
+
+      <!-- 全额已付 → 完成 -->
+      <view class="pay-btn pay-btn-done" wx:elif="{{order.payment_status === 'fully_paid'}}">
+        <text class="pay-btn-label">已全额付清 ✓</text>
+      </view>
+
+      <!-- 已退款 / 已取消 -->
+      <view class="pay-btn pay-btn-cancelled"
+            wx:elif="{{order.payment_status === 'refunded' || order.status === 'cancelled'}}">
+        <text class="pay-btn-label">
+          {{order.payment_status === 'refunded' ? '已退款' : '预订已取消'}}
+        </text>
+      </view>
+    </view>
+
+  </block>
+
+  <!-- 错误状态 -->
+  <view class="error-wrap" wx:elif="{{errorMsg}}">
+    <text class="error-icon">⚠️</text>
+    <text class="error-msg">{{errorMsg}}</text>
+    <view class="retry-btn" bindtap="loadOrder">重试</view>
+  </view>
+
+</view>

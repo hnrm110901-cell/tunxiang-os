@@ -38,7 +38,18 @@ def _get_tenant_id(request: Request) -> str:
 
 # ─── Mock 存储（内存，重启清空） ───────────────────────────────────────────────
 
+DEMO_TENANT_ID = "10000000-0000-0000-0000-000000000001"
+DEMO_STORE_ID  = "20000000-0000-0000-0000-000000000001"
+
 _STORES: List[dict] = [
+    {
+        "id": DEMO_STORE_ID, "tenant_id": DEMO_TENANT_ID,
+        "name": "徐记海鲜·五一广场旗舰店", "type": "direct", "city": "长沙",
+        "address": "湖南省长沙市天心区五一广场8号", "status": "active",
+        "today_revenue_fen": 0, "table_count": 15,
+        "manager": "李淳", "phone": "0731-88888888",
+        "created_at": "2026-04-04T00:00:00Z", "is_deleted": False,
+    },
     {
         "id": "s1", "tenant_id": "demo",
         "name": "五一广场店", "type": "direct", "city": "长沙",
@@ -74,6 +85,23 @@ _STORES: List[dict] = [
 ]
 
 _TABLES: List[dict] = [
+    # 演示门店桌台（徐记海鲜·五一广场旗舰店）
+    {"id": "d01", "store_id": DEMO_STORE_ID, "number": "A01", "area": "大厅A区", "capacity": 4,  "status": "available", "shape": "square",    "note": "", "is_deleted": False},
+    {"id": "d02", "store_id": DEMO_STORE_ID, "number": "A02", "area": "大厅A区", "capacity": 4,  "status": "available", "shape": "square",    "note": "", "is_deleted": False},
+    {"id": "d03", "store_id": DEMO_STORE_ID, "number": "A03", "area": "大厅A区", "capacity": 6,  "status": "occupied",  "shape": "rectangle", "note": "", "is_deleted": False},
+    {"id": "d04", "store_id": DEMO_STORE_ID, "number": "A04", "area": "大厅A区", "capacity": 6,  "status": "available", "shape": "rectangle", "note": "", "is_deleted": False},
+    {"id": "d05", "store_id": DEMO_STORE_ID, "number": "A05", "area": "大厅A区", "capacity": 8,  "status": "available", "shape": "rectangle", "note": "", "is_deleted": False},
+    {"id": "d06", "store_id": DEMO_STORE_ID, "number": "B01", "area": "大厅B区", "capacity": 4,  "status": "available", "shape": "square",    "note": "", "is_deleted": False},
+    {"id": "d07", "store_id": DEMO_STORE_ID, "number": "B02", "area": "大厅B区", "capacity": 4,  "status": "reserved",  "shape": "square",    "note": "", "is_deleted": False},
+    {"id": "d08", "store_id": DEMO_STORE_ID, "number": "B03", "area": "大厅B区", "capacity": 6,  "status": "available", "shape": "rectangle", "note": "", "is_deleted": False},
+    {"id": "d09", "store_id": DEMO_STORE_ID, "number": "B04", "area": "大厅B区", "capacity": 8,  "status": "available", "shape": "rectangle", "note": "", "is_deleted": False},
+    {"id": "d10", "store_id": DEMO_STORE_ID, "number": "B05", "area": "大厅B区", "capacity": 10, "status": "available", "shape": "rectangle", "note": "", "is_deleted": False},
+    {"id": "d11", "store_id": DEMO_STORE_ID, "number": "VIP1","area": "贵宾包厢", "capacity": 8,  "status": "available", "shape": "rectangle", "note": "", "is_deleted": False},
+    {"id": "d12", "store_id": DEMO_STORE_ID, "number": "VIP2","area": "贵宾包厢", "capacity": 10, "status": "available", "shape": "rectangle", "note": "", "is_deleted": False},
+    {"id": "d13", "store_id": DEMO_STORE_ID, "number": "VIP3","area": "贵宾包厢", "capacity": 12, "status": "available", "shape": "rectangle", "note": "", "is_deleted": False},
+    {"id": "d14", "store_id": DEMO_STORE_ID, "number": "VIP4","area": "贵宾包厢", "capacity": 16, "status": "occupied",  "shape": "rectangle", "note": "", "is_deleted": False},
+    {"id": "d15", "store_id": DEMO_STORE_ID, "number": "T01", "area": "室外露台", "capacity": 4,  "status": "available", "shape": "round",     "note": "", "is_deleted": False},
+    # 原 mock 门店桌台
     {"id": "t1",  "store_id": "s1", "number": "A01", "area": "大厅", "capacity": 4,  "status": "available", "shape": "square",    "note": "", "is_deleted": False},
     {"id": "t2",  "store_id": "s1", "number": "A02", "area": "大厅", "capacity": 2,  "status": "occupied",  "shape": "round",     "note": "", "is_deleted": False},
     {"id": "t3",  "store_id": "s1", "number": "A03", "area": "大厅", "capacity": 6,  "status": "available", "shape": "rectangle", "note": "", "is_deleted": False},

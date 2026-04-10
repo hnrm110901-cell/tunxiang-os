@@ -1,0 +1,200 @@
+# Agent体系 Feature Flags
+# 域：agent
+# 命名格式：agent.{skill_agent}.{feature}.{action}
+# 注意：auto_execute / auto_publish 类Flag均为高风险，默认关闭
+
+flags:
+  - identifier: agent_hr_shift_suggest_enable
+    name: agent.hr.shift_suggest.enable
+    description: >
+      智能排班建议（基于营收预测+历史客流+员工技能匹配，生成推荐排班方案）。
+      管理者可接受或手动调整，不自动执行。
+    defaultValue: false
+    environments:
+      dev: true
+      test: true
+      uat: true
+      pilot: false
+      prod: false
+    targeting_rules:
+      pilot:
+        - dimension: brand_id
+          values: [pilot_brand_001]
+      prod:
+        - dimension: role_code
+          values: [L2, L3]
+    tags: [agent, hr, shift, suggest]
+
+  - identifier: agent_hr_shift_auto_execute
+    name: agent.hr.shift_suggest.auto_execute
+    description: >
+      排班自动执行（L2自治级别）：Agent排班建议无需人工确认直接生效。
+      高风险Flag，仅允许L2及以上自治门店启用。
+      启用前必须经过审批流并在pilot环境观察至少7天。
+    defaultValue: false
+    risk_level: HIGH
+    environments:
+      dev: false
+      test: false
+      uat: false
+      pilot: false
+      prod: false
+    targeting_rules:
+      pilot:
+        - dimension: role_code
+          values: [L2, L3]
+        - dimension: brand_id
+          values: [pilot_brand_001]
+    tags: [agent, hr, shift, auto-execute, high-risk]
+
+  - identifier: agent_growth_dormant_recall_enable
+    name: agent.growth.dormant_recall.enable
+    description: >
+      沉默召回Agent（自动识别沉默客户，生成个性化召回内容并通过最优渠道触达）。
+      依赖 growth.member.recall_v2.enable，建议同步开启。
+    defaultValue: false
+    environments:
+      dev: true
+      test: true
+      uat: true
+      pilot: false
+      prod: false
+    targeting_rules:
+      pilot:
+        - dimension: brand_id
+          values: [pilot_brand_001, pilot_brand_002]
+    tags: [agent, growth, dormant, recall]
+
+  - identifier: agent_growth_member_insight_enable
+    name: agent.growth.member_insight.enable
+    description: >
+      会员洞察Agent（主动分析高价值客户行为变化，生成洞察摘要推送给运营人员）。
+      联动客户360页面和CLV引擎。
+    defaultValue: false
+    environments:
+      dev: true
+      test: true
+      uat: true
+      pilot: true
+      prod: false
+    targeting_rules:
+      prod:
+        - dimension: role_code
+          values: [L2, L3]
+    tags: [agent, growth, member, insight]
+
+  - identifier: agent_ops_daily_review_enable
+    name: agent.ops.daily_review.enable
+    description: >
+      日清E1-E8全流程AI追踪（自动检查每日门店运营8个关键节点，异常自动预警）。
+      E1开档→E2备料→E3开餐→E4高峰→E5低谷→E6备货→E7收餐→E8日结。
+    defaultValue: false
+    environments:
+      dev: true
+      test: true
+      uat: true
+      pilot: true
+      prod: false
+    targeting_rules:
+      prod:
+        - dimension: brand_id
+          values: []
+    tags: [agent, ops, daily-review, e1-e8]
+
+  - identifier: agent_trade_discount_alert_enable
+    name: agent.trade.discount_alert.enable
+    description: >
+      折扣健康预警Agent（实时监控折扣使用是否突破毛利底线，异常立即推送预警）。
+      P0级Agent，建议所有门店开启。联动三条硬约束中的毛利底线校验。
+    defaultValue: false
+    environments:
+      dev: true
+      test: true
+      uat: true
+      pilot: true
+      prod: false
+    targeting_rules:
+      prod:
+        - dimension: role_code
+          values: [L1, L2, L3]
+    tags: [agent, trade, discount, alert, p0]
+
+  - identifier: agent_finance_pnl_summary_enable
+    name: agent.finance.pnl_summary.enable
+    description: >
+      P&L AI摘要（每日/每周/每月自动生成结构化损益分析，
+      标注异常项并给出改善建议）。
+    defaultValue: false
+    environments:
+      dev: true
+      test: true
+      uat: true
+      pilot: false
+      prod: false
+    targeting_rules:
+      pilot:
+        - dimension: brand_id
+          values: [pilot_brand_001]
+      prod:
+        - dimension: role_code
+          values: [L3]
+    tags: [agent, finance, pnl, summary]
+
+  - identifier: agent_org_attrition_risk_enable
+    name: agent.org.attrition_risk.enable
+    description: >
+      离职风险预警Agent（7维模型：考勤/收入/晋升/任务量/团队关系/绩效/情绪）。
+      提前14天预测高风险员工，推送给店长。
+    defaultValue: false
+    environments:
+      dev: true
+      test: true
+      uat: true
+      pilot: false
+      prod: false
+    targeting_rules:
+      pilot:
+        - dimension: brand_id
+          values: [pilot_brand_001]
+    tags: [agent, org, attrition, risk, 7dim]
+
+  - identifier: agent_wecom_notify_enable
+    name: agent.wecom_notify.enable
+    description: >
+      企微通知全局开关（控制所有Agent是否通过企业微信推送通知）。
+      关闭后所有Agent通知仅在系统内显示，不外发企微消息。
+    defaultValue: false
+    environments:
+      dev: false
+      test: false
+      uat: true
+      pilot: true
+      prod: false
+    targeting_rules:
+      prod:
+        - dimension: tenant_id
+          values: []   # 需按租户逐步开启
+    tags: [agent, wecom, notify, global]
+
+  - identifier: agent_l3_autonomy_enable
+    name: agent.l3_autonomy.enable
+    description: >
+      L3全自治级别开关（允许Agent在无人干预情况下执行高影响操作：
+      自动发布营销、自动调价、自动排班）。
+      最高风险Flag，需三级审批，仅限特定门店试点，
+      且必须同时满足：毛利底线保护 + 食安合规 + 客户体验三条硬约束。
+    defaultValue: false
+    risk_level: CRITICAL
+    environments:
+      dev: false
+      test: false
+      uat: false
+      pilot: false
+      prod: false
+    targeting_rules:
+      pilot:
+        - dimension: store_id
+          values: []   # 需单独审批后填入
+        - dimension: role_code
+          values: [L3]
+    tags: [agent, l3, autonomy, critical-risk]

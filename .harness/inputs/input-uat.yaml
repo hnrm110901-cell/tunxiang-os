@@ -1,0 +1,61 @@
+inputSet:
+  name: input-uat
+  identifier: input_uat
+  projectIdentifier: TunXiangOS
+  orgIdentifier: default
+  description: "UAT 环境输入集"
+  tags:
+    env: uat
+
+  pipeline:
+    identifier: cd_api_gateway
+    variables:
+      - name: imageTag
+        type: String
+        value: <+input>
+
+    stages:
+      - stage:
+          identifier: Deploy_UAT
+          type: Deployment
+          spec:
+            environment:
+              environmentRef: env_uat
+              infrastructureDefinitions:
+                - identifier: k8s_uat_shared
+                  inputs:
+                    identifier: k8s_uat_shared
+                    type: KubernetesDirect
+                    spec:
+                      namespace: tunxiang-uat
+
+# ── 环境参数 ──────────────────────────────────────────────────
+# namespace:      tunxiang-uat
+# replicaCount:   2
+# healthUrl:      https://uat-api.tunxiangos.cn/health
+# valuesFile:     gitops/uat/values.yaml
+# ─────────────────────────────────────────────────────────────
+
+envOverrides:
+  namespace: tunxiang-uat
+  replicaCount: 2
+  healthUrl: https://uat-api.tunxiangos.cn/health
+  valuesFile: gitops/uat/values.yaml
+  resources:
+    requests:
+      cpu: "200m"
+      memory: "512Mi"
+    limits:
+      cpu: "1000m"
+      memory: "1Gi"
+  autoscaling:
+    enabled: false
+  ingress:
+    host: uat-api.tunxiangos.cn
+    tls: true
+  logLevel: INFO
+  approval:
+    groups:
+      - qa_group
+      - product_group
+    minimumCount: 1

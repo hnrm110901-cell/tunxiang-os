@@ -1,0 +1,34 @@
+# tx-analytics prod环境覆盖配置
+# 经营分析服务：含ETL管道+8个物化视图，由Harness CD流水线自动合并
+
+replicaCount: 2
+
+image:
+  tag: ${IMAGE_TAG}  # 由Harness CD流水线注入，禁止手动修改
+
+env:
+  TUNXIANG_ENV: prod
+  LOG_LEVEL: info
+  # ETL数据管道：生产环境启用，从事件流填充8个物化视图
+  ETL_ENABLED: "true"
+  # 物化视图刷新间隔：300秒，与sync-engine同步周期对齐
+  MATERIALIZED_VIEW_REFRESH_INTERVAL: "300"
+  PNL_CALC_ENABLED: "true"
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 200m
+    memory: 256Mi
+
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 6
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+podAntiAffinity:
+  enabled: true

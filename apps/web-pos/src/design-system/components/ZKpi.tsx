@@ -1,4 +1,3 @@
-import React from 'react';
 import styles from './ZKpi.module.css';
 
 interface ZKpiProps {

@@ -103,11 +103,12 @@ def upgrade() -> None:
     op.execute("ALTER TABLE brand_profiles FORCE ROW LEVEL SECURITY;")
     for op_name in ("select", "insert", "update", "delete"):
         check = f"WITH CHECK ({_RLS_COND})" if op_name in ("insert", "update") else ""
+        using = f"USING ({_RLS_COND})" if op_name != "insert" else ""
         op.execute(f"""
             CREATE POLICY rls_bp_{op_name}
                 ON brand_profiles
                 FOR {op_name.upper()}
-                USING ({_RLS_COND})
+                {using}
                 {check};
         """)
 
@@ -165,11 +166,12 @@ def upgrade() -> None:
     op.execute("ALTER TABLE brand_seasonal_calendar FORCE ROW LEVEL SECURITY;")
     for op_name in ("select", "insert", "update", "delete"):
         check = f"WITH CHECK ({_RLS_COND})" if op_name in ("insert", "update") else ""
+        using = f"USING ({_RLS_COND})" if op_name != "insert" else ""
         op.execute(f"""
             CREATE POLICY rls_bsc_{op_name}
                 ON brand_seasonal_calendar
                 FOR {op_name.upper()}
-                USING ({_RLS_COND})
+                {using}
                 {check};
         """)
 
@@ -234,11 +236,12 @@ def upgrade() -> None:
     op.execute("ALTER TABLE brand_content_constraints FORCE ROW LEVEL SECURITY;")
     for op_name in ("select", "insert", "update", "delete"):
         check = f"WITH CHECK ({_RLS_COND})" if op_name in ("insert", "update") else ""
+        using = f"USING ({_RLS_COND})" if op_name != "insert" else ""
         op.execute(f"""
             CREATE POLICY rls_bcc_{op_name}
                 ON brand_content_constraints
                 FOR {op_name.upper()}
-                USING ({_RLS_COND})
+                {using}
                 {check};
         """)
 

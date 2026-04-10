@@ -680,3 +680,172 @@ class TestDouyinDeliveryAdapter:
             app_key="k", app_secret="s"
         ) as adapter:
             assert isinstance(adapter, DeliveryPlatformAdapter)
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#  微信自有外卖适配器测试
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+from shared.adapters.wechat_delivery_adapter import WeChatDeliveryAdapter
+
+
+class TestWeChatDeliveryAdapter:
+    """微信自有外卖适配器测试"""
+
+    @pytest.fixture
+    def adapter(self) -> WeChatDeliveryAdapter:
+        return WeChatDeliveryAdapter(
+            app_key="test_key",
+            app_secret="test_secret",
+            store_map={},
+            timeout=10,
+        )
+
+    # ── 基本属性 ─────────────────────────────────────────
+
+    def test_commission_rate_zero(self, adapter: WeChatDeliveryAdapter) -> None:
+        """微信自有外卖 0% 抽成"""
+        assert adapter.COMMISSION_RATE == 0.0
+        assert adapter.PLATFORM_NAME == "wechat"
+
+    # ── 创建订单（通过 get_order_detail 验证） ───────────
+
+    @pytest.mark.asyncio
+    async def test_get_order_detail(self, adapter: WeChatDeliveryAdapter) -> None:
+        """获取订单详情应返回 commission_fen=0"""
+        detail = await adapter.get_order_detail("WX-test-001")
+        assert detail["platform"] == "wechat"
+        assert detail["platform_order_id"] == "WX-test-001"
+        assert detail["commission_rate"] == 0.0
+        assert detail["commission_fen"] == 0
+
+    # ── 接单 / 拒单 / 出餐 ───────────────────────────────
+
+    @pytest.mark.asyncio
+    async def test_accept_order(self, adapter: WeChatDeliveryAdapter) -> None:
+        """接受订单（自有外卖默认自动接单）"""
+        result = await adapter.accept_order("WX-test-001")
+        assert result is True
+
+    @pytest.mark.asyncio
+    async def test_reject_order(self, adapter: WeChatDeliveryAdapter) -> None:
+        """拒绝订单"""
+        result = await adapter.reject_order("WX-test-001", "客户取消")
+        assert result is True
+
+    @pytest.mark.asyncio
+    async def test_mark_ready(self, adapter: WeChatDeliveryAdapter) -> None:
+        """标记出餐完成"""
+        result = await adapter.mark_ready("WX-test-001")
+        assert result is True
+
+    # ── 拉取订单（自有外卖直接走 tx-trade，pull 返空）────
+
+    @pytest.mark.asyncio
+    async def test_pull_orders_empty(self, adapter: WeChatDeliveryAdapter) -> None:
+        """自有外卖 pull_orders 返回空列表（订单直接进 tx-trade）"""
+        orders = await adapter.pull_orders("store_001", datetime.now())
+        assert orders == []
+
+    # ── 配送请求 ─────────────────────────────────────────
+
+    @pytest.mark.asyncio
+    async def test_request_delivery_dada(self, adapter: WeChatDeliveryAdapter) -> None:
+        """请求达达配送"""
+        result = await adapter.request_delivery("WX-001", "dada")
+        assert result["ok"] is True
+        assert result["provider"] == "dada"
+        assert result["delivery_type"] == "third_party"
+        assert "tracking_id" in result
+
+    @pytest.mark.asyncio
+    async def test_request_delivery_self(self, adapter: WeChatDeliveryAdapter) -> None:
+        """请求自配送"""
+        result = await adapter.request_delivery("WX-001", "self")
+        assert result["ok"] is True
+        assert result["delivery_type"] == "self_delivery"
+        assert result["estimated_minutes"] == 20
+
+    @pytest.mark.asyncio
+    async def test_request_delivery_shunfeng(self, adapter: WeChatDeliveryAdapter) -> None:
+        """请求顺丰配送"""
+        result = await adapter.request_delivery("WX-001", "shunfeng")
+        assert result["ok"] is True
+        assert result["provider"] == "shunfeng"
+
+    @pytest.mark.asyncio
+    async def test_request_unsupported_provider(self, adapter: WeChatDeliveryAdapter) -> None:
+        """不支持的配送商应抛出 DeliveryPlatformError"""
+        with pytest.raises(DeliveryPlatformError):
+            await adapter.request_delivery("WX-001", "unknown_provider")
+
+    # ── 配送回调 ─────────────────────────────────────────
+
+    @pytest.mark.asyncio
+    async def test_handle_callback_delivered(self, adapter: WeChatDeliveryAdapter) -> None:
+        """配送完成回调"""
+        result = await adapter.handle_delivery_callback({"event": "delivered", "order_id": "WX-001"})
+        assert result["ok"] is True
+        assert result["status"] == "delivered"
+
+    @pytest.mark.asyncio
+    async def test_handle_callback_pickup(self, adapter: WeChatDeliveryAdapter) -> None:
+        """骑手取餐回调"""
+        result = await adapter.handle_delivery_callback({"event": "pickup", "order_id": "WX-001"})
+        assert result["ok"] is True
+        assert result["status"] == "picked_up"
+
+    @pytest.mark.asyncio
+    async def test_handle_callback_exception(self, adapter: WeChatDeliveryAdapter) -> None:
+        """配送异常回调"""
+        result = await adapter.handle_delivery_callback({"event": "exception", "order_id": "WX-001"})
+        assert result["ok"] is True
+        assert result["status"] == "delivery_exception"
+
+    # ── 菜单同步 ─────────────────────────────────────────
+
+    @pytest.mark.asyncio
+    async def test_menu_sync(self, adapter: WeChatDeliveryAdapter) -> None:
+        """菜单同步（自管理模式），synced 应等于菜品数"""
+        result = await adapter.sync_menu("store_001", [{"id": "d1"}, {"id": "d2"}])
+        assert result["synced"] == 2
+        assert result["failed"] == 0
+        assert result["platform"] == "wechat"
+
+    # ── 库存更新 ─────────────────────────────────────────
+
+    @pytest.mark.asyncio
+    async def test_update_stock(self, adapter: WeChatDeliveryAdapter) -> None:
+        """更新菜品上下架状态"""
+        result = await adapter.update_stock("store_001", "d1", True)
+        assert result is True
+        result = await adapter.update_stock("store_001", "d1", False)
+        assert result is True
+
+    # ── 佣金汇总 ─────────────────────────────────────────
+
+    @pytest.mark.asyncio
+    async def test_commission_summary_zero(self, adapter: WeChatDeliveryAdapter) -> None:
+        """佣金汇总为 0"""
+        result = await adapter.get_commission_summary("2026-04-01", "2026-04-07")
+        assert result["commission_fen"] == 0
+        assert result["commission_rate"] == 0.0
+        assert result["ok"] is True
+
+    # ── 上下文管理器 / 资源释放 ──────────────────────────
+
+    @pytest.mark.asyncio
+    async def test_close(self, adapter: WeChatDeliveryAdapter) -> None:
+        """释放资源不应报错"""
+        await adapter.close()
+
+    # ── 工厂注册验证 ─────────────────────────────────────
+
+    def test_wechat_adapter_registered(self) -> None:
+        """微信自有外卖适配器已注册到工厂"""
+        adapter = get_delivery_adapter("wechat", app_key="k", app_secret="s", store_map={})
+        assert adapter is not None
+        assert isinstance(adapter, WeChatDeliveryAdapter)
+        assert isinstance(adapter, DeliveryPlatformAdapter)
+        assert adapter.PLATFORM_NAME == "wechat"

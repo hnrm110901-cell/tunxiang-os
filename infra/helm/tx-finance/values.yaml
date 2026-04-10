@@ -1,0 +1,81 @@
+# tx-finance — 财务结算微服务
+
+replicaCount: 2
+
+image:
+  repository: tunxiang/tx-finance
+  pullPolicy: IfNotPresent
+  tag: latest
+
+service:
+  type: ClusterIP
+  port: 8007
+  targetPort: 8007
+
+ingress:
+  enabled: false
+  className: nginx
+  host: ""
+  tls: false
+  tlsSecretName: ""
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 200m
+    memory: 256Mi
+
+env:
+  TUNXIANG_ENV: prod
+  LOG_LEVEL: info
+  # VAT增值税计算引擎：国税局合规税率计算，开票前必须开启
+  VAT_CALCULATION_ENABLED: "true"
+  # 分账引擎：多档口/多品牌收益分账（对应 TradeFlags.SPLIT_PAYMENT）
+  # 徐记海鲜等多档口门店强依赖此功能
+  PROFIT_SPLIT_ENABLED: "true"
+
+# Secret中存放的敏感环境变量（由外部Secret Manager注入）
+secretRef:
+  name: tx-finance-secret
+  # 包含: DB_URL, REDIS_URL, JWT_SECRET, SUPABASE_SERVICE_KEY
+
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 8007
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  failureThreshold: 3
+  timeoutSeconds: 5
+
+readinessProbe:
+  httpGet:
+    path: /health
+    port: 8007
+  initialDelaySeconds: 5
+  periodSeconds: 5
+  failureThreshold: 3
+  timeoutSeconds: 3
+
+# Pod反亲和：财务服务Pod分散到不同节点
+podAntiAffinity:
+  enabled: true
+
+serviceAccount:
+  create: false
+  name: ""
+
+podAnnotations: {}
+
+nodeSelector: {}
+
+tolerations: []

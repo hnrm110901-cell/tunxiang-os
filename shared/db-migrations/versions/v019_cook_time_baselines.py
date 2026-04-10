@@ -76,7 +76,6 @@ def upgrade() -> None:
         "ix_cook_time_baselines_lookup",
         TABLE_NAME,
         ["tenant_id", "dish_id", "dept_id", "hour_bucket", "day_type"],
-        comment="制作时间基准核心查询索引（包含tenant_id确保RLS友好）",
     )
 
     # ── 档口维度索引：按档口查最新基准 ──
@@ -84,7 +83,6 @@ def upgrade() -> None:
         "ix_cook_time_baselines_dept_computed",
         TABLE_NAME,
         ["tenant_id", "dept_id", "computed_at"],
-        comment="按档口查询最新基准时间",
     )
 
     # =====================================================================

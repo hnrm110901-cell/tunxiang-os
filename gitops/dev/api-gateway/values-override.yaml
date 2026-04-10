@@ -1,0 +1,30 @@
+replicaCount: 1
+
+image:
+  tag: latest  # dev环境用latest，快速迭代
+
+ingress:
+  host: dev-api.tunxiangos.cn
+  tls: false  # dev环境不强制TLS
+
+env:
+  TUNXIANG_ENV: dev
+  LOG_LEVEL: debug
+  FEATURE_AGENT_L3_AUTONOMY_ENABLE: "false"
+  FEATURE_GROWTH_HUB_JOURNEY_V2_ENABLE: "false"
+
+resources:
+  limits:
+    cpu: 200m
+    memory: 256Mi
+  requests:
+    cpu: 50m
+    memory: 128Mi
+
+# dev环境不开启自动扩缩容
+autoscaling:
+  enabled: false
+
+# dev环境单实例，关闭反亲和
+podAntiAffinity:
+  enabled: false

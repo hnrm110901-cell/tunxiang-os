@@ -30,7 +30,13 @@ export * from './enterpriseApi';
 export * from './handoverApi';
 export * from './couponApi';
 export * from './orderExtApi';
-export * from './posOpsApi';
+// posOpsApi exports printReceipt too; re-export everything except that duplicate
+export { preBill, fireToKitchen, markServed, pauseItem, overridePrice,
+  giftOrder, returnOrder, rushOrder, modifyTableOpen, transferItem,
+  transferTable, closeTable, verifyOrder, verifyMember,
+  kitchenMessage, transferPayment, mergeOrders, markSoldOut, setDishLimit,
+  changeWaiter, fetchTableStatus,
+} from './posOpsApi';
 
 // ─── 排队 ───
 

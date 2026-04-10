@@ -1,0 +1,75 @@
+# tx-agent 单实例，避免LLM任务重复调度
+replicaCount: 1
+
+image:
+  repository: tunxiang/tx-agent
+  pullPolicy: IfNotPresent
+  tag: latest
+
+service:
+  type: ClusterIP
+  port: 8008
+  targetPort: 8008
+
+ingress:
+  enabled: false
+
+# LLM调用场景资源配置（内存需求高）
+resources:
+  limits:
+    cpu: 1000m
+    memory: 2Gi
+  requests:
+    cpu: 300m
+    memory: 512Mi
+
+env:
+  TUNXIANG_ENV: prod
+  LOG_LEVEL: info
+  MODEL_ROUTER_BACKEND: claude-haiku
+  AGENT_AUTONOMY_LEVEL: L1
+  MAX_CONCURRENT_TASKS: "5"
+  TASK_TIMEOUT_SECONDS: "120"
+
+# 敏感配置来自Secret
+secretRef:
+  name: tx-agent-secret
+  # 包含: DB_URL, REDIS_URL, CLAUDE_API_KEY, OPENAI_API_KEY
+
+# Agent策略配置文件挂载（ConfigMap）
+agentStrategies:
+  enabled: true
+  configMapName: tx-agent-strategies
+  mountPath: /app/config/strategies
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 80
+
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 8008
+  initialDelaySeconds: 45
+  periodSeconds: 15
+  failureThreshold: 3
+  timeoutSeconds: 10
+
+readinessProbe:
+  httpGet:
+    path: /health
+    port: 8008
+  initialDelaySeconds: 15
+  periodSeconds: 10
+  failureThreshold: 3
+  timeoutSeconds: 5
+
+# tx-agent单实例，不需要反亲和
+podAntiAffinity:
+  enabled: false
+
+podAnnotations: {}
+nodeSelector: {}
+tolerations: []

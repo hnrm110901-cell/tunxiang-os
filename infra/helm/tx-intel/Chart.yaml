@@ -1,0 +1,6 @@
+apiVersion: v2
+name: tx-intel
+description: 屯象OS 商业智能微服务 — BI分析/报表/低频单实例服务
+type: application
+version: 1.0.0
+appVersion: "latest"

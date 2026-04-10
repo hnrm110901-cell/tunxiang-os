@@ -99,9 +99,13 @@ from .api.coupon_routes import router as coupon_router
 from .api.growth_campaign_routes import router as growth_campaign_router
 from .api.journey_routes import router as journey_router
 from .api.offer_routes import router as offer_router            # v144 DB化
+from .api.campaign_engine_db_routes import router as campaign_engine_db_router  # v193 活动引擎持久化
+from .api.distribution_routes import router as distribution_router  # v191 三级分销
 from .api.referral_routes import router as referral_router
 from .api.segmentation_routes import router as segmentation_router
+from .api.growth_hub_routes import router as growth_hub_router
 from .api.touch_attribution_routes import router as touch_attribution_router
+from .api.wecom_scrm_agent_routes import router as wecom_scrm_agent_router  # P3-05 企微SCRM私域Agent
 
 _approval_service = _ApprovalService()
 
@@ -215,6 +219,296 @@ def _on_approval_expiry_done(task: asyncio.Task) -> None:
         )
 
 
+# ---------------------------------------------------------------------------
+# APScheduler — Growth Journey V2 tick（每60秒）
+# ---------------------------------------------------------------------------
+
+from services.growth_journey_service import GrowthJourneyService as _GrowthJourneyService
+from services.growth_brand_service import GrowthBrandService as _GrowthBrandService
+
+# Feature Flag SDK — 控制 Growth Journey V2 / 沉默召回 等 cron 任务
+try:
+    from shared.feature_flags import FlagContext, is_enabled as _ff_is_enabled
+    from shared.feature_flags.flag_names import GrowthFlags as _GrowthFlags
+    _FEATURE_FLAGS_AVAILABLE = True
+except ImportError:
+    _FEATURE_FLAGS_AVAILABLE = False
+    logger.warning("feature_flags_sdk_not_available", reason="import failed, all flags default to enabled")
+
+_growth_journey_svc = _GrowthJourneyService()
+_growth_brand_svc = _GrowthBrandService()
+
+
+async def _run_growth_journey_tick() -> None:
+    """定时任务：每分钟推进所有租户到期的增长中枢V2旅程。"""
+    # Feature Flag 检查：growth.hub.journey_v2.enable
+    # 关闭时跳过整个 V2 tick，降级依赖 V1 旅程执行器（_run_journey_tick）继续工作
+    if _FEATURE_FLAGS_AVAILABLE and not _ff_is_enabled(_GrowthFlags.JOURNEY_V2):
+        logger.info(
+            "growth_journey_v2_tick_skipped",
+            reason="feature_flag_disabled",
+            flag=_GrowthFlags.JOURNEY_V2,
+        )
+        return
+
+    logger.info("growth_journey_v2_tick_started")
+    from sqlalchemy import text as _text
+
+    # 查出所有活跃租户
+    async with async_session_factory() as probe_db:
+        try:
+            result = await probe_db.execute(
+                _text("SELECT DISTINCT tenant_id FROM stores WHERE is_active = true")
+            )
+            tenant_ids = [str(row[0]) for row in result.fetchall()]
+        except (OSError, RuntimeError, ValueError) as exc:
+            logger.error("growth_journey_v2_fetch_tenants_error", error=str(exc), exc_info=True)
+            return
+
+    total_scanned = 0
+    total_advanced = 0
+    total_failed = 0
+
+    for tid in tenant_ids:
+        async with async_session_factory() as db:
+            try:
+                await db.execute(_text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": tid})
+                result = await _growth_journey_svc.process_pending(tenant_id=tid, db=db)
+                await db.commit()
+                total_scanned += result.get("scanned", 0)
+                total_advanced += result.get("advanced", 0)
+                total_failed += result.get("failed", 0)
+            except (OSError, RuntimeError, ValueError) as exc:
+                await db.rollback()
+                logger.error("growth_journey_v2_tick_tenant_error", tenant_id=tid, error=str(exc), exc_info=True)
+
+    logger.info("growth_journey_v2_tick_done",
+                tenant_count=len(tenant_ids),
+                scanned=total_scanned,
+                advanced=total_advanced,
+                failed=total_failed)
+
+
+def _schedule_growth_journey_tick() -> None:
+    task = asyncio.create_task(_run_growth_journey_tick())
+    task.add_done_callback(_on_growth_journey_tick_done)
+
+
+def _on_growth_journey_tick_done(task: asyncio.Task) -> None:
+    exc = task.exception() if not task.cancelled() else None
+    if exc is not None:
+        logger.error("growth_journey_v2_tick_unhandled", error=str(exc), exc_info=exc)
+
+
+# ---------------------------------------------------------------------------
+# APScheduler — Silent Detection（每日凌晨2点）
+# ---------------------------------------------------------------------------
+
+from services.growth_experiment_service import GrowthExperimentService as _GrowthExperimentService
+from services.growth_profile_service import GrowthProfileService as _GrowthProfileService
+
+_growth_experiment_svc = _GrowthExperimentService()
+_growth_profile_svc = _GrowthProfileService()
+
+
+async def _run_silent_detection() -> None:
+    """每日凌晨2点：扫描沉默客户，更新召回优先级。"""
+    # Feature Flag 检查：growth.member.recall_v2.enable
+    # 关闭时跳过 V2 沉默召回检测（V1 召回逻辑不受影响）
+    if _FEATURE_FLAGS_AVAILABLE and not _ff_is_enabled(_GrowthFlags.RECALL_V2):
+        logger.info(
+            "growth_silent_detection_skipped",
+            reason="feature_flag_disabled",
+            flag=_GrowthFlags.RECALL_V2,
+        )
+        return
+
+    logger.info("growth_silent_detection_started")
+    from sqlalchemy import text as _text
+    async with async_session_factory() as probe_db:
+        try:
+            result = await probe_db.execute(
+                _text("SELECT DISTINCT tenant_id FROM stores WHERE is_active = true")
+            )
+            tenant_ids = [str(row[0]) for row in result.fetchall()]
+        except (OSError, RuntimeError, ValueError) as exc:
+            logger.error("silent_detection_fetch_tenants_error", error=str(exc), exc_info=True)
+            return
+    for tid in tenant_ids:
+        async with async_session_factory() as db:
+            try:
+                await db.execute(_text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": tid})
+                result = await _growth_profile_svc.batch_detect_silent(tid, db)
+                await db.commit()
+                logger.info("silent_detection_tenant_done", tenant_id=tid, **result)
+            except (OSError, RuntimeError, ValueError) as exc:
+                await db.rollback()
+                logger.error("silent_detection_tenant_error", tenant_id=tid, error=str(exc), exc_info=True)
+    logger.info("growth_silent_detection_finished", tenant_count=len(tenant_ids))
+
+
+def _schedule_silent_detection() -> None:
+    task = asyncio.create_task(_run_silent_detection())
+    task.add_done_callback(_on_silent_detection_done)
+
+
+def _on_silent_detection_done(task: asyncio.Task) -> None:
+    exc = task.exception() if not task.cancelled() else None
+    if exc is not None:
+        logger.error("silent_detection_unhandled", error=str(exc), exc_info=exc)
+
+
+# ---------------------------------------------------------------------------
+# APScheduler — P1 Field Computation（每日凌晨3点）
+# ---------------------------------------------------------------------------
+
+
+async def _run_p1_field_computation() -> None:
+    """每日凌晨3点：计算P1字段（心理距离/超级用户/里程碑/裂变场景）"""
+    # Feature Flag 检查
+    if _FEATURE_FLAGS_AVAILABLE and not _ff_is_enabled(_GrowthFlags.RECALL_V2):
+        logger.info(
+            "p1_field_computation_skipped",
+            reason="feature_flag_disabled",
+        )
+        return
+
+    logger.info("p1_field_computation_started")
+    from sqlalchemy import text as _text
+    async with async_session_factory() as probe_db:
+        try:
+            result = await probe_db.execute(
+                _text("SELECT DISTINCT tenant_id FROM stores WHERE is_active = true")
+            )
+            tenant_ids = [str(row[0]) for row in result.fetchall()]
+        except (OSError, RuntimeError, ValueError) as exc:
+            logger.error("p1_computation_fetch_tenants_error", error=str(exc), exc_info=True)
+            return
+
+    for tid in tenant_ids:
+        async with async_session_factory() as db:
+            try:
+                await db.execute(_text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": tid})
+                result = await _growth_profile_svc.batch_compute_p1_fields(tid, db)
+                await db.commit()
+                logger.info(
+                    "p1_computation_tenant_done",
+                    tenant_id=tid,
+                    **{k: v.get("total_updated", 0) for k, v in result.items()},
+                )
+            except (OSError, RuntimeError, ValueError) as exc:
+                await db.rollback()
+                logger.error("p1_computation_tenant_error", tenant_id=tid, error=str(exc), exc_info=True)
+    logger.info("p1_field_computation_finished", tenant_count=len(tenant_ids))
+
+
+def _schedule_p1_computation() -> None:
+    task = asyncio.create_task(_run_p1_field_computation())
+    task.add_done_callback(_on_p1_computation_done)
+
+
+def _on_p1_computation_done(task: asyncio.Task) -> None:
+    exc = task.exception() if not task.cancelled() else None
+    if exc is not None:
+        logger.error("p1_computation_unhandled", error=str(exc), exc_info=exc)
+
+
+# ---------------------------------------------------------------------------
+# APScheduler — Auto Iterate Experiments（每6小时）
+# ---------------------------------------------------------------------------
+
+
+async def _run_auto_iterate() -> None:
+    """每6小时：自动迭代实验 + 调整旅程参数"""
+    logger.info("auto_iterate_started")
+    from sqlalchemy import text as _text
+
+    async with async_session_factory() as probe_db:
+        try:
+            result = await probe_db.execute(
+                _text("SELECT DISTINCT tenant_id FROM stores WHERE is_active = true")
+            )
+            tenant_ids = [str(row[0]) for row in result.fetchall()]
+        except (OSError, RuntimeError, ValueError) as exc:
+            logger.error("auto_iterate_fetch_tenants_error", error=str(exc), exc_info=True)
+            return
+
+    for tid in tenant_ids:
+        async with async_session_factory() as db:
+            try:
+                await db.execute(_text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": tid})
+                iter_result = await _growth_experiment_svc.auto_iterate(tid, db)
+                adjust_result = await _growth_experiment_svc.auto_adjust_journey_params(tid, db)
+                await db.commit()
+                logger.info(
+                    "auto_iterate_tenant_done",
+                    tenant_id=tid,
+                    actions=len(iter_result.get("actions_taken", [])),
+                    adjustments=len(adjust_result.get("adjustments", [])),
+                )
+            except (OSError, RuntimeError, ValueError) as exc:
+                await db.rollback()
+                logger.error("auto_iterate_tenant_error", tenant_id=tid, error=str(exc), exc_info=True)
+
+    logger.info("auto_iterate_finished", tenant_count=len(tenant_ids))
+
+
+def _schedule_auto_iterate() -> None:
+    task = asyncio.create_task(_run_auto_iterate())
+    task.add_done_callback(_on_auto_iterate_done)
+
+
+def _on_auto_iterate_done(task: asyncio.Task) -> None:
+    exc = task.exception() if not task.cancelled() else None
+    if exc is not None:
+        logger.error("auto_iterate_unhandled", error=str(exc), exc_info=exc)
+
+
+# ---------------------------------------------------------------------------
+# APScheduler — Calendar Trigger Check（每日08:00 节庆信号检测）
+# ---------------------------------------------------------------------------
+
+from services.calendar_signal_proxy import CalendarSignalService as _CalendarSignalService
+
+_calendar_signal_svc = _CalendarSignalService()
+
+
+async def _run_calendar_trigger_check() -> None:
+    """每日早8点：检查是否有节庆信号需要触发增长旅程。"""
+    logger.info("calendar_trigger_check_started")
+    try:
+        triggers = _calendar_signal_svc.get_growth_triggers()
+    except (ValueError, RuntimeError, OSError) as exc:
+        logger.error("calendar_trigger_check_error", error=str(exc), exc_info=True)
+        return
+
+    if not triggers:
+        logger.info("calendar_trigger_check_no_triggers")
+        return
+
+    logger.info("calendar_trigger_check_found", count=len(triggers))
+    for trigger in triggers:
+        # 生成Agent建议（不直接执行旅程，走审核流）
+        logger.info(
+            "calendar_trigger_suggestion",
+            event=trigger["event_name"],
+            action=trigger.get("action"),
+            description=trigger.get("description"),
+        )
+        # 后续接入：调用 growth_suggestion_service.create_suggestion()
+
+
+def _schedule_calendar_trigger() -> None:
+    task = asyncio.create_task(_run_calendar_trigger_check())
+    task.add_done_callback(_on_calendar_trigger_done)
+
+
+def _on_calendar_trigger_done(task: asyncio.Task) -> None:
+    exc = task.exception() if not task.cancelled() else None
+    if exc is not None:
+        logger.error("calendar_trigger_check_unhandled", error=str(exc), exc_info=exc)
+
+
 async def _run_journey_event_listener() -> None:
     """旅程事件监听后台任务：订阅 Redis Stream，实时触发旅程。
 
@@ -272,10 +566,70 @@ async def lifespan(app: FastAPI):
         misfire_grace_time=30,
     )
 
+    # Growth Journey V2 tick — 每分钟推进到期的增长中枢V2旅程
+    _scheduler.add_job(
+        _schedule_growth_journey_tick,
+        trigger="interval",
+        seconds=60,
+        id="growth_journey_v2_tick",
+        replace_existing=True,
+        max_instances=1,
+        misfire_grace_time=30,
+    )
+
+    # Silent Detection — 每日凌晨2点
+    _scheduler.add_job(
+        _schedule_silent_detection,
+        trigger="cron",
+        hour=2,
+        id="growth_silent_detection",
+        replace_existing=True,
+        max_instances=1,
+        misfire_grace_time=300,
+    )
+
+    # P1 Field Computation — 每日凌晨3点（心理距离/超级用户/里程碑/裂变场景）
+    _scheduler.add_job(
+        _schedule_p1_computation,
+        trigger="cron",
+        hour=3,
+        id="growth_p1_computation",
+        replace_existing=True,
+        max_instances=1,
+        misfire_grace_time=300,
+    )
+
+    # Auto Iterate Experiments — 每6小时自动迭代实验 + 调整旅程参数
+    _scheduler.add_job(
+        _schedule_auto_iterate,
+        trigger="interval",
+        hours=6,
+        id="growth_auto_iterate",
+        replace_existing=True,
+        max_instances=1,
+        misfire_grace_time=600,
+    )
+
+    # Calendar Trigger Check — 每日08:00 节庆信号检测
+    _scheduler.add_job(
+        _schedule_calendar_trigger,
+        trigger="cron",
+        hour=8,
+        id="growth_calendar_trigger",
+        replace_existing=True,
+        max_instances=1,
+        misfire_grace_time=300,
+    )
+
     _scheduler.start()
     logger.info("journey_executor_scheduler_started", interval_seconds=60)
     logger.info("approval_expiry_scheduler_started", interval_hours=1)
     logger.info("journey_engine_scheduler_started", interval_seconds=60)
+    logger.info("growth_journey_v2_scheduler_started", interval_seconds=60)
+    logger.info("growth_silent_detection_scheduler_started", trigger="cron_02:00")
+    logger.info("growth_p1_computation_scheduler_started", trigger="cron_03:00")
+    logger.info("growth_auto_iterate_scheduler_started", interval_hours=6)
+    logger.info("growth_calendar_trigger_scheduler_started", trigger="cron_08:00")
 
     # 启动 EventBridge（桥接业务事件 → JourneyEngine）
     _bridge = _get_event_bridge(
@@ -315,11 +669,17 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="TunxiangOS tx-growth", version="3.0.0", lifespan=lifespan)
+
+from prometheus_fastapi_instrumentator import Instrumentator
+Instrumentator().instrument(app).expose(app)
+
 app.include_router(campaign_router)
 app.include_router(coupon_router)           # /api/v1/growth/coupons（优惠券核销）
-app.include_router(growth_campaign_router)  # /api/v1/growth/campaigns（新标准路径）
+app.include_router(growth_campaign_router)      # /api/v1/growth/campaigns（新标准路径）
+app.include_router(campaign_engine_db_router)  # /api/v1/growth/campaigns-v2（v193 持久化引擎）
 app.include_router(segmentation_router)
 app.include_router(referral_router)
+app.include_router(distribution_router)  # v191 三级分销 /api/v1/growth/referral/*
 app.include_router(attribution_router)
 app.include_router(touch_attribution_router)
 app.include_router(ab_test_router)
@@ -330,6 +690,8 @@ app.include_router(journey_router)
 app.include_router(offer_router)            # /api/v1/offers — offers/offer_redemptions 表
 app.include_router(content_router)          # /api/v1/content — content_templates 表
 app.include_router(channel_router)          # /api/v1/channels — channel_configs/message_send_logs 表
+app.include_router(growth_hub_router)       # /api/v1/growth — 增长中枢V2
+app.include_router(wecom_scrm_agent_router)  # P3-05 企微SCRM私域Agent（生日/沉睡/回访）
 
 # 服务实例
 brand_svc = BrandStrategyService()

@@ -505,6 +505,29 @@ async def finish_cooking(
             "duration_sec": duration_sec,
         })
 
+    # ── 回调堂食会话：更新出菜时间戳，推进状态到 dining ──
+    dining_session_id = db_task.dining_session_id
+    if dining_session_id:
+        tenant_id_str = str(db_task.tenant_id) if db_task.tenant_id else tenant_id
+        dish_qty = int(db_task.quantity or 1)
+
+        async def _notify_session() -> None:
+            from shared.ontology.src.database import async_session_factory
+            from .dining_session_service import DiningSessionService
+            async with async_session_factory() as notify_db:
+                try:
+                    svc = DiningSessionService(notify_db, tenant_id_str)
+                    await svc.record_dish_served(dining_session_id, dish_count=dish_qty)
+                    await notify_db.commit()
+                except Exception:
+                    log.warning(
+                        "kds_actions.finish_cooking.session_callback_failed",
+                        session_id=str(dining_session_id),
+                        exc_info=True,
+                    )
+
+        asyncio.create_task(_notify_session())
+
     log.info("kds_actions.finish_cooking.ok", duration=duration_sec)
     return {
         "ok": True,

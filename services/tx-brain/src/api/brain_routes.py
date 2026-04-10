@@ -11,6 +11,17 @@ Endpoints:
   POST /api/v1/brain/menu/optimize             — 智能排菜（库存 + 菜品表现）
   POST /api/v1/brain/crm/campaign              — 私域运营活动方案（微信群/朋友圈/小程序）
   GET  /api/v1/brain/health                    — AI服务健康检查（验证Claude API可达）
+  POST /api/v1/brain/energy/analyze            — 能耗监控快速分析（mv_energy_efficiency）
+  GET  /api/v1/brain/discount/mv-insight       — 折扣健康数据（mv_discount_health）
+  GET  /api/v1/brain/inventory/mv-insight      — BOM损耗数据（mv_inventory_bom）
+  GET  /api/v1/brain/finance/mv-insight        — 财务P&L数据（mv_store_pnl + mv_channel_margin）
+  GET  /api/v1/brain/member/mv-insight         — 会员CLV聚合（mv_member_clv）
+  GET  /api/v1/brain/menu/mv-insight           — 菜单优化损耗数据（mv_inventory_bom）
+  GET  /api/v1/brain/dispatch/mv-insight       — 出餐调度订单量趋势（mv_store_pnl）
+  GET  /api/v1/brain/crm/mv-insight            — 私域运营CLV数据（mv_member_clv）
+  GET  /api/v1/brain/customer-service/mv-insight — 舆情摘要（mv_public_opinion）
+  GET  /api/v1/brain/energy/mv-insight         — 能耗数据（mv_energy_efficiency）
+  POST /api/v1/brain/patrol/mv-insight         — 巡店质检增强分析（mv_public_opinion背景注入）
 """
 from __future__ import annotations
 
@@ -18,8 +29,11 @@ from typing import Any
 
 import anthropic
 import structlog
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from shared.ontology.src.database import get_db_no_rls
 
 from ..agents.crm_operator import crm_operator
 from ..agents.customer_service import customer_service
@@ -30,6 +44,7 @@ from ..agents.inventory_sentinel import inventory_sentinel
 from ..agents.member_insight import member_insight
 from ..agents.menu_optimizer import menu_optimizer
 from ..agents.patrol_inspector import patrol_inspector
+from ..agents.energy_monitor import energy_monitor
 
 logger = structlog.get_logger()
 
@@ -102,6 +117,17 @@ class PatrolAnalyzeRequest(BaseModel):
         default=100.0,
         description="上次综合评分（用于趋势对比，默认100）",
     )
+
+
+class EnergyAnalyzeRequest(BaseModel):
+    tenant_id: str = Field(..., description="租户ID")
+    store_id: str | None = Field(None, description="门店ID（可选，空=全租户聚合）")
+    period_days: int = Field(default=7, description="分析周期天数，默认7天")
+
+
+class MvInsightQuery(BaseModel):
+    tenant_id: str
+    store_id: str | None = None
 
 
 # ─── Endpoints ───────────────────────────────────────────────────
@@ -611,4 +637,176 @@ async def crm_campaign(req: CRMCampaignRequest) -> dict[str, Any]:
             },
         }
 
+    return {"ok": True, "data": result}
+
+
+@router.post("/energy/analyze")
+async def energy_analyze(req: EnergyAnalyzeRequest) -> dict[str, Any]:
+    """POST /api/v1/brain/energy/analyze
+
+    调用能耗监控Agent快速路径（读 mv_energy_efficiency），无 Claude 调用。
+    失败时返回 error 字段。
+    """
+    try:
+        result = await energy_monitor.analyze_from_mv(req.tenant_id, req.store_id)
+    except Exception as exc:
+        logger.error("energy_analyze_error", error=str(exc))
+        return {
+            "ok": False,
+            "error": {"code": "ENERGY_ANALYZE_ERROR", "message": str(exc)},
+        }
+    return {"ok": True, "data": result}
+
+
+# ─── analyze_from_mv 快速路径端点（Phase 3，读物化视图，<5ms）──────────
+
+
+@router.get("/discount/mv-insight")
+async def discount_mv_insight(
+    tenant_id: str,
+    store_id: str | None = None,
+) -> dict[str, Any]:
+    """GET /api/v1/brain/discount/mv-insight
+
+    从 mv_discount_health 快速读取折扣健康数据（Phase 3 快速路径）。
+    返回 inference_layer="mv_fast_path" + 折扣数据 + risk_signal。
+    """
+    result = await discount_guardian.analyze_from_mv(tenant_id, store_id)
+    return {"ok": True, "data": result}
+
+
+@router.get("/inventory/mv-insight")
+async def inventory_mv_insight(
+    tenant_id: str,
+    store_id: str | None = None,
+) -> dict[str, Any]:
+    """GET /api/v1/brain/inventory/mv-insight
+
+    从 mv_inventory_bom 快速读取 BOM 损耗数据（Phase 3 快速路径）。
+    """
+    result = await inventory_sentinel.analyze_from_mv(tenant_id, store_id)
+    return {"ok": True, "data": result}
+
+
+@router.get("/finance/mv-insight")
+async def finance_mv_insight(
+    tenant_id: str,
+    store_id: str | None = None,
+) -> dict[str, Any]:
+    """GET /api/v1/brain/finance/mv-insight
+
+    从 mv_store_pnl + mv_channel_margin 快速读取财务健康数据（Phase 3 快速路径）。
+    """
+    result = await finance_auditor.analyze_from_mv(tenant_id, store_id)
+    return {"ok": True, "data": result}
+
+
+@router.get("/member/mv-insight")
+async def member_mv_insight(
+    tenant_id: str,
+    store_id: str | None = None,
+) -> dict[str, Any]:
+    """GET /api/v1/brain/member/mv-insight
+
+    从 mv_member_clv 快速读取会员 CLV 聚合数据（Phase 3 快速路径）。
+    """
+    result = await member_insight.analyze_from_mv(tenant_id, store_id)
+    return {"ok": True, "data": result}
+
+
+@router.get("/menu/mv-insight")
+async def menu_mv_insight(
+    tenant_id: str,
+    store_id: str | None = None,
+) -> dict[str, Any]:
+    """GET /api/v1/brain/menu/mv-insight
+
+    从 mv_inventory_bom 快速读取食材损耗数据（菜单优化视角，Phase 3 快速路径）。
+    """
+    result = await menu_optimizer.analyze_from_mv(tenant_id, store_id)
+    return {"ok": True, "data": result}
+
+
+@router.get("/dispatch/mv-insight")
+async def dispatch_mv_insight(
+    tenant_id: str,
+    store_id: str | None = None,
+) -> dict[str, Any]:
+    """GET /api/v1/brain/dispatch/mv-insight
+
+    从 mv_store_pnl 快速读取近7天订单量趋势（出餐调度视角，Phase 3 快速路径）。
+    """
+    result = await dispatch_predictor.analyze_from_mv(tenant_id, store_id)
+    return {"ok": True, "data": result}
+
+
+@router.get("/crm/mv-insight")
+async def crm_mv_insight(
+    tenant_id: str,
+    store_id: str | None = None,
+) -> dict[str, Any]:
+    """GET /api/v1/brain/crm/mv-insight
+
+    从 mv_member_clv 快速读取会员CLV（私域运营视角，Phase 3 快速路径）。
+    """
+    result = await crm_operator.analyze_from_mv(tenant_id, store_id)
+    return {"ok": True, "data": result}
+
+
+@router.get("/customer-service/mv-insight")
+async def customer_service_mv_insight(
+    tenant_id: str,
+    store_id: str | None = None,
+) -> dict[str, Any]:
+    """GET /api/v1/brain/customer-service/mv-insight
+
+    从 mv_public_opinion 快速读取舆情摘要（Phase 3 快速路径）。
+    """
+    result = await customer_service.analyze_from_mv(tenant_id, store_id)
+    return {"ok": True, "data": result}
+
+
+@router.get("/energy/mv-insight")
+async def energy_mv_insight(
+    tenant_id: str,
+    store_id: str | None = None,
+) -> dict[str, Any]:
+    """GET /api/v1/brain/energy/mv-insight
+
+    从 mv_energy_efficiency 快速读取能耗数据（Phase 3 快速路径）。
+    """
+    result = await energy_monitor.analyze_from_mv(tenant_id, store_id)
+    return {"ok": True, "data": result}
+
+
+@router.post("/patrol/mv-insight")
+async def patrol_mv_insight(
+    req: PatrolAnalyzeRequest,  # 复用现有的 PatrolAnalyzeRequest model
+    db: AsyncSession = Depends(get_db_no_rls),  # 舆情视图跨 tenant 聚合，用 no_rls
+) -> dict[str, Any]:
+    """POST /api/v1/brain/patrol/mv-insight
+
+    调用巡店质检Agent的 analyze_from_mv() 增强分析（读 mv_public_opinion）。
+    先从物化视图加载舆情背景，再调用标准 analyze()。
+
+    注意：此端点为 POST（因需要传入 payload），与其他 GET mv-insight 端点不同。
+    """
+    try:
+        result = await patrol_inspector.analyze_from_mv(req.model_dump(), db)
+    except anthropic.APIConnectionError as exc:
+        logger.error("patrol_mv_insight_connection_error", error=str(exc))
+        return {
+            "ok": False,
+            "error": {"code": "AI_CONNECTION_ERROR", "message": "无法连接Claude API"},
+        }
+    except anthropic.APIError as exc:
+        logger.error(
+            "patrol_mv_insight_api_error",
+            status_code=getattr(exc, "status_code", None),
+            error=str(exc),
+        )
+        return {
+            "ok": False,
+            "error": {"code": "AI_API_ERROR", "message": f"Claude API错误: {exc}"},
+        }
     return {"ok": True, "data": result}

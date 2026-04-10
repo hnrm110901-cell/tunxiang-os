@@ -56,7 +56,7 @@ def upgrade() -> None:
             (config->'fixed_costs'->>'monthly_other_fixed_fen')::BIGINT, 0
           )
         WHERE config IS NOT NULL
-          AND config ? 'fixed_costs';
+          AND jsonb_exists(config::jsonb, 'fixed_costs');
     """)
 
 

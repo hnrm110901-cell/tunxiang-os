@@ -169,19 +169,15 @@ def upgrade() -> None:
     )
 
     # 复合索引：KDS轮询"某档口待出品任务"的核心查询路径
-    op.create_index(
-        "ix_kds_tasks_dept_status_created",
-        "kds_tasks",
-        ["dept_id", "status", "created_at"],
-        postgresql_where=sa.text("is_deleted = false"),
-    )
+    op.execute(sa.text(
+        "CREATE INDEX IF NOT EXISTS ix_kds_tasks_dept_status_created "
+        "ON kds_tasks (dept_id, status, created_at) WHERE is_deleted = false"
+    ))
     # 按订单聚合任务进度查询
-    op.create_index(
-        "ix_kds_tasks_order_id",
-        "kds_tasks",
-        ["order_id"],
-        postgresql_where=sa.text("order_id IS NOT NULL AND is_deleted = false"),
-    )
+    op.execute(sa.text(
+        "CREATE INDEX IF NOT EXISTS ix_kds_tasks_order_id "
+        "ON kds_tasks (order_id) WHERE order_id IS NOT NULL AND is_deleted = false"
+    ))
 
 
 def downgrade() -> None:

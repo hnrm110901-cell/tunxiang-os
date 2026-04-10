@@ -49,7 +49,19 @@ def upgrade() -> None:
     op.execute("ALTER TABLE menu_publish_requests ENABLE ROW LEVEL SECURITY;")
     op.execute("ALTER TABLE menu_publish_requests FORCE ROW LEVEL SECURITY;")
     for action in ("SELECT", "INSERT", "UPDATE", "DELETE"):
-        op.execute(f"""
+        if action == "INSERT":
+            op.execute(f"""
+            CREATE POLICY menu_publish_requests_{action.lower()}_tenant ON menu_publish_requests
+            AS RESTRICTIVE FOR {action}
+            WITH CHECK (
+                current_setting('app.tenant_id', TRUE) IS NOT NULL
+                AND current_setting('app.tenant_id', TRUE) <> ''
+                AND tenant_id = NULLIF(current_setting('app.tenant_id', TRUE), '')::UUID
+            );
+
+            """)
+        else:
+            op.execute(f"""
             CREATE POLICY menu_publish_requests_{action.lower()}_tenant ON menu_publish_requests
             AS RESTRICTIVE FOR {action}
             USING (
@@ -57,7 +69,8 @@ def upgrade() -> None:
                 AND current_setting('app.tenant_id', TRUE) <> ''
                 AND tenant_id = NULLIF(current_setting('app.tenant_id', TRUE), '')::UUID
             );
-        """)
+
+            """)
     op.execute("""
         CREATE INDEX IF NOT EXISTS ix_menu_publish_requests_tenant_status
             ON menu_publish_requests (tenant_id, status);
@@ -88,7 +101,19 @@ def upgrade() -> None:
     op.execute("ALTER TABLE store_menu_permissions ENABLE ROW LEVEL SECURITY;")
     op.execute("ALTER TABLE store_menu_permissions FORCE ROW LEVEL SECURITY;")
     for action in ("SELECT", "INSERT", "UPDATE", "DELETE"):
-        op.execute(f"""
+        if action == "INSERT":
+            op.execute(f"""
+            CREATE POLICY store_menu_permissions_{action.lower()}_tenant ON store_menu_permissions
+            AS RESTRICTIVE FOR {action}
+            WITH CHECK (
+                current_setting('app.tenant_id', TRUE) IS NOT NULL
+                AND current_setting('app.tenant_id', TRUE) <> ''
+                AND tenant_id = NULLIF(current_setting('app.tenant_id', TRUE), '')::UUID
+            );
+
+            """)
+        else:
+            op.execute(f"""
             CREATE POLICY store_menu_permissions_{action.lower()}_tenant ON store_menu_permissions
             AS RESTRICTIVE FOR {action}
             USING (
@@ -96,7 +121,8 @@ def upgrade() -> None:
                 AND current_setting('app.tenant_id', TRUE) <> ''
                 AND tenant_id = NULLIF(current_setting('app.tenant_id', TRUE), '')::UUID
             );
-        """)
+
+            """)
     op.execute("""
         CREATE INDEX IF NOT EXISTS ix_store_menu_permissions_tenant_store
             ON store_menu_permissions (tenant_id, store_id);

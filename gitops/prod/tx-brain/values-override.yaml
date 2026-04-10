@@ -1,0 +1,33 @@
+# tx-brain prod环境覆盖配置
+# 由Harness CD流水线自动合并，禁止手动修改image.tag
+#
+# !! replicaCount 强制为 1，LLM服务单实例，见values.yaml顶部说明 !!
+
+replicaCount: 1
+
+image:
+  tag: ${IMAGE_TAG}  # 由Harness CD流水线注入，禁止手动修改
+
+env:
+  TUNXIANG_ENV: prod
+  LOG_LEVEL: info
+  MODEL_BACKEND: claude-haiku
+  # 生产环境严格禁止MOCK，所有LLM调用必须走真实Claude API
+  MOCK_LLM: "false"
+
+resources:
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+  requests:
+    cpu: 400m
+    memory: 512Mi
+
+# HPA禁止开启，LLM单实例是硬约束
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 1
+
+podAntiAffinity:
+  enabled: false

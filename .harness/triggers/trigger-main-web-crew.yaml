@@ -1,0 +1,38 @@
+trigger:
+  name: trigger-main-web-crew
+  identifier: trigger_main_web_crew
+  projectIdentifier: TunXiangOS
+  orgIdentifier: default
+  description: "web-crew 服务员端前端 main 分支推送触发器。push to main 时触发 cd_web_crew 流水线。"
+  tags:
+    service: web-crew
+    event: push-main
+  enabled: true
+  pipelineIdentifier: cd_web_crew
+  source:
+    type: Webhook
+    spec:
+      type: Github
+      spec:
+        type: Push
+        spec:
+          connectorRef: github_connector
+          repoName: tunxiang-os
+          autoAbortPreviousExecutions: false
+          payloadConditions:
+            - key: targetBranch
+              operator: Equals
+              value: main
+          headerConditions: []
+          jexlCondition: ""
+          actions: []
+  inputYaml: |
+    pipeline:
+      identifier: cd_web_crew
+      properties:
+        ci:
+          codebase:
+            build:
+              type: branch
+              spec:
+                branch: main

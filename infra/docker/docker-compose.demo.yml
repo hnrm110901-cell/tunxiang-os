@@ -1,8 +1,35 @@
-version: "3.8"
+# ============================================================
+# 屯象OS Demo 环境 Docker Compose
+# 用法: docker compose -f docker-compose.demo.yml up -d
+# 核心服务：postgres + redis + gateway + 5个业务微服务 + 3个前端
+# 连字符服务用 cd + uvicorn src.main:app 方式启动
+# ============================================================
+
+x-py-common: &py-common
+  image: python:3.11-slim
+  restart: unless-stopped
+  networks:
+    - txos-demo
+  environment: &common-env
+    DATABASE_URL: postgresql+asyncpg://tunxiang:tunxiang_demo_2024@postgres:5432/tunxiang_os
+    REDIS_URL: redis://redis:6379/0
+    TX_ENV: demo
+    TX_AUTH_ENABLED: "false"
+    TX_RATE_LIMIT_ENABLED: "false"
+    LOG_LEVEL: INFO
+    PYTHONPATH: /app
+    PYTHONUNBUFFERED: "1"
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
 
 services:
+  # ── 基础设施 ──────────────────────────────────────────────
   postgres:
     image: postgres:16-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_USER: tunxiang
       POSTGRES_PASSWORD: tunxiang_demo_2024
@@ -11,68 +38,200 @@ services:
       - "5432:5432"
     volumes:
       - demo_pg_data:/var/lib/postgresql/data
-    networks:
-      - tunxiang-net
+      - ./init-rls.sql:/docker-entrypoint-initdb.d/01-rls.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U tunxiang -d tunxiang_os"]
       interval: 5s
       timeout: 3s
       retries: 10
+    networks:
+      - txos-demo
 
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - txos-demo
+
+  # ── API Gateway ───────────────────────────────────────────
   gateway:
-    image: python:3.12-slim
+    <<: *py-common
     working_dir: /app
     command: >
-      bash -c "pip install --no-cache-dir -q
-      fastapi>=0.104.0 uvicorn[standard]>=0.24.0 pydantic>=2.4.0
-      sqlalchemy>=2.0.0 asyncpg>=0.29.0 structlog>=23.1.0
-      passlib[bcrypt]>=1.7.4 PyJWT>=2.8.0 httpx>=0.25.0
-      && uvicorn services.gateway.src.main:app --host 0.0.0.0 --port 8000"
+      sh -c "pip install -q -i https://pypi.tuna.tsinghua.edu.cn/simple
+             -r services/gateway/requirements.txt &&
+             uvicorn services.gateway.src.main:app
+             --host 0.0.0.0 --port 8000"
     ports:
       - "8000:8000"
-    environment:
-      DATABASE_URL: postgresql+asyncpg://tunxiang:tunxiang_demo_2024@postgres:5432/tunxiang_os
-      JWT_SECRET: tunxiang-demo-jwt-secret-2024
-      PYTHONPATH: /app
-    depends_on:
-      postgres:
-        condition: service_healthy
-    networks:
-      - tunxiang-net
     volumes:
-      - ../..:/app:ro
+      - ../../services/gateway:/app/services/gateway
+      - ../../shared:/app/shared
 
-  tx-analytics:
-    image: python:3.12-slim
+  # ── 核心业务微服务 ────────────────────────────────────────
+  tx-trade:
+    <<: *py-common
     working_dir: /app
     command: >
-      bash -c "pip install --no-cache-dir -q
-      fastapi>=0.104.0 uvicorn[standard]>=0.24.0 pydantic>=2.4.0
-      sqlalchemy>=2.0.0 asyncpg>=0.29.0 structlog>=23.1.0 httpx>=0.25.0
-      apscheduler>=3.10.0
-      && uvicorn services.tx_analytics.src.main:app --host 0.0.0.0 --port 8007"
+      sh -c "pip install -q -i https://pypi.tuna.tsinghua.edu.cn/simple
+             -r services/tx-trade/requirements.txt &&
+             cd /app/services/tx-trade &&
+             uvicorn src.main:app --host 0.0.0.0 --port 8001"
+    ports:
+      - "8001:8001"
+    volumes:
+      - ../../services/tx-trade:/app/services/tx-trade
+      - ../../shared:/app/shared
+
+  tx-menu:
+    <<: *py-common
+    working_dir: /app
+    command: >
+      sh -c "pip install -q -i https://pypi.tuna.tsinghua.edu.cn/simple
+             -r services/tx-menu/requirements.txt &&
+             cd /app/services/tx-menu &&
+             uvicorn src.main:app --host 0.0.0.0 --port 8002"
+    ports:
+      - "8002:8002"
+    volumes:
+      - ../../services/tx-menu:/app/services/tx-menu
+      - ../../shared:/app/shared
+
+  tx-member:
+    <<: *py-common
+    working_dir: /app
+    command: >
+      sh -c "pip install -q -i https://pypi.tuna.tsinghua.edu.cn/simple
+             -r services/tx-member/requirements.txt &&
+             cd /app/services/tx-member &&
+             uvicorn src.main:app --host 0.0.0.0 --port 8003"
+    ports:
+      - "8003:8003"
+    volumes:
+      - ../../services/tx-member:/app/services/tx-member
+      - ../../shared:/app/shared
+
+  tx-ops:
+    <<: *py-common
+    working_dir: /app
+    command: >
+      sh -c "pip install -q -i https://pypi.tuna.tsinghua.edu.cn/simple
+             -r services/tx-ops/requirements.txt &&
+             cd /app/services/tx-ops &&
+             uvicorn src.main:app --host 0.0.0.0 --port 8005"
+    ports:
+      - "8005:8005"
+    volumes:
+      - ../../services/tx-ops:/app/services/tx-ops
+      - ../../shared:/app/shared
+
+  tx-finance:
+    <<: *py-common
+    working_dir: /app
+    command: >
+      sh -c "pip install -q -i https://pypi.tuna.tsinghua.edu.cn/simple
+             -r services/tx-finance/requirements.txt &&
+             cd /app/services/tx-finance &&
+             uvicorn src.main:app --host 0.0.0.0 --port 8007"
     ports:
       - "8007:8007"
-    environment:
-      DATABASE_URL: postgresql+asyncpg://tunxiang:tunxiang_demo_2024@postgres:5432/tunxiang_os
-      PYTHONPATH: /app
-      TENANT_1_ID: "10000000-0000-0000-0000-000000000001"
-      TENANT_1_NAME: "尝在一起"
-      TENANT_2_ID: "10000000-0000-0000-0000-000000000002"
-      TENANT_2_NAME: "最黔线"
-      TENANT_3_ID: "10000000-0000-0000-0000-000000000003"
-      TENANT_3_NAME: "尚宫厨"
-    depends_on:
-      postgres:
-        condition: service_healthy
-    networks:
-      - tunxiang-net
     volumes:
-      - ../..:/app:ro
+      - ../../services/tx-finance:/app/services/tx-finance
+      - ../../shared:/app/shared
 
-networks:
-  tunxiang-net:
-    driver: bridge
+  tx-analytics:
+    <<: *py-common
+    working_dir: /app
+    command: >
+      sh -c "pip install -q -i https://pypi.tuna.tsinghua.edu.cn/simple
+             -r services/tx-analytics/requirements.txt &&
+             cd /app/services/tx-analytics &&
+             uvicorn src.main:app --host 0.0.0.0 --port 8009"
+    ports:
+      - "8009:8009"
+    volumes:
+      - ../../services/tx-analytics:/app/services/tx-analytics
+      - ../../shared:/app/shared
+
+  # ── 数据库迁移（一次性 job）────────────────────────────────
+  migrate:
+    <<: *py-common
+    working_dir: /app
+    restart: "no"
+    command: >
+      sh -c "pip install -q -i https://pypi.tuna.tsinghua.edu.cn/simple
+             alembic asyncpg sqlalchemy psycopg2-binary &&
+             alembic -c shared/db-migrations/alembic.ini upgrade head &&
+             echo '✅ 迁移完成'"
+    volumes:
+      - ../../shared:/app/shared
+      - ../../services:/app/services
+
+  # ── 前端（Vite Dev Server）────────────────────────────────
+  web-admin:
+    image: node:20-alpine
+    restart: unless-stopped
+    working_dir: /app
+    command: >
+      sh -c "npm config set registry https://registry.npmmirror.com &&
+             npm install && npm run dev -- --host 0.0.0.0"
+    ports:
+      - "5173:5173"
+    volumes:
+      - ../../apps/web-admin:/app
+      - web_admin_nm:/app/node_modules
+    environment:
+      VITE_API_BASE_URL: http://localhost:8000
+    networks:
+      - txos-demo
+
+  web-pos:
+    image: node:20-alpine
+    restart: unless-stopped
+    working_dir: /app
+    command: >
+      sh -c "npm config set registry https://registry.npmmirror.com &&
+             npm install && npm run dev -- --host 0.0.0.0 --port 5174"
+    ports:
+      - "5174:5174"
+    volumes:
+      - ../../apps/web-pos:/app
+      - web_pos_nm:/app/node_modules
+    environment:
+      VITE_API_BASE_URL: http://localhost:8000
+    networks:
+      - txos-demo
+
+  web-kds:
+    image: node:20-alpine
+    restart: unless-stopped
+    working_dir: /app
+    command: >
+      sh -c "npm config set registry https://registry.npmmirror.com &&
+             npm install && npm run dev -- --host 0.0.0.0 --port 5175"
+    ports:
+      - "5175:5175"
+    volumes:
+      - ../../apps/web-kds:/app
+      - web_kds_nm:/app/node_modules
+    environment:
+      VITE_API_BASE_URL: http://localhost:8000
+    networks:
+      - txos-demo
 
 volumes:
   demo_pg_data:
+  web_admin_nm:
+  web_pos_nm:
+  web_kds_nm:
+
+networks:
+  txos-demo:
+    driver: bridge

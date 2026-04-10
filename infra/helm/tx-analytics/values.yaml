@@ -1,0 +1,83 @@
+# tx-analytics — 经营分析微服务
+# 含8个物化视图的分析服务：ETL数据管道/P&L计算/经营驾驶舱
+
+replicaCount: 2
+
+image:
+  repository: tunxiang/tx-analytics
+  pullPolicy: IfNotPresent
+  tag: latest
+
+service:
+  type: ClusterIP
+  port: 8009
+  targetPort: 8009
+
+ingress:
+  enabled: false
+  className: nginx
+  host: ""
+  tls: false
+  tlsSecretName: ""
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 200m
+    memory: 256Mi
+
+env:
+  TUNXIANG_ENV: prod
+  LOG_LEVEL: info
+  # ETL数据管道：从事件流抽取并填充8个物化视图
+  ETL_ENABLED: "true"
+  # 物化视图刷新间隔：300秒（5分钟），与sync-engine同步周期一致
+  MATERIALIZED_VIEW_REFRESH_INTERVAL: "300"
+  # P&L计算引擎：自动计算门店/品牌/集团多层损益
+  PNL_CALC_ENABLED: "true"
+
+# Secret中存放的敏感环境变量（由外部Secret Manager注入）
+secretRef:
+  name: tx-analytics-secret
+  # 包含: DB_URL, REDIS_URL, JWT_SECRET, SUPABASE_SERVICE_KEY
+
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 6
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 8009
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  failureThreshold: 3
+  timeoutSeconds: 5
+
+readinessProbe:
+  httpGet:
+    path: /health
+    port: 8009
+  initialDelaySeconds: 5
+  periodSeconds: 5
+  failureThreshold: 3
+  timeoutSeconds: 3
+
+# Pod反亲和：分析服务Pod分散到不同节点，防止ETL任务单点故障
+podAntiAffinity:
+  enabled: true
+
+serviceAccount:
+  create: false
+  name: ""
+
+podAnnotations: {}
+
+nodeSelector: {}
+
+tolerations: []

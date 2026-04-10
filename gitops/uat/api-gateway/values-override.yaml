@@ -1,0 +1,28 @@
+replicaCount: 2
+
+image:
+  tag: latest  # UAT阶段使用稳定latest，验收通过后打版本Tag
+
+ingress:
+  host: uat-api.tunxiangos.cn
+  tls: true
+
+env:
+  TUNXIANG_ENV: uat
+  LOG_LEVEL: info
+  FEATURE_AGENT_L3_AUTONOMY_ENABLE: "false"
+  FEATURE_GROWTH_HUB_JOURNEY_V2_ENABLE: "false"
+
+resources:
+  limits:
+    cpu: 300m
+    memory: 384Mi
+  requests:
+    cpu: 100m
+    memory: 192Mi
+
+autoscaling:
+  enabled: false
+
+podAntiAffinity:
+  enabled: true

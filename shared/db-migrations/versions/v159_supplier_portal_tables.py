@@ -47,7 +47,19 @@ def upgrade() -> None:
     op.execute("ALTER TABLE supplier_accounts FORCE ROW LEVEL SECURITY;")
 
     for action in ("SELECT", "INSERT", "UPDATE", "DELETE"):
-        op.execute(f"""
+        if action == "INSERT":
+            op.execute(f"""
+            CREATE POLICY supplier_accounts_{action.lower()}_tenant ON supplier_accounts
+            AS RESTRICTIVE FOR {action}
+            WITH CHECK (
+                current_setting('app.tenant_id', TRUE) IS NOT NULL
+                AND current_setting('app.tenant_id', TRUE) <> ''
+                AND tenant_id = NULLIF(current_setting('app.tenant_id', TRUE), '')::UUID
+            );
+
+            """)
+        else:
+            op.execute(f"""
             CREATE POLICY supplier_accounts_{action.lower()}_tenant ON supplier_accounts
             AS RESTRICTIVE FOR {action}
             USING (
@@ -55,7 +67,8 @@ def upgrade() -> None:
                 AND current_setting('app.tenant_id', TRUE) <> ''
                 AND tenant_id = NULLIF(current_setting('app.tenant_id', TRUE), '')::UUID
             );
-        """)
+
+            """)
 
     op.execute("""
         CREATE INDEX IF NOT EXISTS ix_supplier_accounts_tenant
@@ -96,7 +109,19 @@ def upgrade() -> None:
     op.execute("ALTER TABLE supplier_quotations FORCE ROW LEVEL SECURITY;")
 
     for action in ("SELECT", "INSERT", "UPDATE", "DELETE"):
-        op.execute(f"""
+        if action == "INSERT":
+            op.execute(f"""
+            CREATE POLICY supplier_quotations_{action.lower()}_tenant ON supplier_quotations
+            AS RESTRICTIVE FOR {action}
+            WITH CHECK (
+                current_setting('app.tenant_id', TRUE) IS NOT NULL
+                AND current_setting('app.tenant_id', TRUE) <> ''
+                AND tenant_id = NULLIF(current_setting('app.tenant_id', TRUE), '')::UUID
+            );
+
+            """)
+        else:
+            op.execute(f"""
             CREATE POLICY supplier_quotations_{action.lower()}_tenant ON supplier_quotations
             AS RESTRICTIVE FOR {action}
             USING (
@@ -104,7 +129,8 @@ def upgrade() -> None:
                 AND current_setting('app.tenant_id', TRUE) <> ''
                 AND tenant_id = NULLIF(current_setting('app.tenant_id', TRUE), '')::UUID
             );
-        """)
+
+            """)
 
     op.execute("""
         CREATE INDEX IF NOT EXISTS ix_supplier_quotations_tenant
@@ -151,7 +177,19 @@ def upgrade() -> None:
     op.execute("ALTER TABLE supplier_reconciliations FORCE ROW LEVEL SECURITY;")
 
     for action in ("SELECT", "INSERT", "UPDATE", "DELETE"):
-        op.execute(f"""
+        if action == "INSERT":
+            op.execute(f"""
+            CREATE POLICY supplier_reconciliations_{action.lower()}_tenant ON supplier_reconciliations
+            AS RESTRICTIVE FOR {action}
+            WITH CHECK (
+                current_setting('app.tenant_id', TRUE) IS NOT NULL
+                AND current_setting('app.tenant_id', TRUE) <> ''
+                AND tenant_id = NULLIF(current_setting('app.tenant_id', TRUE), '')::UUID
+            );
+
+            """)
+        else:
+            op.execute(f"""
             CREATE POLICY supplier_reconciliations_{action.lower()}_tenant ON supplier_reconciliations
             AS RESTRICTIVE FOR {action}
             USING (
@@ -159,7 +197,8 @@ def upgrade() -> None:
                 AND current_setting('app.tenant_id', TRUE) <> ''
                 AND tenant_id = NULLIF(current_setting('app.tenant_id', TRUE), '')::UUID
             );
-        """)
+
+            """)
 
     op.execute("""
         CREATE INDEX IF NOT EXISTS ix_supplier_reconciliations_tenant
