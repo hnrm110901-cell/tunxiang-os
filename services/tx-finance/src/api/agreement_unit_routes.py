@@ -780,7 +780,7 @@ async def manual_charge(
                     "tenant_id": str(tid),
                 },
             )
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — 最外层HTTP兜底，返回500错误响应
         logger.error("manual_charge.failed", unit_id=unit_id, error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="手动挂账失败") from exc
 
@@ -857,7 +857,7 @@ async def repay(
             {"id": str(uid), "tenant_id": str(tid)},
         )
         unit = fetch.mappings().first()
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — 最外层HTTP兜底，返回500错误响应
         logger.error("repay.fetch_failed", unit_id=unit_id, error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="查询协议单位失败") from exc
 
@@ -897,7 +897,7 @@ async def repay(
                 },
             )
             pay_amount = sum_result.scalar() or 0
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 — 最外层HTTP兜底，返回500错误响应
             logger.error("repay.sum_specific_failed", error=str(exc), exc_info=True)
             raise HTTPException(status_code=500, detail="计算指定还款金额失败") from exc
 
@@ -952,7 +952,7 @@ async def repay(
                     "tenant_id": str(tid),
                 },
             )
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — 最外层HTTP兜底，返回500错误响应
         logger.error("repay.failed", unit_id=unit_id, error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="还款失败") from exc
 
