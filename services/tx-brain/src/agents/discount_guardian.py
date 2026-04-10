@@ -12,11 +12,11 @@ from __future__ import annotations
 import json
 import re
 
-import anthropic
 import structlog
 
+from ..services.model_router import chat as model_chat
+
 logger = structlog.get_logger()
-client = anthropic.AsyncAnthropic()  # 从环境变量 ANTHROPIC_API_KEY 读取
 
 
 class DiscountGuardianAgent:
@@ -76,11 +76,13 @@ class DiscountGuardianAgent:
         """
         context = self._build_context(event, history)
 
-        message = await client.messages.create(
+        message = await model_chat(
             model="claude-sonnet-4-6",
             max_tokens=512,
             system=self.SYSTEM_PROMPT,
             messages=[{"role": "user", "content": context}],
+            agent_id="discount_guardian",
+            tenant_id=event.get("tenant_id", "unknown"),
         )
 
         response_text = message.content[0].text

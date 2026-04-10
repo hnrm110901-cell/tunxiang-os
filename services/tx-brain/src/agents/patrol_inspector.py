@@ -14,8 +14,9 @@ import re
 import anthropic
 import structlog
 
+from ..services.model_router import chat as model_chat
+
 logger = structlog.get_logger()
-client = anthropic.AsyncAnthropic()  # 从环境变量 ANTHROPIC_API_KEY 读取
 
 # 各类别中文名
 CATEGORY_FOOD_SAFETY = "食安"

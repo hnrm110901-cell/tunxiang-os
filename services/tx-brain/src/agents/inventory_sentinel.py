@@ -13,11 +13,11 @@ import re
 from collections import defaultdict
 from datetime import date
 
-import anthropic
 import structlog
 
+from ..services.model_router import chat as model_chat
+
 logger = structlog.get_logger()
-client = anthropic.AsyncAnthropic()  # 从环境变量 ANTHROPIC_API_KEY 读取
 
 # 风险等级阈值（天）
 HIGH_RISK_DAYS = 2
@@ -110,11 +110,13 @@ class InventorySentinelAgent:
         # 调用 Claude Haiku 生成采购建议
         context = self._build_context(store_id, risk_items)
 
-        message = await client.messages.create(
+        message = await model_chat(
             model="claude-haiku-4-5-20251001",
             max_tokens=1024,
             system=self.SYSTEM_PROMPT,
             messages=[{"role": "user", "content": context}],
+            agent_id="inventory_sentinel",
+            tenant_id=tenant_id,
         )
 
         response_text = message.content[0].text

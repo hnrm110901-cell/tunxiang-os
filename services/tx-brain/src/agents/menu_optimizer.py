@@ -14,8 +14,9 @@ import re
 import anthropic
 import structlog
 
+from ..services.model_router import chat as model_chat
+
 logger = structlog.get_logger()
-client = anthropic.AsyncAnthropic()  # 从环境变量 ANTHROPIC_API_KEY 读取
 
 # 临期食材阈值（天）
 EXPIRY_THRESHOLD_DAYS = 3
@@ -87,11 +88,13 @@ class MenuOptimizer:
         context = self._build_context(payload, pre_calc)
 
         try:
-            message = await client.messages.create(
+            message = await model_chat(
                 model="claude-sonnet-4-6",
                 max_tokens=1024,
                 system=self.SYSTEM_PROMPT,
                 messages=[{"role": "user", "content": context}],
+                agent_id="menu_optimizer",
+                tenant_id=payload.get("tenant_id", "unknown"),
             )
             response_text = message.content[0].text
             result = self._parse_response(response_text)

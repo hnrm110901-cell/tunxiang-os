@@ -7,11 +7,11 @@ from __future__ import annotations
 import json
 import re
 
-import anthropic
 import structlog
 
+from ..services.model_router import chat as model_chat
+
 logger = structlog.get_logger()
-client = anthropic.AsyncAnthropic()  # 从环境变量 ANTHROPIC_API_KEY 读取
 
 
 class MemberInsightAgent:

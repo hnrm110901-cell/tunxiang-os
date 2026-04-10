@@ -16,8 +16,9 @@ import structlog
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
+from ..services.model_router import chat as model_chat
+
 logger = structlog.get_logger()
-client = anthropic.AsyncAnthropic()  # 从环境变量 ANTHROPIC_API_KEY 读取
 
 # 文案长度限制
 WECHAT_GROUP_MAX_LEN = 300
@@ -100,11 +101,13 @@ class CRMOperator:
         context = self._build_context(payload, pre_check)
 
         try:
-            message = await client.messages.create(
+            message = await model_chat(
                 model="claude-haiku-4-5-20251001",
                 max_tokens=1024,
                 system=self.SYSTEM_PROMPT,
                 messages=[{"role": "user", "content": context}],
+                agent_id="crm_operator",
+                tenant_id=payload.get("tenant_id", "unknown"),
             )
             response_text = message.content[0].text
             result = self._parse_response(response_text)

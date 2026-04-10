@@ -12,13 +12,13 @@ from __future__ import annotations
 import json
 import re
 
-import anthropic
 import structlog
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
+from ..services.model_router import chat as model_chat
+
 logger = structlog.get_logger()
-client = anthropic.AsyncAnthropic()  # 从环境变量 ANTHROPIC_API_KEY 读取
 
 # 食品安全投诉关键词（触发高优先级强制处置）
 _FOOD_SAFETY_KEYWORDS = ["变质", "异物", "食物中毒", "发霉", "腐烂", "虫子", "头发", "玻璃", "金属"]
@@ -113,11 +113,13 @@ class CustomerServiceAgent:
         context = self._build_context(payload, pre_check)
         messages = self._build_messages(payload, context)
 
-        message = await client.messages.create(
+        message = await model_chat(
             model="claude-sonnet-4-6",
             max_tokens=1024,
             system=self.SYSTEM_PROMPT,
             messages=messages,
+            agent_id="customer_service",
+            tenant_id=payload.get("tenant_id", "unknown"),
         )
 
         response_text = message.content[0].text

@@ -15,8 +15,9 @@ import re
 import anthropic
 import structlog
 
+from ..services.model_router import chat as model_chat
+
 logger = structlog.get_logger()
-client = anthropic.AsyncAnthropic()  # 从环境变量 ANTHROPIC_API_KEY 读取
 
 # ─── 阈值常量 ──────────────────────────────────────────────────────
 MARGIN_THRESHOLD = 0.65        # 成本率上限（cost/revenue > 65% 触发告警）
@@ -102,11 +103,13 @@ class FinanceAuditor:
 
         # Step 3: 调用 Claude 深度分析
         try:
-            message = await client.messages.create(
+            message = await model_chat(
                 model="claude-haiku-4-5-20251001",
                 max_tokens=1024,
                 system=self.SYSTEM_PROMPT,
                 messages=[{"role": "user", "content": context}],
+                agent_id="finance_auditor",
+                tenant_id=payload.get("tenant_id", "unknown"),
             )
             response_text = message.content[0].text
             result = self._parse_response(response_text)

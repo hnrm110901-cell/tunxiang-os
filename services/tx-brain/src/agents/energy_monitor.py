@@ -22,8 +22,9 @@ import structlog
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
+from ..services.model_router import chat as model_chat
+
 logger = structlog.get_logger()
-client = anthropic.AsyncAnthropic()  # 从环境变量 ANTHROPIC_API_KEY 读取
 
 # 能耗效率评级阈值
 RATIO_EXCELLENT = 0.05   # ≤5% — 优秀
@@ -109,11 +110,13 @@ class EnergyMonitorAgent:
         context = self._build_context(payload, efficiency_level)
 
         try:
-            message = await client.messages.create(
+            message = await model_chat(
                 model="claude-haiku-4-5-20251001",
                 max_tokens=1024,
                 system=self.SYSTEM_PROMPT,
                 messages=[{"role": "user", "content": context}],
+                agent_id="energy_monitor",
+                tenant_id=tenant_id,
             )
             response_text = message.content[0].text
             parsed = self._parse_response(response_text)
