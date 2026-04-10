@@ -68,7 +68,7 @@ async def get_daily_revenue(
 
     try:
         rev = await _revenue_engine.get_daily_revenue(tid, sid, biz_date, db)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — 最外层HTTP兜底，返回500错误响应
         logger.error("get_daily_revenue.failed", store_id=store_id, error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="日营收查询失败") from exc
 
@@ -560,7 +560,7 @@ async def forecast_cashflow(
             .order_by(text("1"))
         )
         hist = [{"date": str(r.day.date()), "revenue_fen": int(r.revenue)} for r in hist_rows.all()]
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — 最外层HTTP兜底，返回500错误响应
         logger.error("forecast_cashflow.history_query_failed", store_id=store_id, error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="现金流预测查询失败") from exc
 
@@ -664,7 +664,7 @@ async def get_monthly_report(
 
 
 @router.get("/reports/monthly/{store_id}/html")
-async def get_monthly_report_html(store_id: str, month: Optional[str] = None):
+async def get_monthly_report_html(store_id: str, month: Optional[str] = None) -> dict:
     """HTML 月报（浏览器打印 PDF）— 规划中"""
     return {"ok": True, "data": {"html": "", "note": "HTML report planned for Phase 1.1.4"}}
 
@@ -688,7 +688,7 @@ async def get_daily_revenue_summary(
 
     try:
         report = await _report_engine.daily_revenue_summary(tid, sid, biz_date, db)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — 最外层HTTP兜底，返回500错误响应
         logger.error("daily_revenue_summary.failed", store_id=store_id, error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="营业收入汇总表生成失败") from exc
 
@@ -712,7 +712,7 @@ async def get_payment_discount_report(
 
     try:
         report = await _report_engine.payment_discount_report(tid, sid, biz_date, db)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — 最外层HTTP兜底，返回500错误响应
         logger.error("payment_discount_report.failed", store_id=store_id, error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="付款折扣表生成失败") from exc
 
@@ -736,7 +736,7 @@ async def get_cashflow_by_store(
 
     try:
         report = await _report_engine.cashflow_by_store(tid, sid, biz_date, db)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — 最外层HTTP兜底，返回500错误响应
         logger.error("cashflow_by_store.failed", store_id=store_id, error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="日现金流报表生成失败") from exc
 
@@ -761,7 +761,7 @@ async def get_dish_sales_stats(
 
     try:
         report = await _report_engine.dish_sales_stats(tid, sid, biz_date, db, top_n=top_n)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — 最外层HTTP兜底，返回500错误响应
         logger.error("dish_sales_stats.failed", store_id=store_id, error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="菜品销售统计表生成失败") from exc
 
@@ -785,7 +785,7 @@ async def get_billing_audit(
 
     try:
         report = await _report_engine.billing_audit(tid, sid, biz_date, db)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — 最外层HTTP兜底，返回500错误响应
         logger.error("billing_audit.failed", store_id=store_id, error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="账单稽核表生成失败") from exc
 
@@ -807,7 +807,7 @@ async def get_realtime_store_stats(
 
     try:
         report = await _report_engine.realtime_store_stats(tid, sid, db)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — 最外层HTTP兜底，返回500错误响应
         logger.error("realtime_store_stats.failed", store_id=store_id, error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="实时营业统计生成失败") from exc
 
@@ -817,14 +817,14 @@ async def get_realtime_store_stats(
 # ── 凭证 ──────────────────────────────────────────────────────
 
 @router.post("/voucher/generate")
-async def generate_voucher(settlement: dict):
+async def generate_voucher(settlement: dict) -> dict:
     """从日结数据生成会计凭证"""
     voucher = generate_voucher_from_settlement(settlement, settlement.get("store_name", ""))
     return {"ok": True, "data": voucher}
 
 
 @router.post("/voucher/kingdee")
-async def export_kingdee_voucher(settlement: dict):
+async def export_kingdee_voucher(settlement: dict) -> dict:
     """生成金蝶 K3 Cloud 格式凭证"""
     voucher = generate_voucher_from_settlement(settlement, settlement.get("store_name", ""))
     kingdee_format = format_for_kingdee(voucher)
@@ -834,6 +834,6 @@ async def export_kingdee_voucher(settlement: dict):
 # ── 电子发票 ──────────────────────────────────────────────────
 
 @router.post("/invoice")
-async def create_invoice(order_id: str, buyer_info: dict):
+async def create_invoice(order_id: str, buyer_info: dict) -> dict:
     """电子发票开具 — 调用诺诺 Adapter"""
     return {"ok": True, "data": {"invoice_id": "new", "note": "Nuonuo adapter integration pending"}}

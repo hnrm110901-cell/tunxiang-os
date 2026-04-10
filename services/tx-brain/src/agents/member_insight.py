@@ -66,11 +66,13 @@ class MemberInsightAgent:
         """
         context = self._build_context(member, orders)
 
-        message = await client.messages.create(
+        message = await model_chat(
             model="claude-haiku-4-5-20251001",
             max_tokens=512,
             system=self.SYSTEM_PROMPT,
             messages=[{"role": "user", "content": context}],
+            agent_id="member_insight",
+            tenant_id=member.get("tenant_id", "unknown"),
         )
 
         response_text = message.content[0].text

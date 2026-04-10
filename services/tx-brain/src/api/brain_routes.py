@@ -385,23 +385,23 @@ async def brain_health() -> dict[str, Any]:
     检查AI服务健康状态，验证Claude API是否可达。
     发送一条最小化请求到 claude-haiku 确认连通性。
     """
-    import anthropic as _anthropic
-
-    _client = _anthropic.AsyncAnthropic()
+    from ..services.model_router import chat as model_chat
 
     try:
-        msg = await _client.messages.create(
+        msg = await model_chat(
             model="claude-haiku-4-5-20251001",
             max_tokens=8,
             messages=[{"role": "user", "content": "ping"}],
+            agent_id="health_check",
+            tenant_id="system",
         )
         claude_ok = bool(msg.content)
         claude_status = "reachable"
-    except _anthropic.APIConnectionError as exc:
+    except anthropic.APIConnectionError as exc:
         logger.warning("brain_health_connection_error", error=str(exc))
         claude_ok = False
         claude_status = f"connection_error: {exc}"
-    except _anthropic.APIError as exc:
+    except anthropic.APIError as exc:
         logger.warning(
             "brain_health_api_error",
             status_code=getattr(exc, "status_code", None),

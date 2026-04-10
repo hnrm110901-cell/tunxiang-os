@@ -128,11 +128,13 @@ class PatrolInspector:
         context = self._build_context(payload, pre_calc, fail_items)
 
         try:
-            message = await client.messages.create(
+            message = await model_chat(
                 model="claude-haiku-4-5-20251001",
                 max_tokens=1024,
                 system=self.SYSTEM_PROMPT,
                 messages=[{"role": "user", "content": context}],
+                agent_id="patrol_inspector",
+                tenant_id=tenant_id,
             )
             response_text = message.content[0].text
             claude_result = self._parse_claude_response(response_text)
