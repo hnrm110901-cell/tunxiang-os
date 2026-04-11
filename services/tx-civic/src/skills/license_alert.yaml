@@ -1,0 +1,9 @@
+name: license_alert
+description: "证照到期预警"
+trigger_phrases:
+  - "证照到期"
+  - "健康证"
+  - "许可证"
+  - "证照总览"
+parameters: []
+handler: services.civic_agent_service.skill_license_overview

@@ -1,0 +1,16 @@
+name: trace_query
+description: "追溯食材来源"
+trigger_phrases:
+  - "追溯"
+  - "食材来源"
+  - "查批次"
+  - "供应商"
+parameters:
+  - name: keyword
+    type: string
+    required: true
+    description: "食材名称或批次号"
+  - name: store_id
+    type: string
+    required: false
+handler: services.civic_agent_service.skill_trace_ingredient

@@ -34,6 +34,7 @@ DOMAIN_ROUTES = {
     "brain": os.getenv("TX_BRAIN_URL", "http://localhost:8010"),
     "intel": os.getenv("TX_INTEL_URL", "http://localhost:8011"),
     "org": os.getenv("TX_ORG_URL", "http://localhost:8012"),
+    "civic": os.getenv("TX_CIVIC_URL", "http://localhost:8014"),
     # 别名路由：print/* 和 kds/* 均转发到 tx-trade
     "print": os.getenv("TX_TRADE_URL", "http://localhost:8001"),
     "kds": os.getenv("TX_TRADE_URL", "http://localhost:8001"),
