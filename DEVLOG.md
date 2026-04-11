@@ -65,10 +65,28 @@
 - `services/tx-intel/src/api/competitor_monitoring_routes.py` — 4个接口（扫描/周报/预警/平台快照），调用 tx-agent + 美团/抖音/小红书适配器
 - `services/tx-intel/src/main.py` ← 注册 competitor_monitoring_router
 
+### Phase 3 第二轮追加（同日完成）
+
+**归因闭环完整实现**
+- `ai_marketing_orchestrator.py` — 新增 `update_order_attribution` 动作：查找72h窗口内最近未归因touch，更新 attribution_order_id + attribution_revenue_fen + converted_at
+- `ai_marketing_orchestrator_routes.py` — 新增 `POST /attribute-order` 接口（供 cashier_engine ORDER.PAID 后调用）
+- `CHANNEL_PRIORITY` 新增 `xiaohongshu_note`（节日营销）+ `brand_content` 场景
+
+**渠道完整覆盖**
+- `ai_marketing_routes.py` — channel-test 接入小红书渠道检测（XiaohongshuMarketingAdapter）
+- 全渠道覆盖：SMS / 微信OA / 企微 / 美团 / 抖音 / 小红书（6大渠道）
+
+**竞品情报自动化**
+- `tx-intel/src/main.py` — 加入 lifespan 每日0点异步任务，自动触发 `generate_weekly_intel_report`
+
+**AI营销驾驶舱 UI**
+- `apps/web-admin/src/pages/marketing/AiMarketingDashboardPage.tsx` — 755行，含健康评分/4项KPI卡片/渠道分析/活动排名/AI洞察/触达日志/一键触发Modal
+- `apps/web-admin/src/App.tsx` ← 注册路由 `/hq/growth/ai-marketing`
+
 ### 明日计划
-- 归因窗口期闭环：ORDER.PAID 事件回写 attribution_order_id 到 marketing_touch_log
-- 小红书渠道接入到 channel-test 测试端点
-- 竞品监控定时任务（APScheduler 每日0点自动触发周报）
+- cashier_engine 调用 /attribute-order 接口（ORDER.PAID → 自动归因）
+- AI营销驾驶舱加入门店选择器（多门店切换）
+- 小红书笔记内容生成接入 ContentHub（tx-brain AIGC）
 
 ---
 
