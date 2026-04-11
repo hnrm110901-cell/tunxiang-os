@@ -25,6 +25,10 @@ app = FastAPI(
 from prometheus_fastapi_instrumentator import Instrumentator
 Instrumentator().instrument(app).expose(app)
 
+# /api/v1/intel/competitor-monitor/* — 竞品监控（v207）
+from .api.competitor_monitoring_routes import router as competitor_monitoring_router
+app.include_router(competitor_monitoring_router)
+
 # ─── 服务实例 ───
 
 competitor_svc = CompetitorMonitorService()
