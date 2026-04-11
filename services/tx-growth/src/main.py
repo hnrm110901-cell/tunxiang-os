@@ -106,6 +106,7 @@ from .api.segmentation_routes import router as segmentation_router
 from .api.growth_hub_routes import router as growth_hub_router
 from .api.touch_attribution_routes import router as touch_attribution_router
 from .api.wecom_scrm_agent_routes import router as wecom_scrm_agent_router  # P3-05 企微SCRM私域Agent
+from .api.ai_marketing_routes import router as ai_marketing_router           # AI营销自动化（v207）
 
 _approval_service = _ApprovalService()
 
@@ -691,7 +692,8 @@ app.include_router(offer_router)            # /api/v1/offers — offers/offer_re
 app.include_router(content_router)          # /api/v1/content — content_templates 表
 app.include_router(channel_router)          # /api/v1/channels — channel_configs/message_send_logs 表
 app.include_router(growth_hub_router)       # /api/v1/growth — 增长中枢V2
-app.include_router(wecom_scrm_agent_router)  # P3-05 企微SCRM私域Agent（生日/沉睡/回访）
+app.include_router(wecom_scrm_agent_router)  # P3-05 企微SCRM私域Agent
+app.include_router(ai_marketing_router)      # /api/v1/growth/ai-marketing/* — AI营销自动化（v207）（生日/沉睡/回访）
 
 # 服务实例
 brand_svc = BrandStrategyService()

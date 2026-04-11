@@ -27,6 +27,7 @@ except ImportError:
 from .api.brain_routes import router as brain_router
 from .api.voice_api import router as voice_router
 from .api.voice_order_stable_routes import router as voice_stable_router
+from .api.content_hub_routes import router as content_hub_router  # AI营销内容中枢（v207）
 from .services.cfo_dashboard import CFODashboardService
 from .services.evolution_2030 import Evolution2030Service
 from .services.voice_orchestrator import VoiceOrchestrator
@@ -97,6 +98,7 @@ app.add_middleware(
 app.include_router(voice_router)
 app.include_router(brain_router)
 app.include_router(voice_stable_router)
+app.include_router(content_hub_router)   # /api/v1/brain/content/* — AIGC 营销内容生成（v207）
 
 
 # ─── Health & Info ───────────────────────────────────────────────
