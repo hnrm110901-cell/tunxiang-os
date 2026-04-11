@@ -1,15 +1,13 @@
 /**
  * KitchenBoard -- 档口任务看板（核心页面）
  *
- * 三列布局：待制作 | 制作中 | 已完成
- * 每张卡片：桌号 + 菜名 + 数量 + 等待时间 + VIP标记 + 备注
- * 按优先级排序，催菜标红，超时闪烁
- * 深色背景，触控优化（最小48x48按钮，最小16px字体）
- *
+ * 布局：预警条 + 统计栏 / 水平滚动工单卡片区（240px/张，gap≥12px）
+ * 使用 TXKDSTicket 组件：倒计时实时更新，超时整卡红底白字，左滑完成
  * WebSocket 实时推送：连接 Mac mini /ws/kds/{stationId}
- * 替代旧版 setInterval 轮询
+ * 深色背景，触控优化（最小48px按钮，最小20px菜品字体）
  */
 import { useState, useEffect, useCallback } from 'react';
+import { TXKDSTicket, type TXKDSTicketItem } from '@tx/touch/components/TXKDSTicket';
 import { useKdsWebSocket, type KDSTicket, type RemakeAlert } from '../hooks/useKdsWebSocket';
 import { warmUpAudio } from '../utils/audio';
 import { pauseTicket, resumeTicket, grabTicket } from '../api/kdsOpsApi';
@@ -29,16 +27,6 @@ function getKdsConfig() {
   }
 }
 
-// ─── 超时阈值（分钟） ───
-
-function getTimeoutThresholds() {
-  const critical = parseInt(localStorage.getItem('kds_timeout_minutes') || '25', 10);
-  return {
-    warn: Math.max(Math.floor(critical * 0.6), 5),
-    critical,
-  };
-}
-
 // ─── 优先级排序权重 ───
 
 function priorityWeight(p: string): number {
@@ -54,35 +42,6 @@ function sortTickets(tickets: KDSTicket[]): KDSTicket[] {
     return a.createdAt - b.createdAt;
   });
 }
-
-// ─── 时间格式 ───
-
-function elapsedMin(ts: number): number {
-  return Math.floor((Date.now() - ts) / 60000);
-}
-
-function formatElapsed(ts: number): string {
-  const total = Math.floor((Date.now() - ts) / 1000);
-  const m = Math.floor(total / 60);
-  const s = total % 60;
-  return `${m}:${String(s).padStart(2, '0')}`;
-}
-
-type TimeLevel = 'normal' | 'warning' | 'critical';
-
-function getTimeLevel(ts: number): TimeLevel {
-  const { warn, critical } = getTimeoutThresholds();
-  const m = elapsedMin(ts);
-  if (m >= critical) return 'critical';
-  if (m >= warn) return 'warning';
-  return 'normal';
-}
-
-const TIME_COLORS: Record<TimeLevel, string> = {
-  normal: '#0F6E56',
-  warning: '#BA7517',
-  critical: '#A32D2D',
-};
 
 // ─── Component ───
 
@@ -114,7 +73,6 @@ export function KitchenBoard() {
     }
   }, [wsEnabled, wsTickets]);
 
-  const [tick, setTick] = useState(0);
   const [selectedDept, setSelectedDept] = useState<string>('all');
   const [audioWarmed, setAudioWarmed] = useState(false);
 
@@ -130,11 +88,7 @@ export function KitchenBoard() {
   // 当前操作员ID（实际应从登录信息获取）
   const operatorId = (window as any).__OPERATOR_ID__ as string | undefined;
 
-  // 每秒刷新倒计时
-  useEffect(() => {
-    const timer = setInterval(() => setTick(t => t + 1), 1000);
-    return () => clearInterval(timer);
-  }, []);
+  // 注意：倒计时由 TXKDSTicket 内部每秒更新，无需外部 tick
 
   // 用户首次触控时预热 AudioContext
   const handleFirstTouch = useCallback(() => {
@@ -215,6 +169,20 @@ export function KitchenBoard() {
       .filter(a => Date.now() - a.timestamp < 5 * 60 * 1000)
       .map(a => a.ticketId),
   );
+
+  // 平均出餐时间（已完成工单的总时长均值，单位：分钟）
+  const avgCookMin = done.length > 0
+    ? Math.round(
+        done.reduce((sum, t) => sum + (t.completedAt && t.createdAt ? (t.completedAt - t.createdAt) / 60000 : 0), 0)
+        / done.filter(t => t.completedAt).length || 0,
+      )
+    : 0;
+
+  // 活跃工单（pending + cooking）按水平滚动排列
+  const activeTickets = [
+    ...sortTickets(pending.map(t => ({ ...t, _col: 'pending' as const }))),
+    ...sortTickets(cooking.map(t => ({ ...t, _col: 'cooking' as const }))),
+  ];
 
   return (
     <div
@@ -332,61 +300,156 @@ export function KitchenBoard() {
             </span>
           )}
         </div>
-        <div style={{ display: 'flex', gap: 32, fontSize: 18 }}>
+        {/* 统计栏：待出单数 + 平均出餐时间 */}
+        <div style={{ display: 'flex', gap: 32, fontSize: 18, alignItems: 'center' }}>
           <span>
-            待制作 <b style={{ color: '#BA7517', fontSize: 28, fontFamily: 'JetBrains Mono, monospace' }}>{pending.length}</b>
+            待出 <b style={{ color: '#BA7517', fontSize: 28, fontFamily: 'JetBrains Mono, monospace' }}>{pending.length + cooking.length}</b> 单
           </span>
           <span>
-            制作中 <b style={{ color: '#1890ff', fontSize: 28, fontFamily: 'JetBrains Mono, monospace' }}>{cooking.length}</b>
+            平均出餐 <b style={{ color: '#0F6E56', fontSize: 28, fontFamily: 'JetBrains Mono, monospace' }}>{avgCookMin}</b> 分钟
           </span>
           <span>
-            已完成 <b style={{ color: '#0F6E56', fontSize: 28, fontFamily: 'JetBrains Mono, monospace' }}>{done.length}</b>
+            已完成 <b style={{ color: '#555', fontSize: 24, fontFamily: 'JetBrains Mono, monospace' }}>{done.length}</b>
           </span>
         </div>
       </header>
 
-      {/* 三列看板 */}
-      <div style={{ flex: 1, display: 'flex', gap: 2, overflow: 'hidden' }}>
-        {/* 待制作 */}
-        <BoardColumn title="待制作" count={pending.length} color="#BA7517" bgColor="#1a1a00">
-          {pending.map(t => (
-            <TicketCard
-              key={t.id}
-              ticket={t}
-              actionLabel="开始制作"
-              actionColor="#1890ff"
-              onAction={() => startCooking(t.id)}
-              tick={tick}
-              isFlashing={rushTicketIds.has(t.id)}
-              isPaused={pausedIds.has(t.id)}
-              onGrab={grabMode && operatorId ? () => handleGrab(t.id) : undefined}
-            />
-          ))}
-        </BoardColumn>
+      {/* KDS 工单区：水平滚动，每张卡片 240px，gap 16px */}
+      <div style={{
+        flex: 1, overflowX: 'auto', overflowY: 'hidden',
+        display: 'flex', flexDirection: 'row', alignItems: 'flex-start',
+        gap: 16, padding: '16px 20px',
+        WebkitOverflowScrolling: 'touch',
+      }}>
+        {activeTickets.length === 0 && (
+          <div style={{
+            flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 24, color: '#555',
+          }}>
+            暂无工单
+          </div>
+        )}
+        {activeTickets.map(t => {
+          const isPending = t._col === 'pending';
+          const isPaused = pausedIds.has(t.id);
+          // 将 KDSTicket.items 映射为 TXKDSTicketItem
+          const txItems: TXKDSTicketItem[] = t.items.map(item => ({
+            name: item.name,
+            qty: item.qty,
+            spec: item.notes || undefined,
+            priority: (rushTicketIds.has(t.id) || t.priority === 'rush') ? 'rush' : 'normal',
+          }));
+          return (
+            <div key={t.id} style={{ display: 'flex', flexDirection: 'column', gap: 8, flexShrink: 0 }}>
+              {/* TXKDSTicket 卡片：倒计时、超时红底、左滑完成 */}
+              <TXKDSTicket
+                orderId={t.orderNo}
+                tableNo={t.tableNo}
+                items={txItems}
+                createdAt={new Date(t.createdAt)}
+                timeLimit={config.timeoutMinutes}
+                isVip={t.priority === 'vip'}
+                onComplete={() => isPending ? startCooking(t.id) : completeCooking(t.id)}
+                onRush={() => grabMode && operatorId ? handleGrab(t.id) : startCooking(t.id)}
+              />
+              {/* 状态标签 + 停菜/操作按钮（卡片外补充） */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, width: 240 }}>
+                {/* 状态徽章 */}
+                <div style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  padding: '4px 0', borderRadius: 6,
+                  background: isPending ? '#1a1a00' : '#001a1a',
+                  fontSize: 16, fontWeight: 'bold',
+                  color: isPending ? '#BA7517' : '#4A9EFF',
+                  border: `1px solid ${isPending ? '#BA7517' : '#4A9EFF'}`,
+                }}>
+                  {isPending ? '待制作' : '制作中'}
+                </div>
 
-        {/* 制作中 */}
-        <BoardColumn title="制作中" count={cooking.length} color="#1890ff" bgColor="#001a1a">
-          {cooking.map(t => (
-            <TicketCard
-              key={t.id}
-              ticket={t}
-              actionLabel="完成出品"
-              actionColor="#0F6E56"
-              onAction={() => completeCooking(t.id)}
-              tick={tick}
-              isFlashing={rushTicketIds.has(t.id)}
-              isPaused={pausedIds.has(t.id)}
-              onPause={() => togglePause(t.id)}
-            />
-          ))}
-        </BoardColumn>
+                {/* 停菜标记 */}
+                {isPaused && (
+                  <div style={{
+                    background: '#2A2A00', border: '1px solid #666600',
+                    borderRadius: 6, padding: '4px 10px',
+                    fontSize: 16, color: '#CCCC00', fontWeight: 600, textAlign: 'center',
+                  }}>
+                    已停菜
+                  </div>
+                )}
 
-        {/* 已完成 */}
-        <BoardColumn title="已完成" count={done.length} color="#0F6E56" bgColor="#001a00">
-          {done.map(t => (
-            <DoneCard key={t.id} ticket={t} />
-          ))}
-        </BoardColumn>
+                {/* 操作按钮 */}
+                <div style={{ display: 'flex', gap: 8 }}>
+                  {isPending && grabMode && operatorId ? (
+                    <button
+                      onClick={() => handleGrab(t.id)}
+                      style={{
+                        flex: 1, padding: '14px 0', border: 'none', borderRadius: 8,
+                        background: '#FF6B35', color: '#fff',
+                        fontSize: 20, fontWeight: 'bold', cursor: 'pointer', minHeight: 56,
+                      }}
+                      onTouchStart={e => (e.currentTarget.style.transform = 'scale(0.97)')}
+                      onTouchEnd={e => (e.currentTarget.style.transform = 'scale(1)')}
+                    >
+                      抢单
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => isPending ? startCooking(t.id) : completeCooking(t.id)}
+                      disabled={isPaused}
+                      style={{
+                        flex: 1, padding: '14px 0', border: 'none', borderRadius: 8,
+                        background: isPaused ? '#2A2A2A' : isPending ? '#4A9EFF' : '#0F6E56',
+                        color: '#fff', fontSize: 20, fontWeight: 'bold',
+                        cursor: isPaused ? 'not-allowed' : 'pointer',
+                        opacity: isPaused ? 0.5 : 1, minHeight: 56,
+                      }}
+                      onTouchStart={e => !isPaused && (e.currentTarget.style.transform = 'scale(0.97)')}
+                      onTouchEnd={e => (e.currentTarget.style.transform = 'scale(1)')}
+                    >
+                      {isPending ? '开始制作' : '完成出品'}
+                    </button>
+                  )}
+                  {/* 停菜/恢复（仅制作中） */}
+                  {!isPending && (
+                    <button
+                      onClick={() => togglePause(t.id)}
+                      style={{
+                        padding: '14px 14px', border: `1px solid ${isPaused ? '#666600' : '#333'}`,
+                        borderRadius: 8,
+                        background: isPaused ? '#2A2A00' : '#1A1A1A',
+                        color: isPaused ? '#CCCC00' : '#666',
+                        fontSize: 20, fontWeight: 'bold',
+                        cursor: 'pointer', minHeight: 56, minWidth: 56,
+                      } as React.CSSProperties}
+                      onTouchStart={e => (e.currentTarget.style.transform = 'scale(0.97)')}
+                      onTouchEnd={e => (e.currentTarget.style.transform = 'scale(1)')}
+                      title={isPaused ? '恢复出品' : '停菜'}
+                    >
+                      {isPaused ? '▶' : '⏸'}
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+
+        {/* 已完成区域：分隔线 + 简化卡片 */}
+        {done.length > 0 && (
+          <>
+            <div style={{
+              width: 2, alignSelf: 'stretch', background: '#222', flexShrink: 0, margin: '0 4px',
+            }} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flexShrink: 0 }}>
+              <div style={{ fontSize: 18, color: '#555', fontWeight: 'bold', textAlign: 'center', padding: '4px 0' }}>
+                已完成 ({done.length})
+              </div>
+              <div style={{ display: 'flex', gap: 12 }}>
+                {done.map(t => <DoneCard key={t.id} ticket={t} />)}
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
       {/* 动画 CSS */}
@@ -394,14 +457,6 @@ export function KitchenBoard() {
         @keyframes kds-pulse {
           0%, 100% { opacity: 1; }
           50% { opacity: 0.7; }
-        }
-        @keyframes kds-border-flash {
-          0%, 100% { border-color: #A32D2D; }
-          50% { border-color: #ff4d4f; }
-        }
-        @keyframes kds-rush-flash {
-          0%, 100% { box-shadow: 0 0 0 0 rgba(255, 77, 79, 0); }
-          50% { box-shadow: 0 0 16px 4px rgba(255, 77, 79, 0.6); }
         }
         @keyframes kds-slide-in {
           from { opacity: 0; transform: translateY(-12px); }
@@ -472,6 +527,7 @@ function RemakeOverlay({ alerts, onDismiss }: {
 }
 
 // ─── 档口选项卡 ───
+// (BoardColumn and TicketCard replaced by TXKDSTicket from @tx/touch)
 
 const DEPT_OPTIONS = [
   { id: 'all', label: '全部' },
@@ -502,195 +558,6 @@ function DeptTabs({ selected, onChange }: { selected: string; onChange: (id: str
           {d.label}
         </button>
       ))}
-    </div>
-  );
-}
-
-// ─── 看板列 ───
-
-function BoardColumn({ title, count, color, bgColor, children }: {
-  title: string; count: number; color: string; bgColor: string; children: React.ReactNode;
-}) {
-  return (
-    <div style={{
-      flex: 1, display: 'flex', flexDirection: 'column',
-      background: bgColor, overflow: 'hidden',
-    }}>
-      <div style={{
-        textAlign: 'center', padding: '10px 0', fontSize: 20,
-        fontWeight: 'bold', color, borderBottom: `3px solid ${color}`,
-      }}>
-        {title} ({count})
-      </div>
-      <div style={{
-        flex: 1, overflowY: 'auto', padding: 10, display: 'flex',
-        flexDirection: 'column', gap: 10,
-        WebkitOverflowScrolling: 'touch',
-      }}>
-        {children}
-      </div>
-    </div>
-  );
-}
-
-// ─── 工单卡片 ───
-
-function TicketCard({ ticket: t, actionLabel, actionColor, onAction, tick: _tick, isFlashing, isPaused, onPause, onGrab }: {
-  ticket: KDSTicket; actionLabel: string; actionColor: string;
-  onAction: () => void; tick: number; isFlashing?: boolean;
-  isPaused?: boolean;
-  onPause?: () => void;
-  onGrab?: () => void;
-}) {
-  const level = getTimeLevel(t.createdAt);
-  const elapsed = formatElapsed(t.createdAt);
-  const isRush = t.priority === 'rush';
-  const isVip = t.priority === 'vip';
-  const isCritical = level === 'critical';
-
-  const borderColor = isCritical
-    ? '#A32D2D'
-    : isRush ? '#BA7517' : isVip ? '#722ed1' : '#333';
-
-  // 催单闪烁：来自 WebSocket rush_order 的最近告警
-  const rushFlashing = isFlashing || isRush;
-
-  return (
-    <div style={{
-      background: isCritical ? '#1a0505' : '#111',
-      borderRadius: 12, padding: 14,
-      borderLeft: `6px solid ${borderColor}`,
-      border: isCritical ? '2px solid #A32D2D' : undefined,
-      borderLeftWidth: 6, borderLeftStyle: 'solid', borderLeftColor: borderColor,
-      animation: isCritical
-        ? 'kds-border-flash 1.5s infinite'
-        : rushFlashing
-          ? 'kds-rush-flash 1s infinite'
-          : undefined,
-    }}>
-      {/* 头部：桌号 + 标签 + 时间 */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 26, fontWeight: 'bold', color: '#fff' }}>{t.tableNo}</span>
-          <span style={{ fontSize: 16, color: '#666' }}>#{t.orderNo}</span>
-          {isRush && (
-            <span style={{
-              fontSize: 16, padding: '2px 10px', borderRadius: 6,
-              background: '#A32D2D', color: '#fff', fontWeight: 'bold',
-              animation: 'kds-pulse 1s infinite',
-            }}>
-              催
-            </span>
-          )}
-          {isVip && (
-            <span style={{
-              fontSize: 16, padding: '2px 10px', borderRadius: 6,
-              background: 'linear-gradient(135deg, #C5A347, #E8D48B)', color: '#1a1a00', fontWeight: 'bold',
-            }}>
-              VIP
-            </span>
-          )}
-        </div>
-        <div style={{
-          fontSize: 28, fontWeight: 'bold',
-          color: TIME_COLORS[level],
-          fontFamily: 'JetBrains Mono, monospace',
-        }}>
-          {elapsed}
-        </div>
-      </div>
-
-      {/* 菜品列表 */}
-      {t.items.map((item, i) => (
-        <div key={i} style={{
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          padding: '4px 0', fontSize: 20, fontWeight: 'bold',
-        }}>
-          <span style={{ flex: 1 }}>
-            {item.name}
-            {item.notes && (
-              <span style={{ fontSize: 16, color: '#A32D2D', marginLeft: 6, fontWeight: 'normal' }}>
-                ({item.notes})
-              </span>
-            )}
-          </span>
-          <span style={{ color: '#FF6B35', fontSize: 22, minWidth: 50, textAlign: 'right' }}>
-            x{item.qty}
-          </span>
-        </div>
-      ))}
-
-      {/* 停菜标记 */}
-      {isPaused && (
-        <div style={{
-          background: '#2A2A00', border: '1px solid #666600',
-          borderRadius: 6, padding: '4px 10px', marginTop: 8,
-          fontSize: 14, color: '#CCCC00', fontWeight: 600,
-        }}>
-          ⏸ 已停菜 — 暂缓出品
-        </div>
-      )}
-
-      {/* 操作按钮区 */}
-      <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-        {/* 抢单按钮（仅 pending + 抢单模式） */}
-        {onGrab && (
-          <button
-            onClick={onGrab}
-            style={{
-              flex: 1, padding: '14px 0', border: 'none', borderRadius: 8,
-              background: '#FF6B35', color: '#fff',
-              fontSize: 20, fontWeight: 'bold', cursor: 'pointer', minHeight: 56,
-              transition: 'transform 200ms ease',
-            }}
-            onTouchStart={e => (e.currentTarget.style.transform = 'scale(0.97)')}
-            onTouchEnd={e => (e.currentTarget.style.transform = 'scale(1)')}
-          >
-            🏃 抢单
-          </button>
-        )}
-
-        {/* 主操作按钮（无抢单模式时展示） */}
-        {!onGrab && (
-          <button
-            onClick={onAction}
-            disabled={isPaused}
-            style={{
-              flex: 1, padding: '14px 0', border: 'none', borderRadius: 8,
-              background: isPaused ? '#2A2A2A' : actionColor, color: '#fff',
-              fontSize: 20, fontWeight: 'bold',
-              cursor: isPaused ? 'not-allowed' : 'pointer',
-              opacity: isPaused ? 0.5 : 1,
-              minHeight: 56, transition: 'transform 200ms ease',
-            }}
-            onTouchStart={e => !isPaused && (e.currentTarget.style.transform = 'scale(0.97)')}
-            onTouchEnd={e => (e.currentTarget.style.transform = 'scale(1)')}
-          >
-            {actionLabel}
-          </button>
-        )}
-
-        {/* 停菜/恢复按钮（cooking 状态才显示） */}
-        {onPause && (
-          <button
-            onClick={onPause}
-            style={{
-              padding: '14px 14px', border: 'none', borderRadius: 8,
-              background: isPaused ? '#2A2A00' : '#1A1A1A',
-              color: isPaused ? '#CCCC00' : '#666',
-              fontSize: 18, fontWeight: 'bold',
-              cursor: 'pointer', minHeight: 56, minWidth: 72,
-              border: `1px solid ${isPaused ? '#666600' : '#333'}`,
-              transition: 'transform 200ms ease',
-            } as React.CSSProperties}
-            onTouchStart={e => (e.currentTarget.style.transform = 'scale(0.97)')}
-            onTouchEnd={e => (e.currentTarget.style.transform = 'scale(1)')}
-            title={isPaused ? '恢复出品' : '停菜'}
-          >
-            {isPaused ? '▶' : '⏸'}
-          </button>
-        )}
-      </div>
     </div>
   );
 }
