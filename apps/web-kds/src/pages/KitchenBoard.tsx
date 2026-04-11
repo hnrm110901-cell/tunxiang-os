@@ -1,15 +1,13 @@
 /**
  * KitchenBoard -- 档口任务看板（核心页面）
  *
- * 三列布局：待制作 | 制作中 | 已完成
- * 每张卡片：桌号 + 菜名 + 数量 + 等待时间 + VIP标记 + 备注
- * 按优先级排序，催菜标红，超时闪烁
- * 深色背景，触控优化（最小48x48按钮，最小16px字体）
- *
+ * 布局：预警条 + 统计栏 / 水平滚动工单卡片区（240px/张，gap≥12px）
+ * 使用 TXKDSTicket 组件：倒计时实时更新，超时整卡红底白字，左滑完成
  * WebSocket 实时推送：连接 Mac mini /ws/kds/{stationId}
- * 替代旧版 setInterval 轮询
+ * 深色背景，触控优化（最小48px按钮，最小20px菜品字体）
  */
 import { useState, useEffect, useCallback } from 'react';
+import { TXKDSTicket, type TXKDSTicketItem } from '@tx/touch/components/TXKDSTicket';
 import { useKdsWebSocket, type KDSTicket, type RemakeAlert } from '../hooks/useKdsWebSocket';
 import { warmUpAudio } from '../utils/audio';
 import { pauseTicket, resumeTicket, grabTicket } from '../api/kdsOpsApi';
