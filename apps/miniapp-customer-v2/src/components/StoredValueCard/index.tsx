@@ -62,7 +62,7 @@ const StoredValueCard: React.FC<StoredValueCardProps> = ({
           width: '240rpx',
           height: '240rpx',
           borderRadius: '120rpx',
-          background: 'radial-gradient(circle, rgba(255,107,44,0.18) 0%, transparent 70%)',
+          background: 'radial-gradient(circle, rgba(255,107,53,0.18) 0%, transparent 70%)',
           pointerEvents: 'none',
         }}
       />
@@ -207,14 +207,14 @@ const StoredValueCard: React.FC<StoredValueCardProps> = ({
           >
             <View
               style={{
-                background: 'rgba(255,107,44,0.2)',
+                background: 'rgba(255,107,53,0.2)',
                 borderRadius: '8rpx',
                 padding: '4rpx 12rpx',
               }}
             >
               <Text
                 style={{
-                  color: '#FF6B2C',
+                  color: '#FF6B35',
                   fontSize: '22rpx',
                   fontWeight: '600',
                 }}
@@ -224,7 +224,7 @@ const StoredValueCard: React.FC<StoredValueCardProps> = ({
             </View>
             <Text
               style={{
-                color: '#FF6B2C',
+                color: '#FF6B35',
                 fontSize: '28rpx',
                 fontWeight: '600',
               }}
@@ -257,12 +257,12 @@ const StoredValueCard: React.FC<StoredValueCardProps> = ({
           style={{
             flex: 1,
             height: '88rpx',
-            background: '#FF6B2C',
+            background: '#FF6B35',
             borderRadius: '44rpx',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            boxShadow: '0 4rpx 20rpx rgba(255,107,44,0.4)',
+            boxShadow: '0 4rpx 20rpx rgba(255,107,53,0.4)',
           }}
           onClick={onRecharge}
         >

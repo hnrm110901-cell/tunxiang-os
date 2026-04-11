@@ -75,11 +75,11 @@ const CouponCard: React.FC<CouponCardProps> = ({
   const isUsed = coupon.status === 'used'
 
   // Colour palette
-  const stripeColor = isActive ? '#FF6B2C' : '#3A4E5A'
+  const stripeColor = isActive ? '#FF6B35' : '#3A4E5A'
   const cardBg = isActive ? '#1A2E38' : '#132029'
   const textPrimary = isActive ? '#FFFFFF' : '#5A7080'
   const textSecondary = isActive ? '#9EB5C0' : '#3A4E5A'
-  const amountColor = isActive ? '#FF6B2C' : '#3A4E5A'
+  const amountColor = isActive ? '#FF6B35' : '#3A4E5A'
 
   const handleTap = () => {
     if (isActive && selectable && onSelect) {
@@ -96,7 +96,7 @@ const CouponCard: React.FC<CouponCardProps> = ({
         borderRadius: '24rpx',
         overflow: 'hidden',
         border: selected
-          ? '2rpx solid #FF6B2C'
+          ? '2rpx solid #FF6B35'
           : `2rpx solid ${isActive ? '#1E3340' : '#1A2532'}`,
         minHeight: '160rpx',
         position: 'relative',
@@ -234,8 +234,8 @@ const CouponCard: React.FC<CouponCardProps> = ({
               width: '44rpx',
               height: '44rpx',
               borderRadius: '22rpx',
-              border: `3rpx solid ${selected ? '#FF6B2C' : '#2A4558'}`,
-              background: selected ? '#FF6B2C' : 'transparent',
+              border: `3rpx solid ${selected ? '#FF6B35' : '#2A4558'}`,
+              background: selected ? '#FF6B35' : 'transparent',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',

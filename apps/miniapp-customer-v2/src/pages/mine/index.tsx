@@ -25,7 +25,7 @@ import type { MemberLevel, PointsBalance } from '../../api/member'
 const C = {
   bg:       '#0B1A20',
   card:     '#132029',
-  primary:  '#FF6B2C',
+  primary:  '#FF6B35',
   text1:    '#E8F4F8',
   text2:    '#9EB5C0',
   divider:  'rgba(255,255,255,0.07)',
@@ -87,7 +87,7 @@ function ListItem({ icon, label, badge, arrow = true, danger, onTap }: ListItemP
       {badge !== undefined && (
         <View
           style={{
-            background: 'rgba(255,107,44,0.15)',
+            background: 'rgba(255,107,53,0.15)',
             borderRadius: '20rpx',
             padding: '4rpx 16rpx',
             marginRight: '8rpx',

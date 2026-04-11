@@ -20,7 +20,7 @@ interface DishCardProps {
 }
 
 const TAG_STYLES: Record<string, { bg: string; color: string; label: string }> = {
-  new:       { bg: '#FF6B2C', color: '#fff',    label: '新品' },
+  new:       { bg: '#FF6B35', color: '#fff',    label: '新品' },
   hot:       { bg: '#E53935', color: '#fff',    label: '热销' },
   recommend: { bg: '#FFD700', color: '#0B1A20', label: '推荐' },
 }
@@ -181,7 +181,7 @@ const DishCard: React.FC<DishCardProps> = ({ dish, quantity, onAdd, onRemove, on
         >
           <Text
             style={{
-              color: '#FF6B2C',
+              color: '#FF6B35',
               fontSize: '32rpx',
               fontWeight: '700',
             }}
@@ -207,7 +207,7 @@ const DishCard: React.FC<DishCardProps> = ({ dish, quantity, onAdd, onRemove, on
                       width: '56rpx',
                       height: '56rpx',
                       borderRadius: '28rpx',
-                      border: '2rpx solid #FF6B2C',
+                      border: '2rpx solid #FF6B35',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -216,7 +216,7 @@ const DishCard: React.FC<DishCardProps> = ({ dish, quantity, onAdd, onRemove, on
                     }}
                     onClick={onRemove}
                   >
-                    <Text style={{ color: '#FF6B2C', fontSize: '32rpx', lineHeight: '1' }}>−</Text>
+                    <Text style={{ color: '#FF6B35', fontSize: '32rpx', lineHeight: '1' }}>−</Text>
                   </View>
                   <Text
                     style={{
@@ -236,7 +236,7 @@ const DishCard: React.FC<DishCardProps> = ({ dish, quantity, onAdd, onRemove, on
                   width: '56rpx',
                   height: '56rpx',
                   borderRadius: '28rpx',
-                  background: '#FF6B2C',
+                  background: '#FF6B35',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',

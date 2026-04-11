@@ -21,7 +21,7 @@ import { fenToYuanDisplay } from '../../../utils/format'
 
 // ─── Brand tokens ─────────────────────────────────────────────────────────────
 const C = {
-  primary: '#FF6B2C',
+  primary: '#FF6B35',
   primaryDark: '#E55A1F',
   bgDeep: '#0B1A20',
   bgCard: '#132029',
@@ -149,7 +149,7 @@ function CouponSheet({
                     display: 'flex',
                     flexDirection: 'row',
                     alignItems: 'center',
-                    background: isSelected ? 'rgba(255,107,44,0.12)' : C.bgDeep,
+                    background: isSelected ? 'rgba(255,107,53,0.12)' : C.bgDeep,
                     border: `2rpx solid ${isSelected ? C.primary : C.border}`,
                     borderRadius: '16rpx',
                     padding: '20rpx 24rpx',

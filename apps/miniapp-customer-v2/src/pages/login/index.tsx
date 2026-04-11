@@ -23,9 +23,9 @@ import { txRequest } from '../../utils/request'
 
 // ─── Brand tokens ─────────────────────────────────────────────────────────────
 const C = {
-  primary:     '#FF6B2C',
+  primary:     '#FF6B35',
   primaryDk:   '#E55A1F',
-  primaryBg:   'rgba(255,107,44,0.10)',
+  primaryBg:   'rgba(255,107,53,0.10)',
   wechat:      '#07C160',
   wechatDk:    '#059A4C',
   bgDeep:      '#0B1A20',

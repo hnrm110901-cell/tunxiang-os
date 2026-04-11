@@ -18,7 +18,7 @@ import { useUserStore } from '../../../store/useUserStore'
 // ─── Brand tokens ─────────────────────────────────────────────────────────────
 
 const C = {
-  primary: '#FF6B2C',
+  primary: '#FF6B35',
   bgDeep: '#0B1A20',
   bgCard: '#132029',
   border: '#1E3040',
@@ -314,8 +314,8 @@ const PreferencesPage: React.FC = () => {
         {/* AI hint banner */}
         <View
           style={{
-            background: 'rgba(255,107,44,0.1)',
-            border: '2rpx solid rgba(255,107,44,0.25)',
+            background: 'rgba(255,107,53,0.1)',
+            border: '2rpx solid rgba(255,107,53,0.25)',
             borderRadius: '20rpx',
             padding: '24rpx 28rpx',
             display: 'flex',
@@ -340,7 +340,7 @@ const PreferencesPage: React.FC = () => {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            boxShadow: saving ? 'none' : '0 4rpx 24rpx rgba(255,107,44,0.4)',
+            boxShadow: saving ? 'none' : '0 4rpx 24rpx rgba(255,107,53,0.4)',
             marginBottom: '60rpx',
             opacity: saving ? 0.75 : 1,
           }}

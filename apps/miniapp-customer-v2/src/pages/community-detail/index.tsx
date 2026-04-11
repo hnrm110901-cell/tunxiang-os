@@ -52,8 +52,8 @@ interface Comment {
 // ─── Brand tokens ─────────────────────────────────────────────────────────────
 
 const C = {
-  primary:    '#FF6B2C',
-  primaryDim: 'rgba(255,107,44,0.15)',
+  primary:    '#FF6B35',
+  primaryDim: 'rgba(255,107,53,0.15)',
   bg:         '#0B1A20',
   card:       '#132029',
   cardHover:  '#1A2E38',
@@ -316,7 +316,7 @@ export default function CommunityDetailPage() {
                 background: C.primaryDim,
                 borderRadius: '40rpx',
                 padding: '12rpx 28rpx',
-                border: `1rpx solid rgba(255,107,44,0.3)`,
+                border: `1rpx solid rgba(255,107,53,0.3)`,
               }}
             >
               <Text style={{ color: C.primary, fontSize: '24rpx', fontWeight: '600' }}>+ 关注</Text>

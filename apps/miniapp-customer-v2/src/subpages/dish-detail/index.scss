@@ -108,13 +108,13 @@
 }
 
 .price-symbol {
-  color: #FF6B2C;
+  color: $tx-primary;
   font-size: 28rpx;
   font-weight: 600;
 }
 
 .price-value {
-  color: #FF6B2C;
+  color: $tx-primary;
   font-size: 48rpx;
   font-weight: 700;
   margin-left: 4rpx;
@@ -186,8 +186,8 @@
   min-width: 140rpx;
 
   &.active {
-    border-color: #FF6B2C;
-    background: rgba(255, 107, 44, 0.1);
+    border-color: $tx-primary;
+    background: rgba(255, 107, 53, 0.1);
   }
 }
 
@@ -199,7 +199,7 @@
 
 .spec-price {
   font-size: 22rpx;
-  color: #FF6B2C;
+  color: $tx-primary;
 }
 
 // ─── Allergens ───────────────────────────────────────────────────────────────
@@ -280,7 +280,7 @@
 .related-price {
   display: block;
   font-size: 24rpx;
-  color: #FF6B2C;
+  color: $tx-primary;
   margin-top: 4rpx;
 }
 
@@ -339,7 +339,7 @@
 .add-cart-btn {
   flex: 1;
   height: 80rpx;
-  background: #FF6B2C;
+  background: $tx-primary;
   border-radius: 40rpx;
   display: flex;
   justify-content: center;

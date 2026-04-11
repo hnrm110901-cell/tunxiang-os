@@ -20,7 +20,7 @@ import { txRequest } from '../../utils/request'
 // ─── Brand tokens ─────────────────────────────────────────────────────────────
 
 const C = {
-  primary:     '#FF6B2C',
+  primary:     '#FF6B35',
   primaryDark: '#E55A1F',
   bgDeep:      '#0B1A20',
   bgCard:      '#132029',
@@ -212,7 +212,7 @@ function StepBar({ step }: { step: 1 | 2 | 3 }) {
                   width: '56rpx',
                   height: '56rpx',
                   borderRadius: '28rpx',
-                  background: curr ? C.primary : done ? 'rgba(255,107,44,0.3)' : C.bgCard,
+                  background: curr ? C.primary : done ? 'rgba(255,107,53,0.3)' : C.bgCard,
                   border: `2rpx solid ${curr ? C.primary : done ? C.primary : C.border}`,
                   display: 'flex',
                   alignItems: 'center',
@@ -297,7 +297,7 @@ function CalendarGrid({ days, selected, onSelect }: CalendarGridProps) {
                 alignItems: 'center',
                 gap: '8rpx',
                 background: isSelected ? C.primary : C.bgCard,
-                border: `2rpx solid ${isSelected ? C.primary : isToday ? 'rgba(255,107,44,0.4)' : C.border}`,
+                border: `2rpx solid ${isSelected ? C.primary : isToday ? 'rgba(255,107,53,0.4)' : C.border}`,
                 opacity: isFull ? 0.45 : 1,
                 flexShrink: 0,
               }}
@@ -455,7 +455,7 @@ function MultiChipSelect<T extends string>({
             style={{
               padding: '12rpx 32rpx',
               borderRadius: '40rpx',
-              background: active ? 'rgba(255,107,44,0.15)' : C.bgCard,
+              background: active ? 'rgba(255,107,53,0.15)' : C.bgCard,
               border: `2rpx solid ${active ? C.primary : C.border}`,
             }}
           >
@@ -519,8 +519,8 @@ function GuestStepper({ value, onChange, min = 1, max = 20 }: GuestStepperProps)
           width: '96rpx',
           height: '96rpx',
           borderRadius: '48rpx',
-          background: value < max ? C.primary : 'rgba(255,107,44,0.2)',
-          border: `2rpx solid ${value < max ? C.primary : 'rgba(255,107,44,0.2)'}`,
+          background: value < max ? C.primary : 'rgba(255,107,53,0.2)',
+          border: `2rpx solid ${value < max ? C.primary : 'rgba(255,107,53,0.2)'}`,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -719,7 +719,7 @@ function ReservationCard({ record, onModify, onCancel }: ReservationCardProps) {
           {record.occasion !== '无' && (
             <View
               style={{
-                background: 'rgba(255,107,44,0.1)',
+                background: 'rgba(255,107,53,0.1)',
                 borderRadius: '12rpx',
                 padding: '8rpx 20rpx',
               }}
@@ -1234,7 +1234,7 @@ export default function ReservationPage() {
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      boxShadow: '0 8rpx 32rpx rgba(255,107,44,0.4)',
+                      boxShadow: '0 8rpx 32rpx rgba(255,107,53,0.4)',
                     }}
                   >
                     <Text style={{ color: C.white, fontSize: '32rpx', fontWeight: '700' }}>
@@ -1299,12 +1299,12 @@ export default function ReservationPage() {
                     onClick={goStep2}
                     style={{
                       height: '104rpx',
-                      background: form.time ? C.primary : 'rgba(255,107,44,0.3)',
+                      background: form.time ? C.primary : 'rgba(255,107,53,0.3)',
                       borderRadius: '52rpx',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      boxShadow: form.time ? '0 8rpx 32rpx rgba(255,107,44,0.4)' : 'none',
+                      boxShadow: form.time ? '0 8rpx 32rpx rgba(255,107,53,0.4)' : 'none',
                     }}
                   >
                     <Text style={{ color: C.white, fontSize: '34rpx', fontWeight: '700' }}>
@@ -1386,7 +1386,7 @@ export default function ReservationPage() {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        boxShadow: '0 8rpx 32rpx rgba(255,107,44,0.4)',
+                        boxShadow: '0 8rpx 32rpx rgba(255,107,53,0.4)',
                       }}
                     >
                       <Text style={{ color: C.white, fontSize: '32rpx', fontWeight: '700' }}>
@@ -1405,10 +1405,10 @@ export default function ReservationPage() {
                   {/* Reservation summary strip */}
                   <View
                     style={{
-                      background: 'rgba(255,107,44,0.08)',
+                      background: 'rgba(255,107,53,0.08)',
                       borderRadius: '20rpx',
                       padding: '20rpx 28rpx',
-                      border: `1rpx solid rgba(255,107,44,0.25)`,
+                      border: `1rpx solid rgba(255,107,53,0.25)`,
                       display: 'flex',
                       flexDirection: 'row',
                       justifyContent: 'space-between',
@@ -1504,12 +1504,12 @@ export default function ReservationPage() {
                       style={{
                         flex: 2,
                         height: '96rpx',
-                        background: submitting ? 'rgba(255,107,44,0.5)' : C.primary,
+                        background: submitting ? 'rgba(255,107,53,0.5)' : C.primary,
                         borderRadius: '48rpx',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        boxShadow: submitting ? 'none' : '0 8rpx 32rpx rgba(255,107,44,0.4)',
+                        boxShadow: submitting ? 'none' : '0 8rpx 32rpx rgba(255,107,53,0.4)',
                       }}
                     >
                       <Text style={{ color: C.white, fontSize: '32rpx', fontWeight: '700' }}>
@@ -1561,7 +1561,7 @@ export default function ReservationPage() {
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      boxShadow: '0 8rpx 32rpx rgba(255,107,44,0.3)',
+                      boxShadow: '0 8rpx 32rpx rgba(255,107,53,0.3)',
                     }}
                   >
                     <Text style={{ color: C.white, fontSize: '30rpx', fontWeight: '700' }}>

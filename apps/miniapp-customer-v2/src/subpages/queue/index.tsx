@@ -23,7 +23,7 @@ import { txRequest } from '../../utils/request'
 // ─── Brand tokens ─────────────────────────────────────────────────────────────
 
 const C = {
-  primary:     '#FF6B2C',
+  primary:     '#FF6B35',
   primaryDark: '#E55A1F',
   bgDeep:      '#0B1A20',
   bgCard:      '#132029',
@@ -188,10 +188,10 @@ function CalledTicker({ numbers }: CalledTickerProps) {
             <View
               key={n}
               style={{
-                background: 'rgba(255,107,44,0.12)',
+                background: 'rgba(255,107,53,0.12)',
                 borderRadius: '12rpx',
                 padding: '8rpx 24rpx',
-                border: `1rpx solid rgba(255,107,44,0.3)`,
+                border: `1rpx solid rgba(255,107,53,0.3)`,
               }}
             >
               <Text style={{ color: C.primary, fontSize: '32rpx', fontWeight: '700' }}>{n}</Text>
@@ -700,10 +700,10 @@ export default function QueuePage() {
                       </View>
                       <View
                         style={{
-                          background: 'rgba(255,107,44,0.12)',
+                          background: 'rgba(255,107,53,0.12)',
                           borderRadius: '20rpx',
                           padding: '20rpx 28rpx',
-                          border: `1rpx solid rgba(255,107,44,0.3)`,
+                          border: `1rpx solid rgba(255,107,53,0.3)`,
                           display: 'flex',
                           flexDirection: 'column',
                           alignItems: 'center',
@@ -751,7 +751,7 @@ export default function QueuePage() {
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      boxShadow: '0 8rpx 32rpx rgba(255,107,44,0.4)',
+                      boxShadow: '0 8rpx 32rpx rgba(255,107,53,0.4)',
                     }}
                   >
                     <Text
@@ -827,9 +827,9 @@ export default function QueuePage() {
                       style={{
                         flex: 2,
                         height: '88rpx',
-                        background: 'rgba(255,107,44,0.12)',
+                        background: 'rgba(255,107,53,0.12)',
                         borderRadius: '44rpx',
-                        border: `2rpx solid rgba(255,107,44,0.4)`,
+                        border: `2rpx solid rgba(255,107,53,0.4)`,
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -1018,7 +1018,7 @@ export default function QueuePage() {
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      boxShadow: '0 8rpx 32rpx rgba(255,107,44,0.4)',
+                      boxShadow: '0 8rpx 32rpx rgba(255,107,53,0.4)',
                     }}
                   >
                     <Text style={{ color: C.white, fontSize: '32rpx', fontWeight: '700' }}>

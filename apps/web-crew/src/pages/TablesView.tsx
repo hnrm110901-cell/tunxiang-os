@@ -5,6 +5,7 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { TXCard, TXButton } from '@tx/touch';
 import { fetchTableStatus } from '../api';
 import type { TableInfo } from '../api';
 
@@ -114,7 +115,6 @@ interface TableCardProps {
 }
 
 function TableCard({ table, onTap, member }: TableCardProps) {
-  const [pressed, setPressed] = useState(false);
   const mins = calcMinutes(table.seated_at);
   const color = STATUS_COLOR[table.status] || '#8c8c8c';
   const label = STATUS_LABEL[table.status] || table.status;
@@ -126,27 +126,22 @@ function TableCard({ table, onTap, member }: TableCardProps) {
   // 推荐甜品：正常用餐但超过30分钟
   const suggestDessert = table.status === 'occupied' && mins > 30 && !isOvertime;
 
+  // 映射 TXCard status：超时 → danger，一般占座 → normal
+  const cardStatus = isOvertime ? 'danger' : 'normal';
+
   return (
-    <div
-      onClick={() => onTap(table)}
-      onPointerDown={() => setPressed(true)}
-      onPointerUp={() => setPressed(false)}
-      onPointerCancel={() => setPressed(false)}
+    <TXCard
+      status={cardStatus}
+      onPress={() => onTap(table)}
       style={{
         position: 'relative',
-        borderRadius: 10,
-        background: '#112228',
         borderLeft: `4px solid ${color}`,
         padding: '14px 16px',
-        cursor: 'pointer',
-        WebkitTapHighlightColor: 'transparent',
-        transform: pressed ? 'scale(0.97)' : 'scale(1)',
-        transition: 'transform 0.1s ease',
-        userSelect: 'none',
         minHeight: 48,
         display: 'flex',
         flexDirection: 'column',
         gap: 6,
+        background: '#112228',
         ...(isOvertime ? { animation: 'txPulse 1.8s ease-in-out infinite' } : {}),
       }}
     >
@@ -217,7 +212,7 @@ function TableCard({ table, onTap, member }: TableCardProps) {
           🍮 建议推荐甜品
         </div>
       )}
-    </div>
+    </TXCard>
   );
 }
 
@@ -425,46 +420,24 @@ export function TablesView() {
         </div>
 
         <div style={{ display: 'flex', gap: 8 }}>
-          <button
-            onClick={() => navigate('/table-map')}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              minHeight: 48,
-              padding: '0 16px',
-              background: 'transparent',
-              border: '1.5px solid var(--tx-primary, #FF6B35)',
-              borderRadius: 8,
-              color: 'var(--tx-primary, #FF6B35)',
-              fontSize: 16,
-              fontWeight: 600,
-              cursor: 'pointer',
-              WebkitTapHighlightColor: 'transparent',
-            }}
+          {/* TXButton secondary — 地图视图 */}
+          <TXButton
+            variant="secondary"
+            size="normal"
+            onPress={() => navigate('/table-map')}
+            style={{ padding: '0 16px', fontSize: 16 }}
           >
             🗺️ 地图视图
-          </button>
-          <button
-            onClick={handleScanQR}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              minHeight: 48,
-              padding: '0 16px',
-              background: 'var(--tx-primary, #FF6B35)',
-              border: 'none',
-              borderRadius: 8,
-              color: '#ffffff',
-              fontSize: 16,
-              fontWeight: 600,
-              cursor: 'pointer',
-              WebkitTapHighlightColor: 'transparent',
-            }}
+          </TXButton>
+          {/* TXButton primary — 扫码开台 */}
+          <TXButton
+            variant="primary"
+            size="normal"
+            onPress={handleScanQR}
+            style={{ padding: '0 16px', fontSize: 16 }}
           >
             📷 扫码开台
-          </button>
+          </TXButton>
         </div>
       </div>
 
@@ -494,22 +467,15 @@ export function TablesView() {
         >
           <div style={{ fontSize: 40, marginBottom: 12 }}>⚠️</div>
           <div style={{ fontSize: 16, marginBottom: 20 }}>{error}</div>
-          <button
-            onClick={loadTables}
-            style={{
-              minHeight: 48,
-              padding: '0 32px',
-              background: 'var(--tx-primary, #FF6B35)',
-              border: 'none',
-              borderRadius: 8,
-              color: '#fff',
-              fontSize: 16,
-              fontWeight: 600,
-              cursor: 'pointer',
-            }}
+          {/* TXButton primary — 重试加载 */}
+          <TXButton
+            variant="primary"
+            size="normal"
+            onPress={loadTables}
+            style={{ padding: '0 32px', fontSize: 16 }}
           >
             重试
-          </button>
+          </TXButton>
         </div>
       )}
 

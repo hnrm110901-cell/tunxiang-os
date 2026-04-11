@@ -21,7 +21,7 @@ import { fenToYuanDisplay } from '../../../utils/format'
 // ─── Brand tokens ─────────────────────────────────────────────────────────────
 
 const C = {
-  primary: '#FF6B2C',
+  primary: '#FF6B35',
   bgDeep: '#0B1A20',
   bgCard: '#132029',
   bgHover: '#1A2E38',
@@ -420,8 +420,8 @@ const StoredValuePage: React.FC = () => {
             {/* Bonus rules table */}
             <View
               style={{
-                background: 'rgba(255,107,44,0.06)',
-                border: '1rpx solid rgba(255,107,44,0.2)',
+                background: 'rgba(255,107,53,0.06)',
+                border: '1rpx solid rgba(255,107,53,0.2)',
                 borderRadius: '16rpx',
                 padding: '20rpx 24rpx',
                 marginBottom: '28rpx',
@@ -450,7 +450,7 @@ const StoredValuePage: React.FC = () => {
                   <View
                     key={r.amount}
                     style={{
-                      background: 'rgba(255,107,44,0.12)',
+                      background: 'rgba(255,107,53,0.12)',
                       borderRadius: '12rpx',
                       padding: '8rpx 20rpx',
                       display: 'flex',
@@ -499,7 +499,7 @@ const StoredValuePage: React.FC = () => {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                boxShadow: rechargeFen > 0 ? '0 4rpx 24rpx rgba(255,107,44,0.4)' : 'none',
+                boxShadow: rechargeFen > 0 ? '0 4rpx 24rpx rgba(255,107,53,0.4)' : 'none',
               }}
               onClick={handleRechargeBtn}
             >

@@ -3,7 +3,7 @@
  */
 import { useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
-import { TXAgentAlert } from '@tx/touch';
+import { TXAgentAlert, type TXAgentAlertProps } from '@tx/touch';
 import { TablesView } from './pages/TablesView';
 import { QuickOrderView } from './pages/QuickOrderView';
 import { ActiveOrdersView } from './pages/ActiveOrdersView';
@@ -75,6 +75,11 @@ import { CrewPointsHistoryPage } from './pages/hr/CrewPointsHistoryPage';
 import { CrewMyPayrollPage } from './pages/hr/CrewMyPayrollPage';
 import { CrewMyGrowthPage } from './pages/hr/CrewMyGrowthPage';
 import { CrewMyCompliancePage } from './pages/hr/CrewMyCompliancePage';
+
+// ─── Agent 预警数据结构（后续接 WebSocket 推送，暂用 mock 空数组）───────────
+interface AgentAlert extends TXAgentAlertProps {
+  id: string;
+}
 
 // ─── Tab 图标（Unicode emoji / 文字符号）────────────────────────────────────
 const tabs = [
@@ -175,9 +180,22 @@ function BottomTab() {
 }
 
 export default function App() {
+  // Agent 预警条状态（暂用 mock 空数组，后续接 WebSocket 推送）
+  const [agentAlerts] = useState<AgentAlert[]>([]);
+
   return (
     <BrowserRouter>
       <div style={{ background: '#0B1A20', minHeight: '100vh', color: '#fff', paddingBottom: 64 }}>
+        {/* Agent 预警条（有预警时显示在最顶部，高度动态，推送来源：折扣守护/出餐调度等） */}
+        {agentAlerts.length > 0 && (
+          <TXAgentAlert
+            agentName={agentAlerts[0].agentName}
+            message={agentAlerts[0].message}
+            severity={agentAlerts[0].severity}
+            onAction={agentAlerts[0].onAction}
+            actionLabel={agentAlerts[0].actionLabel}
+          />
+        )}
         {/* 传菜员全桌上齐通知（固定顶部横幅，WebSocket实时推送） */}
         <TableServedNotice />
         {/* 服务铃实时响应（固定右下角悬浮角标） */}

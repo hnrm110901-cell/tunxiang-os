@@ -8,7 +8,7 @@
  *   4. FAB publish button
  *
  * Tech: Taro 3 + React 18 + TypeScript
- * Style: inline styles, dark theme (#0B1A20 bg, #132029 card, #FF6B2C primary)
+ * Style: inline styles, dark theme (#0B1A20 bg, #132029 card, #FF6B35 primary)
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react'
@@ -32,8 +32,8 @@ interface Post {
 // ─── Brand tokens ─────────────────────────────────────────────────────────────
 
 const C = {
-  primary:    '#FF6B2C',
-  primaryDim: 'rgba(255,107,44,0.15)',
+  primary:    '#FF6B35',
+  primaryDim: 'rgba(255,107,53,0.15)',
   bg:         '#0B1A20',
   card:       '#132029',
   cardHover:  '#1A2E38',
@@ -42,7 +42,7 @@ const C = {
   text2:      '#9EB5C0',
   text3:      '#5A7A88',
   white:      '#fff',
-  heartOn:    '#FF6B2C',
+  heartOn:    '#FF6B35',
   heartOff:   '#5A7A88',
 } as const
 
@@ -375,7 +375,7 @@ export default function CommunityPage() {
                   background: C.primaryDim,
                   borderRadius: '20rpx',
                   padding: '6rpx 24rpx',
-                  border: `1rpx solid rgba(255,107,44,0.3)`,
+                  border: `1rpx solid rgba(255,107,53,0.3)`,
                 }}
               >
                 <Text style={{ color: C.primary, fontSize: '24rpx', fontWeight: '600' }}>
@@ -484,7 +484,7 @@ export default function CommunityPage() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          boxShadow: '0 8rpx 24rpx rgba(255,107,44,0.45)',
+          boxShadow: '0 8rpx 24rpx rgba(255,107,53,0.45)',
           zIndex: 100,
         }}
         onClick={() => Taro.navigateTo({ url: '/pages/community-publish/index' }).catch(() =>

@@ -29,7 +29,7 @@ import { txRequest } from '../../utils/request'
 // ─── Brand tokens ─────────────────────────────────────────────────────────────
 
 const C = {
-  primary: '#FF6B2C',
+  primary: '#FF6B35',
   primaryDark: '#E55A1F',
   bgDeep: '#0B1A20',
   bgCard: '#132029',
@@ -55,7 +55,7 @@ interface GroupBuyActivity extends Activity {
 // ─── Status badge ─────────────────────────────────────────────────────────────
 
 const STATUS_CONFIG: Record<GroupBuyStatus, { label: string; color: string; bg: string }> = {
-  recruiting: { label: '拼单中', color: C.primary, bg: 'rgba(255,107,44,0.15)' },
+  recruiting: { label: '拼单中', color: C.primary, bg: 'rgba(255,107,53,0.15)' },
   full:       { label: '已满员', color: C.success, bg: 'rgba(76,175,80,0.15)' },
   success:    { label: '已成团', color: C.success, bg: 'rgba(76,175,80,0.15)' },
   failed:     { label: '已失败', color: C.red,     bg: 'rgba(229,57,53,0.15)' },
