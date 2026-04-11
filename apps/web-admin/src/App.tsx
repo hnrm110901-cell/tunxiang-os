@@ -1,5 +1,6 @@
 /**
  * web-admin — 总部管理后台
+ * 路由已按产品域拆分到 src/routes/*.tsx
  */
 import { useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
@@ -7,78 +8,8 @@ import { getToken, clearAuth, isTokenExpired } from './api/client';
 import { ShellHQ } from './shell/ShellHQ';
 import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
-import { StoreHealthPage } from './pages/StoreHealthPage';
-import { AgentMonitorPage } from './pages/AgentMonitorPage';
-import { TradePage } from './pages/TradePage';
-import { CatalogPage } from './pages/CatalogPage';
-import { SupplyPage } from './pages/SupplyPage';
-import { OperationsPage } from './pages/OperationsPage';
-import { CrmPage } from './pages/CrmPage';
-import { OrgPage } from './pages/OrgPage';
-import { SystemPage } from './pages/SystemPage';
 import { DailyPlanPage } from './pages/DailyPlanPage';
-import { GrowthDashboardPage } from './pages/hq/growth/GrowthDashboardPage';
-import { SegmentCenterPage } from './pages/hq/growth/SegmentCenterPage';
-import { JourneyListPage } from './pages/hq/growth/JourneyListPage';
-import { JourneyCanvasPage } from './pages/hq/growth/JourneyCanvasPage';
-import { ROIOverviewPage } from './pages/hq/growth/ROIOverviewPage';
-import { IntelDashboardPage } from './pages/hq/market-intel/IntelDashboardPage';
-import { NewProductListPage } from './pages/hq/market-intel/NewProductListPage';
-import { NewProductOpportunityPage } from './pages/hq/market-intel/NewProductOpportunityPage';
-import { ContentCenterPage } from './pages/hq/growth/ContentCenterPage';
-import { OfferCenterPage } from './pages/hq/growth/OfferCenterPage';
-import { ChannelCenterPage } from './pages/hq/growth/ChannelCenterPage';
-import { ReferralCenterPage } from './pages/hq/growth/ReferralCenterPage';
-import { StoreExecutionPage } from './pages/hq/growth/StoreExecutionPage';
-import { CompetitorCenterPage } from './pages/hq/market-intel/CompetitorCenterPage';
-import { CompetitorDetailPage } from './pages/hq/market-intel/CompetitorDetailPage';
-import { ReviewTopicPage } from './pages/hq/market-intel/ReviewTopicPage';
-import { TrendReportPage } from './pages/hq/market-intel/TrendReportPage';
-import { TrendRadarPage } from './pages/hq/market-intel/TrendRadarPage';
-import { ReviewIntelPage } from './pages/hq/market-intel/ReviewIntelPage';
-import { JourneyDetailPage } from './pages/hq/growth/JourneyDetailPage';
-import { OpsDashboardPage } from './pages/hq/ops/OpsDashboardPage';
-import { StoreAnalysisPage } from './pages/hq/ops/StoreAnalysisPage';
-import { DishAnalysisPage } from './pages/hq/ops/DishAnalysisPage';
-import { ApprovalCenterPage } from './pages/hq/ops/ApprovalCenterPage';
-import { ReviewCenterPage } from './pages/hq/ops/ReviewCenterPage';
-import { AlertCenterPage } from './pages/hq/ops/AlertCenterPage';
-import { SettingsPage } from './pages/hq/ops/SettingsPage';
-import { PeakMonitorPage } from './pages/hq/ops/PeakMonitorPage';
-import { RegionalPage } from './pages/hq/ops/RegionalPage';
-import { CruiseMonitorPage } from './pages/hq/ops/CruiseMonitorPage';
-import { OperationPlanPage } from './pages/hq/ops/OperationPlanPage';
-import { EventBusHealthPage } from './pages/hq/ops/EventBusHealthPage';
-import { StoreClonePage } from './pages/hq/ops/StoreClonePage';
-import { DailyReviewPage } from './pages/hq/ops/DailyReviewPage';
-import { SmartSpecialsPage } from './pages/hq/ops/SmartSpecialsPage';
-import { FinanceAnalysisPage } from './pages/hq/analytics/FinanceAnalysisPage';
-import { PLReportPage } from './pages/hq/analytics/PLReportPage';
-import { MemberAnalysisPage } from './pages/hq/analytics/MemberAnalysisPage';
-import { MultiStoreComparePage } from './pages/hq/analytics/MultiStoreComparePage';
-import { TrendAnalysisPage } from './pages/hq/analytics/TrendAnalysisPage';
-import { BanquetBoardPage } from './pages/hq/BanquetBoardPage';
-import { ReceiptEditorPage } from './pages/ReceiptEditorPage';
-import { GroupBuyPage } from './pages/hq/growth/GroupBuyPage';
-import { StampCardPage } from './pages/hq/growth/StampCardPage';
-import { XHSIntegrationPage } from './pages/hq/growth/XHSIntegrationPage';
-import { RetailMallPage } from './pages/hq/growth/RetailMallPage';
-import { JourneyMonitorPage } from './pages/hq/growth/JourneyMonitorPage';
-import { DeliveryPage } from './pages/hq/trade/DeliveryPage';
-import { InventoryIntelPage } from './pages/hq/supply/InventoryIntelPage';
-import { SupplyChainPage } from './pages/hq/supply/SupplyChainPage';
-import { HRDashboardPage } from './pages/hq/org/HRDashboardPage';
-import { BudgetTrackerPage } from './pages/hq/analytics/BudgetTrackerPage';
-import { MemberCardPage } from './pages/hq/growth/MemberCardPage';
-import { LiveSeafoodPage } from './pages/menu/live-seafood/LiveSeafoodPage';
-import { BanquetMenuPage } from './pages/trade/banquet-menu/BanquetMenuPage';
-import BanquetManagePage from './pages/trade/BanquetManagePage'; // Y-A8 宴席支付闭环
-import { DishDeptMappingPage } from './pages/trade/kds-mapping/DishDeptMappingPage';
-import { OperationsDashboardPage } from './pages/OperationsDashboardPage';
-import { MenuTemplatePage } from './pages/menu/template/MenuTemplatePage';
-import { CentralKitchenPage } from './pages/CentralKitchenPage';
-import { CentralKitchenPage as CentralKitchenPageV2 } from './pages/supply/CentralKitchenPage';
-import { BomEditorPage } from './pages/supply/bom/BomEditorPage';
+import { SystemPage } from './pages/SystemPage';
 import { PayrollPage } from './pages/PayrollPage';
 import { ApprovalTemplatePage } from './pages/ops/approval/ApprovalTemplatePage';
 import { ApprovalCenterPage as ApprovalCenterPageNew } from './pages/ops/approval/ApprovalCenterPage';
@@ -285,93 +216,8 @@ function App() {
         <Routes>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<DashboardPage />} />
-          <Route path="/operations-dashboard" element={<OperationsDashboardPage />} />
-          <Route path="/store-health" element={<StoreHealthPage />} />
-          <Route path="/agents" element={<AgentMonitorPage />} />
-          <Route path="/trade" element={<TradePage />} />
-          <Route path="/catalog" element={<CatalogPage />} />
-          <Route path="/supply" element={<SupplyPage />} />
-          <Route path="/operations" element={<OperationsPage />} />
-          <Route path="/crm" element={<CrmPage />} />
-          <Route path="/org" element={<OrgPage />} />
-          <Route path="/system" element={<SystemPage />} />
           <Route path="/daily-plan" element={<DailyPlanPage />} />
-          <Route path="/hq/growth/dashboard" element={<GrowthDashboardPage />} />
-          <Route path="/hq/growth/segments" element={<SegmentCenterPage />} />
-          <Route path="/hq/growth/journeys" element={<JourneyListPage />} />
-          <Route path="/hq/growth/journeys/:journeyId" element={<JourneyDetailPage />} />
-          <Route path="/hq/growth/journeys/:journeyId/canvas" element={<JourneyCanvasPage />} />
-          <Route path="/hq/growth/roi" element={<ROIOverviewPage />} />
-          <Route path="/hq/market-intel/dashboard" element={<IntelDashboardPage />} />
-          <Route path="/hq/market-intel/new-products" element={<NewProductListPage />} />
-          <Route path="/hq/market-intel/new-products/:id" element={<NewProductOpportunityPage />} />
-          <Route path="/hq/growth/content" element={<ContentCenterPage />} />
-          <Route path="/hq/growth/offers" element={<OfferCenterPage />} />
-          <Route path="/hq/growth/channels" element={<ChannelCenterPage />} />
-          <Route path="/hq/growth/referral" element={<ReferralCenterPage />} />
-          <Route path="/hq/growth/execution" element={<StoreExecutionPage />} />
-          <Route path="/hq/market-intel/competitors" element={<CompetitorCenterPage />} />
-          <Route path="/hq/market-intel/competitors/:competitorId" element={<CompetitorDetailPage />} />
-          <Route path="/hq/market-intel/reviews" element={<ReviewTopicPage />} />
-          <Route path="/hq/market-intel/reports" element={<TrendReportPage />} />
-          <Route path="/hq/market-intel/trend-radar" element={<TrendRadarPage />} />
-          <Route path="/hq/market-intel/review-intel" element={<ReviewIntelPage />} />
-          <Route path="/hq/ops/dashboard" element={<OpsDashboardPage />} />
-          <Route path="/hq/ops/store-analysis" element={<StoreAnalysisPage />} />
-          <Route path="/hq/ops/dish-analysis" element={<DishAnalysisPage />} />
-          <Route path="/hq/ops/approvals" element={<ApprovalCenterPage />} />
-          <Route path="/hq/ops/review" element={<ReviewCenterPage />} />
-          <Route path="/hq/ops/alerts" element={<AlertCenterPage />} />
-          <Route path="/hq/ops/settings" element={<SettingsPage />} />
-          <Route path="/hq/ops/peak-monitor" element={<PeakMonitorPage />} />
-          <Route path="/hq/ops/regional" element={<RegionalPage />} />
-          <Route path="/hq/ops/cruise" element={<CruiseMonitorPage />} />
-          <Route path="/hq/ops/operation-plans" element={<OperationPlanPage />} />
-          <Route path="/hq/ops/event-bus-health" element={<EventBusHealthPage />} />
-          <Route path="/hq/ops/store-clone" element={<StoreClonePage />} />
-          <Route path="/hq/ops/daily-review" element={<DailyReviewPage />} />
-          <Route path="/hq/ops/smart-specials" element={<SmartSpecialsPage />} />
-          <Route path="/hq/analytics/finance" element={<FinanceAnalysisPage />} />
-          <Route path="/hq/analytics/pl-report" element={<PLReportPage />} />
-          <Route path="/hq/analytics/member" element={<MemberAnalysisPage />} />
-          <Route path="/hq/analytics/multi-store" element={<MultiStoreComparePage />} />
-          <Route path="/hq/analytics/trend" element={<TrendAnalysisPage />} />
-          <Route path="/hq/analytics/budget" element={<BudgetTrackerPage />} />
-          <Route path="/hq/growth/group-buy" element={<GroupBuyPage />} />
-          <Route path="/hq/growth/stamp-card" element={<StampCardPage />} />
-          <Route path="/hq/growth/xhs" element={<XHSIntegrationPage />} />
-          <Route path="/hq/growth/retail-mall" element={<RetailMallPage />} />
-          <Route path="/hq/growth/journey-monitor" element={<JourneyMonitorPage />} />
-          {/* 增长中枢V2新增路由 */}
-          <Route path="/hq/growth/customers" element={<CustomerPoolPage />} />
-          <Route path="/hq/growth/customers/:customerId" element={<Customer360Page />} />
-          <Route path="/hq/growth/journey-templates" element={<GrowthJourneyTemplatePage />} />
-          <Route path="/hq/growth/journey-runs" element={<GrowthJourneyRunsPage />} />
-          <Route path="/hq/growth/agent-workbench" element={<AgentWorkbenchPage />} />
-          <Route path="/hq/growth/settings" element={<GrowthSettingsPage />} />
-          <Route path="/hq/growth/journey-attribution" element={<JourneyAttributionPage />} />
-          <Route path="/hq/growth/segment-tags" element={<GrowthSegmentTagsPage />} />
-          <Route path="/hq/growth/offer-packs" element={<GrowthOfferPacksPage />} />
-          <Route path="/hq/growth/brand-comparison" element={<BrandComparisonPage />} />
-          <Route path="/hq/growth/store-ranking" element={<StoreGrowthRankPage />} />
-          <Route path="/hq/growth/cross-brand" element={<CrossBrandPage />} />
-          <Route path="/hq/growth/external-signals" element={<ExternalSignalsPage />} />
-          <Route path="/hq/trade/delivery" element={<DeliveryPage />} />
-          <Route path="/hq/supply/inventory-intel" element={<InventoryIntelPage />} />
-          <Route path="/hq/supply/chain" element={<SupplyChainPage />} />
-          <Route path="/hq/org/hr" element={<HRDashboardPage />} />
-          <Route path="/hq/banquet" element={<BanquetBoardPage />} />
-          <Route path="/receipt-editor" element={<ReceiptEditorPage />} />
-          <Route path="/receipt-editor/:templateId" element={<ReceiptEditorPage />} />
-          <Route path="/hq/growth/member-cards" element={<MemberCardPage />} />
-          <Route path="/hq/menu/live-seafood" element={<LiveSeafoodPage />} />
-          <Route path="/hq/trade/banquet-menu" element={<BanquetMenuPage />} />
-          <Route path="/trade/banquet" element={<BanquetManagePage />} />
-          <Route path="/hq/kds/dish-dept-mapping" element={<DishDeptMappingPage />} />
-          <Route path="/menu-templates" element={<MenuTemplatePage />} />
-          <Route path="/central-kitchen" element={<CentralKitchenPage />} />
-          <Route path="/supply/central-kitchen" element={<CentralKitchenPageV2 />} />
-          <Route path="/supply/bom" element={<BomEditorPage />} />
+          <Route path="/system" element={<SystemPage />} />
           <Route path="/payroll" element={<PayrollPage />} />
           <Route path="/approval-templates" element={<ApprovalTemplatePage />} />
           <Route path="/approval-center" element={<ApprovalCenterPageNew />} />

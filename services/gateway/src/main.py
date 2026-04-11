@@ -28,11 +28,15 @@ from .wecom_internal import router as wecom_internal_router
 from .wecom_group_routes import router as wecom_group_router
 from .gdpr_routes import router as gdpr_router
 from .sync_scheduler import create_sync_scheduler, sync_router as sync_health_router
+from .wecom_bot_routes import router as wecom_bot_router
 from .response import ok
 
 app = FastAPI(title="TunxiangOS Gateway", version="3.0.0", description="AI-Native Restaurant Chain Operating System")
 
+from .personalization_middleware import PersonalizationMiddleware
+
 app.add_middleware(RequestLogMiddleware)
+app.add_middleware(PersonalizationMiddleware)  # 千人千面：注入X-User-Segment/Prefs/Subscription
 app.add_middleware(TenantMiddleware)
 app.add_middleware(AuthMiddleware)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -154,15 +158,11 @@ app.add_middleware(
 # 认证 API（必须在 proxy 之前注册，否则被通配路由拦截）
 app.include_router(auth_router)
 
-app.include_router(auth_router)
 app.include_router(hub_router)
 app.include_router(relay_router)
 
 # 开放 API（ISV 应用 + OAuth2 client_credentials；依赖 DB 未配置时相关端点返回 503）
 app.include_router(open_api_router)
-
-# 情报→增长自动接力 API
-app.include_router(relay_router)
 
 # 企业微信回调 API
 app.include_router(wecom_router)
@@ -183,6 +183,8 @@ app.include_router(wecom_group_router)
 app.include_router(gdpr_router)
 # 企微群管理与通知推送 API（群创建/列表/发消息/通知/状态）
 app.include_router(wecom_notify_router)
+# 企微机器人对话入口 API（接收企微消息→NLQ引擎→回答）
+app.include_router(wecom_bot_router)
 # 品智POS 同步健康检查 API（GET /api/v1/sync/health）
 app.include_router(sync_health_router)
 

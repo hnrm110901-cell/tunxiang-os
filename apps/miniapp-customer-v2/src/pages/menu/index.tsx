@@ -31,6 +31,7 @@ import { useStoreInfo } from '../../store/useStoreInfo'
 import { getCategories, getDishes } from '../../api/menu'
 import { CartBar } from '../../components/CartBar'
 import { DishCard } from '../../components/DishCard'
+import { AiChatAssistant } from '../../components/AiChatAssistant'
 import type { MenuCategory, Dish } from '../../api/menu'
 
 // ─── Inline colours ───────────────────────────────────────────────────────────
@@ -550,6 +551,9 @@ export default function MenuPage() {
         onClose={() => { setCustomizeVisible(false); setSelectedDish(null) }}
         onConfirm={handleCustomizeConfirm}
       />
+
+      {/* ─── AI 点餐助手 ─── */}
+      <AiChatAssistant storeId={storeId} />
 
       {/* ─── CartBar ─── */}
       <CartBar

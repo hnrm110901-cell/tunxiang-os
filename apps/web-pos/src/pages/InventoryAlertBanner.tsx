@@ -43,9 +43,9 @@ interface InventoryAlertBannerProps {
 // ─── 常量 ───
 
 const API_BASE: string =
-  (window as Record<string, unknown>).__STORE_API_BASE__ as string || '';
+  (window as unknown as Record<string, unknown>).__STORE_API_BASE__ as string || '';
 const TENANT_ID: string =
-  (window as Record<string, unknown>).__TENANT_ID__ as string || '';
+  (window as unknown as Record<string, unknown>).__TENANT_ID__ as string || '';
 
 const POLL_INTERVAL_MS = 60_000;
 

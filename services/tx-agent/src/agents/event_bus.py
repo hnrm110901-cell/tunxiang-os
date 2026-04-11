@@ -349,6 +349,58 @@ DEFAULT_EVENT_HANDLERS: dict[str, list[tuple[str, str]]] = {
     "finance.daily_pl.generated": [
         ("finance_audit", "check_pl_anomaly"),           # P&L异常检测
     ],
+
+    # ── 千人千面Agent事件驱动 ────────────────────────────────────────
+    "member.profile_updated": [
+        ("personalization", "generate_batch_reasons"),    # 用户画像更新→重新生成推荐理由
+    ],
+    "trade.order.paid": [
+        ("personalization", "generate_reorder_prompt"),   # 消费后→生成复购提醒文案
+    ],
+
+    # ── 排位Agent事件驱动 ────────────────────────────────────────────
+    "trade.table.freed": [
+        ("queue_seating", "auto_call_next"),              # 桌台空出自动叫号
+    ],
+    "trade.queue.ticket_created": [
+        ("queue_seating", "predict_wait_time"),           # 新排队预测等位时间
+    ],
+    "trade.reservation.no_show": [
+        ("queue_seating", "handle_no_show_release"),      # 爽约释放桌位
+    ],
+
+    # ── 后厨超时Agent事件驱动 ────────────────────────────────────────
+    "kds.item.overtime_warning": [
+        ("kitchen_overtime", "analyze_overtime_cause"),    # 出餐超时原因分析
+        ("kitchen_overtime", "auto_rush_notify"),          # 自动催菜
+    ],
+    "kds.scan.scheduled": [
+        ("kitchen_overtime", "scan_overtime_items"),       # 定时扫描超时项
+    ],
+
+    # ── 收银异常Agent事件驱动 ────────────────────────────────────────
+    "trade.order.reverse_settled": [
+        ("billing_anomaly", "detect_reverse_settle_anomaly"),  # 反结账异常检测
+    ],
+    "trade.payment.confirmed": [
+        ("billing_anomaly", "detect_payment_anomaly"),    # 支付异常检测
+    ],
+    "trade.shift.closed": [
+        ("billing_anomaly", "analyze_shift_variance"),    # 班结现金差异
+    ],
+
+    # ── 闭店Agent事件驱动 ────────────────────────────────────────────
+    "ops.closing_time.approaching": [
+        ("closing_ops", "pre_closing_check"),             # 闭店前30分钟预检
+        ("closing_ops", "remind_unsettled_orders"),       # 未结单提醒
+    ],
+    "ops.checklist.closing_submitted": [
+        ("closing_ops", "check_checklist_status"),        # 检查单提交追踪
+    ],
+    "ops.daily_settlement.completed": [
+        ("closing_ops", "validate_daily_settlement"),     # 日结数据校验
+        ("closing_ops", "generate_closing_report"),       # 生成闭店报告
+    ],
 }
 
 

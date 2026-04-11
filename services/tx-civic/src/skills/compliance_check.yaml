@@ -1,0 +1,14 @@
+name: compliance_check
+description: "检查门店合规状态"
+trigger_phrases:
+  - "检查合规"
+  - "合规状态"
+  - "门店合规"
+  - "证照到期"
+  - "食安检查"
+parameters:
+  - name: store_id
+    type: string
+    required: false
+    description: "门店ID，不传则检查全部"
+handler: services.civic_agent_service.skill_check_compliance

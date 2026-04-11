@@ -521,7 +521,8 @@ async def list_combo_groups(
         return _ok({"combo_id": combo_id, "groups": []})
 
     group_ids = [str(r.id) for r in group_rows]
-    id_placeholders = ", ".join([f"'{gid}'" for gid in group_ids])
+    gid_params = {f"gid_{i}": gid for i, gid in enumerate(group_ids)}
+    id_placeholders = ", ".join([f":gid_{i}" for i in range(len(group_ids))])
 
     # 查所有分组的菜品（一次查询）
     items_sql = text(f"""
@@ -533,7 +534,7 @@ async def list_combo_groups(
           AND is_deleted = false
         ORDER BY sort_order ASC, created_at ASC
     """)
-    items_result = await db.execute(items_sql, {"tenant_id": tenant_id})
+    items_result = await db.execute(items_sql, {"tenant_id": tenant_id, **gid_params})
     item_rows = items_result.fetchall()
 
     # 按 group_id 分组
@@ -770,7 +771,8 @@ async def validate_combo_selection(
 
     valid_item_ids: set[str] = set()
     if all_selected_ids:
-        id_placeholders = ", ".join([f"'{iid}'" for iid in all_selected_ids])
+        id_params = {f"iid_{i}": iid for i, iid in enumerate(all_selected_ids)}
+        id_placeholders = ", ".join([f":iid_{i}" for i in range(len(all_selected_ids))])
         valid_sql = text(f"""
             SELECT i.id, i.group_id FROM combo_group_items i
             JOIN combo_groups g ON g.id = i.group_id
@@ -782,6 +784,7 @@ async def validate_combo_selection(
         valid_result = await db.execute(valid_sql, {
             "combo_id":  combo_id,
             "tenant_id": tenant_id,
+            **id_params,
         })
         for vr in valid_result.fetchall():
             valid_item_ids.add(str(vr.id))
@@ -789,7 +792,8 @@ async def validate_combo_selection(
     # 查各 item_id 所属分组（用于"菜品不在该分组"校验）
     item_group_map: dict[str, str] = {}  # item_id -> group_id
     if all_selected_ids:
-        id_placeholders_2 = ", ".join([f"'{iid}'" for iid in all_selected_ids])
+        id_params_2 = {f"iid2_{i}": iid for i, iid in enumerate(all_selected_ids)}
+        id_placeholders_2 = ", ".join([f":iid2_{i}" for i in range(len(all_selected_ids))])
         item_group_sql = text(f"""
             SELECT i.id, i.group_id FROM combo_group_items i
             JOIN combo_groups g ON g.id = i.group_id
@@ -801,6 +805,7 @@ async def validate_combo_selection(
         item_group_result = await db.execute(item_group_sql, {
             "combo_id":  combo_id,
             "tenant_id": tenant_id,
+            **id_params_2,
         })
         for igr in item_group_result.fetchall():
             item_group_map[str(igr.id)] = str(igr.group_id)

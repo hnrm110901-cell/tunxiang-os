@@ -86,6 +86,8 @@ services:
       TX_BRAIN_URL:    http://tx-brain:8010
       TX_INTEL_URL:    http://tx-intel:8011
       TX_ORG_URL:      http://tx-org:8012
+      TX_PREDICT_URL:  http://tx-predict:8013
+      TX_CIVIC_URL:    http://tx-civic:8014
       WECOM_CORP_ID:   ${WECOM_CORP_ID:-}
       WECOM_AGENT_ID:  ${WECOM_AGENT_ID:-}
       WECOM_SECRET:    ${WECOM_SECRET:-}
@@ -260,6 +262,33 @@ services:
     build:
       <<: *build-defaults
       dockerfile: services/tx-org/Dockerfile
+    environment:
+      <<: *common-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # ── 预测引擎 :8013 ────────────────────────────────────────
+  tx-predict:
+    <<: *svc-defaults
+    build:
+      <<: *build-defaults
+      dockerfile: services/tx-predict/Dockerfile
+    environment:
+      <<: *common-env
+      HEFENG_API_KEY: ${HEFENG_API_KEY:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ── 城市监管平台 :8014 ────────────────────────────────────────
+  tx-civic:
+    <<: *svc-defaults
+    build:
+      <<: *build-defaults
+      dockerfile: services/tx-civic/Dockerfile
     environment:
       <<: *common-env
     depends_on:

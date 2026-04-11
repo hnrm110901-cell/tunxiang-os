@@ -172,7 +172,7 @@ interface TXNumpadProps {
   maxValue?: number;
 }
 
-function TXNumpad({ value, onChange, onConfirm, allowDecimal = true, maxValue }: TXNumpadProps) {
+function TXNumpad({ value, onChange, onConfirm: _onConfirm, allowDecimal = true, maxValue }: TXNumpadProps) {
   const [pressKey, setPressKey] = useState<string | null>(null);
 
   const handleKey = (key: string) => {
@@ -198,7 +198,7 @@ function TXNumpad({ value, onChange, onConfirm, allowDecimal = true, maxValue }:
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
       {keys.map((k) => {
-        const isConfirm = false;
+        const _isConfirm = false; void _isConfirm;
         const isDel = k === 'del';
         return (
           <button

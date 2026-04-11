@@ -32,7 +32,7 @@ interface OrderState {
 
 let itemCounter = 0;
 
-export const useOrderStore = create<OrderState>((set, get) => ({
+export const useOrderStore = create<OrderState>((set, _get) => ({
   orderId: null,
   orderNo: null,
   tableNo: '',

@@ -1,18 +1,19 @@
 """押金管理 API 路由
 
 端点：
-  POST /api/v1/deposits/                  — 收取押金
-  POST /api/v1/deposits/{id}/apply        — 押金抵扣消费（关联 order_id）
-  POST /api/v1/deposits/{id}/refund       — 退还押金
-  POST /api/v1/deposits/{id}/convert      — 押金转收入
-  GET  /api/v1/deposits/{id}              — 押金详情
-  GET  /api/v1/deposits/store/{store_id}  — 门店押金列表
-  GET  /api/v1/deposits/report/ledger     — 押金台账报表
-  GET  /api/v1/deposits/report/aging      — 押金账龄分析
+  POST /api/v1/deposits/                        — 收取押金
+  POST /api/v1/deposits/{id}/apply              — 押金抵扣消费（关联 order_id）
+  POST /api/v1/deposits/{id}/refund             — 退还押金
+  POST /api/v1/deposits/{id}/convert            — 押金转收入
+  GET  /api/v1/deposits/{id}                    — 押金详情
+  GET  /api/v1/deposits/store/{store_id}        — 门店押金列表
+  GET  /api/v1/deposits/report/ledger           — 押金台账报表
+  GET  /api/v1/deposits/report/aging            — 押金账龄分析
+  GET  /api/v1/deposits/report/shift-summary    — 结班押金汇总
 """
 import asyncio
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 
 import structlog
@@ -733,6 +734,85 @@ async def aging_report(
                 "31_90_days": {"count": row["cnt_31_90d"],  "amount_fen": row["amt_31_90d"]},
                 "over_90_days": {"count": row["cnt_over_90d"], "amount_fen": row["amt_over_90d"]},
             },
+        },
+        "error": None,
+    }
+
+
+# ─── GET /report/shift-summary — 结班押金汇总 ────────────────────────────────
+
+@router.get("/report/shift-summary", summary="结班押金汇总")
+async def shift_summary_report(
+    store_id: str = Query(..., description="门店ID"),
+    shift_date: date = Query(default_factory=date.today, description="班次日期 YYYY-MM-DD"),
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(_get_tenant_db),
+):
+    """结班押金汇总：本班收押金 / 退押金 / 净留存。
+    班次定义为当天 00:00 至 23:59:59（北京时间，Asia/Shanghai）。
+    """
+    tid = _parse_uuid(x_tenant_id, "X-Tenant-ID")
+    sid = _parse_uuid(store_id, "store_id")
+
+    try:
+        import zoneinfo
+        cst = zoneinfo.ZoneInfo("Asia/Shanghai")
+    except (ImportError, KeyError):
+        cst = timezone(timedelta(hours=8))
+
+    shift_start = datetime(shift_date.year, shift_date.month, shift_date.day,
+                           0, 0, 0, tzinfo=cst).astimezone(timezone.utc)
+    shift_end = datetime(shift_date.year, shift_date.month, shift_date.day,
+                         23, 59, 59, tzinfo=cst).astimezone(timezone.utc)
+
+    try:
+        result = await db.execute(
+            text("""
+                SELECT
+                    COUNT(*) FILTER (WHERE collected_at >= :start AND collected_at <= :end_ts)
+                        AS received_count,
+                    COALESCE(SUM(amount_fen) FILTER (
+                        WHERE collected_at >= :start AND collected_at <= :end_ts
+                    ), 0) AS received_fen,
+                    COUNT(*) FILTER (
+                        WHERE refunded_amount_fen > 0
+                          AND updated_at >= :start AND updated_at <= :end_ts
+                    ) AS refunded_count,
+                    COALESCE(SUM(refunded_amount_fen) FILTER (
+                        WHERE refunded_amount_fen > 0
+                          AND updated_at >= :start AND updated_at <= :end_ts
+                    ), 0) AS refunded_fen
+                FROM biz_deposits
+                WHERE tenant_id = :tenant_id::UUID
+                  AND store_id = :store_id::UUID
+            """),
+            {
+                "tenant_id": str(tid),
+                "store_id": str(sid),
+                "start": shift_start,
+                "end_ts": shift_end,
+            },
+        )
+        row = result.mappings().first()
+    except Exception as exc:
+        logger.error("shift_summary_report.failed", store_id=store_id,
+                     shift_date=str(shift_date), error=str(exc), exc_info=True)
+        raise HTTPException(status_code=500, detail="结班押金汇总失败") from exc
+
+    received_fen = int(row["received_fen"] or 0)
+    refunded_fen = int(row["refunded_fen"] or 0)
+    net_fen = received_fen - refunded_fen
+
+    return {
+        "ok": True,
+        "data": {
+            "store_id": store_id,
+            "shift_date": str(shift_date),
+            "received_count": int(row["received_count"] or 0),
+            "received_fen": received_fen,
+            "refunded_count": int(row["refunded_count"] or 0),
+            "refunded_fen": refunded_fen,
+            "net_fen": net_fen,
         },
         "error": None,
     }

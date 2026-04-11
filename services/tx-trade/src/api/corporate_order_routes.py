@@ -1,87 +1,52 @@
 """
-团餐/企业客户路由
-Y-A9
+团餐/企业客户路由 — Y-A9 Mock→DB 改造（v206）
 
 企业客户主数据管理 + 团餐订单创建（授信校验/折扣应用/菜品白名单）+ 批量出账 + 对账导出
+
+全部端点已接入 DB（corporate_customers / corporate_orders / corporate_bills）
 """
+
 import csv
 import io
+import json
 import uuid
 from datetime import date, datetime, timezone
 from decimal import ROUND_HALF_UP, Decimal
 from typing import List, Optional
 
 import structlog
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from shared.ontology.src.database import get_db_with_tenant
 
 logger = structlog.get_logger()
 router = APIRouter(prefix="/api/v1/trade/corporate", tags=["corporate-orders"])
 
-# ─── Mock 数据 ────────────────────────────────────────────────────────────────
 
-MOCK_CORPORATE_CUSTOMERS: list[dict] = [
-    {
-        "id": "corp-001",
-        "company_name": "湘雅医院",
-        "company_code": "XY001",
-        "contact_name": "张主任",
-        "contact_phone": "0731-88888001",
-        "billing_type": "monthly",
-        "credit_limit_fen": 5_000_000,
-        "used_credit_fen": 1_280_000,
-        "tax_no": "91430100XXXXXXXX01",
-        "invoice_title": "中南大学湘雅医院",
-        "discount_rate": 0.95,
-        "approved_menu_ids": [],
-        "status": "active",
-        "is_deleted": False,
-        "created_at": "2026-01-01T08:00:00+08:00",
-        "updated_at": "2026-04-01T10:00:00+08:00",
-    },
-    {
-        "id": "corp-002",
-        "company_name": "湖南大学",
-        "company_code": "HNU002",
-        "contact_name": "李老师",
-        "contact_phone": "0731-88822002",
-        "billing_type": "weekly",
-        "credit_limit_fen": 2_000_000,
-        "used_credit_fen": 680_000,
-        "tax_no": "91430100XXXXXXXX02",
-        "invoice_title": "湖南大学",
-        "discount_rate": 0.92,
-        "approved_menu_ids": [],
-        "status": "active",
-        "is_deleted": False,
-        "created_at": "2026-02-01T08:00:00+08:00",
-        "updated_at": "2026-04-02T09:30:00+08:00",
-    },
-]
+# ─── DB 依赖 ─────────────────────────────────────────────────────────────────
 
-# 模拟企业订单存储（内存 mock，生产替换 DB）
-_MOCK_ORDERS: list[dict] = []
-# 模拟账单存储
-_MOCK_BILLS: list[dict] = []
+def _get_tenant_id(request: Request) -> str:
+    return request.headers.get("X-Tenant-Id", "default")
+
+
+async def _get_db(request: Request):
+    tenant_id = _get_tenant_id(request)
+    async for session in get_db_with_tenant(tenant_id):
+        yield session
 
 
 # ─── 工具函数 ─────────────────────────────────────────────────────────────────
 
-def _find_customer(customer_id: str) -> dict | None:
-    for c in MOCK_CORPORATE_CUSTOMERS:
-        if c["id"] == customer_id and not c["is_deleted"]:
-            return c
-    return None
-
-
-def _ok(data: dict | list) -> dict:
+def _ok(data) -> dict:
     return {"ok": True, "data": data, "error": None}
 
 
-def _available_credit(customer: dict) -> int:
-    """可用授信 = 授信额度 - 已用授信"""
-    return customer["credit_limit_fen"] - customer["used_credit_fen"]
+def _available_credit(credit_limit_fen: int, used_credit_fen: int) -> int:
+    return credit_limit_fen - used_credit_fen
 
 
 # ─── 请求/响应模型 ────────────────────────────────────────────────────────────
@@ -91,15 +56,12 @@ class CreateCustomerReq(BaseModel):
     company_code: Optional[str] = Field(None, max_length=30, description="企业编码（全局唯一）")
     contact_name: Optional[str] = Field(None, max_length=50)
     contact_phone: Optional[str] = Field(None, max_length=20)
-    billing_type: str = Field(default="monthly",
-                              description="monthly/weekly/immediate：月结/周结/即结")
+    billing_type: str = Field(default="monthly", description="monthly/weekly/immediate")
     credit_limit_fen: int = Field(default=0, ge=0, description="授信额度（分）")
     tax_no: Optional[str] = Field(None, max_length=30, description="开票税号")
     invoice_title: Optional[str] = Field(None, max_length=100, description="发票抬头")
-    discount_rate: float = Field(default=1.0, ge=0.0, le=1.0,
-                                 description="企业折扣率，如0.900=九折")
-    approved_menu_ids: List[str] = Field(default_factory=list,
-                                         description="菜品ID白名单，空=全部允许")
+    discount_rate: float = Field(default=1.0, ge=0.0, le=1.0, description="企业折扣率")
+    approved_menu_ids: List[str] = Field(default_factory=list, description="菜品ID白名单")
 
 
 class UpdateCustomerReq(BaseModel):
@@ -107,7 +69,7 @@ class UpdateCustomerReq(BaseModel):
     contact_name: Optional[str] = Field(None, max_length=50)
     contact_phone: Optional[str] = Field(None, max_length=20)
     billing_type: Optional[str] = None
-    credit_limit_fen: Optional[int] = Field(None, ge=0, description="新授信额度（分）")
+    credit_limit_fen: Optional[int] = Field(None, ge=0)
     tax_no: Optional[str] = Field(None, max_length=30)
     invoice_title: Optional[str] = Field(None, max_length=100)
     discount_rate: Optional[float] = Field(None, ge=0.0, le=1.0)
@@ -139,220 +101,228 @@ class BulkBillReq(BaseModel):
 
 @router.get("/customers", summary="企业客户列表")
 async def list_customers(
-    status: Optional[str] = Query(None, description="状态过滤：active/inactive"),
+    request: Request,
+    status: Optional[str] = Query(None, description="状态过滤：active/suspended"),
     keyword: Optional[str] = Query(None, description="公司名关键词搜索"),
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
+    db: AsyncSession = Depends(_get_db),
 ) -> dict:
-    """列出所有企业客户，支持状态过滤和关键词搜索。"""
-    customers = [c for c in MOCK_CORPORATE_CUSTOMERS if not c["is_deleted"]]
-
+    conditions = ["is_deleted = FALSE"]
+    params: dict = {"limit": size, "offset": (page - 1) * size}
     if status:
-        customers = [c for c in customers if c["status"] == status]
+        conditions.append("status = :status")
+        params["status"] = status
     if keyword:
-        customers = [c for c in customers
-                     if keyword.lower() in c["company_name"].lower()]
+        conditions.append("company_name ILIKE :keyword")
+        params["keyword"] = f"%{keyword}%"
 
-    total = len(customers)
-    start = (page - 1) * size
-    items = customers[start: start + size]
+    where = " AND ".join(conditions)
 
-    # 附加可用授信
-    enriched = []
-    for c in items:
-        row = dict(c)
-        row["available_credit_fen"] = _available_credit(c)
-        enriched.append(row)
+    count_row = await db.execute(text(f"SELECT COUNT(*) FROM corporate_customers WHERE {where}"), params)
+    total = count_row.scalar() or 0
 
-    return _ok({"items": enriched, "total": total, "page": page, "size": size})
+    rows = await db.execute(
+        text(f"""
+            SELECT *, credit_limit_fen - used_credit_fen AS available_credit_fen
+            FROM corporate_customers
+            WHERE {where}
+            ORDER BY created_at DESC
+            LIMIT :limit OFFSET :offset
+        """),
+        params,
+    )
+    items = [dict(r._mapping) for r in rows.fetchall()]
+    return _ok({"items": items, "total": total, "page": page, "size": size})
 
 
 # ─── 2. 新增企业客户 ──────────────────────────────────────────────────────────
 
 @router.post("/customers", summary="新增企业客户", status_code=201)
-async def create_customer(req: CreateCustomerReq) -> dict:
-    """创建企业客户主数据记录。"""
+async def create_customer(
+    request: Request, req: CreateCustomerReq,
+    db: AsyncSession = Depends(_get_db),
+) -> dict:
+    tenant_id = _get_tenant_id(request)
+
     # 编码唯一性校验
     if req.company_code:
-        existing = [c for c in MOCK_CORPORATE_CUSTOMERS
-                    if c.get("company_code") == req.company_code and not c["is_deleted"]]
-        if existing:
-            raise HTTPException(
-                status_code=409,
-                detail=f"企业编码 '{req.company_code}' 已存在",
-            )
+        dup = await db.execute(
+            text("SELECT id FROM corporate_customers WHERE company_code = :code AND is_deleted = FALSE"),
+            {"code": req.company_code},
+        )
+        if dup.fetchone():
+            raise HTTPException(status_code=409, detail=f"企业编码 '{req.company_code}' 已存在")
 
-    new_id = f"corp-{uuid.uuid4().hex[:8]}"
-    now_iso = datetime.now(timezone.utc).isoformat()
-    customer: dict = {
-        "id": new_id,
-        "company_name": req.company_name,
-        "company_code": req.company_code,
-        "contact_name": req.contact_name,
-        "contact_phone": req.contact_phone,
-        "billing_type": req.billing_type,
-        "credit_limit_fen": req.credit_limit_fen,
-        "used_credit_fen": 0,
-        "tax_no": req.tax_no,
-        "invoice_title": req.invoice_title,
-        "discount_rate": req.discount_rate,
-        "approved_menu_ids": req.approved_menu_ids,
-        "status": "active",
-        "is_deleted": False,
-        "created_at": now_iso,
-        "updated_at": now_iso,
-    }
-    MOCK_CORPORATE_CUSTOMERS.append(customer)
-    logger.info("corporate_customer.created", customer_id=new_id,
-                company_name=req.company_name)
-
-    result = dict(customer)
-    result["available_credit_fen"] = _available_credit(customer)
-    return _ok(result)
+    row = await db.execute(
+        text("""
+            INSERT INTO corporate_customers
+                (tenant_id, store_id, company_name, company_code, contact_name, contact_phone,
+                 billing_type, credit_limit_fen, tax_no, invoice_title, discount_rate, approved_menu_ids)
+            VALUES
+                (:tenant_id, :tenant_id, :name, :code, :contact, :phone,
+                 :billing, :credit, :tax, :invoice, :discount, :menu_ids::jsonb)
+            RETURNING *, credit_limit_fen - used_credit_fen AS available_credit_fen
+        """),
+        {
+            "tenant_id": tenant_id, "name": req.company_name, "code": req.company_code,
+            "contact": req.contact_name, "phone": req.contact_phone,
+            "billing": req.billing_type, "credit": req.credit_limit_fen,
+            "tax": req.tax_no, "invoice": req.invoice_title,
+            "discount": req.discount_rate, "menu_ids": json.dumps(req.approved_menu_ids),
+        },
+    )
+    await db.commit()
+    customer = dict(row.fetchone()._mapping)
+    logger.info("corporate_customer.created", customer_id=str(customer["id"]))
+    return _ok(customer)
 
 
 # ─── 3. 更新企业客户 ──────────────────────────────────────────────────────────
 
-@router.put("/customers/{customer_id}", summary="更新企业客户（含授信额度）")
-async def update_customer(customer_id: str, req: UpdateCustomerReq) -> dict:
-    """更新企业客户信息，包括授信额度调整。"""
-    customer = _find_customer(customer_id)
-    if customer is None:
-        raise HTTPException(status_code=404, detail=f"企业客户 '{customer_id}' 不存在")
-
+@router.put("/customers/{customer_id}", summary="更新企业客户")
+async def update_customer(
+    customer_id: str, req: UpdateCustomerReq,
+    db: AsyncSession = Depends(_get_db),
+) -> dict:
     updates = req.model_dump(exclude_none=True)
     if not updates:
         raise HTTPException(status_code=400, detail="无更新内容")
 
-    customer.update(updates)
-    customer["updated_at"] = datetime.now(timezone.utc).isoformat()
+    # 构建SET子句（安全参数化）
+    set_parts = []
+    params: dict = {"cid": customer_id}
+    for k, v in updates.items():
+        if k == "approved_menu_ids":
+            set_parts.append(f"approved_menu_ids = :val_{k}::jsonb")
+            params[f"val_{k}"] = json.dumps(v)
+        else:
+            set_parts.append(f"{k} = :val_{k}")
+            params[f"val_{k}"] = v
+    set_parts.append("updated_at = NOW()")
 
-    logger.info("corporate_customer.updated", customer_id=customer_id,
-                fields=list(updates.keys()))
-
-    result = dict(customer)
-    result["available_credit_fen"] = _available_credit(customer)
-    return _ok(result)
+    row = await db.execute(
+        text(f"""
+            UPDATE corporate_customers
+            SET {', '.join(set_parts)}
+            WHERE id = :cid AND is_deleted = FALSE
+            RETURNING *, credit_limit_fen - used_credit_fen AS available_credit_fen
+        """),
+        params,
+    )
+    await db.commit()
+    updated = row.fetchone()
+    if not updated:
+        raise HTTPException(status_code=404, detail=f"企业客户 '{customer_id}' 不存在")
+    return _ok(dict(updated._mapping))
 
 
 # ─── 4. 授信额度查询 ──────────────────────────────────────────────────────────
 
 @router.get("/customers/{customer_id}/credit", summary="授信额度查询")
-async def get_credit(customer_id: str) -> dict:
-    """
-    查询企业客户授信使用情况。
-    可用授信 = credit_limit - used_credit
-    """
-    customer = _find_customer(customer_id)
-    if customer is None:
-        raise HTTPException(status_code=404, detail=f"企业客户 '{customer_id}' 不存在")
-
-    available = _available_credit(customer)
-    usage_pct = (
-        round(customer["used_credit_fen"] / customer["credit_limit_fen"] * 100, 2)
-        if customer["credit_limit_fen"] > 0 else 0.0
+async def get_credit(customer_id: str, db: AsyncSession = Depends(_get_db)) -> dict:
+    row = await db.execute(
+        text("""
+            SELECT id, company_name, credit_limit_fen, used_credit_fen, billing_type,
+                   credit_limit_fen - used_credit_fen AS available_credit_fen,
+                   CASE WHEN credit_limit_fen > 0
+                        THEN ROUND(used_credit_fen::numeric / credit_limit_fen * 100, 2)
+                        ELSE 0 END AS usage_percent
+            FROM corporate_customers
+            WHERE id = :cid AND is_deleted = FALSE
+        """),
+        {"cid": customer_id},
     )
-    return _ok({
-        "customer_id": customer_id,
-        "company_name": customer["company_name"],
-        "credit_limit_fen": customer["credit_limit_fen"],
-        "used_credit_fen": customer["used_credit_fen"],
-        "available_credit_fen": available,
-        "usage_percent": usage_pct,
-        "billing_type": customer["billing_type"],
-    })
+    customer = row.fetchone()
+    if not customer:
+        raise HTTPException(status_code=404, detail=f"企业客户 '{customer_id}' 不存在")
+    return _ok(dict(customer._mapping))
 
 
 # ─── 5. 创建企业订单 ──────────────────────────────────────────────────────────
 
 @router.post("/orders", summary="创建企业订单", status_code=201)
-async def create_corporate_order(req: CreateCorporateOrderReq) -> dict:
-    """
-    创建企业团餐订单：
-    1. 验证企业客户有效性（status=active）
-    2. 验证菜品白名单（approved_menu_ids 非空时校验）
-    3. 计算折扣后金额
-    4. 检查授信额度（used + amount ≤ limit）
-    5. 写入订单，更新 used_credit_fen
-    """
-    customer = _find_customer(req.corporate_customer_id)
-    if customer is None:
-        raise HTTPException(status_code=404,
-                            detail=f"企业客户 '{req.corporate_customer_id}' 不存在")
-    if customer["status"] != "active":
-        raise HTTPException(status_code=400,
-                            detail=f"企业客户状态为 '{customer['status']}'，无法下单")
+async def create_corporate_order(
+    request: Request, req: CreateCorporateOrderReq,
+    db: AsyncSession = Depends(_get_db),
+) -> dict:
+    tenant_id = _get_tenant_id(request)
 
-    # ── 菜品白名单校验 ──
-    approved_ids: list = customer.get("approved_menu_ids") or []
+    # 查询客户
+    cust_row = await db.execute(
+        text("""
+            SELECT id, company_name, status, credit_limit_fen, used_credit_fen,
+                   discount_rate, approved_menu_ids
+            FROM corporate_customers
+            WHERE id = :cid AND is_deleted = FALSE
+        """),
+        {"cid": req.corporate_customer_id},
+    )
+    customer = cust_row.fetchone()
+    if not customer:
+        raise HTTPException(status_code=404, detail=f"企业客户 '{req.corporate_customer_id}' 不存在")
+    if customer.status != "active":
+        raise HTTPException(status_code=400, detail=f"企业客户状态为 '{customer.status}'，无法下单")
+
+    # 菜品白名单校验
+    approved_ids = customer.approved_menu_ids or []
     if approved_ids:
         for item in req.items:
             if item.dish_id not in approved_ids:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"菜品 '{item.dish_id}' 不在企业允许点单的菜品白名单中",
-                )
+                raise HTTPException(status_code=400, detail=f"菜品 '{item.dish_id}' 不在白名单中")
 
-    # ── 原始金额 ──
-    original_amount_fen = sum(item.qty * item.unit_price_fen for item in req.items)
+    # 计算金额
+    original_fen = sum(item.qty * item.unit_price_fen for item in req.items)
+    discount_rate = Decimal(str(customer.discount_rate))
+    final_fen = int((Decimal(str(original_fen)) * discount_rate).to_integral_value(rounding=ROUND_HALF_UP))
 
-    # ── 应用折扣率 ──
-    discount_rate = Decimal(str(customer["discount_rate"]))
-    discounted_amount_fen = int(
-        (Decimal(str(original_amount_fen)) * discount_rate).to_integral_value(
-            rounding=ROUND_HALF_UP
-        )
-    )
-
-    # ── 授信额度校验 ──
-    used = customer["used_credit_fen"]
-    limit = customer["credit_limit_fen"]
-    if used + discounted_amount_fen > limit:
-        available = limit - used
+    # 授信校验
+    available = customer.credit_limit_fen - customer.used_credit_fen
+    if final_fen > available:
         raise HTTPException(
             status_code=400,
-            detail=(
-                f"授信额度不足：可用 {available} 分，本单需 {discounted_amount_fen} 分。"
-                f"请先结算欠款或调高授信额度。"
-            ),
+            detail=f"授信额度不足：可用 {available} 分，本单需 {final_fen} 分",
         )
 
-    # ── 创建订单 ──
-    order_id = f"CO-{uuid.uuid4().hex[:12].upper()}"
-    now_iso = datetime.now(timezone.utc).isoformat()
-    order: dict = {
-        "id": order_id,
-        "corporate_customer_id": req.corporate_customer_id,
-        "company_name": customer["company_name"],
-        "store_id": req.store_id,
-        "items": [i.model_dump() for i in req.items],
-        "original_amount_fen": original_amount_fen,
-        "discount_rate": float(discount_rate),
-        "discounted_amount_fen": discounted_amount_fen,
-        "billing_status": "unbilled",
-        "remark": req.remark,
-        "created_at": now_iso,
-    }
-    _MOCK_ORDERS.append(order)
+    # 创建订单 + 更新授信（事务内）
+    order_no = f"CO-{uuid.uuid4().hex[:12].upper()}"
+    order_row = await db.execute(
+        text("""
+            INSERT INTO corporate_orders
+                (tenant_id, store_id, corporate_customer_id, order_no, items,
+                 original_amount_fen, discount_rate, final_amount_fen)
+            VALUES
+                (:tid, :sid, :cid, :no, :items::jsonb,
+                 :original, :discount, :final)
+            RETURNING id, order_no, final_amount_fen, ordered_at
+        """),
+        {
+            "tid": tenant_id, "sid": req.store_id, "cid": req.corporate_customer_id,
+            "no": order_no, "items": json.dumps([i.model_dump() for i in req.items]),
+            "original": original_fen, "discount": float(discount_rate), "final": final_fen,
+        },
+    )
 
     # 更新已用授信
-    customer["used_credit_fen"] += discounted_amount_fen
-    customer["updated_at"] = now_iso
+    await db.execute(
+        text("""
+            UPDATE corporate_customers
+            SET used_credit_fen = used_credit_fen + :amount, updated_at = NOW()
+            WHERE id = :cid
+        """),
+        {"cid": req.corporate_customer_id, "amount": final_fen},
+    )
+    await db.commit()
 
-    logger.info("corporate_order.created",
-                order_id=order_id,
-                customer_id=req.corporate_customer_id,
-                original_fen=original_amount_fen,
-                discounted_fen=discounted_amount_fen)
-
+    order = order_row.fetchone()
+    logger.info("corporate_order.created", order_no=order_no, final_fen=final_fen)
     return _ok({
-        "order_id": order_id,
-        "company_name": customer["company_name"],
-        "original_amount_fen": original_amount_fen,
+        "order_id": str(order.id), "order_no": order.order_no,
+        "company_name": customer.company_name,
+        "original_amount_fen": original_fen,
         "discount_rate": float(discount_rate),
-        "discounted_amount_fen": discounted_amount_fen,
-        "billing_status": "unbilled",
-        "created_at": now_iso,
+        "final_amount_fen": final_fen,
+        "ordered_at": str(order.ordered_at),
     })
 
 
@@ -360,114 +330,120 @@ async def create_corporate_order(req: CreateCorporateOrderReq) -> dict:
 
 @router.get("/orders", summary="企业订单列表")
 async def list_corporate_orders(
-    corporate_customer_id: Optional[str] = Query(None, description="按企业客户ID过滤"),
-    order_date: Optional[date] = Query(None, description="按日期过滤 YYYY-MM-DD"),
-    billing_status: Optional[str] = Query(None, description="账单状态：unbilled/billed"),
+    corporate_customer_id: Optional[str] = Query(None),
+    order_date: Optional[date] = Query(None),
+    billing_status: Optional[str] = Query(None, description="unbilled/billed"),
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
+    db: AsyncSession = Depends(_get_db),
 ) -> dict:
-    """列出企业团餐订单，支持多维过滤。"""
-    orders = list(_MOCK_ORDERS)
-
+    conditions = ["1=1"]
+    params: dict = {"limit": size, "offset": (page - 1) * size}
     if corporate_customer_id:
-        orders = [o for o in orders
-                  if o["corporate_customer_id"] == corporate_customer_id]
-    if billing_status:
-        orders = [o for o in orders if o["billing_status"] == billing_status]
+        conditions.append("o.corporate_customer_id = :cid")
+        params["cid"] = corporate_customer_id
     if order_date:
-        date_str = order_date.isoformat()
-        orders = [o for o in orders if o["created_at"].startswith(date_str)]
+        conditions.append("o.ordered_at::date = :odate")
+        params["odate"] = order_date
+    if billing_status == "billed":
+        conditions.append("o.billed = TRUE")
+    elif billing_status == "unbilled":
+        conditions.append("o.billed = FALSE")
 
-    total = len(orders)
-    start = (page - 1) * size
-    items = orders[start: start + size]
+    where = " AND ".join(conditions)
+    count_row = await db.execute(text(f"SELECT COUNT(*) FROM corporate_orders o WHERE {where}"), params)
+    total = count_row.scalar() or 0
 
+    rows = await db.execute(
+        text(f"""
+            SELECT o.*, c.company_name
+            FROM corporate_orders o
+            JOIN corporate_customers c ON c.id = o.corporate_customer_id
+            WHERE {where}
+            ORDER BY o.ordered_at DESC
+            LIMIT :limit OFFSET :offset
+        """),
+        params,
+    )
+    items = [dict(r._mapping) for r in rows.fetchall()]
     return _ok({"items": items, "total": total, "page": page, "size": size})
 
 
 # ─── 7. 批量账单生成 ──────────────────────────────────────────────────────────
 
 @router.post("/orders/bulk-bill", summary="批量账单生成")
-async def bulk_bill(req: BulkBillReq) -> dict:
-    """
-    将指定周期内所有 unbilled 订单汇总，生成账单（mock PDF 文本），标记为 billed。
+async def bulk_bill(
+    request: Request, req: BulkBillReq,
+    db: AsyncSession = Depends(_get_db),
+) -> dict:
+    tenant_id = _get_tenant_id(request)
 
-    Body: {corporate_customer_id, billing_period_start, billing_period_end}
-    """
-    customer = _find_customer(req.corporate_customer_id)
-    if customer is None:
-        raise HTTPException(status_code=404,
-                            detail=f"企业客户 '{req.corporate_customer_id}' 不存在")
+    # 查客户
+    cust_row = await db.execute(
+        text("SELECT id, company_name FROM corporate_customers WHERE id = :cid AND is_deleted = FALSE"),
+        {"cid": req.corporate_customer_id},
+    )
+    customer = cust_row.fetchone()
+    if not customer:
+        raise HTTPException(status_code=404, detail=f"企业客户 '{req.corporate_customer_id}' 不存在")
 
-    start_str = req.billing_period_start.isoformat()
-    end_str = req.billing_period_end.isoformat()
+    # 汇总未出账订单
+    agg = await db.execute(
+        text("""
+            SELECT COUNT(*) AS cnt, COALESCE(SUM(final_amount_fen), 0) AS total
+            FROM corporate_orders
+            WHERE corporate_customer_id = :cid
+              AND billed = FALSE
+              AND ordered_at::date BETWEEN :start AND :end
+        """),
+        {"cid": req.corporate_customer_id, "start": req.billing_period_start, "end": req.billing_period_end},
+    )
+    summary = agg.fetchone()
+    if not summary or summary.cnt == 0:
+        raise HTTPException(status_code=400, detail="该周期内无可出账订单")
 
-    # 找出该周期内 unbilled 订单
-    target_orders = [
-        o for o in _MOCK_ORDERS
-        if o["corporate_customer_id"] == req.corporate_customer_id
-        and o["billing_status"] == "unbilled"
-        and start_str <= o["created_at"][:10] <= end_str
-    ]
+    # 创建账单
+    bill_no = f"BILL-{uuid.uuid4().hex[:10].upper()}"
+    bill_row = await db.execute(
+        text("""
+            INSERT INTO corporate_bills
+                (tenant_id, store_id, corporate_customer_id, bill_no,
+                 period_start, period_end, order_count, total_amount_fen)
+            VALUES
+                (:tid, :tid, :cid, :bno, :start, :end, :cnt, :total)
+            RETURNING id
+        """),
+        {
+            "tid": tenant_id, "cid": req.corporate_customer_id, "bno": bill_no,
+            "start": req.billing_period_start, "end": req.billing_period_end,
+            "cnt": summary.cnt, "total": summary.total,
+        },
+    )
+    bill_id = bill_row.scalar()
 
-    if not target_orders:
-        raise HTTPException(
-            status_code=400,
-            detail=f"在 {start_str} ~ {end_str} 期间未找到可出账的未结算订单",
-        )
+    # 标记订单已出账
+    await db.execute(
+        text("""
+            UPDATE corporate_orders
+            SET billed = TRUE, bill_id = :bill_id
+            WHERE corporate_customer_id = :cid
+              AND billed = FALSE
+              AND ordered_at::date BETWEEN :start AND :end
+        """),
+        {"bill_id": bill_id, "cid": req.corporate_customer_id,
+         "start": req.billing_period_start, "end": req.billing_period_end},
+    )
+    await db.commit()
 
-    total_fen = sum(o["discounted_amount_fen"] for o in target_orders)
-    order_count = len(target_orders)
-
-    # 标记已出账
-    billed_order_ids = []
-    for o in target_orders:
-        o["billing_status"] = "billed"
-        billed_order_ids.append(o["id"])
-
-    # 生成账单
-    bill_id = f"BILL-{uuid.uuid4().hex[:10].upper()}"
-    now_iso = datetime.now(timezone.utc).isoformat()
-    bill: dict = {
-        "bill_id": bill_id,
-        "corporate_customer_id": req.corporate_customer_id,
-        "company_name": customer["company_name"],
-        "billing_period_start": start_str,
-        "billing_period_end": end_str,
-        "order_count": order_count,
-        "total_fen": total_fen,
-        "billed_order_ids": billed_order_ids,
-        "billing_type": customer["billing_type"],
-        "discount_rate": customer["discount_rate"],
-        "pdf_mock_text": (
-            f"【屯象OS 企业账单】\n"
-            f"企业：{customer['company_name']}\n"
-            f"账期：{start_str} ~ {end_str}\n"
-            f"订单数：{order_count}\n"
-            f"合计金额：¥{total_fen / 100:.2f}\n"
-            f"账单号：{bill_id}\n"
-            f"出账时间：{now_iso}\n"
-        ),
-        "status": "issued",
-        "created_at": now_iso,
-    }
-    _MOCK_BILLS.append(bill)
-
-    logger.info("corporate.bulk_bill.created",
-                bill_id=bill_id,
-                customer_id=req.corporate_customer_id,
-                order_count=order_count,
-                total_fen=total_fen)
-
+    logger.info("corporate.bulk_bill.created", bill_no=bill_no, orders=summary.cnt, total_fen=summary.total)
     return _ok({
-        "bill_id": bill_id,
-        "company_name": customer["company_name"],
-        "billing_period_start": start_str,
-        "billing_period_end": end_str,
-        "order_count": order_count,
-        "total_fen": total_fen,
-        "status": "issued",
-        "created_at": now_iso,
+        "bill_id": str(bill_id), "bill_no": bill_no,
+        "company_name": customer.company_name,
+        "period_start": str(req.billing_period_start),
+        "period_end": str(req.billing_period_end),
+        "order_count": summary.cnt,
+        "total_amount_fen": summary.total,
+        "total_amount_yuan": round(summary.total / 100, 2),
     })
 
 
@@ -475,55 +451,41 @@ async def bulk_bill(req: BulkBillReq) -> dict:
 
 @router.get("/export", summary="对账导出（CSV）")
 async def export_reconciliation(
-    corporate_customer_id: str = Query(..., description="企业客户ID"),
-    date_from: date = Query(..., description="起始日期 YYYY-MM-DD"),
-    date_to: date = Query(..., description="截止日期 YYYY-MM-DD"),
-    fmt: str = Query("csv", alias="format", description="导出格式（目前仅支持 csv）"),
+    corporate_customer_id: str = Query(...),
+    date_from: date = Query(...),
+    date_to: date = Query(...),
+    fmt: str = Query("csv", alias="format"),
+    db: AsyncSession = Depends(_get_db),
 ) -> PlainTextResponse:
-    """
-    对账导出：返回指定时间段内企业订单的 CSV 格式账单明细。
-
-    参数：corporate_customer_id, date_from, date_to, format=csv
-    """
-    customer = _find_customer(corporate_customer_id)
-    if customer is None:
-        raise HTTPException(status_code=404,
-                            detail=f"企业客户 '{corporate_customer_id}' 不存在")
-
-    start_str = date_from.isoformat()
-    end_str = date_to.isoformat()
-
-    orders = [
-        o for o in _MOCK_ORDERS
-        if o["corporate_customer_id"] == corporate_customer_id
-        and start_str <= o["created_at"][:10] <= end_str
-    ]
+    rows = await db.execute(
+        text("""
+            SELECT o.order_no, c.company_name, o.store_id,
+                   o.original_amount_fen, o.discount_rate, o.final_amount_fen,
+                   CASE WHEN o.billed THEN 'billed' ELSE 'unbilled' END AS billing_status,
+                   o.ordered_at
+            FROM corporate_orders o
+            JOIN corporate_customers c ON c.id = o.corporate_customer_id
+            WHERE o.corporate_customer_id = :cid
+              AND o.ordered_at::date BETWEEN :start AND :end
+            ORDER BY o.ordered_at
+        """),
+        {"cid": corporate_customer_id, "start": date_from, "end": date_to},
+    )
+    orders = rows.fetchall()
 
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow([
-        "订单号", "企业名称", "门店ID",
-        "原始金额(分)", "折扣率", "实际金额(分)",
-        "账单状态", "下单时间",
-    ])
-
+    writer.writerow(["订单号", "企业名称", "门店ID", "原始金额(分)", "折扣率", "实际金额(分)", "账单状态", "下单时间"])
     for o in orders:
         writer.writerow([
-            o["id"],
-            o["company_name"],
-            o["store_id"],
-            o["original_amount_fen"],
-            o["discount_rate"],
-            o["discounted_amount_fen"],
-            o["billing_status"],
-            o["created_at"],
+            o.order_no, o.company_name, o.store_id,
+            o.original_amount_fen, o.discount_rate, o.final_amount_fen,
+            o.billing_status, str(o.ordered_at),
         ])
 
-    csv_content = output.getvalue()
-    filename = f"corporate_bill_{corporate_customer_id}_{start_str}_{end_str}.csv"
-
+    filename = f"corporate_bill_{corporate_customer_id}_{date_from}_{date_to}.csv"
     return PlainTextResponse(
-        content=csv_content,
+        content=output.getvalue(),
         media_type="text/csv; charset=utf-8",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )

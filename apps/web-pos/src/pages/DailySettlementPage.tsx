@@ -34,7 +34,7 @@ const T = {
 } as const;
 
 const BASE_OPS  = 'http://localhost:8005';
-const TENANT_ID = (window as Record<string, unknown>).__TENANT_ID__ as string | undefined || '';
+const TENANT_ID = (window as unknown as Record<string, unknown>).__TENANT_ID__ as string | undefined || '';
 
 /* ─────────────────────────────────────────
    工具函数
@@ -291,7 +291,7 @@ function buildDailyPrintText(data: DailyData): string {
 }
 
 async function callPrint(content: string): Promise<void> {
-  const w = window as Record<string, unknown>;
+  const w = window as unknown as Record<string, unknown>;
   if (typeof w.TXBridge === 'object' && w.TXBridge !== null) {
     const bridge = w.TXBridge as { print?: (s: string) => void };
     if (typeof bridge.print === 'function') {

@@ -16,17 +16,11 @@ export function LoginPage({ onLogin }: LoginPageProps) {
     try {
       const res = await fetch('/api/v1/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password }) });
       const json = await res.json();
-      if (json.ok) { localStorage.setItem('tx_token', json.data.token); localStorage.setItem('tx_user', JSON.stringify(json.data.user)); onLogin(); }
-      else { setError(json.error?.message || '登录失败'); }
-    } catch (_err) { setError('网络错误，请检查连接'); } finally { setLoading(false); }
-
       if (json.ok) {
         localStorage.setItem('tx_token', json.data.token);
         localStorage.setItem('tx_user', JSON.stringify(json.data.user));
         const u = json.data.user as { tenant_id?: string } | undefined;
-        if (u?.tenant_id) {
-          localStorage.setItem('tx_tenant_id', u.tenant_id);
-        }
+        if (u?.tenant_id) localStorage.setItem('tx_tenant_id', u.tenant_id);
         onLogin();
       } else {
         setError(json.error?.message || '登录失败');

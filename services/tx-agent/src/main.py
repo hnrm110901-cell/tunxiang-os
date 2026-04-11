@@ -33,6 +33,9 @@ from .api.skill_registry_routes import router as skill_registry_router
 from .api.skill_context_routes import router as skill_context_router
 from .api.discount_guard_enhanced_routes import router as discount_guard_enhanced_router
 from .api.agent_hub_routes import router as agent_hub_router
+from .api.ops_agent_routes import router as ops_agent_router
+from .api.autonomy_controller_routes import router as autonomy_controller_router
+from .api.agent_roi_routes import router as agent_roi_router
 from .api.ai_marketing_orchestrator_routes import router as ai_marketing_orchestrator_router  # AI营销编排 P1（v207）
 from .routers.diagnosis_router import router as diagnosis_router
 from .routers.pilot_router import router as pilot_router
@@ -169,6 +172,9 @@ app.include_router(skill_registry_router)
 app.include_router(skill_context_router)
 app.include_router(discount_guard_enhanced_router)
 app.include_router(agent_hub_router)
+app.include_router(ops_agent_router)
+app.include_router(autonomy_controller_router)
+app.include_router(agent_roi_router)
 app.include_router(ai_marketing_orchestrator_router)  # /api/v1/agent/ai-marketing/* — AI营销编排（v207）
 
 

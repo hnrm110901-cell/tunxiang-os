@@ -21,9 +21,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fetchDishes, fetchCategories, type DishItem } from '../api/menuApi';
-import { createOrder, addItem, settleOrder, createPayment } from '../api/tradeApi';
 import { printReceipt as bridgePrint, openCashBox } from '../bridge/TXBridge';
-import { printReceipt as apiPrintReceipt } from '../api/tradeApi';
 
 // ─── Design Tokens（与 CallingScreenPage 一致） ───
 const C = {
@@ -80,12 +78,12 @@ const MOCK_DISHES: DishItem[] = [
 const fen2yuan = (fen: number) => (fen / 100).toFixed(2);
 
 function getBase(): string {
-  return (window as Record<string, unknown>).__API_BASE__ as string || '';
+  return (window as unknown as Record<string, unknown>).__API_BASE__ as string || '';
 }
 
 function getTenantId(): string {
   return (
-    (window as Record<string, unknown>).__TENANT_ID__ as string
+    (window as unknown as Record<string, unknown>).__TENANT_ID__ as string
     || localStorage.getItem('tenant_id')
     || ''
   );
@@ -93,7 +91,7 @@ function getTenantId(): string {
 
 function getStoreId(): string {
   return (
-    (window as Record<string, unknown>).__STORE_ID__ as string
+    (window as unknown as Record<string, unknown>).__STORE_ID__ as string
     || localStorage.getItem('store_id')
     || import.meta.env.VITE_STORE_ID
     || ''

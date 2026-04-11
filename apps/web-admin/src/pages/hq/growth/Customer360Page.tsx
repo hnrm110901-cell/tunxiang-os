@@ -6,8 +6,10 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Card, Tag, Button, Space, Row, Col, Statistic, Table, Timeline, Spin, Descriptions, Progress, message,
-  Modal, Select, Radio,
+  Modal, Select, Radio, Tabs, List,
 } from 'antd';
+import type { TabsProps } from 'antd';
+import { BulbOutlined } from '@ant-design/icons';
 import {
   ArrowLeftOutlined, RocketOutlined, RobotOutlined, StarOutlined,
   PhoneOutlined, ShopOutlined, CrownOutlined, HeartOutlined, TrophyOutlined, ShareAltOutlined,
@@ -561,6 +563,78 @@ export function Customer360Page() {
           </Card>
         </Col>
       </Row>
+
+      {/* 🧠 AI 洞察 Tab 区域 */}
+      <Card
+        title={
+          <Tabs
+            defaultActiveKey="timeline"
+            items={[
+              { key: 'timeline', label: '经营行动时间轴' },
+              { key: 'ai-insight', label: '🧠 AI 洞察' },
+            ] as TabsProps['items']}
+            onChange={() => {}}
+            style={{ marginBottom: -16 }}
+          />
+        }
+        style={{ background: CARD_BG, border: `1px solid ${BORDER}`, marginBottom: 16 }}
+        styles={{ header: { borderBottom: `1px solid ${BORDER}`, padding: '0 24px' } }}
+      >
+        <Row gutter={16}>
+          <Col span={14}>
+            <Card
+              title={<span style={{ color: TEXT_PRIMARY }}>AI 消费预测</span>}
+              style={{ background: 'rgba(255,107,53,0.04)', border: `1px solid ${BORDER}` }}
+              styles={{ header: { borderBottom: `1px solid ${BORDER}` } }}
+            >
+              <Statistic
+                title={<span style={{ color: TEXT_SECONDARY }}>预测本月消费</span>}
+                value={2840}
+                prefix="¥"
+                valueStyle={{ color: SUCCESS_GREEN, fontWeight: 700 }}
+              />
+              <Statistic
+                title={<span style={{ color: TEXT_SECONDARY }}>预测到访次数</span>}
+                value={3}
+                suffix="次"
+                style={{ marginTop: 16 }}
+                valueStyle={{ color: INFO_BLUE, fontWeight: 700 }}
+              />
+              <Progress
+                percent={72}
+                strokeColor={BRAND_ORANGE}
+                style={{ marginTop: 16 }}
+              />
+              <div style={{ color: TEXT_SECONDARY, fontSize: 12, marginTop: 6 }}>
+                预计 2026-04-12 到访，置信度 72%
+              </div>
+            </Card>
+          </Col>
+          <Col span={10}>
+            <Card
+              title={<span style={{ color: TEXT_PRIMARY }}>个性化服务建议</span>}
+              style={{ background: 'rgba(255,107,53,0.04)', border: `1px solid ${BORDER}` }}
+              styles={{ header: { borderBottom: `1px solid ${BORDER}` } }}
+            >
+              <List
+                dataSource={[
+                  '偏好安静包厢，提前预留 VIP 包厢',
+                  '对海鲜过敏，点单时自动提示',
+                  '钻石会员，迎宾升级专属服务',
+                ]}
+                renderItem={(item) => (
+                  <List.Item style={{ padding: '8px 0' }}>
+                    <Space>
+                      <BulbOutlined style={{ color: BRAND_ORANGE }} />
+                      <span style={{ color: TEXT_PRIMARY, fontSize: 13 }}>{item}</span>
+                    </Space>
+                  </List.Item>
+                )}
+              />
+            </Card>
+          </Col>
+        </Row>
+      </Card>
 
       {/* 底部: 经营行动时间轴 */}
       <Card

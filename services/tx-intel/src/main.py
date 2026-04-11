@@ -683,6 +683,11 @@ def get_event_by_date(target_date: str) -> dict:
     return ok(result)
 
 
+# ─── 评价情感分析路由 ───
+
+from .api.sentiment_routes import router as sentiment_router
+app.include_router(sentiment_router)
+
 # ─── 健康检查 ───
 
 @app.get("/health")
@@ -700,5 +705,6 @@ def health_check() -> dict:
             "pilot_suggestion",
             "weather_signal",
             "calendar_signal",
+            "sentiment_analysis",
         ],
     })

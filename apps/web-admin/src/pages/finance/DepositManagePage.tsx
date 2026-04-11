@@ -38,6 +38,7 @@ import {
   convertDeposit,
   getDepositLedger,
   getDepositAging,
+  getDepositShiftSummary,
 } from '../../api/depositApi';
 import { txFetchData } from '../../api';
 import dayjs from 'dayjs';
@@ -108,6 +109,18 @@ export function DepositManagePage() {
   const [aging, setAging] = useState<DepositAgingItem | null>(null);
   const [agingLoading, setAgingLoading] = useState(false);
 
+  // 结班汇总数据
+  const [shiftSummary, setShiftSummary] = useState<{
+    received_count: number;
+    received_fen: number;
+    refunded_count: number;
+    refunded_fen: number;
+    net_fen: number;
+    shift_date: string;
+  } | null>(null);
+  const [shiftSummaryLoading, setShiftSummaryLoading] = useState(false);
+  const [shiftDate, setShiftDate] = useState<Dayjs>(dayjs());
+
   // 退押金 Modal
   const [refundVisible, setRefundVisible] = useState(false);
   const [refundTarget, setRefundTarget] = useState<DepositRecord | null>(null);
@@ -165,6 +178,19 @@ export function DepositManagePage() {
     }
   }, []);
 
+  // 加载结班汇总
+  const loadShiftSummary = useCallback(async (sid: string, sdate: string) => {
+    setShiftSummaryLoading(true);
+    try {
+      const data = await getDepositShiftSummary(sid, sdate);
+      setShiftSummary(data);
+    } catch (err) {
+      message.error(err instanceof Error ? err.message : '加载结班汇总失败');
+    } finally {
+      setShiftSummaryLoading(false);
+    }
+  }, []);
+
   // 加载账龄
   const loadAging = useCallback(async (sid: string) => {
     setAgingLoading(true);
@@ -184,11 +210,12 @@ export function DepositManagePage() {
     setPage(1);
     void loadRecords(storeId, 1, statusFilter);
     void loadAging(storeId);
+    void loadShiftSummary(storeId, dayjs().format('YYYY-MM-DD'));
 
     const end = dayjs().format('YYYY-MM-DD');
     const start = dayjs().subtract(30, 'day').format('YYYY-MM-DD');
     void loadLedger(storeId, start, end);
-  }, [storeId, statusFilter, loadRecords, loadAging, loadLedger]);
+  }, [storeId, statusFilter, loadRecords, loadAging, loadLedger, loadShiftSummary]);
 
   const handlePageChange = (p: number) => {
     setPage(p);
@@ -482,6 +509,84 @@ export function DepositManagePage() {
           ) : (
             <div style={{ textAlign: 'center', padding: '40px 0', color: '#B4B2A9' }}>
               {storeId ? '请选择日期范围查看台账' : '请先选择门店'}
+            </div>
+          )}
+        </Spin>
+      ),
+    },
+    {
+      key: 'shift',
+      label: '结班汇总',
+      children: (
+        <Spin spinning={shiftSummaryLoading}>
+          <div style={{ marginBottom: 16 }}>
+            <Space>
+              <DatePicker
+                value={shiftDate}
+                allowClear={false}
+                onChange={(val) => {
+                  if (val) {
+                    setShiftDate(val);
+                    if (storeId) void loadShiftSummary(storeId, val.format('YYYY-MM-DD'));
+                  }
+                }}
+              />
+              <Button
+                type="primary"
+                style={{ background: '#FF6B35', borderColor: '#FF6B35' }}
+                onClick={() => {
+                  if (!storeId) { message.warning('请先选择门店'); return; }
+                  void loadShiftSummary(storeId, shiftDate.format('YYYY-MM-DD'));
+                }}
+              >
+                查询
+              </Button>
+            </Space>
+          </div>
+          {shiftSummary ? (
+            <>
+              <Row gutter={16} style={{ marginBottom: 16 }}>
+                <Col span={8}>
+                  <Card styles={{ body: { padding: '20px 24px' } }}>
+                    <Statistic
+                      title={`本班收押金（${shiftSummary.received_count} 笔）`}
+                      value={fenToYuan(shiftSummary.received_fen)}
+                      prefix="¥"
+                      valueStyle={{ color: '#0F6E56', fontWeight: 700 }}
+                    />
+                  </Card>
+                </Col>
+                <Col span={8}>
+                  <Card styles={{ body: { padding: '20px 24px' } }}>
+                    <Statistic
+                      title={`本班退押金（${shiftSummary.refunded_count} 笔）`}
+                      value={fenToYuan(shiftSummary.refunded_fen)}
+                      prefix="¥"
+                      valueStyle={{ color: '#185FA5', fontWeight: 700 }}
+                    />
+                  </Card>
+                </Col>
+                <Col span={8}>
+                  <Card styles={{ body: { padding: '20px 24px' } }}>
+                    <Statistic
+                      title="净留存"
+                      value={fenToYuan(shiftSummary.net_fen)}
+                      prefix="¥"
+                      valueStyle={{
+                        color: shiftSummary.net_fen >= 0 ? '#0F6E56' : '#A32D2D',
+                        fontWeight: 700,
+                      }}
+                    />
+                  </Card>
+                </Col>
+              </Row>
+              <div style={{ color: '#B4B2A9', fontSize: 13 }}>
+                统计范围：{shiftSummary.shift_date} 00:00 — 23:59（北京时间）
+              </div>
+            </>
+          ) : (
+            <div style={{ textAlign: 'center', padding: '40px 0', color: '#B4B2A9' }}>
+              {storeId ? '请选择日期查看结班汇总' : '请先选择门店'}
             </div>
           )}
         </Spin>

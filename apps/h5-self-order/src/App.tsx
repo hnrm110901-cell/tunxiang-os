@@ -1,7 +1,7 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { LangProvider } from '@/i18n/LangContext';
 import ScanEntry from '@/pages/ScanEntry';
-import MenuBrowse from '@/pages/MenuBrowse';
+import TemplateRouter from '@/templates';
 import DishDetail from '@/pages/DishDetail';
 import Cart from '@/pages/Cart';
 import Checkout from '@/pages/Checkout';
@@ -15,7 +15,7 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<ScanEntry />} />
-          <Route path="/menu" element={<MenuBrowse />} />
+          <Route path="/menu" element={<TemplateRouter />} />
           <Route path="/dish/:id" element={<DishDetail />} />
           <Route path="/cart" element={<Cart />} />
           <Route path="/checkout" element={<Checkout />} />

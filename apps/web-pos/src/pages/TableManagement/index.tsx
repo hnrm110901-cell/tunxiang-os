@@ -5,7 +5,7 @@
  */
 
 import React, { useEffect, useMemo } from 'react';
-import { Segmented, Button, Space, message, Affix } from 'antd';
+import { Segmented, Button, message } from 'antd';
 import {
   BgColorsOutlined,
   UnorderedListOutlined,
@@ -45,7 +45,6 @@ export const TableManagementPage: React.FC<TableManagementPageProps> = ({
   storeId = 'store-001', // 默认门店ID，实际应从路由或上下文获取
 }) => {
   const {
-    tables,
     summary,
     viewMode,
     loading,

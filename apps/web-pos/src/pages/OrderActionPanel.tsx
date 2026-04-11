@@ -7,11 +7,11 @@ import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useOrderStore } from '../store/orderStore';
 import {
-  preBill, fireToKitchen, markServed, pauseItem, overridePrice,
-  giftOrder, returnOrder, rushOrder, modifyTableOpen, transferItem,
-  transferTable, closeTable, verifyOrder, printReceipt, verifyMember,
-  kitchenMessage, transferPayment, mergeOrders, markSoldOut, setDishLimit,
-  changeWaiter, fetchTableStatus,
+  preBill, fireToKitchen,
+  giftOrder, returnOrder, rushOrder, modifyTableOpen,
+  closeTable, verifyOrder, printReceipt, verifyMember,
+  kitchenMessage,
+  changeWaiter,
 } from '../api/posOpsApi';
 
 /* ─── 样式常量 ─── */

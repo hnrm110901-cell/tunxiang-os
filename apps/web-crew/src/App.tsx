@@ -73,6 +73,13 @@ import { CrewPointsHistoryPage } from './pages/hr/CrewPointsHistoryPage';
 import { CrewMyPayrollPage } from './pages/hr/CrewMyPayrollPage';
 import { CrewMyGrowthPage } from './pages/hr/CrewMyGrowthPage';
 import { CrewMyCompliancePage } from './pages/hr/CrewMyCompliancePage';
+// ─── Phase 3: 店长工作台 ─────────────────────────────────────────────────────
+import { OpeningChecklistPage } from './pages/manager/OpeningChecklistPage';
+import { ClosingChecklistPage } from './pages/manager/ClosingChecklistPage';
+import { DailyBriefPage } from './pages/manager/DailyBriefPage';
+import { StoreLivePage } from './pages/manager/StoreLivePage';
+import { StoreIncidentsCenterPage } from './pages/manager/StoreIncidentsCenterPage';
+import { PatrolExecutionPage } from './pages/manager/PatrolExecutionPage';
 
 const tabs = [
   { path: '/tables',   label: '桌台',   icon: 'T' },
@@ -87,7 +94,7 @@ const tabs = [
 function BottomTab() {
   const loc = useLocation();
   // 在全屏子页面中隐藏底栏
-  const hiddenPaths = ['/open-table', '/order-full', '/rush', '/table-ops', '/member', '/complaint', '/service-confirm', '/peak-alert', '/order-status', '/table-detail', '/table-side-pay', '/seat-split', '/crew-stats', '/manager-app', '/receiving', '/stocktake', '/handover', '/route-optimize', '/shift-schedule', '/dish-recognize', '/shift-summary', '/self-pay-link', '/discount-request', '/scan-pay', '/stored-value-recharge', '/printer-settings', '/waitlist', '/member-level-config', '/group-dashboard', '/store-detail', '/live-seafood', '/reservations', '/daily-settlement', '/shift-handover', '/issue-report', '/member-lookup', '/member-points', '/member/', '/approvals', '/manager-dashboard', '/urge', '/schedule-clock', '/me'];
+  const hiddenPaths = ['/open-table', '/order-full', '/rush', '/table-ops', '/member', '/complaint', '/service-confirm', '/peak-alert', '/order-status', '/table-detail', '/table-side-pay', '/seat-split', '/crew-stats', '/manager-app', '/receiving', '/stocktake', '/handover', '/route-optimize', '/shift-schedule', '/dish-recognize', '/shift-summary', '/self-pay-link', '/discount-request', '/scan-pay', '/stored-value-recharge', '/printer-settings', '/waitlist', '/member-level-config', '/group-dashboard', '/store-detail', '/live-seafood', '/reservations', '/daily-settlement', '/shift-handover', '/issue-report', '/member-lookup', '/member-points', '/member/', '/approvals', '/manager-dashboard', '/manager/', '/urge', '/schedule-clock', '/me', '/store/'];
   const shouldHide = hiddenPaths.some(p => loc.pathname.startsWith(p));
   if (shouldHide) return null;
 
@@ -192,6 +199,13 @@ export default function App() {
           <Route path="/approvals" element={<ApprovalPage />} />
           {/* 店长实时经营看板 */}
           <Route path="/manager-dashboard" element={<ManagerDashboardPage />} />
+          {/* ─── Phase 3: 店长工作台 ─── */}
+          <Route path="/manager/opening-checklist" element={<OpeningChecklistPage />} />
+          <Route path="/manager/closing-checklist" element={<ClosingChecklistPage />} />
+          <Route path="/manager/daily-brief" element={<DailyBriefPage />} />
+          <Route path="/manager/store-live" element={<StoreLivePage />} />
+          <Route path="/manager/incidents" element={<StoreIncidentsCenterPage />} />
+          <Route path="/manager/patrol" element={<PatrolExecutionPage />} />
           {/* 催菜/加菜流程 */}
           <Route path="/urge" element={<UrgePage />} />
           {/* 排班查看（Tab页） */}

@@ -14,6 +14,7 @@ import {
   Button,
   Card,
   Col,
+  Collapse,
   ConfigProvider,
   DatePicker,
   Descriptions,
@@ -71,6 +72,26 @@ interface PaymentReconcileRow {
   channel_amount_fen: number;
   diff_fen: number;
   status: ReconcileStatus;
+}
+
+/** 支付渠道对账汇总行 */
+interface ChannelSummaryRow {
+  channel: string;
+  channel_name: string;
+  transaction_count: number;
+  total_amount_fen: number;
+  fee_fen: number;
+  net_amount_fen: number;
+}
+
+/** 收银员收款统计行 */
+interface CashierReceiptRow {
+  cashier_id: string;
+  cashier_name: string;
+  shift_count: number;
+  total_amount_fen: number;
+  order_count: number;
+  channel_breakdown: Record<string, number>;
 }
 
 interface DeliveryReconcileRow {
@@ -178,6 +199,40 @@ async function fetchPaymentRows(date?: string, storeId?: string): Promise<Paymen
       `/api/v1/analytics/reconciliation?${params.toString()}`,
     );
     return data.items ?? [];
+  } catch (_e: unknown) { /* 降级空数组 */ }
+  return [];
+}
+
+/** 获取支付渠道汇总对账（真实 API） */
+async function fetchChannelSummary(
+  startDate: string,
+  endDate: string,
+  storeId?: string,
+): Promise<ChannelSummaryRow[]> {
+  try {
+    const params = new URLSearchParams({ start_date: startDate, end_date: endDate });
+    if (storeId && storeId !== 'all') params.set('store_id', storeId);
+    const data = await txFetchData<{ channels: ChannelSummaryRow[] }>(
+      `/api/v1/finance/payment-reconciliation?${params.toString()}`,
+    );
+    return data.channels ?? [];
+  } catch (_e: unknown) { /* 降级空数组 */ }
+  return [];
+}
+
+/** 获取收银员收款统计（真实 API） */
+async function fetchCashierReceipts(
+  startDate: string,
+  endDate: string,
+  storeId?: string,
+): Promise<CashierReceiptRow[]> {
+  try {
+    const params = new URLSearchParams({ start_date: startDate, end_date: endDate });
+    if (storeId && storeId !== 'all') params.set('store_id', storeId);
+    const data = await txFetchData<{ cashiers: CashierReceiptRow[] }>(
+      `/api/v1/finance/cashier-receipts?${params.toString()}`,
+    );
+    return data.cashiers ?? [];
   } catch (_e: unknown) { /* 降级空数组 */ }
   return [];
 }
@@ -341,12 +396,117 @@ function DiffDisplay({ diff_fen }: { diff_fen: number }) {
   return <Text type="secondary">0.00</Text>;
 }
 
+// ─── CSV 导出工具 ──────────────────────────────────────────────────────────────
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function exportCSV(data: any[], filename?: string) {
+  if (!data || data.length === 0) {
+    message.warning('暂无数据可导出');
+    return;
+  }
+  const csv = [
+    Object.keys(data[0]).join(','),
+    ...data.map((row) =>
+      Object.values(row)
+        .map((v) => (typeof v === 'object' ? JSON.stringify(v) : String(v ?? '')))
+        .join(','),
+    ),
+  ].join('\n');
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename ?? `支付对账_${dayjs().format('YYYYMMDD')}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ─── 收银员收款明细子面板 ──────────────────────────────────────────────────────
+
+function CashierReceiptsPanel({
+  startDate,
+  endDate,
+  storeId,
+}: {
+  startDate: string;
+  endDate: string;
+  storeId?: string;
+}) {
+  const [cashiers, setCashiers] = useState<CashierReceiptRow[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await fetchCashierReceipts(startDate, endDate, storeId);
+      setCashiers(data);
+    } finally {
+      setLoading(false);
+    }
+  }, [startDate, endDate, storeId]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const cashierColumns = [
+    { title: '收银员', dataIndex: 'cashier_name', key: 'cashier_name', width: 100 },
+    { title: '工号', dataIndex: 'cashier_id', key: 'cashier_id', width: 120 },
+    { title: '班次数', dataIndex: 'shift_count', key: 'shift_count', width: 80 },
+    { title: '收款总额(元)', dataIndex: 'total_amount_fen', key: 'total_amount_fen', width: 130,
+      render: (_: unknown, r: CashierReceiptRow) => <Text strong>{formatMoney(r.total_amount_fen)}</Text> },
+    { title: '订单数', dataIndex: 'order_count', key: 'order_count', width: 80 },
+    { title: '微信(元)', key: 'wechat', width: 110,
+      render: (_: unknown, r: CashierReceiptRow) => formatMoney(r.channel_breakdown.wechat ?? 0) },
+    { title: '支付宝(元)', key: 'alipay', width: 110,
+      render: (_: unknown, r: CashierReceiptRow) => formatMoney(r.channel_breakdown.alipay ?? 0) },
+    { title: '现金(元)', key: 'cash', width: 100,
+      render: (_: unknown, r: CashierReceiptRow) => formatMoney(r.channel_breakdown.cash ?? 0) },
+    { title: '银行卡(元)', key: 'card', width: 110,
+      render: (_: unknown, r: CashierReceiptRow) => formatMoney(r.channel_breakdown.card ?? 0) },
+    { title: '会员卡(元)', key: 'member_card', width: 110,
+      render: (_: unknown, r: CashierReceiptRow) => formatMoney(r.channel_breakdown.member_card ?? 0) },
+  ];
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
+        <Button
+          size="small"
+          icon={<DownloadOutlined />}
+          onClick={() => exportCSV(cashiers, `收银员统计_${dayjs().format('YYYYMMDD')}.csv`)}
+        >
+          导出 CSV
+        </Button>
+      </div>
+      <Table<CashierReceiptRow>
+        columns={cashierColumns}
+        dataSource={cashiers}
+        rowKey="cashier_id"
+        loading={loading}
+        pagination={{ pageSize: 10 }}
+        size="small"
+        scroll={{ x: 900 }}
+      />
+    </div>
+  );
+}
+
 // ─── Tab1: 支付对账 ────────────────────────────────────────────────────────────
 
 function PaymentReconcileTab() {
   const actionRef = useRef<ActionType>();
   const [selectedRows, setSelectedRows] = useState<PaymentReconcileRow[]>([]);
   const [manualModalOpen, setManualModalOpen] = useState(false);
+  const [channelSummaries, setChannelSummaries] = useState<ChannelSummaryRow[]>([]);
+
+  // 默认日期范围：本月 1 日 ~ 今天
+  const today = dayjs().format('YYYY-MM-DD');
+  const monthStart = dayjs().startOf('month').format('YYYY-MM-DD');
+
+  useEffect(() => {
+    fetchChannelSummary(monthStart, today).then(setChannelSummaries);
+  }, [monthStart, today]);
 
   const columns: ProColumns<PaymentReconcileRow>[] = [
     { title: '日期', dataIndex: 'date', valueType: 'date', width: 110 },
@@ -370,6 +530,17 @@ function PaymentReconcileTab() {
     { title: '状态', dataIndex: 'status', width: 100, filters: Object.entries(STATUS_CONFIG).map(([k, v]) => ({ text: v.label, value: k })), onFilter: (value, record) => record.status === value, render: (_, r) => <StatusTag status={r.status} /> },
   ];
 
+  const channelColumns = [
+    { title: '渠道', dataIndex: 'channel_name', key: 'channel_name', width: 100 },
+    { title: '笔数', dataIndex: 'transaction_count', key: 'transaction_count', width: 80 },
+    { title: '总金额(元)', dataIndex: 'total_amount_fen', key: 'total_amount_fen', width: 130,
+      render: (_: unknown, r: ChannelSummaryRow) => <Text strong>{formatMoney(r.total_amount_fen)}</Text> },
+    { title: '手续费(元)', dataIndex: 'fee_fen', key: 'fee_fen', width: 120,
+      render: (_: unknown, r: ChannelSummaryRow) => <Text type="warning">{formatMoney(r.fee_fen)}</Text> },
+    { title: '净收(元)', dataIndex: 'net_amount_fen', key: 'net_amount_fen', width: 120,
+      render: (_: unknown, r: ChannelSummaryRow) => <Text style={{ color: '#52c41a' }}>{formatMoney(r.net_amount_fen)}</Text> },
+  ];
+
   const handleManualReconcile = async (values: { reason: string }) => {
     message.success(`已手动对账 ${selectedRows.length} 条记录，原因: ${values.reason}`);
     setSelectedRows([]);
@@ -379,7 +550,31 @@ function PaymentReconcileTab() {
   };
 
   return (
-    <>
+    <Space direction="vertical" size={16} style={{ width: '100%' }}>
+      {/* 渠道汇总统计卡片 */}
+      <Card
+        title="本月支付渠道汇总"
+        size="small"
+        extra={
+          <Button
+            size="small"
+            icon={<DownloadOutlined />}
+            onClick={() => exportCSV(channelSummaries, `渠道汇总_${dayjs().format('YYYYMMDD')}.csv`)}
+          >
+            导出 CSV
+          </Button>
+        }
+      >
+        <Table<ChannelSummaryRow>
+          columns={channelColumns}
+          dataSource={channelSummaries}
+          rowKey="channel"
+          pagination={false}
+          size="small"
+        />
+      </Card>
+
+      {/* 逐笔明细 ProTable */}
       <ProTable<PaymentReconcileRow>
         actionRef={actionRef}
         columns={columns}
@@ -395,6 +590,16 @@ function PaymentReconcileTab() {
         toolbar={{
           actions: [
             <Button
+              key="export"
+              icon={<DownloadOutlined />}
+              onClick={async () => {
+                const data = await fetchPaymentRows();
+                exportCSV(data, `支付对账明细_${dayjs().format('YYYYMMDD')}.csv`);
+              }}
+            >
+              导出 CSV
+            </Button>,
+            <Button
               key="manual"
               type="primary"
               disabled={selectedRows.filter((r) => r.status !== 'matched').length === 0}
@@ -409,6 +614,23 @@ function PaymentReconcileTab() {
         dateFormatter="string"
         headerTitle="支付对账明细"
       />
+
+      {/* 收银员收款明细折叠面板 */}
+      <Collapse
+        items={[
+          {
+            key: 'cashier',
+            label: '收银员收款明细',
+            children: (
+              <CashierReceiptsPanel
+                startDate={monthStart}
+                endDate={today}
+              />
+            ),
+          },
+        ]}
+      />
+
       <ModalForm
         title="手动对账"
         open={manualModalOpen}
@@ -427,7 +649,7 @@ function PaymentReconcileTab() {
           fieldProps={{ rows: 3 }}
         />
       </ModalForm>
-    </>
+    </Space>
   );
 }
 

@@ -352,7 +352,7 @@ export function DepositPosPage() {
   };
 
   // ── 押金抵消费 状态 ────────────────────────────────────────────────────────
-  const [convertSearchId, setConvertSearchId] = useState('');
+  const [_convertSearchId, _setConvertSearchId] = useState('');
   const [convertSearchLoading, setConvertSearchLoading] = useState(false);
   const [convertDeposits, setConvertDeposits] = useState<DepositRecord[]>([]);
   const [convertSelected, setConvertSelected] = useState<DepositRecord | null>(null);

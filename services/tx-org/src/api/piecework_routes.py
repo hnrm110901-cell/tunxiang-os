@@ -20,7 +20,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime, timezone
+from datetime import date, datetime
 from typing import Any
 
 import structlog
@@ -53,6 +53,19 @@ async def _set_rls(db: AsyncSession, tenant_id: str) -> None:
     """设置 RLS session 变量。"""
     await db.execute(text("SELECT set_config('app.tenant_id', :tid, TRUE)"),
                      {"tid": tenant_id})
+
+
+def _serialize_row(row: Any) -> dict[str, Any]:
+    """将 DB 行转为可 JSON 序列化的 dict（UUID→str, datetime→isoformat, date→str）。"""
+    d = dict(row._mapping)
+    for k, v in d.items():
+        if isinstance(v, uuid.UUID):
+            d[k] = str(v)
+        elif isinstance(v, datetime):
+            d[k] = v.isoformat()
+        elif isinstance(v, date):
+            d[k] = str(v)
+    return d
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -116,67 +129,6 @@ class RecordCreate(BaseModel):
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# MOCK 数据辅助（DB不可用时保障端点不崩溃）
-# ──────────────────────────────────────────────────────────────────────────────
-
-_MOCK_ZONES = [
-    {"id": "00000000-0000-0000-0000-000000000001", "name": "热菜区",
-     "store_id": None, "description": "所有热菜岗位", "is_active": True},
-    {"id": "00000000-0000-0000-0000-000000000002", "name": "凉菜区",
-     "store_id": None, "description": "凉菜/卤味岗位", "is_active": True},
-    {"id": "00000000-0000-0000-0000-000000000003", "name": "传菜组",
-     "store_id": None, "description": "传菜员计件区域", "is_active": True},
-]
-
-_MOCK_SCHEMES = [
-    {"id": "00000000-0000-0000-0000-000000000010",
-     "name": "热菜厨师计件方案", "calc_type": "by_dish",
-     "applicable_role": "chef", "is_active": True,
-     "effective_date": "2026-01-01"},
-    {"id": "00000000-0000-0000-0000-000000000011",
-     "name": "传菜员计件方案", "calc_type": "by_dish",
-     "applicable_role": "runner", "is_active": True,
-     "effective_date": "2026-01-01"},
-]
-
-_MOCK_STORE_STATS = [
-    {"employee_id": "emp-001", "employee_name": "张小厨",
-     "total_fee_fen": 32000, "total_quantity": 64, "record_count": 8},
-    {"employee_id": "emp-002", "employee_name": "李传菜",
-     "total_fee_fen": 18500, "total_quantity": 37, "record_count": 5},
-]
-
-_MOCK_EMPLOYEE_STATS = [
-    {"dish_name": "红烧肉", "total_quantity": 20, "unit_fee_fen": 200,
-     "total_fee_fen": 4000},
-    {"dish_name": "清蒸鲈鱼", "total_quantity": 15, "unit_fee_fen": 300,
-     "total_fee_fen": 4500},
-]
-
-_MOCK_BY_DISH = [
-    {"dish_name": "红烧肉", "total_quantity": 85, "total_fee_fen": 17000, "rank": 1},
-    {"dish_name": "清蒸鲈鱼", "total_quantity": 60, "total_fee_fen": 18000, "rank": 2},
-    {"dish_name": "水煮鱼", "total_quantity": 55, "total_fee_fen": 11000, "rank": 3},
-    {"dish_name": "夫妻肺片", "total_quantity": 48, "total_fee_fen": 7200, "rank": 4},
-    {"dish_name": "宫保鸡丁", "total_quantity": 42, "total_fee_fen": 6300, "rank": 5},
-]
-
-_MOCK_DAILY_REPORT = {
-    "date": str(date.today()),
-    "total_fee_fen": 128000,
-    "total_quantity": 320,
-    "participant_count": 12,
-    "top5": [
-        {"rank": 1, "employee_name": "张小厨", "total_fee_fen": 32000, "quantity": 64},
-        {"rank": 2, "employee_name": "王大厨", "total_fee_fen": 28500, "quantity": 57},
-        {"rank": 3, "employee_name": "李传菜", "total_fee_fen": 18500, "quantity": 37},
-        {"rank": 4, "employee_name": "赵二厨", "total_fee_fen": 16000, "quantity": 32},
-        {"rank": 5, "employee_name": "陈凉菜", "total_fee_fen": 14000, "quantity": 28},
-    ],
-}
-
-
-# ──────────────────────────────────────────────────────────────────────────────
 # 区域管理
 # ──────────────────────────────────────────────────────────────────────────────
 
@@ -204,10 +156,10 @@ async def list_zones(
             "active": is_active,
             "store_id": str(store_id) if store_id else None,
         })
-        items = [dict(r._mapping) for r in rows]
+        items = [_serialize_row(r) for r in rows]
     except SQLAlchemyError as exc:
-        logger.warning("piecework.zones.list.db_error", error=str(exc))
-        items = _MOCK_ZONES
+        logger.error("piecework.zones.list.db_error", error=str(exc))
+        raise _err(f"查询计件区域失败：{exc}", 500) from exc
 
     return _ok({"items": items, "total": len(items)})
 
@@ -349,10 +301,10 @@ async def list_schemes(
             "zone_id": str(zone_id) if zone_id else None,
             "role": applicable_role,
         })
-        items = [dict(r._mapping) for r in rows]
+        items = [_serialize_row(r) for r in rows]
     except SQLAlchemyError as exc:
-        logger.warning("piecework.schemes.list.db_error", error=str(exc))
-        items = _MOCK_SCHEMES
+        logger.error("piecework.schemes.list.db_error", error=str(exc))
+        raise _err(f"查询计件方案失败：{exc}", 500) from exc
 
     return _ok({"items": items, "total": len(items)})
 
@@ -437,15 +389,15 @@ async def get_scheme(
             WHERE scheme_id = :sid AND tenant_id = :tid
             ORDER BY created_at
         """), {"sid": str(scheme_id), "tid": x_tenant_id})
-        items = [dict(r._mapping) for r in items_row]
+        items = [_serialize_row(r) for r in items_row]
 
-        result = dict(scheme._mapping)
+        result = _serialize_row(scheme)
         result["items"] = items
     except HTTPException:
         raise
     except SQLAlchemyError as exc:
-        logger.warning("piecework.scheme.get.db_error", error=str(exc))
-        result = {**_MOCK_SCHEMES[0], "items": _MOCK_EMPLOYEE_STATS}
+        logger.error("piecework.scheme.get.db_error", error=str(exc))
+        raise _err(f"查询方案详情失败：{exc}", 500) from exc
 
     return _ok(result)
 
@@ -584,10 +536,10 @@ async def stats_store(
             "start_dt": start_date,
             "end_dt": end_date,
         })
-        items = [dict(r._mapping) for r in rows]
+        items = [_serialize_row(r) for r in rows]
     except SQLAlchemyError as exc:
-        logger.warning("piecework.stats.store.db_error", error=str(exc))
-        items = _MOCK_STORE_STATS
+        logger.error("piecework.stats.store.db_error", error=str(exc))
+        raise _err(f"查询门店统计失败：{exc}", 500) from exc
 
     return _ok({
         "store_id": str(store_id),
@@ -628,10 +580,10 @@ async def stats_employee(
             "start_dt": start_date,
             "end_dt": end_date,
         })
-        items = [dict(r._mapping) for r in rows]
+        items = [_serialize_row(r) for r in rows]
     except SQLAlchemyError as exc:
-        logger.warning("piecework.stats.employee.db_error", error=str(exc))
-        items = _MOCK_EMPLOYEE_STATS
+        logger.error("piecework.stats.employee.db_error", error=str(exc))
+        raise _err(f"查询员工统计失败：{exc}", 500) from exc
 
     return _ok({
         "employee_id": str(employee_id),
@@ -670,10 +622,10 @@ async def stats_by_dish(
             "store_id": str(store_id),
             "query_date": query_date,
         })
-        items = [dict(r._mapping) for r in rows]
+        items = [_serialize_row(r) for r in rows]
     except SQLAlchemyError as exc:
-        logger.warning("piecework.stats.by_dish.db_error", error=str(exc))
-        items = _MOCK_BY_DISH
+        logger.error("piecework.stats.by_dish.db_error", error=str(exc))
+        raise _err(f"查询品项统计失败：{exc}", 500) from exc
 
     return _ok({
         "store_id": str(store_id),
@@ -695,9 +647,9 @@ async def daily_report(
         await _set_rls(db, x_tenant_id)
         summary_row = await db.execute(text("""
             SELECT
-                SUM(total_fee_fen)  AS total_fee_fen,
-                SUM(quantity)       AS total_quantity,
-                COUNT(DISTINCT employee_id) AS participant_count
+                COALESCE(SUM(total_fee_fen), 0)  AS total_fee_fen,
+                COALESCE(SUM(quantity), 0)       AS total_quantity,
+                COUNT(DISTINCT employee_id)      AS participant_count
             FROM piecework_records
             WHERE tenant_id  = :tid
               AND store_id   = :store_id
@@ -719,7 +671,7 @@ async def daily_report(
             ORDER BY total_fee_fen DESC
             LIMIT 5
         """), {"tid": x_tenant_id, "store_id": str(store_id), "report_date": report_date})
-        top5 = [dict(r._mapping) for r in top5_rows]
+        top5 = [_serialize_row(r) for r in top5_rows]
 
         data = {
             "date": str(report_date),
@@ -730,7 +682,7 @@ async def daily_report(
             "top5": top5,
         }
     except SQLAlchemyError as exc:
-        logger.warning("piecework.daily_report.db_error", error=str(exc))
-        data = {**_MOCK_DAILY_REPORT, "date": str(report_date), "store_id": str(store_id)}
+        logger.error("piecework.daily_report.db_error", error=str(exc))
+        raise _err(f"查询日报数据失败：{exc}", 500) from exc
 
     return _ok(data)

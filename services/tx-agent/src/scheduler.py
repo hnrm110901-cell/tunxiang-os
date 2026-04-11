@@ -98,6 +98,44 @@ AGENT_SCHEDULES: dict[str, dict[str, Any]] = {
         "task": "push_evening_recap",
         "description": "晚推经营简报",
     },
+    # ─── 运营专项Agent定时任务 ───
+    "closing_pre_check": {
+        "hour": 21,
+        "minute": 30,
+        "task": "closing_pre_check_all_stores",
+        "description": "闭店预检（闭店前30分钟）：未结单/未闭班/现金差异检测",
+    },
+    "closing_daily_brief": {
+        "hour": 22,
+        "minute": 30,
+        "task": "generate_closing_reports",
+        "description": "生成闭店报告 + AI经营日报",
+    },
+    "billing_daily_audit": {
+        "hour": 23,
+        "minute": 0,
+        "task": "billing_daily_risk_scan",
+        "description": "收银异常日终审计：反结账/漏单/挂账超期汇总",
+    },
+}
+
+# ─── 高频定时任务（秒级间隔，需要独立调度器运行） ───
+
+INTERVAL_SCHEDULES: dict[str, dict[str, Any]] = {
+    "kitchen_overtime_scan": {
+        "interval_seconds": 60,
+        "task": "scan_kitchen_overtime_items",
+        "description": "后厨超时扫描：每60秒检测所有门店的超时出餐项",
+        "agent_id": "kitchen_overtime",
+        "action": "scan_overtime_items",
+    },
+    "queue_wait_update": {
+        "interval_seconds": 120,
+        "task": "update_queue_wait_predictions",
+        "description": "排队等位时间更新：每2分钟刷新所有门店的等位预测",
+        "agent_id": "queue_seating",
+        "action": "predict_wait_time",
+    },
 }
 
 # 所有调度必须包含的字段

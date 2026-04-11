@@ -3,20 +3,28 @@
 负责 dining_sessions 的完整生命周期管理：
   开台 / 查询 / 桌台大板 / 状态迁移 / 转台 / 并台 / 买单 / 结账 / 清台 / VIP识别
 
+v186新增：开台时自动关联当前营业市别（market_session_id）
+
 统一响应格式: {"ok": bool, "data": {}, "error": {}}
 所有接口需 X-Tenant-ID header。
 """
 from __future__ import annotations
 
+import asyncio
 import uuid
+from datetime import datetime, time
 from typing import Optional
 
+import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field, field_validator
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
 from ..services.dining_session_service import DiningSessionService
+
+logger = structlog.get_logger(__name__)
 
 router = APIRouter(prefix="/api/v1/dining-sessions", tags=["dining-sessions"])
 
@@ -146,7 +154,91 @@ async def open_table(
         )
     except ValueError as exc:
         _err(str(exc), code=409 if "已有活跃会话" in str(exc) else 400)
+
+    # v186：开台后自动关联当前营业市别（后台异步，不阻塞开台响应）
+    session_id_for_market = session.get("id") if isinstance(session, dict) else getattr(session, "id", None)
+    if session_id_for_market:
+        asyncio.create_task(
+            _bind_market_session(db, tid, str(body.store_id), str(session_id_for_market))
+        )
+
     return _ok(session)
+
+
+async def _get_current_market_session_id(
+    db: AsyncSession,
+    tenant_id: str,
+    store_id: str,
+) -> Optional[str]:
+    """查询当前时间所在的营业市别ID（优先门店配置，无则查集团模板）"""
+    await db.execute(
+        text("SELECT set_config('app.tenant_id', :tid, TRUE)"), {"tid": tenant_id}
+    )
+    now_time = datetime.now().time()
+
+    def _in_session(start: time, end: time) -> bool:
+        if start <= end:
+            return start <= now_time < end
+        return now_time >= start or now_time < end
+
+    # 1. 门店自定义配置
+    store_rows = (await db.execute(
+        text("""
+            SELECT id, start_time, end_time
+            FROM store_market_sessions
+            WHERE tenant_id = :tid AND store_id = :sid AND is_active = TRUE
+        """),
+        {"tid": tenant_id, "sid": store_id},
+    )).fetchall()
+
+    for row in store_rows:
+        st = row.start_time if isinstance(row.start_time, time) else datetime.strptime(str(row.start_time), "%H:%M:%S").time()
+        et = row.end_time if isinstance(row.end_time, time) else datetime.strptime(str(row.end_time), "%H:%M:%S").time()
+        if _in_session(st, et):
+            return str(row.id)
+
+    # 2. 集团模板
+    tmpl_rows = (await db.execute(
+        text("""
+            SELECT id, start_time, end_time
+            FROM market_session_templates
+            WHERE tenant_id = :tid AND is_active = TRUE
+            ORDER BY display_order, start_time
+        """),
+        {"tid": tenant_id},
+    )).fetchall()
+
+    for row in tmpl_rows:
+        st = row.start_time if isinstance(row.start_time, time) else datetime.strptime(str(row.start_time), "%H:%M:%S").time()
+        et = row.end_time if isinstance(row.end_time, time) else datetime.strptime(str(row.end_time), "%H:%M:%S").time()
+        if _in_session(st, et):
+            return str(row.id)
+
+    return None
+
+
+async def _bind_market_session(
+    db: AsyncSession,
+    tenant_id: str,
+    store_id: str,
+    session_id: str,
+) -> None:
+    """开台后台任务：查询当前市别并写入 dining_sessions.market_session_id"""
+    try:
+        market_session_id = await _get_current_market_session_id(db, tenant_id, store_id)
+        if market_session_id:
+            await db.execute(
+                text("UPDATE dining_sessions SET market_session_id = :msid WHERE id = :sid"),
+                {"msid": market_session_id, "sid": session_id},
+            )
+            await db.commit()
+            logger.info(
+                "market_session_bound",
+                dining_session_id=session_id,
+                market_session_id=market_session_id,
+            )
+    except Exception as exc:  # noqa: BLE001 - 市别关联失败不影响已完成的开台
+        logger.warning("market_session_bind_failed", error=str(exc), dining_session_id=session_id)
 
 
 @router.get("/board", summary="桌台大板")

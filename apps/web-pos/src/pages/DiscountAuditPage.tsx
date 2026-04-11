@@ -93,7 +93,7 @@ function formatAmount(val: string): string {
   return `¥${parseFloat(val).toFixed(2)}`;
 }
 
-const STORE_ID = (window as Record<string, unknown>).STORE_ID as string | undefined;
+const STORE_ID = (window as unknown as Record<string, unknown>).STORE_ID as string | undefined;
 
 export function DiscountAuditPage() {
   const [period, setPeriod] = useState<Period>('today');
@@ -119,7 +119,7 @@ export function DiscountAuditPage() {
   async function fetchData() {
     setLoading(true);
     try {
-      const tenantId = (window as Record<string, unknown>).TENANT_ID as string ?? '';
+      const tenantId = (window as unknown as Record<string, unknown>).TENANT_ID as string ?? '';
       const headers = { 'X-Tenant-ID': tenantId };
 
       const params = new URLSearchParams({ period, store_id: STORE_ID ?? '' });

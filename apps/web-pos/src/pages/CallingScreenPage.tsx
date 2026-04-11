@@ -64,12 +64,12 @@ const ORDER_TYPE_COLOR: Record<string, string> = {
 // ─── API ───
 
 function getBase(): string {
-  return (window as Record<string, unknown>).__API_BASE__ as string || '';
+  return (window as unknown as Record<string, unknown>).__API_BASE__ as string || '';
 }
 
 function getTenantId(): string {
   return (
-    (window as Record<string, unknown>).__TENANT_ID__ as string
+    (window as unknown as Record<string, unknown>).__TENANT_ID__ as string
     || localStorage.getItem('tenant_id')
     || ''
   );
@@ -77,7 +77,7 @@ function getTenantId(): string {
 
 function getStoreId(): string {
   return (
-    (window as Record<string, unknown>).__STORE_ID__ as string
+    (window as unknown as Record<string, unknown>).__STORE_ID__ as string
     || localStorage.getItem('store_id')
     || import.meta.env.VITE_STORE_ID
     || ''

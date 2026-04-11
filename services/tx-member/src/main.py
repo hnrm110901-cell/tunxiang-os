@@ -38,6 +38,9 @@ from api.points_routes import router as points_router
 from api.premium_card_routes import router as premium_card_router
 from api.premium_membership_card_routes import router as premium_membership_router  # Y-D7 付费会员卡产品化
 from api.golden_id_routes import router as golden_id_router  # Y-D9 全渠道 Golden ID 映射
+from api.cross_brand_member_routes import router as cross_brand_router  # 跨品牌会员智能
+from api.recommendation_routes import router as recommendation_router  # 实时推荐引擎
+from api.subscription_routes import router as subscription_router  # 付费会员订阅
 from api.rfm_routes import router as rfm_router
 from api.smart_dispatch_routes import router as smart_dispatch_router
 from api.stamp_card_routes import router as stamp_card_router
@@ -200,6 +203,9 @@ app.include_router(member_level_router)
 app.include_router(member_insight_router)
 app.include_router(gdpr_router)  # Y-L6 GDPR 删除/导出请求工作流
 app.include_router(golden_id_router)  # Y-D9 全渠道 Golden ID 映射
+app.include_router(cross_brand_router)  # 跨品牌会员智能
+app.include_router(recommendation_router)  # 实时推荐引擎
+app.include_router(subscription_router)  # 付费会员订阅
 
 
 @app.get("/health")

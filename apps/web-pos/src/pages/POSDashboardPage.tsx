@@ -34,6 +34,8 @@ const shortcuts = [
   { label: '排队', path: '/queue', icon: '[Q]', color: '#13c2c2' },
   { label: '报表', path: '/reports', icon: '[G]', color: '#52c41a' },
   { label: '快速收银', path: '/quick-cashier', icon: '[$]', color: '#FF6B35' },
+  { label: '吧台盘点', path: '/bar-counter', icon: '[📦]', color: '#0F6E56' },
+  { label: '存酒管理', path: '/wine-storage', icon: '[🍷]', color: '#722ED1' },
   { label: '设置', path: '/settings', icon: '[⚙]', color: '#8899A6' },
 ];
 

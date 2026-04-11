@@ -470,6 +470,7 @@ function AgentGridTab({
         onClose={() => setDrawerOpen(false)}
       >
         {selectedAgent && (
+          <>
           <Tabs
             defaultActiveKey="info"
             items={[
@@ -573,6 +574,7 @@ function AgentGridTab({
               手动触发（测试）
             </Button>
           </div>
+          </>
         )}
       </Drawer>
     </>

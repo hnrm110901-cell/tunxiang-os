@@ -78,6 +78,43 @@ CORE_AGENTS = [
         "service": "tx-brain",
         "description": "生成每日经营简报，发现经营异常，回答自然语言问题",
     },
+    # ─── 运营专项Agent ───
+    {
+        "id": "queue_seating",
+        "name": "排位智能",
+        "name_en": "Queue & Seating Agent",
+        "emoji": "🪑",
+        "color": "#7C3AED",
+        "service": "tx-agent",
+        "description": "智能排队叫号、台型匹配、等位预测、VIP优先、高峰分流",
+    },
+    {
+        "id": "kitchen_overtime",
+        "name": "后厨超时监控",
+        "name_en": "Kitchen Overtime Agent",
+        "emoji": "⏱️",
+        "color": "#DC2626",
+        "service": "tx-agent",
+        "description": "出餐超时检测、催菜调度、瓶颈档口识别、超时根因分析",
+    },
+    {
+        "id": "billing_anomaly",
+        "name": "收银异常检测",
+        "name_en": "Billing Anomaly Agent",
+        "emoji": "💳",
+        "color": "#D97706",
+        "service": "tx-agent",
+        "description": "反结账检测、漏单检测、支付异常、挂账超期、班次差异",
+    },
+    {
+        "id": "closing_ops",
+        "name": "闭店守护",
+        "name_en": "Closing Operations Agent",
+        "emoji": "🌙",
+        "color": "#4338CA",
+        "service": "tx-agent",
+        "description": "闭店预检、未结单提醒、日结校验、检查单追踪、异常上报",
+    },
 ]
 
 

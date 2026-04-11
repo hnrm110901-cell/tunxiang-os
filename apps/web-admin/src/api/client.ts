@@ -96,6 +96,10 @@ export async function apiPatch<T>(path: string, body?: unknown): Promise<T> {
   });
 }
 
+/** 兼容别名 */
+export { TxApiError as ApiError };
+export type ApiRequestOptions = RequestInit;
+
 /** 通用请求（兼容旧调用），返回完整 TxResponse */
 export async function apiRequest<T>(path: string, options?: RequestInit): Promise<TxResponse<T>> {
   return txFetch<T>(path, options);

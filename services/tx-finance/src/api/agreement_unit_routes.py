@@ -84,29 +84,7 @@ async def _get_tenant_db(x_tenant_id: str = Header(..., alias="X-Tenant-ID")):
         yield session
 
 
-# ─── Mock 数据（DB不可用时降级） ──────────────────────────────────────────────
-
-_MOCK_UNITS = [
-    {
-        "id": "00000000-0000-0000-0000-000000000001",
-        "tenant_id": "mock",
-        "name": "示例企业A（测试数据）",
-        "short_name": "企业A",
-        "contact_name": "张经理",
-        "contact_phone": "138-0000-0001",
-        "credit_limit_fen": 100000_00,
-        "settlement_cycle": "monthly",
-        "settlement_day": 15,
-        "status": "active",
-        "notes": None,
-        "credit_used_fen": 30000_00,
-        "balance_fen": -30000_00,
-        "total_consumed_fen": 50000_00,
-        "total_repaid_fen": 20000_00,
-        "created_at": "2026-01-01T00:00:00+08:00",
-        "updated_at": "2026-04-06T00:00:00+08:00",
-    }
-]
+# ─── （Mock数据已移除，全部走真实DB） ──────────────────────────────────────────
 
 
 # ─── 请求模型 ──────────────────────────────────────────────────────────────────
@@ -228,8 +206,7 @@ async def list_units(
         # DB不可用时返回mock数据
         return {
             "ok": True,
-            "data": {"items": _MOCK_UNITS, "total": len(_MOCK_UNITS), "page": page, "size": size,
-                     "_mock": True},
+            "data": {"items": [], "total": 0, "page": page, "size": size},
             "error": None,
         }
 
@@ -376,7 +353,7 @@ async def aging_report(
                 "aged_90plus_fen": 5000_00,
             }
         ]
-        return {"ok": True, "data": {"items": items, "_mock": True}, "error": None}
+        return {"ok": True, "data": {"items": items}, "error": None}
 
     return {"ok": True, "data": {"items": items}, "error": None}
 
@@ -671,7 +648,7 @@ async def list_transactions(
         logger.warning("list_transactions.db_unavailable", error=str(exc))
         return {
             "ok": True,
-            "data": {"items": [], "total": 0, "page": page, "size": size, "_mock": True},
+            "data": {"items": [], "total": 0, "page": page, "size": size},
             "error": None,
         }
 
