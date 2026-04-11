@@ -168,6 +168,7 @@ DELIVERY_QUESTIONS: list[dict] = [
         "choices_display": ["不管理库存", "管理原料库存", "管理原料+半成品"],
         "required": True,
         "default": "ingredient",
+        "hint": "选择库存管理的精细度。管理原料库存可启用损耗预警和自动补货建议",
     },
     # === 人员 ===
     {
@@ -275,7 +276,7 @@ def _build_config_package(session: OnboardingSession) -> dict:
     })
 
     # 写入 tenant_id（来自会话）
-    pkg_dict = pkg.model_dump()
+    pkg_dict = pkg.model_dump(mode="json")  # datetime → ISO string
     pkg_dict["tenant_id"] = session.tenant_id
     return pkg_dict
 

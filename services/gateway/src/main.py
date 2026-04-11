@@ -31,6 +31,7 @@ from .sync_scheduler import create_sync_scheduler, sync_router as sync_health_ro
 from .response import ok
 from .api.onboarding_routes import router as onboarding_router
 from .api.config_health_routes import router as config_health_router
+from .api.migration_routes import router as migration_router
 
 app = FastAPI(title="TunxiangOS Gateway", version="3.0.0", description="AI-Native Restaurant Chain Operating System")
 
@@ -193,6 +194,9 @@ app.include_router(onboarding_router)
 
 # 配置健康度检查 API（上线前门控，score ≥ 90 才允许上线）
 app.include_router(config_health_router)
+
+# 天财商龙迁移 API（菜品/会员/配置映射 + 储值审核）
+app.include_router(migration_router)
 
 # 域路由代理（通配路由 /api/v1/{domain}/{path}，放最后）
 app.include_router(proxy_router)
