@@ -21,6 +21,8 @@
 """
 from __future__ import annotations
 
+import hashlib
+import json
 import os
 import time
 import uuid
@@ -29,6 +31,7 @@ from typing import Any, Optional
 
 import httpx
 import structlog
+from sqlalchemy import text
 
 from ..base import AgentResult, SkillAgent
 
@@ -509,14 +512,38 @@ class AiMarketingOrchestratorAgent(SkillAgent):
         if cooldown_hours == 0:
             return {"ok": True}
 
-        # 生产环境通过 marketing_touch_log 表查询最近触达时间
-        # 当前实现：mock 通过（测试时可 patch）
-        logger.debug(
-            "cooldown_check",
-            member_id=member_id,
-            action_type=action_type,
-            cooldown_hours=cooldown_hours,
-        )
+        if self._db is not None and member_id:
+            try:
+                await self._db.execute(
+                    text("SELECT set_config('app.tenant_id', :tid, true)"),
+                    {"tid": str(self.tenant_id)},
+                )
+                row = await self._db.execute(
+                    text("""
+                        SELECT COUNT(*) FROM marketing_touch_log
+                        WHERE tenant_id = :tenant_id::uuid
+                          AND member_id = :member_id::uuid
+                          AND campaign_type = :campaign_type
+                          AND sent_at > NOW() - (:hours || ' hours')::interval
+                          AND NOT is_deleted
+                    """),
+                    {
+                        "tenant_id": str(self.tenant_id),
+                        "member_id": member_id,
+                        "campaign_type": action_type,
+                        "hours": cooldown_hours,
+                    },
+                )
+                count = row.scalar()
+                if count and count > 0:
+                    return {
+                        "ok": False,
+                        "reason": f"冷却期内（{cooldown_hours}h）：最近已触达，跳过",
+                    }
+            except (ValueError, OSError) as exc:
+                logger.warning("cooldown_check_db_error", error=str(exc), action_type=action_type)
+
+        logger.debug("cooldown_check", member_id=member_id, action_type=action_type, cooldown_hours=cooldown_hours)
         return {"ok": True, "cooldown_hours": cooldown_hours}
 
     async def _check_marketing_constraints(
@@ -603,8 +630,11 @@ class AiMarketingOrchestratorAgent(SkillAgent):
         campaign_type: str,
         ref_id: str,
     ) -> dict[str, Any]:
-        """通过 tx-growth 渠道引擎发送消息"""
+        """通过 tx-growth 渠道引擎发送消息，并写入 marketing_touch_log"""
         touch_id = f"touch_{uuid.uuid4().hex[:12]}"
+        send_status = "queued"
+        message_id: Optional[str] = None
+
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
                 resp = await client.post(
@@ -620,18 +650,68 @@ class AiMarketingOrchestratorAgent(SkillAgent):
                     },
                 )
                 if resp.status_code == 200:
-                    return resp.json().get("data", {"touch_id": touch_id, "status": "sent"})
+                    data = resp.json().get("data", {})
+                    send_status = data.get("status", "sent")
+                    message_id = data.get("message_id")
+                    send_result = data if data else {"touch_id": touch_id, "status": "sent"}
+                else:
+                    send_result = {"touch_id": touch_id, "status": "queued"}
         except (httpx.ConnectError, httpx.TimeoutException) as exc:
             logger.warning("growth_channel_unavailable", touch_id=touch_id, error=str(exc))
+            send_status = "queued"
+            send_result = {"touch_id": touch_id, "status": "queued", "channels": channels}
 
-        # 降级：记录为待发送
+        # Write touch log to DB if session available
+        if self._db is not None:
+            # Build content_hash for dedup
+            content_preview = content.get("preview", "")
+            content_hash = hashlib.sha256(
+                f"{member_id}:{campaign_type}:{content_preview}".encode()
+            ).hexdigest()[:64]
+
+            try:
+                await self._db.execute(
+                    text("SELECT set_config('app.tenant_id', :tid, true)"),
+                    {"tid": str(self.tenant_id)},
+                )
+                primary_channel = channels[0] if channels else "unknown"
+                await self._db.execute(
+                    text("""
+                        INSERT INTO marketing_touch_log
+                          (tenant_id, member_id, channel, campaign_type,
+                           message_id, content_hash, status, sent_at, metadata_json)
+                        VALUES
+                          (:tenant_id::uuid,
+                           CASE WHEN :member_id = '' THEN NULL ELSE :member_id::uuid END,
+                           :channel, :campaign_type,
+                           :message_id, :content_hash,
+                           :status, NOW(),
+                           :metadata::jsonb)
+                    """),
+                    {
+                        "tenant_id": str(self.tenant_id),
+                        "member_id": member_id,
+                        "channel": primary_channel,
+                        "campaign_type": campaign_type,
+                        "message_id": message_id or touch_id,
+                        "content_hash": content_hash,
+                        "status": send_status,
+                        "metadata": json.dumps({"touch_id": touch_id, "ref_id": ref_id, "all_channels": channels}),
+                    },
+                )
+                await self._db.commit()
+            except (ValueError, OSError) as exc:
+                logger.warning("touch_log_write_error", touch_id=touch_id, error=str(exc))
+                # Don't fail the dispatch because of log write failure
+
         logger.info(
-            "message_queued_for_retry",
+            "message_dispatched",
             touch_id=touch_id,
             member_id=member_id,
             campaign_type=campaign_type,
+            status=send_status,
         )
-        return {"touch_id": touch_id, "status": "queued", "channels": channels}
+        return send_result
 
 
 # ─────────────────────────────────────────────────────────────────────────────

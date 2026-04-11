@@ -16,6 +16,8 @@ from typing import Any, Optional
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, ConfigDict
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = structlog.get_logger(__name__)
 router = APIRouter(prefix="/api/v1/agent/ai-marketing", tags=["ai-marketing"])
@@ -25,6 +27,14 @@ def _require_tenant(x_tenant_id: str = Header(..., alias="X-Tenant-ID")) -> str:
     if not x_tenant_id:
         raise HTTPException(status_code=400, detail="X-Tenant-ID header required")
     return x_tenant_id
+
+
+async def _get_db(
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+):
+    from shared.ontology.src.database import get_db_with_tenant
+    async for session in get_db_with_tenant(x_tenant_id):
+        yield session
 
 
 def _get_agent(tenant_id: str, store_id: Optional[str] = None) -> Any:
@@ -189,25 +199,60 @@ async def get_touch_log(
     page: int = Query(default=1, ge=1),
     size: int = Query(default=20, ge=1, le=100),
     tenant_id: str = Depends(_require_tenant),
+    db: AsyncSession = Depends(_get_db),
 ) -> dict[str, Any]:
-    """查询近期营销触达记录
+    """查询近期营销触达记录（来自 marketing_touch_log 表）"""
+    offset = (page - 1) * size
 
-    支持按门店、时间范围、状态筛选。
-    数据来源：marketing_touch_log 表。
-    """
-    # 生产环境：查询 marketing_touch_log 表
-    # 当前返回 mock 数据
-    mock_items = [
+    await db.execute(
+        text("SELECT set_config('app.tenant_id', :tid, true)"),
+        {"tid": str(tenant_id)},
+    )
+
+    # Get total count
+    count_row = await db.execute(
+        text("""
+            SELECT COUNT(*) FROM marketing_touch_log
+            WHERE tenant_id = :tenant_id::uuid
+              AND sent_at > NOW() - (:days || ' days')::interval
+              AND NOT is_deleted
+        """),
+        {"tenant_id": str(tenant_id), "days": days},
+    )
+    total = count_row.scalar() or 0
+
+    # Get page items
+    rows = await db.execute(
+        text("""
+            SELECT
+                message_id,
+                member_id::text,
+                channel,
+                campaign_type,
+                status,
+                sent_at,
+                attribution_revenue_fen
+            FROM marketing_touch_log
+            WHERE tenant_id = :tenant_id::uuid
+              AND sent_at > NOW() - (:days || ' days')::interval
+              AND NOT is_deleted
+            ORDER BY sent_at DESC
+            LIMIT :size OFFSET :offset
+        """),
+        {"tenant_id": str(tenant_id), "days": days, "size": size, "offset": offset},
+    )
+
+    items = [
         {
-            "touch_id": f"touch_{i:04d}",
-            "member_id": f"mbr_{i:06d}",
-            "channel": ["sms", "wechat_subscribe", "wecom_chat"][i % 3],
-            "campaign_type": ["post_order_touch", "birthday_care", "winback_journey"][i % 3],
-            "status": ["sent", "delivered", "clicked"][i % 3],
-            "sent_at": f"2026-04-{10 + (i % 2):02d}T{10 + i:02d}:00:00Z",
-            "attribution_revenue_fen": [0, 8800, 12000][i % 3],
+            "touch_id": row.message_id or "",
+            "member_id": row.member_id or "",
+            "channel": row.channel,
+            "campaign_type": row.campaign_type or "",
+            "status": row.status,
+            "sent_at": row.sent_at.isoformat() if row.sent_at else None,
+            "attribution_revenue_fen": row.attribution_revenue_fen or 0,
         }
-        for i in range(1, min(size + 1, 6))
+        for row in rows.fetchall()
     ]
 
     return {
@@ -215,9 +260,9 @@ async def get_touch_log(
         "data": {
             "store_id": store_id,
             "days": days,
-            "total": 128,
+            "total": total,
             "page": page,
             "size": size,
-            "items": mock_items,
+            "items": items,
         },
     }
