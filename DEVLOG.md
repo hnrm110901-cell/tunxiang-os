@@ -48,10 +48,27 @@
 - `tx-growth/main.py` ← ai_marketing_router（/api/v1/growth/ai-marketing/*）
 - `skills/__init__.py` ← AiMarketingOrchestratorAgent 加入 ALL_SKILL_AGENTS（事件总线可调度）
 
+### Phase 3 追加（同日完成）
+
+**渠道扩展**
+- `shared/integrations/xiaohongshu_marketing.py` — 小红书适配器（品牌笔记/内容效果/品牌提及/广告ROI/POI门店，Mock模式）
+- `shared/integrations/tests/test_xiaohongshu_adapter.py` — 6个测试用例（全部通过）
+
+**归因闭环（touch_log 写入链路）**
+- `ai_marketing_orchestrator.py` — `_dispatch_message()` 写入 marketing_touch_log，`_check_cooldown()` 真实查DB
+- `ai_marketing_orchestrator_routes.py` — `/touch-log` GET 接口改为真实分页查询
+
+**性能报告真实化**
+- `ai_marketing_routes.py` — `performance-summary` 替换为 4条真实 SQL 聚合（渠道分析/活动排名/ROI计算/最优渠道洞察）
+
+**竞品监控路由**
+- `services/tx-intel/src/api/competitor_monitoring_routes.py` — 4个接口（扫描/周报/预警/平台快照），调用 tx-agent + 美团/抖音/小红书适配器
+- `services/tx-intel/src/main.py` ← 注册 competitor_monitoring_router
+
 ### 明日计划
-- Phase 2 归因闭环：marketing_touch_log 写入链路完整实现
-- _dispatch_message() 实际写入 touch_log 表
-- touch-log GET 接口从数据库读取真实记录
+- 归因窗口期闭环：ORDER.PAID 事件回写 attribution_order_id 到 marketing_touch_log
+- 小红书渠道接入到 channel-test 测试端点
+- 竞品监控定时任务（APScheduler 每日0点自动触发周报）
 
 ---
 
