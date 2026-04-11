@@ -1,3 +1,4 @@
+from .ai_marketing_orchestrator import AiMarketingOrchestratorAgent
 from .ai_waiter import AIWaiterAgent
 from .banquet_growth import BanquetGrowthAgent
 
@@ -71,4 +72,6 @@ ALL_SKILL_AGENTS = [
     # HR Agent (人力Agent)
     ComplianceAlertAgent,
     SalaryAdvisorAgent,
+    # AI营销编排 Agent (v207)
+    AiMarketingOrchestratorAgent,
 ]

@@ -243,6 +243,23 @@ import PremiumCardPage from './pages/member/PremiumCardPage';
 // ─── Y-M4: 外卖自营配送调度 + Y-A9: 企业客户管理 ──────────────────────────────
 import DeliveryDispatchPage from './pages/trade/DeliveryDispatchPage';
 import CorporateCustomerPage from './pages/trade/CorporateCustomerPage';
+// ─── 人力中枢升级 Sprint 1: 编制+工单+预警 ────────────────────────────────────────
+import StaffingTemplatePage from './pages/hr/StaffingTemplatePage';
+import StaffingAnalysisPage from './pages/hr/StaffingAnalysisPage';
+import DRIWorkOrderCenterPage from './pages/hr/DRIWorkOrderCenterPage';
+// ─── 人力中枢升级 Sprint 2: 带教+训练+认证 ────────────────────────────────────────
+import MentorshipSupervisePage from './pages/hr/MentorshipSupervisePage';
+import OnboardingPathPage from './pages/hr/OnboardingPathPage';
+import CertificationPage from './pages/hr/CertificationPage';
+// ─── 人力中枢升级 Sprint 3: 就绪度+高峰保障 ────────────────────────────────────────
+import StoreReadinessPage from './pages/hr/StoreReadinessPage';
+import PeakGuardPage from './pages/hr/PeakGuardPage';
+// ─── 人力中枢升级 Sprint 4: AI驱动层 ────────────────────────────────────────
+import CoachSessionPage from './pages/hr/CoachSessionPage';
+import AlertAggregationPage from './pages/hr/AlertAggregationPage';
+import HRHubOverviewPage from './pages/hr/HRHubOverviewPage';
+// ─── AI营销驾驶舱 ─────────────────────────────────────────────────────────────
+import AiMarketingDashboardPage from './pages/marketing/AiMarketingDashboardPage';
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(() => {
@@ -469,6 +486,21 @@ function App() {
           <Route path="/hr/governance/benchmark" element={<GovernanceBenchmarkPage />} />
           <Route path="/hr/governance/staffing" element={<GovernanceStaffingPage />} />
           <Route path="/hr/governance/risk-stores" element={<GovernanceRiskStoresPage />} />
+          {/* 人力中枢升级 Sprint 1 */}
+          <Route path="/hr/staffing/templates" element={<StaffingTemplatePage />} />
+          <Route path="/hr/staffing/analysis" element={<StaffingAnalysisPage />} />
+          <Route path="/hr/dri-workorders" element={<DRIWorkOrderCenterPage />} />
+          {/* 人力中枢升级 Sprint 2 */}
+          <Route path="/hr/mentorship" element={<MentorshipSupervisePage />} />
+          <Route path="/hr/onboarding" element={<OnboardingPathPage />} />
+          <Route path="/hr/certifications" element={<CertificationPage />} />
+          {/* 人力中枢升级 Sprint 3 */}
+          <Route path="/hr/store-readiness" element={<StoreReadinessPage />} />
+          <Route path="/hr/peak-guard" element={<PeakGuardPage />} />
+          {/* 人力中枢升级 Sprint 4 */}
+          <Route path="/hr/hub" element={<HRHubOverviewPage />} />
+          <Route path="/hr/coach-sessions" element={<CoachSessionPage />} />
+          <Route path="/hr/alert-center" element={<AlertAggregationPage />} />
           {/* Agent中枢 */}
           <Route path="/hr/agents" element={<AgentHubPage />} />
           <Route path="/hr/agents/compliance-alert" element={<AgentComplianceAlertPage />} />
@@ -522,6 +554,8 @@ function App() {
           <Route path="/hq/analytics/revenue-optimize" element={<RevenueOptimizePage />} />
           {/* /hq/analytics/table-turnover handled in Sprint 4 routes above */}
           <Route path="/hq/growth/customer-brain"      element={<CustomerBrainPage />} />
+          {/* ─── AI营销驾驶舱 ─── */}
+          <Route path="/hq/growth/ai-marketing" element={<AiMarketingDashboardPage />} />
           {/* ─── Y-C4: 多渠道菜单发布完善 ─── */}
           <Route path="/menu/channels" element={<ChannelMenuPage />} />
           {/* ─── Y-D7: 付费会员卡产品化 ─── */}
