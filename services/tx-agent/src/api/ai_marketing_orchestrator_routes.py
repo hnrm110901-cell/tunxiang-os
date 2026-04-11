@@ -64,6 +64,16 @@ class BatchTriggerBody(BaseModel):
     extra_context: dict[str, Any] = {}
 
 
+class AttributeOrderBody(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    member_id: str
+    order_id: str
+    order_amount_fen: int
+    store_id: str
+    attribution_window_hours: int = 72
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # 路由
 # ─────────────────────────────────────────────────────────────────────────────
@@ -265,4 +275,43 @@ async def get_touch_log(
             "size": size,
             "items": items,
         },
+    }
+
+
+@router.post("/attribute-order")
+async def attribute_order_to_touch(
+    body: AttributeOrderBody,
+    tenant_id: str = Depends(_require_tenant),
+    db: AsyncSession = Depends(_get_db),
+) -> dict[str, Any]:
+    """将订单归因到最近的营销触达记录
+
+    在 ORDER.PAID 事件后调用。查找该会员在归因窗口期内最近一条
+    未归因的 touch_log，更新归因订单ID + 归因收入。
+
+    适用于：
+    - cashier_engine 在支付确认后异步调用
+    - 事件消费者处理 ORDER.PAID 事件时调用
+    - 手动归因修正
+    """
+    from ..agents.skills.ai_marketing_orchestrator import AiMarketingOrchestratorAgent
+    agent = AiMarketingOrchestratorAgent(
+        tenant_id=tenant_id,
+        store_id=body.store_id,
+        db=db,
+    )
+    result = await agent.execute(
+        "update_order_attribution",
+        {
+            "member_id": body.member_id,
+            "order_id": body.order_id,
+            "order_amount_fen": body.order_amount_fen,
+            "attribution_window_hours": body.attribution_window_hours,
+        },
+    )
+    return {
+        "ok": result.success,
+        "data": result.data,
+        "reasoning": result.reasoning,
+        "error": result.error,
     }

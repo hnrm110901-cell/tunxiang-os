@@ -64,9 +64,10 @@ CHANNEL_PRIORITY: dict[str, list[str]] = {
     "welcome_journey":      ["wechat_subscribe", "wecom_chat", "sms"],
     "winback_journey":      ["wecom_chat", "sms", "wechat_subscribe"],
     "birthday_care":        ["wechat_subscribe", "wecom_chat"],
-    "holiday_campaign":     ["wechat_oa", "wecom_chat", "sms"],
+    "holiday_campaign":     ["wechat_oa", "wecom_chat", "sms", "xiaohongshu_note"],
     "upgrade_celebration":  ["wechat_subscribe", "wecom_chat"],
     "churn_rescue":         ["sms", "wecom_chat", "wechat_subscribe"],
+    "brand_content":        ["xiaohongshu_note", "douyin_content", "wecom_chat"],
 }
 
 
@@ -98,6 +99,7 @@ class AiMarketingOrchestratorAgent(SkillAgent):
             "execute_upgrade_celebration",
             "execute_churn_rescue",
             "get_marketing_health_score",
+            "update_order_attribution",
         ]
 
     async def execute(self, action: str, params: dict[str, Any]) -> AgentResult:
@@ -112,6 +114,7 @@ class AiMarketingOrchestratorAgent(SkillAgent):
             "execute_upgrade_celebration": self._upgrade_celebration,
             "execute_churn_rescue":        self._churn_rescue,
             "get_marketing_health_score":  self._marketing_health_score,
+            "update_order_attribution":    self._update_order_attribution,
         }
 
         handler = dispatch.get(action)
@@ -499,6 +502,133 @@ class AiMarketingOrchestratorAgent(SkillAgent):
             reasoning=f"门店营销健康评分 {total_score}/100，等级 {grade}",
             confidence=0.85,
         )
+
+    # ─── 归因闭环 ─────────────────────────────────────────────────────────────
+
+    async def _update_order_attribution(self, params: dict[str, Any]) -> AgentResult:
+        """ORDER.PAID 触发：将订单归因到最近的营销触达记录
+
+        查找该会员在归因窗口期（默认72h）内最近一条未归因的 touch_log，
+        更新 attribution_order_id + attribution_revenue_fen + converted_at。
+        """
+        member_id = params.get("member_id", "")
+        order_id = params.get("order_id", "")
+        order_amount_fen = params.get("order_amount_fen", 0)
+        attribution_window_hours = params.get("attribution_window_hours", 72)
+
+        if not member_id or not order_id:
+            return AgentResult(
+                success=False,
+                action="update_order_attribution",
+                error="member_id 和 order_id 不可为空",
+            )
+
+        if self._db is None:
+            logger.info(
+                "attribution_skipped_no_db",
+                order_id=order_id,
+                member_id=member_id,
+            )
+            return AgentResult(
+                success=True,
+                action="update_order_attribution",
+                data={"skipped": True, "reason": "DB 不可用，归因跳过"},
+                reasoning="DB session 未注入，无法执行归因更新",
+                confidence=1.0,
+            )
+
+        try:
+            await self._db.execute(
+                text("SELECT set_config('app.tenant_id', :tid, true)"),
+                {"tid": str(self.tenant_id)},
+            )
+
+            # 查找最近一条未归因的 touch（在归因窗口内）
+            row = await self._db.execute(
+                text("""
+                    SELECT id, channel, campaign_type, message_id
+                    FROM marketing_touch_log
+                    WHERE tenant_id = :tenant_id::uuid
+                      AND member_id = :member_id::uuid
+                      AND attribution_order_id IS NULL
+                      AND status IN ('sent', 'delivered', 'clicked', 'queued')
+                      AND sent_at > NOW() - (:window_hours || ' hours')::interval
+                      AND NOT is_deleted
+                    ORDER BY sent_at DESC
+                    LIMIT 1
+                """),
+                {
+                    "tenant_id": str(self.tenant_id),
+                    "member_id": member_id,
+                    "window_hours": attribution_window_hours,
+                },
+            )
+            touch_row = row.fetchone()
+
+            if touch_row is None:
+                return AgentResult(
+                    success=True,
+                    action="update_order_attribution",
+                    data={"attributed": False, "reason": f"窗口期({attribution_window_hours}h)内无可归因触达记录"},
+                    reasoning=f"会员 {member_id[:8]}... 在 {attribution_window_hours}h 内无营销触达记录",
+                    confidence=1.0,
+                )
+
+            touch_id = str(touch_row.id)
+            # 更新归因
+            await self._db.execute(
+                text("""
+                    UPDATE marketing_touch_log
+                    SET attribution_order_id = :order_id::uuid,
+                        attribution_revenue_fen = :revenue_fen,
+                        converted_at = NOW(),
+                        status = 'converted'
+                    WHERE id = :touch_id::uuid
+                      AND tenant_id = :tenant_id::uuid
+                """),
+                {
+                    "order_id": order_id,
+                    "revenue_fen": order_amount_fen,
+                    "touch_id": touch_id,
+                    "tenant_id": str(self.tenant_id),
+                },
+            )
+            await self._db.commit()
+
+            logger.info(
+                "order_attributed",
+                touch_id=touch_id,
+                order_id=order_id,
+                member_id=member_id[:8],
+                amount_fen=order_amount_fen,
+            )
+
+            return AgentResult(
+                success=True,
+                action="update_order_attribution",
+                data={
+                    "attributed": True,
+                    "touch_id": touch_id,
+                    "order_id": order_id,
+                    "channel": touch_row.channel,
+                    "campaign_type": touch_row.campaign_type,
+                    "attribution_revenue_fen": order_amount_fen,
+                    "attribution_window_hours": attribution_window_hours,
+                },
+                reasoning=(
+                    f"订单 {order_id[:8]}... 成功归因到 [{touch_row.campaign_type}] "
+                    f"渠道 [{touch_row.channel}]，归因收入 {order_amount_fen/100:.1f}元"
+                ),
+                confidence=0.9,
+            )
+
+        except (ValueError, OSError) as exc:
+            logger.warning("attribution_update_error", order_id=order_id, error=str(exc))
+            return AgentResult(
+                success=False,
+                action="update_order_attribution",
+                error=f"归因更新失败: {exc}",
+            )
 
     # ─── 内部工具方法 ─────────────────────────────────────────────────────────
 
