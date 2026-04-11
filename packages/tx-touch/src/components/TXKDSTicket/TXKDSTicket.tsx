@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useSwipe } from '../../hooks/useSwipe';
 import styles from './TXKDSTicket.module.css';
 
@@ -13,7 +13,8 @@ export interface TXKDSTicketProps {
   orderId: string;
   tableNo: string;
   items: TXKDSTicketItem[];
-  createdAt: Date;
+  /** 下单时间戳（毫秒），传数字避免父组件每次 render 创建新 Date 对象 */
+  createdAt: number;
   /** 出餐时限，单位：分钟 */
   timeLimit: number;
   isVip?: boolean;
@@ -43,21 +44,16 @@ export function TXKDSTicket({
   onComplete,
   onRush,
 }: TXKDSTicketProps) {
-  const totalSeconds = timeLimit * 60;
-  const [secondsLeft, setSecondsLeft] = useState<number>(() => {
-    const elapsed = Math.floor((Date.now() - createdAt.getTime()) / 1000);
-    return totalSeconds - elapsed;
-  });
+  const totalSeconds = useMemo(() => timeLimit * 60, [timeLimit]);
 
+  // tick 计数器：每秒 +1，触发重渲染；secondsLeft 直接从时间戳派生，无状态延迟
+  const [, setTick] = useState(0);
   useEffect(() => {
-    const interval = setInterval(() => {
-      setSecondsLeft(() => {
-        const elapsed = Math.floor((Date.now() - createdAt.getTime()) / 1000);
-        return totalSeconds - elapsed;
-      });
-    }, 1000);
+    const interval = setInterval(() => setTick(n => n + 1), 1000);
     return () => clearInterval(interval);
-  }, [createdAt, totalSeconds]);
+  }, []); // 不依赖 createdAt，interval 永不重建
+
+  const secondsLeft = Math.floor(totalSeconds - (Date.now() - createdAt) / 1000);
 
   // 颜色编码判断
   const ratio = secondsLeft / totalSeconds;

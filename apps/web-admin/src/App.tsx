@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ConfigProvider } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
-import { txAdminTheme } from './theme/antd-theme';
+import { txAdminTheme } from '@tx/tokens';
 import { getToken, clearAuth, isTokenExpired } from './api/client';
 import { ShellHQ } from './shell/ShellHQ';
 import { LoginPage } from './pages/LoginPage';

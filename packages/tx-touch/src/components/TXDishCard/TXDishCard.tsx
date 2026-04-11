@@ -1,5 +1,6 @@
 import React from 'react';
 import { useLongPress } from '../../hooks/useLongPress';
+import { fenToYuan } from '../../utils/currency';
 import styles from './TXDishCard.module.css';
 
 export interface TXDishCardProps {
@@ -13,11 +14,6 @@ export interface TXDishCardProps {
   quantity?: number;
   onPress: () => void;
   onLongPress?: () => void;
-}
-
-/** 分转元，保留两位小数 */
-function fenToYuan(fen: number): string {
-  return (fen / 100).toFixed(2);
 }
 
 export function TXDishCard({

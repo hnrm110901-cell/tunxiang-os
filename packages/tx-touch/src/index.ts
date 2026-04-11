@@ -44,6 +44,6 @@ export { useSwipe } from './hooks/useSwipe';
 export { useHaptic } from './hooks/useHaptic';
 
 // ─── Styles 路径（消费方自行 import）────────────────────────────
-// import '@tx/touch/src/styles/tokens.css';
+// import '@tx/tokens/src/tokens.css';     ← Token（必须，在 tx-touch 之前引入）
 // import '@tx/touch/src/styles/reset.css';
 // import '@tx/touch/src/styles/animations.css';

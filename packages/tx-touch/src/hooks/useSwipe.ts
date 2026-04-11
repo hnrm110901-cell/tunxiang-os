@@ -1,23 +1,14 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useRef } from 'react';
 
 type SwipeDirection = 'left' | 'right' | 'up' | 'down' | null;
 
-interface SwipeState {
-  deltaX: number;
-  deltaY: number;
-  direction: SwipeDirection;
-}
-
-interface SwipeHandlers {
+export interface SwipeHandlers {
   onTouchStart: (e: React.TouchEvent) => void;
   onTouchMove: (e: React.TouchEvent) => void;
   onTouchEnd: (e: React.TouchEvent) => void;
-  deltaX: number;
-  deltaY: number;
-  direction: SwipeDirection;
 }
 
-interface UseSwipeOptions {
+export interface UseSwipeOptions {
   /** 触发方向判定的最小滑动距离（px），默认 30 */
   threshold?: number;
   /** 滑动结束回调 */
@@ -26,13 +17,13 @@ interface UseSwipeOptions {
 
 /**
  * 滑动检测 Hook
- * 实时返回 deltaX/deltaY/direction，并在滑动结束时触发回调
+ * 使用 ref 追踪滑动状态，不触发组件重渲染，在 onSwipeEnd 时返回结果。
  */
 export function useSwipe(options: UseSwipeOptions = {}): SwipeHandlers {
   const { threshold = 30, onSwipeEnd } = options;
 
   const startRef = useRef<{ x: number; y: number } | null>(null);
-  const [state, setState] = useState<SwipeState>({
+  const deltaRef = useRef<{ deltaX: number; deltaY: number; direction: SwipeDirection }>({
     deltaX: 0,
     deltaY: 0,
     direction: null,
@@ -42,7 +33,7 @@ export function useSwipe(options: UseSwipeOptions = {}): SwipeHandlers {
     const touch = e.touches[0];
     if (!touch) return;
     startRef.current = { x: touch.clientX, y: touch.clientY };
-    setState({ deltaX: 0, deltaY: 0, direction: null });
+    deltaRef.current = { deltaX: 0, deltaY: 0, direction: null };
   }, []);
 
   const onTouchMove = useCallback((e: React.TouchEvent) => {
@@ -54,33 +45,22 @@ export function useSwipe(options: UseSwipeOptions = {}): SwipeHandlers {
 
     let direction: SwipeDirection = null;
     if (Math.abs(dx) >= threshold || Math.abs(dy) >= threshold) {
-      if (Math.abs(dx) >= Math.abs(dy)) {
-        direction = dx > 0 ? 'right' : 'left';
-      } else {
-        direction = dy > 0 ? 'down' : 'up';
-      }
+      direction = Math.abs(dx) >= Math.abs(dy)
+        ? dx > 0 ? 'right' : 'left'
+        : dy > 0 ? 'down' : 'up';
     }
 
-    setState({ deltaX: dx, deltaY: dy, direction });
+    // ref 写入不触发重渲染
+    deltaRef.current = { deltaX: dx, deltaY: dy, direction };
   }, [threshold]);
 
   const onTouchEnd = useCallback((_e: React.TouchEvent) => {
     if (!startRef.current) return;
-    const { deltaX, deltaY, direction } = state;
-    onSwipeEnd?.(direction, deltaX, deltaY);
+    const { deltaX, deltaY, direction } = deltaRef.current;
     startRef.current = null;
-    // 重置状态（不立即清除方向，让消费者在 onSwipeEnd 中读取）
-    setTimeout(() => {
-      setState({ deltaX: 0, deltaY: 0, direction: null });
-    }, 0);
-  }, [state, onSwipeEnd]);
+    deltaRef.current = { deltaX: 0, deltaY: 0, direction: null };
+    onSwipeEnd?.(direction, deltaX, deltaY);
+  }, [onSwipeEnd]);
 
-  return {
-    onTouchStart,
-    onTouchMove,
-    onTouchEnd,
-    deltaX: state.deltaX,
-    deltaY: state.deltaY,
-    direction: state.direction,
-  };
+  return { onTouchStart, onTouchMove, onTouchEnd };
 }

@@ -9,9 +9,9 @@ import { TXCard, TXScrollList } from '@tx/touch';
 import {
   CardField,
   TableCardData,
-  TableStatus,
 } from '../../types/table-card';
 import { useTableStore } from '../../stores/tableStore';
+import { getStatusText, getStatusColor, getAlertBgColor } from './tableStatusUtils';
 import styles from './TableManagement.module.css';
 
 /**
@@ -25,50 +25,6 @@ export interface TableListViewProps {
   /** 加载中状态 */
   loading?: boolean;
 }
-
-/**
- * 获取状态对应的Tag颜色
- */
-const getStatusTagColor = (status: TableStatus): string => {
-  const colorMap: Record<TableStatus, string> = {
-    [TableStatus.Empty]: '#0F6E56',
-    [TableStatus.Dining]: '#185FA5',
-    [TableStatus.Reserved]: '#BA7517',
-    [TableStatus.PendingCheckout]: '#A32D2D',
-    [TableStatus.PendingCleanup]: '#555',
-  };
-  return colorMap[status];
-};
-
-/**
- * 获取状态显示文本
- */
-const getStatusText = (status: TableStatus): string => {
-  const statusMap: Record<TableStatus, string> = {
-    [TableStatus.Empty]: '空台',
-    [TableStatus.Dining]: '用餐中',
-    [TableStatus.Reserved]: '已预订',
-    [TableStatus.PendingCheckout]: '待结账',
-    [TableStatus.PendingCleanup]: '待清台',
-  };
-  return statusMap[status];
-};
-
-/**
- * 获取预警级别对应的背景色
- */
-const getAlertColor = (alert: string): string => {
-  switch (alert) {
-    case 'critical':
-      return 'rgba(163,45,45,0.20)';
-    case 'warning':
-      return 'rgba(186,117,23,0.20)';
-    case 'info':
-      return 'rgba(24,95,165,0.20)';
-    default:
-      return 'rgba(255,255,255,0.06)';
-  }
-};
 
 /**
  * 确定行的预警级别（critical > warning > info > normal）
@@ -190,7 +146,7 @@ const AreaPanel: React.FC<{
                     display: 'inline-block',
                     padding: '4px 10px',
                     borderRadius: 6,
-                    background: getStatusTagColor(table.status),
+                    background: getStatusColor(table.status),
                     color: '#fff',
                     fontSize: 14,
                     fontWeight: 600,
@@ -208,7 +164,7 @@ const AreaPanel: React.FC<{
                         style={{
                           padding: '4px 10px',
                           borderRadius: 6,
-                          background: getAlertColor(field.alert),
+                          background: getAlertBgColor(field.alert),
                           border: '1px solid rgba(255,255,255,0.12)',
                           cursor: 'pointer',
                           fontSize: 13,

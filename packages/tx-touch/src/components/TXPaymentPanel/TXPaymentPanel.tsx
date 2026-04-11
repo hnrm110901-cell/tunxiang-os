@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { TXButton } from '../TXButton/TXButton';
 import { TXNumpad } from '../TXNumpad/TXNumpad';
+import { fenToYuan } from '../../utils/currency';
 import styles from './TXPaymentPanel.module.css';
 
 export interface TXPaymentPanelItem {
@@ -20,10 +21,6 @@ export interface TXPaymentPanelProps {
   onPayByCard: () => void;
   onPayByCredit: () => void;
   onCancel: () => void;
-}
-
-function fenToYuan(fen: number): string {
-  return (fen / 100).toFixed(2);
 }
 
 export function TXPaymentPanel({

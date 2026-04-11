@@ -6,13 +6,13 @@
 持久化: campaign_report_entries 表（v207 迁移创建）
 """
 import json
-import random
 import uuid
 from typing import Any
 
 import structlog
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
+from shared.ontology.src.database import _set_tenant_on_session
 
 log = structlog.get_logger()
 
@@ -101,10 +101,7 @@ async def _handle_report(
     """处理报名逻辑 — 写入 campaign_report_entries。"""
     # 设置 RLS 上下文
     try:
-        await db.execute(
-            text("SELECT set_config('app.tenant_id', :tid, true)"),
-            {"tid": tenant_id},
-        )
+        await _set_tenant_on_session(db, tenant_id)
     except SQLAlchemyError as exc:
         log.error("report_draw.rls_setup_failed", error=str(exc), exc_info=True)
         return {"success": False, "reason": "数据库配置失败"}
@@ -194,6 +191,7 @@ async def _handle_report(
         )
         position = pos_res.scalar() or 1
     except SQLAlchemyError:
+        log.warning("report_draw.count_position_failed", exc_info=True)
         position = 1
 
     log.info(
@@ -219,76 +217,92 @@ async def _handle_draw(
     """处理开奖逻辑 — 从 campaign_report_entries 读取报名列表并随机抽奖。"""
     # 设置 RLS 上下文
     try:
-        await db.execute(
-            text("SELECT set_config('app.tenant_id', :tid, true)"),
-            {"tid": tenant_id},
-        )
+        await _set_tenant_on_session(db, tenant_id)
     except SQLAlchemyError as exc:
         log.error("report_draw.rls_setup_failed", error=str(exc), exc_info=True)
         return {"success": False, "reason": "数据库配置失败"}
 
-    # 读取所有未开奖的报名记录
+    prizes = config.get("prizes", [])
+    if not prizes:
+        return {"success": False, "reason": "奖项配置为空"}
+
+    # 统计参与人数，判断是否有人报名
     try:
-        rows_res = await db.execute(
+        count_res = await db.execute(
             text("""
-                SELECT id, customer_id FROM campaign_report_entries
+                SELECT COUNT(*) FROM campaign_report_entries
                 WHERE tenant_id = :tenant_id
                   AND campaign_id = :campaign_id
                   AND is_winner = false
                   AND drawn_at IS NULL
                   AND is_deleted = false
-                ORDER BY registered_at ASC
             """),
-            {
-                "tenant_id": uuid.UUID(tenant_id),
-                "campaign_id": campaign_id,
-            },
+            {"tenant_id": uuid.UUID(tenant_id), "campaign_id": campaign_id},
         )
-        entries = rows_res.fetchall()
+        total_entries: int = count_res.scalar() or 0
     except SQLAlchemyError as exc:
-        log.error("report_draw.fetch_entries_failed", error=str(exc), exc_info=True)
+        log.error("report_draw.count_entries_failed", error=str(exc), exc_info=True)
         return {"success": False, "reason": "数据库查询失败"}
 
-    if not entries:
+    if total_entries == 0:
         return {"success": False, "reason": "无人报名"}
 
-    prizes = config.get("prizes", [])
     winners: list[dict] = []
-    remaining = [(str(row[0]), row[1]) for row in entries]  # [(entry_id, customer_id)]
 
+    # 每个奖项做一次数据库端随机采样，避免全量拉取到 Python 内存
     for prize in prizes:
-        count = min(prize.get("winner_count", 1), len(remaining))
-        if count <= 0:
+        prize_count = min(prize.get("winner_count", 1), total_entries - len(winners))
+        if prize_count <= 0:
             continue
-        selected = random.sample(remaining, count)
-        for entry_id, cid in selected:
-            winners.append({
-                "customer_id": cid,
-                "prize": prize,
-                "entry_id": entry_id,
-            })
-            remaining.remove((entry_id, cid))
-
-    # 更新中奖记录
-    if winners:
         try:
-            for w in winners:
-                await db.execute(
-                    text("""
-                        UPDATE campaign_report_entries
-                        SET is_winner = true,
-                            prize = :prize::jsonb,
-                            drawn_at = NOW(),
-                            updated_at = NOW()
-                        WHERE id = :entry_id
-                          AND tenant_id = :tenant_id
-                    """),
-                    {
-                        "entry_id": uuid.UUID(w["entry_id"]),
-                        "tenant_id": uuid.UUID(tenant_id),
-                        "prize": json.dumps(w["prize"], ensure_ascii=False),
-                    },
-                )
+            rows_res = await db.execute(
+                text("""
+                    SELECT id, customer_id FROM campaign_report_entries
+                    WHERE tenant_id = :tenant_id
+                      AND campaign_id = :campaign_id
+                      AND is_winner = false
+                      AND drawn_at IS NULL
+                      AND is_deleted = false
+                      AND id NOT IN :exclude_ids
+                    ORDER BY random()
+                    LIMIT :limit
+                """),
+                {
+                    "tenant_id": uuid.UUID(tenant_id),
+                    "campaign_id": campaign_id,
+                    "exclude_ids": tuple(uuid.UUID(w["entry_id"]) for w in winners) or (uuid.UUID(int=0),),
+                    "limit": prize_count,
+                },
+            )
+            for row in rows_res.fetchall():
+                winners.append({"entry_id": str(row[0]), "customer_id": row[1], "prize": prize})
+        except SQLAlchemyError as exc:
+            log.error("report_draw.sample_entries_failed", error=str(exc), exc_info=True)
+            return {"success": False, "reason": "数据库随机抽取失败"}
+
+    # 批量 UPDATE 中奖记录（单次 SQL，不循环）
+    if winners:
+        winner_ids = [uuid.UUID(w["entry_id"]) for w in winners]
+        prize_map = {w["entry_id"]: json.dumps(w["prize"], ensure_ascii=False) for w in winners}
+        try:
+            # 按 entry_id 逐条 prize 不同，使用 VALUES 子查询批量更新
+            values_sql = ", ".join(
+                f"('{w['entry_id']}'::uuid, '{prize_map[w['entry_id']]}'::jsonb)"
+                for w in winners
+            )
+            await db.execute(
+                text(f"""
+                    UPDATE campaign_report_entries AS t
+                    SET is_winner = true,
+                        prize = v.prize,
+                        drawn_at = NOW(),
+                        updated_at = NOW()
+                    FROM (VALUES {values_sql}) AS v(id, prize)
+                    WHERE t.id = v.id
+                      AND t.tenant_id = :tenant_id
+                """),
+                {"tenant_id": uuid.UUID(tenant_id)},
+            )
             await db.commit()
         except SQLAlchemyError as exc:
             await db.rollback()
@@ -304,6 +318,6 @@ async def _handle_draw(
     return {
         "success": True,
         "action": "drawn",
-        "total_participants": len(entries),
+        "total_participants": total_entries,
         "winners": [{"customer_id": w["customer_id"], "prize": w["prize"]} for w in winners],
     }

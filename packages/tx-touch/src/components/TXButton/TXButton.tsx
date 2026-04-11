@@ -38,18 +38,12 @@ export function TXButton({
     .filter(Boolean)
     .join(' ');
 
-  const handleClick = () => {
-    if (!disabled && !loading) {
-      onPress();
-    }
-  };
-
   return (
     <button
       type="button"
       className={classNames}
       disabled={disabled || loading}
-      onClick={handleClick}
+      onClick={onPress}
       style={style}
     >
       {loading ? (

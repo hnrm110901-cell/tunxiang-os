@@ -8,11 +8,11 @@
 import React, { useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   TableCardData,
-  TableStatus,
   TableLayout,
   CardField,
 } from '../../types/table-card';
 import { useTableStore } from '../../stores/tableStore';
+import { getStatusText, getStatusColor } from './tableStatusUtils';
 import styles from './TableManagement.module.css';
 
 /**
@@ -26,34 +26,6 @@ export interface TableMapViewProps {
   /** 加载中状态 */
   loading?: boolean;
 }
-
-/**
- * 获取状态对应的填充色
- */
-const getStatusColor = (status: TableStatus): string => {
-  const colorMap: Record<TableStatus, string> = {
-    [TableStatus.Empty]: '#0F6E56',
-    [TableStatus.Dining]: '#185FA5',
-    [TableStatus.Reserved]: '#BA7517',
-    [TableStatus.PendingCheckout]: '#A32D2D',
-    [TableStatus.PendingCleanup]: '#555',
-  };
-  return colorMap[status];
-};
-
-/**
- * 获取状态显示文本
- */
-const getStatusText = (status: TableStatus): string => {
-  const statusMap: Record<TableStatus, string> = {
-    [TableStatus.Empty]: '空台',
-    [TableStatus.Dining]: '用餐中',
-    [TableStatus.Reserved]: '已预订',
-    [TableStatus.PendingCheckout]: '待结账',
-    [TableStatus.PendingCleanup]: '待清台',
-  };
-  return statusMap[status];
-};
 
 /**
  * 地图表格组件

@@ -4,7 +4,7 @@
 """
 import uuid
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import AsyncGenerator, List, Optional
 
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
@@ -20,29 +20,27 @@ from services.store_transfer_service import (
     generate_detail_report,
     generate_summary_report,
 )
-from shared.ontology.src.database import get_db
+from shared.ontology.src.database import TenantIDInvalid, TenantIDMissing, get_db_with_tenant
 
 logger = structlog.get_logger(__name__)
 
 router = APIRouter(prefix="/api/v1/org", tags=["transfers"])
 
 
-# ── 辅助函数 ──────────────────────────────────────────────────────────────────
+# ── DB 依赖（含 RLS 校验，防止 NULL 绕过）──────────────────────────────────────
 
 
-def _parse_tenant(x_tenant_id: str) -> str:
+async def _get_db(
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+) -> AsyncGenerator[AsyncSession, None]:
     try:
-        uuid.UUID(x_tenant_id)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail="X-Tenant-ID 须为合法 UUID") from e
-    return x_tenant_id
+        async for session in get_db_with_tenant(x_tenant_id):
+            yield session
+    except (TenantIDMissing, TenantIDInvalid) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-async def _set_rls(db: AsyncSession, tenant_id: str) -> None:
-    await db.execute(
-        text("SELECT set_config('app.tenant_id', :tid, true)"),
-        {"tid": tenant_id},
-    )
+# ── 辅助函数 ──────────────────────────────────────────────────────────────────
 
 
 def _row_to_dict(row: object) -> dict:
@@ -117,12 +115,9 @@ class CostReportReq(BaseModel):
 async def api_create_transfer(
     req: CreateTransferReq,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(_get_db),
 ) -> dict:
     """创建借调单（持久化到 employee_transfers 表）。"""
-    tid = _parse_tenant(x_tenant_id)
-    await _set_rls(db, tid)
-
     # 业务校验（利用原有纯函数服务）
     try:
         from services.store_transfer_service import create_transfer_order as _validate
@@ -164,7 +159,7 @@ async def api_create_transfer(
             """),
             {
                 "id": transfer_id,
-                "tenant_id": uuid.UUID(tid),
+                "tenant_id": uuid.UUID(x_tenant_id),
                 "employee_id": req.employee_id,
                 "employee_name": req.employee_name,
                 "from_store_id": req.from_store_id,
@@ -180,7 +175,7 @@ async def api_create_transfer(
         await db.commit()
     except SQLAlchemyError as exc:
         await db.rollback()
-        logger.error("transfer.create_failed", error=str(exc), tenant_id=tid, exc_info=True)
+        logger.error("transfer.create_failed", error=str(exc), tenant_id=x_tenant_id, exc_info=True)
         raise HTTPException(status_code=500, detail="借调单创建失败，请稍后重试")
 
     order = {
@@ -199,7 +194,7 @@ async def api_create_transfer(
         "approved_at": None,
         "created_at": now.isoformat(),
     }
-    logger.info("transfer.created", transfer_id=str(transfer_id), tenant_id=tid)
+    logger.info("transfer.created", transfer_id=str(transfer_id), tenant_id=x_tenant_id)
     return {"ok": True, "data": order}
 
 
@@ -211,14 +206,11 @@ async def api_list_transfers(
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(_get_db),
 ) -> dict:
     """列表查询借调单（支持 store_id/employee_id/status 筛选）。"""
-    tid = _parse_tenant(x_tenant_id)
-    await _set_rls(db, tid)
-
     conditions = ["tenant_id = :tenant_id", "is_deleted = false"]
-    params: dict = {"tenant_id": uuid.UUID(tid)}
+    params: dict = {"tenant_id": uuid.UUID(x_tenant_id)}
 
     if store_id:
         conditions.append("(from_store_id = :store_id OR to_store_id = :store_id)")
@@ -257,7 +249,7 @@ async def api_list_transfers(
         items = [_row_to_dict(r) for r in rows_res.fetchall()]
 
     except SQLAlchemyError as exc:
-        logger.error("transfer.list_failed", error=str(exc), tenant_id=tid, exc_info=True)
+        logger.error("transfer.list_failed", error=str(exc), tenant_id=x_tenant_id, exc_info=True)
         raise HTTPException(status_code=500, detail="查询借调单失败，请稍后重试")
 
     return {"ok": True, "data": {"items": items, "total": total}}
@@ -268,19 +260,16 @@ async def api_approve_transfer(
     transfer_id: str,
     req: ApproveTransferReq,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(_get_db),
 ) -> dict:
     """审批借调单（pending → approved）。"""
-    tid = _parse_tenant(x_tenant_id)
-    await _set_rls(db, tid)
-
     try:
         cur = await db.execute(
             text("""
                 SELECT id, status FROM employee_transfers
                 WHERE id = :id AND tenant_id = :tenant_id AND is_deleted = false
             """),
-            {"id": transfer_id, "tenant_id": uuid.UUID(tid)},
+            {"id": transfer_id, "tenant_id": uuid.UUID(x_tenant_id)},
         )
         row = cur.fetchone()
     except SQLAlchemyError as exc:
@@ -313,7 +302,7 @@ async def api_approve_transfer(
                 "approver_id": req.approver_id,
                 "now": now,
                 "id": transfer_id,
-                "tenant_id": uuid.UUID(tid),
+                "tenant_id": uuid.UUID(x_tenant_id),
             },
         )
         await db.commit()
@@ -335,14 +324,14 @@ async def api_approve_transfer(
                 FROM employee_transfers
                 WHERE id = :id AND tenant_id = :tenant_id
             """),
-            {"id": transfer_id, "tenant_id": uuid.UUID(tid)},
+            {"id": transfer_id, "tenant_id": uuid.UUID(x_tenant_id)},
         )
         updated = _row_to_dict(res.fetchone())
     except SQLAlchemyError as exc:
         logger.warning("transfer.approve_refetch_failed", error=str(exc))
         updated = {"id": transfer_id, "status": "approved", "approved_by": req.approver_id}
 
-    logger.info("transfer.approved", transfer_id=transfer_id, tenant_id=tid)
+    logger.info("transfer.approved", transfer_id=transfer_id, tenant_id=x_tenant_id)
     return {"ok": True, "data": updated}
 
 

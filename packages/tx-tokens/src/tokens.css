@@ -112,4 +112,7 @@
   --tx-z-modal: 500;
   --tx-z-toast: 800;
   --tx-z-agent-alert: 9999;
+
+  /* ===== Agent 预警条（TXAgentAlert 运行时动态写入实际高度）===== */
+  --agent-alert-height: 0px;
 }

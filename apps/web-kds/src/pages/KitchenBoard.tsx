@@ -6,7 +6,7 @@
  * WebSocket 实时推送：连接 Mac mini /ws/kds/{stationId}
  * 深色背景，触控优化（最小48px按钮，最小20px菜品字体）
  */
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { TXKDSTicket, type TXKDSTicketItem } from '@tx/touch/components/TXKDSTicket';
 import { useKdsWebSocket, type KDSTicket, type RemakeAlert } from '../hooks/useKdsWebSocket';
 import { warmUpAudio } from '../utils/audio';
@@ -46,7 +46,8 @@ function sortTickets(tickets: KDSTicket[]): KDSTicket[] {
 // ─── Component ───
 
 export function KitchenBoard() {
-  const config = getKdsConfig();
+  // localStorage 读取只在 mount 时执行一次
+  const [config] = useState(getKdsConfig);
   const wsEnabled = !!config.host;
 
   // WebSocket 数据源
@@ -61,17 +62,12 @@ export function KitchenBoard() {
     dismissTimeoutAlert,
   } = useKdsWebSocket(config);
 
-  // 本地 tickets state（无 WS 时用 mock 数据，有 WS 时同步 WS 数据）
-  const [tickets, setTickets] = useState<KDSTicket[]>(() =>
-    wsEnabled ? [] : MOCK_TICKETS,
+  // 单一数据源：WS 数据或离线 mock
+  const [offlineTickets, setOfflineTickets] = useState<KDSTicket[]>(
+    () => wsEnabled ? [] : MOCK_TICKETS,
   );
-
-  // 当 WS 数据更新时同步到本地
-  useEffect(() => {
-    if (wsEnabled && wsTickets.length > 0) {
-      setTickets(wsTickets);
-    }
-  }, [wsEnabled, wsTickets]);
+  const tickets = wsEnabled ? wsTickets : offlineTickets;
+  const setTickets = wsEnabled ? setWsTickets : setOfflineTickets;
 
   const [selectedDept, setSelectedDept] = useState<string>('all');
   const [audioWarmed, setAudioWarmed] = useState(false);
@@ -100,11 +96,8 @@ export function KitchenBoard() {
 
   // 开始制作
   const startCooking = useCallback((id: string) => {
-    const update = (prev: KDSTicket[]) =>
-      prev.map(t => t.id === id ? { ...t, status: 'cooking' as const, startedAt: Date.now() } : t);
-    setTickets(update);
-    if (wsEnabled) setWsTickets(update);
-  }, [wsEnabled, setWsTickets]);
+    setTickets(prev => prev.map(t => t.id === id ? { ...t, status: 'cooking' as const, startedAt: Date.now() } : t));
+  }, [setTickets]);
 
   // 停菜/恢复
   const togglePause = useCallback(async (id: string) => {
@@ -136,23 +129,17 @@ export function KitchenBoard() {
     if (!operatorId) return;
     try {
       await grabTicket(id, operatorId);
-      const update = (prev: KDSTicket[]) =>
-        prev.map(t => t.id === id ? { ...t, status: 'cooking' as const, startedAt: Date.now() } : t);
-      setTickets(update);
-      if (wsEnabled) setWsTickets(update);
+      setTickets(prev => prev.map(t => t.id === id ? { ...t, status: 'cooking' as const, startedAt: Date.now() } : t));
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : '抢单失败';
       alert(msg);
     }
-  }, [operatorId, wsEnabled, setWsTickets]);
+  }, [operatorId, setTickets]);
 
   // 完成出品
   const completeCooking = useCallback((id: string) => {
-    const update = (prev: KDSTicket[]) =>
-      prev.map(t => t.id === id ? { ...t, status: 'done' as const, completedAt: Date.now() } : t);
-    setTickets(update);
-    if (wsEnabled) setWsTickets(update);
-  }, [wsEnabled, setWsTickets]);
+    setTickets(prev => prev.map(t => t.id === id ? { ...t, status: 'done' as const, completedAt: Date.now() } : t));
+  }, [setTickets]);
 
   // 按档口过滤
   const filtered = selectedDept === 'all' ? tickets : tickets.filter(t => t.deptId === selectedDept);
@@ -163,26 +150,27 @@ export function KitchenBoard() {
     .sort((a, b) => (b.completedAt || 0) - (a.completedAt || 0))
     .slice(0, 10);
 
-  // 催单中的 ticket IDs（最近 5 分钟）
-  const rushTicketIds = new Set(
-    rushAlerts
-      .filter(a => Date.now() - a.timestamp < 5 * 60 * 1000)
-      .map(a => a.ticketId),
+  // 催单中的 ticket IDs（最近 5 分钟），rushAlerts 变化时才重建 Set
+  const rushTicketIds = useMemo(
+    () => new Set(rushAlerts.filter(a => Date.now() - a.timestamp < 5 * 60 * 1000).map(a => a.ticketId)),
+    [rushAlerts],
   );
 
   // 平均出餐时间（已完成工单的总时长均值，单位：分钟）
-  const avgCookMin = done.length > 0
-    ? Math.round(
-        done.reduce((sum, t) => sum + (t.completedAt && t.createdAt ? (t.completedAt - t.createdAt) / 60000 : 0), 0)
-        / done.filter(t => t.completedAt).length || 0,
-      )
-    : 0;
+  const avgCookMin = useMemo(() => {
+    if (done.length === 0) return 0;
+    const valid = done.filter(t => t.completedAt);
+    if (valid.length === 0) return 0;
+    return Math.round(
+      valid.reduce((sum, t) => sum + (t.completedAt! - t.createdAt) / 60000, 0) / valid.length,
+    );
+  }, [done]);
 
-  // 活跃工单（pending + cooking）按水平滚动排列
-  const activeTickets = [
+  // 活跃工单（pending + cooking）按水平滚动排列，只在依赖变化时重算
+  const activeTickets = useMemo(() => [
     ...sortTickets(pending.map(t => ({ ...t, _col: 'pending' as const }))),
     ...sortTickets(cooking.map(t => ({ ...t, _col: 'cooking' as const }))),
-  ];
+  ], [pending, cooking]);
 
   return (
     <div
@@ -291,7 +279,7 @@ export function KitchenBoard() {
               cursor: 'pointer',
             }}
           >
-            {batchView ? '合并视图' : '合并视图'}
+            合并视图
           </button>
 
           {!wsEnabled && (
@@ -346,7 +334,7 @@ export function KitchenBoard() {
                 orderId={t.orderNo}
                 tableNo={t.tableNo}
                 items={txItems}
-                createdAt={new Date(t.createdAt)}
+                createdAt={t.createdAt}
                 timeLimit={config.timeoutMinutes}
                 isVip={t.priority === 'vip'}
                 onComplete={() => isPending ? startCooking(t.id) : completeCooking(t.id)}

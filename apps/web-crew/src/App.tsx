@@ -1,7 +1,6 @@
 /**
  * 服务员端 PWA — 手机点餐/加菜/催菜/桌台状态
  */
-import { useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
 import { TXAgentAlert, type TXAgentAlertProps } from '@tx/touch';
 import { TablesView } from './pages/TablesView';
@@ -180,8 +179,8 @@ function BottomTab() {
 }
 
 export default function App() {
-  // Agent 预警条状态（暂用 mock 空数组，后续接 WebSocket 推送）
-  const [agentAlerts] = useState<AgentAlert[]>([]);
+  // Agent 预警条状态（暂用空数组，后续接 WebSocket 推送替换为 useState）
+  const agentAlerts: AgentAlert[] = [];
 
   return (
     <BrowserRouter>

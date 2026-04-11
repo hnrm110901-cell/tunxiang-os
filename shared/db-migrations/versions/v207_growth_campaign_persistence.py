@@ -62,6 +62,12 @@ def upgrade() -> None:
     op.create_index('idx_report_entries_winner', TABLE,
                     ['tenant_id', 'campaign_id', 'is_winner'],
                     postgresql_where=sa.text('is_winner = true'))
+    # 开奖场景（ORDER BY random() LIMIT k）：覆盖未中奖、未开奖的候选行
+    op.create_index('idx_report_entries_pending_draw', TABLE,
+                    ['tenant_id', 'campaign_id', 'registered_at'],
+                    postgresql_where=sa.text(
+                        'is_winner = false AND drawn_at IS NULL AND is_deleted = false'
+                    ))
 
     # ─── RLS 策略 ────────────────────────────────────────────────────────────
     op.execute(f"ALTER TABLE {TABLE} ENABLE ROW LEVEL SECURITY")
@@ -73,6 +79,7 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.execute(f"DROP POLICY IF EXISTS {TABLE}_tenant_isolation ON {TABLE}")
+    op.drop_index('idx_report_entries_pending_draw', table_name=TABLE)
     op.drop_index('idx_report_entries_winner', table_name=TABLE)
     op.drop_index('idx_report_entries_customer', table_name=TABLE)
     op.drop_index('idx_report_entries_campaign', table_name=TABLE)
