@@ -1,25 +1,67 @@
-"""门店借调与成本分摊 API"""
+"""门店借调与成本分摊 API
+
+持久化：employee_transfers 表（v140 创建，v208 补全字段）
+"""
+import uuid
+from datetime import datetime, timezone
 from typing import List, Optional
 
-from fastapi import APIRouter, HTTPException, Query
+import structlog
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from services.store_transfer_service import (
-    approve_transfer_order,
     compute_cost_split,
     compute_time_split,
-    create_transfer_order,
     generate_cost_analysis_report,
     generate_detail_report,
     generate_summary_report,
 )
+from shared.ontology.src.database import get_db
+
+logger = structlog.get_logger(__name__)
 
 router = APIRouter(prefix="/api/v1/org", tags=["transfers"])
 
-# ── 内存存储（演示用，生产环境替换为 DB） ──────────────────
-_transfer_store: dict = {}  # id -> order dict
+
+# ── 辅助函数 ──────────────────────────────────────────────────────────────────
 
 
-# ── 请求模型 ──────────────────────────────────────────────
+def _parse_tenant(x_tenant_id: str) -> str:
+    try:
+        uuid.UUID(x_tenant_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail="X-Tenant-ID 须为合法 UUID") from e
+    return x_tenant_id
+
+
+async def _set_rls(db: AsyncSession, tenant_id: str) -> None:
+    await db.execute(
+        text("SELECT set_config('app.tenant_id', :tid, true)"),
+        {"tid": tenant_id},
+    )
+
+
+def _row_to_dict(row: object) -> dict:
+    """将 SQLAlchemy Row 转为可序列化字典。"""
+    if hasattr(row, "_mapping"):
+        d = dict(row._mapping)
+    else:
+        d = dict(row)
+    for key in ("start_date", "end_date", "created_at", "updated_at", "approved_at", "effective_date"):
+        if d.get(key) is not None and hasattr(d[key], "isoformat"):
+            d[key] = d[key].isoformat()
+    for key in ("id", "tenant_id", "employee_id", "from_store_id", "to_store_id",
+                "requested_by", "approved_by"):
+        if d.get(key) is not None:
+            d[key] = str(d[key])
+    return d
+
+
+# ── 请求模型 ──────────────────────────────────────────────────────────────────
 
 
 class CreateTransferReq(BaseModel):
@@ -68,14 +110,23 @@ class CostReportReq(BaseModel):
     all_employees: Optional[List[dict]] = None
 
 
-# ── 借调单 CRUD ───────────────────────────────────────────
+# ── 借调单 CRUD ───────────────────────────────────────────────────────────────
 
 
 @router.post("/transfers")
-async def api_create_transfer(req: CreateTransferReq):
-    """创建借调单"""
+async def api_create_transfer(
+    req: CreateTransferReq,
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """创建借调单（持久化到 employee_transfers 表）。"""
+    tid = _parse_tenant(x_tenant_id)
+    await _set_rls(db, tid)
+
+    # 业务校验（利用原有纯函数服务）
     try:
-        order = create_transfer_order(
+        from services.store_transfer_service import create_transfer_order as _validate
+        _validate(
             employee_id=req.employee_id,
             employee_name=req.employee_name,
             from_store_id=req.from_store_id,
@@ -87,9 +138,68 @@ async def api_create_transfer(req: CreateTransferReq):
             reason=req.reason,
         )
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
-    _transfer_store[order["id"]] = order
+    transfer_id = uuid.uuid4()
+    now = datetime.now(timezone.utc)
+
+    try:
+        await db.execute(
+            text("""
+                INSERT INTO employee_transfers (
+                    id, tenant_id, employee_id, employee_name,
+                    from_store_id, from_store_name,
+                    to_store_id, to_store_name,
+                    start_date, end_date,
+                    reason, status, is_deleted,
+                    created_at, updated_at
+                ) VALUES (
+                    :id, :tenant_id, :employee_id, :employee_name,
+                    :from_store_id, :from_store_name,
+                    :to_store_id, :to_store_name,
+                    :start_date, :end_date,
+                    :reason, 'pending', false,
+                    :now, :now
+                )
+            """),
+            {
+                "id": transfer_id,
+                "tenant_id": uuid.UUID(tid),
+                "employee_id": req.employee_id,
+                "employee_name": req.employee_name,
+                "from_store_id": req.from_store_id,
+                "from_store_name": req.from_store_name,
+                "to_store_id": req.to_store_id,
+                "to_store_name": req.to_store_name,
+                "start_date": req.start_date,
+                "end_date": req.end_date,
+                "reason": req.reason,
+                "now": now,
+            },
+        )
+        await db.commit()
+    except SQLAlchemyError as exc:
+        await db.rollback()
+        logger.error("transfer.create_failed", error=str(exc), tenant_id=tid, exc_info=True)
+        raise HTTPException(status_code=500, detail="借调单创建失败，请稍后重试")
+
+    order = {
+        "id": str(transfer_id),
+        "employee_id": req.employee_id,
+        "employee_name": req.employee_name,
+        "from_store_id": req.from_store_id,
+        "from_store_name": req.from_store_name,
+        "to_store_id": req.to_store_id,
+        "to_store_name": req.to_store_name,
+        "start_date": req.start_date,
+        "end_date": req.end_date,
+        "reason": req.reason,
+        "status": "pending",
+        "approved_by": None,
+        "approved_at": None,
+        "created_at": now.isoformat(),
+    }
+    logger.info("transfer.created", transfer_id=str(transfer_id), tenant_id=tid)
     return {"ok": True, "data": order}
 
 
@@ -100,50 +210,148 @@ async def api_list_transfers(
     status: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
-):
-    """列表查询借调单（支持 store_id/employee_id/status 筛选）"""
-    items = list(_transfer_store.values())
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """列表查询借调单（支持 store_id/employee_id/status 筛选）。"""
+    tid = _parse_tenant(x_tenant_id)
+    await _set_rls(db, tid)
+
+    conditions = ["tenant_id = :tenant_id", "is_deleted = false"]
+    params: dict = {"tenant_id": uuid.UUID(tid)}
 
     if store_id:
-        items = [
-            o for o in items
-            if o["from_store_id"] == store_id or o["to_store_id"] == store_id
-        ]
+        conditions.append("(from_store_id = :store_id OR to_store_id = :store_id)")
+        params["store_id"] = store_id
     if employee_id:
-        items = [o for o in items if o["employee_id"] == employee_id]
+        conditions.append("employee_id = :employee_id")
+        params["employee_id"] = employee_id
     if status:
-        items = [o for o in items if o["status"] == status]
+        conditions.append("status = :status")
+        params["status"] = status
 
-    total = len(items)
-    start = (page - 1) * size
-    end = start + size
-    paged = items[start:end]
+    where = " AND ".join(conditions)
 
-    return {"ok": True, "data": {"items": paged, "total": total}}
+    try:
+        count_res = await db.execute(
+            text(f"SELECT COUNT(*) FROM employee_transfers WHERE {where}"),
+            params,
+        )
+        total = count_res.scalar() or 0
+
+        rows_res = await db.execute(
+            text(f"""
+                SELECT id, tenant_id, employee_id, employee_name,
+                       from_store_id, from_store_name,
+                       to_store_id, to_store_name,
+                       start_date, end_date,
+                       reason, status, approved_by, approved_at,
+                       created_at, updated_at
+                FROM employee_transfers
+                WHERE {where}
+                ORDER BY created_at DESC
+                LIMIT :size OFFSET :offset
+            """),
+            {**params, "size": size, "offset": (page - 1) * size},
+        )
+        items = [_row_to_dict(r) for r in rows_res.fetchall()]
+
+    except SQLAlchemyError as exc:
+        logger.error("transfer.list_failed", error=str(exc), tenant_id=tid, exc_info=True)
+        raise HTTPException(status_code=500, detail="查询借调单失败，请稍后重试")
+
+    return {"ok": True, "data": {"items": items, "total": total}}
 
 
 @router.post("/transfers/{transfer_id}/approve")
-async def api_approve_transfer(transfer_id: str, req: ApproveTransferReq):
-    """审批借调单"""
-    order = _transfer_store.get(transfer_id)
-    if not order:
-        raise HTTPException(status_code=404, detail="借调单不存在")
+async def api_approve_transfer(
+    transfer_id: str,
+    req: ApproveTransferReq,
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """审批借调单（pending → approved）。"""
+    tid = _parse_tenant(x_tenant_id)
+    await _set_rls(db, tid)
 
     try:
-        updated = approve_transfer_order(order, req.approver_id)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        cur = await db.execute(
+            text("""
+                SELECT id, status FROM employee_transfers
+                WHERE id = :id AND tenant_id = :tenant_id AND is_deleted = false
+            """),
+            {"id": transfer_id, "tenant_id": uuid.UUID(tid)},
+        )
+        row = cur.fetchone()
+    except SQLAlchemyError as exc:
+        logger.error("transfer.approve_fetch_failed", error=str(exc), exc_info=True)
+        raise HTTPException(status_code=500, detail="查询借调单失败，请稍后重试")
 
-    _transfer_store[transfer_id] = updated
+    if not row:
+        raise HTTPException(status_code=404, detail="借调单不存在")
+
+    current_status = row[1]
+    if current_status != "pending":
+        raise HTTPException(
+            status_code=400,
+            detail=f"借调单状态为 {current_status}，无法审批",
+        )
+
+    now = datetime.now(timezone.utc)
+
+    try:
+        await db.execute(
+            text("""
+                UPDATE employee_transfers
+                SET status = 'approved',
+                    approved_by = :approver_id,
+                    approved_at = :now,
+                    updated_at = :now
+                WHERE id = :id AND tenant_id = :tenant_id
+            """),
+            {
+                "approver_id": req.approver_id,
+                "now": now,
+                "id": transfer_id,
+                "tenant_id": uuid.UUID(tid),
+            },
+        )
+        await db.commit()
+    except SQLAlchemyError as exc:
+        await db.rollback()
+        logger.error("transfer.approve_failed", error=str(exc), exc_info=True)
+        raise HTTPException(status_code=500, detail="审批借调单失败，请稍后重试")
+
+    # 返回更新后的记录
+    try:
+        res = await db.execute(
+            text("""
+                SELECT id, tenant_id, employee_id, employee_name,
+                       from_store_id, from_store_name,
+                       to_store_id, to_store_name,
+                       start_date, end_date,
+                       reason, status, approved_by, approved_at,
+                       created_at, updated_at
+                FROM employee_transfers
+                WHERE id = :id AND tenant_id = :tenant_id
+            """),
+            {"id": transfer_id, "tenant_id": uuid.UUID(tid)},
+        )
+        updated = _row_to_dict(res.fetchone())
+    except SQLAlchemyError as exc:
+        logger.warning("transfer.approve_refetch_failed", error=str(exc))
+        updated = {"id": transfer_id, "status": "approved", "approved_by": req.approver_id}
+
+    logger.info("transfer.approved", transfer_id=transfer_id, tenant_id=tid)
     return {"ok": True, "data": updated}
 
 
-# ── 成本分摊 ──────────────────────────────────────────────
+# ── 成本分摊 ──────────────────────────────────────────────────────────────────
 
 
 @router.post("/cost-split")
-async def api_cost_split(req: CostSplitReq):
-    """成本分摊查询"""
+async def api_cost_split(req: CostSplitReq) -> dict:
+    """成本分摊查询（纯计算，无 DB 依赖）。"""
     attendance = [r.model_dump() for r in req.attendance_records]
     time_split = compute_time_split(req.transfers, attendance)
     salary = req.salary_data.model_dump()
@@ -152,8 +360,8 @@ async def api_cost_split(req: CostSplitReq):
 
 
 @router.post("/cost-split/report")
-async def api_cost_report(req: CostReportReq):
-    """三表报告（detail/summary/analysis）"""
+async def api_cost_report(req: CostReportReq) -> dict:
+    """三表报告（detail/summary/analysis，纯计算，无 DB 依赖）。"""
     attendance = [r.model_dump() for r in req.attendance_records]
     time_split = compute_time_split(req.transfers, attendance)
     salary = req.salary_data.model_dump()
@@ -167,21 +375,22 @@ async def api_cost_report(req: CostReportReq):
         report = generate_detail_report(req.employee_id, emp_time, emp_cost)
         return {"ok": True, "data": report}
 
-    elif req.report_type == "summary":
-        all_emp = []
-        for emp_id, emp_cost in cost_split.items():
-            all_emp.append({"employee_id": emp_id, "cost_split": emp_cost})
+    if req.report_type == "summary":
+        all_emp = [
+            {"employee_id": eid, "cost_split": ecost}
+            for eid, ecost in cost_split.items()
+        ]
         report = generate_summary_report(all_emp)
         return {"ok": True, "data": report}
 
-    elif req.report_type == "analysis":
-        all_emp = []
-        for emp_id, emp_cost in cost_split.items():
-            all_emp.append({"employee_id": emp_id, "cost_split": emp_cost})
+    if req.report_type == "analysis":
+        all_emp = [
+            {"employee_id": eid, "cost_split": ecost}
+            for eid, ecost in cost_split.items()
+        ]
         summary = generate_summary_report(all_emp)
         budget = req.budget_data or {}
         report = generate_cost_analysis_report(summary, budget)
         return {"ok": True, "data": report}
 
-    else:
-        raise HTTPException(status_code=400, detail=f"未知报告类型: {req.report_type}")
+    raise HTTPException(status_code=400, detail=f"未知报告类型: {req.report_type}")
