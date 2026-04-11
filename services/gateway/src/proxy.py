@@ -51,6 +51,8 @@ DOMAIN_ROUTES = {
     "narrative": os.getenv("TX_ANALYTICS_URL", "http://localhost:8009"),
     # Supply 子域路由（tx-supply:8006）
     "procurement-recommend": os.getenv("TX_SUPPLY_URL", "http://localhost:8006"),
+    # 支付中枢（tx-pay:8013）
+    "pay": os.getenv("TX_PAY_URL", "http://localhost:8013"),
 }
 
 # 旧单体回退（M4a 后可移除）

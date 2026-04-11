@@ -2120,6 +2120,101 @@ _register("energy_monitor__analyze_from_mv", _entry(
 
 
 # ---------------------------------------------------------------------------
+# tx-pay: payment_nexus (7 actions) — 支付中枢 MCP 工具
+# ---------------------------------------------------------------------------
+
+_register("payment_nexus__query_status", _entry(
+    agent_id="payment_nexus",
+    action="query_status",
+    description="查询支付状态 — 输入 payment_id，返回支付方式、金额、状态、第三方流水号",
+    input_schema={
+        "properties": {
+            "payment_id": {"type": "string", "description": "支付单号（如 PAY20260411143000ABCD）"},
+        },
+        "required": ["payment_id"],
+    },
+))
+
+_register("payment_nexus__daily_summary", _entry(
+    agent_id="payment_nexus",
+    action="daily_summary",
+    description="门店当日支付汇总 — 按支付方式分组（微信/支付宝/现金/储值/挂账），含手续费计算",
+    input_schema={
+        "properties": {
+            "store_id": {"type": "string", "description": "门店ID"},
+            "summary_date": {"type": "string", "description": "日期 YYYY-MM-DD（默认今天）"},
+        },
+        "required": ["store_id"],
+    },
+))
+
+_register("payment_nexus__list_channels", _entry(
+    agent_id="payment_nexus",
+    action="list_channels",
+    description="列出已注册的支付渠道及其支持的支付方式 — 用于诊断渠道配置问题",
+    input_schema={
+        "properties": {},
+    },
+))
+
+_register("payment_nexus__list_pending_agent_payments", _entry(
+    agent_id="payment_nexus",
+    action="list_pending_agent_payments",
+    description="列出等待人类确认的 Agent 支付请求 — POS 端展示确认弹窗",
+    input_schema={
+        "properties": {
+            "agent_id": {"type": "string", "description": "筛选特定 Agent（可选）"},
+        },
+    },
+))
+
+_register("payment_nexus__prepare", _entry(
+    agent_id="payment_nexus",
+    action="prepare",
+    description="Agent 准备支付（不扣款）— 生成 prepared_id 推送到 POS 端等待收银员确认。单笔上限 1000 元",
+    input_schema={
+        "properties": {
+            "tenant_id": {"type": "string", "description": "租户ID"},
+            "store_id": {"type": "string", "description": "门店ID"},
+            "order_id": {"type": "string", "description": "订单ID"},
+            "amount_fen": {"type": "integer", "description": "金额（分）"},
+            "method": {"type": "string", "description": "支付方式: wechat/alipay/cash/member_balance/credit_account"},
+            "reason": {"type": "string", "description": "Agent 发起支付的理由"},
+        },
+        "required": ["tenant_id", "store_id", "order_id", "amount_fen", "method", "reason"],
+    },
+))
+
+_register("payment_nexus__confirm_agent", _entry(
+    agent_id="payment_nexus",
+    action="confirm_agent",
+    description="确认 Agent 准备的支付并执行扣款 — 必须由收银员通过生物识别/密码确认",
+    input_schema={
+        "properties": {
+            "prepared_id": {"type": "string", "description": "Agent 准备的支付ID"},
+            "operator_id": {"type": "string", "description": "操作员ID"},
+            "auth_type": {"type": "string", "description": "认证方式: biometric/password/sms_code"},
+        },
+        "required": ["prepared_id", "operator_id", "auth_type"],
+    },
+))
+
+_register("payment_nexus__refund", _entry(
+    agent_id="payment_nexus",
+    action="refund",
+    description="发起退款 — 需管理员审批。支持全额退款和部分退款",
+    input_schema={
+        "properties": {
+            "payment_id": {"type": "string", "description": "原支付单号"},
+            "refund_amount_fen": {"type": "integer", "description": "退款金额（分）"},
+            "reason": {"type": "string", "description": "退款原因"},
+        },
+        "required": ["payment_id", "refund_amount_fen", "reason"],
+    },
+))
+
+
+# ---------------------------------------------------------------------------
 # Convenience accessors
 # ---------------------------------------------------------------------------
 
