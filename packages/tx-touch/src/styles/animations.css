@@ -1,0 +1,104 @@
+/*
+ * TXTouch · 触控动画
+ * 原则：动画只用于操作反馈，不用于装饰
+ */
+
+/* ─── 按压反馈 ─── */
+/* 在可点击元素上添加此类，:active 时自动产生按压感 */
+.tx-press-feedback {
+  transition: transform 200ms ease, filter 200ms ease, opacity 200ms ease;
+}
+
+.tx-press-feedback:active {
+  transform: scale(0.97);
+  filter: brightness(0.92);
+}
+
+/* ─── 脉冲动画（Agent critical预警） ─── */
+@keyframes tx-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+.tx-pulse {
+  animation: tx-pulse 1.5s ease-in-out infinite;
+}
+
+/* ─── 底部弹层滑入 ─── */
+@keyframes tx-slide-up-in {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes tx-slide-up-out {
+  from {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+}
+
+.tx-slide-up {
+  animation: tx-slide-up-in 300ms ease-out forwards;
+}
+
+.tx-slide-down {
+  animation: tx-slide-up-out 250ms ease-in forwards;
+}
+
+/* ─── 列表项淡入 ─── */
+@keyframes tx-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.tx-fade-in {
+  animation: tx-fade-in 200ms ease-out both;
+}
+
+/* ─── 旋转加载圈 ─── */
+@keyframes tx-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.tx-spin {
+  animation: tx-spin 600ms linear infinite;
+}
+
+/* ─── 遮罩淡入/淡出 ─── */
+@keyframes tx-mask-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.tx-mask-in {
+  animation: tx-mask-in 200ms ease-out forwards;
+}

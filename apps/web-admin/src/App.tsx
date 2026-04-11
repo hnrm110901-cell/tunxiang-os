@@ -3,6 +3,9 @@
  */
 import { useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { ConfigProvider } from 'antd';
+import zhCN from 'antd/locale/zh_CN';
+import { txAdminTheme } from './theme/antd-theme';
 import { getToken, clearAuth, isTokenExpired } from './api/client';
 import { ShellHQ } from './shell/ShellHQ';
 import { LoginPage } from './pages/LoginPage';
@@ -275,9 +278,16 @@ function App() {
     setIsLoggedIn(false);
   };
 
-  if (!isLoggedIn) { return <LoginPage onLogin={() => setIsLoggedIn(true)} />; }
+  if (!isLoggedIn) {
+    return (
+      <ConfigProvider theme={txAdminTheme} locale={zhCN}>
+        <LoginPage onLogin={() => setIsLoggedIn(true)} />
+      </ConfigProvider>
+    );
+  }
 
   return (
+    <ConfigProvider theme={txAdminTheme} locale={zhCN}>
     <BrowserRouter>
       <ShellHQ onLogout={handleLogout}>
         <Routes>
@@ -563,6 +573,7 @@ function App() {
         </Routes>
       </ShellHQ>
     </BrowserRouter>
+    </ConfigProvider>
   );
 }
 

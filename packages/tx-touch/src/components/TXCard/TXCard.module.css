@@ -1,0 +1,50 @@
+.card {
+  background: var(--tx-bg-1);
+  border-radius: var(--tx-radius-md);
+  box-shadow: var(--tx-shadow-sm);
+  border: 1.5px solid var(--tx-border);
+  overflow: hidden;
+  position: relative;
+  transition: transform 200ms ease, box-shadow 200ms ease;
+}
+
+/* ─── 选中态 ─── */
+.selected {
+  border: 2px solid var(--tx-primary);
+}
+
+/* ─── 状态色条（左侧4px） ─── */
+.warning::before,
+.danger::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  border-radius: var(--tx-radius-md) 0 0 var(--tx-radius-md);
+}
+
+.warning::before {
+  background: var(--tx-warning);
+}
+
+.danger::before {
+  background: var(--tx-danger);
+}
+
+.danger {
+  background: rgba(163, 45, 45, 0.04);
+}
+
+/* ─── 可点击按压态 ─── */
+.pressable {
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+.pressable:active {
+  transform: scale(0.98);
+  box-shadow: var(--tx-shadow-md);
+}
