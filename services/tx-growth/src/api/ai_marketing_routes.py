@@ -248,26 +248,112 @@ async def get_performance_summary(
         {"tid": str(tenant_id)},
     )
 
-    # 聚合营销数据（生产环境查真实表）
+    # ── Total touches in period ──────────────────────────────────────────────
+    total_row = await db.execute(
+        text("""
+            SELECT COUNT(*) as total_touches,
+                   COUNT(DISTINCT member_id) as unique_members
+            FROM marketing_touch_log
+            WHERE tenant_id = :tenant_id::uuid
+              AND sent_at > NOW() - (:days || ' days')::interval
+              AND NOT is_deleted
+        """),
+        {"tenant_id": str(tenant_id), "days": days},
+    )
+    totals = total_row.fetchone()
+    total_touches = totals.total_touches if totals else 0
+    unique_members = totals.unique_members if totals else 0
+
+    # ── Channel breakdown ────────────────────────────────────────────────────
+    chan_rows = await db.execute(
+        text("""
+            SELECT channel,
+                   COUNT(*) as sent,
+                   COUNT(*) FILTER (WHERE status IN ('sent','delivered','clicked','converted')) as delivered,
+                   COUNT(*) FILTER (WHERE attribution_revenue_fen IS NOT NULL AND attribution_revenue_fen > 0) as conversions
+            FROM marketing_touch_log
+            WHERE tenant_id = :tenant_id::uuid
+              AND sent_at > NOW() - (:days || ' days')::interval
+              AND NOT is_deleted
+            GROUP BY channel
+        """),
+        {"tenant_id": str(tenant_id), "days": days},
+    )
+    channel_breakdown: dict[str, Any] = {}
+    for row in chan_rows.fetchall():
+        cvr = round(row.conversions / max(1, row.sent), 3)
+        channel_breakdown[row.channel] = {
+            "sent": row.sent,
+            "delivered": row.delivered,
+            "conversion_rate": cvr,
+        }
+
+    # ── Campaign performance ─────────────────────────────────────────────────
+    camp_rows = await db.execute(
+        text("""
+            SELECT campaign_type,
+                   COUNT(*) as sent,
+                   COUNT(*) FILTER (WHERE attribution_revenue_fen IS NOT NULL AND attribution_revenue_fen > 0) as attributed_orders,
+                   COALESCE(SUM(attribution_revenue_fen), 0) as revenue_fen
+            FROM marketing_touch_log
+            WHERE tenant_id = :tenant_id::uuid
+              AND sent_at > NOW() - (:days || ' days')::interval
+              AND NOT is_deleted
+            GROUP BY campaign_type
+            ORDER BY revenue_fen DESC
+        """),
+        {"tenant_id": str(tenant_id), "days": days},
+    )
+    campaign_performance = [
+        {
+            "type": row.campaign_type or "unknown",
+            "sent": row.sent,
+            "attributed_orders": row.attributed_orders,
+            "revenue_fen": row.revenue_fen,
+        }
+        for row in camp_rows.fetchall()
+    ]
+
+    # ── Total attributed revenue ─────────────────────────────────────────────
+    total_revenue_row = await db.execute(
+        text("""
+            SELECT COALESCE(SUM(attribution_revenue_fen), 0) as total_revenue
+            FROM marketing_touch_log
+            WHERE tenant_id = :tenant_id::uuid
+              AND sent_at > NOW() - (:days || ' days')::interval
+              AND NOT is_deleted
+        """),
+        {"tenant_id": str(tenant_id), "days": days},
+    )
+    total_revenue = int(total_revenue_row.scalar() or 0)
+
+    # ── ROI: attributed revenue / (touches × 1元/条 估算成本) ────────────────
+    marketing_cost = max(1, total_touches * 100)  # 1元/条消息估算成本（单位：分）
+    overall_roi = round(total_revenue / marketing_cost, 2) if total_revenue > 0 else 0.0
+
+    # ── Top insight from channel performance ─────────────────────────────────
+    best_channel = max(
+        channel_breakdown.items(),
+        key=lambda x: x[1]["conversion_rate"],
+        default=(None, {}),
+    )
+    top_insight = (
+        f"{best_channel[0]} 渠道转化率最高（{best_channel[1]['conversion_rate']:.0%}），建议加大该渠道触达比例"
+        if best_channel[0]
+        else "暂无足够数据生成洞察，建议先完成渠道配置"
+    )
+
     summary = {
         "store_id": store_id,
         "period_days": days,
-        "total_touches": 342,
-        "unique_members_reached": 218,
-        "channel_breakdown": {
-            "sms": {"sent": 145, "delivered": 138, "conversion_rate": 0.12},
-            "wechat_subscribe": {"sent": 132, "delivered": 128, "conversion_rate": 0.18},
-            "wecom_chat": {"sent": 65, "delivered": 62, "conversion_rate": 0.24},
-        },
-        "campaign_performance": [
-            {"type": "post_order_touch", "sent": 156, "attributed_orders": 28, "revenue_fen": 210000},
-            {"type": "birthday_care", "sent": 12, "attributed_orders": 9, "revenue_fen": 76500},
-            {"type": "winback_journey", "sent": 89, "attributed_orders": 11, "revenue_fen": 88000},
-        ],
-        "total_attributed_revenue_fen": 374500,
-        "total_marketing_cost_fen": 48000,
-        "overall_roi": 7.8,
-        "top_insight": "企微1对1话术转化率最高（24%），建议加大企微触达比例",
+        "total_touches": total_touches,
+        "unique_members_reached": unique_members,
+        "channel_breakdown": channel_breakdown,
+        "campaign_performance": campaign_performance,
+        "total_attributed_revenue_fen": total_revenue,
+        "total_marketing_cost_fen": marketing_cost,
+        "overall_roi": overall_roi,
+        "top_insight": top_insight,
     }
 
     return {"ok": True, "data": summary}
