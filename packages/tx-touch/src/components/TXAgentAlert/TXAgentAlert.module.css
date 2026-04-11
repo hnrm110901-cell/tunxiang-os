@@ -1,0 +1,83 @@
+.alert {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 16px;
+  min-height: 56px;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ─── 内容区域 ─── */
+.content {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  flex-wrap: wrap;
+}
+
+.agentTag {
+  font-size: 13px;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.25);
+  color: #fff;
+  padding: 2px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.message {
+  font-size: 16px;
+  font-weight: 500;
+  color: #fff;
+  line-height: 1.4;
+}
+
+/* ─── 操作按钮 ─── */
+.actionBtn {
+  background: rgba(255, 255, 255, 0.25);
+  border: 1.5px solid rgba(255, 255, 255, 0.6);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  padding: 6px 16px;
+  border-radius: var(--tx-radius-sm);
+  cursor: pointer;
+  white-space: nowrap;
+  min-height: var(--tx-tap-min);
+  display: flex;
+  align-items: center;
+  -webkit-tap-highlight-color: transparent;
+  flex-shrink: 0;
+}
+
+.actionBtn:active {
+  background: rgba(255, 255, 255, 0.4);
+  transform: scale(0.97);
+}
+
+/* ─── Severity 变体 ─── */
+.critical {
+  background: var(--tx-danger);
+  animation: tx-alert-pulse 1.5s ease-in-out infinite;
+}
+
+.warning {
+  background: var(--tx-warning);
+}
+
+.info {
+  background: var(--tx-info);
+}
+
+@keyframes tx-alert-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.8; }
+}

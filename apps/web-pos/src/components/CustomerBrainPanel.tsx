@@ -4,7 +4,7 @@
  * 结账视图左侧展示会员画像、偏好、存酒及 AI 行动建议。
  * Sprint 2：菜品智能体 + 客户大脑 POS 层
  */
-import { Button } from 'antd';
+import { TXButton } from '@tx/touch';
 
 interface CustomerProfile {
   memberId: string;

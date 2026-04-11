@@ -4,10 +4,10 @@
    ═══════════════════════════════════════════ */
 
 :root {
-  /* ─── 品牌色 ─── */
-  --brand: #FF6B2C;
-  --brand-light: #FF8F5E;
-  --brand-bg: rgba(255, 107, 44, 0.08);
+  /* ─── 品牌色（已迁移至 @tx/tokens/tokens.css，此处保留向后兼容变量）─── */
+  --brand: #FF6B35;
+  --brand-light: #FF8555;
+  --brand-bg: rgba(255, 107, 53, 0.08);
 
   /* ─── 语义色 ─── */
   --green: #52c41a;

@@ -7,6 +7,8 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, 'src'),
+      '@tx/touch': path.resolve(__dirname, '../../packages/tx-touch/src'),
+      '@tx/tokens': path.resolve(__dirname, '../../packages/tx-tokens/src'),
     },
   },
   server: {
