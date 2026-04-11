@@ -5,13 +5,7 @@
  */
 
 import React, { useEffect, useMemo } from 'react';
-import { Segmented, Button, Space, message, Affix } from 'antd';
-import {
-  BgColorsOutlined,
-  UnorderedListOutlined,
-  EnvironmentOutlined,
-  ReloadOutlined,
-} from '@ant-design/icons';
+import { TXButton } from '@tx/touch';
 import { useTableStore } from '../../stores/tableStore';
 import { ViewMode } from '../../types/table-card';
 import StatusSummaryBar from './components/StatusSummaryBar';
@@ -31,10 +25,10 @@ export interface TableManagementPageProps {
 /**
  * 视图配置
  */
-const VIEW_CONFIG: Record<ViewMode, { icon: React.ReactNode; label: string }> = {
-  card: { icon: <BgColorsOutlined />, label: '卡片' },
-  list: { icon: <UnorderedListOutlined />, label: '列表' },
-  map: { icon: <EnvironmentOutlined />, label: '地图' },
+const VIEW_CONFIG: Record<ViewMode, { icon: string; label: string }> = {
+  card: { icon: '⊞', label: '卡片' },
+  list: { icon: '≡', label: '列表' },
+  map: { icon: '⊙', label: '地图' },
 };
 
 /**
@@ -74,9 +68,8 @@ export const TableManagementPage: React.FC<TableManagementPageProps> = ({
   const handleRefresh = async () => {
     try {
       await fetchTables(storeId, viewMode);
-      message.success('刷新成功');
     } catch (err) {
-      message.error('刷新失败');
+      // 刷新失败：静默处理（toast 由 store 的 error 字段驱动）
     }
   };
 
@@ -124,49 +117,45 @@ export const TableManagementPage: React.FC<TableManagementPageProps> = ({
         />
 
         <div className={styles.viewModeSelector}>
-          <Segmented<string>
-            value={viewMode}
-            onChange={handleViewModeChange}
-            options={[
-              {
-                label: (
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    {VIEW_CONFIG.card.icon}
-                    {VIEW_CONFIG.card.label}
-                  </span>
-                ),
-                value: 'card',
-              },
-              {
-                label: (
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    {VIEW_CONFIG.list.icon}
-                    {VIEW_CONFIG.list.label}
-                  </span>
-                ),
-                value: 'list',
-              },
-              {
-                label: (
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    {VIEW_CONFIG.map.icon}
-                    {VIEW_CONFIG.map.label}
-                  </span>
-                ),
-                value: 'map',
-              },
-            ]}
-            disabled={loading}
-          />
+          {/* 视图切换 — 用原生按钮组替代 antd Segmented */}
+          <div style={{ display: 'flex', gap: 4, background: 'rgba(255,255,255,0.06)', borderRadius: 8, padding: 4 }}>
+            {(['card', 'list', 'map'] as ViewMode[]).map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                disabled={loading}
+                onClick={() => handleViewModeChange(mode)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  padding: '8px 14px',
+                  minHeight: 40,
+                  border: 'none',
+                  borderRadius: 6,
+                  background: viewMode === mode ? '#FF6B35' : 'transparent',
+                  color: viewMode === mode ? '#fff' : 'rgba(255,255,255,0.65)',
+                  fontSize: 16,
+                  fontWeight: viewMode === mode ? 600 : 400,
+                  cursor: loading ? 'not-allowed' : 'pointer',
+                  transition: 'background 200ms ease',
+                  fontFamily: 'inherit',
+                }}
+              >
+                <span>{VIEW_CONFIG[mode].icon}</span>
+                <span>{VIEW_CONFIG[mode].label}</span>
+              </button>
+            ))}
+          </div>
 
-          <Button
-            icon={<ReloadOutlined />}
-            onClick={handleRefresh}
-            loading={loading}
-            title="刷新数据"
+          <TXButton
+            variant="secondary"
+            size="normal"
+            onPress={handleRefresh}
+            disabled={loading}
           >
-            刷新
-          </Button>
+            {loading ? '刷新中...' : '↻ 刷新'}
+          </TXButton>
         </div>
       </div>
 
