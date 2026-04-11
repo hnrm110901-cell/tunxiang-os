@@ -4,6 +4,157 @@
 
 ---
 
+## 2026-04-11 (Sprint 4)
+
+### 今日完成：人力中枢升级 Sprint 4 — AI驱动层（教练+聚合+总览）
+
+**后端 API（2个模块，19个端点）**
+- `coach_session_routes.py` — 店长教练Agent（11端点：CRUD+建议采纳+行动追踪+有效性分析+店长汇总）
+- `alert_aggregation_routes.py` — AI预警聚合引擎（8端点：风险矩阵+趋势分析+门店排名+员工画像+问题店+处理效率+总览+周报）
+- `main.py` 注册 2 个新路由模块
+
+**前端页面（3个页面）**
+- `CoachSessionPage.tsx` — 店长教练Agent页（有效性分析+ProTable+Drawer建议采纳/行动追踪/重点员工）
+- `AlertAggregationPage.tsx` — AI人力预警中心（趋势Line图+风险矩阵热力表+门店排名+问题店清单+周度简报）
+- `HRHubOverviewPage.tsx` — 人力中枢总览页（8指标驾驶舱+预警饼图+进度条+8模块导航卡片）
+- `App.tsx` 注册 3 条前端路由
+
+**业务亮点**
+- 聚合引擎: hub-overview一个API返回8大域全部关键指标，总览页只需1次请求
+- 风险矩阵: 门店×预警类型，severity加权可视化，一眼定位问题交叉点
+- 店长教练: AI建议采纳追踪+就绪度前后对比，量化教练效果
+- 周度简报: 自动生成环比变化，critical事件+问题店Top3
+
+### 数据变化
+- 新增后端 API 模块：2 个（coach-sessions/alert-aggregation）
+- 新增端点：19 个
+- 新增前端页面：3 个
+- 新增前端路由：3 条
+- 数据库表：复用 v206 已建的 coach_sessions + ai_alerts 等
+
+### 遗留问题
+- 店长教练AI建议生成需接入tx-brain(Claude API)自动根据门店数据生成个性化建议
+- 员工风险画像需对接员工姓名解析（目前显示UUID）
+- 问题店"创建DRI工单"按钮需对接DRI工单创建API
+
+---
+
+## 2026-04-11 (Sprint 3)
+
+### 今日完成：人力中枢升级 Sprint 3 — 营业保障层（就绪度+高峰保障）
+
+**后端 API（2个模块，20个端点）**
+- `store_readiness_routes.py` — 门店就绪度评分（10端点：UPSERT+Dashboard+今日概览+趋势+热力图+行动追加）
+- `peak_guard_routes.py` — 高峰保障指挥（10端点：CRUD+Dashboard+即将到来+覆盖预警+行动追加+事后评估）
+- `main.py` 注册 2 个新路由模块
+
+**前端页面（2个页面）**
+- `StoreReadinessPage.tsx` — 今日营业就绪度（红黄绿灯仪表板+今日卡片矩阵+趋势Line图+维度Progress+详情Drawer）
+- `PeakGuardPage.tsx` — 高峰保障指挥（覆盖预警Alert+未来7天Timeline排期+ProTable+动态缺岗表单+事后评估+行动追加）
+- `App.tsx` 注册 2 条前端路由
+
+**业务亮点**
+- 就绪度: 四维权重算法自动评分(排班35%+技能25%+新人20%+培训20%)，UPSERT避免重复
+- 高峰保障: risk_positions自动计算coverage_score，事后评估对比effectiveness
+- 热力图: DISTINCT ON取每店最新分数，支撑矩阵/地图可视化
+- 预警联动: 覆盖度<60自动进入alerts列表
+
+### 数据变化
+- 新增后端 API 模块：2 个（store-readiness/peak-guard）
+- 新增端点：20 个
+- 新增前端页面：2 个
+- 新增前端路由：2 条
+- 数据库表：复用 v206 已建的 store_readiness_scores / peak_guard_records
+
+### 遗留问题
+- 就绪度评分需接入HRAgentScheduler定时自动计算（每日凌晨扫描门店排班+员工数据）
+- 高峰保障upcoming需接入POS营收预测数据（预测客流）
+- 热力图前端可视化需对接门店GPS坐标数据
+
+### 明日计划
+- Sprint 4（AI驱动层）：AI预警聚合引擎、店长教练Agent、人力中枢总览升级
+
+---
+
+## 2026-04-11 (Sprint 2)
+
+### 今日完成：人力中枢升级 Sprint 2 — 训练复制层（带教+训练+认证）
+
+**后端 API（3个模块，30个端点）**
+- `mentorship_routes.py` — 带教关系管理（9端点：CRUD+完成+终止+统计+排行榜）
+- `onboarding_path_routes.py` — 新员工训练路径（11端点：CRUD+任务完成+推进+模板+Dashboard）
+- `certification_routes.py` — 岗位认证与通关（10端点：CRUD+打分+评定+补考+过期预警+Dashboard）
+- `main.py` 注册 3 个新路由模块
+
+**前端页面（3个页面）**
+- `MentorshipSupervisePage.tsx` — 带教督导页（统计+排行榜+ProTable+完成/终止Modal）
+- `OnboardingPathPage.tsx` — 新员工训练路径页（Dashboard+ProTable+Drawer详情+Timeline任务列表+推进/完成/终止）
+- `CertificationPage.tsx` — 岗位认证与通关页（Dashboard+过期预警+ProTable+Drawer考核项打分+评定/补考）
+- `App.tsx` 注册 3 条前端路由
+
+**业务亮点**
+- 训练路径: 7/14/30天三套标准模板自动填充，jsonb_set精确更新单个任务
+- 岗位认证: 5岗位(厨师/服务员/店长/收银/保洁)各有专属考核项模板
+- 带教管理: 创建校验(不能自我带教+同时段唯一)，排行榜按评分排名
+- 过期预警: 30天内到期认证自动预警，一键发起补考
+
+### 数据变化
+- 新增后端 API 模块：3 个（mentorship/onboarding/certification）
+- 新增端点：30 个
+- 新增前端页面：3 个
+- 新增前端路由：3 条
+- 数据库表：复用 v206 已建的 mentorship_relations / onboarding_paths / position_certifications
+
+### 遗留问题
+- 带教关系中 mentor_id/mentee_id 前端暂显示UUID前8位，待接入员工姓名解析
+- 训练路径推进(advance-day)需接入HRAgentScheduler定时任务自动推进
+- 认证过期预警需接入AI预警系统(ai_alerts)自动生成预警记录
+
+### 明日计划
+- Sprint 3（营业保障层）：门店就绪度评分、高峰保障指挥、排班工作台升级
+
+---
+
+## 2026-04-11
+
+### 今日完成：人力中枢升级 Sprint 1 — 编制+工单+预警基座层
+
+**数据库（v206迁移）:**
+- 新增10张核心表：store_staffing_templates, staffing_snapshots, mentorship_relations, onboarding_paths, position_certifications, store_readiness_scores, peak_guard_records, dri_work_orders, ai_alerts, coach_sessions
+- 全部含RLS租户隔离策略、复合索引、CHECK约束
+- 4个UNIQUE约束防止数据重复
+
+**后端API（4个路由模块，34个端点）:**
+- staffing_template_routes.py: 8端点（编制模板CRUD/批量/汇总/复制）
+- staffing_analysis_routes.py: 7端点（快照生成/对标分析/缺编排名/趋势/技能缺口/营业影响）
+- dri_workorder_routes.py: 10端点（工单CRUD/状态机流转/统计/我的工单/行动项管理）
+- ai_alert_routes.py: 9端点（预警CRUD/仪表板/批量/门店摘要/处理/忽略/转工单）
+- 全部注册到tx-org main.py
+
+**前端页面（3个新页面）:**
+- StaffingTemplatePage.tsx: 编制模板管理（汇总卡片+ProTable+ModalForm+复制模板）
+- StaffingAnalysisPage.tsx: 编制对标分析（对标明细+缺编排名+趋势折线图）
+- DRIWorkOrderCenterPage.tsx: DRI工单中心（统计看板+工单列表+详情抽屉+状态流转+行动项管理）
+- 全部注册到App.tsx路由
+
+### 数据变化
+- 迁移版本: v205 → v206
+- 新增API模块: 4个（staffing_template/staffing_analysis/dri_workorder/ai_alert）
+- 新增API端点: 34个
+- 新增前端页面: 3个
+- 新增前端路由: 3条（/hr/staffing/templates, /hr/staffing/analysis, /hr/dri-workorders）
+
+### 遗留问题
+- AI预警前端页面待Sprint 4整合到AgentHub
+- 编制快照生成需接入定时任务（建议加入HRAgentScheduler每日执行）
+- DRI工单通知推送待接入企微/飞书IM
+
+### 明日计划
+- Sprint 2: 训练复制层（带教关系/新员工训练路径/岗位认证）
+- Sprint 3: 营业保障层（就绪度/高峰保障/排班升级）
+
+---
+
 ## 2026-04-07
 
 ### 今日完成：SCRM8差距补齐 + 全量测试覆盖
