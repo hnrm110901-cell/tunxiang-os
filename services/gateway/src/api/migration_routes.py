@@ -27,6 +27,8 @@ import structlog
 from fastapi import APIRouter, Header, HTTPException, Query, Request
 from pydantic import BaseModel
 
+from ..response import ok
+
 logger = structlog.get_logger(__name__)
 
 router = APIRouter(prefix="/api/v1/migration", tags=["migration"])
@@ -63,8 +65,6 @@ async def start_tiancai_migration(req: TiancaiMigrationStartRequest) -> dict:
 
     dry_run=True 时只拉取数据不写库，用于迁移前评估。
     """
-    from ..response import ok
-
     adapter = _build_adapter(req.tenant_id, req.tiancai_config)
 
     # 异步执行完整迁移（配置+菜品+会员）
@@ -104,7 +104,6 @@ async def get_tiancai_prefilled(
     仅执行配置映射，返回 prefilled_answers（不写数据库）。
     用于 onboarding 会话启动前的预览，让商户确认映射结果是否正确。
     """
-    from ..response import ok
     from ..migration.tiancai_config_mapper import TiancaiConfigMapper
 
     config = {}
@@ -141,8 +140,6 @@ async def get_pending_members_summary(
     返回：总人数、总储值金额（元）、按金额段分布。
     此接口结果需财务负责人签字后才能执行 approve。
     """
-    from ..response import ok
-
     tenant_id = x_tenant_id
     try:
         from shared.ontology.src.database import async_session_factory
@@ -198,8 +195,6 @@ async def list_pending_members(
     order_by: str = Query("balance_desc", description="balance_desc | balance_asc | name"),
 ) -> dict:
     """列出待审核（或已处理）的储值迁移会员。"""
-    from ..response import ok
-
     tenant_id = x_tenant_id
     offset = (page - 1) * size
 
@@ -277,7 +272,6 @@ async def approve_pending_member(
       1. 天财系统中该会员储值已被冻结
       2. 双方余额已人工对账一致
     """
-    from ..response import ok
     from datetime import datetime, timezone
 
     tenant_id = x_tenant_id
@@ -377,7 +371,6 @@ async def reject_pending_member(
     """
     审核拒绝：记录拒绝原因，储值余额不迁移（保留在天财系统中）。
     """
-    from ..response import ok
     from datetime import datetime, timezone
 
     tenant_id = x_tenant_id

@@ -6,40 +6,27 @@ import structlog
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from prometheus_fastapi_instrumentator import Instrumentator
 
-from .middleware import AuthMiddleware, TenantMiddleware, RequestLogMiddleware
-from .proxy import router as proxy_router
+from .api.config_health_routes import router as config_health_router
+from .api.migration_routes import router as migration_router
+from .api.onboarding_routes import router as onboarding_router
 from .api.open_api_routes import router as open_api_router
 from .auth import router as auth_router
+from .gdpr_routes import router as gdpr_router
 from .growth_intel_relay import router as relay_router
 from .hub_api import router as hub_router
-from .middleware import RequestLogMiddleware, TenantMiddleware
+from .middleware import AuthMiddleware, RequestLogMiddleware, TenantMiddleware
 from .middleware.audit_middleware import AuditMiddleware
 from .proxy import router as proxy_router
 from .response import ok
+from .sync_scheduler import create_sync_scheduler, sync_router as sync_health_router
 from .wecom_group_routes import router as wecom_group_router
 from .wecom_internal import router as wecom_internal_router
 from .wecom_jssdk import router as wecom_jssdk_router
 from .wecom_notify_routes import router as wecom_notify_router
 from .wecom_routes import router as wecom_router
 from .wecom_scrm_routes import router as wecom_scrm_router
-from .wecom_jssdk import router as wecom_jssdk_router
-from .wecom_internal import router as wecom_internal_router
-from .wecom_group_routes import router as wecom_group_router
-from .gdpr_routes import router as gdpr_router
-from .sync_scheduler import create_sync_scheduler, sync_router as sync_health_router
-from .response import ok
-from .api.onboarding_routes import router as onboarding_router
-from .api.config_health_routes import router as config_health_router
-from .api.migration_routes import router as migration_router
-
-app = FastAPI(title="TunxiangOS Gateway", version="3.0.0", description="AI-Native Restaurant Chain Operating System")
-
-app.add_middleware(RequestLogMiddleware)
-app.add_middleware(TenantMiddleware)
-app.add_middleware(AuthMiddleware)
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
-logger = structlog.get_logger(__name__)
 
 app = FastAPI(
     title="TunxiangOS Gateway",
@@ -47,8 +34,9 @@ app = FastAPI(
     description="AI-Native Restaurant Chain Operating System",
 )
 
-from prometheus_fastapi_instrumentator import Instrumentator
 Instrumentator().instrument(app).expose(app)
+
+logger = structlog.get_logger(__name__)
 
 # ── APScheduler 定时任务 ──────────────────────────────────────────
 
@@ -157,15 +145,11 @@ app.add_middleware(
 # 认证 API（必须在 proxy 之前注册，否则被通配路由拦截）
 app.include_router(auth_router)
 
-app.include_router(auth_router)
 app.include_router(hub_router)
 app.include_router(relay_router)
 
 # 开放 API（ISV 应用 + OAuth2 client_credentials；依赖 DB 未配置时相关端点返回 503）
 app.include_router(open_api_router)
-
-# 情报→增长自动接力 API
-app.include_router(relay_router)
 
 # 企业微信回调 API
 app.include_router(wecom_router)

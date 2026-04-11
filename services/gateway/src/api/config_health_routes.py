@@ -24,6 +24,8 @@ import structlog
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
+from ..response import ok as ok_response
+
 logger = structlog.get_logger(__name__)
 
 router = APIRouter(prefix="/api/v1/config", tags=["config-health"])
@@ -100,36 +102,26 @@ async def _check_shift_configured(tenant_id: str, db) -> CheckResult:
     )
 
 
-async def _check_payment_methods(tenant_id: str, db) -> CheckResult:
+async def _check_payment_methods(tenant_id: str, db, *, tenant_config=None) -> CheckResult:
     """至少配置一种支付方式"""
-    from sqlalchemy import text
-
-    result = await db.execute(text(
-        "SELECT COUNT(*) FROM tenant_agent_configs WHERE tenant_id = :tid"
-    ), {"tid": tenant_id})
-    count = result.scalar() or 0
-    ok = count >= 1
+    has_config = tenant_config is not None
     return CheckResult(
         check_id="payment_methods",
         name="支付方式已配置",
         severity="critical",
-        status="pass" if ok else "fail",
-        score_earned=20 if ok else 0,
+        status="pass" if has_config else "fail",
+        score_earned=20 if has_config else 0,
         score_max=20,
-        message="支付方式配置已写入" if ok else "未找到支付方式配置",
-        fix_hint="" if ok else "请重新运行上线交付向导（onboarding）完成配置",
+        message="支付方式配置已写入" if has_config else "未找到支付方式配置",
+        fix_hint="" if has_config else "请重新运行上线交付向导（onboarding）完成配置",
     )
 
 
-async def _check_kds_zone(tenant_id: str, db) -> CheckResult:
+async def _check_kds_zone(tenant_id: str, db, *, tenant_config=None) -> CheckResult:
     """已配置 KDS 分区（非快餐业态必须）"""
     from sqlalchemy import text
 
-    result = await db.execute(text(
-        "SELECT restaurant_type FROM tenant_agent_configs WHERE tenant_id = :tid LIMIT 1"
-    ), {"tid": tenant_id})
-    row = result.fetchone()
-    rt = (row[0] if row else "casual_dining") or "casual_dining"
+    rt = (tenant_config.get("restaurant_type") if tenant_config else None) or "casual_dining"
 
     # 快餐可以没有专门的KDS分区（用出品台就够了）
     if rt == "fast_food":
@@ -161,15 +153,9 @@ async def _check_kds_zone(tenant_id: str, db) -> CheckResult:
     )
 
 
-async def _check_agent_policy(tenant_id: str, db) -> CheckResult:
+async def _check_agent_policy(tenant_id: str, db, *, tenant_config=None) -> CheckResult:
     """折扣守护 Agent 策略已初始化"""
-    from sqlalchemy import text
-
-    result = await db.execute(text(
-        "SELECT agent_policies FROM tenant_agent_configs WHERE tenant_id = :tid LIMIT 1"
-    ), {"tid": tenant_id})
-    row = result.fetchone()
-    has_policy = bool(row and row[0])
+    has_policy = bool(tenant_config and tenant_config.get("agent_policies"))
 
     return CheckResult(
         check_id="agent_policy",
@@ -246,15 +232,11 @@ async def _check_store_configured(tenant_id: str, db) -> CheckResult:
     )
 
 
-async def _check_table_configured(tenant_id: str, db) -> CheckResult:
+async def _check_table_configured(tenant_id: str, db, *, tenant_config=None) -> CheckResult:
     """桌台已配置（非快餐必须）"""
     from sqlalchemy import text
 
-    result = await db.execute(text(
-        "SELECT restaurant_type FROM tenant_agent_configs WHERE tenant_id = :tid LIMIT 1"
-    ), {"tid": tenant_id})
-    row = result.fetchone()
-    rt = (row[0] if row else "casual_dining") or "casual_dining"
+    rt = (tenant_config.get("restaurant_type") if tenant_config else None) or "casual_dining"
 
     if rt == "fast_food":
         return CheckResult(
@@ -317,7 +299,6 @@ async def get_health_report(tenant_id: str) -> dict:
     score ≥ 90 且 critical_fails 为空 → go_live_ready = true
     """
     from datetime import datetime, timezone
-    from ..response import ok
 
     checks = await _run_all_checks(tenant_id)
 
@@ -360,7 +341,7 @@ async def get_health_report(tenant_id: str) -> dict:
         critical_fails=critical_fails,
     )
 
-    return ok(report.model_dump())
+    return ok_response(report.model_dump())
 
 
 @router.get("/health/{tenant_id}/summary")
@@ -370,8 +351,6 @@ async def get_health_summary(tenant_id: str) -> dict:
 
     返回：{ go_live_ready, score, blocking_issues }
     """
-    from ..response import ok
-
     checks = await _run_all_checks(tenant_id)
     total_earned = sum(c.score_earned for c in checks)
     total_max = sum(c.score_max for c in checks)
@@ -383,7 +362,7 @@ async def get_health_summary(tenant_id: str) -> dict:
         if c.severity == "critical" and c.status == "fail"
     ]
 
-    return ok({
+    return ok_response({
         "tenant_id": tenant_id,
         "score": overall_score,
         "go_live_ready": overall_score >= 90 and len(blocking) == 0,
@@ -408,6 +387,9 @@ ALL_CHECKS = [
 ]
 
 
+_CHECKS_USING_TENANT_CONFIG = {"_check_payment_methods", "_check_agent_policy", "_check_kds_zone", "_check_table_configured"}
+
+
 async def _run_all_checks(tenant_id: str) -> list[CheckResult]:
     """执行所有检查项，DB 不可用时返回跳过结果。"""
     try:
@@ -416,10 +398,26 @@ async def _run_all_checks(tenant_id: str) -> list[CheckResult]:
 
         async with async_session_factory() as db:
             await db.execute(text("SET app.tenant_id = :tid"), {"tid": tenant_id})
+
+            # 预取 tenant_agent_configs（4 个检查项共用，避免重复查询）
+            tac_row = await db.execute(text(
+                "SELECT restaurant_type, agent_policies, billing_rules "
+                "FROM tenant_agent_configs WHERE tenant_id = :tid LIMIT 1"
+            ), {"tid": tenant_id})
+            tac = tac_row.fetchone()
+            tenant_config = {
+                "restaurant_type": tac[0],
+                "agent_policies": tac[1],
+                "billing_rules": tac[2],
+            } if tac else None
+
             results = []
             for check_fn in ALL_CHECKS:
                 try:
-                    results.append(await check_fn(tenant_id, db))
+                    if check_fn.__name__ in _CHECKS_USING_TENANT_CONFIG:
+                        results.append(await check_fn(tenant_id, db, tenant_config=tenant_config))
+                    else:
+                        results.append(await check_fn(tenant_id, db))
                 except Exception as exc:  # noqa: BLE001 — 单项检查失败不阻塞其他项
                     logger.warning(
                         "health_check_item_error",

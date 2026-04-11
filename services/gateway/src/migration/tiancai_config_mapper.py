@@ -18,6 +18,7 @@
 """
 from __future__ import annotations
 
+import asyncio
 from typing import Any, Optional
 
 import structlog
@@ -63,16 +64,18 @@ class TiancaiConfigMapper:
         """
         answers: dict[str, Any] = {}
 
-        # 逐项读取，单项失败不阻断整体
-        await self._map_shop_basic(answers)
-        await self._map_printers(answers)
-        await self._map_shifts(answers)
-        await self._map_discount_policy(answers)
-        await self._map_billing_rules(answers)
-        await self._map_kitchen_zones(answers)
-        await self._map_payment_methods(answers)
-        await self._map_member_config(answers)
-        await self._map_delivery_channels(answers)
+        # 并发读取所有天财 API（各映射独立，单项失败不阻断整体）
+        await asyncio.gather(
+            self._map_shop_basic(answers),
+            self._map_printers(answers),
+            self._map_shifts(answers),
+            self._map_discount_policy(answers),
+            self._map_billing_rules(answers),
+            self._map_kitchen_zones(answers),
+            self._map_payment_methods(answers),
+            self._map_member_config(answers),
+            self._map_delivery_channels(answers),
+        )
         self._infer_restaurant_type(answers)
 
         logger.info(

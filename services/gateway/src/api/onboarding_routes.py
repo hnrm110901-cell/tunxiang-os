@@ -18,6 +18,7 @@ DeliveryAgent 通过 20 个关键业务问题引导商户完成系统配置，
 """
 from __future__ import annotations
 
+import json
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Optional
@@ -25,6 +26,8 @@ from typing import Any, Optional
 import structlog
 from fastapi import APIRouter, Header, HTTPException, Request
 from pydantic import BaseModel, Field
+
+from ..response import ok
 
 logger = structlog.get_logger(__name__)
 
@@ -302,8 +305,6 @@ def _next_question(session: OnboardingSession) -> Optional[dict]:
 async def list_templates() -> dict:
     """列出所有可用业态模板（供前端业态选择器使用）。"""
     from shared.config_templates import list_templates as _list
-    from ..response import ok
-
     return ok(_list())
 
 
@@ -315,8 +316,6 @@ async def start_session(req: StartRequest) -> dict:
     如果是天财迁移（migration_source=tiancai），传入 prefilled_answers
     可将天财读取的配置预填，减少需要人工回答的问题数量。
     """
-    from ..response import ok
-
     sid = str(uuid.uuid4())
     now = datetime.now(tz=timezone.utc)
     session = OnboardingSession(
@@ -356,8 +355,6 @@ async def answer_question(session_id: str, req: AnswerRequest) -> dict:
     回答问题。支持单问（key+value）或批量（answers dict）。
     每次回答后返回下一个问题和当前进度。
     """
-    from ..response import ok
-
     session = _sessions.get(session_id)
     if not session:
         raise HTTPException(status_code=404, detail="会话不存在或已过期")
@@ -395,8 +392,6 @@ async def preview_config(session_id: str) -> dict:
     预览基于当前答案生成的配置包（人类可读格式）。
     可在回答过程中随时调用，让商户确认配置是否符合预期。
     """
-    from ..response import ok
-
     session = _sessions.get(session_id)
     if not session:
         raise HTTPException(status_code=404, detail="会话不存在或已过期")
@@ -419,8 +414,6 @@ async def confirm_session(session_id: str) -> dict:
     确认配置并生成正式的 TenantConfigPackage。
     确认后会话锁定，不可再修改答案。
     """
-    from ..response import ok
-
     session = _sessions.get(session_id)
     if not session:
         raise HTTPException(status_code=404, detail="会话不存在或已过期")
@@ -477,8 +470,6 @@ async def import_config(req: ImportRequest, request: Request) -> dict:
     写入完成后，调用 config_health 服务计算健康度分数，
     分数 < 90 时返回警告但不阻断（上线前由 go-live-check 阻断）。
     """
-    from ..response import ok
-
     session = _sessions.get(req.session_id)
     if not session:
         raise HTTPException(status_code=404, detail="会话不存在或已过期")
@@ -619,8 +610,8 @@ async def _do_import(tenant_id: str, pkg: dict) -> dict:
                   updated_at           = NOW()
             """), {
                 "tid": tenant_id,
-                "policies": str(agent_policies).replace("'", '"'),
-                "billing": str(billing_rules).replace("'", '"'),
+                "policies": json.dumps(agent_policies, ensure_ascii=False),
+                "billing": json.dumps(billing_rules, ensure_ascii=False),
                 "rt": pkg.get("restaurant_type", "casual_dining"),
                 "sid": pkg.get("delivery_session_id", ""),
             })
