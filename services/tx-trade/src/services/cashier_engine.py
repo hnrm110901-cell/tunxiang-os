@@ -5,6 +5,7 @@
 """
 import asyncio
 import math
+import os
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
@@ -26,6 +27,8 @@ from .state_machine import (
 )
 
 logger = structlog.get_logger()
+
+AGENT_SERVICE_URL = os.getenv("AGENT_SERVICE_URL", "http://tx-agent:8008")
 
 
 def _gen_order_no() -> str:
@@ -52,6 +55,38 @@ _TABLE_STATUS_TO_STATE_MACHINE = {
     TableStatus.occupied.value: "dining",
     TableStatus.cleaning.value: "pending_cleanup",
 }
+
+
+async def _trigger_marketing_attribution(
+    *,
+    tenant_id: str,
+    member_id: str,
+    order_id: str,
+    order_amount_fen: int,
+    store_id: str,
+) -> None:
+    """火花旁路：将订单归因到最近的营销触达记录（不阻塞收银流程）"""
+    import httpx as _httpx
+    try:
+        async with _httpx.AsyncClient(timeout=8.0) as client:
+            await client.post(
+                f"{AGENT_SERVICE_URL}/api/v1/agent/ai-marketing/attribute-order",
+                headers={"X-Tenant-ID": tenant_id},
+                json={
+                    "member_id": member_id,
+                    "order_id": order_id,
+                    "order_amount_fen": order_amount_fen,
+                    "store_id": store_id,
+                    "attribution_window_hours": 72,
+                },
+            )
+    except (_httpx.ConnectError, _httpx.TimeoutException) as exc:
+        import structlog as _structlog
+        _structlog.get_logger().debug(
+            "marketing_attribution_skipped",
+            order_id=order_id,
+            error=str(exc),
+        )
 
 
 class CashierEngine:
@@ -778,10 +813,20 @@ class CashierEngine:
             source_service="tx-trade",
         ))
 
-        # ─── 支付后推券（异步不阻塞） ───
+        # ─── 营销归因（火花旁路，不阻塞结算）───
         effective_customer_id = customer_id or (
             str(order.customer_id) if order.customer_id else None
         )
+        if effective_customer_id:
+            asyncio.create_task(_trigger_marketing_attribution(
+                tenant_id=str(self.tenant_id),
+                member_id=effective_customer_id,
+                order_id=order_id,
+                order_amount_fen=order.final_amount_fen,
+                store_id=str(order.store_id) if order.store_id else "",
+            ))
+
+        # ─── 支付后推券（异步不阻塞） ───
         if effective_customer_id:
             try:
                 from .post_payment_service import PostPaymentService
