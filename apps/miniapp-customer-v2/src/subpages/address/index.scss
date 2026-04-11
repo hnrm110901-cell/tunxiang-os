@@ -57,7 +57,7 @@
   border: 2rpx solid #1E3340;
 
   &.is-default {
-    border-color: rgba(255, 107, 44, 0.3);
+    border-color: rgba(255, 107, 53, 0.3);
   }
 }
 
@@ -86,13 +86,13 @@
 }
 
 .address-tag {
-  background: rgba(255, 107, 44, 0.12);
+  background: rgba(255, 107, 53, 0.12);
   border-radius: 6rpx;
   padding: 4rpx 12rpx;
 }
 
 .tag-text {
-  color: #FF6B2C;
+  color: $tx-primary;
   font-size: 22rpx;
 }
 
@@ -163,7 +163,7 @@
 
 .add-btn {
   height: 88rpx;
-  background: #FF6B2C;
+  background: $tx-primary;
   border-radius: 44rpx;
   display: flex;
   justify-content: center;
@@ -234,8 +234,8 @@
   background: #132029;
 
   &.active {
-    border-color: #FF6B2C;
-    background: rgba(255, 107, 44, 0.1);
+    border-color: $tx-primary;
+    background: rgba(255, 107, 53, 0.1);
   }
 }
 
@@ -270,7 +270,7 @@
 .btn-save {
   flex: 2;
   height: 88rpx;
-  background: #FF6B2C;
+  background: $tx-primary;
   border-radius: 44rpx;
   display: flex;
   justify-content: center;
