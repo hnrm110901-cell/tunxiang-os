@@ -1,11 +1,11 @@
 /**
  * P3-04 菜品5因子动态排名引擎页面
  * 三个Tab：排行榜 / 四象限矩阵 / 健康诊断报告
+ * 技术栈：Ant Design 5.x + ProComponents（Tab1 排行榜使用 ProTable）
  */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Tabs,
-  Table,
   Tag,
   Progress,
   Card,
@@ -34,7 +34,9 @@ import {
   CheckCircleOutlined,
   ThunderboltOutlined,
 } from '@ant-design/icons';
-import type { ColumnsType } from 'antd/es/table';
+import { ProTable } from '@ant-design/pro-components';
+import type { ProColumns, ActionType } from '@ant-design/pro-components';
+import { MarginTag } from '../../components/MarginTag';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -168,26 +170,12 @@ function RankChange({ change }: { change: number }) {
 // ─── Tab1: 排行榜 ────────────────────────────────────────────────────────────
 
 function RankingTab({ storeId }: { storeId: string }) {
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState<DishRankItem[]>([]);
+  const actionRef = useRef<ActionType>();
   const [weights, setWeights] = useState({
     volume: 30, margin: 30, reorder: 20, satisfaction: 10, trend: 10,
   });
   const [weightsTotal, setWeightsTotal] = useState(100);
   const [saving, setSaving] = useState(false);
-
-  const fetchRanking = async () => {
-    setLoading(true);
-    try {
-      const res = await fetch(`${API_BASE}/api/v1/menu/ranking/dishes?store_id=${storeId}&limit=20`);
-      const json = await res.json();
-      if (json.ok) setData(json.data.items);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => { fetchRanking(); }, []);
 
   const handleWeightChange = (key: keyof typeof weights, val: number) => {
     const next = { ...weights, [key]: val };
@@ -216,7 +204,7 @@ function RankingTab({ storeId }: { storeId: string }) {
       const json = await res.json();
       if (json.ok) {
         message.success('权重已更新，排名将重新计算');
-        fetchRanking();
+        actionRef.current?.reload();
       } else {
         message.error(json.detail || '保存失败');
       }
@@ -228,22 +216,24 @@ function RankingTab({ storeId }: { storeId: string }) {
   const weightTotalOk = Math.abs(weightsTotal - 100) <= 0;
   const totalColor = weightTotalOk ? '#0F6E56' : '#A32D2D';
 
-  const columns: ColumnsType<DishRankItem> = [
+  const columns: ProColumns<DishRankItem>[] = [
     {
       title: '排名',
       dataIndex: 'rank',
       width: 60,
-      render: (rank: number) => (
+      search: false,
+      sorter: false,
+      render: (_, row) => (
         <div
           style={{
             width: 28, height: 28, borderRadius: '50%',
-            background: rank <= 3 ? '#FF6B35' : '#F8F7F5',
-            color: rank <= 3 ? '#fff' : '#2C2C2A',
+            background: row.rank <= 3 ? '#FF6B35' : '#F8F7F5',
+            color: row.rank <= 3 ? '#fff' : '#2C2C2A',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontWeight: 600, fontSize: 13,
           }}
         >
-          {rank}
+          {row.rank}
         </div>
       ),
     },
@@ -251,9 +241,9 @@ function RankingTab({ storeId }: { storeId: string }) {
       title: '菜品',
       dataIndex: 'dish_name',
       width: 130,
-      render: (name: string, row: DishRankItem) => (
+      render: (_, row) => (
         <div>
-          <Text strong style={{ fontSize: 14 }}>{name}</Text>
+          <Text strong style={{ fontSize: 14 }}>{row.dish_name}</Text>
           <br />
           <Text type="secondary" style={{ fontSize: 12 }}>{row.category} · {fmtPrice(row.price_fen)}</Text>
         </div>
@@ -261,25 +251,34 @@ function RankingTab({ storeId }: { storeId: string }) {
     },
     {
       title: '5因子评分',
-      key: 'scores',
+      dataIndex: 'scores',
       width: 220,
-      render: (_: unknown, row: DishRankItem) => <ScoreBars scores={row.scores} />,
+      search: false,
+      render: (_, row) => <ScoreBars scores={row.scores} />,
+    },
+    {
+      title: '毛利率',
+      dataIndex: ['scores', 'margin'],
+      width: 90,
+      search: false,
+      render: (_, row) => <MarginTag margin={row.scores.margin} />,
     },
     {
       title: '综合分',
       dataIndex: 'composite_score',
       width: 90,
-      sorter: (a, b) => a.composite_score - b.composite_score,
-      render: (score: number) => (
+      search: false,
+      sorter: true,
+      render: (_, row) => (
         <div style={{ textAlign: 'center' }}>
           <Text
             strong
             style={{
               fontSize: 20,
-              color: score >= 0.8 ? '#FF6B35' : score >= 0.6 ? '#0F6E56' : score >= 0.4 ? '#BA7517' : '#A32D2D',
+              color: row.composite_score >= 0.8 ? '#FF6B35' : row.composite_score >= 0.6 ? '#0F6E56' : row.composite_score >= 0.4 ? '#BA7517' : '#A32D2D',
             }}
           >
-            {(score * 100).toFixed(0)}
+            {(row.composite_score * 100).toFixed(0)}
           </Text>
           <Text type="secondary" style={{ fontSize: 12 }}>/100</Text>
         </div>
@@ -289,18 +288,23 @@ function RankingTab({ storeId }: { storeId: string }) {
       title: '周变化',
       dataIndex: 'rank_change',
       width: 80,
-      render: (change: number) => <RankChange change={change} />,
+      search: false,
+      render: (_, row) => <RankChange change={row.rank_change} />,
     },
     {
       title: '标签',
       dataIndex: 'recommendation_tag',
       width: 90,
-      render: (tag: string) => (
+      valueType: 'select',
+      valueEnum: Object.fromEntries(
+        Object.keys(TAG_COLORS).map(k => [k, { text: k }])
+      ),
+      render: (_, row) => (
         <Tag
-          color={TAG_COLORS[tag] || '#999'}
+          color={TAG_COLORS[row.recommendation_tag] || '#999'}
           style={{ color: '#fff', border: 'none', fontWeight: 500 }}
         >
-          {tag}
+          {row.recommendation_tag}
         </Tag>
       ),
     },
@@ -374,18 +378,36 @@ function RankingTab({ storeId }: { storeId: string }) {
         </Row>
       </Card>
 
-      {/* 排名表格 */}
-      <Card>
-        <Table
-          columns={columns}
-          dataSource={data}
-          rowKey="dish_id"
-          loading={loading}
-          pagination={false}
-          size="middle"
-          rowClassName={(_, index) => index < 3 ? 'top3-row' : ''}
-        />
-      </Card>
+      {/* 排名表格 — ProTable */}
+      <ProTable<DishRankItem>
+        actionRef={actionRef}
+        columns={columns}
+        rowKey="dish_id"
+        headerTitle={
+          <Space>
+            <FireOutlined style={{ color: '#FF6B35' }} />
+            <span>菜品排行榜</span>
+          </Space>
+        }
+        request={async () => {
+          try {
+            const res = await fetch(`${API_BASE}/api/v1/menu/ranking/dishes?store_id=${storeId}&limit=20`);
+            const json = await res.json();
+            if (json.ok) {
+              return { data: json.data.items as DishRankItem[], total: json.data.items.length, success: true };
+            }
+          } catch {
+            // ignore
+          }
+          return { data: [], total: 0, success: false };
+        }}
+        search={{ labelWidth: 'auto' }}
+        pagination={{ defaultPageSize: 20, showSizeChanger: true }}
+        size="middle"
+        scroll={{ x: 900 }}
+        rowClassName={(_, index) => index < 3 ? 'top3-row' : ''}
+        cardBordered
+      />
     </div>
   );
 }
