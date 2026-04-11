@@ -97,7 +97,7 @@ tunxiang-os/
     web-forge/                  # React — Forge 开发者市场
     h5-self-order/              # React — H5 自助点餐（多渠道）
     miniapp-customer/           # 微信小程序 — 顾客端（8 主包 + 7 分包）
-  services/                     # 16 个微服务（FastAPI + SQLAlchemy 2.0 + asyncpg）
+  services/                     # 17 个微服务（FastAPI + SQLAlchemy 2.0 + asyncpg）
     gateway/           :8000    # API Gateway + 域路由代理 + 租户管理
     tx-trade/          :8001    # 交易履约（76 API 模块）
     tx-menu/           :8002    # 菜品菜单（15 API 模块）
@@ -111,6 +111,7 @@ tunxiang-os/
     tx-brain/          :8010    # AI 智能决策中枢（Claude API）
     tx-intel/          :8011    # 商业智能
     tx-org/            :8012    # 组织人事（28 API 模块）
+    tx-pay/            :8013    # 支付中枢（渠道抽象/路由引擎/Saga事务/Agent支付协议）
     mcp-server/                 # MCP Protocol Server（对接 Claude Code）
   edge/                         # Mac mini M4 边缘智能后台
     mac-station/                # FastAPI — 门店本地 API + PostgreSQL 副本
@@ -118,7 +119,7 @@ tunxiang-os/
     sync-engine/                # Python — 本地PG ↔ 云端PG 增量同步（300秒/轮）
   shared/
     ontology/                   # Ontology 实体定义（Pydantic models）
-    db-migrations/              # Alembic 迁移（148 个版本，v001-v148）
+    db-migrations/              # Alembic 迁移（206 个版本，v001-v206）
       # v147: 统一事件存储表（events + projector_checkpoints）
       # v148: 8个物化视图（mv_discount_health/mv_channel_margin/mv_inventory_bom
       #        mv_member_clv/mv_store_pnl/mv_daily_settlement/mv_safety_compliance/mv_energy_efficiency）

@@ -4,6 +4,49 @@
 
 ---
 
+## 2026-04-11
+
+### 今日完成：tx-pay 支付中枢服务创建（从零搭建完整骨架）
+
+**架构决策：**
+- 基于代码审计，确认支付逻辑散布 5 个服务 12 个核心类，需要独立支付中枢
+- 设计 tx-pay (:8013) 作为所有资金流动的唯一入口
+- 三层架构：协议适配层(L3) → 支付编排层(L2) → 渠道抽象层(L1)
+
+**核心模块实现：**
+- [tx-pay] BasePaymentChannel 抽象基类 + ChannelRegistry 渠道注册表
+- [tx-pay] PaymentRoutingEngine 多租户×多门店×多渠道路由引擎
+- [tx-pay] PaymentSaga 分布式事务补偿 + SplitPayEngine 拆单支付 + IdempotencyGuard 幂等保护
+- [tx-pay] 7 个具体渠道实现：WechatPay/Alipay/Lakala/Shouqianba/Cash/StoredValue/CreditAccount
+- [tx-pay] PaymentNexusService 核心服务层（串联路由→编排→幂等→事件）
+- [tx-pay] Agent 支付协议层 — prepare/confirm/reject 三阶段人机协作
+- [tx-pay] MCP 支付工具定义（7 个工具 + 4 个协议适配器预留位）
+- [tx-pay] API 路由：payment_routes + callback_routes + admin_routes + agent_routes
+
+**前瞻性设计：**
+- 微信Skill / 支付宝ACT / 谷歌UCP / OpenAI ACP 协议适配器接口预留
+- Agent 支付限额机制（单笔 1000 元 / 日累计 5000 元）
+- 数字人民币渠道枚举预留
+
+### 数据变化
+- 迁移版本：v205 → v206
+- 新增 3 张表：payment_channel_configs / payment_sagas / payment_idempotency
+- 新增服务：tx-pay (:8013)，含 22 个源文件
+- CLAUDE.md 微服务数：16 → 17
+
+### 遗留问题
+- tx-trade 中现有支付代码尚未迁移（P1 阶段渐进式抽取）
+- 支付宝渠道为 Mock 实现，待正式 SDK 对接
+- Agent 支付的 prepared_payment 需持久化到 DB（当前内存存储）
+- gateway 域路由尚未添加 tx-pay 代理条目
+
+### 明日计划
+- 在 gateway/src/proxy.py 添加 pay → tx-pay 域路由
+- 在 mcp-server/src/agent_registry.py 注册 7 个支付 MCP 工具
+- 编写 tx-pay 核心流程单元测试（saga + split_pay + routing）
+
+---
+
 ## 2026-04-07
 
 ### 今日完成：SCRM8差距补齐 + 全量测试覆盖
