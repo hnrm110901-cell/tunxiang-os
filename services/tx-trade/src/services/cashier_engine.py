@@ -10,6 +10,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
+import httpx
 import structlog
 from sqlalchemy import Date, and_, cast, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -66,9 +67,8 @@ async def _trigger_marketing_attribution(
     store_id: str,
 ) -> None:
     """火花旁路：将订单归因到最近的营销触达记录（不阻塞收银流程）"""
-    import httpx as _httpx
     try:
-        async with _httpx.AsyncClient(timeout=8.0) as client:
+        async with httpx.AsyncClient(timeout=8.0) as client:
             await client.post(
                 f"{AGENT_SERVICE_URL}/api/v1/agent/ai-marketing/attribute-order",
                 headers={"X-Tenant-ID": tenant_id},
@@ -80,9 +80,8 @@ async def _trigger_marketing_attribution(
                     "attribution_window_hours": 72,
                 },
             )
-    except (_httpx.ConnectError, _httpx.TimeoutException) as exc:
-        import structlog as _structlog
-        _structlog.get_logger().debug(
+    except (httpx.ConnectError, httpx.TimeoutException) as exc:
+        logger.debug(
             "marketing_attribution_skipped",
             order_id=order_id,
             error=str(exc),

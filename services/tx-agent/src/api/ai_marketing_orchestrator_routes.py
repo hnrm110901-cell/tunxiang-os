@@ -214,24 +214,8 @@ async def get_touch_log(
     """查询近期营销触达记录（来自 marketing_touch_log 表）"""
     offset = (page - 1) * size
 
-    await db.execute(
-        text("SELECT set_config('app.tenant_id', :tid, true)"),
-        {"tid": str(tenant_id)},
-    )
-
-    # Get total count
-    count_row = await db.execute(
-        text("""
-            SELECT COUNT(*) FROM marketing_touch_log
-            WHERE tenant_id = :tenant_id::uuid
-              AND sent_at > NOW() - (:days || ' days')::interval
-              AND NOT is_deleted
-        """),
-        {"tenant_id": str(tenant_id), "days": days},
-    )
-    total = count_row.scalar() or 0
-
-    # Get page items
+    # Single query: use window function to avoid a separate COUNT round-trip.
+    # _get_db dependency (get_db_with_tenant) already called set_config.
     rows = await db.execute(
         text("""
             SELECT
@@ -241,16 +225,20 @@ async def get_touch_log(
                 campaign_type,
                 status,
                 sent_at,
-                attribution_revenue_fen
+                attribution_revenue_fen,
+                COUNT(*) OVER() AS total_count
             FROM marketing_touch_log
             WHERE tenant_id = :tenant_id::uuid
-              AND sent_at > NOW() - (:days || ' days')::interval
+              AND sent_at > NOW() - make_interval(days => :days)
               AND NOT is_deleted
             ORDER BY sent_at DESC
             LIMIT :size OFFSET :offset
         """),
         {"tenant_id": str(tenant_id), "days": days, "size": size, "offset": offset},
     )
+
+    all_rows = rows.fetchall()
+    total = all_rows[0].total_count if all_rows else 0
 
     items = [
         {
@@ -262,7 +250,7 @@ async def get_touch_log(
             "sent_at": row.sent_at.isoformat() if row.sent_at else None,
             "attribution_revenue_fen": row.attribution_revenue_fen or 0,
         }
-        for row in rows.fetchall()
+        for row in all_rows
     ]
 
     return {

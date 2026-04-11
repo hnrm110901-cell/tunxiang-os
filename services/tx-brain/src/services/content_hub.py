@@ -446,7 +446,7 @@ class ContentHub:
         }
 
         # 写入缓存（best-effort，失败不阻断）
-        await self._save_xhs_note_to_cache(cache_key, result, tenant_id, campaign_type)
+        await self._save_xhs_note_to_cache(cache_key, result, tenant_id, campaign_type, db=None)
 
         return result
 
@@ -456,6 +456,8 @@ class ContentHub:
         note: dict,
         tenant_id: str,
         campaign_type: str,
+        *,
+        db: AsyncSession | None = None,
     ) -> None:
         """将小红书笔记结果写入 ai_content_cache 表（best-effort）。
 
@@ -465,71 +467,17 @@ class ContentHub:
         if self._model_router is None:
             return
 
-        # 尝试获取 db session
-        try:
-            from ..database import get_session  # lazy import
-
-            db_gen = get_session()
-            db: AsyncSession = await db_gen.__anext__()
-        except (ImportError, OSError, RuntimeError) as exc:
-            logger.warning(
-                "content_hub_xhs_note_cache_no_session",
-                cache_key=cache_key,
-                error=str(exc),
-            )
-            return
-
-        expires_at = datetime.now(timezone.utc) + timedelta(hours=self.MAX_CACHE_AGE_HOURS)
         ctype = f"xiaohongshu_note:{campaign_type}"
-        try:
-            await db.execute(
-                text("SELECT set_config('app.tenant_id', :tid, true)"),
-                {"tid": tenant_id},
-            )
-            await db.execute(
-                text(
-                    """
-                    INSERT INTO ai_content_cache
-                        (tenant_id, cache_key, campaign_type, package_json, tokens_used, expires_at)
-                    VALUES
-                        (:tid, :key, :ctype, :pkg_json, :tokens, :expires)
-                    ON CONFLICT (tenant_id, cache_key)
-                    WHERE NOT is_deleted
-                    DO UPDATE SET
-                        package_json = EXCLUDED.package_json,
-                        tokens_used  = EXCLUDED.tokens_used,
-                        expires_at   = EXCLUDED.expires_at
-                    """
-                ),
-                {
-                    "tid":      tenant_id,
-                    "key":      cache_key,
-                    "ctype":    ctype,
-                    "pkg_json": json.dumps(note, ensure_ascii=False, default=str),
-                    "tokens":   0,
-                    "expires":  expires_at,
-                },
-            )
-            await db.commit()
-            logger.info(
-                "content_hub_xhs_note_cache_saved",
-                cache_key=cache_key,
-                tenant_id=tenant_id,
-                expires_at=expires_at.isoformat(),
-            )
-        except Exception as exc:  # noqa: BLE001 — 缓存写入失败不阻断主流程
-            logger.warning(
-                "content_hub_xhs_note_cache_write_failed",
-                cache_key=cache_key,
-                tenant_id=tenant_id,
-                error=str(exc),
-                exc_info=True,
-            )
-        finally:
-            try:
-                await db_gen.aclose()
-            except (OSError, RuntimeError):
-                pass
+        pkg_json = json.dumps(note, ensure_ascii=False, default=str)
+        await self._upsert_content_cache(
+            cache_key=cache_key,
+            campaign_type=ctype,
+            pkg_json=pkg_json,
+            tokens_used=0,
+            tenant_id=tenant_id,
+            db=db,
+            log_event="content_hub_xhs_note_cache",
+        )
 
     async def _get_cached_content(
         self,
@@ -595,10 +543,49 @@ class ContentHub:
         tenant_id: str,
         db: AsyncSession,
     ) -> None:
-        """将生成结果写入 ai_content_cache 表。
+        """将生成结果写入 ai_content_cache 表（best-effort）。"""
+        await self._upsert_content_cache(
+            cache_key=cache_key,
+            campaign_type=package.campaign_type,
+            pkg_json=json.dumps(package.model_dump(), ensure_ascii=False, default=str),
+            tokens_used=package.tokens_used,
+            tenant_id=tenant_id,
+            db=db,
+            log_event="content_hub_cache",
+        )
 
-        写入失败仅记录警告，不阻断主流程。
+    async def _upsert_content_cache(
+        self,
+        *,
+        cache_key: str,
+        campaign_type: str,
+        pkg_json: str,
+        tokens_used: int,
+        tenant_id: str,
+        db: AsyncSession | None,
+        log_event: str,
+    ) -> None:
+        """Shared helper: upsert a row in ai_content_cache (best-effort).
+
+        If *db* is None, acquires a short-lived session internally.
+        Write failures are logged and swallowed so callers are never blocked.
         """
+        own_session = db is None
+        db_gen = None
+        if own_session:
+            try:
+                from ..database import get_session  # lazy import
+
+                db_gen = get_session()
+                db = await db_gen.__anext__()
+            except (ImportError, OSError, RuntimeError) as exc:
+                logger.warning(
+                    f"{log_event}_no_session",
+                    cache_key=cache_key,
+                    error=str(exc),
+                )
+                return
+
         expires_at = datetime.now(timezone.utc) + timedelta(hours=self.MAX_CACHE_AGE_HOURS)
         try:
             await db.execute(
@@ -621,29 +608,35 @@ class ContentHub:
                     """
                 ),
                 {
-                    "tid":     tenant_id,
-                    "key":     cache_key,
-                    "ctype":   package.campaign_type,
-                    "pkg_json": json.dumps(package.model_dump(), ensure_ascii=False, default=str),
-                    "tokens":  package.tokens_used,
-                    "expires": expires_at,
+                    "tid":      tenant_id,
+                    "key":      cache_key,
+                    "ctype":    campaign_type,
+                    "pkg_json": pkg_json,
+                    "tokens":   tokens_used,
+                    "expires":  expires_at,
                 },
             )
             await db.commit()
             logger.info(
-                "content_hub_cache_saved",
+                f"{log_event}_saved",
                 cache_key=cache_key,
                 tenant_id=tenant_id,
                 expires_at=expires_at.isoformat(),
             )
         except Exception as exc:  # noqa: BLE001 — 缓存写入失败不阻断主流程
             logger.warning(
-                "content_hub_cache_write_failed",
+                f"{log_event}_write_failed",
                 cache_key=cache_key,
                 tenant_id=tenant_id,
                 error=str(exc),
                 exc_info=True,
             )
+        finally:
+            if own_session and db_gen is not None:
+                try:
+                    await db_gen.aclose()
+                except (OSError, RuntimeError):
+                    pass
 
     def _build_generation_prompt(self, request: CampaignContentRequest) -> str:
         """构建发给 Claude 的生成提示词。

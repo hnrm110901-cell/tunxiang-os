@@ -21,17 +21,18 @@
 """
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import os
 import time
 import uuid
-from datetime import datetime, timezone
 from typing import Any, Optional
 
 import httpx
 import structlog
 from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 
 from ..base import AgentResult, SkillAgent
 
@@ -57,6 +58,12 @@ MARKETING_COOLDOWN_RULES: dict[str, int] = {
 
 # 默认毛利底线（百分比）
 DEFAULT_MARGIN_FLOOR_PCT = 0.15
+
+# 默认均单金额（分）— 生产环境应从门店配置读取
+DEFAULT_AVG_ORDER_FEN = int(os.getenv("DEFAULT_AVG_ORDER_FEN", "40000"))
+
+# 可归因状态（touch 处于这些状态时才可归因到订单）
+ATTRIBUTABLE_STATUSES = ("sent", "delivered", "clicked", "queued")
 
 # 渠道优先级（按场景）
 CHANNEL_PRIORITY: dict[str, list[str]] = {
@@ -370,14 +377,19 @@ class AiMarketingOrchestratorAgent(SkillAgent):
             channels=CHANNEL_PRIORITY["holiday_campaign"],
         )
 
-        send_results = []
-        for mid in member_ids[:200]:  # 批量最多200人，大批量走异步队列
-            res = await self._dispatch_message(
-                member_id=mid, channels=CHANNEL_PRIORITY["holiday_campaign"],
-                content=content_pkg, campaign_type="holiday_campaign",
-                ref_id=f"{holiday_name}_{mid}",
-            )
-            send_results.append(res)
+        sem = asyncio.Semaphore(10)
+
+        async def _send_one(mid: str) -> dict:
+            async with sem:
+                return await self._dispatch_message(
+                    member_id=mid, channels=CHANNEL_PRIORITY["holiday_campaign"],
+                    content=content_pkg, campaign_type="holiday_campaign",
+                    ref_id=f"{holiday_name}_{mid}",
+                )
+
+        send_results = list(
+            await asyncio.gather(*[_send_one(mid) for mid in member_ids[:200]])
+        )
 
         return AgentResult(
             success=True, action="execute_holiday_campaign",
@@ -552,7 +564,7 @@ class AiMarketingOrchestratorAgent(SkillAgent):
                       AND member_id = :member_id::uuid
                       AND attribution_order_id IS NULL
                       AND status IN ('sent', 'delivered', 'clicked', 'queued')
-                      AND sent_at > NOW() - (:window_hours || ' hours')::interval
+                      AND sent_at > NOW() - make_interval(hours => :window_hours)
                       AND NOT is_deleted
                     ORDER BY sent_at DESC
                     LIMIT 1
@@ -622,7 +634,7 @@ class AiMarketingOrchestratorAgent(SkillAgent):
                 confidence=0.9,
             )
 
-        except (ValueError, OSError) as exc:
+        except (ValueError, OSError, SQLAlchemyError) as exc:
             logger.warning("attribution_update_error", order_id=order_id, error=str(exc))
             return AgentResult(
                 success=False,
@@ -654,7 +666,7 @@ class AiMarketingOrchestratorAgent(SkillAgent):
                         WHERE tenant_id = :tenant_id::uuid
                           AND member_id = :member_id::uuid
                           AND campaign_type = :campaign_type
-                          AND sent_at > NOW() - (:hours || ' hours')::interval
+                          AND sent_at > NOW() - make_interval(hours => :hours)
                           AND NOT is_deleted
                     """),
                     {
@@ -670,7 +682,7 @@ class AiMarketingOrchestratorAgent(SkillAgent):
                         "ok": False,
                         "reason": f"冷却期内（{cooldown_hours}h）：最近已触达，跳过",
                     }
-            except (ValueError, OSError) as exc:
+            except (ValueError, OSError, SQLAlchemyError) as exc:
                 logger.warning("cooldown_check_db_error", error=str(exc), action_type=action_type)
 
         logger.debug("cooldown_check", member_id=member_id, action_type=action_type, cooldown_hours=cooldown_hours)
@@ -691,9 +703,17 @@ class AiMarketingOrchestratorAgent(SkillAgent):
         violations: list[str] = []
         margin_floor_pct = DEFAULT_MARGIN_FLOOR_PCT
 
-        # 约束1: 毛利底线（以400元均单为基准，折扣≤60元则通过15%毛利底线）
+        # 约束1: 毛利底线（生产环境应从门店配置读取均单，当前使用env配置兜底）
         if discount_fen > 0:
-            avg_order_fen = 40000  # 400元均单（生产环境从门店配置读取）
+            avg_order_fen = DEFAULT_AVG_ORDER_FEN
+            if avg_order_fen == 40000:
+                logger.warning(
+                    "margin_constraint_using_default_avg_order",
+                    member_id=member_id,
+                    action_type=action_type,
+                    avg_order_fen=avg_order_fen,
+                    hint="Set DEFAULT_AVG_ORDER_FEN env var or wire store config",
+                )
             max_discount = int(avg_order_fen * (1 - margin_floor_pct))
             if discount_fen > max_discount:
                 violations.append(
@@ -793,10 +813,10 @@ class AiMarketingOrchestratorAgent(SkillAgent):
 
         # Write touch log to DB if session available
         if self._db is not None:
-            # Build content_hash for dedup
+            # Include touch_id so hash is unique per dispatch (prevents false dedup)
             content_preview = content.get("preview", "")
             content_hash = hashlib.sha256(
-                f"{member_id}:{campaign_type}:{content_preview}".encode()
+                f"{touch_id}:{member_id}:{campaign_type}:{content_preview}".encode()
             ).hexdigest()[:64]
 
             try:
@@ -817,6 +837,7 @@ class AiMarketingOrchestratorAgent(SkillAgent):
                            :message_id, :content_hash,
                            :status, NOW(),
                            :metadata::jsonb)
+                        ON CONFLICT DO NOTHING
                     """),
                     {
                         "tenant_id": str(self.tenant_id),
@@ -829,8 +850,9 @@ class AiMarketingOrchestratorAgent(SkillAgent):
                         "metadata": json.dumps({"touch_id": touch_id, "ref_id": ref_id, "all_channels": channels}),
                     },
                 )
-                await self._db.commit()
-            except (ValueError, OSError) as exc:
+                # Commit is the responsibility of the calling handler; flush only here
+                await self._db.flush()
+            except (ValueError, OSError, SQLAlchemyError) as exc:
                 logger.warning("touch_log_write_error", touch_id=touch_id, error=str(exc))
                 # Don't fail the dispatch because of log write failure
 
