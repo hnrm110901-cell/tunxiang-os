@@ -4,246 +4,154 @@
 
 ---
 
+## 2026-04-11 (Sprint 4)
+
+### 今日完成：人力中枢升级 Sprint 4 — AI驱动层（教练+聚合+总览）
+
+**后端 API（2个模块，19个端点）**
+- `coach_session_routes.py` — 店长教练Agent（11端点：CRUD+建议采纳+行动追踪+有效性分析+店长汇总）
+- `alert_aggregation_routes.py` — AI预警聚合引擎（8端点：风险矩阵+趋势分析+门店排名+员工画像+问题店+处理效率+总览+周报）
+- `main.py` 注册 2 个新路由模块
+
+**前端页面（3个页面）**
+- `CoachSessionPage.tsx` — 店长教练Agent页（有效性分析+ProTable+Drawer建议采纳/行动追踪/重点员工）
+- `AlertAggregationPage.tsx` — AI人力预警中心（趋势Line图+风险矩阵热力表+门店排名+问题店清单+周度简报）
+- `HRHubOverviewPage.tsx` — 人力中枢总览页（8指标驾驶舱+预警饼图+进度条+8模块导航卡片）
+- `App.tsx` 注册 3 条前端路由
+
+**业务亮点**
+- 聚合引擎: hub-overview一个API返回8大域全部关键指标，总览页只需1次请求
+- 风险矩阵: 门店×预警类型，severity加权可视化，一眼定位问题交叉点
+- 店长教练: AI建议采纳追踪+就绪度前后对比，量化教练效果
+- 周度简报: 自动生成环比变化，critical事件+问题店Top3
+
+### 数据变化
+- 新增后端 API 模块：2 个（coach-sessions/alert-aggregation）
+- 新增端点：19 个
+- 新增前端页面：3 个
+- 新增前端路由：3 条
+- 数据库表：复用 v206 已建的 coach_sessions + ai_alerts 等
+
+### 遗留问题
+- 店长教练AI建议生成需接入tx-brain(Claude API)自动根据门店数据生成个性化建议
+- 员工风险画像需对接员工姓名解析（目前显示UUID）
+- 问题店"创建DRI工单"按钮需对接DRI工单创建API
+
+---
+
+## 2026-04-11 (Sprint 3)
+
+### 今日完成：人力中枢升级 Sprint 3 — 营业保障层（就绪度+高峰保障）
+
+**后端 API（2个模块，20个端点）**
+- `store_readiness_routes.py` — 门店就绪度评分（10端点：UPSERT+Dashboard+今日概览+趋势+热力图+行动追加）
+- `peak_guard_routes.py` — 高峰保障指挥（10端点：CRUD+Dashboard+即将到来+覆盖预警+行动追加+事后评估）
+- `main.py` 注册 2 个新路由模块
+
+**前端页面（2个页面）**
+- `StoreReadinessPage.tsx` — 今日营业就绪度（红黄绿灯仪表板+今日卡片矩阵+趋势Line图+维度Progress+详情Drawer）
+- `PeakGuardPage.tsx` — 高峰保障指挥（覆盖预警Alert+未来7天Timeline排期+ProTable+动态缺岗表单+事后评估+行动追加）
+- `App.tsx` 注册 2 条前端路由
+
+**业务亮点**
+- 就绪度: 四维权重算法自动评分(排班35%+技能25%+新人20%+培训20%)，UPSERT避免重复
+- 高峰保障: risk_positions自动计算coverage_score，事后评估对比effectiveness
+- 热力图: DISTINCT ON取每店最新分数，支撑矩阵/地图可视化
+- 预警联动: 覆盖度<60自动进入alerts列表
+
+### 数据变化
+- 新增后端 API 模块：2 个（store-readiness/peak-guard）
+- 新增端点：20 个
+- 新增前端页面：2 个
+- 新增前端路由：2 条
+- 数据库表：复用 v206 已建的 store_readiness_scores / peak_guard_records
+
+### 遗留问题
+- 就绪度评分需接入HRAgentScheduler定时自动计算（每日凌晨扫描门店排班+员工数据）
+- 高峰保障upcoming需接入POS营收预测数据（预测客流）
+- 热力图前端可视化需对接门店GPS坐标数据
+
+### 明日计划
+- Sprint 4（AI驱动层）：AI预警聚合引擎、店长教练Agent、人力中枢总览升级
+
+---
+
+## 2026-04-11 (Sprint 2)
+
+### 今日完成：人力中枢升级 Sprint 2 — 训练复制层（带教+训练+认证）
+
+**后端 API（3个模块，30个端点）**
+- `mentorship_routes.py` — 带教关系管理（9端点：CRUD+完成+终止+统计+排行榜）
+- `onboarding_path_routes.py` — 新员工训练路径（11端点：CRUD+任务完成+推进+模板+Dashboard）
+- `certification_routes.py` — 岗位认证与通关（10端点：CRUD+打分+评定+补考+过期预警+Dashboard）
+- `main.py` 注册 3 个新路由模块
+
+**前端页面（3个页面）**
+- `MentorshipSupervisePage.tsx` — 带教督导页（统计+排行榜+ProTable+完成/终止Modal）
+- `OnboardingPathPage.tsx` — 新员工训练路径页（Dashboard+ProTable+Drawer详情+Timeline任务列表+推进/完成/终止）
+- `CertificationPage.tsx` — 岗位认证与通关页（Dashboard+过期预警+ProTable+Drawer考核项打分+评定/补考）
+- `App.tsx` 注册 3 条前端路由
+
+**业务亮点**
+- 训练路径: 7/14/30天三套标准模板自动填充，jsonb_set精确更新单个任务
+- 岗位认证: 5岗位(厨师/服务员/店长/收银/保洁)各有专属考核项模板
+- 带教管理: 创建校验(不能自我带教+同时段唯一)，排行榜按评分排名
+- 过期预警: 30天内到期认证自动预警，一键发起补考
+
+### 数据变化
+- 新增后端 API 模块：3 个（mentorship/onboarding/certification）
+- 新增端点：30 个
+- 新增前端页面：3 个
+- 新增前端路由：3 条
+- 数据库表：复用 v206 已建的 mentorship_relations / onboarding_paths / position_certifications
+
+### 遗留问题
+- 带教关系中 mentor_id/mentee_id 前端暂显示UUID前8位，待接入员工姓名解析
+- 训练路径推进(advance-day)需接入HRAgentScheduler定时任务自动推进
+- 认证过期预警需接入AI预警系统(ai_alerts)自动生成预警记录
+
+### 明日计划
+- Sprint 3（营业保障层）：门店就绪度评分、高峰保障指挥、排班工作台升级
+
+---
+
 ## 2026-04-11
 
-### 今日完成
+### 今日完成：人力中枢升级 Sprint 1 — 编制+工单+预警基座层
 
-**tx-civic — 餐饮城市监管平台Agent（第14个微服务 :8013）全栈交付**
+**数据库（v206迁移）:**
+- 新增10张核心表：store_staffing_templates, staffing_snapshots, mentorship_relations, onboarding_paths, position_certifications, store_readiness_scores, peak_guard_records, dri_work_orders, ai_alerts, coach_sessions
+- 全部含RLS租户隔离策略、复合索引、CHECK约束
+- 4个UNIQUE约束防止数据重复
 
-- [tx-civic] 数据库迁移 v225-v229：15张新表（城市档案/食安追溯/明厨亮灶/环保/证照/消防/上报引擎/合规评分）全部含RLS策略
-- [tx-civic] 城市适配器层：双层适配器架构（城市路由+领域对接），5城市实现（上海沪食安/北京阳光餐饮/浙江浙食链/广东粤食安/四川天府监管）+ 通用兜底GenericAdapter，三级查找（精确→省级→兜底）
-- [tx-civic] 业务服务层：9个Service（traceability/kitchen_monitor/env_compliance/license_manager/fire_safety/submission_engine/compliance_score/civic_agent）共2994行
-- [tx-civic] API路由层：9个路由文件，40个端点（追溯8/明厨亮灶6/环保5/证照6/消防4/上报5/看板3/适配器3）共2325行
-- [tx-civic] 基础设施：main.py入口、16枚举类、22事件类型、3个定时Worker（每日合规巡检/证照到期监控/定时上报）、3个Agent Skills、Dockerfile、requirements.txt
-- [CLAUDE.md] 更新：13→14微服务、新增tx-civic服务描述、迁移版本184→229、架构图更新
-- [研究] 中国连锁餐饮行业政府/监管平台全景分析：食安追溯、明厨亮灶、环保合规、消防安全、证照管理、反食品浪费、智慧城市对接等11大类
+**后端API（4个路由模块，34个端点）:**
+- staffing_template_routes.py: 8端点（编制模板CRUD/批量/汇总/复制）
+- staffing_analysis_routes.py: 7端点（快照生成/对标分析/缺编排名/趋势/技能缺口/营业影响）
+- dri_workorder_routes.py: 10端点（工单CRUD/状态机流转/统计/我的工单/行动项管理）
+- ai_alert_routes.py: 9端点（预警CRUD/仪表板/批量/门店摘要/处理/忽略/转工单）
+- 全部注册到tx-org main.py
+
+**前端页面（3个新页面）:**
+- StaffingTemplatePage.tsx: 编制模板管理（汇总卡片+ProTable+ModalForm+复制模板）
+- StaffingAnalysisPage.tsx: 编制对标分析（对标明细+缺编排名+趋势折线图）
+- DRIWorkOrderCenterPage.tsx: DRI工单中心（统计看板+工单列表+详情抽屉+状态流转+行动项管理）
+- 全部注册到App.tsx路由
 
 ### 数据变化
-- 迁移版本：v224 → v229（+5个迁移，15张新表）
-- 新增微服务：tx-civic（:8013）
-- 新增文件：52个
-- 新增代码：8,619行（迁移524 + 适配器1,753 + 服务2,994 + 路由2,325 + 基础设施1,352）
-- 新增API端点：40个
-- 新增Agent Skills：3个（compliance_check/trace_query/license_alert）
-
-**基础设施集成**
-- [infra] docker-compose.yml: 新增tx-civic服务定义 + Gateway环境变量TX_CIVIC_URL
-- [infra] nginx/api.conf: 新增/api/v1/civic/反代路由
-- [gateway] proxy.py: 注册civic→tx-civic:8014路由映射
-- [fix] 端口8013已被tx-predict占用，tx-civic改用8014
+- 迁移版本: v205 → v206
+- 新增API模块: 4个（staffing_template/staffing_analysis/dri_workorder/ai_alert）
+- 新增API端点: 34个
+- 新增前端页面: 3个
+- 新增前端路由: 3条（/hr/staffing/templates, /hr/staffing/analysis, /hr/dri-workorders）
 
 ### 遗留问题
-- 所有城市适配器均为Mock模式，真实API对接需按客户所在城市逐个实施
-- 需要为tx-civic编写单元测试（当前覆盖率0%）
+- AI预警前端页面待Sprint 4整合到AgentHub
+- 编制快照生成需接入定时任务（建议加入HRAgentScheduler每日执行）
+- DRI工单通知推送待接入企微/飞书IM
 
 ### 明日计划
-- tx-civic单元测试编写
-- Gateway路由注册
-- 种子客户城市的真实平台API调研（沪食安/浙食链开放平台文档）
-
----
-
-## 2026-04-10
-
-### 今日完成
-
-**第一波：P0 经营闭环（Sprint 1-3）**
-- [web-admin] S1-T1 整改指挥中心 — RectificationCenterPage.tsx + rectificationApi.ts
-- [web-admin] S1-T2 门店健康度雷达 — StoreHealthRadarPage.tsx + storeHealthRadarApi.ts（含SVG雷达图、30秒自动刷新）
-- [web-admin] S1-T3 区域经营总览 — RegionOverviewPage.tsx + regionOverviewApi.ts（含Sparkline、下钻）
-- [web-crew] S2-T1 营业中控台 — StoreLivePage.tsx（慢菜预警、退菜投诉流、等位队列、30秒轮询）
-- [web-crew] S2-T2 门店异常事件中心 — StoreIncidentsCenterPage.tsx（6类异常、快速上报FAB、时间线）
-- [web-crew] S2-T3 巡检整改执行 — PatrolExecutionPage.tsx + patrolApi.ts（5类巡检、不合格自动生成整改）
-- [web-admin] S3-T1 经营简报中心 — BriefingCenterPage.tsx + briefingApi.ts（AI叙事日报/周报、订阅设置）
-- [web-admin] S3-T2 预警规则配置中心 — AlertRuleConfigPage.tsx + alertRuleApi.ts（5域规则、阈值编辑、规则测试）
-- [web-admin] S3-T3 集成健康中心 — IntegrationHealthPage.tsx + integrationHealthApi.ts（10适配器监控、Webhook日志）
-
-**第二波：P1 会员增长中枢**
-- [web-admin] P1-01 会员驾驶舱 — MemberDashboardPage.tsx（6 KPI、RFM饼图、生命周期漏斗、30天趋势）
-- [web-admin] P1-01 RFM分层中心 — MemberSegmentPage.tsx（4×2矩阵、会员列表、标签管理、人群包）
-- [web-admin] P1-02 券权益中心 — CouponBenefitPage.tsx + couponBenefitApi.ts（优惠券/积分/储值/礼品卡）
-- [web-admin] P1-02 客户旅程编排 — JourneyDesignerPage.tsx（可视化流程图、5种节点类型）
-
-**第三波：后端API端点**
-- [tx-ops] 7个新路由文件：rectification/store_live/incident/briefing/alert_rule/integration_health/inspection
-- [tx-analytics] 2个新路由文件：store_health_radar/region_overview
-- [tx-member] 2个新路由文件：member_dashboard/coupon_benefit
-- [tx-growth] 1个新路由文件：journey_designer
-
-**基础设施**
-- [战略] 完成屯象OS战略升级方案V2 + P0开发计划明细
-- [路由] 注册13条新前端路由
-- [菜单] 注册11条新菜单项
-
-### 数据变化
-- 新增前端页面组件：13 个
-- 新增前端API模块：10 个
-- 新增后端路由文件：12 个
-- 新增前端路由：13 条
-- 新增菜单项：11 条
-- 修改文件：6 个（hq-ops.tsx, hq-analytics.tsx, hq-growth.tsx, web-crew/App.tsx, menuConfigs.ts, api/index.ts）
-
-### 遗留问题
-- 后端路由文件需注册到各服务main.py
-- 跨终端联动（预警→整改→执行→闭环）需要端到端测试验证
-- P1 组织人效中枢（排班/考勤/绩效）待开发
-- P1 业财结算中枢（营收对账/成本毛利/P&L）待开发
-
-### 明日计划
-- 后端路由注册到各微服务main.py
-- P1 组织人效中枢页面开发
-- P1 业财结算中枢页面开发
-- 前端TypeScript编译验证
-
----
-
-## 2026-04-10
-
-### 今日完成
-- [miniapp-v2] Wave 1-4小程序全量升级: 10新文件/2386行（brand-picker/pre-order/AiChatAssistant/subscription/taste-profile/ReorderBanner/group-order/cross-brand/insights/i18n）
-- [tx-member] subscription_routes: 付费会员订阅4端点
-- [tx-trade] group_order_routes: 拼单5端点
-- [web-admin] 构建修复: pro-components+ahooks+antd-theme+HR路由→3终端Vite构建通过
-
-### 数据变化
-- miniapp-v2: 89→99文件, 38922→41381行, 30→55页面, 13→16组件
-- 新增后端API: 9端点
-
-### 遗留问题
-- miniapp Taro编译待验证; git push需手动
-
----
-
-## 2026-04-09 (Round 4)
-
-### 今日完成
-- [tx-analytics] AI自动日报 daily_brief_routes.py — 门店日报(营收/客流/客单价/毛利率vs昨日/vs上周+异常摘要+Agent决策+TOP5热销滞销+明日行动) + 集团日报 + 定时推送配置 + 历史列表
-- [tx-intel] 评价情感分析 sentiment_routes.py — 关键词匹配情感分析(60+正负面关键词+5大问题分类) + 门店评价仪表盘 + 差评预警
-- [gateway] 企微机器人对话入口 wecom_bot_routes.py — 企微消息回调→NLQ引擎→自然语言回答(支持XML/JSON双格式+签名验证)
-- [migration] v222: daily_briefs + sentiment_cache 表(含RLS策略+唯一索引)
-- [tests] 14个集成测试全部通过(情感分析4+日报推荐4+企微机器人4+批量分析2)
-
-### 数据变化
-- 迁移版本：v220 → v222
-- 新增 API 模块：3 个（tx-analytics/daily_brief_routes, tx-intel/sentiment_routes, gateway/wecom_bot_routes）
-- 新增测试：14 个
-- 新增路由：10 个（日报4 + 情感分析3 + 企微机器人3）
-
-### 遗留问题
-- v221迁移占位未创建（v222 down_revision='v221'需后续补齐链路）
-- 情感分析仪表盘/差评预警目前返回mock数据，待sentiment_cache ETL管道接入
-- 企微机器人实际部署需配置 WECOM_BOT_CALLBACK_TOKEN / WECOM_BOT_WEBHOOK_URL 环境变量
-
-### 明日计划
-- 接入情感分析实时评价采集管道
-- 日报定时推送cron job实际调度接入APScheduler
-
----
-
-## 2026-04-09 (Round 3)
-
-### 今日完成
-- [tx-member] 跨品牌会员智能 cross_brand_member_routes.py — 统一画像/会员合并/跨品牌统计/积分互通（对标Olo Guest Intelligence + 海底捞2亿会员中台）
-- [tx-member] 实时推荐引擎 recommendation_routes.py — 点餐推荐(4维度加权)/加单推荐(结账前)/回访推荐(RFM分层)/推荐效果统计(篮子提升额)
-- [db] v222迁移 — recommendation_logs + cross_brand_member_links（2表+RLS+6索引+1唯一约束）
-- [tests] 8个测试用例全部通过 — 模型验证/哈希一致性/餐段判断/分数排序/迁移结构
-
-### 数据变化
-- 迁移版本：v221 → v222
-- 新增 API 模块：2个（cross_brand_member_routes / recommendation_routes）
-- 新增测试：8个
-- 新增端点：8个（跨品牌画像/合并/统计/积分互通 + 点餐推荐/加单推荐/回访推荐/推荐效果）
-
-### 遗留问题
-- 推荐日志的 is_accepted 字段需由前端回调更新（点餐页面采纳推荐时 PATCH）
-- 购物篮关联规则当前为实时SQL查询，大数据量下需考虑预计算物化视图
-- 跨品牌积分互通兑换比例配置待管理后台页面支持
-
----
-
-## 2026-04-09 (Round 2)
-
-### 今日完成
-- [tx-agent] Agent自治等级控制器 autonomy_controller_routes.py — L1/L2/L3分级自治 + 自动执行规则引擎（9个Agent覆盖）
-- [tx-agent] Agent效果量化仪表盘 agent_roi_routes.py — ROI汇总/单Agent明细/效能排行（对标Yum Byte效果量化）
-- [db] v221迁移 — agent_autonomy_configs + agent_auto_executions + agent_roi_metrics（3表+RLS+6索引）
-- [tests] 11个测试用例全部通过 — 规则引擎纯函数测试7个 + ROI定义完整性测试4个
-
-### 数据变化
-- 迁移版本：v220 → v221
-- 新增 API 模块：2个（autonomy_controller_routes / agent_roi_routes）
-- 新增测试：11个
-- 新增端点：7个（autonomy config/actions/pending + roi summary/detail/leaderboard）
-
-### 遗留问题
-- Agent自动执行写入逻辑待接入各Agent execute()
-- ROI指标采集任务待创建（定时从物化视图聚合写入agent_roi_metrics）
-
----
-
-## 2026-04-09
-
-### 今日完成
-- [web-admin] Phase 0: Shell导航修复 — SidebarHQ点击导航+active状态、IconRail/ShellHQ URL同步、MENU_CONFIGS重构对齐规划文档
-- [web-admin] Phase 1: 4个P0新页面 — FloorTableConfigPage(桌台配置)、BusinessDayConfigPage(营业日配置)、TaskCenterPage(任务中心)、ReservationManagePage(预定管理)
-- [web-pos] Phase 2: POS核心完善 — OrderPage三栏点餐页重写(58→520行)、ShiftPage交接班完善(106→290行)、ExceptionPage异常中心完善(64→310行)、外卖路由修复(/delivery→OmniChannelOrders)
-- [web-crew] Phase 3: 店长工作台 — OpeningChecklistPage(开店检查单16项4类)、ClosingChecklistPage(闭店检查单16项+日结预检)、DailyBriefPage(AI经营日报)
-- [web-pos] Phase 4B: PadLayout.tsx 平板大屏适配wrapper(设备检测+PAD Token+TXBridge桥接)
-- [web-admin] Phase 5A: App.tsx路由拆分(600→65行)，10个域路由文件
-- [web-admin] Phase 5B: MENU_CONFIGS提取到config/menuConfigs.ts(13模块+getAllMenuItems搜索辅助)
-- [web-admin] Phase 6: P1洞察页面 — StoreInsightsPage(门店经营洞察排名)、PeriodAnalysisPage(餐段分析)
-- [tx-agent] Phase 6: 4个专项运营Agent — QueueSeatingAgent/KitchenOvertimeAgent/BillingAnomalyAgent/ClosingAgent(共24 actions)
-
-### 数据变化
-- 新增文件：26个（前端页面9+布局1+配置1+路由11+Agent4）
-- 修改文件：15个
-- ALL_SKILL_AGENTS: 29 → 33个
-- App.tsx: 600行 → 65行（路由拆分）
-
-### 遗留问题
-- web-admin LoginPage + CampaignPage 预存语法错误待修复
-- miniapp-customer-v2 排队/预定/评价模块待完善
-- 4个新Agent EventBus注册待配置
-
-### 明日计划
-- miniapp-customer-v2: 完善排队/预定/评价系统
-- 新Agent接入EventBus事件处理链
-- 新页面API联调
-
----
-
-## 2026-04-07
-
-### 今日完成
-- [web-admin] Sprint 1 运营指挥官基础层：AgentHubPage、AgentCommandCenterPage、AgentActionLog、FloorMapPage右侧面板、QueuePage AI叫号、TablesView脉冲动画+催单badge、AgentAlertBar、SidebarHQ agent模块、App.tsx路由
-- [web-pos] Sprint 2 菜品智能体+客户大脑：DishRecommendBanner、CustomerBrainPanel、MemberQuickCard、DishTimePrediction、OrderPage/SettlePage/OmniChannelOrders/MemberInsightCard增强
-- [web-admin] Sprint 3 经营分析师+收益优化师：NLQueryPage、AIDailyBriefPage、RevenueOptimizePage、CustomerBrainPage、NLQChatPanel、AskAgentFloat、OpsDashboardPage预警、Customer360 AI洞察Tab
-- [web-admin] Sprint 4 供应链卫士+Agent市场：ProcurementSuggestionPage、WastageAnalysisPage、DemandForecastPage、AgentMarketplacePage、AgentSettingsPage、AnomalyDetectionPage、TableTurnoverPage、DishAgentDashboardPage
-- [tx-agent] 新增 agent_hub_routes.py（6核心Agent状态BFF，5端点：status/actions/confirm/dismiss/log）
-- [tx-analytics] 新增 nlq_routes.py（自然语言问数骨架）、anomaly_routes.py（经营异常检测分级）
-- [gateway] 新增15个子域路由映射（agent-hub/nlq/anomaly/store-analysis/procurement-recommend等）
-- [db-migrations] v205_agent_decision_logs_status：agent_decision_logs 补充 status + action 列
-- [web-admin/web-pos/web-crew] TypeScript 编译：web-admin 417→4错误（已知遗留）；web-pos 168→0；web-crew 20→0
-- [web-admin] AgentHubPage + AgentActionLog 接入真实 /api/v1/agent-hub/* API
-
-### 数据变化
-- 迁移版本：v204 → v205
-- 新增 API 模块：5个（agent-hub×5端点、nlq×3端点、anomaly×4端点）
-- 新增前端页面：19个（Admin×15 + POS组件×4）
-- 新增前端组件：7个（NLQChatPanel/AskAgentFloat/AgentActionLog/AgentAlertBar/DishRecommendBanner/CustomerBrainPanel/MemberQuickCard/DishTimePrediction）
-- Admin页面总数：237 → 256
-
-### 遗留问题
-- web-admin LoginPage（2错误）+ CampaignPage（2错误）预存语法错误待修复
-- NLQueryPage / AIDailyBriefPage / CustomerBrainPage 前端仍使用 mock 数据，待接入真实 API
-- nlq_routes.py 骨架待 tx-brain reasoning_engine 完整集成
-
-### 明日计划
-- 接入 AIDailyBriefPage → /api/v1/daily-review/today
-- 接入 CustomerBrainPage → /api/v1/segmentation（RFM数据）
-- 接入 ProcurementSuggestionPage → /api/v1/procurement-recommend/recommend/{store_id}
-- 接入 AnomalyDetectionPage → /api/v1/anomaly/today
-- 完善 nlq_routes.py → 集成 tx-brain reasoning_engine
+- Sprint 2: 训练复制层（带教关系/新员工训练路径/岗位认证）
+- Sprint 3: 营业保障层（就绪度/高峰保障/排班升级）
 
 ---
 
