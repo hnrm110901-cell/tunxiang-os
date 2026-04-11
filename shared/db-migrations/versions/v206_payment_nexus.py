@@ -60,7 +60,31 @@ def upgrade() -> None:
     op.execute("ALTER TABLE payment_channel_configs ENABLE ROW LEVEL SECURITY")
     op.execute("ALTER TABLE payment_channel_configs FORCE ROW LEVEL SECURITY")
     op.execute("""
-        CREATE POLICY pcc_tenant_isolation ON payment_channel_configs
+        CREATE POLICY pcc_select ON payment_channel_configs FOR SELECT
+            USING (
+                tenant_id = current_setting('app.tenant_id', TRUE)::UUID
+                AND current_setting('app.tenant_id', TRUE) IS NOT NULL
+                AND current_setting('app.tenant_id', TRUE) <> ''
+            )
+    """)
+    op.execute("""
+        CREATE POLICY pcc_insert ON payment_channel_configs FOR INSERT
+            WITH CHECK (
+                tenant_id = current_setting('app.tenant_id', TRUE)::UUID
+                AND current_setting('app.tenant_id', TRUE) IS NOT NULL
+                AND current_setting('app.tenant_id', TRUE) <> ''
+            )
+    """)
+    op.execute("""
+        CREATE POLICY pcc_update ON payment_channel_configs FOR UPDATE
+            USING (
+                tenant_id = current_setting('app.tenant_id', TRUE)::UUID
+                AND current_setting('app.tenant_id', TRUE) IS NOT NULL
+                AND current_setting('app.tenant_id', TRUE) <> ''
+            )
+    """)
+    op.execute("""
+        CREATE POLICY pcc_delete ON payment_channel_configs FOR DELETE
             USING (
                 tenant_id = current_setting('app.tenant_id', TRUE)::UUID
                 AND current_setting('app.tenant_id', TRUE) IS NOT NULL
@@ -100,7 +124,31 @@ def upgrade() -> None:
     op.execute("ALTER TABLE payment_sagas ENABLE ROW LEVEL SECURITY")
     op.execute("ALTER TABLE payment_sagas FORCE ROW LEVEL SECURITY")
     op.execute("""
-        CREATE POLICY ps_tenant_isolation ON payment_sagas
+        CREATE POLICY ps_select ON payment_sagas FOR SELECT
+            USING (
+                tenant_id = current_setting('app.tenant_id', TRUE)::UUID
+                AND current_setting('app.tenant_id', TRUE) IS NOT NULL
+                AND current_setting('app.tenant_id', TRUE) <> ''
+            )
+    """)
+    op.execute("""
+        CREATE POLICY ps_insert ON payment_sagas FOR INSERT
+            WITH CHECK (
+                tenant_id = current_setting('app.tenant_id', TRUE)::UUID
+                AND current_setting('app.tenant_id', TRUE) IS NOT NULL
+                AND current_setting('app.tenant_id', TRUE) <> ''
+            )
+    """)
+    op.execute("""
+        CREATE POLICY ps_update ON payment_sagas FOR UPDATE
+            USING (
+                tenant_id = current_setting('app.tenant_id', TRUE)::UUID
+                AND current_setting('app.tenant_id', TRUE) IS NOT NULL
+                AND current_setting('app.tenant_id', TRUE) <> ''
+            )
+    """)
+    op.execute("""
+        CREATE POLICY ps_delete ON payment_sagas FOR DELETE
             USING (
                 tenant_id = current_setting('app.tenant_id', TRUE)::UUID
                 AND current_setting('app.tenant_id', TRUE) IS NOT NULL
@@ -139,7 +187,31 @@ def upgrade() -> None:
     op.execute("ALTER TABLE payment_idempotency ENABLE ROW LEVEL SECURITY")
     op.execute("ALTER TABLE payment_idempotency FORCE ROW LEVEL SECURITY")
     op.execute("""
-        CREATE POLICY pi_tenant_isolation ON payment_idempotency
+        CREATE POLICY pi_select ON payment_idempotency FOR SELECT
+            USING (
+                tenant_id = current_setting('app.tenant_id', TRUE)::UUID
+                AND current_setting('app.tenant_id', TRUE) IS NOT NULL
+                AND current_setting('app.tenant_id', TRUE) <> ''
+            )
+    """)
+    op.execute("""
+        CREATE POLICY pi_insert ON payment_idempotency FOR INSERT
+            WITH CHECK (
+                tenant_id = current_setting('app.tenant_id', TRUE)::UUID
+                AND current_setting('app.tenant_id', TRUE) IS NOT NULL
+                AND current_setting('app.tenant_id', TRUE) <> ''
+            )
+    """)
+    op.execute("""
+        CREATE POLICY pi_update ON payment_idempotency FOR UPDATE
+            USING (
+                tenant_id = current_setting('app.tenant_id', TRUE)::UUID
+                AND current_setting('app.tenant_id', TRUE) IS NOT NULL
+                AND current_setting('app.tenant_id', TRUE) <> ''
+            )
+    """)
+    op.execute("""
+        CREATE POLICY pi_delete ON payment_idempotency FOR DELETE
             USING (
                 tenant_id = current_setting('app.tenant_id', TRUE)::UUID
                 AND current_setting('app.tenant_id', TRUE) IS NOT NULL
