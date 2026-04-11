@@ -1,10 +1,11 @@
 """ContentHub API — AI营销内容生成接口
 
 提供基于 Claude API 的 AIGC 餐饮营销内容生成能力：
-  POST /api/v1/brain/content/generate         — 生成全渠道活动内容包
-  POST /api/v1/brain/content/review-response  — 生成点评回复
-  POST /api/v1/brain/content/dish-story       — 生成菜品故事
-  GET  /api/v1/brain/content/cache-stats      — 缓存统计
+  POST /api/v1/brain/content/generate           — 生成全渠道活动内容包
+  POST /api/v1/brain/content/review-response    — 生成点评回复
+  POST /api/v1/brain/content/dish-story         — 生成菜品故事
+  POST /api/v1/brain/content/xiaohongshu-note   — 生成小红书种草笔记
+  GET  /api/v1/brain/content/cache-stats        — 缓存统计
 
 所有接口需要 X-Tenant-ID 请求头。
 """
@@ -89,6 +90,18 @@ class DishStoryBody(BaseModel):
     brand_voice: BrandVoiceConfig
 
 
+class XHSNoteBody(BaseModel):
+    """生成小红书种草笔记请求体"""
+    model_config = ConfigDict(extra="ignore")
+
+    store_name: str
+    dish_name: str
+    brand_voice: dict = {}
+    campaign_type: str = "store_visit"
+    city: str = "长沙"
+    target_audience: str = "年轻女性用户"
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # 路由
 # ─────────────────────────────────────────────────────────────────────────────
@@ -171,6 +184,41 @@ async def generate_dish_story(
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except (ConnectionError, TimeoutError) as exc:
+        raise HTTPException(status_code=503, detail="AI service temporarily unavailable") from exc
+
+
+@router.post("/xiaohongshu-note")
+async def generate_xiaohongshu_note(
+    body: XHSNoteBody,
+    tenant_id: str = Depends(_require_tenant),
+    hub: ContentHub = Depends(_get_content_hub),
+) -> dict[str, Any]:
+    """生成小红书种草笔记（标题+正文+标签+表情+封面建议）
+
+    一次调用生成结构化小红书笔记，适合探店种草内容：
+    - title: ≤20字吸引年轻女性用户的标题
+    - body: 100-300字小红书风格正文（第一人称/口语化）
+    - hashtags: 5-8个话题标签
+    - emojis: 3-5个适合插入正文的表情建议
+    - cover_concept: 一句话封面图构图建议
+    - cta: 互动引导语
+    """
+    try:
+        result = await hub.generate_xiaohongshu_note(
+            tenant_id=tenant_id,
+            store_name=body.store_name,
+            dish_name=body.dish_name,
+            brand_voice=body.brand_voice,
+            campaign_type=body.campaign_type,
+            city=body.city,
+            target_audience=body.target_audience,
+        )
+        return {"ok": True, "data": result}
+    except ValueError as exc:
+        logger.warning("xhs_note_validation_error", tenant_id=tenant_id, error=str(exc))
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except (ConnectionError, TimeoutError) as exc:
+        logger.error("xhs_note_upstream_error", tenant_id=tenant_id, error=str(exc))
         raise HTTPException(status_code=503, detail="AI service temporarily unavailable") from exc
 
 

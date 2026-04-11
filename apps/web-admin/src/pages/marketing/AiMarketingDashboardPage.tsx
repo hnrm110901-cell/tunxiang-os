@@ -21,7 +21,6 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   Badge,
   Button,
-  Card,
   Col,
   Divider,
   Form,
@@ -33,7 +32,6 @@ import {
   Select,
   Space,
   Spin,
-  Statistic,
   Table,
   Tag,
 } from 'antd';
@@ -42,7 +40,9 @@ import {
   ReloadOutlined,
   ThunderboltOutlined,
 } from '@ant-design/icons';
-import type { ColumnsType } from 'antd/es/table';
+import { ProTable, StatisticCard } from '@ant-design/pro-components';
+import type { ProColumns } from '@ant-design/pro-components';
+import { Bar } from '@ant-design/charts';
 import { txFetch } from '../../api';
 
 // ─── Design Token（深色驾驶舱主题）───────────────────────────────────────────
@@ -134,12 +134,12 @@ export default function AiMarketingDashboardPage() {
   const [days,         setDays]         = useState(7);
   const [loadingHS,    setLoadingHS]    = useState(false);
   const [loadingPS,    setLoadingPS]    = useState(false);
-  const [loadingLog,   setLoadingLog]   = useState(false);
+  const [loadingTouchLog, setLoadingTouchLog] = useState(false);
   const [healthScore,  setHealthScore]  = useState<HealthScore | null>(null);
   const [perfSummary,  setPerfSummary]  = useState<PerformanceSummary | null>(null);
   const [touchLogs,    setTouchLogs]    = useState<TouchLog[]>([]);
-  const [logTotal,     setLogTotal]     = useState(0);
-  const [logPage,      setLogPage]      = useState(1);
+  const [touchTotal,   setTouchTotal]   = useState(0);
+  const [touchPage,    setTouchPage]    = useState(1);
   const [triggerOpen,  setTriggerOpen]  = useState(false);
   const [triggerLoading, setTriggerLoading] = useState(false);
   const [triggerForm]  = Form.useForm();
@@ -176,18 +176,18 @@ export default function AiMarketingDashboardPage() {
 
   // ── 触达日志 ──
   const fetchTouchLog = useCallback(async (page = 1) => {
-    setLoadingLog(true);
+    setLoadingTouchLog(true);
     try {
       const res = await txFetch(
         `/api/v1/agent/ai-marketing/touch-log?store_id=${storeId}&days=${days}&page=${page}&size=20`
       );
       setTouchLogs(res.data?.items ?? []);
-      setLogTotal(res.data?.total ?? 0);
-      setLogPage(page);
+      setTouchTotal(res.data?.total ?? 0);
+      setTouchPage(page);
     } catch {
       message.error('获取触达日志失败');
     } finally {
-      setLoadingLog(false);
+      setLoadingTouchLog(false);
     }
   }, [storeId, days]);
 
@@ -219,17 +219,6 @@ export default function AiMarketingDashboardPage() {
     }
   };
 
-  // ── 渠道分解表数据 ──
-  const channelRows = perfSummary
-    ? Object.entries(perfSummary.channel_breakdown).map(([key, val]) => ({
-        key,
-        channel: key,
-        sent: val.sent,
-        delivered: val.delivered,
-        conversion_rate: val.conversion_rate,
-      }))
-    : [];
-
   // ── 活动效果表数据（按归因收入降序）──
   const campaignRows = perfSummary
     ? [...perfSummary.campaign_performance].sort(
@@ -238,25 +227,7 @@ export default function AiMarketingDashboardPage() {
     : [];
 
   // ─── 列定义 ──────────────────────────────────────────────────────────────
-  const channelColumns: ColumnsType<typeof channelRows[0]> = [
-    {
-      title: '渠道',
-      dataIndex: 'channel',
-      render: (ch: string) => (
-        <Tag color="blue">{channelLabel[ch] ?? ch}</Tag>
-      ),
-    },
-    { title: '发送数', dataIndex: 'sent', align: 'right' },
-    { title: '到达数', dataIndex: 'delivered', align: 'right' },
-    {
-      title: '转化率',
-      dataIndex: 'conversion_rate',
-      align: 'right',
-      render: (v: number) => `${(v * 100).toFixed(1)}%`,
-    },
-  ];
-
-  const campaignColumns: ColumnsType<CampaignPerf> = [
+  const campaignColumns: ProColumns<CampaignPerf>[] = [
     { title: '活动类型', dataIndex: 'type' },
     { title: '发送数',   dataIndex: 'sent',              align: 'right' },
     { title: '归因订单', dataIndex: 'attributed_orders', align: 'right' },
@@ -264,11 +235,11 @@ export default function AiMarketingDashboardPage() {
       title: '归因收入（元）',
       dataIndex: 'revenue_fen',
       align: 'right',
-      render: (v: number) => fmtFen(v),
+      render: (_, row) => fmtFen(row.revenue_fen),
     },
   ];
 
-  const logColumns: ColumnsType<TouchLog> = [
+  const touchLogColumns: ProColumns<TouchLog>[] = [
     {
       title: '触达ID',
       dataIndex: 'touch_id',
@@ -278,14 +249,14 @@ export default function AiMarketingDashboardPage() {
     {
       title: '会员ID',
       dataIndex: 'member_id',
-      render: (id: string) => `${id.slice(0, 8)}...`,
+      render: (_, row) => `${row.member_id.slice(0, 8)}...`,
       width: 120,
     },
     {
       title: '渠道',
       dataIndex: 'channel',
-      render: (ch: string) => (
-        <Tag color="geekblue">{channelLabel[ch] ?? ch}</Tag>
+      render: (_, row) => (
+        <Tag color="geekblue">{channelLabel[row.channel] ?? row.channel}</Tag>
       ),
       width: 110,
     },
@@ -294,22 +265,22 @@ export default function AiMarketingDashboardPage() {
       title: '状态',
       dataIndex: 'status',
       width: 90,
-      render: (s: string) => (
-        <Tag color={statusColor[s] ?? 'default'}>{s}</Tag>
+      render: (_, row) => (
+        <Tag color={statusColor[row.status] ?? 'default'}>{row.status}</Tag>
       ),
     },
     {
       title: '发送时间',
       dataIndex: 'sent_at',
       width: 170,
-      render: (t: string) => t ? new Date(t).toLocaleString('zh-CN') : '—',
+      render: (_, row) => row.sent_at ? new Date(row.sent_at).toLocaleString('zh-CN') : '—',
     },
     {
       title: '归因收入',
       dataIndex: 'attribution_revenue_fen',
       align: 'right',
       width: 100,
-      render: (v: number) => v > 0 ? fmtFen(v) : '—',
+      render: (_, row) => row.attribution_revenue_fen > 0 ? fmtFen(row.attribution_revenue_fen) : '—',
     },
   ];
 
@@ -318,12 +289,6 @@ export default function AiMarketingDashboardPage() {
     background: C.cardBg,
     border: `1px solid ${C.border}`,
     borderRadius: 8,
-  };
-  const innerStyle: React.CSSProperties = {
-    background: C.innerBg,
-    border: `1px solid ${C.border}`,
-    borderRadius: 6,
-    padding: '12px 16px',
   };
 
   // ─── 健康评分卡 ──────────────────────────────────────────────────────────
@@ -407,59 +372,12 @@ export default function AiMarketingDashboardPage() {
   // ─── 四大指标卡 ──────────────────────────────────────────────────────────
   const renderStatCards = () => (
     <Spin spinning={loadingPS}>
-      <Row gutter={[12, 12]}>
-        {[
-          {
-            title: '总触达次数',
-            value: perfSummary?.total_touches ?? '—',
-            suffix: '次',
-            color: C.info,
-          },
-          {
-            title: '触达会员数',
-            value: perfSummary?.unique_members_reached ?? '—',
-            suffix: '人',
-            color: C.primary,
-          },
-          {
-            title: '归因收入',
-            value: perfSummary
-              ? fmtFen(perfSummary.total_attributed_revenue_fen)
-              : '—',
-            suffix: '',
-            color: C.success,
-          },
-          {
-            title: '营销ROI',
-            value: perfSummary ? `${perfSummary.overall_roi.toFixed(2)}x` : '—',
-            suffix: '',
-            color: C.warning,
-          },
-        ].map((item) => (
-          <Col span={6} key={item.title}>
-            <div style={{ ...innerStyle, textAlign: 'center' }}>
-              <div style={{ color: C.textMuted, fontSize: 12, marginBottom: 6 }}>
-                {item.title}
-              </div>
-              <div
-                style={{
-                  fontSize: 26,
-                  fontWeight: 700,
-                  color: item.color,
-                  lineHeight: 1.2,
-                }}
-              >
-                {item.value}
-                {item.suffix && (
-                  <span style={{ fontSize: 13, color: C.textMuted, marginLeft: 2 }}>
-                    {item.suffix}
-                  </span>
-                )}
-              </div>
-            </div>
-          </Col>
-        ))}
-      </Row>
+      <StatisticCard.Group>
+        <StatisticCard statistic={{ title: '总触达次数', value: perfSummary?.total_touches ?? '-', suffix: '次' }} />
+        <StatisticCard statistic={{ title: '触达会员数', value: perfSummary?.unique_members_reached ?? '-', suffix: '人' }} />
+        <StatisticCard statistic={{ title: '归因收入', value: perfSummary ? fmtFen(perfSummary.total_attributed_revenue_fen) : '-' }} />
+        <StatisticCard statistic={{ title: '营销ROI', value: perfSummary?.overall_roi ?? '-', suffix: 'x', valueStyle: { color: (perfSummary?.overall_roi ?? 0) >= 5 ? C.success : C.warning } }} />
+      </StatisticCard.Group>
     </Spin>
   );
 
@@ -494,17 +412,17 @@ export default function AiMarketingDashboardPage() {
         </div>
 
         <Space wrap>
-          <span style={{ color: C.textSub, fontSize: 13 }}>门店ID</span>
-          <Input
+          <Select
             value={storeId}
-            onChange={(e) => setStoreId(e.target.value)}
-            style={{
-              width: 140,
-              background: C.cardBg,
-              border: `1px solid ${C.border}`,
-              color: C.text,
-            }}
-            placeholder="store-001"
+            onChange={setStoreId}
+            style={{ width: 180 }}
+            options={[
+              { label: '全部门店',    value: 'all'       },
+              { label: '总部示例店',  value: 'store-001' },
+              { label: '长沙旗舰店',  value: 'store-002' },
+              { label: '北京中关村店', value: 'store-003' },
+            ]}
+            placeholder="选择门店"
           />
           <span style={{ color: C.textSub, fontSize: 13 }}>周期</span>
           <Select
@@ -565,16 +483,34 @@ export default function AiMarketingDashboardPage() {
                     渠道分解
                   </div>
                   <Spin spinning={loadingPS}>
-                    <Table
-                      dataSource={channelRows}
-                      columns={channelColumns}
-                      rowKey="key"
-                      size="small"
-                      pagination={false}
-                      locale={{ emptyText: <span style={{ color: C.textMuted }}>暂无渠道数据</span> }}
-                      style={{ background: 'transparent' }}
-                      className="tx-dark-table"
-                    />
+                    {perfSummary ? (() => {
+                      const channelData = Object.entries(perfSummary.channel_breakdown).map(([channel, v]) => ({
+                        channel: channelLabel[channel] || channel,
+                        value: v.sent,
+                        type: '发送数',
+                      })).concat(Object.entries(perfSummary.channel_breakdown).map(([channel, v]) => ({
+                        channel: channelLabel[channel] || channel,
+                        value: v.delivered,
+                        type: '到达数',
+                      })));
+                      return (
+                        <Bar
+                          data={channelData}
+                          xField="value"
+                          yField="channel"
+                          seriesField="type"
+                          isGroup
+                          color={[C.primary, C.info]}
+                          legend={{ position: 'top-right' }}
+                          xAxis={{ grid: null }}
+                          height={Math.max(200, Object.keys(perfSummary.channel_breakdown).length * 50)}
+                        />
+                      );
+                    })() : (
+                      <div style={{ color: C.textMuted, textAlign: 'center', padding: '40px 0' }}>
+                        暂无渠道数据
+                      </div>
+                    )}
                   </Spin>
                 </div>
               </Col>
@@ -641,26 +577,23 @@ export default function AiMarketingDashboardPage() {
         <div style={{ color: C.textSub, fontSize: 13, marginBottom: 12 }}>
           触达日志
         </div>
-        <Spin spinning={loadingLog}>
-          <Table
-            dataSource={touchLogs}
-            columns={logColumns}
-            rowKey="touch_id"
-            size="small"
-            scroll={{ x: 900 }}
-            pagination={{
-              current: logPage,
-              pageSize: 20,
-              total: logTotal,
-              showTotal: (t) => `共 ${t} 条`,
-              onChange: (p) => fetchTouchLog(p),
-              style: { color: C.textSub },
-            }}
-            locale={{ emptyText: <span style={{ color: C.textMuted }}>暂无触达记录</span> }}
-            style={{ background: 'transparent' }}
-            className="tx-dark-table"
-          />
-        </Spin>
+        <ProTable<TouchLog>
+          columns={touchLogColumns}
+          dataSource={touchLogs}
+          rowKey="touch_id"
+          loading={loadingTouchLog}
+          search={false}
+          pagination={{
+            current: touchPage,
+            pageSize: 20,
+            total: touchTotal,
+            onChange: (p) => fetchTouchLog(p),
+            showSizeChanger: false,
+          }}
+          toolBarRender={false}
+          style={{ background: C.cardBg }}
+          scroll={{ x: 900 }}
+        />
       </div>
 
       {/* ── 一键触发 Modal ── */}

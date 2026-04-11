@@ -14,6 +14,7 @@
   - miniapp_banner: 小程序横幅标题/副标题
   - douyin_caption: 抖音视频配文
   - xiaohongshu: 小红书笔记标题+正文
+  - xiaohongshu_note: 小红书种草笔记（结构化：标题/正文/标签/表情/封面建议）
   - store_announcement: 门店公告/LED 屏文案
 
 输出格式：CampaignContentPackage，包含所有渠道的内容变体
@@ -43,6 +44,7 @@ CHANNEL_MAX_CHARS: dict[str, int] = {
     "miniapp_banner":    50,
     "douyin_caption":    150,
     "xiaohongshu":       1000,
+    "xiaohongshu_note":  1500,
     "store_announcement": 100,
 }
 
@@ -308,6 +310,226 @@ class ContentHub:
             max_tokens=400,
         )
         return response.strip()
+
+    async def generate_xiaohongshu_note(
+        self,
+        tenant_id: str,
+        store_name: str,
+        dish_name: str,
+        brand_voice: dict,
+        campaign_type: str = "store_visit",
+        city: str = "长沙",
+        target_audience: str = "年轻女性用户",
+    ) -> dict:
+        """生成小红书种草笔记
+
+        生成结构化笔记内容：标题/正文/标签/表情建议/封面构图建议
+
+        Args:
+            tenant_id:       租户 UUID
+            store_name:      餐厅名称
+            dish_name:       主推菜品名称
+            brand_voice:     品牌调性配置字典（至少含 tone 键）
+            campaign_type:   活动类型（默认 store_visit）
+            city:            门店所在城市（默认长沙）
+            target_audience: 目标受众描述
+
+        Returns:
+            结构化笔记字典，包含 title/body/hashtags/emojis/cover_concept/cta
+
+        Raises:
+            ValueError: store_name 或 dish_name 为空
+        """
+        if not store_name.strip():
+            raise ValueError("store_name 不能为空")
+        if not dish_name.strip():
+            raise ValueError("dish_name 不能为空")
+
+        cache_key = hashlib.sha256(
+            f"xiaohongshu_note:{store_name}:{dish_name}:{campaign_type}".encode()
+        ).hexdigest()
+
+        # 无 ModelRouter 时返回 mock 响应
+        if self._model_router is None:
+            logger.info(
+                "content_hub_xhs_note_mock",
+                tenant_id=tenant_id,
+                store_name=store_name,
+                dish_name=dish_name,
+            )
+            return {
+                "title": f"探店{store_name} | {dish_name}真的绝了",
+                "body": f"最近发现了{city}宝藏餐厅 {store_name}，{dish_name}让我念念不忘...",
+                "hashtags": [f"#{store_name}", f"#{dish_name}", "#美食探店", f"#{city}美食", "#种草"],
+                "emojis": ["😋", "🍜", "✨", "❤️"],
+                "cover_concept": f"{dish_name}特写，暖光氛围，背景虚化",
+                "cta": "你最想尝哪道菜？评论区见～",
+                "cached": False,
+                "mock": True,
+            }
+
+        prompt = f"""你是一位擅长小红书内容创作的营销文案专家。
+为以下餐厅生成一篇小红书种草笔记：
+
+品牌信息：
+- 餐厅名：{store_name}
+- 城市：{city}
+- 品牌调性：{brand_voice.get('tone', '亲切温暖')}
+- 主推内容：{dish_name}
+- 活动类型：{campaign_type}
+- 目标受众：{target_audience}
+
+请以 JSON 格式输出，包含以下字段：
+{{
+  "title": "标题（≤20字，有吸引力）",
+  "body": "正文（100-300字，小红书风格，第一人称，口语化，有具体细节和情绪）",
+  "hashtags": ["#tag1", "#tag2", ...（5-8个）],
+  "emojis": ["😋", "🍜", ...（3-5个，建议插入正文的表情）],
+  "cover_concept": "封面图构图建议（一句话）",
+  "cta": "引导语（如"评论区告诉我你最想尝哪道菜～"）"
+}}
+
+注意：标题和正文必须自然真实，避免广告感，像真实用户分享。"""
+
+        logger.info(
+            "content_hub_xhs_note_calling_model_router",
+            tenant_id=tenant_id,
+            store_name=store_name,
+            dish_name=dish_name,
+            campaign_type=campaign_type,
+        )
+
+        raw_text = await self._model_router.complete(
+            tenant_id=tenant_id,
+            task_type="standard_analysis",
+            messages=[{"role": "user", "content": prompt}],
+            system=(
+                "你是屯象OS的AI营销文案专家，专注中国连锁餐饮行业。"
+                "你的输出必须是合法JSON。"
+            ),
+            max_tokens=800,
+        )
+
+        # 去除可能的 markdown 代码块标记
+        raw_stripped = raw_text.strip()
+        if raw_stripped.startswith("```"):
+            lines = raw_stripped.split("\n")
+            raw_stripped = "\n".join(lines[1:-1]) if len(lines) > 2 else raw_stripped
+
+        try:
+            note_data: dict = json.loads(raw_stripped)
+        except json.JSONDecodeError as exc:
+            logger.warning(
+                "content_hub_xhs_note_parse_failed",
+                tenant_id=tenant_id,
+                error=str(exc),
+                raw_preview=raw_stripped[:200],
+            )
+            note_data = {
+                "title": f"探店{store_name} | {dish_name}真的绝了",
+                "body": raw_stripped[:300],
+                "hashtags": [f"#{store_name}", f"#{dish_name}", "#美食探店", f"#{city}美食", "#种草"],
+                "emojis": ["😋", "🍜", "✨", "❤️"],
+                "cover_concept": f"{dish_name}特写，暖光氛围，背景虚化",
+                "cta": "你最想尝哪道菜？评论区见～",
+            }
+
+        result: dict = {
+            "title": note_data.get("title", ""),
+            "body": note_data.get("body", ""),
+            "hashtags": note_data.get("hashtags", []),
+            "emojis": note_data.get("emojis", []),
+            "cover_concept": note_data.get("cover_concept", ""),
+            "cta": note_data.get("cta", ""),
+            "cached": False,
+            "mock": False,
+        }
+
+        # 写入缓存（best-effort，失败不阻断）
+        await self._save_xhs_note_to_cache(cache_key, result, tenant_id, campaign_type)
+
+        return result
+
+    async def _save_xhs_note_to_cache(
+        self,
+        cache_key: str,
+        note: dict,
+        tenant_id: str,
+        campaign_type: str,
+    ) -> None:
+        """将小红书笔记结果写入 ai_content_cache 表（best-effort）。
+
+        复用 ai_content_cache，campaign_type 存为 "xiaohongshu_note:{campaign_type}"。
+        写入失败仅记录警告，不阻断主流程。
+        """
+        if self._model_router is None:
+            return
+
+        # 尝试获取 db session
+        try:
+            from ..database import get_session  # lazy import
+
+            db_gen = get_session()
+            db: AsyncSession = await db_gen.__anext__()
+        except (ImportError, OSError, RuntimeError) as exc:
+            logger.warning(
+                "content_hub_xhs_note_cache_no_session",
+                cache_key=cache_key,
+                error=str(exc),
+            )
+            return
+
+        expires_at = datetime.now(timezone.utc) + timedelta(hours=self.MAX_CACHE_AGE_HOURS)
+        ctype = f"xiaohongshu_note:{campaign_type}"
+        try:
+            await db.execute(
+                text("SELECT set_config('app.tenant_id', :tid, true)"),
+                {"tid": tenant_id},
+            )
+            await db.execute(
+                text(
+                    """
+                    INSERT INTO ai_content_cache
+                        (tenant_id, cache_key, campaign_type, package_json, tokens_used, expires_at)
+                    VALUES
+                        (:tid, :key, :ctype, :pkg_json, :tokens, :expires)
+                    ON CONFLICT (tenant_id, cache_key)
+                    WHERE NOT is_deleted
+                    DO UPDATE SET
+                        package_json = EXCLUDED.package_json,
+                        tokens_used  = EXCLUDED.tokens_used,
+                        expires_at   = EXCLUDED.expires_at
+                    """
+                ),
+                {
+                    "tid":      tenant_id,
+                    "key":      cache_key,
+                    "ctype":    ctype,
+                    "pkg_json": json.dumps(note, ensure_ascii=False, default=str),
+                    "tokens":   0,
+                    "expires":  expires_at,
+                },
+            )
+            await db.commit()
+            logger.info(
+                "content_hub_xhs_note_cache_saved",
+                cache_key=cache_key,
+                tenant_id=tenant_id,
+                expires_at=expires_at.isoformat(),
+            )
+        except Exception as exc:  # noqa: BLE001 — 缓存写入失败不阻断主流程
+            logger.warning(
+                "content_hub_xhs_note_cache_write_failed",
+                cache_key=cache_key,
+                tenant_id=tenant_id,
+                error=str(exc),
+                exc_info=True,
+            )
+        finally:
+            try:
+                await db_gen.aclose()
+            except (OSError, RuntimeError):
+                pass
 
     async def _get_cached_content(
         self,
