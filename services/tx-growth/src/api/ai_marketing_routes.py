@@ -406,6 +406,17 @@ async def test_channel_connectivity(
             adp = DouyinMarketingAdapter()
             results[channel] = {"status": "configured" if not adp.is_mock else "mock_mode", "is_mock": adp.is_mock}
 
+        elif channel == "xiaohongshu":
+            try:
+                from shared.integrations.xiaohongshu_marketing import XiaohongshuMarketingAdapter
+                adp = XiaohongshuMarketingAdapter()
+                results[channel] = {
+                    "status": "configured" if not adp.is_mock else "mock_mode",
+                    "is_mock": adp.is_mock,
+                }
+            except ImportError:
+                results[channel] = {"status": "adapter_not_installed"}
+
         else:
             results[channel] = {"status": "unknown_channel"}
 

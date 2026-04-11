@@ -2,8 +2,13 @@
 
 提供竞对监测、消费洞察、口碑分析、新品雷达、价格洞察、情报报告、试点建议等 API。
 """
+import asyncio
+import os
+from contextlib import asynccontextmanager
+from datetime import datetime, timedelta
 from typing import Optional
 
+import httpx
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from services.competitor_monitor import CompetitorMonitorService
@@ -16,10 +21,72 @@ from services.review_topic_engine import ReviewTopicEngine
 from services.weather_signal import WeatherSignalService
 from services.calendar_signal import CalendarSignalService
 
+AGENT_SERVICE_URL = os.getenv("AGENT_SERVICE_URL", "http://tx-agent:8008")
+
+
+async def _daily_intel_report_task() -> None:
+    """每日0点自动生成竞对情报周报（后台任务）"""
+    import structlog as _structlog
+    _logger = _structlog.get_logger("daily_intel_task")
+
+    while True:
+        now = datetime.now()
+        # 计算到明日0点的等待时间
+        tomorrow_midnight = datetime(now.year, now.month, now.day) + timedelta(days=1)
+        wait_seconds = (tomorrow_midnight - now).total_seconds()
+        _logger.info("daily_intel_task_scheduled", wait_seconds=int(wait_seconds))
+        await asyncio.sleep(wait_seconds)
+
+        # 触发周报生成
+        week_end = datetime.now().date().isoformat()
+        week_start = (datetime.now().date() - timedelta(days=7)).isoformat()
+        try:
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                resp = await client.post(
+                    f"{AGENT_SERVICE_URL}/api/v1/agent/dispatch",
+                    headers={"X-Tenant-ID": "system"},
+                    json={
+                        "agent_id": "competitor_watch",
+                        "action": "generate_weekly_intel_report",
+                        "params": {
+                            "tenant_id": "system",
+                            "competitor_snapshots": [],
+                            "own_reviews": [],
+                            "competitor_reviews": [],
+                            "market_trends": [],
+                            "week_start": week_start,
+                            "week_end": week_end,
+                        },
+                    },
+                )
+                _logger.info(
+                    "daily_intel_report_completed",
+                    status_code=resp.status_code,
+                    week_start=week_start,
+                    week_end=week_end,
+                )
+        except (httpx.ConnectError, httpx.TimeoutException) as exc:
+            _logger.warning("daily_intel_report_failed", error=str(exc))
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    task = asyncio.create_task(_daily_intel_report_task())
+    try:
+        yield
+    finally:
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+
+
 app = FastAPI(
     title="屯象OS — 市场情报中枢",
     description="Market Intelligence Hub: 竞对监测、消费洞察、口碑分析、新品雷达、价格洞察、情报报告、试点建议、天气信号、节庆日历",
     version="1.1.0",
+    lifespan=lifespan,
 )
 
 from prometheus_fastapi_instrumentator import Instrumentator
