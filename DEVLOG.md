@@ -42,11 +42,16 @@
 - 新增渠道覆盖：3个（微信OA+企微 / 美团 / 抖音）
 - 新增测试：33个
 
+### 路由注册（追加）
+- `tx-brain/main.py` ← content_hub_router（/api/v1/brain/content/*）
+- `tx-agent/main.py` ← ai_marketing_orchestrator_router（/api/v1/agent/ai-marketing/*）
+- `tx-growth/main.py` ← ai_marketing_router（/api/v1/growth/ai-marketing/*）
+- `skills/__init__.py` ← AiMarketingOrchestratorAgent 加入 ALL_SKILL_AGENTS（事件总线可调度）
+
 ### 明日计划
-- 将 ai_marketing_routes.py 注册到 tx-growth main.py
-- 将 content_hub_routes.py 注册到 tx-brain main.py
-- 将 ai_marketing_orchestrator_routes.py 注册到 tx-agent main.py
 - Phase 2 归因闭环：marketing_touch_log 写入链路完整实现
+- _dispatch_message() 实际写入 touch_log 表
+- touch-log GET 接口从数据库读取真实记录
 
 ---
 
