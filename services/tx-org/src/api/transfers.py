@@ -14,7 +14,6 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from services.store_transfer_service import (
-    approve_transfer_order,
     compute_cost_split,
     compute_time_split,
     generate_cost_analysis_report,
