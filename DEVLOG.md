@@ -83,10 +83,22 @@
 - `apps/web-admin/src/pages/marketing/AiMarketingDashboardPage.tsx` — 755行，含健康评分/4项KPI卡片/渠道分析/活动排名/AI洞察/触达日志/一键触发Modal
 - `apps/web-admin/src/App.tsx` ← 注册路由 `/hq/growth/ai-marketing`
 
+### Phase 3 第三轮追加（同日完成）
+
+**归因闭环最终打通**
+- `cashier_engine.py` — ORDER.PAID 后 fire-and-forget 调用 `/api/v1/agent/ai-marketing/attribute-order`，完整闭环：下单→触达→复购→归因 全链路打通
+
+**ContentHub 小红书种草笔记**
+- `services/content_hub.py` — 新增 `generate_xiaohongshu_note()` 方法：结构化输出（标题/正文/5-8标签/表情建议/封面构图），Claude API驱动，含24h缓存 + Mock降级
+- `api/content_hub_routes.py` — 新增 `POST /api/v1/brain/content/xiaohongshu-note` 接口
+
+**AI营销驾驶舱 Admin规范验证**
+- 已确认：ProTable/StatisticCard/Bar图表/门店Select选择器均已合规实现
+
 ### 明日计划
-- cashier_engine 调用 /attribute-order 接口（ORDER.PAID → 自动归因）
-- AI营销驾驶舱加入门店选择器（多门店切换）
-- 小红书笔记内容生成接入 ContentHub（tx-brain AIGC）
+- 小红书种草笔记接入 AiMarketingOrchestratorAgent（brand_content 场景触发）
+- 营销活动数据大盘：接入 mv_channel_margin 物化视图（Phase 3 归因数据）
+- cashier_engine attribution 集成测试
 
 ---
 
