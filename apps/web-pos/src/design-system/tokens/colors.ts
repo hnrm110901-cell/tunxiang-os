@@ -1,24 +1,24 @@
 /**
  * 屯象OS · 色彩Token
- * 品牌色: Mint #0AAF9A — v2 设计系统
+ * 品牌色: #FF6B35（暖橙色）— 统一 Design Token，与 @tx/tokens 对齐
  * 基于 v2 prototype workspace.html 设计规范
  */
 
-// ── Mint 品牌主色阶 ──
+// ── 品牌主色阶（暖橙 #FF6B35）──
 export const brand = {
-  50:  '#E6F7F5',
-  100: '#B3EBE4',
-  200: '#80DFD3',
-  300: '#4DD3C2',
-  400: '#26C9B4',
-  500: '#0AAF9A',  // Primary — --color-primary
-  600: '#099987',  // Hover
-  700: '#078070',  // Active/Pressed
-  800: '#056659',
-  900: '#034D43',
+  50:  '#FFF3ED',
+  100: '#FFE0CC',
+  200: '#FFBD99',
+  300: '#FF9966',
+  400: '#FF8555',
+  500: '#FF6B35',  // Primary — --tx-primary / --color-primary
+  600: '#E55A28',  // Hover
+  700: '#CC4A1A',  // Active/Pressed
+  800: '#A33515',
+  900: '#7A2510',
 } as const;
 
-// ── 保留旧名 mint 作为别名，兼容现有引用 ──
+// ── 保留旧名 mint 作为别名，兼容现有引用（已迁移至 #FF6B35 暖橙色）──
 export const mint = brand;
 
 // ── Navy 文字/导航色阶 ──
@@ -82,7 +82,7 @@ export const dark = {
 
 // ── 快捷常量 ──
 export const colors = {
-  accent:  brand[500],   // #0AAF9A
+  accent:  brand[500],   // #FF6B35
   green:   semantic.success,
   red:     semantic.danger,
   yellow:  warm.sun,

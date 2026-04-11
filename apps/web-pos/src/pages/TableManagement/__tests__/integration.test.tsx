@@ -5,8 +5,7 @@
 
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { ConfigProvider } from 'antd';
-import zhCN from 'antd/lib/locale/zh_CN';
+// antd ConfigProvider 已移除 — 直接渲染（已迁移至 TXTouch，无需 antd provider）
 import TableManagementPage from '../index';
 import { useTableStore } from '../../../stores/tableStore';
 
@@ -30,9 +29,9 @@ describe('TableManagementPage Integration Tests', () => {
 
   it('åºè¯¥æ­£ç¡®æ¸²æä¸»é¡µé¢', () => {
     render(
-      <ConfigProvider locale={zhCN}>
+
         <TableManagementPage storeId="store-001" />
-      </ConfigProvider>
+
     );
 
     // æ£æ¥ä¸»è¦åç´ æ¯å¦å­å¨
@@ -86,9 +85,9 @@ describe('TableManagementPage Integration Tests', () => {
     });
 
     render(
-      <ConfigProvider locale={zhCN}>
+
         <TableManagementPage storeId="store-001" />
-      </ConfigProvider>
+
     );
 
     // ç­å¾æ°æ®å è½½
@@ -103,9 +102,9 @@ describe('TableManagementPage Integration Tests', () => {
 
   it('åºè¯¥æ¯æè§å¾åæ¢', async () => {
     render(
-      <ConfigProvider locale={zhCN}>
+
         <TableManagementPage storeId="store-001" />
-      </ConfigProvider>
+
     );
 
     const listButton = screen.getByText('åè¡¨');
@@ -120,9 +119,9 @@ describe('TableManagementPage Integration Tests', () => {
     (global.fetch as jest.Mock).mockRejectedValueOnce(new Error('API Error'));
 
     render(
-      <ConfigProvider locale={zhCN}>
+
         <TableManagementPage storeId="store-001" />
-      </ConfigProvider>
+
     );
 
     await waitFor(() => {
@@ -173,9 +172,9 @@ describe('TableManagementPage Integration Tests', () => {
     });
 
     render(
-      <ConfigProvider locale={zhCN}>
+
         <TableManagementPage storeId="store-001" />
-      </ConfigProvider>
+
     );
 
     // ç¹å»ç­éæé®
@@ -221,9 +220,9 @@ describe('TableManagementPage Integration Tests', () => {
     });
 
     render(
-      <ConfigProvider locale={zhCN}>
+
         <TableManagementPage storeId="store-001" />
-      </ConfigProvider>
+
     );
 
     expect(screen.getByText('ææ æ¡å°æ°æ®')).toBeInTheDocument();
@@ -235,9 +234,9 @@ describe('TableManagementPage Integration Tests', () => {
     });
 
     render(
-      <ConfigProvider locale={zhCN}>
+
         <TableManagementPage storeId="store-001" />
-      </ConfigProvider>
+
     );
 
     expect(screen.getByText('å è½½ä¸­...')).toBeInTheDocument();
