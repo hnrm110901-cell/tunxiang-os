@@ -258,6 +258,8 @@ import PeakGuardPage from './pages/hr/PeakGuardPage';
 import CoachSessionPage from './pages/hr/CoachSessionPage';
 import AlertAggregationPage from './pages/hr/AlertAggregationPage';
 import HRHubOverviewPage from './pages/hr/HRHubOverviewPage';
+// ─── AI营销驾驶舱 ─────────────────────────────────────────────────────────────
+import AiMarketingDashboardPage from './pages/marketing/AiMarketingDashboardPage';
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(() => {
@@ -552,6 +554,8 @@ function App() {
           <Route path="/hq/analytics/revenue-optimize" element={<RevenueOptimizePage />} />
           {/* /hq/analytics/table-turnover handled in Sprint 4 routes above */}
           <Route path="/hq/growth/customer-brain"      element={<CustomerBrainPage />} />
+          {/* ─── AI营销驾驶舱 ─── */}
+          <Route path="/hq/growth/ai-marketing" element={<AiMarketingDashboardPage />} />
           {/* ─── Y-C4: 多渠道菜单发布完善 ─── */}
           <Route path="/menu/channels" element={<ChannelMenuPage />} />
           {/* ─── Y-D7: 付费会员卡产品化 ─── */}
