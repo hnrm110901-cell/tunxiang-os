@@ -82,12 +82,18 @@ async def process_event(
             elif event_type == "expense.application.submitted":
                 await _handle_application_submitted(db, UUID(tenant_id), payload)
 
+            elif event_type == "supply.purchase_order.approved":
+                await _handle_purchase_order_approved(db, UUID(tenant_id), payload)
+
+            elif event_type == "supply.purchase_order.cancelled":
+                await _handle_purchase_order_cancelled(db, UUID(tenant_id), payload)
+
             elif event_type == "supply.purchase_order.goods_received":
-                # P1实现：采购付款联动
+                # 货物已收，可触发最终付款；当前仅记录，待 P2 实现
                 log.info(
-                    "event_deferred",
+                    "event_received",
                     event_type=event_type,
-                    reason="P1_not_implemented",
+                    note="goods_received_logged_pending_p2",
                 )
 
             elif event_type == "trade.revenue.daily_summary":
@@ -205,6 +211,109 @@ async def _handle_application_submitted(
         application_id=str(application_id),
         tenant_id=str(tenant_id),
         result=result,
+    )
+
+
+async def _handle_purchase_order_approved(
+    db: Any,
+    tenant_id: UUID,
+    payload: dict[str, Any],
+) -> None:
+    """处理 supply.purchase_order.approved 事件。
+
+    自动为采购订单创建付款单草稿（幂等：同一订单重复触发只创建一张）。
+
+    payload 预期字段：
+      purchase_order_id   (str UUID, 必填)
+      purchase_order_no   (str, 可选)
+      supplier_id         (str UUID, 可选)
+      supplier_name       (str, 可选)
+      total_amount        (int 分, 必填)
+      payment_type        (str, 可选, 默认 purchase)
+      due_date            (str ISO date, 可选)
+      items               (list[dict], 可选)
+    """
+    try:
+        from src.services.procurement_payment_service import ProcurementPaymentService
+    except ImportError:
+        log.warning(
+            "procurement_payment_service_not_available",
+            trigger="purchase_order_approved",
+            note="ProcurementPaymentService not yet available; skipping.",
+        )
+        return
+
+    purchase_order_id_str = payload.get("purchase_order_id")
+    if not purchase_order_id_str:
+        log.error(
+            "event_missing_purchase_order_id",
+            event_type="supply.purchase_order.approved",
+            payload_keys=list(payload.keys()),
+        )
+        return
+
+    svc = ProcurementPaymentService()
+    payment = await svc.create_from_purchase_order(
+        db=db,
+        tenant_id=tenant_id,
+        order_data=payload,
+    )
+    await db.commit()
+
+    log.info(
+        "purchase_order_approved_payment_created",
+        tenant_id=str(tenant_id),
+        payment_id=str(payment.id),
+        purchase_order_id=purchase_order_id_str,
+    )
+
+
+async def _handle_purchase_order_cancelled(
+    db: Any,
+    tenant_id: UUID,
+    payload: dict[str, Any],
+) -> None:
+    """处理 supply.purchase_order.cancelled 事件。
+
+    查找对应付款单并标记为 cancelled。若无对应付款单，静默跳过。
+
+    payload 预期字段：
+      purchase_order_id   (str UUID, 必填)
+    """
+    try:
+        from src.services.procurement_payment_service import ProcurementPaymentService
+    except ImportError:
+        log.warning(
+            "procurement_payment_service_not_available",
+            trigger="purchase_order_cancelled",
+            note="ProcurementPaymentService not yet available; skipping.",
+        )
+        return
+
+    purchase_order_id_str = payload.get("purchase_order_id")
+    if not purchase_order_id_str:
+        log.error(
+            "event_missing_purchase_order_id",
+            event_type="supply.purchase_order.cancelled",
+            payload_keys=list(payload.keys()),
+        )
+        return
+
+    purchase_order_id = UUID(purchase_order_id_str)
+    svc = ProcurementPaymentService()
+    payment = await svc.cancel_payment_by_order_id(
+        db=db,
+        tenant_id=tenant_id,
+        purchase_order_id=purchase_order_id,
+    )
+    if payment is not None:
+        await db.commit()
+
+    log.info(
+        "purchase_order_cancelled_payment_updated",
+        tenant_id=str(tenant_id),
+        purchase_order_id=purchase_order_id_str,
+        payment_cancelled=payment is not None,
     )
 
 

@@ -542,6 +542,146 @@ async def init_brand_standards(
 # 餐饮行业默认差标模板
 # ─────────────────────────────────────────────────────────────────────────────
 
+async def get_default_city_tiers_template() -> list[dict]:
+    """返回50个主要城市的城市级别映射模板（硬编码业务数据）。
+
+    覆盖范围：
+      - 一线城市（tier1）：4个
+      - 新一线城市（tier2）：15个
+      - 二线城市（tier3）：31个
+    合计：50个城市
+
+    适用于租户首次配置时批量写入 standard_city_tiers 表。
+    """
+    return [
+        # ── 一线城市（4个）─────────────────────────────────────────────────────
+        {"city_name": "北京", "province": "北京市",   "city_code": "110000", "tier": CityTier.TIER1.value},
+        {"city_name": "上海", "province": "上海市",   "city_code": "310000", "tier": CityTier.TIER1.value},
+        {"city_name": "广州", "province": "广东省",   "city_code": "440100", "tier": CityTier.TIER1.value},
+        {"city_name": "深圳", "province": "广东省",   "city_code": "440300", "tier": CityTier.TIER1.value},
+
+        # ── 新一线城市（15个）──────────────────────────────────────────────────
+        {"city_name": "成都", "province": "四川省",   "city_code": "510100", "tier": CityTier.TIER2.value},
+        {"city_name": "杭州", "province": "浙江省",   "city_code": "330100", "tier": CityTier.TIER2.value},
+        {"city_name": "重庆", "province": "重庆市",   "city_code": "500000", "tier": CityTier.TIER2.value},
+        {"city_name": "武汉", "province": "湖北省",   "city_code": "420100", "tier": CityTier.TIER2.value},
+        {"city_name": "西安", "province": "陕西省",   "city_code": "610100", "tier": CityTier.TIER2.value},
+        {"city_name": "苏州", "province": "江苏省",   "city_code": "320500", "tier": CityTier.TIER2.value},
+        {"city_name": "天津", "province": "天津市",   "city_code": "120000", "tier": CityTier.TIER2.value},
+        {"city_name": "南京", "province": "江苏省",   "city_code": "320100", "tier": CityTier.TIER2.value},
+        {"city_name": "长沙", "province": "湖南省",   "city_code": "430100", "tier": CityTier.TIER2.value},
+        {"city_name": "郑州", "province": "河南省",   "city_code": "410100", "tier": CityTier.TIER2.value},
+        {"city_name": "东莞", "province": "广东省",   "city_code": "441900", "tier": CityTier.TIER2.value},
+        {"city_name": "青岛", "province": "山东省",   "city_code": "370200", "tier": CityTier.TIER2.value},
+        {"city_name": "沈阳", "province": "辽宁省",   "city_code": "210100", "tier": CityTier.TIER2.value},
+        {"city_name": "宁波", "province": "浙江省",   "city_code": "330200", "tier": CityTier.TIER2.value},
+        {"city_name": "昆明", "province": "云南省",   "city_code": "530100", "tier": CityTier.TIER2.value},
+
+        # ── 二线城市（31个）───────────────────────────────────────────────────
+        {"city_name": "合肥", "province": "安徽省",   "city_code": "340100", "tier": CityTier.TIER3.value},
+        {"city_name": "福州", "province": "福建省",   "city_code": "350100", "tier": CityTier.TIER3.value},
+        {"city_name": "无锡", "province": "江苏省",   "city_code": "320200", "tier": CityTier.TIER3.value},
+        {"city_name": "厦门", "province": "福建省",   "city_code": "350200", "tier": CityTier.TIER3.value},
+        {"city_name": "哈尔滨", "province": "黑龙江省", "city_code": "230100", "tier": CityTier.TIER3.value},
+        {"city_name": "济南", "province": "山东省",   "city_code": "370100", "tier": CityTier.TIER3.value},
+        {"city_name": "温州", "province": "浙江省",   "city_code": "330300", "tier": CityTier.TIER3.value},
+        {"city_name": "南昌", "province": "江西省",   "city_code": "360100", "tier": CityTier.TIER3.value},
+        {"city_name": "长春", "province": "吉林省",   "city_code": "220100", "tier": CityTier.TIER3.value},
+        {"city_name": "泉州", "province": "福建省",   "city_code": "350500", "tier": CityTier.TIER3.value},
+        {"city_name": "石家庄", "province": "河北省",  "city_code": "130100", "tier": CityTier.TIER3.value},
+        {"city_name": "贵阳", "province": "贵州省",   "city_code": "520100", "tier": CityTier.TIER3.value},
+        {"city_name": "太原", "province": "山西省",   "city_code": "140100", "tier": CityTier.TIER3.value},
+        {"city_name": "南宁", "province": "广西壮族自治区", "city_code": "450100", "tier": CityTier.TIER3.value},
+        {"city_name": "常州", "province": "江苏省",   "city_code": "320400", "tier": CityTier.TIER3.value},
+        {"city_name": "扬州", "province": "江苏省",   "city_code": "321000", "tier": CityTier.TIER3.value},
+        {"city_name": "南通", "province": "江苏省",   "city_code": "320600", "tier": CityTier.TIER3.value},
+        {"city_name": "嘉兴", "province": "浙江省",   "city_code": "330400", "tier": CityTier.TIER3.value},
+        {"city_name": "珠海", "province": "广东省",   "city_code": "440400", "tier": CityTier.TIER3.value},
+        {"city_name": "惠州", "province": "广东省",   "city_code": "441300", "tier": CityTier.TIER3.value},
+        {"city_name": "中山", "province": "广东省",   "city_code": "442000", "tier": CityTier.TIER3.value},
+        {"city_name": "湖州", "province": "浙江省",   "city_code": "330500", "tier": CityTier.TIER3.value},
+        {"city_name": "台州", "province": "浙江省",   "city_code": "331000", "tier": CityTier.TIER3.value},
+        {"city_name": "徐州", "province": "江苏省",   "city_code": "320300", "tier": CityTier.TIER3.value},
+        {"city_name": "烟台", "province": "山东省",   "city_code": "370600", "tier": CityTier.TIER3.value},
+        {"city_name": "潍坊", "province": "山东省",   "city_code": "370700", "tier": CityTier.TIER3.value},
+        {"city_name": "兰州", "province": "甘肃省",   "city_code": "620100", "tier": CityTier.TIER3.value},
+        {"city_name": "海口", "province": "海南省",   "city_code": "460100", "tier": CityTier.TIER3.value},
+        {"city_name": "呼和浩特", "province": "内蒙古自治区", "city_code": "150100", "tier": CityTier.TIER3.value},
+        {"city_name": "银川", "province": "宁夏回族自治区", "city_code": "640100", "tier": CityTier.TIER3.value},
+    ]
+
+
+async def init_tenant_city_tiers(
+    db: AsyncSession,
+    tenant_id: uuid.UUID,
+    skip_existing: bool = True,
+) -> int:
+    """将50个城市差标模板写入 standard_city_tiers 表。
+
+    新租户首次初始化时调用（如在品牌创建流程中触发）。
+
+    Args:
+        skip_existing: True=跳过已存在的城市（不覆盖，幂等），False=强制更新 tier
+
+    Returns:
+        实际写入（新增）的城市数量
+    """
+    cities = await get_default_city_tiers_template()
+
+    log = logger.bind(tenant_id=str(tenant_id))
+
+    # 一次性查出已有的城市名，避免逐条查询
+    existing_stmt = select(StandardCityTier.city_name).where(
+        StandardCityTier.tenant_id == tenant_id,
+    )
+    existing_result = await db.execute(existing_stmt)
+    existing_names: set[str] = {row[0] for row in existing_result.fetchall()}
+
+    new_rows: list[StandardCityTier] = []
+    update_rows: list[StandardCityTier] = []
+
+    for city in cities:
+        city_name = city["city_name"]
+        if city_name in existing_names:
+            if not skip_existing:
+                # 查出记录并更新 tier
+                upd_stmt = select(StandardCityTier).where(
+                    StandardCityTier.tenant_id == tenant_id,
+                    StandardCityTier.city_name == city_name,
+                ).limit(1)
+                upd_result = await db.execute(upd_stmt)
+                row = upd_result.scalar_one_or_none()
+                if row is not None:
+                    row.tier = city["tier"]
+                    row.province = city.get("province")
+                    row.city_code = city.get("city_code")
+                    update_rows.append(row)
+        else:
+            new_rows.append(
+                StandardCityTier(
+                    id=uuid.uuid4(),
+                    tenant_id=tenant_id,
+                    city_name=city_name,
+                    city_code=city.get("city_code"),
+                    province=city.get("province"),
+                    tier=city["tier"],
+                    is_system=True,
+                )
+            )
+
+    if new_rows:
+        db.add_all(new_rows)
+        await db.flush()
+
+    log.info(
+        "tenant_city_tiers_initialized",
+        inserted=len(new_rows),
+        updated=len(update_rows),
+        skipped=len(cities) - len(new_rows) - len(update_rows),
+    )
+    return len(new_rows)
+
+
 async def get_default_standards_template() -> list[dict]:
     """返回餐饮行业推荐差标模板（硬编码业务数据）。
 

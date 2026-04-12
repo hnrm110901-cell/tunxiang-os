@@ -14,6 +14,7 @@ from uuid import UUID
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, UploadFile, File, status
 from pydantic import BaseModel, Field
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
@@ -756,3 +757,76 @@ async def list_city_tiers(
     except Exception as exc:
         log.error("city_tiers_list_failed", error=str(exc), tenant_id=str(tenant_id), exc_info=True)
         raise HTTPException(status_code=500, detail="查询城市级别失败，请稍后重试")
+
+
+@router.get("/cities/tiers/template")
+async def get_city_tiers_template() -> Dict[str, Any]:
+    """获取50个主要城市的级别映射模板（无需认证）
+
+    返回覆盖全国50个主要城市的城市级别映射模板：
+      - 一线城市（tier1）：北京、上海、广州、深圳（4个）
+      - 新一线城市（tier2）：成都、杭州、重庆等（15个）
+      - 二线城市（tier3）：合肥、福州、无锡等（31个）
+
+    可作为新租户初始化城市差标配置的参考数据，
+    也可通过 POST /cities/tiers/init 一键写入数据库。
+    """
+    try:
+        items = await _std_svc.get_default_city_tiers_template()
+        # 按城市级别分组统计
+        tier_counts: Dict[str, int] = {}
+        for item in items:
+            tier = item["tier"]
+            tier_counts[tier] = tier_counts.get(tier, 0) + 1
+        return {
+            "ok": True,
+            "data": items,
+            "total": len(items),
+            "tier_counts": tier_counts,
+        }
+    except Exception as exc:
+        log.error("city_tiers_template_failed", error=str(exc), exc_info=True)
+        raise HTTPException(status_code=500, detail="获取城市差标模板失败，请稍后重试")
+
+
+@router.post("/cities/tiers/init")
+async def init_city_tiers(
+    skip_existing: bool = True,
+    tenant_id: UUID = Depends(get_tenant_id),
+    db: AsyncSession = Depends(get_db),
+) -> Dict[str, Any]:
+    """一键初始化50个城市差标映射（新租户首次配置时调用）
+
+    将系统预置的50个城市（tier1/tier2/tier3）批量写入当前租户的 standard_city_tiers 表。
+
+    Args:
+        skip_existing: True（默认）=跳过已存在的城市（幂等，不覆盖），
+                       False=强制更新已有城市的 tier
+
+    返回：
+        inserted: 实际新增的城市数量
+        total: 模板总城市数量
+    """
+    try:
+        inserted = await _std_svc.init_tenant_city_tiers(
+            db=db,
+            tenant_id=tenant_id,
+            skip_existing=skip_existing,
+        )
+        await db.commit()
+        return {
+            "ok": True,
+            "data": {
+                "inserted": inserted,
+                "total": 50,
+                "message": f"城市差标初始化完成，新增 {inserted} 个城市映射",
+            },
+        }
+    except SQLAlchemyError as exc:
+        await db.rollback()
+        log.error("city_tiers_init_db_failed", error=str(exc), tenant_id=str(tenant_id), exc_info=True)
+        raise HTTPException(status_code=500, detail="城市差标初始化失败（数据库错误），请稍后重试")
+    except Exception as exc:
+        await db.rollback()
+        log.error("city_tiers_init_failed", error=str(exc), tenant_id=str(tenant_id), exc_info=True)
+        raise HTTPException(status_code=500, detail="城市差标初始化失败，请稍后重试")

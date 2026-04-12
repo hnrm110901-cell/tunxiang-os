@@ -521,6 +521,7 @@ async def check_application_compliance(
         has_major = False
         has_minor = False
         has_warning = False
+        max_over_rate = 0.0
 
         for idx, item in enumerate(expense_items):
             # 推断费用类型
@@ -540,7 +541,14 @@ async def check_application_compliance(
 
             item_result["item_id"] = str(item.id)
             item_result["item_index"] = idx
+            # original_amount_fen：标准字段别名，与 item_amount_fen 保持一致
+            item_result["original_amount_fen"] = item.amount
             item_results.append(item_result)
+
+            # 跟踪最大超标率
+            item_over_rate = item_result.get("over_rate") or 0.0
+            if item_over_rate and item_over_rate > max_over_rate:
+                max_over_rate = item_over_rate
 
             # 累加允许金额（截断后）
             total_allowed += item_result["allowed_amount_fen"]
@@ -562,20 +570,29 @@ async def check_application_compliance(
         # 步骤5：汇总整体状态
         if has_major:
             overall_status = "needs_special_channel"
+            # 标准状态：>50% 超标 → over_limit_major
+            std_status = "over_limit_major"
             can_submit = False
         elif has_minor:
             overall_status = "needs_explanation"
+            # 标准状态：20%-50% 超标 → over_limit_minor
+            std_status = "over_limit_minor"
             can_submit = False
         elif has_warning:
             overall_status = "compliant"    # 允许提交，审批单高亮
+            # 标准状态：<20% 超标 → compliant_with_warning
+            std_status = "compliant_with_warning"
             can_submit = True
         else:
             overall_status = "compliant"
+            std_status = "compliant"
             can_submit = True
 
         summary["items"] = item_results
+        summary["status"] = std_status
         summary["overall_status"] = overall_status
         summary["can_submit"] = can_submit
+        summary["max_over_rate"] = max_over_rate
         summary["total_allowed_amount_fen"] = total_allowed
         summary["total_over_amount_fen"] = total_over
         summary["required_explanation_items"] = required_explanation_idxs
@@ -624,8 +641,10 @@ async def check_application_compliance(
     except Exception as exc:
         error_msg = f"{type(exc).__name__}: {exc}"
         summary["error"] = error_msg
-        summary["overall_status"] = "compliant"   # 异常时放行，不阻断主流程
+        summary["status"] = "compliant"           # 异常时放行，不阻断主流程
+        summary["overall_status"] = "compliant"
         summary["can_submit"] = True
+        summary["max_over_rate"] = 0.0
         summary["summary_message"] = "差标合规检查异常，已放行（请人工复核）"
         log.error(
             "a3_check_application_compliance_error",

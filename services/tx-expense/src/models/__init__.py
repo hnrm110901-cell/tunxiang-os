@@ -46,6 +46,7 @@ from .petty_cash import (
 )
 from .invoice import Invoice, InvoiceItem
 from .travel import TravelRequest, TravelItinerary, TravelAllocation
+from .budget import Budget, BudgetAllocation, BudgetAdjustment, BudgetSnapshot
 
 __all__ = [
     # 枚举
@@ -93,4 +94,9 @@ __all__ = [
     "TravelRequest",
     "TravelItinerary",
     "TravelAllocation",
+    # 预算模型
+    "Budget",
+    "BudgetAllocation",
+    "BudgetAdjustment",
+    "BudgetSnapshot",
 ]

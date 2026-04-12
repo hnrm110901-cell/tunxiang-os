@@ -35,6 +35,7 @@ from .api.contract_routes import router as contract_router
 from .api.cost_attribution_routes import router as cost_attribution_router
 from .api.expense_dashboard import router as expense_dashboard_router
 from .api.event_webhook_routes import router as event_webhook_router
+from .api.procurement_routes import router as procurement_router
 
 app = FastAPI(
     title="tx-expense · 屯象费控管理服务",
@@ -67,6 +68,7 @@ app.include_router(contract_router,          prefix="/api/v1/expense/contracts",
 app.include_router(cost_attribution_router,  prefix="/api/v1/expense/cost-attribution",  tags=["成本归因"])
 app.include_router(expense_dashboard_router, prefix="/api/v1/expense/dashboard",         tags=["费控看板"])
 app.include_router(event_webhook_router,                                                 tags=["内部事件"])
+app.include_router(procurement_router,       prefix="/api/v1/expense/procurement",       tags=["采购付款"])
 
 
 @app.get("/health")
@@ -85,7 +87,8 @@ async def startup() -> None:
     # scheduler.add_job(daily_cost_attribution.run_daily_cost_attribution,
     #                   'cron', hour=23, minute=0, id='daily_cost_attribution')
     # scheduler.add_job(contract_expiry_watcher.run_contract_expiry_check,
-    #                   'cron', hour=9, minute=0, id='contract_expiry_watcher')
+    #                   'cron', hour=8, minute=0, id='contract_expiry_watcher')
+    # ^ 每日 08:00: 合同到期预警 + A4预算预警Agent日检
 
 
 @app.on_event("shutdown")
