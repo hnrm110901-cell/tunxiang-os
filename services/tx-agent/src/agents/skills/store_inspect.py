@@ -10,7 +10,7 @@ from typing import Any
 
 import structlog
 
-from ..base import AgentResult, SkillAgent
+from ..base import ActionConfig, AgentResult, SkillAgent
 
 logger = structlog.get_logger(__name__)
 
@@ -45,6 +45,33 @@ class StoreInspectAgent(SkillAgent):
             "predict_maintenance", "security_advice", "food_safety_status", "store_dashboard",
             "trigger_shift_checklist", "log_attendance_issue", "create_followup_task",
         ]
+
+    def get_action_config(self, action: str) -> ActionConfig:
+        """巡店质检 Agent 的 action 级会话策略"""
+        configs = {
+            # 故障诊断需人工确认修复方案
+            "diagnose_fault": ActionConfig(
+                requires_human_confirm=True,
+                max_retries=1,
+                risk_level="high",
+            ),
+            # 健康检查可自动重试
+            "health_check": ActionConfig(max_retries=2, risk_level="medium"),
+            # 食安状态检查需要人工确认违规处理
+            "food_safety_status": ActionConfig(
+                requires_human_confirm=True,
+                risk_level="high",
+            ),
+            # 预测维护可重试
+            "predict_maintenance": ActionConfig(max_retries=1, risk_level="low"),
+            # 班次质检清单
+            "trigger_shift_checklist": ActionConfig(max_retries=1, risk_level="medium"),
+            # 考勤记录
+            "log_attendance_issue": ActionConfig(risk_level="medium"),
+            # 跟进任务
+            "create_followup_task": ActionConfig(max_retries=1, risk_level="medium"),
+        }
+        return configs.get(action, ActionConfig())
 
     async def execute(self, action: str, params: dict[str, Any]) -> AgentResult:
         dispatch = {

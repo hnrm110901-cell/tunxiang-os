@@ -16,7 +16,7 @@ from typing import Any
 
 import structlog
 
-from ..base import AgentResult, SkillAgent
+from ..base import ActionConfig, AgentResult, SkillAgent
 
 logger = structlog.get_logger()
 
@@ -38,6 +38,34 @@ class ClosingAgent(SkillAgent):
             "generate_closing_report",
             "escalate_anomaly",
         ]
+
+    def get_action_config(self, action: str) -> ActionConfig:
+        """闭店 Agent 的 action 级会话策略"""
+        configs = {
+            # 日结校验失败需要人工确认是否强制闭店
+            "validate_daily_settlement": ActionConfig(
+                requires_human_confirm=True,
+                max_retries=1,
+                risk_level="high",
+            ),
+            # 异常上报需要人工确认上报内容
+            "escalate_anomaly": ActionConfig(
+                requires_human_confirm=True,
+                max_retries=0,
+                risk_level="critical",
+            ),
+            # 预检可自动重试（网络抖动等）
+            "pre_closing_check": ActionConfig(
+                max_retries=2,
+                risk_level="medium",
+            ),
+            # 生成报告可重试
+            "generate_closing_report": ActionConfig(
+                max_retries=1,
+                risk_level="low",
+            ),
+        }
+        return configs.get(action, ActionConfig())
 
     async def execute(self, action: str, params: dict[str, Any]) -> AgentResult:
         dispatch = {
