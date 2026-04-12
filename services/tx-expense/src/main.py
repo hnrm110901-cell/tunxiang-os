@@ -33,6 +33,7 @@ from .api.travel_routes import router as travel_router
 from .api.budget_routes import router as budget_router
 from .api.contract_routes import router as contract_router
 from .api.cost_attribution_routes import router as cost_attribution_router
+from .api.cost_routes import router as cost_routes_router
 from .api.expense_dashboard import router as expense_dashboard_router
 from .api.event_webhook_routes import router as event_webhook_router
 from .api.procurement_routes import router as procurement_router
@@ -66,6 +67,7 @@ app.include_router(travel_router,            prefix="/api/v1/expense/travel",   
 app.include_router(budget_router,            prefix="/api/v1/expense/budgets",           tags=["预算"])
 app.include_router(contract_router,          prefix="/api/v1/expense/contracts",         tags=["合同台账"])
 app.include_router(cost_attribution_router,  prefix="/api/v1/expense/cost-attribution",  tags=["成本归因"])
+app.include_router(cost_routes_router,       prefix="/api/v1/expense/costs",              tags=["成本归集日报"])
 app.include_router(expense_dashboard_router, prefix="/api/v1/expense/dashboard",         tags=["费控看板"])
 app.include_router(event_webhook_router,                                                 tags=["内部事件"])
 app.include_router(procurement_router,       prefix="/api/v1/expense/procurement",       tags=["采购付款"])
