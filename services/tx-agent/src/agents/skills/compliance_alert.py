@@ -10,7 +10,7 @@ import structlog
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError, ProgrammingError
 
-from ..base import AgentResult, SkillAgent
+from ..base import ActionConfig, AgentResult, SkillAgent
 
 logger = structlog.get_logger(__name__)
 
@@ -463,6 +463,23 @@ class ComplianceAlertAgent(SkillAgent):
             "scan_attendance",
             "get_alert_summary",
         ]
+
+    def get_action_config(self, action: str) -> ActionConfig:
+        """合规预警 Agent 的 action 级会话策略"""
+        configs = {
+            # 全量扫描耗时较长，允许重试
+            "scan_all": ActionConfig(
+                max_retries=2,
+                risk_level="medium",
+            ),
+            # 各分项扫描可重试
+            "scan_documents": ActionConfig(max_retries=2, risk_level="medium"),
+            "scan_performance": ActionConfig(max_retries=1, risk_level="medium"),
+            "scan_attendance": ActionConfig(max_retries=1, risk_level="medium"),
+            # 预警摘要低风险
+            "get_alert_summary": ActionConfig(max_retries=1, risk_level="low"),
+        }
+        return configs.get(action, ActionConfig())
 
     def _store_scope(self, params: dict[str, Any]) -> Optional[str]:
         sid = params.get("store_id")

@@ -7,7 +7,7 @@ from typing import Any
 
 import structlog
 
-from ..base import AgentResult, SkillAgent
+from ..base import ActionConfig, AgentResult, SkillAgent
 
 try:
     from services.tunxiang_api.src.shared.core.model_router import model_router
@@ -90,6 +90,33 @@ class SmartCustomerServiceAgent(SkillAgent):
 
     def get_supported_actions(self) -> list[str]:
         return ["answer_faq", "handle_complaint", "analyze_sentiment", "generate_reply"]
+
+    def get_action_config(self, action: str) -> ActionConfig:
+        """智能客服 Agent 的 action 级会话策略"""
+        configs = {
+            # 客诉处理涉及补偿决策，需人工确认
+            "handle_complaint": ActionConfig(
+                risk_level="medium",
+                requires_human_confirm=True,
+                max_retries=2,
+            ),
+            # 回复生成可重试
+            "generate_reply": ActionConfig(
+                risk_level="low",
+                max_retries=2,
+            ),
+            # FAQ 自动回答
+            "answer_faq": ActionConfig(
+                risk_level="low",
+                max_retries=1,
+            ),
+            # 情感分析
+            "analyze_sentiment": ActionConfig(
+                risk_level="low",
+                max_retries=1,
+            ),
+        }
+        return configs.get(action, ActionConfig())
 
     async def execute(self, action: str, params: dict[str, Any]) -> AgentResult:
         dispatch = {

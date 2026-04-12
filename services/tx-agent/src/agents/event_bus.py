@@ -303,6 +303,7 @@ DEFAULT_EVENT_HANDLERS: dict[str, list[tuple[str, str]]] = {
         ("member_insight", "update_customer_rfm"),      # 更新会员RFM分层
         ("private_ops", "check_journey_trigger"),        # 检查私域旅程触发条件
         ("finance_audit", "update_daily_revenue"),       # 更新日营收
+        ("personalization", "generate_reorder_prompt"),  # 消费后→生成复购提醒文案
     ],
     "trade.discount.blocked": [
         ("discount_guard", "log_violation"),             # 记录折扣违规
@@ -354,10 +355,6 @@ DEFAULT_EVENT_HANDLERS: dict[str, list[tuple[str, str]]] = {
     "member.profile_updated": [
         ("personalization", "generate_batch_reasons"),    # 用户画像更新→重新生成推荐理由
     ],
-    "trade.order.paid": [
-        ("personalization", "generate_reorder_prompt"),   # 消费后→生成复购提醒文案
-    ],
-
     # ── 排位Agent事件驱动 ────────────────────────────────────────────
     "trade.table.freed": [
         ("queue_seating", "auto_call_next"),              # 桌台空出自动叫号
@@ -404,25 +401,98 @@ DEFAULT_EVENT_HANDLERS: dict[str, list[tuple[str, str]]] = {
 }
 
 
-def create_default_event_bus() -> EventBus:
-    """创建带预注册处理器的 EventBus（使用占位 handler）
+def _make_placeholder_handler(aid: str, act: str) -> Callable:
+    """创建占位处理器：记录事件并返回动作名"""
+    def handler(event: AgentEvent) -> dict:
+        return {
+            "agent_id": aid,
+            "action": act,
+            "event_type": event.event_type,
+            "store_id": event.store_id,
+            "processed": True,
+        }
+    return handler
 
+
+def create_default_event_bus() -> EventBus:
+    """创建带预注册处理器的 EventBus（使用硬编码的 DEFAULT_EVENT_HANDLERS）
+
+    降级方案：当 DB 不可用时使用此函数。
     生产环境中，handler 应替换为实际的 Agent 方法调用。
     """
     bus = EventBus()
     for event_type, handlers in DEFAULT_EVENT_HANDLERS.items():
         for agent_id, action_name in handlers:
-            # 占位处理器：记录事件并返回动作名
-            def make_handler(aid: str, act: str) -> Callable:
-                def handler(event: AgentEvent) -> dict:
-                    return {
-                        "agent_id": aid,
-                        "action": act,
-                        "event_type": event.event_type,
-                        "store_id": event.store_id,
-                        "processed": True,
-                    }
-                return handler
+            bus.register_handler(
+                event_type, agent_id, _make_placeholder_handler(agent_id, action_name),
+            )
+    return bus
 
-            bus.register_handler(event_type, agent_id, make_handler(agent_id, action_name))
+
+async def create_event_bus_from_db(
+    db: Any,
+    tenant_id: str,
+) -> EventBus:
+    """从 DB 加载 event_agent_bindings 并注册 handler 的异步工厂函数
+
+    优先从 DB 加载映射规则；DB 查询失败时降级到 create_default_event_bus()。
+
+    Args:
+        db: 带租户隔离的异步 DB session
+        tenant_id: 租户 ID
+
+    Returns:
+        配置好 handler 的 EventBus 实例
+    """
+    from sqlalchemy import select
+    from sqlalchemy.exc import SQLAlchemyError
+
+    bus = EventBus()
+
+    try:
+        # 延迟导入避免循环依赖
+        from ..models.event_agent_binding import EventAgentBinding
+
+        stmt = (
+            select(EventAgentBinding)
+            .where(
+                EventAgentBinding.tenant_id == tenant_id,
+                EventAgentBinding.enabled == True,  # noqa: E712
+                EventAgentBinding.is_deleted == False,  # noqa: E712
+            )
+            .order_by(EventAgentBinding.priority.desc())
+        )
+        result = await db.execute(stmt)
+        bindings = result.scalars().all()
+
+        if not bindings:
+            logger.warning(
+                "event_bus_no_bindings_in_db",
+                tenant_id=tenant_id,
+                fallback="default_event_handlers",
+            )
+            return create_default_event_bus()
+
+        for binding in bindings:
+            bus.register_handler(
+                binding.event_type,
+                binding.agent_id,
+                _make_placeholder_handler(binding.agent_id, binding.action),
+            )
+
+        logger.info(
+            "event_bus_loaded_from_db",
+            tenant_id=tenant_id,
+            binding_count=len(bindings),
+        )
+
+    except SQLAlchemyError as exc:
+        logger.warning(
+            "event_bus_db_load_failed",
+            tenant_id=tenant_id,
+            error=str(exc),
+            fallback="default_event_handlers",
+        )
+        return create_default_event_bus()
+
     return bus

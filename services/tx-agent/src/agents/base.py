@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 from typing import Any, Optional
 
 import structlog
+from sqlalchemy.exc import SQLAlchemyError
 
 logger = structlog.get_logger()
 
@@ -33,6 +34,14 @@ class AgentResult:
     agent_level: int = 1  # 1=suggest, 2=auto+rollback, 3=fully_autonomous
     rollback_window_min: int = 30  # Level 2: minutes before auto-commit
     rollback_id: str = ""  # For Level 2 rollback tracking
+
+
+@dataclass
+class ActionConfig:
+    """Per-action session policy declaration"""
+    requires_human_confirm: bool = False
+    max_retries: int = 0
+    risk_level: str = "low"  # low/medium/high/critical
 
 
 class SkillAgent(ABC):
@@ -106,6 +115,31 @@ class SkillAgent(ABC):
                 violations=constraint_result.violations,
             )
 
+        # ── Session 事件记录（当 DB 可用时）──
+        if self._db is not None:
+            try:
+                from ..models.session_event import SessionEvent
+                session_id = params.get("_session_id")
+                if session_id:
+                    event = SessionEvent(
+                        tenant_id=self.tenant_id,
+                        session_id=session_id,
+                        sequence_no=params.get("_sequence_no", 0),
+                        event_type="step_completed" if result.success else "step_failed",
+                        agent_id=self.agent_id,
+                        action=action,
+                        input_json=params,
+                        output_json=result.data,
+                        reasoning=result.reasoning,
+                        tokens_used=0,
+                        duration_ms=result.execution_ms,
+                        inference_layer=result.inference_layer,
+                    )
+                    self._db.add(event)
+                    await self._db.flush()
+            except (ImportError, AttributeError, TypeError, SQLAlchemyError) as e:
+                logger.debug("session_event_skip", reason=str(e))
+
         logger.info(
             "agent_executed",
             agent=self.agent_id,
@@ -137,6 +171,16 @@ class SkillAgent(ABC):
     def get_supported_actions(self) -> list[str]:
         """返回该 Agent 支持的所有 action 列表"""
         ...
+
+    def get_action_config(self, action: str) -> ActionConfig:
+        """Override in subclass to declare per-action session policies.
+
+        Used by Orchestrator to decide:
+        - requires_human_confirm → create checkpoint, pause session
+        - max_retries → auto-retry on failure
+        - risk_level → observability tagging
+        """
+        return ActionConfig()
 
     def get_info(self) -> dict:
         """返回 Agent 元信息"""

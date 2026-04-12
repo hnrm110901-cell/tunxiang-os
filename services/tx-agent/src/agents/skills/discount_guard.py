@@ -7,6 +7,10 @@
 Phase 3 升级（2026-04-04）：
   新增 get_daily_discount_health — 直接读取 mv_discount_health 物化视图
   替代原有的跨服务查询模式（读视图延迟 < 5ms vs 跨服务拼接 > 100ms）
+
+P1-5 升级（2026-04-12）：
+  集成 EdgeAwareMixin — 折扣异常检测优先使用边缘 Core ML 推理
+  边缘高置信度（>0.8）时直接使用边缘结果，节省 Claude API 成本
 """
 import asyncio
 import os
@@ -17,7 +21,8 @@ import httpx
 import structlog
 from sqlalchemy import text
 
-from ..base import AgentResult, SkillAgent
+from ..base import ActionConfig, AgentResult, SkillAgent
+from ..edge_mixin import EdgeAwareMixin
 
 logger = structlog.get_logger()
 
@@ -26,7 +31,7 @@ logger = structlog.get_logger()
 REPORT_TYPES = ["period_summary", "aggregate", "trend", "by_entity", "by_region", "comparison", "plan_vs_actual"]
 
 
-class DiscountGuardAgent(SkillAgent):
+class DiscountGuardAgent(EdgeAwareMixin, SkillAgent):
     agent_id = "discount_guard"
     agent_name = "折扣守护"
     description = "实时检测异常折扣/赠送，扫描证照，财务报表查询"
@@ -45,6 +50,53 @@ class DiscountGuardAgent(SkillAgent):
             "log_violation",
         ]
 
+    def get_action_config(self, action: str) -> ActionConfig:
+        """折扣守护 Agent 的 action 级会话策略"""
+        configs = {
+            # 折扣异常检测涉及资金风险，需人工确认
+            "detect_discount_anomaly": ActionConfig(
+                risk_level="high",
+                requires_human_confirm=True,
+                max_retries=1,
+            ),
+            # 折扣健康视图读取，中等风险
+            "get_daily_discount_health": ActionConfig(
+                risk_level="medium",
+                max_retries=1,
+            ),
+            # 证照扫描可重试
+            "scan_store_licenses": ActionConfig(
+                risk_level="medium",
+                max_retries=2,
+            ),
+            # 全品牌证照扫描
+            "scan_all_licenses": ActionConfig(
+                risk_level="medium",
+                max_retries=2,
+            ),
+            # 财务报表查询
+            "get_financial_report": ActionConfig(
+                risk_level="medium",
+                max_retries=1,
+            ),
+            # 凭证解释（云端 LLM）
+            "explain_voucher": ActionConfig(
+                risk_level="medium",
+                max_retries=1,
+            ),
+            # 对账状态查询
+            "reconciliation_status": ActionConfig(
+                risk_level="medium",
+                max_retries=1,
+            ),
+            # 违规记录留痕
+            "log_violation": ActionConfig(
+                risk_level="medium",
+                max_retries=1,
+            ),
+        }
+        return configs.get(action, ActionConfig())
+
     async def execute(self, action: str, params: dict[str, Any]) -> AgentResult:
         dispatch = {
             "detect_discount_anomaly": self._detect_anomaly,
@@ -62,7 +114,13 @@ class DiscountGuardAgent(SkillAgent):
         return await handler(params)
 
     async def _detect_anomaly(self, params: dict) -> AgentResult:
-        """折扣异常检测 — 边缘优先，有 DB 时查真实订单，有 model_router 时用 Claude 深度分析"""
+        """折扣异常检测 — 边缘 Core ML 优先 → 规则引擎 → Claude 深度分析
+
+        推理链路：
+        1. 尝试边缘 Core ML 推理（<50ms，高置信度时直接返回，节省 API 成本）
+        2. 规则引擎快速判断（始终执行，作为基线）
+        3. Claude API 深度分析（仅在风险较高且边缘置信度不足时调用）
+        """
         order_id = params.get("order_id")
 
         # 若有 order_id 且 DB 可用，从 DB 查真实数据；否则降级到 params 中的 order 字典
@@ -84,7 +142,57 @@ class DiscountGuardAgent(SkillAgent):
         discount_rate = discount / total if total > 0 else 0
         threshold = params.get("threshold", 0.5)
 
-        # 规则引擎先算（边缘推理，快速）
+        # ── Step 1: 尝试边缘 Core ML 推理 ──
+        from datetime import datetime as _dt
+
+        edge_result = await self.get_edge_prediction(
+            "discount-risk",
+            order_data={
+                "discount_rate": discount_rate,
+                "hour_of_day": _dt.now().hour,
+                "order_amount_fen": total,
+                "employee_id": order_data.get("employee_id", ""),
+                "table_id": order_data.get("table_id", ""),
+            },
+        )
+
+        # 边缘高置信度（>0.8）且有明确结论时，直接使用边缘结果
+        if edge_result and edge_result.get("confidence", 0) > 0.8:
+            edge_risk_score = edge_result.get("risk_score", 0)
+            edge_risk_level = edge_result.get("risk_level", "low")
+            is_anomaly = edge_risk_level in ("high", "medium") or edge_risk_score > 0.5
+
+            logger.info(
+                "discount_guard_edge_shortcut",
+                discount_rate=discount_rate,
+                edge_risk_score=edge_risk_score,
+                edge_risk_level=edge_risk_level,
+                order_id=order_id,
+            )
+
+            return AgentResult(
+                success=True, action="detect_discount_anomaly",
+                data={
+                    "is_anomaly": is_anomaly,
+                    "discount_rate": round(discount_rate, 4),
+                    "threshold": threshold,
+                    "risk_factors": edge_result.get("risk_factors", []),
+                    "risk_score": edge_risk_score,
+                    "price_fen": total,
+                    "cost_fen": order_data.get("cost_fen", 0),
+                    "llm_analysis": "",
+                    "order_id": order_id,
+                    "edge_method": edge_result.get("method", "unknown"),
+                },
+                reasoning=(
+                    f"边缘推理：折扣率{discount_rate:.1%}，风险评分{edge_risk_score:.2f}，"
+                    f"风险等级={edge_risk_level}（Core ML 高置信度，跳过 Claude API）"
+                ),
+                confidence=edge_result["confidence"],
+                inference_layer="edge",
+            )
+
+        # ── Step 2: 规则引擎快速判断（边缘不可用或低置信度时） ──
         risk_factors = []
         if discount_rate > 0.7:
             risk_factors.append("折扣率超70%")
@@ -93,9 +201,15 @@ class DiscountGuardAgent(SkillAgent):
         if order_data.get("waiter_discount_count", 0) > 5:
             risk_factors.append("同一服务员频繁打折")
 
+        # 合并边缘推理的风险因素（如有）
+        if edge_result and edge_result.get("risk_factors"):
+            for factor in edge_result["risk_factors"]:
+                if factor not in risk_factors:
+                    risk_factors.append(factor)
+
         is_anomaly = discount_rate > threshold or len(risk_factors) >= 2
 
-        # 若有 model_router 且风险较高，用 Claude 做深度分析
+        # ── Step 3: Claude API 深度分析（仅在风险较高时调用） ──
         llm_analysis = ""
         if self._router and is_anomaly:
             try:

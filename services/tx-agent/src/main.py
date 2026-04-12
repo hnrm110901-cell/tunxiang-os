@@ -5,6 +5,8 @@ Master Agent 编排 + 9 个 Skill Agent + 三条硬约束
 import asyncio
 from contextlib import asynccontextmanager
 
+import structlog
+
 from fastapi import Depends, FastAPI, Header
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -38,8 +40,41 @@ from .api.autonomy_controller_routes import router as autonomy_controller_router
 from .api.agent_roi_routes import router as agent_roi_router
 from .api.ai_marketing_orchestrator_routes import router as ai_marketing_orchestrator_router  # AI营销编排 P1（v207）
 from .api.knowledge_routes import router as knowledge_router  # 知识库管理 API
+from .api.tool_routes import router as tool_router
+from .api.edge_routes import router as edge_router  # P1-5 边缘推理状态/代理接口
 from .routers.diagnosis_router import router as diagnosis_router
 from .routers.pilot_router import router as pilot_router
+
+# P0 新路由 — 部分可能尚未创建，用 try/except 避免阻止服务启动
+try:
+    from .api.agent_registry_routes import router as agent_registry_router
+except ImportError:
+    agent_registry_router = None
+
+try:
+    from .api.session_routes import router as session_router
+except ImportError:
+    session_router = None
+
+try:
+    from .api.event_binding_routes import router as event_binding_router
+except ImportError:
+    event_binding_router = None
+
+try:
+    from .api.checkpoint_routes import router as checkpoint_router
+except ImportError:
+    checkpoint_router = None
+
+try:
+    from .api.agent_memory_routes import router as agent_memory_router
+except ImportError:
+    agent_memory_router = None
+
+try:
+    from .api.agent_message_routes import router as agent_message_router
+except ImportError:
+    agent_message_router = None
 
 
 async def get_db_with_tenant_factory(
@@ -62,6 +97,22 @@ async def lifespan(app: FastAPI):
     master = MasterAgent(tenant_id="system")
     for cls in ALL_SKILL_AGENTS:
         master.register(cls(tenant_id="system"))
+
+    # ── Tool Registry 初始化：自动注册所有 Agent 的工具 ──
+    from .services.tool_registry import ToolRegistry
+
+    tool_registry = ToolRegistry.get_instance()
+    _total_tools = 0
+    for agent in master._agents.values():
+        _total_tools += tool_registry.register_agent(agent)
+    # 同时从 MCP agent_registry 导入静态定义（补充 input_schema）
+    _mcp_count = tool_registry.import_from_mcp_registry()
+    structlog.get_logger(__name__).info(
+        "tool_registry_initialized",
+        agent_tools=_total_tools,
+        mcp_imported=_mcp_count,
+        total=tool_registry.tool_count,
+    )
 
     # 用真实 handler 创建 EventBus（替代占位 handler）
     factory = AgentEventHandlerFactory(master)
@@ -178,6 +229,22 @@ app.include_router(autonomy_controller_router)
 app.include_router(agent_roi_router)
 app.include_router(ai_marketing_orchestrator_router)  # /api/v1/agent/ai-marketing/* — AI营销编排（v207）
 app.include_router(knowledge_router)  # /api/v1/knowledge/* — 知识库管理
+app.include_router(tool_router)  # /api/v1/tools/* — Tool Bus 统一工具注册与调用（P1-4）
+app.include_router(edge_router)  # /api/v1/edge/* — 边缘推理状态/代理（P1-5）
+
+# P0 新路由（条件注册）
+if agent_registry_router is not None:
+    app.include_router(agent_registry_router)
+if session_router is not None:
+    app.include_router(session_router)
+if event_binding_router is not None:
+    app.include_router(event_binding_router)
+if checkpoint_router is not None:
+    app.include_router(checkpoint_router)
+if agent_memory_router is not None:
+    app.include_router(agent_memory_router)
+if agent_message_router is not None:
+    app.include_router(agent_message_router)
 
 
 @app.get("/health")
@@ -201,11 +268,13 @@ async def list_agents(
 async def dispatch_agent(
     agent_id: str,
     action: str,
-    params: dict = {},
+    params: dict | None = None,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
     db: AsyncSession = Depends(get_db_with_tenant_factory),
 ):
     """调度指定 Agent 执行（真实租户 + DB + ModelRouter）"""
+    if params is None:
+        params = {}
     from .agents.master import MasterAgent
     from .agents.skills import ALL_SKILL_AGENTS
     from .services.model_router import ModelRouter
