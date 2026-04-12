@@ -99,6 +99,21 @@ export const ko: Record<keyof typeof zh, string> = {
   payResultViewOrder: '주문 확인',
   payResultContinue: '추가 주문',
 
+  addMoreTitle: '추가 주문',
+  addMoreExisting: '기존',
+  addMoreDishUnit: '개',
+  addMoreBadge: '새로 추가',
+  addMoreSubmit: '추가하기',
+
+  orderConfirmTitle: '주문 확인',
+  orderConfirmItemCount: '개',
+  orderConfirmItems: '선택한 요리',
+  orderConfirmDelete: '삭제',
+  orderConfirmPoints: '포인트 사용',
+  orderConfirmSubtotal: '소계',
+  orderConfirmDiscount: '할인',
+  orderConfirmPayable: '결제 금액',
+
   demoMode: '데모 모드',
   demoWelcome: '어서오세요',
   demoLoadingHint: '메뉴로 이동 중...',

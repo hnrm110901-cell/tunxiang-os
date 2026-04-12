@@ -99,6 +99,21 @@ export const ja: Record<keyof typeof zh, string> = {
   payResultViewOrder: '注文を確認',
   payResultContinue: '追加注文',
 
+  addMoreTitle: '追加注文',
+  addMoreExisting: '既注文',
+  addMoreDishUnit: '品',
+  addMoreBadge: '新規',
+  addMoreSubmit: '追加する',
+
+  orderConfirmTitle: '注文確認',
+  orderConfirmItemCount: '品',
+  orderConfirmItems: '選択した料理',
+  orderConfirmDelete: '削除',
+  orderConfirmPoints: 'ポイント利用',
+  orderConfirmSubtotal: '小計',
+  orderConfirmDiscount: '割引',
+  orderConfirmPayable: 'お支払い',
+
   demoMode: 'デモモード',
   demoWelcome: 'いらっしゃいませ',
   demoLoadingHint: 'メニューに移動中...',

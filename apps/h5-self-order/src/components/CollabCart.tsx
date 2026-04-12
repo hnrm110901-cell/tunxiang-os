@@ -432,7 +432,7 @@ export default function CollabCart({
             <textarea
               value={callNote}
               onChange={(e) => setCallNote(e.target.value)}
-              placeholder="备注（选填）：如"需要辣椒"、"宝宝椅"..."
+              placeholder="备注（选填）：如「需要辣椒」、「宝宝椅」..."
               className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-700 placeholder-gray-300 resize-none h-20 mb-4 focus:outline-none focus:border-orange-400"
               maxLength={100}
             />
