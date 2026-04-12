@@ -12,6 +12,10 @@ from api.cost_routes_v2 import router as cost_v2_router
 from api.credit_account_routes import router as credit_account_router
 from api.deposit_routes import router as deposit_router
 from api.e_invoice_routes import router as invoice_router
+from api.budget_routes import router as budget_router
+from api.budget_v2_routes import router as budget_v2_router
+from api.payroll_routes import router as payroll_router
+from api.vat_routes import router as vat_router
 from api.vat_ledger_routes import router as vat_ledger_router
 from api.split_payment_routes import router as split_payment_router
 from api.erp_routes import router as erp_router
@@ -95,6 +99,18 @@ app.include_router(vat_ledger_router)   # /api/v1/finance/vat/*
 
 # Y-B2 聚合支付/分账：微信/支付宝分账 + 幂等通知 + SplitEngine + 调账
 app.include_router(split_payment_router)  # /api/v1/finance/split/*
+
+# v101 预算管理：预算计划 CRUD + 审批 + 执行录入 + 进度查询
+app.include_router(budget_router)          # /api/v1/finance/budgets/*
+
+# v118 预算管理 v2：面向前端报表的快捷接口（年度列表/月度创建/执行情况）
+app.include_router(budget_v2_router, prefix="/api/v1/finance")  # /api/v1/finance/budget/*
+
+# 薪资管理：薪资单 CRUD + 审批 + 发薪标记 + 方案配置 + 历史汇总
+app.include_router(payroll_router)         # /api/v1/finance/payroll/*
+
+# v102 企业增值税：申报单管理 + 进项发票录入/验证 + 税率参考
+app.include_router(vat_router)             # /api/v1/finance/vat/*
 
 
 @app.get("/health")
