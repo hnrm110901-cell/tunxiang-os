@@ -51,6 +51,7 @@ services:
       TX_INTEL_URL: http://tx-intel:8011
       TX_ORG_URL: http://tx-org:8012
       TX_CIVIC_URL: http://tx-civic:8014
+      TX_EXPENSE_URL: http://tx-expense:8015
       WECOM_CORP_ID: ${WECOM_CORP_ID}
       WECOM_AGENT_ID: ${WECOM_AGENT_ID}
       WECOM_SECRET: ${WECOM_SECRET}
@@ -160,6 +161,36 @@ services:
       postgres:
         condition: service_healthy
     restart: unless-stopped
+
+  tx-expense:
+    build:
+      context: .
+      dockerfile: services/tx-expense/Dockerfile
+    container_name: tx-expense
+    ports:
+      - "8015:8015"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://tunxiang:changeme_dev@postgres/tunxiang_os
+      SUPABASE_URL: ${SUPABASE_URL:-}
+      SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY:-}
+      CORS_ALLOW_ORIGINS: ${CORS_ALLOW_ORIGINS:-*}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      # OCR服务配置（P0-S4实现发票核验时填充）
+      OCR_PROVIDER: ${OCR_PROVIDER:-baidu}
+      BAIDU_OCR_API_KEY: ${BAIDU_OCR_API_KEY:-}
+      BAIDU_OCR_SECRET_KEY: ${BAIDU_OCR_SECRET_KEY:-}
+      # 金税接口（P0-S4实现时填充）
+      TAX_VERIFY_API_URL: ${TAX_VERIFY_API_URL:-}
+      TAX_VERIFY_API_KEY: ${TAX_VERIFY_API_KEY:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8015/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   tx-analytics:
     build:
