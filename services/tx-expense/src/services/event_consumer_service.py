@@ -178,6 +178,39 @@ async def _handle_daily_close(
         result=result,
     )
 
+    # A6 POS对账Agent：备用金核销 + 成本数据更新
+    try:
+        from src.agents.a6_pos_reconciliation import A6POSReconciliationAgent
+
+        a6 = A6POSReconciliationAgent()
+        a6_event_data = {
+            "tenant_id": str(tenant_id),
+            "store_id": str(store_id),
+            "date": str(close_date),
+            "pos_summary": {
+                "pos_petty_cash_balance": pos_declared,
+                "pos_session_id": pos_session_id,
+                **{k: v for k, v in payload.items()
+                   if k not in ("store_id", "pos_session_id", "close_date",
+                                "pos_petty_cash_declared")},
+            },
+        }
+        await a6.handle_daily_close(a6_event_data, db)
+    except ImportError:
+        log.warning(
+            "a6_agent_not_available",
+            trigger="pos_daily_close",
+            note="A6 agent not yet available; skipping.",
+        )
+    except Exception as exc:  # noqa: BLE001 — A6 失败不影响 A1 已完成的核销
+        log.error(
+            "a6_agent_failed",
+            store_id=str(store_id),
+            tenant_id=str(tenant_id),
+            error=str(exc),
+            exc_info=True,
+        )
+
 
 async def _handle_application_submitted(
     db: Any,
