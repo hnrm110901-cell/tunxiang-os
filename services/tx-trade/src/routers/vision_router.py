@@ -24,9 +24,6 @@ router = APIRouter(prefix="/api/v1/vision", tags=["vision"])
 COREML_BRIDGE_URL = "http://localhost:8100/vision/recognize"
 COREML_TIMEOUT_SECONDS = 5.0
 
-# Claude haiku model for vision fallback
-CLAUDE_VISION_MODEL = "claude-haiku-4-5-20251001"
-
 
 class RecognizeDishRequest(BaseModel):
     image_base64: str
@@ -86,12 +83,16 @@ async def _recognize_via_coreml(image_base64: str, store_id: str) -> list[DishMa
         return None
 
 
-async def _recognize_via_claude(image_base64: str, store_id: str) -> list[DishMatch]:
+async def _recognize_via_claude(image_base64: str, store_id: str, tenant_id: str) -> list[DishMatch]:
     """
     方案B：使用 Claude Vision API 识别图片，从门店菜单中匹配。
-    依赖 ANTHROPIC_API_KEY 环境变量。
+    通过 ModelRouter 调用（统一成本追踪 + 熔断保护）。
     """
-    import anthropic
+    try:
+        from tx_agent.src.services.model_router import ModelRouter  # type: ignore[import]
+    except ImportError:
+        logger.warning("model_router_unavailable_vision_fallback", store_id=store_id)
+        return []
 
     menu_items = await _fetch_menu_items(store_id)
     if not menu_items:
@@ -112,10 +113,9 @@ async def _recognize_via_claude(image_base64: str, store_id: str) -> list[DishMa
         "confidence 为整数 0-100，最多返回 3 个最匹配结果，按置信度降序排列。"
     )
 
-    client = anthropic.AsyncAnthropic()
-    message = await client.messages.create(
-        model=CLAUDE_VISION_MODEL,
-        max_tokens=512,
+    raw_text = await ModelRouter().complete(
+        tenant_id=tenant_id,
+        task_type="standard_analysis",
         messages=[
             {
                 "role": "user",
@@ -132,9 +132,9 @@ async def _recognize_via_claude(image_base64: str, store_id: str) -> list[DishMa
                 ],
             }
         ],
+        max_tokens=512,
     )
-
-    raw_text = message.content[0].text.strip()
+    raw_text = raw_text.strip()
     # 提取 JSON 部分（防止模型在 JSON 外加说明）
     start = raw_text.find("{")
     end = raw_text.rfind("}") + 1
@@ -185,7 +185,7 @@ async def recognize_dish(
     # 方案B fallback
     if matches is None:
         try:
-            matches = await _recognize_via_claude(body.image_base64, body.store_id)
+            matches = await _recognize_via_claude(body.image_base64, body.store_id, x_tenant_id or "default")
         except (httpx.HTTPError, httpx.TimeoutException, ValueError, KeyError) as exc:  # MLPS3-P0: 异常收窄
             logger.error("claude_vision_error", error=str(exc), store_id=body.store_id, exc_info=True)
             matches = []

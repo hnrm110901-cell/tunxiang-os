@@ -6,7 +6,7 @@
  * Section 4：本月绩效排行 TOP10
  */
 import { useEffect, useState, useCallback } from 'react';
-import { txFetch } from '../api';
+import { txFetchData } from '../api';
 
 // ─── 类型定义 ───────────────────────────────────────────────
 
@@ -451,7 +451,7 @@ export function OrgPage() {
     const storeId = filterStore || (storeOptions[0]?.id ?? 'all');
     if (!filterStore) params.set('store_id', storeId);
 
-    txFetch<EmployeeListResp>(`/api/v1/org/employees?${params}`)
+    txFetchData<EmployeeListResp>(`/api/v1/org/employees?${params}`)
       .then((data) => {
         setEmployees(data.items ?? []);
         setEmpTotal(data.total ?? 0);
@@ -474,7 +474,7 @@ export function OrgPage() {
     const storeId = filterStore || (storeOptions[0]?.id ?? '');
     if (!storeId) return;
 
-    txFetch<AttendanceResp>(`/api/v1/org/attendance?store_id=${storeId}&date=${today}`)
+    txFetchData<AttendanceResp>(`/api/v1/org/attendance?store_id=${storeId}&date=${today}`)
       .then((data) => {
         const map: Record<string, AttendanceRecord> = {};
         (data.records ?? []).forEach((r) => { map[r.emp_id] = r; });
@@ -494,7 +494,7 @@ export function OrgPage() {
       return;
     }
 
-    txFetch<ScheduleResp>(`/api/v1/org/schedule/?store_id=${storeId}&week=${week}`)
+    txFetchData<ScheduleResp>(`/api/v1/org/schedule/?store_id=${storeId}&week=${week}`)
       .then((data) => setScheduleData(data.schedule ?? []))
       .catch(() => setScheduleData([]))
       .finally(() => setScheduleLoading(false));
@@ -507,7 +507,7 @@ export function OrgPage() {
     const storeId = filterStore || (storeOptions[0]?.id ?? '');
 
     // 用 compute 接口触发计算，再用 labor-cost/ranking 取排行
-    txFetch<{ rankings: PerformanceRank[] }>(`/api/v1/org/labor-cost/ranking${storeId ? `?brand_id=${storeId}` : ''}`)
+    txFetchData<{ rankings: PerformanceRank[] }>(`/api/v1/org/labor-cost/ranking${storeId ? `?brand_id=${storeId}` : ''}`)
       .then((data) => setPerfRanking((data.rankings ?? []).slice(0, 10)))
       .catch(() => setPerfRanking([]))
       .finally(() => setPerfLoading(false));

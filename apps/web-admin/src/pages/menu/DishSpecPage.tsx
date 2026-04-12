@@ -4,7 +4,7 @@
  * 技术栈：Ant Design 5.x + ProComponents
  */
 import { useRef, useState, useEffect } from 'react';
-import { txFetch } from '../../api';
+import { txFetchData } from '../../api';
 import {
   ProTable,
   ModalForm,
@@ -55,7 +55,7 @@ interface DishSpec {
 
 async function fetchDishSpecs(dishId: string): Promise<DishSpec[]> {
   try {
-    const res = await txFetch<{ items: DishSpec[] }>(`/api/v1/menu/dishes/${dishId}/specs`);
+    const res = await txFetchData<{ items: DishSpec[] }>(`/api/v1/menu/dishes/${dishId}/specs`);
     return res.data?.items ?? [];
   } catch (err) {
     console.error('[DishSpecPage] fetchDishSpecs 失败:', err);
@@ -70,7 +70,7 @@ async function fetchAllSpecs(params: { dish_name?: string; spec_group?: string; 
     if (params.spec_group) query.set('spec_group', params.spec_group);
     query.set('page', String(params.current ?? 1));
     query.set('size', String(params.pageSize ?? 10));
-    const res = await txFetch<{ items: DishSpec[]; total: number }>(`/api/v1/menu/specs?${query.toString()}`);
+    const res = await txFetchData<{ items: DishSpec[]; total: number }>(`/api/v1/menu/specs?${query.toString()}`);
     return { data: res.data?.items ?? [], total: res.data?.total ?? 0, success: true };
   } catch (err) {
     console.error('[DishSpecPage] fetchAllSpecs 失败:', err);
@@ -79,21 +79,21 @@ async function fetchAllSpecs(params: { dish_name?: string; spec_group?: string; 
 }
 
 async function createSpec(dishId: string, payload: { name: string; options: SpecOption[]; is_required: boolean }): Promise<void> {
-  await txFetch<DishSpec>(`/api/v1/menu/dishes/${dishId}/specs`, {
+  await txFetchData<DishSpec>(`/api/v1/menu/dishes/${dishId}/specs`, {
     method: 'POST',
     body: JSON.stringify(payload),
   });
 }
 
 async function updateSpec(dishId: string, specId: string, payload: Partial<{ name: string; options: SpecOption[]; is_required: boolean }>): Promise<void> {
-  await txFetch<DishSpec>(`/api/v1/menu/dishes/${dishId}/specs/${specId}`, {
+  await txFetchData<DishSpec>(`/api/v1/menu/dishes/${dishId}/specs/${specId}`, {
     method: 'PATCH',
     body: JSON.stringify(payload),
   });
 }
 
 async function deleteSpec(dishId: string, specId: string): Promise<void> {
-  await txFetch<void>(`/api/v1/menu/dishes/${dishId}/specs/${specId}`, {
+  await txFetchData<void>(`/api/v1/menu/dishes/${dishId}/specs/${specId}`, {
     method: 'PATCH',
     body: JSON.stringify({ is_deleted: true }),
   });

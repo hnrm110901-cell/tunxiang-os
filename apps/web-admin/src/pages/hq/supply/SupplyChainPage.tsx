@@ -3,7 +3,7 @@
  * 深色主题，与 EventBusHealthPage 风格一致
  */
 import { useEffect, useState, useCallback } from 'react';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 // ─── 类型定义 ───
 
@@ -490,7 +490,7 @@ export function SupplyChainPage() {
       if (receivingStatusFilter) params.set('status', receivingStatusFilter);
       if (receivingDateFilter) params.set('date', receivingDateFilter);
       const qs = params.toString() ? `?${params.toString()}` : '';
-      const data = await txFetch<{ items: ReceivingOrder[] }>(`/api/v1/receiving/orders${qs}`);
+      const data = await txFetchData<{ items: ReceivingOrder[] }>(`/api/v1/receiving/orders${qs}`);
       setReceivingOrders(data.items || []);
     } catch {
       /* 保留旧数据 */
@@ -507,7 +507,7 @@ export function SupplyChainPage() {
       if (transferStatusFilter) params.set('status', transferStatusFilter);
       if (transferPerspective !== 'all') params.set('perspective', transferPerspective);
       const qs = params.toString() ? `?${params.toString()}` : '';
-      const data = await txFetch<{ items: TransferOrder[] }>(`/api/v1/transfers${qs}`);
+      const data = await txFetchData<{ items: TransferOrder[] }>(`/api/v1/transfers${qs}`);
       setTransferOrders(data.items || []);
     } catch {
       /* 保留旧数据 */
@@ -535,7 +535,7 @@ export function SupplyChainPage() {
     itemId: string,
     data: { received_qty: number; quality_grade: string },
   ) => {
-    await txFetch(`/api/v1/receiving/orders/${orderId}/items/${itemId}/inspect`, {
+    await txFetchData(`/api/v1/receiving/orders/${orderId}/items/${itemId}/inspect`, {
       method: 'POST',
       body: JSON.stringify(data),
     });
@@ -554,7 +554,7 @@ export function SupplyChainPage() {
   }, []);
 
   const handleComplete = useCallback(async (orderId: string) => {
-    await txFetch(`/api/v1/receiving/orders/${orderId}/complete`, { method: 'POST' });
+    await txFetchData(`/api/v1/receiving/orders/${orderId}/complete`, { method: 'POST' });
     setSuccessIds(s => new Set([...s, orderId]));
     setReceivingOrders(orders =>
       orders.map(o => o.id === orderId ? { ...o, status: 'completed' } : o)
@@ -563,7 +563,7 @@ export function SupplyChainPage() {
   }, [fetchReceivingOrders]);
 
   const handleRejectAll = useCallback(async (orderId: string) => {
-    await txFetch(`/api/v1/receiving/orders/${orderId}/reject-all`, { method: 'POST' });
+    await txFetchData(`/api/v1/receiving/orders/${orderId}/reject-all`, { method: 'POST' });
     setReceivingOrders(orders =>
       orders.map(o => o.id === orderId ? { ...o, status: 'rejected' } : o)
     );
@@ -575,7 +575,7 @@ export function SupplyChainPage() {
     orderId: string,
     action: 'approve' | 'ship' | 'receive' | 'cancel',
   ) => {
-    await txFetch(`/api/v1/transfers/${orderId}/${action}`, { method: 'POST' });
+    await txFetchData(`/api/v1/transfers/${orderId}/${action}`, { method: 'POST' });
     // 乐观更新状态
     const nextStatus: Record<string, TransferOrder['status']> = {
       approve: 'approved',

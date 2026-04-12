@@ -27,7 +27,7 @@ import {
   ProColumns,
   ProTable,
 } from '@ant-design/pro-components';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 const { Title } = Typography;
 
@@ -85,7 +85,7 @@ export default function PayrollApproval() {
     try {
       let successCount = 0;
       for (const id of selectedRowKeys) {
-        const res = await txFetch(`/api/v1/payroll/records/${id}/approve`, {
+        const res = await txFetchData(`/api/v1/payroll/records/${id}/approve`, {
           method: 'POST',
         }) as { ok: boolean };
         if (res.ok) successCount++;
@@ -164,7 +164,7 @@ export default function PayrollApproval() {
               size="small"
               icon={<CheckCircleOutlined />}
               onClick={async () => {
-                const res = await txFetch(`/api/v1/payroll/records/${r.id}/approve`, {
+                const res = await txFetchData(`/api/v1/payroll/records/${r.id}/approve`, {
                   method: 'POST',
                 }) as { ok: boolean };
                 if (res.ok) {
@@ -219,7 +219,7 @@ export default function PayrollApproval() {
           query.set('page', String(params.current ?? 1));
           query.set('size', String(params.pageSize ?? 20));
           try {
-            const res = await txFetch(`/api/v1/payroll/records?${query}`) as {
+            const res = await txFetchData(`/api/v1/payroll/records?${query}`) as {
               ok: boolean;
               data: { items: PayrollItem[]; total: number };
             };

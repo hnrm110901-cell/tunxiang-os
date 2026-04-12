@@ -3,7 +3,7 @@
  * 实时监控各业务域 Redis Stream 的消息积压量和消费状态
  */
 import { useEffect, useState, useCallback } from 'react';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 // ─── 类型定义 ───
 
@@ -92,8 +92,8 @@ export function EventBusHealthPage() {
   const fetchData = useCallback(async () => {
     try {
       const [sys, events] = await Promise.all([
-        txFetch<SystemHealthData>('/api/v1/health'),
-        txFetch<EventHealthData>('/api/v1/health/events'),
+        txFetchData<SystemHealthData>('/api/v1/health'),
+        txFetchData<EventHealthData>('/api/v1/health/events'),
       ]);
       setSystemHealth(sys);
       setEventHealth(events);

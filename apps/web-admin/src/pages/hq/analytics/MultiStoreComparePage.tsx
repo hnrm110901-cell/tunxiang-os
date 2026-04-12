@@ -10,13 +10,13 @@
  *   5. 门店健康评分排名 → GET /api/v1/store-health/overview
  *
  * 技术规范：
- *   - txFetch + Promise.allSettled 并行请求
+ *   - txFetchData + Promise.allSettled 并行请求
  *   - 各Section独立错误处理，互不影响
  *   - 深色主题：bg #0d1e28，card #1a2a33
  *   - 纯手写SVG，不依赖任何图表库
  */
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 // ─────────────────────────────────────────────
 // 类型定义
@@ -599,7 +599,7 @@ export function MultiStoreComparePage() {
     setStoreListLoading(true);
     setHealthLoading(true);
 
-    txFetch<StoreHealthOverview>('/api/v1/store-health/overview')
+    txFetchData<StoreHealthOverview>('/api/v1/store-health/overview')
       .then((data) => {
         const stores = data.stores.map((s) => ({
           store_id: s.store_id,
@@ -654,14 +654,14 @@ export function MultiStoreComparePage() {
         start_date: startDate,
         end_date: endDate,
       };
-      return txFetch<unknown>('/api/v1/analysis/store/comparison', {
+      return txFetchData<unknown>('/api/v1/analysis/store/comparison', {
         method: 'POST',
         body: JSON.stringify(body),
       });
     });
 
     const trendRequests = ids.map((storeId) =>
-      txFetch<unknown>(
+      txFetchData<unknown>(
         `/api/v1/analysis/store/${encodeURIComponent(storeId)}/revenue?start_date=${startDate}&end_date=${endDate}`,
       ),
     );

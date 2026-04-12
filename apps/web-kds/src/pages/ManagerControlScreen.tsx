@@ -53,7 +53,6 @@ interface ManagerData {
 // ─── Constants ───
 
 const API_BASE = (window as any).__STORE_API_BASE__ || '';
-const TENANT_ID = (window as any).__TENANT_ID__ || '';
 const STORE_ID = (window as any).__STORE_ID__ || '';
 const REFRESH_MS = 10_000;
 
@@ -289,15 +288,12 @@ export function ManagerControlScreen() {
     }
 
     try {
-      const res = await txFetch(
+      const data = await txFetch<ManagerData>(
         `${API_BASE}/api/v1/kitchen-monitor/manager/${STORE_ID}`,
         undefined,
-        TENANT_ID,
       );
-      if (res.ok) {
-        setData(res.data as ManagerData);
-        setError(null);
-      }
+      setData(data);
+      setError(null);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : '加载失败');
     } finally {
@@ -318,7 +314,6 @@ export function ManagerControlScreen() {
       await txFetch(
         `${API_BASE}/api/v1/kds/orders/${orderId}/call-up`,
         { method: 'POST' },
-        TENANT_ID,
       );
       setActionMsg('整桌叫起成功');
       setTimeout(() => setActionMsg(null), 2500);
@@ -333,7 +328,6 @@ export function ManagerControlScreen() {
       await txFetch(
         `${API_BASE}/api/v1/kds/orders/${orderId}/rush-all`,
         { method: 'POST' },
-        TENANT_ID,
       );
       setActionMsg('已发出全桌加急');
       setTimeout(() => setActionMsg(null), 2500);

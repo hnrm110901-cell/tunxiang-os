@@ -587,8 +587,8 @@ class P0Reports:
             if cash_row:
                 cash_start = cash_row["cash_start_fen"]
                 cash_change = cash_row["cash_change_fen"]
-        except Exception:  # cash_sessions 表可能未迁移
-            log.warning("p0.cashflow_daily.cash_sessions_unavailable", store_id=store_id)
+        except Exception as exc:  # noqa: BLE001 — cash_sessions 表可能未迁移
+            log.warning("p0.cashflow_daily.cash_sessions_unavailable", store_id=store_id, error=str(exc))
 
         store_name = income_rows[0]["store_name"] if income_rows else store_id
         refund_index: dict[str, int] = {r["payment_method"]: r["refund_fen"] for r in refund_rows}
@@ -938,8 +938,8 @@ class P0Reports:
             w_row = (await session.execute(waiting_sql, params)).mappings().first()
             if w_row:
                 waiting = w_row["waiting_groups"]
-        except Exception:
-            log.warning("p0.realtime_store_stats.waitlist_unavailable", store_id=store_id)
+        except Exception as exc:  # noqa: BLE001 — 候位表可能未建立，跳过
+            log.warning("p0.realtime_store_stats.waitlist_unavailable", store_id=store_id, error=str(exc))
 
         store_name = rev_row["store_name"] if rev_row else store_id
         revenue_fen = rev_row["revenue_fen"] if rev_row else 0

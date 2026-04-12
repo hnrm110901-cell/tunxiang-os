@@ -1,4 +1,7 @@
+import { useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { getStoreToken } from './api/index';
+import { PosLoginPage } from './pages/PosLoginPage';
 import { InventoryAlertBanner } from './pages/InventoryAlertBanner';
 import { CashierPage } from './pages/CashierPage';
 import { OrderPage } from './pages/OrderPage';
@@ -98,6 +101,12 @@ function AppLayout() {
 }
 
 function App() {
+  const [isLoggedIn, setIsLoggedIn] = useState(() => !!getStoreToken());
+
+  if (!isLoggedIn) {
+    return <PosLoginPage onLogin={() => setIsLoggedIn(true)} />;
+  }
+
   return (
     <BrowserRouter>
       <AppLayout />

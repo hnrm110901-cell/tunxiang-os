@@ -43,7 +43,7 @@ import {
   type DailyTrendItem,
   type GoalProgress,
   type ManagerAlert,
-  type StoreComparison,
+  type ManagerStoreComparison as StoreComparison,
   type StoreDailyStats,
 } from '../../api/managerDashboardApi';
 import { txFetchData } from '../../api';

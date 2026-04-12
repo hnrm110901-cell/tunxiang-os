@@ -31,7 +31,7 @@ import {
   ProFormTextArea,
   ProTable,
 } from '@ant-design/pro-components';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 const { Title } = Typography;
 
@@ -129,7 +129,7 @@ export default function SettingsRoles() {
   const loadPermissions = async (roleId: string) => {
     setPermLoading(true);
     try {
-      const data = await txFetch<{ permissions: string[] }>(
+      const data = await txFetchData<{ permissions: string[] }>(
         `/api/v1/roles/${roleId}/permissions`,
       );
       setCheckedKeys(data.permissions || []);
@@ -143,7 +143,7 @@ export default function SettingsRoles() {
   const savePermissions = async () => {
     if (!currentRole) return;
     try {
-      await txFetch(`/api/v1/roles/${currentRole.id}/permissions`, {
+      await txFetchData(`/api/v1/roles/${currentRole.id}/permissions`, {
         method: 'PUT',
         body: JSON.stringify({ permissions: checkedKeys }),
       });
@@ -210,7 +210,7 @@ export default function SettingsRoles() {
           query.set('size', String(params.pageSize || 20));
           if (params.name) query.set('keyword', params.name);
           try {
-            const data = await txFetch<RoleListResp>(
+            const data = await txFetchData<RoleListResp>(
               `/api/v1/roles?${query.toString()}`,
             );
             return { data: data.items || [], total: data.total || 0, success: true };
@@ -231,7 +231,7 @@ export default function SettingsRoles() {
             }
             onFinish={async (values) => {
               try {
-                await txFetch('/api/v1/roles', {
+                await txFetchData('/api/v1/roles', {
                   method: 'POST',
                   body: JSON.stringify(values),
                 });

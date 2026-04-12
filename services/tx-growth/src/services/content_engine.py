@@ -363,7 +363,8 @@ class ContentEngine:
                 {"tpl_id": tpl_id, "tid": tid},
             )
             await db.commit()
-        except Exception:
+        except Exception as exc:  # noqa: BLE001 — 使用计数写入失败不阻断返回
+            logger.warning("content_engine.usage_count_update_failed", tpl_id=tpl_id, error=str(exc))
             await db.rollback()
 
         return body

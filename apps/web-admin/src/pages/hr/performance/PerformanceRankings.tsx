@@ -17,7 +17,7 @@ import { TrophyOutlined, ArrowUpOutlined, ArrowDownOutlined, MinusOutlined } fro
 import { ProColumns, ProTable } from '@ant-design/pro-components';
 import type { ActionType } from '@ant-design/pro-components';
 import { Column } from '@ant-design/charts';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 const { Title } = Typography;
 const TX_PRIMARY = '#FF6B35';
@@ -147,7 +147,7 @@ export default function PerformanceRankings() {
               query.set('page', String(params.current ?? 1));
               query.set('size', String(params.pageSize ?? 20));
               try {
-                const res = await txFetch(`/api/v1/performance/rankings?${query}`) as {
+                const res = await txFetchData(`/api/v1/performance/rankings?${query}`) as {
                   ok: boolean;
                   data: RankingResp;
                 };

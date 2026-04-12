@@ -6,7 +6,7 @@
  */
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 // ---- 颜色常量 ----
 const BG_1 = '#112228';
@@ -43,7 +43,7 @@ interface Journey {
 
 async function apiFetchJourneys(): Promise<Journey[]> {
   try {
-    const res = await txFetch<{ items: Journey[] }>('/api/v1/growth/journeys');
+    const res = await txFetchData<{ items: Journey[] }>('/api/v1/growth/journeys');
     return res?.items ?? [];
   } catch {
     return [];
@@ -51,7 +51,7 @@ async function apiFetchJourneys(): Promise<Journey[]> {
 }
 
 async function apiPatchJourney(id: string, status: JourneyStatus): Promise<void> {
-  await txFetch(`/api/v1/growth/journeys/${encodeURIComponent(id)}`, {
+  await txFetchData(`/api/v1/growth/journeys/${encodeURIComponent(id)}`, {
     method: 'PATCH',
     body: JSON.stringify({ status }),
   });

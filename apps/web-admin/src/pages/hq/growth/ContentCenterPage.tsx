@@ -5,7 +5,7 @@
  * 文案/海报/短信/企微/小程序/节日模板 + 内容生成工作台 + 审核队列 + 效果统计
  */
 import { useState, useEffect, useCallback } from 'react';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 // ---- 颜色常量 ----
 const BG_MAIN = '#0d1e28';
@@ -484,7 +484,7 @@ function GenerationWorkbench() {
     setGenError(null);
     setResults([]);
     try {
-      const resp = await txFetch<{ items: string[] }>('/api/v1/member/content/generate', {
+      const resp = await txFetchData<{ items: string[] }>('/api/v1/member/content/generate', {
         method: 'POST',
         body: JSON.stringify({ contentType, brand, segment, scene, tone }),
       });
@@ -911,7 +911,7 @@ export function ContentCenterPage() {
     setLoadingOverview(true);
     setErrorOverview(null);
     try {
-      const data = await txFetch<ContentOverviewResponse>('/api/v1/member/content/overview');
+      const data = await txFetchData<ContentOverviewResponse>('/api/v1/member/content/overview');
       setOverview(data);
     } catch {
       // 优雅降级：显示空状态而非报错
@@ -927,7 +927,7 @@ export function ContentCenterPage() {
     setLoadingTemplates(true);
     setErrorTemplates(null);
     try {
-      const resp = await txFetch<ContentListResponse>('/api/v1/member/content?page=1&size=50');
+      const resp = await txFetchData<ContentListResponse>('/api/v1/member/content?page=1&size=50');
       setTemplates(resp.items ?? []);
     } catch {
       // 优雅降级：显示空态引导页
@@ -943,7 +943,7 @@ export function ContentCenterPage() {
     setLoadingReviews(true);
     setErrorReviews(null);
     try {
-      const resp = await txFetch<ContentReviewResponse>('/api/v1/member/content/reviews?page=1&size=50');
+      const resp = await txFetchData<ContentReviewResponse>('/api/v1/member/content/reviews?page=1&size=50');
       setReviews(resp.items ?? []);
     } catch {
       setReviews([]);
@@ -958,7 +958,7 @@ export function ContentCenterPage() {
     setLoadingStats(true);
     setErrorStats(null);
     try {
-      const resp = await txFetch<ContentStatsResponse>('/api/v1/member/content/stats?days=30');
+      const resp = await txFetchData<ContentStatsResponse>('/api/v1/member/content/stats?days=30');
       setStats(resp.items ?? []);
     } catch {
       setStats([]);
@@ -971,7 +971,7 @@ export function ContentCenterPage() {
   // 审核操作
   async function handleApprove(id: string) {
     try {
-      await txFetch(`/api/v1/member/content/reviews/${id}/approve`, { method: 'POST' });
+      await txFetchData(`/api/v1/member/content/reviews/${id}/approve`, { method: 'POST' });
       setReviews(prev => prev.map(r => r.id === id ? { ...r, status: '已通过' } : r));
     } catch {
       // 静默失败，不中断操作
@@ -980,7 +980,7 @@ export function ContentCenterPage() {
 
   async function handleReject(id: string) {
     try {
-      await txFetch(`/api/v1/member/content/reviews/${id}/reject`, { method: 'POST' });
+      await txFetchData(`/api/v1/member/content/reviews/${id}/reject`, { method: 'POST' });
       setReviews(prev => prev.map(r => r.id === id ? { ...r, status: '已拒绝' } : r));
     } catch {
       // 静默失败

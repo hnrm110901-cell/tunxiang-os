@@ -17,7 +17,7 @@ import { CrownOutlined, SearchOutlined } from '@ant-design/icons';
 import { ProColumns, ProTable } from '@ant-design/pro-components';
 import type { ActionType } from '@ant-design/pro-components';
 import { Bar } from '@ant-design/charts';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 const { Title } = Typography;
 const TX_PRIMARY = '#FF6B35';
@@ -70,7 +70,7 @@ export default function PerformanceHorseRace() {
     }
     setLoading(true);
     try {
-      const res = await txFetch('/api/v1/performance/horse-race', {
+      const res = await txFetchData('/api/v1/performance/horse-race', {
         method: 'POST',
         body: JSON.stringify({ store_ids: storeIds, metric, period }),
       }) as { ok: boolean; data: { items: HorseRaceItem[] } };

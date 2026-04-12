@@ -27,7 +27,7 @@ import {
   message,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { txFetch, txFetchData } from '../../api';
+import { txFetchData } from '../../api';
 
 const { Title, Text, Paragraph } = Typography;
 

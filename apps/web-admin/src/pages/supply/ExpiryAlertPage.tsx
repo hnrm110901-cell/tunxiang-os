@@ -6,7 +6,7 @@
  * 颜色规范：≤3天 danger红 / ≤7天 orange / ≤15天 warning黄 / 其余正常
  */
 import { useRef, useState, useCallback, useEffect } from 'react';
-import { txFetchData, txFetch } from '../../api/client';
+import { txFetchData } from '../../api/client';
 import {
   ProTable,
   ProColumns,
@@ -91,7 +91,7 @@ interface ExpirySummary {
 // ─── 工具函数 ─────────────────────────────────────────────────────────────────
 
 async function apiPatch<T = unknown>(path: string, body?: unknown): Promise<T> {
-  const resp = await txFetch<T>(path, {
+  const resp = await txFetchData<T>(path, {
     method: 'PATCH',
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
@@ -148,7 +148,7 @@ function QuickPOModal({ ingredientName, open, onClose }: QuickPOModalProps) {
       modalProps={{ onCancel: onClose, destroyOnClose: true }}
       onFinish={async (values) => {
         try {
-          await txFetch('/api/v1/supply/purchase-orders', {
+          await txFetchData('/api/v1/supply/purchase-orders', {
             method: 'POST',
             body: JSON.stringify({
               store_id: values.store_id,

@@ -4,7 +4,7 @@
  * 报告列表（接真实 /api/v1/reports）+ 报告详情预览 + 降级友好
  */
 import { useState, useEffect } from 'react';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 // ---- 颜色常量 ----
 const BG   = '#0d1e28';
@@ -49,7 +49,7 @@ interface ApiReportRow {
 // ---- API ----
 async function fetchTrendReports(): Promise<ReportItem[]> {
   try {
-    const data = await txFetch<{ items: ApiReportRow[]; total: number }>(
+    const data = await txFetchData<{ items: ApiReportRow[]; total: number }>(
       '/api/v1/reports?category=operation'
     );
     if (data?.items?.length) {

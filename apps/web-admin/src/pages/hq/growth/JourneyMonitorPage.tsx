@@ -4,7 +4,7 @@
  * 30 秒自动刷新，侧边抽屉展示旅程详情
  */
 import { useState, useEffect, useCallback } from 'react';
-import { txFetch } from '../../../api/index';
+import { txFetchData } from '../../../api/index';
 
 // ---- 颜色常量（与 JourneyListPage 一致）----
 const BG_0 = '#0B1A20';
@@ -154,7 +154,7 @@ export function JourneyMonitorPage() {
   // 加载旅程列表（旅程执行状态监控）
   const loadJourneys = useCallback(async () => {
     try {
-      const data = await txFetch<{ items: JourneyDefinition[] }>('/api/v1/growth/journeys');
+      const data = await txFetchData<{ items: JourneyDefinition[] }>('/api/v1/growth/journeys');
       setJourneys(data.items ?? []);
     } catch {
       // API 不可用时 fallback 空列表，显示"暂无数据"
@@ -167,7 +167,7 @@ export function JourneyMonitorPage() {
   // 加载节点执行历史
   const loadEnrollments = useCallback(async (journeyId: string) => {
     try {
-      const data = await txFetch<{ items: JourneyEnrollment[] }>(
+      const data = await txFetchData<{ items: JourneyEnrollment[] }>(
         `/api/v1/growth/journeys/${encodeURIComponent(journeyId)}/executions?limit=20`,
       );
       setEnrollments(data.items ?? []);
@@ -208,7 +208,7 @@ export function JourneyMonitorPage() {
 
     setActionLoading(j.id);
     try {
-      await txFetch(endpoint, {
+      await txFetchData(endpoint, {
         method: 'PATCH',
         body: JSON.stringify({ status: newStatusVal }),
       });
@@ -229,7 +229,7 @@ export function JourneyMonitorPage() {
   const importTemplate = useCallback(async (templateId: string) => {
     setImportingTemplate(templateId);
     try {
-      await txFetch('/api/v1/growth/journeys/from-template', {
+      await txFetchData('/api/v1/growth/journeys/from-template', {
         method: 'POST',
         body: JSON.stringify({ template_id: templateId }),
       });

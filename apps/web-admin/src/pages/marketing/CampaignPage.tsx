@@ -46,7 +46,7 @@ import {
   TeamOutlined,
   ThunderboltOutlined,
 } from '@ant-design/icons';
-import { txFetch } from '../../api';
+import { txFetchData } from '../../api';
 
 const { RangePicker } = DatePicker;
 
@@ -135,7 +135,7 @@ const STATUS_BADGE: Record<CampaignStatus, { status: 'default' | 'success' | 'wa
 
 async function fetchSummary(): Promise<SummaryStats> {
   try {
-    return await txFetch<SummaryStats>('/api/v1/growth/campaigns/summary');
+    return await txFetchData<SummaryStats>('/api/v1/growth/campaigns/summary');
   } catch {
     return EMPTY_SUMMARY;
   }
@@ -144,7 +144,7 @@ async function fetchSummary(): Promise<SummaryStats> {
 async function fetchCampaigns(status?: string): Promise<Campaign[]> {
   try {
     const params = status ? `?status=${encodeURIComponent(status)}` : '';
-    const res = await txFetch<{ items: Campaign[] }>(`/api/v1/growth/campaigns${params}`);
+    const res = await txFetchData<{ items: Campaign[] }>(`/api/v1/growth/campaigns${params}`);
     return res?.items ?? [];
   } catch {
     return [];
@@ -153,7 +153,7 @@ async function fetchCampaigns(status?: string): Promise<Campaign[]> {
 
 async function fetchCampaignDetail(id: string): Promise<CampaignDetail | null> {
   try {
-    return await txFetch<CampaignDetail>(`/api/v1/growth/campaigns/${id}`);
+    return await txFetchData<CampaignDetail>(`/api/v1/growth/campaigns/${id}`);
   } catch {
     return null;
   }
@@ -161,7 +161,7 @@ async function fetchCampaignDetail(id: string): Promise<CampaignDetail | null> {
 
 async function fetchCoupons(): Promise<Coupon[]> {
   try {
-    const res = await txFetch<{ items: Coupon[] }>('/api/v1/growth/coupons');
+    const res = await txFetchData<{ items: Coupon[] }>('/api/v1/growth/coupons');
     return res?.items ?? [];
   } catch {
     return [];
@@ -170,7 +170,7 @@ async function fetchCoupons(): Promise<Coupon[]> {
 
 async function fetchStores(): Promise<StoreOption[]> {
   try {
-    const res = await txFetch<{ items: StoreOption[] }>('/api/v1/org/stores');
+    const res = await txFetchData<{ items: StoreOption[] }>('/api/v1/org/stores');
     return res?.items ?? [];
   } catch {
     return [];
@@ -185,7 +185,7 @@ async function createCampaign(payload: {
   end_date: string;
 }): Promise<Campaign | null> {
   try {
-    return await txFetch<Campaign>('/api/v1/growth/campaigns', {
+    return await txFetchData<Campaign>('/api/v1/growth/campaigns', {
       method: 'POST',
       body: JSON.stringify(payload),
     });
@@ -195,7 +195,7 @@ async function createCampaign(payload: {
 }
 
 async function patchCampaignStatus(id: string, status: CampaignStatus): Promise<void> {
-  await txFetch(`/api/v1/growth/campaigns/${id}`, {
+  await txFetchData(`/api/v1/growth/campaigns/${id}`, {
     method: 'PATCH',
     body: JSON.stringify({ status }),
   });
@@ -760,7 +760,7 @@ export function CampaignPage() {
                   onOpenChange={setCouponCreateOpen}
                   onFinish={async (values) => {
                     try {
-                      await txFetch('/api/v1/growth/coupons', {
+                      await txFetchData('/api/v1/growth/coupons', {
                         method: 'POST',
                         body: JSON.stringify({
                           name: values.name,

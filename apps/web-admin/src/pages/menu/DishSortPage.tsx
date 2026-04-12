@@ -5,7 +5,7 @@
  * 技术栈：Ant Design 5.x + ProComponents
  */
 import { useState, useEffect, useCallback } from 'react';
-import { txFetch } from '../../api';
+import { txFetchData } from '../../api';
 import {
   Card,
   Tabs,
@@ -54,7 +54,7 @@ interface DishCategory {
 
 async function fetchCategories(): Promise<DishCategory[]> {
   try {
-    const res = await txFetch<{ items: DishCategory[] }>('/api/v1/menu/categories');
+    const res = await txFetchData<{ items: DishCategory[] }>('/api/v1/menu/categories');
     return res.data?.items ?? [];
   } catch (err) {
     console.error('[DishSortPage] fetchCategories 失败:', err);
@@ -64,7 +64,7 @@ async function fetchCategories(): Promise<DishCategory[]> {
 
 async function fetchDishesByCategory(categoryId: string): Promise<DishSortItem[]> {
   try {
-    const res = await txFetch<{ items: DishSortItem[] }>(
+    const res = await txFetchData<{ items: DishSortItem[] }>(
       `/api/v1/menu/dishes?category_id=${encodeURIComponent(categoryId)}&include_sort=true&size=200`,
     );
     return res.data?.items ?? [];
@@ -75,7 +75,7 @@ async function fetchDishesByCategory(categoryId: string): Promise<DishSortItem[]
 }
 
 async function saveDishSort(items: { id: string; sort_order: number }[]): Promise<void> {
-  await txFetch<void>('/api/v1/menu/dishes/sort', {
+  await txFetchData<void>('/api/v1/menu/dishes/sort', {
     method: 'POST',
     body: JSON.stringify({ items }),
   });

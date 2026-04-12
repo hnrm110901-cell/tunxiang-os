@@ -10,7 +10,7 @@ import {
   Descriptions, message, Spin,
 } from 'antd';
 import { SearchOutlined, TeamOutlined, UserOutlined } from '@ant-design/icons';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 // ---- 颜色常量 ----
 const PAGE_BG = '#0d1e28';
@@ -115,7 +115,7 @@ export function CustomerPoolPage() {
         Object.entries(groupDef.filter).forEach(([k, v]) => { params[k] = v; });
       }
       const qs = new URLSearchParams(params).toString();
-      const resp = await txFetch<CustomerListResp>(`/api/v1/member/customers?${qs}`);
+      const resp = await txFetchData<CustomerListResp>(`/api/v1/member/customers?${qs}`);
       if (resp.data) {
         setCustomers(resp.data.items);
         setTotal(resp.data.total);

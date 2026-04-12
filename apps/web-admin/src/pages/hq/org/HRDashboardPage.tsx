@@ -3,7 +3,7 @@
  * 考勤 + 请假 + 薪资 三合一管理视图
  */
 import { useEffect, useState, useCallback } from 'react';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 // ─── 类型定义 ───
 
@@ -204,10 +204,10 @@ function AttendanceTab({
     setLoading(true);
     try {
       const [sum, ano] = await Promise.all([
-        txFetch<AttendanceSummary>(
+        txFetchData<AttendanceSummary>(
           `/api/v1/attendance/daily?store_id=${encodeURIComponent(storeId)}&date=${date}`,
         ),
-        txFetch<{ items: AttendanceAnomaly[] }>(
+        txFetchData<{ items: AttendanceAnomaly[] }>(
           `/api/v1/attendance/anomalies?store_id=${encodeURIComponent(storeId)}&start_date=${date.slice(0, 7)}-01&end_date=${date}`,
         ),
       ]);
@@ -333,10 +333,10 @@ function LeaveTab({
     setLoading(true);
     try {
       const [allReqs, balData] = await Promise.all([
-        txFetch<{ items: LeaveRequest[] }>(
+        txFetchData<{ items: LeaveRequest[] }>(
           `/api/v1/leave-requests?store_id=${encodeURIComponent(storeId)}&status=`,
         ),
-        txFetch<{ items: LeaveBalance[] }>(
+        txFetchData<{ items: LeaveBalance[] }>(
           `/api/v1/leave-requests/balance?employee_id=`,
         ),
       ]);
@@ -525,7 +525,7 @@ function PayrollTab({
     if (!storeId) return;
     setLoading(true);
     try {
-      const data = await txFetch<PayrollSummary>(
+      const data = await txFetchData<PayrollSummary>(
         `/api/v1/payroll/store/${encodeURIComponent(storeId)}/${encodeURIComponent(month)}`,
       );
       setPayroll(data);
@@ -542,7 +542,7 @@ function PayrollTab({
     if (!storeId) return;
     setBatchLoading(true);
     try {
-      await txFetch(`/api/v1/payroll/batch/${encodeURIComponent(storeId)}`, {
+      await txFetchData(`/api/v1/payroll/batch/${encodeURIComponent(storeId)}`, {
         method: 'POST',
         body: JSON.stringify({ month }),
       });
@@ -557,7 +557,7 @@ function PayrollTab({
   const handleConfirm = async (recordId: string) => {
     setActionLoading(prev => ({ ...prev, [recordId]: 'confirm' }));
     try {
-      await txFetch(`/api/v1/payroll/${encodeURIComponent(recordId)}/confirm`, { method: 'POST' });
+      await txFetchData(`/api/v1/payroll/${encodeURIComponent(recordId)}/confirm`, { method: 'POST' });
       await fetchData();
     } finally {
       setActionLoading(prev => { const n = { ...prev }; delete n[recordId]; return n; });
@@ -567,7 +567,7 @@ function PayrollTab({
   const handlePay = async (recordId: string) => {
     setActionLoading(prev => ({ ...prev, [recordId]: 'pay' }));
     try {
-      await txFetch(`/api/v1/payroll/${encodeURIComponent(recordId)}/pay`, { method: 'POST' });
+      await txFetchData(`/api/v1/payroll/${encodeURIComponent(recordId)}/pay`, { method: 'POST' });
       await fetchData();
     } finally {
       setActionLoading(prev => { const n = { ...prev }; delete n[recordId]; return n; });

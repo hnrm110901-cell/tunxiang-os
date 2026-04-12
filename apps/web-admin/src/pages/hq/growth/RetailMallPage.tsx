@@ -4,7 +4,7 @@
  * 商品管理 + 订单管理 + KPI看板
  */
 import { useState, useEffect, useCallback } from 'react';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 const BG_1 = '#0d1e28';
 const BG_2 = '#1a2a33';
@@ -73,7 +73,7 @@ function useRetailProducts() {
 
   const load = useCallback((page = 1) => {
     setLoading(true);
-    txFetch<PaginatedResponse<RetailProduct>>(`/api/v1/menu/dishes?channel=retail&page=${page}&size=20`)
+    txFetchData<PaginatedResponse<RetailProduct>>(`/api/v1/menu/dishes?channel=retail&page=${page}&size=20`)
       .then(data => {
         setProducts(data.items || []);
         setTotal(data.total || 0);
@@ -101,7 +101,7 @@ function useRetailOrders() {
   const load = useCallback((page = 1, status?: string) => {
     setLoading(true);
     const qs = status && status !== '全部' ? `&status=${encodeURIComponent(status)}` : '';
-    txFetch<PaginatedResponse<RetailOrder>>(`/api/v1/trade/orders?channel=retail&page=${page}&size=20${qs}`)
+    txFetchData<PaginatedResponse<RetailOrder>>(`/api/v1/trade/orders?channel=retail&page=${page}&size=20${qs}`)
       .then(data => {
         setOrders(data.items || []);
         setTotal(data.total || 0);
@@ -124,7 +124,7 @@ function useRetailKPI() {
   const [kpi, setKpi] = useState<RetailKPI | null>(null);
 
   useEffect(() => {
-    txFetch<RetailKPI>('/api/v1/analytics/retail/kpi')
+    txFetchData<RetailKPI>('/api/v1/analytics/retail/kpi')
       .then(setKpi)
       .catch(() => setKpi(null));
   }, []);
@@ -270,7 +270,7 @@ function ProductsTab() {
   const handleStatusToggle = async (p: RetailProduct) => {
     const newStatus = p.status === '在售' ? '下架' : '在售';
     try {
-      await txFetch(`/api/v1/menu/dishes/${p.id}`, {
+      await txFetchData(`/api/v1/menu/dishes/${p.id}`, {
         method: 'PATCH',
         body: JSON.stringify({ status: newStatus, channel: 'retail' }),
       });
@@ -371,7 +371,7 @@ function OrdersTab() {
 
   const handleShip = async (orderId: string) => {
     try {
-      await txFetch(`/api/v1/trade/orders/${orderId}/ship`, { method: 'POST' });
+      await txFetchData(`/api/v1/trade/orders/${orderId}/ship`, { method: 'POST' });
       reload();
     } catch {
       // 静默处理
@@ -465,7 +465,7 @@ function AnalyticsTab() {
 
   useEffect(() => {
     setLoading(true);
-    txFetch<{ categories: typeof categoryData; metrics: typeof metrics }>('/api/v1/analytics/retail/detail')
+    txFetchData<{ categories: typeof categoryData; metrics: typeof metrics }>('/api/v1/analytics/retail/detail')
       .then(data => {
         setCategoryData(data.categories || []);
         setMetrics(data.metrics || []);

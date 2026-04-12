@@ -228,8 +228,8 @@ async def _bind_market_session(
         market_session_id = await _get_current_market_session_id(db, tenant_id, store_id)
         if market_session_id:
             await db.execute(
-                text("UPDATE dining_sessions SET market_session_id = :msid WHERE id = :sid"),
-                {"msid": market_session_id, "sid": session_id},
+                text("UPDATE dining_sessions SET market_session_id = :msid WHERE id = :sid AND tenant_id = :tid"),
+                {"msid": market_session_id, "sid": session_id, "tid": tenant_id},
             )
             await db.commit()
             logger.info(

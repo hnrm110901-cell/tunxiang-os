@@ -75,7 +75,7 @@ const TX_DANGER  = '#A32D2D';
 const TX_INFO    = '#185FA5';
 const TX_NAVY    = '#1E2A3A';
 
-import { txFetch } from '../../api';
+import { txFetchData } from '../../api';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -169,7 +169,7 @@ interface Certificate {
 
 async function fetchCourses(): Promise<Course[]> {
   try {
-    const data = await txFetch<{ items: Course[] }>('/api/v1/org/training/courses');
+    const data = await txFetchData<{ items: Course[] }>('/api/v1/org/training/courses');
     return data?.items ?? [];
   } catch {
     return [];
@@ -178,7 +178,7 @@ async function fetchCourses(): Promise<Course[]> {
 
 async function fetchProgress(storeId = 'current'): Promise<EmployeeProgress[]> {
   try {
-    const data = await txFetch<{ items: EmployeeProgress[] }>(
+    const data = await txFetchData<{ items: EmployeeProgress[] }>(
       `/api/v1/org/training/progress?store_id=${storeId}`,
     );
     return data?.items ?? [];
@@ -189,7 +189,7 @@ async function fetchProgress(storeId = 'current'): Promise<EmployeeProgress[]> {
 
 async function fetchExams(): Promise<Exam[]> {
   try {
-    const data = await txFetch<{ items: Exam[] }>('/api/v1/org/training/exams');
+    const data = await txFetchData<{ items: Exam[] }>('/api/v1/org/training/exams');
     return data?.items ?? [];
   } catch {
     return [];
@@ -198,7 +198,7 @@ async function fetchExams(): Promise<Exam[]> {
 
 async function fetchExamResults(examId: string): Promise<ExamResult[]> {
   try {
-    const data = await txFetch<{ items: ExamResult[] }>(
+    const data = await txFetchData<{ items: ExamResult[] }>(
       `/api/v1/org/training/exams/${examId}/results`,
     );
     return data?.items ?? [];
@@ -209,7 +209,7 @@ async function fetchExamResults(examId: string): Promise<ExamResult[]> {
 
 async function fetchCertificates(): Promise<Certificate[]> {
   try {
-    const data = await txFetch<{ items: Certificate[] }>('/api/v1/org/training/certificates');
+    const data = await txFetchData<{ items: Certificate[] }>('/api/v1/org/training/certificates');
     return data?.items ?? [];
   } catch {
     return [];
@@ -218,7 +218,7 @@ async function fetchCertificates(): Promise<Certificate[]> {
 
 async function sendReminder(employeeIds: string[]): Promise<boolean> {
   try {
-    await txFetch('/api/v1/org/training/remind', {
+    await txFetchData('/api/v1/org/training/remind', {
       method: 'POST',
       body: JSON.stringify({ employee_ids: employeeIds }),
     });
@@ -346,7 +346,7 @@ function CourseTab() {
     };
 
     try {
-      await txFetch('/api/v1/org/training/courses', {
+      await txFetchData('/api/v1/org/training/courses', {
         method: 'POST',
         body: JSON.stringify(courseData),
       });
@@ -609,7 +609,7 @@ function ProgressTab() {
 
   const handleCompleteCourse = async (employeeId: string, courseId: string) => {
     try {
-      await txFetch('/api/v1/org/training/complete', {
+      await txFetchData('/api/v1/org/training/complete', {
         method: 'POST',
         body: JSON.stringify({ employee_id: employeeId, course_id: courseId }),
       });
@@ -755,7 +755,7 @@ function ExamTab() {
     };
 
     try {
-      await txFetch('/api/v1/org/training/exams', {
+      await txFetchData('/api/v1/org/training/exams', {
         method: 'POST',
         body: JSON.stringify(examData),
       });
@@ -908,7 +908,7 @@ function CertificateTab() {
     };
 
     try {
-      await txFetch('/api/v1/org/training/certificates', {
+      await txFetchData('/api/v1/org/training/certificates', {
         method: 'POST',
         body: JSON.stringify(certData),
       });

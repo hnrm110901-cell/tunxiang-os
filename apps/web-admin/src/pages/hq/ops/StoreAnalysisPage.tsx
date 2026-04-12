@@ -5,7 +5,7 @@
  */
 import { useState, useEffect, useCallback } from 'react';
 import { TxLineChart, TxHeatmap } from '../../../components/charts';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 const STORES = ['芙蓉路店', '岳麓店', '星沙店', '河西店', '开福店'];
 
@@ -60,7 +60,7 @@ export function StoreAnalysisPage() {
     setLoading(true);
     try {
       const storeId = selectedStores[0];
-      const res = await txFetch<StoreAnalysisData>(
+      const res = await txFetchData<StoreAnalysisData>(
         `/api/v1/analytics/store-analysis?store_id=${encodeURIComponent(storeId)}&period=${period}`
       );
       setAnalysisData(res ?? EMPTY_ANALYSIS);
@@ -75,7 +75,7 @@ export function StoreAnalysisPage() {
     if (selectedStores.length === 0) return;
     try {
       const ids = selectedStores.map(encodeURIComponent).join(',');
-      const res = await txFetch<{ items: CompareItem[] }>(
+      const res = await txFetchData<{ items: CompareItem[] }>(
         `/api/v1/analytics/store-comparison?store_ids=${ids}&period=${period}`
       );
       setCompareData(res?.items ?? []);

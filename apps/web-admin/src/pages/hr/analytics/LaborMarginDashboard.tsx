@@ -40,7 +40,7 @@ import {
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import type { Dayjs } from 'dayjs';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 const { Title, Text } = Typography;
 
@@ -105,7 +105,7 @@ export default function LaborMarginDashboard() {
 
   // 加载门店列表
   useEffect(() => {
-    txFetch<{ items: { id: string; store_name: string }[] }>('/api/v1/stores?page=1&size=100')
+    txFetchData<{ items: { id: string; store_name: string }[] }>('/api/v1/stores?page=1&size=100')
       .then((resp) => {
         const list = (resp.data?.items || []).map((s) => ({ id: s.id, name: s.store_name }));
         setStores(list);
@@ -125,9 +125,9 @@ export default function LaborMarginDashboard() {
     setLoading(true);
 
     Promise.all([
-      txFetch<RealtimeMargin>(`/api/v1/labor-margin/realtime?store_id=${storeId}&target_date=${dateStr}`),
-      txFetch<HourlyRow[]>(`/api/v1/labor-margin/hourly?store_id=${storeId}&target_date=${dateStr}`),
-      txFetch<LossHoursData>(`/api/v1/labor-margin/loss-hours?store_id=${storeId}&target_date=${dateStr}`),
+      txFetchData<RealtimeMargin>(`/api/v1/labor-margin/realtime?store_id=${storeId}&target_date=${dateStr}`),
+      txFetchData<HourlyRow[]>(`/api/v1/labor-margin/hourly?store_id=${storeId}&target_date=${dateStr}`),
+      txFetchData<LossHoursData>(`/api/v1/labor-margin/loss-hours?store_id=${storeId}&target_date=${dateStr}`),
     ])
       .then(([summaryResp, hourlyResp, lossResp]) => {
         setSummary(summaryResp.data);

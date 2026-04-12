@@ -40,7 +40,7 @@ import {
   Timeline,
 } from 'antd';
 import { PlusOutlined, CheckCircleOutlined, ClockCircleOutlined } from '@ant-design/icons';
-import { txFetch } from '../../api/client';
+import { txFetchData } from '../../api/client';
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 //  类型
@@ -136,7 +136,7 @@ export default function OnboardingPathPage() {
 
   const fetchDashboard = useCallback(async () => {
     try {
-      const data = await txFetch<DashboardData>('/api/v1/onboarding-paths/dashboard');
+      const data = await txFetchData<DashboardData>('/api/v1/onboarding-paths/dashboard');
       setDashboard(data);
     } catch {
       message.error('加载仪表板失败');
@@ -156,7 +156,7 @@ export default function OnboardingPathPage() {
     setDrawerOpen(true);
     setDetailLoading(true);
     try {
-      const data = await txFetch<OnboardingPath>(`/api/v1/onboarding-paths/${id}`);
+      const data = await txFetchData<OnboardingPath>(`/api/v1/onboarding-paths/${id}`);
       setDetail(data);
     } catch {
       message.error('加载详情失败');
@@ -168,7 +168,7 @@ export default function OnboardingPathPage() {
   const refreshDetail = async () => {
     if (!detail) return;
     try {
-      const data = await txFetch<OnboardingPath>(`/api/v1/onboarding-paths/${detail.id}`);
+      const data = await txFetchData<OnboardingPath>(`/api/v1/onboarding-paths/${detail.id}`);
       setDetail(data);
     } catch {
       message.error('刷新详情失败');
@@ -185,7 +185,7 @@ export default function OnboardingPathPage() {
   // ── 完成单个任务 ──
   const handleCompleteTask = async (pathId: string, taskIdx: number) => {
     try {
-      await txFetch(`/api/v1/onboarding-paths/${pathId}/task/${taskIdx}`, { method: 'PUT' });
+      await txFetchData(`/api/v1/onboarding-paths/${pathId}/task/${taskIdx}`, { method: 'PUT' });
       message.success('任务已完成');
       await refreshDetail();
     } catch {
@@ -196,7 +196,7 @@ export default function OnboardingPathPage() {
   // ── 推进训练日 ──
   const handleAdvanceDay = async (id: string) => {
     try {
-      await txFetch(`/api/v1/onboarding-paths/${id}/advance-day`, { method: 'PUT' });
+      await txFetchData(`/api/v1/onboarding-paths/${id}/advance-day`, { method: 'PUT' });
       message.success('已推进到下一天');
       closeDrawerAndReload();
     } catch {
@@ -207,7 +207,7 @@ export default function OnboardingPathPage() {
   // ── 完成训练 ──
   const handleComplete = async (id: string) => {
     try {
-      await txFetch(`/api/v1/onboarding-paths/${id}/complete`, { method: 'PUT' });
+      await txFetchData(`/api/v1/onboarding-paths/${id}/complete`, { method: 'PUT' });
       message.success('训练已完成');
       closeDrawerAndReload();
     } catch {
@@ -225,7 +225,7 @@ export default function OnboardingPathPage() {
       return;
     }
     try {
-      await txFetch(`/api/v1/onboarding-paths/${terminateId}/terminate`, {
+      await txFetchData(`/api/v1/onboarding-paths/${terminateId}/terminate`, {
         method: 'PUT',
         body: JSON.stringify({ notes: terminateNotes }),
       });
@@ -421,7 +421,7 @@ export default function OnboardingPathPage() {
           if (store_id) filters += `&store_id=${store_id}`;
           if (target_days) filters += `&target_days=${target_days}`;
           try {
-            const res = await txFetch<ListResult>(
+            const res = await txFetchData<ListResult>(
               `/api/v1/onboarding-paths?page=${current}&size=${pageSize}${filters}`,
             );
             return { data: res.items, total: res.total, success: true };
@@ -450,7 +450,7 @@ export default function OnboardingPathPage() {
             modalProps={{ destroyOnClose: true }}
             onFinish={async (values) => {
               try {
-                await txFetch('/api/v1/onboarding-paths', {
+                await txFetchData('/api/v1/onboarding-paths', {
                   method: 'POST',
                   body: JSON.stringify(values),
                 });

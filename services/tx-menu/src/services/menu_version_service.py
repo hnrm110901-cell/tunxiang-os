@@ -45,8 +45,8 @@ async def _get_redis() -> Optional[Any]:
         await client.ping()
         _redis_client = client
         return _redis_client
-    except Exception:
-        log.warning("menu_version.redis_unavailable_ws_push_disabled")
+    except Exception as exc:  # noqa: BLE001 — Redis不可用时禁用WS推送
+        log.warning("menu_version.redis_unavailable_ws_push_disabled", error=str(exc))
         return None
 
 

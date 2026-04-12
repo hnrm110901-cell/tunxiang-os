@@ -28,7 +28,7 @@ import {
 } from '@ant-design/icons';
 import { ProTable } from '@ant-design/pro-components';
 import type { ProColumns } from '@ant-design/pro-components';
-import { txFetch } from '../../api';
+import { txFetchData } from '../../api';
 
 const { Title, Text } = Typography;
 
@@ -133,7 +133,7 @@ function SingleInsightPanel() {
     setResult(null);
     try {
       const payload = buildMockPayload(customerId.trim());
-      const data = await txFetch<InsightResult>('/api/v1/brain/member/insight', {
+      const data = await txFetchData<InsightResult>('/api/v1/brain/member/insight', {
         method: 'POST',
         body: JSON.stringify(payload),
       });
@@ -337,7 +337,7 @@ function BatchInsightPanel() {
       const row = updated[i];
       try {
         const payload = buildMockPayload(row.customer_id);
-        const data = await txFetch<InsightResult>('/api/v1/brain/member/insight', {
+        const data = await txFetchData<InsightResult>('/api/v1/brain/member/insight', {
           method: 'POST',
           body: JSON.stringify(payload),
         });

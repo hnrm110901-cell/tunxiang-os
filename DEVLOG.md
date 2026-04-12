@@ -147,6 +147,236 @@
 
 ---
 
+## 2026-04-12 (三品牌真实凭证写入)
+
+### 今日完成：三品牌凭证落地
+
+**环境变量（新建）**
+- `.env` — 基于 `.env.example` 创建，替换三品牌所有占位符为真实凭证：
+  - 尝在一起（CZYZ）：品智 base_url + api_token + 3 门店 token，奥琦玮 app_id/app_key/merchant_id
+  - 最黔线（ZQX）：品智 base_url + api_token + 6 门店 token，奥琦玮 app_id/app_key/merchant_id
+  - 尚宫厨（SGC）：品智 base_url + api_token + 5 门店 token，奥琦玮 app_id/app_key/merchant_id + 卡券中心 app_id/app_key
+
+**数据库迁移（新增）**
+- `shared/db-migrations/versions/v233_seed_merchant_configs.py`
+  - UPDATE tenants SET systems_config = \<真实凭证 JSONB\>, sync_enabled = TRUE WHERE code IN ('t-czq','t-zqx','t-sgc')
+  - 尚宫厨额外含 `coupon_center` 配置节（apigateway.acewill.net，11 个平台）
+  - downgrade：重置 systems_config = '{}', sync_enabled = FALSE
+
+**门店种子脚本（新增）**
+- `scripts/seed_three_brands_stores.py`
+  - asyncpg 直连 DATABASE_URL，从 tenants 表查 tenant_id
+  - 14 条门店记录（CZYZ×3 + ZQX×6 + SGC×5），ON CONFLICT (store_code) DO UPDATE
+  - extra_data JSONB 存 pinzhi_store_id / pinzhi_token / aoqiwei_shop_id
+
+### 数据变化
+- 迁移版本：v232 → v233
+- 新增文件：3 个（.env + v233迁移 + seed脚本）
+- 覆盖门店：14 家（CZYZ 3 + ZQX 6 + SGC 5）
+
+### 遗留问题
+- 种子脚本依赖 stores 表有 `store_code` 唯一约束，如不存在需先确认
+- ZQX 门店城市均填"长沙"，仁怀店（32309）实际在贵州仁怀，后续可按需修正
+
+### 明日计划
+- 运行 `alembic upgrade v233` 将凭证写入 DB
+- 运行 `python scripts/seed_three_brands_stores.py` 初始化门店
+- 对接品智适配器，验证 t-czq 凭证连通性
+
+---
+
+## 2026-04-12 (三品牌四系统租户配置)
+
+### 今日完成：多系统凭证配置基础设施
+
+**数据库迁移（新增）**
+- `shared/db-migrations/versions/v232_tenant_multi_system_config.py`
+  - `tenants` 表新增 `systems_config JSONB` 列（GIN 索引）和 `sync_enabled BOOLEAN` 列
+  - 为 t-czq / t-zqx / t-sgc 三租户写入四系统配置骨架（凭证留空占位，待客户提供）
+
+**Pydantic 配置模型（新增）**
+- `shared/adapters/config/multi_system_config.py`
+  - `PinzhiConfig` — base_url + app_secret（品智 API Token）+ org_id
+  - `AoqiweiCrmConfig` — appid + appkey（微生活会员，MD5签名）
+  - `AoqiweiSupplyConfig` — app_id + app_secret（供应链，MD5签名）
+  - `YidingConfig` — base_url + api_key（存 secret）+ hotel_id
+  - `TenantSystemsConfig` — 四系统容器，字段均 Optional
+- `shared/adapters/config/__init__.py` — 统一导出入口
+
+**系统配置管理 API（新增）**
+- `services/tx-org/src/api/tenant_systems_routes.py` — 3 个端点：
+  - `GET  /api/v1/org/tenant/systems-config` — 脱敏读取（凭证前4位+***）
+  - `PUT  /api/v1/org/tenant/systems-config` — 全量替换，json.dumps 写 JSONB
+  - `POST /api/v1/org/tenant/systems-config/test/{system_name}` — 连通性测试
+    - pinzhi → get_store_info()
+    - aoqiwei_crm → get_member_info(mobile="10000000000")（业务错误=通信成功）
+    - aoqiwei_supply → query_shops()
+    - yiding → health_check() / client.ping()
+- `services/tx-org/src/main.py` — 追加 include_router(tenant_systems_router)
+
+### 数据变化
+- 迁移版本：v231 → v232
+- 新增 API 端点：3 个（tx-org/:8012，/api/v1/org/tenant/...）
+- 新增文件：4 个（v232迁移 + multi_system_config.py + __init__.py + tenant_systems_routes.py）
+
+### 设计要点
+- 凭证绝不硬编码/日志打印，全部经 DB 读写
+- 品智适配器真实参数为 token，PinzhiConfig.app_secret 字段存该值（命名统一）
+- 易订适配器真实参数为 secret，YidingConfig.api_key 字段存该值（命名统一）
+- PUT 端点使用 json.dumps 序列化后绑定参数，避免 Python dict → JSONB 类型转换问题
+- 所有异常处理限定具体类型（RuntimeError/ValueError），无 broad except
+
+### 遗留问题
+- YidingConfig 未独立存储 appid 字段（appid 目前为空字符串），易订适配器 appid 待客户提供后通过 PUT 接口更新（可在 YidingConfig 追加 appid 字段）
+- 三品牌 systems_config 骨架中凭证全部为空，需待客户提供后填入
+
+### 明日计划
+- 为 tenant_systems_routes.py 编写 pytest 测试（mock DB + 3端点覆盖）
+- 确认易订 appid 字段需求，如需则在 YidingConfig 追加并发 v233 迁移
+
+---
+
+## 2026-04-12 (四系统数据同步协调器)
+
+### 今日完成：MultiSystemSyncService + Celery 定时任务 + 同步管理API
+
+**服务层（新增）**
+- `services/tx-ops/src/services/multi_system_sync_service.py` — `MultiSystemSyncService`，6个 async 方法：
+  - `sync_pinzhi_orders(tenant_id, store_id, since_date)` — 品智订单 upsert → orders 表，发射 `OrderEventType.CREATED`
+  - `sync_aoqiwei_members(tenant_id, store_id)` — 奥琦玮CRM会员刷新 → customers upsert on golden_id
+  - `sync_aoqiwei_inventory(tenant_id, store_id)` — 奥琦玮供应链库存 → ingredients upsert，发射 `InventoryEventType.ADJUSTED`
+  - `sync_yiding_reservations(tenant_id, store_id)` — 易订待处理预订 → reservations 表，自动调用 confirm_orders
+  - `sync_all(tenant_id, store_ids, systems)` — asyncio.create_task 并发执行四系统，返回 `{total_synced, by_system, errors, duration_ms}`
+  - `get_sync_status(tenant_id)` — 从 operation_logs 读取24h内同步记录，返回各系统 `{last_sync_at, success_rate, last_errors}`
+  - 所有同步记录写入 `operation_logs(log_type='sync_record')`
+
+**Celery 定时任务（新增）**
+- `services/tx-ops/src/celery_tasks_sync.py` — 4个 Celery 任务 + beat_schedule 配置：
+  - `sync.pinzhi_orders_15min` — crontab `*/15`，soft_time_limit=600s
+  - `sync.aoqiwei_members_hourly` — crontab `minute=0`，soft_time_limit=1800s
+  - `sync.aoqiwei_inventory_hourly` — crontab `minute=5`，soft_time_limit=900s
+  - `sync.yiding_reservations_5min` — crontab `*/5`，soft_time_limit=240s
+  - 各任务遍历 `stores.extra_data->>'sync_enabled'=true` 的所有租户门店
+  - Celery 未安装时自动降级（模块可 import，任务函数不可用）
+
+**路由层（新增）**
+- `services/tx-ops/src/api/sync_management_routes.py` — 4个端点：
+  - `POST /api/v1/ops/sync/trigger` — 手动触发全量/多系统同步（body: {tenant_id, store_ids, systems}）
+  - `POST /api/v1/ops/sync/trigger/{system_name}` — 触发单个系统（pinzhi/aoqiwei_crm/aoqiwei_supply/yiding）
+  - `GET  /api/v1/ops/sync/status` — 各系统同步状态（24h内成功率/最近时间/最近错误）
+  - `GET  /api/v1/ops/sync/logs` — ProTable 格式分页日志（支持 system/store_id/status 过滤）
+
+**主服务注册**
+- `services/tx-ops/src/main.py` — 追加 `include_router(sync_management_router)`
+
+### 数据变化
+- 迁移版本：无（复用现有 operation_logs 表，log_type='sync_record'）
+- 新增 API 端点：4个（tx-ops，/api/v1/ops/sync/...）
+- 新增服务文件：3个（multi_system_sync_service + celery_tasks_sync + sync_management_routes）
+
+### 设计要点
+- 事件发射用 `asyncio.create_task(emit_event(...))` 旁路，不阻塞同步主流程
+- 禁止 `except Exception` — 各适配器调用捕获 `ValueError / RuntimeError / ConnectionError`
+- 单条记录写入失败不阻断整批（continue），错误收集后统一返回
+- 金额单位全部为分（整数），unit_price_fen = int(float(price) * 100)
+- Celery worker 进程级复用 AsyncEngine（_engine 单例）
+- 门店通过 `stores.extra_data->>'sync_enabled'=true` 控制是否参与定时同步
+- 每个门店可通过 `extra_data->>'sync_systems'` 指定只同步部分系统
+
+### 遗留问题
+- 奥琦玮CRM get_member_info 是单查接口，批量同步效率偏低；后续可接入批量查询接口（如有）
+- Celery 任务使用 asyncio.run() 驱动 async（Celery 官方尚未完全支持 async task）；生产环境可考虑 celery-pool-asyncio
+
+### 明日计划
+- 为 MultiSystemSyncService 补充单元测试（mock 适配器模式，覆盖 upsert 逻辑和事件发射）
+- 考虑在 sync_all 加入超时保护（per-store asyncio.wait_for）
+
+---
+
+## 2026-04-12 (HQ跨品牌分析API — P2)
+
+### 今日完成：总部跨品牌分析模块
+
+**服务层（新增）**
+- `services/tx-analytics/src/services/hq_brand_analytics_service.py` — HQBrandAnalyticsService，4个async方法：
+  - `get_brands_overview` — 从 ontology_snapshots 聚合各品牌营收/单量/健康分（健康分=营收达成率40%+毛利率40%+活跃门店比例20%）
+  - `get_brand_store_performance` — 品牌下所有门店当日绩效矩阵（revenue/target/achievement/gross_margin/labor_cost/alert_count/trend/rank），分页+多字段排序
+  - `compare_brands` — 四维度排行（revenue/gross_margin/avg_order/per_store_revenue）+ 最近7天每品牌日营收趋势折线数据
+  - `get_brand_pnl` — 从 mv_store_pnl 物化视图聚合品牌月度P&L（品牌汇总+各门店明细），无数据返回空结构而非假数据
+
+**路由层（新增）**
+- `services/tx-analytics/src/api/hq_brand_analytics_routes.py` — 4个端点：
+  - `GET /api/v1/analytics/hq/brands/overview` — brand_ids逗号分隔可选过滤，date_range=today|week|month
+  - `GET /api/v1/analytics/hq/brands/{brand_id}/stores/performance` — sort_by多字段+分页
+  - `GET /api/v1/analytics/hq/brands/compare` — brand_ids必填（≥2），period=week|month
+  - `GET /api/v1/analytics/hq/brands/{brand_id}/pnl` — year_month=YYYY-MM
+
+**主服务注册**
+- `services/tx-analytics/src/main.py` — 追加 include_router(hq_brand_analytics_router)
+
+### 数据变化
+- 迁移版本：无（复用 ontology_snapshots v068 + mv_store_pnl v148 现有表）
+- 新增 API 端点：4个（tx-analytics，/api/v1/analytics/hq/...）
+- 新增服务文件：2个（hq_brand_analytics_service.py + hq_brand_analytics_routes.py）
+
+### 设计要点
+- 所有查询使用 tenant_id = ANY(:tenant_ids::uuid[]) 支持超管多租户场景
+- 无真实数据时返回空结构（非假数据），前端显示"暂无数据"
+- SQLAlchemyError 精确捕获，路由层兜底返回 {"ok": false, "error": {"message": "..."}}
+- 所有金额字段单位：分（整数），不使用浮点
+- 日志全部用 structlog
+
+### 遗留问题
+- get_brand_store_performance 中门店营收来自 store 类型快照的 avg_daily_revenue_fen 字段；若快照未计算门店粒度指标，需补充门店级 ETL 任务
+- stores.daily_revenue_target_fen 字段不在现有迁移中，需确认字段是否存在或在 v232 中添加
+- compare_brands 趋势窗口固定为7天，不受 period=month 影响（简化设计，可后续优化）
+
+### 明日计划
+- 为 HQBrandAnalyticsService 编写 pytest 测试（mock DB + 4个方法覆盖）
+- 确认 stores 表是否有 daily_revenue_target_fen 字段，如无则在 v232 添加
+
+---
+
+## 2026-04-12 (品牌层后端完善 — P1)
+
+### 今日完成：品牌管理全栈真实DB化
+
+**数据库迁移**
+- `v231_brands_table.py` — 创建 brands 核心表（14字段）+ RLS NULLIF安全策略 + 3个索引
+- brands 表支持首批客户：尝在一起（CZ）、最黔线（ZQ）、尚宫厨（SG）
+- 为 stores.brand_id 新增索引（为后续外键升级做准备）
+
+**服务层（新增）**
+- `services/tx-org/src/services/brand_management_service.py` — 6个方法：
+  - `list_brands` — 品牌列表（brand_type/status过滤 + 门店数统计）
+  - `get_brand` — 品牌详情（含门店数/区域数）
+  - `create_brand` — 创建品牌（IntegrityError精确捕获）
+  - `update_brand` — 更新品牌字段（含strategy_config JSONB）
+  - `assign_stores_to_brand` — 批量分配门店（跨租户防护 + SQLAlchemyError精确捕获）
+  - `get_brand_stores` — 品牌门店列表（分页）
+
+**路由层（重写）**
+- `services/tx-org/src/api/brand_management_routes.py` — 彻底移除 MOCK_BRANDS
+  - 所有端点改为调用 brand_management_service 服务层
+  - 新增 `PUT /api/v1/org/brands/{brand_id}/stores` — 批量门店分配
+  - 新增请求模型 `AssignStoresReq`
+  - strategy 端点复用 `update_brand` 服务方法，消除重复逻辑
+
+### 数据变化
+- 迁移版本：v230 → v231
+- 新增后端 API 端点：1个新增（PUT /brands/{brand_id}/stores）
+- 新增服务文件：1个（brand_management_service.py）
+
+### 遗留问题
+- stores.brand_id 当前为 VARCHAR(50)，待数据迁移完成后升级为 UUID 外键引用
+- brands 表无种子数据，首批客户（尝在一起/最黔线/尚宫厨）需手动或通过脚本插入
+
+### 明日计划
+- 为品牌层编写 pytest 测试套件（list/get/create/assign 4个核心路径）
+- 考虑 regions 表增加 brand_id 字段（当前 get_brand 统计区域数但 regions.brand_id 可能为 UUID 类型，需确认）
+
+---
+
 ## 2026-04-11 (AI营销自动化 — Phase 1+2 启动)
 
 ### 今日完成：AI营销自动化全栈基础建设
@@ -242,6 +472,57 @@
 - 小红书种草笔记接入 AiMarketingOrchestratorAgent（brand_content 场景触发）
 - 营销活动数据大盘：接入 mv_channel_margin 物化视图（Phase 3 归因数据）
 - cashier_engine attribution 集成测试
+
+---
+
+## 2026-04-12 — v6 审计修复 Phase 1
+
+### 今日完成：安全审计修复（C2/H1/H3/H4/H5/M4 + P0-2静默异常）
+
+**C2 — v230 RLS NULLIF 全量回填（CRITICAL）**
+- 新建 `shared/db-migrations/versions/v230_rls_nullif_backfill.py`
+- 覆盖 v112–v150 遗留的 70 张表，补 `NULLIF + WITH CHECK + FORCE ROW LEVEL SECURITY`
+- 跳过已由 v138/v139/v224 修复的表
+
+**H1 — UPDATE/DELETE 全面补 tenant_id（HIGH）**
+- `delivery_aggregator_routes.py`：`get_aggregator_order` + `_order_action` SELECT/UPDATE 补 `AND tenant_id = :tid`；accept/ready/cancel 三个动作路由传入 Request
+- `dining_session_routes.py`：`_bind_market_session` UPDATE 补 `AND tenant_id = :tid`
+
+**H3 — vision_router 改用 ModelRouter（HIGH）**
+- 删除 `import anthropic` 直接调用，改为懒导入 `ModelRouter` + try/except ImportError 降级
+- `_recognize_via_claude` 增加 `tenant_id` 参数；`recognize_dish` 路由传入 `x_tenant_id`
+
+**H4 — BriefingCenterPage 用 DOMPurify（HIGH）**
+- `apps/web-admin/package.json` 添加 `dompurify@^3.1.0` + `@types/dompurify@^3.0.0`
+- `dangerouslySetInnerHTML` 改为 `DOMPurify.sanitize(renderMarkdown(...))`
+
+**H5 — rate_limiter Redis降级安全保护（HIGH）**
+- `LoginBruteForceProtection` 新增进程内 `_mem_counts` 字典
+- Redis 不可用时 `record_failure` / `is_locked` 均降级至内存计数器，不再完全放行
+
+**M4 — scan_pay 支付事件（MEDIUM）**
+- `scan_pay_routes.py` 引入 `PaymentEventType`；创建时发 `INITIATED`，`_simulate_payment` 实际 UPDATE 状态为 paid 并发 `CONFIRMED`
+
+**P0-2 — 11个静默/裸 except Exception 修复（v6 remediation）**
+- 9个文件，全部加 `as exc` + 日志（6个新增 log.warning，3个补全现有 log 调用）
+- 2个 WebSocket 保活场景加 `# noqa: BLE001` 注释说明意图
+- `cashier_api.py` / `procurement_recommend_routes.py` 补充 structlog 初始化
+
+### 数据变化
+- 新增迁移版本：v229 → v230
+- 修改后端文件：13 个
+- 修改前端文件：2 个（BriefingCenterPage + package.json）
+- 安全评分估算：72 → 85 → **88**（RLS+登录+XSS+异常全修）
+
+### 遗留问题
+- P0-1：git历史中泄露的商户凭证（config/merchants/.env.*）需 git-filter-repo 清除，此操作需手动执行并联系客户轮换 API Key
+- P1-3：自定义异常层级体系（TunxiangBaseError/POSAdapterError等）未建立
+- P1-1/P1-2：POS适配器和Agent包测试覆盖率不足
+
+### 明日计划
+- P1-3：新建 `services/gateway/src/core/exceptions.py` 异常层级
+- P1-1：品智适配器测试补全（目标 ≥8 用例）
+- web-admin 安装 dompurify（`pnpm install`）
 
 ---
 

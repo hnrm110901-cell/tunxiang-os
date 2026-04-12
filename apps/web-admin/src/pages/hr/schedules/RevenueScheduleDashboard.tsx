@@ -55,7 +55,7 @@ import { Heatmap, Column, Line } from '@ant-design/charts';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 import isoWeek from 'dayjs/plugin/isoWeek';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 dayjs.extend(isoWeek);
 
@@ -172,9 +172,9 @@ export default function RevenueScheduleDashboard() {
       const monthStr = weekStart.format('YYYY-MM');
 
       const [planRes, analysisRes, savingsRes] = await Promise.allSettled([
-        txFetch(`/api/v1/revenue-schedule/optimal-plan?store_id=${storeId}&week_start=${weekStr}`),
-        txFetch(`/api/v1/revenue-schedule/analysis?store_id=${storeId}&weeks=4`),
-        txFetch(`/api/v1/revenue-schedule/savings-estimate?store_id=${storeId}&month=${monthStr}`),
+        txFetchData(`/api/v1/revenue-schedule/optimal-plan?store_id=${storeId}&week_start=${weekStr}`),
+        txFetchData(`/api/v1/revenue-schedule/analysis?store_id=${storeId}&weeks=4`),
+        txFetchData(`/api/v1/revenue-schedule/savings-estimate?store_id=${storeId}&month=${monthStr}`),
       ]);
 
       if (planRes.status === 'fulfilled' && planRes.value?.ok) {
@@ -216,7 +216,7 @@ export default function RevenueScheduleDashboard() {
       onOk: async () => {
         setApplying(true);
         try {
-          const res = await txFetch('/api/v1/revenue-schedule/apply-plan', {
+          const res = await txFetchData('/api/v1/revenue-schedule/apply-plan', {
             method: 'POST',
             body: JSON.stringify({
               store_id: storeId,

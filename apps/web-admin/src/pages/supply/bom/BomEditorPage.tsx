@@ -61,7 +61,7 @@ import {
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import ReactECharts from 'echarts-for-react';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 const { Title, Text } = Typography;
 const { Panel } = Collapse;
@@ -173,7 +173,7 @@ const BomEditorPage: React.FC = () => {
       const params = search
         ? `?search=${encodeURIComponent(search)}&size=50`
         : '?size=50';
-      const data = await txFetch<{ items: Dish[]; total: number }>(
+      const data = await txFetchData<{ items: Dish[]; total: number }>(
         `/api/v1/menu/dishes${params}`
       );
       setDishes(data.items || []);
@@ -215,7 +215,7 @@ const BomEditorPage: React.FC = () => {
     setItems([]);
     setBreakdown([]);
     try {
-      const data = await txFetch<{ items: Bom[]; total: number }>(
+      const data = await txFetchData<{ items: Bom[]; total: number }>(
         `/api/v1/supply/boms?dish_id=${encodeURIComponent(dish.id)}`
       );
       const list: Bom[] = (data.items || []).map(b => ({
@@ -314,7 +314,7 @@ const BomEditorPage: React.FC = () => {
           unit_cost_fen: rest.unit_cost_fen,
         })),
       };
-      await txFetch(`/api/v1/supply/boms/${activeBom.id}`, {
+      await txFetchData(`/api/v1/supply/boms/${activeBom.id}`, {
         method: 'PUT',
         body: JSON.stringify(payload),
       });
@@ -333,7 +333,7 @@ const BomEditorPage: React.FC = () => {
     if (!activeBom) return;
     setRecalculating(true);
     try {
-      const result = await txFetch<{ total_cost_fen: number }>(
+      const result = await txFetchData<{ total_cost_fen: number }>(
         `/api/v1/supply/boms/${activeBom.id}/calculate-cost`,
         { method: 'POST' }
       );
@@ -351,7 +351,7 @@ const BomEditorPage: React.FC = () => {
     if (!activeBom) return;
     setBreakdownLoading(true);
     try {
-      const data = await txFetch<{ items: CostBreakdownItem[] }>(
+      const data = await txFetchData<{ items: CostBreakdownItem[] }>(
         `/api/v1/supply/boms/${activeBom.id}/cost-breakdown`
       );
       setBreakdown(data.items || []);
@@ -378,7 +378,7 @@ const BomEditorPage: React.FC = () => {
   const handleCreateVersion = async (values: { version_note: string; yield_quantity: number; yield_unit: string }) => {
     if (!selectedDish) return;
     try {
-      await txFetch('/api/v1/supply/boms', {
+      await txFetchData('/api/v1/supply/boms', {
         method: 'POST',
         body: JSON.stringify({
           dish_id: selectedDish.id,

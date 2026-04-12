@@ -21,7 +21,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { TxLineChart } from '../components/charts';
 import { TxPieChart } from '../components/charts';
-import { txFetch } from '../api';
+import { txFetchData } from '../api';
 
 // ─── 颜色常量（Design Token） ───
 const C = {
@@ -304,13 +304,13 @@ export function OperationsDashboardPage() {
 
     try {
       const [storesRes, pnlRes, yPnlRes, summaryRes, trendRes, compareRes, checklistRes] = await Promise.allSettled([
-        txFetch<{ items: Store[] }>('/api/v1/trade/stores/realtime-status'),
-        txFetch<PnlData>(`/api/v1/finance/pnl/calculate?store_id=${storeParam}&date=${selectedDate}`),
-        txFetch<PnlData>(`/api/v1/finance/pnl/calculate?store_id=${storeParam}&date=${yesterday}`),
-        txFetch<DailySummary>(`/api/v1/ops/daily-summary?store_id=${storeParam}&date=${selectedDate}`),
-        txFetch<{ items: TrendPoint[] }>(`/api/v1/finance/pnl/trend?store_id=${storeParam}&days=30`),
-        txFetch<{ items: StorePnl[] }>(`/api/v1/ops/dashboard`),
-        txFetch<{ items: ChecklistStore[] }>(`/api/v1/ops/settlement/checklist?date=${selectedDate}`),
+        txFetchData<{ items: Store[] }>('/api/v1/trade/stores/realtime-status'),
+        txFetchData<PnlData>(`/api/v1/finance/pnl/calculate?store_id=${storeParam}&date=${selectedDate}`),
+        txFetchData<PnlData>(`/api/v1/finance/pnl/calculate?store_id=${storeParam}&date=${yesterday}`),
+        txFetchData<DailySummary>(`/api/v1/ops/daily-summary?store_id=${storeParam}&date=${selectedDate}`),
+        txFetchData<{ items: TrendPoint[] }>(`/api/v1/finance/pnl/trend?store_id=${storeParam}&days=30`),
+        txFetchData<{ items: StorePnl[] }>(`/api/v1/ops/dashboard`),
+        txFetchData<{ items: ChecklistStore[] }>(`/api/v1/ops/settlement/checklist?date=${selectedDate}`),
       ]);
 
       if (storesRes.status === 'fulfilled' && storesRes.value.data?.items) setStores(storesRes.value.data.items);

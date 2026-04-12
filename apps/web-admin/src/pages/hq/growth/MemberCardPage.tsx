@@ -3,7 +3,7 @@
  * 深色主题，与 EventBusHealthPage 风格一致
  */
 import { useEffect, useState, useCallback } from 'react';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 // ─── 类型定义 ───
 
@@ -121,12 +121,12 @@ function RechargeModal({ card, plans, onClose, onSuccess }: RechargeModalProps) 
     setError('');
     try {
       if (selectedPlanId) {
-        await txFetch('/api/v1/member/stored-value/recharge-by-plan', {
+        await txFetchData('/api/v1/member/stored-value/recharge-by-plan', {
           method: 'POST',
           body: JSON.stringify({ card_id: card.id, plan_id: selectedPlanId }),
         });
       } else {
-        await txFetch(`/api/v1/member/stored-value/accounts/${card.id}/recharge`, {
+        await txFetchData(`/api/v1/member/stored-value/accounts/${card.id}/recharge`, {
           method: 'POST',
           body: JSON.stringify({ amount_fen: customAmountFen }),
         });
@@ -291,7 +291,7 @@ function StoredValueTab({ cards, plans, loading, onRefresh }: StoredValueTabProp
     setDetailCard(card);
     setTxLoading(true);
     try {
-      const result = await txFetch<{ items: StoredValueTransaction[] }>(
+      const result = await txFetchData<{ items: StoredValueTransaction[] }>(
         `/api/v1/member/stored-value/transactions/${card.id}?page=1&size=20`
       );
       setTransactions(result.items || []);
@@ -627,7 +627,7 @@ export function MemberCardPage() {
     setSvLoading(true);
     try {
       const [plansRes] = await Promise.all([
-        txFetch<RechargePlan[]>('/api/v1/member/stored-value/plans'),
+        txFetchData<RechargePlan[]>('/api/v1/member/stored-value/plans'),
       ]);
       setPlans(Array.isArray(plansRes) ? plansRes : []);
       // 注：储值卡列表目前无全量列表端点，使用空数组占位
@@ -646,7 +646,7 @@ export function MemberCardPage() {
       // 积分流水：暂用 settlement 端点获取本月汇总
       const now = new Date();
       const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-      const settlement = await txFetch<{
+      const settlement = await txFetchData<{
         store_settlements: { card_id: string; points_earned: number; points_spent: number }[];
         total_points_earned: number;
         total_points_spent: number;

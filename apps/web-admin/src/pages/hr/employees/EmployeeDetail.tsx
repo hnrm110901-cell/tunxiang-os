@@ -26,7 +26,7 @@ import {
 import { EditOutlined, UserOutlined } from '@ant-design/icons';
 import { ProColumns, ProTable, StatisticCard } from '@ant-design/pro-components';
 import { Line } from '@ant-design/charts';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 const { Title, Text } = Typography;
 
@@ -147,8 +147,8 @@ export default function EmployeeDetail() {
     if (!employeeId) return;
     setLoading(true);
     Promise.all([
-      txFetch<EmployeeBasic>(`/api/v1/employees/${employeeId}`),
-      txFetch<ProfileTabs>(`/api/v1/employees/${employeeId}/profile-tabs`),
+      txFetchData<EmployeeBasic>(`/api/v1/employees/${employeeId}`),
+      txFetchData<ProfileTabs>(`/api/v1/employees/${employeeId}/profile-tabs`),
     ])
       .then(([bResp, tResp]) => {
         setBasic(bResp.data);

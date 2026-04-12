@@ -12,7 +12,7 @@ import {
 } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, SettingOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 const { Title, Text } = Typography;
 
@@ -215,7 +215,7 @@ export function ApprovalTemplatePage() {
   const loadTemplates = useCallback(async (p = 1) => {
     setLoading(true);
     try {
-      const res = await txFetch<TemplateListResponse>(
+      const res = await txFetchData<TemplateListResponse>(
         `/api/v1/ops/approval-templates?page=${p}&size=20`,
       );
       setTemplates(res.data?.items ?? []);
@@ -262,13 +262,13 @@ export function ApprovalTemplatePage() {
     try {
       const payload = { ...values, steps };
       if (editTarget) {
-        await txFetch(`/api/v1/ops/approval-templates/${editTarget.id}`, {
+        await txFetchData(`/api/v1/ops/approval-templates/${editTarget.id}`, {
           method: 'PATCH',
           body: JSON.stringify(payload),
         });
         message.success('模板已更新');
       } else {
-        await txFetch('/api/v1/ops/approval-templates', {
+        await txFetchData('/api/v1/ops/approval-templates', {
           method: 'POST',
           body: JSON.stringify(payload),
         });
@@ -284,7 +284,7 @@ export function ApprovalTemplatePage() {
   // ── 切换启用状态 ──
   const handleToggle = async (template: ApprovalTemplate, enabled: boolean) => {
     try {
-      await txFetch(`/api/v1/ops/approval-templates/${template.id}`, {
+      await txFetchData(`/api/v1/ops/approval-templates/${template.id}`, {
         method: 'PATCH',
         body: JSON.stringify({ is_enabled: enabled }),
       });
@@ -298,7 +298,7 @@ export function ApprovalTemplatePage() {
   // ── 删除 ──
   const handleDelete = async (templateId: string) => {
     try {
-      await txFetch(`/api/v1/ops/approval-templates/${templateId}`, {
+      await txFetchData(`/api/v1/ops/approval-templates/${templateId}`, {
         method: 'DELETE',
       });
       message.success('已删除');

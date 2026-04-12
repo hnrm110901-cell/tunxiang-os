@@ -3,7 +3,7 @@
  * 接入真实API：E1-E8节点状态 + 今日营收目标 vs 实际 + 待审批/异常数
  */
 import { useState, useEffect, useCallback } from 'react';
-import { txFetch } from '../api';
+import { txFetchData } from '../api';
 
 // ---- 颜色常量 ----
 const BG_0 = '#0d1e28';
@@ -460,7 +460,7 @@ export function DailyPlanPage() {
     setNodeLoading(true);
     setNodeError(null);
     try {
-      const data = await txFetch<DailyReviewStatus>(
+      const data = await txFetchData<DailyReviewStatus>(
         `/api/v1/ops/daily-review/status?date=${encodeURIComponent(date)}`,
       );
       setNodeData(data);
@@ -476,7 +476,7 @@ export function DailyPlanPage() {
     setProfitLoading(true);
     setProfitError(null);
     try {
-      const data = await txFetch<DailyProfitData>(
+      const data = await txFetchData<DailyProfitData>(
         `/api/v1/finance/daily-profit?date=${encodeURIComponent(date)}`,
       );
       setProfitData(data);
@@ -492,7 +492,7 @@ export function DailyPlanPage() {
     setApprovalLoading(true);
     setApprovalError(null);
     try {
-      const data = await txFetch<ApprovalCount>(
+      const data = await txFetchData<ApprovalCount>(
         `/api/v1/ops/approvals/count?date=${encodeURIComponent(date)}&status=pending`,
       );
       setApprovalCount(data.pending_count ?? 0);
@@ -509,7 +509,7 @@ export function DailyPlanPage() {
     setAnomalyLoading(true);
     setAnomalyError(null);
     try {
-      const data = await txFetch<AnomalyCount>(
+      const data = await txFetchData<AnomalyCount>(
         `/api/v1/ops/anomalies/count?date=${encodeURIComponent(date)}&status=open`,
       );
       setAnomalyCount(data.anomaly_count ?? 0);

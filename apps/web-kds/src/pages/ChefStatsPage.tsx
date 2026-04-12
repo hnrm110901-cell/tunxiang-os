@@ -29,7 +29,6 @@ type Period = 'today' | 'week' | 'month';
 // ─── Constants ───
 
 const API_BASE = (window as any).__STORE_API_BASE__ || '';
-const TENANT_ID = (window as any).__TENANT_ID__ || '';
 const STORE_ID = (window as any).__STORE_ID__ || '';
 
 const PERIOD_LABELS: Record<Period, string> = {
@@ -93,15 +92,12 @@ export function ChefStatsPage() {
       return;
     }
     try {
-      const res = await txFetch(
+      const data = await txFetch<{ items: ChefStat[] }>(
         `${API_BASE}/api/v1/kds/chef-stats/leaderboard?store_id=${STORE_ID}&period=${p}`,
         undefined,
-        TENANT_ID,
       );
-      if (res.ok) {
-        setStats(res.data.items as ChefStat[]);
-        setError(null);
-      }
+      setStats(data.items);
+      setError(null);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : '加载失败');
     } finally {

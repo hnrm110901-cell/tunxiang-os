@@ -15,7 +15,7 @@ import {
   ProFormTextArea,
   ProTable,
 } from '@ant-design/pro-components';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 // ─── 类型 ────────────────────────────────────────────────────────────────────
 
@@ -81,7 +81,7 @@ export default function ComplianceTasks() {
           {r.status === 'open' && (
             <a
               onClick={async () => {
-                await txFetch(`/api/v1/compliance/alerts/${r.id}/acknowledge`, { method: 'POST' });
+                await txFetchData(`/api/v1/compliance/alerts/${r.id}/acknowledge`, { method: 'POST' });
                 message.success('已标记为处理中');
                 actionRef.current?.reload();
               }}
@@ -118,7 +118,7 @@ export default function ComplianceTasks() {
           if (params.pageSize) query.set('size', String(params.pageSize));
           query.append('status', 'open');
           query.append('status', 'acknowledged');
-          const resp = await txFetch<{ items: TaskItem[]; total: number }>(
+          const resp = await txFetchData<{ items: TaskItem[]; total: number }>(
             `/api/v1/compliance/alerts?${query.toString()}`,
           );
           const d = resp.data;
@@ -132,7 +132,7 @@ export default function ComplianceTasks() {
         onOpenChange={setModalVisible}
         onFinish={async (values) => {
           if (!resolveId) return false;
-          await txFetch(`/api/v1/compliance/alerts/${resolveId}/resolve`, {
+          await txFetchData(`/api/v1/compliance/alerts/${resolveId}/resolve`, {
             method: 'POST',
             body: JSON.stringify(values),
           });

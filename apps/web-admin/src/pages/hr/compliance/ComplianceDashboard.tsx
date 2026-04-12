@@ -15,7 +15,7 @@ import {
   ExclamationCircleOutlined,
   WarningOutlined,
 } from '@ant-design/icons';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 // ─── 类型 ────────────────────────────────────────────────────────────────────
 
@@ -47,7 +47,7 @@ export default function ComplianceDashboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    txFetch<DashboardData>('/api/v1/compliance/dashboard')
+    txFetchData<DashboardData>('/api/v1/compliance/dashboard')
       .then((resp) => setData(resp.data))
       .catch(() => message.error('加载合规总览失败'))
       .finally(() => setLoading(false));

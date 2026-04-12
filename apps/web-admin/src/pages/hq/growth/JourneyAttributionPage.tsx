@@ -14,7 +14,7 @@ import * as echarts from 'echarts/core';
 import { BarChart, PieChart } from 'echarts/charts';
 import { GridComponent, TooltipComponent, LegendComponent } from 'echarts/components';
 import { CanvasRenderer } from 'echarts/renderers';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 import { useApi } from '../../../hooks/useApi';
 import type { TouchExecution, MechanismAttribution, RepairEffectiveness, JourneyTemplateAttribution, JourneyEnrollmentDetail, StoreAttribution } from '../../../api/growthHubApi';
 
@@ -131,7 +131,7 @@ export function JourneyAttributionPage() {
       const params: Record<string, string> = { page: '1', size: '200' };
       if (filterType) params.journey_type = filterType;
       const qs = new URLSearchParams(params).toString();
-      const resp = await txFetch<{ items: TouchExecution[]; total: number }>(
+      const resp = await txFetchData<{ items: TouchExecution[]; total: number }>(
         `/api/v1/growth/touch-executions?${qs}`
       );
       if (resp.data) setExecutions(resp.data.items);
@@ -150,7 +150,7 @@ export function JourneyAttributionPage() {
     setDrawerOpen(true);
     setDrawerLoading(true);
     try {
-      const resp = await txFetch<{ items: JourneyEnrollmentDetail[]; total: number }>(
+      const resp = await txFetchData<{ items: JourneyEnrollmentDetail[]; total: number }>(
         `/api/v1/growth/journey-enrollments?journey_template_id=${templateId}&size=20`
       );
       if (resp.data) setDrawerData(resp.data.items);

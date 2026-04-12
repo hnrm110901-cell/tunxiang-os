@@ -48,7 +48,7 @@ import {
 } from '@ant-design/pro-components';
 import dayjs, { Dayjs } from 'dayjs';
 import isoWeek from 'dayjs/plugin/isoWeek';
-import { txFetch } from '../../api';
+import { txFetchData } from '../../api';
 
 dayjs.extend(isoWeek);
 
@@ -124,7 +124,7 @@ function TodayBoard({ storeId }: { storeId: string }) {
     setLoading(true);
     setError(null);
     try {
-      const data = await txFetch<TodayStats>(
+      const data = await txFetchData<TodayStats>(
         `/api/v1/attendance/today?store_id=${storeId}`,
       );
       setStats(data);
@@ -211,7 +211,7 @@ function EmployeeSummaryCard({
 
   useEffect(() => {
     if (!employeeId) { setSummary(null); return; }
-    txFetch<EmployeeSummary>(
+    txFetchData<EmployeeSummary>(
       `/api/v1/attendance/employee-summary?employee_id=${employeeId}&year=${year}&month=${month}`,
     )
       .then(setSummary)
@@ -266,7 +266,7 @@ function WeekScheduleView({ storeId }: { storeId: string }) {
     setLoading(true);
     setError(null);
     try {
-      const data = await txFetch<{ items: WeekSchedule[] }>(
+      const data = await txFetchData<{ items: WeekSchedule[] }>(
         `/api/v1/schedules/week?store_id=${storeId}&week_start=${weekStart.format('YYYY-MM-DD')}`,
       );
       setSchedules(data.items ?? []);
@@ -312,7 +312,7 @@ function WeekScheduleView({ storeId }: { storeId: string }) {
           }
           onFinish={async (values) => {
             try {
-              await txFetch('/api/v1/schedules', {
+              await txFetchData('/api/v1/schedules', {
                 method: 'POST',
                 body: JSON.stringify({
                   store_id: storeId,
@@ -573,7 +573,7 @@ export function AttendancePage() {
                         ...(params.employee_name ? { employee_name: params.employee_name } : {}),
                         ...(params.status ? { status: params.status } : {}),
                       });
-                      const data = await txFetch<AttendanceListResp>(
+                      const data = await txFetchData<AttendanceListResp>(
                         `/api/v1/attendance/records?${qs}`,
                       );
                       return { data: data.items, total: data.total, success: true };
@@ -610,7 +610,7 @@ export function AttendancePage() {
         onFinish={async (values) => {
           if (!adjustRecord) return false;
           try {
-            await txFetch(`/api/v1/attendance/records/${adjustRecord.id}/adjust`, {
+            await txFetchData(`/api/v1/attendance/records/${adjustRecord.id}/adjust`, {
               method: 'POST',
               body: JSON.stringify({
                 clock_in: values.clock_in,

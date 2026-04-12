@@ -2,7 +2,7 @@
  * 小票模板 API — /api/v1/receipt-templates/*
  * 小票模板的增删改查、预览、复制、设为默认
  */
-import { txFetch } from './index';
+import { txFetchData } from './index';
 
 // ─── 类型定义 ───
 
@@ -91,71 +91,69 @@ export const receiptTemplateApi = {
   list: (storeId: string, printType?: string): Promise<{ items: ReceiptTemplate[]; total: number }> => {
     const params = new URLSearchParams({ store_id: storeId });
     if (printType) params.set('print_type', printType);
-    return txFetch(`/api/v1/receipt-templates?${params.toString()}`);
+    return txFetchData<{ items: ReceiptTemplate[]; total: number }>(`/api/v1/receipt-templates?${params.toString()}`);
   },
 
   /** 获取单个模板 */
   get: (id: string): Promise<ReceiptTemplate> =>
-    txFetch(`/api/v1/receipt-templates/${encodeURIComponent(id)}`),
+    txFetchData<ReceiptTemplate>(`/api/v1/receipt-templates/${encodeURIComponent(id)}`),
 
   /** 创建模板 */
   create: (data: CreateTemplateReq): Promise<ReceiptTemplate> =>
-    txFetch('/api/v1/receipt-templates', {
+    txFetchData<ReceiptTemplate>('/api/v1/receipt-templates', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
 
   /** 更新模板 */
   update: (id: string, data: UpdateTemplateReq): Promise<ReceiptTemplate> =>
-    txFetch(`/api/v1/receipt-templates/${encodeURIComponent(id)}`, {
+    txFetchData<ReceiptTemplate>(`/api/v1/receipt-templates/${encodeURIComponent(id)}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     }),
 
   /** 删除模板 */
   delete: (id: string): Promise<void> =>
-    txFetch(`/api/v1/receipt-templates/${encodeURIComponent(id)}`, {
+    txFetchData<void>(`/api/v1/receipt-templates/${encodeURIComponent(id)}`, {
       method: 'DELETE',
     }),
 
   /** 设为默认 */
   setDefault: (id: string): Promise<void> =>
-    txFetch(`/api/v1/receipt-templates/${encodeURIComponent(id)}/set-default`, {
+    txFetchData<void>(`/api/v1/receipt-templates/${encodeURIComponent(id)}/set-default`, {
       method: 'POST',
     }),
 
   /** 预览（传入config返回渲染结果） */
   preview: (config: TemplateConfig): Promise<{ html: string }> =>
-    txFetch('/api/v1/receipt-templates/preview', {
+    txFetchData<{ html: string }>('/api/v1/receipt-templates/preview', {
       method: 'POST',
       body: JSON.stringify({ config, context: 'sample' }),
     }),
 
   /** 复制模板 */
   duplicate: (id: string): Promise<ReceiptTemplate> =>
-    txFetch(`/api/v1/receipt-templates/${encodeURIComponent(id)}/duplicate`, {
+    txFetchData<ReceiptTemplate>(`/api/v1/receipt-templates/${encodeURIComponent(id)}/duplicate`, {
       method: 'POST',
     }),
 
   /** 获取元素目录 */
   getElementCatalog: (): Promise<{ items: ElementCatalogItem[] }> =>
-    txFetch('/api/v1/receipt-templates/elements/catalog'),
+    txFetchData<{ items: ElementCatalogItem[] }>('/api/v1/receipt-templates/elements/catalog'),
 
   /** 获取预置模板列表 */
-  getPresets: async (): Promise<Array<{
+  getPresets: (): Promise<Array<{
     key: string;
     name: string;
     description: string;
     thumbnail_style: string;
     config: TemplateConfig;
-  }>> => {
-    const res = await txFetch('/api/v1/receipt-templates/presets') as { data: Array<{
+  }>> =>
+    txFetchData<Array<{
       key: string;
       name: string;
       description: string;
       thumbnail_style: string;
       config: TemplateConfig;
-    }> };
-    return res.data;
-  },
+    }>>('/api/v1/receipt-templates/presets'),
 };

@@ -40,7 +40,7 @@ import {
   Typography,
 } from 'antd';
 import { ExclamationCircleOutlined, PlusOutlined } from '@ant-design/icons';
-import { txFetch } from '../../api/client';
+import { txFetchData } from '../../api/client';
 import dayjs from 'dayjs';
 
 const { Text } = Typography;
@@ -173,7 +173,7 @@ export default function DRIWorkOrderCenterPage() {
   const loadStats = async () => {
     setStatsLoading(true);
     try {
-      const resp = await txFetch<Statistics>('/api/v1/dri-workorders/statistics');
+      const resp = await txFetchData<Statistics>('/api/v1/dri-workorders/statistics');
       setStats(resp.data);
     } catch (err) {
       // 统计加载失败不阻塞页面
@@ -191,7 +191,7 @@ export default function DRIWorkOrderCenterPage() {
   const loadDetail = async (id: string) => {
     setDetailLoading(true);
     try {
-      const resp = await txFetch<DRIWorkOrder>(`/api/v1/dri-workorders/${id}`);
+      const resp = await txFetchData<DRIWorkOrder>(`/api/v1/dri-workorders/${id}`);
       setCurrentOrder(resp.data);
       setDrawerVisible(true);
     } catch (err) {
@@ -205,7 +205,7 @@ export default function DRIWorkOrderCenterPage() {
   // ━━━━ 创建工单 ━━━━
   const handleCreate = async (values: Record<string, unknown>) => {
     try {
-      await txFetch('/api/v1/dri-workorders', {
+      await txFetchData('/api/v1/dri-workorders', {
         method: 'POST',
         body: JSON.stringify(values),
       });
@@ -224,7 +224,7 @@ export default function DRIWorkOrderCenterPage() {
   // ━━━━ 删除工单（仅草稿） ━━━━
   const handleDelete = async (id: string) => {
     try {
-      await txFetch(`/api/v1/dri-workorders/${id}`, { method: 'DELETE' });
+      await txFetchData(`/api/v1/dri-workorders/${id}`, { method: 'DELETE' });
       message.success('工单已删除');
       actionRef.current?.reload();
       loadStats();
@@ -269,7 +269,7 @@ export default function DRIWorkOrderCenterPage() {
     if (!currentOrder) return;
     try {
       const body: Record<string, string> = { target_status: targetStatus, ...extraBody };
-      const resp = await txFetch<DRIWorkOrder>(`/api/v1/dri-workorders/${currentOrder.id}/transition`, {
+      const resp = await txFetchData<DRIWorkOrder>(`/api/v1/dri-workorders/${currentOrder.id}/transition`, {
         method: 'PUT',
         body: JSON.stringify(body),
       });
@@ -301,7 +301,7 @@ export default function DRIWorkOrderCenterPage() {
       return;
     }
     try {
-      const resp = await txFetch<DRIWorkOrder>(`/api/v1/dri-workorders/${currentOrder.id}/actions`, {
+      const resp = await txFetchData<DRIWorkOrder>(`/api/v1/dri-workorders/${currentOrder.id}/actions`, {
         method: 'POST',
         body: JSON.stringify(newAction),
       });
@@ -319,7 +319,7 @@ export default function DRIWorkOrderCenterPage() {
   const handleCompleteAction = async (index: number) => {
     if (!currentOrder) return;
     try {
-      const resp = await txFetch<DRIWorkOrder>(
+      const resp = await txFetchData<DRIWorkOrder>(
         `/api/v1/dri-workorders/${currentOrder.id}/actions/${index}/complete`,
         { method: 'PUT' },
       );
@@ -575,7 +575,7 @@ export default function DRIWorkOrderCenterPage() {
           query.set('size', String(params.pageSize ?? 20));
 
           try {
-            const resp = await txFetch<PagedResult>(
+            const resp = await txFetchData<PagedResult>(
               `/api/v1/dri-workorders?${query.toString()}`,
             );
             return {
@@ -623,7 +623,7 @@ export default function DRIWorkOrderCenterPage() {
           rules={[{ required: true, message: '请选择门店' }]}
           request={async () => {
             try {
-              const resp = await txFetch<{ id: string; name: string }[]>('/api/v1/stores?size=200');
+              const resp = await txFetchData<{ id: string; name: string }[]>('/api/v1/stores?size=200');
               const items = (resp.data as unknown as { items?: { id: string; name: string }[] })?.items ?? resp.data ?? [];
               return (Array.isArray(items) ? items : []).map((s) => ({
                 label: s.name,
@@ -641,7 +641,7 @@ export default function DRIWorkOrderCenterPage() {
           label="DRI负责人"
           request={async () => {
             try {
-              const resp = await txFetch<{ id: string; name: string }[]>('/api/v1/employees?size=200');
+              const resp = await txFetchData<{ id: string; name: string }[]>('/api/v1/employees?size=200');
               const items = (resp.data as unknown as { items?: { id: string; name: string }[] })?.items ?? resp.data ?? [];
               return (Array.isArray(items) ? items : []).map((e) => ({
                 label: e.name,

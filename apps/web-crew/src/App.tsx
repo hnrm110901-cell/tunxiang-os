@@ -1,7 +1,10 @@
 /**
  * 服务员端 PWA — 手机点餐/加菜/催菜/桌台状态
  */
+import { useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
+import { getStoreToken } from './api/index';
+import { CrewLoginPage } from './pages/CrewLoginPage';
 import { TablesView } from './pages/TablesView';
 import { QuickOrderView } from './pages/QuickOrderView';
 import { ActiveOrdersView } from './pages/ActiveOrdersView';
@@ -130,6 +133,12 @@ function BottomTab() {
 }
 
 export default function App() {
+  const [isLoggedIn, setIsLoggedIn] = useState(() => !!getStoreToken());
+
+  if (!isLoggedIn) {
+    return <CrewLoginPage onLogin={() => setIsLoggedIn(true)} />;
+  }
+
   return (
     <BrowserRouter>
       <div style={{ background: '#0B1A20', minHeight: '100vh', color: '#fff', paddingBottom: 64 }}>

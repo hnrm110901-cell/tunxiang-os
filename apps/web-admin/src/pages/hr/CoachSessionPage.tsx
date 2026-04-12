@@ -42,7 +42,7 @@ import {
   Timeline,
 } from 'antd';
 import { PlusOutlined, CheckCircleOutlined, ClockCircleOutlined } from '@ant-design/icons';
-import { txFetch } from '../../api/client';
+import { txFetchData } from '../../api/client';
 import dayjs from 'dayjs';
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -172,7 +172,7 @@ export default function CoachSessionPage() {
   const loadDashboard = async () => {
     setDashLoading(true);
     try {
-      const resp = await txFetch<DashboardData>('/api/v1/coach-sessions/dashboard');
+      const resp = await txFetchData<DashboardData>('/api/v1/coach-sessions/dashboard');
       setDashboard(resp.data);
     } catch (err) {
       console.error('Failed to load dashboard', err);
@@ -185,7 +185,7 @@ export default function CoachSessionPage() {
   const loadEffectiveness = async () => {
     setEffLoading(true);
     try {
-      const resp = await txFetch<EffectivenessData>('/api/v1/coach-sessions/effectiveness');
+      const resp = await txFetchData<EffectivenessData>('/api/v1/coach-sessions/effectiveness');
       setEffectiveness(resp.data?.items ?? []);
     } catch (err) {
       console.error('Failed to load effectiveness', err);
@@ -202,7 +202,7 @@ export default function CoachSessionPage() {
   // ━━━━ 创建教练会话 ━━━━
   const handleCreate = async (values: Record<string, unknown>) => {
     try {
-      await txFetch('/api/v1/coach-sessions', {
+      await txFetchData('/api/v1/coach-sessions', {
         method: 'POST',
         body: JSON.stringify({
           ...values,
@@ -226,7 +226,7 @@ export default function CoachSessionPage() {
   // ━━━━ 删除教练会话 ━━━━
   const handleDelete = async (id: string) => {
     try {
-      await txFetch(`/api/v1/coach-sessions/${id}`, { method: 'DELETE' });
+      await txFetchData(`/api/v1/coach-sessions/${id}`, { method: 'DELETE' });
       message.success('已删除');
       actionRef.current?.reload();
       loadDashboard();
@@ -241,7 +241,7 @@ export default function CoachSessionPage() {
     setDrawerVisible(true);
     setDetailLoading(true);
     try {
-      const resp = await txFetch<CoachSession>(`/api/v1/coach-sessions/${record.id}`);
+      const resp = await txFetchData<CoachSession>(`/api/v1/coach-sessions/${record.id}`);
       setCurrentSession(resp.data);
     } catch (err) {
       message.error('加载详情失败');
@@ -254,10 +254,10 @@ export default function CoachSessionPage() {
   // ━━━━ 采纳建议 ━━━━
   const handleAcceptSuggestion = async (sessionId: string, idx: number) => {
     try {
-      await txFetch(`/api/v1/coach-sessions/${sessionId}/accept/${idx}`, { method: 'PUT' });
+      await txFetchData(`/api/v1/coach-sessions/${sessionId}/accept/${idx}`, { method: 'PUT' });
       message.success('已采纳');
       // 刷新详情
-      const resp = await txFetch<CoachSession>(`/api/v1/coach-sessions/${sessionId}`);
+      const resp = await txFetchData<CoachSession>(`/api/v1/coach-sessions/${sessionId}`);
       setCurrentSession(resp.data);
       actionRef.current?.reload();
       loadDashboard();
@@ -270,13 +270,13 @@ export default function CoachSessionPage() {
   const handleAddAction = async (sessionId: string) => {
     if (!newAction.trim()) return;
     try {
-      await txFetch(`/api/v1/coach-sessions/${sessionId}/actions`, {
+      await txFetchData(`/api/v1/coach-sessions/${sessionId}/actions`, {
         method: 'POST',
         body: JSON.stringify({ action: newAction.trim() }),
       });
       message.success('行动已追加');
       setNewAction('');
-      const resp = await txFetch<CoachSession>(`/api/v1/coach-sessions/${sessionId}`);
+      const resp = await txFetchData<CoachSession>(`/api/v1/coach-sessions/${sessionId}`);
       setCurrentSession(resp.data);
       actionRef.current?.reload();
     } catch (err) {
@@ -292,14 +292,14 @@ export default function CoachSessionPage() {
       return;
     }
     try {
-      await txFetch(`/api/v1/coach-sessions/${sessionId}/actions/${actionIdx}/complete`, {
+      await txFetchData(`/api/v1/coach-sessions/${sessionId}/actions/${actionIdx}/complete`, {
         method: 'PUT',
         body: JSON.stringify({ result: completeResult.trim() }),
       });
       message.success('行动已完成');
       setCompleteActionModal({ visible: false, sessionId: '', actionIdx: -1 });
       setCompleteResult('');
-      const resp = await txFetch<CoachSession>(`/api/v1/coach-sessions/${sessionId}`);
+      const resp = await txFetchData<CoachSession>(`/api/v1/coach-sessions/${sessionId}`);
       setCurrentSession(resp.data);
       actionRef.current?.reload();
     } catch (err) {
@@ -315,14 +315,14 @@ export default function CoachSessionPage() {
       return;
     }
     try {
-      await txFetch(`/api/v1/coach-sessions/${sessionId}`, {
+      await txFetchData(`/api/v1/coach-sessions/${sessionId}`, {
         method: 'PUT',
         body: JSON.stringify({ readiness_after: readinessAfter }),
       });
       message.success('就绪度已更新');
       setReadinessModal({ visible: false, sessionId: '' });
       setReadinessAfter(null);
-      const resp = await txFetch<CoachSession>(`/api/v1/coach-sessions/${sessionId}`);
+      const resp = await txFetchData<CoachSession>(`/api/v1/coach-sessions/${sessionId}`);
       setCurrentSession(resp.data);
       actionRef.current?.reload();
       loadDashboard();
@@ -531,7 +531,7 @@ export default function CoachSessionPage() {
           if (store_id) query.set('store_id', store_id);
           if (manager_id) query.set('manager_id', manager_id);
           if (session_type) query.set('session_type', session_type);
-          const resp = await txFetch<{ items: CoachSession[]; total: number }>(
+          const resp = await txFetchData<{ items: CoachSession[]; total: number }>(
             `/api/v1/coach-sessions?${query.toString()}`
           );
           return {

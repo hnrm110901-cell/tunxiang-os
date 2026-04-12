@@ -42,7 +42,7 @@ import {
   SafetyCertificateOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import { txFetch } from '../../api/client';
+import { txFetchData } from '../../api/client';
 
 // ─── 类型 ────────────────────────────────────────────────────────────────────
 
@@ -136,7 +136,7 @@ export default function CertificationPage() {
   const loadDashboard = useCallback(async () => {
     setDashLoading(true);
     try {
-      const resp = await txFetch<DashboardData>('/api/v1/certifications/dashboard');
+      const resp = await txFetchData<DashboardData>('/api/v1/certifications/dashboard');
       setDash(resp.data);
     } catch {
       message.error('加载认证总览失败');
@@ -147,7 +147,7 @@ export default function CertificationPage() {
 
   const loadExpiring = useCallback(async () => {
     try {
-      const resp = await txFetch<{ items: Certification[]; total: number }>(
+      const resp = await txFetchData<{ items: Certification[]; total: number }>(
         '/api/v1/certifications/expiring',
       );
       setExpiring(resp.data?.items ?? []);
@@ -167,7 +167,7 @@ export default function CertificationPage() {
     setDrawerOpen(true);
     setDetailLoading(true);
     try {
-      const resp = await txFetch<Certification>(`/api/v1/certifications/${id}`);
+      const resp = await txFetchData<Certification>(`/api/v1/certifications/${id}`);
       setDetail(resp.data);
     } catch {
       message.error('加载认证详情失败');
@@ -179,7 +179,7 @@ export default function CertificationPage() {
   const refreshDetail = async () => {
     if (!detail) return;
     try {
-      const resp = await txFetch<Certification>(`/api/v1/certifications/${detail.id}`);
+      const resp = await txFetchData<Certification>(`/api/v1/certifications/${detail.id}`);
       setDetail(resp.data);
     } catch {
       message.error('刷新详情失败');
@@ -195,7 +195,7 @@ export default function CertificationPage() {
     }
     setScoreSubmitting(true);
     try {
-      await txFetch(`/api/v1/certifications/${scoreModal.certId}/exam/${scoreModal.idx}`, {
+      await txFetchData(`/api/v1/certifications/${scoreModal.certId}/exam/${scoreModal.idx}`, {
         method: 'PUT',
         body: JSON.stringify({
           score: scoreValue,
@@ -219,7 +219,7 @@ export default function CertificationPage() {
 
   const handleFinalize = async (id: string) => {
     try {
-      await txFetch(`/api/v1/certifications/${id}/finalize`, { method: 'PUT' });
+      await txFetchData(`/api/v1/certifications/${id}/finalize`, { method: 'PUT' });
       message.success('评定完成');
       await refreshDetail();
       tableRef.current?.reload();
@@ -234,7 +234,7 @@ export default function CertificationPage() {
 
   const handleRetake = async (id: string) => {
     try {
-      await txFetch(`/api/v1/certifications/${id}/retake`, { method: 'PUT' });
+      await txFetchData(`/api/v1/certifications/${id}/retake`, { method: 'PUT' });
       message.success('已发起补考，考核项已重置');
       await refreshDetail();
       tableRef.current?.reload();
@@ -248,7 +248,7 @@ export default function CertificationPage() {
 
   const handleDelete = async (id: string) => {
     try {
-      await txFetch(`/api/v1/certifications/${id}`, { method: 'DELETE' });
+      await txFetchData(`/api/v1/certifications/${id}`, { method: 'DELETE' });
       message.success('已删除');
       tableRef.current?.reload();
       loadDashboard();
@@ -549,7 +549,7 @@ export default function CertificationPage() {
           if (employee_id)
             filters += `&employee_id=${encodeURIComponent(employee_id)}`;
           try {
-            const resp = await txFetch<{ items: Certification[]; total: number }>(
+            const resp = await txFetchData<{ items: Certification[]; total: number }>(
               `/api/v1/certifications?page=${current}&size=${pageSize}${filters}`,
             );
             return {
@@ -579,7 +579,7 @@ export default function CertificationPage() {
             modalProps={{ destroyOnClose: true }}
             onFinish={async (values) => {
               try {
-                await txFetch('/api/v1/certifications', {
+                await txFetchData('/api/v1/certifications', {
                   method: 'POST',
                   body: JSON.stringify(values),
                 });

@@ -3,7 +3,7 @@
  * 选择源门店和目标门店，勾选克隆项，一键复制配置
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 // ─── 类型定义 ───────────────────────────────────────────────────────────────
 
@@ -256,7 +256,7 @@ export function StoreClonePage() {
 
   // ── 加载门店列表 ──
   useEffect(() => {
-    txFetch<{ items: StoreOption[] }>('/api/v1/stores').then((res) => {
+    txFetchData<{ items: StoreOption[] }>('/api/v1/stores').then((res) => {
       setStores(res.items ?? []);
     }).catch(() => {
       // 降级：如果接口不存在则保持空列表，不崩溃
@@ -267,7 +267,7 @@ export function StoreClonePage() {
   const loadHistory = useCallback(async () => {
     setHistoryLoading(true);
     try {
-      const res = await txFetch<{ items: CloneHistoryItem[] }>('/api/v1/store-clone/history');
+      const res = await txFetchData<{ items: CloneHistoryItem[] }>('/api/v1/store-clone/history');
       setHistory((res.items ?? []).slice(0, 20));
     } catch {
       // 静默失败
@@ -283,7 +283,7 @@ export function StoreClonePage() {
     if (pollTimerRef.current) clearInterval(pollTimerRef.current);
     pollTimerRef.current = setInterval(async () => {
       try {
-        const data = await txFetch<CloneProgressData>(`/api/v1/store-clone/${taskId}/progress`);
+        const data = await txFetchData<CloneProgressData>(`/api/v1/store-clone/${taskId}/progress`);
         setProgress(data);
         const isTerminal = ['completed', 'failed', 'partial'].includes(data.status);
         if (isTerminal) {
@@ -331,7 +331,7 @@ export function StoreClonePage() {
     setProgress(null);
 
     try {
-      const res = await txFetch<{ task_id: string; message: string }>('/api/v1/store-clone', {
+      const res = await txFetchData<{ task_id: string; message: string }>('/api/v1/store-clone', {
         method: 'POST',
         body: JSON.stringify({
           source_store_id: sourceId,

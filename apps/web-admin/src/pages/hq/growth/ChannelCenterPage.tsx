@@ -5,7 +5,7 @@
  * 数据来源: /api/v1/finance/analytics/revenue-composition
  */
 import { useState, useEffect } from 'react';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 // ─── 主题常量 ───
 const BG = '#0d1e28';
@@ -349,8 +349,8 @@ export function ChannelCenterPage() {
 
       try {
         const [revResp, trendResp] = await Promise.allSettled([
-          txFetch<{ items: RevenueChannel[] }>('/api/v1/finance/analytics/revenue-composition?period=month'),
-          txFetch<{ items: FinanceTrend[] }>('/api/v1/finance/analytics/trend?period=month&days=30'),
+          txFetchData<{ items: RevenueChannel[] }>('/api/v1/finance/analytics/revenue-composition?period=month'),
+          txFetchData<{ items: FinanceTrend[] }>('/api/v1/finance/analytics/trend?period=month&days=30'),
         ]);
 
         if (!cancelled) {

@@ -4,7 +4,7 @@
  *      POST /api/v1/ops/reviews/{id}/submit  { score, notes }
  */
 import { useState, useEffect, useCallback } from 'react';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 type ReviewPeriod = 'day' | 'week' | 'month';
 type HealthLevel = 'green' | 'yellow' | 'red';
@@ -60,7 +60,7 @@ export function ReviewCenterPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await txFetch<ReviewData>(
+      const res = await txFetchData<ReviewData>(
         `/api/v1/ops/reviews?status=${period}`
       );
       setData(res ?? EMPTY_DATA);

@@ -4,7 +4,7 @@
  * 接入真实 API: GET/POST /api/v1/stamp-cards/templates
  */
 import { useState, useEffect, useCallback } from 'react';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 // ── 设计 Token ──────────────────────────────────────────────────
 const BG_1   = '#0d1e28';
@@ -102,7 +102,7 @@ export function StampCardPage() {
     setLoading(true);
     setApiError(null);
     try {
-      const data = await txFetch<StampTemplate[] | { items: StampTemplate[] }>(
+      const data = await txFetchData<StampTemplate[] | { items: StampTemplate[] }>(
         '/api/v1/stamp-cards/templates'
       );
       const list = Array.isArray(data) ? data : (data as { items: StampTemplate[] }).items ?? [];
@@ -439,7 +439,7 @@ function CreateModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
     setError(null);
     try {
       const minOrderFen = Math.round(parseFloat(form.min_order_fen_yuan || '0') * 100);
-      await txFetch('/api/v1/stamp-cards/templates', {
+      await txFetchData('/api/v1/stamp-cards/templates', {
         method: 'POST',
         body: JSON.stringify({
           name: form.name.trim(),

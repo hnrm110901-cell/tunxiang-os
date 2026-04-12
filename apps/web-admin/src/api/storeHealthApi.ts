@@ -1,7 +1,7 @@
 /**
  * 门店健康 API — /api/v1/store-health/*
  */
-import { txFetch } from './index';
+import { txFetchData } from './index';
 
 // ─── 类型 ───
 
@@ -41,10 +41,10 @@ export interface StoreHealthOverview {
 
 /** 获取所有门店健康汇总列表 */
 export async function fetchStoreHealthOverview(): Promise<StoreHealthOverview> {
-  return txFetch<StoreHealthOverview>('/api/v1/store-health/overview');
+  return txFetchData<StoreHealthOverview>('/api/v1/store-health/overview');
 }
 
 /** 获取单门店详细健康报告 */
 export async function fetchStoreHealthDetail(storeId: string): Promise<StoreHealthItem> {
-  return txFetch<StoreHealthItem>(`/api/v1/store-health/${encodeURIComponent(storeId)}`);
+  return txFetchData<StoreHealthItem>(`/api/v1/store-health/${encodeURIComponent(storeId)}`);
 }

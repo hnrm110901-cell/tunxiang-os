@@ -6,7 +6,7 @@
  * API: /api/v1/supply/* via txFetchData；失败时空数据 fallback
  */
 import React, { useRef, useState, useEffect, useCallback } from 'react';
-import { txFetchData, txFetch } from '../../api/client';
+import { txFetchData } from '../../api/client';
 import {
   ProTable,
   ProColumns,
@@ -141,7 +141,7 @@ function getRemainingDaysColor(days: number): string {
   return '#52c41a';
 }
 
-// ─── API 调用（txFetch，失败时空数据 fallback）──────────────────────────────
+// ─── API 调用（txFetchData，失败时空数据 fallback）──────────────────────────────
 
 const getStoreId = () => localStorage.getItem('tx_store_id') ?? 'default';
 
@@ -191,7 +191,7 @@ async function fetchAlertSummary(): Promise<AlertSummary> {
 
 async function submitStockAdjust(itemId: string, delta_qty: number, reason: string): Promise<boolean> {
   try {
-    await txFetch('/api/v1/supply/inventory/adjust', {
+    await txFetchData('/api/v1/supply/inventory/adjust', {
       method: 'POST',
       body: JSON.stringify({ ingredient_id: itemId, delta_qty, reason }),
     });

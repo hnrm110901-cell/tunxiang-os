@@ -39,13 +39,13 @@ interface BoardConfig {
 // ─── Constants ───
 
 const API_BASE: string =
-  (window as Record<string, unknown>).__STORE_API_BASE__ as string || '';
+  (window as unknown as Record<string, unknown>).__STORE_API_BASE__ as string || '';
 const TENANT_ID: string =
-  (window as Record<string, unknown>).__TENANT_ID__ as string || '';
+  (window as unknown as Record<string, unknown>).__TENANT_ID__ as string || '';
 const STORE_ID: string =
-  (window as Record<string, unknown>).__STORE_ID__ as string || '';
+  (window as unknown as Record<string, unknown>).__STORE_ID__ as string || '';
 const WS_BASE: string =
-  (window as Record<string, unknown>).__KDS_WS_URL__ as string || '';
+  (window as unknown as Record<string, unknown>).__KDS_WS_URL__ as string || '';
 
 const HEADERS: Record<string, string> = {
   'Content-Type': 'application/json',

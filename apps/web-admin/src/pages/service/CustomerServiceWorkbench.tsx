@@ -4,7 +4,7 @@
  * API: tx-member :8003, try/catch 降级 Mock
  */
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { txFetch } from '../../api';
+import { txFetchData } from '../../api';
 import {
   Avatar,
   Badge,
@@ -136,7 +136,7 @@ const QUICK_REPLIES = [
 
 async function apiFetch<T>(path: string): Promise<T | null> {
   try {
-    const res = await txFetch<T>(path);
+    const res = await txFetchData<T>(path);
     return res.data ?? null;
   } catch {
     return null;
@@ -145,7 +145,7 @@ async function apiFetch<T>(path: string): Promise<T | null> {
 
 async function apiPatch<T>(path: string, body: Record<string, unknown>): Promise<T | null> {
   try {
-    const res = await txFetch<T>(path, { method: 'PATCH', body: JSON.stringify(body) });
+    const res = await txFetchData<T>(path, { method: 'PATCH', body: JSON.stringify(body) });
     return res.data ?? null;
   } catch {
     return null;
@@ -154,7 +154,7 @@ async function apiPatch<T>(path: string, body: Record<string, unknown>): Promise
 
 async function apiPost<T>(path: string, body: Record<string, unknown>): Promise<T | null> {
   try {
-    const res = await txFetch<T>(path, { method: 'POST', body: JSON.stringify(body) });
+    const res = await txFetchData<T>(path, { method: 'POST', body: JSON.stringify(body) });
     return res.data ?? null;
   } catch {
     return null;

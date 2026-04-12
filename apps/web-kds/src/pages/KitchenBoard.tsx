@@ -675,7 +675,7 @@ function TicketCard({ ticket: t, actionLabel, actionColor, onAction, tick: _tick
           <button
             onClick={onPause}
             style={{
-              padding: '14px 14px', border: 'none', borderRadius: 8,
+              padding: '14px 14px', borderRadius: 8,
               background: isPaused ? '#2A2A00' : '#1A1A1A',
               color: isPaused ? '#CCCC00' : '#666',
               fontSize: 18, fontWeight: 'bold',

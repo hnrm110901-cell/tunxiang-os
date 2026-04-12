@@ -35,7 +35,7 @@ import { ReloadOutlined, CameraOutlined } from '@ant-design/icons';
 import { Line } from '@ant-design/charts';
 import dayjs from 'dayjs';
 import type { Dayjs } from 'dayjs';
-import { txFetch } from '../../api/client';
+import { txFetchData } from '../../api/client';
 import type { TxResponse } from '../../api/client';
 
 const { Title } = Typography;
@@ -168,7 +168,7 @@ export default function StaffingAnalysisPage() {
   // ─── 加载门店列表 ──────────────────────────────────────────────────────────
   useEffect(() => {
     (async () => {
-      const res = await txFetch<{ items: { id: string; name: string }[] }>(
+      const res = await txFetchData<{ items: { id: string; name: string }[] }>(
         '/api/v1/stores?page=1&size=200',
       );
       if (res.ok && res.data) {
@@ -185,7 +185,7 @@ export default function StaffingAnalysisPage() {
   const dateStr = selectedDate.format('YYYY-MM-DD');
 
   const fetchCompare = async (sid: string) => {
-    const res = await txFetch<CompareData>(
+    const res = await txFetchData<CompareData>(
       `/api/v1/staffing-analysis/compare?store_id=${encodeURIComponent(sid)}&snapshot_date=${dateStr}`,
     );
     if (res.ok && res.data) {
@@ -195,7 +195,7 @@ export default function StaffingAnalysisPage() {
   };
 
   const fetchImpact = async (sid: string) => {
-    const res = await txFetch<{ items: ImpactItem[] }>(
+    const res = await txFetchData<{ items: ImpactItem[] }>(
       `/api/v1/staffing-analysis/impact?store_id=${encodeURIComponent(sid)}&snapshot_date=${dateStr}`,
     );
     if (res.ok && res.data) {
@@ -204,7 +204,7 @@ export default function StaffingAnalysisPage() {
   };
 
   const fetchRanking = async () => {
-    const res = await txFetch<{ items: RankingItem[] }>(
+    const res = await txFetchData<{ items: RankingItem[] }>(
       `/api/v1/staffing-analysis/gap-ranking?snapshot_date=${dateStr}&limit=10`,
     );
     if (res.ok && res.data) {
@@ -215,7 +215,7 @@ export default function StaffingAnalysisPage() {
   const fetchTrend = async (sid: string) => {
     const endDate = selectedDate.format('YYYY-MM-DD');
     const startDate = selectedDate.subtract(29, 'day').format('YYYY-MM-DD');
-    const res = await txFetch<{ items: TrendItem[] }>(
+    const res = await txFetchData<{ items: TrendItem[] }>(
       `/api/v1/staffing-analysis/trend?store_id=${encodeURIComponent(sid)}&start_date=${startDate}&end_date=${endDate}`,
     );
     if (res.ok && res.data) {
@@ -257,7 +257,7 @@ export default function StaffingAnalysisPage() {
     }
     setSnapshotLoading(true);
     try {
-      const res = await txFetch<unknown>('/api/v1/staffing-analysis/snapshot', {
+      const res = await txFetchData<unknown>('/api/v1/staffing-analysis/snapshot', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ store_id: storeId, snapshot_date: dateStr }),

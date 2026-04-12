@@ -14,6 +14,8 @@ from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from shared.events.src.emitter import emit_event
+from shared.events.src.event_types import PaymentEventType
 from shared.ontology.src.database import get_db
 
 router = APIRouter(prefix="/api/v1/payments", tags=["scan-pay"])
@@ -84,8 +86,18 @@ async def scan_pay(
         )
         await db.commit()
 
+        # 事件：支付发起
+        asyncio.create_task(emit_event(
+            event_type=PaymentEventType.INITIATED,
+            tenant_id=tenant_id,
+            stream_id=payment_id,
+            payload={"amount_fen": body.amount_fen, "channel": channel, "store_id": body.store_id},
+            store_id=body.store_id,
+            source_service="tx-trade",
+        ))
+
         # 异步模拟支付结果（实际应调用微信/支付宝 API）
-        asyncio.create_task(_simulate_payment(payment_id, tenant_id))
+        asyncio.create_task(_simulate_payment(payment_id, tenant_id, body.store_id, body.amount_fen, channel))
 
         return _ok({
             "payment_id": payment_id,
@@ -99,11 +111,42 @@ async def scan_pay(
         raise HTTPException(status_code=500, detail=f"支付发起失败: {exc}")
 
 
-async def _simulate_payment(payment_id: str, tenant_id: str) -> None:
+async def _simulate_payment(
+    payment_id: str, tenant_id: str, store_id: str, amount_fen: int, channel: str
+) -> None:
     """模拟异步支付回调（生产环境替换为第三方回调处理）。"""
+    from shared.ontology.src.database import async_session_factory  # 避免循环导入
+
     await asyncio.sleep(2)
     # 生产环境：调用微信/支付宝收款 API，等待回调更新状态
-    # 此处仅更新状态为已支付（演示用）
+    # 此处模拟支付成功，更新状态并发出确认事件
+    try:
+        async with async_session_factory() as db:
+            await db.execute(
+                text("SELECT set_config('app.tenant_id', :tid, true)"),
+                {"tid": tenant_id},
+            )
+            await db.execute(
+                text("""
+                    UPDATE scan_pay_transactions
+                    SET status = 'paid', paid_at = NOW(), updated_at = NOW()
+                    WHERE payment_id = :payment_id AND tenant_id = :tenant_id AND status = 'pending'
+                """),
+                {"payment_id": payment_id, "tenant_id": tenant_id},
+            )
+            await db.commit()
+    except Exception:  # noqa: BLE001 — 模拟回调失败不影响主流程
+        return
+
+    # 事件：支付确认
+    await emit_event(
+        event_type=PaymentEventType.CONFIRMED,
+        tenant_id=tenant_id,
+        stream_id=payment_id,
+        payload={"amount_fen": amount_fen, "channel": channel, "store_id": store_id},
+        store_id=store_id,
+        source_service="tx-trade",
+    )
 
 
 @router.get("/scan-pay/{payment_id}/status")

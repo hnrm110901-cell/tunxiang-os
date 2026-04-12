@@ -4,7 +4,7 @@
  * 7天客流趋势（柱状图：预测 vs 实际）| 菜品需求热力图 TOP20x7天
  * 预测准确率追踪（近30天折线，目标线85%）
  *
- * 数据源：txFetch（后端 API）
+ * 数据源：txFetchData（后端 API）
  * 图表：纯 CSS/SVG（TxBarChart / TxHeatmap / TxLineChart）
  */
 import { useState, useEffect, useCallback } from 'react';
@@ -14,7 +14,7 @@ import dayjs from 'dayjs';
 import { TxBarChart } from '../../../components/charts';
 import { TxHeatmap } from '../../../components/charts';
 import { TxLineChart } from '../../../components/charts';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 // ─── 类型定义 ───────────────────────────────────────────────────────────────
 
@@ -138,11 +138,11 @@ export function PredictDashboardPage() {
     try {
       // TODO: 后端就绪后替换为真实 API
       // const [tRes, rRes, wRes, dRes, aRes] = await Promise.allSettled([
-      //   txFetch(`/api/v1/predict/traffic/today?store_id=${selectedStore}`),
-      //   txFetch(`/api/v1/predict/revenue/week?store_id=${selectedStore}`),
-      //   txFetch(`/api/v1/predict/traffic/weekly?store_id=${selectedStore}`),
-      //   txFetch(`/api/v1/predict/demand/heatmap?store_id=${selectedStore}`),
-      //   txFetch(`/api/v1/predict/accuracy?store_id=${selectedStore}&days=30`),
+      //   txFetchData(`/api/v1/predict/traffic/today?store_id=${selectedStore}`),
+      //   txFetchData(`/api/v1/predict/revenue/week?store_id=${selectedStore}`),
+      //   txFetchData(`/api/v1/predict/traffic/weekly?store_id=${selectedStore}`),
+      //   txFetchData(`/api/v1/predict/demand/heatmap?store_id=${selectedStore}`),
+      //   txFetchData(`/api/v1/predict/accuracy?store_id=${selectedStore}&days=30`),
       // ]);
       await new Promise(r => setTimeout(r, 400));
       setTraffic(mockTrafficForecast());

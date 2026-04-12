@@ -28,7 +28,7 @@ import { ProTable } from '@ant-design/pro-components';
 import type { ActionType, ProColumns } from '@ant-design/pro-components';
 import { BarChartOutlined } from '@ant-design/icons';
 import dayjs, { Dayjs } from 'dayjs';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 const { Title } = Typography;
 const TX_PRIMARY = '#FF6B35';
@@ -68,7 +68,7 @@ export default function AttendanceMonthly() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await txFetch<{ store_id: string; store_name: string }[]>('/api/v1/org/stores');
+        const res = await txFetchData<{ store_id: string; store_name: string }[]>('/api/v1/org/stores');
         const list = res.data ?? [];
         setStores(list);
         if (list.length > 0) setStoreId(list[0].store_id);
@@ -185,7 +185,7 @@ export default function AttendanceMonthly() {
           columns={columns}
           request={async () => {
             if (!storeId) return { data: [], total: 0, success: true };
-            const res = await txFetch<MonthlySummary>(
+            const res = await txFetchData<MonthlySummary>(
               `/api/v1/attendance/monthly-summary?store_id=${storeId}&year=${month.year()}&month=${month.month() + 1}`,
             );
             const d = res.data;

@@ -20,7 +20,7 @@ import {
   ProFormTextArea,
   ProTable,
 } from '@ant-design/pro-components';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 // ─── 类型 ────────────────────────────────────────────────────────────────────
 
@@ -131,7 +131,7 @@ export default function JobGrades() {
           if (params.current) query.set('page', String(params.current));
           if (params.pageSize) query.set('size', String(params.pageSize));
           if (activeCategory !== 'all') query.set('category', activeCategory);
-          const resp = await txFetch<{ items: JobGrade[]; total: number }>(
+          const resp = await txFetchData<{ items: JobGrade[]; total: number }>(
             `/api/v1/job-grades?${query.toString()}`,
           );
           const d = resp.data;
@@ -167,13 +167,13 @@ export default function JobGrades() {
               };
               delete payload.salary_range;
               if (editItem) {
-                await txFetch(`/api/v1/job-grades/${editItem.id}`, {
+                await txFetchData(`/api/v1/job-grades/${editItem.id}`, {
                   method: 'PUT',
                   body: JSON.stringify(payload),
                 });
                 message.success('更新成功');
               } else {
-                await txFetch('/api/v1/job-grades', {
+                await txFetchData('/api/v1/job-grades', {
                   method: 'POST',
                   body: JSON.stringify(payload),
                 });

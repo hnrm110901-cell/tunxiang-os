@@ -38,7 +38,7 @@ import {
   FallOutlined,
 } from '@ant-design/icons';
 import { Line } from '@ant-design/charts';
-import { txFetch } from '../../api/client';
+import { txFetchData } from '../../api/client';
 
 const { Title, Text } = Typography;
 
@@ -150,11 +150,11 @@ export default function AlertAggregationPage() {
     setLoading(true);
     try {
       const [effRes, rankRes, matrixRes, probRes, digestRes] = await Promise.all([
-        txFetch<EffectivenessData>('/api/v1/alert-aggregation/action-effectiveness'),
-        txFetch<{ items: StoreRisk[] }>('/api/v1/alert-aggregation/store-risk-ranking'),
-        txFetch<MatrixData>('/api/v1/alert-aggregation/risk-matrix'),
-        txFetch<{ items: ProblemStore[] }>('/api/v1/alert-aggregation/problem-stores'),
-        txFetch<WeeklyDigest>('/api/v1/alert-aggregation/weekly-digest'),
+        txFetchData<EffectivenessData>('/api/v1/alert-aggregation/action-effectiveness'),
+        txFetchData<{ items: StoreRisk[] }>('/api/v1/alert-aggregation/store-risk-ranking'),
+        txFetchData<MatrixData>('/api/v1/alert-aggregation/risk-matrix'),
+        txFetchData<{ items: ProblemStore[] }>('/api/v1/alert-aggregation/problem-stores'),
+        txFetchData<WeeklyDigest>('/api/v1/alert-aggregation/weekly-digest'),
       ]);
       setEffectiveness(effRes);
       setRanking(rankRes.items);
@@ -170,7 +170,7 @@ export default function AlertAggregationPage() {
 
   const loadTrend = async (days: number) => {
     try {
-      const res = await txFetch<{ items: TrendItem[] }>(
+      const res = await txFetchData<{ items: TrendItem[] }>(
         `/api/v1/alert-aggregation/trend-analysis?days=${days}&group_by=day`,
       );
       setTrendData(res.items);

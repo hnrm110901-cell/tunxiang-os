@@ -23,7 +23,7 @@ import {
   ProFormTextArea,
   ProTable,
 } from '@ant-design/pro-components';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 const { Title } = Typography;
 const TX_PRIMARY = '#FF6B35';
@@ -49,7 +49,7 @@ export default function PerformancePoints() {
 
   const handleAward = async (values: Record<string, unknown>, type: 'award' | 'deduct') => {
     try {
-      const res = await txFetch('/api/v1/points/award', {
+      const res = await txFetchData('/api/v1/points/award', {
         method: 'POST',
         body: JSON.stringify({ ...values, type }),
       }) as { ok: boolean };
@@ -117,7 +117,7 @@ export default function PerformancePoints() {
 
   const employeeRequest = async () => {
     try {
-      const res = await txFetch('/api/v1/org/employees?page=1&size=200') as {
+      const res = await txFetchData('/api/v1/org/employees?page=1&size=200') as {
         ok: boolean;
         data: { items: { id: string; name: string }[] };
       };
@@ -177,7 +177,7 @@ export default function PerformancePoints() {
           query.set('page', String(params.current ?? 1));
           query.set('size', String(params.pageSize ?? 20));
           try {
-            const res = await txFetch(`/api/v1/points/leaderboard?${query}`) as {
+            const res = await txFetchData(`/api/v1/points/leaderboard?${query}`) as {
               ok: boolean;
               data: { items: PointsItem[]; total: number };
             };

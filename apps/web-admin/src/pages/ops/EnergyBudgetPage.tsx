@@ -20,7 +20,7 @@ import {
   DollarOutlined, SettingOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import { txFetch } from '../../api';
+import { txFetchData } from '../../api';
 
 const { Text, Title } = Typography;
 
@@ -146,9 +146,8 @@ function BudgetTab({ stores }: BudgetTabProps) {
     setError(null);
     try {
       const params = new URLSearchParams({ year: String(year), month: String(month), store_id: storeId });
-      const res  = await txFetch(`/api/v1/ops/energy/budget-vs-actual?${params}`);
-      const json = await res.json();
-      setData(json ?? null);
+      const json = await txFetchData(`/api/v1/ops/energy/budget-vs-actual?${params}`);
+      setData((json as Record<string, unknown>) ?? null);
     } catch {
       setError('加载预算对比数据失败，请稍后重试');
     } finally {
@@ -170,7 +169,7 @@ function BudgetTab({ stores }: BudgetTabProps) {
   const handleSetBudget = async (values: Record<string, unknown>) => {
     setSubmitting(true);
     try {
-      await txFetch('/api/v1/ops/energy/budgets', {
+      await txFetchData('/api/v1/ops/energy/budgets', {
         method: 'POST',
         body: JSON.stringify({
           store_id: storeId,
@@ -394,9 +393,8 @@ function AlertRulesTab() {
     setLoading(true);
     setError(null);
     try {
-      const res  = await txFetch('/api/v1/ops/energy/alert-rules');
-      const data = await res.json();
-      setRules(data.items ?? data ?? []);
+      const data = await txFetchData<{ items?: unknown[] }>('/api/v1/ops/energy/alert-rules');
+      setRules((data as { items?: unknown[] }).items ?? (data as unknown[]) ?? []);
     } catch {
       setError('加载告警规则失败，请稍后重试');
     } finally {
@@ -409,7 +407,7 @@ function AlertRulesTab() {
   const handleCreate = async (values: Record<string, unknown>) => {
     setSubmitting(true);
     try {
-      await txFetch('/api/v1/ops/energy/alert-rules', {
+      await txFetchData('/api/v1/ops/energy/alert-rules', {
         method: 'POST',
         body: JSON.stringify(values),
       });
@@ -427,7 +425,7 @@ function AlertRulesTab() {
   const handleToggle = async (rule: AlertRule, enabled: boolean) => {
     setTogglingId(rule.id);
     try {
-      await txFetch(`/api/v1/ops/energy/alert-rules/${rule.id}`, {
+      await txFetchData(`/api/v1/ops/energy/alert-rules/${rule.id}`, {
         method: 'PATCH',
         body: JSON.stringify({ is_enabled: enabled }),
       });
@@ -622,9 +620,8 @@ function HistoryTab({ stores }: HistoryTabProps) {
     try {
       const params = new URLSearchParams({ year: String(queryYear) });
       if (storeId) params.set('store_id', storeId);
-      const res  = await txFetch(`/api/v1/ops/energy/budgets?${params}`);
-      const data = await res.json();
-      setBudgets(data.items ?? data ?? []);
+      const data = await txFetchData<{ items?: unknown[] }>(`/api/v1/ops/energy/budgets?${params}`);
+      setBudgets((data as { items?: unknown[] }).items ?? (data as unknown[]) ?? []);
     } catch {
       setError('加载历史预算失败，请稍后重试');
     } finally {
@@ -723,9 +720,8 @@ export function EnergyBudgetPage() {
   const fetchStores = async () => {
     setStoresLoading(true);
     try {
-      const res  = await txFetch('/api/v1/org/stores');
-      const data = await res.json();
-      setStores(data.items ?? data ?? []);
+      const data = await txFetchData<{ items?: unknown[] }>('/api/v1/org/stores');
+      setStores((data as { items?: unknown[] }).items ?? (data as unknown[]) ?? []);
     } catch {
       message.warning('门店列表加载失败，部分功能可能受限');
     } finally {

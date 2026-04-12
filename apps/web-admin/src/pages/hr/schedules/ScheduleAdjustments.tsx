@@ -14,7 +14,7 @@ import { useRef } from 'react';
 import { Button, Popconfirm, Space, Tag, Typography, message } from 'antd';
 import { CheckOutlined, CloseOutlined } from '@ant-design/icons';
 import { ActionType, ProColumns, ProTable } from '@ant-design/pro-components';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 const { Title } = Typography;
 
@@ -51,7 +51,7 @@ export default function ScheduleAdjustments() {
 
   const handleAction = async (id: string, action: 'approve' | 'reject') => {
     try {
-      const res = await txFetch(`/api/v1/schedules/swap-requests/${id}/${action}`, {
+      const res = await txFetchData(`/api/v1/schedules/swap-requests/${id}/${action}`, {
         method: 'POST',
       }) as { ok: boolean };
       if (res.ok) {
@@ -145,7 +145,7 @@ export default function ScheduleAdjustments() {
           query.set('page', String(params.current ?? 1));
           query.set('size', String(params.pageSize ?? 20));
           try {
-            const res = await txFetch(`/api/v1/schedules/swap-requests?${query}`) as {
+            const res = await txFetchData(`/api/v1/schedules/swap-requests?${query}`) as {
               ok: boolean;
               data: { items: SwapRequest[]; total: number };
             };

@@ -2,7 +2,7 @@
  * 派单 API — /api/v1/dispatch/*
  * Agent/人工派单、审批流转、执行跟踪
  */
-import { txFetch } from './index';
+import { txFetchData } from './index';
 
 // ─── 类型 ───
 
@@ -46,14 +46,14 @@ export async function fetchDispatchTickets(
   const params = new URLSearchParams({ page: String(page), size: String(size) });
   if (status) params.set('status', status);
   if (storeId) params.set('store_id', storeId);
-  return txFetch(`/api/v1/dispatch/tickets?${params.toString()}`);
+  return txFetchData<{ items: DispatchTicket[]; total: number }>(`/api/v1/dispatch/tickets?${params.toString()}`);
 }
 
 /** 获取单个派单详情 */
 export async function getDispatchDetail(
   ticketId: string,
 ): Promise<DispatchTicket & { comments: DispatchComment[] }> {
-  return txFetch(`/api/v1/dispatch/tickets/${encodeURIComponent(ticketId)}`);
+  return txFetchData<DispatchTicket & { comments: DispatchComment[] }>(`/api/v1/dispatch/tickets/${encodeURIComponent(ticketId)}`);
 }
 
 /** 创建派单（人工） */
@@ -65,7 +65,7 @@ export async function createDispatchTicket(
   assigneeId?: string,
   deadline?: string,
 ): Promise<{ ticket_id: string }> {
-  return txFetch('/api/v1/dispatch/tickets', {
+  return txFetchData<{ ticket_id: string }>('/api/v1/dispatch/tickets', {
     method: 'POST',
     body: JSON.stringify({
       store_id: storeId,
@@ -83,7 +83,7 @@ export async function assignDispatchTicket(
   ticketId: string,
   assigneeId: string,
 ): Promise<{ ticket_id: string; assignee_id: string }> {
-  return txFetch(`/api/v1/dispatch/tickets/${encodeURIComponent(ticketId)}/assign`, {
+  return txFetchData<{ ticket_id: string; assignee_id: string }>(`/api/v1/dispatch/tickets/${encodeURIComponent(ticketId)}/assign`, {
     method: 'POST',
     body: JSON.stringify({ assignee_id: assigneeId }),
   });
@@ -95,7 +95,7 @@ export async function updateDispatchStatus(
   status: DispatchStatus,
   note?: string,
 ): Promise<{ ticket_id: string; status: DispatchStatus }> {
-  return txFetch(`/api/v1/dispatch/tickets/${encodeURIComponent(ticketId)}/status`, {
+  return txFetchData<{ ticket_id: string; status: DispatchStatus }>(`/api/v1/dispatch/tickets/${encodeURIComponent(ticketId)}/status`, {
     method: 'PUT',
     body: JSON.stringify({ status, note }),
   });
@@ -106,7 +106,7 @@ export async function addDispatchComment(
   ticketId: string,
   content: string,
 ): Promise<{ comment_id: string }> {
-  return txFetch(`/api/v1/dispatch/tickets/${encodeURIComponent(ticketId)}/comments`, {
+  return txFetchData<{ comment_id: string }>(`/api/v1/dispatch/tickets/${encodeURIComponent(ticketId)}/comments`, {
     method: 'POST',
     body: JSON.stringify({ content }),
   });

@@ -36,7 +36,7 @@ import {
   SwapOutlined,
   WarningOutlined,
 } from '@ant-design/icons';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 const { Title, Text } = Typography;
 
@@ -115,7 +115,7 @@ export default function MenuSkillMatch() {
   const handleAnalyze = async () => {
     setLoading(true);
     try {
-      const resp = await txFetch<{ data: MatchData }>('/api/v1/agent/growth_coach/menu_skill_match', {
+      const resp = await txFetchData<{ data: MatchData }>('/api/v1/agent/growth_coach/menu_skill_match', {
         method: 'POST',
         body: JSON.stringify({
           cuisine_type: cuisineType,

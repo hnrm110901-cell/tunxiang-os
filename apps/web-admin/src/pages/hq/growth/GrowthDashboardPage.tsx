@@ -10,7 +10,7 @@
  */
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 import { useApi } from '../../../hooks/useApi';
 import type { JourneyTemplateAttribution, AgentSuggestionDetail, P1Distribution } from '../../../api/growthHubApi';
 
@@ -697,11 +697,11 @@ export function GrowthDashboardPage() {
     setErrorKpi(null);   setErrorTrend(null);   setErrorRfm(null);   setErrorDashboard(null);
 
     const [growthRes, activityRes, repurchaseRes, rfmRes, dashboardRes] = await Promise.allSettled([
-      txFetch<{ ok: boolean; data: GrowthData }>(`/api/v1/member/analytics/growth?${qs}`),
-      txFetch<{ ok: boolean; data: ActivityData }>(`/api/v1/member/analytics/activity?${qs}`),
-      txFetch<{ ok: boolean; data: RepurchaseData }>(`/api/v1/member/analytics/repurchase?${qs}`),
-      txFetch<{ ok: boolean; data: RfmDistribution }>('/api/v1/member/rfm/distribution'),
-      txFetch<{ ok: boolean; data: DashboardSummary }>('/api/v1/dashboard/summary'),
+      txFetchData<{ ok: boolean; data: GrowthData }>(`/api/v1/member/analytics/growth?${qs}`),
+      txFetchData<{ ok: boolean; data: ActivityData }>(`/api/v1/member/analytics/activity?${qs}`),
+      txFetchData<{ ok: boolean; data: RepurchaseData }>(`/api/v1/member/analytics/repurchase?${qs}`),
+      txFetchData<{ ok: boolean; data: RfmDistribution }>('/api/v1/member/rfm/distribution'),
+      txFetchData<{ ok: boolean; data: DashboardSummary }>('/api/v1/dashboard/summary'),
     ]);
 
     // --- KPI 数据（growth + activity + repurchase）---

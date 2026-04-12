@@ -73,8 +73,8 @@ export const startScan = (): Promise<string> => {
   return new Promise((resolve) => {
     if (isAndroidPOS() && window.TXBridge) {
       const callbackName = `__txScanCb_${Date.now()}`;
-      (window as Record<string, unknown>)[callbackName] = (result: string) => {
-        delete (window as Record<string, unknown>)[callbackName];
+      (window as unknown as Record<string, unknown>)[callbackName] = (result: string) => {
+        delete (window as unknown as Record<string, unknown>)[callbackName];
         resolve(result);
       };
       window.TXBridge.scan();

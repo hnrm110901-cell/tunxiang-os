@@ -36,7 +36,7 @@ import {
   TeamOutlined,
   ThunderboltOutlined,
 } from '@ant-design/icons';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 const { Title, Text } = Typography;
 const { RangePicker } = DatePicker;
@@ -96,7 +96,7 @@ export default function ScheduleBatch() {
   const loadTemplates = async () => {
     if (templatesLoaded) return;
     try {
-      const res = await txFetch('/api/v1/schedules/templates?page=1&size=100') as {
+      const res = await txFetchData('/api/v1/schedules/templates?page=1&size=100') as {
         ok: boolean;
         data: { items: TemplateOption[] };
       };
@@ -108,7 +108,7 @@ export default function ScheduleBatch() {
   const loadEmployees = async () => {
     if (employeesLoaded) return;
     try {
-      const res = await txFetch('/api/v1/org/employees?page=1&size=200') as {
+      const res = await txFetchData('/api/v1/org/employees?page=1&size=200') as {
         ok: boolean;
         data: { items: EmployeeOption[] };
       };
@@ -122,7 +122,7 @@ export default function ScheduleBatch() {
   const handleValidate = async () => {
     setValidating(true);
     try {
-      const res = await txFetch('/api/v1/schedules/validate', {
+      const res = await txFetchData('/api/v1/schedules/validate', {
         method: 'POST',
         body: JSON.stringify({
           template_id: templateId,
@@ -147,7 +147,7 @@ export default function ScheduleBatch() {
   const handleCreate = async () => {
     setCreating(true);
     try {
-      const res = await txFetch('/api/v1/schedules/batch', {
+      const res = await txFetchData('/api/v1/schedules/batch', {
         method: 'POST',
         body: JSON.stringify({
           template_id: templateId,

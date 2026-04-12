@@ -4,13 +4,13 @@
  * 新建品牌 | 品牌对比视图（2-3个品牌并排KPI）
  * 跨品牌会员统计（总会员/共享会员/品牌独占会员）
  *
- * 数据源：txFetch（后端 API）
+ * 数据源：txFetchData（后端 API）
  * 纯 CSS 实现可视化，无第三方图表库
  */
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Button, Modal, Form, Input, InputNumber, Spin, Tag, message, Checkbox } from 'antd';
 import { PlusOutlined, ReloadOutlined, SwapOutlined } from '@ant-design/icons';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 // ─── 类型定义 ───────────────────────────────────────────────────────────────
 
@@ -103,8 +103,8 @@ export function BrandManagePage() {
     try {
       // TODO: 后端就绪后替换
       // const [brandRes, memberRes] = await Promise.allSettled([
-      //   txFetch<{ items: BrandInfo[] }>('/api/v1/org/brands'),
-      //   txFetch<CrossBrandMember>('/api/v1/member/cross-brand-stats'),
+      //   txFetchData<{ items: BrandInfo[] }>('/api/v1/org/brands'),
+      //   txFetchData<CrossBrandMember>('/api/v1/member/cross-brand-stats'),
       // ]);
       await new Promise(r => setTimeout(r, 400));
       const b = mockBrands();
@@ -123,7 +123,7 @@ export function BrandManagePage() {
     try {
       const values = await form.validateFields();
       // TODO: 后端就绪后替换
-      // await txFetch('/api/v1/org/brands', { method: 'POST', body: JSON.stringify(values) });
+      // await txFetchData('/api/v1/org/brands', { method: 'POST', body: JSON.stringify(values) });
       await new Promise(r => setTimeout(r, 500));
       message.success(`品牌「${values.brand_name}」创建成功`);
       setCreateOpen(false);

@@ -14,7 +14,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MobileLayout } from '../../components/MobileLayout';
-import { txFetch } from '../../api/client';
+import { txFetchData } from '../../api/client';
 
 // ─── 类型 ───
 
@@ -121,7 +121,7 @@ export function MobileHomePage() {
     let cancelled = false;
     setLoading(true);
 
-    txFetch<DashboardStats>('/api/v1/analytics/dashboard-stats')
+    txFetchData<DashboardStats>('/api/v1/analytics/dashboard-stats')
       .then(res => {
         if (!cancelled) setData(res.data ?? MOCK);
       })

@@ -36,7 +36,7 @@ import {
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
-import { txFetch } from '../api';
+import { txFetchData } from '../api';
 
 const { Title, Text } = Typography;
 
@@ -141,7 +141,7 @@ export function PayrollPage() {
       // JOIN employees e ON ps.employee_id = e.id
       // WHERE ps.tenant_id = :tid AND ps.period_year = :year AND ps.period_month = :month
       // AND ps.store_id = :store_id AND ps.is_deleted = false ORDER BY e.name
-      const data = await txFetch<{ items: PayrollSummaryRow[]; total: number }>(
+      const data = await txFetchData<{ items: PayrollSummaryRow[]; total: number }>(
         `/api/v1/org/payroll/summaries?year=${year}&month=${month}&store_id=${CURRENT_STORE_ID}`,
       );
       setSummaries(data.items);
@@ -158,7 +158,7 @@ export function PayrollPage() {
     try {
       // TODO: SELECT * FROM payroll_configs WHERE tenant_id = :tid
       //       AND store_id = :store_id AND is_deleted = false ORDER BY employee_role
-      const data = await txFetch<{ items: PayrollConfig[]; total: number }>(
+      const data = await txFetchData<{ items: PayrollConfig[]; total: number }>(
         `/api/v1/org/payroll/config?store_id=${CURRENT_STORE_ID}`,
       );
       setConfigs(data.items);
@@ -179,7 +179,7 @@ export function PayrollPage() {
       const year = selectedMonth.year();
       const month = selectedMonth.month() + 1;
       // TODO: 遍历 employees 表所有在职员工，调用薪资引擎计算，写入 payroll_summaries 表
-      const result = await txFetch<BatchCalcResult>('/api/v1/org/payroll/calculate-batch', {
+      const result = await txFetchData<BatchCalcResult>('/api/v1/org/payroll/calculate-batch', {
         method: 'POST',
         body: JSON.stringify({ store_id: CURRENT_STORE_ID, year, month }),
       });
@@ -205,7 +205,7 @@ export function PayrollPage() {
       //       AND tenant_id=:tid AND store_id=:store_id AND period_year=:year AND period_month=:month
       for (const item of draftItems) {
         if (!item.id) continue;
-        await txFetch(`/api/v1/org/payroll/summaries/${item.id}/confirm`, { method: 'POST' });
+        await txFetchData(`/api/v1/org/payroll/summaries/${item.id}/confirm`, { method: 'POST' });
       }
       messageApi.success(`已确认 ${draftItems.length} 条薪资单`);
       loadSummaries();
@@ -239,7 +239,7 @@ export function PayrollPage() {
       if (!editingConfig) return;
       // TODO: UPSERT INTO payroll_configs SET ... WHERE tenant_id=:tid AND store_id=:store_id
       //       AND employee_role=:role AND effective_from=:date
-      await txFetch('/api/v1/org/payroll/config', {
+      await txFetchData('/api/v1/org/payroll/config', {
         method: 'POST',
         body: JSON.stringify({
           store_id: CURRENT_STORE_ID,

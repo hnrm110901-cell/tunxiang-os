@@ -1,7 +1,7 @@
 /**
  * HR 模块 API 客户端 — 合规预警、IM 同步、绩效、积分、薪资台账
  */
-import { txFetch } from './index';
+import { txFetchData } from './index';
 
 // ─── A. 合规预警 ───
 
@@ -32,11 +32,11 @@ export interface ComplianceAlertResp {
 
 export async function fetchComplianceAlerts(severity?: string): Promise<ComplianceAlertResp> {
   const query = severity ? `?severity=${encodeURIComponent(severity)}` : '';
-  return txFetch(`/api/v1/org/compliance/alerts${query}`);
+  return txFetchData<ComplianceAlertResp>(`/api/v1/org/compliance/alerts${query}`);
 }
 
 export async function triggerComplianceScan(scanType: string = 'all'): Promise<ComplianceAlertResp> {
-  return txFetch('/api/v1/org/compliance/scan', {
+  return txFetchData<ComplianceAlertResp>('/api/v1/org/compliance/scan', {
     method: 'POST',
     body: JSON.stringify({ scan_type: scanType }),
   });
@@ -67,7 +67,7 @@ export interface IMSyncPreview {
 }
 
 export async function fetchIMSyncStatus(): Promise<IMSyncStatus> {
-  return txFetch('/api/v1/org/im-sync/status');
+  return txFetchData<IMSyncStatus>('/api/v1/org/im-sync/status');
 }
 
 export async function previewIMSync(
@@ -75,7 +75,7 @@ export async function previewIMSync(
   corpId: string,
   corpSecret: string,
 ): Promise<IMSyncPreview> {
-  return txFetch('/api/v1/org/im-sync/preview', {
+  return txFetchData<IMSyncPreview>('/api/v1/org/im-sync/preview', {
     method: 'POST',
     body: JSON.stringify({ provider, corp_id: corpId, corp_secret: corpSecret }),
   });
@@ -86,7 +86,7 @@ export async function applyIMSync(
   diffId: string,
   autoCreate: boolean = false,
 ): Promise<{ bound: number; created: number; deactivated: number; errors: string[] }> {
-  return txFetch('/api/v1/org/im-sync/apply', {
+  return txFetchData<{ bound: number; created: number; deactivated: number; errors: string[] }>('/api/v1/org/im-sync/apply', {
     method: 'POST',
     body: JSON.stringify({ provider, diff_id: diffId, auto_create: autoCreate }),
   });
@@ -116,7 +116,7 @@ export async function fetchPerformanceScores(
   if (storeId) params.set('store_id', storeId);
   if (month) params.set('month', month);
   const query = params.toString() ? `?${params.toString()}` : '';
-  return txFetch(`/api/v1/org/performance/scores${query}`);
+  return txFetchData<{ items: PerformanceScoreItem[]; total: number }>(`/api/v1/org/performance/scores${query}`);
 }
 
 export async function submitPerformanceScore(
@@ -124,7 +124,7 @@ export async function submitPerformanceScore(
   month: string,
   scores: Record<string, number>,
 ): Promise<{ weighted_total: number; rank_hint: string }> {
-  return txFetch('/api/v1/org/performance/scores', {
+  return txFetchData<{ weighted_total: number; rank_hint: string }>('/api/v1/org/performance/scores', {
     method: 'POST',
     body: JSON.stringify({ employee_id: employeeId, month, scores }),
   });
@@ -146,7 +146,7 @@ export async function fetchEmployeePoints(
   storeId?: string,
 ): Promise<{ items: EmployeePoints[]; total: number }> {
   const query = storeId ? `?store_id=${encodeURIComponent(storeId)}` : '';
-  return txFetch(`/api/v1/org/points/leaderboard${query}`);
+  return txFetchData<{ items: EmployeePoints[]; total: number }>(`/api/v1/org/points/leaderboard${query}`);
 }
 
 // ─── E. 薪资台账 ───
@@ -170,11 +170,11 @@ export async function fetchPayslips(
   month: string,
   page?: number,
 ): Promise<{ items: PayslipDetail[]; total: number }> {
-  return txFetch(
+  return txFetchData<{ items: PayslipDetail[]; total: number }>(
     `/api/v1/payroll/payslips?store_id=${encodeURIComponent(storeId)}&month=${encodeURIComponent(month)}&page=${page || 1}&size=20`,
   );
 }
 
 export async function fetchMyPayslip(month: string): Promise<PayslipDetail> {
-  return txFetch(`/api/v1/payroll/my-payslip?month=${encodeURIComponent(month)}`);
+  return txFetchData<PayslipDetail>(`/api/v1/payroll/my-payslip?month=${encodeURIComponent(month)}`);
 }

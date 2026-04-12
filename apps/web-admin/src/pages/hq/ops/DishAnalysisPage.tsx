@@ -4,7 +4,7 @@
  */
 import { useState, useEffect, useCallback } from 'react';
 import { TxScatterChart } from '../../../components/charts';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 interface SalesRankItem {
   rank: number;
@@ -73,7 +73,7 @@ export function DishAnalysisPage() {
     try {
       const params = new URLSearchParams({ period });
       if (storeId) params.set('store_id', storeId);
-      const res = await txFetch<DishAnalysisData>(
+      const res = await txFetchData<DishAnalysisData>(
         `/api/v1/analytics/dish-analysis?${params.toString()}`
       );
       setData(res ?? EMPTY_DATA);

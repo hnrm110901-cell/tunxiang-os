@@ -16,7 +16,7 @@ import {
   LogoutOutlined,
 } from '@ant-design/icons';
 import { ActionType, ProColumns, ProTable } from '@ant-design/pro-components';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 // ─── 类型 ────────────────────────────────────────────────────────────────────
 
@@ -82,7 +82,7 @@ export default function EmployeeList() {
       valueType: 'select',
       fieldProps: { placeholder: '选择部门', showSearch: true },
       request: async () => {
-        const resp = await txFetch<{ items: { id: string; name: string }[] }>(
+        const resp = await txFetchData<{ items: { id: string; name: string }[] }>(
           '/api/v1/org-structure/departments',
         );
         return (resp.data?.items ?? []).map((d) => ({ label: d.name, value: d.id }));
@@ -97,7 +97,7 @@ export default function EmployeeList() {
       valueType: 'select',
       fieldProps: { placeholder: '选择门店', showSearch: true },
       request: async () => {
-        const resp = await txFetch<{ items: { id: string; name: string }[] }>(
+        const resp = await txFetchData<{ items: { id: string; name: string }[] }>(
           '/api/v1/stores',
         );
         return (resp.data?.items ?? []).map((s) => ({ label: s.name, value: s.id }));
@@ -174,7 +174,7 @@ export default function EmployeeList() {
         if (params.department_id) query.set('department_id', params.department_id);
         if (params.status) query.set('status', params.status);
         if (params.employment_type) query.set('employment_type', params.employment_type);
-        const resp = await txFetch<EmployeeListResp>(
+        const resp = await txFetchData<EmployeeListResp>(
           `/api/v1/employees?${query.toString()}`,
         );
         const d = resp.data;

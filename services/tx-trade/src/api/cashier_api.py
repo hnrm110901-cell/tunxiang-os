@@ -14,11 +14,14 @@
 from typing import List, Optional
 from uuid import UUID
 
+import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+
+logger = structlog.get_logger(__name__)
 
 from ..services.cashier_engine import CashierEngine
 from ..services.daily_settlement import DailySettlementService
@@ -704,7 +707,8 @@ async def checkout_with_discounts(
                     conflicts=conflicts,
                 )
                 await db.commit()
-            except Exception:
+            except Exception as exc:  # noqa: BLE001 — 折扣日志写入失败不阻断结算
+                logger.warning("cashier.discount_log_write_failed", error=str(exc))
                 await db.rollback()
 
             discount_result = {
@@ -715,8 +719,8 @@ async def checkout_with_discounts(
                 "conflicts": conflicts,
                 "log_id": log_id,
             }
-        except Exception:
-            # 折扣计算失败，降级到原始金额，不阻断支付
+        except Exception as exc:  # noqa: BLE001 — 折扣计算失败降级到原始金额，不阻断支付
+            logger.warning("cashier.discount_calc_failed_fallback", error=str(exc), exc_info=True)
             discount_result["final_amount_fen"] = req.base_amount_fen
 
     final_pay_fen = discount_result["final_amount_fen"]

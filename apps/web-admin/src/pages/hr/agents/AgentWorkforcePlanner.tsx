@@ -34,7 +34,7 @@ import {
   ReloadOutlined,
   ThunderboltOutlined,
 } from '@ant-design/icons';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 const { Title, Text } = Typography;
 
@@ -72,7 +72,7 @@ export default function AgentWorkforcePlanner() {
   const load = async () => {
     setLoading(true);
     try {
-      const resp = await txFetch<{ data: OptimizationResp }>(
+      const resp = await txFetchData<{ data: OptimizationResp }>(
         '/api/v1/agent/workforce_planner/suggest_optimization',
         {
           method: 'POST',

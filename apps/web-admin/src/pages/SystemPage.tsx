@@ -4,7 +4,7 @@
  */
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { txFetch } from '../api';
+import { txFetchData } from '../api';
 
 // ─── 类型定义 ───
 
@@ -283,7 +283,7 @@ export function SystemPage() {
     setConfigsLoading(true);
     setConfigsError(null);
     try {
-      const data = await txFetch<{ items: SystemConfig[] }>('/api/v1/system/configs');
+      const data = await txFetchData<{ items: SystemConfig[] }>('/api/v1/system/configs');
       const items = data.items ?? [];
       setConfigs(items);
       const vals: Record<string, string> = {};
@@ -299,7 +299,7 @@ export function SystemPage() {
   const loadSysInfo = useCallback(async () => {
     setSysInfoLoading(true);
     try {
-      const data = await txFetch<SystemInfo>('/api/v1/system/info');
+      const data = await txFetchData<SystemInfo>('/api/v1/system/info');
       setSysInfo(data);
     } catch {
       setSysInfo(null);
@@ -317,7 +317,7 @@ export function SystemPage() {
     setSaveLoading(true);
     setSaveMsg(null);
     try {
-      await txFetch('/api/v1/system/configs', {
+      await txFetchData('/api/v1/system/configs', {
         method: 'PUT',
         body: JSON.stringify({ configs: editValues }),
       });
@@ -457,7 +457,7 @@ export function SystemPage() {
               <button
                 style={btnSecondaryStyle}
                 onClick={() => {
-                  txFetch('/api/v1/system/cache/clear', { method: 'POST' }).catch(() => {});
+                  txFetchData('/api/v1/system/cache/clear', { method: 'POST' }).catch(() => {});
                 }}
               >
                 清除系统缓存
@@ -465,7 +465,7 @@ export function SystemPage() {
               <button
                 style={btnSecondaryStyle}
                 onClick={() => {
-                  txFetch('/api/v1/system/backup/trigger', { method: 'POST' }).catch(() => {});
+                  txFetchData('/api/v1/system/backup/trigger', { method: 'POST' }).catch(() => {});
                 }}
               >
                 立即备份数据
@@ -473,7 +473,7 @@ export function SystemPage() {
               <button
                 style={btnSecondaryStyle}
                 onClick={() => {
-                  txFetch('/api/v1/system/health').catch(() => {});
+                  txFetchData('/api/v1/system/health').catch(() => {});
                   loadSysInfo();
                 }}
               >

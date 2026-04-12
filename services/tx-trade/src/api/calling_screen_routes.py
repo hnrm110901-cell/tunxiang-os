@@ -68,7 +68,8 @@ class CallingScreenManager:
         for ws in connections:
             try:
                 await ws.send_text(message)
-            except Exception:
+            except Exception as exc:  # noqa: BLE001 — WebSocket断连，标记清理
+                logger.debug("calling_screen.ws_send_failed", error=str(exc))
                 dead.append(ws)
 
         for ws in dead:
@@ -199,7 +200,7 @@ async def calling_screen_ws(
             try:
                 await asyncio.sleep(30)
                 await ws.send_text(json.dumps({"event": "ping", "data": {}}))
-            except Exception:
+            except Exception:  # noqa: BLE001 — WebSocket已断开，退出保活循环
                 break
 
     ping_task = asyncio.create_task(_ping_loop())

@@ -270,7 +270,7 @@ export function RunnerStation() {
   const [dishes, setDishes] = useState<RunnerDish[]>([]);
   const [loadingIds, setLoadingIds] = useState<Set<string>>(new Set());
   const [tick, setTick] = useState(0);
-  const [lastFetch, setLastFetch] = useState(0);
+  const [_lastFetch, setLastFetch] = useState(0);
 
   // 每秒刷新等待时间显示
   useEffect(() => {

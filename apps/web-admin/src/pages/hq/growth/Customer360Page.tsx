@@ -19,7 +19,7 @@ import * as echarts from 'echarts/core';
 import { LineChart } from 'echarts/charts';
 import { GridComponent, TooltipComponent, LegendComponent } from 'echarts/components';
 import { CanvasRenderer } from 'echarts/renderers';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 import type { GrowthProfile, TouchExecution, AgentSuggestion, ServiceRepairCase, JourneyTemplate } from '../../../api/growthHubApi';
 
 echarts.use([LineChart, GridComponent, TooltipComponent, LegendComponent, CanvasRenderer]);
@@ -131,11 +131,11 @@ export function Customer360Page() {
     setLoading(true);
     try {
       const [custResp, profileResp, touchResp, suggResp, repairResp] = await Promise.allSettled([
-        txFetch<CustomerDetail>(`/api/v1/member/customers/${customerId}`),
-        txFetch<GrowthProfile>(`/api/v1/growth/customers/${customerId}/profile`),
-        txFetch<{ items: TouchExecution[] }>(`/api/v1/growth/touch-executions?customer_id=${customerId}`),
-        txFetch<{ items: AgentSuggestion[] }>(`/api/v1/growth/agent-suggestions?customer_id=${customerId}`),
-        txFetch<{ items: ServiceRepairCase[] }>(`/api/v1/growth/service-repair-cases?customer_id=${customerId}`),
+        txFetchData<CustomerDetail>(`/api/v1/member/customers/${customerId}`),
+        txFetchData<GrowthProfile>(`/api/v1/growth/customers/${customerId}/profile`),
+        txFetchData<{ items: TouchExecution[] }>(`/api/v1/growth/touch-executions?customer_id=${customerId}`),
+        txFetchData<{ items: AgentSuggestion[] }>(`/api/v1/growth/agent-suggestions?customer_id=${customerId}`),
+        txFetchData<{ items: ServiceRepairCase[] }>(`/api/v1/growth/service-repair-cases?customer_id=${customerId}`),
       ]);
       if (custResp.status === 'fulfilled' && custResp.value.data) setCustomer(custResp.value.data);
       if (profileResp.status === 'fulfilled' && profileResp.value.data) setGrowthProfile(profileResp.value.data);
@@ -155,7 +155,7 @@ export function Customer360Page() {
   const handleOpenJourneyModal = useCallback(async () => {
     setJourneyModalOpen(true);
     try {
-      const resp = await txFetch<{ items: JourneyTemplate[] }>('/api/v1/growth/journey-templates?is_active=true');
+      const resp = await txFetchData<{ items: JourneyTemplate[] }>('/api/v1/growth/journey-templates?is_active=true');
       if (resp.data) setJourneyTemplates(resp.data.items);
     } catch (err) {
       console.error('fetch journey templates error', err);
@@ -166,7 +166,7 @@ export function Customer360Page() {
     if (!customerId || !selectedTemplateId) return;
     setJourneySubmitting(true);
     try {
-      await txFetch('/api/v1/growth/journey-enrollments', {
+      await txFetchData('/api/v1/growth/journey-enrollments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -190,7 +190,7 @@ export function Customer360Page() {
     if (!customerId) return;
     setAgentSubmitting(true);
     try {
-      await txFetch('/api/v1/growth/agent-suggestions', {
+      await txFetchData('/api/v1/growth/agent-suggestions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

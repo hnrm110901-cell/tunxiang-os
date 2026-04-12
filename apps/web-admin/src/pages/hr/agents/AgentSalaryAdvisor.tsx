@@ -37,7 +37,7 @@ import {
   ProColumns,
   ProTable,
 } from '@ant-design/pro-components';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -194,7 +194,7 @@ export default function AgentSalaryAdvisor() {
 
     try {
       // 调用薪酬顾问Agent
-      const resp = await txFetch<{ reasoning: string; data: Record<string, unknown> }>(
+      const resp = await txFetchData<{ reasoning: string; data: Record<string, unknown> }>(
         '/api/v1/agent/salary_advisor/recommend_salary',
         {
           method: 'POST',
@@ -236,7 +236,7 @@ export default function AgentSalaryAdvisor() {
             headerTitle="薪资优化建议"
             request={async (params) => {
               try {
-                const resp = await txFetch<{
+                const resp = await txFetchData<{
                   data: { allocated_fen: number; plans: SalaryAdvice[] };
                 }>('/api/v1/agent/salary_advisor/optimize_raise_plan', {
                   method: 'POST',

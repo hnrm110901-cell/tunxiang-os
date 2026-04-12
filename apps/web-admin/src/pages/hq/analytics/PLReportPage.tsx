@@ -4,7 +4,7 @@
  * 调用 GET /api/v1/finance/pl/store  /api/v1/finance/cost/breakdown
  */
 import { useState, useCallback } from 'react';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 // ---------- 类型定义 ----------
 
@@ -187,8 +187,8 @@ export function PLReportPage() {
     const { start, end } = getDateRange();
     try {
       const [plRes, cbRes] = await Promise.allSettled([
-        txFetch<PLReport>(`/api/v1/analytics/pl-report?store_id=${encodeURIComponent(storeId)}&start=${start}&end=${end}`),
-        txFetch<{ items: CostBreakdownItem[] }>(`/api/v1/finance/cost/breakdown?store_id=${encodeURIComponent(storeId)}&start_date=${start}&end_date=${end}&top_n=10`),
+        txFetchData<PLReport>(`/api/v1/analytics/pl-report?store_id=${encodeURIComponent(storeId)}&start=${start}&end=${end}`),
+        txFetchData<{ items: CostBreakdownItem[] }>(`/api/v1/finance/cost/breakdown?store_id=${encodeURIComponent(storeId)}&start_date=${start}&end_date=${end}&top_n=10`),
       ]);
       if (plRes.status === 'fulfilled' && plRes.value.data) setReport(plRes.value.data);
       else setReport(null);

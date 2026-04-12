@@ -39,7 +39,7 @@ import {
   WarningOutlined,
 } from '@ant-design/icons';
 import dayjs, { Dayjs } from 'dayjs';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 const { Title } = Typography;
 
@@ -100,7 +100,7 @@ export default function StoreOpsExceptions() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await txFetch<{ store_id: string; store_name: string }[]>('/api/v1/org/stores');
+        const res = await txFetchData<{ store_id: string; store_name: string }[]>('/api/v1/org/stores');
         const list = res.data ?? [];
         setStores(list);
         if (list.length > 0) setStoreId(list[0].store_id);
@@ -112,7 +112,7 @@ export default function StoreOpsExceptions() {
 
   const handleQuickAction = async (id: string, action: 'confirm' | 'resolve', remark?: string) => {
     try {
-      await txFetch('/api/v1/store-ops/quick-action', {
+      await txFetchData('/api/v1/store-ops/quick-action', {
         method: 'POST',
         body: JSON.stringify({ anomaly_id: id, action, remark }),
       });
@@ -253,7 +253,7 @@ export default function StoreOpsExceptions() {
           columns={columns}
           request={async (params) => {
             if (!storeId) return { data: [], total: 0, success: true };
-            const res = await txFetch<AnomalySummary>(
+            const res = await txFetchData<AnomalySummary>(
               `/api/v1/store-ops/anomalies?store_id=${storeId}&date=${date.format('YYYY-MM-DD')}`,
             );
             const d = res.data;

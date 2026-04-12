@@ -16,7 +16,7 @@ import {
   ProFormTextArea,
   ProTable,
 } from '@ant-design/pro-components';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 // ─── 类型 ────────────────────────────────────────────────────────────────────
 
@@ -111,7 +111,7 @@ export default function ComplianceAlerts() {
       valueType: 'select',
       fieldProps: { placeholder: '选择门店', showSearch: true },
       request: async () => {
-        const resp = await txFetch<{ items: { id: string; name: string }[] }>('/api/v1/stores');
+        const resp = await txFetchData<{ items: { id: string; name: string }[] }>('/api/v1/stores');
         return (resp.data?.items ?? []).map((s) => ({ label: s.name, value: s.id }));
       },
     },
@@ -196,7 +196,7 @@ export default function ComplianceAlerts() {
           if (params.alert_type) query.set('alert_type', params.alert_type);
           if (params.severity) query.set('severity', params.severity);
           if (params.store_id) query.set('store_id', params.store_id);
-          const resp = await txFetch<{ items: AlertItem[]; total: number }>(
+          const resp = await txFetchData<{ items: AlertItem[]; total: number }>(
             `/api/v1/compliance/alerts?${query.toString()}`,
           );
           const d = resp.data;
@@ -211,7 +211,7 @@ export default function ComplianceAlerts() {
         onOpenChange={setModalVisible}
         onFinish={async (values) => {
           if (!actionAlertId) return false;
-          await txFetch(`/api/v1/compliance/alerts/${actionAlertId}/${actionType}`, {
+          await txFetchData(`/api/v1/compliance/alerts/${actionAlertId}/${actionType}`, {
             method: 'POST',
             body: JSON.stringify(values),
           });

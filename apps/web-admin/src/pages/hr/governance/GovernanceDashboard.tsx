@@ -16,7 +16,7 @@ import {
   TeamOutlined,
   TrophyOutlined,
 } from '@ant-design/icons';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 const { Text } = Typography;
 
@@ -48,7 +48,7 @@ export default function GovernanceDashboard() {
   const [dimension, setDimension] = useState<string>('brand');
 
   useEffect(() => {
-    txFetch<GovernanceData>('/api/v1/hr/governance/dashboard')
+    txFetchData<GovernanceData>('/api/v1/hr/governance/dashboard')
       .then((resp) => setData(resp.data))
       .catch(() => message.error('加载驾驶舱数据失败'))
       .finally(() => setLoading(false));

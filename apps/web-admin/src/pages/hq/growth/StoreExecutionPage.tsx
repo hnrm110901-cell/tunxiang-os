@@ -5,7 +5,7 @@
  * 支持按门店筛选，执行评分按E1-E8完成率计算
  */
 import { useState, useEffect, useCallback } from 'react';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 // ---- 颜色常量 ----
 const BG_0 = '#0d1e28';
@@ -504,7 +504,7 @@ export function StoreExecutionPage() {
     setLoading(true);
     setError(null);
     try {
-      const resp = await txFetch<AllStoresReviewResponse>(
+      const resp = await txFetchData<AllStoresReviewResponse>(
         `/api/v1/ops/daily-review/status?date=${encodeURIComponent(date)}&all_stores=true`,
       );
       setStoresData(resp.items ?? []);

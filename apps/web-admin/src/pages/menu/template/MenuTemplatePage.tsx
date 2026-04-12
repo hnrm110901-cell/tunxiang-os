@@ -62,7 +62,7 @@ import {
   ShopOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 const { Title, Text } = Typography;
 const { Panel } = Collapse;
@@ -190,7 +190,7 @@ const EMPTY_VERSIONS: VersionHistory[] = [];
 
 async function fetchTemplates(): Promise<{ items: MenuTemplate[]; total: number }> {
   try {
-    const res = await txFetch<{ items: MenuTemplate[]; total: number }>('/api/v1/menu/templates');
+    const res = await txFetchData<{ items: MenuTemplate[]; total: number }>('/api/v1/menu/templates');
     return res.data ?? { items: EMPTY_TEMPLATES, total: 0 };
   } catch (err) {
     console.error('[MenuTemplatePage] fetchTemplates 失败:', err);
@@ -200,7 +200,7 @@ async function fetchTemplates(): Promise<{ items: MenuTemplate[]; total: number 
 
 async function fetchTemplateSections(templateId: string): Promise<MenuSection[]> {
   try {
-    const res = await txFetch<MenuSection[]>(`/api/v1/menu/templates/${templateId}/sections`);
+    const res = await txFetchData<MenuSection[]>(`/api/v1/menu/templates/${templateId}/sections`);
     return res.data ?? EMPTY_SECTIONS;
   } catch (err) {
     console.error('[MenuTemplatePage] fetchTemplateSections 失败:', err);
@@ -209,7 +209,7 @@ async function fetchTemplateSections(templateId: string): Promise<MenuSection[]>
 }
 
 async function applyTemplate(templateId: string, storeId: string): Promise<void> {
-  await txFetch<void>(`/api/v1/menu/templates/${templateId}/apply`, {
+  await txFetchData<void>(`/api/v1/menu/templates/${templateId}/apply`, {
     method: 'POST',
     body: JSON.stringify({ store_id: storeId }),
   });
@@ -221,7 +221,7 @@ async function createTemplate(payload: {
   description: string;
   copy_from_id?: string;
 }): Promise<MenuTemplate> {
-  const res = await txFetch<MenuTemplate>('/api/v1/menu/templates', {
+  const res = await txFetchData<MenuTemplate>('/api/v1/menu/templates', {
     method: 'POST',
     body: JSON.stringify(payload),
   });
@@ -233,7 +233,7 @@ async function updateTemplate(
   id: string,
   payload: Partial<Pick<MenuTemplate, 'name' | 'business_type' | 'description'>>,
 ): Promise<MenuTemplate> {
-  const res = await txFetch<MenuTemplate>(`/api/v1/menu/templates/${id}`, {
+  const res = await txFetchData<MenuTemplate>(`/api/v1/menu/templates/${id}`, {
     method: 'PUT',
     body: JSON.stringify(payload),
   });
@@ -245,7 +245,7 @@ async function updateSectionOrder(
   templateId: string,
   sections: Array<{ id: string; sort_order: number }>,
 ): Promise<void> {
-  await txFetch<void>(`/api/v1/menu/templates/${templateId}/sections/reorder`, {
+  await txFetchData<void>(`/api/v1/menu/templates/${templateId}/sections/reorder`, {
     method: 'PUT',
     body: JSON.stringify({ sections }),
   });
@@ -256,7 +256,7 @@ async function toggleSectionEnabled(
   sectionId: string,
   is_enabled: boolean,
 ): Promise<void> {
-  await txFetch<void>(`/api/v1/menu/templates/${templateId}/sections/${sectionId}`, {
+  await txFetchData<void>(`/api/v1/menu/templates/${templateId}/sections/${sectionId}`, {
     method: 'PATCH',
     body: JSON.stringify({ is_enabled }),
   });
@@ -268,7 +268,7 @@ async function updateDishInSection(
   dishItemId: string,
   payload: { is_enabled?: boolean; template_price_fen?: number | null; sort_order?: number },
 ): Promise<void> {
-  await txFetch<void>(`/api/v1/menu/templates/${templateId}/sections/${sectionId}/dishes/${dishItemId}`, {
+  await txFetchData<void>(`/api/v1/menu/templates/${templateId}/sections/${sectionId}/dishes/${dishItemId}`, {
     method: 'PATCH',
     body: JSON.stringify(payload),
   });
@@ -279,7 +279,7 @@ async function publishToStores(payload: {
   store_ids: string[];
   diff_configs: StoreDiffConfig[];
 }): Promise<{ publish_id: string; status: string }> {
-  const res = await txFetch<{ publish_id: string; status: string }>('/api/v1/menu/brand/publish', {
+  const res = await txFetchData<{ publish_id: string; status: string }>('/api/v1/menu/brand/publish', {
     method: 'POST',
     body: JSON.stringify(payload),
   });
@@ -288,7 +288,7 @@ async function publishToStores(payload: {
 
 async function fetchPublishStatus(templateId: string): Promise<PublishRecord[]> {
   try {
-    const res = await txFetch<PublishRecord[]>(`/api/v1/menu/publish-status?template_id=${templateId}`);
+    const res = await txFetchData<PublishRecord[]>(`/api/v1/menu/publish-status?template_id=${templateId}`);
     return res.data ?? EMPTY_PUBLISH_RECORDS;
   } catch (err) {
     console.error('[MenuTemplatePage] fetchPublishStatus 失败:', err);
@@ -298,7 +298,7 @@ async function fetchPublishStatus(templateId: string): Promise<PublishRecord[]> 
 
 async function fetchVersionHistory(templateId: string): Promise<VersionHistory[]> {
   try {
-    const res = await txFetch<VersionHistory[]>(`/api/v1/menu/templates/${templateId}/versions`);
+    const res = await txFetchData<VersionHistory[]>(`/api/v1/menu/templates/${templateId}/versions`);
     return res.data ?? EMPTY_VERSIONS;
   } catch (err) {
     console.error('[MenuTemplatePage] fetchVersionHistory 失败:', err);
@@ -307,7 +307,7 @@ async function fetchVersionHistory(templateId: string): Promise<VersionHistory[]
 }
 
 async function rollbackToVersion(templateId: string, versionId: string): Promise<void> {
-  await txFetch<void>(`/api/v1/menu/templates/${templateId}/rollback`, {
+  await txFetchData<void>(`/api/v1/menu/templates/${templateId}/rollback`, {
     method: 'POST',
     body: JSON.stringify({ version_id: versionId }),
   });
@@ -861,7 +861,7 @@ const PublishTab: React.FC<PublishTabProps> = ({ template }) => {
 
   // 加载门店列表
   useEffect(() => {
-    txFetch<{ items: StoreOption[] }>('/api/v1/system/stores?size=200')
+    txFetchData<{ items: StoreOption[] }>('/api/v1/system/stores?size=200')
       .then((res) => setStores(res.data?.items ?? EMPTY_STORES))
       .catch((err) => console.error('[PublishTab] 加载门店失败:', err));
   }, []);

@@ -3,6 +3,7 @@
  * 总部管理员查看 AI 生成的经营报告（日报/周报/门店对标/异常简报）
  */
 import { useState, useEffect, useCallback } from 'react';
+import DOMPurify from 'dompurify';
 import {
   ConfigProvider, Tabs, List, Card, Row, Col, Statistic, Tag, Input, Button,
   Space, Modal, Form, TimePicker, Checkbox, Spin, Empty, Badge,
@@ -473,7 +474,7 @@ const BriefingDetail: React.FC<BriefingDetailProps> = ({ briefing }) => {
       >
         <div
           style={{ lineHeight: 1.8, fontSize: 14, color: '#2C2C2A' }}
-          dangerouslySetInnerHTML={{ __html: renderMarkdown(briefing.content) }}
+          dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(renderMarkdown(briefing.content)) }}
         />
       </Card>
 

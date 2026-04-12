@@ -20,7 +20,7 @@ import {
   WarningOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import { txFetch } from '../../api';
+import { txFetchData } from '../../api';
 
 const { RangePicker } = DatePicker;
 const { Text } = Typography;
@@ -216,7 +216,7 @@ function PlansTab({ plans, loading, onRefresh }: PlansTabProps) {
   const handleCreate = async (values: Record<string, unknown>) => {
     setSubmitting(true);
     try {
-      await txFetch('/api/v1/ops/haccp/plans', {
+      await txFetchData('/api/v1/ops/haccp/plans', {
         method: 'POST',
         body: JSON.stringify({
           ...values,
@@ -238,7 +238,7 @@ function PlansTab({ plans, loading, onRefresh }: PlansTabProps) {
   const handleToggle = async (plan: HACCPPlan, enabled: boolean) => {
     setTogglingId(plan.id);
     try {
-      await txFetch(`/api/v1/ops/haccp/plans/${plan.id}`, {
+      await txFetchData(`/api/v1/ops/haccp/plans/${plan.id}`, {
         method: 'PATCH',
         body: JSON.stringify({ is_enabled: enabled }),
       });
@@ -474,9 +474,8 @@ function RecordsTab({ plans }: RecordsTabProps) {
       if (qualifiedFilter !== null) {
         params.set('is_qualified', String(qualifiedFilter));
       }
-      const res = await txFetch(`/api/v1/ops/haccp/records?${params.toString()}`);
-      const data = await res.json();
-      setRecords(data.items ?? data ?? []);
+      const data = await txFetchData<{ items?: unknown[] }>(`/api/v1/ops/haccp/records?${params.toString()}`);
+      setRecords((data as { items?: unknown[] }).items ?? (data as unknown[]) ?? []);
     } catch {
       setError('加载执行记录失败，请稍后重试');
     } finally {
@@ -518,7 +517,7 @@ function RecordsTab({ plans }: RecordsTabProps) {
     if (!selectedPlan) return;
     setSubmitting(true);
     try {
-      await txFetch('/api/v1/ops/haccp/records', {
+      await txFetchData('/api/v1/ops/haccp/records', {
         method: 'POST',
         body: JSON.stringify({
           plan_id: selectedPlan.id,
@@ -860,9 +859,8 @@ export function HACCPPage() {
     setStatsLoading(true);
     setStatsError(null);
     try {
-      const res = await txFetch('/api/v1/ops/haccp/stats');
-      const data = await res.json();
-      setStats(data);
+      const data = await txFetchData('/api/v1/ops/haccp/stats');
+      setStats(data as Parameters<typeof setStats>[0]);
     } catch {
       setStatsError('加载统计数据失败');
     } finally {
@@ -875,9 +873,8 @@ export function HACCPPage() {
     setPlansLoading(true);
     setPlansError(null);
     try {
-      const res = await txFetch('/api/v1/ops/haccp/plans');
-      const data = await res.json();
-      setPlans(data.items ?? data ?? []);
+      const data = await txFetchData<{ items?: unknown[] }>('/api/v1/ops/haccp/plans');
+      setPlans((data as { items?: unknown[] }).items ?? (data as unknown[]) ?? []);
     } catch {
       setPlansError('加载检查计划失败，请稍后重试');
     } finally {

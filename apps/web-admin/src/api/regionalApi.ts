@@ -2,7 +2,7 @@
  * 区域追踪 API — /api/v1/regional/*
  * 区域门店评分卡、整改任务、跨店对标
  */
-import { txFetch } from './index';
+import { txFetchData } from './index';
 
 // ─── 类型 ───
 
@@ -53,7 +53,7 @@ export async function fetchStoreScoreCards(
   region?: string,
 ): Promise<{ items: StoreScoreCard[] }> {
   const regionParam = region ? `?region=${encodeURIComponent(region)}` : '';
-  return txFetch(`/api/v1/regional/score-cards${regionParam}`);
+  return txFetchData<{ items: StoreScoreCard[] }>(`/api/v1/regional/score-cards${regionParam}`);
 }
 
 /** 整改任务列表 */
@@ -66,14 +66,14 @@ export async function fetchRectifyTasks(
   const params = new URLSearchParams({ page: String(page), size: String(size) });
   if (storeId) params.set('store_id', storeId);
   if (status) params.set('status', status);
-  return txFetch(`/api/v1/regional/rectify-tasks?${params.toString()}`);
+  return txFetchData<{ items: RectifyTask[]; total: number }>(`/api/v1/regional/rectify-tasks?${params.toString()}`);
 }
 
 /** 获取整改详情及时间线 */
 export async function fetchRectifyDetail(
   taskId: string,
 ): Promise<RectifyTask & { timeline: RectifyTimeline[] }> {
-  return txFetch(`/api/v1/regional/rectify-tasks/${encodeURIComponent(taskId)}`);
+  return txFetchData<RectifyTask & { timeline: RectifyTimeline[] }>(`/api/v1/regional/rectify-tasks/${encodeURIComponent(taskId)}`);
 }
 
 /** 创建整改任务 */
@@ -84,7 +84,7 @@ export async function createRectifyTask(
   deadline: string,
   assignee: string,
 ): Promise<{ task_id: string }> {
-  return txFetch('/api/v1/regional/rectify-tasks', {
+  return txFetchData<{ task_id: string }>('/api/v1/regional/rectify-tasks', {
     method: 'POST',
     body: JSON.stringify({ store_id: storeId, title, priority, deadline, assignee }),
   });
@@ -96,7 +96,7 @@ export async function updateRectifyStatus(
   status: RectifyStatus,
   note?: string,
 ): Promise<{ task_id: string; status: RectifyStatus }> {
-  return txFetch(`/api/v1/regional/rectify-tasks/${encodeURIComponent(taskId)}/status`, {
+  return txFetchData<{ task_id: string; status: RectifyStatus }>(`/api/v1/regional/rectify-tasks/${encodeURIComponent(taskId)}/status`, {
     method: 'PUT',
     body: JSON.stringify({ status, note }),
   });
@@ -108,5 +108,5 @@ export async function fetchBenchmark(
   region?: string,
 ): Promise<{ items: BenchmarkItem[] }> {
   const regionParam = region ? `&region=${encodeURIComponent(region)}` : '';
-  return txFetch(`/api/v1/regional/benchmark?metric=${encodeURIComponent(metric)}${regionParam}`);
+  return txFetchData<{ items: BenchmarkItem[] }>(`/api/v1/regional/benchmark?metric=${encodeURIComponent(metric)}${regionParam}`);
 }

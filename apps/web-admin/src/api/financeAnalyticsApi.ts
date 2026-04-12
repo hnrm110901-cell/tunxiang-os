@@ -2,7 +2,7 @@
  * 财务分析 API — /api/v1/finance/analytics/*
  * 收入构成、支付渠道、折扣结构、门店利润排行
  */
-import { txFetch } from './index';
+import { txFetchData } from './index';
 
 // ─── 类型 ───
 
@@ -53,7 +53,7 @@ export async function fetchRevenueComposition(
   period: 'day' | 'week' | 'month' = 'month',
 ): Promise<{ items: RevenueChannel[] }> {
   const storeParam = storeId ? `&store_id=${encodeURIComponent(storeId)}` : '';
-  return txFetch(`/api/v1/finance/analytics/revenue-composition?period=${period}${storeParam}`);
+  return txFetchData<{ items: RevenueChannel[] }>(`/api/v1/finance/analytics/revenue-composition?period=${period}${storeParam}`);
 }
 
 /** 支付渠道分布 */
@@ -62,7 +62,7 @@ export async function fetchPaymentMethodStats(
   period: 'day' | 'week' | 'month' = 'month',
 ): Promise<{ items: PaymentMethodStats[] }> {
   const storeParam = storeId ? `&store_id=${encodeURIComponent(storeId)}` : '';
-  return txFetch(`/api/v1/finance/analytics/payment-methods?period=${period}${storeParam}`);
+  return txFetchData<{ items: PaymentMethodStats[] }>(`/api/v1/finance/analytics/payment-methods?period=${period}${storeParam}`);
 }
 
 /** 折扣结构分析 */
@@ -71,14 +71,14 @@ export async function fetchDiscountStructure(
   period: 'day' | 'week' | 'month' = 'month',
 ): Promise<{ items: DiscountStructure[] }> {
   const storeParam = storeId ? `&store_id=${encodeURIComponent(storeId)}` : '';
-  return txFetch(`/api/v1/finance/analytics/discount-structure?period=${period}${storeParam}`);
+  return txFetchData<{ items: DiscountStructure[] }>(`/api/v1/finance/analytics/discount-structure?period=${period}${storeParam}`);
 }
 
 /** 门店利润排行 */
 export async function fetchStoreProfitRank(
   period: 'day' | 'week' | 'month' = 'month',
 ): Promise<{ items: StoreProfitRank[] }> {
-  return txFetch(`/api/v1/finance/analytics/store-profit-rank?period=${period}`);
+  return txFetchData<{ items: StoreProfitRank[] }>(`/api/v1/finance/analytics/store-profit-rank?period=${period}`);
 }
 
 /** 财务趋势 */
@@ -88,5 +88,5 @@ export async function fetchFinanceTrend(
   days = 30,
 ): Promise<{ items: FinanceTrend[] }> {
   const storeParam = storeId ? `&store_id=${encodeURIComponent(storeId)}` : '';
-  return txFetch(`/api/v1/finance/analytics/trend?period=${period}&days=${days}${storeParam}`);
+  return txFetchData<{ items: FinanceTrend[] }>(`/api/v1/finance/analytics/trend?period=${period}&days=${days}${storeParam}`);
 }

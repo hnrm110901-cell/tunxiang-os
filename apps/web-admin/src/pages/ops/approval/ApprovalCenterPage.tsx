@@ -12,7 +12,7 @@ import {
 } from 'antd';
 import { EyeOutlined, SearchOutlined, ClockCircleOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 const { Title, Text } = Typography;
 const { Search } = Input;
@@ -216,7 +216,7 @@ export function ApprovalCenterPage() {
         : '';
       const kwParam = kw ? `&keyword=${encodeURIComponent(kw)}` : '';
       const bizParam = biz ? `&business_type=${encodeURIComponent(biz)}` : '';
-      const res = await txFetch<InstanceListResponse>(
+      const res = await txFetchData<InstanceListResponse>(
         `/api/v1/ops/approvals/instances?page=${p}&size=20${statusParam}${kwParam}${bizParam}`,
       );
       setInstances(res.data?.items ?? []);
@@ -258,7 +258,7 @@ export function ApprovalCenterPage() {
     setDetailInstance(record);
     if (!record.steps || record.steps.length === 0) {
       try {
-        const full = await txFetch<ApprovalInstance>(`/api/v1/ops/approvals/instances/${record.id}`);
+        const full = await txFetchData<ApprovalInstance>(`/api/v1/ops/approvals/instances/${record.id}`);
         setDetailInstance(full.data ?? record);
       } catch {
         /* 使用列表数据 */

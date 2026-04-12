@@ -27,7 +27,7 @@ import {
   Typography,
 } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
-import { txFetch } from '../../api';
+import { txFetchData } from '../../api';
 
 const { Text } = Typography;
 
@@ -137,7 +137,7 @@ export function CampaignManagePage() {
     setStatsDrawerOpen(true);
     setStatsLoading(true);
     try {
-      const data = await txFetch<CampaignStats>(`/api/v1/growth/campaigns/${campaign.id}/stats`);
+      const data = await txFetchData<CampaignStats>(`/api/v1/growth/campaigns/${campaign.id}/stats`);
       setStats(data);
     } catch (e: unknown) {
       setStatsError(e instanceof Error ? e.message : '获取统计数据失败');
@@ -153,7 +153,7 @@ export function CampaignManagePage() {
     setNotifyDrawerOpen(true);
     setNotifyTasksLoading(true);
     try {
-      const data = await txFetch<{ items: NotificationTask[] }>(
+      const data = await txFetchData<{ items: NotificationTask[] }>(
         `/api/v1/growth/notifications/tasks?campaign_id=${campaign.id}`,
       );
       setNotifyTasks(data.items ?? []);
@@ -167,7 +167,7 @@ export function CampaignManagePage() {
   // 激活活动 draft → active
   const handleActivate = async (campaign: Campaign) => {
     try {
-      await txFetch(`/api/v1/growth/campaigns/${campaign.id}/activate`, { method: 'POST' });
+      await txFetchData(`/api/v1/growth/campaigns/${campaign.id}/activate`, { method: 'POST' });
       message.success('活动已激活');
       actionRef.current?.reload();
     } catch (e: unknown) {
@@ -178,7 +178,7 @@ export function CampaignManagePage() {
   // 结束活动 active → ended
   const handleEnd = async (campaign: Campaign) => {
     try {
-      await txFetch(`/api/v1/growth/campaigns/${campaign.id}/end`, { method: 'POST' });
+      await txFetchData(`/api/v1/growth/campaigns/${campaign.id}/end`, { method: 'POST' });
       message.success('活动已结束');
       actionRef.current?.reload();
     } catch (e: unknown) {
@@ -192,7 +192,7 @@ export function CampaignManagePage() {
     setSendingNotify(true);
     setSendError(null);
     try {
-      await txFetch('/api/v1/growth/notifications/send-campaign', {
+      await txFetchData('/api/v1/growth/notifications/send-campaign', {
         method: 'POST',
         body: JSON.stringify({
           campaign_id: selectedCampaign.id,
@@ -202,7 +202,7 @@ export function CampaignManagePage() {
       });
       message.success('推送已发送');
       // 刷新发送记录
-      const data = await txFetch<{ items: NotificationTask[] }>(
+      const data = await txFetchData<{ items: NotificationTask[] }>(
         `/api/v1/growth/notifications/tasks?campaign_id=${selectedCampaign.id}`,
       );
       setNotifyTasks(data.items ?? []);
@@ -348,7 +348,7 @@ export function CampaignManagePage() {
           if (start_time_gte) query.set('start_time_gte', String(start_time_gte));
           if (start_time_lte) query.set('start_time_lte', String(start_time_lte));
           try {
-            const data = await txFetch<{ items: Campaign[]; total: number }>(
+            const data = await txFetchData<{ items: Campaign[]; total: number }>(
               `/api/v1/growth/campaigns/?${query.toString()}`,
             );
             return { data: data.items, total: data.total, success: true };
@@ -379,7 +379,7 @@ export function CampaignManagePage() {
         onFinish={async (values) => {
           try {
             const [start_time, end_time] = (values.time_range as [string, string]) ?? [];
-            await txFetch('/api/v1/growth/campaigns/', {
+            await txFetchData('/api/v1/growth/campaigns/', {
               method: 'POST',
               body: JSON.stringify({
                 name: values.name,
@@ -446,7 +446,7 @@ export function CampaignManagePage() {
           placeholder="请选择优惠券（可选）"
           request={async () => {
             try {
-              const data = await txFetch<{ items: AvailableCoupon[] }>(
+              const data = await txFetchData<{ items: AvailableCoupon[] }>(
                 '/api/v1/growth/coupons/available',
               );
               return (data.items ?? []).map((c) => ({ value: c.id, label: c.name }));

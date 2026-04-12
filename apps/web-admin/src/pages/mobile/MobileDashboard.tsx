@@ -6,7 +6,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MobileLayout } from '../../components/MobileLayout';
-import { txFetch } from '../../api/client';
+import { txFetchData } from '../../api/client';
 
 // ─── 类型 ───
 
@@ -98,7 +98,7 @@ export function MobileDashboard() {
     let cancelled = false;
     setLoading(true);
 
-    txFetch<MobileDashboardData>('/api/v1/analytics/dashboard?store_id=all')
+    txFetchData<MobileDashboardData>('/api/v1/analytics/dashboard?store_id=all')
       .then(res => {
         if (!cancelled) setData(res.data ?? MOCK_DATA);
       })

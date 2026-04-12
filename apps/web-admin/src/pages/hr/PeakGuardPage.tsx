@@ -62,7 +62,7 @@ import {
   WarningOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import { txFetch } from '../../api/client';
+import { txFetchData } from '../../api/client';
 
 const { Title, Text } = Typography;
 
@@ -176,7 +176,7 @@ export default function PeakGuardPage() {
   const loadDashboard = async () => {
     setDashLoading(true);
     try {
-      const res = await txFetch<DashboardData>('/api/v1/peak-guard/dashboard');
+      const res = await txFetchData<DashboardData>('/api/v1/peak-guard/dashboard');
       if (res.data) setDashboard(res.data);
     } catch {
       message.error('加载仪表板失败');
@@ -187,7 +187,7 @@ export default function PeakGuardPage() {
 
   const loadAlerts = async () => {
     try {
-      const res = await txFetch<{ items: PeakGuardRecord[] }>('/api/v1/peak-guard/alerts');
+      const res = await txFetchData<{ items: PeakGuardRecord[] }>('/api/v1/peak-guard/alerts');
       if (res.data) setAlerts(res.data.items);
     } catch {
       /* silent */
@@ -196,7 +196,7 @@ export default function PeakGuardPage() {
 
   const loadUpcoming = async () => {
     try {
-      const res = await txFetch<{ items: PeakGuardRecord[] }>('/api/v1/peak-guard/upcoming');
+      const res = await txFetchData<{ items: PeakGuardRecord[] }>('/api/v1/peak-guard/upcoming');
       if (res.data) setUpcoming(res.data.items);
     } catch {
       /* silent */
@@ -220,7 +220,7 @@ export default function PeakGuardPage() {
 
   const openDetail = async (record: PeakGuardRecord) => {
     try {
-      const res = await txFetch<PeakGuardRecord>(`/api/v1/peak-guard/${record.id}`);
+      const res = await txFetchData<PeakGuardRecord>(`/api/v1/peak-guard/${record.id}`);
       setDetailRecord(res.data ?? record);
     } catch {
       setDetailRecord(record);
@@ -233,14 +233,14 @@ export default function PeakGuardPage() {
     try {
       const values = await actionForm.validateFields();
       setActionSubmitting(true);
-      await txFetch(`/api/v1/peak-guard/${detailRecord.id}/actions`, {
+      await txFetchData(`/api/v1/peak-guard/${detailRecord.id}/actions`, {
         method: 'POST',
         body: JSON.stringify(values),
       });
       message.success('行动已追加');
       actionForm.resetFields();
       // 刷新详情
-      const res = await txFetch<PeakGuardRecord>(`/api/v1/peak-guard/${detailRecord.id}`);
+      const res = await txFetchData<PeakGuardRecord>(`/api/v1/peak-guard/${detailRecord.id}`);
       if (res.data) setDetailRecord(res.data);
       refreshAll();
     } catch {
@@ -264,7 +264,7 @@ export default function PeakGuardPage() {
     if (!evalRecord || evalScore === null) return;
     setEvalSubmitting(true);
     try {
-      const res = await txFetch<{ effectiveness: number }>(
+      const res = await txFetchData<{ effectiveness: number }>(
         `/api/v1/peak-guard/${evalRecord.id}/evaluate`,
         {
           method: 'PUT',
@@ -276,7 +276,7 @@ export default function PeakGuardPage() {
       refreshAll();
       // 刷新详情（如果打开中）
       if (detailRecord?.id === evalRecord.id) {
-        const detailRes = await txFetch<PeakGuardRecord>(`/api/v1/peak-guard/${evalRecord.id}`);
+        const detailRes = await txFetchData<PeakGuardRecord>(`/api/v1/peak-guard/${evalRecord.id}`);
         if (detailRes.data) setDetailRecord(detailRes.data);
       }
     } catch {
@@ -296,7 +296,7 @@ export default function PeakGuardPage() {
       okType: 'danger',
       onOk: async () => {
         try {
-          await txFetch(`/api/v1/peak-guard/${record.id}`, { method: 'DELETE' });
+          await txFetchData(`/api/v1/peak-guard/${record.id}`, { method: 'DELETE' });
           message.success('已删除');
           refreshAll();
         } catch {
@@ -595,7 +595,7 @@ export default function PeakGuardPage() {
       modalProps={{ destroyOnClose: true }}
       onFinish={async (values: Record<string, unknown>) => {
         try {
-          await txFetch('/api/v1/peak-guard', {
+          await txFetchData('/api/v1/peak-guard', {
             method: 'POST',
             body: JSON.stringify(values),
           });
@@ -856,7 +856,7 @@ export default function PeakGuardPage() {
             query.set('coverage_below', String(coverage_below));
 
           try {
-            const res = await txFetch<{ items: PeakGuardRecord[]; total: number }>(
+            const res = await txFetchData<{ items: PeakGuardRecord[]; total: number }>(
               `/api/v1/peak-guard?${query.toString()}`,
             );
             return {

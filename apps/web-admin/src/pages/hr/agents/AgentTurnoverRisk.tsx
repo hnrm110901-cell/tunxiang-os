@@ -38,7 +38,7 @@ import {
   ProColumns,
   ProTable,
 } from '@ant-design/pro-components';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 const { Title, Text } = Typography;
 
@@ -96,7 +96,7 @@ export default function AgentTurnoverRisk() {
   const load = async () => {
     setLoading(true);
     try {
-      const resp = await txFetch<{ data: RiskResp }>(
+      const resp = await txFetchData<{ data: RiskResp }>(
         '/api/v1/agent/turnover_risk/calculate_risk_score',
         { method: 'POST', body: JSON.stringify({}) },
       );

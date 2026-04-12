@@ -6,7 +6,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Card, Tabs, Table, Tag, Switch, message, Space, Spin } from 'antd';
 import { SettingOutlined } from '@ant-design/icons';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 // ---- 颜色常量（深色主题） ----
 const PAGE_BG = '#0d1e28';
@@ -56,7 +56,7 @@ function TemplateManageTab() {
   const fetchTemplates = useCallback(async () => {
     setLoading(true);
     try {
-      const resp = await txFetch<{ items: JourneyTemplate[]; total: number }>(
+      const resp = await txFetchData<{ items: JourneyTemplate[]; total: number }>(
         '/api/v1/growth/journey-templates?size=100'
       );
       if (resp.data) setTemplates(resp.data.items);
@@ -72,7 +72,7 @@ function TemplateManageTab() {
   const handleToggle = async (id: string, active: boolean) => {
     try {
       const action = active ? 'activate' : 'deactivate';
-      await txFetch(`/api/v1/growth/journey-templates/${id}/${action}`, { method: 'POST' });
+      await txFetchData(`/api/v1/growth/journey-templates/${id}/${action}`, { method: 'POST' });
       message.success(active ? '已激活' : '已停用');
       fetchTemplates();
     } catch (err) {
@@ -204,7 +204,7 @@ function AuditLogTab() {
   useEffect(() => {
     (async () => {
       try {
-        const resp = await txFetch<{ items: AuditItem[]; total: number }>(
+        const resp = await txFetchData<{ items: AuditItem[]; total: number }>(
           '/api/v1/growth/agent-suggestions?size=50'
         );
         if (resp.data) setItems(resp.data.items);

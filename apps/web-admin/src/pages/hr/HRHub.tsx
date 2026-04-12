@@ -20,7 +20,7 @@ import {
   TeamOutlined,
   WarningOutlined,
 } from '@ant-design/icons';
-import { txFetch } from '../../api';
+import { txFetchData } from '../../api';
 
 const { Title, Text } = Typography;
 
@@ -49,7 +49,7 @@ export default function HRHub() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    txFetch<HRDashboardData>('/api/v1/hr/dashboard')
+    txFetchData<HRDashboardData>('/api/v1/hr/dashboard')
       .then((resp) => setData(resp.data))
       .catch(() => message.error('加载人力中枢数据失败'))
       .finally(() => setLoading(false));

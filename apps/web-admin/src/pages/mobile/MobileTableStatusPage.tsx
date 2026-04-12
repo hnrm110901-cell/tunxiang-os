@@ -5,7 +5,7 @@
  */
 import { useState, useEffect, useRef } from 'react';
 import { MobileLayout } from '../../components/MobileLayout';
-import { txFetch } from '../../api/client';
+import { txFetchData } from '../../api/client';
 
 // ─── 类型 ───
 
@@ -112,7 +112,7 @@ export function MobileTableStatusPage() {
   const fetchTables = (storeId: string) => {
     setLoading(true);
 
-    txFetch<TableItem[]>(`/api/v1/trade/tables?store_id=${storeId}`)
+    txFetchData<TableItem[]>(`/api/v1/trade/tables?store_id=${storeId}`)
       .then(res => {
         setTables(res.data ?? generateMockTables(storeId));
       })

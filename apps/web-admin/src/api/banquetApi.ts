@@ -5,7 +5,7 @@
  * 后端路由前缀：/api/v1/banquets（banquet_routes.py）
  * txFetch 会自动注入 X-Tenant-ID header
  */
-import { txFetch } from './index';
+import { txFetchData } from './index';
 
 // ─── 类型定义 ───
 
@@ -118,7 +118,7 @@ export async function fetchBanquetFunnel(
   storeId?: string,
 ): Promise<BanquetFunnelData> {
   const query = storeId ? `?store_id=${encodeURIComponent(storeId)}` : '';
-  return txFetch(`/api/v1/banquet/funnel${query}`);
+  return txFetchData<BanquetFunnelData>(`/api/v1/banquet/funnel${query}`);
 }
 
 /** 获取宴会列表（分页 + 筛选） */
@@ -133,14 +133,14 @@ export async function fetchBanquetList(
   if (filters.keyword) params.set('keyword', filters.keyword);
   params.set('page', String(filters.page || 1));
   params.set('size', String(filters.size || 20));
-  return txFetch(`/api/v1/banquet/list?${params.toString()}`);
+  return txFetchData<{ items: BanquetListItem[]; total: number }>(`/api/v1/banquet/list?${params.toString()}`);
 }
 
 /** 获取宴会详情（含时间轴） */
 export async function fetchBanquetDetail(
   contractId: string,
 ): Promise<BanquetDetail> {
-  return txFetch(
+  return txFetchData<BanquetDetail>(
     `/api/v1/banquets/contracts/${encodeURIComponent(contractId)}`,
   );
 }
@@ -150,14 +150,14 @@ export async function fetchBanquetKPIs(
   storeId?: string,
 ): Promise<BanquetKPIs> {
   const query = storeId ? `?store_id=${encodeURIComponent(storeId)}` : '';
-  return txFetch(`/api/v1/banquet/kpis${query}`);
+  return txFetchData<BanquetKPIs>(`/api/v1/banquet/kpis${query}`);
 }
 
 /** 创建新宴会线索 — POST /api/v1/banquets/leads */
 export async function createBanquetLead(
   payload: CreateLeadPayload,
 ): Promise<{ lead_id: string; contract_id: string }> {
-  return txFetch('/api/v1/banquets/leads', {
+  return txFetchData<{ lead_id: string; contract_id: string }>('/api/v1/banquets/leads', {
     method: 'POST',
     body: JSON.stringify({
       customer_name: payload.customer_name,
@@ -178,7 +178,7 @@ export async function advanceBanquetStage(
   leadId: string,
   targetStage: string,
 ): Promise<{ lead_id: string; stage: string }> {
-  return txFetch(
+  return txFetchData<{ lead_id: string; stage: string }>(
     `/api/v1/banquets/leads/${encodeURIComponent(leadId)}/stage?target_stage=${encodeURIComponent(targetStage)}`,
     { method: 'PUT' },
   );

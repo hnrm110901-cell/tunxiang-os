@@ -41,7 +41,7 @@ import {
   SettingOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
-import { txFetch, txFetchData } from '../../../api';
+import { txFetchData } from '../../../api';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -94,28 +94,28 @@ async function fetchLiveSeafood(
 ): Promise<{ items: LiveSeafoodDish[]; total: number }> {
   const params = new URLSearchParams({ store_id: storeId });
   if (inStockOnly) params.set('in_stock_only', 'true');
-  const res = await txFetch<{ items: LiveSeafoodDish[]; total: number }>(
+  const res = await txFetchData<{ items: LiveSeafoodDish[]; total: number }>(
     `/api/v1/menu/live-seafood?${params.toString()}`,
   );
   return res.data ?? { items: [], total: 0 };
 }
 
 async function fetchLiveSeafoodStats(storeId: string): Promise<LiveSeafoodStats> {
-  const res = await txFetch<LiveSeafoodStats>(
+  const res = await txFetchData<LiveSeafoodStats>(
     `/api/v1/menu/live-seafood/stats?store_id=${storeId}`,
   );
   return res.data ?? { total_species: 0, today_sales_fen: 0, avg_survival_rate: 0, low_stock_count: 0 };
 }
 
 async function fetchTankZoneList(): Promise<{ items: TankZone[]; total: number }> {
-  const res = await txFetch<{ items: TankZone[]; total: number }>(
+  const res = await txFetchData<{ items: TankZone[]; total: number }>(
     '/api/v1/menu/live-seafood/tanks',
   );
   return res.data ?? { items: [], total: 0 };
 }
 
 async function fetchTankDishes(zoneCode: string): Promise<LiveSeafoodDish[]> {
-  const res = await txFetch<{ items: LiveSeafoodDish[] }>(
+  const res = await txFetchData<{ items: LiveSeafoodDish[] }>(
     `/api/v1/menu/live-seafood/tanks/${encodeURIComponent(zoneCode)}/dishes`,
   );
   return res.data?.items ?? [];
@@ -125,7 +125,7 @@ async function patchLiveSeafood(
   dishId: string,
   payload: Partial<Omit<LiveSeafoodDish, 'dish_id' | 'dish_name' | 'tank_zone_name' | 'current_stock'>>,
 ): Promise<void> {
-  await txFetch<LiveSeafoodDish>(`/api/v1/menu/live-seafood/${dishId}`, {
+  await txFetchData<LiveSeafoodDish>(`/api/v1/menu/live-seafood/${dishId}`, {
     method: 'PATCH',
     body: JSON.stringify(payload),
   });
@@ -137,7 +137,7 @@ async function adjustStock(
   deltaWeightG: number,
   reason: string,
 ): Promise<void> {
-  await txFetch<void>(`/api/v1/menu/live-seafood/stocks/${dishId}`, {
+  await txFetchData<void>(`/api/v1/menu/live-seafood/stocks/${dishId}`, {
     method: 'PATCH',
     body: JSON.stringify({ delta_count: deltaCount, delta_weight_g: deltaWeightG, reason }),
   });
@@ -155,7 +155,7 @@ async function fetchTankZones(): Promise<{ items: TankZone[]; total: number }> {
 async function createTankZone(
   payload: Omit<TankZone, 'id'>,
 ): Promise<TankZone> {
-  const res = await txFetch<TankZone>('/api/v1/menu/tank-zones', {
+  const res = await txFetchData<TankZone>('/api/v1/menu/tank-zones', {
     method: 'POST',
     body: JSON.stringify(payload),
   });

@@ -28,7 +28,6 @@ interface PrepItem {
 // ─── Constants ───
 
 const API_BASE = (window as any).__STORE_API_BASE__ || '';
-const TENANT_ID = (window as any).__TENANT_ID__ || '';
 const STORE_ID = (window as any).__STORE_ID__ || '';
 const DEPT_ID = (window as any).__KDS_DEPT_ID__ || '';
 
@@ -130,15 +129,12 @@ export function PrepRecommendationPanel() {
     try {
       const params = new URLSearchParams({ store_id: STORE_ID });
       if (DEPT_ID) params.set('dept_id', DEPT_ID);
-      const res = await txFetch(
+      const data = await txFetch<{ items: PrepItem[] }>(
         `${API_BASE}/api/v1/kds/prep/recommendations?${params.toString()}`,
         undefined,
-        TENANT_ID,
       );
-      if (res.ok) {
-        setItems(res.data.items as PrepItem[]);
-        setError(null);
-      }
+      setItems(data.items);
+      setError(null);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : '加载失败');
     } finally {

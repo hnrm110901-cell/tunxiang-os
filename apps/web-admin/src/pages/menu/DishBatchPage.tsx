@@ -4,7 +4,7 @@
  * 技术栈：Ant Design 5.x + ProComponents
  */
 import { useRef, useState, useEffect, useCallback } from 'react';
-import { txFetch } from '../../api';
+import { txFetchData } from '../../api';
 import {
   ProTable,
   ModalForm,
@@ -72,7 +72,7 @@ async function apiFetchDishes(page: number, catId?: string): Promise<{ items: Di
   try {
     const params = new URLSearchParams({ page: String(page) });
     if (catId) params.set('category_id', catId);
-    const res = await txFetch<{ items: DishBatchItem[]; total: number }>(
+    const res = await txFetchData<{ items: DishBatchItem[]; total: number }>(
       `/api/v1/menu/dishes?${params.toString()}`
     );
     return res ?? { items: [], total: 0 };
@@ -82,14 +82,14 @@ async function apiFetchDishes(page: number, catId?: string): Promise<{ items: Di
 }
 
 async function apiBatchToggle(ids: string[], is_available: boolean): Promise<void> {
-  await txFetch('/api/v1/menu/dishes/batch-toggle', {
+  await txFetchData('/api/v1/menu/dishes/batch-toggle', {
     method: 'POST',
     body: JSON.stringify({ ids, is_available }),
   });
 }
 
 async function apiBatchPrice(ids: string[], price_fen: number): Promise<void> {
-  await txFetch('/api/v1/menu/dishes/batch-price', {
+  await txFetchData('/api/v1/menu/dishes/batch-price', {
     method: 'POST',
     body: JSON.stringify({ ids, price_fen }),
   });
@@ -97,7 +97,7 @@ async function apiBatchPrice(ids: string[], price_fen: number): Promise<void> {
 
 async function apiFetchCategories(): Promise<CategoryOption[]> {
   try {
-    const res = await txFetch<{ items: Array<{ category_id: string; category_name: string }> }>(
+    const res = await txFetchData<{ items: Array<{ category_id: string; category_name: string }> }>(
       '/api/v1/menu/categories'
     );
     return (res?.items ?? []).map((c) => ({ value: c.category_id, label: c.category_name }));
@@ -300,7 +300,7 @@ export function DishBatchPage() {
         await apiBatchPrice(selectedRowKeys, value);
       } else {
         // ratio 模式：先获取当前菜品价格，再逐一计算（或由后端支持 ratio 参数）
-        await txFetch('/api/v1/menu/dishes/batch-price', {
+        await txFetchData('/api/v1/menu/dishes/batch-price', {
           method: 'POST',
           body: JSON.stringify({ ids: selectedRowKeys, adjust_type: 'ratio', ratio: value }),
         });
@@ -317,7 +317,7 @@ export function DishBatchPage() {
   // ── 批量设置标签 ──
   const handleBatchTag = async (values: { tags: ('recommended' | 'new' | 'limited')[] }) => {
     try {
-      await txFetch('/api/v1/menu/dishes/batch-tags', {
+      await txFetchData('/api/v1/menu/dishes/batch-tags', {
         method: 'POST',
         body: JSON.stringify({ ids: selectedRowKeys, tags: values.tags }),
       });
@@ -334,7 +334,7 @@ export function DishBatchPage() {
   const handleBatchCategory = async (values: { category_id: string }) => {
     const cat = categories.find((c) => c.value === values.category_id);
     try {
-      await txFetch('/api/v1/menu/dishes/batch-category', {
+      await txFetchData('/api/v1/menu/dishes/batch-category', {
         method: 'POST',
         body: JSON.stringify({ ids: selectedRowKeys, category_id: values.category_id }),
       });

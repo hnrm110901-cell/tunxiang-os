@@ -41,7 +41,7 @@ import {
   ClockCircleOutlined,
   ReloadOutlined,
 } from '@ant-design/icons';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 const { Title, Text } = Typography;
 const TX_PRIMARY = '#FF6B35';
@@ -158,7 +158,7 @@ export default function LeaveApprovalBoard() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await txFetch<{ store_id: string; store_name: string }[]>('/api/v1/org/stores');
+        const res = await txFetchData<{ store_id: string; store_name: string }[]>('/api/v1/org/stores');
         const list = res.data ?? [];
         setStores(list);
         if (list.length > 0) setStoreId(list[0].store_id);
@@ -173,9 +173,9 @@ export default function LeaveApprovalBoard() {
     setLoading(true);
     try {
       const [pendingRes, approvedRes, rejectedRes] = await Promise.all([
-        txFetch<{ items: LeaveCard[] }>(`/api/v1/leave-requests?store_id=${storeId}&status=pending&size=50`),
-        txFetch<{ items: LeaveCard[] }>(`/api/v1/leave-requests?store_id=${storeId}&status=approved&size=50`),
-        txFetch<{ items: LeaveCard[] }>(`/api/v1/leave-requests?store_id=${storeId}&status=rejected&size=50`),
+        txFetchData<{ items: LeaveCard[] }>(`/api/v1/leave-requests?store_id=${storeId}&status=pending&size=50`),
+        txFetchData<{ items: LeaveCard[] }>(`/api/v1/leave-requests?store_id=${storeId}&status=approved&size=50`),
+        txFetchData<{ items: LeaveCard[] }>(`/api/v1/leave-requests?store_id=${storeId}&status=rejected&size=50`),
       ]);
       setBoardData({
         pending: pendingRes.data?.items ?? [],
@@ -218,7 +218,7 @@ export default function LeaveApprovalBoard() {
 
     if (targetCol === 'approved') {
       try {
-        await txFetch(`/api/v1/leave-requests/${cardId}/approve`, {
+        await txFetchData(`/api/v1/leave-requests/${cardId}/approve`, {
           method: 'POST',
           body: JSON.stringify({ comment: '看板拖拽审批通过' }),
         });
@@ -229,7 +229,7 @@ export default function LeaveApprovalBoard() {
       }
     } else if (targetCol === 'rejected') {
       try {
-        await txFetch(`/api/v1/leave-requests/${cardId}/reject`, {
+        await txFetchData(`/api/v1/leave-requests/${cardId}/reject`, {
           method: 'POST',
           body: JSON.stringify({ comment: '看板拖拽拒绝' }),
         });
@@ -328,7 +328,7 @@ export default function LeaveApprovalBoard() {
             <Button key="reject" danger onClick={async () => {
               if (!actionTarget) return;
               try {
-                await txFetch(`/api/v1/leave-requests/${actionTarget.id}/reject`, {
+                await txFetchData(`/api/v1/leave-requests/${actionTarget.id}/reject`, {
                   method: 'POST',
                   body: JSON.stringify({ comment: '' }),
                 });
@@ -347,7 +347,7 @@ export default function LeaveApprovalBoard() {
         onFinish={async (values) => {
           if (!actionTarget) return false;
           try {
-            await txFetch(`/api/v1/leave-requests/${actionTarget.id}/approve`, {
+            await txFetchData(`/api/v1/leave-requests/${actionTarget.id}/approve`, {
               method: 'POST',
               body: JSON.stringify({ comment: values.comment }),
             });

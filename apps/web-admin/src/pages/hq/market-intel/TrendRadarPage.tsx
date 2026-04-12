@@ -4,7 +4,7 @@
  * 调用 /api/v1/analytics/competitive 获取竞品/趋势数据，降级展示手写 SVG 条形图
  */
 import { useState, useEffect } from 'react';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 // ---- 颜色常量 ----
 const BG   = '#0d1e28';
@@ -64,7 +64,7 @@ const FALLBACK_SIGNALS: TrendSignal[] = [
 // ---- API ----
 async function fetchTrendSignals(): Promise<{ signals: TrendSignal[]; isFallback: boolean }> {
   try {
-    const data = await txFetch<CompetitiveData>('/api/v1/analytics/competitive?store_id=hq');
+    const data = await txFetchData<CompetitiveData>('/api/v1/analytics/competitive?store_id=hq');
     // 如果后端返回了 trends 字段就用真实数据
     if (data?.trends?.length) {
       return { signals: data.trends, isFallback: false };

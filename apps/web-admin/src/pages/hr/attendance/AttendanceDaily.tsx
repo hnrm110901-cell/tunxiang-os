@@ -27,7 +27,7 @@ import { ProTable } from '@ant-design/pro-components';
 import type { ActionType, ProColumns } from '@ant-design/pro-components';
 import { FileTextOutlined } from '@ant-design/icons';
 import dayjs, { Dayjs } from 'dayjs';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 const { Title } = Typography;
 const TX_PRIMARY = '#FF6B35';
@@ -65,7 +65,7 @@ export default function AttendanceDaily() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await txFetch<{ store_id: string; store_name: string }[]>('/api/v1/org/stores');
+        const res = await txFetchData<{ store_id: string; store_name: string }[]>('/api/v1/org/stores');
         const list = res.data ?? [];
         setStores(list);
         if (list.length > 0) setStoreId(list[0].store_id);
@@ -130,7 +130,7 @@ export default function AttendanceDaily() {
           columns={columns}
           request={async (params) => {
             if (!storeId) return { data: [], total: 0, success: true };
-            const res = await txFetch<{ items: DailyRecord[]; total: number }>(
+            const res = await txFetchData<{ items: DailyRecord[]; total: number }>(
               `/api/v1/attendance/daily?store_id=${storeId}&date=${date.format('YYYY-MM-DD')}&page=${params.current ?? 1}&size=${params.pageSize ?? 20}`,
             );
             return {

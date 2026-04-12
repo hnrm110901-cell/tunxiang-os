@@ -44,7 +44,7 @@ import {
 import { ProTable } from '@ant-design/pro-components';
 import type { ProColumns, ActionType } from '@ant-design/pro-components';
 import dayjs, { Dayjs } from 'dayjs';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 const { Title, Text } = Typography;
 
@@ -249,7 +249,7 @@ export default function StoreOpsToday() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await txFetch<StoreOption[]>('/api/v1/org/stores');
+        const res = await txFetchData<StoreOption[]>('/api/v1/org/stores');
         const list = res.data ?? [];
         setStores(list);
         if (list.length > 0) setStoreId(list[0].store_id);
@@ -264,7 +264,7 @@ export default function StoreOpsToday() {
     if (!storeId) return;
     setLoading(true);
     try {
-      const res = await txFetch<TodayOverview>(
+      const res = await txFetchData<TodayOverview>(
         `/api/v1/store-ops/today?store_id=${storeId}&date=${date.format('YYYY-MM-DD')}`,
       );
       setData(res.data);

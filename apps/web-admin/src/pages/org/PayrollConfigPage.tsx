@@ -9,7 +9,7 @@
  *  - 搜索栏：employee_role + store_id + is_active
  *
  * API 基地址: /api/v1/payroll/configs
- * X-Tenant-ID 通过 txFetch 统一注入
+ * X-Tenant-ID 通过 txFetchData 统一注入
  */
 
 import { useRef, useState } from 'react';
@@ -32,7 +32,7 @@ import {
   ProFormDigit,
   ProTable,
 } from '@ant-design/pro-components';
-import { txFetch } from '../../api';
+import { txFetchData } from '../../api';
 
 // ─── 类型 ────────────────────────────────────────────────────────────────────
 
@@ -206,7 +206,7 @@ export function PayrollConfigPage() {
     query.set('size',  String(params.pageSize ?? 20));
 
     try {
-      const data = await txFetch<ConfigListResp>(
+      const data = await txFetchData<ConfigListResp>(
         `/api/v1/payroll/configs?${query.toString()}`,
       );
       return { data: data.items, total: data.total, success: true };
@@ -228,13 +228,13 @@ export function PayrollConfigPage() {
 
     try {
       if (editingRecord) {
-        await txFetch(`/api/v1/payroll/configs/${editingRecord.id}`, {
+        await txFetchData(`/api/v1/payroll/configs/${editingRecord.id}`, {
           method: 'PUT',
           body: JSON.stringify(payload),
         });
         messageApi.success('薪资方案已更新');
       } else {
-        await txFetch('/api/v1/payroll/configs', {
+        await txFetchData('/api/v1/payroll/configs', {
           method: 'POST',
           body: JSON.stringify(payload),
         });
@@ -253,7 +253,7 @@ export function PayrollConfigPage() {
 
   const handleDelete = async (id: string) => {
     try {
-      await txFetch(`/api/v1/payroll/configs/${id}`, { method: 'DELETE' });
+      await txFetchData(`/api/v1/payroll/configs/${id}`, { method: 'DELETE' });
       messageApi.success('方案已删除');
       actionRef.current?.reload();
     } catch (err) {
