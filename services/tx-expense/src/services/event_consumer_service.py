@@ -79,6 +79,9 @@ async def process_event(
             elif event_type == "org.employee.departed":
                 await _handle_employee_departure(db, UUID(tenant_id), payload)
 
+            elif event_type == "expense.application.submitted":
+                await _handle_application_submitted(db, UUID(tenant_id), payload)
+
             elif event_type == "supply.purchase_order.goods_received":
                 # P1实现：采购付款联动
                 log.info(
@@ -165,6 +168,41 @@ async def _handle_daily_close(
     log.info(
         "daily_close_handled",
         store_id=str(store_id),
+        tenant_id=str(tenant_id),
+        result=result,
+    )
+
+
+async def _handle_application_submitted(
+    db: Any,
+    tenant_id: UUID,
+    payload: dict[str, Any],
+) -> None:
+    """处理 expense.application.submitted 事件，触发 A2 发票核验。
+
+    payload 预期字段：
+      application_id  (str UUID, 必填)
+    """
+    try:
+        from src.agents.a2_invoice_verifier import run as a2_run
+    except ImportError:
+        log.warning(
+            "a2_agent_not_available",
+            trigger="application_submitted",
+            note="A2 agent not yet implemented; skipping.",
+        )
+        return
+
+    application_id = UUID(payload["application_id"])
+    result = await a2_run(
+        db=db,
+        tenant_id=tenant_id,
+        trigger="application_submitted",
+        payload={"application_id": application_id},
+    )
+    log.info(
+        "invoice_verification_triggered",
+        application_id=str(application_id),
         tenant_id=str(tenant_id),
         result=result,
     )
