@@ -7,6 +7,11 @@
 4. 综合结果生成最终决策
 5. 写入 AgentDecisionLog 留痕
 
+增强功能（P0-5/6/7）：
+- Session 生命周期：每次编排包裹在 SessionRun 中，全过程留痕
+- 人工确认节点：requires_human_confirm 步骤执行后暂停等待审批
+- Step 重试机制：失败步骤自动重试，max_retries 控制上限
+
 关键约束：三条硬约束（毛利底线 / 食安合规 / 客户体验）在 synthesize 阶段校验。
 """
 from __future__ import annotations
@@ -37,6 +42,7 @@ class StepStatus(str, Enum):
     COMPLETED = "completed"
     FAILED = "failed"
     SKIPPED = "skipped"
+    PAUSED = "paused"
 
 
 @dataclass
@@ -51,6 +57,11 @@ class ExecutionStep:
     status: StepStatus = StepStatus.PENDING
     result: Optional[AgentResult] = None
     error: Optional[str] = None
+    # P0-6: 人工确认节点
+    requires_human_confirm: bool = False
+    # P0-7: Step 重试机制
+    max_retries: int = 0
+    retry_count: int = 0
 
 
 @dataclass
@@ -77,6 +88,18 @@ class OrchestratorResult:
     confidence: float
     plan_steps: list = field(default_factory=list)  # ExecutionPlan.steps 摘要（用于决策留痕）
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    # P0-5: Session 关联
+    session_id: Optional[str] = None
+    # P0-6: 暂停标记
+    paused: bool = False
+    checkpoint_id: Optional[str] = None
+
+
+def _generate_session_id() -> str:
+    """生成可读的 session_id: SR-{YYYYMMDD}-{short_uuid[:8]}"""
+    date_str = datetime.now(timezone.utc).strftime("%Y%m%d")
+    short = uuid.uuid4().hex[:8]
+    return f"SR-{date_str}-{short}"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -105,21 +128,244 @@ class AgentOrchestrator:
         model_router: Any,          # ModelRouter 实例
         tenant_id: str,
         store_id: Optional[str] = None,
+        db: Any = None,             # P0-5: AsyncSession（可选，无DB时降级为无状态模式）
     ) -> None:
         self.master = master_agent
         self.router = model_router
         self.tenant_id = tenant_id
         self.store_id = store_id
+        self.db = db
+        # P0-5: Session 事件序号计数器（每次 orchestrate 重置）
+        self._event_seq: int = 0
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # Session 辅助方法（P0-5）
+    # ─────────────────────────────────────────────────────────────────────────
+
+    def _next_seq(self) -> int:
+        """递增并返回下一个事件序号"""
+        self._event_seq += 1
+        return self._event_seq
+
+    async def _create_session_run(
+        self,
+        trigger: AgentEvent | str,
+    ) -> str:
+        """创建 SessionRun 记录，返回 session_id"""
+        from ..models.session_run import SessionRun
+
+        session_id = _generate_session_id()
+        trigger_type = "event" if isinstance(trigger, AgentEvent) else "user_command"
+
+        run = SessionRun(
+            tenant_id=self.tenant_id,
+            session_id=session_id,
+            status="created",
+            trigger_type=trigger_type,
+            store_id=self.store_id,
+        )
+        self.db.add(run)
+        await self.db.flush()
+
+        logger.info(
+            "session_run_created",
+            session_id=session_id,
+            trigger_type=trigger_type,
+            tenant_id=self.tenant_id,
+        )
+        return session_id
+
+    async def _update_session_status(
+        self,
+        session_id: str,
+        status: str,
+        **kwargs: Any,
+    ) -> None:
+        """更新 SessionRun 状态"""
+        from sqlalchemy import update
+        from ..models.session_run import SessionRun
+
+        values: dict[str, Any] = {"status": status}
+        values.update(kwargs)
+
+        if status in ("completed", "failed"):
+            values["finished_at"] = datetime.now(timezone.utc)
+        elif status == "running":
+            values["started_at"] = datetime.now(timezone.utc)
+
+        stmt = (
+            update(SessionRun)
+            .where(SessionRun.session_id == session_id)
+            .values(**values)
+        )
+        await self.db.execute(stmt)
+        await self.db.flush()
+
+        logger.info(
+            "session_status_updated",
+            session_id=session_id,
+            status=status,
+        )
+
+    async def _emit_session_event(
+        self,
+        session_id: str,
+        event_type: str,
+        step_id: Optional[str] = None,
+        agent_id: Optional[str] = None,
+        detail: Optional[dict] = None,
+        error_message: Optional[str] = None,
+    ) -> None:
+        """写入 SessionEvent"""
+        from ..models.session_event import SessionEvent
+
+        event = SessionEvent(
+            tenant_id=self.tenant_id,
+            session_id=session_id,
+            sequence_no=self._next_seq(),
+            event_type=event_type,
+            step_id=step_id,
+            agent_id=agent_id,
+            detail=detail,
+            error_message=error_message,
+        )
+        self.db.add(event)
+        await self.db.flush()
+
+    async def _create_checkpoint(
+        self,
+        session_id: str,
+        step: ExecutionStep,
+        result: AgentResult,
+    ) -> str:
+        """创建人工确认暂停节点，返回 checkpoint_id"""
+        from ..models.session_checkpoint import SessionCheckpoint
+
+        checkpoint = SessionCheckpoint(
+            tenant_id=self.tenant_id,
+            session_id=session_id,
+            step_id=step.step_id,
+            reason="human_review",
+            status="pending",
+            pending_action={
+                "agent_id": step.agent_id,
+                "action": step.action,
+                "params": step.params,
+                "result_data": result.data,
+                "result_reasoning": result.reasoning,
+                "confidence": result.confidence,
+                "recommended_actions": result.data.get("recommended_actions", []),
+            },
+        )
+        self.db.add(checkpoint)
+        await self.db.flush()
+
+        checkpoint_id = str(checkpoint.id)
+        logger.info(
+            "session_checkpoint_created",
+            session_id=session_id,
+            step_id=step.step_id,
+            checkpoint_id=checkpoint_id,
+        )
+        return checkpoint_id
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # 主入口
+    # ─────────────────────────────────────────────────────────────────────────
 
     async def orchestrate(
         self,
         trigger: AgentEvent | str,
         context: Optional[dict] = None,
     ) -> OrchestratorResult:
-        """主入口：接收触发器 → 规划 → 执行 → 综合 → 返回结果"""
-        plan = await self._plan(trigger, context or {})
-        results = await self._execute(plan)
-        return await self._synthesize(plan, results)
+        """主入口：接收触发器 → 规划 → 执行 → 综合 → 返回结果
+
+        P0-5: 有 db 时包裹在 SessionRun 生命周期中。
+        """
+        session_id: Optional[str] = None
+        self._event_seq = 0
+
+        # P0-5: 创建 SessionRun
+        if self.db is not None:
+            session_id = await self._create_session_run(trigger)
+            await self._update_session_status(session_id, "running")
+
+        try:
+            plan = await self._plan(trigger, context or {})
+
+            # P0-5: 记录 plan_id 到 SessionRun
+            if self.db is not None and session_id:
+                await self._update_session_status(
+                    session_id, "running",
+                    plan_id=plan.plan_id,
+                    total_steps=len(plan.steps),
+                    trigger_summary=plan.trigger_summary,
+                )
+
+            results = await self._execute(plan, session_id)
+
+            # P0-6: 检查是否因人工确认暂停
+            paused_step = next(
+                (s for s in plan.steps if s.status == StepStatus.PAUSED),
+                None,
+            )
+            if paused_step is not None:
+                # 编排暂停 — 返回暂停结果
+                checkpoint_id = (
+                    paused_step.result.data.get("checkpoint_id")
+                    if paused_step.result and paused_step.result.data
+                    else None
+                )
+                completed = [
+                    sid for sid, r in results.items() if r.success
+                    and not (r.data and r.data.get("checkpoint_created"))
+                ]
+                return OrchestratorResult(
+                    plan_id=plan.plan_id,
+                    success=True,
+                    completed_steps=completed,
+                    failed_steps=[sid for sid, r in results.items() if not r.success],
+                    synthesis=f"编排暂停：步骤 {paused_step.step_id} 需要人工确认",
+                    recommended_actions=[],
+                    constraints_passed=True,
+                    confidence=0.0,
+                    plan_steps=plan.steps,
+                    session_id=session_id,
+                    paused=True,
+                    checkpoint_id=checkpoint_id,
+                )
+
+            result = await self._synthesize(plan, results)
+            result.session_id = session_id
+
+            # P0-5: 更新 SessionRun 为完成
+            if self.db is not None and session_id:
+                completed_count = len(result.completed_steps)
+                failed_count = len(result.failed_steps)
+                final_status = "completed" if result.success else "failed"
+                await self._update_session_status(
+                    session_id,
+                    final_status,
+                    completed_steps=completed_count,
+                    failed_steps=failed_count,
+                    result_json={
+                        "synthesis": result.synthesis,
+                        "recommended_actions": result.recommended_actions,
+                    },
+                    confidence=result.confidence,
+                    constraints_passed=result.constraints_passed,
+                )
+
+            return result
+
+        except (RuntimeError, ValueError, asyncio.CancelledError) as exc:
+            # P0-5: 编排异常时标记 SessionRun 为 failed
+            if self.db is not None and session_id:
+                await self._update_session_status(
+                    session_id, "failed",
+                    result_json={"error": str(exc)},
+                )
+            raise
 
     # ─────────────────────────────────────────────────────────────────────────
     # Phase 1: 规划
@@ -159,6 +405,8 @@ class AgentOrchestrator:
 2. 无依赖关系的步骤设 depends_on 为空列表（可并行执行）
 3. 有依赖的步骤设 depends_on 为前置 step_id 列表
 4. 每个步骤的 params 需具体，包含触发事件中的关键数据
+5. 如果步骤涉及高风险操作（如大额折扣、批量修改价格、库存调整），设 requires_human_confirm 为 true
+6. 如果步骤涉及网络调用或外部服务，设 max_retries 为 1-3（视重要性而定）
 
 请以JSON格式输出执行计划（不要有任何markdown格式）：
 {{
@@ -171,7 +419,9 @@ class AgentOrchestrator:
       "action": "动作名",
       "params": {{"key": "value"}},
       "depends_on": [],
-      "timeout_seconds": 30
+      "timeout_seconds": 30,
+      "requires_human_confirm": false,
+      "max_retries": 0
     }}
   ]
 }}"""
@@ -192,6 +442,8 @@ class AgentOrchestrator:
                     params=s.get("params", {}),
                     depends_on=s.get("depends_on", []),
                     timeout_seconds=s.get("timeout_seconds", 30),
+                    requires_human_confirm=s.get("requires_human_confirm", False),
+                    max_retries=s.get("max_retries", 0),
                 )
                 for s in plan_data.get("steps", [])
             ]
@@ -216,14 +468,21 @@ class AgentOrchestrator:
     # Phase 2: 执行
     # ─────────────────────────────────────────────────────────────────────────
 
-    async def _execute(self, plan: ExecutionPlan) -> dict[str, AgentResult]:
+    async def _execute(
+        self,
+        plan: ExecutionPlan,
+        session_id: Optional[str] = None,
+    ) -> dict[str, AgentResult]:
         """按依赖关系执行计划步骤（支持并行）"""
         results: dict[str, AgentResult] = {}
         completed_ids: set[str] = set()
+        paused_ids: set[str] = set()
         pending = list(plan.steps)
 
         while pending:
             # 找出所有依赖已满足的步骤（可并行执行）
+            # P0-6: paused 的步骤也算"完成"以解除下游依赖检查，
+            # 但 paused 步骤的下游不应执行（在下面的 break 处理）
             ready = [
                 s for s in pending
                 if all(dep in completed_ids for dep in s.depends_on)
@@ -239,12 +498,26 @@ class AgentOrchestrator:
 
             # 并行执行所有就绪步骤
             batch_results = await asyncio.gather(
-                *[self._run_step(plan, step) for step in ready]
+                *[self._run_step(plan, step, session_id) for step in ready]
             )
 
             for step_id, result in batch_results:
                 results[step_id] = result
                 completed_ids.add(step_id)
+
+                # P0-6: 如果该步骤被暂停，记录并中止后续编排
+                step_obj = next((s for s in plan.steps if s.step_id == step_id), None)
+                if step_obj and step_obj.status == StepStatus.PAUSED:
+                    paused_ids.add(step_id)
+
+            # P0-6: 有步骤暂停时中止后续编排
+            if paused_ids:
+                logger.info(
+                    "orchestrator_paused_for_human_confirm",
+                    plan_id=plan.plan_id,
+                    paused_steps=list(paused_ids),
+                )
+                break
 
             pending = [s for s in pending if s.step_id not in completed_ids]
 
@@ -254,48 +527,147 @@ class AgentOrchestrator:
         self,
         plan: ExecutionPlan,
         step: ExecutionStep,
+        session_id: Optional[str] = None,
     ) -> tuple[str, AgentResult]:
-        """执行单个步骤，带超时保护"""
+        """执行单个步骤，带超时保护 + 重试 + 人工确认暂停"""
         step.status = StepStatus.RUNNING
-        try:
-            result = await asyncio.wait_for(
-                self.master.dispatch(step.agent_id, step.action, step.params),
-                timeout=step.timeout_seconds,
-            )
-            step.status = StepStatus.COMPLETED
-            step.result = result
-            logger.info(
-                "orchestrator_step_completed",
-                plan_id=plan.plan_id,
-                step_id=step.step_id,
-                agent_id=step.agent_id,
-            )
-            return step.step_id, result
 
-        except (TimeoutError, asyncio.TimeoutError):
-            step.status = StepStatus.FAILED
-            step.error = f"timeout after {step.timeout_seconds}s"
-            logger.warning(
-                "orchestrator_step_timeout",
+        # P0-5: 记录 step_started 事件
+        if self.db is not None and session_id:
+            await self._emit_session_event(
+                session_id=session_id,
+                event_type="step_started",
                 step_id=step.step_id,
                 agent_id=step.agent_id,
-                timeout_seconds=step.timeout_seconds,
-            )
-            return step.step_id, AgentResult(
-                success=False, action=step.action, error=step.error
+                detail={"action": step.action, "params": step.params},
             )
 
-        except (RuntimeError, ValueError) as exc:
+        # P0-7: 重试循环
+        last_error: Optional[str] = None
+        while True:
+            try:
+                result = await asyncio.wait_for(
+                    self.master.dispatch(step.agent_id, step.action, step.params),
+                    timeout=step.timeout_seconds,
+                )
+                step.status = StepStatus.COMPLETED
+                step.result = result
+
+                # P0-5: 记录 step_completed 事件
+                if self.db is not None and session_id:
+                    await self._emit_session_event(
+                        session_id=session_id,
+                        event_type="step_completed",
+                        step_id=step.step_id,
+                        agent_id=step.agent_id,
+                        detail={
+                            "success": result.success,
+                            "confidence": result.confidence,
+                            "retry_count": step.retry_count,
+                        },
+                    )
+
+                logger.info(
+                    "orchestrator_step_completed",
+                    plan_id=plan.plan_id,
+                    step_id=step.step_id,
+                    agent_id=step.agent_id,
+                    retry_count=step.retry_count,
+                )
+
+                # P0-6: 人工确认节点处理
+                if step.requires_human_confirm and self.db is not None and session_id:
+                    checkpoint_id = await self._create_checkpoint(
+                        session_id=session_id,
+                        step=step,
+                        result=result,
+                    )
+                    # 暂停 SessionRun
+                    await self._update_session_status(session_id, "paused")
+                    await self._emit_session_event(
+                        session_id=session_id,
+                        event_type="session_paused",
+                        step_id=step.step_id,
+                        agent_id=step.agent_id,
+                        detail={"checkpoint_id": checkpoint_id, "reason": "human_review"},
+                    )
+                    step.status = StepStatus.PAUSED
+                    return step.step_id, AgentResult(
+                        success=True,
+                        action=step.action,
+                        data={
+                            "checkpoint_created": True,
+                            "checkpoint_id": checkpoint_id,
+                            "original_result": result.data,
+                        },
+                        reasoning="步骤已完成，等待人工确认",
+                        confidence=result.confidence,
+                    )
+
+                return step.step_id, result
+
+            except (TimeoutError, asyncio.TimeoutError):
+                last_error = f"timeout after {step.timeout_seconds}s"
+                log_method = logger.warning
+                log_event = "orchestrator_step_timeout"
+
+            except (RuntimeError, ValueError) as exc:
+                last_error = str(exc)
+                log_method = logger.error
+                log_event = "orchestrator_step_failed"
+
+            # P0-7: 重试判断
+            if step.retry_count < step.max_retries:
+                step.retry_count += 1
+                log_method(
+                    log_event,
+                    step_id=step.step_id,
+                    agent_id=step.agent_id,
+                    error=last_error,
+                    retrying=True,
+                    retry_count=step.retry_count,
+                    max_retries=step.max_retries,
+                )
+                # P0-5: 记录 step_retried 事件
+                if self.db is not None and session_id:
+                    await self._emit_session_event(
+                        session_id=session_id,
+                        event_type="step_retried",
+                        step_id=step.step_id,
+                        agent_id=step.agent_id,
+                        detail={
+                            "retry_count": step.retry_count,
+                            "max_retries": step.max_retries,
+                            "error": last_error,
+                        },
+                    )
+                continue  # 重试
+
+            # 最终失败
             step.status = StepStatus.FAILED
-            step.error = str(exc)
-            logger.error(
-                "orchestrator_step_failed",
+            step.error = last_error
+            log_method(
+                log_event,
                 step_id=step.step_id,
                 agent_id=step.agent_id,
-                error=str(exc),
+                error=last_error,
+                retry_count=step.retry_count,
+                max_retries=step.max_retries,
             )
+
+            # P0-5: 记录 step_failed 事件
+            if self.db is not None and session_id:
+                await self._emit_session_event(
+                    session_id=session_id,
+                    event_type="step_failed",
+                    step_id=step.step_id,
+                    agent_id=step.agent_id,
+                    error_message=last_error,
+                    detail={"retry_count": step.retry_count, "max_retries": step.max_retries},
+                )
+
             return step.step_id, AgentResult(
-                success=False, action=step.action, error=step.error
+                success=False, action=step.action, error=last_error
             )
 
     # ─────────────────────────────────────────────────────────────────────────

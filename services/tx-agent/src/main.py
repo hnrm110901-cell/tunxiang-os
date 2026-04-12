@@ -40,6 +40,27 @@ from .api.ai_marketing_orchestrator_routes import router as ai_marketing_orchest
 from .routers.diagnosis_router import router as diagnosis_router
 from .routers.pilot_router import router as pilot_router
 
+# P0 新路由 — 部分可能尚未创建，用 try/except 避免阻止服务启动
+try:
+    from .api.agent_registry_routes import router as agent_registry_router
+except ImportError:
+    agent_registry_router = None
+
+try:
+    from .api.session_routes import router as session_router
+except ImportError:
+    session_router = None
+
+try:
+    from .api.event_binding_routes import router as event_binding_router
+except ImportError:
+    event_binding_router = None
+
+try:
+    from .api.checkpoint_routes import router as checkpoint_router
+except ImportError:
+    checkpoint_router = None
+
 
 async def get_db_with_tenant_factory(
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
@@ -176,6 +197,16 @@ app.include_router(ops_agent_router)
 app.include_router(autonomy_controller_router)
 app.include_router(agent_roi_router)
 app.include_router(ai_marketing_orchestrator_router)  # /api/v1/agent/ai-marketing/* — AI营销编排（v207）
+
+# P0 新路由（条件注册）
+if agent_registry_router is not None:
+    app.include_router(agent_registry_router)
+if session_router is not None:
+    app.include_router(session_router)
+if event_binding_router is not None:
+    app.include_router(event_binding_router)
+if checkpoint_router is not None:
+    app.include_router(checkpoint_router)
 
 
 @app.get("/health")
