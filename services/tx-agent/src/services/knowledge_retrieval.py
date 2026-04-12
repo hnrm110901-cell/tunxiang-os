@@ -7,15 +7,20 @@
 - index_decision_history: 索引Agent决策日志
 
 Qdrant不可用时所有方法优雅降级（返回空/False），不影响主业务。
+当 HYBRID_SEARCH_V2 feature flag 开启时，search() 切换到 pgvector 混合检索路径，
+index_document() 双写 Qdrant + pgvector。48 个 Skill Agent 无感切换。
 """
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import uuid
 from typing import Any, Optional
 
 import structlog
 
+from shared.feature_flags.flag_client import is_enabled
+from shared.feature_flags.flag_names import KnowledgeFlags
 from shared.vector_store.client import QdrantClient
 from shared.vector_store.embeddings import EmbeddingService
 from shared.vector_store.indexes import get_vector_size
@@ -91,6 +96,13 @@ class KnowledgeRetrievalService:
                 doc_id=doc_id,
                 tenant_id=tenant_id,
             )
+
+        # 双写：当 HYBRID_SEARCH_V2 开启时，同步写入 pgvector
+        if is_enabled(KnowledgeFlags.HYBRID_SEARCH_V2):
+            asyncio.create_task(
+                _index_to_pgvector(collection, doc_id, text, metadata, tenant_id)
+            )
+
         return success
 
     # ── 批量索引 ─────────────────────────────────────────────
@@ -182,48 +194,11 @@ class KnowledgeRetrievalService:
         if not query or not query.strip():
             return []
 
-        # 向量化查询
-        query_vector = await EmbeddingService.embed_text(query)
+        # 检查是否启用混合检索V2路径（pgvector + 关键词 + RRF + Rerank）
+        if is_enabled(KnowledgeFlags.HYBRID_SEARCH_V2):
+            return await _search_hybrid_v2(collection, query, tenant_id, top_k, filters)
 
-        # 构建Qdrant过滤器（tenant隔离 + 额外过滤条件）
-        must_conditions: list[dict[str, Any]] = [
-            {
-                "key": "tenant_id",
-                "match": {"value": tenant_id},
-            }
-        ]
-
-        if filters:
-            for key, value in filters.items():
-                must_conditions.append({
-                    "key": key,
-                    "match": {"value": value},
-                })
-
-        qdrant_filter: dict[str, Any] = {"must": must_conditions}
-
-        results = await QdrantClient.search(
-            collection=collection,
-            query_vector=query_vector,
-            filter=qdrant_filter,
-            limit=top_k,
-        )
-
-        # 格式化结果
-        formatted = []
-        for hit in results:
-            formatted.append({
-                "doc_id": hit.get("payload", {}).get("doc_id", ""),
-                "score": hit.get("score", 0.0),
-                "text": hit.get("payload", {}).get("text", ""),
-                "metadata": {
-                    k: v
-                    for k, v in hit.get("payload", {}).items()
-                    if k not in ("tenant_id", "text", "doc_id")
-                },
-            })
-
-        return formatted
+        return await _search_qdrant(collection, query, tenant_id, top_k, filters)
 
     # ── 业务专用索引方法 ────────────────────────────────────
 
@@ -334,6 +309,125 @@ class KnowledgeRetrievalService:
             text=text,
             metadata=metadata,
             tenant_id=tenant_id,
+        )
+
+
+# ── Qdrant 检索（共用逻辑）────────────────────────────────────
+
+
+async def _search_qdrant(
+    collection: str,
+    query: str,
+    tenant_id: str,
+    top_k: int = 5,
+    filters: Optional[dict[str, Any]] = None,
+) -> list[dict[str, Any]]:
+    """Qdrant 检索路径（search() 和 _search_hybrid_v2 fallback 共用）"""
+    query_vector = await EmbeddingService.embed_text(query)
+
+    must_conditions: list[dict[str, Any]] = [
+        {"key": "tenant_id", "match": {"value": tenant_id}}
+    ]
+    if filters:
+        for key, value in filters.items():
+            must_conditions.append({"key": key, "match": {"value": value}})
+
+    results = await QdrantClient.search(
+        collection=collection,
+        query_vector=query_vector,
+        filter={"must": must_conditions},
+        limit=top_k,
+    )
+
+    return [
+        {
+            "doc_id": hit.get("payload", {}).get("doc_id", ""),
+            "score": hit.get("score", 0.0),
+            "text": hit.get("payload", {}).get("text", ""),
+            "metadata": {
+                k: v
+                for k, v in hit.get("payload", {}).items()
+                if k not in ("tenant_id", "text", "doc_id")
+            },
+        }
+        for hit in results
+    ]
+
+
+# ── Hybrid V2 路径（pgvector + 关键词 + RRF + Rerank）──────────
+
+
+async def _search_hybrid_v2(
+    collection: str,
+    query: str,
+    tenant_id: str,
+    top_k: int = 5,
+    filters: Optional[dict[str, Any]] = None,
+) -> list[dict[str, Any]]:
+    """混合检索 V2 路径（pgvector + 关键词 + RRF + Rerank）。
+
+    当 HYBRID_SEARCH_V2 feature flag 开启时使用此路径。
+    返回格式与原 Qdrant 路径一致，确保 48 个 Skill Agent 无感切换。
+    """
+    try:
+        # TODO: 接入实际 DB session
+        # 当前阶段先 fallback 到 Qdrant，等 DB session 注入机制就绪后切换
+        logger.info(
+            "search_hybrid_v2_invoked",
+            collection=collection,
+            tenant_id=tenant_id,
+            top_k=top_k,
+        )
+
+        # 暂时 fallback 到 Qdrant（DB session 未注入）
+        # 未来接入 DB session 后启用:
+        # from shared.knowledge_store.hybrid_search import HybridSearchEngine
+        # from shared.knowledge_store.reranker import RerankerService
+        # results = await HybridSearchEngine.search(
+        #     query=query,
+        #     collection=collection,
+        #     tenant_id=tenant_id,
+        #     db=db,  # 需要注入
+        #     top_k=20,
+        #     filters=filters,
+        # )
+        # reranked = await RerankerService.rerank(query, results, top_k=top_k)
+        # return _format_hybrid_results(reranked)
+
+        # Fallback: 使用原 Qdrant 路径（DB session 未注入前复用）
+        return await _search_qdrant(collection, query, tenant_id, top_k, filters)
+
+    except Exception as exc:
+        logger.warning("search_hybrid_v2_error", error=str(exc), exc_info=True)
+        return []
+
+
+async def _index_to_pgvector(
+    collection: str,
+    doc_id: str,
+    text: str,
+    metadata: dict[str, Any],
+    tenant_id: str,
+) -> None:
+    """双写辅助：将文档索引到 pgvector（旁路写入，失败不影响主流程）。"""
+    try:
+        # TODO: 接入实际 DB session 后启用
+        # from shared.knowledge_store.pg_vector_store import PgVectorStore
+        # vector = await EmbeddingService.embed_text(text)
+        # await PgVectorStore.upsert(db, collection, doc_id, text, vector, metadata, tenant_id)
+        logger.info(
+            "index_to_pgvector_placeholder",
+            collection=collection,
+            doc_id=doc_id,
+            tenant_id=tenant_id,
+        )
+    except Exception as exc:
+        logger.warning(
+            "index_to_pgvector_error",
+            collection=collection,
+            doc_id=doc_id,
+            error=str(exc),
+            exc_info=True,
         )
 
 

@@ -39,6 +39,7 @@ from .api.ops_agent_routes import router as ops_agent_router
 from .api.autonomy_controller_routes import router as autonomy_controller_router
 from .api.agent_roi_routes import router as agent_roi_router
 from .api.ai_marketing_orchestrator_routes import router as ai_marketing_orchestrator_router  # AI营销编排 P1（v207）
+from .api.knowledge_routes import router as knowledge_router  # 知识库管理 API
 from .api.tool_routes import router as tool_router
 from .api.edge_routes import router as edge_router  # P1-5 边缘推理状态/代理接口
 from .routers.diagnosis_router import router as diagnosis_router
@@ -227,6 +228,7 @@ app.include_router(ops_agent_router)
 app.include_router(autonomy_controller_router)
 app.include_router(agent_roi_router)
 app.include_router(ai_marketing_orchestrator_router)  # /api/v1/agent/ai-marketing/* — AI营销编排（v207）
+app.include_router(knowledge_router)  # /api/v1/knowledge/* — 知识库管理
 app.include_router(tool_router)  # /api/v1/tools/* — Tool Bus 统一工具注册与调用（P1-4）
 app.include_router(edge_router)  # /api/v1/edge/* — 边缘推理状态/代理（P1-5）
 

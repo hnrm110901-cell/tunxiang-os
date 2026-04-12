@@ -256,6 +256,8 @@ DOMAIN_STREAM_MAP: dict[str, str] = {
     "campaign":     "tx_campaign_events",
     # 增长中枢域（v184 新增）
     "growth":       "tx_growth_events",
+    # 知识库域
+    "knowledge":    "tx_knowledge_events",
     # 兼容旧域
     "trade":        "trade_events",
     "supply":       "supply_events",
@@ -290,6 +292,8 @@ DOMAIN_STREAM_TYPE_MAP: dict[str, str] = {
     "credit":       "credit",
     # 增长中枢域（v184 新增）
     "growth":       "growth",
+    # 知识库域
+    "knowledge":    "knowledge",
 }
 
 # ──────────────────────────────────────────────────────────────────────
@@ -352,6 +356,19 @@ class CampaignEventType(str, Enum):
 # 增长中枢域（私域复购链路，v184 新增）
 # ──────────────────────────────────────────────────────────────────────
 
+class KnowledgeEventType(str, Enum):
+    """知识库域事件"""
+
+    DOCUMENT_UPLOADED = "knowledge.document.uploaded"
+    DOCUMENT_PROCESSED = "knowledge.document.processed"
+    DOCUMENT_PUBLISHED = "knowledge.document.published"
+    DOCUMENT_ARCHIVED = "knowledge.document.archived"
+    CHUNK_INDEXED = "knowledge.chunk.indexed"
+    GRAPH_ENTITY_EXTRACTED = "knowledge.graph.entity_extracted"
+    QUERY_ANSWERED = "knowledge.query.answered"
+    STALE_ALERT = "knowledge.stale.alert"
+
+
 class GrowthEventType(str, Enum):
     """增长中枢事件 — 私域复购链路"""
 
@@ -411,6 +428,8 @@ ALL_EVENT_ENUMS = (
     SafetyInspectionEventType,
     # 营销活动域（v157 新增）
     CampaignEventType,
+    # 知识库域
+    KnowledgeEventType,
     # 增长中枢域（v184 新增）
     GrowthEventType,
 )

@@ -37,6 +37,7 @@ services:
     volumes:
       - pg_dev_data:/var/lib/postgresql/data
       - ./init-rls.sql:/docker-entrypoint-initdb.d/01-rls.sql
+      - ./init-pgvector.sql:/docker-entrypoint-initdb.d/02-pgvector.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-tunxiang}"]
       interval: 5s

@@ -155,3 +155,25 @@ class SupplyFlags:
 
     # AI智能补货计划（需要tx-brain支持）
     SMART_REORDER = "supply.intel.smart_reorder.enable"
+
+
+class KnowledgeFlags:
+    """知识库域 Flag 名称。"""
+
+    # Phase 1: pgvector 混合检索（替代 Qdrant）
+    HYBRID_SEARCH_V2 = "knowledge.search.hybrid_v2.enable"
+
+    # Phase 1: 文档处理管线
+    DOCUMENT_PIPELINE = "knowledge.document.pipeline.enable"
+
+    # Phase 2: Agentic RAG（智能检索路由）
+    AGENTIC_RAG = "knowledge.rag.agentic.enable"
+
+    # Phase 2: 纠错式 RAG（检索质量自动修正）
+    CORRECTIVE_RAG = "knowledge.rag.corrective.enable"
+
+    # Phase 3: LightRAG 知识图谱增强
+    LIGHTRAG_GRAPH = "knowledge.graph.lightrag.enable"
+
+    # Phase 4: 边缘知识同步（Mac mini 本地副本）
+    EDGE_KNOWLEDGE_SYNC = "knowledge.edge.sync.enable"

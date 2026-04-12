@@ -1,12 +1,14 @@
-"""Neo4j Ontology Schema — 11 Node Labels + 15 Relationship Types
+"""Neo4j Ontology Schema — 16 Node Labels + 24 Relationship Types
 
 定义屯象OS知识图谱的完整本体结构。
 所有实体和关系的枚举、属性要求、约束规则。
+Phase 3 新增：Regulation / Procedure / Allergen / Certification / Season 节点，
+以及 9 种新关系类型用于食安合规、季节菜品、过敏原预警等场景。
 """
 
 from typing import Any
 
-# ─── 11 Node Labels ───
+# ─── 16 Node Labels ───
 
 NODE_LABELS = [
     "Store",
@@ -20,9 +22,15 @@ NODE_LABELS = [
     "Category",
     "Region",
     "Equipment",
+    # Phase 3 — LightRAG 知识图谱扩展
+    "Regulation",
+    "Procedure",
+    "Allergen",
+    "Certification",
+    "Season",
 ]
 
-# ─── 15 Relationship Types ───
+# ─── 24 Relationship Types ───
 
 RELATIONSHIP_TYPES = [
     "BELONGS_TO",       # Store→Brand, Brand→Region
@@ -40,6 +48,16 @@ RELATIONSHIP_TYPES = [
     "CAUSES",           # Event→Event (causal chain)
     "DECIDED_BY",       # Decision→Agent
     "RESULTED_IN",      # Decision→Outcome
+    # Phase 3 — LightRAG 知识图谱扩展
+    "ALLERGEN_WARNING",       # Dish/Ingredient→Allergen（过敏原预警）
+    "SEASONAL_AVAILABLE",     # Dish/Ingredient→Season（季节供应）
+    "SUBSTITUTABLE_BY",       # Ingredient→Ingredient（可替代关系）
+    "REQUIRES_CERTIFICATION", # Store/Employee→Certification（资质要求）
+    "INSPECTION_COVERS",      # Regulation→Store/Equipment（检查覆盖）
+    "PAIRS_WITH",             # Dish→Dish（搭配推荐）
+    "UPSELL_WITH",            # Dish→Dish（加售推荐）
+    "REGULATED_BY",           # Dish/Ingredient/Store→Regulation（受监管）
+    "PROCEDURE_FOR",          # Procedure→Equipment/Dish（操作规程）
 ]
 
 # ─── Node Required Properties ───
@@ -56,6 +74,12 @@ NODE_REQUIRED_PROPERTIES: dict[str, list[str]] = {
     "Category": ["name", "tenant_id"],
     "Region": ["name"],
     "Equipment": ["name", "tenant_id", "equipment_type"],
+    # Phase 3 — LightRAG 知识图谱扩展
+    "Regulation": ["name", "tenant_id", "authority", "effective_date"],
+    "Procedure": ["name", "tenant_id", "category"],
+    "Allergen": ["name"],
+    "Certification": ["name", "tenant_id", "issuing_body"],
+    "Season": ["name", "start_month", "end_month"],
 }
 
 # ─── Relationship Properties ───
@@ -68,6 +92,12 @@ RELATIONSHIP_PROPERTIES: dict[str, list[str]] = {
     "SIMILAR_TO": ["score"],
     "CAUSES": ["confidence", "evidence"],
     "RESULTED_IN": ["outcome_type", "measured_at"],
+    # Phase 3 — LightRAG 知识图谱扩展
+    "ALLERGEN_WARNING": ["severity"],
+    "SEASONAL_AVAILABLE": ["peak_flag"],
+    "SUBSTITUTABLE_BY": ["ratio", "note"],
+    "REQUIRES_CERTIFICATION": ["valid_until"],
+    "INSPECTION_COVERS": ["frequency"],
 }
 
 # ─── Uniqueness Constraints ───
@@ -84,6 +114,12 @@ UNIQUE_CONSTRAINTS: dict[str, str] = {
     "Category": "id",
     "Region": "id",
     "Equipment": "id",
+    # Phase 3 — LightRAG 知识图谱扩展
+    "Regulation": "id",
+    "Procedure": "id",
+    "Allergen": "id",
+    "Certification": "id",
+    "Season": "id",
 }
 
 # ─── Index Definitions ───
@@ -98,6 +134,13 @@ INDEX_DEFINITIONS: list[dict[str, Any]] = [
     {"label": "Order", "properties": ["tenant_id", "store_id"]},
     {"label": "Customer", "properties": ["tenant_id"]},
     {"label": "Employee", "properties": ["tenant_id"]},
+    # Phase 3 — LightRAG 知识图谱扩展
+    {"label": "Regulation", "properties": ["tenant_id"]},
+    {"label": "Regulation", "properties": ["name"]},
+    {"label": "Procedure", "properties": ["tenant_id"]},
+    {"label": "Allergen", "properties": ["name"]},
+    {"label": "Certification", "properties": ["tenant_id"]},
+    {"label": "Season", "properties": ["name"]},
 ]
 
 

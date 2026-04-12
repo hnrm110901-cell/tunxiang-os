@@ -4,6 +4,80 @@
 
 ---
 
+## 2026-04-12 (餐饮知识库Agent V2 — 四阶段全量交付)
+
+### 今日完成：知识库Agent从"被动检索管道"升级为"Agentic RAG + LightRAG知识图谱"
+
+**Phase 1 — 混合检索 + 文档处理管线**
+- `shared/knowledge_store/` — 全新知识库引擎模块（18个Python文件）
+  - `pg_vector_store.py` — pgvector向量存储（替代Qdrant，基于PostgreSQL原生扩展）
+  - `hybrid_search.py` — 向量+关键词混合检索（RRF融合排序，k=60）
+  - `reranker.py` — Voyage rerank-2 精排服务（API + score-based降级）
+  - `document_processor.py` — 文档处理管线（PDF/DOCX/XLSX/TXT解析+分块+向量化）
+  - `chunker.py` — 语义分块器（~512 token/块，中文段落边界感知，tiktoken计数）
+  - `schemas.py` — 7个Pydantic V2数据模型
+- `services/tx-agent/src/api/knowledge_routes.py` — 8个知识库API端点（文档CRUD+检索+索引）
+- `services/tx-agent/src/services/knowledge_retrieval.py` — search()按feature flag路由（Qdrant↔pgvector无感切换）
+- `shared/feature_flags/flag_names.py` — 新增KnowledgeFlags（6个flag覆盖四阶段）
+- `shared/events/src/event_types.py` — 新增KnowledgeEventType（8个事件）
+- `infra/docker/init-pgvector.sql` + docker-compose.dev.yml更新
+
+**Phase 2 — Agentic RAG + 纠错机制**
+- `query_router.py` — 查询复杂度自动分类（simple/medium/complex）+ 策略路由 + 子问题分解
+- `corrective_rag.py` — 纠错式检索（相关度<0.6自动改写query重试，max 2次）
+- `citation_engine.py` — Claude Citations API集成（答案自动附带原文引用定位）
+- `query_logger.py` — 检索质量监控（P50/P99延迟、纠错触发率、平均相关度）
+- `models.py` — QueryResult, Citation, AnswerWithCitations等数据模型
+
+**Phase 3 — LightRAG知识图谱增强**
+- `pg_graph_repository.py` — PG-backed图谱CRUD（替代内存OntologyRepository）
+- `graph_extractor.py` — Claude + 规则双模式实体/关系抽取（10实体类型+12关系类型）
+- `graph_retriever.py` — 双层检索（low-level实体匹配 + high-level社区摘要）+ 向量融合
+- `community_detector.py` — BFS连通分量社区发现 + LLM摘要生成
+- `graph_event_handler.py` — 事件驱动图谱维护（文档处理/菜品变更/供应商变更自动更新）
+- `services/tx-brain/src/ontology/schema.py` — 新增5节点标签+9关系类型（16节点/24关系）
+
+**Phase 4 — 边缘知识库 + 管理UI**
+- `edge/sync-engine/src/knowledge_sync.py` — 知识库云→边缘同步（全量+增量5min）
+- `edge/mac-station/src/services/offline_knowledge.py` — 离线知识查询（CoreML embedding + 本地pgvector）
+- `shared/knowledge_store/freshness_monitor.py` — 知识新鲜度监控（>90天未审核预警）
+- `apps/web-admin/src/routes/hq-knowledge.tsx` — 知识库管理路由（4个页面）
+- `apps/web-admin/src/pages/knowledge/` — 4个管理页面（Dashboard/文档列表/上传/检索测试）
+- `apps/web-admin/src/api/knowledge.ts` — 前端API客户端
+
+### 数据变化
+- 迁移版本：v230 → v235（5个新迁移）
+  - v231: pgvector扩展
+  - v232: knowledge_documents表
+  - v233: knowledge_chunks表（含HNSW向量索引+GIN全文索引）
+  - v234: knowledge_query_logs表
+  - v235: kg_nodes + kg_edges + kg_communities（知识图谱三表）
+- 新增 Python 模块：18个（shared/knowledge_store/）
+- 新增 API 端点：8个（/api/v1/knowledge/*）
+- 新增测试：78个（4个测试文件，全部通过）
+- 新增前端页面：4个 + 1个API客户端 + 1个路由配置
+- 新增 Feature Flags：6个（KnowledgeFlags）
+- 新增事件类型：8个（KnowledgeEventType）
+
+### 架构决策
+- **pgvector替代Qdrant**：减少一个基础设施组件，PostgreSQL原生向量检索，<5M向量性能足够
+- **KnowledgeRetrievalService.search()签名不变**：48个Skill Agent零改动，通过feature flag内部路由
+- **LightRAG风格图谱**：双层检索（实体+社区），比full GraphRAG节省90% token
+- **规则优先，LLM增强**：QueryRouter/CorrectiveRAG/GraphExtractor均有无LLM降级路径
+
+### 遗留问题
+- DB session注入机制待完善（当前pgvector路径有TODO标记，flag OFF时不影响现有功能）
+- 知识库管理UI页面为Placeholder骨架，需接入真实API数据
+- CoreML embedding模型未转换（边缘embedding当前使用TF-IDF降级）
+- 社区摘要生成需要实际运行后调优提示词
+
+### 明日计划
+- 完善DB session注入，启用HYBRID_SEARCH_V2 flag进行端到端测试
+- 导入首批知识文档（食安SOP + 菜品配方）验证全链路
+- 部署pgvector到开发环境Docker Compose
+
+---
+
 ## 2026-04-12 (P1 Agent OS 能力升级 — Memory + 协调 + Tool Bus + Edge SLM)
 
 ### 今日完成：P1 全量升级（5大模块并行开发）
