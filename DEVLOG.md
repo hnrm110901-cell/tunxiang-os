@@ -4,6 +4,98 @@
 
 ---
 
+## 2026-04-12 计件提成3.0 对标天财（模块2.6）
+
+### 今日完成
+- [tx-org] 新增 `commission_v3_routes.py`，13个API端点（/api/v1/commission/*）
+- [tx-org] 注册路由到 main.py
+- [web-admin] 新增 `CommissionV3Page.tsx`（4 Tab：方案/规则/员工查询/月结）
+- [web-admin] 注册路由 `/hr/commission-v3`
+- [db-migrations] 新增 `v244_commission_v3.py`（3张表：commission_schemes / commission_rules / commission_records）
+
+### 数据变化
+- 迁移版本：v244 → v244_commission_v3（基于v244）
+- 新增表：commission_schemes / commission_rules / commission_records（含RLS+唯一约束）
+- 新增API端点：13个（方案CRUD+复制/规则配置/计算/汇总/月结/报表）
+
+### 遗留问题
+- commission calculate 端点中 table/time_slot 类型目前使用固定金额，后续需接入实际订单桌台数据
+- 月结 UPSERT ON CONFLICT 依赖 (tenant_id, employee_id, store_id, year_month) 唯一约束，请确认迁移已执行后再调用
+
+### 明日计划
+- 对接 table/time_slot 类型到 tx-trade 桌台订单数据
+- 增加员工姓名冗余存储（commission_records.employee_name）
+
+---
+
+## 2026-04-12 tx-expense 费控管理系统 (第15个微服务 :8015)
+
+### 交付统计
+- 迁移: v234-v244 (11个迁移文件, 27张新表)
+- 服务文件: ~35个Python文件
+- 代码行数: ~18,000行
+- API端点: ~105个
+
+### 核心模块
+- 费控申请 + 审批引擎 (4级金额路由)
+- 备用金管理 (状态机 + POS核销)
+- 发票OCR + 金税四期验证 + 集团去重
+- 差旅管理 + 巡店联动
+- 差标合规检查 (50城市)
+- 合同台账 + 到期预警
+- 采购付款联动 (tx-supply集成)
+- 预算管理 (科目级分配)
+- 成本归集日报 (POS打通)
+- 报表引擎 (三维度汇总)
+
+### 6大AI Agent
+- A1: 备用金守护者 (POS核销+异常检测)
+- A2: 发票核验师 (批量OCR+税务验证)
+- A3: 差标合规官 (50城市4级截断)
+- A4: 预算预警员 (实时执行率监控)
+- A5: 差旅助手 (巡店→差旅自动生成)
+- A6: POS对账员 (日结核销+差异升级)
+
+### 餐饮行业差异化亮点
+- POS数据直接打通成本率计算
+- 督导巡店任务自动生成差旅申请
+- 集团多品牌发票跨租户去重
+- 50城市差旅标准配置
+- 备用金与POS日结自动核销
+
+### P2-S4 收尾交付
+- [tx-expense/scripts] 新建 `seed_expense_demo.py`：DEMO数据初始化脚本
+  - 直接调用 HTTP API，支持 `--base-url` / `--tenant-id` 参数
+  - 覆盖8个模块：科目/差标(50城市)/预算(5个)/备用金(3账户)/申请(10个各状态)/合同(2个)/差旅(1个+2行程)/发票mock
+  - 幂等设计：重复运行自动跳过已存在数据，彩色进度输出（✓/✗）
+- [tx-expense/tests] 新建 `test_expense_flow.py`：端到端集成测试
+  - 6大测试类（23个测试方法）覆盖核心流程
+  - pytest + httpx.AsyncClient，外部服务全 mock
+  - 通过 `EXPENSE_TEST_URL` 环境变量注入服务地址
+  - 服务不可用自动 skip（不强制要求测试环境运行中）
+
+### 迁移链
+v233 → v234(费用基础) → v235(申请审批) → v236(通知+差标)
+→ v237(备用金) → v238(发票) → v239(差旅)
+→ v240(采购付款) → v241(合同台账)
+→ v242(预算系统) → v243(成本归集) → v244(发票去重)
+
+### 数据变化
+- 新增文件: `services/tx-expense/scripts/seed_expense_demo.py`
+- 新增文件: `services/tx-expense/tests/test_expense_flow.py`
+
+### 遗留问题
+- 差标合规 A3 Agent 完整实现 (Task #23) 待续
+- tx-org 集成服务 (Task #24) 待续
+- v239 差旅三表迁移 (Task #25) 待续
+
+### 明日计划
+- 补全 A3/A5 Agent 单元测试 (audit 要求 ≥3 用例)
+- 执行 seed_expense_demo.py 验证端到端 DEMO 流程
+- billing_rules 补充 pytest 用例（审计约束）
+
+---
+
 ## 2026-04-12 (加盟商管理闭环 v240 — 模块3.2)
 
 ### 今日完成

@@ -193,6 +193,7 @@ import PeakGuardPage from './pages/hr/PeakGuardPage';
 import CoachSessionPage from './pages/hr/CoachSessionPage';
 import AlertAggregationPage from './pages/hr/AlertAggregationPage';
 import HRHubOverviewPage from './pages/hr/HRHubOverviewPage';
+import { CommissionV3Page } from './pages/hr/CommissionV3Page';  // 计件提成3.0 模块2.6
 // ─── AI营销驾驶舱 ─────────────────────────────────────────────────────────────
 import AiMarketingDashboardPage from './pages/marketing/AiMarketingDashboardPage';
 // ─── 促销规则引擎 V2（模块2.5）────────────────────────────────────────────────
@@ -319,6 +320,7 @@ function App() {
           <Route path="/hr/payroll/labor-cost" element={<PayrollLaborCostPage />} />
           <Route path="/hr/payroll/approval" element={<PayrollApprovalPage />} />
           <Route path="/hr/payroll/summary" element={<PayrollSummaryPage />} />
+          <Route path="/hr/commission-v3" element={<CommissionV3Page />} />  {/* 计件提成3.0 模块2.6 */}
           {/* 合规中心 */}
           <Route path="/hr/compliance" element={<ComplianceDashboardPage />} />
           <Route path="/hr/compliance/alerts" element={<ComplianceAlertsPage />} />
