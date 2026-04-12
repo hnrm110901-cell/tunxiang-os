@@ -4,7 +4,83 @@
 
 ---
 
-<<<<<<< Updated upstream
+## 2026-04-12 (最低消费/服务费规则引擎 v238)
+
+### 今日完成
+- [tx-trade] 新增账单规则引擎（模块1.4，对标天财商龙）
+  - `billing_rules` 表：store_id 维度，支持 min_spend/service_fee 两种规则类型，fixed/per_person/percentage 三种计算方式，JSONB 豁免条件（会员等级/协议单位），带 RLS 策略
+  - `billing_rules_routes.py`：3 个 API 端点（GET 获取/PUT 配置/POST 应用），Repository 模式，structlog 日志，完整 type hints
+  - 事件接入：OrderEventType.BILLING_RULE_APPLIED 写入事件总线（asyncio.create_task 旁路，不阻断主流程）
+- [shared/events] event_types.py 新增 `OrderEventType.BILLING_RULE_APPLIED` 枚举值
+- [web-pos] SettlePage.tsx 集成账单规则引擎
+  - 支付前调用 apply-billing-rules API
+  - 账单展示服务费明细行（含金额）
+  - 未达最低消费时弹出 Toast 提示（本桌消费/最低消费/差额，3秒自动消失）
+
+### 数据变化
+- 迁移版本：v237 → v238（billing_rules 表 + RLS）
+- 新增 API 端点：3 个（GET billing-rules/{store_id} / PUT billing-rules/{store_id} / POST orders/{id}/apply-billing-rules）
+- 修改文件：`services/tx-trade/src/main.py`、`shared/events/src/event_types.py`、`apps/web-pos/src/pages/SettlePage.tsx`
+
+### 遗留问题
+- billing_rules 暂无单元测试，待补充 pytest 用例（≥3个，审计约束）
+
+### 明日计划
+- 为 billing_rules_routes.py 补充测试：apply-billing-rules 服务费计算/最低消费差额/豁免逻辑
+
+---
+
+## 2026-04-12 (tx-finance 缺失路由注册修复)
+
+### 今日完成
+- [tx-finance] 修复 main.py 中 4 个路由模块未注册问题
+
+**新增注册路由：**
+- `budget_routes.py` (v101) — `/api/v1/finance/budgets/*`，8 个预算管理端点（CRUD + 审批 + 执行录入 + 进度查询）
+- `budget_v2_routes.py` (v118) — `/api/v1/finance/budget/*`，3 个面向前端报表的快捷接口（年度列表/月度创建/执行情况）
+- `payroll_routes.py` — `/api/v1/finance/payroll/*`，9 个薪资管理端点（薪资单 CRUD + 审批 + 发薪 + 方案配置 + 历史）
+- `vat_routes.py` (v102) — `/api/v1/finance/vat/*`，9 个企业增值税端点（申报单 + 进项发票 + 税率）
+
+**注意**：`vat_routes`（企业增值税申报）与已有的 `vat_ledger_routes`（增值税台账）是不同模块，两者并存不冲突。
+
+### 数据变化
+- 新增 API 端点：29 个（budgets 8 + budget_v2 3 + payroll 9 + vat 9）
+- 修改文件：`services/tx-finance/src/main.py`
+
+### 遗留问题
+- 无
+
+### 明日计划
+- 为新注册路由补充集成测试（pytest）
+
+---
+
+## 2026-04-12 (tx-expense 微服务 P0-S1)
+
+### tx-expense 微服务 P0-S1 启动（Sprint 1/8）
+
+**交付内容：**
+- 新建微服务 tx-expense :8015（第15个业务微服务）
+- 数据库迁移 v234_expense_foundation（expense_categories + expense_scenarios，2张表，RLS）
+- 数据库迁移 v235_expense_applications（expense_applications + expense_items + expense_attachments + approval_routing_rules + approval_instances + approval_nodes，6张表，全RLS）
+- ORM 模型层（8个枚举 + 15个事件常量 + 8个SQLAlchemy模型）
+- 服务层：expense_application_service + approval_engine_service
+- API 路由：18个端点（expense 12 + approval 6），占位路由骨架 7个模块
+- docker-compose 集成 + gateway 路由注册
+
+**技术决策：**
+- 审批流采用金额分段路由（<500元店长/500-2000区域/2000-10000品牌财务/>10000 CFO）
+- routing_snapshot 快照机制：审批链在实例创建时固化，规则变更不影响进行中审批
+- 金额统一存分(fen)，与屯象OS全局约定一致
+- 6大费控Agent框架预留（A1-A6），P1阶段实现
+
+**下一Sprint（P0-S2）计划：**
+- 备用金管理模块（v237迁移 + petty_cash_service + petty_cash_routes）
+- POS日结联动（订阅 ops.daily_close.completed 事件）
+- 发票采集基础（v238迁移 + invoice OCR接入）
+
+---
+
 ## 2026-04-12 (餐饮知识库Agent V2 — 四阶段全量交付)
 
 ### 今日完成：知识库Agent从"被动检索管道"升级为"Agentic RAG + LightRAG知识图谱"
@@ -219,56 +295,6 @@
 - P1-1: Agent Memory 持久化（短期/长期记忆 + 向量检索）
 - P1-2: MCP Tool Bus 统一工具注册框架
 - P1-3: 其余6个 SkillAgent 改造为 ActionConfig 模式
-=======
-## 2026-04-12 (tx-finance 缺失路由注册修复)
-
-### 今日完成
-- [tx-finance] 修复 main.py 中 4 个路由模块未注册问题
-
-**新增注册路由：**
-- `budget_routes.py` (v101) — `/api/v1/finance/budgets/*`，8 个预算管理端点（CRUD + 审批 + 执行录入 + 进度查询）
-- `budget_v2_routes.py` (v118) — `/api/v1/finance/budget/*`，3 个面向前端报表的快捷接口（年度列表/月度创建/执行情况）
-- `payroll_routes.py` — `/api/v1/finance/payroll/*`，9 个薪资管理端点（薪资单 CRUD + 审批 + 发薪 + 方案配置 + 历史）
-- `vat_routes.py` (v102) — `/api/v1/finance/vat/*`，9 个企业增值税端点（申报单 + 进项发票 + 税率）
-
-**注意**：`vat_routes`（企业增值税申报）与已有的 `vat_ledger_routes`（增值税台账）是不同模块，两者并存不冲突。
-
-### 数据变化
-- 新增 API 端点：29 个（budgets 8 + budget_v2 3 + payroll 9 + vat 9）
-- 修改文件：`services/tx-finance/src/main.py`
-
-### 遗留问题
-- 无
-
-### 明日计划
-- 为新注册路由补充集成测试（pytest）
-
----
-
-## 2026-04-12
-
-### tx-expense 微服务 P0-S1 启动（Sprint 1/8）
-
-**交付内容：**
-- 新建微服务 tx-expense :8015（第15个业务微服务）
-- 数据库迁移 v234_expense_foundation（expense_categories + expense_scenarios，2张表，RLS）
-- 数据库迁移 v235_expense_applications（expense_applications + expense_items + expense_attachments + approval_routing_rules + approval_instances + approval_nodes，6张表，全RLS）
-- ORM 模型层（8个枚举 + 15个事件常量 + 8个SQLAlchemy模型）
-- 服务层：expense_application_service + approval_engine_service
-- API 路由：18个端点（expense 12 + approval 6），占位路由骨架 7个模块
-- docker-compose 集成 + gateway 路由注册
-
-**技术决策：**
-- 审批流采用金额分段路由（<500元店长/500-2000区域/2000-10000品牌财务/>10000 CFO）
-- routing_snapshot 快照机制：审批链在实例创建时固化，规则变更不影响进行中审批
-- 金额统一存分(fen)，与屯象OS全局约定一致
-- 6大费控Agent框架预留（A1-A6），P1阶段实现
-
-**下一Sprint（P0-S2）计划：**
-- 备用金管理模块（v237迁移 + petty_cash_service + petty_cash_routes）
-- POS日结联动（订阅 ops.daily_close.completed 事件）
-- 发票采集基础（v238迁移 + invoice OCR接入）
->>>>>>> Stashed changes
 
 ---
 

@@ -329,6 +329,11 @@ from .api.group_order_routes import router as group_order_router
 app.include_router(min_consumption_router)
 app.include_router(group_order_router)
 
+# ── v238: 账单规则引擎（最低消费/服务费，对标天财商龙模块1.4）──
+from .api.billing_rules_routes import router as billing_rules_router
+
+app.include_router(billing_rules_router)
+
 
 @app.get("/health")
 async def health():

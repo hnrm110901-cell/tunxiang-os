@@ -32,6 +32,7 @@ class OrderEventType(str, Enum):
     REFUNDED = "order.refunded"            # 整单退款
     PARTIAL_REFUNDED = "order.partial_refunded"  # 部分退款
     CLOSED = "order.closed"               # 结账关闭
+    BILLING_RULE_APPLIED = "order.billing_rule_applied"  # 账单规则（最低消费/服务费）应用
 
 
 class DiscountEventType(str, Enum):
