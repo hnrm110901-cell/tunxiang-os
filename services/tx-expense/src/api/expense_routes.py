@@ -98,6 +98,17 @@ class ExpenseApplicationUpdate(BaseModel):
     metadata: Optional[dict] = None
 
 
+class SubmitApplicationRequest(BaseModel):
+    compliance_explanation: Optional[str] = Field(
+        None,
+        description=(
+            "超标说明（当费用项超标20%-50%时必填）。"
+            "说明将记录到申请备注，供审批人参考。"
+        ),
+        max_length=500,
+    )
+
+
 class PaginatedResponse(BaseModel):
     data: List[Any]
     total: int
@@ -253,6 +264,7 @@ async def update_application(
 @router.post("/applications/{application_id}/submit")
 async def submit_application(
     application_id: UUID,
+    body: SubmitApplicationRequest = SubmitApplicationRequest(),
     tenant_id: UUID = Depends(get_tenant_id),
     current_user_id: UUID = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -261,18 +273,23 @@ async def submit_application(
     提交费用申请（触发审批流）
 
     - 只允许提交 draft 状态的申请
+    - 提交前由 A3 差标合规 Agent 自动检查费用项合规性：
+      - 超标 >50%：超出部分自动截断至差标限额，备注中记录原始金额和超标率
+      - 超标 20%-50%：必须在请求体中提供 compliance_explanation，否则返回 400
+      - 超标 <20%：允许提交，审批单中高亮显示警告
     - 提交后自动创建审批实例，状态变为 submitted
     - 审批路由根据金额和场景自动匹配
     """
     expense_svc = _get_expense_service()
     approval_svc = _get_approval_service()
     try:
-        # 先提交申请
+        # 先提交申请（含 A3 合规检查）
         submitted = await expense_svc.submit_application(
             db=db,
             tenant_id=tenant_id,
             application_id=application_id,
             submitter_id=current_user_id,
+            compliance_explanation=body.compliance_explanation,
         )
         if submitted is None:
             raise HTTPException(status_code=404, detail="费用申请不存在或无权提交")

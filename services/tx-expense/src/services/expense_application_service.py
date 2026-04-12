@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from shared.events.src.emitter import emit_event
+from ..agents import a3_standard_compliance as _a3_agent
 from ..models.expense_application import (
     ExpenseApplication,
     ExpenseAttachment,
@@ -289,8 +290,14 @@ async def submit_application(
     tenant_id: uuid.UUID,
     application_id: uuid.UUID,
     submitter_id: uuid.UUID,
+    compliance_explanation: Optional[str] = None,
 ) -> ExpenseApplication:
     """提交费用申请（草稿 → 已提交）。
+
+    提交前通过 A3 差标合规 Agent 执行合规检查：
+      - 超标 >50%：截断超出部分（amount_fen = limit_fen），备注中记录原始金额和超标率
+      - 超标 20%-50%：必须提供 compliance_explanation，否则拒绝提交（ValueError）
+      - 超标 <20%：允许提交，备注中追加警告信息
 
     仅修改申请状态，审批实例由 approval_engine_service.create_approval_instance() 创建。
     提交后广播事件 EXPENSE_APPLICATION_SUBMITTED 至事件总线。
@@ -301,6 +308,148 @@ async def submit_application(
         raise ValueError(
             f"Cannot submit application in status '{application.status}'. Only DRAFT applications can be submitted."
         )
+
+    # ── A3 差标合规检查 ────────────────────────────────────────────────────────
+    log = logger.bind(
+        tenant_id=str(tenant_id),
+        application_id=str(application_id),
+        submitter_id=str(submitter_id),
+    )
+    try:
+        compliance_result = await _a3_agent.check_application_compliance(
+            db=db,
+            tenant_id=tenant_id,
+            application_id=application_id,
+        )
+        log.info(
+            "a3_compliance_check_done",
+            overall_status=compliance_result.get("overall_status"),
+            can_submit=compliance_result.get("can_submit"),
+            total_over_amount_fen=compliance_result.get("total_over_amount_fen", 0),
+        )
+
+        overall_status = compliance_result.get("overall_status", "compliant")
+        item_results: list[dict] = compliance_result.get("items", [])
+
+        # 遍历每个明细行，执行截断 / 校验说明 / 记录警告
+        items_need_explanation: list[int] = compliance_result.get(
+            "required_explanation_items", []
+        )
+
+        # 先处理 >50% 截断项（over_limit_major）——无论 can_submit，直接截断
+        for item_result in item_results:
+            if item_result.get("status") == "over_limit_major":
+                item_id_str = item_result.get("item_id")
+                limit_fen: Optional[int] = item_result.get("limit_fen")
+                original_fen: int = item_result.get("item_amount_fen", 0)
+                over_rate: float = item_result.get("over_rate") or 0.0
+
+                if item_id_str is None or limit_fen is None:
+                    log.warning(
+                        "a3_truncation_skipped_missing_fields",
+                        item_result=item_result,
+                    )
+                    continue
+
+                try:
+                    item_uuid = uuid.UUID(item_id_str)
+                except ValueError:
+                    log.warning(
+                        "a3_truncation_skipped_invalid_uuid",
+                        item_id=item_id_str,
+                    )
+                    continue
+
+                # 定位 expense_item 并截断金额
+                stmt = (
+                    select(ExpenseItem)
+                    .where(
+                        ExpenseItem.id == item_uuid,
+                        ExpenseItem.tenant_id == tenant_id,
+                    )
+                )
+                result = await db.execute(stmt)
+                expense_item = result.scalar_one_or_none()
+
+                if expense_item is None:
+                    log.warning(
+                        "a3_truncation_skipped_item_not_found",
+                        item_id=item_id_str,
+                        tenant_id=str(tenant_id),
+                    )
+                    continue
+
+                original_yuan = original_fen / 100
+                over_pct_str = f"{over_rate * 100:.1f}%"
+                truncation_note = (
+                    f"[系统截断] 原申请金额 {original_yuan:.2f} 元，"
+                    f"超标率 {over_pct_str}，已截断至差标限额 {limit_fen / 100:.2f} 元"
+                )
+
+                expense_item.amount = limit_fen
+                existing_notes = expense_item.notes or ""
+                expense_item.notes = (
+                    f"{existing_notes}；{truncation_note}" if existing_notes else truncation_note
+                )
+
+                log.info(
+                    "a3_item_truncated",
+                    item_id=item_id_str,
+                    original_fen=original_fen,
+                    limit_fen=limit_fen,
+                    over_rate=over_rate,
+                )
+
+        # 重新计算 total_amount（截断后）
+        all_items_stmt = select(ExpenseItem).where(
+            ExpenseItem.application_id == application_id,
+            ExpenseItem.tenant_id == tenant_id,
+            ExpenseItem.is_deleted == False,  # noqa: E712
+        )
+        all_items_result = await db.execute(all_items_stmt)
+        all_items = list(all_items_result.scalars().all())
+        application.total_amount = sum(i.amount for i in all_items)
+
+        # 处理 20%-50% 超标项：必须有 compliance_explanation
+        if items_need_explanation:
+            if not compliance_explanation or not compliance_explanation.strip():
+                raise ValueError(
+                    f"申请中有 {len(items_need_explanation)} 个费用项超标20%-50%，"
+                    "提交时必须在请求中提供 compliance_explanation（超标说明）"
+                )
+            # 将说明追加到申请备注
+            existing_app_notes = application.notes or ""
+            explanation_note = f"[超标说明] {compliance_explanation.strip()}"
+            application.notes = (
+                f"{existing_app_notes}；{explanation_note}"
+                if existing_app_notes
+                else explanation_note
+            )
+            log.info(
+                "a3_compliance_explanation_recorded",
+                items_need_explanation=items_need_explanation,
+            )
+
+        # 处理 <20% 警告项：允许提交，标记警告到申请 metadata
+        if overall_status == "compliant" and compliance_result.get("total_over_amount_fen", 0) > 0:
+            application.metadata = {
+                **(application.metadata or {}),
+                "compliance_warning": compliance_result.get("summary_message", ""),
+            }
+
+        await db.flush()
+
+    except ValueError:
+        # ValueError 是业务拒绝，直接向上层传播
+        raise
+    except Exception as exc:
+        # A3 Agent 异常不阻断提交流程，但必须记录日志
+        log.error(
+            "a3_compliance_check_failed_non_blocking",
+            error=f"{type(exc).__name__}: {exc}",
+            exc_info=True,
+        )
+    # ── A3 合规检查结束 ────────────────────────────────────────────────────────
 
     now = _now_utc()
     application.status = ExpenseStatus.SUBMITTED.value

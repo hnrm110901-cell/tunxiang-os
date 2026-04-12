@@ -202,3 +202,39 @@ class OcrProvider(str, Enum):
     BAIDU = "baidu"
     ALIYUN = "aliyun"
     MOCK = "mock"   # 开发测试用
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 差旅模块枚举
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TravelStatus(str, Enum):
+    """差旅申请状态"""
+    DRAFT = "draft"                        # 草稿
+    PENDING_APPROVAL = "pending_approval"  # 待审批
+    APPROVED = "approved"                  # 已审批
+    IN_PROGRESS = "in_progress"            # 出行中
+    COMPLETED = "completed"                # 已完成
+    CANCELLED = "cancelled"                # 已取消
+    REJECTED = "rejected"                  # 已驳回
+
+
+class ItineraryStatus(str, Enum):
+    """行程状态"""
+    PLANNED = "planned"           # 计划中
+    CONFIRMED = "confirmed"       # 已确认
+    IN_PROGRESS = "in_progress"   # 进行中
+    COMPLETED = "completed"       # 已完成
+    CANCELLED = "cancelled"       # 已取消
+
+
+class TransportMode(str, Enum):
+    """交通方式"""
+    FLIGHT = "flight"                     # 飞机
+    HIGH_SPEED_RAIL = "high_speed_rail"   # 高铁/动车
+    TRAIN = "train"                       # 普通火车
+    BUS = "bus"                           # 长途汽车
+    TAXI = "taxi"                         # 出租车/网约车
+    PRIVATE_CAR = "private_car"           # 私家车
+    SUBWAY = "subway"                     # 地铁/公共交通
+    OTHER = "other"                       # 其他

@@ -10,6 +10,9 @@ from .expense_enums import (
     AgentJobStatus,
     AgentType,
     ExpenseCategoryCode,
+    TravelStatus,
+    ItineraryStatus,
+    TransportMode,
 )
 from .expense_events import (
     EXPENSE_APPLICATION_SUBMITTED,
@@ -42,6 +45,7 @@ from .petty_cash import (
     PettyCashSettlement,
 )
 from .invoice import Invoice, InvoiceItem
+from .travel import TravelRequest, TravelItinerary, TravelAllocation
 
 __all__ = [
     # 枚举
@@ -53,6 +57,9 @@ __all__ = [
     "AgentJobStatus",
     "AgentType",
     "ExpenseCategoryCode",
+    "TravelStatus",
+    "ItineraryStatus",
+    "TransportMode",
     # 事件常量
     "EXPENSE_APPLICATION_SUBMITTED",
     "EXPENSE_APPLICATION_APPROVED",
@@ -82,4 +89,8 @@ __all__ = [
     # 发票模型
     "Invoice",
     "InvoiceItem",
+    # 差旅模型
+    "TravelRequest",
+    "TravelItinerary",
+    "TravelAllocation",
 ]

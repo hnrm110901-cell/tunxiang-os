@@ -34,6 +34,7 @@ from ..models.expense_enums import (
 )
 from ..models.expense_events import EXPENSE_APPLICATION_APPROVED, EXPENSE_APPLICATION_REJECTED
 from src.services import notification_service
+from src.services import org_integration_service
 
 logger = structlog.get_logger(__name__)
 
@@ -272,20 +273,27 @@ async def create_approval_instance(
     # 推送给第一个审批人（异步旁路，不阻塞主流程）
     if nodes:
         first_node = nodes[0]
-        asyncio.create_task(
-            notification_service.send_approval_requested(
+
+        async def _notify_first_approver() -> None:
+            ctx = await org_integration_service.enrich_notification_context(
+                tenant_id=tenant_id,
+                applicant_id=application.applicant_id,
+                store_id=application.store_id,
+            )
+            await notification_service.send_approval_requested(
                 db=db,
                 tenant_id=tenant_id,
                 application_id=application_id,
                 approver_id=first_node.approver_id,
                 approver_role=first_node.approver_role,
                 application_title=application.title,
-                applicant_name=str(application.applicant_id),  # TODO P1: 从tx-org查真实姓名
-                total_amount=application.total_amount,          # 分(fen)
-                store_name=str(application.store_id),           # TODO P1: 从tx-org查真实门店名
+                applicant_name=ctx["applicant_name"],
+                total_amount=application.total_amount,
+                store_name=ctx["store_name"],
                 brand_id=application.brand_id,
             )
-        )
+
+        asyncio.create_task(_notify_first_approver())
 
     return instance
 
@@ -402,21 +410,29 @@ async def process_approval_action(
             log.info("approval_instance_completed", total_nodes=instance.total_nodes)
 
             # 推送审批通过通知给申请人（异步旁路）
-            asyncio.create_task(
-                notification_service.send_approval_result(
+            _app_approved = instance.application
+
+            async def _notify_approved() -> None:
+                ctx = await org_integration_service.enrich_notification_context(
+                    tenant_id=tenant_id,
+                    applicant_id=_app_approved.applicant_id,
+                    store_id=_app_approved.store_id,
+                )
+                await notification_service.send_approval_result(
                     db=db,
                     tenant_id=tenant_id,
-                    application_id=instance.application.id,
-                    applicant_id=instance.application.applicant_id,
+                    application_id=_app_approved.id,
+                    applicant_id=_app_approved.applicant_id,
                     event_type="approved",
-                    application_title=instance.application.title,
-                    applicant_name=str(instance.application.applicant_id),  # TODO P1: 查真实姓名
-                    total_amount=instance.application.total_amount,
-                    store_name=str(instance.application.store_id),
-                    brand_id=instance.application.brand_id,
+                    application_title=_app_approved.title,
+                    applicant_name=ctx["applicant_name"],
+                    total_amount=_app_approved.total_amount,
+                    store_name=ctx["store_name"],
+                    brand_id=_app_approved.brand_id,
                     comment=comment,
                 )
-            )
+
+            asyncio.create_task(_notify_approved())
 
             asyncio.create_task(
                 emit_event(
@@ -451,21 +467,29 @@ async def process_approval_action(
         log.info("approval_instance_rejected", node_index=current_node.node_index, comment=comment)
 
         # 推送驳回通知给申请人（异步旁路）
-        asyncio.create_task(
-            notification_service.send_approval_result(
+        _app_rejected = instance.application
+
+        async def _notify_rejected() -> None:
+            ctx = await org_integration_service.enrich_notification_context(
+                tenant_id=tenant_id,
+                applicant_id=_app_rejected.applicant_id,
+                store_id=_app_rejected.store_id,
+            )
+            await notification_service.send_approval_result(
                 db=db,
                 tenant_id=tenant_id,
-                application_id=instance.application.id,
-                applicant_id=instance.application.applicant_id,
+                application_id=_app_rejected.id,
+                applicant_id=_app_rejected.applicant_id,
                 event_type="rejected",
-                application_title=instance.application.title,
-                applicant_name=str(instance.application.applicant_id),
-                total_amount=instance.application.total_amount,
-                store_name=str(instance.application.store_id),
-                brand_id=instance.application.brand_id,
+                application_title=_app_rejected.title,
+                applicant_name=ctx["applicant_name"],
+                total_amount=_app_rejected.total_amount,
+                store_name=ctx["store_name"],
+                brand_id=_app_rejected.brand_id,
                 comment=comment,
             )
-        )
+
+        asyncio.create_task(_notify_rejected())
 
         asyncio.create_task(
             emit_event(
@@ -515,20 +539,29 @@ async def process_approval_action(
         next_approver_id = transfer_to_id
 
         # 推送给新审批人（异步旁路）
-        asyncio.create_task(
-            notification_service.send_approval_requested(
+        _app_transfer = instance.application
+        _transfer_to_id = transfer_to_id
+
+        async def _notify_transferred() -> None:
+            ctx = await org_integration_service.enrich_notification_context(
+                tenant_id=tenant_id,
+                applicant_id=_app_transfer.applicant_id,
+                store_id=_app_transfer.store_id,
+            )
+            await notification_service.send_approval_requested(
                 db=db,
                 tenant_id=tenant_id,
-                application_id=instance.application.id,
-                approver_id=transfer_to_id,
+                application_id=_app_transfer.id,
+                approver_id=_transfer_to_id,
                 approver_role="transferred",
-                application_title=instance.application.title,
-                applicant_name=str(instance.application.applicant_id),
-                total_amount=instance.application.total_amount,
-                store_name=str(instance.application.store_id),
-                brand_id=instance.application.brand_id,
+                application_title=_app_transfer.title,
+                applicant_name=ctx["applicant_name"],
+                total_amount=_app_transfer.total_amount,
+                store_name=ctx["store_name"],
+                brand_id=_app_transfer.brand_id,
             )
-        )
+
+        asyncio.create_task(_notify_transferred())
 
         log.info(
             "approval_node_transferred",
@@ -725,20 +758,30 @@ async def send_reminder_for_pending(
             (_now_utc() - node.created_at).total_seconds() / 3600
         )
 
-        asyncio.create_task(
-            notification_service.send_reminder(
+        _app_reminder = application
+        _node_approver_id = node.approver_id
+        _pending_hours = pending_hours
+
+        async def _notify_reminder() -> None:
+            ctx = await org_integration_service.enrich_notification_context(
+                tenant_id=tenant_id,
+                applicant_id=_app_reminder.applicant_id,
+                store_id=_app_reminder.store_id,
+            )
+            await notification_service.send_reminder(
                 db=db,
                 tenant_id=tenant_id,
-                application_id=application.id,
-                approver_id=node.approver_id,
-                application_title=application.title,
-                applicant_name=str(application.applicant_id),  # TODO P1: 从tx-org查真实姓名
-                total_amount=application.total_amount,
-                store_name=str(application.store_id),           # TODO P1: 从tx-org查真实门店名
-                brand_id=application.brand_id,
-                pending_hours=pending_hours,
+                application_id=_app_reminder.id,
+                approver_id=_node_approver_id,
+                application_title=_app_reminder.title,
+                applicant_name=ctx["applicant_name"],
+                total_amount=_app_reminder.total_amount,
+                store_name=ctx["store_name"],
+                brand_id=_app_reminder.brand_id,
+                pending_hours=_pending_hours,
             )
-        )
+
+        asyncio.create_task(_notify_reminder())
         reminded += 1
 
     logger.info(
