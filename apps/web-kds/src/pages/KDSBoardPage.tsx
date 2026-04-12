@@ -16,6 +16,13 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useSwipe } from '../hooks/useSwipe';
 import { fetchTicketQueue, startTicket, completeTicket } from '../api/kdsOpsApi';
 import { warmUpAudio, playNewOrder, playTimeout } from '../utils/audio';
+import { useKDSRules } from '../hooks/useKDSRules';
+import {
+  getTimeLevelFromRules,
+  getTimerColorFromLevel,
+  getChannelColor,
+  type KDSRuleConfig,
+} from '../api/kdsRulesApi';
 
 // ─── CSS Variables ──────────────────────────────────────
 
@@ -67,6 +74,14 @@ interface DemoTicket {
   priority: 'normal' | 'rush' | 'vip';
   timeLimit: number; // minutes
   startedAt?: number;
+  /** 渠道：dine_in / takeout / pickup */
+  channel?: string;
+  /** 是否赠菜工单 */
+  isGift?: boolean;
+  /** 是否退菜工单 */
+  isReturn?: boolean;
+  /** 客位数 */
+  guestSeat?: number;
 }
 
 // ─── 时间状态 ──────────────────────────────────────────
@@ -77,6 +92,23 @@ function getTimeStatus(createdAt: number, timeLimit: number): TimeStatus {
   const elapsedMin = (Date.now() - createdAt) / 60000;
   if (elapsedMin >= timeLimit) return 'overtime';
   if (elapsedMin >= timeLimit * 0.5) return 'warning';
+  return 'normal';
+}
+
+/**
+ * 根据KDS规则配置计算时间状态（优先使用规则，回退到原有timeLimit逻辑）
+ */
+function getTimeStatusFromRules(
+  createdAt: number,
+  timeLimit: number,
+  rules: KDSRuleConfig,
+): TimeStatus {
+  const elapsedMin = (Date.now() - createdAt) / 60000;
+  const level = getTimeLevelFromRules(elapsedMin, rules);
+  if (level === 'urgent') return 'overtime';
+  if (level === 'warning') return 'warning';
+  // 兜底：如果 timeLimit 到期也算超时
+  if (elapsedMin >= timeLimit) return 'overtime';
   return 'normal';
 }
 
@@ -141,16 +173,21 @@ function buildMockTickets(): DemoTicket[] {
   return [
     makeTicket({ createdAtOffsetMin: 25, status: 'cooking', priority: 'normal', tableNo: 'A01',
       items: [{ name: '剁椒鱼头', qty: 1, notes: '少辣' }, { name: '小炒肉', qty: 1, notes: '' }],
-      startedAt: Date.now() - 22 * 60 * 1000 }), // 超时
+      startedAt: Date.now() - 22 * 60 * 1000,
+      channel: 'dine_in', guestSeat: 4 }), // 超时
     makeTicket({ createdAtOffsetMin: 12, status: 'cooking', priority: 'vip', tableNo: 'B01',
       items: [{ name: '口味虾', qty: 2, notes: '中辣' }, { name: '米饭', qty: 4, notes: '' }],
-      startedAt: Date.now() - 10 * 60 * 1000 }), // 即将超时
-    makeTicket({ createdAtOffsetMin: 5, status: 'pending', priority: 'normal', tableNo: 'A03',
-      items: [{ name: '蒜蓉西兰花', qty: 1, notes: '' }, { name: '酸菜鱼', qty: 1, notes: '微辣' }] }),
+      startedAt: Date.now() - 10 * 60 * 1000,
+      channel: 'dine_in', guestSeat: 6 }), // 即将超时
+    makeTicket({ createdAtOffsetMin: 5, status: 'pending', priority: 'normal', tableNo: '外卖001',
+      items: [{ name: '蒜蓉西兰花', qty: 1, notes: '' }, { name: '酸菜鱼', qty: 1, notes: '微辣' }],
+      channel: 'takeout' }),
     makeTicket({ createdAtOffsetMin: 3, status: 'pending', priority: 'rush', tableNo: 'C01',
-      items: [{ name: '外婆鸡', qty: 1, notes: '' }] }),
-    makeTicket({ createdAtOffsetMin: 1, status: 'pending', priority: 'normal', tableNo: 'D02',
-      items: [{ name: '番茄炒蛋', qty: 2, notes: '' }, { name: '土豆丝', qty: 1, notes: '' }] }),
+      items: [{ name: '外婆鸡', qty: 1, notes: '' }],
+      channel: 'dine_in', isGift: true, guestSeat: 2 }),
+    makeTicket({ createdAtOffsetMin: 1, status: 'pending', priority: 'normal', tableNo: '自取003',
+      items: [{ name: '番茄炒蛋', qty: 2, notes: '' }, { name: '土豆丝', qty: 1, notes: '' }],
+      channel: 'pickup' }),
   ];
 }
 
@@ -163,6 +200,9 @@ export function KDSBoardPage() {
   const isDemo = searchParams.get('demo') === 'true';
   const storeId = searchParams.get('store') || 'wh';
   const storeName = STORE_MAP[storeId] || '未知门店';
+
+  // 加载门店KDS规则配置（超时颜色/渠道色/标识开关）
+  const { rules } = useKDSRules(storeId);
 
   const [tickets, setTickets] = useState<DemoTicket[]>(() => buildMockTickets());
   const [tick, setTick] = useState(0); // 每秒刷新倒计时
@@ -373,7 +413,7 @@ export function KDSBoardPage() {
   const pendingCount = activeTickets.filter((t) => t.status === 'pending').length;
   const cookingCount = activeTickets.filter((t) => t.status === 'cooking').length;
   const overtimeCount = activeTickets.filter(
-    (t) => getTimeStatus(t.createdAt, t.timeLimit) === 'overtime',
+    (t) => getTimeStatusFromRules(t.createdAt, t.timeLimit, rules) === 'overtime',
   ).length;
 
   return (
@@ -534,6 +574,7 @@ export function KDSBoardPage() {
               key={ticket.id}
               ticket={ticket}
               tick={tick}
+              rules={rules}
               onStart={() => handleStart(ticket.id)}
               onComplete={() => handleComplete(ticket.id)}
             />
@@ -592,34 +633,33 @@ function StatItem({
 function KDSTicketCard({
   ticket,
   tick: _tick,
+  rules,
   onStart,
   onComplete,
 }: {
   ticket: DemoTicket;
   tick: number;
+  rules: KDSRuleConfig;
   onStart: () => void;
   onComplete: () => void;
 }) {
-  const status = getTimeStatus(ticket.createdAt, ticket.timeLimit);
+  const status = getTimeStatusFromRules(ticket.createdAt, ticket.timeLimit, rules);
   const elapsed = formatElapsed(ticket.createdAt);
+  const elapsedMin = (Date.now() - ticket.createdAt) / 60000;
+  const level = getTimeLevelFromRules(elapsedMin, rules);
   const isVip = ticket.priority === 'vip';
   const isRush = ticket.priority === 'rush';
   const isCooking = ticket.status === 'cooking';
 
-  // 颜色编码
+  // 颜色编码（优先使用规则配置的颜色）
   const borderColor =
     status === 'overtime'
-      ? '#A32D2D'
+      ? rules.urgent_color
       : status === 'warning'
-        ? '#BA7517'
+        ? rules.warn_color
         : 'rgba(255,255,255,0.1)';
 
-  const timerColor =
-    status === 'overtime'
-      ? '#ff4d4f'
-      : status === 'warning'
-        ? '#f5a623'
-        : '#0F6E56';
+  const timerColor = getTimerColorFromLevel(level, rules);
 
   const cardBg =
     status === 'overtime'
@@ -632,6 +672,14 @@ function KDSTicketCard({
       : status === 'warning'
         ? 'kds-warn-flash 2s infinite'
         : 'kds-card-in 0.3s ease-out';
+
+  // 渠道标识色
+  const channelColor = ticket.channel ? getChannelColor(ticket.channel, rules) : null;
+  const channelLabel: Record<string, string> = {
+    dine_in: '堂食',
+    takeout: '外卖',
+    pickup: '自取',
+  };
 
   // 左滑完成手势
   const { swipeHandlers, swipeOffset, isSwiping } = useSwipe({
@@ -698,21 +746,44 @@ function KDSTicketCard({
           }}
         >
           <div>
-            <div
-              style={{
-                fontSize: 28,
-                fontWeight: 800,
-                color: '#fff',
-                lineHeight: 1,
-                marginBottom: 4,
-              }}
-            >
-              {ticket.tableNo}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+              <div
+                style={{
+                  fontSize: 28,
+                  fontWeight: 800,
+                  color: '#fff',
+                  lineHeight: 1,
+                }}
+              >
+                {ticket.tableNo}
+              </div>
+              {/* 客位数（受规则开关控制） */}
+              {rules.show_guest_seat && ticket.guestSeat != null && (
+                <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.45)' }}>
+                  {ticket.guestSeat}位
+                </span>
+              )}
             </div>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
               <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.35)' }}>
                 #{ticket.orderNo}
               </span>
+              {/* 渠道标识色块（受规则开关控制） */}
+              {rules.show_channel_badge && channelColor && ticket.channel && (
+                <span style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 4,
+                  fontSize: 13, padding: '1px 8px', borderRadius: 5,
+                  background: channelColor + '33',
+                  border: `1px solid ${channelColor}`,
+                  color: channelColor, fontWeight: 600,
+                }}>
+                  <span style={{
+                    width: 8, height: 8, borderRadius: '50%',
+                    background: channelColor, display: 'inline-block',
+                  }} />
+                  {channelLabel[ticket.channel] ?? ticket.channel}
+                </span>
+              )}
               {isVip && (
                 <span
                   style={{
@@ -740,6 +811,28 @@ function KDSTicketCard({
                   }}
                 >
                   催
+                </span>
+              )}
+              {/* 赠菜标识角标 */}
+              {ticket.isGift && (
+                <span style={{
+                  fontSize: 13, padding: '1px 8px', borderRadius: 5,
+                  background: rules.gift_badge_color + '33',
+                  border: `1px solid ${rules.gift_badge_color}`,
+                  color: rules.gift_badge_color, fontWeight: 700,
+                }}>
+                  赠
+                </span>
+              )}
+              {/* 退菜标识角标 */}
+              {ticket.isReturn && (
+                <span style={{
+                  fontSize: 13, padding: '1px 8px', borderRadius: 5,
+                  background: rules.return_badge_color + '33',
+                  border: `1px solid ${rules.return_badge_color}`,
+                  color: rules.return_badge_color, fontWeight: 700,
+                }}>
+                  退
                 </span>
               )}
             </div>
