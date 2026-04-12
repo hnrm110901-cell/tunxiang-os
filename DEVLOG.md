@@ -4,6 +4,149 @@
 
 ---
 
+## 2026-04-12 (P1 Agent OS 能力升级 — Memory + 协调 + Tool Bus + Edge SLM)
+
+### 今日完成：P1 全量升级（5大模块并行开发）
+
+**P1-1: Agent Memory 持久化**
+- `v233_agent_memories` 迁移 — agent_memories 表 + 3索引 + RLS
+- `AgentMemory` ORM + `AgentMemoryService`（store/recall/search/forget/consolidate）
+- 5 API 端点 `/api/v1/agent-memory`（存储/查询/搜索/删除/合并）
+- 支持 memory_type 分类：finding/insight/preference/learned_rule
+- 支持 TTL 过期 + 向量存储引用（embedding_id 预留）
+
+**P1-2: Multi-Agent 协调协议**
+- `v234_agent_messages` 迁移 — agent_messages 表 + 3索引 + RLS
+- `AgentMessage` ORM + `AgentMessageService`（send/pending/broadcast/reply/conversation）
+- 6 API 端点 `/api/v1/agent-messages`
+- 支持 4 种消息类型：request/response/notification/delegation
+- correlation_id 支持对话线程追踪
+
+**P1-3: 核心6个Agent ActionConfig改造**
+- `discount_guard` — 8 actions（anomaly检测需人工确认 + 高风险）
+- `smart_menu` — 12 actions（菜单优化需人工确认）
+- `member_insight` — 17 actions（RFM分析中等风险）
+- `inventory_alert` — 13 actions（补货/监控需人工确认 + 高风险）
+- `finance_audit` — 18 actions（异常检测为关键风险）
+- `smart_customer_service` — 4 actions（投诉处理需人工确认）
+
+**P1-4: Tool Bus 统一工具注册**
+- `ToolRegistry` 单例 — 自动从 SkillAgent 注册 + MCP 静态定义导入
+- `ToolCaller` — 跨 Agent 工具调用 + SessionEvent 审计日志
+- 5 API 端点 `/api/v1/tools`（列表/搜索/LLM schema 导出/调用）
+- lifespan 启动时自动注册所有 Agent 的 actions 为 tools
+
+**P1-5: Edge SLM Agent 集成**
+- `EdgeInferenceClient` — Core ML bridge 客户端（localhost:8100, 2s超时, 60s健康缓存）
+- `EdgeAwareMixin` — Agent 边缘推理混入（lazy client, predict_type 分发）
+- `discount_guard` 升级 — 3步推理链（Edge Core ML → 规则引擎 → Claude API）
+  - 边缘置信度 >0.8 时直接返回，跳过 Claude API 节省成本
+- `inventory_alert` 升级 — 边缘客流预测增强补货量计算
+  - 高峰期（午餐/晚餐）自动 1.3x 需求放大
+- 3 API 端点 `/api/v1/edge`（状态/预测代理）
+- 22 个测试用例
+
+### 数据变化
+- 迁移版本：v232 → v234（+2）
+- 新增 ORM 模型：2个（AgentMemory, AgentMessage）
+- 新增 API 端点：19个
+- 新增 Service：5个（AgentMemoryService, AgentMessageService, ToolRegistry, ToolCaller, EdgeInferenceClient）
+- 改造 Agent：6个（ActionConfig） + 2个（EdgeAwareMixin）
+- 新增测试：22个
+- 总代码变化：+3349 行
+
+### 架构升级对标
+| 能力 | 对标 | 实现 |
+|------|------|------|
+| Agent Memory | Claude Managed Agent Memory | AgentMemory 表 + 向量检索预留 |
+| Multi-Agent 协调 | A2A Protocol (Google) | agent_messages + correlation_id 线程 |
+| Tool Bus | MCP Tool Use | ToolRegistry 自动注册 + LLM schema |
+| Edge SLM | SoundHound 端侧推理 | Core ML bridge + EdgeAwareMixin |
+| ActionConfig 策略 | Anthropic Tool Policies | 72 actions 声明式风险/确认/重试 |
+
+### 遗留问题
+- P2: Agent Memory 向量检索（接入 shared/vector_store Qdrant）
+- P2: AgentMessage → Redis Streams 实时推送（当前纯 DB 轮询）
+- P2: 剩余 39 个 Agent 的 ActionConfig 改造
+- P2: Tool Bus 权限控制（role-based tool access）
+- P2: Edge 模型热更新（OTA 推送 Core ML 模型）
+
+### 明日计划
+- P2-1: Agent Memory 向量检索集成
+- P2-2: 自主排菜 Agent 升级（Autonomous Menu Planning）
+- P2-3: 实时 Agent 消息推送（WebSocket + Redis Streams）
+
+---
+
+## 2026-04-12 (P0 平台底座架构升级 — 借鉴 Claude Managed Agent)
+
+### 今日完成：Agent OS 平台底座全量升级
+
+**新增 ORM 模型（8个）**
+- `AgentTemplate` / `AgentVersion` / `AgentDeployment` — Agent 注册 + 版本管理 + 灰度部署
+- `SessionRun` / `SessionEvent` / `SessionCheckpoint` — 会话运行时 + 事件留痕 + 断点续跑
+- `EventAgentBinding` — 事件→Agent 映射可配置化
+
+**新增 DB 迁移（v230 ~ v232，3个）**
+- v230: agent_templates + agent_versions + agent_deployments + RLS
+- v231: session_runs + session_events + session_checkpoints + RLS
+- v232: event_agent_bindings + 49条初始映射数据 + RLS
+
+**新增 Service 层（4个）**
+- `AgentRegistryService` — 模板/版本/部署 CRUD + 灰度放量（MD5 hash gating）
+- `SessionRuntimeService` — 会话状态机 + 事件追加 + 步骤计数
+- `SessionCostService` — 成本汇总 + 日趋势分析
+- `EventBindingService` — 事件映射 CRUD + 按优先级查询 handlers
+
+**新增 API 路由（3组，32个端点）**
+- `/api/v1/agent-registry` — 15端点（模板/版本/部署管理）
+- `/api/v1/sessions` — 11端点（会话生命周期/成本分析）
+- `/api/v1/event-bindings` — 6端点（映射管理）
+
+**核心模块升级（5个文件）**
+- `orchestrator.py` — Session 生命周期集成 + 人工确认断点 + 步骤级重试（372→743行）
+- `observability.py` — 从 mock 数据切换到 SessionRun/SessionEvent 真实 DB 查询
+- `master.py` — 动态加载 AgentDeployment + 46个 agent_id 映射
+- `event_bus.py` — `create_event_bus_from_db()` 从 DB 加载映射（fallback 硬编码）
+- `main.py` — 条件注册4个新路由（ImportError 安全降级）
+
+**SkillAgent 基类升级 + 首批3个业务Agent改造**
+- `base.py` — 新增 ActionConfig 策略声明 + Session 事件自动写入
+- `closing_agent.py` — 日结校验/异常上报需人工确认
+- `compliance_alert.py` — 全量扫描/分项扫描支持重试
+- `store_inspect.py` — 故障诊断/食安检查需人工确认
+
+### 数据变化
+- 迁移版本：v229 → v232（+3）
+- 新增 ORM 模型：8个
+- 新增 API 端点：32个
+- 新增 Service：4个
+- 修改核心文件：9个
+- 总代码变化：+4556 行
+
+### 架构设计来源
+借鉴 Anthropic Claude Managed Agent 7大模式：
+1. Agent 模板化注册 → AgentTemplate + AgentVersion
+2. Session 运行时 → SessionRun + SessionEvent
+3. 断点续跑 → SessionCheckpoint + 人工确认机制
+4. 事件驱动可配置 → EventAgentBinding（替代硬编码 DEFAULT_EVENT_HANDLERS）
+5. 灰度发布 → AgentDeployment + MD5 hash gating
+6. 成本分层 → SessionCostService（按 Agent/门店/日期分析）
+7. 可观测性 → Observability 接入真实 DB
+
+### 遗留问题
+- P1: Memory 持久化模块（Agent 跨 Session 记忆）待开发
+- P1: MCP/Tool Bus 统一工具注册待开发
+- P1: Multi-Agent 协调协议（消息传递 vs 共享黑板）待设计
+- 首批3个Agent改造为声明式策略，其余6个Agent待后续改造
+
+### 明日计划
+- P1-1: Agent Memory 持久化（短期/长期记忆 + 向量检索）
+- P1-2: MCP Tool Bus 统一工具注册框架
+- P1-3: 其余6个 SkillAgent 改造为 ActionConfig 模式
+
+---
+
 ## 2026-04-12 (三品牌真实凭证写入)
 
 ### 今日完成：三品牌凭证落地
