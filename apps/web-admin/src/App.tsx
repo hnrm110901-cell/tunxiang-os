@@ -193,6 +193,8 @@ import AlertAggregationPage from './pages/hr/AlertAggregationPage';
 import HRHubOverviewPage from './pages/hr/HRHubOverviewPage';
 // ─── AI营销驾驶舱 ─────────────────────────────────────────────────────────────
 import AiMarketingDashboardPage from './pages/marketing/AiMarketingDashboardPage';
+// ─── 促销规则引擎 V2（模块2.5）────────────────────────────────────────────────
+import PromotionRulesV2Page from './pages/marketing/PromotionRulesV2Page';
 // ─── P3: HQ总部管控看板 ────────────────────────────────────────────────────────
 import { BrandOverview } from './pages/analytics/hq/BrandOverview';
 import { StorePerformanceMatrix } from './pages/analytics/hq/StorePerformanceMatrix';
@@ -399,6 +401,8 @@ function App() {
           <Route path="/hq/growth/customer-brain"      element={<CustomerBrainPage />} />
           {/* ─── AI营销驾驶舱 ─── */}
           <Route path="/hq/growth/ai-marketing" element={<AiMarketingDashboardPage />} />
+          {/* ─── 模块2.5: 促销规则引擎V2 ─── */}
+          <Route path="/marketing/promotions-v2" element={<PromotionRulesV2Page />} />
           {/* ─── P3: HQ总部管控看板 ─── */}
           <Route path="/analytics/hq/overview" element={<BrandOverview />} />
           <Route path="/analytics/hq/stores"   element={<StorePerformanceMatrix />} />
