@@ -78,6 +78,14 @@ async def health():
 @app.on_event("startup")
 async def startup() -> None:
     logger.info("tx_expense_started", service="tx-expense", version="1.0.0")
+    # 定时任务注册（需要 APScheduler，参照项目现有调度方式）
+    # from .workers import monthly_petty_cash, daily_cost_attribution, contract_expiry_watcher
+    # scheduler.add_job(monthly_petty_cash.run_monthly_settlement_for_all_tenants,
+    #                   'cron', day=25, hour=0, minute=30, id='monthly_petty_cash')
+    # scheduler.add_job(daily_cost_attribution.run_daily_cost_attribution,
+    #                   'cron', hour=23, minute=0, id='daily_cost_attribution')
+    # scheduler.add_job(contract_expiry_watcher.run_contract_expiry_check,
+    #                   'cron', hour=9, minute=0, id='contract_expiry_watcher')
 
 
 @app.on_event("shutdown")

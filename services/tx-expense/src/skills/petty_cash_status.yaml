@@ -1,0 +1,25 @@
+name: petty_cash_status
+description: "查询门店备用金状态：余额、预警、待核销流水"
+version: "1.0"
+agent_type: a1_petty_cash_guardian
+trigger_phrases:
+  - "备用金余额"
+  - "门店备用金"
+  - "备用金状态"
+  - "petty cash"
+parameters:
+  - name: store_id
+    type: string
+    required: false
+    description: "门店ID，不传则返回当前租户所有门店汇总"
+  - name: tenant_id
+    type: string
+    required: true
+    description: "租户ID"
+handler: services.petty_cash_service.get_account_stats
+response_template: |
+  门店备用金状态：
+  - 账户数：{total_accounts}（活跃 {active_count}，冻结 {frozen_count}）
+  - 总余额：{total_balance_yuan} 元
+  - 低余额预警：{below_threshold_count} 个账户
+  - 本月未核销流水：{unreconciled_this_month} 笔

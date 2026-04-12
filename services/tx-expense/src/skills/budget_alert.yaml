@@ -1,0 +1,19 @@
+name: budget_alert
+description: "查询预算预警状态（A4 Agent P1 实现，此 Skill 为占位）"
+version: "1.0"
+status: "placeholder_p1"
+trigger_phrases:
+  - "预算预警"
+  - "预算消耗"
+  - "budget alert"
+parameters:
+  - name: brand_id
+    type: string
+    required: false
+    description: "品牌ID，不传则返回当前租户所有品牌汇总"
+  - name: tenant_id
+    type: string
+    required: true
+    description: "租户ID"
+handler: agents.a4_budget_monitor.run
+notes: "A4预算预警Agent在P1-S1实现，此Skill在P1-S1后激活"

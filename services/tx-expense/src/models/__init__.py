@@ -41,6 +41,7 @@ from .petty_cash import (
     PettyCashTransaction,
     PettyCashSettlement,
 )
+from .invoice import Invoice, InvoiceItem
 
 __all__ = [
     # 枚举
@@ -78,4 +79,7 @@ __all__ = [
     "PettyCashAccount",
     "PettyCashTransaction",
     "PettyCashSettlement",
+    # 发票模型
+    "Invoice",
+    "InvoiceItem",
 ]

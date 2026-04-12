@@ -165,3 +165,40 @@ class PettyCashSettlementStatus(str, Enum):
     SUBMITTED = "submitted"   # 已提交财务
     CONFIRMED = "confirmed"   # 财务确认
     CLOSED = "closed"         # 已归档
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 发票模块枚举
+# ─────────────────────────────────────────────────────────────────────────────
+
+class InvoiceType(str, Enum):
+    """发票类型"""
+    VAT_SPECIAL = "vat_special"     # 增值税专用发票
+    VAT_GENERAL = "vat_general"     # 增值税普通发票
+    QUOTA = "quota"                  # 定额发票
+    RECEIPT = "receipt"              # 收据
+    OTHER = "other"                  # 其他凭证
+
+
+class OcrStatus(str, Enum):
+    """OCR识别状态"""
+    PENDING = "pending"
+    PROCESSING = "processing"
+    SUCCESS = "success"
+    FAILED = "failed"
+
+
+class VerifyStatus(str, Enum):
+    """金税核验状态"""
+    PENDING = "pending"
+    VERIFIED_REAL = "verified_real"       # 核验为真
+    VERIFIED_FAKE = "verified_fake"       # 核验为假（高亮警告，不自动驳回）
+    VERIFY_FAILED = "verify_failed"       # 核验接口失败（网络等原因）
+    SKIPPED = "skipped"                   # 跳过核验（定额发票等不支持）
+
+
+class OcrProvider(str, Enum):
+    """OCR服务提供商"""
+    BAIDU = "baidu"
+    ALIYUN = "aliyun"
+    MOCK = "mock"   # 开发测试用
