@@ -105,7 +105,7 @@ export default function OrgStructure() {
     setLoading(true);
     try {
       const resp = await txFetchData<OrgNode[]>('/api/v1/org-structure/tree');
-      setTree(resp.data ?? []);
+      setTree(resp ?? []);
     } catch {
       message.error('加载组织架构失败');
     } finally {

@@ -44,6 +44,8 @@ export interface JourneyTemplate {
   trigger_rule_json: Record<string, unknown> | null;
   total_steps: number;
   is_active: boolean;
+  is_system?: boolean | null;
+  priority?: number | null;
   steps?: JourneyStep[];
   created_at: string;
   updated_at: string;
@@ -149,6 +151,9 @@ export interface AgentSuggestion {
   published_enrollment_id: string | null;
   created_at: string;
   updated_at: string;
+  requires_human_review?: boolean | null;
+  risk_summary?: string | null;
+  expected_outcome_json?: Record<string, unknown> | null;
 }
 
 // ---- API Functions ----

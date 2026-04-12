@@ -151,8 +151,8 @@ export default function EmployeeDetail() {
       txFetchData<ProfileTabs>(`/api/v1/employees/${employeeId}/profile-tabs`),
     ])
       .then(([bResp, tResp]) => {
-        setBasic(bResp.data);
-        setTabs(tResp.data);
+        setBasic(bResp);
+        setTabs(tResp);
       })
       .catch(() => message.error('加载员工信息失败'))
       .finally(() => setLoading(false));

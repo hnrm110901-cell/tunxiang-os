@@ -28,6 +28,7 @@ const C = {
   danger:    '#A32D2D',
   info:      '#185FA5',
   navy:      '#1E2A3A',
+  navyLight: '#2C3E50',
   bgCard:    '#112228',
   bgInner:   '#0B1A20',
   bgRow:     '#1a2a33',

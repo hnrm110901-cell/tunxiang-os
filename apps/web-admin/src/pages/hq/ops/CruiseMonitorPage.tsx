@@ -103,7 +103,7 @@ export function CruiseMonitorPage() {
       const res = await txFetchData<CruiseDashboard>(
         `/api/v1/ops/daily-review?date=${todayDate}`,
       );
-      if (res.data) setDashboard(res.data);
+      if (res) setDashboard(res);
     } catch {
       // 加载失败保持当前数据
     } finally {

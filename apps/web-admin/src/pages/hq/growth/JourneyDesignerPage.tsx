@@ -284,13 +284,13 @@ function DesignerNode({
       <div style={{ fontSize: 13, fontWeight: 600, color: TEXT_1, lineHeight: 1.3 }}>{node.label}</div>
 
       {/* 简要配置信息 */}
-      {node.type === 'wait' && node.config.hours && (
+      {node.type === 'wait' && !!node.config.hours && (
         <div style={{ fontSize: 11, color: TEXT_3, marginTop: 4 }}>等待 {node.config.hours as number} 小时</div>
       )}
-      {node.type === 'wait' && node.config.days && (
+      {node.type === 'wait' && !!node.config.days && (
         <div style={{ fontSize: 11, color: TEXT_3, marginTop: 4 }}>等待 {node.config.days as number} 天</div>
       )}
-      {node.type === 'condition' && node.config.field && (
+      {node.type === 'condition' && !!node.config.field && (
         <div style={{ fontSize: 11, color: TEXT_3, marginTop: 4 }}>
           IF {node.config.field as string} {node.config.op as string} {String(node.config.value)}
         </div>

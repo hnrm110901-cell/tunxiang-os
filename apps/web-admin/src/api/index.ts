@@ -74,3 +74,4 @@ export * from './menuSchemeApi';
 export * from './growthHubApi';
 export * from './integrationHealthApi';
 export * from './memberGrowthApi';
+export * from './hqAnalyticsApi';

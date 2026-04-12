@@ -421,7 +421,7 @@ function ConflictDetectionTab() {
           diff_rate: 0.102, diff_rate_pct: '10.2%', severity: 'warning',
           suggestion: '外卖价比堂食高10%，在合理范围内，可适当监控',
         },
-      ].filter(c => c.diff_rate * 100 > threshold);
+      ].filter(c => c.diff_rate * 100 > threshold) as ConflictDish[];
       setConflicts(mockConflicts);
       setHasCritical(mockConflicts.some(c => c.severity === 'critical'));
     } finally {

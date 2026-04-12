@@ -137,7 +137,7 @@ export default function CertificationPage() {
     setDashLoading(true);
     try {
       const resp = await txFetchData<DashboardData>('/api/v1/certifications/dashboard');
-      setDash(resp.data);
+      setDash(resp);
     } catch {
       message.error('加载认证总览失败');
     } finally {
@@ -150,7 +150,7 @@ export default function CertificationPage() {
       const resp = await txFetchData<{ items: Certification[]; total: number }>(
         '/api/v1/certifications/expiring',
       );
-      setExpiring(resp.data?.items ?? []);
+      setExpiring(resp?.items ?? []);
     } catch {
       /* 静默 */
     }
@@ -168,7 +168,7 @@ export default function CertificationPage() {
     setDetailLoading(true);
     try {
       const resp = await txFetchData<Certification>(`/api/v1/certifications/${id}`);
-      setDetail(resp.data);
+      setDetail(resp);
     } catch {
       message.error('加载认证详情失败');
     } finally {
@@ -180,7 +180,7 @@ export default function CertificationPage() {
     if (!detail) return;
     try {
       const resp = await txFetchData<Certification>(`/api/v1/certifications/${detail.id}`);
-      setDetail(resp.data);
+      setDetail(resp);
     } catch {
       message.error('刷新详情失败');
     }
@@ -553,8 +553,8 @@ export default function CertificationPage() {
               `/api/v1/certifications?page=${current}&size=${pageSize}${filters}`,
             );
             return {
-              data: resp.data?.items ?? [],
-              total: resp.data?.total ?? 0,
+              data: resp?.items ?? [],
+              total: resp?.total ?? 0,
               success: true,
             };
           } catch {

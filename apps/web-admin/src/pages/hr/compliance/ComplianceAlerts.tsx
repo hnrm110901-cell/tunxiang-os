@@ -112,7 +112,7 @@ export default function ComplianceAlerts() {
       fieldProps: { placeholder: '选择门店', showSearch: true },
       request: async () => {
         const resp = await txFetchData<{ items: { id: string; name: string }[] }>('/api/v1/stores');
-        return (resp.data?.items ?? []).map((s) => ({ label: s.name, value: s.id }));
+        return (resp?.items ?? []).map((s) => ({ label: s.name, value: s.id }));
       },
     },
     { title: '门店', dataIndex: 'store_name', hideInSearch: true, width: 120 },
@@ -199,8 +199,8 @@ export default function ComplianceAlerts() {
           const resp = await txFetchData<{ items: AlertItem[]; total: number }>(
             `/api/v1/compliance/alerts?${query.toString()}`,
           );
-          const d = resp.data;
-          return { data: d?.items ?? [], total: d?.total ?? 0, success: resp.ok };
+          const d = resp;
+          return { data: d?.items ?? [], total: d?.total ?? 0, success: true };
         }}
       />
 

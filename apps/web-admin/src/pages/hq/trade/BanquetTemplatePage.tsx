@@ -365,7 +365,7 @@ function TemplateDrawerForm({ editRecord, trigger, onSuccess }: TemplateDrawerFo
   return (
     <DrawerForm
       title={isEdit ? `编辑模板 — ${editRecord?.name}` : '新建套餐模板'}
-      trigger={trigger}
+      trigger={trigger as React.ReactElement}
       width={760}
       drawerProps={{ destroyOnClose: true }}
       initialValues={
@@ -568,8 +568,8 @@ function BuildQuoteModal({ template, open, onClose }: BuildQuoteModalProps) {
             } as BuildQuotePayload),
           },
         );
-        if (res.data) {
-          setQuoteResult(res.data);
+        if (res) {
+          setQuoteResult(res);
           message.success('报价单已生成');
         }
       } catch {
@@ -908,8 +908,8 @@ export function BanquetTemplatePage() {
               const res = await txFetchData<{ items: BanquetTemplate[]; total: number }>(
                 `/api/v1/banquets/templates?${qs.toString()}`,
               );
-              if (res.data) {
-                return { data: res.data.items, total: res.data.total, success: true };
+              if (res) {
+                return { data: res.items, total: res.total, success: true };
               }
               throw new Error('empty');
             } catch {

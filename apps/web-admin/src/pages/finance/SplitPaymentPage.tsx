@@ -29,7 +29,7 @@ import {
   Typography,
 } from 'antd';
 import {
-  AdjustmentOutlined,
+  ApartmentOutlined,
   CalculatorOutlined,
   FileSearchOutlined,
   PlusOutlined,

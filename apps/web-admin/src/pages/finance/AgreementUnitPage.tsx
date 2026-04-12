@@ -816,7 +816,7 @@ function ChargeModal({ open, unit, onClose, onSuccess }: {
           />
         </Form.Item>
         <Form.Item name="print_voucher" valuePropName="checked">
-          <Checkbox icon={<PrinterOutlined />}>打印凭证</Checkbox>
+          <Checkbox><PrinterOutlined /> 打印凭证</Checkbox>
         </Form.Item>
       </Form>
     </Modal>
@@ -945,7 +945,7 @@ function RepayModal({ open, unit, onClose, onSuccess }: {
         </Form.Item>
 
         <Form.Item name="print_voucher" valuePropName="checked">
-          <Checkbox icon={<PrinterOutlined />}>打印还款凭证</Checkbox>
+          <Checkbox><PrinterOutlined /> 打印还款凭证</Checkbox>
         </Form.Item>
       </Form>
     </Modal>

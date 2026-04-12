@@ -173,7 +173,7 @@ export default function CoachSessionPage() {
     setDashLoading(true);
     try {
       const resp = await txFetchData<DashboardData>('/api/v1/coach-sessions/dashboard');
-      setDashboard(resp.data);
+      setDashboard(resp);
     } catch (err) {
       console.error('Failed to load dashboard', err);
     } finally {
@@ -186,7 +186,7 @@ export default function CoachSessionPage() {
     setEffLoading(true);
     try {
       const resp = await txFetchData<EffectivenessData>('/api/v1/coach-sessions/effectiveness');
-      setEffectiveness(resp.data?.items ?? []);
+      setEffectiveness(resp?.items ?? []);
     } catch (err) {
       console.error('Failed to load effectiveness', err);
     } finally {
@@ -242,7 +242,7 @@ export default function CoachSessionPage() {
     setDetailLoading(true);
     try {
       const resp = await txFetchData<CoachSession>(`/api/v1/coach-sessions/${record.id}`);
-      setCurrentSession(resp.data);
+      setCurrentSession(resp);
     } catch (err) {
       message.error('加载详情失败');
       setCurrentSession(record);
@@ -258,7 +258,7 @@ export default function CoachSessionPage() {
       message.success('已采纳');
       // 刷新详情
       const resp = await txFetchData<CoachSession>(`/api/v1/coach-sessions/${sessionId}`);
-      setCurrentSession(resp.data);
+      setCurrentSession(resp);
       actionRef.current?.reload();
       loadDashboard();
     } catch (err) {
@@ -277,7 +277,7 @@ export default function CoachSessionPage() {
       message.success('行动已追加');
       setNewAction('');
       const resp = await txFetchData<CoachSession>(`/api/v1/coach-sessions/${sessionId}`);
-      setCurrentSession(resp.data);
+      setCurrentSession(resp);
       actionRef.current?.reload();
     } catch (err) {
       message.error('追加失败');
@@ -300,7 +300,7 @@ export default function CoachSessionPage() {
       setCompleteActionModal({ visible: false, sessionId: '', actionIdx: -1 });
       setCompleteResult('');
       const resp = await txFetchData<CoachSession>(`/api/v1/coach-sessions/${sessionId}`);
-      setCurrentSession(resp.data);
+      setCurrentSession(resp);
       actionRef.current?.reload();
     } catch (err) {
       message.error('操作失败');
@@ -323,7 +323,7 @@ export default function CoachSessionPage() {
       setReadinessModal({ visible: false, sessionId: '' });
       setReadinessAfter(null);
       const resp = await txFetchData<CoachSession>(`/api/v1/coach-sessions/${sessionId}`);
-      setCurrentSession(resp.data);
+      setCurrentSession(resp);
       actionRef.current?.reload();
       loadDashboard();
     } catch (err) {
@@ -535,8 +535,8 @@ export default function CoachSessionPage() {
             `/api/v1/coach-sessions?${query.toString()}`
           );
           return {
-            data: resp.data?.items ?? [],
-            total: resp.data?.total ?? 0,
+            data: resp?.items ?? [],
+            total: resp?.total ?? 0,
             success: true,
           };
         }}

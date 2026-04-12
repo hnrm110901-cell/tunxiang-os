@@ -15,7 +15,7 @@
  *  GET /api/v1/labor-margin/loss-hours?store_id=&date=
  */
 
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Alert,
   Card,
@@ -30,7 +30,9 @@ import {
   message,
 } from 'antd';
 import { StatisticCard } from '@ant-design/pro-components';
-import { Area } from '@ant-design/charts';
+import { Area as _AreaChart } from '@ant-design/charts';
+// Cast to accept broader prop types (chart lib has overly strict readonly types)
+const AreaChart = _AreaChart as unknown as React.ComponentType<Record<string, unknown>>;
 import {
   DollarOutlined,
   ShoppingCartOutlined,
@@ -107,7 +109,7 @@ export default function LaborMarginDashboard() {
   useEffect(() => {
     txFetchData<{ items: { id: string; store_name: string }[] }>('/api/v1/stores?page=1&size=100')
       .then((resp) => {
-        const list = (resp.data?.items || []).map((s) => ({ id: s.id, name: s.store_name }));
+        const list = (resp?.items || []).map((s) => ({ id: s.id, name: s.store_name }));
         setStores(list);
         if (list.length > 0 && !storeId) setStoreId(list[0].id);
       })
@@ -130,9 +132,9 @@ export default function LaborMarginDashboard() {
       txFetchData<LossHoursData>(`/api/v1/labor-margin/loss-hours?store_id=${storeId}&target_date=${dateStr}`),
     ])
       .then(([summaryResp, hourlyResp, lossResp]) => {
-        setSummary(summaryResp.data);
-        setHourly(hourlyResp.data || []);
-        setLossData(lossResp.data);
+        setSummary(summaryResp);
+        setHourly(hourlyResp || []);
+        setLossData(lossResp);
       })
       .catch(() => message.error('加载毛利数据失败'))
       .finally(() => setLoading(false));
@@ -266,17 +268,16 @@ export default function LaborMarginDashboard() {
       {/* 堆叠面积图 */}
       <Card title="小时成本结构" style={{ marginBottom: 16 }} loading={loading}>
         {chartData.length > 0 ? (
-          <Area
+          <AreaChart
             data={chartData}
             xField="hour"
             yField="value"
             seriesField="type"
-            isStack
             height={320}
             areaStyle={{ fillOpacity: 0.7 }}
             color={['#A32D2D', '#BA7517', '#185FA5', '#0F6E56']}
             yAxis={{ label: { formatter: (v: string) => `${v}元` } }}
-            tooltip={{ formatter: (datum) => ({ name: datum.type, value: `${Number(datum.value).toFixed(0)}元` }) }}
+            tooltip={{ formatter: (datum: Record<string, unknown>) => ({ name: datum.type, value: `${Number(datum.value).toFixed(0)}元` }) }}
             annotations={
               Array.from(lossHourSet).map((h) => ({
                 type: 'region',

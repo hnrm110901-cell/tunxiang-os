@@ -101,7 +101,7 @@ export default function StoreOpsExceptions() {
     (async () => {
       try {
         const res = await txFetchData<{ store_id: string; store_name: string }[]>('/api/v1/org/stores');
-        const list = res.data ?? [];
+        const list = res ?? [];
         setStores(list);
         if (list.length > 0) setStoreId(list[0].store_id);
       } catch {
@@ -256,7 +256,7 @@ export default function StoreOpsExceptions() {
             const res = await txFetchData<AnomalySummary>(
               `/api/v1/store-ops/anomalies?store_id=${storeId}&date=${date.format('YYYY-MM-DD')}`,
             );
-            const d = res.data;
+            const d = res;
             if (d) {
               setSummary({
                 late: d.late_count,

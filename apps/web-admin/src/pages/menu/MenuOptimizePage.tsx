@@ -2,7 +2,7 @@
  * MenuOptimizePage — 智能排菜AI建议
  * 调用 POST /api/v1/brain/menu/optimize，展示AI排菜方案
  */
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { txFetchData } from '../../api';
 
 // ─── 类型定义 ───
@@ -132,8 +132,8 @@ export function MenuOptimizePage() {
         method: 'POST',
         body: JSON.stringify({ store_id: storeId, date, meal_period: mealPeriod }),
       });
-      setResult(resp.data ?? null);
-      if (!resp.data) {
+      setResult(resp ?? null);
+      if (!resp) {
         setError('AI 返回数据为空，请重试');
       }
     } catch (e: unknown) {

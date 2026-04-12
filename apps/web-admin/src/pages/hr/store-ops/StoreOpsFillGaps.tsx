@@ -156,7 +156,7 @@ export default function StoreOpsFillGaps() {
     (async () => {
       try {
         const res = await txFetchData<{ store_id: string; store_name: string }[]>('/api/v1/org/stores');
-        const list = res.data ?? [];
+        const list = res ?? [];
         setStores(list);
         if (list.length > 0) setStoreId(list[0].store_id);
       } catch {
@@ -172,7 +172,7 @@ export default function StoreOpsFillGaps() {
       const res = await txFetchData<Candidate[]>(
         `/api/v1/store-ops/fill-suggestions?gap_id=${gapId}`,
       );
-      setCandidates(res.data ?? []);
+      setCandidates(res ?? []);
     } catch {
       message.error('加载候选人失败');
     } finally {
@@ -267,7 +267,7 @@ export default function StoreOpsFillGaps() {
                 const res = await txFetchData<{ items: GapItem[]; total: number }>(
                   `/api/v1/store-ops/gaps?${query.toString()}`,
                 );
-                return { data: res.data?.items ?? [], total: res.data?.total ?? 0, success: true };
+                return { data: res?.items ?? [], total: res?.total ?? 0, success: true };
               }}
               rowKey="id"
               search={{ labelWidth: 'auto' }}

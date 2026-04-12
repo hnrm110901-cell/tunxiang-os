@@ -23,6 +23,9 @@ import { TxLineChart } from '../components/charts';
 import { TxPieChart } from '../components/charts';
 import { txFetchData } from '../api';
 
+// ─── E1-E8 日清日结环节名称 ───
+const E_NAMES = ['营业准备', '收银核对', '库存盘点', '卫生检查', '设备检查', '人员签退', '财务汇总', '日结确认'];
+
 // ─── 颜色常量（Design Token） ───
 const C = {
   primary: '#FF6B35',
@@ -313,13 +316,13 @@ export function OperationsDashboardPage() {
         txFetchData<{ items: ChecklistStore[] }>(`/api/v1/ops/settlement/checklist?date=${selectedDate}`),
       ]);
 
-      if (storesRes.status === 'fulfilled' && storesRes.value.data?.items) setStores(storesRes.value.data.items);
-      if (pnlRes.status === 'fulfilled' && pnlRes.value.data) setPnl(pnlRes.value.data);
-      if (yPnlRes.status === 'fulfilled' && yPnlRes.value.data) setYesterdayPnl(yPnlRes.value.data);
-      if (summaryRes.status === 'fulfilled' && summaryRes.value.data) setSummary(summaryRes.value.data);
-      if (trendRes.status === 'fulfilled' && trendRes.value.data?.items) setTrend(trendRes.value.data.items);
-      if (compareRes.status === 'fulfilled' && compareRes.value.data?.items) setStorePnl(compareRes.value.data.items);
-      if (checklistRes.status === 'fulfilled' && checklistRes.value.data?.items) setChecklist(checklistRes.value.data.items);
+      if (storesRes.status === 'fulfilled' && storesRes.value?.items) setStores(storesRes.value.items);
+      if (pnlRes.status === 'fulfilled' && pnlRes.value) setPnl(pnlRes.value);
+      if (yPnlRes.status === 'fulfilled' && yPnlRes.value) setYesterdayPnl(yPnlRes.value);
+      if (summaryRes.status === 'fulfilled' && summaryRes.value) setSummary(summaryRes.value);
+      if (trendRes.status === 'fulfilled' && trendRes.value?.items) setTrend(trendRes.value.items);
+      if (compareRes.status === 'fulfilled' && compareRes.value?.items) setStorePnl(compareRes.value.items);
+      if (checklistRes.status === 'fulfilled' && checklistRes.value?.items) setChecklist(checklistRes.value.items);
     } catch {
       // 保持空数据
     }

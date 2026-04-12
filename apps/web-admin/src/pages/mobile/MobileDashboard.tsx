@@ -100,7 +100,7 @@ export function MobileDashboard() {
 
     txFetchData<MobileDashboardData>('/api/v1/analytics/dashboard?store_id=all')
       .then(res => {
-        if (!cancelled) setData(res.data ?? MOCK_DATA);
+        if (!cancelled) setData(res ?? MOCK_DATA);
       })
       .catch(() => {
         if (!cancelled) setData(MOCK_DATA);

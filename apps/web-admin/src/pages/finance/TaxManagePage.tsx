@@ -35,7 +35,7 @@ import { StatisticCard } from '@ant-design/pro-components';
 import dayjs, { Dayjs } from 'dayjs';
 
 const { Title, Text } = Typography;
-const { TabPane } = require('antd').Tabs ?? {};
+// TabPane removed (not used)
 
 // ── 类型定义 ──────────────────────────────────────────────────────────────────
 

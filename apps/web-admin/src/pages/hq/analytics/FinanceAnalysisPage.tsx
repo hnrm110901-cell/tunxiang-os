@@ -98,20 +98,20 @@ export function FinanceAnalysisPage() {
         txFetchData<CostData>(`/api/v1/analytics/cost?period=${p}`),
         txFetchData<ChannelMarginData>(`/api/v1/analytics/channel-margin?date=${today}`),
       ]);
-      if (revRes.status === 'fulfilled' && revRes.value.data) {
-        const d = revRes.value.data;
+      if (revRes.status === 'fulfilled' && revRes.value) {
+        const d = revRes.value;
         setRevenueChannels(d.channels ?? []);
         setRevenueTrend(d.trend ?? []);
       }
-      if (costRes.status === 'fulfilled' && costRes.value.data) {
-        const d = costRes.value.data;
+      if (costRes.status === 'fulfilled' && costRes.value) {
+        const d = costRes.value;
         setPayments(d.payments ?? []);
         setPaymentTrend(d.payment_trend ?? []);
         setDiscounts(d.discounts ?? []);
         setDiscountTrend(d.discount_trend ?? []);
       }
-      if (marginRes.status === 'fulfilled' && marginRes.value.data) {
-        setStoreProfits(marginRes.value.data.store_profits ?? []);
+      if (marginRes.status === 'fulfilled' && marginRes.value) {
+        setStoreProfits(marginRes.value.store_profits ?? []);
       }
     } catch {
       // 保持空数据

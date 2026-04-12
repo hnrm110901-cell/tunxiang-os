@@ -540,7 +540,7 @@ const InventoryLogTable: React.FC<InventoryLogTableProps> = ({ filterIngredient 
       pagination={{ pageSize: 15, showSizeChanger: true }}
       dateFormatter="string"
       headerTitle={filterIngredient ? undefined : '库存流水'}
-      options={!filterIngredient}
+      options={filterIngredient ? false : undefined}
     />
   );
 };

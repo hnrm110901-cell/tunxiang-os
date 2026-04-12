@@ -48,7 +48,7 @@ export default function ComplianceDashboard() {
 
   useEffect(() => {
     txFetchData<DashboardData>('/api/v1/compliance/dashboard')
-      .then((resp) => setData(resp.data))
+      .then((resp) => setData(resp))
       .catch(() => message.error('加载合规总览失败'))
       .finally(() => setLoading(false));
   }, []);

@@ -59,7 +59,7 @@ function TemplateManageTab() {
       const resp = await txFetchData<{ items: JourneyTemplate[]; total: number }>(
         '/api/v1/growth/journey-templates?size=100'
       );
-      if (resp.data) setTemplates(resp.data.items);
+      if (resp) setTemplates(resp.items);
     } catch (err) {
       console.error('fetch templates error', err);
     } finally {
@@ -207,7 +207,7 @@ function AuditLogTab() {
         const resp = await txFetchData<{ items: AuditItem[]; total: number }>(
           '/api/v1/growth/agent-suggestions?size=50'
         );
-        if (resp.data) setItems(resp.data.items);
+        if (resp) setItems(resp.items);
       } catch (err) {
         console.error('fetch audit log error', err);
       } finally {

@@ -201,7 +201,7 @@ export function PublicOpinionPage() {
     try {
       await apiRequest(`${BASE_URL}/api/v1/ops/public-opinion/mentions/${mentionId}/resolve`, {
         method: 'PATCH',
-        body: { resolution_note: '已处理' },
+        body: JSON.stringify({ resolution_note: '已处理' }),
       });
       message.success('已标记为处理完成');
       setMentions(prev => prev.map(m => m.id === mentionId ? { ...m, is_resolved: true } : m));

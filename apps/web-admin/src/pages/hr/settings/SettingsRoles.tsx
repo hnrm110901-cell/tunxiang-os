@@ -272,7 +272,6 @@ export default function SettingsRoles() {
           checkedKeys={checkedKeys}
           onCheck={(keys) => setCheckedKeys(keys as string[])}
           treeData={PERMISSION_TREE}
-          loading={permLoading}
         />
       </Drawer>
     </div>

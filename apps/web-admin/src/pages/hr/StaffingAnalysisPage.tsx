@@ -171,8 +171,8 @@ export default function StaffingAnalysisPage() {
       const res = await txFetchData<{ items: { id: string; name: string }[] }>(
         '/api/v1/stores?page=1&size=200',
       );
-      if (res.ok && res.data) {
-        const list = res.data.items.map((s) => ({ id: s.id, name: s.name }));
+      if (res) {
+        const list = res.items.map((s) => ({ id: s.id, name: s.name }));
         setStores(list);
         if (list.length > 0) {
           setStoreId(list[0].id);
@@ -188,9 +188,9 @@ export default function StaffingAnalysisPage() {
     const res = await txFetchData<CompareData>(
       `/api/v1/staffing-analysis/compare?store_id=${encodeURIComponent(sid)}&snapshot_date=${dateStr}`,
     );
-    if (res.ok && res.data) {
-      setCompareItems(res.data.items);
-      setSummary(res.data.summary);
+    if (res) {
+      setCompareItems(res.items);
+      setSummary(res.summary);
     }
   };
 
@@ -198,8 +198,8 @@ export default function StaffingAnalysisPage() {
     const res = await txFetchData<{ items: ImpactItem[] }>(
       `/api/v1/staffing-analysis/impact?store_id=${encodeURIComponent(sid)}&snapshot_date=${dateStr}`,
     );
-    if (res.ok && res.data) {
-      setImpactItems(res.data.items);
+    if (res) {
+      setImpactItems(res.items);
     }
   };
 
@@ -207,8 +207,8 @@ export default function StaffingAnalysisPage() {
     const res = await txFetchData<{ items: RankingItem[] }>(
       `/api/v1/staffing-analysis/gap-ranking?snapshot_date=${dateStr}&limit=10`,
     );
-    if (res.ok && res.data) {
-      setRankingItems(res.data.items);
+    if (res) {
+      setRankingItems(res.items);
     }
   };
 
@@ -218,8 +218,8 @@ export default function StaffingAnalysisPage() {
     const res = await txFetchData<{ items: TrendItem[] }>(
       `/api/v1/staffing-analysis/trend?store_id=${encodeURIComponent(sid)}&start_date=${startDate}&end_date=${endDate}`,
     );
-    if (res.ok && res.data) {
-      setTrendItems(res.data.items);
+    if (res) {
+      setTrendItems(res.items);
     }
   };
 
@@ -257,17 +257,13 @@ export default function StaffingAnalysisPage() {
     }
     setSnapshotLoading(true);
     try {
-      const res = await txFetchData<unknown>('/api/v1/staffing-analysis/snapshot', {
+      await txFetchData('/api/v1/staffing-analysis/snapshot', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ store_id: storeId, snapshot_date: dateStr }),
       });
-      if (res.ok) {
-        message.success('快照生成成功');
-        await refreshAll();
-      } else {
-        message.error(res.error?.message || '快照生成失败');
-      }
+      message.success('快照生成成功');
+      await refreshAll();
     } catch (err) {
       message.error('快照生成请求失败');
     } finally {

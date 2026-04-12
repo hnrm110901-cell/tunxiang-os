@@ -136,8 +136,7 @@ const QUICK_REPLIES = [
 
 async function apiFetch<T>(path: string): Promise<T | null> {
   try {
-    const res = await txFetchData<T>(path);
-    return res.data ?? null;
+    return await txFetchData<T>(path);
   } catch {
     return null;
   }
@@ -146,7 +145,7 @@ async function apiFetch<T>(path: string): Promise<T | null> {
 async function apiPatch<T>(path: string, body: Record<string, unknown>): Promise<T | null> {
   try {
     const res = await txFetchData<T>(path, { method: 'PATCH', body: JSON.stringify(body) });
-    return res.data ?? null;
+    return res ?? null;
   } catch {
     return null;
   }
@@ -155,7 +154,7 @@ async function apiPatch<T>(path: string, body: Record<string, unknown>): Promise
 async function apiPost<T>(path: string, body: Record<string, unknown>): Promise<T | null> {
   try {
     const res = await txFetchData<T>(path, { method: 'POST', body: JSON.stringify(body) });
-    return res.data ?? null;
+    return res ?? null;
   } catch {
     return null;
   }
@@ -963,9 +962,8 @@ function StatsTab() {
   const [rankData, setRankData] = useState<HandlerRank[]>([]);
 
   useEffect(() => {
-    apiFetch<StatsData>('/api/v1/ops/service-tickets/stats', {
-      trend: [], type_dist: [], handler_rank: [],
-    }).then((d) => {
+    apiFetch<StatsData>('/api/v1/ops/service-tickets/stats').then((d) => {
+      if (!d) return;
       setTrendData(d.trend ?? []);
       setTypeDist(d.type_dist ?? []);
       setRankData(d.handler_rank ?? []);

@@ -97,7 +97,7 @@ export default function LeaveDetail({ leaveId }: { leaveId?: string }) {
     setLoading(true);
     try {
       const res = await txFetchData<LeaveDetailData>(`/api/v1/leave-requests/${id}`);
-      setData(res.data);
+      setData(res);
     } catch {
       message.error('加载请假详情失败');
     } finally {

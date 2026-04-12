@@ -159,7 +159,7 @@ export default function LeaveApprovalBoard() {
     (async () => {
       try {
         const res = await txFetchData<{ store_id: string; store_name: string }[]>('/api/v1/org/stores');
-        const list = res.data ?? [];
+        const list = res ?? [];
         setStores(list);
         if (list.length > 0) setStoreId(list[0].store_id);
       } catch {
@@ -178,9 +178,9 @@ export default function LeaveApprovalBoard() {
         txFetchData<{ items: LeaveCard[] }>(`/api/v1/leave-requests?store_id=${storeId}&status=rejected&size=50`),
       ]);
       setBoardData({
-        pending: pendingRes.data?.items ?? [],
-        approved: approvedRes.data?.items ?? [],
-        rejected: rejectedRes.data?.items ?? [],
+        pending: pendingRes?.items ?? [],
+        approved: approvedRes?.items ?? [],
+        rejected: rejectedRes?.items ?? [],
       });
     } catch {
       message.error('加载看板数据失败');

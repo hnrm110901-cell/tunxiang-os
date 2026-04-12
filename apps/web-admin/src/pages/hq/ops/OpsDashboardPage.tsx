@@ -81,11 +81,11 @@ export function OpsDashboardPage() {
         txFetchData<{ items: StoreRankItem[] }>(`/api/v1/analytics/alerts?status=active&level=critical&period=${period}`),
         txFetchData<HourlyTrend>('/api/v1/ops/dashboard/hourly-trend'),
       ]);
-      if (kpiRes.status === 'fulfilled') setKpis(kpiRes.value.data?.items ?? []);
-      if (alertsRes.status === 'fulfilled') setStores(alertsRes.value.data?.items ?? []);
-      if (agentRes.status === 'fulfilled') setDecisions(agentRes.value.data?.items ?? []);
-      if (rankRes.status === 'fulfilled') setStores(rankRes.value.data?.items ?? []);
-      if (trendRes.status === 'fulfilled' && trendRes.value.data) setHourlyTrend(trendRes.value.data);
+      if (kpiRes.status === 'fulfilled') setKpis(kpiRes.value?.items ?? []);
+      if (alertsRes.status === 'fulfilled') setStores(alertsRes.value?.items ?? []);
+      if (agentRes.status === 'fulfilled') setDecisions(agentRes.value?.items ?? []);
+      if (rankRes.status === 'fulfilled') setStores(rankRes.value?.items ?? []);
+      if (trendRes.status === 'fulfilled' && trendRes.value) setHourlyTrend(trendRes.value);
     } catch {
       // 保持空数据
     }

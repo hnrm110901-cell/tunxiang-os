@@ -158,7 +158,7 @@ function NodeStatusCard({
   if (loading) return <LoadingCard height={200} />;
   if (error) return <ErrorCard message={error} onRetry={onRetry} />;
 
-  const nodes = data?.nodes ?? Object.keys(NODE_NAMES).map(k => ({
+  const nodes: NodeStatus[] = data?.nodes ?? Object.keys(NODE_NAMES).map(k => ({
     node_id: k,
     node_name: NODE_NAMES[k],
     status: 'pending' as const,

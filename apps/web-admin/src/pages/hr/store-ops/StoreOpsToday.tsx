@@ -250,7 +250,7 @@ export default function StoreOpsToday() {
     (async () => {
       try {
         const res = await txFetchData<StoreOption[]>('/api/v1/org/stores');
-        const list = res.data ?? [];
+        const list = res ?? [];
         setStores(list);
         if (list.length > 0) setStoreId(list[0].store_id);
       } catch (err) {
@@ -267,7 +267,7 @@ export default function StoreOpsToday() {
       const res = await txFetchData<TodayOverview>(
         `/api/v1/store-ops/today?store_id=${storeId}&date=${date.format('YYYY-MM-DD')}`,
       );
-      setData(res.data);
+      setData(res);
     } catch (err) {
       message.error('加载作战台数据失败');
     } finally {

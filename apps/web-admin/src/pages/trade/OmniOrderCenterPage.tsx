@@ -498,9 +498,9 @@ export default function OmniOrderCenterPage() {
       dataIndex: 'paid_fen',
       width: 110,
       align: 'right',
-      render: (v: number, r) => (
+      render: (_, r) => (
         <Space direction="vertical" size={0} style={{ textAlign: 'right' }}>
-          <Text strong style={{ color: '#2C2C2A' }}>{fenToYuan(v)}</Text>
+          <Text strong style={{ color: '#2C2C2A' }}>{fenToYuan(r.paid_fen)}</Text>
           {r.discount_fen > 0 && (
             <Text type="secondary" style={{ fontSize: 11 }}>
               折扣 -{fenToYuan(r.discount_fen)}
@@ -513,7 +513,7 @@ export default function OmniOrderCenterPage() {
       title: '支付方式',
       dataIndex: 'payment_method',
       width: 100,
-      render: (v: string) => PAYMENT_LABEL[v] || v || '-',
+      render: (_, r) => (r.payment_method ? PAYMENT_LABEL[r.payment_method] || r.payment_method : '-'),
     },
     {
       title: '状态',
@@ -534,7 +534,7 @@ export default function OmniOrderCenterPage() {
       title: '下单时间',
       dataIndex: 'created_at',
       width: 130,
-      render: (v: string) => v ? dayjs(v).format('MM-DD HH:mm') : '-',
+      render: (_, r) => r.created_at ? dayjs(r.created_at).format('MM-DD HH:mm') : '-',
     },
     {
       title: '操作',
@@ -683,7 +683,7 @@ export default function OmniOrderCenterPage() {
           // 搜索模式：直接显示搜索结果
           <Table<OmniOrder>
             dataSource={searchResults}
-            columns={columns}
+            columns={columns as import('antd/es/table').ColumnsType<OmniOrder>}
             rowKey="order_id"
             size="small"
             pagination={{ pageSize: 20 }}

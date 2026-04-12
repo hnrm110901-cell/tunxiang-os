@@ -49,7 +49,7 @@ export default function GovernanceDashboard() {
 
   useEffect(() => {
     txFetchData<GovernanceData>('/api/v1/hr/governance/dashboard')
-      .then((resp) => setData(resp.data))
+      .then((resp) => setData(resp))
       .catch(() => message.error('加载驾驶舱数据失败'))
       .finally(() => setLoading(false));
   }, []);

@@ -85,7 +85,7 @@ export default function EmployeeList() {
         const resp = await txFetchData<{ items: { id: string; name: string }[] }>(
           '/api/v1/org-structure/departments',
         );
-        return (resp.data?.items ?? []).map((d) => ({ label: d.name, value: d.id }));
+        return (resp?.items ?? []).map((d) => ({ label: d.name, value: d.id }));
       },
     },
     { title: '部门', dataIndex: 'department_name', hideInSearch: true },
@@ -100,7 +100,7 @@ export default function EmployeeList() {
         const resp = await txFetchData<{ items: { id: string; name: string }[] }>(
           '/api/v1/stores',
         );
-        return (resp.data?.items ?? []).map((s) => ({ label: s.name, value: s.id }));
+        return (resp?.items ?? []).map((s) => ({ label: s.name, value: s.id }));
       },
     },
     { title: '门店', dataIndex: 'store_name', hideInSearch: true },
@@ -177,8 +177,8 @@ export default function EmployeeList() {
         const resp = await txFetchData<EmployeeListResp>(
           `/api/v1/employees?${query.toString()}`,
         );
-        const d = resp.data;
-        return { data: d?.items ?? [], total: d?.total ?? 0, success: resp.ok };
+        const d = resp;
+        return { data: d?.items ?? [], total: d?.total ?? 0, success: true };
       }}
       toolBarRender={() => [
         <Button

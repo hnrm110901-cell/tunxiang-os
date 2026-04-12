@@ -137,11 +137,11 @@ export function Customer360Page() {
         txFetchData<{ items: AgentSuggestion[] }>(`/api/v1/growth/agent-suggestions?customer_id=${customerId}`),
         txFetchData<{ items: ServiceRepairCase[] }>(`/api/v1/growth/service-repair-cases?customer_id=${customerId}`),
       ]);
-      if (custResp.status === 'fulfilled' && custResp.value.data) setCustomer(custResp.value.data);
-      if (profileResp.status === 'fulfilled' && profileResp.value.data) setGrowthProfile(profileResp.value.data);
-      if (touchResp.status === 'fulfilled' && touchResp.value.data) setTouches(touchResp.value.data.items);
-      if (suggResp.status === 'fulfilled' && suggResp.value.data) setSuggestions(suggResp.value.data.items);
-      if (repairResp.status === 'fulfilled' && repairResp.value.data) setRepairCases(repairResp.value.data.items);
+      if (custResp.status === 'fulfilled' && custResp.value) setCustomer(custResp.value);
+      if (profileResp.status === 'fulfilled' && profileResp.value) setGrowthProfile(profileResp.value);
+      if (touchResp.status === 'fulfilled' && touchResp.value) setTouches(touchResp.value.items);
+      if (suggResp.status === 'fulfilled' && suggResp.value) setSuggestions(suggResp.value.items);
+      if (repairResp.status === 'fulfilled' && repairResp.value) setRepairCases(repairResp.value.items);
     } catch (err) {
       console.error('Customer360 fetch error', err);
     } finally {
@@ -156,7 +156,7 @@ export function Customer360Page() {
     setJourneyModalOpen(true);
     try {
       const resp = await txFetchData<{ items: JourneyTemplate[] }>('/api/v1/growth/journey-templates?is_active=true');
-      if (resp.data) setJourneyTemplates(resp.data.items);
+      if (resp) setJourneyTemplates(resp.items);
     } catch (err) {
       console.error('fetch journey templates error', err);
     }

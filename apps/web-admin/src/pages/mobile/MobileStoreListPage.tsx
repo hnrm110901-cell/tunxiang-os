@@ -193,7 +193,7 @@ export function MobileStoreListPage() {
 
     txFetchData<StoreItem[]>('/api/v1/analytics/store-list')
       .then(res => {
-        if (!cancelled) setStores(res.data ?? MOCK_STORES);
+        if (!cancelled) setStores(res ?? MOCK_STORES);
       })
       .catch(() => {
         if (!cancelled) setStores(MOCK_STORES);

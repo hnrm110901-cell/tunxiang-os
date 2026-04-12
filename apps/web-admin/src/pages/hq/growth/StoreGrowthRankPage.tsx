@@ -64,8 +64,8 @@ export function StoreGrowthRankPage() {
     const filtered = brand === '全部品牌' ? raw : raw.filter(s => s.brand_name === brand);
     // sort by selected metric desc
     return [...filtered].sort((a, b) => {
-      const va = (a as Record<string, unknown>)[sortMetric] as number ?? 0;
-      const vb = (b as Record<string, unknown>)[sortMetric] as number ?? 0;
+      const va = (a as unknown as Record<string, unknown>)[sortMetric] as number ?? 0;
+      const vb = (b as unknown as Record<string, unknown>)[sortMetric] as number ?? 0;
       return vb - va;
     });
   }, [data, brand, sortMetric]);
@@ -93,7 +93,7 @@ export function StoreGrowthRankPage() {
         name: metricLabel,
         type: 'bar',
         data: [...top10].reverse().map(s => {
-          const val = (s as Record<string, unknown>)[sortMetric] as number ?? 0;
+          const val = (s as unknown as Record<string, unknown>)[sortMetric] as number ?? 0;
           return typeof val === 'number' ? +val.toFixed(2) : 0;
         }),
         itemStyle: { color: BRAND_ORANGE },

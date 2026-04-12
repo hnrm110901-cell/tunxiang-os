@@ -105,8 +105,8 @@ export default function ComplianceDocExpiring() {
           const resp = await txFetchData<{ items: ExpiringDoc[]; total: number }>(
             `/api/v1/employee-documents/expiring?${query.toString()}`,
           );
-          const d = resp.data;
-          return { data: d?.items ?? [], total: d?.total ?? 0, success: resp.ok };
+          const d = resp;
+          return { data: d?.items ?? [], total: d?.total ?? 0, success: true };
         }}
       />
 
