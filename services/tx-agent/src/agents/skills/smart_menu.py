@@ -11,7 +11,7 @@ from typing import Any
 
 import structlog
 
-from ..base import AgentResult, SkillAgent
+from ..base import ActionConfig, AgentResult, SkillAgent
 
 logger = structlog.get_logger()
 
@@ -38,6 +38,68 @@ class SmartMenuAgent(SkillAgent):
             "suggest_alternatives", "mark_sold_out",
             "push_expiry_specials", "flag_high_cost_dishes",
         ]
+
+    def get_action_config(self, action: str) -> ActionConfig:
+        """智能排菜 Agent 的 action 级会话策略"""
+        configs = {
+            # 菜单优化影响全店菜品展示，需人工确认
+            "optimize_menu": ActionConfig(
+                risk_level="high",
+                requires_human_confirm=True,
+                max_retries=1,
+            ),
+            # 上市检查涉及新品发布决策
+            "check_launch_readiness": ActionConfig(
+                risk_level="high",
+                requires_human_confirm=True,
+                max_retries=1,
+            ),
+            # 菜品四象限分类 & 复盘属于评估类
+            "classify_quadrant": ActionConfig(
+                risk_level="medium",
+                max_retries=2,
+            ),
+            "run_dish_review": ActionConfig(
+                risk_level="medium",
+                max_retries=2,
+            ),
+            # 风险扫描
+            "scan_dish_risks": ActionConfig(
+                risk_level="medium",
+                max_retries=2,
+            ),
+            # 高成本菜品标记
+            "flag_high_cost_dishes": ActionConfig(
+                risk_level="medium",
+                max_retries=1,
+            ),
+            # 以下为低风险操作
+            "simulate_cost": ActionConfig(
+                risk_level="low",
+                max_retries=1,
+            ),
+            "recommend_pilot_stores": ActionConfig(
+                risk_level="low",
+                max_retries=1,
+            ),
+            "inspect_dish_quality": ActionConfig(
+                risk_level="low",
+                max_retries=1,
+            ),
+            "suggest_alternatives": ActionConfig(
+                risk_level="low",
+                max_retries=1,
+            ),
+            "mark_sold_out": ActionConfig(
+                risk_level="low",
+                max_retries=1,
+            ),
+            "push_expiry_specials": ActionConfig(
+                risk_level="low",
+                max_retries=1,
+            ),
+        }
+        return configs.get(action, ActionConfig())
 
     async def execute(self, action: str, params: dict[str, Any]) -> AgentResult:
         dispatch = {

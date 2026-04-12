@@ -10,7 +10,7 @@ from typing import Any, Optional
 
 import structlog
 
-from ..base import AgentResult, SkillAgent
+from ..base import ActionConfig, AgentResult, SkillAgent
 
 logger = structlog.get_logger(__name__)
 
@@ -50,6 +50,101 @@ class FinanceAuditAgent(SkillAgent):
             "get_settlement_snapshot",  # Phase 3: 读 mv_daily_settlement
             "get_pnl_snapshot",         # Phase 3: 读 mv_store_pnl
         ]
+
+    def get_action_config(self, action: str) -> ActionConfig:
+        """财务稽核 Agent 的 action 级会话策略"""
+        configs = {
+            # 折扣异常标记 — 最高风险，需人工确认
+            "flag_discount_anomaly": ActionConfig(
+                risk_level="critical",
+                requires_human_confirm=True,
+                max_retries=0,
+            ),
+            # 营收异常检测 — 最高风险
+            "detect_revenue_anomaly": ActionConfig(
+                risk_level="critical",
+                requires_human_confirm=True,
+                max_retries=0,
+            ),
+            # P&L 异常检查
+            "check_pl_anomaly": ActionConfig(
+                risk_level="critical",
+                requires_human_confirm=True,
+                max_retries=0,
+            ),
+            # 根因分析
+            "root_cause_analysis": ActionConfig(
+                risk_level="high",
+                requires_human_confirm=True,
+                max_retries=1,
+            ),
+            # 日结对账需人工确认
+            "daily_reconciliation": ActionConfig(
+                risk_level="high",
+                requires_human_confirm=True,
+                max_retries=1,
+            ),
+            # 营收更新
+            "update_daily_revenue": ActionConfig(
+                risk_level="high",
+                requires_human_confirm=True,
+                max_retries=1,
+            ),
+            # 收货差异标记
+            "flag_receiving_variance": ActionConfig(
+                risk_level="high",
+                requires_human_confirm=True,
+                max_retries=1,
+            ),
+            # 审批结果处理
+            "process_approval_result": ActionConfig(
+                risk_level="high",
+                requires_human_confirm=True,
+                max_retries=1,
+            ),
+            # 以下为中等风险操作
+            "get_financial_report": ActionConfig(
+                risk_level="medium",
+                max_retries=1,
+            ),
+            "snapshot_kpi": ActionConfig(
+                risk_level="medium",
+                max_retries=1,
+            ),
+            "forecast_orders": ActionConfig(
+                risk_level="medium",
+                max_retries=1,
+            ),
+            "generate_biz_insight": ActionConfig(
+                risk_level="medium",
+                max_retries=1,
+            ),
+            "match_scenario": ActionConfig(
+                risk_level="medium",
+                max_retries=1,
+            ),
+            "analyze_order_trend": ActionConfig(
+                risk_level="medium",
+                max_retries=1,
+            ),
+            "cost_analysis": ActionConfig(
+                risk_level="medium",
+                max_retries=1,
+            ),
+            "generate_shift_summary": ActionConfig(
+                risk_level="medium",
+                max_retries=1,
+            ),
+            "get_settlement_snapshot": ActionConfig(
+                risk_level="medium",
+                max_retries=1,
+            ),
+            "get_pnl_snapshot": ActionConfig(
+                risk_level="medium",
+                max_retries=1,
+            ),
+        }
+        return configs.get(action, ActionConfig())
 
     async def execute(self, action: str, params: dict[str, Any]) -> AgentResult:
         dispatch = {

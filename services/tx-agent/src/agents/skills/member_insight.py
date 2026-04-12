@@ -9,7 +9,7 @@ from typing import Any
 
 import structlog
 
-from ..base import AgentResult, SkillAgent
+from ..base import ActionConfig, AgentResult, SkillAgent
 
 logger = structlog.get_logger(__name__)
 
@@ -58,6 +58,81 @@ class MemberInsightAgent(SkillAgent):
             "generate_milestone_suggestion",        # P1: 里程碑庆祝建议
             "generate_referral_suggestion",         # P1: 裂变场景激活建议
         ]
+
+    def get_action_config(self, action: str) -> ActionConfig:
+        """会员洞察 Agent 的 action 级会话策略"""
+        configs = {
+            # RFM 更新涉及会员分层变更
+            "update_customer_rfm": ActionConfig(
+                risk_level="medium",
+                max_retries=2,
+            ),
+            "rfm_analysis": ActionConfig(
+                risk_level="medium",
+                max_retries=2,
+            ),
+            "analyze_rfm": ActionConfig(
+                risk_level="medium",
+                max_retries=2,
+            ),
+            # CLV 快照读取
+            "get_clv_snapshot": ActionConfig(
+                risk_level="low",
+                max_retries=1,
+            ),
+            # 报告 / 建议生成类（低风险）
+            "generate_first_to_second_suggestion": ActionConfig(
+                risk_level="low",
+                max_retries=1,
+            ),
+            "generate_repair_suggestion": ActionConfig(
+                risk_level="low",
+                max_retries=1,
+            ),
+            "generate_super_user_suggestion": ActionConfig(
+                risk_level="low",
+                max_retries=1,
+            ),
+            "generate_psych_bridge_suggestion": ActionConfig(
+                risk_level="low",
+                max_retries=1,
+            ),
+            "generate_milestone_suggestion": ActionConfig(
+                risk_level="low",
+                max_retries=1,
+            ),
+            "generate_referral_suggestion": ActionConfig(
+                risk_level="low",
+                max_retries=1,
+            ),
+            # 信号检测 / 监控类
+            "detect_signals": ActionConfig(
+                risk_level="low",
+            ),
+            "detect_competitor": ActionConfig(
+                risk_level="low",
+            ),
+            "get_churn_risks": ActionConfig(
+                risk_level="low",
+            ),
+            "monitor_service_quality": ActionConfig(
+                risk_level="low",
+            ),
+            "collect_feedback": ActionConfig(
+                risk_level="low",
+            ),
+            # 旅程触发 / 客诉处理涉及用户交互
+            "trigger_journey": ActionConfig(
+                risk_level="low",
+            ),
+            "process_bad_review": ActionConfig(
+                risk_level="low",
+            ),
+            "handle_complaint": ActionConfig(
+                risk_level="low",
+            ),
+        }
+        return configs.get(action, ActionConfig())
 
     async def execute(self, action: str, params: dict[str, Any]) -> AgentResult:
         dispatch = {

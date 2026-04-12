@@ -5,19 +5,24 @@
 边缘推理：Core ML 库存消耗计算
 
 迁移自 tunxiang V2.x packages/agents/inventory/src/agent.py
+
+P1-5 升级（2026-04-12）：
+  集成 EdgeAwareMixin — 补货告警使用边缘客流预测增强缺货预判
+  边缘客流预测提供需求预估，Agent 用于补货量计算
 """
 import statistics
-from datetime import datetime, timezone
+from datetime import date as date_cls, datetime, timezone
 from typing import Any
 
 import structlog
 
-from ..base import AgentResult, SkillAgent
+from ..base import ActionConfig, AgentResult, SkillAgent
+from ..edge_mixin import EdgeAwareMixin
 
 logger = structlog.get_logger(__name__)
 
 
-class InventoryAlertAgent(SkillAgent):
+class InventoryAlertAgent(EdgeAwareMixin, SkillAgent):
     agent_id = "inventory_alert"
     agent_name = "库存预警"
     description = "库存监控、需求预测、补货告警、供应商管理、损耗分析"
@@ -40,6 +45,75 @@ class InventoryAlertAgent(SkillAgent):
             "plan_usage",
             "get_bom_loss_snapshot",   # Phase 3: 读 mv_inventory_bom
         ]
+
+    def get_action_config(self, action: str) -> ActionConfig:
+        """库存预警 Agent 的 action 级会话策略"""
+        configs = {
+            # 库存监控发现低库存，需人工确认补货决策
+            "monitor_inventory": ActionConfig(
+                risk_level="high",
+                requires_human_confirm=True,
+                max_retries=1,
+            ),
+            # 补货告警需人工确认
+            "generate_restock_alerts": ActionConfig(
+                risk_level="high",
+                requires_human_confirm=True,
+                max_retries=1,
+            ),
+            # 紧急补货通知
+            "urgent_reorder_notify": ActionConfig(
+                risk_level="high",
+                requires_human_confirm=True,
+                max_retries=1,
+            ),
+            # 缺货严重度评估
+            "assess_shortage_severity": ActionConfig(
+                risk_level="high",
+                requires_human_confirm=True,
+                max_retries=1,
+            ),
+            # 过期检查涉及食安合规
+            "check_expiration": ActionConfig(
+                risk_level="high",
+                requires_human_confirm=True,
+                max_retries=1,
+            ),
+            # 以下为中等风险操作
+            "predict_consumption": ActionConfig(
+                risk_level="medium",
+                max_retries=1,
+            ),
+            "optimize_stock_levels": ActionConfig(
+                risk_level="medium",
+                max_retries=1,
+            ),
+            "compare_supplier_prices": ActionConfig(
+                risk_level="medium",
+                max_retries=1,
+            ),
+            "evaluate_supplier": ActionConfig(
+                risk_level="medium",
+                max_retries=1,
+            ),
+            "scan_contract_risks": ActionConfig(
+                risk_level="medium",
+                max_retries=1,
+            ),
+            "analyze_waste": ActionConfig(
+                risk_level="medium",
+                max_retries=1,
+            ),
+            "plan_usage": ActionConfig(
+                risk_level="medium",
+                max_retries=1,
+            ),
+            "get_bom_loss_snapshot": ActionConfig(
+                risk_level="medium",
+                max_retries=1,
+            ),
+        }
+        return configs.get(action, ActionConfig())
 
     async def execute(self, action: str, params: dict[str, Any]) -> AgentResult:
         dispatch = {
@@ -179,8 +253,37 @@ class InventoryAlertAgent(SkillAgent):
     # ─── 补货告警（查DB + Claude采购建议） ───
 
     async def _generate_alerts(self, params: dict) -> AgentResult:
-        """生成补货告警：优先查DB，有缺货数据时调用Claude生成采购建议"""
+        """生成补货告警：优先查DB，有缺货数据时调用Claude生成采购建议
+
+        P1-5 升级：使用边缘客流预测增强缺货预判
+        - 边缘客流预测提供未来几小时的客流量预估
+        - 高客流时段自动提高补货紧急度
+        """
         store_id = params.get("store_id") or self.store_id
+
+        # ── 边缘客流预测：获取未来需求预估 ──
+        traffic_forecast: dict[str, Any] | None = None
+        demand_multiplier = 1.0
+        if store_id:
+            traffic_forecast = await self.get_edge_prediction(
+                "traffic",
+                store_id=store_id,
+                date=date_cls.today().isoformat(),
+                hour=datetime.now(timezone.utc).hour,
+            )
+            if traffic_forecast:
+                peak_label = traffic_forecast.get("peak_label", "off_peak")
+                predicted_count = traffic_forecast.get("predicted_count", 0)
+                # 高峰期或高客流时提高补货紧急度
+                if peak_label in ("lunch_peak", "dinner_peak") or predicted_count > 60:
+                    demand_multiplier = 1.3
+                    logger.info(
+                        "inventory_alert_demand_boost",
+                        store_id=store_id,
+                        peak_label=peak_label,
+                        predicted_count=predicted_count,
+                        demand_multiplier=demand_multiplier,
+                    )
 
         alerts = []
         db_data = ""
@@ -204,7 +307,9 @@ class InventoryAlertAgent(SkillAgent):
 
             for row in rows.mappings():
                 d = dict(row)
-                gap = d["safety_stock"] - d["current_qty"]
+                base_gap = d["safety_stock"] - d["current_qty"]
+                # 边缘客流预测增强：高峰期自动放大补货量
+                gap = int(base_gap * demand_multiplier)
                 alerts.append({
                     "ingredient_id": str(d["id"]),
                     "name": d["name"],

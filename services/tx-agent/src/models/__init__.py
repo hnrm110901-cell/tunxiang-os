@@ -6,3 +6,4 @@ from .session_run import SessionRun
 from .session_event import SessionEvent
 from .session_checkpoint import SessionCheckpoint
 from .event_agent_binding import EventAgentBinding
+from .agent_memory import AgentMemory
