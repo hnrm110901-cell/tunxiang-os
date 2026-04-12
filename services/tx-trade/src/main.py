@@ -287,6 +287,11 @@ from .api.calling_screen_routes import router as calling_screen_router
 app.include_router(quick_cashier_router)
 app.include_router(calling_screen_router)
 
+# ── 模块3.1: 快餐平行流程（取餐号/出餐叫号/快餐KDS）──
+from .api.fastfood_routes import router as fastfood_router
+
+app.include_router(fastfood_router)
+
 # ── TC-P2-12: 智慧商街/档口管理（美食广场多档口并行收银+独立核算）──
 from .api.food_court_routes import router as food_court_router
 
