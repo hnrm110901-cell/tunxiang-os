@@ -18,37 +18,49 @@ depends_on = None
 
 
 def upgrade() -> None:
+    conn = op.get_bind()
+    existing = sa.inspect(conn).get_table_names()
+
     # ── corporate_customers（企业客户主数据）──
-    op.create_table(
-        "corporate_customers",
-        sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
-        sa.Column("tenant_id", sa.String(50), nullable=False, index=True),
-        sa.Column("store_id", sa.String(50), nullable=False, index=True),
-        sa.Column("company_name", sa.String(200), nullable=False),
-        sa.Column("company_code", sa.String(50), nullable=True, unique=True),
-        sa.Column("contact_name", sa.String(100), nullable=True),
-        sa.Column("contact_phone", sa.String(20), nullable=True),
-        sa.Column("billing_type", sa.String(20), nullable=False, server_default="monthly",
-                  comment="monthly/weekly/per_order"),
-        sa.Column("credit_limit_fen", sa.BigInteger, nullable=False, server_default="0"),
-        sa.Column("used_credit_fen", sa.BigInteger, nullable=False, server_default="0"),
-        sa.Column("tax_no", sa.String(50), nullable=True),
-        sa.Column("invoice_title", sa.String(200), nullable=True),
-        sa.Column("discount_rate", sa.Float, nullable=False, server_default="1.0",
-                  comment="企业折扣率，如 0.95 = 95折"),
-        sa.Column("approved_menu_ids", JSONB, server_default="[]"),
-        sa.Column("status", sa.String(20), nullable=False, server_default="active",
-                  comment="active/suspended/terminated"),
-        sa.Column("is_deleted", sa.Boolean, server_default=sa.text("FALSE")),
-        sa.Column("created_at", sa.DateTime, server_default=sa.text("NOW()")),
-        sa.Column("updated_at", sa.DateTime, server_default=sa.text("NOW()")),
-    )
+    if 'corporate_customers' not in existing:
+        op.create_table(
+            "corporate_customers",
+            sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
+            sa.Column("tenant_id", sa.String(50), nullable=False, index=True),
+            sa.Column("store_id", sa.String(50), nullable=False, index=True),
+            sa.Column("company_name", sa.String(200), nullable=False),
+            sa.Column("company_code", sa.String(50), nullable=True, unique=True),
+            sa.Column("contact_name", sa.String(100), nullable=True),
+            sa.Column("contact_phone", sa.String(20), nullable=True),
+            sa.Column("billing_type", sa.String(20), nullable=False, server_default="monthly",
+                      comment="monthly/weekly/per_order"),
+            sa.Column("credit_limit_fen", sa.BigInteger, nullable=False, server_default="0"),
+            sa.Column("used_credit_fen", sa.BigInteger, nullable=False, server_default="0"),
+            sa.Column("tax_no", sa.String(50), nullable=True),
+            sa.Column("invoice_title", sa.String(200), nullable=True),
+            sa.Column("discount_rate", sa.Float, nullable=False, server_default="1.0",
+                      comment="企业折扣率，如 0.95 = 95折"),
+            sa.Column("approved_menu_ids", JSONB, server_default="[]"),
+            sa.Column("status", sa.String(20), nullable=False, server_default="active",
+                      comment="active/suspended/terminated"),
+            sa.Column("is_deleted", sa.Boolean, server_default=sa.text("FALSE")),
+            sa.Column("created_at", sa.DateTime, server_default=sa.text("NOW()")),
+            sa.Column("updated_at", sa.DateTime, server_default=sa.text("NOW()")),
+        )
     op.execute("ALTER TABLE corporate_customers ENABLE ROW LEVEL SECURITY;")
     op.execute("ALTER TABLE corporate_customers FORCE ROW LEVEL SECURITY;")
     op.execute("""
-        CREATE POLICY corporate_customers_tenant ON corporate_customers
-        USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), ''))
-        WITH CHECK (tenant_id = NULLIF(current_setting('app.tenant_id', true), ''));
+        DO $$ BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_policies
+                WHERE tablename = 'corporate_customers'
+                AND policyname = 'corporate_customers_tenant'
+            ) THEN
+                EXECUTE 'CREATE POLICY corporate_customers_tenant ON corporate_customers
+                    USING (tenant_id = NULLIF(current_setting(''app.tenant_id'', true), ''''))
+                    WITH CHECK (tenant_id = NULLIF(current_setting(''app.tenant_id'', true), ''''))';
+            END IF;
+        END$$;
     """)
 
     # ── corporate_orders（企业订单）──
