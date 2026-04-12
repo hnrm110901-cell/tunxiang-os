@@ -4,6 +4,33 @@
 
 ---
 
+## 2026-04-12 菜谱方案批量下发与门店差异化（模块3.4）
+
+### 今日完成
+- [shared/events] `event_types.py` 新增 `MenuEventType`（6个事件：PLAN_CREATED/PUBLISHED/DISTRIBUTED/ROLLED_BACK/STORE_OVERRIDE_SET/STORE_OVERRIDE_RESET）
+- [tx-menu] 新增 `menu_plan_routes.py`，13个API端点（版本管理/下发日志/门店差异化/批量操作）
+- [tx-menu] 注册路由到 main.py
+- [web-admin] 新增 `menuPlanApi.ts`（前端API客户端，覆盖所有新端点）
+- [web-admin] 新增 `MenuPlanPage.tsx`（4 Tab：方案列表/批量下发/门店差异化/版本历史）
+- [web-admin] 注册路由 `/menu/plans`
+- [db-migrations] 新增 `v245_menu_plan_versions_distribute_log.py`（2张表）
+
+### 数据变化
+- 迁移版本：v244 → v245
+- 新增表：`menu_plan_versions`（方案版本快照，支持回滚）/ `menu_distribute_log`（下发日志）
+- 两表均含 RLS 策略（app.tenant_id 隔离）
+- 新增API端点：13个（版本CRUD+回滚/下发日志/覆盖管理/重置/待更新通知/分类排序/批量启停/批量指定分类）
+
+### 遗留问题
+- `menu_plan_versions` 的 snapshot_json 需在 publish 端点中自动触发（当前为手动调用 POST /versions）
+- distribute_log 的 status='pending' 目前需手动插入，后续可改为 distribute 时自动写入再异步确认
+
+### 明日计划
+- 在 scheme_routes.py distribute 端点中同步写入 menu_distribute_log
+- 在 publish 端点中自动快照当前菜品到 menu_plan_versions
+
+---
+
 ## 2026-04-12 计件提成3.0 对标天财（模块2.6）
 
 ### 今日完成

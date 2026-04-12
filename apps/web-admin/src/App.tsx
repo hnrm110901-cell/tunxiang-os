@@ -67,6 +67,7 @@ import FoodCourtManagePage from './pages/store/FoodCourtManagePage';  // TC-P2-1
 import { AgentDashboardPage } from './pages/agent/AgentDashboardPage';
 // ─── Phase1-4 新增页面 ───────────────────────────────────────────────────────
 import MenuSchemePage from './pages/menu/MenuSchemePage';
+import MenuPlanPage from './pages/menu/MenuPlanPage';  // 模块3.4 菜谱方案批量下发+门店差异化
 import { WineStoragePage } from './pages/finance/WineStoragePage';
 import { DepositManagePage } from './pages/finance/DepositManagePage';
 import { CostManagePage } from './pages/finance/CostManagePage';
@@ -283,6 +284,8 @@ function App() {
           <Route path="/analytics/reports" element={<ReportCenterPage />} />
           {/* ─── Phase4: 菜谱方案 ─── */}
           <Route path="/menu/schemes" element={<MenuSchemePage />} />
+          {/* ─── 模块3.4: 菜谱方案批量下发+门店差异化+版本管理 ─── */}
+          <Route path="/menu/plans" element={<MenuPlanPage />} />
           {/* ─── Sprint 0-8: 人力中枢 ─── */}
           <Route path="/hr" element={<HRHubPage />} />
           {/* 员工主数据 */}

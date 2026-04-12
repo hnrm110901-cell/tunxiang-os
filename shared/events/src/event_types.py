@@ -370,6 +370,17 @@ class KnowledgeEventType(str, Enum):
     STALE_ALERT = "knowledge.stale.alert"
 
 
+class MenuEventType(str, Enum):
+    """菜谱方案事件 — 模块3.4 批量下发与门店差异化"""
+
+    PLAN_CREATED = "menu.plan_created"          # 方案创建
+    PLAN_PUBLISHED = "menu.plan_published"      # 方案发布（draft→published）
+    PLAN_DISTRIBUTED = "menu.plan_distributed"  # 方案批量下发到门店
+    PLAN_ROLLED_BACK = "menu.plan_rolled_back"  # 回滚到历史版本
+    STORE_OVERRIDE_SET = "menu.store_override_set"    # 门店微调（价格/状态覆盖）
+    STORE_OVERRIDE_RESET = "menu.store_override_reset"  # 门店覆盖全部重置为集团方案
+
+
 class GrowthEventType(str, Enum):
     """增长中枢事件 — 私域复购链路"""
 
@@ -433,4 +444,6 @@ ALL_EVENT_ENUMS = (
     KnowledgeEventType,
     # 增长中枢域（v184 新增）
     GrowthEventType,
+    # 菜谱方案域（v245 新增，模块3.4）
+    MenuEventType,
 )
