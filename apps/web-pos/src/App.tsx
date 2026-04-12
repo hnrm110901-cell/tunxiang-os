@@ -35,6 +35,9 @@ import { OmniChannelOrders } from './pages/OmniChannelOrders';  // 外卖聚合�
 import { TrainingModePage } from './pages/TrainingModePage';
 import { TrainingModeBanner } from './components/TrainingModeBanner';
 import { useTrainingMode } from './hooks/useTrainingMode';
+import { FastFoodPage } from './pages/fastfood/FastFoodPage';
+import { CallNumberScreen } from './pages/fastfood/CallNumberScreen';
+import { FastFoodKDSView } from './pages/fastfood/FastFoodKDSView';
 
 const STORE_ID: string =
   (window as unknown as Record<string, unknown>).__STORE_ID__ as string || '';
@@ -95,6 +98,10 @@ function AppLayout() {
         <Route path="/delivery" element={<OmniChannelOrders />} />
         {/* ─── 训练/演示模式入口 ─── */}
         <Route path="/training" element={<TrainingModePage />} />
+        {/* ─── 模块3.1: 快餐平行流程 ─── */}
+        <Route path="/fastfood" element={<FastFoodPage />} />
+        <Route path="/fastfood/call-screen" element={<CallNumberScreen />} />
+        <Route path="/fastfood/kds" element={<FastFoodKDSView />} />
       </Routes>
     </div>
   );
