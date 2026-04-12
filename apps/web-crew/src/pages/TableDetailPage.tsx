@@ -74,7 +74,8 @@ type ActiveModal =
   | 'close-table'    // 关台确认
   | 'edit-table'     // 修改开台
   | 'pay-transfer'   // 转账
-  | 'print-confirm'; // 打印客单确认
+  | 'print-confirm'  // 打印客单确认
+  | 'batch-urge';    // 批量催菜
 
 // ─── API 工具 ───
 
@@ -741,6 +742,214 @@ function GiftModal({
   );
 }
 
+// ─── 子组件：批量催菜弹窗 ───
+
+function BatchUrgeModal({
+  items,
+  onConfirm,
+  onCancel,
+}: {
+  items: OrderItem[];
+  onConfirm: (itemIds: string[]) => void;
+  onCancel: () => void;
+}) {
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  const toggle = (id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleAll = () => {
+    const urgeable = items.filter((i) => !i.is_served || i.served_qty < i.qty);
+    if (selected.size === urgeable.length) {
+      setSelected(new Set());
+    } else {
+      setSelected(new Set(urgeable.map((i) => i.item_id)));
+    }
+  };
+
+  const urgeableItems = items.filter((i) => i.served_qty < i.qty);
+
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(0,0,0,0.55)',
+        display: 'flex',
+        alignItems: 'flex-end',
+        zIndex: 100,
+      }}
+      onClick={onCancel}
+    >
+      <div
+        style={{
+          width: '100%',
+          background: T.white,
+          borderRadius: '16px 16px 0 0',
+          maxHeight: '80vh',
+          display: 'flex',
+          flexDirection: 'column',
+          padding: '20px 0 0',
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* 标题栏 */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '0 20px 14px',
+            borderBottom: `1px solid ${T.border}`,
+          }}
+        >
+          <div style={{ fontSize: 18, fontWeight: 700, color: T.text1 }}>
+            ⚡ 批量催菜
+          </div>
+          <button
+            onClick={toggleAll}
+            style={{
+              fontSize: 14,
+              color: T.primary,
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              padding: '4px 8px',
+              minHeight: 36,
+            }}
+          >
+            {selected.size === urgeableItems.length ? '取消全选' : '全选'}
+          </button>
+        </div>
+
+        {urgeableItems.length === 0 ? (
+          <div
+            style={{
+              textAlign: 'center',
+              padding: '32px 20px',
+              color: T.text3,
+              fontSize: 15,
+            }}
+          >
+            所有菜品已上桌，无需催菜
+          </div>
+        ) : (
+          <div style={{ flex: 1, overflowY: 'auto', padding: '8px 0' }}>
+            {urgeableItems.map((item) => (
+              <div
+                key={item.item_id}
+                onClick={() => toggle(item.item_id)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  padding: '14px 20px',
+                  borderBottom: `1px solid ${T.border}`,
+                  background: selected.has(item.item_id) ? '#FFF3EE' : T.white,
+                  gap: 14,
+                  cursor: 'pointer',
+                }}
+              >
+                {/* 复选框 */}
+                <div
+                  style={{
+                    width: 24,
+                    height: 24,
+                    borderRadius: 6,
+                    border: `2px solid ${selected.has(item.item_id) ? T.primary : T.border}`,
+                    background: selected.has(item.item_id) ? T.primary : T.white,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                  }}
+                >
+                  {selected.has(item.item_id) && (
+                    <span style={{ color: '#fff', fontSize: 14, fontWeight: 700 }}>✓</span>
+                  )}
+                </div>
+
+                {/* 菜名 + 状态 */}
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 17, color: T.text1, fontWeight: 500 }}>
+                    {item.dish_name}
+                  </div>
+                  <div style={{ fontSize: 13, color: T.text3, marginTop: 2 }}>
+                    已上 {item.served_qty}/{item.qty} 份
+                    {item.spec ? ` · ${item.spec}` : ''}
+                  </div>
+                </div>
+
+                {/* 待催数量 */}
+                <span
+                  style={{
+                    fontSize: 15,
+                    color: T.danger,
+                    fontWeight: 600,
+                    background: '#FFF0F0',
+                    borderRadius: 8,
+                    padding: '4px 10px',
+                  }}
+                >
+                  待上{item.qty - item.served_qty}份
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* 底部操作栏 */}
+        <div
+          style={{
+            padding: '14px 20px 32px',
+            borderTop: `1px solid ${T.border}`,
+            display: 'flex',
+            gap: 12,
+          }}
+        >
+          <button
+            onClick={onCancel}
+            style={{
+              flex: 1,
+              minHeight: 56,
+              background: T.bg,
+              color: T.text2,
+              border: 'none',
+              borderRadius: 10,
+              fontSize: 17,
+              cursor: 'pointer',
+            }}
+          >
+            取消
+          </button>
+          <button
+            onClick={() => selected.size > 0 && onConfirm([...selected])}
+            disabled={selected.size === 0}
+            style={{
+              flex: 2,
+              minHeight: 56,
+              background: selected.size > 0 ? T.primary : T.text3,
+              color: '#fff',
+              border: 'none',
+              borderRadius: 10,
+              fontSize: 17,
+              fontWeight: 700,
+              cursor: selected.size > 0 ? 'pointer' : 'not-allowed',
+            }}
+          >
+            批量催菜（{selected.size}道）
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── 主组件 ───
 
 export function TableDetailPage() {
@@ -853,7 +1062,12 @@ export function TableDetailPage() {
         navigate(`/order-full?table=${tableNo}&order_id=${orderId}&mode=return`);
         break;
       case 'rush':
-        navigate(`/rush?table=${tableNo}&order_id=${orderId || order?.order_id || ''}`);
+        // 优先使用批量催菜面板（有订单条目时）
+        if (order && order.items.some((i) => i.served_qty < i.qty)) {
+          setModal('batch-urge');
+        } else {
+          navigate(`/rush?table=${tableNo}&order_id=${orderId || order?.order_id || ''}`);
+        }
         break;
       case 'edit-table':
         setModal('edit-table');
@@ -906,6 +1120,36 @@ export function TableDetailPage() {
     showToast(`已标记赠单，原因：${reason}`);
     closeModal();
   }, [closeModal, showToast]);
+
+  // 批量催菜
+  const handleBatchUrge = useCallback(async (itemIds: string[]) => {
+    const currentOrderId = orderId || order?.order_id || '';
+    if (!currentOrderId || itemIds.length === 0) return;
+
+    setLoading(true);
+    closeModal();
+    try {
+      const tenantId = (window as any).__TENANT_ID__ || '';
+      const res = await fetch(`/api/v1/trade/orders/${encodeURIComponent(currentOrderId)}/urge-items`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Tenant-ID': tenantId,
+        },
+        body: JSON.stringify({ item_ids: itemIds }),
+      });
+      const json = await res.json();
+      if (!res.ok || json.ok === false) {
+        throw new Error(json.error?.message || `HTTP ${res.status}`);
+      }
+      showToast(`已催菜 ${itemIds.length} 道，后厨已通知`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : '催菜失败';
+      showToast(`催菜失败：${msg}`);
+    } finally {
+      setLoading(false);
+    }
+  }, [orderId, order?.order_id, closeModal, showToast]);
 
   // 危险操作：关台二次确认
   const handleCloseTable = useCallback(async () => {
@@ -1241,6 +1485,14 @@ export function TableDetailPage() {
       )}
 
       {/* ── 弹窗区域 ── */}
+      {modal === 'batch-urge' && (
+        <BatchUrgeModal
+          items={order?.items ?? []}
+          onConfirm={handleBatchUrge}
+          onCancel={closeModal}
+        />
+      )}
+
       {modal === 'gift' && (
         <GiftModal
           items={(order?.items ?? []).filter((i) => !i.is_gift)}

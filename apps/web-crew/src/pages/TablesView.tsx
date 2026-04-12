@@ -2,11 +2,14 @@
  * 桌台状态视图（服务员视角）
  * - 真实 API：fetchTableStatus()
  * - WebSocket 实时推送：/api/v1/tables/ws/layout/{store_id}
+ * - 移动银台Pro模块2.2：实时人均消费 + 简约模式
  */
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fetchTableStatus } from '../api';
 import type { TableInfo } from '../api';
+import { useCrewStore } from '../store/crewStore';
+import { SlimModeToggle } from '../components/SlimModeToggle';
 
 // ─── 常量 ───────────────────────────────────────────────
 
@@ -107,17 +110,31 @@ interface MemberInfo {
   visit_count: number;
 }
 
+/** 桌台当前消费金额（分），从订单 API 获取后填充 */
+interface TableSpend {
+  total_fen: number;
+}
+
 interface TableCardProps {
   table: TableInfo;
   onTap: (t: TableInfo) => void;
   member?: MemberInfo | null;
+  spend?: TableSpend | null;
+  isSlimMode?: boolean;
 }
 
-function TableCard({ table, onTap, member }: TableCardProps) {
+function TableCard({ table, onTap, member, spend, isSlimMode }: TableCardProps) {
   const [pressed, setPressed] = useState(false);
   const mins = calcMinutes(table.seated_at);
   const color = STATUS_COLOR[table.status] || '#8c8c8c';
   const label = STATUS_LABEL[table.status] || table.status;
+
+  // ── 人均消费计算 ──
+  const totalYuan = spend ? spend.total_fen / 100 : 0;
+  const perPersonYuan =
+    spend && table.guest_count > 0
+      ? spend.total_fen / 100 / table.guest_count
+      : 0;
 
   // 超时判断：在座超过45分钟视为超时（可根据实际阈值调整）
   const isOvertime = table.status === 'occupied' && mins > 45;
@@ -137,7 +154,7 @@ function TableCard({ table, onTap, member }: TableCardProps) {
         borderRadius: 10,
         background: '#112228',
         borderLeft: `4px solid ${color}`,
-        padding: '14px 16px',
+        padding: isSlimMode ? '12px 14px' : '14px 16px',
         cursor: 'pointer',
         WebkitTapHighlightColor: 'transparent',
         transform: pressed ? 'scale(0.97)' : 'scale(1)',
@@ -146,7 +163,7 @@ function TableCard({ table, onTap, member }: TableCardProps) {
         minHeight: 48,
         display: 'flex',
         flexDirection: 'column',
-        gap: 6,
+        gap: isSlimMode ? 4 : 6,
         ...(isOvertime ? { animation: 'txPulse 1.8s ease-in-out infinite' } : {}),
       }}
     >
@@ -161,7 +178,9 @@ function TableCard({ table, onTap, member }: TableCardProps) {
 
       {/* 行1：桌号 + 状态 tag */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span style={{ fontSize: 18, fontWeight: 700, color: '#fff' }}>{table.table_no}</span>
+        <span style={{ fontSize: isSlimMode ? 22 : 18, fontWeight: 700, color: '#fff' }}>
+          {table.table_no}
+        </span>
         <span
           style={{
             fontSize: 12,
@@ -176,18 +195,47 @@ function TableCard({ table, onTap, member }: TableCardProps) {
         </span>
       </div>
 
-      {/* 行2：人数 + 时长 */}
+      {/* 行2：人数 + 时长 + 人均消费 */}
       {table.status !== 'idle' && (
-        <div style={{ fontSize: 14, color: '#aaa' }}>
-          {table.guest_count > 0 ? `${table.guest_count}人` : ''}
-          {table.status === 'occupied' && table.seated_at
-            ? `${table.guest_count > 0 ? ' · ' : ''}${formatDuration(mins)}`
-            : ''}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 4 }}>
+          <div style={{ fontSize: 14, color: '#aaa' }}>
+            {table.guest_count > 0 ? `${table.guest_count}人` : ''}
+            {table.status === 'occupied' && table.seated_at
+              ? `${table.guest_count > 0 ? ' · ' : ''}${formatDuration(mins)}`
+              : ''}
+          </div>
+
+          {/* 人均消费（有金额时显示） */}
+          {table.status === 'occupied' && spend && spend.total_fen > 0 && (
+            <div style={{ textAlign: 'right', flexShrink: 0 }}>
+              <span
+                style={{
+                  fontSize: isSlimMode ? 15 : 13,
+                  color: '#FF6B35',
+                  fontWeight: 600,
+                }}
+              >
+                ¥{totalYuan.toFixed(0)}
+              </span>
+              {table.guest_count > 0 && (
+                <span
+                  style={{
+                    display: 'block',
+                    fontSize: 11,
+                    color: '#888',
+                    lineHeight: 1.3,
+                  }}
+                >
+                  ¥{perPersonYuan.toFixed(0)}/人
+                </span>
+              )}
+            </div>
+          )}
         </div>
       )}
 
-      {/* 行3：会员标识（occupied 且有绑定会员时显示） */}
-      {table.status === 'occupied' && member && (
+      {/* 行3：会员标识（occupied 且有绑定会员时显示，简约模式下隐藏） */}
+      {!isSlimMode && table.status === 'occupied' && member && (
         <div
           style={{
             fontSize: 16,
@@ -199,20 +247,20 @@ function TableCard({ table, onTap, member }: TableCardProps) {
         </div>
       )}
 
-      {/* 行4：空闲提示 或 占座金额占位（金额需订单详情API，此处展示在座标记） */}
+      {/* 行4：空闲提示 或 占座金额占位 */}
       {table.status === 'idle' && (
         <div style={{ fontSize: 14, color: STATUS_COLOR.idle }}>空闲 &rsaquo;</div>
       )}
 
-      {/* AI 状态行：超时提示 */}
-      {isOvertime && (
+      {/* AI 状态行（简约模式下隐藏） */}
+      {!isSlimMode && isOvertime && (
         <div style={{ fontSize: 12, color: '#A32D2D', fontWeight: 600, marginTop: 2 }}>
           ⏰ 预计5分钟出品
         </div>
       )}
 
-      {/* AI 状态行：建议推荐甜品 */}
-      {suggestDessert && (
+      {/* AI 状态行：建议推荐甜品（简约模式下隐藏） */}
+      {!isSlimMode && suggestDessert && (
         <div style={{ fontSize: 12, color: '#6D3EA8', fontWeight: 600, marginTop: 2 }}>
           🍮 建议推荐甜品
         </div>
@@ -225,11 +273,13 @@ function TableCard({ table, onTap, member }: TableCardProps) {
 
 export function TablesView() {
   const navigate = useNavigate();
+  const { isSlimMode } = useCrewStore();
 
   const [tables, setTables] = useState<TableInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [memberMap, setMemberMap] = useState<Record<string, MemberInfo | null>>({});
+  const [spendMap, setSpendMap] = useState<Record<string, TableSpend | null>>({});
 
   const wsRef = useRef<WebSocket | null>(null);
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -243,12 +293,14 @@ export function TablesView() {
       const result = await fetchTableStatus(STORE_ID);
       setTables(result.items);
 
-      // 并行获取所有 occupied 桌的会员信息（失败时静默忽略）
+      // 并行获取所有 occupied 桌的会员信息 + 消费金额（失败时静默忽略）
       const occupiedWithOrder = result.items.filter(
         (t) => t.status === 'occupied' && t.order_id
       );
       if (occupiedWithOrder.length > 0) {
         const tenantId = (window as any).__TENANT_ID__ || '';
+
+        // 会员信息
         const memberResults = await Promise.allSettled(
           occupiedWithOrder.map((t) =>
             fetch(`/api/v1/member/by-order?order_id=${t.order_id}`, {
@@ -268,6 +320,27 @@ export function TablesView() {
           }
         });
         setMemberMap(map);
+
+        // 消费金额（从订单摘要接口获取 total_fen）
+        const spendResults = await Promise.allSettled(
+          occupiedWithOrder.map((t) =>
+            fetch(`/api/v1/trade/orders/${encodeURIComponent(t.order_id ?? '')}/summary`, {
+              headers: { 'X-Tenant-ID': tenantId },
+            })
+              .then((r) => r.json())
+              .then((res) => ({
+                table_no: t.table_no,
+                spend: res.ok && res.data ? ({ total_fen: (res.data.total_fen ?? res.data.final_amount_fen ?? 0) } as TableSpend) : null,
+              }))
+          )
+        );
+        const sm: Record<string, TableSpend | null> = {};
+        spendResults.forEach((r) => {
+          if (r.status === 'fulfilled' && r.value) {
+            sm[r.value.table_no] = r.value.spend;
+          }
+        });
+        setSpendMap(sm);
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : '加载失败';
@@ -425,6 +498,7 @@ export function TablesView() {
         </div>
 
         <div style={{ display: 'flex', gap: 8 }}>
+          <SlimModeToggle compact />
           <button
             onClick={() => navigate('/table-map')}
             style={{
@@ -467,6 +541,26 @@ export function TablesView() {
           </button>
         </div>
       </div>
+
+      {/* 简约模式横幅提示 */}
+      {isSlimMode && (
+        <div
+          style={{
+            background: 'rgba(255,107,35,0.12)',
+            borderBottom: '1px solid rgba(255,107,35,0.3)',
+            padding: '6px 16px',
+            fontSize: 13,
+            color: '#FF6B35',
+            fontWeight: 600,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+          }}
+        >
+          <span>⚡</span>
+          <span>简约模式已开启 — 高峰期精简视图</span>
+        </div>
+      )}
 
       {/* 加载 Skeleton */}
       {loading && (
@@ -524,8 +618,8 @@ export function TablesView() {
             <div
               style={{
                 display: 'grid',
-                gridTemplateColumns: '1fr 1fr',
-                gap: 10,
+                gridTemplateColumns: isSlimMode ? 'repeat(3, 1fr)' : '1fr 1fr',
+                gap: isSlimMode ? 8 : 10,
               }}
             >
               {tables.map((t) => (
@@ -534,6 +628,8 @@ export function TablesView() {
                   table={t}
                   onTap={handleTableTap}
                   member={memberMap[t.table_no]}
+                  spend={spendMap[t.table_no]}
+                  isSlimMode={isSlimMode}
                 />
               ))}
             </div>
