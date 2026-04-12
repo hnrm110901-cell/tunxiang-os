@@ -17,45 +17,56 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # ── 加盟合同主表 ──
-    op.create_table(
-        "franchise_contracts",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True,
-                  server_default=sa.text("gen_random_uuid()")),
-        sa.Column("tenant_id", postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column("contract_no", sa.VARCHAR(50), nullable=False, comment="合同编号 FC-YYYYMM-XXXX"),
-        sa.Column("contract_type", sa.VARCHAR(20), nullable=False,
-                  comment="initial/renewal/amendment"),
-        sa.Column("franchisee_id", sa.VARCHAR(100), nullable=False, comment="加盟商ID"),
-        sa.Column("franchisee_name", sa.VARCHAR(200), server_default="", comment="加盟商名称"),
-        sa.Column("sign_date", sa.DATE, nullable=False),
-        sa.Column("start_date", sa.DATE, nullable=False),
-        sa.Column("end_date", sa.DATE, nullable=False),
-        sa.Column("contract_amount_fen", sa.BIGINT, server_default="0", comment="合同金额(分)"),
-        sa.Column("file_url", sa.TEXT, nullable=True, comment="合同文件URL"),
-        sa.Column("status", sa.VARCHAR(20), server_default="active",
-                  comment="active/expired/terminated"),
-        sa.Column("alert_days_before", sa.INTEGER, server_default="30",
-                  comment="到期提醒提前天数"),
-        sa.Column("notes", sa.TEXT, nullable=True),
-        sa.Column("created_by", sa.VARCHAR(100), nullable=True),
-        sa.Column("is_deleted", sa.BOOLEAN, server_default="false", nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True),
-                  server_default=sa.text("now()"), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True),
-                  server_default=sa.text("now()"), nullable=False),
-    )
-    op.create_index("ix_franchise_contracts_tenant_status",
-                    "franchise_contracts", ["tenant_id", "status"])
-    op.create_index("ix_franchise_contracts_franchisee",
-                    "franchise_contracts", ["tenant_id", "franchisee_id"])
-    op.create_index("ix_franchise_contracts_end_date",
-                    "franchise_contracts", ["tenant_id", "end_date"])
+    conn = op.get_bind()
+    existing = sa.inspect(conn).get_table_names()
 
+    # ── 加盟合同主表 ──
+    if 'franchise_contracts' not in existing:
+        op.create_table(
+            "franchise_contracts",
+            sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True,
+                      server_default=sa.text("gen_random_uuid()")),
+            sa.Column("tenant_id", postgresql.UUID(as_uuid=True), nullable=False),
+            sa.Column("contract_no", sa.VARCHAR(50), nullable=False, comment="合同编号 FC-YYYYMM-XXXX"),
+            sa.Column("contract_type", sa.VARCHAR(20), nullable=False,
+                      comment="initial/renewal/amendment"),
+            sa.Column("franchisee_id", sa.VARCHAR(100), nullable=False, comment="加盟商ID"),
+            sa.Column("franchisee_name", sa.VARCHAR(200), server_default="", comment="加盟商名称"),
+            sa.Column("sign_date", sa.DATE, nullable=False),
+            sa.Column("start_date", sa.DATE, nullable=False),
+            sa.Column("end_date", sa.DATE, nullable=False),
+            sa.Column("contract_amount_fen", sa.BIGINT, server_default="0", comment="合同金额(分)"),
+            sa.Column("file_url", sa.TEXT, nullable=True, comment="合同文件URL"),
+            sa.Column("status", sa.VARCHAR(20), server_default="active",
+                      comment="active/expired/terminated"),
+            sa.Column("alert_days_before", sa.INTEGER, server_default="30",
+                      comment="到期提醒提前天数"),
+            sa.Column("notes", sa.TEXT, nullable=True),
+            sa.Column("created_by", sa.VARCHAR(100), nullable=True),
+            sa.Column("is_deleted", sa.BOOLEAN, server_default="false", nullable=False),
+            sa.Column("created_at", sa.DateTime(timezone=True),
+                      server_default=sa.text("now()"), nullable=False),
+            sa.Column("updated_at", sa.DateTime(timezone=True),
+                      server_default=sa.text("now()"), nullable=False),
+        )
+        op.create_index("ix_franchise_contracts_tenant_status",
+                        "franchise_contracts", ["tenant_id", "status"])
+        op.create_index("ix_franchise_contracts_franchisee",
+                        "franchise_contracts", ["tenant_id", "franchisee_id"])
+        op.create_index("ix_franchise_contracts_end_date",
+                        "franchise_contracts", ["tenant_id", "end_date"])
     op.execute("ALTER TABLE franchise_contracts ENABLE ROW LEVEL SECURITY")
     op.execute("""
-        CREATE POLICY fc_tenant_isolation ON franchise_contracts
-        USING (tenant_id = current_setting('app.tenant_id')::uuid)
+        DO $$ BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_policies
+                WHERE tablename = 'franchise_contracts'
+                AND policyname = 'fc_tenant_isolation'
+            ) THEN
+                EXECUTE 'CREATE POLICY fc_tenant_isolation ON franchise_contracts
+                    USING (tenant_id = current_setting(''app.tenant_id'')::uuid)';
+            END IF;
+        END$$;
     """)
 
     # ── 加盟收费记录 ──

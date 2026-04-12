@@ -13,6 +13,9 @@ depends_on = None
 
 
 def upgrade() -> None:
+    conn = op.get_bind()
+    existing = sa.inspect(conn).get_table_names()
+
     # ── 排菜方案模板 ──
     op.create_table(
         "banquet_menu_plans",
@@ -42,36 +45,45 @@ def upgrade() -> None:
     """)
 
     # ── 宴席场次 ──
-    op.create_table(
-        "banquet_sessions",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True,
-                  server_default=sa.text("gen_random_uuid()")),
-        sa.Column("tenant_id", postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column("store_id", postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column("menu_plan_id", postgresql.UUID(as_uuid=True), nullable=True),
-        sa.Column("session_date", sa.DATE, nullable=False),
-        sa.Column("time_slot", sa.VARCHAR(20), nullable=False, comment="lunch/dinner/custom"),
-        sa.Column("room_ids", postgresql.JSONB, server_default="[]", comment="包厢ID列表"),
-        sa.Column("table_count", sa.INTEGER, nullable=False, server_default="1"),
-        sa.Column("guest_count", sa.INTEGER, nullable=False),
-        sa.Column("contact_name", sa.VARCHAR(50), nullable=True),
-        sa.Column("contact_phone", sa.VARCHAR(20), nullable=True),
-        sa.Column("status", sa.VARCHAR(20), server_default="confirmed",
-                  comment="confirmed/preparing/serving/completed/cancelled"),
-        sa.Column("total_amount_fen", sa.BIGINT, server_default="0"),
-        sa.Column("deposit_fen", sa.BIGINT, server_default="0", comment="定金"),
-        sa.Column("notes", sa.TEXT, nullable=True),
-        sa.Column("created_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()")),
-        sa.Column("updated_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()")),
-        sa.Column("is_deleted", sa.BOOLEAN, server_default="false", nullable=False),
-    )
-    op.create_index("ix_bs_tenant_date", "banquet_sessions", ["tenant_id", "session_date"])
+    if 'banquet_sessions' not in existing:
+        op.create_table(
+            "banquet_sessions",
+            sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True,
+                      server_default=sa.text("gen_random_uuid()")),
+            sa.Column("tenant_id", postgresql.UUID(as_uuid=True), nullable=False),
+            sa.Column("store_id", postgresql.UUID(as_uuid=True), nullable=False),
+            sa.Column("menu_plan_id", postgresql.UUID(as_uuid=True), nullable=True),
+            sa.Column("session_date", sa.DATE, nullable=False),
+            sa.Column("time_slot", sa.VARCHAR(20), nullable=False, comment="lunch/dinner/custom"),
+            sa.Column("room_ids", postgresql.JSONB, server_default="[]", comment="包厢ID列表"),
+            sa.Column("table_count", sa.INTEGER, nullable=False, server_default="1"),
+            sa.Column("guest_count", sa.INTEGER, nullable=False),
+            sa.Column("contact_name", sa.VARCHAR(50), nullable=True),
+            sa.Column("contact_phone", sa.VARCHAR(20), nullable=True),
+            sa.Column("status", sa.VARCHAR(20), server_default="confirmed",
+                      comment="confirmed/preparing/serving/completed/cancelled"),
+            sa.Column("total_amount_fen", sa.BIGINT, server_default="0"),
+            sa.Column("deposit_fen", sa.BIGINT, server_default="0", comment="定金"),
+            sa.Column("notes", sa.TEXT, nullable=True),
+            sa.Column("created_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()")),
+            sa.Column("updated_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()")),
+            sa.Column("is_deleted", sa.BOOLEAN, server_default="false", nullable=False),
+        )
+        op.create_index("ix_bs_tenant_date", "banquet_sessions", ["tenant_id", "session_date"])
     op.execute("ALTER TABLE banquet_sessions ENABLE ROW LEVEL SECURITY")
     op.execute("ALTER TABLE banquet_sessions FORCE ROW LEVEL SECURITY")
     op.execute("""
-        CREATE POLICY bs_tenant ON banquet_sessions
-        USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::UUID)
-        WITH CHECK (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::UUID)
+        DO $$ BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_policies
+                WHERE tablename = 'banquet_sessions'
+                AND policyname = 'bs_tenant'
+            ) THEN
+                EXECUTE 'CREATE POLICY bs_tenant ON banquet_sessions
+                    USING (tenant_id = NULLIF(current_setting(''app.tenant_id'', true), '''')::UUID)
+                    WITH CHECK (tenant_id = NULLIF(current_setting(''app.tenant_id'', true), '''')::UUID)';
+            END IF;
+        END$$;
     """)
 
     # ── 分席账单 ──
