@@ -36,6 +36,11 @@ from .approval_engine import (
 )
 from .notification import ExpenseNotification
 from .expense_standard import ExpenseStandard, StandardCityTier
+from .petty_cash import (
+    PettyCashAccount,
+    PettyCashTransaction,
+    PettyCashSettlement,
+)
 
 __all__ = [
     # 枚举
@@ -69,4 +74,8 @@ __all__ = [
     "ExpenseNotification",
     "ExpenseStandard",
     "StandardCityTier",
+    # 备用金模型
+    "PettyCashAccount",
+    "PettyCashTransaction",
+    "PettyCashSettlement",
 ]
