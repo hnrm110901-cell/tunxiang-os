@@ -74,6 +74,7 @@ from api.store_readiness_routes import router as store_readiness_router
 from api.peak_guard_routes import router as peak_guard_router
 from api.alert_aggregation_routes import router as alert_aggregation_router
 from api.coach_session_routes import router as coach_session_router
+from api.tenant_systems_routes import router as tenant_systems_router
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from shared.ontology.src.database import get_db as _shared_get_db
@@ -194,6 +195,7 @@ app.include_router(store_readiness_router)     # 门店就绪度评分（v206表
 app.include_router(peak_guard_router)          # 高峰保障指挥（v206表）人力中枢S3
 app.include_router(alert_aggregation_router)   # AI预警聚合引擎（聚合分析层）人力中枢S4
 app.include_router(coach_session_router)       # 店长教练Agent（v206表）人力中枢S4
+app.include_router(tenant_systems_router)      # 租户多系统配置管理（v232表）三品牌四系统
 
 @app.get("/health")
 async def health():

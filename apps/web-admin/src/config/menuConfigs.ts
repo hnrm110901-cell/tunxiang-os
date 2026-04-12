@@ -131,6 +131,10 @@ export const MENU_CONFIGS: Record<string, MenuConfig> = {
       { label: '驾驶舱', items: [
         { id: 'analytics-dashboard', label: '经营驾驶舱', icon: '🖥️', path: '/analytics/dashboard' },
       ]},
+      { label: 'HQ总部看板', items: [
+        { id: 'hq-brand-overview', label: '多品牌总览', icon: '🏢', path: '/analytics/hq/overview' },
+        { id: 'hq-store-matrix', label: '门店绩效矩阵', icon: '📊', path: '/analytics/hq/stores' },
+      ]},
       { label: '分析', items: [
         { id: 'region-overview', label: '区域经营总览', icon: '🗺️', path: '/hq/analytics/region-overview' },
         { id: 'finance-analysis', label: '财务分析', icon: '💹', path: '/hq/analytics/finance' },

@@ -29,6 +29,7 @@ from .api.nlq_routes import router as nlq_router
 from .api.anomaly_routes import router as anomaly_router
 from .api.insights_routes import router as insights_router
 from .api.daily_brief_routes import router as daily_brief_router
+from .api.hq_brand_analytics_routes import router as hq_brand_analytics_router
 from .api.seed_loader import load_p0_seeds
 
 @asynccontextmanager
@@ -74,6 +75,7 @@ app.include_router(nlq_router)
 app.include_router(anomaly_router)
 app.include_router(insights_router)
 app.include_router(daily_brief_router)
+app.include_router(hq_brand_analytics_router)
 
 @app.get("/health")
 async def health():

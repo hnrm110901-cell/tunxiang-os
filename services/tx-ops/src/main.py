@@ -39,6 +39,7 @@ from .api.safety_inspection_router import router as safety_inspection_router
 from .api.haccp_routes import router as haccp_router
 from .api.settlement_monitor_routes import router as settlement_monitor_router
 from .api.trial_data_routes import router as trial_data_router
+from .api.sync_management_routes import router as sync_management_router
 
 app = FastAPI(title="TunxiangOS tx-ops", version="3.0.0", description="日清日结操作层")
 
@@ -89,6 +90,7 @@ app.include_router(public_opinion_router)    # Phase 4: 舆情监控
 app.include_router(haccp_router)             # Phase 4: HACCP检查计划数字化
 app.include_router(settlement_monitor_router) # TC-P0-05: 日结监控看板（总部多店聚合）
 app.include_router(trial_data_router)         # TC-P1-11: 试营业数据清除
+app.include_router(sync_management_router)   # 四系统数据同步协调器管理API
 
 
 @app.get("/health")

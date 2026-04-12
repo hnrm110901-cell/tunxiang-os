@@ -193,6 +193,9 @@ import AlertAggregationPage from './pages/hr/AlertAggregationPage';
 import HRHubOverviewPage from './pages/hr/HRHubOverviewPage';
 // ─── AI营销驾驶舱 ─────────────────────────────────────────────────────────────
 import AiMarketingDashboardPage from './pages/marketing/AiMarketingDashboardPage';
+// ─── P3: HQ总部管控看板 ────────────────────────────────────────────────────────
+import { BrandOverview } from './pages/analytics/hq/BrandOverview';
+import { StorePerformanceMatrix } from './pages/analytics/hq/StorePerformanceMatrix';
 
 function App() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
@@ -396,6 +399,9 @@ function App() {
           <Route path="/hq/growth/customer-brain"      element={<CustomerBrainPage />} />
           {/* ─── AI营销驾驶舱 ─── */}
           <Route path="/hq/growth/ai-marketing" element={<AiMarketingDashboardPage />} />
+          {/* ─── P3: HQ总部管控看板 ─── */}
+          <Route path="/analytics/hq/overview" element={<BrandOverview />} />
+          <Route path="/analytics/hq/stores"   element={<StorePerformanceMatrix />} />
           {/* ─── Y-C4: 多渠道菜单发布完善 ─── */}
           <Route path="/menu/channels" element={<ChannelMenuPage />} />
           {/* ─── Y-D7: 付费会员卡产品化 ─── */}
