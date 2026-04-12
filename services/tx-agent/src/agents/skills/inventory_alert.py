@@ -265,11 +265,14 @@ class InventoryAlertAgent(EdgeAwareMixin, SkillAgent):
         traffic_forecast: dict[str, Any] | None = None
         demand_multiplier = 1.0
         if store_id:
+            # 使用东八区本地时间（中国门店）
+            from zoneinfo import ZoneInfo
+            local_now = datetime.now(ZoneInfo("Asia/Shanghai"))
             traffic_forecast = await self.get_edge_prediction(
                 "traffic",
                 store_id=store_id,
-                date=date_cls.today().isoformat(),
-                hour=datetime.now(timezone.utc).hour,
+                date=local_now.date().isoformat(),
+                hour=local_now.hour,
             )
             if traffic_forecast:
                 peak_label = traffic_forecast.get("peak_label", "off_peak")

@@ -122,7 +122,9 @@ class AgentMemoryService:
             AgentMemory.tenant_id == UUID(tenant_id),
             AgentMemory.is_deleted == False,  # noqa: E712
             (AgentMemory.expires_at.is_(None)) | (AgentMemory.expires_at > now),
-            AgentMemory.memory_key.ilike(f"%{query_text}%"),
+            AgentMemory.memory_key.ilike(
+                f"%{query_text.replace('%', '\\%').replace('_', '\\_')}%"
+            ),
         )
         if agent_id is not None:
             stmt = stmt.where(AgentMemory.agent_id == agent_id)

@@ -157,17 +157,25 @@ async def invoke_tool(
     from ..agents.skills import ALL_SKILL_AGENTS
     from ..services.model_router import ModelRouter
 
+    # 检查工具是否存在及权限
+    registry = _get_registry()
+    tool_def = registry.get_tool(tool_id)
+    if tool_def is None:
+        raise HTTPException(status_code=404, detail=f"Tool not found: {tool_id}")
+    if tool_def.requires_auth:
+        logger.warning("tool_invoke_requires_auth", tool_id=tool_id, tenant_id=x_tenant_id)
+
     # 创建带租户隔离的 MasterAgent
     try:
         model_router = ModelRouter()
     except ValueError:
+        logger.warning("tool_invoke_no_model_router", tool_id=tool_id, reason="ANTHROPIC_API_KEY unset")
         model_router = None
 
     master = MasterAgent(tenant_id=x_tenant_id)
     for cls in ALL_SKILL_AGENTS:
         master.register(cls(tenant_id=x_tenant_id, db=db, model_router=model_router))
 
-    registry = _get_registry()
     caller = ToolCaller(master=master, registry=registry, db=db)
 
     try:

@@ -25,16 +25,21 @@ class EdgeAwareMixin:
 
     Provides a lazily-initialized EdgeInferenceClient and a unified
     get_edge_prediction() dispatch method with automatic logging.
+    Each agent instance gets its own client (set on the instance, not the class).
     """
 
-    _edge_client: EdgeInferenceClient | None = None
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        super().__init_subclass__(**kwargs)
 
     @property
     def edge(self) -> EdgeInferenceClient:
-        """Lazily create and return the EdgeInferenceClient singleton."""
-        if self._edge_client is None:
-            self._edge_client = EdgeInferenceClient()
-        return self._edge_client
+        """Lazily create and return the EdgeInferenceClient (per instance)."""
+        try:
+            client = self.__dict__["_edge_client"]
+        except KeyError:
+            client = EdgeInferenceClient()
+            self.__dict__["_edge_client"] = client
+        return client
 
     async def get_edge_prediction(
         self,

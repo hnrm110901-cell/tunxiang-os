@@ -167,6 +167,8 @@ class ToolRegistry:
                 continue
 
             tool_id = f"{agent_id}.{action}"
+            # 保留已注册工具的 risk_level（来自 ActionConfig），MCP 仅补充 schema
+            existing = self._tools.get(tool_id)
             tool = ToolDefinition(
                 tool_id=tool_id,
                 agent_id=agent_id,
@@ -175,9 +177,9 @@ class ToolRegistry:
                 input_schema=entry.get("inputSchema", {"type": "object", "properties": {}}),
                 output_schema=None,
                 requires_auth=False,
-                risk_level="low",
+                risk_level=existing.risk_level if existing else "low",
             )
-            self.register(tool)
+            self._tools[tool_id] = tool
             count += 1
 
         logger.info("mcp_registry_imported", count=count)

@@ -79,8 +79,12 @@ class AgentMessageService:
                 AgentMessage.tenant_id == UUID(tenant_id),
                 AgentMessage.is_deleted == False,  # noqa: E712
                 AgentMessage.status == "pending",
-                # 发给该 agent 或广播消息
-                (AgentMessage.to_agent_id == agent_id) | (AgentMessage.to_agent_id.is_(None)),
+                # 发给该 agent 或广播消息（排除自己发的广播）
+                (AgentMessage.to_agent_id == agent_id)
+                | (
+                    AgentMessage.to_agent_id.is_(None)
+                    & (AgentMessage.from_agent_id != agent_id)
+                ),
             )
             .where(
                 # 跳过已过期

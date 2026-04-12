@@ -121,15 +121,20 @@ class MemberInsightAgent(SkillAgent):
             "collect_feedback": ActionConfig(
                 risk_level="low",
             ),
-            # 旅程触发 / 客诉处理涉及用户交互
+            # 旅程触发 / 客诉处理涉及客户触达，需较高风险等级
             "trigger_journey": ActionConfig(
-                risk_level="low",
+                risk_level="medium",
+                requires_human_confirm=True,
             ),
             "process_bad_review": ActionConfig(
-                risk_level="low",
+                risk_level="medium",
+                requires_human_confirm=True,
+                max_retries=1,
             ),
             "handle_complaint": ActionConfig(
-                risk_level="low",
+                risk_level="medium",
+                requires_human_confirm=True,
+                max_retries=1,
             ),
         }
         return configs.get(action, ActionConfig())
