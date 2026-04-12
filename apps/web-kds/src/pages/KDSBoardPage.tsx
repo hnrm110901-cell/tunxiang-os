@@ -10,12 +10,16 @@
  *   2. 有 WS 配置  → 连接 Mac mini WebSocket 实时推送
  *   3. 兜底        → 每 3 秒轮询 /api/v1/kds/queue
  *   4. 连接失败    → 3-5 张模拟工单（1 超时、1 即将超时、其余正常）
+ *
+ * KDS theme is applied via data-theme="kds" on root element.
+ * Theme colors are available via CSS vars: --tx-kds-green, --tx-kds-amber, --tx-kds-red
  */
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useSwipe } from '../hooks/useSwipe';
 import { fetchTicketQueue, startTicket, completeTicket } from '../api/kdsOpsApi';
 import { warmUpAudio, playNewOrder, playTimeout } from '../utils/audio';
+import { formatPrice } from '@tx-ds/utils';
 
 // ─── CSS Variables ──────────────────────────────────────
 
@@ -30,6 +34,9 @@ const CSS_VARS = `
     --tx-border: rgba(255,255,255,0.08);
     --tx-text-1: #F0F0F0;
     --tx-text-2: rgba(255,255,255,0.55);
+    --tx-kds-green: #0F6E56;
+    --tx-kds-amber: #f5a623;
+    --tx-kds-red: #ff4d4f;
   }
   @keyframes kds-pulse {
     0%, 100% { opacity: 1; }
@@ -69,6 +76,17 @@ interface DemoTicket {
   startedAt?: number;
 }
 
+/** Grouped dish entry for by-dish view */
+interface GroupedDish {
+  name: string;
+  totalQty: number;
+  tables: string[];
+  notes: string[];
+}
+
+type ViewMode = 'scroll' | 'paged';
+type GroupMode = 'by-table' | 'by-dish';
+
 // ─── 时间状态 ──────────────────────────────────────────
 
 type TimeStatus = 'normal' | 'warning' | 'overtime';
@@ -78,6 +96,15 @@ function getTimeStatus(createdAt: number, timeLimit: number): TimeStatus {
   if (elapsedMin >= timeLimit) return 'overtime';
   if (elapsedMin >= timeLimit * 0.5) return 'warning';
   return 'normal';
+}
+
+/** Get time color using KDS theme CSS custom properties */
+function getTimeColor(elapsedMs: number, timeLimitMin: number): string {
+  const elapsedMin = elapsedMs / 60000;
+  const ratio = elapsedMin / timeLimitMin;
+  if (ratio >= 1.0) return 'var(--tx-kds-red)';
+  if (ratio >= 0.5) return 'var(--tx-kds-amber)';
+  return 'var(--tx-kds-green)';
 }
 
 function formatElapsed(createdAt: number): string {
@@ -154,6 +181,10 @@ function buildMockTickets(): DemoTicket[] {
   ];
 }
 
+// ─── Pagination helpers ──────────────────────────────────
+
+const TICKETS_PER_PAGE = 6;
+
 // ─── 主组件 ───────────────────────────────────────────
 
 export function KDSBoardPage() {
@@ -168,6 +199,11 @@ export function KDSBoardPage() {
   const [tick, setTick] = useState(0); // 每秒刷新倒计时
   const [clock, setClock] = useState(() => formatClock());
   const [audioWarmed, setAudioWarmed] = useState(false);
+
+  // View mode toggles
+  const [viewMode, setViewMode] = useState<ViewMode>('scroll');
+  const [groupMode, setGroupMode] = useState<GroupMode>('by-table');
+  const [currentPage, setCurrentPage] = useState(0);
 
   const wsRef = useRef<WebSocket | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -376,6 +412,52 @@ export function KDSBoardPage() {
     (t) => getTimeStatus(t.createdAt, t.timeLimit) === 'overtime',
   ).length;
 
+  // ─── Pagination (paged mode) ──────────────────────
+
+  const totalPages = Math.max(1, Math.ceil(activeTickets.length / TICKETS_PER_PAGE));
+
+  // Clamp current page when tickets change
+  useEffect(() => {
+    if (currentPage >= totalPages) {
+      setCurrentPage(Math.max(0, totalPages - 1));
+    }
+  }, [totalPages, currentPage]);
+
+  const pagedTickets = useMemo(() => {
+    if (viewMode !== 'paged') return activeTickets;
+    const start = currentPage * TICKETS_PER_PAGE;
+    return activeTickets.slice(start, start + TICKETS_PER_PAGE);
+  }, [viewMode, activeTickets, currentPage]);
+
+  // ─── Group by dish ────────────────────────────────
+
+  const groupedDishes = useMemo((): GroupedDish[] => {
+    if (groupMode !== 'by-dish') return [];
+    const map = new Map<string, GroupedDish>();
+    for (const ticket of activeTickets) {
+      for (const item of ticket.items) {
+        const existing = map.get(item.name);
+        if (existing) {
+          existing.totalQty += item.qty;
+          if (!existing.tables.includes(ticket.tableNo)) {
+            existing.tables.push(ticket.tableNo);
+          }
+          if (item.notes && !existing.notes.includes(item.notes)) {
+            existing.notes.push(item.notes);
+          }
+        } else {
+          map.set(item.name, {
+            name: item.name,
+            totalQty: item.qty,
+            tables: [ticket.tableNo],
+            notes: item.notes ? [item.notes] : [],
+          });
+        }
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => b.totalQty - a.totalQty);
+  }, [groupMode, activeTickets]);
+
   return (
     <div
       style={{
@@ -448,16 +530,44 @@ export function KDSBoardPage() {
           )}
         </div>
 
-        {/* 中：统计数字 */}
-        <div style={{ display: 'flex', gap: 32, alignItems: 'center' }}>
-          <StatItem label="待制作" value={pendingCount} color="#BA7517" />
-          <StatItem label="制作中" value={cookingCount} color="#185FA5" />
-          <StatItem
-            label="超时"
-            value={overtimeCount}
-            color={overtimeCount > 0 ? '#A32D2D' : '#444'}
-            blink={overtimeCount > 0}
-          />
+        {/* 中：统计数字 + 视图切换 */}
+        <div style={{ display: 'flex', gap: 24, alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: 32, alignItems: 'center' }}>
+            <StatItem label="待制作" value={pendingCount} color="#BA7517" />
+            <StatItem label="制作中" value={cookingCount} color="#185FA5" />
+            <StatItem
+              label="超时"
+              value={overtimeCount}
+              color={overtimeCount > 0 ? '#A32D2D' : '#444'}
+              blink={overtimeCount > 0}
+            />
+          </div>
+
+          {/* 视图切换按钮组 */}
+          <div style={{ display: 'flex', gap: 4, background: 'rgba(255,255,255,0.06)', borderRadius: 8, padding: 2 }}>
+            <ToggleButton
+              active={viewMode === 'scroll'}
+              label="滚动"
+              onClick={() => { setViewMode('scroll'); setCurrentPage(0); }}
+            />
+            <ToggleButton
+              active={viewMode === 'paged'}
+              label="分页"
+              onClick={() => { setViewMode('paged'); setCurrentPage(0); }}
+            />
+          </div>
+          <div style={{ display: 'flex', gap: 4, background: 'rgba(255,255,255,0.06)', borderRadius: 8, padding: 2 }}>
+            <ToggleButton
+              active={groupMode === 'by-table'}
+              label="按桌"
+              onClick={() => setGroupMode('by-table')}
+            />
+            <ToggleButton
+              active={groupMode === 'by-dish'}
+              label="按菜"
+              onClick={() => setGroupMode('by-dish')}
+            />
+          </div>
         </div>
 
         {/* 右：时钟 + 返回 */}
@@ -492,59 +602,165 @@ export function KDSBoardPage() {
         </div>
       </header>
 
-      {/* ── 工单区（水平滚动） ── */}
-      <div
-        style={{
-          flex: 1,
-          display: 'flex',
-          alignItems: 'flex-start',
-          gap: 16,
-          padding: '20px 20px',
-          overflowX: 'auto',
-          overflowY: 'hidden',
-          WebkitOverflowScrolling: 'touch',
-          scrollbarWidth: 'thin',
-          scrollbarColor: 'rgba(255,255,255,0.1) transparent',
-        }}
-      >
-        {activeTickets.length === 0 ? (
+      {/* ── 主内容区 ── */}
+      {groupMode === 'by-dish' ? (
+        /* ── 按菜品分组视图 ── */
+        <div
+          style={{
+            flex: 1,
+            overflowY: 'auto',
+            padding: '20px 24px',
+          }}
+        >
+          {groupedDishes.length === 0 ? (
+            <EmptyState isDemo={isDemo} />
+          ) : (
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+              gap: 16,
+            }}>
+              {groupedDishes.map((dish) => (
+                <DishGroupCard key={dish.name} dish={dish} />
+              ))}
+            </div>
+          )}
+        </div>
+      ) : viewMode === 'paged' ? (
+        /* ── 分页视图 ── */
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <div
             style={{
               flex: 1,
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: 'rgba(255,255,255,0.2)',
-              fontSize: 24,
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
+              gridAutoRows: 'min-content',
               gap: 16,
+              padding: '20px 20px',
+              overflowY: 'auto',
+              alignContent: 'start',
             }}
           >
-            <span style={{ fontSize: 64 }}>✓</span>
-            <span>暂无待出餐工单</span>
-            {isDemo && (
-              <span style={{ fontSize: 18, color: 'rgba(255,255,255,0.15)' }}>
-                每 30 秒将自动生成新工单
-              </span>
+            {pagedTickets.length === 0 ? (
+              <div style={{ gridColumn: '1 / -1' }}>
+                <EmptyState isDemo={isDemo} />
+              </div>
+            ) : (
+              pagedTickets.map((ticket) => (
+                <KDSTicketCard
+                  key={ticket.id}
+                  ticket={ticket}
+                  tick={tick}
+                  onStart={() => handleStart(ticket.id)}
+                  onComplete={() => handleComplete(ticket.id)}
+                />
+              ))
             )}
           </div>
-        ) : (
-          activeTickets.map((ticket) => (
-            <KDSTicketCard
-              key={ticket.id}
-              ticket={ticket}
-              tick={tick}
-              onStart={() => handleStart(ticket.id)}
-              onComplete={() => handleComplete(ticket.id)}
-            />
-          ))
-        )}
 
-        {/* 末尾占位，避免最后一张卡贴边 */}
-        {activeTickets.length > 0 && (
-          <div style={{ flexShrink: 0, width: 4 }} />
-        )}
-      </div>
+          {/* 分页导航 */}
+          {activeTickets.length > 0 && (
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                gap: 16,
+                padding: '12px 0',
+                background: '#111827',
+                borderTop: '1px solid rgba(255,255,255,0.06)',
+                flexShrink: 0,
+              }}
+            >
+              <PageNavButton
+                label="<"
+                disabled={currentPage <= 0}
+                onClick={() => setCurrentPage((p) => Math.max(0, p - 1))}
+              />
+              <span
+                style={{
+                  fontSize: 16,
+                  fontWeight: 600,
+                  color: 'rgba(255,255,255,0.6)',
+                  fontFamily: 'JetBrains Mono, monospace',
+                  minWidth: 100,
+                  textAlign: 'center',
+                }}
+              >
+                {currentPage + 1} / {totalPages}
+              </span>
+              <PageNavButton
+                label=">"
+                disabled={currentPage >= totalPages - 1}
+                onClick={() => setCurrentPage((p) => Math.min(totalPages - 1, p + 1))}
+              />
+            </div>
+          )}
+        </div>
+      ) : (
+        /* ── 水平滚动视图（原始默认） ── */
+        <div
+          style={{
+            flex: 1,
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: 16,
+            padding: '20px 20px',
+            overflowX: 'auto',
+            overflowY: 'hidden',
+            WebkitOverflowScrolling: 'touch',
+            scrollbarWidth: 'thin',
+            scrollbarColor: 'rgba(255,255,255,0.1) transparent',
+          }}
+        >
+          {activeTickets.length === 0 ? (
+            <EmptyState isDemo={isDemo} />
+          ) : (
+            activeTickets.map((ticket) => (
+              <KDSTicketCard
+                key={ticket.id}
+                ticket={ticket}
+                tick={tick}
+                onStart={() => handleStart(ticket.id)}
+                onComplete={() => handleComplete(ticket.id)}
+              />
+            ))
+          )}
+
+          {/* 末尾占位，避免最后一张卡贴边 */}
+          {activeTickets.length > 0 && (
+            <div style={{ flexShrink: 0, width: 4 }} />
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── 空状态 ─────────────────────────────────────────
+
+function EmptyState({ isDemo }: { isDemo: boolean }) {
+  return (
+    <div
+      style={{
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: 'rgba(255,255,255,0.2)',
+        fontSize: 24,
+        gap: 16,
+        minHeight: 300,
+      }}
+    >
+      <span style={{ fontSize: 64 }}>✓</span>
+      <span>暂无待出餐工单</span>
+      {isDemo && (
+        <span style={{ fontSize: 18, color: 'rgba(255,255,255,0.15)' }}>
+          每 30 秒将自动生成新工单
+        </span>
+      )}
     </div>
   );
 }
@@ -587,6 +803,117 @@ function StatItem({
   );
 }
 
+// ─── 切换按钮 ────────────────────────────────────────
+
+function ToggleButton({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        padding: '4px 12px',
+        borderRadius: 6,
+        border: 'none',
+        background: active ? 'rgba(255,107,53,0.2)' : 'transparent',
+        color: active ? '#FF6B35' : 'rgba(255,255,255,0.4)',
+        fontSize: 14,
+        fontWeight: active ? 700 : 400,
+        cursor: 'pointer',
+        transition: 'all 0.15s',
+      }}
+    >
+      {label}
+    </button>
+  );
+}
+
+// ─── 分页导航按钮 ────────────────────────────────────
+
+function PageNavButton({ label, disabled, onClick }: { label: string; disabled: boolean; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      style={{
+        width: 48,
+        height: 48,
+        borderRadius: 10,
+        border: '1px solid rgba(255,255,255,0.1)',
+        background: disabled ? 'transparent' : 'rgba(255,255,255,0.06)',
+        color: disabled ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.6)',
+        fontSize: 24,
+        fontWeight: 700,
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      {label}
+    </button>
+  );
+}
+
+// ─── 按菜品分组卡片 ──────────────────────────────────
+
+function DishGroupCard({ dish }: { dish: GroupedDish }) {
+  return (
+    <div
+      style={{
+        background: '#111827',
+        border: '2px solid rgba(255,255,255,0.08)',
+        borderRadius: 16,
+        padding: '16px 18px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 10,
+      }}
+    >
+      {/* 菜名 + 总数 */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span style={{ fontSize: 22, fontWeight: 800, color: '#F0F0F0' }}>
+          {dish.name}
+        </span>
+        <span
+          style={{
+            fontSize: 28,
+            fontWeight: 800,
+            color: '#FF6B35',
+            fontFamily: 'JetBrains Mono, monospace',
+          }}
+        >
+          x{dish.totalQty}
+        </span>
+      </div>
+
+      {/* 桌号列表 */}
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        {dish.tables.map((table) => (
+          <span
+            key={table}
+            style={{
+              padding: '2px 10px',
+              borderRadius: 6,
+              background: 'rgba(255,255,255,0.06)',
+              color: 'rgba(255,255,255,0.6)',
+              fontSize: 14,
+              fontWeight: 500,
+            }}
+          >
+            {table}
+          </span>
+        ))}
+      </div>
+
+      {/* 备注 */}
+      {dish.notes.length > 0 && (
+        <div style={{ fontSize: 14, color: 'var(--tx-kds-amber)' }}>
+          {dish.notes.join(' / ')}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── 工单卡片 ─────────────────────────────────────────
 
 function KDSTicketCard({
@@ -602,24 +929,20 @@ function KDSTicketCard({
 }) {
   const status = getTimeStatus(ticket.createdAt, ticket.timeLimit);
   const elapsed = formatElapsed(ticket.createdAt);
+  const elapsedMs = Date.now() - ticket.createdAt;
   const isVip = ticket.priority === 'vip';
   const isRush = ticket.priority === 'rush';
   const isCooking = ticket.status === 'cooking';
 
-  // 颜色编码
+  // 颜色编码 — using CSS vars via getTimeColor
+  const timerColor = getTimeColor(elapsedMs, ticket.timeLimit);
+
   const borderColor =
     status === 'overtime'
       ? '#A32D2D'
       : status === 'warning'
         ? '#BA7517'
         : 'rgba(255,255,255,0.1)';
-
-  const timerColor =
-    status === 'overtime'
-      ? '#ff4d4f'
-      : status === 'warning'
-        ? '#f5a623'
-        : '#0F6E56';
 
   const cardBg =
     status === 'overtime'
@@ -654,7 +977,7 @@ function KDSTicketCard({
         style={{
           position: 'absolute',
           inset: 0,
-          background: '#0F6E56',
+          background: 'var(--tx-kds-green)',
           borderRadius: 16,
           display: 'flex',
           alignItems: 'center',
@@ -802,7 +1125,7 @@ function KDSTicketCard({
                   <span
                     style={{
                       fontSize: 15,
-                      color: '#f5a623',
+                      color: 'var(--tx-kds-amber)',
                       marginLeft: 6,
                       fontWeight: 400,
                     }}
@@ -820,7 +1143,7 @@ function KDSTicketCard({
                   textAlign: 'right',
                 }}
               >
-                ×{item.qty}
+                x{item.qty}
               </span>
             </div>
           ))}
@@ -837,7 +1160,7 @@ function KDSTicketCard({
           ) : (
             <ActionButton
               label="出餐完成"
-              color="#0F6E56"
+              color="var(--tx-kds-green)"
               onClick={onComplete}
             />
           )}

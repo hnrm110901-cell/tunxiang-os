@@ -1,50 +1,71 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLang } from '@/i18n/LangContext';
 import { useOrderStore } from '@/store/useOrderStore';
 import { fetchCategories, fetchDishes, searchDishes, fetchAiRecommendations } from '@/api/menuApi';
-import type { Category, DishItem, AiRecommendation } from '@/api/menuApi';
-import DishCard from '@/components/DishCard';
-import CartBar from '@/components/CartBar';
+import type { Category, AiRecommendation } from '@/api/menuApi';
+import { DishCard, CategoryNav, MenuSearch, CartPanel, SpecSheet } from '@tx-ds/biz';
+import type { DishData, SpecGroup } from '@tx-ds/biz';
+import { formatPrice } from '@tx-ds/utils';
 
-// ─── 尝在一起演示 Mock 数据 ──────────────────────────────────────────────────
+// ─── Mock 分类数据（尝在一起演示） ──────────────────────────────────────────
 
-const MOCK_CATEGORIES: Category[] = [
-  { id: 'signature', name: '招牌', icon: '⭐', sortOrder: 1 },
-  { id: 'hunan',     name: '湘菜', icon: '🌶️', sortOrder: 2 },
-  { id: 'cold',      name: '凉菜', icon: '🥗', sortOrder: 3 },
-  { id: 'soup',      name: '汤羹', icon: '🍲', sortOrder: 4 },
-  { id: 'staple',    name: '主食', icon: '🍚', sortOrder: 5 },
-  { id: 'drinks',    name: '饮品', icon: '🥤', sortOrder: 6 },
+const MOCK_CATEGORIES: Array<{ id: string; name: string; icon: string }> = [
+  { id: 'signature', name: '招牌', icon: '⭐' },
+  { id: 'hunan',     name: '湘菜', icon: '🌶️' },
+  { id: 'cold',      name: '凉菜', icon: '🥗' },
+  { id: 'soup',      name: '汤羹', icon: '🍲' },
+  { id: 'staple',    name: '主食', icon: '🍚' },
+  { id: 'drinks',    name: '饮品', icon: '🥤' },
 ];
 
-function makeDish(id: string, name: string, catId: string, price: number, desc: string, tags: DishItem['tags'] = []): DishItem {
-  return {
-    id, name, categoryId: catId, description: desc, price,
-    images: [], tags, allergens: [], customOptions: [], soldOut: false, sortOrder: 1,
-  };
+function makeDish(
+  id: string, name: string, category: string, priceFen: number,
+  description: string, tags: DishData['tags'] = [], allergens: DishData['allergens'] = [],
+): DishData {
+  return { id, name, category, priceFen, description, tags, allergens, images: [], soldOut: false };
 }
 
-const MOCK_DISHES: DishItem[] = [
-  makeDish('d001', '剁椒鱼头', 'signature', 88, '新鲜花鲢，酱料手工腌制48小时，鲜辣过瘾', [{ type: 'signature', label: '招牌' }, { type: 'spicy2', label: '中辣' }]),
-  makeDish('d002', '口味虾', 'signature', 128, '青壳龙虾，秘制口味酱现炒，肉质Q弹', [{ type: 'signature', label: '招牌' }, { type: 'spicy3', label: '特辣' }]),
-  makeDish('d003', '毛氏红烧肉', 'signature', 68, '五花肉精选，冰糖入味，软糯不腻', [{ type: 'signature', label: '招牌' }]),
-  makeDish('d004', '农家小炒肉', 'hunan', 48, '土猪五花，搭配青椒爆炒，香辣鲜嫩', [{ type: 'spicy2', label: '中辣' }]),
-  makeDish('d005', '湘西土匪鸭', 'hunan', 68, '麻辣干香，湘西传统做法', [{ type: 'spicy3', label: '特辣' }]),
-  makeDish('d006', '剁椒蒸蛋', 'hunan', 28, '嫩豆腐配剁椒，口感滑嫩', [{ type: 'spicy1', label: '微辣' }]),
-  makeDish('d007', '辣椒炒腊肉', 'hunan', 52, '自制腊肉，搭配新鲜辣椒，烟熏香浓', [{ type: 'spicy2', label: '中辣' }]),
-  makeDish('d008', '擂辣椒', 'cold', 26, '传统手工擂制，鲜辣开胃', [{ type: 'spicy2', label: '中辣' }]),
-  makeDish('d009', '酸辣蕨根粉', 'cold', 24, '手工蕨根粉，酸爽开胃', [{ type: 'spicy1', label: '微辣' }]),
-  makeDish('d010', '皮蛋豆腐', 'cold', 22, '嫩豆腐配皮蛋，淋上特调酱汁', []),
-  makeDish('d011', '猪肚鸡汤', 'soup', 58, '滋补老母鸡与猪肚慢炖4小时', []),
-  makeDish('d012', '酸萝卜老鸭汤', 'soup', 52, '酸萝卜去腻，老鸭鲜甜', []),
-  makeDish('d013', '剁椒蛋炒饭', 'staple', 22, '米饭粒粒分明，剁椒提香', [{ type: 'spicy1', label: '微辣' }]),
-  makeDish('d014', '手工米粉', 'staple', 18, '湘式手工米粉，劲道爽滑', []),
-  makeDish('d015', '冰镇梅子汤', 'drinks', 12, '酸甜开胃，解辣必备', []),
-  makeDish('d016', '湘茶冷泡茶', 'drinks', 16, '本地茶农直供，清凉回甘', []),
+const MOCK_DISHES: DishData[] = [
+  makeDish('d001', '剁椒鱼头', 'signature', 8800, '新鲜花鲢，酱料手工腌制48小时，鲜辣过瘾', [{ type: 'signature', label: '招牌' }, { type: 'spicy2', label: '中辣' }]),
+  makeDish('d002', '口味虾', 'signature', 12800, '青壳龙虾，秘制口味酱现炒，肉质Q弹', [{ type: 'signature', label: '招牌' }, { type: 'spicy3', label: '特辣' }]),
+  makeDish('d003', '毛氏红烧肉', 'signature', 6800, '五花肉精选，冰糖入味，软糯不腻', [{ type: 'signature', label: '招牌' }]),
+  makeDish('d004', '农家小炒肉', 'hunan', 4800, '土猪五花，搭配青椒爆炒，香辣鲜嫩', [{ type: 'spicy2', label: '中辣' }]),
+  makeDish('d005', '湘西土匪鸭', 'hunan', 6800, '麻辣干香，湘西传统做法', [{ type: 'spicy3', label: '特辣' }]),
+  makeDish('d006', '剁椒蒸蛋', 'hunan', 2800, '嫩豆腐配剁椒，口感滑嫩', [{ type: 'spicy1', label: '微辣' }]),
+  makeDish('d007', '辣椒炒腊肉', 'hunan', 5200, '自制腊肉，搭配新鲜辣椒，烟熏香浓', [{ type: 'spicy2', label: '中辣' }]),
+  makeDish('d008', '擂辣椒', 'cold', 2600, '传统手工擂制，鲜辣开胃', [{ type: 'spicy2', label: '中辣' }]),
+  makeDish('d009', '酸辣蕨根粉', 'cold', 2400, '手工蕨根粉，酸爽开胃', [{ type: 'spicy1', label: '微辣' }]),
+  makeDish('d010', '皮蛋豆腐', 'cold', 2200, '嫩豆腐配皮蛋，淋上特调酱汁', [], [{ code: 'egg', name: '蛋' }]),
+  makeDish('d011', '猪肚鸡汤', 'soup', 5800, '滋补老母鸡与猪肚慢炖4小时'),
+  makeDish('d012', '酸萝卜老鸭汤', 'soup', 5200, '酸萝卜去腻，老鸭鲜甜'),
+  makeDish('d013', '剁椒蛋炒饭', 'staple', 2200, '米饭粒粒分明，剁椒提香', [{ type: 'spicy1', label: '微辣' }]),
+  makeDish('d014', '手工米粉', 'staple', 1800, '湘式手工米粉，劲道爽滑'),
+  makeDish('d015', '冰镇梅子汤', 'drinks', 1200, '酸甜开胃，解辣必备'),
+  makeDish('d016', '湘茶冷泡茶', 'drinks', 1600, '本地茶农直供，清凉回甘'),
 ];
 
-/** 菜单浏览页 — 左分类 + 右菜品列表 */
+// ─── Mock 规格组 ────────────────────────────────────────
+
+const MOCK_SPEC_GROUPS: SpecGroup[] = [
+  { id: 'spicy', name: '辣度', type: 'single', required: true, options: [
+    { id: 's1', label: '不辣' },
+    { id: 's2', label: '微辣' },
+    { id: 's3', label: '中辣' },
+    { id: 's4', label: '特辣' },
+  ]},
+  { id: 'side', name: '配菜', type: 'multi', required: false, options: [
+    { id: 'sd1', label: '豆腐', extraPriceFen: 0 },
+    { id: 'sd2', label: '粉丝', extraPriceFen: 0 },
+    { id: 'sd3', label: '金针菇', extraPriceFen: 300 },
+  ]},
+];
+
+/** 有规格的菜品 ID（演示用） */
+const DISHES_WITH_SPECS = new Set(['d001', 'd002', 'd004', 'd005']);
+
+// ─── 菜单浏览页 ─────────────────────────────────────────
+
 export default function MenuBrowse() {
   const { t } = useLang();
   const navigate = useNavigate();
@@ -56,41 +77,53 @@ export default function MenuBrowse() {
   const cartCount = useOrderStore((s) => s.cartCount);
   const cartTotal = useOrderStore((s) => s.cartTotal);
 
-  const [categories, setCategories] = useState<Category[]>([]);
+  const [categories, setCategories] = useState<Array<{ id: string; name: string; icon?: string }>>([]);
   const [activeCat, setActiveCat] = useState('');
-  const [dishes, setDishes] = useState<DishItem[]>([]);
+  const [dishes, setDishes] = useState<DishData[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<DishItem[] | null>(null);
+  const [searchResults, setSearchResults] = useState<DishData[] | null>(null);
   const [aiRecs, setAiRecs] = useState<AiRecommendation[]>([]);
   const searchTimerRef = useRef<ReturnType<typeof setTimeout>>();
 
-  // 加载分类和菜品
+  // SpecSheet state
+  const [specDish, setSpecDish] = useState<DishData | null>(null);
+
+  // ─── 加载分类和菜品 ───
   useEffect(() => {
     if (!storeId) { navigate('/'); return; }
 
     fetchCategories(storeId).then((cats) => {
-      setCategories(cats);
-      if (cats.length > 0) setActiveCat(cats[0].id);
+      const mapped = cats.map((c) => ({ id: c.id, name: c.name, icon: c.icon }));
+      setCategories(mapped);
+      if (mapped.length > 0) setActiveCat(mapped[0].id);
     }).catch(() => {
-      // API 不可用时使用演示 mock 数据
       setCategories(MOCK_CATEGORIES);
       setActiveCat(MOCK_CATEGORIES[0].id);
     });
 
-    fetchDishes(storeId).then(setDishes).catch(() => {
-      // API 不可用时使用演示 mock 数据
+    fetchDishes(storeId).then((items) => {
+      // Adapt API DishItem → DishData (priceFen)
+      const mapped: DishData[] = items.map((d) => ({
+        id: d.id, name: d.name, category: d.categoryId,
+        priceFen: Math.round(d.price * 100),
+        description: d.description, images: d.images,
+        tags: d.tags, allergens: d.allergens as DishData['allergens'],
+        soldOut: d.soldOut,
+      }));
+      setDishes(mapped);
+    }).catch(() => {
       setDishes(MOCK_DISHES);
     });
   }, [storeId, navigate]);
 
-  // AI推荐
+  // ─── AI 推荐 ───
   useEffect(() => {
     if (!storeId) return;
     const dishIds = cart.map((c) => c.dish.id);
     fetchAiRecommendations(storeId, dishIds).then(setAiRecs).catch(() => { /* ignore */ });
   }, [storeId, cart]);
 
-  // 搜索防抖
+  // ─── 搜索防抖 ───
   const handleSearch = useCallback((q: string) => {
     setSearchQuery(q);
     if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
@@ -98,39 +131,60 @@ export default function MenuBrowse() {
     searchTimerRef.current = setTimeout(async () => {
       try {
         const results = await searchDishes(storeId, q);
-        setSearchResults(results);
+        const mapped: DishData[] = results.map((d) => ({
+          id: d.id, name: d.name, category: d.categoryId,
+          priceFen: Math.round(d.price * 100),
+          description: d.description, images: d.images,
+          tags: d.tags, allergens: d.allergens as DishData['allergens'],
+          soldOut: d.soldOut,
+        }));
+        setSearchResults(mapped);
       } catch {
         setSearchResults([]);
       }
     }, 300);
   }, [storeId]);
 
-  // 语音搜索
-  const handleVoiceSearch = () => {
-    if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) return;
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    const recognition = new SpeechRecognition();
-    recognition.lang = 'zh-CN';
-    recognition.continuous = false;
-    recognition.interimResults = false;
-    recognition.onresult = (event: any) => {
-      const transcript = event.results[0][0].transcript;
-      handleSearch(transcript);
-    };
-    recognition.start();
-  };
+  // ─── 菜品点击：有规格 → SpecSheet，无规格 → 直接加购 ───
+  const handleDishTap = useCallback((dish: DishData) => {
+    if (DISHES_WITH_SPECS.has(dish.id)) {
+      setSpecDish(dish);
+    } else {
+      addToCart({ id: dish.id, name: dish.name, categoryId: dish.category, description: dish.description ?? '', price: dish.priceFen / 100, images: dish.images ?? [], tags: dish.tags ?? [], allergens: [], customOptions: [], soldOut: false, sortOrder: 1 }, 1, {});
+    }
+  }, [addToCart]);
 
-  const getQuantity = (dishId: string) =>
-    cart.filter((c) => c.dish.id === dishId).reduce((sum, c) => sum + c.quantity, 0);
+  const handleSpecConfirm = useCallback((selections: Record<string, string[]>, quantity: number) => {
+    if (!specDish) return;
+    addToCart({ id: specDish.id, name: specDish.name, categoryId: specDish.category, description: specDish.description ?? '', price: specDish.priceFen / 100, images: specDish.images ?? [], tags: specDish.tags ?? [], allergens: [], customOptions: [], soldOut: false, sortOrder: 1 }, quantity, selections);
+    setSpecDish(null);
+  }, [specDish, addToCart]);
 
-  const displayDishes = searchResults ?? dishes.filter((d) => !activeCat || d.categoryId === activeCat);
+  const getQuantity = useCallback((dishId: string) =>
+    cart.filter((c) => c.dish.id === dishId).reduce((sum, c) => sum + c.quantity, 0),
+  [cart]);
+
+  const displayDishes = useMemo(
+    () => searchResults ?? dishes.filter((d) => !activeCat || d.category === activeCat),
+    [searchResults, dishes, activeCat],
+  );
+
+  // ─── Cart items adapted for CartPanel ───
+  const cartItems = useMemo(() =>
+    cart.map((c) => ({
+      id: `${c.dish.id}-${JSON.stringify(c.specs ?? {})}`,
+      dishId: c.dish.id,
+      name: c.dish.name,
+      quantity: c.quantity,
+      priceFen: Math.round(c.dish.price * 100),
+    })),
+  [cart]);
+
+  const totalFen = useMemo(() => Math.round(cartTotal() * 100), [cartTotal]);
 
   return (
-    <div style={{
-      display: 'flex', flexDirection: 'column', height: '100vh',
-      background: 'var(--tx-bg-primary)',
-    }}>
-      {/* 顶部：门店 + 搜索栏 */}
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: 'var(--tx-bg-primary)' }}>
+      {/* 顶部：门店信息 */}
       <div style={{ padding: '12px 16px', flexShrink: 0 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
           <div>
@@ -141,141 +195,50 @@ export default function MenuBrowse() {
               {t('tableNo')} {tableNo}
             </div>
           </div>
-          <button
-            className="tx-pressable"
-            onClick={() => navigate(-1)}
-            style={{
-              padding: '6px 14px', borderRadius: 'var(--tx-radius-full)',
-              background: 'var(--tx-bg-tertiary)',
-              color: 'var(--tx-text-secondary)', fontSize: 'var(--tx-font-sm)',
-            }}
-          >
+          <button className="tx-pressable" onClick={() => navigate(-1)} style={{ padding: '6px 14px', borderRadius: 'var(--tx-radius-full)', background: 'var(--tx-bg-tertiary)', color: 'var(--tx-text-secondary)', fontSize: 'var(--tx-font-sm)' }}>
             {t('back')}
-          </button>
-        </div>
-
-        {/* 搜索栏 */}
-        <div style={{ display: 'flex', gap: 8 }}>
-          <div style={{
-            flex: 1, display: 'flex', alignItems: 'center',
-            background: 'var(--tx-bg-tertiary)', borderRadius: 'var(--tx-radius-md)',
-            padding: '0 12px', height: 44,
-          }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
-              <circle cx="11" cy="11" r="7" stroke="#666" strokeWidth="2"/>
-              <path d="M20 20l-3.5-3.5" stroke="#666" strokeWidth="2" strokeLinecap="round"/>
-            </svg>
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => handleSearch(e.target.value)}
-              placeholder={t('search')}
-              style={{
-                flex: 1, height: '100%', marginLeft: 8,
-                background: 'transparent', color: 'var(--tx-text-primary)',
-                fontSize: 'var(--tx-font-sm)',
-              }}
-            />
-          </div>
-          <button
-            className="tx-pressable"
-            onClick={handleVoiceSearch}
-            style={{
-              width: 44, height: 44, borderRadius: 'var(--tx-radius-md)',
-              background: 'var(--tx-bg-tertiary)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}
-            aria-label={t('voiceSearch')}
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-              <rect x="9" y="2" width="6" height="12" rx="3" stroke="#A0A0A0" strokeWidth="2"/>
-              <path d="M5 11a7 7 0 0014 0" stroke="#A0A0A0" strokeWidth="2" strokeLinecap="round"/>
-              <path d="M12 18v4m-3 0h6" stroke="#A0A0A0" strokeWidth="2" strokeLinecap="round"/>
-            </svg>
           </button>
         </div>
       </div>
 
-      {/* 主体：左分类 + 右菜品 */}
+      {/* 主体：左分类 + 右内容 */}
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
         {/* 左侧分类导航 */}
-        {!searchResults && (
-          <div style={{
-            width: 80, flexShrink: 0, overflowY: 'auto',
-            background: 'var(--tx-bg-secondary)',
-          }}>
-            {categories.map((cat) => (
-              <button
-                key={cat.id}
-                className="tx-pressable"
-                onClick={() => setActiveCat(cat.id)}
-                style={{
-                  width: '100%', padding: '16px 8px',
-                  textAlign: 'center', fontSize: 'var(--tx-font-xs)',
-                  color: activeCat === cat.id ? 'var(--tx-brand)' : 'var(--tx-text-secondary)',
-                  fontWeight: activeCat === cat.id ? 700 : 400,
-                  background: activeCat === cat.id ? 'var(--tx-bg-primary)' : 'transparent',
-                  borderLeft: activeCat === cat.id ? '3px solid var(--tx-brand)' : '3px solid transparent',
-                  transition: 'all 0.2s',
-                }}
-              >
-                {cat.icon && <div style={{ fontSize: 20, marginBottom: 4 }}>{cat.icon}</div>}
-                {cat.name}
-              </button>
-            ))}
-          </div>
+        {!searchResults && categories.length > 0 && (
+          <CategoryNav
+            categories={categories}
+            activeId={activeCat}
+            layout="sidebar"
+            onSelect={setActiveCat}
+          />
         )}
 
-        {/* 右侧菜品列表 */}
-        <div style={{
-          flex: 1, overflowY: 'auto', padding: '0 12px 120px 12px',
-        }}>
+        {/* 右侧内容区 */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '0 12px 120px 12px' }}>
+          {/* 搜索框 */}
+          <div style={{ padding: '8px 0' }}>
+            <MenuSearch
+              value={searchQuery}
+              onChange={handleSearch}
+              onVoiceResult={handleSearch}
+              enableVoice
+              placeholder={t('search')}
+            />
+          </div>
+
           {/* AI推荐区 */}
           {aiRecs.length > 0 && !searchResults && (
-            <div style={{ marginBottom: 16, marginTop: 12 }}>
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12,
-              }}>
-                <span style={{
-                  padding: '2px 8px', borderRadius: 'var(--tx-radius-sm)',
-                  background: 'rgba(59, 130, 246, 0.15)',
-                  color: 'var(--tx-info)', fontSize: 'var(--tx-font-xs)', fontWeight: 600,
-                }}>
-                  AI
-                </span>
-                <span style={{ color: 'var(--tx-text-primary)', fontSize: 'var(--tx-font-sm)', fontWeight: 600 }}>
-                  {t('aiRecommend')}
-                </span>
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
+                <span style={{ padding: '2px 8px', borderRadius: 'var(--tx-radius-sm)', background: 'rgba(59, 130, 246, 0.15)', color: 'var(--tx-info)', fontSize: 'var(--tx-font-xs)', fontWeight: 600 }}>AI</span>
+                <span style={{ color: 'var(--tx-text-primary)', fontSize: 'var(--tx-font-sm)', fontWeight: 600 }}>{t('aiRecommend')}</span>
               </div>
               <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 8 }}>
                 {aiRecs.map((rec) => (
-                  <div
-                    key={rec.dishId}
-                    className="tx-pressable"
-                    onClick={() => navigate(`/dish/${rec.dishId}`)}
-                    style={{
-                      minWidth: 140, padding: 10, borderRadius: 'var(--tx-radius-md)',
-                      background: 'var(--tx-bg-card)', flexShrink: 0,
-                    }}
-                  >
-                    <img
-                      src={rec.dish.images[0] ?? ''}
-                      alt={rec.dish.name}
-                      loading="lazy"
-                      style={{ width: '100%', height: 100, objectFit: 'cover', borderRadius: 8 }}
-                    />
-                    <div style={{
-                      marginTop: 6, fontSize: 'var(--tx-font-sm)', fontWeight: 600,
-                      color: 'var(--tx-text-primary)',
-                      whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                    }}>
-                      {rec.dish.name}
-                    </div>
-                    <div style={{
-                      fontSize: 'var(--tx-font-xs)', color: 'var(--tx-brand)', marginTop: 2,
-                    }}>
-                      {t('yuan')}{rec.dish.price}
-                    </div>
+                  <div key={rec.dishId} className="tx-pressable" onClick={() => navigate(`/dish/${rec.dishId}`)} style={{ minWidth: 140, padding: 10, borderRadius: 'var(--tx-radius-md)', background: 'var(--tx-bg-card)', flexShrink: 0 }}>
+                    <img src={rec.dish.images[0] ?? ''} alt={rec.dish.name} loading="lazy" style={{ width: '100%', height: 100, objectFit: 'cover', borderRadius: 8 }} />
+                    <div style={{ marginTop: 6, fontSize: 'var(--tx-font-sm)', fontWeight: 600, color: 'var(--tx-text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{rec.dish.name}</div>
+                    <div style={{ fontSize: 'var(--tx-font-xs)', color: 'var(--tx-brand)', marginTop: 2 }}>{formatPrice(Math.round(rec.dish.price * 100))}</div>
                   </div>
                 ))}
               </div>
@@ -287,17 +250,17 @@ export default function MenuBrowse() {
             <DishCard
               key={dish.id}
               dish={dish}
+              variant="horizontal"
               quantity={getQuantity(dish.id)}
-              onAdd={() => addToCart(dish, 1, {})}
-              onTap={() => navigate(`/dish/${dish.id}`)}
+              showTags
+              showAllergens
+              onAdd={() => handleDishTap(dish)}
+              onTap={() => handleDishTap(dish)}
             />
           ))}
 
           {displayDishes.length === 0 && (
-            <div style={{
-              textAlign: 'center', padding: 48,
-              color: 'var(--tx-text-tertiary)', fontSize: 'var(--tx-font-sm)',
-            }}>
+            <div style={{ textAlign: 'center', padding: 48, color: 'var(--tx-text-tertiary)', fontSize: 'var(--tx-font-sm)' }}>
               {searchResults ? 'No results' : t('loading')}
             </div>
           )}
@@ -305,11 +268,24 @@ export default function MenuBrowse() {
       </div>
 
       {/* 底部购物车栏 */}
-      <CartBar
-        count={cartCount()}
-        total={cartTotal()}
-        onViewCart={() => navigate('/cart')}
-        onCheckout={() => navigate('/checkout')}
+      <CartPanel
+        mode="bottom-bar"
+        items={cartItems}
+        totalFen={totalFen}
+        onUpdateQuantity={() => {}}
+        onRemoveItem={() => {}}
+        onSettle={() => navigate('/checkout')}
+      />
+
+      {/* 规格选择面板 */}
+      <SpecSheet
+        visible={!!specDish}
+        dishName={specDish?.name ?? ''}
+        dishPriceFen={specDish?.priceFen ?? 0}
+        dishImage={specDish?.images?.[0]}
+        specGroups={MOCK_SPEC_GROUPS}
+        onConfirm={handleSpecConfirm}
+        onClose={() => setSpecDish(null)}
       />
     </div>
   );

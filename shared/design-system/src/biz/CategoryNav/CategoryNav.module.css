@@ -1,0 +1,127 @@
+/* ─── CategoryNav Base ─── */
+
+.nav {
+  display: flex;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ─── Sidebar Layout ─── */
+
+.sidebar {
+  flex-direction: column;
+  width: 80px;
+  flex-shrink: 0;
+  background: var(--tx-bg-secondary, #112228);
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.sidebar::-webkit-scrollbar {
+  display: none;
+}
+
+.sidebar .item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+  min-height: 64px;
+  padding: 10px 4px;
+  border: none;
+  border-left: 3px solid transparent;
+  background: transparent;
+  color: var(--tx-text-secondary, #94a3b8);
+  cursor: pointer;
+  transition:
+    background-color 250ms cubic-bezier(0.34, 1.56, 0.64, 1),
+    border-color 250ms cubic-bezier(0.34, 1.56, 0.64, 1),
+    color 250ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.sidebar .item.active {
+  background: var(--tx-bg-primary, #0B1A20);
+  border-left-color: #FF6B2C;
+  color: var(--tx-text-primary, #e2e8f0);
+}
+
+.sidebar .icon {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.sidebar .label {
+  font-size: var(--tx-font-xs, 11px);
+  font-weight: 500;
+  line-height: 1.2;
+  text-align: center;
+  word-break: break-all;
+}
+
+.sidebar .count {
+  font-size: 10px;
+  color: var(--tx-text-tertiary, #64748b);
+}
+
+/* ─── Topbar Layout ─── */
+
+.topbar {
+  flex-direction: row;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--tx-bg-secondary, #112228);
+}
+
+.topbar::-webkit-scrollbar {
+  display: none;
+}
+
+.topbar .item {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 16px;
+  border: none;
+  border-radius: var(--tx-radius-full, 9999px);
+  background: var(--tx-bg-tertiary, #1a2a33);
+  color: var(--tx-text-secondary, #94a3b8);
+  font-size: var(--tx-font-sm, 13px);
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  flex-shrink: 0;
+  min-height: var(--tx-touch-min, 44px);
+  transition:
+    background-color 250ms cubic-bezier(0.34, 1.56, 0.64, 1),
+    color 250ms cubic-bezier(0.34, 1.56, 0.64, 1),
+    transform 250ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.topbar .item.active {
+  background: #FF6B2C;
+  color: #fff;
+  font-weight: 600;
+}
+
+.topbar .icon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.topbar .label {
+  line-height: 1;
+}
+
+.topbar .count {
+  font-size: 11px;
+  opacity: 0.7;
+}
